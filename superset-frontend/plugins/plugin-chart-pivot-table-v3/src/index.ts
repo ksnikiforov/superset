@@ -54,7 +54,8 @@ export default class PivotTableV3ChartPlugin extends ChartPlugin<
     super({
       loadChart: () => import('./PivotTableChart'),
       metadata,
-      transformProps,
+      // Casting because the chart consumes a richer prop shape than the base ChartProps type captures.
+      transformProps: transformProps as any,
       controlPanel,
       buildQuery,
     });

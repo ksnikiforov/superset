@@ -17,11 +17,13 @@
  * under the License.
  */
 import {
+  BinaryQueryObjectFilterClause,
   buildQueryContext,
   ensureIsArray,
   getColumnLabel,
   QueryFormColumn,
   QueryObject,
+  QueryObjectFilterClause,
   SupersetClient,
 } from '@superset-ui/core';
 import { formatQueryName } from './buildQuery';
@@ -44,11 +46,14 @@ export interface FetchPivotBranchParams {
 
 const cache = new Map<string, PivotTreeData>();
 
-const buildPathFilters = (groupby: QueryFormColumn[], path: PivotPath) =>
+const buildPathFilters = (
+  groupby: QueryFormColumn[],
+  path: PivotPath,
+): BinaryQueryObjectFilterClause[] =>
   path.map((value, index) => ({
     col: getColumnLabel(groupby[index]),
-    op: value === null || value === undefined ? 'IS NULL' : '==',
-    val: value === null || value === undefined ? undefined : value,
+    op: value === null || value === undefined ? 'IS NULL' : ('==' as const),
+    val: value === null || value === undefined ? null : value,
   }));
 
 export async function fetchPivotBranch({
@@ -91,7 +96,10 @@ export async function fetchPivotBranch({
     {
       ...baseQueryObject,
       columns,
-      filters: [...(baseQueryObject.filters || []), ...filters],
+      filters: [
+        ...(baseQueryObject.filters || []),
+        ...(filters as QueryObjectFilterClause[]),
+      ],
       query_name: `${formatQueryName(rowDepth, colDepth)}|branch:${axis}:${serializePath(
         path,
       )}`,

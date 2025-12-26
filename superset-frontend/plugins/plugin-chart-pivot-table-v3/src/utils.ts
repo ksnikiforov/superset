@@ -31,7 +31,9 @@ export const PATH_DIVIDER = '__';
 export const serializePath = (path: PivotPath = []) => path.join(PATH_DIVIDER);
 
 export const getMetricKeys = (metrics: QueryFormMetric[]) =>
-  metrics.map(metric => (typeof metric === 'string' ? metric : metric.label));
+  metrics
+    .map(metric => (typeof metric === 'string' ? metric : metric.label))
+    .filter((m): m is string => !!m);
 
 export const parseDepth = (queryName?: string) => {
   if (
@@ -82,7 +84,7 @@ export const buildTreeFromRecords = (
         axis: 'row',
         key: rowKey,
         path: rowPath,
-        label: rowPath[rowPath.length - 1] ?? 'Total',
+        label: rowPath[rowPath.length - 1]?.toString() ?? 'Total',
         formattedLabel: rowPath[rowPath.length - 1]?.toString() ?? 'Total',
         level: rowDepth,
         hasChildren: rowDepth < rowGroupby.length,
@@ -94,7 +96,7 @@ export const buildTreeFromRecords = (
         axis: 'col',
         key: colKey,
         path: colPath,
-        label: colPath[colPath.length - 1] ?? 'Total',
+        label: colPath[colPath.length - 1]?.toString() ?? 'Total',
         formattedLabel: colPath[colPath.length - 1]?.toString() ?? 'Total',
         level: colDepth,
         hasChildren: colDepth < colGroupby.length,
@@ -105,7 +107,7 @@ export const buildTreeFromRecords = (
     const values = metricKeys.reduce(
       (acc, key) => ({
         ...acc,
-        [key]: record[key],
+        [key]: record[key as string],
       }),
       {} as Record<string, DataRecordValue>,
     );

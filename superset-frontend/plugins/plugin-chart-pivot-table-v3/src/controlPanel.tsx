@@ -26,7 +26,6 @@ import {
   ensureIsArray,
   isAdhocColumn,
   isPhysicalColumn,
-  QueryFormMetric,
   SMART_DATE_ID,
   t,
   validateNonEmpty,

@@ -23,6 +23,7 @@ import {
   PlusSquareOutlined,
 } from '@ant-design/icons';
 import {
+  BinaryQueryObjectFilterClause,
   CurrencyFormatter,
   DataRecordValue,
   getColumnLabel,
@@ -49,12 +50,12 @@ const StyledTable = styled.table`
 
   th,
   td {
-    border: 1px solid ${({ theme }) => theme.colors.grayscale.light2};
+    border: 1px solid ${({ theme }) => (theme as any).colors?.grayscale?.light2 || (theme as any).colorBorder};
     padding: 6px 8px;
   }
 
   th {
-    background: ${({ theme }) => theme.colors.grayscale.light4};
+    background: ${({ theme }) => (theme as any).colors?.grayscale?.light4 || (theme as any).colorBgLayout};
     text-align: left;
   }
 `;
@@ -62,7 +63,7 @@ const StyledTable = styled.table`
 const HeaderCell = styled.div`
   display: flex;
   align-items: center;
-  gap: ${({ theme }) => theme.gridUnit * 1.5}px;
+  gap: ${({ theme }) => ((theme as any).gridUnit || 4) * 1.5}px;
 `;
 
 const ToggleButton = styled.button`
@@ -72,11 +73,11 @@ const ToggleButton = styled.button`
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  color: ${({ theme }) => theme.colors.grayscale.base};
+  color: ${({ theme }) => (theme as any).colors?.grayscale?.base || (theme as any).colorText};
 
   &:disabled {
     cursor: default;
-    color: ${({ theme }) => theme.colors.grayscale.light1};
+    color: ${({ theme }) => (theme as any).colors?.grayscale?.light1 || (theme as any).colorTextQuaternary};
   }
 `;
 
@@ -132,7 +133,7 @@ const formatMetricValue = (
   value: DataRecordValue,
   columnFormats: Record<string, string>,
   currencyFormats: Record<string, any>,
-  defaultFormatter: (v: DataRecordValue) => string,
+  defaultFormatter: (v: number | null | undefined) => string,
 ) => {
   if (value === null || value === undefined) {
     return '';
@@ -295,22 +296,22 @@ function PivotTableChart(props: PivotTableProps) {
         value,
         columnFormats,
         currencyFormats,
-        numberFormatter,
+        val => numberFormatter(val as number),
       ),
     [columnFormats, currencyFormats, numberFormatter],
   );
 
   const buildFilters = useCallback(
-    (rowNode: PivotTreeNode, colNode: PivotTreeNode) => [
+    (rowNode: PivotTreeNode, colNode: PivotTreeNode): BinaryQueryObjectFilterClause[] => [
       ...rowNode.path.map((val, i) => ({
         col: getColumnLabel(groupbyRows[i]),
-        op: val === null || val === undefined ? 'IS NULL' : '==',
-        val,
+        op: val === null || val === undefined ? ('IS NULL' as const) : ('==' as const),
+        val: val === undefined ? null : val,
       })),
       ...colNode.path.map((val, i) => ({
         col: getColumnLabel(groupbyColumns[i]),
-        op: val === null || val === undefined ? 'IS NULL' : '==',
-        val,
+        op: val === null || val === undefined ? ('IS NULL' as const) : ('==' as const),
+        val: val === undefined ? null : val,
       })),
     ],
     [groupbyColumns, groupbyRows],
@@ -324,7 +325,7 @@ function PivotTableChart(props: PivotTableProps) {
       const filters = buildFilters(rowNode, colNode);
       setDataMask({
         extraFormData: {
-          filters,
+          filters: filters as any,
         },
         filterState: {
           value: filters.map(filter => filter.val),
@@ -378,7 +379,7 @@ function PivotTableChart(props: PivotTableProps) {
         crossFilter: emitCrossFilters
           ? {
               dataMask: {
-                extraFormData: { filters: contextFilters },
+                extraFormData: { filters: contextFilters as any },
                 filterState: {
                   value: contextFilters.map(filter => filter.val),
                   selectedFilters: contextFilters.reduce(
@@ -414,7 +415,10 @@ function PivotTableChart(props: PivotTableProps) {
       }
       return metrics
         .map(metric => {
-          const metricKey = typeof metric === 'string' ? metric : metric.label;
+          const metricKey = typeof metric === 'string' ? metric : metric.label || '';
+          if (!metricKey) {
+            return null;
+          }
           const value = renderValue(metricKey, cell.values[metricKey]);
           if (allowRenderHtml && typeof value === 'string' && value.includes('<')) {
             return (

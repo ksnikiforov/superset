@@ -19,13 +19,13 @@
 import {
   ContextMenuFilters,
   Currency,
-  DataRecord,
   DataRecordValue,
   JsonObject,
   NumberFormatter,
   QueryFormColumn,
   QueryFormData,
   QueryFormMetric,
+  ChartProps as BaseChartProps,
   SetDataMaskHook,
   TimeFormatter,
   TimeGranularity,
@@ -123,7 +123,9 @@ export type PivotTableQueryFormData = QueryFormData &
     treeData?: PivotTreeData;
   };
 
-export interface PivotTableProps extends PivotTableStylesProps {
+export interface PivotTableProps
+  extends BaseChartProps<PivotTableQueryFormData>,
+    PivotTableStylesProps {
   data: PivotTreeData;
   formData: PivotTableQueryFormData;
   metrics: QueryFormMetric[];

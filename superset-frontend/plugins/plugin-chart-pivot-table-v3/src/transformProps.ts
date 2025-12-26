@@ -65,10 +65,12 @@ export default function transformProps(
         acc: Record<string, ((value: DataRecordValue) => string) | undefined>,
         temporalColname: string,
       ) => {
-        let formatter;
+        let formatter: ((value: DataRecordValue) => string) | undefined;
         if (formData.dateFormat === SMART_DATE_ID) {
           if (granularity) {
-            formatter = getTimeFormatterForGranularity(granularity);
+            const base = getTimeFormatterForGranularity(granularity);
+            formatter = (value: DataRecordValue) =>
+              base(value as number | Date | null | undefined);
           } else if (
             combinedData.every(
               row =>
@@ -77,10 +79,14 @@ export default function transformProps(
                 typeof row[temporalColname] === 'number',
             )
           ) {
-            formatter = getTimeFormatter(DATABASE_DATETIME);
+            const base = getTimeFormatter(DATABASE_DATETIME);
+            formatter = (value: DataRecordValue) =>
+              base(value as number | Date | null | undefined);
           }
         } else if (formData.dateFormat) {
-          formatter = getTimeFormatter(formData.dateFormat);
+          const base = getTimeFormatter(formData.dateFormat);
+          formatter = (value: DataRecordValue) =>
+            base(value as number | Date | null | undefined);
         }
         if (formatter) {
           acc[temporalColname] = formatter;
@@ -98,7 +104,8 @@ export default function transformProps(
   );
 
   const nextTree = queriesData.reduce<PivotTreeData>((acc, query) => {
-    const { rowDepth, colDepth } = parseDepth(query?.query_name);
+    const queryName = (query as any)?.query_name;
+    const { rowDepth, colDepth } = parseDepth(queryName);
     const branch = buildTreeFromRecords(
       query.data || [],
       metrics,
@@ -108,7 +115,7 @@ export default function transformProps(
       colDepth,
     );
     return mergeTrees(acc, branch);
-  }, ownState?.treeData as PivotTreeData | undefined);
+  }, ownState?.treeData || ({} as PivotTreeData));
 
   const { selectedFilters } = filterState;
 
