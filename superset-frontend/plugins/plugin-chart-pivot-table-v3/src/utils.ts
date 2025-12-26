@@ -28,9 +28,22 @@ import { formatQueryName } from './buildQuery';
 
 export const PATH_DIVIDER = '__';
 export const METRICS_PLACEHOLDER = '__MEASURES__';
+export const METRICS_PLACEHOLDER_LABEL = 'Σ Values';
 
 export const stripMetricsPlaceholder = (groupby: QueryFormColumn[]) =>
-  groupby.filter(col => col !== METRICS_PLACEHOLDER);
+  groupby.filter(col => {
+    if (col === METRICS_PLACEHOLDER) {
+      return false;
+    }
+    if (
+      typeof col === 'object' &&
+      ((col as any).column_name === METRICS_PLACEHOLDER ||
+        (col as any).label === METRICS_PLACEHOLDER)
+    ) {
+      return false;
+    }
+    return true;
+  });
 
 export const serializePath = (path: PivotPath = []) => path.join(PATH_DIVIDER);
 

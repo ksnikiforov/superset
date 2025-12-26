@@ -45,6 +45,7 @@ export default function OptionWrapper(
   props: OptionProps & {
     type: string;
     onShiftOptions: (dragIndex: number, hoverIndex: number) => void;
+    listId?: string;
   },
 ) {
   const {
@@ -60,6 +61,7 @@ export default function OptionWrapper(
     datasourceWarningMessage,
     canDelete = true,
     tooltipOverlay,
+    listId,
     ...rest
   } = props;
   const ref = useRef<HTMLDivElement>(null);
@@ -69,6 +71,8 @@ export default function OptionWrapper(
     item: {
       type,
       dragIndex: index,
+      sourceId: listId,
+      column,
     },
     collect: (monitor: DragSourceMonitor) => ({
       isDragging: monitor.isDragging(),
@@ -87,6 +91,9 @@ export default function OptionWrapper(
 
       // Don't replace items with themselves
       if (dragIndex === hoverIndex) {
+        return;
+      }
+      if (item.sourceId && listId && item.sourceId !== listId) {
         return;
       }
       // Determine rectangle on screen

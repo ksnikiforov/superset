@@ -134,6 +134,58 @@ const buildVisibleList = (
   return ordered;
 };
 
+type HeaderCellInfo = {
+  node: PivotTreeNode;
+  colSpan: number;
+  rowSpan: number;
+};
+
+const buildColumnHeaderRows = (
+  cols: PivotTreeNode[],
+  nodes: Record<string, PivotTreeNode>,
+) => {
+  if (cols.length === 0) {
+    return [] as HeaderCellInfo[][];
+  }
+  const maxDepth = Math.max(...cols.map(col => col.path.length));
+  const rows: HeaderCellInfo[][] = Array.from({ length: maxDepth }, () => []);
+  // Track the last cell per row to aggregate colspan across adjacent columns.
+  const lastCells: (HeaderCellInfo | undefined)[] = Array(maxDepth).fill(
+    undefined,
+  );
+
+  cols.forEach(col => {
+    const path = col.path;
+    const lastLevel = path.length - 1;
+    for (let level = 0; level < maxDepth; level += 1) {
+      if (level >= path.length) {
+        // covered by rowSpan of the last existing level
+        break;
+      }
+      const key = serializePath(path.slice(0, level + 1));
+      const node = nodes[key];
+      if (!node) {
+        continue;
+      }
+      const rowSpan = level === lastLevel ? maxDepth - level : 1;
+      const prev = lastCells[level];
+      if (prev && prev.node.key === node.key && prev.rowSpan === rowSpan) {
+        prev.colSpan += 1;
+      } else {
+        const cell: HeaderCellInfo = {
+          node,
+          colSpan: 1,
+          rowSpan,
+        };
+        rows[level].push(cell);
+        lastCells[level] = cell;
+      }
+    }
+  });
+
+  return rows;
+};
+
 const compareValues = (
   a: DataRecordValue,
   b: DataRecordValue,
@@ -229,6 +281,8 @@ function PivotTableChart(props: PivotTableProps) {
   const [expandedCols, setExpandedCols] = useState<Set<string>>(new Set());
   const [loadingKeys, setLoadingKeys] = useState<Set<string>>(new Set());
   const [errorMessage, setErrorMessage] = useState<string>();
+  const [fetchedRowKeys, setFetchedRowKeys] = useState<Set<string>>(new Set());
+  const [fetchedColKeys, setFetchedColKeys] = useState<Set<string>>(new Set());
 
   const numberFormatter = useMemo(
     () => getNumberFormatter(valueFormat),
@@ -262,6 +316,8 @@ function PivotTableChart(props: PivotTableProps) {
     };
     setExpandedRows(seedExpanded(data.rows));
     setExpandedCols(seedExpanded(data.cols));
+    setFetchedRowKeys(new Set());
+    setFetchedColKeys(new Set());
   }, [data, startCollapsed, initialDepth]);
 
   const hasLoadedChildren = useCallback(
@@ -286,7 +342,15 @@ function PivotTableChart(props: PivotTableProps) {
         return;
       }
 
-      if (node.hasChildren && !hasLoadedChildren(axis, node)) {
+      const fetchedKeys = axis === 'row' ? fetchedRowKeys : fetchedColKeys;
+      const markFetched =
+        axis === 'row' ? setFetchedRowKeys : setFetchedColKeys;
+
+      if (
+        node.hasChildren &&
+        !hasLoadedChildren(axis, node) &&
+        !fetchedKeys.has(node.key)
+      ) {
         const cached = peekPivotBranchCache({
           axis,
           path: node.path,
@@ -295,6 +359,11 @@ function PivotTableChart(props: PivotTableProps) {
         });
         if (cached) {
           setTree(current => mergeTrees(current, cached));
+          markFetched(prev => {
+            const next = new Set(prev);
+            next.add(node.key);
+            return next;
+          });
         } else {
           setLoadingKeys(prev => new Set(prev).add(node.key));
           const result = await fetchPivotBranch({
@@ -309,6 +378,11 @@ function PivotTableChart(props: PivotTableProps) {
           }
           if (result.data) {
             setTree(current => mergeTrees(current, result.data));
+            markFetched(prev => {
+              const next = new Set(prev);
+              next.add(node.key);
+              return next;
+            });
           }
           setLoadingKeys(prev => {
             const next = new Set(prev);
@@ -325,6 +399,8 @@ function PivotTableChart(props: PivotTableProps) {
       expandedCols,
       expandedRows,
       hasLoadedChildren,
+      fetchedColKeys,
+      fetchedRowKeys,
       maxDepthPerFetch,
       props,
       tree,
@@ -351,6 +427,10 @@ function PivotTableChart(props: PivotTableProps) {
   const visibleCols = useMemo(
     () => buildVisibleList(tree.cols, expandedCols, colSorter, skipColRoot),
     [expandedCols, colSorter, skipColRoot, tree.cols],
+  );
+  const columnHeaderRows = useMemo(
+    () => buildColumnHeaderRows(visibleCols, tree.cols),
+    [visibleCols, tree.cols],
   );
 
   const renderValue = useCallback(
@@ -557,29 +637,43 @@ function PivotTableChart(props: PivotTableProps) {
       {errorMessage && <div>{t('Error loading branch: %s', errorMessage)}</div>}
       <StyledTable>
         <thead>
-          <tr>
-            <th>{t('Rows')}</th>
-            {visibleCols.map(col => (
-              <th key={col.key}>
-                <HeaderCell style={{ paddingLeft: col.path.length * 12 }}>
-                  {col.hasChildren && col.path.length > 0 && (
-                    <ToggleButton
-                      type="button"
-                      onClick={() => handleToggle('col', col)}
-                    >
-                      {expandedCols.has(col.key) ? (
-                        <MinusSquareOutlined />
-                      ) : (
-                        <PlusSquareOutlined />
+          {columnHeaderRows.length === 0 ? (
+            <tr>
+              <th>{t('Rows')}</th>
+            </tr>
+          ) : (
+            columnHeaderRows.map((rowCells, rowIdx) => (
+              <tr key={`col-header-row-${rowIdx}`}>
+                {rowIdx === 0 && (
+                  <th rowSpan={columnHeaderRows.length}>{t('Rows')}</th>
+                )}
+                {rowCells.map(cell => (
+                  <th
+                    key={`col-header-${cell.node.key}-${rowIdx}`}
+                    colSpan={cell.colSpan}
+                    rowSpan={cell.rowSpan}
+                  >
+                    <HeaderCell>
+                      {cell.node.hasChildren && cell.node.path.length > 0 && (
+                        <ToggleButton
+                          type="button"
+                          onClick={() => handleToggle('col', cell.node)}
+                        >
+                          {expandedCols.has(cell.node.key) ? (
+                            <MinusSquareOutlined />
+                          ) : (
+                            <PlusSquareOutlined />
+                          )}
+                        </ToggleButton>
                       )}
-                    </ToggleButton>
-                  )}
-                  <span>{col.formattedLabel}</span>
-                  {loadingKeys.has(col.key) && <Spinner />}
-                </HeaderCell>
-              </th>
-            ))}
-          </tr>
+                      <span>{cell.node.formattedLabel}</span>
+                      {loadingKeys.has(cell.node.key) && <Spinner />}
+                    </HeaderCell>
+                  </th>
+                ))}
+              </tr>
+            ))
+          )}
         </thead>
         <tbody>
           {visibleRows.map(row => (

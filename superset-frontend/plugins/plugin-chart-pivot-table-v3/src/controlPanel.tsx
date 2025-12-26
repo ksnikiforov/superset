@@ -31,7 +31,7 @@ import {
   validateNonEmpty,
 } from '@superset-ui/core';
 import { MetricsLayoutEnum } from './types';
-import { METRICS_PLACEHOLDER } from './utils';
+import { METRICS_PLACEHOLDER, METRICS_PLACEHOLDER_LABEL } from './utils';
 
 const withMetricsPlaceholder = (config: any) => ({
   ...config,
@@ -47,8 +47,14 @@ const withMetricsPlaceholder = (config: any) => ({
     );
     const placeholderOption = {
       column_name: METRICS_PLACEHOLDER,
-      verbose_name: t('Measures'),
-      label: t('Measures'),
+      verbose_name: t(METRICS_PLACEHOLDER_LABEL),
+      label: t(METRICS_PLACEHOLDER_LABEL),
+      type: 'VARCHAR',
+      groupby: true,
+      filterable: false,
+      is_dttm: false,
+      is_placeholder: true,
+      canDelete: false,
     };
     const nextOptions = metricsValue.length
       ? hasPlaceholder
@@ -57,9 +63,29 @@ const withMetricsPlaceholder = (config: any) => ({
       : options.filter(
           (opt: any) => (opt?.column_name || opt?.label) !== METRICS_PLACEHOLDER,
         );
+    let value = ensureIsArray(controlState?.value);
+    const normalizeVal = (val: any) => {
+      if (val === METRICS_PLACEHOLDER) return METRICS_PLACEHOLDER;
+      if (typeof val === 'object') {
+        const name = (val as any).column_name || (val as any).label;
+        if (name === METRICS_PLACEHOLDER) {
+          return METRICS_PLACEHOLDER;
+        }
+      }
+      return val;
+    };
+    value = value.map(normalizeVal);
+    if (metricsValue.length > 0 && !value.includes(METRICS_PLACEHOLDER)) {
+      value = [...value, METRICS_PLACEHOLDER];
+    }
+    if (metricsValue.length === 0 && value.includes(METRICS_PLACEHOLDER)) {
+      value = value.filter((v: any) => v !== METRICS_PLACEHOLDER);
+    }
     return {
       ...base,
       options: nextOptions,
+      value,
+      placeholder: !metricsValue.length,
     };
   },
 });
@@ -75,6 +101,8 @@ const config: ControlPanelConfig = {
             name: 'groupbyColumns',
             config: withMetricsPlaceholder({
               ...sharedControls.groupby,
+              type: 'DndColumnSelect',
+              dragTypeOverride: 'pivot_v3_dnd',
               label: t('Columns'),
               description: t('Columns to group by on the columns'),
             }),
@@ -85,6 +113,8 @@ const config: ControlPanelConfig = {
             name: 'groupbyRows',
             config: withMetricsPlaceholder({
               ...sharedControls.groupby,
+              type: 'DndColumnSelect',
+              dragTypeOverride: 'pivot_v3_dnd',
               label: t('Rows'),
               description: t('Columns to group by on the rows'),
             }),
@@ -393,15 +423,29 @@ const config: ControlPanelConfig = {
 
     // Auto-insert the measures placeholder into columns when metrics exist and
     // it isn't already placed. Remove it when no metrics are selected.
-    const hasPlaceholderInRows = rows.includes(METRICS_PLACEHOLDER);
-    const hasPlaceholderInCols = cols.includes(METRICS_PLACEHOLDER);
+    const normalize = (vals: any[]) =>
+      vals.map(val => {
+        if (val === METRICS_PLACEHOLDER) return METRICS_PLACEHOLDER;
+        if (
+          typeof val === 'object' &&
+          ((val as any).column_name === METRICS_PLACEHOLDER ||
+            (val as any).label === METRICS_PLACEHOLDER)
+        ) {
+          return METRICS_PLACEHOLDER;
+        }
+        return val;
+      });
+    const rowsNorm = normalize(rows);
+    const colsNorm = normalize(cols);
+    const hasPlaceholderInRows = rowsNorm.includes(METRICS_PLACEHOLDER);
+    const hasPlaceholderInCols = colsNorm.includes(METRICS_PLACEHOLDER);
     const shouldInsertPlaceholder = metrics.length > 0;
     const sanitizedRows = shouldInsertPlaceholder
-      ? rows
-      : rows.filter(col => col !== METRICS_PLACEHOLDER);
+      ? rowsNorm
+      : rowsNorm.filter(col => col !== METRICS_PLACEHOLDER);
     const sanitizedCols = shouldInsertPlaceholder
-      ? cols
-      : cols.filter(col => col !== METRICS_PLACEHOLDER);
+      ? colsNorm
+      : colsNorm.filter(col => col !== METRICS_PLACEHOLDER);
 
     const groupbyColumns = getStandardizedControls().controls.columns.filter(
       col => !sanitizedRows.includes(col),
@@ -416,11 +460,21 @@ const config: ControlPanelConfig = {
         ? [...sanitizedCols, METRICS_PLACEHOLDER]
         : sanitizedCols;
 
+    // Ensure the placeholder only lives in one axis at a time. Prefer the axis
+    // where the user already placed it (rows if present, otherwise columns).
+    const rowsHasPlaceholder = sanitizedRows.includes(METRICS_PLACEHOLDER);
+    const colsHasPlaceholder = nextGroupbyColumns.includes(METRICS_PLACEHOLDER);
+    const finalRows = sanitizedRows;
+    const finalCols =
+      rowsHasPlaceholder && colsHasPlaceholder
+        ? nextGroupbyColumns.filter(col => col !== METRICS_PLACEHOLDER)
+        : nextGroupbyColumns;
+
     return {
       ...formData,
       metrics: getStandardizedControls().popAllMetrics(),
-      groupbyRows: sanitizedRows,
-      groupbyColumns: nextGroupbyColumns,
+      groupbyRows: finalRows,
+      groupbyColumns: finalCols,
     };
   },
 };

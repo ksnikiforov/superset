@@ -38,6 +38,8 @@ export type DndColumnSelectProps = DndControlProps<QueryFormColumn> & {
   options: ColumnMeta[];
   isTemporal?: boolean;
   disabledTabs?: Set<string>;
+  dragTypeOverride?: string;
+  listId?: string;
 };
 
 function DndColumnSelect(props: DndColumnSelectProps) {
@@ -52,6 +54,8 @@ function DndColumnSelect(props: DndColumnSelectProps) {
     label,
     isTemporal,
     disabledTabs,
+    dragTypeOverride,
+    listId,
   } = props;
   const [newColumnPopoverVisible, setNewColumnPopoverVisible] = useState(false);
 
@@ -64,12 +68,18 @@ function DndColumnSelect(props: DndColumnSelectProps) {
   }, [multi, options, value]);
 
   const onDrop = useCallback(
-    (item: DatasourcePanelDndItem) => {
-      const column = item.value as ColumnMeta;
+    (item: DatasourcePanelDndItem | any) => {
+      const column = (item as any)?.value ?? (item as any)?.column;
+      if (!column) {
+        return;
+      }
+      const columnName =
+        (column as ColumnMeta).column_name ||
+        (typeof column === 'string' ? column : undefined);
       if (!optionSelector.multi && !isEmpty(optionSelector.values)) {
-        optionSelector.replace(0, column.column_name);
-      } else {
-        optionSelector.add(column.column_name);
+        optionSelector.replace(0, columnName || column);
+      } else if (!optionSelector.has(columnName || column)) {
+        optionSelector.add(columnName || column);
       }
       onChange(optionSelector.getValues());
     },
@@ -77,8 +87,14 @@ function DndColumnSelect(props: DndColumnSelectProps) {
   );
 
   const canDrop = useCallback(
-    (item: DatasourcePanelDndItem) => {
-      const columnName = (item.value as ColumnMeta).column_name;
+    (item: DatasourcePanelDndItem | any) => {
+      const value = (item as any)?.value ?? (item as any)?.column;
+      const columnName =
+        (value as ColumnMeta)?.column_name ||
+        (typeof value === 'string' ? value : undefined);
+      if (!columnName) {
+        return false;
+      }
       return (
         columnName in optionSelector.options && !optionSelector.has(columnName)
       );
@@ -130,9 +146,10 @@ function DndColumnSelect(props: DndColumnSelectProps) {
             <OptionWrapper
               key={idx}
               index={idx}
-              clickClose={onClickClose}
+              clickClose={canDelete ? onClickClose : undefined}
               onShiftOptions={onShiftOptions}
-              type={`${DndItemType.ColumnOption}_${name}_${label}`}
+              type={dragTypeOverride || `${DndItemType.ColumnOption}_${name}_${label}`}
+              listId={listId || name}
               canDelete={canDelete}
               column={column}
               datasourceWarningMessage={datasourceWarningMessage}
@@ -195,7 +212,7 @@ function DndColumnSelect(props: DndColumnSelectProps) {
         onDrop={onDrop}
         canDrop={canDrop}
         valuesRenderer={valuesRenderer}
-        accept={DndItemType.Column}
+        accept={[DndItemType.Column, dragTypeOverride || DndItemType.Column]}
         displayGhostButton={multi || optionSelector.values.length === 0}
         ghostButtonText={labelGhostButtonText}
         onClickGhostButton={openPopover}
