@@ -4,7 +4,8 @@
     "composite": true,
     "rootDir": "src",
     "outDir": "lib",
-    "baseUrl": "."
+    "baseUrl": ".",
+    "types": []
   },
   "include": ["src/**/*", "types/**/*"],
   "exclude": ["lib", "test"],

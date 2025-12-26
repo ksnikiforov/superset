@@ -21,6 +21,7 @@ import {
   ensureIsArray,
   getColumnLabel,
   QueryFormColumn,
+  QueryObject,
   SupersetClient,
 } from '@superset-ui/core';
 import { formatQueryName } from './buildQuery';
@@ -86,7 +87,7 @@ export async function fetchPivotBranch({
       ? buildPathFilters(rowGroupby, path)
       : buildPathFilters(colGroupby, path);
 
-  const queryContext = buildQueryContext(formData, baseQueryObject => [
+  const queryContext = buildQueryContext(formData, (baseQueryObject: QueryObject) => [
     {
       ...baseQueryObject,
       columns,
