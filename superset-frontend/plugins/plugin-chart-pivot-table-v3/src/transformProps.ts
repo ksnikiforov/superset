@@ -64,6 +64,10 @@ export default function transformProps(
   const combinedData = queriesData.flatMap(({ data }) => data || []);
   const colnames = queriesData[0]?.colnames || [];
   const coltypes = queriesData[0]?.coltypes || [];
+  const colTypeMap: Record<string, GenericDataType> = {};
+  colnames.forEach((name: string, idx: number) => {
+    colTypeMap[name] = coltypes[idx];
+  });
 
   const dateFormatters = colnames
     .filter(
@@ -127,6 +131,11 @@ export default function transformProps(
       colDepth = groupbyColumns.filter(col =>
         colSet.has(String(getColumnLabel(col))),
       ).length;
+      // If inference still yields zero but data exists, assume full depth so tree populates.
+      if ((rowDepth === 0 && colDepth === 0) && (query.data || []).length > 0) {
+        rowDepth = groupbyRows.length;
+        colDepth = groupbyColumns.length;
+      }
     }
 
     // Clamp to the configured groupby lengths to avoid over-reading.
@@ -188,5 +197,6 @@ export default function transformProps(
     onContextMenu,
     timeGrainSqla: formData.time_grain_sqla,
     treeData: nextTree,
+    colTypeMap,
   };
 }

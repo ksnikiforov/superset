@@ -29,6 +29,7 @@ import {
   getColumnLabel,
   getNumberFormatter,
   QueryObjectFilterClause,
+  GenericDataType,
   styled,
   t,
 } from '@superset-ui/core';
@@ -122,12 +123,41 @@ const buildVisibleList = (
   return ordered;
 };
 
-const sortByOrder = (order: string) => (a: PivotTreeNode, b: PivotTreeNode) => {
-  if (order === 'key_z_to_a') {
-    return b.formattedLabel.localeCompare(a.formattedLabel);
+const compareValues = (
+  a: DataRecordValue,
+  b: DataRecordValue,
+  type?: GenericDataType,
+) => {
+  if (a === b) return 0;
+  if (a === null || a === undefined) return -1;
+  if (b === null || b === undefined) return 1;
+  switch (type) {
+    case GenericDataType.Numeric:
+      return (Number(a) || 0) - (Number(b) || 0);
+    case GenericDataType.Temporal:
+      return (new Date(a as any).getTime() || 0) - (new Date(b as any).getTime() || 0);
+    default:
+      return String(a).localeCompare(String(b));
   }
-  return a.formattedLabel.localeCompare(b.formattedLabel);
 };
+
+const sortByOrder =
+  (
+    order: string,
+    colTypeMap?: Record<string, GenericDataType>,
+    groupby?: string[],
+  ) =>
+  (a: PivotTreeNode, b: PivotTreeNode) => {
+    if (order === 'key_z_to_a') {
+      return b.formattedLabel.localeCompare(a.formattedLabel);
+    }
+    // Determine type based on current level label, if available
+    const level = a.path.length - 1;
+    const label = groupby?.[level];
+    const type = label ? colTypeMap?.[label] : undefined;
+    const cmp = compareValues(a.label, b.label, type);
+    return order === 'key_a_to_z' ? cmp : -cmp;
+  };
 
 const formatMetricValue = (
   metric: string,
@@ -179,6 +209,7 @@ function PivotTableChart(props: PivotTableProps) {
     onContextMenu,
     timeGrainSqla,
     dateFormatters = {},
+    colTypeMap,
   } = props;
 
   const [tree, setTree] = useState<PivotTreeData>(data);
@@ -278,8 +309,14 @@ function PivotTableChart(props: PivotTableProps) {
     ],
   );
 
-  const rowSorter = useMemo(() => sortByOrder(rowOrder), [rowOrder]);
-  const colSorter = useMemo(() => sortByOrder(colOrder), [colOrder]);
+  const rowSorter = useMemo(
+    () => sortByOrder(rowOrder, colTypeMap, groupbyRows.map(getColumnLabel)),
+    [rowOrder, colTypeMap, groupbyRows],
+  );
+  const colSorter = useMemo(
+    () => sortByOrder(colOrder, colTypeMap, groupbyColumns.map(getColumnLabel)),
+    [colOrder, colTypeMap, groupbyColumns],
+  );
 
   const visibleRows = useMemo(
     () => buildVisibleList(tree.rows, expandedRows, rowSorter),
@@ -419,25 +456,40 @@ function PivotTableChart(props: PivotTableProps) {
     ],
   );
 
+  const deriveMetricKey = useCallback(
+    (rowNode: PivotTreeNode, colNode: PivotTreeNode) => {
+      const metricLabels = metrics.map(m =>
+        typeof m === 'string' ? m : getColumnLabel(m as any),
+      );
+      // When metrics are on rows, the metric key is the last element in the row path.
+      // When metrics are on cols, it is the last element in the col path.
+      const metricCandidate =
+        formData.metricsLayout === 'ROWS'
+          ? rowNode.path[rowNode.path.length - 1]
+          : colNode.path[colNode.path.length - 1];
+      if (metricCandidate && metricLabels.includes(String(metricCandidate))) {
+        return metricCandidate as string;
+      }
+      // Fallback: first available metric in the cell values.
+      return Object.keys(tree.cells[`${rowNode.key}|${colNode.key}`]?.values || {})[0];
+    },
+    [formData.metricsLayout, metrics, tree.cells],
+  );
+
   const renderCellContent = useCallback(
     (rowNode: PivotTreeNode, colNode: PivotTreeNode) => {
       const cell = tree.cells[`${rowNode.key}|${colNode.key}`];
       if (!cell) {
         return '';
       }
-      const metricKey =
-        Object.keys(cell.values)[0] ||
-        (typeof metrics[0] === 'string'
-          ? (metrics[0] as string)
-          : metrics[0]?.label ||
-            '');
+      const metricKey = deriveMetricKey(rowNode, colNode);
       const value = renderValue(metricKey, cell.values[metricKey]);
       if (allowRenderHtml && typeof value === 'string' && value.includes('<')) {
         return <span dangerouslySetInnerHTML={{ __html: value }} />;
       }
       return value;
     },
-    [allowRenderHtml, metrics, renderValue, tree.cells],
+    [allowRenderHtml, deriveMetricKey, renderValue, tree.cells],
   );
 
   return (

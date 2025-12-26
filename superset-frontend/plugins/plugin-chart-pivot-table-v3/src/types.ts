@@ -29,6 +29,7 @@ import {
   SetDataMaskHook,
   TimeFormatter,
   TimeGranularity,
+  GenericDataType,
 } from '@superset-ui/core';
 import { ColorFormatters } from '@superset-ui/chart-controls';
 
@@ -108,10 +109,11 @@ export type PivotTableQueryFormData = QueryFormData &
     verboseMap: JsonObject;
     columnFormats: JsonObject;
     currencyFormats: Record<string, Currency>;
-    metricColorFormatters: ColorFormatters;
-    dateFormatters: Record<string, DateFormatter | undefined>;
-    legacy_order_by: QueryFormMetric[] | QueryFormMetric | null;
-    order_desc: boolean;
+  metricColorFormatters: ColorFormatters;
+  dateFormatters: Record<string, DateFormatter | undefined>;
+  colTypeMap?: Record<string, GenericDataType>;
+  legacy_order_by: QueryFormMetric[] | QueryFormMetric | null;
+  order_desc: boolean;
     onContextMenu?: (
       clientX: number,
       clientY: number,
@@ -156,6 +158,7 @@ export interface PivotTableProps
   currencyFormats: Record<string, Currency>;
   metricColorFormatters: ColorFormatters;
   dateFormatters: Record<string, DateFormatter | undefined>;
+  colTypeMap?: Record<string, GenericDataType>;
   onContextMenu?: (
     clientX: number,
     clientY: number,
