@@ -28,6 +28,7 @@ import {
   DataRecordValue,
   getColumnLabel,
   getNumberFormatter,
+  QueryObjectFilterClause,
   styled,
   t,
 } from '@superset-ui/core';
@@ -204,13 +205,13 @@ function PivotTableChart(props: PivotTableProps) {
         (max, node) => Math.max(max, node.level),
         0,
       ) + 1;
-    const seedRowDepth = startCollapsed ? resolvedInitialDepth : maxRowDepth;
-    const seedColDepth = startCollapsed ? resolvedInitialDepth : maxColDepth;
+    const seedRowDepth = startCollapsed ? 0 : maxRowDepth;
+    const seedColDepth = startCollapsed ? 0 : maxColDepth;
     const seedExpanded = (nodes: Record<string, PivotTreeNode>) => {
       const next = new Set<string>([rootKey]);
       Object.values(nodes).forEach(node => {
         const depthLimit = nodes === data.rows ? seedRowDepth : seedColDepth;
-        if (node.level < depthLimit) {
+        if (node.level > 0 && node.level <= depthLimit) {
           next.add(node.key);
         }
       });
@@ -302,15 +303,18 @@ function PivotTableChart(props: PivotTableProps) {
   );
 
   const buildFilters = useCallback(
-    (rowNode: PivotTreeNode, colNode: PivotTreeNode): BinaryQueryObjectFilterClause[] => [
+    (
+      rowNode: PivotTreeNode,
+      colNode: PivotTreeNode,
+    ): QueryObjectFilterClause[] => [
       ...rowNode.path.map((val, i) => ({
         col: getColumnLabel(groupbyRows[i]),
-        op: val === null || val === undefined ? ('IS NULL' as const) : ('==' as const),
+        op: (val === null || val === undefined ? 'IS NULL' : '==') as any,
         val: val === undefined ? null : val,
       })),
       ...colNode.path.map((val, i) => ({
         col: getColumnLabel(groupbyColumns[i]),
-        op: val === null || val === undefined ? ('IS NULL' as const) : ('==' as const),
+        op: (val === null || val === undefined ? 'IS NULL' : '==') as any,
         val: val === undefined ? null : val,
       })),
     ],
@@ -323,19 +327,24 @@ function PivotTableChart(props: PivotTableProps) {
         return;
       }
       const filters = buildFilters(rowNode, colNode);
+      const binaryFilters = filters.filter(
+        (filter): filter is BinaryQueryObjectFilterClause => 'val' in filter,
+      );
       setDataMask({
         extraFormData: {
           filters: filters as any,
         },
         filterState: {
-          value: filters.map(filter => filter.val),
-          selectedFilters: filters.reduce(
-            (acc, filter) => ({
+          value: binaryFilters.map(filter => filter.val),
+          selectedFilters: binaryFilters.reduce((acc, filter) => {
+            const key = String(
+              'col' in filter ? (filter as any).col : (filter as any).subject,
+            );
+            return {
               ...acc,
-              [filter.col]: [filter.val],
-            }),
-            {},
-          ),
+              [key]: [filter.val],
+            };
+          }, {} as Record<string, DataRecordValue[]>),
         },
       });
     },
@@ -364,9 +373,12 @@ function PivotTableChart(props: PivotTableProps) {
             col,
             op: '==',
             val,
-            formattedVal: formatter ? formatter(val) : String(val),
+            formattedVal:
+              typeof formatter === 'function'
+                ? formatter(val as any)
+                : String(val),
             grain: formatter && axis === 'row' ? timeGrainSqla : undefined,
-          };
+          } as BinaryQueryObjectFilterClause;
         });
 
       const contextFilters = [
@@ -385,7 +397,7 @@ function PivotTableChart(props: PivotTableProps) {
                   selectedFilters: contextFilters.reduce(
                     (acc, filter) => ({
                       ...acc,
-                      [filter.col]: [filter.val],
+                      [String(filter.col)]: [filter.val],
                     }),
                     {},
                   ),
@@ -413,28 +425,17 @@ function PivotTableChart(props: PivotTableProps) {
       if (!cell) {
         return '';
       }
-      return metrics
-        .map(metric => {
-          const metricKey = typeof metric === 'string' ? metric : metric.label || '';
-          if (!metricKey) {
-            return null;
-          }
-          const value = renderValue(metricKey, cell.values[metricKey]);
-          if (allowRenderHtml && typeof value === 'string' && value.includes('<')) {
-            return (
-              <span
-                key={metricKey}
-                dangerouslySetInnerHTML={{ __html: value }}
-              />
-            );
-          }
-          return (
-            <div key={metricKey}>
-              <strong>{metricKey}</strong>: {value}
-            </div>
-          );
-        })
-        .filter(Boolean);
+      const metricKey =
+        Object.keys(cell.values)[0] ||
+        (typeof metrics[0] === 'string'
+          ? (metrics[0] as string)
+          : metrics[0]?.label ||
+            '');
+      const value = renderValue(metricKey, cell.values[metricKey]);
+      if (allowRenderHtml && typeof value === 'string' && value.includes('<')) {
+        return <span dangerouslySetInnerHTML={{ __html: value }} />;
+      }
+      return value;
     },
     [allowRenderHtml, metrics, renderValue, tree.cells],
   );
@@ -448,8 +449,8 @@ function PivotTableChart(props: PivotTableProps) {
             <th>{t('Rows')}</th>
             {visibleCols.map(col => (
               <th key={col.key}>
-                <HeaderCell>
-                  {col.hasChildren && (
+                <HeaderCell style={{ paddingLeft: col.path.length * 12 }}>
+                  {col.hasChildren && col.path.length > 0 && (
                     <ToggleButton
                       type="button"
                       onClick={() => handleToggle('col', col)}
@@ -472,8 +473,8 @@ function PivotTableChart(props: PivotTableProps) {
           {visibleRows.map(row => (
             <tr key={row.key}>
               <th>
-                <HeaderCell>
-                  {row.hasChildren && (
+                <HeaderCell style={{ paddingLeft: row.path.length * 12 }}>
+                  {row.hasChildren && row.path.length > 0 && (
                     <ToggleButton
                       type="button"
                       onClick={() => handleToggle('row', row)}

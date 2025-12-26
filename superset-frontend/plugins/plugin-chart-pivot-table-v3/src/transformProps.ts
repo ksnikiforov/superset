@@ -23,12 +23,22 @@ import {
   GenericDataType,
   getTimeFormatter,
   getTimeFormatterForGranularity,
+  getColumnLabel,
   SMART_DATE_ID,
   TimeFormats,
 } from '@superset-ui/core';
 import { getColorFormatters } from '@superset-ui/chart-controls';
-import { PivotTableQueryFormData, PivotTreeData } from './types';
-import { buildTreeFromRecords, mergeTrees, parseDepth } from './utils';
+import {
+  MetricsLayoutEnum,
+  PivotTableQueryFormData,
+  PivotTreeData,
+} from './types';
+import {
+  applyMetricAxis,
+  buildTreeFromRecords,
+  mergeTrees,
+  parseDepth,
+} from './utils';
 
 const { DATABASE_DATETIME } = TimeFormats;
 
@@ -103,9 +113,26 @@ export default function transformProps(
     theme,
   );
 
-  const nextTree = queriesData.reduce<PivotTreeData>((acc, query) => {
-    const queryName = (query as any)?.query_name;
-    const { rowDepth, colDepth } = parseDepth(queryName);
+  const nextTreeRaw = queriesData.reduce<PivotTreeData>((acc, query) => {
+    const queryName = (query as any)?.query_name || (query as any)?.queryName;
+    let { rowDepth, colDepth } = parseDepth(queryName);
+
+    // Fallback: if query_name is missing or unparsable, infer how many groupby
+    // levels were included in this query by inspecting returned column names.
+    if (rowDepth === 0 && colDepth === 0) {
+      const colSet = new Set((query.colnames || []).map((name: any) => String(name)));
+      rowDepth = groupbyRows.filter(col =>
+        colSet.has(String(getColumnLabel(col))),
+      ).length;
+      colDepth = groupbyColumns.filter(col =>
+        colSet.has(String(getColumnLabel(col))),
+      ).length;
+    }
+
+    // Clamp to the configured groupby lengths to avoid over-reading.
+    rowDepth = Math.min(rowDepth || 0, groupbyRows.length);
+    colDepth = Math.min(colDepth || 0, groupbyColumns.length);
+
     const branch = buildTreeFromRecords(
       query.data || [],
       metrics,
@@ -116,6 +143,11 @@ export default function transformProps(
     );
     return mergeTrees(acc, branch);
   }, ownState?.treeData || ({} as PivotTreeData));
+  const nextTree = applyMetricAxis(
+    nextTreeRaw,
+    metrics,
+    formData.metricsLayout || MetricsLayoutEnum.COLUMNS,
+  );
 
   const { selectedFilters } = filterState;
 

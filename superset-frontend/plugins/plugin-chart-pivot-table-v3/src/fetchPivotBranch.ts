@@ -65,7 +65,14 @@ export async function fetchPivotBranch({
 }: FetchPivotBranchParams): Promise<FetchPivotBranchResult> {
   const rowGroupby = ensureIsArray<QueryFormColumn>(formData.groupbyRows);
   const colGroupby = ensureIsArray<QueryFormColumn>(formData.groupbyColumns);
-  const depthIncrement = Math.max(maxDepthPerFetch || formData.maxDepthPerFetch || 1, 1);
+  const defaultIncrement = Math.max(
+    formData.maxDepthPerFetch || 0,
+    maxDepthPerFetch || 0,
+  );
+  const depthIncrement =
+    defaultIncrement > 0
+      ? defaultIncrement
+      : Number.MAX_SAFE_INTEGER;
 
   const rowDepth =
     axis === 'row'

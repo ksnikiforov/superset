@@ -23,7 +23,7 @@ import {
   QueryFormColumn,
   QueryFormMetric,
 } from '@superset-ui/core';
-import { PivotPath, PivotTreeData } from './types';
+import { MetricsLayoutEnum, PivotPath, PivotTreeData } from './types';
 import { formatQueryName } from './buildQuery';
 
 export const PATH_DIVIDER = '__';
@@ -57,6 +57,89 @@ export const mergeTrees = (
   cells: { ...(left?.cells || {}), ...(right?.cells || {}) },
 });
 
+export const applyMetricAxis = (
+  tree: PivotTreeData,
+  metrics: QueryFormMetric[],
+  metricsLayout: MetricsLayoutEnum,
+): PivotTreeData => {
+  const metricKeys = getMetricKeys(metrics);
+  if (metricKeys.length === 0) {
+    return tree;
+  }
+
+  const result: PivotTreeData = {
+    rows: { ...tree.rows },
+    cols: { ...tree.cols },
+    cells: { ...tree.cells },
+  };
+
+  if (metricsLayout === MetricsLayoutEnum.ROWS) {
+    Object.values(tree.rows).forEach(rowNode => {
+      metricKeys.forEach(metric => {
+        const metricPath = [...rowNode.path, metric];
+        const metricKey = serializePath(metricPath);
+        if (result.rows[metricKey]) {
+          return;
+        }
+        result.rows[metricKey] = {
+          axis: 'row',
+          key: metricKey,
+          path: metricPath,
+          label: metric,
+          formattedLabel: metric,
+          level: rowNode.level + 1,
+          hasChildren: false,
+          isSubtotal: rowNode.isSubtotal,
+        };
+
+        Object.values(tree.cols).forEach(colNode => {
+          const baseCell = tree.cells[`${rowNode.key}|${colNode.key}`];
+          const val = baseCell?.values?.[metric];
+          result.cells[`${metricKey}|${colNode.key}`] = {
+            rowKey: metricKey,
+            colKey: colNode.key,
+            values: { [metric]: val },
+            isSubtotal: baseCell?.isSubtotal,
+          };
+        });
+      });
+    });
+  } else {
+    Object.values(tree.cols).forEach(colNode => {
+      metricKeys.forEach(metric => {
+        const metricPath = [...colNode.path, metric];
+        const metricKey = serializePath(metricPath);
+        if (result.cols[metricKey]) {
+          return;
+        }
+        result.cols[metricKey] = {
+          axis: 'col',
+          key: metricKey,
+          path: metricPath,
+          label: metric,
+          formattedLabel: metric,
+          level: colNode.level + 1,
+          hasChildren: false,
+          isSubtotal: colNode.isSubtotal,
+        };
+
+        Object.values(tree.rows).forEach(rowNode => {
+          const baseCell = tree.cells[`${rowNode.key}|${colNode.key}`];
+          const val = baseCell?.values?.[metric];
+          result.cells[`${rowNode.key}|${metricKey}`] = {
+            rowKey: rowNode.key,
+            colKey: metricKey,
+            values: { [metric]: val },
+            isSubtotal: baseCell?.isSubtotal,
+          };
+        });
+      });
+    });
+  }
+
+  return result;
+};
+
 export const buildTreeFromRecords = (
   records: DataRecord[],
   metrics: QueryFormMetric[],
@@ -86,9 +169,9 @@ export const buildTreeFromRecords = (
         path: rowPath,
         label: rowPath[rowPath.length - 1]?.toString() ?? 'Total',
         formattedLabel: rowPath[rowPath.length - 1]?.toString() ?? 'Total',
-        level: rowDepth,
-        hasChildren: rowDepth < rowGroupby.length,
-        isSubtotal: rowDepth < rowGroupby.length,
+        level: rowPath.length,
+        hasChildren: rowPath.length < rowGroupby.length,
+        isSubtotal: rowPath.length < rowGroupby.length,
       };
     }
     if (!tree.cols[colKey]) {
@@ -98,9 +181,9 @@ export const buildTreeFromRecords = (
         path: colPath,
         label: colPath[colPath.length - 1]?.toString() ?? 'Total',
         formattedLabel: colPath[colPath.length - 1]?.toString() ?? 'Total',
-        level: colDepth,
-        hasChildren: colDepth < colGroupby.length,
-        isSubtotal: colDepth < colGroupby.length,
+        level: colPath.length,
+        hasChildren: colPath.length < colGroupby.length,
+        isSubtotal: colPath.length < colGroupby.length,
       };
     }
 
@@ -118,7 +201,8 @@ export const buildTreeFromRecords = (
       rowKey,
       colKey,
       values,
-      isSubtotal: rowDepth < rowGroupby.length || colDepth < colGroupby.length,
+      isSubtotal:
+        rowPath.length < rowGroupby.length || colPath.length < colGroupby.length,
     };
   });
 
