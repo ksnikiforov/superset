@@ -27,6 +27,10 @@ import { MetricsLayoutEnum, PivotPath, PivotTreeData } from './types';
 import { formatQueryName } from './buildQuery';
 
 export const PATH_DIVIDER = '__';
+export const METRICS_PLACEHOLDER = '__MEASURES__';
+
+export const stripMetricsPlaceholder = (groupby: QueryFormColumn[]) =>
+  groupby.filter(col => col !== METRICS_PLACEHOLDER);
 
 export const serializePath = (path: PivotPath = []) => path.join(PATH_DIVIDER);
 
@@ -61,78 +65,151 @@ export const applyMetricAxis = (
   tree: PivotTreeData,
   metrics: QueryFormMetric[],
   metricsLayout: MetricsLayoutEnum,
+  rowGroupby: QueryFormColumn[],
+  colGroupby: QueryFormColumn[],
+  metricPosition?: number,
 ): PivotTreeData => {
   const metricKeys = getMetricKeys(metrics);
   if (metricKeys.length === 0) {
     return tree;
   }
 
-  const result: PivotTreeData = {
-    rows: { ...tree.rows },
-    cols: { ...tree.cols },
-    cells: { ...tree.cells },
+  const result: PivotTreeData = { rows: {}, cols: {}, cells: {} };
+
+  const ensureNode = (
+    axis: 'row' | 'col',
+    path: PivotPath,
+    fullDepth: number,
+    isSubtotal?: boolean,
+  ) => {
+    const nodes = axis === 'row' ? result.rows : result.cols;
+    const key = serializePath(path);
+    if (nodes[key]) return nodes[key];
+    const label =
+      path.length === 0
+        ? 'Total'
+        : path[path.length - 1]?.toString() ?? 'Total';
+    const node = {
+      axis,
+      key,
+      path,
+      label,
+      formattedLabel: label,
+      level: path.length,
+      hasChildren: path.length < fullDepth,
+      isSubtotal: isSubtotal ?? path.length < fullDepth,
+    };
+    nodes[key] = node;
+    return node;
   };
 
   if (metricsLayout === MetricsLayoutEnum.ROWS) {
-    Object.values(tree.rows).forEach(rowNode => {
-      metricKeys.forEach(metric => {
-        const metricPath = [...rowNode.path, metric];
-        const metricKey = serializePath(metricPath);
-        if (result.rows[metricKey]) {
-          return;
-        }
-        result.rows[metricKey] = {
-          axis: 'row',
-          key: metricKey,
-          path: metricPath,
-          label: metric,
-          formattedLabel: metric,
-          level: rowNode.level + 1,
-          hasChildren: false,
-          isSubtotal: rowNode.isSubtotal,
-        };
+    const rowDepthWithMetrics = rowGroupby.length + 1;
+    const insertIndex = Math.min(
+      metricPosition ?? rowGroupby.length,
+      rowGroupby.length,
+    );
 
-        Object.values(tree.cols).forEach(colNode => {
-          const baseCell = tree.cells[`${rowNode.key}|${colNode.key}`];
-          const val = baseCell?.values?.[metric];
-          result.cells[`${metricKey}|${colNode.key}`] = {
-            rowKey: metricKey,
-            colKey: colNode.key,
-            values: { [metric]: val },
-            isSubtotal: baseCell?.isSubtotal,
-          };
-        });
+    // preserve column nodes
+    Object.values(tree.cols).forEach(colNode => {
+      ensureNode(
+        'col',
+        colNode.path,
+        colGroupby.length,
+        colNode.isSubtotal || undefined,
+      );
+    });
+
+    Object.values(tree.cells).forEach(cell => {
+      const baseRow = tree.rows[cell.rowKey];
+      const baseCol = tree.cols[cell.colKey];
+      const rowPath = baseRow?.path || [];
+      const colPath = baseCol?.path || [];
+      const rowPrefix = rowPath.slice(0, insertIndex);
+      const rowSuffix = rowPath.slice(insertIndex);
+
+      metricKeys.forEach(metric => {
+        const newRowPath = [...rowPrefix, metric, ...rowSuffix];
+        // ensure row hierarchy nodes
+        for (let depth = 0; depth <= newRowPath.length; depth += 1) {
+          const subPath = newRowPath.slice(0, depth);
+          ensureNode(
+            'row',
+            subPath,
+            rowDepthWithMetrics,
+            baseRow?.isSubtotal || undefined,
+          );
+        }
+        const newRowKey = serializePath(newRowPath);
+
+        const colKey = serializePath(colPath);
+        ensureNode(
+          'col',
+          colPath,
+          colGroupby.length,
+          baseCol?.isSubtotal || undefined,
+        );
+
+        result.cells[`${newRowKey}|${colKey}`] = {
+          rowKey: newRowKey,
+          colKey,
+          values: { [metric]: cell.values[metric] },
+          isSubtotal: cell.isSubtotal,
+        };
       });
     });
   } else {
-    Object.values(tree.cols).forEach(colNode => {
-      metricKeys.forEach(metric => {
-        const metricPath = [...colNode.path, metric];
-        const metricKey = serializePath(metricPath);
-        if (result.cols[metricKey]) {
-          return;
-        }
-        result.cols[metricKey] = {
-          axis: 'col',
-          key: metricKey,
-          path: metricPath,
-          label: metric,
-          formattedLabel: metric,
-          level: colNode.level + 1,
-          hasChildren: false,
-          isSubtotal: colNode.isSubtotal,
-        };
+    const colDepthWithMetrics = colGroupby.length + 1;
+    const insertIndex = Math.min(
+      metricPosition ?? colGroupby.length,
+      colGroupby.length,
+    );
 
-        Object.values(tree.rows).forEach(rowNode => {
-          const baseCell = tree.cells[`${rowNode.key}|${colNode.key}`];
-          const val = baseCell?.values?.[metric];
-          result.cells[`${rowNode.key}|${metricKey}`] = {
-            rowKey: rowNode.key,
-            colKey: metricKey,
-            values: { [metric]: val },
-            isSubtotal: baseCell?.isSubtotal,
-          };
-        });
+    // preserve row nodes
+    Object.values(tree.rows).forEach(rowNode =>
+      ensureNode(
+        'row',
+        rowNode.path,
+        rowGroupby.length,
+        rowNode.isSubtotal || undefined,
+      ),
+    );
+
+    Object.values(tree.cells).forEach(cell => {
+      const baseRow = tree.rows[cell.rowKey];
+      const baseCol = tree.cols[cell.colKey];
+      const rowPath = baseRow?.path || [];
+      const colPath = baseCol?.path || [];
+      const colPrefix = colPath.slice(0, insertIndex);
+      const colSuffix = colPath.slice(insertIndex);
+
+      metricKeys.forEach(metric => {
+        const newColPath = [...colPrefix, metric, ...colSuffix];
+        for (let depth = 0; depth <= newColPath.length; depth += 1) {
+          const subPath = newColPath.slice(0, depth);
+          ensureNode(
+            'col',
+            subPath,
+            colDepthWithMetrics,
+            baseCol?.isSubtotal || undefined,
+          );
+        }
+        const newColKey = serializePath(newColPath);
+
+        const rowKey = serializePath(rowPath);
+        ensureNode(
+          'row',
+          rowPath,
+          rowGroupby.length,
+          baseRow?.isSubtotal || undefined,
+        );
+
+        result.cells[`${rowKey}|${newColKey}`] = {
+          rowKey,
+          colKey: newColKey,
+          values: { [metric]: cell.values[metric] },
+          isSubtotal: cell.isSubtotal,
+        };
       });
     });
   }

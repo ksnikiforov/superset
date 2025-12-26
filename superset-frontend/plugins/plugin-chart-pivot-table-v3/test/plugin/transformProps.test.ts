@@ -64,7 +64,7 @@ describe('Pivot Table v3 transformProps', () => {
     const result = transformProps(chartProps as any);
     expect(result.data.rows).toBeDefined();
     expect(result.data.cols).toBeDefined();
-    expect(result.data.cells['A|B']).toBeDefined();
+    expect(result.data.cells['A|B__metric1']).toBeDefined();
     expect(result.metrics).toEqual(['metric1']);
   });
 });

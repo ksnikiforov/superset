@@ -25,6 +25,7 @@ import {
   QueryFormOrderBy,
 } from '@superset-ui/core';
 import { PivotTableQueryFormData } from './types';
+import { stripMetricsPlaceholder } from './utils';
 
 export const QUERY_NAME_PREFIX = 'pivot_v3';
 export const formatQueryName = (rowDepth: number, colDepth: number) =>
@@ -63,8 +64,12 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
   const time_grain_sqla =
     extra_form_data?.time_grain_sqla || formData.time_grain_sqla;
 
-  const rowGroupby = ensureIsArray<QueryFormColumn>(groupbyRows);
-  const colGroupby = ensureIsArray<QueryFormColumn>(groupbyColumns);
+  const rowGroupby = stripMetricsPlaceholder(
+    ensureIsArray<QueryFormColumn>(groupbyRows),
+  );
+  const colGroupby = stripMetricsPlaceholder(
+    ensureIsArray<QueryFormColumn>(groupbyColumns),
+  );
 
   const isTotalsEnabled = rowTotals || colTotals || rowSubTotals || colSubTotals;
   const requireMultiQuery = startCollapsed || isTotalsEnabled;

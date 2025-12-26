@@ -31,6 +31,38 @@ import {
   validateNonEmpty,
 } from '@superset-ui/core';
 import { MetricsLayoutEnum } from './types';
+import { METRICS_PLACEHOLDER } from './utils';
+
+const withMetricsPlaceholder = (config: any) => ({
+  ...config,
+  mapStateToProps: (state: any, controlState: any, chart: any) => {
+    const base =
+      typeof config.mapStateToProps === 'function'
+        ? config.mapStateToProps(state, controlState, chart)
+        : {};
+    const metricsValue = ensureIsArray(state?.controls?.metrics?.value);
+    const options = ensureIsArray(base?.options);
+    const hasPlaceholder = options.some(
+      (opt: any) => (opt?.column_name || opt?.label) === METRICS_PLACEHOLDER,
+    );
+    const placeholderOption = {
+      column_name: METRICS_PLACEHOLDER,
+      verbose_name: t('Measures'),
+      label: t('Measures'),
+    };
+    const nextOptions = metricsValue.length
+      ? hasPlaceholder
+        ? options
+        : [...options, placeholderOption]
+      : options.filter(
+          (opt: any) => (opt?.column_name || opt?.label) !== METRICS_PLACEHOLDER,
+        );
+    return {
+      ...base,
+      options: nextOptions,
+    };
+  },
+});
 
 const config: ControlPanelConfig = {
   controlPanelSections: [
@@ -41,21 +73,21 @@ const config: ControlPanelConfig = {
         [
           {
             name: 'groupbyColumns',
-            config: {
+            config: withMetricsPlaceholder({
               ...sharedControls.groupby,
               label: t('Columns'),
               description: t('Columns to group by on the columns'),
-            },
+            }),
           },
         ],
         [
           {
             name: 'groupbyRows',
-            config: {
+            config: withMetricsPlaceholder({
               ...sharedControls.groupby,
               label: t('Rows'),
               description: t('Columns to group by on the rows'),
-            },
+            }),
           },
         ],
         [
@@ -355,17 +387,40 @@ const config: ControlPanelConfig = {
     },
   ],
   formDataOverrides: formData => {
+    const metrics = ensureIsArray(formData.metrics);
+    const rows = ensureIsArray(formData.groupbyRows);
+    const cols = ensureIsArray(formData.groupbyColumns);
+
+    // Auto-insert the measures placeholder into columns when metrics exist and
+    // it isn't already placed. Remove it when no metrics are selected.
+    const hasPlaceholderInRows = rows.includes(METRICS_PLACEHOLDER);
+    const hasPlaceholderInCols = cols.includes(METRICS_PLACEHOLDER);
+    const shouldInsertPlaceholder = metrics.length > 0;
+    const sanitizedRows = shouldInsertPlaceholder
+      ? rows
+      : rows.filter(col => col !== METRICS_PLACEHOLDER);
+    const sanitizedCols = shouldInsertPlaceholder
+      ? cols
+      : cols.filter(col => col !== METRICS_PLACEHOLDER);
+
     const groupbyColumns = getStandardizedControls().controls.columns.filter(
-      col => !ensureIsArray(formData.groupbyRows).includes(col),
+      col => !sanitizedRows.includes(col),
     );
     getStandardizedControls().controls.columns =
       getStandardizedControls().controls.columns.filter(
         col => !groupbyColumns.includes(col),
       );
+
+    const nextGroupbyColumns =
+      shouldInsertPlaceholder && !hasPlaceholderInRows && !hasPlaceholderInCols
+        ? [...sanitizedCols, METRICS_PLACEHOLDER]
+        : sanitizedCols;
+
     return {
       ...formData,
       metrics: getStandardizedControls().popAllMetrics(),
-      groupbyColumns,
+      groupbyRows: sanitizedRows,
+      groupbyColumns: nextGroupbyColumns,
     };
   },
 };

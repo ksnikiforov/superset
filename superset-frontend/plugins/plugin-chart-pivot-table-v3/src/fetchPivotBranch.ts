@@ -22,13 +22,28 @@ import {
   ensureIsArray,
   getColumnLabel,
   QueryFormColumn,
+  QueryFormMetric,
   QueryObject,
   QueryObjectFilterClause,
   SupersetClient,
 } from '@superset-ui/core';
 import { formatQueryName } from './buildQuery';
-import { PivotAxis, PivotPath, PivotTableQueryFormData, PivotTreeData } from './types';
-import { buildTreeFromRecords, mergeTrees, serializePath } from './utils';
+import {
+  MetricsLayoutEnum,
+  PivotAxis,
+  PivotPath,
+  PivotTableQueryFormData,
+  PivotTreeData,
+} from './types';
+import {
+  METRICS_PLACEHOLDER,
+  buildTreeFromRecords,
+  applyMetricAxis,
+  mergeTrees,
+  getMetricKeys,
+  serializePath,
+  stripMetricsPlaceholder,
+} from './utils';
 
 export interface FetchPivotBranchResult {
   data?: PivotTreeData;
@@ -46,6 +61,29 @@ export interface FetchPivotBranchParams {
 
 const cache = new Map<string, PivotTreeData>();
 
+const buildCacheKey = (
+  axis: PivotAxis,
+  path: PivotPath,
+  rowDepth: number,
+  colDepth: number,
+  rowGroupbyRaw: QueryFormColumn[],
+  colGroupbyRaw: QueryFormColumn[],
+  metrics: QueryFormMetric[],
+  aggregateFunction?: string,
+) =>
+  [
+    axis,
+    serializePath(path),
+    rowDepth,
+    colDepth,
+    serializePath(rowGroupbyRaw.map(getColumnLabel)),
+    serializePath(colGroupbyRaw.map(getColumnLabel)),
+    serializePath(getMetricKeys(metrics)),
+    aggregateFunction || '',
+  ].join('|');
+
+export const peekPivotBranchCacheByKey = (key: string) => cache.get(key);
+
 const buildPathFilters = (
   groupby: QueryFormColumn[],
   path: PivotPath,
@@ -56,15 +94,63 @@ const buildPathFilters = (
     val: value === null || value === undefined ? null : value,
   }));
 
-export async function fetchPivotBranch({
+interface ResolvedFetchContext {
+  rowGroupbyRaw: QueryFormColumn[];
+  colGroupbyRaw: QueryFormColumn[];
+  rowGroupby: QueryFormColumn[];
+  colGroupby: QueryFormColumn[];
+  metrics: QueryFormMetric[];
+  metricsLayoutResolved: MetricsLayoutEnum;
+  metricInsertIndex: number;
+  sanitizedPath: PivotPath;
+  rowDepth: number;
+  colDepth: number;
+  cacheKey: string;
+}
+
+const resolveFetchContext = ({
   formData,
   axis,
   path,
   maxDepthPerFetch,
-  currentTree,
-}: FetchPivotBranchParams): Promise<FetchPivotBranchResult> {
-  const rowGroupby = ensureIsArray<QueryFormColumn>(formData.groupbyRows);
-  const colGroupby = ensureIsArray<QueryFormColumn>(formData.groupbyColumns);
+}: FetchPivotBranchParams): ResolvedFetchContext => {
+  const rowGroupbyRaw = ensureIsArray<QueryFormColumn>(formData.groupbyRows);
+  const colGroupbyRaw = ensureIsArray<QueryFormColumn>(formData.groupbyColumns);
+  const rowGroupby = stripMetricsPlaceholder(rowGroupbyRaw);
+  const colGroupby = stripMetricsPlaceholder(colGroupbyRaw);
+
+  const rowPlaceholderIndex = rowGroupbyRaw.indexOf(METRICS_PLACEHOLDER);
+  const colPlaceholderIndex = colGroupbyRaw.indexOf(METRICS_PLACEHOLDER);
+  const metricsAxis: PivotAxis | undefined =
+    rowPlaceholderIndex >= 0
+      ? 'row'
+      : colPlaceholderIndex >= 0
+      ? 'col'
+      : formData.metricsLayout === 'ROWS'
+      ? 'row'
+      : 'col';
+  const metricsLayoutResolved =
+    metricsAxis === 'row'
+      ? MetricsLayoutEnum.ROWS
+      : MetricsLayoutEnum.COLUMNS;
+  const metrics = ensureIsArray(formData.metrics);
+  const metricInsertIndex =
+    metricsAxis === 'row'
+      ? rowPlaceholderIndex >= 0
+        ? Math.min(rowPlaceholderIndex, rowGroupby.length)
+        : rowGroupby.length
+      : colPlaceholderIndex >= 0
+      ? Math.min(colPlaceholderIndex, colGroupby.length)
+      : colGroupby.length;
+
+  const normalizePath = (p: PivotPath, targetAxis: PivotAxis) => {
+    if (metricsAxis !== targetAxis) {
+      return p;
+    }
+    return [...p.slice(0, metricInsertIndex), ...p.slice(metricInsertIndex + 1)];
+  };
+
+  const sanitizedPath = normalizePath(path, axis);
   const defaultIncrement = Math.max(
     formData.maxDepthPerFetch || 0,
     maxDepthPerFetch || 0,
@@ -76,14 +162,65 @@ export async function fetchPivotBranch({
 
   const rowDepth =
     axis === 'row'
-      ? Math.min(rowGroupby.length, path.length + depthIncrement)
+      ? Math.min(rowGroupby.length, sanitizedPath.length + depthIncrement)
       : rowGroupby.length;
   const colDepth =
     axis === 'col'
-      ? Math.min(colGroupby.length, path.length + depthIncrement)
+      ? Math.min(colGroupby.length, sanitizedPath.length + depthIncrement)
       : colGroupby.length;
 
-  const cacheKey = `${axis}|${serializePath(path)}|${rowDepth}|${colDepth}`;
+  const cacheKey = buildCacheKey(
+    axis,
+    path,
+    rowDepth,
+    colDepth,
+    rowGroupbyRaw,
+    colGroupbyRaw,
+    metrics,
+    formData.aggregateFunction,
+  );
+
+  return {
+    rowGroupbyRaw,
+    colGroupbyRaw,
+    rowGroupby,
+    colGroupby,
+    metrics,
+    metricsLayoutResolved,
+    metricInsertIndex,
+    sanitizedPath,
+    rowDepth,
+    colDepth,
+    cacheKey,
+  };
+};
+
+export const peekPivotBranchCache = (params: FetchPivotBranchParams) => {
+  const ctx = resolveFetchContext(params);
+  return cache.get(ctx.cacheKey);
+};
+
+export async function fetchPivotBranch({
+  formData,
+  axis,
+  path,
+  maxDepthPerFetch,
+  currentTree,
+}: FetchPivotBranchParams): Promise<FetchPivotBranchResult> {
+  const {
+    rowGroupby,
+    colGroupby,
+    rowGroupbyRaw,
+    colGroupbyRaw,
+    metrics,
+    metricsLayoutResolved,
+    metricInsertIndex,
+    sanitizedPath,
+    rowDepth,
+    colDepth,
+    cacheKey,
+  } = resolveFetchContext({ formData, axis, path, maxDepthPerFetch });
+
   const cached = cache.get(cacheKey);
   if (cached) {
     return { data: cached, cached: true };
@@ -96,8 +233,8 @@ export async function fetchPivotBranch({
 
   const filters =
     axis === 'row'
-      ? buildPathFilters(rowGroupby, path)
-      : buildPathFilters(colGroupby, path);
+      ? buildPathFilters(rowGroupby, sanitizedPath)
+      : buildPathFilters(colGroupby, sanitizedPath);
 
   const queryContext = buildQueryContext(formData, (baseQueryObject: QueryObject) => [
     {
@@ -127,7 +264,15 @@ export async function fetchPivotBranch({
       rowDepth,
       colDepth,
     );
-    const merged = mergeTrees(currentTree, branchTree);
+    const branchWithMetrics = applyMetricAxis(
+      branchTree,
+      ensureIsArray(formData.metrics),
+      metricsLayoutResolved,
+      rowGroupby,
+      colGroupby,
+      metricInsertIndex,
+    );
+    const merged = mergeTrees(currentTree, branchWithMetrics);
     cache.set(cacheKey, merged);
     return { data: merged };
   } catch (error) {

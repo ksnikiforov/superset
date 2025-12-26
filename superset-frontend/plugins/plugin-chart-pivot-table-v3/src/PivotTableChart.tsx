@@ -33,8 +33,13 @@ import {
   styled,
   t,
 } from '@superset-ui/core';
-import { fetchPivotBranch } from './fetchPivotBranch';
-import { PivotTableProps, PivotTreeData, PivotTreeNode } from './types';
+import { fetchPivotBranch, peekPivotBranchCache } from './fetchPivotBranch';
+import {
+  MetricsLayoutEnum,
+  PivotTableProps,
+  PivotTreeData,
+  PivotTreeNode,
+} from './types';
 import { mergeTrees, serializePath } from './utils';
 
 const Container = styled.div<{ height: number; width: number | string }>`
@@ -103,6 +108,7 @@ const buildVisibleList = (
   nodes: Record<string, PivotTreeNode>,
   expanded: Set<string>,
   sorter: (a: PivotTreeNode, b: PivotTreeNode) => number,
+  skipRoot = false,
 ) => {
   const ordered: PivotTreeNode[] = [];
   const root = nodes[rootKey];
@@ -119,7 +125,12 @@ const buildVisibleList = (
     children.forEach(traverse);
   };
 
-  traverse(root);
+  if (skipRoot) {
+    const children = findChildren(nodes, root).sort(sorter);
+    children.forEach(traverse);
+  } else {
+    traverse(root);
+  }
   return ordered;
 };
 
@@ -210,6 +221,7 @@ function PivotTableChart(props: PivotTableProps) {
     timeGrainSqla,
     dateFormatters = {},
     colTypeMap,
+    metricsLayout = MetricsLayoutEnum.COLUMNS,
   } = props;
 
   const [tree, setTree] = useState<PivotTreeData>(data);
@@ -275,25 +287,35 @@ function PivotTableChart(props: PivotTableProps) {
       }
 
       if (node.hasChildren && !hasLoadedChildren(axis, node)) {
-        setLoadingKeys(prev => new Set(prev).add(node.key));
-        const result = await fetchPivotBranch({
+        const cached = peekPivotBranchCache({
           axis,
           path: node.path,
           formData,
           maxDepthPerFetch,
-          currentTree: tree,
         });
-        if (result.error) {
-          setErrorMessage(result.error.message);
+        if (cached) {
+          setTree(current => mergeTrees(current, cached));
+        } else {
+          setLoadingKeys(prev => new Set(prev).add(node.key));
+          const result = await fetchPivotBranch({
+            axis,
+            path: node.path,
+            formData,
+            maxDepthPerFetch,
+            currentTree: tree,
+          });
+          if (result.error) {
+            setErrorMessage(result.error.message);
+          }
+          if (result.data) {
+            setTree(current => mergeTrees(current, result.data));
+          }
+          setLoadingKeys(prev => {
+            const next = new Set(prev);
+            next.delete(node.key);
+            return next;
+          });
         }
-        if (result.data) {
-          setTree(current => mergeTrees(current, result.data));
-        }
-        setLoadingKeys(prev => {
-          const next = new Set(prev);
-          next.delete(node.key);
-          return next;
-        });
       }
       const next = new Set(expanded);
       next.add(node.key);
@@ -318,13 +340,17 @@ function PivotTableChart(props: PivotTableProps) {
     [colOrder, colTypeMap, groupbyColumns],
   );
 
+  const skipRowRoot =
+    groupbyRows.length > 0 && !props.rowTotals && !props.rowSubTotals;
+  const skipColRoot = groupbyColumns.length === 0;
+
   const visibleRows = useMemo(
-    () => buildVisibleList(tree.rows, expandedRows, rowSorter),
-    [expandedRows, rowSorter, tree.rows],
+    () => buildVisibleList(tree.rows, expandedRows, rowSorter, skipRowRoot),
+    [expandedRows, rowSorter, skipRowRoot, tree.rows],
   );
   const visibleCols = useMemo(
-    () => buildVisibleList(tree.cols, expandedCols, colSorter),
-    [expandedCols, colSorter, tree.cols],
+    () => buildVisibleList(tree.cols, expandedCols, colSorter, skipColRoot),
+    [expandedCols, colSorter, skipColRoot, tree.cols],
   );
 
   const renderValue = useCallback(
@@ -343,19 +369,36 @@ function PivotTableChart(props: PivotTableProps) {
     (
       rowNode: PivotTreeNode,
       colNode: PivotTreeNode,
-    ): QueryObjectFilterClause[] => [
-      ...rowNode.path.map((val, i) => ({
-        col: getColumnLabel(groupbyRows[i]),
-        op: (val === null || val === undefined ? 'IS NULL' : '==') as any,
-        val: val === undefined ? null : val,
-      })),
-      ...colNode.path.map((val, i) => ({
-        col: getColumnLabel(groupbyColumns[i]),
-        op: (val === null || val === undefined ? 'IS NULL' : '==') as any,
-        val: val === undefined ? null : val,
-      })),
-    ],
-    [groupbyColumns, groupbyRows],
+    ): QueryObjectFilterClause[] => {
+      const metricLabels = metrics.map(m =>
+        typeof m === 'string' ? m : getColumnLabel(m as any),
+      );
+      const normalizedRowPath =
+        metricsLayout === MetricsLayoutEnum.ROWS
+          ? rowNode.path.filter(
+              val => !metricLabels.includes(String(val ?? '')),
+            )
+          : rowNode.path;
+      const normalizedColPath =
+        metricsLayout === MetricsLayoutEnum.COLUMNS
+          ? colNode.path.filter(
+              val => !metricLabels.includes(String(val ?? '')),
+            )
+          : colNode.path;
+      return [
+        ...normalizedRowPath.map((val, i) => ({
+          col: getColumnLabel(groupbyRows[i]),
+          op: (val === null || val === undefined ? 'IS NULL' : '==') as any,
+          val: val === undefined ? null : val,
+        })),
+        ...normalizedColPath.map((val, i) => ({
+          col: getColumnLabel(groupbyColumns[i]),
+          op: (val === null || val === undefined ? 'IS NULL' : '==') as any,
+          val: val === undefined ? null : val,
+        })),
+      ];
+    },
+    [groupbyColumns, groupbyRows, metrics, metricsLayout],
   );
 
   const handleCellClick = useCallback(
@@ -403,7 +446,22 @@ function PivotTableChart(props: PivotTableProps) {
         columns: any[],
         axis: 'row' | 'col',
       ) =>
-        node.path.map((val, idx) => {
+        (axis === 'row' && metricsLayout === MetricsLayoutEnum.ROWS
+          ? node.path.filter(
+              val =>
+                !metrics
+                  .map(m => (typeof m === 'string' ? m : getColumnLabel(m as any)))
+                  .includes(String(val ?? '')),
+            )
+          : axis === 'col' && metricsLayout === MetricsLayoutEnum.COLUMNS
+          ? node.path.filter(
+              val =>
+                !metrics
+                  .map(m => (typeof m === 'string' ? m : getColumnLabel(m as any)))
+                  .includes(String(val ?? '')),
+            )
+          : node.path
+        ).map((val, idx) => {
           const col = getColumnLabel(columns[idx]);
           const formatter = dateFormatters[col];
           return {
@@ -451,6 +509,8 @@ function PivotTableChart(props: PivotTableProps) {
       getColumnLabel,
       groupbyColumns,
       groupbyRows,
+      metrics,
+      metricsLayout,
       onContextMenu,
       timeGrainSqla,
     ],
@@ -464,7 +524,7 @@ function PivotTableChart(props: PivotTableProps) {
       // When metrics are on rows, the metric key is the last element in the row path.
       // When metrics are on cols, it is the last element in the col path.
       const metricCandidate =
-        formData.metricsLayout === 'ROWS'
+        metricsLayout === MetricsLayoutEnum.ROWS
           ? rowNode.path[rowNode.path.length - 1]
           : colNode.path[colNode.path.length - 1];
       if (metricCandidate && metricLabels.includes(String(metricCandidate))) {
@@ -473,7 +533,7 @@ function PivotTableChart(props: PivotTableProps) {
       // Fallback: first available metric in the cell values.
       return Object.keys(tree.cells[`${rowNode.key}|${colNode.key}`]?.values || {})[0];
     },
-    [formData.metricsLayout, metrics, tree.cells],
+    [metricsLayout, metrics, tree.cells],
   );
 
   const renderCellContent = useCallback(

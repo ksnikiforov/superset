@@ -26,6 +26,7 @@ import {
   getColumnLabel,
   SMART_DATE_ID,
   TimeFormats,
+  ensureIsArray,
 } from '@superset-ui/core';
 import { getColorFormatters } from '@superset-ui/chart-controls';
 import {
@@ -35,9 +36,11 @@ import {
 } from './types';
 import {
   applyMetricAxis,
+  METRICS_PLACEHOLDER,
   buildTreeFromRecords,
   mergeTrees,
   parseDepth,
+  stripMetricsPlaceholder,
 } from './utils';
 
 const { DATABASE_DATETIME } = TimeFormats;
@@ -58,7 +61,27 @@ export default function transformProps(
     theme,
     ownState,
   } = chartProps;
-  const { groupbyRows = [], groupbyColumns = [], metrics = [] } = formData;
+  const groupbyRowsRaw = ensureIsArray(formData.groupbyRows || []);
+  const groupbyColumnsRaw = ensureIsArray(formData.groupbyColumns || []);
+  const rowPlaceholderIndex = groupbyRowsRaw.indexOf(METRICS_PLACEHOLDER);
+  const colPlaceholderIndex = groupbyColumnsRaw.indexOf(METRICS_PLACEHOLDER);
+  const groupbyRows = stripMetricsPlaceholder(groupbyRowsRaw);
+  const groupbyColumns = stripMetricsPlaceholder(groupbyColumnsRaw);
+  const metricsLayout =
+    rowPlaceholderIndex >= 0
+      ? MetricsLayoutEnum.ROWS
+      : colPlaceholderIndex >= 0
+      ? MetricsLayoutEnum.COLUMNS
+      : formData.metricsLayout || MetricsLayoutEnum.COLUMNS;
+  const metricInsertIndex =
+    metricsLayout === MetricsLayoutEnum.ROWS
+      ? rowPlaceholderIndex >= 0
+        ? Math.min(rowPlaceholderIndex, groupbyRows.length)
+        : groupbyRows.length
+      : colPlaceholderIndex >= 0
+      ? Math.min(colPlaceholderIndex, groupbyColumns.length)
+      : groupbyColumns.length;
+  const metrics = ensureIsArray(formData.metrics || []);
   const granularity = extractTimegrain(rawFormData);
 
   const combinedData = queriesData.flatMap(({ data }) => data || []);
@@ -155,7 +178,10 @@ export default function transformProps(
   const nextTree = applyMetricAxis(
     nextTreeRaw,
     metrics,
-    formData.metricsLayout || MetricsLayoutEnum.COLUMNS,
+    metricsLayout,
+    groupbyRows,
+    groupbyColumns,
+    metricInsertIndex,
   );
 
   const { selectedFilters } = filterState;
@@ -165,7 +191,7 @@ export default function transformProps(
     height,
     margin: (formData as any).margin ?? 0,
     data: nextTree,
-    formData,
+    formData: { ...formData, metricsLayout },
     metrics,
     groupbyRows,
     groupbyColumns,
@@ -183,7 +209,7 @@ export default function transformProps(
     dateFormat: formData.dateFormat,
     currencyFormat: formData.currencyFormat,
     allowRenderHtml: formData.allowRenderHtml,
-    metricsLayout: formData.metricsLayout,
+    metricsLayout,
     transposePivot: formData.transposePivot,
     combineMetric: formData.combineMetric,
     emitCrossFilters,
