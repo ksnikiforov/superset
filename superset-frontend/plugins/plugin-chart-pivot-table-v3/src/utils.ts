@@ -151,6 +151,32 @@ export const buildTreeFromRecords = (
   const tree: PivotTreeData = { rows: {}, cols: {}, cells: {} };
   const metricKeys = getMetricKeys(metrics);
 
+  const ensureNode = (
+    axis: 'row' | 'col',
+    path: DataRecordValue[],
+    totalLabel: string,
+  ) => {
+    const nodes = axis === 'row' ? tree.rows : tree.cols;
+    const key = serializePath(path);
+    if (nodes[key]) return;
+    const label =
+      path.length === 0
+        ? totalLabel
+        : path[path.length - 1]?.toString() ?? totalLabel;
+    nodes[key] = {
+      axis,
+      key,
+      path,
+      label,
+      formattedLabel: label,
+      level: path.length,
+      hasChildren:
+        path.length < (axis === 'row' ? rowGroupby.length : colGroupby.length),
+      isSubtotal:
+        path.length < (axis === 'row' ? rowGroupby.length : colGroupby.length),
+    };
+  };
+
   records.forEach(record => {
     const rowPath = rowGroupby
       .slice(0, rowDepth)
@@ -159,33 +185,17 @@ export const buildTreeFromRecords = (
       .slice(0, colDepth)
       .map(col => record[getColumnLabel(col)]);
 
+    // create intermediate row nodes
+    for (let i = 0; i <= rowPath.length; i += 1) {
+      ensureNode('row', rowPath.slice(0, i), 'Total');
+    }
+    // create intermediate col nodes
+    for (let i = 0; i <= colPath.length; i += 1) {
+      ensureNode('col', colPath.slice(0, i), 'Total');
+    }
+
     const rowKey = serializePath(rowPath);
     const colKey = serializePath(colPath);
-
-    if (!tree.rows[rowKey]) {
-      tree.rows[rowKey] = {
-        axis: 'row',
-        key: rowKey,
-        path: rowPath,
-        label: rowPath[rowPath.length - 1]?.toString() ?? 'Total',
-        formattedLabel: rowPath[rowPath.length - 1]?.toString() ?? 'Total',
-        level: rowPath.length,
-        hasChildren: rowPath.length < rowGroupby.length,
-        isSubtotal: rowPath.length < rowGroupby.length,
-      };
-    }
-    if (!tree.cols[colKey]) {
-      tree.cols[colKey] = {
-        axis: 'col',
-        key: colKey,
-        path: colPath,
-        label: colPath[colPath.length - 1]?.toString() ?? 'Total',
-        formattedLabel: colPath[colPath.length - 1]?.toString() ?? 'Total',
-        level: colPath.length,
-        hasChildren: colPath.length < colGroupby.length,
-        isSubtotal: colPath.length < colGroupby.length,
-      };
-    }
 
     const values = metricKeys.reduce(
       (acc, key) => ({
@@ -206,31 +216,8 @@ export const buildTreeFromRecords = (
     };
   });
 
-  const rootKey = serializePath([]);
-  if (!tree.rows[rootKey]) {
-    tree.rows[rootKey] = {
-      axis: 'row',
-      key: rootKey,
-      path: [],
-      label: 'Total',
-      formattedLabel: 'Total',
-      level: 0,
-      hasChildren: rowGroupby.length > 0,
-      isSubtotal: rowGroupby.length > 0,
-    };
-  }
-  if (!tree.cols[rootKey]) {
-    tree.cols[rootKey] = {
-      axis: 'col',
-      key: rootKey,
-      path: [],
-      label: 'Total',
-      formattedLabel: 'Total',
-      level: 0,
-      hasChildren: colGroupby.length > 0,
-      isSubtotal: colGroupby.length > 0,
-    };
-  }
+  ensureNode('row', [], 'Total');
+  ensureNode('col', [], 'Total');
 
   return tree;
 };
