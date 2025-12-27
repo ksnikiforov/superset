@@ -295,37 +295,27 @@ const config: ControlPanelConfig = {
         ],
         [
           {
-            name: 'rowSubtotalLevels',
+            name: 'rowTotals',
             config: {
-              type: 'SelectControl',
-              label: t('Row totals & subtotals'),
-              description: t(
-                'Select which row levels should show totals/subtotals (0 = total).',
-              ),
-              clearable: true,
-              multiple: true,
-              default: [],
+              type: 'CheckboxControl',
+              label: t('Row total'),
+              description: t('Show grand total for rows.'),
+              default: false,
               renderTrigger: true,
-              optionRenderer: (opt: any) => opt?.label ?? opt?.value,
-              mapStateToProps: state => {
-                const rowsRaw = ensureIsArray(state?.controls?.groupbyRows?.value);
-                const colsRaw = ensureIsArray(state?.controls?.groupbyColumns?.value);
-                const metricsValue = ensureIsArray(state?.controls?.metrics?.value);
-                const placement = resolveMetricPlacement(rowsRaw, colsRaw, {
-                  hasMetrics: metricsValue.length > 0,
-                  preferredAxis:
-                    (state?.controls?.metricsLayout?.value as MetricsLayoutEnum) ||
-                    MetricsLayoutEnum.COLUMNS,
-                });
-                const rowDepth = stripMetricsPlaceholder(placement.rows).length;
-                const options = Array.from({ length: rowDepth + 1 }).map((_, idx) => ({
-                  value: idx,
-                  label: idx === 0 ? t('Total') : t('Subtotal level %s', idx),
-                }));
-                return { options };
-              },
             },
           },
+          {
+            name: 'colTotals',
+            config: {
+              type: 'CheckboxControl',
+              label: t('Column total'),
+              description: t('Show grand total for columns.'),
+              default: false,
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
           {
             name: 'colSubtotalLevels',
             config: {
@@ -356,6 +346,55 @@ const config: ControlPanelConfig = {
                 }));
                 return { options };
               },
+            },
+          },
+        ],
+        [
+          {
+            name: 'rowTotalPosition',
+            config: {
+              type: 'SelectControl',
+              label: t('Row total position'),
+              description: t('Show the row grand total at the top or bottom.'),
+              clearable: false,
+              default: 'start',
+              renderTrigger: true,
+              choices: [
+                ['start', t('Top')],
+                ['end', t('Bottom')],
+              ],
+            },
+          },
+          {
+            name: 'colTotalPosition',
+            config: {
+              type: 'SelectControl',
+              label: t('Column total position'),
+              description: t('Place the grand total column at the start or end.'),
+              clearable: false,
+              default: 'start',
+              renderTrigger: true,
+              choices: [
+                ['start', t('Front')],
+                ['end', t('End')],
+              ],
+            },
+          },
+        ],
+        [
+          {
+            name: 'colSubtotalPosition',
+            config: {
+              type: 'SelectControl',
+              label: t('Column subtotal position'),
+              description: t('Place subtotal columns before or after their group.'),
+              clearable: false,
+              default: 'start',
+              renderTrigger: true,
+              choices: [
+                ['start', t('Front')],
+                ['end', t('End')],
+              ],
             },
           },
         ],

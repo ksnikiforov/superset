@@ -18,14 +18,19 @@
  */
 
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import PivotTableChart from '../../src/PivotTableChart';
 import {
   MetricsLayoutEnum,
   PivotTableQueryFormData,
   PivotTreeData,
 } from '../../src/types';
-import { serializePath } from '../../src/utils';
+import {
+  applyMetricAxis,
+  buildTreeFromRecords,
+  mergeTrees,
+  serializePath,
+} from '../../src/utils';
 
 const baseFormData: Partial<PivotTableQueryFormData> = {
   groupbyRows: ['r1'],
@@ -246,5 +251,278 @@ describe('PivotTableChart metric tier suppression', () => {
     // Metric label should not show as a row header; the second level should be orderPriority.
     expect(screen.queryAllByText('countCustomers')).toHaveLength(0);
     expect(screen.getByText('1-URGENT')).toBeTruthy();
+  });
+});
+
+describe('PivotTableChart totals & subtotals', () => {
+  const baseProps = {
+    aggregateFunction: 'Sum',
+    width: 400,
+    height: 300,
+    startCollapsed: false,
+    initialDepth: 2,
+    maxDepthPerFetch: 1,
+    rowTotals: false,
+    colTotals: false,
+    rowSubTotals: false,
+    colSubTotals: false,
+    rowSubtotalLevels: [],
+    colSubtotalLevels: [],
+    rowOrder: 'key_a_to_z',
+    colOrder: 'key_a_to_z',
+    valueFormat: '',
+    columnFormats: {},
+    currencyFormats: {},
+    allowRenderHtml: false,
+    emitCrossFilters: false,
+    setDataMask: jest.fn(),
+    metricColorFormatters: [],
+    dateFormatters: {},
+    verboseMap: {},
+  };
+
+  it('renders selected column subtotals at the configured position using aggregated values', () => {
+    const detail = buildTreeFromRecords(
+      [
+        { region: 'US', category: 'Tech', subcategory: 'Laptop', metric1: 2 },
+        { region: 'US', category: 'Tech', subcategory: 'Phone', metric1: 3 },
+      ],
+      ['metric1'],
+      ['region'],
+      ['category', 'subcategory'],
+      1,
+      2,
+    );
+    const subtotal = buildTreeFromRecords(
+      [{ region: 'US', category: 'Tech', metric1: 999 }],
+      ['metric1'],
+      ['region'],
+      ['category', 'subcategory'],
+      1,
+      1,
+    );
+    const tree = applyMetricAxis(
+      mergeTrees(subtotal, detail),
+      ['metric1'],
+      MetricsLayoutEnum.COLUMNS,
+      ['region'],
+      ['category', 'subcategory'],
+      2,
+    );
+
+    render(
+      <PivotTableChart
+        data={tree}
+        formData={
+          {
+            ...(baseProps as Partial<PivotTableQueryFormData>),
+            groupbyRows: ['region'],
+            groupbyColumns: ['category', 'subcategory', '__MEASURES__'],
+            metricsLayout: MetricsLayoutEnum.COLUMNS,
+            metrics: ['metric1'],
+            colSubtotalLevels: [1],
+            colSubtotalPosition: 'start',
+          } as PivotTableQueryFormData
+        }
+        metrics={['metric1']}
+        groupbyRows={['region']}
+        groupbyColumns={['category', 'subcategory']}
+        aggregateFunction="Sum"
+        width={600}
+        height={400}
+        startCollapsed={false}
+        initialDepth={2}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[1]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        rowTotalPosition="start"
+        colSubtotalPosition="start"
+        colTotalPosition="start"
+      />,
+    );
+
+    const regionRow = screen.getByText('US').closest('tr') as HTMLElement;
+    const valueCells = within(regionRow).getAllByRole('cell');
+    const values = valueCells.map(cell => cell.textContent?.trim());
+    expect(values[0]).toBe('999');
+    expect(values.slice(1)).toEqual(expect.arrayContaining(['2', '3']));
+  });
+
+  it('positions grand totals at the end for rows and columns when configured', () => {
+    const totalsOnly = buildTreeFromRecords(
+      [{ metric1: 12 }],
+      ['metric1'],
+      ['region'],
+      ['category'],
+      0,
+      0,
+    );
+    const detail = buildTreeFromRecords(
+      [{ region: 'US', category: 'Tech', metric1: 5 }],
+      ['metric1'],
+      ['region'],
+      ['category'],
+      1,
+      1,
+    );
+    const tree = applyMetricAxis(
+      mergeTrees(totalsOnly, detail),
+      ['metric1'],
+      MetricsLayoutEnum.COLUMNS,
+      ['region'],
+      ['category'],
+      1,
+    );
+
+    const { container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={
+          {
+            ...(baseProps as Partial<PivotTableQueryFormData>),
+            groupbyRows: ['region'],
+            groupbyColumns: ['category', '__MEASURES__'],
+            metricsLayout: MetricsLayoutEnum.COLUMNS,
+            metrics: ['metric1'],
+            rowSubtotalLevels: [0],
+            colSubtotalLevels: [0],
+            rowTotalPosition: 'end',
+            colTotalPosition: 'end',
+          } as PivotTableQueryFormData
+        }
+        metrics={['metric1']}
+        groupbyRows={['region']}
+        groupbyColumns={['category']}
+        aggregateFunction="Sum"
+        width={400}
+        height={300}
+        startCollapsed={false}
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[0]}
+        colSubtotalLevels={[0]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        rowTotalPosition="end"
+        colSubtotalPosition="start"
+        colTotalPosition="end"
+      />,
+    );
+
+    const headerRow = container.querySelector('thead tr:last-child') as HTMLElement;
+    const headers = within(headerRow).getAllByRole('columnheader');
+    const headerLabels = headers.slice(1).map(cell => cell.textContent?.trim());
+    expect(headerLabels[headerLabels.length - 1]).toBe('Grand total');
+
+    const bodyRows = within(container.querySelector('tbody') as HTMLElement).getAllByRole('row');
+    const getRowLabel = (row: HTMLElement) =>
+      (row.querySelector('th')?.textContent || '').trim();
+    const firstRowLabel = getRowLabel(bodyRows[0]);
+    const lastRowLabel = getRowLabel(bodyRows[bodyRows.length - 1]);
+    expect(firstRowLabel).not.toBe('Grand total');
+    expect(lastRowLabel).toBe('Grand total');
+  });
+
+  it('shows column grand total when enabled without selecting level 0', () => {
+    const detail = buildTreeFromRecords(
+      [{ region: 'US', category: 'Tech', metric1: 5 }],
+      ['metric1'],
+      ['region'],
+      ['category'],
+      1,
+      1,
+    );
+    const total = buildTreeFromRecords(
+      [{ region: 'US', metric1: 8 }],
+      ['metric1'],
+      ['region'],
+      ['category'],
+      1,
+      0,
+    );
+    const tree = applyMetricAxis(
+      mergeTrees(detail, total),
+      ['metric1'],
+      MetricsLayoutEnum.COLUMNS,
+      ['region'],
+      ['category'],
+      1,
+    );
+
+    const { container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={
+          {
+            ...(baseProps as Partial<PivotTableQueryFormData>),
+            groupbyRows: ['region'],
+            groupbyColumns: ['category', '__MEASURES__'],
+            metricsLayout: MetricsLayoutEnum.COLUMNS,
+            metrics: ['metric1'],
+            colTotals: true,
+            colSubtotalLevels: [],
+          } as PivotTableQueryFormData
+        }
+        metrics={['metric1']}
+        groupbyRows={['region']}
+        groupbyColumns={['category']}
+        aggregateFunction="Sum"
+        width={400}
+        height={300}
+        startCollapsed={false}
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={true}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        rowTotalPosition="start"
+        colSubtotalPosition="start"
+        colTotalPosition="start"
+      />,
+    );
+
+    const headerRow = container.querySelector('thead tr:last-child') as HTMLElement;
+    expect(within(headerRow).getByText('Grand total')).toBeTruthy();
+    const bodyRow = container.querySelector('tbody tr') as HTMLElement;
+    expect(within(bodyRow).getByText('8')).toBeTruthy();
   });
 });

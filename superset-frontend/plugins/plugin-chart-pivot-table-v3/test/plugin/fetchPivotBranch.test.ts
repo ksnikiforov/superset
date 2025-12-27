@@ -24,6 +24,7 @@ import {
 } from '../../src/types';
 import { resolveFetchContextForTest, fetchPivotBranch } from '../../src/fetchPivotBranch';
 import { METRICS_PLACEHOLDER, serializePath } from '../../src/utils';
+import { formatQueryName } from '../../src/buildQuery';
 import { SupersetClient } from '@superset-ui/core';
 
 jest.mock('@superset-ui/core', () => {
@@ -48,6 +49,10 @@ const makeNode = (node: Partial<PivotTreeNode>): PivotTreeNode => ({
 });
 
 describe('resolveFetchContext', () => {
+  beforeEach(() => {
+    (SupersetClient.post as jest.Mock).mockReset();
+  });
+
   it('keeps column depth aligned to visible dimensions when metrics are on columns', () => {
     const currentTree: PivotTreeData = {
       rows: {
@@ -290,31 +295,38 @@ describe('resolveFetchContext', () => {
 
   it('fetches both col root and expanded col depth when rows fetch under metric-first columns', async () => {
     const postMock = SupersetClient.post as jest.Mock;
-    postMock.mockResolvedValueOnce({
+    postMock.mockImplementationOnce(({ jsonPayload }) => ({
       json: {
-        result: [
-          {
-            data: [
-              {
-                nation: 'USA',
-                orderPriority: 'HIGH',
-                segment: 'AUTO',
-                countCustomers: 5,
-              },
-            ],
-          },
-          {
-            data: [
-              {
-                nation: 'USA',
-                orderPriority: 'HIGH',
-                countCustomers: 5,
-              },
-            ],
-          },
-        ],
+        result: (jsonPayload.queries || []).map((query: any) => {
+          const name = query.query_name as string;
+          if (name.includes(formatQueryName(2, 2))) {
+            return {
+              data: [
+                {
+                  nation: 'USA',
+                  orderPriority: 'HIGH',
+                  segment: 'AUTO',
+                  countCustomers: 5,
+                },
+              ],
+            };
+          }
+          if (name.includes(formatQueryName(2, 1))) {
+            return {
+              data: [
+                {
+                  nation: 'USA',
+                  orderPriority: 'HIGH',
+                  segment: 'AUTO',
+                  countCustomers: 5,
+                },
+              ],
+            };
+          }
+          return { data: [] };
+        }),
       },
-    });
+    }));
 
     const currentTree: PivotTreeData = {
       rows: {
@@ -375,5 +387,307 @@ describe('resolveFetchContext', () => {
         `${serializePath(['USA', 'HIGH'])}|${serializePath([])}`
       ]?.values.countCustomers,
     ).toBe(5);
+  });
+
+  it('fetches parent column depth when expanding rows under expanded columns', async () => {
+    const postMock = SupersetClient.post as jest.Mock;
+    postMock.mockImplementationOnce(({ jsonPayload }) => ({
+      json: {
+        result: (jsonPayload.queries || []).map(() => ({ data: [] })),
+      },
+    }));
+
+    const currentTree: PivotTreeData = {
+      rows: {
+        '': makeNode({ axis: 'row', path: [], hasChildren: true }),
+        USA: makeNode({
+          axis: 'row',
+          path: ['USA'],
+          level: 1,
+          hasChildren: true,
+          label: 'USA',
+          formattedLabel: 'USA',
+        }),
+      },
+      cols: {
+        '': makeNode({ axis: 'col', path: [], hasChildren: true }),
+        Consumer: makeNode({
+          axis: 'col',
+          path: ['Consumer'],
+          level: 1,
+          hasChildren: true,
+          label: 'Consumer',
+          formattedLabel: 'Consumer',
+        }),
+        'Consumer__AIR': makeNode({
+          axis: 'col',
+          path: ['Consumer', 'AIR'],
+          level: 2,
+          hasChildren: false,
+          label: 'AIR',
+          formattedLabel: 'AIR',
+        }),
+      },
+      cells: {},
+    };
+
+    await fetchPivotBranch({
+      formData: {
+        groupbyRows: ['nation', 'orderPriority', 'orderStatus'],
+        groupbyColumns: ['segment', 'shipMode', METRICS_PLACEHOLDER],
+        metrics: ['countCustomers'],
+        metricsLayout: MetricsLayoutEnum.COLUMNS,
+        datasource: '1__table',
+        viz_type: 'pivot_table_v3',
+      } as any,
+      axis: 'row',
+      path: ['USA'],
+      currentTree,
+    });
+
+    expect(postMock).toHaveBeenCalledTimes(1);
+    const queries = (postMock.mock.calls[0][0] as any).jsonPayload?.queries || [];
+    expect(queries.length).toBe(4);
+    const queryNames = queries.map((q: any) => q.query_name);
+    expect(queryNames).toEqual(
+      expect.arrayContaining([
+        `${formatQueryName(3, 2)}|branch:row:${serializePath(['USA'])}`,
+        `${formatQueryName(3, 1)}|branch:row:${serializePath(['USA'])}`,
+        `${formatQueryName(2, 2)}|branch:row:${serializePath(['USA'])}`,
+        `${formatQueryName(2, 1)}|branch:row:${serializePath(['USA'])}`,
+      ]),
+    );
+  });
+
+  it('fetches ancestor column aggregates when expanding columns with deeper rows', async () => {
+    const postMock = SupersetClient.post as jest.Mock;
+    postMock.mockImplementationOnce(({ jsonPayload }) => ({
+      json: {
+        result: (jsonPayload.queries || []).map(() => ({ data: [] })),
+      },
+    }));
+
+    const currentTree: PivotTreeData = {
+      rows: {
+        '': makeNode({ axis: 'row', path: [], hasChildren: true }),
+        USA: makeNode({
+          axis: 'row',
+          path: ['USA'],
+          level: 1,
+          hasChildren: true,
+          label: 'USA',
+          formattedLabel: 'USA',
+        }),
+        'USA__HIGH': makeNode({
+          axis: 'row',
+          path: ['USA', 'HIGH'],
+          level: 2,
+          hasChildren: true,
+          label: 'HIGH',
+          formattedLabel: 'HIGH',
+        }),
+      },
+      cols: {
+        '': makeNode({ axis: 'col', path: [], hasChildren: true }),
+        Consumer: makeNode({
+          axis: 'col',
+          path: ['Consumer'],
+          level: 1,
+          hasChildren: true,
+          label: 'Consumer',
+          formattedLabel: 'Consumer',
+        }),
+      },
+      cells: {},
+    };
+
+    await fetchPivotBranch({
+      formData: {
+        groupbyRows: ['nation', 'orderPriority', 'orderStatus'],
+        groupbyColumns: ['segment', 'shipMode', METRICS_PLACEHOLDER],
+        metrics: ['countCustomers'],
+        metricsLayout: MetricsLayoutEnum.COLUMNS,
+        datasource: '1__table',
+        viz_type: 'pivot_table_v3',
+      } as any,
+      axis: 'col',
+      path: ['Consumer'],
+      currentTree,
+      visibleRowDepth: 2,
+    });
+
+    expect(postMock).toHaveBeenCalledTimes(1);
+    const queries = (postMock.mock.calls[0][0] as any).jsonPayload?.queries || [];
+    expect(queries.length).toBe(4);
+    const queryNames = queries.map((q: any) => q.query_name);
+    expect(queryNames).toEqual(
+      expect.arrayContaining([
+        `${formatQueryName(2, 2)}|branch:col:${serializePath(['Consumer'])}`,
+        `${formatQueryName(1, 2)}|branch:col:${serializePath(['Consumer'])}`,
+        `${formatQueryName(2, 1)}|branch:col:${serializePath(['Consumer'])}`,
+        `${formatQueryName(1, 1)}|branch:col:${serializePath(['Consumer'])}`,
+      ]),
+    );
+  });
+
+  it('fetches ancestor column aggregates for all visible row depths when rows are deeper than two levels', async () => {
+    const postMock = SupersetClient.post as jest.Mock;
+    postMock.mockImplementationOnce(({ jsonPayload }) => ({
+      json: {
+        result: (jsonPayload.queries || []).map(() => ({ data: [] })),
+      },
+    }));
+
+    const currentTree: PivotTreeData = {
+      rows: {
+        '': makeNode({ axis: 'row', path: [], hasChildren: true }),
+        USA: makeNode({
+          axis: 'row',
+          path: ['USA'],
+          level: 1,
+          hasChildren: true,
+          label: 'USA',
+          formattedLabel: 'USA',
+        }),
+        'USA__HIGH': makeNode({
+          axis: 'row',
+          path: ['USA', 'HIGH'],
+          level: 2,
+          hasChildren: true,
+          label: 'HIGH',
+          formattedLabel: 'HIGH',
+        }),
+        'USA__HIGH__F': makeNode({
+          axis: 'row',
+          path: ['USA', 'HIGH', 'F'],
+          level: 3,
+          hasChildren: false,
+          label: 'F',
+          formattedLabel: 'F',
+        }),
+      },
+      cols: {
+        '': makeNode({ axis: 'col', path: [], hasChildren: true }),
+        Consumer: makeNode({
+          axis: 'col',
+          path: ['Consumer'],
+          level: 1,
+          hasChildren: true,
+          label: 'Consumer',
+          formattedLabel: 'Consumer',
+        }),
+      },
+      cells: {},
+    };
+
+    await fetchPivotBranch({
+      formData: {
+        groupbyRows: ['nation', 'orderPriority', 'orderStatus'],
+        groupbyColumns: ['segment', 'shipMode', METRICS_PLACEHOLDER],
+        metrics: ['countCustomers'],
+        metricsLayout: MetricsLayoutEnum.COLUMNS,
+        datasource: '1__table',
+        viz_type: 'pivot_table_v3',
+      } as any,
+      axis: 'col',
+      path: ['Consumer'],
+      currentTree,
+      visibleRowDepth: 3,
+    });
+
+    expect(postMock).toHaveBeenCalledTimes(1);
+    const queries = (postMock.mock.calls[0][0] as any).jsonPayload?.queries || [];
+    expect(queries.length).toBe(6);
+    const queryNames = queries.map((q: any) => q.query_name);
+    expect(queryNames).toEqual(
+      expect.arrayContaining([
+        `${formatQueryName(3, 2)}|branch:col:${serializePath(['Consumer'])}`,
+        `${formatQueryName(2, 2)}|branch:col:${serializePath(['Consumer'])}`,
+        `${formatQueryName(1, 2)}|branch:col:${serializePath(['Consumer'])}`,
+        `${formatQueryName(3, 1)}|branch:col:${serializePath(['Consumer'])}`,
+        `${formatQueryName(2, 1)}|branch:col:${serializePath(['Consumer'])}`,
+        `${formatQueryName(1, 1)}|branch:col:${serializePath(['Consumer'])}`,
+      ]),
+    );
+  });
+
+  it('fetches ancestor column levels when expanding rows after deeper column expansions', async () => {
+    const postMock = SupersetClient.post as jest.Mock;
+    postMock.mockImplementationOnce(({ jsonPayload }) => ({
+      json: {
+        result: (jsonPayload.queries || []).map(() => ({ data: [] })),
+      },
+    }));
+
+    const currentTree: PivotTreeData = {
+      rows: {
+        '': makeNode({ axis: 'row', path: [], hasChildren: true }),
+        USA: makeNode({
+          axis: 'row',
+          path: ['USA'],
+          level: 1,
+          hasChildren: true,
+          label: 'USA',
+          formattedLabel: 'USA',
+        }),
+      },
+      cols: {
+        '': makeNode({ axis: 'col', path: [], hasChildren: true }),
+        AUTO: makeNode({
+          axis: 'col',
+          path: ['AUTO'],
+          level: 1,
+          hasChildren: true,
+          label: 'AUTO',
+          formattedLabel: 'AUTO',
+        }),
+        'AUTO__AIR': makeNode({
+          axis: 'col',
+          path: ['AUTO', 'AIR'],
+          level: 2,
+          hasChildren: true,
+          label: 'AIR',
+          formattedLabel: 'AIR',
+        }),
+        'AUTO__AIR__F': makeNode({
+          axis: 'col',
+          path: ['AUTO', 'AIR', 'F'],
+          level: 3,
+          hasChildren: false,
+          label: 'F',
+          formattedLabel: 'F',
+        }),
+      },
+      cells: {},
+    };
+
+    await fetchPivotBranch({
+      formData: {
+        groupbyRows: ['nation', 'orderPriority'],
+        groupbyColumns: ['segment', 'shipMode', 'orderStatus', METRICS_PLACEHOLDER],
+        metrics: ['countCustomers'],
+        metricsLayout: MetricsLayoutEnum.COLUMNS,
+        datasource: '1__table',
+        viz_type: 'pivot_table_v3',
+      } as any,
+      axis: 'row',
+      path: ['USA'],
+      currentTree,
+      visibleColDepth: 3,
+    });
+
+    expect(postMock).toHaveBeenCalledTimes(1);
+    const queries = (postMock.mock.calls[0][0] as any).jsonPayload?.queries || [];
+    const queryNames = queries.map((q: any) => q.query_name);
+    expect(queryNames).toEqual(
+      expect.arrayContaining([
+        `${formatQueryName(2, 3)}|branch:row:${serializePath(['USA'])}`,
+        `${formatQueryName(2, 2)}|branch:row:${serializePath(['USA'])}`,
+        `${formatQueryName(2, 1)}|branch:row:${serializePath(['USA'])}`,
+        `${formatQueryName(1, 3)}|branch:row:${serializePath(['USA'])}`,
+        `${formatQueryName(1, 2)}|branch:row:${serializePath(['USA'])}`,
+        `${formatQueryName(1, 1)}|branch:row:${serializePath(['USA'])}`,
+      ]),
+    );
   });
 });

@@ -32,7 +32,9 @@ import {
   mergeTrees,
   serializePath,
 } from '../../src/utils';
-import { fetchPivotBranch } from '../../src/fetchPivotBranch';
+import { fetchPivotBranch, peekPivotBranchCache } from '../../src/fetchPivotBranch';
+import { SupersetClient } from '@superset-ui/core';
+import { formatQueryName } from '../../src/buildQuery';
 
 jest.mock('../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../src/fetchPivotBranch');
@@ -45,6 +47,7 @@ jest.mock('../../src/fetchPivotBranch', () => {
 
 describe('PivotTableChart expansion with metrics before dimensions', () => {
   const fetchPivotBranchMock = fetchPivotBranch as jest.Mock;
+  const peekPivotBranchCacheMock = peekPivotBranchCache as jest.Mock;
   beforeEach(() => {
     fetchPivotBranchMock.mockClear();
   });
@@ -787,5 +790,822 @@ describe('PivotTableChart expansion with metrics before dimensions', () => {
     const canChildCell = await within(tbody).findByText('HIGH');
     const canChildRow = canChildCell.closest('tr') as HTMLElement;
     expect(within(canChildRow).getByText('20')).toBeTruthy();
+  });
+
+  it('keeps ancestor row values when expanding columns under a deeper row', async () => {
+    const baseTreeRaw = buildTreeFromRecords(
+      [{ nation: 'USA', segment: 'AUTO', countCustomers: 10 }],
+      ['countCustomers'],
+      ['nation', 'orderPriority', 'orderStatus'],
+      ['segment', 'shipMode'],
+      1,
+      1,
+    );
+    const baseTree = applyMetricAxis(
+      baseTreeRaw,
+      ['countCustomers'],
+      MetricsLayoutEnum.COLUMNS,
+      ['nation', 'orderPriority', 'orderStatus'],
+      ['segment', 'shipMode'],
+      2,
+    );
+
+    const rowBranchRaw = buildTreeFromRecords(
+      [
+        {
+          nation: 'USA',
+          orderPriority: 'HIGH',
+          segment: 'AUTO',
+          countCustomers: 6,
+        },
+      ],
+      ['countCustomers'],
+      ['nation', 'orderPriority', 'orderStatus'],
+      ['segment', 'shipMode'],
+      2,
+      1,
+    );
+    const rowBranchWithMetrics = applyMetricAxis(
+      rowBranchRaw,
+      ['countCustomers'],
+      MetricsLayoutEnum.COLUMNS,
+      ['nation', 'orderPriority', 'orderStatus'],
+      ['segment', 'shipMode'],
+      2,
+    );
+
+    const colBranchRowDepth1Raw = buildTreeFromRecords(
+      [
+        {
+          nation: 'USA',
+          segment: 'AUTO',
+          shipMode: 'AIR',
+          countCustomers: 10,
+        },
+      ],
+      ['countCustomers'],
+      ['nation', 'orderPriority', 'orderStatus'],
+      ['segment', 'shipMode'],
+      1,
+      2,
+    );
+    const colBranchRowDepth1 = applyMetricAxis(
+      colBranchRowDepth1Raw,
+      ['countCustomers'],
+      MetricsLayoutEnum.COLUMNS,
+      ['nation', 'orderPriority', 'orderStatus'],
+      ['segment', 'shipMode'],
+      2,
+    );
+
+    const colBranchRowDepth2Raw = buildTreeFromRecords(
+      [
+        {
+          nation: 'USA',
+          orderPriority: 'HIGH',
+          segment: 'AUTO',
+          shipMode: 'AIR',
+          countCustomers: 6,
+        },
+      ],
+      ['countCustomers'],
+      ['nation', 'orderPriority', 'orderStatus'],
+      ['segment', 'shipMode'],
+      2,
+      2,
+    );
+    const colBranchRowDepth2 = applyMetricAxis(
+      colBranchRowDepth2Raw,
+      ['countCustomers'],
+      MetricsLayoutEnum.COLUMNS,
+      ['nation', 'orderPriority', 'orderStatus'],
+      ['segment', 'shipMode'],
+      2,
+    );
+
+    fetchPivotBranchMock
+      .mockResolvedValueOnce({ data: rowBranchWithMetrics })
+      .mockResolvedValueOnce({
+        data: mergeTrees(colBranchRowDepth1, colBranchRowDepth2),
+      });
+
+    const { container, getAllByLabelText, findByText } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={
+          {
+            ...baseFormData,
+            groupbyRows: ['nation', 'orderPriority', 'orderStatus'],
+            groupbyColumns: ['segment', 'shipMode', METRICS_PLACEHOLDER],
+            metricsLayout: MetricsLayoutEnum.COLUMNS,
+            metrics: ['countCustomers'],
+          } as PivotTableQueryFormData
+        }
+        metrics={['countCustomers']}
+        groupbyRows={['nation', 'orderPriority', 'orderStatus']}
+        groupbyColumns={['segment', 'shipMode']}
+        aggregateFunction="Sum"
+        width={600}
+        height={400}
+        startCollapsed
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    // Expand the first row (USA -> orderPriority)
+    const rowToggle = within(
+      container.querySelector('tbody') as HTMLElement,
+    ).getAllByLabelText('plus-square')[0];
+    fireEvent.click(rowToggle);
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
+    });
+
+    // Expand the first column header (AUTO -> shipMode)
+    const colToggle = getAllByLabelText('plus-square')[0];
+    fireEvent.click(colToggle);
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
+    });
+
+    // Parent row (nation) should still render values for the expanded column leaf.
+    const usaRow = await findByText('USA');
+    const usaRowEl = usaRow.closest('tr') as HTMLElement;
+    expect(within(usaRowEl).getByText('10')).toBeTruthy();
+  });
+
+  it('fills ancestor column cells when expanding rows after a column branch expand', async () => {
+    const baseTreeRaw = buildTreeFromRecords(
+      [
+        { nation: 'USA', segment: 'AUTO', countCustomers: 10 },
+        { nation: 'USA', segment: 'CONSUMER', countCustomers: 7 },
+      ],
+      ['countCustomers'],
+      ['nation', 'orderPriority', 'orderStatus'],
+      ['segment', 'shipMode'],
+      1,
+      1,
+    );
+    const baseTree = applyMetricAxis(
+      baseTreeRaw,
+      ['countCustomers'],
+      MetricsLayoutEnum.COLUMNS,
+      ['nation', 'orderPriority', 'orderStatus'],
+      ['segment', 'shipMode'],
+      2,
+    );
+
+    const colBranchRowDepth1Raw = buildTreeFromRecords(
+      [
+        { nation: 'USA', segment: 'AUTO', shipMode: 'AIR', countCustomers: 6 },
+        { nation: 'USA', segment: 'AUTO', shipMode: 'SEA', countCustomers: 4 },
+      ],
+      ['countCustomers'],
+      ['nation', 'orderPriority', 'orderStatus'],
+      ['segment', 'shipMode'],
+      1,
+      2,
+    );
+    const colBranchRowDepth1 = applyMetricAxis(
+      colBranchRowDepth1Raw,
+      ['countCustomers'],
+      MetricsLayoutEnum.COLUMNS,
+      ['nation', 'orderPriority', 'orderStatus'],
+      ['segment', 'shipMode'],
+      2,
+    );
+
+    const rowBranchLeafRaw = buildTreeFromRecords(
+      [
+        {
+          nation: 'USA',
+          orderPriority: 'HIGH',
+          segment: 'AUTO',
+          shipMode: 'AIR',
+          countCustomers: 5,
+        },
+        {
+          nation: 'USA',
+          orderPriority: 'HIGH',
+          segment: 'AUTO',
+          shipMode: 'SEA',
+          countCustomers: 5,
+        },
+      ],
+      ['countCustomers'],
+      ['nation', 'orderPriority', 'orderStatus'],
+      ['segment', 'shipMode'],
+      2,
+      2,
+    );
+    const rowBranchLeaf = applyMetricAxis(
+      rowBranchLeafRaw,
+      ['countCustomers'],
+      MetricsLayoutEnum.COLUMNS,
+      ['nation', 'orderPriority', 'orderStatus'],
+      ['segment', 'shipMode'],
+      2,
+    );
+
+    const rowBranchColParentRaw = buildTreeFromRecords(
+      [
+        {
+          nation: 'USA',
+          orderPriority: 'HIGH',
+          segment: 'AUTO',
+          countCustomers: 10,
+        },
+        {
+          nation: 'USA',
+          orderPriority: 'HIGH',
+          segment: 'CONSUMER',
+          countCustomers: 7,
+        },
+      ],
+      ['countCustomers'],
+      ['nation', 'orderPriority', 'orderStatus'],
+      ['segment', 'shipMode'],
+      2,
+      1,
+    );
+    const rowBranchColParent = applyMetricAxis(
+      rowBranchColParentRaw,
+      ['countCustomers'],
+      MetricsLayoutEnum.COLUMNS,
+      ['nation', 'orderPriority', 'orderStatus'],
+      ['segment', 'shipMode'],
+      2,
+    );
+
+    fetchPivotBranchMock
+      .mockResolvedValueOnce({ data: colBranchRowDepth1 })
+      .mockResolvedValueOnce({
+        data: mergeTrees(rowBranchLeaf, rowBranchColParent),
+      });
+
+    const { container, findByText } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={
+          {
+            ...baseFormData,
+            groupbyRows: ['nation', 'orderPriority', 'orderStatus'],
+            groupbyColumns: ['segment', 'shipMode', METRICS_PLACEHOLDER],
+            metricsLayout: MetricsLayoutEnum.COLUMNS,
+            metrics: ['countCustomers'],
+          } as PivotTableQueryFormData
+        }
+        metrics={['countCustomers']}
+        groupbyRows={['nation', 'orderPriority', 'orderStatus']}
+        groupbyColumns={['segment', 'shipMode']}
+        aggregateFunction="Sum"
+        width={600}
+        height={400}
+        startCollapsed
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    const thead = container.querySelector('thead') as HTMLElement;
+    const [firstColToggle] = within(thead).getAllByLabelText('plus-square');
+    fireEvent.click(firstColToggle);
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
+    });
+
+    const tbody = container.querySelector('tbody') as HTMLElement;
+    const [firstRowToggle] = within(tbody).getAllByLabelText('plus-square');
+    fireEvent.click(firstRowToggle);
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
+    });
+
+    const highCell = await findByText('HIGH');
+    const highRow = highCell.closest('tr') as HTMLElement;
+    expect(within(highRow).getAllByText('5')).toHaveLength(2);
+    expect(within(highRow).getByText('7')).toBeTruthy();
+  });
+
+  it('keeps row-level ancestor column values when expanding a different column after deeper rows', async () => {
+    const baseTreeRaw = buildTreeFromRecords(
+      [
+        { nation: 'USA', segment: 'AUTO', countCustomers: 100 },
+        { nation: 'USA', segment: 'BUILDING', countCustomers: 150 },
+        { nation: 'CAN', segment: 'AUTO', countCustomers: 90 },
+      ],
+      ['countCustomers'],
+      ['nation', 'orderPriority', 'orderStatus'],
+      ['segment', 'shipMode'],
+      1,
+      1,
+    );
+    const baseTree = applyMetricAxis(
+      baseTreeRaw,
+      ['countCustomers'],
+      MetricsLayoutEnum.COLUMNS,
+      ['nation', 'orderPriority', 'orderStatus'],
+      ['segment', 'shipMode'],
+      2,
+    );
+
+    const colBranchAutoRaw = buildTreeFromRecords(
+      [
+        {
+          nation: 'USA',
+          segment: 'AUTO',
+          shipMode: 'AIR',
+          countCustomers: 60,
+        },
+      ],
+      ['countCustomers'],
+      ['nation', 'orderPriority', 'orderStatus'],
+      ['segment', 'shipMode'],
+      1,
+      2,
+    );
+    const colBranchAuto = applyMetricAxis(
+      colBranchAutoRaw,
+      ['countCustomers'],
+      MetricsLayoutEnum.COLUMNS,
+      ['nation', 'orderPriority', 'orderStatus'],
+      ['segment', 'shipMode'],
+      2,
+    );
+
+    const rowBranchNationRaw = buildTreeFromRecords(
+      [
+        { nation: 'USA', orderPriority: '1-URGENT', segment: 'AUTO', countCustomers: 40 },
+        { nation: 'USA', orderPriority: '1-URGENT', segment: 'BUILDING', countCustomers: 50 },
+        { nation: 'CAN', orderPriority: '1-URGENT', segment: 'AUTO', countCustomers: 30 },
+      ],
+      ['countCustomers'],
+      ['nation', 'orderPriority', 'orderStatus'],
+      ['segment', 'shipMode'],
+      2,
+      1,
+    );
+    const rowBranchNation = applyMetricAxis(
+      rowBranchNationRaw,
+      ['countCustomers'],
+      MetricsLayoutEnum.COLUMNS,
+      ['nation', 'orderPriority', 'orderStatus'],
+      ['segment', 'shipMode'],
+      2,
+    );
+
+    const rowBranchOrderPriorityRaw = buildTreeFromRecords(
+      [
+        {
+          nation: 'USA',
+          orderPriority: '1-URGENT',
+          orderStatus: 'F',
+          segment: 'AUTO',
+          countCustomers: 20,
+        },
+        {
+          nation: 'CAN',
+          orderPriority: '1-URGENT',
+          orderStatus: 'F',
+          segment: 'AUTO',
+          countCustomers: 15,
+        },
+      ],
+      ['countCustomers'],
+      ['nation', 'orderPriority', 'orderStatus'],
+      ['segment', 'shipMode'],
+      3,
+      1,
+    );
+    const rowBranchOrderPriority = applyMetricAxis(
+      rowBranchOrderPriorityRaw,
+      ['countCustomers'],
+      MetricsLayoutEnum.COLUMNS,
+      ['nation', 'orderPriority', 'orderStatus'],
+      ['segment', 'shipMode'],
+      2,
+    );
+
+    const colBranchBuildingRaw = buildTreeFromRecords(
+      [
+        {
+          nation: 'USA',
+          orderPriority: '1-URGENT',
+          segment: 'BUILDING',
+          shipMode: 'AIR',
+          countCustomers: 25,
+        },
+        {
+          nation: 'CAN',
+          orderPriority: '1-URGENT',
+          segment: 'BUILDING',
+          shipMode: 'AIR',
+          countCustomers: 35,
+        },
+      ],
+      ['countCustomers'],
+      ['nation', 'orderPriority', 'orderStatus'],
+      ['segment', 'shipMode'],
+      2,
+      2,
+    );
+    const colBranchBuildingLeaf = applyMetricAxis(
+      colBranchBuildingRaw,
+      ['countCustomers'],
+      MetricsLayoutEnum.COLUMNS,
+      ['nation', 'orderPriority', 'orderStatus'],
+      ['segment', 'shipMode'],
+      2,
+    );
+
+    const colBranchBuildingRow1Raw = buildTreeFromRecords(
+      [
+        { nation: 'USA', segment: 'BUILDING', shipMode: 'AIR', countCustomers: 50 },
+        { nation: 'CAN', segment: 'BUILDING', shipMode: 'AIR', countCustomers: 35 },
+      ],
+      ['countCustomers'],
+      ['nation', 'orderPriority', 'orderStatus'],
+      ['segment', 'shipMode'],
+      1,
+      2,
+    );
+    const colBranchBuildingRow1 = applyMetricAxis(
+      colBranchBuildingRow1Raw,
+      ['countCustomers'],
+      MetricsLayoutEnum.COLUMNS,
+      ['nation', 'orderPriority', 'orderStatus'],
+      ['segment', 'shipMode'],
+      2,
+    );
+
+    const colBranchBuildingAncestorRaw = buildTreeFromRecords(
+      [
+        {
+          nation: 'USA',
+          orderPriority: '1-URGENT',
+          segment: 'BUILDING',
+          shipMode: 'AIR',
+          countCustomers: 50,
+        },
+      ],
+      ['countCustomers'],
+      ['nation', 'orderPriority', 'orderStatus'],
+      ['segment', 'shipMode'],
+      2,
+      2,
+    );
+    const colBranchBuildingAncestor = applyMetricAxis(
+      colBranchBuildingAncestorRaw,
+      ['countCustomers'],
+      MetricsLayoutEnum.COLUMNS,
+      ['nation', 'orderPriority', 'orderStatus'],
+      ['segment', 'shipMode'],
+      2,
+    );
+
+    fetchPivotBranchMock
+      .mockResolvedValueOnce({ data: colBranchAuto })
+      .mockResolvedValueOnce({ data: rowBranchNation })
+      .mockResolvedValueOnce({ data: rowBranchOrderPriority })
+      .mockResolvedValueOnce({
+        data: mergeTrees(
+          colBranchBuildingRow1,
+          mergeTrees(colBranchBuildingLeaf, colBranchBuildingAncestor),
+        ),
+      });
+
+    const { container, findByText, getAllByLabelText } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={
+          {
+            ...baseFormData,
+            groupbyRows: ['nation', 'orderPriority', 'orderStatus'],
+            groupbyColumns: ['segment', 'shipMode', METRICS_PLACEHOLDER],
+            metricsLayout: MetricsLayoutEnum.COLUMNS,
+            metrics: ['countCustomers'],
+          } as PivotTableQueryFormData
+        }
+        metrics={['countCustomers']}
+        groupbyRows={['nation', 'orderPriority', 'orderStatus']}
+        groupbyColumns={['segment', 'shipMode']}
+        aggregateFunction="Sum"
+        width={800}
+        height={500}
+        startCollapsed
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    // 1) Expand first column (AUTO)
+    const thead = container.querySelector('thead') as HTMLElement;
+    fireEvent.click(within(thead).getAllByLabelText('plus-square')[0]);
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
+    });
+
+    // 2) Expand first row (USA)
+    const tbody = container.querySelector('tbody') as HTMLElement;
+    const firstRowToggle = within(tbody).getAllByLabelText('plus-square')[0];
+    fireEvent.click(firstRowToggle);
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
+    });
+
+    // 3) Expand first child row (1-URGENT)
+    const secondRowToggle = within(tbody).getAllByLabelText('plus-square')[0];
+    fireEvent.click(secondRowToggle);
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(3);
+    });
+
+    // 4) Expand second column header (BUILDING)
+    const buildingHeaderCell = within(thead).getByText('BUILDING').closest('th') as HTMLElement;
+    const buildingToggle = within(buildingHeaderCell).getByLabelText('plus-square');
+    fireEvent.click(buildingToggle);
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(4);
+    });
+
+    const orderPriorityRow = await findByText('1-URGENT');
+    const orderPriorityEl = orderPriorityRow.closest('tr') as HTMLElement;
+    // Order-priority row should now have values under the newly expanded BUILDING column.
+    await waitFor(() => {
+      const valueCell = Array.from(orderPriorityEl.querySelectorAll('td')).find(
+        cell => cell.textContent && cell.textContent.trim() !== '',
+      );
+      expect(valueCell).toBeTruthy();
+    });
+    // Sibling top-level row should also have building values populated.
+    const canRow = await findByText('CAN');
+    const canRowEl = canRow.closest('tr') as HTMLElement;
+    await waitFor(() => {
+      const valueCell = Array.from(canRowEl.querySelectorAll('td')).find(
+        cell => cell.textContent && cell.textContent.trim() !== '',
+      );
+      expect(valueCell).toBeTruthy();
+    });
+  });
+
+  it('fills ancestor column values for all visible rows when expanding another column after deep row expansion', async () => {
+    const actualFetchModule = jest.requireActual('../../src/fetchPivotBranch');
+    fetchPivotBranchMock.mockImplementation(args =>
+      actualFetchModule.fetchPivotBranch(args),
+    );
+    peekPivotBranchCacheMock.mockImplementation(
+      actualFetchModule.peekPivotBranchCache,
+    );
+    const postSpy = jest.spyOn(SupersetClient, 'post');
+    postSpy.mockImplementation(({ jsonPayload }) => {
+      const queries = jsonPayload.queries || [];
+      const result = queries.map((query: any) => {
+        const name = query.query_name as string;
+        if (name.includes('branch:col:AUTO')) {
+          if (name.includes(formatQueryName(1, 2))) {
+            return {
+              data: [
+                {
+                  nation: 'USA',
+                  segment: 'AUTO',
+                  shipMode: 'AIR',
+                  countCustomers: 100,
+                },
+                {
+                  nation: 'CAN',
+                  segment: 'AUTO',
+                  shipMode: 'AIR',
+                  countCustomers: 80,
+                },
+              ],
+            };
+          }
+          return { data: [] };
+        }
+        if (name.includes('branch:row:USA__1-URGENT')) {
+          if (name.includes(formatQueryName(3, 2))) {
+            return {
+              data: [
+                {
+                  nation: 'USA',
+                  orderPriority: '1-URGENT',
+                  orderStatus: 'F',
+                  segment: 'AUTO',
+                  shipMode: 'AIR',
+                  countCustomers: 25,
+                },
+              ],
+            };
+          }
+          return { data: [] };
+        }
+        if (name.includes('branch:row:USA')) {
+          if (name.includes(formatQueryName(2, 2))) {
+            return {
+              data: [
+                {
+                  nation: 'USA',
+                  orderPriority: '1-URGENT',
+                  segment: 'AUTO',
+                  shipMode: 'AIR',
+                  countCustomers: 50,
+                },
+              ],
+            };
+          }
+          return { data: [] };
+        }
+        if (name.includes('branch:col:CONSUMER')) {
+          if (name.includes(formatQueryName(3, 2))) {
+            return {
+              data: [
+                {
+                  nation: 'USA',
+                  orderPriority: '1-URGENT',
+                  orderStatus: 'F',
+                  segment: 'CONSUMER',
+                  shipMode: 'AIR',
+                  countCustomers: 15,
+                },
+              ],
+            };
+          }
+          if (name.includes(formatQueryName(1, 2))) {
+            return {
+              data: [
+                {
+                  nation: 'USA',
+                  segment: 'CONSUMER',
+                  shipMode: 'AIR',
+                  countCustomers: 45,
+                },
+                {
+                  nation: 'CAN',
+                  segment: 'CONSUMER',
+                  shipMode: 'AIR',
+                  countCustomers: 35,
+                },
+              ],
+            };
+          }
+          return { data: [] };
+        }
+        return { data: [] };
+      });
+      return Promise.resolve({ json: { result } });
+    });
+
+    const baseTreeRaw = buildTreeFromRecords(
+      [
+        { nation: 'USA', segment: 'AUTO', countCustomers: 100 },
+        { nation: 'CAN', segment: 'AUTO', countCustomers: 80 },
+        { nation: 'CAN', segment: 'CONSUMER', countCustomers: 60 },
+      ],
+      ['countCustomers'],
+      ['nation', 'orderPriority', 'orderStatus'],
+      ['segment', 'shipMode'],
+      1,
+      1,
+    );
+    const baseTree = applyMetricAxis(
+      baseTreeRaw,
+      ['countCustomers'],
+      MetricsLayoutEnum.COLUMNS,
+      ['nation', 'orderPriority', 'orderStatus'],
+      ['segment', 'shipMode'],
+      2,
+    );
+
+    try {
+      const { container, findByText } = render(
+        <PivotTableChart
+          data={baseTree}
+          formData={
+            {
+              ...baseFormData,
+              groupbyRows: ['nation', 'orderPriority', 'orderStatus'],
+              groupbyColumns: ['segment', 'shipMode', METRICS_PLACEHOLDER],
+              metricsLayout: MetricsLayoutEnum.COLUMNS,
+              metrics: ['countCustomers'],
+            } as PivotTableQueryFormData
+          }
+          metrics={['countCustomers']}
+          groupbyRows={['nation', 'orderPriority', 'orderStatus']}
+          groupbyColumns={['segment', 'shipMode']}
+          aggregateFunction="Sum"
+          width={800}
+          height={500}
+          startCollapsed
+          initialDepth={1}
+          maxDepthPerFetch={2}
+          rowTotals={false}
+          colTotals={false}
+          rowSubTotals={false}
+          colSubTotals={false}
+          rowSubtotalLevels={[]}
+          colSubtotalLevels={[]}
+          rowOrder="key_a_to_z"
+          colOrder="key_a_to_z"
+          valueFormat=""
+          columnFormats={{}}
+          currencyFormats={{}}
+          allowRenderHtml={false}
+          emitCrossFilters={false}
+          setDataMask={jest.fn()}
+          metricColorFormatters={[]}
+          dateFormatters={{}}
+        />,
+      );
+
+      const thead = container.querySelector('thead') as HTMLElement;
+      const autoHeader = within(thead).getByText('AUTO').closest('th') as HTMLElement;
+      fireEvent.click(within(autoHeader).getByLabelText('plus-square'));
+      await waitFor(() => {
+        expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
+      });
+
+      const usaRow = await findByText('USA');
+      const usaRowEl = usaRow.closest('tr') as HTMLElement;
+      fireEvent.click(within(usaRowEl).getByLabelText('plus-square'));
+      await waitFor(() => {
+        expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
+      });
+
+      const urgentRow = await findByText('1-URGENT');
+      const urgentRowEl = urgentRow.closest('tr') as HTMLElement;
+      fireEvent.click(within(urgentRowEl).getByLabelText('plus-square'));
+      await waitFor(() => {
+        expect(fetchPivotBranchMock).toHaveBeenCalledTimes(3);
+      });
+
+      const consumerHeader = within(thead).getByText('CONSUMER').closest('th') as HTMLElement;
+      fireEvent.click(within(consumerHeader).getByLabelText('plus-square'));
+      await waitFor(() => {
+        expect(fetchPivotBranchMock).toHaveBeenCalledTimes(4);
+      });
+
+      const canRow = await findByText('CAN');
+      const canRowEl = canRow.closest('tr') as HTMLElement;
+      await waitFor(() => {
+        expect(within(canRowEl).getByText('35')).toBeTruthy();
+      });
+      const orderStatusRow = await findByText('F');
+      const orderStatusRowEl = orderStatusRow.closest('tr') as HTMLElement;
+      expect(within(orderStatusRowEl).getByText('15')).toBeTruthy();
+    } finally {
+      postSpy.mockRestore();
+      fetchPivotBranchMock.mockReset();
+      fetchPivotBranchMock.mockResolvedValue({ data: undefined });
+      peekPivotBranchCacheMock.mockReset();
+    }
   });
 });

@@ -324,7 +324,22 @@ function PivotTableChart(props: PivotTableProps) {
     colTotals = false,
     rowSubTotals = false,
     colSubTotals = false,
+    rowTotalPosition = 'start',
+    colTotalPosition = 'start',
+    colSubtotalPosition = 'start',
   } = props;
+
+  const normalizedRowSubtotalLevels = useMemo(
+    () => rowSubtotalLevels.filter(level => level === 0),
+    [rowSubtotalLevels],
+  );
+  const normalizedColSubtotalLevels = useMemo(
+    () =>
+      colSubtotalLevels.filter(
+        level => level <= groupbyColumns.length && level >= 0,
+      ),
+    [colSubtotalLevels, groupbyColumns.length],
+  );
 
   const [tree, setTree] = useState<PivotTreeData>(data);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -558,51 +573,104 @@ function PivotTableChart(props: PivotTableProps) {
     [colOrder, colTypeMap, groupbyColumns],
   );
 
-  const showRowRoot =
-    groupbyRows.length > 0 &&
-    (rowSubtotalLevels.includes(0) || rowTotals || rowSubTotals);
-  const showColRoot =
-    groupbyColumns.length > 0 &&
-    (colSubtotalLevels.includes(0) || colTotals || colSubTotals);
-
-  const skipRowRoot = groupbyRows.length > 0 && !showRowRoot;
-  const skipColRoot = groupbyColumns.length === 0 || !showColRoot;
-
-  const visibleRows = useMemo(
-    () =>
-      buildVisibleList(
-        tree.rows,
-        expandedRows,
-        rowSorter,
-        skipRowRoot,
-        getRowChildren,
-      ),
-    [expandedRows, getRowChildren, rowSorter, skipRowRoot, tree.rows],
-  );
-  const visibleCols = useMemo(
-    () => {
-      const leaves = buildVisibleLeafList(
-        tree.cols,
-        expandedCols,
-        colSorter,
-        skipColRoot,
-        getColChildren,
-      );
-      if (leaves.length === 0 && tree.cols[rootKey]) {
-        return [tree.cols[rootKey]];
-      }
-      if (showColRoot && tree.cols[rootKey]) {
-        return [tree.cols[rootKey], ...leaves];
-      }
-      return leaves;
-    },
-    [expandedCols, colSorter, getColChildren, skipColRoot, showColRoot, tree.cols],
-  );
   const countDimDepth = useCallback(
     (path: PivotTreeNode['path']) =>
       path.filter(val => !metricLabelSet.has(String(val ?? ''))).length,
     [metricLabelSet],
   );
+
+  const showRowRoot =
+    groupbyRows.length > 0 &&
+    (normalizedRowSubtotalLevels.includes(0) || rowTotals || rowSubTotals);
+  const showColRoot =
+    groupbyColumns.length > 0 &&
+    (normalizedColSubtotalLevels.includes(0) || colTotals || colSubTotals);
+
+  const skipRowRoot = groupbyRows.length > 0 && !showRowRoot;
+  const skipColRoot = groupbyColumns.length === 0 || !showColRoot;
+
+  const visibleRows = useMemo(() => {
+    const ordered = buildVisibleList(
+      tree.rows,
+      expandedRows,
+      rowSorter,
+      skipRowRoot,
+      getRowChildren,
+    );
+    if (rowTotalPosition === 'end' && showRowRoot) {
+      const rootIdx = ordered.findIndex(row => row.key === rootKey);
+      if (rootIdx >= 0) {
+        const [rootRow] = ordered.splice(rootIdx, 1);
+        return [...ordered, rootRow];
+      }
+    }
+    return ordered;
+  }, [
+    expandedRows,
+    getRowChildren,
+    rowSorter,
+    rowTotalPosition,
+    showRowRoot,
+    skipRowRoot,
+    tree.rows,
+  ]);
+
+  const buildColLeavesWithSubtotals = useCallback(
+    (node: PivotTreeNode): PivotTreeNode[] => {
+      const children = getColChildren(node).sort(colSorter);
+      const dimDepth = countDimDepth(node.path);
+      const includeSubtotal =
+        node.isSubtotal &&
+        ((colTotals && dimDepth === 0) ||
+          normalizedColSubtotalLevels.includes(dimDepth) ||
+          colSubTotals) &&
+        !(dimDepth === 0 && !showColRoot);
+      if (!expandedCols.has(node.key) || children.length === 0) {
+        return [node];
+      }
+      const childLeaves = children.flatMap(buildColLeavesWithSubtotals);
+      if (includeSubtotal) {
+        const placeAtFront =
+          (dimDepth === 0 ? colTotalPosition : colSubtotalPosition) === 'start';
+        return placeAtFront
+          ? [node, ...childLeaves]
+          : [...childLeaves, node];
+      }
+      return childLeaves;
+    },
+    [
+      getColChildren,
+      colSorter,
+      countDimDepth,
+      normalizedColSubtotalLevels,
+      showColRoot,
+      expandedCols,
+      colTotalPosition,
+      colSubtotalPosition,
+      colTotals,
+    ],
+  );
+
+  const visibleCols = useMemo(() => {
+    const root = tree.cols[rootKey];
+    if (!root) {
+      return [] as PivotTreeNode[];
+    }
+    const startNodes = skipColRoot
+      ? getColChildren(root).sort(colSorter)
+      : [root];
+    const leaves = startNodes.flatMap(buildColLeavesWithSubtotals);
+    if (leaves.length === 0 && tree.cols[rootKey]) {
+      return [tree.cols[rootKey]];
+    }
+    return leaves;
+  }, [
+    buildColLeavesWithSubtotals,
+    colSorter,
+    getColChildren,
+    skipColRoot,
+    tree.cols,
+  ]);
   const visibleRowDepth = useMemo(
     () => Math.max(0, ...visibleRows.map(row => countDimDepth(row.path))),
     [countDimDepth, visibleRows],
@@ -1009,6 +1077,12 @@ function PivotTableChart(props: PivotTableProps) {
     [allowRenderHtml, deriveMetricKey, renderValue, tree.cells],
   );
 
+  const formatLabel = useCallback(
+    (node: PivotTreeNode) =>
+      node.level === 0 ? t('Grand total') : node.formattedLabel,
+    [],
+  );
+
   return (
     <Container height={height} width={width}>
       {errorMessage && <div>{t('Error loading branch: %s', errorMessage)}</div>}
@@ -1039,19 +1113,19 @@ function PivotTableChart(props: PivotTableProps) {
                             type="button"
                             onClick={() => handleToggle('col', cell.node)}
                           >
-                            {expandedCols.has(cell.node.key) ? (
-                              <MinusSquareOutlined />
-                            ) : (
-                              <PlusSquareOutlined />
-                            )}
-                          </ToggleButton>
+                        {expandedCols.has(cell.node.key) ? (
+                          <MinusSquareOutlined />
+                        ) : (
+                          <PlusSquareOutlined />
                         )}
-                        <span>{cell.node.formattedLabel}</span>
-                        {loadingKeys.has(cell.node.key) && <Spinner />}
-                      </HeaderCell>
-                    </th>
-                  );
-                })}
+                      </ToggleButton>
+                    )}
+                    <span>{formatLabel(cell.node)}</span>
+                    {loadingKeys.has(cell.node.key) && <Spinner />}
+                  </HeaderCell>
+                </th>
+              );
+            })}
               </tr>
             ))
           )}
@@ -1076,7 +1150,7 @@ function PivotTableChart(props: PivotTableProps) {
                         )}
                       </ToggleButton>
                     )}
-                    <span>{row.formattedLabel}</span>
+                    <span>{formatLabel(row)}</span>
                     {loadingKeys.has(row.key) && <Spinner />}
                   </HeaderCell>
                 </th>

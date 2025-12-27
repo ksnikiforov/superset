@@ -44,6 +44,7 @@ import {
   serializePath,
   resolveMetricPlacement,
   stripMetricsPlaceholder,
+  normalizeSubtotalLevels,
 } from './utils';
 
 export interface FetchPivotBranchResult {
@@ -109,6 +110,8 @@ interface ResolvedFetchContext {
   rowDepth: number;
   colDepth: number;
   cacheKey: string;
+  rowSubtotalLevels: number[];
+  colSubtotalLevels: number[];
 }
 
 const resolveFetchContext = ({
@@ -129,6 +132,18 @@ const resolveFetchContext = ({
   });
   const rowGroupby = stripMetricsPlaceholder(placement.rows);
   const colGroupby = stripMetricsPlaceholder(placement.cols);
+  const rowSubtotalLevels = normalizeSubtotalLevels(
+    formData.rowSubtotalLevels,
+    rowGroupby.length,
+    formData.rowTotals,
+    formData.rowSubTotals,
+  ).filter(level => level === 0);
+  const colSubtotalLevels = normalizeSubtotalLevels(
+    formData.colSubtotalLevels,
+    colGroupby.length,
+    formData.colTotals,
+    formData.colSubTotals,
+  );
   const metricsLayoutResolved = placement.layout;
   const metricsAxis: PivotAxis =
     metricsLayoutResolved === MetricsLayoutEnum.ROWS ? 'row' : 'col';
@@ -208,6 +223,8 @@ const resolveFetchContext = ({
     rowDepth,
     colDepth,
     cacheKey,
+    rowSubtotalLevels,
+    colSubtotalLevels,
   };
 };
 
@@ -240,6 +257,8 @@ export async function fetchPivotBranch({
     rowDepth,
     colDepth,
     cacheKey,
+    rowSubtotalLevels,
+    colSubtotalLevels,
   } = resolveFetchContext({
     formData,
     axis,
@@ -255,9 +274,15 @@ export async function fetchPivotBranch({
     return { data: cached, cached: true };
   }
 
-  const depthPairs: Array<{ rowDepth: number; colDepth: number }> = [
-    { rowDepth, colDepth },
-  ];
+  const depthPairs: Array<{ rowDepth: number; colDepth: number }> = [];
+  const addDepthPair = (rowDepthVal: number, colDepthVal: number) => {
+    const key = `${rowDepthVal}|${colDepthVal}`;
+    if (depthPairs.find(pair => `${pair.rowDepth}|${pair.colDepth}` === key)) {
+      return;
+    }
+    depthPairs.push({ rowDepth: rowDepthVal, colDepth: colDepthVal });
+  };
+  addDepthPair(rowDepth, colDepth);
 
   const needsMetricFrontRoot =
     metricsLayoutResolved === MetricsLayoutEnum.ROWS &&
@@ -265,7 +290,7 @@ export async function fetchPivotBranch({
     axis === 'col' &&
     rowDepth > 0;
   if (needsMetricFrontRoot) {
-    depthPairs.push({ rowDepth: 0, colDepth });
+    addDepthPair(0, colDepth);
   }
   const needsMetricFrontColumnRootForRows =
     metricsLayoutResolved === MetricsLayoutEnum.COLUMNS &&
@@ -273,8 +298,61 @@ export async function fetchPivotBranch({
     axis === 'row' &&
     colDepth > 0;
   if (needsMetricFrontColumnRootForRows) {
-    depthPairs.push({ rowDepth, colDepth: 0 });
+    addDepthPair(rowDepth, 0);
   }
+  if (axis === 'col' && rowDepth > 0 && colDepth > 0) {
+    addDepthPair(Math.max(rowDepth - 1, 0), colDepth);
+  }
+  if (axis === 'col' && colDepth > 0 && rowDepth > 0) {
+    const colParentDepth = Math.max(colDepth - 1, 0);
+    for (let depth = 1; depth <= rowDepth; depth += 1) {
+      addDepthPair(depth, colDepth);
+      if (colParentDepth !== colDepth) {
+        addDepthPair(depth, colParentDepth);
+      }
+    }
+  }
+  if (axis === 'row' && colDepth > 0) {
+    for (let depth = 1; depth <= colDepth; depth += 1) {
+      addDepthPair(rowDepth, depth);
+      if (rowDepth > 0) {
+        addDepthPair(Math.max(rowDepth - 1, 0), depth);
+      }
+    }
+  }
+  if (metricsLayoutResolved === MetricsLayoutEnum.COLUMNS && colDepth > 0) {
+    const colParentDepth = Math.max(colDepth - 1, 0);
+    if (axis === 'col') {
+      addDepthPair(rowDepth, colParentDepth);
+      if (rowDepth > 0) {
+        addDepthPair(Math.max(rowDepth - 1, 0), colDepth);
+        addDepthPair(Math.max(rowDepth - 1, 0), colParentDepth);
+      }
+    } else if (axis === 'row') {
+      addDepthPair(rowDepth, colParentDepth);
+      if (rowDepth > 0) {
+        addDepthPair(Math.max(rowDepth - 1, 0), colDepth);
+        addDepthPair(Math.max(rowDepth - 1, 0), colParentDepth);
+      }
+    }
+  }
+  const effectiveRowLevels = Array.from(
+    new Set([
+      ...rowSubtotalLevels,
+      ...(formData.rowTotals ? [0] : []),
+    ]),
+  ).filter(level => level <= rowDepth);
+  const effectiveColLevels = Array.from(
+    new Set([
+      ...colSubtotalLevels,
+      ...(formData.colTotals ? [0] : []),
+    ]),
+  ).filter(level => level <= colDepth);
+  const subtotalRowDepths = new Set<number>([rowDepth, ...effectiveRowLevels]);
+  const subtotalColDepths = new Set<number>([colDepth, ...effectiveColLevels]);
+  subtotalRowDepths.forEach(rowDepthVal => {
+    subtotalColDepths.forEach(colDepthVal => addDepthPair(rowDepthVal, colDepthVal));
+  });
 
   const filters =
     axis === 'row'

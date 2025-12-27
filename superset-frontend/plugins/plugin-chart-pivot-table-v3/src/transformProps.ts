@@ -33,6 +33,7 @@ import {
   MetricsLayoutEnum,
   PivotTableQueryFormData,
   PivotTreeData,
+  TotalPosition,
 } from './types';
 import {
   applyMetricAxis,
@@ -83,6 +84,12 @@ export default function transformProps(
     formData.colTotals,
     formData.colSubTotals,
   );
+  const rowTotalPosition =
+    (formData.rowTotalPosition as TotalPosition) || 'start';
+  const colTotalPosition =
+    (formData.colTotalPosition as TotalPosition) || 'start';
+  const colSubtotalPosition =
+    (formData.colSubtotalPosition as TotalPosition) || 'start';
   const metricsLayout = placement.layout;
   const metricInsertIndex =
     metricsLayout === MetricsLayoutEnum.ROWS
@@ -236,5 +243,8 @@ export default function transformProps(
     timeGrainSqla: formData.time_grain_sqla,
     treeData: nextTree,
     colTypeMap,
+    rowTotalPosition,
+    colTotalPosition,
+    colSubtotalPosition,
   };
 }

@@ -421,6 +421,7 @@ export const buildTreeFromRecords = (
 ): PivotTreeData => {
   const tree: PivotTreeData = { rows: {}, cols: {}, cells: {} };
   const metricKeys = getMetricKeys(metrics);
+  const rootKey = serializePath([]);
 
   const ensureNode = (
     axis: 'row' | 'col',
@@ -487,8 +488,18 @@ export const buildTreeFromRecords = (
     };
   });
 
-  ensureNode('row', [], 'Total');
-  ensureNode('col', [], 'Total');
+  ensureNode('row', [], 'Grand total');
+  ensureNode('col', [], 'Grand total');
+  const rootValues =
+    tree.rows[rootKey]?.values || tree.cols[rootKey]?.values;
+  if (rootValues && !tree.cells[`${rootKey}|${rootKey}`]) {
+    tree.cells[`${rootKey}|${rootKey}`] = {
+      rowKey: rootKey,
+      colKey: rootKey,
+      values: rootValues,
+      isSubtotal: true,
+    };
+  }
 
   return tree;
 };
