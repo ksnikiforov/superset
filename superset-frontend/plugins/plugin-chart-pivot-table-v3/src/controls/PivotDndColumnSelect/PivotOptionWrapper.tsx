@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { useRef } from 'react';
+import { useMemo, useRef } from 'react';
 import {
   useDrag,
   useDrop,
@@ -30,7 +30,7 @@ import {
 } from 'src/explore/components/controls/DndColumnSelectControl/types';
 import { Tooltip } from '@superset-ui/core/components';
 import { StyledColumnOption } from 'src/explore/components/optionRenderers';
-import { styled, isAdhocColumn } from '@superset-ui/core';
+import { styled, isAdhocColumn, t, useTheme } from '@superset-ui/core';
 import { ColumnMeta } from '@superset-ui/chart-controls';
 import Option from 'src/explore/components/controls/DndColumnSelectControl/Option';
 
@@ -41,15 +41,37 @@ export const OptionLabel = styled.div`
   white-space: nowrap;
 `;
 
+const PlaceholderBadge = styled.span`
+  margin-left: ${({ theme }) => theme.gridUnit || 4}px;
+  padding: 0 6px;
+  border-radius: ${({ theme }) => theme.borderRadius}px;
+  border: 1px solid ${({ theme }) => theme.colorPrimary};
+  background: transparent;
+  color: ${({ theme }) => theme.colorPrimary};
+  font-size: ${({ theme }) =>
+    theme.typography?.sizes?.s ||
+    theme.typography?.sizes?.m ||
+    theme.fontSizeSM}px;
+  font-weight: ${({ theme }) =>
+    theme.typography?.weights?.bold ||
+    theme.typography?.weightStrong ||
+    theme.fontWeightBold ||
+    600};
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+`;
+
 type PivotOptionProps = OptionProps & {
   type: string;
   onShiftOptions: (dragIndex: number, hoverIndex: number) => void;
   listId?: string;
   onHoverIndex?: (index: number) => void;
   onHoverListId?: (listId?: string) => void;
+  isPlaceholder?: boolean;
 };
 
 export default function PivotOptionWrapper(props: PivotOptionProps) {
+  const theme = useTheme();
   const {
     index,
     label,
@@ -66,11 +88,33 @@ export default function PivotOptionWrapper(props: PivotOptionProps) {
     canDelete = true,
     tooltipOverlay,
     listId,
-    itemRef,
+    isPlaceholder,
     ...rest
   } = props;
   const ref = useRef<HTMLDivElement>(null);
   const labelRef = useRef<HTMLDivElement>(null);
+
+  const labelStyles = useMemo(() => {
+    if (!isPlaceholder) {
+      return undefined;
+    }
+    return {
+      color: theme.colors?.grayscale?.dark1 || theme.colorText,
+      display: 'inline-flex',
+      alignItems: 'center',
+      gap: Math.max(4, theme.gridUnit),
+      lineHeight: 1.1,
+    };
+  }, [isPlaceholder, theme]);
+
+  const placeholderTextStyles = useMemo(() => {
+    if (!isPlaceholder) {
+      return undefined;
+    }
+    return {
+      marginRight: (theme.gridUnit || 4) * 2,
+    };
+  }, [isPlaceholder, theme]);
 
   const [{ isDragging }, drag] = useDrag({
     item: {
@@ -194,10 +238,6 @@ export default function PivotOptionWrapper(props: PivotOptionProps) {
     return null;
   };
 
-  const setRefs = (node: HTMLDivElement | null) => {
-    ref.current = node;
-  };
-
   drag(drop(ref));
 
   return (
@@ -210,12 +250,21 @@ export default function PivotOptionWrapper(props: PivotOptionProps) {
       <Option
         index={index}
         clickClose={clickClose}
-        withCaret={withCaret}
+        withCaret={withCaret && !isPlaceholder}
         isExtra={isExtra}
         datasourceWarningMessage={datasourceWarningMessage}
-        canDelete={canDelete}
+        canDelete={isPlaceholder ? false : canDelete}
       >
-        <Label />
+        <OptionLabel ref={labelRef} style={labelStyles}>
+          {isPlaceholder ? (
+            <>
+              <span style={placeholderTextStyles}>{t('Σ Values')}</span>
+              <PlaceholderBadge>{t('Fixed')}</PlaceholderBadge>
+            </>
+          ) : (
+            <Label />
+          )}
+        </OptionLabel>
       </Option>
     </DragContainer>
   );

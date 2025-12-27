@@ -16,12 +16,12 @@ This document summarizes the functional requirements gathered from user feedback
 
 ### Metrics placement & values
 - **Metrics as their own tier in the hierarchy:** Metrics are projected into row/col headers (depending on layout) instead of being combined in a single cell (`applyMetricAxis` in `utils.ts`, invoked from `transformProps.ts`).
-- **Draggable metrics placeholder (“Σ Values”):** Selecting a metric injects a non-removable “Σ Values” placeholder into Rows/Columns controls; it is draggable across/within hierarchies to place the metrics tier where desired (`controlPanel.tsx`, placeholder metadata in `utils.ts`, placement handled in `transformProps.ts`/`applyMetricAxis`).
+- **Draggable metrics placeholder (“Σ Values”):** Selecting a metric injects a non-removable “Σ Values” placeholder into Rows/Columns controls; it is draggable across/within hierarchies to place the metrics tier where desired (`controlPanel.tsx`, placeholder metadata in `utils.ts`, placement handled in `transformProps.ts`/`applyMetricAxis`). The placeholder is styled inline with a small “Fixed” badge and no delete affordance to signal it cannot be removed from the layout.
 - **Correct metric selection per cell:** Cell rendering derives the metric key from the metric tier node; optional user-selected fallback resolves metric collisions (`deriveMetricKey` in `PivotTableChart.tsx`, `metricConflictFallback` control).
 - **Multiple metrics as separate headers:** Each metric produces its own header node; cells display a single metric’s value (`applyMetricAxis`, `renderCellContent`).
 
 ### Drag & drop behavior (current)
-- **Metrics placeholder dedupe & move:** Resolver ensures only one `__MEASURES__` lives across axes; cross-axis drops dispatch both axes in sync (control panel + DnD plumbing). Metrics move without duplication; backend/query alignment uses the same resolver.
+- **Metrics placeholder dedupe & move:** Resolver ensures only one `__MEASURES__` lives across axes; cross-axis drops dispatch both axes in sync (control panel + DnD plumbing). Metrics move without duplication; backend/query alignment uses the same resolver. Placeholder DnD logic lives entirely in the plugin control (no global Explore overrides).
 - **Dimensions move instead of copy:** Non-measure fields are deduped across axes on drop so they move between Rows/Columns rather than copying.
 - **Ordering gap:** Cross-axis drops currently append when hover index isn’t captured reliably (no preview). Further work needed to compute insert index from pointer position for consistent placement.
 

@@ -301,11 +301,44 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
   const valuesRenderer = useCallback(
     () =>
       optionSelector.values.map((column, idx) => {
+        const isPlaceholder =
+          column === METRICS_PLACEHOLDER ||
+          (isColumnMeta(column) &&
+            column.column_name === METRICS_PLACEHOLDER);
         const datasourceWarningMessage =
           isAdhocColumn(column) && column.datasourceWarning
             ? t('This column might be incompatible with current dataset')
             : undefined;
-        const withCaret = isAdhocColumn(column) || !column.error_text;
+        const withCaret =
+          !isPlaceholder && (isAdhocColumn(column) || !column.error_text);
+        const optionNode = (
+          <PivotOptionWrapper
+            key={idx}
+            index={idx}
+            clickClose={!isPlaceholder && canDelete ? onClickClose : undefined}
+            onShiftOptions={onShiftOptions}
+            onHoverIndex={setLastHoverIndex}
+            onHoverListId={setLastHoverList}
+            type={dragType}
+            listId={currentListId}
+            canDelete={!isPlaceholder && canDelete}
+            column={column}
+            datasourceWarningMessage={datasourceWarningMessage}
+            withCaret={withCaret}
+            isPlaceholder={isPlaceholder}
+            tooltipOverlay={
+              isPlaceholder
+                ? t(
+                    'Values placeholder for metrics placement; it cannot be removed.',
+                  )
+                : undefined
+            }
+          />
+        );
+
+        if (isPlaceholder) {
+          return optionNode;
+        }
 
         return (
           <ColumnSelectPopoverTrigger
@@ -323,20 +356,7 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
             isTemporal={isTemporal}
             disabledTabs={disabledTabs}
           >
-            <PivotOptionWrapper
-              key={idx}
-              index={idx}
-              clickClose={canDelete ? onClickClose : undefined}
-              onShiftOptions={onShiftOptions}
-              onHoverIndex={setLastHoverIndex}
-              onHoverListId={setLastHoverList}
-              type={dragType}
-              listId={currentListId}
-              canDelete={canDelete}
-              column={column}
-              datasourceWarningMessage={datasourceWarningMessage}
-              withCaret={withCaret}
-            />
+            {optionNode}
           </ColumnSelectPopoverTrigger>
         );
       }),
