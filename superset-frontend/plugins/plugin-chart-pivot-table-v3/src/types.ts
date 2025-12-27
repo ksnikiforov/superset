@@ -89,6 +89,8 @@ export interface PivotTableCustomizeProps {
   colTotals: boolean;
   rowSubTotals: boolean;
   colSubTotals: boolean;
+  rowSubtotalLevels?: number[];
+  colSubtotalLevels?: number[];
   rowOrder: string;
   colOrder: string;
   valueFormat?: string;
@@ -141,6 +143,8 @@ export interface PivotTableProps
   colTotals: boolean;
   rowSubTotals: boolean;
   colSubTotals: boolean;
+  rowSubtotalLevels?: number[];
+  colSubtotalLevels?: number[];
   rowOrder: string;
   colOrder: string;
   valueFormat?: string;

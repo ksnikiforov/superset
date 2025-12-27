@@ -41,6 +41,7 @@ import {
   parseDepth,
   resolveMetricPlacement,
   stripMetricsPlaceholder,
+  normalizeSubtotalLevels,
 } from './utils';
 
 const { DATABASE_DATETIME } = TimeFormats;
@@ -70,6 +71,18 @@ export default function transformProps(
   });
   const groupbyRows = stripMetricsPlaceholder(placement.rows);
   const groupbyColumns = stripMetricsPlaceholder(placement.cols);
+  const rowSubtotalLevels = normalizeSubtotalLevels(
+    formData.rowSubtotalLevels,
+    groupbyRows.length,
+    formData.rowTotals,
+    formData.rowSubTotals,
+  );
+  const colSubtotalLevels = normalizeSubtotalLevels(
+    formData.colSubtotalLevels,
+    groupbyColumns.length,
+    formData.colTotals,
+    formData.colSubTotals,
+  );
   const metricsLayout = placement.layout;
   const metricInsertIndex =
     metricsLayout === MetricsLayoutEnum.ROWS
@@ -200,6 +213,8 @@ export default function transformProps(
     colTotals: formData.colTotals,
     rowSubTotals: formData.rowSubTotals,
     colSubTotals: formData.colSubTotals,
+    rowSubtotalLevels,
+    colSubtotalLevels,
     rowOrder: formData.rowOrder,
     colOrder: formData.colOrder,
     valueFormat: formData.valueFormat,

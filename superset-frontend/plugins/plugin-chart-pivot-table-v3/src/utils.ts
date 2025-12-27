@@ -59,6 +59,30 @@ export const getMetricKeys = (metrics: QueryFormMetric[]) =>
     .map(metric => (typeof metric === 'string' ? metric : metric.label))
     .filter((m): m is string => !!m);
 
+export const normalizeSubtotalLevels = (
+  levels: number[] | undefined,
+  maxDepth: number,
+  legacyTotal?: boolean,
+  legacySubtotals?: boolean,
+) => {
+  const base = Array.isArray(levels)
+    ? levels
+        .map(l => Number(l))
+        .filter(l => Number.isFinite(l) && l <= maxDepth && l >= 0)
+    : [];
+  const next = new Set(base);
+  if (legacyTotal) {
+    next.add(0);
+  }
+  if (legacySubtotals) {
+    // legacy boolean meant all levels; here we add every level greater than 0
+    for (let i = 1; i <= maxDepth; i += 1) {
+      next.add(i);
+    }
+  }
+  return Array.from(next).sort((a, b) => a - b);
+};
+
 export const parseDepth = (queryName?: string) => {
   if (
     !queryName ||
@@ -260,6 +284,18 @@ export const applyMetricAxis = (
           values: { [metric]: cell.values[metric] },
           isSubtotal: cell.isSubtotal,
         };
+        // If there is only one metric, also surface the value at the base row
+        // path so collapsed views (before expanding into the metric tier) can render.
+        if (metricKeys.length === 1) {
+          const baseRowKey = serializePath(rowPath);
+          result.cells[`${baseRowKey}|${colKey}`] =
+            result.cells[`${baseRowKey}|${colKey}`] || {
+              rowKey: baseRowKey,
+              colKey,
+              values: { [metric]: cell.values[metric] },
+              isSubtotal: cell.isSubtotal,
+            };
+        }
       });
     });
   } else {
@@ -314,6 +350,18 @@ export const applyMetricAxis = (
           values: { [metric]: cell.values[metric] },
           isSubtotal: cell.isSubtotal,
         };
+        // If there is only one metric, also surface the value at the base column
+        // path so collapsed views (before expanding into the metric tier) can render.
+        if (metricKeys.length === 1) {
+          const baseColKey = serializePath(colPath);
+          result.cells[`${rowKey}|${baseColKey}`] =
+            result.cells[`${rowKey}|${baseColKey}`] || {
+              rowKey,
+              colKey: baseColKey,
+              values: { [metric]: cell.values[metric] },
+              isSubtotal: cell.isSubtotal,
+            };
+        }
       });
     });
   }

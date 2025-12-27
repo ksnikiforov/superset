@@ -113,6 +113,7 @@ const resolveFetchContext = ({
   axis,
   path,
   maxDepthPerFetch,
+  currentTree,
 }: FetchPivotBranchParams): ResolvedFetchContext => {
   const rowGroupbyRaw = ensureIsArray<QueryFormColumn>(formData.groupbyRows);
   const colGroupbyRaw = ensureIsArray<QueryFormColumn>(formData.groupbyColumns);
@@ -150,14 +151,25 @@ const resolveFetchContext = ({
       ? defaultIncrement
       : Number.MAX_SAFE_INTEGER;
 
+  const currentRowDepth =
+    Math.max(
+      0,
+      ...Object.values(currentTree?.rows || {}).map(node => node.path.length),
+    ) || 0;
+  const currentColDepth =
+    Math.max(
+      0,
+      ...Object.values(currentTree?.cols || {}).map(node => node.path.length),
+    ) || 0;
+
   const rowDepth =
     axis === 'row'
       ? Math.min(rowGroupby.length, sanitizedPath.length + depthIncrement)
-      : rowGroupby.length;
+      : Math.min(rowGroupby.length, currentRowDepth);
   const colDepth =
     axis === 'col'
       ? Math.min(colGroupby.length, sanitizedPath.length + depthIncrement)
-      : colGroupby.length;
+      : Math.min(colGroupby.length, currentColDepth);
 
   const cacheKey = buildCacheKey(
     axis,
@@ -209,7 +221,7 @@ export async function fetchPivotBranch({
     rowDepth,
     colDepth,
     cacheKey,
-  } = resolveFetchContext({ formData, axis, path, maxDepthPerFetch });
+  } = resolveFetchContext({ formData, axis, path, maxDepthPerFetch, currentTree });
 
   const cached = cache.get(cacheKey);
   if (cached) {

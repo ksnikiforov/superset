@@ -109,6 +109,8 @@ const buildVisibleList = (
   expanded: Set<string>,
   sorter: (a: PivotTreeNode, b: PivotTreeNode) => number,
   skipRoot = false,
+  getChildren: (node: PivotTreeNode) => PivotTreeNode[] = node =>
+    findChildren(nodes, node),
 ) => {
   const ordered: PivotTreeNode[] = [];
   const root = nodes[rootKey];
@@ -121,7 +123,7 @@ const buildVisibleList = (
     if (!expanded.has(node.key)) {
       return;
     }
-    const children = findChildren(nodes, node).sort(sorter);
+    const children = getChildren(node).sort(sorter);
     children.forEach(traverse);
   };
 
@@ -132,6 +134,39 @@ const buildVisibleList = (
     traverse(root);
   }
   return ordered;
+};
+
+const buildVisibleLeafList = (
+  nodes: Record<string, PivotTreeNode>,
+  expanded: Set<string>,
+  sorter: (a: PivotTreeNode, b: PivotTreeNode) => number,
+  skipRoot = false,
+  getChildren: (node: PivotTreeNode) => PivotTreeNode[] = node =>
+    findChildren(nodes, node),
+) => {
+  const leaves: PivotTreeNode[] = [];
+  const root = nodes[rootKey];
+  if (!root) {
+    return leaves;
+  }
+
+  const traverse = (node: PivotTreeNode) => {
+    const children = getChildren(node).sort(sorter);
+    if (!expanded.has(node.key) || children.length === 0) {
+      leaves.push(node);
+      return;
+    }
+    children.forEach(traverse);
+  };
+
+  if (skipRoot) {
+    const children = getChildren(root).sort(sorter);
+    children.forEach(traverse);
+  } else {
+    traverse(root);
+  }
+
+  return leaves;
 };
 
 type HeaderCellInfo = {
@@ -147,7 +182,7 @@ const buildColumnHeaderRows = (
   if (cols.length === 0) {
     return [] as HeaderCellInfo[][];
   }
-  const maxDepth = Math.max(...cols.map(col => col.path.length));
+  const maxDepth = Math.max(...cols.map(col => Math.max(col.path.length, 1)));
   const rows: HeaderCellInfo[][] = Array.from({ length: maxDepth }, () => []);
   // Track the last cell per row to aggregate colspan across adjacent columns.
   const lastCells: (HeaderCellInfo | undefined)[] = Array(maxDepth).fill(
@@ -156,6 +191,15 @@ const buildColumnHeaderRows = (
 
   cols.forEach(col => {
     const path = col.path;
+    if (path.length === 0) {
+      const cell: HeaderCellInfo = {
+        node: col,
+        colSpan: 1,
+        rowSpan: maxDepth,
+      };
+      rows[0].push(cell);
+      return;
+    }
     const lastLevel = path.length - 1;
     for (let level = 0; level < maxDepth; level += 1) {
       if (level >= path.length) {
@@ -274,6 +318,12 @@ function PivotTableChart(props: PivotTableProps) {
     dateFormatters = {},
     colTypeMap,
     metricsLayout = MetricsLayoutEnum.COLUMNS,
+    rowSubtotalLevels = [],
+    colSubtotalLevels = [],
+    rowTotals = false,
+    colTotals = false,
+    rowSubTotals = false,
+    colSubTotals = false,
   } = props;
 
   const [tree, setTree] = useState<PivotTreeData>(data);
@@ -320,12 +370,58 @@ function PivotTableChart(props: PivotTableProps) {
     setFetchedColKeys(new Set());
   }, [data, startCollapsed, initialDepth]);
 
+  const metricLabels = useMemo(
+    () =>
+      metrics.map(m => (typeof m === 'string' ? m : getColumnLabel(m as any))),
+    [metrics],
+  );
+
+  const getRowChildren = useCallback(
+    (parent: PivotTreeNode) => {
+      const children = findChildren(tree.rows, parent);
+      if (
+        metricsLayout === MetricsLayoutEnum.ROWS &&
+        parent.axis === 'row' &&
+        parent.level < groupbyRows.length
+      ) {
+        return children.filter(
+          child =>
+            !metricLabels.includes(String(child.path[parent.level] ?? '')),
+        );
+      }
+      return children;
+    },
+    [groupbyRows.length, metricLabels, metricsLayout, tree.rows],
+  );
+
+  const getColChildren = useCallback(
+    (parent: PivotTreeNode) => {
+      const children = findChildren(tree.cols, parent);
+      if (
+        metricsLayout === MetricsLayoutEnum.COLUMNS &&
+        parent.axis === 'col' &&
+        parent.level < groupbyColumns.length
+      ) {
+        return children.filter(
+          child =>
+            !metricLabels.includes(String(child.path[parent.level] ?? '')),
+        );
+      }
+      return children;
+    },
+    [groupbyColumns.length, metricLabels, metricsLayout, tree.cols],
+  );
+
   const hasLoadedChildren = useCallback(
     (axis: 'row' | 'col', node: PivotTreeNode) => {
-      const nodes = axis === 'row' ? tree.rows : tree.cols;
-      return findChildren(nodes, node).length > 0;
+      const children =
+        axis === 'row' ? getRowChildren(node) : getColChildren(node);
+      if (children.length === 0) {
+        return false;
+      }
+      return true;
     },
-    [tree.cols, tree.rows],
+    [getColChildren, getRowChildren],
   );
 
   const handleToggle = useCallback(
@@ -356,6 +452,7 @@ function PivotTableChart(props: PivotTableProps) {
           path: node.path,
           formData,
           maxDepthPerFetch,
+          currentTree: tree,
         });
         if (cached) {
           setTree(current => mergeTrees(current, cached));
@@ -416,17 +513,45 @@ function PivotTableChart(props: PivotTableProps) {
     [colOrder, colTypeMap, groupbyColumns],
   );
 
-  const skipRowRoot =
-    groupbyRows.length > 0 && !props.rowTotals && !props.rowSubTotals;
-  const skipColRoot = groupbyColumns.length === 0;
+  const showRowRoot =
+    groupbyRows.length > 0 &&
+    (rowSubtotalLevels.includes(0) || rowTotals || rowSubTotals);
+  const showColRoot =
+    groupbyColumns.length > 0 &&
+    (colSubtotalLevels.includes(0) || colTotals || colSubTotals);
+
+  const skipRowRoot = groupbyRows.length > 0 && !showRowRoot;
+  const skipColRoot = groupbyColumns.length === 0 || !showColRoot;
 
   const visibleRows = useMemo(
-    () => buildVisibleList(tree.rows, expandedRows, rowSorter, skipRowRoot),
-    [expandedRows, rowSorter, skipRowRoot, tree.rows],
+    () =>
+      buildVisibleList(
+        tree.rows,
+        expandedRows,
+        rowSorter,
+        skipRowRoot,
+        getRowChildren,
+      ),
+    [expandedRows, getRowChildren, rowSorter, skipRowRoot, tree.rows],
   );
   const visibleCols = useMemo(
-    () => buildVisibleList(tree.cols, expandedCols, colSorter, skipColRoot),
-    [expandedCols, colSorter, skipColRoot, tree.cols],
+    () => {
+      const leaves = buildVisibleLeafList(
+        tree.cols,
+        expandedCols,
+        colSorter,
+        skipColRoot,
+        getColChildren,
+      );
+      if (leaves.length === 0 && tree.cols[rootKey]) {
+        return [tree.cols[rootKey]];
+      }
+      if (showColRoot && tree.cols[rootKey]) {
+        return [tree.cols[rootKey], ...leaves];
+      }
+      return leaves;
+    },
+    [expandedCols, colSorter, getColChildren, skipColRoot, showColRoot, tree.cols],
   );
   const columnHeaderRows = useMemo(
     () => buildColumnHeaderRows(visibleCols, tree.cols),

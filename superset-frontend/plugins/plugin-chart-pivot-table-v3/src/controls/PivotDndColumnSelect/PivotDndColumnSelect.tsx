@@ -151,8 +151,12 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
           pivotPlacement.setControlValue ||
           ((name: string, val: any) =>
             dispatch(setControlValueAction(name, val, [])));
-        setControl(pivotPlacement.controlNames.rows, resolved.rows, []);
-        setControl(pivotPlacement.controlNames.cols, resolved.cols, []);
+        // Defer control updates to avoid unmounting drop targets mid-drag,
+        // which can trigger react-dnd's "Expected to find a valid target".
+        requestAnimationFrame(() => {
+          setControl(pivotPlacement.controlNames.rows, resolved.rows, []);
+          setControl(pivotPlacement.controlNames.cols, resolved.cols, []);
+        });
         resetHover();
         return;
       }
@@ -313,7 +317,7 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
           !isPlaceholder && (isAdhocColumn(column) || !column.error_text);
         const optionNode = (
           <PivotOptionWrapper
-            key={idx}
+            key={getOptionKey(column, idx)}
             index={idx}
             clickClose={!isPlaceholder && canDelete ? onClickClose : undefined}
             onShiftOptions={onShiftOptions}
@@ -409,6 +413,28 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
         multi ? 2 : 1,
       ),
     [ghostButtonText, multi],
+  );
+
+  const getOptionKey = useCallback(
+    (column: QueryFormColumn | ColumnMeta | AdhocColumn | string, idx: number) => {
+      if (
+        column === METRICS_PLACEHOLDER ||
+        (isColumnMeta(column) && column.column_name === METRICS_PLACEHOLDER)
+      ) {
+        return `${currentListId}-placeholder`;
+      }
+      if (isColumnMeta(column)) {
+        return `${currentListId}-col-${column.column_name}`;
+      }
+      if (isAdhocColumn(column)) {
+        return `${currentListId}-adhoc-${column.label || column.sqlExpression || idx}`;
+      }
+      if (typeof column === 'string') {
+        return `${currentListId}-str-${column}`;
+      }
+      return `${currentListId}-idx-${idx}`;
+    },
+    [currentListId],
   );
 
   return (

@@ -24,8 +24,12 @@ import {
   QueryFormColumn,
   QueryFormOrderBy,
 } from '@superset-ui/core';
-import { PivotTableQueryFormData } from './types';
-import { stripMetricsPlaceholder } from './utils';
+import { MetricsLayoutEnum, PivotTableQueryFormData } from './types';
+import {
+  normalizeSubtotalLevels,
+  resolveMetricPlacement,
+  stripMetricsPlaceholder,
+} from './utils';
 
 export const QUERY_NAME_PREFIX = 'pivot_v3';
 export const formatQueryName = (rowDepth: number, colDepth: number) =>
@@ -58,29 +62,65 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
     colTotals,
     rowSubTotals,
     colSubTotals,
+    rowSubtotalLevels,
+    colSubtotalLevels,
     initialDepth = 1,
   } = formData;
 
   const time_grain_sqla =
     extra_form_data?.time_grain_sqla || formData.time_grain_sqla;
 
-  const rowGroupby = stripMetricsPlaceholder(
-    ensureIsArray<QueryFormColumn>(groupbyRows),
-  );
-  const colGroupby = stripMetricsPlaceholder(
-    ensureIsArray<QueryFormColumn>(groupbyColumns),
-  );
+  const rowGroupbyRaw = ensureIsArray<QueryFormColumn>(groupbyRows);
+  const colGroupbyRaw = ensureIsArray<QueryFormColumn>(groupbyColumns);
+  const metrics = ensureIsArray(formData.metrics);
+  const placement = resolveMetricPlacement(rowGroupbyRaw, colGroupbyRaw, {
+    hasMetrics: metrics.length > 0,
+    preferredAxis: formData.metricsLayout as MetricsLayoutEnum,
+  });
+  const rowGroupby = stripMetricsPlaceholder(placement.rows);
+  const colGroupby = stripMetricsPlaceholder(placement.cols);
+  const metricsOnRows = placement.layout === MetricsLayoutEnum.ROWS;
+  const metricInsertIndex =
+    placement.metricPosition >= 0 ? placement.metricPosition : undefined;
 
   const isTotalsEnabled = rowTotals || colTotals || rowSubTotals || colSubTotals;
-  const requireMultiQuery = startCollapsed || isTotalsEnabled;
+  const isLevelTotalsEnabled =
+    (rowSubtotalLevels && rowSubtotalLevels.length > 0) ||
+    (colSubtotalLevels && colSubtotalLevels.length > 0);
+  const requireMultiQuery = startCollapsed || isTotalsEnabled || isLevelTotalsEnabled;
+
+  const initialDepthResolved = Math.max(initialDepth || 1, 1);
+  const adjustForMetricFront = (depth: number, onAxis: boolean) => {
+    if (!onAxis) {
+      return depth;
+    }
+    // If metrics sit at position 0 on this axis, one visible level is the metric tier itself.
+    if (metricInsertIndex === 0) {
+      return Math.max(depth - 1, 0);
+    }
+    return depth;
+  };
 
   const rowDepthLimit = Math.min(
     rowGroupby.length,
-    Math.max(initialDepth || 1, 1),
+    adjustForMetricFront(initialDepthResolved, metricsOnRows),
   );
   const colDepthLimit = Math.min(
     colGroupby.length,
-    Math.max(initialDepth || 1, 1),
+    adjustForMetricFront(initialDepthResolved, !metricsOnRows),
+  );
+
+  const rowLevels = normalizeSubtotalLevels(
+    rowSubtotalLevels,
+    rowGroupby.length,
+    rowTotals,
+    rowSubTotals,
+  );
+  const colLevels = normalizeSubtotalLevels(
+    colSubtotalLevels,
+    colGroupby.length,
+    colTotals,
+    colSubTotals,
   );
 
   const temporalLookup = formData?.temporal_columns_lookup || {};
@@ -102,7 +142,7 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
         {
           ...baseQueryObject,
           orderby,
-        columns: [...rowGroupby, ...colGroupby].map(col =>
+          columns: [...rowGroupby, ...colGroupby].map(col =>
             normalizeColumn(col, time_grain_sqla, isTemporalColumn(col)),
           ),
           query_name: formatQueryName(rowGroupby.length, colGroupby.length),
@@ -110,29 +150,12 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
       ];
     }
 
-    const rowDepths = new Set<number>();
-    const colDepths = new Set<number>();
+    const rowDepths = new Set<number>(rowLevels);
+    const colDepths = new Set<number>(colLevels);
 
-    if (rowTotals || rowSubTotals) {
-      rowDepths.add(0);
-    }
-    if (colTotals || colSubTotals) {
-      colDepths.add(0);
-    }
-
-    for (let depth = 1; depth <= rowDepthLimit; depth += 1) {
-      rowDepths.add(depth);
-    }
-    for (let depth = 1; depth <= colDepthLimit; depth += 1) {
-      colDepths.add(depth);
-    }
-
-    if (rowDepths.size === 0) {
-      rowDepths.add(rowDepthLimit || 0);
-    }
-    if (colDepths.size === 0) {
-      colDepths.add(colDepthLimit || 0);
-    }
+    // always include the initial visible depth for each axis
+    rowDepths.add(rowDepthLimit || 0);
+    colDepths.add(colDepthLimit || 0);
 
     const queries = Array.from(rowDepths).flatMap(rowDepth =>
       Array.from(colDepths).map(colDepth => ({

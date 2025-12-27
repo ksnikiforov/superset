@@ -35,6 +35,7 @@ import {
   METRICS_PLACEHOLDER,
   METRICS_PLACEHOLDER_LABEL,
   resolveMetricPlacement,
+  stripMetricsPlaceholder,
 } from './utils';
 import PivotDndColumnSelect from './controls/PivotDndColumnSelect/PivotDndColumnSelect';
 
@@ -294,45 +295,67 @@ const config: ControlPanelConfig = {
         ],
         [
           {
-            name: 'rowTotals',
+            name: 'rowSubtotalLevels',
             config: {
-              type: 'CheckboxControl',
-              label: t('Show rows total'),
-              default: false,
+              type: 'SelectControl',
+              label: t('Row totals & subtotals'),
+              description: t(
+                'Select which row levels should show totals/subtotals (0 = total).',
+              ),
+              clearable: true,
+              multiple: true,
+              default: [],
               renderTrigger: true,
-              description: t('Display row level total from the database.'),
+              optionRenderer: (opt: any) => opt?.label ?? opt?.value,
+              mapStateToProps: state => {
+                const rowsRaw = ensureIsArray(state?.controls?.groupbyRows?.value);
+                const colsRaw = ensureIsArray(state?.controls?.groupbyColumns?.value);
+                const metricsValue = ensureIsArray(state?.controls?.metrics?.value);
+                const placement = resolveMetricPlacement(rowsRaw, colsRaw, {
+                  hasMetrics: metricsValue.length > 0,
+                  preferredAxis:
+                    (state?.controls?.metricsLayout?.value as MetricsLayoutEnum) ||
+                    MetricsLayoutEnum.COLUMNS,
+                });
+                const rowDepth = stripMetricsPlaceholder(placement.rows).length;
+                const options = Array.from({ length: rowDepth + 1 }).map((_, idx) => ({
+                  value: idx,
+                  label: idx === 0 ? t('Total') : t('Subtotal level %s', idx),
+                }));
+                return { options };
+              },
             },
           },
           {
-            name: 'rowSubTotals',
+            name: 'colSubtotalLevels',
             config: {
-              type: 'CheckboxControl',
-              label: t('Show rows subtotal'),
-              default: false,
+              type: 'SelectControl',
+              label: t('Column totals & subtotals'),
+              description: t(
+                'Select which column levels should show totals/subtotals (0 = total).',
+              ),
+              clearable: true,
+              multiple: true,
+              default: [],
               renderTrigger: true,
-              description: t('Display row level subtotal from the database.'),
-            },
-          },
-        ],
-        [
-          {
-            name: 'colTotals',
-            config: {
-              type: 'CheckboxControl',
-              label: t('Show columns total'),
-              default: false,
-              renderTrigger: true,
-              description: t('Display column level total from the database.'),
-            },
-          },
-          {
-            name: 'colSubTotals',
-            config: {
-              type: 'CheckboxControl',
-              label: t('Show columns subtotal'),
-              default: false,
-              renderTrigger: true,
-              description: t('Display column level subtotal from the database.'),
+              optionRenderer: (opt: any) => opt?.label ?? opt?.value,
+              mapStateToProps: state => {
+                const rowsRaw = ensureIsArray(state?.controls?.groupbyRows?.value);
+                const colsRaw = ensureIsArray(state?.controls?.groupbyColumns?.value);
+                const metricsValue = ensureIsArray(state?.controls?.metrics?.value);
+                const placement = resolveMetricPlacement(rowsRaw, colsRaw, {
+                  hasMetrics: metricsValue.length > 0,
+                  preferredAxis:
+                    (state?.controls?.metricsLayout?.value as MetricsLayoutEnum) ||
+                    MetricsLayoutEnum.COLUMNS,
+                });
+                const colDepth = stripMetricsPlaceholder(placement.cols).length;
+                const options = Array.from({ length: colDepth + 1 }).map((_, idx) => ({
+                  value: idx,
+                  label: idx === 0 ? t('Total') : t('Subtotal level %s', idx),
+                }));
+                return { options };
+              },
             },
           },
         ],
