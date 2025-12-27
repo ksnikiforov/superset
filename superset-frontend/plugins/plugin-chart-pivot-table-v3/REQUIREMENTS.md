@@ -40,6 +40,19 @@ This document summarizes the functional requirements gathered from user feedback
 - Align totals ordering for complex layouts (metrics on rows + row totals) and verify deep hierarchy totals.
 - Add comprehensive tests for column header stacking and metric conflict fallback behavior.
 
+### Interaction & behavior guide (expected)
+- **Layout resolution:** The “Σ Values” placeholder is resolved into the target axis at a specific index (`resolveMetricPlacement` → `transformProps.ts`), producing an ordered list of row/col groupbys and a metrics axis. Only one placeholder exists across axes; cross-axis moves update both controls.
+- **Initial render (collapsed):** Build queries for the initial visible depths (respecting `initialDepth`, metrics placement, and selected totals/subtotals). Render only top-level row/col nodes. If metrics are on columns (or rows) and there is exactly one metric, also surface the metric value at the base axis key so cells are populated without expanding.
+- **Expand rows:** Clicking “+” on a row should fetch the next row depth only (plus any selected subtotal depths), merged into the tree, and the visible traversal should progress through the dimension levels before showing metrics. Example expected path with `rows: [r1, r2], columns: [Values, c1], metrics: [m1]`: `r1 → r2` (metrics on columns stay off the row hierarchy).
+- **Expand columns:** Clicking “+” on a column should fetch the next column depth (plus selected subtotal depths) with row depth limited to what is currently rendered. Example with `rows: [r1], columns: [Values, c1], metrics: [m1]`: expanding a column shows metric headers/values; row depth should not be forced deeper.
+- **Single metric at the bottom:** When only one metric is selected and Values is the last level on an axis, suppress the extra metric header row/column while keeping values visible.
+- **Totals/subtotals:** Level-aware selections (arrays) define which depths to request. Initial load queries only visible depths + selected totals/subtotals; branch fetches request the same depth pairs when expanding.
+- **Drag & drop:** Placeholder is deduped across axes; drag should not throw; cross-axis drops update both controls and rerun placement. Keys are stable to avoid react-dnd target invalidation.
+
+### Current bugs to fix
+- **Row expansion skips last dimension when metrics are on columns:** With `rows: [r1, r2]`, `columns: [Values, c1]`, `metrics: [m1]`, expansion still goes `r1 → Value` instead of `r1 → r2`. Suspected areas: `PivotTableChart.tsx` (`getRowChildren`, `buildVisibleList`, `hasLoadedChildren`) and row-depth alignment in `fetchPivotBranch.ts` (context resolver). Metric filtering may be hiding the `r2` node before it is fetched.
+- **Metric tier suppression vs. expand:** Hiding the metric tier for single-metric cases must not suppress the needed row/col depth. Filtering in `getRowChildren`/`getColChildren` should coexist with branch fetching so dimension nodes still materialize; verify branch depth calculation (`resolveFetchContext` in `fetchPivotBranch.ts`) respects current visible depth when metrics are on the opposite axis.
+
 ### Key file references
 - Query construction: `superset-frontend/plugins/plugin-chart-pivot-table-v3/src/buildQuery.ts`
 - Branch fetching: `superset-frontend/plugins/plugin-chart-pivot-table-v3/src/fetchPivotBranch.ts`
