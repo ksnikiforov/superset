@@ -22,6 +22,7 @@ import {
   getColumnLabel,
   QueryFormColumn,
   QueryFormMetric,
+  ensureIsArray,
 } from '@superset-ui/core';
 import { MetricsLayoutEnum, PivotPath, PivotTreeData } from './types';
 import { formatQueryName } from './buildQuery';
@@ -30,18 +31,24 @@ export const PATH_DIVIDER = '__';
 export const METRICS_PLACEHOLDER = '__MEASURES__';
 export const METRICS_PLACEHOLDER_LABEL = 'Σ Values';
 
+export const normalizePlaceholder = (val: QueryFormColumn) => {
+  if (val === METRICS_PLACEHOLDER) return METRICS_PLACEHOLDER;
+  if (
+    typeof val === 'object' &&
+    ((val as any).column_name === METRICS_PLACEHOLDER ||
+      (val as any).label === METRICS_PLACEHOLDER)
+  ) {
+    return METRICS_PLACEHOLDER;
+  }
+  return val;
+};
+
+export const isMetricsPlaceholder = (val: QueryFormColumn) =>
+  normalizePlaceholder(val) === METRICS_PLACEHOLDER;
+
 export const stripMetricsPlaceholder = (groupby: QueryFormColumn[]) =>
   groupby.filter(col => {
-    if (col === METRICS_PLACEHOLDER) {
-      return false;
-    }
-    if (
-      typeof col === 'object' &&
-      ((col as any).column_name === METRICS_PLACEHOLDER ||
-        (col as any).label === METRICS_PLACEHOLDER)
-    ) {
-      return false;
-    }
+    if (isMetricsPlaceholder(col)) return false;
     return true;
   });
 
@@ -73,6 +80,90 @@ export const mergeTrees = (
   cols: { ...(left?.cols || {}), ...(right?.cols || {}) },
   cells: { ...(left?.cells || {}), ...(right?.cells || {}) },
 });
+
+export const resolveMetricPlacement = (
+  rowsRaw: QueryFormColumn[] = [],
+  colsRaw: QueryFormColumn[] = [],
+  options: {
+    hasMetrics: boolean;
+    preferredAxis?: MetricsLayoutEnum;
+    lastMoved?: 'row' | 'col';
+  },
+) => {
+  const normalizeGroupby = (values: QueryFormColumn[] = []) =>
+    ensureIsArray(values).map(normalizePlaceholder);
+  const rowsNormalized = normalizeGroupby(rowsRaw);
+  const colsNormalized = normalizeGroupby(colsRaw);
+  const rowsBase = rowsNormalized.filter(val => !isMetricsPlaceholder(val));
+  const colsBase = colsNormalized.filter(val => !isMetricsPlaceholder(val));
+  const preferred =
+    options.preferredAxis === MetricsLayoutEnum.ROWS ? 'row' : 'col';
+
+  if (!options.hasMetrics) {
+    const layout =
+      options.preferredAxis === MetricsLayoutEnum.ROWS
+        ? MetricsLayoutEnum.ROWS
+        : MetricsLayoutEnum.COLUMNS;
+    return {
+      rows: rowsBase,
+      cols: colsBase,
+      axis: preferred,
+      layout,
+      metricPosition: -1,
+    };
+  }
+
+  const rowsHas = rowsNormalized.some(isMetricsPlaceholder);
+  const colsHas = colsNormalized.some(isMetricsPlaceholder);
+
+  let axis: 'row' | 'col' = preferred;
+  if (rowsHas && !colsHas) {
+    axis = 'row';
+  } else if (colsHas && !rowsHas) {
+    axis = 'col';
+  } else if (rowsHas && colsHas) {
+    axis = options.lastMoved || preferred;
+  } else if (!rowsHas && !colsHas) {
+    axis = options.lastMoved || preferred;
+  }
+
+  const insertIndex =
+    axis === 'row'
+      ? Math.min(
+          rowsHas
+            ? rowsNormalized.indexOf(METRICS_PLACEHOLDER)
+            : rowsBase.length,
+          rowsBase.length,
+        )
+      : Math.min(
+          colsHas
+            ? colsNormalized.indexOf(METRICS_PLACEHOLDER)
+            : colsBase.length,
+          colsBase.length,
+        );
+
+  const rows =
+    axis === 'row'
+      ? [
+          ...rowsBase.slice(0, insertIndex),
+          METRICS_PLACEHOLDER,
+          ...rowsBase.slice(insertIndex),
+        ]
+      : rowsBase;
+  const cols =
+    axis === 'col'
+      ? [
+          ...colsBase.slice(0, insertIndex),
+          METRICS_PLACEHOLDER,
+          ...colsBase.slice(insertIndex),
+        ]
+      : colsBase;
+
+  const layout =
+    axis === 'row' ? MetricsLayoutEnum.ROWS : MetricsLayoutEnum.COLUMNS;
+
+  return { rows, cols, axis, layout, metricPosition: insertIndex };
+};
 
 export const applyMetricAxis = (
   tree: PivotTreeData,

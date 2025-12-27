@@ -31,16 +31,22 @@ import {
   validateNonEmpty,
 } from '@superset-ui/core';
 import { MetricsLayoutEnum } from './types';
-import { METRICS_PLACEHOLDER, METRICS_PLACEHOLDER_LABEL } from './utils';
+import {
+  METRICS_PLACEHOLDER,
+  METRICS_PLACEHOLDER_LABEL,
+  resolveMetricPlacement,
+} from './utils';
 
-const withMetricsPlaceholder = (config: any) => ({
+  const withMetricsPlaceholder = (axis: 'row' | 'col') => (config: any) => ({
   ...config,
+  shouldMapStateToProps: () => true,
   mapStateToProps: (state: any, controlState: any, chart: any) => {
     const base =
       typeof config.mapStateToProps === 'function'
         ? config.mapStateToProps(state, controlState, chart)
         : {};
     const metricsValue = ensureIsArray(state?.controls?.metrics?.value);
+    const hasMetrics = metricsValue.length > 0;
     const options = ensureIsArray(base?.options);
     const hasPlaceholder = options.some(
       (opt: any) => (opt?.column_name || opt?.label) === METRICS_PLACEHOLDER,
@@ -56,36 +62,58 @@ const withMetricsPlaceholder = (config: any) => ({
       is_placeholder: true,
       canDelete: false,
     };
-    const nextOptions = metricsValue.length
+    const nextOptions = hasMetrics
       ? hasPlaceholder
         ? options
         : [...options, placeholderOption]
       : options.filter(
           (opt: any) => (opt?.column_name || opt?.label) !== METRICS_PLACEHOLDER,
         );
-    let value = ensureIsArray(controlState?.value);
-    const normalizeVal = (val: any) => {
-      if (val === METRICS_PLACEHOLDER) return METRICS_PLACEHOLDER;
-      if (typeof val === 'object') {
-        const name = (val as any).column_name || (val as any).label;
-        if (name === METRICS_PLACEHOLDER) {
-          return METRICS_PLACEHOLDER;
-        }
-      }
-      return val;
-    };
-    value = value.map(normalizeVal);
-    if (metricsValue.length > 0 && !value.includes(METRICS_PLACEHOLDER)) {
-      value = [...value, METRICS_PLACEHOLDER];
+    const rowsRaw =
+      axis === 'row'
+        ? ensureIsArray(controlState?.value)
+        : ensureIsArray(state?.controls?.groupbyRows?.value);
+    const colsRaw =
+      axis === 'col'
+        ? ensureIsArray(controlState?.value)
+        : ensureIsArray(state?.controls?.groupbyColumns?.value);
+    const preferredLayout =
+      (state?.controls?.metricsLayout?.value as MetricsLayoutEnum) ||
+      (state?.form_data?.metricsLayout as MetricsLayoutEnum) ||
+      MetricsLayoutEnum.COLUMNS;
+    const resolved = resolveMetricPlacement(rowsRaw, colsRaw, {
+      hasMetrics,
+      preferredAxis: preferredLayout,
+    });
+    if ((window as any).__PIVOT_V3_DEBUG_PLACEMENT) {
+      // eslint-disable-next-line no-console
+      console.log('[pivot-v3] placement', {
+        axis,
+        rowsRaw,
+        colsRaw,
+        resolvedRows: resolved.rows,
+        resolvedCols: resolved.cols,
+        preferredLayout,
+        hasMetrics,
+        hasSetControlValue: !!state?.actions?.setControlValue,
+      });
     }
-    if (metricsValue.length === 0 && value.includes(METRICS_PLACEHOLDER)) {
-      value = value.filter((v: any) => v !== METRICS_PLACEHOLDER);
-    }
+    const value = axis === 'row' ? resolved.rows : resolved.cols;
     return {
       ...base,
       options: nextOptions,
       value,
-      placeholder: !metricsValue.length,
+      placeholder: !hasMetrics,
+      pivotPlacement: {
+        axis: axis === 'row' ? 'rows' : 'cols',
+        rows: resolved.rows,
+        cols: resolved.cols,
+        preferredAxis: resolved.layout,
+        hasMetrics,
+        controlNames: { rows: 'groupbyRows', cols: 'groupbyColumns' },
+        resolve: resolveMetricPlacement,
+        setControlValue: state?.actions?.setControlValue,
+      },
     };
   },
 });
@@ -99,7 +127,7 @@ const config: ControlPanelConfig = {
         [
           {
             name: 'groupbyColumns',
-            config: withMetricsPlaceholder({
+            config: withMetricsPlaceholder('col')({
               ...sharedControls.groupby,
               type: 'DndColumnSelect',
               dragTypeOverride: 'pivot_v3_dnd',
@@ -111,7 +139,7 @@ const config: ControlPanelConfig = {
         [
           {
             name: 'groupbyRows',
-            config: withMetricsPlaceholder({
+            config: withMetricsPlaceholder('row')({
               ...sharedControls.groupby,
               type: 'DndColumnSelect',
               dragTypeOverride: 'pivot_v3_dnd',
@@ -420,61 +448,17 @@ const config: ControlPanelConfig = {
     const metrics = ensureIsArray(formData.metrics);
     const rows = ensureIsArray(formData.groupbyRows);
     const cols = ensureIsArray(formData.groupbyColumns);
-
-    // Auto-insert the measures placeholder into columns when metrics exist and
-    // it isn't already placed. Remove it when no metrics are selected.
-    const normalize = (vals: any[]) =>
-      vals.map(val => {
-        if (val === METRICS_PLACEHOLDER) return METRICS_PLACEHOLDER;
-        if (
-          typeof val === 'object' &&
-          ((val as any).column_name === METRICS_PLACEHOLDER ||
-            (val as any).label === METRICS_PLACEHOLDER)
-        ) {
-          return METRICS_PLACEHOLDER;
-        }
-        return val;
-      });
-    const rowsNorm = normalize(rows);
-    const colsNorm = normalize(cols);
-    const hasPlaceholderInRows = rowsNorm.includes(METRICS_PLACEHOLDER);
-    const hasPlaceholderInCols = colsNorm.includes(METRICS_PLACEHOLDER);
-    const shouldInsertPlaceholder = metrics.length > 0;
-    const sanitizedRows = shouldInsertPlaceholder
-      ? rowsNorm
-      : rowsNorm.filter(col => col !== METRICS_PLACEHOLDER);
-    const sanitizedCols = shouldInsertPlaceholder
-      ? colsNorm
-      : colsNorm.filter(col => col !== METRICS_PLACEHOLDER);
-
-    const groupbyColumns = getStandardizedControls().controls.columns.filter(
-      col => !sanitizedRows.includes(col),
-    );
-    getStandardizedControls().controls.columns =
-      getStandardizedControls().controls.columns.filter(
-        col => !groupbyColumns.includes(col),
-      );
-
-    const nextGroupbyColumns =
-      shouldInsertPlaceholder && !hasPlaceholderInRows && !hasPlaceholderInCols
-        ? [...sanitizedCols, METRICS_PLACEHOLDER]
-        : sanitizedCols;
-
-    // Ensure the placeholder only lives in one axis at a time. Prefer the axis
-    // where the user already placed it (rows if present, otherwise columns).
-    const rowsHasPlaceholder = sanitizedRows.includes(METRICS_PLACEHOLDER);
-    const colsHasPlaceholder = nextGroupbyColumns.includes(METRICS_PLACEHOLDER);
-    const finalRows = sanitizedRows;
-    const finalCols =
-      rowsHasPlaceholder && colsHasPlaceholder
-        ? nextGroupbyColumns.filter(col => col !== METRICS_PLACEHOLDER)
-        : nextGroupbyColumns;
+    const resolved = resolveMetricPlacement(rows, cols, {
+      hasMetrics: metrics.length > 0,
+      preferredAxis: formData.metricsLayout as MetricsLayoutEnum,
+    });
 
     return {
       ...formData,
       metrics: getStandardizedControls().popAllMetrics(),
-      groupbyRows: finalRows,
-      groupbyColumns: finalCols,
+      metricsLayout: resolved.layout,
+      groupbyRows: resolved.rows,
+      groupbyColumns: resolved.cols,
     };
   },
 };

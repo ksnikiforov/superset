@@ -36,10 +36,10 @@ import {
 } from './types';
 import {
   applyMetricAxis,
-  METRICS_PLACEHOLDER,
   buildTreeFromRecords,
   mergeTrees,
   parseDepth,
+  resolveMetricPlacement,
   stripMetricsPlaceholder,
 } from './utils';
 
@@ -61,27 +61,24 @@ export default function transformProps(
     theme,
     ownState,
   } = chartProps;
+  const metrics = ensureIsArray(formData.metrics || []);
   const groupbyRowsRaw = ensureIsArray(formData.groupbyRows || []);
   const groupbyColumnsRaw = ensureIsArray(formData.groupbyColumns || []);
-  const rowPlaceholderIndex = groupbyRowsRaw.indexOf(METRICS_PLACEHOLDER);
-  const colPlaceholderIndex = groupbyColumnsRaw.indexOf(METRICS_PLACEHOLDER);
-  const groupbyRows = stripMetricsPlaceholder(groupbyRowsRaw);
-  const groupbyColumns = stripMetricsPlaceholder(groupbyColumnsRaw);
-  const metricsLayout =
-    rowPlaceholderIndex >= 0
-      ? MetricsLayoutEnum.ROWS
-      : colPlaceholderIndex >= 0
-      ? MetricsLayoutEnum.COLUMNS
-      : formData.metricsLayout || MetricsLayoutEnum.COLUMNS;
+  const placement = resolveMetricPlacement(groupbyRowsRaw, groupbyColumnsRaw, {
+    hasMetrics: metrics.length > 0,
+    preferredAxis: formData.metricsLayout as MetricsLayoutEnum,
+  });
+  const groupbyRows = stripMetricsPlaceholder(placement.rows);
+  const groupbyColumns = stripMetricsPlaceholder(placement.cols);
+  const metricsLayout = placement.layout;
   const metricInsertIndex =
     metricsLayout === MetricsLayoutEnum.ROWS
-      ? rowPlaceholderIndex >= 0
-        ? Math.min(rowPlaceholderIndex, groupbyRows.length)
+      ? placement.metricPosition >= 0
+        ? Math.min(placement.metricPosition, groupbyRows.length)
         : groupbyRows.length
-      : colPlaceholderIndex >= 0
-      ? Math.min(colPlaceholderIndex, groupbyColumns.length)
+      : placement.metricPosition >= 0
+      ? Math.min(placement.metricPosition, groupbyColumns.length)
       : groupbyColumns.length;
-  const metrics = ensureIsArray(formData.metrics || []);
   const granularity = extractTimegrain(rawFormData);
 
   const combinedData = queriesData.flatMap(({ data }) => data || []);

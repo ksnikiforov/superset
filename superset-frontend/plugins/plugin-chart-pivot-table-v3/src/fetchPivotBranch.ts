@@ -36,12 +36,12 @@ import {
   PivotTreeData,
 } from './types';
 import {
-  METRICS_PLACEHOLDER,
   buildTreeFromRecords,
   applyMetricAxis,
   mergeTrees,
   getMetricKeys,
   serializePath,
+  resolveMetricPlacement,
   stripMetricsPlaceholder,
 } from './utils';
 
@@ -116,35 +116,25 @@ const resolveFetchContext = ({
 }: FetchPivotBranchParams): ResolvedFetchContext => {
   const rowGroupbyRaw = ensureIsArray<QueryFormColumn>(formData.groupbyRows);
   const colGroupbyRaw = ensureIsArray<QueryFormColumn>(formData.groupbyColumns);
-  const rowGroupby = stripMetricsPlaceholder(rowGroupbyRaw);
-  const colGroupby = stripMetricsPlaceholder(colGroupbyRaw);
-
-  const rowPlaceholderIndex = rowGroupbyRaw.indexOf(METRICS_PLACEHOLDER);
-  const colPlaceholderIndex = colGroupbyRaw.indexOf(METRICS_PLACEHOLDER);
-  const metricsAxis: PivotAxis | undefined =
-    rowPlaceholderIndex >= 0
-      ? 'row'
-      : colPlaceholderIndex >= 0
-      ? 'col'
-      : formData.metricsLayout === 'ROWS'
-      ? 'row'
-      : 'col';
-  const metricsLayoutResolved =
-    metricsAxis === 'row'
-      ? MetricsLayoutEnum.ROWS
-      : MetricsLayoutEnum.COLUMNS;
   const metrics = ensureIsArray(formData.metrics);
+  const placement = resolveMetricPlacement(rowGroupbyRaw, colGroupbyRaw, {
+    hasMetrics: metrics.length > 0,
+    preferredAxis: formData.metricsLayout as MetricsLayoutEnum,
+  });
+  const rowGroupby = stripMetricsPlaceholder(placement.rows);
+  const colGroupby = stripMetricsPlaceholder(placement.cols);
+  const metricsLayoutResolved = placement.layout;
+  const metricsAxis: PivotAxis =
+    metricsLayoutResolved === MetricsLayoutEnum.ROWS ? 'row' : 'col';
   const metricInsertIndex =
-    metricsAxis === 'row'
-      ? rowPlaceholderIndex >= 0
-        ? Math.min(rowPlaceholderIndex, rowGroupby.length)
-        : rowGroupby.length
-      : colPlaceholderIndex >= 0
-      ? Math.min(colPlaceholderIndex, colGroupby.length)
+    placement.metricPosition >= 0
+      ? placement.metricPosition
+      : metricsAxis === 'row'
+      ? rowGroupby.length
       : colGroupby.length;
 
   const normalizePath = (p: PivotPath, targetAxis: PivotAxis) => {
-    if (metricsAxis !== targetAxis) {
+    if (metricsAxis !== targetAxis || placement.metricPosition < 0) {
       return p;
     }
     return [...p.slice(0, metricInsertIndex), ...p.slice(metricInsertIndex + 1)];
@@ -174,8 +164,8 @@ const resolveFetchContext = ({
     path,
     rowDepth,
     colDepth,
-    rowGroupbyRaw,
-    colGroupbyRaw,
+    placement.rows,
+    placement.cols,
     metrics,
     formData.aggregateFunction,
   );

@@ -20,6 +20,11 @@ This document summarizes the functional requirements gathered from user feedback
 - **Correct metric selection per cell:** Cell rendering derives the metric key from the metric tier node; optional user-selected fallback resolves metric collisions (`deriveMetricKey` in `PivotTableChart.tsx`, `metricConflictFallback` control).
 - **Multiple metrics as separate headers:** Each metric produces its own header node; cells display a single metric’s value (`applyMetricAxis`, `renderCellContent`).
 
+### Drag & drop behavior (current)
+- **Metrics placeholder dedupe & move:** Resolver ensures only one `__MEASURES__` lives across axes; cross-axis drops dispatch both axes in sync (control panel + DnD plumbing). Metrics move without duplication; backend/query alignment uses the same resolver.
+- **Dimensions move instead of copy:** Non-measure fields are deduped across axes on drop so they move between Rows/Columns rather than copying.
+- **Ordering gap:** Cross-axis drops currently append when hover index isn’t captured reliably (no preview). Further work needed to compute insert index from pointer position for consistent placement.
+
 ### Totals behavior
 - **No column total when there is no column hierarchy:** Root column node is suppressed when no column groupbys, avoiding an extra “Total” column (`buildTreeFromRecords`, `visibleCols` filter in `PivotTableChart.tsx`).
 - **Column totals only when columns exist; ordering follows hierarchy:** Totals appear only when column hierarchy exists; ordering follows hierarchy → metrics → totals (column root suppressed when empty). Row totals suppressed when no row totals selected.

@@ -55,6 +55,8 @@ export default function OptionWrapper(
     column,
     type,
     onShiftOptions,
+    onHoverIndex,
+    onHoverListId,
     clickClose,
     withCaret,
     isExtra,
@@ -88,12 +90,17 @@ export default function OptionWrapper(
       }
       const { dragIndex } = item;
       const hoverIndex = index;
+      onHoverIndex?.(hoverIndex);
+      onHoverListId?.(listId);
 
       // Don't replace items with themselves
-      if (dragIndex === hoverIndex) {
+      if (item.sourceId && listId && item.sourceId !== listId) {
+        // Cross-list hover: record position but don't reorder this list.
+        onHoverIndex?.(hoverIndex);
+        onHoverListId?.(listId);
         return;
       }
-      if (item.sourceId && listId && item.sourceId !== listId) {
+      if (dragIndex === hoverIndex) {
         return;
       }
       // Determine rectangle on screen

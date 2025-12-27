@@ -26,8 +26,11 @@ import {
 } from '@superset-ui/core';
 
 const getColumnNameOrAdhocColumn = (
-  column: ColumnMeta | AdhocColumn,
+  column: ColumnMeta | AdhocColumn | string,
 ): QueryFormColumn => {
+  if (typeof column === 'string') {
+    return column;
+  }
   if (isColumnMeta(column)) {
     return column.column_name;
   }
