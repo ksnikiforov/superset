@@ -238,6 +238,17 @@ export const applyMetricAxis = (
       rowGroupby.length,
     );
 
+    // Preserve the original row hierarchy so dimensions remain expandable when
+    // metrics are inserted ahead of them.
+    Object.values(tree.rows).forEach(rowNode =>
+      ensureNode(
+        'row',
+        rowNode.path,
+        rowGroupby.length,
+        rowNode.isSubtotal || undefined,
+      ),
+    );
+
     // preserve column nodes
     Object.values(tree.cols).forEach(colNode => {
       ensureNode(
@@ -284,9 +295,14 @@ export const applyMetricAxis = (
           values: { [metric]: cell.values[metric] },
           isSubtotal: cell.isSubtotal,
         };
-        // If there is only one metric, also surface the value at the base row
-        // path so collapsed views (before expanding into the metric tier) can render.
-        if (metricKeys.length === 1) {
+        // If there is only one metric and the metric tier is at the end,
+        // also surface the value at the base row path so collapsed views
+        // (before expanding into the metric tier) can render.
+        if (
+          metricKeys.length === 1 &&
+          (metricPosition === undefined ||
+            metricPosition >= rowGroupby.length)
+        ) {
           const baseRowKey = serializePath(rowPath);
           result.cells[`${baseRowKey}|${colKey}`] =
             result.cells[`${baseRowKey}|${colKey}`] || {
@@ -303,6 +319,17 @@ export const applyMetricAxis = (
     const insertIndex = Math.min(
       metricPosition ?? colGroupby.length,
       colGroupby.length,
+    );
+
+    // Preserve the original column hierarchy so dimensions remain expandable when
+    // metrics are inserted ahead of them.
+    Object.values(tree.cols).forEach(colNode =>
+      ensureNode(
+        'col',
+        colNode.path,
+        colGroupby.length,
+        colNode.isSubtotal || undefined,
+      ),
     );
 
     // preserve row nodes
@@ -350,9 +377,14 @@ export const applyMetricAxis = (
           values: { [metric]: cell.values[metric] },
           isSubtotal: cell.isSubtotal,
         };
-        // If there is only one metric, also surface the value at the base column
-        // path so collapsed views (before expanding into the metric tier) can render.
-        if (metricKeys.length === 1) {
+        // If there is only one metric and the metric tier is at the end,
+        // also surface the value at the base column path so collapsed views
+        // (before expanding into the metric tier) can render.
+        if (
+          metricKeys.length === 1 &&
+          (metricPosition === undefined ||
+            metricPosition >= colGroupby.length)
+        ) {
           const baseColKey = serializePath(colPath);
           result.cells[`${rowKey}|${baseColKey}`] =
             result.cells[`${rowKey}|${baseColKey}`] || {

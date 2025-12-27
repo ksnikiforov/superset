@@ -32,6 +32,7 @@ import {
   MetricsLayoutEnum,
   PivotAxis,
   PivotPath,
+  PivotTreeNode,
   PivotTableQueryFormData,
   PivotTreeData,
 } from './types';
@@ -134,14 +135,14 @@ const resolveFetchContext = ({
       ? rowGroupby.length
       : colGroupby.length;
 
-  const normalizePath = (p: PivotPath, targetAxis: PivotAxis) => {
+  const stripMetricFromPath = (p: PivotPath, targetAxis: PivotAxis) => {
     if (metricsAxis !== targetAxis || placement.metricPosition < 0) {
       return p;
     }
     return [...p.slice(0, metricInsertIndex), ...p.slice(metricInsertIndex + 1)];
   };
 
-  const sanitizedPath = normalizePath(path, axis);
+  const sanitizedPath = stripMetricFromPath(path, axis);
   const defaultIncrement = Math.max(
     formData.maxDepthPerFetch || 0,
     maxDepthPerFetch || 0,
@@ -151,16 +152,19 @@ const resolveFetchContext = ({
       ? defaultIncrement
       : Number.MAX_SAFE_INTEGER;
 
-  const currentRowDepth =
+  const getCurrentDepth = (
+    nodes: Record<string, PivotTreeNode> | undefined,
+    targetAxis: PivotAxis,
+  ) =>
     Math.max(
       0,
-      ...Object.values(currentTree?.rows || {}).map(node => node.path.length),
-    ) || 0;
-  const currentColDepth =
-    Math.max(
-      0,
-      ...Object.values(currentTree?.cols || {}).map(node => node.path.length),
-    ) || 0;
+      ...Object.values(nodes || {}).map(node =>
+        stripMetricFromPath(node.path, targetAxis).length,
+      ),
+    );
+
+  const currentRowDepth = getCurrentDepth(currentTree?.rows, 'row');
+  const currentColDepth = getCurrentDepth(currentTree?.cols, 'col');
 
   const rowDepth =
     axis === 'row'
@@ -202,6 +206,9 @@ export const peekPivotBranchCache = (params: FetchPivotBranchParams) => {
   return cache.get(ctx.cacheKey);
 };
 
+// Exported for tests
+export const resolveFetchContextForTest = resolveFetchContext;
+
 export async function fetchPivotBranch({
   formData,
   axis,
@@ -228,43 +235,63 @@ export async function fetchPivotBranch({
     return { data: cached, cached: true };
   }
 
-  const columns = [
-    ...rowGroupby.slice(0, rowDepth),
-    ...colGroupby.slice(0, colDepth),
+  const depthPairs: Array<{ rowDepth: number; colDepth: number }> = [
+    { rowDepth, colDepth },
   ];
+
+  const needsMetricFrontRoot =
+    metricsLayoutResolved === MetricsLayoutEnum.ROWS &&
+    metricInsertIndex === 0 &&
+    axis === 'col' &&
+    rowDepth > 0;
+  if (needsMetricFrontRoot) {
+    depthPairs.push({ rowDepth: 0, colDepth });
+  }
 
   const filters =
     axis === 'row'
       ? buildPathFilters(rowGroupby, sanitizedPath)
       : buildPathFilters(colGroupby, sanitizedPath);
 
-  const queryContext = buildQueryContext(formData, (baseQueryObject: QueryObject) => [
-    {
-      ...baseQueryObject,
-      columns,
-      filters: [
-        ...(baseQueryObject.filters || []),
-        ...(filters as QueryObjectFilterClause[]),
-      ],
-      query_name: `${formatQueryName(rowDepth, colDepth)}|branch:${axis}:${serializePath(
-        path,
-      )}`,
-    },
-  ]);
+  const queryContext = buildQueryContext(
+    formData,
+    (baseQueryObject: QueryObject) =>
+      depthPairs.map(pair => ({
+        ...baseQueryObject,
+        columns: [
+          ...rowGroupby.slice(0, pair.rowDepth),
+          ...colGroupby.slice(0, pair.colDepth),
+        ],
+        filters: [
+          ...(baseQueryObject.filters || []),
+          ...(filters as QueryObjectFilterClause[]),
+        ],
+        query_name: `${formatQueryName(pair.rowDepth, pair.colDepth)}|branch:${axis}:${serializePath(
+          path,
+        )}`,
+      })),
+  );
 
   try {
     const { json = {} } = await SupersetClient.post({
       endpoint: '/api/v1/chart/data',
       jsonPayload: queryContext,
     });
-    const [result] = (json as any).result || [];
-    const branchTree = buildTreeFromRecords(
-      result?.data || [],
-      formData.metrics,
-      rowGroupby,
-      colGroupby,
-      rowDepth,
-      colDepth,
+    const results = ((json as any).result || []) as any[];
+    const branchTree = depthPairs.reduce<PivotTreeData>(
+      (acc, pair, idx) =>
+        mergeTrees(
+          acc,
+          buildTreeFromRecords(
+            results[idx]?.data || [],
+            formData.metrics,
+            rowGroupby,
+            colGroupby,
+            pair.rowDepth,
+            pair.colDepth,
+          ),
+        ),
+      {} as PivotTreeData,
     );
     const branchWithMetrics = applyMetricAxis(
       branchTree,

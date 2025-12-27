@@ -128,7 +128,7 @@ const buildVisibleList = (
   };
 
   if (skipRoot) {
-    const children = findChildren(nodes, root).sort(sorter);
+    const children = getChildren(root).sort(sorter);
     children.forEach(traverse);
   } else {
     traverse(root);
@@ -376,56 +376,228 @@ function PivotTableChart(props: PivotTableProps) {
     [metrics],
   );
 
+  const metricLabelSet = useMemo(() => new Set(metricLabels), [metricLabels]);
+
+  const findMetricIndex = useCallback(
+    (nodes: Record<string, PivotTreeNode>) => {
+      let found: number | undefined;
+      Object.values(nodes).forEach(node => {
+        const idx = node.path.findIndex(val =>
+          metricLabelSet.has(String(val ?? '')),
+        );
+        if (idx >= 0) {
+          found = found === undefined ? idx : Math.max(found, idx);
+        }
+      });
+      return found;
+    },
+    [metricLabelSet],
+  );
+
+  const metricIndexOnRows = useMemo(
+    () => findMetricIndex(tree.rows),
+    [findMetricIndex, tree.rows],
+  );
+  const metricIndexOnCols = useMemo(
+    () => findMetricIndex(tree.cols),
+    [findMetricIndex, tree.cols],
+  );
+
+  const hideMetricHeaderOnRows = useMemo(
+    () =>
+      metricsLayout === MetricsLayoutEnum.ROWS &&
+      metricLabels.length === 1 &&
+      metricIndexOnRows !== undefined &&
+      metricIndexOnRows === groupbyRows.length,
+    [groupbyRows.length, metricIndexOnRows, metricLabels.length, metricsLayout],
+  );
+  const hideMetricHeaderOnCols = useMemo(
+    () =>
+      metricsLayout === MetricsLayoutEnum.COLUMNS &&
+      metricLabels.length === 1 &&
+      metricIndexOnCols !== undefined &&
+      metricIndexOnCols === groupbyColumns.length,
+    [
+      groupbyColumns.length,
+      metricIndexOnCols,
+      metricLabels.length,
+      metricsLayout,
+    ],
+  );
+
+  const metricIndexForRows =
+    metricsLayout === MetricsLayoutEnum.ROWS && !hideMetricHeaderOnRows
+      ? metricIndexOnRows ?? 0
+      : metricIndexOnRows;
+  const metricIndexForCols =
+    metricsLayout === MetricsLayoutEnum.COLUMNS && !hideMetricHeaderOnCols
+      ? metricIndexOnCols ?? 0
+      : metricIndexOnCols;
+
+  const getRawRowChildren = useCallback(
+    (parent: PivotTreeNode) => findChildren(tree.rows, parent),
+    [tree.rows],
+  );
+
+  const getRawColChildren = useCallback(
+    (parent: PivotTreeNode) => findChildren(tree.cols, parent),
+    [tree.cols],
+  );
+
   const getRowChildren = useCallback(
     (parent: PivotTreeNode) => {
-      const children = findChildren(tree.rows, parent);
+      const children = getRawRowChildren(parent);
+      const filteredByMetricPosition = children.filter(child => {
+        if (metricIndexForRows === undefined) {
+          return true;
+        }
+        if (child.path.length <= metricIndexForRows) {
+          return true;
+        }
+        const metricAtIndex = metricLabelSet.has(
+          String(child.path[metricIndexForRows] ?? ''),
+        );
+        // When metrics sit at the front, ensure we only surface nodes that
+        // include the metric at that index, so placeholder/base nodes without
+        // metric labels do not render as empty rows.
+        return metricAtIndex;
+      });
+      let filtered = filteredByMetricPosition;
       if (
         metricsLayout === MetricsLayoutEnum.ROWS &&
         parent.axis === 'row' &&
-        parent.level < groupbyRows.length
+        parent.level < groupbyRows.length &&
+        (metricIndexOnRows === undefined ||
+          metricIndexOnRows > parent.level)
       ) {
-        const filtered = children.filter(
-          child =>
-            !metricLabels.includes(String(child.path[parent.level] ?? '')),
+        const withoutMetrics = children.filter(
+          child => !metricLabelSet.has(String(child.path[parent.level] ?? '')),
         );
-        // If filtering removes everything (e.g., metrics inserted before remaining groupbys),
-        // fall back to the original children so metrics remain expandable.
-        return filtered.length > 0 ? filtered : children;
+        filtered = withoutMetrics.length > 0 ? withoutMetrics : children;
       }
-      return children;
+      if (
+        hideMetricHeaderOnRows &&
+        parent.axis === 'row' &&
+        parent.level >= groupbyRows.length
+      ) {
+        filtered = filtered.filter(
+          child => !metricLabelSet.has(String(child.path[parent.level] ?? '')),
+        );
+      }
+      return filtered;
     },
-    [groupbyRows.length, metricLabels, metricsLayout, tree.rows],
+    [
+      getRawRowChildren,
+      groupbyRows.length,
+      metricIndexForRows,
+      hideMetricHeaderOnRows,
+      metricLabelSet,
+      metricsLayout,
+    ],
   );
 
   const getColChildren = useCallback(
     (parent: PivotTreeNode) => {
-      const children = findChildren(tree.cols, parent);
+      const children = getRawColChildren(parent);
+      const filteredByMetricPosition = children.filter(child => {
+        if (metricIndexForCols === undefined) {
+          return true;
+        }
+        if (child.path.length <= metricIndexForCols) {
+          return true;
+        }
+        const metricAtIndex = metricLabelSet.has(
+          String(child.path[metricIndexForCols] ?? ''),
+        );
+        return metricAtIndex;
+      });
+      let filtered = filteredByMetricPosition;
       if (
         metricsLayout === MetricsLayoutEnum.COLUMNS &&
         parent.axis === 'col' &&
-        parent.level < groupbyColumns.length
+        parent.level < groupbyColumns.length &&
+        (metricIndexOnCols === undefined ||
+          metricIndexOnCols > parent.level)
       ) {
-        const filtered = children.filter(
-          child =>
-            !metricLabels.includes(String(child.path[parent.level] ?? '')),
+        const withoutMetrics = children.filter(
+          child => !metricLabelSet.has(String(child.path[parent.level] ?? '')),
         );
-        return filtered.length > 0 ? filtered : children;
+        filtered = withoutMetrics.length > 0 ? withoutMetrics : children;
       }
-      return children;
+      if (
+        hideMetricHeaderOnCols &&
+        parent.axis === 'col' &&
+        parent.level >= groupbyColumns.length
+      ) {
+        filtered = filtered.filter(
+          child => !metricLabelSet.has(String(child.path[parent.level] ?? '')),
+        );
+      }
+      return filtered;
     },
-    [groupbyColumns.length, metricLabels, metricsLayout, tree.cols],
+    [
+      getRawColChildren,
+      groupbyColumns.length,
+      metricIndexForCols,
+      hideMetricHeaderOnCols,
+      metricLabelSet,
+      metricsLayout,
+    ],
   );
 
   const hasLoadedChildren = useCallback(
     (axis: 'row' | 'col', node: PivotTreeNode) => {
       const children =
-        axis === 'row' ? getRowChildren(node) : getColChildren(node);
+        axis === 'row' ? getRawRowChildren(node) : getRawColChildren(node);
       if (children.length === 0) {
+        return false;
+      }
+      const groupby = axis === 'row' ? groupbyRows : groupbyColumns;
+      const parentDimDepth = node.path.filter(
+        val => !metricLabelSet.has(String(val ?? '')),
+      ).length;
+      const metricIndex =
+        axis === 'row' ? metricIndexForRows : metricIndexForCols;
+      if (
+        metricIndex !== undefined &&
+        node.path.length > metricIndex &&
+        metricLabelSet.has(String(node.path[metricIndex] ?? '')) &&
+        parentDimDepth < groupby.length
+      ) {
+        // Sitting on the metric tier and deeper dimensions remain; force fetch.
+        return false;
+      }
+      const childDimDepths = children.map(
+        child =>
+          child.path.filter(
+            val => !metricLabelSet.has(String(val ?? '')),
+          ).length,
+      );
+      const maxChildDimDepth = Math.max(...childDimDepths, 0);
+      const hasChildCells = children.some(child =>
+        Object.keys(tree.cells).some(key =>
+          axis === 'row' ? key.startsWith(`${child.key}|`) : key.endsWith(`|${child.key}`),
+        ),
+      );
+      if (
+        parentDimDepth < groupby.length &&
+        (maxChildDimDepth <= parentDimDepth || !hasChildCells)
+      ) {
+        // Only metric-tier children or placeholder nodes are present; treat as not loaded.
         return false;
       }
       return true;
     },
-    [getColChildren, getRowChildren],
+    [
+      getRawColChildren,
+      getRawRowChildren,
+      groupbyColumns,
+      groupbyRows,
+      metricLabelSet,
+      metricIndexForCols,
+      metricIndexForRows,
+      tree.cells,
+    ],
   );
 
   const handleToggle = useCallback(
@@ -776,68 +948,76 @@ function PivotTableChart(props: PivotTableProps) {
                 {rowIdx === 0 && (
                   <th rowSpan={columnHeaderRows.length}>{t('Rows')}</th>
                 )}
-                {rowCells.map(cell => (
-                  <th
-                    key={`col-header-${cell.node.key}-${rowIdx}`}
-                    colSpan={cell.colSpan}
-                    rowSpan={cell.rowSpan}
-                  >
-                    <HeaderCell>
-                      {cell.node.hasChildren && cell.node.path.length > 0 && (
-                        <ToggleButton
-                          type="button"
-                          onClick={() => handleToggle('col', cell.node)}
-                        >
-                          {expandedCols.has(cell.node.key) ? (
-                            <MinusSquareOutlined />
-                          ) : (
-                            <PlusSquareOutlined />
-                          )}
-                        </ToggleButton>
-                      )}
-                      <span>{cell.node.formattedLabel}</span>
-                      {loadingKeys.has(cell.node.key) && <Spinner />}
-                    </HeaderCell>
-                  </th>
-                ))}
+                {rowCells.map(cell => {
+                  const showToggle =
+                    cell.node.hasChildren && cell.node.path.length > 0;
+                  return (
+                    <th
+                      key={`col-header-${cell.node.key}-${rowIdx}`}
+                      colSpan={cell.colSpan}
+                      rowSpan={cell.rowSpan}
+                    >
+                      <HeaderCell>
+                        {showToggle && (
+                          <ToggleButton
+                            type="button"
+                            onClick={() => handleToggle('col', cell.node)}
+                          >
+                            {expandedCols.has(cell.node.key) ? (
+                              <MinusSquareOutlined />
+                            ) : (
+                              <PlusSquareOutlined />
+                            )}
+                          </ToggleButton>
+                        )}
+                        <span>{cell.node.formattedLabel}</span>
+                        {loadingKeys.has(cell.node.key) && <Spinner />}
+                      </HeaderCell>
+                    </th>
+                  );
+                })}
               </tr>
             ))
           )}
         </thead>
         <tbody>
-          {visibleRows.map(row => (
-            <tr key={row.key}>
-              <th>
-                <HeaderCell style={{ paddingLeft: row.path.length * 12 }}>
-                  {row.hasChildren && row.path.length > 0 && (
-                    <ToggleButton
-                      type="button"
-                      onClick={() => handleToggle('row', row)}
-                    >
-                      {expandedRows.has(row.key) ? (
-                        <MinusSquareOutlined />
-                      ) : (
-                        <PlusSquareOutlined />
-                      )}
-                    </ToggleButton>
-                  )}
-                  <span>{row.formattedLabel}</span>
-                  {loadingKeys.has(row.key) && <Spinner />}
-                </HeaderCell>
-              </th>
-              {visibleCols.map(col => (
-                <td
-                  key={`${row.key}|${col.key}`}
-                  onClick={() => handleCellClick(row, col)}
-                  onContextMenu={event =>
-                    handleCellContextMenu(event, row, col)
-                  }
-                >
-                  {renderCellContent(row, col)}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {visibleRows.map(row => {
+            const showToggle =
+              row.hasChildren && row.path.length > 0;
+            return (
+              <tr key={row.key}>
+                <th>
+                  <HeaderCell style={{ paddingLeft: row.path.length * 12 }}>
+                    {showToggle && (
+                      <ToggleButton
+                        type="button"
+                        onClick={() => handleToggle('row', row)}
+                      >
+                        {expandedRows.has(row.key) ? (
+                          <MinusSquareOutlined />
+                        ) : (
+                          <PlusSquareOutlined />
+                        )}
+                      </ToggleButton>
+                    )}
+                    <span>{row.formattedLabel}</span>
+                    {loadingKeys.has(row.key) && <Spinner />}
+                  </HeaderCell>
+                </th>
+                {visibleCols.map(col => (
+                  <td
+                    key={`${row.key}|${col.key}`}
+                    onClick={() => handleCellClick(row, col)}
+                    onContextMenu={event =>
+                      handleCellContextMenu(event, row, col)
+                    }
+                  >
+                    {renderCellContent(row, col)}
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
         </tbody>
       </StyledTable>
     </Container>
