@@ -275,7 +275,6 @@ export default function transformProps(
     currencyFormat: formData.currencyFormat,
     allowRenderHtml: formData.allowRenderHtml,
     metricsLayout,
-    transposePivot: formData.transposePivot,
     emitCrossFilters,
     setDataMask,
     selectedFilters,

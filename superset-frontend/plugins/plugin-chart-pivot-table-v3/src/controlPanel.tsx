@@ -36,6 +36,7 @@ import {
   METRICS_PLACEHOLDER_LABEL,
   resolveMetricPlacement,
   stripMetricsPlaceholder,
+  normalizeSubtotalLevels,
 } from './utils';
 import PivotDndColumnSelect from './controls/PivotDndColumnSelect/PivotDndColumnSelect';
 
@@ -315,20 +316,23 @@ const config: ControlPanelConfig = {
                     (state?.controls?.metricsLayout?.value as MetricsLayoutEnum) ||
                     MetricsLayoutEnum.COLUMNS,
                 });
-                const colDepth = stripMetricsPlaceholder(placement.cols).length;
-                const options = Array.from({ length: colDepth }).map((_, idx) => ({
-                  value: idx + 1,
-                  label: t('Subtotal level %s', idx + 1),
-                }));
-                const currentValue = ensureIsArray(
-                  state?.controls?.colSubtotalLevels?.value,
-                )
-                  .map(level => Number(level))
-                  .filter(
-                    level =>
-                      Number.isFinite(level) && level > 0 && level <= colDepth,
-                  );
-                return { options, value: currentValue };
+                const colDepthFromPlacement = stripMetricsPlaceholder(
+                  placement.cols,
+                ).length;
+                const colDepthRaw = stripMetricsPlaceholder(colsRaw).length;
+                const colDepth = Math.max(colDepthFromPlacement, colDepthRaw);
+                const options =
+                  colDepth > 0
+                    ? Array.from({ length: colDepth }).map((_, idx) => ({
+                        value: idx + 1,
+                        label: t('Subtotal level %s', idx + 1),
+                      }))
+                    : [];
+                const normalizedValue = normalizeSubtotalLevels(
+                  ensureIsArray(state?.controls?.colSubtotalLevels?.value),
+                  colDepth,
+                ).filter(level => level > 0 && level <= colDepth);
+                return { options, value: normalizedValue };
               },
             },
           },
@@ -406,18 +410,6 @@ const config: ControlPanelConfig = {
                 ['key_a_to_z', t('key a-z')],
                 ['key_z_to_a', t('key z-a')],
               ],
-              renderTrigger: true,
-            },
-          },
-        ],
-        [
-          {
-            name: 'transposePivot',
-            config: {
-              type: 'CheckboxControl',
-              label: t('Transpose pivot'),
-              default: false,
-              description: t('Swap rows and columns'),
               renderTrigger: true,
             },
           },

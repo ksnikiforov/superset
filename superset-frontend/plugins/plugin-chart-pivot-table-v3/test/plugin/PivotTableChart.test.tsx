@@ -310,7 +310,7 @@ describe('PivotTableChart totals & subtotals', () => {
       2,
     );
 
-    render(
+    const { container } = render(
       <PivotTableChart
         data={tree}
         formData={
@@ -524,5 +524,294 @@ describe('PivotTableChart totals & subtotals', () => {
     expect(within(headerRow).getByText('Grand total')).toBeTruthy();
     const bodyRow = container.querySelector('tbody tr') as HTMLElement;
     expect(within(bodyRow).getByText('8')).toBeTruthy();
+  });
+
+  it('does not render parent column totals as leaves when branch subtotals exist under multiple column roots', () => {
+    const rootKey = serializePath([]);
+    const rowKey = serializePath(['US']);
+    const makeColNode = (
+      path: string[],
+      isSubtotal = false,
+      hasChildren = false,
+    ): PivotTreeNode => ({
+      axis: 'col',
+      key: serializePath(path),
+      path,
+      label: path[path.length - 1] || 'Grand total',
+      formattedLabel: path[path.length - 1] || 'Grand total',
+      level: path.length,
+      hasChildren,
+      isSubtotal,
+    });
+
+    const cols: Record<string, PivotTreeNode> = {
+      [rootKey]: makeColNode([], true, true),
+      [serializePath(['A'])]: makeColNode(['A'], true, true),
+      [serializePath(['A', 'Subtotal'])]: makeColNode(['A', 'Subtotal'], true),
+      [serializePath(['A', '1-URGENT'])]: makeColNode(['A', '1-URGENT']),
+      [serializePath(['A', '2-HIGH'])]: makeColNode(['A', '2-HIGH']),
+      [serializePath(['N'])]: makeColNode(['N'], true, true),
+      [serializePath(['N', 'Subtotal'])]: makeColNode(['N', 'Subtotal'], true),
+      [serializePath(['N', '1-URGENT'])]: makeColNode(['N', '1-URGENT']),
+      [serializePath(['N', '2-HIGH'])]: makeColNode(['N', '2-HIGH']),
+    };
+    const rows: Record<string, PivotTreeNode> = {
+      [rootKey]: {
+        axis: 'row',
+        key: rootKey,
+        path: [],
+        label: 'Grand total',
+        formattedLabel: 'Grand total',
+        level: 0,
+        hasChildren: true,
+        isSubtotal: true,
+      },
+      [rowKey]: {
+        axis: 'row',
+        key: rowKey,
+        path: ['US'],
+        label: 'US',
+        formattedLabel: 'US',
+        level: 1,
+        hasChildren: false,
+        isSubtotal: false,
+      },
+    };
+    const cells: Record<string, PivotResultCell> = {
+      [`${rowKey}|${serializePath(['A', '1-URGENT'])}`]: {
+        rowKey,
+        colKey: serializePath(['A', '1-URGENT']),
+        values: { metric1: 10 },
+      },
+      [`${rowKey}|${serializePath(['A', '2-HIGH'])}`]: {
+        rowKey,
+        colKey: serializePath(['A', '2-HIGH']),
+        values: { metric1: 20 },
+      },
+      [`${rowKey}|${serializePath(['A', 'Subtotal'])}`]: {
+        rowKey,
+        colKey: serializePath(['A', 'Subtotal']),
+        values: { metric1: 30 },
+        isSubtotal: true,
+      },
+      [`${rowKey}|${serializePath(['N', '1-URGENT'])}`]: {
+        rowKey,
+        colKey: serializePath(['N', '1-URGENT']),
+        values: { metric1: 30 },
+      },
+      [`${rowKey}|${serializePath(['N', '2-HIGH'])}`]: {
+        rowKey,
+        colKey: serializePath(['N', '2-HIGH']),
+        values: { metric1: 40 },
+      },
+      [`${rowKey}|${serializePath(['N', 'Subtotal'])}`]: {
+        rowKey,
+        colKey: serializePath(['N', 'Subtotal']),
+        values: { metric1: 70 },
+        isSubtotal: true,
+      },
+      [`${rowKey}|${rootKey}`]: {
+        rowKey,
+        colKey: rootKey,
+        values: { metric1: 100 },
+        isSubtotal: true,
+      },
+    };
+    const tree: PivotTreeData = { rows, cols, cells };
+
+    const { container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={
+          {
+            ...(baseProps as Partial<PivotTableQueryFormData>),
+            groupbyRows: ['region'],
+            groupbyColumns: ['flag', 'priority', '__MEASURES__'],
+            metricsLayout: MetricsLayoutEnum.COLUMNS,
+            metrics: ['metric1'],
+            colTotals: true,
+            colSubtotalLevels: [1],
+            colSubtotalPosition: 'start',
+            colTotalPosition: 'end',
+          } as PivotTableQueryFormData
+        }
+        metrics={['metric1']}
+        groupbyRows={['region']}
+        groupbyColumns={['flag', 'priority']}
+        aggregateFunction="Sum"
+        width={800}
+        height={400}
+        startCollapsed={false}
+        initialDepth={2}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[1]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        rowTotalPosition="start"
+        colSubtotalPosition="start"
+        colTotalPosition="end"
+      />,
+    );
+
+    const headerRow = container.querySelector('thead tr:last-child') as HTMLElement;
+    const labels = within(headerRow)
+      .getAllByRole('columnheader')
+      .map(cell => cell.textContent?.trim())
+      .slice(1);
+    expect(labels).not.toContain('A');
+    expect(labels).not.toContain('N');
+  });
+
+  it('currently renders both parent total and subtotal leaves when column subtotals are enabled (duplication)', () => {
+    const rootKey = serializePath([]);
+    const rowKey = serializePath(['US']);
+    const makeColNode = (
+      path: string[],
+      isSubtotal = false,
+      hasChildren = false,
+    ): PivotTreeNode => ({
+      axis: 'col',
+      key: serializePath(path),
+      path,
+      label: path[path.length - 1] || 'Grand total',
+      formattedLabel: path[path.length - 1] || 'Grand total',
+      level: path.length,
+      hasChildren,
+      isSubtotal,
+    });
+
+    // Build a tree where the parent column node is marked as a subtotal and
+    // also has a child subtotal leaf, matching the UI duplication scenario.
+    const cols: Record<string, PivotTreeNode> = {
+      [rootKey]: makeColNode([], true, true),
+      [serializePath(['A'])]: makeColNode(['A'], true, true),
+      [serializePath(['A', '1-URGENT'])]: makeColNode(['A', '1-URGENT']),
+      [serializePath(['A', '2-HIGH'])]: makeColNode(['A', '2-HIGH']),
+      // Parent total encoded as a leaf at the same depth as children.
+      [serializePath(['A', 'A'])]: makeColNode(['A', 'A'], true),
+      [serializePath(['A', 'Subtotal'])]: makeColNode(['A', 'Subtotal'], true),
+    };
+    const rows: Record<string, PivotTreeNode> = {
+      [rootKey]: {
+        axis: 'row',
+        key: rootKey,
+        path: [],
+        label: 'Grand total',
+        formattedLabel: 'Grand total',
+        level: 0,
+        hasChildren: true,
+        isSubtotal: true,
+      },
+      [rowKey]: {
+        axis: 'row',
+        key: rowKey,
+        path: ['US'],
+        label: 'US',
+        formattedLabel: 'US',
+        level: 1,
+        hasChildren: false,
+        isSubtotal: false,
+      },
+    };
+    const cells: Record<string, PivotResultCell> = {
+      [`${rowKey}|${serializePath(['A'])}`]: {
+        rowKey,
+        colKey: serializePath(['A']),
+        values: { metric1: 100 },
+        isSubtotal: true,
+      },
+      [`${rowKey}|${serializePath(['A', '1-URGENT'])}`]: {
+        rowKey,
+        colKey: serializePath(['A', '1-URGENT']),
+        values: { metric1: 10 },
+      },
+      [`${rowKey}|${serializePath(['A', '2-HIGH'])}`]: {
+        rowKey,
+        colKey: serializePath(['A', '2-HIGH']),
+        values: { metric1: 20 },
+      },
+      [`${rowKey}|${serializePath(['A', 'A'])}`]: {
+        rowKey,
+        colKey: serializePath(['A', 'A']),
+        values: { metric1: 25 },
+        isSubtotal: true,
+      },
+      [`${rowKey}|${serializePath(['A', 'Subtotal'])}`]: {
+        rowKey,
+        colKey: serializePath(['A', 'Subtotal']),
+        values: { metric1: 30 },
+        isSubtotal: true,
+      },
+    };
+    const tree: PivotTreeData = { rows, cols, cells };
+
+    const { container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={
+          {
+            ...(baseProps as Partial<PivotTableQueryFormData>),
+            groupbyRows: ['region'],
+            groupbyColumns: ['flag', 'priority', '__MEASURES__'],
+            metricsLayout: MetricsLayoutEnum.COLUMNS,
+            metrics: ['metric1'],
+            colTotals: true,
+            colSubtotalLevels: [1],
+            colSubtotalPosition: 'start',
+            colTotalPosition: 'end',
+          } as PivotTableQueryFormData
+        }
+        metrics={['metric1']}
+        groupbyRows={['region']}
+        groupbyColumns={['flag', 'priority']}
+        aggregateFunction="Sum"
+        width={800}
+        height={400}
+        startCollapsed={false}
+        initialDepth={2}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[1]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        rowTotalPosition="start"
+        colSubtotalPosition="start"
+        colTotalPosition="end"
+      />,
+    );
+
+    const headerRow = container.querySelector('thead tr:last-child') as HTMLElement;
+    const labels = within(headerRow)
+      .getAllByRole('columnheader')
+      .map(cell => cell.textContent?.trim())
+      .slice(1);
+    // Desired behavior: parent total leaf should not render alongside branch subtotal leaves.
+    expect(labels).not.toContain('A');
+    expect(labels).toEqual(expect.arrayContaining(['1-URGENT', '2-HIGH', 'Subtotal']));
   });
 });

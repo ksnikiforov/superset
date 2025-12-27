@@ -99,7 +99,6 @@ export interface PivotTableCustomizeProps {
   currencyFormat?: Currency;
   allowRenderHtml?: boolean;
   metricsLayout?: MetricsLayoutEnum;
-  transposePivot?: boolean;
   rowTotalPosition?: TotalPosition;
   colTotalPosition?: TotalPosition;
   colSubtotalPosition?: TotalPosition;
@@ -155,7 +154,6 @@ export interface PivotTableProps
   currencyFormat?: Currency;
   allowRenderHtml?: boolean;
   metricsLayout?: MetricsLayoutEnum;
-  transposePivot?: boolean;
   emitCrossFilters?: boolean;
   setDataMask: SetDataMaskHook;
   selectedFilters?: Record<string, DataRecordValue[]>;

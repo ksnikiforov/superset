@@ -231,6 +231,106 @@ export const peekPivotBranchCache = (params: FetchPivotBranchParams) => {
 // Exported for tests
 export const resolveFetchContextForTest = resolveFetchContext;
 
+const prefixTreeWithPath = (
+  tree: PivotTreeData,
+  axis: PivotAxis,
+  prefixPath: PivotPath,
+  fullDepth: number,
+  appendSubtotalToken = false,
+): PivotTreeData => {
+  if (prefixPath.length === 0) {
+    return tree;
+  }
+
+  const next: PivotTreeData = {
+    rows: { ...tree.rows },
+    cols: { ...tree.cols },
+    cells: {},
+  };
+
+  const ensurePrefixNodes = (path: PivotPath) => {
+    let currentPath: PivotPath = [];
+    path.forEach(val => {
+      currentPath = [...currentPath, val];
+      const key = serializePath(currentPath);
+      const targetMap = axis === 'row' ? next.rows : next.cols;
+      if (!targetMap[key]) {
+        const isSubtotalNode = currentPath.length === prefixPath.length;
+        const label =
+          isSubtotalNode || currentPath.length === 0
+            ? 'Subtotal'
+            : currentPath[currentPath.length - 1]?.toString() ?? 'Subtotal';
+        targetMap[key] = {
+          axis,
+          key,
+          path: currentPath,
+          label,
+          formattedLabel: label,
+          level: currentPath.length,
+          hasChildren: currentPath.length < fullDepth,
+          isSubtotal: true,
+        };
+      }
+    });
+  };
+
+  ensurePrefixNodes(prefixPath);
+
+  const sourceNodes = axis === 'row' ? tree.rows : tree.cols;
+  Object.values(sourceNodes).forEach(node => {
+    let newPath = [...prefixPath, ...node.path];
+    if (appendSubtotalToken && newPath.length === prefixPath.length) {
+      newPath = [...newPath, 'Subtotal'];
+    }
+    const key = serializePath(newPath);
+    const isSubtotalNode =
+      node.path.length === 0 ||
+      newPath.length === prefixPath.length ||
+      (appendSubtotalToken && newPath[newPath.length - 1] === 'Subtotal');
+    const label = isSubtotalNode ? 'Subtotal' : node.label;
+    const mappedNode = {
+      ...node,
+      axis,
+      key,
+      path: newPath,
+      label,
+      formattedLabel: label,
+      level: newPath.length,
+      hasChildren: newPath.length < fullDepth,
+      isSubtotal: true,
+    };
+    if (axis === 'row') {
+      next.rows[key] = mappedNode;
+    } else {
+      next.cols[key] = mappedNode;
+    }
+  });
+
+  Object.values(tree.cells).forEach(cell => {
+    const baseRowPath = tree.rows[cell.rowKey]?.path || [];
+    const baseColPath = tree.cols[cell.colKey]?.path || [];
+    let newRowPath =
+      axis === 'row' ? [...prefixPath, ...baseRowPath] : baseRowPath;
+    let newColPath =
+      axis === 'col' ? [...prefixPath, ...baseColPath] : baseColPath;
+    if (appendSubtotalToken && axis === 'row' && newRowPath.length === prefixPath.length) {
+      newRowPath = [...newRowPath, 'Subtotal'];
+    }
+    if (appendSubtotalToken && axis === 'col' && newColPath.length === prefixPath.length) {
+      newColPath = [...newColPath, 'Subtotal'];
+    }
+    const newRowKey = serializePath(newRowPath);
+    const newColKey = serializePath(newColPath);
+    next.cells[`${newRowKey}|${newColKey}`] = {
+      ...cell,
+      rowKey: newRowKey,
+      colKey: newColKey,
+    };
+  });
+
+  return next;
+};
+
 export async function fetchPivotBranch({
   formData,
   axis,
@@ -379,14 +479,50 @@ export async function fetchPivotBranch({
       (acc, pair, idx) =>
         mergeTrees(
           acc,
-          buildTreeFromRecords(
-            results[idx]?.data || [],
-            formData.metrics,
-            rowGroupby,
-            colGroupby,
-            pair.rowDepth,
-            pair.colDepth,
-          ),
+          (() => {
+            let tree = buildTreeFromRecords(
+              results[idx]?.data || [],
+              formData.metrics,
+              rowGroupby,
+              colGroupby,
+              pair.rowDepth,
+              pair.colDepth,
+            );
+            const needsSubtotalTokenForCol =
+              axis === 'col' &&
+              sanitizedPath.length > 0 &&
+              pair.colDepth <= sanitizedPath.length;
+            const needsSubtotalTokenForRow =
+              axis === 'row' &&
+              sanitizedPath.length > 0 &&
+              pair.rowDepth <= sanitizedPath.length;
+            if (
+              axis === 'col' &&
+              sanitizedPath.length > 0 &&
+              pair.colDepth <= sanitizedPath.length
+            ) {
+              tree = prefixTreeWithPath(
+                tree,
+                'col',
+                sanitizedPath,
+                colGroupby.length,
+                needsSubtotalTokenForCol,
+              );
+            } else if (
+              axis === 'row' &&
+              sanitizedPath.length > 0 &&
+              pair.rowDepth <= sanitizedPath.length
+            ) {
+              tree = prefixTreeWithPath(
+                tree,
+                'row',
+                sanitizedPath,
+                rowGroupby.length,
+                needsSubtotalTokenForRow,
+              );
+            }
+            return tree;
+          })(),
         ),
       {} as PivotTreeData,
     );

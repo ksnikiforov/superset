@@ -1,41 +1,21 @@
-## Pivot Table v3 – Outstanding Issues
+## Pivot Table v3 – Subtotal duplication (current blocker)
 
-### UI and data gaps discovered (totals/subtotals)
+### Problem statement
+- When column totals and branch subtotals are enabled and multiple column roots exist (e.g., flags A/N with priorities underneath), the rendered leaf headers still include the parent total leaf (e.g., “A”, “N”) alongside the injected “Subtotal” child, producing duplicated totals and repeated value columns.
+- The bug appears after expanding columns with totals/subtotals selected; expected behavior is one subtotal leaf per branch and no parent-total leaf at the same depth. Grand totals should remain only at the configured position.
+- Existing tests did not cover this multi-root column subtotal scenario; current UI output shows parent totals and subtotals rendered together.
 
-1) **Grand total label**  
-   - Requirement: display “Grand total” for totals. Currently labels come from node.formattedLabel. A temporary UI mapping was added in `PivotTableChart.tsx` (see `formatLabel`) but the underlying node labels remain `"Total"`; consider updating tree construction if the source label must change.  
-   - Snippet: `src/PivotTableChart.tsx` -> `const formatLabel = useCallback(... node.level === 0 ? t('Grand total') ...);`
+### Repro (to be encoded in tests)
+- Columns: two top-level values (e.g., `flag: A, N`) with a second-level priority (`1-URGENT`, `2-HIGH`, …).
+- Options: `colTotals` enabled, `colSubtotalLevels` includes level 1, `colSubtotalPosition` start, `colTotalPosition` end, `metricsLayout` on columns.
+- Data: per-priority values for each flag plus a grand total; when expanded, headers show `[A, A Subtotal, N, N Subtotal, Grand total]` (or similar), indicating duplication.
 
-2) **Grand total intersection blank / incorrect**  
-   - Symptom: cell at grand-total rows x grand-total columns is empty or carries an incorrect value.  
-   - Context: `buildTreeFromRecords` seeds `tree.cells['|']` with `rowRoot.values || colRoot.values` when available. If totals come from separate queries or don’t aggregate both axes, the intersection is wrong. Need a deterministic way to populate/sum the grand-total cell from total queries.  
-   - Snippet: `src/utils.ts` near end of `buildTreeFromRecords`.
+### Plan of attack
+1) Add failing regression test that builds a pivot tree with multiple column roots and level-1 subtotals, asserting that parent column totals are NOT rendered as leaf headers when branch subtotals exist. Include an explicit check that “A”/“N” (parent totals) are absent while subtotals remain.
+2) Investigate column tree shaping and rendering:
+   - `buildTreeFromRecords`/`prefixTreeWithPath`/`mergeTrees`: ensure branch subtotal nodes are keyed/labeled distinctly and parent totals are not emitted as leaves when a child subtotal is present.
+   - `buildColLeavesWithSubtotals` and leaf pruning: traverse columns so that when a node is subtotal-eligible and children exist, only the subtotal child renders; parent total stays non-leaf.
+   - Preserve grand total ordering per `colTotalPosition` without reintroducing parent totals.
+3) Fix implementation accordingly, keeping row/metric behaviors intact (no regression to metric-first expansion).
+4) Verify against new regression plus existing pivot v3 suite; run full plugin tests.
 
-3) **Row subtotal selector still effectively single-value / should be totals-only**  
-   - Requirement: rows support only grand totals (no per-level subtotals); selector should be a simple toggle. Control panel now exposes `rowTotals` as a checkbox and removes the row subtotal multi-select, but form data still carries `rowSubtotalLevels` and related normalization may ignore user expectations. Verify Explore UI shows a checkbox, not a multi-select, and remove stale schema if needed.  
-   - Snippet: `src/controlPanel.tsx` rows under “Options”.
-
-4) **Column subtotal selector appears single-select in UI**  
-   - Requirement: multi-select for column subtotal levels. Control config is `multiple: true`, but UI still behaves like single-select. Investigate the SelectControl props/state plumbing; see `src/controlPanel.tsx` `colSubtotalLevels`.
-
-5) **Column subtotals not rendering**  
-   - Symptom: even with levels selected, subtotal columns do not appear. Rendering currently inserts subtotal nodes when `node.isSubtotal` and `(colTotals || selected levels || colSubTotals)` are true. If the server returns subtotal records at fewer depths, verify queries include those depth pairs and that nodes/cells are built.  
-   - Snippet: `src/PivotTableChart.tsx` `buildColLeavesWithSubtotals`; fetch depth pairs in `src/fetchPivotBranch.ts` (`effectiveColLevels`).
-
-6) **Column totals & subtotals control should exclude total level and support “Select all”**  
-   - Requirement: level picker should list only subtotal levels (>=1); grand total already has its own toggle. Add “Select all” so users can quickly reselect after level changes. UI currently shows level 0 and lacks select-all.  
-   - Snippet: `src/controlPanel.tsx` under `colSubtotalLevels` options builder.
-
-7) **Legacy/irrelevant controls in Customize tab**  
-   - Aggregation function, metrics layout (“Apply metrics on”), and similar legacy controls may no longer apply to v3 totals/subtotals behavior. Audit and hide/remove irrelevant options to reduce confusion.  
-   - Files: `src/controlPanel.tsx` and any dependent formData plumbing.
-
-8) **Simple sum totals still incorrect / missing cells**  
-   - Symptom: even with a single SUM metric and shallow hierarchies, row/column totals and the grand total misalign (e.g., row totals show only the last value, some subtotal cells are blank, and the overall grand total is off).  
-   - Context: UI-side aggregation was removed, so the table now shows only server results. The merge path for totals appears to drop or overwrite the (0,0) slice, or total queries may not be emitted/consumed for every depth combination when both axes have totals.  
-   - Where to look: verify `buildQuery.ts` emits the full set of total/subtotal depth pairs (including `row0|col0`) for collapsed loads; confirm the returned total query is present in `queriesData` and that `transformProps.ts`/`buildTreeFromRecords`/`mergeTrees` attach that slice to both row/col roots without being overridden by deeper merges. Inspect how `PivotTableChart.tsx` filters visible columns/rows when totals exist to ensure the returned total cells are reachable.
-
-Notes for next iteration:
-- Update labels at the data level if consistent “Grand total” strings are required in nodes/tests.
-- Ensure a consistent total record is present (or computed) so `tree.cells['|']` is always populated correctly when either row/column totals are enabled.
-- Validate SelectControl behavior in Explore to confirm multi-select UX for column subtotal levels; adjust control props or upstream component if necessary.
