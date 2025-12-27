@@ -300,8 +300,7 @@ export const applyMetricAxis = (
         // (before expanding into the metric tier) can render.
         if (
           metricKeys.length === 1 &&
-          (metricPosition === undefined ||
-            metricPosition >= rowGroupby.length)
+          metricPosition !== 0
         ) {
           const baseRowKey = serializePath(rowPath);
           result.cells[`${baseRowKey}|${colKey}`] =
@@ -382,8 +381,7 @@ export const applyMetricAxis = (
         // (before expanding into the metric tier) can render.
         if (
           metricKeys.length === 1 &&
-          (metricPosition === undefined ||
-            metricPosition >= colGroupby.length)
+          metricPosition !== 0
         ) {
           const baseColKey = serializePath(colPath);
           result.cells[`${rowKey}|${baseColKey}`] =

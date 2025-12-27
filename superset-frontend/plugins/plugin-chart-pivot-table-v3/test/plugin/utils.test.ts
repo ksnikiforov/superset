@@ -90,4 +90,70 @@ describe('applyMetricAxis', () => {
     expect(result.cols[serializePath(['m1'])]).toBeDefined();
     expect(result.cols[serializePath(['c1'])]).toBeDefined();
   });
+
+  it('surfaces single metric values at the base row when the metric is not first', () => {
+    const tree = {
+      rows: {
+        '': {
+          axis: 'row',
+          key: '',
+          path: [],
+          label: 'Total',
+          formattedLabel: 'Total',
+          level: 0,
+          hasChildren: true,
+        },
+        USA: {
+          axis: 'row',
+          key: serializePath(['USA']),
+          path: ['USA'],
+          label: 'USA',
+          formattedLabel: 'USA',
+          level: 1,
+          hasChildren: true,
+        },
+      },
+      cols: {
+        '': {
+          axis: 'col',
+          key: '',
+          path: [],
+          label: 'Total',
+          formattedLabel: 'Total',
+          level: 0,
+          hasChildren: true,
+        },
+        BUILDING: {
+          axis: 'col',
+          key: serializePath(['BUILDING']),
+          path: ['BUILDING'],
+          label: 'BUILDING',
+          formattedLabel: 'BUILDING',
+          level: 1,
+          hasChildren: false,
+        },
+      },
+      cells: {
+        [`${serializePath(['USA'])}|${serializePath(['BUILDING'])}`]: {
+          rowKey: serializePath(['USA']),
+          colKey: serializePath(['BUILDING']),
+          values: { countCustomers: 10 },
+        },
+      },
+    } as PivotTreeData;
+
+    const withMetrics = applyMetricAxis(
+      tree,
+      ['countCustomers'],
+      MetricsLayoutEnum.ROWS,
+      ['nation', 'orderPriority'],
+      ['segment'],
+      1,
+    );
+
+    expect(withMetrics.cells['USA|BUILDING']?.values.countCustomers).toBe(10);
+    expect(
+      withMetrics.cells['USA__countCustomers|BUILDING']?.values.countCustomers,
+    ).toBe(10);
+  });
 });
