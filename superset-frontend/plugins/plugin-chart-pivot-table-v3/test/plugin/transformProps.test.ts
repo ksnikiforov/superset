@@ -21,6 +21,7 @@ import { ChartProps, supersetTheme } from '@superset-ui/core';
 import transformProps from '../../src/transformProps';
 import { MetricsLayoutEnum, PivotTableQueryFormData } from '../../src/types';
 import { formatQueryName } from '../../src/buildQuery';
+import { serializePath } from '../../src/utils';
 
 describe('Pivot Table v3 transformProps', () => {
   const formData: Partial<PivotTableQueryFormData> = {
@@ -89,5 +90,73 @@ describe('Pivot Table v3 transformProps', () => {
     const result = transformProps(customProps as any);
     expect(result.rowSubtotalLevels).toEqual([0]);
     expect(result.colSubtotalLevels).toEqual([1]);
+  });
+
+  it('merges row and column totals including the grand-total intersection for single-metric sums', () => {
+    const queriesData = [
+      {
+        data: [{ metric1: 15 }],
+        colnames: ['metric1'],
+        coltypes: [0],
+        query_name: formatQueryName(0, 0),
+      },
+      {
+        data: [
+          { row1: 'A', metric1: 6 },
+          { row1: 'B', metric1: 9 },
+        ],
+        colnames: ['row1', 'metric1'],
+        coltypes: [1, 0],
+        query_name: formatQueryName(1, 0),
+      },
+      {
+        data: [
+          { col1: 'X', metric1: 10 },
+          { col1: 'Y', metric1: 5 },
+        ],
+        colnames: ['col1', 'metric1'],
+        coltypes: [1, 0],
+        query_name: formatQueryName(0, 1),
+      },
+      {
+        data: [
+          { row1: 'A', col1: 'X', metric1: 4 },
+          { row1: 'A', col1: 'Y', metric1: 2 },
+          { row1: 'B', col1: 'X', metric1: 6 },
+          { row1: 'B', col1: 'Y', metric1: 3 },
+        ],
+        colnames: ['row1', 'col1', 'metric1'],
+        coltypes: [1, 1, 0],
+        query_name: formatQueryName(1, 1),
+      },
+    ];
+
+    const props = new ChartProps({
+      formData: {
+        ...formData,
+        rowTotals: true,
+        colTotals: true,
+        startCollapsed: true,
+        groupbyRows: ['row1'],
+        groupbyColumns: ['col1', '__MEASURES__'],
+        metrics: ['metric1'],
+      },
+      width: 400,
+      height: 300,
+      queriesData,
+      hooks: { setDataMask: jest.fn() },
+      filterState: { selectedFilters: {} },
+      datasource: { verboseMap: {}, columnFormats: {}, currencyFormats: {} },
+      theme: supersetTheme,
+    });
+
+    const { data: tree } = transformProps(props as any);
+    const rootKey = serializePath([]);
+
+    expect(tree.cells[`A|${rootKey}`]?.values.metric1).toBe(6);
+    expect(tree.cells[`B|${rootKey}`]?.values.metric1).toBe(9);
+    expect(tree.cells[`${rootKey}|X`]?.values.metric1).toBe(10);
+    expect(tree.cells[`${rootKey}|Y`]?.values.metric1).toBe(5);
+    expect(tree.cells[`${rootKey}|${rootKey}`]?.values.metric1).toBe(15);
   });
 });

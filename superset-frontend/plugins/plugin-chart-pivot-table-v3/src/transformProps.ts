@@ -43,6 +43,7 @@ import {
   resolveMetricPlacement,
   stripMetricsPlaceholder,
   normalizeSubtotalLevels,
+  serializePath,
 } from './utils';
 
 const { DATABASE_DATETIME } = TimeFormats;
@@ -95,6 +96,9 @@ export default function transformProps(
       ? Math.min(placement.metricPosition, groupbyColumns.length)
       : groupbyColumns.length;
   const granularity = extractTimegrain(rawFormData);
+  const metricKeys = metrics.map(metric =>
+    typeof metric === 'string' ? metric : metric.label || '',
+  );
 
   const combinedData = queriesData.flatMap(({ data }) => data || []);
   const colnames = queriesData[0]?.colnames || [];
@@ -195,6 +199,53 @@ export default function transformProps(
     groupbyColumns,
     metricInsertIndex,
   );
+  const rootKey = serializePath([]);
+  const zeroDepthQuery = queriesData.find(query => {
+    const { rowDepth: rd, colDepth: cd } = parseDepth(
+      (query as any)?.query_name || (query as any)?.queryName,
+    );
+    return rd === 0 && cd === 0;
+  });
+  const grandTotalRecord = zeroDepthQuery?.data?.[0];
+  if (grandTotalRecord) {
+    const grandValues = metricKeys.reduce((acc, key) => {
+      if (!key) return acc;
+      return { ...acc, [key]: (grandTotalRecord as any)[key] };
+    }, {} as Record<string, DataRecordValue>);
+    if (Object.keys(grandValues).length > 0) {
+      nextTree.rows[rootKey] = {
+        ...nextTree.rows[rootKey],
+        values: { ...(nextTree.rows[rootKey]?.values || {}), ...grandValues },
+      };
+      nextTree.cols[rootKey] = {
+        ...nextTree.cols[rootKey],
+        values: { ...(nextTree.cols[rootKey]?.values || {}), ...grandValues },
+      };
+      nextTree.cells[`${rootKey}|${rootKey}`] = {
+        rowKey: rootKey,
+        colKey: rootKey,
+        values: {
+          ...(nextTree.cells[`${rootKey}|${rootKey}`]?.values || {}),
+          ...grandValues,
+        },
+        isSubtotal: true,
+      };
+    }
+  }
+  if (nextTree.rows[rootKey]) {
+    nextTree.rows[rootKey] = {
+      ...nextTree.rows[rootKey],
+      label: 'Grand total',
+      formattedLabel: 'Grand total',
+    };
+  }
+  if (nextTree.cols[rootKey]) {
+    nextTree.cols[rootKey] = {
+      ...nextTree.cols[rootKey],
+      label: 'Grand total',
+      formattedLabel: 'Grand total',
+    };
+  }
 
   const { selectedFilters } = filterState;
 

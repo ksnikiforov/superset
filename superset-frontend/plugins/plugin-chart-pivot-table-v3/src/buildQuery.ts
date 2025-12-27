@@ -172,6 +172,20 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
       })),
     );
 
+    if (rowTotals && colTotals) {
+      const hasGrandTotalSlice = queries.some(
+        query => query.query_name === formatQueryName(0, 0),
+      );
+      if (!hasGrandTotalSlice) {
+        queries.unshift({
+          ...baseQueryObject,
+          orderby,
+          columns: [],
+          query_name: formatQueryName(0, 0),
+        });
+      }
+    }
+
     if (queries.length === 0) {
       queries.push({
         ...baseQueryObject,

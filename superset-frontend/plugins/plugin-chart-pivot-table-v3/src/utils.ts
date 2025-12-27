@@ -546,8 +546,18 @@ export const buildTreeFromRecords = (
 
   ensureNode('row', [], 'Grand total');
   ensureNode('col', [], 'Grand total');
-  const rootValues =
-    Object.keys(grandTotalValues).length > 0 ? grandTotalValues : undefined;
+  const mergedRootValues = {
+    ...(tree.rows[rootKey]?.values || {}),
+    ...(tree.cols[rootKey]?.values || {}),
+    ...(Object.keys(grandTotalValues).length > 0 ? grandTotalValues : {}),
+  };
+  const hasGrandTotalValues = Object.keys(grandTotalValues).length > 0;
+  const allowRootFallback = rowDepth === 0 && colDepth === 0;
+  const rootValues = hasGrandTotalValues
+    ? mergedRootValues
+    : allowRootFallback && Object.keys(mergedRootValues).length > 0
+    ? mergedRootValues
+    : undefined;
   if (rootValues && !tree.cells[`${rootKey}|${rootKey}`]) {
     tree.cells[`${rootKey}|${rootKey}`] = {
       rowKey: rootKey,
