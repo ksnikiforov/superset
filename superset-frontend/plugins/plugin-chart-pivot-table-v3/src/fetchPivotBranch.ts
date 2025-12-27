@@ -58,6 +58,8 @@ export interface FetchPivotBranchParams {
   path: PivotPath;
   maxDepthPerFetch?: number;
   currentTree?: PivotTreeData;
+  visibleRowDepth?: number;
+  visibleColDepth?: number;
 }
 
 const cache = new Map<string, PivotTreeData>();
@@ -115,6 +117,8 @@ const resolveFetchContext = ({
   path,
   maxDepthPerFetch,
   currentTree,
+  visibleRowDepth,
+  visibleColDepth,
 }: FetchPivotBranchParams): ResolvedFetchContext => {
   const rowGroupbyRaw = ensureIsArray<QueryFormColumn>(formData.groupbyRows);
   const colGroupbyRaw = ensureIsArray<QueryFormColumn>(formData.groupbyColumns);
@@ -163,8 +167,14 @@ const resolveFetchContext = ({
       ),
     );
 
-  const currentRowDepth = getCurrentDepth(currentTree?.rows, 'row');
-  const currentColDepth = getCurrentDepth(currentTree?.cols, 'col');
+  const currentRowDepth =
+    visibleRowDepth !== undefined
+      ? Math.min(visibleRowDepth, rowGroupby.length)
+      : getCurrentDepth(currentTree?.rows, 'row');
+  const currentColDepth =
+    visibleColDepth !== undefined
+      ? Math.min(visibleColDepth, colGroupby.length)
+      : getCurrentDepth(currentTree?.cols, 'col');
 
   const rowDepth =
     axis === 'row'
@@ -215,6 +225,8 @@ export async function fetchPivotBranch({
   path,
   maxDepthPerFetch,
   currentTree,
+  visibleRowDepth,
+  visibleColDepth,
 }: FetchPivotBranchParams): Promise<FetchPivotBranchResult> {
   const {
     rowGroupby,
@@ -228,7 +240,15 @@ export async function fetchPivotBranch({
     rowDepth,
     colDepth,
     cacheKey,
-  } = resolveFetchContext({ formData, axis, path, maxDepthPerFetch, currentTree });
+  } = resolveFetchContext({
+    formData,
+    axis,
+    path,
+    maxDepthPerFetch,
+    currentTree,
+    visibleRowDepth,
+    visibleColDepth,
+  });
 
   const cached = cache.get(cacheKey);
   if (cached) {
@@ -246,6 +266,14 @@ export async function fetchPivotBranch({
     rowDepth > 0;
   if (needsMetricFrontRoot) {
     depthPairs.push({ rowDepth: 0, colDepth });
+  }
+  const needsMetricFrontColumnRootForRows =
+    metricsLayoutResolved === MetricsLayoutEnum.COLUMNS &&
+    metricInsertIndex === 0 &&
+    axis === 'row' &&
+    colDepth > 0;
+  if (needsMetricFrontColumnRootForRows) {
+    depthPairs.push({ rowDepth, colDepth: 0 });
   }
 
   const filters =

@@ -457,4 +457,335 @@ describe('PivotTableChart expansion with metrics before dimensions', () => {
     });
     expect(getByText('USA')).toBeTruthy();
   });
+
+  it('shows fetched metric values after collapsing metric-first columns and expanding a row', async () => {
+    const baseTreeRaw = buildTreeFromRecords(
+      [{ nation: 'USA', segment: 'AUTO', countCustomers: 10 }],
+      ['countCustomers'],
+      ['nation', 'orderPriority'],
+      ['segment'],
+      1,
+      0,
+    );
+    const baseTree = applyMetricAxis(
+      baseTreeRaw,
+      ['countCustomers'],
+      MetricsLayoutEnum.COLUMNS,
+      ['nation', 'orderPriority'],
+      ['segment'],
+      0,
+    );
+
+    const columnBranchRaw = buildTreeFromRecords(
+      [{ nation: 'USA', segment: 'AUTO', countCustomers: 10 }],
+      ['countCustomers'],
+      ['nation', 'orderPriority'],
+      ['segment'],
+      1,
+      1,
+    );
+    const columnBranchWithMetrics = applyMetricAxis(
+      columnBranchRaw,
+      ['countCustomers'],
+      MetricsLayoutEnum.COLUMNS,
+      ['nation', 'orderPriority'],
+      ['segment'],
+      0,
+    );
+
+    const rowBranchRaw = buildTreeFromRecords(
+      [{ nation: 'USA', orderPriority: 'HIGH', countCustomers: 7 }],
+      ['countCustomers'],
+      ['nation', 'orderPriority'],
+      ['segment'],
+      2,
+      0,
+    );
+    const rowBranchWithMetrics = applyMetricAxis(
+      rowBranchRaw,
+      ['countCustomers'],
+      MetricsLayoutEnum.COLUMNS,
+      ['nation', 'orderPriority'],
+      ['segment'],
+      0,
+    );
+
+    const finalColBranchRaw = buildTreeFromRecords(
+      [
+        {
+          nation: 'USA',
+          orderPriority: 'HIGH',
+          segment: 'AUTO',
+          countCustomers: 7,
+        },
+      ],
+      ['countCustomers'],
+      ['nation', 'orderPriority'],
+      ['segment'],
+      2,
+      1,
+    );
+    const finalColBranchWithMetrics = applyMetricAxis(
+      finalColBranchRaw,
+      ['countCustomers'],
+      MetricsLayoutEnum.COLUMNS,
+      ['nation', 'orderPriority'],
+      ['segment'],
+      0,
+    );
+
+    fetchPivotBranchMock
+      .mockResolvedValueOnce({ data: columnBranchWithMetrics })
+      .mockResolvedValueOnce({ data: rowBranchWithMetrics })
+      .mockResolvedValueOnce({ data: finalColBranchWithMetrics });
+
+    const { container, getByText } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={
+          {
+            ...baseFormData,
+            groupbyRows: ['nation', 'orderPriority'],
+            groupbyColumns: [METRICS_PLACEHOLDER, 'segment'],
+            metricsLayout: MetricsLayoutEnum.COLUMNS,
+            metrics: ['countCustomers'],
+          } as PivotTableQueryFormData
+        }
+        metrics={['countCustomers']}
+        groupbyRows={['nation', 'orderPriority']}
+        groupbyColumns={['segment']}
+        aggregateFunction="Sum"
+        width={400}
+        height={300}
+        startCollapsed
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    const thead = container.querySelector('thead') as HTMLElement;
+    fireEvent.click(within(thead).getByLabelText('plus-square'));
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
+    });
+    fireEvent.click(within(thead).getByLabelText('minus-square'));
+
+    const usaRow = getByText('USA').closest('tr') as HTMLElement;
+    fireEvent.click(within(usaRow).getByLabelText('plus-square'));
+
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
+    });
+
+    fireEvent.click(within(thead).getByLabelText('plus-square'));
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(3);
+    });
+
+    const tbody = container.querySelector('tbody') as HTMLElement;
+    const priorityCell = await within(tbody).findByText('HIGH');
+    const priorityRow = priorityCell.closest('tr') as HTMLElement;
+    expect(priorityRow).toBeTruthy();
+    expect(within(priorityRow).getByText('7')).toBeTruthy();
+  });
+
+  it('keeps values when expanding multiple rows after collapsing columns twice', async () => {
+    const baseTreeRaw = buildTreeFromRecords(
+      [
+        { nation: 'USA', orderPriority: 'LOW', segment: 'AUTO', countCustomers: 10 },
+        { nation: 'CAN', orderPriority: 'HIGH', segment: 'AUTO', countCustomers: 20 },
+      ],
+      ['countCustomers'],
+      ['nation', 'orderPriority'],
+      ['segment'],
+      1,
+      0,
+    );
+    const baseTree = applyMetricAxis(
+      baseTreeRaw,
+      ['countCustomers'],
+      MetricsLayoutEnum.COLUMNS,
+      ['nation', 'orderPriority'],
+      ['segment'],
+      0,
+    );
+
+    const columnBranchRaw = buildTreeFromRecords(
+      [
+        { nation: 'USA', orderPriority: 'LOW', segment: 'AUTO', countCustomers: 10 },
+        { nation: 'CAN', orderPriority: 'HIGH', segment: 'AUTO', countCustomers: 20 },
+      ],
+      ['countCustomers'],
+      ['nation', 'orderPriority'],
+      ['segment'],
+      1,
+      1,
+    );
+    const columnBranchWithMetrics = applyMetricAxis(
+      columnBranchRaw,
+      ['countCustomers'],
+      MetricsLayoutEnum.COLUMNS,
+      ['nation', 'orderPriority'],
+      ['segment'],
+      0,
+    );
+
+    const columnRefetchRaw = buildTreeFromRecords(
+      [
+        {
+          nation: 'USA',
+          orderPriority: 'LOW',
+          segment: 'AUTO',
+          countCustomers: 10,
+        },
+        {
+          nation: 'CAN',
+          orderPriority: 'HIGH',
+          segment: 'AUTO',
+          countCustomers: 20,
+        },
+      ],
+      ['countCustomers'],
+      ['nation', 'orderPriority'],
+      ['segment'],
+      2,
+      1,
+    );
+    const columnRefetchWithMetrics = applyMetricAxis(
+      columnRefetchRaw,
+      ['countCustomers'],
+      MetricsLayoutEnum.COLUMNS,
+      ['nation', 'orderPriority'],
+      ['segment'],
+      0,
+    );
+
+    const usaRowBranchRaw = buildTreeFromRecords(
+      [{ nation: 'USA', orderPriority: 'LOW', countCustomers: 10 }],
+      ['countCustomers'],
+      ['nation', 'orderPriority'],
+      ['segment'],
+      2,
+      0,
+    );
+    const usaRowBranchWithMetrics = applyMetricAxis(
+      usaRowBranchRaw,
+      ['countCustomers'],
+      MetricsLayoutEnum.COLUMNS,
+      ['nation', 'orderPriority'],
+      ['segment'],
+      0,
+    );
+
+    const canRowBranchRaw = buildTreeFromRecords(
+      [{ nation: 'CAN', orderPriority: 'HIGH', countCustomers: 20 }],
+      ['countCustomers'],
+      ['nation', 'orderPriority'],
+      ['segment'],
+      2,
+      0,
+    );
+    const canRowBranchWithMetrics = applyMetricAxis(
+      canRowBranchRaw,
+      ['countCustomers'],
+      MetricsLayoutEnum.COLUMNS,
+      ['nation', 'orderPriority'],
+      ['segment'],
+      0,
+    );
+
+    fetchPivotBranchMock
+      .mockResolvedValueOnce({ data: columnBranchWithMetrics })
+      .mockResolvedValueOnce({ data: usaRowBranchWithMetrics })
+      .mockResolvedValueOnce({ data: columnRefetchWithMetrics })
+      .mockResolvedValueOnce({ data: canRowBranchWithMetrics });
+
+    const { container, getByText } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={
+          {
+            ...baseFormData,
+            groupbyRows: ['nation', 'orderPriority'],
+            groupbyColumns: [METRICS_PLACEHOLDER, 'segment'],
+            metricsLayout: MetricsLayoutEnum.COLUMNS,
+            metrics: ['countCustomers'],
+          } as PivotTableQueryFormData
+        }
+        metrics={['countCustomers']}
+        groupbyRows={['nation', 'orderPriority']}
+        groupbyColumns={['segment']}
+        aggregateFunction="Sum"
+        width={400}
+        height={300}
+        startCollapsed
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    const thead = container.querySelector('thead') as HTMLElement;
+    fireEvent.click(within(thead).getByLabelText('plus-square'));
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
+    });
+
+    fireEvent.click(within(thead).getByLabelText('minus-square'));
+
+    const usaRow = getByText('USA').closest('tr') as HTMLElement;
+    fireEvent.click(within(usaRow).getByLabelText('plus-square'));
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
+    });
+
+    // Re-expand columns with deeper row depth, then collapse again.
+    fireEvent.click(within(thead).getByLabelText('plus-square'));
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(3);
+    });
+    fireEvent.click(within(thead).getByLabelText('minus-square'));
+
+    const canRow = getByText('CAN').closest('tr') as HTMLElement;
+    fireEvent.click(within(canRow).getByLabelText('plus-square'));
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(4);
+    });
+
+    const tbody = container.querySelector('tbody') as HTMLElement;
+    const canChildCell = await within(tbody).findByText('HIGH');
+    const canChildRow = canChildCell.closest('tr') as HTMLElement;
+    expect(within(canChildRow).getByText('20')).toBeTruthy();
+  });
 });

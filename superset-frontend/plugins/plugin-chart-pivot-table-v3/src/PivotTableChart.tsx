@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   LoadingOutlined,
   MinusSquareOutlined,
@@ -331,8 +331,12 @@ function PivotTableChart(props: PivotTableProps) {
   const [expandedCols, setExpandedCols] = useState<Set<string>>(new Set());
   const [loadingKeys, setLoadingKeys] = useState<Set<string>>(new Set());
   const [errorMessage, setErrorMessage] = useState<string>();
-  const [fetchedRowKeys, setFetchedRowKeys] = useState<Set<string>>(new Set());
-  const [fetchedColKeys, setFetchedColKeys] = useState<Set<string>>(new Set());
+  const [fetchedRowKeys, setFetchedRowKeys] = useState<Map<string, number>>(
+    () => new Map(),
+  );
+  const [fetchedColKeys, setFetchedColKeys] = useState<Map<string, number>>(
+    () => new Map(),
+  );
 
   const numberFormatter = useMemo(
     () => getNumberFormatter(valueFormat),
@@ -366,8 +370,8 @@ function PivotTableChart(props: PivotTableProps) {
     };
     setExpandedRows(seedExpanded(data.rows));
     setExpandedCols(seedExpanded(data.cols));
-    setFetchedRowKeys(new Set());
-    setFetchedColKeys(new Set());
+    setFetchedRowKeys(new Map());
+    setFetchedColKeys(new Map());
   }, [data, startCollapsed, initialDepth]);
 
   const metricLabels = useMemo(
@@ -545,141 +549,6 @@ function PivotTableChart(props: PivotTableProps) {
     ],
   );
 
-  const hasLoadedChildren = useCallback(
-    (axis: 'row' | 'col', node: PivotTreeNode) => {
-      const children =
-        axis === 'row' ? getRawRowChildren(node) : getRawColChildren(node);
-      if (children.length === 0) {
-        return false;
-      }
-      const groupby = axis === 'row' ? groupbyRows : groupbyColumns;
-      const parentDimDepth = node.path.filter(
-        val => !metricLabelSet.has(String(val ?? '')),
-      ).length;
-      const metricIndex =
-        axis === 'row' ? metricIndexForRows : metricIndexForCols;
-      if (
-        metricIndex !== undefined &&
-        node.path.length > metricIndex &&
-        metricLabelSet.has(String(node.path[metricIndex] ?? '')) &&
-        parentDimDepth < groupby.length
-      ) {
-        // Sitting on the metric tier and deeper dimensions remain; force fetch.
-        return false;
-      }
-      const childDimDepths = children.map(
-        child =>
-          child.path.filter(
-            val => !metricLabelSet.has(String(val ?? '')),
-          ).length,
-      );
-      const maxChildDimDepth = Math.max(...childDimDepths, 0);
-      const hasChildCells = children.some(child =>
-        Object.keys(tree.cells).some(key =>
-          axis === 'row' ? key.startsWith(`${child.key}|`) : key.endsWith(`|${child.key}`),
-        ),
-      );
-      if (
-        parentDimDepth < groupby.length &&
-        (maxChildDimDepth <= parentDimDepth || !hasChildCells)
-      ) {
-        // Only metric-tier children or placeholder nodes are present; treat as not loaded.
-        return false;
-      }
-      return true;
-    },
-    [
-      getRawColChildren,
-      getRawRowChildren,
-      groupbyColumns,
-      groupbyRows,
-      metricLabelSet,
-      metricIndexForCols,
-      metricIndexForRows,
-      tree.cells,
-    ],
-  );
-
-  const handleToggle = useCallback(
-    async (axis: 'row' | 'col', node: PivotTreeNode) => {
-      const expanded = axis === 'row' ? expandedRows : expandedCols;
-      const updateExpanded =
-        axis === 'row' ? setExpandedRows : setExpandedCols;
-      const isOpen = expanded.has(node.key);
-
-      if (isOpen) {
-        const next = new Set(expanded);
-        next.delete(node.key);
-        updateExpanded(next);
-        return;
-      }
-
-      const fetchedKeys = axis === 'row' ? fetchedRowKeys : fetchedColKeys;
-      const markFetched =
-        axis === 'row' ? setFetchedRowKeys : setFetchedColKeys;
-
-      if (
-        node.hasChildren &&
-        !hasLoadedChildren(axis, node) &&
-        !fetchedKeys.has(node.key)
-      ) {
-        const cached = peekPivotBranchCache({
-          axis,
-          path: node.path,
-          formData,
-          maxDepthPerFetch,
-          currentTree: tree,
-        });
-        if (cached) {
-          setTree(current => mergeTrees(current, cached));
-          markFetched(prev => {
-            const next = new Set(prev);
-            next.add(node.key);
-            return next;
-          });
-        } else {
-          setLoadingKeys(prev => new Set(prev).add(node.key));
-          const result = await fetchPivotBranch({
-            axis,
-            path: node.path,
-            formData,
-            maxDepthPerFetch,
-            currentTree: tree,
-          });
-          if (result.error) {
-            setErrorMessage(result.error.message);
-          }
-          if (result.data) {
-            setTree(current => mergeTrees(current, result.data));
-            markFetched(prev => {
-              const next = new Set(prev);
-              next.add(node.key);
-              return next;
-            });
-          }
-          setLoadingKeys(prev => {
-            const next = new Set(prev);
-            next.delete(node.key);
-            return next;
-          });
-        }
-      }
-      const next = new Set(expanded);
-      next.add(node.key);
-      updateExpanded(next);
-    },
-    [
-      expandedCols,
-      expandedRows,
-      hasLoadedChildren,
-      fetchedColKeys,
-      fetchedRowKeys,
-      maxDepthPerFetch,
-      props,
-      tree,
-    ],
-  );
-
   const rowSorter = useMemo(
     () => sortByOrder(rowOrder, colTypeMap, groupbyRows.map(getColumnLabel)),
     [rowOrder, colTypeMap, groupbyRows],
@@ -729,9 +598,216 @@ function PivotTableChart(props: PivotTableProps) {
     },
     [expandedCols, colSorter, getColChildren, skipColRoot, showColRoot, tree.cols],
   );
+  const countDimDepth = useCallback(
+    (path: PivotTreeNode['path']) =>
+      path.filter(val => !metricLabelSet.has(String(val ?? ''))).length,
+    [metricLabelSet],
+  );
+  const visibleRowDepth = useMemo(
+    () => Math.max(0, ...visibleRows.map(row => countDimDepth(row.path))),
+    [countDimDepth, visibleRows],
+  );
+  const visibleColDepth = useMemo(
+    () => Math.max(0, ...visibleCols.map(col => countDimDepth(col.path))),
+    [countDimDepth, visibleCols],
+  );
+  const lastVisibleRowDepthRef = useRef(visibleRowDepth);
+  const lastVisibleColDepthRef = useRef(visibleColDepth);
+  useEffect(() => {
+    if (visibleRowDepth > lastVisibleRowDepthRef.current) {
+      lastVisibleRowDepthRef.current = visibleRowDepth;
+      setFetchedColKeys(new Map());
+    } else {
+      lastVisibleRowDepthRef.current = visibleRowDepth;
+    }
+  }, [visibleRowDepth]);
+  useEffect(() => {
+    if (visibleColDepth > lastVisibleColDepthRef.current) {
+      lastVisibleColDepthRef.current = visibleColDepth;
+      setFetchedRowKeys(new Map());
+    } else {
+      lastVisibleColDepthRef.current = visibleColDepth;
+    }
+  }, [visibleColDepth]);
+  const hasLoadedChildren = useCallback(
+    (axis: 'row' | 'col', node: PivotTreeNode) => {
+      const children =
+        axis === 'row' ? getRawRowChildren(node) : getRawColChildren(node);
+      if (children.length === 0) {
+        return false;
+      }
+      const groupby = axis === 'row' ? groupbyRows : groupbyColumns;
+      const parentDimDepth = node.path.filter(
+        val => !metricLabelSet.has(String(val ?? '')),
+      ).length;
+      const metricIndex =
+        axis === 'row' ? metricIndexForRows : metricIndexForCols;
+      if (
+        metricIndex !== undefined &&
+        node.path.length > metricIndex &&
+        metricLabelSet.has(String(node.path[metricIndex] ?? '')) &&
+        parentDimDepth < groupby.length
+      ) {
+        // Sitting on the metric tier and deeper dimensions remain; force fetch.
+        return false;
+      }
+      const childDimDepths = children.map(
+        child =>
+          child.path.filter(
+            val => !metricLabelSet.has(String(val ?? '')),
+          ).length,
+      );
+      const maxChildDimDepth = Math.max(...childDimDepths, 0);
+      const childCellRowDepths: number[] = [];
+      const childCellColDepths: number[] = [];
+      const hasChildCells = children.some(child =>
+        Object.keys(tree.cells).some(key => {
+          const matches =
+            axis === 'row'
+              ? key.startsWith(`${child.key}|`)
+              : key.endsWith(`|${child.key}`);
+          if (matches) {
+            const [rowKey, colKey] = key.split('|');
+            const rowNode = tree.rows[rowKey];
+            const colNode = tree.cols[colKey];
+            if (rowNode) {
+              childCellRowDepths.push(
+                rowNode.path.filter(
+                  val => !metricLabelSet.has(String(val ?? '')),
+                ).length,
+              );
+            }
+            if (colNode) {
+              childCellColDepths.push(
+                colNode.path.filter(
+                  val => !metricLabelSet.has(String(val ?? '')),
+                ).length,
+              );
+            }
+          }
+          return matches;
+        }),
+      );
+      const maxChildRowDepth = Math.max(...childCellRowDepths, 0);
+      const maxChildColDepth = Math.max(...childCellColDepths, 0);
+      if (
+        parentDimDepth < groupby.length &&
+        (maxChildDimDepth <= parentDimDepth || !hasChildCells)
+      ) {
+        // Only metric-tier children or placeholder nodes are present; treat as not loaded.
+        return false;
+      }
+      if (axis === 'col' && visibleRowDepth > maxChildRowDepth) {
+        return false;
+      }
+      if (axis === 'row' && visibleColDepth > maxChildColDepth) {
+        return false;
+      }
+      return true;
+    },
+    [
+      getRawColChildren,
+      getRawRowChildren,
+      groupbyColumns,
+      groupbyRows,
+      metricLabelSet,
+      metricIndexForCols,
+      metricIndexForRows,
+      tree.cells,
+      visibleColDepth,
+      visibleRowDepth,
+    ],
+  );
   const columnHeaderRows = useMemo(
     () => buildColumnHeaderRows(visibleCols, tree.cols),
     [visibleCols, tree.cols],
+  );
+  const handleToggle = useCallback(
+    async (axis: 'row' | 'col', node: PivotTreeNode) => {
+      const expanded = axis === 'row' ? expandedRows : expandedCols;
+      const updateExpanded =
+        axis === 'row' ? setExpandedRows : setExpandedCols;
+      const isOpen = expanded.has(node.key);
+
+      if (isOpen) {
+        const next = new Set(expanded);
+        next.delete(node.key);
+        updateExpanded(next);
+        return;
+      }
+
+      const fetchedKeys = axis === 'row' ? fetchedRowKeys : fetchedColKeys;
+      const requiredDepth = axis === 'row' ? visibleColDepth : visibleRowDepth;
+      const fetchedDepth = fetchedKeys.get(node.key) ?? -1;
+      const markFetched =
+        axis === 'row' ? setFetchedRowKeys : setFetchedColKeys;
+
+      if (
+        node.hasChildren &&
+        (!hasLoadedChildren(axis, node) || fetchedDepth !== requiredDepth)
+      ) {
+        const cached = peekPivotBranchCache({
+          axis,
+          path: node.path,
+          formData,
+          maxDepthPerFetch,
+          currentTree: tree,
+          visibleRowDepth,
+          visibleColDepth,
+        });
+        if (cached) {
+          setTree(current => mergeTrees(current, cached));
+          markFetched(prev => {
+            const next = new Map(prev);
+            next.set(node.key, requiredDepth);
+            return next;
+          });
+        } else {
+          setLoadingKeys(prev => new Set(prev).add(node.key));
+          const result = await fetchPivotBranch({
+            axis,
+            path: node.path,
+            formData,
+            maxDepthPerFetch,
+            currentTree: tree,
+            visibleRowDepth,
+            visibleColDepth,
+          });
+          if (result.error) {
+            setErrorMessage(result.error.message);
+          }
+          if (result.data) {
+            setTree(current => mergeTrees(current, result.data));
+            markFetched(prev => {
+              const next = new Map(prev);
+              next.set(node.key, requiredDepth);
+              return next;
+            });
+          }
+          setLoadingKeys(prev => {
+            const next = new Set(prev);
+            next.delete(node.key);
+            return next;
+          });
+        }
+      }
+      const next = new Set(expanded);
+      next.add(node.key);
+      updateExpanded(next);
+    },
+    [
+      expandedCols,
+      expandedRows,
+      fetchedColKeys,
+      fetchedRowKeys,
+      formData,
+      hasLoadedChildren,
+      maxDepthPerFetch,
+      peekPivotBranchCache,
+      tree,
+      visibleColDepth,
+      visibleRowDepth,
+    ],
   );
 
   const renderValue = useCallback(
