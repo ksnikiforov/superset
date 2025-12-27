@@ -127,18 +127,6 @@ const config: ControlPanelConfig = {
       controlSetRows: [
         [
           {
-            name: 'groupbyColumns',
-            config: withMetricsPlaceholder('col')({
-              ...sharedControls.groupby,
-              type: PivotDndColumnSelect,
-              dragTypeOverride: 'pivot_v3_dnd',
-              label: t('Columns'),
-              description: t('Columns to group by on the columns'),
-            }),
-          },
-        ],
-        [
-          {
             name: 'groupbyRows',
             config: withMetricsPlaceholder('row')({
               ...sharedControls.groupby,
@@ -146,6 +134,18 @@ const config: ControlPanelConfig = {
               dragTypeOverride: 'pivot_v3_dnd',
               label: t('Rows'),
               description: t('Columns to group by on the rows'),
+            }),
+          },
+        ],
+        [
+          {
+            name: 'groupbyColumns',
+            config: withMetricsPlaceholder('col')({
+              ...sharedControls.groupby,
+              type: PivotDndColumnSelect,
+              dragTypeOverride: 'pivot_v3_dnd',
+              label: t('Columns'),
+              description: t('Columns to group by on the columns'),
             }),
           },
         ],
