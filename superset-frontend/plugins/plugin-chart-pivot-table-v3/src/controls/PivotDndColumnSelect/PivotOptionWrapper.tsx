@@ -32,7 +32,7 @@ import { Tooltip } from '@superset-ui/core/components';
 import { StyledColumnOption } from 'src/explore/components/optionRenderers';
 import { styled, isAdhocColumn } from '@superset-ui/core';
 import { ColumnMeta } from '@superset-ui/chart-controls';
-import Option from './Option';
+import Option from 'src/explore/components/controls/DndColumnSelectControl/Option';
 
 export const OptionLabel = styled.div`
   width: 100%;
@@ -41,12 +41,15 @@ export const OptionLabel = styled.div`
   white-space: nowrap;
 `;
 
-export default function OptionWrapper(
-  props: OptionProps & {
-    type: string;
-    onShiftOptions: (dragIndex: number, hoverIndex: number) => void;
-  },
-) {
+type PivotOptionProps = OptionProps & {
+  type: string;
+  onShiftOptions: (dragIndex: number, hoverIndex: number) => void;
+  listId?: string;
+  onHoverIndex?: (index: number) => void;
+  onHoverListId?: (listId?: string) => void;
+};
+
+export default function PivotOptionWrapper(props: PivotOptionProps) {
   const {
     index,
     label,
@@ -54,12 +57,16 @@ export default function OptionWrapper(
     column,
     type,
     onShiftOptions,
+    onHoverIndex,
+    onHoverListId,
     clickClose,
     withCaret,
     isExtra,
     datasourceWarningMessage,
     canDelete = true,
     tooltipOverlay,
+    listId,
+    itemRef,
     ...rest
   } = props;
   const ref = useRef<HTMLDivElement>(null);
@@ -69,6 +76,8 @@ export default function OptionWrapper(
     item: {
       type,
       dragIndex: index,
+      sourceId: listId,
+      column,
     },
     collect: (monitor: DragSourceMonitor) => ({
       isDragging: monitor.isDragging(),
@@ -84,8 +93,16 @@ export default function OptionWrapper(
       }
       const { dragIndex } = item;
       const hoverIndex = index;
+      onHoverIndex?.(hoverIndex);
+      onHoverListId?.(listId);
 
       // Don't replace items with themselves
+      if (item.sourceId && listId && item.sourceId !== listId) {
+        // Cross-list hover: record position but don't reorder this list.
+        onHoverIndex?.(hoverIndex);
+        onHoverListId?.(listId);
+        return;
+      }
       if (dragIndex === hoverIndex) {
         return;
       }
@@ -177,10 +194,19 @@ export default function OptionWrapper(
     return null;
   };
 
+  const setRefs = (node: HTMLDivElement | null) => {
+    ref.current = node;
+  };
+
   drag(drop(ref));
 
   return (
-    <DragContainer ref={ref} {...rest}>
+    <DragContainer
+      ref={ref}
+      data-option-index={index}
+      data-list-id={listId}
+      {...rest}
+    >
       <Option
         index={index}
         clickClose={clickClose}

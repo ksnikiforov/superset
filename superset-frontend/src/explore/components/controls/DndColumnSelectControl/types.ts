@@ -33,8 +33,6 @@ export interface OptionProps {
   datasourceWarningMessage?: string;
   canDelete?: boolean;
   tooltipOverlay?: ReactNode;
-  onHoverIndex?: (index: number) => void;
-  onHoverListId?: (listId?: string) => void;
 }
 
 export interface OptionItemInterface {

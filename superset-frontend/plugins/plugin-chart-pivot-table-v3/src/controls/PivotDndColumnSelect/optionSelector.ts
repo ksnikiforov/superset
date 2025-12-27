@@ -26,8 +26,11 @@ import {
 } from '@superset-ui/core';
 
 const getColumnNameOrAdhocColumn = (
-  column: ColumnMeta | AdhocColumn,
+  column: ColumnMeta | AdhocColumn | string,
 ): QueryFormColumn => {
+  if (typeof column === 'string') {
+    return column;
+  }
   if (isColumnMeta(column)) {
     return column.column_name;
   }
@@ -35,7 +38,7 @@ const getColumnNameOrAdhocColumn = (
 };
 
 export class OptionSelector {
-  values: (ColumnMeta | AdhocColumn)[];
+  values: (ColumnMeta | AdhocColumn | string)[];
 
   options: Record<string, ColumnMeta>;
 
@@ -64,7 +67,7 @@ export class OptionSelector {
           ),
         };
       })
-      .filter(Boolean) as ColumnMeta[];
+      .filter(Boolean) as (ColumnMeta | AdhocColumn | string)[];
   }
 
   add(value: QueryFormColumn) {

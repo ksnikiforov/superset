@@ -36,6 +36,7 @@ import {
   METRICS_PLACEHOLDER_LABEL,
   resolveMetricPlacement,
 } from './utils';
+import PivotDndColumnSelect from './controls/PivotDndColumnSelect/PivotDndColumnSelect';
 
   const withMetricsPlaceholder = (axis: 'row' | 'col') => (config: any) => ({
   ...config,
@@ -129,7 +130,7 @@ const config: ControlPanelConfig = {
             name: 'groupbyColumns',
             config: withMetricsPlaceholder('col')({
               ...sharedControls.groupby,
-              type: 'DndColumnSelect',
+              type: PivotDndColumnSelect,
               dragTypeOverride: 'pivot_v3_dnd',
               label: t('Columns'),
               description: t('Columns to group by on the columns'),
@@ -141,7 +142,7 @@ const config: ControlPanelConfig = {
             name: 'groupbyRows',
             config: withMetricsPlaceholder('row')({
               ...sharedControls.groupby,
-              type: 'DndColumnSelect',
+              type: PivotDndColumnSelect,
               dragTypeOverride: 'pivot_v3_dnd',
               label: t('Rows'),
               description: t('Columns to group by on the rows'),
