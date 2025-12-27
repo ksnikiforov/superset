@@ -72,18 +72,13 @@ export default function transformProps(
   });
   const groupbyRows = stripMetricsPlaceholder(placement.rows);
   const groupbyColumns = stripMetricsPlaceholder(placement.cols);
-  const rowSubtotalLevels = normalizeSubtotalLevels(
-    formData.rowSubtotalLevels,
-    groupbyRows.length,
-    formData.rowTotals,
-    formData.rowSubTotals,
-  );
+  const rowSubtotalLevels = formData.rowTotals ? [0] : [];
   const colSubtotalLevels = normalizeSubtotalLevels(
     formData.colSubtotalLevels,
     groupbyColumns.length,
-    formData.colTotals,
+    false,
     formData.colSubTotals,
-  );
+  ).filter(level => level > 0);
   const rowTotalPosition =
     (formData.rowTotalPosition as TotalPosition) || 'start';
   const colTotalPosition =
@@ -218,7 +213,7 @@ export default function transformProps(
     maxDepthPerFetch: formData.maxDepthPerFetch,
     rowTotals: formData.rowTotals,
     colTotals: formData.colTotals,
-    rowSubTotals: formData.rowSubTotals,
+    rowSubTotals: false,
     colSubTotals: formData.colSubTotals,
     rowSubtotalLevels,
     colSubtotalLevels,
@@ -230,7 +225,6 @@ export default function transformProps(
     allowRenderHtml: formData.allowRenderHtml,
     metricsLayout,
     transposePivot: formData.transposePivot,
-    combineMetric: formData.combineMetric,
     emitCrossFilters,
     setDataMask,
     selectedFilters,

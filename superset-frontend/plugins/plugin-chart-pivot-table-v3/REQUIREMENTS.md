@@ -42,6 +42,7 @@ This document summarizes the functional requirements gathered from user feedback
 - Verify ancestor column values stay populated when rows expand under multi-level columns (segment → shipMode → Values) to avoid blanks at higher column levels.
 - Ensure ancestor column aggregates are fetched and rendered for all visible rows when expanding additional column leaves after deeper row expansion (e.g., column expand → row expand → child row expand → another column expand).
 - Fix grand total labeling/value consistency: show “Grand total” in data and UI and ensure the grand-total x grand-total cell is populated from total queries.
+- Totals still misalign for simple SUM scenarios: confirm `buildQuery` emits a `row0|col0` slice when both axes request totals, and ensure `transformProps`/`buildTreeFromRecords`/`mergeTrees` retain that slice instead of overwriting it when deeper branches merge. Add coverage that a single-metric sum with row+col totals produces correct per-axis totals and a correct grand total.
 - Column subtotal control should be multi-select only for subtotal levels (exclude total level toggle), and provide a “Select all” affordance when levels change.
 - Hide or retire legacy controls in the Customize tab that no longer apply (e.g., aggregation function, metrics layout switch) to reduce confusion.
 

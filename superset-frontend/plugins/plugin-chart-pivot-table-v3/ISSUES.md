@@ -30,6 +30,11 @@
    - Aggregation function, metrics layout (“Apply metrics on”), and similar legacy controls may no longer apply to v3 totals/subtotals behavior. Audit and hide/remove irrelevant options to reduce confusion.  
    - Files: `src/controlPanel.tsx` and any dependent formData plumbing.
 
+8) **Simple sum totals still incorrect / missing cells**  
+   - Symptom: even with a single SUM metric and shallow hierarchies, row/column totals and the grand total misalign (e.g., row totals show only the last value, some subtotal cells are blank, and the overall grand total is off).  
+   - Context: UI-side aggregation was removed, so the table now shows only server results. The merge path for totals appears to drop or overwrite the (0,0) slice, or total queries may not be emitted/consumed for every depth combination when both axes have totals.  
+   - Where to look: verify `buildQuery.ts` emits the full set of total/subtotal depth pairs (including `row0|col0`) for collapsed loads; confirm the returned total query is present in `queriesData` and that `transformProps.ts`/`buildTreeFromRecords`/`mergeTrees` attach that slice to both row/col roots without being overridden by deeper merges. Inspect how `PivotTableChart.tsx` filters visible columns/rows when totals exist to ensure the returned total cells are reachable.
+
 Notes for next iteration:
 - Update labels at the data level if consistent “Grand total” strings are required in nodes/tests.
 - Ensure a consistent total record is present (or computed) so `tree.cells['|']` is always populated correctly when either row/column totals are enabled.

@@ -99,11 +99,62 @@ export const parseDepth = (queryName?: string) => {
 export const mergeTrees = (
   left?: PivotTreeData,
   right?: PivotTreeData,
-): PivotTreeData => ({
-  rows: { ...(left?.rows || {}), ...(right?.rows || {}) },
-  cols: { ...(left?.cols || {}), ...(right?.cols || {}) },
-  cells: { ...(left?.cells || {}), ...(right?.cells || {}) },
-});
+): PivotTreeData => {
+  const mergeNodeMaps = (
+    target?: Record<string, PivotTreeNode>,
+    source?: Record<string, PivotTreeNode>,
+  ) => {
+    const result: Record<string, PivotTreeNode> = { ...(target || {}) };
+    Object.entries(source || {}).forEach(([key, node]) => {
+      const existing = result[key];
+      if (!existing) {
+        result[key] = node;
+        return;
+      }
+      const mergedValues =
+        node.values && Object.keys(node.values).length > 0
+          ? { ...(existing.values || {}), ...node.values }
+          : existing.values;
+      result[key] = {
+        ...existing,
+        ...node,
+        ...(mergedValues ? { values: mergedValues } : {}),
+      };
+    });
+    return result;
+  };
+
+  const mergeCells = (
+    target?: Record<string, PivotResultCell>,
+    source?: Record<string, PivotResultCell>,
+  ) => {
+    const result: Record<string, PivotResultCell> = { ...(target || {}) };
+    Object.entries(source || {}).forEach(([key, cell]) => {
+      const existing = result[key];
+      if (!existing) {
+        result[key] = cell;
+        return;
+      }
+      const mergedValues =
+        cell.values && Object.keys(cell.values).length > 0
+          ? { ...(existing.values || {}), ...cell.values }
+          : existing.values;
+      result[key] = {
+        ...existing,
+        ...cell,
+        ...(mergedValues ? { values: mergedValues } : {}),
+        isSubtotal: cell.isSubtotal ?? existing.isSubtotal,
+      };
+    });
+    return result;
+  };
+
+  return {
+    rows: mergeNodeMaps(left?.rows, right?.rows),
+    cols: mergeNodeMaps(left?.cols, right?.cols),
+    cells: mergeCells(left?.cells, right?.cells),
+  };
+};
 
 export const resolveMetricPlacement = (
   rowsRaw: QueryFormColumn[] = [],
@@ -215,8 +266,8 @@ export const applyMetricAxis = (
     if (nodes[key]) return nodes[key];
     const label =
       path.length === 0
-        ? 'Total'
-        : path[path.length - 1]?.toString() ?? 'Total';
+        ? 'Grand total'
+        : path[path.length - 1]?.toString() ?? 'Grand total';
     const node = {
       axis,
       key,
@@ -422,6 +473,7 @@ export const buildTreeFromRecords = (
   const tree: PivotTreeData = { rows: {}, cols: {}, cells: {} };
   const metricKeys = getMetricKeys(metrics);
   const rootKey = serializePath([]);
+  let grandTotalValues: Record<string, DataRecordValue> = {};
 
   const ensureNode = (
     axis: 'row' | 'col',
@@ -433,7 +485,7 @@ export const buildTreeFromRecords = (
     if (nodes[key]) return;
     const label =
       path.length === 0
-        ? totalLabel
+        ? 'Grand total'
         : path[path.length - 1]?.toString() ?? totalLabel;
     nodes[key] = {
       axis,
@@ -486,12 +538,16 @@ export const buildTreeFromRecords = (
       isSubtotal:
         rowPath.length < rowGroupby.length || colPath.length < colGroupby.length,
     };
+
+    if (rowPath.length === 0 && colPath.length === 0) {
+      grandTotalValues = { ...grandTotalValues, ...values };
+    }
   });
 
   ensureNode('row', [], 'Grand total');
   ensureNode('col', [], 'Grand total');
   const rootValues =
-    tree.rows[rootKey]?.values || tree.cols[rootKey]?.values;
+    Object.keys(grandTotalValues).length > 0 ? grandTotalValues : undefined;
   if (rootValues && !tree.cells[`${rootKey}|${rootKey}`]) {
     tree.cells[`${rootKey}|${rootKey}`] = {
       rowKey: rootKey,

@@ -231,30 +231,6 @@ const config: ControlPanelConfig = {
       controlSetRows: [
         [
           {
-            name: 'aggregateFunction',
-            config: {
-              type: 'SelectControl',
-              label: t('Aggregation function'),
-              clearable: false,
-              choices: [
-                ['Count', t('Count')],
-                ['Count Unique Values', t('Count Unique Values')],
-                ['Sum', t('Sum')],
-                ['Average', t('Average')],
-                ['Median', t('Median')],
-                ['Minimum', t('Minimum')],
-                ['Maximum', t('Maximum')],
-              ],
-              default: 'Sum',
-              description: t(
-                'Server-side aggregation used for totals and prefetched branches.',
-              ),
-              renderTrigger: true,
-            },
-          },
-        ],
-        [
-          {
             name: 'startCollapsed',
             config: {
               type: 'CheckboxControl',
@@ -320,12 +296,12 @@ const config: ControlPanelConfig = {
             name: 'colSubtotalLevels',
             config: {
               type: 'SelectControl',
-              label: t('Column totals & subtotals'),
+              label: t('Column subtotals'),
               description: t(
-                'Select which column levels should show totals/subtotals (0 = total).',
+                'Select which column levels should show subtotals. Grand total is controlled separately.',
               ),
               clearable: true,
-              multiple: true,
+              multi: true,
               default: [],
               renderTrigger: true,
               optionRenderer: (opt: any) => opt?.label ?? opt?.value,
@@ -340,11 +316,19 @@ const config: ControlPanelConfig = {
                     MetricsLayoutEnum.COLUMNS,
                 });
                 const colDepth = stripMetricsPlaceholder(placement.cols).length;
-                const options = Array.from({ length: colDepth + 1 }).map((_, idx) => ({
-                  value: idx,
-                  label: idx === 0 ? t('Total') : t('Subtotal level %s', idx),
+                const options = Array.from({ length: colDepth }).map((_, idx) => ({
+                  value: idx + 1,
+                  label: t('Subtotal level %s', idx + 1),
                 }));
-                return { options };
+                const currentValue = ensureIsArray(
+                  state?.controls?.colSubtotalLevels?.value,
+                )
+                  .map(level => Number(level))
+                  .filter(
+                    level =>
+                      Number.isFinite(level) && level > 0 && level <= colDepth,
+                  );
+                return { options, value: currentValue };
               },
             },
           },
@@ -428,40 +412,12 @@ const config: ControlPanelConfig = {
         ],
         [
           {
-            name: 'metricsLayout',
-            config: {
-              type: 'RadioButtonControl',
-              renderTrigger: true,
-              label: t('Apply metrics on'),
-              default: MetricsLayoutEnum.COLUMNS,
-              options: [
-                [MetricsLayoutEnum.COLUMNS, t('Columns')],
-                [MetricsLayoutEnum.ROWS, t('Rows')],
-              ],
-              description: t(
-                'Show metrics grouped with columns or grouped with rows.',
-              ),
-            },
-          },
-          {
             name: 'transposePivot',
             config: {
               type: 'CheckboxControl',
               label: t('Transpose pivot'),
               default: false,
               description: t('Swap rows and columns'),
-              renderTrigger: true,
-            },
-          },
-        ],
-        [
-          {
-            name: 'combineMetric',
-            config: {
-              type: 'CheckboxControl',
-              label: t('Combine metrics'),
-              default: false,
-              description: t('Display metrics together within each dimension.'),
               renderTrigger: true,
             },
           },

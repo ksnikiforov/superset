@@ -23,6 +23,7 @@ import {
   buildTreeFromRecords,
   applyMetricAxis,
   mergeTrees,
+  serializePath,
 } from './utils';
 import { MetricsLayoutEnum } from './types';
 
@@ -137,6 +138,46 @@ describe('applyMetricAxis + buildTreeFromRecords integration', () => {
       2,
     );
     expect(withMetrics.cells['1-URGENT__SUB1|']?.values.metric1).toBe(20);
+  });
+
+  it('sets grand total labels and intersection from grand-total queries', () => {
+    const rootKey = serializePath([]);
+    const tree = buildTreeFromRecords(
+      [{ metric1: 99 }],
+      ['metric1'],
+      [],
+      [],
+      0,
+      0,
+    );
+    expect(tree.rows[rootKey].label).toEqual('Grand total');
+    expect(tree.cols[rootKey].label).toEqual('Grand total');
+    expect(tree.cells[`${rootKey}|${rootKey}`]?.values.metric1).toBe(99);
+  });
+
+  it('preserves grand total cell when merging deeper branches', () => {
+    const rootKey = serializePath([]);
+    const totals = buildTreeFromRecords(
+      [{ metric1: 1500000 }],
+      ['metric1'],
+      ['letter'],
+      [],
+      0,
+      0,
+    );
+    const branch = buildTreeFromRecords(
+      [
+        { letter: 'F', metric1: 100 },
+        { letter: 'O', metric1: 200 },
+      ],
+      ['metric1'],
+      ['letter'],
+      [],
+      1,
+      0,
+    );
+    const merged = mergeTrees(totals, branch);
+    expect(merged.cells[`${rootKey}|${rootKey}`]?.values.metric1).toBe(1500000);
   });
 });
 

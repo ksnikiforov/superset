@@ -1079,7 +1079,9 @@ function PivotTableChart(props: PivotTableProps) {
 
   const formatLabel = useCallback(
     (node: PivotTreeNode) =>
-      node.level === 0 ? t('Grand total') : node.formattedLabel,
+      node.level === 0
+        ? t(node.formattedLabel || 'Grand total')
+        : node.formattedLabel,
     [],
   );
 

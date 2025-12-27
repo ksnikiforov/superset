@@ -67,3 +67,15 @@ test('emits multi queries when startCollapsed is true', () => {
   expect(names).toContain(formatQueryName(0, 2));
   expect(names).toContain(formatQueryName(2, 2));
 });
+
+test('emits column subtotal depth without including grand total level', () => {
+  const queryContext = buildQuery({
+    ...baseFormData,
+    startCollapsed: true,
+    colSubtotalLevels: [1],
+    colTotals: false,
+  });
+  const names = queryContext.queries.map(q => q.query_name);
+  expect(names).toContain(formatQueryName(2, 1));
+  expect(names).not.toContain(formatQueryName(2, 0));
+});

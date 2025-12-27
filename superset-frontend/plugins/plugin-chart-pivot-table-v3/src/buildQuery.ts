@@ -60,7 +60,6 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
     startCollapsed = true,
     rowTotals,
     colTotals,
-    rowSubTotals,
     colSubTotals,
     rowSubtotalLevels,
     colSubtotalLevels,
@@ -83,7 +82,7 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
   const metricInsertIndex =
     placement.metricPosition >= 0 ? placement.metricPosition : undefined;
 
-  const isTotalsEnabled = rowTotals || colTotals || rowSubTotals || colSubTotals;
+  const isTotalsEnabled = rowTotals || colTotals || colSubTotals;
   const isLevelTotalsEnabled =
     (rowSubtotalLevels && rowSubtotalLevels.length > 0) ||
     (colSubtotalLevels && colSubtotalLevels.length > 0);
@@ -110,18 +109,14 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
     adjustForMetricFront(initialDepthResolved, !metricsOnRows),
   );
 
-  const rowLevels = normalizeSubtotalLevels(
-    rowSubtotalLevels,
-    rowGroupby.length,
-    rowTotals,
-    rowSubTotals,
-  );
-  const colLevels = normalizeSubtotalLevels(
+  const rowLevels = rowTotals ? [0] : [];
+  const colLevelsBase = normalizeSubtotalLevels(
     colSubtotalLevels,
     colGroupby.length,
-    colTotals,
+    false,
     colSubTotals,
-  );
+  ).filter(level => level > 0);
+  const colLevels = colTotals ? [0, ...colLevelsBase] : colLevelsBase;
 
   const temporalLookup = formData?.temporal_columns_lookup || {};
   const isTemporalColumn = (col: QueryFormColumn) =>

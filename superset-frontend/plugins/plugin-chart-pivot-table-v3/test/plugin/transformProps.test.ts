@@ -67,4 +67,27 @@ describe('Pivot Table v3 transformProps', () => {
     expect(result.data.cells['A|B__metric1']).toBeDefined();
     expect(result.metrics).toEqual(['metric1']);
   });
+
+  it('normalizes row and column subtotal selections', () => {
+    const customProps = new ChartProps({
+      ...chartProps,
+      formData: {
+        ...formData,
+        rowTotals: true,
+        colTotals: false,
+        colSubtotalLevels: [0, 1, 5],
+      },
+      queriesData: [
+        {
+          data: [{ metric1: 5 }],
+          colnames: ['metric1'],
+          coltypes: [0],
+          query_name: formatQueryName(0, 0),
+        },
+      ],
+    });
+    const result = transformProps(customProps as any);
+    expect(result.rowSubtotalLevels).toEqual([0]);
+    expect(result.colSubtotalLevels).toEqual([1]);
+  });
 });

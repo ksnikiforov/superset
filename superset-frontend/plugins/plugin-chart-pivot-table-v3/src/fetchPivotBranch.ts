@@ -132,18 +132,13 @@ const resolveFetchContext = ({
   });
   const rowGroupby = stripMetricsPlaceholder(placement.rows);
   const colGroupby = stripMetricsPlaceholder(placement.cols);
-  const rowSubtotalLevels = normalizeSubtotalLevels(
-    formData.rowSubtotalLevels,
-    rowGroupby.length,
-    formData.rowTotals,
-    formData.rowSubTotals,
-  ).filter(level => level === 0);
+  const rowSubtotalLevels = formData.rowTotals ? [0] : [];
   const colSubtotalLevels = normalizeSubtotalLevels(
     formData.colSubtotalLevels,
     colGroupby.length,
-    formData.colTotals,
+    false,
     formData.colSubTotals,
-  );
+  ).filter(level => level > 0);
   const metricsLayoutResolved = placement.layout;
   const metricsAxis: PivotAxis =
     metricsLayoutResolved === MetricsLayoutEnum.ROWS ? 'row' : 'col';
@@ -336,12 +331,8 @@ export async function fetchPivotBranch({
       }
     }
   }
-  const effectiveRowLevels = Array.from(
-    new Set([
-      ...rowSubtotalLevels,
-      ...(formData.rowTotals ? [0] : []),
-    ]),
-  ).filter(level => level <= rowDepth);
+  const effectiveRowLevels =
+    formData.rowTotals && rowDepth >= 0 ? [0] : [];
   const effectiveColLevels = Array.from(
     new Set([
       ...colSubtotalLevels,
