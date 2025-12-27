@@ -384,10 +384,13 @@ function PivotTableChart(props: PivotTableProps) {
         parent.axis === 'row' &&
         parent.level < groupbyRows.length
       ) {
-        return children.filter(
+        const filtered = children.filter(
           child =>
             !metricLabels.includes(String(child.path[parent.level] ?? '')),
         );
+        // If filtering removes everything (e.g., metrics inserted before remaining groupbys),
+        // fall back to the original children so metrics remain expandable.
+        return filtered.length > 0 ? filtered : children;
       }
       return children;
     },
@@ -402,10 +405,11 @@ function PivotTableChart(props: PivotTableProps) {
         parent.axis === 'col' &&
         parent.level < groupbyColumns.length
       ) {
-        return children.filter(
+        const filtered = children.filter(
           child =>
             !metricLabels.includes(String(child.path[parent.level] ?? '')),
         );
+        return filtered.length > 0 ? filtered : children;
       }
       return children;
     },
