@@ -62,6 +62,8 @@ test('emits multi queries when startCollapsed is true', () => {
   });
   expect(queryContext.queries.length).toBeGreaterThan(1);
   const names = queryContext.queries.map(q => q.query_name);
-  expect(names).toContain(formatQueryName(0, 0));
-  expect(names).toContain(formatQueryName(1, 1));
+  // With totals enabled and two column groupbys, the initial collapse issues
+  // the visible depth plus a row-total slice.
+  expect(names).toContain(formatQueryName(0, 2));
+  expect(names).toContain(formatQueryName(2, 2));
 });

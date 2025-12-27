@@ -167,6 +167,8 @@ describe('resolveFetchContext', () => {
         groupbyColumns: ['segment', 'orderPriority'],
         metrics: ['countCustomers'],
         metricsLayout: MetricsLayoutEnum.ROWS,
+        datasource: '1__table',
+        viz_type: 'pivot_table_v3',
       } as any,
       axis: 'col',
       path: ['BUILDING'],

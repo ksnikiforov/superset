@@ -174,15 +174,6 @@ describe('PivotTableChart metric tier suppression', () => {
           level: 1,
           hasChildren: true,
         },
-        'USA__countCustomers': {
-          axis: 'row',
-          key: serializePath(['USA', 'countCustomers']),
-          path: ['USA', 'countCustomers'],
-          label: 'countCustomers',
-          formattedLabel: 'countCustomers',
-          level: 2,
-          hasChildren: true,
-        },
         'USA__1-URGENT': {
           axis: 'row',
           key: serializePath(['USA', '1-URGENT']),
@@ -191,15 +182,6 @@ describe('PivotTableChart metric tier suppression', () => {
           formattedLabel: '1-URGENT',
           level: 2,
           hasChildren: true,
-        },
-        'USA__1-URGENT__countCustomers': {
-          axis: 'row',
-          key: serializePath(['USA', '1-URGENT', 'countCustomers']),
-          path: ['USA', '1-URGENT', 'countCustomers'],
-          label: 'countCustomers',
-          formattedLabel: 'countCustomers',
-          level: 3,
-          hasChildren: false,
         },
       },
       cols: {
@@ -214,8 +196,8 @@ describe('PivotTableChart metric tier suppression', () => {
         },
       },
       cells: {
-        [`${serializePath(['USA', '1-URGENT', 'countCustomers'])}|`]: {
-          rowKey: serializePath(['USA', '1-URGENT', 'countCustomers']),
+        [`${serializePath(['USA', '1-URGENT'])}|`]: {
+          rowKey: serializePath(['USA', '1-URGENT']),
           colKey: '',
           values: { countCustomers: 5 },
         },
@@ -262,7 +244,7 @@ describe('PivotTableChart metric tier suppression', () => {
     render(<PivotTableChart {...props} />);
 
     // Metric label should not show as a row header; the second level should be orderPriority.
-    expect(screen.queryByText('countCustomers')).toBeNull();
+    expect(screen.queryAllByText('countCustomers')).toHaveLength(0);
     expect(screen.getByText('1-URGENT')).toBeTruthy();
   });
 });

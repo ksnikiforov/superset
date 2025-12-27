@@ -82,20 +82,11 @@ describe('PivotTableChart expansion with metrics before dimensions', () => {
         level: 0,
         hasChildren: true,
       },
-      A_base: {
-        axis: 'row',
-        key: serializePath(['A_base']),
-        path: ['A_base'],
-        label: 'A',
-        formattedLabel: 'A',
-        level: 1,
-        hasChildren: true,
-      },
-      A: {
-        axis: 'row',
-        key: serializePath(['A']),
-        path: ['A'],
-        label: 'A',
+        A: {
+          axis: 'row',
+          key: serializePath(['A']),
+          path: ['A'],
+          label: 'A',
         formattedLabel: 'A',
         level: 1,
         hasChildren: true,
@@ -388,6 +379,82 @@ describe('PivotTableChart expansion with metrics before dimensions', () => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
     });
 
-    expect(await findByText('B')).toBeInTheDocument();
+    expect(await findByText('B')).toBeTruthy();
+  });
+
+  it('fetches row branch after expanding/collapsing metric-first columns', async () => {
+    fetchPivotBranchMock.mockResolvedValue({ data: undefined });
+
+    const baseTreeRaw = buildTreeFromRecords(
+      [{ nation: 'USA', segment: 'AUTO', countCustomers: 10 }],
+      ['countCustomers'],
+      ['nation', 'orderPriority'],
+      ['segment'],
+      1,
+      1,
+    );
+    const baseTree = applyMetricAxis(
+      baseTreeRaw,
+      ['countCustomers'],
+      MetricsLayoutEnum.COLUMNS,
+      ['nation', 'orderPriority'],
+      ['segment'],
+      0,
+    );
+
+    const { getAllByLabelText, getByText } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={
+          {
+            ...baseFormData,
+            groupbyRows: ['nation', 'orderPriority'],
+            groupbyColumns: [METRICS_PLACEHOLDER, 'segment'],
+            metricsLayout: MetricsLayoutEnum.COLUMNS,
+            metrics: ['countCustomers'],
+          } as PivotTableQueryFormData
+        }
+        metrics={['countCustomers']}
+        groupbyRows={['nation', 'orderPriority']}
+        groupbyColumns={['segment']}
+        aggregateFunction="Sum"
+        width={400}
+        height={300}
+        startCollapsed
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    const colToggle = getAllByLabelText('plus-square')[0];
+    fireEvent.click(colToggle);
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
+    });
+    fireEvent.click(getAllByLabelText('minus-square')[0]);
+
+    const usaRow = getByText('USA').closest('tr') as HTMLElement;
+    const rowToggle = within(usaRow).getByLabelText('plus-square');
+    fireEvent.click(rowToggle);
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
+    });
+    expect(getByText('USA')).toBeTruthy();
   });
 });

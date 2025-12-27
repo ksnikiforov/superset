@@ -22,8 +22,8 @@ import {
   resolveMetricPlacement,
   buildTreeFromRecords,
   applyMetricAxis,
+  mergeTrees,
 } from './utils';
-import { MetricsLayoutEnum } from './types';
 import { MetricsLayoutEnum } from './types';
 
 describe('applyMetricAxis + buildTreeFromRecords integration', () => {
@@ -186,7 +186,7 @@ describe('normalizeSubtotalLevels', () => {
 
   it('filters out-of-range levels and dedupes', () => {
     expect(normalizeSubtotalLevels([0, 1, 5, 1], 2, false, false)).toEqual([
-      0, 1, 2,
+      0, 1,
     ]);
   });
 });

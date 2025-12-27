@@ -376,12 +376,24 @@ export const applyMetricAxis = (
           values: { [metric]: cell.values[metric] },
           isSubtotal: cell.isSubtotal,
         };
+        if (metricKeys.length === 1 && metricPosition === 0) {
+          const rootColKey = serializePath(colPrefix);
+          result.cells[`${rowKey}|${rootColKey}`] =
+            result.cells[`${rowKey}|${rootColKey}`] || {
+              rowKey,
+              colKey: rootColKey,
+              values: { [metric]: cell.values[metric] },
+              isSubtotal: cell.isSubtotal,
+            };
+        }
         // If there is only one metric and the metric tier is at the end,
         // also surface the value at the base column path so collapsed views
         // (before expanding into the metric tier) can render.
         if (
           metricKeys.length === 1 &&
-          metricPosition !== 0
+          (metricPosition === undefined ||
+            metricPosition >= colGroupby.length ||
+            metricPosition === 0)
         ) {
           const baseColKey = serializePath(colPath);
           result.cells[`${rowKey}|${baseColKey}`] =

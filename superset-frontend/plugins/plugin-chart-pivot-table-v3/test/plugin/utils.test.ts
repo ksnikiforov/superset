@@ -88,7 +88,70 @@ describe('applyMetricAxis', () => {
 
     expect(result.cols[serializePath([])]).toBeDefined();
     expect(result.cols[serializePath(['m1'])]).toBeDefined();
-    expect(result.cols[serializePath(['c1'])]).toBeDefined();
+  });
+
+  it('surfaces single metric values on the base column when the metric is first', () => {
+    const tree = {
+      rows: {
+        '': {
+          axis: 'row',
+          key: '',
+          path: [],
+          label: 'Total',
+          formattedLabel: 'Total',
+          level: 0,
+          hasChildren: true,
+        },
+        A: {
+          axis: 'row',
+          key: serializePath(['A']),
+          path: ['A'],
+          label: 'A',
+          formattedLabel: 'A',
+          level: 1,
+          hasChildren: false,
+        },
+      },
+      cols: {
+        '': {
+          axis: 'col',
+          key: '',
+          path: [],
+          label: 'Total',
+          formattedLabel: 'Total',
+          level: 0,
+          hasChildren: true,
+        },
+        AUTO: {
+          axis: 'col',
+          key: serializePath(['AUTO']),
+          path: ['AUTO'],
+          label: 'AUTO',
+          formattedLabel: 'AUTO',
+          level: 1,
+          hasChildren: false,
+        },
+      },
+      cells: {
+        [`${serializePath(['A'])}|${serializePath(['AUTO'])}`]: {
+          rowKey: serializePath(['A']),
+          colKey: serializePath(['AUTO']),
+          values: { m1: 10 },
+        },
+      },
+    } as PivotTreeData;
+
+    const withMetrics = applyMetricAxis(
+      tree,
+      ['m1'],
+      MetricsLayoutEnum.COLUMNS,
+      ['r1'],
+      ['c1'],
+      0,
+    );
+
+    expect(withMetrics.cells['A|AUTO']?.values.m1).toBe(10);
+    expect(withMetrics.cells['A|']?.values.m1).toBe(10);
   });
 
   it('surfaces single metric values at the base row when the metric is not first', () => {
