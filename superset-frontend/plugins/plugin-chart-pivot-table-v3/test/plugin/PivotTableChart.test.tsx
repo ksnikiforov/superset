@@ -809,7 +809,7 @@ describe('PivotTableChart totals & subtotals', () => {
     const labels = within(headerRow)
       .getAllByRole('columnheader')
       .map(cell => cell.textContent?.trim())
-      .slice(1);
+      .filter(label => label && label !== 'Rows');
     // Desired behavior: parent total leaf should not render alongside branch subtotal leaves.
     expect(labels).not.toContain('A');
     expect(labels).toEqual(expect.arrayContaining(['1-URGENT', '2-HIGH', 'Subtotal']));

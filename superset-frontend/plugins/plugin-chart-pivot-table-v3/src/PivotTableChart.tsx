@@ -628,15 +628,33 @@ function PivotTableChart(props: PivotTableProps) {
       if (!expandedCols.has(node.key) || children.length === 0) {
         return [node];
       }
+      const placeAtFront =
+        (dimDepth === 0 ? colTotalPosition : colSubtotalPosition) === 'start';
       const childLeaves = children.flatMap(buildColLeavesWithSubtotals);
-      if (includeSubtotal) {
-        const placeAtFront =
-          (dimDepth === 0 ? colTotalPosition : colSubtotalPosition) === 'start';
-        return placeAtFront
-          ? [node, ...childLeaves]
-          : [...childLeaves, node];
+      if (!includeSubtotal) {
+        return childLeaves;
       }
-      return childLeaves;
+      const matchesBranchSubtotal = (leaf: PivotTreeNode) =>
+        leaf.isSubtotal &&
+        leaf.path.length === node.path.length + 1 &&
+        node.path.every((val, idx) => val === leaf.path[idx]) &&
+        (leaf.path[node.path.length] === 'Subtotal' ||
+          leaf.label === node.label);
+      const subtotalLeaf =
+        childLeaves.find(
+          leaf =>
+            matchesBranchSubtotal(leaf) &&
+            leaf.path[node.path.length] === 'Subtotal',
+        ) || childLeaves.find(matchesBranchSubtotal);
+      if (subtotalLeaf) {
+        const remainingLeaves = childLeaves.filter(
+          leaf => leaf.key !== subtotalLeaf.key && !matchesBranchSubtotal(leaf),
+        );
+        return placeAtFront
+          ? [subtotalLeaf, ...remainingLeaves]
+          : [...remainingLeaves, subtotalLeaf];
+      }
+      return placeAtFront ? [node, ...childLeaves] : [...childLeaves, node];
     },
     [
       getColChildren,
