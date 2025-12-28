@@ -159,4 +159,33 @@ describe('Pivot Table v3 transformProps', () => {
     expect(tree.cells[`${rootKey}|Y`]?.values.metric1).toBe(5);
     expect(tree.cells[`${rootKey}|${rootKey}`]?.values.metric1).toBe(15);
   });
+
+  it('infers column depth when query metadata is shallow but column groupbys are present', () => {
+    const props = new ChartProps({
+      formData: {
+        ...formData,
+        groupbyRows: ['row1'],
+        groupbyColumns: ['col1', 'col2', '__MEASURES__'],
+        metrics: ['metric1'],
+        metricsLayout: MetricsLayoutEnum.COLUMNS,
+      },
+      width: 400,
+      height: 300,
+      queriesData: [
+        {
+          data: [{ row1: 'A', col1: 'X', col2: 'Y', metric1: 10 }],
+          colnames: ['row1', 'col1', 'col2', 'metric1'],
+          coltypes: [1, 1, 1, 0],
+          query_name: formatQueryName(1, 0),
+        },
+      ],
+      hooks: { setDataMask: jest.fn() },
+      filterState: { selectedFilters: {} },
+      datasource: { verboseMap: {}, columnFormats: {}, currencyFormats: {} },
+      theme: supersetTheme,
+    });
+
+    const { data: tree } = transformProps(props as any);
+    expect(tree.cols[serializePath(['X'])]).toBeDefined();
+  });
 });

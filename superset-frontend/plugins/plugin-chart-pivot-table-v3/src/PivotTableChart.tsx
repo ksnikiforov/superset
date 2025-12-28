@@ -40,7 +40,7 @@ import {
   PivotTreeData,
   PivotTreeNode,
 } from './types';
-import { mergeTrees, serializePath } from './utils';
+import { isSubtotalToken, mergeTrees, serializePath, SUBTOTAL_LABEL } from './utils';
 
 const Container = styled.div<{ height: number; width: number | string }>`
   ${({ height, width }) => `
@@ -503,6 +503,24 @@ function PivotTableChart(props: PivotTableProps) {
           child => !metricLabelSet.has(String(child.path[parent.level] ?? '')),
         );
       }
+      if (!rowSubTotals) {
+        filtered = filtered.filter(child => {
+          if (!child.isSubtotal || child.path.length === 0) {
+            return true;
+          }
+          const last = child.path[child.path.length - 1];
+          if (isSubtotalToken(last)) {
+            return false;
+          }
+          if (
+            child.label === SUBTOTAL_LABEL ||
+            child.formattedLabel === SUBTOTAL_LABEL
+          ) {
+            return false;
+          }
+          return true;
+        });
+      }
       return filtered;
     },
     [
@@ -512,6 +530,7 @@ function PivotTableChart(props: PivotTableProps) {
       hideMetricHeaderOnRows,
       metricLabelSet,
       metricsLayout,
+      rowSubTotals,
     ],
   );
 
@@ -634,21 +653,45 @@ function PivotTableChart(props: PivotTableProps) {
       if (!includeSubtotal) {
         return childLeaves;
       }
-      const matchesBranchSubtotal = (leaf: PivotTreeNode) =>
+      const isBranchLeaf = (leaf: PivotTreeNode) =>
         leaf.isSubtotal &&
         leaf.path.length === node.path.length + 1 &&
-        node.path.every((val, idx) => val === leaf.path[idx]) &&
-        (leaf.path[node.path.length] === 'Subtotal' ||
-          leaf.label === node.label);
+        node.path.every((val, idx) => val === leaf.path[idx]);
+      const isExplicitSubtotalLeaf = (leaf: PivotTreeNode) => {
+        if (!isBranchLeaf(leaf)) {
+          return false;
+        }
+        const token = leaf.path[node.path.length];
+        return (
+          isSubtotalToken(token) ||
+          leaf.formattedLabel === SUBTOTAL_LABEL ||
+          leaf.label === SUBTOTAL_LABEL
+        );
+      };
+      const explicitSubtotalLeaf = childLeaves.find(isExplicitSubtotalLeaf);
+      const isDuplicateSubtotalLeaf = (leaf: PivotTreeNode) => {
+        if (!isBranchLeaf(leaf)) {
+          return false;
+        }
+        const token = leaf.path[node.path.length];
+        if (
+          isSubtotalToken(token) ||
+          leaf.formattedLabel === SUBTOTAL_LABEL ||
+          leaf.label === SUBTOTAL_LABEL
+        ) {
+          return true;
+        }
+        if (!explicitSubtotalLeaf) {
+          return leaf.label === node.label;
+        }
+        return leaf.label === node.label || node.path.includes(token);
+      };
       const subtotalLeaf =
-        childLeaves.find(
-          leaf =>
-            matchesBranchSubtotal(leaf) &&
-            leaf.path[node.path.length] === 'Subtotal',
-        ) || childLeaves.find(matchesBranchSubtotal);
+        explicitSubtotalLeaf || childLeaves.find(isDuplicateSubtotalLeaf);
       if (subtotalLeaf) {
         const remainingLeaves = childLeaves.filter(
-          leaf => leaf.key !== subtotalLeaf.key && !matchesBranchSubtotal(leaf),
+          leaf =>
+            leaf.key !== subtotalLeaf.key && !isDuplicateSubtotalLeaf(leaf),
         );
         return placeAtFront
           ? [subtotalLeaf, ...remainingLeaves]

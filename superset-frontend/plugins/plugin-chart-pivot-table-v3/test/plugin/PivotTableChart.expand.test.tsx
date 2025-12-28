@@ -1523,6 +1523,12 @@ describe('PivotTableChart expansion with metrics before dimensions', () => {
       groupbyColumns.length,
     );
     rowBranch.cols[subtotalKey] = rowBranch.cols[subtotalKey] || colBranch.cols[subtotalKey];
+    rowBranch.cells[`${serializePath(['F', 'A'])}|${subtotalKey}`] = {
+      rowKey: serializePath(['F', 'A']),
+      colKey: subtotalKey,
+      values: { quantitySold: 30 },
+      isSubtotal: true,
+    };
     const subtotalRowKey = serializePath(['F', '__subtotal__']);
     rowBranch.rows[subtotalRowKey] = {
       axis: 'row',
@@ -1725,6 +1731,12 @@ describe('PivotTableChart expansion with metrics before dimensions', () => {
       groupbyColumns.length,
     );
     rowBranch.cols[subtotalKey] = rowBranch.cols[subtotalKey] || colBranch.cols[subtotalKey];
+    rowBranch.cells[`${serializePath(['F', 'A'])}|${subtotalKey}`] = {
+      rowKey: serializePath(['F', 'A']),
+      colKey: subtotalKey,
+      values: { quantitySold: 30 },
+      isSubtotal: true,
+    };
 
     fetchPivotBranchMock
       .mockResolvedValueOnce({ data: colBranch })
@@ -1791,15 +1803,13 @@ describe('PivotTableChart expansion with metrics before dimensions', () => {
     const headers = within(headerRow)
       .getAllByRole('columnheader')
       .map(cell => cell.textContent?.trim());
-    const subtotalIndex = headers.indexOf('Subtotal');
-    expect(subtotalIndex).toBeGreaterThan(-1);
+    expect(headers).toContain('Subtotal');
 
     const childRow = await within(
       container.querySelector('tbody') as HTMLElement,
     ).findByText('A');
     const childRowEl = childRow.closest('tr') as HTMLElement;
-    const subtotalCell = childRowEl.querySelectorAll('td')[subtotalIndex];
-    expect(subtotalCell.textContent?.trim()).toBeTruthy();
+    expect(within(childRowEl).getByText('30')).toBeTruthy();
   });
 
   it('fills ancestor column values for all visible rows when expanding another column after deep row expansion', async () => {

@@ -45,6 +45,8 @@ import {
   resolveMetricPlacement,
   stripMetricsPlaceholder,
   normalizeSubtotalLevels,
+  SUBTOTAL_LABEL,
+  SUBTOTAL_TOKEN,
 } from './utils';
 
 export interface FetchPivotBranchResult {
@@ -231,103 +233,64 @@ export const peekPivotBranchCache = (params: FetchPivotBranchParams) => {
 // Exported for tests
 export const resolveFetchContextForTest = resolveFetchContext;
 
-const prefixTreeWithPath = (
-  tree: PivotTreeData,
+const filterDepthPairsForAxis = (
+  pairs: Array<{ rowDepth: number; colDepth: number }>,
   axis: PivotAxis,
-  prefixPath: PivotPath,
+  pathLength: number,
+) => {
+  if (pathLength === 0) {
+    return pairs;
+  }
+  return pairs.filter(pair =>
+    axis === 'row' ? pair.rowDepth >= pathLength : pair.colDepth >= pathLength,
+  );
+};
+
+const injectColumnSubtotalLeaves = (
+  tree: PivotTreeData,
+  depth: number,
   fullDepth: number,
-  appendSubtotalToken = false,
-): PivotTreeData => {
-  if (prefixPath.length === 0) {
+) => {
+  if (depth <= 0 || depth >= fullDepth) {
     return tree;
   }
-
   const next: PivotTreeData = {
     rows: { ...tree.rows },
     cols: { ...tree.cols },
-    cells: {},
+    cells: { ...tree.cells },
   };
-
-  const ensurePrefixNodes = (path: PivotPath) => {
-    let currentPath: PivotPath = [];
-    path.forEach(val => {
-      currentPath = [...currentPath, val];
-      const key = serializePath(currentPath);
-      const targetMap = axis === 'row' ? next.rows : next.cols;
-      if (!targetMap[key]) {
-        const isSubtotalNode = currentPath.length === prefixPath.length;
-        const label =
-          isSubtotalNode || currentPath.length === 0
-            ? 'Subtotal'
-            : currentPath[currentPath.length - 1]?.toString() ?? 'Subtotal';
-        targetMap[key] = {
-          axis,
-          key,
-          path: currentPath,
-          label,
-          formattedLabel: label,
-          level: currentPath.length,
-          hasChildren: currentPath.length < fullDepth,
-          isSubtotal: true,
-        };
-      }
-    });
-  };
-
-  ensurePrefixNodes(prefixPath);
-
-  const sourceNodes = axis === 'row' ? tree.rows : tree.cols;
-  Object.values(sourceNodes).forEach(node => {
-    let newPath = [...prefixPath, ...node.path];
-    if (appendSubtotalToken && newPath.length === prefixPath.length) {
-      newPath = [...newPath, 'Subtotal'];
+  const subtotalNodes = Object.values(tree.cols).filter(
+    node => node.path.length === depth && node.path.length > 0,
+  );
+  subtotalNodes.forEach(node => {
+    const subtotalPath = [...node.path, SUBTOTAL_TOKEN];
+    const subtotalKey = serializePath(subtotalPath);
+    if (!next.cols[subtotalKey]) {
+      next.cols[subtotalKey] = {
+        ...node,
+        key: subtotalKey,
+        path: subtotalPath,
+        label: SUBTOTAL_LABEL,
+        formattedLabel: SUBTOTAL_LABEL,
+        level: subtotalPath.length,
+        hasChildren: subtotalPath.length < fullDepth,
+        isSubtotal: true,
+      };
     }
-    const key = serializePath(newPath);
-    const isSubtotalNode =
-      node.path.length === 0 ||
-      newPath.length === prefixPath.length ||
-      (appendSubtotalToken && newPath[newPath.length - 1] === 'Subtotal');
-    const label = isSubtotalNode ? 'Subtotal' : node.label;
-    const mappedNode = {
-      ...node,
-      axis,
-      key,
-      path: newPath,
-      label,
-      formattedLabel: label,
-      level: newPath.length,
-      hasChildren: newPath.length < fullDepth,
+  });
+  Object.values(tree.cells).forEach(cell => {
+    const baseColPath = tree.cols[cell.colKey]?.path;
+    if (!baseColPath || baseColPath.length !== depth || baseColPath.length === 0) {
+      return;
+    }
+    const subtotalColKey = serializePath([...baseColPath, SUBTOTAL_TOKEN]);
+    const cellKey = `${cell.rowKey}|${subtotalColKey}`;
+    next.cells[cellKey] = {
+      ...cell,
+      colKey: subtotalColKey,
       isSubtotal: true,
     };
-    if (axis === 'row') {
-      next.rows[key] = mappedNode;
-    } else {
-      next.cols[key] = mappedNode;
-    }
   });
-
-  Object.values(tree.cells).forEach(cell => {
-    const baseRowPath = tree.rows[cell.rowKey]?.path || [];
-    const baseColPath = tree.cols[cell.colKey]?.path || [];
-    let newRowPath =
-      axis === 'row' ? [...prefixPath, ...baseRowPath] : baseRowPath;
-    let newColPath =
-      axis === 'col' ? [...prefixPath, ...baseColPath] : baseColPath;
-    if (appendSubtotalToken && axis === 'row' && newRowPath.length === prefixPath.length) {
-      newRowPath = [...newRowPath, 'Subtotal'];
-    }
-    if (appendSubtotalToken && axis === 'col' && newColPath.length === prefixPath.length) {
-      newColPath = [...newColPath, 'Subtotal'];
-    }
-    const newRowKey = serializePath(newRowPath);
-    const newColKey = serializePath(newColPath);
-    next.cells[`${newRowKey}|${newColKey}`] = {
-      ...cell,
-      rowKey: newRowKey,
-      colKey: newColKey,
-    };
-  });
-
   return next;
 };
 
@@ -442,8 +405,15 @@ export async function fetchPivotBranch({
   const subtotalRowDepths = new Set<number>([rowDepth, ...effectiveRowLevels]);
   const subtotalColDepths = new Set<number>([colDepth, ...effectiveColLevels]);
   subtotalRowDepths.forEach(rowDepthVal => {
-    subtotalColDepths.forEach(colDepthVal => addDepthPair(rowDepthVal, colDepthVal));
+    subtotalColDepths.forEach(colDepthVal =>
+      addDepthPair(rowDepthVal, colDepthVal),
+    );
   });
+  const queryPairs = filterDepthPairsForAxis(
+    depthPairs,
+    axis,
+    sanitizedPath.length,
+  );
 
   const filters =
     axis === 'row'
@@ -453,7 +423,7 @@ export async function fetchPivotBranch({
   const queryContext = buildQueryContext(
     formData,
     (baseQueryObject: QueryObject) =>
-      depthPairs.map(pair => ({
+      queryPairs.map(pair => ({
         ...baseQueryObject,
         columns: [
           ...rowGroupby.slice(0, pair.rowDepth),
@@ -475,7 +445,7 @@ export async function fetchPivotBranch({
       jsonPayload: queryContext,
     });
     const results = ((json as any).result || []) as any[];
-    const branchTree = depthPairs.reduce<PivotTreeData>(
+    const branchTree = queryPairs.reduce<PivotTreeData>(
       (acc, pair, idx) =>
         mergeTrees(
           acc,
@@ -488,37 +458,11 @@ export async function fetchPivotBranch({
               pair.rowDepth,
               pair.colDepth,
             );
-            const needsSubtotalTokenForCol =
-              axis === 'col' &&
-              sanitizedPath.length > 0 &&
-              pair.colDepth <= sanitizedPath.length;
-            const needsSubtotalTokenForRow =
-              axis === 'row' &&
-              sanitizedPath.length > 0 &&
-              pair.rowDepth <= sanitizedPath.length;
-            if (
-              axis === 'col' &&
-              sanitizedPath.length > 0 &&
-              pair.colDepth <= sanitizedPath.length
-            ) {
-              tree = prefixTreeWithPath(
+            if (colSubtotalLevels.includes(pair.colDepth)) {
+              tree = injectColumnSubtotalLeaves(
                 tree,
-                'col',
-                sanitizedPath,
+                pair.colDepth,
                 colGroupby.length,
-                needsSubtotalTokenForCol,
-              );
-            } else if (
-              axis === 'row' &&
-              sanitizedPath.length > 0 &&
-              pair.rowDepth <= sanitizedPath.length
-            ) {
-              tree = prefixTreeWithPath(
-                tree,
-                'row',
-                sanitizedPath,
-                rowGroupby.length,
-                needsSubtotalTokenForRow,
               );
             }
             return tree;

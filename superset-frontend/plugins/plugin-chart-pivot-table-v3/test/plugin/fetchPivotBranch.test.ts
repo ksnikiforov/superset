@@ -23,7 +23,7 @@ import {
   PivotTreeNode,
 } from '../../src/types';
 import { resolveFetchContextForTest, fetchPivotBranch } from '../../src/fetchPivotBranch';
-import { METRICS_PLACEHOLDER, serializePath } from '../../src/utils';
+import { METRICS_PLACEHOLDER, serializePath, SUBTOTAL_TOKEN } from '../../src/utils';
 import { formatQueryName } from '../../src/buildQuery';
 import { SupersetClient } from '@superset-ui/core';
 
@@ -457,6 +457,87 @@ describe('resolveFetchContext', () => {
         `${formatQueryName(2, 1)}|branch:row:${serializePath(['USA'])}`,
       ]),
     );
+  });
+
+  it('fetches column subtotal slices for expanded rows and maps them to subtotal leaves', async () => {
+    const postMock = SupersetClient.post as jest.Mock;
+    postMock.mockImplementationOnce(({ jsonPayload }) => ({
+      json: {
+        result: (jsonPayload.queries || []).map((query: any) => {
+          const name = query.query_name as string;
+          if (name.includes(formatQueryName(2, 1))) {
+            return {
+              data: [{ r1: 'A', r2: 'B', c1: 'X', metric1: 42 }],
+            };
+          }
+          return { data: [] };
+        }),
+      },
+    }));
+
+    const currentTree: PivotTreeData = {
+      rows: {
+        '': makeNode({ axis: 'row', path: [], hasChildren: true }),
+        A: makeNode({
+          axis: 'row',
+          path: ['A'],
+          level: 1,
+          hasChildren: true,
+          label: 'A',
+          formattedLabel: 'A',
+        }),
+      },
+      cols: {
+        '': makeNode({ axis: 'col', path: [], hasChildren: true }),
+        X: makeNode({
+          axis: 'col',
+          path: ['X'],
+          level: 1,
+          hasChildren: true,
+          label: 'X',
+          formattedLabel: 'X',
+        }),
+        'X__Y': makeNode({
+          axis: 'col',
+          path: ['X', 'Y'],
+          level: 2,
+          hasChildren: false,
+          label: 'Y',
+          formattedLabel: 'Y',
+        }),
+      },
+      cells: {},
+    };
+
+    const result = await fetchPivotBranch({
+      formData: {
+        groupbyRows: ['r1', 'r2'],
+        groupbyColumns: ['c1', 'c2', METRICS_PLACEHOLDER],
+        metrics: ['metric1'],
+        metricsLayout: MetricsLayoutEnum.COLUMNS,
+        colSubtotalLevels: [1],
+        datasource: '1__table',
+        viz_type: 'pivot_table_v3',
+      } as any,
+      axis: 'row',
+      path: ['A'],
+      currentTree,
+      visibleColDepth: 2,
+      maxDepthPerFetch: 1,
+    });
+
+    expect(postMock).toHaveBeenCalledTimes(1);
+    const queries = (postMock.mock.calls[0][0] as any).jsonPayload?.queries || [];
+    const queryNames = queries.map((q: any) => q.query_name);
+    expect(queryNames).toEqual(
+      expect.arrayContaining([
+        `${formatQueryName(2, 1)}|branch:row:${serializePath(['A'])}`,
+      ]),
+    );
+    const subtotalKey = serializePath(['X', SUBTOTAL_TOKEN]);
+    const rowKey = serializePath(['A', 'B']);
+    expect(result.data?.cols[subtotalKey]).toBeDefined();
+    expect(result.data?.cells[`${rowKey}|${subtotalKey}`]?.values.metric1).toBe(42);
   });
 
   it('fetches ancestor column aggregates when expanding columns with deeper rows', async () => {

@@ -30,6 +30,11 @@ import { formatQueryName } from './buildQuery';
 export const PATH_DIVIDER = '__';
 export const METRICS_PLACEHOLDER = '__MEASURES__';
 export const METRICS_PLACEHOLDER_LABEL = 'Σ Values';
+export const SUBTOTAL_TOKEN = '__subtotal__';
+export const SUBTOTAL_LABEL = 'Subtotal';
+
+export const isSubtotalToken = (val: unknown) =>
+  val === SUBTOTAL_TOKEN || val === SUBTOTAL_LABEL;
 
 export const normalizePlaceholder = (val: QueryFormColumn) => {
   if (val === METRICS_PLACEHOLDER) return METRICS_PLACEHOLDER;

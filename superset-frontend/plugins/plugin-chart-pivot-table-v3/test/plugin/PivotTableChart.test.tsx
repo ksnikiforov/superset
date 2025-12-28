@@ -18,18 +18,22 @@
  */
 
 import React from 'react';
+import { ChartProps, supersetTheme } from '@superset-ui/core';
 import { render, screen, within } from '@testing-library/react';
 import PivotTableChart from '../../src/PivotTableChart';
+import transformProps from '../../src/transformProps';
 import {
   MetricsLayoutEnum,
   PivotTableQueryFormData,
   PivotTreeData,
   PivotTreeNode,
 } from '../../src/types';
+import { formatQueryName } from '../../src/buildQuery';
 import {
   applyMetricAxis,
   buildTreeFromRecords,
   mergeTrees,
+  METRICS_PLACEHOLDER,
   serializePath,
 } from '../../src/utils';
 
@@ -437,39 +441,60 @@ describe('PivotTableChart initial depth on collapsed render', () => {
   });
 
   it('fails when only grand total column renders for multi-column selection (regression guard)', () => {
-    // Simulate a broken response that only includes grand-total columns despite multi-column groupbys.
-    const treeRaw = buildTreeFromRecords(
-      [
-        { orderStatus: 'F', quantitySold: 10 },
-        { orderStatus: 'O', quantitySold: 5 },
+    // Simulate a broken response that labels colDepth=0 but still returns column groupbys.
+    const formData = {
+      ...(baseProps as Partial<PivotTableQueryFormData>),
+      groupbyRows: ['orderStatus'],
+      groupbyColumns: ['orderPriority', 'revenueBand', 'returnFlag', METRICS_PLACEHOLDER],
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      metrics: ['quantitySold'],
+      viz_type: 'pivot_table_v3',
+      datasource: '1__table',
+    } as PivotTableQueryFormData;
+    const chartProps = new ChartProps({
+      formData,
+      width: 600,
+      height: 300,
+      queriesData: [
+        {
+          data: [
+            {
+              orderStatus: 'F',
+              orderPriority: 'A',
+              revenueBand: '10k-50k',
+              returnFlag: 'Y',
+              quantitySold: 10,
+            },
+            {
+              orderStatus: 'O',
+              orderPriority: 'N',
+              revenueBand: '1k-5k',
+              returnFlag: 'N',
+              quantitySold: 5,
+            },
+          ],
+          colnames: [
+            'orderStatus',
+            'orderPriority',
+            'revenueBand',
+            'returnFlag',
+            'quantitySold',
+          ],
+          coltypes: [1, 1, 1, 1, 0],
+          query_name: formatQueryName(1, 0),
+        },
       ],
-      ['quantitySold'],
-      ['orderStatus'],
-      ['orderPriority', 'revenueBand', 'returnFlag'],
-      1,
-      0,
-    );
-    const tree = applyMetricAxis(
-      treeRaw,
-      ['quantitySold'],
-      MetricsLayoutEnum.COLUMNS,
-      ['orderStatus'],
-      ['orderPriority', 'revenueBand', 'returnFlag'],
-      3,
-    );
+      hooks: { setDataMask: jest.fn() },
+      filterState: { selectedFilters: {} },
+      datasource: { verboseMap: {}, columnFormats: {}, currencyFormats: {} },
+      theme: supersetTheme,
+    });
+    const { data: tree } = transformProps(chartProps as any);
 
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={
-          {
-            ...(baseProps as Partial<PivotTableQueryFormData>),
-            groupbyRows: ['orderStatus'],
-            groupbyColumns: ['orderPriority', 'revenueBand', 'returnFlag', '__MEASURES__'],
-            metricsLayout: MetricsLayoutEnum.COLUMNS,
-            metrics: ['quantitySold'],
-          } as PivotTableQueryFormData
-        }
+        formData={formData}
         metrics={['quantitySold']}
         groupbyRows={['orderStatus']}
         groupbyColumns={['orderPriority', 'revenueBand', 'returnFlag']}

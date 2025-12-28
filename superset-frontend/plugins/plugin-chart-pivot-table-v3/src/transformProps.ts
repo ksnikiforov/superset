@@ -160,21 +160,23 @@ export default function transformProps(
     const queryName = (query as any)?.query_name || (query as any)?.queryName;
     let { rowDepth, colDepth } = parseDepth(queryName);
 
-    // Fallback: if query_name is missing or unparsable, infer how many groupby
+    // Fallback: if query_name is missing or shallow, infer how many groupby
     // levels were included in this query by inspecting returned column names.
-    if (rowDepth === 0 && colDepth === 0) {
-      const colSet = new Set((query.colnames || []).map((name: any) => String(name)));
-      rowDepth = groupbyRows.filter(col =>
-        colSet.has(String(getColumnLabel(col))),
-      ).length;
-      colDepth = groupbyColumns.filter(col =>
-        colSet.has(String(getColumnLabel(col))),
-      ).length;
-      // If inference still yields zero but data exists, assume full depth so tree populates.
-      if ((rowDepth === 0 && colDepth === 0) && (query.data || []).length > 0) {
-        rowDepth = groupbyRows.length;
-        colDepth = groupbyColumns.length;
-      }
+    const colSet = new Set((query.colnames || []).map((name: any) => String(name)));
+    const inferredRowDepth = groupbyRows.filter(col =>
+      colSet.has(String(getColumnLabel(col))),
+    ).length;
+    const inferredColDepth = groupbyColumns.filter(col =>
+      colSet.has(String(getColumnLabel(col))),
+    ).length;
+    if (inferredRowDepth > rowDepth || inferredColDepth > colDepth) {
+      rowDepth = Math.max(rowDepth, inferredRowDepth);
+      colDepth = Math.max(colDepth, inferredColDepth);
+    }
+    // If inference still yields zero but data exists, assume full depth so tree populates.
+    if (rowDepth === 0 && colDepth === 0 && (query.data || []).length > 0) {
+      rowDepth = groupbyRows.length;
+      colDepth = groupbyColumns.length;
     }
 
     // Clamp to the configured groupby lengths to avoid over-reading.
