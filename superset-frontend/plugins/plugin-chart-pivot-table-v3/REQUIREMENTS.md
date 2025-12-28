@@ -13,6 +13,8 @@ This document summarizes the functional requirements gathered from user feedback
 - **Start collapsed with expand toggles:** Root only expanded; children show toggles. Initial expansion respects `initialDepth`; optional column auto-expand (`autoExpandColumns`) expands all column levels on load (`PivotTableChart.tsx`).
 - **Hierarchy nodes created for all levels:** Intermediate nodes are built so multi-level hierarchies can expand beyond depth 2 (`buildTreeFromRecords`).
 - **Column headers render top-to-bottom hierarchy:** Column headers are stacked with row/col spans, reflecting depth instead of flat indentation (`PivotTableChart.tsx`).
+- **Subtotal nodes do not expand:** Nodes whose path contains the subtotal token (`__subtotal__`) never show expand toggles; only non-subtotal hierarchy nodes can expand (`PivotTableChart.tsx`).
+- **Row indentation is depth-based:** Row headers indent per dimension depth (16px per level) with no spacer for non-expandable rows so indentation stays consistent without extra gaps (`PivotTableChart.tsx`).
 
 ### Metrics placement & values
 - **Metrics as their own tier in the hierarchy:** Metrics are projected into row/col headers (depending on layout) instead of being combined in a single cell (`applyMetricAxis` in `utils.ts`, invoked from `transformProps.ts`).
@@ -28,6 +30,15 @@ This document summarizes the functional requirements gathered from user feedback
 ### Totals behavior
 - **No column total when there is no column hierarchy:** Root column node is suppressed when no column groupbys, avoiding an extra “Total” column (`buildTreeFromRecords`, `visibleCols` filter in `PivotTableChart.tsx`).
 - **Column totals only when columns exist; ordering follows hierarchy:** Totals appear only when column hierarchy exists; ordering follows hierarchy → metrics → totals (column root suppressed when empty). Row totals suppressed when no row totals selected.
+- **Subtotal depth options clamp to hierarchy:** Column subtotal level selector only exposes levels that can actually exist for the current column groupby and excludes the total level; the same clamp is applied in query building and prop transforms (`controlPanel.tsx`, `buildQuery.ts`, `transformProps.ts`).
+- **Subtotal label normalization:** Subtotal headers render with the user-facing label “Subtotal” (not the internal token), and explicit subtotal leaves are de-duplicated on insertion (`PivotTableChart.tsx`, `fetchPivotBranch.ts`).
+
+### Styling & presentation
+- **Theme selector (light presets):** Theme options are Blue, Peach, Grey, Custom, None; presets use light Excel-style tints (`utils.ts`, `controlPanel.tsx`).
+- **Theme application scope:** Theme color applies to column header cells and the row grand total (including the bottom grand-total cell), and nowhere else (`PivotTableChart.tsx`).
+- **Row header label emphasis:** The “Rows” label is bolded to match Excel/Power BI conventions (`PivotTableChart.tsx`).
+- **Value alignment:** Measure values are right-aligned via a dedicated value-cell class to keep numeric columns aligned (`PivotTableChart.tsx`).
+- **Aggregate emphasis behavior:** Explicit totals are bold; intermediate levels become bold only after a deeper expand at that level; leaf levels remain non-bold (`PivotTableChart.tsx`).
 
 ### Sorting
 - **Type-aware sorting of headers:** Sorting uses column type metadata to sort numeric/temporal values correctly (`sortByOrder`/`compareValues` in `PivotTableChart.tsx`, type map built in `transformProps.ts`).
