@@ -101,6 +101,7 @@ export interface PivotTableCustomizeProps {
   allowRenderHtml?: boolean;
   metricsLayout?: MetricsLayoutEnum;
   rowTotalPosition?: TotalPosition;
+  rowSubtotalPosition?: TotalPosition;
   colTotalPosition?: TotalPosition;
   colSubtotalPosition?: TotalPosition;
   pivotTheme?: PivotTheme;
@@ -176,6 +177,7 @@ export interface PivotTableProps
     formData: PivotTableCustomizeProps;
   };
   rowTotalPosition?: TotalPosition;
+  rowSubtotalPosition?: TotalPosition;
   colTotalPosition?: TotalPosition;
   colSubtotalPosition?: TotalPosition;
 }

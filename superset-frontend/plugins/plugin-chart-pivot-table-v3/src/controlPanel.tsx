@@ -342,6 +342,33 @@ const config: ControlPanelConfig = {
         ],
         [
           {
+            name: 'rowSubTotals',
+            config: {
+              type: 'CheckboxControl',
+              label: t('Row subtotals'),
+              description: t('Show subtotals for row groups.'),
+              default: true,
+              renderTrigger: true,
+            },
+          },
+          {
+            name: 'rowSubtotalPosition',
+            config: {
+              type: 'SelectControl',
+              label: t('Row subtotal position'),
+              description: t('Show row subtotals inline or as a row at the bottom.'),
+              clearable: false,
+              default: 'start',
+              renderTrigger: true,
+              choices: [
+                ['start', t('Top')],
+                ['end', t('Bottom')],
+              ],
+            },
+          },
+        ],
+        [
+          {
             name: 'colSubtotalLevels',
             config: {
               type: 'SelectControl',

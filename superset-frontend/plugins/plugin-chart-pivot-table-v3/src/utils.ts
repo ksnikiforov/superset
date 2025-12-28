@@ -24,7 +24,7 @@ import {
   QueryFormMetric,
   ensureIsArray,
 } from '@superset-ui/core';
-import { MetricsLayoutEnum, PivotPath, PivotTreeData } from './types';
+import { MetricsLayoutEnum, PivotPath, PivotTreeData, PivotTreeNode } from './types';
 import { formatQueryName } from './buildQuery';
 
 export const PATH_DIVIDER = '__';
@@ -97,6 +97,105 @@ export const normalizeSubtotalLevels = (
     }
   }
   return Array.from(next).sort((a, b) => a - b);
+};
+
+export const injectRowSubtotalLeaves = (
+  tree: PivotTreeData,
+  depth: number,
+  fullDepth: number,
+) => {
+  if (depth <= 0 || depth >= fullDepth) {
+    return tree;
+  }
+  const next: PivotTreeData = {
+    rows: { ...tree.rows },
+    cols: { ...tree.cols },
+    cells: { ...tree.cells },
+  };
+  const subtotalNodes = Object.values(tree.rows).filter(
+    node => node.path.length === depth && node.path.length > 0,
+  );
+  subtotalNodes.forEach(node => {
+    const subtotalPath = [...node.path, SUBTOTAL_TOKEN];
+    const subtotalKey = serializePath(subtotalPath);
+    if (!next.rows[subtotalKey]) {
+      next.rows[subtotalKey] = {
+        ...node,
+        key: subtotalKey,
+        path: subtotalPath,
+        label: SUBTOTAL_LABEL,
+        formattedLabel: SUBTOTAL_LABEL,
+        level: subtotalPath.length,
+        hasChildren: false,
+        isSubtotal: true,
+      };
+    }
+  });
+  Object.values(tree.cells).forEach(cell => {
+    const baseRowPath = tree.rows[cell.rowKey]?.path;
+    if (!baseRowPath || baseRowPath.length !== depth || baseRowPath.length === 0) {
+      return;
+    }
+    const subtotalRowKey = serializePath([...baseRowPath, SUBTOTAL_TOKEN]);
+    const cellKey = `${subtotalRowKey}|${cell.colKey}`;
+    next.cells[cellKey] = {
+      ...cell,
+      rowKey: subtotalRowKey,
+      isSubtotal: true,
+    };
+  });
+  return next;
+};
+
+export const labelRowSubtotalLeaves = (
+  tree: PivotTreeData,
+  metrics: QueryFormMetric[],
+) => {
+  const metricLabels = new Set(getMetricKeys(metrics));
+  const nextRows: Record<string, PivotTreeNode> = { ...tree.rows };
+  let hasChanges = false;
+
+  Object.values(tree.rows).forEach(node => {
+    const subtotalIndex = node.path.findIndex(isSubtotalToken);
+    if (subtotalIndex < 0) {
+      return;
+    }
+    let baseLabel = '';
+    for (let i = subtotalIndex - 1; i >= 0; i -= 1) {
+      const val = node.path[i];
+      if (!metricLabels.has(String(val ?? '')) && !isSubtotalToken(val)) {
+        baseLabel = String(val ?? '');
+        break;
+      }
+    }
+    if (!baseLabel) {
+      return;
+    }
+    let metricLabel: string | undefined;
+    for (let i = subtotalIndex + 1; i < node.path.length; i += 1) {
+      const val = node.path[i];
+      if (metricLabels.has(String(val ?? ''))) {
+        metricLabel = String(val ?? '');
+        break;
+      }
+    }
+    const nextLabel = metricLabel
+      ? `${baseLabel} ${metricLabel}`
+      : `${baseLabel} Total`;
+    if (node.label !== nextLabel || node.formattedLabel !== nextLabel) {
+      nextRows[node.key] = {
+        ...node,
+        label: nextLabel,
+        formattedLabel: nextLabel,
+      };
+      hasChanges = true;
+    }
+  });
+
+  if (!hasChanges) {
+    return tree;
+  }
+  return { ...tree, rows: nextRows };
 };
 
 export const parseDepth = (queryName?: string) => {

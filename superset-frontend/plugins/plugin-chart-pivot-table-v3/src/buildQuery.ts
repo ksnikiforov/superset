@@ -109,7 +109,14 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
     adjustForMetricFront(initialDepthResolved, !metricsOnRows),
   );
 
-  const rowLevels = rowTotals ? [0] : [];
+  const rowSubTotalsEnabled = formData.rowSubTotals ?? true;
+  const maxRowSubtotalDepth = Math.max(rowGroupby.length - 1, 0);
+  const rowLevels = normalizeSubtotalLevels(
+    rowSubtotalLevels,
+    maxRowSubtotalDepth,
+    rowTotals,
+    rowSubTotalsEnabled,
+  );
   const maxColSubtotalDepth = Math.max(colGroupby.length - 1, 0);
   const colLevelsBase = normalizeSubtotalLevels(
     colSubtotalLevels,

@@ -92,3 +92,14 @@ test('requests the first column level on initial collapsed render with multiple 
   expect(names).toContain(formatQueryName(1, 1));
   expect(names).not.toContain(formatQueryName(1, 0));
 });
+
+test('includes row subtotal depths when row subtotals are enabled', () => {
+  const queryContext = buildQuery({
+    ...baseFormData,
+    startCollapsed: true,
+    rowTotals: false,
+    rowSubTotals: true,
+  });
+  const names = queryContext.queries.map(q => q.query_name);
+  expect(names).toContain(formatQueryName(1, 2));
+});

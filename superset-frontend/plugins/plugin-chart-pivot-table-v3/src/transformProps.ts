@@ -43,6 +43,8 @@ import {
   resolveMetricPlacement,
   stripMetricsPlaceholder,
   normalizeSubtotalLevels,
+  injectRowSubtotalLeaves,
+  labelRowSubtotalLeaves,
   serializePath,
 } from './utils';
 
@@ -73,7 +75,14 @@ export default function transformProps(
   });
   const groupbyRows = stripMetricsPlaceholder(placement.rows);
   const groupbyColumns = stripMetricsPlaceholder(placement.cols);
-  const rowSubtotalLevels = formData.rowTotals ? [0] : [];
+  const rowSubTotalsEnabled = formData.rowSubTotals ?? true;
+  const maxRowSubtotalDepth = Math.max(groupbyRows.length - 1, 0);
+  const rowSubtotalLevels = normalizeSubtotalLevels(
+    formData.rowSubtotalLevels,
+    maxRowSubtotalDepth,
+    formData.rowTotals,
+    rowSubTotalsEnabled,
+  );
   const maxColSubtotalDepth = Math.max(groupbyColumns.length - 1, 0);
   const colSubtotalLevels = normalizeSubtotalLevels(
     formData.colSubtotalLevels,
@@ -83,6 +92,8 @@ export default function transformProps(
   ).filter(level => level > 0);
   const rowTotalPosition =
     (formData.rowTotalPosition as TotalPosition) || 'start';
+  const rowSubtotalPosition =
+    (formData.rowSubtotalPosition as TotalPosition) || 'start';
   const colTotalPosition =
     (formData.colTotalPosition as TotalPosition) || 'start';
   const colSubtotalPosition =
@@ -196,8 +207,13 @@ export default function transformProps(
     );
     return mergeTrees(acc, branch);
   }, ownState?.treeData || ({} as PivotTreeData));
-  const nextTree = applyMetricAxis(
+  const rowSubtotalDepths = rowSubtotalLevels.filter(level => level > 0);
+  const nextTreeWithRowSubtotals = rowSubtotalDepths.reduce(
+    (acc, depth) => injectRowSubtotalLeaves(acc, depth, groupbyRows.length),
     nextTreeRaw,
+  );
+  const nextTree = applyMetricAxis(
+    nextTreeWithRowSubtotals,
     metrics,
     metricsLayout,
     groupbyRows,
@@ -237,16 +253,17 @@ export default function transformProps(
       };
     }
   }
-  if (nextTree.rows[rootKey]) {
-    nextTree.rows[rootKey] = {
-      ...nextTree.rows[rootKey],
+  const nextTreeLabeled = labelRowSubtotalLeaves(nextTree, metrics);
+  if (nextTreeLabeled.rows[rootKey]) {
+    nextTreeLabeled.rows[rootKey] = {
+      ...nextTreeLabeled.rows[rootKey],
       label: 'Grand total',
       formattedLabel: 'Grand total',
     };
   }
-  if (nextTree.cols[rootKey]) {
-    nextTree.cols[rootKey] = {
-      ...nextTree.cols[rootKey],
+  if (nextTreeLabeled.cols[rootKey]) {
+    nextTreeLabeled.cols[rootKey] = {
+      ...nextTreeLabeled.cols[rootKey],
       label: 'Grand total',
       formattedLabel: 'Grand total',
     };
@@ -258,7 +275,7 @@ export default function transformProps(
     width,
     height,
     margin: (formData as any).margin ?? 0,
-    data: nextTree,
+    data: nextTreeLabeled,
     formData: { ...formData, metricsLayout },
     metrics,
     groupbyRows,
@@ -269,7 +286,7 @@ export default function transformProps(
     maxDepthPerFetch: formData.maxDepthPerFetch,
     rowTotals: formData.rowTotals,
     colTotals: formData.colTotals,
-    rowSubTotals: false,
+    rowSubTotals: rowSubTotalsEnabled,
     colSubTotals: formData.colSubTotals,
     rowSubtotalLevels,
     colSubtotalLevels,
@@ -290,9 +307,10 @@ export default function transformProps(
     dateFormatters,
     onContextMenu,
     timeGrainSqla: formData.time_grain_sqla,
-    treeData: nextTree,
+    treeData: nextTreeLabeled,
     colTypeMap,
     rowTotalPosition,
+    rowSubtotalPosition,
     colTotalPosition,
     colSubtotalPosition,
     pivotTheme,

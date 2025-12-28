@@ -85,6 +85,7 @@ describe('resolveFetchContext', () => {
         groupbyColumns: [METRICS_PLACEHOLDER, 'c1'],
         metrics: ['m1'],
         metricsLayout: MetricsLayoutEnum.COLUMNS,
+        rowSubTotals: false,
       } as any,
       axis: 'row',
       path: ['A'],
@@ -136,6 +137,7 @@ describe('resolveFetchContext', () => {
         groupbyColumns: [METRICS_PLACEHOLDER, 'c1'],
         metrics: ['m1'],
         metricsLayout: MetricsLayoutEnum.COLUMNS,
+        rowSubTotals: false,
       } as any,
       axis: 'row',
       path: ['A'],
@@ -187,6 +189,7 @@ describe('resolveFetchContext', () => {
         groupbyColumns: [METRICS_PLACEHOLDER, 'c1'],
         metrics: ['m1'],
         metricsLayout: MetricsLayoutEnum.COLUMNS,
+        rowSubTotals: false,
       } as any,
       axis: 'col',
       path: ['m1'],
@@ -274,6 +277,7 @@ describe('resolveFetchContext', () => {
         groupbyColumns: ['segment', 'orderPriority'],
         metrics: ['countCustomers'],
         metricsLayout: MetricsLayoutEnum.ROWS,
+        rowSubTotals: false,
         datasource: '1__table',
         viz_type: 'pivot_table_v3',
       } as any,
@@ -368,6 +372,7 @@ describe('resolveFetchContext', () => {
         groupbyColumns: [METRICS_PLACEHOLDER, 'segment'],
         metrics: ['countCustomers'],
         metricsLayout: MetricsLayoutEnum.COLUMNS,
+        rowSubTotals: false,
         datasource: '1__table',
         viz_type: 'pivot_table_v3',
       } as any,
@@ -437,6 +442,7 @@ describe('resolveFetchContext', () => {
         groupbyColumns: ['segment', 'shipMode', METRICS_PLACEHOLDER],
         metrics: ['countCustomers'],
         metricsLayout: MetricsLayoutEnum.COLUMNS,
+        rowSubTotals: false,
         datasource: '1__table',
         viz_type: 'pivot_table_v3',
       } as any,
@@ -516,6 +522,7 @@ describe('resolveFetchContext', () => {
         metrics: ['metric1'],
         metricsLayout: MetricsLayoutEnum.COLUMNS,
         colSubtotalLevels: [1],
+        rowSubTotals: false,
         datasource: '1__table',
         viz_type: 'pivot_table_v3',
       } as any,
@@ -588,6 +595,7 @@ describe('resolveFetchContext', () => {
         groupbyColumns: ['segment', 'shipMode', METRICS_PLACEHOLDER],
         metrics: ['countCustomers'],
         metricsLayout: MetricsLayoutEnum.COLUMNS,
+        rowSubTotals: false,
         datasource: '1__table',
         viz_type: 'pivot_table_v3',
       } as any,
@@ -667,6 +675,7 @@ describe('resolveFetchContext', () => {
         groupbyColumns: ['segment', 'shipMode', METRICS_PLACEHOLDER],
         metrics: ['countCustomers'],
         metricsLayout: MetricsLayoutEnum.COLUMNS,
+        rowSubTotals: false,
         datasource: '1__table',
         viz_type: 'pivot_table_v3',
       } as any,
@@ -748,6 +757,7 @@ describe('resolveFetchContext', () => {
         groupbyColumns: ['segment', 'shipMode', 'orderStatus', METRICS_PLACEHOLDER],
         metrics: ['countCustomers'],
         metricsLayout: MetricsLayoutEnum.COLUMNS,
+        rowSubTotals: false,
         datasource: '1__table',
         viz_type: 'pivot_table_v3',
       } as any,
@@ -768,6 +778,58 @@ describe('resolveFetchContext', () => {
         `${formatQueryName(1, 3)}|branch:row:${serializePath(['USA'])}`,
         `${formatQueryName(1, 2)}|branch:row:${serializePath(['USA'])}`,
         `${formatQueryName(1, 1)}|branch:row:${serializePath(['USA'])}`,
+      ]),
+    );
+  });
+
+  it('requests row subtotal depths when row subtotals are enabled', async () => {
+    const postMock = SupersetClient.post as jest.Mock;
+    postMock.mockImplementationOnce(({ jsonPayload }) => ({
+      json: {
+        result: (jsonPayload.queries || []).map(() => ({ data: [] })),
+      },
+    }));
+
+    const currentTree: PivotTreeData = {
+      rows: {
+        '': makeNode({ axis: 'row', path: [], hasChildren: true }),
+        A: makeNode({
+          axis: 'row',
+          path: ['A'],
+          level: 1,
+          hasChildren: true,
+          label: 'A',
+          formattedLabel: 'A',
+        }),
+      },
+      cols: {
+        '': makeNode({ axis: 'col', path: [], hasChildren: false }),
+      },
+      cells: {},
+    };
+
+    await fetchPivotBranch({
+      formData: {
+        groupbyRows: ['r1', 'r2'],
+        groupbyColumns: [],
+        metrics: ['metric1'],
+        metricsLayout: MetricsLayoutEnum.COLUMNS,
+        rowSubTotals: true,
+        datasource: '1__table',
+        viz_type: 'pivot_table_v3',
+      } as any,
+      axis: 'row',
+      path: ['A'],
+      currentTree,
+      visibleColDepth: 0,
+      maxDepthPerFetch: 1,
+    });
+
+    const queries = (postMock.mock.calls[0][0] as any).jsonPayload?.queries || [];
+    const queryNames = queries.map((q: any) => q.query_name);
+    expect(queryNames).toEqual(
+      expect.arrayContaining([
+        `${formatQueryName(1, 0)}|branch:row:${serializePath(['A'])}`,
       ]),
     );
   });

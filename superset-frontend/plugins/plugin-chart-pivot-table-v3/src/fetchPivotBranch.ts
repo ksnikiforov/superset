@@ -45,6 +45,8 @@ import {
   resolveMetricPlacement,
   stripMetricsPlaceholder,
   normalizeSubtotalLevels,
+  injectRowSubtotalLeaves,
+  labelRowSubtotalLeaves,
   SUBTOTAL_LABEL,
   SUBTOTAL_TOKEN,
 } from './utils';
@@ -134,7 +136,14 @@ const resolveFetchContext = ({
   });
   const rowGroupby = stripMetricsPlaceholder(placement.rows);
   const colGroupby = stripMetricsPlaceholder(placement.cols);
-  const rowSubtotalLevels = formData.rowTotals ? [0] : [];
+  const rowSubTotalsEnabled = formData.rowSubTotals ?? true;
+  const maxRowSubtotalDepth = Math.max(rowGroupby.length - 1, 0);
+  const rowSubtotalLevels = normalizeSubtotalLevels(
+    formData.rowSubtotalLevels,
+    maxRowSubtotalDepth,
+    formData.rowTotals,
+    rowSubTotalsEnabled,
+  );
   const maxColSubtotalDepth = Math.max(colGroupby.length - 1, 0);
   const colSubtotalLevels = normalizeSubtotalLevels(
     formData.colSubtotalLevels,
@@ -395,8 +404,9 @@ export async function fetchPivotBranch({
       }
     }
   }
-  const effectiveRowLevels =
-    formData.rowTotals && rowDepth >= 0 ? [0] : [];
+  const effectiveRowLevels = Array.from(new Set(rowSubtotalLevels)).filter(
+    level => level <= rowDepth,
+  );
   const effectiveColLevels = Array.from(
     new Set([
       ...colSubtotalLevels,
@@ -466,6 +476,12 @@ export async function fetchPivotBranch({
                 colGroupby.length,
               );
             }
+            const rowSubtotalDepths = rowSubtotalLevels.filter(
+              level => level > 0 && level <= pair.rowDepth,
+            );
+            rowSubtotalDepths.forEach(depth => {
+              tree = injectRowSubtotalLeaves(tree, depth, rowGroupby.length);
+            });
             return tree;
           })(),
         ),
@@ -479,7 +495,11 @@ export async function fetchPivotBranch({
       colGroupby,
       metricInsertIndex,
     );
-    const merged = mergeTrees(currentTree, branchWithMetrics);
+    const labeledBranch = labelRowSubtotalLeaves(
+      branchWithMetrics,
+      ensureIsArray(formData.metrics),
+    );
+    const merged = mergeTrees(currentTree, labeledBranch);
     cache.set(cacheKey, merged);
     return { data: merged };
   } catch (error) {
