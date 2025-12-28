@@ -2314,3 +2314,97 @@ describe('PivotTableChart expansion with metrics before dimensions', () => {
     await clickNextColToggle(3);
   });
 });
+
+describe('PivotTableChart expansion with metrics between dimensions', () => {
+  it('expands product rows from a metric node when metrics sit in the middle', async () => {
+    const treeRaw = buildTreeFromRecords(
+      [{ group: 'Bikes', product: 'Bike1', m1: 10, m2: 20 }],
+      ['m1', 'm2'],
+      ['group', 'product'],
+      [],
+      2,
+      0,
+    );
+    const tree = applyMetricAxis(
+      treeRaw,
+      ['m1', 'm2'],
+      MetricsLayoutEnum.ROWS,
+      ['group', 'product'],
+      [],
+      1,
+    );
+
+    const { queryAllByText } = render(
+      <PivotTableChart
+        data={tree}
+        formData={
+          {
+            groupbyRows: ['group', 'product', '__MEASURES__'],
+            groupbyColumns: [],
+            metrics: ['m1', 'm2'],
+            aggregateFunction: 'Sum',
+            rowTotals: false,
+            colTotals: false,
+            rowSubTotals: false,
+            colSubTotals: false,
+            startCollapsed: false,
+            initialDepth: 2,
+            maxDepthPerFetch: 1,
+            rowOrder: 'key_a_to_z',
+            colOrder: 'key_a_to_z',
+            metricsLayout: MetricsLayoutEnum.ROWS,
+            viz_type: 'pivot_table_v3',
+            datasource: '1__table',
+            metricColorFormatters: [],
+            dateFormatters: {},
+            verboseMap: {},
+          } as PivotTableQueryFormData
+        }
+        metrics={['m1', 'm2']}
+        groupbyRows={['group', 'product']}
+        groupbyColumns={[]}
+        aggregateFunction="Sum"
+        width={400}
+        height={300}
+        startCollapsed={false}
+        initialDepth={2}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    expect(queryAllByText('Bike1')).toHaveLength(2);
+
+    const metricRows = queryAllByText('m2');
+    const metricRow = metricRows[0]?.closest('tr') as HTMLElement;
+    const minusToggle = within(metricRow).getByLabelText('minus-square');
+    fireEvent.click(minusToggle);
+
+    await waitFor(() => {
+      expect(queryAllByText('Bike1')).toHaveLength(1);
+    });
+
+    const metricRowAfter = queryAllByText('m2')[0]?.closest('tr') as HTMLElement;
+    const plusToggle = within(metricRowAfter).getByLabelText('plus-square');
+    fireEvent.click(plusToggle);
+
+    await waitFor(() => {
+      expect(queryAllByText('Bike1')).toHaveLength(2);
+    });
+  });
+});

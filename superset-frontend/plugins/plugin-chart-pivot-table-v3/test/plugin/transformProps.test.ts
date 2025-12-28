@@ -188,4 +188,31 @@ describe('Pivot Table v3 transformProps', () => {
     const { data: tree } = transformProps(props as any);
     expect(tree.cols[serializePath(['X'])]).toBeDefined();
   });
+
+  it('propagates rowSubTotals when enabled', () => {
+    const props = new ChartProps({
+      formData: {
+        ...formData,
+        rowSubTotals: true,
+        rowTotals: true,
+      },
+      width: 400,
+      height: 300,
+      queriesData: [
+        {
+          data: [{ row1: 'A', metric1: 10 }],
+          colnames: ['row1', 'metric1'],
+          coltypes: [1, 0],
+          query_name: formatQueryName(1, 0),
+        },
+      ],
+      hooks: { setDataMask: jest.fn() },
+      filterState: { selectedFilters: {} },
+      datasource: { verboseMap: {}, columnFormats: {}, currencyFormats: {} },
+      theme: supersetTheme,
+    });
+
+    const result = transformProps(props as any);
+    expect(result.rowSubTotals).toBe(true);
+  });
 });

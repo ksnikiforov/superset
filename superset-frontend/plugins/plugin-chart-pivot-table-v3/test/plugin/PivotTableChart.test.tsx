@@ -35,6 +35,7 @@ import {
   mergeTrees,
   METRICS_PLACEHOLDER,
   serializePath,
+  SUBTOTAL_TOKEN,
 } from '../../src/utils';
 
 const baseFormData: Partial<PivotTableQueryFormData> = {
@@ -256,6 +257,241 @@ describe('PivotTableChart metric tier suppression', () => {
     // Metric label should not show as a row header; the second level should be orderPriority.
     expect(screen.queryAllByText('countCustomers')).toHaveLength(0);
     expect(screen.getByText('1-URGENT')).toBeTruthy();
+  });
+});
+
+describe('PivotTableChart multi-metric visibility', () => {
+  it('shows metrics under a collapsed row group when multiple metrics are selected', () => {
+    const treeRaw = buildTreeFromRecords(
+      [
+        { group: 'Bikes', product: 'Road', measure1: 10, measure2: 20 },
+        { group: 'Bikes', product: 'Mountain', measure1: 5, measure2: 15 },
+      ],
+      ['measure1', 'measure2'],
+      ['group', 'product'],
+      [],
+      2,
+      0,
+    );
+    const tree = applyMetricAxis(
+      treeRaw,
+      ['measure1', 'measure2'],
+      MetricsLayoutEnum.ROWS,
+      ['group', 'product'],
+      [],
+      2,
+    );
+
+    const { container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={
+          {
+            ...(baseFormData as Partial<PivotTableQueryFormData>),
+            groupbyRows: ['group', 'product'],
+            groupbyColumns: [],
+            metricsLayout: MetricsLayoutEnum.ROWS,
+            metrics: ['measure1', 'measure2'],
+          } as PivotTableQueryFormData
+        }
+        metrics={['measure1', 'measure2']}
+        groupbyRows={['group', 'product']}
+        groupbyColumns={[]}
+        aggregateFunction="Sum"
+        width={400}
+        height={300}
+        startCollapsed
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    const rowHeaders = Array.from(
+      container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
+    ).map(cell => cell.textContent?.trim());
+
+    expect(rowHeaders).toEqual(
+      expect.arrayContaining(['Bikes', 'measure1', 'measure2']),
+    );
+    expect(rowHeaders).not.toEqual(
+      expect.arrayContaining(['Road', 'Mountain']),
+    );
+
+    const groupRow = screen.getByText('Bikes').closest('tr') as HTMLElement;
+    expect(within(groupRow).getByLabelText('plus-square')).toBeTruthy();
+  });
+
+  it('shows metrics under collapsed columns when multiple metrics are selected', () => {
+    const treeRaw = buildTreeFromRecords(
+      [
+        { group: 'Bikes', product: 'Road', measure1: 10, measure2: 20 },
+        { group: 'Bikes', product: 'Mountain', measure1: 5, measure2: 15 },
+      ],
+      ['measure1', 'measure2'],
+      [],
+      ['group', 'product'],
+      0,
+      2,
+    );
+    const tree = applyMetricAxis(
+      treeRaw,
+      ['measure1', 'measure2'],
+      MetricsLayoutEnum.COLUMNS,
+      [],
+      ['group', 'product'],
+      2,
+    );
+
+    const { container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={
+          {
+            ...(baseFormData as Partial<PivotTableQueryFormData>),
+            groupbyRows: [],
+            groupbyColumns: ['group', 'product', '__MEASURES__'],
+            metricsLayout: MetricsLayoutEnum.COLUMNS,
+            metrics: ['measure1', 'measure2'],
+          } as PivotTableQueryFormData
+        }
+        metrics={['measure1', 'measure2']}
+        groupbyRows={[]}
+        groupbyColumns={['group', 'product']}
+        aggregateFunction="Sum"
+        width={400}
+        height={300}
+        startCollapsed
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    const headerLabels = Array.from(
+      container.querySelectorAll('thead th') as NodeListOf<HTMLElement>,
+    ).map(cell => cell.textContent?.trim());
+
+    expect(headerLabels).toEqual(
+      expect.arrayContaining(['measure1', 'measure2']),
+    );
+    expect(headerLabels).not.toEqual(expect.arrayContaining(['Road', 'Mountain']));
+  });
+
+  it('keeps metrics on columns when both row and column hierarchies are present', () => {
+    const treeRaw = buildTreeFromRecords(
+      [
+        {
+          group: 'Bikes',
+          product: 'Bike1',
+          col_lvl1: 'L1',
+          col_lvl2: 'X',
+          m1: 4,
+          m2: 8,
+        },
+        {
+          group: 'Bikes',
+          product: 'Bike2',
+          col_lvl1: 'L1',
+          col_lvl2: 'Y',
+          m1: 2,
+          m2: 6,
+        },
+      ],
+      ['m1', 'm2'],
+      ['group', 'product'],
+      ['col_lvl1', 'col_lvl2'],
+      2,
+      2,
+    );
+    const tree = applyMetricAxis(
+      treeRaw,
+      ['m1', 'm2'],
+      MetricsLayoutEnum.COLUMNS,
+      ['group', 'product'],
+      ['col_lvl1', 'col_lvl2'],
+      2,
+    );
+
+    const { container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={
+          {
+            ...(baseFormData as Partial<PivotTableQueryFormData>),
+            groupbyRows: ['group', 'product'],
+            groupbyColumns: ['col_lvl1', 'col_lvl2', '__MEASURES__'],
+            metricsLayout: MetricsLayoutEnum.COLUMNS,
+            metrics: ['m1', 'm2'],
+          } as PivotTableQueryFormData
+        }
+        metrics={['m1', 'm2']}
+        groupbyRows={['group', 'product']}
+        groupbyColumns={['col_lvl1', 'col_lvl2']}
+        aggregateFunction="Sum"
+        width={500}
+        height={300}
+        startCollapsed={false}
+        initialDepth={2}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    const rowHeaders = Array.from(
+      container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
+    ).map(cell => cell.textContent?.trim());
+    expect(rowHeaders).not.toEqual(expect.arrayContaining(['m1', 'm2']));
+
+    const headerLabels = Array.from(
+      container.querySelectorAll('thead th') as NodeListOf<HTMLElement>,
+    ).map(cell => cell.textContent?.trim());
+    expect(headerLabels).toEqual(expect.arrayContaining(['m1', 'm2']));
   });
 });
 
@@ -608,7 +844,7 @@ describe('PivotTableChart initial depth on collapsed render', () => {
     expect(rowHeaders).not.toContain('Grand total');
   });
 
-  it('does not render row subtotals (only column subtotals are supported)', () => {
+  it('hides row subtotals when rowSubTotals is disabled', () => {
     const rootKey = serializePath([]);
     const subtotalRowKey = serializePath(['Subtotal']);
     const rows: Record<string, PivotTreeNode> = {
@@ -835,6 +1071,472 @@ describe('PivotTableChart totals & subtotals', () => {
     const values = valueCells.map(cell => cell.textContent?.trim());
     expect(values[0]).toBe('999');
     expect(values.slice(1)).toEqual(expect.arrayContaining(['2', '3']));
+  });
+
+  it('renders row subtotals inline by default when enabled', () => {
+    const rootKey = serializePath([]);
+    const groupKey = serializePath(['Bikes']);
+    const subtotalKey = serializePath(['Bikes', SUBTOTAL_TOKEN]);
+    const rows: Record<string, PivotTreeNode> = {
+      [rootKey]: {
+        axis: 'row',
+        key: rootKey,
+        path: [],
+        label: 'Grand total',
+        formattedLabel: 'Grand total',
+        level: 0,
+        hasChildren: true,
+        isSubtotal: true,
+      },
+      [groupKey]: {
+        axis: 'row',
+        key: groupKey,
+        path: ['Bikes'],
+        label: 'Bikes',
+        formattedLabel: 'Bikes',
+        level: 1,
+        hasChildren: true,
+        isSubtotal: false,
+      },
+      [serializePath(['Bikes', 'Alpha'])]: {
+        axis: 'row',
+        key: serializePath(['Bikes', 'Alpha']),
+        path: ['Bikes', 'Alpha'],
+        label: 'Alpha',
+        formattedLabel: 'Alpha',
+        level: 2,
+        hasChildren: false,
+        isSubtotal: false,
+      },
+      [serializePath(['Bikes', 'Zebra'])]: {
+        axis: 'row',
+        key: serializePath(['Bikes', 'Zebra']),
+        path: ['Bikes', 'Zebra'],
+        label: 'Zebra',
+        formattedLabel: 'Zebra',
+        level: 2,
+        hasChildren: false,
+        isSubtotal: false,
+      },
+      [subtotalKey]: {
+        axis: 'row',
+        key: subtotalKey,
+        path: ['Bikes', SUBTOTAL_TOKEN],
+        label: 'Bikes Total',
+        formattedLabel: 'Bikes Total',
+        level: 2,
+        hasChildren: false,
+        isSubtotal: true,
+      },
+    };
+    const cols: Record<string, PivotTreeNode> = {
+      [rootKey]: {
+        axis: 'col',
+        key: rootKey,
+        path: [],
+        label: 'Grand total',
+        formattedLabel: 'Grand total',
+        level: 0,
+        hasChildren: false,
+        isSubtotal: true,
+      },
+    };
+    const cells: Record<string, PivotResultCell> = {
+      [`${groupKey}|${rootKey}`]: {
+        rowKey: groupKey,
+        colKey: rootKey,
+        values: { metric1: 30 },
+      },
+      [`${serializePath(['Bikes', 'Alpha'])}|${rootKey}`]: {
+        rowKey: serializePath(['Bikes', 'Alpha']),
+        colKey: rootKey,
+        values: { metric1: 10 },
+      },
+      [`${serializePath(['Bikes', 'Zebra'])}|${rootKey}`]: {
+        rowKey: serializePath(['Bikes', 'Zebra']),
+        colKey: rootKey,
+        values: { metric1: 20 },
+      },
+      [`${subtotalKey}|${rootKey}`]: {
+        rowKey: subtotalKey,
+        colKey: rootKey,
+        values: { metric1: 30 },
+        isSubtotal: true,
+      },
+      [`${rootKey}|${rootKey}`]: {
+        rowKey: rootKey,
+        colKey: rootKey,
+        values: { metric1: 30 },
+        isSubtotal: true,
+      },
+    };
+    const tree: PivotTreeData = { rows, cols, cells };
+
+    const props = {
+      ...(baseProps as Partial<PivotTableQueryFormData>),
+      groupbyRows: ['group', 'product'],
+      groupbyColumns: [],
+      metricsLayout: MetricsLayoutEnum.ROWS,
+      metrics: ['metric1'],
+      rowSubTotals: true,
+      rowTotals: true,
+      rowSubtotalPosition: 'start',
+    } as any;
+
+    const { container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={props}
+        metrics={['metric1']}
+        groupbyRows={['group', 'product']}
+        groupbyColumns={[]}
+        aggregateFunction="Sum"
+        width={500}
+        height={300}
+        startCollapsed={false}
+        initialDepth={2}
+        maxDepthPerFetch={1}
+        rowTotals
+        colTotals={false}
+        rowSubTotals
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        rowTotalPosition="start"
+        colSubtotalPosition="start"
+        colTotalPosition="start"
+      />,
+    );
+
+    const rowHeaders = Array.from(
+      container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
+    ).map(cell => cell.textContent?.trim());
+    expect(rowHeaders).toEqual(
+      expect.arrayContaining(['Bikes', 'Alpha', 'Zebra']),
+    );
+    expect(rowHeaders).not.toContain('Bikes Total');
+
+    const bikesRow = screen.getByText('Bikes').closest('tr') as HTMLElement;
+    const valueCell = within(bikesRow).getAllByRole('cell')[0];
+    expect(valueCell.textContent?.trim()).toBe('30');
+  });
+
+  it('places row subtotals after children when rowSubtotalPosition is end', () => {
+    const rootKey = serializePath([]);
+    const groupKey = serializePath(['Bikes']);
+    const subtotalKey = serializePath(['Bikes', SUBTOTAL_TOKEN]);
+    const rows: Record<string, PivotTreeNode> = {
+      [rootKey]: {
+        axis: 'row',
+        key: rootKey,
+        path: [],
+        label: 'Grand total',
+        formattedLabel: 'Grand total',
+        level: 0,
+        hasChildren: true,
+        isSubtotal: true,
+      },
+      [groupKey]: {
+        axis: 'row',
+        key: groupKey,
+        path: ['Bikes'],
+        label: 'Bikes',
+        formattedLabel: 'Bikes',
+        level: 1,
+        hasChildren: true,
+        isSubtotal: false,
+      },
+      [serializePath(['Bikes', 'Alpha'])]: {
+        axis: 'row',
+        key: serializePath(['Bikes', 'Alpha']),
+        path: ['Bikes', 'Alpha'],
+        label: 'Alpha',
+        formattedLabel: 'Alpha',
+        level: 2,
+        hasChildren: false,
+        isSubtotal: false,
+      },
+      [serializePath(['Bikes', 'Zebra'])]: {
+        axis: 'row',
+        key: serializePath(['Bikes', 'Zebra']),
+        path: ['Bikes', 'Zebra'],
+        label: 'Zebra',
+        formattedLabel: 'Zebra',
+        level: 2,
+        hasChildren: false,
+        isSubtotal: false,
+      },
+      [subtotalKey]: {
+        axis: 'row',
+        key: subtotalKey,
+        path: ['Bikes', SUBTOTAL_TOKEN],
+        label: 'Bikes Total',
+        formattedLabel: 'Bikes Total',
+        level: 2,
+        hasChildren: false,
+        isSubtotal: true,
+      },
+    };
+    const cols: Record<string, PivotTreeNode> = {
+      [rootKey]: {
+        axis: 'col',
+        key: rootKey,
+        path: [],
+        label: 'Grand total',
+        formattedLabel: 'Grand total',
+        level: 0,
+        hasChildren: false,
+        isSubtotal: true,
+      },
+    };
+    const cells: Record<string, PivotResultCell> = {
+      [`${groupKey}|${rootKey}`]: {
+        rowKey: groupKey,
+        colKey: rootKey,
+        values: { metric1: null },
+      },
+      [`${serializePath(['Bikes', 'Alpha'])}|${rootKey}`]: {
+        rowKey: serializePath(['Bikes', 'Alpha']),
+        colKey: rootKey,
+        values: { metric1: 10 },
+      },
+      [`${serializePath(['Bikes', 'Zebra'])}|${rootKey}`]: {
+        rowKey: serializePath(['Bikes', 'Zebra']),
+        colKey: rootKey,
+        values: { metric1: 20 },
+      },
+      [`${subtotalKey}|${rootKey}`]: {
+        rowKey: subtotalKey,
+        colKey: rootKey,
+        values: { metric1: 30 },
+        isSubtotal: true,
+      },
+      [`${rootKey}|${rootKey}`]: {
+        rowKey: rootKey,
+        colKey: rootKey,
+        values: { metric1: 30 },
+        isSubtotal: true,
+      },
+    };
+    const tree: PivotTreeData = { rows, cols, cells };
+
+    const props = {
+      ...(baseProps as Partial<PivotTableQueryFormData>),
+      groupbyRows: ['group', 'product'],
+      groupbyColumns: [],
+      metricsLayout: MetricsLayoutEnum.ROWS,
+      metrics: ['metric1'],
+      rowSubTotals: true,
+      rowTotals: true,
+      rowSubtotalPosition: 'end',
+    } as any;
+
+    const { container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={props}
+        metrics={['metric1']}
+        groupbyRows={['group', 'product']}
+        groupbyColumns={[]}
+        aggregateFunction="Sum"
+        width={500}
+        height={300}
+        startCollapsed={false}
+        initialDepth={2}
+        maxDepthPerFetch={1}
+        rowTotals
+        colTotals={false}
+        rowSubTotals
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        rowTotalPosition="start"
+        colSubtotalPosition="start"
+        colTotalPosition="start"
+      />,
+    );
+
+    const rowHeaders = Array.from(
+      container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
+    ).map(cell => cell.textContent?.trim());
+    expect(rowHeaders.indexOf('Bikes Total')).toBeGreaterThan(
+      rowHeaders.indexOf('Zebra'),
+    );
+
+    const bikesRow = screen.getByText('Bikes').closest('tr') as HTMLElement;
+    const bikesValue = within(bikesRow).getAllByRole('cell')[0];
+    expect(bikesValue.textContent?.trim()).toBe('');
+
+    const subtotalRow = screen.getByText('Bikes Total').closest('tr') as HTMLElement;
+    const subtotalHeader = subtotalRow.querySelector('th') as HTMLElement;
+    expect(subtotalHeader.className).toContain('subtotal-cell');
+    expect(within(subtotalHeader).queryByLabelText('plus-square')).toBeNull();
+  });
+
+  it('forces row subtotals to the bottom when multiple metrics are selected', () => {
+    const rootKey = serializePath([]);
+    const colKey = rootKey;
+    const group = 'Bikes';
+    const products = ['Bike1', 'Bike2'];
+    const metrics = ['m1', 'm2', 'm3'];
+
+    const rows: Record<string, PivotTreeNode> = {};
+    const cols: Record<string, PivotTreeNode> = {
+      [colKey]: {
+        axis: 'col',
+        key: colKey,
+        path: [],
+        label: 'Grand total',
+        formattedLabel: 'Grand total',
+        level: 0,
+        hasChildren: false,
+        isSubtotal: true,
+      },
+    };
+    const cells: Record<string, PivotResultCell> = {};
+
+    const addRow = (
+      path: string[],
+      label: string,
+      hasChildren: boolean,
+      isSubtotal = false,
+    ) => {
+      const key = serializePath(path);
+      rows[key] = {
+        axis: 'row',
+        key,
+        path,
+        label,
+        formattedLabel: label,
+        level: path.length,
+        hasChildren,
+        isSubtotal,
+      };
+      return key;
+    };
+
+    addRow([], 'Grand total', true, true);
+    addRow([group], group, true);
+
+    products.forEach(product => {
+      addRow([group, product], product, true);
+      metrics.forEach(metric => {
+        const metricKey = addRow([group, product, metric], metric, false);
+        cells[`${metricKey}|${colKey}`] = {
+          rowKey: metricKey,
+          colKey,
+          values: { [metric]: 1 },
+        };
+        const productSubtotalKey = addRow(
+          [group, product, SUBTOTAL_TOKEN, metric],
+          `${product} ${metric}`,
+          false,
+          true,
+        );
+        cells[`${productSubtotalKey}|${colKey}`] = {
+          rowKey: productSubtotalKey,
+          colKey,
+          values: { [metric]: 2 },
+          isSubtotal: true,
+        };
+      });
+    });
+
+    metrics.forEach(metric => {
+      const groupSubtotalKey = addRow(
+        [group, SUBTOTAL_TOKEN, metric],
+        `${group} ${metric}`,
+        false,
+        true,
+      );
+      cells[`${groupSubtotalKey}|${colKey}`] = {
+        rowKey: groupSubtotalKey,
+        colKey,
+        values: { [metric]: 3 },
+        isSubtotal: true,
+      };
+    });
+
+    const tree: PivotTreeData = { rows, cols, cells };
+    const props = {
+      ...(baseProps as Partial<PivotTableQueryFormData>),
+      groupbyRows: ['group', 'product'],
+      groupbyColumns: [],
+      metricsLayout: MetricsLayoutEnum.ROWS,
+      metrics,
+      rowSubTotals: true,
+      rowTotals: true,
+      rowSubtotalPosition: 'start',
+    } as any;
+
+    const { container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={props}
+        metrics={metrics}
+        groupbyRows={['group', 'product']}
+        groupbyColumns={[]}
+        aggregateFunction="Sum"
+        width={600}
+        height={400}
+        startCollapsed={false}
+        initialDepth={3}
+        maxDepthPerFetch={1}
+        rowTotals
+        colTotals={false}
+        rowSubTotals
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        rowTotalPosition="start"
+        colSubtotalPosition="start"
+        colTotalPosition="start"
+      />,
+    );
+
+    const rowHeaders = Array.from(
+      container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
+    )
+      .map(cell => cell.textContent?.trim())
+      .filter(label => label && label !== 'Grand total');
+
+    const tail = rowHeaders.slice(-metrics.length);
+    expect(tail).toEqual(metrics.map(metric => `${group} ${metric}`));
+
+    metrics.forEach(metric => {
+      const totalRow = screen.getByText(`${group} ${metric}`).closest('tr') as HTMLElement;
+      expect(totalRow.querySelector('th')?.className).toContain('subtotal-cell');
+    });
   });
 
   it('positions grand totals at the end for rows and columns when configured', () => {
