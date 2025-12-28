@@ -14,3 +14,4 @@
 6. Tackle case when multiple expands are clicked at once
 7. Add expand controls - expand whole layer
 8. Add sorting by any column. On right click select what row levels to sor
+9. There is no option now to remove subtotals
