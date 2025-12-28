@@ -16,6 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import React from 'react';
 import {
   ControlPanelConfig,
   D3_TIME_FORMAT_OPTIONS,
@@ -24,6 +25,7 @@ import {
 } from '@superset-ui/chart-controls';
 import {
   ensureIsArray,
+  getColumnLabel,
   isAdhocColumn,
   isPhysicalColumn,
   SMART_DATE_ID,
@@ -34,13 +36,59 @@ import { MetricsLayoutEnum } from './types';
 import {
   METRICS_PLACEHOLDER,
   METRICS_PLACEHOLDER_LABEL,
+  parseThemeColors,
+  PIVOT_THEME_PRESETS,
   resolveMetricPlacement,
   stripMetricsPlaceholder,
   normalizeSubtotalLevels,
 } from './utils';
 import PivotDndColumnSelect from './controls/PivotDndColumnSelect/PivotDndColumnSelect';
 
-  const withMetricsPlaceholder = (axis: 'row' | 'col') => (config: any) => ({
+const themeOptions = [
+  {
+    value: 'blue',
+    label: t('Blue'),
+    colors: [PIVOT_THEME_PRESETS.blue],
+  },
+  {
+    value: 'peach',
+    label: t('Peach'),
+    colors: [PIVOT_THEME_PRESETS.peach],
+  },
+  {
+    value: 'grey',
+    label: t('Grey'),
+    colors: [PIVOT_THEME_PRESETS.grey],
+  },
+  { value: 'custom', label: t('Custom'), colors: [] },
+  { value: 'none', label: t('None'), colors: [] },
+];
+
+const renderThemeSwatches = (colors: string[]) => (
+  <span style={{ display: 'inline-flex', gap: 4, marginLeft: 8 }}>
+    {colors.map(color => (
+      <span
+        key={color}
+        style={{
+          width: 12,
+          height: 12,
+          borderRadius: 2,
+          border: '1px solid #D9D9D9',
+          backgroundColor: color,
+        }}
+      />
+    ))}
+  </span>
+);
+
+const renderThemeOption = (option: any) => (
+  <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+    <span>{option.label}</span>
+    {option.colors?.length ? renderThemeSwatches(option.colors) : null}
+  </span>
+);
+
+const withMetricsPlaceholder = (axis: 'row' | 'col') => (config: any) => ({
   ...config,
   shouldMapStateToProps: () => true,
   mapStateToProps: (state: any, controlState: any, chart: any) => {
@@ -306,32 +354,29 @@ const config: ControlPanelConfig = {
               default: [],
               renderTrigger: true,
               optionRenderer: (opt: any) => opt?.label ?? opt?.value,
+              shouldMapStateToProps: () => true,
               mapStateToProps: state => {
-                const rowsRaw = ensureIsArray(state?.controls?.groupbyRows?.value);
                 const colsRaw = ensureIsArray(state?.controls?.groupbyColumns?.value);
-                const metricsValue = ensureIsArray(state?.controls?.metrics?.value);
-                const placement = resolveMetricPlacement(rowsRaw, colsRaw, {
-                  hasMetrics: metricsValue.length > 0,
-                  preferredAxis:
-                    (state?.controls?.metricsLayout?.value as MetricsLayoutEnum) ||
-                    MetricsLayoutEnum.COLUMNS,
-                });
-                const colDepthFromPlacement = stripMetricsPlaceholder(
-                  placement.cols,
-                ).length;
-                const colDepthRaw = stripMetricsPlaceholder(colsRaw).length;
-                const colDepth = Math.max(colDepthFromPlacement, colDepthRaw);
+                const colGroupby = stripMetricsPlaceholder(colsRaw);
+                const colDepth = colGroupby.length;
+                const maxSubtotalDepth = Math.max(colDepth - 1, 0);
                 const options =
-                  colDepth > 0
-                    ? Array.from({ length: colDepth }).map((_, idx) => ({
-                        value: idx + 1,
-                        label: t('Subtotal level %s', idx + 1),
-                      }))
+                  maxSubtotalDepth > 0
+                    ? Array.from({ length: maxSubtotalDepth }).map((_, idx) => {
+                        const labelColumn = colGroupby[idx + 1];
+                        const label = labelColumn
+                          ? getColumnLabel(labelColumn)
+                          : t('Subtotal level %s', idx + 1);
+                        return {
+                          value: idx + 1,
+                          label,
+                        };
+                      })
                     : [];
                 const normalizedValue = normalizeSubtotalLevels(
                   ensureIsArray(state?.controls?.colSubtotalLevels?.value),
-                  colDepth,
-                ).filter(level => level > 0 && level <= colDepth);
+                  maxSubtotalDepth,
+                ).filter(level => level > 0 && level <= maxSubtotalDepth);
                 return { options, value: normalizedValue };
               },
             },
@@ -383,6 +428,46 @@ const config: ControlPanelConfig = {
                 ['start', t('Front')],
                 ['end', t('End')],
               ],
+            },
+          },
+        ],
+        [
+          {
+            name: 'pivotTheme',
+            config: {
+              type: 'SelectControl',
+              label: t('Pivot table theme'),
+              clearable: false,
+              default: 'none',
+              renderTrigger: true,
+              options: themeOptions,
+              optionRenderer: renderThemeOption,
+              valueRenderer: renderThemeOption,
+              description: t('Choose a preset theme for headers and grand totals.'),
+            },
+          },
+        ],
+        [
+          {
+            name: 'pivotThemeColors',
+            config: {
+              type: 'TextControl',
+              label: t('Custom theme colors'),
+              default: '',
+              renderTrigger: true,
+              mapStateToProps: state => {
+                const rawValue = String(
+                  state?.controls?.pivotThemeColors?.value || '',
+                );
+                const colors = parseThemeColors(rawValue).slice(0, 1);
+                return {
+                  description: colors.length
+                    ? renderThemeSwatches(colors)
+                    : t(
+                        'Single hex color for header and grand totals, e.g. #DDEBF7',
+                      ),
+                };
+              },
             },
           },
         ],

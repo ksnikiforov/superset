@@ -36,6 +36,7 @@ import { ColorFormatters } from '@superset-ui/chart-controls';
 export type PivotAxis = 'row' | 'col';
 export type PivotPath = DataRecordValue[];
 export type TotalPosition = 'start' | 'end';
+export type PivotTheme = 'none' | 'blue' | 'peach' | 'grey' | 'custom';
 
 export interface PivotTableStylesProps {
   height: number;
@@ -102,6 +103,8 @@ export interface PivotTableCustomizeProps {
   rowTotalPosition?: TotalPosition;
   colTotalPosition?: TotalPosition;
   colSubtotalPosition?: TotalPosition;
+  pivotTheme?: PivotTheme;
+  pivotThemeColors?: string;
 }
 
 export type PivotTableQueryFormData = QueryFormData &

@@ -135,9 +135,10 @@ const resolveFetchContext = ({
   const rowGroupby = stripMetricsPlaceholder(placement.rows);
   const colGroupby = stripMetricsPlaceholder(placement.cols);
   const rowSubtotalLevels = formData.rowTotals ? [0] : [];
+  const maxColSubtotalDepth = Math.max(colGroupby.length - 1, 0);
   const colSubtotalLevels = normalizeSubtotalLevels(
     formData.colSubtotalLevels,
-    colGroupby.length,
+    maxColSubtotalDepth,
     false,
     formData.colSubTotals,
   ).filter(level => level > 0);

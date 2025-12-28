@@ -32,9 +32,20 @@ export const METRICS_PLACEHOLDER = '__MEASURES__';
 export const METRICS_PLACEHOLDER_LABEL = 'Σ Values';
 export const SUBTOTAL_TOKEN = '__subtotal__';
 export const SUBTOTAL_LABEL = 'Subtotal';
+export const PIVOT_THEME_PRESETS: Record<string, string> = {
+  blue: '#DDEBF7',
+  peach: '#FCE4D6',
+  grey: '#E7E6E6',
+};
 
 export const isSubtotalToken = (val: unknown) =>
   val === SUBTOTAL_TOKEN || val === SUBTOTAL_LABEL;
+
+export const parseThemeColors = (value?: string) =>
+  (value || '')
+    .split(',')
+    .map(color => color.trim())
+    .filter(color => /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(color));
 
 export const normalizePlaceholder = (val: QueryFormColumn) => {
   if (val === METRICS_PLACEHOLDER) return METRICS_PLACEHOLDER;

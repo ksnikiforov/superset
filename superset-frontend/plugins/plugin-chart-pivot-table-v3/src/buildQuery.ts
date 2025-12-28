@@ -110,9 +110,10 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
   );
 
   const rowLevels = rowTotals ? [0] : [];
+  const maxColSubtotalDepth = Math.max(colGroupby.length - 1, 0);
   const colLevelsBase = normalizeSubtotalLevels(
     colSubtotalLevels,
-    colGroupby.length,
+    maxColSubtotalDepth,
     false,
     colSubTotals,
   ).filter(level => level > 0);

@@ -40,7 +40,14 @@ import {
   PivotTreeData,
   PivotTreeNode,
 } from './types';
-import { isSubtotalToken, mergeTrees, serializePath, SUBTOTAL_LABEL } from './utils';
+import {
+  isSubtotalToken,
+  mergeTrees,
+  parseThemeColors,
+  PIVOT_THEME_PRESETS,
+  serializePath,
+  SUBTOTAL_LABEL,
+} from './utils';
 
 const Container = styled.div<{ height: number; width: number | string }>`
   ${({ height, width }) => `
@@ -61,9 +68,26 @@ const StyledTable = styled.table`
     padding: 6px 8px;
   }
 
-  th {
-    background: ${({ theme }) => (theme as any).colors?.grayscale?.light4 || (theme as any).colorBgLayout};
+  thead th {
+    background: ${({ theme }) =>
+      (theme as any).colors?.grayscale?.light4 || (theme as any).colorBgLayout};
     text-align: left;
+    vertical-align: top;
+  }
+
+  td.value-cell {
+    text-align: right;
+  }
+
+  tbody th {
+    background: ${({ theme }) =>
+      (theme as any).colorBgContainer || '#fff'};
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .subtotal-cell {
+    font-weight: 600;
   }
 `;
 
@@ -72,6 +96,13 @@ const HeaderCell = styled.div`
   align-items: center;
   gap: ${({ theme }) => ((theme as any).gridUnit || 4) * 1.5}px;
 `;
+
+const ColumnHeaderCell = styled(HeaderCell)`
+  align-items: flex-start;
+  line-height: 1.2;
+`;
+
+const ROW_INDENT_PX = 16;
 
 const ToggleButton = styled.button`
   border: none;
@@ -327,6 +358,8 @@ function PivotTableChart(props: PivotTableProps) {
     rowTotalPosition = 'start',
     colTotalPosition = 'start',
     colSubtotalPosition = 'start',
+    pivotTheme = 'none',
+    pivotThemeColors = '',
   } = props;
 
   const normalizedRowSubtotalLevels = useMemo(
@@ -336,7 +369,8 @@ function PivotTableChart(props: PivotTableProps) {
   const normalizedColSubtotalLevels = useMemo(
     () =>
       colSubtotalLevels.filter(
-        level => level <= groupbyColumns.length && level >= 0,
+        level =>
+          level <= Math.max(groupbyColumns.length - 1, 0) && level >= 0,
       ),
     [colSubtotalLevels, groupbyColumns.length],
   );
@@ -638,8 +672,9 @@ function PivotTableChart(props: PivotTableProps) {
     (node: PivotTreeNode): PivotTreeNode[] => {
       const children = getColChildren(node).sort(colSorter);
       const dimDepth = countDimDepth(node.path);
+      const hasChildren = children.length > 0;
       const includeSubtotal =
-        node.isSubtotal &&
+        hasChildren &&
         ((colTotals && dimDepth === 0) ||
           normalizedColSubtotalLevels.includes(dimDepth) ||
           colSubTotals) &&
@@ -851,8 +886,148 @@ function PivotTableChart(props: PivotTableProps) {
     () => buildColumnHeaderRows(visibleCols, tree.cols),
     [visibleCols, tree.cols],
   );
+  const themeColor = useMemo(() => {
+    if (pivotTheme === 'custom') {
+      return parseThemeColors(pivotThemeColors)[0];
+    }
+    return PIVOT_THEME_PRESETS[pivotTheme];
+  }, [pivotTheme, pivotThemeColors]);
+  const getTotalBackground = useCallback(
+    (row?: PivotTreeNode) => {
+      if (!themeColor) {
+        return undefined;
+      }
+      const isRowTotal = row?.key === rootKey && showRowRoot;
+      return isRowTotal ? themeColor : undefined;
+    },
+    [showRowRoot, themeColor],
+  );
+  const expandedRowDepths = useMemo(() => {
+    const depths = new Set<number>();
+    expandedRows.forEach(key => {
+      const node = tree.rows[key];
+      if (!node || !node.hasChildren) {
+        return;
+      }
+      if (node.path.length === 0) {
+        return;
+      }
+      const dimDepth = countDimDepth(node.path);
+      if (dimDepth < groupbyRows.length) {
+        depths.add(dimDepth);
+      }
+    });
+    return depths;
+  }, [countDimDepth, expandedRows, groupbyRows.length, tree.rows]);
+  const expandedColDepths = useMemo(() => {
+    const depths = new Set<number>();
+    expandedCols.forEach(key => {
+      const node = tree.cols[key];
+      if (!node || !node.hasChildren) {
+        return;
+      }
+      if (node.path.length === 0) {
+        return;
+      }
+      const dimDepth = countDimDepth(node.path);
+      if (dimDepth < groupbyColumns.length) {
+        depths.add(dimDepth);
+      }
+    });
+    return depths;
+  }, [countDimDepth, expandedCols, groupbyColumns.length, tree.cols]);
+  const isExplicitTotalNode = useCallback(
+    (node: PivotTreeNode) => {
+      if (node.path.length === 0) {
+        return true;
+      }
+      return (
+        isSubtotalToken(node.label) || isSubtotalToken(node.formattedLabel)
+      );
+    },
+    [],
+  );
+  const isExplicitSubtotalNode = useCallback(
+    (node?: PivotTreeNode) => {
+      if (!node) {
+        return false;
+      }
+      return node.path.some(isSubtotalToken);
+    },
+    [],
+  );
+  const getNodeDimDepth = useCallback(
+    (node: PivotTreeNode) => {
+      const dimDepth = countDimDepth(node.path);
+      return isExplicitSubtotalNode(node) ? Math.max(dimDepth - 1, 0) : dimDepth;
+    },
+    [countDimDepth, isExplicitSubtotalNode],
+  );
+  const shouldShowToggle = useCallback(
+    (_axis: 'row' | 'col', node?: PivotTreeNode) => {
+      if (!node || !node.hasChildren || node.path.length === 0) {
+        return false;
+      }
+      if (isExplicitSubtotalNode(node)) {
+        return false;
+      }
+      return true;
+    },
+    [isExplicitSubtotalNode],
+  );
+  const isRowAggregateBold = useCallback(
+    (row?: PivotTreeNode) => {
+      if (!row) {
+        return false;
+      }
+      if (isExplicitTotalNode(row)) {
+        return true;
+      }
+      if (!row.hasChildren) {
+        return false;
+      }
+      const dimDepth = countDimDepth(row.path);
+      if (dimDepth >= groupbyRows.length) {
+        return false;
+      }
+      return expandedRowDepths.has(dimDepth);
+    },
+    [
+      countDimDepth,
+      expandedRowDepths,
+      groupbyRows.length,
+      isExplicitTotalNode,
+    ],
+  );
+  const isColAggregateBold = useCallback(
+    (col?: PivotTreeNode) => {
+      if (!col) {
+        return false;
+      }
+      if (isExplicitTotalNode(col)) {
+        return true;
+      }
+      if (!col.hasChildren) {
+        return false;
+      }
+      const dimDepth = countDimDepth(col.path);
+      if (dimDepth >= groupbyColumns.length) {
+        return false;
+      }
+      return expandedColDepths.has(dimDepth);
+    },
+    [
+      countDimDepth,
+      expandedColDepths,
+      groupbyColumns.length,
+      isExplicitTotalNode,
+    ],
+  );
   const handleToggle = useCallback(
     async (axis: 'row' | 'col', node: PivotTreeNode) => {
+      if (!shouldShowToggle(axis, node)) {
+        return;
+      }
       const expanded = axis === 'row' ? expandedRows : expandedCols;
       const updateExpanded =
         axis === 'row' ? setExpandedRows : setExpandedCols;
@@ -933,6 +1108,7 @@ function PivotTableChart(props: PivotTableProps) {
       hasLoadedChildren,
       maxDepthPerFetch,
       peekPivotBranchCache,
+      shouldShowToggle,
       tree,
       visibleColDepth,
       visibleRowDepth,
@@ -1139,10 +1315,15 @@ function PivotTableChart(props: PivotTableProps) {
   );
 
   const formatLabel = useCallback(
-    (node: PivotTreeNode) =>
-      node.level === 0
-        ? t(node.formattedLabel || 'Grand total')
-        : node.formattedLabel,
+    (node: PivotTreeNode) => {
+      const rawLabel = node.formattedLabel || node.label;
+      const normalizedLabel = isSubtotalToken(rawLabel)
+        ? SUBTOTAL_LABEL
+        : rawLabel;
+      return node.level === 0
+        ? t(normalizedLabel || 'Grand total')
+        : normalizedLabel;
+    },
     [],
   );
 
@@ -1153,55 +1334,84 @@ function PivotTableChart(props: PivotTableProps) {
         <thead>
           {columnHeaderRows.length === 0 ? (
             <tr>
-              <th>{t('Rows')}</th>
+              <th
+                style={
+                  themeColor
+                    ? { backgroundColor: themeColor, fontWeight: 600 }
+                    : { fontWeight: 600 }
+                }
+              >
+                {t('Rows')}
+              </th>
             </tr>
           ) : (
             columnHeaderRows.map((rowCells, rowIdx) => (
               <tr key={`col-header-row-${rowIdx}`}>
                 {rowIdx === 0 && (
-                  <th rowSpan={columnHeaderRows.length}>{t('Rows')}</th>
+                  <th
+                    rowSpan={columnHeaderRows.length}
+                    style={
+                      themeColor
+                        ? { backgroundColor: themeColor, fontWeight: 600 }
+                        : { fontWeight: 600 }
+                    }
+                  >
+                    {t('Rows')}
+                  </th>
                 )}
                 {rowCells.map(cell => {
-                  const showToggle =
-                    cell.node.hasChildren && cell.node.path.length > 0;
+                  const showToggle = shouldShowToggle('col', cell.node);
+                  const isSubtotalHeader = isColAggregateBold(cell.node);
                   return (
                     <th
                       key={`col-header-${cell.node.key}-${rowIdx}`}
                       colSpan={cell.colSpan}
                       rowSpan={cell.rowSpan}
+                      className={isSubtotalHeader ? 'subtotal-cell' : undefined}
+                      style={
+                        themeColor
+                          ? { backgroundColor: themeColor }
+                          : undefined
+                      }
                     >
-                      <HeaderCell>
+                      <ColumnHeaderCell>
                         {showToggle && (
                           <ToggleButton
                             type="button"
                             onClick={() => handleToggle('col', cell.node)}
                           >
-                        {expandedCols.has(cell.node.key) ? (
-                          <MinusSquareOutlined />
-                        ) : (
-                          <PlusSquareOutlined />
+                            {expandedCols.has(cell.node.key) ? (
+                              <MinusSquareOutlined />
+                            ) : (
+                              <PlusSquareOutlined />
+                            )}
+                          </ToggleButton>
                         )}
-                      </ToggleButton>
-                    )}
-                    <span>{formatLabel(cell.node)}</span>
-                    {loadingKeys.has(cell.node.key) && <Spinner />}
-                  </HeaderCell>
-                </th>
-              );
-            })}
+                        <span>{formatLabel(cell.node)}</span>
+                        {loadingKeys.has(cell.node.key) && <Spinner />}
+                      </ColumnHeaderCell>
+                    </th>
+                  );
+                })}
               </tr>
             ))
           )}
         </thead>
         <tbody>
           {visibleRows.map(row => {
-            const showToggle =
-              row.hasChildren && row.path.length > 0;
+            const showToggle = shouldShowToggle('row', row);
+            const rowAggregateBold = isRowAggregateBold(row);
+            const isSubtotalHeader = rowAggregateBold;
+            const rowTotalBg = getTotalBackground(row);
+            const rowIndent = getNodeDimDepth(row) * ROW_INDENT_PX;
             return (
               <tr key={row.key}>
-                <th>
-                  <HeaderCell style={{ paddingLeft: row.path.length * 12 }}>
-                    {showToggle && (
+                <th
+                  className={isSubtotalHeader ? 'subtotal-cell' : undefined}
+                  style={rowTotalBg ? { backgroundColor: rowTotalBg } : undefined}
+                >
+                  <HeaderCell style={{ paddingLeft: rowIndent }}>
+                    {showToggle ? (
                       <ToggleButton
                         type="button"
                         onClick={() => handleToggle('row', row)}
@@ -1212,22 +1422,35 @@ function PivotTableChart(props: PivotTableProps) {
                           <PlusSquareOutlined />
                         )}
                       </ToggleButton>
-                    )}
+                    ) : null}
                     <span>{formatLabel(row)}</span>
                     {loadingKeys.has(row.key) && <Spinner />}
                   </HeaderCell>
                 </th>
-                {visibleCols.map(col => (
-                  <td
-                    key={`${row.key}|${col.key}`}
-                    onClick={() => handleCellClick(row, col)}
-                    onContextMenu={event =>
-                      handleCellContextMenu(event, row, col)
-                    }
-                  >
-                    {renderCellContent(row, col)}
-                  </td>
-                ))}
+                {visibleCols.map(col => {
+                  const cellKey = `${row.key}|${col.key}`;
+                  const colAggregateBold = isColAggregateBold(col);
+                  const isSubtotalCell = rowAggregateBold || colAggregateBold;
+                  const cellTotalBg = rowTotalBg;
+                  const cellClassName = isSubtotalCell
+                    ? 'subtotal-cell value-cell'
+                    : 'value-cell';
+                  return (
+                    <td
+                      key={cellKey}
+                      className={cellClassName}
+                      style={
+                        cellTotalBg ? { backgroundColor: cellTotalBg } : undefined
+                      }
+                      onClick={() => handleCellClick(row, col)}
+                      onContextMenu={event =>
+                        handleCellContextMenu(event, row, col)
+                      }
+                    >
+                      {renderCellContent(row, col)}
+                    </td>
+                  );
+                })}
               </tr>
             );
           })}

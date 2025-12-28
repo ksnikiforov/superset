@@ -38,8 +38,8 @@ describe('pivot table v3 control panel', () => {
         colSubtotalLevels: { value: [1, 3, 5, 0] },
       },
     });
-    expect(result.options.map((opt: any) => opt.value)).toEqual([1, 2, 3]);
-    expect(result.value).toEqual([1, 3]);
+    expect(result.options.map((opt: any) => opt.value)).toEqual([1, 2]);
+    expect(result.value).toEqual([1]);
   });
 
   it('returns empty options when there are no column levels', () => {

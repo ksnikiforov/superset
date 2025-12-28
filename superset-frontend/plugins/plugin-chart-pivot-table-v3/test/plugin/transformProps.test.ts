@@ -89,7 +89,7 @@ describe('Pivot Table v3 transformProps', () => {
     });
     const result = transformProps(customProps as any);
     expect(result.rowSubtotalLevels).toEqual([0]);
-    expect(result.colSubtotalLevels).toEqual([1]);
+    expect(result.colSubtotalLevels).toEqual([]);
   });
 
   it('merges row and column totals including the grand-total intersection for single-metric sums', () => {

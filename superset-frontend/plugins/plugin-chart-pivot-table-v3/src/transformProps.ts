@@ -74,9 +74,10 @@ export default function transformProps(
   const groupbyRows = stripMetricsPlaceholder(placement.rows);
   const groupbyColumns = stripMetricsPlaceholder(placement.cols);
   const rowSubtotalLevels = formData.rowTotals ? [0] : [];
+  const maxColSubtotalDepth = Math.max(groupbyColumns.length - 1, 0);
   const colSubtotalLevels = normalizeSubtotalLevels(
     formData.colSubtotalLevels,
-    groupbyColumns.length,
+    maxColSubtotalDepth,
     false,
     formData.colSubTotals,
   ).filter(level => level > 0);
@@ -86,6 +87,8 @@ export default function transformProps(
     (formData.colTotalPosition as TotalPosition) || 'start';
   const colSubtotalPosition =
     (formData.colSubtotalPosition as TotalPosition) || 'start';
+  const pivotTheme = formData.pivotTheme || 'none';
+  const pivotThemeColors = formData.pivotThemeColors || '';
   const metricsLayout = placement.layout;
   const metricInsertIndex =
     metricsLayout === MetricsLayoutEnum.ROWS
@@ -292,5 +295,7 @@ export default function transformProps(
     rowTotalPosition,
     colTotalPosition,
     colSubtotalPosition,
+    pivotTheme,
+    pivotThemeColors,
   };
 }
