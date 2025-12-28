@@ -15,3 +15,6 @@
 7. Add expand controls - expand whole layer
 8. Add sorting by any column. On right click select what row levels to sor
 9. There is no option now to remove subtotals
+10. no cache invalidation on changing filters
+11. check date formatting
+12. auto pagination for sources supporting it
