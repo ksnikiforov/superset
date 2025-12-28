@@ -1397,6 +1397,411 @@ describe('PivotTableChart expansion with metrics before dimensions', () => {
     });
   });
 
+  it('does not render a row subtotal after expanding a column then a row with row subtotals disabled', async () => {
+    const metrics = ['quantitySold'];
+    const groupbyRows = ['orderStatus', 'returnFlag'];
+    const groupbyColumns = ['revenueBand', 'orderPriority'];
+    const baseRaw = buildTreeFromRecords(
+      [
+        {
+          orderStatus: 'F',
+          returnFlag: 'A',
+          revenueBand: '10k-50k',
+          orderPriority: '1-URGENT',
+          quantitySold: 10,
+        },
+        {
+          orderStatus: 'O',
+          returnFlag: 'A',
+          revenueBand: '1k-5k',
+          orderPriority: '2-HIGH',
+          quantitySold: 5,
+        },
+      ],
+      metrics,
+      groupbyRows,
+      groupbyColumns,
+      1,
+      1,
+    );
+    const baseTree = applyMetricAxis(
+      baseRaw,
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      groupbyRows,
+      groupbyColumns,
+      groupbyColumns.length,
+    );
+
+    const colBranchRaw = buildTreeFromRecords(
+      [
+        {
+          orderStatus: 'F',
+          returnFlag: 'A',
+          revenueBand: '10k-50k',
+          orderPriority: '1-URGENT',
+          quantitySold: 10,
+        },
+        {
+          orderStatus: 'F',
+          returnFlag: 'F',
+          revenueBand: '10k-50k',
+          orderPriority: '2-HIGH',
+          quantitySold: 20,
+        },
+        {
+          orderStatus: 'O',
+          returnFlag: 'A',
+          revenueBand: '10k-50k',
+          orderPriority: '1-URGENT',
+          quantitySold: 5,
+        },
+      ],
+      metrics,
+      groupbyRows,
+      groupbyColumns,
+      1,
+      2,
+    );
+    const colBranch = applyMetricAxis(
+      colBranchRaw,
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      groupbyRows,
+      groupbyColumns,
+      groupbyColumns.length,
+    );
+    const subtotalKey = serializePath(['10k-50k', 'Subtotal']);
+    colBranch.cols[subtotalKey] = {
+      axis: 'col',
+      key: subtotalKey,
+      path: ['10k-50k', 'Subtotal'],
+      label: 'Subtotal',
+      formattedLabel: 'Subtotal',
+      level: 2,
+      hasChildren: false,
+      isSubtotal: true,
+    };
+    [serializePath(['F']), serializePath(['O'])].forEach(rowKey => {
+      colBranch.cells[`${rowKey}|${subtotalKey}`] = {
+        rowKey,
+        colKey: subtotalKey,
+        values: { quantitySold: rowKey === serializePath(['F']) ? 30 : 5 },
+        isSubtotal: true,
+      };
+    });
+
+    const rowBranchRaw = buildTreeFromRecords(
+      [
+        {
+          orderStatus: 'F',
+          returnFlag: 'A',
+          revenueBand: '10k-50k',
+          orderPriority: '1-URGENT',
+          quantitySold: 10,
+        },
+        {
+          orderStatus: 'F',
+          returnFlag: 'A',
+          revenueBand: '10k-50k',
+          orderPriority: '2-HIGH',
+          quantitySold: 20,
+        },
+      ],
+      metrics,
+      groupbyRows,
+      groupbyColumns,
+      2,
+      2,
+    );
+    const rowBranch = applyMetricAxis(
+      rowBranchRaw,
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      groupbyRows,
+      groupbyColumns,
+      groupbyColumns.length,
+    );
+    rowBranch.cols[subtotalKey] = rowBranch.cols[subtotalKey] || colBranch.cols[subtotalKey];
+    const subtotalRowKey = serializePath(['F', '__subtotal__']);
+    rowBranch.rows[subtotalRowKey] = {
+      axis: 'row',
+      key: subtotalRowKey,
+      path: ['F', '__subtotal__'],
+      label: 'Subtotal',
+      formattedLabel: 'Subtotal',
+      level: 2,
+      hasChildren: false,
+      isSubtotal: true,
+    };
+    rowBranch.cells[`${subtotalRowKey}|${serializePath(['10k-50k'])}`] = {
+      rowKey: subtotalRowKey,
+      colKey: serializePath(['10k-50k']),
+      values: { quantitySold: 30 },
+      isSubtotal: true,
+    };
+
+    fetchPivotBranchMock
+      .mockResolvedValueOnce({ data: colBranch })
+      .mockResolvedValueOnce({ data: rowBranch });
+
+    const { container } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={
+          {
+            ...baseFormData,
+            groupbyRows,
+            groupbyColumns: [...groupbyColumns, METRICS_PLACEHOLDER],
+            metricsLayout: MetricsLayoutEnum.COLUMNS,
+            metrics,
+            colTotals: true,
+            colSubtotalLevels: [1],
+            rowTotals: true,
+            rowSubTotals: false,
+            rowSubtotalLevels: [],
+          } as PivotTableQueryFormData
+        }
+        metrics={metrics}
+        groupbyRows={groupbyRows}
+        groupbyColumns={groupbyColumns}
+        aggregateFunction="Sum"
+        width={500}
+        height={400}
+        startCollapsed
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals
+        colTotals
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[1]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    const thead = container.querySelector('thead') as HTMLElement;
+    fireEvent.click(within(thead).getAllByLabelText('plus-square')[0]);
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
+    });
+
+    const tbody = container.querySelector('tbody') as HTMLElement;
+    fireEvent.click(within(tbody).getAllByLabelText('plus-square')[0]);
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
+    });
+
+    const rowHeaders = Array.from(
+      (container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>),
+    ).map(cell => cell.textContent?.trim());
+    expect(rowHeaders).not.toContain('Subtotal');
+  });
+
+  it('fills column subtotal cells for expanded rows after expanding columns first', async () => {
+    const metrics = ['quantitySold'];
+    const groupbyRows = ['orderStatus', 'returnFlag'];
+    const groupbyColumns = ['revenueBand', 'orderPriority'];
+    const baseRaw = buildTreeFromRecords(
+      [
+        {
+          orderStatus: 'F',
+          returnFlag: 'A',
+          revenueBand: '10k-50k',
+          orderPriority: '1-URGENT',
+          quantitySold: 10,
+        },
+        {
+          orderStatus: 'O',
+          returnFlag: 'A',
+          revenueBand: '1k-5k',
+          orderPriority: '2-HIGH',
+          quantitySold: 5,
+        },
+      ],
+      metrics,
+      groupbyRows,
+      groupbyColumns,
+      1,
+      1,
+    );
+    const baseTree = applyMetricAxis(
+      baseRaw,
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      groupbyRows,
+      groupbyColumns,
+      groupbyColumns.length,
+    );
+
+    const colBranchRaw = buildTreeFromRecords(
+      [
+        {
+          orderStatus: 'F',
+          returnFlag: 'A',
+          revenueBand: '10k-50k',
+          orderPriority: '1-URGENT',
+          quantitySold: 10,
+        },
+        {
+          orderStatus: 'F',
+          returnFlag: 'F',
+          revenueBand: '10k-50k',
+          orderPriority: '2-HIGH',
+          quantitySold: 20,
+        },
+      ],
+      metrics,
+      groupbyRows,
+      groupbyColumns,
+      1,
+      2,
+    );
+    const colBranch = applyMetricAxis(
+      colBranchRaw,
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      groupbyRows,
+      groupbyColumns,
+      groupbyColumns.length,
+    );
+    const subtotalKey = serializePath(['10k-50k', 'Subtotal']);
+    colBranch.cols[subtotalKey] = {
+      axis: 'col',
+      key: subtotalKey,
+      path: ['10k-50k', 'Subtotal'],
+      label: 'Subtotal',
+      formattedLabel: 'Subtotal',
+      level: 2,
+      hasChildren: false,
+      isSubtotal: true,
+    };
+    colBranch.cells[`${serializePath(['F'])}|${subtotalKey}`] = {
+      rowKey: serializePath(['F']),
+      colKey: subtotalKey,
+      values: { quantitySold: 30 },
+      isSubtotal: true,
+    };
+
+    const rowBranchRaw = buildTreeFromRecords(
+      [
+        {
+          orderStatus: 'F',
+          returnFlag: 'A',
+          revenueBand: '10k-50k',
+          orderPriority: '1-URGENT',
+          quantitySold: 10,
+        },
+        {
+          orderStatus: 'F',
+          returnFlag: 'A',
+          revenueBand: '10k-50k',
+          orderPriority: '2-HIGH',
+          quantitySold: 20,
+        },
+      ],
+      metrics,
+      groupbyRows,
+      groupbyColumns,
+      2,
+      2,
+    );
+    const rowBranch = applyMetricAxis(
+      rowBranchRaw,
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      groupbyRows,
+      groupbyColumns,
+      groupbyColumns.length,
+    );
+    rowBranch.cols[subtotalKey] = rowBranch.cols[subtotalKey] || colBranch.cols[subtotalKey];
+
+    fetchPivotBranchMock
+      .mockResolvedValueOnce({ data: colBranch })
+      .mockResolvedValueOnce({ data: rowBranch });
+
+    const { container, findByText } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={
+          {
+            ...baseFormData,
+            groupbyRows,
+            groupbyColumns: [...groupbyColumns, METRICS_PLACEHOLDER],
+            metricsLayout: MetricsLayoutEnum.COLUMNS,
+            metrics,
+            colTotals: true,
+            colSubtotalLevels: [1],
+            rowTotals: true,
+            rowSubTotals: false,
+            rowSubtotalLevels: [],
+          } as PivotTableQueryFormData
+        }
+        metrics={metrics}
+        groupbyRows={groupbyRows}
+        groupbyColumns={groupbyColumns}
+        aggregateFunction="Sum"
+        width={500}
+        height={400}
+        startCollapsed
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals
+        colTotals
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[1]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    const thead = container.querySelector('thead') as HTMLElement;
+    fireEvent.click(within(thead).getAllByLabelText('plus-square')[0]);
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
+    });
+
+    const tbody = container.querySelector('tbody') as HTMLElement;
+    fireEvent.click(within(tbody).getAllByLabelText('plus-square')[0]);
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
+    });
+
+    const headerRow = container.querySelector('thead tr:last-child') as HTMLElement;
+    const headers = within(headerRow)
+      .getAllByRole('columnheader')
+      .map(cell => cell.textContent?.trim());
+    const subtotalIndex = headers.indexOf('Subtotal');
+    expect(subtotalIndex).toBeGreaterThan(-1);
+
+    const childRow = await within(
+      container.querySelector('tbody') as HTMLElement,
+    ).findByText('A');
+    const childRowEl = childRow.closest('tr') as HTMLElement;
+    const subtotalCell = childRowEl.querySelectorAll('td')[subtotalIndex];
+    expect(subtotalCell.textContent?.trim()).toBeTruthy();
+  });
+
   it('fills ancestor column values for all visible rows when expanding another column after deep row expansion', async () => {
     const actualFetchModule = jest.requireActual('../../src/fetchPivotBranch');
     fetchPivotBranchMock.mockImplementation(args =>
@@ -1596,17 +2001,116 @@ describe('PivotTableChart expansion with metrics before dimensions', () => {
       const canRow = await findByText('CAN');
       const canRowEl = canRow.closest('tr') as HTMLElement;
       await waitFor(() => {
-        expect(within(canRowEl).getByText('35')).toBeTruthy();
+        expect(within(canRowEl).getAllByText('35').length).toBeGreaterThan(0);
       });
       const orderStatusRow = await findByText('F');
       const orderStatusRowEl = orderStatusRow.closest('tr') as HTMLElement;
-      expect(within(orderStatusRowEl).getByText('15')).toBeTruthy();
+      expect(within(orderStatusRowEl).getAllByText('15').length).toBeGreaterThan(0);
     } finally {
       postSpy.mockRestore();
       fetchPivotBranchMock.mockReset();
       fetchPivotBranchMock.mockResolvedValue({ data: undefined });
       peekPivotBranchCacheMock.mockReset();
     }
+  });
+
+  it('hides synthesized row subtotal nodes when row subtotals are disabled across multi-level expand', () => {
+    const metrics = ['quantitySold'];
+    const groupbyRows = ['orderStatus', 'returnFlag'];
+    const groupbyColumns = ['revenueBand', 'orderPriority'];
+
+    const baseTreeRaw = buildTreeFromRecords(
+      [
+        {
+          orderStatus: 'F',
+          returnFlag: 'A',
+          revenueBand: '10k-50k',
+          orderPriority: '1-URGENT',
+          quantitySold: 10,
+        },
+      ],
+      metrics,
+      groupbyRows,
+      groupbyColumns,
+      2,
+      2,
+    );
+    const tree = applyMetricAxis(
+      baseTreeRaw,
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      groupbyRows,
+      groupbyColumns,
+      groupbyColumns.length,
+    );
+    const subtotalKey = serializePath(['F', '__subtotal__']);
+    const firstColKey = Object.keys(tree.cells)[0].split('|')[1];
+    tree.rows[subtotalKey] = {
+      axis: 'row',
+      key: subtotalKey,
+      path: ['F', '__subtotal__'],
+      label: '__subtotal__',
+      formattedLabel: 'Subtotal',
+      level: 2,
+      hasChildren: true,
+      isSubtotal: true,
+    };
+    tree.cells[`${subtotalKey}|${firstColKey}`] = {
+      rowKey: subtotalKey,
+      colKey: firstColKey,
+      values: { quantitySold: 99 },
+      isSubtotal: true,
+    };
+
+    const { container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={
+          {
+            ...baseFormData,
+            groupbyRows,
+            groupbyColumns: [...groupbyColumns, METRICS_PLACEHOLDER],
+            metricsLayout: MetricsLayoutEnum.COLUMNS,
+            metrics,
+            rowTotals: true,
+            rowSubTotals: false,
+            rowSubtotalLevels: [],
+            colTotals: true,
+            colSubtotalLevels: [1],
+          } as PivotTableQueryFormData
+        }
+        metrics={metrics}
+        groupbyRows={groupbyRows}
+        groupbyColumns={groupbyColumns}
+        aggregateFunction="Sum"
+        width={500}
+        height={300}
+        startCollapsed={false}
+        initialDepth={2}
+        maxDepthPerFetch={1}
+        rowTotals
+        colTotals
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[1]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    const rowHeaders = Array.from(
+      (container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>),
+    ).map(cell => cell.textContent?.trim());
+    expect(rowHeaders).not.toContain('Subtotal');
   });
 
   it('expands a five-level row hierarchy sequentially', async () => {
