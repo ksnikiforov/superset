@@ -370,14 +370,18 @@ function PivotTableChart(props: PivotTableProps) {
       Object.values(data.cols).reduce(
         (max, node) => Math.max(max, node.level),
         0,
-      ) + 1;
-    const seedRowDepth = startCollapsed ? 0 : maxRowDepth;
-    const seedColDepth = startCollapsed ? 0 : maxColDepth;
+Fi      ) + 1;
+    const seedRowDepth = startCollapsed
+      ? Math.min(resolvedInitialDepth, maxRowDepth)
+      : maxRowDepth;
+    const seedColDepth = startCollapsed
+      ? Math.min(resolvedInitialDepth, maxColDepth)
+      : maxColDepth;
     const seedExpanded = (nodes: Record<string, PivotTreeNode>) => {
       const next = new Set<string>([rootKey]);
       Object.values(nodes).forEach(node => {
         const depthLimit = nodes === data.rows ? seedRowDepth : seedColDepth;
-        if (node.level > 0 && node.level <= depthLimit) {
+        if (node.level > 0 && node.level < depthLimit) {
           next.add(node.key);
         }
       });
@@ -636,10 +640,11 @@ function PivotTableChart(props: PivotTableProps) {
       }
       const matchesBranchSubtotal = (leaf: PivotTreeNode) =>
         leaf.isSubtotal &&
-        leaf.path.length === node.path.length + 1 &&
+          leaf.path.length === node.path.length + 1 &&
         node.path.every((val, idx) => val === leaf.path[idx]) &&
         (leaf.path[node.path.length] === 'Subtotal' ||
-          leaf.label === node.label);
+          leaf.label === node.label ||
+          node.path.includes(leaf.label as any));
       const subtotalLeaf =
         childLeaves.find(
           leaf =>
@@ -647,14 +652,23 @@ function PivotTableChart(props: PivotTableProps) {
             leaf.path[node.path.length] === 'Subtotal',
         ) || childLeaves.find(matchesBranchSubtotal);
       if (subtotalLeaf) {
+        const subtotalLeafNode = { ...subtotalLeaf, hasChildren: false };
         const remainingLeaves = childLeaves.filter(
-          leaf => leaf.key !== subtotalLeaf.key && !matchesBranchSubtotal(leaf),
+          leaf =>
+            leaf.key !== subtotalLeaf.key && !matchesBranchSubtotal(leaf),
         );
         return placeAtFront
-          ? [subtotalLeaf, ...remainingLeaves]
-          : [...remainingLeaves, subtotalLeaf];
+          ? [subtotalLeafNode, ...remainingLeaves]
+          : [...remainingLeaves, subtotalLeafNode];
       }
-      return placeAtFront ? [node, ...childLeaves] : [...childLeaves, node];
+      const subtotalNode = { ...node, hasChildren: false };
+      const remainingLeaves = childLeaves.filter(
+        leaf =>
+          !(leaf.isSubtotal && leaf.path.length === node.path.length + 1),
+      );
+      return placeAtFront
+        ? [subtotalNode, ...remainingLeaves]
+        : [...remainingLeaves, subtotalNode];
     },
     [
       getColChildren,
@@ -804,10 +818,15 @@ function PivotTableChart(props: PivotTableProps) {
       visibleRowDepth,
     ],
   );
-  const columnHeaderRows = useMemo(
-    () => buildColumnHeaderRows(visibleCols, tree.cols),
-    [visibleCols, tree.cols],
-  );
+  const columnHeaderRows = useMemo(() => {
+    const colsForHeaders = { ...tree.cols };
+    visibleCols.forEach(col => {
+      if (col.isSubtotal && col.hasChildren === false) {
+        colsForHeaders[col.key] = { ...(colsForHeaders[col.key] || col), hasChildren: false };
+      }
+    });
+    return buildColumnHeaderRows(visibleCols, colsForHeaders);
+  }, [tree.cols, visibleCols]);
   const handleToggle = useCallback(
     async (axis: 'row' | 'col', node: PivotTreeNode) => {
       const expanded = axis === 'row' ? expandedRows : expandedCols;

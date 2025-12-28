@@ -1608,4 +1608,195 @@ describe('PivotTableChart expansion with metrics before dimensions', () => {
       peekPivotBranchCacheMock.mockReset();
     }
   });
+
+  it('expands a five-level row hierarchy sequentially', async () => {
+    fetchPivotBranchMock.mockReset();
+    fetchPivotBranchMock.mockResolvedValue({ data: undefined });
+    const rootKey = serializePath([]);
+    const rowLabels = ['L1', 'L2', 'L3', 'L4', 'L5'];
+    const rows = {
+      [rootKey]: {
+        axis: 'row',
+        key: rootKey,
+        path: [],
+        label: 'Total',
+        formattedLabel: 'Total',
+        level: 0,
+        hasChildren: true,
+      },
+    } as PivotTreeData['rows'];
+    rowLabels.reduce((path, label, idx) => {
+      const nextPath = [...path, label];
+      rows[serializePath(nextPath)] = {
+        axis: 'row',
+        key: serializePath(nextPath),
+        path: nextPath,
+        label,
+        formattedLabel: label,
+        level: idx + 1,
+        hasChildren: idx < rowLabels.length - 1,
+      };
+      return nextPath;
+    }, [] as string[]);
+    const cols: PivotTreeData['cols'] = {
+      [rootKey]: {
+        axis: 'col',
+        key: rootKey,
+        path: [],
+        label: 'Total',
+        formattedLabel: 'Total',
+        level: 0,
+        hasChildren: false,
+      },
+    };
+    const tree: PivotTreeData = { rows, cols, cells: {} };
+
+    const { container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={
+          {
+            ...baseFormData,
+            groupbyRows: ['r1', 'r2', 'r3', 'r4', 'r5'],
+            groupbyColumns: [],
+            metrics: ['m1'],
+          } as PivotTableQueryFormData
+        }
+        metrics={['m1']}
+        groupbyRows={['r1', 'r2', 'r3', 'r4', 'r5']}
+        groupbyColumns={[]}
+        aggregateFunction="Sum"
+        width={400}
+        height={300}
+        startCollapsed
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    const tbody = container.querySelector('tbody') as HTMLElement;
+    const clickNextRowToggle = async (callCount: number) => {
+      const plusToggles = within(tbody).getAllByLabelText('plus-square');
+      fireEvent.click(plusToggles[0]);
+      await waitFor(() =>
+        expect(fetchPivotBranchMock).toHaveBeenCalledTimes(callCount),
+      );
+    };
+
+    await clickNextRowToggle(1);
+    await clickNextRowToggle(2);
+    await clickNextRowToggle(3);
+  });
+
+  it('expands a five-level column hierarchy sequentially', async () => {
+    fetchPivotBranchMock.mockReset();
+    fetchPivotBranchMock.mockResolvedValue({ data: undefined });
+    const rootKey = serializePath([]);
+    const colLabels = ['C1', 'C2', 'C3', 'C4', 'C5'];
+    const cols = {
+      [rootKey]: {
+        axis: 'col',
+        key: rootKey,
+        path: [],
+        label: 'Total',
+        formattedLabel: 'Total',
+        level: 0,
+        hasChildren: true,
+      },
+    } as PivotTreeData['cols'];
+    colLabels.reduce((path, label, idx) => {
+      const nextPath = [...path, label];
+      cols[serializePath(nextPath)] = {
+        axis: 'col',
+        key: serializePath(nextPath),
+        path: nextPath,
+        label,
+        formattedLabel: label,
+        level: idx + 1,
+        hasChildren: idx < colLabels.length - 1,
+      };
+      return nextPath;
+    }, [] as string[]);
+    const rows: PivotTreeData['rows'] = {
+      [rootKey]: {
+        axis: 'row',
+        key: rootKey,
+        path: [],
+        label: 'Total',
+        formattedLabel: 'Total',
+        level: 0,
+        hasChildren: false,
+      },
+    };
+    const tree: PivotTreeData = { rows, cols, cells: {} };
+
+    const { container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={
+          {
+            ...baseFormData,
+            groupbyRows: [],
+            groupbyColumns: ['c1', 'c2', 'c3', 'c4', 'c5'],
+            metrics: ['m1'],
+            colTotals: false,
+          } as PivotTableQueryFormData
+        }
+        metrics={['m1']}
+        groupbyRows={[]}
+        groupbyColumns={['c1', 'c2', 'c3', 'c4', 'c5']}
+        aggregateFunction="Sum"
+        width={400}
+        height={300}
+        startCollapsed
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    const thead = container.querySelector('thead') as HTMLElement;
+    const clickNextColToggle = async (callCount: number) => {
+      const plusToggles = within(thead).getAllByLabelText('plus-square');
+      fireEvent.click(plusToggles[0]);
+      await waitFor(() =>
+        expect(fetchPivotBranchMock).toHaveBeenCalledTimes(callCount),
+      );
+    };
+
+    await clickNextColToggle(1);
+    await clickNextColToggle(2);
+    await clickNextColToggle(3);
+  });
 });

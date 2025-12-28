@@ -79,3 +79,16 @@ test('emits column subtotal depth without including grand total level', () => {
   expect(names).toContain(formatQueryName(2, 1));
   expect(names).not.toContain(formatQueryName(2, 0));
 });
+
+test('requests the first column level on initial collapsed render with multiple column groupbys', () => {
+  const queryContext = buildQuery({
+    ...baseFormData,
+    groupbyRows: ['orderStatus'],
+    groupbyColumns: ['orderPriority', 'revenueBand', 'returnFlag'],
+    startCollapsed: true,
+    initialDepth: 1,
+  } as PivotTableQueryFormData);
+  const names = queryContext.queries.map(q => q.query_name);
+  expect(names).toContain(formatQueryName(1, 1));
+  expect(names).not.toContain(formatQueryName(1, 0));
+});
