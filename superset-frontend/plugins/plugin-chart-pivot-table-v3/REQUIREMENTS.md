@@ -67,9 +67,25 @@ This document summarizes the functional requirements gathered from user feedback
 - **Totals/subtotals:** Level-aware selections (arrays) define which depths to request. Initial load queries only visible depths + selected totals/subtotals; branch fetches request the same depth pairs when expanding. _Coverage: `buildQuery.test.ts` (multi-query when totals/collapse); deeper totals rendering coverage missing._
 - **Drag & drop:** Placeholder is deduped across axes; drag should not throw; cross-axis drops update both controls and rerun placement. Keys are stable to avoid react-dnd target invalidation. _Coverage: missing._
 
+### Architecture refactor (current state)
+- **Render + state:** `PivotTableChart.tsx` owns React state, fetch orchestration, and the HTML table render. [`src/PivotTableChart.tsx`](src/PivotTableChart.tsx)
+- **Traversal + sorting:** Tree traversal, header row building, sorting, and value formatting live in the view-model helpers. [`src/pivot/viewModel.ts`](src/pivot/viewModel.ts)
+- **Totals/metrics policy:** Metric path helpers, subtotal/total detection, and depth calculations live here. [`src/pivot/metricsTotals.ts`](src/pivot/metricsTotals.ts)
+- **Visibility + expansion:** Visible row/column builders, depth helpers, and loaded-children checks live here. [`src/pivot/visibility.ts`](src/pivot/visibility.ts)
+- **Column header display:** Column header display-path logic (for metrics/totals layouts) lives here. [`src/pivot/columnDisplay.ts`](src/pivot/columnDisplay.ts)
+- **Filters + context menu:** Cross-filter and context menu filter assembly live here. [`src/pivot/filters.ts`](src/pivot/filters.ts)
+- **Cell helpers:** Metric key resolution, row subtotal hiding, and label formatting live here. [`src/pivot/cellUtils.ts`](src/pivot/cellUtils.ts)
+- **No UI change intended:** The HTML table output and behavior are expected to remain identical; this is purely structural.
+
 ### Key file references
-- Query construction: `superset-frontend/plugins/plugin-chart-pivot-table-v3/src/buildQuery.ts`
-- Branch fetching: `superset-frontend/plugins/plugin-chart-pivot-table-v3/src/fetchPivotBranch.ts`
-- Data shaping & type map: `superset-frontend/plugins/plugin-chart-pivot-table-v3/src/transformProps.ts`
-- Tree building & metric axis projection: `superset-frontend/plugins/plugin-chart-pivot-table-v3/src/utils.ts`
-- Rendering, expansion, sorting, cell metrics: `superset-frontend/plugins/plugin-chart-pivot-table-v3/src/PivotTableChart.tsx`
+- Query construction: [`src/buildQuery.ts`](src/buildQuery.ts)
+- Branch fetching: [`src/fetchPivotBranch.ts`](src/fetchPivotBranch.ts)
+- Data shaping & type map: [`src/transformProps.ts`](src/transformProps.ts)
+- Tree building & metric axis projection: [`src/utils.ts`](src/utils.ts)
+- Rendering, expansion, sorting, cell metrics: [`src/PivotTableChart.tsx`](src/PivotTableChart.tsx)
+- View-model helpers: [`src/pivot/viewModel.ts`](src/pivot/viewModel.ts)
+- Totals/metrics helpers: [`src/pivot/metricsTotals.ts`](src/pivot/metricsTotals.ts)
+- Visibility helpers: [`src/pivot/visibility.ts`](src/pivot/visibility.ts)
+- Column display helpers: [`src/pivot/columnDisplay.ts`](src/pivot/columnDisplay.ts)
+- Filter helpers: [`src/pivot/filters.ts`](src/pivot/filters.ts)
+- Cell helpers: [`src/pivot/cellUtils.ts`](src/pivot/cellUtils.ts)
