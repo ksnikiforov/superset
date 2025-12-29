@@ -130,12 +130,49 @@ const resolveFetchContext = ({
   const rowGroupbyRaw = ensureIsArray<QueryFormColumn>(formData.groupbyRows);
   const colGroupbyRaw = ensureIsArray<QueryFormColumn>(formData.groupbyColumns);
   const metrics = ensureIsArray(formData.metrics);
+  const metricLabels = getMetricKeys(metrics);
+  const metricLabelSet = new Set(metricLabels);
   const placement = resolveMetricPlacement(rowGroupbyRaw, colGroupbyRaw, {
     hasMetrics: metrics.length > 0,
     preferredAxis: formData.metricsLayout as MetricsLayoutEnum,
   });
-  const rowGroupby = stripMetricsPlaceholder(placement.rows);
-  const colGroupby = stripMetricsPlaceholder(placement.cols);
+  let rowGroupby = stripMetricsPlaceholder(placement.rows);
+  let colGroupby = stripMetricsPlaceholder(placement.cols);
+  const metricsLayoutResolved = placement.layout;
+  const metricsAxis: PivotAxis =
+    metricsLayoutResolved === MetricsLayoutEnum.ROWS ? 'row' : 'col';
+  const metricInsertIndexBase =
+    placement.metricPosition >= 0
+      ? placement.metricPosition
+      : metricsAxis === 'row'
+      ? rowGroupby.length
+      : colGroupby.length;
+  const metricIndexInPath =
+    metricsAxis === axis
+      ? path.findIndex(val => metricLabelSet.has(String(val ?? '')))
+      : -1;
+  const shouldCollapseRowDims =
+    metricsAxis === 'row' &&
+    axis === 'row' &&
+    metricIndexInPath >= 0 &&
+    metricIndexInPath < metricInsertIndexBase;
+  const shouldCollapseColDims =
+    metricsAxis === 'col' &&
+    axis === 'col' &&
+    metricIndexInPath >= 0 &&
+    metricIndexInPath < metricInsertIndexBase;
+
+  if (shouldCollapseRowDims) {
+    rowGroupby = rowGroupby.filter(
+      (_, idx) => idx < metricIndexInPath || idx >= metricInsertIndexBase,
+    );
+  }
+  if (shouldCollapseColDims) {
+    colGroupby = colGroupby.filter(
+      (_, idx) => idx < metricIndexInPath || idx >= metricInsertIndexBase,
+    );
+  }
+
   const rowSubTotalsEnabled = formData.rowSubTotals ?? true;
   const maxRowSubtotalDepth = Math.max(rowGroupby.length - 1, 0);
   const rowSubtotalLevels = normalizeSubtotalLevels(
@@ -151,21 +188,21 @@ const resolveFetchContext = ({
     false,
     formData.colSubTotals,
   ).filter(level => level > 0);
-  const metricsLayoutResolved = placement.layout;
-  const metricsAxis: PivotAxis =
-    metricsLayoutResolved === MetricsLayoutEnum.ROWS ? 'row' : 'col';
+
   const metricInsertIndex =
-    placement.metricPosition >= 0
-      ? placement.metricPosition
-      : metricsAxis === 'row'
-      ? rowGroupby.length
-      : colGroupby.length;
+    (shouldCollapseRowDims || shouldCollapseColDims) && metricIndexInPath >= 0
+      ? metricIndexInPath
+      : metricInsertIndexBase;
 
   const stripMetricFromPath = (p: PivotPath, targetAxis: PivotAxis) => {
-    if (metricsAxis !== targetAxis || placement.metricPosition < 0) {
+    if (metricsAxis !== targetAxis) {
       return p;
     }
-    return [...p.slice(0, metricInsertIndex), ...p.slice(metricInsertIndex + 1)];
+    const idx = p.findIndex(val => metricLabelSet.has(String(val ?? '')));
+    if (idx < 0) {
+      return p;
+    }
+    return [...p.slice(0, idx), ...p.slice(idx + 1)];
   };
 
   const sanitizedPath = stripMetricFromPath(path, axis);
@@ -212,8 +249,8 @@ const resolveFetchContext = ({
     path,
     rowDepth,
     colDepth,
-    placement.rows,
-    placement.cols,
+    rowGroupby,
+    colGroupby,
     metrics,
     formData.aggregateFunction,
   );

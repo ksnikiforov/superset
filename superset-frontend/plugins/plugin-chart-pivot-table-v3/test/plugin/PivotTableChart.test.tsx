@@ -3111,7 +3111,203 @@ describe('PivotTableChart totals & subtotals', () => {
     return { labeledTree, metrics, rowGroupby };
   };
 
-  it('hides metric-tier subtotals and lower subtotals when top position is selected', () => {
+  const buildDeepMetricSubtotalTree = (subtotalLevels: number[]) => {
+    const metrics = ['averageOrderValue', 'weightedDiscount'];
+    const rowGroupby = ['A', 'B', 'C', 'D', 'E', 'F'];
+    const detailRecords = [
+      {
+        A: 'A',
+        B: 'B',
+        C: 'C',
+        D: 'D',
+        E: 'E',
+        F: 'F1',
+        averageOrderValue: 10,
+        weightedDiscount: 0.1,
+      },
+      {
+        A: 'A',
+        B: 'B',
+        C: 'C',
+        D: 'D',
+        E: 'E',
+        F: 'F2',
+        averageOrderValue: 20,
+        weightedDiscount: 0.2,
+      },
+      {
+        A: 'A',
+        B: 'B',
+        C: 'C',
+        D: 'D',
+        E: 'E',
+        F: 'F3',
+        averageOrderValue: 30,
+        weightedDiscount: 0.3,
+      },
+      {
+        A: 'A',
+        B: 'B',
+        C: 'C',
+        D: 'D',
+        E: 'E',
+        F: 'F4',
+        averageOrderValue: 40,
+        weightedDiscount: 0.4,
+      },
+    ];
+    const detail = buildTreeFromRecords(
+      detailRecords,
+      metrics,
+      rowGroupby,
+      [],
+      rowGroupby.length,
+      0,
+    );
+    const aggregateSeed = {
+      A: 'A',
+      B: 'B',
+      C: 'C',
+      D: 'D',
+      E: 'E',
+      F: 'F1',
+      averageOrderValue: 100,
+      weightedDiscount: 0.5,
+    };
+    const aggregated = subtotalLevels.reduce((acc, depth, idx) => {
+      const record = {
+        ...aggregateSeed,
+        averageOrderValue: 100 + depth + idx,
+        weightedDiscount: 0.5 + (depth + idx) / 100,
+      };
+      const branch = buildTreeFromRecords(
+        [record],
+        metrics,
+        rowGroupby,
+        [],
+        depth,
+        0,
+      );
+      return mergeTrees(acc, branch);
+    }, detail);
+    const withSubtotals = subtotalLevels.reduce(
+      (acc, depth) => injectRowSubtotalLeaves(acc, depth, rowGroupby.length),
+      aggregated,
+    );
+    const withMetrics = applyMetricAxis(
+      withSubtotals,
+      metrics,
+      MetricsLayoutEnum.ROWS,
+      rowGroupby,
+      [],
+      3,
+    );
+    const labeledTree = labelRowSubtotalLeaves(withMetrics, metrics);
+    return { labeledTree, metrics, rowGroupby };
+  };
+
+  const buildVeryDeepMetricSubtotalTree = (subtotalLevels: number[]) => {
+    const metrics = ['averageOrderValue', 'weightedDiscount'];
+    const rowGroupby = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'];
+    const detailRecords = [
+      {
+        A: 'A',
+        B: 'B',
+        C: 'C',
+        D: 'D',
+        E: 'E',
+        F: 'F',
+        G: 'G',
+        H: 'H',
+        I: 'I',
+        J: 'J1',
+        averageOrderValue: 10,
+        weightedDiscount: 0.1,
+      },
+      {
+        A: 'A',
+        B: 'B',
+        C: 'C',
+        D: 'D',
+        E: 'E',
+        F: 'F',
+        G: 'G',
+        H: 'H',
+        I: 'I',
+        J: 'J2',
+        averageOrderValue: 20,
+        weightedDiscount: 0.2,
+      },
+      {
+        A: 'A',
+        B: 'B',
+        C: 'C',
+        D: 'D',
+        E: 'E',
+        F: 'F',
+        G: 'G',
+        H: 'H',
+        I: 'I',
+        J: 'J3',
+        averageOrderValue: 30,
+        weightedDiscount: 0.3,
+      },
+    ];
+    const detail = buildTreeFromRecords(
+      detailRecords,
+      metrics,
+      rowGroupby,
+      [],
+      rowGroupby.length,
+      0,
+    );
+    const aggregateSeed = {
+      A: 'A',
+      B: 'B',
+      C: 'C',
+      D: 'D',
+      E: 'E',
+      F: 'F',
+      G: 'G',
+      H: 'H',
+      I: 'I',
+      J: 'J1',
+      averageOrderValue: 100,
+      weightedDiscount: 0.5,
+    };
+    const aggregated = subtotalLevels.reduce((acc, depth, idx) => {
+      const record = {
+        ...aggregateSeed,
+        averageOrderValue: 120 + depth + idx,
+        weightedDiscount: 0.7 + (depth + idx) / 100,
+      };
+      const branch = buildTreeFromRecords(
+        [record],
+        metrics,
+        rowGroupby,
+        [],
+        depth,
+        0,
+      );
+      return mergeTrees(acc, branch);
+    }, detail);
+    const withSubtotals = subtotalLevels.reduce(
+      (acc, depth) => injectRowSubtotalLeaves(acc, depth, rowGroupby.length),
+      aggregated,
+    );
+    const withMetrics = applyMetricAxis(
+      withSubtotals,
+      metrics,
+      MetricsLayoutEnum.ROWS,
+      rowGroupby,
+      [],
+      5,
+    );
+    const labeledTree = labelRowSubtotalLeaves(withMetrics, metrics);
+    return { labeledTree, metrics, rowGroupby };
+  };
+
+  it('renders only top-level metric subtotals at the bottom when top position is selected with multiple metrics', () => {
     const { labeledTree, metrics, rowGroupby } = buildMetricSubtotalTree();
 
     const { container } = render(
@@ -3166,15 +3362,48 @@ describe('PivotTableChart totals & subtotals', () => {
     )
       .map(cell => cell.textContent?.trim())
       .filter((label): label is string => !!label);
+    const lastLeafIndex = rowHeaders.lastIndexOf('Under 1k');
+    const avgTotalIndex = rowHeaders.indexOf('1-5 averageOrderValue');
+    const discountTotalIndex = rowHeaders.indexOf('1-5 weightedDiscount');
+    const avgTotalCount = rowHeaders.filter(
+      label => label === '1-5 averageOrderValue',
+    ).length;
+    const discountTotalCount = rowHeaders.filter(
+      label => label === '1-5 weightedDiscount',
+    ).length;
 
-    expect(rowHeaders).not.toContain('1-5 averageOrderValue');
-    expect(rowHeaders).not.toContain('1-5 weightedDiscount');
-    expect(rowHeaders).not.toContain('A Total');
+    expect(rowHeaders).toEqual(
+      expect.arrayContaining(['1-5 averageOrderValue', '1-5 weightedDiscount']),
+    );
+    expect(avgTotalCount).toBe(1);
+    expect(discountTotalCount).toBe(1);
+    expect(lastLeafIndex).toBeGreaterThan(-1);
+    expect(avgTotalIndex).toBeGreaterThan(lastLeafIndex);
+    expect(discountTotalIndex).toBeGreaterThan(lastLeafIndex);
     expect(rowHeaders).not.toContain('A averageOrderValue');
     expect(rowHeaders).not.toContain('A weightedDiscount');
+    expect(rowHeaders).not.toContain('N averageOrderValue');
+    expect(rowHeaders).not.toContain('N weightedDiscount');
+    expect(rowHeaders).not.toContain('1-5 Total');
+    expect(rowHeaders).not.toContain('A Total');
+
+    const getRowIndent = (label: string) => {
+      const headerCell = screen.getAllByText(label)[0].closest(
+        'div',
+      ) as HTMLElement;
+      return Number.parseInt(headerCell.style.paddingLeft || '0', 10);
+    };
+    const metricIndent = getRowIndent('averageOrderValue');
+    const returnFlagIndent = getRowIndent('A');
+    const subtotalIndent = getRowIndent('1-5 averageOrderValue');
+    const subtotalDiscountIndent = getRowIndent('1-5 weightedDiscount');
+
+    expect(subtotalIndent).toBe(returnFlagIndent);
+    expect(subtotalDiscountIndent).toBe(returnFlagIndent);
+    expect(returnFlagIndent).toBeGreaterThan(metricIndent);
   });
 
-  it('renders lower-level subtotals as "<Group> Total" when bottom position is selected', () => {
+  it('renders only top-level metric subtotals when bottom position is selected with multiple metrics', () => {
     const { labeledTree, metrics, rowGroupby } = buildMetricSubtotalTree();
 
     const { container } = render(
@@ -3229,14 +3458,616 @@ describe('PivotTableChart totals & subtotals', () => {
     )
       .map(cell => cell.textContent?.trim())
       .filter((label): label is string => !!label);
+    const lastLeafIndex = rowHeaders.lastIndexOf('Under 1k');
+    const avgTotalIndex = rowHeaders.indexOf('1-5 averageOrderValue');
+    const discountTotalIndex = rowHeaders.indexOf('1-5 weightedDiscount');
+    const avgTotalCount = rowHeaders.filter(
+      label => label === '1-5 averageOrderValue',
+    ).length;
+    const discountTotalCount = rowHeaders.filter(
+      label => label === '1-5 weightedDiscount',
+    ).length;
 
-    expect(rowHeaders).toContain('A Total');
+    expect(rowHeaders).toEqual(
+      expect.arrayContaining(['1-5 averageOrderValue', '1-5 weightedDiscount']),
+    );
+    expect(avgTotalCount).toBe(1);
+    expect(discountTotalCount).toBe(1);
+    expect(lastLeafIndex).toBeGreaterThan(-1);
+    expect(avgTotalIndex).toBeGreaterThan(lastLeafIndex);
+    expect(discountTotalIndex).toBeGreaterThan(lastLeafIndex);
     expect(rowHeaders).not.toContain('A averageOrderValue');
+    expect(rowHeaders).not.toContain('A weightedDiscount');
+    expect(rowHeaders).not.toContain('N averageOrderValue');
+    expect(rowHeaders).not.toContain('N weightedDiscount');
+    expect(rowHeaders).not.toContain('A Total');
+    expect(rowHeaders).not.toContain('1-5 Total');
+
+    const getRowIndent = (label: string) => {
+      const headerCell = screen.getAllByText(label)[0].closest(
+        'div',
+      ) as HTMLElement;
+      return Number.parseInt(headerCell.style.paddingLeft || '0', 10);
+    };
+    const metricIndent = getRowIndent('averageOrderValue');
+    const returnFlagIndent = getRowIndent('A');
+    const subtotalIndent = getRowIndent('1-5 averageOrderValue');
+    const subtotalDiscountIndent = getRowIndent('1-5 weightedDiscount');
+
+    expect(subtotalIndent).toBe(returnFlagIndent);
+    expect(subtotalDiscountIndent).toBe(returnFlagIndent);
+    expect(returnFlagIndent).toBeGreaterThan(metricIndent);
+  });
+
+  it('suppresses metric-labeled subtotals when row subtotals are disabled', () => {
+    const { labeledTree, metrics, rowGroupby } = buildMetricSubtotalTree();
+
+    const { container } = render(
+      <PivotTableChart
+        data={labeledTree}
+        formData={
+          {
+            ...(baseProps as Partial<PivotTableQueryFormData>),
+            groupbyRows: rowGroupby,
+            groupbyColumns: [],
+            metricsLayout: MetricsLayoutEnum.ROWS,
+            metrics,
+            rowSubTotals: false,
+            rowSubtotalLevels: [1, 2],
+            rowSubtotalPosition: 'end',
+          } as PivotTableQueryFormData
+        }
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={[]}
+        aggregateFunction="Sum"
+        width={600}
+        height={300}
+        startCollapsed={false}
+        initialDepth={3}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[1, 2]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        rowTotalPosition="start"
+        colSubtotalPosition="start"
+        colTotalPosition="start"
+        rowSubtotalPosition="end"
+      />,
+    );
+
+    const rowHeaders = Array.from(
+      container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
+    )
+      .map(cell => cell.textContent?.trim())
+      .filter((label): label is string => !!label);
+
     expect(rowHeaders).not.toContain('1-5 averageOrderValue');
     expect(rowHeaders).not.toContain('1-5 weightedDiscount');
+    expect(rowHeaders).not.toContain('A averageOrderValue');
+    expect(rowHeaders).not.toContain('A weightedDiscount');
+    expect(rowHeaders).not.toContain('N averageOrderValue');
+    expect(rowHeaders).not.toContain('N weightedDiscount');
   });
 
-  it('does not duplicate subtotal rows for the same group when multiple levels are enabled', () => {
+  it('pushes metric subtotals for A/B/C to the bottom and matches indentation when metrics are between C and D (top position)', () => {
+    const { labeledTree, metrics, rowGroupby } = buildDeepMetricSubtotalTree([
+      1, 2, 3,
+    ]);
+
+    const { container } = render(
+      <PivotTableChart
+        data={labeledTree}
+        formData={
+          {
+            ...(baseProps as Partial<PivotTableQueryFormData>),
+            groupbyRows: ['A', 'B', 'C', METRICS_PLACEHOLDER, 'D', 'E', 'F'],
+            groupbyColumns: [],
+            metricsLayout: MetricsLayoutEnum.ROWS,
+            metrics,
+            rowSubTotals: true,
+            rowSubtotalLevels: [1, 2, 3],
+            rowSubtotalPosition: 'start',
+          } as PivotTableQueryFormData
+        }
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={[]}
+        aggregateFunction="Sum"
+        width={600}
+        height={300}
+        startCollapsed={false}
+        initialDepth={5}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals
+        colSubTotals={false}
+        rowSubtotalLevels={[1, 2, 3]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        rowTotalPosition="start"
+        colSubtotalPosition="start"
+        colTotalPosition="start"
+        rowSubtotalPosition="start"
+      />,
+    );
+
+    const rowHeaders = Array.from(
+      container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
+    )
+      .map(cell => cell.textContent?.trim())
+      .filter((label): label is string => !!label);
+    const lastLeafIndex = rowHeaders.lastIndexOf('F4');
+    const totals = [
+      'C averageOrderValue',
+      'C weightedDiscount',
+      'B averageOrderValue',
+      'B weightedDiscount',
+      'A averageOrderValue',
+      'A weightedDiscount',
+    ];
+
+    expect(rowHeaders).toEqual(expect.arrayContaining(totals));
+    totals.forEach(label => {
+      expect(rowHeaders.filter(item => item === label)).toHaveLength(1);
+      expect(rowHeaders.indexOf(label)).toBeGreaterThan(lastLeafIndex);
+    });
+    expect(rowHeaders).not.toContain('A Total');
+    expect(rowHeaders).not.toContain('B Total');
+    expect(rowHeaders).not.toContain('C Total');
+    expect(rowHeaders).not.toContain('D averageOrderValue');
+    expect(rowHeaders).not.toContain('D weightedDiscount');
+    expect(rowHeaders).not.toContain('E averageOrderValue');
+    expect(rowHeaders).not.toContain('E weightedDiscount');
+    expect(rowHeaders).not.toContain('E Total');
+
+    const getRowIndent = (label: string) => {
+      const headerCell = screen.getByText(label).closest('div') as HTMLElement;
+      return Number.parseInt(headerCell.style.paddingLeft || '0', 10);
+    };
+    const indentA = getRowIndent('A');
+    const indentB = getRowIndent('B');
+    const indentC = getRowIndent('C');
+    expect(getRowIndent('A averageOrderValue')).toBe(indentA);
+    expect(getRowIndent('A weightedDiscount')).toBe(indentA);
+    expect(getRowIndent('B averageOrderValue')).toBe(indentB);
+    expect(getRowIndent('B weightedDiscount')).toBe(indentB);
+    expect(getRowIndent('C averageOrderValue')).toBe(indentC);
+    expect(getRowIndent('C weightedDiscount')).toBe(indentC);
+  });
+
+  it('adds single-metric E totals and keeps A/B/C subtotals aligned when metrics are between C and D (bottom position)', () => {
+    const { labeledTree, metrics, rowGroupby } = buildDeepMetricSubtotalTree([
+      1, 2, 3, 5,
+    ]);
+
+    const { container } = render(
+      <PivotTableChart
+        data={labeledTree}
+        formData={
+          {
+            ...(baseProps as Partial<PivotTableQueryFormData>),
+            groupbyRows: ['A', 'B', 'C', METRICS_PLACEHOLDER, 'D', 'E', 'F'],
+            groupbyColumns: [],
+            metricsLayout: MetricsLayoutEnum.ROWS,
+            metrics,
+            rowSubTotals: true,
+            rowSubtotalLevels: [1, 2, 3, 5],
+            rowSubtotalPosition: 'end',
+          } as PivotTableQueryFormData
+        }
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={[]}
+        aggregateFunction="Sum"
+        width={600}
+        height={300}
+        startCollapsed={false}
+        initialDepth={5}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals
+        colSubTotals={false}
+        rowSubtotalLevels={[1, 2, 3, 5]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        rowTotalPosition="start"
+        colSubtotalPosition="start"
+        colTotalPosition="start"
+        rowSubtotalPosition="end"
+      />,
+    );
+
+    const rowHeaders = Array.from(
+      container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
+    )
+      .map(cell => cell.textContent?.trim())
+      .filter((label): label is string => !!label);
+    const firstLeafIndex = rowHeaders.indexOf('F4');
+    const lastLeafIndex = rowHeaders.lastIndexOf('F4');
+    const totals = [
+      'C averageOrderValue',
+      'C weightedDiscount',
+      'B averageOrderValue',
+      'B weightedDiscount',
+      'A averageOrderValue',
+      'A weightedDiscount',
+    ];
+    const eTotalCount = rowHeaders.filter(label => label === 'E Total').length;
+
+    expect(rowHeaders).toEqual(expect.arrayContaining(totals));
+    totals.forEach(label => {
+      expect(rowHeaders.filter(item => item === label)).toHaveLength(1);
+      expect(rowHeaders.indexOf(label)).toBeGreaterThan(lastLeafIndex);
+    });
+    expect(firstLeafIndex).toBeGreaterThan(-1);
+    expect(rowHeaders.indexOf('E Total')).toBeGreaterThan(firstLeafIndex);
+    expect(rowHeaders.lastIndexOf('E Total')).toBeGreaterThan(lastLeafIndex);
+    expect(eTotalCount).toBe(2);
+    expect(rowHeaders).not.toContain('A Total');
+    expect(rowHeaders).not.toContain('B Total');
+    expect(rowHeaders).not.toContain('C Total');
+    expect(rowHeaders).not.toContain('D averageOrderValue');
+    expect(rowHeaders).not.toContain('D weightedDiscount');
+    expect(rowHeaders).not.toContain('E averageOrderValue');
+    expect(rowHeaders).not.toContain('E weightedDiscount');
+
+    const getRowIndent = (label: string) => {
+      const headerCell = screen.getAllByText(label)[0].closest(
+        'div',
+      ) as HTMLElement;
+      return Number.parseInt(headerCell.style.paddingLeft || '0', 10);
+    };
+    const indentA = getRowIndent('A');
+    const indentB = getRowIndent('B');
+    const indentC = getRowIndent('C');
+    const indentE = getRowIndent('E');
+    expect(getRowIndent('A averageOrderValue')).toBe(indentA);
+    expect(getRowIndent('A weightedDiscount')).toBe(indentA);
+    expect(getRowIndent('B averageOrderValue')).toBe(indentB);
+    expect(getRowIndent('B weightedDiscount')).toBe(indentB);
+    expect(getRowIndent('C averageOrderValue')).toBe(indentC);
+    expect(getRowIndent('C weightedDiscount')).toBe(indentC);
+    expect(getRowIndent('E Total')).toBe(indentE);
+
+    const eRow = screen.getAllByText(/^E$/)[0].closest(
+      'tr',
+    ) as HTMLTableRowElement;
+    const eCells = Array.from(eRow.querySelectorAll('td'));
+    expect(eCells.some(cell => cell.textContent?.trim())).toBe(false);
+  });
+
+  it('pushes A-E metric subtotals to the bottom when values are between E and F (layout 1)', () => {
+    const { labeledTree, metrics, rowGroupby } = buildVeryDeepMetricSubtotalTree(
+      [1, 2, 3, 4, 5],
+    );
+
+    const { container } = render(
+      <PivotTableChart
+        data={labeledTree}
+        formData={
+          {
+            ...(baseProps as Partial<PivotTableQueryFormData>),
+            groupbyRows: [
+              'A',
+              'B',
+              'C',
+              'D',
+              'E',
+              METRICS_PLACEHOLDER,
+              'F',
+              'G',
+              'H',
+              'I',
+              'J',
+            ],
+            groupbyColumns: [],
+            metricsLayout: MetricsLayoutEnum.ROWS,
+            metrics,
+            rowSubTotals: true,
+            rowSubtotalLevels: [1, 2, 3, 4, 5],
+            rowSubtotalPosition: 'start',
+          } as PivotTableQueryFormData
+        }
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={[]}
+        aggregateFunction="Sum"
+        width={600}
+        height={300}
+        startCollapsed={false}
+        initialDepth={7}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals
+        colSubTotals={false}
+        rowSubtotalLevels={[1, 2, 3, 4, 5]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        rowTotalPosition="start"
+        colSubtotalPosition="start"
+        colTotalPosition="start"
+        rowSubtotalPosition="start"
+      />,
+    );
+
+    const rowHeaders = Array.from(
+      container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
+    )
+      .map(cell => cell.textContent?.trim())
+      .filter((label): label is string => !!label);
+    const lastLeafIndex = rowHeaders.lastIndexOf('J3');
+    const totals = [
+      'A averageOrderValue',
+      'A weightedDiscount',
+      'B averageOrderValue',
+      'B weightedDiscount',
+      'C averageOrderValue',
+      'C weightedDiscount',
+      'D averageOrderValue',
+      'D weightedDiscount',
+      'E averageOrderValue',
+      'E weightedDiscount',
+    ];
+
+    expect(rowHeaders).toEqual(expect.arrayContaining(totals));
+    totals.forEach(label => {
+      expect(rowHeaders.filter(item => item === label)).toHaveLength(1);
+      const index = rowHeaders.indexOf(label);
+      if (index <= lastLeafIndex) {
+        throw new Error(
+          `layout1 order ${label} index=${index} lastLeafIndex=${lastLeafIndex} rows=${rowHeaders.join(
+            ' | ',
+          )}`,
+        );
+      }
+      expect(index).toBeGreaterThan(lastLeafIndex);
+    });
+    expect(rowHeaders).not.toContain('G Total');
+    expect(rowHeaders).not.toContain('H Total');
+    expect(rowHeaders).not.toContain('I Total');
+    expect(rowHeaders).not.toContain('A Total');
+    expect(rowHeaders).not.toContain('B Total');
+    expect(rowHeaders).not.toContain('C Total');
+    expect(rowHeaders).not.toContain('D Total');
+    expect(rowHeaders).not.toContain('E Total');
+
+    const getRowIndent = (label: string) => {
+      const headerCell = screen.getByText(label).closest('div') as HTMLElement;
+      return Number.parseInt(headerCell.style.paddingLeft || '0', 10);
+    };
+    const indentA = getRowIndent('A');
+    const indentB = getRowIndent('B');
+    const indentC = getRowIndent('C');
+    const indentD = getRowIndent('D');
+    const indentE = getRowIndent('E');
+    expect(getRowIndent('A averageOrderValue')).toBe(indentA);
+    expect(getRowIndent('A weightedDiscount')).toBe(indentA);
+    expect(getRowIndent('B averageOrderValue')).toBe(indentB);
+    expect(getRowIndent('B weightedDiscount')).toBe(indentB);
+    expect(getRowIndent('C averageOrderValue')).toBe(indentC);
+    expect(getRowIndent('C weightedDiscount')).toBe(indentC);
+    expect(getRowIndent('D averageOrderValue')).toBe(indentD);
+    expect(getRowIndent('D weightedDiscount')).toBe(indentD);
+    expect(getRowIndent('E averageOrderValue')).toBe(indentE);
+    expect(getRowIndent('E weightedDiscount')).toBe(indentE);
+  });
+
+  it('renders G/H/I totals under each metric branch and keeps A-E subtotals aligned (layout 2)', () => {
+    const { labeledTree, metrics, rowGroupby } = buildVeryDeepMetricSubtotalTree(
+      [1, 2, 3, 4, 5, 6, 7, 8, 9],
+    );
+
+    const { container } = render(
+      <PivotTableChart
+        data={labeledTree}
+        formData={
+          {
+            ...(baseProps as Partial<PivotTableQueryFormData>),
+            groupbyRows: [
+              'A',
+              'B',
+              'C',
+              'D',
+              'E',
+              METRICS_PLACEHOLDER,
+              'F',
+              'G',
+              'H',
+              'I',
+              'J',
+            ],
+            groupbyColumns: [],
+            metricsLayout: MetricsLayoutEnum.ROWS,
+            metrics,
+            rowSubTotals: true,
+            rowSubtotalLevels: [1, 2, 3, 4, 5, 6, 7, 8, 9],
+            rowSubtotalPosition: 'end',
+          } as PivotTableQueryFormData
+        }
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={[]}
+        aggregateFunction="Sum"
+        width={600}
+        height={300}
+        startCollapsed={false}
+        initialDepth={7}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals
+        colSubTotals={false}
+        rowSubtotalLevels={[1, 2, 3, 4, 5, 6, 7, 8, 9]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        rowTotalPosition="start"
+        colSubtotalPosition="start"
+        colTotalPosition="start"
+        rowSubtotalPosition="end"
+      />,
+    );
+
+    const rowHeaders = Array.from(
+      container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
+    )
+      .map(cell => cell.textContent?.trim())
+      .filter((label): label is string => !!label);
+    const totals = [
+      'A averageOrderValue',
+      'A weightedDiscount',
+      'B averageOrderValue',
+      'B weightedDiscount',
+      'C averageOrderValue',
+      'C weightedDiscount',
+      'D averageOrderValue',
+      'D weightedDiscount',
+      'E averageOrderValue',
+      'E weightedDiscount',
+    ];
+    const fTotals = rowHeaders.filter(label => label === 'F Total');
+    const gTotals = rowHeaders.filter(label => label === 'G Total');
+    const hTotals = rowHeaders.filter(label => label === 'H Total');
+    const iTotals = rowHeaders.filter(label => label === 'I Total');
+
+    expect(rowHeaders).toEqual(expect.arrayContaining(totals));
+    totals.forEach(label => {
+      expect(rowHeaders.filter(item => item === label)).toHaveLength(1);
+    });
+    expect(fTotals).toHaveLength(2);
+    expect(gTotals).toHaveLength(2);
+    expect(hTotals).toHaveLength(2);
+    expect(iTotals).toHaveLength(2);
+    expect(rowHeaders).not.toContain('F averageOrderValue');
+    expect(rowHeaders).not.toContain('F weightedDiscount');
+    expect(rowHeaders).not.toContain('G averageOrderValue');
+    expect(rowHeaders).not.toContain('G weightedDiscount');
+    expect(rowHeaders).not.toContain('H averageOrderValue');
+    expect(rowHeaders).not.toContain('H weightedDiscount');
+    expect(rowHeaders).not.toContain('I averageOrderValue');
+    expect(rowHeaders).not.toContain('I weightedDiscount');
+
+    const getRowIndent = (label: string) => {
+      const headerCell = screen.getAllByText(label)[0].closest(
+        'div',
+      ) as HTMLElement;
+      return Number.parseInt(headerCell.style.paddingLeft || '0', 10);
+    };
+    const indentA = getRowIndent('A');
+    const indentB = getRowIndent('B');
+    const indentC = getRowIndent('C');
+    const indentD = getRowIndent('D');
+    const indentE = getRowIndent('E');
+    const indentF = getRowIndent('F');
+    const indentG = getRowIndent('G');
+    const indentH = getRowIndent('H');
+    const indentI = getRowIndent('I');
+    expect(getRowIndent('A averageOrderValue')).toBe(indentA);
+    expect(getRowIndent('A weightedDiscount')).toBe(indentA);
+    expect(getRowIndent('B averageOrderValue')).toBe(indentB);
+    expect(getRowIndent('B weightedDiscount')).toBe(indentB);
+    expect(getRowIndent('C averageOrderValue')).toBe(indentC);
+    expect(getRowIndent('C weightedDiscount')).toBe(indentC);
+    expect(getRowIndent('D averageOrderValue')).toBe(indentD);
+    expect(getRowIndent('D weightedDiscount')).toBe(indentD);
+    expect(getRowIndent('E averageOrderValue')).toBe(indentE);
+    expect(getRowIndent('E weightedDiscount')).toBe(indentE);
+    screen.getAllByText('F Total').forEach(node => {
+      const indent = Number.parseInt(
+        (node.closest('div') as HTMLElement).style.paddingLeft || '0',
+        10,
+      );
+      expect(indent).toBe(indentF);
+    });
+    screen.getAllByText('G Total').forEach(node => {
+      const indent = Number.parseInt(
+        (node.closest('div') as HTMLElement).style.paddingLeft || '0',
+        10,
+      );
+      expect(indent).toBe(indentG);
+    });
+    screen.getAllByText('H Total').forEach(node => {
+      const indent = Number.parseInt(
+        (node.closest('div') as HTMLElement).style.paddingLeft || '0',
+        10,
+      );
+      expect(indent).toBe(indentH);
+    });
+    screen.getAllByText('I Total').forEach(node => {
+      const indent = Number.parseInt(
+        (node.closest('div') as HTMLElement).style.paddingLeft || '0',
+        10,
+      );
+      expect(indent).toBe(indentI);
+    });
+
+    const assertRowHasNoValues = (label: RegExp) => {
+      const rows = screen.getAllByText(label);
+      rows.forEach(node => {
+        const row = node.closest('tr') as HTMLTableRowElement;
+        const cells = Array.from(row.querySelectorAll('td'));
+        expect(cells.some(cell => cell.textContent?.trim())).toBe(false);
+      });
+    };
+    assertRowHasNoValues(/^F$/);
+    assertRowHasNoValues(/^G$/);
+    assertRowHasNoValues(/^H$/);
+    assertRowHasNoValues(/^I$/);
+  });
+
+  it('does not duplicate metric subtotals for the same group when multiple levels are enabled', () => {
     const { labeledTree, metrics, rowGroupby } = buildMetricSubtotalTree();
 
     const { container } = render(
@@ -3292,7 +4123,13 @@ describe('PivotTableChart totals & subtotals', () => {
       .map(cell => cell.textContent?.trim())
       .filter((label): label is string => !!label);
 
-    expect(rowHeaders.filter(label => label === '1-5 Total')).toHaveLength(1);
+    expect(rowHeaders.filter(label => label === '1-5 Total')).toHaveLength(0);
+    expect(
+      rowHeaders.filter(label => label === '1-5 averageOrderValue'),
+    ).toHaveLength(1);
+    expect(
+      rowHeaders.filter(label => label === '1-5 weightedDiscount'),
+    ).toHaveLength(1);
   });
 
   it('does not render metric total headers when metrics are the first column level', () => {

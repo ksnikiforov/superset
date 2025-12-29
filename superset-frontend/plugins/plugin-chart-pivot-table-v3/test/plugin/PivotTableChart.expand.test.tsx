@@ -28,6 +28,8 @@ import {
 import {
   applyMetricAxis,
   buildTreeFromRecords,
+  injectRowSubtotalLeaves,
+  labelRowSubtotalLeaves,
   METRICS_PLACEHOLDER,
   mergeTrees,
   serializePath,
@@ -3661,5 +3663,1137 @@ describe('PivotTableChart expansion with metrics between dimensions', () => {
       expect(within(avgRow).queryByLabelText('plus-square')).toBeNull();
     });
     expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders a single metric subtotal per orderPriority and removes it on collapse', async () => {
+    const metrics = ['averageOrderValue', 'weightedDiscount'];
+    const rowGroupby = ['orderPriority', 'shipMode', 'orderStatus'];
+    const colGroupby = ['shipInstruction', 'customerSegment', 'returnFlag'];
+    const rowSubtotalLevels = [1, 2];
+    const records = [
+      {
+        orderPriority: '1-URGENT',
+        shipMode: 'AIR',
+        orderStatus: 'F',
+        shipInstruction: 'COLLECT COD',
+        customerSegment: 'AUTO',
+        returnFlag: 'N',
+        averageOrderValue: 100,
+        weightedDiscount: 0.05,
+      },
+      {
+        orderPriority: '1-URGENT',
+        shipMode: 'FOB',
+        orderStatus: 'O',
+        shipInstruction: 'COLLECT COD',
+        customerSegment: 'AUTO',
+        returnFlag: 'N',
+        averageOrderValue: 110,
+        weightedDiscount: 0.06,
+      },
+    ];
+    const buildTreeAtDepth = (rowDepth: number) => {
+      const raw = buildTreeFromRecords(
+        records,
+        metrics,
+        rowGroupby,
+        colGroupby,
+        rowDepth,
+        1,
+      );
+      const withSubtotals = rowSubtotalLevels.reduce(
+        (acc, depth) => injectRowSubtotalLeaves(acc, depth, rowGroupby.length),
+        raw,
+      );
+      const withMetrics = applyMetricAxis(
+        withSubtotals,
+        metrics,
+        MetricsLayoutEnum.ROWS,
+        rowGroupby,
+        colGroupby,
+        rowGroupby.length,
+      );
+      return labelRowSubtotalLeaves(withMetrics, metrics);
+    };
+
+    const baseTree = buildTreeAtDepth(1);
+    const branchTree = buildTreeAtDepth(2);
+
+    fetchPivotBranchMock.mockResolvedValueOnce({ data: branchTree });
+
+    const { container, getByText } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={
+          {
+            groupbyRows: [...rowGroupby, METRICS_PLACEHOLDER],
+            groupbyColumns: colGroupby,
+            metrics,
+            metricsLayout: MetricsLayoutEnum.ROWS,
+            aggregateFunction: 'Sum',
+            rowTotals: false,
+            colTotals: false,
+            rowSubTotals: true,
+            colSubTotals: false,
+            rowSubtotalLevels,
+            startCollapsed: true,
+            initialDepth: 1,
+            maxDepthPerFetch: 1,
+            rowOrder: 'key_a_to_z',
+            colOrder: 'key_a_to_z',
+            viz_type: 'pivot_table_v3',
+            datasource: '1__table',
+            metricColorFormatters: [],
+            dateFormatters: {},
+            verboseMap: {},
+          } as PivotTableQueryFormData
+        }
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={colGroupby}
+        aggregateFunction="Sum"
+        width={500}
+        height={300}
+        startCollapsed
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={true}
+        colSubTotals={false}
+        rowSubtotalLevels={rowSubtotalLevels}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    const tbody = container.querySelector('tbody') as HTMLElement;
+    const urgentRow = getByText('1-URGENT').closest('tr') as HTMLElement;
+    fireEvent.click(within(urgentRow).getByLabelText('plus-square'));
+
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(
+      within(tbody).getAllByText('1-URGENT averageOrderValue'),
+    ).toHaveLength(1);
+    expect(
+      within(tbody).getAllByText('1-URGENT weightedDiscount'),
+    ).toHaveLength(1);
+    expect(within(tbody).queryByText('1-URGENT Total')).toBeNull();
+
+    const expandedUrgentRow = getByText('1-URGENT').closest(
+      'tr',
+    ) as HTMLElement;
+    fireEvent.click(within(expandedUrgentRow).getByLabelText('minus-square'));
+
+    await waitFor(() => {
+      expect(
+        within(tbody).queryByText('1-URGENT averageOrderValue'),
+      ).toBeNull();
+      expect(
+        within(tbody).queryByText('1-URGENT weightedDiscount'),
+      ).toBeNull();
+    });
+  });
+
+  it('hides non-metric totals when metrics sit between row dimensions', async () => {
+    const metrics = ['averageOrderValue', 'weightedDiscount'];
+    const rowGroupby = ['orderPriority', 'shipMode', 'orderStatus'];
+    const colGroupby = ['shipInstruction', 'customerSegment', 'returnFlag'];
+    const rowSubtotalLevels = [1, 2];
+    const records = [
+      {
+        orderPriority: '1-URGENT',
+        shipMode: 'AIR',
+        orderStatus: 'F',
+        shipInstruction: 'COLLECT COD',
+        customerSegment: 'AUTO',
+        returnFlag: 'N',
+        averageOrderValue: 100,
+        weightedDiscount: 0.05,
+      },
+      {
+        orderPriority: '1-URGENT',
+        shipMode: 'FOB',
+        orderStatus: 'O',
+        shipInstruction: 'COLLECT COD',
+        customerSegment: 'AUTO',
+        returnFlag: 'N',
+        averageOrderValue: 110,
+        weightedDiscount: 0.06,
+      },
+    ];
+    const buildTreeAtDepth = (rowDepth: number) => {
+      const raw = buildTreeFromRecords(
+        records,
+        metrics,
+        rowGroupby,
+        colGroupby,
+        rowDepth,
+        1,
+      );
+      const withSubtotals = rowSubtotalLevels.reduce(
+        (acc, depth) => injectRowSubtotalLeaves(acc, depth, rowGroupby.length),
+        raw,
+      );
+      const withMetrics = applyMetricAxis(
+        withSubtotals,
+        metrics,
+        MetricsLayoutEnum.ROWS,
+        rowGroupby,
+        colGroupby,
+        2,
+      );
+      return labelRowSubtotalLeaves(withMetrics, metrics);
+    };
+
+    const baseTree = buildTreeAtDepth(1);
+    const branchTree = buildTreeAtDepth(2);
+
+    fetchPivotBranchMock.mockResolvedValueOnce({ data: branchTree });
+
+    const { container, getByText } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={
+          {
+            groupbyRows: [
+              'orderPriority',
+              'shipMode',
+              METRICS_PLACEHOLDER,
+              'orderStatus',
+            ],
+            groupbyColumns: colGroupby,
+            metrics,
+            metricsLayout: MetricsLayoutEnum.ROWS,
+            aggregateFunction: 'Sum',
+            rowTotals: false,
+            colTotals: false,
+            rowSubTotals: true,
+            colSubTotals: false,
+            rowSubtotalLevels,
+            startCollapsed: true,
+            initialDepth: 1,
+            maxDepthPerFetch: 1,
+            rowOrder: 'key_a_to_z',
+            colOrder: 'key_a_to_z',
+            viz_type: 'pivot_table_v3',
+            datasource: '1__table',
+            metricColorFormatters: [],
+            dateFormatters: {},
+            verboseMap: {},
+          } as PivotTableQueryFormData
+        }
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={colGroupby}
+        aggregateFunction="Sum"
+        width={500}
+        height={300}
+        startCollapsed
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={true}
+        colSubTotals={false}
+        rowSubtotalLevels={rowSubtotalLevels}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    const tbody = container.querySelector('tbody') as HTMLElement;
+    const urgentRow = getByText('1-URGENT').closest('tr') as HTMLElement;
+    fireEvent.click(within(urgentRow).getByLabelText('plus-square'));
+
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(within(tbody).queryByText('1-URGENT Total')).toBeNull();
+  });
+
+  it('shows metric subtotals only when row subtotals are enabled', async () => {
+    const metrics = ['averageOrderValue', 'weightedDiscount'];
+    const rowGroupby = ['orderPriority', 'shipMode', 'orderStatus'];
+    const colGroupby = ['shipInstruction', 'customerSegment', 'returnFlag'];
+    const records = [
+      {
+        orderPriority: '1-URGENT',
+        shipMode: 'AIR',
+        orderStatus: 'F',
+        shipInstruction: 'COLLECT COD',
+        customerSegment: 'AUTO',
+        returnFlag: 'N',
+        averageOrderValue: 100,
+        weightedDiscount: 0.05,
+      },
+    ];
+    const buildTreeAtDepth = (rowDepth: number) =>
+      applyMetricAxis(
+        buildTreeFromRecords(
+          records,
+          metrics,
+          rowGroupby,
+          colGroupby,
+          rowDepth,
+          1,
+        ),
+        metrics,
+        MetricsLayoutEnum.ROWS,
+        rowGroupby,
+        colGroupby,
+        rowGroupby.length,
+      );
+
+    const baseTree = buildTreeAtDepth(1);
+    const branchTree = buildTreeAtDepth(2);
+
+    fetchPivotBranchMock.mockResolvedValueOnce({ data: branchTree });
+
+    const { container, getByText } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={
+          {
+            groupbyRows: [...rowGroupby, METRICS_PLACEHOLDER],
+            groupbyColumns: colGroupby,
+            metrics,
+            metricsLayout: MetricsLayoutEnum.ROWS,
+            aggregateFunction: 'Sum',
+            rowTotals: false,
+            colTotals: false,
+            rowSubTotals: false,
+            colSubTotals: false,
+            rowSubtotalLevels: [],
+            startCollapsed: true,
+            initialDepth: 1,
+            maxDepthPerFetch: 1,
+            rowOrder: 'key_a_to_z',
+            colOrder: 'key_a_to_z',
+            viz_type: 'pivot_table_v3',
+            datasource: '1__table',
+            metricColorFormatters: [],
+            dateFormatters: {},
+            verboseMap: {},
+          } as PivotTableQueryFormData
+        }
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={colGroupby}
+        aggregateFunction="Sum"
+        width={500}
+        height={300}
+        startCollapsed
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    const tbody = container.querySelector('tbody') as HTMLElement;
+    const urgentRow = getByText('1-URGENT').closest('tr') as HTMLElement;
+    fireEvent.click(within(urgentRow).getByLabelText('plus-square'));
+
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(within(tbody).queryByText('1-URGENT averageOrderValue')).toBeNull();
+    expect(within(tbody).queryByText('1-URGENT weightedDiscount')).toBeNull();
+    expect(within(tbody).queryByText('1-URGENT Total')).toBeNull();
+  });
+
+  it('expands Values to load orderStatus when metrics sit between shipMode and orderStatus', async () => {
+    const metrics = ['averageOrderValue', 'weightedDiscount'];
+    const rowGroupby = ['orderPriority', 'shipMode', 'orderStatus'];
+    const colGroupby = ['shipInstruction', 'customerSegment', 'returnFlag'];
+    const records = [
+      {
+        orderPriority: '1-URGENT',
+        shipMode: 'AIR',
+        orderStatus: 'F',
+        shipInstruction: 'COLLECT COD',
+        customerSegment: 'AUTO',
+        returnFlag: 'N',
+        averageOrderValue: 100,
+        weightedDiscount: 0.05,
+      },
+    ];
+    const buildTreeAtDepth = (rowDepth: number) =>
+      applyMetricAxis(
+        buildTreeFromRecords(
+          records,
+          metrics,
+          rowGroupby,
+          colGroupby,
+          rowDepth,
+          1,
+        ),
+        metrics,
+        MetricsLayoutEnum.ROWS,
+        rowGroupby,
+        colGroupby,
+        2,
+      );
+    const buildCollapsedBranch = (rowDepth: number) => {
+      const collapsedGroupby = ['orderPriority', 'orderStatus'];
+      return applyMetricAxis(
+        buildTreeFromRecords(
+          records,
+          metrics,
+          collapsedGroupby,
+          colGroupby,
+          rowDepth,
+          1,
+        ),
+        metrics,
+        MetricsLayoutEnum.ROWS,
+        collapsedGroupby,
+        colGroupby,
+        1,
+      );
+    };
+
+    const baseTree = buildTreeAtDepth(1);
+    const orderStatusBranch = buildCollapsedBranch(2);
+
+    fetchPivotBranchMock.mockResolvedValueOnce({ data: orderStatusBranch });
+
+    const { container } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={
+          {
+            groupbyRows: [
+              'orderPriority',
+              'shipMode',
+              METRICS_PLACEHOLDER,
+              'orderStatus',
+            ],
+            groupbyColumns: colGroupby,
+            metrics,
+            metricsLayout: MetricsLayoutEnum.ROWS,
+            aggregateFunction: 'Sum',
+            rowTotals: false,
+            colTotals: false,
+            rowSubTotals: false,
+            colSubTotals: false,
+            startCollapsed: true,
+            initialDepth: 1,
+            maxDepthPerFetch: 1,
+            rowOrder: 'key_a_to_z',
+            colOrder: 'key_a_to_z',
+            viz_type: 'pivot_table_v3',
+            datasource: '1__table',
+            metricColorFormatters: [],
+            dateFormatters: {},
+            verboseMap: {},
+          } as PivotTableQueryFormData
+        }
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={colGroupby}
+        aggregateFunction="Sum"
+        width={500}
+        height={300}
+        startCollapsed
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    const tbody = container.querySelector('tbody') as HTMLElement;
+    const metricLabel = within(tbody).getAllByText('averageOrderValue')[0];
+    const metricRow = metricLabel.closest('tr') as HTMLElement;
+    fireEvent.click(within(metricRow).getByLabelText('plus-square'));
+
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
+    });
+
+    expect(within(tbody).getByText(/^F$/)).toBeTruthy();
+  });
+
+  it('recalculates lower levels after expanding orderPriority above Values', async () => {
+    const metrics = ['averageOrderValue', 'weightedDiscount'];
+    const rowGroupby = ['orderPriority', 'shipMode', 'orderStatus'];
+    const colGroupby = ['shipInstruction', 'customerSegment', 'returnFlag'];
+    const records = [
+      {
+        orderPriority: '1-URGENT',
+        shipMode: 'AIR',
+        orderStatus: 'F',
+        shipInstruction: 'COLLECT COD',
+        customerSegment: 'AUTO',
+        returnFlag: 'N',
+        averageOrderValue: 100,
+        weightedDiscount: 0.05,
+      },
+      {
+        orderPriority: '1-URGENT',
+        shipMode: 'MAIL',
+        orderStatus: 'O',
+        shipInstruction: 'COLLECT COD',
+        customerSegment: 'AUTO',
+        returnFlag: 'N',
+        averageOrderValue: 110,
+        weightedDiscount: 0.06,
+      },
+    ];
+    const buildTreeAtDepth = (rowDepth: number) =>
+      applyMetricAxis(
+        buildTreeFromRecords(
+          records,
+          metrics,
+          rowGroupby,
+          colGroupby,
+          rowDepth,
+          1,
+        ),
+        metrics,
+        MetricsLayoutEnum.ROWS,
+        rowGroupby,
+        colGroupby,
+        2,
+      );
+
+    const buildCollapsedBranch = (rowDepth: number) => {
+      const collapsedGroupby = ['orderPriority', 'orderStatus'];
+      return applyMetricAxis(
+        buildTreeFromRecords(
+          records,
+          metrics,
+          collapsedGroupby,
+          colGroupby,
+          rowDepth,
+          1,
+        ),
+        metrics,
+        MetricsLayoutEnum.ROWS,
+        collapsedGroupby,
+        colGroupby,
+        1,
+      );
+    };
+
+    const baseTree = buildTreeAtDepth(1);
+    const orderStatusBranch = buildCollapsedBranch(2);
+    const shipModeBranch = buildTreeAtDepth(3);
+
+    fetchPivotBranchMock
+      .mockResolvedValueOnce({ data: orderStatusBranch })
+      .mockResolvedValueOnce({ data: shipModeBranch });
+
+    const { container, getByText } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={
+          {
+            groupbyRows: [
+              'orderPriority',
+              'shipMode',
+              METRICS_PLACEHOLDER,
+              'orderStatus',
+            ],
+            groupbyColumns: colGroupby,
+            metrics,
+            metricsLayout: MetricsLayoutEnum.ROWS,
+            aggregateFunction: 'Sum',
+            rowTotals: false,
+            colTotals: false,
+            rowSubTotals: false,
+            colSubTotals: false,
+            startCollapsed: true,
+            initialDepth: 1,
+            maxDepthPerFetch: 1,
+            rowOrder: 'key_a_to_z',
+            colOrder: 'key_a_to_z',
+            viz_type: 'pivot_table_v3',
+            datasource: '1__table',
+            metricColorFormatters: [],
+            dateFormatters: {},
+            verboseMap: {},
+          } as PivotTableQueryFormData
+        }
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={colGroupby}
+        aggregateFunction="Sum"
+        width={500}
+        height={300}
+        startCollapsed
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    const tbody = container.querySelector('tbody') as HTMLElement;
+    const metricLabel = within(tbody).getAllByText('averageOrderValue')[0];
+    const metricRow = metricLabel.closest('tr') as HTMLElement;
+    fireEvent.click(within(metricRow).getByLabelText('plus-square'));
+
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
+    });
+
+    const orderPriorityRow = getByText('1-URGENT').closest(
+      'tr',
+    ) as HTMLElement;
+    fireEvent.click(within(orderPriorityRow).getByLabelText('plus-square'));
+
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
+    });
+
+    const rows = Array.from(tbody.querySelectorAll('tr'));
+    const shipModeRow = getByText('AIR').closest('tr') as HTMLElement;
+    const shipModeIndex = rows.indexOf(shipModeRow);
+    const shipModeMetricRow = rows
+      .slice(shipModeIndex + 1)
+      .find(row => within(row).queryByText('averageOrderValue')) as
+      | HTMLElement
+      | undefined;
+    expect(shipModeMetricRow).toBeTruthy();
+    expect(
+      within(shipModeMetricRow as HTMLElement).getByLabelText('minus-square'),
+    ).toBeTruthy();
+    expect(
+      within(shipModeMetricRow as HTMLElement).queryByLabelText('plus-square'),
+    ).toBeNull();
+    const statusRow = rows
+      .slice(rows.indexOf(shipModeMetricRow as HTMLElement) + 1)
+      .find(row => within(row).queryByText(/^F$/)) as
+      | HTMLElement
+      | undefined;
+    expect(statusRow).toBeTruthy();
+  });
+
+  it('keeps orderStatus rows under Values after expanding orderPriority', async () => {
+    const metrics = ['averageOrderValue', 'weightedDiscount'];
+    const rowGroupby = ['orderPriority', 'shipMode', 'orderStatus'];
+    const colGroupby = ['shipInstruction', 'customerSegment', 'returnFlag'];
+    const records = [
+      {
+        orderPriority: '1-URGENT',
+        shipMode: 'AIR',
+        orderStatus: 'F',
+        shipInstruction: 'COLLECT COD',
+        customerSegment: 'AUTO',
+        returnFlag: 'N',
+        averageOrderValue: 100,
+        weightedDiscount: 0.05,
+      },
+      {
+        orderPriority: '1-URGENT',
+        shipMode: 'MAIL',
+        orderStatus: 'O',
+        shipInstruction: 'COLLECT COD',
+        customerSegment: 'AUTO',
+        returnFlag: 'N',
+        averageOrderValue: 110,
+        weightedDiscount: 0.06,
+      },
+    ];
+    const buildTreeAtDepth = (rowDepth: number) =>
+      applyMetricAxis(
+        buildTreeFromRecords(
+          records,
+          metrics,
+          rowGroupby,
+          colGroupby,
+          rowDepth,
+          1,
+        ),
+        metrics,
+        MetricsLayoutEnum.ROWS,
+        rowGroupby,
+        colGroupby,
+        2,
+      );
+
+    const buildCollapsedBranch = (rowDepth: number) => {
+      const collapsedGroupby = ['orderPriority', 'orderStatus'];
+      return applyMetricAxis(
+        buildTreeFromRecords(
+          records,
+          metrics,
+          collapsedGroupby,
+          colGroupby,
+          rowDepth,
+          1,
+        ),
+        metrics,
+        MetricsLayoutEnum.ROWS,
+        collapsedGroupby,
+        colGroupby,
+        1,
+      );
+    };
+
+    const baseTree = buildTreeAtDepth(1);
+    const orderStatusBranch = buildCollapsedBranch(2);
+    const shipModeBranch = buildTreeAtDepth(3);
+
+    fetchPivotBranchMock
+      .mockResolvedValueOnce({ data: orderStatusBranch })
+      .mockResolvedValueOnce({ data: shipModeBranch });
+
+    const { container, getByText } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={
+          {
+            groupbyRows: [
+              'orderPriority',
+              'shipMode',
+              METRICS_PLACEHOLDER,
+              'orderStatus',
+            ],
+            groupbyColumns: colGroupby,
+            metrics,
+            metricsLayout: MetricsLayoutEnum.ROWS,
+            aggregateFunction: 'Sum',
+            rowTotals: false,
+            colTotals: false,
+            rowSubTotals: false,
+            colSubTotals: false,
+            startCollapsed: true,
+            initialDepth: 1,
+            maxDepthPerFetch: 1,
+            rowOrder: 'key_a_to_z',
+            colOrder: 'key_a_to_z',
+            viz_type: 'pivot_table_v3',
+            datasource: '1__table',
+            metricColorFormatters: [],
+            dateFormatters: {},
+            verboseMap: {},
+          } as PivotTableQueryFormData
+        }
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={colGroupby}
+        aggregateFunction="Sum"
+        width={500}
+        height={300}
+        startCollapsed
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    const tbody = container.querySelector('tbody') as HTMLElement;
+    const metricLabel = within(tbody).getAllByText('averageOrderValue')[0];
+    const metricRow = metricLabel.closest('tr') as HTMLElement;
+    fireEvent.click(within(metricRow).getByLabelText('plus-square'));
+
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
+    });
+
+    const orderPriorityRow = getByText('1-URGENT').closest(
+      'tr',
+    ) as HTMLElement;
+    fireEvent.click(within(orderPriorityRow).getByLabelText('plus-square'));
+
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
+    });
+
+    expect(within(tbody).getAllByText(/^F$/)).toHaveLength(1);
+    expect(within(tbody).getAllByText(/^O$/)).toHaveLength(1);
+  });
+
+  it('keeps column values out of row headers when expanding above Values', async () => {
+    const metrics = ['averageOrderValue', 'weightedDiscount'];
+    const rowGroupby = ['orderPriority', 'shipMode', 'orderStatus'];
+    const colGroupby = ['shipInstruction', 'customerSegment', 'returnFlag'];
+    const records = [
+      {
+        orderPriority: '1-URGENT',
+        shipMode: 'AIR',
+        orderStatus: 'F',
+        shipInstruction: 'COLLECT COD',
+        customerSegment: 'AUTO',
+        returnFlag: 'N',
+        averageOrderValue: 100,
+        weightedDiscount: 0.05,
+      },
+      {
+        orderPriority: '1-URGENT',
+        shipMode: 'FOB',
+        orderStatus: 'O',
+        shipInstruction: 'DELIVER IN PERSON',
+        customerSegment: 'AUTO',
+        returnFlag: 'N',
+        averageOrderValue: 110,
+        weightedDiscount: 0.06,
+      },
+    ];
+    const buildTreeAtDepth = (rowDepth: number) =>
+      applyMetricAxis(
+        buildTreeFromRecords(
+          records,
+          metrics,
+          rowGroupby,
+          colGroupby,
+          rowDepth,
+          1,
+        ),
+        metrics,
+        MetricsLayoutEnum.ROWS,
+        rowGroupby,
+        colGroupby,
+        2,
+      );
+
+    const buildCollapsedBranch = (rowDepth: number) => {
+      const collapsedGroupby = ['orderPriority', 'orderStatus'];
+      return applyMetricAxis(
+        buildTreeFromRecords(
+          records,
+          metrics,
+          collapsedGroupby,
+          colGroupby,
+          rowDepth,
+          1,
+        ),
+        metrics,
+        MetricsLayoutEnum.ROWS,
+        collapsedGroupby,
+        colGroupby,
+        1,
+      );
+    };
+
+    const baseTree = buildTreeAtDepth(1);
+    const orderStatusBranch = buildCollapsedBranch(2);
+    const shipModeBranch = buildTreeAtDepth(3);
+
+    fetchPivotBranchMock
+      .mockResolvedValueOnce({ data: orderStatusBranch })
+      .mockResolvedValueOnce({ data: shipModeBranch });
+
+    const { container, getByText } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={
+          {
+            groupbyRows: [
+              'orderPriority',
+              'shipMode',
+              METRICS_PLACEHOLDER,
+              'orderStatus',
+            ],
+            groupbyColumns: colGroupby,
+            metrics,
+            metricsLayout: MetricsLayoutEnum.ROWS,
+            aggregateFunction: 'Sum',
+            rowTotals: false,
+            colTotals: false,
+            rowSubTotals: false,
+            colSubTotals: false,
+            startCollapsed: true,
+            initialDepth: 1,
+            maxDepthPerFetch: 1,
+            rowOrder: 'key_a_to_z',
+            colOrder: 'key_a_to_z',
+            viz_type: 'pivot_table_v3',
+            datasource: '1__table',
+            metricColorFormatters: [],
+            dateFormatters: {},
+            verboseMap: {},
+          } as PivotTableQueryFormData
+        }
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={colGroupby}
+        aggregateFunction="Sum"
+        width={500}
+        height={300}
+        startCollapsed
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    const tbody = container.querySelector('tbody') as HTMLElement;
+    const thead = container.querySelector('thead') as HTMLElement;
+    const metricLabel = within(tbody).getAllByText('averageOrderValue')[0];
+    const metricRow = metricLabel.closest('tr') as HTMLElement;
+    fireEvent.click(within(metricRow).getByLabelText('plus-square'));
+
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
+    });
+
+    const orderPriorityRow = getByText('1-URGENT').closest(
+      'tr',
+    ) as HTMLElement;
+    fireEvent.click(within(orderPriorityRow).getByLabelText('plus-square'));
+
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
+    });
+
+    expect(within(thead).getByText('COLLECT COD')).toBeTruthy();
+    expect(within(thead).getByText('DELIVER IN PERSON')).toBeTruthy();
+    expect(within(tbody).queryByText('COLLECT COD')).toBeNull();
+    expect(within(tbody).queryByText('DELIVER IN PERSON')).toBeNull();
+    expect(within(tbody).getByText('AIR')).toBeTruthy();
+    expect(within(tbody).getByText('FOB')).toBeTruthy();
+  });
+
+  it('expands Values and orderStatus when another level follows', async () => {
+    const metrics = ['averageOrderValue', 'weightedDiscount'];
+    const rowGroupby = [
+      'orderPriority',
+      'shipMode',
+      'orderStatus',
+      'orderClass',
+    ];
+    const colGroupby = ['shipInstruction', 'customerSegment', 'returnFlag'];
+    const records = [
+      {
+        orderPriority: '1-URGENT',
+        shipMode: 'AIR',
+        orderStatus: 'F',
+        orderClass: 'A',
+        shipInstruction: 'COLLECT COD',
+        customerSegment: 'AUTO',
+        returnFlag: 'N',
+        averageOrderValue: 100,
+        weightedDiscount: 0.05,
+      },
+    ];
+    const buildTreeAtDepth = (rowDepth: number) =>
+      applyMetricAxis(
+        buildTreeFromRecords(
+          records,
+          metrics,
+          rowGroupby,
+          colGroupby,
+          rowDepth,
+          1,
+        ),
+        metrics,
+        MetricsLayoutEnum.ROWS,
+        rowGroupby,
+        colGroupby,
+        2,
+      );
+
+    const buildCollapsedBranch = (rowDepth: number, collapsedGroupby: string[]) =>
+      applyMetricAxis(
+        buildTreeFromRecords(
+          records,
+          metrics,
+          collapsedGroupby,
+          colGroupby,
+          rowDepth,
+          1,
+        ),
+        metrics,
+        MetricsLayoutEnum.ROWS,
+        collapsedGroupby,
+        colGroupby,
+        1,
+      );
+
+    const baseTree = buildTreeAtDepth(1);
+    const orderStatusBranch = buildCollapsedBranch(2, [
+      'orderPriority',
+      'orderStatus',
+      'orderClass',
+    ]);
+    const orderClassBranch = buildCollapsedBranch(3, [
+      'orderPriority',
+      'orderStatus',
+      'orderClass',
+    ]);
+
+    fetchPivotBranchMock
+      .mockResolvedValueOnce({ data: orderStatusBranch })
+      .mockResolvedValueOnce({ data: orderClassBranch });
+
+    const { container } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={
+          {
+            groupbyRows: [
+              'orderPriority',
+              'shipMode',
+              METRICS_PLACEHOLDER,
+              'orderStatus',
+              'orderClass',
+            ],
+            groupbyColumns: colGroupby,
+            metrics,
+            metricsLayout: MetricsLayoutEnum.ROWS,
+            aggregateFunction: 'Sum',
+            rowTotals: false,
+            colTotals: false,
+            rowSubTotals: false,
+            colSubTotals: false,
+            startCollapsed: true,
+            initialDepth: 1,
+            maxDepthPerFetch: 1,
+            rowOrder: 'key_a_to_z',
+            colOrder: 'key_a_to_z',
+            viz_type: 'pivot_table_v3',
+            datasource: '1__table',
+            metricColorFormatters: [],
+            dateFormatters: {},
+            verboseMap: {},
+          } as PivotTableQueryFormData
+        }
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={colGroupby}
+        aggregateFunction="Sum"
+        width={500}
+        height={300}
+        startCollapsed
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    const tbody = container.querySelector('tbody') as HTMLElement;
+    const metricLabel = within(tbody).getAllByText('averageOrderValue')[0];
+    const metricRow = metricLabel.closest('tr') as HTMLElement;
+    fireEvent.click(within(metricRow).getByLabelText('plus-square'));
+
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
+    });
+
+    const statusRow = within(tbody).getByText(/^F$/).closest(
+      'tr',
+    ) as HTMLElement;
+    fireEvent.click(within(statusRow).getByLabelText('plus-square'));
+
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
+    });
+
+    expect(within(tbody).getByText('A')).toBeTruthy();
   });
 });

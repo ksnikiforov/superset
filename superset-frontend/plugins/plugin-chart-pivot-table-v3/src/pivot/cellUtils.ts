@@ -77,7 +77,10 @@ export const shouldHideRowValues = ({
   if (rowNode.path.length === 0 || isExplicitSubtotalNode(rowNode)) {
     return false;
   }
-  if (rowNode.path.some(val => metricLabelSet.has(String(val ?? '')))) {
+  const metricIndex = rowNode.path.findIndex(val =>
+    metricLabelSet.has(String(val ?? '')),
+  );
+  if (metricIndex === rowNode.path.length - 1) {
     return false;
   }
   if (!rowNode.hasChildren) {

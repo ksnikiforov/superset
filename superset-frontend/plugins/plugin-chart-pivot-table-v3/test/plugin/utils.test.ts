@@ -485,7 +485,7 @@ describe('labelRowSubtotalLeaves', () => {
     expect(labeled.rows[subtotalKey]?.formattedLabel).toBe('Bikes Total');
   });
 
-  it('uses "<Group> Total" when the subtotal token follows a metric', () => {
+  it('uses "<Group> <Metric>" when the subtotal token follows a metric', () => {
     const rootKey = serializePath([]);
     const subtotalKey = serializePath(['Bikes', 'metric1', SUBTOTAL_TOKEN]);
     const tree: PivotTreeData = {
@@ -527,7 +527,7 @@ describe('labelRowSubtotalLeaves', () => {
     };
 
     const labeled = labelRowSubtotalLeaves(tree, ['metric1', 'metric2']);
-    expect(labeled.rows[subtotalKey]?.label).toBe('Bikes Total');
-    expect(labeled.rows[subtotalKey]?.formattedLabel).toBe('Bikes Total');
+    expect(labeled.rows[subtotalKey]?.label).toBe('Bikes metric1');
+    expect(labeled.rows[subtotalKey]?.formattedLabel).toBe('Bikes metric1');
   });
 });

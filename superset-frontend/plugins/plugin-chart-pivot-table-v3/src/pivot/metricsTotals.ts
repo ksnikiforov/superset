@@ -29,6 +29,7 @@ type NodeDepthConfig = {
   metricLabelSet: Set<string>;
   metricsLayout: MetricsLayoutEnum;
   hideMetricHeaderOnRows: boolean;
+  metricLayoutIndexOnRows?: number;
 };
 
 export const getMetricLabelFromPath = (
@@ -188,9 +189,31 @@ export const isExplicitTotalNode = (
 
 export const getNodeDimDepth = (
   node: PivotTreeNode,
-  { metricLabelSet, metricsLayout, hideMetricHeaderOnRows }: NodeDepthConfig,
+  {
+    metricLabelSet,
+    metricsLayout,
+    hideMetricHeaderOnRows,
+    metricLayoutIndexOnRows,
+  }: NodeDepthConfig,
 ) => {
   const dimDepth = countDimDepth(node.path, metricLabelSet);
+  const subtotalTokenCount = node.path.filter(
+    val => isSubtotalToken(val) || val === 'Total',
+  ).length;
+  const subtotalIndex = node.path.findIndex(
+    val => isSubtotalToken(val) || val === 'Total',
+  );
+  const metricIndex = node.path.findIndex(val =>
+    metricLabelSet.has(String(val ?? '')),
+  );
+  const boundarySubtotal =
+    metricsLayout === MetricsLayoutEnum.ROWS &&
+    metricLayoutIndexOnRows === 1 &&
+    subtotalIndex === metricLayoutIndexOnRows &&
+    metricIndex > subtotalIndex;
+  const adjustedDimDepth = boundarySubtotal
+    ? dimDepth
+    : Math.max(dimDepth - subtotalTokenCount, 0);
   const hasMetric = node.path.some(val =>
     metricLabelSet.has(String(val ?? '')),
   );
@@ -200,6 +223,18 @@ export const getNodeDimDepth = (
     hasMetric
       ? 1
       : 0;
-  const depth = dimDepth + metricDepth;
-  return isExplicitSubtotalNode(node) ? Math.max(depth - 1, 0) : depth;
+  const depth = adjustedDimDepth + metricDepth;
+  if (!isExplicitSubtotalNode(node)) {
+    return depth;
+  }
+  const shouldOffsetSubtotal =
+    subtotalIndex >= 0 && (metricIndex < 0 || metricIndex > subtotalIndex);
+  const skipOffsetAtBoundary =
+    metricsLayout === MetricsLayoutEnum.ROWS &&
+    metricLayoutIndexOnRows === 1 &&
+    subtotalIndex === metricLayoutIndexOnRows &&
+    metricIndex > subtotalIndex;
+  return shouldOffsetSubtotal && !skipOffsetAtBoundary
+    ? Math.max(depth - 1, 0)
+    : depth;
 };

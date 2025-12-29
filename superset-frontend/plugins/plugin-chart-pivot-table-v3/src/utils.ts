@@ -170,10 +170,12 @@ export const labelRowSubtotalLeaves = (
       return;
     }
     let baseLabel = '';
+    let baseLabelIndex: number | undefined;
     for (let i = subtotalIndex - 1; i >= 0; i -= 1) {
       const val = node.path[i];
       if (!metricLabels.has(String(val ?? '')) && !isSubtotalToken(val)) {
         baseLabel = String(val ?? '');
+        baseLabelIndex = i;
         break;
       }
     }
@@ -181,10 +183,12 @@ export const labelRowSubtotalLeaves = (
       return;
     }
     let metricLabel: string | undefined;
+    let metricLabelIndex: number | undefined;
     for (let i = subtotalIndex + 1; i < node.path.length; i += 1) {
       const val = node.path[i];
       if (metricLabels.has(String(val ?? ''))) {
         metricLabel = String(val ?? '');
+        metricLabelIndex = i;
         break;
       }
     }
@@ -192,15 +196,22 @@ export const labelRowSubtotalLeaves = (
       for (let i = subtotalIndex - 1; i >= 0; i -= 1) {
         const val = node.path[i];
         if (metricLabels.has(String(val ?? ''))) {
+          metricLabel = String(val ?? '');
+          metricLabelIndex = i;
           break;
         }
       }
     }
-    const hasMetricAfterSubtotal = !!metricLabel;
-    const nextLabel =
-      !isSingleMetric && hasMetricAfterSubtotal
-        ? `${baseLabel} ${metricLabel}`
-        : `${baseLabel} Total`;
+    const hasMetricLabel = !!metricLabel;
+    const metricBeforeBase =
+      metricLabelIndex !== undefined &&
+      baseLabelIndex !== undefined &&
+      metricLabelIndex < baseLabelIndex;
+    const useMetricLabel =
+      !isSingleMetric && hasMetricLabel && !metricBeforeBase;
+    const nextLabel = useMetricLabel
+      ? `${baseLabel} ${metricLabel}`
+      : `${baseLabel} Total`;
     if (node.label !== nextLabel || node.formattedLabel !== nextLabel) {
       nextRows[node.key] = {
         ...node,
@@ -480,7 +491,12 @@ export const applyMetricAxis = (
       const rowKey = serializePath(rowPath);
 
       metricKeys.forEach(metric => {
-        const newRowPath = [...rowPrefix, metric, ...rowSuffix];
+        const hasSubtotalAtInsert =
+          rowSuffix.length > 0 &&
+          (isSubtotalToken(rowSuffix[0]) || rowSuffix[0] === 'Total');
+        const newRowPath = hasSubtotalAtInsert
+          ? [...rowPrefix, rowSuffix[0], metric, ...rowSuffix.slice(1)]
+          : [...rowPrefix, metric, ...rowSuffix];
         // ensure row hierarchy nodes
         for (let depth = 0; depth <= newRowPath.length; depth += 1) {
           const subPath = newRowPath.slice(0, depth);
