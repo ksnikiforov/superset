@@ -19,6 +19,7 @@
 import React from 'react';
 import {
   ControlPanelConfig,
+  ControlSubSectionHeader,
   D3_TIME_FORMAT_OPTIONS,
   getStandardizedControls,
   sharedControls,
@@ -279,6 +280,11 @@ const config: ControlPanelConfig = {
       expanded: true,
       controlSetRows: [
         [
+          <ControlSubSectionHeader key="pivot-expansion">
+            {t('Expansion')}
+          </ControlSubSectionHeader>,
+        ],
+        [
           {
             name: 'startCollapsed',
             config: {
@@ -306,17 +312,11 @@ const config: ControlPanelConfig = {
               ),
             },
           },
-          {
-            name: 'maxDepthPerFetch',
-            config: {
-              type: 'TextControl',
-              label: t('Max depth per fetch'),
-              default: 1,
-              isInt: true,
-              renderTrigger: true,
-              description: t('Depth fetched for each expanded branch.'),
-            },
-          },
+        ],
+        [
+          <ControlSubSectionHeader key="pivot-row-options">
+            {t('Row options')}
+          </ControlSubSectionHeader>,
         ],
         [
           {
@@ -330,13 +330,18 @@ const config: ControlPanelConfig = {
             },
           },
           {
-            name: 'colTotals',
+            name: 'rowTotalPosition',
             config: {
-              type: 'CheckboxControl',
-              label: t('Column total'),
-              description: t('Show grand total for columns.'),
-              default: false,
+              type: 'SelectControl',
+              label: t('Row total position'),
+              description: t('Show the row grand total at the top or bottom.'),
+              clearable: false,
+              default: 'start',
               renderTrigger: true,
+              choices: [
+                ['start', t('Top')],
+                ['end', t('Bottom')],
+              ],
             },
           },
         ],
@@ -363,6 +368,53 @@ const config: ControlPanelConfig = {
               choices: [
                 ['start', t('Top')],
                 ['end', t('Bottom')],
+              ],
+            },
+          },
+        ],
+        [
+          {
+            name: 'rowOrder',
+            config: {
+              type: 'SelectControl',
+              label: t('Sort rows by'),
+              default: 'key_a_to_z',
+              choices: [
+                ['key_a_to_z', t('key a-z')],
+                ['key_z_to_a', t('key z-a')],
+              ],
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          <ControlSubSectionHeader key="pivot-column-options">
+            {t('Column options')}
+          </ControlSubSectionHeader>,
+        ],
+        [
+          {
+            name: 'colTotals',
+            config: {
+              type: 'CheckboxControl',
+              label: t('Column total'),
+              description: t('Show grand total for columns.'),
+              default: false,
+              renderTrigger: true,
+            },
+          },
+          {
+            name: 'colTotalPosition',
+            config: {
+              type: 'SelectControl',
+              label: t('Column total position'),
+              description: t('Place the grand total column at the start or end.'),
+              clearable: false,
+              default: 'start',
+              renderTrigger: true,
+              choices: [
+                ['start', t('Front')],
+                ['end', t('End')],
               ],
             },
           },
@@ -411,38 +463,6 @@ const config: ControlPanelConfig = {
         ],
         [
           {
-            name: 'rowTotalPosition',
-            config: {
-              type: 'SelectControl',
-              label: t('Row total position'),
-              description: t('Show the row grand total at the top or bottom.'),
-              clearable: false,
-              default: 'start',
-              renderTrigger: true,
-              choices: [
-                ['start', t('Top')],
-                ['end', t('Bottom')],
-              ],
-            },
-          },
-          {
-            name: 'colTotalPosition',
-            config: {
-              type: 'SelectControl',
-              label: t('Column total position'),
-              description: t('Place the grand total column at the start or end.'),
-              clearable: false,
-              default: 'start',
-              renderTrigger: true,
-              choices: [
-                ['start', t('Front')],
-                ['end', t('End')],
-              ],
-            },
-          },
-        ],
-        [
-          {
             name: 'colSubtotalPosition',
             config: {
               type: 'SelectControl',
@@ -457,6 +477,26 @@ const config: ControlPanelConfig = {
               ],
             },
           },
+        ],
+        [
+          {
+            name: 'colOrder',
+            config: {
+              type: 'SelectControl',
+              label: t('Sort columns by'),
+              default: 'key_a_to_z',
+              choices: [
+                ['key_a_to_z', t('key a-z')],
+                ['key_z_to_a', t('key z-a')],
+              ],
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          <ControlSubSectionHeader key="pivot-theme">
+            {t('Theme')}
+          </ControlSubSectionHeader>,
         ],
         [
           {
@@ -499,32 +539,9 @@ const config: ControlPanelConfig = {
           },
         ],
         [
-          {
-            name: 'rowOrder',
-            config: {
-              type: 'SelectControl',
-              label: t('Sort rows by'),
-              default: 'key_a_to_z',
-              choices: [
-                ['key_a_to_z', t('key a-z')],
-                ['key_z_to_a', t('key z-a')],
-              ],
-              renderTrigger: true,
-            },
-          },
-          {
-            name: 'colOrder',
-            config: {
-              type: 'SelectControl',
-              label: t('Sort columns by'),
-              default: 'key_a_to_z',
-              choices: [
-                ['key_a_to_z', t('key a-z')],
-                ['key_z_to_a', t('key z-a')],
-              ],
-              renderTrigger: true,
-            },
-          },
+          <ControlSubSectionHeader key="pivot-formatting">
+            {t('Formatting')}
+          </ControlSubSectionHeader>,
         ],
         [
           {
@@ -582,6 +599,7 @@ const config: ControlPanelConfig = {
       metricsLayout: resolved.layout,
       groupbyRows: resolved.rows,
       groupbyColumns: resolved.cols,
+      maxDepthPerFetch: 1,
     };
   },
 };

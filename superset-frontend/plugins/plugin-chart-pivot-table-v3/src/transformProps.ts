@@ -100,6 +100,7 @@ export default function transformProps(
     (formData.colSubtotalPosition as TotalPosition) || 'start';
   const pivotTheme = formData.pivotTheme || 'none';
   const pivotThemeColors = formData.pivotThemeColors || '';
+  const maxDepthPerFetch = 1;
   const metricsLayout = placement.layout;
   const metricInsertIndex =
     metricsLayout === MetricsLayoutEnum.ROWS
@@ -283,14 +284,14 @@ export default function transformProps(
     height,
     margin: (formData as any).margin ?? 0,
     data: nextTreeLabeled,
-    formData: { ...formData, metricsLayout },
+    formData: { ...formData, metricsLayout, maxDepthPerFetch },
     metrics,
     groupbyRows,
     groupbyColumns,
     aggregateFunction: formData.aggregateFunction,
     startCollapsed: formData.startCollapsed ?? true,
     initialDepth: formData.initialDepth ?? 1,
-    maxDepthPerFetch: formData.maxDepthPerFetch,
+    maxDepthPerFetch,
     rowTotals: formData.rowTotals,
     colTotals: formData.colTotals,
     rowSubTotals: rowSubTotalsEnabled,

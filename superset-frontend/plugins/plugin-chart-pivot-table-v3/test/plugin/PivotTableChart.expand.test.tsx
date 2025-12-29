@@ -2279,7 +2279,7 @@ describe('PivotTableChart expansion with metrics before dimensions', () => {
           height={500}
           startCollapsed
           initialDepth={1}
-          maxDepthPerFetch={2}
+          maxDepthPerFetch={1}
           rowTotals={false}
           colTotals={false}
           rowSubTotals={false}
