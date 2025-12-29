@@ -2729,6 +2729,438 @@ describe('PivotTableChart totals & subtotals', () => {
     expect(totalValue.textContent?.trim()).toBe('100');
   });
 
+  describe('metric grand totals with metrics between row dimensions', () => {
+    const buildMetrics = (count: number) =>
+      Array.from({ length: count }, (_, idx) => `A_METRIC_${idx + 1}`);
+
+    const buildMetricTotalsTree = (metrics: string[]) => {
+      const rowGroupby = [
+        'shipMode',
+        'orderPriority',
+        'returnFlag',
+        'shipInstruction',
+      ];
+      const colGroupby = ['lineStatus'];
+      const buildMetricValues = (base: number) =>
+        metrics.reduce(
+          (acc, metric, idx) => ({ ...acc, [metric]: base + idx }),
+          {} as Record<string, number>,
+        );
+      const detail = buildTreeFromRecords(
+        [
+          {
+            shipMode: 'AIR',
+            orderPriority: '1-URGENT',
+            returnFlag: 'N',
+            shipInstruction: 'DELIVER IN PERSON',
+            lineStatus: 'F',
+            ...buildMetricValues(10),
+          },
+          {
+            shipMode: 'FOB',
+            orderPriority: '2-HIGH',
+            returnFlag: 'N',
+            shipInstruction: 'DELIVER IN PERSON',
+            lineStatus: 'O',
+            ...buildMetricValues(20),
+          },
+        ],
+        metrics,
+        rowGroupby,
+        colGroupby,
+        2,
+        1,
+      );
+      const totals = buildTreeFromRecords(
+        [
+          { lineStatus: 'F', ...buildMetricValues(100) },
+          { lineStatus: 'O', ...buildMetricValues(200) },
+        ],
+        metrics,
+        rowGroupby,
+        colGroupby,
+        0,
+        1,
+      );
+      return applyMetricAxis(
+        mergeTrees(detail, totals),
+        metrics,
+        MetricsLayoutEnum.ROWS,
+        rowGroupby,
+        colGroupby,
+        2,
+      );
+    };
+
+    it.each([2, 3, 4, 5])(
+      'places metric grand totals after ship modes with %i metrics',
+      metricCount => {
+        const metrics = buildMetrics(metricCount);
+        const tree = buildMetricTotalsTree(metrics);
+        const { container } = render(
+          <PivotTableChart
+            data={tree}
+            formData={
+              {
+                ...(baseProps as Partial<PivotTableQueryFormData>),
+                groupbyRows: [
+                  'shipMode',
+                  'orderPriority',
+                  METRICS_PLACEHOLDER,
+                  'returnFlag',
+                  'shipInstruction',
+                ],
+                groupbyColumns: ['lineStatus'],
+                metricsLayout: MetricsLayoutEnum.ROWS,
+                metrics,
+                rowTotals: true,
+                rowTotalPosition: 'end',
+              } as PivotTableQueryFormData
+            }
+            metrics={metrics}
+            groupbyRows={[
+              'shipMode',
+              'orderPriority',
+              'returnFlag',
+              'shipInstruction',
+            ]}
+            groupbyColumns={['lineStatus']}
+            aggregateFunction="Sum"
+            width={600}
+            height={300}
+            startCollapsed={false}
+            initialDepth={2}
+            maxDepthPerFetch={1}
+            rowTotals
+            colTotals={false}
+            rowSubTotals={false}
+            colSubTotals={false}
+            rowSubtotalLevels={[]}
+            colSubtotalLevels={[]}
+            rowOrder="key_a_to_z"
+            colOrder="key_a_to_z"
+            valueFormat=""
+            columnFormats={{}}
+            currencyFormats={{}}
+            allowRenderHtml={false}
+            emitCrossFilters={false}
+            setDataMask={jest.fn()}
+            metricColorFormatters={[]}
+            dateFormatters={{}}
+            rowTotalPosition="end"
+            colSubtotalPosition="start"
+            colTotalPosition="start"
+          />,
+        );
+
+        const rowHeaders = Array.from(
+          container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
+        ).map(cell => cell.textContent?.trim());
+        const shipModes = ['AIR', 'FOB'];
+        shipModes.forEach(label => {
+          expect(rowHeaders).toContain(label);
+        });
+        const lastShipModeIndex = Math.max(
+          ...shipModes.map(label => rowHeaders.lastIndexOf(label)),
+        );
+        metrics.forEach(metric => {
+          const totalLabel = `Total ${metric}`;
+          const totalIndex = rowHeaders.lastIndexOf(totalLabel);
+          expect(totalIndex).toBeGreaterThan(-1);
+          expect(totalIndex).toBeGreaterThan(lastShipModeIndex);
+        });
+      },
+    );
+  });
+
+  it('orders metric grand totals by selection when metrics are on rows', () => {
+    const metrics = ['metricB', 'metricA', 'metricC'];
+    const detail = buildTreeFromRecords(
+      [
+        {
+          orderPriority: '1-URGENT',
+          shipMode: 'AIR',
+          metricB: 10,
+          metricA: 20,
+          metricC: 30,
+        },
+      ],
+      metrics,
+      ['orderPriority'],
+      ['shipMode'],
+      1,
+      1,
+    );
+    const totals = buildTreeFromRecords(
+      [
+        {
+          shipMode: 'AIR',
+          metricB: 100,
+          metricA: 200,
+          metricC: 300,
+        },
+      ],
+      metrics,
+      ['orderPriority'],
+      ['shipMode'],
+      0,
+      1,
+    );
+    const tree = applyMetricAxis(
+      mergeTrees(detail, totals),
+      metrics,
+      MetricsLayoutEnum.ROWS,
+      ['orderPriority'],
+      ['shipMode'],
+      1,
+    );
+
+    const { container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={
+          {
+            ...(baseProps as Partial<PivotTableQueryFormData>),
+            groupbyRows: ['orderPriority'],
+            groupbyColumns: ['shipMode'],
+            metricsLayout: MetricsLayoutEnum.ROWS,
+            metrics,
+            rowTotals: true,
+            rowTotalPosition: 'end',
+          } as PivotTableQueryFormData
+        }
+        metrics={metrics}
+        groupbyRows={['orderPriority']}
+        groupbyColumns={['shipMode']}
+        aggregateFunction="Sum"
+        width={600}
+        height={300}
+        startCollapsed={false}
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        rowTotalPosition="end"
+        colSubtotalPosition="start"
+        colTotalPosition="start"
+      />,
+    );
+
+    const rowHeaders = Array.from(
+      container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
+    ).map(cell => cell.textContent?.trim());
+    const totalLabels = metrics.map(metric => `Total ${metric}`);
+    const totalIndexes = totalLabels.map(label => rowHeaders.indexOf(label));
+    totalIndexes.forEach(index => {
+      expect(index).toBeGreaterThan(-1);
+    });
+    expect([...totalIndexes].sort((a, b) => a - b)).toEqual(totalIndexes);
+  });
+
+  it('orders metric subtotal rows by selection when metrics are on rows', () => {
+    const metrics = ['metricB', 'metricA', 'metricC'];
+    const rowGroupby = ['shipMode', 'orderPriority'];
+    const detail = buildTreeFromRecords(
+      [
+        {
+          shipMode: 'AIR',
+          orderPriority: '1-URGENT',
+          metricB: 10,
+          metricA: 20,
+          metricC: 30,
+        },
+        {
+          shipMode: 'AIR',
+          orderPriority: '2-HIGH',
+          metricB: 11,
+          metricA: 21,
+          metricC: 31,
+        },
+      ],
+      metrics,
+      rowGroupby,
+      [],
+      2,
+      0,
+    );
+    const subtotalLevel1 = buildTreeFromRecords(
+      [
+        {
+          shipMode: 'AIR',
+          metricB: 21,
+          metricA: 41,
+          metricC: 61,
+        },
+      ],
+      metrics,
+      rowGroupby,
+      [],
+      1,
+      0,
+    );
+    const withSubtotals = injectRowSubtotalLeaves(
+      mergeTrees(detail, subtotalLevel1),
+      1,
+      rowGroupby.length,
+    );
+    const withMetrics = applyMetricAxis(
+      withSubtotals,
+      metrics,
+      MetricsLayoutEnum.ROWS,
+      rowGroupby,
+      [],
+      2,
+    );
+    const tree = labelRowSubtotalLeaves(withMetrics, metrics);
+
+    const { container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={
+          {
+            ...(baseProps as Partial<PivotTableQueryFormData>),
+            groupbyRows: [...rowGroupby, METRICS_PLACEHOLDER],
+            groupbyColumns: [],
+            metricsLayout: MetricsLayoutEnum.ROWS,
+            metrics,
+            rowSubTotals: true,
+            rowSubtotalLevels: [1],
+            rowSubtotalPosition: 'end',
+          } as PivotTableQueryFormData
+        }
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={[]}
+        aggregateFunction="Sum"
+        width={600}
+        height={300}
+        startCollapsed={false}
+        initialDepth={3}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals
+        colSubTotals={false}
+        rowSubtotalLevels={[1]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        rowTotalPosition="start"
+        colSubtotalPosition="start"
+        colTotalPosition="start"
+        rowSubtotalPosition="end"
+      />,
+    );
+
+    const rowHeaders = Array.from(
+      container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
+    ).map(cell => cell.textContent?.trim());
+    const subtotalLabels = metrics.map(metric => `AIR ${metric}`);
+    const subtotalIndexes = subtotalLabels.map(label => rowHeaders.indexOf(label));
+    subtotalIndexes.forEach(index => {
+      expect(index).toBeGreaterThan(-1);
+    });
+    expect([...subtotalIndexes].sort((a, b) => a - b)).toEqual(subtotalIndexes);
+  });
+
+  it('orders metric columns by selection when metrics are on columns', () => {
+    const metrics = ['metricB', 'metricA', 'metricC'];
+    const tree = applyMetricAxis(
+      buildTreeFromRecords(
+        [
+          {
+            orderPriority: '1-URGENT',
+            metricB: 10,
+            metricA: 20,
+            metricC: 30,
+          },
+        ],
+        metrics,
+        ['orderPriority'],
+        [],
+        1,
+        0,
+      ),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      ['orderPriority'],
+      [],
+      0,
+    );
+
+    const { container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={
+          {
+            ...(baseProps as Partial<PivotTableQueryFormData>),
+            groupbyRows: ['orderPriority'],
+            groupbyColumns: [METRICS_PLACEHOLDER],
+            metricsLayout: MetricsLayoutEnum.COLUMNS,
+            metrics,
+          } as PivotTableQueryFormData
+        }
+        metrics={metrics}
+        groupbyRows={['orderPriority']}
+        groupbyColumns={[]}
+        aggregateFunction="Sum"
+        width={600}
+        height={300}
+        startCollapsed={false}
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        rowTotalPosition="start"
+        colSubtotalPosition="start"
+        colTotalPosition="start"
+      />,
+    );
+
+    const headerRow = container.querySelector('thead tr:last-child') as HTMLElement;
+    const headerLabels = within(headerRow)
+      .getAllByRole('columnheader')
+      .map(cell => cell.textContent?.trim())
+      .filter(label => label && label !== 'Rows');
+    expect(headerLabels).toEqual(metrics);
+  });
+
   it('omits the grand total row when multiple metrics are on rows and keeps grand total column values', () => {
     const metrics = ['averageOrderValue', 'countOrders'];
     const detail = buildTreeFromRecords(
@@ -2815,6 +3247,13 @@ describe('PivotTableChart totals & subtotals', () => {
     expect(rowHeaders).toEqual(
       expect.arrayContaining(['Total averageOrderValue', 'Total countOrders']),
     );
+    const firstDimIndex = rowHeaders.findIndex(label => label === '1-URGENT');
+    expect(firstDimIndex).toBeGreaterThan(-1);
+    ['Total averageOrderValue', 'Total countOrders'].forEach(label => {
+      const totalIndex = rowHeaders.indexOf(label);
+      expect(totalIndex).toBeGreaterThan(-1);
+      expect(totalIndex).toBeLessThan(firstDimIndex);
+    });
 
     const headerRow = container.querySelector(
       'thead tr:last-child',

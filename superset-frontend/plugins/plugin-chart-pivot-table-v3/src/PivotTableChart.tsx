@@ -306,13 +306,18 @@ function PivotTableChart(props: PivotTableProps) {
     setFetchedColKeys(new Map());
   }, [data, startCollapsed, initialDepth]);
 
-  const metricLabels = useMemo(
-    () =>
-      metrics.map(m => (typeof m === 'string' ? m : getColumnLabel(m as any))),
-    [metrics],
+  const metricLabels = metrics.map(m =>
+    typeof m === 'string' ? m : getColumnLabel(m as any),
   );
-
-  const metricLabelSet = useMemo(() => new Set(metricLabels), [metricLabels]);
+  const metricOrderKey = metricLabels.join('|');
+  const metricLabelSet = useMemo(
+    () => new Set(metricLabels),
+    [metricOrderKey],
+  );
+  const metricOrderMap = useMemo(
+    () => new Map(metricLabels.map((label, idx) => [label, idx])),
+    [metricOrderKey],
+  );
   const isMultiMetric = metricLabels.length > 1;
 
   const findMetricIndex = useCallback(
@@ -463,6 +468,23 @@ function PivotTableChart(props: PivotTableProps) {
     (path: PivotTreeNode['path']) =>
       getMetricLabelFromPathBase(path, metricLabelSet),
     [metricLabelSet],
+  );
+
+  const compareMetricOrder = useCallback(
+    (a: PivotTreeNode, b: PivotTreeNode) => {
+      const aMetric = getMetricLabelFromPath(a.path);
+      const bMetric = getMetricLabelFromPath(b.path);
+      if (!aMetric || !bMetric || aMetric === bMetric) {
+        return 0;
+      }
+      const aIndex = metricOrderMap.get(aMetric);
+      const bIndex = metricOrderMap.get(bMetric);
+      if (aIndex === undefined || bIndex === undefined) {
+        return 0;
+      }
+      return aIndex - bIndex;
+    },
+    [getMetricLabelFromPath, metricOrderMap],
   );
 
   const getNonMetricPathParts = useCallback(
@@ -1047,29 +1069,67 @@ function PivotTableChart(props: PivotTableProps) {
       colTypeMap,
       groupbyRows.map(getColumnLabel),
     );
-    if (!rowSubTotals || effectiveRowSubtotalPosition !== 'end') {
+    const pushMetricTotalsToEnd =
+      (rowTotals && resolvedRowTotalPosition === 'end') ||
+      (rowSubTotals && effectiveRowSubtotalPosition === 'end');
+    const pullMetricTotalsToStart =
+      rowTotals && resolvedRowTotalPosition === 'start';
+    if (!rowSubTotals && !pushMetricTotalsToEnd && !pullMetricTotalsToStart) {
       return baseSorter;
     }
     return (a: PivotTreeNode, b: PivotTreeNode) => {
-      const aSubtotal = isExplicitSubtotalNode(a) ? 1 : 0;
-      const bSubtotal = isExplicitSubtotalNode(b) ? 1 : 0;
+      if (pullMetricTotalsToStart) {
+        const aMetricTotal = isMetricGrandTotalNode(a) ? 1 : 0;
+        const bMetricTotal = isMetricGrandTotalNode(b) ? 1 : 0;
+        if (aMetricTotal !== bMetricTotal) {
+          return bMetricTotal - aMetricTotal;
+        }
+      }
+      const aSubtotal =
+        isExplicitSubtotalNode(a) ||
+        (pushMetricTotalsToEnd && isMetricGrandTotalNode(a))
+          ? 1
+          : 0;
+      const bSubtotal =
+        isExplicitSubtotalNode(b) ||
+        (pushMetricTotalsToEnd && isMetricGrandTotalNode(b))
+          ? 1
+          : 0;
       if (aSubtotal !== bSubtotal) {
         return aSubtotal - bSubtotal;
+      }
+      const metricOrder = compareMetricOrder(a, b);
+      if (metricOrder !== 0) {
+        return metricOrder;
       }
       return baseSorter(a, b);
     };
   }, [
     colTypeMap,
+    compareMetricOrder,
     effectiveRowSubtotalPosition,
     groupbyRows,
     isExplicitSubtotalNode,
+    isMetricGrandTotalNode,
     rowOrder,
+    rowTotals,
+    resolvedRowTotalPosition,
     rowSubTotals,
   ]);
-  const colSorter = useMemo(
-    () => sortByOrder(colOrder, colTypeMap, groupbyColumns.map(getColumnLabel)),
-    [colOrder, colTypeMap, groupbyColumns],
-  );
+  const colSorter = useMemo(() => {
+    const baseSorter = sortByOrder(
+      colOrder,
+      colTypeMap,
+      groupbyColumns.map(getColumnLabel),
+    );
+    return (a: PivotTreeNode, b: PivotTreeNode) => {
+      const metricOrder = compareMetricOrder(a, b);
+      if (metricOrder !== 0) {
+        return metricOrder;
+      }
+      return baseSorter(a, b);
+    };
+  }, [colOrder, colTypeMap, compareMetricOrder, groupbyColumns]);
 
   const showRowRootBase =
     groupbyRows.length > 0 &&
