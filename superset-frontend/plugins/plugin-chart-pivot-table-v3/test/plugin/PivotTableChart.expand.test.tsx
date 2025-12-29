@@ -297,6 +297,322 @@ describe('PivotTableChart expansion with metrics before dimensions', () => {
     });
   });
 
+  it('keeps metric-first return flag values after expanding a child level', async () => {
+    const metrics = ['averageOrderValue', 'weightedDiscount'];
+    const rowGroupby = ['returnFlag', 'orderPriority'];
+    const colGroupby = ['shipMode'];
+    const rowSubtotalLevels = [1];
+    const records = [
+      {
+        returnFlag: 'A',
+        orderPriority: '1-URGENT',
+        shipMode: 'AIR',
+        averageOrderValue: 100,
+        weightedDiscount: 0.1,
+      },
+      {
+        returnFlag: 'A',
+        orderPriority: '2-HIGH',
+        shipMode: 'FOB',
+        averageOrderValue: 200,
+        weightedDiscount: 0.2,
+      },
+      {
+        returnFlag: 'N',
+        orderPriority: '1-URGENT',
+        shipMode: 'AIR',
+        averageOrderValue: 300,
+        weightedDiscount: 0.3,
+      },
+      {
+        returnFlag: 'N',
+        orderPriority: '2-HIGH',
+        shipMode: 'FOB',
+        averageOrderValue: 400,
+        weightedDiscount: 0.4,
+      },
+    ];
+
+    const buildTreeAtDepth = (rowDepth: number) => {
+      let tree = buildTreeFromRecords(
+        records,
+        metrics,
+        rowGroupby,
+        colGroupby,
+        rowDepth,
+        1,
+      );
+      rowSubtotalLevels
+        .filter(level => level > 0 && level <= rowDepth)
+        .forEach(depth => {
+          tree = injectRowSubtotalLeaves(tree, depth, rowGroupby.length);
+        });
+      const withMetrics = applyMetricAxis(
+        tree,
+        metrics,
+        MetricsLayoutEnum.ROWS,
+        rowGroupby,
+        colGroupby,
+        0,
+      );
+      return labelRowSubtotalLeaves(withMetrics, metrics);
+    };
+
+    const baseTree = buildTreeAtDepth(0);
+    const returnFlagTree = buildTreeAtDepth(1);
+    const orderPriorityTree = buildTreeAtDepth(2);
+
+    fetchPivotBranchMock
+      .mockResolvedValueOnce({ data: returnFlagTree })
+      .mockResolvedValueOnce({ data: orderPriorityTree });
+
+    const { container } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={
+          {
+            groupbyRows: [METRICS_PLACEHOLDER, ...rowGroupby],
+            groupbyColumns: colGroupby,
+            metrics,
+            metricsLayout: MetricsLayoutEnum.ROWS,
+            aggregateFunction: 'Sum',
+            rowTotals: false,
+            colTotals: false,
+            rowSubTotals: true,
+            colSubTotals: false,
+            rowSubtotalLevels,
+            rowSubtotalPosition: 'start',
+            startCollapsed: true,
+            initialDepth: 1,
+            maxDepthPerFetch: 1,
+            rowOrder: 'key_a_to_z',
+            colOrder: 'key_a_to_z',
+            viz_type: 'pivot_table_v3',
+            datasource: '1__table',
+            metricColorFormatters: [],
+            dateFormatters: {},
+            verboseMap: {},
+          } as PivotTableQueryFormData
+        }
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={colGroupby}
+        aggregateFunction="Sum"
+        width={500}
+        height={300}
+        startCollapsed
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={true}
+        colSubTotals={false}
+        rowSubtotalLevels={rowSubtotalLevels}
+        rowSubtotalPosition="start"
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    const tbody = container.querySelector('tbody') as HTMLElement;
+    const avgRow = within(tbody)
+      .getByText('averageOrderValue')
+      .closest('tr') as HTMLElement;
+    fireEvent.click(within(avgRow).getByLabelText('plus-square'));
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
+    });
+
+    const returnFlagRow = within(tbody).getByText(/^A$/).closest(
+      'tr',
+    ) as HTMLElement;
+    fireEvent.click(within(returnFlagRow).getByLabelText('plus-square'));
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
+    });
+
+    await waitFor(() => {
+      const valueCell = Array.from(returnFlagRow.querySelectorAll('td')).find(
+        cell => cell.textContent && cell.textContent.trim() !== '',
+      );
+      expect(valueCell).toBeTruthy();
+    });
+  });
+
+  it('keeps metric-first return flag values after deeper expansion', async () => {
+    const metrics = ['averageOrderValue', 'weightedDiscount'];
+    const rowGroupby = ['returnFlag', 'orderPriority', 'orderStatus'];
+    const colGroupby = ['shipMode'];
+    const rowSubtotalLevels = [1];
+    const records = [
+      {
+        returnFlag: 'A',
+        orderPriority: '1-URGENT',
+        orderStatus: 'F',
+        shipMode: 'AIR',
+        averageOrderValue: 100,
+        weightedDiscount: 0.1,
+      },
+      {
+        returnFlag: 'A',
+        orderPriority: '2-HIGH',
+        orderStatus: 'O',
+        shipMode: 'FOB',
+        averageOrderValue: 200,
+        weightedDiscount: 0.2,
+      },
+      {
+        returnFlag: 'N',
+        orderPriority: '1-URGENT',
+        orderStatus: 'F',
+        shipMode: 'AIR',
+        averageOrderValue: 300,
+        weightedDiscount: 0.3,
+      },
+      {
+        returnFlag: 'N',
+        orderPriority: '2-HIGH',
+        orderStatus: 'O',
+        shipMode: 'FOB',
+        averageOrderValue: 400,
+        weightedDiscount: 0.4,
+      },
+    ];
+
+    const buildTreeAtDepth = (rowDepth: number) => {
+      let tree = buildTreeFromRecords(
+        records,
+        metrics,
+        rowGroupby,
+        colGroupby,
+        rowDepth,
+        1,
+      );
+      rowSubtotalLevels
+        .filter(level => level > 0 && level <= rowDepth)
+        .forEach(depth => {
+          tree = injectRowSubtotalLeaves(tree, depth, rowGroupby.length);
+        });
+      const withMetrics = applyMetricAxis(
+        tree,
+        metrics,
+        MetricsLayoutEnum.ROWS,
+        rowGroupby,
+        colGroupby,
+        0,
+      );
+      return labelRowSubtotalLeaves(withMetrics, metrics);
+    };
+
+    const baseTree = buildTreeAtDepth(0);
+    const returnFlagTree = buildTreeAtDepth(1);
+    const orderPriorityTree = buildTreeAtDepth(2);
+    const orderStatusTree = buildTreeAtDepth(3);
+
+    fetchPivotBranchMock
+      .mockResolvedValueOnce({ data: returnFlagTree })
+      .mockResolvedValueOnce({ data: orderPriorityTree })
+      .mockResolvedValueOnce({ data: orderStatusTree });
+
+    const { container } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={
+          {
+            groupbyRows: [METRICS_PLACEHOLDER, ...rowGroupby],
+            groupbyColumns: colGroupby,
+            metrics,
+            metricsLayout: MetricsLayoutEnum.ROWS,
+            aggregateFunction: 'Sum',
+            rowTotals: false,
+            colTotals: false,
+            rowSubTotals: true,
+            colSubTotals: false,
+            rowSubtotalLevels,
+            rowSubtotalPosition: 'start',
+            startCollapsed: true,
+            initialDepth: 1,
+            maxDepthPerFetch: 1,
+            rowOrder: 'key_a_to_z',
+            colOrder: 'key_a_to_z',
+            viz_type: 'pivot_table_v3',
+            datasource: '1__table',
+            metricColorFormatters: [],
+            dateFormatters: {},
+            verboseMap: {},
+          } as PivotTableQueryFormData
+        }
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={colGroupby}
+        aggregateFunction="Sum"
+        width={500}
+        height={300}
+        startCollapsed
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={true}
+        colSubTotals={false}
+        rowSubtotalLevels={rowSubtotalLevels}
+        rowSubtotalPosition="start"
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    const tbody = container.querySelector('tbody') as HTMLElement;
+    const avgRow = within(tbody)
+      .getByText('averageOrderValue')
+      .closest('tr') as HTMLElement;
+    fireEvent.click(within(avgRow).getByLabelText('plus-square'));
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
+    });
+
+    const returnFlagRow = within(tbody).getByText(/^A$/).closest(
+      'tr',
+    ) as HTMLElement;
+    fireEvent.click(within(returnFlagRow).getByLabelText('plus-square'));
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
+    });
+
+    const orderPriorityRow = within(tbody).getByText('1-URGENT').closest(
+      'tr',
+    ) as HTMLElement;
+    fireEvent.click(within(orderPriorityRow).getByLabelText('plus-square'));
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(3);
+    });
+
+    await waitFor(() => {
+      const valueCell = Array.from(returnFlagRow.querySelectorAll('td')).find(
+        cell => cell.textContent && cell.textContent.trim() !== '',
+      );
+      expect(valueCell).toBeTruthy();
+    });
+  });
+
   it('expands row to the next dimension when metrics are on columns', async () => {
     const baseTreeRaw = buildTreeFromRecords(
       [{ r1: 'A', m1: 5 }],

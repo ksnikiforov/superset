@@ -314,13 +314,6 @@ function PivotTableChart(props: PivotTableProps) {
 
   const metricLabelSet = useMemo(() => new Set(metricLabels), [metricLabels]);
   const isMultiMetric = metricLabels.length > 1;
-  const forceRowSubtotalEnd =
-    rowSubTotals &&
-    isMultiMetric &&
-    resolvedMetricsLayout === MetricsLayoutEnum.ROWS;
-  const effectiveRowSubtotalPosition = forceRowSubtotalEnd
-    ? 'end'
-    : resolvedRowSubtotalPosition;
 
   const findMetricIndex = useCallback(
     (nodes: Record<string, PivotTreeNode>) => {
@@ -430,6 +423,14 @@ function PivotTableChart(props: PivotTableProps) {
     resolvedMetricsLayout === MetricsLayoutEnum.ROWS && metricIndexOnRows === 0;
   const metricsFirstOnCols =
     resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS && metricIndexOnCols === 0;
+  const forceRowSubtotalEnd =
+    rowSubTotals &&
+    isMultiMetric &&
+    resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
+    !metricsFirstOnRows;
+  const effectiveRowSubtotalPosition = forceRowSubtotalEnd
+    ? 'end'
+    : resolvedRowSubtotalPosition;
 
   const hideMetricHeaderOnRows = useMemo(
     () =>
