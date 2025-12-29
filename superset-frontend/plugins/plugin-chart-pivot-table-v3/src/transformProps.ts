@@ -113,6 +113,40 @@ export default function transformProps(
   const metricKeys = metrics.map(metric =>
     typeof metric === 'string' ? metric : metric.label || '',
   );
+  const metricKeySet = new Set(metricKeys.filter(key => key));
+
+  const resolveQueryDepth = (query: typeof queriesData[number]) => {
+    const queryName = (query as any)?.query_name || (query as any)?.queryName;
+    let { rowDepth, colDepth } = parseDepth(queryName);
+    const colSet = new Set((query.colnames || []).map((name: any) => String(name)));
+    const inferredRowDepth = groupbyRows.filter(col =>
+      colSet.has(String(getColumnLabel(col))),
+    ).length;
+    const inferredColDepth = groupbyColumns.filter(col =>
+      colSet.has(String(getColumnLabel(col))),
+    ).length;
+    if (colSet.size > 0) {
+      rowDepth = inferredRowDepth;
+      colDepth = inferredColDepth;
+    }
+    const hasGroupbyCols = inferredRowDepth > 0 || inferredColDepth > 0;
+    const hasMetricCols =
+      metricKeySet.size > 0 &&
+      Array.from(metricKeySet).some(key => colSet.has(String(key)));
+    const isMetricOnlyQuery = colSet.size > 0 && !hasGroupbyCols && hasMetricCols;
+    if (
+      rowDepth === 0 &&
+      colDepth === 0 &&
+      (query.data || []).length > 0 &&
+      !isMetricOnlyQuery
+    ) {
+      rowDepth = groupbyRows.length;
+      colDepth = groupbyColumns.length;
+    }
+    rowDepth = Math.min(rowDepth || 0, groupbyRows.length);
+    colDepth = Math.min(colDepth || 0, groupbyColumns.length);
+    return { rowDepth, colDepth };
+  };
 
   const combinedData = queriesData.flatMap(({ data }) => data || []);
   const colnames = queriesData[0]?.colnames || [];
@@ -171,32 +205,7 @@ export default function transformProps(
   );
 
   const nextTreeRaw = queriesData.reduce<PivotTreeData>((acc, query) => {
-    const queryName = (query as any)?.query_name || (query as any)?.queryName;
-    let { rowDepth, colDepth } = parseDepth(queryName);
-
-    // Fallback: if query_name is missing or shallow, infer how many groupby
-    // levels were included in this query by inspecting returned column names.
-    const colSet = new Set((query.colnames || []).map((name: any) => String(name)));
-    const inferredRowDepth = groupbyRows.filter(col =>
-      colSet.has(String(getColumnLabel(col))),
-    ).length;
-    const inferredColDepth = groupbyColumns.filter(col =>
-      colSet.has(String(getColumnLabel(col))),
-    ).length;
-    if (inferredRowDepth > rowDepth || inferredColDepth > colDepth) {
-      rowDepth = Math.max(rowDepth, inferredRowDepth);
-      colDepth = Math.max(colDepth, inferredColDepth);
-    }
-    // If inference still yields zero but data exists, assume full depth so tree populates.
-    if (rowDepth === 0 && colDepth === 0 && (query.data || []).length > 0) {
-      rowDepth = groupbyRows.length;
-      colDepth = groupbyColumns.length;
-    }
-
-    // Clamp to the configured groupby lengths to avoid over-reading.
-    rowDepth = Math.min(rowDepth || 0, groupbyRows.length);
-    colDepth = Math.min(colDepth || 0, groupbyColumns.length);
-
+    const { rowDepth, colDepth } = resolveQueryDepth(query);
     const branch = buildTreeFromRecords(
       query.data || [],
       metrics,
@@ -222,9 +231,7 @@ export default function transformProps(
   );
   const rootKey = serializePath([]);
   const zeroDepthQuery = queriesData.find(query => {
-    const { rowDepth: rd, colDepth: cd } = parseDepth(
-      (query as any)?.query_name || (query as any)?.queryName,
-    );
+    const { rowDepth: rd, colDepth: cd } = resolveQueryDepth(query);
     return rd === 0 && cd === 0;
   });
   const grandTotalRecord = zeroDepthQuery?.data?.[0];

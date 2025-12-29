@@ -74,10 +74,19 @@ export const isMetricGrandTotalNode = (
   if (!metricLabel) {
     return false;
   }
+  const nonMetricParts = getNonMetricPathParts(node.path, metricLabelSet);
+  if (nonMetricParts.length !== 0) {
+    return false;
+  }
+  if (node.axis === 'row' && metricsFirstOnRows) {
+    return String(node.path[0] ?? '') === metricLabel;
+  }
+  if (node.axis === 'col' && metricsFirstOnCols) {
+    return String(node.path[0] ?? '') === metricLabel;
+  }
   if (String(node.path[node.path.length - 1] ?? '') !== metricLabel) {
     return false;
   }
-  const nonMetricParts = getNonMetricPathParts(node.path, metricLabelSet);
   return nonMetricParts.length === 0;
 };
 

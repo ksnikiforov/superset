@@ -160,6 +160,61 @@ describe('Pivot Table v3 transformProps', () => {
     expect(tree.cells[`${rootKey}|${rootKey}`]?.values.metric1).toBe(15);
   });
 
+  it('uses metric-only queries as grand totals even when query depth metadata is wrong', () => {
+    const queriesData = [
+      {
+        data: [{ r1: 'A', r2: 'B', c1: 'X', metric1: 10 }],
+        colnames: ['r1', 'r2', 'c1', 'metric1'],
+        coltypes: [1, 1, 1, 0],
+        query_name: formatQueryName(2, 1),
+      },
+      {
+        data: [
+          { c1: 'X', metric1: 100 },
+          { c1: 'Y', metric1: 200 },
+        ],
+        colnames: ['c1', 'metric1'],
+        coltypes: [1, 0],
+        query_name: formatQueryName(0, 1),
+      },
+      {
+        data: [{ r1: 'A', r2: 'B', metric1: 300 }],
+        colnames: ['r1', 'r2', 'metric1'],
+        coltypes: [1, 1, 0],
+        query_name: formatQueryName(2, 0),
+      },
+      {
+        data: [{ metric1: 999 }],
+        colnames: ['metric1'],
+        coltypes: [0],
+        query_name: formatQueryName(2, 1),
+      },
+    ];
+
+    const props = new ChartProps({
+      formData: {
+        ...formData,
+        groupbyRows: ['r1', 'r2'],
+        groupbyColumns: ['c1', '__MEASURES__'],
+        metrics: ['metric1'],
+        metricsLayout: MetricsLayoutEnum.COLUMNS,
+        rowTotals: true,
+        colTotals: true,
+      },
+      width: 400,
+      height: 300,
+      queriesData,
+      hooks: { setDataMask: jest.fn() },
+      filterState: { selectedFilters: {} },
+      datasource: { verboseMap: {}, columnFormats: {}, currencyFormats: {} },
+      theme: supersetTheme,
+    });
+
+    const { data: tree } = transformProps(props as any);
+    const rootKey = serializePath([]);
+    expect(tree.cells[`${rootKey}|${rootKey}`]?.values.metric1).toBe(999);
+  });
+
   it('infers column depth when query metadata is shallow but column groupbys are present', () => {
     const props = new ChartProps({
       formData: {

@@ -124,21 +124,30 @@ export const buildColumnHeaderRows = (
       }
       const headerPath = path.slice(0, level + 1);
       const key = serializePath(headerPath);
-      const node =
-        nodes[key] ||
-        ({
-          axis: 'col',
-          key,
-          path: headerPath,
-          label: headerPath[level]?.toString() ?? '',
-          formattedLabel: headerPath[level]?.toString() ?? '',
-          level: headerPath.length,
-          hasChildren: level < maxDepth - 1,
-          isSubtotal:
-            headerPath.some(isSubtotalToken) ||
-            String(headerPath[level] ?? '').startsWith('Total ') ||
-            String(headerPath[level] ?? '').endsWith(' Total'),
-        } as PivotTreeNode);
+      let node = nodes[key];
+      if (!node) {
+        if (level === lastLevel) {
+          node = {
+            ...col,
+            label: headerPath[level]?.toString() ?? '',
+            formattedLabel: headerPath[level]?.toString() ?? '',
+          };
+        } else {
+          node = {
+            axis: 'col',
+            key,
+            path: headerPath,
+            label: headerPath[level]?.toString() ?? '',
+            formattedLabel: headerPath[level]?.toString() ?? '',
+            level: headerPath.length,
+            hasChildren: level < maxDepth - 1,
+            isSubtotal:
+              headerPath.some(isSubtotalToken) ||
+              String(headerPath[level] ?? '').startsWith('Total ') ||
+              String(headerPath[level] ?? '').endsWith(' Total'),
+          } as PivotTreeNode;
+        }
+      }
       const rowSpan = level === lastLevel ? maxDepth - level : 1;
       const prev = lastCells[level];
       if (prev && prev.node.key === node.key && prev.rowSpan === rowSpan) {

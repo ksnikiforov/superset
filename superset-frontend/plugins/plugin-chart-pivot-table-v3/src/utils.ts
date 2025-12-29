@@ -113,7 +113,10 @@ export const injectRowSubtotalLeaves = (
     cells: { ...tree.cells },
   };
   const subtotalNodes = Object.values(tree.rows).filter(
-    node => node.path.length === depth && node.path.length > 0,
+    node =>
+      node.path.length === depth &&
+      node.path.length > 0 &&
+      !node.path.some(val => isSubtotalToken(val) || val === 'Total'),
   );
   subtotalNodes.forEach(node => {
     const subtotalPath = [...node.path, SUBTOTAL_TOKEN];
@@ -133,7 +136,12 @@ export const injectRowSubtotalLeaves = (
   });
   Object.values(tree.cells).forEach(cell => {
     const baseRowPath = tree.rows[cell.rowKey]?.path;
-    if (!baseRowPath || baseRowPath.length !== depth || baseRowPath.length === 0) {
+    if (
+      !baseRowPath ||
+      baseRowPath.length !== depth ||
+      baseRowPath.length === 0 ||
+      baseRowPath.some(val => isSubtotalToken(val) || val === 'Total')
+    ) {
       return;
     }
     const subtotalRowKey = serializePath([...baseRowPath, SUBTOTAL_TOKEN]);
@@ -152,6 +160,7 @@ export const labelRowSubtotalLeaves = (
   metrics: QueryFormMetric[],
 ) => {
   const metricLabels = new Set(getMetricKeys(metrics));
+  const isSingleMetric = metricLabels.size === 1;
   const nextRows: Record<string, PivotTreeNode> = { ...tree.rows };
   let hasChanges = false;
 
@@ -179,9 +188,19 @@ export const labelRowSubtotalLeaves = (
         break;
       }
     }
-    const nextLabel = metricLabel
-      ? `${baseLabel} ${metricLabel}`
-      : `${baseLabel} Total`;
+    if (!metricLabel) {
+      for (let i = subtotalIndex - 1; i >= 0; i -= 1) {
+        const val = node.path[i];
+        if (metricLabels.has(String(val ?? ''))) {
+          break;
+        }
+      }
+    }
+    const hasMetricAfterSubtotal = !!metricLabel;
+    const nextLabel =
+      !isSingleMetric && hasMetricAfterSubtotal
+        ? `${baseLabel} ${metricLabel}`
+        : `${baseLabel} Total`;
     if (node.label !== nextLabel || node.formattedLabel !== nextLabel) {
       nextRows[node.key] = {
         ...node,

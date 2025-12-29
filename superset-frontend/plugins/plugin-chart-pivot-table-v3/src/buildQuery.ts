@@ -153,12 +153,22 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
       ];
     }
 
-    const rowDepths = new Set<number>(rowLevels);
-    const colDepths = new Set<number>(colLevels);
+    const rowLevelsForInitial = startCollapsed
+      ? rowLevels.filter(level => level <= rowDepthLimit)
+      : rowLevels;
+    const colLevelsForInitial = startCollapsed
+      ? colLevels.filter(level => level <= colDepthLimit)
+      : colLevels;
+
+    const rowDepths = new Set<number>(rowLevelsForInitial);
+    const colDepths = new Set<number>(colLevelsForInitial);
 
     // always include the initial visible depth for each axis
     rowDepths.add(rowDepthLimit || 0);
     colDepths.add(colDepthLimit || 0);
+    if (metricsOnRows && metricInsertIndex === 0 && colTotals) {
+      rowDepths.add(0);
+    }
 
     const queries = Array.from(rowDepths).flatMap(rowDepth =>
       Array.from(colDepths).map(colDepth => ({

@@ -24,8 +24,10 @@ import {
   mergeTrees,
   METRICS_PLACEHOLDER,
   normalizeSubtotalLevels,
+  labelRowSubtotalLeaves,
   resolveMetricPlacement,
   serializePath,
+  SUBTOTAL_TOKEN,
 } from '../../src/utils';
 
 const baseTree: PivotTreeData = {
@@ -433,5 +435,99 @@ describe('normalizeSubtotalLevels', () => {
     expect(normalizeSubtotalLevels([0, 1, 5, 1], 2, false, false)).toEqual([
       0, 1,
     ]);
+  });
+});
+
+describe('labelRowSubtotalLeaves', () => {
+  it('uses "<Group> Total" when there is a single metric', () => {
+    const rootKey = serializePath([]);
+    const subtotalKey = serializePath(['Bikes', SUBTOTAL_TOKEN, 'metric1']);
+    const tree: PivotTreeData = {
+      rows: {
+        [rootKey]: {
+          axis: 'row',
+          key: rootKey,
+          path: [],
+          label: 'Grand total',
+          formattedLabel: 'Grand total',
+          level: 0,
+          hasChildren: true,
+          isSubtotal: true,
+        },
+        [subtotalKey]: {
+          axis: 'row',
+          key: subtotalKey,
+          path: ['Bikes', SUBTOTAL_TOKEN, 'metric1'],
+          label: 'Subtotal',
+          formattedLabel: 'Subtotal',
+          level: 3,
+          hasChildren: false,
+          isSubtotal: true,
+        },
+      },
+      cols: {
+        [rootKey]: {
+          axis: 'col',
+          key: rootKey,
+          path: [],
+          label: 'Grand total',
+          formattedLabel: 'Grand total',
+          level: 0,
+          hasChildren: false,
+          isSubtotal: true,
+        },
+      },
+      cells: {},
+    };
+
+    const labeled = labelRowSubtotalLeaves(tree, ['metric1']);
+    expect(labeled.rows[subtotalKey]?.label).toBe('Bikes Total');
+    expect(labeled.rows[subtotalKey]?.formattedLabel).toBe('Bikes Total');
+  });
+
+  it('uses "<Group> Total" when the subtotal token follows a metric', () => {
+    const rootKey = serializePath([]);
+    const subtotalKey = serializePath(['Bikes', 'metric1', SUBTOTAL_TOKEN]);
+    const tree: PivotTreeData = {
+      rows: {
+        [rootKey]: {
+          axis: 'row',
+          key: rootKey,
+          path: [],
+          label: 'Grand total',
+          formattedLabel: 'Grand total',
+          level: 0,
+          hasChildren: true,
+          isSubtotal: true,
+        },
+        [subtotalKey]: {
+          axis: 'row',
+          key: subtotalKey,
+          path: ['Bikes', 'metric1', SUBTOTAL_TOKEN],
+          label: 'Subtotal',
+          formattedLabel: 'Subtotal',
+          level: 3,
+          hasChildren: false,
+          isSubtotal: true,
+        },
+      },
+      cols: {
+        [rootKey]: {
+          axis: 'col',
+          key: rootKey,
+          path: [],
+          label: 'Grand total',
+          formattedLabel: 'Grand total',
+          level: 0,
+          hasChildren: false,
+          isSubtotal: true,
+        },
+      },
+      cells: {},
+    };
+
+    const labeled = labelRowSubtotalLeaves(tree, ['metric1', 'metric2']);
+    expect(labeled.rows[subtotalKey]?.label).toBe('Bikes Total');
+    expect(labeled.rows[subtotalKey]?.formattedLabel).toBe('Bikes Total');
   });
 });

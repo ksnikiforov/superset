@@ -18,7 +18,8 @@
  */
 
 import buildQuery, { formatQueryName } from '../../src/buildQuery';
-import { PivotTableQueryFormData } from '../../src/types';
+import { MetricsLayoutEnum, PivotTableQueryFormData } from '../../src/types';
+import { METRICS_PLACEHOLDER } from '../../src/utils';
 
 const baseFormData = {
   groupbyRows: ['row1', 'row2'],
@@ -102,4 +103,48 @@ test('includes row subtotal depths when row subtotals are enabled', () => {
   });
   const names = queryContext.queries.map(q => q.query_name);
   expect(names).toContain(formatQueryName(1, 2));
+});
+
+test('limits row subtotal depths to initial visible depth when collapsed', () => {
+  const queryContext = buildQuery({
+    ...baseFormData,
+    groupbyRows: [
+      'quantityBand',
+      'returnFlag',
+      'shipMode',
+      'revenueBand',
+      METRICS_PLACEHOLDER,
+    ],
+    groupbyColumns: ['customerSegment', 'shipMode'],
+    metrics: ['averageOrderValue', 'weightedDiscount'],
+    metricsLayout: MetricsLayoutEnum.ROWS,
+    startCollapsed: true,
+    initialDepth: 1,
+    rowTotals: true,
+    colTotals: true,
+    rowSubTotals: true,
+  } as PivotTableQueryFormData);
+  const names = queryContext.queries.map(q => q.query_name);
+  expect(queryContext.queries).toHaveLength(4);
+  expect(names).toContain(formatQueryName(0, 0));
+  expect(names).toContain(formatQueryName(0, 1));
+  expect(names).toContain(formatQueryName(1, 0));
+  expect(names).toContain(formatQueryName(1, 1));
+  expect(names).not.toContain(formatQueryName(2, 1));
+  expect(names).not.toContain(formatQueryName(3, 1));
+});
+
+test('includes zero-depth totals when metrics lead rows and column totals are enabled', () => {
+  const queryContext = buildQuery({
+    ...baseFormData,
+    groupbyRows: [METRICS_PLACEHOLDER, 'quantityBand', 'orderPriority'],
+    groupbyColumns: ['returnFlag', 'shipMode'],
+    metrics: ['averageOrderValue', 'weightedDiscount'],
+    metricsLayout: MetricsLayoutEnum.ROWS,
+    startCollapsed: true,
+    initialDepth: 2,
+    colTotals: true,
+  } as PivotTableQueryFormData);
+  const names = queryContext.queries.map(q => q.query_name);
+  expect(names).toContain(formatQueryName(0, 0));
 });

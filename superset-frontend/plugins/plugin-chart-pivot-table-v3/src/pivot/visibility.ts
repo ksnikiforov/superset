@@ -126,15 +126,11 @@ export const createColLeavesBuilder = ({
       return childLeaves;
     }
     const isBranchLeaf = (leaf: PivotTreeNode) =>
-      leaf.isSubtotal &&
       leaf.path.length === node.path.length + 1 &&
       node.path.every((val, idx) => val === leaf.path[idx]);
-    const isExplicitSubtotalLeaf = (leaf: PivotTreeNode) => {
+    const isSubtotalTokenLeaf = (leaf: PivotTreeNode) => {
       if (!isBranchLeaf(leaf)) {
         return false;
-      }
-      if (isMetricGrandTotalNode(leaf) || isMetricSubtotalNode(leaf)) {
-        return true;
       }
       const token = leaf.path[node.path.length];
       return (
@@ -143,7 +139,12 @@ export const createColLeavesBuilder = ({
         leaf.label === SUBTOTAL_LABEL
       );
     };
-    const explicitSubtotalLeaf = childLeaves.find(isExplicitSubtotalLeaf);
+    const isMetricSubtotalLeaf = (leaf: PivotTreeNode) =>
+      isBranchLeaf(leaf) &&
+      (isMetricGrandTotalNode(leaf) || isMetricSubtotalNode(leaf));
+    const explicitSubtotalLeaf =
+      childLeaves.find(isSubtotalTokenLeaf) ||
+      childLeaves.find(isMetricSubtotalLeaf);
     const isDuplicateSubtotalLeaf = (leaf: PivotTreeNode) => {
       if (!isBranchLeaf(leaf)) {
         return false;
