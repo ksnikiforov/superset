@@ -388,6 +388,7 @@ export const applyMetricAxis = (
   }
 
   const result: PivotTreeData = { rows: {}, cols: {}, cells: {} };
+  const metricLabelSet = new Set(metricKeys);
 
   const ensureNode = (
     axis: 'row' | 'col',
@@ -402,6 +403,30 @@ export const applyMetricAxis = (
       path.length === 0
         ? 'Grand total'
         : path[path.length - 1]?.toString() ?? 'Grand total';
+    const isMetricNode = metricLabelSet.has(
+      String(path[path.length - 1] ?? ''),
+    );
+    let hasChildren = path.length < fullDepth;
+    if (isMetricNode) {
+      if (
+        axis === 'row' &&
+        metricsLayout === MetricsLayoutEnum.ROWS &&
+        (metricPosition ?? rowGroupby.length) >= rowGroupby.length
+      ) {
+        hasChildren = false;
+      }
+      if (
+        axis === 'col' &&
+        metricsLayout === MetricsLayoutEnum.COLUMNS &&
+        (metricPosition ?? colGroupby.length) >= colGroupby.length
+      ) {
+        hasChildren = false;
+      }
+    }
+    const isSubtotalValue =
+      isSubtotal ??
+      (path.length < fullDepth &&
+        !(isMetricNode && hasChildren === false));
     const node = {
       axis,
       key,
@@ -409,8 +434,8 @@ export const applyMetricAxis = (
       label,
       formattedLabel: label,
       level: path.length,
-      hasChildren: path.length < fullDepth,
-      isSubtotal: isSubtotal ?? path.length < fullDepth,
+      hasChildren,
+      isSubtotal: isSubtotalValue,
     };
     nodes[key] = node;
     return node;
@@ -452,6 +477,8 @@ export const applyMetricAxis = (
       const rowPrefix = rowPath.slice(0, insertIndex);
       const rowSuffix = rowPath.slice(insertIndex);
 
+      const rowKey = serializePath(rowPath);
+
       metricKeys.forEach(metric => {
         const newRowPath = [...rowPrefix, metric, ...rowSuffix];
         // ensure row hierarchy nodes
@@ -487,10 +514,9 @@ export const applyMetricAxis = (
           metricKeys.length === 1 &&
           metricPosition !== 0
         ) {
-          const baseRowKey = serializePath(rowPath);
-          result.cells[`${baseRowKey}|${colKey}`] =
-            result.cells[`${baseRowKey}|${colKey}`] || {
-              rowKey: baseRowKey,
+          result.cells[`${rowKey}|${colKey}`] =
+            result.cells[`${rowKey}|${colKey}`] || {
+              rowKey,
               colKey,
               values: { [metric]: cell.values[metric] },
               isSubtotal: cell.isSubtotal,
@@ -533,6 +559,8 @@ export const applyMetricAxis = (
       const colPath = baseCol?.path || [];
       const colPrefix = colPath.slice(0, insertIndex);
       const colSuffix = colPath.slice(insertIndex);
+
+      const colKey = serializePath(colPath);
 
       metricKeys.forEach(metric => {
         const newColPath = [...colPrefix, metric, ...colSuffix];

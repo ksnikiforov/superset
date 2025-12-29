@@ -38,10 +38,12 @@ import {
   PivotTreeNode,
 } from './types';
 import {
+  isMetricsPlaceholder,
   isSubtotalToken,
   mergeTrees,
   parseThemeColors,
   PIVOT_THEME_PRESETS,
+  resolveMetricPlacement,
   serializePath,
   SUBTOTAL_LABEL,
 } from './utils';
@@ -220,6 +222,41 @@ function PivotTableChart(props: PivotTableProps) {
       ),
     [colSubtotalLevels, groupbyColumns.length],
   );
+  const metricPlacement = useMemo(
+    () =>
+      resolveMetricPlacement(formData.groupbyRows, formData.groupbyColumns, {
+        hasMetrics: metrics.length > 0,
+        preferredAxis: resolvedMetricsLayout,
+      }),
+    [
+      formData.groupbyColumns,
+      formData.groupbyRows,
+      metrics.length,
+      resolvedMetricsLayout,
+    ],
+  );
+  const metricInsertIndexOnRows = useMemo(() => {
+    if (
+      resolvedMetricsLayout !== MetricsLayoutEnum.ROWS ||
+      metricPlacement.metricPosition < 0
+    ) {
+      return undefined;
+    }
+    return Math.min(metricPlacement.metricPosition, groupbyRows.length);
+  }, [groupbyRows.length, metricPlacement.metricPosition, resolvedMetricsLayout]);
+  const metricInsertIndexOnCols = useMemo(() => {
+    if (
+      resolvedMetricsLayout !== MetricsLayoutEnum.COLUMNS ||
+      metricPlacement.metricPosition < 0
+    ) {
+      return undefined;
+    }
+    return Math.min(metricPlacement.metricPosition, groupbyColumns.length);
+  }, [
+    groupbyColumns.length,
+    metricPlacement.metricPosition,
+    resolvedMetricsLayout,
+  ]);
 
   const [tree, setTree] = useState<PivotTreeData>(data);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -301,14 +338,20 @@ function PivotTableChart(props: PivotTableProps) {
     [metricLabelSet],
   );
 
-  const metricIndexOnRows = useMemo(
-    () => findMetricIndex(tree.rows),
-    [findMetricIndex, tree.rows],
-  );
-  const metricIndexOnCols = useMemo(
-    () => findMetricIndex(tree.cols),
-    [findMetricIndex, tree.cols],
-  );
+  const metricIndexOnRows = useMemo(() => {
+    const treeIndex = findMetricIndex(tree.rows);
+    if (treeIndex !== undefined) {
+      return treeIndex;
+    }
+    return metricInsertIndexOnRows;
+  }, [findMetricIndex, metricInsertIndexOnRows, tree.rows]);
+  const metricIndexOnCols = useMemo(() => {
+    const treeIndex = findMetricIndex(tree.cols);
+    if (treeIndex !== undefined) {
+      return treeIndex;
+    }
+    return metricInsertIndexOnCols;
+  }, [findMetricIndex, metricInsertIndexOnCols, tree.cols]);
   const metricDimIndexOnRows = useMemo(() => {
     if (resolvedMetricsLayout !== MetricsLayoutEnum.ROWS) {
       return undefined;
@@ -348,6 +391,32 @@ function PivotTableChart(props: PivotTableProps) {
     });
     return found;
   }, [metricLabelSet, resolvedMetricsLayout, tree.rows]);
+  const formRowsHasPlaceholder = useMemo(
+    () =>
+      Array.isArray(formData.groupbyRows) &&
+      formData.groupbyRows.some(isMetricsPlaceholder),
+    [formData.groupbyRows],
+  );
+  const formColsHasPlaceholder = useMemo(
+    () =>
+      Array.isArray(formData.groupbyColumns) &&
+      formData.groupbyColumns.some(isMetricsPlaceholder),
+    [formData.groupbyColumns],
+  );
+  const metricLayoutIndexOnRows = formRowsHasPlaceholder
+    ? metricInsertIndexOnRows ?? metricIndexOnRows
+    : metricIndexOnRows;
+  const metricLayoutIndexOnCols = formColsHasPlaceholder
+    ? metricInsertIndexOnCols ?? metricIndexOnCols
+    : metricIndexOnCols;
+  const metricsAtRowEnd =
+    resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
+    metricInsertIndexOnRows !== undefined &&
+    metricInsertIndexOnRows >= groupbyRows.length;
+  const metricsAtColEnd =
+    resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS &&
+    metricInsertIndexOnCols !== undefined &&
+    metricInsertIndexOnCols >= groupbyColumns.length;
   const metricsFirstOnRows =
     resolvedMetricsLayout === MetricsLayoutEnum.ROWS && metricIndexOnRows === 0;
   const metricsFirstOnCols =
@@ -412,14 +481,8 @@ function PivotTableChart(props: PivotTableProps) {
     [],
   );
 
-  const metricIndexForRows =
-    resolvedMetricsLayout === MetricsLayoutEnum.ROWS && !hideMetricHeaderOnRows
-      ? metricIndexOnRows ?? 0
-      : metricIndexOnRows;
-  const metricIndexForCols =
-    resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS && !hideMetricHeaderOnCols
-      ? metricIndexOnCols ?? 0
-      : metricIndexOnCols;
+  const metricIndexForRows = metricLayoutIndexOnRows ?? metricIndexOnRows;
+  const metricIndexForCols = metricLayoutIndexOnCols ?? metricIndexOnCols;
 
   const getMetricDepthForParent = useCallback(
     (nodes: Record<string, PivotTreeNode>, parent: PivotTreeNode) =>
@@ -496,6 +559,7 @@ function PivotTableChart(props: PivotTableProps) {
       if (metricNodes.length === 0) {
         return [] as PivotTreeNode[];
       }
+      const hasMetricChildren = metricDepth < groupbyRows.length;
       const metricLabels = Array.from(
         new Set(
           metricNodes.map(node => String(node.path[metricDepth] ?? '')),
@@ -506,17 +570,21 @@ function PivotTableChart(props: PivotTableProps) {
         const collapsedKey = serializePath(collapsedPath);
         const existing = tree.rows[collapsedKey];
         if (existing) {
-          const hasChildren = getRawRowChildren(existing).length > 0;
+          const hasChildren = metricsAtRowEnd
+            ? false
+            : getRawRowChildren(existing).length > 0 || hasMetricChildren;
           return { ...existing, hasChildren };
         }
         const sourceNode = metricNodes.find(
           node => String(node.path[metricDepth] ?? '') === metricLabel,
         );
-        const hasChildren = Object.values(tree.rows).some(
-          node =>
-            node.path.length === collapsedPath.length + 1 &&
-            collapsedPath.every((val, idx) => val === node.path[idx]),
-        );
+        const hasChildren = metricsAtRowEnd
+          ? false
+          : Object.values(tree.rows).some(
+              node =>
+                node.path.length === collapsedPath.length + 1 &&
+                collapsedPath.every((val, idx) => val === node.path[idx]),
+            ) || hasMetricChildren;
         return {
           ...(sourceNode || metricNodes[0]),
           key: collapsedKey,
@@ -533,8 +601,10 @@ function PivotTableChart(props: PivotTableProps) {
       getMetricDepthForParent,
       getMetricTierNodes,
       getRawRowChildren,
+      groupbyRows.length,
       isMultiMetric,
       metricLabelSet,
+      metricsAtRowEnd,
       resolvedMetricsLayout,
       tree.rows,
     ],
@@ -562,6 +632,7 @@ function PivotTableChart(props: PivotTableProps) {
       if (metricNodes.length === 0) {
         return [] as PivotTreeNode[];
       }
+      const hasMetricChildren = metricDepth < groupbyColumns.length;
       const metricLabels = Array.from(
         new Set(
           metricNodes.map(node => String(node.path[metricDepth] ?? '')),
@@ -575,9 +646,16 @@ function PivotTableChart(props: PivotTableProps) {
         );
         const existing = tree.cols[collapsedKey];
         if (existing) {
-          const hasChildren = getRawColChildren(existing).length > 0;
+          const hasChildren =
+            metricsAtColEnd
+              ? false
+              : getRawColChildren(existing).length > 0 || hasMetricChildren;
           return { ...existing, hasChildren };
         }
+        const hasChildren = metricsAtColEnd
+          ? false
+          : getRawColChildren({ ...parent, path: collapsedPath }).length > 0 ||
+            hasMetricChildren;
         return {
           ...(sourceNode || metricNodes[0]),
           key: collapsedKey,
@@ -585,7 +663,7 @@ function PivotTableChart(props: PivotTableProps) {
           label: metricLabel,
           formattedLabel: metricLabel,
           level: collapsedPath.length,
-          hasChildren: false,
+          hasChildren,
         };
       });
     },
@@ -594,8 +672,10 @@ function PivotTableChart(props: PivotTableProps) {
       getMetricDepthForParent,
       getMetricTierNodes,
       getRawColChildren,
+      groupbyColumns.length,
       isMultiMetric,
       metricLabelSet,
+      metricsAtColEnd,
       resolvedMetricsLayout,
       tree.cols,
     ],
@@ -641,8 +721,8 @@ function PivotTableChart(props: PivotTableProps) {
         resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
         parent.axis === 'row' &&
         parent.level < groupbyRows.length &&
-        (metricIndexOnRows === undefined ||
-          metricIndexOnRows > parent.level)
+        (metricLayoutIndexOnRows === undefined ||
+          metricLayoutIndexOnRows > parent.level)
       ) {
         const hasNonMetricChildren = children.some(child => {
           const metricAtLevel = metricLabelSet.has(
@@ -658,6 +738,14 @@ function PivotTableChart(props: PivotTableProps) {
             return true;
           }
           if (hasNonMetricChildren) {
+            if (
+              !rowTotals &&
+              metricLayoutIndexOnRows !== undefined &&
+              parent.level < metricLayoutIndexOnRows &&
+              metricIndexOnRows === 0
+            ) {
+              return false;
+            }
             return isMetricGrandTotalNode(child);
           }
           return isMetricGrandTotalNode(child) || isMetricSubtotalNode(child);
@@ -775,6 +863,8 @@ function PivotTableChart(props: PivotTableProps) {
       getRawRowChildren,
       groupbyRows.length,
       metricIndexForRows,
+      metricIndexOnRows,
+      metricLayoutIndexOnRows,
       hideMetricHeaderOnRows,
       metricLabelSet,
       metricDimIndexOnRows,
@@ -783,6 +873,7 @@ function PivotTableChart(props: PivotTableProps) {
       isExplicitSubtotalNode,
       isMetricGrandTotalNode,
       metricsFirstOnRows,
+      rowTotals,
       rowSubTotals,
       tree.rows,
     ],
@@ -808,8 +899,8 @@ function PivotTableChart(props: PivotTableProps) {
         resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS &&
         parent.axis === 'col' &&
         parent.level < groupbyColumns.length &&
-        (metricIndexOnCols === undefined ||
-          metricIndexOnCols > parent.level)
+        (metricLayoutIndexOnCols === undefined ||
+          metricLayoutIndexOnCols > parent.level)
       ) {
         const allowMetricSubtotals =
           colSubTotals || normalizedColSubtotalLevels.length > 0;
@@ -846,6 +937,7 @@ function PivotTableChart(props: PivotTableProps) {
       getRawColChildren,
       groupbyColumns.length,
       metricIndexForCols,
+      metricLayoutIndexOnCols,
       hideMetricHeaderOnCols,
       metricLabelSet,
       normalizedColSubtotalLevels.length,
@@ -1123,28 +1215,23 @@ function PivotTableChart(props: PivotTableProps) {
       if (isExplicitSubtotalNode(node) || isMetricGrandTotalNode(node)) {
         return false;
       }
-      if (
-        axis === 'row' &&
-        resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
-        isMultiMetric &&
-        metricIndexOnRows !== undefined &&
-        metricIndexOnRows > 0 &&
-        metricIndexOnRows < groupbyRows.length &&
-        node.path.length === metricIndexOnRows &&
-        !node.path.some(val => metricLabelSet.has(String(val ?? '')))
-      ) {
-        return false;
-      }
-      if (
-        axis === 'col' &&
-        resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS &&
-        isMultiMetric &&
-        metricIndexOnCols !== undefined &&
-        metricIndexOnCols > 0 &&
-        metricIndexOnCols < groupbyColumns.length &&
-        node.path.length === metricIndexOnCols &&
-        !node.path.some(val => metricLabelSet.has(String(val ?? '')))
-      ) {
+      const hideMetricParentToggle =
+        axis === 'row'
+          ? resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
+            isMultiMetric &&
+            metricLayoutIndexOnRows !== undefined &&
+            metricLayoutIndexOnRows > 0 &&
+            metricLayoutIndexOnRows < groupbyRows.length &&
+            node.path.length === metricLayoutIndexOnRows &&
+            !node.path.some(val => metricLabelSet.has(String(val ?? '')))
+          : resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS &&
+            isMultiMetric &&
+            metricLayoutIndexOnCols !== undefined &&
+            metricLayoutIndexOnCols > 0 &&
+            metricLayoutIndexOnCols < groupbyColumns.length &&
+            node.path.length === metricLayoutIndexOnCols &&
+            !node.path.some(val => metricLabelSet.has(String(val ?? '')));
+      if (hideMetricParentToggle) {
         return false;
       }
       return true;
@@ -1152,11 +1239,11 @@ function PivotTableChart(props: PivotTableProps) {
     [
       groupbyColumns.length,
       groupbyRows.length,
-      isMultiMetric,
       isExplicitSubtotalNode,
       isMetricGrandTotalNode,
-      metricIndexOnCols,
-      metricIndexOnRows,
+      isMultiMetric,
+      metricLayoutIndexOnCols,
+      metricLayoutIndexOnRows,
       metricLabelSet,
       resolvedMetricsLayout,
     ],
