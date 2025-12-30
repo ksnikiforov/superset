@@ -18,10 +18,11 @@
  */
 
 import buildQuery, { formatQueryName } from '../../src/buildQuery';
-import { MetricsLayoutEnum, PivotTableQueryFormData } from '../../src/types';
+import { MetricsLayoutEnum } from '../../src/types';
 import { METRICS_PLACEHOLDER } from '../../src/utils';
+import { buildFormData } from './fixtures/pivotFormData';
 
-const baseFormData = {
+const baseFormData = buildFormData({
   groupbyRows: ['row1', 'row2'],
   groupbyColumns: ['col1', 'col2'],
   metrics: ['metric1'],
@@ -39,15 +40,18 @@ const baseFormData = {
   aggregateFunction: 'Sum',
   rowOrder: 'key_a_to_z',
   colOrder: 'key_a_to_z',
+  metricsLayout: undefined,
+  legacy_order_by: [],
+  order_desc: true,
+  width: 400,
+  height: 400,
+  margin: 0,
   verboseMap: {},
   columnFormats: {},
   currencyFormats: {},
   metricColorFormatters: [],
   dateFormatters: {},
-  setDataMask: () => {},
-  legacy_order_by: [],
-  order_desc: true,
-} as unknown as PivotTableQueryFormData;
+});
 
 test('emits a single grouped query when totals are disabled and expanded', () => {
   const queryContext = buildQuery(baseFormData);
@@ -70,60 +74,68 @@ test('emits multi queries when startCollapsed is true', () => {
 });
 
 test('emits column subtotal depth without including grand total level', () => {
-  const queryContext = buildQuery({
-    ...baseFormData,
-    startCollapsed: true,
-    colSubtotalLevels: [1],
-    colTotals: false,
-  });
+  const queryContext = buildQuery(
+    buildFormData({
+      ...baseFormData,
+      startCollapsed: true,
+      colSubtotalLevels: [1],
+      colTotals: false,
+    }),
+  );
   const names = queryContext.queries.map(q => q.query_name);
   expect(names).toContain(formatQueryName(2, 1));
   expect(names).not.toContain(formatQueryName(2, 0));
 });
 
 test('requests the first column level on initial collapsed render with multiple column groupbys', () => {
-  const queryContext = buildQuery({
-    ...baseFormData,
-    groupbyRows: ['orderStatus'],
-    groupbyColumns: ['orderPriority', 'revenueBand', 'returnFlag'],
-    startCollapsed: true,
-    initialDepth: 1,
-  } as PivotTableQueryFormData);
+  const queryContext = buildQuery(
+    buildFormData({
+      ...baseFormData,
+      groupbyRows: ['orderStatus'],
+      groupbyColumns: ['orderPriority', 'revenueBand', 'returnFlag'],
+      startCollapsed: true,
+      initialDepth: 1,
+    }),
+  );
   const names = queryContext.queries.map(q => q.query_name);
   expect(names).toContain(formatQueryName(1, 1));
   expect(names).not.toContain(formatQueryName(1, 0));
 });
 
 test('includes row subtotal depths when row subtotals are enabled', () => {
-  const queryContext = buildQuery({
-    ...baseFormData,
-    startCollapsed: true,
-    rowTotals: false,
-    rowSubTotals: true,
-  });
+  const queryContext = buildQuery(
+    buildFormData({
+      ...baseFormData,
+      startCollapsed: true,
+      rowTotals: false,
+      rowSubTotals: true,
+    }),
+  );
   const names = queryContext.queries.map(q => q.query_name);
   expect(names).toContain(formatQueryName(1, 2));
 });
 
 test('limits row subtotal depths to initial visible depth when collapsed', () => {
-  const queryContext = buildQuery({
-    ...baseFormData,
-    groupbyRows: [
-      'quantityBand',
-      'returnFlag',
-      'shipMode',
-      'revenueBand',
-      METRICS_PLACEHOLDER,
-    ],
-    groupbyColumns: ['customerSegment', 'shipMode'],
-    metrics: ['averageOrderValue', 'weightedDiscount'],
-    metricsLayout: MetricsLayoutEnum.ROWS,
-    startCollapsed: true,
-    initialDepth: 1,
-    rowTotals: true,
-    colTotals: true,
-    rowSubTotals: true,
-  } as PivotTableQueryFormData);
+  const queryContext = buildQuery(
+    buildFormData({
+      ...baseFormData,
+      groupbyRows: [
+        'quantityBand',
+        'returnFlag',
+        'shipMode',
+        'revenueBand',
+        METRICS_PLACEHOLDER,
+      ],
+      groupbyColumns: ['customerSegment', 'shipMode'],
+      metrics: ['averageOrderValue', 'weightedDiscount'],
+      metricsLayout: MetricsLayoutEnum.ROWS,
+      startCollapsed: true,
+      initialDepth: 1,
+      rowTotals: true,
+      colTotals: true,
+      rowSubTotals: true,
+    }),
+  );
   const names = queryContext.queries.map(q => q.query_name);
   expect(queryContext.queries).toHaveLength(4);
   expect(names).toContain(formatQueryName(0, 0));
@@ -135,16 +147,18 @@ test('limits row subtotal depths to initial visible depth when collapsed', () =>
 });
 
 test('includes zero-depth totals when metrics lead rows and column totals are enabled', () => {
-  const queryContext = buildQuery({
-    ...baseFormData,
-    groupbyRows: [METRICS_PLACEHOLDER, 'quantityBand', 'orderPriority'],
-    groupbyColumns: ['returnFlag', 'shipMode'],
-    metrics: ['averageOrderValue', 'weightedDiscount'],
-    metricsLayout: MetricsLayoutEnum.ROWS,
-    startCollapsed: true,
-    initialDepth: 2,
-    colTotals: true,
-  } as PivotTableQueryFormData);
+  const queryContext = buildQuery(
+    buildFormData({
+      ...baseFormData,
+      groupbyRows: [METRICS_PLACEHOLDER, 'quantityBand', 'orderPriority'],
+      groupbyColumns: ['returnFlag', 'shipMode'],
+      metrics: ['averageOrderValue', 'weightedDiscount'],
+      metricsLayout: MetricsLayoutEnum.ROWS,
+      startCollapsed: true,
+      initialDepth: 2,
+      colTotals: true,
+    }),
+  );
   const names = queryContext.queries.map(q => q.query_name);
   expect(names).toContain(formatQueryName(0, 0));
 });

@@ -20,15 +20,17 @@
 import React from 'react';
 import { ChartProps, supersetTheme } from '@superset-ui/core';
 import { render, screen, within } from '@testing-library/react';
-import PivotTableChart from '../../src/PivotTableChart';
+import PivotTableChart from './fixtures/TestPivotTableChart';
 import transformProps from '../../src/transformProps';
 import {
   MetricsLayoutEnum,
   PivotTableQueryFormData,
+  PivotResultCell,
   PivotTreeData,
   PivotTreeNode,
 } from '../../src/types';
 import { formatQueryName } from '../../src/buildQuery';
+import { buildFormData } from './fixtures/pivotFormData';
 import {
   applyMetricAxis,
   buildTreeFromRecords,
@@ -131,7 +133,7 @@ describe('PivotTableChart metric tier suppression', () => {
   it('hides the metric column header when there is a single metric at the last column level', () => {
     const props = {
       data: baseTree,
-      formData: baseFormData as PivotTableQueryFormData,
+      formData: buildFormData(baseFormData),
       metrics: ['metric1'],
       groupbyRows: ['r1'],
       groupbyColumns: ['c1'],
@@ -219,13 +221,13 @@ describe('PivotTableChart metric tier suppression', () => {
 
     const props = {
       data: treeWithMetricBottom,
-      formData: {
+      formData: buildFormData( {
         ...baseFormData,
         groupbyRows: ['nation', 'orderPriority'],
         groupbyColumns: ['segment'],
         metrics: ['countCustomers'],
         metricsLayout: MetricsLayoutEnum.ROWS,
-      } as PivotTableQueryFormData,
+      }),
       metrics: ['countCustomers'],
       groupbyRows: ['nation', 'orderPriority'],
       groupbyColumns: ['segment'],
@@ -287,14 +289,14 @@ describe('PivotTableChart multi-metric visibility', () => {
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseFormData as Partial<PivotTableQueryFormData>),
             groupbyRows: ['group', 'product'],
             groupbyColumns: [],
             metricsLayout: MetricsLayoutEnum.ROWS,
             metrics: ['measure1', 'measure2'],
-          } as PivotTableQueryFormData
+          })
         }
         metrics={['measure1', 'measure2']}
         groupbyRows={['group', 'product']}
@@ -367,14 +369,14 @@ describe('PivotTableChart multi-metric visibility', () => {
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseFormData as Partial<PivotTableQueryFormData>),
             groupbyRows: [],
             groupbyColumns: ['group', 'product', '__MEASURES__'],
             metricsLayout: MetricsLayoutEnum.COLUMNS,
             metrics: ['measure1', 'measure2'],
-          } as PivotTableQueryFormData
+          })
         }
         metrics={['measure1', 'measure2']}
         groupbyRows={[]}
@@ -452,14 +454,14 @@ describe('PivotTableChart multi-metric visibility', () => {
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseFormData as Partial<PivotTableQueryFormData>),
             groupbyRows: ['group', 'product'],
             groupbyColumns: ['col_lvl1', 'col_lvl2', '__MEASURES__'],
             metricsLayout: MetricsLayoutEnum.COLUMNS,
             metrics: ['m1', 'm2'],
-          } as PivotTableQueryFormData
+          })
         }
         metrics={['m1', 'm2']}
         groupbyRows={['group', 'product']}
@@ -556,14 +558,14 @@ describe('PivotTableChart metric tier indentation and toggles', () => {
     render(
       <PivotTableChart
         data={tree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: ['orderPriority', 'shipMode', METRICS_PLACEHOLDER],
             groupbyColumns: [],
             metricsLayout: MetricsLayoutEnum.ROWS,
             metrics: ['averageOrderValue', 'weightedDiscount'],
-          } as PivotTableQueryFormData
+          })
         }
         metrics={['averageOrderValue', 'weightedDiscount']}
         groupbyRows={['orderPriority', 'shipMode']}
@@ -614,14 +616,14 @@ describe('PivotTableChart metric tier indentation and toggles', () => {
     render(
       <PivotTableChart
         data={tree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: ['orderPriority', 'shipMode', METRICS_PLACEHOLDER],
             groupbyColumns: [],
             metricsLayout: MetricsLayoutEnum.ROWS,
             metrics: ['averageOrderValue', 'weightedDiscount'],
-          } as PivotTableQueryFormData
+          })
         }
         metrics={['averageOrderValue', 'weightedDiscount']}
         groupbyRows={['orderPriority', 'shipMode']}
@@ -665,7 +667,7 @@ describe('PivotTableChart metric tier indentation and toggles', () => {
     render(
       <PivotTableChart
         data={tree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: ['orderPriority', METRICS_PLACEHOLDER, 'shipMode'],
@@ -674,7 +676,7 @@ describe('PivotTableChart metric tier indentation and toggles', () => {
             metrics: ['averageOrderValue', 'weightedDiscount'],
             startCollapsed: true,
             initialDepth: 1,
-          } as PivotTableQueryFormData
+          })
         }
         metrics={['averageOrderValue', 'weightedDiscount']}
         groupbyRows={['orderPriority', 'shipMode']}
@@ -725,7 +727,7 @@ describe('PivotTableChart metric tier indentation and toggles', () => {
     render(
       <PivotTableChart
         data={tree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: [],
@@ -734,7 +736,7 @@ describe('PivotTableChart metric tier indentation and toggles', () => {
             metrics: ['averageOrderValue', 'weightedDiscount'],
             startCollapsed: true,
             initialDepth: 1,
-          } as PivotTableQueryFormData
+          })
         }
         metrics={['averageOrderValue', 'weightedDiscount']}
         groupbyRows={[]}
@@ -814,14 +816,14 @@ describe('PivotTableChart initial depth on collapsed render', () => {
     render(
       <PivotTableChart
         data={tree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: ['orderStatus'],
             groupbyColumns: ['orderPriority', 'revenueBand', 'returnFlag', '__MEASURES__'],
             metricsLayout: MetricsLayoutEnum.COLUMNS,
             metrics: ['quantitySold'],
-          } as PivotTableQueryFormData
+          })
         }
         metrics={['quantitySold']}
         groupbyRows={['orderStatus']}
@@ -893,14 +895,14 @@ describe('PivotTableChart initial depth on collapsed render', () => {
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: ['orderStatus'],
             groupbyColumns: ['orderPriority', 'revenueBand', 'returnFlag', '__MEASURES__'],
             metricsLayout: MetricsLayoutEnum.COLUMNS,
             metrics: ['quantitySold'],
-          } as PivotTableQueryFormData
+          })
         }
         metrics={['quantitySold']}
         groupbyRows={['orderStatus']}
@@ -941,15 +943,20 @@ describe('PivotTableChart initial depth on collapsed render', () => {
 
   it('fails when only grand total column renders for multi-column selection (regression guard)', () => {
     // Simulate a broken response that labels colDepth=0 but still returns column groupbys.
-    const formData = {
+    const formData = buildFormData({
       ...(baseProps as Partial<PivotTableQueryFormData>),
       groupbyRows: ['orderStatus'],
-      groupbyColumns: ['orderPriority', 'revenueBand', 'returnFlag', METRICS_PLACEHOLDER],
+      groupbyColumns: [
+        'orderPriority',
+        'revenueBand',
+        'returnFlag',
+        METRICS_PLACEHOLDER,
+      ],
       metricsLayout: MetricsLayoutEnum.COLUMNS,
       metrics: ['quantitySold'],
       viz_type: 'pivot_table_v3',
       datasource: '1__table',
-    } as PivotTableQueryFormData;
+    });
     const chartProps = new ChartProps({
       formData,
       width: 600,
@@ -993,7 +1000,7 @@ describe('PivotTableChart initial depth on collapsed render', () => {
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={formData}
+        formData={buildFormData(formData)}
         metrics={['quantitySold']}
         groupbyRows={['orderStatus']}
         groupbyColumns={['orderPriority', 'revenueBand', 'returnFlag']}
@@ -1060,18 +1067,21 @@ describe('PivotTableChart initial depth on collapsed render', () => {
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={
-          {
-            ...(baseProps as Partial<PivotTableQueryFormData>),
-            groupbyRows: ['orderStatus'],
-            groupbyColumns: ['orderPriority', 'revenueBand', 'returnFlag', '__MEASURES__'],
-            metricsLayout: MetricsLayoutEnum.COLUMNS,
-            metrics: ['quantitySold'],
-            rowTotals: false,
-            rowSubTotals: false,
-            rowSubtotalLevels: [],
-          } as PivotTableQueryFormData
-        }
+        formData={buildFormData({
+          ...(baseProps as Partial<PivotTableQueryFormData>),
+          groupbyRows: ['orderStatus'],
+          groupbyColumns: [
+            'orderPriority',
+            'revenueBand',
+            'returnFlag',
+            '__MEASURES__',
+          ],
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+          metrics: ['quantitySold'],
+          rowTotals: false,
+          rowSubTotals: false,
+          rowSubtotalLevels: [],
+        })}
         metrics={['quantitySold']}
         groupbyRows={['orderStatus']}
         groupbyColumns={['orderPriority', 'revenueBand', 'returnFlag']}
@@ -1182,7 +1192,7 @@ describe('PivotTableChart initial depth on collapsed render', () => {
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: ['orderStatus'],
@@ -1191,7 +1201,7 @@ describe('PivotTableChart initial depth on collapsed render', () => {
             metrics: ['metric1'],
             colSubtotalLevels: [0],
             colTotals: true,
-          } as PivotTableQueryFormData
+          })
         }
         metrics={['metric1']}
         groupbyRows={['orderStatus']}
@@ -1287,7 +1297,7 @@ describe('PivotTableChart totals & subtotals', () => {
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: ['region'],
@@ -1296,7 +1306,7 @@ describe('PivotTableChart totals & subtotals', () => {
             metrics: ['metric1'],
             colSubtotalLevels: [1],
             colSubtotalPosition: 'start',
-          } as PivotTableQueryFormData
+          })
         }
         metrics={['metric1']}
         groupbyRows={['region']}
@@ -1435,7 +1445,7 @@ describe('PivotTableChart totals & subtotals', () => {
     };
     const tree: PivotTreeData = { rows, cols, cells };
 
-    const props = {
+    const props: Partial<PivotTableQueryFormData> = {
       ...(baseProps as Partial<PivotTableQueryFormData>),
       groupbyRows: ['group', 'product'],
       groupbyColumns: [],
@@ -1444,12 +1454,12 @@ describe('PivotTableChart totals & subtotals', () => {
       rowSubTotals: true,
       rowTotals: true,
       rowSubtotalPosition: 'start',
-    } as any;
+    };
 
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={props}
+        formData={buildFormData(props)}
         metrics={['metric1']}
         groupbyRows={['group', 'product']}
         groupbyColumns={[]}
@@ -1555,18 +1565,16 @@ describe('PivotTableChart totals & subtotals', () => {
     render(
       <PivotTableChart
         data={tree}
-        formData={
-          {
-            ...(baseProps as Partial<PivotTableQueryFormData>),
-            groupbyRows: ['group'],
-            groupbyColumns: [],
-            metricsLayout: MetricsLayoutEnum.ROWS,
-            metrics: ['metric1'],
-            rowSubTotals: true,
-            rowSubtotalLevels: [1],
-            rowSubtotalPosition: 'end',
-          } as PivotTableQueryFormData
-        }
+        formData={buildFormData({
+          ...(baseProps as Partial<PivotTableQueryFormData>),
+          groupbyRows: ['group'],
+          groupbyColumns: [],
+          metricsLayout: MetricsLayoutEnum.ROWS,
+          metrics: ['metric1'],
+          rowSubTotals: true,
+          rowSubtotalLevels: [1],
+          rowSubtotalPosition: 'end',
+        })}
         metrics={['metric1']}
         groupbyRows={['group']}
         groupbyColumns={[]}
@@ -1722,7 +1730,7 @@ describe('PivotTableChart totals & subtotals', () => {
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: ['orderPriority', 'shipMode'],
@@ -1732,7 +1740,7 @@ describe('PivotTableChart totals & subtotals', () => {
             rowSubTotals: true,
             rowSubtotalLevels: [1],
             rowSubtotalPosition: 'start',
-          } as PivotTableQueryFormData
+          })
         }
         metrics={['averageOrderValue', 'weightedDiscount']}
         groupbyRows={['orderPriority', 'shipMode']}
@@ -1875,7 +1883,7 @@ describe('PivotTableChart totals & subtotals', () => {
     };
     const tree: PivotTreeData = { rows, cols, cells };
 
-    const props = {
+    const props: Partial<PivotTableQueryFormData> = {
       ...(baseProps as Partial<PivotTableQueryFormData>),
       groupbyRows: ['group', 'product'],
       groupbyColumns: [],
@@ -1884,12 +1892,12 @@ describe('PivotTableChart totals & subtotals', () => {
       rowSubTotals: true,
       rowTotals: true,
       rowSubtotalPosition: 'end',
-    } as any;
+    };
 
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={props}
+        formData={buildFormData(props)}
         metrics={['metric1']}
         groupbyRows={['group', 'product']}
         groupbyColumns={[]}
@@ -2045,18 +2053,16 @@ describe('PivotTableChart totals & subtotals', () => {
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={
-          {
-            ...(baseProps as Partial<PivotTableQueryFormData>),
-            groupbyRows: ['orderPriority', 'shipMode'],
-            groupbyColumns: [METRICS_PLACEHOLDER],
-            metricsLayout: MetricsLayoutEnum.COLUMNS,
-            metrics: ['averageOrderValue', 'weightedDiscount'],
-            rowSubTotals: true,
-            rowSubtotalLevels: [1],
-            rowSubtotalPosition: 'end',
-          } as PivotTableQueryFormData
-        }
+        formData={buildFormData({
+          ...(baseProps as Partial<PivotTableQueryFormData>),
+          groupbyRows: ['orderPriority', 'shipMode'],
+          groupbyColumns: [METRICS_PLACEHOLDER],
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+          metrics: ['averageOrderValue', 'weightedDiscount'],
+          rowSubTotals: true,
+          rowSubtotalLevels: [1],
+          rowSubtotalPosition: 'end',
+        })}
         metrics={['averageOrderValue', 'weightedDiscount']}
         groupbyRows={['orderPriority', 'shipMode']}
         groupbyColumns={[]}
@@ -2185,7 +2191,7 @@ describe('PivotTableChart totals & subtotals', () => {
     });
 
     const tree: PivotTreeData = { rows, cols, cells };
-    const props = {
+    const props: Partial<PivotTableQueryFormData> = {
       ...(baseProps as Partial<PivotTableQueryFormData>),
       groupbyRows: ['group', 'product'],
       groupbyColumns: [],
@@ -2194,12 +2200,12 @@ describe('PivotTableChart totals & subtotals', () => {
       rowSubTotals: true,
       rowTotals: true,
       rowSubtotalPosition: 'start',
-    } as any;
+    };
 
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={props}
+        formData={buildFormData(props)}
         metrics={metrics}
         groupbyRows={['group', 'product']}
         groupbyColumns={[]}
@@ -2307,18 +2313,16 @@ describe('PivotTableChart totals & subtotals', () => {
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={
-          {
-            ...(baseProps as Partial<PivotTableQueryFormData>),
-            groupbyRows: ['qualityBand', METRICS_PLACEHOLDER],
-            groupbyColumns: [],
-            metricsLayout: MetricsLayoutEnum.ROWS,
-            metrics: ['averageOrderValue'],
-            rowTotals: true,
-            rowSubTotals: true,
-            rowSubtotalPosition: 'end',
-          } as PivotTableQueryFormData
-        }
+        formData={buildFormData({
+          ...(baseProps as Partial<PivotTableQueryFormData>),
+          groupbyRows: ['qualityBand', METRICS_PLACEHOLDER],
+          groupbyColumns: [],
+          metricsLayout: MetricsLayoutEnum.ROWS,
+          metrics: ['averageOrderValue'],
+          rowTotals: true,
+          rowSubTotals: true,
+          rowSubtotalPosition: 'end',
+        })}
         metrics={['averageOrderValue']}
         groupbyRows={['qualityBand']}
         groupbyColumns={[]}
@@ -2386,7 +2390,7 @@ describe('PivotTableChart totals & subtotals', () => {
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: ['region'],
@@ -2397,7 +2401,7 @@ describe('PivotTableChart totals & subtotals', () => {
             colSubtotalLevels: [0],
             rowTotalPosition: 'end',
             colTotalPosition: 'end',
-          } as PivotTableQueryFormData
+          })
         }
         metrics={['metric1']}
         groupbyRows={['region']}
@@ -2473,7 +2477,7 @@ describe('PivotTableChart totals & subtotals', () => {
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: ['region'],
@@ -2482,7 +2486,7 @@ describe('PivotTableChart totals & subtotals', () => {
             metrics: ['metric1'],
             colTotals: true,
             colSubtotalLevels: [],
-          } as PivotTableQueryFormData
+          })
         }
         metrics={['metric1']}
         groupbyRows={['region']}
@@ -2566,7 +2570,7 @@ describe('PivotTableChart totals & subtotals', () => {
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: ['orderPriority'],
@@ -2575,7 +2579,7 @@ describe('PivotTableChart totals & subtotals', () => {
             metrics,
             colTotals: true,
             colTotalPosition: 'end',
-          } as PivotTableQueryFormData
+          })
         }
         metrics={metrics}
         groupbyRows={['orderPriority']}
@@ -2669,7 +2673,7 @@ describe('PivotTableChart totals & subtotals', () => {
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: ['orderPriority'],
@@ -2678,7 +2682,7 @@ describe('PivotTableChart totals & subtotals', () => {
             metrics,
             rowTotals: true,
             rowTotalPosition: 'end',
-          } as PivotTableQueryFormData
+          })
         }
         metrics={metrics}
         groupbyRows={['orderPriority']}
@@ -2800,7 +2804,7 @@ describe('PivotTableChart totals & subtotals', () => {
         const { container } = render(
           <PivotTableChart
             data={tree}
-            formData={
+            formData={buildFormData(
               {
                 ...(baseProps as Partial<PivotTableQueryFormData>),
                 groupbyRows: [
@@ -2815,7 +2819,7 @@ describe('PivotTableChart totals & subtotals', () => {
                 metrics,
                 rowTotals: true,
                 rowTotalPosition: 'end',
-              } as PivotTableQueryFormData
+              })
             }
             metrics={metrics}
             groupbyRows={[
@@ -2918,7 +2922,7 @@ describe('PivotTableChart totals & subtotals', () => {
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: ['orderPriority'],
@@ -2927,7 +2931,7 @@ describe('PivotTableChart totals & subtotals', () => {
             metrics,
             rowTotals: true,
             rowTotalPosition: 'end',
-          } as PivotTableQueryFormData
+          })
         }
         metrics={metrics}
         groupbyRows={['orderPriority']}
@@ -3030,7 +3034,7 @@ describe('PivotTableChart totals & subtotals', () => {
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: [...rowGroupby, METRICS_PLACEHOLDER],
@@ -3040,7 +3044,7 @@ describe('PivotTableChart totals & subtotals', () => {
             rowSubTotals: true,
             rowSubtotalLevels: [1],
             rowSubtotalPosition: 'end',
-          } as PivotTableQueryFormData
+          })
         }
         metrics={metrics}
         groupbyRows={rowGroupby}
@@ -3113,14 +3117,14 @@ describe('PivotTableChart totals & subtotals', () => {
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: ['orderPriority'],
             groupbyColumns: [METRICS_PLACEHOLDER],
             metricsLayout: MetricsLayoutEnum.COLUMNS,
             metrics,
-          } as PivotTableQueryFormData
+          })
         }
         metrics={metrics}
         groupbyRows={['orderPriority']}
@@ -3198,7 +3202,7 @@ describe('PivotTableChart totals & subtotals', () => {
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: ['orderPriority'],
@@ -3207,7 +3211,7 @@ describe('PivotTableChart totals & subtotals', () => {
             metrics,
             rowTotals: true,
             colTotals: true,
-          } as PivotTableQueryFormData
+          })
         }
         metrics={metrics}
         groupbyRows={['orderPriority']}
@@ -3304,7 +3308,7 @@ describe('PivotTableChart totals & subtotals', () => {
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: ['orderPriority'],
@@ -3313,7 +3317,7 @@ describe('PivotTableChart totals & subtotals', () => {
             metrics,
             rowTotals: true,
             colTotals: true,
-          } as PivotTableQueryFormData
+          })
         }
         metrics={metrics}
         groupbyRows={['orderPriority']}
@@ -3404,7 +3408,7 @@ describe('PivotTableChart totals & subtotals', () => {
     const { container } = render(
       <PivotTableChart
         data={labeledTree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: ['orderPriority', 'qualityBand'],
@@ -3413,7 +3417,7 @@ describe('PivotTableChart totals & subtotals', () => {
             metrics,
             rowSubTotals: true,
             rowSubtotalLevels: [1],
-          } as PivotTableQueryFormData
+          })
         }
         metrics={metrics}
         groupbyRows={['orderPriority', 'qualityBand']}
@@ -3752,7 +3756,7 @@ describe('PivotTableChart totals & subtotals', () => {
     const { container } = render(
       <PivotTableChart
         data={labeledTree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: rowGroupby,
@@ -3762,7 +3766,7 @@ describe('PivotTableChart totals & subtotals', () => {
             rowSubTotals: true,
             rowSubtotalLevels: [1, 2],
             rowSubtotalPosition: 'start',
-          } as PivotTableQueryFormData
+          })
         }
         metrics={metrics}
         groupbyRows={rowGroupby}
@@ -3848,7 +3852,7 @@ describe('PivotTableChart totals & subtotals', () => {
     const { container } = render(
       <PivotTableChart
         data={labeledTree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: rowGroupby,
@@ -3858,7 +3862,7 @@ describe('PivotTableChart totals & subtotals', () => {
             rowSubTotals: true,
             rowSubtotalLevels: [1, 2],
             rowSubtotalPosition: 'end',
-          } as PivotTableQueryFormData
+          })
         }
         metrics={metrics}
         groupbyRows={rowGroupby}
@@ -3944,7 +3948,7 @@ describe('PivotTableChart totals & subtotals', () => {
     const { container } = render(
       <PivotTableChart
         data={labeledTree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: rowGroupby,
@@ -3954,7 +3958,7 @@ describe('PivotTableChart totals & subtotals', () => {
             rowSubTotals: false,
             rowSubtotalLevels: [1, 2],
             rowSubtotalPosition: 'end',
-          } as PivotTableQueryFormData
+          })
         }
         metrics={metrics}
         groupbyRows={rowGroupby}
@@ -4010,7 +4014,7 @@ describe('PivotTableChart totals & subtotals', () => {
     const { container } = render(
       <PivotTableChart
         data={labeledTree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: ['A', 'B', 'C', METRICS_PLACEHOLDER, 'D', 'E', 'F'],
@@ -4020,7 +4024,7 @@ describe('PivotTableChart totals & subtotals', () => {
             rowSubTotals: true,
             rowSubtotalLevels: [1, 2, 3],
             rowSubtotalPosition: 'start',
-          } as PivotTableQueryFormData
+          })
         }
         metrics={metrics}
         groupbyRows={rowGroupby}
@@ -4106,7 +4110,7 @@ describe('PivotTableChart totals & subtotals', () => {
     const { container } = render(
       <PivotTableChart
         data={labeledTree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: ['A', 'B', 'C', METRICS_PLACEHOLDER, 'D', 'E', 'F'],
@@ -4116,7 +4120,7 @@ describe('PivotTableChart totals & subtotals', () => {
             rowSubTotals: true,
             rowSubtotalLevels: [1, 2, 3, 5],
             rowSubtotalPosition: 'end',
-          } as PivotTableQueryFormData
+          })
         }
         metrics={metrics}
         groupbyRows={rowGroupby}
@@ -4217,7 +4221,7 @@ describe('PivotTableChart totals & subtotals', () => {
     const { container } = render(
       <PivotTableChart
         data={labeledTree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: [
@@ -4239,7 +4243,7 @@ describe('PivotTableChart totals & subtotals', () => {
             rowSubTotals: true,
             rowSubtotalLevels: [1, 2, 3, 4, 5],
             rowSubtotalPosition: 'start',
-          } as PivotTableQueryFormData
+          })
         }
         metrics={metrics}
         groupbyRows={rowGroupby}
@@ -4343,7 +4347,7 @@ describe('PivotTableChart totals & subtotals', () => {
     const { container } = render(
       <PivotTableChart
         data={labeledTree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: [
@@ -4365,7 +4369,7 @@ describe('PivotTableChart totals & subtotals', () => {
             rowSubTotals: true,
             rowSubtotalLevels: [1, 2, 3, 4, 5, 6, 7, 8, 9],
             rowSubtotalPosition: 'end',
-          } as PivotTableQueryFormData
+          })
         }
         metrics={metrics}
         groupbyRows={rowGroupby}
@@ -4512,7 +4516,7 @@ describe('PivotTableChart totals & subtotals', () => {
     const { container } = render(
       <PivotTableChart
         data={labeledTree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: rowGroupby,
@@ -4522,7 +4526,7 @@ describe('PivotTableChart totals & subtotals', () => {
             rowSubTotals: true,
             rowSubtotalLevels: [1, 2],
             rowSubtotalPosition: 'end',
-          } as PivotTableQueryFormData
+          })
         }
         metrics={metrics}
         groupbyRows={rowGroupby}
@@ -4724,7 +4728,7 @@ describe('PivotTableChart totals & subtotals', () => {
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: ['r1'],
@@ -4733,7 +4737,7 @@ describe('PivotTableChart totals & subtotals', () => {
             metrics,
             colTotals: true,
             colTotalPosition: 'end',
-          } as PivotTableQueryFormData
+          })
         }
         metrics={metrics}
         groupbyRows={['r1']}
@@ -4922,7 +4926,7 @@ describe('PivotTableChart totals & subtotals', () => {
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: [METRICS_PLACEHOLDER, 'r1', 'r2'],
@@ -4931,7 +4935,7 @@ describe('PivotTableChart totals & subtotals', () => {
             metrics,
             rowTotals: true,
             rowTotalPosition: 'end',
-          } as PivotTableQueryFormData
+          })
         }
         metrics={metrics}
         groupbyRows={['r1', 'r2']}
@@ -5016,7 +5020,7 @@ describe('PivotTableChart totals & subtotals', () => {
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: ['r1'],
@@ -5025,7 +5029,7 @@ describe('PivotTableChart totals & subtotals', () => {
             metrics,
             colTotals: true,
             colTotalPosition: 'end',
-          } as PivotTableQueryFormData
+          })
         }
         metrics={metrics}
         groupbyRows={['r1']}
@@ -5112,7 +5116,7 @@ describe('PivotTableChart totals & subtotals', () => {
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: ['r1'],
@@ -5121,7 +5125,7 @@ describe('PivotTableChart totals & subtotals', () => {
             metrics,
             colTotals: true,
             colTotalPosition: 'end',
-          } as PivotTableQueryFormData
+          })
         }
         metrics={metrics}
         groupbyRows={['r1']}
@@ -5222,7 +5226,7 @@ describe('PivotTableChart totals & subtotals', () => {
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: ['r1'],
@@ -5234,7 +5238,7 @@ describe('PivotTableChart totals & subtotals', () => {
             colSubtotalLevels: [1],
             colTotalPosition: 'end',
             colSubtotalPosition: 'end',
-          } as PivotTableQueryFormData
+          })
         }
         metrics={metrics}
         groupbyRows={['r1']}
@@ -5377,7 +5381,7 @@ describe('PivotTableChart totals & subtotals', () => {
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: ['region'],
@@ -5388,7 +5392,7 @@ describe('PivotTableChart totals & subtotals', () => {
             colSubtotalLevels: [1],
             colSubtotalPosition: 'start',
             colTotalPosition: 'end',
-          } as PivotTableQueryFormData
+          })
         }
         metrics={['metric1']}
         groupbyRows={['region']}
@@ -5516,7 +5520,7 @@ describe('PivotTableChart totals & subtotals', () => {
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: ['region'],
@@ -5527,7 +5531,7 @@ describe('PivotTableChart totals & subtotals', () => {
             colSubtotalLevels: [1],
             colSubtotalPosition: 'start',
             colTotalPosition: 'end',
-          } as PivotTableQueryFormData
+          })
         }
         metrics={['metric1']}
         groupbyRows={['region']}
@@ -5656,7 +5660,7 @@ describe('PivotTableChart totals & subtotals', () => {
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: ['region'],
@@ -5669,7 +5673,7 @@ describe('PivotTableChart totals & subtotals', () => {
             colTotalPosition: 'end',
             startCollapsed: false,
             initialDepth: 3,
-          } as PivotTableQueryFormData
+          })
         }
         metrics={['metric1']}
         groupbyRows={['region']}
@@ -5789,7 +5793,7 @@ describe('PivotTableChart totals & subtotals', () => {
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: ['region'],
@@ -5802,7 +5806,7 @@ describe('PivotTableChart totals & subtotals', () => {
             colTotalPosition: 'end',
             startCollapsed: false,
             initialDepth: 5,
-          } as PivotTableQueryFormData
+          })
         }
         metrics={['metric1']}
         groupbyRows={['region']}
@@ -5917,7 +5921,7 @@ describe('PivotTableChart totals & subtotals', () => {
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: ['region'],
@@ -5930,7 +5934,7 @@ describe('PivotTableChart totals & subtotals', () => {
             colTotalPosition: 'start',
             startCollapsed: false,
             initialDepth: 5,
-          } as PivotTableQueryFormData
+          })
         }
         metrics={['metric1']}
         groupbyRows={['region']}
@@ -6038,7 +6042,7 @@ describe('PivotTableChart totals & subtotals', () => {
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={
+        formData={buildFormData(
           {
             ...(baseProps as Partial<PivotTableQueryFormData>),
             groupbyRows: ['region'],
@@ -6051,7 +6055,7 @@ describe('PivotTableChart totals & subtotals', () => {
             colTotalPosition: 'end',
             startCollapsed: false,
             initialDepth: 2,
-          } as PivotTableQueryFormData
+          })
         }
         metrics={['metric1']}
         groupbyRows={['region']}
