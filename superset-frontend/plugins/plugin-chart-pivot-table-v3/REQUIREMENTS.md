@@ -46,15 +46,6 @@ This document summarizes the functional requirements gathered from user feedback
 ### Branch fetching depth
 - **Fixed per-fetch depth:** Branch fetches always advance one level per expand; `maxDepthPerFetch` is fixed to `1` (`transformProps.ts`, `fetchPivotBranch.ts`).
 
-### Known gaps / TODOs
-- Solidify metrics placeholder styling/affordance in the control panel to ensure visibility across all Explore themes.
-- Align totals ordering for complex layouts (metrics on rows + row totals) and verify deep hierarchy totals.
-- Add comprehensive tests for column header stacking and metric conflict fallback behavior.
-- Verify ancestor column values stay populated when rows expand under multi-level columns (segment → shipMode → Values) to avoid blanks at higher column levels.
-- Ensure ancestor column aggregates are fetched and rendered for all visible rows when expanding additional column leaves after deeper row expansion (e.g., column expand → row expand → child row expand → another column expand).
-- Column subtotal control now clamps options to the actual column depth and excludes the total level; still add a “Select all” affordance when levels change.
-- Hide or retire legacy controls in the Customize tab that no longer apply (e.g., aggregation function, metrics layout switch) to reduce confusion; pivot transpose control has been removed.
-- When expanding a column hierarchy with totals, avoid duplicating the parent total column alongside the injected branch subtotal: replace/suppress the parent total for that path and render a single “Subtotal” child beneath the expanded header.
 
 ### Interaction & behavior guide (expected)
 - **Layout resolution:** The “Σ Values” placeholder is resolved into the target axis at a specific index (`resolveMetricPlacement` → `transformProps.ts`), producing an ordered list of row/col groupbys and a metrics axis. Only one placeholder exists across axes; cross-axis moves update both controls. _Coverage: missing._
@@ -67,15 +58,6 @@ This document summarizes the functional requirements gathered from user feedback
 - **Totals/subtotals:** Level-aware selections (arrays) define which depths to request. Initial load queries only visible depths + selected totals/subtotals; branch fetches request the same depth pairs when expanding. _Coverage: `buildQuery.test.ts` (multi-query when totals/collapse); deeper totals rendering coverage missing._
 - **Drag & drop:** Placeholder is deduped across axes; drag should not throw; cross-axis drops update both controls and rerun placement. Keys are stable to avoid react-dnd target invalidation. _Coverage: missing._
 
-### Architecture refactor (current state)
-- **Render + state:** `PivotTableChart.tsx` owns React state, fetch orchestration, and the HTML table render. [`src/PivotTableChart.tsx`](src/PivotTableChart.tsx)
-- **Traversal + sorting:** Tree traversal, header row building, sorting, and value formatting live in the view-model helpers. [`src/pivot/viewModel.ts`](src/pivot/viewModel.ts)
-- **Totals/metrics policy:** Metric path helpers, subtotal/total detection, and depth calculations live here. [`src/pivot/metricsTotals.ts`](src/pivot/metricsTotals.ts)
-- **Visibility + expansion:** Visible row/column builders, depth helpers, and loaded-children checks live here. [`src/pivot/visibility.ts`](src/pivot/visibility.ts)
-- **Column header display:** Column header display-path logic (for metrics/totals layouts) lives here. [`src/pivot/columnDisplay.ts`](src/pivot/columnDisplay.ts)
-- **Filters + context menu:** Cross-filter and context menu filter assembly live here. [`src/pivot/filters.ts`](src/pivot/filters.ts)
-- **Cell helpers:** Metric key resolution, row subtotal hiding, and label formatting live here. [`src/pivot/cellUtils.ts`](src/pivot/cellUtils.ts)
-- **No UI change intended:** The HTML table output and behavior are expected to remain identical; this is purely structural.
 
 ### Key file references
 - Query construction: [`src/buildQuery.ts`](src/buildQuery.ts)

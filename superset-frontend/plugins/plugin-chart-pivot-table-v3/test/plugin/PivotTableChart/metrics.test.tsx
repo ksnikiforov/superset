@@ -252,151 +252,188 @@ describe('PivotTableChart metric tier suppression', () => {
 });
 
 describe('PivotTableChart multi-metric visibility', () => {
+  const metricsVariants = [
+    ['measure1', 'measure2'],
+    ['measure1', 'measure2', 'measure3'],
+  ];
+
   it('shows metrics under a collapsed row group when multiple metrics are selected', () => {
-    const treeRaw = buildTreeFromRecords(
-      [
-        { group: 'Bikes', product: 'Road', measure1: 10, measure2: 20 },
-        { group: 'Bikes', product: 'Mountain', measure1: 5, measure2: 15 },
-      ],
-      ['measure1', 'measure2'],
-      ['group', 'product'],
-      [],
-      2,
-      0,
-    );
-    const tree = applyMetricAxis(
-      treeRaw,
-      ['measure1', 'measure2'],
-      MetricsLayoutEnum.ROWS,
-      ['group', 'product'],
-      [],
-      2,
-    );
+    metricsVariants.forEach(metrics => {
+      const treeRaw = buildTreeFromRecords(
+        [
+          {
+            group: 'Bikes',
+            product: 'Road',
+            measure1: 10,
+            measure2: 20,
+            measure3: 30,
+          },
+          {
+            group: 'Bikes',
+            product: 'Mountain',
+            measure1: 5,
+            measure2: 15,
+            measure3: 25,
+          },
+        ],
+        metrics,
+        ['group', 'product'],
+        [],
+        2,
+        0,
+      );
+      const tree = applyMetricAxis(
+        treeRaw,
+        metrics,
+        MetricsLayoutEnum.ROWS,
+        ['group', 'product'],
+        [],
+        2,
+      );
 
-    const { container } = render(
-      <PivotTableChart
-        data={tree}
-        formData={buildFormData({
-          ...(baseFormData as Partial<PivotTableQueryFormData>),
-          groupbyRows: ['group', 'product'],
-          groupbyColumns: [],
-          metricsLayout: MetricsLayoutEnum.ROWS,
-          metrics: ['measure1', 'measure2'],
-        })}
-        metrics={['measure1', 'measure2']}
-        groupbyRows={['group', 'product']}
-        groupbyColumns={[]}
-        aggregateFunction="Sum"
-        width={400}
-        height={300}
-        startCollapsed
-        initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
-        colTotals={false}
-        rowSubTotals={false}
-        colSubTotals={false}
-        rowSubtotalLevels={[]}
-        colSubtotalLevels={[]}
-        rowOrder="key_a_to_z"
-        colOrder="key_a_to_z"
-        valueFormat=""
-        columnFormats={{}}
-        currencyFormats={{}}
-        allowRenderHtml={false}
-        emitCrossFilters={false}
-        setDataMask={jest.fn()}
-        metricColorFormatters={[]}
-        dateFormatters={{}}
-      />,
-    );
+      const { container, unmount } = render(
+        <PivotTableChart
+          data={tree}
+          formData={buildFormData({
+            ...(baseFormData as Partial<PivotTableQueryFormData>),
+            groupbyRows: ['group', 'product'],
+            groupbyColumns: [],
+            metricsLayout: MetricsLayoutEnum.ROWS,
+            metrics,
+          })}
+          metrics={metrics}
+          groupbyRows={['group', 'product']}
+          groupbyColumns={[]}
+          aggregateFunction="Sum"
+          width={400}
+          height={300}
+          startCollapsed
+          initialDepth={1}
+          maxDepthPerFetch={1}
+          rowTotals={false}
+          colTotals={false}
+          rowSubTotals={false}
+          colSubTotals={false}
+          rowSubtotalLevels={[]}
+          colSubtotalLevels={[]}
+          rowOrder="key_a_to_z"
+          colOrder="key_a_to_z"
+          valueFormat=""
+          columnFormats={{}}
+          currencyFormats={{}}
+          allowRenderHtml={false}
+          emitCrossFilters={false}
+          setDataMask={jest.fn()}
+          metricColorFormatters={[]}
+          dateFormatters={{}}
+        />,
+      );
 
-    const rowHeaders = Array.from(
-      container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
-    ).map(cell => cell.textContent?.trim());
+      const rowHeaders = Array.from(
+        container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
+      ).map(cell => cell.textContent?.trim());
 
-    expect(rowHeaders).toEqual(
-      expect.arrayContaining(['Bikes', 'measure1', 'measure2']),
-    );
-    expect(rowHeaders).not.toEqual(
-      expect.arrayContaining(['Road', 'Mountain']),
-    );
+      expect(rowHeaders).toEqual(
+        expect.arrayContaining(['Bikes', ...metrics]),
+      );
+      expect(rowHeaders).not.toEqual(
+        expect.arrayContaining(['Road', 'Mountain']),
+      );
 
-    const groupRow = screen.getByText('Bikes').closest('tr') as HTMLElement;
-    expect(within(groupRow).getByLabelText('plus-square')).toBeTruthy();
+      const groupRow = screen.getByText('Bikes').closest('tr') as HTMLElement;
+      expect(within(groupRow).getByLabelText('plus-square')).toBeTruthy();
 
-    const metricRow = screen.getAllByText('measure1')[0].closest('tr') as HTMLElement;
-    expect(within(metricRow).queryByLabelText('plus-square')).toBeNull();
-    expect(within(metricRow).queryByLabelText('minus-square')).toBeNull();
+      const metricRow = screen.getAllByText(metrics[0])[0].closest(
+        'tr',
+      ) as HTMLElement;
+      expect(within(metricRow).queryByLabelText('plus-square')).toBeNull();
+      expect(within(metricRow).queryByLabelText('minus-square')).toBeNull();
+      unmount();
+    });
   });
 
   it('shows metrics under collapsed columns when multiple metrics are selected', () => {
-    const treeRaw = buildTreeFromRecords(
-      [
-        { group: 'Bikes', product: 'Road', measure1: 10, measure2: 20 },
-        { group: 'Bikes', product: 'Mountain', measure1: 5, measure2: 15 },
-      ],
-      ['measure1', 'measure2'],
-      [],
-      ['group', 'product'],
-      0,
-      2,
-    );
-    const tree = applyMetricAxis(
-      treeRaw,
-      ['measure1', 'measure2'],
-      MetricsLayoutEnum.COLUMNS,
-      [],
-      ['group', 'product'],
-      2,
-    );
+    metricsVariants.forEach(metrics => {
+      const treeRaw = buildTreeFromRecords(
+        [
+          {
+            group: 'Bikes',
+            product: 'Road',
+            measure1: 10,
+            measure2: 20,
+            measure3: 30,
+          },
+          {
+            group: 'Bikes',
+            product: 'Mountain',
+            measure1: 5,
+            measure2: 15,
+            measure3: 25,
+          },
+        ],
+        metrics,
+        [],
+        ['group', 'product'],
+        0,
+        2,
+      );
+      const tree = applyMetricAxis(
+        treeRaw,
+        metrics,
+        MetricsLayoutEnum.COLUMNS,
+        [],
+        ['group', 'product'],
+        2,
+      );
 
-    const { container } = render(
-      <PivotTableChart
-        data={tree}
-        formData={buildFormData({
-          ...(baseFormData as Partial<PivotTableQueryFormData>),
-          groupbyRows: [],
-          groupbyColumns: ['group', 'product', '__MEASURES__'],
-          metricsLayout: MetricsLayoutEnum.COLUMNS,
-          metrics: ['measure1', 'measure2'],
-        })}
-        metrics={['measure1', 'measure2']}
-        groupbyRows={[]}
-        groupbyColumns={['group', 'product']}
-        aggregateFunction="Sum"
-        width={400}
-        height={300}
-        startCollapsed
-        initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
-        colTotals={false}
-        rowSubTotals={false}
-        colSubTotals={false}
-        rowSubtotalLevels={[]}
-        colSubtotalLevels={[]}
-        rowOrder="key_a_to_z"
-        colOrder="key_a_to_z"
-        valueFormat=""
-        columnFormats={{}}
-        currencyFormats={{}}
-        allowRenderHtml={false}
-        emitCrossFilters={false}
-        setDataMask={jest.fn()}
-        metricColorFormatters={[]}
-        dateFormatters={{}}
-      />,
-    );
+      const { container, unmount } = render(
+        <PivotTableChart
+          data={tree}
+          formData={buildFormData({
+            ...(baseFormData as Partial<PivotTableQueryFormData>),
+            groupbyRows: [],
+            groupbyColumns: ['group', 'product', '__MEASURES__'],
+            metricsLayout: MetricsLayoutEnum.COLUMNS,
+            metrics,
+          })}
+          metrics={metrics}
+          groupbyRows={[]}
+          groupbyColumns={['group', 'product']}
+          aggregateFunction="Sum"
+          width={400}
+          height={300}
+          startCollapsed
+          initialDepth={1}
+          maxDepthPerFetch={1}
+          rowTotals={false}
+          colTotals={false}
+          rowSubTotals={false}
+          colSubTotals={false}
+          rowSubtotalLevels={[]}
+          colSubtotalLevels={[]}
+          rowOrder="key_a_to_z"
+          colOrder="key_a_to_z"
+          valueFormat=""
+          columnFormats={{}}
+          currencyFormats={{}}
+          allowRenderHtml={false}
+          emitCrossFilters={false}
+          setDataMask={jest.fn()}
+          metricColorFormatters={[]}
+          dateFormatters={{}}
+        />,
+      );
 
-    const headerLabels = Array.from(
-      container.querySelectorAll('thead th') as NodeListOf<HTMLElement>,
-    ).map(cell => cell.textContent?.trim());
+      const headerLabels = Array.from(
+        container.querySelectorAll('thead th') as NodeListOf<HTMLElement>,
+      ).map(cell => cell.textContent?.trim());
 
-    expect(headerLabels).toEqual(
-      expect.arrayContaining(['measure1', 'measure2']),
-    );
-    expect(headerLabels).not.toEqual(expect.arrayContaining(['Road', 'Mountain']));
+      expect(headerLabels).toEqual(expect.arrayContaining(metrics));
+      expect(headerLabels).not.toEqual(
+        expect.arrayContaining(['Road', 'Mountain']),
+      );
+      unmount();
+    });
   });
 
   it('keeps metrics on columns when both row and column hierarchies are present', () => {

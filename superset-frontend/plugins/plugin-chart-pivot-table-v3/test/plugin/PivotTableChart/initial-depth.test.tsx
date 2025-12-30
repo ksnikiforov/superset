@@ -39,6 +39,11 @@ import {
 } from '../../../src/utils';
 
 describe('PivotTableChart initial depth on collapsed render', () => {
+  const metricsVariants = [
+    ['quantitySold'],
+    ['quantitySold', 'profit'],
+    ['quantitySold', 'profit', 'discount'],
+  ];
   const baseProps = {
     aggregateFunction: 'Sum',
     width: 400,
@@ -66,76 +71,87 @@ describe('PivotTableChart initial depth on collapsed render', () => {
   };
 
   it('shows first column level when collapsed with initialDepth=1', () => {
-    const treeRaw = buildTreeFromRecords(
-      [
-        {
-          orderStatus: 'F',
-          orderPriority: 'A',
-          revenueBand: '10k-50k',
-          returnFlag: 'Y',
-          quantitySold: 10,
-        },
-      ],
-      ['quantitySold'],
-      ['orderStatus'],
-      ['orderPriority', 'revenueBand', 'returnFlag'],
-      1,
-      3,
-    );
-    const tree = applyMetricAxis(
-      treeRaw,
-      ['quantitySold'],
-      MetricsLayoutEnum.COLUMNS,
-      ['orderStatus'],
-      ['orderPriority', 'revenueBand', 'returnFlag'],
-      3,
-    );
+    metricsVariants.forEach(metrics => {
+      const treeRaw = buildTreeFromRecords(
+        [
+          {
+            orderStatus: 'F',
+            orderPriority: 'A',
+            revenueBand: '10k-50k',
+            returnFlag: 'Y',
+            quantitySold: 10,
+            profit: 3,
+            discount: 1,
+          },
+        ],
+        metrics,
+        ['orderStatus'],
+        ['orderPriority', 'revenueBand', 'returnFlag'],
+        1,
+        3,
+      );
+      const tree = applyMetricAxis(
+        treeRaw,
+        metrics,
+        MetricsLayoutEnum.COLUMNS,
+        ['orderStatus'],
+        ['orderPriority', 'revenueBand', 'returnFlag'],
+        3,
+      );
 
-    render(
-      <PivotTableChart
-        data={tree}
-        formData={buildFormData({
-          ...(baseProps as Partial<PivotTableQueryFormData>),
-          groupbyRows: ['orderStatus'],
-          groupbyColumns: ['orderPriority', 'revenueBand', 'returnFlag', '__MEASURES__'],
-          metricsLayout: MetricsLayoutEnum.COLUMNS,
-          metrics: ['quantitySold'],
-        })}
-        metrics={['quantitySold']}
-        groupbyRows={['orderStatus']}
-        groupbyColumns={['orderPriority', 'revenueBand', 'returnFlag']}
-        aggregateFunction="Sum"
-        width={400}
-        height={300}
-        startCollapsed
-        initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
-        colTotals={false}
-        rowSubTotals={false}
-        colSubTotals={false}
-        rowSubtotalLevels={[]}
-        colSubtotalLevels={[]}
-        rowOrder="key_a_to_z"
-        colOrder="key_a_to_z"
-        valueFormat=""
-        columnFormats={{}}
-        currencyFormats={{}}
-        allowRenderHtml={false}
-        emitCrossFilters={false}
-        setDataMask={jest.fn()}
-        metricColorFormatters={[]}
-        dateFormatters={{}}
-      />,
-    );
+      const { unmount } = render(
+        <PivotTableChart
+          data={tree}
+          formData={buildFormData({
+            ...(baseProps as Partial<PivotTableQueryFormData>),
+            groupbyRows: ['orderStatus'],
+            groupbyColumns: [
+              'orderPriority',
+              'revenueBand',
+              'returnFlag',
+              '__MEASURES__',
+            ],
+            metricsLayout: MetricsLayoutEnum.COLUMNS,
+            metrics,
+          })}
+          metrics={metrics}
+          groupbyRows={['orderStatus']}
+          groupbyColumns={['orderPriority', 'revenueBand', 'returnFlag']}
+          aggregateFunction="Sum"
+          width={400}
+          height={300}
+          startCollapsed
+          initialDepth={1}
+          maxDepthPerFetch={1}
+          rowTotals={false}
+          colTotals={false}
+          rowSubTotals={false}
+          colSubTotals={false}
+          rowSubtotalLevels={[]}
+          colSubtotalLevels={[]}
+          rowOrder="key_a_to_z"
+          colOrder="key_a_to_z"
+          valueFormat=""
+          columnFormats={{}}
+          currencyFormats={{}}
+          allowRenderHtml={false}
+          emitCrossFilters={false}
+          setDataMask={jest.fn()}
+          metricColorFormatters={[]}
+          dateFormatters={{}}
+        />,
+      );
 
-    // First column level (orderPriority) should render even when collapsed.
-    expect(screen.getByText('A')).toBeTruthy();
-    // Only one visible column level; deeper levels should not render until expanded.
-    expect(screen.queryByText('10k-50k')).toBeNull();
+      // First column level (orderPriority) should render even when collapsed.
+      expect(screen.getByText('A')).toBeTruthy();
+      // Only one visible column level; deeper levels should not render until expanded.
+      expect(screen.queryByText('10k-50k')).toBeNull();
+      unmount();
+    });
   });
 
   it('renders top-level column headers for multi-column layout when data is present', () => {
+    const metrics = ['quantitySold'];
     const treeRaw = buildTreeFromRecords(
       [
         {
@@ -144,6 +160,8 @@ describe('PivotTableChart initial depth on collapsed render', () => {
           revenueBand: '10k-50k',
           returnFlag: 'Y',
           quantitySold: 10,
+          profit: 3,
+          discount: 1,
         },
         {
           orderStatus: 'O',
@@ -151,9 +169,11 @@ describe('PivotTableChart initial depth on collapsed render', () => {
           revenueBand: '1k-5k',
           returnFlag: 'N',
           quantitySold: 5,
+          profit: 2,
+          discount: 0,
         },
       ],
-      ['quantitySold'],
+      metrics,
       ['orderStatus'],
       ['orderPriority', 'revenueBand', 'returnFlag'],
       1,
@@ -161,7 +181,7 @@ describe('PivotTableChart initial depth on collapsed render', () => {
     );
     const tree = applyMetricAxis(
       treeRaw,
-      ['quantitySold'],
+      metrics,
       MetricsLayoutEnum.COLUMNS,
       ['orderStatus'],
       ['orderPriority', 'revenueBand', 'returnFlag'],
@@ -174,11 +194,16 @@ describe('PivotTableChart initial depth on collapsed render', () => {
         formData={buildFormData({
           ...(baseProps as Partial<PivotTableQueryFormData>),
           groupbyRows: ['orderStatus'],
-          groupbyColumns: ['orderPriority', 'revenueBand', 'returnFlag', '__MEASURES__'],
+          groupbyColumns: [
+            'orderPriority',
+            'revenueBand',
+            'returnFlag',
+            '__MEASURES__',
+          ],
           metricsLayout: MetricsLayoutEnum.COLUMNS,
-          metrics: ['quantitySold'],
+          metrics,
         })}
-        metrics={['quantitySold']}
+        metrics={metrics}
         groupbyRows={['orderStatus']}
         groupbyColumns={['orderPriority', 'revenueBand', 'returnFlag']}
         aggregateFunction="Sum"
@@ -206,7 +231,9 @@ describe('PivotTableChart initial depth on collapsed render', () => {
       />,
     );
 
-    const headerRow = container.querySelector('thead tr:last-child') as HTMLElement;
+    const headerRow = container.querySelector(
+      'thead tr:last-child',
+    ) as HTMLElement;
     const headers = within(headerRow)
       .getAllByRole('columnheader')
       .map(cell => cell.textContent?.trim())
@@ -217,6 +244,7 @@ describe('PivotTableChart initial depth on collapsed render', () => {
 
   it('fails when only grand total column renders for multi-column selection (regression guard)', () => {
     // Simulate a broken response that labels colDepth=0 but still returns column groupbys.
+    const metrics = ['quantitySold', 'profit', 'discount'];
     const formData = buildFormData({
       ...(baseProps as Partial<PivotTableQueryFormData>),
       groupbyRows: ['orderStatus'],
@@ -227,7 +255,7 @@ describe('PivotTableChart initial depth on collapsed render', () => {
         METRICS_PLACEHOLDER,
       ],
       metricsLayout: MetricsLayoutEnum.COLUMNS,
-      metrics: ['quantitySold'],
+      metrics,
       viz_type: 'pivot_table_v3',
       datasource: '1__table',
     });
@@ -244,6 +272,8 @@ describe('PivotTableChart initial depth on collapsed render', () => {
               revenueBand: '10k-50k',
               returnFlag: 'Y',
               quantitySold: 10,
+              profit: 3,
+              discount: 1,
             },
             {
               orderStatus: 'O',
@@ -251,6 +281,8 @@ describe('PivotTableChart initial depth on collapsed render', () => {
               revenueBand: '1k-5k',
               returnFlag: 'N',
               quantitySold: 5,
+              profit: 2,
+              discount: 0,
             },
           ],
           colnames: [
@@ -259,8 +291,10 @@ describe('PivotTableChart initial depth on collapsed render', () => {
             'revenueBand',
             'returnFlag',
             'quantitySold',
+            'profit',
+            'discount',
           ],
-          coltypes: [1, 1, 1, 1, 0],
+          coltypes: [1, 1, 1, 1, 0, 0, 0],
           query_name: formatQueryName(1, 0),
         },
       ],
@@ -275,7 +309,7 @@ describe('PivotTableChart initial depth on collapsed render', () => {
       <PivotTableChart
         data={tree}
         formData={buildFormData(formData)}
-        metrics={['quantitySold']}
+        metrics={metrics}
         groupbyRows={['orderStatus']}
         groupbyColumns={['orderPriority', 'revenueBand', 'returnFlag']}
         aggregateFunction="Sum"
@@ -313,87 +347,93 @@ describe('PivotTableChart initial depth on collapsed render', () => {
   });
 
   it('does not render row grand total when row totals/subtotals are disabled', () => {
-    const treeRaw = buildTreeFromRecords(
-      [
-        {
-          orderStatus: 'F',
-          orderPriority: 'A',
-          revenueBand: '10k-50k',
-          returnFlag: 'Y',
-          quantitySold: 10,
-        },
-      ],
-      ['quantitySold'],
-      ['orderStatus'],
-      ['orderPriority', 'revenueBand', 'returnFlag'],
-      1,
-      3,
-    );
-    const tree = applyMetricAxis(
-      treeRaw,
-      ['quantitySold'],
-      MetricsLayoutEnum.COLUMNS,
-      ['orderStatus'],
-      ['orderPriority', 'revenueBand', 'returnFlag'],
-      3,
-    );
+    metricsVariants.forEach(metrics => {
+      const treeRaw = buildTreeFromRecords(
+        [
+          {
+            orderStatus: 'F',
+            orderPriority: 'A',
+            revenueBand: '10k-50k',
+            returnFlag: 'Y',
+            quantitySold: 10,
+            profit: 3,
+            discount: 1,
+          },
+        ],
+        metrics,
+        ['orderStatus'],
+        ['orderPriority', 'revenueBand', 'returnFlag'],
+        1,
+        3,
+      );
+      const tree = applyMetricAxis(
+        treeRaw,
+        metrics,
+        MetricsLayoutEnum.COLUMNS,
+        ['orderStatus'],
+        ['orderPriority', 'revenueBand', 'returnFlag'],
+        3,
+      );
 
-    const { container } = render(
-      <PivotTableChart
-        data={tree}
-        formData={buildFormData({
-          ...(baseProps as Partial<PivotTableQueryFormData>),
-          groupbyRows: ['orderStatus'],
-          groupbyColumns: [
-            'orderPriority',
-            'revenueBand',
-            'returnFlag',
-            '__MEASURES__',
-          ],
-          metricsLayout: MetricsLayoutEnum.COLUMNS,
-          metrics: ['quantitySold'],
-          rowTotals: false,
-          rowSubTotals: false,
-          rowSubtotalLevels: [],
-        })}
-        metrics={['quantitySold']}
-        groupbyRows={['orderStatus']}
-        groupbyColumns={['orderPriority', 'revenueBand', 'returnFlag']}
-        aggregateFunction="Sum"
-        width={600}
-        height={300}
-        startCollapsed
-        initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
-        colTotals={false}
-        rowSubTotals={false}
-        colSubTotals={false}
-        rowSubtotalLevels={[]}
-        colSubtotalLevels={[]}
-        rowOrder="key_a_to_z"
-        colOrder="key_a_to_z"
-        valueFormat=""
-        columnFormats={{}}
-        currencyFormats={{}}
-        allowRenderHtml={false}
-        emitCrossFilters={false}
-        setDataMask={jest.fn()}
-        metricColorFormatters={[]}
-        dateFormatters={{}}
-      />,
-    );
+      const { container, unmount } = render(
+        <PivotTableChart
+          data={tree}
+          formData={buildFormData({
+            ...(baseProps as Partial<PivotTableQueryFormData>),
+            groupbyRows: ['orderStatus'],
+            groupbyColumns: [
+              'orderPriority',
+              'revenueBand',
+              'returnFlag',
+              '__MEASURES__',
+            ],
+            metricsLayout: MetricsLayoutEnum.COLUMNS,
+            metrics,
+            rowTotals: false,
+            rowSubTotals: false,
+            rowSubtotalLevels: [],
+          })}
+          metrics={metrics}
+          groupbyRows={['orderStatus']}
+          groupbyColumns={['orderPriority', 'revenueBand', 'returnFlag']}
+          aggregateFunction="Sum"
+          width={600}
+          height={300}
+          startCollapsed
+          initialDepth={1}
+          maxDepthPerFetch={1}
+          rowTotals={false}
+          colTotals={false}
+          rowSubTotals={false}
+          colSubTotals={false}
+          rowSubtotalLevels={[]}
+          colSubtotalLevels={[]}
+          rowOrder="key_a_to_z"
+          colOrder="key_a_to_z"
+          valueFormat=""
+          columnFormats={{}}
+          currencyFormats={{}}
+          allowRenderHtml={false}
+          emitCrossFilters={false}
+          setDataMask={jest.fn()}
+          metricColorFormatters={[]}
+          dateFormatters={{}}
+        />,
+      );
 
-    const rowHeaders = Array.from(
-      (container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>),
-    ).map(cell => cell.textContent?.trim());
-    expect(rowHeaders).toEqual(expect.arrayContaining(['F']));
-    expect(rowHeaders).not.toContain('Grand total');
+      const rowHeaders = Array.from(
+        (container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>),
+      ).map(cell => cell.textContent?.trim());
+      expect(rowHeaders).toEqual(expect.arrayContaining(['F']));
+      expect(rowHeaders).not.toContain('Grand total');
+      unmount();
+    });
   });
 
   it('hides row subtotals when rowSubTotals is disabled', () => {
     const rootKey = serializePath([]);
     const subtotalRowKey = serializePath(['Subtotal']);
+    const metrics = ['metric1', 'metric2', 'metric3'];
     const rows: Record<string, PivotTreeNode> = {
       [rootKey]: {
         axis: 'row',
@@ -452,12 +492,12 @@ describe('PivotTableChart initial depth on collapsed render', () => {
       [`${serializePath(['F'])}|${serializePath(['A'])}`]: {
         rowKey: serializePath(['F']),
         colKey: serializePath(['A']),
-        values: { metric1: 10 },
+        values: { metric1: 10, metric2: 20, metric3: 30 },
       },
       [`${subtotalRowKey}|${serializePath(['A'])}`]: {
         rowKey: subtotalRowKey,
         colKey: serializePath(['A']),
-        values: { metric1: 5 },
+        values: { metric1: 5, metric2: 15, metric3: 25 },
         isSubtotal: true,
       },
     };
@@ -471,11 +511,11 @@ describe('PivotTableChart initial depth on collapsed render', () => {
           groupbyRows: ['orderStatus'],
           groupbyColumns: ['orderPriority', '__MEASURES__'],
           metricsLayout: MetricsLayoutEnum.COLUMNS,
-          metrics: ['metric1'],
+          metrics,
           colSubtotalLevels: [0],
           colTotals: true,
         })}
-        metrics={['metric1']}
+        metrics={metrics}
         groupbyRows={['orderStatus']}
         groupbyColumns={['orderPriority']}
         aggregateFunction="Sum"

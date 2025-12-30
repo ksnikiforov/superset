@@ -47,12 +47,25 @@ scenarios based on those tests.
   metric node.
   See `superset-frontend/plugins/plugin-chart-pivot-table-v3/test/plugin/expand/metrics-before/PivotTableChart.expand.metrics-before.metric-first.test.tsx`.
 
+### Metric count independence
+- Metric-tier layout, toggles, and collapsed initial rendering behave the same
+  for single-metric and multi-metric selections; tests iterate across multiple
+  metric counts to assert layout behavior is not tied to a fixed number.
+  See `superset-frontend/plugins/plugin-chart-pivot-table-v3/test/plugin/PivotTableChart/metric-tier-layout.test.tsx`
+  and `superset-frontend/plugins/plugin-chart-pivot-table-v3/test/plugin/PivotTableChart/initial-depth.test.tsx`.
+- Collapsed multi-metric layouts surface metric headers while keeping deeper
+  dimension members hidden until expanded, for both rows and columns.
+  See `superset-frontend/plugins/plugin-chart-pivot-table-v3/test/plugin/PivotTableChart/metrics.test.tsx`.
+
 ### Metrics on columns
 - Expanding a row when metrics live on columns fetches the next row dimension
   and correctly rehydrates values across metric columns.
   See `superset-frontend/plugins/plugin-chart-pivot-table-v3/test/plugin/expand/metrics-before/PivotTableChart.expand.metrics-before.column-metrics.test.tsx`.
 - Column expand/collapse cycles do not break subsequent row expansions; metrics
   remain available after column toggles.
+  See `superset-frontend/plugins/plugin-chart-pivot-table-v3/test/plugin/expand/metrics-before/PivotTableChart.expand.metrics-before.column-metrics.test.tsx`.
+- Row expansion respects `initialDepth`, advancing exactly one row level beyond
+  the currently visible depth when metrics are on columns.
   See `superset-frontend/plugins/plugin-chart-pivot-table-v3/test/plugin/expand/metrics-before/PivotTableChart.expand.metrics-before.column-metrics.test.tsx`.
 
 ### Ancestor values, totals, and subtotals
@@ -98,6 +111,12 @@ scenarios based on those tests.
 - When more dimensions follow Values, expanding Values triggers further
   downstream dimension expansion (for example, Values then `orderStatus`).
   See `superset-frontend/plugins/plugin-chart-pivot-table-v3/test/plugin/expand/metrics-between/PivotTableChart.expand.metrics-between.regressions.test.tsx`.
+
+## Totals and subtotals
+
+- Grand totals honor `rowTotalPosition` and `colTotalPosition` for start/end
+  ordering.
+  See `superset-frontend/plugins/plugin-chart-pivot-table-v3/test/plugin/PivotTableChart/totals/columns.test.tsx`.
 
 ## Stability guarantees
 
