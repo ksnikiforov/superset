@@ -27,7 +27,12 @@ import {
   PivotTreeData,
 } from '../../../src/types';
 import { buildFormData } from '../fixtures/pivotFormData';
-import { applyMetricAxis, buildTreeFromRecords, serializePath } from '../../../src/utils';
+import {
+  applyMetricAxis,
+  buildTreeFromRecords,
+  METRICS_PLACEHOLDER,
+  serializePath,
+} from '../../../src/utils';
 
 const baseFormData: Partial<PivotTableQueryFormData> = {
   groupbyRows: ['r1'],
@@ -153,6 +158,85 @@ describe('PivotTableChart metric tier suppression', () => {
 
     expect(screen.queryByText('metric1')).toBeNull();
     expect(screen.getByText('C1')).toBeTruthy();
+  });
+
+  it('renders metric headers without dimension prefixes when metrics are last on columns', () => {
+    const metrics = ['averageOrderValue', 'weightedDiscount'];
+    const treeRaw = buildTreeFromRecords(
+      [
+        {
+          orderPriority: '1-URGENT',
+          shipMode: 'AIR',
+          category: 'FURNITURE',
+          averageOrderValue: 10,
+          weightedDiscount: 0.1,
+        },
+      ],
+      metrics,
+      ['orderPriority'],
+      ['shipMode', 'category'],
+      1,
+      1,
+    );
+    const tree = applyMetricAxis(
+      treeRaw,
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      ['orderPriority'],
+      ['shipMode', 'category'],
+      2,
+    );
+
+    const props: Partial<PivotTableProps> = {
+      data: tree,
+      formData: buildFormData({
+        ...baseFormData,
+        groupbyRows: ['orderPriority'],
+        groupbyColumns: ['shipMode', 'category', METRICS_PLACEHOLDER],
+        metricsLayout: MetricsLayoutEnum.COLUMNS,
+        metrics,
+      }),
+      metrics,
+      groupbyRows: ['orderPriority'],
+      groupbyColumns: ['shipMode', 'category'],
+      aggregateFunction: 'Sum',
+      width: 400,
+      height: 300,
+      startCollapsed: false,
+      initialDepth: 1,
+      maxDepthPerFetch: 1,
+      rowTotals: false,
+      colTotals: false,
+      rowSubTotals: false,
+      colSubTotals: false,
+      rowSubtotalLevels: [],
+      colSubtotalLevels: [],
+      rowOrder: 'key_a_to_z',
+      colOrder: 'key_a_to_z',
+      valueFormat: '',
+      columnFormats: {},
+      currencyFormats: {},
+      allowRenderHtml: false,
+      emitCrossFilters: false,
+      setDataMask: jest.fn(),
+      metricColorFormatters: [],
+      dateFormatters: {},
+      verboseMap: {},
+    };
+
+    const { container } = render(<PivotTableChart {...props} />);
+    const headerRow = container.querySelector(
+      'thead tr:last-child',
+    ) as HTMLElement;
+    const headerLabels = within(headerRow)
+      .getAllByRole('columnheader')
+      .map(cell => cell.textContent?.trim())
+      .filter(label => label && label !== 'Rows');
+
+    metrics.forEach(metric => {
+      expect(headerLabels).toContain(metric);
+      expect(headerLabels).not.toContain(`AIR ${metric}`);
+    });
   });
 
   it('keeps metric tier hidden on rows when the metric is at the bottom of the hierarchy', () => {

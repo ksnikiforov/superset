@@ -30,8 +30,9 @@ scenarios based on those tests.
   next level for that axis without forcing deeper levels on the other axis.
   See `superset-frontend/plugins/plugin-chart-pivot-table-v3/test/plugin/expand/metrics-before/PivotTableChart.expand.metrics-before.column-metrics.test.tsx`
   and `superset-frontend/plugins/plugin-chart-pivot-table-v3/test/plugin/expand/metrics-between/PivotTableChart.expand.metrics-between.expansion.test.tsx`.
-- Expansion keeps previously visible values stable. Collapsing and re-expanding
-  should not drop already-fetched values or duplicate nodes.
+- Collapsing a parent clears partially expanded descendants (only fully expanded
+  branches should persist). Re-expansion reuses fetched data but resets partial
+  toggle state to avoid stale expansion duplication.
   See `superset-frontend/plugins/plugin-chart-pivot-table-v3/test/plugin/expand/metrics-before/PivotTableChart.expand.metrics-before.column-metrics.test.tsx`
   and `superset-frontend/plugins/plugin-chart-pivot-table-v3/test/plugin/expand/metrics-between/PivotTableChart.expand.metrics-between.regressions.test.tsx`.
 - Deep hierarchies expand sequentially across multiple levels without errors.
@@ -99,13 +100,17 @@ scenarios based on those tests.
   expanding Values reveals `orderStatus`).
 - Expanding a parent dimension above the Values level recalculates the order and
   placement of deeper levels, but keeps metric nodes in the correct position.
-- Re-expansion preserves nested values (for example, `returnFlag` rows remain
-  under the same metric nodes).
+- If metric nodes and downstream rows were expanded at a collapsed depth, those
+  expansions are duplicated across newly revealed prefixes (for example, each
+  `orderStatus` branch keeps the previously expanded metric and
+  `shipInstruction` rows open) until a parent collapse resets partial toggles.
+- Re-expansion requires re-opening partial descendants (for example, `returnFlag`
+  rows are collapsed after a parent collapse and must be expanded again).
   See `superset-frontend/plugins/plugin-chart-pivot-table-v3/test/plugin/expand/metrics-between/PivotTableChart.expand.metrics-between.expansion.test.tsx`.
 
 ### Regression-focused expectations
-- Toggle state and values are consistent after collapsing and re-expanding
-  parent levels or metric tiers.
+- Collapsing a parent resets partial toggle state under that branch; re-expanding
+  the parent does not automatically reopen partial descendants.
 - Column values remain in column headers and do not appear in row headers after
   expanding above the Values level.
 - When more dimensions follow Values, expanding Values triggers further
@@ -137,8 +142,8 @@ and columns `shipInstruction -> customerSegment -> returnFlag`:
   in the row header. See
   `superset-frontend/plugins/plugin-chart-pivot-table-v3/test/plugin/expand/metrics-between/PivotTableChart.expand.metrics-between.expansion.test.tsx`
   and `superset-frontend/plugins/plugin-chart-pivot-table-v3/test/plugin/expand/metrics-between/PivotTableChart.expand.metrics-between.regressions.test.tsx`.
-- Collapsing and re-expanding the metric tier keeps `returnFlag` rows nested and
-  preserves values. See
+- Collapsing and re-expanding the metric tier resets partial descendants (such
+  as `returnFlag` rows), which must be explicitly re-expanded. See
   `superset-frontend/plugins/plugin-chart-pivot-table-v3/test/plugin/expand/metrics-between/PivotTableChart.expand.metrics-between.regressions.test.tsx`.
 
 ### Scenario B: Metrics on columns with deep row expansion

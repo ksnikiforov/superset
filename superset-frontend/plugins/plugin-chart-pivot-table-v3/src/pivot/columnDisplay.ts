@@ -21,6 +21,7 @@ import { MetricsLayoutEnum, PivotTreeNode } from '../types';
 type ColumnDisplayConfig = {
   metricsLayout: MetricsLayoutEnum;
   metricsFirstOnCols: boolean;
+  metricsAtColEnd: boolean;
   metricLabels: string[];
   isExplicitSubtotalNode: (node: PivotTreeNode) => boolean;
   getMetricLabelFromPath: (path: PivotTreeNode['path']) => string | undefined;
@@ -37,6 +38,7 @@ export const buildColumnDisplayPath = (
   const {
     metricsLayout,
     metricsFirstOnCols,
+    metricsAtColEnd,
     metricLabels,
     isExplicitSubtotalNode,
     getMetricLabelFromPath,
@@ -79,6 +81,7 @@ export const buildColumnDisplayPath = (
   if (
     metricIsLeaf &&
     nonMetricParts.length > 0 &&
+    !metricsAtColEnd &&
     (isMetricSubtotalNode(col) || col.hasChildren)
   ) {
     const groupLabel = String(nonMetricParts[nonMetricParts.length - 1]);

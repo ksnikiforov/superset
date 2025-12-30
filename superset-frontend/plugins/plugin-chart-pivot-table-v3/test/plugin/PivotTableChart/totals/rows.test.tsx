@@ -824,6 +824,385 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(values).toEqual(expect.arrayContaining(['10', '0.05']));
   });
 
+  it('shows orderPriority subtotals at the bottom when metrics are first on rows', () => {
+    const metrics = ['averageOrderValue', 'weightedDiscount'];
+    const rowGroupby = ['orderPriority', 'shipMode', 'orderStatus'];
+    const colGroupby = ['shipInstruction', 'customerSegment'];
+    const detail = buildTreeFromRecords(
+      [
+        {
+          orderPriority: '1-URGENT',
+          shipMode: 'AIR',
+          orderStatus: 'F',
+          shipInstruction: 'COLLECT COD',
+          customerSegment: 'AUTO',
+          averageOrderValue: 10,
+          weightedDiscount: 0.05,
+        },
+        {
+          orderPriority: '1-URGENT',
+          shipMode: 'FOB',
+          orderStatus: 'F',
+          shipInstruction: 'COLLECT COD',
+          customerSegment: 'AUTO',
+          averageOrderValue: 20,
+          weightedDiscount: 0.06,
+        },
+      ],
+      metrics,
+      rowGroupby,
+      colGroupby,
+      3,
+      2,
+    );
+    const subtotal = buildTreeFromRecords(
+      [
+        {
+          orderPriority: '1-URGENT',
+          shipInstruction: 'COLLECT COD',
+          customerSegment: 'AUTO',
+          averageOrderValue: 100,
+          weightedDiscount: 0.05,
+        },
+      ],
+      metrics,
+      rowGroupby,
+      colGroupby,
+      1,
+      2,
+    );
+    const withSubtotals = injectRowSubtotalLeaves(
+      mergeTrees(detail, subtotal),
+      1,
+      rowGroupby.length,
+    );
+    const withMetrics = applyMetricAxis(
+      withSubtotals,
+      metrics,
+      MetricsLayoutEnum.ROWS,
+      rowGroupby,
+      colGroupby,
+      0,
+    );
+    const labeledTree = labelRowSubtotalLeaves(withMetrics, metrics);
+
+    const { container } = render(
+      <PivotTableChart
+        data={labeledTree}
+        formData={buildFormData({
+          ...(baseProps as Partial<PivotTableQueryFormData>),
+          groupbyRows: [METRICS_PLACEHOLDER, ...rowGroupby],
+          groupbyColumns: colGroupby,
+          metricsLayout: MetricsLayoutEnum.ROWS,
+          metrics,
+          rowSubTotals: true,
+          rowSubtotalLevels: [1],
+          rowSubtotalPosition: 'end',
+        })}
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={colGroupby}
+        aggregateFunction="Sum"
+        width={600}
+        height={300}
+        startCollapsed={false}
+        initialDepth={3}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals
+        colSubTotals={false}
+        rowSubtotalLevels={[1]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        rowTotalPosition="start"
+        colSubtotalPosition="start"
+        colTotalPosition="start"
+        rowSubtotalPosition="end"
+      />,
+    );
+
+    const rowHeaders = Array.from(
+      container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
+    ).map(cell => cell.textContent?.trim());
+    expect(rowHeaders).toEqual(expect.arrayContaining(['1-URGENT Total']));
+    expect(rowHeaders.lastIndexOf('1-URGENT Total')).toBeGreaterThan(
+      rowHeaders.lastIndexOf('FOB'),
+    );
+  });
+
+  it('shows orderPriority subtotals at the bottom when metrics are between the first row dimension and the rest', () => {
+    const metrics = ['averageOrderValue', 'weightedDiscount'];
+    const rowGroupby = ['row1', 'orderPriority', 'shipMode', 'orderStatus'];
+    const colGroupby = ['shipInstruction', 'customerSegment'];
+    const detail = buildTreeFromRecords(
+      [
+        {
+          row1: 'R1',
+          orderPriority: '1-URGENT',
+          shipMode: 'AIR',
+          orderStatus: 'F',
+          shipInstruction: 'COLLECT COD',
+          customerSegment: 'AUTO',
+          averageOrderValue: 10,
+          weightedDiscount: 0.05,
+        },
+        {
+          row1: 'R1',
+          orderPriority: '1-URGENT',
+          shipMode: 'FOB',
+          orderStatus: 'F',
+          shipInstruction: 'COLLECT COD',
+          customerSegment: 'AUTO',
+          averageOrderValue: 20,
+          weightedDiscount: 0.06,
+        },
+      ],
+      metrics,
+      rowGroupby,
+      colGroupby,
+      4,
+      2,
+    );
+    const subtotal = buildTreeFromRecords(
+      [
+        {
+          row1: 'R1',
+          orderPriority: '1-URGENT',
+          shipInstruction: 'COLLECT COD',
+          customerSegment: 'AUTO',
+          averageOrderValue: 100,
+          weightedDiscount: 0.05,
+        },
+      ],
+      metrics,
+      rowGroupby,
+      colGroupby,
+      2,
+      2,
+    );
+    const withSubtotals = injectRowSubtotalLeaves(
+      mergeTrees(detail, subtotal),
+      2,
+      rowGroupby.length,
+    );
+    const withMetrics = applyMetricAxis(
+      withSubtotals,
+      metrics,
+      MetricsLayoutEnum.ROWS,
+      rowGroupby,
+      colGroupby,
+      1,
+    );
+    const labeledTree = labelRowSubtotalLeaves(withMetrics, metrics);
+
+    const { container } = render(
+      <PivotTableChart
+        data={labeledTree}
+        formData={buildFormData({
+          ...(baseProps as Partial<PivotTableQueryFormData>),
+          groupbyRows: ['row1', METRICS_PLACEHOLDER, 'orderPriority', 'shipMode', 'orderStatus'],
+          groupbyColumns: colGroupby,
+          metricsLayout: MetricsLayoutEnum.ROWS,
+          metrics,
+          rowSubTotals: true,
+          rowSubtotalLevels: [2],
+          rowSubtotalPosition: 'end',
+        })}
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={colGroupby}
+        aggregateFunction="Sum"
+        width={600}
+        height={300}
+        startCollapsed={false}
+        initialDepth={4}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals
+        colSubTotals={false}
+        rowSubtotalLevels={[2]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        rowTotalPosition="start"
+        colSubtotalPosition="start"
+        colTotalPosition="start"
+        rowSubtotalPosition="end"
+      />,
+    );
+
+    const rowHeaders = Array.from(
+      container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
+    ).map(cell => cell.textContent?.trim());
+    expect(rowHeaders).toEqual(expect.arrayContaining(['1-URGENT Total']));
+    expect(rowHeaders.lastIndexOf('1-URGENT Total')).toBeGreaterThan(
+      rowHeaders.lastIndexOf('FOB'),
+    );
+  });
+
+  it('respects top subtotal positioning after the metric tier', () => {
+    const metrics = ['averageOrderValue', 'weightedDiscount'];
+    const rowGroupby = [
+      'shipMode',
+      'orderStatus',
+      'customerSegment',
+      'shipInstruction',
+      'orderPriority',
+    ];
+    const colGroupby: string[] = [];
+    const detail = buildTreeFromRecords(
+      [
+        {
+          shipMode: 'AIR',
+          orderStatus: 'F',
+          customerSegment: 'AUTO',
+          shipInstruction: 'COLLECT COD',
+          orderPriority: '1-URGENT',
+          averageOrderValue: 10,
+          weightedDiscount: 0.05,
+        },
+        {
+          shipMode: 'AIR',
+          orderStatus: 'F',
+          customerSegment: 'AUTO',
+          shipInstruction: 'COLLECT COD',
+          orderPriority: '2-HIGH',
+          averageOrderValue: 20,
+          weightedDiscount: 0.06,
+        },
+      ],
+      metrics,
+      rowGroupby,
+      colGroupby,
+      5,
+      0,
+    );
+    const subtotalDepth2 = buildTreeFromRecords(
+      [
+        {
+          shipMode: 'AIR',
+          orderStatus: 'F',
+          averageOrderValue: 30,
+          weightedDiscount: 0.055,
+        },
+      ],
+      metrics,
+      rowGroupby,
+      colGroupby,
+      2,
+      0,
+    );
+    const subtotalDepth4 = buildTreeFromRecords(
+      [
+        {
+          shipMode: 'AIR',
+          orderStatus: 'F',
+          customerSegment: 'AUTO',
+          shipInstruction: 'COLLECT COD',
+          averageOrderValue: 30,
+          weightedDiscount: 0.055,
+        },
+      ],
+      metrics,
+      rowGroupby,
+      colGroupby,
+      4,
+      0,
+    );
+    const merged = mergeTrees(mergeTrees(detail, subtotalDepth2), subtotalDepth4);
+    const withSubtotals = injectRowSubtotalLeaves(
+      injectRowSubtotalLeaves(merged, 2, rowGroupby.length),
+      4,
+      rowGroupby.length,
+    );
+    const withMetrics = applyMetricAxis(
+      withSubtotals,
+      metrics,
+      MetricsLayoutEnum.ROWS,
+      rowGroupby,
+      colGroupby,
+      3,
+    );
+    const labeledTree = labelRowSubtotalLeaves(withMetrics, metrics);
+
+    const { container } = render(
+      <PivotTableChart
+        data={labeledTree}
+        formData={buildFormData({
+          ...(baseProps as Partial<PivotTableQueryFormData>),
+          groupbyRows: [
+            'shipMode',
+            'orderStatus',
+            'customerSegment',
+            METRICS_PLACEHOLDER,
+            'shipInstruction',
+            'orderPriority',
+          ],
+          groupbyColumns: [],
+          metricsLayout: MetricsLayoutEnum.ROWS,
+          metrics,
+          rowSubTotals: true,
+          rowSubtotalLevels: [2, 4],
+          rowSubtotalPosition: 'start',
+        })}
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={colGroupby}
+        aggregateFunction="Sum"
+        width={600}
+        height={300}
+        startCollapsed={false}
+        initialDepth={5}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals
+        colSubTotals={false}
+        rowSubtotalLevels={[2, 4]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        rowTotalPosition="start"
+        colSubtotalPosition="start"
+        colTotalPosition="start"
+        rowSubtotalPosition="start"
+      />,
+    );
+
+    const rowHeaders = Array.from(
+      container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
+    ).map(cell => cell.textContent?.trim());
+    expect(rowHeaders).toEqual(expect.arrayContaining(['F averageOrderValue']));
+    expect(rowHeaders).not.toContain('COLLECT COD Total');
+  });
+
   it('forces row subtotals to the bottom when multiple metrics are selected', () => {
     const rootKey = serializePath([]);
     const colKey = rootKey;
@@ -2024,7 +2403,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     return { labeledTree, metrics, rowGroupby };
   };
 
-  it('renders only top-level metric subtotals at the bottom when top position is selected with multiple metrics', () => {
+  it('renders top-level metric subtotals and suppresses returnFlag totals when top position is selected with multiple metrics', () => {
     const { labeledTree, metrics, rowGroupby } = buildMetricSubtotalTree();
 
     const { container } = render(
@@ -2099,8 +2478,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(rowHeaders).not.toContain('A weightedDiscount');
     expect(rowHeaders).not.toContain('N averageOrderValue');
     expect(rowHeaders).not.toContain('N weightedDiscount');
-    expect(rowHeaders).not.toContain('1-5 Total');
     expect(rowHeaders).not.toContain('A Total');
+    expect(rowHeaders).not.toContain('N Total');
+    expect(rowHeaders).not.toContain('1-5 Total');
 
     const getRowIndent = (label: string) => {
       const headerCell = screen.getAllByText(label)[0].closest(
@@ -2118,7 +2498,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(returnFlagIndent).toBeGreaterThan(metricIndent);
   });
 
-  it('renders only top-level metric subtotals when bottom position is selected with multiple metrics', () => {
+  it('renders top-level metric subtotals and returnFlag totals when bottom position is selected with multiple metrics', () => {
     const { labeledTree, metrics, rowGroupby } = buildMetricSubtotalTree();
 
     const { container } = render(
@@ -2193,7 +2573,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(rowHeaders).not.toContain('A weightedDiscount');
     expect(rowHeaders).not.toContain('N averageOrderValue');
     expect(rowHeaders).not.toContain('N weightedDiscount');
-    expect(rowHeaders).not.toContain('A Total');
+    expect(rowHeaders).toEqual(expect.arrayContaining(['A Total', 'N Total']));
     expect(rowHeaders).not.toContain('1-5 Total');
 
     const getRowIndent = (label: string) => {

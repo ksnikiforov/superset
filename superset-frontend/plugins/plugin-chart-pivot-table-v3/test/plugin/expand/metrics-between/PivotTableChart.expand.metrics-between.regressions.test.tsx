@@ -220,11 +220,11 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
       | undefined;
     expect(collapsedMetricRow).toBeTruthy();
     expect(
-      within(collapsedMetricRow as HTMLElement).getByLabelText('minus-square'),
-    ).toBeTruthy();
-    expect(
-      within(collapsedMetricRow as HTMLElement).queryByLabelText('plus-square'),
+      within(collapsedMetricRow as HTMLElement).queryByLabelText('minus-square'),
     ).toBeNull();
+    expect(
+      within(collapsedMetricRow as HTMLElement).getByLabelText('plus-square'),
+    ).toBeTruthy();
     const metricValueCell = Array.from(
       (collapsedMetricRow as HTMLElement).querySelectorAll('td'),
     ).find(cell => cell.textContent && cell.textContent.trim() !== '');
@@ -240,17 +240,11 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
       (collapsedDiscountRow as HTMLElement).querySelectorAll('td'),
     ).find(cell => cell.textContent && cell.textContent.trim() !== '');
     expect(discountValueCell).toBeTruthy();
-    const collapsedReturnFlagRow = (await waitFor(() =>
-      within(tbody).getByText(/^A$/).closest('tr'),
-    )) as HTMLElement;
-    const returnFlagValueCell = Array.from(
-      collapsedReturnFlagRow.querySelectorAll('td'),
-    ).find(cell => cell.textContent && cell.textContent.trim() !== '');
-    expect(returnFlagValueCell).toBeTruthy();
-    expect(within(tbody).getByText('COLLECT COD')).toBeTruthy();
+    expect(within(tbody).queryByText(/^A$/)).toBeNull();
+    expect(within(tbody).queryByText('COLLECT COD')).toBeNull();
   });
 
-  it('renders returnFlag values and top-positioned subtotals after re-expanding a metric', async () => {
+  it('renders returnFlag values and suppresses top-positioned subtotals after re-expanding a metric', async () => {
     const rowGroupby = [
       'orderPriority',
       'shipMode',
@@ -459,18 +453,13 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
       | undefined;
     expect(collapsedMetricRow).toBeTruthy();
     fireEvent.click(
-      within(collapsedMetricRow as HTMLElement).getByLabelText('minus-square'),
-    );
-    fireEvent.click(
       within(collapsedMetricRow as HTMLElement).getByLabelText('plus-square'),
     );
 
     const reopenedReturnFlagRow = (await waitFor(() =>
       within(tbody).getByText(/^A$/).closest('tr'),
     )) as HTMLElement;
-    expect(
-      within(reopenedReturnFlagRow).getByLabelText('minus-square'),
-    ).toBeTruthy();
+    fireEvent.click(within(reopenedReturnFlagRow).getByLabelText('plus-square'));
 
     await waitFor(() => {
       expect(within(tbody).getByText('COLLECT COD')).toBeTruthy();
@@ -483,7 +472,7 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
       .find(row => within(row).queryByText('A Total')) as
       | HTMLElement
       | undefined;
-    expect(subtotalRow).toBeTruthy();
+    expect(subtotalRow).toBeUndefined();
     const instructionRow = rows
       .slice(returnFlagRowIndex + 1)
       .find(row => within(row).queryByText('COLLECT COD')) as
@@ -496,7 +485,6 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
         cell => cell.textContent && cell.textContent.trim() !== '',
       );
     expect(hasValue(reopenedReturnFlagRow as HTMLElement)).toBeTruthy();
-    expect(hasValue(subtotalRow as HTMLElement)).toBeTruthy();
   });
 
   it('keeps metric values after collapsing and re-expanding returnFlag when metrics are last', async () => {
@@ -743,9 +731,18 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     const orderStatusBranch = buildCollapsedBranch(2);
     const shipModeBranch = buildTreeAtDepth(3);
 
-    fetchPivotBranchMock
-      .mockResolvedValueOnce({ data: orderStatusBranch })
-      .mockResolvedValueOnce({ data: shipModeBranch });
+    fetchPivotBranchMock.mockImplementation(({ path }) => {
+      const metricIndex = path.findIndex(val =>
+        metrics.includes(String(val ?? '')),
+      );
+      if (metricIndex >= 0) {
+        return Promise.resolve({ data: orderStatusBranch });
+      }
+      if (path.length === 1) {
+        return Promise.resolve({ data: shipModeBranch });
+      }
+      return Promise.resolve({ data: undefined });
+    });
 
     const { container, getByText } = render(
       <PivotTableChart
@@ -830,7 +827,9 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     expect(within(tbody).queryByText('COLLECT COD')).toBeNull();
     expect(within(tbody).queryByText('DELIVER IN PERSON')).toBeNull();
     expect(within(tbody).getByText('AIR')).toBeTruthy();
-    expect(within(tbody).getByText('FOB')).toBeTruthy();
+    await waitFor(() => {
+      expect(within(tbody).getByText('FOB')).toBeTruthy();
+    });
   });
 
   it('expands Values and orderStatus when another level follows', async () => {
@@ -900,9 +899,15 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
       'orderClass',
     ]);
 
-    fetchPivotBranchMock
-      .mockResolvedValueOnce({ data: orderStatusBranch })
-      .mockResolvedValueOnce({ data: orderClassBranch });
+    fetchPivotBranchMock.mockImplementation(({ path }) => {
+      if (path.length === 2) {
+        return Promise.resolve({ data: orderStatusBranch });
+      }
+      if (path.length === 3) {
+        return Promise.resolve({ data: orderClassBranch });
+      }
+      return Promise.resolve({ data: undefined });
+    });
 
     const { container } = render(
       <PivotTableChart
@@ -973,9 +978,9 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
     });
 
-    const statusRow = within(tbody).getByText(/^F$/).closest(
-      'tr',
-    ) as HTMLElement;
+    const statusRow = (await waitFor(() =>
+      within(tbody).getByText(/^F$/).closest('tr'),
+    )) as HTMLElement;
     fireEvent.click(within(statusRow).getByLabelText('plus-square'));
 
     await waitFor(() => {
