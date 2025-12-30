@@ -19,22 +19,22 @@
 
 import React from 'react';
 import { render, fireEvent, waitFor, within } from '@testing-library/react';
-import PivotTableChart from './fixtures/TestPivotTableChart';
-import { MetricsLayoutEnum } from '../../src/types';
-import { baseFormData, buildFormData } from './fixtures/pivotFormData';
+import PivotTableChart from '../../fixtures/TestPivotTableChart';
+import { MetricsLayoutEnum } from '../../../../src/types';
+import { baseFormData, buildFormData } from '../../fixtures/pivotFormData';
 import {
   applyMetricAxis,
   buildTreeFromRecords,
   METRICS_PLACEHOLDER,
   mergeTrees,
   serializePath,
-} from '../../src/utils';
-import { fetchPivotBranch, peekPivotBranchCache } from '../../src/fetchPivotBranch';
+} from '../../../../src/utils';
+import { fetchPivotBranch, peekPivotBranchCache } from '../../../../src/fetchPivotBranch';
 import { SupersetClient } from '@superset-ui/core';
-import { formatQueryName } from '../../src/buildQuery';
+import { formatQueryName } from '../../../../src/buildQuery';
 
-jest.mock('../../src/fetchPivotBranch', () => {
-  const actual = jest.requireActual('../../src/fetchPivotBranch');
+jest.mock('../../../../src/fetchPivotBranch', () => {
+  const actual = jest.requireActual('../../../../src/fetchPivotBranch');
   return {
     ...actual,
     fetchPivotBranch: jest.fn().mockResolvedValue({ data: undefined }),
@@ -1070,7 +1070,7 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
   });
 
   it('fills ancestor column values for all visible rows when expanding another column after deep row expansion', async () => {
-    const actualFetchModule = jest.requireActual('../../src/fetchPivotBranch');
+    const actualFetchModule = jest.requireActual('../../../../src/fetchPivotBranch');
     fetchPivotBranchMock.mockImplementation(args =>
       actualFetchModule.fetchPivotBranch(args),
     );

@@ -19,14 +19,14 @@
 
 import React from 'react';
 import { render, fireEvent, waitFor, within } from '@testing-library/react';
-import PivotTableChart from './fixtures/TestPivotTableChart';
-import { PivotTreeData } from '../../src/types';
-import { baseFormData, buildFormData } from './fixtures/pivotFormData';
-import { serializePath } from '../../src/utils';
-import { fetchPivotBranch } from '../../src/fetchPivotBranch';
+import PivotTableChart from '../../fixtures/TestPivotTableChart';
+import { PivotTreeData } from '../../../../src/types';
+import { baseFormData, buildFormData } from '../../fixtures/pivotFormData';
+import { serializePath } from '../../../../src/utils';
+import { fetchPivotBranch } from '../../../../src/fetchPivotBranch';
 
-jest.mock('../../src/fetchPivotBranch', () => {
-  const actual = jest.requireActual('../../src/fetchPivotBranch');
+jest.mock('../../../../src/fetchPivotBranch', () => {
+  const actual = jest.requireActual('../../../../src/fetchPivotBranch');
   return {
     ...actual,
     fetchPivotBranch: jest.fn().mockResolvedValue({ data: undefined }),
