@@ -19,24 +19,37 @@ under the License.
 
 # Column Header Alignment Examples (Metrics Last on Columns)
 
+## Excel-style layout (col_lvl1/col_lvl2 with totals)
+
+Scenario
+- Columns: col_lvl1 -> col_lvl2 -> Values
+- Metrics: measure1, measure2
+- Subtotals at col_lvl1 and grand totals enabled
+
+```
+Level 1: col_lvl1_1                                                                                              col_lvl1_1 measure1       col_lvl1_1 measure2       col_lvl1_2                                                                                              col_lvl1_2 measure1       col_lvl1_2 measure2       Total measure1            Total measure2
+Level 2: col_lvl2_1                                          col_lvl2_2                                                                                              col_lvl2_1                                          col_lvl2_2
+Level 3: measure1                  measure2                  measure1                  measure2                                                                      measure1                  measure2                  measure1                  measure2
+```
+
+## Desired (no repeated parent labels on leaf metrics)
+
 Scenario
 - Columns: ShipMode -> Category -> Values
 - Metrics: Sales, Profit
 - Data: AIR/FURNITURE, AIR/OFFICE
 - Subtotals enabled at Category
 
-## Desired (no repeated parent labels on leaf metrics)
-
 ```
 Level 1: AIR (colSpan=6)
-Level 2: FURNITURE (colSpan=2)                        OFFICE (colSpan=2)                          Subtotal (colSpan=2)
-Level 3: Sales                 Profit                Sales                 Profit                FURNITURE Sales       FURNITURE Profit
+Level 2: FURNITURE (colSpan=2)                               OFFICE (colSpan=2)                                  Subtotal (colSpan=2)
+Level 3: Sales                     Profit                    Sales                     Profit                    FURNITURE Sales           FURNITURE Profit
 ```
 
 ## Undesired (parent label repeated on every metric leaf)
 
 ```
 Level 1: AIR (colSpan=6)
-Level 2: FURNITURE (colSpan=2)                        OFFICE (colSpan=2)                          Subtotal (colSpan=2)
-Level 3: FURNITURE Sales       FURNITURE Profit      OFFICE Sales          OFFICE Profit         FURNITURE Sales       FURNITURE Profit
+Level 2: FURNITURE (colSpan=2)                               OFFICE (colSpan=2)                                  Subtotal (colSpan=2)
+Level 3: FURNITURE Sales           FURNITURE Profit          OFFICE Sales              OFFICE Profit             FURNITURE Sales           FURNITURE Profit
 ```

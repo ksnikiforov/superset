@@ -18,7 +18,7 @@
  */
 
 import React from 'react';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import {
   MetricsLayoutEnum,
@@ -31,8 +31,23 @@ import {
   applyMetricAxis,
   buildTreeFromRecords,
   METRICS_PLACEHOLDER,
+  mergeTrees,
   serializePath,
+  SUBTOTAL_LABEL,
+  SUBTOTAL_TOKEN,
 } from '../../../src/utils';
+import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
+
+jest.mock('../../../src/fetchPivotBranch', () => {
+  const actual = jest.requireActual('../../../src/fetchPivotBranch');
+  return {
+    ...actual,
+    fetchPivotBranch: jest.fn().mockResolvedValue({ data: undefined }),
+    peekPivotBranchCache: jest.fn(),
+  };
+});
+
+const fetchPivotBranchMock = fetchPivotBranch as jest.Mock;
 
 const baseFormData: Partial<PivotTableQueryFormData> = {
   groupbyRows: ['r1'],
@@ -121,7 +136,59 @@ const baseTree: PivotTreeData = {
   },
 };
 
+const injectColumnSubtotalLeaves = (
+  tree: PivotTreeData,
+  depth: number,
+  fullDepth: number,
+) => {
+  if (depth <= 0 || depth >= fullDepth) {
+    return tree;
+  }
+  const next: PivotTreeData = {
+    rows: { ...tree.rows },
+    cols: { ...tree.cols },
+    cells: { ...tree.cells },
+  };
+  const subtotalNodes = Object.values(tree.cols).filter(
+    node => node.path.length === depth && node.path.length > 0,
+  );
+  subtotalNodes.forEach(node => {
+    const subtotalPath = [...node.path, SUBTOTAL_TOKEN];
+    const subtotalKey = serializePath(subtotalPath);
+    if (!next.cols[subtotalKey]) {
+      next.cols[subtotalKey] = {
+        ...node,
+        key: subtotalKey,
+        path: subtotalPath,
+        label: SUBTOTAL_LABEL,
+        formattedLabel: SUBTOTAL_LABEL,
+        level: subtotalPath.length,
+        hasChildren: subtotalPath.length < fullDepth,
+        isSubtotal: true,
+      };
+    }
+  });
+  Object.values(tree.cells).forEach(cell => {
+    const baseColPath = tree.cols[cell.colKey]?.path;
+    if (!baseColPath || baseColPath.length !== depth || baseColPath.length === 0) {
+      return;
+    }
+    const subtotalColKey = serializePath([...baseColPath, SUBTOTAL_TOKEN]);
+    const cellKey = `${cell.rowKey}|${subtotalColKey}`;
+    next.cells[cellKey] = {
+      ...cell,
+      colKey: subtotalColKey,
+      isSubtotal: true,
+    };
+  });
+  return next;
+};
+
 describe('PivotTableChart metric tier suppression', () => {
+  beforeEach(() => {
+    fetchPivotBranchMock.mockClear();
+  });
+
   it('hides the metric column header when there is a single metric at the last column level', () => {
     const props: Partial<PivotTableProps> = {
       data: baseTree,
@@ -225,10 +292,8 @@ describe('PivotTableChart metric tier suppression', () => {
     };
 
     const { container } = render(<PivotTableChart {...props} />);
-    const headerRow = container.querySelector(
-      'thead tr:last-child',
-    ) as HTMLElement;
-    const headerLabels = within(headerRow)
+    const header = container.querySelector('thead') as HTMLElement;
+    const headerLabels = within(header)
       .getAllByRole('columnheader')
       .map(cell => cell.textContent?.trim())
       .filter(label => label && label !== 'Rows');
@@ -237,6 +302,498 @@ describe('PivotTableChart metric tier suppression', () => {
       expect(headerLabels).toContain(metric);
       expect(headerLabels).not.toContain(`AIR ${metric}`);
     });
+  });
+
+  it('shows year headers once with metric labels on the next row when metrics are last on columns', () => {
+    const metrics = ['grossRevenue', 'countCustomers'];
+    const treeRaw = buildTreeFromRecords(
+      [
+        {
+          shipMode: 'AIR',
+          orderYear: '1992',
+          shipInstruction: 'EXPRESS',
+          grossRevenue: 10,
+          countCustomers: 2,
+        },
+        {
+          shipMode: 'AIR',
+          orderYear: '1993',
+          shipInstruction: 'STANDARD',
+          grossRevenue: 12,
+          countCustomers: 3,
+        },
+      ],
+      metrics,
+      ['shipMode'],
+      ['orderYear', 'shipInstruction'],
+      1,
+      1,
+    );
+    const tree = applyMetricAxis(
+      treeRaw,
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      ['shipMode'],
+      ['orderYear', 'shipInstruction'],
+      2,
+    );
+
+    const props: Partial<PivotTableProps> = {
+      data: tree,
+      formData: buildFormData({
+        ...baseFormData,
+        groupbyRows: ['shipMode'],
+        groupbyColumns: ['orderYear', 'shipInstruction', METRICS_PLACEHOLDER],
+        metricsLayout: MetricsLayoutEnum.COLUMNS,
+        metrics,
+        startCollapsed: true,
+        initialDepth: 1,
+        colSubTotals: true,
+      }),
+      metrics,
+      groupbyRows: ['shipMode'],
+      groupbyColumns: ['orderYear', 'shipInstruction'],
+      aggregateFunction: 'Sum',
+      width: 400,
+      height: 300,
+      startCollapsed: true,
+      initialDepth: 1,
+      maxDepthPerFetch: 1,
+      rowTotals: false,
+      colTotals: false,
+      rowSubTotals: false,
+      colSubTotals: true,
+      rowSubtotalLevels: [],
+      colSubtotalLevels: [],
+      rowOrder: 'key_a_to_z',
+      colOrder: 'key_a_to_z',
+      valueFormat: '',
+      columnFormats: {},
+      currencyFormats: {},
+      allowRenderHtml: false,
+      emitCrossFilters: false,
+      setDataMask: jest.fn(),
+      metricColorFormatters: [],
+      dateFormatters: {},
+      verboseMap: {},
+    };
+
+    const { container } = render(<PivotTableChart {...props} />);
+    const headerRows = container.querySelectorAll('thead tr');
+    const topLabels = within(headerRows[0])
+      .getAllByRole('columnheader')
+      .map(cell => cell.textContent?.trim())
+      .filter(label => label && label !== 'Rows');
+    const yearLabels = topLabels.filter(label => /^\d{4}$/.test(label));
+    expect(yearLabels).toEqual(['1992', '1993']);
+    expect(topLabels).not.toEqual(
+      expect.arrayContaining(['1992 grossRevenue', '1993 grossRevenue']),
+    );
+
+    const metricLabels = within(headerRows[1])
+      .getAllByRole('columnheader')
+      .map(cell => cell.textContent?.trim())
+      .filter(label => label && label !== 'Rows');
+    expect(metricLabels).toEqual([
+      'grossRevenue',
+      'countCustomers',
+      'grossRevenue',
+      'countCustomers',
+    ]);
+
+    const yearHeader = within(headerRows[0]).getByText('1992').closest(
+      'th',
+    ) as HTMLElement;
+    expect(within(yearHeader).getByLabelText('plus-square')).toBeTruthy();
+  });
+
+  it('expands to the next column dimension on first toggle when metrics are last on columns', async () => {
+    const metrics = ['grossRevenue', 'countCustomers'];
+    const records = [
+      {
+        shipMode: 'AIR',
+        orderYear: '1992',
+        shipInstruction: 'EXPRESS',
+        grossRevenue: 10,
+        countCustomers: 2,
+      },
+      {
+        shipMode: 'AIR',
+        orderYear: '1992',
+        shipInstruction: 'STANDARD',
+        grossRevenue: 8,
+        countCustomers: 1,
+      },
+      {
+        shipMode: 'AIR',
+        orderYear: '1993',
+        shipInstruction: 'EXPRESS',
+        grossRevenue: 12,
+        countCustomers: 3,
+      },
+    ];
+    const baseRaw = buildTreeFromRecords(
+      records,
+      metrics,
+      ['shipMode'],
+      ['orderYear', 'shipInstruction'],
+      1,
+      1,
+    );
+    const baseTreeWithMetrics = applyMetricAxis(
+      baseRaw,
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      ['shipMode'],
+      ['orderYear', 'shipInstruction'],
+      2,
+    );
+
+    const branchRaw = buildTreeFromRecords(
+      records,
+      metrics,
+      ['shipMode'],
+      ['orderYear', 'shipInstruction'],
+      1,
+      2,
+    );
+    const branchTreeWithMetrics = applyMetricAxis(
+      branchRaw,
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      ['shipMode'],
+      ['orderYear', 'shipInstruction'],
+      2,
+    );
+    const mergedTree = mergeTrees(baseTreeWithMetrics, branchTreeWithMetrics);
+
+    fetchPivotBranchMock.mockResolvedValueOnce({ data: mergedTree });
+
+    const props: Partial<PivotTableProps> = {
+      data: baseTreeWithMetrics,
+      formData: buildFormData({
+        ...baseFormData,
+        groupbyRows: ['shipMode'],
+        groupbyColumns: ['orderYear', 'shipInstruction', METRICS_PLACEHOLDER],
+        metricsLayout: MetricsLayoutEnum.COLUMNS,
+        metrics,
+        startCollapsed: true,
+        initialDepth: 1,
+      }),
+      metrics,
+      groupbyRows: ['shipMode'],
+      groupbyColumns: ['orderYear', 'shipInstruction'],
+      aggregateFunction: 'Sum',
+      width: 400,
+      height: 300,
+      startCollapsed: true,
+      initialDepth: 1,
+      maxDepthPerFetch: 1,
+      rowTotals: false,
+      colTotals: false,
+      rowSubTotals: false,
+      colSubTotals: false,
+      rowSubtotalLevels: [],
+      colSubtotalLevels: [],
+      rowOrder: 'key_a_to_z',
+      colOrder: 'key_a_to_z',
+      valueFormat: '',
+      columnFormats: {},
+      currencyFormats: {},
+      allowRenderHtml: false,
+      emitCrossFilters: false,
+      setDataMask: jest.fn(),
+      metricColorFormatters: [],
+      dateFormatters: {},
+      verboseMap: {},
+    };
+
+    const { container } = render(<PivotTableChart {...props} />);
+    const initialHeaderRows = container.querySelectorAll('thead tr');
+    const yearHeader = within(initialHeaderRows[0]).getByText('1992').closest(
+      'th',
+    ) as HTMLElement;
+    fireEvent.click(within(yearHeader).getByLabelText('plus-square'));
+
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
+    });
+
+    const headerRows = container.querySelectorAll('thead tr');
+    expect(headerRows.length).toBeGreaterThan(2);
+    const dimensionLabels = within(headerRows[1])
+      .getAllByRole('columnheader')
+      .map(cell => cell.textContent?.trim())
+      .filter(label => label && label !== 'Rows');
+    expect(dimensionLabels).toEqual(
+      expect.arrayContaining(['EXPRESS', 'STANDARD']),
+    );
+  });
+
+  it('expands to the next column dimension when the metrics placeholder is absent', async () => {
+    const metrics = ['grossRevenue', 'countCustomers'];
+    const records = [
+      {
+        shipMode: 'AIR',
+        orderYear: '1992',
+        shipInstruction: 'EXPRESS',
+        grossRevenue: 10,
+        countCustomers: 2,
+      },
+      {
+        shipMode: 'AIR',
+        orderYear: '1992',
+        shipInstruction: 'STANDARD',
+        grossRevenue: 8,
+        countCustomers: 1,
+      },
+      {
+        shipMode: 'AIR',
+        orderYear: '1993',
+        shipInstruction: 'EXPRESS',
+        grossRevenue: 12,
+        countCustomers: 3,
+      },
+    ];
+    const baseRaw = buildTreeFromRecords(
+      records,
+      metrics,
+      ['shipMode'],
+      ['orderYear', 'shipInstruction'],
+      1,
+      1,
+    );
+    const baseTreeWithMetrics = applyMetricAxis(
+      baseRaw,
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      ['shipMode'],
+      ['orderYear', 'shipInstruction'],
+      2,
+    );
+
+    const branchRaw = buildTreeFromRecords(
+      records,
+      metrics,
+      ['shipMode'],
+      ['orderYear', 'shipInstruction'],
+      1,
+      2,
+    );
+    const branchTreeWithMetrics = applyMetricAxis(
+      branchRaw,
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      ['shipMode'],
+      ['orderYear', 'shipInstruction'],
+      2,
+    );
+    const mergedTree = mergeTrees(baseTreeWithMetrics, branchTreeWithMetrics);
+
+    fetchPivotBranchMock.mockResolvedValueOnce({ data: mergedTree });
+
+    const props: Partial<PivotTableProps> = {
+      data: baseTreeWithMetrics,
+      formData: buildFormData({
+        ...baseFormData,
+        groupbyRows: ['shipMode'],
+        groupbyColumns: ['orderYear', 'shipInstruction'],
+        metricsLayout: MetricsLayoutEnum.COLUMNS,
+        metrics,
+        startCollapsed: true,
+        initialDepth: 1,
+      }),
+      metrics,
+      groupbyRows: ['shipMode'],
+      groupbyColumns: ['orderYear', 'shipInstruction'],
+      aggregateFunction: 'Sum',
+      width: 400,
+      height: 300,
+      startCollapsed: true,
+      initialDepth: 1,
+      maxDepthPerFetch: 1,
+      rowTotals: false,
+      colTotals: false,
+      rowSubTotals: false,
+      colSubTotals: false,
+      rowSubtotalLevels: [],
+      colSubtotalLevels: [],
+      rowOrder: 'key_a_to_z',
+      colOrder: 'key_a_to_z',
+      valueFormat: '',
+      columnFormats: {},
+      currencyFormats: {},
+      allowRenderHtml: false,
+      emitCrossFilters: false,
+      setDataMask: jest.fn(),
+      metricColorFormatters: [],
+      dateFormatters: {},
+      verboseMap: {},
+    };
+
+    const { container } = render(<PivotTableChart {...props} />);
+    const initialHeaderRows = container.querySelectorAll('thead tr');
+    const yearHeader = within(initialHeaderRows[0]).getByText('1992').closest(
+      'th',
+    ) as HTMLElement;
+    fireEvent.click(within(yearHeader).getByLabelText('plus-square'));
+
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
+    });
+
+    const headerRows = container.querySelectorAll('thead tr');
+    expect(headerRows.length).toBeGreaterThan(2);
+    const dimensionLabels = within(headerRows[1])
+      .getAllByRole('columnheader')
+      .map(cell => cell.textContent?.trim())
+      .filter(label => label && label !== 'Rows');
+    expect(dimensionLabels).toEqual(
+      expect.arrayContaining(['EXPRESS', 'STANDARD']),
+    );
+  });
+
+  it('fetches deeper column dimensions when subtotals exist and metrics are last on columns', async () => {
+    const metrics = ['grossRevenue', 'countCustomers'];
+    const records = [
+      {
+        shipMode: 'AIR',
+        orderYear: '1992',
+        shipInstruction: 'EXPRESS',
+        grossRevenue: 10,
+        countCustomers: 2,
+      },
+      {
+        shipMode: 'AIR',
+        orderYear: '1992',
+        shipInstruction: 'STANDARD',
+        grossRevenue: 8,
+        countCustomers: 1,
+      },
+      {
+        shipMode: 'AIR',
+        orderYear: '1993',
+        shipInstruction: 'EXPRESS',
+        grossRevenue: 12,
+        countCustomers: 3,
+      },
+    ];
+    const baseRaw = buildTreeFromRecords(
+      records,
+      metrics,
+      ['shipMode'],
+      ['orderYear', 'shipInstruction'],
+      1,
+      1,
+    );
+    const baseWithSubtotals = injectColumnSubtotalLeaves(
+      baseRaw,
+      1,
+      2,
+    );
+    const baseTreeWithMetrics = applyMetricAxis(
+      baseWithSubtotals,
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      ['shipMode'],
+      ['orderYear', 'shipInstruction'],
+      2,
+    );
+
+    const branchRaw = buildTreeFromRecords(
+      records,
+      metrics,
+      ['shipMode'],
+      ['orderYear', 'shipInstruction'],
+      1,
+      2,
+    );
+    const branchWithSubtotals = injectColumnSubtotalLeaves(
+      branchRaw,
+      1,
+      2,
+    );
+    const branchTreeWithMetrics = applyMetricAxis(
+      branchWithSubtotals,
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      ['shipMode'],
+      ['orderYear', 'shipInstruction'],
+      2,
+    );
+    const mergedTree = mergeTrees(baseTreeWithMetrics, branchTreeWithMetrics);
+
+    fetchPivotBranchMock
+      .mockResolvedValueOnce({ data: baseTreeWithMetrics })
+      .mockResolvedValueOnce({ data: mergedTree });
+
+    const props: Partial<PivotTableProps> = {
+      data: baseTreeWithMetrics,
+      formData: buildFormData({
+        ...baseFormData,
+        groupbyRows: ['shipMode'],
+        groupbyColumns: ['orderYear', 'shipInstruction', METRICS_PLACEHOLDER],
+        metricsLayout: MetricsLayoutEnum.COLUMNS,
+        metrics,
+        startCollapsed: true,
+        initialDepth: 1,
+        colSubTotals: true,
+      }),
+      metrics,
+      groupbyRows: ['shipMode'],
+      groupbyColumns: ['orderYear', 'shipInstruction'],
+      aggregateFunction: 'Sum',
+      width: 400,
+      height: 300,
+      startCollapsed: true,
+      initialDepth: 1,
+      maxDepthPerFetch: 1,
+      rowTotals: false,
+      colTotals: false,
+      rowSubTotals: false,
+      colSubTotals: true,
+      rowSubtotalLevels: [],
+      colSubtotalLevels: [],
+      rowOrder: 'key_a_to_z',
+      colOrder: 'key_a_to_z',
+      valueFormat: '',
+      columnFormats: {},
+      currencyFormats: {},
+      allowRenderHtml: false,
+      emitCrossFilters: false,
+      setDataMask: jest.fn(),
+      metricColorFormatters: [],
+      dateFormatters: {},
+      verboseMap: {},
+    };
+
+    const { container } = render(<PivotTableChart {...props} />);
+    const initialHeaderRows = container.querySelectorAll('thead tr');
+    const yearHeader = within(initialHeaderRows[0]).getByText('1992').closest(
+      'th',
+    ) as HTMLElement;
+    fireEvent.click(within(yearHeader).getByLabelText('plus-square'));
+
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
+    });
+
+    fireEvent.click(within(yearHeader).getByLabelText('minus-square'));
+    fireEvent.click(within(yearHeader).getByLabelText('plus-square'));
+
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
+    });
+
+    const headerRows = container.querySelectorAll('thead tr');
+    expect(headerRows.length).toBeGreaterThan(2);
+    const dimensionLabels = within(headerRows[1])
+      .getAllByRole('columnheader')
+      .map(cell => cell.textContent?.trim())
+      .filter(label => label && label !== 'Rows');
+    expect(dimensionLabels).toEqual(
+      expect.arrayContaining(['EXPRESS', 'STANDARD']),
+    );
   });
 
   it('keeps metric tier hidden on rows when the metric is at the bottom of the hierarchy', () => {

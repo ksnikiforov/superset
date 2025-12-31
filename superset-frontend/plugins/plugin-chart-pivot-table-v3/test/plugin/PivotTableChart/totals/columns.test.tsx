@@ -215,7 +215,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       />,
     );
 
-    const headerRow = container.querySelector('thead tr:last-child') as HTMLElement;
+    const headerRow = container.querySelector('thead tr:first-child') as HTMLElement;
     const headers = within(headerRow).getAllByRole('columnheader');
     const headerLabels = headers.slice(1).map(cell => cell.textContent?.trim());
     const headerIndex = position === 'end' ? headerLabels.length - 1 : 0;
@@ -305,8 +305,8 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       />,
     );
 
-    const headerRow = container.querySelector('thead tr:last-child') as HTMLElement;
-    expect(within(headerRow).getByText('Grand total')).toBeTruthy();
+    const header = container.querySelector('thead') as HTMLElement;
+    expect(within(header).getByText('Grand total')).toBeTruthy();
     const bodyRow = container.querySelector('tbody tr') as HTMLElement;
     expect(within(bodyRow).getByText('8')).toBeTruthy();
   });
@@ -402,15 +402,13 @@ describe('PivotTableChart totals & subtotals - columns', () => {
         />,
       );
 
-      const headerRow = container.querySelector(
-        'thead tr:last-child',
-      ) as HTMLElement;
-      const headers = within(headerRow)
+      const header = container.querySelector('thead') as HTMLElement;
+      const headers = within(header)
         .getAllByRole('columnheader')
         .map(cell => cell.textContent?.trim())
         .filter(label => label && label !== 'Rows');
       metrics.forEach(metric => {
-        expect(headers.filter(label => label === metric)).toHaveLength(2);
+        expect(headers).toEqual(expect.arrayContaining([metric, `Total ${metric}`]));
       });
 
       const urgentRow = screen.getByText('1-URGENT').closest(
@@ -573,10 +571,8 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       />,
     );
 
-    const headerRow = container.querySelector(
-      'thead tr:last-child',
-    ) as HTMLElement;
-    const headerLabels = within(headerRow)
+    const header = container.querySelector('thead') as HTMLElement;
+    const headerLabels = within(header)
       .getAllByRole('columnheader')
       .map(cell => cell.textContent?.trim())
       .filter(label => label && label !== 'Rows');

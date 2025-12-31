@@ -273,12 +273,23 @@ export const hasLoadedChildren = ({
   visibleColDepth,
   countDimDepth,
 }: HasLoadedChildrenParams) => {
+  const countBaseDimDepth = (path: PivotTreeNode['path']) =>
+    path.filter(val => {
+      const value = String(val ?? '');
+      if (metricLabelSet.has(value)) {
+        return false;
+      }
+      if (isSubtotalToken(val) || value === 'Total') {
+        return false;
+      }
+      return true;
+    }).length;
   const children = getRawChildren(axis, node);
   if (children.length === 0) {
     return false;
   }
   const groupbyLength = axis === 'row' ? groupbyRowsLength : groupbyColsLength;
-  const parentDimDepth = countDimDepth(node.path);
+  const parentDimDepth = countBaseDimDepth(node.path);
   const metricIndex = axis === 'row' ? metricIndexForRows : metricIndexForCols;
   if (
     metricIndex !== undefined &&
@@ -289,7 +300,9 @@ export const hasLoadedChildren = ({
     // Sitting on the metric tier and deeper dimensions remain; force fetch.
     return false;
   }
-  const childDimDepths = children.map(child => countDimDepth(child.path));
+  const childDimDepths = children.map(child =>
+    countBaseDimDepth(child.path),
+  );
   const maxChildDimDepth = Math.max(...childDimDepths, 0);
   const childCellRowDepths: number[] = [];
   const childCellColDepths: number[] = [];
