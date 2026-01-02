@@ -208,12 +208,20 @@ export const formatMetricValue = (
   columnFormats: Record<string, string>,
   currencyFormats: Record<string, any>,
   defaultFormatter: (v: number | null | undefined) => string,
+  d3FormatOverride?: string,
 ) => {
   if (value === null || value === undefined) {
     return '';
   }
   if (typeof value !== 'number') {
     return String(value);
+  }
+  if (d3FormatOverride) {
+    try {
+      return getNumberFormatter(d3FormatOverride)(value);
+    } catch {
+      // Fall through to default formatting when override is invalid.
+    }
   }
   const currency = currencyFormats?.[metric];
   const d3Format = columnFormats?.[metric];

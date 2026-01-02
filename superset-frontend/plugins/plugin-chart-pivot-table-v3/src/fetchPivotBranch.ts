@@ -40,7 +40,9 @@ import {
   buildTreeFromRecords,
   applyMetricAxis,
   mergeTrees,
+  collectMetricFormattingMetrics,
   getMetricKeys,
+  mergeMetrics,
   serializePath,
   resolveMetricPlacement,
   stripMetricsPlaceholder,
@@ -108,6 +110,7 @@ interface ResolvedFetchContext {
   rowGroupby: QueryFormColumn[];
   colGroupby: QueryFormColumn[];
   metrics: QueryFormMetric[];
+  metricsForQuery: QueryFormMetric[];
   metricsLayoutResolved: MetricsLayoutEnum;
   metricInsertIndex: number;
   sanitizedPath: PivotPath;
@@ -130,6 +133,10 @@ const resolveFetchContext = ({
   const rowGroupbyRaw = ensureIsArray<QueryFormColumn>(formData.groupbyRows);
   const colGroupbyRaw = ensureIsArray<QueryFormColumn>(formData.groupbyColumns);
   const metrics = ensureIsArray(formData.metrics);
+  const formattingMetrics = collectMetricFormattingMetrics(
+    formData.metricFormatting,
+  );
+  const metricsForQuery = mergeMetrics(metrics, formattingMetrics);
   const metricLabels = getMetricKeys(metrics);
   const metricLabelSet = new Set(metricLabels);
   const placement = resolveMetricPlacement(rowGroupbyRaw, colGroupbyRaw, {
@@ -256,7 +263,7 @@ const resolveFetchContext = ({
     colDepth,
     rowGroupby,
     colGroupby,
-    metrics,
+    metricsForQuery.length > 0 ? metricsForQuery : metrics,
     formData.aggregateFunction,
   );
 
@@ -266,6 +273,7 @@ const resolveFetchContext = ({
     rowGroupby,
     colGroupby,
     metrics,
+    metricsForQuery,
     metricsLayoutResolved,
     metricInsertIndex,
     sanitizedPath,
@@ -361,6 +369,7 @@ export async function fetchPivotBranch({
     rowGroupbyRaw,
     colGroupbyRaw,
     metrics,
+    metricsForQuery,
     metricsLayoutResolved,
     metricInsertIndex,
     sanitizedPath,
@@ -378,6 +387,10 @@ export async function fetchPivotBranch({
     visibleRowDepth,
     visibleColDepth,
   });
+  const queryFormData =
+    metricsForQuery.length > 0
+      ? { ...formData, metrics: metricsForQuery }
+      : formData;
 
   const cached = cache.get(cacheKey);
   if (cached) {
@@ -474,7 +487,7 @@ export async function fetchPivotBranch({
       : buildPathFilters(colGroupby, sanitizedPath);
 
   const queryContext = buildQueryContext(
-    formData,
+    queryFormData,
     (baseQueryObject: QueryObject) =>
       queryPairs.map(pair => ({
         ...baseQueryObject,
@@ -505,7 +518,7 @@ export async function fetchPivotBranch({
           (() => {
             let tree = buildTreeFromRecords(
               results[idx]?.data || [],
-              formData.metrics,
+              metricsForQuery.length > 0 ? metricsForQuery : formData.metrics,
               rowGroupby,
               colGroupby,
               pair.rowDepth,

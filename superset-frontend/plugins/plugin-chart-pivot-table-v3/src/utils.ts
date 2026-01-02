@@ -20,11 +20,20 @@ import {
   DataRecord,
   DataRecordValue,
   getColumnLabel,
+  getMetricLabel,
+  Metric,
   QueryFormColumn,
   QueryFormMetric,
   ensureIsArray,
 } from '@superset-ui/core';
-import { MetricsLayoutEnum, PivotPath, PivotTreeData, PivotTreeNode } from './types';
+import {
+  MetricsLayoutEnum,
+  METRIC_FORMATTING_FIELDS,
+  PivotMetricFormattingMap,
+  PivotPath,
+  PivotTreeData,
+  PivotTreeNode,
+} from './types';
 import { formatQueryName } from './buildQuery';
 
 export const PATH_DIVIDER = '__';
@@ -70,10 +79,53 @@ export const stripMetricsPlaceholder = (groupby: QueryFormColumn[]) =>
 
 export const serializePath = (path: PivotPath = []) => path.join(PATH_DIVIDER);
 
+export const getMetricKey = (metric: QueryFormMetric | Metric) => {
+  if (typeof metric === 'string') {
+    return metric;
+  }
+  if ('expressionType' in metric) {
+    return getMetricLabel(metric) || '';
+  }
+  if ('metric_name' in metric && metric.metric_name) {
+    return metric.metric_name;
+  }
+  return getMetricLabel(metric) || '';
+};
+
 export const getMetricKeys = (metrics: QueryFormMetric[]) =>
-  metrics
-    .map(metric => (typeof metric === 'string' ? metric : metric.label))
-    .filter((m): m is string => !!m);
+  metrics.map(getMetricKey).filter((m): m is string => !!m);
+
+export const collectMetricFormattingMetrics = (
+  metricFormatting?: PivotMetricFormattingMap,
+): QueryFormMetric[] => {
+  if (!metricFormatting) {
+    return [];
+  }
+  return Object.values(metricFormatting).flatMap(formatting =>
+    METRIC_FORMATTING_FIELDS.map(field => formatting[field]).filter(
+      (metric): metric is QueryFormMetric => !!metric,
+    ),
+  );
+};
+
+export const mergeMetrics = (
+  metrics: QueryFormMetric[],
+  extraMetrics: QueryFormMetric[],
+) => {
+  const seen = new Set<string>();
+  const result: QueryFormMetric[] = [];
+  const addMetric = (metric: QueryFormMetric) => {
+    const key = getMetricKey(metric);
+    if (!key || seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    result.push(metric);
+  };
+  metrics.forEach(addMetric);
+  extraMetrics.forEach(addMetric);
+  return result;
+};
 
 export const normalizeSubtotalLevels = (
   levels: number[] | undefined,
@@ -491,6 +543,10 @@ export const applyMetricAxis = (
       const rowKey = serializePath(rowPath);
 
       metricKeys.forEach(metric => {
+        const mergedValues = {
+          [metric]: cell.values[metric],
+          ...cell.values,
+        };
         const hasSubtotalAtInsert =
           rowSuffix.length > 0 &&
           (isSubtotalToken(rowSuffix[0]) || rowSuffix[0] === 'Total');
@@ -520,7 +576,7 @@ export const applyMetricAxis = (
         result.cells[`${newRowKey}|${colKey}`] = {
           rowKey: newRowKey,
           colKey,
-          values: { [metric]: cell.values[metric] },
+          values: mergedValues,
           isSubtotal: cell.isSubtotal,
         };
         // If there is only one metric and the metric tier is at the end,
@@ -534,7 +590,7 @@ export const applyMetricAxis = (
             result.cells[`${rowKey}|${colKey}`] || {
               rowKey,
               colKey,
-              values: { [metric]: cell.values[metric] },
+              values: mergedValues,
               isSubtotal: cell.isSubtotal,
             };
         }
@@ -579,6 +635,10 @@ export const applyMetricAxis = (
       const colKey = serializePath(colPath);
 
       metricKeys.forEach(metric => {
+        const mergedValues = {
+          [metric]: cell.values[metric],
+          ...cell.values,
+        };
         const newColPath = [...colPrefix, metric, ...colSuffix];
         for (let depth = 0; depth <= newColPath.length; depth += 1) {
           const subPath = newColPath.slice(0, depth);
@@ -602,7 +662,7 @@ export const applyMetricAxis = (
         result.cells[`${rowKey}|${newColKey}`] = {
           rowKey,
           colKey: newColKey,
-          values: { [metric]: cell.values[metric] },
+          values: mergedValues,
           isSubtotal: cell.isSubtotal,
         };
         if (metricKeys.length === 1 && metricPosition === 0) {
@@ -611,7 +671,7 @@ export const applyMetricAxis = (
             result.cells[`${rowKey}|${rootColKey}`] || {
               rowKey,
               colKey: rootColKey,
-              values: { [metric]: cell.values[metric] },
+              values: mergedValues,
               isSubtotal: cell.isSubtotal,
             };
         }
@@ -629,7 +689,7 @@ export const applyMetricAxis = (
             result.cells[`${rowKey}|${baseColKey}`] || {
               rowKey,
               colKey: baseColKey,
-              values: { [metric]: cell.values[metric] },
+              values: mergedValues,
               isSubtotal: cell.isSubtotal,
             };
         }

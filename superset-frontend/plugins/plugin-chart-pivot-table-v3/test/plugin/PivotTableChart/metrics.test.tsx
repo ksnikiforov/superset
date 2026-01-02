@@ -18,7 +18,13 @@
  */
 
 import React from 'react';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from 'spec/helpers/testing-library';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import {
   MetricsLayoutEnum,
@@ -225,6 +231,79 @@ describe('PivotTableChart metric tier suppression', () => {
 
     expect(screen.queryByText('metric1')).toBeNull();
     expect(screen.getByText('C1')).toBeTruthy();
+  });
+
+  it('applies background and text colors from formatting metrics', () => {
+    const formattedTree: PivotTreeData = {
+      ...baseTree,
+      cells: {
+        ...baseTree.cells,
+        [`${serializePath(['A'])}|${serializePath(['C1'])}`]: {
+          rowKey: serializePath(['A']),
+          colKey: serializePath(['C1']),
+          values: {
+            metric1: 10,
+            metric1_bg: '#111111',
+            metric1_text: '#00ff00',
+          },
+        },
+        [`${serializePath(['A'])}|${serializePath(['C1', 'metric1'])}`]: {
+          rowKey: serializePath(['A']),
+          colKey: serializePath(['C1', 'metric1']),
+          values: {
+            metric1: 11,
+            metric1_bg: '#222222',
+            metric1_text: '#ff0000',
+          },
+        },
+      },
+    };
+
+    render(
+      <PivotTableChart
+        data={formattedTree}
+        formData={buildFormData({
+          ...baseFormData,
+          metricFormatting: {
+            metric1: {
+              backgroundColor: 'metric1_bg',
+              textColor: 'metric1_text',
+            },
+          },
+        })}
+        metrics={['metric1']}
+        groupbyRows={['r1']}
+        groupbyColumns={['c1']}
+        aggregateFunction="Sum"
+        width={400}
+        height={300}
+        startCollapsed={false}
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    const cell = screen.getByText('10').closest('td');
+    expect(cell).toHaveStyle({
+      backgroundColor: '#111111',
+      color: '#00ff00',
+    });
   });
 
   it('renders metric headers without dimension prefixes when metrics are last on columns', () => {

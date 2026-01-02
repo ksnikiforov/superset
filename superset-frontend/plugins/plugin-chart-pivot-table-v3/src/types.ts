@@ -74,15 +74,36 @@ export enum MetricsLayoutEnum {
   COLUMNS = 'COLUMNS',
 }
 
+export type MetricFormattingScope =
+  | 'values'
+  | 'values_totals'
+  | 'values_totals_grand_totals';
+
 export type DateFormatter =
   | TimeFormatter
   | NumberFormatter
   | ((value: DataRecordValue) => string);
 
+export const METRIC_FORMATTING_FIELDS = [
+  'backgroundColor',
+  'textColor',
+  'd3Format',
+] as const;
+
+export type MetricFormattingField = (typeof METRIC_FORMATTING_FIELDS)[number];
+
+export type PivotMetricFormatting = Partial<
+  Record<MetricFormattingField, QueryFormMetric>
+>;
+
+export type PivotMetricFormattingMap = Record<string, PivotMetricFormatting>;
+
 export interface PivotTableCustomizeProps {
   groupbyRows: QueryFormColumn[];
   groupbyColumns: QueryFormColumn[];
   metrics: QueryFormMetric[];
+  metricFormatting?: PivotMetricFormattingMap;
+  metricFormattingScope?: MetricFormattingScope;
   aggregateFunction?: string;
   startCollapsed: boolean;
   initialDepth?: number;
@@ -141,6 +162,8 @@ export interface PivotTableProps
   metrics: QueryFormMetric[];
   groupbyRows: QueryFormColumn[];
   groupbyColumns: QueryFormColumn[];
+  metricFormatting?: PivotMetricFormattingMap;
+  metricFormattingScope?: MetricFormattingScope;
   aggregateFunction?: string;
   startCollapsed: boolean;
   initialDepth?: number;

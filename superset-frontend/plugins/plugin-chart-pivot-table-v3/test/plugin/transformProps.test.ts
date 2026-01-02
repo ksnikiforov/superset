@@ -69,6 +69,36 @@ describe('Pivot Table v3 transformProps', () => {
     expect(result.metrics).toEqual(['metric1']);
   });
 
+  it('keeps conditional formatting metric values in the tree', () => {
+    const props = new ChartProps({
+      ...chartProps,
+      formData: {
+        ...formData,
+        metricFormatting: {
+          metric1: {
+            backgroundColor: {
+              expressionType: 'SQL',
+              sqlExpression: 'CASE WHEN SUM(sales) > 0 THEN "#111111" END',
+              label: 'metric1_bg',
+            },
+          },
+        },
+      },
+      queriesData: [
+        {
+          data: [{ row1: 'A', col1: 'B', metric1: 10, metric1_bg: '#111111' }],
+          colnames: ['row1', 'col1', 'metric1', 'metric1_bg'],
+          coltypes: [1, 1, 0, 1],
+          query_name: formatQueryName(1, 1),
+        },
+      ],
+    });
+    const result = transformProps(
+      props as ChartProps<PivotTableQueryFormData>,
+    );
+    expect(result.data.cells['A|B__metric1'].values.metric1_bg).toBe('#111111');
+  });
+
   it('normalizes row and column subtotal selections', () => {
     const customProps = new ChartProps({
       ...chartProps,

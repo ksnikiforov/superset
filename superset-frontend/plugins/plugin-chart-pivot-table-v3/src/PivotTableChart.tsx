@@ -32,6 +32,9 @@ import {
 } from '@superset-ui/core';
 import { fetchPivotBranch, peekPivotBranchCache } from './fetchPivotBranch';
 import {
+  MetricFormattingScope,
+  METRIC_FORMATTING_FIELDS,
+  MetricFormattingField,
   MetricsLayoutEnum,
   PivotTableProps,
   PivotTreeData,
@@ -40,6 +43,7 @@ import {
 import {
   isMetricsPlaceholder,
   isSubtotalToken,
+  getMetricKey,
   mergeTrees,
   normalizeSubtotalLevels,
   parseThemeColors,
@@ -157,6 +161,87 @@ const Spinner = styled(LoadingOutlined)`
   font-size: 12px;
 `;
 
+type FormattingKeys = {
+  [key in MetricFormattingField]?: string;
+};
+
+const HEX_COLOR_PATTERN = /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+
+const parseRgbChannel = (value: string) => {
+  const numeric = Number(value.trim());
+  if (!Number.isFinite(numeric) || numeric < 0 || numeric > 255) {
+    return null;
+  }
+  return numeric;
+};
+
+const parseAlphaChannel = (value: string) => {
+  const numeric = Number(value.trim());
+  if (!Number.isFinite(numeric) || numeric < 0 || numeric > 1) {
+    return null;
+  }
+  return numeric;
+};
+
+const normalizeCssColor = (rawValue: DataRecordValue) => {
+  if (typeof rawValue !== 'string') {
+    return undefined;
+  }
+  const value = rawValue.trim().replace(/^['"]|['"]$/g, '');
+  if (!value) {
+    return undefined;
+  }
+  if (HEX_COLOR_PATTERN.test(value)) {
+    return value;
+  }
+  const rgbMatch = value.match(/^rgba?\((.*)\)$/i);
+  if (!rgbMatch) {
+    return undefined;
+  }
+  const parts = rgbMatch[1]
+    .split(',')
+    .map(part => part.trim())
+    .filter(part => part.length > 0);
+  const isRgba = value.toLowerCase().startsWith('rgba');
+  if ((isRgba && parts.length !== 4) || (!isRgba && parts.length !== 3)) {
+    return undefined;
+  }
+  const [r, g, b] = parts.slice(0, 3).map(parseRgbChannel);
+  if (r === null || g === null || b === null) {
+    return undefined;
+  }
+  if (isRgba) {
+    const alpha = parseAlphaChannel(parts[3]);
+    if (alpha === null) {
+      return undefined;
+    }
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+  return `rgb(${r}, ${g}, ${b})`;
+};
+
+const normalizeD3Format = (rawValue: DataRecordValue) => {
+  if (typeof rawValue !== 'string') {
+    return undefined;
+  }
+  const value = rawValue.trim();
+  return value.length > 0 ? value : undefined;
+};
+
+const shouldApplyMetricFormatting = (
+  scope: MetricFormattingScope,
+  isTotalCell: boolean,
+  isGrandTotalCell: boolean,
+) => {
+  if (scope === 'values') {
+    return !isTotalCell;
+  }
+  if (scope === 'values_totals') {
+    return !isGrandTotalCell;
+  }
+  return true;
+};
+
 
 function PivotTableChart(props: PivotTableProps) {
   const {
@@ -198,6 +283,33 @@ function PivotTableChart(props: PivotTableProps) {
   } = props;
   const resolvedMetricsLayout =
     (formData.metricsLayout as MetricsLayoutEnum) || metricsLayout;
+  const metricFormattingScope =
+    (formData.metricFormattingScope as MetricFormattingScope) || 'values';
+  const metricFormatting = formData.metricFormatting || {};
+  const formattingKeyMap = useMemo(() => {
+    const next: Record<string, FormattingKeys> = {};
+    Object.entries(metricFormatting).forEach(([metricKey, formatting]) => {
+      if (!metricKey) {
+        return;
+      }
+      const formattingKeys = METRIC_FORMATTING_FIELDS.reduce(
+        (acc, field) => {
+          const key = formatting?.[field]
+            ? getMetricKey(formatting[field])
+            : '';
+          if (key) {
+            acc[field] = key;
+          }
+          return acc;
+        },
+        {} as FormattingKeys,
+      );
+      if (Object.keys(formattingKeys).length > 0) {
+        next[metricKey] = formattingKeys;
+      }
+    });
+    return next;
+  }, [metricFormatting]);
   const resolvedRowTotalPosition =
     formData.rowTotalPosition || rowTotalPosition;
   const resolvedRowSubtotalPosition =
@@ -2473,13 +2585,14 @@ function PivotTableChart(props: PivotTableProps) {
   );
 
   const renderValue = useCallback(
-    (metric: string, value: DataRecordValue) =>
+    (metric: string, value: DataRecordValue, d3FormatOverride?: string) =>
       formatMetricValue(
         metric,
         value,
         columnFormats,
         currencyFormats,
         val => numberFormatter(val as number),
+        d3FormatOverride,
       ),
     [columnFormats, currencyFormats, numberFormatter],
   );
@@ -2619,7 +2732,12 @@ function PivotTableChart(props: PivotTableProps) {
   );
 
   const renderCellContent = useCallback(
-    (rowNode: PivotTreeNode, colNode: PivotTreeNode) => {
+    (
+      rowNode: PivotTreeNode,
+      colNode: PivotTreeNode,
+      metricKeyOverride?: string,
+      d3FormatOverride?: string,
+    ) => {
       if (shouldHideRowValues(rowNode)) {
         return '';
       }
@@ -2627,8 +2745,12 @@ function PivotTableChart(props: PivotTableProps) {
       if (!cell) {
         return '';
       }
-      const metricKey = deriveMetricKey(rowNode, colNode);
-      const value = renderValue(metricKey, cell.values[metricKey]);
+      const metricKey = metricKeyOverride || deriveMetricKey(rowNode, colNode);
+      const value = renderValue(
+        metricKey,
+        cell.values[metricKey],
+        d3FormatOverride,
+      );
       if (allowRenderHtml && typeof value === 'string' && value.includes('<')) {
         return <span dangerouslySetInnerHTML={{ __html: value }} />;
       }
@@ -2767,25 +2889,62 @@ function PivotTableChart(props: PivotTableProps) {
                 </th>
                 {visibleCols.map(col => {
                   const cellKey = `${row.key}|${col.key}`;
+                  const cell = tree.cells[cellKey];
+                  const metricKey = cell ? deriveMetricKey(row, col) : '';
+                  const formattingKeys = metricKey
+                    ? formattingKeyMap[metricKey]
+                    : undefined;
                   const colAggregateBold = isColAggregateBold(col);
                   const isSubtotalCell = rowAggregateBold || colAggregateBold;
+                  const isGrandTotalCell =
+                    row.path.length === 0 || col.path.length === 0;
+                  const applyFormatting = !!(
+                    cell &&
+                    formattingKeys &&
+                    shouldApplyMetricFormatting(
+                      metricFormattingScope,
+                      isSubtotalCell,
+                      isGrandTotalCell,
+                    )
+                  );
+                  const backgroundColor =
+                    applyFormatting && formattingKeys?.backgroundColor
+                      ? normalizeCssColor(
+                          cell.values[formattingKeys.backgroundColor],
+                        )
+                      : undefined;
+                  const textColor =
+                    applyFormatting && formattingKeys?.textColor
+                      ? normalizeCssColor(cell.values[formattingKeys.textColor])
+                      : undefined;
+                  const d3FormatOverride =
+                    applyFormatting && formattingKeys?.d3Format
+                      ? normalizeD3Format(
+                          cell.values[formattingKeys.d3Format],
+                        )
+                      : undefined;
                   const cellTotalBg = rowTotalBg;
                   const cellClassName = isSubtotalCell
                     ? 'subtotal-cell value-cell'
                     : 'value-cell';
+                  const cellStyle = {
+                    ...(cellTotalBg ? { backgroundColor: cellTotalBg } : {}),
+                    ...(backgroundColor ? { backgroundColor } : {}),
+                    ...(textColor ? { color: textColor } : {}),
+                  };
+                  const style =
+                    Object.keys(cellStyle).length > 0 ? cellStyle : undefined;
                   return (
                     <td
                       key={cellKey}
                       className={cellClassName}
-                      style={
-                        cellTotalBg ? { backgroundColor: cellTotalBg } : undefined
-                      }
+                      style={style}
                       onClick={() => handleCellClick(row, col)}
                       onContextMenu={event =>
                         handleCellContextMenu(event, row, col)
                       }
                     >
-                      {renderCellContent(row, col)}
+                      {renderCellContent(row, col, metricKey, d3FormatOverride)}
                     </td>
                   );
                 })}

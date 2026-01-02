@@ -26,6 +26,8 @@ import {
 } from '@superset-ui/core';
 import { MetricsLayoutEnum, PivotTableQueryFormData } from './types';
 import {
+  collectMetricFormattingMetrics,
+  mergeMetrics,
   normalizeSubtotalLevels,
   resolveMetricPlacement,
   stripMetricsPlaceholder,
@@ -72,6 +74,10 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
   const rowGroupbyRaw = ensureIsArray<QueryFormColumn>(groupbyRows);
   const colGroupbyRaw = ensureIsArray<QueryFormColumn>(groupbyColumns);
   const metrics = ensureIsArray(formData.metrics);
+  const formattingMetrics = collectMetricFormattingMetrics(
+    formData.metricFormatting,
+  );
+  const metricsForQuery = mergeMetrics(metrics, formattingMetrics);
   const placement = resolveMetricPlacement(rowGroupbyRaw, colGroupbyRaw, {
     hasMetrics: metrics.length > 0,
     preferredAxis: formData.metricsLayout as MetricsLayoutEnum,
@@ -135,18 +141,23 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
     (temporalLookup?.[col as string] || formData.granularity_sqla === col);
 
   return buildQueryContext(formData, baseQueryObject => {
-    const { series_limit_metric, metrics, order_desc } = baseQueryObject;
+    const { series_limit_metric, order_desc } = baseQueryObject;
+    const queryMetrics =
+      metricsForQuery.length > 0 ? metricsForQuery : baseQueryObject.metrics;
     let orderby: QueryFormOrderBy[] | undefined;
     if (series_limit_metric) {
       orderby = [[series_limit_metric, !order_desc]];
     } else if (Array.isArray(metrics) && metrics[0]) {
       orderby = [[metrics[0], !order_desc]];
+    } else if (Array.isArray(queryMetrics) && queryMetrics[0]) {
+      orderby = [[queryMetrics[0], !order_desc]];
     }
 
     if (!requireMultiQuery) {
       return [
         {
           ...baseQueryObject,
+          metrics: queryMetrics,
           orderby,
           columns: [...rowGroupby, ...colGroupby].map(col =>
             normalizeColumn(col, time_grain_sqla, isTemporalColumn(col)),
@@ -176,6 +187,7 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
     const queries = Array.from(rowDepths).flatMap(rowDepth =>
       Array.from(colDepths).map(colDepth => ({
         ...baseQueryObject,
+        metrics: queryMetrics,
         orderby,
         columns: [
           ...rowGroupby
@@ -200,6 +212,7 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
       if (!hasGrandTotalSlice) {
         queries.unshift({
           ...baseQueryObject,
+          metrics: queryMetrics,
           orderby,
           columns: [],
           query_name: formatQueryName(0, 0),
@@ -210,6 +223,7 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
     if (queries.length === 0) {
       queries.push({
         ...baseQueryObject,
+        metrics: queryMetrics,
         orderby,
         columns: [],
         query_name: formatQueryName(0, 0),

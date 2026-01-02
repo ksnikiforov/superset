@@ -38,7 +38,10 @@ import {
 import {
   applyMetricAxis,
   buildTreeFromRecords,
+  collectMetricFormattingMetrics,
+  getMetricKeys,
   mergeTrees,
+  mergeMetrics,
   parseDepth,
   resolveMetricPlacement,
   stripMetricsPlaceholder,
@@ -67,6 +70,9 @@ export default function transformProps(
     ownState,
   } = chartProps;
   const metrics = ensureIsArray(formData.metrics || []);
+  const metricFormatting = formData.metricFormatting || {};
+  const formattingMetrics = collectMetricFormattingMetrics(metricFormatting);
+  const metricsForQuery = mergeMetrics(metrics, formattingMetrics);
   const groupbyRowsRaw = ensureIsArray(formData.groupbyRows || []);
   const groupbyColumnsRaw = ensureIsArray(formData.groupbyColumns || []);
   const placement = resolveMetricPlacement(groupbyRowsRaw, groupbyColumnsRaw, {
@@ -116,10 +122,10 @@ export default function transformProps(
       ? Math.min(placement.metricPosition, groupbyColumns.length)
       : groupbyColumns.length;
   const granularity = extractTimegrain(rawFormData);
-  const metricKeys = metrics.map(metric =>
-    typeof metric === 'string' ? metric : metric.label || '',
-  );
+  const metricKeys = getMetricKeys(metrics);
   const metricKeySet = new Set(metricKeys.filter(key => key));
+  const metricKeysForQuery = getMetricKeys(metricsForQuery);
+  const metricKeySetForQuery = new Set(metricKeysForQuery.filter(key => key));
 
   const resolveQueryDepth = (query: typeof queriesData[number]) => {
     const queryName = (query as any)?.query_name || (query as any)?.queryName;
@@ -137,8 +143,8 @@ export default function transformProps(
     }
     const hasGroupbyCols = inferredRowDepth > 0 || inferredColDepth > 0;
     const hasMetricCols =
-      metricKeySet.size > 0 &&
-      Array.from(metricKeySet).some(key => colSet.has(String(key)));
+      metricKeySetForQuery.size > 0 &&
+      Array.from(metricKeySetForQuery).some(key => colSet.has(String(key)));
     const isMetricOnlyQuery = colSet.size > 0 && !hasGroupbyCols && hasMetricCols;
     if (
       rowDepth === 0 &&
@@ -214,7 +220,7 @@ export default function transformProps(
     const { rowDepth, colDepth } = resolveQueryDepth(query);
     const branch = buildTreeFromRecords(
       query.data || [],
-      metrics,
+      metricsForQuery,
       groupbyRows,
       groupbyColumns,
       rowDepth,
@@ -242,7 +248,7 @@ export default function transformProps(
   });
   const grandTotalRecord = zeroDepthQuery?.data?.[0];
   if (grandTotalRecord) {
-    const grandValues = metricKeys.reduce((acc, key) => {
+    const grandValues = metricKeysForQuery.reduce((acc, key) => {
       if (!key) return acc;
       return { ...acc, [key]: (grandTotalRecord as any)[key] };
     }, {} as Record<string, DataRecordValue>);
@@ -291,6 +297,8 @@ export default function transformProps(
     data: nextTreeLabeled,
     formData: { ...formData, metricsLayout, maxDepthPerFetch },
     metrics,
+    metricFormatting,
+    metricFormattingScope: formData.metricFormattingScope,
     groupbyRows,
     groupbyColumns,
     aggregateFunction: formData.aggregateFunction,

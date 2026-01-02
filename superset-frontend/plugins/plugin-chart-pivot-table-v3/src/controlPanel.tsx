@@ -48,6 +48,7 @@ import {
   normalizeSubtotalLevels,
 } from './utils';
 import PivotDndColumnSelect from './controls/PivotDndColumnSelect/PivotDndColumnSelect';
+import PivotDndMetricSelect from './controls/PivotDndMetricSelect/PivotDndMetricSelect';
 
 const themeOptions = [
   {
@@ -371,7 +372,37 @@ const config: ControlPanelConfig = {
             name: 'metrics',
             config: {
               ...sharedControls.metrics,
+              type: PivotDndMetricSelect,
               validators: [validateNonEmpty],
+            },
+          },
+        ],
+        [
+          {
+            name: 'metricFormattingScope',
+            config: {
+              type: 'SelectControl',
+              label: t('Conditional formatting scope'),
+              description: t(
+                'Apply conditional formatting to values only, totals, or include grand totals.',
+              ),
+              clearable: false,
+              default: 'values',
+              renderTrigger: true,
+              choices: [
+                ['values', t('Values only')],
+                ['values_totals', t('Values + totals')],
+                ['values_totals_grand_totals', t('Values + totals + grand totals')],
+              ],
+            },
+          },
+        ],
+        [
+          {
+            name: 'metricFormatting',
+            config: {
+              type: 'HiddenControl',
+              default: {},
             },
           },
         ],

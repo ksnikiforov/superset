@@ -162,3 +162,27 @@ test('includes zero-depth totals when metrics lead rows and column totals are en
   const names = queryContext.queries.map(q => q.query_name);
   expect(names).toContain(formatQueryName(0, 0));
 });
+
+test('includes conditional formatting metrics in query payloads', () => {
+  const queryContext = buildQuery(
+    buildFormData({
+      ...baseFormData,
+      metrics: ['metric1'],
+      metricFormatting: {
+        metric1: {
+          backgroundColor: {
+            expressionType: 'SQL',
+            sqlExpression: 'CASE WHEN SUM(sales) > 0 THEN "#111111" END',
+            label: 'metric1_bg',
+          },
+        },
+      },
+    }),
+  );
+
+  const queryMetrics = queryContext.queries[0].metrics || [];
+  const metricKeys = queryMetrics.map(metric =>
+    typeof metric === 'string' ? metric : metric.label,
+  );
+  expect(metricKeys).toEqual(['metric1', 'metric1_bg']);
+});
