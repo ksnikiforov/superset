@@ -142,6 +142,535 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     expect(values.slice(1)).toEqual(expect.arrayContaining(['2', '3']));
   });
 
+  it('hides column subtotals for unselected levels', () => {
+    const detail = buildTreeFromRecords(
+      [{ row1: 'A', col1: 'F', col2: 'X', col3: 'Z', metric1: 1 }],
+      ['metric1'],
+      ['row1'],
+      ['col1', 'col2', 'col3'],
+      1,
+      3,
+    );
+    const subtotalLevel1 = buildTreeFromRecords(
+      [{ row1: 'A', col1: 'F', metric1: 999 }],
+      ['metric1'],
+      ['row1'],
+      ['col1', 'col2', 'col3'],
+      1,
+      1,
+    );
+    const subtotalLevel2 = buildTreeFromRecords(
+      [{ row1: 'A', col1: 'F', col2: 'X', metric1: 555 }],
+      ['metric1'],
+      ['row1'],
+      ['col1', 'col2', 'col3'],
+      1,
+      2,
+    );
+    const tree = applyMetricAxis(
+      mergeTrees(mergeTrees(detail, subtotalLevel1), subtotalLevel2),
+      ['metric1'],
+      MetricsLayoutEnum.COLUMNS,
+      ['row1'],
+      ['col1', 'col2', 'col3'],
+      3,
+    );
+
+    render(
+      <PivotTableChart
+        data={tree}
+        formData={buildFormData({
+          ...(baseProps as Partial<PivotTableQueryFormData>),
+          groupbyRows: ['row1'],
+          groupbyColumns: ['col1', 'col2', 'col3', '__MEASURES__'],
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+          metrics: ['metric1'],
+          colSubTotals: true,
+          colSubtotalLevels: [2],
+          colSubtotalPosition: 'end',
+        })}
+        metrics={['metric1']}
+        groupbyRows={['row1']}
+        groupbyColumns={['col1', 'col2', 'col3']}
+        aggregateFunction="Sum"
+        width={600}
+        height={400}
+        startCollapsed={false}
+        initialDepth={3}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[2]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        rowTotalPosition="start"
+        colSubtotalPosition="end"
+        colTotalPosition="start"
+      />,
+    );
+
+    expect(screen.queryByText('999')).toBeNull();
+    expect(screen.queryByText('555')).not.toBeNull();
+  });
+
+  it('renders multi-metric column subtotals at the end even when configured at the start', () => {
+    const metrics = ['m1', 'm2'];
+    const detail = buildTreeFromRecords(
+      [
+        { region: 'US', year: '1992', shipMode: 'AIR', m1: 1, m2: 10 },
+        { region: 'US', year: '1992', shipMode: 'SEA', m1: 2, m2: 20 },
+      ],
+      metrics,
+      ['region'],
+      ['year', 'shipMode'],
+      1,
+      2,
+    );
+    const subtotal = buildTreeFromRecords(
+      [{ region: 'US', year: '1992', m1: 100, m2: 200 }],
+      metrics,
+      ['region'],
+      ['year', 'shipMode'],
+      1,
+      1,
+    );
+    const tree = applyMetricAxis(
+      mergeTrees(subtotal, detail),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      ['region'],
+      ['year', 'shipMode'],
+      2,
+    );
+
+    render(
+      <PivotTableChart
+        data={tree}
+        formData={buildFormData({
+          ...(baseProps as Partial<PivotTableQueryFormData>),
+          groupbyRows: ['region'],
+          groupbyColumns: ['year', 'shipMode', '__MEASURES__'],
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+          metrics,
+          colSubtotalLevels: [1],
+          colSubtotalPosition: 'start',
+        })}
+        metrics={metrics}
+        groupbyRows={['region']}
+        groupbyColumns={['year', 'shipMode']}
+        aggregateFunction="Sum"
+        width={600}
+        height={400}
+        startCollapsed={false}
+        initialDepth={2}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[1]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        rowTotalPosition="start"
+        colSubtotalPosition="start"
+        colTotalPosition="start"
+      />,
+    );
+
+    const regionRow = screen.getByText('US').closest('tr') as HTMLElement;
+    const values = within(regionRow)
+      .getAllByRole('cell')
+      .map(cell => cell.textContent?.trim());
+    expect(values).toEqual(['1', '10', '2', '20', '100', '200']);
+  });
+
+  it('avoids duplicating metric subtotal columns when subtotal tokens are present', () => {
+    const metrics = ['grossRevenue', 'countCustomers'];
+    const detail = buildTreeFromRecords(
+      [
+        {
+          region: 'US',
+          year: '1992',
+          shipMode: 'AIR',
+          grossRevenue: 1,
+          countCustomers: 10,
+        },
+        {
+          region: 'US',
+          year: '1992',
+          shipMode: 'NONE',
+          grossRevenue: 2,
+          countCustomers: 20,
+        },
+      ],
+      metrics,
+      ['region'],
+      ['year', 'shipMode'],
+      1,
+      2,
+    );
+    const subtotal = buildTreeFromRecords(
+      [
+        {
+          region: 'US',
+          year: '1992',
+          grossRevenue: 100,
+          countCustomers: 200,
+        },
+      ],
+      metrics,
+      ['region'],
+      ['year', 'shipMode'],
+      1,
+      1,
+    );
+    const merged = mergeTrees(detail, subtotal);
+    const subtotalPath = ['1992', '__subtotal__'];
+    const subtotalKey = serializePath(subtotalPath);
+    const baseSubtotalKey = serializePath(['1992']);
+    merged.cols[subtotalKey] = {
+      ...(merged.cols[baseSubtotalKey] as PivotTreeNode),
+      key: subtotalKey,
+      path: subtotalPath,
+      label: 'Subtotal',
+      formattedLabel: 'Subtotal',
+      level: subtotalPath.length,
+      hasChildren: false,
+      isSubtotal: true,
+    };
+    const baseCellKey = `${serializePath(['US'])}|${baseSubtotalKey}`;
+    const baseCell = merged.cells[baseCellKey];
+    merged.cells[`${serializePath(['US'])}|${subtotalKey}`] = {
+      ...(baseCell as PivotResultCell),
+      colKey: subtotalKey,
+      isSubtotal: true,
+    };
+
+    const tree = applyMetricAxis(
+      merged,
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      ['region'],
+      ['year', 'shipMode'],
+      2,
+    );
+
+    const { container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={buildFormData({
+          ...(baseProps as Partial<PivotTableQueryFormData>),
+          groupbyRows: ['region'],
+          groupbyColumns: ['year', 'shipMode', '__MEASURES__'],
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+          metrics,
+          colSubtotalLevels: [1],
+          colSubtotalPosition: 'start',
+        })}
+        metrics={metrics}
+        groupbyRows={['region']}
+        groupbyColumns={['year', 'shipMode']}
+        aggregateFunction="Sum"
+        width={600}
+        height={300}
+        startCollapsed={false}
+        initialDepth={2}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[1]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        rowTotalPosition="start"
+        colSubtotalPosition="start"
+        colTotalPosition="start"
+      />,
+    );
+
+    const headerRow = container.querySelector('thead tr') as HTMLElement;
+    const headerLabels = within(headerRow)
+      .getAllByRole('columnheader')
+      .map(cell => cell.textContent?.trim())
+      .filter(label => label && label !== 'Rows');
+    const grossRevenueCount = headerLabels.filter(
+      label => label === '1992 grossRevenue',
+    ).length;
+    const countCustomersCount = headerLabels.filter(
+      label => label === '1992 countCustomers',
+    ).length;
+    expect(grossRevenueCount).toBe(1);
+    expect(countCustomersCount).toBe(1);
+  });
+
+  it('keeps column grand totals when column subtotals exist with multiple metrics', () => {
+    const metrics = ['grossRevenue', 'countCustomers'];
+    const detail = buildTreeFromRecords(
+      [
+        {
+          region: 'US',
+          year: '1992',
+          shipMode: 'AIR',
+          grossRevenue: 1,
+          countCustomers: 10,
+        },
+      ],
+      metrics,
+      ['region'],
+      ['year', 'shipMode'],
+      1,
+      2,
+    );
+    const subtotal = buildTreeFromRecords(
+      [
+        {
+          region: 'US',
+          year: '1992',
+          grossRevenue: 100,
+          countCustomers: 200,
+        },
+      ],
+      metrics,
+      ['region'],
+      ['year', 'shipMode'],
+      1,
+      1,
+    );
+    const totals = buildTreeFromRecords(
+      [
+        {
+          region: 'US',
+          grossRevenue: 1000,
+          countCustomers: 2000,
+        },
+      ],
+      metrics,
+      ['region'],
+      ['year', 'shipMode'],
+      1,
+      0,
+    );
+    const merged = mergeTrees(mergeTrees(detail, subtotal), totals);
+    const subtotalPath = ['1992', '__subtotal__'];
+    const subtotalKey = serializePath(subtotalPath);
+    const baseSubtotalKey = serializePath(['1992']);
+    merged.cols[subtotalKey] = {
+      ...(merged.cols[baseSubtotalKey] as PivotTreeNode),
+      key: subtotalKey,
+      path: subtotalPath,
+      label: 'Subtotal',
+      formattedLabel: 'Subtotal',
+      level: subtotalPath.length,
+      hasChildren: false,
+      isSubtotal: true,
+    };
+    const baseCellKey = `${serializePath(['US'])}|${baseSubtotalKey}`;
+    const baseCell = merged.cells[baseCellKey];
+    merged.cells[`${serializePath(['US'])}|${subtotalKey}`] = {
+      ...(baseCell as PivotResultCell),
+      colKey: subtotalKey,
+      isSubtotal: true,
+    };
+
+    const tree = applyMetricAxis(
+      merged,
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      ['region'],
+      ['year', 'shipMode'],
+      2,
+    );
+
+    const { container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={buildFormData({
+          ...(baseProps as Partial<PivotTableQueryFormData>),
+          groupbyRows: ['region'],
+          groupbyColumns: ['year', 'shipMode', '__MEASURES__'],
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+          metrics,
+          colTotals: true,
+          colSubtotalLevels: [1],
+          colSubtotalPosition: 'start',
+        })}
+        metrics={metrics}
+        groupbyRows={['region']}
+        groupbyColumns={['year', 'shipMode']}
+        aggregateFunction="Sum"
+        width={600}
+        height={300}
+        startCollapsed={false}
+        initialDepth={2}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[1]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        rowTotalPosition="start"
+        colSubtotalPosition="start"
+        colTotalPosition="end"
+      />,
+    );
+
+    const headerLabels = within(container.querySelector('thead') as HTMLElement)
+      .getAllByRole('columnheader')
+      .map(cell => cell.textContent?.trim())
+      .filter(label => label && label !== 'Rows');
+    expect(headerLabels).toEqual(
+      expect.arrayContaining(['Total grossRevenue', 'Total countCustomers']),
+    );
+  });
+
+  it('keeps column group headers when collapsed after deeper expansion data exists', () => {
+    const metrics = ['grossRevenue', 'countCustomers'];
+    const detail = buildTreeFromRecords(
+      [
+        {
+          region: 'US',
+          year: '1992',
+          shipMode: 'AIR',
+          grossRevenue: 1,
+          countCustomers: 10,
+        },
+      ],
+      metrics,
+      ['region'],
+      ['year', 'shipMode'],
+      1,
+      2,
+    );
+    const subtotal = buildTreeFromRecords(
+      [
+        {
+          region: 'US',
+          year: '1992',
+          grossRevenue: 100,
+          countCustomers: 200,
+        },
+      ],
+      metrics,
+      ['region'],
+      ['year', 'shipMode'],
+      1,
+      1,
+    );
+    const merged = mergeTrees(detail, subtotal);
+    const tree = applyMetricAxis(
+      merged,
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      ['region'],
+      ['year', 'shipMode'],
+      2,
+    );
+
+    const { container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={buildFormData({
+          ...(baseProps as Partial<PivotTableQueryFormData>),
+          groupbyRows: ['region'],
+          groupbyColumns: ['year', 'shipMode', '__MEASURES__'],
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+          metrics,
+          colSubtotalLevels: [1],
+          startCollapsed: true,
+          initialDepth: 1,
+        })}
+        metrics={metrics}
+        groupbyRows={['region']}
+        groupbyColumns={['year', 'shipMode']}
+        aggregateFunction="Sum"
+        width={600}
+        height={300}
+        startCollapsed
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[1]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        rowTotalPosition="start"
+        colSubtotalPosition="start"
+        colTotalPosition="start"
+      />,
+    );
+
+    const headerRows = Array.from(
+      container.querySelectorAll('thead tr'),
+    ) as HTMLElement[];
+    const topLabels = within(headerRows[0])
+      .getAllByRole('columnheader')
+      .map(cell => cell.textContent?.trim())
+      .filter(label => label && label !== 'Rows');
+    const secondLabels = within(headerRows[1])
+      .getAllByRole('columnheader')
+      .map(cell => cell.textContent?.trim())
+      .filter(label => label && label !== 'Rows');
+    const allLabels = [...topLabels, ...secondLabels];
+    expect(topLabels).toEqual(expect.arrayContaining(['1992']));
+    expect(secondLabels).toEqual(
+      expect.arrayContaining(['grossRevenue', 'countCustomers']),
+    );
+    expect(allLabels).not.toContain('1992 grossRevenue');
+    expect(allLabels).not.toContain('1992 countCustomers');
+  });
+
   test.each(['start', 'end'] as const)(
     'positions grand totals at the %s for rows and columns when configured',
     position => {

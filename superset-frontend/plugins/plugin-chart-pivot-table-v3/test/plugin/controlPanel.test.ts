@@ -55,4 +55,17 @@ describe('pivot table v3 control panel', () => {
     expect(result.options).toEqual([]);
     expect(result.value).toEqual([]);
   });
+
+  it('selects all column levels when subtotals are enabled with no explicit levels', () => {
+    const colSubtotalControl = getControl('colSubtotalLevels');
+    const result = colSubtotalControl.config.mapStateToProps({
+      controls: {
+        groupbyColumns: { value: ['col1', 'col2', 'col3'] },
+        colSubtotalLevels: { value: [] },
+        colSubTotals: { value: true },
+      },
+    });
+    expect(result.value).toEqual([1, 2]);
+    expect(result.enabled).toEqual(true);
+  });
 });

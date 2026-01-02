@@ -182,11 +182,16 @@ const resolveFetchContext = ({
     rowSubTotalsEnabled,
   );
   const maxColSubtotalDepth = Math.max(colGroupby.length - 1, 0);
-  const colSubtotalLevels = normalizeSubtotalLevels(
+  const colSubtotalLevelsRaw = ensureIsArray<number>(
     formData.colSubtotalLevels,
+  );
+  const colSubtotalsLegacyEnabled =
+    colSubtotalLevelsRaw.length === 0 && !!formData.colSubTotals;
+  const colSubtotalLevels = normalizeSubtotalLevels(
+    colSubtotalLevelsRaw,
     maxColSubtotalDepth,
     false,
-    formData.colSubTotals,
+    colSubtotalsLegacyEnabled,
   ).filter(level => level > 0);
 
   const metricInsertIndex =

@@ -41,6 +41,7 @@ import {
   isMetricsPlaceholder,
   isSubtotalToken,
   mergeTrees,
+  normalizeSubtotalLevels,
   parseThemeColors,
   PIVOT_THEME_PRESETS,
   resolveMetricPlacement,
@@ -216,11 +217,13 @@ function PivotTableChart(props: PivotTableProps) {
   );
   const normalizedColSubtotalLevels = useMemo(
     () =>
-      colSubtotalLevels.filter(
-        level =>
-          level <= Math.max(groupbyColumns.length - 1, 0) && level >= 0,
+      normalizeSubtotalLevels(
+        colSubtotalLevels,
+        Math.max(groupbyColumns.length - 1, 0),
+        false,
+        colSubtotalLevels.length === 0 && colSubTotals,
       ),
-    [colSubtotalLevels, groupbyColumns.length],
+    [colSubtotalLevels, colSubTotals, groupbyColumns.length],
   );
   const metricPlacement = useMemo(
     () =>
@@ -496,6 +499,11 @@ function PivotTableChart(props: PivotTableProps) {
   const effectiveRowSubtotalPosition = forceRowSubtotalEnd
     ? 'end'
     : resolvedRowSubtotalPosition;
+  const forceColSubtotalEnd =
+    isMultiMetric && resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS;
+  const effectiveColSubtotalPosition = forceColSubtotalEnd
+    ? 'end'
+    : resolvedColSubtotalPosition;
 
   const hideMetricHeaderOnRows = useMemo(
     () =>
@@ -769,6 +777,15 @@ function PivotTableChart(props: PivotTableProps) {
             metricsAtColEnd
               ? false
               : getRawColChildren(existing).length > 0 || hasMetricChildren;
+          if (isMetricSubtotalNode(existing)) {
+            return {
+              ...existing,
+              label: metricLabel,
+              formattedLabel: metricLabel,
+              isSubtotal: false,
+              hasChildren,
+            };
+          }
           return { ...existing, hasChildren };
         }
         const hasChildren = metricsAtColEnd
@@ -793,6 +810,7 @@ function PivotTableChart(props: PivotTableProps) {
       getRawColChildren,
       groupbyColumns.length,
       isMultiMetric,
+      isMetricSubtotalNode,
       metricLabelSet,
       metricsAtColEnd,
       resolvedMetricsLayout,
@@ -1630,17 +1648,13 @@ function PivotTableChart(props: PivotTableProps) {
         normalizedColSubtotalLevels,
         showColRoot,
         colTotals,
-        colSubTotals,
         resolvedColTotalPosition,
-        resolvedColSubtotalPosition,
-        resolvedMetricsLayout,
-        isMultiMetric,
+        resolvedColSubtotalPosition: effectiveColSubtotalPosition,
         isMetricGrandTotalNode,
         isMetricSubtotalNode,
       }),
     [
       colSorter,
-      colSubTotals,
       colTotals,
       countDimDepth,
       expandedCols,
@@ -1648,11 +1662,9 @@ function PivotTableChart(props: PivotTableProps) {
       getCollapsedColLeaves,
       isMetricGrandTotalNode,
       isMetricSubtotalNode,
-      isMultiMetric,
       normalizedColSubtotalLevels,
-      resolvedColSubtotalPosition,
+      effectiveColSubtotalPosition,
       resolvedColTotalPosition,
-      resolvedMetricsLayout,
       showColRoot,
     ],
   );

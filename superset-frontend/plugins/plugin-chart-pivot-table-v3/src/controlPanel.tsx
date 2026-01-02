@@ -19,6 +19,7 @@
 import React from 'react';
 import {
   ControlPanelConfig,
+  ControlPanelState,
   ControlSubSectionHeader,
   D3_TIME_FORMAT_OPTIONS,
   getStandardizedControls,
@@ -33,6 +34,9 @@ import {
   t,
   validateNonEmpty,
 } from '@superset-ui/core';
+import { Checkbox, Space, Typography } from '@superset-ui/core/components';
+import { CheckboxChangeEvent } from '@superset-ui/core/components/Checkbox/types';
+import ControlHeader from 'src/explore/components/ControlHeader';
 import { MetricsLayoutEnum } from './types';
 import {
   METRICS_PLACEHOLDER,
@@ -169,6 +173,137 @@ const withMetricsPlaceholder = (axis: 'row' | 'col') => (config: any) => ({
     };
   },
 });
+
+type ColumnSubtotalOption = {
+  value: number;
+  label: string;
+};
+
+type SetControlValue = (
+  controlName: string,
+  value: boolean | number[],
+  errors?: string[],
+) => void;
+
+type ColumnSubtotalSelectorProps = {
+  name?: string;
+  label?: React.ReactNode;
+  description?: React.ReactNode;
+  validationErrors?: string[];
+  renderTrigger?: boolean;
+  value?: number[];
+  options: ColumnSubtotalOption[];
+  enabled: boolean;
+  onChange?: (value: number[]) => void;
+  setControlValue?: SetControlValue;
+};
+
+const ColumnSubtotalSelector = ({
+  name,
+  label,
+  description,
+  validationErrors,
+  renderTrigger,
+  value,
+  options,
+  enabled,
+  onChange,
+  setControlValue,
+}: ColumnSubtotalSelectorProps) => {
+  const selectedValues = ensureIsArray<number>(value);
+  const allValues = options.map(option => option.value);
+  const hasOptions = options.length > 0;
+  const allSelected = hasOptions && selectedValues.length === options.length;
+  const isIndeterminate =
+    selectedValues.length > 0 && selectedValues.length < options.length;
+
+  const setEnabled = (nextEnabled: boolean) => {
+    setControlValue?.('colSubTotals', nextEnabled, []);
+  };
+
+  const updateLevels = (nextLevels: number[]) => {
+    const next = [...new Set(nextLevels)].sort((a, b) => a - b);
+    onChange?.(next);
+    setEnabled(next.length > 0);
+  };
+
+  const handleEnabledChange = (event: CheckboxChangeEvent) => {
+    const nextEnabled = event.target.checked;
+    if (!nextEnabled) {
+      updateLevels([]);
+      return;
+    }
+    if (selectedValues.length === 0) {
+      updateLevels(allValues);
+      return;
+    }
+    setEnabled(true);
+  };
+
+  const handleSelectAllChange = (event: CheckboxChangeEvent) => {
+    updateLevels(event.target.checked ? allValues : []);
+  };
+
+  const handleOptionChange =
+    (level: number) => (event: CheckboxChangeEvent) => {
+      const nextLevels = event.target.checked
+        ? [...selectedValues, level]
+        : selectedValues.filter(valueItem => valueItem !== level);
+      updateLevels(nextLevels);
+    };
+
+  return (
+    <div>
+      <ControlHeader
+        name={name}
+        label={label}
+        description={description}
+        validationErrors={validationErrors}
+        renderTrigger={renderTrigger}
+      />
+      <Space direction="vertical" size="small">
+        <Checkbox
+          checked={enabled}
+          onChange={handleEnabledChange}
+          disabled={!hasOptions}
+        >
+          {t('Show column subtotals')}
+        </Checkbox>
+        <Space direction="vertical" size="small">
+          <Typography.Text type="secondary">
+            {t('Subtotal levels')}
+          </Typography.Text>
+          <Checkbox
+            indeterminate={isIndeterminate}
+            checked={allSelected}
+            onChange={handleSelectAllChange}
+            disabled={!enabled || !hasOptions}
+          >
+            {t('Select all')}
+          </Checkbox>
+          <Space direction="vertical" size="small">
+            {hasOptions ? (
+              options.map(option => (
+                <Checkbox
+                  key={option.value}
+                  checked={selectedValues.includes(option.value)}
+                  onChange={handleOptionChange(option.value)}
+                  disabled={!enabled}
+                >
+                  {option.label}
+                </Checkbox>
+              ))
+            ) : (
+              <Typography.Text type="secondary">
+                {t('No subtotal levels available')}
+              </Typography.Text>
+            )}
+          </Space>
+        </Space>
+      </Space>
+    </div>
+  );
+};
 
 const config: ControlPanelConfig = {
   controlPanelSections: [
@@ -421,20 +556,32 @@ const config: ControlPanelConfig = {
         ],
         [
           {
+            name: 'colSubTotals',
+            config: {
+              type: 'CheckboxControl',
+              label: t('Column subtotals'),
+              description: t('Show subtotals for column groups.'),
+              default: false,
+              renderTrigger: true,
+              hidden: true,
+            },
+          },
+        ],
+        [
+          {
             name: 'colSubtotalLevels',
             config: {
-              type: 'SelectControl',
+              type: ColumnSubtotalSelector,
               label: t('Column subtotals'),
               description: t(
                 'Select which column levels should show subtotals. Grand total is controlled separately.',
               ),
-              clearable: true,
-              multi: true,
               default: [],
               renderTrigger: true,
-              optionRenderer: (opt: any) => opt?.label ?? opt?.value,
               shouldMapStateToProps: () => true,
-              mapStateToProps: state => {
+              mapStateToProps: (state: ControlPanelState & {
+                actions?: { setControlValue?: SetControlValue };
+              }) => {
                 const colsRaw = ensureIsArray(state?.controls?.groupbyColumns?.value);
                 const colGroupby = stripMetricsPlaceholder(colsRaw);
                 const colDepth = colGroupby.length;
@@ -442,21 +589,37 @@ const config: ControlPanelConfig = {
                 const options =
                   maxSubtotalDepth > 0
                     ? Array.from({ length: maxSubtotalDepth }).map((_, idx) => {
-                        const labelColumn = colGroupby[idx + 1];
+                        const labelColumn = colGroupby[idx];
+                        const levelLabel = t('Level %s', idx + 1);
                         const label = labelColumn
-                          ? getColumnLabel(labelColumn)
-                          : t('Subtotal level %s', idx + 1);
+                          ? `${levelLabel}: ${getColumnLabel(labelColumn)}`
+                          : levelLabel;
                         return {
                           value: idx + 1,
                           label,
                         };
                       })
                     : [];
+                const rawValue = ensureIsArray<number>(
+                  state?.controls?.colSubtotalLevels?.value,
+                );
+                const legacyEnabled =
+                  rawValue.length === 0 && !!state?.controls?.colSubTotals?.value;
                 const normalizedValue = normalizeSubtotalLevels(
-                  ensureIsArray(state?.controls?.colSubtotalLevels?.value),
+                  rawValue,
                   maxSubtotalDepth,
+                  false,
+                  legacyEnabled,
                 ).filter(level => level > 0 && level <= maxSubtotalDepth);
-                return { options, value: normalizedValue };
+                const enabled =
+                  !!state?.controls?.colSubTotals?.value ||
+                  normalizedValue.length > 0;
+                return {
+                  options,
+                  value: normalizedValue,
+                  enabled,
+                  setControlValue: state?.actions?.setControlValue,
+                };
               },
             },
           },

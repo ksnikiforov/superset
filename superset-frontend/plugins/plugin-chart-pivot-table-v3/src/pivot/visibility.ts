@@ -16,12 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import {
-  MetricsLayoutEnum,
-  PivotResultCell,
-  PivotTreeNode,
-  TotalPosition,
-} from '../types';
+import { PivotResultCell, PivotTreeNode, TotalPosition } from '../types';
 import { isSubtotalToken, SUBTOTAL_LABEL } from '../utils';
 import { buildVisibleList, rootKey } from './viewModel';
 
@@ -73,11 +68,8 @@ type ColLeavesParams = {
   normalizedColSubtotalLevels: number[];
   showColRoot: boolean;
   colTotals: boolean;
-  colSubTotals: boolean;
   resolvedColTotalPosition: TotalPosition;
   resolvedColSubtotalPosition: TotalPosition;
-  resolvedMetricsLayout: MetricsLayoutEnum;
-  isMultiMetric: boolean;
   isMetricGrandTotalNode: (node?: PivotTreeNode) => boolean;
   isMetricSubtotalNode: (node?: PivotTreeNode) => boolean;
 };
@@ -91,11 +83,8 @@ export const createColLeavesBuilder = ({
   normalizedColSubtotalLevels,
   showColRoot,
   colTotals,
-  colSubTotals,
   resolvedColTotalPosition,
   resolvedColSubtotalPosition,
-  resolvedMetricsLayout,
-  isMultiMetric,
   isMetricGrandTotalNode,
   isMetricSubtotalNode,
 }: ColLeavesParams) => {
@@ -106,24 +95,54 @@ export const createColLeavesBuilder = ({
     const includeSubtotal =
       hasChildren &&
       ((colTotals && dimDepth === 0) ||
-        normalizedColSubtotalLevels.includes(dimDepth) ||
-        colSubTotals) &&
+        normalizedColSubtotalLevels.includes(dimDepth)) &&
       !(dimDepth === 0 && !showColRoot);
+    const isSubtotalTokenForNode = (leaf: PivotTreeNode) => {
+      if (!node.path.every((val, idx) => val === leaf.path[idx])) {
+        return false;
+      }
+      const token = leaf.path[node.path.length];
+      if (isSubtotalToken(token) || token === 'Total') {
+        return true;
+      }
+      if (leaf.path.length !== node.path.length + 1) {
+        return false;
+      }
+      return (
+        leaf.formattedLabel === SUBTOTAL_LABEL || leaf.label === SUBTOTAL_LABEL
+      );
+    };
+    const isMetricSubtotalForNode = (leaf: PivotTreeNode) => {
+      if (!node.path.every((val, idx) => val === leaf.path[idx])) {
+        return false;
+      }
+      if (!isMetricGrandTotalNode(leaf) && !isMetricSubtotalNode(leaf)) {
+        return false;
+      }
+      return countDimDepth(leaf.path) === dimDepth;
+    };
+    const filterHiddenSubtotals = (leaves: PivotTreeNode[]) => {
+      const hasDeeperLeaves = leaves.some(
+        leaf => countDimDepth(leaf.path) > dimDepth,
+      );
+      if (!hasDeeperLeaves) {
+        return leaves;
+      }
+      return leaves.filter(
+        leaf =>
+          !isSubtotalTokenForNode(leaf) && !isMetricSubtotalForNode(leaf),
+      );
+    };
     if (!expandedCols.has(node.key) || children.length === 0) {
       const collapsedMetricLeaves = getCollapsedColLeaves(node);
       return collapsedMetricLeaves.length > 0 ? collapsedMetricLeaves : [node];
     }
     const placeAtFront =
-      (
-        dimDepth === 0
-          ? resolvedColTotalPosition
-          : resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS && isMultiMetric
-          ? 'end'
-          : resolvedColSubtotalPosition
-      ) === 'start';
+      (dimDepth === 0 ? resolvedColTotalPosition : resolvedColSubtotalPosition) ===
+      'start';
     const childLeaves = children.flatMap(buildColLeavesWithSubtotals);
     if (!includeSubtotal) {
-      return childLeaves;
+      return filterHiddenSubtotals(childLeaves);
     }
     const isBranchLeaf = (leaf: PivotTreeNode) =>
       leaf.path.length === node.path.length + 1 &&
@@ -142,12 +161,39 @@ export const createColLeavesBuilder = ({
     const isMetricSubtotalLeaf = (leaf: PivotTreeNode) =>
       isBranchLeaf(leaf) &&
       (isMetricGrandTotalNode(leaf) || isMetricSubtotalNode(leaf));
-    const explicitSubtotalLeaf =
-      childLeaves.find(isSubtotalTokenLeaf) ||
-      childLeaves.find(isMetricSubtotalLeaf);
+    const subtotalTokenDescendants =
+      node.path.length === 0
+        ? []
+        : childLeaves.filter(leaf =>
+            leaf.path.slice(node.path.length).some(isSubtotalToken),
+          );
+    const hasSubtotalTokenDescendants = subtotalTokenDescendants.length > 0;
+    const explicitSubtotalLeaves = childLeaves.filter(leaf =>
+      isSubtotalTokenLeaf(leaf) ||
+      (!hasSubtotalTokenDescendants && isMetricSubtotalLeaf(leaf)),
+    );
+    if (hasSubtotalTokenDescendants) {
+      explicitSubtotalLeaves.push(...subtotalTokenDescendants);
+    }
+    const explicitSubtotalLeavesUnique: PivotTreeNode[] = [];
+    const explicitSubtotalKeys = new Set<string>();
+    explicitSubtotalLeaves.forEach(leaf => {
+      if (explicitSubtotalKeys.has(leaf.key)) {
+        return;
+      }
+      explicitSubtotalKeys.add(leaf.key);
+      explicitSubtotalLeavesUnique.push(leaf);
+    });
+    const resolvedSubtotalLeaves = explicitSubtotalLeavesUnique;
     const isDuplicateSubtotalLeaf = (leaf: PivotTreeNode) => {
       if (!isBranchLeaf(leaf)) {
         return false;
+      }
+      if (explicitSubtotalKeys.has(leaf.key)) {
+        return false;
+      }
+      if (hasSubtotalTokenDescendants && isMetricSubtotalLeaf(leaf)) {
+        return true;
       }
       const token = leaf.path[node.path.length];
       if (
@@ -157,13 +203,21 @@ export const createColLeavesBuilder = ({
       ) {
         return true;
       }
-      if (!explicitSubtotalLeaf) {
+      if (resolvedSubtotalLeaves.length === 0) {
         return leaf.label === node.label;
       }
       return leaf.label === node.label || node.path.includes(token);
     };
-    const subtotalLeaf =
-      explicitSubtotalLeaf || childLeaves.find(isDuplicateSubtotalLeaf);
+    if (resolvedSubtotalLeaves.length > 0) {
+      const remainingLeaves = childLeaves.filter(
+        leaf =>
+          !explicitSubtotalKeys.has(leaf.key) && !isDuplicateSubtotalLeaf(leaf),
+      );
+      return placeAtFront
+        ? [...resolvedSubtotalLeaves, ...remainingLeaves]
+        : [...remainingLeaves, ...resolvedSubtotalLeaves];
+    }
+    const subtotalLeaf = childLeaves.find(isDuplicateSubtotalLeaf);
     if (subtotalLeaf) {
       const remainingLeaves = childLeaves.filter(
         leaf =>

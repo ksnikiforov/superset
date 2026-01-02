@@ -118,11 +118,14 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
     rowSubTotalsEnabled,
   );
   const maxColSubtotalDepth = Math.max(colGroupby.length - 1, 0);
+  const colSubtotalLevelsRaw = ensureIsArray<number>(colSubtotalLevels);
+  const colSubtotalsLegacyEnabled =
+    colSubtotalLevelsRaw.length === 0 && !!colSubTotals;
   const colLevelsBase = normalizeSubtotalLevels(
-    colSubtotalLevels,
+    colSubtotalLevelsRaw,
     maxColSubtotalDepth,
     false,
-    colSubTotals,
+    colSubtotalsLegacyEnabled,
   ).filter(level => level > 0);
   const colLevels = colTotals ? [0, ...colLevelsBase] : colLevelsBase;
 
