@@ -35,10 +35,10 @@ import {
 } from '@superset-ui/core/components';
 import { Icons } from '@superset-ui/core/components/Icons';
 import { ColumnMeta } from '@superset-ui/chart-controls';
-import MetricDefinitionValue from 'src/explore/components/controls/MetricControl/MetricDefinitionValue';
 import AdhocMetric from 'src/explore/components/controls/MetricControl/AdhocMetric';
 import AdhocMetricPopoverTrigger from 'src/explore/components/controls/MetricControl/AdhocMetricPopoverTrigger';
 import { savedMetricType } from 'src/explore/components/controls/MetricControl/types';
+import MetricDefinitionValue from './MetricDefinitionValue';
 import {
   MetricFormattingField,
   PivotMetricFormatting,
@@ -46,16 +46,18 @@ import {
 } from '../../types';
 import { getMetricKey } from '../../utils';
 
-const MetricRow = styled.div`
-  display: flex;
-  align-items: center;
-  gap: ${({ theme }) => theme.sizeUnit}px;
-  width: 100%;
+const MetricFormattingButton = styled(Button)`
+  height: ${({ theme }) => theme.sizeUnit * 5}px;
+  min-height: ${({ theme }) => theme.sizeUnit * 5}px;
+  min-width: ${({ theme }) => theme.sizeUnit * 5}px;
+  width: ${({ theme }) => theme.sizeUnit * 5}px;
+  padding: 0;
 `;
 
-const MetricLabelWrap = styled.div`
-  flex: 1;
-  min-width: 0;
+const MetricFormattingButtonWrap = styled.div`
+  display: flex;
+  align-items: center;
+  padding-right: ${({ theme }) => theme.sizeUnit}px;
 `;
 
 type ValueType = Metric | AdhocMetric | QueryFormMetric;
@@ -412,17 +414,20 @@ const MetricFormatSelector = ({
           onChange={nextValue => {
             if (!nextValue) {
               onChange(undefined);
+              setIsDropdownOpen(false);
               return;
             }
             const nextValueKey = getSelectValueKey(nextValue);
             if (!nextValueKey) {
               onChange(undefined);
+              setIsDropdownOpen(false);
               return;
             }
             const nextMetric = optionMap.get(nextValueKey);
             onChange(
               normalizeFormattingMetric(nextMetric ?? nextValueKey),
             );
+            setIsDropdownOpen(false);
           }}
           onClick={() => setIsDropdownOpen(true)}
           onClear={() => onChange(undefined)}
@@ -527,65 +532,76 @@ export default function PivotMetricDefinitionValue(
     [formattingKey, props.onMetricFormattingChange],
   );
 
-  return (
-    <MetricRow>
-      <MetricLabelWrap>
-        <MetricDefinitionValue
-          option={props.option as QueryFormMetric}
-          index={props.index}
-          onMetricEdit={props.onMetricEdit}
-          onRemoveMetric={props.onRemoveMetric}
-          columns={props.columns}
-          savedMetrics={props.savedMetrics}
-          savedMetricsOptions={props.savedMetricsOptions}
-          datasource={props.datasource}
-          onMoveLabel={props.onMoveLabel}
-          onDropLabel={props.onDropLabel}
-          type={props.type}
-          multi={props.multi}
-          datasourceWarningMessage={props.datasourceWarningMessage}
-        />
-      </MetricLabelWrap>
-      <Popover
-        content={
-          <Space direction="vertical" size={8}>
-            <Typography.Text strong>
-              {t('Conditional formatting')}
-            </Typography.Text>
-            <Typography.Text type="secondary">
-              {t('Metric: %s', metricLabel)}
-            </Typography.Text>
-            {FORMAT_SELECTOR_CONFIG.map(selector => (
-              <MetricFormatSelector
-                key={selector.field}
-                label={selector.label}
-                tooltip={selector.tooltip}
-                value={formatting[selector.field]}
-                metrics={props.availableMetrics}
-                onChange={metric =>
-                  handleFormattingChange(selector.field, metric)
-                }
-                columns={props.columns}
-                savedMetrics={props.savedMetrics}
-                datasource={props.datasource}
-              />
-            ))}
-          </Space>
-        }
-        overlayStyle={{ minWidth: 420 }}
-        trigger="click"
-        placement="right"
-      >
-        <Tooltip title={t('Add conditional formatting')}>
-          <Button
+  const formattingPopoverContent = (
+    <div
+      data-ignore-control-popover
+      onClick={event => event.stopPropagation()}
+      onMouseDown={event => event.stopPropagation()}
+    >
+      <Space direction="vertical" size={8}>
+        <Typography.Text strong>{t('Conditional formatting')}</Typography.Text>
+        <Typography.Text type="secondary">
+          {t('Metric: %s', metricLabel)}
+        </Typography.Text>
+        {FORMAT_SELECTOR_CONFIG.map(selector => (
+          <MetricFormatSelector
+            key={selector.field}
+            label={selector.label}
+            tooltip={selector.tooltip}
+            value={formatting[selector.field]}
+            metrics={props.availableMetrics}
+            onChange={metric => handleFormattingChange(selector.field, metric)}
+            columns={props.columns}
+            savedMetrics={props.savedMetrics}
+            datasource={props.datasource}
+          />
+        ))}
+      </Space>
+    </div>
+  );
+
+  const formattingControl = (
+    <Popover
+      content={formattingPopoverContent}
+      overlayStyle={{ width: 'fit-content' }}
+      trigger="click"
+      placement="right"
+      getPopupContainer={() => document.body}
+    >
+      <Tooltip title={t('Add conditional formatting')}>
+        <MetricFormattingButtonWrap
+          data-ignore-control-popover
+          onClick={event => event.stopPropagation()}
+          onMouseDown={event => event.stopPropagation()}
+        >
+          <MetricFormattingButton
             aria-label={t('Add conditional formatting for %s', metricLabel)}
             data-test="pivot-metric-formatting-button"
             icon={<Icons.FormatPainterOutlined iconSize="s" />}
             size="small"
             type="text"
           />
-        </Tooltip>
-      </Popover>
-    </MetricRow>
+        </MetricFormattingButtonWrap>
+      </Tooltip>
+    </Popover>
+  );
+
+  return (
+    <MetricDefinitionValue
+      option={props.option as QueryFormMetric}
+      index={props.index}
+      onMetricEdit={props.onMetricEdit}
+      onRemoveMetric={props.onRemoveMetric}
+      columns={props.columns}
+      savedMetrics={props.savedMetrics}
+      savedMetricsOptions={props.savedMetricsOptions}
+      datasource={props.datasource}
+      onMoveLabel={props.onMoveLabel}
+      onDropLabel={props.onDropLabel}
+      type={props.type}
+      multi={props.multi}
+      datasourceWarningMessage={props.datasourceWarningMessage}
+      rightNode={formattingControl}
+    />
   );
 }
