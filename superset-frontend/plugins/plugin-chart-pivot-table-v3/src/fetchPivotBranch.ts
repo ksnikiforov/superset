@@ -40,7 +40,8 @@ import {
   buildTreeFromRecords,
   applyMetricAxis,
   mergeTrees,
-  collectMetricFormattingMetrics,
+  collectMetricFormattingMetricsForQuery,
+  collectDimensionFormattingMetricsForQuery,
   getMetricKeys,
   mergeMetrics,
   serializePath,
@@ -119,6 +120,8 @@ interface ResolvedFetchContext {
   cacheKey: string;
   rowSubtotalLevels: number[];
   colSubtotalLevels: number[];
+  hasRowFormatting: boolean;
+  hasColFormatting: boolean;
 }
 
 const resolveFetchContext = ({
@@ -133,9 +136,22 @@ const resolveFetchContext = ({
   const rowGroupbyRaw = ensureIsArray<QueryFormColumn>(formData.groupbyRows);
   const colGroupbyRaw = ensureIsArray<QueryFormColumn>(formData.groupbyColumns);
   const metrics = ensureIsArray(formData.metrics);
-  const formattingMetrics = collectMetricFormattingMetrics(
+  const metricFormattingMetrics = collectMetricFormattingMetricsForQuery(
     formData.metricFormatting,
   );
+  const rowFormattingMetrics = collectDimensionFormattingMetricsForQuery(
+    formData.rowFormatting,
+    rowGroupbyRaw,
+  );
+  const colFormattingMetrics = collectDimensionFormattingMetricsForQuery(
+    formData.colFormatting,
+    colGroupbyRaw,
+  );
+  const formattingMetrics = [
+    ...metricFormattingMetrics,
+    ...rowFormattingMetrics,
+    ...colFormattingMetrics,
+  ];
   const metricsForQuery = mergeMetrics(metrics, formattingMetrics);
   const metricLabels = getMetricKeys(metrics);
   const metricLabelSet = new Set(metricLabels);
@@ -282,6 +298,8 @@ const resolveFetchContext = ({
     cacheKey,
     rowSubtotalLevels,
     colSubtotalLevels,
+    hasRowFormatting: rowFormattingMetrics.length > 0,
+    hasColFormatting: colFormattingMetrics.length > 0,
   };
 };
 
@@ -378,6 +396,8 @@ export async function fetchPivotBranch({
     cacheKey,
     rowSubtotalLevels,
     colSubtotalLevels,
+    hasRowFormatting,
+    hasColFormatting,
   } = resolveFetchContext({
     formData,
     axis,
@@ -459,13 +479,19 @@ export async function fetchPivotBranch({
       }
     }
   }
-  const effectiveRowLevels = Array.from(new Set(rowSubtotalLevels)).filter(
-    level => level <= rowDepth,
-  );
+  const includeRowTotalForColFormatting = axis === 'col' && hasColFormatting;
+  const includeColTotalForRowFormatting = axis === 'row' && hasRowFormatting;
+  const effectiveRowLevels = Array.from(
+    new Set([
+      ...rowSubtotalLevels,
+      ...(includeRowTotalForColFormatting ? [0] : []),
+    ]),
+  ).filter(level => level <= rowDepth);
   const effectiveColLevels = Array.from(
     new Set([
       ...colSubtotalLevels,
       ...(formData.colTotals ? [0] : []),
+      ...(includeColTotalForRowFormatting ? [0] : []),
     ]),
   ).filter(level => level <= colDepth);
   const subtotalRowDepths = new Set<number>([rowDepth, ...effectiveRowLevels]);

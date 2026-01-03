@@ -99,6 +99,59 @@ describe('Pivot Table v3 transformProps', () => {
     expect(result.data.cells['A|B__metric1'].values.metric1_bg).toBe('#111111');
   });
 
+  it('keeps row and column formatting metric values in the tree', () => {
+    const props = new ChartProps({
+      ...chartProps,
+      formData: {
+        ...formData,
+        rowFormatting: {
+          row1: {
+            backgroundColor: {
+              expressionType: 'SQL',
+              sqlExpression: 'SUM(sales)',
+              label: 'row_bg',
+            },
+          },
+        },
+        colFormatting: {
+          col1: {
+            textColor: {
+              expressionType: 'SQL',
+              sqlExpression: 'SUM(profit)',
+              label: 'col_text',
+            },
+          },
+        },
+      },
+      queriesData: [
+        {
+          data: [{ row1: 'A', metric1: 10, row_bg: '#111111' }],
+          colnames: ['row1', 'metric1', 'row_bg'],
+          coltypes: [1, 0, 1],
+          query_name: formatQueryName(1, 0),
+        },
+        {
+          data: [{ col1: 'B', metric1: 10, col_text: '#00ff00' }],
+          colnames: ['col1', 'metric1', 'col_text'],
+          coltypes: [1, 0, 1],
+          query_name: formatQueryName(0, 1),
+        },
+      ],
+    });
+    const result = transformProps(
+      props as ChartProps<PivotTableQueryFormData>,
+    );
+    const rowKey = serializePath(['A']);
+    const colKey = serializePath(['B']);
+    const rootKey = serializePath([]);
+    expect(result.data.cells[`${rowKey}|${rootKey}`].values.row_bg).toBe(
+      '#111111',
+    );
+    expect(result.data.cells[`${rootKey}|${colKey}`].values.col_text).toBe(
+      '#00ff00',
+    );
+  });
+
   it('normalizes row and column subtotal selections', () => {
     const customProps = new ChartProps({
       ...chartProps,

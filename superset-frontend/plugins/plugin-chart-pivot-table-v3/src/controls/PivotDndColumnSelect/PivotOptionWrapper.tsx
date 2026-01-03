@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { useMemo, useRef } from 'react';
+import { ReactNode, useMemo, useRef } from 'react';
 import {
   useDrag,
   useDrop,
@@ -24,15 +24,12 @@ import {
   DragSourceMonitor,
 } from 'react-dnd';
 import { DragContainer } from 'src/explore/components/controls/OptionControls';
-import {
-  OptionProps,
-  OptionItemInterface,
-} from 'src/explore/components/controls/DndColumnSelectControl/types';
+import { OptionItemInterface } from 'src/explore/components/controls/DndColumnSelectControl/types';
 import { Tooltip } from '@superset-ui/core/components';
 import { StyledColumnOption } from 'src/explore/components/optionRenderers';
 import { styled, isAdhocColumn, t, useTheme } from '@superset-ui/core';
 import { ColumnMeta } from '@superset-ui/chart-controls';
-import Option from 'src/explore/components/controls/DndColumnSelectControl/Option';
+import PivotOption from './PivotOption';
 
 export const OptionLabel = styled.div`
   width: 100%;
@@ -61,7 +58,18 @@ const PlaceholderBadge = styled.span`
   letter-spacing: 0.03em;
 `;
 
-type PivotOptionProps = OptionProps & {
+type PivotOptionWrapperProps = {
+  index: number;
+  label?: string;
+  tooltipTitle?: string;
+  column?: ColumnMeta | AdhocColumn;
+  clickClose: (index: number) => void;
+  withCaret?: boolean;
+  isExtra?: boolean;
+  datasourceWarningMessage?: string;
+  canDelete?: boolean;
+  tooltipOverlay?: ReactNode;
+  rightNode?: ReactNode;
   type: string;
   onShiftOptions: (dragIndex: number, hoverIndex: number) => void;
   listId?: string;
@@ -70,7 +78,7 @@ type PivotOptionProps = OptionProps & {
   isPlaceholder?: boolean;
 };
 
-export default function PivotOptionWrapper(props: PivotOptionProps) {
+export default function PivotOptionWrapper(props: PivotOptionWrapperProps) {
   const theme = useTheme();
   const {
     index,
@@ -89,6 +97,7 @@ export default function PivotOptionWrapper(props: PivotOptionProps) {
     tooltipOverlay,
     listId,
     isPlaceholder,
+    rightNode,
     ...rest
   } = props;
   const ref = useRef<HTMLDivElement>(null);
@@ -247,13 +256,14 @@ export default function PivotOptionWrapper(props: PivotOptionProps) {
       data-list-id={listId}
       {...rest}
     >
-      <Option
+      <PivotOption
         index={index}
         clickClose={clickClose}
         withCaret={withCaret && !isPlaceholder}
         isExtra={isExtra}
         datasourceWarningMessage={datasourceWarningMessage}
         canDelete={isPlaceholder ? false : canDelete}
+        rightNode={rightNode}
       >
         <OptionLabel ref={labelRef} style={labelStyles}>
           {isPlaceholder ? (
@@ -265,7 +275,7 @@ export default function PivotOptionWrapper(props: PivotOptionProps) {
             <Label />
           )}
         </OptionLabel>
-      </Option>
+      </PivotOption>
     </DragContainer>
   );
 }

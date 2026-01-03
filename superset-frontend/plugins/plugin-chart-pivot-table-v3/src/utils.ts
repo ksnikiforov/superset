@@ -29,6 +29,10 @@ import {
 import {
   MetricsLayoutEnum,
   METRIC_FORMATTING_FIELDS,
+  DIMENSION_FORMATTING_FIELDS,
+  DimensionFormattingScope,
+  PivotDimensionFormatting,
+  PivotDimensionFormattingMap,
   PivotMetricFormattingMap,
   PivotMetricFormatting,
   PivotPath,
@@ -242,6 +246,53 @@ export const normalizeMetricFormattingMap = (
   );
 };
 
+const normalizeDimensionFormattingScope = (
+  value: unknown,
+): DimensionFormattingScope => {
+  if (value === 'label' || value === 'all') {
+    return value;
+  }
+  if (value === 'value') {
+    return 'label';
+  }
+  if (typeof value === 'boolean') {
+    return value ? 'all' : 'label';
+  }
+  return 'all';
+};
+
+export const normalizeDimensionFormattingMap = (
+  formatting?: PivotDimensionFormattingMap,
+): PivotDimensionFormattingMap => {
+  if (!formatting) {
+    return {};
+  }
+  return Object.entries(formatting).reduce<PivotDimensionFormattingMap>(
+    (acc, [dimensionKey, formattingValue]) => {
+      if (!dimensionKey || !formattingValue) {
+        return acc;
+      }
+      const nextFormatting: PivotDimensionFormatting = {};
+      DIMENSION_FORMATTING_FIELDS.forEach(field => {
+        const normalized = normalizeMetricFormattingValue(
+          formattingValue[field],
+        );
+        if (normalized !== undefined) {
+          nextFormatting[field] = normalized;
+        }
+      });
+      if (Object.keys(nextFormatting).length > 0) {
+        nextFormatting.applyTo = normalizeDimensionFormattingScope(
+          formattingValue.applyTo,
+        );
+        acc[dimensionKey] = nextFormatting;
+      }
+      return acc;
+    },
+    {},
+  );
+};
+
 const normalizeFormattingMetricForQuery = (
   metric: QueryFormMetric,
 ): QueryFormMetric => {
@@ -255,6 +306,56 @@ const normalizeFormattingMetricForQuery = (
   return metric;
 };
 
+const buildDimensionKeyMap = (columns: QueryFormColumn[]) => {
+  const keyMap = new Map<string, string>();
+  columns.forEach(column => {
+    const key = getColumnLabel(column);
+    if (!key) {
+      return;
+    }
+    const candidates = new Set<string>([key]);
+    if (typeof column !== 'string') {
+      if (column.label) {
+        candidates.add(column.label);
+      }
+      if (column.sqlExpression) {
+        candidates.add(column.sqlExpression);
+      }
+    }
+    candidates.forEach(candidate => {
+      if (!keyMap.has(candidate)) {
+        keyMap.set(candidate, key);
+      }
+    });
+  });
+  return keyMap;
+};
+
+export const normalizeDimensionFormattingMapWithKeys = (
+  formatting: PivotDimensionFormattingMap | undefined,
+  columns: QueryFormColumn[],
+): PivotDimensionFormattingMap => {
+  const normalized = normalizeDimensionFormattingMap(formatting);
+  if (columns.length === 0) {
+    return normalized;
+  }
+  const keyMap = buildDimensionKeyMap(columns);
+  return Object.entries(normalized).reduce<PivotDimensionFormattingMap>(
+    (acc, [dimensionKey, dimensionFormatting]) => {
+      const resolvedKey = keyMap.get(dimensionKey);
+      if (!resolvedKey) {
+        return acc;
+      }
+      acc[resolvedKey] = {
+        ...(acc[resolvedKey] || {}),
+        ...dimensionFormatting,
+      };
+      return acc;
+    },
+    {},
+  );
+};
+
 export const collectMetricFormattingMetricsForQuery = (
   metricFormatting?: PivotMetricFormattingMap,
 ): QueryFormMetric[] => {
@@ -263,6 +364,21 @@ export const collectMetricFormattingMetricsForQuery = (
   ).flatMap(formatting =>
     METRIC_FORMATTING_FIELDS.map(field =>
       normalizeMetricFormattingValue(formatting[field]),
+    )
+      .filter((metric): metric is QueryFormMetric => metric !== undefined)
+      .map(metric => normalizeFormattingMetricForQuery(metric)),
+  );
+};
+
+export const collectDimensionFormattingMetricsForQuery = (
+  formatting: PivotDimensionFormattingMap | undefined,
+  columns: QueryFormColumn[],
+): QueryFormMetric[] => {
+  return Object.values(
+    normalizeDimensionFormattingMapWithKeys(formatting, columns),
+  ).flatMap(dimensionFormatting =>
+    DIMENSION_FORMATTING_FIELDS.map(field =>
+      normalizeMetricFormattingValue(dimensionFormatting[field]),
     )
       .filter((metric): metric is QueryFormMetric => metric !== undefined)
       .map(metric => normalizeFormattingMetricForQuery(metric)),

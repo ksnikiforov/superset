@@ -306,6 +306,188 @@ describe('PivotTableChart metric tier suppression', () => {
     });
   });
 
+  it('applies row and column formatting with metric priority', () => {
+    const formattedTree: PivotTreeData = {
+      ...baseTree,
+      cells: {
+        ...baseTree.cells,
+        [`${serializePath(['A'])}|${serializePath([])}`]: {
+          rowKey: serializePath(['A']),
+          colKey: serializePath([]),
+          values: {
+            row_bg: '#111111',
+            row_text: '#00ff00',
+          },
+        },
+        [`${serializePath([])}|${serializePath(['C1'])}`]: {
+          rowKey: serializePath([]),
+          colKey: serializePath(['C1']),
+          values: {
+            col_bg: '#222222',
+            col_text: '#0000ff',
+          },
+        },
+        [`${serializePath(['A'])}|${serializePath(['C1'])}`]: {
+          rowKey: serializePath(['A']),
+          colKey: serializePath(['C1']),
+          values: {
+            metric1: 10,
+            metric1_bg: '#333333',
+            metric1_text: '#123123',
+          },
+        },
+      },
+    };
+
+    render(
+      <PivotTableChart
+        data={formattedTree}
+        formData={buildFormData({
+          ...baseFormData,
+          metricFormatting: {
+            metric1: {
+              backgroundColor: 'metric1_bg',
+              textColor: 'metric1_text',
+            },
+          },
+          rowFormatting: {
+            r1: {
+              backgroundColor: 'row_bg',
+              textColor: 'row_text',
+            },
+          },
+          colFormatting: {
+            c1: {
+              backgroundColor: 'col_bg',
+              textColor: 'col_text',
+            },
+          },
+        })}
+        metrics={['metric1']}
+        groupbyRows={['r1']}
+        groupbyColumns={['c1']}
+        aggregateFunction="Sum"
+        width={400}
+        height={300}
+        startCollapsed={false}
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    const cell = screen.getByText('10').closest('td');
+    expect(cell).toHaveStyle({
+      backgroundColor: '#333333',
+      color: '#123123',
+    });
+
+    const rowHeader = screen.getByText('A').closest('th');
+    expect(rowHeader).toHaveStyle({
+      backgroundColor: '#111111',
+      color: '#00ff00',
+    });
+
+    const colHeader = screen.getByText('C1').closest('th');
+    expect(colHeader).toHaveStyle({
+      backgroundColor: '#222222',
+      color: '#0000ff',
+    });
+  });
+
+  it('applies label-only formatting scope to headers', () => {
+    const formattedTree: PivotTreeData = {
+      ...baseTree,
+      cells: {
+        ...baseTree.cells,
+        [`${serializePath(['A'])}|${serializePath([])}`]: {
+          rowKey: serializePath(['A']),
+          colKey: serializePath([]),
+          values: {
+            row_bg: '#111111',
+          },
+        },
+        [`${serializePath([])}|${serializePath(['C1'])}`]: {
+          rowKey: serializePath([]),
+          colKey: serializePath(['C1']),
+          values: {
+            col_bg: '#222222',
+          },
+        },
+      },
+    };
+
+    render(
+      <PivotTableChart
+        data={formattedTree}
+        formData={buildFormData({
+          ...baseFormData,
+          rowFormatting: {
+            r1: {
+              backgroundColor: 'row_bg',
+              applyTo: 'label',
+            },
+          },
+          colFormatting: {
+            c1: {
+              backgroundColor: 'col_bg',
+              applyTo: 'label',
+            },
+          },
+        })}
+        metrics={['metric1']}
+        groupbyRows={['r1']}
+        groupbyColumns={['c1']}
+        aggregateFunction="Sum"
+        width={400}
+        height={300}
+        startCollapsed={false}
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    const cell = screen.getByText('10').closest('td');
+    expect(cell).not.toHaveStyle({ backgroundColor: '#111111' });
+
+    const rowHeader = screen.getByText('A').closest('th');
+    expect(rowHeader).toHaveStyle({ backgroundColor: '#111111' });
+
+    const colHeader = screen.getByText('C1').closest('th');
+    expect(colHeader).toHaveStyle({ backgroundColor: '#222222' });
+  });
+
   it('renders metric headers without dimension prefixes when metrics are last on columns', () => {
     const metrics = ['averageOrderValue', 'weightedDiscount'];
     const treeRaw = buildTreeFromRecords(

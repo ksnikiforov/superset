@@ -49,6 +49,7 @@ import {
 } from '../../types';
 import {
   collectMetricFormattingMetrics,
+  getFormattingMetricKey,
   getMetricKey,
   normalizeMetricFormattingMapWithKeys,
 } from '../../utils';
@@ -149,7 +150,9 @@ const resolveMetricKey = (option: ValueType) =>
 const dedupeMetrics = (metrics: ValueType[]) => {
   const seen = new Set<string>();
   return metrics.filter(metric => {
-    const key = resolveMetricKey(metric);
+    const key =
+      getFormattingMetricKey(metric as QueryFormMetric | Metric) ||
+      resolveMetricKey(metric);
     if (!key || seen.has(key)) {
       return false;
     }

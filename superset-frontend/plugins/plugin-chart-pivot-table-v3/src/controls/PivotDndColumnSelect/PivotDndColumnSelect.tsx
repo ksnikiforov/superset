@@ -16,47 +16,150 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DropTargetMonitor } from 'react-dnd';
 import { useDispatch } from 'react-redux';
 import {
   AdhocColumn,
+  ensureIsArray,
+  getColumnLabel,
+  Metric,
   tn,
   QueryFormColumn,
+  QueryFormMetric,
+  styled,
   t,
   isAdhocColumn,
 } from '@superset-ui/core';
+import {
+  Button,
+  Popover,
+  Radio,
+  Space,
+  Tooltip,
+  Typography,
+} from '@superset-ui/core/components';
+import { Icons } from '@superset-ui/core/components/Icons';
 import { ColumnMeta, isColumnMeta } from '@superset-ui/chart-controls';
-import { isEmpty } from 'lodash';
+import { isEmpty, isEqual } from 'lodash';
 import { setControlValue as setControlValueAction } from 'src/explore/actions/exploreActions';
 import ColumnSelectPopoverTrigger from 'src/explore/components/controls/DndColumnSelectControl/ColumnSelectPopoverTrigger';
 import { DndControlProps } from 'src/explore/components/controls/DndColumnSelectControl/types';
-import { DatasourcePanelDndItem } from 'src/explore/components/DatasourcePanel/types';
+import { isDatasourcePanelDndItem } from 'src/explore/components/DatasourcePanel/types';
 import { DndItemType } from 'src/explore/components/DndItemType';
-import { METRICS_PLACEHOLDER } from '../../utils';
+import {
+  METRICS_PLACEHOLDER,
+  mergeMetrics,
+  normalizeDimensionFormattingMapWithKeys,
+} from '../../utils';
+import {
+  DimensionFormattingField,
+  DimensionFormattingScope,
+  PivotDimensionFormatting,
+  PivotDimensionFormattingMap,
+  MetricsLayoutEnum,
+} from '../../types';
+import {
+  MetricFormatSelector,
+  MetricOptionValue,
+} from '../PivotDndMetricSelect/PivotMetricDefinitionValue';
 import PivotOptionWrapper from './PivotOptionWrapper';
 import PivotDndSelectLabel from './PivotSelectLabel';
 import { OptionSelector } from './optionSelector';
 
 const DEFAULT_DRAG_TYPE = 'pivot_v3_dnd';
 
+const DEFAULT_DIMENSION_FORMATTING_SCOPE: DimensionFormattingScope = 'all';
+
+const DIMENSION_FORMAT_SELECTOR_CONFIG: Array<{
+  field: DimensionFormattingField;
+  label: string;
+  tooltip: ReactNode;
+}> = [
+  {
+    field: 'backgroundColor',
+    label: t('Background color metric'),
+    tooltip: t(
+      "Metric that returns a color for the row or column background (HEX, RGB, or RGBA). Example: '#111111'.",
+    ),
+  },
+  {
+    field: 'textColor',
+    label: t('Text color metric'),
+    tooltip: t(
+      "Metric that returns a color for the row or column text (HEX, RGB, or RGBA). Example: '#ffffff'.",
+    ),
+  },
+];
+
+const DimensionFormattingButton = styled(Button)`
+  height: ${({ theme }) => theme.sizeUnit * 5}px;
+  min-height: ${({ theme }) => theme.sizeUnit * 5}px;
+  min-width: ${({ theme }) => theme.sizeUnit * 5}px;
+  width: ${({ theme }) => theme.sizeUnit * 5}px;
+  padding: 0;
+`;
+
+const DimensionFormattingButtonWrap = styled.div`
+  display: flex;
+  align-items: center;
+  padding-right: ${({ theme }) => theme.sizeUnit}px;
+`;
+
+type WindowWithPivotDebug = Window & { __PIVOT_V3_DEBUG_PLACEMENT?: boolean };
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+type DroppedColumn = ColumnMeta | AdhocColumn | QueryFormColumn;
+
+const isDroppedColumn = (value: unknown): value is DroppedColumn =>
+  typeof value === 'string' ||
+  isColumnMeta(value) ||
+  isAdhocColumn(value as QueryFormColumn);
+
+const getDroppedColumnValue = (item: unknown): DroppedColumn | undefined => {
+  if (isDatasourcePanelDndItem(item)) {
+    return isDroppedColumn(item.value) ? item.value : undefined;
+  }
+  if (isRecord(item)) {
+    const candidate = item.value ?? item.column;
+    return isDroppedColumn(candidate) ? candidate : undefined;
+  }
+  return undefined;
+};
+
 export type PivotPlacement = {
   axis: 'rows' | 'cols';
   rows: QueryFormColumn[];
   cols: QueryFormColumn[];
   hasMetrics: boolean;
-  preferredAxis?: any;
+  preferredAxis?: MetricsLayoutEnum;
   controlNames?: { rows: string; cols: string };
   resolve?: (
     rows: QueryFormColumn[],
     cols: QueryFormColumn[],
-    options: { hasMetrics: boolean; preferredAxis?: any; lastMoved?: 'row' | 'col' },
-  ) => { rows: QueryFormColumn[]; cols: QueryFormColumn[]; layout?: any };
-  setControlValue?: (name: string, value: any, errors?: any[]) => void;
+    options: {
+      hasMetrics: boolean;
+      preferredAxis?: MetricsLayoutEnum;
+      lastMoved?: 'row' | 'col';
+    },
+  ) => {
+    rows: QueryFormColumn[];
+    cols: QueryFormColumn[];
+    layout?: MetricsLayoutEnum;
+  };
+  setControlValue?: (
+    name: string,
+    value: QueryFormColumn[] | QueryFormColumn | null | undefined,
+    errors?: string[],
+  ) => void;
 };
 
 export type PivotDndColumnSelectProps = DndControlProps<QueryFormColumn> & {
   options: ColumnMeta[];
+  savedMetrics?: Metric[];
+  datasource?: Record<string, unknown>;
   isTemporal?: boolean;
   disabledTabs?: Set<string>;
   dragTypeOverride?: string;
@@ -80,6 +183,9 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
     dragTypeOverride,
     listId,
     pivotPlacement,
+    formData,
+    savedMetrics = [],
+    datasource,
   } = props;
   const [newColumnPopoverVisible, setNewColumnPopoverVisible] = useState(false);
   const lastHoverRef = useRef<{ index: number | null; listId?: string }>({
@@ -89,6 +195,17 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const dragType = dragTypeOverride || DEFAULT_DRAG_TYPE;
   const currentListId = listId || name;
+  const axis: 'row' | 'col' =
+    pivotPlacement?.axis === 'cols'
+      ? 'col'
+      : pivotPlacement?.axis === 'rows'
+      ? 'row'
+      : name === 'groupbyColumns'
+      ? 'col'
+      : 'row';
+  const formattingControlName: 'rowFormatting' | 'colFormatting' =
+    axis === 'row' ? 'rowFormatting' : 'colFormatting';
+  const setControlValue = props.actions?.setControlValue;
 
   const optionSelector = useMemo(() => {
     const optionsMap = Object.fromEntries(
@@ -98,11 +215,51 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
     return new OptionSelector(optionsMap, multi, value);
   }, [multi, options, value]);
 
+  const rawFormatting =
+    (formData?.[formattingControlName] as PivotDimensionFormattingMap) || {};
+  const dimensionFormatting = useMemo(
+    () =>
+      normalizeDimensionFormattingMapWithKeys(
+        rawFormatting,
+        ensureIsArray<QueryFormColumn>(value),
+      ),
+    [rawFormatting, value],
+  );
+  const formattingRef = useRef<PivotDimensionFormattingMap>(dimensionFormatting);
+  const formattingPendingRef = useRef<PivotDimensionFormattingMap | null>(null);
+  const [localFormatting, setLocalFormatting] =
+    useState<PivotDimensionFormattingMap>(dimensionFormatting);
+
+  useEffect(() => {
+    if (formattingPendingRef.current) {
+      if (isEqual(dimensionFormatting, formattingPendingRef.current)) {
+        formattingPendingRef.current = null;
+        formattingRef.current = dimensionFormatting;
+        if (!isEqual(dimensionFormatting, localFormatting)) {
+          setLocalFormatting(dimensionFormatting);
+        }
+      }
+      return;
+    }
+    formattingRef.current = dimensionFormatting;
+    if (!isEqual(dimensionFormatting, localFormatting)) {
+      setLocalFormatting(dimensionFormatting);
+    }
+  }, [dimensionFormatting, localFormatting]);
+
   const toArray = useCallback(
     (val: QueryFormColumn[] | QueryFormColumn | null | undefined) =>
       Array.isArray(val) ? val : val == null ? [] : [val],
     [],
   );
+
+  const availableMetrics = useMemo(() => {
+    const selectedMetrics = ensureIsArray<QueryFormMetric>(formData?.metrics);
+    const savedMetricNames = savedMetrics
+      .map(metric => metric.metric_name)
+      .filter(Boolean) as QueryFormMetric[];
+    return mergeMetrics(selectedMetrics, savedMetricNames);
+  }, [formData?.metrics, savedMetrics]);
 
   const resetHover = useCallback(() => {
     lastHoverRef.current = { index: null, listId: undefined };
@@ -110,7 +267,9 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
 
   const applyChange = useCallback(
     (nextValue: QueryFormColumn[] | QueryFormColumn | null | undefined) => {
-      const debugOn = (window as any).__PIVOT_V3_DEBUG_PLACEMENT;
+      const debugOn = Boolean(
+        (window as WindowWithPivotDebug).__PIVOT_V3_DEBUG_PLACEMENT,
+      );
       if (
         pivotPlacement?.resolve &&
         pivotPlacement.controlNames?.rows &&
@@ -147,15 +306,22 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
             resolved,
           });
         }
-        const setControl =
-          pivotPlacement.setControlValue ||
-          ((name: string, val: any) =>
-            dispatch(setControlValueAction(name, val, [])));
+        const setControl = (
+          controlName: string,
+          val: QueryFormColumn[],
+          errors: string[] = [],
+        ) => {
+          if (pivotPlacement.setControlValue) {
+            pivotPlacement.setControlValue(controlName, val, errors);
+            return;
+          }
+          dispatch(setControlValueAction(controlName, val, errors));
+        };
         // Defer control updates to avoid unmounting drop targets mid-drag,
         // which can trigger react-dnd's "Expected to find a valid target".
         requestAnimationFrame(() => {
-          setControl(pivotPlacement.controlNames.rows, resolved.rows, []);
-          setControl(pivotPlacement.controlNames.cols, resolved.cols, []);
+          setControl(pivotPlacement.controlNames.rows, resolved.rows);
+          setControl(pivotPlacement.controlNames.cols, resolved.cols);
         });
         resetHover();
         return;
@@ -223,14 +389,12 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
   );
 
   const onDrop = useCallback(
-    (item: DatasourcePanelDndItem | any, monitor?: DropTargetMonitor) => {
-      const column = (item as any)?.value ?? (item as any)?.column;
+    (item: unknown, monitor?: DropTargetMonitor) => {
+      const column = getDroppedColumnValue(item);
       if (!column) {
         return;
       }
-      const columnName =
-        (column as ColumnMeta).column_name ||
-        (typeof column === 'string' ? column : undefined);
+      const columnName = isColumnMeta(column) ? column.column_name : undefined;
       const columnValue = columnName || column;
       if (!optionSelector.multi && !isEmpty(optionSelector.values)) {
         optionSelector.replace(0, columnValue as QueryFormColumn);
@@ -239,7 +403,7 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
         return;
       }
       const insertAt = computeInsertIndex(monitor);
-      if ((window as any).__PIVOT_V3_DEBUG_PLACEMENT) {
+      if ((window as WindowWithPivotDebug).__PIVOT_V3_DEBUG_PLACEMENT) {
         // eslint-disable-next-line no-console
         console.log('[pivot-v3] DnD drop details', {
           listId: currentListId,
@@ -272,16 +436,18 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
   );
 
   const canDrop = useCallback(
-    (item: DatasourcePanelDndItem | any) => {
-      const value = (item as any)?.value ?? (item as any)?.column;
-      const columnName = (value as ColumnMeta)?.column_name;
-      if (columnName && columnName in optionSelector.options) {
-        return !optionSelector.has(columnName);
+    (item: unknown) => {
+      const column = getDroppedColumnValue(item);
+      if (!column) {
+        return false;
       }
-      if (typeof value === 'string') {
-        return !optionSelector.has(value);
+      if (isColumnMeta(column)) {
+        return !optionSelector.has(column.column_name);
       }
-      return true;
+      if (typeof column === 'string' || isAdhocColumn(column)) {
+        return !optionSelector.has(column as QueryFormColumn);
+      }
+      return false;
     },
     [optionSelector],
   );
@@ -302,6 +468,69 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
     [applyChange, optionSelector],
   );
 
+  const updateFormatting = useCallback(
+    (
+      dimensionKey: string,
+      field: DimensionFormattingField | 'applyTo',
+      value?: QueryFormMetric | DimensionFormattingScope,
+    ) => {
+      if (!dimensionKey || !setControlValue) {
+        return;
+      }
+      const baseFormatting = formattingRef.current || {};
+      const nextFormatting: PivotDimensionFormattingMap = { ...baseFormatting };
+      const nextEntry: PivotDimensionFormatting = {
+        ...(baseFormatting[dimensionKey] || {}),
+      };
+
+      if (field === 'applyTo') {
+        nextEntry.applyTo =
+          (value as DimensionFormattingScope) ?? DEFAULT_DIMENSION_FORMATTING_SCOPE;
+      } else if (value) {
+        nextEntry[field] = value as QueryFormMetric;
+      } else {
+        delete nextEntry[field];
+      }
+
+      const hasMetricFormatting = DIMENSION_FORMAT_SELECTOR_CONFIG.some(
+        selector => nextEntry[selector.field],
+      );
+      if (hasMetricFormatting) {
+        nextEntry.applyTo =
+          nextEntry.applyTo ?? DEFAULT_DIMENSION_FORMATTING_SCOPE;
+        nextFormatting[dimensionKey] = nextEntry;
+      } else {
+        delete nextFormatting[dimensionKey];
+      }
+
+      setLocalFormatting(nextFormatting);
+      formattingPendingRef.current = nextFormatting;
+      formattingRef.current = nextFormatting;
+      setControlValue(formattingControlName, nextFormatting);
+    },
+    [formattingControlName, setControlValue],
+  );
+
+  const getDimensionKey = useCallback(
+    (column: ColumnMeta | AdhocColumn | string) => {
+      if (isColumnMeta(column)) {
+        return column.column_name;
+      }
+      return getColumnLabel(column as QueryFormColumn);
+    },
+    [],
+  );
+
+  const getDimensionLabel = useCallback(
+    (column: ColumnMeta | AdhocColumn | string) => {
+      if (isColumnMeta(column)) {
+        return column.verbose_name || column.column_name;
+      }
+      return getColumnLabel(column as QueryFormColumn);
+    },
+    [],
+  );
+
   const valuesRenderer = useCallback(
     () =>
       optionSelector.values.map((column, idx) => {
@@ -315,6 +544,96 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
             : undefined;
         const withCaret =
           !isPlaceholder && (isAdhocColumn(column) || !column.error_text);
+        const dimensionKey = !isPlaceholder ? getDimensionKey(column) : undefined;
+        const dimensionLabel = !isPlaceholder
+          ? getDimensionLabel(column)
+          : undefined;
+        const formatting =
+          dimensionKey && localFormatting[dimensionKey]
+            ? localFormatting[dimensionKey]
+            : undefined;
+        const formattingScope =
+          formatting?.applyTo ?? DEFAULT_DIMENSION_FORMATTING_SCOPE;
+        const formattingPopoverContent =
+          dimensionKey && dimensionLabel ? (
+            <div
+              data-ignore-control-popover
+              onClick={event => event.stopPropagation()}
+              onMouseDown={event => event.stopPropagation()}
+            >
+              <Space direction="vertical" size={8}>
+                <Typography.Text strong>
+                  {t('Conditional formatting')}
+                </Typography.Text>
+                <Typography.Text type="secondary">
+                  {axis === 'row'
+                    ? t('Row: %s', dimensionLabel)
+                    : t('Column: %s', dimensionLabel)}
+                </Typography.Text>
+                {DIMENSION_FORMAT_SELECTOR_CONFIG.map(selector => (
+                  <MetricFormatSelector
+                    key={selector.field}
+                    label={selector.label}
+                    tooltip={selector.tooltip}
+                    value={formatting?.[selector.field]}
+                    metrics={availableMetrics as MetricOptionValue[]}
+                    onChange={metric =>
+                      updateFormatting(dimensionKey, selector.field, metric)
+                    }
+                    columns={options}
+                    savedMetrics={savedMetrics}
+                    datasource={datasource}
+                  />
+                ))}
+                <Radio.Group
+                  value={formattingScope}
+                  onChange={event =>
+                    updateFormatting(
+                      dimensionKey,
+                      'applyTo',
+                      event.target.value,
+                    )
+                  }
+                >
+                  <Radio value="all">
+                    {axis === 'row'
+                      ? t('Apply to whole row')
+                      : t('Apply to whole column')}
+                  </Radio>
+                  <Radio value="label">{t('Apply to value')}</Radio>
+                </Radio.Group>
+              </Space>
+            </div>
+          ) : null;
+        const formattingControl =
+          dimensionKey && dimensionLabel ? (
+            <Popover
+              content={formattingPopoverContent}
+              overlayStyle={{ width: 'fit-content' }}
+              trigger="click"
+              placement="right"
+              getPopupContainer={() => document.body}
+            >
+              <Tooltip title={t('Add conditional formatting')}>
+                <DimensionFormattingButtonWrap
+                  data-ignore-control-popover
+                  onClick={event => event.stopPropagation()}
+                  onMouseDown={event => event.stopPropagation()}
+                >
+                  <DimensionFormattingButton
+                    aria-label={t(
+                      'Add conditional formatting for %s',
+                      dimensionLabel,
+                    )}
+                    data-test="pivot-dimension-formatting-button"
+                    icon={<Icons.FormatPainterOutlined iconSize="s" />}
+                    size="small"
+                    type="text"
+                  />
+                </DimensionFormattingButtonWrap>
+              </Tooltip>
+            </Popover>
+          ) : undefined;
         const optionNode = (
           <PivotOptionWrapper
             key={getOptionKey(column, idx)}
@@ -330,6 +649,7 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
             datasourceWarningMessage={datasourceWarningMessage}
             withCaret={withCaret}
             isPlaceholder={isPlaceholder}
+            rightNode={formattingControl}
             tooltipOverlay={
               isPlaceholder
                 ? t(
@@ -366,17 +686,25 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
       }),
     [
       applyChange,
+      availableMetrics,
+      axis,
       canDelete,
       currentListId,
+      datasource,
       disabledTabs,
       dragType,
+      getDimensionKey,
+      getDimensionLabel,
       isTemporal,
+      localFormatting,
       onClickClose,
       onShiftOptions,
       optionSelector,
       options,
+      savedMetrics,
       setLastHoverIndex,
       setLastHoverList,
+      updateFormatting,
     ],
   );
 

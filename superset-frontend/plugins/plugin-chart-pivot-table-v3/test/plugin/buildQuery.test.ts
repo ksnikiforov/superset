@@ -187,6 +187,79 @@ test('includes conditional formatting metrics in query payloads', () => {
   expect(metricKeys).toEqual(['metric1', 'metric1_bg']);
 });
 
+test('includes row and column formatting metrics in query payloads', () => {
+  const queryContext = buildQuery(
+    buildFormData({
+      ...baseFormData,
+      metrics: ['metric1'],
+      rowFormatting: {
+        row1: {
+          backgroundColor: {
+            expressionType: 'SQL',
+            sqlExpression: 'SUM(sales)',
+            label: 'row_bg',
+          },
+        },
+      },
+      colFormatting: {
+        col1: {
+          textColor: {
+            expressionType: 'SQL',
+            sqlExpression: 'SUM(profit)',
+            label: 'col_text',
+          },
+        },
+      },
+    }),
+  );
+
+  const queryMetrics = queryContext.queries[0].metrics || [];
+  const metricKeys = queryMetrics.map(metric =>
+    typeof metric === 'string' ? metric : metric.label,
+  );
+  expect(metricKeys).toEqual(
+    expect.arrayContaining(['metric1', 'row_bg', 'col_text']),
+  );
+});
+
+test('adds row totals queries when row formatting is enabled without totals', () => {
+  const queryContext = buildQuery(
+    buildFormData({
+      ...baseFormData,
+      startCollapsed: false,
+      rowTotals: false,
+      colTotals: false,
+      rowFormatting: {
+        row1: {
+          backgroundColor: 'row_bg',
+        },
+      },
+    }),
+  );
+  const names = queryContext.queries.map(q => q.query_name);
+  expect(names).toContain(formatQueryName(2, 2));
+  expect(names).toContain(formatQueryName(2, 0));
+});
+
+test('adds column totals queries when column formatting is enabled without totals', () => {
+  const queryContext = buildQuery(
+    buildFormData({
+      ...baseFormData,
+      startCollapsed: false,
+      rowTotals: false,
+      colTotals: false,
+      colFormatting: {
+        col1: {
+          backgroundColor: 'col_bg',
+        },
+      },
+    }),
+  );
+  const names = queryContext.queries.map(q => q.query_name);
+  expect(names).toContain(formatQueryName(2, 2));
+  expect(names).toContain(formatQueryName(0, 2));
+});
+
 test('keeps distinct formatting metrics with identical labels in queries', () => {
   const queryContext = buildQuery(
     buildFormData({

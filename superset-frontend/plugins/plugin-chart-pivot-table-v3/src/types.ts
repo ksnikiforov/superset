@@ -92,11 +92,27 @@ export const METRIC_FORMATTING_FIELDS = [
 
 export type MetricFormattingField = (typeof METRIC_FORMATTING_FIELDS)[number];
 
+export const DIMENSION_FORMATTING_FIELDS = [
+  'backgroundColor',
+  'textColor',
+] as const;
+
+export type DimensionFormattingField =
+  (typeof DIMENSION_FORMATTING_FIELDS)[number];
+
+export type DimensionFormattingScope = 'all' | 'label';
+
 export type PivotMetricFormatting = Partial<
   Record<MetricFormattingField, QueryFormMetric>
 >;
 
 export type PivotMetricFormattingMap = Record<string, PivotMetricFormatting>;
+
+export type PivotDimensionFormatting = Partial<
+  Record<DimensionFormattingField, QueryFormMetric>
+> & { applyTo?: DimensionFormattingScope };
+
+export type PivotDimensionFormattingMap = Record<string, PivotDimensionFormatting>;
 
 export interface PivotTableCustomizeProps {
   groupbyRows: QueryFormColumn[];
@@ -104,6 +120,8 @@ export interface PivotTableCustomizeProps {
   metrics: QueryFormMetric[];
   metricFormatting?: PivotMetricFormattingMap;
   metricFormattingScope?: MetricFormattingScope;
+  rowFormatting?: PivotDimensionFormattingMap;
+  colFormatting?: PivotDimensionFormattingMap;
   aggregateFunction?: string;
   startCollapsed: boolean;
   initialDepth?: number;
@@ -138,11 +156,11 @@ export type PivotTableQueryFormData = QueryFormData &
     verboseMap: JsonObject;
     columnFormats: JsonObject;
     currencyFormats: Record<string, Currency>;
-  metricColorFormatters: ColorFormatters;
-  dateFormatters: Record<string, DateFormatter | undefined>;
-  colTypeMap?: Record<string, GenericDataType>;
-  legacy_order_by: QueryFormMetric[] | QueryFormMetric | null;
-  order_desc: boolean;
+    metricColorFormatters: ColorFormatters;
+    dateFormatters: Record<string, DateFormatter | undefined>;
+    colTypeMap?: Record<string, GenericDataType>;
+    legacy_order_by: QueryFormMetric[] | QueryFormMetric | null;
+    order_desc: boolean;
     onContextMenu?: (
       clientX: number,
       clientY: number,
@@ -164,6 +182,8 @@ export interface PivotTableProps
   groupbyColumns: QueryFormColumn[];
   metricFormatting?: PivotMetricFormattingMap;
   metricFormattingScope?: MetricFormattingScope;
+  rowFormatting?: PivotDimensionFormattingMap;
+  colFormatting?: PivotDimensionFormattingMap;
   aggregateFunction?: string;
   startCollapsed: boolean;
   initialDepth?: number;

@@ -27,6 +27,7 @@ import {
 import { MetricsLayoutEnum, PivotTableQueryFormData } from './types';
 import {
   collectMetricFormattingMetricsForQuery,
+  collectDimensionFormattingMetricsForQuery,
   mergeMetrics,
   normalizeSubtotalLevels,
   resolveMetricPlacement,
@@ -74,16 +75,29 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
   const rowGroupbyRaw = ensureIsArray<QueryFormColumn>(groupbyRows);
   const colGroupbyRaw = ensureIsArray<QueryFormColumn>(groupbyColumns);
   const metrics = ensureIsArray(formData.metrics);
-  const formattingMetrics = collectMetricFormattingMetricsForQuery(
+  const metricFormattingMetrics = collectMetricFormattingMetricsForQuery(
     formData.metricFormatting,
   );
-  const metricsForQuery = mergeMetrics(metrics, formattingMetrics);
   const placement = resolveMetricPlacement(rowGroupbyRaw, colGroupbyRaw, {
     hasMetrics: metrics.length > 0,
     preferredAxis: formData.metricsLayout as MetricsLayoutEnum,
   });
   const rowGroupby = stripMetricsPlaceholder(placement.rows);
   const colGroupby = stripMetricsPlaceholder(placement.cols);
+  const rowFormattingMetrics = collectDimensionFormattingMetricsForQuery(
+    formData.rowFormatting,
+    rowGroupby,
+  );
+  const colFormattingMetrics = collectDimensionFormattingMetricsForQuery(
+    formData.colFormatting,
+    colGroupby,
+  );
+  const formattingMetrics = [
+    ...metricFormattingMetrics,
+    ...rowFormattingMetrics,
+    ...colFormattingMetrics,
+  ];
+  const metricsForQuery = mergeMetrics(metrics, formattingMetrics);
   const metricsOnRows = placement.layout === MetricsLayoutEnum.ROWS;
   const metricInsertIndex =
     placement.metricPosition >= 0 ? placement.metricPosition : undefined;
@@ -92,7 +106,10 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
   const isLevelTotalsEnabled =
     (rowSubtotalLevels && rowSubtotalLevels.length > 0) ||
     (colSubtotalLevels && colSubtotalLevels.length > 0);
-  const requireMultiQuery = startCollapsed || isTotalsEnabled || isLevelTotalsEnabled;
+  const needsFormattingTotals =
+    rowFormattingMetrics.length > 0 || colFormattingMetrics.length > 0;
+  const requireMultiQuery =
+    startCollapsed || isTotalsEnabled || isLevelTotalsEnabled || needsFormattingTotals;
 
   const initialDepthResolved = Math.max(initialDepth || 1, 1);
   const adjustForMetricFront = (depth: number, onAxis: boolean) => {
@@ -180,6 +197,12 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
     // always include the initial visible depth for each axis
     rowDepths.add(rowDepthLimit || 0);
     colDepths.add(colDepthLimit || 0);
+    if (rowFormattingMetrics.length > 0) {
+      colDepths.add(0);
+    }
+    if (colFormattingMetrics.length > 0) {
+      rowDepths.add(0);
+    }
     if (metricsOnRows && metricInsertIndex === 0 && colTotals) {
       rowDepths.add(0);
     }

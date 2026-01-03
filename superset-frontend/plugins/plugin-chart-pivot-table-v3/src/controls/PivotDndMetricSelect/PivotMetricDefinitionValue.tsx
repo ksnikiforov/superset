@@ -62,12 +62,12 @@ const MetricFormattingButtonWrap = styled.div`
 
 type ValueType = Metric | AdhocMetric | QueryFormMetric;
 
-type MetricSelectValue = {
+export type MetricSelectValue = {
   value: string | number;
   label?: string;
 };
 
-type MetricOptionValue = ValueType | MetricSelectValue;
+export type MetricOptionValue = ValueType | MetricSelectValue;
 
 type PivotMetricDefinitionValueProps = {
   option: ValueType;
@@ -287,7 +287,7 @@ const FORMAT_SELECTOR_CONFIG: Array<{
 
 const METRIC_SELECT_WIDTH = 220;
 
-const MetricFormatSelector = ({
+export const MetricFormatSelector = ({
   label,
   tooltip,
   value,

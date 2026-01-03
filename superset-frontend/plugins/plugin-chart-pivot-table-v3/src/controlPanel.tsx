@@ -322,6 +322,25 @@ const config: ControlPanelConfig = {
               dragTypeOverride: 'pivot_v3_dnd',
               label: t('Rows'),
               description: t('Columns to group by on the rows'),
+              mapStateToProps: (
+                state: ControlPanelState,
+                controlState: ControlState,
+                chartState?: Record<string, unknown>,
+              ) => {
+                const base =
+                  typeof sharedControls.groupby.mapStateToProps === 'function'
+                    ? sharedControls.groupby.mapStateToProps(
+                        state,
+                        controlState,
+                        chartState,
+                      )
+                    : {};
+                return {
+                  ...base,
+                  formData: state.form_data,
+                  datasource: state.datasource,
+                };
+              },
             }),
           },
         ],
@@ -334,6 +353,25 @@ const config: ControlPanelConfig = {
               dragTypeOverride: 'pivot_v3_dnd',
               label: t('Columns'),
               description: t('Columns to group by on the columns'),
+              mapStateToProps: (
+                state: ControlPanelState,
+                controlState: ControlState,
+                chartState?: Record<string, unknown>,
+              ) => {
+                const base =
+                  typeof sharedControls.groupby.mapStateToProps === 'function'
+                    ? sharedControls.groupby.mapStateToProps(
+                        state,
+                        controlState,
+                        chartState,
+                      )
+                    : {};
+                return {
+                  ...base,
+                  formData: state.form_data,
+                  datasource: state.datasource,
+                };
+              },
             }),
           },
         ],
@@ -419,6 +457,24 @@ const config: ControlPanelConfig = {
         [
           {
             name: 'metricFormatting',
+            config: {
+              type: 'HiddenControl',
+              default: {},
+            },
+          },
+        ],
+        [
+          {
+            name: 'rowFormatting',
+            config: {
+              type: 'HiddenControl',
+              default: {},
+            },
+          },
+        ],
+        [
+          {
+            name: 'colFormatting',
             config: {
               type: 'HiddenControl',
               default: {},

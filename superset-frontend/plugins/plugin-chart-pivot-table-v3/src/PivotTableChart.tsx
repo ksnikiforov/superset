@@ -35,10 +35,14 @@ import {
   MetricFormattingScope,
   METRIC_FORMATTING_FIELDS,
   MetricFormattingField,
+  DIMENSION_FORMATTING_FIELDS,
+  DimensionFormattingField,
+  DimensionFormattingScope,
   MetricsLayoutEnum,
   PivotTableProps,
   PivotTreeData,
   PivotTreeNode,
+  PivotDimensionFormattingMap,
 } from './types';
 import {
   isMetricsPlaceholder,
@@ -46,6 +50,7 @@ import {
   getFormattingMetricKey,
   getMetricKey,
   mergeTrees,
+  normalizeDimensionFormattingMapWithKeys,
   normalizeMetricFormattingMapWithKeys,
   normalizeSubtotalLevels,
   parseThemeColors,
@@ -166,6 +171,10 @@ const Spinner = styled(LoadingOutlined)`
 type FormattingKeys = {
   [key in MetricFormattingField]?: string;
 };
+
+type DimensionFormattingKeys = {
+  [key in DimensionFormattingField]?: string;
+} & { applyTo: DimensionFormattingScope };
 
 const HEX_COLOR_PATTERN = /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 
@@ -291,6 +300,20 @@ function PivotTableChart(props: PivotTableProps) {
     formData.metricFormatting,
     metrics,
   );
+  const rowFormatting = useMemo(
+    () => normalizeDimensionFormattingMapWithKeys(
+      formData.rowFormatting,
+      groupbyRows,
+    ),
+    [formData.rowFormatting, groupbyRows],
+  );
+  const colFormatting = useMemo(
+    () => normalizeDimensionFormattingMapWithKeys(
+      formData.colFormatting,
+      groupbyColumns,
+    ),
+    [formData.colFormatting, groupbyColumns],
+  );
   const formattingKeyMap = useMemo(() => {
     const next: Record<string, FormattingKeys> = {};
     Object.entries(metricFormatting).forEach(([metricKey, formatting]) => {
@@ -315,6 +338,44 @@ function PivotTableChart(props: PivotTableProps) {
     });
     return next;
   }, [metricFormatting]);
+  const buildDimensionFormattingKeyMap = useCallback(
+    (formatting: PivotDimensionFormattingMap) => {
+      const next: Record<string, DimensionFormattingKeys> = {};
+      Object.entries(formatting).forEach(([dimensionKey, dimensionFormatting]) => {
+        if (!dimensionKey) {
+          return;
+        }
+        const formattingKeys = DIMENSION_FORMATTING_FIELDS.reduce(
+          (acc, field) => {
+            const key = dimensionFormatting?.[field]
+              ? getFormattingMetricKey(dimensionFormatting[field])
+              : '';
+            if (key) {
+              acc[field] = key;
+            }
+            return acc;
+          },
+          {} as Omit<DimensionFormattingKeys, 'applyTo'>,
+        );
+        if (Object.keys(formattingKeys).length > 0) {
+          next[dimensionKey] = {
+            ...formattingKeys,
+            applyTo: dimensionFormatting.applyTo ?? 'all',
+          };
+        }
+      });
+      return next;
+    },
+    [],
+  );
+  const rowFormattingKeyMap = useMemo(
+    () => buildDimensionFormattingKeyMap(rowFormatting),
+    [buildDimensionFormattingKeyMap, rowFormatting],
+  );
+  const colFormattingKeyMap = useMemo(
+    () => buildDimensionFormattingKeyMap(colFormatting),
+    [buildDimensionFormattingKeyMap, colFormatting],
+  );
   const resolvedRowTotalPosition =
     formData.rowTotalPosition || rowTotalPosition;
   const resolvedRowSubtotalPosition =
@@ -676,6 +737,27 @@ function PivotTableChart(props: PivotTableProps) {
     (path: PivotTreeNode['path']) =>
       getNonMetricPathPartsBase(path, metricLabelSet),
     [metricLabelSet],
+  );
+  const getDimensionKeyForNode = useCallback(
+    (node: PivotTreeNode, axis: 'row' | 'col') => {
+      const nonMetricParts = getNonMetricPathParts(node.path);
+      const nonSubtotalParts = nonMetricParts.filter(
+        part => !isSubtotalToken(part),
+      );
+      if (nonSubtotalParts.length === 0) {
+        return undefined;
+      }
+      const dimensionIndex = nonSubtotalParts.length - 1;
+      const dimension =
+        axis === 'row'
+          ? groupbyRows[dimensionIndex]
+          : groupbyColumns[dimensionIndex];
+      if (!dimension) {
+        return undefined;
+      }
+      return getColumnLabel(dimension);
+    },
+    [getNonMetricPathParts, groupbyColumns, groupbyRows],
   );
   const colNonMetricDepths = useMemo(() => {
     const depthMap = new Map<string, number>();
@@ -1907,6 +1989,88 @@ function PivotTableChart(props: PivotTableProps) {
     },
     [showRowRoot, themeColor],
   );
+  const buildFormattingValuesMap = useCallback(
+    (axis: 'row' | 'col') => {
+      const valuesMap = new Map<string, Record<string, DataRecordValue>>();
+      Object.values(tree.cells).forEach(cell => {
+        const rowNode = tree.rows[cell.rowKey];
+        const colNode = tree.cols[cell.colKey];
+        if (!rowNode || !colNode) {
+          return;
+        }
+        const rowKey = serializePath(getNonMetricPathParts(rowNode.path));
+        const colKey = serializePath(getNonMetricPathParts(colNode.path));
+        if (axis === 'row') {
+          if (colKey !== rootKey || valuesMap.has(rowKey)) {
+            return;
+          }
+          valuesMap.set(rowKey, cell.values);
+          return;
+        }
+        if (rowKey !== rootKey || valuesMap.has(colKey)) {
+          return;
+        }
+        valuesMap.set(colKey, cell.values);
+      });
+      return valuesMap;
+    },
+    [getNonMetricPathParts, tree.cells, tree.cols, tree.rows],
+  );
+  const rowFormattingValuesMap = useMemo(
+    () => buildFormattingValuesMap('row'),
+    [buildFormattingValuesMap],
+  );
+  const colFormattingValuesMap = useMemo(
+    () => buildFormattingValuesMap('col'),
+    [buildFormattingValuesMap],
+  );
+  const resolveDimensionStyle = useCallback(
+    (axis: 'row' | 'col', node: PivotTreeNode, target: 'label' | 'cell') => {
+      if (node.path.length === 0 || isMetricGrandTotalNode(node)) {
+        return undefined;
+      }
+      const dimensionKey = getDimensionKeyForNode(node, axis);
+      const formattingMap =
+        axis === 'row' ? rowFormattingKeyMap : colFormattingKeyMap;
+      const formatting = dimensionKey ? formattingMap[dimensionKey] : undefined;
+      if (!formatting) {
+        return undefined;
+      }
+      if (target === 'cell' && formatting.applyTo !== 'all') {
+        return undefined;
+      }
+      const nonMetricKey = serializePath(getNonMetricPathParts(node.path));
+      const values =
+        axis === 'row'
+          ? rowFormattingValuesMap.get(nonMetricKey)
+          : colFormattingValuesMap.get(nonMetricKey);
+      if (!values) {
+        return undefined;
+      }
+      const backgroundColor = formatting.backgroundColor
+        ? normalizeCssColor(values[formatting.backgroundColor])
+        : undefined;
+      const textColor = formatting.textColor
+        ? normalizeCssColor(values[formatting.textColor])
+        : undefined;
+      if (!backgroundColor && !textColor) {
+        return undefined;
+      }
+      return {
+        ...(backgroundColor ? { backgroundColor } : {}),
+        ...(textColor ? { color: textColor } : {}),
+      };
+    },
+    [
+      colFormattingKeyMap,
+      colFormattingValuesMap,
+      getDimensionKeyForNode,
+      getNonMetricPathParts,
+      isMetricGrandTotalNode,
+      rowFormattingKeyMap,
+      rowFormattingValuesMap,
+    ],
+  );
   const expandedRowDepths = useMemo(
     () =>
       getExpandedDepths(
@@ -2827,17 +2991,26 @@ function PivotTableChart(props: PivotTableProps) {
                 {rowCells.map(cell => {
                   const showToggle = shouldShowToggle('col', cell.node);
                   const isSubtotalHeader = isColAggregateBold(cell.node);
+                  const colHeaderFormatting = resolveDimensionStyle(
+                    'col',
+                    cell.node,
+                    'label',
+                  );
+                  const colHeaderStyle = {
+                    ...(themeColor ? { backgroundColor: themeColor } : {}),
+                    ...(colHeaderFormatting || {}),
+                  };
+                  const colHeaderStyleResolved =
+                    Object.keys(colHeaderStyle).length > 0
+                      ? colHeaderStyle
+                      : undefined;
                   return (
                     <th
                       key={`col-header-${cell.node.key}-${rowIdx}`}
                       colSpan={cell.colSpan}
                       rowSpan={cell.rowSpan}
                       className={isSubtotalHeader ? 'subtotal-cell' : undefined}
-                      style={
-                        themeColor
-                          ? { backgroundColor: themeColor }
-                          : undefined
-                      }
+                      style={colHeaderStyleResolved}
                     >
                       <ColumnHeaderCell>
                         {showToggle && (
@@ -2868,12 +3041,25 @@ function PivotTableChart(props: PivotTableProps) {
             const rowAggregateBold = isRowAggregateBold(row);
             const isSubtotalHeader = rowAggregateBold;
             const rowTotalBg = getTotalBackground(row);
+            const rowHeaderFormatting = resolveDimensionStyle(
+              'row',
+              row,
+              'label',
+            );
+            const rowHeaderStyle = {
+              ...(rowTotalBg ? { backgroundColor: rowTotalBg } : {}),
+              ...(rowHeaderFormatting || {}),
+            };
+            const rowHeaderStyleResolved =
+              Object.keys(rowHeaderStyle).length > 0
+                ? rowHeaderStyle
+                : undefined;
             const rowIndent = getNodeDimDepth(row) * ROW_INDENT_PX;
             return (
               <tr key={row.key}>
                 <th
                   className={isSubtotalHeader ? 'subtotal-cell' : undefined}
-                  style={rowTotalBg ? { backgroundColor: rowTotalBg } : undefined}
+                  style={rowHeaderStyleResolved}
                 >
                   <HeaderCell style={{ paddingLeft: rowIndent }}>
                     {showToggle ? (
@@ -2906,6 +3092,12 @@ function PivotTableChart(props: PivotTableProps) {
                     col.path.length === 0 ||
                     isMetricGrandTotalNode(row) ||
                     isMetricGrandTotalNode(col);
+                  const rowCellFormatting = !isGrandTotalCell
+                    ? resolveDimensionStyle('row', row, 'cell')
+                    : undefined;
+                  const colCellFormatting = !isGrandTotalCell
+                    ? resolveDimensionStyle('col', col, 'cell')
+                    : undefined;
                   const applyColorFormatting = !!(
                     cell &&
                     formattingKeys &&
@@ -2940,6 +3132,18 @@ function PivotTableChart(props: PivotTableProps) {
                     : 'value-cell';
                   const cellStyle = {
                     ...(cellTotalBg ? { backgroundColor: cellTotalBg } : {}),
+                    ...(colCellFormatting?.backgroundColor
+                      ? { backgroundColor: colCellFormatting.backgroundColor }
+                      : {}),
+                    ...(colCellFormatting?.color
+                      ? { color: colCellFormatting.color }
+                      : {}),
+                    ...(rowCellFormatting?.backgroundColor
+                      ? { backgroundColor: rowCellFormatting.backgroundColor }
+                      : {}),
+                    ...(rowCellFormatting?.color
+                      ? { color: rowCellFormatting.color }
+                      : {}),
                     ...(backgroundColor ? { backgroundColor } : {}),
                     ...(textColor ? { color: textColor } : {}),
                   };

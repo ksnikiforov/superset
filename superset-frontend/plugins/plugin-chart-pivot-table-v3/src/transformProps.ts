@@ -38,10 +38,12 @@ import {
 import {
   applyMetricAxis,
   buildTreeFromRecords,
+  collectDimensionFormattingMetricsForQuery,
   collectMetricFormattingMetricsForQuery,
   getMetricKeys,
   mergeTrees,
   mergeMetrics,
+  normalizeDimensionFormattingMapWithKeys,
   normalizeMetricFormattingMapWithKeys,
   parseDepth,
   resolveMetricPlacement,
@@ -75,8 +77,9 @@ export default function transformProps(
     formData.metricFormatting,
     metrics,
   );
-  const formattingMetrics =
-    collectMetricFormattingMetricsForQuery(metricFormatting);
+  const formattingMetrics = collectMetricFormattingMetricsForQuery(
+    metricFormatting,
+  );
   const metricsForQuery = mergeMetrics(metrics, formattingMetrics);
   const groupbyRowsRaw = ensureIsArray(formData.groupbyRows || []);
   const groupbyColumnsRaw = ensureIsArray(formData.groupbyColumns || []);
@@ -86,6 +89,26 @@ export default function transformProps(
   });
   const groupbyRows = stripMetricsPlaceholder(placement.rows);
   const groupbyColumns = stripMetricsPlaceholder(placement.cols);
+  const rowFormatting = normalizeDimensionFormattingMapWithKeys(
+    formData.rowFormatting,
+    groupbyRows,
+  );
+  const colFormatting = normalizeDimensionFormattingMapWithKeys(
+    formData.colFormatting,
+    groupbyColumns,
+  );
+  const rowFormattingMetrics = collectDimensionFormattingMetricsForQuery(
+    rowFormatting,
+    groupbyRows,
+  );
+  const colFormattingMetrics = collectDimensionFormattingMetricsForQuery(
+    colFormatting,
+    groupbyColumns,
+  );
+  const metricsForQueryWithFormatting = mergeMetrics(metricsForQuery, [
+    ...rowFormattingMetrics,
+    ...colFormattingMetrics,
+  ]);
   const rowSubTotalsEnabled = formData.rowSubTotals ?? true;
   const maxRowSubtotalDepth = Math.max(groupbyRows.length - 1, 0);
   const rowSubtotalLevels = normalizeSubtotalLevels(
@@ -129,7 +152,7 @@ export default function transformProps(
   const granularity = extractTimegrain(rawFormData);
   const metricKeys = getMetricKeys(metrics);
   const metricKeySet = new Set(metricKeys.filter(key => key));
-  const metricKeysForQuery = getMetricKeys(metricsForQuery);
+  const metricKeysForQuery = getMetricKeys(metricsForQueryWithFormatting);
   const metricKeySetForQuery = new Set(metricKeysForQuery.filter(key => key));
 
   const resolveQueryDepth = (query: typeof queriesData[number]) => {
@@ -225,7 +248,7 @@ export default function transformProps(
     const { rowDepth, colDepth } = resolveQueryDepth(query);
     const branch = buildTreeFromRecords(
       query.data || [],
-      metricsForQuery,
+      metricsForQueryWithFormatting,
       groupbyRows,
       groupbyColumns,
       rowDepth,
