@@ -170,4 +170,171 @@ describe('PivotDndMetricSelect', () => {
 
     await waitFor(() => expect(setControlValue).not.toHaveBeenCalled());
   });
+
+  it('hydrates formatting selections from persisted labeled values', async () => {
+    render(
+      <PivotDndMetricSelect
+        {...baseProps}
+        formData={{
+          datasource: '1__table',
+          metricFormatting: {
+            sum__value: {
+              backgroundColor: { value: { key: 'color_metric' } },
+            },
+          },
+          viz_type: 'pivot_table_v3',
+        }}
+      />,
+      { useDnd: true },
+    );
+
+    await userEvent.click(
+      screen.getAllByTestId('pivot-metric-formatting-button')[0],
+    );
+    await screen.findByText('Conditional formatting');
+
+    const backgroundSelect = screen.getByRole('combobox', {
+      name: /background color metric/i,
+    });
+    const selectContainer = backgroundSelect.closest('.ant-select');
+    expect(selectContainer).not.toBeNull();
+
+    await waitFor(() => {
+      expect(
+        selectContainer?.querySelector('.ant-select-selection-item')
+          ?.textContent,
+      ).toContain('color_metric');
+    });
+  });
+
+  it('hydrates formatting metrics missing expressionType', async () => {
+    render(
+      <PivotDndMetricSelect
+        {...baseProps}
+        formData={{
+          datasource: '1__table',
+          metricFormatting: {
+            sum__value: {
+              backgroundColor: {
+                sqlExpression: 'SUM(orders)',
+                label: 'cond_format',
+                hasCustomLabel: true,
+              },
+            },
+          },
+          viz_type: 'pivot_table_v3',
+        }}
+      />,
+      { useDnd: true },
+    );
+
+    await userEvent.click(
+      screen.getAllByTestId('pivot-metric-formatting-button')[0],
+    );
+    await screen.findByText('Conditional formatting');
+
+    const backgroundSelect = screen.getByRole('combobox', {
+      name: /background color metric/i,
+    });
+    const selectContainer = backgroundSelect.closest('.ant-select');
+    expect(selectContainer).not.toBeNull();
+
+    await waitFor(() => {
+      expect(
+        selectContainer?.querySelector('.ant-select-selection-item')
+          ?.textContent,
+      ).toContain('cond_format');
+    });
+  });
+
+  it('hydrates formatting when formatting key matches the metric label', async () => {
+    const savedMetric = {
+      metric_name: 'avg__order_value',
+      verbose_name: 'averageOrderValue',
+      uuid: 'metric-1',
+    };
+    render(
+      <PivotDndMetricSelect
+        {...baseProps}
+        value={[savedMetric.metric_name]}
+        savedMetrics={[savedMetric]}
+        formData={{
+          datasource: '1__table',
+          metricFormatting: {
+            averageOrderValue: {
+              backgroundColor: 'cond_format',
+            },
+          },
+          viz_type: 'pivot_table_v3',
+        }}
+      />,
+      { useDnd: true },
+    );
+
+    await userEvent.click(
+      screen.getAllByTestId('pivot-metric-formatting-button')[0],
+    );
+    await screen.findByText('Conditional formatting');
+
+    const backgroundSelect = screen.getByRole('combobox', {
+      name: /background color metric/i,
+    });
+    const selectContainer = backgroundSelect.closest('.ant-select');
+    expect(selectContainer).not.toBeNull();
+
+    await waitFor(() => {
+      expect(
+        selectContainer?.querySelector('.ant-select-selection-item')
+          ?.textContent,
+      ).toContain('cond_format');
+    });
+  });
+
+  it('keeps distinct adhoc formatting metrics with identical labels', async () => {
+    const formattingMetricOne: QueryFormMetric = {
+      expressionType: 'SQL',
+      sqlExpression: 'SUM(a)',
+      label: 'formatting',
+      hasCustomLabel: true,
+      optionName: 'metric_formatting_1',
+    };
+    const formattingMetricTwo: QueryFormMetric = {
+      expressionType: 'SQL',
+      sqlExpression: 'SUM(b)',
+      label: 'formatting',
+      hasCustomLabel: true,
+      optionName: 'metric_formatting_2',
+    };
+
+    render(
+      <PivotDndMetricSelect
+        {...baseProps}
+        value={['sum__value']}
+        formData={{
+          datasource: '1__table',
+          metricFormatting: {
+            sum__value: {
+              backgroundColor: formattingMetricOne,
+              textColor: formattingMetricTwo,
+            },
+          },
+          viz_type: 'pivot_table_v3',
+        }}
+      />,
+      { useDnd: true },
+    );
+
+    await userEvent.click(
+      screen.getAllByTestId('pivot-metric-formatting-button')[0],
+    );
+    await screen.findByText('Conditional formatting');
+
+    const backgroundSelect = screen.getByRole('combobox', {
+      name: /background color metric/i,
+    });
+    await userEvent.click(backgroundSelect);
+    const listbox = await screen.findByRole('listbox');
+
+    expect(within(listbox).getAllByText('formatting')).toHaveLength(2);
+  });
 });

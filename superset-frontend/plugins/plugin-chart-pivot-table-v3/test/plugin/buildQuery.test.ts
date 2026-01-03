@@ -186,3 +186,40 @@ test('includes conditional formatting metrics in query payloads', () => {
   );
   expect(metricKeys).toEqual(['metric1', 'metric1_bg']);
 });
+
+test('keeps distinct formatting metrics with identical labels in queries', () => {
+  const queryContext = buildQuery(
+    buildFormData({
+      ...baseFormData,
+      metrics: ['metric1'],
+      metricFormatting: {
+        metric1: {
+          backgroundColor: {
+            expressionType: 'SQL',
+            sqlExpression: 'SUM(a)',
+            label: 'formatting',
+            optionName: 'metric_formatting_1',
+            hasCustomLabel: true,
+          },
+          textColor: {
+            expressionType: 'SQL',
+            sqlExpression: 'SUM(b)',
+            label: 'formatting',
+            optionName: 'metric_formatting_2',
+            hasCustomLabel: true,
+          },
+        },
+      },
+    }),
+  );
+
+  const queryMetrics = queryContext.queries[0].metrics || [];
+  const metricKeys = queryMetrics.map(metric =>
+    typeof metric === 'string' ? metric : metric.label,
+  );
+  expect(metricKeys).toEqual([
+    'metric1',
+    'metric_formatting_1',
+    'metric_formatting_2',
+  ]);
+});

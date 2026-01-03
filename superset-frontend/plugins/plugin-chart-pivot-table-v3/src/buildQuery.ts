@@ -26,7 +26,7 @@ import {
 } from '@superset-ui/core';
 import { MetricsLayoutEnum, PivotTableQueryFormData } from './types';
 import {
-  collectMetricFormattingMetrics,
+  collectMetricFormattingMetricsForQuery,
   mergeMetrics,
   normalizeSubtotalLevels,
   resolveMetricPlacement,
@@ -74,7 +74,7 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
   const rowGroupbyRaw = ensureIsArray<QueryFormColumn>(groupbyRows);
   const colGroupbyRaw = ensureIsArray<QueryFormColumn>(groupbyColumns);
   const metrics = ensureIsArray(formData.metrics);
-  const formattingMetrics = collectMetricFormattingMetrics(
+  const formattingMetrics = collectMetricFormattingMetricsForQuery(
     formData.metricFormatting,
   );
   const metricsForQuery = mergeMetrics(metrics, formattingMetrics);

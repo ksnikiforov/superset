@@ -30,6 +30,7 @@ import {
   MetricsLayoutEnum,
   METRIC_FORMATTING_FIELDS,
   PivotMetricFormattingMap,
+  PivotMetricFormatting,
   PivotPath,
   PivotTreeData,
   PivotTreeNode,
@@ -95,16 +96,232 @@ export const getMetricKey = (metric: QueryFormMetric | Metric) => {
 export const getMetricKeys = (metrics: QueryFormMetric[]) =>
   metrics.map(getMetricKey).filter((m): m is string => !!m);
 
+type MetricSelectValue = {
+  value: string | number;
+  label?: string;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const isMetricSelectValue = (value: unknown): value is MetricSelectValue =>
+  isRecord(value) &&
+  'value' in value &&
+  (typeof value.value === 'string' || typeof value.value === 'number');
+
+const getMetricOptionName = (metric: QueryFormMetric | Metric) => {
+  if (isRecord(metric)) {
+    const optionName = metric.optionName;
+    if (typeof optionName === 'string' && optionName.trim().length > 0) {
+      return optionName;
+    }
+  }
+  return undefined;
+};
+
+export const getFormattingMetricKey = (metric: QueryFormMetric | Metric) =>
+  getMetricOptionName(metric) || getMetricKey(metric);
+
+const coerceExpressionType = (
+  value: Record<string, unknown>,
+): QueryFormMetric | undefined => {
+  const expressionType = value.expressionType;
+  if (typeof expressionType === 'string' && expressionType.length > 0) {
+    return value as QueryFormMetric;
+  }
+  const sqlExpression = value.sqlExpression;
+  if (typeof sqlExpression === 'string' && sqlExpression.trim().length > 0) {
+    return { ...value, expressionType: 'SQL' } as QueryFormMetric;
+  }
+  const aggregate = value.aggregate;
+  const column = value.column;
+  if (
+    typeof aggregate === 'string' &&
+    aggregate.length > 0 &&
+    isRecord(column)
+  ) {
+    return { ...value, expressionType: 'SIMPLE' } as QueryFormMetric;
+  }
+  return undefined;
+};
+
+export const normalizeMetricFormattingValue = (
+  value: unknown,
+): QueryFormMetric | undefined => {
+  if (typeof value === 'string') {
+    return value.trim().length > 0 ? value : undefined;
+  }
+  if (typeof value === 'number') {
+    return String(value);
+  }
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const normalized = normalizeMetricFormattingValue(entry);
+      if (normalized !== undefined) {
+        return normalized;
+      }
+    }
+    return undefined;
+  }
+  if (isRecord(value)) {
+    if ('value' in value) {
+      const nested = normalizeMetricFormattingValue(value.value);
+      if (nested !== undefined) {
+        return nested;
+      }
+    }
+    if ('metric' in value) {
+      const nested = normalizeMetricFormattingValue(value.metric);
+      if (nested !== undefined) {
+        return nested;
+      }
+    }
+    const inferred = coerceExpressionType(value);
+    if (inferred !== undefined) {
+      return inferred;
+    }
+    if (isMetricSelectValue(value)) {
+      const nextValue = String(value.value);
+      return nextValue.length > 0 ? nextValue : undefined;
+    }
+    const key = value.key;
+    if (typeof key === 'string' && key.trim().length > 0) {
+      return key;
+    }
+    if (typeof key === 'number') {
+      return String(key);
+    }
+    const name = value.name;
+    if (typeof name === 'string' && name.trim().length > 0) {
+      return name;
+    }
+    const metricName = value.metric_name;
+    if (typeof metricName === 'string' && metricName.trim().length > 0) {
+      return metricName;
+    }
+    const expressionType = value.expressionType;
+    if (typeof expressionType === 'string') {
+      return value as QueryFormMetric;
+    }
+    const label = value.label;
+    if (typeof label === 'string' && label.trim().length > 0) {
+      return label;
+    }
+    const title = value.title;
+    if (typeof title === 'string' && title.trim().length > 0) {
+      return title;
+    }
+  }
+  return undefined;
+};
+
+export const normalizeMetricFormattingMap = (
+  metricFormatting?: PivotMetricFormattingMap,
+): PivotMetricFormattingMap => {
+  if (!metricFormatting) {
+    return {};
+  }
+  return Object.entries(metricFormatting).reduce<PivotMetricFormattingMap>(
+    (acc, [metricKey, formatting]) => {
+      if (!metricKey || !formatting) {
+        return acc;
+      }
+      const nextFormatting: PivotMetricFormatting = {};
+      METRIC_FORMATTING_FIELDS.forEach(field => {
+        const normalized = normalizeMetricFormattingValue(formatting[field]);
+        if (normalized !== undefined) {
+          nextFormatting[field] = normalized;
+        }
+      });
+      if (Object.keys(nextFormatting).length > 0) {
+        acc[metricKey] = nextFormatting;
+      }
+      return acc;
+    },
+    {},
+  );
+};
+
+const normalizeFormattingMetricForQuery = (
+  metric: QueryFormMetric,
+): QueryFormMetric => {
+  if (typeof metric === 'string') {
+    return metric;
+  }
+  const optionName = getMetricOptionName(metric);
+  if (optionName && metric.label !== optionName) {
+    return { ...metric, label: optionName };
+  }
+  return metric;
+};
+
+export const collectMetricFormattingMetricsForQuery = (
+  metricFormatting?: PivotMetricFormattingMap,
+): QueryFormMetric[] => {
+  return Object.values(
+    normalizeMetricFormattingMap(metricFormatting),
+  ).flatMap(formatting =>
+    METRIC_FORMATTING_FIELDS.map(field =>
+      normalizeMetricFormattingValue(formatting[field]),
+    )
+      .filter((metric): metric is QueryFormMetric => metric !== undefined)
+      .map(metric => normalizeFormattingMetricForQuery(metric)),
+  );
+};
+
+export const normalizeMetricFormattingMapWithKeys = (
+  metricFormatting: PivotMetricFormattingMap | undefined,
+  metrics: QueryFormMetric[],
+  savedMetrics?: Metric[],
+): PivotMetricFormattingMap => {
+  const normalized = normalizeMetricFormattingMap(metricFormatting);
+  if (metrics.length === 0) {
+    return normalized;
+  }
+  const metricKeys = new Set(getMetricKeys(metrics));
+  const verboseNameToKey = (savedMetrics || []).reduce<Map<string, string>>(
+    (acc, metric) => {
+      if (metric.verbose_name && metric.metric_name) {
+        acc.set(metric.verbose_name, metric.metric_name);
+      }
+      return acc;
+    },
+    new Map(),
+  );
+  const labelToKey = metrics.reduce<Map<string, string>>((acc, metric) => {
+    const key = getMetricKey(metric);
+    const label = getMetricLabel(metric);
+    if (key && label && key !== label && !acc.has(label)) {
+      acc.set(label, key);
+    }
+    return acc;
+  }, new Map());
+  return Object.entries(normalized).reduce<PivotMetricFormattingMap>(
+    (acc, [metricKey, formatting]) => {
+      const resolvedKey = metricKeys.has(metricKey)
+        ? metricKey
+        : labelToKey.get(metricKey) ||
+          verboseNameToKey.get(metricKey) ||
+          metricKey;
+      if (!resolvedKey) {
+        return acc;
+      }
+      acc[resolvedKey] = { ...(acc[resolvedKey] || {}), ...formatting };
+      return acc;
+    },
+    {},
+  );
+};
+
 export const collectMetricFormattingMetrics = (
   metricFormatting?: PivotMetricFormattingMap,
 ): QueryFormMetric[] => {
-  if (!metricFormatting) {
-    return [];
-  }
-  return Object.values(metricFormatting).flatMap(formatting =>
-    METRIC_FORMATTING_FIELDS.map(field => formatting[field]).filter(
-      (metric): metric is QueryFormMetric => !!metric,
-    ),
+  return Object.values(
+    normalizeMetricFormattingMap(metricFormatting),
+  ).flatMap(formatting =>
+    METRIC_FORMATTING_FIELDS.map(field =>
+      normalizeMetricFormattingValue(formatting[field]),
+    ).filter((metric): metric is QueryFormMetric => metric !== undefined),
   );
 };
 

@@ -20,6 +20,7 @@ import React from 'react';
 import {
   ControlPanelConfig,
   ControlPanelState,
+  ControlState,
   ControlSubSectionHeader,
   D3_TIME_FORMAT_OPTIONS,
   getStandardizedControls,
@@ -374,6 +375,24 @@ const config: ControlPanelConfig = {
               ...sharedControls.metrics,
               type: PivotDndMetricSelect,
               validators: [validateNonEmpty],
+              mapStateToProps: (
+                state: ControlPanelState,
+                controlState: ControlState,
+                chartState?: Record<string, unknown>,
+              ) => {
+                const base =
+                  typeof sharedControls.metrics.mapStateToProps === 'function'
+                    ? sharedControls.metrics.mapStateToProps(
+                        state,
+                        controlState,
+                        chartState,
+                      )
+                    : {};
+                return {
+                  ...base,
+                  formData: state.form_data,
+                };
+              },
             },
           },
         ],

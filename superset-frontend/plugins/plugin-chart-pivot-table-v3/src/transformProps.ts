@@ -38,10 +38,11 @@ import {
 import {
   applyMetricAxis,
   buildTreeFromRecords,
-  collectMetricFormattingMetrics,
+  collectMetricFormattingMetricsForQuery,
   getMetricKeys,
   mergeTrees,
   mergeMetrics,
+  normalizeMetricFormattingMapWithKeys,
   parseDepth,
   resolveMetricPlacement,
   stripMetricsPlaceholder,
@@ -70,8 +71,12 @@ export default function transformProps(
     ownState,
   } = chartProps;
   const metrics = ensureIsArray(formData.metrics || []);
-  const metricFormatting = formData.metricFormatting || {};
-  const formattingMetrics = collectMetricFormattingMetrics(metricFormatting);
+  const metricFormatting = normalizeMetricFormattingMapWithKeys(
+    formData.metricFormatting,
+    metrics,
+  );
+  const formattingMetrics =
+    collectMetricFormattingMetricsForQuery(metricFormatting);
   const metricsForQuery = mergeMetrics(metrics, formattingMetrics);
   const groupbyRowsRaw = ensureIsArray(formData.groupbyRows || []);
   const groupbyColumnsRaw = ensureIsArray(formData.groupbyColumns || []);

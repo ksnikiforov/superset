@@ -43,8 +43,10 @@ import {
 import {
   isMetricsPlaceholder,
   isSubtotalToken,
+  getFormattingMetricKey,
   getMetricKey,
   mergeTrees,
+  normalizeMetricFormattingMapWithKeys,
   normalizeSubtotalLevels,
   parseThemeColors,
   PIVOT_THEME_PRESETS,
@@ -285,7 +287,10 @@ function PivotTableChart(props: PivotTableProps) {
     (formData.metricsLayout as MetricsLayoutEnum) || metricsLayout;
   const metricFormattingScope =
     (formData.metricFormattingScope as MetricFormattingScope) || 'values';
-  const metricFormatting = formData.metricFormatting || {};
+  const metricFormatting = normalizeMetricFormattingMapWithKeys(
+    formData.metricFormatting,
+    metrics,
+  );
   const formattingKeyMap = useMemo(() => {
     const next: Record<string, FormattingKeys> = {};
     Object.entries(metricFormatting).forEach(([metricKey, formatting]) => {
@@ -295,7 +300,7 @@ function PivotTableChart(props: PivotTableProps) {
       const formattingKeys = METRIC_FORMATTING_FIELDS.reduce(
         (acc, field) => {
           const key = formatting?.[field]
-            ? getMetricKey(formatting[field])
+            ? getFormattingMetricKey(formatting[field])
             : '';
           if (key) {
             acc[field] = key;
@@ -2897,8 +2902,11 @@ function PivotTableChart(props: PivotTableProps) {
                   const colAggregateBold = isColAggregateBold(col);
                   const isSubtotalCell = rowAggregateBold || colAggregateBold;
                   const isGrandTotalCell =
-                    row.path.length === 0 || col.path.length === 0;
-                  const applyFormatting = !!(
+                    row.path.length === 0 ||
+                    col.path.length === 0 ||
+                    isMetricGrandTotalNode(row) ||
+                    isMetricGrandTotalNode(col);
+                  const applyColorFormatting = !!(
                     cell &&
                     formattingKeys &&
                     shouldApplyMetricFormatting(
@@ -2907,18 +2915,21 @@ function PivotTableChart(props: PivotTableProps) {
                       isGrandTotalCell,
                     )
                   );
+                  const applyD3Formatting = !!(
+                    cell && formattingKeys?.d3Format
+                  );
                   const backgroundColor =
-                    applyFormatting && formattingKeys?.backgroundColor
+                    applyColorFormatting && formattingKeys?.backgroundColor
                       ? normalizeCssColor(
                           cell.values[formattingKeys.backgroundColor],
                         )
                       : undefined;
                   const textColor =
-                    applyFormatting && formattingKeys?.textColor
+                    applyColorFormatting && formattingKeys?.textColor
                       ? normalizeCssColor(cell.values[formattingKeys.textColor])
                       : undefined;
                   const d3FormatOverride =
-                    applyFormatting && formattingKeys?.d3Format
+                    applyD3Formatting
                       ? normalizeD3Format(
                           cell.values[formattingKeys.d3Format],
                         )

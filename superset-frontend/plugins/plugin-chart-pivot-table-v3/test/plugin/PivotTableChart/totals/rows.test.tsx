@@ -1557,6 +1557,8 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     const totalRow = screen.getByText('Total averageOrderValue').closest(
       'tr',
     ) as HTMLElement;
+      'tr',
+    ) as HTMLElement;
     const totalValue = within(totalRow).getAllByRole('cell')[0];
     expect(totalValue.textContent?.trim()).toBe('100');
   });
@@ -2014,6 +2016,8 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(grandIndex).toBeGreaterThan(-1);
 
     const totalRow = screen.getByText('Total averageOrderValue').closest(
+      'tr',
+    ) as HTMLElement;
       'tr',
     ) as HTMLElement;
     const totalCells = within(totalRow).getAllByRole('cell');
