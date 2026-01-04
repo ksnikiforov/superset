@@ -258,6 +258,7 @@ function PivotTableChart(props: PivotTableProps) {
   const {
     data,
     formData,
+    queryFormData,
     width,
     height,
     metrics,
@@ -292,6 +293,7 @@ function PivotTableChart(props: PivotTableProps) {
     pivotTheme = 'none',
     pivotThemeColors = '',
   } = props;
+  const fetchFormData = queryFormData || formData;
   const resolvedMetricsLayout =
     (formData.metricsLayout as MetricsLayoutEnum) || metricsLayout;
   const metricFormattingScope =
@@ -1812,7 +1814,8 @@ function PivotTableChart(props: PivotTableProps) {
   const skipRowRoot = groupbyRows.length > 0 && !showRowRoot;
   const skipColRoot = groupbyColumns.length === 0 || !showColRoot;
 
-  const visibleRows = useMemo(
+  const shouldHideMetricGrandTotalsOnRows = !showRowRootBase;
+  const visibleRowsBase = useMemo(
     () =>
       buildVisibleRows({
         rows: tree.rows,
@@ -1834,6 +1837,13 @@ function PivotTableChart(props: PivotTableProps) {
       skipRowRoot,
       tree.rows,
     ],
+  );
+  const visibleRows = useMemo(
+    () =>
+      shouldHideMetricGrandTotalsOnRows
+        ? visibleRowsBase.filter(row => !isMetricGrandTotalNode(row))
+        : visibleRowsBase,
+    [isMetricGrandTotalNode, shouldHideMetricGrandTotalsOnRows, visibleRowsBase],
   );
 
   const buildColLeavesWithSubtotals = useMemo(
@@ -1868,7 +1878,8 @@ function PivotTableChart(props: PivotTableProps) {
     ],
   );
 
-  const visibleCols = useMemo(
+  const shouldHideMetricGrandTotalsOnCols = !showColRoot;
+  const visibleColsBase = useMemo(
     () =>
       buildVisibleCols({
         cols: tree.cols,
@@ -1878,6 +1889,13 @@ function PivotTableChart(props: PivotTableProps) {
         buildColLeavesWithSubtotals,
       }),
     [buildColLeavesWithSubtotals, colSorter, getColChildren, skipColRoot, tree.cols],
+  );
+  const visibleCols = useMemo(
+    () =>
+      shouldHideMetricGrandTotalsOnCols
+        ? visibleColsBase.filter(col => !isMetricGrandTotalNode(col))
+        : visibleColsBase,
+    [isMetricGrandTotalNode, shouldHideMetricGrandTotalsOnCols, visibleColsBase],
   );
   const { visibleRowDepth, visibleColDepth } = useMemo(
     () => getVisibleDepths(visibleRows, visibleCols, countDimDepth),
@@ -2480,7 +2498,7 @@ function PivotTableChart(props: PivotTableProps) {
           const cached = peekPivotBranchCache({
             axis,
             path: targetNode.path,
-            formData,
+            formData: fetchFormData,
             maxDepthPerFetch,
             currentTree: nextTree,
             visibleRowDepth,
@@ -2508,7 +2526,7 @@ function PivotTableChart(props: PivotTableProps) {
             const result = await fetchPivotBranch({
               axis,
               path: targetNode.path,
-              formData,
+              formData: fetchFormData,
               maxDepthPerFetch,
               currentTree: nextTree,
               visibleRowDepth,
@@ -2544,7 +2562,7 @@ function PivotTableChart(props: PivotTableProps) {
           const cached = peekPivotBranchCache({
             axis,
             path: node.path,
-            formData,
+            formData: fetchFormData,
             maxDepthPerFetch,
             currentTree: tree,
             visibleRowDepth,
@@ -2565,7 +2583,7 @@ function PivotTableChart(props: PivotTableProps) {
             const result = await fetchPivotBranch({
               axis,
               path: node.path,
-              formData,
+              formData: fetchFormData,
               maxDepthPerFetch,
               currentTree: tree,
               visibleRowDepth,

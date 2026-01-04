@@ -101,6 +101,13 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
   const metricsOnRows = placement.layout === MetricsLayoutEnum.ROWS;
   const metricInsertIndex =
     placement.metricPosition >= 0 ? placement.metricPosition : undefined;
+  const hasRowTotals = rowTotals || ensureIsArray(rowSubtotalLevels).includes(0);
+  const hasColTotals = colTotals || ensureIsArray(colSubtotalLevels).includes(0);
+  const shouldIncludeGrandTotalQuery =
+    (rowGroupby.length === 0 && colGroupby.length === 0) ||
+    (hasRowTotals && hasColTotals) ||
+    (metricsOnRows && metricInsertIndex === 0 && hasColTotals) ||
+    (!metricsOnRows && metricInsertIndex === 0 && hasRowTotals);
 
   const isTotalsEnabled = rowTotals || colTotals || colSubTotals;
   const isLevelTotalsEnabled =
@@ -207,7 +214,7 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
       rowDepths.add(0);
     }
 
-    const queries = Array.from(rowDepths).flatMap(rowDepth =>
+    let queries = Array.from(rowDepths).flatMap(rowDepth =>
       Array.from(colDepths).map(colDepth => ({
         ...baseQueryObject,
         metrics: queryMetrics,
@@ -228,7 +235,13 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
       })),
     );
 
-    if (rowTotals && colTotals) {
+    if (!shouldIncludeGrandTotalQuery) {
+      queries = queries.filter(
+        query => query.query_name !== formatQueryName(0, 0),
+      );
+    }
+
+    if (hasRowTotals && hasColTotals) {
       const hasGrandTotalSlice = queries.some(
         query => query.query_name === formatQueryName(0, 0),
       );

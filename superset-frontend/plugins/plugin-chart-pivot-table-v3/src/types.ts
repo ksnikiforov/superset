@@ -177,6 +177,7 @@ export interface PivotTableProps
     PivotTableStylesProps {
   data: PivotTreeData;
   formData: PivotTableQueryFormData;
+  queryFormData?: PivotTableQueryFormData;
   metrics: QueryFormMetric[];
   groupbyRows: QueryFormColumn[];
   groupbyColumns: QueryFormColumn[];

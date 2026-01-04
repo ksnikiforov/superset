@@ -154,6 +154,11 @@ export default function transformProps(
   const metricKeySet = new Set(metricKeys.filter(key => key));
   const metricKeysForQuery = getMetricKeys(metricsForQueryWithFormatting);
   const metricKeySetForQuery = new Set(metricKeysForQuery.filter(key => key));
+  const queryFormData: PivotTableQueryFormData = {
+    ...rawFormData,
+    metricsLayout,
+    maxDepthPerFetch,
+  };
 
   const resolveQueryDepth = (query: typeof queriesData[number]) => {
     const queryName = (query as any)?.query_name || (query as any)?.queryName;
@@ -324,6 +329,7 @@ export default function transformProps(
     margin: (formData as any).margin ?? 0,
     data: nextTreeLabeled,
     formData: { ...formData, metricsLayout, maxDepthPerFetch },
+    queryFormData,
     metrics,
     metricFormatting,
     metricFormattingScope: formData.metricFormattingScope,

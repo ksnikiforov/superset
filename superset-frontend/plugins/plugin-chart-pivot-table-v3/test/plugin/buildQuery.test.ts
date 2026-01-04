@@ -260,6 +260,29 @@ test('adds column totals queries when column formatting is enabled without total
   expect(names).toContain(formatQueryName(0, 2));
 });
 
+test('avoids grand total queries when only formatting requires totals', () => {
+  const queryContext = buildQuery(
+    buildFormData({
+      ...baseFormData,
+      startCollapsed: false,
+      rowTotals: false,
+      colTotals: false,
+      rowFormatting: {
+        row1: {
+          backgroundColor: 'row_bg',
+        },
+      },
+      colFormatting: {
+        col1: {
+          textColor: 'col_text',
+        },
+      },
+    }),
+  );
+  const names = queryContext.queries.map(q => q.query_name);
+  expect(names).not.toContain(formatQueryName(0, 0));
+});
+
 test('keeps distinct formatting metrics with identical labels in queries', () => {
   const queryContext = buildQuery(
     buildFormData({

@@ -22,10 +22,15 @@ import {
   PivotTreeData,
   PivotTreeNode,
 } from '../../src/types';
-import { resolveFetchContextForTest, fetchPivotBranch } from '../../src/fetchPivotBranch';
+import {
+  clearPivotBranchCache,
+  fetchPivotBranch,
+  resolveFetchContextForTest,
+} from '../../src/fetchPivotBranch';
 import { METRICS_PLACEHOLDER, serializePath, SUBTOTAL_TOKEN } from '../../src/utils';
 import { formatQueryName } from '../../src/buildQuery';
 import { SupersetClient } from '@superset-ui/core';
+import { buildFormData } from './fixtures/pivotFormData';
 
 jest.mock('@superset-ui/core', () => {
   const actual = jest.requireActual('@superset-ui/core');
@@ -48,9 +53,15 @@ const makeNode = (node: Partial<PivotTreeNode>): PivotTreeNode => ({
   ...node,
 });
 
+type QueryPayload = {
+  time_range?: string;
+  filters?: Array<{ col?: string; op?: string; val?: string }>;
+};
+
 describe('resolveFetchContext', () => {
   beforeEach(() => {
     (SupersetClient.post as jest.Mock).mockReset();
+    clearPivotBranchCache();
   });
 
   it('keeps column depth aligned to visible dimensions when metrics are on columns', () => {
@@ -832,5 +843,130 @@ describe('resolveFetchContext', () => {
         `${formatQueryName(1, 0)}|branch:row:${serializePath(['A'])}`,
       ]),
     );
+  });
+
+  it('propagates extra_form_data filters into branch queries', async () => {
+    const postMock = SupersetClient.post as jest.Mock;
+    postMock.mockResolvedValueOnce({
+      json: {
+        result: [{ data: [] }],
+      },
+    });
+
+    const currentTree: PivotTreeData = {
+      rows: {
+        '': makeNode({ axis: 'row', path: [], hasChildren: true }),
+        '4-NOT SPECIFIED': makeNode({
+          axis: 'row',
+          path: ['4-NOT SPECIFIED'],
+          level: 1,
+          hasChildren: true,
+          label: '4-NOT SPECIFIED',
+          formattedLabel: '4-NOT SPECIFIED',
+        }),
+      },
+      cols: {
+        '': makeNode({ axis: 'col', path: [], hasChildren: false }),
+      },
+      cells: {},
+    };
+
+    const formData = buildFormData({
+      groupbyRows: ['orderPriority'],
+      groupbyColumns: [],
+      metrics: ['countCustomers'],
+      metricsLayout: MetricsLayoutEnum.ROWS,
+      rowSubTotals: false,
+      extra_form_data: {
+        time_range: '2020-01-01 : 2020-02-01',
+        filters: [{ col: 'orderDate', op: '>=', val: '2020-01-01' }],
+      },
+    });
+
+    await fetchPivotBranch({
+      formData,
+      axis: 'row',
+      path: ['4-NOT SPECIFIED'],
+      currentTree,
+      visibleColDepth: 0,
+    });
+
+    const payload = postMock.mock.calls[0]?.[0] as {
+      jsonPayload?: { queries?: QueryPayload[] };
+    };
+    const firstQuery = payload.jsonPayload?.queries?.[0];
+    expect(firstQuery?.time_range).toBe('2020-01-01 : 2020-02-01');
+    expect(firstQuery?.filters).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          col: 'orderDate',
+          op: '>=',
+          val: '2020-01-01',
+        }),
+      ]),
+    );
+  });
+
+  it('invalidates cache when extra_form_data filters change', async () => {
+    const postMock = SupersetClient.post as jest.Mock;
+    postMock.mockResolvedValue({
+      json: {
+        result: [{ data: [] }],
+      },
+    });
+
+    const currentTree: PivotTreeData = {
+      rows: {
+        '': makeNode({ axis: 'row', path: [], hasChildren: true }),
+        A: makeNode({
+          axis: 'row',
+          path: ['A'],
+          level: 1,
+          hasChildren: true,
+          label: 'A',
+          formattedLabel: 'A',
+        }),
+      },
+      cols: {
+        '': makeNode({ axis: 'col', path: [], hasChildren: false }),
+      },
+      cells: {},
+    };
+
+    await fetchPivotBranch({
+      formData: buildFormData({
+        groupbyRows: ['orderPriority'],
+        groupbyColumns: [],
+        metrics: ['countCustomers'],
+        metricsLayout: MetricsLayoutEnum.ROWS,
+        rowSubTotals: false,
+        extra_form_data: {
+          time_range: '2020-01-01 : 2020-02-01',
+        },
+      }),
+      axis: 'row',
+      path: ['A'],
+      currentTree,
+      visibleColDepth: 0,
+    });
+
+    await fetchPivotBranch({
+      formData: buildFormData({
+        groupbyRows: ['orderPriority'],
+        groupbyColumns: [],
+        metrics: ['countCustomers'],
+        metricsLayout: MetricsLayoutEnum.ROWS,
+        rowSubTotals: false,
+        extra_form_data: {
+          time_range: '2021-01-01 : 2021-02-01',
+        },
+      }),
+      axis: 'row',
+      path: ['A'],
+      currentTree,
+      visibleColDepth: 0,
+    });
+
+    expect(postMock).toHaveBeenCalledTimes(2);
   });
 });

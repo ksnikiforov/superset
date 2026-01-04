@@ -554,6 +554,9 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
             : undefined;
         const formattingScope =
           formatting?.applyTo ?? DEFAULT_DIMENSION_FORMATTING_SCOPE;
+        const hasFormatting = Boolean(
+          formatting?.backgroundColor || formatting?.textColor,
+        );
         const formattingPopoverContent =
           dimensionKey && dimensionLabel ? (
             <div
@@ -628,7 +631,7 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
                     data-test="pivot-dimension-formatting-button"
                     icon={<Icons.FormatPainterOutlined iconSize="s" />}
                     size="small"
-                    type="text"
+                    buttonStyle={hasFormatting ? 'primary' : 'tertiary'}
                   />
                 </DimensionFormattingButtonWrap>
               </Tooltip>

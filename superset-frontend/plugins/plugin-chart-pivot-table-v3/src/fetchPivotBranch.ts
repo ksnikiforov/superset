@@ -72,6 +72,56 @@ export interface FetchPivotBranchParams {
 
 const cache = new Map<string, PivotTreeData>();
 
+const stableStringify = (value: unknown): string => {
+  if (Array.isArray(value)) {
+    return `[${value.map(stableStringify).join(',')}]`;
+  }
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    return `{${Object.keys(record)
+      .sort()
+      .map(key => `${JSON.stringify(key)}:${stableStringify(record[key])}`)
+      .join(',')}}`;
+  }
+  const serialized = JSON.stringify(value);
+  return serialized === undefined ? 'undefined' : serialized;
+};
+
+const getExtraFormData = (
+  formData: PivotTableQueryFormData,
+): PivotTableQueryFormData['extra_form_data'] | undefined => {
+  if (formData.extra_form_data) {
+    return formData.extra_form_data;
+  }
+  const candidate = (
+    formData as PivotTableQueryFormData & {
+      extraFormData?: PivotTableQueryFormData['extra_form_data'];
+    }
+  ).extraFormData;
+  return candidate;
+};
+
+const getTimeRange = (formData: PivotTableQueryFormData) => {
+  if (formData.time_range) {
+    return formData.time_range;
+  }
+  const candidate = (
+    formData as PivotTableQueryFormData & { timeRange?: string }
+  ).timeRange;
+  return candidate;
+};
+
+const buildFilterKey = (formData: PivotTableQueryFormData) =>
+  stableStringify({
+    time_range: getTimeRange(formData),
+    since: formData.since,
+    until: formData.until,
+    filters: formData.filters,
+    adhoc_filters: formData.adhoc_filters,
+    extra_filters: formData.extra_filters,
+    extra_form_data: getExtraFormData(formData),
+  });
+
 const buildCacheKey = (
   axis: PivotAxis,
   path: PivotPath,
@@ -81,6 +131,7 @@ const buildCacheKey = (
   colGroupbyRaw: QueryFormColumn[],
   metrics: QueryFormMetric[],
   aggregateFunction?: string,
+  filterKey?: string,
 ) =>
   [
     axis,
@@ -91,9 +142,11 @@ const buildCacheKey = (
     serializePath(colGroupbyRaw.map(getColumnLabel)),
     serializePath(getMetricKeys(metrics)),
     aggregateFunction || '',
+    filterKey || '',
   ].join('|');
 
 export const peekPivotBranchCacheByKey = (key: string) => cache.get(key);
+export const clearPivotBranchCache = () => cache.clear();
 
 const buildPathFilters = (
   groupby: QueryFormColumn[],
@@ -272,6 +325,7 @@ const resolveFetchContext = ({
       ? Math.min(colGroupby.length, sanitizedPath.length + depthIncrement)
       : Math.min(colGroupby.length, currentColDepth);
 
+  const filterKey = buildFilterKey(formData);
   const cacheKey = buildCacheKey(
     axis,
     path,
@@ -281,6 +335,7 @@ const resolveFetchContext = ({
     colGroupby,
     metricsForQuery.length > 0 ? metricsForQuery : metrics,
     formData.aggregateFunction,
+    filterKey,
   );
 
   return {
@@ -506,6 +561,20 @@ export async function fetchPivotBranch({
     axis,
     sanitizedPath.length,
   );
+  const hasRowTotals = formData.rowTotals || rowSubtotalLevels.includes(0);
+  const hasColTotals = formData.colTotals;
+  const shouldIncludeGrandTotalPair =
+    (rowGroupby.length === 0 && colGroupby.length === 0) ||
+    (hasRowTotals && hasColTotals) ||
+    (metricsLayoutResolved === MetricsLayoutEnum.ROWS &&
+      metricInsertIndex === 0 &&
+      hasColTotals) ||
+    (metricsLayoutResolved === MetricsLayoutEnum.COLUMNS &&
+      metricInsertIndex === 0 &&
+      hasRowTotals);
+  const filteredQueryPairs = shouldIncludeGrandTotalPair
+    ? queryPairs
+    : queryPairs.filter(pair => !(pair.rowDepth === 0 && pair.colDepth === 0));
 
   const filters =
     axis === 'row'
@@ -515,7 +584,7 @@ export async function fetchPivotBranch({
   const queryContext = buildQueryContext(
     queryFormData,
     (baseQueryObject: QueryObject) =>
-      queryPairs.map(pair => ({
+      filteredQueryPairs.map(pair => ({
         ...baseQueryObject,
         columns: [
           ...rowGroupby.slice(0, pair.rowDepth),
@@ -537,7 +606,7 @@ export async function fetchPivotBranch({
       jsonPayload: queryContext,
     });
     const results = ((json as any).result || []) as any[];
-    const branchTree = queryPairs.reduce<PivotTreeData>(
+    const branchTree = filteredQueryPairs.reduce<PivotTreeData>(
       (acc, pair, idx) =>
         mergeTrees(
           acc,

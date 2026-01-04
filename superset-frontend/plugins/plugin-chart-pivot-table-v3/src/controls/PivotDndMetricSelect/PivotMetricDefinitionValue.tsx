@@ -522,6 +522,11 @@ export default function PivotMetricDefinitionValue(
   }, [metricKey, metricLabel, props.metricFormatting, props.option]);
   const formatting =
     (formattingKey && props.metricFormatting[formattingKey]) || {};
+  const hasFormatting = Boolean(
+    formatting.backgroundColor ||
+      formatting.textColor ||
+      formatting.d3Format,
+  );
   const handleFormattingChange = useCallback(
     (field: keyof PivotMetricFormatting, metric?: QueryFormMetric) => {
       if (!formattingKey) {
@@ -579,7 +584,7 @@ export default function PivotMetricDefinitionValue(
             data-test="pivot-metric-formatting-button"
             icon={<Icons.FormatPainterOutlined iconSize="s" />}
             size="small"
-            type="text"
+            buttonStyle={hasFormatting ? 'primary' : 'tertiary'}
           />
         </MetricFormattingButtonWrap>
       </Tooltip>
