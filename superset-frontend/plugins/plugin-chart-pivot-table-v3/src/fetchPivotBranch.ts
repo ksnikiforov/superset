@@ -42,6 +42,7 @@ import {
   mergeTrees,
   collectMetricFormattingMetricsForQuery,
   collectDimensionFormattingMetricsForQuery,
+  collectDimensionSortingMetricsForQuery,
   getMetricKeys,
   mergeMetrics,
   serializePath,
@@ -175,6 +176,8 @@ interface ResolvedFetchContext {
   colSubtotalLevels: number[];
   hasRowFormatting: boolean;
   hasColFormatting: boolean;
+  hasRowSorting: boolean;
+  hasColSorting: boolean;
 }
 
 const resolveFetchContext = ({
@@ -200,10 +203,20 @@ const resolveFetchContext = ({
     formData.colFormatting,
     colGroupbyRaw,
   );
+  const rowSortingMetrics = collectDimensionSortingMetricsForQuery(
+    formData.rowSorting,
+    rowGroupbyRaw,
+  );
+  const colSortingMetrics = collectDimensionSortingMetricsForQuery(
+    formData.colSorting,
+    colGroupbyRaw,
+  );
   const formattingMetrics = [
     ...metricFormattingMetrics,
     ...rowFormattingMetrics,
     ...colFormattingMetrics,
+    ...rowSortingMetrics,
+    ...colSortingMetrics,
   ];
   const metricsForQuery = mergeMetrics(metrics, formattingMetrics);
   const metricLabels = getMetricKeys(metrics);
@@ -355,6 +368,8 @@ const resolveFetchContext = ({
     colSubtotalLevels,
     hasRowFormatting: rowFormattingMetrics.length > 0,
     hasColFormatting: colFormattingMetrics.length > 0,
+    hasRowSorting: rowSortingMetrics.length > 0,
+    hasColSorting: colSortingMetrics.length > 0,
   };
 };
 
@@ -453,6 +468,8 @@ export async function fetchPivotBranch({
     colSubtotalLevels,
     hasRowFormatting,
     hasColFormatting,
+    hasRowSorting,
+    hasColSorting,
   } = resolveFetchContext({
     formData,
     axis,
@@ -534,8 +551,10 @@ export async function fetchPivotBranch({
       }
     }
   }
-  const includeRowTotalForColFormatting = axis === 'col' && hasColFormatting;
-  const includeColTotalForRowFormatting = axis === 'row' && hasRowFormatting;
+  const includeRowTotalForColFormatting =
+    axis === 'col' && (hasColFormatting || hasColSorting);
+  const includeColTotalForRowFormatting =
+    axis === 'row' && (hasRowFormatting || hasRowSorting);
   const effectiveRowLevels = Array.from(
     new Set([
       ...rowSubtotalLevels,

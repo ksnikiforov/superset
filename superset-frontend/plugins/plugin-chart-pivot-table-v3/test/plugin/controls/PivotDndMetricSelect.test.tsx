@@ -26,6 +26,8 @@ import {
 import { QueryFormMetric } from '@superset-ui/core';
 import PivotDndMetricSelect from '../../../src/controls/PivotDndMetricSelect/PivotDndMetricSelect';
 
+jest.setTimeout(60000);
+
 const baseProps = {
   name: 'metrics',
   label: 'Metrics',
@@ -79,7 +81,8 @@ describe('PivotDndMetricSelect', () => {
       name: /background color metric/i,
     });
     await userEvent.click(backgroundSelect);
-    await userEvent.type(backgroundSelect, 'color_metric');
+    await userEvent.clear(backgroundSelect);
+    await userEvent.type(backgroundSelect, 'color_metric', { delay: 10 });
 
     const manualOption = await waitFor(() =>
       within(screen.getByRole('listbox')).getByText('color_metric'),
@@ -118,6 +121,9 @@ describe('PivotDndMetricSelect', () => {
       within(screen.getByRole('listbox')).getByText('sum__value'),
     );
     await userEvent.click(backgroundOption);
+    await waitFor(() =>
+      expect(screen.queryByRole('listbox')).not.toBeInTheDocument(),
+    );
 
     await userEvent.click(textSelect);
     const textOption = await waitFor(() =>

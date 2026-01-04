@@ -33,8 +33,13 @@ import {
   DimensionFormattingScope,
   PivotDimensionFormatting,
   PivotDimensionFormattingMap,
+  PivotDimensionSorting,
+  PivotDimensionSortingMap,
+  PivotAxisValueRef,
   PivotMetricFormattingMap,
   PivotMetricFormatting,
+  PivotSortMode,
+  PivotSortOrder,
   PivotPath,
   PivotTreeData,
   PivotTreeNode,
@@ -356,6 +361,94 @@ export const normalizeDimensionFormattingMapWithKeys = (
   );
 };
 
+const DEFAULT_DIMENSION_SORT_ORDER: PivotSortOrder = 'asc';
+
+const normalizeDimensionSortingOrder = (value: unknown): PivotSortOrder =>
+  value === 'desc' ? 'desc' : 'asc';
+
+const normalizeDimensionSortingMode = (value: unknown): PivotSortMode =>
+  value === 'axis_value' ? 'axis_value' : 'total';
+
+const normalizeAxisValueRef = (
+  value: unknown,
+): PivotAxisValueRef | undefined => {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  const axis = value.axis;
+  const path = value.path;
+  if (axis !== 'row' && axis !== 'col') {
+    return undefined;
+  }
+  if (!Array.isArray(path)) {
+    return undefined;
+  }
+  return { axis, path: path as PivotPath };
+};
+
+export const normalizeDimensionSortingMap = (
+  sorting?: PivotDimensionSortingMap,
+): PivotDimensionSortingMap => {
+  if (!sorting) {
+    return {};
+  }
+  return Object.entries(sorting).reduce<PivotDimensionSortingMap>(
+    (acc, [dimensionKey, sortingValue]) => {
+      if (!dimensionKey || !sortingValue || !isRecord(sortingValue)) {
+        return acc;
+      }
+      const hasOrder = 'order' in sortingValue;
+      const hasMode = 'mode' in sortingValue;
+      const hasAxisRefKey = 'axisValueRef' in sortingValue;
+      const axisValueRef = normalizeAxisValueRef(sortingValue.axisValueRef);
+      const metric = normalizeMetricFormattingValue(sortingValue.metric);
+      const shouldKeep =
+        metric !== undefined || hasOrder || hasMode || hasAxisRefKey;
+      if (!shouldKeep) {
+        return acc;
+      }
+      const next: PivotDimensionSorting = {
+        order: hasOrder
+          ? normalizeDimensionSortingOrder(sortingValue.order)
+          : DEFAULT_DIMENSION_SORT_ORDER,
+        mode: hasMode
+          ? normalizeDimensionSortingMode(sortingValue.mode)
+          : 'total',
+        ...(metric !== undefined ? { metric } : {}),
+        ...(axisValueRef ? { axisValueRef } : {}),
+      };
+      acc[dimensionKey] = next;
+      return acc;
+    },
+    {},
+  );
+};
+
+export const normalizeDimensionSortingMapWithKeys = (
+  sorting: PivotDimensionSortingMap | undefined,
+  columns: QueryFormColumn[],
+): PivotDimensionSortingMap => {
+  const normalized = normalizeDimensionSortingMap(sorting);
+  if (columns.length === 0) {
+    return normalized;
+  }
+  const keyMap = buildDimensionKeyMap(columns);
+  return Object.entries(normalized).reduce<PivotDimensionSortingMap>(
+    (acc, [dimensionKey, dimensionSorting]) => {
+      const resolvedKey = keyMap.get(dimensionKey);
+      if (!resolvedKey) {
+        return acc;
+      }
+      acc[resolvedKey] = {
+        ...(acc[resolvedKey] || {}),
+        ...dimensionSorting,
+      };
+      return acc;
+    },
+    {},
+  );
+};
+
 export const collectMetricFormattingMetricsForQuery = (
   metricFormatting?: PivotMetricFormattingMap,
 ): QueryFormMetric[] => {
@@ -382,6 +475,19 @@ export const collectDimensionFormattingMetricsForQuery = (
     )
       .filter((metric): metric is QueryFormMetric => metric !== undefined)
       .map(metric => normalizeFormattingMetricForQuery(metric)),
+  );
+};
+
+export const collectDimensionSortingMetricsForQuery = (
+  sorting: PivotDimensionSortingMap | undefined,
+  columns: QueryFormColumn[],
+): QueryFormMetric[] => {
+  return Object.values(
+    normalizeDimensionSortingMapWithKeys(sorting, columns),
+  ).flatMap(entry =>
+    entry.metric
+      ? [normalizeFormattingMetricForQuery(entry.metric)]
+      : [],
   );
 };
 

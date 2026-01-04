@@ -28,6 +28,7 @@ import { MetricsLayoutEnum, PivotTableQueryFormData } from './types';
 import {
   collectMetricFormattingMetricsForQuery,
   collectDimensionFormattingMetricsForQuery,
+  collectDimensionSortingMetricsForQuery,
   mergeMetrics,
   normalizeSubtotalLevels,
   resolveMetricPlacement,
@@ -92,10 +93,20 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
     formData.colFormatting,
     colGroupby,
   );
+  const rowSortingMetrics = collectDimensionSortingMetricsForQuery(
+    formData.rowSorting,
+    rowGroupby,
+  );
+  const colSortingMetrics = collectDimensionSortingMetricsForQuery(
+    formData.colSorting,
+    colGroupby,
+  );
   const formattingMetrics = [
     ...metricFormattingMetrics,
     ...rowFormattingMetrics,
     ...colFormattingMetrics,
+    ...rowSortingMetrics,
+    ...colSortingMetrics,
   ];
   const metricsForQuery = mergeMetrics(metrics, formattingMetrics);
   const metricsOnRows = placement.layout === MetricsLayoutEnum.ROWS;
@@ -114,7 +125,10 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
     (rowSubtotalLevels && rowSubtotalLevels.length > 0) ||
     (colSubtotalLevels && colSubtotalLevels.length > 0);
   const needsFormattingTotals =
-    rowFormattingMetrics.length > 0 || colFormattingMetrics.length > 0;
+    rowFormattingMetrics.length > 0 ||
+    colFormattingMetrics.length > 0 ||
+    rowSortingMetrics.length > 0 ||
+    colSortingMetrics.length > 0;
   const requireMultiQuery =
     startCollapsed || isTotalsEnabled || isLevelTotalsEnabled || needsFormattingTotals;
 
@@ -208,6 +222,12 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
       colDepths.add(0);
     }
     if (colFormattingMetrics.length > 0) {
+      rowDepths.add(0);
+    }
+    if (rowSortingMetrics.length > 0) {
+      colDepths.add(0);
+    }
+    if (colSortingMetrics.length > 0) {
       rowDepths.add(0);
     }
     if (metricsOnRows && metricInsertIndex === 0 && colTotals) {

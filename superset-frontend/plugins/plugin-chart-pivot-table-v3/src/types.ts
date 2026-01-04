@@ -114,6 +114,23 @@ export type PivotDimensionFormatting = Partial<
 
 export type PivotDimensionFormattingMap = Record<string, PivotDimensionFormatting>;
 
+export type PivotSortOrder = 'asc' | 'desc';
+export type PivotSortMode = 'total' | 'axis_value';
+
+export type PivotAxisValueRef = {
+  axis: PivotAxis;
+  path: PivotPath;
+};
+
+export type PivotDimensionSorting = {
+  metric?: QueryFormMetric;
+  order?: PivotSortOrder;
+  mode?: PivotSortMode;
+  axisValueRef?: PivotAxisValueRef;
+};
+
+export type PivotDimensionSortingMap = Record<string, PivotDimensionSorting>;
+
 export interface PivotTableCustomizeProps {
   groupbyRows: QueryFormColumn[];
   groupbyColumns: QueryFormColumn[];
@@ -122,6 +139,8 @@ export interface PivotTableCustomizeProps {
   metricFormattingScope?: MetricFormattingScope;
   rowFormatting?: PivotDimensionFormattingMap;
   colFormatting?: PivotDimensionFormattingMap;
+  rowSorting?: PivotDimensionSortingMap;
+  colSorting?: PivotDimensionSortingMap;
   aggregateFunction?: string;
   startCollapsed: boolean;
   initialDepth?: number;
@@ -185,6 +204,8 @@ export interface PivotTableProps
   metricFormattingScope?: MetricFormattingScope;
   rowFormatting?: PivotDimensionFormattingMap;
   colFormatting?: PivotDimensionFormattingMap;
+  rowSorting?: PivotDimensionSortingMap;
+  colSorting?: PivotDimensionSortingMap;
   aggregateFunction?: string;
   startCollapsed: boolean;
   initialDepth?: number;

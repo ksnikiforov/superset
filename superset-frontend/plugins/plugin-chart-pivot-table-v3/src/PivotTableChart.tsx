@@ -25,6 +25,7 @@ import {
 import {
   BinaryQueryObjectFilterClause,
   DataRecordValue,
+  GenericDataType,
   getColumnLabel,
   getNumberFormatter,
   styled,
@@ -43,6 +44,9 @@ import {
   PivotTreeData,
   PivotTreeNode,
   PivotDimensionFormattingMap,
+  PivotDimensionSortingMap,
+  PivotSortOrder,
+  PivotSortMode,
 } from './types';
 import {
   isMetricsPlaceholder,
@@ -51,6 +55,7 @@ import {
   getMetricKey,
   mergeTrees,
   normalizeDimensionFormattingMapWithKeys,
+  normalizeDimensionSortingMapWithKeys,
   normalizeMetricFormattingMapWithKeys,
   normalizeSubtotalLevels,
   parseThemeColors,
@@ -61,6 +66,7 @@ import {
 } from './utils';
 import {
   buildColumnHeaderRows,
+  compareValues,
   findChildren,
   formatMetricValue,
   rootKey,
@@ -175,6 +181,14 @@ type FormattingKeys = {
 type DimensionFormattingKeys = {
   [key in DimensionFormattingField]?: string;
 } & { applyTo: DimensionFormattingScope };
+
+type DimensionSortingKeys = {
+  metricKey?: string;
+  order: PivotSortOrder;
+  mode: PivotSortMode;
+};
+
+const DEFAULT_DIMENSION_SORT_ORDER: PivotSortOrder = 'asc';
 
 const HEX_COLOR_PATTERN = /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 
@@ -316,6 +330,20 @@ function PivotTableChart(props: PivotTableProps) {
     ),
     [formData.colFormatting, groupbyColumns],
   );
+  const rowSorting = useMemo(
+    () => normalizeDimensionSortingMapWithKeys(
+      formData.rowSorting,
+      groupbyRows,
+    ),
+    [formData.rowSorting, groupbyRows],
+  );
+  const colSorting = useMemo(
+    () => normalizeDimensionSortingMapWithKeys(
+      formData.colSorting,
+      groupbyColumns,
+    ),
+    [formData.colSorting, groupbyColumns],
+  );
   const formattingKeyMap = useMemo(() => {
     const next: Record<string, FormattingKeys> = {};
     Object.entries(metricFormatting).forEach(([metricKey, formatting]) => {
@@ -370,6 +398,29 @@ function PivotTableChart(props: PivotTableProps) {
     },
     [],
   );
+  const buildDimensionSortingKeyMap = useCallback(
+    (sorting: PivotDimensionSortingMap) => {
+      const next: Record<string, DimensionSortingKeys> = {};
+      Object.entries(sorting).forEach(([dimensionKey, dimensionSorting]) => {
+        if (!dimensionKey) {
+          return;
+        }
+        const metricKey = dimensionSorting.metric
+          ? getFormattingMetricKey(dimensionSorting.metric)
+          : '';
+        if (!metricKey && !dimensionSorting.axisValueRef) {
+          return;
+        }
+        next[dimensionKey] = {
+          metricKey: metricKey || undefined,
+          order: dimensionSorting.order ?? DEFAULT_DIMENSION_SORT_ORDER,
+          mode: dimensionSorting.mode ?? 'total',
+        };
+      });
+      return next;
+    },
+    [],
+  );
   const rowFormattingKeyMap = useMemo(
     () => buildDimensionFormattingKeyMap(rowFormatting),
     [buildDimensionFormattingKeyMap, rowFormatting],
@@ -377,6 +428,18 @@ function PivotTableChart(props: PivotTableProps) {
   const colFormattingKeyMap = useMemo(
     () => buildDimensionFormattingKeyMap(colFormatting),
     [buildDimensionFormattingKeyMap, colFormatting],
+  );
+  const rowSortingKeyMap = useMemo(
+    () => buildDimensionSortingKeyMap(rowSorting),
+    [buildDimensionSortingKeyMap, rowSorting],
+  );
+  const colSortingKeyMap = useMemo(
+    () => buildDimensionSortingKeyMap(colSorting),
+    [buildDimensionSortingKeyMap, colSorting],
+  );
+  const hasRowSorting = useMemo(
+    () => Object.keys(rowSortingKeyMap).length > 0,
+    [rowSortingKeyMap],
   );
   const resolvedRowTotalPosition =
     formData.rowTotalPosition || rowTotalPosition;
@@ -1730,6 +1793,138 @@ function PivotTableChart(props: PivotTableProps) {
     ],
   );
 
+  const buildFormattingValuesMap = useCallback(
+    (axis: 'row' | 'col') => {
+      const valuesMap = new Map<string, Record<string, DataRecordValue>>();
+      Object.values(tree.cells).forEach(cell => {
+        const rowNode = tree.rows[cell.rowKey];
+        const colNode = tree.cols[cell.colKey];
+        if (!rowNode || !colNode) {
+          return;
+        }
+        const rowKey = serializePath(getNonMetricPathParts(rowNode.path));
+        const colKey = serializePath(getNonMetricPathParts(colNode.path));
+        if (axis === 'row') {
+          if (colKey !== rootKey || valuesMap.has(rowKey)) {
+            return;
+          }
+          valuesMap.set(rowKey, cell.values);
+          return;
+        }
+        if (rowKey !== rootKey || valuesMap.has(colKey)) {
+          return;
+        }
+        valuesMap.set(colKey, cell.values);
+      });
+      return valuesMap;
+    },
+    [getNonMetricPathParts, tree.cells, tree.cols, tree.rows],
+  );
+  const rowFormattingValuesMap = useMemo(
+    () => buildFormattingValuesMap('row'),
+    [buildFormattingValuesMap],
+  );
+  const colFormattingValuesMap = useMemo(
+    () => buildFormattingValuesMap('col'),
+    [buildFormattingValuesMap],
+  );
+  const rowSortingValuesMap = useMemo(
+    () => buildFormattingValuesMap('row'),
+    [buildFormattingValuesMap],
+  );
+  const colSortingValuesMap = useMemo(
+    () => buildFormattingValuesMap('col'),
+    [buildFormattingValuesMap],
+  );
+  const resolveDimensionStyle = useCallback(
+    (axis: 'row' | 'col', node: PivotTreeNode, target: 'label' | 'cell') => {
+      if (node.path.length === 0 || isMetricGrandTotalNode(node)) {
+        return undefined;
+      }
+      const dimensionKey = getDimensionKeyForNode(node, axis);
+      const formattingMap =
+        axis === 'row' ? rowFormattingKeyMap : colFormattingKeyMap;
+      const formatting = dimensionKey ? formattingMap[dimensionKey] : undefined;
+      if (!formatting) {
+        return undefined;
+      }
+      if (target === 'cell' && formatting.applyTo !== 'all') {
+        return undefined;
+      }
+      const nonMetricKey = serializePath(getNonMetricPathParts(node.path));
+      const values =
+        axis === 'row'
+          ? rowFormattingValuesMap.get(nonMetricKey)
+          : colFormattingValuesMap.get(nonMetricKey);
+      if (!values) {
+        return undefined;
+      }
+      const backgroundColor = formatting.backgroundColor
+        ? normalizeCssColor(values[formatting.backgroundColor])
+        : undefined;
+      const textColor = formatting.textColor
+        ? normalizeCssColor(values[formatting.textColor])
+        : undefined;
+      if (!backgroundColor && !textColor) {
+        return undefined;
+      }
+      return {
+        ...(backgroundColor ? { backgroundColor } : {}),
+        ...(textColor ? { color: textColor } : {}),
+      };
+    },
+    [
+      colFormattingKeyMap,
+      colFormattingValuesMap,
+      getDimensionKeyForNode,
+      getNonMetricPathParts,
+      isMetricGrandTotalNode,
+      rowFormattingKeyMap,
+      rowFormattingValuesMap,
+    ],
+  );
+  const resolveSortConfig = useCallback(
+    (axis: 'row' | 'col', a: PivotTreeNode, b: PivotTreeNode) => {
+      const dimensionKey =
+        getDimensionKeyForNode(a, axis) || getDimensionKeyForNode(b, axis);
+      if (!dimensionKey) {
+        return undefined;
+      }
+      const map = axis === 'row' ? rowSortingKeyMap : colSortingKeyMap;
+      return map[dimensionKey];
+    },
+    [colSortingKeyMap, getDimensionKeyForNode, rowSortingKeyMap],
+  );
+  const getSortValue = useCallback(
+    (axis: 'row' | 'col', node: PivotTreeNode, metricKey: string) => {
+      const nonMetricKey = serializePath(getNonMetricPathParts(node.path));
+      const valuesMap =
+        axis === 'row' ? rowSortingValuesMap : colSortingValuesMap;
+      return valuesMap.get(nonMetricKey)?.[metricKey];
+    },
+    [colSortingValuesMap, getNonMetricPathParts, rowSortingValuesMap],
+  );
+  const compareMetricSort = useCallback(
+    (axis: 'row' | 'col', a: PivotTreeNode, b: PivotTreeNode) => {
+      const config = resolveSortConfig(axis, a, b);
+      if (!config?.metricKey || config.mode !== 'total') {
+        return 0;
+      }
+      const aValue = getSortValue(axis, a, config.metricKey);
+      const bValue = getSortValue(axis, b, config.metricKey);
+      if (aValue === undefined || bValue === undefined) {
+        return 0;
+      }
+      const type =
+        typeof aValue === 'number' && typeof bValue === 'number'
+          ? GenericDataType.Numeric
+          : undefined;
+      const cmp = compareValues(aValue, bValue, type);
+      return config.order === 'asc' ? cmp : -cmp;
+    },
+    [compareValues, getSortValue, resolveSortConfig],
+  );
+
   const rowSorter = useMemo(() => {
     const baseSorter = sortByOrder(
       rowOrder,
@@ -1741,7 +1936,12 @@ function PivotTableChart(props: PivotTableProps) {
       (rowSubTotals && effectiveRowSubtotalPosition === 'end');
     const pullMetricTotalsToStart =
       rowTotals && resolvedRowTotalPosition === 'start';
-    if (!rowSubTotals && !pushMetricTotalsToEnd && !pullMetricTotalsToStart) {
+    if (
+      !rowSubTotals &&
+      !pushMetricTotalsToEnd &&
+      !pullMetricTotalsToStart &&
+      !hasRowSorting
+    ) {
       return baseSorter;
     }
     return (a: PivotTreeNode, b: PivotTreeNode) => {
@@ -1769,13 +1969,19 @@ function PivotTableChart(props: PivotTableProps) {
       if (metricOrder !== 0) {
         return metricOrder;
       }
+      const metricSort = compareMetricSort('row', a, b);
+      if (metricSort !== 0) {
+        return metricSort;
+      }
       return baseSorter(a, b);
     };
   }, [
     colTypeMap,
+    compareMetricSort,
     compareMetricOrder,
     effectiveRowSubtotalPosition,
     groupbyRows,
+    hasRowSorting,
     isExplicitSubtotalNode,
     isMetricGrandTotalNode,
     rowOrder,
@@ -1794,9 +2000,13 @@ function PivotTableChart(props: PivotTableProps) {
       if (metricOrder !== 0) {
         return metricOrder;
       }
+      const metricSort = compareMetricSort('col', a, b);
+      if (metricSort !== 0) {
+        return metricSort;
+      }
       return baseSorter(a, b);
     };
-  }, [colOrder, colTypeMap, compareMetricOrder, groupbyColumns]);
+  }, [colOrder, colTypeMap, compareMetricOrder, compareMetricSort, groupbyColumns]);
 
   const showRowRootBase =
     groupbyRows.length > 0 &&
@@ -2006,88 +2216,6 @@ function PivotTableChart(props: PivotTableProps) {
       return isRowTotal ? themeColor : undefined;
     },
     [showRowRoot, themeColor],
-  );
-  const buildFormattingValuesMap = useCallback(
-    (axis: 'row' | 'col') => {
-      const valuesMap = new Map<string, Record<string, DataRecordValue>>();
-      Object.values(tree.cells).forEach(cell => {
-        const rowNode = tree.rows[cell.rowKey];
-        const colNode = tree.cols[cell.colKey];
-        if (!rowNode || !colNode) {
-          return;
-        }
-        const rowKey = serializePath(getNonMetricPathParts(rowNode.path));
-        const colKey = serializePath(getNonMetricPathParts(colNode.path));
-        if (axis === 'row') {
-          if (colKey !== rootKey || valuesMap.has(rowKey)) {
-            return;
-          }
-          valuesMap.set(rowKey, cell.values);
-          return;
-        }
-        if (rowKey !== rootKey || valuesMap.has(colKey)) {
-          return;
-        }
-        valuesMap.set(colKey, cell.values);
-      });
-      return valuesMap;
-    },
-    [getNonMetricPathParts, tree.cells, tree.cols, tree.rows],
-  );
-  const rowFormattingValuesMap = useMemo(
-    () => buildFormattingValuesMap('row'),
-    [buildFormattingValuesMap],
-  );
-  const colFormattingValuesMap = useMemo(
-    () => buildFormattingValuesMap('col'),
-    [buildFormattingValuesMap],
-  );
-  const resolveDimensionStyle = useCallback(
-    (axis: 'row' | 'col', node: PivotTreeNode, target: 'label' | 'cell') => {
-      if (node.path.length === 0 || isMetricGrandTotalNode(node)) {
-        return undefined;
-      }
-      const dimensionKey = getDimensionKeyForNode(node, axis);
-      const formattingMap =
-        axis === 'row' ? rowFormattingKeyMap : colFormattingKeyMap;
-      const formatting = dimensionKey ? formattingMap[dimensionKey] : undefined;
-      if (!formatting) {
-        return undefined;
-      }
-      if (target === 'cell' && formatting.applyTo !== 'all') {
-        return undefined;
-      }
-      const nonMetricKey = serializePath(getNonMetricPathParts(node.path));
-      const values =
-        axis === 'row'
-          ? rowFormattingValuesMap.get(nonMetricKey)
-          : colFormattingValuesMap.get(nonMetricKey);
-      if (!values) {
-        return undefined;
-      }
-      const backgroundColor = formatting.backgroundColor
-        ? normalizeCssColor(values[formatting.backgroundColor])
-        : undefined;
-      const textColor = formatting.textColor
-        ? normalizeCssColor(values[formatting.textColor])
-        : undefined;
-      if (!backgroundColor && !textColor) {
-        return undefined;
-      }
-      return {
-        ...(backgroundColor ? { backgroundColor } : {}),
-        ...(textColor ? { color: textColor } : {}),
-      };
-    },
-    [
-      colFormattingKeyMap,
-      colFormattingValuesMap,
-      getDimensionKeyForNode,
-      getNonMetricPathParts,
-      isMetricGrandTotalNode,
-      rowFormattingKeyMap,
-      rowFormattingValuesMap,
-    ],
   );
   const expandedRowDepths = useMemo(
     () =>

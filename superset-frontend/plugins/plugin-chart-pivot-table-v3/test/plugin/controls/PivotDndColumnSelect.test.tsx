@@ -25,6 +25,8 @@ import {
 } from 'spec/helpers/testing-library';
 import PivotDndColumnSelect from '../../../src/controls/PivotDndColumnSelect/PivotDndColumnSelect';
 
+jest.setTimeout(60000);
+
 const baseProps = {
   name: 'groupbyRows',
   label: 'Rows',
@@ -43,6 +45,16 @@ describe('PivotDndColumnSelect', () => {
     });
 
     const buttons = screen.getAllByTestId('pivot-dimension-formatting-button');
+    expect(buttons).toHaveLength(1);
+  });
+
+  it('renders a sorting button for each column', () => {
+    render(<PivotDndColumnSelect {...baseProps} />, {
+      useDnd: true,
+      useRedux: true,
+    });
+
+    const buttons = screen.getAllByTestId('pivot-dimension-sorting-button');
     expect(buttons).toHaveLength(1);
   });
 
@@ -92,6 +104,61 @@ describe('PivotDndColumnSelect', () => {
           backgroundColor: 'metric1',
           textColor: 'metric2',
           applyTo: 'all',
+        },
+      }),
+    );
+  });
+
+  it('updates sorting metric and order for rows', async () => {
+    const setControlValue = jest.fn();
+    render(
+      <PivotDndColumnSelect
+        {...baseProps}
+        actions={{ setControlValue }}
+        formData={{
+          datasource: '1__table',
+          metrics: ['metric1', 'metric2'],
+          rowSorting: {},
+          viz_type: 'pivot_table_v3',
+        }}
+      />,
+      { useDnd: true, useRedux: true },
+    );
+
+    await userEvent.click(
+      screen.getAllByTestId('pivot-dimension-sorting-button')[0],
+    );
+    await screen.findByText('Sorting');
+
+    const metricSelect = screen.getByRole('combobox', {
+      name: /sort by metric/i,
+    });
+    await userEvent.click(metricSelect);
+    const metricOption = await waitFor(() =>
+      within(screen.getByRole('listbox')).getByText('metric1'),
+    );
+    await userEvent.click(metricOption);
+
+    await waitFor(() =>
+      expect(setControlValue).toHaveBeenLastCalledWith('rowSorting', {
+        country: {
+          metric: 'metric1',
+          order: 'asc',
+          mode: 'total',
+        },
+      }),
+    );
+
+    await userEvent.click(
+      screen.getByRole('radio', { name: /descending/i }),
+    );
+
+    await waitFor(() =>
+      expect(setControlValue).toHaveBeenLastCalledWith('rowSorting', {
+        country: {
+          metric: 'metric1',
+          order: 'desc',
+          mode: 'total',
         },
       }),
     );

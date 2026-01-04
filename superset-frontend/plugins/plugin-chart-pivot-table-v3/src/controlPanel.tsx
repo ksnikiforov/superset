@@ -481,6 +481,24 @@ const config: ControlPanelConfig = {
             },
           },
         ],
+        [
+          {
+            name: 'rowSorting',
+            config: {
+              type: 'HiddenControl',
+              default: {},
+            },
+          },
+        ],
+        [
+          {
+            name: 'colSorting',
+            config: {
+              type: 'HiddenControl',
+              default: {},
+            },
+          },
+        ],
         ['adhoc_filters'],
         ['series_limit'],
         [

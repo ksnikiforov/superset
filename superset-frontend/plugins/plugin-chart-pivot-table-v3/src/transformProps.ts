@@ -44,6 +44,7 @@ import {
   mergeTrees,
   mergeMetrics,
   normalizeDimensionFormattingMapWithKeys,
+  normalizeDimensionSortingMapWithKeys,
   normalizeMetricFormattingMapWithKeys,
   parseDepth,
   resolveMetricPlacement,
@@ -52,6 +53,7 @@ import {
   injectRowSubtotalLeaves,
   labelRowSubtotalLeaves,
   serializePath,
+  collectDimensionSortingMetricsForQuery,
 } from './utils';
 
 const { DATABASE_DATETIME } = TimeFormats;
@@ -97,6 +99,14 @@ export default function transformProps(
     formData.colFormatting,
     groupbyColumns,
   );
+  const rowSorting = normalizeDimensionSortingMapWithKeys(
+    formData.rowSorting,
+    groupbyRows,
+  );
+  const colSorting = normalizeDimensionSortingMapWithKeys(
+    formData.colSorting,
+    groupbyColumns,
+  );
   const rowFormattingMetrics = collectDimensionFormattingMetricsForQuery(
     rowFormatting,
     groupbyRows,
@@ -105,9 +115,19 @@ export default function transformProps(
     colFormatting,
     groupbyColumns,
   );
+  const rowSortingMetrics = collectDimensionSortingMetricsForQuery(
+    rowSorting,
+    groupbyRows,
+  );
+  const colSortingMetrics = collectDimensionSortingMetricsForQuery(
+    colSorting,
+    groupbyColumns,
+  );
   const metricsForQueryWithFormatting = mergeMetrics(metricsForQuery, [
     ...rowFormattingMetrics,
     ...colFormattingMetrics,
+    ...rowSortingMetrics,
+    ...colSortingMetrics,
   ]);
   const rowSubTotalsEnabled = formData.rowSubTotals ?? true;
   const maxRowSubtotalDepth = Math.max(groupbyRows.length - 1, 0);
@@ -336,6 +356,8 @@ export default function transformProps(
     groupbyRows,
     groupbyColumns,
     aggregateFunction: formData.aggregateFunction,
+    rowSorting,
+    colSorting,
     startCollapsed: formData.startCollapsed ?? true,
     initialDepth: formData.initialDepth ?? 1,
     maxDepthPerFetch,
