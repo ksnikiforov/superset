@@ -52,6 +52,7 @@ import {
   mergeMetrics,
   normalizeDimensionFormattingMapWithKeys,
   normalizeDimensionSortingMapWithKeys,
+  transferDimensionSettingsAcrossAxes,
 } from '../../utils';
 import {
   DimensionFormattingField,
@@ -329,14 +330,12 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
         pivotPlacement.controlNames?.rows &&
         pivotPlacement.controlNames?.cols
       ) {
+        const prevRows = toArray(pivotPlacement.rows);
+        const prevCols = toArray(pivotPlacement.cols);
         let rowsNext =
-          pivotPlacement.axis === 'rows'
-            ? toArray(nextValue)
-            : toArray(pivotPlacement.rows);
+          pivotPlacement.axis === 'rows' ? toArray(nextValue) : prevRows;
         let colsNext =
-          pivotPlacement.axis === 'cols'
-            ? toArray(nextValue)
-            : toArray(pivotPlacement.cols);
+          pivotPlacement.axis === 'cols' ? toArray(nextValue) : prevCols;
         if (pivotPlacement.axis === 'rows') {
           colsNext = colsNext.filter(
             val => val === METRICS_PLACEHOLDER || !rowsNext.includes(val),
@@ -371,11 +370,63 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
           }
           dispatch(setControlValueAction(controlName, val, errors));
         };
+        const transferredSettings = transferDimensionSettingsAcrossAxes(
+          prevRows,
+          prevCols,
+          resolved.rows,
+          resolved.cols,
+          {
+            rowFormatting: formData?.rowFormatting,
+            colFormatting: formData?.colFormatting,
+            rowSorting: formData?.rowSorting,
+            colSorting: formData?.colSorting,
+          },
+        );
         // Defer control updates to avoid unmounting drop targets mid-drag,
         // which can trigger react-dnd's "Expected to find a valid target".
         requestAnimationFrame(() => {
           setControl(pivotPlacement.controlNames.rows, resolved.rows);
           setControl(pivotPlacement.controlNames.cols, resolved.cols);
+          if (transferredSettings.hasAxisChanges && setControlValue) {
+            if (
+              !isEqual(
+                formData?.rowFormatting || {},
+                transferredSettings.rowFormatting,
+              )
+            ) {
+              setControlValue(
+                'rowFormatting',
+                transferredSettings.rowFormatting,
+              );
+            }
+            if (
+              !isEqual(
+                formData?.colFormatting || {},
+                transferredSettings.colFormatting,
+              )
+            ) {
+              setControlValue(
+                'colFormatting',
+                transferredSettings.colFormatting,
+              );
+            }
+            if (
+              !isEqual(
+                formData?.rowSorting || {},
+                transferredSettings.rowSorting,
+              )
+            ) {
+              setControlValue('rowSorting', transferredSettings.rowSorting);
+            }
+            if (
+              !isEqual(
+                formData?.colSorting || {},
+                transferredSettings.colSorting,
+              )
+            ) {
+              setControlValue('colSorting', transferredSettings.colSorting);
+            }
+          }
         });
         resetHover();
         return;
@@ -391,7 +442,7 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
       onChange(nextValue);
       resetHover();
     },
-    [dispatch, onChange, pivotPlacement, resetHover, toArray],
+    [dispatch, formData, onChange, pivotPlacement, resetHover, setControlValue, toArray],
   );
 
   const setLastHoverIndex = useCallback(
@@ -573,7 +624,17 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
       const baseSorting = sortingRef.current || {};
       const nextSorting: PivotDimensionSortingMap = { ...baseSorting };
       if (!metric) {
-        delete nextSorting[dimensionKey];
+        const existing = baseSorting[dimensionKey];
+        if (existing) {
+          const { metric: _metric, ...rest } = existing;
+          if (Object.keys(rest).length === 0) {
+            delete nextSorting[dimensionKey];
+          } else {
+            nextSorting[dimensionKey] = rest;
+          }
+        } else {
+          delete nextSorting[dimensionKey];
+        }
       } else {
         const existing = baseSorting[dimensionKey] || {};
         const nextEntry: PivotDimensionSorting = {
@@ -599,15 +660,12 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
       }
       const baseSorting = sortingRef.current || {};
       const existing = baseSorting[dimensionKey];
-      if (!existing?.metric) {
-        return;
-      }
       const nextSorting: PivotDimensionSortingMap = {
         ...baseSorting,
         [dimensionKey]: {
-          ...existing,
+          ...(existing || {}),
           order,
-          mode: existing.mode ?? DEFAULT_DIMENSION_SORT_MODE,
+          mode: existing?.mode ?? DEFAULT_DIMENSION_SORT_MODE,
         },
       };
       setLocalSorting(nextSorting);
@@ -671,7 +729,7 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
         const hasFormatting = Boolean(
           formatting?.backgroundColor || formatting?.textColor,
         );
-        const hasSorting = Boolean(sortingMetric);
+        const hasSorting = Boolean(sorting);
         const formattingPopoverContent =
           dimensionKey && dimensionLabel ? (
             <div
@@ -757,7 +815,6 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
                       event.target.value as PivotSortOrder,
                     )
                   }
-                  disabled={!sortingMetric}
                 >
                   <Radio value="asc">{t('Ascending')}</Radio>
                   <Radio value="desc">{t('Descending')}</Radio>

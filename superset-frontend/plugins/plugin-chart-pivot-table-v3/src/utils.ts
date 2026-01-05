@@ -449,6 +449,171 @@ export const normalizeDimensionSortingMapWithKeys = (
   );
 };
 
+const normalizeDimensionFormattingMapForAxis = (
+  formatting: PivotDimensionFormattingMap | undefined,
+  columns: QueryFormColumn[],
+): PivotDimensionFormattingMap => {
+  const normalized = normalizeDimensionFormattingMap(formatting);
+  if (columns.length === 0) {
+    return normalized;
+  }
+  const keyMap = buildDimensionKeyMap(columns);
+  return Object.entries(normalized).reduce<PivotDimensionFormattingMap>(
+    (acc, [dimensionKey, dimensionFormatting]) => {
+      const resolvedKey = keyMap.get(dimensionKey) ?? dimensionKey;
+      acc[resolvedKey] = {
+        ...(acc[resolvedKey] || {}),
+        ...dimensionFormatting,
+      };
+      return acc;
+    },
+    {},
+  );
+};
+
+const normalizeDimensionSortingMapForAxis = (
+  sorting: PivotDimensionSortingMap | undefined,
+  columns: QueryFormColumn[],
+): PivotDimensionSortingMap => {
+  const normalized = normalizeDimensionSortingMap(sorting);
+  if (columns.length === 0) {
+    return normalized;
+  }
+  const keyMap = buildDimensionKeyMap(columns);
+  return Object.entries(normalized).reduce<PivotDimensionSortingMap>(
+    (acc, [dimensionKey, dimensionSorting]) => {
+      const resolvedKey = keyMap.get(dimensionKey) ?? dimensionKey;
+      acc[resolvedKey] = {
+        ...(acc[resolvedKey] || {}),
+        ...dimensionSorting,
+      };
+      return acc;
+    },
+    {},
+  );
+};
+
+const getDimensionKeyFromColumn = (
+  column: QueryFormColumn,
+): string | undefined => {
+  if (isMetricsPlaceholder(column)) {
+    return undefined;
+  }
+  const key = getColumnLabel(column);
+  return key || undefined;
+};
+
+const buildDimensionKeySet = (columns: QueryFormColumn[]) => {
+  const keys = new Set<string>();
+  columns.forEach(column => {
+    const key = getDimensionKeyFromColumn(column);
+    if (key) {
+      keys.add(key);
+    }
+  });
+  return keys;
+};
+
+type DimensionSettingsTransferResult = {
+  rowFormatting: PivotDimensionFormattingMap;
+  colFormatting: PivotDimensionFormattingMap;
+  rowSorting: PivotDimensionSortingMap;
+  colSorting: PivotDimensionSortingMap;
+  hasAxisChanges: boolean;
+};
+
+export const transferDimensionSettingsAcrossAxes = (
+  prevRows: QueryFormColumn[],
+  prevCols: QueryFormColumn[],
+  nextRows: QueryFormColumn[],
+  nextCols: QueryFormColumn[],
+  settings: {
+    rowFormatting?: PivotDimensionFormattingMap;
+    colFormatting?: PivotDimensionFormattingMap;
+    rowSorting?: PivotDimensionSortingMap;
+    colSorting?: PivotDimensionSortingMap;
+  },
+): DimensionSettingsTransferResult => {
+  const prevRowKeys = buildDimensionKeySet(prevRows);
+  const prevColKeys = buildDimensionKeySet(prevCols);
+  const nextRowKeys = buildDimensionKeySet(nextRows);
+  const nextColKeys = buildDimensionKeySet(nextCols);
+
+  const movedToRows = new Set(
+    Array.from(nextRowKeys).filter(
+      key => !prevRowKeys.has(key) && prevColKeys.has(key),
+    ),
+  );
+  const movedToCols = new Set(
+    Array.from(nextColKeys).filter(
+      key => !prevColKeys.has(key) && prevRowKeys.has(key),
+    ),
+  );
+  const hasAxisChanges = movedToRows.size > 0 || movedToCols.size > 0;
+
+  const rowFormatting = normalizeDimensionFormattingMapForAxis(
+    settings.rowFormatting,
+    prevRows,
+  );
+  const colFormatting = normalizeDimensionFormattingMapForAxis(
+    settings.colFormatting,
+    prevCols,
+  );
+  const rowSorting = normalizeDimensionSortingMapForAxis(
+    settings.rowSorting,
+    prevRows,
+  );
+  const colSorting = normalizeDimensionSortingMapForAxis(
+    settings.colSorting,
+    prevCols,
+  );
+
+  if (!hasAxisChanges) {
+    return {
+      rowFormatting,
+      colFormatting,
+      rowSorting,
+      colSorting,
+      hasAxisChanges,
+    };
+  }
+
+  const nextRowFormatting = { ...rowFormatting };
+  const nextColFormatting = { ...colFormatting };
+  const nextRowSorting = { ...rowSorting };
+  const nextColSorting = { ...colSorting };
+
+  movedToCols.forEach(key => {
+    if (rowFormatting[key]) {
+      nextColFormatting[key] = rowFormatting[key];
+      delete nextRowFormatting[key];
+    }
+    if (rowSorting[key]) {
+      nextColSorting[key] = rowSorting[key];
+      delete nextRowSorting[key];
+    }
+  });
+
+  movedToRows.forEach(key => {
+    if (colFormatting[key]) {
+      nextRowFormatting[key] = colFormatting[key];
+      delete nextColFormatting[key];
+    }
+    if (colSorting[key]) {
+      nextRowSorting[key] = colSorting[key];
+      delete nextColSorting[key];
+    }
+  });
+
+  return {
+    rowFormatting: nextRowFormatting,
+    colFormatting: nextColFormatting,
+    rowSorting: nextRowSorting,
+    colSorting: nextColSorting,
+    hasAxisChanges,
+  };
+};
+
 export const collectMetricFormattingMetricsForQuery = (
   metricFormatting?: PivotMetricFormattingMap,
 ): QueryFormMetric[] => {

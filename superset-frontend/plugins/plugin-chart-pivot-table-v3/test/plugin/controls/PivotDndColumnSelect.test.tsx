@@ -164,6 +164,41 @@ describe('PivotDndColumnSelect', () => {
     );
   });
 
+  it('updates sorting order without a metric', async () => {
+    const setControlValue = jest.fn();
+    render(
+      <PivotDndColumnSelect
+        {...baseProps}
+        actions={{ setControlValue }}
+        formData={{
+          datasource: '1__table',
+          metrics: ['metric1', 'metric2'],
+          rowSorting: {},
+          viz_type: 'pivot_table_v3',
+        }}
+      />,
+      { useDnd: true, useRedux: true },
+    );
+
+    await userEvent.click(
+      screen.getAllByTestId('pivot-dimension-sorting-button')[0],
+    );
+    await screen.findByText('Sorting');
+
+    await userEvent.click(
+      screen.getByRole('radio', { name: /descending/i }),
+    );
+
+    await waitFor(() =>
+      expect(setControlValue).toHaveBeenLastCalledWith('rowSorting', {
+        country: {
+          order: 'desc',
+          mode: 'total',
+        },
+      }),
+    );
+  });
+
   it('updates the apply-to scope when toggled', async () => {
     const setControlValue = jest.fn();
     render(

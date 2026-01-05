@@ -28,6 +28,7 @@ import {
   resolveMetricPlacement,
   serializePath,
   SUBTOTAL_TOKEN,
+  transferDimensionSettingsAcrossAxes,
 } from '../../src/utils';
 
 const baseTree: PivotTreeData = {
@@ -228,6 +229,82 @@ describe('applyMetricAxis', () => {
     expect(
       withMetrics.cells['USA__countCustomers|BUILDING']?.values.countCustomers,
     ).toBe(10);
+  });
+});
+
+describe('transferDimensionSettingsAcrossAxes', () => {
+  it('moves formatting and sorting settings when axes change', () => {
+    const result = transferDimensionSettingsAcrossAxes(
+      ['country'],
+      ['state'],
+      ['state'],
+      ['country'],
+      {
+        rowFormatting: {
+          country: { backgroundColor: 'metric1', applyTo: 'all' },
+        },
+        colFormatting: {
+          state: { textColor: 'metric2', applyTo: 'label' },
+        },
+        rowSorting: {
+          country: { order: 'desc', mode: 'total' },
+        },
+        colSorting: {
+          state: { metric: 'metric1', order: 'asc', mode: 'total' },
+        },
+      },
+    );
+
+    expect(result.hasAxisChanges).toBe(true);
+    expect(result.rowFormatting).toEqual({
+      state: { textColor: 'metric2', applyTo: 'label' },
+    });
+    expect(result.colFormatting).toEqual({
+      country: { backgroundColor: 'metric1', applyTo: 'all' },
+    });
+    expect(result.rowSorting).toEqual({
+      state: { metric: 'metric1', order: 'asc', mode: 'total' },
+    });
+    expect(result.colSorting).toEqual({
+      country: { order: 'desc', mode: 'total' },
+    });
+  });
+
+  it('keeps settings when axes stay the same', () => {
+    const result = transferDimensionSettingsAcrossAxes(
+      ['country'],
+      ['state'],
+      ['country'],
+      ['state'],
+      {
+        rowFormatting: {
+          country: { backgroundColor: 'metric1', applyTo: 'all' },
+        },
+        colFormatting: {
+          state: { textColor: 'metric2', applyTo: 'label' },
+        },
+        rowSorting: {
+          country: { order: 'desc', mode: 'total' },
+        },
+        colSorting: {
+          state: { metric: 'metric1', order: 'asc', mode: 'total' },
+        },
+      },
+    );
+
+    expect(result.hasAxisChanges).toBe(false);
+    expect(result.rowFormatting).toEqual({
+      country: { backgroundColor: 'metric1', applyTo: 'all' },
+    });
+    expect(result.colFormatting).toEqual({
+      state: { textColor: 'metric2', applyTo: 'label' },
+    });
+    expect(result.rowSorting).toEqual({
+      country: { order: 'desc', mode: 'total' },
+    });
+    expect(result.colSorting).toEqual({
+      state: { metric: 'metric1', order: 'asc', mode: 'total' },
+    });
   });
 });
 

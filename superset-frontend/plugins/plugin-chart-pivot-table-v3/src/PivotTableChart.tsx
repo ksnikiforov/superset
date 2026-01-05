@@ -408,9 +408,6 @@ function PivotTableChart(props: PivotTableProps) {
         const metricKey = dimensionSorting.metric
           ? getFormattingMetricKey(dimensionSorting.metric)
           : '';
-        if (!metricKey && !dimensionSorting.axisValueRef) {
-          return;
-        }
         next[dimensionKey] = {
           metricKey: metricKey || undefined,
           order: dimensionSorting.order ?? DEFAULT_DIMENSION_SORT_ORDER,
@@ -1907,7 +1904,17 @@ function PivotTableChart(props: PivotTableProps) {
   const compareMetricSort = useCallback(
     (axis: 'row' | 'col', a: PivotTreeNode, b: PivotTreeNode) => {
       const config = resolveSortConfig(axis, a, b);
-      if (!config?.metricKey || config.mode !== 'total') {
+      if (!config) {
+        return 0;
+      }
+      if (!config.metricKey) {
+        const dimensionKey =
+          getDimensionKeyForNode(a, axis) || getDimensionKeyForNode(b, axis);
+        const type = dimensionKey ? colTypeMap?.[dimensionKey] : undefined;
+        const cmp = compareValues(a.label, b.label, type);
+        return config.order === 'asc' ? cmp : -cmp;
+      }
+      if (config.mode !== 'total') {
         return 0;
       }
       const aValue = getSortValue(axis, a, config.metricKey);
@@ -1922,7 +1929,13 @@ function PivotTableChart(props: PivotTableProps) {
       const cmp = compareValues(aValue, bValue, type);
       return config.order === 'asc' ? cmp : -cmp;
     },
-    [compareValues, getSortValue, resolveSortConfig],
+    [
+      colTypeMap,
+      compareValues,
+      getDimensionKeyForNode,
+      getSortValue,
+      resolveSortConfig,
+    ],
   );
 
   const rowSorter = useMemo(() => {

@@ -84,4 +84,65 @@ describe('PivotTableChart sorting', () => {
     );
     expect(labels).toEqual(['Canada', 'Brazil']);
   });
+
+  it('sorts rows by dimension values when no metric is configured', () => {
+    const metrics = ['metric1'];
+    const groupbyRows = ['country'];
+    const groupbyColumns: string[] = [];
+    const tree = buildTreeFromRecords(
+      [
+        { country: 'Brazil', metric1: 10 },
+        { country: 'Argentina', metric1: 20 },
+      ],
+      metrics,
+      groupbyRows,
+      groupbyColumns,
+      1,
+      0,
+    );
+
+    render(
+      <PivotTableChart
+        data={tree}
+        formData={buildFormData({
+          groupbyRows,
+          groupbyColumns,
+          metrics,
+          rowSorting: {
+            country: { order: 'desc', mode: 'total' },
+          },
+        })}
+        metrics={metrics}
+        groupbyRows={groupbyRows}
+        groupbyColumns={groupbyColumns}
+        startCollapsed={false}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        width={400}
+        height={300}
+        margin={0}
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        verboseMap={{}}
+      />,
+    );
+
+    const dataRows = screen.getAllByRole('row').slice(1);
+    const labels = dataRows.map(row =>
+      row.querySelector('th')?.textContent?.trim(),
+    );
+    expect(labels).toEqual(['Brazil', 'Argentina']);
+  });
 });
