@@ -46,11 +46,15 @@ import PivotMetricDefinitionValue from './PivotMetricDefinitionValue';
 import {
   PivotMetricFormatting,
   PivotMetricFormattingMap,
+  PivotMetricDatabar,
+  PivotMetricDatabarMap,
 } from '../../types';
 import {
   collectMetricFormattingMetrics,
+  collectMetricDatabarMetrics,
   getFormattingMetricKey,
   getMetricKey,
+  normalizeMetricDatabarMapWithKeys,
   normalizeMetricFormattingMapWithKeys,
 } from '../../utils';
 
@@ -177,6 +181,8 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
   const setControlValue = props.actions?.setControlValue;
   const rawMetricFormatting =
     (props.formData?.metricFormatting as PivotMetricFormattingMap) || {};
+  const rawMetricDatabars =
+    (props.formData?.metricDatabars as PivotMetricDatabarMap) || {};
   const metricFormatting = useMemo(
     () =>
       normalizeMetricFormattingMapWithKeys(
@@ -186,12 +192,25 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       ),
     [props.value, rawMetricFormatting, savedMetrics],
   );
+  const metricDatabars = useMemo(
+    () =>
+      normalizeMetricDatabarMapWithKeys(
+        rawMetricDatabars,
+        ensureIsArray(props.value),
+        savedMetrics,
+      ),
+    [props.value, rawMetricDatabars, savedMetrics],
+  );
   const metricFormattingRef = useRef<PivotMetricFormattingMap>(metricFormatting);
+  const metricDatabarsRef = useRef<PivotMetricDatabarMap>(metricDatabars);
   const metricFormattingPendingRef = useRef<PivotMetricFormattingMap | null>(
     null,
   );
+  const metricDatabarsPendingRef = useRef<PivotMetricDatabarMap | null>(null);
   const [localMetricFormatting, setLocalMetricFormatting] =
     useState<PivotMetricFormattingMap>(metricFormatting);
+  const [localMetricDatabars, setLocalMetricDatabars] =
+    useState<PivotMetricDatabarMap>(metricDatabars);
 
   useEffect(() => {
     if (metricFormattingPendingRef.current) {
@@ -209,6 +228,23 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       setLocalMetricFormatting(metricFormatting);
     }
   }, [localMetricFormatting, metricFormatting]);
+
+  useEffect(() => {
+    if (metricDatabarsPendingRef.current) {
+      if (isEqual(metricDatabars, metricDatabarsPendingRef.current)) {
+        metricDatabarsPendingRef.current = null;
+        metricDatabarsRef.current = metricDatabars;
+        if (!isEqual(metricDatabars, localMetricDatabars)) {
+          setLocalMetricDatabars(metricDatabars);
+        }
+      }
+      return;
+    }
+    metricDatabarsRef.current = metricDatabars;
+    if (!isEqual(metricDatabars, localMetricDatabars)) {
+      setLocalMetricDatabars(metricDatabars);
+    }
+  }, [localMetricDatabars, metricDatabars]);
 
   const extra = useMemo<{ disallow_adhoc_metrics?: boolean }>(() => {
     let parsedExtra: { disallow_adhoc_metrics?: boolean } = {};
@@ -263,6 +299,32 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
           metricFormattingRef.current = nextFormatting;
           setLocalMetricFormatting(nextFormatting);
           setControlValue('metricFormatting', nextFormatting);
+        }
+        const baseDatabars = metricDatabarsRef.current || {};
+        const nextDatabars = Object.fromEntries(
+          Object.entries(baseDatabars).filter(([key]) =>
+            activeMetricKeys.has(key),
+          ),
+        ) as PivotMetricDatabarMap;
+        const cleanedDatabars = Object.entries(nextDatabars).reduce<PivotMetricDatabarMap>(
+          (acc, [key, config]) => {
+            const scaleLikeKey = config.scaleLike
+              ? getMetricKey(config.scaleLike as QueryFormMetric)
+              : '';
+            if (scaleLikeKey && !activeMetricKeys.has(scaleLikeKey)) {
+              acc[key] = { ...config, scaleLike: undefined };
+            } else {
+              acc[key] = config;
+            }
+            return acc;
+          },
+          {},
+        );
+        if (!isEqual(baseDatabars, cleanedDatabars)) {
+          metricDatabarsPendingRef.current = cleanedDatabars;
+          metricDatabarsRef.current = cleanedDatabars;
+          setLocalMetricDatabars(cleanedDatabars);
+          setControlValue('metricDatabars', cleanedDatabars);
         }
       }
       onChange(multi ? optionValues : optionValues[0]);
@@ -330,20 +392,60 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
     [setControlValue],
   );
 
+  const handleMetricDatabarChange = useCallback(
+    (
+      metricKey: string,
+      field: keyof PivotMetricDatabar,
+      value?: PivotMetricDatabar[keyof PivotMetricDatabar],
+    ) => {
+      if (!setControlValue) {
+        return;
+      }
+      const baseDatabars = metricDatabarsRef.current || {};
+      const current = baseDatabars[metricKey] || {};
+      const updated: PivotMetricDatabar = {
+        ...current,
+        [field]: value,
+      };
+      if (field === 'colorMetric' && value) {
+        updated.colorMode = 'byMetric';
+      }
+      if (field === 'colorMode' && value !== 'byMetric') {
+        delete updated.colorMetric;
+      }
+      if (field === 'colorMetric' && !value) {
+        updated.colorMode = 'static';
+      }
+      const nextDatabars = { ...baseDatabars };
+      if (!updated.type) {
+        delete nextDatabars[metricKey];
+      } else {
+        nextDatabars[metricKey] = updated;
+      }
+      setLocalMetricDatabars(nextDatabars);
+      metricDatabarsPendingRef.current = nextDatabars;
+      metricDatabarsRef.current = nextDatabars;
+      setControlValue('metricDatabars', nextDatabars);
+    },
+    [setControlValue],
+  );
+
   const availableMetrics = useMemo(() => {
     const selectedMetrics = value;
     const formattingMetrics = collectMetricFormattingMetrics(
       localMetricFormatting,
     );
+    const databarMetrics = collectMetricDatabarMetrics(localMetricDatabars);
     const savedMetricNames = savedMetrics
       .map(metric => metric.metric_name)
       .filter(Boolean) as ValueType[];
     return dedupeMetrics([
       ...selectedMetrics,
       ...formattingMetrics,
+      ...databarMetrics,
       ...savedMetricNames,
     ]);
-  }, [localMetricFormatting, savedMetrics, value]);
+  }, [localMetricDatabars, localMetricFormatting, savedMetrics, value]);
 
   const canDrop = useCallback(
     (item: DatasourcePanelDndItem) => {
@@ -468,8 +570,11 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
         savedMetrics={savedMetrics}
         savedMetricsOptions={getSavedMetricOptionsForMetric(index)}
         availableMetrics={availableMetrics}
+        selectedMetrics={value}
         metricFormatting={localMetricFormatting}
         onMetricFormattingChange={handleMetricFormattingChange}
+        metricDatabars={localMetricDatabars}
+        onMetricDatabarChange={handleMetricDatabarChange}
         datasource={props.datasource}
         onMoveLabel={moveLabel}
         onDropLabel={handleDropLabel}
@@ -485,11 +590,14 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
     [
       availableMetrics,
       getSavedMetricOptionsForMetric,
+      handleMetricDatabarChange,
       handleMetricFormattingChange,
       handleDropLabel,
-      metricFormatting,
+      localMetricDatabars,
+      localMetricFormatting,
       moveLabel,
       multi,
+      value,
       onMetricEdit,
       onRemoveMetric,
       props.columns,

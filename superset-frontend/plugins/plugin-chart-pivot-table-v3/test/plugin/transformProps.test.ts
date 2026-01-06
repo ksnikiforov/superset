@@ -99,6 +99,47 @@ describe('Pivot Table v3 transformProps', () => {
     expect(result.data.cells['A|B__metric1'].values.metric1_bg).toBe('#111111');
   });
 
+  it('keeps databar color metric values in the tree', () => {
+    const props = new ChartProps({
+      ...chartProps,
+      formData: {
+        ...formData,
+        metricDatabars: {
+          metric1: {
+            type: 'bar',
+            colorMode: 'byMetric',
+            colorMetric: {
+              expressionType: 'SQL',
+              sqlExpression: 'CASE WHEN SUM(sales) > 0 THEN "#111111" END',
+              label: 'metric1_color',
+            },
+          },
+        },
+      },
+      queriesData: [
+        {
+          data: [
+            {
+              row1: 'A',
+              col1: 'B',
+              metric1: 10,
+              metric1_color: '#111111',
+            },
+          ],
+          colnames: ['row1', 'col1', 'metric1', 'metric1_color'],
+          coltypes: [1, 1, 0, 1],
+          query_name: formatQueryName(1, 1),
+        },
+      ],
+    });
+    const result = transformProps(
+      props as ChartProps<PivotTableQueryFormData>,
+    );
+    expect(result.data.cells['A|B__metric1'].values.metric1_color).toBe(
+      '#111111',
+    );
+  });
+
   it('keeps row and column formatting metric values in the tree', () => {
     const props = new ChartProps({
       ...chartProps,

@@ -38,6 +38,8 @@ import {
   PivotAxisValueRef,
   PivotMetricFormattingMap,
   PivotMetricFormatting,
+  PivotMetricDatabarMap,
+  PivotMetricDatabar,
   PivotSortMode,
   PivotSortOrder,
   PivotPath,
@@ -245,6 +247,61 @@ export const normalizeMetricFormattingMap = (
       if (Object.keys(nextFormatting).length > 0) {
         acc[metricKey] = nextFormatting;
       }
+      return acc;
+    },
+    {},
+  );
+};
+
+const normalizeDatabarType = (value: unknown): PivotMetricDatabar['type'] => {
+  if (value === 'bar' || value === 'lollipop' || value === 'waterfall') {
+    return value;
+  }
+  return undefined;
+};
+
+export const normalizeMetricDatabarMap = (
+  metricDatabars?: PivotMetricDatabarMap,
+): PivotMetricDatabarMap => {
+  if (!metricDatabars) {
+    return {};
+  }
+  return Object.entries(metricDatabars).reduce<PivotMetricDatabarMap>(
+    (acc, [metricKey, config]) => {
+      if (!metricKey || !config) {
+        return acc;
+      }
+      const type = normalizeDatabarType(config.type);
+      if (!type) {
+        return acc;
+      }
+      const scaleLike = normalizeMetricFormattingValue(config.scaleLike);
+      const colorMetric = normalizeMetricFormattingValue(config.colorMetric);
+      const colorMode =
+        (config.colorMode === 'byMetric' || colorMetric) && colorMetric
+          ? 'byMetric'
+          : 'static';
+      const scaleGroup =
+        typeof config.scaleGroup === 'string' && config.scaleGroup.trim().length > 0
+          ? config.scaleGroup.trim()
+          : undefined;
+      const positiveColor =
+        typeof config.positiveColor === 'string' && config.positiveColor.trim().length > 0
+          ? config.positiveColor
+          : undefined;
+      const negativeColor =
+        typeof config.negativeColor === 'string' && config.negativeColor.trim().length > 0
+          ? config.negativeColor
+          : undefined;
+      acc[metricKey] = {
+        type,
+        scaleLike,
+        scaleGroup,
+        colorMode,
+        colorMetric: colorMode === 'byMetric' ? colorMetric : undefined,
+        positiveColor,
+        negativeColor,
+      };
       return acc;
     },
     {},
@@ -700,6 +757,53 @@ export const normalizeMetricFormattingMapWithKeys = (
   );
 };
 
+export const normalizeMetricDatabarMapWithKeys = (
+  metricDatabars: PivotMetricDatabarMap | undefined,
+  metrics: QueryFormMetric[],
+  savedMetrics?: Metric[],
+): PivotMetricDatabarMap => {
+  const normalized = normalizeMetricDatabarMap(metricDatabars);
+  if (metrics.length === 0) {
+    return normalized;
+  }
+  const metricKeys = new Set(getMetricKeys(metrics));
+  const verboseNameToKey = (savedMetrics || []).reduce<Map<string, string>>(
+    (acc, metric) => {
+      if (metric.verbose_name && metric.metric_name) {
+        acc.set(metric.verbose_name, metric.metric_name);
+      }
+      return acc;
+    },
+    new Map(),
+  );
+  const labelToKey = metrics.reduce<Map<string, string>>((acc, metric) => {
+    const key = getMetricKey(metric);
+    const label = getMetricLabel(metric);
+    if (key && label && key !== label && !acc.has(label)) {
+      acc.set(label, key);
+    }
+    return acc;
+  }, new Map());
+  return Object.entries(normalized).reduce<PivotMetricDatabarMap>(
+    (acc, [metricKey, config]) => {
+      const resolvedKey = metricKeys.has(metricKey)
+        ? metricKey
+        : labelToKey.get(metricKey) ||
+          verboseNameToKey.get(metricKey) ||
+          metricKey;
+      if (!resolvedKey) {
+        return acc;
+      }
+      acc[resolvedKey] = {
+        ...(acc[resolvedKey] || {}),
+        ...config,
+      };
+      return acc;
+    },
+    {},
+  );
+};
+
 export const collectMetricFormattingMetrics = (
   metricFormatting?: PivotMetricFormattingMap,
 ): QueryFormMetric[] => {
@@ -710,6 +814,31 @@ export const collectMetricFormattingMetrics = (
       normalizeMetricFormattingValue(formatting[field]),
     ).filter((metric): metric is QueryFormMetric => metric !== undefined),
   );
+};
+
+export const collectMetricDatabarMetrics = (
+  metricDatabars?: PivotMetricDatabarMap,
+): QueryFormMetric[] => {
+  return Object.values(
+    normalizeMetricDatabarMap(metricDatabars),
+  ).flatMap(config =>
+    config.colorMode === 'byMetric' && config.colorMetric
+      ? [config.colorMetric]
+      : [],
+  );
+};
+
+export const collectMetricDatabarMetricsForQuery = (
+  metricDatabars?: PivotMetricDatabarMap,
+): QueryFormMetric[] => {
+  return Object.values(
+    normalizeMetricDatabarMap(metricDatabars),
+  ).flatMap(config => {
+    if (config.colorMode !== 'byMetric' || !config.colorMetric) {
+      return [];
+    }
+    return [normalizeFormattingMetricForQuery(config.colorMetric)];
+  });
 };
 
 export const mergeMetrics = (

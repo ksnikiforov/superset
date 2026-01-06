@@ -27,6 +27,7 @@ import {
 import { MetricsLayoutEnum, PivotTableQueryFormData } from './types';
 import {
   collectMetricFormattingMetricsForQuery,
+  collectMetricDatabarMetricsForQuery,
   collectDimensionFormattingMetricsForQuery,
   collectDimensionSortingMetricsForQuery,
   mergeMetrics,
@@ -79,6 +80,9 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
   const metricFormattingMetrics = collectMetricFormattingMetricsForQuery(
     formData.metricFormatting,
   );
+  const metricDatabarMetrics = collectMetricDatabarMetricsForQuery(
+    formData.metricDatabars,
+  );
   const placement = resolveMetricPlacement(rowGroupbyRaw, colGroupbyRaw, {
     hasMetrics: metrics.length > 0,
     preferredAxis: formData.metricsLayout as MetricsLayoutEnum,
@@ -103,6 +107,7 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
   );
   const formattingMetrics = [
     ...metricFormattingMetrics,
+    ...metricDatabarMetrics,
     ...rowFormattingMetrics,
     ...colFormattingMetrics,
     ...rowSortingMetrics,

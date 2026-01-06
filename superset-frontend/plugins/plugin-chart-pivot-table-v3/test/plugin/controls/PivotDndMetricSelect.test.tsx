@@ -144,6 +144,43 @@ describe('PivotDndMetricSelect', () => {
     );
   });
 
+  it('stores databar configuration when a type is selected', async () => {
+    const setControlValue = jest.fn();
+    render(
+      <PivotDndMetricSelect
+        {...baseProps}
+        actions={{ setControlValue }}
+        formData={{
+          datasource: '1__table',
+          metricFormatting: {},
+          metricDatabars: {},
+          viz_type: 'pivot_table_v3',
+        }}
+      />,
+      { useDnd: true },
+    );
+
+    await userEvent.click(
+      screen.getAllByTestId('pivot-metric-formatting-button')[0],
+    );
+    await screen.findByText('Databars');
+
+    const typeSelect = screen.getByRole('combobox', { name: /databar type/i });
+    await userEvent.click(typeSelect);
+    await userEvent.click(await screen.findByText('Filled bar'));
+
+    await waitFor(() =>
+      expect(setControlValue).toHaveBeenCalledWith(
+        'metricDatabars',
+        expect.objectContaining({
+          sum__value: expect.objectContaining({
+            type: 'bar',
+          }),
+        }),
+      ),
+    );
+  });
+
   it('keeps formatting for adhoc metrics with verbose labels', async () => {
     const setControlValue = jest.fn();
     const adhocMetric: QueryFormMetric = {

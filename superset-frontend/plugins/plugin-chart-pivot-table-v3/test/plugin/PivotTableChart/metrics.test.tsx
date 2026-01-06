@@ -306,6 +306,191 @@ describe('PivotTableChart metric tier suppression', () => {
     });
   });
 
+  it('renders databars for configured metrics', () => {
+    render(
+      <PivotTableChart
+        data={baseTree}
+        formData={buildFormData({
+          ...baseFormData,
+          metricDatabars: {
+            metric1: {
+              type: 'bar',
+              positiveColor: '#666666',
+              negativeColor: '#666666',
+            },
+          },
+        })}
+        metrics={['metric1']}
+        groupbyRows={['r1']}
+        groupbyColumns={['c1']}
+        aggregateFunction="Sum"
+        width={400}
+        height={300}
+        startCollapsed={false}
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    const databars = screen.getAllByTestId('pivot-databar');
+    expect(databars.length).toBeGreaterThan(0);
+    expect(screen.getByText('10')).toBeInTheDocument();
+  });
+
+  it('scales databars using union of scale-like group values', () => {
+    const tree = applyMetricAxis(
+      buildTreeFromRecords(
+        [
+          {
+            r1: 'A',
+            c1: 'C1',
+            metric1: 10,
+            metric2: 100,
+          },
+        ],
+        ['metric1', 'metric2'],
+        ['r1'],
+        ['c1'],
+        1,
+        1,
+      ),
+      ['metric1', 'metric2'],
+      MetricsLayoutEnum.COLUMNS,
+      ['r1'],
+      ['c1'],
+    );
+
+    render(
+      <PivotTableChart
+        data={tree}
+        formData={buildFormData({
+          ...baseFormData,
+          metrics: ['metric1', 'metric2'],
+          metricDatabars: {
+            metric1: {
+              type: 'bar',
+              scaleLike: 'metric2',
+            },
+            metric2: {
+              type: 'bar',
+            },
+          },
+        })}
+        metrics={['metric1', 'metric2']}
+        groupbyRows={['r1']}
+        groupbyColumns={['c1']}
+        aggregateFunction="Sum"
+        width={400}
+        height={300}
+        startCollapsed={false}
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    const cell = screen.getByText('10').closest('td');
+    expect(cell).toBeTruthy();
+    if (!cell) {
+      return;
+    }
+    const bar = within(cell).getByTestId('pivot-databar-bar');
+    const widthPct = Number.parseFloat(bar.style.width);
+    expect(widthPct).toBeCloseTo(10, 1);
+  });
+
+  it('renders databars on row grand totals', () => {
+    const treeWithTotal: PivotTreeData = {
+      ...baseTree,
+      cells: {
+        ...baseTree.cells,
+        [`${serializePath([])}|${serializePath(['C1'])}`]: {
+          rowKey: serializePath([]),
+          colKey: serializePath(['C1']),
+          values: { metric1: 50 },
+        },
+      },
+    };
+
+    render(
+      <PivotTableChart
+        data={treeWithTotal}
+        formData={buildFormData({
+          ...baseFormData,
+          rowTotals: true,
+          metricDatabars: {
+            metric1: {
+              type: 'bar',
+            },
+          },
+        })}
+        metrics={['metric1']}
+        groupbyRows={['r1']}
+        groupbyColumns={['c1']}
+        aggregateFunction="Sum"
+        width={400}
+        height={300}
+        startCollapsed={false}
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={true}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    const totalCell = screen.getByText('50').closest('td');
+    expect(totalCell).toBeTruthy();
+    if (!totalCell) {
+      return;
+    }
+    expect(within(totalCell).getByTestId('pivot-databar')).toBeInTheDocument();
+  });
+
   it('applies row and column formatting with metric priority', () => {
     const formattedTree: PivotTreeData = {
       ...baseTree,

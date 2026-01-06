@@ -40,12 +40,14 @@ import {
   buildTreeFromRecords,
   collectDimensionFormattingMetricsForQuery,
   collectMetricFormattingMetricsForQuery,
+  collectMetricDatabarMetricsForQuery,
   getMetricKeys,
   mergeTrees,
   mergeMetrics,
   normalizeDimensionFormattingMapWithKeys,
   normalizeDimensionSortingMapWithKeys,
   normalizeMetricFormattingMapWithKeys,
+  normalizeMetricDatabarMapWithKeys,
   parseDepth,
   resolveMetricPlacement,
   stripMetricsPlaceholder,
@@ -79,9 +81,14 @@ export default function transformProps(
     formData.metricFormatting,
     metrics,
   );
+  const metricDatabars = normalizeMetricDatabarMapWithKeys(
+    formData.metricDatabars,
+    metrics,
+  );
   const formattingMetrics = collectMetricFormattingMetricsForQuery(
     metricFormatting,
   );
+  const databarMetrics = collectMetricDatabarMetricsForQuery(metricDatabars);
   const metricsForQuery = mergeMetrics(metrics, formattingMetrics);
   const groupbyRowsRaw = ensureIsArray(formData.groupbyRows || []);
   const groupbyColumnsRaw = ensureIsArray(formData.groupbyColumns || []);
@@ -124,6 +131,7 @@ export default function transformProps(
     groupbyColumns,
   );
   const metricsForQueryWithFormatting = mergeMetrics(metricsForQuery, [
+    ...databarMetrics,
     ...rowFormattingMetrics,
     ...colFormattingMetrics,
     ...rowSortingMetrics,
@@ -352,6 +360,7 @@ export default function transformProps(
     queryFormData,
     metrics,
     metricFormatting,
+    metricDatabars,
     metricFormattingScope: formData.metricFormattingScope,
     groupbyRows,
     groupbyColumns,

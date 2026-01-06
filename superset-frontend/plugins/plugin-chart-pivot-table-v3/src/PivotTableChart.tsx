@@ -26,8 +26,10 @@ import {
   BinaryQueryObjectFilterClause,
   DataRecordValue,
   GenericDataType,
+  addAlpha,
   getColumnLabel,
   getNumberFormatter,
+  supersetTheme,
   styled,
   t,
 } from '@superset-ui/core';
@@ -45,6 +47,8 @@ import {
   PivotTreeNode,
   PivotDimensionFormattingMap,
   PivotDimensionSortingMap,
+  PivotResultCell,
+  PivotMetricDatabarMap,
   PivotSortOrder,
   PivotSortMode,
 } from './types';
@@ -57,6 +61,7 @@ import {
   normalizeDimensionFormattingMapWithKeys,
   normalizeDimensionSortingMapWithKeys,
   normalizeMetricFormattingMapWithKeys,
+  normalizeMetricDatabarMapWithKeys,
   normalizeSubtotalLevels,
   parseThemeColors,
   PIVOT_THEME_PRESETS,
@@ -109,7 +114,8 @@ const Container = styled.div<{ height: number; width: number | string }>`
 `;
 
 const StyledTable = styled.table`
-  width: 100%;
+  width: max-content;
+  min-width: 100%;
   border-collapse: collapse;
   font-size: 12px;
 
@@ -128,6 +134,11 @@ const StyledTable = styled.table`
 
   td.value-cell {
     text-align: right;
+  }
+
+  td.databar-cell {
+    padding: 0;
+    position: relative;
   }
 
   tbody th {
@@ -172,6 +183,109 @@ const ToggleButton = styled.button`
 
 const Spinner = styled(LoadingOutlined)`
   font-size: 12px;
+`;
+
+const DatabarContent = styled.div`
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  box-sizing: border-box;
+  flex: 1;
+`;
+
+const DatabarSpacer = styled.div`
+  height: ${({ theme }) => theme.sizeUnit * 4}px;
+  visibility: hidden;
+  pointer-events: none;
+`;
+
+const DatabarScale = styled.div`
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+`;
+
+const DatabarLabel = styled.div`
+  position: absolute;
+  white-space: nowrap;
+  background-color: rgba(255, 255, 255, 0.6);
+  padding: 0 ${({ theme }) => theme.sizeUnit * 0.5}px;
+  z-index: 3;
+  pointer-events: none;
+`;
+
+const DatabarBaseline = styled.div<{ $color: string }>`
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: ${({ theme }) => Math.max(2, theme.sizeUnit * 0.5)}px;
+  background-color: ${({ $color }) => $color};
+  transform: translateX(-50%);
+  z-index: 2;
+`;
+
+const DatabarConnector = styled.div<{ $color: string; $width: number }>`
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: ${({ $width }) => $width}px;
+  background-color: ${({ $color }) => $color};
+  transform: translateX(-50%);
+  z-index: 2;
+`;
+
+const DatabarDottedConnector = styled.div<{ $color: string; $width: number }>`
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: ${({ $width }) => $width}px;
+  background-image: ${({ $color }) =>
+    `repeating-linear-gradient(
+      to bottom,
+      ${$color},
+      ${$color} 2px,
+      transparent 2px,
+      transparent 4px
+    )`};
+  background-repeat: repeat;
+  background-size: 100% 4px;
+  transform: translateX(-50%);
+  z-index: 2;
+`;
+
+const DatabarRect = styled.div<{
+  $color: string;
+  $height: number | string;
+}>`
+  position: absolute;
+  height: ${({ $height }) =>
+    typeof $height === 'number' ? `${$height}px` : $height};
+  background-color: ${({ $color }) => $color};
+  z-index: 1;
+`;
+
+const DatabarLine = styled.div<{ $color: string }>`
+  position: absolute;
+  height: 2px;
+  background-color: ${({ $color }) => $color};
+  z-index: 1;
+`;
+
+const DatabarDot = styled.div<{ $color: string }>`
+  width: ${({ theme }) => theme.sizeUnit * 1.5}px;
+  height: ${({ theme }) => theme.sizeUnit * 1.5}px;
+  border-radius: 50%;
+  background-color: ${({ $color }) => $color};
+  flex-shrink: 0;
+  z-index: 1;
 `;
 
 type FormattingKeys = {
@@ -245,6 +359,46 @@ const normalizeCssColor = (rawValue: DataRecordValue) => {
   return `rgb(${r}, ${g}, ${b})`;
 };
 
+const CONNECTOR_ALPHA_LEVELS = [0.75, 0.6, 0.45, 0.3];
+
+const resolveConnectorAlpha = (depth: number) => {
+  const boundedDepth = Math.max(0, depth);
+  const idx = Math.min(boundedDepth, CONNECTOR_ALPHA_LEVELS.length - 1);
+  return CONNECTOR_ALPHA_LEVELS[idx];
+};
+
+const applyAlphaToColor = (rawColor: string, alpha: number) => {
+  const normalized = normalizeCssColor(rawColor) ?? rawColor.trim();
+  if (HEX_COLOR_PATTERN.test(normalized)) {
+    const base =
+      normalized.length === 9 ? normalized.slice(0, 7) : normalized;
+    const baseAlpha =
+      normalized.length === 9
+        ? parseInt(normalized.slice(7), 16) / 255
+        : undefined;
+    const resolvedAlpha =
+      baseAlpha === undefined ? alpha : baseAlpha * alpha;
+    return addAlpha(base, resolvedAlpha);
+  }
+  const rgbMatch = normalized.match(/^rgba?\((.*)\)$/i);
+  if (!rgbMatch) {
+    return normalized;
+  }
+  const parts = rgbMatch[1]
+    .split(',')
+    .map(part => part.trim())
+    .filter(part => part.length > 0);
+  const [r, g, b] = parts.slice(0, 3).map(parseRgbChannel);
+  if (r === null || g === null || b === null) {
+    return normalized;
+  }
+  const parsedAlpha =
+    parts.length === 4 ? parseAlphaChannel(parts[3]) : null;
+  const resolvedAlpha =
+    parsedAlpha === null ? alpha : parsedAlpha * alpha;
+  return `rgba(${r}, ${g}, ${b}, ${resolvedAlpha})`;
+};
+
 const normalizeD3Format = (rawValue: DataRecordValue) => {
   if (typeof rawValue !== 'string') {
     return undefined;
@@ -265,6 +419,70 @@ const shouldApplyMetricFormatting = (
     return !isGrandTotalCell;
   }
   return true;
+};
+
+type DatabarScale = {
+  min: number;
+  max: number;
+};
+
+const clampValue = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), max);
+
+const resolveScaleBounds = (scale: DatabarScale) => {
+  const min = Number.isFinite(scale.min) ? scale.min : 0;
+  const max = Number.isFinite(scale.max) ? scale.max : 0;
+  const boundedMin = Math.min(min, 0);
+  const boundedMax = Math.max(max, 0);
+  const span = boundedMax - boundedMin || 1;
+  const zeroPct = (0 - boundedMin) / span;
+  return {
+    boundedMin,
+    boundedMax,
+    span,
+    zeroPct,
+  };
+};
+
+const toPercent = (value: number, scale: DatabarScale) => {
+  const { boundedMin, boundedMax, span } = resolveScaleBounds(scale);
+  const clamped = clampValue(value, boundedMin, boundedMax);
+  return (clamped - boundedMin) / span;
+};
+
+const resolveScaleGroupKey = (
+  metricKey: string,
+  databarMap: PivotMetricDatabarMap,
+) => {
+  let current = metricKey;
+  const visited = new Set<string>();
+  while (true) {
+    if (visited.has(current)) {
+      break;
+    }
+    visited.add(current);
+    const config = databarMap[current];
+    if (!config?.scaleLike) {
+      break;
+    }
+    const next = getMetricKey(config.scaleLike);
+    if (!next || next === current) {
+      break;
+    }
+    current = next;
+  }
+  return current;
+};
+
+const getNumericValue = (value: DataRecordValue) => {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : undefined;
+  }
+  if (typeof value === 'string' && value.trim().length > 0) {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
 };
 
 
@@ -306,6 +524,7 @@ function PivotTableChart(props: PivotTableProps) {
     colSubtotalPosition = 'start',
     pivotTheme = 'none',
     pivotThemeColors = '',
+    theme = supersetTheme,
   } = props;
   const fetchFormData = queryFormData || formData;
   const resolvedMetricsLayout =
@@ -315,6 +534,10 @@ function PivotTableChart(props: PivotTableProps) {
   const metricFormatting = normalizeMetricFormattingMapWithKeys(
     formData.metricFormatting,
     metrics,
+  );
+  const metricDatabars = useMemo(
+    () => normalizeMetricDatabarMapWithKeys(formData.metricDatabars, metrics),
+    [formData.metricDatabars, metrics],
   );
   const rowFormatting = useMemo(
     () => normalizeDimensionFormattingMapWithKeys(
@@ -3036,6 +3259,421 @@ function PivotTableChart(props: PivotTableProps) {
     [metrics, resolvedMetricsLayout, tree.cells],
   );
 
+  const isRowGrandTotalNode = useCallback(
+    (rowNode: PivotTreeNode) =>
+      rowNode.path.length === 0 || isMetricGrandTotalNode(rowNode),
+    [isMetricGrandTotalNode],
+  );
+
+  const databarMetricKeys = useMemo(
+    () => Object.keys(metricDatabars),
+    [metricDatabars],
+  );
+  const scaleLikeTargets = useMemo(() => {
+    const targets = new Set<string>();
+    databarMetricKeys.forEach(metricKey => {
+      const scaleLike = metricDatabars[metricKey]?.scaleLike;
+      if (!scaleLike) {
+        return;
+      }
+      const scaleKey = getMetricKey(scaleLike);
+      if (scaleKey) {
+        targets.add(scaleKey);
+      }
+    });
+    return targets;
+  }, [databarMetricKeys, metricDatabars]);
+  const metricsForScale = useMemo(
+    () => new Set<string>([...databarMetricKeys, ...scaleLikeTargets]),
+    [databarMetricKeys, scaleLikeTargets],
+  );
+  const visibleRowKeySet = useMemo(
+    () => new Set(visibleRows.map(row => row.key)),
+    [visibleRows],
+  );
+  const visibleColKeySet = useMemo(
+    () => new Set(visibleCols.map(col => col.key)),
+    [visibleCols],
+  );
+  const databarScales = useMemo(() => {
+    if (metricsForScale.size === 0) {
+      return new Map<string, DatabarScale>();
+    }
+    const scaleMap = new Map<string, DatabarScale>();
+    Object.values(tree.cells).forEach(cell => {
+      if (
+        !visibleRowKeySet.has(cell.rowKey) ||
+        !visibleColKeySet.has(cell.colKey)
+      ) {
+        return;
+      }
+      const rowNode = tree.rows[cell.rowKey];
+      const colNode = tree.cols[cell.colKey];
+      if (!rowNode || !colNode) {
+        return;
+      }
+      if (isRowGrandTotalNode(rowNode)) {
+        return;
+      }
+      const metricKey = deriveMetricKey(rowNode, colNode);
+      if (!metricsForScale.has(metricKey)) {
+        return;
+      }
+      const value = getNumericValue(cell.values[metricKey]);
+      if (value === undefined) {
+        return;
+      }
+      const scaleKey = resolveScaleGroupKey(metricKey, metricDatabars);
+      const current = scaleMap.get(scaleKey);
+      if (!current) {
+        scaleMap.set(scaleKey, { min: value, max: value });
+      } else {
+        current.min = Math.min(current.min, value);
+        current.max = Math.max(current.max, value);
+      }
+    });
+    return scaleMap;
+  }, [
+    deriveMetricKey,
+    isRowGrandTotalNode,
+    metricDatabars,
+    metricsForScale,
+    tree.cells,
+    tree.cols,
+    tree.rows,
+    visibleColKeySet,
+    visibleRowKeySet,
+  ]);
+  const waterfallOffsets = useMemo(() => {
+    const offsets = new Map<
+      string,
+      {
+        start: number;
+        end: number;
+        scaleKey: string;
+        connectAbove: boolean;
+        connectBelow: boolean;
+        connectAboveValue?: number;
+        connectBelowValue?: number;
+      }
+    >();
+    if (metricsForScale.size === 0) {
+      return offsets;
+    }
+    const cumulative = new Map<string, number>();
+    const prevKeys = new Map<string, string>();
+    visibleRows.forEach(rowNode => {
+      const isGrandTotalRow = isRowGrandTotalNode(rowNode);
+      const shouldReset = isExplicitSubtotalNode(rowNode) && !isGrandTotalRow;
+      const isExpandedGroup = rowNode.hasChildren && expandedRows.has(rowNode.key);
+      if (shouldReset) {
+        cumulative.clear();
+        prevKeys.clear();
+      }
+      visibleCols.forEach(colNode => {
+        const cellKey = `${rowNode.key}|${colNode.key}`;
+        const cell = tree.cells[cellKey];
+        if (!cell) {
+          return;
+        }
+        const metricKey = deriveMetricKey(rowNode, colNode);
+        const config = metricDatabars[metricKey];
+        if (!config || config.type !== 'waterfall') {
+          return;
+        }
+        const scaleKey = resolveScaleGroupKey(metricKey, metricDatabars);
+        const value = getNumericValue(cell.values[metricKey]);
+        if (value === undefined) {
+          return;
+        }
+        const cumulativeKey = `${colNode.key}|${metricKey}`;
+        const prevEndValue = cumulative.get(cumulativeKey) ?? 0;
+        const start = shouldReset || isGrandTotalRow ? 0 : prevEndValue;
+        const end = start + value;
+        const prevKey = prevKeys.get(cumulativeKey);
+        const connectAbove = !shouldReset && !!prevKey;
+        offsets.set(cellKey, {
+          start,
+          end,
+          scaleKey,
+          connectAbove,
+          connectBelow: false,
+          connectAboveValue: connectAbove ? prevEndValue : undefined,
+          connectBelowValue: end,
+        });
+        if (connectAbove && prevKey) {
+          const prevOffset = offsets.get(prevKey);
+          if (prevOffset) {
+            offsets.set(prevKey, { ...prevOffset, connectBelow: true });
+          }
+        }
+        const nextCumulative = shouldReset ? 0 : isExpandedGroup ? start : end;
+        cumulative.set(cumulativeKey, nextCumulative);
+        if (!shouldReset) {
+          prevKeys.set(cumulativeKey, cellKey);
+        }
+      });
+    });
+    return offsets;
+  }, [
+    deriveMetricKey,
+    isExplicitSubtotalNode,
+    isRowGrandTotalNode,
+    expandedRows,
+    metricDatabars,
+    metricsForScale,
+    tree.cells,
+    visibleCols,
+    visibleRows,
+  ]);
+  const waterfallScales = useMemo(() => {
+    if (waterfallOffsets.size === 0) {
+      return databarScales;
+    }
+    const scaleMap = new Map<string, DatabarScale>();
+    waterfallOffsets.forEach(({ start, end, scaleKey }) => {
+      const min = Math.min(start, end);
+      const max = Math.max(start, end);
+      const current = scaleMap.get(scaleKey);
+      if (!current) {
+        scaleMap.set(scaleKey, { min, max });
+      } else {
+        current.min = Math.min(current.min, min);
+        current.max = Math.max(current.max, max);
+      }
+    });
+    return scaleMap;
+  }, [databarScales, waterfallOffsets]);
+
+  const databarLabelSpaces = useMemo(() => {
+    if (databarMetricKeys.length === 0) {
+      return new Map<string, { positive: number; negative: number }>();
+    }
+    const labelOffset = theme.sizeUnit;
+    const labelPadding = theme.sizeUnit * 0.5;
+    const labelCharWidth = theme.sizeUnit * 1.6;
+    const shouldHide = (rowNode: PivotTreeNode) =>
+      shouldHideRowValuesBase({
+        rowNode,
+        rowSubTotals,
+        effectiveRowSubtotalPosition: getRowSubtotalPosition(rowNode),
+        metricLabelSet,
+        expandedRows,
+        countDimDepth,
+        rowSubtotalDepths,
+        isExplicitSubtotalNode,
+      });
+    const spaceMap = new Map<string, { positive: number; negative: number }>();
+    Object.values(tree.cells).forEach(cell => {
+      if (
+        !visibleRowKeySet.has(cell.rowKey) ||
+        !visibleColKeySet.has(cell.colKey)
+      ) {
+        return;
+      }
+      const rowNode = tree.rows[cell.rowKey];
+      const colNode = tree.cols[cell.colKey];
+      if (!rowNode || !colNode) {
+        return;
+      }
+      if (shouldHide(rowNode)) {
+        return;
+      }
+      const metricKey = deriveMetricKey(rowNode, colNode);
+      const config = metricDatabars[metricKey];
+      if (!config?.type) {
+        return;
+      }
+      const rawValue = cell.values[metricKey];
+      const value = getNumericValue(rawValue);
+      if (value === undefined) {
+        return;
+      }
+      const scaleKey = resolveScaleGroupKey(metricKey, metricDatabars);
+      const scale =
+        config.type === 'waterfall'
+          ? waterfallScales.get(scaleKey)
+          : databarScales.get(scaleKey);
+      if (!scale) {
+        return;
+      }
+      const scaleBounds = resolveScaleBounds(scale);
+      let startPct = scaleBounds.zeroPct;
+      let endPct = toPercent(value, scale);
+      if (config.type === 'waterfall') {
+        const offset = waterfallOffsets.get(`${rowNode.key}|${colNode.key}`);
+        const startValue = offset?.start ?? 0;
+        const endValue = offset?.end ?? value;
+        startPct = toPercent(startValue, scale);
+        endPct = toPercent(endValue, scale);
+      }
+      const barStart = Math.min(startPct, endPct);
+      const barEnd = Math.max(startPct, endPct);
+      const labelAnchorPct = value >= 0 ? barEnd : barStart;
+      const formattingKeys = formattingKeyMap[metricKey];
+      const d3FormatOverride = formattingKeys?.d3Format
+        ? normalizeD3Format(cell.values[formattingKeys.d3Format])
+        : undefined;
+      const formatted = renderValue(metricKey, rawValue, d3FormatOverride);
+      const labelText =
+        formatted === null || formatted === undefined
+          ? ''
+          : String(formatted).replace(/<[^>]*>/g, '');
+      const labelWidth =
+        labelText.length * labelCharWidth + labelOffset + labelPadding * 2;
+      const existing = spaceMap.get(scaleKey) ?? { positive: 0, negative: 0 };
+      if (labelAnchorPct >= scaleBounds.zeroPct) {
+        existing.positive = Math.max(existing.positive, labelWidth);
+      } else {
+        existing.negative = Math.max(existing.negative, labelWidth);
+      }
+      spaceMap.set(scaleKey, existing);
+    });
+    return spaceMap;
+  }, [
+    databarMetricKeys,
+    databarScales,
+    countDimDepth,
+    deriveMetricKey,
+    expandedRows,
+    formattingKeyMap,
+    getRowSubtotalPosition,
+    isExplicitSubtotalNode,
+    metricLabelSet,
+    metricDatabars,
+    renderValue,
+    rowSubTotals,
+    rowSubtotalDepths,
+    theme.sizeUnit,
+    tree.cells,
+    tree.cols,
+    tree.rows,
+    visibleColKeySet,
+    visibleRowKeySet,
+    waterfallOffsets,
+    waterfallScales,
+  ]);
+  const databarColumnMinWidths = useMemo(() => {
+    const widthMap = new Map<string, number>();
+    if (databarMetricKeys.length === 0) {
+      return widthMap;
+    }
+    const baseBarWidth = theme.sizeUnit * 12;
+    const basePaddingX = theme.sizeUnit * 2;
+    Object.values(tree.cells).forEach(cell => {
+      if (
+        !visibleRowKeySet.has(cell.rowKey) ||
+        !visibleColKeySet.has(cell.colKey)
+      ) {
+        return;
+      }
+      const rowNode = tree.rows[cell.rowKey];
+      const colNode = tree.cols[cell.colKey];
+      if (!rowNode || !colNode) {
+        return;
+      }
+      const metricKey = deriveMetricKey(rowNode, colNode);
+      const config = metricDatabars[metricKey];
+      if (!config?.type) {
+        return;
+      }
+      const scaleKey = resolveScaleGroupKey(metricKey, metricDatabars);
+      const labelSpace = databarLabelSpaces.get(scaleKey);
+      const minWidth =
+        (labelSpace?.positive ?? 0) +
+        (labelSpace?.negative ?? 0) +
+        baseBarWidth +
+        basePaddingX * 2;
+      const current = widthMap.get(cell.colKey) ?? 0;
+      if (minWidth > current) {
+        widthMap.set(cell.colKey, minWidth);
+      }
+    });
+    return widthMap;
+  }, [
+    databarLabelSpaces,
+    databarMetricKeys,
+    deriveMetricKey,
+    metricDatabars,
+    theme.sizeUnit,
+    tree.cells,
+    tree.cols,
+    tree.rows,
+    visibleColKeySet,
+    visibleRowKeySet,
+  ]);
+
+  const waterfallBridgeOffsets = useMemo(() => {
+    const bridgeMap = new Map<
+      string,
+      Array<{ value: number; depth: number; scaleKey: string }>
+    >();
+    if (waterfallOffsets.size === 0) {
+      return bridgeMap;
+    }
+    visibleCols.forEach(colNode => {
+      const lastExpandedTotals = new Map<
+        number,
+        { index: number; value: number; scaleKey: string }
+      >();
+      visibleRows.forEach((rowNode, rowIndex) => {
+        const cellKey = `${rowNode.key}|${colNode.key}`;
+        const offset = waterfallOffsets.get(cellKey);
+        if (!offset) {
+          return;
+        }
+        const depth = getNodeDimDepth(rowNode);
+        const previous = lastExpandedTotals.get(depth);
+        if (previous && rowIndex - previous.index > 1) {
+          for (let idx = previous.index; idx <= rowIndex; idx += 1) {
+            const betweenRow = visibleRows[idx];
+            const betweenKey = `${betweenRow.key}|${colNode.key}`;
+            const betweenOffset = waterfallOffsets.get(betweenKey);
+            const betweenScaleKey = betweenOffset?.scaleKey ?? previous.scaleKey;
+            if (
+              betweenOffset &&
+              betweenScaleKey !== previous.scaleKey
+            ) {
+              continue;
+            }
+            const entry = {
+              value: previous.value,
+              depth,
+              scaleKey: betweenScaleKey,
+            };
+            const existing = bridgeMap.get(betweenKey);
+            if (existing) {
+              const alreadySet = existing.some(
+                item => item.value === entry.value && item.depth === entry.depth,
+              );
+              if (!alreadySet) {
+                existing.push(entry);
+              }
+            } else {
+              bridgeMap.set(betweenKey, [entry]);
+            }
+          }
+        }
+        if (rowNode.hasChildren && expandedRows.has(rowNode.key)) {
+          lastExpandedTotals.set(depth, {
+            index: rowIndex,
+            value: offset.end,
+            scaleKey: offset.scaleKey,
+          });
+        } else if (previous) {
+          lastExpandedTotals.delete(depth);
+        }
+      });
+    });
+    return bridgeMap;
+  }, [
+    expandedRows,
+    getNodeDimDepth,
+    visibleCols,
+    visibleRows,
+    waterfallOffsets,
+  ]);
+
   const shouldHideRowValues = useCallback(
     (rowNode: PivotTreeNode) =>
       shouldHideRowValuesBase({
@@ -3090,6 +3728,249 @@ function PivotTableChart(props: PivotTableProps) {
       renderValue,
       shouldHideRowValues,
       tree.cells,
+    ],
+  );
+
+  const renderDatabarContent = useCallback(
+    (
+      rowNode: PivotTreeNode,
+      colNode: PivotTreeNode,
+      cell: PivotResultCell | undefined,
+      metricKey: string,
+      d3FormatOverride?: string,
+    ) => {
+      const labelNode = cell
+        ? renderCellContent(rowNode, colNode, metricKey, d3FormatOverride)
+        : '';
+      const hasLabel =
+        labelNode !== '' && labelNode !== null && labelNode !== undefined;
+      const config = metricDatabars[metricKey];
+      if (!config?.type) {
+        return labelNode;
+      }
+      const rawValue = cell?.values[metricKey];
+      const value = getNumericValue(rawValue);
+      const scaleKey = resolveScaleGroupKey(metricKey, metricDatabars);
+      const scale =
+        config.type === 'waterfall'
+          ? waterfallScales.get(scaleKey)
+          : databarScales.get(scaleKey);
+      if (!scale) {
+        return labelNode;
+      }
+      const scaleBounds = resolveScaleBounds(scale);
+      const baselinePct = scaleBounds.zeroPct;
+      const baselineColor =
+        theme.colorTextTertiary || theme.colorBorder || theme.colorText;
+      const baselineWidth = Math.max(2, theme.sizeUnit * 0.5);
+      const connectorWidth = Math.max(1, Math.round(baselineWidth / 2));
+      const barHeightPct = 85;
+      const barGapPct = (100 - barHeightPct) / 2;
+      const barTopPct = barGapPct;
+      const barBottomPct = barGapPct + barHeightPct;
+      const barHeight = `${barHeightPct}%`;
+      const lineHeight = 2;
+      const labelOffset = theme.sizeUnit;
+      const basePaddingX = theme.sizeUnit * 2;
+      const labelSpace = databarLabelSpaces.get(scaleKey);
+      const contentStyle = {
+        paddingLeft: `${basePaddingX + (labelSpace?.negative ?? 0)}px`,
+        paddingRight: `${basePaddingX + (labelSpace?.positive ?? 0)}px`,
+      };
+
+      const offsetKey = `${rowNode.key}|${colNode.key}`;
+      const waterfallOffset = waterfallOffsets.get(offsetKey);
+      const connectorAboveValue =
+        config.type === 'waterfall'
+          ? waterfallOffset?.connectAboveValue
+          : undefined;
+      const connectorBelowValue =
+        config.type === 'waterfall'
+          ? waterfallOffset?.connectBelowValue
+          : undefined;
+      const connectorAbovePct =
+        connectorAboveValue === undefined
+          ? undefined
+          : toPercent(connectorAboveValue, scale);
+      const connectorBelowPct =
+        connectorBelowValue === undefined
+          ? undefined
+          : toPercent(connectorBelowValue, scale);
+      const renderConnector =
+        config.type === 'waterfall' && value !== undefined;
+      const connectorTopStyle =
+        connectorAbovePct === undefined
+          ? undefined
+          : {
+              left: `${connectorAbovePct * 100}%`,
+              top: '0%',
+              bottom: `${100 - barBottomPct}%`,
+            };
+      const connectorBottomStyle =
+        connectorBelowPct === undefined
+          ? undefined
+          : {
+              left: `${connectorBelowPct * 100}%`,
+              top: `${barTopPct}%`,
+              bottom: '0%',
+            };
+      const bridgeEntries =
+        config.type === 'waterfall'
+          ? waterfallBridgeOffsets.get(offsetKey)
+          : undefined;
+      const bridgeRenderables =
+        bridgeEntries
+          ?.filter(entry => entry.scaleKey === scaleKey)
+          .map(entry => {
+            const pct = toPercent(entry.value, scale);
+            const color = applyAlphaToColor(
+              baselineColor,
+              resolveConnectorAlpha(entry.depth),
+            );
+            return {
+              key: `${entry.scaleKey}-${entry.value}-${entry.depth}`,
+              color,
+              style: {
+                left: `${pct * 100}%`,
+                top: '0%',
+                bottom: '0%',
+              },
+            };
+          }) ?? [];
+
+      let barStart = baselinePct;
+      let barEnd = baselinePct;
+      let barWidthPct = 0;
+      let barColor = baselineColor;
+      let labelStyle: React.CSSProperties | undefined;
+      let isPositive = false;
+      if (value !== undefined) {
+        let startPct = baselinePct;
+        let endPct = toPercent(value, scale);
+        if (config.type === 'waterfall') {
+          const startValue = waterfallOffset?.start ?? 0;
+          const endValue = waterfallOffset?.end ?? value;
+          startPct = toPercent(startValue, scale);
+          endPct = toPercent(endValue, scale);
+        }
+        barStart = Math.min(startPct, endPct);
+        barEnd = Math.max(startPct, endPct);
+        barWidthPct = Math.max(barEnd - barStart, 0);
+        const colorMetricKey =
+          config.colorMode === 'byMetric' && config.colorMetric
+            ? getFormattingMetricKey(config.colorMetric)
+            : undefined;
+        const metricColor =
+          cell && colorMetricKey
+            ? normalizeCssColor(cell.values[colorMetricKey])
+            : undefined;
+        isPositive = value >= 0;
+        const fallbackColor = theme.colorText;
+        const positiveColor = config.positiveColor || fallbackColor;
+        const negativeColor = config.negativeColor || fallbackColor;
+        barColor =
+          metricColor || (isPositive ? positiveColor : negativeColor);
+        labelStyle = isPositive
+          ? {
+              left: `calc(${Math.min(barEnd, 1) * 100}% + ${labelOffset}px)`,
+              top: '50%',
+              transform: 'translateY(-50%)',
+            }
+          : {
+              left: `calc(${Math.max(barStart, 0) * 100}% - ${labelOffset}px)`,
+              top: '50%',
+              transform: 'translate(-100%, -50%)',
+            };
+      }
+
+      return (
+        <>
+          <DatabarContent data-test="pivot-databar" style={contentStyle}>
+            <DatabarScale>
+              <DatabarBaseline
+                $color={baselineColor}
+                style={{ left: `${baselinePct * 100}%` }}
+              />
+              {bridgeRenderables.map(bridge => (
+                <DatabarDottedConnector
+                  key={bridge.key}
+                  $color={bridge.color}
+                  $width={connectorWidth}
+                  style={bridge.style}
+                />
+              ))}
+              {renderConnector &&
+                waterfallOffset?.connectAbove &&
+                connectorTopStyle && (
+                <DatabarConnector
+                  $color={baselineColor}
+                  $width={connectorWidth}
+                  style={connectorTopStyle}
+                />
+              )}
+              {renderConnector &&
+                waterfallOffset?.connectBelow &&
+                connectorBottomStyle && (
+                <DatabarConnector
+                  $color={baselineColor}
+                  $width={connectorWidth}
+                  style={connectorBottomStyle}
+                />
+              )}
+              {value !== undefined ? (
+                config.type === 'lollipop' ? (
+                  <>
+                    <DatabarLine
+                      $color={barColor}
+                      style={{
+                        left: `${barStart * 100}%`,
+                        width: `${barWidthPct * 100}%`,
+                        top: `calc(50% - ${lineHeight / 2}px)`,
+                      }}
+                    />
+                    <div
+                      style={{
+                        position: 'absolute',
+                        left: `${barEnd * 100}%`,
+                        top: '50%',
+                        transform: 'translate(-50%, -50%)',
+                      }}
+                    >
+                      <DatabarDot $color={barColor} />
+                    </div>
+                  </>
+                ) : (
+                  <DatabarRect
+                    $color={barColor}
+                    $height={barHeight}
+                    data-test="pivot-databar-bar"
+                    style={{
+                      left: `${barStart * 100}%`,
+                      width: `${barWidthPct * 100}%`,
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                    }}
+                  />
+                )
+              ) : null}
+              {value !== undefined && hasLabel && labelStyle ? (
+                <DatabarLabel style={labelStyle}>{labelNode}</DatabarLabel>
+              ) : null}
+            </DatabarScale>
+          </DatabarContent>
+          <DatabarSpacer aria-hidden="true" />
+        </>
+      );
+    },
+    [
+      databarLabelSpaces,
+      databarScales,
+      metricDatabars,
+      renderCellContent,
+      theme,
+      waterfallBridgeOffsets,
+      waterfallOffsets,
+      waterfallScales,
     ],
   );
 
@@ -3240,7 +4121,7 @@ function PivotTableChart(props: PivotTableProps) {
                 {visibleCols.map(col => {
                   const cellKey = `${row.key}|${col.key}`;
                   const cell = tree.cells[cellKey];
-                  const metricKey = cell ? deriveMetricKey(row, col) : '';
+                  const metricKey = deriveMetricKey(row, col);
                   const formattingKeys = metricKey
                     ? formattingKeyMap[metricKey]
                     : undefined;
@@ -3286,9 +4167,18 @@ function PivotTableChart(props: PivotTableProps) {
                         )
                       : undefined;
                   const cellTotalBg = rowTotalBg;
-                  const cellClassName = isSubtotalCell
-                    ? 'subtotal-cell value-cell'
-                    : 'value-cell';
+                  const databarConfig = metricKey
+                    ? metricDatabars[metricKey]
+                    : undefined;
+                  const colMinWidth = databarColumnMinWidths.get(col.key);
+                  const isDatabarCell = !!databarConfig?.type;
+                  const cellClassName = [
+                    isSubtotalCell ? 'subtotal-cell' : '',
+                    'value-cell',
+                    isDatabarCell ? 'databar-cell' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ');
                   const cellStyle = {
                     ...(cellTotalBg ? { backgroundColor: cellTotalBg } : {}),
                     ...(colCellFormatting?.backgroundColor
@@ -3305,9 +4195,27 @@ function PivotTableChart(props: PivotTableProps) {
                       : {}),
                     ...(backgroundColor ? { backgroundColor } : {}),
                     ...(textColor ? { color: textColor } : {}),
+                    ...(colMinWidth
+                      ? { minWidth: `${Math.ceil(colMinWidth)}px` }
+                      : {}),
                   };
                   const style =
                     Object.keys(cellStyle).length > 0 ? cellStyle : undefined;
+                  const cellContent =
+                    databarConfig?.type && metricKey
+                      ? renderDatabarContent(
+                          row,
+                          col,
+                          cell,
+                          metricKey,
+                          d3FormatOverride,
+                        )
+                      : renderCellContent(
+                          row,
+                          col,
+                          metricKey,
+                          d3FormatOverride,
+                        );
                   return (
                     <td
                       key={cellKey}
@@ -3318,7 +4226,7 @@ function PivotTableChart(props: PivotTableProps) {
                         handleCellContextMenu(event, row, col)
                       }
                     >
-                      {renderCellContent(row, col, metricKey, d3FormatOverride)}
+                      {cellContent}
                     </td>
                   );
                 })}

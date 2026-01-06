@@ -465,6 +465,15 @@ const config: ControlPanelConfig = {
         ],
         [
           {
+            name: 'metricDatabars',
+            config: {
+              type: 'HiddenControl',
+              default: {},
+            },
+          },
+        ],
+        [
+          {
             name: 'rowFormatting',
             config: {
               type: 'HiddenControl',

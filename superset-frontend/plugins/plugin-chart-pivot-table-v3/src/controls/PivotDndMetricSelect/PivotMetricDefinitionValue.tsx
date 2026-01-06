@@ -18,6 +18,7 @@
  */
 import { ReactNode, useCallback, useMemo, useState } from 'react';
 import {
+  getCategoricalSchemeRegistry,
   getMetricLabel,
   Metric,
   QueryFormMetric,
@@ -26,6 +27,9 @@ import {
 } from '@superset-ui/core';
 import {
   Button,
+  ColorPicker,
+  type ColorValue,
+  Divider,
   InfoTooltip,
   Popover,
   Select,
@@ -41,6 +45,9 @@ import { savedMetricType } from 'src/explore/components/controls/MetricControl/t
 import MetricDefinitionValue from './MetricDefinitionValue';
 import {
   MetricFormattingField,
+  PivotDatabarType,
+  PivotMetricDatabar,
+  PivotMetricDatabarMap,
   PivotMetricFormatting,
   PivotMetricFormattingMap,
 } from '../../types';
@@ -62,6 +69,27 @@ const MetricFormattingButtonWrap = styled.div`
 
 type ValueType = Metric | AdhocMetric | QueryFormMetric;
 
+const rgbToHex = (color: ColorValue): string => {
+  const { r, g, b, a = 1 } = color.toRgb();
+  const toHex = (value: number) => {
+    const hex = Math.round(value).toString(16);
+    return hex.length === 1 ? `0${hex}` : hex;
+  };
+  const base = `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+  if (a !== 1) {
+    return `${base}${toHex(Math.round(a * 255))}`;
+  }
+  return base;
+};
+
+const DATABAR_TYPE_OPTIONS: Array<{ label: string; value: PivotDatabarType | 'none' }> =
+  [
+    { label: t('None'), value: 'none' },
+    { label: t('Filled bar'), value: 'bar' },
+    { label: t('Lollipop bar'), value: 'lollipop' },
+    { label: t('Waterfall'), value: 'waterfall' },
+  ];
+
 export type MetricSelectValue = {
   value: string | number;
   label?: string;
@@ -80,11 +108,18 @@ type PivotMetricDefinitionValueProps = {
   savedMetrics: Metric[];
   savedMetricsOptions: savedMetricType[];
   availableMetrics: ValueType[];
+  selectedMetrics: ValueType[];
   metricFormatting: PivotMetricFormattingMap;
   onMetricFormattingChange: (
     metricKey: string,
     field: keyof PivotMetricFormatting,
     metric?: QueryFormMetric,
+  ) => void;
+  metricDatabars: PivotMetricDatabarMap;
+  onMetricDatabarChange: (
+    metricKey: string,
+    field: keyof PivotMetricDatabar,
+    value?: PivotMetricDatabar[keyof PivotMetricDatabar],
   ) => void;
   multi?: boolean;
   datasource?: Record<string, unknown>;
@@ -475,6 +510,10 @@ export default function PivotMetricDefinitionValue(
     }
     return metricLabel !== t('Metric') ? metricLabel : '';
   }, [metricLabel, props.option]);
+  const presetColors = useMemo(() => {
+    const categoricalScheme = getCategoricalSchemeRegistry().get();
+    return categoricalScheme?.colors.slice(0, 9) || [];
+  }, []);
   const formattingKey = useMemo(() => {
     const candidateKeys = [metricKey, metricLabel].filter(
       (candidate): candidate is string => !!candidate,
@@ -520,12 +559,55 @@ export default function PivotMetricDefinitionValue(
       candidateKeys.find(key => props.metricFormatting[key]) || metricKey
     );
   }, [metricKey, metricLabel, props.metricFormatting, props.option]);
+  const databarKey = useMemo(() => {
+    const candidateKeys = [metricKey, metricLabel].filter(
+      (candidate): candidate is string => !!candidate,
+    );
+    const savedMetricMatch = props.savedMetrics.find(metric => {
+      if (metric.metric_name === metricKey || metric.metric_name === metricLabel) {
+        return true;
+      }
+      if (metric.verbose_name === metricKey || metric.verbose_name === metricLabel) {
+        return true;
+      }
+      return false;
+    });
+    if (savedMetricMatch) {
+      if (savedMetricMatch.metric_name) {
+        candidateKeys.push(savedMetricMatch.metric_name);
+      }
+      if (savedMetricMatch.verbose_name) {
+        candidateKeys.push(savedMetricMatch.verbose_name);
+      }
+    }
+    if (typeof props.option === 'object' && props.option !== null) {
+      if (
+        'metric_name' in props.option &&
+        typeof props.option.metric_name === 'string'
+      ) {
+        candidateKeys.push(props.option.metric_name);
+      }
+      if ('label' in props.option && typeof props.option.label === 'string') {
+        candidateKeys.push(props.option.label);
+      }
+      if (
+        'verbose_name' in props.option &&
+        typeof props.option.verbose_name === 'string'
+      ) {
+        candidateKeys.push(props.option.verbose_name);
+      }
+    }
+    return candidateKeys.find(key => props.metricDatabars[key]) || metricKey;
+  }, [metricKey, metricLabel, props.metricDatabars, props.option, props.savedMetrics]);
   const formatting =
     (formattingKey && props.metricFormatting[formattingKey]) || {};
+  const databar =
+    (databarKey && props.metricDatabars[databarKey]) || {};
   const hasFormatting = Boolean(
     formatting.backgroundColor ||
       formatting.textColor ||
-      formatting.d3Format,
+      formatting.d3Format ||
+      databar.type,
   );
   const handleFormattingChange = useCallback(
     (field: keyof PivotMetricFormatting, metric?: QueryFormMetric) => {
@@ -536,6 +618,18 @@ export default function PivotMetricDefinitionValue(
     },
     [formattingKey, props.onMetricFormattingChange],
   );
+  const handleDatabarChange = useCallback(
+    (field: keyof PivotMetricDatabar, value?: PivotMetricDatabar[keyof PivotMetricDatabar]) => {
+      if (!databarKey) {
+        return;
+      }
+      props.onMetricDatabarChange(databarKey, field, value);
+    },
+    [databarKey, props.onMetricDatabarChange],
+  );
+  const databarTypeValue = databar.type ?? 'none';
+  const colorMode = databar.colorMode === 'byMetric' ? 'byMetric' : 'static';
+  const showDatabarControls = databarTypeValue !== 'none';
 
   const formattingPopoverContent = (
     <div
@@ -561,6 +655,76 @@ export default function PivotMetricDefinitionValue(
             datasource={props.datasource}
           />
         ))}
+        <Divider style={{ margin: 0 }} />
+        <Typography.Text strong>{t('Databars')}</Typography.Text>
+        <Typography.Text type="secondary">
+          {t('Metric: %s', metricLabel)}
+        </Typography.Text>
+        <Space direction="vertical" size={8}>
+          <div>
+            <Typography.Text>{t('Databar type')}</Typography.Text>
+            <Select
+              ariaLabel={t('Databar type')}
+              options={DATABAR_TYPE_OPTIONS}
+              value={databarTypeValue}
+              style={{ width: METRIC_SELECT_WIDTH }}
+              onChange={value =>
+                handleDatabarChange(
+                  'type',
+                  value === 'none' ? undefined : (value as PivotDatabarType),
+                )
+              }
+            />
+          </div>
+          {showDatabarControls && (
+            <>
+              <MetricFormatSelector
+                label={t('Scale like')}
+                tooltip={t('Scale this databar to the selected metric.')}
+                value={databar.scaleLike}
+                metrics={props.selectedMetrics}
+                onChange={metric => handleDatabarChange('scaleLike', metric)}
+                columns={props.columns}
+                savedMetrics={props.savedMetrics}
+                datasource={props.datasource}
+              />
+              <MetricFormatSelector
+                label={t('Color by metric')}
+                tooltip={t('Metric that returns a color for the databar.')}
+                value={databar.colorMetric}
+                metrics={props.availableMetrics}
+                onChange={metric => handleDatabarChange('colorMetric', metric)}
+                columns={props.columns}
+                savedMetrics={props.savedMetrics}
+                datasource={props.datasource}
+              />
+              <Space direction="vertical" size={4}>
+                <Typography.Text>{t('Positive color')}</Typography.Text>
+                <ColorPicker
+                  presets={[{ label: t('Theme colors'), colors: presetColors }]}
+                  value={databar.positiveColor}
+                  disabled={colorMode === 'byMetric'}
+                  onChangeComplete={color =>
+                    handleDatabarChange('positiveColor', rgbToHex(color))
+                  }
+                  showText
+                />
+              </Space>
+              <Space direction="vertical" size={4}>
+                <Typography.Text>{t('Negative color')}</Typography.Text>
+                <ColorPicker
+                  presets={[{ label: t('Theme colors'), colors: presetColors }]}
+                  value={databar.negativeColor}
+                  disabled={colorMode === 'byMetric'}
+                  onChangeComplete={color =>
+                    handleDatabarChange('negativeColor', rgbToHex(color))
+                  }
+                  showText
+                />
+              </Space>
+            </>
+          )}
+        </Space>
       </Space>
     </div>
   );

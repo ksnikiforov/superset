@@ -92,6 +92,20 @@ export const METRIC_FORMATTING_FIELDS = [
 
 export type MetricFormattingField = (typeof METRIC_FORMATTING_FIELDS)[number];
 
+export type PivotDatabarType = 'bar' | 'lollipop' | 'waterfall';
+
+export type PivotMetricDatabar = {
+  type?: PivotDatabarType;
+  scaleGroup?: string;
+  scaleLike?: QueryFormMetric;
+  colorMode?: 'static' | 'byMetric';
+  colorMetric?: QueryFormMetric;
+  positiveColor?: string;
+  negativeColor?: string;
+};
+
+export type PivotMetricDatabarMap = Record<string, PivotMetricDatabar>;
+
 export const DIMENSION_FORMATTING_FIELDS = [
   'backgroundColor',
   'textColor',
@@ -136,6 +150,7 @@ export interface PivotTableCustomizeProps {
   groupbyColumns: QueryFormColumn[];
   metrics: QueryFormMetric[];
   metricFormatting?: PivotMetricFormattingMap;
+  metricDatabars?: PivotMetricDatabarMap;
   metricFormattingScope?: MetricFormattingScope;
   rowFormatting?: PivotDimensionFormattingMap;
   colFormatting?: PivotDimensionFormattingMap;
@@ -201,6 +216,7 @@ export interface PivotTableProps
   groupbyRows: QueryFormColumn[];
   groupbyColumns: QueryFormColumn[];
   metricFormatting?: PivotMetricFormattingMap;
+  metricDatabars?: PivotMetricDatabarMap;
   metricFormattingScope?: MetricFormattingScope;
   rowFormatting?: PivotDimensionFormattingMap;
   colFormatting?: PivotDimensionFormattingMap;

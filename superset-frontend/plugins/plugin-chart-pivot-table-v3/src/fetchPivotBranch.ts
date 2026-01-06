@@ -41,6 +41,7 @@ import {
   applyMetricAxis,
   mergeTrees,
   collectMetricFormattingMetricsForQuery,
+  collectMetricDatabarMetricsForQuery,
   collectDimensionFormattingMetricsForQuery,
   collectDimensionSortingMetricsForQuery,
   getMetricKeys,
@@ -195,6 +196,9 @@ const resolveFetchContext = ({
   const metricFormattingMetrics = collectMetricFormattingMetricsForQuery(
     formData.metricFormatting,
   );
+  const metricDatabarMetrics = collectMetricDatabarMetricsForQuery(
+    formData.metricDatabars,
+  );
   const rowFormattingMetrics = collectDimensionFormattingMetricsForQuery(
     formData.rowFormatting,
     rowGroupbyRaw,
@@ -213,6 +217,7 @@ const resolveFetchContext = ({
   );
   const formattingMetrics = [
     ...metricFormattingMetrics,
+    ...metricDatabarMetrics,
     ...rowFormattingMetrics,
     ...colFormattingMetrics,
     ...rowSortingMetrics,
