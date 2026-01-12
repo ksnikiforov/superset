@@ -113,6 +113,8 @@ import {
 } from './pivot/visibility';
 import { buildCellFilters, buildContextMenuFilters } from './pivot/filters';
 import {
+  buildFormattingValueMaps,
+  buildVisibleCellEntries,
   deriveMetricKey as deriveMetricKeyBase,
   formatNodeLabel as formatNodeLabelBase,
   shouldHideRowValues as shouldHideRowValuesBase,
@@ -539,6 +541,16 @@ const shouldApplyMetricFormatting = (
 type DatabarScale = {
   min: number;
   max: number;
+};
+
+type WaterfallOffset = {
+  start: number;
+  end: number;
+  scaleKey: string;
+  connectAbove: boolean;
+  connectBelow: boolean;
+  connectAboveValue?: number;
+  connectBelowValue?: number;
 };
 
 const clampValue = (value: number, min: number, max: number) =>
@@ -2166,49 +2178,20 @@ function PivotTableChart(props: PivotTableProps) {
     ],
   );
 
-  const buildFormattingValuesMap = useCallback(
-    (axis: 'row' | 'col') => {
-      const valuesMap = new Map<string, Record<string, DataRecordValue>>();
-      Object.values(tree.cells).forEach(cell => {
-        const rowNode = tree.rows[cell.rowKey];
-        const colNode = tree.cols[cell.colKey];
-        if (!rowNode || !colNode) {
-          return;
-        }
-        const rowKey = serializePath(getNonMetricPathParts(rowNode.path));
-        const colKey = serializePath(getNonMetricPathParts(colNode.path));
-        if (axis === 'row') {
-          if (colKey !== rootKey || valuesMap.has(rowKey)) {
-            return;
-          }
-          valuesMap.set(rowKey, cell.values);
-          return;
-        }
-        if (rowKey !== rootKey || valuesMap.has(colKey)) {
-          return;
-        }
-        valuesMap.set(colKey, cell.values);
-      });
-      return valuesMap;
-    },
-    [getNonMetricPathParts, tree.cells, tree.cols, tree.rows],
-  );
-  const rowFormattingValuesMap = useMemo(
-    () => buildFormattingValuesMap('row'),
-    [buildFormattingValuesMap],
-  );
-  const colFormattingValuesMap = useMemo(
-    () => buildFormattingValuesMap('col'),
-    [buildFormattingValuesMap],
-  );
-  const rowSortingValuesMap = useMemo(
-    () => buildFormattingValuesMap('row'),
-    [buildFormattingValuesMap],
-  );
-  const colSortingValuesMap = useMemo(
-    () => buildFormattingValuesMap('col'),
-    [buildFormattingValuesMap],
-  );
+  const { rowValuesMap: rowFormattingValuesMap, colValuesMap: colFormattingValuesMap } =
+    useMemo(
+      () =>
+        buildFormattingValueMaps({
+          cells: tree.cells,
+          rows: tree.rows,
+          cols: tree.cols,
+          getNonMetricPathParts,
+          rootKey,
+        }),
+      [getNonMetricPathParts, tree.cells, tree.cols, tree.rows],
+    );
+  const rowSortingValuesMap = rowFormattingValuesMap;
+  const colSortingValuesMap = colFormattingValuesMap;
   const resolveDimensionStyle = useCallback(
     (axis: 'row' | 'col', node: PivotTreeNode, target: 'label' | 'cell') => {
       if (node.path.length === 0 || isMetricGrandTotalNode(node)) {
@@ -3518,23 +3501,48 @@ function PivotTableChart(props: PivotTableProps) {
     () => new Set(visibleCols.map(col => col.key)),
     [visibleCols],
   );
-  const databarScales = useMemo(() => {
+  const isRowTotalAtStart =
+    resolvedRowTotalPosition === 'start' && showRowRoot;
+  const visibleCells = useMemo(
+    () =>
+      buildVisibleCellEntries({
+        cells: tree.cells,
+        rows: tree.rows,
+        cols: tree.cols,
+        visibleRowKeys: visibleRowKeySet,
+        visibleColKeys: visibleColKeySet,
+      }),
+    [tree.cells, tree.rows, tree.cols, visibleColKeySet, visibleRowKeySet],
+  );
+  const {
+    databarScales,
+    waterfallOffsets,
+    waterfallScales,
+    databarLabelSpaces,
+    databarColumnMinWidths,
+    waterfallBridgeOffsets,
+  } = useMemo(() => {
+    const emptyScaleMap = new Map<string, DatabarScale>();
+    const emptyOffsets = new Map<string, WaterfallOffset>();
+    const emptyLabelSpaces = new Map<string, { positive: number; negative: number }>();
+    const emptyWidths = new Map<string, number>();
+    const emptyBridges = new Map<
+      string,
+      Array<{ value: number; depth: number; scaleKey: string }>
+    >();
     if (metricsForScale.size === 0) {
-      return new Map<string, DatabarScale>();
+      return {
+        databarScales: emptyScaleMap,
+        waterfallOffsets: emptyOffsets,
+        waterfallScales: emptyScaleMap,
+        databarLabelSpaces: emptyLabelSpaces,
+        databarColumnMinWidths: emptyWidths,
+        waterfallBridgeOffsets: emptyBridges,
+      };
     }
+
     const scaleMap = new Map<string, DatabarScale>();
-    Object.values(tree.cells).forEach(cell => {
-      if (
-        !visibleRowKeySet.has(cell.rowKey) ||
-        !visibleColKeySet.has(cell.colKey)
-      ) {
-        return;
-      }
-      const rowNode = tree.rows[cell.rowKey];
-      const colNode = tree.cols[cell.colKey];
-      if (!rowNode || !colNode) {
-        return;
-      }
+    visibleCells.forEach(({ rowNode, colNode, cell }) => {
       if (isRowGrandTotalNode(rowNode)) {
         return;
       }
@@ -3555,34 +3563,8 @@ function PivotTableChart(props: PivotTableProps) {
         current.max = Math.max(current.max, value);
       }
     });
-    return scaleMap;
-  }, [
-    deriveMetricKey,
-    isRowGrandTotalNode,
-    metricDatabars,
-    metricsForScale,
-    tree.cells,
-    tree.cols,
-    tree.rows,
-    visibleColKeySet,
-    visibleRowKeySet,
-  ]);
-  const waterfallOffsets = useMemo(() => {
-    const offsets = new Map<
-      string,
-      {
-        start: number;
-        end: number;
-        scaleKey: string;
-        connectAbove: boolean;
-        connectBelow: boolean;
-        connectAboveValue?: number;
-        connectBelowValue?: number;
-      }
-    >();
-    if (metricsForScale.size === 0) {
-      return offsets;
-    }
+
+    const offsets = new Map<string, WaterfallOffset>();
     const cumulative = new Map<string, number>();
     const prevKeys = new Map<string, string>();
     visibleRows.forEach(rowNode => {
@@ -3612,7 +3594,13 @@ function PivotTableChart(props: PivotTableProps) {
         const cumulativeKey = serializeCellKey(colNode.key, metricKey);
         const prevEndValue = cumulative.get(cumulativeKey) ?? 0;
         const start = shouldReset || isGrandTotalRow ? 0 : prevEndValue;
-        const end = start + value;
+        const isTotalRow =
+          isGrandTotalRow ||
+          isExplicitSubtotalNode(rowNode) ||
+          isMetricSubtotalNode(rowNode);
+        const delta =
+          isTotalRow || !isRowTotalAtStart ? value : -value;
+        const end = start + delta;
         const prevKey = prevKeys.get(cumulativeKey);
         const connectAbove = !shouldReset && !!prevKey;
         offsets.set(cellKey, {
@@ -3630,272 +3618,220 @@ function PivotTableChart(props: PivotTableProps) {
             offsets.set(prevKey, { ...prevOffset, connectBelow: true });
           }
         }
-        const nextCumulative = shouldReset ? 0 : isExpandedGroup ? start : end;
+        const shouldHoldCumulative =
+          isExpandedGroup && !(isGrandTotalRow && isRowTotalAtStart);
+        const nextCumulative = shouldReset ? 0 : shouldHoldCumulative ? start : end;
         cumulative.set(cumulativeKey, nextCumulative);
         if (!shouldReset) {
           prevKeys.set(cumulativeKey, cellKey);
         }
       });
     });
-    return offsets;
-  }, [
-    deriveMetricKey,
-    isExplicitSubtotalNode,
-    isRowGrandTotalNode,
-    expandedRows,
-    metricDatabars,
-    metricsForScale,
-    tree.cells,
-    visibleCols,
-    visibleRows,
-  ]);
-  const waterfallScales = useMemo(() => {
-    if (waterfallOffsets.size === 0) {
-      return databarScales;
-    }
-    const scaleMap = new Map<string, DatabarScale>();
-    waterfallOffsets.forEach(({ start, end, scaleKey }) => {
-      const min = Math.min(start, end);
-      const max = Math.max(start, end);
-      const current = scaleMap.get(scaleKey);
-      if (!current) {
-        scaleMap.set(scaleKey, { min, max });
-      } else {
-        current.min = Math.min(current.min, min);
-        current.max = Math.max(current.max, max);
-      }
-    });
-    return scaleMap;
-  }, [databarScales, waterfallOffsets]);
 
-  const databarLabelSpaces = useMemo(() => {
-    if (databarMetricKeys.length === 0) {
-      return new Map<string, { positive: number; negative: number }>();
+    const waterfallScaleMap = new Map<string, DatabarScale>();
+    if (offsets.size === 0) {
+      scaleMap.forEach((value, key) => {
+        waterfallScaleMap.set(key, value);
+      });
+    } else {
+      offsets.forEach(({ start, end, scaleKey }) => {
+        const min = Math.min(start, end);
+        const max = Math.max(start, end);
+        const current = waterfallScaleMap.get(scaleKey);
+        if (!current) {
+          waterfallScaleMap.set(scaleKey, { min, max });
+        } else {
+          current.min = Math.min(current.min, min);
+          current.max = Math.max(current.max, max);
+        }
+      });
     }
+
     const labelOffset = theme.sizeUnit;
     const labelPadding = theme.sizeUnit * 0.5;
     const labelCharWidth = theme.sizeUnit * 1.6;
-    const shouldHide = (rowNode: PivotTreeNode) =>
-      shouldHideRowValuesBase({
-        rowNode,
-        rowSubTotals,
-        effectiveRowSubtotalPosition: getRowSubtotalPosition(rowNode),
-        isMetricTokenValue,
-        expandedRows,
-        countDimDepth,
-        rowSubtotalDepths,
-        isExplicitSubtotalNode,
-      });
     const spaceMap = new Map<string, { positive: number; negative: number }>();
-    Object.values(tree.cells).forEach(cell => {
-      if (
-        !visibleRowKeySet.has(cell.rowKey) ||
-        !visibleColKeySet.has(cell.colKey)
-      ) {
-        return;
-      }
-      const rowNode = tree.rows[cell.rowKey];
-      const colNode = tree.cols[cell.colKey];
-      if (!rowNode || !colNode) {
-        return;
-      }
-      if (shouldHide(rowNode)) {
-        return;
-      }
-      const metricKey = deriveMetricKey(rowNode, colNode);
-      const config = metricDatabars[metricKey];
-      if (!config?.type) {
-        return;
-      }
-      const rawValue = cell.values[metricKey];
-      const value = getNumericValue(rawValue);
-      if (value === undefined) {
-        return;
-      }
-      const scaleKey = resolveScaleGroupKey(metricKey, metricDatabars);
-      const scale =
-        config.type === 'waterfall'
-          ? waterfallScales.get(scaleKey)
-          : databarScales.get(scaleKey);
-      if (!scale) {
-        return;
-      }
-      const scaleBounds = resolveScaleBounds(scale);
-      let startPct = scaleBounds.zeroPct;
-      let endPct = toPercent(value, scale);
-      if (config.type === 'waterfall') {
-        const offset = waterfallOffsets.get(
-          serializeCellKey(rowNode.key, colNode.key),
-        );
-        const startValue = offset?.start ?? 0;
-        const endValue = offset?.end ?? value;
-        startPct = toPercent(startValue, scale);
-        endPct = toPercent(endValue, scale);
-      }
-      const barStart = Math.min(startPct, endPct);
-      const barEnd = Math.max(startPct, endPct);
-      const labelAnchorPct = value >= 0 ? barEnd : barStart;
-      const formattingKeys = formattingKeyMap[metricKey];
-      const d3FormatOverride = formattingKeys?.d3Format
-        ? normalizeD3Format(cell.values[formattingKeys.d3Format])
-        : undefined;
-      const formatted = renderValue(metricKey, rawValue, d3FormatOverride);
-      const labelText =
-        formatted === null || formatted === undefined
-          ? ''
-          : String(formatted).replace(/<[^>]*>/g, '');
-      const labelWidth =
-        labelText.length * labelCharWidth + labelOffset + labelPadding * 2;
-      const existing = spaceMap.get(scaleKey) ?? { positive: 0, negative: 0 };
-      if (labelAnchorPct >= scaleBounds.zeroPct) {
-        existing.positive = Math.max(existing.positive, labelWidth);
-      } else {
-        existing.negative = Math.max(existing.negative, labelWidth);
-      }
-      spaceMap.set(scaleKey, existing);
-    });
-    return spaceMap;
-  }, [
-    databarMetricKeys,
-    databarScales,
-    countDimDepth,
-    deriveMetricKey,
-    expandedRows,
-    formattingKeyMap,
-    getRowSubtotalPosition,
-    isExplicitSubtotalNode,
-    metricLabelSet,
-    metricDatabars,
-    renderValue,
-    rowSubTotals,
-    rowSubtotalDepths,
-    theme.sizeUnit,
-    tree.cells,
-    tree.cols,
-    tree.rows,
-    visibleColKeySet,
-    visibleRowKeySet,
-    waterfallOffsets,
-    waterfallScales,
-  ]);
-  const databarColumnMinWidths = useMemo(() => {
-    const widthMap = new Map<string, number>();
-    if (databarMetricKeys.length === 0) {
-      return widthMap;
+    if (databarMetricKeys.length > 0) {
+      const shouldHide = (rowNode: PivotTreeNode) =>
+        shouldHideRowValuesBase({
+          rowNode,
+          rowSubTotals,
+          effectiveRowSubtotalPosition: getRowSubtotalPosition(rowNode),
+          isMetricTokenValue,
+          expandedRows,
+          countDimDepth,
+          rowSubtotalDepths,
+          isExplicitSubtotalNode,
+        });
+      visibleCells.forEach(({ rowNode, colNode, cell, cellKey }) => {
+        if (shouldHide(rowNode)) {
+          return;
+        }
+        const metricKey = deriveMetricKey(rowNode, colNode);
+        const config = metricDatabars[metricKey];
+        if (!config?.type) {
+          return;
+        }
+        const rawValue = cell.values[metricKey];
+        const value = getNumericValue(rawValue);
+        if (value === undefined) {
+          return;
+        }
+        const scaleKey = resolveScaleGroupKey(metricKey, metricDatabars);
+        const scale =
+          config.type === 'waterfall'
+            ? waterfallScaleMap.get(scaleKey)
+            : scaleMap.get(scaleKey);
+        if (!scale) {
+          return;
+        }
+        const scaleBounds = resolveScaleBounds(scale);
+        let startPct = scaleBounds.zeroPct;
+        let endPct = toPercent(value, scale);
+        if (config.type === 'waterfall') {
+          const offset = offsets.get(cellKey);
+          const startValue = offset?.start ?? 0;
+          const endValue = offset?.end ?? value;
+          startPct = toPercent(startValue, scale);
+          endPct = toPercent(endValue, scale);
+        }
+        const barStart = Math.min(startPct, endPct);
+        const barEnd = Math.max(startPct, endPct);
+        const formattingKeys = formattingKeyMap[metricKey];
+        const d3FormatOverride = formattingKeys?.d3Format
+          ? normalizeD3Format(cell.values[formattingKeys.d3Format])
+          : undefined;
+        const formatted = renderValue(metricKey, rawValue, d3FormatOverride);
+        const labelText =
+          formatted === null || formatted === undefined
+            ? ''
+            : String(formatted).replace(/<[^>]*>/g, '');
+        const labelWidth =
+          labelText.length * labelCharWidth + labelOffset + labelPadding * 2;
+        const existing = spaceMap.get(scaleKey) ?? { positive: 0, negative: 0 };
+        if (value >= 0) {
+          existing.positive = Math.max(existing.positive, labelWidth);
+        } else {
+          existing.negative = Math.max(existing.negative, labelWidth);
+        }
+        spaceMap.set(scaleKey, existing);
+      });
     }
-    Object.values(tree.cells).forEach(cell => {
-      if (
-        !visibleRowKeySet.has(cell.rowKey) ||
-        !visibleColKeySet.has(cell.colKey)
-      ) {
-        return;
-      }
-      const rowNode = tree.rows[cell.rowKey];
-      const colNode = tree.cols[cell.colKey];
-      if (!rowNode || !colNode) {
-        return;
-      }
-      const metricKey = deriveMetricKey(rowNode, colNode);
-      const config = metricDatabars[metricKey];
-      if (!config?.type) {
-        return;
-      }
-      const scaleKey = resolveScaleGroupKey(metricKey, metricDatabars);
-      const labelSpace = databarLabelSpaces.get(scaleKey);
-      const minWidth =
-        (labelSpace?.positive ?? 0) +
-        (labelSpace?.negative ?? 0) +
-        databarScaleWidth +
-        databarPaddingX * 2;
-      const current = widthMap.get(cell.colKey) ?? 0;
-      if (minWidth > current) {
-        widthMap.set(cell.colKey, minWidth);
-      }
-    });
-    return widthMap;
-  }, [
-    databarLabelSpaces,
-    databarMetricKeys,
-    databarPaddingX,
-    databarScaleWidth,
-    deriveMetricKey,
-    metricDatabars,
-    tree.cells,
-    tree.cols,
-    tree.rows,
-    visibleColKeySet,
-    visibleRowKeySet,
-  ]);
 
-  const waterfallBridgeOffsets = useMemo(() => {
+    const widthMap = new Map<string, number>();
+    if (databarMetricKeys.length > 0) {
+      visibleCells.forEach(({ cell, colNode, rowNode }) => {
+        const metricKey = deriveMetricKey(rowNode, colNode);
+        const config = metricDatabars[metricKey];
+        if (!config?.type) {
+          return;
+        }
+        const scaleKey = resolveScaleGroupKey(metricKey, metricDatabars);
+        const labelSpace = spaceMap.get(scaleKey);
+        const minWidth =
+          (labelSpace?.positive ?? 0) +
+          (labelSpace?.negative ?? 0) +
+          databarScaleWidth +
+          databarPaddingX * 2;
+        const current = widthMap.get(cell.colKey) ?? 0;
+        if (minWidth > current) {
+          widthMap.set(cell.colKey, minWidth);
+        }
+      });
+    }
+
     const bridgeMap = new Map<
       string,
       Array<{ value: number; depth: number; scaleKey: string }>
     >();
-    if (waterfallOffsets.size === 0) {
-      return bridgeMap;
-    }
-    visibleCols.forEach(colNode => {
-      const lastExpandedTotals = new Map<
-        number,
-        { index: number; value: number; scaleKey: string }
-      >();
-      visibleRows.forEach((rowNode, rowIndex) => {
-        const cellKey = serializeCellKey(rowNode.key, colNode.key);
-        const offset = waterfallOffsets.get(cellKey);
-        if (!offset) {
-          return;
-        }
-        const depth = getNodeDimDepth(rowNode);
-        const previous = lastExpandedTotals.get(depth);
-        if (previous && rowIndex - previous.index > 1) {
-          for (let idx = previous.index; idx <= rowIndex; idx += 1) {
-            const betweenRow = visibleRows[idx];
-            const betweenKey = serializeCellKey(betweenRow.key, colNode.key);
-            const betweenOffset = waterfallOffsets.get(betweenKey);
-            const betweenScaleKey = betweenOffset?.scaleKey ?? previous.scaleKey;
-            if (
-              betweenOffset &&
-              betweenScaleKey !== previous.scaleKey
-            ) {
-              continue;
-            }
-            const entry = {
-              value: previous.value,
-              depth,
-              scaleKey: betweenScaleKey,
-            };
-            const existing = bridgeMap.get(betweenKey);
-            if (existing) {
-              const alreadySet = existing.some(
-                item => item.value === entry.value && item.depth === entry.depth,
-              );
-              if (!alreadySet) {
-                existing.push(entry);
+    if (offsets.size > 0) {
+      visibleCols.forEach(colNode => {
+        const lastExpandedTotals = new Map<
+          number,
+          { index: number; value: number; scaleKey: string }
+        >();
+        visibleRows.forEach((rowNode, rowIndex) => {
+          const cellKey = serializeCellKey(rowNode.key, colNode.key);
+          const offset = offsets.get(cellKey);
+          if (!offset) {
+            return;
+          }
+          const depth = getNodeDimDepth(rowNode);
+          const previous = lastExpandedTotals.get(depth);
+          if (previous && rowIndex - previous.index > 1) {
+            for (let idx = previous.index; idx <= rowIndex; idx += 1) {
+              const betweenRow = visibleRows[idx];
+              const betweenKey = serializeCellKey(betweenRow.key, colNode.key);
+              const betweenOffset = offsets.get(betweenKey);
+              const betweenScaleKey = betweenOffset?.scaleKey ?? previous.scaleKey;
+              if (betweenOffset && betweenScaleKey !== previous.scaleKey) {
+                continue;
               }
-            } else {
-              bridgeMap.set(betweenKey, [entry]);
+              const entry = {
+                value: previous.value,
+                depth,
+                scaleKey: betweenScaleKey,
+              };
+              const existing = bridgeMap.get(betweenKey);
+              if (existing) {
+                const alreadySet = existing.some(
+                  item => item.value === entry.value && item.depth === entry.depth,
+                );
+                if (!alreadySet) {
+                  existing.push(entry);
+                }
+              } else {
+                bridgeMap.set(betweenKey, [entry]);
+              }
             }
           }
-        }
-        if (rowNode.hasChildren && expandedRows.has(rowNode.key)) {
-          lastExpandedTotals.set(depth, {
-            index: rowIndex,
-            value: offset.end,
-            scaleKey: offset.scaleKey,
-          });
-        } else if (previous) {
-          lastExpandedTotals.delete(depth);
-        }
+          if (rowNode.hasChildren && expandedRows.has(rowNode.key)) {
+            lastExpandedTotals.set(depth, {
+              index: rowIndex,
+              value: offset.end,
+              scaleKey: offset.scaleKey,
+            });
+          } else if (previous) {
+            lastExpandedTotals.delete(depth);
+          }
+        });
       });
-    });
-    return bridgeMap;
+    }
+
+    return {
+      databarScales: scaleMap,
+      waterfallOffsets: offsets,
+      waterfallScales: waterfallScaleMap,
+      databarLabelSpaces: spaceMap,
+      databarColumnMinWidths: widthMap,
+      waterfallBridgeOffsets: bridgeMap,
+    };
   }, [
+    countDimDepth,
+    databarMetricKeys,
+    databarPaddingX,
+    databarScaleWidth,
+    deriveMetricKey,
     expandedRows,
+    formattingKeyMap,
     getNodeDimDepth,
+    getRowSubtotalPosition,
+    isExplicitSubtotalNode,
+    isMetricSubtotalNode,
+    isMetricTokenValue,
+    isRowGrandTotalNode,
+    metricDatabars,
+    metricsForScale,
+    renderValue,
+    resolvedRowTotalPosition,
+    rowSubTotals,
+    rowSubtotalDepths,
+    showRowRoot,
+    theme.sizeUnit,
+    tree.cells,
+    visibleCells,
     visibleCols,
     visibleRows,
-    waterfallOffsets,
   ]);
 
   const shouldHideRowValues = useCallback(

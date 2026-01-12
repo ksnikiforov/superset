@@ -16,9 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { QueryFormMetric } from '@superset-ui/core';
+import { DataRecordValue, QueryFormMetric } from '@superset-ui/core';
 import { MetricsLayoutEnum, PivotResultCell, PivotTreeNode } from '../types';
-import { decodeMetricKey, getMetricKey, serializeCellKey } from '../utils';
+import {
+  decodeMetricKey,
+  getMetricKey,
+  serializeCellKey,
+  serializePath,
+} from '../utils';
 
 type DeriveMetricKeyParams = {
   rowNode: PivotTreeNode;
@@ -142,4 +147,81 @@ export const formatNodeLabel = ({
     }
   }
   return normalizedLabel;
+};
+
+export type VisibleCellEntry = {
+  cellKey: string;
+  cell: PivotResultCell;
+  rowNode: PivotTreeNode;
+  colNode: PivotTreeNode;
+};
+
+type BuildVisibleCellEntriesParams = {
+  cells: Record<string, PivotResultCell>;
+  rows: Record<string, PivotTreeNode>;
+  cols: Record<string, PivotTreeNode>;
+  visibleRowKeys: Set<string>;
+  visibleColKeys: Set<string>;
+};
+
+export const buildVisibleCellEntries = ({
+  cells,
+  rows,
+  cols,
+  visibleRowKeys,
+  visibleColKeys,
+}: BuildVisibleCellEntriesParams) => {
+  const entries: VisibleCellEntry[] = [];
+  Object.values(cells).forEach(cell => {
+    if (!visibleRowKeys.has(cell.rowKey) || !visibleColKeys.has(cell.colKey)) {
+      return;
+    }
+    const rowNode = rows[cell.rowKey];
+    const colNode = cols[cell.colKey];
+    if (!rowNode || !colNode) {
+      return;
+    }
+    entries.push({
+      cellKey: serializeCellKey(cell.rowKey, cell.colKey),
+      cell,
+      rowNode,
+      colNode,
+    });
+  });
+  return entries;
+};
+
+type BuildFormattingValueMapsParams = {
+  cells: Record<string, PivotResultCell>;
+  rows: Record<string, PivotTreeNode>;
+  cols: Record<string, PivotTreeNode>;
+  getNonMetricPathParts: (path: PivotTreeNode['path']) => PivotTreeNode['path'];
+  rootKey: string;
+};
+
+export const buildFormattingValueMaps = ({
+  cells,
+  rows,
+  cols,
+  getNonMetricPathParts,
+  rootKey,
+}: BuildFormattingValueMapsParams) => {
+  const rowValuesMap = new Map<string, Record<string, DataRecordValue>>();
+  const colValuesMap = new Map<string, Record<string, DataRecordValue>>();
+  Object.values(cells).forEach(cell => {
+    const rowNode = rows[cell.rowKey];
+    const colNode = cols[cell.colKey];
+    if (!rowNode || !colNode) {
+      return;
+    }
+    const rowKey = serializePath(getNonMetricPathParts(rowNode.path));
+    const colKey = serializePath(getNonMetricPathParts(colNode.path));
+    if (colKey === rootKey && !rowValuesMap.has(rowKey)) {
+      rowValuesMap.set(rowKey, cell.values);
+    }
+    if (rowKey === rootKey && !colValuesMap.has(colKey)) {
+      colValuesMap.set(colKey, cell.values);
+    }
+  });
+  return { rowValuesMap, colValuesMap };
 };

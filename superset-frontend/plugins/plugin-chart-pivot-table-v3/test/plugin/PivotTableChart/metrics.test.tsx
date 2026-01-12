@@ -574,6 +574,158 @@ describe('PivotTableChart metric tier suppression', () => {
     expect(within(totalCell).getByTestId('pivot-databar')).toBeInTheDocument();
   });
 
+  it('reverses waterfall flow when row totals are on top', () => {
+    const rootKey = serializePath([]);
+    const tree = applyMetricAxis(
+      buildTreeFromRecords(
+        [
+          { r1: 'A', c1: 'C1', metric1: 10 },
+          { r1: 'B', c1: 'C1', metric1: 20 },
+        ],
+        ['metric1'],
+        ['r1'],
+        ['c1'],
+        1,
+        1,
+      ),
+      ['metric1'],
+      MetricsLayoutEnum.COLUMNS,
+      ['r1'],
+      ['c1'],
+    );
+    tree.cells[serializeCellKey(rootKey, serializePath(['C1']))] = {
+      rowKey: rootKey,
+      colKey: serializePath(['C1']),
+      values: { metric1: 30 },
+    };
+
+    const renderWithTotalsPosition = (rowTotalPosition: 'start' | 'end') => {
+      const { unmount } = render(
+        <PivotTableChart
+          data={tree}
+          formData={buildFormData({
+            ...baseFormData,
+            rowTotals: true,
+            rowTotalPosition,
+            metricDatabars: {
+              metric1: { type: 'waterfall' },
+            },
+          })}
+          metrics={['metric1']}
+          groupbyRows={['r1']}
+          groupbyColumns={['c1']}
+          aggregateFunction="Sum"
+          width={400}
+          height={300}
+          startCollapsed={false}
+          initialDepth={1}
+          maxDepthPerFetch={1}
+          rowTotals={true}
+          rowTotalPosition={rowTotalPosition}
+          colTotals={false}
+          rowSubTotals={false}
+          colSubTotals={false}
+          rowSubtotalLevels={[]}
+          colSubtotalLevels={[]}
+          rowOrder="key_a_to_z"
+          colOrder="key_a_to_z"
+          valueFormat=""
+          columnFormats={{}}
+          currencyFormats={{}}
+          allowRenderHtml={false}
+          emitCrossFilters={false}
+          setDataMask={jest.fn()}
+          metricColorFormatters={[]}
+          dateFormatters={{}}
+        />,
+      );
+
+      const cell = screen.getByText('10').closest('td');
+      expect(cell).toBeTruthy();
+      if (!cell) {
+        unmount();
+        throw new Error('Expected cell for row A metric not found.');
+      }
+      const bar = within(cell).getByTestId('pivot-databar-bar');
+      const left = Number.parseFloat(bar.style.left);
+      unmount();
+      return left;
+    };
+
+    const topTotalLeft = renderWithTotalsPosition('start');
+    const bottomTotalLeft = renderWithTotalsPosition('end');
+    expect(topTotalLeft).toBeGreaterThan(bottomTotalLeft);
+  });
+
+  it('allocates left padding for negative waterfall labels above zero', () => {
+    const tree = applyMetricAxis(
+      buildTreeFromRecords(
+        [
+          { r1: 'A', c1: 'C1', metric1: 100 },
+          { r1: 'B', c1: 'C1', metric1: -10 },
+        ],
+        ['metric1'],
+        ['r1'],
+        ['c1'],
+        1,
+        1,
+      ),
+      ['metric1'],
+      MetricsLayoutEnum.COLUMNS,
+      ['r1'],
+      ['c1'],
+    );
+
+    render(
+      <PivotTableChart
+        data={tree}
+        formData={buildFormData({
+          ...baseFormData,
+          metricDatabars: {
+            metric1: { type: 'waterfall' },
+          },
+        })}
+        metrics={['metric1']}
+        groupbyRows={['r1']}
+        groupbyColumns={['c1']}
+        aggregateFunction="Sum"
+        width={400}
+        height={300}
+        startCollapsed={false}
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    const labelNodes = screen.getAllByText('-10');
+    const databarCell = labelNodes
+      .map(node => node.closest('td'))
+      .find(cell => cell && within(cell).queryByTestId('pivot-databar'));
+    expect(databarCell).toBeTruthy();
+    if (!databarCell) {
+      return;
+    }
+    const databar = within(databarCell).getByTestId('pivot-databar');
+    const paddingLeft = Number.parseFloat(databar.style.paddingLeft);
+    expect(paddingLeft).toBeGreaterThan(supersetTheme.sizeUnit * 2);
+  });
+
   it('applies row and column formatting with metric priority', () => {
     const formattedTree: PivotTreeData = {
       ...baseTree,
