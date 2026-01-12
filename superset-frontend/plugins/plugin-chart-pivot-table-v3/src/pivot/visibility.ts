@@ -17,7 +17,7 @@
  * under the License.
  */
 import { PivotResultCell, PivotTreeNode, TotalPosition } from '../types';
-import { isSubtotalToken, SUBTOTAL_LABEL } from '../utils';
+import { isSubtotalToken, parseCellKey, SUBTOTAL_LABEL } from '../utils';
 import { buildVisibleList, rootKey } from './viewModel';
 
 type VisibleRowsParams = {
@@ -102,7 +102,7 @@ export const createColLeavesBuilder = ({
         return false;
       }
       const token = leaf.path[node.path.length];
-      if (isSubtotalToken(token) || token === 'Total') {
+      if (isSubtotalToken(token)) {
         return true;
       }
       if (leaf.path.length !== node.path.length + 1) {
@@ -300,7 +300,7 @@ type HasLoadedChildrenParams = {
   getRawChildren: (axis: 'row' | 'col', node: PivotTreeNode) => PivotTreeNode[];
   groupbyRowsLength: number;
   groupbyColsLength: number;
-  metricLabelSet: Set<string>;
+  isMetricTokenValue: (val: unknown) => boolean;
   metricIndexForRows?: number;
   metricIndexForCols?: number;
   cells: Record<string, PivotResultCell>;
@@ -317,7 +317,7 @@ export const hasLoadedChildren = ({
   getRawChildren,
   groupbyRowsLength,
   groupbyColsLength,
-  metricLabelSet,
+  isMetricTokenValue,
   metricIndexForRows,
   metricIndexForCols,
   cells,
@@ -330,10 +330,10 @@ export const hasLoadedChildren = ({
   const countBaseDimDepth = (path: PivotTreeNode['path']) =>
     path.filter(val => {
       const value = String(val ?? '');
-      if (metricLabelSet.has(value)) {
+      if (isMetricTokenValue(value)) {
         return false;
       }
-      if (isSubtotalToken(val) || value === 'Total') {
+      if (isSubtotalToken(val)) {
         return false;
       }
       return true;
@@ -348,7 +348,7 @@ export const hasLoadedChildren = ({
   if (
     metricIndex !== undefined &&
     node.path.length > metricIndex &&
-    metricLabelSet.has(String(node.path[metricIndex] ?? '')) &&
+    isMetricTokenValue(node.path[metricIndex]) &&
     parentDimDepth < groupbyLength
   ) {
     // Sitting on the metric tier and deeper dimensions remain; force fetch.
@@ -362,12 +362,9 @@ export const hasLoadedChildren = ({
   const childCellColDepths: number[] = [];
   const hasChildCells = children.some(child =>
     Object.keys(cells).some(key => {
-      const matches =
-        axis === 'row'
-          ? key.startsWith(`${child.key}|`)
-          : key.endsWith(`|${child.key}`);
+      const { rowKey, colKey } = parseCellKey(key);
+      const matches = axis === 'row' ? rowKey === child.key : colKey === child.key;
       if (matches) {
-        const [rowKey, colKey] = key.split('|');
         const rowNode = rows[rowKey];
         const colNode = cols[colKey];
         if (rowNode) {

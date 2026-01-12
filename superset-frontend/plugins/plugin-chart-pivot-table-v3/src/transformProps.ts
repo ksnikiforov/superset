@@ -54,6 +54,7 @@ import {
   normalizeSubtotalLevels,
   injectRowSubtotalLeaves,
   labelRowSubtotalLeaves,
+  serializeCellKey,
   serializePath,
   collectDimensionSortingMetricsForQuery,
 } from './utils';
@@ -222,22 +223,26 @@ export default function transformProps(
   };
 
   const combinedData = queriesData.flatMap(({ data }) => data || []);
-  const colnames = queriesData[0]?.colnames || [];
-  const coltypes = queriesData[0]?.coltypes || [];
   const colTypeMap: Record<string, GenericDataType> = {};
-  colnames.forEach((name: string, idx: number) => {
-    colTypeMap[name] = coltypes[idx];
+  queriesData.forEach(query => {
+    const colnames = query?.colnames || [];
+    const coltypes = query?.coltypes || [];
+    colnames.forEach((name: string, idx: number) => {
+      const coltype = coltypes[idx];
+      if (coltype !== undefined) {
+        colTypeMap[name] = coltype;
+      }
+    });
   });
 
-  const dateFormatters = colnames
-    .filter(
-      (colname: string, index: number) =>
-        coltypes[index] === GenericDataType.Temporal,
-    )
+  const temporalColumns = Object.keys(colTypeMap).filter(
+    colname => colTypeMap[colname] === GenericDataType.Temporal,
+  );
+  const dateFormatters = temporalColumns
     .reduce(
       (
         acc: Record<string, ((value: DataRecordValue) => string) | undefined>,
-        temporalColname: string,
+        temporalColname,
       ) => {
         let formatter: ((value: DataRecordValue) => string) | undefined;
         if (formData.dateFormat === SMART_DATE_ID) {
@@ -277,6 +282,19 @@ export default function transformProps(
     theme,
   );
 
+  const treeDataSignature = JSON.stringify({
+    rows: groupbyRows.map(getColumnLabel),
+    cols: groupbyColumns.map(getColumnLabel),
+    metrics: metricKeysForQuery,
+    metricsLayout,
+    metricInsertIndex,
+    rowSubtotalLevels,
+    colSubtotalLevels,
+  });
+  const baseTree =
+    ownState?.treeData && ownState?.treeDataSignature === treeDataSignature
+      ? ownState.treeData
+      : ({} as PivotTreeData);
   const nextTreeRaw = queriesData.reduce<PivotTreeData>((acc, query) => {
     const { rowDepth, colDepth } = resolveQueryDepth(query);
     const branch = buildTreeFromRecords(
@@ -288,7 +306,7 @@ export default function transformProps(
       colDepth,
     );
     return mergeTrees(acc, branch);
-  }, ownState?.treeData || ({} as PivotTreeData));
+  }, baseTree);
   const rowSubtotalDepths = rowSubtotalLevels.filter(level => level > 0);
   const nextTreeWithRowSubtotals = rowSubtotalDepths.reduce(
     (acc, depth) => injectRowSubtotalLeaves(acc, depth, groupbyRows.length),
@@ -314,6 +332,7 @@ export default function transformProps(
       return { ...acc, [key]: (grandTotalRecord as any)[key] };
     }, {} as Record<string, DataRecordValue>);
     if (Object.keys(grandValues).length > 0) {
+      const rootCellKey = serializeCellKey(rootKey, rootKey);
       nextTree.rows[rootKey] = {
         ...nextTree.rows[rootKey],
         values: { ...(nextTree.rows[rootKey]?.values || {}), ...grandValues },
@@ -322,11 +341,11 @@ export default function transformProps(
         ...nextTree.cols[rootKey],
         values: { ...(nextTree.cols[rootKey]?.values || {}), ...grandValues },
       };
-      nextTree.cells[`${rootKey}|${rootKey}`] = {
+      nextTree.cells[rootCellKey] = {
         rowKey: rootKey,
         colKey: rootKey,
         values: {
-          ...(nextTree.cells[`${rootKey}|${rootKey}`]?.values || {}),
+          ...(nextTree.cells[rootCellKey]?.values || {}),
           ...grandValues,
         },
         isSubtotal: true,

@@ -66,6 +66,7 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
     rowTotals,
     colTotals,
     colSubTotals,
+    rowSubTotals,
     rowSubtotalLevels,
     colSubtotalLevels,
     initialDepth = 1,
@@ -131,7 +132,9 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
     (metricsOnRows && metricInsertIndex === 0 && hasColTotals) ||
     (!metricsOnRows && metricInsertIndex === 0 && hasRowTotals);
 
-  const isTotalsEnabled = rowTotals || colTotals || colSubTotals;
+  const rowSubTotalsEnabled = rowSubTotals ?? true;
+  const isTotalsEnabled =
+    rowTotals || colTotals || colSubTotals || rowSubTotalsEnabled;
   const isLevelTotalsEnabled =
     (rowSubtotalLevels && rowSubtotalLevels.length > 0) ||
     (colSubtotalLevels && colSubtotalLevels.length > 0);
@@ -164,7 +167,6 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
     adjustForMetricFront(initialDepthResolved, !metricsOnRows),
   );
 
-  const rowSubTotalsEnabled = formData.rowSubTotals ?? true;
   const maxRowSubtotalDepth = Math.max(rowGroupby.length - 1, 0);
   const rowLevels = normalizeSubtotalLevels(
     rowSubtotalLevels,

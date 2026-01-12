@@ -37,8 +37,10 @@ import { buildFormData } from '../fixtures/pivotFormData';
 import {
   applyMetricAxis,
   buildTreeFromRecords,
+  encodeMetricKey,
   METRICS_PLACEHOLDER,
   mergeTrees,
+  serializeCellKey,
   serializePath,
   SUBTOTAL_LABEL,
   SUBTOTAL_TOKEN,
@@ -119,10 +121,10 @@ const baseTree: PivotTreeData = {
       level: 1,
       hasChildren: true,
     },
-    'C1__metric1': {
+    [serializePath(['C1', encodeMetricKey('metric1')])]: {
       axis: 'col',
-      key: serializePath(['C1', 'metric1']),
-      path: ['C1', 'metric1'],
+      key: serializePath(['C1', encodeMetricKey('metric1')]),
+      path: ['C1', encodeMetricKey('metric1')],
       label: 'metric1',
       formattedLabel: 'metric1',
       level: 2,
@@ -130,14 +132,17 @@ const baseTree: PivotTreeData = {
     },
   },
   cells: {
-    [`${serializePath(['A'])}|${serializePath(['C1'])}`]: {
+    [serializeCellKey(serializePath(['A']), serializePath(['C1']))]: {
       rowKey: serializePath(['A']),
       colKey: serializePath(['C1']),
       values: { metric1: 10 },
     },
-    [`${serializePath(['A'])}|${serializePath(['C1', 'metric1'])}`]: {
+    [serializeCellKey(
+      serializePath(['A']),
+      serializePath(['C1', encodeMetricKey('metric1')]),
+    )]: {
       rowKey: serializePath(['A']),
-      colKey: serializePath(['C1', 'metric1']),
+      colKey: serializePath(['C1', encodeMetricKey('metric1')]),
       values: { metric1: 10 },
     },
   },
@@ -181,7 +186,7 @@ const injectColumnSubtotalLeaves = (
       return;
     }
     const subtotalColKey = serializePath([...baseColPath, SUBTOTAL_TOKEN]);
-    const cellKey = `${cell.rowKey}|${subtotalColKey}`;
+    const cellKey = serializeCellKey(cell.rowKey, subtotalColKey);
     next.cells[cellKey] = {
       ...cell,
       colKey: subtotalColKey,
@@ -239,7 +244,7 @@ describe('PivotTableChart metric tier suppression', () => {
       ...baseTree,
       cells: {
         ...baseTree.cells,
-        [`${serializePath(['A'])}|${serializePath(['C1'])}`]: {
+        [serializeCellKey(serializePath(['A']), serializePath(['C1']))]: {
           rowKey: serializePath(['A']),
           colKey: serializePath(['C1']),
           values: {
@@ -248,9 +253,12 @@ describe('PivotTableChart metric tier suppression', () => {
             metric1_text: '#00ff00',
           },
         },
-        [`${serializePath(['A'])}|${serializePath(['C1', 'metric1'])}`]: {
+        [serializeCellKey(
+          serializePath(['A']),
+          serializePath(['C1', encodeMetricKey('metric1')]),
+        )]: {
           rowKey: serializePath(['A']),
-          colKey: serializePath(['C1', 'metric1']),
+          colKey: serializePath(['C1', encodeMetricKey('metric1')]),
           values: {
             metric1: 11,
             metric1_bg: '#222222',
@@ -510,7 +518,7 @@ describe('PivotTableChart metric tier suppression', () => {
       ...baseTree,
       cells: {
         ...baseTree.cells,
-        [`${serializePath([])}|${serializePath(['C1'])}`]: {
+        [serializeCellKey(serializePath([]), serializePath(['C1']))]: {
           rowKey: serializePath([]),
           colKey: serializePath(['C1']),
           values: { metric1: 50 },
@@ -571,7 +579,7 @@ describe('PivotTableChart metric tier suppression', () => {
       ...baseTree,
       cells: {
         ...baseTree.cells,
-        [`${serializePath(['A'])}|${serializePath([])}`]: {
+        [serializeCellKey(serializePath(['A']), serializePath([]))]: {
           rowKey: serializePath(['A']),
           colKey: serializePath([]),
           values: {
@@ -579,7 +587,7 @@ describe('PivotTableChart metric tier suppression', () => {
             row_text: '#00ff00',
           },
         },
-        [`${serializePath([])}|${serializePath(['C1'])}`]: {
+        [serializeCellKey(serializePath([]), serializePath(['C1']))]: {
           rowKey: serializePath([]),
           colKey: serializePath(['C1']),
           values: {
@@ -587,7 +595,7 @@ describe('PivotTableChart metric tier suppression', () => {
             col_text: '#0000ff',
           },
         },
-        [`${serializePath(['A'])}|${serializePath(['C1'])}`]: {
+        [serializeCellKey(serializePath(['A']), serializePath(['C1']))]: {
           rowKey: serializePath(['A']),
           colKey: serializePath(['C1']),
           values: {
@@ -675,14 +683,14 @@ describe('PivotTableChart metric tier suppression', () => {
       ...baseTree,
       cells: {
         ...baseTree.cells,
-        [`${serializePath(['A'])}|${serializePath([])}`]: {
+        [serializeCellKey(serializePath(['A']), serializePath([]))]: {
           rowKey: serializePath(['A']),
           colKey: serializePath([]),
           values: {
             row_bg: '#111111',
           },
         },
-        [`${serializePath([])}|${serializePath(['C1'])}`]: {
+        [serializeCellKey(serializePath([]), serializePath(['C1']))]: {
           rowKey: serializePath([]),
           colKey: serializePath(['C1']),
           values: {
@@ -1338,7 +1346,7 @@ describe('PivotTableChart metric tier suppression', () => {
           level: 1,
           hasChildren: true,
         },
-        'USA__1-URGENT': {
+        [serializePath(['USA', '1-URGENT'])]: {
           axis: 'row',
           key: serializePath(['USA', '1-URGENT']),
           path: ['USA', '1-URGENT'],
@@ -1349,9 +1357,9 @@ describe('PivotTableChart metric tier suppression', () => {
         },
       },
       cols: {
-        '': {
+        [serializePath([])]: {
           axis: 'col',
-          key: '',
+          key: serializePath([]),
           path: [],
           label: 'Total',
           formattedLabel: 'Total',
@@ -1360,9 +1368,12 @@ describe('PivotTableChart metric tier suppression', () => {
         },
       },
       cells: {
-        [`${serializePath(['USA', '1-URGENT'])}|`]: {
+        [serializeCellKey(
+          serializePath(['USA', '1-URGENT']),
+          serializePath([]),
+        )]: {
           rowKey: serializePath(['USA', '1-URGENT']),
-          colKey: '',
+          colKey: serializePath([]),
           values: { countCustomers: 5 },
         },
       },

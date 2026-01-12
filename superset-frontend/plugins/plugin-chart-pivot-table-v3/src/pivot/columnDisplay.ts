@@ -17,6 +17,7 @@
  * under the License.
  */
 import { MetricsLayoutEnum, PivotTreeNode } from '../types';
+import { decodeMetricKey } from '../utils';
 
 type ColumnDisplayConfig = {
   metricsLayout: MetricsLayoutEnum;
@@ -57,7 +58,9 @@ export const buildColumnDisplayPath = (
     if (!isExplicitSubtotalNode(col) || path.length >= maxDepth) {
       return path;
     }
-    const lastLabel = String(path[path.length - 1] ?? '');
+    const lastLabel =
+      decodeMetricKey(path[path.length - 1]) ??
+      String(path[path.length - 1] ?? '');
     return [
       ...path,
       ...Array(Math.max(maxDepth - path.length, 0)).fill(lastLabel),
@@ -95,7 +98,8 @@ export const buildColumnDisplayPath = (
     return [totalLabel, ...Array(padCount).fill(totalLabel), metricLabel];
   }
   const metricIsLeaf =
-    String(col.path[col.path.length - 1] ?? '') === metricLabel;
+    (decodeMetricKey(col.path[col.path.length - 1]) ??
+      String(col.path[col.path.length - 1] ?? '')) === metricLabel;
   if (metricIsLeaf && nonMetricParts.length > 0) {
     if (
       metricsAtColEnd &&

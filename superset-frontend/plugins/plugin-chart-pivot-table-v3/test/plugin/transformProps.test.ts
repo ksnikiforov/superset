@@ -21,7 +21,7 @@ import { ChartProps, supersetTheme } from '@superset-ui/core';
 import transformProps from '../../src/transformProps';
 import { MetricsLayoutEnum, PivotTableQueryFormData } from '../../src/types';
 import { formatQueryName } from '../../src/buildQuery';
-import { serializePath } from '../../src/utils';
+import { encodeMetricKey, serializeCellKey, serializePath } from '../../src/utils';
 
 describe('Pivot Table v3 transformProps', () => {
   const formData: Partial<PivotTableQueryFormData> = {
@@ -60,12 +60,15 @@ describe('Pivot Table v3 transformProps', () => {
     datasource: { verboseMap: {}, columnFormats: {}, currencyFormats: {} },
     theme: supersetTheme,
   });
+  const rowKey = serializePath(['A']);
+  const colKey = serializePath(['B', encodeMetricKey('metric1')]);
+  const cellKey = serializeCellKey(rowKey, colKey);
 
   it('builds a tree from query results', () => {
     const result = transformProps(chartProps as any);
     expect(result.data.rows).toBeDefined();
     expect(result.data.cols).toBeDefined();
-    expect(result.data.cells['A|B__metric1']).toBeDefined();
+    expect(result.data.cells[cellKey]).toBeDefined();
     expect(result.metrics).toEqual(['metric1']);
   });
 
@@ -96,7 +99,7 @@ describe('Pivot Table v3 transformProps', () => {
     const result = transformProps(
       props as ChartProps<PivotTableQueryFormData>,
     );
-    expect(result.data.cells['A|B__metric1'].values.metric1_bg).toBe('#111111');
+    expect(result.data.cells[cellKey].values.metric1_bg).toBe('#111111');
   });
 
   it('keeps databar color metric values in the tree', () => {
@@ -135,7 +138,7 @@ describe('Pivot Table v3 transformProps', () => {
     const result = transformProps(
       props as ChartProps<PivotTableQueryFormData>,
     );
-    expect(result.data.cells['A|B__metric1'].values.metric1_color).toBe(
+    expect(result.data.cells[cellKey].values.metric1_color).toBe(
       '#111111',
     );
   });
@@ -185,10 +188,14 @@ describe('Pivot Table v3 transformProps', () => {
     const rowKey = serializePath(['A']);
     const colKey = serializePath(['B']);
     const rootKey = serializePath([]);
-    expect(result.data.cells[`${rowKey}|${rootKey}`].values.row_bg).toBe(
+    expect(
+      result.data.cells[serializeCellKey(rowKey, rootKey)].values.row_bg,
+    ).toBe(
       '#111111',
     );
-    expect(result.data.cells[`${rootKey}|${colKey}`].values.col_text).toBe(
+    expect(
+      result.data.cells[serializeCellKey(rootKey, colKey)].values.col_text,
+    ).toBe(
       '#00ff00',
     );
   });
@@ -277,11 +284,25 @@ describe('Pivot Table v3 transformProps', () => {
     const { data: tree } = transformProps(props as any);
     const rootKey = serializePath([]);
 
-    expect(tree.cells[`A|${rootKey}`]?.values.metric1).toBe(6);
-    expect(tree.cells[`B|${rootKey}`]?.values.metric1).toBe(9);
-    expect(tree.cells[`${rootKey}|X`]?.values.metric1).toBe(10);
-    expect(tree.cells[`${rootKey}|Y`]?.values.metric1).toBe(5);
-    expect(tree.cells[`${rootKey}|${rootKey}`]?.values.metric1).toBe(15);
+    expect(
+      tree.cells[serializeCellKey(serializePath(['A']), rootKey)]?.values
+        .metric1,
+    ).toBe(6);
+    expect(
+      tree.cells[serializeCellKey(serializePath(['B']), rootKey)]?.values
+        .metric1,
+    ).toBe(9);
+    expect(
+      tree.cells[serializeCellKey(rootKey, serializePath(['X']))]?.values
+        .metric1,
+    ).toBe(10);
+    expect(
+      tree.cells[serializeCellKey(rootKey, serializePath(['Y']))]?.values
+        .metric1,
+    ).toBe(5);
+    expect(
+      tree.cells[serializeCellKey(rootKey, rootKey)]?.values.metric1,
+    ).toBe(15);
   });
 
   it('uses metric-only queries as grand totals even when query depth metadata is wrong', () => {
@@ -336,7 +357,9 @@ describe('Pivot Table v3 transformProps', () => {
 
     const { data: tree } = transformProps(props as any);
     const rootKey = serializePath([]);
-    expect(tree.cells[`${rootKey}|${rootKey}`]?.values.metric1).toBe(999);
+    expect(
+      tree.cells[serializeCellKey(rootKey, rootKey)]?.values.metric1,
+    ).toBe(999);
   });
 
   it('infers column depth when query metadata is shallow but column groupbys are present', () => {

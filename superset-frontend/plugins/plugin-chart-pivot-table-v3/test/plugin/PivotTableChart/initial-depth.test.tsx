@@ -35,7 +35,9 @@ import {
   applyMetricAxis,
   buildTreeFromRecords,
   METRICS_PLACEHOLDER,
+  serializeCellKey,
   serializePath,
+  SUBTOTAL_TOKEN,
 } from '../../../src/utils';
 
 describe('PivotTableChart initial depth on collapsed render', () => {
@@ -432,7 +434,7 @@ describe('PivotTableChart initial depth on collapsed render', () => {
 
   it('hides row subtotals when rowSubTotals is disabled', () => {
     const rootKey = serializePath([]);
-    const subtotalRowKey = serializePath(['Subtotal']);
+    const subtotalRowKey = serializePath([SUBTOTAL_TOKEN]);
     const metrics = ['metric1', 'metric2', 'metric3'];
     const rows: Record<string, PivotTreeNode> = {
       [rootKey]: {
@@ -458,7 +460,7 @@ describe('PivotTableChart initial depth on collapsed render', () => {
       [subtotalRowKey]: {
         axis: 'row',
         key: subtotalRowKey,
-        path: ['Subtotal'],
+        path: [SUBTOTAL_TOKEN],
         label: 'Subtotal',
         formattedLabel: 'Subtotal',
         level: 1,
@@ -488,15 +490,16 @@ describe('PivotTableChart initial depth on collapsed render', () => {
         isSubtotal: true,
       },
     };
+    const colKey = serializePath(['A']);
     const cells: Record<string, PivotResultCell> = {
-      [`${serializePath(['F'])}|${serializePath(['A'])}`]: {
+      [serializeCellKey(serializePath(['F']), colKey)]: {
         rowKey: serializePath(['F']),
-        colKey: serializePath(['A']),
+        colKey,
         values: { metric1: 10, metric2: 20, metric3: 30 },
       },
-      [`${subtotalRowKey}|${serializePath(['A'])}`]: {
+      [serializeCellKey(subtotalRowKey, colKey)]: {
         rowKey: subtotalRowKey,
-        colKey: serializePath(['A']),
+        colKey,
         values: { metric1: 5, metric2: 15, metric3: 25 },
         isSubtotal: true,
       },

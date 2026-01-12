@@ -21,21 +21,25 @@ import { MetricsLayoutEnum, PivotTreeData } from '../../src/types';
 import {
   applyMetricAxis,
   buildTreeFromRecords,
+  encodeMetricKey,
   mergeTrees,
   METRICS_PLACEHOLDER,
   normalizeSubtotalLevels,
   labelRowSubtotalLeaves,
   resolveMetricPlacement,
+  serializeCellKey,
   serializePath,
   SUBTOTAL_TOKEN,
   transferDimensionSettingsAcrossAxes,
 } from '../../src/utils';
 
+const rootKey = serializePath([]);
+
 const baseTree: PivotTreeData = {
   rows: {
-    '': {
+    [rootKey]: {
       axis: 'row',
-      key: '',
+      key: rootKey,
       path: [],
       label: 'Total',
       formattedLabel: 'Total',
@@ -53,9 +57,9 @@ const baseTree: PivotTreeData = {
     },
   },
   cols: {
-    '': {
+    [rootKey]: {
       axis: 'col',
-      key: '',
+      key: rootKey,
       path: [],
       label: 'Total',
       formattedLabel: 'Total',
@@ -64,9 +68,9 @@ const baseTree: PivotTreeData = {
     },
   },
   cells: {
-    [`${serializePath(['A'])}|`]: {
+    [serializeCellKey(serializePath(['A']), rootKey)]: {
       rowKey: serializePath(['A']),
-      colKey: '',
+      colKey: rootKey,
       values: { m1: 10 },
     },
   },
@@ -84,7 +88,7 @@ describe('applyMetricAxis', () => {
     );
 
     expect(result.rows[serializePath(['A'])]).toBeDefined();
-    expect(result.rows[serializePath(['m1'])]).toBeDefined();
+    expect(result.rows[serializePath([encodeMetricKey('m1')])]).toBeDefined();
   });
 
   it('preserves dimension nodes when metrics are inserted at the front of columns', () => {
@@ -97,16 +101,16 @@ describe('applyMetricAxis', () => {
       0,
     );
 
-    expect(result.cols[serializePath([])]).toBeDefined();
-    expect(result.cols[serializePath(['m1'])]).toBeDefined();
+    expect(result.cols[rootKey]).toBeDefined();
+    expect(result.cols[serializePath([encodeMetricKey('m1')])]).toBeDefined();
   });
 
   it('surfaces single metric values on the base column when the metric is first', () => {
     const tree = {
       rows: {
-        '': {
+        [rootKey]: {
           axis: 'row',
-          key: '',
+          key: rootKey,
           path: [],
           label: 'Total',
           formattedLabel: 'Total',
@@ -124,9 +128,9 @@ describe('applyMetricAxis', () => {
         },
       },
       cols: {
-        '': {
+        [rootKey]: {
           axis: 'col',
-          key: '',
+          key: rootKey,
           path: [],
           label: 'Total',
           formattedLabel: 'Total',
@@ -144,7 +148,10 @@ describe('applyMetricAxis', () => {
         },
       },
       cells: {
-        [`${serializePath(['A'])}|${serializePath(['AUTO'])}`]: {
+        [serializeCellKey(
+          serializePath(['A']),
+          serializePath(['AUTO']),
+        )]: {
           rowKey: serializePath(['A']),
           colKey: serializePath(['AUTO']),
           values: { m1: 10 },
@@ -161,16 +168,23 @@ describe('applyMetricAxis', () => {
       0,
     );
 
-    expect(withMetrics.cells['A|AUTO']?.values.m1).toBe(10);
-    expect(withMetrics.cells['A|']?.values.m1).toBe(10);
+    expect(
+      withMetrics.cells[
+        serializeCellKey(serializePath(['A']), serializePath(['AUTO']))
+      ]?.values.m1,
+    ).toBe(10);
+    expect(
+      withMetrics.cells[serializeCellKey(serializePath(['A']), rootKey)]
+        ?.values.m1,
+    ).toBe(10);
   });
 
   it('surfaces single metric values at the base row when the metric is not first', () => {
     const tree = {
       rows: {
-        '': {
+        [rootKey]: {
           axis: 'row',
-          key: '',
+          key: rootKey,
           path: [],
           label: 'Total',
           formattedLabel: 'Total',
@@ -188,9 +202,9 @@ describe('applyMetricAxis', () => {
         },
       },
       cols: {
-        '': {
+        [rootKey]: {
           axis: 'col',
-          key: '',
+          key: rootKey,
           path: [],
           label: 'Total',
           formattedLabel: 'Total',
@@ -208,7 +222,10 @@ describe('applyMetricAxis', () => {
         },
       },
       cells: {
-        [`${serializePath(['USA'])}|${serializePath(['BUILDING'])}`]: {
+        [serializeCellKey(
+          serializePath(['USA']),
+          serializePath(['BUILDING']),
+        )]: {
           rowKey: serializePath(['USA']),
           colKey: serializePath(['BUILDING']),
           values: { countCustomers: 10 },
@@ -225,9 +242,18 @@ describe('applyMetricAxis', () => {
       1,
     );
 
-    expect(withMetrics.cells['USA|BUILDING']?.values.countCustomers).toBe(10);
     expect(
-      withMetrics.cells['USA__countCustomers|BUILDING']?.values.countCustomers,
+      withMetrics.cells[
+        serializeCellKey(serializePath(['USA']), serializePath(['BUILDING']))
+      ]?.values.countCustomers,
+    ).toBe(10);
+    expect(
+      withMetrics.cells[
+        serializeCellKey(
+          serializePath(['USA', encodeMetricKey('countCustomers')]),
+          serializePath(['BUILDING']),
+        )
+      ]?.values.countCustomers,
     ).toBe(10);
   });
 });
@@ -327,7 +353,12 @@ describe('applyMetricAxis + buildTreeFromRecords integration', () => {
       0,
     );
     expect(
-      withMetrics.cells['1-URGENT|weightedDiscount']?.values.weightedDiscount,
+      withMetrics.cells[
+        serializeCellKey(
+          serializePath(['1-URGENT']),
+          serializePath([encodeMetricKey('weightedDiscount')]),
+        )
+      ]?.values.weightedDiscount,
     ).toBe(0.05);
   });
 
@@ -374,8 +405,12 @@ describe('applyMetricAxis + buildTreeFromRecords integration', () => {
 
     const merged = mergeTrees(baseTree, branchWithMetrics);
     expect(
-      merged.cells['1-URGENT|weightedDiscount__Consumer']?.values
-        .weightedDiscount,
+      merged.cells[
+        serializeCellKey(
+          serializePath(['1-URGENT']),
+          serializePath([encodeMetricKey('weightedDiscount'), 'Consumer']),
+        )
+      ]?.values.weightedDiscount,
     ).toBe(0.05);
   });
 
@@ -396,7 +431,14 @@ describe('applyMetricAxis + buildTreeFromRecords integration', () => {
       ['category'],
       1,
     );
-    expect(withMetrics.cells['1-URGENT|AUTO']?.values.metric1).toBe(10);
+    expect(
+      withMetrics.cells[
+        serializeCellKey(
+          serializePath(['1-URGENT']),
+          serializePath(['AUTO']),
+        )
+      ]?.values.metric1,
+    ).toBe(10);
   });
 
   it('populates collapsed row cells when there is a single metric', () => {
@@ -416,7 +458,14 @@ describe('applyMetricAxis + buildTreeFromRecords integration', () => {
       [],
       2,
     );
-    expect(withMetrics.cells['1-URGENT__SUB1|']?.values.metric1).toBe(20);
+    expect(
+      withMetrics.cells[
+        serializeCellKey(
+          serializePath(['1-URGENT', 'SUB1']),
+          serializePath([]),
+        )
+      ]?.values.metric1,
+    ).toBe(20);
   });
 
   it('sets grand total labels and intersection from grand-total queries', () => {
@@ -431,7 +480,9 @@ describe('applyMetricAxis + buildTreeFromRecords integration', () => {
     );
     expect(tree.rows[rootKey].label).toEqual('Grand total');
     expect(tree.cols[rootKey].label).toEqual('Grand total');
-    expect(tree.cells[`${rootKey}|${rootKey}`]?.values.metric1).toBe(99);
+    expect(
+      tree.cells[serializeCellKey(rootKey, rootKey)]?.values.metric1,
+    ).toBe(99);
   });
 
   it('preserves grand total cell when merging deeper branches', () => {
@@ -456,7 +507,9 @@ describe('applyMetricAxis + buildTreeFromRecords integration', () => {
       0,
     );
     const merged = mergeTrees(totals, branch);
-    expect(merged.cells[`${rootKey}|${rootKey}`]?.values.metric1).toBe(1500000);
+    expect(
+      merged.cells[serializeCellKey(rootKey, rootKey)]?.values.metric1,
+    ).toBe(1500000);
   });
 });
 
@@ -518,7 +571,11 @@ describe('normalizeSubtotalLevels', () => {
 describe('labelRowSubtotalLeaves', () => {
   it('uses "<Group> Total" when there is a single metric', () => {
     const rootKey = serializePath([]);
-    const subtotalKey = serializePath(['Bikes', SUBTOTAL_TOKEN, 'metric1']);
+    const subtotalKey = serializePath([
+      'Bikes',
+      SUBTOTAL_TOKEN,
+      encodeMetricKey('metric1'),
+    ]);
     const tree: PivotTreeData = {
       rows: {
         [rootKey]: {
@@ -534,7 +591,7 @@ describe('labelRowSubtotalLeaves', () => {
         [subtotalKey]: {
           axis: 'row',
           key: subtotalKey,
-          path: ['Bikes', SUBTOTAL_TOKEN, 'metric1'],
+          path: ['Bikes', SUBTOTAL_TOKEN, encodeMetricKey('metric1')],
           label: 'Subtotal',
           formattedLabel: 'Subtotal',
           level: 3,
@@ -564,7 +621,11 @@ describe('labelRowSubtotalLeaves', () => {
 
   it('uses "<Group> <Metric>" when the subtotal token follows a metric', () => {
     const rootKey = serializePath([]);
-    const subtotalKey = serializePath(['Bikes', 'metric1', SUBTOTAL_TOKEN]);
+    const subtotalKey = serializePath([
+      'Bikes',
+      encodeMetricKey('metric1'),
+      SUBTOTAL_TOKEN,
+    ]);
     const tree: PivotTreeData = {
       rows: {
         [rootKey]: {
@@ -580,7 +641,7 @@ describe('labelRowSubtotalLeaves', () => {
         [subtotalKey]: {
           axis: 'row',
           key: subtotalKey,
-          path: ['Bikes', 'metric1', SUBTOTAL_TOKEN],
+          path: ['Bikes', encodeMetricKey('metric1'), SUBTOTAL_TOKEN],
           label: 'Subtotal',
           formattedLabel: 'Subtotal',
           level: 3,

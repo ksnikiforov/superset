@@ -30,11 +30,9 @@ under the License.
 - Single-metric, metrics-first-on-rows does not propagate values back to base row paths, so collapsed views can show empty cells even though data exists. (`src/utils.ts:1443-1450`)
 
 ## High
-- Sorting config supports `axisValueRef` and `mode: axis_value`, but sorting ignores both and only handles `mode === "total"`. The UI exposes settings that do nothing. (`src/utils.ts:500-516`, `src/PivotTableChart.tsx:2129-2144`)
-- Sorting and dimension formatting are derived only from root row/col totals. If totals are hidden or not fetched, sorting/formatting silently no-op. (`src/PivotTableChart.tsx:2018-2040`, `src/PivotTableChart.tsx:2121-2148`)
+- Sorting and dimension formatting are derived only from root row/col totals. If totals are hidden or not fetched, sorting/formatting silently no-op. (`src/PivotTableChart.tsx:2018-2040`, `src/PivotTableChart.tsx:2121-2148`). The intended behaviour is do the total query even if total is not displayed.
 - `transformProps` always merges new query results into `ownState.treeData`. If formData changes (metrics/groupbys), stale nodes and cells from the previous run remain and contaminate the new tree. (`src/transformProps.ts:280-291`)
 - Concurrent expands can clobber each other because `handleToggle` merges into a stale `tree` snapshot and calls `setTree` without reconciling with the latest state. Quick multi-clicks can drop previously fetched branches. (`src/PivotTableChart.tsx:2778-2990`)
-- `allowRenderHtml` uses `dangerouslySetInnerHTML` without any sanitization. Turning it on with untrusted data is an XSS foot-gun. (`src/PivotTableChart.tsx:3703-3725`)
 - The expand cache key ignores subtotal selections; toggling row/col subtotal levels can reuse cached branches that lack the requested totals. (`src/fetchPivotBranch.ts:127-148`, `src/fetchPivotBranch.ts:416-454`)
 - No sticky header implementation despite the requirement; the table is a plain overflowed element with no locked row/column headers. (`src/PivotTableChart.tsx:110-140`, `superset-frontend/plugins/plugin-chart-pivot-table-v3/REQUIREMENTS.md:55`)
 
@@ -42,7 +40,6 @@ under the License.
 - `buildFilterKey` omits several query-shaping knobs (time grain, granularity, row/series limits, post_processing), so cached data can be wrong even with identical filters. (`src/fetchPivotBranch.ts:116-125`)
 - `resolveQueryDepth` infers depth from `colnames` when `query_name` is missing; partial queries can be interpreted as full depth and create phantom nodes. (`src/transformProps.ts:191-221`)
 - `METRICS_PLACEHOLDER` is a literal sentinel; a real column named `__MEASURES__` is silently stripped and cannot be grouped on. (`src/utils.ts:51-90`)
-- Databar scales are computed only from currently visible cells, so expanding/collapsing changes scale ranges and makes existing bars jump. (`src/PivotTableChart.tsx:3302-3340`)
 - Type metadata is taken only from the first query result; later queries with different types are formatted/sorted with stale types. (`src/transformProps.ts:224-231`)
 - "Grand total" and "Total" are hard-coded English strings used in logic, so localization is incomplete and data values with those strings are hazardous. (`src/utils.ts:1325-1333`, `src/transformProps.ts:336-349`)
 - `normalizeCssColor` rejects named colors, 3-digit hex, and `hsl()`. Formatting silently drops user input. (`src/PivotTableChart.tsx:248-330`)

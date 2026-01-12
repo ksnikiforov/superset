@@ -27,7 +27,10 @@ import {
   buildTreeFromRecords,
   METRICS_PLACEHOLDER,
   mergeTrees,
+  parseCellKey,
+  serializeCellKey,
   serializePath,
+  SUBTOTAL_TOKEN,
 } from '../../../../src/utils';
 import { fetchPivotBranch, peekPivotBranchCache } from '../../../../src/fetchPivotBranch';
 import { SupersetClient } from '@superset-ui/core';
@@ -728,11 +731,11 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
       groupbyColumns,
       groupbyColumns.length,
     );
-    const subtotalKey = serializePath(['10k-50k', 'Subtotal']);
+    const subtotalKey = serializePath(['10k-50k', SUBTOTAL_TOKEN]);
     colBranch.cols[subtotalKey] = {
       axis: 'col',
       key: subtotalKey,
-      path: ['10k-50k', 'Subtotal'],
+      path: ['10k-50k', SUBTOTAL_TOKEN],
       label: 'Subtotal',
       formattedLabel: 'Subtotal',
       level: 2,
@@ -740,7 +743,7 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
       isSubtotal: true,
     };
     [serializePath(['F']), serializePath(['O'])].forEach(rowKey => {
-      colBranch.cells[`${rowKey}|${subtotalKey}`] = {
+      colBranch.cells[serializeCellKey(rowKey, subtotalKey)] = {
         rowKey,
         colKey: subtotalKey,
         values: { quantitySold: rowKey === serializePath(['F']) ? 30 : 5 },
@@ -780,24 +783,28 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
       groupbyColumns.length,
     );
     rowBranch.cols[subtotalKey] = rowBranch.cols[subtotalKey] || colBranch.cols[subtotalKey];
-    rowBranch.cells[`${serializePath(['F', 'A'])}|${subtotalKey}`] = {
+    rowBranch.cells[
+      serializeCellKey(serializePath(['F', 'A']), subtotalKey)
+    ] = {
       rowKey: serializePath(['F', 'A']),
       colKey: subtotalKey,
       values: { quantitySold: 30 },
       isSubtotal: true,
     };
-    const subtotalRowKey = serializePath(['F', '__subtotal__']);
+    const subtotalRowKey = serializePath(['F', SUBTOTAL_TOKEN]);
     rowBranch.rows[subtotalRowKey] = {
       axis: 'row',
       key: subtotalRowKey,
-      path: ['F', '__subtotal__'],
+      path: ['F', SUBTOTAL_TOKEN],
       label: 'Subtotal',
       formattedLabel: 'Subtotal',
       level: 2,
       hasChildren: false,
       isSubtotal: true,
     };
-    rowBranch.cells[`${subtotalRowKey}|${serializePath(['10k-50k'])}`] = {
+    rowBranch.cells[
+      serializeCellKey(subtotalRowKey, serializePath(['10k-50k']))
+    ] = {
       rowKey: subtotalRowKey,
       colKey: serializePath(['10k-50k']),
       values: { quantitySold: 30 },
@@ -938,18 +945,20 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
       groupbyColumns,
       groupbyColumns.length,
     );
-    const subtotalKey = serializePath(['10k-50k', 'Subtotal']);
+    const subtotalKey = serializePath(['10k-50k', SUBTOTAL_TOKEN]);
     colBranch.cols[subtotalKey] = {
       axis: 'col',
       key: subtotalKey,
-      path: ['10k-50k', 'Subtotal'],
+      path: ['10k-50k', SUBTOTAL_TOKEN],
       label: 'Subtotal',
       formattedLabel: 'Subtotal',
       level: 2,
       hasChildren: false,
       isSubtotal: true,
     };
-    colBranch.cells[`${serializePath(['F'])}|${subtotalKey}`] = {
+    colBranch.cells[
+      serializeCellKey(serializePath(['F']), subtotalKey)
+    ] = {
       rowKey: serializePath(['F']),
       colKey: subtotalKey,
       values: { quantitySold: 30 },
@@ -987,8 +996,11 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
       groupbyColumns,
       groupbyColumns.length,
     );
-    rowBranch.cols[subtotalKey] = rowBranch.cols[subtotalKey] || colBranch.cols[subtotalKey];
-    rowBranch.cells[`${serializePath(['F', 'A'])}|${subtotalKey}`] = {
+    rowBranch.cols[subtotalKey] =
+      rowBranch.cols[subtotalKey] || colBranch.cols[subtotalKey];
+    rowBranch.cells[
+      serializeCellKey(serializePath(['F', 'A']), subtotalKey)
+    ] = {
       rowKey: serializePath(['F', 'A']),
       colKey: subtotalKey,
       values: { quantitySold: 30 },
@@ -1082,7 +1094,7 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
       const queries = jsonPayload.queries || [];
       const result = queries.map((query: any) => {
         const name = query.query_name as string;
-        if (name.includes('branch:col:AUTO')) {
+        if (name.includes(`branch:col:${serializePath(['AUTO'])}`)) {
           if (name.includes(formatQueryName(1, 2))) {
             return {
               data: [
@@ -1103,7 +1115,11 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
           }
           return { data: [] };
         }
-        if (name.includes('branch:row:USA__1-URGENT')) {
+        if (
+          name.includes(
+            `branch:row:${serializePath(['USA', '1-URGENT'])}`,
+          )
+        ) {
           if (name.includes(formatQueryName(3, 2))) {
             return {
               data: [
@@ -1120,7 +1136,7 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
           }
           return { data: [] };
         }
-        if (name.includes('branch:row:USA')) {
+        if (name.includes(`branch:row:${serializePath(['USA'])}`)) {
           if (name.includes(formatQueryName(2, 2))) {
             return {
               data: [
@@ -1136,7 +1152,7 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
           }
           return { data: [] };
         }
-        if (name.includes('branch:col:CONSUMER')) {
+        if (name.includes(`branch:col:${serializePath(['CONSUMER'])}`)) {
           if (name.includes(formatQueryName(3, 2))) {
             return {
               data: [
@@ -1310,19 +1326,19 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
       groupbyColumns,
       groupbyColumns.length,
     );
-    const subtotalKey = serializePath(['F', '__subtotal__']);
-    const firstColKey = Object.keys(tree.cells)[0].split('|')[1];
+    const subtotalKey = serializePath(['F', SUBTOTAL_TOKEN]);
+    const { colKey: firstColKey } = parseCellKey(Object.keys(tree.cells)[0]);
     tree.rows[subtotalKey] = {
       axis: 'row',
       key: subtotalKey,
-      path: ['F', '__subtotal__'],
-      label: '__subtotal__',
+      path: ['F', SUBTOTAL_TOKEN],
+      label: SUBTOTAL_TOKEN,
       formattedLabel: 'Subtotal',
       level: 2,
       hasChildren: true,
       isSubtotal: true,
     };
-    tree.cells[`${subtotalKey}|${firstColKey}`] = {
+    tree.cells[serializeCellKey(subtotalKey, firstColKey)] = {
       rowKey: subtotalKey,
       colKey: firstColKey,
       values: { quantitySold: 99 },

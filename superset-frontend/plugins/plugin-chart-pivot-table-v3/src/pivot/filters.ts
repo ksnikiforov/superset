@@ -25,9 +25,7 @@ import {
   QueryObjectFilterClause,
 } from '@superset-ui/core';
 import { MetricsLayoutEnum, PivotTreeNode } from '../types';
-
-const getMetricLabels = (metrics: QueryFormMetric[]) =>
-  metrics.map(m => (typeof m === 'string' ? m : getColumnLabel(m as any)));
+import { decodeMetricKey, getMetricKeys } from '../utils';
 
 const stripMetricPath = (
   path: PivotTreeNode['path'],
@@ -36,10 +34,16 @@ const stripMetricPath = (
   metricLabels: Set<string>,
 ) => {
   if (axis === 'row' && metricsLayout === MetricsLayoutEnum.ROWS) {
-    return path.filter(val => !metricLabels.has(String(val ?? '')));
+    return path.filter(val => {
+      const decoded = decodeMetricKey(val);
+      return !(decoded && metricLabels.has(decoded));
+    });
   }
   if (axis === 'col' && metricsLayout === MetricsLayoutEnum.COLUMNS) {
-    return path.filter(val => !metricLabels.has(String(val ?? '')));
+    return path.filter(val => {
+      const decoded = decodeMetricKey(val);
+      return !(decoded && metricLabels.has(decoded));
+    });
   }
   return path;
 };
@@ -61,7 +65,7 @@ export const buildCellFilters = ({
   metrics,
   metricsLayout,
 }: CellFiltersParams): QueryObjectFilterClause[] => {
-  const metricLabelSet = new Set(getMetricLabels(metrics));
+  const metricLabelSet = new Set(getMetricKeys(metrics));
   const normalizedRowPath = stripMetricPath(
     rowNode.path,
     'row',
@@ -133,7 +137,7 @@ export const buildContextMenuFilters = ({
   dateFormatters,
   timeGrainSqla,
 }: ContextFiltersParams): BinaryQueryObjectFilterClause[] => {
-  const metricLabelSet = new Set(getMetricLabels(metrics));
+  const metricLabelSet = new Set(getMetricKeys(metrics));
   return [
     ...buildAxisContextFilters(
       rowNode,

@@ -27,7 +27,13 @@ import {
   fetchPivotBranch,
   resolveFetchContextForTest,
 } from '../../src/fetchPivotBranch';
-import { METRICS_PLACEHOLDER, serializePath, SUBTOTAL_TOKEN } from '../../src/utils';
+import {
+  encodeMetricKey,
+  METRICS_PLACEHOLDER,
+  serializeCellKey,
+  serializePath,
+  SUBTOTAL_TOKEN,
+} from '../../src/utils';
 import { formatQueryName } from '../../src/buildQuery';
 import { SupersetClient } from '@superset-ui/core';
 import { buildFormData } from './fixtures/pivotFormData';
@@ -79,9 +85,9 @@ describe('resolveFetchContext', () => {
       },
       cols: {
         '': makeNode({ axis: 'col', path: [], hasChildren: true }),
-        m1: makeNode({
+        [serializePath([encodeMetricKey('m1')])]: makeNode({
           axis: 'col',
-          path: ['m1'],
+          path: [encodeMetricKey('m1')],
           level: 1,
           label: 'm1',
           formattedLabel: 'm1',
@@ -122,17 +128,17 @@ describe('resolveFetchContext', () => {
       },
       cols: {
         '': makeNode({ axis: 'col', path: [], hasChildren: true }),
-        m1: makeNode({
+        [serializePath([encodeMetricKey('m1')])]: makeNode({
           axis: 'col',
-          path: ['m1'],
+          path: [encodeMetricKey('m1')],
           level: 1,
           hasChildren: true,
           label: 'm1',
           formattedLabel: 'm1',
         }),
-        'm1__AUTO': makeNode({
+        [serializePath([encodeMetricKey('m1'), 'AUTO'])]: makeNode({
           axis: 'col',
-          path: ['m1', 'AUTO'],
+          path: [encodeMetricKey('m1'), 'AUTO'],
           level: 2,
           hasChildren: false,
           label: 'AUTO',
@@ -171,7 +177,7 @@ describe('resolveFetchContext', () => {
           label: 'A',
           formattedLabel: 'A',
         }),
-        'A__B': makeNode({
+        [serializePath(['A', 'B'])]: makeNode({
           axis: 'row',
           path: ['A', 'B'],
           level: 2,
@@ -182,9 +188,9 @@ describe('resolveFetchContext', () => {
       },
       cols: {
         '': makeNode({ axis: 'col', path: [], hasChildren: true }),
-        m1: makeNode({
+        [serializePath([encodeMetricKey('m1')])]: makeNode({
           axis: 'col',
-          path: ['m1'],
+          path: [encodeMetricKey('m1')],
           level: 1,
           hasChildren: true,
           label: 'm1',
@@ -203,7 +209,7 @@ describe('resolveFetchContext', () => {
         rowSubTotals: false,
       } as any,
       axis: 'col',
-      path: ['m1'],
+      path: [encodeMetricKey('m1')],
       currentTree,
       visibleRowDepth: 1,
     });
@@ -243,25 +249,26 @@ describe('resolveFetchContext', () => {
     const currentTree: PivotTreeData = {
       rows: {
         '': makeNode({ axis: 'row', path: [], hasChildren: true }),
-        countCustomers: makeNode({
+        [serializePath([encodeMetricKey('countCustomers')])]: makeNode({
           axis: 'row',
-          path: ['countCustomers'],
+          path: [encodeMetricKey('countCustomers')],
           level: 1,
           hasChildren: true,
           label: 'countCustomers',
           formattedLabel: 'countCustomers',
         }),
-        'countCustomers__USA': makeNode({
+        [serializePath([encodeMetricKey('countCustomers'), 'USA'])]: makeNode({
           axis: 'row',
-          path: ['countCustomers', 'USA'],
+          path: [encodeMetricKey('countCustomers'), 'USA'],
           level: 2,
           hasChildren: true,
           label: 'USA',
           formattedLabel: 'USA',
         }),
-        'countCustomers__USA__ACME': makeNode({
+        [serializePath([encodeMetricKey('countCustomers'), 'USA', 'ACME'])]:
+          makeNode({
           axis: 'row',
-          path: ['countCustomers', 'USA', 'ACME'],
+          path: [encodeMetricKey('countCustomers'), 'USA', 'ACME'],
           level: 3,
           hasChildren: false,
           label: 'ACME',
@@ -298,12 +305,20 @@ describe('resolveFetchContext', () => {
     });
 
     expect(postMock).toHaveBeenCalled();
-    expect(result.data?.cells['countCustomers|BUILDING__1-URGENT']?.values.countCustomers).toBe(
-      10,
-    );
+    const metricRowKey = serializePath([encodeMetricKey('countCustomers')]);
+    const detailRowKey = serializePath([
+      encodeMetricKey('countCustomers'),
+      'USA',
+      'ACME',
+    ]);
+    const colKey = serializePath(['BUILDING', '1-URGENT']);
+    expect(
+      result.data?.cells[serializeCellKey(metricRowKey, colKey)]?.values
+        .countCustomers,
+    ).toBe(10);
     expect(
       result.data?.cells[
-        `${serializePath(['countCustomers', 'USA', 'ACME'])}|BUILDING__1-URGENT`
+        serializeCellKey(detailRowKey, colKey)
       ]?.values.countCustomers,
     ).toBe(4);
   });
@@ -357,17 +372,17 @@ describe('resolveFetchContext', () => {
       },
       cols: {
         '': makeNode({ axis: 'col', path: [], hasChildren: true }),
-        countCustomers: makeNode({
+        [serializePath([encodeMetricKey('countCustomers')])]: makeNode({
           axis: 'col',
-          path: ['countCustomers'],
+          path: [encodeMetricKey('countCustomers')],
           level: 1,
           hasChildren: true,
           label: 'countCustomers',
           formattedLabel: 'countCustomers',
         }),
-        'countCustomers__AUTO': makeNode({
+        [serializePath([encodeMetricKey('countCustomers'), 'AUTO'])]: makeNode({
           axis: 'col',
-          path: ['countCustomers', 'AUTO'],
+          path: [encodeMetricKey('countCustomers'), 'AUTO'],
           level: 2,
           hasChildren: false,
           label: 'AUTO',
@@ -395,12 +410,15 @@ describe('resolveFetchContext', () => {
     expect(postMock).toHaveBeenCalled();
     expect(
       result.data?.cells[
-        `${serializePath(['USA', 'HIGH'])}|${serializePath(['countCustomers', 'AUTO'])}`
+        serializeCellKey(
+          serializePath(['USA', 'HIGH']),
+          serializePath([encodeMetricKey('countCustomers'), 'AUTO']),
+        )
       ]?.values.countCustomers,
     ).toBe(5);
     expect(
       result.data?.cells[
-        `${serializePath(['USA', 'HIGH'])}|${serializePath([])}`
+        serializeCellKey(serializePath(['USA', 'HIGH']), serializePath([]))
       ]?.values.countCustomers,
     ).toBe(5);
   });
@@ -435,7 +453,7 @@ describe('resolveFetchContext', () => {
           label: 'Consumer',
           formattedLabel: 'Consumer',
         }),
-        'Consumer__AIR': makeNode({
+        [serializePath(['Consumer', 'AIR'])]: makeNode({
           axis: 'col',
           path: ['Consumer', 'AIR'],
           level: 2,
@@ -514,7 +532,7 @@ describe('resolveFetchContext', () => {
           label: 'X',
           formattedLabel: 'X',
         }),
-        'X__Y': makeNode({
+        [serializePath(['X', 'Y'])]: makeNode({
           axis: 'col',
           path: ['X', 'Y'],
           level: 2,
@@ -555,7 +573,9 @@ describe('resolveFetchContext', () => {
     const subtotalKey = serializePath(['X', SUBTOTAL_TOKEN]);
     const rowKey = serializePath(['A', 'B']);
     expect(result.data?.cols[subtotalKey]).toBeDefined();
-    expect(result.data?.cells[`${rowKey}|${subtotalKey}`]?.values.metric1).toBe(42);
+    expect(
+      result.data?.cells[serializeCellKey(rowKey, subtotalKey)]?.values.metric1,
+    ).toBe(42);
   });
 
   it('fetches ancestor column aggregates when expanding columns with deeper rows', async () => {
@@ -577,7 +597,7 @@ describe('resolveFetchContext', () => {
           label: 'USA',
           formattedLabel: 'USA',
         }),
-        'USA__HIGH': makeNode({
+        [serializePath(['USA', 'HIGH'])]: makeNode({
           axis: 'row',
           path: ['USA', 'HIGH'],
           level: 2,
@@ -649,7 +669,7 @@ describe('resolveFetchContext', () => {
           label: 'USA',
           formattedLabel: 'USA',
         }),
-        'USA__HIGH': makeNode({
+        [serializePath(['USA', 'HIGH'])]: makeNode({
           axis: 'row',
           path: ['USA', 'HIGH'],
           level: 2,
@@ -657,7 +677,7 @@ describe('resolveFetchContext', () => {
           label: 'HIGH',
           formattedLabel: 'HIGH',
         }),
-        'USA__HIGH__F': makeNode({
+        [serializePath(['USA', 'HIGH', 'F'])]: makeNode({
           axis: 'row',
           path: ['USA', 'HIGH', 'F'],
           level: 3,
@@ -742,7 +762,7 @@ describe('resolveFetchContext', () => {
           label: 'AUTO',
           formattedLabel: 'AUTO',
         }),
-        'AUTO__AIR': makeNode({
+        [serializePath(['AUTO', 'AIR'])]: makeNode({
           axis: 'col',
           path: ['AUTO', 'AIR'],
           level: 2,
@@ -750,7 +770,7 @@ describe('resolveFetchContext', () => {
           label: 'AIR',
           formattedLabel: 'AIR',
         }),
-        'AUTO__AIR__F': makeNode({
+        [serializePath(['AUTO', 'AIR', 'F'])]: makeNode({
           axis: 'col',
           path: ['AUTO', 'AIR', 'F'],
           level: 3,

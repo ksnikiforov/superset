@@ -31,10 +31,12 @@ import { buildFormData } from '../../fixtures/pivotFormData';
 import {
   applyMetricAxis,
   buildTreeFromRecords,
+  encodeMetricKey,
   injectRowSubtotalLeaves,
   labelRowSubtotalLeaves,
   mergeTrees,
   METRICS_PLACEHOLDER,
+  serializeCellKey,
   serializePath,
   SUBTOTAL_TOKEN,
 } from '../../../../src/utils';
@@ -135,28 +137,28 @@ describe('PivotTableChart totals & subtotals - rows', () => {
       },
     };
     const cells: Record<string, PivotResultCell> = {
-      [`${groupKey}|${rootKey}`]: {
+      [serializeCellKey(groupKey, rootKey)]: {
         rowKey: groupKey,
         colKey: rootKey,
         values: { metric1: 30 },
       },
-      [`${serializePath(['Bikes', 'Alpha'])}|${rootKey}`]: {
+      [serializeCellKey(serializePath(['Bikes', 'Alpha']), rootKey)]: {
         rowKey: serializePath(['Bikes', 'Alpha']),
         colKey: rootKey,
         values: { metric1: 10 },
       },
-      [`${serializePath(['Bikes', 'Zebra'])}|${rootKey}`]: {
+      [serializeCellKey(serializePath(['Bikes', 'Zebra']), rootKey)]: {
         rowKey: serializePath(['Bikes', 'Zebra']),
         colKey: rootKey,
         values: { metric1: 20 },
       },
-      [`${subtotalKey}|${rootKey}`]: {
+      [serializeCellKey(subtotalKey, rootKey)]: {
         rowKey: subtotalKey,
         colKey: rootKey,
         values: { metric1: 30 },
         isSubtotal: true,
       },
-      [`${rootKey}|${rootKey}`]: {
+      [serializeCellKey(rootKey, rootKey)]: {
         rowKey: rootKey,
         colKey: rootKey,
         values: { metric1: 30 },
@@ -227,7 +229,11 @@ describe('PivotTableChart totals & subtotals - rows', () => {
   it('labels single-metric subtotal rows as "<Group> Total"', () => {
     const rootKey = serializePath([]);
     const groupKey = serializePath(['Bikes']);
-    const subtotalKey = serializePath(['Bikes', SUBTOTAL_TOKEN, 'metric1']);
+    const subtotalKey = serializePath([
+      'Bikes',
+      SUBTOTAL_TOKEN,
+      encodeMetricKey('metric1'),
+    ]);
     const rows: Record<string, PivotTreeNode> = {
       [rootKey]: {
         axis: 'row',
@@ -252,7 +258,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
       [subtotalKey]: {
         axis: 'row',
         key: subtotalKey,
-        path: ['Bikes', SUBTOTAL_TOKEN, 'metric1'],
+        path: ['Bikes', SUBTOTAL_TOKEN, encodeMetricKey('metric1')],
         label: 'Subtotal',
         formattedLabel: 'Subtotal',
         level: 3,
@@ -273,7 +279,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
       },
     };
     const cells: Record<string, PivotResultCell> = {
-      [`${subtotalKey}|${rootKey}`]: {
+      [serializeCellKey(subtotalKey, rootKey)]: {
         rowKey: subtotalKey,
         colKey: rootKey,
         values: { metric1: 30 },
@@ -334,7 +340,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
   it('keeps row subtotal values inline and suppresses subtotal rows when expanded at top position (multi-metric columns)', () => {
     const rootKey = serializePath([]);
     const urgentKey = serializePath(['1-URGENT']);
-    const subtotalKey = serializePath(['1-URGENT', 'Total']);
+    const subtotalKey = serializePath(['1-URGENT', SUBTOTAL_TOKEN]);
     const rows: Record<string, PivotTreeNode> = {
       [rootKey]: {
         axis: 'row',
@@ -369,7 +375,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
       [subtotalKey]: {
         axis: 'row',
         key: subtotalKey,
-        path: ['1-URGENT', 'Total'],
+        path: ['1-URGENT', SUBTOTAL_TOKEN],
         label: '1-URGENT Total',
         formattedLabel: '1-URGENT Total',
         level: 2,
@@ -390,8 +396,8 @@ describe('PivotTableChart totals & subtotals - rows', () => {
       },
       averageOrderValue: {
         axis: 'col',
-        key: serializePath(['averageOrderValue']),
-        path: ['averageOrderValue'],
+        key: serializePath([encodeMetricKey('averageOrderValue')]),
+        path: [encodeMetricKey('averageOrderValue')],
         label: 'averageOrderValue',
         formattedLabel: 'averageOrderValue',
         level: 1,
@@ -400,8 +406,8 @@ describe('PivotTableChart totals & subtotals - rows', () => {
       },
       weightedDiscount: {
         axis: 'col',
-        key: serializePath(['weightedDiscount']),
-        path: ['weightedDiscount'],
+        key: serializePath([encodeMetricKey('weightedDiscount')]),
+        path: [encodeMetricKey('weightedDiscount')],
         label: 'weightedDiscount',
         formattedLabel: 'weightedDiscount',
         level: 1,
@@ -410,37 +416,37 @@ describe('PivotTableChart totals & subtotals - rows', () => {
       },
     };
     const cells: Record<string, PivotResultCell> = {
-      [`${urgentKey}|${serializePath(['averageOrderValue'])}`]: {
+      [serializeCellKey(urgentKey, serializePath([encodeMetricKey('averageOrderValue')]))]: {
         rowKey: urgentKey,
-        colKey: serializePath(['averageOrderValue']),
+        colKey: serializePath([encodeMetricKey('averageOrderValue')]),
         values: { averageOrderValue: 10 },
       },
-      [`${urgentKey}|${serializePath(['weightedDiscount'])}`]: {
+      [serializeCellKey(urgentKey, serializePath([encodeMetricKey('weightedDiscount')]))]: {
         rowKey: urgentKey,
-        colKey: serializePath(['weightedDiscount']),
+        colKey: serializePath([encodeMetricKey('weightedDiscount')]),
         values: { weightedDiscount: 0.05 },
       },
-      [`${serializePath(['1-URGENT', 'AIR'])}|${serializePath(['averageOrderValue'])}`]:
+      [serializeCellKey(serializePath(['1-URGENT', 'AIR']), serializePath([encodeMetricKey('averageOrderValue')]))]:
         {
           rowKey: serializePath(['1-URGENT', 'AIR']),
-          colKey: serializePath(['averageOrderValue']),
+          colKey: serializePath([encodeMetricKey('averageOrderValue')]),
           values: { averageOrderValue: 5 },
         },
-      [`${serializePath(['1-URGENT', 'AIR'])}|${serializePath(['weightedDiscount'])}`]:
+      [serializeCellKey(serializePath(['1-URGENT', 'AIR']), serializePath([encodeMetricKey('weightedDiscount')]))]:
         {
           rowKey: serializePath(['1-URGENT', 'AIR']),
-          colKey: serializePath(['weightedDiscount']),
+          colKey: serializePath([encodeMetricKey('weightedDiscount')]),
           values: { weightedDiscount: 0.02 },
         },
-      [`${subtotalKey}|${serializePath(['averageOrderValue'])}`]: {
+      [serializeCellKey(subtotalKey, serializePath([encodeMetricKey('averageOrderValue')]))]: {
         rowKey: subtotalKey,
-        colKey: serializePath(['averageOrderValue']),
+        colKey: serializePath([encodeMetricKey('averageOrderValue')]),
         values: { averageOrderValue: 10 },
         isSubtotal: true,
       },
-      [`${subtotalKey}|${serializePath(['weightedDiscount'])}`]: {
+      [serializeCellKey(subtotalKey, serializePath([encodeMetricKey('weightedDiscount')]))]: {
         rowKey: subtotalKey,
-        colKey: serializePath(['weightedDiscount']),
+        colKey: serializePath([encodeMetricKey('weightedDiscount')]),
         values: { weightedDiscount: 0.05 },
         isSubtotal: true,
       },
@@ -571,28 +577,28 @@ describe('PivotTableChart totals & subtotals - rows', () => {
       },
     };
     const cells: Record<string, PivotResultCell> = {
-      [`${groupKey}|${rootKey}`]: {
+      [serializeCellKey(groupKey, rootKey)]: {
         rowKey: groupKey,
         colKey: rootKey,
         values: { metric1: null },
       },
-      [`${serializePath(['Bikes', 'Alpha'])}|${rootKey}`]: {
+      [serializeCellKey(serializePath(['Bikes', 'Alpha']), rootKey)]: {
         rowKey: serializePath(['Bikes', 'Alpha']),
         colKey: rootKey,
         values: { metric1: 10 },
       },
-      [`${serializePath(['Bikes', 'Zebra'])}|${rootKey}`]: {
+      [serializeCellKey(serializePath(['Bikes', 'Zebra']), rootKey)]: {
         rowKey: serializePath(['Bikes', 'Zebra']),
         colKey: rootKey,
         values: { metric1: 20 },
       },
-      [`${subtotalKey}|${rootKey}`]: {
+      [serializeCellKey(subtotalKey, rootKey)]: {
         rowKey: subtotalKey,
         colKey: rootKey,
         values: { metric1: 30 },
         isSubtotal: true,
       },
-      [`${rootKey}|${rootKey}`]: {
+      [serializeCellKey(rootKey, rootKey)]: {
         rowKey: rootKey,
         colKey: rootKey,
         values: { metric1: 30 },
@@ -667,7 +673,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
   it('keeps row subtotal values inline while collapsed when rowSubtotalPosition is end (multi-metric columns)', () => {
     const rootKey = serializePath([]);
     const urgentKey = serializePath(['1-URGENT']);
-    const subtotalKey = serializePath(['1-URGENT', 'Total']);
+    const subtotalKey = serializePath(['1-URGENT', SUBTOTAL_TOKEN]);
     const rows: Record<string, PivotTreeNode> = {
       [rootKey]: {
         axis: 'row',
@@ -702,7 +708,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
       [subtotalKey]: {
         axis: 'row',
         key: subtotalKey,
-        path: ['1-URGENT', 'Total'],
+        path: ['1-URGENT', SUBTOTAL_TOKEN],
         label: '1-URGENT Total',
         formattedLabel: '1-URGENT Total',
         level: 2,
@@ -723,8 +729,8 @@ describe('PivotTableChart totals & subtotals - rows', () => {
       },
       averageOrderValue: {
         axis: 'col',
-        key: serializePath(['averageOrderValue']),
-        path: ['averageOrderValue'],
+        key: serializePath([encodeMetricKey('averageOrderValue')]),
+        path: [encodeMetricKey('averageOrderValue')],
         label: 'averageOrderValue',
         formattedLabel: 'averageOrderValue',
         level: 1,
@@ -733,8 +739,8 @@ describe('PivotTableChart totals & subtotals - rows', () => {
       },
       weightedDiscount: {
         axis: 'col',
-        key: serializePath(['weightedDiscount']),
-        path: ['weightedDiscount'],
+        key: serializePath([encodeMetricKey('weightedDiscount')]),
+        path: [encodeMetricKey('weightedDiscount')],
         label: 'weightedDiscount',
         formattedLabel: 'weightedDiscount',
         level: 1,
@@ -743,25 +749,25 @@ describe('PivotTableChart totals & subtotals - rows', () => {
       },
     };
     const cells: Record<string, PivotResultCell> = {
-      [`${urgentKey}|${serializePath(['averageOrderValue'])}`]: {
+      [serializeCellKey(urgentKey, serializePath([encodeMetricKey('averageOrderValue')]))]: {
         rowKey: urgentKey,
-        colKey: serializePath(['averageOrderValue']),
+        colKey: serializePath([encodeMetricKey('averageOrderValue')]),
         values: { averageOrderValue: 10 },
       },
-      [`${urgentKey}|${serializePath(['weightedDiscount'])}`]: {
+      [serializeCellKey(urgentKey, serializePath([encodeMetricKey('weightedDiscount')]))]: {
         rowKey: urgentKey,
-        colKey: serializePath(['weightedDiscount']),
+        colKey: serializePath([encodeMetricKey('weightedDiscount')]),
         values: { weightedDiscount: 0.05 },
       },
-      [`${subtotalKey}|${serializePath(['averageOrderValue'])}`]: {
+      [serializeCellKey(subtotalKey, serializePath([encodeMetricKey('averageOrderValue')]))]: {
         rowKey: subtotalKey,
-        colKey: serializePath(['averageOrderValue']),
+        colKey: serializePath([encodeMetricKey('averageOrderValue')]),
         values: { averageOrderValue: 10 },
         isSubtotal: true,
       },
-      [`${subtotalKey}|${serializePath(['weightedDiscount'])}`]: {
+      [serializeCellKey(subtotalKey, serializePath([encodeMetricKey('weightedDiscount')]))]: {
         rowKey: subtotalKey,
-        colKey: serializePath(['weightedDiscount']),
+        colKey: serializePath([encodeMetricKey('weightedDiscount')]),
         values: { weightedDiscount: 0.05 },
         isSubtotal: true,
       },
@@ -1251,19 +1257,20 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     products.forEach(product => {
       addRow([group, product], product, true);
       metrics.forEach(metric => {
-        const metricKey = addRow([group, product, metric], metric, false);
-        cells[`${metricKey}|${colKey}`] = {
+        const metricToken = encodeMetricKey(metric);
+        const metricKey = addRow([group, product, metricToken], metric, false);
+        cells[serializeCellKey(metricKey, colKey)] = {
           rowKey: metricKey,
           colKey,
           values: { [metric]: 1 },
         };
         const productSubtotalKey = addRow(
-          [group, product, SUBTOTAL_TOKEN, metric],
+          [group, product, SUBTOTAL_TOKEN, metricToken],
           `${product} ${metric}`,
           false,
           true,
         );
-        cells[`${productSubtotalKey}|${colKey}`] = {
+        cells[serializeCellKey(productSubtotalKey, colKey)] = {
           rowKey: productSubtotalKey,
           colKey,
           values: { [metric]: 2 },
@@ -1273,13 +1280,14 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     });
 
     metrics.forEach(metric => {
+      const metricToken = encodeMetricKey(metric);
       const groupSubtotalKey = addRow(
-        [group, SUBTOTAL_TOKEN, metric],
+        [group, SUBTOTAL_TOKEN, metricToken],
         `${group} ${metric}`,
         false,
         true,
       );
-      cells[`${groupSubtotalKey}|${colKey}`] = {
+      cells[serializeCellKey(groupSubtotalKey, colKey)] = {
         rowKey: groupSubtotalKey,
         colKey,
         values: { [metric]: 3 },
@@ -1351,8 +1359,11 @@ describe('PivotTableChart totals & subtotals - rows', () => {
 
   it('suppresses metric grand total rows when a single metric is on rows', () => {
     const rootKey = serializePath([]);
-    const totalKey = serializePath(['Total']);
-    const metricTotalKey = serializePath(['Total', 'averageOrderValue']);
+    const totalKey = serializePath([SUBTOTAL_TOKEN]);
+    const metricTotalKey = serializePath([
+      SUBTOTAL_TOKEN,
+      encodeMetricKey('averageOrderValue'),
+    ]);
     const rows: Record<string, PivotTreeNode> = {
       [rootKey]: {
         axis: 'row',
@@ -1367,7 +1378,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
       [totalKey]: {
         axis: 'row',
         key: totalKey,
-        path: ['Total'],
+        path: [SUBTOTAL_TOKEN],
         label: 'Total',
         formattedLabel: 'Total',
         level: 1,
@@ -1377,7 +1388,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
       [metricTotalKey]: {
         axis: 'row',
         key: metricTotalKey,
-        path: ['Total', 'averageOrderValue'],
+        path: [SUBTOTAL_TOKEN, encodeMetricKey('averageOrderValue')],
         label: 'averageOrderValue',
         formattedLabel: 'averageOrderValue',
         level: 2,
@@ -1398,7 +1409,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
       },
     };
     const cells: Record<string, PivotResultCell> = {
-      [`${metricTotalKey}|${rootKey}`]: {
+      [serializeCellKey(metricTotalKey, rootKey)]: {
         rowKey: metricTotalKey,
         colKey: rootKey,
         values: { averageOrderValue: 100 },
@@ -3215,6 +3226,8 @@ describe('PivotTableChart totals & subtotals - rows', () => {
 
   it('does not render metric total rows when metrics are the first row level', () => {
     const metrics = ['measure1', 'measure2'];
+    const measure1Token = encodeMetricKey('measure1');
+    const measure2Token = encodeMetricKey('measure2');
     const rootKey = serializePath([]);
     const colKey = serializePath(['C1']);
     const rows: Record<string, PivotTreeNode> = {
@@ -3228,80 +3241,80 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         hasChildren: true,
         isSubtotal: true,
       },
-      [serializePath(['measure1'])]: {
+      [serializePath([measure1Token])]: {
         axis: 'row',
-        key: serializePath(['measure1']),
-        path: ['measure1'],
+        key: serializePath([measure1Token]),
+        path: [measure1Token],
         label: 'measure1',
         formattedLabel: 'measure1',
         level: 1,
         hasChildren: true,
         isSubtotal: false,
       },
-      [serializePath(['measure2'])]: {
+      [serializePath([measure2Token])]: {
         axis: 'row',
-        key: serializePath(['measure2']),
-        path: ['measure2'],
+        key: serializePath([measure2Token]),
+        path: [measure2Token],
         label: 'measure2',
         formattedLabel: 'measure2',
         level: 1,
         hasChildren: true,
         isSubtotal: false,
       },
-      [serializePath(['measure1', 'Total'])]: {
+      [serializePath([measure1Token, SUBTOTAL_TOKEN])]: {
         axis: 'row',
-        key: serializePath(['measure1', 'Total']),
-        path: ['measure1', 'Total'],
+        key: serializePath([measure1Token, SUBTOTAL_TOKEN]),
+        path: [measure1Token, SUBTOTAL_TOKEN],
         label: 'Total measure1',
         formattedLabel: 'Total measure1',
         level: 2,
         hasChildren: false,
         isSubtotal: true,
       },
-      [serializePath(['measure2', 'Total'])]: {
+      [serializePath([measure2Token, SUBTOTAL_TOKEN])]: {
         axis: 'row',
-        key: serializePath(['measure2', 'Total']),
-        path: ['measure2', 'Total'],
+        key: serializePath([measure2Token, SUBTOTAL_TOKEN]),
+        path: [measure2Token, SUBTOTAL_TOKEN],
         label: 'Total measure2',
         formattedLabel: 'Total measure2',
         level: 2,
         hasChildren: false,
         isSubtotal: true,
       },
-      [serializePath(['measure1', 'R1'])]: {
+      [serializePath([measure1Token, 'R1'])]: {
         axis: 'row',
-        key: serializePath(['measure1', 'R1']),
-        path: ['measure1', 'R1'],
+        key: serializePath([measure1Token, 'R1']),
+        path: [measure1Token, 'R1'],
         label: 'R1',
         formattedLabel: 'R1',
         level: 2,
         hasChildren: true,
         isSubtotal: false,
       },
-      [serializePath(['measure1', 'R1', 'R2'])]: {
+      [serializePath([measure1Token, 'R1', 'R2'])]: {
         axis: 'row',
-        key: serializePath(['measure1', 'R1', 'R2']),
-        path: ['measure1', 'R1', 'R2'],
+        key: serializePath([measure1Token, 'R1', 'R2']),
+        path: [measure1Token, 'R1', 'R2'],
         label: 'R2',
         formattedLabel: 'R2',
         level: 3,
         hasChildren: false,
         isSubtotal: false,
       },
-      [serializePath(['measure2', 'R1'])]: {
+      [serializePath([measure2Token, 'R1'])]: {
         axis: 'row',
-        key: serializePath(['measure2', 'R1']),
-        path: ['measure2', 'R1'],
+        key: serializePath([measure2Token, 'R1']),
+        path: [measure2Token, 'R1'],
         label: 'R1',
         formattedLabel: 'R1',
         level: 2,
         hasChildren: true,
         isSubtotal: false,
       },
-      [serializePath(['measure2', 'R1', 'R2'])]: {
+      [serializePath([measure2Token, 'R1', 'R2'])]: {
         axis: 'row',
-        key: serializePath(['measure2', 'R1', 'R2']),
-        path: ['measure2', 'R1', 'R2'],
+        key: serializePath([measure2Token, 'R1', 'R2']),
+        path: [measure2Token, 'R1', 'R2'],
         label: 'R2',
         formattedLabel: 'R2',
         level: 3,
@@ -3332,25 +3345,29 @@ describe('PivotTableChart totals & subtotals - rows', () => {
       },
     };
     const cells: Record<string, PivotResultCell> = {
-      [`${serializePath(['measure1', 'Total'])}|${colKey}`]: {
-        rowKey: serializePath(['measure1', 'Total']),
+      [serializeCellKey(serializePath([measure1Token, SUBTOTAL_TOKEN]), colKey)]:
+        {
+          rowKey: serializePath([measure1Token, SUBTOTAL_TOKEN]),
         colKey,
         values: { measure1: 100 },
         isSubtotal: true,
       },
-      [`${serializePath(['measure2', 'Total'])}|${colKey}`]: {
-        rowKey: serializePath(['measure2', 'Total']),
+      [serializeCellKey(serializePath([measure2Token, SUBTOTAL_TOKEN]), colKey)]:
+        {
+          rowKey: serializePath([measure2Token, SUBTOTAL_TOKEN]),
         colKey,
         values: { measure2: 200 },
         isSubtotal: true,
       },
-      [`${serializePath(['measure1', 'R1', 'R2'])}|${colKey}`]: {
-        rowKey: serializePath(['measure1', 'R1', 'R2']),
+      [serializeCellKey(serializePath([measure1Token, 'R1', 'R2']), colKey)]:
+        {
+          rowKey: serializePath([measure1Token, 'R1', 'R2']),
         colKey,
         values: { measure1: 10 },
       },
-      [`${serializePath(['measure2', 'R1', 'R2'])}|${colKey}`]: {
-        rowKey: serializePath(['measure2', 'R1', 'R2']),
+      [serializeCellKey(serializePath([measure2Token, 'R1', 'R2']), colKey)]:
+        {
+          rowKey: serializePath([measure2Token, 'R1', 'R2']),
         colKey,
         values: { measure2: 20 },
       },

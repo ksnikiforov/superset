@@ -18,7 +18,7 @@
  */
 import { QueryFormMetric } from '@superset-ui/core';
 import { MetricsLayoutEnum, PivotResultCell, PivotTreeNode } from '../types';
-import { getMetricKey } from '../utils';
+import { decodeMetricKey, getMetricKey, serializeCellKey } from '../utils';
 
 type DeriveMetricKeyParams = {
   rowNode: PivotTreeNode;
@@ -42,18 +42,21 @@ export const deriveMetricKey = ({
     metricsLayout === MetricsLayoutEnum.ROWS
       ? rowNode.path[rowNode.path.length - 1]
       : colNode.path[colNode.path.length - 1];
-  if (metricCandidate && metricLabels.includes(String(metricCandidate))) {
-    return metricCandidate as string;
+  const decodedCandidate = decodeMetricKey(metricCandidate);
+  if (decodedCandidate && metricLabels.includes(decodedCandidate)) {
+    return decodedCandidate;
   }
   // Fallback: first available metric in the cell values.
-  return Object.keys(cells[`${rowNode.key}|${colNode.key}`]?.values || {})[0];
+  return Object.keys(
+    cells[serializeCellKey(rowNode.key, colNode.key)]?.values || {},
+  )[0];
 };
 
 type ShouldHideRowValuesParams = {
   rowNode: PivotTreeNode;
   rowSubTotals: boolean;
   effectiveRowSubtotalPosition: 'start' | 'end';
-  metricLabelSet: Set<string>;
+  isMetricTokenValue: (val: unknown) => boolean;
   expandedRows: Set<string>;
   countDimDepth: (path: PivotTreeNode['path']) => number;
   rowSubtotalDepths: number[];
@@ -64,7 +67,7 @@ export const shouldHideRowValues = ({
   rowNode,
   rowSubTotals,
   effectiveRowSubtotalPosition,
-  metricLabelSet,
+  isMetricTokenValue,
   expandedRows,
   countDimDepth,
   rowSubtotalDepths,
@@ -76,9 +79,7 @@ export const shouldHideRowValues = ({
   if (rowNode.path.length === 0 || isExplicitSubtotalNode(rowNode)) {
     return false;
   }
-  const metricIndex = rowNode.path.findIndex(val =>
-    metricLabelSet.has(String(val ?? '')),
-  );
+  const metricIndex = rowNode.path.findIndex(val => isMetricTokenValue(val));
   if (metricIndex === rowNode.path.length - 1) {
     return false;
   }
@@ -116,7 +117,15 @@ export const formatNodeLabel = ({
   isSubtotalToken,
 }: FormatLabelParams) => {
   const rawLabel = node.formattedLabel || node.label;
-  const normalizedLabel = isSubtotalToken(rawLabel) ? subtotalLabel : rawLabel;
+  const metricLabelFromPath = getMetricLabelFromPath(node.path);
+  const decodedLabel = decodeMetricKey(rawLabel);
+  const resolvedLabel =
+    decodedLabel && metricLabelFromPath === decodedLabel
+      ? decodedLabel
+      : rawLabel;
+  const normalizedLabel = isSubtotalToken(resolvedLabel)
+    ? subtotalLabel
+    : resolvedLabel;
   if (node.level === 0) {
     return translate(normalizedLabel || 'Grand total');
   }

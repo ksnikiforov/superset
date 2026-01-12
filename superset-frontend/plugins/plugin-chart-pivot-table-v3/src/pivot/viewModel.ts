@@ -23,7 +23,7 @@ import {
   getNumberFormatter,
 } from '@superset-ui/core';
 import { PivotTreeNode } from '../types';
-import { isSubtotalToken, serializePath } from '../utils';
+import { decodeMetricKey, isSubtotalToken, serializePath } from '../utils';
 
 export const rootKey = serializePath([]);
 
@@ -125,26 +125,29 @@ export const buildColumnHeaderRows = (
       const headerPath = path.slice(0, level + 1);
       const key = serializePath(headerPath);
       let node = nodes[key];
+      const headerLabel =
+        decodeMetricKey(headerPath[level]) ??
+        String(headerPath[level] ?? '');
       if (!node) {
         if (level === lastLevel) {
           node = {
             ...col,
-            label: headerPath[level]?.toString() ?? '',
-            formattedLabel: headerPath[level]?.toString() ?? '',
+            label: headerLabel,
+            formattedLabel: headerLabel,
           };
         } else {
           node = {
             axis: 'col',
             key,
             path: headerPath,
-            label: headerPath[level]?.toString() ?? '',
-            formattedLabel: headerPath[level]?.toString() ?? '',
+            label: headerLabel,
+            formattedLabel: headerLabel,
             level: headerPath.length,
             hasChildren: level < maxDepth - 1,
             isSubtotal:
               headerPath.some(isSubtotalToken) ||
-              String(headerPath[level] ?? '').startsWith('Total ') ||
-              String(headerPath[level] ?? '').endsWith(' Total'),
+              headerLabel.startsWith('Total ') ||
+              headerLabel.endsWith(' Total'),
           } as PivotTreeNode;
         }
       }

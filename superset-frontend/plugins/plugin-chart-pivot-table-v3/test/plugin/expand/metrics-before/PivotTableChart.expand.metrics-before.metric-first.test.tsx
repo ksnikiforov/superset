@@ -28,9 +28,11 @@ import { baseFormData, buildFormData } from '../../fixtures/pivotFormData';
 import {
   applyMetricAxis,
   buildTreeFromRecords,
+  encodeMetricKey,
   injectRowSubtotalLeaves,
   labelRowSubtotalLeaves,
   METRICS_PLACEHOLDER,
+  serializeCellKey,
   serializePath,
 } from '../../../../src/utils';
 import { fetchPivotBranch } from '../../../../src/fetchPivotBranch';
@@ -70,10 +72,10 @@ describe('PivotTableChart expansion with metrics before dimensions (metric-first
         level: 1,
         hasChildren: true,
       },
-      'A__countCustomers': {
+      [serializePath(['A', encodeMetricKey('countCustomers')])]: {
         axis: 'row',
-        key: serializePath(['A', 'countCustomers']),
-        path: ['A', 'countCustomers'],
+        key: serializePath(['A', encodeMetricKey('countCustomers')]),
+        path: ['A', encodeMetricKey('countCustomers')],
         label: 'countCustomers',
         formattedLabel: 'countCustomers',
         level: 2,
@@ -92,14 +94,17 @@ describe('PivotTableChart expansion with metrics before dimensions (metric-first
       },
     },
     cells: {
-      [`${serializePath(['A'])}|`]: {
+      [serializeCellKey(serializePath(['A']), serializePath([]))]: {
         rowKey: serializePath(['A']),
-        colKey: '',
+        colKey: serializePath([]),
         values: { countCustomers: 1 },
       },
-      [`${serializePath(['A', 'countCustomers'])}|`]: {
-        rowKey: serializePath(['A', 'countCustomers']),
-        colKey: '',
+      [serializeCellKey(
+        serializePath(['A', encodeMetricKey('countCustomers')]),
+        serializePath([]),
+      )]: {
+        rowKey: serializePath(['A', encodeMetricKey('countCustomers')]),
+        colKey: serializePath([]),
         values: { countCustomers: 1 },
       },
     },
@@ -171,28 +176,28 @@ describe('PivotTableChart expansion with metrics before dimensions (metric-first
           level: 1,
           hasChildren: true,
         },
-        m1: {
+        [serializePath([encodeMetricKey('m1')])]: {
           axis: 'row',
-          key: serializePath(['m1']),
-          path: ['m1'],
+          key: serializePath([encodeMetricKey('m1')]),
+          path: [encodeMetricKey('m1')],
           label: 'm1',
           formattedLabel: 'm1',
           level: 1,
           hasChildren: true,
         },
-        'm1__A': {
+        [serializePath([encodeMetricKey('m1'), 'A'])]: {
           axis: 'row',
-          key: serializePath(['m1', 'A']),
-          path: ['m1', 'A'],
+          key: serializePath([encodeMetricKey('m1'), 'A']),
+          path: [encodeMetricKey('m1'), 'A'],
           label: 'A',
           formattedLabel: 'A',
           level: 2,
           hasChildren: true,
         },
-        'm1__A__B': {
+        [serializePath([encodeMetricKey('m1'), 'A', 'B'])]: {
           axis: 'row',
-          key: serializePath(['m1', 'A', 'B']),
-          path: ['m1', 'A', 'B'],
+          key: serializePath([encodeMetricKey('m1'), 'A', 'B']),
+          path: [encodeMetricKey('m1'), 'A', 'B'],
           label: 'B',
           formattedLabel: 'B',
           level: 3,
@@ -211,9 +216,12 @@ describe('PivotTableChart expansion with metrics before dimensions (metric-first
         },
       },
       cells: {
-        [`${serializePath(['m1', 'A', 'B'])}|`]: {
-          rowKey: serializePath(['m1', 'A', 'B']),
-          colKey: '',
+        [serializeCellKey(
+          serializePath([encodeMetricKey('m1'), 'A', 'B']),
+          serializePath([]),
+        )]: {
+          rowKey: serializePath([encodeMetricKey('m1'), 'A', 'B']),
+          colKey: serializePath([]),
           values: { m1: 5 },
         },
       },

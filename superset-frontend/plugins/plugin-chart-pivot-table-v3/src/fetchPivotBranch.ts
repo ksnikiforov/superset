@@ -17,10 +17,12 @@
  * under the License.
  */
 import {
+  AdhocColumn,
   BinaryQueryObjectFilterClause,
   buildQueryContext,
   ensureIsArray,
   getColumnLabel,
+  isPhysicalColumn,
   QueryFormColumn,
   QueryFormMetric,
   QueryObject,
@@ -52,6 +54,8 @@ import {
   normalizeSubtotalLevels,
   injectRowSubtotalLeaves,
   labelRowSubtotalLeaves,
+  decodeMetricKey,
+  serializeCellKey,
   SUBTOTAL_LABEL,
   SUBTOTAL_TOKEN,
 } from './utils';
@@ -66,6 +70,7 @@ export interface FetchPivotBranchParams {
   formData: PivotTableQueryFormData;
   axis: PivotAxis;
   path: PivotPath;
+  metricPath?: PivotPath;
   maxDepthPerFetch?: number;
   currentTree?: PivotTreeData;
   visibleRowDepth?: number;
@@ -122,6 +127,17 @@ const buildFilterKey = (formData: PivotTableQueryFormData) =>
     adhoc_filters: formData.adhoc_filters,
     extra_filters: formData.extra_filters,
     extra_form_data: getExtraFormData(formData),
+    time_grain_sqla: getExtraFormData(formData)?.time_grain_sqla,
+    granularity: formData.granularity,
+    granularity_sqla: formData.granularity_sqla,
+    row_limit: formData.row_limit,
+    row_offset: formData.row_offset,
+    series_limit: formData.series_limit,
+    series_limit_metric: formData.series_limit_metric,
+    order_desc: formData.order_desc,
+    row_order: formData.rowOrder,
+    col_order: formData.colOrder,
+    post_processing: formData.post_processing,
   });
 
 const buildCacheKey = (
@@ -129,23 +145,25 @@ const buildCacheKey = (
   path: PivotPath,
   rowDepth: number,
   colDepth: number,
-  rowGroupbyRaw: QueryFormColumn[],
-  colGroupbyRaw: QueryFormColumn[],
+  rowGroupby: QueryFormColumn[],
+  colGroupby: QueryFormColumn[],
   metrics: QueryFormMetric[],
   aggregateFunction?: string,
   filterKey?: string,
+  cacheMeta?: Record<string, unknown>,
 ) =>
-  [
+  stableStringify({
     axis,
-    serializePath(path),
+    path: serializePath(path),
     rowDepth,
     colDepth,
-    serializePath(rowGroupbyRaw.map(getColumnLabel)),
-    serializePath(colGroupbyRaw.map(getColumnLabel)),
-    serializePath(getMetricKeys(metrics)),
-    aggregateFunction || '',
-    filterKey || '',
-  ].join('|');
+    rowGroupby: rowGroupby.map(getColumnLabel),
+    colGroupby: colGroupby.map(getColumnLabel),
+    metrics: getMetricKeys(metrics),
+    aggregateFunction: aggregateFunction || '',
+    filterKey: filterKey || '',
+    ...(cacheMeta || {}),
+  });
 
 export const peekPivotBranchCacheByKey = (key: string) => cache.get(key);
 export const clearPivotBranchCache = () => cache.clear();
@@ -165,6 +183,8 @@ interface ResolvedFetchContext {
   colGroupbyRaw: QueryFormColumn[];
   rowGroupby: QueryFormColumn[];
   colGroupby: QueryFormColumn[];
+  rowGroupbyForQuery: QueryFormColumn[];
+  colGroupbyForQuery: QueryFormColumn[];
   metrics: QueryFormMetric[];
   metricsForQuery: QueryFormMetric[];
   metricsLayoutResolved: MetricsLayoutEnum;
@@ -179,12 +199,14 @@ interface ResolvedFetchContext {
   hasColFormatting: boolean;
   hasRowSorting: boolean;
   hasColSorting: boolean;
+  timeGrainSqla?: string;
 }
 
 const resolveFetchContext = ({
   formData,
   axis,
   path,
+  metricPath,
   maxDepthPerFetch,
   currentTree,
   visibleRowDepth,
@@ -232,6 +254,28 @@ const resolveFetchContext = ({
   const metricsForQuery = mergeMetrics(metrics, formattingMetrics);
   const metricLabels = getMetricKeys(metrics);
   const metricLabelSet = new Set(metricLabels);
+  const extraFormData = getExtraFormData(formData);
+  const timeGrainSqla = extraFormData?.time_grain_sqla || formData.time_grain_sqla;
+  const temporalLookup = formData?.temporal_columns_lookup || {};
+  const isTemporalColumn = (col: QueryFormColumn) =>
+    isPhysicalColumn(col) &&
+    (temporalLookup?.[col as string] || formData.granularity_sqla === col);
+  const normalizeColumn = (
+    col: QueryFormColumn,
+    time_grain_sqla?: string,
+    isTemporal?: boolean,
+  ) => {
+    if (isPhysicalColumn(col) && time_grain_sqla && isTemporal) {
+      return {
+        timeGrain: time_grain_sqla,
+        columnType: 'BASE_AXIS',
+        sqlExpression: col,
+        label: col,
+        expressionType: 'SQL',
+      } as AdhocColumn;
+    }
+    return col;
+  };
   const placement = resolveMetricPlacement(rowGroupbyRaw, colGroupbyRaw, {
     hasMetrics: metrics.length > 0,
     preferredAxis: formData.metricsLayout as MetricsLayoutEnum,
@@ -241,15 +285,21 @@ const resolveFetchContext = ({
   const metricsLayoutResolved = placement.layout;
   const metricsAxis: PivotAxis =
     metricsLayoutResolved === MetricsLayoutEnum.ROWS ? 'row' : 'col';
+  const pathForMetrics = metricPath ?? path;
   const metricInsertIndexBase =
     placement.metricPosition >= 0
       ? placement.metricPosition
       : metricsAxis === 'row'
       ? rowGroupby.length
       : colGroupby.length;
+  const getMetricIndex = (candidatePath: PivotPath) =>
+    candidatePath.findIndex(val => {
+      const decoded = decodeMetricKey(val);
+      return decoded !== undefined && metricLabelSet.has(decoded);
+    });
   const metricIndexInPath =
     metricsAxis === axis
-      ? path.findIndex(val => metricLabelSet.has(String(val ?? '')))
+      ? getMetricIndex(pathForMetrics)
       : -1;
   const shouldCollapseRowDims =
     metricsAxis === 'row' &&
@@ -299,18 +349,23 @@ const resolveFetchContext = ({
       ? metricIndexInPath
       : metricInsertIndexBase;
 
-  const stripMetricFromPath = (p: PivotPath, targetAxis: PivotAxis) => {
+  const stripMetricFromPath = (
+    p: PivotPath,
+    targetAxis: PivotAxis,
+    metricIndexOverride?: number,
+  ) => {
     if (metricsAxis !== targetAxis) {
       return p;
     }
-    const idx = p.findIndex(val => metricLabelSet.has(String(val ?? '')));
+    const idx =
+      metricIndexOverride !== undefined ? metricIndexOverride : getMetricIndex(p);
     if (idx < 0) {
       return p;
     }
     return [...p.slice(0, idx), ...p.slice(idx + 1)];
   };
 
-  const sanitizedPath = stripMetricFromPath(path, axis);
+  const sanitizedPath = stripMetricFromPath(path, axis, metricIndexInPath);
   const defaultIncrement = Math.max(
     formData.maxDepthPerFetch || 0,
     maxDepthPerFetch || 0,
@@ -350,16 +405,37 @@ const resolveFetchContext = ({
       : Math.min(colGroupby.length, currentColDepth);
 
   const filterKey = buildFilterKey(formData);
+  const rowGroupbyForQuery = rowGroupby.map(col =>
+    normalizeColumn(col, timeGrainSqla, isTemporalColumn(col)),
+  );
+  const colGroupbyForQuery = colGroupby.map(col =>
+    normalizeColumn(col, timeGrainSqla, isTemporalColumn(col)),
+  );
   const cacheKey = buildCacheKey(
     axis,
-    path,
+    pathForMetrics,
     rowDepth,
     colDepth,
-    rowGroupby,
-    colGroupby,
+    rowGroupbyForQuery,
+    colGroupbyForQuery,
     metricsForQuery.length > 0 ? metricsForQuery : metrics,
     formData.aggregateFunction,
     filterKey,
+    {
+      datasource: formData.datasource,
+      time_grain_sqla: timeGrainSqla,
+      granularity: formData.granularity,
+      granularity_sqla: formData.granularity_sqla,
+      rowTotals: formData.rowTotals,
+      colTotals: formData.colTotals,
+      rowSubTotals: formData.rowSubTotals,
+      colSubTotals: formData.colSubTotals,
+      rowSubtotalLevels,
+      colSubtotalLevels,
+      metricsLayoutResolved,
+      metricInsertIndex,
+      maxDepthPerFetch,
+    },
   );
 
   return {
@@ -367,6 +443,8 @@ const resolveFetchContext = ({
     colGroupbyRaw,
     rowGroupby,
     colGroupby,
+    rowGroupbyForQuery,
+    colGroupbyForQuery,
     metrics,
     metricsForQuery,
     metricsLayoutResolved,
@@ -381,6 +459,7 @@ const resolveFetchContext = ({
     hasColFormatting: colFormattingMetrics.length > 0,
     hasRowSorting: rowSortingMetrics.length > 0,
     hasColSorting: colSortingMetrics.length > 0,
+    timeGrainSqla,
   };
 };
 
@@ -443,7 +522,7 @@ const injectColumnSubtotalLeaves = (
       return;
     }
     const subtotalColKey = serializePath([...baseColPath, SUBTOTAL_TOKEN]);
-    const cellKey = `${cell.rowKey}|${subtotalColKey}`;
+    const cellKey = serializeCellKey(cell.rowKey, subtotalColKey);
     next.cells[cellKey] = {
       ...cell,
       colKey: subtotalColKey,
@@ -465,8 +544,8 @@ export async function fetchPivotBranch({
   const {
     rowGroupby,
     colGroupby,
-    rowGroupbyRaw,
-    colGroupbyRaw,
+    rowGroupbyForQuery,
+    colGroupbyForQuery,
     metrics,
     metricsForQuery,
     metricsLayoutResolved,
@@ -608,8 +687,8 @@ export async function fetchPivotBranch({
 
   const filters =
     axis === 'row'
-      ? buildPathFilters(rowGroupby, sanitizedPath)
-      : buildPathFilters(colGroupby, sanitizedPath);
+      ? buildPathFilters(rowGroupbyForQuery, sanitizedPath)
+      : buildPathFilters(colGroupbyForQuery, sanitizedPath);
 
   const queryContext = buildQueryContext(
     queryFormData,
@@ -617,8 +696,8 @@ export async function fetchPivotBranch({
       filteredQueryPairs.map(pair => ({
         ...baseQueryObject,
         columns: [
-          ...rowGroupby.slice(0, pair.rowDepth),
-          ...colGroupby.slice(0, pair.colDepth),
+          ...rowGroupbyForQuery.slice(0, pair.rowDepth),
+          ...colGroupbyForQuery.slice(0, pair.colDepth),
         ],
         filters: [
           ...(baseQueryObject.filters || []),
@@ -644,8 +723,8 @@ export async function fetchPivotBranch({
             let tree = buildTreeFromRecords(
               results[idx]?.data || [],
               metricsForQuery.length > 0 ? metricsForQuery : formData.metrics,
-              rowGroupby,
-              colGroupby,
+              rowGroupbyForQuery,
+              colGroupbyForQuery,
               pair.rowDepth,
               pair.colDepth,
             );
