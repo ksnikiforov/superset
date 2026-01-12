@@ -192,6 +192,7 @@ export default function transformProps(
   const resolveQueryDepth = (query: typeof queriesData[number]) => {
     const queryName = (query as any)?.query_name || (query as any)?.queryName;
     let { rowDepth, colDepth } = parseDepth(queryName);
+    const hasQueryName = !!queryName;
     const colSet = new Set((query.colnames || []).map((name: any) => String(name)));
     const inferredRowDepth = groupbyRows.filter(col =>
       colSet.has(String(getColumnLabel(col))),
@@ -212,7 +213,8 @@ export default function transformProps(
       rowDepth === 0 &&
       colDepth === 0 &&
       (query.data || []).length > 0 &&
-      !isMetricOnlyQuery
+      !isMetricOnlyQuery &&
+      hasQueryName
     ) {
       rowDepth = groupbyRows.length;
       colDepth = groupbyColumns.length;
@@ -420,5 +422,6 @@ export default function transformProps(
     colSubtotalPosition,
     pivotTheme,
     pivotThemeColors,
+    stickyHeaders: formData.stickyHeaders ?? true,
   };
 }

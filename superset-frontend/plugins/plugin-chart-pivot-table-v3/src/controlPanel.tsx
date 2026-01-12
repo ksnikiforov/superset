@@ -582,6 +582,20 @@ const config: ControlPanelConfig = {
           },
         ],
         [
+          {
+            name: 'stickyHeaders',
+            config: {
+              type: 'CheckboxControl',
+              label: t('Sticky headers'),
+              default: true,
+              renderTrigger: true,
+              description: t(
+                'Keep row and column headers visible while scrolling the table.',
+              ),
+            },
+          },
+        ],
+        [
           <ControlSubSectionHeader key="pivot-row-options">
             {t('Row options')}
           </ControlSubSectionHeader>,

@@ -391,6 +391,26 @@ describe('Pivot Table v3 transformProps', () => {
     expect(tree.cols[serializePath(['X'])]).toBeDefined();
   });
 
+  it('avoids inferring full depth when query metadata is missing', () => {
+    const props = new ChartProps({
+      ...chartProps,
+      queriesData: [
+        {
+          data: [{ metric1: 10 }],
+        },
+      ],
+    });
+    const result = transformProps(
+      props as ChartProps<PivotTableQueryFormData>,
+    );
+    const root = serializePath([]);
+    expect(Object.keys(result.data.rows)).toEqual([root]);
+    expect(Object.keys(result.data.cols)).toEqual(
+      expect.arrayContaining([root, serializePath([encodeMetricKey('metric1')])]),
+    );
+    expect(Object.keys(result.data.rows)).toHaveLength(1);
+  });
+
   it('propagates rowSubTotals when enabled', () => {
     const props = new ChartProps({
       formData: {

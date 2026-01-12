@@ -16,7 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   LoadingOutlined,
   MinusSquareOutlined,
@@ -119,16 +126,29 @@ const Container = styled.div<{ height: number; width: number | string }>`
   `}
 `;
 
-const StyledTable = styled.table`
+const StyledTable = styled.table<{ $stickyHeaders: boolean }>`
+  --pivot-border-color: ${({ theme }) =>
+    (theme as any).colors?.grayscale?.light2 || (theme as any).colorBorder};
   width: max-content;
   min-width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 12px;
 
   th,
   td {
-    border: 1px solid ${({ theme }) => (theme as any).colors?.grayscale?.light2 || (theme as any).colorBorder};
+    border-right: 1px solid var(--pivot-border-color);
+    border-bottom: 1px solid var(--pivot-border-color);
     padding: 6px 8px;
+  }
+
+  thead tr:first-child th {
+    border-top: 1px solid var(--pivot-border-color);
+  }
+
+  thead th:first-child,
+  tbody th {
+    border-left: 1px solid var(--pivot-border-color);
   }
 
   thead th {
@@ -136,6 +156,14 @@ const StyledTable = styled.table`
       (theme as any).colors?.grayscale?.light4 || (theme as any).colorBgLayout};
     text-align: left;
     vertical-align: top;
+    ${({ $stickyHeaders }) =>
+      $stickyHeaders
+        ? `
+      position: sticky;
+      top: 0;
+      z-index: 4;
+    `
+        : ''}
   }
 
   td.value-cell {
@@ -152,10 +180,60 @@ const StyledTable = styled.table`
       (theme as any).colorBgContainer || '#fff'};
     text-align: left;
     vertical-align: top;
+    ${({ $stickyHeaders }) =>
+      $stickyHeaders
+        ? `
+      position: sticky;
+      left: 0;
+      z-index: 3;
+    `
+        : ''}
   }
 
   .subtotal-cell {
     font-weight: 600;
+  }
+
+  .pivot-sticky-corner {
+    ${({ $stickyHeaders }) =>
+      $stickyHeaders
+        ? `
+      position: sticky;
+      top: 0;
+      left: 0;
+      z-index: 5;
+    `
+        : ''}
+  }
+
+  tbody tr.pivot-grand-total-row td,
+  tbody tr.pivot-grand-total-row th {
+    background-color: ${({ theme }) => theme.colorBgContainer || '#fff'};
+  }
+
+  ${({ $stickyHeaders }) =>
+    $stickyHeaders
+      ? `
+    tbody tr.pivot-grand-total-row--top td,
+    tbody tr.pivot-grand-total-row--top th {
+      position: sticky;
+      top: var(--pivot-header-offset, 0px);
+      z-index: 3;
+    }
+
+    tbody tr.pivot-grand-total-row--bottom td,
+    tbody tr.pivot-grand-total-row--bottom th {
+      position: sticky;
+      bottom: 0;
+      z-index: 3;
+    }
+
+    tbody tr.pivot-grand-total-row--top th,
+    tbody tr.pivot-grand-total-row--bottom th {
+      z-index: 4;
+    }
+  `
+      : ''}
   }
 `;
 
@@ -224,7 +302,7 @@ const DatabarLabel = styled.div`
   white-space: nowrap;
   background-color: rgba(255, 255, 255, 0.6);
   padding: 0 ${({ theme }) => theme.sizeUnit * 0.5}px;
-  z-index: 3;
+  z-index: 2;
   pointer-events: none;
 `;
 
@@ -235,7 +313,7 @@ const DatabarBaseline = styled.div<{ $color: string }>`
   width: ${({ theme }) => Math.max(2, theme.sizeUnit * 0.5)}px;
   background-color: ${({ $color }) => $color};
   transform: translateX(-50%);
-  z-index: 2;
+  z-index: 1;
 `;
 
 const DatabarConnector = styled.div<{ $color: string; $width: number }>`
@@ -245,7 +323,7 @@ const DatabarConnector = styled.div<{ $color: string; $width: number }>`
   width: ${({ $width }) => $width}px;
   background-color: ${({ $color }) => $color};
   transform: translateX(-50%);
-  z-index: 2;
+  z-index: 1;
 `;
 
 const DatabarDottedConnector = styled.div<{ $color: string; $width: number }>`
@@ -264,7 +342,7 @@ const DatabarDottedConnector = styled.div<{ $color: string; $width: number }>`
   background-repeat: repeat;
   background-size: 100% 4px;
   transform: translateX(-50%);
-  z-index: 2;
+  z-index: 1;
 `;
 
 const DatabarRect = styled.div<{
@@ -310,7 +388,21 @@ type DimensionSortingKeys = {
 
 const DEFAULT_DIMENSION_SORT_ORDER: PivotSortOrder = 'asc';
 
-const HEX_COLOR_PATTERN = /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+const HEX_COLOR_PATTERN = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
+
+const normalizeHexColor = (value: string) => {
+  if (!HEX_COLOR_PATTERN.test(value)) {
+    return undefined;
+  }
+  const hex = value.toLowerCase();
+  if (hex.length === 4) {
+    return `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`;
+  }
+  if (hex.length === 5) {
+    return `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}${hex[4]}${hex[4]}`;
+  }
+  return hex;
+};
 
 const parseRgbChannel = (value: string) => {
   const numeric = Number(value.trim());
@@ -336,11 +428,30 @@ const normalizeCssColor = (rawValue: DataRecordValue) => {
   if (!value) {
     return undefined;
   }
-  if (HEX_COLOR_PATTERN.test(value)) {
-    return value;
+  const hex = normalizeHexColor(value);
+  if (hex) {
+    return hex;
   }
   const rgbMatch = value.match(/^rgba?\((.*)\)$/i);
   if (!rgbMatch) {
+    const hslMatch = value.match(/^hsla?\((.*)\)$/i);
+    if (hslMatch) {
+      const parts = hslMatch[1]
+        .split(',')
+        .map(part => part.trim())
+        .filter(part => part.length > 0);
+      const isHsla = value.toLowerCase().startsWith('hsla');
+      if (
+        (isHsla && parts.length !== 4) ||
+        (!isHsla && parts.length !== 3)
+      ) {
+        return undefined;
+      }
+      return value;
+    }
+    if (/^[a-zA-Z]+$/.test(value)) {
+      return value;
+    }
     return undefined;
   }
   const parts = rgbMatch[1]
@@ -375,13 +486,11 @@ const resolveConnectorAlpha = (depth: number) => {
 
 const applyAlphaToColor = (rawColor: string, alpha: number) => {
   const normalized = normalizeCssColor(rawColor) ?? rawColor.trim();
-  if (HEX_COLOR_PATTERN.test(normalized)) {
-    const base =
-      normalized.length === 9 ? normalized.slice(0, 7) : normalized;
+  const hex = normalizeHexColor(normalized);
+  if (hex) {
+    const base = hex.length === 9 ? hex.slice(0, 7) : hex;
     const baseAlpha =
-      normalized.length === 9
-        ? parseInt(normalized.slice(7), 16) / 255
-        : undefined;
+      hex.length === 9 ? parseInt(hex.slice(7), 16) / 255 : undefined;
     const resolvedAlpha =
       baseAlpha === undefined ? alpha : baseAlpha * alpha;
     return addAlpha(base, resolvedAlpha);
@@ -530,6 +639,7 @@ function PivotTableChart(props: PivotTableProps) {
     colSubtotalPosition = 'start',
     pivotTheme = 'none',
     pivotThemeColors = '',
+    stickyHeaders = true,
     theme = supersetTheme,
   } = props;
   const fetchFormData = queryFormData || formData;
@@ -537,6 +647,7 @@ function PivotTableChart(props: PivotTableProps) {
     (formData.metricsLayout as MetricsLayoutEnum) || metricsLayout;
   const metricFormattingScope =
     (formData.metricFormattingScope as MetricFormattingScope) || 'values';
+  const resolvedStickyHeaders = formData.stickyHeaders ?? stickyHeaders;
   const metricFormatting = normalizeMetricFormattingMapWithKeys(
     formData.metricFormatting,
     metrics,
@@ -677,12 +788,18 @@ function PivotTableChart(props: PivotTableProps) {
     formData.colSubtotalPosition || colSubtotalPosition;
 
   const normalizedRowSubtotalLevels = useMemo(
-    () => rowSubtotalLevels.filter(level => level === 0),
-    [rowSubtotalLevels],
+    () =>
+      normalizeSubtotalLevels(
+        rowSubtotalLevels,
+        Math.max(groupbyRows.length - 1, 0),
+        rowTotals,
+        rowSubTotals ?? true,
+      ),
+    [groupbyRows.length, rowSubTotals, rowSubtotalLevels, rowTotals],
   );
   const rowSubtotalDepths = useMemo(
-    () => rowSubtotalLevels.filter(level => level > 0),
-    [rowSubtotalLevels],
+    () => normalizedRowSubtotalLevels.filter(level => level > 0),
+    [normalizedRowSubtotalLevels],
   );
   const normalizedColSubtotalLevels = useMemo(
     () =>
@@ -731,6 +848,10 @@ function PivotTableChart(props: PivotTableProps) {
   ]);
 
   const [tree, setTree] = useState<PivotTreeData>(data);
+  const treeRef = useRef(tree);
+  useEffect(() => {
+    treeRef.current = tree;
+  }, [tree]);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [expandedCols, setExpandedCols] = useState<Set<string>>(new Set());
   const expandedRowsRef = useRef(expandedRows);
@@ -741,9 +862,13 @@ function PivotTableChart(props: PivotTableProps) {
   const [fullyExpandedCols, setFullyExpandedCols] = useState<Set<string>>(
     new Set(),
   );
+  const fullyExpandedRowsRef = useRef(fullyExpandedRows);
+  const fullyExpandedColsRef = useRef(fullyExpandedCols);
   const [loadingKeys, setLoadingKeys] = useState<Set<string>>(new Set());
   const loadingCountsRef = useRef<Map<string, number>>(new Map());
   const [errorMessage, setErrorMessage] = useState<string>();
+  const [headerOffset, setHeaderOffset] = useState(0);
+  const headerRef = useRef<HTMLTableSectionElement | null>(null);
   const [fetchedRowKeys, setFetchedRowKeys] = useState<Map<string, number>>(
     () => new Map(),
   );
@@ -770,6 +895,27 @@ function PivotTableChart(props: PivotTableProps) {
     expandedColsRef.current = next;
     setExpandedCols(next);
   }, []);
+  const setFullyExpandedRowsState = useCallback((next: Set<string>) => {
+    fullyExpandedRowsRef.current = next;
+    setFullyExpandedRows(next);
+  }, []);
+  const setFullyExpandedColsState = useCallback((next: Set<string>) => {
+    fullyExpandedColsRef.current = next;
+    setFullyExpandedCols(next);
+  }, []);
+  const commitTree = useCallback((nextTree: PivotTreeData) => {
+    treeRef.current = nextTree;
+    setTree(nextTree);
+  }, []);
+  const applyTreeUpdate = useCallback(
+    (updater: (current: PivotTreeData) => PivotTreeData) => {
+      const nextTree = updater(treeRef.current);
+      treeRef.current = nextTree;
+      setTree(nextTree);
+      return nextTree;
+    },
+    [],
+  );
 
   const numberFormatter = useMemo(
     () => getNumberFormatter(valueFormat),
@@ -804,8 +950,8 @@ function PivotTableChart(props: PivotTableProps) {
     };
     setExpandedRowsState(seedExpanded(data.rows));
     setExpandedColsState(seedExpanded(data.cols));
-    setFullyExpandedRows(new Set());
-    setFullyExpandedCols(new Set());
+    setFullyExpandedRowsState(new Set());
+    setFullyExpandedColsState(new Set());
     setFetchedRowKeys(new Map());
     setFetchedColKeys(new Map());
     loadingCountsRef.current = new Map();
@@ -2438,6 +2584,15 @@ function PivotTableChart(props: PivotTableProps) {
     () => buildColumnHeaderRows(visibleCols, tree.cols, getColumnDisplayPath),
     [getColumnDisplayPath, visibleCols, tree.cols],
   );
+  useLayoutEffect(() => {
+    if (!resolvedStickyHeaders) {
+      setHeaderOffset(prev => (prev === 0 ? prev : 0));
+      return;
+    }
+    const nextOffset =
+      headerRef.current?.getBoundingClientRect().height ?? 0;
+    setHeaderOffset(prev => (prev === nextOffset ? prev : nextOffset));
+  }, [columnHeaderRows, resolvedStickyHeaders, width]);
   const themeColor = useMemo(() => {
     if (pivotTheme === 'custom') {
       return parseThemeColors(pivotThemeColors)[0];
@@ -2775,9 +2930,9 @@ function PivotTableChart(props: PivotTableProps) {
       const updateExpanded =
         axis === 'row' ? setExpandedRowsState : setExpandedColsState;
       const fullExpanded =
-        axis === 'row' ? fullyExpandedRows : fullyExpandedCols;
+        axis === 'row' ? fullyExpandedRowsRef.current : fullyExpandedColsRef.current;
       const updateFullExpanded =
-        axis === 'row' ? setFullyExpandedRows : setFullyExpandedCols;
+        axis === 'row' ? setFullyExpandedRowsState : setFullyExpandedColsState;
       const isOpen = expanded.has(node.key);
 
       if (isOpen) {
@@ -2789,7 +2944,7 @@ function PivotTableChart(props: PivotTableProps) {
           node,
           next,
           nextFull,
-          axis === 'row' ? tree.rows : tree.cols,
+          axis === 'row' ? treeRef.current.rows : treeRef.current.cols,
         );
         next = pruned.expanded;
         nextFull = pruned.fullyExpanded;
@@ -2839,8 +2994,14 @@ function PivotTableChart(props: PivotTableProps) {
           : [];
         const collapsedMetricExpansions =
           axis === 'row' ? collectCollapsedMetricExpansions(node, expanded) : [];
-        let nextTree = tree;
+        let nextTree = treeRef.current;
         let fetchedBranch: PivotTreeData | undefined;
+        const mergeIntoTree = (incoming: PivotTreeData) => {
+          nextTree = applyTreeUpdate(current =>
+            mergeTrees(current, incoming),
+          );
+          return nextTree;
+        };
         const fetchBranchForNode = async (targetNode: PivotTreeNode) => {
           if (!targetNode.hasChildren) {
             return;
@@ -2859,14 +3020,12 @@ function PivotTableChart(props: PivotTableProps) {
             metricPath: targetNode.path,
             formData: fetchFormData,
             maxDepthPerFetch,
-            currentTree: nextTree,
+            currentTree: treeRef.current,
             visibleRowDepth,
             visibleColDepth,
           });
           if (cached) {
-            const merged = mergeTrees(nextTree, cached);
-            nextTree = merged;
-            setTree(merged);
+            const merged = mergeIntoTree(cached);
             setErrorMessage(undefined);
             if (targetNode.key === node.key) {
               fetchedBranch = cached;
@@ -2889,7 +3048,7 @@ function PivotTableChart(props: PivotTableProps) {
               metricPath: targetNode.path,
               formData: fetchFormData,
               maxDepthPerFetch,
-              currentTree: nextTree,
+              currentTree: treeRef.current,
               visibleRowDepth,
               visibleColDepth,
             });
@@ -2897,9 +3056,7 @@ function PivotTableChart(props: PivotTableProps) {
               setErrorMessage(result.error.message);
             }
             if (result.data) {
-              const merged = mergeTrees(nextTree, result.data);
-              nextTree = merged;
-              setTree(merged);
+              const merged = mergeIntoTree(result.data);
               setErrorMessage(undefined);
               if (targetNode.key === node.key) {
                 fetchedBranch = result.data;
@@ -2927,14 +3084,12 @@ function PivotTableChart(props: PivotTableProps) {
             metricPath: node.path,
             formData: fetchFormData,
             maxDepthPerFetch,
-            currentTree: tree,
+            currentTree: treeRef.current,
             visibleRowDepth,
             visibleColDepth,
           });
           if (cached) {
-            const merged = mergeTrees(tree, cached);
-            nextTree = merged;
-            setTree(merged);
+            const merged = mergeIntoTree(cached);
             setErrorMessage(undefined);
             fetchedBranch = cached;
             markFetched(prev => {
@@ -2950,7 +3105,7 @@ function PivotTableChart(props: PivotTableProps) {
               metricPath: node.path,
               formData: fetchFormData,
               maxDepthPerFetch,
-              currentTree: tree,
+              currentTree: treeRef.current,
               visibleRowDepth,
               visibleColDepth,
             });
@@ -2958,9 +3113,7 @@ function PivotTableChart(props: PivotTableProps) {
               setErrorMessage(result.error.message);
             }
             if (result.data) {
-              const merged = mergeTrees(tree, result.data);
-              nextTree = merged;
-              setTree(merged);
+              const merged = mergeIntoTree(result.data);
               setErrorMessage(undefined);
               fetchedBranch = result.data;
               markFetched(prev => {
@@ -2976,7 +3129,7 @@ function PivotTableChart(props: PivotTableProps) {
           prunedTree = pruneStaleCollapsedRows(prunedTree, node, fetchedBranch);
           if (prunedTree !== nextTree) {
             nextTree = prunedTree;
-            setTree(prunedTree);
+            commitTree(prunedTree);
           }
         }
         if (axis === 'col') {
@@ -2984,11 +3137,17 @@ function PivotTableChart(props: PivotTableProps) {
           prunedTree = pruneStaleCollapsedCols(prunedTree, node, fetchedBranch);
           if (prunedTree !== nextTree) {
             nextTree = prunedTree;
-            setTree(prunedTree);
+            commitTree(prunedTree);
           }
         }
-        const next = new Set(expanded);
-        const nextFull = new Set(fullExpanded);
+        const next = new Set(expandedRowsRef.current);
+        const nextFull = new Set(fullyExpandedRowsRef.current);
+        if (axis === 'col') {
+          next.clear();
+          expandedColsRef.current.forEach(key => next.add(key));
+          nextFull.clear();
+          fullyExpandedColsRef.current.forEach(key => nextFull.add(key));
+        }
         const markPartial = (key: string) => {
           nextFull.delete(key);
         };
@@ -3131,7 +3290,8 @@ function PivotTableChart(props: PivotTableProps) {
       setExpandedColsState,
       setExpandedRowsState,
       shouldShowToggle,
-      tree,
+      applyTreeUpdate,
+      commitTree,
       prunePartialExpansions,
       updateLoadingKey,
       visibleColDepth,
@@ -4017,15 +4177,22 @@ function PivotTableChart(props: PivotTableProps) {
       t,
     ],
   );
+  const containerStyle: React.CSSProperties = {
+    '--pivot-header-offset': `${resolvedStickyHeaders ? headerOffset : 0}px`,
+  };
 
   return (
-    <Container height={height} width={width}>
+    <Container height={height} width={width} style={containerStyle}>
       {errorMessage && <div>{t('Error loading branch: %s', errorMessage)}</div>}
-      <StyledTable>
-        <thead>
+      <StyledTable
+        $stickyHeaders={resolvedStickyHeaders}
+        data-sticky-headers={resolvedStickyHeaders}
+      >
+        <thead ref={headerRef}>
           {columnHeaderRows.length === 0 ? (
             <tr>
               <th
+                className="pivot-sticky-corner"
                 style={
                   themeColor
                     ? { backgroundColor: themeColor, fontWeight: 600 }
@@ -4041,6 +4208,7 @@ function PivotTableChart(props: PivotTableProps) {
                 {rowIdx === 0 && (
                   <th
                     rowSpan={columnHeaderRows.length}
+                    className="pivot-sticky-corner"
                     style={
                       themeColor
                         ? { backgroundColor: themeColor, fontWeight: 600 }
@@ -4102,6 +4270,14 @@ function PivotTableChart(props: PivotTableProps) {
             const showToggle = shouldShowToggle('row', row);
             const rowAggregateBold = isRowAggregateBold(row);
             const isSubtotalHeader = rowAggregateBold;
+            const isGrandTotalRow = showRowRoot && row.key === rootKey;
+            const grandTotalPositionClass =
+              resolvedRowTotalPosition === 'end'
+                ? 'pivot-grand-total-row--bottom'
+                : 'pivot-grand-total-row--top';
+            const rowClassName = isGrandTotalRow
+              ? `pivot-grand-total-row ${grandTotalPositionClass}`
+              : undefined;
             const rowTotalBg = getTotalBackground(row);
             const rowHeaderFormatting = resolveDimensionStyle(
               'row',
@@ -4118,7 +4294,7 @@ function PivotTableChart(props: PivotTableProps) {
                 : undefined;
             const rowIndent = getNodeDimDepth(row) * ROW_INDENT_PX;
             return (
-              <tr key={row.key}>
+              <tr key={row.key} className={rowClassName}>
                 <th
                   className={isSubtotalHeader ? 'subtotal-cell' : undefined}
                   style={rowHeaderStyleResolved}

@@ -17,7 +17,7 @@
  * under the License.
  */
 import { PivotResultCell, PivotTreeNode, TotalPosition } from '../types';
-import { isSubtotalToken, parseCellKey, SUBTOTAL_LABEL } from '../utils';
+import { isSubtotalToken, parseCellKey } from '../utils';
 import { buildVisibleList, rootKey } from './viewModel';
 
 type VisibleRowsParams = {
@@ -102,15 +102,7 @@ export const createColLeavesBuilder = ({
         return false;
       }
       const token = leaf.path[node.path.length];
-      if (isSubtotalToken(token)) {
-        return true;
-      }
-      if (leaf.path.length !== node.path.length + 1) {
-        return false;
-      }
-      return (
-        leaf.formattedLabel === SUBTOTAL_LABEL || leaf.label === SUBTOTAL_LABEL
-      );
+      return isSubtotalToken(token);
     };
     const isMetricSubtotalForNode = (leaf: PivotTreeNode) => {
       if (!node.path.every((val, idx) => val === leaf.path[idx])) {
@@ -152,11 +144,7 @@ export const createColLeavesBuilder = ({
         return false;
       }
       const token = leaf.path[node.path.length];
-      return (
-        isSubtotalToken(token) ||
-        leaf.formattedLabel === SUBTOTAL_LABEL ||
-        leaf.label === SUBTOTAL_LABEL
-      );
+      return isSubtotalToken(token);
     };
     const isMetricSubtotalLeaf = (leaf: PivotTreeNode) =>
       isBranchLeaf(leaf) &&
@@ -196,15 +184,8 @@ export const createColLeavesBuilder = ({
         return true;
       }
       const token = leaf.path[node.path.length];
-      if (
-        isSubtotalToken(token) ||
-        leaf.formattedLabel === SUBTOTAL_LABEL ||
-        leaf.label === SUBTOTAL_LABEL
-      ) {
-        return true;
-      }
       if (resolvedSubtotalLeaves.length === 0) {
-        return leaf.label === node.label;
+        return leaf.label === node.label || node.path.includes(token);
       }
       return leaf.label === node.label || node.path.includes(token);
     };

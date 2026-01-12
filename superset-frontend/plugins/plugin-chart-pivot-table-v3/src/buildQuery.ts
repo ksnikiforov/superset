@@ -30,6 +30,7 @@ import {
   collectMetricDatabarMetricsForQuery,
   collectDimensionFormattingMetricsForQuery,
   collectDimensionSortingMetricsForQuery,
+  hasTotalSorting,
   mergeMetrics,
   normalizeSubtotalLevels,
   resolveMetricPlacement,
@@ -121,6 +122,8 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
     ...colSortingMetrics,
   ];
   const metricsForQuery = mergeMetrics(metrics, formattingMetrics);
+  const hasRowTotalSorting = hasTotalSorting(formData.rowSorting, rowGroupby);
+  const hasColTotalSorting = hasTotalSorting(formData.colSorting, colGroupby);
   const metricsOnRows = placement.layout === MetricsLayoutEnum.ROWS;
   const metricInsertIndex =
     placement.metricPosition >= 0 ? placement.metricPosition : undefined;
@@ -133,18 +136,38 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
     (!metricsOnRows && metricInsertIndex === 0 && hasRowTotals);
 
   const rowSubTotalsEnabled = rowSubTotals ?? true;
+  const maxRowSubtotalDepth = Math.max(rowGroupby.length - 1, 0);
+  const rowLevels = normalizeSubtotalLevels(
+    rowSubtotalLevels,
+    maxRowSubtotalDepth,
+    rowTotals,
+    rowSubTotalsEnabled,
+  );
+  const maxColSubtotalDepth = Math.max(colGroupby.length - 1, 0);
+  const colSubtotalLevelsRaw = ensureIsArray<number>(colSubtotalLevels);
+  const colSubtotalsLegacyEnabled =
+    colSubtotalLevelsRaw.length === 0 && !!colSubTotals;
+  const colLevelsBase = normalizeSubtotalLevels(
+    colSubtotalLevelsRaw,
+    maxColSubtotalDepth,
+    false,
+    colSubtotalsLegacyEnabled,
+  ).filter(level => level > 0);
+  const colLevels = colTotals ? [0, ...colLevelsBase] : colLevelsBase;
+  const hasRowSubtotals = rowLevels.some(level => level > 0);
+  const hasColSubtotals = colLevels.some(level => level > 0);
   const isTotalsEnabled =
     rowTotals || colTotals || colSubTotals || rowSubTotalsEnabled;
-  const isLevelTotalsEnabled =
-    (rowSubtotalLevels && rowSubtotalLevels.length > 0) ||
-    (colSubtotalLevels && colSubtotalLevels.length > 0);
+  const isLevelTotalsEnabled = hasRowSubtotals || hasColSubtotals;
   const needsFormattingTotals =
-    rowFormattingMetrics.length > 0 ||
-    colFormattingMetrics.length > 0 ||
-    rowSortingMetrics.length > 0 ||
-    colSortingMetrics.length > 0;
+    rowFormattingMetrics.length > 0 || colFormattingMetrics.length > 0;
+  const needsSortingTotals = hasRowTotalSorting || hasColTotalSorting;
   const requireMultiQuery =
-    startCollapsed || isTotalsEnabled || isLevelTotalsEnabled || needsFormattingTotals;
+    startCollapsed ||
+    isTotalsEnabled ||
+    isLevelTotalsEnabled ||
+    needsFormattingTotals ||
+    needsSortingTotals;
 
   const initialDepthResolved = Math.max(initialDepth || 1, 1);
   const adjustForMetricFront = (depth: number, onAxis: boolean) => {
@@ -166,25 +189,6 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
     colGroupby.length,
     adjustForMetricFront(initialDepthResolved, !metricsOnRows),
   );
-
-  const maxRowSubtotalDepth = Math.max(rowGroupby.length - 1, 0);
-  const rowLevels = normalizeSubtotalLevels(
-    rowSubtotalLevels,
-    maxRowSubtotalDepth,
-    rowTotals,
-    rowSubTotalsEnabled,
-  );
-  const maxColSubtotalDepth = Math.max(colGroupby.length - 1, 0);
-  const colSubtotalLevelsRaw = ensureIsArray<number>(colSubtotalLevels);
-  const colSubtotalsLegacyEnabled =
-    colSubtotalLevelsRaw.length === 0 && !!colSubTotals;
-  const colLevelsBase = normalizeSubtotalLevels(
-    colSubtotalLevelsRaw,
-    maxColSubtotalDepth,
-    false,
-    colSubtotalsLegacyEnabled,
-  ).filter(level => level > 0);
-  const colLevels = colTotals ? [0, ...colLevelsBase] : colLevelsBase;
 
   const temporalLookup = formData?.temporal_columns_lookup || {};
   const isTemporalColumn = (col: QueryFormColumn) =>
@@ -230,16 +234,10 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
     // always include the initial visible depth for each axis
     rowDepths.add(rowDepthLimit || 0);
     colDepths.add(colDepthLimit || 0);
-    if (rowFormattingMetrics.length > 0) {
+    if (rowFormattingMetrics.length > 0 || hasRowTotalSorting) {
       colDepths.add(0);
     }
-    if (colFormattingMetrics.length > 0) {
-      rowDepths.add(0);
-    }
-    if (rowSortingMetrics.length > 0) {
-      colDepths.add(0);
-    }
-    if (colSortingMetrics.length > 0) {
+    if (colFormattingMetrics.length > 0 || hasColTotalSorting) {
       rowDepths.add(0);
     }
     if (metricsOnRows && metricInsertIndex === 0 && colTotals) {

@@ -144,10 +144,7 @@ export const buildColumnHeaderRows = (
             formattedLabel: headerLabel,
             level: headerPath.length,
             hasChildren: level < maxDepth - 1,
-            isSubtotal:
-              headerPath.some(isSubtotalToken) ||
-              headerLabel.startsWith('Total ') ||
-              headerLabel.endsWith(' Total'),
+            isSubtotal: headerPath.some(isSubtotalToken),
           } as PivotTreeNode;
         }
       }

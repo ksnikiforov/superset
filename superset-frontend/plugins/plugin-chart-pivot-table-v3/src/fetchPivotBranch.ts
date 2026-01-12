@@ -56,6 +56,7 @@ import {
   labelRowSubtotalLeaves,
   decodeMetricKey,
   serializeCellKey,
+  hasTotalSorting,
   SUBTOTAL_LABEL,
   SUBTOTAL_TOKEN,
 } from './utils';
@@ -78,6 +79,29 @@ export interface FetchPivotBranchParams {
 }
 
 const cache = new Map<string, PivotTreeData>();
+const CACHE_MAX_ENTRIES = 200;
+
+const touchCache = (key: string, value: PivotTreeData) => {
+  if (cache.has(key)) {
+    cache.delete(key);
+  }
+  cache.set(key, value);
+  if (cache.size > CACHE_MAX_ENTRIES) {
+    const oldestKey = cache.keys().next().value;
+    if (oldestKey !== undefined) {
+      cache.delete(oldestKey);
+    }
+  }
+};
+
+const readCache = (key: string) => {
+  const cached = cache.get(key);
+  if (!cached) {
+    return undefined;
+  }
+  touchCache(key, cached);
+  return cached;
+};
 
 const stableStringify = (value: unknown): string => {
   if (Array.isArray(value)) {
@@ -165,7 +189,7 @@ const buildCacheKey = (
     ...(cacheMeta || {}),
   });
 
-export const peekPivotBranchCacheByKey = (key: string) => cache.get(key);
+export const peekPivotBranchCacheByKey = (key: string) => readCache(key);
 export const clearPivotBranchCache = () => cache.clear();
 
 const buildPathFilters = (
@@ -197,8 +221,8 @@ interface ResolvedFetchContext {
   colSubtotalLevels: number[];
   hasRowFormatting: boolean;
   hasColFormatting: boolean;
-  hasRowSorting: boolean;
-  hasColSorting: boolean;
+  hasRowTotalSorting: boolean;
+  hasColTotalSorting: boolean;
   timeGrainSqla?: string;
 }
 
@@ -322,6 +346,9 @@ const resolveFetchContext = ({
       (_, idx) => idx < metricIndexInPath || idx >= metricInsertIndexBase,
     );
   }
+
+  const hasRowTotalSorting = hasTotalSorting(formData.rowSorting, rowGroupby);
+  const hasColTotalSorting = hasTotalSorting(formData.colSorting, colGroupby);
 
   const rowSubTotalsEnabled = formData.rowSubTotals ?? true;
   const maxRowSubtotalDepth = Math.max(rowGroupby.length - 1, 0);
@@ -457,15 +484,15 @@ const resolveFetchContext = ({
     colSubtotalLevels,
     hasRowFormatting: rowFormattingMetrics.length > 0,
     hasColFormatting: colFormattingMetrics.length > 0,
-    hasRowSorting: rowSortingMetrics.length > 0,
-    hasColSorting: colSortingMetrics.length > 0,
+    hasRowTotalSorting,
+    hasColTotalSorting,
     timeGrainSqla,
   };
 };
 
 export const peekPivotBranchCache = (params: FetchPivotBranchParams) => {
   const ctx = resolveFetchContext(params);
-  return cache.get(ctx.cacheKey);
+  return readCache(ctx.cacheKey);
 };
 
 // Exported for tests
@@ -558,8 +585,8 @@ export async function fetchPivotBranch({
     colSubtotalLevels,
     hasRowFormatting,
     hasColFormatting,
-    hasRowSorting,
-    hasColSorting,
+    hasRowTotalSorting,
+    hasColTotalSorting,
   } = resolveFetchContext({
     formData,
     axis,
@@ -574,7 +601,7 @@ export async function fetchPivotBranch({
       ? { ...formData, metrics: metricsForQuery }
       : formData;
 
-  const cached = cache.get(cacheKey);
+  const cached = readCache(cacheKey);
   if (cached) {
     return { data: cached, cached: true };
   }
@@ -642,9 +669,9 @@ export async function fetchPivotBranch({
     }
   }
   const includeRowTotalForColFormatting =
-    axis === 'col' && (hasColFormatting || hasColSorting);
+    axis === 'col' && (hasColFormatting || hasColTotalSorting);
   const includeColTotalForRowFormatting =
-    axis === 'row' && (hasRowFormatting || hasRowSorting);
+    axis === 'row' && (hasRowFormatting || hasRowTotalSorting);
   const effectiveRowLevels = Array.from(
     new Set([
       ...rowSubtotalLevels,
@@ -759,7 +786,7 @@ export async function fetchPivotBranch({
       ensureIsArray(formData.metrics),
     );
     const merged = mergeTrees(currentTree, labeledBranch);
-    cache.set(cacheKey, merged);
+    touchCache(cacheKey, merged);
     return { data: merged };
   } catch (error) {
     return { error: error as Error };

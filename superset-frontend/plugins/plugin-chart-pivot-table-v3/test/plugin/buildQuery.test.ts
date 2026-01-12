@@ -341,6 +341,47 @@ test('avoids grand total queries when only formatting requires totals', () => {
   expect(names).not.toContain(formatQueryName(0, 0));
 });
 
+test('adds row totals queries when row sorting uses total metric', () => {
+  const queryContext = buildQuery(
+    buildFormData({
+      ...baseFormData,
+      startCollapsed: false,
+      rowTotals: false,
+      colTotals: false,
+      rowSorting: {
+        row1: {
+          metric: 'metric1',
+          order: 'asc',
+          mode: 'total',
+        },
+      },
+    }),
+  );
+  const names = queryContext.queries.map(q => q.query_name);
+  expect(names).toContain(formatQueryName(2, 2));
+  expect(names).toContain(formatQueryName(2, 0));
+});
+
+test('skips row totals queries when row sorting does not use totals', () => {
+  const queryContext = buildQuery(
+    buildFormData({
+      ...baseFormData,
+      startCollapsed: false,
+      rowTotals: false,
+      colTotals: false,
+      rowSorting: {
+        row1: {
+          metric: 'metric1',
+          order: 'asc',
+          mode: 'axis_value',
+        },
+      },
+    }),
+  );
+  const names = queryContext.queries.map(q => q.query_name);
+  expect(names).toEqual([formatQueryName(2, 2)]);
+});
+
 test('keeps distinct formatting metrics with identical labels in queries', () => {
   const queryContext = buildQuery(
     buildFormData({

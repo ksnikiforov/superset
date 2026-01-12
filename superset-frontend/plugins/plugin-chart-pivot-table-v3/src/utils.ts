@@ -53,7 +53,7 @@ export const CELL_KEY_DIVIDER = '\u0001';
 export const METRICS_PLACEHOLDER = '__MEASURES__';
 export const METRICS_PLACEHOLDER_LABEL = 'Σ Values';
 export const METRIC_TOKEN_PREFIX = '__metric__';
-export const SUBTOTAL_TOKEN = '__subtotal__';
+export const SUBTOTAL_TOKEN = '\u0002subtotal';
 export const SUBTOTAL_LABEL = 'Subtotal';
 export const PIVOT_THEME_PRESETS: Record<string, string> = {
   blue: '#DDEBF7',
@@ -74,11 +74,117 @@ export const isMetricToken = (val: unknown): val is string =>
 export const decodeMetricKey = (val: unknown): string | undefined =>
   isMetricToken(val) ? val.slice(METRIC_TOKEN_PREFIX.length) : undefined;
 
-export const parseThemeColors = (value?: string) =>
-  (value || '')
+const normalizeThemeHexColor = (value: string) => {
+  if (!/^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(value)) {
+    return null;
+  }
+  const hex = value.toLowerCase();
+  if (hex.length === 4) {
+    return `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}`;
+  }
+  if (hex.length === 5) {
+    return `#${hex[1]}${hex[1]}${hex[2]}${hex[2]}${hex[3]}${hex[3]}${hex[4]}${hex[4]}`;
+  }
+  return hex;
+};
+
+const parseThemeRgbChannel = (value: string) => {
+  const numeric = Number(value.trim());
+  if (!Number.isFinite(numeric) || numeric < 0 || numeric > 255) {
+    return null;
+  }
+  return numeric;
+};
+
+const parseThemeAlphaChannel = (value: string) => {
+  const numeric = Number(value.trim());
+  if (!Number.isFinite(numeric) || numeric < 0 || numeric > 1) {
+    return null;
+  }
+  return numeric;
+};
+
+const splitThemeColors = (value: string) => {
+  const parts: string[] = [];
+  let current = '';
+  let depth = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    const char = value[i];
+    if (char === '(') {
+      depth += 1;
+    } else if (char === ')') {
+      depth = Math.max(0, depth - 1);
+    }
+    if (char === ',' && depth === 0) {
+      parts.push(current);
+      current = '';
+      continue;
+    }
+    current += char;
+  }
+  if (current) {
+    parts.push(current);
+  }
+  return parts;
+};
+
+const normalizeThemeColor = (rawValue: string) => {
+  const value = rawValue.trim().replace(/^['"]|['"]$/g, '');
+  if (!value) {
+    return null;
+  }
+  const hex = normalizeThemeHexColor(value);
+  if (hex) {
+    return hex;
+  }
+  const rgbMatch = value.match(/^rgba?\((.*)\)$/i);
+  if (!rgbMatch) {
+    const hslMatch = value.match(/^hsla?\((.*)\)$/i);
+    if (hslMatch) {
+      const parts = hslMatch[1]
+        .split(',')
+        .map(part => part.trim())
+        .filter(part => part.length > 0);
+      const isHsla = value.toLowerCase().startsWith('hsla');
+      if (
+        (isHsla && parts.length !== 4) ||
+        (!isHsla && parts.length !== 3)
+      ) {
+        return null;
+      }
+      return value;
+    }
+    if (/^[a-zA-Z]+$/.test(value)) {
+      return value;
+    }
+    return null;
+  }
+  const parts = rgbMatch[1]
     .split(',')
-    .map(color => color.trim())
-    .filter(color => /^#[0-9a-fA-F]{3}([0-9a-fA-F]{3})?$/.test(color));
+    .map(part => part.trim())
+    .filter(part => part.length > 0);
+  const isRgba = value.toLowerCase().startsWith('rgba');
+  if ((isRgba && parts.length !== 4) || (!isRgba && parts.length !== 3)) {
+    return null;
+  }
+  const [r, g, b] = parts.slice(0, 3).map(parseThemeRgbChannel);
+  if (r === null || g === null || b === null) {
+    return null;
+  }
+  if (isRgba) {
+    const alpha = parseThemeAlphaChannel(parts[3]);
+    if (alpha === null) {
+      return null;
+    }
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+  return `rgb(${r}, ${g}, ${b})`;
+};
+
+export const parseThemeColors = (value?: string) =>
+  splitThemeColors(value || '')
+    .map(color => normalizeThemeColor(color))
+    .filter((color): color is string => !!color);
 
 export const normalizePlaceholder = (val: QueryFormColumn) => {
   if (val === METRICS_PLACEHOLDER) return METRICS_PLACEHOLDER;
@@ -581,6 +687,16 @@ export const normalizeDimensionSortingMapWithKeys = (
       return acc;
     },
     {},
+  );
+};
+
+export const hasTotalSorting = (
+  sorting: PivotDimensionSortingMap | undefined,
+  columns: QueryFormColumn[],
+): boolean => {
+  const normalized = normalizeDimensionSortingMapWithKeys(sorting, columns);
+  return Object.values(normalized).some(
+    entry => entry.metric !== undefined && (entry.mode ?? 'total') === 'total',
   );
 };
 

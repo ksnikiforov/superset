@@ -179,6 +179,7 @@ export interface PivotTableCustomizeProps {
   colSubtotalPosition?: TotalPosition;
   pivotTheme?: PivotTheme;
   pivotThemeColors?: string;
+  stickyHeaders?: boolean;
 }
 
 export type PivotTableQueryFormData = QueryFormData &
@@ -261,4 +262,5 @@ export interface PivotTableProps
   rowSubtotalPosition?: TotalPosition;
   colTotalPosition?: TotalPosition;
   colSubtotalPosition?: TotalPosition;
+  stickyHeaders?: boolean;
 }

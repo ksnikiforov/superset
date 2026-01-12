@@ -26,6 +26,7 @@ import {
   METRICS_PLACEHOLDER,
   normalizeSubtotalLevels,
   labelRowSubtotalLeaves,
+  parseThemeColors,
   resolveMetricPlacement,
   serializeCellKey,
   serializePath,
@@ -255,6 +256,22 @@ describe('applyMetricAxis', () => {
         )
       ]?.values.countCustomers,
     ).toBe(10);
+  });
+});
+
+describe('parseThemeColors', () => {
+  it('accepts common CSS color formats', () => {
+    expect(
+      parseThemeColors(
+        ' #abc, rgb(10,20,30), rgba(10, 20, 30, 0.5), hsl(120, 30%, 40%), blue, nope(1) ',
+      ),
+    ).toEqual([
+      '#aabbcc',
+      'rgb(10, 20, 30)',
+      'rgba(10, 20, 30, 0.5)',
+      'hsl(120, 30%, 40%)',
+      'blue',
+    ]);
   });
 });
 
