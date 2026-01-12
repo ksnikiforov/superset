@@ -109,13 +109,6 @@ export const buildColumnDisplayPath = (
     ) {
       return buildMetricSubtotalPathAtEnd();
     }
-    if (!metricsAtColEnd && (isMetricSubtotalNode(col) || col.hasChildren)) {
-      const groupLabel = String(nonMetricParts[nonMetricParts.length - 1]);
-      return padToDepth([
-        ...col.path.slice(0, -1),
-        `${groupLabel} ${metricLabel}`,
-      ]);
-    }
   }
   return padToDepth(col.path);
 };

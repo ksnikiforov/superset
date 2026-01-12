@@ -18,10 +18,10 @@
  */
 
 import React from 'react';
-import { render, within } from '@testing-library/react';
+import { render, waitFor, within } from '@testing-library/react';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { buildFormData } from '../fixtures/pivotFormData';
-import { buildTreeFromRecords } from '../../../src/utils';
+import { buildTreeFromRecords, METRICS_PLACEHOLDER } from '../../../src/utils';
 
 describe('PivotTableChart sticky headers', () => {
   const metrics = ['metric1'];
@@ -96,5 +96,76 @@ describe('PivotTableChart sticky headers', () => {
       .closest('tr') as HTMLElement;
     expect(totalRow.classList.contains('pivot-grand-total-row')).toBe(true);
     expect(totalRow.classList.contains('pivot-grand-total-row--bottom')).toBe(true);
+  });
+
+  it('stacks multi-level column headers with offsets when sticky headers are enabled', async () => {
+    const multiLevelTree = buildTreeFromRecords(
+      [{ country: 'Brazil', region: 'South', state: 'SC', metric1: 10 }],
+      metrics,
+      groupbyRows,
+      ['region', 'state'],
+      1,
+      2,
+    );
+    const getBoundingClientRectSpy = jest
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockImplementation(function () {
+        if (this.tagName === 'TR' && this.closest('thead')) {
+          const rows = Array.from(this.parentElement?.children ?? []);
+          const idx = rows.indexOf(this);
+          const heights = [20, 18];
+          const height = heights[idx] ?? 0;
+          return {
+            width: 0,
+            height,
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            x: 0,
+            y: 0,
+            toJSON: () => ({}),
+          } as DOMRect;
+        }
+        return {
+          width: 0,
+          height: 0,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          x: 0,
+          y: 0,
+          toJSON: () => ({}),
+        } as DOMRect;
+      });
+
+    const { container } = render(
+      <PivotTableChart
+        data={multiLevelTree}
+        formData={buildFormData({
+          groupbyRows,
+          groupbyColumns: ['region', 'state', METRICS_PLACEHOLDER],
+          metrics,
+          stickyHeaders: true,
+        })}
+        metrics={metrics}
+        groupbyRows={groupbyRows}
+        groupbyColumns={['region', 'state']}
+        stickyHeaders
+      />,
+    );
+
+    const headerRows = Array.from(
+      container.querySelectorAll('thead tr'),
+    ) as HTMLElement[];
+    expect(headerRows.length).toBeGreaterThan(1);
+
+    await waitFor(() => {
+      const row1Cell = headerRows[1].querySelector('th') as HTMLElement;
+      expect(row1Cell.style.top).toBe('20px');
+    });
+
+    getBoundingClientRectSpy.mockRestore();
   });
 });

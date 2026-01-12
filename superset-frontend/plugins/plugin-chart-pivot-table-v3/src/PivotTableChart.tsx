@@ -629,7 +629,7 @@ function PivotTableChart(props: PivotTableProps) {
     metricsLayout = MetricsLayoutEnum.COLUMNS,
     rowSubtotalLevels = [],
     colSubtotalLevels = [],
-    rowTotals = false,
+    rowTotals = true,
     colTotals = false,
     rowSubTotals = false,
     colSubTotals = false,
@@ -646,7 +646,7 @@ function PivotTableChart(props: PivotTableProps) {
   const resolvedMetricsLayout =
     (formData.metricsLayout as MetricsLayoutEnum) || metricsLayout;
   const metricFormattingScope =
-    (formData.metricFormattingScope as MetricFormattingScope) || 'values';
+    (formData.metricFormattingScope as MetricFormattingScope) || 'values_totals';
   const resolvedStickyHeaders = formData.stickyHeaders ?? stickyHeaders;
   const metricFormatting = normalizeMetricFormattingMapWithKeys(
     formData.metricFormatting,
@@ -868,6 +868,7 @@ function PivotTableChart(props: PivotTableProps) {
   const loadingCountsRef = useRef<Map<string, number>>(new Map());
   const [errorMessage, setErrorMessage] = useState<string>();
   const [headerOffset, setHeaderOffset] = useState(0);
+  const [headerRowOffsets, setHeaderRowOffsets] = useState<number[]>([]);
   const headerRef = useRef<HTMLTableSectionElement | null>(null);
   const [fetchedRowKeys, setFetchedRowKeys] = useState<Map<string, number>>(
     () => new Map(),
@@ -2096,18 +2097,23 @@ function PivotTableChart(props: PivotTableProps) {
   const getColChildren = useCallback(
     (parent: PivotTreeNode) => {
       const children = getRawColChildren(parent);
-      const filteredByMetricPosition = children.filter(child => {
-        if (metricIndexForCols === undefined) {
-          return true;
-        }
-        if (child.path.length <= metricIndexForCols) {
-          return true;
-        }
-        const metricAtIndex = isMetricTokenValue(
-          child.path[metricIndexForCols],
-        );
-        return metricAtIndex;
-      });
+      const parentHasMetric = parent.path.some(val =>
+        isMetricTokenValue(val),
+      );
+      const filteredByMetricPosition = parentHasMetric
+        ? children
+        : children.filter(child => {
+            if (metricIndexForCols === undefined) {
+              return true;
+            }
+            if (child.path.length <= metricIndexForCols) {
+              return true;
+            }
+            const metricAtIndex = isMetricTokenValue(
+              child.path[metricIndexForCols],
+            );
+            return metricAtIndex;
+          });
       let filtered = filteredByMetricPosition;
       if (
         resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS &&
@@ -2472,6 +2478,10 @@ function PivotTableChart(props: PivotTableProps) {
   );
 
   const shouldHideMetricGrandTotalsOnCols = !showColRoot;
+  const shouldSuppressColRoot =
+    resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS &&
+    metricsFirstOnCols &&
+    isMultiMetric;
   const visibleColsBase = useMemo(
     () =>
       buildVisibleCols({
@@ -2483,13 +2493,28 @@ function PivotTableChart(props: PivotTableProps) {
       }),
     [buildColLeavesWithSubtotals, colSorter, getColChildren, skipColRoot, tree.cols],
   );
-  const visibleCols = useMemo(
-    () =>
-      shouldHideMetricGrandTotalsOnCols
-        ? visibleColsBase.filter(col => !isMetricGrandTotalNode(col))
-        : visibleColsBase,
-    [isMetricGrandTotalNode, shouldHideMetricGrandTotalsOnCols, visibleColsBase],
-  );
+  const visibleCols = useMemo(() => {
+    const filtered = shouldHideMetricGrandTotalsOnCols
+      ? visibleColsBase.filter(col => !isMetricGrandTotalNode(col))
+      : visibleColsBase;
+    if (!shouldSuppressColRoot) {
+      return filtered;
+    }
+    const hasMetricLeaves = filtered.some(col =>
+      col.path.some(val => isMetricTokenValue(val)),
+    );
+    if (!hasMetricLeaves) {
+      return filtered;
+    }
+    const withoutRoot = filtered.filter(col => col.key !== rootKey);
+    return withoutRoot.length > 0 ? withoutRoot : filtered;
+  }, [
+    isMetricGrandTotalNode,
+    isMetricTokenValue,
+    shouldHideMetricGrandTotalsOnCols,
+    shouldSuppressColRoot,
+    visibleColsBase,
+  ]);
   const { visibleRowDepth, visibleColDepth } = useMemo(
     () => getVisibleDepths(visibleRows, visibleCols, countDimDepth),
     [countDimDepth, visibleCols, visibleRows],
@@ -2550,8 +2575,22 @@ function PivotTableChart(props: PivotTableProps) {
     ],
   );
   const getColumnDisplayPath = useCallback(
-    (col: PivotTreeNode, maxDepth: number) =>
-      buildColumnDisplayPath(col, maxDepth, {
+    (col: PivotTreeNode, maxDepth: number) => {
+      if (
+        resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS &&
+        metricsFirstOnCols &&
+        expandedCols.has(col.key)
+      ) {
+        const metricLabel = getMetricLabelFromPath(col.path);
+        if (metricLabel && col.path.length < maxDepth) {
+          const totalLabel = metricLabel;
+          return [
+            ...col.path,
+            ...Array(Math.max(maxDepth - col.path.length, 0)).fill(totalLabel),
+          ];
+        }
+      }
+      return buildColumnDisplayPath(col, maxDepth, {
         metricsLayout: resolvedMetricsLayout,
         metricsFirstOnCols,
         metricsAtColEnd,
@@ -2564,7 +2603,8 @@ function PivotTableChart(props: PivotTableProps) {
         getNonMetricPathParts,
         isMetricGrandTotalNode,
         isMetricSubtotalNode,
-      }),
+      });
+    },
     [
       getMetricLabelFromPath,
       getNonMetricPathParts,
@@ -2577,6 +2617,7 @@ function PivotTableChart(props: PivotTableProps) {
       hasDeeperNonMetricDescendants,
       metricsAtColEnd,
       metricsFirstOnCols,
+      expandedCols,
       resolvedMetricsLayout,
     ],
   );
@@ -2587,11 +2628,27 @@ function PivotTableChart(props: PivotTableProps) {
   useLayoutEffect(() => {
     if (!resolvedStickyHeaders) {
       setHeaderOffset(prev => (prev === 0 ? prev : 0));
+      setHeaderRowOffsets(prev => (prev.length === 0 ? prev : []));
       return;
     }
-    const nextOffset =
-      headerRef.current?.getBoundingClientRect().height ?? 0;
+    const rows = Array.from(
+      headerRef.current?.querySelectorAll('tr') ?? [],
+    );
+    let runningOffset = 0;
+    const nextRowOffsets = rows.map(row => {
+      const currentOffset = runningOffset;
+      runningOffset += row.getBoundingClientRect().height;
+      return currentOffset;
+    });
+    const nextOffset = runningOffset;
     setHeaderOffset(prev => (prev === nextOffset ? prev : nextOffset));
+    setHeaderRowOffsets(prev => {
+      if (prev.length !== nextRowOffsets.length) {
+        return nextRowOffsets;
+      }
+      const isSame = prev.every((value, idx) => value === nextRowOffsets[idx]);
+      return isSame ? prev : nextRowOffsets;
+    });
   }, [columnHeaderRows, resolvedStickyHeaders, width]);
   const themeColor = useMemo(() => {
     if (pivotTheme === 'custom') {
@@ -4229,6 +4286,9 @@ function PivotTableChart(props: PivotTableProps) {
                   const colHeaderStyle = {
                     ...(themeColor ? { backgroundColor: themeColor } : {}),
                     ...(colHeaderFormatting || {}),
+                    ...(resolvedStickyHeaders
+                      ? { top: `${headerRowOffsets[rowIdx] ?? 0}px` }
+                      : {}),
                   };
                   const colHeaderStyleResolved =
                     Object.keys(colHeaderStyle).length > 0

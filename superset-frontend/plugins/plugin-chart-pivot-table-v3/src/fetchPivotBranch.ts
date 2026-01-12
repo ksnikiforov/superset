@@ -319,7 +319,10 @@ const resolveFetchContext = ({
   const getMetricIndex = (candidatePath: PivotPath) =>
     candidatePath.findIndex(val => {
       const decoded = decodeMetricKey(val);
-      return decoded !== undefined && metricLabelSet.has(decoded);
+      if (decoded !== undefined && metricLabelSet.has(decoded)) {
+        return true;
+      }
+      return typeof val === 'string' && metricLabelSet.has(val);
     });
   const metricIndexInPath =
     metricsAxis === axis

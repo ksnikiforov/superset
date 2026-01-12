@@ -92,10 +92,12 @@ export const createColLeavesBuilder = ({
     const children = getColChildren(node).sort(colSorter);
     const dimDepth = countDimDepth(node.path);
     const hasChildren = children.length > 0;
+    const hasMetricGrandTotals = children.some(isMetricGrandTotalNode);
     const includeSubtotal =
       hasChildren &&
       ((colTotals && dimDepth === 0) ||
-        normalizedColSubtotalLevels.includes(dimDepth)) &&
+        normalizedColSubtotalLevels.includes(dimDepth) ||
+        (dimDepth === 0 && hasMetricGrandTotals)) &&
       !(dimDepth === 0 && !showColRoot);
     const isSubtotalTokenForNode = (leaf: PivotTreeNode) => {
       if (!node.path.every((val, idx) => val === leaf.path[idx])) {
@@ -127,7 +129,14 @@ export const createColLeavesBuilder = ({
     };
     if (!expandedCols.has(node.key) || children.length === 0) {
       const collapsedMetricLeaves = getCollapsedColLeaves(node);
-      return collapsedMetricLeaves.length > 0 ? collapsedMetricLeaves : [node];
+      if (collapsedMetricLeaves.length === 0) {
+        return [node];
+      }
+      return collapsedMetricLeaves.flatMap(leaf =>
+        expandedCols.has(leaf.key)
+          ? buildColLeavesWithSubtotals(leaf)
+          : [leaf],
+      );
     }
     const placeAtFront =
       (dimDepth === 0 ? resolvedColTotalPosition : resolvedColSubtotalPosition) ===
@@ -148,17 +157,26 @@ export const createColLeavesBuilder = ({
     };
     const isMetricSubtotalLeaf = (leaf: PivotTreeNode) =>
       isBranchLeaf(leaf) &&
-      (isMetricGrandTotalNode(leaf) || isMetricSubtotalNode(leaf));
-    const subtotalTokenDescendants =
-      node.path.length === 0
-        ? []
-        : childLeaves.filter(leaf =>
-            leaf.path.slice(node.path.length).some(isSubtotalToken),
-          );
+      (isMetricGrandTotalNode(leaf) || isMetricSubtotalNode(leaf)) &&
+      countDimDepth(leaf.path) === dimDepth;
+    const baseDimDepth = countDimDepth(
+      node.path.filter(val => !isSubtotalToken(val)),
+    );
+    const subtotalTokenDescendants = childLeaves.filter(leaf => {
+      if (!leaf.path.slice(node.path.length).some(isSubtotalToken)) {
+        return false;
+      }
+      const leafBaseDepth = countDimDepth(
+        leaf.path.filter(val => !isSubtotalToken(val)),
+      );
+      return leafBaseDepth === baseDimDepth;
+    });
     const hasSubtotalTokenDescendants = subtotalTokenDescendants.length > 0;
-    const explicitSubtotalLeaves = childLeaves.filter(leaf =>
-      isSubtotalTokenLeaf(leaf) ||
-      (!hasSubtotalTokenDescendants && isMetricSubtotalLeaf(leaf)),
+    const explicitSubtotalLeaves = childLeaves.filter(
+      leaf =>
+        isSubtotalTokenLeaf(leaf) ||
+        isMetricGrandTotalNode(leaf) ||
+        (!hasSubtotalTokenDescendants && isMetricSubtotalLeaf(leaf)),
     );
     if (hasSubtotalTokenDescendants) {
       explicitSubtotalLeaves.push(...subtotalTokenDescendants);
@@ -326,6 +344,7 @@ export const hasLoadedChildren = ({
   const groupbyLength = axis === 'row' ? groupbyRowsLength : groupbyColsLength;
   const parentDimDepth = countBaseDimDepth(node.path);
   const metricIndex = axis === 'row' ? metricIndexForRows : metricIndexForCols;
+  const parentHasMetric = node.path.some(val => isMetricTokenValue(val));
   if (
     metricIndex !== undefined &&
     node.path.length > metricIndex &&
@@ -333,6 +352,15 @@ export const hasLoadedChildren = ({
     parentDimDepth < groupbyLength
   ) {
     // Sitting on the metric tier and deeper dimensions remain; force fetch.
+    return false;
+  }
+  if (
+    metricIndex !== undefined &&
+    parentDimDepth < metricIndex &&
+    !parentHasMetric &&
+    children.some(child => child.path.some(val => isMetricTokenValue(val)))
+  ) {
+    // Metrics are showing before their configured position; fetch the missing dimension.
     return false;
   }
   const childDimDepths = children.map(child =>

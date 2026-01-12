@@ -559,4 +559,507 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
     expect(within(canChildRow).getByText('20')).toBeTruthy();
   });
 
+  it('shows metric headers without a grand total when metrics are first on columns', () => {
+    const metrics = ['measure1', 'measure2'];
+    const rowGroupby = ['orderPriority', 'discountBand', 'customerSegment'];
+    const colGroupby = ['revenueBand'];
+    const baseTreeRaw = buildTreeFromRecords(
+      [{ orderPriority: '1-URGENT', measure1: 10, measure2: 20 }],
+      metrics,
+      rowGroupby,
+      colGroupby,
+      1,
+      0,
+    );
+    const baseTree = applyMetricAxis(
+      baseTreeRaw,
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      rowGroupby,
+      colGroupby,
+      0,
+    );
+
+    const { container } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={buildFormData(
+          {
+            ...baseFormData,
+            groupbyRows: rowGroupby,
+            groupbyColumns: [METRICS_PLACEHOLDER, 'revenueBand'],
+            metricsLayout: MetricsLayoutEnum.COLUMNS,
+            metrics,
+            colTotals: true,
+          })
+        }
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={colGroupby}
+        aggregateFunction="Sum"
+        width={400}
+        height={300}
+        startCollapsed
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    const headerLabels = within(container.querySelector('thead') as HTMLElement)
+      .getAllByRole('columnheader')
+      .map(cell => cell.textContent?.trim())
+      .filter(label => label && label !== 'Rows');
+    expect(headerLabels).toEqual(expect.arrayContaining(metrics));
+    expect(headerLabels).not.toContain('Grand total');
+
+    const metricCell = within(
+      container.querySelector('thead') as HTMLElement,
+    ).getByText('measure1').closest('th') as HTMLElement;
+    expect(within(metricCell).getByLabelText('plus-square')).toBeTruthy();
+  });
+
+  it('expands a metric column to the next level when metrics are first', async () => {
+    const metrics = ['measure1', 'measure2'];
+    const rowGroupby = ['orderPriority', 'discountBand', 'customerSegment'];
+    const colGroupby = ['revenueBand'];
+    const baseTreeRaw = buildTreeFromRecords(
+      [{ orderPriority: '1-URGENT', measure1: 10, measure2: 20 }],
+      metrics,
+      rowGroupby,
+      colGroupby,
+      1,
+      0,
+    );
+    const baseTree = applyMetricAxis(
+      baseTreeRaw,
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      rowGroupby,
+      colGroupby,
+      0,
+    );
+
+    const colBranchRaw = buildTreeFromRecords(
+      [
+        {
+          orderPriority: '1-URGENT',
+          revenueBand: 'REV-A',
+          measure1: 10,
+          measure2: 20,
+        },
+      ],
+      metrics,
+      rowGroupby,
+      colGroupby,
+      1,
+      1,
+    );
+    const colBranchWithMetrics = applyMetricAxis(
+      colBranchRaw,
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      rowGroupby,
+      colGroupby,
+      0,
+    );
+
+    fetchPivotBranchMock.mockResolvedValueOnce({ data: colBranchWithMetrics });
+
+    const { container, findByText } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={buildFormData(
+          {
+            ...baseFormData,
+            groupbyRows: rowGroupby,
+            groupbyColumns: [METRICS_PLACEHOLDER, 'revenueBand'],
+            metricsLayout: MetricsLayoutEnum.COLUMNS,
+            metrics,
+            colTotals: true,
+          })
+        }
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={colGroupby}
+        aggregateFunction="Sum"
+        width={400}
+        height={300}
+        startCollapsed
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    const thead = container.querySelector('thead') as HTMLElement;
+    const metricCell = within(thead).getByText('measure1').closest('th') as HTMLElement;
+    fireEvent.click(within(metricCell).getByLabelText('plus-square'));
+
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
+    });
+    expect(await findByText('REV-A')).toBeTruthy();
+  });
+
+  it('keeps column layout stable when collapsing one expanded metric', async () => {
+    const metrics = ['measure1', 'measure2', 'measure3', 'measure4'];
+    const rowGroupby = ['orderPriority', 'discountBand', 'customerSegment'];
+    const colGroupby = ['col2'];
+    const baseTreeRaw = buildTreeFromRecords(
+      [
+        {
+          orderPriority: '1-URGENT',
+          discountBand: 'LOW',
+          customerSegment: 'CONSUMER',
+          measure1: 10,
+          measure2: 20,
+          measure3: 30,
+          measure4: 40,
+        },
+      ],
+      metrics,
+      rowGroupby,
+      colGroupby,
+      1,
+      0,
+    );
+    const baseTree = applyMetricAxis(
+      baseTreeRaw,
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      rowGroupby,
+      colGroupby,
+      0,
+    );
+
+    const colBranchRaw = buildTreeFromRecords(
+      [
+        {
+          orderPriority: '1-URGENT',
+          discountBand: 'LOW',
+          customerSegment: 'CONSUMER',
+          col2: 'C2-A',
+          measure1: 10,
+          measure2: 20,
+          measure3: 30,
+          measure4: 40,
+        },
+        {
+          orderPriority: '1-URGENT',
+          discountBand: 'LOW',
+          customerSegment: 'CONSUMER',
+          col2: 'C2-B',
+          measure1: 11,
+          measure2: 21,
+          measure3: 31,
+          measure4: 41,
+        },
+      ],
+      metrics,
+      rowGroupby,
+      colGroupby,
+      1,
+      1,
+    );
+    const colBranchWithMetrics = applyMetricAxis(
+      colBranchRaw,
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      rowGroupby,
+      colGroupby,
+      0,
+    );
+
+    fetchPivotBranchMock.mockResolvedValue({ data: colBranchWithMetrics });
+
+    const { container } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={buildFormData(
+          {
+            ...baseFormData,
+            groupbyRows: rowGroupby,
+            groupbyColumns: [METRICS_PLACEHOLDER, 'col2'],
+            metricsLayout: MetricsLayoutEnum.COLUMNS,
+            metrics,
+          })
+        }
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={colGroupby}
+        aggregateFunction="Sum"
+        width={500}
+        height={300}
+        startCollapsed
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    const thead = container.querySelector('thead') as HTMLElement;
+    const measure1Header = within(thead).getByText('measure1').closest(
+      'th',
+    ) as HTMLElement;
+    fireEvent.click(within(measure1Header).getByLabelText('plus-square'));
+
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
+    });
+
+    const measure2Header = within(thead).getByText('measure2').closest(
+      'th',
+    ) as HTMLElement;
+    fireEvent.click(within(measure2Header).getByLabelText('plus-square'));
+
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
+    });
+
+    fireEvent.click(within(measure1Header).getByLabelText('minus-square'));
+
+    await waitFor(() => {
+      const refreshed = container.querySelector('thead') as HTMLElement;
+      const headerLabels = within(refreshed)
+        .getAllByText('measure1')
+        .filter(node =>
+          (node.closest('th') as HTMLElement | null)?.querySelector(
+            '[aria-label="plus-square"]',
+          ),
+        );
+      expect(headerLabels.length).toBeGreaterThan(0);
+    });
+
+    const lastHeaderRow = container.querySelector(
+      'thead tr:last-child',
+    ) as HTMLElement;
+    const lastRowLabels = within(lastHeaderRow)
+      .getAllByRole('columnheader')
+      .map(cell => cell.textContent?.trim())
+      .filter(label => label && label !== 'Rows');
+    expect(lastRowLabels).toEqual(['C2-A', 'C2-B']);
+
+    const firstBodyRow = container.querySelector(
+      'tbody tr',
+    ) as HTMLElement;
+    expect(firstBodyRow.querySelectorAll('td').length).toBe(5);
+  });
+
+  it('keeps metric-first headers consistent after collapsing one expanded metric with totals', async () => {
+    const metrics = ['measure1', 'measure2', 'measure3', 'measure4'];
+    const rowGroupby = ['orderPriority', 'discountBand', 'customerSegment'];
+    const colGroupby = ['col2'];
+    const baseTreeRaw = buildTreeFromRecords(
+      [
+        {
+          orderPriority: '1-URGENT',
+          discountBand: 'LOW',
+          customerSegment: 'CONSUMER',
+          measure1: 10,
+          measure2: 20,
+          measure3: 30,
+          measure4: 40,
+        },
+      ],
+      metrics,
+      rowGroupby,
+      colGroupby,
+      1,
+      0,
+    );
+    const baseTree = applyMetricAxis(
+      baseTreeRaw,
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      rowGroupby,
+      colGroupby,
+      0,
+    );
+
+    const colBranchRaw = buildTreeFromRecords(
+      [
+        {
+          orderPriority: '1-URGENT',
+          discountBand: 'LOW',
+          customerSegment: 'CONSUMER',
+          col2: 'C2-A',
+          measure1: 10,
+          measure2: 20,
+          measure3: 30,
+          measure4: 40,
+        },
+        {
+          orderPriority: '1-URGENT',
+          discountBand: 'LOW',
+          customerSegment: 'CONSUMER',
+          col2: 'C2-B',
+          measure1: 11,
+          measure2: 21,
+          measure3: 31,
+          measure4: 41,
+        },
+      ],
+      metrics,
+      rowGroupby,
+      colGroupby,
+      1,
+      1,
+    );
+    const colBranchWithMetrics = applyMetricAxis(
+      colBranchRaw,
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      rowGroupby,
+      colGroupby,
+      0,
+    );
+
+    fetchPivotBranchMock.mockResolvedValue({ data: colBranchWithMetrics });
+
+    const { container } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={buildFormData(
+          {
+            ...baseFormData,
+            groupbyRows: rowGroupby,
+            groupbyColumns: [METRICS_PLACEHOLDER, 'col2'],
+            metricsLayout: MetricsLayoutEnum.COLUMNS,
+            metrics,
+            colTotals: true,
+            rowTotals: true,
+          })
+        }
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={colGroupby}
+        aggregateFunction="Sum"
+        width={500}
+        height={300}
+        startCollapsed
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals
+        colTotals
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    const thead = container.querySelector('thead') as HTMLElement;
+    const measure1Header = within(thead).getByText('measure1').closest(
+      'th',
+    ) as HTMLElement;
+    fireEvent.click(within(measure1Header).getByLabelText('plus-square'));
+
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
+    });
+
+    const measure2Header = within(thead).getByText('measure2').closest(
+      'th',
+    ) as HTMLElement;
+    fireEvent.click(within(measure2Header).getByLabelText('plus-square'));
+
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
+    });
+
+    fireEvent.click(within(measure1Header).getByLabelText('minus-square'));
+
+    await waitFor(() => {
+      const refreshed = container.querySelector('thead') as HTMLElement;
+      const measure1Cells = within(refreshed)
+        .getAllByText('measure1')
+        .map(node => node.closest('th') as HTMLElement)
+        .filter(cell => cell);
+      expect(measure1Cells).toHaveLength(1);
+      expect(
+        within(measure1Cells[0]).getByLabelText('plus-square'),
+      ).toBeTruthy();
+    });
+
+    const refreshedHead = container.querySelector('thead') as HTMLElement;
+    const measure2Cells = within(refreshedHead)
+      .getAllByText('measure2')
+      .map(node => node.closest('th') as HTMLElement)
+      .filter(cell => cell);
+    expect(measure2Cells.length).toBeGreaterThan(0);
+    expect(
+      within(measure2Cells[0]).getByLabelText('minus-square'),
+    ).toBeTruthy();
+
+    const lastHeaderRow = container.querySelector(
+      'thead tr:last-child',
+    ) as HTMLElement;
+    const lastRowLabels = within(lastHeaderRow)
+      .getAllByRole('columnheader')
+      .map(cell => cell.textContent?.trim())
+      .filter(label => label && label !== 'Rows');
+    expect(lastRowLabels).toEqual(['measure2', 'C2-A', 'C2-B']);
+
+    const firstBodyRow = container.querySelector(
+      'tbody tr',
+    ) as HTMLElement;
+    expect(firstBodyRow.querySelectorAll('td').length).toBe(6);
+  });
+
 });

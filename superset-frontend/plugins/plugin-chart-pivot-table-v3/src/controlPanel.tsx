@@ -444,7 +444,7 @@ const config: ControlPanelConfig = {
                 'Apply conditional formatting to values only, totals, or include grand totals.',
               ),
               clearable: false,
-              default: 'values',
+              default: 'values_totals',
               renderTrigger: true,
               choices: [
                 ['values', t('Values only')],
@@ -607,7 +607,7 @@ const config: ControlPanelConfig = {
               type: 'CheckboxControl',
               label: t('Row total'),
               description: t('Show grand total for rows.'),
-              default: false,
+              default: true,
               renderTrigger: true,
             },
           },

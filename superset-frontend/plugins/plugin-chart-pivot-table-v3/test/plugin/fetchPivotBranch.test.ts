@@ -29,6 +29,8 @@ import {
 } from '../../src/fetchPivotBranch';
 import {
   encodeMetricKey,
+  applyMetricAxis,
+  buildTreeFromRecords,
   METRICS_PLACEHOLDER,
   serializeCellKey,
   serializePath,
@@ -421,6 +423,90 @@ describe('resolveFetchContext', () => {
         serializeCellKey(serializePath(['USA', 'HIGH']), serializePath([]))
       ]?.values.countCustomers,
     ).toBe(5);
+  });
+
+  it('expands metric-first columns when the metric path uses raw labels', async () => {
+    const postMock = SupersetClient.post as jest.Mock;
+    postMock.mockImplementationOnce(({ jsonPayload }) => ({
+      json: {
+        result: (jsonPayload.queries || []).map((query: any) => {
+          const name = query.query_name as string;
+          if (name.includes(formatQueryName(1, 1))) {
+            return {
+              data: [
+                {
+                  orderPriority: '1-URGENT',
+                  revenueBand: 'REV-A',
+                  measure1: 10,
+                  measure2: 20,
+                },
+              ],
+            };
+          }
+          if (name.includes(formatQueryName(1, 0))) {
+            return {
+              data: [
+                {
+                  orderPriority: '1-URGENT',
+                  measure1: 30,
+                  measure2: 40,
+                },
+              ],
+            };
+          }
+          return { data: [] };
+        }),
+      },
+    }));
+
+    const metrics = ['measure1', 'measure2'];
+    const currentTreeRaw = buildTreeFromRecords(
+      [{ orderPriority: '1-URGENT', measure1: 30, measure2: 40 }],
+      metrics,
+      ['orderPriority'],
+      ['revenueBand'],
+      1,
+      0,
+    );
+    const currentTree = applyMetricAxis(
+      currentTreeRaw,
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      ['orderPriority'],
+      ['revenueBand'],
+      0,
+    );
+
+    const result = await fetchPivotBranch({
+      formData: {
+        groupbyRows: ['orderPriority'],
+        groupbyColumns: [METRICS_PLACEHOLDER, 'revenueBand'],
+        metrics,
+        metricsLayout: MetricsLayoutEnum.COLUMNS,
+        rowSubTotals: false,
+        datasource: '1__table',
+        viz_type: 'pivot_table_v3',
+      } as any,
+      axis: 'col',
+      path: ['measure1'],
+      metricPath: ['measure1'],
+      currentTree,
+    });
+
+    expect(postMock).toHaveBeenCalledTimes(1);
+    const queries = (postMock.mock.calls[0][0] as any).jsonPayload?.queries || [];
+    queries.forEach((query: QueryPayload) => {
+      const hasMetricFilter = (query.filters || []).some(
+        filter => filter?.col === 'revenueBand' && filter?.val === 'measure1',
+      );
+      expect(hasMetricFilter).toBe(false);
+    });
+
+    const expandedColKey = serializePath([
+      encodeMetricKey('measure1'),
+      'REV-A',
+    ]);
+    expect(result.data?.cols[expandedColKey]).toBeTruthy();
   });
 
   it('fetches parent column depth when expanding rows under expanded columns', async () => {
