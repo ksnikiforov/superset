@@ -25,6 +25,7 @@ import {
   waitFor,
   within,
 } from 'spec/helpers/testing-library';
+import { supersetTheme } from '@superset-ui/core';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import {
   MetricsLayoutEnum,
@@ -428,6 +429,80 @@ describe('PivotTableChart metric tier suppression', () => {
     const bar = within(cell).getByTestId('pivot-databar-bar');
     const widthPct = Number.parseFloat(bar.style.width);
     expect(widthPct).toBeCloseTo(10, 1);
+  });
+
+  it('caps databar scale width for visual comparability', () => {
+    const tree = applyMetricAxis(
+      buildTreeFromRecords(
+        [
+          {
+            r1: 'A',
+            c1: 'C1',
+            metric1: 10,
+            metric_with_long_label: 20,
+          },
+        ],
+        ['metric1', 'metric_with_long_label'],
+        ['r1'],
+        ['c1'],
+        1,
+        1,
+      ),
+      ['metric1', 'metric_with_long_label'],
+      MetricsLayoutEnum.COLUMNS,
+      ['r1'],
+      ['c1'],
+    );
+
+    render(
+      <PivotTableChart
+        data={tree}
+        formData={buildFormData({
+          ...baseFormData,
+          metrics: ['metric1', 'metric_with_long_label'],
+          metricDatabars: {
+            metric1: {
+              type: 'bar',
+            },
+            metric_with_long_label: {
+              type: 'bar',
+            },
+          },
+        })}
+        metrics={['metric1', 'metric_with_long_label']}
+        groupbyRows={['r1']}
+        groupbyColumns={['c1']}
+        aggregateFunction="Sum"
+        width={400}
+        height={300}
+        startCollapsed={false}
+        initialDepth={1}
+        maxDepthPerFetch={1}
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        colSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    const scales = screen.getAllByTestId('pivot-databar-scale');
+    expect(scales).toHaveLength(2);
+    const expectedMaxWidth = `${supersetTheme.sizeUnit * 12}px`;
+    scales.forEach(scale => {
+      expect(scale).toHaveStyle(`max-width: ${expectedMaxWidth}`);
+    });
   });
 
   it('renders databars on row grand totals', () => {

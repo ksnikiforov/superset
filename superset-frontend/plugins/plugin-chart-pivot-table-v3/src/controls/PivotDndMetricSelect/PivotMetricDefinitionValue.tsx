@@ -24,6 +24,7 @@ import {
   QueryFormMetric,
   styled,
   t,
+  useTheme,
 } from '@superset-ui/core';
 import {
   Button,
@@ -51,7 +52,12 @@ import {
   PivotMetricFormatting,
   PivotMetricFormattingMap,
 } from '../../types';
-import { getMetricKey } from '../../utils';
+import {
+  DEFAULT_DATABAR_NEGATIVE_COLOR,
+  DEFAULT_DATABAR_POSITIVE_COLOR,
+  getFormattingMetricKey,
+  getMetricKey,
+} from '../../utils';
 
 const MetricFormattingButton = styled(Button)`
   height: ${({ theme }) => theme.sizeUnit * 5}px;
@@ -328,6 +334,7 @@ export const MetricFormatSelector = ({
   value,
   metrics,
   onChange,
+  disabled = false,
   columns,
   savedMetrics,
   datasource,
@@ -337,6 +344,7 @@ export const MetricFormatSelector = ({
   value?: QueryFormMetric | MetricSelectValue;
   metrics: MetricOptionValue[];
   onChange: (metric?: QueryFormMetric) => void;
+  disabled?: boolean;
   columns: ColumnMeta[];
   savedMetrics: Metric[];
   datasource?: Record<string, unknown>;
@@ -440,6 +448,7 @@ export const MetricFormatSelector = ({
           placeholder={t('Select a metric')}
           style={{ width: METRIC_SELECT_WIDTH }}
           open={isDropdownOpen}
+          disabled={disabled}
           onOpenChange={setIsDropdownOpen}
           value={selectedValue}
           options={options.map(option => ({
@@ -464,7 +473,11 @@ export const MetricFormatSelector = ({
             );
             setIsDropdownOpen(false);
           }}
-          onClick={() => setIsDropdownOpen(true)}
+          onClick={() => {
+            if (!disabled) {
+              setIsDropdownOpen(true);
+            }
+          }}
           onClear={() => onChange(undefined)}
           showSearch
           optionFilterProps={['label', 'value']}
@@ -499,6 +512,15 @@ export const MetricFormatSelector = ({
 export default function PivotMetricDefinitionValue(
   props: PivotMetricDefinitionValueProps,
 ) {
+  const theme = useTheme();
+  const defaultPositiveColor =
+    theme.colorSuccess ||
+    (theme as { colors?: { success?: { base?: string } } }).colors?.success?.base ||
+    DEFAULT_DATABAR_POSITIVE_COLOR;
+  const defaultNegativeColor =
+    theme.colorError ||
+    (theme as { colors?: { error?: { base?: string } } }).colors?.error?.base ||
+    DEFAULT_DATABAR_NEGATIVE_COLOR;
   const metricLabel = useMemo(
     () => resolveMetricLabel(props.option),
     [props.option],
@@ -627,9 +649,69 @@ export default function PivotMetricDefinitionValue(
     },
     [databarKey, props.onMetricDatabarChange],
   );
+  const handleDatabarTypeChange = useCallback(
+    (value: string) => {
+      const nextType =
+        value === 'none' ? undefined : (value as PivotDatabarType);
+      handleDatabarChange('type', nextType);
+      if (nextType) {
+        if (!databar.positiveColor) {
+          handleDatabarChange('positiveColor', defaultPositiveColor);
+        }
+        if (!databar.negativeColor) {
+          handleDatabarChange('negativeColor', defaultNegativeColor);
+        }
+      }
+    },
+    [
+      databar.negativeColor,
+      databar.positiveColor,
+      defaultNegativeColor,
+      defaultPositiveColor,
+      handleDatabarChange,
+    ],
+  );
   const databarTypeValue = databar.type ?? 'none';
   const colorMode = databar.colorMode === 'byMetric' ? 'byMetric' : 'static';
   const showDatabarControls = databarTypeValue !== 'none';
+  const { scaleLikeSources, scaleLikeTargets } = useMemo(() => {
+    const sources = new Set<string>();
+    const targets = new Set<string>();
+    Object.entries(props.metricDatabars).forEach(([key, config]) => {
+      const targetKey = config.scaleLike
+        ? getFormattingMetricKey(config.scaleLike as QueryFormMetric | Metric)
+        : undefined;
+      if (targetKey) {
+        sources.add(key);
+        targets.add(targetKey);
+      }
+    });
+    return { scaleLikeSources: sources, scaleLikeTargets: targets };
+  }, [props.metricDatabars]);
+  const scaleLikeMetricKey = databarKey || metricKey;
+  const scaleLikeDisabled = Boolean(
+    scaleLikeMetricKey && scaleLikeTargets.has(scaleLikeMetricKey),
+  );
+  const scaleLikeMetrics = useMemo(() => {
+    if (!scaleLikeMetricKey) {
+      return props.selectedMetrics;
+    }
+    return props.selectedMetrics.filter(metric => {
+      const candidateKey =
+        getFormattingMetricKey(metric as QueryFormMetric | Metric) ||
+        resolveMetricKey(metric as MetricOptionValue);
+      if (!candidateKey) {
+        return false;
+      }
+      if (candidateKey === scaleLikeMetricKey) {
+        return false;
+      }
+      if (scaleLikeSources.has(candidateKey)) {
+        return false;
+      }
+      return true;
+    });
+  }, [props.selectedMetrics, scaleLikeMetricKey, scaleLikeSources]);
 
   const formattingPopoverContent = (
     <div
@@ -668,12 +750,7 @@ export default function PivotMetricDefinitionValue(
               options={DATABAR_TYPE_OPTIONS}
               value={databarTypeValue}
               style={{ width: METRIC_SELECT_WIDTH }}
-              onChange={value =>
-                handleDatabarChange(
-                  'type',
-                  value === 'none' ? undefined : (value as PivotDatabarType),
-                )
-              }
+              onChange={handleDatabarTypeChange}
             />
           </div>
           {showDatabarControls && (
@@ -682,8 +759,9 @@ export default function PivotMetricDefinitionValue(
                 label={t('Scale like')}
                 tooltip={t('Scale this databar to the selected metric.')}
                 value={databar.scaleLike}
-                metrics={props.selectedMetrics}
+                metrics={scaleLikeMetrics}
                 onChange={metric => handleDatabarChange('scaleLike', metric)}
+                disabled={scaleLikeDisabled}
                 columns={props.columns}
                 savedMetrics={props.savedMetrics}
                 datasource={props.datasource}
@@ -702,7 +780,7 @@ export default function PivotMetricDefinitionValue(
                 <Typography.Text>{t('Positive color')}</Typography.Text>
                 <ColorPicker
                   presets={[{ label: t('Theme colors'), colors: presetColors }]}
-                  value={databar.positiveColor}
+                  value={databar.positiveColor ?? defaultPositiveColor}
                   disabled={colorMode === 'byMetric'}
                   onChangeComplete={color =>
                     handleDatabarChange('positiveColor', rgbToHex(color))
@@ -714,7 +792,7 @@ export default function PivotMetricDefinitionValue(
                 <Typography.Text>{t('Negative color')}</Typography.Text>
                 <ColorPicker
                   presets={[{ label: t('Theme colors'), colors: presetColors }]}
-                  value={databar.negativeColor}
+                  value={databar.negativeColor ?? defaultNegativeColor}
                   disabled={colorMode === 'byMetric'}
                   onChangeComplete={color =>
                     handleDatabarChange('negativeColor', rgbToHex(color))

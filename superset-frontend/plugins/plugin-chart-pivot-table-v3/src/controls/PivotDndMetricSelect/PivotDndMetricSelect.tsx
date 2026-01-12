@@ -48,6 +48,7 @@ import {
   PivotMetricFormattingMap,
   PivotMetricDatabar,
   PivotMetricDatabarMap,
+  METRIC_FORMATTING_FIELDS,
 } from '../../types';
 import {
   collectMetricFormattingMetrics,
@@ -151,6 +152,179 @@ const resolveMetricLabel = (option: ValueType) => {
 const resolveMetricKey = (option: ValueType) =>
   getMetricKey(option as QueryFormMetric | Metric);
 
+const collectMetricIdentifiers = (metric: ValueType) => {
+  const identifiers = new Set<string>();
+  if (typeof metric === 'string') {
+    if (metric.length > 0) {
+      identifiers.add(metric);
+    }
+    return identifiers;
+  }
+  const formattingKey = getFormattingMetricKey(metric as QueryFormMetric | Metric);
+  if (formattingKey) {
+    identifiers.add(formattingKey);
+  }
+  const metricKey = getMetricKey(metric as QueryFormMetric | Metric);
+  if (metricKey) {
+    identifiers.add(metricKey);
+  }
+  const label = resolveMetricLabel(metric);
+  if (label && label !== t('Metric')) {
+    identifiers.add(label);
+  }
+  if ('metric_name' in metric && typeof metric.metric_name === 'string') {
+    identifiers.add(metric.metric_name);
+  }
+  if ('verbose_name' in metric && typeof metric.verbose_name === 'string') {
+    identifiers.add(metric.verbose_name);
+  }
+  return identifiers;
+};
+
+const resolveMetricReferenceKey = (metric?: QueryFormMetric) => {
+  if (!metric) {
+    return undefined;
+  }
+  if (typeof metric === 'string') {
+    return metric.length > 0 ? metric : undefined;
+  }
+  const metricKey = getMetricKey(metric as QueryFormMetric | Metric);
+  if (metricKey) {
+    return metricKey;
+  }
+  return undefined;
+};
+
+const normalizeMetricReferenceValue = (
+  metric: ValueType,
+): QueryFormMetric => {
+  if (typeof metric === 'string') {
+    return metric;
+  }
+  if ('metric_name' in metric && metric.metric_name) {
+    return metric.metric_name;
+  }
+  if (metric instanceof AdhocMetric) {
+    return {
+      expressionType: metric.expressionType,
+      column: metric.column,
+      aggregate: metric.aggregate,
+      sqlExpression: metric.sqlExpression,
+      label: metric.label,
+      hasCustomLabel: metric.hasCustomLabel,
+      optionName: metric.optionName,
+    };
+  }
+  if ('expressionType' in metric) {
+    const adhocMetric = new AdhocMetric(metric);
+    return {
+      expressionType: adhocMetric.expressionType,
+      column: adhocMetric.column,
+      aggregate: adhocMetric.aggregate,
+      sqlExpression: adhocMetric.sqlExpression,
+      label: metric.label || adhocMetric.label,
+      hasCustomLabel: metric.hasCustomLabel ?? adhocMetric.hasCustomLabel,
+      optionName:
+        typeof metric.optionName === 'string' ? metric.optionName : undefined,
+    };
+  }
+  return metric as QueryFormMetric;
+};
+
+export const updateMetricConfigForRename = ({
+  metricFormatting,
+  metricDatabars,
+  oldMetric,
+  newMetric,
+}: {
+  metricFormatting: PivotMetricFormattingMap;
+  metricDatabars: PivotMetricDatabarMap;
+  oldMetric: ValueType;
+  newMetric: ValueType;
+}) => {
+  const oldIdentifiers = collectMetricIdentifiers(oldMetric);
+  const nextLabel = resolveMetricLabel(newMetric);
+  const nextKey =
+    resolveMetricReferenceKey(newMetric as QueryFormMetric) ||
+    (nextLabel !== t('Metric') ? nextLabel : undefined);
+  if (!nextKey || oldIdentifiers.size === 0) {
+    return { metricFormatting, metricDatabars };
+  }
+  const replacementMetric = normalizeMetricReferenceValue(newMetric);
+
+  const replaceReference = (metric?: QueryFormMetric) => {
+    if (!metric) {
+      return metric;
+    }
+    if (typeof metric === 'string') {
+      return oldIdentifiers.has(metric) ? replacementMetric : metric;
+    }
+    const identifiers = collectMetricIdentifiers(metric as ValueType);
+    for (const identifier of identifiers) {
+      if (oldIdentifiers.has(identifier)) {
+        return replacementMetric;
+      }
+    }
+    return metric;
+  };
+
+  const renameMapKey = <T extends Record<string, unknown>>(map: Record<string, T>) => {
+    let next = { ...map };
+    oldIdentifiers.forEach(identifier => {
+      if (identifier && identifier !== nextKey && identifier in next) {
+        const existing = next[nextKey];
+        const value = next[identifier];
+        const merged =
+          existing && typeof existing === 'object'
+            ? { ...value, ...existing }
+            : existing || value;
+        next = { ...next, [nextKey]: merged };
+        delete next[identifier];
+      }
+    });
+    return next;
+  };
+
+  const updatedFormattingBase = renameMapKey(metricFormatting);
+  const updatedFormatting = Object.entries(updatedFormattingBase).reduce<PivotMetricFormattingMap>(
+    (acc, [key, formatting]) => {
+      const nextFormatting = { ...formatting };
+      METRIC_FORMATTING_FIELDS.forEach(field => {
+        const updatedMetric = replaceReference(formatting[field]);
+        if (updatedMetric !== formatting[field]) {
+          nextFormatting[field] = updatedMetric;
+        }
+      });
+      acc[key] = nextFormatting;
+      return acc;
+    },
+    {},
+  );
+
+  const updatedDatabarsBase = renameMapKey(metricDatabars);
+  const updatedDatabars = Object.entries(updatedDatabarsBase).reduce<PivotMetricDatabarMap>(
+    (acc, [key, config]) => {
+      const nextConfig: PivotMetricDatabar = { ...config };
+      const nextScaleLike = replaceReference(config.scaleLike);
+      const nextColorMetric = replaceReference(config.colorMetric);
+      if (nextScaleLike !== config.scaleLike) {
+        nextConfig.scaleLike = nextScaleLike;
+      }
+      if (nextColorMetric !== config.colorMetric) {
+        nextConfig.colorMetric = nextColorMetric;
+      }
+      acc[key] = nextConfig;
+      return acc;
+    },
+    {},
+  );
+
+  return {
+    metricFormatting: updatedFormatting,
+    metricDatabars: updatedDatabars,
+  };
+};
+
 const dedupeMetrics = (metrics: ValueType[]) => {
   const seen = new Set<string>();
   return metrics.filter(metric => {
@@ -163,6 +337,18 @@ const dedupeMetrics = (metrics: ValueType[]) => {
     seen.add(key);
     return true;
   });
+};
+
+const collectActiveMetricKeys = (metrics: ValueType[]) => {
+  const keys = new Set<string>();
+  metrics.forEach(metric => {
+    collectMetricIdentifiers(metric).forEach(identifier => {
+      if (identifier) {
+        keys.add(identifier);
+      }
+    });
+  });
+  return keys;
 };
 
 type MetricSelectDatasource = {
@@ -283,10 +469,8 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
         })
         .filter(option => option);
       if (setControlValue) {
-        const activeMetricKeys = new Set(
-          optionValues
-            .map(metric => resolveMetricKey(metric as ValueType))
-            .filter(label => label.length > 0),
+        const activeMetricKeys = collectActiveMetricKeys(
+          optionValues as ValueType[],
         );
         const baseFormatting = metricFormattingRef.current || {};
         const nextFormatting = Object.fromEntries(
@@ -309,7 +493,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
         const cleanedDatabars = Object.entries(nextDatabars).reduce<PivotMetricDatabarMap>(
           (acc, [key, config]) => {
             const scaleLikeKey = config.scaleLike
-              ? getMetricKey(config.scaleLike as QueryFormMetric)
+              ? getFormattingMetricKey(config.scaleLike as QueryFormMetric)
               : '';
             if (scaleLikeKey && !activeMetricKeys.has(scaleLikeKey)) {
               acc[key] = { ...config, scaleLike: undefined };
@@ -396,24 +580,55 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
     (
       metricKey: string,
       field: keyof PivotMetricDatabar,
-      value?: PivotMetricDatabar[keyof PivotMetricDatabar],
+      nextValue?: PivotMetricDatabar[keyof PivotMetricDatabar],
     ) => {
       if (!setControlValue) {
         return;
       }
       const baseDatabars = metricDatabarsRef.current || {};
+      if (field === 'scaleLike' && nextValue) {
+        const activeMetricKeys = collectActiveMetricKeys(value);
+        const { sources, targets } = Object.entries(baseDatabars).reduce<{
+          sources: Set<string>;
+          targets: Set<string>;
+        }>(
+          (acc, [key, config]) => {
+            const scaleLikeKey = config.scaleLike
+              ? getFormattingMetricKey(config.scaleLike as QueryFormMetric)
+              : undefined;
+            if (scaleLikeKey) {
+              acc.sources.add(key);
+              acc.targets.add(scaleLikeKey);
+            }
+            return acc;
+          },
+          { sources: new Set(), targets: new Set() },
+        );
+        const targetKey = getFormattingMetricKey(
+          nextValue as QueryFormMetric | Metric,
+        );
+        if (
+          !targetKey ||
+          targetKey === metricKey ||
+          !activeMetricKeys.has(targetKey) ||
+          sources.has(targetKey) ||
+          targets.has(metricKey)
+        ) {
+          return;
+        }
+      }
       const current = baseDatabars[metricKey] || {};
       const updated: PivotMetricDatabar = {
         ...current,
-        [field]: value,
+        [field]: nextValue,
       };
-      if (field === 'colorMetric' && value) {
+      if (field === 'colorMetric' && nextValue) {
         updated.colorMode = 'byMetric';
       }
-      if (field === 'colorMode' && value !== 'byMetric') {
+      if (field === 'colorMode' && nextValue !== 'byMetric') {
         delete updated.colorMetric;
       }
-      if (field === 'colorMetric' && !value) {
+      if (field === 'colorMetric' && !nextValue) {
         updated.colorMode = 'static';
       }
       const nextDatabars = { ...baseDatabars };
@@ -427,7 +642,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       metricDatabarsRef.current = nextDatabars;
       setControlValue('metricDatabars', nextDatabars);
     },
-    [setControlValue],
+    [setControlValue, value],
   );
 
   const availableMetrics = useMemo(() => {
@@ -488,6 +703,29 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       if (oldMetric instanceof AdhocMetric && oldMetric.equals(changedMetric)) {
         return;
       }
+      if (setControlValue) {
+        const baseFormatting = metricFormattingRef.current || {};
+        const baseDatabars = metricDatabarsRef.current || {};
+        const { metricFormatting: nextFormatting, metricDatabars: nextDatabars } =
+          updateMetricConfigForRename({
+            metricFormatting: baseFormatting,
+            metricDatabars: baseDatabars,
+            oldMetric,
+            newMetric: changedMetric,
+          });
+        if (!isEqual(baseFormatting, nextFormatting)) {
+          metricFormattingPendingRef.current = nextFormatting;
+          metricFormattingRef.current = nextFormatting;
+          setLocalMetricFormatting(nextFormatting);
+          setControlValue('metricFormatting', nextFormatting);
+        }
+        if (!isEqual(baseDatabars, nextDatabars)) {
+          metricDatabarsPendingRef.current = nextDatabars;
+          metricDatabarsRef.current = nextDatabars;
+          setLocalMetricDatabars(nextDatabars);
+          setControlValue('metricDatabars', nextDatabars);
+        }
+      }
       const newValue = value.map(value => {
         if (
           ('metric_name' in oldMetric && value === oldMetric.metric_name) ||
@@ -502,7 +740,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       setValue(newValue);
       handleChange(newValue);
     },
-    [handleChange, value],
+    [handleChange, setControlValue, value],
   );
 
   const onRemoveMetric = useCallback(

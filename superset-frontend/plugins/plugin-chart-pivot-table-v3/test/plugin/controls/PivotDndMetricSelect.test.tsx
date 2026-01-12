@@ -24,7 +24,9 @@ import {
   within,
 } from 'spec/helpers/testing-library';
 import { QueryFormMetric } from '@superset-ui/core';
-import PivotDndMetricSelect from '../../../src/controls/PivotDndMetricSelect/PivotDndMetricSelect';
+import PivotDndMetricSelect, {
+  updateMetricConfigForRename,
+} from '../../../src/controls/PivotDndMetricSelect/PivotDndMetricSelect';
 
 jest.setTimeout(60000);
 
@@ -178,6 +180,175 @@ describe('PivotDndMetricSelect', () => {
           }),
         }),
       ),
+    );
+  });
+
+  it('disables scale-like for metrics that are already scale targets', async () => {
+    render(
+      <PivotDndMetricSelect
+        {...baseProps}
+        formData={{
+          datasource: '1__table',
+          metricFormatting: {},
+          metricDatabars: {
+            sum__value: {
+              type: 'bar',
+              scaleLike: 'avg__value',
+            },
+            avg__value: {
+              type: 'bar',
+            },
+          },
+          viz_type: 'pivot_table_v3',
+        }}
+      />,
+      { useDnd: true },
+    );
+
+    await userEvent.click(
+      screen.getAllByTestId('pivot-metric-formatting-button')[1],
+    );
+    await screen.findByText('Databars');
+
+    const scaleLikeSelect = screen.getByRole('combobox', {
+      name: /scale like/i,
+    });
+    await userEvent.click(scaleLikeSelect);
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
+
+  it('filters scale-like targets to prevent chaining', async () => {
+    render(
+      <PivotDndMetricSelect
+        {...baseProps}
+        value={['sum__value', 'avg__value', 'count__value']}
+        formData={{
+          datasource: '1__table',
+          metricFormatting: {},
+          metricDatabars: {
+            sum__value: {
+              type: 'bar',
+              scaleLike: 'avg__value',
+            },
+            avg__value: {
+              type: 'bar',
+            },
+            count__value: {
+              type: 'bar',
+            },
+          },
+          viz_type: 'pivot_table_v3',
+        }}
+      />,
+      { useDnd: true },
+    );
+
+    await userEvent.click(
+      screen.getAllByTestId('pivot-metric-formatting-button')[2],
+    );
+    await screen.findByText('Databars');
+
+    const scaleLikeSelect = screen.getByRole('combobox', {
+      name: /scale like/i,
+    });
+    await userEvent.click(scaleLikeSelect);
+
+    const listbox = await screen.findByRole('listbox');
+    expect(within(listbox).queryByText('sum__value')).not.toBeInTheDocument();
+    expect(within(listbox).getByText('avg__value')).toBeInTheDocument();
+  });
+
+  it('keeps databar references when a metric is renamed', () => {
+    const oldMetric: QueryFormMetric = {
+      expressionType: 'SQL',
+      sqlExpression: 'SUM(value)',
+      label: 'OldMetric',
+    };
+    const newMetric: QueryFormMetric = {
+      expressionType: 'SQL',
+      sqlExpression: 'SUM(value)',
+      label: 'NewMetric',
+    };
+    const { metricDatabars, metricFormatting } = updateMetricConfigForRename({
+      metricFormatting: {
+        metricA: {
+          backgroundColor: 'OldMetric',
+        },
+      },
+      metricDatabars: {
+        metricA: {
+          type: 'bar',
+          scaleLike: 'OldMetric',
+        },
+        OldMetric: {
+          type: 'bar',
+        },
+      },
+      oldMetric,
+      newMetric,
+    });
+
+    expect(metricDatabars.OldMetric).toBeUndefined();
+    expect(metricDatabars.NewMetric).toEqual(
+      expect.objectContaining({ type: 'bar' }),
+    );
+    expect(metricDatabars.metricA?.scaleLike).toEqual(
+      expect.objectContaining({
+        expressionType: 'SQL',
+        sqlExpression: 'SUM(value)',
+        label: 'NewMetric',
+      }),
+    );
+    expect(metricFormatting.metricA?.backgroundColor).toEqual(
+      expect.objectContaining({
+        expressionType: 'SQL',
+        sqlExpression: 'SUM(value)',
+        label: 'NewMetric',
+      }),
+    );
+  });
+
+  it('keeps formatting references when a metric formula changes', () => {
+    const oldMetric: QueryFormMetric = {
+      expressionType: 'SQL',
+      sqlExpression: 'MEASURE(grossRevenue)',
+      label: 'grossRevenue',
+      optionName: 'metric_abc123',
+    };
+    const newMetric: QueryFormMetric = {
+      expressionType: 'SQL',
+      sqlExpression: 'MEASURE(grossRevenue) / 100',
+      label: 'grossRevenue / 100',
+      optionName: 'metric_abc123',
+    };
+    const { metricDatabars, metricFormatting } = updateMetricConfigForRename({
+      metricFormatting: {
+        metricB: {
+          backgroundColor: oldMetric,
+        },
+      },
+      metricDatabars: {
+        metricB: {
+          type: 'bar',
+          scaleLike: oldMetric,
+        },
+      },
+      oldMetric,
+      newMetric,
+    });
+
+    expect(typeof metricDatabars.metricB?.scaleLike).toBe('object');
+    expect(metricDatabars.metricB?.scaleLike).toEqual(
+      expect.objectContaining({
+        sqlExpression: 'MEASURE(grossRevenue) / 100',
+        label: 'grossRevenue / 100',
+      }),
+    );
+    expect(metricFormatting.metricB?.backgroundColor).toEqual(
+      expect.objectContaining({
+        sqlExpression: 'MEASURE(grossRevenue) / 100',
+        label: 'grossRevenue / 100',
+      }),
     );
   });
 

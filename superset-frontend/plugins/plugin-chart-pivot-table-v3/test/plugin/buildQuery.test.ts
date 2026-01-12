@@ -187,6 +187,38 @@ test('includes conditional formatting metrics in query payloads', () => {
   expect(metricKeys).toEqual(['metric1', 'metric1_bg']);
 });
 
+test('resolves formatting metric references to active metrics', () => {
+  const activeMetric = {
+    expressionType: 'SQL',
+    sqlExpression: 'MEASURE(grossRevenue)',
+    label: 'grossRevenue',
+    optionName: 'metric_gross_rev',
+  };
+  const staleMetric = {
+    expressionType: 'SQL',
+    sqlExpression: 'MEASURE(grossRevenue) / 100',
+    label: 'grossRevenue_old',
+    optionName: 'metric_gross_rev',
+  };
+  const queryContext = buildQuery(
+    buildFormData({
+      ...baseFormData,
+      metrics: [activeMetric],
+      metricFormatting: {
+        grossRevenue: {
+          backgroundColor: staleMetric,
+        },
+      },
+    }),
+  );
+
+  const queryMetrics = queryContext.queries[0].metrics || [];
+  const metricKeys = queryMetrics.map(metric =>
+    typeof metric === 'string' ? metric : metric.label,
+  );
+  expect(metricKeys).toEqual(['grossRevenue']);
+});
+
 test('includes databar color metrics in query payloads', () => {
   const queryContext = buildQuery(
     buildFormData({

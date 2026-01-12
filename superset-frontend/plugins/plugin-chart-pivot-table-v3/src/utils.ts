@@ -58,6 +58,8 @@ export const PIVOT_THEME_PRESETS: Record<string, string> = {
   peach: '#FCE4D6',
   grey: '#E7E6E6',
 };
+export const DEFAULT_DATABAR_POSITIVE_COLOR = '#5ac189';
+export const DEFAULT_DATABAR_NEGATIVE_COLOR = '#e04355';
 
 export const isSubtotalToken = (val: unknown) =>
   val === SUBTOTAL_TOKEN || val === SUBTOTAL_LABEL;
@@ -288,11 +290,11 @@ export const normalizeMetricDatabarMap = (
       const positiveColor =
         typeof config.positiveColor === 'string' && config.positiveColor.trim().length > 0
           ? config.positiveColor
-          : undefined;
+          : DEFAULT_DATABAR_POSITIVE_COLOR;
       const negativeColor =
         typeof config.negativeColor === 'string' && config.negativeColor.trim().length > 0
           ? config.negativeColor
-          : undefined;
+          : DEFAULT_DATABAR_NEGATIVE_COLOR;
       acc[metricKey] = {
         type,
         scaleLike,
@@ -366,6 +368,44 @@ const normalizeFormattingMetricForQuery = (
     return { ...metric, label: optionName };
   }
   return metric;
+};
+
+const resolveMetricReferenceForQuery = (
+  metric: QueryFormMetric,
+  metrics: QueryFormMetric[],
+): QueryFormMetric => {
+  if (metrics.length === 0) {
+    return metric;
+  }
+  const referenceCandidates = new Set<string>();
+  if (typeof metric === 'string') {
+    if (metric.length > 0) {
+      referenceCandidates.add(metric);
+    }
+  } else {
+    [
+      getFormattingMetricKey(metric),
+      getMetricKey(metric),
+      getMetricLabel(metric),
+    ]
+      .filter((key): key is string => Boolean(key))
+      .forEach(key => referenceCandidates.add(key));
+  }
+  if (referenceCandidates.size === 0) {
+    return metric;
+  }
+  const resolved = metrics.find(candidate => {
+    if (typeof candidate === 'string') {
+      return referenceCandidates.has(candidate);
+    }
+    const candidateKeys = [
+      getFormattingMetricKey(candidate),
+      getMetricKey(candidate),
+      getMetricLabel(candidate),
+    ].filter((key): key is string => Boolean(key));
+    return candidateKeys.some(key => referenceCandidates.has(key));
+  });
+  return resolved || metric;
 };
 
 const buildDimensionKeyMap = (columns: QueryFormColumn[]) => {
@@ -673,6 +713,7 @@ export const transferDimensionSettingsAcrossAxes = (
 
 export const collectMetricFormattingMetricsForQuery = (
   metricFormatting?: PivotMetricFormattingMap,
+  metrics: QueryFormMetric[] = [],
 ): QueryFormMetric[] => {
   return Object.values(
     normalizeMetricFormattingMap(metricFormatting),
@@ -681,13 +722,19 @@ export const collectMetricFormattingMetricsForQuery = (
       normalizeMetricFormattingValue(formatting[field]),
     )
       .filter((metric): metric is QueryFormMetric => metric !== undefined)
-      .map(metric => normalizeFormattingMetricForQuery(metric)),
+      .map(metric => resolveMetricReferenceForQuery(metric, metrics))
+      .map(metric =>
+        metrics.includes(metric)
+          ? metric
+          : normalizeFormattingMetricForQuery(metric),
+      ),
   );
 };
 
 export const collectDimensionFormattingMetricsForQuery = (
   formatting: PivotDimensionFormattingMap | undefined,
   columns: QueryFormColumn[],
+  metrics: QueryFormMetric[] = [],
 ): QueryFormMetric[] => {
   return Object.values(
     normalizeDimensionFormattingMapWithKeys(formatting, columns),
@@ -696,19 +743,32 @@ export const collectDimensionFormattingMetricsForQuery = (
       normalizeMetricFormattingValue(dimensionFormatting[field]),
     )
       .filter((metric): metric is QueryFormMetric => metric !== undefined)
-      .map(metric => normalizeFormattingMetricForQuery(metric)),
+      .map(metric => resolveMetricReferenceForQuery(metric, metrics))
+      .map(metric =>
+        metrics.includes(metric)
+          ? metric
+          : normalizeFormattingMetricForQuery(metric),
+      ),
   );
 };
 
 export const collectDimensionSortingMetricsForQuery = (
   sorting: PivotDimensionSortingMap | undefined,
   columns: QueryFormColumn[],
+  metrics: QueryFormMetric[] = [],
 ): QueryFormMetric[] => {
   return Object.values(
     normalizeDimensionSortingMapWithKeys(sorting, columns),
   ).flatMap(entry =>
     entry.metric
-      ? [normalizeFormattingMetricForQuery(entry.metric)]
+      ? [
+          (() => {
+            const resolved = resolveMetricReferenceForQuery(entry.metric, metrics);
+            return metrics.includes(resolved)
+              ? resolved
+              : normalizeFormattingMetricForQuery(resolved);
+          })(),
+        ]
       : [],
   );
 };
@@ -784,7 +844,28 @@ export const normalizeMetricDatabarMapWithKeys = (
     }
     return acc;
   }, new Map());
-  return Object.entries(normalized).reduce<PivotMetricDatabarMap>(
+  const resolveMetricReference = (metric?: QueryFormMetric) => {
+    if (!metric) {
+      return undefined;
+    }
+    const candidates = [
+      getFormattingMetricKey(metric),
+      getMetricKey(metric as QueryFormMetric | Metric),
+    ].filter((candidate): candidate is string => Boolean(candidate));
+    for (const candidate of candidates) {
+      if (metricKeys.has(candidate)) {
+        return candidate;
+      }
+    }
+    for (const candidate of candidates) {
+      const resolved = labelToKey.get(candidate) || verboseNameToKey.get(candidate);
+      if (resolved) {
+        return resolved;
+      }
+    }
+    return undefined;
+  };
+  const merged = Object.entries(normalized).reduce<PivotMetricDatabarMap>(
     (acc, [metricKey, config]) => {
       const resolvedKey = metricKeys.has(metricKey)
         ? metricKey
@@ -798,6 +879,47 @@ export const normalizeMetricDatabarMapWithKeys = (
         ...(acc[resolvedKey] || {}),
         ...config,
       };
+      return acc;
+    },
+    {},
+  );
+  const mapped = Object.entries(merged).reduce<PivotMetricDatabarMap>(
+    (acc, [metricKey, config]) => {
+      const scaleLikeKey = resolveMetricReference(config.scaleLike);
+      const nextConfig: PivotMetricDatabar = { ...config };
+      if (scaleLikeKey && scaleLikeKey !== metricKey) {
+        nextConfig.scaleLike = scaleLikeKey;
+      } else if (nextConfig.scaleLike) {
+        delete nextConfig.scaleLike;
+      }
+      acc[metricKey] = nextConfig;
+      return acc;
+    },
+    {},
+  );
+  const scaleLikeTargets = Object.entries(mapped).reduce<Set<string>>(
+    (targets, [metricKey, config]) => {
+      const scaleLikeKey = config.scaleLike
+        ? getFormattingMetricKey(config.scaleLike)
+        : undefined;
+      if (scaleLikeKey && scaleLikeKey !== metricKey) {
+        targets.add(scaleLikeKey);
+      }
+      return targets;
+    },
+    new Set(),
+  );
+  if (scaleLikeTargets.size === 0) {
+    return mapped;
+  }
+  return Object.entries(mapped).reduce<PivotMetricDatabarMap>(
+    (acc, [metricKey, config]) => {
+      if (scaleLikeTargets.has(metricKey) && config.scaleLike) {
+        const { scaleLike, ...rest } = config;
+        acc[metricKey] = rest;
+        return acc;
+      }
+      acc[metricKey] = config;
       return acc;
     },
     {},
@@ -830,6 +952,7 @@ export const collectMetricDatabarMetrics = (
 
 export const collectMetricDatabarMetricsForQuery = (
   metricDatabars?: PivotMetricDatabarMap,
+  metrics: QueryFormMetric[] = [],
 ): QueryFormMetric[] => {
   return Object.values(
     normalizeMetricDatabarMap(metricDatabars),
@@ -837,7 +960,12 @@ export const collectMetricDatabarMetricsForQuery = (
     if (config.colorMode !== 'byMetric' || !config.colorMetric) {
       return [];
     }
-    return [normalizeFormattingMetricForQuery(config.colorMetric)];
+    const resolved = resolveMetricReferenceForQuery(config.colorMetric, metrics);
+    return [
+      metrics.includes(resolved)
+        ? resolved
+        : normalizeFormattingMetricForQuery(resolved),
+    ];
   });
 };
 

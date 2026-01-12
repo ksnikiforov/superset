@@ -79,9 +79,11 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
   const metrics = ensureIsArray(formData.metrics);
   const metricFormattingMetrics = collectMetricFormattingMetricsForQuery(
     formData.metricFormatting,
+    metrics,
   );
   const metricDatabarMetrics = collectMetricDatabarMetricsForQuery(
     formData.metricDatabars,
+    metrics,
   );
   const placement = resolveMetricPlacement(rowGroupbyRaw, colGroupbyRaw, {
     hasMetrics: metrics.length > 0,
@@ -92,18 +94,22 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
   const rowFormattingMetrics = collectDimensionFormattingMetricsForQuery(
     formData.rowFormatting,
     rowGroupby,
+    metrics,
   );
   const colFormattingMetrics = collectDimensionFormattingMetricsForQuery(
     formData.colFormatting,
     colGroupby,
+    metrics,
   );
   const rowSortingMetrics = collectDimensionSortingMetricsForQuery(
     formData.rowSorting,
     rowGroupby,
+    metrics,
   );
   const colSortingMetrics = collectDimensionSortingMetricsForQuery(
     formData.colSorting,
     colGroupby,
+    metrics,
   );
   const formattingMetrics = [
     ...metricFormattingMetrics,
@@ -182,7 +188,6 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
   const isTemporalColumn = (col: QueryFormColumn) =>
     isPhysicalColumn(col) &&
     (temporalLookup?.[col as string] || formData.granularity_sqla === col);
-
   return buildQueryContext(formData, baseQueryObject => {
     const { series_limit_metric, order_desc } = baseQueryObject;
     const queryMetrics =
@@ -190,10 +195,10 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
     let orderby: QueryFormOrderBy[] | undefined;
     if (series_limit_metric) {
       orderby = [[series_limit_metric, !order_desc]];
-    } else if (Array.isArray(metrics) && metrics[0]) {
-      orderby = [[metrics[0], !order_desc]];
-    } else if (Array.isArray(queryMetrics) && queryMetrics[0]) {
-      orderby = [[queryMetrics[0], !order_desc]];
+    } else if (Array.isArray(metrics)) {
+      orderby = metrics[0] ? [[metrics[0], !order_desc]] : undefined;
+    } else if (Array.isArray(queryMetrics)) {
+      orderby = queryMetrics[0] ? [[queryMetrics[0], !order_desc]] : undefined;
     }
 
     if (!requireMultiQuery) {

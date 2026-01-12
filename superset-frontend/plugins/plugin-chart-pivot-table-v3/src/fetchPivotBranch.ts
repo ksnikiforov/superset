@@ -195,25 +195,31 @@ const resolveFetchContext = ({
   const metrics = ensureIsArray(formData.metrics);
   const metricFormattingMetrics = collectMetricFormattingMetricsForQuery(
     formData.metricFormatting,
+    metrics,
   );
   const metricDatabarMetrics = collectMetricDatabarMetricsForQuery(
     formData.metricDatabars,
+    metrics,
   );
   const rowFormattingMetrics = collectDimensionFormattingMetricsForQuery(
     formData.rowFormatting,
     rowGroupbyRaw,
+    metrics,
   );
   const colFormattingMetrics = collectDimensionFormattingMetricsForQuery(
     formData.colFormatting,
     colGroupbyRaw,
+    metrics,
   );
   const rowSortingMetrics = collectDimensionSortingMetricsForQuery(
     formData.rowSorting,
     rowGroupbyRaw,
+    metrics,
   );
   const colSortingMetrics = collectDimensionSortingMetricsForQuery(
     formData.colSorting,
     colGroupbyRaw,
+    metrics,
   );
   const formattingMetrics = [
     ...metricFormattingMetrics,

@@ -55,6 +55,8 @@ import {
 import {
   isMetricsPlaceholder,
   isSubtotalToken,
+  DEFAULT_DATABAR_NEGATIVE_COLOR,
+  DEFAULT_DATABAR_POSITIVE_COLOR,
   getFormattingMetricKey,
   getMetricKey,
   mergeTrees,
@@ -280,8 +282,8 @@ const DatabarLine = styled.div<{ $color: string }>`
 `;
 
 const DatabarDot = styled.div<{ $color: string }>`
-  width: ${({ theme }) => theme.sizeUnit * 1.5}px;
-  height: ${({ theme }) => theme.sizeUnit * 1.5}px;
+  width: ${({ theme }) => theme.sizeUnit * 1.8}px;
+  height: ${({ theme }) => theme.sizeUnit * 1.8}px;
   border-radius: 50%;
   background-color: ${({ $color }) => $color};
   flex-shrink: 0;
@@ -465,7 +467,7 @@ const resolveScaleGroupKey = (
     if (!config?.scaleLike) {
       break;
     }
-    const next = getMetricKey(config.scaleLike);
+    const next = getFormattingMetricKey(config.scaleLike);
     if (!next || next === current) {
       break;
     }
@@ -3269,6 +3271,8 @@ function PivotTableChart(props: PivotTableProps) {
     () => Object.keys(metricDatabars),
     [metricDatabars],
   );
+  const databarScaleWidth = theme.sizeUnit * 12;
+  const databarPaddingX = theme.sizeUnit * 2;
   const scaleLikeTargets = useMemo(() => {
     const targets = new Set<string>();
     databarMetricKeys.forEach(metricKey => {
@@ -3276,7 +3280,7 @@ function PivotTableChart(props: PivotTableProps) {
       if (!scaleLike) {
         return;
       }
-      const scaleKey = getMetricKey(scaleLike);
+      const scaleKey = getFormattingMetricKey(scaleLike);
       if (scaleKey) {
         targets.add(scaleKey);
       }
@@ -3558,8 +3562,6 @@ function PivotTableChart(props: PivotTableProps) {
     if (databarMetricKeys.length === 0) {
       return widthMap;
     }
-    const baseBarWidth = theme.sizeUnit * 12;
-    const basePaddingX = theme.sizeUnit * 2;
     Object.values(tree.cells).forEach(cell => {
       if (
         !visibleRowKeySet.has(cell.rowKey) ||
@@ -3582,8 +3584,8 @@ function PivotTableChart(props: PivotTableProps) {
       const minWidth =
         (labelSpace?.positive ?? 0) +
         (labelSpace?.negative ?? 0) +
-        baseBarWidth +
-        basePaddingX * 2;
+        databarScaleWidth +
+        databarPaddingX * 2;
       const current = widthMap.get(cell.colKey) ?? 0;
       if (minWidth > current) {
         widthMap.set(cell.colKey, minWidth);
@@ -3593,9 +3595,10 @@ function PivotTableChart(props: PivotTableProps) {
   }, [
     databarLabelSpaces,
     databarMetricKeys,
+    databarPaddingX,
+    databarScaleWidth,
     deriveMetricKey,
     metricDatabars,
-    theme.sizeUnit,
     tree.cells,
     tree.cols,
     tree.rows,
@@ -3771,11 +3774,10 @@ function PivotTableChart(props: PivotTableProps) {
       const barHeight = `${barHeightPct}%`;
       const lineHeight = 2;
       const labelOffset = theme.sizeUnit;
-      const basePaddingX = theme.sizeUnit * 2;
       const labelSpace = databarLabelSpaces.get(scaleKey);
       const contentStyle = {
-        paddingLeft: `${basePaddingX + (labelSpace?.negative ?? 0)}px`,
-        paddingRight: `${basePaddingX + (labelSpace?.positive ?? 0)}px`,
+        paddingLeft: `${databarPaddingX + (labelSpace?.negative ?? 0)}px`,
+        paddingRight: `${databarPaddingX + (labelSpace?.positive ?? 0)}px`,
       };
 
       const offsetKey = `${rowNode.key}|${colNode.key}`;
@@ -3865,9 +3867,20 @@ function PivotTableChart(props: PivotTableProps) {
             ? normalizeCssColor(cell.values[colorMetricKey])
             : undefined;
         isPositive = value >= 0;
-        const fallbackColor = theme.colorText;
-        const positiveColor = config.positiveColor || fallbackColor;
-        const negativeColor = config.negativeColor || fallbackColor;
+        const defaultPositiveColor =
+          theme.colorSuccess ||
+          (theme as { colors?: { success?: { base?: string } } }).colors?.success
+            ?.base ||
+          supersetTheme.colorSuccess ||
+          DEFAULT_DATABAR_POSITIVE_COLOR;
+        const defaultNegativeColor =
+          theme.colorError ||
+          (theme as { colors?: { error?: { base?: string } } }).colors?.error
+            ?.base ||
+          supersetTheme.colorError ||
+          DEFAULT_DATABAR_NEGATIVE_COLOR;
+        const positiveColor = config.positiveColor ?? defaultPositiveColor;
+        const negativeColor = config.negativeColor ?? defaultNegativeColor;
         barColor =
           metricColor || (isPositive ? positiveColor : negativeColor);
         labelStyle = isPositive
@@ -3886,7 +3899,10 @@ function PivotTableChart(props: PivotTableProps) {
       return (
         <>
           <DatabarContent data-test="pivot-databar" style={contentStyle}>
-            <DatabarScale>
+            <DatabarScale
+              data-test="pivot-databar-scale"
+              style={{ maxWidth: `${databarScaleWidth}px`, width: '100%' }}
+            >
               <DatabarBaseline
                 $color={baselineColor}
                 style={{ left: `${baselinePct * 100}%` }}
@@ -3931,7 +3947,7 @@ function PivotTableChart(props: PivotTableProps) {
                     <div
                       style={{
                         position: 'absolute',
-                        left: `${barEnd * 100}%`,
+                        left: `${(isPositive ? barEnd : barStart) * 100}%`,
                         top: '50%',
                         transform: 'translate(-50%, -50%)',
                       }}
@@ -3964,7 +3980,9 @@ function PivotTableChart(props: PivotTableProps) {
     },
     [
       databarLabelSpaces,
+      databarPaddingX,
       databarScales,
+      databarScaleWidth,
       metricDatabars,
       renderCellContent,
       theme,
