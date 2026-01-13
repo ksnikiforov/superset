@@ -528,6 +528,36 @@ describe('applyMetricAxis + buildTreeFromRecords integration', () => {
       merged.cells[serializeCellKey(rootKey, rootKey)]?.values.metric1,
     ).toBe(1500000);
   });
+
+  it('preserves row totals when merging detail rows with column groupbys', () => {
+    const totals = buildTreeFromRecords(
+      [
+        { country: 'US', metric1: 30 },
+        { country: 'CA', metric1: 70 },
+      ],
+      ['metric1'],
+      ['country'],
+      ['state'],
+      1,
+      0,
+    );
+    const detail = buildTreeFromRecords(
+      [
+        { country: 'US', state: 'CA', metric1: 10 },
+        { country: 'US', state: 'NY', metric1: 20 },
+        { country: 'CA', state: 'ON', metric1: 30 },
+        { country: 'CA', state: 'QC', metric1: 40 },
+      ],
+      ['metric1'],
+      ['country'],
+      ['state'],
+      1,
+      1,
+    );
+    const merged = mergeTrees(totals, detail);
+    expect(merged.rows[serializePath(['US'])]?.values?.metric1).toBe(30);
+    expect(merged.rows[serializePath(['CA'])]?.values?.metric1).toBe(70);
+  });
 });
 
 describe('resolveMetricPlacement', () => {

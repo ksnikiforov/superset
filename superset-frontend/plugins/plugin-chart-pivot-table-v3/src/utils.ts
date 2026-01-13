@@ -1809,8 +1809,20 @@ export const buildTreeFromRecords = (
       {} as Record<string, DataRecordValue>,
     );
 
-    tree.rows[rowKey].values = { ...(tree.rows[rowKey].values || {}), ...values };
-    tree.cols[colKey].values = { ...(tree.cols[colKey].values || {}), ...values };
+    const isRowTotalRecord = colPath.length === 0;
+    const isColTotalRecord = rowPath.length === 0;
+    if (isRowTotalRecord) {
+      tree.rows[rowKey].values = {
+        ...(tree.rows[rowKey].values || {}),
+        ...values,
+      };
+    }
+    if (isColTotalRecord) {
+      tree.cols[colKey].values = {
+        ...(tree.cols[colKey].values || {}),
+        ...values,
+      };
+    }
     tree.cells[serializeCellKey(rowKey, colKey)] = {
       rowKey,
       colKey,
