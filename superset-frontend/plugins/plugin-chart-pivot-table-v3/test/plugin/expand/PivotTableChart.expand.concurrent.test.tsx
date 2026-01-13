@@ -17,12 +17,14 @@
  * under the License.
  */
 
-import React from 'react';
-import { fireEvent, render, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, waitFor, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
 import { applyMetricAxis, buildTreeFromRecords } from '../../../src/utils';
-import { fetchPivotBranch, peekPivotBranchCache } from '../../../src/fetchPivotBranch';
+import {
+  fetchPivotBranch,
+  peekPivotBranchCache,
+} from '../../../src/fetchPivotBranch';
 import { buildFormData } from '../fixtures/pivotFormData';
 
 jest.mock('../../../src/fetchPivotBranch', () => {
@@ -137,8 +139,14 @@ describe('PivotTableChart concurrent expands', () => {
 
   it('merges branches from overlapping row expansions', async () => {
     const baseTree = buildTree(records, 1);
-    const branchA = buildTree(records.filter(row => row.r1 === 'A'), 2);
-    const branchB = buildTree(records.filter(row => row.r1 === 'B'), 2);
+    const branchA = buildTree(
+      records.filter(row => row.r1 === 'A'),
+      2,
+    );
+    const branchB = buildTree(
+      records.filter(row => row.r1 === 'B'),
+      2,
+    );
 
     const deferredA = createDeferred<{ data?: PivotTreeData }>();
     const deferredB = createDeferred<{ data?: PivotTreeData }>();
@@ -148,7 +156,7 @@ describe('PivotTableChart concurrent expands', () => {
 
     const { container } = renderChart(baseTree);
 
-    const table = await waitFor(() => {
+    await waitFor(() => {
       const next = getPivotTable(container);
       if (!next) {
         throw new Error('Pivot table not found');
@@ -193,8 +201,8 @@ describe('PivotTableChart concurrent expands', () => {
         throw new Error('Pivot table not found');
       }
       const scoped = within(latest);
-      expect(scoped.getByText('X')).toBeTruthy();
-      expect(scoped.getByText('Z')).toBeTruthy();
+      expect(scoped.getByText('X')).toBeInTheDocument();
+      expect(scoped.getByText('Z')).toBeInTheDocument();
     });
   });
 });

@@ -17,8 +17,7 @@
  * under the License.
  */
 
-import React from 'react';
-import { render, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, fireEvent, waitFor, within } from '../../../testUtils';
 import PivotTableChart from '../../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum } from '../../../../src/types';
 import { baseFormData, buildFormData } from '../../fixtures/pivotFormData';
@@ -102,15 +101,13 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
       const { findByText, container } = render(
         <PivotTableChart
           data={baseTree}
-          formData={buildFormData(
-            {
-              ...baseFormData,
-              groupbyRows: rowGroupby,
-              groupbyColumns: [METRICS_PLACEHOLDER, 'c1'],
-              metrics: ['m1'],
-              metricsLayout: MetricsLayoutEnum.COLUMNS,
-            })
-          }
+          formData={buildFormData({
+            ...baseFormData,
+            groupbyRows: rowGroupby,
+            groupbyColumns: [METRICS_PLACEHOLDER, 'c1'],
+            metrics: ['m1'],
+            metricsLayout: MetricsLayoutEnum.COLUMNS,
+          })}
           metrics={['m1']}
           groupbyRows={rowGroupby}
           groupbyColumns={['c1']}
@@ -148,7 +145,7 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
         expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
       });
 
-      expect(await findByText(rowValues[1])).toBeTruthy();
+      expect(await findByText(rowValues[1])).toBeInTheDocument();
     },
   );
 
@@ -175,15 +172,13 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
     const { getAllByLabelText, getByText } = render(
       <PivotTableChart
         data={baseTree}
-        formData={buildFormData(
-          {
-            ...baseFormData,
-            groupbyRows: ['nation', 'orderPriority'],
-            groupbyColumns: [METRICS_PLACEHOLDER, 'segment'],
-            metricsLayout: MetricsLayoutEnum.COLUMNS,
-            metrics: ['countCustomers'],
-          })
-        }
+        formData={buildFormData({
+          ...baseFormData,
+          groupbyRows: ['nation', 'orderPriority'],
+          groupbyColumns: [METRICS_PLACEHOLDER, 'segment'],
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+          metrics: ['countCustomers'],
+        })}
         metrics={['countCustomers']}
         groupbyRows={['nation', 'orderPriority']}
         groupbyColumns={['segment']}
@@ -225,7 +220,7 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
     });
-    expect(getByText('USA')).toBeTruthy();
+    expect(getByText('USA')).toBeInTheDocument();
   });
 
   it('shows fetched metric values after collapsing metric-first columns and expanding a row', async () => {
@@ -312,15 +307,13 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
     const { container, getByText } = render(
       <PivotTableChart
         data={baseTree}
-        formData={buildFormData(
-          {
-            ...baseFormData,
-            groupbyRows: ['nation', 'orderPriority'],
-            groupbyColumns: [METRICS_PLACEHOLDER, 'segment'],
-            metricsLayout: MetricsLayoutEnum.COLUMNS,
-            metrics: ['countCustomers'],
-          })
-        }
+        formData={buildFormData({
+          ...baseFormData,
+          groupbyRows: ['nation', 'orderPriority'],
+          groupbyColumns: [METRICS_PLACEHOLDER, 'segment'],
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+          metrics: ['countCustomers'],
+        })}
         metrics={['countCustomers']}
         groupbyRows={['nation', 'orderPriority']}
         groupbyColumns={['segment']}
@@ -372,14 +365,24 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
     const priorityCell = await within(tbody).findByText('HIGH');
     const priorityRow = priorityCell.closest('tr') as HTMLElement;
     expect(priorityRow).toBeTruthy();
-    expect(within(priorityRow).getByText('7')).toBeTruthy();
+    expect(within(priorityRow).getByText('7')).toBeInTheDocument();
   });
 
   it('keeps values when expanding multiple rows after collapsing columns twice', async () => {
     const baseTreeRaw = buildTreeFromRecords(
       [
-        { nation: 'USA', orderPriority: 'LOW', segment: 'AUTO', countCustomers: 10 },
-        { nation: 'CAN', orderPriority: 'HIGH', segment: 'AUTO', countCustomers: 20 },
+        {
+          nation: 'USA',
+          orderPriority: 'LOW',
+          segment: 'AUTO',
+          countCustomers: 10,
+        },
+        {
+          nation: 'CAN',
+          orderPriority: 'HIGH',
+          segment: 'AUTO',
+          countCustomers: 20,
+        },
       ],
       ['countCustomers'],
       ['nation', 'orderPriority'],
@@ -398,8 +401,18 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
 
     const columnBranchRaw = buildTreeFromRecords(
       [
-        { nation: 'USA', orderPriority: 'LOW', segment: 'AUTO', countCustomers: 10 },
-        { nation: 'CAN', orderPriority: 'HIGH', segment: 'AUTO', countCustomers: 20 },
+        {
+          nation: 'USA',
+          orderPriority: 'LOW',
+          segment: 'AUTO',
+          countCustomers: 10,
+        },
+        {
+          nation: 'CAN',
+          orderPriority: 'HIGH',
+          segment: 'AUTO',
+          countCustomers: 20,
+        },
       ],
       ['countCustomers'],
       ['nation', 'orderPriority'],
@@ -489,15 +502,13 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
     const { container, getByText } = render(
       <PivotTableChart
         data={baseTree}
-        formData={buildFormData(
-          {
-            ...baseFormData,
-            groupbyRows: ['nation', 'orderPriority'],
-            groupbyColumns: [METRICS_PLACEHOLDER, 'segment'],
-            metricsLayout: MetricsLayoutEnum.COLUMNS,
-            metrics: ['countCustomers'],
-          })
-        }
+        formData={buildFormData({
+          ...baseFormData,
+          groupbyRows: ['nation', 'orderPriority'],
+          groupbyColumns: [METRICS_PLACEHOLDER, 'segment'],
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+          metrics: ['countCustomers'],
+        })}
         metrics={['countCustomers']}
         groupbyRows={['nation', 'orderPriority']}
         groupbyColumns={['segment']}
@@ -556,7 +567,7 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
     const tbody = container.querySelector('tbody') as HTMLElement;
     const canChildCell = await within(tbody).findByText('HIGH');
     const canChildRow = canChildCell.closest('tr') as HTMLElement;
-    expect(within(canChildRow).getByText('20')).toBeTruthy();
+    expect(within(canChildRow).getByText('20')).toBeInTheDocument();
   });
 
   it('shows metric headers without a grand total when metrics are first on columns', () => {
@@ -583,16 +594,14 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
     const { container } = render(
       <PivotTableChart
         data={baseTree}
-        formData={buildFormData(
-          {
-            ...baseFormData,
-            groupbyRows: rowGroupby,
-            groupbyColumns: [METRICS_PLACEHOLDER, 'revenueBand'],
-            metricsLayout: MetricsLayoutEnum.COLUMNS,
-            metrics,
-            colTotals: true,
-          })
-        }
+        formData={buildFormData({
+          ...baseFormData,
+          groupbyRows: rowGroupby,
+          groupbyColumns: [METRICS_PLACEHOLDER, 'revenueBand'],
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+          metrics,
+          colTotals: true,
+        })}
         metrics={metrics}
         groupbyRows={rowGroupby}
         groupbyColumns={colGroupby}
@@ -628,10 +637,12 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
     expect(headerLabels).toEqual(expect.arrayContaining(metrics));
     expect(headerLabels).not.toContain('Grand total');
 
-    const metricCell = within(
-      container.querySelector('thead') as HTMLElement,
-    ).getByText('measure1').closest('th') as HTMLElement;
-    expect(within(metricCell).getByLabelText('plus-square')).toBeTruthy();
+    const metricCell = within(container.querySelector('thead') as HTMLElement)
+      .getByText('measure1')
+      .closest('th') as HTMLElement;
+    expect(
+      within(metricCell).getByLabelText('plus-square'),
+    ).toBeInTheDocument();
   });
 
   it('expands a metric column to the next level when metrics are first', async () => {
@@ -684,16 +695,14 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
     const { container, findByText } = render(
       <PivotTableChart
         data={baseTree}
-        formData={buildFormData(
-          {
-            ...baseFormData,
-            groupbyRows: rowGroupby,
-            groupbyColumns: [METRICS_PLACEHOLDER, 'revenueBand'],
-            metricsLayout: MetricsLayoutEnum.COLUMNS,
-            metrics,
-            colTotals: true,
-          })
-        }
+        formData={buildFormData({
+          ...baseFormData,
+          groupbyRows: rowGroupby,
+          groupbyColumns: [METRICS_PLACEHOLDER, 'revenueBand'],
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+          metrics,
+          colTotals: true,
+        })}
         metrics={metrics}
         groupbyRows={rowGroupby}
         groupbyColumns={colGroupby}
@@ -723,13 +732,15 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
     );
 
     const thead = container.querySelector('thead') as HTMLElement;
-    const metricCell = within(thead).getByText('measure1').closest('th') as HTMLElement;
+    const metricCell = within(thead)
+      .getByText('measure1')
+      .closest('th') as HTMLElement;
     fireEvent.click(within(metricCell).getByLabelText('plus-square'));
 
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
     });
-    expect(await findByText('REV-A')).toBeTruthy();
+    expect(await findByText('REV-A')).toBeInTheDocument();
   });
 
   it('keeps column layout stable when collapsing one expanded metric', async () => {
@@ -806,15 +817,13 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
     const { container } = render(
       <PivotTableChart
         data={baseTree}
-        formData={buildFormData(
-          {
-            ...baseFormData,
-            groupbyRows: rowGroupby,
-            groupbyColumns: [METRICS_PLACEHOLDER, 'col2'],
-            metricsLayout: MetricsLayoutEnum.COLUMNS,
-            metrics,
-          })
-        }
+        formData={buildFormData({
+          ...baseFormData,
+          groupbyRows: rowGroupby,
+          groupbyColumns: [METRICS_PLACEHOLDER, 'col2'],
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+          metrics,
+        })}
         metrics={metrics}
         groupbyRows={rowGroupby}
         groupbyColumns={colGroupby}
@@ -844,18 +853,18 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
     );
 
     const thead = container.querySelector('thead') as HTMLElement;
-    const measure1Header = within(thead).getByText('measure1').closest(
-      'th',
-    ) as HTMLElement;
+    const measure1Header = within(thead)
+      .getByText('measure1')
+      .closest('th') as HTMLElement;
     fireEvent.click(within(measure1Header).getByLabelText('plus-square'));
 
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
     });
 
-    const measure2Header = within(thead).getByText('measure2').closest(
-      'th',
-    ) as HTMLElement;
+    const measure2Header = within(thead)
+      .getByText('measure2')
+      .closest('th') as HTMLElement;
     fireEvent.click(within(measure2Header).getByLabelText('plus-square'));
 
     await waitFor(() => {
@@ -885,9 +894,7 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
       .filter(label => label && label !== 'Rows');
     expect(lastRowLabels).toEqual(['C2-A', 'C2-B']);
 
-    const firstBodyRow = container.querySelector(
-      'tbody tr',
-    ) as HTMLElement;
+    const firstBodyRow = container.querySelector('tbody tr') as HTMLElement;
     expect(firstBodyRow.querySelectorAll('td').length).toBe(5);
   });
 
@@ -965,17 +972,15 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
     const { container } = render(
       <PivotTableChart
         data={baseTree}
-        formData={buildFormData(
-          {
-            ...baseFormData,
-            groupbyRows: rowGroupby,
-            groupbyColumns: [METRICS_PLACEHOLDER, 'col2'],
-            metricsLayout: MetricsLayoutEnum.COLUMNS,
-            metrics,
-            colTotals: true,
-            rowTotals: true,
-          })
-        }
+        formData={buildFormData({
+          ...baseFormData,
+          groupbyRows: rowGroupby,
+          groupbyColumns: [METRICS_PLACEHOLDER, 'col2'],
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+          metrics,
+          colTotals: true,
+          rowTotals: true,
+        })}
         metrics={metrics}
         groupbyRows={rowGroupby}
         groupbyColumns={colGroupby}
@@ -1005,18 +1010,18 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
     );
 
     const thead = container.querySelector('thead') as HTMLElement;
-    const measure1Header = within(thead).getByText('measure1').closest(
-      'th',
-    ) as HTMLElement;
+    const measure1Header = within(thead)
+      .getByText('measure1')
+      .closest('th') as HTMLElement;
     fireEvent.click(within(measure1Header).getByLabelText('plus-square'));
 
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
     });
 
-    const measure2Header = within(thead).getByText('measure2').closest(
-      'th',
-    ) as HTMLElement;
+    const measure2Header = within(thead)
+      .getByText('measure2')
+      .closest('th') as HTMLElement;
     fireEvent.click(within(measure2Header).getByLabelText('plus-square'));
 
     await waitFor(() => {
@@ -1034,7 +1039,7 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
       expect(measure1Cells).toHaveLength(1);
       expect(
         within(measure1Cells[0]).getByLabelText('plus-square'),
-      ).toBeTruthy();
+      ).toBeInTheDocument();
     });
 
     const refreshedHead = container.querySelector('thead') as HTMLElement;
@@ -1045,7 +1050,7 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
     expect(measure2Cells.length).toBeGreaterThan(0);
     expect(
       within(measure2Cells[0]).getByLabelText('minus-square'),
-    ).toBeTruthy();
+    ).toBeInTheDocument();
 
     const lastHeaderRow = container.querySelector(
       'thead tr:last-child',
@@ -1056,10 +1061,7 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
       .filter(label => label && label !== 'Rows');
     expect(lastRowLabels).toEqual(['measure2', 'C2-A', 'C2-B']);
 
-    const firstBodyRow = container.querySelector(
-      'tbody tr',
-    ) as HTMLElement;
+    const firstBodyRow = container.querySelector('tbody tr') as HTMLElement;
     expect(firstBodyRow.querySelectorAll('td').length).toBe(6);
   });
-
 });

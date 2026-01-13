@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { ReactNode, useCallback } from 'react';
+import { MouseEvent, ReactNode, useCallback } from 'react';
 import { css, styled, t, useTheme } from '@superset-ui/core';
 import { Icons, InfoTooltip } from '@superset-ui/core/components';
 import {
@@ -24,7 +24,7 @@ import {
   CloseContainer,
   Label,
   OptionControlContainer,
-} from 'src/explore/components/controls/OptionControls';
+} from '../../exploreImports';
 
 export type PivotOptionProps = {
   children?: ReactNode;
@@ -58,6 +58,9 @@ export default function PivotOption({
   canDelete = true,
 }: PivotOptionProps) {
   const theme = useTheme();
+  const stopPropagation = (event: MouseEvent) => {
+    event.stopPropagation();
+  };
   const onClickClose = useCallback(
     e => {
       e.stopPropagation();
@@ -99,7 +102,14 @@ export default function PivotOption({
           }
         />
       )}
-      {rightNode && <RightNodeContainer>{rightNode}</RightNodeContainer>}
+      {rightNode && (
+        <RightNodeContainer
+          onClick={stopPropagation}
+          onMouseDown={stopPropagation}
+        >
+          {rightNode}
+        </RightNodeContainer>
+      )}
       {withCaret && (
         <CaretContainer>
           <Icons.RightOutlined

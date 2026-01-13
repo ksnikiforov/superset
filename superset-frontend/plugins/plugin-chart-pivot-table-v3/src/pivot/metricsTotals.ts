@@ -64,7 +64,11 @@ export const getNonMetricPathParts = (
 
 export const isMetricGrandTotalNode = (
   node: PivotTreeNode | undefined,
-  { metricLabelSet, metricsFirstOnRows, metricsFirstOnCols }: MetricTotalsConfig,
+  {
+    metricLabelSet,
+    metricsFirstOnRows,
+    metricsFirstOnCols,
+  }: MetricTotalsConfig,
 ) => {
   if (!node || !node.isSubtotal) {
     return false;
@@ -201,7 +205,9 @@ export const getNodeDimDepth = (
   }: NodeDepthConfig,
 ) => {
   const dimDepth = countDimDepth(node.path, metricLabelSet);
-  const subtotalTokenCount = node.path.filter(val => isSubtotalToken(val)).length;
+  const subtotalTokenCount = node.path.filter(val =>
+    isSubtotalToken(val),
+  ).length;
   const subtotalIndex = node.path.findIndex(val => isSubtotalToken(val));
   const metricIndex = node.path.findIndex(val => {
     const decoded = decodeMetricKey(val);

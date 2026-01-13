@@ -126,7 +126,10 @@ export type PivotDimensionFormatting = Partial<
   Record<DimensionFormattingField, QueryFormMetric>
 > & { applyTo?: DimensionFormattingScope };
 
-export type PivotDimensionFormattingMap = Record<string, PivotDimensionFormatting>;
+export type PivotDimensionFormattingMap = Record<
+  string,
+  PivotDimensionFormatting
+>;
 
 export type PivotSortOrder = 'asc' | 'desc';
 export type PivotSortMode = 'total' | 'axis_value';
@@ -205,6 +208,7 @@ export type PivotTableQueryFormData = QueryFormData &
     time_grain_sqla?: TimeGranularity;
     granularity_sqla?: string;
     treeData?: PivotTreeData;
+    treeDataSignature?: string;
   };
 
 export interface PivotTableProps

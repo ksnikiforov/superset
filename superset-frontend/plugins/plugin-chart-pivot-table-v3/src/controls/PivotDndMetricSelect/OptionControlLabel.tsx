@@ -16,13 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { ReactNode, useRef } from 'react';
+import { MouseEvent, ReactNode, useRef } from 'react';
 import { DropTargetMonitor, useDrag, useDrop } from 'react-dnd';
 import { css, styled, t, useTheme } from '@superset-ui/core';
 import { Icons, InfoTooltip, Tooltip } from '@superset-ui/core/components';
-import AdhocMetric from 'src/explore/components/controls/MetricControl/AdhocMetric';
-import { savedMetricType } from 'src/explore/components/controls/MetricControl/types';
-import { StyledMetricOption } from 'src/explore/components/optionRenderers';
+import {
+  AdhocMetric,
+  type savedMetricType,
+  StyledMetricOption,
+} from '../../exploreImports';
 
 export const DragContainer = styled.div`
   margin-bottom: ${({ theme }) => theme.sizeUnit}px;
@@ -141,6 +143,9 @@ const OptionControlLabel = ({
   ...props
 }: OptionControlLabelProps) => {
   const theme = useTheme();
+  const stopPropagation = (event: MouseEvent) => {
+    event.stopPropagation();
+  };
   const ref = useRef<HTMLDivElement>(null);
   const labelRef = useRef<HTMLDivElement>(null);
   const hasMetricName = savedMetric?.metric_name;
@@ -263,7 +268,14 @@ const OptionControlLabel = ({
           }
         />
       )}
-      {rightNode && <RightNodeContainer>{rightNode}</RightNodeContainer>}
+      {rightNode && (
+        <RightNodeContainer
+          onClick={stopPropagation}
+          onMouseDown={stopPropagation}
+        >
+          {rightNode}
+        </RightNodeContainer>
+      )}
       {withCaret && (
         <CaretContainer>
           <Icons.RightOutlined

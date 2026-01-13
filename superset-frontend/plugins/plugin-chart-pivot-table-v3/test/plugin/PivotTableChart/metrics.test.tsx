@@ -17,15 +17,8 @@
  * under the License.
  */
 
-import React from 'react';
-import {
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from 'spec/helpers/testing-library';
 import { supersetTheme } from '@superset-ui/core';
+import { fireEvent, render, screen, waitFor, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import {
   MetricsLayoutEnum,
@@ -182,7 +175,11 @@ const injectColumnSubtotalLeaves = (
   });
   Object.values(tree.cells).forEach(cell => {
     const baseColPath = tree.cols[cell.colKey]?.path;
-    if (!baseColPath || baseColPath.length !== depth || baseColPath.length === 0) {
+    if (
+      !baseColPath ||
+      baseColPath.length !== depth ||
+      baseColPath.length === 0
+    ) {
       return;
     }
     const subtotalColKey = serializePath([...baseColPath, SUBTOTAL_TOKEN]);
@@ -235,8 +232,8 @@ describe('PivotTableChart metric tier suppression', () => {
 
     render(<PivotTableChart {...props} />);
 
-    expect(screen.queryByText('metric1')).toBeNull();
-    expect(screen.getByText('C1')).toBeTruthy();
+    expect(screen.queryByText('metric1')).not.toBeInTheDocument();
+    expect(screen.getByText('C1')).toBeInTheDocument();
   });
 
   it('applies background and text colors from formatting metrics', () => {
@@ -547,7 +544,7 @@ describe('PivotTableChart metric tier suppression', () => {
         startCollapsed={false}
         initialDepth={1}
         maxDepthPerFetch={1}
-        rowTotals={true}
+        rowTotals
         colTotals={false}
         rowSubTotals={false}
         colSubTotals={false}
@@ -620,7 +617,7 @@ describe('PivotTableChart metric tier suppression', () => {
           startCollapsed={false}
           initialDepth={1}
           maxDepthPerFetch={1}
-          rowTotals={true}
+          rowTotals
           rowTotalPosition={rowTotalPosition}
           colTotals={false}
           rowSubTotals={false}
@@ -1082,10 +1079,12 @@ describe('PivotTableChart metric tier suppression', () => {
       'countCustomers',
     ]);
 
-    const yearHeader = within(headerRows[0]).getByText('1992').closest(
-      'th',
-    ) as HTMLElement;
-    expect(within(yearHeader).getByLabelText('plus-square')).toBeTruthy();
+    const yearHeader = within(headerRows[0])
+      .getByText('1992')
+      .closest('th') as HTMLElement;
+    expect(
+      within(yearHeader).getByLabelText('plus-square'),
+    ).toBeInTheDocument();
   });
 
   it('expands to the next column dimension on first toggle when metrics are last on columns', async () => {
@@ -1191,9 +1190,9 @@ describe('PivotTableChart metric tier suppression', () => {
 
     const { container } = render(<PivotTableChart {...props} />);
     const initialHeaderRows = container.querySelectorAll('thead tr');
-    const yearHeader = within(initialHeaderRows[0]).getByText('1992').closest(
-      'th',
-    ) as HTMLElement;
+    const yearHeader = within(initialHeaderRows[0])
+      .getByText('1992')
+      .closest('th') as HTMLElement;
     fireEvent.click(within(yearHeader).getByLabelText('plus-square'));
 
     await waitFor(() => {
@@ -1314,9 +1313,9 @@ describe('PivotTableChart metric tier suppression', () => {
 
     const { container } = render(<PivotTableChart {...props} />);
     const initialHeaderRows = container.querySelectorAll('thead tr');
-    const yearHeader = within(initialHeaderRows[0]).getByText('1992').closest(
-      'th',
-    ) as HTMLElement;
+    const yearHeader = within(initialHeaderRows[0])
+      .getByText('1992')
+      .closest('th') as HTMLElement;
     fireEvent.click(within(yearHeader).getByLabelText('plus-square'));
 
     await waitFor(() => {
@@ -1367,11 +1366,7 @@ describe('PivotTableChart metric tier suppression', () => {
       1,
       1,
     );
-    const baseWithSubtotals = injectColumnSubtotalLeaves(
-      baseRaw,
-      1,
-      2,
-    );
+    const baseWithSubtotals = injectColumnSubtotalLeaves(baseRaw, 1, 2);
     const baseTreeWithMetrics = applyMetricAxis(
       baseWithSubtotals,
       metrics,
@@ -1389,11 +1384,7 @@ describe('PivotTableChart metric tier suppression', () => {
       1,
       2,
     );
-    const branchWithSubtotals = injectColumnSubtotalLeaves(
-      branchRaw,
-      1,
-      2,
-    );
+    const branchWithSubtotals = injectColumnSubtotalLeaves(branchRaw, 1, 2);
     const branchTreeWithMetrics = applyMetricAxis(
       branchWithSubtotals,
       metrics,
@@ -1450,9 +1441,9 @@ describe('PivotTableChart metric tier suppression', () => {
 
     const { container } = render(<PivotTableChart {...props} />);
     const initialHeaderRows = container.querySelectorAll('thead tr');
-    const yearHeader = within(initialHeaderRows[0]).getByText('1992').closest(
-      'th',
-    ) as HTMLElement;
+    const yearHeader = within(initialHeaderRows[0])
+      .getByText('1992')
+      .closest('th') as HTMLElement;
     fireEvent.click(within(yearHeader).getByLabelText('plus-square'));
 
     await waitFor(() => {
@@ -1572,7 +1563,7 @@ describe('PivotTableChart metric tier suppression', () => {
 
     // Metric label should not show as a row header; the second level should be orderPriority.
     expect(screen.queryAllByText('countCustomers')).toHaveLength(0);
-    expect(screen.getByText('1-URGENT')).toBeTruthy();
+    expect(screen.getByText('1-URGENT')).toBeInTheDocument();
   });
 });
 
@@ -1658,21 +1649,25 @@ describe('PivotTableChart multi-metric visibility', () => {
         container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
       ).map(cell => cell.textContent?.trim());
 
-      expect(rowHeaders).toEqual(
-        expect.arrayContaining(['Bikes', ...metrics]),
-      );
+      expect(rowHeaders).toEqual(expect.arrayContaining(['Bikes', ...metrics]));
       expect(rowHeaders).not.toEqual(
         expect.arrayContaining(['Road', 'Mountain']),
       );
 
       const groupRow = screen.getByText('Bikes').closest('tr') as HTMLElement;
-      expect(within(groupRow).getByLabelText('plus-square')).toBeTruthy();
+      expect(
+        within(groupRow).getByLabelText('plus-square'),
+      ).toBeInTheDocument();
 
-      const metricRow = screen.getAllByText(metrics[0])[0].closest(
-        'tr',
-      ) as HTMLElement;
-      expect(within(metricRow).queryByLabelText('plus-square')).toBeNull();
-      expect(within(metricRow).queryByLabelText('minus-square')).toBeNull();
+      const metricRow = screen
+        .getAllByText(metrics[0])[0]
+        .closest('tr') as HTMLElement;
+      expect(
+        within(metricRow).queryByLabelText('plus-square'),
+      ).not.toBeInTheDocument();
+      expect(
+        within(metricRow).queryByLabelText('minus-square'),
+      ).not.toBeInTheDocument();
       unmount();
     });
   });

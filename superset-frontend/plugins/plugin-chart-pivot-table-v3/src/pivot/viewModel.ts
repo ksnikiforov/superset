@@ -83,7 +83,10 @@ export type HeaderCellInfo = {
 export const buildColumnHeaderRows = (
   cols: PivotTreeNode[],
   nodes: Record<string, PivotTreeNode>,
-  getDisplayPath?: (col: PivotTreeNode, maxDepth: number) => PivotTreeNode['path'],
+  getDisplayPath?: (
+    col: PivotTreeNode,
+    maxDepth: number,
+  ) => PivotTreeNode['path'],
 ) => {
   if (cols.length === 0) {
     return [] as HeaderCellInfo[][];
@@ -101,9 +104,8 @@ export const buildColumnHeaderRows = (
   );
   const rows: HeaderCellInfo[][] = Array.from({ length: maxDepth }, () => []);
   // Track the last cell per row to aggregate colspan across adjacent columns.
-  const lastCells: (HeaderCellInfo | undefined)[] = Array(maxDepth).fill(
-    undefined,
-  );
+  const lastCells: (HeaderCellInfo | undefined)[] =
+    Array(maxDepth).fill(undefined);
 
   resolvedCols.forEach(({ col, path: rawPath }) => {
     const path = rawPath.length === 0 ? col.path : rawPath;
@@ -126,8 +128,7 @@ export const buildColumnHeaderRows = (
       const key = serializePath(headerPath);
       let node = nodes[key];
       const headerLabel =
-        decodeMetricKey(headerPath[level]) ??
-        String(headerPath[level] ?? '');
+        decodeMetricKey(headerPath[level]) ?? String(headerPath[level] ?? '');
       if (!node) {
         if (level === lastLevel) {
           node = {
@@ -179,17 +180,21 @@ export const compareValues = (
     case GenericDataType.Numeric:
       return (Number(a) || 0) - (Number(b) || 0);
     case GenericDataType.Temporal:
-      return (new Date(a as any).getTime() || 0) - (new Date(b as any).getTime() || 0);
+      return (
+        (new Date(a as any).getTime() || 0) -
+        (new Date(b as any).getTime() || 0)
+      );
     default:
       return String(a).localeCompare(String(b));
   }
 };
 
-export const sortByOrder = (
-  order: string,
-  colTypeMap?: Record<string, GenericDataType>,
-  groupby?: string[],
-) =>
+export const sortByOrder =
+  (
+    order: string,
+    colTypeMap?: Record<string, GenericDataType>,
+    groupby?: string[],
+  ) =>
   (a: PivotTreeNode, b: PivotTreeNode) => {
     if (order === 'key_z_to_a') {
       return b.formattedLabel.localeCompare(a.formattedLabel);

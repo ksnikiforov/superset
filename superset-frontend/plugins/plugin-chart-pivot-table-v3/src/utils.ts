@@ -25,6 +25,7 @@ import {
   QueryFormColumn,
   QueryFormMetric,
   ensureIsArray,
+  supersetTheme,
 } from '@superset-ui/core';
 import {
   MetricsLayoutEnum,
@@ -56,12 +57,12 @@ export const METRIC_TOKEN_PREFIX = '__metric__';
 export const SUBTOTAL_TOKEN = '\u0002subtotal';
 export const SUBTOTAL_LABEL = 'Subtotal';
 export const PIVOT_THEME_PRESETS: Record<string, string> = {
-  blue: '#DDEBF7',
-  peach: '#FCE4D6',
-  grey: '#E7E6E6',
+  blue: supersetTheme.colorPrimaryBg,
+  peach: supersetTheme.colorWarningBg,
+  grey: supersetTheme.colorFillSecondary,
 };
-export const DEFAULT_DATABAR_POSITIVE_COLOR = '#5ac189';
-export const DEFAULT_DATABAR_NEGATIVE_COLOR = '#e04355';
+export const DEFAULT_DATABAR_POSITIVE_COLOR = supersetTheme.colorSuccess;
+export const DEFAULT_DATABAR_NEGATIVE_COLOR = supersetTheme.colorError;
 
 export const isSubtotalToken = (val: unknown) => val === SUBTOTAL_TOKEN;
 
@@ -146,10 +147,7 @@ const normalizeThemeColor = (rawValue: string) => {
         .map(part => part.trim())
         .filter(part => part.length > 0);
       const isHsla = value.toLowerCase().startsWith('hsla');
-      if (
-        (isHsla && parts.length !== 4) ||
-        (!isHsla && parts.length !== 3)
-      ) {
+      if ((isHsla && parts.length !== 4) || (!isHsla && parts.length !== 3)) {
         return null;
       }
       return value;
@@ -268,7 +266,7 @@ const isMetricSelectValue = (value: unknown): value is MetricSelectValue =>
 
 const getMetricOptionName = (metric: QueryFormMetric | Metric) => {
   if (isRecord(metric)) {
-    const optionName = metric.optionName;
+    const { optionName } = metric;
     if (typeof optionName === 'string' && optionName.trim().length > 0) {
       return optionName;
     }
@@ -282,16 +280,16 @@ export const getFormattingMetricKey = (metric: QueryFormMetric | Metric) =>
 const coerceExpressionType = (
   value: Record<string, unknown>,
 ): QueryFormMetric | undefined => {
-  const expressionType = value.expressionType;
+  const { expressionType } = value;
   if (typeof expressionType === 'string' && expressionType.length > 0) {
     return value as QueryFormMetric;
   }
-  const sqlExpression = value.sqlExpression;
+  const { sqlExpression } = value;
   if (typeof sqlExpression === 'string' && sqlExpression.trim().length > 0) {
     return { ...value, expressionType: 'SQL' } as QueryFormMetric;
   }
-  const aggregate = value.aggregate;
-  const column = value.column;
+  const { aggregate } = value;
+  const { column } = value;
   if (
     typeof aggregate === 'string' &&
     aggregate.length > 0 &&
@@ -341,14 +339,14 @@ export const normalizeMetricFormattingValue = (
       const nextValue = String(value.value);
       return nextValue.length > 0 ? nextValue : undefined;
     }
-    const key = value.key;
+    const { key } = value;
     if (typeof key === 'string' && key.trim().length > 0) {
       return key;
     }
     if (typeof key === 'number') {
       return String(key);
     }
-    const name = value.name;
+    const { name } = value;
     if (typeof name === 'string' && name.trim().length > 0) {
       return name;
     }
@@ -356,15 +354,15 @@ export const normalizeMetricFormattingValue = (
     if (typeof metricName === 'string' && metricName.trim().length > 0) {
       return metricName;
     }
-    const expressionType = value.expressionType;
+    const { expressionType } = value;
     if (typeof expressionType === 'string') {
       return value as QueryFormMetric;
     }
-    const label = value.label;
+    const { label } = value;
     if (typeof label === 'string' && label.trim().length > 0) {
       return label;
     }
-    const title = value.title;
+    const { title } = value;
     if (typeof title === 'string' && title.trim().length > 0) {
       return title;
     }
@@ -428,15 +426,18 @@ export const normalizeMetricDatabarMap = (
           ? 'byMetric'
           : 'static';
       const scaleGroup =
-        typeof config.scaleGroup === 'string' && config.scaleGroup.trim().length > 0
+        typeof config.scaleGroup === 'string' &&
+        config.scaleGroup.trim().length > 0
           ? config.scaleGroup.trim()
           : undefined;
       const positiveColor =
-        typeof config.positiveColor === 'string' && config.positiveColor.trim().length > 0
+        typeof config.positiveColor === 'string' &&
+        config.positiveColor.trim().length > 0
           ? config.positiveColor
           : DEFAULT_DATABAR_POSITIVE_COLOR;
       const negativeColor =
-        typeof config.negativeColor === 'string' && config.negativeColor.trim().length > 0
+        typeof config.negativeColor === 'string' &&
+        config.negativeColor.trim().length > 0
           ? config.negativeColor
           : DEFAULT_DATABAR_NEGATIVE_COLOR;
       acc[metricKey] = {
@@ -616,8 +617,8 @@ const normalizeAxisValueRef = (
   if (!isRecord(value)) {
     return undefined;
   }
-  const axis = value.axis;
-  const path = value.path;
+  const { axis } = value;
+  const { path } = value;
   if (axis !== 'row' && axis !== 'col') {
     return undefined;
   }
@@ -868,29 +869,27 @@ export const transferDimensionSettingsAcrossAxes = (
 export const collectMetricFormattingMetricsForQuery = (
   metricFormatting?: PivotMetricFormattingMap,
   metrics: QueryFormMetric[] = [],
-): QueryFormMetric[] => {
-  return Object.values(
-    normalizeMetricFormattingMap(metricFormatting),
-  ).flatMap(formatting =>
-    METRIC_FORMATTING_FIELDS.map(field =>
-      normalizeMetricFormattingValue(formatting[field]),
-    )
-      .filter((metric): metric is QueryFormMetric => metric !== undefined)
-      .map(metric => resolveMetricReferenceForQuery(metric, metrics))
-      .map(metric =>
-        metrics.includes(metric)
-          ? metric
-          : normalizeFormattingMetricForQuery(metric),
-      ),
+): QueryFormMetric[] =>
+  Object.values(normalizeMetricFormattingMap(metricFormatting)).flatMap(
+    formatting =>
+      METRIC_FORMATTING_FIELDS.map(field =>
+        normalizeMetricFormattingValue(formatting[field]),
+      )
+        .filter((metric): metric is QueryFormMetric => metric !== undefined)
+        .map(metric => resolveMetricReferenceForQuery(metric, metrics))
+        .map(metric =>
+          metrics.includes(metric)
+            ? metric
+            : normalizeFormattingMetricForQuery(metric),
+        ),
   );
-};
 
 export const collectDimensionFormattingMetricsForQuery = (
   formatting: PivotDimensionFormattingMap | undefined,
   columns: QueryFormColumn[],
   metrics: QueryFormMetric[] = [],
-): QueryFormMetric[] => {
-  return Object.values(
+): QueryFormMetric[] =>
+  Object.values(
     normalizeDimensionFormattingMapWithKeys(formatting, columns),
   ).flatMap(dimensionFormatting =>
     DIMENSION_FORMATTING_FIELDS.map(field =>
@@ -904,28 +903,28 @@ export const collectDimensionFormattingMetricsForQuery = (
           : normalizeFormattingMetricForQuery(metric),
       ),
   );
-};
 
 export const collectDimensionSortingMetricsForQuery = (
   sorting: PivotDimensionSortingMap | undefined,
   columns: QueryFormColumn[],
   metrics: QueryFormMetric[] = [],
-): QueryFormMetric[] => {
-  return Object.values(
-    normalizeDimensionSortingMapWithKeys(sorting, columns),
-  ).flatMap(entry =>
-    entry.metric
-      ? [
-          (() => {
-            const resolved = resolveMetricReferenceForQuery(entry.metric, metrics);
-            return metrics.includes(resolved)
-              ? resolved
-              : normalizeFormattingMetricForQuery(resolved);
-          })(),
-        ]
-      : [],
+): QueryFormMetric[] =>
+  Object.values(normalizeDimensionSortingMapWithKeys(sorting, columns)).flatMap(
+    entry =>
+      entry.metric
+        ? [
+            (() => {
+              const resolved = resolveMetricReferenceForQuery(
+                entry.metric,
+                metrics,
+              );
+              return metrics.includes(resolved)
+                ? resolved
+                : normalizeFormattingMetricForQuery(resolved);
+            })(),
+          ]
+        : [],
   );
-};
 
 export const normalizeMetricFormattingMapWithKeys = (
   metricFormatting: PivotMetricFormattingMap | undefined,
@@ -1012,7 +1011,8 @@ export const normalizeMetricDatabarMapWithKeys = (
       }
     }
     for (const candidate of candidates) {
-      const resolved = labelToKey.get(candidate) || verboseNameToKey.get(candidate);
+      const resolved =
+        labelToKey.get(candidate) || verboseNameToKey.get(candidate);
       if (resolved) {
         return resolved;
       }
@@ -1069,7 +1069,8 @@ export const normalizeMetricDatabarMapWithKeys = (
   return Object.entries(mapped).reduce<PivotMetricDatabarMap>(
     (acc, [metricKey, config]) => {
       if (scaleLikeTargets.has(metricKey) && config.scaleLike) {
-        const { scaleLike, ...rest } = config;
+        const rest = { ...config };
+        delete rest.scaleLike;
         acc[metricKey] = rest;
         return acc;
       }
@@ -1082,46 +1083,41 @@ export const normalizeMetricDatabarMapWithKeys = (
 
 export const collectMetricFormattingMetrics = (
   metricFormatting?: PivotMetricFormattingMap,
-): QueryFormMetric[] => {
-  return Object.values(
-    normalizeMetricFormattingMap(metricFormatting),
-  ).flatMap(formatting =>
-    METRIC_FORMATTING_FIELDS.map(field =>
-      normalizeMetricFormattingValue(formatting[field]),
-    ).filter((metric): metric is QueryFormMetric => metric !== undefined),
+): QueryFormMetric[] =>
+  Object.values(normalizeMetricFormattingMap(metricFormatting)).flatMap(
+    formatting =>
+      METRIC_FORMATTING_FIELDS.map(field =>
+        normalizeMetricFormattingValue(formatting[field]),
+      ).filter((metric): metric is QueryFormMetric => metric !== undefined),
   );
-};
 
 export const collectMetricDatabarMetrics = (
   metricDatabars?: PivotMetricDatabarMap,
-): QueryFormMetric[] => {
-  return Object.values(
-    normalizeMetricDatabarMap(metricDatabars),
-  ).flatMap(config =>
+): QueryFormMetric[] =>
+  Object.values(normalizeMetricDatabarMap(metricDatabars)).flatMap(config =>
     config.colorMode === 'byMetric' && config.colorMetric
       ? [config.colorMetric]
       : [],
   );
-};
 
 export const collectMetricDatabarMetricsForQuery = (
   metricDatabars?: PivotMetricDatabarMap,
   metrics: QueryFormMetric[] = [],
-): QueryFormMetric[] => {
-  return Object.values(
-    normalizeMetricDatabarMap(metricDatabars),
-  ).flatMap(config => {
+): QueryFormMetric[] =>
+  Object.values(normalizeMetricDatabarMap(metricDatabars)).flatMap(config => {
     if (config.colorMode !== 'byMetric' || !config.colorMetric) {
       return [];
     }
-    const resolved = resolveMetricReferenceForQuery(config.colorMetric, metrics);
+    const resolved = resolveMetricReferenceForQuery(
+      config.colorMetric,
+      metrics,
+    );
     return [
       metrics.includes(resolved)
         ? resolved
         : normalizeFormattingMetricForQuery(resolved),
     ];
   });
-};
 
 export const mergeMetrics = (
   metrics: QueryFormMetric[],
@@ -1491,7 +1487,7 @@ export const applyMetricAxis = (
     const rawLabel =
       path.length === 0
         ? 'Grand total'
-        : path[path.length - 1]?.toString() ?? 'Grand total';
+        : (path[path.length - 1]?.toString() ?? 'Grand total');
     const metricLabel = decodeMetricKey(path[path.length - 1]);
     const label = metricLabel || rawLabel;
     const isMetricNode = metricTokenSet.has(
@@ -1516,8 +1512,7 @@ export const applyMetricAxis = (
     }
     const isSubtotalValue =
       isSubtotal ??
-      (path.length < fullDepth &&
-        !(isMetricNode && hasChildren === false));
+      (path.length < fullDepth && !(isMetricNode && hasChildren === false));
     const node = {
       axis,
       key,
@@ -1577,8 +1572,7 @@ export const applyMetricAxis = (
         };
         const metricToken = encodeMetricKey(metric);
         const hasSubtotalAtInsert =
-          rowSuffix.length > 0 &&
-          isSubtotalToken(rowSuffix[0]);
+          rowSuffix.length > 0 && isSubtotalToken(rowSuffix[0]);
         const newRowPath = hasSubtotalAtInsert
           ? [...rowPrefix, rowSuffix[0], metricToken, ...rowSuffix.slice(1)]
           : [...rowPrefix, metricToken, ...rowSuffix];
@@ -1610,28 +1604,23 @@ export const applyMetricAxis = (
         };
         // If there is only one metric, also surface the value at the base row
         // path so collapsed views (before expanding into the metric tier) can render.
-        if (
-          metricKeys.length === 1 &&
-          metricPosition !== 0
-        ) {
+        if (metricKeys.length === 1 && metricPosition !== 0) {
           const cellKey = serializeCellKey(rowKey, colKey);
-          result.cells[cellKey] =
-            result.cells[cellKey] || {
-              rowKey,
-              colKey,
-              values: mergedValues,
-              isSubtotal: cell.isSubtotal,
-            };
+          result.cells[cellKey] = result.cells[cellKey] || {
+            rowKey,
+            colKey,
+            values: mergedValues,
+            isSubtotal: cell.isSubtotal,
+          };
         }
         if (metricKeys.length === 1 && metricPosition === 0) {
           const cellKey = serializeCellKey(rowKey, colKey);
-          result.cells[cellKey] =
-            result.cells[cellKey] || {
-              rowKey,
-              colKey,
-              values: mergedValues,
-              isSubtotal: cell.isSubtotal,
-            };
+          result.cells[cellKey] = result.cells[cellKey] || {
+            rowKey,
+            colKey,
+            values: mergedValues,
+            isSubtotal: cell.isSubtotal,
+          };
         }
       });
     });
@@ -1671,8 +1660,6 @@ export const applyMetricAxis = (
       const colPrefix = colPath.slice(0, insertIndex);
       const colSuffix = colPath.slice(insertIndex);
 
-      const colKey = serializePath(colPath);
-
       metricKeys.forEach(metric => {
         const mergedValues = {
           [metric]: cell.values[metric],
@@ -1708,13 +1695,12 @@ export const applyMetricAxis = (
         if (metricKeys.length === 1 && metricPosition === 0) {
           const rootColKey = serializePath(colPrefix);
           const cellKey = serializeCellKey(rowKey, rootColKey);
-          result.cells[cellKey] =
-            result.cells[cellKey] || {
-              rowKey,
-              colKey: rootColKey,
-              values: mergedValues,
-              isSubtotal: cell.isSubtotal,
-            };
+          result.cells[cellKey] = result.cells[cellKey] || {
+            rowKey,
+            colKey: rootColKey,
+            values: mergedValues,
+            isSubtotal: cell.isSubtotal,
+          };
         }
         // If there is only one metric and the metric tier is at the end,
         // also surface the value at the base column path so collapsed views
@@ -1727,13 +1713,12 @@ export const applyMetricAxis = (
         ) {
           const baseColKey = serializePath(colPath);
           const cellKey = serializeCellKey(rowKey, baseColKey);
-          result.cells[cellKey] =
-            result.cells[cellKey] || {
-              rowKey,
-              colKey: baseColKey,
-              values: mergedValues,
-              isSubtotal: cell.isSubtotal,
-            };
+          result.cells[cellKey] = result.cells[cellKey] || {
+            rowKey,
+            colKey: baseColKey,
+            values: mergedValues,
+            isSubtotal: cell.isSubtotal,
+          };
         }
       });
     });
@@ -1766,7 +1751,7 @@ export const buildTreeFromRecords = (
     const label =
       path.length === 0
         ? 'Grand total'
-        : path[path.length - 1]?.toString() ?? totalLabel;
+        : (path[path.length - 1]?.toString() ?? totalLabel);
     nodes[key] = {
       axis,
       key,
@@ -1828,7 +1813,8 @@ export const buildTreeFromRecords = (
       colKey,
       values,
       isSubtotal:
-        rowPath.length < rowGroupby.length || colPath.length < colGroupby.length,
+        rowPath.length < rowGroupby.length ||
+        colPath.length < colGroupby.length,
     };
 
     if (rowPath.length === 0 && colPath.length === 0) {
@@ -1848,8 +1834,8 @@ export const buildTreeFromRecords = (
   const rootValues = hasGrandTotalValues
     ? mergedRootValues
     : allowRootFallback && Object.keys(mergedRootValues).length > 0
-    ? mergedRootValues
-    : undefined;
+      ? mergedRootValues
+      : undefined;
   const rootCellKey = serializeCellKey(rootKey, rootKey);
   if (rootValues && !tree.cells[rootCellKey]) {
     tree.cells[rootCellKey] = {

@@ -17,9 +17,8 @@
  * under the License.
  */
 
-import React from 'react';
 import { ChartProps, supersetTheme } from '@superset-ui/core';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import transformProps from '../../../src/transformProps';
 import {
@@ -145,9 +144,9 @@ describe('PivotTableChart initial depth on collapsed render', () => {
       );
 
       // First column level (orderPriority) should render even when collapsed.
-      expect(screen.getByText('A')).toBeTruthy();
+      expect(screen.getByText('A')).toBeInTheDocument();
       // Only one visible column level; deeper levels should not render until expanded.
-      expect(screen.queryByText('10k-50k')).toBeNull();
+      expect(screen.queryByText('10k-50k')).not.toBeInTheDocument();
       unmount();
     });
   });
@@ -339,7 +338,9 @@ describe('PivotTableChart initial depth on collapsed render', () => {
       />,
     );
 
-    const headerRow = container.querySelector('thead tr:last-child') as HTMLElement;
+    const headerRow = container.querySelector(
+      'thead tr:last-child',
+    ) as HTMLElement;
     const headers = within(headerRow)
       .getAllByRole('columnheader')
       .map(cell => cell.textContent?.trim())
@@ -424,7 +425,7 @@ describe('PivotTableChart initial depth on collapsed render', () => {
       );
 
       const rowHeaders = Array.from(
-        (container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>),
+        container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
       ).map(cell => cell.textContent?.trim());
       expect(rowHeaders).toEqual(expect.arrayContaining(['F']));
       expect(rowHeaders).not.toContain('Grand total');
@@ -547,7 +548,7 @@ describe('PivotTableChart initial depth on collapsed render', () => {
     );
 
     const rowHeaders = Array.from(
-      (container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>),
+      container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
     ).map(cell => cell.textContent?.trim());
     expect(rowHeaders).not.toContain('Subtotal');
   });

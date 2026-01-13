@@ -17,8 +17,7 @@
  * under the License.
  */
 
-import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { buildTreeFromRecords } from '../../../src/utils';

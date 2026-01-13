@@ -16,6 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+/* eslint-disable react/forbid-foreign-prop-types */
 
 import PropTypes from 'prop-types';
 import { t } from '@superset-ui/core';

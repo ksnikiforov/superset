@@ -16,13 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import {
-  render,
-  screen,
-  userEvent,
-  waitFor,
-  within,
-} from 'spec/helpers/testing-library';
+import { render, screen, userEvent, waitFor, within } from '../../testUtils';
 import PivotDndColumnSelect from '../../../src/controls/PivotDndColumnSelect/PivotDndColumnSelect';
 
 jest.setTimeout(60000);
@@ -37,26 +31,81 @@ const baseProps = {
   savedMetrics: [],
 };
 
+const columnProps = {
+  ...baseProps,
+  name: 'groupbyColumns',
+  label: 'Columns',
+};
+
+const renderOptions = {
+  useDnd: true,
+  useRedux: true,
+  initialState: {
+    explore: {
+      datasource: {
+        type: 'table',
+      },
+    },
+  },
+};
+
+const axisCases = [
+  { axis: 'rows', props: baseProps },
+  { axis: 'columns', props: columnProps },
+];
+
 describe('PivotDndColumnSelect', () => {
   it('renders a formatting button for each column', () => {
-    render(<PivotDndColumnSelect {...baseProps} />, {
-      useDnd: true,
-      useRedux: true,
-    });
+    render(<PivotDndColumnSelect {...baseProps} />, renderOptions);
 
     const buttons = screen.getAllByTestId('pivot-dimension-formatting-button');
     expect(buttons).toHaveLength(1);
   });
 
   it('renders a sorting button for each column', () => {
-    render(<PivotDndColumnSelect {...baseProps} />, {
-      useDnd: true,
-      useRedux: true,
-    });
+    render(<PivotDndColumnSelect {...baseProps} />, renderOptions);
 
     const buttons = screen.getAllByTestId('pivot-dimension-sorting-button');
     expect(buttons).toHaveLength(1);
   });
+
+  it.each(axisCases)(
+    'does not open the column selector when opening formatting for %s',
+    async ({ props }) => {
+      render(<PivotDndColumnSelect {...props} />, renderOptions);
+
+      await userEvent.click(
+        screen.getAllByTestId('pivot-dimension-formatting-button')[0],
+      );
+
+      expect(
+        await screen.findByText('Conditional formatting'),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('tab', { name: 'Simple' }),
+      ).not.toBeInTheDocument();
+    },
+  );
+
+  it.each(axisCases)(
+    'does not open the column selector when interacting with formatting for %s',
+    async ({ props }) => {
+      render(<PivotDndColumnSelect {...props} />, renderOptions);
+
+      await userEvent.click(
+        screen.getAllByTestId('pivot-dimension-formatting-button')[0],
+      );
+
+      const formattingTitle = await screen.findByText(
+        'Conditional formatting',
+      );
+      await userEvent.click(formattingTitle);
+
+      expect(
+        screen.queryByRole('tab', { name: 'Simple' }),
+      ).not.toBeInTheDocument();
+    },
+  );
 
   it('merges background and text formatting selections for rows', async () => {
     const setControlValue = jest.fn();
@@ -71,7 +120,7 @@ describe('PivotDndColumnSelect', () => {
           viz_type: 'pivot_table_v3',
         }}
       />,
-      { useDnd: true, useRedux: true },
+      renderOptions,
     );
 
     await userEvent.click(
@@ -122,7 +171,7 @@ describe('PivotDndColumnSelect', () => {
           viz_type: 'pivot_table_v3',
         }}
       />,
-      { useDnd: true, useRedux: true },
+      renderOptions,
     );
 
     await userEvent.click(
@@ -149,9 +198,7 @@ describe('PivotDndColumnSelect', () => {
       }),
     );
 
-    await userEvent.click(
-      screen.getByRole('radio', { name: /descending/i }),
-    );
+    await userEvent.click(screen.getByRole('radio', { name: /descending/i }));
 
     await waitFor(() =>
       expect(setControlValue).toHaveBeenLastCalledWith('rowSorting', {
@@ -177,7 +224,7 @@ describe('PivotDndColumnSelect', () => {
           viz_type: 'pivot_table_v3',
         }}
       />,
-      { useDnd: true, useRedux: true },
+      renderOptions,
     );
 
     await userEvent.click(
@@ -185,9 +232,7 @@ describe('PivotDndColumnSelect', () => {
     );
     await screen.findByText('Sorting');
 
-    await userEvent.click(
-      screen.getByRole('radio', { name: /descending/i }),
-    );
+    await userEvent.click(screen.getByRole('radio', { name: /descending/i }));
 
     await waitFor(() =>
       expect(setControlValue).toHaveBeenLastCalledWith('rowSorting', {
@@ -212,7 +257,7 @@ describe('PivotDndColumnSelect', () => {
           viz_type: 'pivot_table_v3',
         }}
       />,
-      { useDnd: true, useRedux: true },
+      renderOptions,
     );
 
     await userEvent.click(

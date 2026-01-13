@@ -17,8 +17,7 @@
  * under the License.
  */
 
-import React from 'react';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '../../../testUtils';
 import PivotTableChart from '../../fixtures/TestPivotTableChart';
 import {
   MetricsLayoutEnum,
@@ -333,8 +332,8 @@ describe('PivotTableChart totals & subtotals - rows', () => {
       />,
     );
 
-    expect(screen.getByText('Bikes Total')).toBeTruthy();
-    expect(screen.queryByText('Bikes metric1')).toBeNull();
+    expect(screen.getByText('Bikes Total')).toBeInTheDocument();
+    expect(screen.queryByText('Bikes metric1')).not.toBeInTheDocument();
   });
 
   it('keeps row subtotal values inline and suppresses subtotal rows when expanded at top position (multi-metric columns)', () => {
@@ -416,35 +415,51 @@ describe('PivotTableChart totals & subtotals - rows', () => {
       },
     };
     const cells: Record<string, PivotResultCell> = {
-      [serializeCellKey(urgentKey, serializePath([encodeMetricKey('averageOrderValue')]))]: {
+      [serializeCellKey(
+        urgentKey,
+        serializePath([encodeMetricKey('averageOrderValue')]),
+      )]: {
         rowKey: urgentKey,
         colKey: serializePath([encodeMetricKey('averageOrderValue')]),
         values: { averageOrderValue: 10 },
       },
-      [serializeCellKey(urgentKey, serializePath([encodeMetricKey('weightedDiscount')]))]: {
+      [serializeCellKey(
+        urgentKey,
+        serializePath([encodeMetricKey('weightedDiscount')]),
+      )]: {
         rowKey: urgentKey,
         colKey: serializePath([encodeMetricKey('weightedDiscount')]),
         values: { weightedDiscount: 0.05 },
       },
-      [serializeCellKey(serializePath(['1-URGENT', 'AIR']), serializePath([encodeMetricKey('averageOrderValue')]))]:
-        {
-          rowKey: serializePath(['1-URGENT', 'AIR']),
-          colKey: serializePath([encodeMetricKey('averageOrderValue')]),
-          values: { averageOrderValue: 5 },
-        },
-      [serializeCellKey(serializePath(['1-URGENT', 'AIR']), serializePath([encodeMetricKey('weightedDiscount')]))]:
-        {
-          rowKey: serializePath(['1-URGENT', 'AIR']),
-          colKey: serializePath([encodeMetricKey('weightedDiscount')]),
-          values: { weightedDiscount: 0.02 },
-        },
-      [serializeCellKey(subtotalKey, serializePath([encodeMetricKey('averageOrderValue')]))]: {
+      [serializeCellKey(
+        serializePath(['1-URGENT', 'AIR']),
+        serializePath([encodeMetricKey('averageOrderValue')]),
+      )]: {
+        rowKey: serializePath(['1-URGENT', 'AIR']),
+        colKey: serializePath([encodeMetricKey('averageOrderValue')]),
+        values: { averageOrderValue: 5 },
+      },
+      [serializeCellKey(
+        serializePath(['1-URGENT', 'AIR']),
+        serializePath([encodeMetricKey('weightedDiscount')]),
+      )]: {
+        rowKey: serializePath(['1-URGENT', 'AIR']),
+        colKey: serializePath([encodeMetricKey('weightedDiscount')]),
+        values: { weightedDiscount: 0.02 },
+      },
+      [serializeCellKey(
+        subtotalKey,
+        serializePath([encodeMetricKey('averageOrderValue')]),
+      )]: {
         rowKey: subtotalKey,
         colKey: serializePath([encodeMetricKey('averageOrderValue')]),
         values: { averageOrderValue: 10 },
         isSubtotal: true,
       },
-      [serializeCellKey(subtotalKey, serializePath([encodeMetricKey('weightedDiscount')]))]: {
+      [serializeCellKey(
+        subtotalKey,
+        serializePath([encodeMetricKey('weightedDiscount')]),
+      )]: {
         rowKey: subtotalKey,
         colKey: serializePath([encodeMetricKey('weightedDiscount')]),
         values: { weightedDiscount: 0.05 },
@@ -504,7 +519,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(rowHeaders).not.toContain('1-URGENT Total');
 
     const urgentRow = screen.getByText('1-URGENT').closest('tr') as HTMLElement;
-    const values = within(urgentRow).getAllByRole('cell').map(cell => cell.textContent?.trim());
+    const values = within(urgentRow)
+      .getAllByRole('cell')
+      .map(cell => cell.textContent?.trim());
     expect(values).toEqual(expect.arrayContaining(['10', '0.05']));
   });
 
@@ -664,10 +681,14 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     const bikesValue = within(bikesRow).getAllByRole('cell')[0];
     expect(bikesValue.textContent?.trim()).toBe('');
 
-    const subtotalRow = screen.getByText('Bikes Total').closest('tr') as HTMLElement;
+    const subtotalRow = screen
+      .getByText('Bikes Total')
+      .closest('tr') as HTMLElement;
     const subtotalHeader = subtotalRow.querySelector('th') as HTMLElement;
     expect(subtotalHeader.className).toContain('subtotal-cell');
-    expect(within(subtotalHeader).queryByLabelText('plus-square')).toBeNull();
+    expect(
+      within(subtotalHeader).queryByLabelText('plus-square'),
+    ).not.toBeInTheDocument();
   });
 
   it('keeps row subtotal values inline while collapsed when rowSubtotalPosition is end (multi-metric columns)', () => {
@@ -749,23 +770,35 @@ describe('PivotTableChart totals & subtotals - rows', () => {
       },
     };
     const cells: Record<string, PivotResultCell> = {
-      [serializeCellKey(urgentKey, serializePath([encodeMetricKey('averageOrderValue')]))]: {
+      [serializeCellKey(
+        urgentKey,
+        serializePath([encodeMetricKey('averageOrderValue')]),
+      )]: {
         rowKey: urgentKey,
         colKey: serializePath([encodeMetricKey('averageOrderValue')]),
         values: { averageOrderValue: 10 },
       },
-      [serializeCellKey(urgentKey, serializePath([encodeMetricKey('weightedDiscount')]))]: {
+      [serializeCellKey(
+        urgentKey,
+        serializePath([encodeMetricKey('weightedDiscount')]),
+      )]: {
         rowKey: urgentKey,
         colKey: serializePath([encodeMetricKey('weightedDiscount')]),
         values: { weightedDiscount: 0.05 },
       },
-      [serializeCellKey(subtotalKey, serializePath([encodeMetricKey('averageOrderValue')]))]: {
+      [serializeCellKey(
+        subtotalKey,
+        serializePath([encodeMetricKey('averageOrderValue')]),
+      )]: {
         rowKey: subtotalKey,
         colKey: serializePath([encodeMetricKey('averageOrderValue')]),
         values: { averageOrderValue: 10 },
         isSubtotal: true,
       },
-      [serializeCellKey(subtotalKey, serializePath([encodeMetricKey('weightedDiscount')]))]: {
+      [serializeCellKey(
+        subtotalKey,
+        serializePath([encodeMetricKey('weightedDiscount')]),
+      )]: {
         rowKey: subtotalKey,
         colKey: serializePath([encodeMetricKey('weightedDiscount')]),
         values: { weightedDiscount: 0.05 },
@@ -826,7 +859,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(rowHeaders).not.toContain('1-URGENT Total');
 
     const urgentRow = screen.getByText('1-URGENT').closest('tr') as HTMLElement;
-    const values = within(urgentRow).getAllByRole('cell').map(cell => cell.textContent?.trim());
+    const values = within(urgentRow)
+      .getAllByRole('cell')
+      .map(cell => cell.textContent?.trim());
     expect(values).toEqual(expect.arrayContaining(['10', '0.05']));
   });
 
@@ -1016,7 +1051,13 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         data={labeledTree}
         formData={buildFormData({
           ...(baseProps as Partial<PivotTableQueryFormData>),
-          groupbyRows: ['row1', METRICS_PLACEHOLDER, 'orderPriority', 'shipMode', 'orderStatus'],
+          groupbyRows: [
+            'row1',
+            METRICS_PLACEHOLDER,
+            'orderPriority',
+            'shipMode',
+            'orderStatus',
+          ],
           groupbyColumns: colGroupby,
           metricsLayout: MetricsLayoutEnum.ROWS,
           metrics,
@@ -1134,7 +1175,10 @@ describe('PivotTableChart totals & subtotals - rows', () => {
       4,
       0,
     );
-    const merged = mergeTrees(mergeTrees(detail, subtotalDepth2), subtotalDepth4);
+    const merged = mergeTrees(
+      mergeTrees(detail, subtotalDepth2),
+      subtotalDepth4,
+    );
     const withSubtotals = injectRowSubtotalLeaves(
       injectRowSubtotalLeaves(merged, 2, rowGroupby.length),
       4,
@@ -1352,8 +1396,12 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(tail).toEqual(metrics.map(metric => `${group} ${metric}`));
 
     metrics.forEach(metric => {
-      const totalRow = screen.getByText(`${group} ${metric}`).closest('tr') as HTMLElement;
-      expect(totalRow.querySelector('th')?.className).toContain('subtotal-cell');
+      const totalRow = screen
+        .getByText(`${group} ${metric}`)
+        .closest('tr') as HTMLElement;
+      expect(totalRow.querySelector('th')?.className).toContain(
+        'subtotal-cell',
+      );
     });
   });
 
@@ -1565,9 +1613,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
       ]),
     );
 
-    const totalRow = screen.getByText('Total averageOrderValue').closest(
-      'tr',
-    ) as HTMLElement;
+    const totalRow = screen
+      .getByText('Total averageOrderValue')
+      .closest('tr') as HTMLElement;
     const totalValue = within(totalRow).getAllByRole('cell')[0];
     expect(totalValue.textContent?.trim()).toBe('100');
   });
@@ -1915,7 +1963,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
       container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
     ).map(cell => cell.textContent?.trim());
     const subtotalLabels = metrics.map(metric => `AIR ${metric}`);
-    const subtotalIndexes = subtotalLabels.map(label => rowHeaders.indexOf(label));
+    const subtotalIndexes = subtotalLabels.map(label =>
+      rowHeaders.indexOf(label),
+    );
     subtotalIndexes.forEach(index => {
       expect(index).toBeGreaterThan(-1);
     });
@@ -2024,9 +2074,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     const grandIndex = headerLabels.indexOf('Grand total');
     expect(grandIndex).toBeGreaterThan(-1);
 
-    const totalRow = screen.getByText('Total averageOrderValue').closest(
-      'tr',
-    ) as HTMLElement;
+    const totalRow = screen
+      .getByText('Total averageOrderValue')
+      .closest('tr') as HTMLElement;
     const totalCells = within(totalRow).getAllByRole('cell');
     expect(totalCells[grandIndex].textContent?.trim()).toBe('100');
   });
@@ -2117,9 +2167,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     const rowHeaders = Array.from(
       container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
     ).map(cell => cell.textContent?.trim());
-    expect(rowHeaders.filter(label => label === 'averageOrderValue')).toHaveLength(
-      1,
-    );
+    expect(
+      rowHeaders.filter(label => label === 'averageOrderValue'),
+    ).toHaveLength(1);
     expect(rowHeaders.filter(label => label === 'countOrders')).toHaveLength(1);
     expect(rowHeaders).toEqual(
       expect.arrayContaining([
@@ -2494,9 +2544,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(rowHeaders).not.toContain('1-5 Total');
 
     const getRowIndent = (label: string) => {
-      const headerCell = screen.getAllByText(label)[0].closest(
-        'div',
-      ) as HTMLElement;
+      const headerCell = screen
+        .getAllByText(label)[0]
+        .closest('div') as HTMLElement;
       return Number.parseInt(headerCell.style.paddingLeft || '0', 10);
     };
     const metricIndent = getRowIndent('averageOrderValue');
@@ -2588,9 +2638,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(rowHeaders).not.toContain('1-5 Total');
 
     const getRowIndent = (label: string) => {
-      const headerCell = screen.getAllByText(label)[0].closest(
-        'div',
-      ) as HTMLElement;
+      const headerCell = screen
+        .getAllByText(label)[0]
+        .closest('div') as HTMLElement;
       return Number.parseInt(headerCell.style.paddingLeft || '0', 10);
     };
     const metricIndent = getRowIndent('averageOrderValue');
@@ -2844,9 +2894,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(rowHeaders).not.toContain('E weightedDiscount');
 
     const getRowIndent = (label: string) => {
-      const headerCell = screen.getAllByText(label)[0].closest(
-        'div',
-      ) as HTMLElement;
+      const headerCell = screen
+        .getAllByText(label)[0]
+        .closest('div') as HTMLElement;
       return Number.parseInt(headerCell.style.paddingLeft || '0', 10);
     };
     const indentA = getRowIndent('A');
@@ -2861,17 +2911,16 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(getRowIndent('C weightedDiscount')).toBe(indentC);
     expect(getRowIndent('E Total')).toBe(indentE);
 
-    const eRow = screen.getAllByText(/^E$/)[0].closest(
-      'tr',
-    ) as HTMLTableRowElement;
+    const eRow = screen
+      .getAllByText(/^E$/)[0]
+      .closest('tr') as HTMLTableRowElement;
     const eCells = Array.from(eRow.querySelectorAll('td'));
     expect(eCells.some(cell => cell.textContent?.trim())).toBe(false);
   });
 
   it('pushes A-E metric subtotals to the bottom when values are between E and F (layout 1)', () => {
-    const { labeledTree, metrics, rowGroupby } = buildVeryDeepMetricSubtotalTree(
-      [1, 2, 3, 4, 5],
-    );
+    const { labeledTree, metrics, rowGroupby } =
+      buildVeryDeepMetricSubtotalTree([1, 2, 3, 4, 5]);
 
     const { container } = render(
       <PivotTableChart
@@ -2993,9 +3042,8 @@ describe('PivotTableChart totals & subtotals - rows', () => {
   });
 
   it('renders G/H/I totals under each metric branch and keeps A-E subtotals aligned (layout 2)', () => {
-    const { labeledTree, metrics, rowGroupby } = buildVeryDeepMetricSubtotalTree(
-      [1, 2, 3, 4, 5, 6, 7, 8, 9],
-    );
+    const { labeledTree, metrics, rowGroupby } =
+      buildVeryDeepMetricSubtotalTree([1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
     const { container } = render(
       <PivotTableChart
@@ -3094,9 +3142,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(rowHeaders).not.toContain('I weightedDiscount');
 
     const getRowIndent = (label: string) => {
-      const headerCell = screen.getAllByText(label)[0].closest(
-        'div',
-      ) as HTMLElement;
+      const headerCell = screen
+        .getAllByText(label)[0]
+        .closest('div') as HTMLElement;
       return Number.parseInt(headerCell.style.paddingLeft || '0', 10);
     };
     const indentA = getRowIndent('A');
@@ -3345,29 +3393,31 @@ describe('PivotTableChart totals & subtotals - rows', () => {
       },
     };
     const cells: Record<string, PivotResultCell> = {
-      [serializeCellKey(serializePath([measure1Token, SUBTOTAL_TOKEN]), colKey)]:
-        {
-          rowKey: serializePath([measure1Token, SUBTOTAL_TOKEN]),
+      [serializeCellKey(
+        serializePath([measure1Token, SUBTOTAL_TOKEN]),
+        colKey,
+      )]: {
+        rowKey: serializePath([measure1Token, SUBTOTAL_TOKEN]),
         colKey,
         values: { measure1: 100 },
         isSubtotal: true,
       },
-      [serializeCellKey(serializePath([measure2Token, SUBTOTAL_TOKEN]), colKey)]:
-        {
-          rowKey: serializePath([measure2Token, SUBTOTAL_TOKEN]),
+      [serializeCellKey(
+        serializePath([measure2Token, SUBTOTAL_TOKEN]),
+        colKey,
+      )]: {
+        rowKey: serializePath([measure2Token, SUBTOTAL_TOKEN]),
         colKey,
         values: { measure2: 200 },
         isSubtotal: true,
       },
-      [serializeCellKey(serializePath([measure1Token, 'R1', 'R2']), colKey)]:
-        {
-          rowKey: serializePath([measure1Token, 'R1', 'R2']),
+      [serializeCellKey(serializePath([measure1Token, 'R1', 'R2']), colKey)]: {
+        rowKey: serializePath([measure1Token, 'R1', 'R2']),
         colKey,
         values: { measure1: 10 },
       },
-      [serializeCellKey(serializePath([measure2Token, 'R1', 'R2']), colKey)]:
-        {
-          rowKey: serializePath([measure2Token, 'R1', 'R2']),
+      [serializeCellKey(serializePath([measure2Token, 'R1', 'R2']), colKey)]: {
+        rowKey: serializePath([measure2Token, 'R1', 'R2']),
         colKey,
         values: { measure2: 20 },
       },

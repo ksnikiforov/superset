@@ -25,7 +25,7 @@ import {
   QueryObjectFilterClause,
 } from '@superset-ui/core';
 import { MetricsLayoutEnum, PivotTreeNode } from '../types';
-import { decodeMetricKey, getMetricKeys } from '../utils';
+import { decodeMetricKey, getMetricKeys, isSubtotalToken } from '../utils';
 
 const stripMetricPath = (
   path: PivotTreeNode['path'],
@@ -33,19 +33,28 @@ const stripMetricPath = (
   metricsLayout: MetricsLayoutEnum,
   metricLabels: Set<string>,
 ) => {
+  const shouldStripMetric =
+    (axis === 'row' && metricsLayout === MetricsLayoutEnum.ROWS) ||
+    (axis === 'col' && metricsLayout === MetricsLayoutEnum.COLUMNS);
   if (axis === 'row' && metricsLayout === MetricsLayoutEnum.ROWS) {
     return path.filter(val => {
+      if (isSubtotalToken(val)) {
+        return false;
+      }
       const decoded = decodeMetricKey(val);
-      return !(decoded && metricLabels.has(decoded));
+      return !(shouldStripMetric && decoded && metricLabels.has(decoded));
     });
   }
   if (axis === 'col' && metricsLayout === MetricsLayoutEnum.COLUMNS) {
     return path.filter(val => {
+      if (isSubtotalToken(val)) {
+        return false;
+      }
       const decoded = decodeMetricKey(val);
-      return !(decoded && metricLabels.has(decoded));
+      return !(shouldStripMetric && decoded && metricLabels.has(decoded));
     });
   }
-  return path;
+  return path.filter(val => !isSubtotalToken(val));
 };
 
 type CellFiltersParams = {
@@ -99,7 +108,10 @@ type ContextFiltersParams = {
   groupbyColumns: QueryFormColumn[];
   metrics: QueryFormMetric[];
   metricsLayout: MetricsLayoutEnum;
-  dateFormatters: Record<string, ((value: DataRecordValue) => string) | undefined>;
+  dateFormatters: Record<
+    string,
+    ((value: DataRecordValue) => string) | undefined
+  >;
   timeGrainSqla?: string;
 };
 
@@ -109,7 +121,10 @@ const buildAxisContextFilters = (
   axis: 'row' | 'col',
   metricsLayout: MetricsLayoutEnum,
   metricLabels: Set<string>,
-  dateFormatters: Record<string, ((value: DataRecordValue) => string) | undefined>,
+  dateFormatters: Record<
+    string,
+    ((value: DataRecordValue) => string) | undefined
+  >,
   timeGrainSqla?: string,
 ) =>
   stripMetricPath(node.path, axis, metricsLayout, metricLabels).map(

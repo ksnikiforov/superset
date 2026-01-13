@@ -149,10 +149,7 @@ describe('applyMetricAxis', () => {
         },
       },
       cells: {
-        [serializeCellKey(
-          serializePath(['A']),
-          serializePath(['AUTO']),
-        )]: {
+        [serializeCellKey(serializePath(['A']), serializePath(['AUTO']))]: {
           rowKey: serializePath(['A']),
           colKey: serializePath(['AUTO']),
           values: { m1: 10 },
@@ -175,8 +172,8 @@ describe('applyMetricAxis', () => {
       ]?.values.m1,
     ).toBe(10);
     expect(
-      withMetrics.cells[serializeCellKey(serializePath(['A']), rootKey)]
-        ?.values.m1,
+      withMetrics.cells[serializeCellKey(serializePath(['A']), rootKey)]?.values
+        .m1,
     ).toBe(10);
   });
 
@@ -223,14 +220,12 @@ describe('applyMetricAxis', () => {
         },
       },
       cells: {
-        [serializeCellKey(
-          serializePath(['USA']),
-          serializePath(['BUILDING']),
-        )]: {
-          rowKey: serializePath(['USA']),
-          colKey: serializePath(['BUILDING']),
-          values: { countCustomers: 10 },
-        },
+        [serializeCellKey(serializePath(['USA']), serializePath(['BUILDING']))]:
+          {
+            rowKey: serializePath(['USA']),
+            colKey: serializePath(['BUILDING']),
+            values: { countCustomers: 10 },
+          },
       },
     } as PivotTreeData;
 
@@ -450,10 +445,7 @@ describe('applyMetricAxis + buildTreeFromRecords integration', () => {
     );
     expect(
       withMetrics.cells[
-        serializeCellKey(
-          serializePath(['1-URGENT']),
-          serializePath(['AUTO']),
-        )
+        serializeCellKey(serializePath(['1-URGENT']), serializePath(['AUTO']))
       ]?.values.metric1,
     ).toBe(10);
   });
@@ -477,10 +469,7 @@ describe('applyMetricAxis + buildTreeFromRecords integration', () => {
     );
     expect(
       withMetrics.cells[
-        serializeCellKey(
-          serializePath(['1-URGENT', 'SUB1']),
-          serializePath([]),
-        )
+        serializeCellKey(serializePath(['1-URGENT', 'SUB1']), serializePath([]))
       ]?.values.metric1,
     ).toBe(20);
   });
@@ -497,9 +486,9 @@ describe('applyMetricAxis + buildTreeFromRecords integration', () => {
     );
     expect(tree.rows[rootKey].label).toEqual('Grand total');
     expect(tree.cols[rootKey].label).toEqual('Grand total');
-    expect(
-      tree.cells[serializeCellKey(rootKey, rootKey)]?.values.metric1,
-    ).toBe(99);
+    expect(tree.cells[serializeCellKey(rootKey, rootKey)]?.values.metric1).toBe(
+      99,
+    );
   });
 
   it('preserves grand total cell when merging deeper branches', () => {
@@ -589,11 +578,10 @@ describe('resolveMetricPlacement', () => {
   });
 
   it('auto-inserts placeholder on preferred axis when missing', () => {
-    const resolved = resolveMetricPlacement(
-      ['country'],
-      ['segment'],
-      { hasMetrics: true, preferredAxis: MetricsLayoutEnum.COLUMNS },
-    );
+    const resolved = resolveMetricPlacement(['country'], ['segment'], {
+      hasMetrics: true,
+      preferredAxis: MetricsLayoutEnum.COLUMNS,
+    });
     expect(resolved.axis).toEqual('col');
     expect(resolved.cols).toEqual(['segment', METRICS_PLACEHOLDER]);
     expect(resolved.layout).toEqual(MetricsLayoutEnum.COLUMNS);

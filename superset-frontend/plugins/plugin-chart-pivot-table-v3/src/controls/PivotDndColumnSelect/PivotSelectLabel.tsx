@@ -26,22 +26,18 @@ import {
 } from 'react';
 import { useDrop, DropTargetMonitor } from 'react-dnd';
 import { t } from '@superset-ui/core';
-import ControlHeader from 'src/explore/components/ControlHeader';
+import { ControlHeader } from '@superset-ui/chart-controls';
+import { Icons } from '@superset-ui/core/components/Icons';
 import {
   AddControlLabel,
-  DndLabelsContainer,
-  HeaderContainer,
-} from 'src/explore/components/controls/OptionControls';
-import {
   DatasourcePanelDndItem,
+  DndItemType,
   DndItemValue,
-} from 'src/explore/components/DatasourcePanel/types';
-import { Icons } from '@superset-ui/core/components/Icons';
-import { DndItemType } from 'src/explore/components/DndItemType';
-import {
+  DndLabelsContainer,
   DraggingContext,
   DropzoneContext,
-} from 'src/explore/components/ExploreContainer';
+  HeaderContainer,
+} from '../../exploreImports';
 
 export type PivotDndSelectLabelProps = {
   name: string;

@@ -19,8 +19,7 @@
 import { ReactNode } from 'react';
 import { Metric } from '@superset-ui/core';
 import { ColumnMeta } from '@superset-ui/chart-controls';
-import AdhocMetric from 'src/explore/components/controls/MetricControl/AdhocMetric';
-import { savedMetricType } from 'src/explore/components/controls/MetricControl/types';
+import { AdhocMetric, type savedMetricType } from '../../exploreImports';
 import AdhocMetricOption from './AdhocMetricOption';
 
 type SavedMetric = savedMetricType & { error_text?: string };
@@ -29,7 +28,10 @@ type MetricOption = Metric | AdhocMetric | string;
 export type MetricDefinitionValueProps = {
   option: MetricOption;
   index: number;
-  onMetricEdit: (changedMetric: Metric | AdhocMetric, oldMetric: Metric | AdhocMetric) => void;
+  onMetricEdit: (
+    changedMetric: Metric | AdhocMetric,
+    oldMetric: Metric | AdhocMetric,
+  ) => void;
   onRemoveMetric: (index: number) => void;
   onMoveLabel: (dragIndex: number, hoverIndex: number) => void;
   onDropLabel: () => void;

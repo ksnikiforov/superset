@@ -23,12 +23,14 @@ import {
   DropTargetMonitor,
   DragSourceMonitor,
 } from 'react-dnd';
-import { DragContainer } from 'src/explore/components/controls/OptionControls';
-import { OptionItemInterface } from 'src/explore/components/controls/DndColumnSelectControl/types';
 import { Tooltip } from '@superset-ui/core/components';
-import { StyledColumnOption } from 'src/explore/components/optionRenderers';
 import { styled, isAdhocColumn, t, useTheme } from '@superset-ui/core';
 import { ColumnMeta } from '@superset-ui/chart-controls';
+import {
+  DragContainer,
+  type OptionItemInterface,
+  StyledColumnOption,
+} from '../../exploreImports';
 import PivotOption from './PivotOption';
 
 export const OptionLabel = styled.div`

@@ -16,14 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import {
-  render,
-  screen,
-  userEvent,
-  waitFor,
-  within,
-} from 'spec/helpers/testing-library';
 import { QueryFormMetric } from '@superset-ui/core';
+import { render, screen, userEvent, waitFor, within } from '../../testUtils';
 import PivotDndMetricSelect, {
   updateMetricConfigForRename,
 } from '../../../src/controls/PivotDndMetricSelect/PivotDndMetricSelect';
@@ -38,18 +32,33 @@ const baseProps = {
   columns: [],
   savedMetrics: [],
   multi: true,
+  datasource: {
+    type: 'table',
+  },
+};
+
+const renderOptions = {
+  useDnd: true,
+  useRedux: true,
+  initialState: {
+    explore: {
+      datasource: {
+        type: 'table',
+      },
+    },
+  },
 };
 
 describe('PivotDndMetricSelect', () => {
   it('renders a formatting button for each metric', () => {
-    render(<PivotDndMetricSelect {...baseProps} />, { useDnd: true });
+    render(<PivotDndMetricSelect {...baseProps} />, renderOptions);
 
     const buttons = screen.getAllByTestId('pivot-metric-formatting-button');
     expect(buttons).toHaveLength(2);
   });
 
   it('opens the formatting popover on click', async () => {
-    render(<PivotDndMetricSelect {...baseProps} />, { useDnd: true });
+    render(<PivotDndMetricSelect {...baseProps} />, renderOptions);
 
     const buttons = screen.getAllByTestId('pivot-metric-formatting-button');
     await userEvent.click(buttons[0]);
@@ -71,7 +80,7 @@ describe('PivotDndMetricSelect', () => {
           viz_type: 'pivot_table_v3',
         }}
       />,
-      { useDnd: true },
+      renderOptions,
     );
 
     await userEvent.click(
@@ -104,7 +113,7 @@ describe('PivotDndMetricSelect', () => {
           viz_type: 'pivot_table_v3',
         }}
       />,
-      { useDnd: true },
+      renderOptions,
     );
 
     await userEvent.click(
@@ -134,15 +143,12 @@ describe('PivotDndMetricSelect', () => {
     await userEvent.click(textOption);
 
     await waitFor(() =>
-      expect(setControlValue).toHaveBeenLastCalledWith(
-        'metricFormatting',
-        {
-          sum__value: {
-            backgroundColor: 'sum__value',
-            textColor: 'avg__value',
-          },
+      expect(setControlValue).toHaveBeenLastCalledWith('metricFormatting', {
+        sum__value: {
+          backgroundColor: 'sum__value',
+          textColor: 'avg__value',
         },
-      ),
+      }),
     );
   });
 
@@ -159,7 +165,7 @@ describe('PivotDndMetricSelect', () => {
           viz_type: 'pivot_table_v3',
         }}
       />,
-      { useDnd: true },
+      renderOptions,
     );
 
     await userEvent.click(
@@ -202,7 +208,7 @@ describe('PivotDndMetricSelect', () => {
           viz_type: 'pivot_table_v3',
         }}
       />,
-      { useDnd: true },
+      renderOptions,
     );
 
     await userEvent.click(
@@ -240,7 +246,7 @@ describe('PivotDndMetricSelect', () => {
           viz_type: 'pivot_table_v3',
         }}
       />,
-      { useDnd: true },
+      renderOptions,
     );
 
     await userEvent.click(
@@ -379,7 +385,7 @@ describe('PivotDndMetricSelect', () => {
           viz_type: 'pivot_table_v3',
         }}
       />,
-      { useDnd: true },
+      renderOptions,
     );
 
     await waitFor(() => expect(setControlValue).not.toHaveBeenCalled());
@@ -399,7 +405,7 @@ describe('PivotDndMetricSelect', () => {
           viz_type: 'pivot_table_v3',
         }}
       />,
-      { useDnd: true },
+      renderOptions,
     );
 
     await userEvent.click(
@@ -439,7 +445,7 @@ describe('PivotDndMetricSelect', () => {
           viz_type: 'pivot_table_v3',
         }}
       />,
-      { useDnd: true },
+      renderOptions,
     );
 
     await userEvent.click(
@@ -482,7 +488,7 @@ describe('PivotDndMetricSelect', () => {
           viz_type: 'pivot_table_v3',
         }}
       />,
-      { useDnd: true },
+      renderOptions,
     );
 
     await userEvent.click(
@@ -535,7 +541,7 @@ describe('PivotDndMetricSelect', () => {
           viz_type: 'pivot_table_v3',
         }}
       />,
-      { useDnd: true },
+      renderOptions,
     );
 
     await userEvent.click(

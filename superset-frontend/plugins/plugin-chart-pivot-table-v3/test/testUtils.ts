@@ -16,18 +16,5 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-/* eslint-disable react-prefer-function-component/react-prefer-function-component */
-
-import { PureComponent } from 'react';
-import { TableRenderer } from './TableRenderers';
-
-class PivotTable extends PureComponent {
-  render() {
-    return <TableRenderer {...this.props} />;
-  }
-}
-
-PivotTable.propTypes = TableRenderer.propTypes;
-PivotTable.defaultProps = TableRenderer.defaultProps;
-
-export default PivotTable;
+/* eslint-disable import/no-extraneous-dependencies */
+export * from 'spec/helpers/testing-library';

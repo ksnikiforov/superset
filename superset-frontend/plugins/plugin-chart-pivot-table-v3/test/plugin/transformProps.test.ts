@@ -21,7 +21,11 @@ import { ChartProps, supersetTheme } from '@superset-ui/core';
 import transformProps from '../../src/transformProps';
 import { MetricsLayoutEnum, PivotTableQueryFormData } from '../../src/types';
 import { formatQueryName } from '../../src/buildQuery';
-import { encodeMetricKey, serializeCellKey, serializePath } from '../../src/utils';
+import {
+  encodeMetricKey,
+  serializeCellKey,
+  serializePath,
+} from '../../src/utils';
 
 describe('Pivot Table v3 transformProps', () => {
   const formData: Partial<PivotTableQueryFormData> = {
@@ -96,9 +100,7 @@ describe('Pivot Table v3 transformProps', () => {
         },
       ],
     });
-    const result = transformProps(
-      props as ChartProps<PivotTableQueryFormData>,
-    );
+    const result = transformProps(props as ChartProps<PivotTableQueryFormData>);
     expect(result.data.cells[cellKey].values.metric1_bg).toBe('#111111');
   });
 
@@ -135,12 +137,8 @@ describe('Pivot Table v3 transformProps', () => {
         },
       ],
     });
-    const result = transformProps(
-      props as ChartProps<PivotTableQueryFormData>,
-    );
-    expect(result.data.cells[cellKey].values.metric1_color).toBe(
-      '#111111',
-    );
+    const result = transformProps(props as ChartProps<PivotTableQueryFormData>);
+    expect(result.data.cells[cellKey].values.metric1_color).toBe('#111111');
   });
 
   it('keeps row and column formatting metric values in the tree', () => {
@@ -182,22 +180,16 @@ describe('Pivot Table v3 transformProps', () => {
         },
       ],
     });
-    const result = transformProps(
-      props as ChartProps<PivotTableQueryFormData>,
-    );
+    const result = transformProps(props as ChartProps<PivotTableQueryFormData>);
     const rowKey = serializePath(['A']);
     const colKey = serializePath(['B']);
     const rootKey = serializePath([]);
     expect(
       result.data.cells[serializeCellKey(rowKey, rootKey)].values.row_bg,
-    ).toBe(
-      '#111111',
-    );
+    ).toBe('#111111');
     expect(
       result.data.cells[serializeCellKey(rootKey, colKey)].values.col_text,
-    ).toBe(
-      '#00ff00',
-    );
+    ).toBe('#00ff00');
   });
 
   it('normalizes row and column subtotal selections', () => {
@@ -300,9 +292,9 @@ describe('Pivot Table v3 transformProps', () => {
       tree.cells[serializeCellKey(rootKey, serializePath(['Y']))]?.values
         .metric1,
     ).toBe(5);
-    expect(
-      tree.cells[serializeCellKey(rootKey, rootKey)]?.values.metric1,
-    ).toBe(15);
+    expect(tree.cells[serializeCellKey(rootKey, rootKey)]?.values.metric1).toBe(
+      15,
+    );
   });
 
   it('uses metric-only queries as grand totals even when query depth metadata is wrong', () => {
@@ -357,9 +349,9 @@ describe('Pivot Table v3 transformProps', () => {
 
     const { data: tree } = transformProps(props as any);
     const rootKey = serializePath([]);
-    expect(
-      tree.cells[serializeCellKey(rootKey, rootKey)]?.values.metric1,
-    ).toBe(999);
+    expect(tree.cells[serializeCellKey(rootKey, rootKey)]?.values.metric1).toBe(
+      999,
+    );
   });
 
   it('infers column depth when query metadata is shallow but column groupbys are present', () => {
@@ -400,13 +392,14 @@ describe('Pivot Table v3 transformProps', () => {
         },
       ],
     });
-    const result = transformProps(
-      props as ChartProps<PivotTableQueryFormData>,
-    );
+    const result = transformProps(props as ChartProps<PivotTableQueryFormData>);
     const root = serializePath([]);
     expect(Object.keys(result.data.rows)).toEqual([root]);
     expect(Object.keys(result.data.cols)).toEqual(
-      expect.arrayContaining([root, serializePath([encodeMetricKey('metric1')])]),
+      expect.arrayContaining([
+        root,
+        serializePath([encodeMetricKey('metric1')]),
+      ]),
     );
     expect(Object.keys(result.data.rows)).toHaveLength(1);
   });

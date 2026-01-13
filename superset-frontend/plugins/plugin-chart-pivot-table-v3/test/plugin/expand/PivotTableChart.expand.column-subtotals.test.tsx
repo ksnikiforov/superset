@@ -17,8 +17,7 @@
  * under the License.
  */
 
-import React from 'react';
-import { fireEvent, render, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, waitFor, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
 import { baseFormData, buildFormData } from '../fixtures/pivotFormData';
@@ -76,7 +75,11 @@ const injectColumnSubtotalLeaves = (
   });
   Object.values(tree.cells).forEach(cell => {
     const baseColPath = tree.cols[cell.colKey]?.path;
-    if (!baseColPath || baseColPath.length !== depth || baseColPath.length === 0) {
+    if (
+      !baseColPath ||
+      baseColPath.length !== depth ||
+      baseColPath.length === 0
+    ) {
       return;
     }
     const subtotalColKey = serializePath([...baseColPath, SUBTOTAL_TOKEN]);
@@ -236,15 +239,15 @@ describe('PivotTableChart column subtotal placement during expansion', () => {
     const col1Row = headerRows.find(row =>
       within(row).queryByText('C1-A'),
     ) as HTMLElement;
-    const col1Cell = within(col1Row).getByText('C1-A').closest(
-      'th',
-    ) as HTMLElement;
+    const col1Cell = within(col1Row)
+      .getByText('C1-A')
+      .closest('th') as HTMLElement;
     fireEvent.click(within(col1Cell).getByLabelText('plus-square'));
 
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
     });
-    expect(await findByText('C2-A')).toBeTruthy();
+    expect(await findByText('C2-A')).toBeInTheDocument();
 
     headerRows = Array.from(
       container.querySelectorAll('thead tr'),
@@ -252,15 +255,15 @@ describe('PivotTableChart column subtotal placement during expansion', () => {
     const col2RowForToggle = headerRows.find(row =>
       within(row).queryByText('C2-A'),
     ) as HTMLElement;
-    const col2Cell = within(col2RowForToggle).getByText('C2-A').closest(
-      'th',
-    ) as HTMLElement;
+    const col2Cell = within(col2RowForToggle)
+      .getByText('C2-A')
+      .closest('th') as HTMLElement;
     fireEvent.click(within(col2Cell).getByLabelText('plus-square'));
 
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
     });
-    expect(await findByText('C3-A')).toBeTruthy();
+    expect(await findByText('C3-A')).toBeInTheDocument();
 
     headerRows = Array.from(
       container.querySelectorAll('thead tr'),
@@ -278,9 +281,7 @@ describe('PivotTableChart column subtotal placement during expansion', () => {
     expect(secondCol2Index).toBeGreaterThan(firstCol2Index);
     const labelsBetween = col2Labels.slice(firstCol2Index + 1, secondCol2Index);
     const metricSubtotalLabels = metrics.map(metric => `C2-A ${metric}`);
-    expect(labelsBetween).toEqual(
-      expect.arrayContaining(metricSubtotalLabels),
-    );
+    expect(labelsBetween).toEqual(expect.arrayContaining(metricSubtotalLabels));
   });
 
   it('keeps grand totals at the end after expanding col1 then col2', async () => {
@@ -349,15 +350,15 @@ describe('PivotTableChart column subtotal placement during expansion', () => {
     const col1Row = headerRows.find(row =>
       within(row).queryByText('C1-A'),
     ) as HTMLElement;
-    const col1Cell = within(col1Row).getByText('C1-A').closest(
-      'th',
-    ) as HTMLElement;
+    const col1Cell = within(col1Row)
+      .getByText('C1-A')
+      .closest('th') as HTMLElement;
     fireEvent.click(within(col1Cell).getByLabelText('plus-square'));
 
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
     });
-    expect(await findByText('C2-A')).toBeTruthy();
+    expect(await findByText('C2-A')).toBeInTheDocument();
 
     headerRows = Array.from(
       container.querySelectorAll('thead tr'),
@@ -365,15 +366,15 @@ describe('PivotTableChart column subtotal placement during expansion', () => {
     const col2RowForToggle = headerRows.find(row =>
       within(row).queryByText('C2-A'),
     ) as HTMLElement;
-    const col2Cell = within(col2RowForToggle).getByText('C2-A').closest(
-      'th',
-    ) as HTMLElement;
+    const col2Cell = within(col2RowForToggle)
+      .getByText('C2-A')
+      .closest('th') as HTMLElement;
     fireEvent.click(within(col2Cell).getByLabelText('plus-square'));
 
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
     });
-    expect(await findByText('C3-A')).toBeTruthy();
+    expect(await findByText('C3-A')).toBeInTheDocument();
 
     headerRows = Array.from(
       container.querySelectorAll('thead tr'),

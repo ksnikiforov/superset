@@ -16,7 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { DropTargetMonitor } from 'react-dnd';
 import { useDispatch } from 'react-redux';
 import {
@@ -42,11 +49,13 @@ import {
 import { Icons } from '@superset-ui/core/components/Icons';
 import { ColumnMeta, isColumnMeta } from '@superset-ui/chart-controls';
 import { isEmpty, isEqual } from 'lodash';
-import { setControlValue as setControlValueAction } from 'src/explore/actions/exploreActions';
-import ColumnSelectPopoverTrigger from 'src/explore/components/controls/DndColumnSelectControl/ColumnSelectPopoverTrigger';
-import { DndControlProps } from 'src/explore/components/controls/DndColumnSelectControl/types';
-import { isDatasourcePanelDndItem } from 'src/explore/components/DatasourcePanel/types';
-import { DndItemType } from 'src/explore/components/DndItemType';
+import {
+  ColumnSelectPopoverTrigger,
+  type DndControlProps,
+  DndItemType,
+  isDatasourcePanelDndItem,
+  setControlValueAction,
+} from '../../exploreImports';
 import {
   METRICS_PLACEHOLDER,
   mergeMetrics,
@@ -128,7 +137,7 @@ const DimensionSortingButtonWrap = styled.div`
   padding-right: ${({ theme }) => theme.sizeUnit}px;
 `;
 
-type WindowWithPivotDebug = Window & { __PIVOT_V3_DEBUG_PLACEMENT?: boolean };
+type WindowWithPivotDebug = Window & { PIVOT_V3_DEBUG_PLACEMENT?: boolean };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -199,7 +208,6 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
     canDelete = true,
     ghostButtonText,
     name,
-    label,
     isTemporal,
     disabledTabs,
     dragTypeOverride,
@@ -221,10 +229,10 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
     pivotPlacement?.axis === 'cols'
       ? 'col'
       : pivotPlacement?.axis === 'rows'
-      ? 'row'
-      : name === 'groupbyColumns'
-      ? 'col'
-      : 'row';
+        ? 'row'
+        : name === 'groupbyColumns'
+          ? 'col'
+          : 'row';
   const formattingControlName: 'rowFormatting' | 'colFormatting' =
     axis === 'row' ? 'rowFormatting' : 'colFormatting';
   const sortingControlName: 'rowSorting' | 'colSorting' =
@@ -239,27 +247,24 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
     return new OptionSelector(optionsMap, multi, value);
   }, [multi, options, value]);
 
-  const rawFormatting =
-    (formData?.[formattingControlName] as PivotDimensionFormattingMap) || {};
-  const dimensionFormatting = useMemo(
-    () =>
-      normalizeDimensionFormattingMapWithKeys(
-        rawFormatting,
-        ensureIsArray<QueryFormColumn>(value),
-      ),
-    [rawFormatting, value],
-  );
-  const rawSorting =
-    (formData?.[sortingControlName] as PivotDimensionSortingMap) || {};
-  const dimensionSorting = useMemo(
-    () =>
-      normalizeDimensionSortingMapWithKeys(
-        rawSorting,
-        ensureIsArray<QueryFormColumn>(value),
-      ),
-    [rawSorting, value],
-  );
-  const formattingRef = useRef<PivotDimensionFormattingMap>(dimensionFormatting);
+  const dimensionFormatting = useMemo(() => {
+    const rawFormatting =
+      (formData?.[formattingControlName] as PivotDimensionFormattingMap) || {};
+    return normalizeDimensionFormattingMapWithKeys(
+      rawFormatting,
+      ensureIsArray<QueryFormColumn>(value),
+    );
+  }, [formData, formattingControlName, value]);
+  const dimensionSorting = useMemo(() => {
+    const rawSorting =
+      (formData?.[sortingControlName] as PivotDimensionSortingMap) || {};
+    return normalizeDimensionSortingMapWithKeys(
+      rawSorting,
+      ensureIsArray<QueryFormColumn>(value),
+    );
+  }, [formData, sortingControlName, value]);
+  const formattingRef =
+    useRef<PivotDimensionFormattingMap>(dimensionFormatting);
   const formattingPendingRef = useRef<PivotDimensionFormattingMap | null>(null);
   const [localFormatting, setLocalFormatting] =
     useState<PivotDimensionFormattingMap>(dimensionFormatting);
@@ -323,7 +328,7 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
   const applyChange = useCallback(
     (nextValue: QueryFormColumn[] | QueryFormColumn | null | undefined) => {
       const debugOn = Boolean(
-        (window as WindowWithPivotDebug).__PIVOT_V3_DEBUG_PLACEMENT,
+        (window as WindowWithPivotDebug).PIVOT_V3_DEBUG_PLACEMENT,
       );
       if (
         pivotPlacement?.resolve &&
@@ -442,7 +447,15 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
       onChange(nextValue);
       resetHover();
     },
-    [dispatch, formData, onChange, pivotPlacement, resetHover, setControlValue, toArray],
+    [
+      dispatch,
+      formData,
+      onChange,
+      pivotPlacement,
+      resetHover,
+      setControlValue,
+      toArray,
+    ],
   );
 
   const setLastHoverIndex = useCallback(
@@ -508,7 +521,7 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
         return;
       }
       const insertAt = computeInsertIndex(monitor);
-      if ((window as WindowWithPivotDebug).__PIVOT_V3_DEBUG_PLACEMENT) {
+      if ((window as WindowWithPivotDebug).PIVOT_V3_DEBUG_PLACEMENT) {
         // eslint-disable-next-line no-console
         console.log('[pivot-v3] DnD drop details', {
           listId: currentListId,
@@ -519,10 +532,7 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
       }
       if (!optionSelector.has(columnValue)) {
         const baseValues = toArray(optionSelector.getValues());
-        const clampedIndex = Math.max(
-          0,
-          Math.min(insertAt, baseValues.length),
-        );
+        const clampedIndex = Math.max(0, Math.min(insertAt, baseValues.length));
         baseValues.splice(clampedIndex, 0, columnValue as QueryFormColumn);
         applyChange(baseValues);
       } else {
@@ -590,7 +600,8 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
 
       if (field === 'applyTo') {
         nextEntry.applyTo =
-          (value as DimensionFormattingScope) ?? DEFAULT_DIMENSION_FORMATTING_SCOPE;
+          (value as DimensionFormattingScope) ??
+          DEFAULT_DIMENSION_FORMATTING_SCOPE;
       } else if (value) {
         nextEntry[field] = value as QueryFormMetric;
       } else {
@@ -626,7 +637,8 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
       if (!metric) {
         const existing = baseSorting[dimensionKey];
         if (existing) {
-          const { metric: _metric, ...rest } = existing;
+          const rest = { ...existing };
+          delete rest.metric;
           if (Object.keys(rest).length === 0) {
             delete nextSorting[dimensionKey];
           } else {
@@ -696,20 +708,46 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
     [],
   );
 
+  const getOptionKey = useCallback(
+    (
+      column: QueryFormColumn | ColumnMeta | AdhocColumn | string,
+      idx: number,
+    ) => {
+      if (
+        column === METRICS_PLACEHOLDER ||
+        (isColumnMeta(column) && column.column_name === METRICS_PLACEHOLDER)
+      ) {
+        return `${currentListId}-placeholder`;
+      }
+      if (isColumnMeta(column)) {
+        return `${currentListId}-col-${column.column_name}`;
+      }
+      if (isAdhocColumn(column)) {
+        return `${currentListId}-adhoc-${column.label || column.sqlExpression || idx}`;
+      }
+      if (typeof column === 'string') {
+        return `${currentListId}-str-${column}`;
+      }
+      return `${currentListId}-idx-${idx}`;
+    },
+    [currentListId],
+  );
+
   const valuesRenderer = useCallback(
     () =>
       optionSelector.values.map((column, idx) => {
         const isPlaceholder =
           column === METRICS_PLACEHOLDER ||
-          (isColumnMeta(column) &&
-            column.column_name === METRICS_PLACEHOLDER);
+          (isColumnMeta(column) && column.column_name === METRICS_PLACEHOLDER);
         const datasourceWarningMessage =
           isAdhocColumn(column) && column.datasourceWarning
             ? t('This column might be incompatible with current dataset')
             : undefined;
         const withCaret =
           !isPlaceholder && (isAdhocColumn(column) || !column.error_text);
-        const dimensionKey = !isPlaceholder ? getDimensionKey(column) : undefined;
+        const dimensionKey = !isPlaceholder
+          ? getDimensionKey(column)
+          : undefined;
         const dimensionLabel = !isPlaceholder
           ? getDimensionLabel(column)
           : undefined;
@@ -722,8 +760,7 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
             ? localSorting[dimensionKey]
             : undefined;
         const sortingMetric = sorting?.metric;
-        const sortingOrder =
-          sorting?.order ?? DEFAULT_DIMENSION_SORT_ORDER;
+        const sortingOrder = sorting?.order ?? DEFAULT_DIMENSION_SORT_ORDER;
         const formattingScope =
           formatting?.applyTo ?? DEFAULT_DIMENSION_FORMATTING_SCOPE;
         const hasFormatting = Boolean(
@@ -732,11 +769,7 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
         const hasSorting = Boolean(sorting);
         const formattingPopoverContent =
           dimensionKey && dimensionLabel ? (
-            <div
-              data-ignore-control-popover
-              onClick={event => event.stopPropagation()}
-              onMouseDown={event => event.stopPropagation()}
-            >
+            <div data-ignore-control-popover>
               <Space direction="vertical" size={8}>
                 <Typography.Text strong>
                   {t('Conditional formatting')}
@@ -783,11 +816,7 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
           ) : null;
         const sortingPopoverContent =
           dimensionKey && dimensionLabel ? (
-            <div
-              data-ignore-control-popover
-              onClick={event => event.stopPropagation()}
-              onMouseDown={event => event.stopPropagation()}
-            >
+            <div data-ignore-control-popover>
               <Space direction="vertical" size={8}>
                 <Typography.Text strong>{t('Sorting')}</Typography.Text>
                 <Typography.Text type="secondary">
@@ -797,12 +826,12 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
                 </Typography.Text>
                 <MetricFormatSelector
                   label={t('Sort by metric')}
-                  tooltip={t('Metric that defines the ordering for this dimension.')}
+                  tooltip={t(
+                    'Metric that defines the ordering for this dimension.',
+                  )}
                   value={sortingMetric}
                   metrics={availableMetrics as MetricOptionValue[]}
-                  onChange={metric =>
-                    updateSortingMetric(dimensionKey, metric)
-                  }
+                  onChange={metric => updateSortingMetric(dimensionKey, metric)}
                   columns={options}
                   savedMetrics={savedMetrics}
                   datasource={datasource}
@@ -955,6 +984,7 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
       dragType,
       getDimensionKey,
       getDimensionLabel,
+      getOptionKey,
       isTemporal,
       localFormatting,
       localSorting,
@@ -1004,28 +1034,6 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
         multi ? 2 : 1,
       ),
     [ghostButtonText, multi],
-  );
-
-  const getOptionKey = useCallback(
-    (column: QueryFormColumn | ColumnMeta | AdhocColumn | string, idx: number) => {
-      if (
-        column === METRICS_PLACEHOLDER ||
-        (isColumnMeta(column) && column.column_name === METRICS_PLACEHOLDER)
-      ) {
-        return `${currentListId}-placeholder`;
-      }
-      if (isColumnMeta(column)) {
-        return `${currentListId}-col-${column.column_name}`;
-      }
-      if (isAdhocColumn(column)) {
-        return `${currentListId}-adhoc-${column.label || column.sqlExpression || idx}`;
-      }
-      if (typeof column === 'string') {
-        return `${currentListId}-str-${column}`;
-      }
-      return `${currentListId}-idx-${idx}`;
-    },
-    [currentListId],
   );
 
   return (

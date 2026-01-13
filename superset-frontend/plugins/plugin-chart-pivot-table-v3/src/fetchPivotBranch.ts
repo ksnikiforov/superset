@@ -279,7 +279,8 @@ const resolveFetchContext = ({
   const metricLabels = getMetricKeys(metrics);
   const metricLabelSet = new Set(metricLabels);
   const extraFormData = getExtraFormData(formData);
-  const timeGrainSqla = extraFormData?.time_grain_sqla || formData.time_grain_sqla;
+  const timeGrainSqla =
+    extraFormData?.time_grain_sqla || formData.time_grain_sqla;
   const temporalLookup = formData?.temporal_columns_lookup || {};
   const isTemporalColumn = (col: QueryFormColumn) =>
     isPhysicalColumn(col) &&
@@ -314,8 +315,8 @@ const resolveFetchContext = ({
     placement.metricPosition >= 0
       ? placement.metricPosition
       : metricsAxis === 'row'
-      ? rowGroupby.length
-      : colGroupby.length;
+        ? rowGroupby.length
+        : colGroupby.length;
   const getMetricIndex = (candidatePath: PivotPath) =>
     candidatePath.findIndex(val => {
       const decoded = decodeMetricKey(val);
@@ -325,9 +326,7 @@ const resolveFetchContext = ({
       return typeof val === 'string' && metricLabelSet.has(val);
     });
   const metricIndexInPath =
-    metricsAxis === axis
-      ? getMetricIndex(pathForMetrics)
-      : -1;
+    metricsAxis === axis ? getMetricIndex(pathForMetrics) : -1;
   const shouldCollapseRowDims =
     metricsAxis === 'row' &&
     axis === 'row' &&
@@ -388,7 +387,9 @@ const resolveFetchContext = ({
       return p;
     }
     const idx =
-      metricIndexOverride !== undefined ? metricIndexOverride : getMetricIndex(p);
+      metricIndexOverride !== undefined
+        ? metricIndexOverride
+        : getMetricIndex(p);
     if (idx < 0) {
       return p;
     }
@@ -401,9 +402,7 @@ const resolveFetchContext = ({
     maxDepthPerFetch || 0,
   );
   const depthIncrement =
-    defaultIncrement > 0
-      ? defaultIncrement
-      : Number.MAX_SAFE_INTEGER;
+    defaultIncrement > 0 ? defaultIncrement : Number.MAX_SAFE_INTEGER;
 
   const getCurrentDepth = (
     nodes: Record<string, PivotTreeNode> | undefined,
@@ -411,8 +410,8 @@ const resolveFetchContext = ({
   ) =>
     Math.max(
       0,
-      ...Object.values(nodes || {}).map(node =>
-        stripMetricFromPath(node.path, targetAxis).length,
+      ...Object.values(nodes || {}).map(
+        node => stripMetricFromPath(node.path, targetAxis).length,
       ),
     );
 
@@ -475,7 +474,6 @@ const resolveFetchContext = ({
     colGroupby,
     rowGroupbyForQuery,
     colGroupbyForQuery,
-    metrics,
     metricsForQuery,
     metricsLayoutResolved,
     metricInsertIndex,
@@ -548,7 +546,11 @@ const injectColumnSubtotalLeaves = (
   });
   Object.values(tree.cells).forEach(cell => {
     const baseColPath = tree.cols[cell.colKey]?.path;
-    if (!baseColPath || baseColPath.length !== depth || baseColPath.length === 0) {
+    if (
+      !baseColPath ||
+      baseColPath.length !== depth ||
+      baseColPath.length === 0
+    ) {
       return;
     }
     const subtotalColKey = serializePath([...baseColPath, SUBTOTAL_TOKEN]);
@@ -576,7 +578,6 @@ export async function fetchPivotBranch({
     colGroupby,
     rowGroupbyForQuery,
     colGroupbyForQuery,
-    metrics,
     metricsForQuery,
     metricsLayoutResolved,
     metricInsertIndex,

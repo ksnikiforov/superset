@@ -17,8 +17,7 @@
  * under the License.
  */
 
-import React from 'react';
-import { render, waitFor, within } from '@testing-library/react';
+import { render, waitFor, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { buildTreeFromRecords, METRICS_PLACEHOLDER } from '../../../src/utils';
@@ -58,13 +57,14 @@ describe('PivotTableChart sticky headers', () => {
     );
 
     const table = container.querySelector('table') as HTMLElement;
-    expect(table.getAttribute('data-sticky-headers')).toBe('true');
+    expect(table).toHaveAttribute('data-sticky-headers', 'true');
 
     const tbody = container.querySelector('tbody') as HTMLElement;
-    const totalRow = within(tbody).getByText('Grand total')
+    const totalRow = within(tbody)
+      .getByText('Grand total')
       .closest('tr') as HTMLElement;
-    expect(totalRow.classList.contains('pivot-grand-total-row')).toBe(true);
-    expect(totalRow.classList.contains('pivot-grand-total-row--top')).toBe(true);
+    expect(totalRow).toHaveClass('pivot-grand-total-row');
+    expect(totalRow).toHaveClass('pivot-grand-total-row--top');
   });
 
   it('allows sticky headers to be disabled', () => {
@@ -89,13 +89,14 @@ describe('PivotTableChart sticky headers', () => {
     );
 
     const table = container.querySelector('table') as HTMLElement;
-    expect(table.getAttribute('data-sticky-headers')).toBe('false');
+    expect(table).toHaveAttribute('data-sticky-headers', 'false');
 
     const tbody = container.querySelector('tbody') as HTMLElement;
-    const totalRow = within(tbody).getByText('Grand total')
+    const totalRow = within(tbody)
+      .getByText('Grand total')
       .closest('tr') as HTMLElement;
-    expect(totalRow.classList.contains('pivot-grand-total-row')).toBe(true);
-    expect(totalRow.classList.contains('pivot-grand-total-row--bottom')).toBe(true);
+    expect(totalRow).toHaveClass('pivot-grand-total-row');
+    expect(totalRow).toHaveClass('pivot-grand-total-row--bottom');
   });
 
   it('stacks multi-level column headers with offsets when sticky headers are enabled', async () => {
@@ -163,7 +164,7 @@ describe('PivotTableChart sticky headers', () => {
 
     await waitFor(() => {
       const row1Cell = headerRows[1].querySelector('th') as HTMLElement;
-      expect(row1Cell.style.top).toBe('20px');
+      expect(row1Cell).toHaveStyle({ top: '20px' });
     });
 
     getBoundingClientRectSpy.mockRestore();

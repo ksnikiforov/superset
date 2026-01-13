@@ -127,8 +127,10 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
   const metricsOnRows = placement.layout === MetricsLayoutEnum.ROWS;
   const metricInsertIndex =
     placement.metricPosition >= 0 ? placement.metricPosition : undefined;
-  const hasRowTotals = rowTotals || ensureIsArray(rowSubtotalLevels).includes(0);
-  const hasColTotals = colTotals || ensureIsArray(colSubtotalLevels).includes(0);
+  const hasRowTotals =
+    rowTotals || ensureIsArray(rowSubtotalLevels).includes(0);
+  const hasColTotals =
+    colTotals || ensureIsArray(colSubtotalLevels).includes(0);
   const shouldIncludeGrandTotalQuery =
     (rowGroupby.length === 0 && colGroupby.length === 0) ||
     (hasRowTotals && hasColTotals) ||

@@ -17,7 +17,6 @@
  * under the License.
  */
 
-import React from 'react';
 import {
   Datasource,
   DatasourceType,
@@ -94,9 +93,7 @@ const baseProps: PivotTableProps = {
 
 type TestPivotTableChartProps = Partial<PivotTableProps>;
 
-export default function TestPivotTableChart(
-  props: TestPivotTableChartProps,
-) {
+export default function TestPivotTableChart(props: TestPivotTableChartProps) {
   const mergedProps: PivotTableProps = {
     ...baseProps,
     ...props,

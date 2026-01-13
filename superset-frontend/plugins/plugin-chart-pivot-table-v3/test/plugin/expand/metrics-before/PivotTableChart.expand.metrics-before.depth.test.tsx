@@ -17,8 +17,7 @@
  * under the License.
  */
 
-import React from 'react';
-import { render, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, fireEvent, waitFor, within } from '../../../testUtils';
 import PivotTableChart from '../../fixtures/TestPivotTableChart';
 import { PivotTreeData } from '../../../../src/types';
 import { baseFormData, buildFormData } from '../../fixtures/pivotFormData';
@@ -142,14 +141,12 @@ describe('PivotTableChart expansion with metrics before dimensions (depth)', () 
       const { container } = render(
         <PivotTableChart
           data={tree}
-          formData={buildFormData(
-            {
-              ...baseFormData,
-              groupbyRows,
-              groupbyColumns: [],
-              metrics: ['m1'],
-            })
-          }
+          formData={buildFormData({
+            ...baseFormData,
+            groupbyRows,
+            groupbyColumns: [],
+            metrics: ['m1'],
+          })}
           metrics={['m1']}
           groupbyRows={groupbyRows}
           groupbyColumns={[]}
@@ -180,13 +177,17 @@ describe('PivotTableChart expansion with metrics before dimensions (depth)', () 
 
       const tbody = container.querySelector('tbody') as HTMLElement;
       const steps = Math.max(depth - 1, 1);
-      for (let step = 1; step <= steps; step += 1) {
-        const plusToggles = within(tbody).getAllByLabelText('plus-square');
-        fireEvent.click(plusToggles[0]);
-        await waitFor(() =>
-          expect(fetchPivotBranchMock).toHaveBeenCalledTimes(step),
-        );
-      }
+      await Array.from({ length: steps }, (_, index) => index + 1).reduce(
+        async (promise, step) => {
+          await promise;
+          const plusToggles = within(tbody).getAllByLabelText('plus-square');
+          fireEvent.click(plusToggles[0]);
+          await waitFor(() =>
+            expect(fetchPivotBranchMock).toHaveBeenCalledTimes(step),
+          );
+        },
+        Promise.resolve(),
+      );
     },
   );
 
@@ -199,15 +200,13 @@ describe('PivotTableChart expansion with metrics before dimensions (depth)', () 
       const { container } = render(
         <PivotTableChart
           data={tree}
-          formData={buildFormData(
-            {
-              ...baseFormData,
-              groupbyRows: [],
-              groupbyColumns,
-              metrics: ['m1'],
-              colTotals: false,
-            })
-          }
+          formData={buildFormData({
+            ...baseFormData,
+            groupbyRows: [],
+            groupbyColumns,
+            metrics: ['m1'],
+            colTotals: false,
+          })}
           metrics={['m1']}
           groupbyRows={[]}
           groupbyColumns={groupbyColumns}
@@ -238,13 +237,17 @@ describe('PivotTableChart expansion with metrics before dimensions (depth)', () 
 
       const thead = container.querySelector('thead') as HTMLElement;
       const steps = Math.max(depth - 1, 1);
-      for (let step = 1; step <= steps; step += 1) {
-        const plusToggles = within(thead).getAllByLabelText('plus-square');
-        fireEvent.click(plusToggles[0]);
-        await waitFor(() =>
-          expect(fetchPivotBranchMock).toHaveBeenCalledTimes(step),
-        );
-      }
+      await Array.from({ length: steps }, (_, index) => index + 1).reduce(
+        async (promise, step) => {
+          await promise;
+          const plusToggles = within(thead).getAllByLabelText('plus-square');
+          fireEvent.click(plusToggles[0]);
+          await waitFor(() =>
+            expect(fetchPivotBranchMock).toHaveBeenCalledTimes(step),
+          );
+        },
+        Promise.resolve(),
+      );
     },
   );
 });

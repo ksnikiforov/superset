@@ -36,13 +36,7 @@ const metadata = new ChartMetadata({
     'Pivot table with lazy branch loading and database-accurate totals/subtotals.',
   ),
   name: t('Pivot Table v3'),
-  tags: [
-    t('Additive'),
-    t('Business'),
-    t('Featured'),
-    t('Report'),
-    t('Pivot'),
-  ],
+  tags: [t('Additive'), t('Business'), t('Featured'), t('Report'), t('Pivot')],
   thumbnail,
 });
 

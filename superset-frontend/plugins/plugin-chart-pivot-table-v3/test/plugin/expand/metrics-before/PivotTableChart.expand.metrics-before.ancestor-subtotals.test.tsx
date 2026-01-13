@@ -17,8 +17,8 @@
  * under the License.
  */
 
-import React from 'react';
-import { render, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, fireEvent, waitFor, within } from '../../../testUtils';
+import { SupersetClient } from '@superset-ui/core';
 import PivotTableChart from '../../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum } from '../../../../src/types';
 import { baseFormData, buildFormData } from '../../fixtures/pivotFormData';
@@ -32,8 +32,10 @@ import {
   serializePath,
   SUBTOTAL_TOKEN,
 } from '../../../../src/utils';
-import { fetchPivotBranch, peekPivotBranchCache } from '../../../../src/fetchPivotBranch';
-import { SupersetClient } from '@superset-ui/core';
+import {
+  fetchPivotBranch,
+  peekPivotBranchCache,
+} from '../../../../src/fetchPivotBranch';
 import { formatQueryName } from '../../../../src/buildQuery';
 
 jest.mock('../../../../src/fetchPivotBranch', () => {
@@ -152,15 +154,13 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
     const { container, getAllByLabelText, findByText } = render(
       <PivotTableChart
         data={baseTree}
-        formData={buildFormData(
-          {
-            ...baseFormData,
-            groupbyRows: ['nation', 'orderPriority', 'orderStatus'],
-            groupbyColumns: ['segment', 'shipMode', METRICS_PLACEHOLDER],
-            metricsLayout: MetricsLayoutEnum.COLUMNS,
-            metrics: ['countCustomers'],
-          })
-        }
+        formData={buildFormData({
+          ...baseFormData,
+          groupbyRows: ['nation', 'orderPriority', 'orderStatus'],
+          groupbyColumns: ['segment', 'shipMode', METRICS_PLACEHOLDER],
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+          metrics: ['countCustomers'],
+        })}
         metrics={['countCustomers']}
         groupbyRows={['nation', 'orderPriority', 'orderStatus']}
         groupbyColumns={['segment', 'shipMode']}
@@ -208,7 +208,7 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
     // Parent row (nation) should still render values for the expanded column leaf.
     const usaRow = await findByText('USA');
     const usaRowEl = usaRow.closest('tr') as HTMLElement;
-    expect(within(usaRowEl).getByText('10')).toBeTruthy();
+    expect(within(usaRowEl).getByText('10')).toBeInTheDocument();
   });
 
   it('fills ancestor column cells when expanding rows after a column branch expand', async () => {
@@ -323,15 +323,13 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
     const { container, findByText } = render(
       <PivotTableChart
         data={baseTree}
-        formData={buildFormData(
-          {
-            ...baseFormData,
-            groupbyRows: ['nation', 'orderPriority', 'orderStatus'],
-            groupbyColumns: ['segment', 'shipMode', METRICS_PLACEHOLDER],
-            metricsLayout: MetricsLayoutEnum.COLUMNS,
-            metrics: ['countCustomers'],
-          })
-        }
+        formData={buildFormData({
+          ...baseFormData,
+          groupbyRows: ['nation', 'orderPriority', 'orderStatus'],
+          groupbyColumns: ['segment', 'shipMode', METRICS_PLACEHOLDER],
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+          metrics: ['countCustomers'],
+        })}
         metrics={['countCustomers']}
         groupbyRows={['nation', 'orderPriority', 'orderStatus']}
         groupbyColumns={['segment', 'shipMode']}
@@ -377,7 +375,7 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
     const highCell = await findByText('HIGH');
     const highRow = highCell.closest('tr') as HTMLElement;
     expect(within(highRow).getAllByText('5')).toHaveLength(2);
-    expect(within(highRow).getByText('7')).toBeTruthy();
+    expect(within(highRow).getByText('7')).toBeInTheDocument();
   });
 
   it('keeps row-level ancestor column values when expanding a different column after deeper rows', async () => {
@@ -428,9 +426,24 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
 
     const rowBranchNationRaw = buildTreeFromRecords(
       [
-        { nation: 'USA', orderPriority: '1-URGENT', segment: 'AUTO', countCustomers: 40 },
-        { nation: 'USA', orderPriority: '1-URGENT', segment: 'BUILDING', countCustomers: 50 },
-        { nation: 'CAN', orderPriority: '1-URGENT', segment: 'AUTO', countCustomers: 30 },
+        {
+          nation: 'USA',
+          orderPriority: '1-URGENT',
+          segment: 'AUTO',
+          countCustomers: 40,
+        },
+        {
+          nation: 'USA',
+          orderPriority: '1-URGENT',
+          segment: 'BUILDING',
+          countCustomers: 50,
+        },
+        {
+          nation: 'CAN',
+          orderPriority: '1-URGENT',
+          segment: 'AUTO',
+          countCustomers: 30,
+        },
       ],
       ['countCustomers'],
       ['nation', 'orderPriority', 'orderStatus'],
@@ -513,8 +526,18 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
 
     const colBranchBuildingRow1Raw = buildTreeFromRecords(
       [
-        { nation: 'USA', segment: 'BUILDING', shipMode: 'AIR', countCustomers: 50 },
-        { nation: 'CAN', segment: 'BUILDING', shipMode: 'AIR', countCustomers: 35 },
+        {
+          nation: 'USA',
+          segment: 'BUILDING',
+          shipMode: 'AIR',
+          countCustomers: 50,
+        },
+        {
+          nation: 'CAN',
+          segment: 'BUILDING',
+          shipMode: 'AIR',
+          countCustomers: 35,
+        },
       ],
       ['countCustomers'],
       ['nation', 'orderPriority', 'orderStatus'],
@@ -567,18 +590,16 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
         ),
       });
 
-    const { container, findByText, getAllByLabelText } = render(
+    const { container, findByText } = render(
       <PivotTableChart
         data={baseTree}
-        formData={buildFormData(
-          {
-            ...baseFormData,
-            groupbyRows: ['nation', 'orderPriority', 'orderStatus'],
-            groupbyColumns: ['segment', 'shipMode', METRICS_PLACEHOLDER],
-            metricsLayout: MetricsLayoutEnum.COLUMNS,
-            metrics: ['countCustomers'],
-          })
-        }
+        formData={buildFormData({
+          ...baseFormData,
+          groupbyRows: ['nation', 'orderPriority', 'orderStatus'],
+          groupbyColumns: ['segment', 'shipMode', METRICS_PLACEHOLDER],
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+          metrics: ['countCustomers'],
+        })}
         metrics={['countCustomers']}
         groupbyRows={['nation', 'orderPriority', 'orderStatus']}
         groupbyColumns={['segment', 'shipMode']}
@@ -630,8 +651,11 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
     });
 
     // 4) Expand second column header (BUILDING)
-    const buildingHeaderCell = within(thead).getByText('BUILDING').closest('th') as HTMLElement;
-    const buildingToggle = within(buildingHeaderCell).getByLabelText('plus-square');
+    const buildingHeaderCell = within(thead)
+      .getByText('BUILDING')
+      .closest('th') as HTMLElement;
+    const buildingToggle =
+      within(buildingHeaderCell).getByLabelText('plus-square');
     fireEvent.click(buildingToggle);
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(4);
@@ -782,15 +806,15 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
       groupbyColumns,
       groupbyColumns.length,
     );
-    rowBranch.cols[subtotalKey] = rowBranch.cols[subtotalKey] || colBranch.cols[subtotalKey];
-    rowBranch.cells[
-      serializeCellKey(serializePath(['F', 'A']), subtotalKey)
-    ] = {
-      rowKey: serializePath(['F', 'A']),
-      colKey: subtotalKey,
-      values: { quantitySold: 30 },
-      isSubtotal: true,
-    };
+    rowBranch.cols[subtotalKey] =
+      rowBranch.cols[subtotalKey] || colBranch.cols[subtotalKey];
+    rowBranch.cells[serializeCellKey(serializePath(['F', 'A']), subtotalKey)] =
+      {
+        rowKey: serializePath(['F', 'A']),
+        colKey: subtotalKey,
+        values: { quantitySold: 30 },
+        isSubtotal: true,
+      };
     const subtotalRowKey = serializePath(['F', SUBTOTAL_TOKEN]);
     rowBranch.rows[subtotalRowKey] = {
       axis: 'row',
@@ -818,20 +842,18 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
     const { container } = render(
       <PivotTableChart
         data={baseTree}
-        formData={buildFormData(
-          {
-            ...baseFormData,
-            groupbyRows,
-            groupbyColumns: [...groupbyColumns, METRICS_PLACEHOLDER],
-            metricsLayout: MetricsLayoutEnum.COLUMNS,
-            metrics,
-            colTotals: true,
-            colSubtotalLevels: [1],
-            rowTotals: true,
-            rowSubTotals: false,
-            rowSubtotalLevels: [],
-          })
-        }
+        formData={buildFormData({
+          ...baseFormData,
+          groupbyRows,
+          groupbyColumns: [...groupbyColumns, METRICS_PLACEHOLDER],
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+          metrics,
+          colTotals: true,
+          colSubtotalLevels: [1],
+          rowTotals: true,
+          rowSubTotals: false,
+          rowSubtotalLevels: [],
+        })}
         metrics={metrics}
         groupbyRows={groupbyRows}
         groupbyColumns={groupbyColumns}
@@ -873,7 +895,7 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
     });
 
     const rowHeaders = Array.from(
-      (container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>),
+      container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
     ).map(cell => cell.textContent?.trim());
     expect(rowHeaders).not.toContain('Subtotal');
   });
@@ -956,9 +978,7 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
       hasChildren: false,
       isSubtotal: true,
     };
-    colBranch.cells[
-      serializeCellKey(serializePath(['F']), subtotalKey)
-    ] = {
+    colBranch.cells[serializeCellKey(serializePath(['F']), subtotalKey)] = {
       rowKey: serializePath(['F']),
       colKey: subtotalKey,
       values: { quantitySold: 30 },
@@ -998,36 +1018,33 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
     );
     rowBranch.cols[subtotalKey] =
       rowBranch.cols[subtotalKey] || colBranch.cols[subtotalKey];
-    rowBranch.cells[
-      serializeCellKey(serializePath(['F', 'A']), subtotalKey)
-    ] = {
-      rowKey: serializePath(['F', 'A']),
-      colKey: subtotalKey,
-      values: { quantitySold: 30 },
-      isSubtotal: true,
-    };
+    rowBranch.cells[serializeCellKey(serializePath(['F', 'A']), subtotalKey)] =
+      {
+        rowKey: serializePath(['F', 'A']),
+        colKey: subtotalKey,
+        values: { quantitySold: 30 },
+        isSubtotal: true,
+      };
 
     fetchPivotBranchMock
       .mockResolvedValueOnce({ data: colBranch })
       .mockResolvedValueOnce({ data: rowBranch });
 
-    const { container, findByText } = render(
+    const { container } = render(
       <PivotTableChart
         data={baseTree}
-        formData={buildFormData(
-          {
-            ...baseFormData,
-            groupbyRows,
-            groupbyColumns: [...groupbyColumns, METRICS_PLACEHOLDER],
-            metricsLayout: MetricsLayoutEnum.COLUMNS,
-            metrics,
-            colTotals: true,
-            colSubtotalLevels: [1],
-            rowTotals: true,
-            rowSubTotals: false,
-            rowSubtotalLevels: [],
-          })
-        }
+        formData={buildFormData({
+          ...baseFormData,
+          groupbyRows,
+          groupbyColumns: [...groupbyColumns, METRICS_PLACEHOLDER],
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+          metrics,
+          colTotals: true,
+          colSubtotalLevels: [1],
+          rowTotals: true,
+          rowSubTotals: false,
+          rowSubtotalLevels: [],
+        })}
         metrics={metrics}
         groupbyRows={groupbyRows}
         groupbyColumns={groupbyColumns}
@@ -1068,7 +1085,9 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
     });
 
-    const headerRow = container.querySelector('thead tr:last-child') as HTMLElement;
+    const headerRow = container.querySelector(
+      'thead tr:last-child',
+    ) as HTMLElement;
     const headers = within(headerRow)
       .getAllByRole('columnheader')
       .map(cell => cell.textContent?.trim());
@@ -1078,11 +1097,13 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
       container.querySelector('tbody') as HTMLElement,
     ).findByText('A');
     const childRowEl = childRow.closest('tr') as HTMLElement;
-    expect(within(childRowEl).getByText('30')).toBeTruthy();
+    expect(within(childRowEl).getByText('30')).toBeInTheDocument();
   });
 
   it('fills ancestor column values for all visible rows when expanding another column after deep row expansion', async () => {
-    const actualFetchModule = jest.requireActual('../../../../src/fetchPivotBranch');
+    const actualFetchModule = jest.requireActual(
+      '../../../../src/fetchPivotBranch',
+    );
     fetchPivotBranchMock.mockImplementation(args =>
       actualFetchModule.fetchPivotBranch(args),
     );
@@ -1115,11 +1136,7 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
           }
           return { data: [] };
         }
-        if (
-          name.includes(
-            `branch:row:${serializePath(['USA', '1-URGENT'])}`,
-          )
-        ) {
+        if (name.includes(`branch:row:${serializePath(['USA', '1-URGENT'])}`)) {
           if (name.includes(formatQueryName(3, 2))) {
             return {
               data: [
@@ -1217,15 +1234,13 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
       const { container, findByText } = render(
         <PivotTableChart
           data={baseTree}
-          formData={buildFormData(
-            {
-              ...baseFormData,
-              groupbyRows: ['nation', 'orderPriority', 'orderStatus'],
-              groupbyColumns: ['segment', 'shipMode', METRICS_PLACEHOLDER],
-              metricsLayout: MetricsLayoutEnum.COLUMNS,
-              metrics: ['countCustomers'],
-            })
-          }
+          formData={buildFormData({
+            ...baseFormData,
+            groupbyRows: ['nation', 'orderPriority', 'orderStatus'],
+            groupbyColumns: ['segment', 'shipMode', METRICS_PLACEHOLDER],
+            metricsLayout: MetricsLayoutEnum.COLUMNS,
+            metrics: ['countCustomers'],
+          })}
           metrics={['countCustomers']}
           groupbyRows={['nation', 'orderPriority', 'orderStatus']}
           groupbyColumns={['segment', 'shipMode']}
@@ -1255,7 +1270,9 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
       );
 
       const thead = container.querySelector('thead') as HTMLElement;
-      const autoHeader = within(thead).getByText('AUTO').closest('th') as HTMLElement;
+      const autoHeader = within(thead)
+        .getByText('AUTO')
+        .closest('th') as HTMLElement;
       fireEvent.click(within(autoHeader).getByLabelText('plus-square'));
       await waitFor(() => {
         expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
@@ -1275,7 +1292,9 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
         expect(fetchPivotBranchMock).toHaveBeenCalledTimes(3);
       });
 
-      const consumerHeader = within(thead).getByText('CONSUMER').closest('th') as HTMLElement;
+      const consumerHeader = within(thead)
+        .getByText('CONSUMER')
+        .closest('th') as HTMLElement;
       fireEvent.click(within(consumerHeader).getByLabelText('plus-square'));
       await waitFor(() => {
         expect(fetchPivotBranchMock).toHaveBeenCalledTimes(4);
@@ -1288,7 +1307,9 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
       });
       const orderStatusRow = await findByText('F');
       const orderStatusRowEl = orderStatusRow.closest('tr') as HTMLElement;
-      expect(within(orderStatusRowEl).getAllByText('15').length).toBeGreaterThan(0);
+      expect(
+        within(orderStatusRowEl).getAllByText('15').length,
+      ).toBeGreaterThan(0);
     } finally {
       postSpy.mockRestore();
       fetchPivotBranchMock.mockReset();
@@ -1348,20 +1369,18 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
     const { container } = render(
       <PivotTableChart
         data={tree}
-        formData={buildFormData(
-          {
-            ...baseFormData,
-            groupbyRows,
-            groupbyColumns: [...groupbyColumns, METRICS_PLACEHOLDER],
-            metricsLayout: MetricsLayoutEnum.COLUMNS,
-            metrics,
-            rowTotals: true,
-            rowSubTotals: false,
-            rowSubtotalLevels: [],
-            colTotals: true,
-            colSubtotalLevels: [1],
-          })
-        }
+        formData={buildFormData({
+          ...baseFormData,
+          groupbyRows,
+          groupbyColumns: [...groupbyColumns, METRICS_PLACEHOLDER],
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+          metrics,
+          rowTotals: true,
+          rowSubTotals: false,
+          rowSubtotalLevels: [],
+          colTotals: true,
+          colSubtotalLevels: [1],
+        })}
         metrics={metrics}
         groupbyRows={groupbyRows}
         groupbyColumns={groupbyColumns}
@@ -1391,9 +1410,8 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
     );
 
     const rowHeaders = Array.from(
-      (container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>),
+      container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
     ).map(cell => cell.textContent?.trim());
     expect(rowHeaders).not.toContain('Subtotal');
   });
-
 });

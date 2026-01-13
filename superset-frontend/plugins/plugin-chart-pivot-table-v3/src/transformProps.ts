@@ -86,9 +86,8 @@ export default function transformProps(
     formData.metricDatabars,
     metrics,
   );
-  const formattingMetrics = collectMetricFormattingMetricsForQuery(
-    metricFormatting,
-  );
+  const formattingMetrics =
+    collectMetricFormattingMetricsForQuery(metricFormatting);
   const databarMetrics = collectMetricDatabarMetricsForQuery(metricDatabars);
   const metricsForQuery = mergeMetrics(metrics, formattingMetrics);
   const groupbyRowsRaw = ensureIsArray(formData.groupbyRows || []);
@@ -176,11 +175,9 @@ export default function transformProps(
         ? Math.min(placement.metricPosition, groupbyRows.length)
         : groupbyRows.length
       : placement.metricPosition >= 0
-      ? Math.min(placement.metricPosition, groupbyColumns.length)
-      : groupbyColumns.length;
+        ? Math.min(placement.metricPosition, groupbyColumns.length)
+        : groupbyColumns.length;
   const granularity = extractTimegrain(rawFormData);
-  const metricKeys = getMetricKeys(metrics);
-  const metricKeySet = new Set(metricKeys.filter(key => key));
   const metricKeysForQuery = getMetricKeys(metricsForQueryWithFormatting);
   const metricKeySetForQuery = new Set(metricKeysForQuery.filter(key => key));
   const queryFormData: PivotTableQueryFormData = {
@@ -189,11 +186,13 @@ export default function transformProps(
     maxDepthPerFetch,
   };
 
-  const resolveQueryDepth = (query: typeof queriesData[number]) => {
+  const resolveQueryDepth = (query: (typeof queriesData)[number]) => {
     const queryName = (query as any)?.query_name || (query as any)?.queryName;
     let { rowDepth, colDepth } = parseDepth(queryName);
     const hasQueryName = !!queryName;
-    const colSet = new Set((query.colnames || []).map((name: any) => String(name)));
+    const colSet = new Set(
+      (query.colnames || []).map((name: any) => String(name)),
+    );
     const inferredRowDepth = groupbyRows.filter(col =>
       colSet.has(String(getColumnLabel(col))),
     ).length;
@@ -208,7 +207,8 @@ export default function transformProps(
     const hasMetricCols =
       metricKeySetForQuery.size > 0 &&
       Array.from(metricKeySetForQuery).some(key => colSet.has(String(key)));
-    const isMetricOnlyQuery = colSet.size > 0 && !hasGroupbyCols && hasMetricCols;
+    const isMetricOnlyQuery =
+      colSet.size > 0 && !hasGroupbyCols && hasMetricCols;
     if (
       rowDepth === 0 &&
       colDepth === 0 &&
@@ -240,42 +240,41 @@ export default function transformProps(
   const temporalColumns = Object.keys(colTypeMap).filter(
     colname => colTypeMap[colname] === GenericDataType.Temporal,
   );
-  const dateFormatters = temporalColumns
-    .reduce(
-      (
-        acc: Record<string, ((value: DataRecordValue) => string) | undefined>,
-        temporalColname,
-      ) => {
-        let formatter: ((value: DataRecordValue) => string) | undefined;
-        if (formData.dateFormat === SMART_DATE_ID) {
-          if (granularity) {
-            const base = getTimeFormatterForGranularity(granularity);
-            formatter = (value: DataRecordValue) =>
-              base(value as number | Date | null | undefined);
-          } else if (
-            combinedData.every(
-              row =>
-                row[temporalColname] === null ||
-                row[temporalColname] === undefined ||
-                typeof row[temporalColname] === 'number',
-            )
-          ) {
-            const base = getTimeFormatter(DATABASE_DATETIME);
-            formatter = (value: DataRecordValue) =>
-              base(value as number | Date | null | undefined);
-          }
-        } else if (formData.dateFormat) {
-          const base = getTimeFormatter(formData.dateFormat);
+  const dateFormatters = temporalColumns.reduce(
+    (
+      acc: Record<string, ((value: DataRecordValue) => string) | undefined>,
+      temporalColname,
+    ) => {
+      let formatter: ((value: DataRecordValue) => string) | undefined;
+      if (formData.dateFormat === SMART_DATE_ID) {
+        if (granularity) {
+          const base = getTimeFormatterForGranularity(granularity);
+          formatter = (value: DataRecordValue) =>
+            base(value as number | Date | null | undefined);
+        } else if (
+          combinedData.every(
+            row =>
+              row[temporalColname] === null ||
+              row[temporalColname] === undefined ||
+              typeof row[temporalColname] === 'number',
+          )
+        ) {
+          const base = getTimeFormatter(DATABASE_DATETIME);
           formatter = (value: DataRecordValue) =>
             base(value as number | Date | null | undefined);
         }
-        if (formatter) {
-          acc[temporalColname] = formatter;
-        }
-        return acc;
-      },
-      {},
-    );
+      } else if (formData.dateFormat) {
+        const base = getTimeFormatter(formData.dateFormat);
+        formatter = (value: DataRecordValue) =>
+          base(value as number | Date | null | undefined);
+      }
+      if (formatter) {
+        acc[temporalColname] = formatter;
+      }
+      return acc;
+    },
+    {},
+  );
 
   const metricColorFormatters = getColorFormatters(
     // @ts-ignore legacy conditional formatting name
@@ -329,10 +328,13 @@ export default function transformProps(
   });
   const grandTotalRecord = zeroDepthQuery?.data?.[0];
   if (grandTotalRecord) {
-    const grandValues = metricKeysForQuery.reduce((acc, key) => {
-      if (!key) return acc;
-      return { ...acc, [key]: (grandTotalRecord as any)[key] };
-    }, {} as Record<string, DataRecordValue>);
+    const grandValues = metricKeysForQuery.reduce(
+      (acc, key) => {
+        if (!key) return acc;
+        return { ...acc, [key]: (grandTotalRecord as any)[key] };
+      },
+      {} as Record<string, DataRecordValue>,
+    );
     if (Object.keys(grandValues).length > 0) {
       const rootCellKey = serializeCellKey(rootKey, rootKey);
       nextTree.rows[rootKey] = {
@@ -377,7 +379,12 @@ export default function transformProps(
     height,
     margin: (formData as any).margin ?? 0,
     data: nextTreeLabeled,
-    formData: { ...formData, metricsLayout, maxDepthPerFetch },
+    formData: {
+      ...formData,
+      metricsLayout,
+      maxDepthPerFetch,
+      treeDataSignature,
+    },
     queryFormData,
     metrics,
     metricFormatting,

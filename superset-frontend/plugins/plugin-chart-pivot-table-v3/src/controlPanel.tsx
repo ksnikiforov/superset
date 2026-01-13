@@ -16,11 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import React from 'react';
 import {
   ControlPanelConfig,
   ControlPanelState,
   ControlState,
+  ControlHeader,
   ControlSubSectionHeader,
   D3_TIME_FORMAT_OPTIONS,
   getStandardizedControls,
@@ -32,12 +32,12 @@ import {
   isAdhocColumn,
   isPhysicalColumn,
   SMART_DATE_ID,
+  supersetTheme,
   t,
   validateNonEmpty,
 } from '@superset-ui/core';
 import { Checkbox, Space, Typography } from '@superset-ui/core/components';
 import { CheckboxChangeEvent } from '@superset-ui/core/components/Checkbox/types';
-import ControlHeader from 'src/explore/components/ControlHeader';
 import { MetricsLayoutEnum } from './types';
 import {
   METRICS_PLACEHOLDER,
@@ -51,19 +51,25 @@ import {
 import PivotDndColumnSelect from './controls/PivotDndColumnSelect/PivotDndColumnSelect';
 import PivotDndMetricSelect from './controls/PivotDndMetricSelect/PivotDndMetricSelect';
 
+type WindowWithPivotDebug = Window & { PIVOT_V3_DEBUG_PLACEMENT?: boolean };
+
+const THEME_BLUE = 'blue';
+const THEME_PEACH = 'peach';
+const THEME_GREY = 'grey';
+
 const themeOptions = [
   {
-    value: 'blue',
+    value: THEME_BLUE,
     label: t('Blue'),
     colors: [PIVOT_THEME_PRESETS.blue],
   },
   {
-    value: 'peach',
+    value: THEME_PEACH,
     label: t('Peach'),
     colors: [PIVOT_THEME_PRESETS.peach],
   },
   {
-    value: 'grey',
+    value: THEME_GREY,
     label: t('Grey'),
     colors: [PIVOT_THEME_PRESETS.grey],
   },
@@ -80,7 +86,7 @@ const renderThemeSwatches = (colors: string[]) => (
           width: 12,
           height: 12,
           borderRadius: 2,
-          border: '1px solid #D9D9D9',
+          border: `1px solid ${supersetTheme.colorBorder}`,
           backgroundColor: color,
         }}
       />
@@ -125,7 +131,8 @@ const withMetricsPlaceholder = (axis: 'row' | 'col') => (config: any) => ({
         ? options
         : [...options, placeholderOption]
       : options.filter(
-          (opt: any) => (opt?.column_name || opt?.label) !== METRICS_PLACEHOLDER,
+          (opt: any) =>
+            (opt?.column_name || opt?.label) !== METRICS_PLACEHOLDER,
         );
     const rowsRaw =
       axis === 'row'
@@ -143,7 +150,7 @@ const withMetricsPlaceholder = (axis: 'row' | 'col') => (config: any) => ({
       hasMetrics,
       preferredAxis: preferredLayout,
     });
-    if ((window as any).__PIVOT_V3_DEBUG_PLACEMENT) {
+    if ((window as WindowWithPivotDebug).PIVOT_V3_DEBUG_PLACEMENT) {
       // eslint-disable-next-line no-console
       console.log('[pivot-v3] placement', {
         axis,
@@ -449,7 +456,10 @@ const config: ControlPanelConfig = {
               choices: [
                 ['values', t('Values only')],
                 ['values_totals', t('Values + totals')],
-                ['values_totals_grand_totals', t('Values + totals + grand totals')],
+                [
+                  'values_totals_grand_totals',
+                  t('Values + totals + grand totals'),
+                ],
               ],
             },
           },
@@ -643,7 +653,9 @@ const config: ControlPanelConfig = {
             config: {
               type: 'SelectControl',
               label: t('Row subtotal position'),
-              description: t('Show row subtotals inline or as a row at the bottom.'),
+              description: t(
+                'Show row subtotals inline or as a row at the bottom.',
+              ),
               clearable: false,
               default: 'start',
               renderTrigger: true,
@@ -690,7 +702,9 @@ const config: ControlPanelConfig = {
             config: {
               type: 'SelectControl',
               label: t('Column total position'),
-              description: t('Place the grand total column at the start or end.'),
+              description: t(
+                'Place the grand total column at the start or end.',
+              ),
               clearable: false,
               default: 'start',
               renderTrigger: true,
@@ -726,10 +740,14 @@ const config: ControlPanelConfig = {
               default: [],
               renderTrigger: true,
               shouldMapStateToProps: () => true,
-              mapStateToProps: (state: ControlPanelState & {
-                actions?: { setControlValue?: SetControlValue };
-              }) => {
-                const colsRaw = ensureIsArray(state?.controls?.groupbyColumns?.value);
+              mapStateToProps: (
+                state: ControlPanelState & {
+                  actions?: { setControlValue?: SetControlValue };
+                },
+              ) => {
+                const colsRaw = ensureIsArray(
+                  state?.controls?.groupbyColumns?.value,
+                );
                 const colGroupby = stripMetricsPlaceholder(colsRaw);
                 const colDepth = colGroupby.length;
                 const maxSubtotalDepth = Math.max(colDepth - 1, 0);
@@ -751,7 +769,8 @@ const config: ControlPanelConfig = {
                   state?.controls?.colSubtotalLevels?.value,
                 );
                 const legacyEnabled =
-                  rawValue.length === 0 && !!state?.controls?.colSubTotals?.value;
+                  rawValue.length === 0 &&
+                  !!state?.controls?.colSubTotals?.value;
                 const normalizedValue = normalizeSubtotalLevels(
                   rawValue,
                   maxSubtotalDepth,
@@ -777,7 +796,9 @@ const config: ControlPanelConfig = {
             config: {
               type: 'SelectControl',
               label: t('Column subtotal position'),
-              description: t('Place subtotal columns before or after their group.'),
+              description: t(
+                'Place subtotal columns before or after their group.',
+              ),
               clearable: false,
               default: 'start',
               renderTrigger: true,
@@ -820,7 +841,9 @@ const config: ControlPanelConfig = {
               options: themeOptions,
               optionRenderer: renderThemeOption,
               valueRenderer: renderThemeOption,
-              description: t('Choose a preset theme for headers and grand totals.'),
+              description: t(
+                'Choose a preset theme for headers and grand totals.',
+              ),
             },
           },
         ],

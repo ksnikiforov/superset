@@ -88,7 +88,9 @@ export const createColLeavesBuilder = ({
   isMetricGrandTotalNode,
   isMetricSubtotalNode,
 }: ColLeavesParams) => {
-  const buildColLeavesWithSubtotals = (node: PivotTreeNode): PivotTreeNode[] => {
+  const buildColLeavesWithSubtotals = (
+    node: PivotTreeNode,
+  ): PivotTreeNode[] => {
     const children = getColChildren(node).sort(colSorter);
     const dimDepth = countDimDepth(node.path);
     const hasChildren = children.length > 0;
@@ -123,8 +125,7 @@ export const createColLeavesBuilder = ({
         return leaves;
       }
       return leaves.filter(
-        leaf =>
-          !isSubtotalTokenForNode(leaf) && !isMetricSubtotalForNode(leaf),
+        leaf => !isSubtotalTokenForNode(leaf) && !isMetricSubtotalForNode(leaf),
       );
     };
     if (!expandedCols.has(node.key) || children.length === 0) {
@@ -133,14 +134,13 @@ export const createColLeavesBuilder = ({
         return [node];
       }
       return collapsedMetricLeaves.flatMap(leaf =>
-        expandedCols.has(leaf.key)
-          ? buildColLeavesWithSubtotals(leaf)
-          : [leaf],
+        expandedCols.has(leaf.key) ? buildColLeavesWithSubtotals(leaf) : [leaf],
       );
     }
     const placeAtFront =
-      (dimDepth === 0 ? resolvedColTotalPosition : resolvedColSubtotalPosition) ===
-      'start';
+      (dimDepth === 0
+        ? resolvedColTotalPosition
+        : resolvedColSubtotalPosition) === 'start';
     const childLeaves = children.flatMap(buildColLeavesWithSubtotals);
     if (!includeSubtotal) {
       return filterHiddenSubtotals(childLeaves);
@@ -219,8 +219,7 @@ export const createColLeavesBuilder = ({
     const subtotalLeaf = childLeaves.find(isDuplicateSubtotalLeaf);
     if (subtotalLeaf) {
       const remainingLeaves = childLeaves.filter(
-        leaf =>
-          leaf.key !== subtotalLeaf.key && !isDuplicateSubtotalLeaf(leaf),
+        leaf => leaf.key !== subtotalLeaf.key && !isDuplicateSubtotalLeaf(leaf),
       );
       return placeAtFront
         ? [subtotalLeaf, ...remainingLeaves]
@@ -266,8 +265,14 @@ export const getVisibleDepths = (
   visibleCols: PivotTreeNode[],
   countDimDepth: (path: PivotTreeNode['path']) => number,
 ) => ({
-  visibleRowDepth: Math.max(0, ...visibleRows.map(row => countDimDepth(row.path))),
-  visibleColDepth: Math.max(0, ...visibleCols.map(col => countDimDepth(col.path))),
+  visibleRowDepth: Math.max(
+    0,
+    ...visibleRows.map(row => countDimDepth(row.path)),
+  ),
+  visibleColDepth: Math.max(
+    0,
+    ...visibleCols.map(col => countDimDepth(col.path)),
+  ),
 });
 
 export const getExpandedDepths = (
@@ -363,16 +368,15 @@ export const hasLoadedChildren = ({
     // Metrics are showing before their configured position; fetch the missing dimension.
     return false;
   }
-  const childDimDepths = children.map(child =>
-    countBaseDimDepth(child.path),
-  );
+  const childDimDepths = children.map(child => countBaseDimDepth(child.path));
   const maxChildDimDepth = Math.max(...childDimDepths, 0);
   const childCellRowDepths: number[] = [];
   const childCellColDepths: number[] = [];
   const hasChildCells = children.some(child =>
     Object.keys(cells).some(key => {
       const { rowKey, colKey } = parseCellKey(key);
-      const matches = axis === 'row' ? rowKey === child.key : colKey === child.key;
+      const matches =
+        axis === 'row' ? rowKey === child.key : colKey === child.key;
       if (matches) {
         const rowNode = rows[rowKey];
         const colNode = cols[colKey];

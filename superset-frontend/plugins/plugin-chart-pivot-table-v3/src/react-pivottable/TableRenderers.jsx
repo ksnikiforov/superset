@@ -16,6 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+/* eslint-disable react-prefer-function-component/react-prefer-function-component */
 
 import { Component } from 'react';
 import { t, safeHtmlSpan } from '@superset-ui/core';

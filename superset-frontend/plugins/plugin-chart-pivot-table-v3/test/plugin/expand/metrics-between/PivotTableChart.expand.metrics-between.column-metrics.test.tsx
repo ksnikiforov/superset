@@ -17,8 +17,7 @@
  * under the License.
  */
 
-import React from 'react';
-import { render, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, fireEvent, waitFor, within } from '../../../testUtils';
 import PivotTableChart from '../../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum } from '../../../../src/types';
 import { baseFormData, buildFormData } from '../../fixtures/pivotFormData';
@@ -198,15 +197,15 @@ describe('PivotTableChart expansion with metrics between dimensions (column-metr
     );
 
     const thead = container.querySelector('thead') as HTMLElement;
-    const metricCell = within(thead).getByText('measure1').closest(
-      'th',
-    ) as HTMLElement;
+    const metricCell = within(thead)
+      .getByText('measure1')
+      .closest('th') as HTMLElement;
     fireEvent.click(within(metricCell).getByLabelText('plus-square'));
 
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
     });
-    expect(await findByText('C2-A')).toBeTruthy();
+    expect(await findByText('C2-A')).toBeInTheDocument();
   });
 
   it('keeps the next column level visible when metric subtotals exist', async () => {
@@ -281,15 +280,15 @@ describe('PivotTableChart expansion with metrics between dimensions (column-metr
     );
 
     const thead = container.querySelector('thead') as HTMLElement;
-    const metricCell = within(thead).getByText('measure1').closest(
-      'th',
-    ) as HTMLElement;
+    const metricCell = within(thead)
+      .getByText('measure1')
+      .closest('th') as HTMLElement;
     fireEvent.click(within(metricCell).getByLabelText('plus-square'));
 
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
     });
-    expect(await findByText('C2-A')).toBeTruthy();
+    expect(await findByText('C2-A')).toBeInTheDocument();
   });
 
   it('refetches the next column level after collapsing a metric expansion', async () => {
@@ -372,13 +371,7 @@ describe('PivotTableChart expansion with metrics between dimensions (column-metr
         formData={buildFormData({
           ...baseFormData,
           groupbyRows: expandedRowGroupby,
-          groupbyColumns: [
-            'col1',
-            'col2',
-            METRICS_PLACEHOLDER,
-            'col3',
-            'col4',
-          ],
+          groupbyColumns: ['col1', 'col2', METRICS_PLACEHOLDER, 'col3', 'col4'],
           metricsLayout: MetricsLayoutEnum.COLUMNS,
           metrics: expandedMetrics,
         })}
@@ -411,28 +404,30 @@ describe('PivotTableChart expansion with metrics between dimensions (column-metr
     );
 
     const thead = container.querySelector('thead') as HTMLElement;
-    const metricCell = within(thead).getByText('measure1').closest(
-      'th',
-    ) as HTMLElement;
+    const metricCell = within(thead)
+      .getByText('measure1')
+      .closest('th') as HTMLElement;
     fireEvent.click(within(metricCell).getByLabelText('plus-square'));
 
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
     });
-    expect(await findByText('C3-A')).toBeTruthy();
+    expect(await findByText('C3-A')).toBeInTheDocument();
 
-    const collapseMetricCell = within(thead).getByText('measure1').closest(
-      'th',
-    ) as HTMLElement;
+    const collapseMetricCell = within(thead)
+      .getByText('measure1')
+      .closest('th') as HTMLElement;
     fireEvent.click(within(collapseMetricCell).getByLabelText('minus-square'));
 
-    const col1Cell = within(thead).getByText('C1-A').closest('th') as HTMLElement;
+    const col1Cell = within(thead)
+      .getByText('C1-A')
+      .closest('th') as HTMLElement;
     fireEvent.click(within(col1Cell).getByLabelText('plus-square'));
 
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
     });
-    expect(await findByText('C2-A')).toBeTruthy();
-    expect(within(thead).queryByText('C3-A')).toBeNull();
+    expect(await findByText('C2-A')).toBeInTheDocument();
+    expect(within(thead).queryByText('C3-A')).not.toBeInTheDocument();
   });
 });

@@ -17,8 +17,7 @@
  * under the License.
  */
 
-import React from 'react';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum, PivotTableQueryFormData } from '../../../src/types';
 import { buildFormData } from '../fixtures/pivotFormData';
@@ -105,9 +104,9 @@ describe('PivotTableChart metric tier indentation and toggles', () => {
       );
 
       const shipModeRow = screen.getByText('AIR').closest('tr') as HTMLElement;
-      const metricRow = screen.getAllByText(metricLabel)[0].closest(
-        'tr',
-      ) as HTMLElement;
+      const metricRow = screen
+        .getAllByText(metricLabel)[0]
+        .closest('tr') as HTMLElement;
       const shipIndent = (shipModeRow.querySelector('th div') as HTMLElement)
         .style.paddingLeft;
       const metricIndent = (metricRow.querySelector('th div') as HTMLElement)
@@ -165,11 +164,15 @@ describe('PivotTableChart metric tier indentation and toggles', () => {
         />,
       );
 
-      const metricRow = screen.getAllByText(metricLabel)[0].closest(
-        'tr',
-      ) as HTMLElement;
-      expect(within(metricRow).queryByLabelText('plus-square')).toBeNull();
-      expect(within(metricRow).queryByLabelText('minus-square')).toBeNull();
+      const metricRow = screen
+        .getAllByText(metricLabel)[0]
+        .closest('tr') as HTMLElement;
+      expect(
+        within(metricRow).queryByLabelText('plus-square'),
+      ).not.toBeInTheDocument();
+      expect(
+        within(metricRow).queryByLabelText('minus-square'),
+      ).not.toBeInTheDocument();
       unmount();
     });
   });
@@ -223,16 +226,22 @@ describe('PivotTableChart metric tier indentation and toggles', () => {
         />,
       );
 
-      const priorityRow = screen.getByText('1-URGENT').closest(
-        'tr',
-      ) as HTMLElement;
-      expect(within(priorityRow).queryByLabelText('plus-square')).toBeNull();
-      expect(within(priorityRow).queryByLabelText('minus-square')).toBeNull();
+      const priorityRow = screen
+        .getByText('1-URGENT')
+        .closest('tr') as HTMLElement;
+      expect(
+        within(priorityRow).queryByLabelText('plus-square'),
+      ).not.toBeInTheDocument();
+      expect(
+        within(priorityRow).queryByLabelText('minus-square'),
+      ).not.toBeInTheDocument();
 
-      const metricRow = screen.getAllByText(metricLabel)[0].closest(
-        'tr',
-      ) as HTMLElement;
-      expect(within(metricRow).getByLabelText('plus-square')).toBeTruthy();
+      const metricRow = screen
+        .getAllByText(metricLabel)[0]
+        .closest('tr') as HTMLElement;
+      expect(
+        within(metricRow).getByLabelText('plus-square'),
+      ).toBeInTheDocument();
       unmount();
     });
   });
@@ -286,18 +295,22 @@ describe('PivotTableChart metric tier indentation and toggles', () => {
         />,
       );
 
-      const priorityHeader = screen.getByText('1-URGENT').closest(
-        'th',
-      ) as HTMLElement;
-      expect(within(priorityHeader).queryByLabelText('plus-square')).toBeNull();
-      expect(within(priorityHeader).queryByLabelText('minus-square')).toBeNull();
+      const priorityHeader = screen
+        .getByText('1-URGENT')
+        .closest('th') as HTMLElement;
+      expect(
+        within(priorityHeader).queryByLabelText('plus-square'),
+      ).not.toBeInTheDocument();
+      expect(
+        within(priorityHeader).queryByLabelText('minus-square'),
+      ).not.toBeInTheDocument();
 
-      const metricHeader = screen.getAllByText(
-        new RegExp(metricLabel),
-      )[0].closest(
-        'th',
-      ) as HTMLElement;
-      expect(within(metricHeader).getByLabelText('plus-square')).toBeTruthy();
+      const metricHeader = screen
+        .getAllByText(new RegExp(metricLabel))[0]
+        .closest('th') as HTMLElement;
+      expect(
+        within(metricHeader).getByLabelText('plus-square'),
+      ).toBeInTheDocument();
       unmount();
     });
   });

@@ -40,9 +40,11 @@ import {
 } from '@superset-ui/core/components';
 import { Icons } from '@superset-ui/core/components/Icons';
 import { ColumnMeta } from '@superset-ui/chart-controls';
-import AdhocMetric from 'src/explore/components/controls/MetricControl/AdhocMetric';
-import AdhocMetricPopoverTrigger from 'src/explore/components/controls/MetricControl/AdhocMetricPopoverTrigger';
-import { savedMetricType } from 'src/explore/components/controls/MetricControl/types';
+import {
+  AdhocMetric,
+  AdhocMetricPopoverTrigger,
+  type savedMetricType,
+} from '../../exploreImports';
 import MetricDefinitionValue from './MetricDefinitionValue';
 import {
   MetricFormattingField,
@@ -88,13 +90,15 @@ const rgbToHex = (color: ColorValue): string => {
   return base;
 };
 
-const DATABAR_TYPE_OPTIONS: Array<{ label: string; value: PivotDatabarType | 'none' }> =
-  [
-    { label: t('None'), value: 'none' },
-    { label: t('Filled bar'), value: 'bar' },
-    { label: t('Lollipop bar'), value: 'lollipop' },
-    { label: t('Waterfall'), value: 'waterfall' },
-  ];
+const DATABAR_TYPE_OPTIONS: Array<{
+  label: string;
+  value: PivotDatabarType | 'none';
+}> = [
+  { label: t('None'), value: 'none' },
+  { label: t('Filled bar'), value: 'bar' },
+  { label: t('Lollipop bar'), value: 'lollipop' },
+  { label: t('Waterfall'), value: 'waterfall' },
+];
 
 export type MetricSelectValue = {
   value: string | number;
@@ -106,7 +110,10 @@ export type MetricOptionValue = ValueType | MetricSelectValue;
 type PivotMetricDefinitionValueProps = {
   option: ValueType;
   index: number;
-  onMetricEdit: (changedMetric: Metric | AdhocMetric, oldMetric: Metric | AdhocMetric) => void;
+  onMetricEdit: (
+    changedMetric: Metric | AdhocMetric,
+    oldMetric: Metric | AdhocMetric,
+  ) => void;
   onRemoveMetric: (index: number) => void;
   onMoveLabel: (dragIndex: number, hoverIndex: number) => void;
   onDropLabel: () => void;
@@ -184,7 +191,9 @@ const resolveMetricLabel = (option: MetricOptionValue) => {
 const resolveMetricKey = (option: MetricOptionValue) =>
   getSelectValueKey(option) || getMetricKey(option as QueryFormMetric | Metric);
 
-const getMetricOptionValue = (option: MetricOptionValue): string | undefined => {
+const getMetricOptionValue = (
+  option: MetricOptionValue,
+): string | undefined => {
   const selectValue = getSelectValueKey(option);
   if (selectValue) {
     return selectValue;
@@ -197,7 +206,7 @@ const getMetricOptionValue = (option: MetricOptionValue): string | undefined => 
     return label !== t('Metric') ? label : undefined;
   }
   if (isRecord(option)) {
-    const optionName = option.optionName;
+    const { optionName } = option;
     if (typeof optionName === 'string' && optionName.length > 0) {
       return optionName;
     }
@@ -220,7 +229,8 @@ const buildMetricOptions = (metrics: MetricOptionValue[]) => {
   const seen = new Set<string>();
   return metrics.reduce<MetricOption[]>((acc, metric) => {
     const label = resolveMetricLabel(metric);
-    const value = getMetricOptionValue(metric) || (label !== t('Metric') ? label : '');
+    const value =
+      getMetricOptionValue(metric) || (label !== t('Metric') ? label : '');
     if (!value || seen.has(value)) {
       return acc;
     }
@@ -271,7 +281,7 @@ const normalizeFormattingMetric = (
     return normalized;
   }
   if (isRecord(metric)) {
-    const sqlExpression = metric.sqlExpression;
+    const { sqlExpression } = metric;
     if (typeof sqlExpression === 'string' && sqlExpression.trim().length > 0) {
       return {
         ...metric,
@@ -280,8 +290,8 @@ const normalizeFormattingMetric = (
           typeof metric.optionName === 'string' ? metric.optionName : undefined,
       } as QueryFormMetric;
     }
-    const aggregate = metric.aggregate;
-    const column = metric.column;
+    const { aggregate } = metric;
+    const { column } = metric;
     if (
       typeof aggregate === 'string' &&
       aggregate.length > 0 &&
@@ -468,9 +478,7 @@ export const MetricFormatSelector = ({
               return;
             }
             const nextMetric = optionMap.get(nextValueKey);
-            onChange(
-              normalizeFormattingMetric(nextMetric ?? nextValueKey),
-            );
+            onChange(normalizeFormattingMetric(nextMetric ?? nextValueKey));
             setIsDropdownOpen(false);
           }}
           onClick={() => {
@@ -513,25 +521,31 @@ export default function PivotMetricDefinitionValue(
   props: PivotMetricDefinitionValueProps,
 ) {
   const theme = useTheme();
+  const {
+    metricDatabars,
+    metricFormatting,
+    onMetricDatabarChange,
+    onMetricFormattingChange,
+    option,
+    savedMetrics,
+  } = props;
   const defaultPositiveColor =
     theme.colorSuccess ||
-    (theme as { colors?: { success?: { base?: string } } }).colors?.success?.base ||
+    (theme as { colors?: { success?: { base?: string } } }).colors?.success
+      ?.base ||
     DEFAULT_DATABAR_POSITIVE_COLOR;
   const defaultNegativeColor =
     theme.colorError ||
     (theme as { colors?: { error?: { base?: string } } }).colors?.error?.base ||
     DEFAULT_DATABAR_NEGATIVE_COLOR;
-  const metricLabel = useMemo(
-    () => resolveMetricLabel(props.option),
-    [props.option],
-  );
+  const metricLabel = useMemo(() => resolveMetricLabel(option), [option]);
   const metricKey = useMemo(() => {
-    const key = resolveMetricKey(props.option);
+    const key = resolveMetricKey(option);
     if (key) {
       return key;
     }
     return metricLabel !== t('Metric') ? metricLabel : '';
-  }, [metricLabel, props.option]);
+  }, [metricLabel, option]);
   const presetColors = useMemo(() => {
     const categoricalScheme = getCategoricalSchemeRegistry().get();
     return categoricalScheme?.colors.slice(0, 9) || [];
@@ -540,11 +554,17 @@ export default function PivotMetricDefinitionValue(
     const candidateKeys = [metricKey, metricLabel].filter(
       (candidate): candidate is string => !!candidate,
     );
-    const savedMetricMatch = props.savedMetrics.find(metric => {
-      if (metric.metric_name === metricKey || metric.metric_name === metricLabel) {
+    const savedMetricMatch = savedMetrics.find(metric => {
+      if (
+        metric.metric_name === metricKey ||
+        metric.metric_name === metricLabel
+      ) {
         return true;
       }
-      if (metric.verbose_name === metricKey || metric.verbose_name === metricLabel) {
+      if (
+        metric.verbose_name === metricKey ||
+        metric.verbose_name === metricLabel
+      ) {
         return true;
       }
       return false;
@@ -557,39 +577,34 @@ export default function PivotMetricDefinitionValue(
         candidateKeys.push(savedMetricMatch.verbose_name);
       }
     }
-    if (typeof props.option === 'object' && props.option !== null) {
-      if (
-        'metric_name' in props.option &&
-        typeof props.option.metric_name === 'string'
-      ) {
-        candidateKeys.push(props.option.metric_name);
+    if (typeof option === 'object' && option !== null) {
+      if ('metric_name' in option && typeof option.metric_name === 'string') {
+        candidateKeys.push(option.metric_name);
       }
-      if (
-        'label' in props.option &&
-        typeof props.option.label === 'string'
-      ) {
-        candidateKeys.push(props.option.label);
+      if ('label' in option && typeof option.label === 'string') {
+        candidateKeys.push(option.label);
       }
-      if (
-        'verbose_name' in props.option &&
-        typeof props.option.verbose_name === 'string'
-      ) {
-        candidateKeys.push(props.option.verbose_name);
+      if ('verbose_name' in option && typeof option.verbose_name === 'string') {
+        candidateKeys.push(option.verbose_name);
       }
     }
-    return (
-      candidateKeys.find(key => props.metricFormatting[key]) || metricKey
-    );
-  }, [metricKey, metricLabel, props.metricFormatting, props.option]);
+    return candidateKeys.find(key => metricFormatting[key]) || metricKey;
+  }, [metricFormatting, metricKey, metricLabel, option, savedMetrics]);
   const databarKey = useMemo(() => {
     const candidateKeys = [metricKey, metricLabel].filter(
       (candidate): candidate is string => !!candidate,
     );
-    const savedMetricMatch = props.savedMetrics.find(metric => {
-      if (metric.metric_name === metricKey || metric.metric_name === metricLabel) {
+    const savedMetricMatch = savedMetrics.find(metric => {
+      if (
+        metric.metric_name === metricKey ||
+        metric.metric_name === metricLabel
+      ) {
         return true;
       }
-      if (metric.verbose_name === metricKey || metric.verbose_name === metricLabel) {
+      if (
+        metric.verbose_name === metricKey ||
+        metric.verbose_name === metricLabel
+      ) {
         return true;
       }
       return false;
@@ -602,29 +617,21 @@ export default function PivotMetricDefinitionValue(
         candidateKeys.push(savedMetricMatch.verbose_name);
       }
     }
-    if (typeof props.option === 'object' && props.option !== null) {
-      if (
-        'metric_name' in props.option &&
-        typeof props.option.metric_name === 'string'
-      ) {
-        candidateKeys.push(props.option.metric_name);
+    if (typeof option === 'object' && option !== null) {
+      if ('metric_name' in option && typeof option.metric_name === 'string') {
+        candidateKeys.push(option.metric_name);
       }
-      if ('label' in props.option && typeof props.option.label === 'string') {
-        candidateKeys.push(props.option.label);
+      if ('label' in option && typeof option.label === 'string') {
+        candidateKeys.push(option.label);
       }
-      if (
-        'verbose_name' in props.option &&
-        typeof props.option.verbose_name === 'string'
-      ) {
-        candidateKeys.push(props.option.verbose_name);
+      if ('verbose_name' in option && typeof option.verbose_name === 'string') {
+        candidateKeys.push(option.verbose_name);
       }
     }
-    return candidateKeys.find(key => props.metricDatabars[key]) || metricKey;
-  }, [metricKey, metricLabel, props.metricDatabars, props.option, props.savedMetrics]);
-  const formatting =
-    (formattingKey && props.metricFormatting[formattingKey]) || {};
-  const databar =
-    (databarKey && props.metricDatabars[databarKey]) || {};
+    return candidateKeys.find(key => metricDatabars[key]) || metricKey;
+  }, [metricDatabars, metricKey, metricLabel, option, savedMetrics]);
+  const formatting = (formattingKey && metricFormatting[formattingKey]) || {};
+  const databar = (databarKey && metricDatabars[databarKey]) || {};
   const hasFormatting = Boolean(
     formatting.backgroundColor ||
       formatting.textColor ||
@@ -636,18 +643,21 @@ export default function PivotMetricDefinitionValue(
       if (!formattingKey) {
         return;
       }
-      props.onMetricFormattingChange(formattingKey, field, metric);
+      onMetricFormattingChange(formattingKey, field, metric);
     },
-    [formattingKey, props.onMetricFormattingChange],
+    [formattingKey, onMetricFormattingChange],
   );
   const handleDatabarChange = useCallback(
-    (field: keyof PivotMetricDatabar, value?: PivotMetricDatabar[keyof PivotMetricDatabar]) => {
+    (
+      field: keyof PivotMetricDatabar,
+      value?: PivotMetricDatabar[keyof PivotMetricDatabar],
+    ) => {
       if (!databarKey) {
         return;
       }
-      props.onMetricDatabarChange(databarKey, field, value);
+      onMetricDatabarChange(databarKey, field, value);
     },
-    [databarKey, props.onMetricDatabarChange],
+    [databarKey, onMetricDatabarChange],
   );
   const handleDatabarTypeChange = useCallback(
     (value: string) => {
@@ -677,7 +687,7 @@ export default function PivotMetricDefinitionValue(
   const { scaleLikeSources, scaleLikeTargets } = useMemo(() => {
     const sources = new Set<string>();
     const targets = new Set<string>();
-    Object.entries(props.metricDatabars).forEach(([key, config]) => {
+    Object.entries(metricDatabars).forEach(([key, config]) => {
       const targetKey = config.scaleLike
         ? getFormattingMetricKey(config.scaleLike as QueryFormMetric | Metric)
         : undefined;
@@ -687,7 +697,7 @@ export default function PivotMetricDefinitionValue(
       }
     });
     return { scaleLikeSources: sources, scaleLikeTargets: targets };
-  }, [props.metricDatabars]);
+  }, [metricDatabars]);
   const scaleLikeMetricKey = databarKey || metricKey;
   const scaleLikeDisabled = Boolean(
     scaleLikeMetricKey && scaleLikeTargets.has(scaleLikeMetricKey),
@@ -714,11 +724,7 @@ export default function PivotMetricDefinitionValue(
   }, [props.selectedMetrics, scaleLikeMetricKey, scaleLikeSources]);
 
   const formattingPopoverContent = (
-    <div
-      data-ignore-control-popover
-      onClick={event => event.stopPropagation()}
-      onMouseDown={event => event.stopPropagation()}
-    >
+    <div data-ignore-control-popover>
       <Space direction="vertical" size={8}>
         <Typography.Text strong>{t('Conditional formatting')}</Typography.Text>
         <Typography.Text type="secondary">
@@ -816,11 +822,7 @@ export default function PivotMetricDefinitionValue(
       getPopupContainer={() => document.body}
     >
       <Tooltip title={t('Add conditional formatting')}>
-        <MetricFormattingButtonWrap
-          data-ignore-control-popover
-          onClick={event => event.stopPropagation()}
-          onMouseDown={event => event.stopPropagation()}
-        >
+        <MetricFormattingButtonWrap data-ignore-control-popover>
           <MetricFormattingButton
             aria-label={t('Add conditional formatting for %s', metricLabel)}
             data-test="pivot-metric-formatting-button"

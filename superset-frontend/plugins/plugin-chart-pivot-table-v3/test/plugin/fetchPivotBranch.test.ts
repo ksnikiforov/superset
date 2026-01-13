@@ -17,6 +17,7 @@
  * under the License.
  */
 
+import { SupersetClient } from '@superset-ui/core';
 import {
   MetricsLayoutEnum,
   PivotTreeData,
@@ -37,7 +38,6 @@ import {
   SUBTOTAL_TOKEN,
 } from '../../src/utils';
 import { formatQueryName } from '../../src/buildQuery';
-import { SupersetClient } from '@superset-ui/core';
 import { buildFormData } from './fixtures/pivotFormData';
 
 jest.mock('@superset-ui/core', () => {
@@ -269,13 +269,13 @@ describe('resolveFetchContext', () => {
         }),
         [serializePath([encodeMetricKey('countCustomers'), 'USA', 'ACME'])]:
           makeNode({
-          axis: 'row',
-          path: [encodeMetricKey('countCustomers'), 'USA', 'ACME'],
-          level: 3,
-          hasChildren: false,
-          label: 'ACME',
-          formattedLabel: 'ACME',
-        }),
+            axis: 'row',
+            path: [encodeMetricKey('countCustomers'), 'USA', 'ACME'],
+            level: 3,
+            hasChildren: false,
+            label: 'ACME',
+            formattedLabel: 'ACME',
+          }),
       },
       cols: {
         '': makeNode({ axis: 'col', path: [], hasChildren: true }),
@@ -319,9 +319,8 @@ describe('resolveFetchContext', () => {
         .countCustomers,
     ).toBe(10);
     expect(
-      result.data?.cells[
-        serializeCellKey(detailRowKey, colKey)
-      ]?.values.countCustomers,
+      result.data?.cells[serializeCellKey(detailRowKey, colKey)]?.values
+        .countCustomers,
     ).toBe(4);
   });
 
@@ -494,7 +493,8 @@ describe('resolveFetchContext', () => {
     });
 
     expect(postMock).toHaveBeenCalledTimes(1);
-    const queries = (postMock.mock.calls[0][0] as any).jsonPayload?.queries || [];
+    const queries =
+      (postMock.mock.calls[0][0] as any).jsonPayload?.queries || [];
     queries.forEach((query: QueryPayload) => {
       const hasMetricFilter = (query.filters || []).some(
         filter => filter?.col === 'revenueBand' && filter?.val === 'measure1',
@@ -567,7 +567,8 @@ describe('resolveFetchContext', () => {
     });
 
     expect(postMock).toHaveBeenCalledTimes(1);
-    const queries = (postMock.mock.calls[0][0] as any).jsonPayload?.queries || [];
+    const queries =
+      (postMock.mock.calls[0][0] as any).jsonPayload?.queries || [];
     expect(queries.length).toBe(4);
     const queryNames = queries.map((q: any) => q.query_name);
     expect(queryNames).toEqual(
@@ -649,7 +650,8 @@ describe('resolveFetchContext', () => {
     });
 
     expect(postMock).toHaveBeenCalledTimes(1);
-    const queries = (postMock.mock.calls[0][0] as any).jsonPayload?.queries || [];
+    const queries =
+      (postMock.mock.calls[0][0] as any).jsonPayload?.queries || [];
     const queryNames = queries.map((q: any) => q.query_name);
     expect(queryNames).toEqual(
       expect.arrayContaining([
@@ -723,7 +725,8 @@ describe('resolveFetchContext', () => {
     });
 
     expect(postMock).toHaveBeenCalledTimes(1);
-    const queries = (postMock.mock.calls[0][0] as any).jsonPayload?.queries || [];
+    const queries =
+      (postMock.mock.calls[0][0] as any).jsonPayload?.queries || [];
     expect(queries.length).toBe(4);
     const queryNames = queries.map((q: any) => q.query_name);
     expect(queryNames).toEqual(
@@ -803,7 +806,8 @@ describe('resolveFetchContext', () => {
     });
 
     expect(postMock).toHaveBeenCalledTimes(1);
-    const queries = (postMock.mock.calls[0][0] as any).jsonPayload?.queries || [];
+    const queries =
+      (postMock.mock.calls[0][0] as any).jsonPayload?.queries || [];
     expect(queries.length).toBe(6);
     const queryNames = queries.map((q: any) => q.query_name);
     expect(queryNames).toEqual(
@@ -871,7 +875,12 @@ describe('resolveFetchContext', () => {
     await fetchPivotBranch({
       formData: {
         groupbyRows: ['nation', 'orderPriority'],
-        groupbyColumns: ['segment', 'shipMode', 'orderStatus', METRICS_PLACEHOLDER],
+        groupbyColumns: [
+          'segment',
+          'shipMode',
+          'orderStatus',
+          METRICS_PLACEHOLDER,
+        ],
         metrics: ['countCustomers'],
         metricsLayout: MetricsLayoutEnum.COLUMNS,
         rowSubTotals: false,
@@ -885,7 +894,8 @@ describe('resolveFetchContext', () => {
     });
 
     expect(postMock).toHaveBeenCalledTimes(1);
-    const queries = (postMock.mock.calls[0][0] as any).jsonPayload?.queries || [];
+    const queries =
+      (postMock.mock.calls[0][0] as any).jsonPayload?.queries || [];
     const queryNames = queries.map((q: any) => q.query_name);
     expect(queryNames).toEqual(
       expect.arrayContaining([
@@ -942,7 +952,8 @@ describe('resolveFetchContext', () => {
       maxDepthPerFetch: 1,
     });
 
-    const queries = (postMock.mock.calls[0][0] as any).jsonPayload?.queries || [];
+    const queries =
+      (postMock.mock.calls[0][0] as any).jsonPayload?.queries || [];
     const queryNames = queries.map((q: any) => q.query_name);
     expect(queryNames).toEqual(
       expect.arrayContaining([

@@ -17,15 +17,14 @@
  * under the License.
  */
 
-import React from 'react';
-import { render, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, fireEvent, waitFor, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
-import {
-  MetricsLayoutEnum,
-  PivotTreeData,
-} from '../../../src/types';
+import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
 import { applyMetricAxis, buildTreeFromRecords } from '../../../src/utils';
-import { fetchPivotBranch, peekPivotBranchCache } from '../../../src/fetchPivotBranch';
+import {
+  fetchPivotBranch,
+  peekPivotBranchCache,
+} from '../../../src/fetchPivotBranch';
 import { buildFormData } from '../fixtures/pivotFormData';
 
 jest.mock('../../../src/fetchPivotBranch', () => {
@@ -134,21 +133,19 @@ describe('PivotTableChart expand/collapse count stability', () => {
     render(
       <PivotTableChart
         data={data}
-        formData={buildFormData(
-          {
-            groupbyRows: rowGroupby,
-            groupbyColumns: colGroupby,
-            metricsLayout,
-            metrics,
-            startCollapsed: true,
-            initialDepth: 1,
-            maxDepthPerFetch: 1,
-            rowTotals: false,
-            colTotals: false,
-            rowSubTotals: false,
-            colSubTotals: false,
-          })
-        }
+        formData={buildFormData({
+          groupbyRows: rowGroupby,
+          groupbyColumns: colGroupby,
+          metricsLayout,
+          metrics,
+          startCollapsed: true,
+          initialDepth: 1,
+          maxDepthPerFetch: 1,
+          rowTotals: false,
+          colTotals: false,
+          rowSubTotals: false,
+          colSubTotals: false,
+        })}
         metrics={metrics}
         groupbyRows={rowGroupby}
         groupbyColumns={colGroupby}
@@ -202,16 +199,15 @@ describe('PivotTableChart expand/collapse count stability', () => {
         throw new Error('Pivot table not found');
       }
       const scope =
-        axis === 'row' ? table.querySelector('tbody') : table.querySelector('thead');
+        axis === 'row'
+          ? table.querySelector('tbody')
+          : table.querySelector('thead');
       if (!scope) {
         throw new Error('Pivot table section not found');
       }
       const toggles = within(scope).getAllByLabelText(label);
       expect(toggles.length).toBeGreaterThan(0);
-      toggle =
-        action === 'collapse'
-          ? toggles[toggles.length - 1]
-          : toggles[0];
+      toggle = action === 'collapse' ? toggles[toggles.length - 1] : toggles[0];
     });
     if (!toggle) {
       throw new Error(`Toggle "${label}" not found`);
@@ -327,18 +323,22 @@ describe('PivotTableChart expand/collapse count stability', () => {
 
       const baseline = getCounts(container);
 
-      for (const action of actions) {
+      await actions.reduce(async (promise, action) => {
+        await promise;
         const axis = action.startsWith('row') ? 'row' : 'col';
         const toggle = action.endsWith('+') ? 'expand' : 'collapse';
         await clickToggle(container, axis, toggle);
-        const expectedLabel = toggle === 'expand' ? 'minus-square' : 'plus-square';
+        const expectedLabel =
+          toggle === 'expand' ? 'minus-square' : 'plus-square';
         await waitFor(() => {
           const table = getPivotTable(container);
           if (!table) {
             throw new Error('Pivot table not found');
           }
           const scope =
-            axis === 'row' ? table.querySelector('tbody') : table.querySelector('thead');
+            axis === 'row'
+              ? table.querySelector('tbody')
+              : table.querySelector('thead');
           if (!scope) {
             throw new Error('Pivot table section not found');
           }
@@ -350,7 +350,7 @@ describe('PivotTableChart expand/collapse count stability', () => {
           expect(counts.rows).toBeGreaterThan(0);
           expect(counts.cols).toBeGreaterThan(0);
         });
-      }
+      }, Promise.resolve());
 
       const finalCounts = getCounts(container);
       expect(finalCounts).toEqual(baseline);

@@ -18,11 +18,13 @@
  */
 import { ReactNode, useCallback } from 'react';
 import { Metric } from '@superset-ui/core';
-import { DndItemType } from 'src/explore/components/DndItemType';
-import AdhocMetric from 'src/explore/components/controls/MetricControl/AdhocMetric';
-import AdhocMetricPopoverTrigger from 'src/explore/components/controls/MetricControl/AdhocMetricPopoverTrigger';
-import { savedMetricType } from 'src/explore/components/controls/MetricControl/types';
 import { ColumnMeta } from '@superset-ui/chart-controls';
+import {
+  AdhocMetric,
+  AdhocMetricPopoverTrigger,
+  DndItemType,
+  type savedMetricType,
+} from '../../exploreImports';
 import OptionControlLabel from './OptionControlLabel';
 
 type SavedMetric = savedMetricType & { error_text?: string };

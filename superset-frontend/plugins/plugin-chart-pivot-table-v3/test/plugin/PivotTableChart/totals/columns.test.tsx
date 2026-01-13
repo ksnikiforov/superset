@@ -17,8 +17,7 @@
  * under the License.
  */
 
-import React from 'react';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within } from '../../../testUtils';
 import PivotTableChart from '../../fixtures/TestPivotTableChart';
 import {
   MetricsLayoutEnum,
@@ -95,7 +94,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       2,
     );
 
-    const { container } = render(
+    render(
       <PivotTableChart
         data={tree}
         formData={buildFormData({
@@ -223,8 +222,8 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       />,
     );
 
-    expect(screen.queryByText('999')).toBeNull();
-    expect(screen.queryByText('555')).not.toBeNull();
+    expect(screen.queryByText('999')).not.toBeInTheDocument();
+    expect(screen.queryByText('555')).toBeInTheDocument();
   });
 
   it('renders multi-metric column subtotals at the end even when configured at the start', () => {
@@ -366,9 +365,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       baseSubtotalKey,
     );
     const baseCell = merged.cells[baseCellKey];
-    merged.cells[
-      serializeCellKey(serializePath(['US']), subtotalKey)
-    ] = {
+    merged.cells[serializeCellKey(serializePath(['US']), subtotalKey)] = {
       ...(baseCell as PivotResultCell),
       colKey: subtotalKey,
       isSubtotal: true,
@@ -507,9 +504,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       baseSubtotalKey,
     );
     const baseCell = merged.cells[baseCellKey];
-    merged.cells[
-      serializeCellKey(serializePath(['US']), subtotalKey)
-    ] = {
+    merged.cells[serializeCellKey(serializePath(['US']), subtotalKey)] = {
       ...(baseCell as PivotResultCell),
       colKey: subtotalKey,
       isSubtotal: true,
@@ -687,95 +682,97 @@ describe('PivotTableChart totals & subtotals - columns', () => {
   test.each(['start', 'end'] as const)(
     'positions grand totals at the %s for rows and columns when configured',
     position => {
-    const totalsOnly = buildTreeFromRecords(
-      [{ metric1: 12 }],
-      ['metric1'],
-      ['region'],
-      ['category'],
-      0,
-      0,
-    );
-    const detail = buildTreeFromRecords(
-      [{ region: 'US', category: 'Tech', metric1: 5 }],
-      ['metric1'],
-      ['region'],
-      ['category'],
-      1,
-      1,
-    );
-    const tree = applyMetricAxis(
-      mergeTrees(totalsOnly, detail),
-      ['metric1'],
-      MetricsLayoutEnum.COLUMNS,
-      ['region'],
-      ['category'],
-      1,
-    );
+      const totalsOnly = buildTreeFromRecords(
+        [{ metric1: 12 }],
+        ['metric1'],
+        ['region'],
+        ['category'],
+        0,
+        0,
+      );
+      const detail = buildTreeFromRecords(
+        [{ region: 'US', category: 'Tech', metric1: 5 }],
+        ['metric1'],
+        ['region'],
+        ['category'],
+        1,
+        1,
+      );
+      const tree = applyMetricAxis(
+        mergeTrees(totalsOnly, detail),
+        ['metric1'],
+        MetricsLayoutEnum.COLUMNS,
+        ['region'],
+        ['category'],
+        1,
+      );
 
-    const { container } = render(
-      <PivotTableChart
-        data={tree}
-        formData={buildFormData({
-          ...(baseProps as Partial<PivotTableQueryFormData>),
-          groupbyRows: ['region'],
-          groupbyColumns: ['category', '__MEASURES__'],
-          metricsLayout: MetricsLayoutEnum.COLUMNS,
-          metrics: ['metric1'],
-          rowSubtotalLevels: [0],
-          colSubtotalLevels: [0],
-          rowTotalPosition: position,
-          colTotalPosition: position,
-        })}
-        metrics={['metric1']}
-        groupbyRows={['region']}
-        groupbyColumns={['category']}
-        aggregateFunction="Sum"
-        width={400}
-        height={300}
-        startCollapsed={false}
-        initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
-        colTotals={false}
-        rowSubTotals={false}
-        colSubTotals={false}
-        rowSubtotalLevels={[0]}
-        colSubtotalLevels={[0]}
-        rowOrder="key_a_to_z"
-        colOrder="key_a_to_z"
-        valueFormat=""
-        columnFormats={{}}
-        currencyFormats={{}}
-        allowRenderHtml={false}
-        emitCrossFilters={false}
-        setDataMask={jest.fn()}
-        metricColorFormatters={[]}
-        dateFormatters={{}}
-        rowTotalPosition={position}
-        colSubtotalPosition="start"
-        colTotalPosition={position}
-      />,
-    );
+      const { container } = render(
+        <PivotTableChart
+          data={tree}
+          formData={buildFormData({
+            ...(baseProps as Partial<PivotTableQueryFormData>),
+            groupbyRows: ['region'],
+            groupbyColumns: ['category', '__MEASURES__'],
+            metricsLayout: MetricsLayoutEnum.COLUMNS,
+            metrics: ['metric1'],
+            rowSubtotalLevels: [0],
+            colSubtotalLevels: [0],
+            rowTotalPosition: position,
+            colTotalPosition: position,
+          })}
+          metrics={['metric1']}
+          groupbyRows={['region']}
+          groupbyColumns={['category']}
+          aggregateFunction="Sum"
+          width={400}
+          height={300}
+          startCollapsed={false}
+          initialDepth={1}
+          maxDepthPerFetch={1}
+          rowTotals={false}
+          colTotals={false}
+          rowSubTotals={false}
+          colSubTotals={false}
+          rowSubtotalLevels={[0]}
+          colSubtotalLevels={[0]}
+          rowOrder="key_a_to_z"
+          colOrder="key_a_to_z"
+          valueFormat=""
+          columnFormats={{}}
+          currencyFormats={{}}
+          allowRenderHtml={false}
+          emitCrossFilters={false}
+          setDataMask={jest.fn()}
+          metricColorFormatters={[]}
+          dateFormatters={{}}
+          rowTotalPosition={position}
+          colSubtotalPosition="start"
+          colTotalPosition={position}
+        />,
+      );
 
-    const headerRow = container.querySelector('thead tr:first-child') as HTMLElement;
-    const headers = within(headerRow).getAllByRole('columnheader');
-    const headerLabels = headers.slice(1).map(cell => cell.textContent?.trim());
-    const headerIndex = position === 'end' ? headerLabels.length - 1 : 0;
-    expect(headerLabels[headerIndex]).toBe('Grand total');
+      const headerRow = container.querySelector(
+        'thead tr:first-child',
+      ) as HTMLElement;
+      const headers = within(headerRow).getAllByRole('columnheader');
+      const headerLabels = headers
+        .slice(1)
+        .map(cell => cell.textContent?.trim());
+      const headerIndex = position === 'end' ? headerLabels.length - 1 : 0;
+      expect(headerLabels[headerIndex]).toBe('Grand total');
 
-    const bodyRows = within(container.querySelector('tbody') as HTMLElement).getAllByRole('row');
-    const getRowLabel = (row: HTMLElement) =>
-      (row.querySelector('th')?.textContent || '').trim();
-    const firstRowLabel = getRowLabel(bodyRows[0]);
-    const lastRowLabel = getRowLabel(bodyRows[bodyRows.length - 1]);
-    if (position === 'end') {
-      expect(firstRowLabel).not.toBe('Grand total');
-      expect(lastRowLabel).toBe('Grand total');
-    } else {
-      expect(firstRowLabel).toBe('Grand total');
-      expect(lastRowLabel).not.toBe('Grand total');
-    }
-  },
+      const bodyRows = within(
+        container.querySelector('tbody') as HTMLElement,
+      ).getAllByRole('row');
+      const getRowLabel = (row: HTMLElement) =>
+        (row.querySelector('th')?.textContent || '').trim();
+      const firstRowLabel = getRowLabel(bodyRows[0]);
+      const lastRowLabel = getRowLabel(bodyRows[bodyRows.length - 1]);
+      const isEnd = position === 'end';
+      expect(firstRowLabel === 'Grand total').toBe(!isEnd);
+      expect(lastRowLabel === 'Grand total').toBe(isEnd);
+    },
   );
 
   it('shows column grand total when enabled without selecting level 0', () => {
@@ -826,7 +823,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
         initialDepth={1}
         maxDepthPerFetch={1}
         rowTotals={false}
-        colTotals={true}
+        colTotals
         rowSubTotals={false}
         colSubTotals={false}
         rowSubtotalLevels={[]}
@@ -848,9 +845,9 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     );
 
     const header = container.querySelector('thead') as HTMLElement;
-    expect(within(header).getByText('Grand total')).toBeTruthy();
+    expect(within(header).getByText('Grand total')).toBeInTheDocument();
     const bodyRow = container.querySelector('tbody tr') as HTMLElement;
-    expect(within(bodyRow).getByText('8')).toBeTruthy();
+    expect(within(bodyRow).getByText('8')).toBeInTheDocument();
   });
 
   it('renders metric-specific column grand totals when metrics are on columns', () => {
@@ -950,12 +947,14 @@ describe('PivotTableChart totals & subtotals - columns', () => {
         .map(cell => cell.textContent?.trim())
         .filter(label => label && label !== 'Rows');
       metrics.forEach(metric => {
-        expect(headers).toEqual(expect.arrayContaining([metric, `Total ${metric}`]));
+        expect(headers).toEqual(
+          expect.arrayContaining([metric, `Total ${metric}`]),
+        );
       });
 
-      const urgentRow = screen.getByText('1-URGENT').closest(
-        'tr',
-      ) as HTMLElement;
+      const urgentRow = screen
+        .getByText('1-URGENT')
+        .closest('tr') as HTMLElement;
       const values = within(urgentRow)
         .getAllByRole('cell')
         .map(cell => cell.textContent?.trim());
@@ -1033,7 +1032,9 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       />,
     );
 
-    const headerRow = container.querySelector('thead tr:last-child') as HTMLElement;
+    const headerRow = container.querySelector(
+      'thead tr:last-child',
+    ) as HTMLElement;
     const headerLabels = within(headerRow)
       .getAllByRole('columnheader')
       .map(cell => cell.textContent?.trim())
@@ -1044,9 +1045,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
   it('omits the grand total column when multiple metrics are on columns and keeps the grand total row', () => {
     const metrics = ['m1', 'm2'];
     const detail = buildTreeFromRecords(
-      [
-        { orderPriority: '1-URGENT', shipMode: 'AIR', m1: 10, m2: 20 },
-      ],
+      [{ orderPriority: '1-URGENT', shipMode: 'AIR', m1: 10, m2: 20 }],
       metrics,
       ['orderPriority'],
       ['shipMode'],
@@ -1658,11 +1657,17 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     const cols: Record<string, PivotTreeNode> = {
       [rootKey]: makeColNode([], true, true),
       [serializePath(['A'])]: makeColNode(['A'], true, true),
-      [serializePath(['A', SUBTOTAL_TOKEN])]: makeColNode(['A', SUBTOTAL_TOKEN], true),
+      [serializePath(['A', SUBTOTAL_TOKEN])]: makeColNode(
+        ['A', SUBTOTAL_TOKEN],
+        true,
+      ),
       [serializePath(['A', '1-URGENT'])]: makeColNode(['A', '1-URGENT']),
       [serializePath(['A', '2-HIGH'])]: makeColNode(['A', '2-HIGH']),
       [serializePath(['N'])]: makeColNode(['N'], true, true),
-      [serializePath(['N', SUBTOTAL_TOKEN])]: makeColNode(['N', SUBTOTAL_TOKEN], true),
+      [serializePath(['N', SUBTOTAL_TOKEN])]: makeColNode(
+        ['N', SUBTOTAL_TOKEN],
+        true,
+      ),
       [serializePath(['N', '1-URGENT'])]: makeColNode(['N', '1-URGENT']),
       [serializePath(['N', '2-HIGH'])]: makeColNode(['N', '2-HIGH']),
     };
@@ -1775,7 +1780,9 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       />,
     );
 
-    const headerRow = container.querySelector('thead tr:last-child') as HTMLElement;
+    const headerRow = container.querySelector(
+      'thead tr:last-child',
+    ) as HTMLElement;
     const labels = within(headerRow)
       .getAllByRole('columnheader')
       .map(cell => cell.textContent?.trim())
@@ -1815,7 +1822,10 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       [serializePath(['A', '2-HIGH'])]: makeColNode(['A', '2-HIGH']),
       // Parent total encoded as a leaf at the same depth as children.
       [serializePath(['A', 'A'])]: makeColNode(['A', 'A'], true),
-      [serializePath(['A', SUBTOTAL_TOKEN])]: makeColNode(['A', SUBTOTAL_TOKEN], true),
+      [serializePath(['A', SUBTOTAL_TOKEN])]: makeColNode(
+        ['A', SUBTOTAL_TOKEN],
+        true,
+      ),
     };
     const rows: Record<string, PivotTreeNode> = {
       [rootKey]: {
@@ -1916,14 +1926,18 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       />,
     );
 
-    const headerRow = container.querySelector('thead tr:last-child') as HTMLElement;
+    const headerRow = container.querySelector(
+      'thead tr:last-child',
+    ) as HTMLElement;
     const labels = within(headerRow)
       .getAllByRole('columnheader')
       .map(cell => cell.textContent?.trim())
       .filter(label => label && label !== 'Rows');
     // Desired behavior: parent total leaf should not render alongside branch subtotal leaves.
     expect(labels).not.toContain('A');
-    expect(labels).toEqual(expect.arrayContaining(['1-URGENT', '2-HIGH', 'Subtotal']));
+    expect(labels).toEqual(
+      expect.arrayContaining(['1-URGENT', '2-HIGH', 'Subtotal']),
+    );
   });
 
   it('suppresses duplicated ancestor subtotal leaves on deeper column levels', () => {
@@ -1952,12 +1966,30 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     const cols: Record<string, PivotTreeNode> = {
       [rootKey]: makeColNode([], true, true),
       [serializePath(['A'])]: makeColNode(['A'], true, true),
-      [serializePath(['A', '1-URGENT'])]: makeColNode(['A', '1-URGENT'], true, true),
-      [serializePath(['A', '1-URGENT', '10k-50k'])]: makeColNode(['A', '1-URGENT', '10k-50k']),
-      [serializePath(['A', '1-URGENT', '1k-5k'])]: makeColNode(['A', '1-URGENT', '1k-5k']),
-      [serializePath(['A', '1-URGENT', SUBTOTAL_TOKEN])]: makeColNode(['A', '1-URGENT', SUBTOTAL_TOKEN], true),
+      [serializePath(['A', '1-URGENT'])]: makeColNode(
+        ['A', '1-URGENT'],
+        true,
+        true,
+      ),
+      [serializePath(['A', '1-URGENT', '10k-50k'])]: makeColNode([
+        'A',
+        '1-URGENT',
+        '10k-50k',
+      ]),
+      [serializePath(['A', '1-URGENT', '1k-5k'])]: makeColNode([
+        'A',
+        '1-URGENT',
+        '1k-5k',
+      ]),
+      [serializePath(['A', '1-URGENT', SUBTOTAL_TOKEN])]: makeColNode(
+        ['A', '1-URGENT', SUBTOTAL_TOKEN],
+        true,
+      ),
       // Redundant ancestor total leaf that should be suppressed.
-      [serializePath(['A', '1-URGENT', 'A'])]: makeColNode(['A', '1-URGENT', 'A'], true),
+      [serializePath(['A', '1-URGENT', 'A'])]: makeColNode(
+        ['A', '1-URGENT', 'A'],
+        true,
+      ),
     };
     const rows: Record<string, PivotTreeNode> = {
       [rootKey]: {
@@ -1998,7 +2030,10 @@ describe('PivotTableChart totals & subtotals - columns', () => {
         values: { metric1: 30 },
         isSubtotal: true,
       },
-      [serializeCellKey(rowKey, serializePath(['A', '1-URGENT', SUBTOTAL_TOKEN]))]: {
+      [serializeCellKey(
+        rowKey,
+        serializePath(['A', '1-URGENT', SUBTOTAL_TOKEN]),
+      )]: {
         rowKey,
         colKey: serializePath(['A', '1-URGENT', SUBTOTAL_TOKEN]),
         values: { metric1: 30 },
@@ -2060,7 +2095,9 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       />,
     );
 
-    const headerRow = container.querySelector('thead tr:last-child') as HTMLElement;
+    const headerRow = container.querySelector(
+      'thead tr:last-child',
+    ) as HTMLElement;
     const labels = within(headerRow)
       .getAllByRole('columnheader')
       .map(cell => cell.textContent?.trim())
@@ -2071,9 +2108,15 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     );
 
     // Subtotal header should not show expand/collapse toggles.
-    const subtotalHeader = within(headerRow).getByText('Subtotal').closest('th') as HTMLElement;
-    expect(within(subtotalHeader).queryByLabelText('plus-square')).toBeNull();
-    expect(within(subtotalHeader).queryByLabelText('minus-square')).toBeNull();
+    const subtotalHeader = within(headerRow)
+      .getByText('Subtotal')
+      .closest('th') as HTMLElement;
+    expect(
+      within(subtotalHeader).queryByLabelText('plus-square'),
+    ).not.toBeInTheDocument();
+    expect(
+      within(subtotalHeader).queryByLabelText('minus-square'),
+    ).not.toBeInTheDocument();
   });
 
   it('orders deep column totals and subtotals according to positions across five levels (end)', () => {
@@ -2127,15 +2170,19 @@ describe('PivotTableChart totals & subtotals - columns', () => {
         isSubtotal: false,
       },
     };
-    const cells = labels.reduce((acc, label, idx) => {
-      acc[serializeCellKey(rowKey, serializePath(labels.slice(0, idx + 1)))] = {
-        rowKey,
-        colKey: serializePath(labels.slice(0, idx + 1)),
-        values: { metric1: (idx + 1) * 5 },
-        isSubtotal: idx < labels.length - 1,
-      };
-      return acc;
-    }, {} as Record<string, PivotResultCell>);
+    const cells = labels.reduce(
+      (acc, label, idx) => {
+        acc[serializeCellKey(rowKey, serializePath(labels.slice(0, idx + 1)))] =
+          {
+            rowKey,
+            colKey: serializePath(labels.slice(0, idx + 1)),
+            values: { metric1: (idx + 1) * 5 },
+            isSubtotal: idx < labels.length - 1,
+          };
+        return acc;
+      },
+      {} as Record<string, PivotResultCell>,
+    );
     cells[serializeCellKey(rowKey, rootKey)] = {
       rowKey,
       colKey: rootKey,
@@ -2199,7 +2246,9 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       expect.arrayContaining(['L5', 'L3', 'L1', 'Grand total']),
     );
     const bodyRow = container.querySelector('tbody tr') as HTMLElement;
-    expect(within(bodyRow).getAllByRole('cell').length).toBeGreaterThanOrEqual(3);
+    expect(within(bodyRow).getAllByRole('cell').length).toBeGreaterThanOrEqual(
+      3,
+    );
   });
 
   it('orders deep column totals and subtotals at the start when configured across five levels', () => {
@@ -2253,15 +2302,19 @@ describe('PivotTableChart totals & subtotals - columns', () => {
         isSubtotal: false,
       },
     };
-    const cells = labels.reduce((acc, label, idx) => {
-      acc[serializeCellKey(rowKey, serializePath(labels.slice(0, idx + 1)))] = {
-        rowKey,
-        colKey: serializePath(labels.slice(0, idx + 1)),
-        values: { metric1: (idx + 1) * 5 },
-        isSubtotal: idx < labels.length - 1,
-      };
-      return acc;
-    }, {} as Record<string, PivotResultCell>);
+    const cells = labels.reduce(
+      (acc, label, idx) => {
+        acc[serializeCellKey(rowKey, serializePath(labels.slice(0, idx + 1)))] =
+          {
+            rowKey,
+            colKey: serializePath(labels.slice(0, idx + 1)),
+            values: { metric1: (idx + 1) * 5 },
+            isSubtotal: idx < labels.length - 1,
+          };
+        return acc;
+      },
+      {} as Record<string, PivotResultCell>,
+    );
     cells[serializeCellKey(rowKey, rootKey)] = {
       rowKey,
       colKey: rootKey,
@@ -2325,7 +2378,9 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       expect.arrayContaining(['Grand total', 'L1', 'L3', 'L5']),
     );
     const bodyRow = container.querySelector('tbody tr') as HTMLElement;
-    expect(within(bodyRow).getAllByRole('cell').length).toBeGreaterThanOrEqual(3);
+    expect(within(bodyRow).getAllByRole('cell').length).toBeGreaterThanOrEqual(
+      3,
+    );
   });
 
   it('does not render expansion toggles for subtotal headers', () => {
@@ -2353,7 +2408,10 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     const cols: Record<string, PivotTreeNode> = {
       [rootKey]: makeColNode([], true, true),
       [serializePath(['A'])]: makeColNode(['A'], true, true),
-      [serializePath(['A', SUBTOTAL_TOKEN])]: makeColNode(['A', SUBTOTAL_TOKEN], true),
+      [serializePath(['A', SUBTOTAL_TOKEN])]: makeColNode(
+        ['A', SUBTOTAL_TOKEN],
+        true,
+      ),
       [serializePath(['A', '1-URGENT'])]: makeColNode(['A', '1-URGENT']),
     };
     const rows: Record<string, PivotTreeNode> = {
@@ -2440,9 +2498,17 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       />,
     );
 
-    const headerRow = container.querySelector('thead tr:last-child') as HTMLElement;
-    const subtotalHeader = within(headerRow).getByText('Subtotal').closest('th') as HTMLElement;
-    expect(within(subtotalHeader).queryByLabelText('plus-square')).toBeNull();
-    expect(within(subtotalHeader).queryByLabelText('minus-square')).toBeNull();
+    const headerRow = container.querySelector(
+      'thead tr:last-child',
+    ) as HTMLElement;
+    const subtotalHeader = within(headerRow)
+      .getByText('Subtotal')
+      .closest('th') as HTMLElement;
+    expect(
+      within(subtotalHeader).queryByLabelText('plus-square'),
+    ).not.toBeInTheDocument();
+    expect(
+      within(subtotalHeader).queryByLabelText('minus-square'),
+    ).not.toBeInTheDocument();
   });
 });

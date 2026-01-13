@@ -17,13 +17,9 @@
  * under the License.
  */
 
-import React from 'react';
-import { render, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, fireEvent, waitFor, within } from '../../../testUtils';
 import PivotTableChart from '../../fixtures/TestPivotTableChart';
-import {
-  MetricsLayoutEnum,
-  PivotTreeData,
-} from '../../../../src/types';
+import { MetricsLayoutEnum, PivotTreeData } from '../../../../src/types';
 import {
   applyMetricAxis,
   buildTreeFromRecords,
@@ -86,7 +82,11 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
         2,
       );
     const buildCollapsedBranch = (data: typeof records, rowDepth: number) => {
-      const collapsedGroupby = ['orderPriority', 'returnFlag', 'shipInstruction'];
+      const collapsedGroupby = [
+        'orderPriority',
+        'returnFlag',
+        'shipInstruction',
+      ];
       return applyMetricAxis(
         buildTreeFromRecords(
           data,
@@ -121,35 +121,33 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     const { container, getByText } = render(
       <PivotTableChart
         data={baseTree}
-        formData={buildFormData(
-          {
-            groupbyRows: [
-              'orderPriority',
-              'shipMode',
-              METRICS_PLACEHOLDER,
-              'returnFlag',
-              'shipInstruction',
-            ],
-            groupbyColumns: colGroupby,
-            metrics,
-            metricsLayout: MetricsLayoutEnum.ROWS,
-            aggregateFunction: 'Sum',
-            rowTotals: false,
-            colTotals: false,
-            rowSubTotals: false,
-            colSubTotals: false,
-            startCollapsed: true,
-            initialDepth: 1,
-            maxDepthPerFetch: 1,
-            rowOrder: 'key_a_to_z',
-            colOrder: 'key_a_to_z',
-            viz_type: 'pivot_table_v3',
-            datasource: '1__table',
-            metricColorFormatters: [],
-            dateFormatters: {},
-            verboseMap: {},
-          })
-        }
+        formData={buildFormData({
+          groupbyRows: [
+            'orderPriority',
+            'shipMode',
+            METRICS_PLACEHOLDER,
+            'returnFlag',
+            'shipInstruction',
+          ],
+          groupbyColumns: colGroupby,
+          metrics,
+          metricsLayout: MetricsLayoutEnum.ROWS,
+          aggregateFunction: 'Sum',
+          rowTotals: false,
+          colTotals: false,
+          rowSubTotals: false,
+          colSubTotals: false,
+          startCollapsed: true,
+          initialDepth: 1,
+          maxDepthPerFetch: 1,
+          rowOrder: 'key_a_to_z',
+          colOrder: 'key_a_to_z',
+          viz_type: 'pivot_table_v3',
+          datasource: '1__table',
+          metricColorFormatters: [],
+          dateFormatters: {},
+          verboseMap: {},
+        })}
         metrics={metrics}
         groupbyRows={rowGroupby}
         groupbyColumns={colGroupby}
@@ -179,9 +177,7 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     );
 
     const tbody = container.querySelector('tbody') as HTMLElement;
-    const orderPriorityRow = getByText('1-URGENT').closest(
-      'tr',
-    ) as HTMLElement;
+    const orderPriorityRow = getByText('1-URGENT').closest('tr') as HTMLElement;
     const initialRows = Array.from(tbody.querySelectorAll('tr'));
     const metricRow = initialRows
       .slice(initialRows.indexOf(orderPriorityRow) + 1)
@@ -189,15 +185,17 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
       | HTMLElement
       | undefined;
     expect(metricRow).toBeTruthy();
-    fireEvent.click(within(metricRow as HTMLElement).getByLabelText('plus-square'));
+    fireEvent.click(
+      within(metricRow as HTMLElement).getByLabelText('plus-square'),
+    );
 
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
     });
 
-    const returnFlagRow = within(tbody).getByText(/^A$/).closest(
-      'tr',
-    ) as HTMLElement;
+    const returnFlagRow = within(tbody)
+      .getByText(/^A$/)
+      .closest('tr') as HTMLElement;
     fireEvent.click(within(returnFlagRow).getByLabelText('plus-square'));
 
     await waitFor(() => {
@@ -220,11 +218,13 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
       | undefined;
     expect(collapsedMetricRow).toBeTruthy();
     expect(
-      within(collapsedMetricRow as HTMLElement).queryByLabelText('minus-square'),
-    ).toBeNull();
+      within(collapsedMetricRow as HTMLElement).queryByLabelText(
+        'minus-square',
+      ),
+    ).not.toBeInTheDocument();
     expect(
       within(collapsedMetricRow as HTMLElement).getByLabelText('plus-square'),
-    ).toBeTruthy();
+    ).toBeInTheDocument();
     const metricValueCell = Array.from(
       (collapsedMetricRow as HTMLElement).querySelectorAll('td'),
     ).find(cell => cell.textContent && cell.textContent.trim() !== '');
@@ -240,8 +240,8 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
       (collapsedDiscountRow as HTMLElement).querySelectorAll('td'),
     ).find(cell => cell.textContent && cell.textContent.trim() !== '');
     expect(discountValueCell).toBeTruthy();
-    expect(within(tbody).queryByText(/^A$/)).toBeNull();
-    expect(within(tbody).queryByText('COLLECT COD')).toBeNull();
+    expect(within(tbody).queryByText(/^A$/)).not.toBeInTheDocument();
+    expect(within(tbody).queryByText('COLLECT COD')).not.toBeInTheDocument();
   });
 
   it('renders returnFlag values and suppresses top-positioned subtotals after re-expanding a metric', async () => {
@@ -293,7 +293,11 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
         rowDepth,
         1,
       );
-      const withSubtotals = applyRowSubtotals(tree, rowDepth, rowGroupby.length);
+      const withSubtotals = applyRowSubtotals(
+        tree,
+        rowDepth,
+        rowGroupby.length,
+      );
       return labelRowSubtotalLeaves(
         applyMetricAxis(
           withSubtotals,
@@ -307,7 +311,11 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
       );
     };
     const buildCollapsedBranch = (data: typeof records, rowDepth: number) => {
-      const collapsedGroupby = ['orderPriority', 'returnFlag', 'shipInstruction'];
+      const collapsedGroupby = [
+        'orderPriority',
+        'returnFlag',
+        'shipInstruction',
+      ];
       const tree = buildTreeFromRecords(
         data,
         metrics,
@@ -351,37 +359,35 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     const { container, getByText } = render(
       <PivotTableChart
         data={baseTree}
-        formData={buildFormData(
-          {
-            groupbyRows: [
-              'orderPriority',
-              'shipMode',
-              METRICS_PLACEHOLDER,
-              'returnFlag',
-              'shipInstruction',
-            ],
-            groupbyColumns: colGroupby,
-            metrics,
-            metricsLayout: MetricsLayoutEnum.ROWS,
-            aggregateFunction: 'Sum',
-            rowTotals: false,
-            colTotals: false,
-            rowSubTotals: true,
-            colSubTotals: false,
-            rowSubtotalLevels,
-            rowSubtotalPosition: 'start',
-            startCollapsed: true,
-            initialDepth: 1,
-            maxDepthPerFetch: 1,
-            rowOrder: 'key_a_to_z',
-            colOrder: 'key_a_to_z',
-            viz_type: 'pivot_table_v3',
-            datasource: '1__table',
-            metricColorFormatters: [],
-            dateFormatters: {},
-            verboseMap: {},
-          })
-        }
+        formData={buildFormData({
+          groupbyRows: [
+            'orderPriority',
+            'shipMode',
+            METRICS_PLACEHOLDER,
+            'returnFlag',
+            'shipInstruction',
+          ],
+          groupbyColumns: colGroupby,
+          metrics,
+          metricsLayout: MetricsLayoutEnum.ROWS,
+          aggregateFunction: 'Sum',
+          rowTotals: false,
+          colTotals: false,
+          rowSubTotals: true,
+          colSubTotals: false,
+          rowSubtotalLevels,
+          rowSubtotalPosition: 'start',
+          startCollapsed: true,
+          initialDepth: 1,
+          maxDepthPerFetch: 1,
+          rowOrder: 'key_a_to_z',
+          colOrder: 'key_a_to_z',
+          viz_type: 'pivot_table_v3',
+          datasource: '1__table',
+          metricColorFormatters: [],
+          dateFormatters: {},
+          verboseMap: {},
+        })}
         metrics={metrics}
         groupbyRows={rowGroupby}
         groupbyColumns={colGroupby}
@@ -393,7 +399,7 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
         maxDepthPerFetch={1}
         rowTotals={false}
         colTotals={false}
-        rowSubTotals={true}
+        rowSubTotals
         colSubTotals={false}
         rowSubtotalLevels={rowSubtotalLevels}
         rowSubtotalPosition="start"
@@ -412,9 +418,7 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     );
 
     const tbody = container.querySelector('tbody') as HTMLElement;
-    const orderPriorityRow = getByText('1-URGENT').closest(
-      'tr',
-    ) as HTMLElement;
+    const orderPriorityRow = getByText('1-URGENT').closest('tr') as HTMLElement;
     const initialRows = Array.from(tbody.querySelectorAll('tr'));
     const metricRow = initialRows
       .slice(initialRows.indexOf(orderPriorityRow) + 1)
@@ -422,15 +426,17 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
       | HTMLElement
       | undefined;
     expect(metricRow).toBeTruthy();
-    fireEvent.click(within(metricRow as HTMLElement).getByLabelText('plus-square'));
+    fireEvent.click(
+      within(metricRow as HTMLElement).getByLabelText('plus-square'),
+    );
 
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
     });
 
-    const returnFlagRow = within(tbody).getByText(/^A$/).closest(
-      'tr',
-    ) as HTMLElement;
+    const returnFlagRow = within(tbody)
+      .getByText(/^A$/)
+      .closest('tr') as HTMLElement;
     fireEvent.click(within(returnFlagRow).getByLabelText('plus-square'));
 
     await waitFor(() => {
@@ -459,10 +465,12 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     const reopenedReturnFlagRow = (await waitFor(() =>
       within(tbody).getByText(/^A$/).closest('tr'),
     )) as HTMLElement;
-    fireEvent.click(within(reopenedReturnFlagRow).getByLabelText('plus-square'));
+    fireEvent.click(
+      within(reopenedReturnFlagRow).getByLabelText('plus-square'),
+    );
 
     await waitFor(() => {
-      expect(within(tbody).getByText('COLLECT COD')).toBeTruthy();
+      expect(within(tbody).getByText('COLLECT COD')).toBeInTheDocument();
     });
 
     const rows = Array.from(tbody.querySelectorAll('tr'));
@@ -546,35 +554,33 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     const { container, getByText } = render(
       <PivotTableChart
         data={baseTree}
-        formData={buildFormData(
-          {
-            groupbyRows: [
-              'orderPriority',
-              'shipMode',
-              'returnFlag',
-              'shipInstruction',
-              METRICS_PLACEHOLDER,
-            ],
-            groupbyColumns: colGroupby,
-            metrics,
-            metricsLayout: MetricsLayoutEnum.ROWS,
-            aggregateFunction: 'Sum',
-            rowTotals: false,
-            colTotals: false,
-            rowSubTotals: false,
-            colSubTotals: false,
-            startCollapsed: true,
-            initialDepth: 1,
-            maxDepthPerFetch: 1,
-            rowOrder: 'key_a_to_z',
-            colOrder: 'key_a_to_z',
-            viz_type: 'pivot_table_v3',
-            datasource: '1__table',
-            metricColorFormatters: [],
-            dateFormatters: {},
-            verboseMap: {},
-          })
-        }
+        formData={buildFormData({
+          groupbyRows: [
+            'orderPriority',
+            'shipMode',
+            'returnFlag',
+            'shipInstruction',
+            METRICS_PLACEHOLDER,
+          ],
+          groupbyColumns: colGroupby,
+          metrics,
+          metricsLayout: MetricsLayoutEnum.ROWS,
+          aggregateFunction: 'Sum',
+          rowTotals: false,
+          colTotals: false,
+          rowSubTotals: false,
+          colSubTotals: false,
+          startCollapsed: true,
+          initialDepth: 1,
+          maxDepthPerFetch: 1,
+          rowOrder: 'key_a_to_z',
+          colOrder: 'key_a_to_z',
+          viz_type: 'pivot_table_v3',
+          datasource: '1__table',
+          metricColorFormatters: [],
+          dateFormatters: {},
+          verboseMap: {},
+        })}
         metrics={metrics}
         groupbyRows={rowGroupby}
         groupbyColumns={colGroupby}
@@ -604,27 +610,25 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     );
 
     const tbody = container.querySelector('tbody') as HTMLElement;
-    const orderPriorityRow = getByText('1-URGENT').closest(
-      'tr',
-    ) as HTMLElement;
+    const orderPriorityRow = getByText('1-URGENT').closest('tr') as HTMLElement;
     fireEvent.click(within(orderPriorityRow).getByLabelText('plus-square'));
 
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
     });
 
-    const shipModeRow = within(tbody).getByText('AIR').closest(
-      'tr',
-    ) as HTMLElement;
+    const shipModeRow = within(tbody)
+      .getByText('AIR')
+      .closest('tr') as HTMLElement;
     fireEvent.click(within(shipModeRow).getByLabelText('plus-square'));
 
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
     });
 
-    const returnFlagRow = within(tbody).getByText(/^A$/).closest(
-      'tr',
-    ) as HTMLElement;
+    const returnFlagRow = within(tbody)
+      .getByText(/^A$/)
+      .closest('tr') as HTMLElement;
     fireEvent.click(within(returnFlagRow).getByLabelText('plus-square'));
 
     await waitFor(() => {
@@ -632,9 +636,9 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     });
 
     const rows = Array.from(tbody.querySelectorAll('tr'));
-    const instructionRow = within(tbody).getByText('COLLECT COD').closest(
-      'tr',
-    ) as HTMLElement;
+    const instructionRow = within(tbody)
+      .getByText('COLLECT COD')
+      .closest('tr') as HTMLElement;
     const instructionIndex = rows.indexOf(instructionRow);
     const metricRow = rows
       .slice(instructionIndex + 1)
@@ -747,34 +751,32 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     const { container, getByText } = render(
       <PivotTableChart
         data={baseTree}
-        formData={buildFormData(
-          {
-            groupbyRows: [
-              'orderPriority',
-              'shipMode',
-              METRICS_PLACEHOLDER,
-              'orderStatus',
-            ],
-            groupbyColumns: colGroupby,
-            metrics,
-            metricsLayout: MetricsLayoutEnum.ROWS,
-            aggregateFunction: 'Sum',
-            rowTotals: false,
-            colTotals: false,
-            rowSubTotals: false,
-            colSubTotals: false,
-            startCollapsed: true,
-            initialDepth: 1,
-            maxDepthPerFetch: 1,
-            rowOrder: 'key_a_to_z',
-            colOrder: 'key_a_to_z',
-            viz_type: 'pivot_table_v3',
-            datasource: '1__table',
-            metricColorFormatters: [],
-            dateFormatters: {},
-            verboseMap: {},
-          })
-        }
+        formData={buildFormData({
+          groupbyRows: [
+            'orderPriority',
+            'shipMode',
+            METRICS_PLACEHOLDER,
+            'orderStatus',
+          ],
+          groupbyColumns: colGroupby,
+          metrics,
+          metricsLayout: MetricsLayoutEnum.ROWS,
+          aggregateFunction: 'Sum',
+          rowTotals: false,
+          colTotals: false,
+          rowSubTotals: false,
+          colSubTotals: false,
+          startCollapsed: true,
+          initialDepth: 1,
+          maxDepthPerFetch: 1,
+          rowOrder: 'key_a_to_z',
+          colOrder: 'key_a_to_z',
+          viz_type: 'pivot_table_v3',
+          datasource: '1__table',
+          metricColorFormatters: [],
+          dateFormatters: {},
+          verboseMap: {},
+        })}
         metrics={metrics}
         groupbyRows={rowGroupby}
         groupbyColumns={colGroupby}
@@ -813,22 +815,22 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
     });
 
-    const orderPriorityRow = getByText('1-URGENT').closest(
-      'tr',
-    ) as HTMLElement;
+    const orderPriorityRow = getByText('1-URGENT').closest('tr') as HTMLElement;
     fireEvent.click(within(orderPriorityRow).getByLabelText('plus-square'));
 
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
     });
 
-    expect(within(thead).getByText('COLLECT COD')).toBeTruthy();
-    expect(within(thead).getByText('DELIVER IN PERSON')).toBeTruthy();
-    expect(within(tbody).queryByText('COLLECT COD')).toBeNull();
-    expect(within(tbody).queryByText('DELIVER IN PERSON')).toBeNull();
-    expect(within(tbody).getByText('AIR')).toBeTruthy();
+    expect(within(thead).getByText('COLLECT COD')).toBeInTheDocument();
+    expect(within(thead).getByText('DELIVER IN PERSON')).toBeInTheDocument();
+    expect(within(tbody).queryByText('COLLECT COD')).not.toBeInTheDocument();
+    expect(
+      within(tbody).queryByText('DELIVER IN PERSON'),
+    ).not.toBeInTheDocument();
+    expect(within(tbody).getByText('AIR')).toBeInTheDocument();
     await waitFor(() => {
-      expect(within(tbody).getByText('FOB')).toBeTruthy();
+      expect(within(tbody).getByText('FOB')).toBeInTheDocument();
     });
   });
 
@@ -870,7 +872,10 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
         2,
       );
 
-    const buildCollapsedBranch = (rowDepth: number, collapsedGroupby: string[]) =>
+    const buildCollapsedBranch = (
+      rowDepth: number,
+      collapsedGroupby: string[],
+    ) =>
       applyMetricAxis(
         buildTreeFromRecords(
           records,
@@ -912,35 +917,33 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     const { container } = render(
       <PivotTableChart
         data={baseTree}
-        formData={buildFormData(
-          {
-            groupbyRows: [
-              'orderPriority',
-              'shipMode',
-              METRICS_PLACEHOLDER,
-              'orderStatus',
-              'orderClass',
-            ],
-            groupbyColumns: colGroupby,
-            metrics,
-            metricsLayout: MetricsLayoutEnum.ROWS,
-            aggregateFunction: 'Sum',
-            rowTotals: false,
-            colTotals: false,
-            rowSubTotals: false,
-            colSubTotals: false,
-            startCollapsed: true,
-            initialDepth: 1,
-            maxDepthPerFetch: 1,
-            rowOrder: 'key_a_to_z',
-            colOrder: 'key_a_to_z',
-            viz_type: 'pivot_table_v3',
-            datasource: '1__table',
-            metricColorFormatters: [],
-            dateFormatters: {},
-            verboseMap: {},
-          })
-        }
+        formData={buildFormData({
+          groupbyRows: [
+            'orderPriority',
+            'shipMode',
+            METRICS_PLACEHOLDER,
+            'orderStatus',
+            'orderClass',
+          ],
+          groupbyColumns: colGroupby,
+          metrics,
+          metricsLayout: MetricsLayoutEnum.ROWS,
+          aggregateFunction: 'Sum',
+          rowTotals: false,
+          colTotals: false,
+          rowSubTotals: false,
+          colSubTotals: false,
+          startCollapsed: true,
+          initialDepth: 1,
+          maxDepthPerFetch: 1,
+          rowOrder: 'key_a_to_z',
+          colOrder: 'key_a_to_z',
+          viz_type: 'pivot_table_v3',
+          datasource: '1__table',
+          metricColorFormatters: [],
+          dateFormatters: {},
+          verboseMap: {},
+        })}
         metrics={metrics}
         groupbyRows={rowGroupby}
         groupbyColumns={colGroupby}
@@ -987,7 +990,6 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
     });
 
-    expect(within(tbody).getByText('A')).toBeTruthy();
+    expect(within(tbody).getByText('A')).toBeInTheDocument();
   });
-
 });

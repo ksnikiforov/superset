@@ -40,7 +40,9 @@ export const deriveMetricKey = ({
   metricsLayout,
   cells,
 }: DeriveMetricKeyParams) => {
-  const metricLabels = metrics.map(getMetricKey).filter(label => label.length > 0);
+  const metricLabels = metrics
+    .map(getMetricKey)
+    .filter(label => label.length > 0);
   // When metrics are on rows, the metric key is the last element in the row path.
   // When metrics are on cols, it is the last element in the col path.
   const metricCandidate =
