@@ -28,6 +28,20 @@ const getControl = (name: string) =>
     ) as any;
 
 describe('pivot table v3 control panel', () => {
+  it('exposes auto-expand level controls with blank defaults', () => {
+    const expandRowsLevelControl = getControl('expandRowsLevel');
+    const expandColumnsLevelControl = getControl('expandColumnsLevel');
+
+    expect(expandRowsLevelControl).toBeDefined();
+    expect(expandRowsLevelControl.config.default).toBeUndefined();
+    expect(expandRowsLevelControl.config.placeholder).toBe('0');
+    expect(expandRowsLevelControl.config.mapStateToProps).toBeUndefined();
+    expect(expandColumnsLevelControl).toBeDefined();
+    expect(expandColumnsLevelControl.config.default).toBeUndefined();
+    expect(expandColumnsLevelControl.config.placeholder).toBe('0');
+    expect(expandColumnsLevelControl.config.mapStateToProps).toBeUndefined();
+  });
+
   it('builds column subtotal options based on column depth and clamps selections', () => {
     const colSubtotalControl = getControl('colSubtotalLevels');
     const result = colSubtotalControl.config.mapStateToProps({

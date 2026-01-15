@@ -40,9 +40,10 @@ import {
   getMetricKeys,
   mergeMetrics,
   normalizeSubtotalLevels,
+  parsePath,
+  resolveExpandLevel,
   resolveMetricPlacement,
   stripMetricsPlaceholder,
-  PATH_DIVIDER,
   SUBTOTAL_TOKEN,
 } from './utils';
 
@@ -176,30 +177,17 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
   const needsFormattingTotals =
     rowFormattingMetrics.length > 0 || colFormattingMetrics.length > 0;
   const needsSortingTotals = hasRowTotalSorting || hasColTotalSorting;
-  const resolveExpandLevel = (
-    rawLevel: number | undefined,
-    groupbyLength: number,
-  ) => {
-    if (rawLevel !== undefined && rawLevel !== null) {
-      const parsed = Number(rawLevel);
-      if (Number.isFinite(parsed)) {
-        return Math.min(Math.max(parsed, 0), groupbyLength);
-      }
-    }
-    if (!startCollapsed) {
-      return groupbyLength;
-    }
-    const resolvedDepth = Math.max(initialDepth || 1, 1) - 1;
-    return Math.min(Math.max(resolvedDepth, 0), groupbyLength);
-  };
-
   const resolvedExpandRowsLevel = resolveExpandLevel(
     expandRowsLevel,
     rowGroupby.length,
+    startCollapsed,
+    initialDepth || 1,
   );
   const resolvedExpandColsLevel = resolveExpandLevel(
     expandColumnsLevel,
     colGroupby.length,
+    startCollapsed,
+    initialDepth || 1,
   );
   const isFullyExpanded =
     resolvedExpandRowsLevel >= rowGroupby.length &&
@@ -237,7 +225,7 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
       return true;
     }).length;
   const parseExpansionKey = (key: PivotExpansionKey): PivotPath =>
-    Array.isArray(key) ? key : key.split(PATH_DIVIDER);
+    Array.isArray(key) ? key : parsePath(key);
   const resolveExpansionDepth = (keys?: PivotExpansionKey[]) => {
     if (!Array.isArray(keys) || keys.length === 0) {
       return 0;
@@ -263,7 +251,7 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
       adjustForMetricFront(resolvedExpandColsLevel + 1, !metricsOnRows),
     ),
   );
-  if (resolvedExpandRowsLevel === 0 && formData.expansionState) {
+  if (formData.expansionState) {
     rowDepthLimit = Math.min(
       rowGroupby.length,
       Math.max(
@@ -272,7 +260,7 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
       ),
     );
   }
-  if (resolvedExpandColsLevel === 0 && formData.expansionState) {
+  if (formData.expansionState) {
     colDepthLimit = Math.min(
       colGroupby.length,
       Math.max(

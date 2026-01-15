@@ -19,54 +19,37 @@ under the License.
 # Pivot Table v3 - Code Review Complaints
 
 ## Critical
-- Data corruption: `buildTreeFromRecords` writes row/col node `values` from per-cell records, so when both row and col groupbys exist the last cell wins and row/col totals become wrong. This breaks totals, total sorting, databar scales, and formatting. (`src/utils.ts`)
-- Key collisions: `serializePath` stringifies values and uses sentinel strings (`__NULL__`, `__UNDEFINED__`, metric token prefix, subtotal token). Real data values matching these or differing only by type (1 vs "1", Date vs string) collapse into the same node and cell key. (`src/utils.ts`)
-- Cell key ambiguity: `serializeCellKey` does not escape `CELL_KEY_DIVIDER`, so any row/col value containing `\u0001` makes keys unparsable and can corrupt the grid. (`src/utils.ts`)
-- Metric label collisions in paths: `resolveFetchContext` treats any path value equal to a metric label as a metric token. If a dimension value matches a metric name, the code strips the wrong segment, builds wrong filters, and fetches the wrong depth. (`src/fetchPivotBranch.ts`)
-- Initial expansion is broken: `initialDepth` is computed then ignored, so `startCollapsed` always collapses to root only. This contradicts requirements and makes fetch depth and UI out of sync. (`src/PivotTableChart.tsx`)
-- Placeholder collisions: `METRICS_PLACEHOLDER` detection keys off `column_name`/`label`, so a real column with that label is removed from groupbys and disappears from queries. (`src/utils.ts`, `src/controlPanel.tsx`)
-- Metrics with duplicate labels are dropped: `mergeMetrics` de-dupes by `getMetricKey`, so two adhoc metrics sharing a label silently lose one metric and its values. (`src/utils.ts`)
-- Metric selection is non-deterministic: `deriveMetricKey` falls back to the first cell value key, which can be a formatting-only metric or just arbitrary object key order. Cells can render the wrong metric. (`src/pivot/cellUtils.ts`)
+- [ ] Unbounded prefetch: `fetchExpandedBranches` blasts one request per expanded node using `Promise.all` with no concurrency limits. A large persisted expansion will spike query load and risk timeouts or rate limiting. (`superset-frontend/plugins/plugin-chart-pivot-table-v3/src/PivotTableChart.tsx:3213`, `superset-frontend/plugins/plugin-chart-pivot-table-v3/src/PivotTableChart.tsx:3302`)
+- [x] Redundant branch fetches: the prefetch loop runs for any expanded set and re-fetches data that is already present in the initial tree because `fetchedRowKeys`/`fetchedColKeys` are empty and never seeded for initial data. That means extra `/chart/data` calls for nodes that are already loaded. (`superset-frontend/plugins/plugin-chart-pivot-table-v3/src/PivotTableChart.tsx:3267`, `superset-frontend/plugins/plugin-chart-pivot-table-v3/src/PivotTableChart.tsx:3396`)
+- [x] Path parsing is lossy and inconsistent: `parseSerializedPath` never decodes `__NULL__`/`__UNDEFINED__`, so persisted expansions on NULL values turn into string filters. Meanwhile `buildQuery` uses `key.split(PATH_DIVIDER)` and ignores escape semantics entirely. This breaks persisted expansions for values containing the divider and corrupts depth calculations. (`superset-frontend/plugins/plugin-chart-pivot-table-v3/src/PivotTableChart.tsx:665`, `superset-frontend/plugins/plugin-chart-pivot-table-v3/src/buildQuery.ts:225`)
+- [x] "Only visible expansions persist" is violated: `persistExpansionState` keeps any expanded key that is not visible as long as it is still in the expanded set, so deep expansions can survive even when a parent is collapsed or removed. That is exactly the case the requirement forbids. (`superset-frontend/plugins/plugin-chart-pivot-table-v3/src/PivotTableChart.tsx:3059`, `superset-frontend/plugins/plugin-chart-pivot-table-v3/src/PivotTableChart.tsx:3090`)
+- [ ] Dashboard persistence gap: when `setControlValue` is missing, expansions only land in `ownState` and never in `formData`. That means a dashboard refresh or publish loses the expansion state, which contradicts "persists page refreshes and publishing". (`superset-frontend/plugins/plugin-chart-pivot-table-v3/src/PivotTableChart.tsx:3130`, `superset-frontend/plugins/plugin-chart-pivot-table-v3/src/controlPanel.tsx:523`)
 
 ## High
-- Subtotal depth detection counts subtotal tokens for current depth, so visible depth is overestimated and branch fetches can request the wrong level. (`src/fetchPivotBranch.ts`)
-- Column subtotal injection does not exclude existing subtotal nodes, so nested subtotals and duplicate subtotal columns are possible. (`src/fetchPivotBranch.ts`)
-- Cache key does not include row/col formatting or sorting config; enabling formatting or total sorting changes query pairs but the cache can return stale branches. (`src/fetchPivotBranch.ts`)
-- `stableStringify` does not normalize array order and stringifies `undefined` as "undefined"; cache keys can collide or thrash for semantically identical filters. (`src/fetchPivotBranch.ts`)
-- No cancellation for in-flight branch fetches; stale responses can merge into collapsed nodes or after unmount. The only pruning is partial and metric-specific. (`src/PivotTableChart.tsx`)
-- `maxDepthPerFetch` falls back to `Number.MAX_SAFE_INTEGER` when undefined or 0, so an expand can silently fetch full depth and blow up query cost. (`src/fetchPivotBranch.ts`)
-- Hard-coded labels ("Total", "Subtotal", "Grand total") are not translated and can become duplicated or awkward ("Total Total"). (`src/utils.ts`, `src/pivot/cellUtils.ts`, `src/PivotTableChart.tsx`)
-- `buildQuery` always sets `orderby` to the first metric when `series_limit_metric` is missing, which can reorder data unexpectedly and fight client-side ordering. (`src/buildQuery.ts`)
-- Formatting helper `normalizeMetricFormattingValue` picks the first element from arrays with no warning; the behavior is arbitrary and hidden. (`src/utils.ts`)
-- Filter builders only strip encoded metric tokens. Raw metric labels in paths (supported in tests) leak into filters and context menus. (`src/pivot/filters.ts`)
+- [x] Hidden regression: `startCollapsed`/`initialDepth` controls were removed with no migration, so there is no UI path to start fully expanded anymore. Existing charts that set `startCollapsed=false` are now stranded with a hidden knob. (`superset-frontend/plugins/plugin-chart-pivot-table-v3/src/controlPanel.tsx:576`, `superset-frontend/plugins/plugin-chart-pivot-table-v3/src/buildQuery.ts:179`)
+- [x] The prefetch flow hides the entire table behind a global `Loading` spinner. For large expansions or slow queries, users lose access to already-visible data and controls. This is a UX regression compared to per-cell spinners. (`superset-frontend/plugins/plugin-chart-pivot-table-v3/src/PivotTableChart.tsx:3396`, `superset-frontend/plugins/plugin-chart-pivot-table-v3/src/PivotTableChart.tsx:5107`)
+- [x] Synthetic nodes for missing expansion keys always set `hasChildren: true` and do not clamp to groupby depth or subtotal tokens. That triggers pointless branch fetches for leaf nodes and can send bogus `SUBTOTAL_TOKEN` filters to the backend. (`superset-frontend/plugins/plugin-chart-pivot-table-v3/src/PivotTableChart.tsx:3234`)
+- [x] `persistExpansionState` and other `setDataMask` calls race and can clobber each other because they spread the stale `ownState` prop instead of using the latest merged state. Expansion state can be dropped by a subsequent tree update. (`superset-frontend/plugins/plugin-chart-pivot-table-v3/src/PivotTableChart.tsx:3130`, `superset-frontend/plugins/plugin-chart-pivot-table-v3/src/PivotTableChart.tsx:4295`)
+- [x] Expand-level logic is duplicated between `buildQuery` and the chart component. Any drift will silently desync fetch depth vs. expansion depth and is already hard to reason about. (`superset-frontend/plugins/plugin-chart-pivot-table-v3/src/PivotTableChart.tsx:575`, `superset-frontend/plugins/plugin-chart-pivot-table-v3/src/buildQuery.ts:179`)
 
 ## Medium
-- The plugin uses `any` all over the place, violating the "no any" rule and making real type errors invisible. (`src/PivotTableChart.tsx`, `src/utils.ts`, `src/transformProps.ts`, `src/controlPanel.tsx`, tests)
-- UI code bypasses `@superset-ui/core/components` and antd tokens, leaning on `@ant-design/icons`, `supersetTheme`, and `theme as any`. This is out of policy and fragile across theme updates. (`src/PivotTableChart.tsx`, `src/controlPanel.tsx`)
-- `formatMetricValue` creates a new `CurrencyFormatter` for every cell. This is a huge perf hit for large tables and should be cached. (`src/pivot/viewModel.ts`)
-- Formatting value maps depend on `Object.values(cells)` iteration order. Formatting can change depending on fetch order and cache merges. (`src/pivot/cellUtils.ts`)
-- Metric placement logic is duplicated across control panel, buildQuery, transformProps, and fetchPivotBranch. Any drift yields subtle query/render mismatches. (multiple files)
-- `buildTreeFromRecords` uses `getColumnLabel` without guarding empty labels; this can read `record['']` or `record[undefined]` and insert bogus paths. (`src/utils.ts`)
-- Temporal sorting uses `new Date(a as any)` which depends on browser parsing and timezone; ordering can differ across clients. (`src/pivot/viewModel.ts`)
-- `buildColumnHeaderRows` generates synthetic nodes without the formatting/sorting metadata of real nodes, so headers can render inconsistently. (`src/pivot/viewModel.ts`)
-- Formatting and databar "collect" helpers can inject extra metrics with no cap or warning, inflating query cost unexpectedly. (`src/utils.ts`, `src/buildQuery.ts`, `src/fetchPivotBranch.ts`)
-- A debug hook `window.__PIVOT_V3_DEBUG_PLACEMENT` is shipped in production and can spam the console. (`src/controlPanel.tsx`)
+- [x] Persisted expansion depth only influences initial query depth when `expandRowsLevel`/`expandColumnsLevel` are zero. If a user expands beyond those levels, the persisted state is ignored at load time, causing avoidable branch fetches and slower rehydration. (`superset-frontend/plugins/plugin-chart-pivot-table-v3/src/buildQuery.ts:266`)
+- [x] `expandRowsLevel`/`expandColumnsLevel` accept non-integers and negative values; the parser just clamps without normalization. That can yield fractional depth math and opaque behavior for users. (`superset-frontend/plugins/plugin-chart-pivot-table-v3/src/PivotTableChart.tsx:564`, `superset-frontend/plugins/plugin-chart-pivot-table-v3/src/buildQuery.ts:179`)
+- [x] `seedExpandedByLevel` uses `countDimDepthBase` which does not strip subtotal tokens, so subtotal nodes can enter the expanded set and get persisted, despite being non-expandable. (`superset-frontend/plugins/plugin-chart-pivot-table-v3/src/PivotTableChart.tsx:601`)
+- [x] Persisting raw `PivotPath` arrays into `formData` can store non-JSON values (e.g., Date objects) and makes serialized chart configs unstable. There is no normalization layer. (`superset-frontend/plugins/plugin-chart-pivot-table-v3/src/PivotTableChart.tsx:3110`)
+- [x] `getStablePrefixLength` uses column labels instead of identifiers; renames or verboseMap changes will drop expansions even when the logical columns are unchanged. (`superset-frontend/plugins/plugin-chart-pivot-table-v3/src/PivotTableChart.tsx:592`)
+- [x] New `chartId`/`chart_id` fields were added to types but are unused. This is dead API surface. (`superset-frontend/plugins/plugin-chart-pivot-table-v3/src/types.ts:211`)
 
 ## Low / Nitpicks
-- `normalizeThemeColor` accepts `hsl(...)` without validation and silently drops invalid input; there is no user feedback. (`src/utils.ts`)
-- `splitThemeColors` is a naive parser and fails on newer CSS color functions like `color-mix()`; commas inside nested functions break parsing. (`src/utils.ts`)
-- Duplicate single-metric propagation blocks in `applyMetricAxis` look like leftover refactor and make the behavior hard to reason about. (`src/utils.ts`)
-- `buildFilterKey` includes large blobs (like `post_processing`) which bloat cache keys and make stringify slower without clear benefit. (`src/fetchPivotBranch.ts`)
-- `formatMetricValue` falls back to `String(value)` for non-numerics, yielding `[object Object]` for JSON-like values and polluting the UI. (`src/pivot/viewModel.ts`)
+- [x] `expandRowsLevel`/`expandColumnsLevel` are TextControls with no min/max guardrails or UX hints about what zero means. This feels like a power-user trap. (`superset-frontend/plugins/plugin-chart-pivot-table-v3/src/controlPanel.tsx:576`)
+- [x] `parseSerializedPath` lives inside `PivotTableChart.tsx` instead of utils, duplicating path parsing logic and inviting more drift. (`superset-frontend/plugins/plugin-chart-pivot-table-v3/src/PivotTableChart.tsx:665`)
+- [x] `isPrefetching` toggles are scattered (initial load and per-branch fetch), which makes it hard to reason about when the spinner is shown. A single state machine would be clearer. (`superset-frontend/plugins/plugin-chart-pivot-table-v3/src/PivotTableChart.tsx:1002`)
 
 ## Missing edge cases and tests
-- Dimension values that match metric labels or sentinel tokens (`__NULL__`, `__UNDEFINED__`, metric token prefix, subtotal token) should not break grouping or expansion.
-- Values containing `PATH_DIVIDER` or `CELL_KEY_DIVIDER` should not corrupt keys or parsing.
-- Duplicate metric labels and duplicate groupby labels should not drop metrics or merge unrelated nodes.
-- `initialDepth` combined with `startCollapsed` should expand to the requested depth, and `initialDepth = 0` should be handled.
-- `autoExpandColumns` behavior is missing entirely and not tested.
-- Collapse while an expand fetch is in flight should not re-open nodes or merge stale data.
-- Switching formatting/sorting configs should invalidate the branch cache and trigger new queries.
-- Drag-and-drop placement, especially cross-axis inserts and hover index accuracy, has no coverage.
-- Sorting by totals and subtotal depths with metric-first layouts is not covered.
-- Rendering with zero metrics, with only one axis, and with metric layout moved mid-axis needs coverage.
+- [x] Persisted expansions for columns (not just rows), especially with metrics on rows/cols and metric-first layouts.
+- [x] Values containing `PATH_DIVIDER`, `__NULL__`, `__UNDEFINED__`, `SUBTOTAL_TOKEN`, or the metric token prefix.
+- [x] Collapsing a parent should purge all descendant expansions from persisted state (explicit regression test for the requirement).
+- [x] Expansion state that comes in as string keys (legacy/ownState) should still rehydrate correctly.
+- [x] `expandRowsLevel`/`expandColumnsLevel` > 0 combined with persisted expansions deeper than those levels.
+- [ ] Dashboard flow without `setControlValue` (only `ownState`) to prove persistence across refresh/publish.
+- [x] Large expansion sets should not trigger duplicate fetches when initial data already contains the needed depth.

@@ -19,7 +19,11 @@
 
 import buildQuery, { formatQueryName } from '../../src/buildQuery';
 import { MetricsLayoutEnum } from '../../src/types';
-import { METRICS_PLACEHOLDER } from '../../src/utils';
+import {
+  METRICS_PLACEHOLDER,
+  PATH_DIVIDER,
+  serializePath,
+} from '../../src/utils';
 import { buildFormData } from './fixtures/pivotFormData';
 
 const baseFormData = buildFormData({
@@ -87,6 +91,21 @@ test('emits column subtotal depth without including grand total level', () => {
   expect(names).not.toContain(formatQueryName(2, 0));
 });
 
+test('normalizes fractional expand levels', () => {
+  const queryContext = buildQuery(
+    buildFormData({
+      ...baseFormData,
+      groupbyColumns: [],
+      startCollapsed: false,
+      expandRowsLevel: 0.5,
+      expandColumnsLevel: 0.2,
+    }),
+  );
+  const names = queryContext.queries.map(q => q.query_name);
+  expect(names).toContain(formatQueryName(1, 0));
+  expect(names.some(name => /row\d+\.\d|col\d+\.\d/.test(name))).toBe(false);
+});
+
 test('requests the first column level on initial collapsed render with multiple column groupbys', () => {
   const queryContext = buildQuery(
     buildFormData({
@@ -136,6 +155,44 @@ test('expands initial column depth to include persisted expansions', () => {
   );
   const names = queryContext.queries.map(q => q.query_name);
   expect(names).toEqual([formatQueryName(1, 2)]);
+});
+
+test('does not overcount expansion depth for escaped path dividers', () => {
+  const dividerValue = `A${PATH_DIVIDER}B`;
+  const queryContext = buildQuery(
+    buildFormData({
+      ...baseFormData,
+      groupbyRows: ['row1', 'row2', 'row3'],
+      groupbyColumns: [],
+      startCollapsed: true,
+      initialDepth: 1,
+      expansionState: {
+        rows: [serializePath([dividerValue])],
+        cols: [],
+      },
+    }),
+  );
+  const names = queryContext.queries.map(q => q.query_name);
+  expect(names).toEqual([formatQueryName(1, 0)]);
+});
+
+test('expands initial depth when expansionState exceeds expand level', () => {
+  const queryContext = buildQuery(
+    buildFormData({
+      ...baseFormData,
+      groupbyRows: ['row1', 'row2', 'row3'],
+      groupbyColumns: [],
+      startCollapsed: true,
+      expandRowsLevel: 1,
+      expandColumnsLevel: 0,
+      expansionState: {
+        rows: [['A'], ['A', 'B'], ['A', 'B', 'C']],
+        cols: [],
+      },
+    }),
+  );
+  const names = queryContext.queries.map(q => q.query_name);
+  expect(names).toEqual([formatQueryName(3, 0)]);
 });
 
 test('includes row subtotal depths when row subtotals are enabled', () => {

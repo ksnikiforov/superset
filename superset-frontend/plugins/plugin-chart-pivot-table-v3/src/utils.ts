@@ -205,6 +205,11 @@ export const stripMetricsPlaceholder = (groupby: QueryFormColumn[]) =>
     return true;
   });
 
+export const getStableColumnKey = (column: QueryFormColumn) =>
+  typeof column === 'string'
+    ? column
+    : column.sqlExpression || column.label || '';
+
 const escapePathDivider = (value: string) =>
   value.split(PATH_DIVIDER).join(`${PATH_DIVIDER}${PATH_DIVIDER}`);
 
@@ -220,6 +225,41 @@ const serializePathValue = (value: PivotPath[number]) => {
 
 export const serializePath = (path: PivotPath = []) =>
   path.map(serializePathValue).join(PATH_DIVIDER);
+
+const deserializePathValue = (value: string): PivotPath[number] => {
+  if (value === '__NULL__') {
+    return null;
+  }
+  if (value === '__UNDEFINED__') {
+    return undefined;
+  }
+  return value;
+};
+
+export const parsePath = (key: string): PivotPath => {
+  if (!key) {
+    return [];
+  }
+  const parts: string[] = [];
+  let buffer = '';
+  for (let idx = 0; idx < key.length; idx += 1) {
+    const char = key[idx];
+    if (char !== PATH_DIVIDER) {
+      buffer += char;
+      continue;
+    }
+    const nextChar = key[idx + 1];
+    if (nextChar === PATH_DIVIDER) {
+      buffer += PATH_DIVIDER;
+      idx += 1;
+      continue;
+    }
+    parts.push(buffer);
+    buffer = '';
+  }
+  parts.push(buffer);
+  return parts.map(deserializePathValue);
+};
 
 export const serializeCellKey = (rowKey: string, colKey: string) =>
   `${rowKey}${CELL_KEY_DIVIDER}${colKey}`;
@@ -1313,6 +1353,34 @@ export const parseDepth = (queryName?: string) => {
   const rowDepth = Number(rowLabel.replace('row', '')) || 0;
   const colDepth = Number(colLabel.replace('col', '')) || 0;
   return { rowDepth, colDepth };
+};
+
+export const normalizeExpandLevel = (rawLevel: number | undefined) => {
+  if (rawLevel === undefined || rawLevel === null) {
+    return undefined;
+  }
+  const parsed = Number(rawLevel);
+  if (!Number.isFinite(parsed)) {
+    return undefined;
+  }
+  return Math.floor(parsed);
+};
+
+export const resolveExpandLevel = (
+  rawLevel: number | undefined,
+  groupbyLength: number,
+  startCollapsed: boolean,
+  initialDepth: number,
+) => {
+  const parsed = normalizeExpandLevel(rawLevel);
+  if (parsed !== undefined) {
+    return Math.min(Math.max(parsed, 0), groupbyLength);
+  }
+  if (!startCollapsed) {
+    return groupbyLength;
+  }
+  const resolvedDepth = Math.max(initialDepth || 1, 1) - 1;
+  return Math.min(Math.max(resolvedDepth, 0), groupbyLength);
 };
 
 export const mergeTrees = (

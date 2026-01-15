@@ -145,6 +145,8 @@ export type PivotExpansionKey = string | PivotPath;
 export type PivotExpansionState = {
   rows: PivotExpansionKey[];
   cols: PivotExpansionKey[];
+  collapsedRows?: PivotExpansionKey[];
+  collapsedCols?: PivotExpansionKey[];
 };
 
 export type PivotDimensionSorting = {
@@ -208,8 +210,6 @@ export type PivotTableQueryFormData = QueryFormData &
     metricColorFormatters: ColorFormatters;
     dateFormatters: Record<string, DateFormatter | undefined>;
     colTypeMap?: Record<string, GenericDataType>;
-    chartId?: number;
-    chart_id?: number;
     legacy_order_by: QueryFormMetric[] | QueryFormMetric | null;
     order_desc: boolean;
     onContextMenu?: (

@@ -28,6 +28,8 @@ import {
   labelRowSubtotalLeaves,
   parseThemeColors,
   resolveMetricPlacement,
+  resolveExpandLevel,
+  normalizeExpandLevel,
   serializeCellKey,
   serializePath,
   SUBTOTAL_TOKEN,
@@ -251,6 +253,22 @@ describe('applyMetricAxis', () => {
         )
       ]?.values.countCustomers,
     ).toBe(10);
+  });
+});
+
+describe('expand level helpers', () => {
+  it('normalizes expand levels to integers', () => {
+    expect(normalizeExpandLevel(2.7)).toBe(2);
+    expect(normalizeExpandLevel(-1)).toBe(-1);
+    expect(normalizeExpandLevel(undefined)).toBeUndefined();
+  });
+
+  it('resolves expand levels with defaults and clamping', () => {
+    expect(resolveExpandLevel(2.7, 3, true, 1)).toBe(2);
+    expect(resolveExpandLevel(-5, 3, true, 1)).toBe(0);
+    expect(resolveExpandLevel(10, 3, true, 1)).toBe(3);
+    expect(resolveExpandLevel(undefined, 4, false, 1)).toBe(4);
+    expect(resolveExpandLevel(undefined, 4, true, 3)).toBe(2);
   });
 });
 

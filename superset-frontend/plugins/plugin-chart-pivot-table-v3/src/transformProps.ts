@@ -42,6 +42,7 @@ import {
   collectMetricFormattingMetricsForQuery,
   collectMetricDatabarMetricsForQuery,
   getMetricKeys,
+  getStableColumnKey,
   mergeTrees,
   mergeMetrics,
   normalizeDimensionFormattingMapWithKeys,
@@ -284,8 +285,8 @@ export default function transformProps(
   );
 
   const treeDataSignature = JSON.stringify({
-    rows: groupbyRows.map(getColumnLabel),
-    cols: groupbyColumns.map(getColumnLabel),
+    rows: groupbyRows.map(getStableColumnKey),
+    cols: groupbyColumns.map(getStableColumnKey),
     metrics: metricKeysForQuery,
     metricsLayout,
     metricInsertIndex,

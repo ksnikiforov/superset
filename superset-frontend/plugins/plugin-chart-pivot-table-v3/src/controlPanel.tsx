@@ -577,12 +577,13 @@ const config: ControlPanelConfig = {
             name: 'expandRowsLevel',
             config: {
               type: 'TextControl',
-              label: t('Expand row levels'),
-              default: 0,
+              label: t('Auto-expand row levels'),
               isInt: true,
+              min: 0,
+              placeholder: t('0'),
               renderTrigger: true,
               description: t(
-                'Number of row levels to expand on initial load.',
+                'Number of row levels to expand on initial load. Leave blank or use 0 to keep rows collapsed.',
               ),
             },
           },
@@ -592,12 +593,13 @@ const config: ControlPanelConfig = {
             name: 'expandColumnsLevel',
             config: {
               type: 'TextControl',
-              label: t('Expand column levels'),
-              default: 0,
+              label: t('Auto-expand column levels'),
               isInt: true,
+              min: 0,
+              placeholder: t('0'),
               renderTrigger: true,
               description: t(
-                'Number of column levels to expand on initial load.',
+                'Number of column levels to expand on initial load. Leave blank or use 0 to keep columns collapsed.',
               ),
             },
           },
