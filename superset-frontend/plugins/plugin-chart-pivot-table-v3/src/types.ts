@@ -27,6 +27,7 @@ import {
   QueryFormMetric,
   ChartProps as BaseChartProps,
   SetDataMaskHook,
+  HandlerFunction,
   TimeFormatter,
   TimeGranularity,
   GenericDataType,
@@ -139,6 +140,13 @@ export type PivotAxisValueRef = {
   path: PivotPath;
 };
 
+export type PivotExpansionKey = string | PivotPath;
+
+export type PivotExpansionState = {
+  rows: PivotExpansionKey[];
+  cols: PivotExpansionKey[];
+};
+
 export type PivotDimensionSorting = {
   metric?: QueryFormMetric;
   order?: PivotSortOrder;
@@ -162,6 +170,9 @@ export interface PivotTableCustomizeProps {
   aggregateFunction?: string;
   startCollapsed: boolean;
   initialDepth?: number;
+  expandRowsLevel?: number;
+  expandColumnsLevel?: number;
+  expansionState?: PivotExpansionState;
   maxDepthPerFetch?: number;
   rowTotals: boolean;
   colTotals: boolean;
@@ -197,6 +208,8 @@ export type PivotTableQueryFormData = QueryFormData &
     metricColorFormatters: ColorFormatters;
     dateFormatters: Record<string, DateFormatter | undefined>;
     colTypeMap?: Record<string, GenericDataType>;
+    chartId?: number;
+    chart_id?: number;
     legacy_order_by: QueryFormMetric[] | QueryFormMetric | null;
     order_desc: boolean;
     onContextMenu?: (
@@ -230,6 +243,9 @@ export interface PivotTableProps
   aggregateFunction?: string;
   startCollapsed: boolean;
   initialDepth?: number;
+  expandRowsLevel?: number;
+  expandColumnsLevel?: number;
+  expansionState?: PivotExpansionState;
   maxDepthPerFetch?: number;
   rowTotals: boolean;
   colTotals: boolean;
@@ -245,6 +261,7 @@ export interface PivotTableProps
   allowRenderHtml?: boolean;
   metricsLayout?: MetricsLayoutEnum;
   emitCrossFilters?: boolean;
+  setControlValue?: HandlerFunction;
   setDataMask: SetDataMaskHook;
   selectedFilters?: Record<string, DataRecordValue[]>;
   verboseMap: JsonObject;

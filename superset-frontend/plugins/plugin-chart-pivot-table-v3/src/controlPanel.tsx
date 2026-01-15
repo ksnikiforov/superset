@@ -518,6 +518,16 @@ const config: ControlPanelConfig = {
             },
           },
         ],
+        [
+          {
+            name: 'expansionState',
+            config: {
+              type: 'HiddenControl',
+              default: null,
+              dontRefreshOnChange: true,
+            },
+          },
+        ],
         ['adhoc_filters'],
         ['series_limit'],
         [
@@ -564,29 +574,30 @@ const config: ControlPanelConfig = {
         ],
         [
           {
-            name: 'startCollapsed',
+            name: 'expandRowsLevel',
             config: {
-              type: 'CheckboxControl',
-              label: t('Start collapsed'),
-              default: true,
+              type: 'TextControl',
+              label: t('Expand row levels'),
+              default: 0,
+              isInt: true,
               renderTrigger: true,
               description: t(
-                'Load top-level totals first. Branches fetch lazily as you expand.',
+                'Number of row levels to expand on initial load.',
               ),
             },
           },
         ],
         [
           {
-            name: 'initialDepth',
+            name: 'expandColumnsLevel',
             config: {
               type: 'TextControl',
-              label: t('Initial depth'),
-              default: 1,
+              label: t('Expand column levels'),
+              default: 0,
               isInt: true,
               renderTrigger: true,
               description: t(
-                'How many levels to fetch/expand on initial load when collapsed.',
+                'Number of column levels to expand on initial load.',
               ),
             },
           },

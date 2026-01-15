@@ -102,6 +102,42 @@ test('requests the first column level on initial collapsed render with multiple 
   expect(names).not.toContain(formatQueryName(1, 0));
 });
 
+test('expands initial row depth to include persisted expansions', () => {
+  const queryContext = buildQuery(
+    buildFormData({
+      ...baseFormData,
+      groupbyRows: ['row1', 'row2', 'row3'],
+      groupbyColumns: ['col1'],
+      startCollapsed: true,
+      initialDepth: 1,
+      expansionState: {
+        rows: [['A'], ['A', 'B'], ['A', 'B', 'C']],
+        cols: [],
+      },
+    }),
+  );
+  const names = queryContext.queries.map(q => q.query_name);
+  expect(names).toEqual([formatQueryName(3, 1)]);
+});
+
+test('expands initial column depth to include persisted expansions', () => {
+  const queryContext = buildQuery(
+    buildFormData({
+      ...baseFormData,
+      groupbyRows: ['row1'],
+      groupbyColumns: ['col1', 'col2', 'col3'],
+      startCollapsed: true,
+      initialDepth: 1,
+      expansionState: {
+        rows: [],
+        cols: [['X'], ['X', 'Y']],
+      },
+    }),
+  );
+  const names = queryContext.queries.map(q => q.query_name);
+  expect(names).toEqual([formatQueryName(1, 2)]);
+});
+
 test('includes row subtotal depths when row subtotals are enabled', () => {
   const queryContext = buildQuery(
     buildFormData({

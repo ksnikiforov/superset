@@ -23,7 +23,7 @@ Pivot Table v3 keeps the familiar formatting/cross-filtering experience while mo
 
 ### Highlights
 
-- Starts collapsed by default; each expansion issues a scoped `/api/v1/chart/data` call and shows a spinner on the header cell.
+- Starts collapsed by default; initial expansion levels are controlled per axis, and each expansion issues a scoped `/api/v1/chart/data` call with a spinner on the header cell.
 - Totals and subtotals (including count distinct) come directly from database queries at each depth.
 - When totals/subtotals are disabled and the table is fully expanded, the plugin falls back to a single grouped query for efficiency.
 - Formatting, cross-filter, and drill-to-detail hooks match Pivot Table v2.
@@ -36,7 +36,7 @@ import PivotTableV3ChartPlugin from '@superset-ui/plugin-chart-pivot-table-v3';
 new PivotTableV3ChartPlugin().configure({ key: 'pivot_table_v3' }).register();
 ```
 
-Key form fields: `groupbyRows`, `groupbyColumns`, `metrics`, `aggregateFunction`, `startCollapsed`, `initialDepth`, `rowTotals`, `colTotals`, `rowSubTotals`, `colSubTotals`, `rowOrder`, `colOrder`, `valueFormat`, `dateFormat`, `currencyFormat`, `allowRenderHtml`, `metricsLayout`, `combineMetric`.
+Key form fields: `groupbyRows`, `groupbyColumns`, `metrics`, `aggregateFunction`, `expandRowsLevel`, `expandColumnsLevel`, `expansionState`, `rowTotals`, `colTotals`, `rowSubTotals`, `colSubTotals`, `rowOrder`, `colOrder`, `valueFormat`, `dateFormat`, `currencyFormat`, `allowRenderHtml`, `metricsLayout`, `combineMetric`.
 
 ### Structure
 

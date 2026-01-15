@@ -24,17 +24,26 @@ import {
   QueryFormColumn,
   QueryFormOrderBy,
 } from '@superset-ui/core';
-import { MetricsLayoutEnum, PivotTableQueryFormData } from './types';
+import {
+  MetricsLayoutEnum,
+  PivotExpansionKey,
+  PivotPath,
+  PivotTableQueryFormData,
+} from './types';
 import {
   collectMetricFormattingMetricsForQuery,
   collectMetricDatabarMetricsForQuery,
   collectDimensionFormattingMetricsForQuery,
   collectDimensionSortingMetricsForQuery,
+  decodeMetricKey,
   hasTotalSorting,
+  getMetricKeys,
   mergeMetrics,
   normalizeSubtotalLevels,
   resolveMetricPlacement,
   stripMetricsPlaceholder,
+  PATH_DIVIDER,
+  SUBTOTAL_TOKEN,
 } from './utils';
 
 export const QUERY_NAME_PREFIX = 'pivot_v3';
@@ -64,6 +73,8 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
     groupbyRows = [],
     extra_form_data,
     startCollapsed = true,
+    expandRowsLevel,
+    expandColumnsLevel,
     rowTotals,
     colTotals,
     colSubTotals,
@@ -79,6 +90,7 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
   const rowGroupbyRaw = ensureIsArray<QueryFormColumn>(groupbyRows);
   const colGroupbyRaw = ensureIsArray<QueryFormColumn>(groupbyColumns);
   const metrics = ensureIsArray(formData.metrics);
+  const metricLabelSet = new Set(getMetricKeys(metrics));
   const metricFormattingMetrics = collectMetricFormattingMetricsForQuery(
     formData.metricFormatting,
     metrics,
@@ -164,14 +176,41 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
   const needsFormattingTotals =
     rowFormattingMetrics.length > 0 || colFormattingMetrics.length > 0;
   const needsSortingTotals = hasRowTotalSorting || hasColTotalSorting;
+  const resolveExpandLevel = (
+    rawLevel: number | undefined,
+    groupbyLength: number,
+  ) => {
+    if (rawLevel !== undefined && rawLevel !== null) {
+      const parsed = Number(rawLevel);
+      if (Number.isFinite(parsed)) {
+        return Math.min(Math.max(parsed, 0), groupbyLength);
+      }
+    }
+    if (!startCollapsed) {
+      return groupbyLength;
+    }
+    const resolvedDepth = Math.max(initialDepth || 1, 1) - 1;
+    return Math.min(Math.max(resolvedDepth, 0), groupbyLength);
+  };
+
+  const resolvedExpandRowsLevel = resolveExpandLevel(
+    expandRowsLevel,
+    rowGroupby.length,
+  );
+  const resolvedExpandColsLevel = resolveExpandLevel(
+    expandColumnsLevel,
+    colGroupby.length,
+  );
+  const isFullyExpanded =
+    resolvedExpandRowsLevel >= rowGroupby.length &&
+    resolvedExpandColsLevel >= colGroupby.length;
   const requireMultiQuery =
-    startCollapsed ||
+    !isFullyExpanded ||
     isTotalsEnabled ||
     isLevelTotalsEnabled ||
     needsFormattingTotals ||
     needsSortingTotals;
 
-  const initialDepthResolved = Math.max(initialDepth || 1, 1);
   const adjustForMetricFront = (depth: number, onAxis: boolean) => {
     if (!onAxis) {
       return depth;
@@ -183,14 +222,65 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
     return depth;
   };
 
-  const rowDepthLimit = Math.min(
+  const countExpansionDepth = (path: PivotPath) =>
+    path.filter(val => {
+      if (val === SUBTOTAL_TOKEN) {
+        return false;
+      }
+      const decoded = decodeMetricKey(val);
+      if (decoded && metricLabelSet.has(decoded)) {
+        return false;
+      }
+      if (typeof val === 'string' && metricLabelSet.has(val)) {
+        return false;
+      }
+      return true;
+    }).length;
+  const parseExpansionKey = (key: PivotExpansionKey): PivotPath =>
+    Array.isArray(key) ? key : key.split(PATH_DIVIDER);
+  const resolveExpansionDepth = (keys?: PivotExpansionKey[]) => {
+    if (!Array.isArray(keys) || keys.length === 0) {
+      return 0;
+    }
+    return keys.reduce(
+      (max, key) =>
+        Math.max(max, countExpansionDepth(parseExpansionKey(key))),
+      0,
+    );
+  };
+
+  let rowDepthLimit = Math.min(
     rowGroupby.length,
-    adjustForMetricFront(initialDepthResolved, metricsOnRows),
+    Math.max(
+      0,
+      adjustForMetricFront(resolvedExpandRowsLevel + 1, metricsOnRows),
+    ),
   );
-  const colDepthLimit = Math.min(
+  let colDepthLimit = Math.min(
     colGroupby.length,
-    adjustForMetricFront(initialDepthResolved, !metricsOnRows),
+    Math.max(
+      0,
+      adjustForMetricFront(resolvedExpandColsLevel + 1, !metricsOnRows),
+    ),
   );
+  if (resolvedExpandRowsLevel === 0 && formData.expansionState) {
+    rowDepthLimit = Math.min(
+      rowGroupby.length,
+      Math.max(
+        rowDepthLimit,
+        resolveExpansionDepth(formData.expansionState.rows),
+      ),
+    );
+  }
+  if (resolvedExpandColsLevel === 0 && formData.expansionState) {
+    colDepthLimit = Math.min(
+      colGroupby.length,
+      Math.max(
+        colDepthLimit,
+        resolveExpansionDepth(formData.expansionState.cols),
+      ),
+    );
+  }
 
   const temporalLookup = formData?.temporal_columns_lookup || {};
   const isTemporalColumn = (col: QueryFormColumn) =>
@@ -223,12 +313,12 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
       ];
     }
 
-    const rowLevelsForInitial = startCollapsed
-      ? rowLevels.filter(level => level <= rowDepthLimit)
-      : rowLevels;
-    const colLevelsForInitial = startCollapsed
-      ? colLevels.filter(level => level <= colDepthLimit)
-      : colLevels;
+    const rowLevelsForInitial = rowLevels.filter(
+      level => level <= rowDepthLimit,
+    );
+    const colLevelsForInitial = colLevels.filter(
+      level => level <= colDepthLimit,
+    );
 
     const rowDepths = new Set<number>(rowLevelsForInitial);
     const colDepths = new Set<number>(colLevelsForInitial);
