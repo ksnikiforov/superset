@@ -96,9 +96,7 @@ describe('PivotDndColumnSelect', () => {
         screen.getAllByTestId('pivot-dimension-formatting-button')[0],
       );
 
-      const formattingTitle = await screen.findByText(
-        'Conditional formatting',
-      );
+      const formattingTitle = await screen.findByText('Conditional formatting');
       await userEvent.click(formattingTitle);
 
       expect(

@@ -231,8 +231,7 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
       return 0;
     }
     return keys.reduce(
-      (max, key) =>
-        Math.max(max, countExpansionDepth(parseExpansionKey(key))),
+      (max, key) => Math.max(max, countExpansionDepth(parseExpansionKey(key))),
       0,
     );
   };

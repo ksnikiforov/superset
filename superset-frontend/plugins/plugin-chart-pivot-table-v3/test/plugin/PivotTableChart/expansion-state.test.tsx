@@ -167,7 +167,8 @@ describe('PivotTableChart expansion state persistence', () => {
     fireEvent.click(toggle as HTMLButtonElement);
 
     await waitFor(() => expect(setDataMask).toHaveBeenCalled());
-    const lastCall = setDataMask.mock.calls[setDataMask.mock.calls.length - 1][0];
+    const lastCall =
+      setDataMask.mock.calls[setDataMask.mock.calls.length - 1][0];
     expect(lastCall?.ownState?.expansionState?.rows).toContain(
       serializePath(['A']),
     );
@@ -200,7 +201,9 @@ describe('PivotTableChart expansion state persistence', () => {
     expect(toggle).not.toBeNull();
     fireEvent.click(toggle as HTMLButtonElement);
 
-    await waitFor(() => expect(setDataMask.mock.calls.length).toBeGreaterThan(1));
+    await waitFor(() =>
+      expect(setDataMask.mock.calls.length).toBeGreaterThan(1),
+    );
     const lastCall = setDataMask.mock.calls[setDataMask.mock.calls.length - 1];
     const lastOwnState = lastCall?.[0]?.ownState as Record<string, unknown>;
     expect(lastOwnState?.treeDataSignature).toEqual(treeDataSignature);
@@ -222,7 +225,9 @@ describe('PivotTableChart expansion state persistence', () => {
     render(buildChartProps({ data: buildTree(1), ownState }));
 
     await waitFor(() => expect(fetchPivotBranchMock).toHaveBeenCalled());
-    await waitFor(() => expect(screen.getAllByText('X').length).toBeGreaterThan(0));
+    await waitFor(() =>
+      expect(screen.getAllByText('X').length).toBeGreaterThan(0),
+    );
   });
 
   it('removes descendant expansions when a parent is collapsed', async () => {
@@ -337,8 +342,8 @@ describe('PivotTableChart expansion state persistence', () => {
     expect(rowToggle).not.toBeNull();
     if (!screen.queryByText('X')) {
       fireEvent.click(rowToggle as HTMLButtonElement);
-      await waitFor(() => expect(screen.getByText('X')).toBeInTheDocument());
     }
+    await waitFor(() => expect(screen.getByText('X')).toBeInTheDocument());
 
     const nestedLabel = screen.getByText('X');
     const nestedCell = nestedLabel.closest('th');
@@ -355,10 +360,7 @@ describe('PivotTableChart expansion state persistence', () => {
     const lastCall = expansionCalls()[expansionCalls().length - 1];
     const expansionState = lastCall?.[1] as PivotExpansionState;
     expect(expansionState.rows).toEqual(
-      expect.arrayContaining([
-        serializePath(['A']),
-        serializePath(['A', 'X']),
-      ]),
+      expect.arrayContaining([serializePath(['A']), serializePath(['A', 'X'])]),
     );
   });
 
@@ -373,7 +375,14 @@ describe('PivotTableChart expansion state persistence', () => {
     ];
     const buildTreeWithDepth = (rowDepth: number) =>
       applyMetricAxis(
-        buildTreeFromRecords(deepRecords, metrics, deepGroupby, [], rowDepth, 0),
+        buildTreeFromRecords(
+          deepRecords,
+          metrics,
+          deepGroupby,
+          [],
+          rowDepth,
+          0,
+        ),
         metrics,
         MetricsLayoutEnum.COLUMNS,
         deepGroupby,
@@ -420,10 +429,7 @@ describe('PivotTableChart expansion state persistence', () => {
     const lastCall = expansionCalls[expansionCalls.length - 1];
     const expansionState = lastCall?.[1] as PivotExpansionState;
     expect(expansionState.rows).toEqual(
-      expect.arrayContaining([
-        serializePath(['A']),
-        serializePath(['A', 'X']),
-      ]),
+      expect.arrayContaining([serializePath(['A']), serializePath(['A', 'X'])]),
     );
 
     fetchPivotBranchMock.mockClear();
@@ -472,7 +478,9 @@ describe('PivotTableChart expansion state persistence', () => {
     await waitFor(() => expect(fetchPivotBranchMock).toHaveBeenCalled());
     const firstCall = fetchPivotBranchMock.mock.calls[0][0];
     expect(firstCall.path).toEqual(['A']);
-    await waitFor(() => expect(screen.getAllByText('X').length).toBeGreaterThan(0));
+    await waitFor(() =>
+      expect(screen.getAllByText('X').length).toBeGreaterThan(0),
+    );
   });
 
   it('keeps expanded rows when groupby labels change', async () => {
@@ -545,7 +553,14 @@ describe('PivotTableChart expansion state persistence', () => {
     ];
     const buildTreeWithDepth = (rowDepth: number) =>
       applyMetricAxis(
-        buildTreeFromRecords(deepRecords, metrics, deepGroupby, [], rowDepth, 0),
+        buildTreeFromRecords(
+          deepRecords,
+          metrics,
+          deepGroupby,
+          [],
+          rowDepth,
+          0,
+        ),
         metrics,
         MetricsLayoutEnum.COLUMNS,
         deepGroupby,
@@ -607,9 +622,7 @@ describe('PivotTableChart expansion state persistence', () => {
       }),
     );
 
-    await waitFor(() =>
-      expect(screen.queryAllByText('X').length).toEqual(0),
-    );
+    await waitFor(() => expect(screen.queryAllByText('X').length).toEqual(0));
   });
 
   it('ignores cached auto expansions when auto-expand is explicitly zero', async () => {
@@ -641,9 +654,7 @@ describe('PivotTableChart expansion state persistence', () => {
       }),
     );
 
-    await waitFor(() =>
-      expect(screen.queryAllByText('X').length).toEqual(0),
-    );
+    await waitFor(() => expect(screen.queryAllByText('X').length).toEqual(0));
   });
 
   it('ignores cached auto expansions when auto-expand is cleared to default', async () => {
@@ -675,9 +686,7 @@ describe('PivotTableChart expansion state persistence', () => {
       }),
     );
 
-    await waitFor(() =>
-      expect(screen.queryAllByText('X').length).toEqual(0),
-    );
+    await waitFor(() => expect(screen.queryAllByText('X').length).toEqual(0));
   });
 
   it('collapses auto-expanded rows when auto-expand is cleared', async () => {
@@ -707,9 +716,7 @@ describe('PivotTableChart expansion state persistence', () => {
       }),
     );
 
-    await waitFor(() =>
-      expect(screen.queryAllByText('X').length).toEqual(0),
-    );
+    await waitFor(() => expect(screen.queryAllByText('X').length).toEqual(0));
   });
 
   it('persists auto-expand rows when cleared to zero', async () => {
@@ -816,7 +823,14 @@ describe('PivotTableChart expansion state persistence', () => {
     ];
     const buildTreeWithDepth = (rowDepth: number) =>
       applyMetricAxis(
-        buildTreeFromRecords(deepRecords, metrics, deepGroupby, [], rowDepth, 0),
+        buildTreeFromRecords(
+          deepRecords,
+          metrics,
+          deepGroupby,
+          [],
+          rowDepth,
+          0,
+        ),
         metrics,
         MetricsLayoutEnum.COLUMNS,
         deepGroupby,
@@ -886,9 +900,7 @@ describe('PivotTableChart expansion state persistence', () => {
       }),
     );
 
-    await waitFor(() =>
-      expect(screen.queryAllByText('X').length).toEqual(0),
-    );
+    await waitFor(() => expect(screen.queryAllByText('X').length).toEqual(0));
   });
 
   it('persists deep expansion state with subtotals and metrics placeholder', async () => {
@@ -1324,9 +1336,7 @@ describe('PivotTableChart expansion state persistence', () => {
 
     render(buildChartProps({ data: buildTree(1), ownState }));
 
-    await waitFor(() =>
-      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1),
-    );
+    await waitFor(() => expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1));
     const firstCall = fetchPivotBranchMock.mock.calls[0][0];
     expect(firstCall.path).toEqual(['A']);
   });

@@ -17,8 +17,8 @@
  * under the License.
  */
 
-import { render, fireEvent, waitFor, within } from '../../../testUtils';
 import { SupersetClient } from '@superset-ui/core';
+import { render, fireEvent, waitFor, within } from '../../../testUtils';
 import PivotTableChart from '../../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum } from '../../../../src/types';
 import { baseFormData, buildFormData } from '../../fixtures/pivotFormData';

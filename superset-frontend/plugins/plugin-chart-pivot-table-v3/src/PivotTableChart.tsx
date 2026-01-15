@@ -1091,9 +1091,7 @@ function PivotTableChart(props: PivotTableProps) {
       metricsLayout: resolvedMetricsLayout,
       metricInsertIndex,
       rowSubtotalLevels: normalizedRowSubtotalLevels,
-      colSubtotalLevels: normalizedColSubtotalLevels.filter(
-        level => level > 0,
-      ),
+      colSubtotalLevels: normalizedColSubtotalLevels.filter(level => level > 0),
     });
   }, [
     formData.treeDataSignature,
@@ -1448,11 +1446,11 @@ function PivotTableChart(props: PivotTableProps) {
       const shouldClearRowCache =
         resolvedExpandRowsLevel > 0 &&
         (prevAutoExpandRows === null || prevAutoExpandRows === 0) &&
-        (baseManualRows.length + baseManualCollapsedRows.length > 0);
+        baseManualRows.length + baseManualCollapsedRows.length > 0;
       const shouldClearColCache =
         resolvedExpandColumnsLevel > 0 &&
         (prevAutoExpandCols === null || prevAutoExpandCols === 0) &&
-        (baseManualCols.length + baseManualCollapsedCols.length > 0);
+        baseManualCols.length + baseManualCollapsedCols.length > 0;
       const manualRows = shouldClearRowCache ? [] : baseManualRows;
       const manualCols = shouldClearColCache ? [] : baseManualCols;
       const manualCollapsedRows = shouldClearRowCache
@@ -2131,8 +2129,8 @@ function PivotTableChart(props: PivotTableProps) {
         }
         const hasChildren = metricsAtColEnd
           ? false
-          : findChildren(nodes, { ...parent, path: collapsedPath }).length > 0 ||
-            hasMetricChildren;
+          : findChildren(nodes, { ...parent, path: collapsedPath }).length >
+              0 || hasMetricChildren;
         return {
           ...(sourceNode || metricNodes[0]),
           key: collapsedKey,
@@ -3189,7 +3187,11 @@ function PivotTableChart(props: PivotTableProps) {
         getRowChildren: parent =>
           getRowChildrenForNodes(parent, treeRef.current.rows),
         getCollapsedRowChildren: parent =>
-          getCollapsedRowChildrenForNodes(parent, nextRows, treeRef.current.rows),
+          getCollapsedRowChildrenForNodes(
+            parent,
+            nextRows,
+            treeRef.current.rows,
+          ),
       });
       const visibleRowsOverride = shouldHideMetricGrandTotalsOnRows
         ? visibleRowsBaseOverride.filter(row => !isMetricGrandTotalNode(row))
@@ -3397,7 +3399,8 @@ function PivotTableChart(props: PivotTableProps) {
           : autoFetchAttemptsRef.current.cols;
       const fetchedKeysRef =
         axis === 'row' ? fetchedRowKeysRef : fetchedColKeysRef;
-      const markFetched = axis === 'row' ? setFetchedRowKeys : setFetchedColKeys;
+      const markFetched =
+        axis === 'row' ? setFetchedRowKeys : setFetchedColKeys;
       const autoExpandDepth =
         axis === 'row'
           ? autoExpandFetchDepthRef.current.rows
@@ -3728,43 +3731,45 @@ function PivotTableChart(props: PivotTableProps) {
     let cancelled = false;
     const maxIterations =
       Math.max(groupbyRows.length, groupbyColumns.length) + 2;
-    const run = async () => {
-      let iterations = 0;
-      let shouldContinue = true;
-      while (!cancelled && shouldContinue && iterations < maxIterations) {
-        const prefetchRows = prefetchRowsRef.current;
-        const prefetchCols = prefetchColsRef.current;
-        const currentExpandedRows = prefetchFromPersistenceRef.current
-          ? new Set([...expandedRowsRef.current, ...prefetchRows])
-          : expandedRowsRef.current;
-        const currentExpandedCols = prefetchFromPersistenceRef.current
-          ? new Set([...expandedColsRef.current, ...prefetchCols])
-          : expandedColsRef.current;
-        const [rowResult, colResult] = await Promise.all([
-          fetchExpandedBranches(
-            'row',
-            currentExpandedRows,
-            treeRef.current.rows,
-          ),
-          fetchExpandedBranches(
-            'col',
-            currentExpandedCols,
-            treeRef.current.cols,
-          ),
-        ]);
-        if (cancelled) {
-          return;
-        }
-        const didLoadData = rowResult.didLoadData || colResult.didLoadData;
-        shouldContinue = didLoadData;
-        iterations += 1;
+    const runIteration = async (iteration: number): Promise<void> => {
+      if (cancelled || iteration >= maxIterations) {
+        return;
       }
+      const prefetchRows = prefetchRowsRef.current;
+      const prefetchCols = prefetchColsRef.current;
+      const currentExpandedRows = prefetchFromPersistenceRef.current
+        ? new Set([...expandedRowsRef.current, ...prefetchRows])
+        : expandedRowsRef.current;
+      const currentExpandedCols = prefetchFromPersistenceRef.current
+        ? new Set([...expandedColsRef.current, ...prefetchCols])
+        : expandedColsRef.current;
+      const [rowResult, colResult] = await Promise.all([
+        fetchExpandedBranches('row', currentExpandedRows, treeRef.current.rows),
+        fetchExpandedBranches('col', currentExpandedCols, treeRef.current.cols),
+      ]);
+      if (cancelled) {
+        return;
+      }
+      const didLoadData = rowResult.didLoadData || colResult.didLoadData;
+      if (!didLoadData) {
+        return;
+      }
+      await runIteration(iteration + 1);
+    };
+    const run = async (): Promise<void> => {
+      await runIteration(0);
       if (!cancelled) {
         shouldAutoFetchRef.current = false;
         prefetchFromPersistenceRef.current = false;
       }
     };
-    void run();
+    run().catch(error => {
+      if (cancelled) {
+        return;
+      }
+      const message = error instanceof Error ? error.message : String(error);
+      setErrorMessage(message);
+    });
     return () => {
       cancelled = true;
     };
@@ -4142,7 +4147,8 @@ function PivotTableChart(props: PivotTableProps) {
       parentPath: PivotTreeNode['path'],
       keys: Set<string>,
     ) => {
-      const nodes = axis === 'row' ? treeRef.current.rows : treeRef.current.cols;
+      const nodes =
+        axis === 'row' ? treeRef.current.rows : treeRef.current.cols;
       const next = new Set<string>();
       keys.forEach(key => {
         const node = nodes[key];
@@ -5561,187 +5567,190 @@ function PivotTableChart(props: PivotTableProps) {
                           <span>{formatLabel(cell.node, 'col')}</span>
                           {loadingKeys.has(cell.node.key) && <Spinner />}
                         </ColumnHeaderCell>
-                    </th>
-                  );
-                })}
-              </tr>
-            ))
-          )}
-        </thead>
-        <tbody>
-          {visibleRows.map(row => {
-            const showToggle = shouldShowToggle('row', row);
-            const rowAggregateBold = isRowAggregateBold(row);
-            const isSubtotalHeader = rowAggregateBold;
-            const isGrandTotalRow = showRowRoot && row.key === rootKey;
-            const grandTotalPositionClass =
-              resolvedRowTotalPosition === 'end'
-                ? 'pivot-grand-total-row--bottom'
-                : 'pivot-grand-total-row--top';
-            const rowClassName = isGrandTotalRow
-              ? `pivot-grand-total-row ${grandTotalPositionClass}`
-              : undefined;
-            const rowTotalBg = getTotalBackground(row);
-            const rowHeaderFormatting = resolveDimensionStyle(
-              'row',
-              row,
-              'label',
-            );
-            const rowHeaderStyle = {
-              ...(rowTotalBg ? { backgroundColor: rowTotalBg } : {}),
-              ...(rowHeaderFormatting || {}),
-            };
-            const rowHeaderStyleResolved =
-              Object.keys(rowHeaderStyle).length > 0
-                ? rowHeaderStyle
+                      </th>
+                    );
+                  })}
+                </tr>
+              ))
+            )}
+          </thead>
+          <tbody>
+            {visibleRows.map(row => {
+              const showToggle = shouldShowToggle('row', row);
+              const rowAggregateBold = isRowAggregateBold(row);
+              const isSubtotalHeader = rowAggregateBold;
+              const isGrandTotalRow = showRowRoot && row.key === rootKey;
+              const grandTotalPositionClass =
+                resolvedRowTotalPosition === 'end'
+                  ? 'pivot-grand-total-row--bottom'
+                  : 'pivot-grand-total-row--top';
+              const rowClassName = isGrandTotalRow
+                ? `pivot-grand-total-row ${grandTotalPositionClass}`
                 : undefined;
-            const rowIndent = getNodeDimDepth(row) * ROW_INDENT_PX;
-            return (
-              <tr key={row.key} className={rowClassName}>
-                <th
-                  className={isSubtotalHeader ? 'subtotal-cell' : undefined}
-                  style={rowHeaderStyleResolved}
-                >
-                  <HeaderCell style={{ paddingLeft: rowIndent }}>
-                    {showToggle ? (
-                      <ToggleButton
-                        type="button"
-                        onClick={() => handleToggle('row', row)}
+              const rowTotalBg = getTotalBackground(row);
+              const rowHeaderFormatting = resolveDimensionStyle(
+                'row',
+                row,
+                'label',
+              );
+              const rowHeaderStyle = {
+                ...(rowTotalBg ? { backgroundColor: rowTotalBg } : {}),
+                ...(rowHeaderFormatting || {}),
+              };
+              const rowHeaderStyleResolved =
+                Object.keys(rowHeaderStyle).length > 0
+                  ? rowHeaderStyle
+                  : undefined;
+              const rowIndent = getNodeDimDepth(row) * ROW_INDENT_PX;
+              return (
+                <tr key={row.key} className={rowClassName}>
+                  <th
+                    className={isSubtotalHeader ? 'subtotal-cell' : undefined}
+                    style={rowHeaderStyleResolved}
+                  >
+                    <HeaderCell style={{ paddingLeft: rowIndent }}>
+                      {showToggle ? (
+                        <ToggleButton
+                          type="button"
+                          onClick={() => handleToggle('row', row)}
+                        >
+                          {expandedRows.has(row.key) ? (
+                            <MinusSquareOutlined />
+                          ) : (
+                            <PlusSquareOutlined />
+                          )}
+                        </ToggleButton>
+                      ) : null}
+                      <span>{formatLabel(row, 'row')}</span>
+                      {loadingKeys.has(row.key) && <Spinner />}
+                    </HeaderCell>
+                  </th>
+                  {visibleCols.map(col => {
+                    const cellKey = serializeCellKey(row.key, col.key);
+                    const cell = tree.cells[cellKey];
+                    const metricKey = deriveMetricKey(row, col);
+                    const formattingKeys = metricKey
+                      ? formattingKeyMap[metricKey]
+                      : undefined;
+                    const colAggregateBold = isColAggregateBold(col);
+                    const isSubtotalCell = rowAggregateBold || colAggregateBold;
+                    const isGrandTotalCell =
+                      row.path.length === 0 ||
+                      col.path.length === 0 ||
+                      isMetricGrandTotalNode(row) ||
+                      isMetricGrandTotalNode(col);
+                    const rowCellFormatting = !isGrandTotalCell
+                      ? resolveDimensionStyle('row', row, 'cell')
+                      : undefined;
+                    const colCellFormatting = !isGrandTotalCell
+                      ? resolveDimensionStyle('col', col, 'cell')
+                      : undefined;
+                    const applyColorFormatting = !!(
+                      cell &&
+                      formattingKeys &&
+                      shouldApplyMetricFormatting(
+                        metricFormattingScope,
+                        isSubtotalCell,
+                        isGrandTotalCell,
+                      )
+                    );
+                    const applyD3Formatting = !!(
+                      cell && formattingKeys?.d3Format
+                    );
+                    const backgroundColor =
+                      applyColorFormatting && formattingKeys?.backgroundColor
+                        ? normalizeCssColor(
+                            cell.values[formattingKeys.backgroundColor],
+                          )
+                        : undefined;
+                    const textColor =
+                      applyColorFormatting && formattingKeys?.textColor
+                        ? normalizeCssColor(
+                            cell.values[formattingKeys.textColor],
+                          )
+                        : undefined;
+                    const d3FormatOverride = applyD3Formatting
+                      ? normalizeD3Format(cell.values[formattingKeys.d3Format])
+                      : undefined;
+                    const cellTotalBg = rowTotalBg;
+                    const databarConfig = metricKey
+                      ? metricDatabars[metricKey]
+                      : undefined;
+                    const colMinWidth = databarColumnMinWidths.get(col.key);
+                    const isDatabarCell = !!databarConfig?.type;
+                    const cellClassName = [
+                      isSubtotalCell ? 'subtotal-cell' : '',
+                      'value-cell',
+                      isDatabarCell ? 'databar-cell' : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ');
+                    const cellStyle = {
+                      ...(cellTotalBg ? { backgroundColor: cellTotalBg } : {}),
+                      ...(colCellFormatting?.backgroundColor
+                        ? { backgroundColor: colCellFormatting.backgroundColor }
+                        : {}),
+                      ...(colCellFormatting?.color
+                        ? { color: colCellFormatting.color }
+                        : {}),
+                      ...(rowCellFormatting?.backgroundColor
+                        ? { backgroundColor: rowCellFormatting.backgroundColor }
+                        : {}),
+                      ...(rowCellFormatting?.color
+                        ? { color: rowCellFormatting.color }
+                        : {}),
+                      ...(backgroundColor ? { backgroundColor } : {}),
+                      ...(textColor ? { color: textColor } : {}),
+                      ...(colMinWidth
+                        ? { minWidth: `${Math.ceil(colMinWidth)}px` }
+                        : {}),
+                    };
+                    const style =
+                      Object.keys(cellStyle).length > 0 ? cellStyle : undefined;
+                    const cellContent =
+                      databarConfig?.type && metricKey
+                        ? renderDatabarContent(
+                            row,
+                            col,
+                            cell,
+                            metricKey,
+                            d3FormatOverride,
+                          )
+                        : renderCellContent(
+                            row,
+                            col,
+                            metricKey,
+                            d3FormatOverride,
+                          );
+                    const cellInteractionProps = emitCrossFilters
+                      ? {
+                          onClick: () => handleCellClick(row, col),
+                          onKeyDown: (
+                            event: KeyboardEvent<HTMLTableCellElement>,
+                          ) => handleCellKeyDown(event, row, col),
+                          role: 'button' as const,
+                          tabIndex: 0,
+                        }
+                      : {};
+                    return (
+                      <td
+                        key={cellKey}
+                        className={cellClassName}
+                        style={style}
+                        {...cellInteractionProps}
+                        onContextMenu={event =>
+                          handleCellContextMenu(event, row, col)
+                        }
                       >
-                        {expandedRows.has(row.key) ? (
-                          <MinusSquareOutlined />
-                        ) : (
-                          <PlusSquareOutlined />
-                        )}
-                      </ToggleButton>
-                    ) : null}
-                    <span>{formatLabel(row, 'row')}</span>
-                    {loadingKeys.has(row.key) && <Spinner />}
-                  </HeaderCell>
-                </th>
-                {visibleCols.map(col => {
-                  const cellKey = serializeCellKey(row.key, col.key);
-                  const cell = tree.cells[cellKey];
-                  const metricKey = deriveMetricKey(row, col);
-                  const formattingKeys = metricKey
-                    ? formattingKeyMap[metricKey]
-                    : undefined;
-                  const colAggregateBold = isColAggregateBold(col);
-                  const isSubtotalCell = rowAggregateBold || colAggregateBold;
-                  const isGrandTotalCell =
-                    row.path.length === 0 ||
-                    col.path.length === 0 ||
-                    isMetricGrandTotalNode(row) ||
-                    isMetricGrandTotalNode(col);
-                  const rowCellFormatting = !isGrandTotalCell
-                    ? resolveDimensionStyle('row', row, 'cell')
-                    : undefined;
-                  const colCellFormatting = !isGrandTotalCell
-                    ? resolveDimensionStyle('col', col, 'cell')
-                    : undefined;
-                  const applyColorFormatting = !!(
-                    cell &&
-                    formattingKeys &&
-                    shouldApplyMetricFormatting(
-                      metricFormattingScope,
-                      isSubtotalCell,
-                      isGrandTotalCell,
-                    )
-                  );
-                  const applyD3Formatting = !!(
-                    cell && formattingKeys?.d3Format
-                  );
-                  const backgroundColor =
-                    applyColorFormatting && formattingKeys?.backgroundColor
-                      ? normalizeCssColor(
-                          cell.values[formattingKeys.backgroundColor],
-                        )
-                      : undefined;
-                  const textColor =
-                    applyColorFormatting && formattingKeys?.textColor
-                      ? normalizeCssColor(cell.values[formattingKeys.textColor])
-                      : undefined;
-                  const d3FormatOverride = applyD3Formatting
-                    ? normalizeD3Format(cell.values[formattingKeys.d3Format])
-                    : undefined;
-                  const cellTotalBg = rowTotalBg;
-                  const databarConfig = metricKey
-                    ? metricDatabars[metricKey]
-                    : undefined;
-                  const colMinWidth = databarColumnMinWidths.get(col.key);
-                  const isDatabarCell = !!databarConfig?.type;
-                  const cellClassName = [
-                    isSubtotalCell ? 'subtotal-cell' : '',
-                    'value-cell',
-                    isDatabarCell ? 'databar-cell' : '',
-                  ]
-                    .filter(Boolean)
-                    .join(' ');
-                  const cellStyle = {
-                    ...(cellTotalBg ? { backgroundColor: cellTotalBg } : {}),
-                    ...(colCellFormatting?.backgroundColor
-                      ? { backgroundColor: colCellFormatting.backgroundColor }
-                      : {}),
-                    ...(colCellFormatting?.color
-                      ? { color: colCellFormatting.color }
-                      : {}),
-                    ...(rowCellFormatting?.backgroundColor
-                      ? { backgroundColor: rowCellFormatting.backgroundColor }
-                      : {}),
-                    ...(rowCellFormatting?.color
-                      ? { color: rowCellFormatting.color }
-                      : {}),
-                    ...(backgroundColor ? { backgroundColor } : {}),
-                    ...(textColor ? { color: textColor } : {}),
-                    ...(colMinWidth
-                      ? { minWidth: `${Math.ceil(colMinWidth)}px` }
-                      : {}),
-                  };
-                  const style =
-                    Object.keys(cellStyle).length > 0 ? cellStyle : undefined;
-                  const cellContent =
-                    databarConfig?.type && metricKey
-                      ? renderDatabarContent(
-                          row,
-                          col,
-                          cell,
-                          metricKey,
-                          d3FormatOverride,
-                        )
-                      : renderCellContent(
-                          row,
-                          col,
-                          metricKey,
-                          d3FormatOverride,
-                        );
-                  const cellInteractionProps = emitCrossFilters
-                    ? {
-                        onClick: () => handleCellClick(row, col),
-                        onKeyDown: (event: KeyboardEvent<HTMLTableCellElement>) =>
-                          handleCellKeyDown(event, row, col),
-                        role: 'button' as const,
-                        tabIndex: 0,
-                      }
-                    : {};
-                  return (
-                    <td
-                      key={cellKey}
-                      className={cellClassName}
-                      style={style}
-                      {...cellInteractionProps}
-                      onContextMenu={event =>
-                        handleCellContextMenu(event, row, col)
-                      }
-                    >
-                      {cellContent}
-                    </td>
-                  );
-                })}
-              </tr>
-            );
-          })}
-        </tbody>
-      </StyledTable>
+                        {cellContent}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </StyledTable>
       )}
     </Container>
   );
