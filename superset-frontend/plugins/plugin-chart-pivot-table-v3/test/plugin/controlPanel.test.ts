@@ -17,15 +17,31 @@
  * under the License.
  */
 
+import {
+  ControlPanelState,
+  ControlState,
+  CustomControlItem,
+  isCustomControlItem,
+} from '@superset-ui/chart-controls';
 import controlPanel from '../../src/controlPanel';
 
-const getControl = (name: string) =>
-  controlPanel.controlPanelSections
-    .flatMap(section => section.controlSetRows)
+type SubtotalOption = { value: number; label: string };
+
+const getControl = (name: string) => {
+  const control = controlPanel.controlPanelSections
+    .flatMap(section => (section ? section.controlSetRows : []))
     .flatMap(row => row)
     .find(
-      control => typeof control === 'object' && control?.name === name,
-    ) as any;
+      (controlItem): controlItem is CustomControlItem =>
+        isCustomControlItem(controlItem) && controlItem.name === name,
+    );
+
+  if (!control) {
+    throw new Error(`Control ${name} not found`);
+  }
+
+  return control;
+};
 
 describe('pivot table v3 control panel', () => {
   it('exposes auto-expand level controls with blank defaults', () => {
@@ -44,41 +60,77 @@ describe('pivot table v3 control panel', () => {
 
   it('builds column subtotal options based on column depth and clamps selections', () => {
     const colSubtotalControl = getControl('colSubtotalLevels');
-    const result = colSubtotalControl.config.mapStateToProps({
+    const mapStateToProps = colSubtotalControl.config.mapStateToProps;
+    if (!mapStateToProps) {
+      throw new Error('mapStateToProps not configured for colSubtotalLevels');
+    }
+    const state = {
       controls: {
         groupbyRows: { value: ['row1'] },
         groupbyColumns: { value: ['col1', 'col2', 'col3'] },
         metrics: { value: ['metric1'] },
         colSubtotalLevels: { value: [1, 3, 5, 0] },
       },
-    });
-    expect(result.options.map((opt: any) => opt.value)).toEqual([1, 2]);
+    } as unknown as ControlPanelState;
+    const controlState = {
+      ...colSubtotalControl.config,
+      name: colSubtotalControl.name,
+    } as ControlState;
+    const result = mapStateToProps(state, controlState) as {
+      options: SubtotalOption[];
+      value: number[];
+    };
+    expect(result.options.map(({ value }) => value)).toEqual([1, 2]);
     expect(result.value).toEqual([1]);
   });
 
   it('returns empty options when there are no column levels', () => {
     const colSubtotalControl = getControl('colSubtotalLevels');
-    const result = colSubtotalControl.config.mapStateToProps({
+    const mapStateToProps = colSubtotalControl.config.mapStateToProps;
+    if (!mapStateToProps) {
+      throw new Error('mapStateToProps not configured for colSubtotalLevels');
+    }
+    const state = {
       controls: {
         groupbyRows: { value: ['row1'] },
         groupbyColumns: { value: [] },
         metrics: { value: ['metric1'] },
         colSubtotalLevels: { value: [1, 2] },
       },
-    });
+    } as unknown as ControlPanelState;
+    const controlState = {
+      ...colSubtotalControl.config,
+      name: colSubtotalControl.name,
+    } as ControlState;
+    const result = mapStateToProps(state, controlState) as {
+      options: SubtotalOption[];
+      value: number[];
+    };
     expect(result.options).toEqual([]);
     expect(result.value).toEqual([]);
   });
 
   it('selects all column levels when subtotals are enabled with no explicit levels', () => {
     const colSubtotalControl = getControl('colSubtotalLevels');
-    const result = colSubtotalControl.config.mapStateToProps({
+    const mapStateToProps = colSubtotalControl.config.mapStateToProps;
+    if (!mapStateToProps) {
+      throw new Error('mapStateToProps not configured for colSubtotalLevels');
+    }
+    const state = {
       controls: {
         groupbyColumns: { value: ['col1', 'col2', 'col3'] },
         colSubtotalLevels: { value: [] },
         colSubTotals: { value: true },
       },
-    });
+    } as unknown as ControlPanelState;
+    const controlState = {
+      ...colSubtotalControl.config,
+      name: colSubtotalControl.name,
+    } as ControlState;
+    const result = mapStateToProps(state, controlState) as {
+      value: number[];
+      enabled: boolean;
+    };
     expect(result.value).toEqual([1, 2]);
     expect(result.enabled).toEqual(true);
   });

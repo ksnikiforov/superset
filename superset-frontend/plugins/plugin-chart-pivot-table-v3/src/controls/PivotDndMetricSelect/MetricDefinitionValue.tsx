@@ -16,14 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { ReactNode } from 'react';
+import { type ComponentProps, ReactNode } from 'react';
 import { Metric } from '@superset-ui/core';
 import { ColumnMeta } from '@superset-ui/chart-controls';
-import { AdhocMetric, type savedMetricType } from '../../exploreImports';
+import {
+  AdhocMetric,
+  AdhocMetricPopoverTrigger,
+  type savedMetricType,
+} from '../../exploreImports';
 import AdhocMetricOption from './AdhocMetricOption';
 
 type SavedMetric = savedMetricType & { error_text?: string };
 type MetricOption = Metric | AdhocMetric | string;
+type AdhocMetricPopoverDatasource =
+  ComponentProps<typeof AdhocMetricPopoverTrigger>['datasource'];
 
 export type MetricDefinitionValueProps = {
   option: MetricOption;
@@ -39,7 +45,7 @@ export type MetricDefinitionValueProps = {
   savedMetrics: SavedMetric[];
   savedMetricsOptions: savedMetricType[];
   multi?: boolean;
-  datasource?: Record<string, unknown>;
+  datasource?: AdhocMetricPopoverDatasource;
   datasourceWarningMessage?: string;
   type?: string;
   rightNode?: ReactNode;

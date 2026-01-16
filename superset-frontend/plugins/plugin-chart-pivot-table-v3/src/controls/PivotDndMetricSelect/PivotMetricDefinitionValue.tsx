@@ -16,7 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { ReactNode, useCallback, useMemo, useState } from 'react';
+import {
+  ReactNode,
+  type ComponentProps,
+  useCallback,
+  useMemo,
+} from 'react';
 import {
   getCategoricalSchemeRegistry,
   getMetricLabel,
@@ -76,6 +81,9 @@ const MetricFormattingButtonWrap = styled.div`
 `;
 
 type ValueType = Metric | AdhocMetric | QueryFormMetric;
+type SavedMetric = savedMetricType & { error_text?: string };
+type AdhocMetricPopoverDatasource =
+  ComponentProps<typeof AdhocMetricPopoverTrigger>['datasource'];
 
 const rgbToHex = (color: ColorValue): string => {
   const { r, g, b, a = 1 } = color.toRgb();
@@ -135,7 +143,7 @@ type PivotMetricDefinitionValueProps = {
     value?: PivotMetricDatabar[keyof PivotMetricDatabar],
   ) => void;
   multi?: boolean;
-  datasource?: Record<string, unknown>;
+  datasource?: AdhocMetricPopoverDatasource;
   datasourceWarningMessage?: string;
   type?: string;
 };
@@ -188,8 +196,16 @@ const resolveMetricLabel = (option: MetricOptionValue) => {
   return t('Metric');
 };
 
-const resolveMetricKey = (option: MetricOptionValue) =>
-  getSelectValueKey(option) || getMetricKey(option as QueryFormMetric | Metric);
+const resolveMetricKey = (option: MetricOptionValue) => {
+  const selectKey = getSelectValueKey(option);
+  if (selectKey) {
+    return selectKey;
+  }
+  if (isMetricSelectValue(option)) {
+    return undefined;
+  }
+  return getMetricKey(option as QueryFormMetric | Metric);
+};
 
 const getMetricOptionValue = (
   option: MetricOptionValue,
@@ -205,14 +221,17 @@ const getMetricOptionValue = (
     const label = resolveMetricLabel(option);
     return label !== t('Metric') ? label : undefined;
   }
-  if (isRecord(option)) {
-    const { optionName } = option;
+  if (isRecord(option) && !isMetricSelectValue(option)) {
+    const optionRecord = option as Record<string, unknown>;
+    const optionName = optionRecord.optionName;
     if (typeof optionName === 'string' && optionName.length > 0) {
       return optionName;
     }
-    const metricName = option.metric_name;
-    if (typeof metricName === 'string' && metricName.length > 0) {
-      return metricName;
+    if ('metric_name' in optionRecord) {
+      const metricName = optionRecord.metric_name;
+      if (typeof metricName === 'string' && metricName.length > 0) {
+        return metricName;
+      }
     }
   }
   const key = resolveMetricKey(option);
@@ -251,8 +270,11 @@ const normalizeFormattingMetric = (
   if (selectValueKey) {
     return selectValueKey;
   }
-  if ('metric_name' in metric && metric.metric_name) {
-    return metric.metric_name;
+  if (isRecord(metric) && 'metric_name' in metric) {
+    const metricName = metric.metric_name;
+    if (typeof metricName === 'string' && metricName.length > 0) {
+      return metricName;
+    }
   }
   if (metric instanceof AdhocMetric) {
     const normalized: QueryFormMetric = {
@@ -266,44 +288,35 @@ const normalizeFormattingMetric = (
     };
     return normalized;
   }
-  if ('expressionType' in metric) {
-    const adhocMetric = new AdhocMetric(metric);
+  if (
+    isRecord(metric) &&
+    !isMetricSelectValue(metric) &&
+    'expressionType' in metric
+  ) {
+    const adhocMetricValue = metric as Exclude<QueryFormMetric, string>;
+    const adhocMetric = new AdhocMetric(adhocMetricValue);
+    const rawLabel =
+      typeof adhocMetricValue.label === 'string'
+        ? adhocMetricValue.label
+        : undefined;
+    const rawHasCustomLabel =
+      typeof adhocMetricValue.hasCustomLabel === 'boolean'
+        ? adhocMetricValue.hasCustomLabel
+        : undefined;
+    const rawOptionName =
+      typeof adhocMetricValue.optionName === 'string'
+        ? adhocMetricValue.optionName
+        : undefined;
     const normalized: QueryFormMetric = {
       expressionType: adhocMetric.expressionType,
       column: adhocMetric.column,
       aggregate: adhocMetric.aggregate,
       sqlExpression: adhocMetric.sqlExpression,
-      label: metric.label || adhocMetric.label,
-      hasCustomLabel: metric.hasCustomLabel ?? adhocMetric.hasCustomLabel,
-      optionName:
-        typeof metric.optionName === 'string' ? metric.optionName : undefined,
+      label: rawLabel || adhocMetric.label,
+      hasCustomLabel: rawHasCustomLabel ?? adhocMetric.hasCustomLabel,
+      optionName: rawOptionName,
     };
     return normalized;
-  }
-  if (isRecord(metric)) {
-    const { sqlExpression } = metric;
-    if (typeof sqlExpression === 'string' && sqlExpression.trim().length > 0) {
-      return {
-        ...metric,
-        expressionType: 'SQL',
-        optionName:
-          typeof metric.optionName === 'string' ? metric.optionName : undefined,
-      } as QueryFormMetric;
-    }
-    const { aggregate } = metric;
-    const { column } = metric;
-    if (
-      typeof aggregate === 'string' &&
-      aggregate.length > 0 &&
-      isRecord(column)
-    ) {
-      return {
-        ...metric,
-        expressionType: 'SIMPLE',
-        optionName:
-          typeof metric.optionName === 'string' ? metric.optionName : undefined,
-      } as QueryFormMetric;
-    }
   }
   return metric as QueryFormMetric;
 };
@@ -357,11 +370,28 @@ export const MetricFormatSelector = ({
   disabled?: boolean;
   columns: ColumnMeta[];
   savedMetrics: Metric[];
-  datasource?: Record<string, unknown>;
+  datasource?: AdhocMetricPopoverDatasource;
 }) => {
   const options = useMemo(
     () => buildMetricOptions(value ? [...metrics, value] : metrics),
     [metrics, value],
+  );
+  const popoverColumns = useMemo(
+    () =>
+      columns.map(column => ({
+        column_name: column.column_name,
+        type: column.type ?? '',
+      })),
+    [columns],
+  );
+  const savedMetricsForPopover = useMemo<savedMetricType[]>(
+    () =>
+      savedMetrics.map(metric => ({
+        metric_name: metric.metric_name,
+        verbose_name: metric.verbose_name,
+        expression: metric.expression ?? '',
+      })),
+    [savedMetrics],
   );
   const optionMap = useMemo(
     () => new Map(options.map(option => [option.value, option.metric])),
@@ -378,7 +408,7 @@ export const MetricFormatSelector = ({
     const label = resolveMetricLabel(value);
     return label !== t('Metric') ? label : undefined;
   }, [value]);
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const datasourceForPopover = datasource;
   const savedMetricForPopover = useMemo(() => {
     if (typeof value === 'string') {
       const savedMetric = savedMetrics.find(
@@ -417,14 +447,19 @@ export const MetricFormatSelector = ({
     if (savedMetricForPopover) {
       return new AdhocMetric({});
     }
-    if (isRecord(value) && 'expressionType' in value) {
-      const rawLabel = value.label;
+    if (
+      isRecord(value) &&
+      !isMetricSelectValue(value) &&
+      'expressionType' in value
+    ) {
+      const metricValue = value as Exclude<QueryFormMetric, string>;
+      const rawLabel = metricValue.label;
       const inferredHasCustomLabel =
-        typeof value.hasCustomLabel === 'boolean'
-          ? value.hasCustomLabel
+        typeof metricValue.hasCustomLabel === 'boolean'
+          ? metricValue.hasCustomLabel
           : typeof rawLabel === 'string' && rawLabel.trim().length > 0;
       return new AdhocMetric({
-        ...(value as QueryFormMetric),
+        ...metricValue,
         hasCustomLabel: inferredHasCustomLabel,
       });
     }
@@ -444,6 +479,34 @@ export const MetricFormatSelector = ({
     return new AdhocMetric({});
   }, [savedMetricForPopover, value]);
 
+  const addMetricButton = (
+    <Tooltip title={t('Add metric')}>
+      <Button
+        aria-label={t('Add metric')}
+        icon={<Icons.PlusOutlined iconSize="s" />}
+        size="small"
+        type="text"
+        disabled={!datasourceForPopover}
+      />
+    </Tooltip>
+  );
+
+  const addMetricPopover = datasourceForPopover ? (
+    <AdhocMetricPopoverTrigger
+      adhocMetric={adhocMetricForPopover}
+      onMetricEdit={newMetric => onChange(normalizeFormattingMetric(newMetric))}
+      columns={popoverColumns}
+      savedMetricsOptions={savedMetricsForPopover}
+      savedMetric={savedMetricForPopover || { metric_name: '', expression: '' }}
+      datasource={datasourceForPopover}
+      isNew
+    >
+      {addMetricButton}
+    </AdhocMetricPopoverTrigger>
+  ) : (
+    addMetricButton
+  );
+
   return (
     <Space direction="vertical" size={4}>
       <Space align="center" size={4}>
@@ -456,10 +519,8 @@ export const MetricFormatSelector = ({
           allowNewOptions
           ariaLabel={label}
           placeholder={t('Select a metric')}
-          style={{ width: METRIC_SELECT_WIDTH }}
-          open={isDropdownOpen}
+          css={{ width: METRIC_SELECT_WIDTH }}
           disabled={disabled}
-          onOpenChange={setIsDropdownOpen}
           value={selectedValue}
           options={options.map(option => ({
             label: option.label,
@@ -468,50 +529,21 @@ export const MetricFormatSelector = ({
           onChange={nextValue => {
             if (!nextValue) {
               onChange(undefined);
-              setIsDropdownOpen(false);
               return;
             }
             const nextValueKey = getSelectValueKey(nextValue);
             if (!nextValueKey) {
               onChange(undefined);
-              setIsDropdownOpen(false);
               return;
             }
             const nextMetric = optionMap.get(nextValueKey);
             onChange(normalizeFormattingMetric(nextMetric ?? nextValueKey));
-            setIsDropdownOpen(false);
-          }}
-          onClick={() => {
-            if (!disabled) {
-              setIsDropdownOpen(true);
-            }
           }}
           onClear={() => onChange(undefined)}
           showSearch
           optionFilterProps={['label', 'value']}
         />
-        <AdhocMetricPopoverTrigger
-          adhocMetric={adhocMetricForPopover}
-          onMetricEdit={newMetric =>
-            onChange(normalizeFormattingMetric(newMetric))
-          }
-          columns={columns}
-          savedMetricsOptions={savedMetrics as savedMetricType[]}
-          savedMetric={
-            savedMetricForPopover || { metric_name: '', expression: '' }
-          }
-          datasource={datasource}
-          isNew
-        >
-          <Tooltip title={t('Add metric')}>
-            <Button
-              aria-label={t('Add metric')}
-              icon={<Icons.PlusOutlined iconSize="s" />}
-              size="small"
-              type="text"
-            />
-          </Tooltip>
-        </AdhocMetricPopoverTrigger>
+        {addMetricPopover}
       </Space>
     </Space>
   );
@@ -530,14 +562,8 @@ export default function PivotMetricDefinitionValue(
     savedMetrics,
   } = props;
   const defaultPositiveColor =
-    theme.colorSuccess ||
-    (theme as { colors?: { success?: { base?: string } } }).colors?.success
-      ?.base ||
-    DEFAULT_DATABAR_POSITIVE_COLOR;
-  const defaultNegativeColor =
-    theme.colorError ||
-    (theme as { colors?: { error?: { base?: string } } }).colors?.error?.base ||
-    DEFAULT_DATABAR_NEGATIVE_COLOR;
+    theme.colorSuccess || DEFAULT_DATABAR_POSITIVE_COLOR;
+  const defaultNegativeColor = theme.colorError || DEFAULT_DATABAR_NEGATIVE_COLOR;
   const metricLabel = useMemo(() => resolveMetricLabel(option), [option]);
   const metricKey = useMemo(() => {
     const key = resolveMetricKey(option);
@@ -755,7 +781,7 @@ export default function PivotMetricDefinitionValue(
               ariaLabel={t('Databar type')}
               options={DATABAR_TYPE_OPTIONS}
               value={databarTypeValue}
-              style={{ width: METRIC_SELECT_WIDTH }}
+              css={{ width: METRIC_SELECT_WIDTH }}
               onChange={handleDatabarTypeChange}
             />
           </div>
@@ -835,14 +861,39 @@ export default function PivotMetricDefinitionValue(
     </Popover>
   );
 
+  const normalizedSavedMetrics = useMemo<SavedMetric[]>(
+    () =>
+      props.savedMetrics.map(metric => ({
+        metric_name: metric.metric_name,
+        verbose_name: metric.verbose_name,
+        expression: metric.expression ?? '',
+        ...(isRecord(metric) && 'error_text' in metric
+          ? { error_text: metric.error_text as string | undefined }
+          : {}),
+      })),
+    [props.savedMetrics],
+  );
+  const resolvedMetricOption = useMemo<Metric | AdhocMetric | string>(() => {
+    if (
+      props.option instanceof AdhocMetric ||
+      typeof props.option === 'string'
+    ) {
+      return props.option;
+    }
+    if (isRecord(props.option) && 'expressionType' in props.option) {
+      return new AdhocMetric(props.option as QueryFormMetric);
+    }
+    return props.option as Metric;
+  }, [props.option]);
+
   return (
     <MetricDefinitionValue
-      option={props.option as QueryFormMetric}
+      option={resolvedMetricOption}
       index={props.index}
       onMetricEdit={props.onMetricEdit}
       onRemoveMetric={props.onRemoveMetric}
       columns={props.columns}
-      savedMetrics={props.savedMetrics}
+      savedMetrics={normalizedSavedMetrics}
       savedMetricsOptions={props.savedMetricsOptions}
       datasource={props.datasource}
       onMoveLabel={props.onMoveLabel}

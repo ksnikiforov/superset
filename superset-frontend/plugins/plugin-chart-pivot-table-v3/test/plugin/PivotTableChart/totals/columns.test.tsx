@@ -137,7 +137,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       />,
     );
 
-    const regionRow = screen.getByText('US').closest('tr') as HTMLElement;
+    const regionRow = screen.getByText('US').closest('tr') as HTMLTableRowElement;
     const valueCells = within(regionRow).getAllByRole('cell');
     const values = valueCells.map(cell => cell.textContent?.trim());
     expect(values[0]).toBe('999');
@@ -299,7 +299,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       />,
     );
 
-    const regionRow = screen.getByText('US').closest('tr') as HTMLElement;
+    const regionRow = screen.getByText('US').closest('tr') as HTMLTableRowElement;
     const values = within(regionRow)
       .getAllByRole('cell')
       .map(cell => cell.textContent?.trim());
@@ -954,7 +954,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
 
       const urgentRow = screen
         .getByText('1-URGENT')
-        .closest('tr') as HTMLElement;
+        .closest('tr') as HTMLTableRowElement;
       const values = within(urgentRow)
         .getAllByRole('cell')
         .map(cell => cell.textContent?.trim());

@@ -31,6 +31,7 @@ import {
   getColumnLabel,
   isAdhocColumn,
   isPhysicalColumn,
+  isQueryFormColumn,
   SMART_DATE_ID,
   supersetTheme,
   t,
@@ -760,7 +761,7 @@ const config: ControlPanelConfig = {
               ) => {
                 const colsRaw = ensureIsArray(
                   state?.controls?.groupbyColumns?.value,
-                );
+                ).filter(isQueryFormColumn);
                 const colGroupby = stripMetricsPlaceholder(colsRaw);
                 const colDepth = colGroupby.length;
                 const maxSubtotalDepth = Math.max(colDepth - 1, 0);
@@ -778,9 +779,9 @@ const config: ControlPanelConfig = {
                         };
                       })
                     : [];
-                const rawValue = ensureIsArray<number>(
+                const rawValue = ensureIsArray(
                   state?.controls?.colSubtotalLevels?.value,
-                );
+                ).filter((value): value is number => typeof value === 'number');
                 const legacyEnabled =
                   rawValue.length === 0 &&
                   !!state?.controls?.colSubTotals?.value;

@@ -103,10 +103,10 @@ describe('PivotTableChart metric tier indentation and toggles', () => {
         />,
       );
 
-      const shipModeRow = screen.getByText('AIR').closest('tr') as HTMLElement;
+      const shipModeRow = screen.getByText('AIR').closest('tr') as HTMLTableRowElement;
       const metricRow = screen
         .getAllByText(metricLabel)[0]
-        .closest('tr') as HTMLElement;
+        .closest('tr') as HTMLTableRowElement;
       const shipIndent = (shipModeRow.querySelector('th div') as HTMLElement)
         .style.paddingLeft;
       const metricIndent = (metricRow.querySelector('th div') as HTMLElement)
@@ -166,7 +166,7 @@ describe('PivotTableChart metric tier indentation and toggles', () => {
 
       const metricRow = screen
         .getAllByText(metricLabel)[0]
-        .closest('tr') as HTMLElement;
+        .closest('tr') as HTMLTableRowElement;
       expect(
         within(metricRow).queryByLabelText('plus-square'),
       ).not.toBeInTheDocument();
@@ -228,7 +228,7 @@ describe('PivotTableChart metric tier indentation and toggles', () => {
 
       const priorityRow = screen
         .getByText('1-URGENT')
-        .closest('tr') as HTMLElement;
+        .closest('tr') as HTMLTableRowElement;
       expect(
         within(priorityRow).queryByLabelText('plus-square'),
       ).not.toBeInTheDocument();
@@ -238,7 +238,7 @@ describe('PivotTableChart metric tier indentation and toggles', () => {
 
       const metricRow = screen
         .getAllByText(metricLabel)[0]
-        .closest('tr') as HTMLElement;
+        .closest('tr') as HTMLTableRowElement;
       expect(
         within(metricRow).getByLabelText('plus-square'),
       ).toBeInTheDocument();

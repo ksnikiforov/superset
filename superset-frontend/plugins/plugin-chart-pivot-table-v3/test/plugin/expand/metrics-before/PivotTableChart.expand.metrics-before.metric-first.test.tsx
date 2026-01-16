@@ -400,7 +400,7 @@ describe('PivotTableChart expansion with metrics before dimensions (metric-first
     const tbody = container.querySelector('tbody') as HTMLElement;
     const avgRow = within(tbody)
       .getByText('averageOrderValue')
-      .closest('tr') as HTMLElement;
+      .closest('tr') as HTMLTableRowElement;
     fireEvent.click(within(avgRow).getByLabelText('plus-square'));
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
@@ -408,7 +408,7 @@ describe('PivotTableChart expansion with metrics before dimensions (metric-first
 
     const returnFlagRow = within(tbody)
       .getByText(/^A$/)
-      .closest('tr') as HTMLElement;
+      .closest('tr') as HTMLTableRowElement;
     fireEvent.click(within(returnFlagRow).getByLabelText('plus-square'));
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
@@ -555,7 +555,7 @@ describe('PivotTableChart expansion with metrics before dimensions (metric-first
     const tbody = container.querySelector('tbody') as HTMLElement;
     const avgRow = within(tbody)
       .getByText('averageOrderValue')
-      .closest('tr') as HTMLElement;
+      .closest('tr') as HTMLTableRowElement;
     fireEvent.click(within(avgRow).getByLabelText('plus-square'));
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
@@ -563,7 +563,7 @@ describe('PivotTableChart expansion with metrics before dimensions (metric-first
 
     const returnFlagRow = within(tbody)
       .getByText(/^A$/)
-      .closest('tr') as HTMLElement;
+      .closest('tr') as HTMLTableRowElement;
     fireEvent.click(within(returnFlagRow).getByLabelText('plus-square'));
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
@@ -571,7 +571,7 @@ describe('PivotTableChart expansion with metrics before dimensions (metric-first
 
     const orderPriorityRow = within(tbody)
       .getByText('1-URGENT')
-      .closest('tr') as HTMLElement;
+      .closest('tr') as HTMLTableRowElement;
     fireEvent.click(within(orderPriorityRow).getByLabelText('plus-square'));
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(3);

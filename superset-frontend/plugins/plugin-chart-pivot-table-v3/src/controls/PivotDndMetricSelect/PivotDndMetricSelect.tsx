@@ -16,7 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type ComponentProps,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { nanoid } from 'nanoid';
 import {
   ensureIsArray,
@@ -61,6 +68,8 @@ import {
 
 const EMPTY_OBJECT: Record<string, never> = {};
 const DND_ACCEPTED_TYPES = [DndItemType.Column, DndItemType.Metric];
+type AdhocMetricPopoverDatasource =
+  ComponentProps<typeof AdhocMetricPopoverTrigger>['datasource'];
 
 const isDictionaryForAdhocMetric = (value: QueryFormMetric) =>
   value &&
@@ -146,7 +155,7 @@ const resolveMetricLabel = (option: ValueType) => {
   if ('expressionType' in option) {
     return getMetricLabel(option as QueryFormMetric);
   }
-  return '';
+  return t('Metric');
 };
 
 const resolveMetricKey = (option: ValueType) =>
@@ -201,8 +210,11 @@ const normalizeMetricReferenceValue = (metric: ValueType): QueryFormMetric => {
   if (typeof metric === 'string') {
     return metric;
   }
-  if ('metric_name' in metric && metric.metric_name) {
-    return metric.metric_name;
+  if ('metric_name' in metric) {
+    const metricName = metric.metric_name;
+    if (typeof metricName === 'string') {
+      return metricName;
+    }
   }
   if (metric instanceof AdhocMetric) {
     return {
@@ -228,7 +240,7 @@ const normalizeMetricReferenceValue = (metric: ValueType): QueryFormMetric => {
         typeof metric.optionName === 'string' ? metric.optionName : undefined,
     };
   }
-  return metric as QueryFormMetric;
+  return metric as unknown as QueryFormMetric;
 };
 
 export const updateMetricConfigForRename = ({
@@ -351,20 +363,25 @@ const collectActiveMetricKeys = (metrics: ValueType[]) => {
   return keys;
 };
 
-type MetricSelectDatasource = {
-  extra?: string | null;
-} & Record<string, unknown>;
-
 export type PivotDndMetricSelectProps = DndControlProps<QueryFormMetric> & {
   columns: ColumnMeta[];
   savedMetrics: Metric[];
-  datasource?: MetricSelectDatasource;
+  datasource?: AdhocMetricPopoverDatasource;
   datasourceType?: string;
 };
 
 export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
   const { onChange, multi, datasource, savedMetrics } = props;
   const setControlValue = props.actions?.setControlValue;
+  const savedMetricsOptions = useMemo<savedMetricType[]>(
+    () =>
+      savedMetrics.map(metric => ({
+        metric_name: metric.metric_name,
+        verbose_name: metric.verbose_name,
+        expression: metric.expression ?? '',
+      })),
+    [savedMetrics],
+  );
   const metricFormatting = useMemo(() => {
     const rawMetricFormatting =
       (props.formData?.metricFormatting as PivotMetricFormattingMap) || {};
@@ -431,12 +448,19 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
 
   const extra = useMemo<{ disallow_adhoc_metrics?: boolean }>(() => {
     let parsedExtra: { disallow_adhoc_metrics?: boolean } = {};
-    if (datasource?.extra) {
+    if (!datasource?.extra) {
+      return parsedExtra;
+    }
+    if (typeof datasource.extra === 'string') {
       try {
         parsedExtra = JSON.parse(datasource.extra);
       } catch {
         parsedExtra = {};
       }
+      return parsedExtra;
+    }
+    if (typeof datasource.extra === 'object') {
+      return datasource.extra as { disallow_adhoc_metrics?: boolean };
     }
     return parsedExtra;
   }, [datasource?.extra]);
@@ -768,10 +792,10 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
   const newSavedMetricOptions = useMemo(
     () =>
       getOptionsForSavedMetrics(
-        savedMetrics,
+        savedMetricsOptions,
         ensureIsArray(props.value) as (string | AdhocMetric)[],
       ),
-    [props.value, savedMetrics],
+    [props.value, savedMetricsOptions],
   );
 
   const getSavedMetricOptionsForMetric = useCallback(
@@ -780,18 +804,18 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
         ensureIsArray(props.value) as (string | AdhocMetric)[]
       )[index];
       return getOptionsForSavedMetrics(
-        savedMetrics,
+        savedMetricsOptions,
         ensureIsArray(props.value) as (string | AdhocMetric)[],
         typeof currentMetric === 'string' ? currentMetric : undefined,
       );
     },
-    [props.value, savedMetrics],
+    [props.value, savedMetricsOptions],
   );
 
-  const handleDropLabel = useCallback(
-    () => onChange(multi ? value : value[0]),
-    [multi, onChange, value],
-  );
+  const handleDropLabel = useCallback(() => {
+    const normalized = value.map(normalizeMetricReferenceValue);
+    onChange(multi ? normalized : normalized[0]);
+  }, [multi, onChange, value]);
 
   const valueRenderer = useCallback(
     (option: ValueType, index: number) => (
@@ -902,6 +926,16 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
     'Drop columns/metrics here or click',
     multi ? 2 : 1,
   );
+  const datasourceForPopover =
+    props.datasource as unknown as AdhocMetricPopoverDatasource;
+  const popoverColumns = useMemo(
+    () =>
+      props.columns.map(column => ({
+        column_name: column.column_name,
+        type: column.type ?? '',
+      })),
+    [props.columns],
+  );
 
   return (
     <div className="metrics-select">
@@ -913,17 +947,15 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
         ghostButtonText={ghostButtonText}
         displayGhostButton={multi || value.length === 0}
         onClickGhostButton={handleClickGhostButton}
-        name={props.name}
-        label={props.label}
         {...props}
       />
       <AdhocMetricPopoverTrigger
         adhocMetric={adhocMetric}
         onMetricEdit={onNewMetric}
-        columns={props.columns}
+        columns={popoverColumns}
         savedMetricsOptions={newSavedMetricOptions}
-        savedMetric={EMPTY_OBJECT as savedMetricType}
-        datasource={props.datasource}
+        savedMetric={{ metric_name: '', expression: '' }}
+        datasource={datasourceForPopover}
         isControlledComponent
         visible={newMetricPopoverVisible}
         togglePopover={togglePopover}

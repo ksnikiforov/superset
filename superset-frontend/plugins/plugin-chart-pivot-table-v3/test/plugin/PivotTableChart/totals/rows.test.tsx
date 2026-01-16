@@ -220,7 +220,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     );
     expect(rowHeaders).not.toContain('Bikes Total');
 
-    const bikesRow = screen.getByText('Bikes').closest('tr') as HTMLElement;
+    const bikesRow = screen.getByText('Bikes').closest('tr') as HTMLTableRowElement;
     const valueCell = within(bikesRow).getAllByRole('cell')[0];
     expect(valueCell.textContent?.trim()).toBe('30');
   });
@@ -518,7 +518,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(rowHeaders).toEqual(expect.arrayContaining(['1-URGENT', 'AIR']));
     expect(rowHeaders).not.toContain('1-URGENT Total');
 
-    const urgentRow = screen.getByText('1-URGENT').closest('tr') as HTMLElement;
+    const urgentRow = screen.getByText('1-URGENT').closest('tr') as HTMLTableRowElement;
     const values = within(urgentRow)
       .getAllByRole('cell')
       .map(cell => cell.textContent?.trim());
@@ -677,13 +677,13 @@ describe('PivotTableChart totals & subtotals - rows', () => {
       rowHeaders.indexOf('Zebra'),
     );
 
-    const bikesRow = screen.getByText('Bikes').closest('tr') as HTMLElement;
+    const bikesRow = screen.getByText('Bikes').closest('tr') as HTMLTableRowElement;
     const bikesValue = within(bikesRow).getAllByRole('cell')[0];
     expect(bikesValue.textContent?.trim()).toBe('');
 
     const subtotalRow = screen
       .getByText('Bikes Total')
-      .closest('tr') as HTMLElement;
+      .closest('tr') as HTMLTableRowElement;
     const subtotalHeader = subtotalRow.querySelector('th') as HTMLElement;
     expect(subtotalHeader.className).toContain('subtotal-cell');
     expect(
@@ -858,7 +858,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(rowHeaders).not.toContain('AIR');
     expect(rowHeaders).not.toContain('1-URGENT Total');
 
-    const urgentRow = screen.getByText('1-URGENT').closest('tr') as HTMLElement;
+    const urgentRow = screen.getByText('1-URGENT').closest('tr') as HTMLTableRowElement;
     const values = within(urgentRow)
       .getAllByRole('cell')
       .map(cell => cell.textContent?.trim());
@@ -1398,7 +1398,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     metrics.forEach(metric => {
       const totalRow = screen
         .getByText(`${group} ${metric}`)
-        .closest('tr') as HTMLElement;
+        .closest('tr') as HTMLTableRowElement;
       expect(totalRow.querySelector('th')?.className).toContain(
         'subtotal-cell',
       );
@@ -1615,7 +1615,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
 
     const totalRow = screen
       .getByText('Total averageOrderValue')
-      .closest('tr') as HTMLElement;
+      .closest('tr') as HTMLTableRowElement;
     const totalValue = within(totalRow).getAllByRole('cell')[0];
     expect(totalValue.textContent?.trim()).toBe('100');
   });
@@ -2076,7 +2076,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
 
     const totalRow = screen
       .getByText('Total averageOrderValue')
-      .closest('tr') as HTMLElement;
+      .closest('tr') as HTMLTableRowElement;
     const totalCells = within(totalRow).getAllByRole('cell');
     expect(totalCells[grandIndex].textContent?.trim()).toBe('100');
   });

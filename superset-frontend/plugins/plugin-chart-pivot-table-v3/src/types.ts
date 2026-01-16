@@ -35,13 +35,14 @@ import {
 import { ColorFormatters } from '@superset-ui/chart-controls';
 
 export type PivotAxis = 'row' | 'col';
-export type PivotPath = DataRecordValue[];
+export type PivotPathValue = DataRecordValue | undefined;
+export type PivotPath = PivotPathValue[];
 export type TotalPosition = 'start' | 'end';
 export type PivotTheme = 'none' | 'blue' | 'peach' | 'grey' | 'custom';
 
 export interface PivotTableStylesProps {
   height: number;
-  width: number | string;
+  width: number;
   margin: number;
 }
 
@@ -283,5 +284,7 @@ export interface PivotTableProps
   rowSubtotalPosition?: TotalPosition;
   colTotalPosition?: TotalPosition;
   colSubtotalPosition?: TotalPosition;
+  pivotTheme?: PivotTheme;
+  pivotThemeColors?: string;
   stickyHeaders?: boolean;
 }

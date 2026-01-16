@@ -28,6 +28,7 @@ import {
   QueryObject,
   QueryObjectFilterClause,
   SupersetClient,
+  UnaryQueryObjectFilterClause,
 } from '@superset-ui/core';
 import { formatQueryName } from './buildQuery';
 import {
@@ -195,12 +196,20 @@ export const clearPivotBranchCache = () => cache.clear();
 const buildPathFilters = (
   groupby: QueryFormColumn[],
   path: PivotPath,
-): BinaryQueryObjectFilterClause[] =>
-  path.map((value, index) => ({
-    col: getColumnLabel(groupby[index]),
-    op: value === null || value === undefined ? 'IS NULL' : ('==' as const),
-    val: value === null || value === undefined ? null : value,
-  }));
+): QueryObjectFilterClause[] =>
+  path.map((value, index) => {
+    if (value === null || value === undefined) {
+      return {
+        col: getColumnLabel(groupby[index]),
+        op: 'IS NULL',
+      } as UnaryQueryObjectFilterClause;
+    }
+    return {
+      col: getColumnLabel(groupby[index]),
+      op: '==',
+      val: value,
+    } as BinaryQueryObjectFilterClause;
+  });
 
 interface ResolvedFetchContext {
   rowGroupbyRaw: QueryFormColumn[];
@@ -474,6 +483,7 @@ const resolveFetchContext = ({
     colGroupby,
     rowGroupbyForQuery,
     colGroupbyForQuery,
+    metrics,
     metricsForQuery,
     metricsLayoutResolved,
     metricInsertIndex,

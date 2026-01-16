@@ -17,7 +17,7 @@
  * under the License.
  */
 
-import { SupersetClient } from '@superset-ui/core';
+import { JsonResponse, SupersetClient } from '@superset-ui/core';
 import { render, fireEvent, waitFor, within } from '../../../testUtils';
 import PivotTableChart from '../../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum } from '../../../../src/types';
@@ -207,7 +207,7 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
 
     // Parent row (nation) should still render values for the expanded column leaf.
     const usaRow = await findByText('USA');
-    const usaRowEl = usaRow.closest('tr') as HTMLElement;
+    const usaRowEl = usaRow.closest('tr') as HTMLTableRowElement;
     expect(within(usaRowEl).getByText('10')).toBeInTheDocument();
   });
 
@@ -373,7 +373,7 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
     });
 
     const highCell = await findByText('HIGH');
-    const highRow = highCell.closest('tr') as HTMLElement;
+    const highRow = highCell.closest('tr') as HTMLTableRowElement;
     expect(within(highRow).getAllByText('5')).toHaveLength(2);
     expect(within(highRow).getByText('7')).toBeInTheDocument();
   });
@@ -662,7 +662,7 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
     });
 
     const orderPriorityRow = await findByText('1-URGENT');
-    const orderPriorityEl = orderPriorityRow.closest('tr') as HTMLElement;
+    const orderPriorityEl = orderPriorityRow.closest('tr') as HTMLTableRowElement;
     // Order-priority row should now have values under the newly expanded BUILDING column.
     await waitFor(() => {
       const valueCell = Array.from(orderPriorityEl.querySelectorAll('td')).find(
@@ -672,7 +672,7 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
     });
     // Sibling top-level row should also have building values populated.
     const canRow = await findByText('CAN');
-    const canRowEl = canRow.closest('tr') as HTMLElement;
+    const canRowEl = canRow.closest('tr') as HTMLTableRowElement;
     await waitFor(() => {
       const valueCell = Array.from(canRowEl.querySelectorAll('td')).find(
         cell => cell.textContent && cell.textContent.trim() !== '',
@@ -1096,7 +1096,7 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
     const childRow = await within(
       container.querySelector('tbody') as HTMLElement,
     ).findByText('A');
-    const childRowEl = childRow.closest('tr') as HTMLElement;
+    const childRowEl = childRow.closest('tr') as HTMLTableRowElement;
     expect(within(childRowEl).getByText('30')).toBeInTheDocument();
   });
 
@@ -1112,8 +1112,13 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
     );
     const postSpy = jest.spyOn(SupersetClient, 'post');
     postSpy.mockImplementation(({ jsonPayload }) => {
-      const queries = jsonPayload.queries || [];
-      const result = queries.map((query: any) => {
+      const payload =
+        typeof jsonPayload === 'string' || jsonPayload == null
+          ? {}
+          : jsonPayload;
+      const queries = (payload as { queries?: Array<{ query_name?: string }> })
+        .queries ?? [];
+      const result = queries.map((query: { query_name?: string }) => {
         const name = query.query_name as string;
         if (name.includes(`branch:col:${serializePath(['AUTO'])}`)) {
           if (name.includes(formatQueryName(1, 2))) {
@@ -1206,7 +1211,10 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
         }
         return { data: [] };
       });
-      return Promise.resolve({ json: { result } });
+      return Promise.resolve({
+        json: { result },
+        response: new Response(),
+      } as unknown as JsonResponse);
     });
 
     const baseTreeRaw = buildTreeFromRecords(
@@ -1279,14 +1287,14 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
       });
 
       const usaRow = await findByText('USA');
-      const usaRowEl = usaRow.closest('tr') as HTMLElement;
+      const usaRowEl = usaRow.closest('tr') as HTMLTableRowElement;
       fireEvent.click(within(usaRowEl).getByLabelText('plus-square'));
       await waitFor(() => {
         expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
       });
 
       const urgentRow = await findByText('1-URGENT');
-      const urgentRowEl = urgentRow.closest('tr') as HTMLElement;
+      const urgentRowEl = urgentRow.closest('tr') as HTMLTableRowElement;
       fireEvent.click(within(urgentRowEl).getByLabelText('plus-square'));
       await waitFor(() => {
         expect(fetchPivotBranchMock).toHaveBeenCalledTimes(3);
@@ -1301,12 +1309,12 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
       });
 
       const canRow = await findByText('CAN');
-      const canRowEl = canRow.closest('tr') as HTMLElement;
+      const canRowEl = canRow.closest('tr') as HTMLTableRowElement;
       await waitFor(() => {
         expect(within(canRowEl).getAllByText('35').length).toBeGreaterThan(0);
       });
       const orderStatusRow = await findByText('F');
-      const orderStatusRowEl = orderStatusRow.closest('tr') as HTMLElement;
+      const orderStatusRowEl = orderStatusRow.closest('tr') as HTMLTableRowElement;
       expect(
         within(orderStatusRowEl).getAllByText('15').length,
       ).toBeGreaterThan(0);

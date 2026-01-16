@@ -17,6 +17,7 @@
  * under the License.
  */
 import {
+  type ComponentProps,
   ReactNode,
   useCallback,
   useEffect,
@@ -83,10 +84,15 @@ import PivotDndSelectLabel from './PivotSelectLabel';
 import { OptionSelector } from './optionSelector';
 
 const DEFAULT_DRAG_TYPE = 'pivot_v3_dnd';
+const NOOP_CLICK_CLOSE = (_index: number) => {};
 
 const DEFAULT_DIMENSION_FORMATTING_SCOPE: DimensionFormattingScope = 'all';
 const DEFAULT_DIMENSION_SORT_ORDER: PivotSortOrder = 'asc';
 const DEFAULT_DIMENSION_SORT_MODE: PivotSortMode = 'total';
+
+const isColumnMetaValue = (
+  column: ColumnMeta | AdhocColumn | string,
+): column is ColumnMeta => typeof column !== 'string' && isColumnMeta(column);
 
 const DIMENSION_FORMAT_SELECTOR_CONFIG: Array<{
   field: DimensionFormattingField;
@@ -146,7 +152,7 @@ type DroppedColumn = ColumnMeta | AdhocColumn | QueryFormColumn;
 
 const isDroppedColumn = (value: unknown): value is DroppedColumn =>
   typeof value === 'string' ||
-  isColumnMeta(value) ||
+  (typeof value === 'object' && value !== null && isColumnMeta(value)) ||
   isAdhocColumn(value as QueryFormColumn);
 
 const getDroppedColumnValue = (item: unknown): DroppedColumn | undefined => {
@@ -190,7 +196,7 @@ export type PivotPlacement = {
 export type PivotDndColumnSelectProps = DndControlProps<QueryFormColumn> & {
   options: ColumnMeta[];
   savedMetrics?: Metric[];
-  datasource?: Record<string, unknown>;
+  datasource?: ComponentProps<typeof MetricFormatSelector>['datasource'];
   isTemporal?: boolean;
   disabledTabs?: Set<string>;
   dragTypeOverride?: string;
@@ -387,11 +393,15 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
             colSorting: formData?.colSorting,
           },
         );
+        const controlNames = pivotPlacement.controlNames;
+        if (!controlNames) {
+          return;
+        }
         // Defer control updates to avoid unmounting drop targets mid-drag,
         // which can trigger react-dnd's "Expected to find a valid target".
         requestAnimationFrame(() => {
-          setControl(pivotPlacement.controlNames.rows, resolved.rows);
-          setControl(pivotPlacement.controlNames.cols, resolved.cols);
+          setControl(controlNames.rows, resolved.rows);
+          setControl(controlNames.cols, resolved.cols);
           if (transferredSettings.hasAxisChanges && setControlValue) {
             if (
               !isEqual(
@@ -512,10 +522,11 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
       if (!column) {
         return;
       }
-      const columnName = isColumnMeta(column) ? column.column_name : undefined;
-      const columnValue = columnName || column;
+      const columnValue: QueryFormColumn = isColumnMetaValue(column)
+        ? column.column_name
+        : (column as QueryFormColumn);
       if (!optionSelector.multi && !isEmpty(optionSelector.values)) {
-        optionSelector.replace(0, columnValue as QueryFormColumn);
+        optionSelector.replace(0, columnValue);
         applyChange(optionSelector.getValues());
         resetHover();
         return;
@@ -533,7 +544,7 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
       if (!optionSelector.has(columnValue)) {
         const baseValues = toArray(optionSelector.getValues());
         const clampedIndex = Math.max(0, Math.min(insertAt, baseValues.length));
-        baseValues.splice(clampedIndex, 0, columnValue as QueryFormColumn);
+        baseValues.splice(clampedIndex, 0, columnValue);
         applyChange(baseValues);
       } else {
         applyChange(optionSelector.getValues());
@@ -556,7 +567,7 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
       if (!column) {
         return false;
       }
-      if (isColumnMeta(column)) {
+      if (isColumnMetaValue(column)) {
         return !optionSelector.has(column.column_name);
       }
       if (typeof column === 'string' || isAdhocColumn(column)) {
@@ -690,7 +701,7 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
 
   const getDimensionKey = useCallback(
     (column: ColumnMeta | AdhocColumn | string) => {
-      if (isColumnMeta(column)) {
+      if (isColumnMetaValue(column)) {
         return column.column_name;
       }
       return getColumnLabel(column as QueryFormColumn);
@@ -700,7 +711,7 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
 
   const getDimensionLabel = useCallback(
     (column: ColumnMeta | AdhocColumn | string) => {
-      if (isColumnMeta(column)) {
+      if (isColumnMetaValue(column)) {
         return column.verbose_name || column.column_name;
       }
       return getColumnLabel(column as QueryFormColumn);
@@ -715,11 +726,12 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
     ) => {
       if (
         column === METRICS_PLACEHOLDER ||
-        (isColumnMeta(column) && column.column_name === METRICS_PLACEHOLDER)
+        (isColumnMetaValue(column) &&
+          column.column_name === METRICS_PLACEHOLDER)
       ) {
         return `${currentListId}-placeholder`;
       }
-      if (isColumnMeta(column)) {
+      if (isColumnMetaValue(column)) {
         return `${currentListId}-col-${column.column_name}`;
       }
       if (isAdhocColumn(column)) {
@@ -738,19 +750,30 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
       optionSelector.values.map((column, idx) => {
         const isPlaceholder =
           column === METRICS_PLACEHOLDER ||
-          (isColumnMeta(column) && column.column_name === METRICS_PLACEHOLDER);
+          (isColumnMetaValue(column) &&
+            column.column_name === METRICS_PLACEHOLDER);
+        const resolvedColumn =
+          typeof column === 'string'
+            ? options.find(option => option.column_name === column)
+            : column;
         const datasourceWarningMessage =
           isAdhocColumn(column) && column.datasourceWarning
             ? t('This column might be incompatible with current dataset')
             : undefined;
+        const hasErrorText =
+          !isPlaceholder &&
+          typeof column !== 'string' &&
+          'error_text' in column &&
+          Boolean(column.error_text);
         const withCaret =
-          !isPlaceholder && (isAdhocColumn(column) || !column.error_text);
+          !isPlaceholder && (isAdhocColumn(column) || !hasErrorText);
         const dimensionKey = !isPlaceholder
           ? getDimensionKey(column)
           : undefined;
         const dimensionLabel = !isPlaceholder
           ? getDimensionLabel(column)
           : undefined;
+        const optionLabel = resolvedColumn ? undefined : dimensionLabel;
         const formatting =
           dimensionKey && localFormatting[dimensionKey]
             ? localFormatting[dimensionKey]
@@ -927,14 +950,17 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
           <PivotOptionWrapper
             key={getOptionKey(column, idx)}
             index={idx}
-            clickClose={!isPlaceholder && canDelete ? onClickClose : undefined}
+            clickClose={
+              !isPlaceholder && canDelete ? onClickClose : NOOP_CLICK_CLOSE
+            }
             onShiftOptions={onShiftOptions}
             onHoverIndex={setLastHoverIndex}
             onHoverListId={setLastHoverList}
             type={dragType}
             listId={currentListId}
             canDelete={!isPlaceholder && canDelete}
-            column={column}
+            label={optionLabel}
+            column={resolvedColumn}
             datasourceWarningMessage={datasourceWarningMessage}
             withCaret={withCaret}
             isPlaceholder={isPlaceholder}
@@ -965,7 +991,7 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
               }
               applyChange(optionSelector.getValues());
             }}
-            editedColumn={column}
+            editedColumn={resolvedColumn}
             isTemporal={isTemporal}
             disabledTabs={disabledTabs}
           >

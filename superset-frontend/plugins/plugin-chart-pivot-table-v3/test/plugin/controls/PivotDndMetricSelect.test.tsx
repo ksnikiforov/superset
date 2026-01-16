@@ -16,6 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import { type ComponentProps } from 'react';
 import { QueryFormMetric } from '@superset-ui/core';
 import { render, screen, userEvent, waitFor, within } from '../../testUtils';
 import PivotDndMetricSelect, {
@@ -24,7 +25,14 @@ import PivotDndMetricSelect, {
 
 jest.setTimeout(60000);
 
+type MetricSelectDatasource =
+  ComponentProps<typeof PivotDndMetricSelect>['datasource'];
+
+const baseDatasource = { type: 'table' } as MetricSelectDatasource;
+
 const baseProps = {
+  type: PivotDndMetricSelect,
+  actions: { setControlValue: jest.fn() },
   name: 'metrics',
   label: 'Metrics',
   onChange: jest.fn(),
@@ -32,9 +40,7 @@ const baseProps = {
   columns: [],
   savedMetrics: [],
   multi: true,
-  datasource: {
-    type: 'table',
-  },
+  datasource: baseDatasource,
 };
 
 const renderOptions = {
@@ -42,9 +48,7 @@ const renderOptions = {
   useRedux: true,
   initialState: {
     explore: {
-      datasource: {
-        type: 'table',
-      },
+      datasource: baseDatasource,
     },
   },
 };

@@ -46,6 +46,7 @@ const baseDatasource: Datasource = {
   verboseMap: {},
 };
 
+const baseFormData = buildFormData({});
 const emptyMetrics: PivotTableProps['metrics'] = [];
 const emptyGroupbyRows: PivotTableProps['groupbyRows'] = [];
 const emptyGroupbyColumns: PivotTableProps['groupbyColumns'] = [];
@@ -53,7 +54,8 @@ const emptyQueriesData: PivotTableProps['queriesData'] = [];
 
 const baseProps: PivotTableProps = {
   data: emptyTree,
-  formData: buildFormData({}),
+  formData: baseFormData,
+  rawFormData: baseFormData,
   metrics: emptyMetrics,
   groupbyRows: emptyGroupbyRows,
   groupbyColumns: emptyGroupbyColumns,
@@ -98,6 +100,8 @@ export default function TestPivotTableChart(props: TestPivotTableChartProps) {
     ...baseProps,
     ...props,
     formData: props.formData ?? baseProps.formData,
+    rawFormData:
+      props.rawFormData ?? props.formData ?? baseProps.rawFormData,
     datasource: props.datasource ?? baseProps.datasource,
     rawDatasource: props.rawDatasource ?? baseProps.rawDatasource,
     hooks: { ...baseProps.hooks, ...(props.hooks ?? {}) },

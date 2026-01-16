@@ -62,7 +62,7 @@ describe('PivotTableChart sticky headers', () => {
     const tbody = container.querySelector('tbody') as HTMLElement;
     const totalRow = within(tbody)
       .getByText('Grand total')
-      .closest('tr') as HTMLElement;
+      .closest('tr') as HTMLTableRowElement;
     expect(totalRow).toHaveClass('pivot-grand-total-row');
     expect(totalRow).toHaveClass('pivot-grand-total-row--top');
   });
@@ -94,7 +94,7 @@ describe('PivotTableChart sticky headers', () => {
     const tbody = container.querySelector('tbody') as HTMLElement;
     const totalRow = within(tbody)
       .getByText('Grand total')
-      .closest('tr') as HTMLElement;
+      .closest('tr') as HTMLTableRowElement;
     expect(totalRow).toHaveClass('pivot-grand-total-row');
     expect(totalRow).toHaveClass('pivot-grand-total-row--bottom');
   });
@@ -110,7 +110,7 @@ describe('PivotTableChart sticky headers', () => {
     );
     const getBoundingClientRectSpy = jest
       .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
-      .mockImplementation(function () {
+      .mockImplementation(function (this: HTMLElement) {
         if (this.tagName === 'TR' && this.closest('thead')) {
           const rows = Array.from(this.parentElement?.children ?? []);
           const idx = rows.indexOf(this);

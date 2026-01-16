@@ -24,7 +24,13 @@ import {
   DragSourceMonitor,
 } from 'react-dnd';
 import { Tooltip } from '@superset-ui/core/components';
-import { styled, isAdhocColumn, t, useTheme } from '@superset-ui/core';
+import {
+  type AdhocColumn,
+  styled,
+  isAdhocColumn,
+  t,
+  useTheme,
+} from '@superset-ui/core';
 import { ColumnMeta } from '@superset-ui/chart-controls';
 import {
   DragContainer,
@@ -41,21 +47,14 @@ export const OptionLabel = styled.div`
 `;
 
 const PlaceholderBadge = styled.span`
-  margin-left: ${({ theme }) => theme.gridUnit || 4}px;
+  margin-left: ${({ theme }) => theme.sizeXXS}px;
   padding: 0 6px;
   border-radius: ${({ theme }) => theme.borderRadius}px;
   border: 1px solid ${({ theme }) => theme.colorPrimary};
   background: transparent;
   color: ${({ theme }) => theme.colorPrimary};
-  font-size: ${({ theme }) =>
-    theme.typography?.sizes?.s ||
-    theme.typography?.sizes?.m ||
-    theme.fontSizeSM}px;
-  font-weight: ${({ theme }) =>
-    theme.typography?.weights?.bold ||
-    theme.typography?.weightStrong ||
-    theme.fontWeightBold ||
-    600};
+  font-size: ${({ theme }) => theme.fontSizeSM}px;
+  font-weight: ${({ theme }) => theme.fontWeightStrong};
   text-transform: uppercase;
   letter-spacing: 0.03em;
 `;
@@ -78,6 +77,11 @@ type PivotOptionWrapperProps = {
   onHoverIndex?: (index: number) => void;
   onHoverListId?: (listId?: string) => void;
   isPlaceholder?: boolean;
+};
+
+type PivotOptionItem = OptionItemInterface & {
+  sourceId?: string;
+  column?: ColumnMeta | AdhocColumn;
 };
 
 export default function PivotOptionWrapper(props: PivotOptionWrapperProps) {
@@ -110,10 +114,10 @@ export default function PivotOptionWrapper(props: PivotOptionWrapperProps) {
       return undefined;
     }
     return {
-      color: theme.colors?.grayscale?.dark1 || theme.colorText,
+      color: theme.colorTextSecondary,
       display: 'inline-flex',
       alignItems: 'center',
-      gap: Math.max(4, theme.gridUnit),
+      gap: theme.sizeXXS,
       lineHeight: 1.1,
     };
   }, [isPlaceholder, theme]);
@@ -123,11 +127,15 @@ export default function PivotOptionWrapper(props: PivotOptionWrapperProps) {
       return undefined;
     }
     return {
-      marginRight: (theme.gridUnit || 4) * 2,
+      marginRight: theme.sizeXS,
     };
   }, [isPlaceholder, theme]);
 
-  const [{ isDragging }, drag] = useDrag({
+  const [{ isDragging }, drag] = useDrag<
+    PivotOptionItem,
+    void,
+    { isDragging: boolean }
+  >({
     item: {
       type,
       dragIndex: index,
@@ -139,10 +147,10 @@ export default function PivotOptionWrapper(props: PivotOptionWrapperProps) {
     }),
   });
 
-  const [, drop] = useDrop({
+  const [, drop] = useDrop<PivotOptionItem, void, Record<string, never>>({
     accept: type,
 
-    hover: (item: OptionItemInterface, monitor: DropTargetMonitor) => {
+    hover: (item, monitor: DropTargetMonitor) => {
       if (!ref.current) {
         return;
       }

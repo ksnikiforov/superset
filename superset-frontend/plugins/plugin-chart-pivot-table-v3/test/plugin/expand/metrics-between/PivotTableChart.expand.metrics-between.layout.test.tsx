@@ -151,12 +151,12 @@ describe('PivotTableChart expansion with metrics between dimensions (layout)', (
         />,
       );
 
-      const firstRow = getByText(levelValues[0]).closest('tr') as HTMLElement;
+      const firstRow = getByText(levelValues[0]).closest('tr') as HTMLTableRowElement;
       expect(
         within(firstRow).queryByLabelText('plus-square'),
       ).not.toBeInTheDocument();
       const [metricRowLabel] = getAllByText(metrics[0]);
-      const metricRow = metricRowLabel.closest('tr') as HTMLElement;
+      const metricRow = metricRowLabel.closest('tr') as HTMLTableRowElement;
       expect(
         within(metricRow).getByLabelText('plus-square'),
       ).toBeInTheDocument();
@@ -242,20 +242,20 @@ describe('PivotTableChart expansion with metrics between dimensions (layout)', (
         />,
       );
 
-      const topRow = getByText(levelValues[0]).closest('tr') as HTMLElement;
+      const topRow = getByText(levelValues[0]).closest('tr') as HTMLTableRowElement;
       const topToggle = within(topRow).getByLabelText('plus-square');
       fireEvent.click(topToggle);
 
       await waitFor(() => {
         const tbody = topRow.closest('tbody') as HTMLElement;
         const parentLabel = within(tbody).getByText(levelValues[1]);
-        const parentRow = parentLabel.closest('tr') as HTMLElement;
+        const parentRow = parentLabel.closest('tr') as HTMLTableRowElement;
         expect(
           within(parentRow).queryByLabelText('plus-square'),
         ).not.toBeInTheDocument();
         const metricRow = within(tbody)
           .getByText(metrics[0])
-          .closest('tr') as HTMLElement;
+          .closest('tr') as HTMLTableRowElement;
         expect(
           within(metricRow).getByLabelText('plus-square'),
         ).toBeInTheDocument();
@@ -336,7 +336,7 @@ describe('PivotTableChart expansion with metrics between dimensions (layout)', (
     expect(queryAllByText('Bike1')).toHaveLength(2);
 
     const metricRows = queryAllByText('m2');
-    const metricRow = metricRows[0]?.closest('tr') as HTMLElement;
+    const metricRow = metricRows[0]?.closest('tr') as HTMLTableRowElement;
     const minusToggle = within(metricRow).getByLabelText('minus-square');
     fireEvent.click(minusToggle);
 
@@ -471,7 +471,7 @@ describe('PivotTableChart expansion with metrics between dimensions (layout)', (
     );
 
     const tbody = container.querySelector('tbody') as HTMLElement;
-    const airRow = getByText('AIR').closest('tr') as HTMLElement;
+    const airRow = getByText('AIR').closest('tr') as HTMLTableRowElement;
     expect(within(airRow).getByLabelText('plus-square')).toBeInTheDocument();
     const metricLabels = within(tbody).getAllByText('averageOrderValue');
     expect(metricLabels.length).toBeGreaterThan(0);
@@ -481,29 +481,29 @@ describe('PivotTableChart expansion with metrics between dimensions (layout)', (
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
     });
 
-    const returnRow = getByText(/^N$/).closest('tr') as HTMLElement;
+    const returnRow = getByText(/^N$/).closest('tr') as HTMLTableRowElement;
     expect(
       within(returnRow).queryByLabelText('plus-square'),
     ).not.toBeInTheDocument();
 
-    const rows = Array.from(tbody.querySelectorAll('tr'));
+    const rows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));
     const returnIndex = rows.indexOf(returnRow);
     const metricRow = rows
       .slice(returnIndex + 1)
       .find(row => within(row).queryByText('averageOrderValue')) as
       | HTMLElement
       | undefined;
-    expect(metricRow).toBeTruthy();
-    expect(
-      within(metricRow as HTMLElement).getByLabelText('plus-square'),
-    ).toBeInTheDocument();
+    if (!metricRow) {
+      throw new Error('Expected metric row to be present');
+    }
+    expect(within(metricRow).getByLabelText('plus-square')).toBeInTheDocument();
 
     fireEvent.click(within(metricRow).getByLabelText('plus-square'));
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
     });
 
-    const quantityRow = getByText('1-5').closest('tr') as HTMLElement;
+    const quantityRow = getByText('1-5').closest('tr') as HTMLTableRowElement;
     expect(
       within(quantityRow).getByLabelText('plus-square'),
     ).toBeInTheDocument();
@@ -513,7 +513,7 @@ describe('PivotTableChart expansion with metrics between dimensions (layout)', (
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(3);
     });
 
-    const revenueRow = getByText('10k-50k').closest('tr') as HTMLElement;
+    const revenueRow = getByText('10k-50k').closest('tr') as HTMLTableRowElement;
     expect(
       within(revenueRow).queryByLabelText('plus-square'),
     ).not.toBeInTheDocument();
@@ -638,14 +638,14 @@ describe('PivotTableChart expansion with metrics between dimensions (layout)', (
     );
 
     const tbody = container.querySelector('tbody') as HTMLElement;
-    const airRow = getByText('AIR').closest('tr') as HTMLElement;
+    const airRow = getByText('AIR').closest('tr') as HTMLTableRowElement;
     fireEvent.click(within(airRow).getByLabelText('plus-square'));
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
     });
 
-    const airReturnRow = getByText(/^N$/).closest('tr') as HTMLElement;
-    const airRows = Array.from(tbody.querySelectorAll('tr'));
+    const airReturnRow = getByText(/^N$/).closest('tr') as HTMLTableRowElement;
+    const airRows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));
     const airReturnIndex = airRows.indexOf(airReturnRow);
     const airMetricRow = airRows
       .slice(airReturnIndex + 1)
@@ -660,20 +660,20 @@ describe('PivotTableChart expansion with metrics between dimensions (layout)', (
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
     });
 
-    const quantityRow = getByText('1-5').closest('tr') as HTMLElement;
+    const quantityRow = getByText('1-5').closest('tr') as HTMLTableRowElement;
     fireEvent.click(within(quantityRow).getByLabelText('plus-square'));
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(3);
     });
 
-    const seaRow = getByText('SEA').closest('tr') as HTMLElement;
+    const seaRow = getByText('SEA').closest('tr') as HTMLTableRowElement;
     fireEvent.click(within(seaRow).getByLabelText('plus-square'));
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(4);
     });
 
-    const seaReturnRow = (await findByText(/^R$/)).closest('tr') as HTMLElement;
-    const rows = Array.from(tbody.querySelectorAll('tr'));
+    const seaReturnRow = (await findByText(/^R$/)).closest('tr') as HTMLTableRowElement;
+    const rows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));
     const seaReturnIndex = rows.indexOf(seaReturnRow);
     const seaMetricRow = rows
       .slice(seaReturnIndex + 1)
@@ -786,12 +786,12 @@ describe('PivotTableChart expansion with metrics between dimensions (layout)', (
       />,
     );
 
-    const urgentRow = getByText('1-URGENT').closest('tr') as HTMLElement;
+    const urgentRow = getByText('1-URGENT').closest('tr') as HTMLTableRowElement;
     expect(within(urgentRow).getByLabelText('plus-square')).toBeInTheDocument();
 
     const metricRows = queryAllByText('averageOrderValue');
     metricRows.forEach(metricLabel => {
-      const metricRow = metricLabel.closest('tr') as HTMLElement;
+      const metricRow = metricLabel.closest('tr') as HTMLTableRowElement;
       const labelCell = metricRow.querySelector('div') as HTMLElement;
       expect(labelCell).not.toHaveStyle({ paddingLeft: '16px' });
     });

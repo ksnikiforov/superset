@@ -973,8 +973,8 @@ describe('PivotTableChart metric tier suppression', () => {
     const header = container.querySelector('thead') as HTMLElement;
     const headerLabels = within(header)
       .getAllByRole('columnheader')
-      .map(cell => cell.textContent?.trim())
-      .filter(label => label && label !== 'Rows');
+      .map(cell => cell.textContent?.trim() ?? '')
+      .filter(label => label !== '' && label !== 'Rows');
 
     metrics.forEach(metric => {
       expect(headerLabels).toContain(metric);
@@ -1057,11 +1057,12 @@ describe('PivotTableChart metric tier suppression', () => {
     };
 
     const { container } = render(<PivotTableChart {...props} />);
-    const headerRows = container.querySelectorAll('thead tr');
+    const headerRows =
+      container.querySelectorAll<HTMLTableRowElement>('thead tr');
     const topLabels = within(headerRows[0])
       .getAllByRole('columnheader')
-      .map(cell => cell.textContent?.trim())
-      .filter(label => label && label !== 'Rows');
+      .map(cell => cell.textContent?.trim() ?? '')
+      .filter(label => label !== '' && label !== 'Rows');
     const yearLabels = topLabels.filter(label => /^\d{4}$/.test(label));
     expect(yearLabels).toEqual(['1992', '1993']);
     expect(topLabels).not.toEqual(
@@ -1070,8 +1071,8 @@ describe('PivotTableChart metric tier suppression', () => {
 
     const metricLabels = within(headerRows[1])
       .getAllByRole('columnheader')
-      .map(cell => cell.textContent?.trim())
-      .filter(label => label && label !== 'Rows');
+      .map(cell => cell.textContent?.trim() ?? '')
+      .filter(label => label !== '' && label !== 'Rows');
     expect(metricLabels).toEqual([
       'grossRevenue',
       'countCustomers',
@@ -1189,7 +1190,8 @@ describe('PivotTableChart metric tier suppression', () => {
     };
 
     const { container } = render(<PivotTableChart {...props} />);
-    const initialHeaderRows = container.querySelectorAll('thead tr');
+    const initialHeaderRows =
+      container.querySelectorAll<HTMLTableRowElement>('thead tr');
     const yearHeader = within(initialHeaderRows[0])
       .getByText('1992')
       .closest('th') as HTMLElement;
@@ -1199,12 +1201,13 @@ describe('PivotTableChart metric tier suppression', () => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
     });
 
-    const headerRows = container.querySelectorAll('thead tr');
+    const headerRows =
+      container.querySelectorAll<HTMLTableRowElement>('thead tr');
     expect(headerRows.length).toBeGreaterThan(2);
     const dimensionLabels = within(headerRows[1])
       .getAllByRole('columnheader')
-      .map(cell => cell.textContent?.trim())
-      .filter(label => label && label !== 'Rows');
+      .map(cell => cell.textContent?.trim() ?? '')
+      .filter(label => label !== '' && label !== 'Rows');
     expect(dimensionLabels).toEqual(
       expect.arrayContaining(['EXPRESS', 'STANDARD']),
     );
@@ -1312,7 +1315,8 @@ describe('PivotTableChart metric tier suppression', () => {
     };
 
     const { container } = render(<PivotTableChart {...props} />);
-    const initialHeaderRows = container.querySelectorAll('thead tr');
+    const initialHeaderRows =
+      container.querySelectorAll<HTMLTableRowElement>('thead tr');
     const yearHeader = within(initialHeaderRows[0])
       .getByText('1992')
       .closest('th') as HTMLElement;
@@ -1322,12 +1326,13 @@ describe('PivotTableChart metric tier suppression', () => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
     });
 
-    const headerRows = container.querySelectorAll('thead tr');
+    const headerRows =
+      container.querySelectorAll<HTMLTableRowElement>('thead tr');
     expect(headerRows.length).toBeGreaterThan(2);
     const dimensionLabels = within(headerRows[1])
       .getAllByRole('columnheader')
-      .map(cell => cell.textContent?.trim())
-      .filter(label => label && label !== 'Rows');
+      .map(cell => cell.textContent?.trim() ?? '')
+      .filter(label => label !== '' && label !== 'Rows');
     expect(dimensionLabels).toEqual(
       expect.arrayContaining(['EXPRESS', 'STANDARD']),
     );
@@ -1440,7 +1445,8 @@ describe('PivotTableChart metric tier suppression', () => {
     };
 
     const { container } = render(<PivotTableChart {...props} />);
-    const initialHeaderRows = container.querySelectorAll('thead tr');
+    const initialHeaderRows =
+      container.querySelectorAll<HTMLTableRowElement>('thead tr');
     const yearHeader = within(initialHeaderRows[0])
       .getByText('1992')
       .closest('th') as HTMLElement;
@@ -1457,12 +1463,13 @@ describe('PivotTableChart metric tier suppression', () => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
     });
 
-    const headerRows = container.querySelectorAll('thead tr');
+    const headerRows =
+      container.querySelectorAll<HTMLTableRowElement>('thead tr');
     expect(headerRows.length).toBeGreaterThan(2);
     const dimensionLabels = within(headerRows[1])
       .getAllByRole('columnheader')
-      .map(cell => cell.textContent?.trim())
-      .filter(label => label && label !== 'Rows');
+      .map(cell => cell.textContent?.trim() ?? '')
+      .filter(label => label !== '' && label !== 'Rows');
     expect(dimensionLabels).toEqual(
       expect.arrayContaining(['EXPRESS', 'STANDARD']),
     );
@@ -1654,14 +1661,14 @@ describe('PivotTableChart multi-metric visibility', () => {
         expect.arrayContaining(['Road', 'Mountain']),
       );
 
-      const groupRow = screen.getByText('Bikes').closest('tr') as HTMLElement;
+      const groupRow = screen.getByText('Bikes').closest('tr') as HTMLTableRowElement;
       expect(
         within(groupRow).getByLabelText('plus-square'),
       ).toBeInTheDocument();
 
       const metricRow = screen
         .getAllByText(metrics[0])[0]
-        .closest('tr') as HTMLElement;
+        .closest('tr') as HTMLTableRowElement;
       expect(
         within(metricRow).queryByLabelText('plus-square'),
       ).not.toBeInTheDocument();

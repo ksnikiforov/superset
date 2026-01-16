@@ -22,6 +22,8 @@ import PivotDndColumnSelect from '../../../src/controls/PivotDndColumnSelect/Piv
 jest.setTimeout(60000);
 
 const baseProps = {
+  type: PivotDndColumnSelect,
+  actions: { setControlValue: jest.fn() },
   name: 'groupbyRows',
   label: 'Rows',
   onChange: jest.fn(),

@@ -134,18 +134,17 @@ import {
   shouldHideRowValues as shouldHideRowValuesBase,
 } from './pivot/cellUtils';
 
-const Container = styled.div<{ height: number; width: number | string }>`
+const Container = styled.div<{ height: number; width: number }>`
   ${({ height, width }) => `
     height: ${height}px;
-    width: ${typeof width === 'string' ? width : `${width}px`};
+    width: ${width}px;
     overflow: auto;
     position: relative;
   `}
 `;
 
 const StyledTable = styled.table<{ $stickyHeaders: boolean }>`
-  --pivot-border-color: ${({ theme }) =>
-    (theme as any).colors?.grayscale?.light2 || (theme as any).colorBorder};
+  --pivot-border-color: ${({ theme }) => theme.colorBorderSecondary};
   width: max-content;
   min-width: 100%;
   border-collapse: separate;
@@ -169,8 +168,7 @@ const StyledTable = styled.table<{ $stickyHeaders: boolean }>`
   }
 
   thead th {
-    background: ${({ theme }) =>
-      (theme as any).colors?.grayscale?.light4 || (theme as any).colorBgLayout};
+    background: ${({ theme }) => theme.colorBgLayout};
     text-align: left;
     vertical-align: top;
     ${({ $stickyHeaders }) =>
@@ -256,7 +254,7 @@ const StyledTable = styled.table<{ $stickyHeaders: boolean }>`
 const HeaderCell = styled.div`
   display: flex;
   align-items: center;
-  gap: ${({ theme }) => ((theme as any).gridUnit || 4) * 1.5}px;
+  gap: ${({ theme }) => theme.sizeXS}px;
 `;
 
 const ColumnHeaderCell = styled(HeaderCell)`
@@ -273,14 +271,11 @@ const ToggleButton = styled.button`
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  color: ${({ theme }) =>
-    (theme as any).colors?.grayscale?.base || (theme as any).colorText};
+  color: ${({ theme }) => theme.colorText};
 
   &:disabled {
     cursor: default;
-    color: ${({ theme }) =>
-      (theme as any).colors?.grayscale?.light1 ||
-      (theme as any).colorTextQuaternary};
+    color: ${({ theme }) => theme.colorTextQuaternary};
   }
 `;
 
@@ -692,7 +687,10 @@ const resolveScaleGroupKey = (
   return current;
 };
 
-const getNumericValue = (value: DataRecordValue) => {
+const getNumericValue = (value: DataRecordValue | undefined) => {
+  if (value === undefined) {
+    return undefined;
+  }
   if (typeof value === 'number') {
     return Number.isFinite(value) ? value : undefined;
   }
@@ -843,8 +841,9 @@ function PivotTableChart(props: PivotTableProps) {
         return;
       }
       const formattingKeys = METRIC_FORMATTING_FIELDS.reduce((acc, field) => {
-        const key = formatting?.[field]
-          ? getFormattingMetricKey(formatting[field])
+        const formattingMetric = formatting?.[field];
+        const key = formattingMetric
+          ? getFormattingMetricKey(formattingMetric)
           : '';
         if (key) {
           acc[field] = key;
@@ -867,8 +866,9 @@ function PivotTableChart(props: PivotTableProps) {
           }
           const formattingKeys = DIMENSION_FORMATTING_FIELDS.reduce(
             (acc, field) => {
-              const key = dimensionFormatting?.[field]
-                ? getFormattingMetricKey(dimensionFormatting[field])
+              const formattingMetric = dimensionFormatting?.[field];
+              const key = formattingMetric
+                ? getFormattingMetricKey(formattingMetric)
                 : '';
               if (key) {
                 acc[field] = key;
@@ -1289,25 +1289,23 @@ function PivotTableChart(props: PivotTableProps) {
     }
     const shouldPersistZeroRows =
       shouldPersistToFormData &&
-      setControlValue &&
       expandRowsLevelRaw == null &&
       resolvedExpandRowsLevel === 0 &&
       (prevAutoExpandRowsRef.current ?? 0) > 0 &&
       !forcedExpandRowsZeroRef.current;
     const shouldPersistZeroCols =
       shouldPersistToFormData &&
-      setControlValue &&
       expandColumnsLevelRaw == null &&
       resolvedExpandColumnsLevel === 0 &&
       (prevAutoExpandColsRef.current ?? 0) > 0 &&
       !forcedExpandColsZeroRef.current;
     if (shouldPersistZeroRows) {
       forcedExpandRowsZeroRef.current = true;
-      setControlValue('expandRowsLevel', 0);
+      setControlValue?.('expandRowsLevel', 0);
     }
     if (shouldPersistZeroCols) {
       forcedExpandColsZeroRef.current = true;
-      setControlValue('expandColumnsLevel', 0);
+      setControlValue?.('expandColumnsLevel', 0);
     }
     if (!shouldResetExpanded && skipExpansionResetRef.current === data) {
       skipExpansionResetRef.current = null;
@@ -1971,16 +1969,6 @@ function PivotTableChart(props: PivotTableProps) {
         : 'end';
     },
     [forceRowSubtotalEnd, isMetricTokenValue, resolvedRowSubtotalPosition],
-  );
-
-  const getRawRowChildren = useCallback(
-    (parent: PivotTreeNode) => findChildren(tree.rows, parent),
-    [tree.rows],
-  );
-
-  const getRawColChildren = useCallback(
-    (parent: PivotTreeNode) => findChildren(tree.cols, parent),
-    [tree.cols],
   );
 
   const getCollapsedRowChildrenForNodes = useCallback(
@@ -5478,7 +5466,9 @@ function PivotTableChart(props: PivotTableProps) {
       resolvedMetricsLayout,
     ],
   );
-  const containerStyle: React.CSSProperties = {
+  const containerStyle: React.CSSProperties & {
+    '--pivot-header-offset': string;
+  } = {
     '--pivot-header-offset': `${resolvedStickyHeaders ? headerOffset : 0}px`,
   };
 
@@ -5669,9 +5659,11 @@ function PivotTableChart(props: PivotTableProps) {
                             cell.values[formattingKeys.textColor],
                           )
                         : undefined;
-                    const d3FormatOverride = applyD3Formatting
-                      ? normalizeD3Format(cell.values[formattingKeys.d3Format])
-                      : undefined;
+                    const d3FormatKey = formattingKeys?.d3Format;
+                    const d3FormatOverride =
+                      applyD3Formatting && d3FormatKey
+                        ? normalizeD3Format(cell.values[d3FormatKey])
+                        : undefined;
                     const cellTotalBg = rowTotalBg;
                     const databarConfig = metricKey
                       ? metricDatabars[metricKey]

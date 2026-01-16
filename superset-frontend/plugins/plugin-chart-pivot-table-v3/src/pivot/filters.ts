@@ -24,7 +24,7 @@ import {
   QueryFormMetric,
   QueryObjectFilterClause,
 } from '@superset-ui/core';
-import { MetricsLayoutEnum, PivotTreeNode } from '../types';
+import { DateFormatter, MetricsLayoutEnum, PivotTreeNode } from '../types';
 import { decodeMetricKey, getMetricKeys, isSubtotalToken } from '../utils';
 
 const stripMetricPath = (
@@ -108,10 +108,7 @@ type ContextFiltersParams = {
   groupbyColumns: QueryFormColumn[];
   metrics: QueryFormMetric[];
   metricsLayout: MetricsLayoutEnum;
-  dateFormatters: Record<
-    string,
-    ((value: DataRecordValue) => string) | undefined
-  >;
+  dateFormatters: Record<string, DateFormatter | undefined>;
   timeGrainSqla?: string;
 };
 
@@ -121,22 +118,24 @@ const buildAxisContextFilters = (
   axis: 'row' | 'col',
   metricsLayout: MetricsLayoutEnum,
   metricLabels: Set<string>,
-  dateFormatters: Record<
-    string,
-    ((value: DataRecordValue) => string) | undefined
-  >,
+  dateFormatters: Record<string, DateFormatter | undefined>,
   timeGrainSqla?: string,
 ) =>
   stripMetricPath(node.path, axis, metricsLayout, metricLabels).map(
     (val, idx) => {
       const col = getColumnLabel(columns[idx]);
       const formatter = dateFormatters[col];
+      const normalizedVal = val === undefined ? null : val;
       return {
         col,
         op: '==',
-        val,
+        val: normalizedVal,
         formattedVal:
-          typeof formatter === 'function' ? formatter(val as any) : String(val),
+          typeof formatter === 'function'
+            ? (formatter as unknown as (value: DataRecordValue) => string)(
+                normalizedVal,
+              )
+            : String(normalizedVal),
         grain: formatter && axis === 'row' ? timeGrainSqla : undefined,
       } as BinaryQueryObjectFilterClause;
     },

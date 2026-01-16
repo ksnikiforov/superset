@@ -17,6 +17,7 @@
  * under the License.
  */
 
+import { AdhocMetricSQL } from '@superset-ui/core';
 import buildQuery, { formatQueryName } from '../../src/buildQuery';
 import { MetricsLayoutEnum } from '../../src/types';
 import {
@@ -47,9 +48,6 @@ const baseFormData = buildFormData({
   metricsLayout: undefined,
   legacy_order_by: [],
   order_desc: true,
-  width: 400,
-  height: 400,
-  margin: 0,
   verboseMap: {},
   columnFormats: {},
   currencyFormats: {},
@@ -101,7 +99,7 @@ test('normalizes fractional expand levels', () => {
       expandColumnsLevel: 0.2,
     }),
   );
-  const names = queryContext.queries.map(q => q.query_name);
+  const names = queryContext.queries.map(q => String(q.query_name ?? ''));
   expect(names).toContain(formatQueryName(1, 0));
   expect(names.some(name => /row\d+\.\d|col\d+\.\d/.test(name))).toBe(false);
 });
@@ -281,13 +279,13 @@ test('includes conditional formatting metrics in query payloads', () => {
 });
 
 test('resolves formatting metric references to active metrics', () => {
-  const activeMetric = {
+  const activeMetric: AdhocMetricSQL = {
     expressionType: 'SQL',
     sqlExpression: 'MEASURE(grossRevenue)',
     label: 'grossRevenue',
     optionName: 'metric_gross_rev',
   };
-  const staleMetric = {
+  const staleMetric: AdhocMetricSQL = {
     expressionType: 'SQL',
     sqlExpression: 'MEASURE(grossRevenue) / 100',
     label: 'grossRevenue_old',

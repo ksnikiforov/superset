@@ -19,7 +19,7 @@
 
 import { render, fireEvent, waitFor, within } from '../../../testUtils';
 import PivotTableChart from '../../fixtures/TestPivotTableChart';
-import { MetricsLayoutEnum } from '../../../../src/types';
+import { MetricsLayoutEnum, PivotPath } from '../../../../src/types';
 import {
   applyMetricAxis,
   buildTreeFromRecords,
@@ -168,7 +168,7 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
 
       const tbody = container.querySelector('tbody') as HTMLElement;
       const metricLabel = within(tbody).getAllByText('averageOrderValue')[0];
-      const metricRow = metricLabel.closest('tr') as HTMLElement;
+      const metricRow = metricLabel.closest('tr') as HTMLTableRowElement;
       fireEvent.click(within(metricRow).getByLabelText('plus-square'));
 
       await waitFor(() => {
@@ -305,22 +305,22 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
 
     const tbody = container.querySelector('tbody') as HTMLElement;
     const metricLabel = within(tbody).getAllByText('averageOrderValue')[0];
-    const metricRow = metricLabel.closest('tr') as HTMLElement;
+    const metricRow = metricLabel.closest('tr') as HTMLTableRowElement;
     fireEvent.click(within(metricRow).getByLabelText('plus-square'));
 
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
     });
 
-    const orderPriorityRow = getByText('1-URGENT').closest('tr') as HTMLElement;
+    const orderPriorityRow = getByText('1-URGENT').closest('tr') as HTMLTableRowElement;
     fireEvent.click(within(orderPriorityRow).getByLabelText('plus-square'));
 
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
     });
 
-    const rows = Array.from(tbody.querySelectorAll('tr'));
-    const shipModeRow = getByText('AIR').closest('tr') as HTMLElement;
+    const rows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));
+    const shipModeRow = getByText('AIR').closest('tr') as HTMLTableRowElement;
     const shipModeIndex = rows.indexOf(shipModeRow);
     const shipModeMetricRow = rows
       .slice(shipModeIndex + 1)
@@ -413,7 +413,7 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
       2,
     );
 
-    fetchPivotBranchMock.mockImplementation(({ path }) => {
+    fetchPivotBranchMock.mockImplementation(({ path }: { path: PivotPath }) => {
       const metricIndex = path.findIndex(val =>
         metrics.includes(String(val ?? '')),
       );
@@ -499,8 +499,8 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
     );
 
     const tbody = container.querySelector('tbody') as HTMLElement;
-    const shipModeRow = getByText('AIR').closest('tr') as HTMLElement;
-    const initialRows = Array.from(tbody.querySelectorAll('tr'));
+    const shipModeRow = getByText('AIR').closest('tr') as HTMLTableRowElement;
+    const initialRows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));
     const metricRow = initialRows
       .slice(initialRows.indexOf(shipModeRow) + 1)
       .find(row => within(row).queryByText('averageOrderValue')) as
@@ -529,7 +529,7 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
       expect(within(tbody).getByText(/^O$/)).toBeInTheDocument();
     });
 
-    const rows = Array.from(tbody.querySelectorAll('tr')) as HTMLElement[];
+    const rows = Array.from(tbody.querySelectorAll<HTMLElement>('tr')) as HTMLElement[];
     const getIndent = (row: HTMLElement) =>
       Number.parseInt(
         (row.querySelector('div') as HTMLElement)?.style.paddingLeft || '0',
@@ -538,7 +538,7 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
     ['F', 'O'].forEach(label => {
       const statusRow = within(tbody)
         .getByText(new RegExp(`^${label}$`))
-        .closest('tr') as HTMLElement;
+        .closest('tr') as HTMLTableRowElement;
       const statusIndent = getIndent(statusRow);
       const statusIndex = rows.indexOf(statusRow);
       let collectCodRow: HTMLElement | undefined;
@@ -561,7 +561,7 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
     const expandedMetricRows = within(tbody)
       .getAllByText('averageOrderValue')
       .filter(label =>
-        within(label.closest('tr') as HTMLElement).queryByLabelText(
+        within(label.closest('tr') as HTMLTableRowElement).queryByLabelText(
           'minus-square',
         ),
       );
@@ -694,14 +694,14 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
 
     const tbody = container.querySelector('tbody') as HTMLElement;
     const metricLabel = within(tbody).getAllByText('averageOrderValue')[0];
-    const metricRow = metricLabel.closest('tr') as HTMLElement;
+    const metricRow = metricLabel.closest('tr') as HTMLTableRowElement;
     fireEvent.click(within(metricRow).getByLabelText('plus-square'));
 
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
     });
 
-    const orderPriorityRow = getByText('1-URGENT').closest('tr') as HTMLElement;
+    const orderPriorityRow = getByText('1-URGENT').closest('tr') as HTMLTableRowElement;
     fireEvent.click(within(orderPriorityRow).getByLabelText('plus-square'));
 
     await waitFor(() => {
@@ -794,7 +794,7 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
       2,
     );
 
-    fetchPivotBranchMock.mockImplementation(({ path }) => {
+    fetchPivotBranchMock.mockImplementation(({ path }: { path: PivotPath }) => {
       const metricIndex = path.findIndex(val =>
         metrics.includes(String(val ?? '')),
       );
@@ -870,8 +870,8 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
     );
 
     const tbody = container.querySelector('tbody') as HTMLElement;
-    const shipModeRow = getByText('AIR').closest('tr') as HTMLElement;
-    const initialRows = Array.from(tbody.querySelectorAll('tr'));
+    const shipModeRow = getByText('AIR').closest('tr') as HTMLTableRowElement;
+    const initialRows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));
     const metricRow = initialRows
       .slice(initialRows.indexOf(shipModeRow) + 1)
       .find(row => within(row).queryByText('averageOrderValue')) as
@@ -893,7 +893,7 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
 
     fireEvent.click(within(shipModeRow).getByLabelText('minus-square'));
 
-    const collapsedRows = Array.from(tbody.querySelectorAll('tr'));
+    const collapsedRows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));
     const collapsedMetricRow = collapsedRows
       .slice(collapsedRows.indexOf(shipModeRow) + 1)
       .find(row => within(row).queryByText('averageOrderValue')) as
@@ -1050,8 +1050,8 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
     );
 
     const tbody = container.querySelector('tbody') as HTMLElement;
-    const orderPriorityRow = getByText('1-URGENT').closest('tr') as HTMLElement;
-    const initialRows = Array.from(tbody.querySelectorAll('tr'));
+    const orderPriorityRow = getByText('1-URGENT').closest('tr') as HTMLTableRowElement;
+    const initialRows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));
     const metricRow = initialRows
       .slice(initialRows.indexOf(orderPriorityRow) + 1)
       .find(row => within(row).queryByText('averageOrderValue')) as
@@ -1072,10 +1072,10 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
     });
 
-    const rows = Array.from(tbody.querySelectorAll('tr'));
+    const rows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));
     const shipModeRow = within(tbody)
       .getByText('AIR')
-      .closest('tr') as HTMLElement;
+      .closest('tr') as HTMLTableRowElement;
     const shipModeIndex = rows.indexOf(shipModeRow);
     const shipModeMetricRow = rows
       .slice(shipModeIndex + 1)
@@ -1259,8 +1259,8 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
     );
 
     const tbody = container.querySelector('tbody') as HTMLElement;
-    const urgentRow = getByText('1-URGENT').closest('tr') as HTMLElement;
-    const firstRows = Array.from(tbody.querySelectorAll('tr'));
+    const urgentRow = getByText('1-URGENT').closest('tr') as HTMLTableRowElement;
+    const firstRows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));
     const urgentMetricRow = firstRows
       .slice(firstRows.indexOf(urgentRow) + 1)
       .find(row => within(row).queryByText('averageOrderValue')) as
@@ -1283,8 +1283,8 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
 
     fireEvent.click(within(urgentRow).getByLabelText('minus-square'));
 
-    const highRow = getByText('2-HIGH').closest('tr') as HTMLElement;
-    const secondRows = Array.from(tbody.querySelectorAll('tr'));
+    const highRow = getByText('2-HIGH').closest('tr') as HTMLTableRowElement;
+    const secondRows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));
     const highMetricRow = secondRows
       .slice(secondRows.indexOf(highRow) + 1)
       .find(row => within(row).queryByText('averageOrderValue')) as
@@ -1305,10 +1305,10 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(4);
     });
 
-    const rows = Array.from(tbody.querySelectorAll('tr'));
+    const rows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));
     const shipModeRow = within(tbody)
       .getByText('FOB')
-      .closest('tr') as HTMLElement;
+      .closest('tr') as HTMLTableRowElement;
     const shipModeIndex = rows.indexOf(shipModeRow);
     const shipModeMetricRow = rows
       .slice(shipModeIndex + 1)
@@ -1486,8 +1486,8 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
     );
 
     const tbody = container.querySelector('tbody') as HTMLElement;
-    const orderPriorityRow = getByText('1-URGENT').closest('tr') as HTMLElement;
-    const initialRows = Array.from(tbody.querySelectorAll('tr'));
+    const orderPriorityRow = getByText('1-URGENT').closest('tr') as HTMLTableRowElement;
+    const initialRows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));
     const metricRow = initialRows
       .slice(initialRows.indexOf(orderPriorityRow) + 1)
       .find(row => within(row).queryByText('averageOrderValue')) as
@@ -1504,7 +1504,7 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
 
     const returnFlagRow = within(tbody)
       .getByText(/^A$/)
-      .closest('tr') as HTMLElement;
+      .closest('tr') as HTMLTableRowElement;
     fireEvent.click(within(returnFlagRow).getByLabelText('plus-square'));
 
     await waitFor(() => {
@@ -1522,7 +1522,7 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
     const shipModeRow = (await waitFor(() =>
       within(tbody).getByText('AIR').closest('tr'),
     )) as HTMLElement;
-    const rows = Array.from(tbody.querySelectorAll('tr'));
+    const rows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));
     const shipModeIndex = rows.indexOf(shipModeRow);
     const shipModeMetricRow = rows
       .slice(shipModeIndex + 1)

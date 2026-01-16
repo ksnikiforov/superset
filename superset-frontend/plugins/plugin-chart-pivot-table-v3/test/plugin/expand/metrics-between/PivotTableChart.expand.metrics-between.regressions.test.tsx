@@ -19,7 +19,11 @@
 
 import { render, fireEvent, waitFor, within } from '../../../testUtils';
 import PivotTableChart from '../../fixtures/TestPivotTableChart';
-import { MetricsLayoutEnum, PivotTreeData } from '../../../../src/types';
+import {
+  MetricsLayoutEnum,
+  PivotPath,
+  PivotTreeData,
+} from '../../../../src/types';
 import {
   applyMetricAxis,
   buildTreeFromRecords,
@@ -177,8 +181,8 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     );
 
     const tbody = container.querySelector('tbody') as HTMLElement;
-    const orderPriorityRow = getByText('1-URGENT').closest('tr') as HTMLElement;
-    const initialRows = Array.from(tbody.querySelectorAll('tr'));
+    const orderPriorityRow = getByText('1-URGENT').closest('tr') as HTMLTableRowElement;
+    const initialRows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));
     const metricRow = initialRows
       .slice(initialRows.indexOf(orderPriorityRow) + 1)
       .find(row => within(row).queryByText('averageOrderValue')) as
@@ -195,7 +199,7 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
 
     const returnFlagRow = within(tbody)
       .getByText(/^A$/)
-      .closest('tr') as HTMLElement;
+      .closest('tr') as HTMLTableRowElement;
     fireEvent.click(within(returnFlagRow).getByLabelText('plus-square'));
 
     await waitFor(() => {
@@ -210,7 +214,7 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
 
     fireEvent.click(within(orderPriorityRow).getByLabelText('minus-square'));
 
-    const rows = Array.from(tbody.querySelectorAll('tr'));
+    const rows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));
     const collapsedMetricRow = rows
       .slice(rows.indexOf(orderPriorityRow) + 1)
       .find(row => within(row).queryByText('averageOrderValue')) as
@@ -418,8 +422,8 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     );
 
     const tbody = container.querySelector('tbody') as HTMLElement;
-    const orderPriorityRow = getByText('1-URGENT').closest('tr') as HTMLElement;
-    const initialRows = Array.from(tbody.querySelectorAll('tr'));
+    const orderPriorityRow = getByText('1-URGENT').closest('tr') as HTMLTableRowElement;
+    const initialRows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));
     const metricRow = initialRows
       .slice(initialRows.indexOf(orderPriorityRow) + 1)
       .find(row => within(row).queryByText('averageOrderValue')) as
@@ -436,7 +440,7 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
 
     const returnFlagRow = within(tbody)
       .getByText(/^A$/)
-      .closest('tr') as HTMLElement;
+      .closest('tr') as HTMLTableRowElement;
     fireEvent.click(within(returnFlagRow).getByLabelText('plus-square'));
 
     await waitFor(() => {
@@ -451,7 +455,7 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
 
     fireEvent.click(within(orderPriorityRow).getByLabelText('minus-square'));
 
-    const collapsedRows = Array.from(tbody.querySelectorAll('tr'));
+    const collapsedRows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));
     const collapsedMetricRow = collapsedRows
       .slice(collapsedRows.indexOf(orderPriorityRow) + 1)
       .find(row => within(row).queryByText('averageOrderValue')) as
@@ -473,7 +477,7 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
       expect(within(tbody).getByText('COLLECT COD')).toBeInTheDocument();
     });
 
-    const rows = Array.from(tbody.querySelectorAll('tr'));
+    const rows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));
     const returnFlagRowIndex = rows.indexOf(reopenedReturnFlagRow);
     const subtotalRow = rows
       .slice(returnFlagRowIndex + 1)
@@ -610,7 +614,7 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     );
 
     const tbody = container.querySelector('tbody') as HTMLElement;
-    const orderPriorityRow = getByText('1-URGENT').closest('tr') as HTMLElement;
+    const orderPriorityRow = getByText('1-URGENT').closest('tr') as HTMLTableRowElement;
     fireEvent.click(within(orderPriorityRow).getByLabelText('plus-square'));
 
     await waitFor(() => {
@@ -619,7 +623,7 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
 
     const shipModeRow = within(tbody)
       .getByText('AIR')
-      .closest('tr') as HTMLElement;
+      .closest('tr') as HTMLTableRowElement;
     fireEvent.click(within(shipModeRow).getByLabelText('plus-square'));
 
     await waitFor(() => {
@@ -628,17 +632,17 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
 
     const returnFlagRow = within(tbody)
       .getByText(/^A$/)
-      .closest('tr') as HTMLElement;
+      .closest('tr') as HTMLTableRowElement;
     fireEvent.click(within(returnFlagRow).getByLabelText('plus-square'));
 
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(3);
     });
 
-    const rows = Array.from(tbody.querySelectorAll('tr'));
+    const rows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));
     const instructionRow = within(tbody)
       .getByText('COLLECT COD')
-      .closest('tr') as HTMLElement;
+      .closest('tr') as HTMLTableRowElement;
     const instructionIndex = rows.indexOf(instructionRow);
     const metricRow = rows
       .slice(instructionIndex + 1)
@@ -657,7 +661,7 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     const reopenedInstructionRow = (await waitFor(() =>
       within(tbody).getByText('COLLECT COD').closest('tr'),
     )) as HTMLElement;
-    const reopenedRows = Array.from(tbody.querySelectorAll('tr'));
+    const reopenedRows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));
     const reopenedMetricRow = reopenedRows
       .slice(reopenedRows.indexOf(reopenedInstructionRow) + 1)
       .find(row => within(row).queryByText('averageOrderValue')) as
@@ -735,7 +739,7 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     const orderStatusBranch = buildCollapsedBranch(2);
     const shipModeBranch = buildTreeAtDepth(3);
 
-    fetchPivotBranchMock.mockImplementation(({ path }) => {
+    fetchPivotBranchMock.mockImplementation(({ path }: { path: PivotPath }) => {
       const metricIndex = path.findIndex(val =>
         metrics.includes(String(val ?? '')),
       );
@@ -808,14 +812,14 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     const tbody = container.querySelector('tbody') as HTMLElement;
     const thead = container.querySelector('thead') as HTMLElement;
     const metricLabel = within(tbody).getAllByText('averageOrderValue')[0];
-    const metricRow = metricLabel.closest('tr') as HTMLElement;
+    const metricRow = metricLabel.closest('tr') as HTMLTableRowElement;
     fireEvent.click(within(metricRow).getByLabelText('plus-square'));
 
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
     });
 
-    const orderPriorityRow = getByText('1-URGENT').closest('tr') as HTMLElement;
+    const orderPriorityRow = getByText('1-URGENT').closest('tr') as HTMLTableRowElement;
     fireEvent.click(within(orderPriorityRow).getByLabelText('plus-square'));
 
     await waitFor(() => {
@@ -904,7 +908,7 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
       'orderClass',
     ]);
 
-    fetchPivotBranchMock.mockImplementation(({ path }) => {
+    fetchPivotBranchMock.mockImplementation(({ path }: { path: PivotPath }) => {
       if (path.length === 2) {
         return Promise.resolve({ data: orderStatusBranch });
       }
@@ -974,7 +978,7 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
 
     const tbody = container.querySelector('tbody') as HTMLElement;
     const metricLabel = within(tbody).getAllByText('averageOrderValue')[0];
-    const metricRow = metricLabel.closest('tr') as HTMLElement;
+    const metricRow = metricLabel.closest('tr') as HTMLTableRowElement;
     fireEvent.click(within(metricRow).getByLabelText('plus-square'));
 
     await waitFor(() => {

@@ -178,13 +178,13 @@ describe('PivotTableChart expansion with metrics between dimensions (metrics-tie
     );
 
     const tbody = container.querySelector('tbody') as HTMLElement;
-    const orderPriorityRow = getByText('1-URGENT').closest('tr') as HTMLElement;
+    const orderPriorityRow = getByText('1-URGENT').closest('tr') as HTMLTableRowElement;
     const avgRowCollapsed = within(tbody)
       .getByText('averageOrderValue')
-      .closest('tr') as HTMLElement;
+      .closest('tr') as HTMLTableRowElement;
     const discountRowCollapsed = within(tbody)
       .getByText('weightedDiscount')
-      .closest('tr') as HTMLElement;
+      .closest('tr') as HTMLTableRowElement;
     expect(
       within(orderPriorityRow).getByLabelText('plus-square'),
     ).toBeInTheDocument();
@@ -204,13 +204,13 @@ describe('PivotTableChart expansion with metrics between dimensions (metrics-tie
 
     const shipModeRow = within(tbody)
       .getByText('AIR')
-      .closest('tr') as HTMLElement;
+      .closest('tr') as HTMLTableRowElement;
     const avgRow = within(tbody)
       .getByText('averageOrderValue')
-      .closest('tr') as HTMLElement;
+      .closest('tr') as HTMLTableRowElement;
     const discountRow = within(tbody)
       .getByText('weightedDiscount')
-      .closest('tr') as HTMLElement;
+      .closest('tr') as HTMLTableRowElement;
     expect(
       within(shipModeRow).getByLabelText('plus-square'),
     ).toBeInTheDocument();
@@ -221,7 +221,7 @@ describe('PivotTableChart expansion with metrics between dimensions (metrics-tie
       within(discountRow).queryByLabelText('plus-square'),
     ).not.toBeInTheDocument();
 
-    const rows = Array.from(tbody.querySelectorAll('tr'));
+    const rows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));
     expect(rows.indexOf(orderPriorityRow)).toBeLessThan(
       rows.indexOf(shipModeRow),
     );
@@ -317,7 +317,7 @@ describe('PivotTableChart expansion with metrics between dimensions (metrics-tie
       />,
     );
 
-    const orderPriorityRow = getByText('1-URGENT').closest('tr') as HTMLElement;
+    const orderPriorityRow = getByText('1-URGENT').closest('tr') as HTMLTableRowElement;
     fireEvent.click(within(orderPriorityRow).getByLabelText('plus-square'));
 
     await waitFor(() => {
@@ -327,7 +327,7 @@ describe('PivotTableChart expansion with metrics between dimensions (metrics-tie
     const tbody = container.querySelector('tbody') as HTMLElement;
     const avgMetricLabels = within(tbody).getAllByText('averageOrderValue');
     avgMetricLabels.forEach(label => {
-      const avgRow = label.closest('tr') as HTMLElement;
+      const avgRow = label.closest('tr') as HTMLTableRowElement;
       expect(
         within(avgRow).queryByLabelText('plus-square'),
       ).not.toBeInTheDocument();
@@ -421,7 +421,7 @@ describe('PivotTableChart expansion with metrics between dimensions (metrics-tie
     );
 
     const tbody = container.querySelector('tbody') as HTMLElement;
-    const urgentRow = getByText('1-URGENT').closest('tr') as HTMLElement;
+    const urgentRow = getByText('1-URGENT').closest('tr') as HTMLTableRowElement;
     fireEvent.click(within(urgentRow).getByLabelText('plus-square'));
 
     await waitFor(() => {
@@ -542,7 +542,7 @@ describe('PivotTableChart expansion with metrics between dimensions (metrics-tie
     );
 
     const tbody = container.querySelector('tbody') as HTMLElement;
-    const urgentRow = getByText('1-URGENT').closest('tr') as HTMLElement;
+    const urgentRow = getByText('1-URGENT').closest('tr') as HTMLTableRowElement;
     fireEvent.click(within(urgentRow).getByLabelText('plus-square'));
 
     await waitFor(() => {
@@ -630,7 +630,7 @@ describe('PivotTableChart expansion with metrics between dimensions (metrics-tie
     );
 
     const tbody = container.querySelector('tbody') as HTMLElement;
-    const urgentRow = getByText('1-URGENT').closest('tr') as HTMLElement;
+    const urgentRow = getByText('1-URGENT').closest('tr') as HTMLTableRowElement;
     fireEvent.click(within(urgentRow).getByLabelText('plus-square'));
 
     await waitFor(() => {

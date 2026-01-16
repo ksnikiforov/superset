@@ -23,6 +23,7 @@ import PivotTableChart from '../fixtures/TestPivotTableChart';
 import {
   MetricsLayoutEnum,
   PivotExpansionState,
+  PivotPath,
   PivotTableQueryFormData,
   PivotTreeData,
 } from '../../../src/types';
@@ -1370,9 +1371,10 @@ describe('PivotTableChart expansion state persistence', () => {
   });
 
   it('decodes undefined values when prefetching persisted expansions', async () => {
+    const undefinedPath = [undefined] as unknown as PivotPath;
     const ownState = {
       expansionState: {
-        rows: [serializePath([undefined])],
+        rows: [serializePath(undefinedPath)],
         cols: [],
       },
     };

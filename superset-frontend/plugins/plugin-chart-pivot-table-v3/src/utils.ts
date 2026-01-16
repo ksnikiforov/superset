@@ -44,6 +44,7 @@ import {
   PivotSortMode,
   PivotSortOrder,
   PivotPath,
+  PivotResultCell,
   PivotTreeData,
   PivotTreeNode,
 } from './types';
@@ -283,9 +284,9 @@ export const getMetricKey = (metric: QueryFormMetric | Metric) => {
     return getMetricLabel(metric) || '';
   }
   if ('metric_name' in metric && metric.metric_name) {
-    return metric.metric_name;
+    return metric.verbose_name || metric.metric_name;
   }
-  return getMetricLabel(metric) || '';
+  return '';
 };
 
 export const getMetricKeys = (metrics: QueryFormMetric[]) =>
@@ -322,11 +323,11 @@ const coerceExpressionType = (
 ): QueryFormMetric | undefined => {
   const { expressionType } = value;
   if (typeof expressionType === 'string' && expressionType.length > 0) {
-    return value as QueryFormMetric;
+    return value as unknown as QueryFormMetric;
   }
   const { sqlExpression } = value;
   if (typeof sqlExpression === 'string' && sqlExpression.trim().length > 0) {
-    return { ...value, expressionType: 'SQL' } as QueryFormMetric;
+    return { ...value, expressionType: 'SQL' } as unknown as QueryFormMetric;
   }
   const { aggregate } = value;
   const { column } = value;
@@ -335,7 +336,7 @@ const coerceExpressionType = (
     aggregate.length > 0 &&
     isRecord(column)
   ) {
-    return { ...value, expressionType: 'SIMPLE' } as QueryFormMetric;
+    return { ...value, expressionType: 'SIMPLE' } as unknown as QueryFormMetric;
   }
   return undefined;
 };
@@ -396,7 +397,7 @@ export const normalizeMetricFormattingValue = (
     }
     const { expressionType } = value;
     if (typeof expressionType === 'string') {
-      return value as QueryFormMetric;
+      return value as unknown as QueryFormMetric;
     }
     const { label } = value;
     if (typeof label === 'string' && label.trim().length > 0) {
@@ -1415,7 +1416,7 @@ export const mergeTrees = (
     target?: Record<string, PivotResultCell>,
     source?: Record<string, PivotResultCell>,
   ) => {
-    const result: Record<string, PivotResultCell> = { ...(target || {}) };
+    const result = { ...(target ?? {}) } as Record<string, PivotResultCell>;
     Object.entries(source || {}).forEach(([key, cell]) => {
       const existing = result[key];
       if (!existing) {

@@ -214,7 +214,7 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
     });
     fireEvent.click(getAllByLabelText('minus-square')[0]);
 
-    const usaRow = getByText('USA').closest('tr') as HTMLElement;
+    const usaRow = getByText('USA').closest('tr') as HTMLTableRowElement;
     const rowToggle = within(usaRow).getByLabelText('plus-square');
     fireEvent.click(rowToggle);
     await waitFor(() => {
@@ -349,7 +349,7 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
     });
     fireEvent.click(within(thead).getByLabelText('minus-square'));
 
-    const usaRow = getByText('USA').closest('tr') as HTMLElement;
+    const usaRow = getByText('USA').closest('tr') as HTMLTableRowElement;
     fireEvent.click(within(usaRow).getByLabelText('plus-square'));
 
     await waitFor(() => {
@@ -363,7 +363,7 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
 
     const tbody = container.querySelector('tbody') as HTMLElement;
     const priorityCell = await within(tbody).findByText('HIGH');
-    const priorityRow = priorityCell.closest('tr') as HTMLElement;
+    const priorityRow = priorityCell.closest('tr') as HTMLTableRowElement;
     expect(priorityRow).toBeTruthy();
     expect(within(priorityRow).getByText('7')).toBeInTheDocument();
   });
@@ -545,7 +545,7 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
 
     fireEvent.click(within(thead).getByLabelText('minus-square'));
 
-    const usaRow = getByText('USA').closest('tr') as HTMLElement;
+    const usaRow = getByText('USA').closest('tr') as HTMLTableRowElement;
     fireEvent.click(within(usaRow).getByLabelText('plus-square'));
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
@@ -558,7 +558,7 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
     });
     fireEvent.click(within(thead).getByLabelText('minus-square'));
 
-    const canRow = getByText('CAN').closest('tr') as HTMLElement;
+    const canRow = getByText('CAN').closest('tr') as HTMLTableRowElement;
     fireEvent.click(within(canRow).getByLabelText('plus-square'));
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(4);
@@ -566,7 +566,7 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
 
     const tbody = container.querySelector('tbody') as HTMLElement;
     const canChildCell = await within(tbody).findByText('HIGH');
-    const canChildRow = canChildCell.closest('tr') as HTMLElement;
+    const canChildRow = canChildCell.closest('tr') as HTMLTableRowElement;
     expect(within(canChildRow).getByText('20')).toBeInTheDocument();
   });
 
