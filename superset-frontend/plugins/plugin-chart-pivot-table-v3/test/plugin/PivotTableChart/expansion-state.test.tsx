@@ -175,6 +175,58 @@ describe('PivotTableChart expansion state persistence', () => {
     );
   });
 
+  it('persists expanded column keys after fetching deeper column nodes', async () => {
+    const colGroupby = ['c1', 'c2'];
+    const recordsWithCols = [
+      { r1: 'A', r2: 'X', c1: 'C', c2: 'U', m1: 10 },
+      { r1: 'A', r2: 'Y', c1: 'C', c2: 'V', m1: 12 },
+      { r1: 'B', r2: 'X', c1: 'D', c2: 'W', m1: 15 },
+    ];
+    const buildTreeWithCols = (
+      rowDepth: number,
+      colDepth: number,
+    ): PivotTreeData =>
+      applyMetricAxis(
+        buildTreeFromRecords(
+          recordsWithCols,
+          metrics,
+          rowGroupby,
+          colGroupby,
+          rowDepth,
+          colDepth,
+        ),
+        metrics,
+        MetricsLayoutEnum.COLUMNS,
+        rowGroupby,
+        colGroupby,
+      );
+
+    fetchPivotBranchMock.mockResolvedValue({ data: buildTreeWithCols(1, 2) });
+    const setDataMask = jest.fn();
+    render(
+      buildChartProps({
+        data: buildTreeWithCols(1, 1),
+        setDataMask,
+        groupbyColumnsOverride: colGroupby,
+        formDataGroupbyColumnsOverride: colGroupby,
+      }),
+    );
+
+    const colLabel = screen.getByText('C');
+    const colCell = colLabel.closest('th');
+    expect(colCell).not.toBeNull();
+    const toggle = colCell?.querySelector('button');
+    expect(toggle).not.toBeNull();
+    fireEvent.click(toggle as HTMLButtonElement);
+
+    await waitFor(() => expect(setDataMask).toHaveBeenCalled());
+    const lastCall =
+      setDataMask.mock.calls[setDataMask.mock.calls.length - 1][0];
+    expect(lastCall?.ownState?.expansionState?.cols).toContain(
+      serializePath(['C']),
+    );
+  });
+
   it('merges expansion state with existing ownState updates', async () => {
     const setDataMask = jest.fn();
     render(

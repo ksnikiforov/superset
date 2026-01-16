@@ -3223,9 +3223,18 @@ function PivotTableChart(props: PivotTableProps) {
             withoutRoot.length > 0 ? withoutRoot : visibleColsOverride;
         }
       }
+      const visibleColKeys = new Set<string>();
+      visibleColsOverride.forEach(col => {
+        for (let idx = 0; idx <= col.path.length; idx += 1) {
+          const key = serializePath(col.path.slice(0, idx));
+          if (treeRef.current.cols[key]) {
+            visibleColKeys.add(key);
+          }
+        }
+      });
       return {
         rows: new Set(visibleRowsOverride.map(row => row.key)),
-        cols: new Set(visibleColsOverride.map(col => col.key)),
+        cols: visibleColKeys,
       };
     },
     [
