@@ -68,8 +68,9 @@ import {
 
 const EMPTY_OBJECT: Record<string, never> = {};
 const DND_ACCEPTED_TYPES = [DndItemType.Column, DndItemType.Metric];
-type AdhocMetricPopoverDatasource =
-  ComponentProps<typeof AdhocMetricPopoverTrigger>['datasource'];
+type AdhocMetricPopoverDatasource = ComponentProps<
+  typeof AdhocMetricPopoverTrigger
+>['datasource'];
 
 const isDictionaryForAdhocMetric = (value: QueryFormMetric) =>
   value &&

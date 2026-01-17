@@ -25,8 +25,9 @@ import PivotDndMetricSelect, {
 
 jest.setTimeout(60000);
 
-type MetricSelectDatasource =
-  ComponentProps<typeof PivotDndMetricSelect>['datasource'];
+type MetricSelectDatasource = ComponentProps<
+  typeof PivotDndMetricSelect
+>['datasource'];
 
 const baseDatasource = { type: 'table' } as MetricSelectDatasource;
 

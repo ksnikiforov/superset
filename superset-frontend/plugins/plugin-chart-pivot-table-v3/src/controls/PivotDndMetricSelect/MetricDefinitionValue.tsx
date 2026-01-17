@@ -28,8 +28,9 @@ import AdhocMetricOption from './AdhocMetricOption';
 
 type SavedMetric = savedMetricType & { error_text?: string };
 type MetricOption = Metric | AdhocMetric | string;
-type AdhocMetricPopoverDatasource =
-  ComponentProps<typeof AdhocMetricPopoverTrigger>['datasource'];
+type AdhocMetricPopoverDatasource = ComponentProps<
+  typeof AdhocMetricPopoverTrigger
+>['datasource'];
 
 export type MetricDefinitionValueProps = {
   option: MetricOption;

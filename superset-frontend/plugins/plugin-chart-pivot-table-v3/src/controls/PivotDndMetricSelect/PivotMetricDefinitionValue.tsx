@@ -16,12 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import {
-  ReactNode,
-  type ComponentProps,
-  useCallback,
-  useMemo,
-} from 'react';
+import { ReactNode, type ComponentProps, useCallback, useMemo } from 'react';
 import {
   getCategoricalSchemeRegistry,
   getMetricLabel,
@@ -82,8 +77,9 @@ const MetricFormattingButtonWrap = styled.div`
 
 type ValueType = Metric | AdhocMetric | QueryFormMetric;
 type SavedMetric = savedMetricType & { error_text?: string };
-type AdhocMetricPopoverDatasource =
-  ComponentProps<typeof AdhocMetricPopoverTrigger>['datasource'];
+type AdhocMetricPopoverDatasource = ComponentProps<
+  typeof AdhocMetricPopoverTrigger
+>['datasource'];
 
 const rgbToHex = (color: ColorValue): string => {
   const { r, g, b, a = 1 } = color.toRgb();
@@ -223,7 +219,7 @@ const getMetricOptionValue = (
   }
   if (isRecord(option) && !isMetricSelectValue(option)) {
     const optionRecord = option as Record<string, unknown>;
-    const optionName = optionRecord.optionName;
+    const { optionName } = optionRecord;
     if (typeof optionName === 'string' && optionName.length > 0) {
       return optionName;
     }
@@ -563,7 +559,8 @@ export default function PivotMetricDefinitionValue(
   } = props;
   const defaultPositiveColor =
     theme.colorSuccess || DEFAULT_DATABAR_POSITIVE_COLOR;
-  const defaultNegativeColor = theme.colorError || DEFAULT_DATABAR_NEGATIVE_COLOR;
+  const defaultNegativeColor =
+    theme.colorError || DEFAULT_DATABAR_NEGATIVE_COLOR;
   const metricLabel = useMemo(() => resolveMetricLabel(option), [option]);
   const metricKey = useMemo(() => {
     const key = resolveMetricKey(option);

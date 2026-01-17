@@ -1661,7 +1661,9 @@ describe('PivotTableChart multi-metric visibility', () => {
         expect.arrayContaining(['Road', 'Mountain']),
       );
 
-      const groupRow = screen.getByText('Bikes').closest('tr') as HTMLTableRowElement;
+      const groupRow = screen
+        .getByText('Bikes')
+        .closest('tr') as HTMLTableRowElement;
       expect(
         within(groupRow).getByLabelText('plus-square'),
       ).toBeInTheDocument();

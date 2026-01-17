@@ -662,7 +662,9 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
     });
 
     const orderPriorityRow = await findByText('1-URGENT');
-    const orderPriorityEl = orderPriorityRow.closest('tr') as HTMLTableRowElement;
+    const orderPriorityEl = orderPriorityRow.closest(
+      'tr',
+    ) as HTMLTableRowElement;
     // Order-priority row should now have values under the newly expanded BUILDING column.
     await waitFor(() => {
       const valueCell = Array.from(orderPriorityEl.querySelectorAll('td')).find(
@@ -1116,8 +1118,8 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
         typeof jsonPayload === 'string' || jsonPayload == null
           ? {}
           : jsonPayload;
-      const queries = (payload as { queries?: Array<{ query_name?: string }> })
-        .queries ?? [];
+      const queries =
+        (payload as { queries?: Array<{ query_name?: string }> }).queries ?? [];
       const result = queries.map((query: { query_name?: string }) => {
         const name = query.query_name as string;
         if (name.includes(`branch:col:${serializePath(['AUTO'])}`)) {
@@ -1314,7 +1316,9 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
         expect(within(canRowEl).getAllByText('35').length).toBeGreaterThan(0);
       });
       const orderStatusRow = await findByText('F');
-      const orderStatusRowEl = orderStatusRow.closest('tr') as HTMLTableRowElement;
+      const orderStatusRowEl = orderStatusRow.closest(
+        'tr',
+      ) as HTMLTableRowElement;
       expect(
         within(orderStatusRowEl).getAllByText('15').length,
       ).toBeGreaterThan(0);

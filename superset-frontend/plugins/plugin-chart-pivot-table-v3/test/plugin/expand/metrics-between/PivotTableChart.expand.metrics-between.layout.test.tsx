@@ -151,7 +151,9 @@ describe('PivotTableChart expansion with metrics between dimensions (layout)', (
         />,
       );
 
-      const firstRow = getByText(levelValues[0]).closest('tr') as HTMLTableRowElement;
+      const firstRow = getByText(levelValues[0]).closest(
+        'tr',
+      ) as HTMLTableRowElement;
       expect(
         within(firstRow).queryByLabelText('plus-square'),
       ).not.toBeInTheDocument();
@@ -242,7 +244,9 @@ describe('PivotTableChart expansion with metrics between dimensions (layout)', (
         />,
       );
 
-      const topRow = getByText(levelValues[0]).closest('tr') as HTMLTableRowElement;
+      const topRow = getByText(levelValues[0]).closest(
+        'tr',
+      ) as HTMLTableRowElement;
       const topToggle = within(topRow).getByLabelText('plus-square');
       fireEvent.click(topToggle);
 
@@ -513,7 +517,9 @@ describe('PivotTableChart expansion with metrics between dimensions (layout)', (
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(3);
     });
 
-    const revenueRow = getByText('10k-50k').closest('tr') as HTMLTableRowElement;
+    const revenueRow = getByText('10k-50k').closest(
+      'tr',
+    ) as HTMLTableRowElement;
     expect(
       within(revenueRow).queryByLabelText('plus-square'),
     ).not.toBeInTheDocument();
@@ -672,7 +678,9 @@ describe('PivotTableChart expansion with metrics between dimensions (layout)', (
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(4);
     });
 
-    const seaReturnRow = (await findByText(/^R$/)).closest('tr') as HTMLTableRowElement;
+    const seaReturnRow = (await findByText(/^R$/)).closest(
+      'tr',
+    ) as HTMLTableRowElement;
     const rows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));
     const seaReturnIndex = rows.indexOf(seaReturnRow);
     const seaMetricRow = rows
@@ -786,7 +794,9 @@ describe('PivotTableChart expansion with metrics between dimensions (layout)', (
       />,
     );
 
-    const urgentRow = getByText('1-URGENT').closest('tr') as HTMLTableRowElement;
+    const urgentRow = getByText('1-URGENT').closest(
+      'tr',
+    ) as HTMLTableRowElement;
     expect(within(urgentRow).getByLabelText('plus-square')).toBeInTheDocument();
 
     const metricRows = queryAllByText('averageOrderValue');

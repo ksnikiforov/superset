@@ -60,7 +60,7 @@ describe('pivot table v3 control panel', () => {
 
   it('builds column subtotal options based on column depth and clamps selections', () => {
     const colSubtotalControl = getControl('colSubtotalLevels');
-    const mapStateToProps = colSubtotalControl.config.mapStateToProps;
+    const { mapStateToProps } = colSubtotalControl.config;
     if (!mapStateToProps) {
       throw new Error('mapStateToProps not configured for colSubtotalLevels');
     }
@@ -86,7 +86,7 @@ describe('pivot table v3 control panel', () => {
 
   it('returns empty options when there are no column levels', () => {
     const colSubtotalControl = getControl('colSubtotalLevels');
-    const mapStateToProps = colSubtotalControl.config.mapStateToProps;
+    const { mapStateToProps } = colSubtotalControl.config;
     if (!mapStateToProps) {
       throw new Error('mapStateToProps not configured for colSubtotalLevels');
     }
@@ -112,7 +112,7 @@ describe('pivot table v3 control panel', () => {
 
   it('selects all column levels when subtotals are enabled with no explicit levels', () => {
     const colSubtotalControl = getControl('colSubtotalLevels');
-    const mapStateToProps = colSubtotalControl.config.mapStateToProps;
+    const { mapStateToProps } = colSubtotalControl.config;
     if (!mapStateToProps) {
       throw new Error('mapStateToProps not configured for colSubtotalLevels');
     }

@@ -181,7 +181,9 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     );
 
     const tbody = container.querySelector('tbody') as HTMLElement;
-    const orderPriorityRow = getByText('1-URGENT').closest('tr') as HTMLTableRowElement;
+    const orderPriorityRow = getByText('1-URGENT').closest(
+      'tr',
+    ) as HTMLTableRowElement;
     const initialRows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));
     const metricRow = initialRows
       .slice(initialRows.indexOf(orderPriorityRow) + 1)
@@ -422,7 +424,9 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     );
 
     const tbody = container.querySelector('tbody') as HTMLElement;
-    const orderPriorityRow = getByText('1-URGENT').closest('tr') as HTMLTableRowElement;
+    const orderPriorityRow = getByText('1-URGENT').closest(
+      'tr',
+    ) as HTMLTableRowElement;
     const initialRows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));
     const metricRow = initialRows
       .slice(initialRows.indexOf(orderPriorityRow) + 1)
@@ -614,7 +618,9 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     );
 
     const tbody = container.querySelector('tbody') as HTMLElement;
-    const orderPriorityRow = getByText('1-URGENT').closest('tr') as HTMLTableRowElement;
+    const orderPriorityRow = getByText('1-URGENT').closest(
+      'tr',
+    ) as HTMLTableRowElement;
     fireEvent.click(within(orderPriorityRow).getByLabelText('plus-square'));
 
     await waitFor(() => {
@@ -819,7 +825,9 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
     });
 
-    const orderPriorityRow = getByText('1-URGENT').closest('tr') as HTMLTableRowElement;
+    const orderPriorityRow = getByText('1-URGENT').closest(
+      'tr',
+    ) as HTMLTableRowElement;
     fireEvent.click(within(orderPriorityRow).getByLabelText('plus-square'));
 
     await waitFor(() => {

@@ -178,7 +178,9 @@ describe('PivotTableChart expansion with metrics between dimensions (metrics-tie
     );
 
     const tbody = container.querySelector('tbody') as HTMLElement;
-    const orderPriorityRow = getByText('1-URGENT').closest('tr') as HTMLTableRowElement;
+    const orderPriorityRow = getByText('1-URGENT').closest(
+      'tr',
+    ) as HTMLTableRowElement;
     const avgRowCollapsed = within(tbody)
       .getByText('averageOrderValue')
       .closest('tr') as HTMLTableRowElement;
@@ -317,7 +319,9 @@ describe('PivotTableChart expansion with metrics between dimensions (metrics-tie
       />,
     );
 
-    const orderPriorityRow = getByText('1-URGENT').closest('tr') as HTMLTableRowElement;
+    const orderPriorityRow = getByText('1-URGENT').closest(
+      'tr',
+    ) as HTMLTableRowElement;
     fireEvent.click(within(orderPriorityRow).getByLabelText('plus-square'));
 
     await waitFor(() => {
@@ -421,7 +425,9 @@ describe('PivotTableChart expansion with metrics between dimensions (metrics-tie
     );
 
     const tbody = container.querySelector('tbody') as HTMLElement;
-    const urgentRow = getByText('1-URGENT').closest('tr') as HTMLTableRowElement;
+    const urgentRow = getByText('1-URGENT').closest(
+      'tr',
+    ) as HTMLTableRowElement;
     fireEvent.click(within(urgentRow).getByLabelText('plus-square'));
 
     await waitFor(() => {
@@ -542,7 +548,9 @@ describe('PivotTableChart expansion with metrics between dimensions (metrics-tie
     );
 
     const tbody = container.querySelector('tbody') as HTMLElement;
-    const urgentRow = getByText('1-URGENT').closest('tr') as HTMLTableRowElement;
+    const urgentRow = getByText('1-URGENT').closest(
+      'tr',
+    ) as HTMLTableRowElement;
     fireEvent.click(within(urgentRow).getByLabelText('plus-square'));
 
     await waitFor(() => {
@@ -630,7 +638,9 @@ describe('PivotTableChart expansion with metrics between dimensions (metrics-tie
     );
 
     const tbody = container.querySelector('tbody') as HTMLElement;
-    const urgentRow = getByText('1-URGENT').closest('tr') as HTMLTableRowElement;
+    const urgentRow = getByText('1-URGENT').closest(
+      'tr',
+    ) as HTMLTableRowElement;
     fireEvent.click(within(urgentRow).getByLabelText('plus-square'));
 
     await waitFor(() => {

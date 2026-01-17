@@ -393,7 +393,7 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
             colSorting: formData?.colSorting,
           },
         );
-        const controlNames = pivotPlacement.controlNames;
+        const { controlNames } = pivotPlacement;
         if (!controlNames) {
           return;
         }

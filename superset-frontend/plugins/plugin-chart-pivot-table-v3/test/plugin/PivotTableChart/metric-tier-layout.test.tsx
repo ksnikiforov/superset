@@ -103,7 +103,9 @@ describe('PivotTableChart metric tier indentation and toggles', () => {
         />,
       );
 
-      const shipModeRow = screen.getByText('AIR').closest('tr') as HTMLTableRowElement;
+      const shipModeRow = screen
+        .getByText('AIR')
+        .closest('tr') as HTMLTableRowElement;
       const metricRow = screen
         .getAllByText(metricLabel)[0]
         .closest('tr') as HTMLTableRowElement;

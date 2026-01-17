@@ -1087,3 +1087,113 @@ describe('resolveFetchContext', () => {
     expect(postMock).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('fetchPivotBranch delta-only contract', () => {
+  beforeEach(() => {
+    (SupersetClient.post as jest.Mock).mockReset();
+    clearPivotBranchCache();
+  });
+
+  const buildMetricFirstColumnTree = (
+    records: Array<{ r1: string; m1: number }>,
+  ) =>
+    applyMetricAxis(
+      buildTreeFromRecords(records, ['m1'], ['r1'], [], 1, 0),
+      ['m1'],
+      MetricsLayoutEnum.COLUMNS,
+      ['r1'],
+      [],
+      0,
+    );
+
+  it('does not include unrelated currentTree nodes in results', async () => {
+    const postMock = SupersetClient.post as jest.Mock;
+    postMock.mockResolvedValueOnce({
+      json: {
+        result: [
+          {
+            data: [{ r1: 'A', m1: 1 }],
+          },
+        ],
+      },
+    });
+
+    const formData = buildFormData({
+      groupbyRows: ['r1'],
+      groupbyColumns: [],
+      metrics: ['m1'],
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      rowSubTotals: false,
+      datasource: '1__table',
+      viz_type: 'pivot_table_v3',
+      maxDepthPerFetch: 1,
+    });
+
+    const currentTree = buildMetricFirstColumnTree([{ r1: 'Z', m1: 999 }]);
+
+    const result = await fetchPivotBranch({
+      formData,
+      axis: 'row',
+      path: ['A'],
+      currentTree,
+      maxDepthPerFetch: 1,
+    });
+
+    const unrelatedRowKey = serializePath(['Z']);
+    const metricColKey = serializePath([encodeMetricKey('m1')]);
+    expect(result.data?.rows[unrelatedRowKey]).toBeUndefined();
+    expect(
+      result.data?.cells[serializeCellKey(unrelatedRowKey, metricColKey)],
+    ).toBeUndefined();
+  });
+
+  it('cache hits are independent of the caller currentTree', async () => {
+    const postMock = SupersetClient.post as jest.Mock;
+    postMock.mockResolvedValueOnce({
+      json: {
+        result: [
+          {
+            data: [{ r1: 'A', m1: 1 }],
+          },
+        ],
+      },
+    });
+
+    const formData = buildFormData({
+      groupbyRows: ['r1'],
+      groupbyColumns: [],
+      metrics: ['m1'],
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      rowSubTotals: false,
+      datasource: '1__table',
+      viz_type: 'pivot_table_v3',
+      maxDepthPerFetch: 1,
+    });
+
+    const firstResult = await fetchPivotBranch({
+      formData,
+      axis: 'row',
+      path: ['A'],
+      currentTree: buildMetricFirstColumnTree([{ r1: 'Z', m1: 999 }]),
+      maxDepthPerFetch: 1,
+    });
+    expect(firstResult.cached).not.toBe(true);
+
+    postMock.mockClear();
+
+    const secondResult = await fetchPivotBranch({
+      formData,
+      axis: 'row',
+      path: ['A'],
+      currentTree: buildMetricFirstColumnTree([{ r1: 'Y', m1: 888 }]),
+      maxDepthPerFetch: 1,
+    });
+
+    expect(secondResult.cached).toBe(true);
+    expect(postMock).not.toHaveBeenCalled();
+
+    const rowKeys = Object.keys(secondResult.data?.rows ?? {});
+    expect(rowKeys).not.toContain(serializePath(['Z']));
+    expect(rowKeys).not.toContain(serializePath(['Y']));
+  });
+});

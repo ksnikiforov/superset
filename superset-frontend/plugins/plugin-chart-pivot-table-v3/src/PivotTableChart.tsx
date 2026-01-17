@@ -44,7 +44,11 @@ import {
   t,
 } from '@superset-ui/core';
 import { Loading } from '@superset-ui/core/components';
-import { fetchPivotBranch, peekPivotBranchCache } from './fetchPivotBranch';
+import {
+  fetchPivotBranch,
+  peekPivotBranchCache,
+  type FetchPivotBranchResult,
+} from './fetchPivotBranch';
 import {
   MetricFormattingScope,
   METRIC_FORMATTING_FIELDS,
@@ -104,6 +108,18 @@ import {
   rootKey,
   sortByOrder,
 } from './pivot/viewModel';
+import {
+  coerceExpansionState as coerceExpansionStateBase,
+  getVisibleExpansionKeys as getVisibleExpansionKeysBase,
+  pruneExpandedToStablePrefix,
+  seedExpandedByLevel,
+  stripAutoSeededExpansions,
+} from './pivot/expansionPersistence';
+import { planHydrationForAxis } from './pivot/hydrationPlanner';
+import {
+  type FetchExpandedBranchesResult,
+  usePivotHydration,
+} from './pivot/usePivotHydration';
 import { buildColumnDisplayPath } from './pivot/columnDisplay';
 import {
   countDimDepth as countDimDepthBase,
@@ -569,79 +585,6 @@ const getStablePrefixLength = (prev: string[], next: string[]) => {
   return idx;
 };
 
-const seedExpandedByLevel = (
-  nodes: Record<string, PivotTreeNode>,
-  expandLevel: number,
-  metricLabelSet: Set<string>,
-  options?: {
-    includeMetricDepthZero?: boolean;
-  },
-) => {
-  const next = new Set<string>([rootKey]);
-  Object.values(nodes).forEach(node => {
-    const depth = countDimDepthBase(node.path, metricLabelSet);
-    if (depth > 0 && depth <= expandLevel) {
-      next.add(node.key);
-      return;
-    }
-    if (options?.includeMetricDepthZero && depth === 0) {
-      const decoded = decodeMetricKey(node.path[node.path.length - 1]);
-      if (decoded && metricLabelSet.has(decoded)) {
-        next.add(node.key);
-      }
-    }
-  });
-  return next;
-};
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-
-type PivotExpansionStateKeys = {
-  rows: string[];
-  cols: string[];
-  collapsedRows?: string[];
-  collapsedCols?: string[];
-};
-
-const coerceExpansionAxis = (value: unknown): string[] | undefined => {
-  if (!Array.isArray(value)) {
-    return undefined;
-  }
-  const resolved: string[] = [];
-  value.forEach(item => {
-    if (typeof item === 'string') {
-      resolved.push(item);
-      return;
-    }
-    if (Array.isArray(item)) {
-      resolved.push(serializePath(item as PivotPath));
-    }
-  });
-  return resolved;
-};
-
-const coerceExpansionState = (
-  value: unknown,
-): PivotExpansionStateKeys | undefined => {
-  if (!isRecord(value)) {
-    return undefined;
-  }
-  const rows = coerceExpansionAxis(value.rows);
-  const cols = coerceExpansionAxis(value.cols);
-  const collapsedRows = coerceExpansionAxis(value.collapsedRows);
-  const collapsedCols = coerceExpansionAxis(value.collapsedCols);
-  if (!rows || !cols) {
-    return undefined;
-  }
-  return {
-    rows,
-    cols,
-    collapsedRows: collapsedRows || [],
-    collapsedCols: collapsedCols || [],
-  };
-};
-
 const clampValue = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
 
@@ -665,6 +608,8 @@ const toPercent = (value: number, scale: DatabarScale) => {
   const clamped = clampValue(value, boundedMin, boundedMax);
   return (clamped - boundedMin) / span;
 };
+
+const STALE_PIVOT_REQUEST = Symbol('pivot-table-stale-request');
 
 const resolveScaleGroupKey = (
   metricKey: string,
@@ -1193,13 +1138,13 @@ function PivotTableChart(props: PivotTableProps) {
     fetchedColKeysRef.current = fetchedColKeys;
   }, [fetchedColKeys]);
   const persistedExpansionState = useMemo(
-    () => coerceExpansionState(formData.expansionState),
+    () => coerceExpansionStateBase(formData.expansionState),
     [formData.expansionState],
   );
   const sessionExpansionState = useMemo(
     () =>
       shouldPersistToOwnState
-        ? coerceExpansionState(ownState?.expansionState)
+        ? coerceExpansionStateBase(ownState?.expansionState)
         : undefined,
     [ownState?.expansionState, shouldPersistToOwnState],
   );
@@ -1209,19 +1154,18 @@ function PivotTableChart(props: PivotTableProps) {
   const prefetchFromPersistenceRef = useRef(false);
   const prefetchRowsRef = useRef<string[]>([]);
   const prefetchColsRef = useRef<string[]>([]);
-  const autoFetchAttemptsRef = useRef<{
-    rows: Map<string, number>;
-    cols: Map<string, number>;
+  const inFlightBranchFetchesRef = useRef<{
+    row: Map<string, Promise<FetchPivotBranchResult | undefined>>;
+    col: Map<string, Promise<FetchPivotBranchResult | undefined>>;
   }>({
-    rows: new Map(),
-    cols: new Map(),
+    row: new Map(),
+    col: new Map(),
   });
   const previousLayoutRef = useRef({
     rows: groupbyRowKeys,
     cols: groupbyColumnKeys,
   });
-  const isPrefetching =
-    prefetchFromPersistenceRef.current && loadingKeys.size > 0;
+  const dataEpochRef = useRef(0);
 
   useEffect(() => {
     ownStateRef.current = ownState ?? {};
@@ -1386,6 +1330,9 @@ function PivotTableChart(props: PivotTableProps) {
       hadSessionExpansionRef.current && !hasSessionExpansion;
     hadSessionExpansionRef.current = hasSessionExpansion;
 
+    dataEpochRef.current += 1;
+    inFlightBranchFetchesRef.current.row.clear();
+    inFlightBranchFetchesRef.current.col.clear();
     commitTree(data);
     setErrorMessage(undefined);
     const shouldApplyExpansionState =
@@ -1396,43 +1343,6 @@ function PivotTableChart(props: PivotTableProps) {
     let nextExpandedRows = expandedRowsRef.current;
     let nextExpandedCols = expandedColsRef.current;
     if (shouldApplyExpansionState) {
-      const stripAutoSeededExpansions = (
-        keys: string[],
-        collapsedKeys: string[],
-        nodes: Record<string, PivotTreeNode>,
-        includeMetricDepthZero: boolean,
-      ) => {
-        if (keys.length === 0 || collapsedKeys.length > 0) {
-          return { rows: keys, collapsed: collapsedKeys };
-        }
-        const maxDepth = keys.reduce((max, key) => {
-          const node = nodes[key];
-          const path = node ? node.path : parsePath(key);
-          return Math.max(max, countDimDepthBase(path, metricLabelSetForDepth));
-        }, 0);
-        if (maxDepth <= 0) {
-          return { rows: keys, collapsed: collapsedKeys };
-        }
-        const seeded = seedExpandedByLevel(
-          nodes,
-          maxDepth,
-          metricLabelSetForDepth,
-          {
-            includeMetricDepthZero,
-          },
-        );
-        const seededSet = new Set(
-          Array.from(seeded).filter(key => key !== rootKey),
-        );
-        if (seededSet.size !== keys.length) {
-          return { rows: keys, collapsed: collapsedKeys };
-        }
-        const isAutoSeeded = keys.every(key => seededSet.has(key));
-        if (!isAutoSeeded) {
-          return { rows: keys, collapsed: collapsedKeys };
-        }
-        return { rows: [], collapsed: [] };
-      };
       const baseManualRows = hasSessionExpansion ? sessionRows : persistedRows;
       const baseManualCols = hasSessionExpansion ? sessionCols : persistedCols;
       const baseManualCollapsedRows = hasSessionExpansion
@@ -1461,28 +1371,30 @@ function PivotTableChart(props: PivotTableProps) {
         resolvedExpandRowsLevel === 0 &&
         !shouldClearRowCache &&
         (prevAutoExpandRowsRef.current ?? 0) > 0
-          ? stripAutoSeededExpansions(
-              manualRows,
-              manualCollapsedRows,
-              data.rows,
-              shouldExpandMetricRows,
-            )
-          : { rows: manualRows, collapsed: manualCollapsedRows };
+          ? stripAutoSeededExpansions({
+              keys: manualRows,
+              collapsedKeys: manualCollapsedRows,
+              nodes: data.rows,
+              metricLabelSet: metricLabelSetForDepth,
+              includeMetricDepthZero: shouldExpandMetricRows,
+            })
+          : { keys: manualRows, collapsedKeys: manualCollapsedRows };
       const normalizedColCache =
         resolvedExpandColumnsLevel === 0 &&
         !shouldClearColCache &&
         (prevAutoExpandColsRef.current ?? 0) > 0
-          ? stripAutoSeededExpansions(
-              manualCols,
-              manualCollapsedCols,
-              data.cols,
-              shouldExpandMetricCols,
-            )
-          : { rows: manualCols, collapsed: manualCollapsedCols };
-      const effectiveManualRows = normalizedRowCache.rows;
-      const effectiveManualCols = normalizedColCache.rows;
-      const effectiveCollapsedRows = normalizedRowCache.collapsed;
-      const effectiveCollapsedCols = normalizedColCache.collapsed;
+          ? stripAutoSeededExpansions({
+              keys: manualCols,
+              collapsedKeys: manualCollapsedCols,
+              nodes: data.cols,
+              metricLabelSet: metricLabelSetForDepth,
+              includeMetricDepthZero: shouldExpandMetricCols,
+            })
+          : { keys: manualCols, collapsedKeys: manualCollapsedCols };
+      const effectiveManualRows = normalizedRowCache.keys;
+      const effectiveManualCols = normalizedColCache.keys;
+      const effectiveCollapsedRows = normalizedRowCache.collapsedKeys;
+      const effectiveCollapsedCols = normalizedColCache.collapsedKeys;
       if (shouldClearRowCache || shouldClearColCache) {
         const nextExpansionState = {
           rows: shouldClearRowCache ? [] : baseManualRows,
@@ -1544,44 +1456,27 @@ function PivotTableChart(props: PivotTableProps) {
       })();
       prefetchRowsRef.current = Array.from(explicitExpandedRowsRef.current);
       prefetchColsRef.current = Array.from(explicitExpandedColsRef.current);
-      const pruneToStablePrefix = (
-        expanded: Set<string>,
-        nodes: Record<string, PivotTreeNode>,
-        stablePrefix: number,
-      ) => {
-        if (stablePrefix <= 0) {
-          return new Set<string>([rootKey]);
-        }
-        const next = new Set<string>([rootKey]);
-        expanded.forEach(key => {
-          const node = nodes[key];
-          const path = node ? node.path : parsePath(key);
-          const depth = countDimDepthBase(path, metricLabelSetForDepth);
-          if (depth <= stablePrefix) {
-            next.add(key);
-          }
-        });
-        return next;
-      };
       if (
         shouldResetExpanded &&
         (hasSessionExpansion || effectiveManualRows.length > 0)
       ) {
-        nextExpandedRows = pruneToStablePrefix(
-          nextExpandedRows,
-          data.rows,
-          rowStablePrefix,
-        );
+        nextExpandedRows = pruneExpandedToStablePrefix({
+          expanded: nextExpandedRows,
+          nodes: data.rows,
+          stablePrefix: rowStablePrefix,
+          metricLabelSet: metricLabelSetForDepth,
+        });
       }
       if (
         shouldResetExpanded &&
         (hasSessionExpansion || effectiveManualCols.length > 0)
       ) {
-        nextExpandedCols = pruneToStablePrefix(
-          nextExpandedCols,
-          data.cols,
-          colStablePrefix,
-        );
+        nextExpandedCols = pruneExpandedToStablePrefix({
+          expanded: nextExpandedCols,
+          nodes: data.cols,
+          stablePrefix: colStablePrefix,
+          metricLabelSet: metricLabelSetForDepth,
+        });
       }
       setExpandedRowsState(nextExpandedRows);
       setExpandedColsState(nextExpandedCols);
@@ -1605,10 +1500,6 @@ function PivotTableChart(props: PivotTableProps) {
     setFetchedColKeys(nextFetchedColKeys);
     loadingCountsRef.current = new Map();
     setLoadingKeys(new Set());
-    autoFetchAttemptsRef.current = {
-      rows: new Map(),
-      cols: new Map(),
-    };
     prevAutoExpandRowsRef.current = resolvedExpandRowsLevel;
     prevAutoExpandColsRef.current = resolvedExpandColumnsLevel;
   }, [
@@ -3164,11 +3055,14 @@ function PivotTableChart(props: PivotTableProps) {
     visibleColsBase,
   ]);
   const getVisibleExpansionKeys = useCallback(
-    (nextRows: Set<string>, nextCols: Set<string>) => {
-      const visibleRowsBaseOverride = buildVisibleRows({
-        rows: treeRef.current.rows,
+    (nextRows: Set<string>, nextCols: Set<string>) =>
+      getVisibleExpansionKeysBase({
+        rowsNodes: treeRef.current.rows,
+        colsNodes: treeRef.current.cols,
         expandedRows: nextRows,
+        expandedCols: nextCols,
         rowSorter,
+        colSorter,
         skipRowRoot,
         showRowRoot,
         rowTotalPosition: resolvedRowTotalPosition,
@@ -3180,63 +3074,24 @@ function PivotTableChart(props: PivotTableProps) {
             nextRows,
             treeRef.current.rows,
           ),
-      });
-      const visibleRowsOverride = shouldHideMetricGrandTotalsOnRows
-        ? visibleRowsBaseOverride.filter(row => !isMetricGrandTotalNode(row))
-        : visibleRowsBaseOverride;
-      const buildColLeavesWithSubtotalsOverride = createColLeavesBuilder({
+        skipColRoot,
+        countDimDepth,
+        normalizedColSubtotalLevels,
+        showColRoot,
+        colTotals,
+        colTotalPosition: resolvedColTotalPosition,
+        resolvedColSubtotalPosition: effectiveColSubtotalPosition,
         getColChildren: parent =>
           getColChildrenForNodes(parent, treeRef.current.cols),
         getCollapsedColLeaves: parent =>
           getCollapsedColLeavesForNodes(parent, nextCols, treeRef.current.cols),
-        colSorter,
-        countDimDepth,
-        expandedCols: nextCols,
-        normalizedColSubtotalLevels,
-        showColRoot,
-        colTotals,
-        resolvedColTotalPosition,
-        resolvedColSubtotalPosition: effectiveColSubtotalPosition,
         isMetricGrandTotalNode,
         isMetricSubtotalNode,
-      });
-      const visibleColsBaseOverride = buildVisibleCols({
-        cols: treeRef.current.cols,
-        skipColRoot,
-        colSorter,
-        getColChildren: parent =>
-          getColChildrenForNodes(parent, treeRef.current.cols),
-        buildColLeavesWithSubtotals: buildColLeavesWithSubtotalsOverride,
-      });
-      let visibleColsOverride = shouldHideMetricGrandTotalsOnCols
-        ? visibleColsBaseOverride.filter(col => !isMetricGrandTotalNode(col))
-        : visibleColsBaseOverride;
-      if (shouldSuppressColRoot) {
-        const hasMetricLeaves = visibleColsOverride.some(col =>
-          col.path.some(val => isMetricTokenValue(val)),
-        );
-        if (hasMetricLeaves) {
-          const withoutRoot = visibleColsOverride.filter(
-            col => col.key !== rootKey,
-          );
-          visibleColsOverride =
-            withoutRoot.length > 0 ? withoutRoot : visibleColsOverride;
-        }
-      }
-      const visibleColKeys = new Set<string>();
-      visibleColsOverride.forEach(col => {
-        for (let idx = 0; idx <= col.path.length; idx += 1) {
-          const key = serializePath(col.path.slice(0, idx));
-          if (treeRef.current.cols[key]) {
-            visibleColKeys.add(key);
-          }
-        }
-      });
-      return {
-        rows: new Set(visibleRowsOverride.map(row => row.key)),
-        cols: visibleColKeys,
-      };
-    },
+        isMetricTokenValue,
+        shouldHideMetricGrandTotalsOnRows,
+        shouldHideMetricGrandTotalsOnCols,
+        shouldSuppressColRoot,
+      }),
     [
       colSorter,
       colTotals,
@@ -3249,8 +3104,8 @@ function PivotTableChart(props: PivotTableProps) {
       isMetricGrandTotalNode,
       isMetricSubtotalNode,
       isMetricTokenValue,
-      normalizedColSubtotalLevels,
       resolvedColTotalPosition,
+      normalizedColSubtotalLevels,
       resolvedRowTotalPosition,
       rowSorter,
       shouldHideMetricGrandTotalsOnCols,
@@ -3335,7 +3190,9 @@ function PivotTableChart(props: PivotTableProps) {
   useEffect(() => {
     if (visibleRowDepth > lastVisibleRowDepthRef.current) {
       lastVisibleRowDepthRef.current = visibleRowDepth;
-      setFetchedColKeys(new Map());
+      const nextFetched = new Map<string, number>();
+      fetchedColKeysRef.current = nextFetched;
+      setFetchedColKeys(nextFetched);
     } else {
       lastVisibleRowDepthRef.current = visibleRowDepth;
     }
@@ -3343,7 +3200,9 @@ function PivotTableChart(props: PivotTableProps) {
   useEffect(() => {
     if (visibleColDepth > lastVisibleColDepthRef.current) {
       lastVisibleColDepthRef.current = visibleColDepth;
-      setFetchedRowKeys(new Map());
+      const nextFetched = new Map<string, number>();
+      fetchedRowKeysRef.current = nextFetched;
+      setFetchedRowKeys(nextFetched);
     } else {
       lastVisibleColDepthRef.current = visibleColDepth;
     }
@@ -3384,234 +3243,156 @@ function PivotTableChart(props: PivotTableProps) {
     async (
       axis: 'row' | 'col',
       expanded: Set<string>,
-      nodes: Record<string, PivotTreeNode>,
-    ): Promise<{ didLoadData: boolean; hasMissingNodes: boolean }> => {
+      _nodes: Record<string, PivotTreeNode>,
+    ): Promise<FetchExpandedBranchesResult> => {
+      const requestEpoch = dataEpochRef.current;
       if (expanded.size <= 1) {
-        return { didLoadData: false, hasMissingNodes: false };
+        return {
+          didLoadData: false,
+          hasMissingNodes: false,
+          hasPendingTargets: false,
+        };
       }
+
       const requiredDepth = axis === 'row' ? visibleColDepth : visibleRowDepth;
-      const fetchMap =
-        axis === 'row'
-          ? autoFetchAttemptsRef.current.rows
-          : autoFetchAttemptsRef.current.cols;
       const fetchedKeysRef =
         axis === 'row' ? fetchedRowKeysRef : fetchedColKeysRef;
       const markFetched =
         axis === 'row' ? setFetchedRowKeys : setFetchedColKeys;
+      const inFlightMap =
+        axis === 'row'
+          ? inFlightBranchFetchesRef.current.row
+          : inFlightBranchFetchesRef.current.col;
+
+      let didLoadData = false;
+      let nextError: string | undefined;
+
       const autoExpandDepth =
         axis === 'row'
           ? autoExpandFetchDepthRef.current.rows
           : autoExpandFetchDepthRef.current.cols;
       const currentAutoExpandLevel =
         axis === 'row' ? resolvedExpandRowsLevel : resolvedExpandColumnsLevel;
-      const hasExpandedBeyondAutoExpand =
-        currentAutoExpandLevel > 0 &&
-        Array.from(expanded).some(key => {
-          if (key === rootKey) {
-            return false;
-          }
-          const node = nodes[key];
-          const path = node ? node.path : parsePath(key);
-          return countDimDepth(path) > currentAutoExpandLevel;
-        });
-      const satisfiedAutoExpandLevel =
-        axis === 'row'
-          ? autoExpandSatisfiedRef.current.rows
-          : autoExpandSatisfiedRef.current.cols;
-      const inFlightAutoExpandLevel =
-        axis === 'row'
-          ? autoExpandInFlightRef.current.rows
-          : autoExpandInFlightRef.current.cols;
+
       if (
-        inFlightAutoExpandLevel !== undefined &&
-        inFlightAutoExpandLevel === currentAutoExpandLevel &&
-        !hasExpandedBeyondAutoExpand
+        autoExpandDepth !== undefined &&
+        autoExpandDepth === currentAutoExpandLevel
       ) {
-        return { didLoadData: false, hasMissingNodes: false };
-      }
-      if (
-        satisfiedAutoExpandLevel !== undefined &&
-        satisfiedAutoExpandLevel === currentAutoExpandLevel
-      ) {
-        if (!hasExpandedBeyondAutoExpand) {
-          return { didLoadData: false, hasMissingNodes: false };
-        }
-      }
-      if (autoExpandDepth !== undefined) {
-        if (autoExpandDepth !== currentAutoExpandLevel) {
-          if (axis === 'row') {
-            autoExpandFetchDepthRef.current.rows = undefined;
-          } else {
-            autoExpandFetchDepthRef.current.cols = undefined;
-          }
+        if (axis === 'row') {
+          autoExpandFetchDepthRef.current.rows = undefined;
         } else {
+          autoExpandFetchDepthRef.current.cols = undefined;
+        }
+        const cached = peekPivotBranchCache({
+          axis,
+          path: [],
+          metricPath: [],
+          formData: fetchFormData,
+          maxDepthPerFetch: autoExpandDepth,
+          currentTree: treeRef.current,
+          visibleRowDepth,
+          visibleColDepth,
+        });
+        if (cached) {
+          didLoadData = true;
+          setErrorMessage(undefined);
+          applyTreeUpdate(current => mergeTrees(current, cached));
           if (axis === 'row') {
-            autoExpandFetchDepthRef.current.rows = undefined;
+            autoExpandSatisfiedRef.current.rows = autoExpandDepth;
           } else {
-            autoExpandFetchDepthRef.current.cols = undefined;
+            autoExpandSatisfiedRef.current.cols = autoExpandDepth;
           }
-          const hasDeeperExpandedNodes = hasExpandedBeyondAutoExpand;
-          const cached = peekPivotBranchCache({
-            axis,
-            path: [],
-            metricPath: [],
-            formData: fetchFormData,
-            maxDepthPerFetch: autoExpandDepth,
-            currentTree: treeRef.current,
-            visibleRowDepth,
-            visibleColDepth,
+          const nextFetched = new Map(fetchedKeysRef.current);
+          expanded.forEach(key => {
+            nextFetched.set(key, requiredDepth);
           });
-          if (cached) {
-            if (axis === 'row') {
-              autoExpandSatisfiedRef.current.rows = autoExpandDepth;
-            } else {
-              autoExpandSatisfiedRef.current.cols = autoExpandDepth;
-            }
-            if (!hasDeeperExpandedNodes) {
-              shouldAutoFetchRef.current = false;
-              prefetchFromPersistenceRef.current = false;
-            }
-            expanded.forEach(key => {
-              fetchMap.set(key, requiredDepth);
-            });
-            setErrorMessage(undefined);
-            applyTreeUpdate(current => mergeTrees(current, cached));
-            markFetched(prev => {
-              const next = new Map(prev);
-              expanded.forEach(key => {
-                next.set(key, requiredDepth);
-              });
-              return next;
-            });
-            return {
-              didLoadData: hasDeeperExpandedNodes,
-              hasMissingNodes: false,
-            };
-          }
-          let didLoadData = false;
-          let nextError: string | undefined;
-          updateLoadingKey(rootKey, 1);
-          if (axis === 'row') {
-            autoExpandInFlightRef.current.rows = autoExpandDepth;
-          } else {
-            autoExpandInFlightRef.current.cols = autoExpandDepth;
+          fetchedKeysRef.current = nextFetched;
+          markFetched(nextFetched);
+        } else {
+          const inFlightKey = `${requestEpoch}:${requiredDepth}:${rootKey}:auto`;
+          const existingPromise = inFlightMap.get(inFlightKey);
+          const requestPromise =
+            existingPromise ||
+            (async (): Promise<FetchPivotBranchResult | undefined> => {
+              updateLoadingKey(rootKey, 1);
+              if (axis === 'row') {
+                autoExpandInFlightRef.current.rows = autoExpandDepth;
+              } else {
+                autoExpandInFlightRef.current.cols = autoExpandDepth;
+              }
+              try {
+                return await fetchPivotBranch({
+                  axis,
+                  path: [],
+                  metricPath: [],
+                  formData: fetchFormData,
+                  maxDepthPerFetch: autoExpandDepth,
+                  currentTree: treeRef.current,
+                  visibleRowDepth,
+                  visibleColDepth,
+                });
+              } finally {
+                updateLoadingKey(rootKey, -1);
+                if (axis === 'row') {
+                  autoExpandInFlightRef.current.rows = undefined;
+                } else {
+                  autoExpandInFlightRef.current.cols = undefined;
+                }
+                inFlightMap.delete(inFlightKey);
+              }
+            })();
+          if (!existingPromise) {
+            inFlightMap.set(inFlightKey, requestPromise);
           }
           try {
-            const result = await fetchPivotBranch({
-              axis,
-              path: [],
-              metricPath: [],
-              formData: fetchFormData,
-              maxDepthPerFetch: autoExpandDepth,
-              currentTree: treeRef.current,
-              visibleRowDepth,
-              visibleColDepth,
-            });
-            if (result.error) {
+            const result = await requestPromise;
+            if (result?.error) {
               nextError = result.error.message;
             }
-            if (result.data) {
+            if (result?.data) {
               didLoadData = true;
+              setErrorMessage(undefined);
+              applyTreeUpdate(current => mergeTrees(current, result.data));
               if (axis === 'row') {
                 autoExpandSatisfiedRef.current.rows = autoExpandDepth;
               } else {
                 autoExpandSatisfiedRef.current.cols = autoExpandDepth;
               }
-              if (!hasDeeperExpandedNodes) {
-                shouldAutoFetchRef.current = false;
-                prefetchFromPersistenceRef.current = false;
-              }
+              const nextFetched = new Map(fetchedKeysRef.current);
               expanded.forEach(key => {
-                fetchMap.set(key, requiredDepth);
+                nextFetched.set(key, requiredDepth);
               });
-              applyTreeUpdate(current => mergeTrees(current, result.data));
+              fetchedKeysRef.current = nextFetched;
+              markFetched(nextFetched);
             }
           } finally {
-            updateLoadingKey(rootKey, -1);
-            if (axis === 'row') {
-              autoExpandInFlightRef.current.rows = undefined;
-            } else {
-              autoExpandInFlightRef.current.cols = undefined;
-            }
+            // handled by requestPromise finally
           }
-          if (didLoadData) {
-            setErrorMessage(undefined);
-            markFetched(prev => {
-              const next = new Map(prev);
-              expanded.forEach(key => {
-                next.set(key, requiredDepth);
-              });
-              return next;
-            });
-          } else if (nextError) {
-            setErrorMessage(nextError);
-          }
-          return {
-            didLoadData: hasDeeperExpandedNodes && didLoadData,
-            hasMissingNodes: false,
-          };
         }
       }
-      let hasMissingNodes = false;
-      const expandedNodes = Array.from(expanded)
-        .filter(key => key !== rootKey)
-        .map(key => {
-          const node = nodes[key];
-          if (!node) {
-            hasMissingNodes = true;
-            const path = parsePath(key);
-            const dimDepth = countDimDepth(path);
-            const groupbyLength =
-              axis === 'row' ? groupbyRows.length : groupbyColumns.length;
-            const isSubtotal = path.some(val => isSubtotalToken(val));
-            return {
-              axis,
-              key,
-              path,
-              label: String(path[path.length - 1] ?? ''),
-              formattedLabel: String(path[path.length - 1] ?? ''),
-              level: path.length,
-              hasChildren: !isSubtotal && dimDepth < groupbyLength,
-              isSubtotal,
-            } as PivotTreeNode;
-          }
-          return node;
-        })
-        .filter((node): node is PivotTreeNode => !!node && node.hasChildren)
-        .sort((a, b) => a.path.length - b.path.length);
-      const nodesToFetch: PivotTreeNode[] = [];
-      const branchesByNode = new Map<string, PivotTreeData>();
-      const nodesToMark = new Set<string>();
-      let didLoadData = false;
-      let nextError: string | undefined;
-      const registerBranch = (nodeKey: string, incoming: PivotTreeData) => {
-        branchesByNode.set(nodeKey, incoming);
-        didLoadData = true;
-      };
 
-      expandedNodes.forEach(node => {
-        if (!expanded.has(node.key)) {
-          return;
-        }
-        if (fetchMap.get(node.key) === requiredDepth) {
-          return;
-        }
-        const fetchedDepth = fetchedKeysRef.current.get(node.key);
-        const loaded = hasLoadedChildren(axis, node);
-        if (loaded) {
-          fetchMap.set(node.key, requiredDepth);
-          nodesToMark.add(node.key);
-          return;
-        }
-        if (fetchedDepth === requiredDepth) {
-          fetchMap.set(node.key, requiredDepth);
-          return;
-        }
-        fetchMap.set(node.key, requiredDepth);
+      const plan = planHydrationForAxis({
+        axis,
+        expandedKeys: expanded,
+        nodes: axis === 'row' ? treeRef.current.rows : treeRef.current.cols,
+        requiredDepth,
+        fetchedDepthByKey: fetchedKeysRef.current,
+        hasLoadedChildren,
+      });
+
+      const branchesByKey = new Map<string, PivotTreeData>();
+      const targetsToFetch: Array<{ key: string; path: PivotPath }> = [];
+      const keysToMark = new Set<string>();
+
+      plan.fetchKeys.forEach(key => {
+        const node = (
+          axis === 'row' ? treeRef.current.rows : treeRef.current.cols
+        )[key];
+        const path = node ? node.path : parsePath(key);
         const cached = peekPivotBranchCache({
           axis,
-          path: getFetchPath(node.path),
-          metricPath: node.path,
+          path: getFetchPath(path),
+          metricPath: path,
           formData: fetchFormData,
           maxDepthPerFetch,
           currentTree: treeRef.current,
@@ -3619,87 +3400,126 @@ function PivotTableChart(props: PivotTableProps) {
           visibleColDepth,
         });
         if (cached) {
-          registerBranch(node.key, cached);
-          nodesToMark.add(node.key);
+          branchesByKey.set(key, cached);
+          keysToMark.add(key);
+          didLoadData = true;
         } else {
-          nodesToFetch.push(node);
+          targetsToFetch.push({ key, path });
         }
       });
 
-      if (nodesToFetch.length > 0) {
+      if (targetsToFetch.length > 0) {
         const results = await Promise.all(
-          nodesToFetch.map(async node => {
-            updateLoadingKey(node.key, 1);
-            try {
-              const result = await fetchPivotBranch({
-                axis,
-                path: getFetchPath(node.path),
-                metricPath: node.path,
-                formData: fetchFormData,
-                maxDepthPerFetch,
-                currentTree: treeRef.current,
-                visibleRowDepth,
-                visibleColDepth,
-              });
-              return { node, result };
-            } finally {
-              updateLoadingKey(node.key, -1);
+          targetsToFetch.map(async target => {
+            const inFlightKey = `${requestEpoch}:${requiredDepth}:${target.key}`;
+            const existingPromise = inFlightMap.get(inFlightKey);
+            const requestPromise =
+              existingPromise ||
+              (async (): Promise<FetchPivotBranchResult | undefined> => {
+                updateLoadingKey(target.key, 1);
+                try {
+                  return await fetchPivotBranch({
+                    axis,
+                    path: getFetchPath(target.path),
+                    metricPath: target.path,
+                    formData: fetchFormData,
+                    maxDepthPerFetch,
+                    currentTree: treeRef.current,
+                    visibleRowDepth,
+                    visibleColDepth,
+                  });
+                } finally {
+                  updateLoadingKey(target.key, -1);
+                  inFlightMap.delete(inFlightKey);
+                }
+              })();
+            if (!existingPromise) {
+              inFlightMap.set(inFlightKey, requestPromise);
             }
+            const result = await requestPromise;
+            return { target, result };
           }),
         );
-        results.forEach(({ node, result }) => {
-          nodesToMark.add(node.key);
-          if (result.error && !nextError) {
+        if (requestEpoch !== dataEpochRef.current) {
+          return {
+            didLoadData: false,
+            hasMissingNodes: false,
+            hasPendingTargets: false,
+          };
+        }
+        results.forEach(({ target, result }) => {
+          if (result?.error && !nextError) {
             nextError = result.error.message;
           }
-          if (result.data) {
-            registerBranch(node.key, result.data);
+          keysToMark.add(target.key);
+          if (result?.data) {
+            branchesByKey.set(target.key, result.data);
+            didLoadData = true;
           }
         });
       }
 
-      if (nodesToMark.size > 0) {
-        markFetched(prev => {
-          const next = new Map(prev);
-          nodesToMark.forEach(key => {
-            next.set(key, requiredDepth);
-          });
-          return next;
-        });
+      if (requestEpoch !== dataEpochRef.current) {
+        return {
+          didLoadData: false,
+          hasMissingNodes: false,
+          hasPendingTargets: false,
+        };
       }
 
-      if (didLoadData) {
-        setErrorMessage(undefined);
-      } else if (nextError) {
+      if (nextError) {
         setErrorMessage(nextError);
+      } else if (didLoadData) {
+        setErrorMessage(undefined);
       }
 
-      if (branchesByNode.size === 0) {
-        return { didLoadData, hasMissingNodes };
+      if (branchesByKey.size > 0) {
+        applyTreeUpdate(current => {
+          let merged = current;
+          branchesByKey.forEach(branch => {
+            merged = mergeTrees(merged, branch);
+          });
+          branchesByKey.forEach((branch, key) => {
+            const currentNodes = axis === 'row' ? merged.rows : merged.cols;
+            const node = currentNodes[key];
+            if (!node) {
+              return;
+            }
+            if (axis === 'row') {
+              merged = pruneCollapsedMetricRows(merged, node, expanded);
+              merged = pruneStaleCollapsedRows(merged, node, branch);
+              return;
+            }
+            merged = pruneCollapsedMetricCols(merged, node, expanded);
+            merged = pruneStaleCollapsedCols(merged, node, branch);
+          });
+          return merged;
+        });
       }
 
-      applyTreeUpdate(current => {
-        let merged = current;
-        branchesByNode.forEach(branch => {
-          merged = mergeTrees(merged, branch);
+      if (keysToMark.size > 0) {
+        const nextFetched = new Map(fetchedKeysRef.current);
+        keysToMark.forEach(key => {
+          nextFetched.set(key, requiredDepth);
         });
-        branchesByNode.forEach((branch, key) => {
-          const currentNodes = axis === 'row' ? merged.rows : merged.cols;
-          const node = currentNodes[key] ?? nodes[key];
-          if (!node) {
-            return;
-          }
-          if (axis === 'row') {
-            merged = pruneCollapsedMetricRows(merged, node, expanded);
-            merged = pruneStaleCollapsedRows(merged, node, branch);
-            return;
-          }
-          merged = pruneCollapsedMetricCols(merged, node, expanded);
-          merged = pruneStaleCollapsedCols(merged, node, branch);
-        });
-        return merged;
+        fetchedKeysRef.current = nextFetched;
+        markFetched(nextFetched);
+      }
+
+      const finalPlan = planHydrationForAxis({
+        axis,
+        expandedKeys: expanded,
+        nodes: axis === 'row' ? treeRef.current.rows : treeRef.current.cols,
+        requiredDepth,
+        fetchedDepthByKey: fetchedKeysRef.current,
+        hasLoadedChildren,
       });
-      return { didLoadData, hasMissingNodes };
+
+      return {
+        didLoadData,
+        hasMissingNodes: plan.hasMissingNodes || finalPlan.hasMissingNodes,
+        hasPendingTargets: finalPlan.pendingKeys.size > 0,
+      };
     },
     [
       applyTreeUpdate,
@@ -3721,63 +3541,27 @@ function PivotTableChart(props: PivotTableProps) {
       visibleRowDepth,
     ],
   );
-  useEffect(() => {
-    if (!shouldAutoFetchRef.current && !prefetchFromPersistenceRef.current) {
-      return undefined;
-    }
-    let cancelled = false;
-    const maxIterations =
-      Math.max(groupbyRows.length, groupbyColumns.length) + 2;
-    const runIteration = async (iteration: number): Promise<void> => {
-      if (cancelled || iteration >= maxIterations) {
-        return;
-      }
-      const prefetchRows = prefetchRowsRef.current;
-      const prefetchCols = prefetchColsRef.current;
-      const currentExpandedRows = prefetchFromPersistenceRef.current
-        ? new Set([...expandedRowsRef.current, ...prefetchRows])
-        : expandedRowsRef.current;
-      const currentExpandedCols = prefetchFromPersistenceRef.current
-        ? new Set([...expandedColsRef.current, ...prefetchCols])
-        : expandedColsRef.current;
-      const [rowResult, colResult] = await Promise.all([
-        fetchExpandedBranches('row', currentExpandedRows, treeRef.current.rows),
-        fetchExpandedBranches('col', currentExpandedCols, treeRef.current.cols),
-      ]);
-      if (cancelled) {
-        return;
-      }
-      const didLoadData = rowResult.didLoadData || colResult.didLoadData;
-      if (!didLoadData) {
-        return;
-      }
-      await runIteration(iteration + 1);
-    };
-    const run = async (): Promise<void> => {
-      await runIteration(0);
-      if (!cancelled) {
-        shouldAutoFetchRef.current = false;
-        prefetchFromPersistenceRef.current = false;
-      }
-    };
-    run().catch(error => {
-      if (cancelled) {
-        return;
-      }
-      const message = error instanceof Error ? error.message : String(error);
-      setErrorMessage(message);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [
+  const { isHydrating } = usePivotHydration({
     expandedRows,
     expandedCols,
+    expandedRowsRef,
+    expandedColsRef,
+    prefetchRowsRef,
+    prefetchColsRef,
+    prefetchFromPersistenceRef,
+    shouldAutoFetchRef,
+    treeRef,
     fetchExpandedBranches,
-    groupbyColumns.length,
-    groupbyRows.length,
-    persistedExpansionState,
-  ]);
+    groupbyRowsLength: groupbyRows.length,
+    groupbyColumnsLength: groupbyColumns.length,
+    onError: message => setErrorMessage(message),
+    onFinish: () => {
+      shouldAutoFetchRef.current = false;
+      prefetchFromPersistenceRef.current = false;
+    },
+  });
+  const showGlobalLoader =
+    isHydrating && prefetchFromPersistenceRef.current === true;
   const getColumnDisplayPath = useCallback(
     (col: PivotTreeNode, maxDepth: number) => {
       if (
@@ -4267,6 +4051,13 @@ function PivotTableChart(props: PivotTableProps) {
       nextManualCollapsed.delete(node.key);
       manualCollapsedRef.current = nextManualCollapsed;
 
+      const requestEpoch = dataEpochRef.current;
+      const abortIfStale = () => {
+        if (requestEpoch !== dataEpochRef.current) {
+          throw STALE_PIVOT_REQUEST;
+        }
+      };
+
       let rootLoading = false;
       const beginRootLoading = () => {
         if (rootLoading) {
@@ -4364,6 +4155,7 @@ function PivotTableChart(props: PivotTableProps) {
               visibleRowDepth,
               visibleColDepth,
             });
+            abortIfStale();
             if (result.error) {
               setErrorMessage(result.error.message);
             }
@@ -4421,6 +4213,7 @@ function PivotTableChart(props: PivotTableProps) {
               visibleRowDepth,
               visibleColDepth,
             });
+            abortIfStale();
             if (result.error) {
               setErrorMessage(result.error.message);
             }
@@ -4436,6 +4229,7 @@ function PivotTableChart(props: PivotTableProps) {
             }
           }
         }
+        abortIfStale();
         if (axis === 'row') {
           let prunedTree = pruneCollapsedMetricRows(nextTree, node, expanded);
           prunedTree = pruneStaleCollapsedRows(prunedTree, node, fetchedBranch);
@@ -4452,6 +4246,7 @@ function PivotTableChart(props: PivotTableProps) {
             commitTree(prunedTree);
           }
         }
+        abortIfStale();
         const next = new Set(expandedRowsRef.current);
         const nextFull = new Set(fullyExpandedRowsRef.current);
         if (axis === 'col') {
@@ -4573,11 +4368,17 @@ function PivotTableChart(props: PivotTableProps) {
             await fetchBranchForNode(rowNode);
           }, Promise.resolve());
         }
+        abortIfStale();
         updateExpanded(next);
         updateFullExpanded(nextFull);
         const nextRows = axis === 'row' ? next : expandedRowsRef.current;
         const nextCols = axis === 'col' ? next : expandedColsRef.current;
         persistExpansionState(nextRows, nextCols);
+      } catch (error) {
+        if (error === STALE_PIVOT_REQUEST) {
+          return;
+        }
+        throw error;
       } finally {
         finishRootLoading();
       }
@@ -5484,7 +5285,7 @@ function PivotTableChart(props: PivotTableProps) {
   return (
     <Container height={height} width={width} style={containerStyle}>
       {errorMessage && <div>{t('Error loading branch: %s', errorMessage)}</div>}
-      {isPrefetching ? (
+      {showGlobalLoader ? (
         <Loading />
       ) : (
         <StyledTable

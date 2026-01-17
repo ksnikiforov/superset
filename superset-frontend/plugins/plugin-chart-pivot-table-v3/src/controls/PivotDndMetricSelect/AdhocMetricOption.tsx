@@ -28,10 +28,12 @@ import {
 import OptionControlLabel from './OptionControlLabel';
 
 type SavedMetric = savedMetricType & { error_text?: string };
-type AdhocMetricPopoverDatasource =
-  ComponentProps<typeof AdhocMetricPopoverTrigger>['datasource'];
-type AdhocMetricPopoverColumns =
-  ComponentProps<typeof AdhocMetricPopoverTrigger>['columns'];
+type AdhocMetricPopoverDatasource = ComponentProps<
+  typeof AdhocMetricPopoverTrigger
+>['datasource'];
+type AdhocMetricPopoverColumns = ComponentProps<
+  typeof AdhocMetricPopoverTrigger
+>['columns'];
 
 type AdhocMetricOptionProps = {
   adhocMetric: AdhocMetric;

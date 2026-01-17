@@ -312,7 +312,9 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
     });
 
-    const orderPriorityRow = getByText('1-URGENT').closest('tr') as HTMLTableRowElement;
+    const orderPriorityRow = getByText('1-URGENT').closest(
+      'tr',
+    ) as HTMLTableRowElement;
     fireEvent.click(within(orderPriorityRow).getByLabelText('plus-square'));
 
     await waitFor(() => {
@@ -529,7 +531,9 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
       expect(within(tbody).getByText(/^O$/)).toBeInTheDocument();
     });
 
-    const rows = Array.from(tbody.querySelectorAll<HTMLElement>('tr')) as HTMLElement[];
+    const rows = Array.from(
+      tbody.querySelectorAll<HTMLElement>('tr'),
+    ) as HTMLElement[];
     const getIndent = (row: HTMLElement) =>
       Number.parseInt(
         (row.querySelector('div') as HTMLElement)?.style.paddingLeft || '0',
@@ -701,7 +705,9 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
     });
 
-    const orderPriorityRow = getByText('1-URGENT').closest('tr') as HTMLTableRowElement;
+    const orderPriorityRow = getByText('1-URGENT').closest(
+      'tr',
+    ) as HTMLTableRowElement;
     fireEvent.click(within(orderPriorityRow).getByLabelText('plus-square'));
 
     await waitFor(() => {
@@ -1050,7 +1056,9 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
     );
 
     const tbody = container.querySelector('tbody') as HTMLElement;
-    const orderPriorityRow = getByText('1-URGENT').closest('tr') as HTMLTableRowElement;
+    const orderPriorityRow = getByText('1-URGENT').closest(
+      'tr',
+    ) as HTMLTableRowElement;
     const initialRows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));
     const metricRow = initialRows
       .slice(initialRows.indexOf(orderPriorityRow) + 1)
@@ -1259,7 +1267,9 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
     );
 
     const tbody = container.querySelector('tbody') as HTMLElement;
-    const urgentRow = getByText('1-URGENT').closest('tr') as HTMLTableRowElement;
+    const urgentRow = getByText('1-URGENT').closest(
+      'tr',
+    ) as HTMLTableRowElement;
     const firstRows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));
     const urgentMetricRow = firstRows
       .slice(firstRows.indexOf(urgentRow) + 1)
@@ -1486,7 +1496,9 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
     );
 
     const tbody = container.querySelector('tbody') as HTMLElement;
-    const orderPriorityRow = getByText('1-URGENT').closest('tr') as HTMLTableRowElement;
+    const orderPriorityRow = getByText('1-URGENT').closest(
+      'tr',
+    ) as HTMLTableRowElement;
     const initialRows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));
     const metricRow = initialRows
       .slice(initialRows.indexOf(orderPriorityRow) + 1)

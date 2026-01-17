@@ -100,8 +100,7 @@ export default function TestPivotTableChart(props: TestPivotTableChartProps) {
     ...baseProps,
     ...props,
     formData: props.formData ?? baseProps.formData,
-    rawFormData:
-      props.rawFormData ?? props.formData ?? baseProps.rawFormData,
+    rawFormData: props.rawFormData ?? props.formData ?? baseProps.rawFormData,
     datasource: props.datasource ?? baseProps.datasource,
     rawDatasource: props.rawDatasource ?? baseProps.rawDatasource,
     hooks: { ...baseProps.hooks, ...(props.hooks ?? {}) },

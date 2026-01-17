@@ -799,9 +799,8 @@ export async function fetchPivotBranch({
       branchWithMetrics,
       ensureIsArray(formData.metrics),
     );
-    const merged = mergeTrees(currentTree, labeledBranch);
-    touchCache(cacheKey, merged);
-    return { data: merged };
+    touchCache(cacheKey, labeledBranch);
+    return { data: labeledBranch };
   } catch (error) {
     return { error: error as Error };
   }
