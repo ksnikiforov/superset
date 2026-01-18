@@ -1151,6 +1151,7 @@ function PivotTableChart(props: PivotTableProps) {
   const hadSessionExpansionRef = useRef(false);
   const skipExpansionResetRef = useRef<PivotTreeData | null>(null);
   const shouldAutoFetchRef = useRef(false);
+  const hasManualToggleRef = useRef(false);
   const prefetchFromPersistenceRef = useRef(false);
   const prefetchRowsRef = useRef<string[]>([]);
   const prefetchColsRef = useRef<string[]>([]);
@@ -3239,6 +3240,115 @@ function PivotTableChart(props: PivotTableProps) {
       visibleRowDepth,
     ],
   );
+
+  const shouldGateCrossAxisReveal =
+    prefetchFromPersistenceRef.current === false &&
+    hasManualToggleRef.current === true &&
+    explicitExpandedRowsRef.current.size > 0 &&
+    explicitExpandedColsRef.current.size > 0;
+  const pendingRowKeysForRender = useMemo(() => {
+    if (!shouldGateCrossAxisReveal) {
+      return new Set<string>();
+    }
+    return planHydrationForAxis({
+      axis: 'row',
+      expandedKeys: expandedRows,
+      nodes: tree.rows,
+      requiredDepth: visibleColDepth,
+      fetchedDepthByKey: fetchedRowKeys,
+      hasLoadedChildren,
+    }).pendingKeys;
+  }, [
+    expandedRows,
+    fetchedRowKeys,
+    shouldGateCrossAxisReveal,
+    hasLoadedChildren,
+    tree.rows,
+    visibleColDepth,
+  ]);
+  const pendingColKeysForRender = useMemo(() => {
+    if (!shouldGateCrossAxisReveal) {
+      return new Set<string>();
+    }
+    return planHydrationForAxis({
+      axis: 'col',
+      expandedKeys: expandedCols,
+      nodes: tree.cols,
+      requiredDepth: visibleRowDepth,
+      fetchedDepthByKey: fetchedColKeys,
+      hasLoadedChildren,
+    }).pendingKeys;
+  }, [
+    expandedCols,
+    fetchedColKeys,
+    shouldGateCrossAxisReveal,
+    hasLoadedChildren,
+    tree.cols,
+    visibleRowDepth,
+  ]);
+  const displayedRows = useMemo(() => {
+    if (!shouldGateCrossAxisReveal || pendingRowKeysForRender.size === 0) {
+      return visibleRows;
+    }
+    const pendingPaths = Array.from(pendingRowKeysForRender)
+      .filter(key => key !== rootKey)
+      .map(key => tree.rows[key]?.path ?? parsePath(key));
+    if (pendingPaths.length === 0) {
+      return visibleRows;
+    }
+    return visibleRows.filter(node => {
+      if (node.key === rootKey) {
+        return true;
+      }
+      return !pendingPaths.some(path => {
+        if (path.length >= node.path.length) {
+          return false;
+        }
+        return path.every((val, idx) => val === node.path[idx]);
+      });
+    });
+  }, [
+    pendingRowKeysForRender,
+    shouldGateCrossAxisReveal,
+    tree.rows,
+    visibleRows,
+  ]);
+  const displayedCols = useMemo(() => {
+    if (!shouldGateCrossAxisReveal || pendingColKeysForRender.size === 0) {
+      return visibleCols;
+    }
+    const pendingPaths = Array.from(pendingColKeysForRender)
+      .filter(key => key !== rootKey)
+      .map(key => tree.cols[key]?.path ?? parsePath(key));
+    if (pendingPaths.length === 0) {
+      return visibleCols;
+    }
+    return visibleCols.filter(node => {
+      if (node.key === rootKey) {
+        return true;
+      }
+      return !pendingPaths.some(path => {
+        if (path.length >= node.path.length) {
+          return false;
+        }
+        return path.every((val, idx) => val === node.path[idx]);
+      });
+    });
+  }, [
+    pendingColKeysForRender,
+    shouldGateCrossAxisReveal,
+    tree.cols,
+    visibleCols,
+  ]);
+  const showRowSpinner = useCallback(
+    (key: string) => loadingKeys.has(key) || pendingRowKeysForRender.has(key),
+    [loadingKeys, pendingRowKeysForRender],
+  );
+  const showColSpinner = useCallback(
+    (key: string) => loadingKeys.has(key) || pendingColKeysForRender.has(key),
+    [loadingKeys, pendingColKeysForRender],
+  );
+
   const fetchExpandedBranches = useCallback(
     async (
       axis: 'row' | 'col',
@@ -3610,8 +3720,8 @@ function PivotTableChart(props: PivotTableProps) {
     ],
   );
   const columnHeaderRows = useMemo(
-    () => buildColumnHeaderRows(visibleCols, tree.cols, getColumnDisplayPath),
-    [getColumnDisplayPath, visibleCols, tree.cols],
+    () => buildColumnHeaderRows(displayedCols, tree.cols, getColumnDisplayPath),
+    [displayedCols, getColumnDisplayPath, tree.cols],
   );
   useLayoutEffect(() => {
     if (!resolvedStickyHeaders) {
@@ -3991,6 +4101,7 @@ function PivotTableChart(props: PivotTableProps) {
       if (!shouldShowToggle(axis, node)) {
         return;
       }
+      hasManualToggleRef.current = true;
       const expanded =
         axis === 'row' ? expandedRowsRef.current : expandedColsRef.current;
       const updateExpanded =
@@ -4371,6 +4482,18 @@ function PivotTableChart(props: PivotTableProps) {
         abortIfStale();
         updateExpanded(next);
         updateFullExpanded(nextFull);
+        // Manual expansions can race across axes (e.g. expand a row, then a column).
+        // The first branch response often lacks "intersection" cells for the other
+        // axis' deeper level. When BOTH axes have active expansions, enable the
+        // hydration loop to reconcile any missing opposite-axis depth in a follow-up
+        // fetch (without showing the global loader, which is reserved for persisted
+        // prefetch).
+        if (
+          expandedRowsRef.current.size > 1 &&
+          expandedColsRef.current.size > 1
+        ) {
+          shouldAutoFetchRef.current = true;
+        }
         const nextRows = axis === 'row' ? next : expandedRowsRef.current;
         const nextCols = axis === 'col' ? next : expandedColsRef.current;
         persistExpansionState(nextRows, nextCols);
@@ -5365,7 +5488,7 @@ function PivotTableChart(props: PivotTableProps) {
                             </ToggleButton>
                           )}
                           <span>{formatLabel(cell.node, 'col')}</span>
-                          {loadingKeys.has(cell.node.key) && <Spinner />}
+                          {showColSpinner(cell.node.key) && <Spinner />}
                         </ColumnHeaderCell>
                       </th>
                     );
@@ -5375,7 +5498,7 @@ function PivotTableChart(props: PivotTableProps) {
             )}
           </thead>
           <tbody>
-            {visibleRows.map(row => {
+            {displayedRows.map(row => {
               const showToggle = shouldShowToggle('row', row);
               const rowAggregateBold = isRowAggregateBold(row);
               const isSubtotalHeader = rowAggregateBold;
@@ -5422,10 +5545,10 @@ function PivotTableChart(props: PivotTableProps) {
                         </ToggleButton>
                       ) : null}
                       <span>{formatLabel(row, 'row')}</span>
-                      {loadingKeys.has(row.key) && <Spinner />}
+                      {showRowSpinner(row.key) && <Spinner />}
                     </HeaderCell>
                   </th>
-                  {visibleCols.map(col => {
+                  {displayedCols.map(col => {
                     const cellKey = serializeCellKey(row.key, col.key);
                     const cell = tree.cells[cellKey];
                     const metricKey = deriveMetricKey(row, col);

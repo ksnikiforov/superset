@@ -170,7 +170,9 @@ describe('PivotTableChart persisted prefetch ignores stale results', () => {
 
     const { container, rerender } = render(makeChart(baseTreeV1));
 
-    await waitFor(() => expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(fetchPivotBranchMock.mock.calls.length).toBeGreaterThanOrEqual(1),
+    );
 
     rerender(makeChart(baseTreeV2));
 

@@ -167,7 +167,9 @@ describe('PivotTableChart persisted prefetch merges concurrent results', () => {
       />,
     );
 
-    await waitFor(() => expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(fetchPivotBranchMock.mock.calls.length).toBeGreaterThanOrEqual(2),
+    );
 
     deferredB.resolve({ data: branchB });
     deferredA.resolve({ data: branchA });

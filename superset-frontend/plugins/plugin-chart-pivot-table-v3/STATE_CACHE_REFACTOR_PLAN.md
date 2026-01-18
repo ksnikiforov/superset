@@ -312,6 +312,8 @@ Note: dashboards persist expansion state in `ownState` (not `formData`), so Opti
   - **Persisted prefetch stale-response guard**: `test/plugin/PivotTableChart/prefetch.epoch.test.tsx`.
   - **Persisted prefetch concurrent merge**: `test/plugin/PivotTableChart/prefetch.concurrent-merge.test.tsx`.
   - **Persisted prefetch satisfied-targets + loader coverage**: `test/plugin/PivotTableChart/prefetch.satisfied-targets.test.tsx`.
+  - **Cross-axis concurrent manual expands (out-of-order resolves)**: `test/plugin/expand/PivotTableChart.expand.cross-axis.concurrent.test.tsx`.
+  - **Cross-axis no-blanks (defer reveal while top-up pending)**: `test/plugin/expand/PivotTableChart.expand.cross-axis.no-blanks.test.tsx`.
 
 - Still recommended (not yet implemented):
   - **Overlap overwrite test**: craft two different branch responses that both include the same `cellKey` but with disjoint `values` keys, and assert `mergeTrees` results keep the union. This is the most direct way to catch “values disappear due to overwrite” if future changes regress merge semantics.

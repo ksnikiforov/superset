@@ -45,10 +45,25 @@ const isSatisfiedNode = ({
   if (!node.hasChildren) {
     return true;
   }
-  if (hasLoadedChildren(axis, node)) {
+  if (requiredDepth === 0 && hasLoadedChildren(axis, node)) {
     return true;
   }
-  return fetchedDepthByKey.get(key) === requiredDepth;
+  const fetchedDepth = fetchedDepthByKey.get(key);
+  if (fetchedDepth === requiredDepth) {
+    return true;
+  }
+  // Children being present is not sufficient when `requiredDepth` represents the
+  // visible opposite-axis depth (the branch might still be missing intersection
+  // cells). Only consider it satisfied if we also have a recorded fetched depth
+  // that meets/exceeds the current requirement.
+  if (
+    fetchedDepth !== undefined &&
+    fetchedDepth >= requiredDepth &&
+    hasLoadedChildren(axis, node)
+  ) {
+    return true;
+  }
+  return false;
 };
 
 const resolveNearestPresentAncestorKey = (

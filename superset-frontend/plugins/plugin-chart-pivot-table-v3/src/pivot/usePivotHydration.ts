@@ -81,7 +81,13 @@ export const usePivotHydration = ({
   }, [fetchExpandedBranches]);
 
   useEffect(() => {
-    if (!shouldAutoFetchRef.current && !prefetchFromPersistenceRef.current) {
+    const hasCrossAxisExpansions =
+      expandedRowsRef.current.size > 1 && expandedColsRef.current.size > 1;
+    if (
+      !shouldAutoFetchRef.current &&
+      !prefetchFromPersistenceRef.current &&
+      !hasCrossAxisExpansions
+    ) {
       return undefined;
     }
     let cancelled = false;
