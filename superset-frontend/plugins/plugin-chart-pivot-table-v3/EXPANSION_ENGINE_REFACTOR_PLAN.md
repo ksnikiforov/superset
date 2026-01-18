@@ -16,7 +16,7 @@ Notes for implementers:
 - New `.ts`/`.tsx` files must include the ASF license header.
 - Quality gates:
   - tests: `npm test plugins/plugin-chart-pivot-table-v3`
-  - lint: `npx lint plugins/plugin-chart-pivot-table-v3`
+  - lint should be run from superst-forntend folder: `npx eslint plugins/plugin-chart-pivot-table-v3`
 
 ## 0) Why this refactor exists
 
