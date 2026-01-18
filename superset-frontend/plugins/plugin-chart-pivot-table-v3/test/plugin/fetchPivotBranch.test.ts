@@ -573,10 +573,10 @@ describe('resolveFetchContext', () => {
     const queryNames = queries.map((q: any) => q.query_name);
     expect(queryNames).toEqual(
       expect.arrayContaining([
-        `${formatQueryName(3, 2)}|branch:row:${serializePath(['USA'])}`,
-        `${formatQueryName(3, 1)}|branch:row:${serializePath(['USA'])}`,
         `${formatQueryName(2, 2)}|branch:row:${serializePath(['USA'])}`,
         `${formatQueryName(2, 1)}|branch:row:${serializePath(['USA'])}`,
+        `${formatQueryName(1, 2)}|branch:row:${serializePath(['USA'])}`,
+        `${formatQueryName(1, 1)}|branch:row:${serializePath(['USA'])}`,
       ]),
     );
   });
@@ -646,7 +646,6 @@ describe('resolveFetchContext', () => {
       path: ['A'],
       currentTree,
       visibleColDepth: 2,
-      maxDepthPerFetch: 1,
     });
 
     expect(postMock).toHaveBeenCalledTimes(1);
@@ -949,7 +948,6 @@ describe('resolveFetchContext', () => {
       path: ['A'],
       currentTree,
       visibleColDepth: 0,
-      maxDepthPerFetch: 1,
     });
 
     const queries =
@@ -1126,7 +1124,6 @@ describe('fetchPivotBranch delta-only contract', () => {
       rowSubTotals: false,
       datasource: '1__table',
       viz_type: 'pivot_table_v3',
-      maxDepthPerFetch: 1,
     });
 
     const currentTree = buildMetricFirstColumnTree([{ r1: 'Z', m1: 999 }]);
@@ -1136,7 +1133,6 @@ describe('fetchPivotBranch delta-only contract', () => {
       axis: 'row',
       path: ['A'],
       currentTree,
-      maxDepthPerFetch: 1,
     });
 
     const unrelatedRowKey = serializePath(['Z']);
@@ -1167,7 +1163,6 @@ describe('fetchPivotBranch delta-only contract', () => {
       rowSubTotals: false,
       datasource: '1__table',
       viz_type: 'pivot_table_v3',
-      maxDepthPerFetch: 1,
     });
 
     const firstResult = await fetchPivotBranch({
@@ -1175,7 +1170,6 @@ describe('fetchPivotBranch delta-only contract', () => {
       axis: 'row',
       path: ['A'],
       currentTree: buildMetricFirstColumnTree([{ r1: 'Z', m1: 999 }]),
-      maxDepthPerFetch: 1,
     });
     expect(firstResult.cached).not.toBe(true);
 
@@ -1186,7 +1180,6 @@ describe('fetchPivotBranch delta-only contract', () => {
       axis: 'row',
       path: ['A'],
       currentTree: buildMetricFirstColumnTree([{ r1: 'Y', m1: 888 }]),
-      maxDepthPerFetch: 1,
     });
 
     expect(secondResult.cached).toBe(true);

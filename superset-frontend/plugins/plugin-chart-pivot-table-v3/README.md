@@ -36,7 +36,7 @@ import PivotTableV3ChartPlugin from '@superset-ui/plugin-chart-pivot-table-v3';
 new PivotTableV3ChartPlugin().configure({ key: 'pivot_table_v3' }).register();
 ```
 
-Key form fields: `groupbyRows`, `groupbyColumns`, `metrics`, `aggregateFunction`, `expandRowsLevel`, `expandColumnsLevel`, `expansionState`, `rowTotals`, `colTotals`, `rowSubTotals`, `colSubTotals`, `rowOrder`, `colOrder`, `valueFormat`, `dateFormat`, `currencyFormat`, `allowRenderHtml`, `metricsLayout`, `combineMetric`.
+Key form fields: `groupbyRows`, `groupbyColumns`, `metrics`, `aggregateFunction`, `expandRowsLevel`, `expandColumnsLevel`, `rowTotals`, `colTotals`, `rowSubTotals`, `rowSubtotalLevels`, `colSubtotalLevels`, `rowOrder`, `colOrder`, `valueFormat`, `dateFormat`, `currencyFormat`, `allowRenderHtml`, `metricsLayout`, `combineMetric`.
 
 ### Structure
 

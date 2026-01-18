@@ -20,21 +20,16 @@
 import { AdhocMetricSQL } from '@superset-ui/core';
 import buildQuery, { formatQueryName } from '../../src/buildQuery';
 import { MetricsLayoutEnum } from '../../src/types';
-import {
-  METRICS_PLACEHOLDER,
-  PATH_DIVIDER,
-  serializePath,
-} from '../../src/utils';
+import { METRICS_PLACEHOLDER, PATH_DIVIDER } from '../../src/utils';
 import { buildFormData } from './fixtures/pivotFormData';
 
 const baseFormData = buildFormData({
   groupbyRows: ['row1', 'row2'],
   groupbyColumns: ['col1', 'col2'],
   metrics: ['metric1'],
-  rowTotals: false,
   colTotals: false,
+  rowTotals: false,
   rowSubTotals: false,
-  colSubTotals: false,
   startCollapsed: false,
   initialDepth: 2,
   datasource: '5__table',
@@ -46,7 +41,6 @@ const baseFormData = buildFormData({
   rowOrder: 'key_a_to_z',
   colOrder: 'key_a_to_z',
   metricsLayout: undefined,
-  legacy_order_by: [],
   order_desc: true,
   verboseMap: {},
   columnFormats: {},
@@ -65,7 +59,7 @@ test('emits multi queries when startCollapsed is true', () => {
   const queryContext = buildQuery({
     ...baseFormData,
     startCollapsed: true,
-    rowTotals: true,
+    colTotals: true,
   });
   expect(queryContext.queries.length).toBeGreaterThan(1);
   const names = queryContext.queries.map(q => q.query_name);
@@ -81,7 +75,7 @@ test('emits column subtotal depth without including grand total level', () => {
       ...baseFormData,
       startCollapsed: true,
       colSubtotalLevels: [1],
-      colTotals: false,
+      rowTotals: false,
     }),
   );
   const names = queryContext.queries.map(q => q.query_name);
@@ -119,78 +113,23 @@ test('requests the first column level on initial collapsed render with multiple 
   expect(names).not.toContain(formatQueryName(1, 0));
 });
 
-test('expands initial row depth to include persisted expansions', () => {
-  const queryContext = buildQuery(
-    buildFormData({
-      ...baseFormData,
-      groupbyRows: ['row1', 'row2', 'row3'],
-      groupbyColumns: ['col1'],
-      startCollapsed: true,
-      initialDepth: 1,
-      expansionState: {
-        rows: [['A'], ['A', 'B'], ['A', 'B', 'C']],
-        cols: [],
-      },
-    }),
-  );
-  const names = queryContext.queries.map(q => q.query_name);
-  expect(names).toEqual([formatQueryName(3, 1)]);
-});
-
-test('expands initial column depth to include persisted expansions', () => {
-  const queryContext = buildQuery(
-    buildFormData({
-      ...baseFormData,
-      groupbyRows: ['row1'],
-      groupbyColumns: ['col1', 'col2', 'col3'],
-      startCollapsed: true,
-      initialDepth: 1,
-      expansionState: {
-        rows: [],
-        cols: [['X'], ['X', 'Y']],
-      },
-    }),
-  );
-  const names = queryContext.queries.map(q => q.query_name);
-  expect(names).toEqual([formatQueryName(1, 2)]);
-});
-
-test('does not overcount expansion depth for escaped path dividers', () => {
+test('ignores expansionState when resolving initial depths', () => {
   const dividerValue = `A${PATH_DIVIDER}B`;
-  const queryContext = buildQuery(
-    buildFormData({
+  const queryContext = buildQuery({
+    ...buildFormData({
       ...baseFormData,
       groupbyRows: ['row1', 'row2', 'row3'],
-      groupbyColumns: [],
+      groupbyColumns: ['col1', 'col2'],
       startCollapsed: true,
       initialDepth: 1,
-      expansionState: {
-        rows: [serializePath([dividerValue])],
-        cols: [],
-      },
     }),
-  );
+    expansionState: {
+      rows: [['A'], ['A', dividerValue], ['A', dividerValue, 'C']],
+      cols: [['X'], ['X', 'Y']],
+    },
+  } as any);
   const names = queryContext.queries.map(q => q.query_name);
-  expect(names).toEqual([formatQueryName(1, 0)]);
-});
-
-test('expands initial depth when expansionState exceeds expand level', () => {
-  const queryContext = buildQuery(
-    buildFormData({
-      ...baseFormData,
-      groupbyRows: ['row1', 'row2', 'row3'],
-      groupbyColumns: [],
-      startCollapsed: true,
-      expandRowsLevel: 1,
-      expandColumnsLevel: 0,
-      expansionState: {
-        rows: [['A'], ['A', 'B'], ['A', 'B', 'C']],
-        cols: [],
-      },
-    }),
-  );
-  const names = queryContext.queries.map(q => q.query_name);
-  expect(names).toEqual([formatQueryName(3, 0)]);
+  expect(names).toEqual([formatQueryName(1, 1)]);
 });
 
 test('includes row subtotal depths when row subtotals are enabled', () => {
@@ -198,7 +137,7 @@ test('includes row subtotal depths when row subtotals are enabled', () => {
     buildFormData({
       ...baseFormData,
       startCollapsed: true,
-      rowTotals: false,
+      colTotals: false,
       rowSubTotals: true,
     }),
   );
@@ -222,8 +161,8 @@ test('limits row subtotal depths to initial visible depth when collapsed', () =>
       metricsLayout: MetricsLayoutEnum.ROWS,
       startCollapsed: true,
       initialDepth: 1,
-      rowTotals: true,
       colTotals: true,
+      rowTotals: true,
       rowSubTotals: true,
     }),
   );
@@ -237,7 +176,7 @@ test('limits row subtotal depths to initial visible depth when collapsed', () =>
   expect(names).not.toContain(formatQueryName(3, 1));
 });
 
-test('includes zero-depth totals when metrics lead rows and column totals are enabled', () => {
+test('includes zero-depth totals when metrics lead rows and row totals are enabled', () => {
   const queryContext = buildQuery(
     buildFormData({
       ...baseFormData,
@@ -247,7 +186,7 @@ test('includes zero-depth totals when metrics lead rows and column totals are en
       metricsLayout: MetricsLayoutEnum.ROWS,
       startCollapsed: true,
       initialDepth: 2,
-      colTotals: true,
+      rowTotals: true,
     }),
   );
   const names = queryContext.queries.map(q => q.query_name);
@@ -376,8 +315,8 @@ test('adds row totals queries when row formatting is enabled without totals', ()
     buildFormData({
       ...baseFormData,
       startCollapsed: false,
-      rowTotals: false,
       colTotals: false,
+      rowTotals: false,
       rowFormatting: {
         row1: {
           backgroundColor: 'row_bg',
@@ -395,8 +334,8 @@ test('adds column totals queries when column formatting is enabled without total
     buildFormData({
       ...baseFormData,
       startCollapsed: false,
-      rowTotals: false,
       colTotals: false,
+      rowTotals: false,
       colFormatting: {
         col1: {
           backgroundColor: 'col_bg',
@@ -414,8 +353,8 @@ test('avoids grand total queries when only formatting requires totals', () => {
     buildFormData({
       ...baseFormData,
       startCollapsed: false,
-      rowTotals: false,
       colTotals: false,
+      rowTotals: false,
       rowFormatting: {
         row1: {
           backgroundColor: 'row_bg',
@@ -437,8 +376,8 @@ test('adds row totals queries when row sorting uses total metric', () => {
     buildFormData({
       ...baseFormData,
       startCollapsed: false,
-      rowTotals: false,
       colTotals: false,
+      rowTotals: false,
       rowSorting: {
         row1: {
           metric: 'metric1',
@@ -458,8 +397,8 @@ test('skips row totals queries when row sorting does not use totals', () => {
     buildFormData({
       ...baseFormData,
       startCollapsed: false,
-      rowTotals: false,
       colTotals: false,
+      rowTotals: false,
       rowSorting: {
         row1: {
           metric: 'metric1',

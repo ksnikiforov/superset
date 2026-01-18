@@ -201,7 +201,7 @@ describe('PivotTableChart column subtotal placement during expansion', () => {
           groupbyColumns: [...colGroupby, METRICS_PLACEHOLDER],
           metricsLayout: MetricsLayoutEnum.COLUMNS,
           metrics,
-          colSubTotals: true,
+          colSubtotalLevels: [1, 2, 3],
           rowSubTotals: true,
           colSubtotalPosition: 'end',
         })}
@@ -213,13 +213,11 @@ describe('PivotTableChart column subtotal placement during expansion', () => {
         height={320}
         startCollapsed
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals
-        colSubTotals
         rowSubtotalLevels={[]}
-        colSubtotalLevels={[]}
+        colSubtotalLevels={[1, 2, 3]}
         rowOrder="key_a_to_z"
         colOrder="key_a_to_z"
         valueFormat=""
@@ -311,10 +309,10 @@ describe('PivotTableChart column subtotal placement during expansion', () => {
           groupbyColumns: [...colGroupby, METRICS_PLACEHOLDER],
           metricsLayout: MetricsLayoutEnum.COLUMNS,
           metrics,
-          colSubTotals: true,
+          colSubtotalLevels: [1, 2, 3],
           rowSubTotals: true,
-          colTotals: true,
-          colTotalPosition: 'end',
+          rowTotals: true,
+          rowTotalPosition: 'end',
         })}
         metrics={metrics}
         groupbyRows={rowGroupby}
@@ -324,13 +322,11 @@ describe('PivotTableChart column subtotal placement during expansion', () => {
         height={320}
         startCollapsed
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
-        colTotals
+        colTotals={false}
+        rowTotals
         rowSubTotals
-        colSubTotals
         rowSubtotalLevels={[]}
-        colSubtotalLevels={[]}
+        colSubtotalLevels={[1, 2, 3]}
         rowOrder="key_a_to_z"
         colOrder="key_a_to_z"
         valueFormat=""

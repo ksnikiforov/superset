@@ -97,11 +97,9 @@ const renderChart = (data: PivotTreeData) =>
         metricsLayout: MetricsLayoutEnum.COLUMNS,
         startCollapsed: true,
         initialDepth: 1,
-        maxDepthPerFetch: 1,
-        rowTotals: false,
         colTotals: false,
+        rowTotals: false,
         rowSubTotals: false,
-        colSubTotals: false,
       })}
       metrics={metrics}
       groupbyRows={rowGroupby}
@@ -111,11 +109,9 @@ const renderChart = (data: PivotTreeData) =>
       height={300}
       startCollapsed
       initialDepth={1}
-      maxDepthPerFetch={1}
-      rowTotals={false}
       colTotals={false}
+      rowTotals={false}
       rowSubTotals={false}
-      colSubTotals={false}
       rowSubtotalLevels={[]}
       colSubtotalLevels={[]}
       rowOrder="key_a_to_z"

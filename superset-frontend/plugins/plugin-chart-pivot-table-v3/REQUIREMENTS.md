@@ -7,7 +7,7 @@ This document summarizes the functional requirements gathered from user feedback
 - **Lazy expansion with collapsed start:** Loads collapsed, fetching deeper data only on expand (`PivotTableChart.tsx` `handleToggle` + `fetchPivotBranch`).
 - **Full-depth fallback when query metadata is missing:** If `query_name` is absent but data exists, infer full groupby depth to populate the tree (`transformProps.ts`).
 - **Branch cache with auto reuse:** Fetched branches are cached; re-expanding uses cached data instantly (`fetchPivotBranch.ts` + cache peek in `PivotTableChart.tsx`).
-- **Fixed fetch depth:** Expansion fetches one level per toggle; `maxDepthPerFetch` is locked to `1` (`transformProps.ts`, `fetchPivotBranch.ts`).
+- **Fixed fetch depth:** Expansion fetches one level per toggle (`transformProps.ts`, `fetchPivotBranch.ts`).
 
 ### Hierarchy & expansion UX
 - **Start collapsed with expand toggles:** Root only expanded; children show toggles. Initial expansion respects `initialDepth`; optional column auto-expand (`autoExpandColumns`) expands all column levels on load (`PivotTableChart.tsx`).
@@ -44,7 +44,7 @@ This document summarizes the functional requirements gathered from user feedback
 - **Type-aware sorting of headers:** Sorting uses column type metadata to sort numeric/temporal values correctly (`sortByOrder`/`compareValues` in `PivotTableChart.tsx`, type map built in `transformProps.ts`).
 
 ### Branch fetching depth
-- **Fixed per-fetch depth:** Branch fetches always advance one level per expand; `maxDepthPerFetch` is fixed to `1` (`transformProps.ts`, `fetchPivotBranch.ts`).
+- **Fixed per-fetch depth:** Branch fetches always advance one level per expand (`transformProps.ts`, `fetchPivotBranch.ts`).
 
 
 ### Interaction & behavior guide (expected)

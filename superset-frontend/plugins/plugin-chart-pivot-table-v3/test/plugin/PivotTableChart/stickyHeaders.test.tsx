@@ -43,15 +43,15 @@ describe('PivotTableChart sticky headers', () => {
           groupbyRows,
           groupbyColumns,
           metrics,
-          rowTotals: true,
-          rowTotalPosition: 'start',
+          colTotals: true,
+          colTotalPosition: 'start',
           stickyHeaders: true,
         })}
         metrics={metrics}
         groupbyRows={groupbyRows}
         groupbyColumns={groupbyColumns}
-        rowTotals
-        rowTotalPosition="start"
+        colTotals
+        colTotalPosition="start"
         stickyHeaders
       />,
     );
@@ -75,15 +75,15 @@ describe('PivotTableChart sticky headers', () => {
           groupbyRows,
           groupbyColumns,
           metrics,
-          rowTotals: true,
-          rowTotalPosition: 'end',
+          colTotals: true,
+          colTotalPosition: 'end',
           stickyHeaders: false,
         })}
         metrics={metrics}
         groupbyRows={groupbyRows}
         groupbyColumns={groupbyColumns}
-        rowTotals
-        rowTotalPosition="end"
+        colTotals
+        colTotalPosition="end"
         stickyHeaders={false}
       />,
     );

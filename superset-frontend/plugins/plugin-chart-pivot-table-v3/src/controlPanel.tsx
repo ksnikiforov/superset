@@ -189,12 +189,6 @@ type ColumnSubtotalOption = {
   label: string;
 };
 
-type SetControlValue = (
-  controlName: string,
-  value: boolean | number[],
-  errors?: string[],
-) => void;
-
 type ColumnSubtotalSelectorProps = {
   name?: string;
   label?: React.ReactNode;
@@ -203,9 +197,7 @@ type ColumnSubtotalSelectorProps = {
   renderTrigger?: boolean;
   value?: number[];
   options: ColumnSubtotalOption[];
-  enabled: boolean;
   onChange?: (value: number[]) => void;
-  setControlValue?: SetControlValue;
 };
 
 const ColumnSubtotalSelector = ({
@@ -216,9 +208,7 @@ const ColumnSubtotalSelector = ({
   renderTrigger,
   value,
   options,
-  enabled,
   onChange,
-  setControlValue,
 }: ColumnSubtotalSelectorProps) => {
   const selectedValues = ensureIsArray<number>(value);
   const allValues = options.map(option => option.value);
@@ -227,27 +217,9 @@ const ColumnSubtotalSelector = ({
   const isIndeterminate =
     selectedValues.length > 0 && selectedValues.length < options.length;
 
-  const setEnabled = (nextEnabled: boolean) => {
-    setControlValue?.('colSubTotals', nextEnabled, []);
-  };
-
   const updateLevels = (nextLevels: number[]) => {
     const next = [...new Set(nextLevels)].sort((a, b) => a - b);
     onChange?.(next);
-    setEnabled(next.length > 0);
-  };
-
-  const handleEnabledChange = (event: CheckboxChangeEvent) => {
-    const nextEnabled = event.target.checked;
-    if (!nextEnabled) {
-      updateLevels([]);
-      return;
-    }
-    if (selectedValues.length === 0) {
-      updateLevels(allValues);
-      return;
-    }
-    setEnabled(true);
   };
 
   const handleSelectAllChange = (event: CheckboxChangeEvent) => {
@@ -272,13 +244,6 @@ const ColumnSubtotalSelector = ({
         renderTrigger={renderTrigger}
       />
       <Space direction="vertical" size="small">
-        <Checkbox
-          checked={enabled}
-          onChange={handleEnabledChange}
-          disabled={!hasOptions}
-        >
-          {t('Show column subtotals')}
-        </Checkbox>
         <Space direction="vertical" size="small">
           <Typography.Text type="secondary">
             {t('Subtotal levels')}
@@ -287,7 +252,7 @@ const ColumnSubtotalSelector = ({
             indeterminate={isIndeterminate}
             checked={allSelected}
             onChange={handleSelectAllChange}
-            disabled={!enabled || !hasOptions}
+            disabled={!hasOptions}
           >
             {t('Select all')}
           </Checkbox>
@@ -298,7 +263,7 @@ const ColumnSubtotalSelector = ({
                   key={option.value}
                   checked={selectedValues.includes(option.value)}
                   onChange={handleOptionChange(option.value)}
-                  disabled={!enabled}
+                  disabled={!hasOptions}
                 >
                   {option.label}
                 </Checkbox>
@@ -519,16 +484,6 @@ const config: ControlPanelConfig = {
             },
           },
         ],
-        [
-          {
-            name: 'expansionState',
-            config: {
-              type: 'HiddenControl',
-              default: null,
-              dontRefreshOnChange: true,
-            },
-          },
-        ],
         ['adhoc_filters'],
         ['series_limit'],
         [
@@ -626,21 +581,23 @@ const config: ControlPanelConfig = {
         ],
         [
           {
-            name: 'rowTotals',
+            name: 'colTotals',
             config: {
               type: 'CheckboxControl',
-              label: t('Row total'),
-              description: t('Show grand total for rows.'),
+              label: t('Column totals'),
+              description: t('Show grand total row for columns.'),
               default: true,
               renderTrigger: true,
             },
           },
           {
-            name: 'rowTotalPosition',
+            name: 'colTotalPosition',
             config: {
               type: 'SelectControl',
-              label: t('Row total position'),
-              description: t('Show the row grand total at the top or bottom.'),
+              label: t('Column total position'),
+              description: t(
+                'Show the column grand total row at the top or bottom.',
+              ),
               clearable: false,
               default: 'start',
               renderTrigger: true,
@@ -702,22 +659,22 @@ const config: ControlPanelConfig = {
         ],
         [
           {
-            name: 'colTotals',
+            name: 'rowTotals',
             config: {
               type: 'CheckboxControl',
-              label: t('Column total'),
-              description: t('Show grand total for columns.'),
+              label: t('Row totals'),
+              description: t('Show grand total column for rows.'),
               default: false,
               renderTrigger: true,
             },
           },
           {
-            name: 'colTotalPosition',
+            name: 'rowTotalPosition',
             config: {
               type: 'SelectControl',
-              label: t('Column total position'),
+              label: t('Row total position'),
               description: t(
-                'Place the grand total column at the start or end.',
+                'Place the grand total column at the front or end.',
               ),
               clearable: false,
               default: 'start',
@@ -726,19 +683,6 @@ const config: ControlPanelConfig = {
                 ['start', t('Front')],
                 ['end', t('End')],
               ],
-            },
-          },
-        ],
-        [
-          {
-            name: 'colSubTotals',
-            config: {
-              type: 'CheckboxControl',
-              label: t('Column subtotals'),
-              description: t('Show subtotals for column groups.'),
-              default: false,
-              renderTrigger: true,
-              hidden: true,
             },
           },
         ],
@@ -754,11 +698,7 @@ const config: ControlPanelConfig = {
               default: [],
               renderTrigger: true,
               shouldMapStateToProps: () => true,
-              mapStateToProps: (
-                state: ControlPanelState & {
-                  actions?: { setControlValue?: SetControlValue };
-                },
-              ) => {
+              mapStateToProps: (state: ControlPanelState) => {
                 const colsRaw = ensureIsArray(
                   state?.controls?.groupbyColumns?.value,
                 ).filter(isQueryFormColumn);
@@ -782,23 +722,15 @@ const config: ControlPanelConfig = {
                 const rawValue = ensureIsArray(
                   state?.controls?.colSubtotalLevels?.value,
                 ).filter((value): value is number => typeof value === 'number');
-                const legacyEnabled =
-                  rawValue.length === 0 &&
-                  !!state?.controls?.colSubTotals?.value;
                 const normalizedValue = normalizeSubtotalLevels(
                   rawValue,
                   maxSubtotalDepth,
                   false,
-                  legacyEnabled,
+                  false,
                 ).filter(level => level > 0 && level <= maxSubtotalDepth);
-                const enabled =
-                  !!state?.controls?.colSubTotals?.value ||
-                  normalizedValue.length > 0;
                 return {
                   options,
                   value: normalizedValue,
-                  enabled,
-                  setControlValue: state?.actions?.setControlValue,
                 };
               },
             },
@@ -946,7 +878,6 @@ const config: ControlPanelConfig = {
       metricsLayout: resolved.layout,
       groupbyRows: resolved.rows,
       groupbyColumns: resolved.cols,
-      maxDepthPerFetch: 1,
     };
   },
 };

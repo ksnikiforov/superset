@@ -169,11 +169,9 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
         height={400}
         startCollapsed
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -338,11 +336,9 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
         height={400}
         startCollapsed
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -608,11 +604,9 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
         height={500}
         startCollapsed
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -850,9 +844,9 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
           groupbyColumns: [...groupbyColumns, METRICS_PLACEHOLDER],
           metricsLayout: MetricsLayoutEnum.COLUMNS,
           metrics,
-          colTotals: true,
-          colSubtotalLevels: [1],
           rowTotals: true,
+          colSubtotalLevels: [1],
+          colTotals: true,
           rowSubTotals: false,
           rowSubtotalLevels: [],
         })}
@@ -864,11 +858,9 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
         height={400}
         startCollapsed
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals
         colTotals
+        rowTotals
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[1]}
         rowOrder="key_a_to_z"
@@ -1041,9 +1033,9 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
           groupbyColumns: [...groupbyColumns, METRICS_PLACEHOLDER],
           metricsLayout: MetricsLayoutEnum.COLUMNS,
           metrics,
-          colTotals: true,
-          colSubtotalLevels: [1],
           rowTotals: true,
+          colSubtotalLevels: [1],
+          colTotals: true,
           rowSubTotals: false,
           rowSubtotalLevels: [],
         })}
@@ -1055,11 +1047,9 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
         height={400}
         startCollapsed
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals
         colTotals
+        rowTotals
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[1]}
         rowOrder="key_a_to_z"
@@ -1259,11 +1249,9 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
           height={500}
           startCollapsed
           initialDepth={1}
-          maxDepthPerFetch={1}
-          rowTotals={false}
           colTotals={false}
+          rowTotals={false}
           rowSubTotals={false}
-          colSubTotals={false}
           rowSubtotalLevels={[]}
           colSubtotalLevels={[]}
           rowOrder="key_a_to_z"
@@ -1395,10 +1383,10 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
           groupbyColumns: [...groupbyColumns, METRICS_PLACEHOLDER],
           metricsLayout: MetricsLayoutEnum.COLUMNS,
           metrics,
-          rowTotals: true,
+          colTotals: true,
           rowSubTotals: false,
           rowSubtotalLevels: [],
-          colTotals: true,
+          rowTotals: true,
           colSubtotalLevels: [1],
         })}
         metrics={metrics}
@@ -1409,11 +1397,9 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
         height={300}
         startCollapsed={false}
         initialDepth={2}
-        maxDepthPerFetch={1}
-        rowTotals
         colTotals
+        rowTotals
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[1]}
         rowOrder="key_a_to_z"

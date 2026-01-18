@@ -73,7 +73,6 @@ export interface FetchPivotBranchParams {
   axis: PivotAxis;
   path: PivotPath;
   metricPath?: PivotPath;
-  maxDepthPerFetch?: number;
   currentTree?: PivotTreeData;
   visibleRowDepth?: number;
   visibleColDepth?: number;
@@ -121,27 +120,10 @@ const stableStringify = (value: unknown): string => {
 
 const getExtraFormData = (
   formData: PivotTableQueryFormData,
-): PivotTableQueryFormData['extra_form_data'] | undefined => {
-  if (formData.extra_form_data) {
-    return formData.extra_form_data;
-  }
-  const candidate = (
-    formData as PivotTableQueryFormData & {
-      extraFormData?: PivotTableQueryFormData['extra_form_data'];
-    }
-  ).extraFormData;
-  return candidate;
-};
+): PivotTableQueryFormData['extra_form_data'] | undefined =>
+  formData.extra_form_data;
 
-const getTimeRange = (formData: PivotTableQueryFormData) => {
-  if (formData.time_range) {
-    return formData.time_range;
-  }
-  const candidate = (
-    formData as PivotTableQueryFormData & { timeRange?: string }
-  ).timeRange;
-  return candidate;
-};
+const getTimeRange = (formData: PivotTableQueryFormData) => formData.time_range;
 
 const buildFilterKey = (formData: PivotTableQueryFormData) =>
   stableStringify({
@@ -240,7 +222,6 @@ const resolveFetchContext = ({
   axis,
   path,
   metricPath,
-  maxDepthPerFetch,
   currentTree,
   visibleRowDepth,
   visibleColDepth,
@@ -366,20 +347,18 @@ const resolveFetchContext = ({
   const rowSubtotalLevels = normalizeSubtotalLevels(
     formData.rowSubtotalLevels,
     maxRowSubtotalDepth,
-    formData.rowTotals,
+    formData.colTotals,
     rowSubTotalsEnabled,
   );
   const maxColSubtotalDepth = Math.max(colGroupby.length - 1, 0);
   const colSubtotalLevelsRaw = ensureIsArray<number>(
     formData.colSubtotalLevels,
   );
-  const colSubtotalsLegacyEnabled =
-    colSubtotalLevelsRaw.length === 0 && !!formData.colSubTotals;
   const colSubtotalLevels = normalizeSubtotalLevels(
     colSubtotalLevelsRaw,
     maxColSubtotalDepth,
     false,
-    colSubtotalsLegacyEnabled,
+    false,
   ).filter(level => level > 0);
 
   const metricInsertIndex =
@@ -406,12 +385,7 @@ const resolveFetchContext = ({
   };
 
   const sanitizedPath = stripMetricFromPath(path, axis, metricIndexInPath);
-  const defaultIncrement = Math.max(
-    formData.maxDepthPerFetch || 0,
-    maxDepthPerFetch || 0,
-  );
-  const depthIncrement =
-    defaultIncrement > 0 ? defaultIncrement : Number.MAX_SAFE_INTEGER;
+  const depthIncrement = 1;
 
   const getCurrentDepth = (
     nodes: Record<string, PivotTreeNode> | undefined,
@@ -467,12 +441,10 @@ const resolveFetchContext = ({
       rowTotals: formData.rowTotals,
       colTotals: formData.colTotals,
       rowSubTotals: formData.rowSubTotals,
-      colSubTotals: formData.colSubTotals,
       rowSubtotalLevels,
       colSubtotalLevels,
       metricsLayoutResolved,
       metricInsertIndex,
-      maxDepthPerFetch,
     },
   );
 
@@ -578,7 +550,6 @@ export async function fetchPivotBranch({
   formData,
   axis,
   path,
-  maxDepthPerFetch,
   currentTree,
   visibleRowDepth,
   visibleColDepth,
@@ -605,7 +576,6 @@ export async function fetchPivotBranch({
     formData,
     axis,
     path,
-    maxDepthPerFetch,
     currentTree,
     visibleRowDepth,
     visibleColDepth,
@@ -695,7 +665,7 @@ export async function fetchPivotBranch({
   const effectiveColLevels = Array.from(
     new Set([
       ...colSubtotalLevels,
-      ...(formData.colTotals ? [0] : []),
+      ...(formData.rowTotals ? [0] : []),
       ...(includeColTotalForRowFormatting ? [0] : []),
     ]),
   ).filter(level => level <= colDepth);
@@ -711,17 +681,17 @@ export async function fetchPivotBranch({
     axis,
     sanitizedPath.length,
   );
-  const hasRowTotals = formData.rowTotals || rowSubtotalLevels.includes(0);
-  const hasColTotals = formData.colTotals;
+  const hasTotalRow = formData.colTotals || rowSubtotalLevels.includes(0);
+  const hasTotalColumn = formData.rowTotals || colSubtotalLevels.includes(0);
   const shouldIncludeGrandTotalPair =
     (rowGroupby.length === 0 && colGroupby.length === 0) ||
-    (hasRowTotals && hasColTotals) ||
+    (hasTotalRow && hasTotalColumn) ||
     (metricsLayoutResolved === MetricsLayoutEnum.ROWS &&
       metricInsertIndex === 0 &&
-      hasColTotals) ||
+      hasTotalColumn) ||
     (metricsLayoutResolved === MetricsLayoutEnum.COLUMNS &&
       metricInsertIndex === 0 &&
-      hasRowTotals);
+      hasTotalRow);
   const filteredQueryPairs = shouldIncludeGrandTotalPair
     ? queryPairs
     : queryPairs.filter(pair => !(pair.rowDepth === 0 && pair.colDepth === 0));

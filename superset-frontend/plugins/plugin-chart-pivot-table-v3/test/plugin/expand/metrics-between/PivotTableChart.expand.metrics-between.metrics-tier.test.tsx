@@ -134,13 +134,11 @@ describe('PivotTableChart expansion with metrics between dimensions (metrics-tie
           metrics,
           metricsLayout: MetricsLayoutEnum.ROWS,
           aggregateFunction: 'Sum',
-          rowTotals: false,
           colTotals: false,
+          rowTotals: false,
           rowSubTotals: false,
-          colSubTotals: false,
           startCollapsed: true,
           initialDepth: 1,
-          maxDepthPerFetch: 1,
           rowOrder: 'key_a_to_z',
           colOrder: 'key_a_to_z',
           viz_type: 'pivot_table_v3',
@@ -157,11 +155,9 @@ describe('PivotTableChart expansion with metrics between dimensions (metrics-tie
         height={300}
         startCollapsed
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -276,13 +272,11 @@ describe('PivotTableChart expansion with metrics between dimensions (metrics-tie
           metrics,
           metricsLayout: MetricsLayoutEnum.ROWS,
           aggregateFunction: 'Sum',
-          rowTotals: false,
           colTotals: false,
+          rowTotals: false,
           rowSubTotals: false,
-          colSubTotals: false,
           startCollapsed: true,
           initialDepth: 1,
-          maxDepthPerFetch: 1,
           rowOrder: 'key_a_to_z',
           colOrder: 'key_a_to_z',
           viz_type: 'pivot_table_v3',
@@ -299,11 +293,9 @@ describe('PivotTableChart expansion with metrics between dimensions (metrics-tie
         height={300}
         startCollapsed
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -380,14 +372,12 @@ describe('PivotTableChart expansion with metrics between dimensions (metrics-tie
           metrics,
           metricsLayout: MetricsLayoutEnum.ROWS,
           aggregateFunction: 'Sum',
-          rowTotals: false,
           colTotals: false,
+          rowTotals: false,
           rowSubTotals: true,
-          colSubTotals: false,
           rowSubtotalLevels,
           startCollapsed: true,
           initialDepth: 1,
-          maxDepthPerFetch: 1,
           rowOrder: 'key_a_to_z',
           colOrder: 'key_a_to_z',
           viz_type: 'pivot_table_v3',
@@ -404,11 +394,9 @@ describe('PivotTableChart expansion with metrics between dimensions (metrics-tie
         height={300}
         startCollapsed
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals
-        colSubTotals={false}
         rowSubtotalLevels={rowSubtotalLevels}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -503,14 +491,12 @@ describe('PivotTableChart expansion with metrics between dimensions (metrics-tie
           metrics,
           metricsLayout: MetricsLayoutEnum.ROWS,
           aggregateFunction: 'Sum',
-          rowTotals: false,
           colTotals: false,
+          rowTotals: false,
           rowSubTotals: true,
-          colSubTotals: false,
           rowSubtotalLevels,
           startCollapsed: true,
           initialDepth: 1,
-          maxDepthPerFetch: 1,
           rowOrder: 'key_a_to_z',
           colOrder: 'key_a_to_z',
           viz_type: 'pivot_table_v3',
@@ -527,11 +513,9 @@ describe('PivotTableChart expansion with metrics between dimensions (metrics-tie
         height={300}
         startCollapsed
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals
-        colSubTotals={false}
         rowSubtotalLevels={rowSubtotalLevels}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -593,14 +577,12 @@ describe('PivotTableChart expansion with metrics between dimensions (metrics-tie
           metrics,
           metricsLayout: MetricsLayoutEnum.ROWS,
           aggregateFunction: 'Sum',
-          rowTotals: false,
           colTotals: false,
+          rowTotals: false,
           rowSubTotals: false,
-          colSubTotals: false,
           rowSubtotalLevels: [],
           startCollapsed: true,
           initialDepth: 1,
-          maxDepthPerFetch: 1,
           rowOrder: 'key_a_to_z',
           colOrder: 'key_a_to_z',
           viz_type: 'pivot_table_v3',
@@ -617,11 +599,9 @@ describe('PivotTableChart expansion with metrics between dimensions (metrics-tie
         height={300}
         startCollapsed
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"

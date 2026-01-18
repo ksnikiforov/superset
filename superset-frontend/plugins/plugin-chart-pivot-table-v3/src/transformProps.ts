@@ -143,20 +143,18 @@ export default function transformProps(
   const rowSubtotalLevels = normalizeSubtotalLevels(
     formData.rowSubtotalLevels,
     maxRowSubtotalDepth,
-    formData.rowTotals,
+    formData.colTotals,
     rowSubTotalsEnabled,
   );
   const maxColSubtotalDepth = Math.max(groupbyColumns.length - 1, 0);
   const colSubtotalLevelsRaw = ensureIsArray<number>(
     formData.colSubtotalLevels,
   );
-  const colSubtotalsLegacyEnabled =
-    colSubtotalLevelsRaw.length === 0 && !!formData.colSubTotals;
   const colSubtotalLevels = normalizeSubtotalLevels(
     colSubtotalLevelsRaw,
     maxColSubtotalDepth,
     false,
-    colSubtotalsLegacyEnabled,
+    false,
   ).filter(level => level > 0);
   const rowTotalPosition =
     (formData.rowTotalPosition as TotalPosition) || 'start';
@@ -168,7 +166,6 @@ export default function transformProps(
     (formData.colSubtotalPosition as TotalPosition) || 'start';
   const pivotTheme = formData.pivotTheme || 'none';
   const pivotThemeColors = formData.pivotThemeColors || '';
-  const maxDepthPerFetch = 1;
   const metricsLayout = placement.layout;
   const metricInsertIndex =
     metricsLayout === MetricsLayoutEnum.ROWS
@@ -184,7 +181,6 @@ export default function transformProps(
   const queryFormData: PivotTableQueryFormData = {
     ...rawFormData,
     metricsLayout,
-    maxDepthPerFetch,
   };
 
   const resolveQueryDepth = (query: (typeof queriesData)[number]) => {
@@ -278,8 +274,7 @@ export default function transformProps(
   );
 
   const metricColorFormatters = getColorFormatters(
-    // @ts-ignore legacy conditional formatting name
-    formData.conditionalFormatting || formData.conditional_formatting,
+    formData.conditional_formatting,
     combinedData,
     theme,
   );
@@ -383,7 +378,6 @@ export default function transformProps(
     formData: {
       ...formData,
       metricsLayout,
-      maxDepthPerFetch,
       treeDataSignature,
     },
     queryFormData,
@@ -398,11 +392,9 @@ export default function transformProps(
     colSorting,
     startCollapsed: formData.startCollapsed ?? true,
     initialDepth: formData.initialDepth ?? 1,
-    maxDepthPerFetch,
     rowTotals: formData.rowTotals,
     colTotals: formData.colTotals,
     rowSubTotals: rowSubTotalsEnabled,
-    colSubTotals: formData.colSubTotals,
     rowSubtotalLevels,
     colSubtotalLevels,
     rowOrder: formData.rowOrder,

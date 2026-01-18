@@ -109,7 +109,9 @@ export class TableRenderer extends Component {
 
     const colSubtotalDisplay = {
       displayOnTop: false,
-      enabled: tableOptions.colSubTotals,
+      enabled:
+        Array.isArray(tableOptions.colSubtotalLevels) &&
+        tableOptions.colSubtotalLevels.length > 0,
       hideOnExpand: false,
       ...subtotalOptions.colSubtotalDisplay,
     };

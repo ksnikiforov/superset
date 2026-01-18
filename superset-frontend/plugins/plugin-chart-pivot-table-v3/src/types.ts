@@ -175,12 +175,9 @@ export interface PivotTableCustomizeProps {
   initialDepth?: number;
   expandRowsLevel?: number;
   expandColumnsLevel?: number;
-  expansionState?: PivotExpansionState;
-  maxDepthPerFetch?: number;
   rowTotals: boolean;
   colTotals: boolean;
   rowSubTotals?: boolean;
-  colSubTotals?: boolean;
   rowSubtotalLevels?: number[];
   colSubtotalLevels?: number[];
   rowOrder: string;
@@ -211,7 +208,6 @@ export type PivotTableQueryFormData = QueryFormData &
     metricColorFormatters: ColorFormatters;
     dateFormatters: Record<string, DateFormatter | undefined>;
     colTypeMap?: Record<string, GenericDataType>;
-    legacy_order_by: QueryFormMetric[] | QueryFormMetric | null;
     order_desc: boolean;
     onContextMenu?: (
       clientX: number,
@@ -246,12 +242,9 @@ export interface PivotTableProps
   initialDepth?: number;
   expandRowsLevel?: number;
   expandColumnsLevel?: number;
-  expansionState?: PivotExpansionState;
-  maxDepthPerFetch?: number;
   rowTotals: boolean;
   colTotals: boolean;
   rowSubTotals?: boolean;
-  colSubTotals?: boolean;
   rowSubtotalLevels?: number[];
   colSubtotalLevels?: number[];
   rowOrder: string;

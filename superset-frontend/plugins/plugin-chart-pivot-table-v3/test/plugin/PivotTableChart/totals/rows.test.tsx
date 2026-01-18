@@ -47,11 +47,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     height: 300,
     startCollapsed: false,
     initialDepth: 2,
-    maxDepthPerFetch: 1,
-    rowTotals: false,
     colTotals: false,
+    rowTotals: false,
     rowSubTotals: false,
-    colSubTotals: false,
     rowSubtotalLevels: [],
     colSubtotalLevels: [],
     rowOrder: 'key_a_to_z',
@@ -173,7 +171,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
       metricsLayout: MetricsLayoutEnum.ROWS,
       metrics: ['metric1'],
       rowSubTotals: true,
-      rowTotals: true,
+      colTotals: true,
       rowSubtotalPosition: 'start',
     };
 
@@ -189,11 +187,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         height={300}
         startCollapsed={false}
         initialDepth={2}
-        maxDepthPerFetch={1}
-        rowTotals
-        colTotals={false}
+        colTotals
+        rowTotals={false}
         rowSubTotals
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -206,9 +202,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         setDataMask={jest.fn()}
         metricColorFormatters={[]}
         dateFormatters={{}}
-        rowTotalPosition="start"
-        colSubtotalPosition="start"
         colTotalPosition="start"
+        colSubtotalPosition="start"
+        rowTotalPosition="start"
       />,
     );
 
@@ -310,11 +306,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         height={300}
         startCollapsed={false}
         initialDepth={3}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals
-        colSubTotals={false}
         rowSubtotalLevels={[1]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -327,9 +321,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         setDataMask={jest.fn()}
         metricColorFormatters={[]}
         dateFormatters={{}}
-        rowTotalPosition="start"
-        colSubtotalPosition="start"
         colTotalPosition="start"
+        colSubtotalPosition="start"
+        rowTotalPosition="start"
         rowSubtotalPosition="end"
       />,
     );
@@ -491,11 +485,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         height={300}
         startCollapsed={false}
         initialDepth={2}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals
-        colSubTotals={false}
         rowSubtotalLevels={[1]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -508,9 +500,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         setDataMask={jest.fn()}
         metricColorFormatters={[]}
         dateFormatters={{}}
-        rowTotalPosition="start"
-        colSubtotalPosition="start"
         colTotalPosition="start"
+        colSubtotalPosition="start"
+        rowTotalPosition="start"
       />,
     );
 
@@ -635,7 +627,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
       metricsLayout: MetricsLayoutEnum.ROWS,
       metrics: ['metric1'],
       rowSubTotals: true,
-      rowTotals: true,
+      colTotals: true,
       rowSubtotalPosition: 'end',
     };
 
@@ -651,11 +643,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         height={300}
         startCollapsed={false}
         initialDepth={2}
-        maxDepthPerFetch={1}
-        rowTotals
-        colTotals={false}
+        colTotals
+        rowTotals={false}
         rowSubTotals
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -668,9 +658,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         setDataMask={jest.fn()}
         metricColorFormatters={[]}
         dateFormatters={{}}
-        rowTotalPosition="start"
-        colSubtotalPosition="start"
         colTotalPosition="start"
+        colSubtotalPosition="start"
+        rowTotalPosition="start"
       />,
     );
 
@@ -834,11 +824,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         height={300}
         startCollapsed
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals
-        colSubTotals={false}
         rowSubtotalLevels={[1]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -851,9 +839,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         setDataMask={jest.fn()}
         metricColorFormatters={[]}
         dateFormatters={{}}
-        rowTotalPosition="start"
-        colSubtotalPosition="start"
         colTotalPosition="start"
+        colSubtotalPosition="start"
+        rowTotalPosition="start"
       />,
     );
 
@@ -956,11 +944,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         height={300}
         startCollapsed={false}
         initialDepth={3}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals
-        colSubTotals={false}
         rowSubtotalLevels={[1]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -973,9 +959,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         setDataMask={jest.fn()}
         metricColorFormatters={[]}
         dateFormatters={{}}
-        rowTotalPosition="start"
-        colSubtotalPosition="start"
         colTotalPosition="start"
+        colSubtotalPosition="start"
+        rowTotalPosition="start"
         rowSubtotalPosition="end"
       />,
     );
@@ -1081,11 +1067,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         height={300}
         startCollapsed={false}
         initialDepth={4}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals
-        colSubTotals={false}
         rowSubtotalLevels={[2]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -1098,9 +1082,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         setDataMask={jest.fn()}
         metricColorFormatters={[]}
         dateFormatters={{}}
-        rowTotalPosition="start"
-        colSubtotalPosition="start"
         colTotalPosition="start"
+        colSubtotalPosition="start"
+        rowTotalPosition="start"
         rowSubtotalPosition="end"
       />,
     );
@@ -1230,11 +1214,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         height={300}
         startCollapsed={false}
         initialDepth={5}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals
-        colSubTotals={false}
         rowSubtotalLevels={[2, 4]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -1247,9 +1229,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         setDataMask={jest.fn()}
         metricColorFormatters={[]}
         dateFormatters={{}}
-        rowTotalPosition="start"
-        colSubtotalPosition="start"
         colTotalPosition="start"
+        colSubtotalPosition="start"
+        rowTotalPosition="start"
         rowSubtotalPosition="start"
       />,
     );
@@ -1355,7 +1337,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
       metricsLayout: MetricsLayoutEnum.ROWS,
       metrics,
       rowSubTotals: true,
-      rowTotals: true,
+      colTotals: true,
       rowSubtotalPosition: 'start',
     };
 
@@ -1371,11 +1353,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         height={400}
         startCollapsed={false}
         initialDepth={3}
-        maxDepthPerFetch={1}
-        rowTotals
-        colTotals={false}
+        colTotals
+        rowTotals={false}
         rowSubTotals
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -1388,9 +1368,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         setDataMask={jest.fn()}
         metricColorFormatters={[]}
         dateFormatters={{}}
-        rowTotalPosition="start"
-        colSubtotalPosition="start"
         colTotalPosition="start"
+        colSubtotalPosition="start"
+        rowTotalPosition="start"
       />,
     );
 
@@ -1483,7 +1463,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
           groupbyColumns: [],
           metricsLayout: MetricsLayoutEnum.ROWS,
           metrics: ['averageOrderValue'],
-          rowTotals: true,
+          colTotals: true,
           rowSubTotals: true,
           rowSubtotalPosition: 'end',
         })}
@@ -1495,11 +1475,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         height={300}
         startCollapsed={false}
         initialDepth={2}
-        maxDepthPerFetch={1}
-        rowTotals
-        colTotals={false}
+        colTotals
+        rowTotals={false}
         rowSubTotals
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -1512,9 +1490,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         setDataMask={jest.fn()}
         metricColorFormatters={[]}
         dateFormatters={{}}
-        rowTotalPosition="start"
-        colSubtotalPosition="start"
         colTotalPosition="start"
+        colSubtotalPosition="start"
+        rowTotalPosition="start"
         rowSubtotalPosition="end"
       />,
     );
@@ -1576,8 +1554,8 @@ describe('PivotTableChart totals & subtotals - rows', () => {
           groupbyColumns: ['shipMode'],
           metricsLayout: MetricsLayoutEnum.ROWS,
           metrics,
-          rowTotals: true,
-          rowTotalPosition: 'end',
+          colTotals: true,
+          colTotalPosition: 'end',
         })}
         metrics={metrics}
         groupbyRows={['orderPriority']}
@@ -1587,11 +1565,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         height={300}
         startCollapsed={false}
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals
-        colTotals={false}
+        colTotals
+        rowTotals={false}
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -1604,9 +1580,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         setDataMask={jest.fn()}
         metricColorFormatters={[]}
         dateFormatters={{}}
-        rowTotalPosition="end"
+        colTotalPosition="end"
         colSubtotalPosition="start"
-        colTotalPosition="start"
+        rowTotalPosition="start"
       />,
     );
 
@@ -1711,8 +1687,8 @@ describe('PivotTableChart totals & subtotals - rows', () => {
               groupbyColumns: ['lineStatus'],
               metricsLayout: MetricsLayoutEnum.ROWS,
               metrics,
-              rowTotals: true,
-              rowTotalPosition: 'end',
+              colTotals: true,
+              colTotalPosition: 'end',
             })}
             metrics={metrics}
             groupbyRows={[
@@ -1727,11 +1703,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
             height={300}
             startCollapsed={false}
             initialDepth={2}
-            maxDepthPerFetch={1}
-            rowTotals
-            colTotals={false}
+            colTotals
+            rowTotals={false}
             rowSubTotals={false}
-            colSubTotals={false}
             rowSubtotalLevels={[]}
             colSubtotalLevels={[]}
             rowOrder="key_a_to_z"
@@ -1744,9 +1718,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
             setDataMask={jest.fn()}
             metricColorFormatters={[]}
             dateFormatters={{}}
-            rowTotalPosition="end"
+            colTotalPosition="end"
             colSubtotalPosition="start"
-            colTotalPosition="start"
+            rowTotalPosition="start"
           />,
         );
 
@@ -1821,8 +1795,8 @@ describe('PivotTableChart totals & subtotals - rows', () => {
           groupbyColumns: ['shipMode'],
           metricsLayout: MetricsLayoutEnum.ROWS,
           metrics,
-          rowTotals: true,
-          rowTotalPosition: 'end',
+          colTotals: true,
+          colTotalPosition: 'end',
         })}
         metrics={metrics}
         groupbyRows={['orderPriority']}
@@ -1832,11 +1806,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         height={300}
         startCollapsed={false}
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals
-        colTotals={false}
+        colTotals
+        rowTotals={false}
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -1849,9 +1821,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         setDataMask={jest.fn()}
         metricColorFormatters={[]}
         dateFormatters={{}}
-        rowTotalPosition="end"
+        colTotalPosition="end"
         colSubtotalPosition="start"
-        colTotalPosition="start"
+        rowTotalPosition="start"
       />,
     );
 
@@ -1943,11 +1915,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         height={300}
         startCollapsed={false}
         initialDepth={3}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals
-        colSubTotals={false}
         rowSubtotalLevels={[1]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -1960,9 +1930,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         setDataMask={jest.fn()}
         metricColorFormatters={[]}
         dateFormatters={{}}
-        rowTotalPosition="start"
-        colSubtotalPosition="start"
         colTotalPosition="start"
+        colSubtotalPosition="start"
+        rowTotalPosition="start"
         rowSubtotalPosition="end"
       />,
     );
@@ -2023,8 +1993,8 @@ describe('PivotTableChart totals & subtotals - rows', () => {
           groupbyColumns: ['shipMode'],
           metricsLayout: MetricsLayoutEnum.ROWS,
           metrics,
-          rowTotals: true,
           colTotals: true,
+          rowTotals: true,
         })}
         metrics={metrics}
         groupbyRows={['orderPriority']}
@@ -2034,11 +2004,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         height={300}
         startCollapsed={false}
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals
         colTotals
+        rowTotals
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -2051,9 +2019,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         setDataMask={jest.fn()}
         metricColorFormatters={[]}
         dateFormatters={{}}
-        rowTotalPosition="start"
+        colTotalPosition="start"
         colSubtotalPosition="start"
-        colTotalPosition="end"
+        rowTotalPosition="end"
       />,
     );
 
@@ -2149,11 +2117,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         height={300}
         startCollapsed={false}
         initialDepth={2}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals
-        colSubTotals={false}
         rowSubtotalLevels={[1]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -2166,9 +2132,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         setDataMask={jest.fn()}
         metricColorFormatters={[]}
         dateFormatters={{}}
-        rowTotalPosition="start"
-        colSubtotalPosition="start"
         colTotalPosition="start"
+        colSubtotalPosition="start"
+        rowTotalPosition="start"
       />,
     );
 
@@ -2496,11 +2462,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         height={300}
         startCollapsed={false}
         initialDepth={3}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals
-        colSubTotals={false}
         rowSubtotalLevels={[1, 2]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -2513,9 +2477,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         setDataMask={jest.fn()}
         metricColorFormatters={[]}
         dateFormatters={{}}
-        rowTotalPosition="start"
-        colSubtotalPosition="start"
         colTotalPosition="start"
+        colSubtotalPosition="start"
+        rowTotalPosition="start"
         rowSubtotalPosition="start"
       />,
     );
@@ -2591,11 +2555,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         height={300}
         startCollapsed={false}
         initialDepth={3}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals
-        colSubTotals={false}
         rowSubtotalLevels={[1, 2]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -2608,9 +2570,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         setDataMask={jest.fn()}
         metricColorFormatters={[]}
         dateFormatters={{}}
-        rowTotalPosition="start"
-        colSubtotalPosition="start"
         colTotalPosition="start"
+        colSubtotalPosition="start"
+        rowTotalPosition="start"
         rowSubtotalPosition="end"
       />,
     );
@@ -2685,11 +2647,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         height={300}
         startCollapsed={false}
         initialDepth={3}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[1, 2]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -2702,9 +2662,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         setDataMask={jest.fn()}
         metricColorFormatters={[]}
         dateFormatters={{}}
-        rowTotalPosition="start"
-        colSubtotalPosition="start"
         colTotalPosition="start"
+        colSubtotalPosition="start"
+        rowTotalPosition="start"
         rowSubtotalPosition="end"
       />,
     );
@@ -2749,11 +2709,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         height={300}
         startCollapsed={false}
         initialDepth={5}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals
-        colSubTotals={false}
         rowSubtotalLevels={[1, 2, 3]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -2766,9 +2724,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         setDataMask={jest.fn()}
         metricColorFormatters={[]}
         dateFormatters={{}}
-        rowTotalPosition="start"
-        colSubtotalPosition="start"
         colTotalPosition="start"
+        colSubtotalPosition="start"
+        rowTotalPosition="start"
         rowSubtotalPosition="start"
       />,
     );
@@ -2843,11 +2801,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         height={300}
         startCollapsed={false}
         initialDepth={5}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals
-        colSubTotals={false}
         rowSubtotalLevels={[1, 2, 3, 5]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -2860,9 +2816,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         setDataMask={jest.fn()}
         metricColorFormatters={[]}
         dateFormatters={{}}
-        rowTotalPosition="start"
-        colSubtotalPosition="start"
         colTotalPosition="start"
+        colSubtotalPosition="start"
+        rowTotalPosition="start"
         rowSubtotalPosition="end"
       />,
     );
@@ -2963,11 +2919,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         height={300}
         startCollapsed={false}
         initialDepth={7}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals
-        colSubTotals={false}
         rowSubtotalLevels={[1, 2, 3, 4, 5]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -2980,9 +2934,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         setDataMask={jest.fn()}
         metricColorFormatters={[]}
         dateFormatters={{}}
-        rowTotalPosition="start"
-        colSubtotalPosition="start"
         colTotalPosition="start"
+        colSubtotalPosition="start"
+        rowTotalPosition="start"
         rowSubtotalPosition="start"
       />,
     );
@@ -3086,11 +3040,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         height={300}
         startCollapsed={false}
         initialDepth={7}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals
-        colSubTotals={false}
         rowSubtotalLevels={[1, 2, 3, 4, 5, 6, 7, 8, 9]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -3103,9 +3055,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         setDataMask={jest.fn()}
         metricColorFormatters={[]}
         dateFormatters={{}}
-        rowTotalPosition="start"
-        colSubtotalPosition="start"
         colTotalPosition="start"
+        colSubtotalPosition="start"
+        rowTotalPosition="start"
         rowSubtotalPosition="end"
       />,
     );
@@ -3241,11 +3193,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         height={300}
         startCollapsed={false}
         initialDepth={3}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals
-        colSubTotals={false}
         rowSubtotalLevels={[1, 2]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -3258,9 +3208,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         setDataMask={jest.fn()}
         metricColorFormatters={[]}
         dateFormatters={{}}
-        rowTotalPosition="start"
-        colSubtotalPosition="start"
         colTotalPosition="start"
+        colSubtotalPosition="start"
+        rowTotalPosition="start"
         rowSubtotalPosition="end"
       />,
     );
@@ -3441,8 +3391,8 @@ describe('PivotTableChart totals & subtotals - rows', () => {
           groupbyColumns: ['c1'],
           metricsLayout: MetricsLayoutEnum.ROWS,
           metrics,
-          rowTotals: true,
-          rowTotalPosition: 'end',
+          colTotals: true,
+          colTotalPosition: 'end',
         })}
         metrics={metrics}
         groupbyRows={['r1', 'r2']}
@@ -3452,11 +3402,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         height={300}
         startCollapsed={false}
         initialDepth={2}
-        maxDepthPerFetch={1}
-        rowTotals
-        colTotals={false}
+        colTotals
+        rowTotals={false}
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -3469,9 +3417,9 @@ describe('PivotTableChart totals & subtotals - rows', () => {
         setDataMask={jest.fn()}
         metricColorFormatters={[]}
         dateFormatters={{}}
-        rowTotalPosition="end"
+        colTotalPosition="end"
         colSubtotalPosition="start"
-        colTotalPosition="start"
+        rowTotalPosition="start"
       />,
     );
 

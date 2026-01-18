@@ -118,11 +118,9 @@ describe('PivotTableChart expansion with metrics between dimensions (column-metr
         height={300}
         startCollapsed
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -176,11 +174,9 @@ describe('PivotTableChart expansion with metrics between dimensions (column-metr
         height={300}
         startCollapsed
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -249,7 +245,7 @@ describe('PivotTableChart expansion with metrics between dimensions (column-metr
           ],
           metricsLayout: MetricsLayoutEnum.COLUMNS,
           metrics,
-          colSubTotals: true,
+          colSubtotalLevels: [1, 2, 3],
         })}
         metrics={metrics}
         groupbyRows={rowGroupby}
@@ -259,13 +255,11 @@ describe('PivotTableChart expansion with metrics between dimensions (column-metr
         height={300}
         startCollapsed
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals={false}
-        colSubTotals
         rowSubtotalLevels={[]}
-        colSubtotalLevels={[]}
+        colSubtotalLevels={[1, 2, 3]}
         rowOrder="key_a_to_z"
         colOrder="key_a_to_z"
         valueFormat=""
@@ -383,11 +377,9 @@ describe('PivotTableChart expansion with metrics between dimensions (column-metr
         height={300}
         startCollapsed
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"

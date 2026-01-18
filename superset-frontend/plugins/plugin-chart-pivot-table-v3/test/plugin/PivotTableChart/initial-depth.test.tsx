@@ -51,11 +51,9 @@ describe('PivotTableChart initial depth on collapsed render', () => {
     height: 300,
     startCollapsed: true,
     initialDepth: 1,
-    maxDepthPerFetch: 1,
-    rowTotals: false,
     colTotals: false,
+    rowTotals: false,
     rowSubTotals: false,
-    colSubTotals: false,
     rowSubtotalLevels: [],
     colSubtotalLevels: [],
     rowOrder: 'key_a_to_z',
@@ -123,11 +121,9 @@ describe('PivotTableChart initial depth on collapsed render', () => {
           height={300}
           startCollapsed
           initialDepth={1}
-          maxDepthPerFetch={1}
-          rowTotals={false}
           colTotals={false}
+          rowTotals={false}
           rowSubTotals={false}
-          colSubTotals={false}
           rowSubtotalLevels={[]}
           colSubtotalLevels={[]}
           rowOrder="key_a_to_z"
@@ -212,11 +208,9 @@ describe('PivotTableChart initial depth on collapsed render', () => {
         height={300}
         startCollapsed
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -318,11 +312,9 @@ describe('PivotTableChart initial depth on collapsed render', () => {
         height={300}
         startCollapsed
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -392,7 +384,7 @@ describe('PivotTableChart initial depth on collapsed render', () => {
             ],
             metricsLayout: MetricsLayoutEnum.COLUMNS,
             metrics,
-            rowTotals: false,
+            colTotals: false,
             rowSubTotals: false,
             rowSubtotalLevels: [],
           })}
@@ -404,11 +396,9 @@ describe('PivotTableChart initial depth on collapsed render', () => {
           height={300}
           startCollapsed
           initialDepth={1}
-          maxDepthPerFetch={1}
-          rowTotals={false}
           colTotals={false}
+          rowTotals={false}
           rowSubTotals={false}
-          colSubTotals={false}
           rowSubtotalLevels={[]}
           colSubtotalLevels={[]}
           rowOrder="key_a_to_z"
@@ -517,7 +507,7 @@ describe('PivotTableChart initial depth on collapsed render', () => {
           metricsLayout: MetricsLayoutEnum.COLUMNS,
           metrics,
           colSubtotalLevels: [0],
-          colTotals: true,
+          rowTotals: true,
         })}
         metrics={metrics}
         groupbyRows={['orderStatus']}
@@ -527,11 +517,9 @@ describe('PivotTableChart initial depth on collapsed render', () => {
         height={200}
         startCollapsed
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
-        colTotals
+        colTotals={false}
+        rowTotals
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[0]}
         rowOrder="key_a_to_z"

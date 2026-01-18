@@ -140,11 +140,9 @@ describe('PivotTableChart expand/collapse count stability', () => {
           metrics,
           startCollapsed: true,
           initialDepth: 1,
-          maxDepthPerFetch: 1,
-          rowTotals: false,
           colTotals: false,
+          rowTotals: false,
           rowSubTotals: false,
-          colSubTotals: false,
         })}
         metrics={metrics}
         groupbyRows={rowGroupby}
@@ -154,11 +152,9 @@ describe('PivotTableChart expand/collapse count stability', () => {
         height={300}
         startCollapsed
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"

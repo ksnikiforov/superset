@@ -155,11 +155,9 @@ describe('PivotTableChart expansion with metrics before dimensions (depth)', () 
           height={300}
           startCollapsed
           initialDepth={1}
-          maxDepthPerFetch={1}
-          rowTotals={false}
           colTotals={false}
+          rowTotals={false}
           rowSubTotals={false}
-          colSubTotals={false}
           rowSubtotalLevels={[]}
           colSubtotalLevels={[]}
           rowOrder="key_a_to_z"
@@ -205,7 +203,7 @@ describe('PivotTableChart expansion with metrics before dimensions (depth)', () 
             groupbyRows: [],
             groupbyColumns,
             metrics: ['m1'],
-            colTotals: false,
+            rowTotals: false,
           })}
           metrics={['m1']}
           groupbyRows={[]}
@@ -215,11 +213,9 @@ describe('PivotTableChart expansion with metrics before dimensions (depth)', () 
           height={300}
           startCollapsed
           initialDepth={1}
-          maxDepthPerFetch={1}
-          rowTotals={false}
           colTotals={false}
+          rowTotals={false}
           rowSubTotals={false}
-          colSubTotals={false}
           rowSubtotalLevels={[]}
           colSubtotalLevels={[]}
           rowOrder="key_a_to_z"

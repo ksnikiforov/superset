@@ -660,7 +660,6 @@ function PivotTableChart(props: PivotTableProps) {
     initialDepth = 1,
     expandRowsLevel: expandRowsLevelProp,
     expandColumnsLevel: expandColumnsLevelProp,
-    maxDepthPerFetch,
     rowOrder,
     colOrder,
     valueFormat,
@@ -678,10 +677,9 @@ function PivotTableChart(props: PivotTableProps) {
     metricsLayout = MetricsLayoutEnum.COLUMNS,
     rowSubtotalLevels = [],
     colSubtotalLevels = [],
-    rowTotals = true,
-    colTotals = false,
+    rowTotals = false,
+    colTotals = true,
     rowSubTotals = false,
-    colSubTotals = false,
     rowTotalPosition = 'start',
     rowSubtotalPosition = 'start',
     colTotalPosition = 'start',
@@ -738,7 +736,6 @@ function PivotTableChart(props: PivotTableProps) {
     ],
   );
   const shouldPersistToFormData = !!setControlValue;
-  const shouldPersistToOwnState = !setControlValue;
   const resolvedMetricsLayout =
     (formData.metricsLayout as MetricsLayoutEnum) || metricsLayout;
   const metricFormattingScope =
@@ -888,10 +885,10 @@ function PivotTableChart(props: PivotTableProps) {
       normalizeSubtotalLevels(
         rowSubtotalLevels,
         Math.max(groupbyRows.length - 1, 0),
-        rowTotals,
+        colTotals,
         rowSubTotals ?? true,
       ),
-    [groupbyRows.length, rowSubTotals, rowSubtotalLevels, rowTotals],
+    [colTotals, groupbyRows.length, rowSubTotals, rowSubtotalLevels],
   );
   const rowSubtotalDepths = useMemo(
     () => normalizedRowSubtotalLevels.filter(level => level > 0),
@@ -902,10 +899,10 @@ function PivotTableChart(props: PivotTableProps) {
       normalizeSubtotalLevels(
         colSubtotalLevels,
         Math.max(groupbyColumns.length - 1, 0),
+        rowTotals,
         false,
-        colSubtotalLevels.length === 0 && colSubTotals,
       ),
-    [colSubtotalLevels, colSubTotals, groupbyColumns.length],
+    [colSubtotalLevels, groupbyColumns.length, rowTotals],
   );
   const metricPlacement = useMemo(
     () =>
@@ -1061,12 +1058,10 @@ function PivotTableChart(props: PivotTableProps) {
         rowTotals,
         colTotals,
         rowSubTotals,
-        colSubTotals,
         expandRowsLevel: resolvedExpandRowsLevel,
         expandColumnsLevel: resolvedExpandColumnsLevel,
       }),
     [
-      colSubTotals,
       colTotals,
       groupbyColumnKeys,
       groupbyRowKeys,
@@ -1096,18 +1091,6 @@ function PivotTableChart(props: PivotTableProps) {
   const explicitExpandedColsRef = useRef<Set<string>>(new Set());
   const explicitCollapsedRowsRef = useRef<Set<string>>(new Set());
   const explicitCollapsedColsRef = useRef<Set<string>>(new Set());
-  const autoExpandFetchDepthRef = useRef<{
-    rows?: number;
-    cols?: number;
-  }>({});
-  const autoExpandSatisfiedRef = useRef<{
-    rows?: number;
-    cols?: number;
-  }>({});
-  const autoExpandInFlightRef = useRef<{
-    rows?: number;
-    cols?: number;
-  }>({});
   const [fullyExpandedRows, setFullyExpandedRows] = useState<Set<string>>(
     new Set(),
   );
@@ -1137,16 +1120,9 @@ function PivotTableChart(props: PivotTableProps) {
   useEffect(() => {
     fetchedColKeysRef.current = fetchedColKeys;
   }, [fetchedColKeys]);
-  const persistedExpansionState = useMemo(
-    () => coerceExpansionStateBase(formData.expansionState),
-    [formData.expansionState],
-  );
   const sessionExpansionState = useMemo(
-    () =>
-      shouldPersistToOwnState
-        ? coerceExpansionStateBase(ownState?.expansionState)
-        : undefined,
-    [ownState?.expansionState, shouldPersistToOwnState],
+    () => coerceExpansionStateBase(ownState?.expansionState),
+    [ownState?.expansionState],
   );
   const hadSessionExpansionRef = useRef(false);
   const skipExpansionResetRef = useRef<PivotTreeData | null>(null);
@@ -1279,48 +1255,8 @@ function PivotTableChart(props: PivotTableProps) {
     const sessionCols = sessionExpansionState?.cols ?? [];
     const sessionCollapsedRows = sessionExpansionState?.collapsedRows ?? [];
     const sessionCollapsedCols = sessionExpansionState?.collapsedCols ?? [];
-    const persistedRows = persistedExpansionState?.rows ?? [];
-    const persistedCols = persistedExpansionState?.cols ?? [];
-    const persistedCollapsedRows = persistedExpansionState?.collapsedRows ?? [];
-    const persistedCollapsedCols = persistedExpansionState?.collapsedCols ?? [];
     const prevAutoExpandRows = prevAutoExpandRowsRef.current;
     const prevAutoExpandCols = prevAutoExpandColsRef.current;
-    if (
-      prevAutoExpandRows !== null &&
-      resolvedExpandRowsLevel !== prevAutoExpandRows
-    ) {
-      autoExpandSatisfiedRef.current.rows = undefined;
-      autoExpandInFlightRef.current.rows = undefined;
-    }
-    if (
-      prevAutoExpandRows !== null &&
-      resolvedExpandRowsLevel > prevAutoExpandRows
-    ) {
-      autoExpandFetchDepthRef.current.rows = resolvedExpandRowsLevel;
-    } else if (
-      prevAutoExpandRows !== null &&
-      resolvedExpandRowsLevel < prevAutoExpandRows
-    ) {
-      autoExpandFetchDepthRef.current.rows = undefined;
-    }
-    if (
-      prevAutoExpandCols !== null &&
-      resolvedExpandColumnsLevel !== prevAutoExpandCols
-    ) {
-      autoExpandSatisfiedRef.current.cols = undefined;
-      autoExpandInFlightRef.current.cols = undefined;
-    }
-    if (
-      prevAutoExpandCols !== null &&
-      resolvedExpandColumnsLevel > prevAutoExpandCols
-    ) {
-      autoExpandFetchDepthRef.current.cols = resolvedExpandColumnsLevel;
-    } else if (
-      prevAutoExpandCols !== null &&
-      resolvedExpandColumnsLevel < prevAutoExpandCols
-    ) {
-      autoExpandFetchDepthRef.current.cols = undefined;
-    }
     const hasSessionExpansion =
       sessionRows.length +
         sessionCols.length +
@@ -1337,21 +1273,14 @@ function PivotTableChart(props: PivotTableProps) {
     commitTree(data);
     setErrorMessage(undefined);
     const shouldApplyExpansionState =
-      shouldResetExpanded ||
-      hasSessionExpansion ||
-      shouldResetFromSession ||
-      !!persistedExpansionState;
+      shouldResetExpanded || hasSessionExpansion || shouldResetFromSession;
     let nextExpandedRows = expandedRowsRef.current;
     let nextExpandedCols = expandedColsRef.current;
     if (shouldApplyExpansionState) {
-      const baseManualRows = hasSessionExpansion ? sessionRows : persistedRows;
-      const baseManualCols = hasSessionExpansion ? sessionCols : persistedCols;
-      const baseManualCollapsedRows = hasSessionExpansion
-        ? sessionCollapsedRows
-        : persistedCollapsedRows;
-      const baseManualCollapsedCols = hasSessionExpansion
-        ? sessionCollapsedCols
-        : persistedCollapsedCols;
+      const baseManualRows = sessionRows;
+      const baseManualCols = sessionCols;
+      const baseManualCollapsedRows = sessionCollapsedRows;
+      const baseManualCollapsedCols = sessionCollapsedCols;
       const shouldClearRowCache =
         resolvedExpandRowsLevel > 0 &&
         (prevAutoExpandRows === null || prevAutoExpandRows === 0) &&
@@ -1404,16 +1333,11 @@ function PivotTableChart(props: PivotTableProps) {
           collapsedCols: shouldClearColCache ? [] : baseManualCollapsedCols,
         };
         skipExpansionResetRef.current = data;
-        if (shouldPersistToOwnState) {
-          setDataMask({
-            ownState: {
-              ...mergeOwnState({ expansionState: nextExpansionState }),
-            },
-          });
-        }
-        if (shouldPersistToFormData && setControlValue) {
-          setControlValue('expansionState', nextExpansionState);
-        }
+        setDataMask({
+          ownState: {
+            ...mergeOwnState({ expansionState: nextExpansionState }),
+          },
+        });
       }
       explicitExpandedRowsRef.current = new Set(
         effectiveManualRows.filter(key => key !== rootKey),
@@ -1512,7 +1436,6 @@ function PivotTableChart(props: PivotTableProps) {
     groupbyRowKeys,
     mergeOwnState,
     metrics,
-    persistedExpansionState,
     resolvedExpandColumnsLevel,
     resolvedExpandRowsLevel,
     sessionExpansionState,
@@ -1526,7 +1449,6 @@ function PivotTableChart(props: PivotTableProps) {
     setFullyExpandedColsState,
     setFullyExpandedRowsState,
     shouldPersistToFormData,
-    shouldPersistToOwnState,
   ]);
 
   const metricLabels = useMemo(
@@ -2096,7 +2018,7 @@ function PivotTableChart(props: PivotTableProps) {
           }
           if (hasNonMetricChildren) {
             if (
-              !rowTotals &&
+              !colTotals &&
               metricLayoutIndexOnRows !== undefined &&
               parent.level < metricLayoutIndexOnRows &&
               metricIndexOnRows === 0
@@ -2241,7 +2163,7 @@ function PivotTableChart(props: PivotTableProps) {
       isMetricGrandTotalNode,
       isMetricSubtotalNode,
       metricsFirstOnRows,
-      rowTotals,
+      colTotals,
       rowSubTotals,
     ],
   );
@@ -2679,8 +2601,7 @@ function PivotTableChart(props: PivotTableProps) {
         (metricLayoutIndexOnCols === undefined ||
           metricLayoutIndexOnCols > parent.level)
       ) {
-        const allowMetricSubtotals =
-          colSubTotals || normalizedColSubtotalLevels.length > 0;
+        const allowMetricSubtotals = normalizedColSubtotalLevels.length > 0;
         const withoutMetrics = children.filter(child => {
           const metricAtLevel = isMetricTokenValue(child.path[parent.level]);
           if (!metricAtLevel) {
@@ -2708,7 +2629,6 @@ function PivotTableChart(props: PivotTableProps) {
       return filtered;
     },
     [
-      colSubTotals,
       groupbyColumns.length,
       metricIndexForCols,
       metricLayoutIndexOnCols,
@@ -2848,10 +2768,10 @@ function PivotTableChart(props: PivotTableProps) {
       groupbyRows.map(getColumnLabel),
     );
     const pushMetricTotalsToEnd =
-      (rowTotals && resolvedRowTotalPosition === 'end') ||
+      (colTotals && resolvedColTotalPosition === 'end') ||
       (rowSubTotals && effectiveRowSubtotalPosition === 'end');
     const pullMetricTotalsToStart =
-      rowTotals && resolvedRowTotalPosition === 'start';
+      colTotals && resolvedColTotalPosition === 'start';
     if (
       !rowSubTotals &&
       !pushMetricTotalsToEnd &&
@@ -2901,8 +2821,8 @@ function PivotTableChart(props: PivotTableProps) {
     isExplicitSubtotalNode,
     isMetricGrandTotalNode,
     rowOrder,
-    rowTotals,
-    resolvedRowTotalPosition,
+    colTotals,
+    resolvedColTotalPosition,
     rowSubTotals,
   ]);
   const colSorter = useMemo(() => {
@@ -2932,13 +2852,13 @@ function PivotTableChart(props: PivotTableProps) {
 
   const showRowRootBase =
     groupbyRows.length > 0 &&
-    (normalizedRowSubtotalLevels.includes(0) || rowTotals);
+    (normalizedRowSubtotalLevels.includes(0) || colTotals);
   const showRowRoot =
     showRowRootBase &&
     !(resolvedMetricsLayout === MetricsLayoutEnum.ROWS && isMultiMetric);
   const showColRoot =
     groupbyColumns.length > 0 &&
-    (normalizedColSubtotalLevels.includes(0) || colTotals || colSubTotals);
+    (normalizedColSubtotalLevels.includes(0) || rowTotals);
 
   const skipRowRoot = groupbyRows.length > 0 && !showRowRoot;
   const skipColRoot = groupbyColumns.length === 0 || !showColRoot;
@@ -2952,7 +2872,7 @@ function PivotTableChart(props: PivotTableProps) {
         rowSorter,
         skipRowRoot,
         showRowRoot,
-        rowTotalPosition: resolvedRowTotalPosition,
+        rowTotalPosition: resolvedColTotalPosition,
         getRowChildren,
         getCollapsedRowChildren,
       }),
@@ -2960,7 +2880,7 @@ function PivotTableChart(props: PivotTableProps) {
       expandedRows,
       getCollapsedRowChildren,
       getRowChildren,
-      resolvedRowTotalPosition,
+      resolvedColTotalPosition,
       rowSorter,
       showRowRoot,
       skipRowRoot,
@@ -2989,15 +2909,15 @@ function PivotTableChart(props: PivotTableProps) {
         expandedCols,
         normalizedColSubtotalLevels,
         showColRoot,
-        colTotals,
-        resolvedColTotalPosition,
+        rowTotals,
+        resolvedColTotalPosition: resolvedRowTotalPosition,
         resolvedColSubtotalPosition: effectiveColSubtotalPosition,
         isMetricGrandTotalNode,
         isMetricSubtotalNode,
       }),
     [
       colSorter,
-      colTotals,
+      rowTotals,
       countDimDepth,
       expandedCols,
       getColChildren,
@@ -3006,7 +2926,7 @@ function PivotTableChart(props: PivotTableProps) {
       isMetricSubtotalNode,
       normalizedColSubtotalLevels,
       effectiveColSubtotalPosition,
-      resolvedColTotalPosition,
+      resolvedRowTotalPosition,
       showColRoot,
     ],
   );
@@ -3066,7 +2986,7 @@ function PivotTableChart(props: PivotTableProps) {
         colSorter,
         skipRowRoot,
         showRowRoot,
-        rowTotalPosition: resolvedRowTotalPosition,
+        rowTotalPosition: resolvedColTotalPosition,
         getRowChildren: parent =>
           getRowChildrenForNodes(parent, treeRef.current.rows),
         getCollapsedRowChildren: parent =>
@@ -3079,8 +2999,8 @@ function PivotTableChart(props: PivotTableProps) {
         countDimDepth,
         normalizedColSubtotalLevels,
         showColRoot,
-        colTotals,
-        colTotalPosition: resolvedColTotalPosition,
+        rowTotals,
+        colTotalPosition: resolvedRowTotalPosition,
         resolvedColSubtotalPosition: effectiveColSubtotalPosition,
         getColChildren: parent =>
           getColChildrenForNodes(parent, treeRef.current.cols),
@@ -3095,7 +3015,7 @@ function PivotTableChart(props: PivotTableProps) {
       }),
     [
       colSorter,
-      colTotals,
+      rowTotals,
       countDimDepth,
       effectiveColSubtotalPosition,
       getCollapsedColLeavesForNodes,
@@ -3105,9 +3025,9 @@ function PivotTableChart(props: PivotTableProps) {
       isMetricGrandTotalNode,
       isMetricSubtotalNode,
       isMetricTokenValue,
-      resolvedColTotalPosition,
-      normalizedColSubtotalLevels,
       resolvedRowTotalPosition,
+      normalizedColSubtotalLevels,
+      resolvedColTotalPosition,
       rowSorter,
       shouldHideMetricGrandTotalsOnCols,
       shouldHideMetricGrandTotalsOnRows,
@@ -3149,38 +3069,20 @@ function PivotTableChart(props: PivotTableProps) {
       explicitCollapsedColsRef.current = new Set(visibleCollapsedCols);
       prefetchRowsRef.current = visibleRows;
       prefetchColsRef.current = visibleCols;
-      if (shouldPersistToOwnState) {
-        setDataMask({
-          ownState: {
-            ...mergeOwnState({
-              expansionState: {
-                rows: visibleRows,
-                cols: visibleCols,
-                collapsedRows: visibleCollapsedRows,
-                collapsedCols: visibleCollapsedCols,
-              },
-            }),
-          },
-        });
-      }
-      if (shouldPersistToFormData && setControlValue) {
-        setControlValue('expansionState', {
-          rows: visibleRows,
-          cols: visibleCols,
-          collapsedRows: visibleCollapsedRows,
-          collapsedCols: visibleCollapsedCols,
-        });
-      }
+      setDataMask({
+        ownState: {
+          ...mergeOwnState({
+            expansionState: {
+              rows: visibleRows,
+              cols: visibleCols,
+              collapsedRows: visibleCollapsedRows,
+              collapsedCols: visibleCollapsedCols,
+            },
+          }),
+        },
+      });
     },
-    [
-      data,
-      getVisibleExpansionKeys,
-      mergeOwnState,
-      setControlValue,
-      setDataMask,
-      shouldPersistToFormData,
-      shouldPersistToOwnState,
-    ],
+    [data, getVisibleExpansionKeys, mergeOwnState, setDataMask],
   );
   const { visibleRowDepth, visibleColDepth } = useMemo(
     () => getVisibleDepths(visibleRows, visibleCols, countDimDepth),
@@ -3377,110 +3279,6 @@ function PivotTableChart(props: PivotTableProps) {
       let didLoadData = false;
       let nextError: string | undefined;
 
-      const autoExpandDepth =
-        axis === 'row'
-          ? autoExpandFetchDepthRef.current.rows
-          : autoExpandFetchDepthRef.current.cols;
-      const currentAutoExpandLevel =
-        axis === 'row' ? resolvedExpandRowsLevel : resolvedExpandColumnsLevel;
-
-      if (
-        autoExpandDepth !== undefined &&
-        autoExpandDepth === currentAutoExpandLevel
-      ) {
-        if (axis === 'row') {
-          autoExpandFetchDepthRef.current.rows = undefined;
-        } else {
-          autoExpandFetchDepthRef.current.cols = undefined;
-        }
-        const cached = peekPivotBranchCache({
-          axis,
-          path: [],
-          metricPath: [],
-          formData: fetchFormData,
-          maxDepthPerFetch: autoExpandDepth,
-          currentTree: treeRef.current,
-          visibleRowDepth,
-          visibleColDepth,
-        });
-        if (cached) {
-          didLoadData = true;
-          setErrorMessage(undefined);
-          applyTreeUpdate(current => mergeTrees(current, cached));
-          if (axis === 'row') {
-            autoExpandSatisfiedRef.current.rows = autoExpandDepth;
-          } else {
-            autoExpandSatisfiedRef.current.cols = autoExpandDepth;
-          }
-          const nextFetched = new Map(fetchedKeysRef.current);
-          expanded.forEach(key => {
-            nextFetched.set(key, requiredDepth);
-          });
-          fetchedKeysRef.current = nextFetched;
-          markFetched(nextFetched);
-        } else {
-          const inFlightKey = `${requestEpoch}:${requiredDepth}:${rootKey}:auto`;
-          const existingPromise = inFlightMap.get(inFlightKey);
-          const requestPromise =
-            existingPromise ||
-            (async (): Promise<FetchPivotBranchResult | undefined> => {
-              updateLoadingKey(rootKey, 1);
-              if (axis === 'row') {
-                autoExpandInFlightRef.current.rows = autoExpandDepth;
-              } else {
-                autoExpandInFlightRef.current.cols = autoExpandDepth;
-              }
-              try {
-                return await fetchPivotBranch({
-                  axis,
-                  path: [],
-                  metricPath: [],
-                  formData: fetchFormData,
-                  maxDepthPerFetch: autoExpandDepth,
-                  currentTree: treeRef.current,
-                  visibleRowDepth,
-                  visibleColDepth,
-                });
-              } finally {
-                updateLoadingKey(rootKey, -1);
-                if (axis === 'row') {
-                  autoExpandInFlightRef.current.rows = undefined;
-                } else {
-                  autoExpandInFlightRef.current.cols = undefined;
-                }
-                inFlightMap.delete(inFlightKey);
-              }
-            })();
-          if (!existingPromise) {
-            inFlightMap.set(inFlightKey, requestPromise);
-          }
-          try {
-            const result = await requestPromise;
-            if (result?.error) {
-              nextError = result.error.message;
-            }
-            if (result?.data) {
-              didLoadData = true;
-              setErrorMessage(undefined);
-              applyTreeUpdate(current => mergeTrees(current, result.data));
-              if (axis === 'row') {
-                autoExpandSatisfiedRef.current.rows = autoExpandDepth;
-              } else {
-                autoExpandSatisfiedRef.current.cols = autoExpandDepth;
-              }
-              const nextFetched = new Map(fetchedKeysRef.current);
-              expanded.forEach(key => {
-                nextFetched.set(key, requiredDepth);
-              });
-              fetchedKeysRef.current = nextFetched;
-              markFetched(nextFetched);
-            }
-          } finally {
-            // handled by requestPromise finally
-          }
-        }
-      }
-
       const plan = planHydrationForAxis({
         axis,
         expandedKeys: expanded,
@@ -3504,7 +3302,6 @@ function PivotTableChart(props: PivotTableProps) {
           path: getFetchPath(path),
           metricPath: path,
           formData: fetchFormData,
-          maxDepthPerFetch,
           currentTree: treeRef.current,
           visibleRowDepth,
           visibleColDepth,
@@ -3533,7 +3330,6 @@ function PivotTableChart(props: PivotTableProps) {
                     path: getFetchPath(target.path),
                     metricPath: target.path,
                     formData: fetchFormData,
-                    maxDepthPerFetch,
                     currentTree: treeRef.current,
                     visibleRowDepth,
                     visibleColDepth,
@@ -3638,7 +3434,6 @@ function PivotTableChart(props: PivotTableProps) {
       hasLoadedChildren,
       groupbyColumns.length,
       groupbyRows.length,
-      maxDepthPerFetch,
       pruneCollapsedMetricCols,
       pruneCollapsedMetricRows,
       pruneStaleCollapsedCols,
@@ -3692,8 +3487,7 @@ function PivotTableChart(props: PivotTableProps) {
         metricsLayout: resolvedMetricsLayout,
         metricsFirstOnCols,
         metricsAtColEnd,
-        allowMetricSubtotalLabels:
-          colSubTotals || normalizedColSubtotalLevels.length > 0,
+        allowMetricSubtotalLabels: normalizedColSubtotalLevels.length > 0,
         hasDeeperNonMetricDescendants,
         metricLabels,
         isExplicitSubtotalNode,
@@ -3710,7 +3504,6 @@ function PivotTableChart(props: PivotTableProps) {
       isMetricGrandTotalNode,
       isMetricSubtotalNode,
       metricLabels,
-      colSubTotals,
       normalizedColSubtotalLevels.length,
       hasDeeperNonMetricDescendants,
       metricsAtColEnd,
@@ -3950,7 +3743,7 @@ function PivotTableChart(props: PivotTableProps) {
         rowSorter,
         skipRowRoot,
         showRowRoot,
-        rowTotalPosition: resolvedRowTotalPosition,
+        rowTotalPosition: resolvedColTotalPosition,
         getRowChildren,
         getCollapsedRowChildren: parent =>
           getCollapsedRowChildren(parent, expanded),
@@ -3979,7 +3772,7 @@ function PivotTableChart(props: PivotTableProps) {
     [
       getCollapsedRowChildren,
       getRowChildren,
-      resolvedRowTotalPosition,
+      resolvedColTotalPosition,
       rowSorter,
       showRowRoot,
       skipRowRoot,
@@ -4233,7 +4026,6 @@ function PivotTableChart(props: PivotTableProps) {
             path: getFetchPath(targetNode.path),
             metricPath: targetNode.path,
             formData: fetchFormData,
-            maxDepthPerFetch,
             currentTree: treeRef.current,
             visibleRowDepth,
             visibleColDepth,
@@ -4261,7 +4053,6 @@ function PivotTableChart(props: PivotTableProps) {
               path: getFetchPath(targetNode.path),
               metricPath: targetNode.path,
               formData: fetchFormData,
-              maxDepthPerFetch,
               currentTree: treeRef.current,
               visibleRowDepth,
               visibleColDepth,
@@ -4298,7 +4089,6 @@ function PivotTableChart(props: PivotTableProps) {
             path: getFetchPath(node.path),
             metricPath: node.path,
             formData: fetchFormData,
-            maxDepthPerFetch,
             currentTree: treeRef.current,
             visibleRowDepth,
             visibleColDepth,
@@ -4319,7 +4109,6 @@ function PivotTableChart(props: PivotTableProps) {
               path: getFetchPath(node.path),
               metricPath: node.path,
               formData: fetchFormData,
-              maxDepthPerFetch,
               currentTree: treeRef.current,
               visibleRowDepth,
               visibleColDepth,
@@ -4518,7 +4307,6 @@ function PivotTableChart(props: PivotTableProps) {
       isExplicitSubtotalNode,
       isMetricGrandTotalNode,
       isMetricTokenValue,
-      maxDepthPerFetch,
       metricLabelSet,
       metricLayoutIndexOnRows,
       persistExpansionState,
@@ -4737,7 +4525,7 @@ function PivotTableChart(props: PivotTableProps) {
     () => new Set(visibleCols.map(col => col.key)),
     [visibleCols],
   );
-  const isRowTotalAtStart = resolvedRowTotalPosition === 'start' && showRowRoot;
+  const isRowTotalAtStart = resolvedColTotalPosition === 'start' && showRowRoot;
   const visibleCells = useMemo(
     () =>
       buildVisibleCellEntries({
@@ -5504,7 +5292,7 @@ function PivotTableChart(props: PivotTableProps) {
               const isSubtotalHeader = rowAggregateBold;
               const isGrandTotalRow = showRowRoot && row.key === rootKey;
               const grandTotalPositionClass =
-                resolvedRowTotalPosition === 'end'
+                resolvedColTotalPosition === 'end'
                   ? 'pivot-grand-total-row--bottom'
                   : 'pivot-grand-total-row--top';
               const rowClassName = isGrandTotalRow

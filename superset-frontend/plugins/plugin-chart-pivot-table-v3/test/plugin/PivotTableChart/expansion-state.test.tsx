@@ -64,6 +64,15 @@ describe('PivotTableChart expansion state persistence', () => {
     return { promise, resolve: resolve as (value: T) => void };
   };
 
+  const getLastExpansionState = (setDataMask: jest.Mock) =>
+    setDataMask.mock.calls[setDataMask.mock.calls.length - 1]?.[0]?.ownState
+      ?.expansionState as PivotExpansionState | undefined;
+
+  const getExpansionStates = (setDataMask: jest.Mock) =>
+    setDataMask.mock.calls
+      .map(call => call[0]?.ownState?.expansionState)
+      .filter(Boolean) as PivotExpansionState[];
+
   const records = [
     { r1: 'A', r2: 'X', m1: 10 },
     { r1: 'A', r2: 'Y', m1: 12 },
@@ -115,11 +124,9 @@ describe('PivotTableChart expansion state persistence', () => {
       initialDepth: 1,
       expandRowsLevel: 0,
       expandColumnsLevel: 0,
-      maxDepthPerFetch: 1,
-      rowTotals: false,
       colTotals: false,
+      rowTotals: false,
       rowSubTotals: false,
-      colSubTotals: false,
       ...formDataOverrides,
     });
     return (
@@ -134,11 +141,9 @@ describe('PivotTableChart expansion state persistence', () => {
         height={300}
         startCollapsed={formData.startCollapsed}
         initialDepth={formData.initialDepth}
-        maxDepthPerFetch={formData.maxDepthPerFetch}
-        rowTotals={formData.rowTotals}
         colTotals={formData.colTotals}
+        rowTotals={formData.rowTotals}
         rowSubTotals={formData.rowSubTotals}
-        colSubTotals={formData.colSubTotals}
         rowSubtotalLevels={formData.rowSubtotalLevels}
         colSubtotalLevels={formData.colSubtotalLevels}
         metricsLayout={formData.metricsLayout}
@@ -284,7 +289,7 @@ describe('PivotTableChart expansion state persistence', () => {
   });
 
   it('removes descendant expansions when a parent is collapsed', async () => {
-    const setControlValue = jest.fn();
+    const setDataMask = jest.fn();
     const deepGroupby = ['r1', 'r2', 'r3'];
     const deepRecords = [
       { r1: 'A', r2: 'X', r3: 'I', m1: 10 },
@@ -303,7 +308,7 @@ describe('PivotTableChart expansion state persistence', () => {
     render(
       buildChartProps({
         data: deepTree,
-        setControlValue,
+        setDataMask,
         groupbyRowsOverride: deepGroupby,
       }),
     );
@@ -328,23 +333,22 @@ describe('PivotTableChart expansion state persistence', () => {
 
     fireEvent.click(rowToggle as HTMLButtonElement);
 
-    const expansionCalls = setControlValue.mock.calls.filter(
-      ([controlName]) => controlName === 'expansionState',
+    await waitFor(() =>
+      expect(getExpansionStates(setDataMask).length).toBeGreaterThan(0),
     );
-    await waitFor(() => expect(expansionCalls.length).toBeGreaterThan(0));
     const expansionState =
-      expansionCalls[expansionCalls.length - 1]?.[1] ||
+      getExpansionStates(setDataMask).slice(-1)[0] ||
       ({} as PivotExpansionState);
     expect(expansionState.rows).not.toContain(serializePath(['A']));
     expect(expansionState.rows).not.toContain(serializePath(['A', 'X']));
   });
 
-  it('persists expansion state to formData for explore updates', async () => {
-    const setControlValue = jest.fn();
+  it('persists expansion state to ownState on toggle', async () => {
+    const setDataMask = jest.fn();
     render(
       buildChartProps({
         data: buildTree(2),
-        setControlValue,
+        setDataMask,
       }),
     );
     const rowLabel = screen.getByText('A');
@@ -354,17 +358,17 @@ describe('PivotTableChart expansion state persistence', () => {
     expect(toggle).not.toBeNull();
     fireEvent.click(toggle as HTMLButtonElement);
 
-    const getExpansionCall = () =>
-      setControlValue.mock.calls.find(
-        ([controlName]) => controlName === 'expansionState',
-      );
-    await waitFor(() => expect(getExpansionCall()).toBeDefined());
-    const expansionState = getExpansionCall()?.[1] as PivotExpansionState;
+    await waitFor(() =>
+      expect(getLastExpansionState(setDataMask)).toBeDefined(),
+    );
+    const expansionState = getLastExpansionState(
+      setDataMask,
+    ) as PivotExpansionState;
     expect(expansionState.rows).toContainEqual(serializePath(['A']));
   });
 
-  it('persists nested expansion state to formData for explore updates', async () => {
-    const setControlValue = jest.fn();
+  it('persists nested expansion state to ownState on toggle', async () => {
+    const setDataMask = jest.fn();
     const deepGroupby = ['r1', 'r2', 'r3'];
     const deepRecords = [
       { r1: 'A', r2: 'X', r3: 'I', m1: 10 },
@@ -383,7 +387,7 @@ describe('PivotTableChart expansion state persistence', () => {
     render(
       buildChartProps({
         data: deepTree,
-        setControlValue,
+        setDataMask,
         groupbyRowsOverride: deepGroupby,
       }),
     );
@@ -405,20 +409,19 @@ describe('PivotTableChart expansion state persistence', () => {
     expect(nestedToggle).not.toBeNull();
     fireEvent.click(nestedToggle as HTMLButtonElement);
 
-    const expansionCalls = () =>
-      setControlValue.mock.calls.filter(
-        ([controlName]) => controlName === 'expansionState',
-      );
-    await waitFor(() => expect(expansionCalls().length).toBeGreaterThan(0));
-    const lastCall = expansionCalls()[expansionCalls().length - 1];
-    const expansionState = lastCall?.[1] as PivotExpansionState;
+    await waitFor(() =>
+      expect(getExpansionStates(setDataMask).length).toBeGreaterThan(0),
+    );
+    const expansionState = getExpansionStates(setDataMask).slice(
+      -1,
+    )[0] as PivotExpansionState;
     expect(expansionState.rows).toEqual(
       expect.arrayContaining([serializePath(['A']), serializePath(['A', 'X'])]),
     );
   });
 
   it('restores nested expansion state after re-render', async () => {
-    const setControlValue = jest.fn();
+    const setDataMask = jest.fn();
     const deepGroupby = ['r1', 'r2', 'r3'];
     const deepRecords = [
       { r1: 'A', r2: 'X', r3: 'I', m1: 10 },
@@ -451,9 +454,8 @@ describe('PivotTableChart expansion state persistence', () => {
     const { rerender } = render(
       buildChartProps({
         data: shallowTree,
-        setControlValue,
+        setDataMask,
         groupbyRowsOverride: deepGroupby,
-        formDataOverrides: { maxDepthPerFetch: 1 },
       }),
     );
 
@@ -478,11 +480,9 @@ describe('PivotTableChart expansion state persistence', () => {
     );
     await waitFor(() => expect(screen.getByText('I')).toBeInTheDocument());
 
-    const expansionCalls = setControlValue.mock.calls.filter(
-      ([controlName]) => controlName === 'expansionState',
-    );
-    const lastCall = expansionCalls[expansionCalls.length - 1];
-    const expansionState = lastCall?.[1] as PivotExpansionState;
+    const expansionState = getExpansionStates(setDataMask).slice(
+      -1,
+    )[0] as PivotExpansionState;
     expect(expansionState.rows).toEqual(
       expect.arrayContaining([serializePath(['A']), serializePath(['A', 'X'])]),
     );
@@ -496,12 +496,9 @@ describe('PivotTableChart expansion state persistence', () => {
     rerender(
       buildChartProps({
         data: shallowTreeNext,
-        setControlValue,
+        setDataMask,
         groupbyRowsOverride: deepGroupby,
-        formDataOverrides: {
-          expansionState,
-          maxDepthPerFetch: 1,
-        },
+        ownState: { expansionState },
       }),
     );
 
@@ -514,14 +511,14 @@ describe('PivotTableChart expansion state persistence', () => {
     await waitFor(() => expect(screen.getByText('I')).toBeInTheDocument());
   });
 
-  it('rehydrates expansion state from string keys in formData', async () => {
+  it('rehydrates expansion state from string keys in ownState', async () => {
     const expandedKey = serializePath(['A']);
     fetchPivotBranchMock.mockResolvedValueOnce({ data: buildTree(2) });
 
     render(
       buildChartProps({
         data: buildTree(1),
-        formDataOverrides: {
+        ownState: {
           expansionState: {
             rows: [expandedKey],
             cols: [],
@@ -632,13 +629,14 @@ describe('PivotTableChart expansion state persistence', () => {
       buildChartProps({
         data: shallowTree,
         groupbyRowsOverride: deepGroupby,
-        formDataOverrides: {
+        ownState: {
           expansionState: {
             rows: [['A'], ['A', 'X']],
             cols: [],
           },
+        },
+        formDataOverrides: {
           expandRowsLevel: 0,
-          maxDepthPerFetch: 1,
         },
       }),
     );
@@ -688,9 +686,9 @@ describe('PivotTableChart expansion state persistence', () => {
     const { rerender } = render(
       buildChartProps({
         data: buildTree(2),
+        ownState: { expansionState: cachedExpansionState },
         formDataOverrides: {
           expandRowsLevel: 2,
-          expansionState: cachedExpansionState,
         },
       }),
     );
@@ -702,9 +700,9 @@ describe('PivotTableChart expansion state persistence', () => {
     rerender(
       buildChartProps({
         data: buildTree(2),
+        ownState: { expansionState: cachedExpansionState },
         formDataOverrides: {
           expandRowsLevel: 0,
-          expansionState: cachedExpansionState,
         },
       }),
     );
@@ -720,9 +718,9 @@ describe('PivotTableChart expansion state persistence', () => {
     const { rerender } = render(
       buildChartProps({
         data: buildTree(2),
+        ownState: { expansionState: cachedExpansionState },
         formDataOverrides: {
           expandRowsLevel: 2,
-          expansionState: cachedExpansionState,
         },
       }),
     );
@@ -734,9 +732,9 @@ describe('PivotTableChart expansion state persistence', () => {
     rerender(
       buildChartProps({
         data: buildTree(2),
+        ownState: { expansionState: cachedExpansionState },
         formDataOverrides: {
           expandRowsLevel: undefined,
-          expansionState: cachedExpansionState,
         },
       }),
     );
@@ -828,11 +826,13 @@ describe('PivotTableChart expansion state persistence', () => {
     fetchPivotBranchMock.mockResolvedValueOnce({ data: deepTree });
 
     const setControlValue = jest.fn();
+    const setDataMask = jest.fn();
     const { rerender } = render(
       buildChartProps({
         data: deepTree,
         groupbyRowsOverride: deepGroupby,
         setControlValue,
+        setDataMask,
         formDataOverrides: {
           expandRowsLevel: 1,
           expandColumnsLevel: 0,
@@ -848,9 +848,7 @@ describe('PivotTableChart expansion state persistence', () => {
     expect(nestedToggle).not.toBeNull();
     fireEvent.click(nestedToggle as HTMLButtonElement);
     await waitFor(() => expect(screen.getByText('I')).toBeInTheDocument());
-    const expansionState = setControlValue.mock.calls.find(
-      ([controlName]) => controlName === 'expansionState',
-    )?.[1] as PivotExpansionState | undefined;
+    const expansionState = getLastExpansionState(setDataMask);
     expect(expansionState).toBeDefined();
 
     rerender(
@@ -858,11 +856,12 @@ describe('PivotTableChart expansion state persistence', () => {
         data: deepTree,
         groupbyRowsOverride: deepGroupby,
         setControlValue,
+        setDataMask,
         formDataOverrides: {
           expandRowsLevel: 0,
           expandColumnsLevel: 0,
-          expansionState,
         },
+        ownState: expansionState ? { expansionState } : undefined,
       }),
     );
 
@@ -897,13 +896,14 @@ describe('PivotTableChart expansion state persistence', () => {
       buildChartProps({
         data: buildTreeWithDepth(1),
         groupbyRowsOverride: deepGroupby,
-        formDataOverrides: {
+        ownState: {
           expansionState: {
             rows: [serializePath(['A']), serializePath(['A', 'X'])],
             cols: [],
           },
+        },
+        formDataOverrides: {
           expandRowsLevel: 1,
-          maxDepthPerFetch: 1,
         },
       }),
     );
@@ -917,38 +917,37 @@ describe('PivotTableChart expansion state persistence', () => {
   });
 
   it('clears cached row expansions when auto-expand rows is set', async () => {
-    const setControlValue = jest.fn();
+    const setDataMask = jest.fn();
     const { rerender } = render(
       buildChartProps({
         data: buildTree(2),
-        setControlValue,
-        formDataOverrides: {
+        setDataMask,
+        ownState: {
           expansionState: {
             rows: [serializePath(['A']), serializePath(['A', 'X'])],
             cols: [],
           },
+        },
+        formDataOverrides: {
           expandRowsLevel: 2,
           expandColumnsLevel: 0,
         },
       }),
     );
 
-    const getExpansionState = () =>
-      setControlValue.mock.calls.find(
-        ([controlName]) => controlName === 'expansionState',
-      )?.[1] as PivotExpansionState | undefined;
-
-    await waitFor(() => expect(getExpansionState()).toBeDefined());
-    const clearedState = getExpansionState();
+    await waitFor(() =>
+      expect(getLastExpansionState(setDataMask)).toBeDefined(),
+    );
+    const clearedState = getLastExpansionState(setDataMask);
     expect(clearedState?.rows).toEqual([]);
     expect(clearedState?.collapsedRows).toEqual([]);
 
     rerender(
       buildChartProps({
         data: buildTree(2),
-        setControlValue,
+        setDataMask,
+        ownState: clearedState ? { expansionState: clearedState } : undefined,
         formDataOverrides: {
-          expansionState: clearedState,
           expandRowsLevel: 0,
           expandColumnsLevel: 0,
         },
@@ -959,7 +958,7 @@ describe('PivotTableChart expansion state persistence', () => {
   });
 
   it('persists deep expansion state with subtotals and metrics placeholder', async () => {
-    const setControlValue = jest.fn();
+    const setDataMask = jest.fn();
     const deepGroupby = ['r1', 'r2', 'r3', 'r4'];
     const deepRecords = [
       { r1: 'A', r2: 'X', r3: 'I', r4: 'alpha', m1: 10 },
@@ -1002,17 +1001,16 @@ describe('PivotTableChart expansion state persistence', () => {
     render(
       buildChartProps({
         data: shallowTree,
-        setControlValue,
+        setDataMask,
         groupbyRowsOverride: deepGroupby,
         groupbyColumnsOverride: [],
         formDataGroupbyColumnsOverride: ['__MEASURES__'],
         formDataOverrides: {
           metricsLayout: MetricsLayoutEnum.COLUMNS,
-          rowTotals: true,
+          colTotals: true,
           rowSubTotals: true,
-          rowTotalPosition: 'end',
+          colTotalPosition: 'end',
           rowSubtotalPosition: 'start',
-          maxDepthPerFetch: 1,
         },
       }),
     );
@@ -1043,11 +1041,9 @@ describe('PivotTableChart expansion state persistence', () => {
       expect(fetchPivotBranchMock.mock.calls.length).toBeGreaterThanOrEqual(3),
     );
 
-    const expansionCalls = setControlValue.mock.calls.filter(
-      ([controlName]) => controlName === 'expansionState',
-    );
-    const lastCall = expansionCalls[expansionCalls.length - 1];
-    const expansionState = lastCall?.[1] as PivotExpansionState;
+    const expansionState = getExpansionStates(setDataMask).slice(
+      -1,
+    )[0] as PivotExpansionState;
     expect(expansionState.rows).toEqual(
       expect.arrayContaining([
         serializePath(['A']),
@@ -1058,7 +1054,7 @@ describe('PivotTableChart expansion state persistence', () => {
   });
 
   it('does not persist subtotal nodes from seeded expansion levels', async () => {
-    const setControlValue = jest.fn();
+    const setDataMask = jest.fn();
     const deepGroupby = ['r1', 'r2', 'r3'];
     const deepRecords = [
       { r1: 'A', r2: 'X', r3: 'I', m1: 10 },
@@ -1096,13 +1092,12 @@ describe('PivotTableChart expansion state persistence', () => {
     render(
       buildChartProps({
         data: shallowTree,
-        setControlValue,
+        setDataMask,
         groupbyRowsOverride: deepGroupby,
         formDataOverrides: {
           expandRowsLevel: 2,
           rowSubTotals: true,
           rowSubtotalLevels: [subtotalDepth],
-          maxDepthPerFetch: 1,
         },
       }),
     );
@@ -1119,11 +1114,9 @@ describe('PivotTableChart expansion state persistence', () => {
       expect(screen.getAllByText('I').length).toBeGreaterThan(0),
     );
 
-    const expansionCalls = setControlValue.mock.calls.filter(
-      ([controlName]) => controlName === 'expansionState',
-    );
-    const lastCall = expansionCalls[expansionCalls.length - 1];
-    const expansionState = lastCall?.[1] as PivotExpansionState;
+    const expansionState = getExpansionStates(setDataMask).slice(
+      -1,
+    )[0] as PivotExpansionState;
     expect(expansionState.rows).not.toContain(
       serializePath(['A', SUBTOTAL_TOKEN]),
     );
@@ -1186,7 +1179,6 @@ describe('PivotTableChart expansion state persistence', () => {
         formDataOverrides: {
           expandRowsLevel: 1,
           expandColumnsLevel: 0,
-          maxDepthPerFetch: 1,
         },
       }),
     );
@@ -1247,7 +1239,6 @@ describe('PivotTableChart expansion state persistence', () => {
         groupbyColumnsOverride: colGroupby,
         formDataGroupbyColumnsOverride: colGroupby,
         formDataOverrides: {
-          maxDepthPerFetch: 1,
           expandRowsLevel: 0,
           expandColumnsLevel: 0,
         },
@@ -1298,14 +1289,15 @@ describe('PivotTableChart expansion state persistence', () => {
         groupbyRowsOverride: deepRowGroupby,
         groupbyColumnsOverride: deepColGroupby,
         formDataGroupbyColumnsOverride: deepColGroupby,
-        formDataOverrides: {
+        ownState: {
           expansionState: {
             rows: [serializePath(['A']), serializePath(['A', 'X'])],
             cols: [serializePath(['C']), serializePath(['C', 'U'])],
           },
+        },
+        formDataOverrides: {
           expandRowsLevel: 0,
           expandColumnsLevel: 1,
-          maxDepthPerFetch: 1,
         },
       }),
     );
@@ -1355,7 +1347,6 @@ describe('PivotTableChart expansion state persistence', () => {
         formDataOverrides: {
           expandRowsLevel: 2,
           expandColumnsLevel: 0,
-          maxDepthPerFetch: 1,
         },
       }),
     );
@@ -1372,7 +1363,6 @@ describe('PivotTableChart expansion state persistence', () => {
         formDataOverrides: {
           expandRowsLevel: 3,
           expandColumnsLevel: 0,
-          maxDepthPerFetch: 1,
         },
       }),
     );
@@ -1382,8 +1372,14 @@ describe('PivotTableChart expansion state persistence', () => {
     const rowCalls = fetchPivotBranchMock.mock.calls.filter(
       ([args]) => args.axis === 'row',
     );
-    expect(rowCalls).toHaveLength(1);
-    expect(rowCalls[0][0].path).toEqual([]);
+    expect(rowCalls).toHaveLength(2);
+    const rowPaths = rowCalls.map(call => JSON.stringify(call[0].path));
+    expect(rowPaths).toEqual(
+      expect.arrayContaining([
+        JSON.stringify(['A', 'X']),
+        JSON.stringify(['B', 'Y']),
+      ]),
+    );
   });
 
   it('does not fetch missing leaf expansions', async () => {

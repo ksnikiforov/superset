@@ -116,11 +116,9 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
           height={300}
           startCollapsed
           initialDepth={1}
-          maxDepthPerFetch={1}
-          rowTotals={false}
           colTotals={false}
+          rowTotals={false}
           rowSubTotals={false}
-          colSubTotals={false}
           rowSubtotalLevels={[]}
           colSubtotalLevels={[]}
           rowOrder="key_a_to_z"
@@ -187,11 +185,9 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
         height={300}
         startCollapsed
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -322,11 +318,9 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
         height={300}
         startCollapsed
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -517,11 +511,9 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
         height={300}
         startCollapsed
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -600,7 +592,7 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
           groupbyColumns: [METRICS_PLACEHOLDER, 'revenueBand'],
           metricsLayout: MetricsLayoutEnum.COLUMNS,
           metrics,
-          colTotals: true,
+          rowTotals: true,
         })}
         metrics={metrics}
         groupbyRows={rowGroupby}
@@ -610,11 +602,9 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
         height={300}
         startCollapsed
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
-        colTotals
+        colTotals={false}
+        rowTotals
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -701,7 +691,7 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
           groupbyColumns: [METRICS_PLACEHOLDER, 'revenueBand'],
           metricsLayout: MetricsLayoutEnum.COLUMNS,
           metrics,
-          colTotals: true,
+          rowTotals: true,
         })}
         metrics={metrics}
         groupbyRows={rowGroupby}
@@ -711,11 +701,9 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
         height={300}
         startCollapsed
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
-        colTotals
+        colTotals={false}
+        rowTotals
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -832,11 +820,9 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
         height={300}
         startCollapsed
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -978,8 +964,8 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
           groupbyColumns: [METRICS_PLACEHOLDER, 'col2'],
           metricsLayout: MetricsLayoutEnum.COLUMNS,
           metrics,
-          colTotals: true,
           rowTotals: true,
+          colTotals: true,
         })}
         metrics={metrics}
         groupbyRows={rowGroupby}
@@ -989,11 +975,9 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
         height={300}
         startCollapsed
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals
         colTotals
+        rowTotals
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"

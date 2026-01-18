@@ -56,15 +56,13 @@ const baseFormData: Partial<PivotTableQueryFormData> = {
   groupbyColumns: ['c1'],
   metrics: ['metric1'],
   aggregateFunction: 'Sum',
-  rowTotals: false,
   colTotals: false,
+  rowTotals: false,
   rowSubTotals: false,
-  colSubTotals: false,
   rowSubtotalLevels: [],
   colSubtotalLevels: [],
   startCollapsed: false,
   initialDepth: 1,
-  maxDepthPerFetch: 1,
   rowOrder: 'key_a_to_z',
   colOrder: 'key_a_to_z',
   metricsLayout: MetricsLayoutEnum.COLUMNS,
@@ -210,11 +208,9 @@ describe('PivotTableChart metric tier suppression', () => {
       height: 300,
       startCollapsed: false,
       initialDepth: 1,
-      maxDepthPerFetch: 1,
-      rowTotals: false,
       colTotals: false,
+      rowTotals: false,
       rowSubTotals: false,
-      colSubTotals: false,
       rowSubtotalLevels: [],
       colSubtotalLevels: [],
       rowOrder: 'key_a_to_z',
@@ -285,11 +281,9 @@ describe('PivotTableChart metric tier suppression', () => {
         height={300}
         startCollapsed={false}
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -334,11 +328,9 @@ describe('PivotTableChart metric tier suppression', () => {
         height={300}
         startCollapsed={false}
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -406,11 +398,9 @@ describe('PivotTableChart metric tier suppression', () => {
         height={300}
         startCollapsed={false}
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -482,11 +472,9 @@ describe('PivotTableChart metric tier suppression', () => {
         height={300}
         startCollapsed={false}
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -528,7 +516,7 @@ describe('PivotTableChart metric tier suppression', () => {
         data={treeWithTotal}
         formData={buildFormData({
           ...baseFormData,
-          rowTotals: true,
+          colTotals: true,
           metricDatabars: {
             metric1: {
               type: 'bar',
@@ -543,11 +531,9 @@ describe('PivotTableChart metric tier suppression', () => {
         height={300}
         startCollapsed={false}
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals
-        colTotals={false}
+        colTotals
+        rowTotals={false}
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -596,14 +582,14 @@ describe('PivotTableChart metric tier suppression', () => {
       values: { metric1: 30 },
     };
 
-    const renderWithTotalsPosition = (rowTotalPosition: 'start' | 'end') => {
+    const renderWithTotalsPosition = (colTotalPosition: 'start' | 'end') => {
       const { unmount } = render(
         <PivotTableChart
           data={tree}
           formData={buildFormData({
             ...baseFormData,
-            rowTotals: true,
-            rowTotalPosition,
+            colTotals: true,
+            colTotalPosition,
             metricDatabars: {
               metric1: { type: 'waterfall' },
             },
@@ -616,12 +602,10 @@ describe('PivotTableChart metric tier suppression', () => {
           height={300}
           startCollapsed={false}
           initialDepth={1}
-          maxDepthPerFetch={1}
-          rowTotals
-          rowTotalPosition={rowTotalPosition}
-          colTotals={false}
+          colTotals
+          colTotalPosition={colTotalPosition}
+          rowTotals={false}
           rowSubTotals={false}
-          colSubTotals={false}
           rowSubtotalLevels={[]}
           colSubtotalLevels={[]}
           rowOrder="key_a_to_z"
@@ -690,11 +674,9 @@ describe('PivotTableChart metric tier suppression', () => {
         height={300}
         startCollapsed={false}
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -788,11 +770,9 @@ describe('PivotTableChart metric tier suppression', () => {
         height={300}
         startCollapsed={false}
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -875,11 +855,9 @@ describe('PivotTableChart metric tier suppression', () => {
         height={300}
         startCollapsed={false}
         initialDepth={1}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"
@@ -949,11 +927,9 @@ describe('PivotTableChart metric tier suppression', () => {
       height: 300,
       startCollapsed: false,
       initialDepth: 1,
-      maxDepthPerFetch: 1,
-      rowTotals: false,
       colTotals: false,
+      rowTotals: false,
       rowSubTotals: false,
-      colSubTotals: false,
       rowSubtotalLevels: [],
       colSubtotalLevels: [],
       rowOrder: 'key_a_to_z',
@@ -1026,7 +1002,7 @@ describe('PivotTableChart metric tier suppression', () => {
         metrics,
         startCollapsed: true,
         initialDepth: 1,
-        colSubTotals: true,
+        colSubtotalLevels: [1],
       }),
       metrics,
       groupbyRows: ['shipMode'],
@@ -1036,13 +1012,11 @@ describe('PivotTableChart metric tier suppression', () => {
       height: 300,
       startCollapsed: true,
       initialDepth: 1,
-      maxDepthPerFetch: 1,
-      rowTotals: false,
       colTotals: false,
+      rowTotals: false,
       rowSubTotals: false,
-      colSubTotals: true,
       rowSubtotalLevels: [],
-      colSubtotalLevels: [],
+      colSubtotalLevels: [1],
       rowOrder: 'key_a_to_z',
       colOrder: 'key_a_to_z',
       valueFormat: '',
@@ -1169,11 +1143,9 @@ describe('PivotTableChart metric tier suppression', () => {
       height: 300,
       startCollapsed: true,
       initialDepth: 1,
-      maxDepthPerFetch: 1,
-      rowTotals: false,
       colTotals: false,
+      rowTotals: false,
       rowSubTotals: false,
-      colSubTotals: false,
       rowSubtotalLevels: [],
       colSubtotalLevels: [],
       rowOrder: 'key_a_to_z',
@@ -1294,11 +1266,9 @@ describe('PivotTableChart metric tier suppression', () => {
       height: 300,
       startCollapsed: true,
       initialDepth: 1,
-      maxDepthPerFetch: 1,
-      rowTotals: false,
       colTotals: false,
+      rowTotals: false,
       rowSubTotals: false,
-      colSubTotals: false,
       rowSubtotalLevels: [],
       colSubtotalLevels: [],
       rowOrder: 'key_a_to_z',
@@ -1414,7 +1384,7 @@ describe('PivotTableChart metric tier suppression', () => {
         metrics,
         startCollapsed: true,
         initialDepth: 1,
-        colSubTotals: true,
+        colSubtotalLevels: [1],
       }),
       metrics,
       groupbyRows: ['shipMode'],
@@ -1424,13 +1394,11 @@ describe('PivotTableChart metric tier suppression', () => {
       height: 300,
       startCollapsed: true,
       initialDepth: 1,
-      maxDepthPerFetch: 1,
-      rowTotals: false,
       colTotals: false,
+      rowTotals: false,
       rowSubTotals: false,
-      colSubTotals: true,
       rowSubtotalLevels: [],
-      colSubtotalLevels: [],
+      colSubtotalLevels: [1],
       rowOrder: 'key_a_to_z',
       colOrder: 'key_a_to_z',
       valueFormat: '',
@@ -1546,11 +1514,9 @@ describe('PivotTableChart metric tier suppression', () => {
       height: 300,
       startCollapsed: false,
       initialDepth: 3,
-      maxDepthPerFetch: 1,
-      rowTotals: false,
       colTotals: false,
+      rowTotals: false,
       rowSubTotals: false,
-      colSubTotals: false,
       rowSubtotalLevels: [],
       colSubtotalLevels: [],
       rowOrder: 'key_a_to_z',
@@ -1632,11 +1598,9 @@ describe('PivotTableChart multi-metric visibility', () => {
           height={300}
           startCollapsed
           initialDepth={1}
-          maxDepthPerFetch={1}
-          rowTotals={false}
           colTotals={false}
+          rowTotals={false}
           rowSubTotals={false}
-          colSubTotals={false}
           rowSubtotalLevels={[]}
           colSubtotalLevels={[]}
           rowOrder="key_a_to_z"
@@ -1733,11 +1697,9 @@ describe('PivotTableChart multi-metric visibility', () => {
           height={300}
           startCollapsed
           initialDepth={1}
-          maxDepthPerFetch={1}
-          rowTotals={false}
           colTotals={false}
+          rowTotals={false}
           rowSubTotals={false}
-          colSubTotals={false}
           rowSubtotalLevels={[]}
           colSubtotalLevels={[]}
           rowOrder="key_a_to_z"
@@ -1818,11 +1780,9 @@ describe('PivotTableChart multi-metric visibility', () => {
         height={300}
         startCollapsed={false}
         initialDepth={2}
-        maxDepthPerFetch={1}
-        rowTotals={false}
         colTotals={false}
+        rowTotals={false}
         rowSubTotals={false}
-        colSubTotals={false}
         rowSubtotalLevels={[]}
         colSubtotalLevels={[]}
         rowOrder="key_a_to_z"

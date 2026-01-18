@@ -67,7 +67,7 @@ type ColLeavesParams = {
   expandedCols: Set<string>;
   normalizedColSubtotalLevels: number[];
   showColRoot: boolean;
-  colTotals: boolean;
+  rowTotals: boolean;
   resolvedColTotalPosition: TotalPosition;
   resolvedColSubtotalPosition: TotalPosition;
   isMetricGrandTotalNode: (node?: PivotTreeNode) => boolean;
@@ -82,7 +82,7 @@ export const createColLeavesBuilder = ({
   expandedCols,
   normalizedColSubtotalLevels,
   showColRoot,
-  colTotals,
+  rowTotals,
   resolvedColTotalPosition,
   resolvedColSubtotalPosition,
   isMetricGrandTotalNode,
@@ -97,7 +97,7 @@ export const createColLeavesBuilder = ({
     const hasMetricGrandTotals = children.some(isMetricGrandTotalNode);
     const includeSubtotal =
       hasChildren &&
-      ((colTotals && dimDepth === 0) ||
+      ((rowTotals && dimDepth === 0) ||
         normalizedColSubtotalLevels.includes(dimDepth) ||
         (dimDepth === 0 && hasMetricGrandTotals)) &&
       !(dimDepth === 0 && !showColRoot);

@@ -193,7 +193,7 @@ export const getVisibleExpansionKeys = ({
   countDimDepth: countDimDepthFn,
   normalizedColSubtotalLevels,
   showColRoot,
-  colTotals,
+  rowTotals,
   colTotalPosition,
   resolvedColSubtotalPosition,
   getColChildren,
@@ -220,7 +220,7 @@ export const getVisibleExpansionKeys = ({
   countDimDepth: (path: PivotTreeNode['path']) => number;
   normalizedColSubtotalLevels: number[];
   showColRoot: boolean;
-  colTotals: boolean;
+  rowTotals: boolean;
   colTotalPosition: TotalPosition;
   resolvedColSubtotalPosition: TotalPosition;
   getColChildren: (parent: PivotTreeNode) => PivotTreeNode[];
@@ -254,7 +254,7 @@ export const getVisibleExpansionKeys = ({
     expandedCols,
     normalizedColSubtotalLevels,
     showColRoot,
-    colTotals,
+    rowTotals,
     resolvedColTotalPosition: colTotalPosition,
     resolvedColSubtotalPosition,
     isMetricGrandTotalNode,

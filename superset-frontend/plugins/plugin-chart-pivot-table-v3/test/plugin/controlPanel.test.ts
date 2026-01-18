@@ -110,7 +110,7 @@ describe('pivot table v3 control panel', () => {
     expect(result.value).toEqual([]);
   });
 
-  it('selects all column levels when subtotals are enabled with no explicit levels', () => {
+  it('keeps column subtotal levels empty when no levels are selected', () => {
     const colSubtotalControl = getControl('colSubtotalLevels');
     const { mapStateToProps } = colSubtotalControl.config;
     if (!mapStateToProps) {
@@ -120,7 +120,6 @@ describe('pivot table v3 control panel', () => {
       controls: {
         groupbyColumns: { value: ['col1', 'col2', 'col3'] },
         colSubtotalLevels: { value: [] },
-        colSubTotals: { value: true },
       },
     } as unknown as ControlPanelState;
     const controlState = {
@@ -129,9 +128,7 @@ describe('pivot table v3 control panel', () => {
     } as ControlState;
     const result = mapStateToProps(state, controlState) as {
       value: number[];
-      enabled: boolean;
     };
-    expect(result.value).toEqual([1, 2]);
-    expect(result.enabled).toEqual(true);
+    expect(result.value).toEqual([]);
   });
 });
