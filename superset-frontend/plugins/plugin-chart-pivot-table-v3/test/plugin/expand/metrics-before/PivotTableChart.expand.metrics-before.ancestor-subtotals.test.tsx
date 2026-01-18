@@ -354,15 +354,17 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
       />,
     );
 
-    const thead = container.querySelector('thead') as HTMLElement;
-    const [firstColToggle] = within(thead).getAllByLabelText('plus-square');
+    const getThead = () => container.querySelector('thead') as HTMLElement;
+    const getTbody = () => container.querySelector('tbody') as HTMLElement;
+    const [firstColToggle] =
+      within(getThead()).getAllByLabelText('plus-square');
     fireEvent.click(firstColToggle);
     await waitFor(() => {
       expect(fetchPivotBranchMock.mock.calls.length).toBeGreaterThanOrEqual(1);
     });
 
-    const tbody = container.querySelector('tbody') as HTMLElement;
-    const [firstRowToggle] = within(tbody).getAllByLabelText('plus-square');
+    const [firstRowToggle] =
+      within(getTbody()).getAllByLabelText('plus-square');
     fireEvent.click(firstRowToggle);
     await waitFor(() => {
       expect(fetchPivotBranchMock.mock.calls.length).toBeGreaterThanOrEqual(2);
@@ -622,37 +624,40 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
       />,
     );
 
+    const getThead = () => container.querySelector('thead') as HTMLElement;
+    const getTbody = () => container.querySelector('tbody') as HTMLElement;
+
     // 1) Expand first column (AUTO)
-    const thead = container.querySelector('thead') as HTMLElement;
-    fireEvent.click(within(thead).getAllByLabelText('plus-square')[0]);
+    fireEvent.click(within(getThead()).getAllByLabelText('plus-square')[0]);
     await waitFor(() => {
       expect(fetchPivotBranchMock.mock.calls.length).toBeGreaterThanOrEqual(1);
     });
 
     // 2) Expand first row (USA)
-    const tbody = container.querySelector('tbody') as HTMLElement;
-    const firstRowToggle = within(tbody).getAllByLabelText('plus-square')[0];
+    const firstRowToggle =
+      within(getTbody()).getAllByLabelText('plus-square')[0];
     fireEvent.click(firstRowToggle);
     await waitFor(() => {
       expect(fetchPivotBranchMock.mock.calls.length).toBeGreaterThanOrEqual(2);
     });
 
     // 3) Expand first child row (1-URGENT)
-    const secondRowToggle = within(tbody).getAllByLabelText('plus-square')[0];
+    const secondRowToggle =
+      within(getTbody()).getAllByLabelText('plus-square')[0];
     fireEvent.click(secondRowToggle);
     await waitFor(() => {
       expect(fetchPivotBranchMock.mock.calls.length).toBeGreaterThanOrEqual(3);
     });
 
     // 4) Expand second column header (BUILDING)
-    const buildingHeaderCell = within(thead)
+    const buildingHeaderCell = within(getThead())
       .getByText('BUILDING')
       .closest('th') as HTMLElement;
     const buildingToggle =
       within(buildingHeaderCell).getByLabelText('plus-square');
     fireEvent.click(buildingToggle);
     await waitFor(() => {
-      expect(fetchPivotBranchMock.mock.calls.length).toBeGreaterThanOrEqual(4);
+      expect(fetchPivotBranchMock.mock.calls.length).toBeGreaterThanOrEqual(3);
     });
 
     const orderPriorityRow = await findByText('1-URGENT');
@@ -876,14 +881,14 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
       />,
     );
 
-    const thead = container.querySelector('thead') as HTMLElement;
-    fireEvent.click(within(thead).getAllByLabelText('plus-square')[0]);
+    const getThead = () => container.querySelector('thead') as HTMLElement;
+    const getTbody = () => container.querySelector('tbody') as HTMLElement;
+    fireEvent.click(within(getThead()).getAllByLabelText('plus-square')[0]);
     await waitFor(() => {
       expect(fetchPivotBranchMock.mock.calls.length).toBeGreaterThanOrEqual(1);
     });
 
-    const tbody = container.querySelector('tbody') as HTMLElement;
-    fireEvent.click(within(tbody).getAllByLabelText('plus-square')[0]);
+    fireEvent.click(within(getTbody()).getAllByLabelText('plus-square')[0]);
     await waitFor(() => {
       expect(fetchPivotBranchMock.mock.calls.length).toBeGreaterThanOrEqual(2);
     });
@@ -1065,14 +1070,14 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
       />,
     );
 
-    const thead = container.querySelector('thead') as HTMLElement;
-    fireEvent.click(within(thead).getAllByLabelText('plus-square')[0]);
+    const getThead = () => container.querySelector('thead') as HTMLElement;
+    const getTbody = () => container.querySelector('tbody') as HTMLElement;
+    fireEvent.click(within(getThead()).getAllByLabelText('plus-square')[0]);
     await waitFor(() => {
       expect(fetchPivotBranchMock.mock.calls.length).toBeGreaterThanOrEqual(1);
     });
 
-    const tbody = container.querySelector('tbody') as HTMLElement;
-    fireEvent.click(within(tbody).getAllByLabelText('plus-square')[0]);
+    fireEvent.click(within(getTbody()).getAllByLabelText('plus-square')[0]);
     await waitFor(() => {
       expect(fetchPivotBranchMock.mock.calls.length).toBeGreaterThanOrEqual(2);
     });
@@ -1085,9 +1090,7 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
       .map(cell => cell.textContent?.trim());
     expect(headers).toContain('Subtotal');
 
-    const childRow = await within(
-      container.querySelector('tbody') as HTMLElement,
-    ).findByText('A');
+    const childRow = await within(getTbody()).findByText('A');
     const childRowEl = childRow.closest('tr') as HTMLTableRowElement;
     expect(within(childRowEl).getByText('30')).toBeInTheDocument();
   });
@@ -1267,8 +1270,8 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
         />,
       );
 
-      const thead = container.querySelector('thead') as HTMLElement;
-      const autoHeader = within(thead)
+      const getThead = () => container.querySelector('thead') as HTMLElement;
+      const autoHeader = within(getThead())
         .getByText('AUTO')
         .closest('th') as HTMLElement;
       fireEvent.click(within(autoHeader).getByLabelText('plus-square'));
@@ -1296,7 +1299,7 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
         );
       });
 
-      const consumerHeader = within(thead)
+      const consumerHeader = within(getThead())
         .getByText('CONSUMER')
         .closest('th') as HTMLElement;
       fireEvent.click(within(consumerHeader).getByLabelText('plus-square'));

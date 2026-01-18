@@ -227,6 +227,7 @@ export interface PivotTableProps
   data: PivotTreeData;
   formData: PivotTableQueryFormData;
   queryFormData?: PivotTableQueryFormData;
+  persistExpansionState?: boolean;
   metrics: QueryFormMetric[];
   groupbyRows: QueryFormColumn[];
   groupbyColumns: QueryFormColumn[];

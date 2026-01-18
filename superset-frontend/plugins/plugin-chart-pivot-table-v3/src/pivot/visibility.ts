@@ -352,15 +352,6 @@ export const hasLoadedChildren = ({
   const parentHasMetric = node.path.some(val => isMetricTokenValue(val));
   if (
     metricIndex !== undefined &&
-    node.path.length > metricIndex &&
-    isMetricTokenValue(node.path[metricIndex]) &&
-    parentDimDepth < groupbyLength
-  ) {
-    // Sitting on the metric tier and deeper dimensions remain; force fetch.
-    return false;
-  }
-  if (
-    metricIndex !== undefined &&
     parentDimDepth < metricIndex &&
     !parentHasMetric &&
     children.some(child => child.path.some(val => isMetricTokenValue(val)))

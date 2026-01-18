@@ -100,6 +100,7 @@ describe('PivotTableChart expansion state persistence', () => {
     groupbyColumnsOverride,
     formDataGroupbyColumnsOverride,
     emitCrossFilters,
+    persistExpansionState = true,
   }: {
     data: PivotTreeData;
     ownState?: Record<string, unknown>;
@@ -110,6 +111,7 @@ describe('PivotTableChart expansion state persistence', () => {
     groupbyColumnsOverride?: QueryFormColumn[];
     formDataGroupbyColumnsOverride?: QueryFormColumn[];
     emitCrossFilters?: boolean;
+    persistExpansionState?: boolean;
   }) => {
     const groupbyRowsValue = groupbyRowsOverride ?? rowGroupby;
     const groupbyColumnsValue = groupbyColumnsOverride ?? [];
@@ -147,6 +149,7 @@ describe('PivotTableChart expansion state persistence', () => {
         rowSubtotalLevels={formData.rowSubtotalLevels}
         colSubtotalLevels={formData.colSubtotalLevels}
         metricsLayout={formData.metricsLayout}
+        persistExpansionState={persistExpansionState}
         ownState={ownState}
         setDataMask={setDataMask || jest.fn()}
         setControlValue={setControlValue}

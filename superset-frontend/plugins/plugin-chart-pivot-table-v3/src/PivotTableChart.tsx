@@ -475,6 +475,7 @@ function PivotTableChart(props: PivotTableProps) {
     ownState,
     setDataMask,
     emitCrossFilters,
+    persistExpansionState: persistExpansionStateProp,
     onContextMenu,
     timeGrainSqla,
     dateFormatters = {},
@@ -534,6 +535,7 @@ function PivotTableChart(props: PivotTableProps) {
   );
   const resolvedMetricsLayout =
     (formData.metricsLayout as MetricsLayoutEnum) || metricsLayout;
+  const persistExpansionState = persistExpansionStateProp ?? false;
   const metricFormattingScope =
     (formData.metricFormattingScope as MetricFormattingScope) ||
     'values_totals';
@@ -1369,7 +1371,11 @@ function PivotTableChart(props: PivotTableProps) {
   );
 
   const getRowChildrenForNodes = useCallback(
-    (parent: PivotTreeNode, nodes: Record<string, PivotTreeNode>) => {
+    (
+      parent: PivotTreeNode,
+      nodes: Record<string, PivotTreeNode>,
+      metricIndexOverride?: number,
+    ) => {
       const rowSubtotalPositionForParent = getRowSubtotalPosition(parent);
       const isMetricSubtotalAtMetricTier = (node: PivotTreeNode) => {
         if (
@@ -1390,15 +1396,14 @@ function PivotTableChart(props: PivotTableProps) {
       const filteredByMetricPosition = parentHasMetric
         ? children
         : children.filter(child => {
-            if (metricIndexForRows === undefined) {
+            const metricIndex = metricIndexOverride ?? metricIndexOnRows;
+            if (metricIndex === undefined) {
               return true;
             }
-            if (child.path.length <= metricIndexForRows) {
+            if (child.path.length <= metricIndex) {
               return true;
             }
-            const metricAtIndex = isMetricTokenValue(
-              child.path[metricIndexForRows],
-            );
+            const metricAtIndex = isMetricTokenValue(child.path[metricIndex]);
             // When metrics sit at the front, ensure we only surface nodes that
             // include the metric at that index, so placeholder/base nodes without
             // metric labels do not render as empty rows.
@@ -1556,7 +1561,6 @@ function PivotTableChart(props: PivotTableProps) {
       countDimDepth,
       getRowSubtotalPosition,
       groupbyRows.length,
-      metricIndexForRows,
       metricIndexOnRows,
       metricLayoutIndexOnRows,
       hideMetricHeaderOnRows,
@@ -1977,21 +1981,24 @@ function PivotTableChart(props: PivotTableProps) {
   );
 
   const getColChildrenForNodes = useCallback(
-    (parent: PivotTreeNode, nodes: Record<string, PivotTreeNode>) => {
+    (
+      parent: PivotTreeNode,
+      nodes: Record<string, PivotTreeNode>,
+      metricIndexOverride?: number,
+    ) => {
       const children = findChildren(nodes, parent);
       const parentHasMetric = parent.path.some(val => isMetricTokenValue(val));
       const filteredByMetricPosition = parentHasMetric
         ? children
         : children.filter(child => {
-            if (metricIndexForCols === undefined) {
+            const metricIndex = metricIndexOverride ?? metricIndexOnCols;
+            if (metricIndex === undefined) {
               return true;
             }
-            if (child.path.length <= metricIndexForCols) {
+            if (child.path.length <= metricIndex) {
               return true;
             }
-            const metricAtIndex = isMetricTokenValue(
-              child.path[metricIndexForCols],
-            );
+            const metricAtIndex = isMetricTokenValue(child.path[metricIndex]);
             return metricAtIndex;
           });
       let filtered = filteredByMetricPosition;
@@ -2031,10 +2038,10 @@ function PivotTableChart(props: PivotTableProps) {
     },
     [
       groupbyColumns.length,
-      metricIndexForCols,
       metricLayoutIndexOnCols,
       hideMetricHeaderOnCols,
       isMetricTokenValue,
+      metricIndexOnCols,
       normalizedColSubtotalLevels.length,
       resolvedMetricsLayout,
       isMetricGrandTotalNode,
@@ -2052,43 +2059,68 @@ function PivotTableChart(props: PivotTableProps) {
       nextExpandedRows: Set<string>,
       nextExpandedCols: Set<string>,
       nextTree: PivotTreeData,
-    ): RenderModelConfig => ({
-      groupbyRowsLength: groupbyRows.length,
-      groupbyColumnsLength: groupbyColumns.length,
-      normalizedRowSubtotalLevels,
-      normalizedColSubtotalLevels,
-      rowTotals,
-      colTotals,
-      rowTotalPosition: resolvedColTotalPosition,
-      colTotalPosition: resolvedRowTotalPosition,
-      resolvedColSubtotalPosition: effectiveColSubtotalPosition,
-      resolvedMetricsLayout,
-      isMultiMetric,
-      metricsFirstOnCols,
-      hideMetricHeaderOnRows,
-      hideMetricHeaderOnCols,
-      rowSorter: depthSorter,
-      colSorter: depthSorter,
-      getRowChildren: parent => getRowChildrenForNodes(parent, nextTree.rows),
-      getCollapsedRowChildren: parent =>
-        getCollapsedRowChildrenForNodes(
-          parent,
-          nextExpandedRows,
-          nextTree.rows,
-        ),
-      getColChildren: parent => getColChildrenForNodes(parent, nextTree.cols),
-      getCollapsedColLeaves: parent =>
-        getCollapsedColLeavesForNodes(parent, nextExpandedCols, nextTree.cols),
-      countDimDepth,
-      isMetricGrandTotalNode,
-      isMetricSubtotalNode,
-      isMetricTokenValue,
-    }),
+    ): RenderModelConfig => {
+      const metricIndexForRowsResolved =
+        findMetricIndex(nextTree.rows) ??
+        metricLayoutIndexOnRows ??
+        metricIndexOnRows;
+      const metricIndexForColsResolved =
+        findMetricIndex(nextTree.cols) ??
+        metricLayoutIndexOnCols ??
+        metricIndexOnCols;
+      return {
+        groupbyRowsLength: groupbyRows.length,
+        groupbyColumnsLength: groupbyColumns.length,
+        normalizedRowSubtotalLevels,
+        normalizedColSubtotalLevels,
+        rowTotals,
+        colTotals,
+        rowTotalPosition: resolvedColTotalPosition,
+        colTotalPosition: resolvedRowTotalPosition,
+        resolvedColSubtotalPosition: effectiveColSubtotalPosition,
+        resolvedMetricsLayout,
+        isMultiMetric,
+        metricsFirstOnCols,
+        hideMetricHeaderOnRows,
+        hideMetricHeaderOnCols,
+        rowSorter: depthSorter,
+        colSorter: depthSorter,
+        getRowChildren: parent =>
+          getRowChildrenForNodes(
+            parent,
+            nextTree.rows,
+            metricIndexForRowsResolved,
+          ),
+        getCollapsedRowChildren: parent =>
+          getCollapsedRowChildrenForNodes(
+            parent,
+            nextExpandedRows,
+            nextTree.rows,
+          ),
+        getColChildren: parent =>
+          getColChildrenForNodes(
+            parent,
+            nextTree.cols,
+            metricIndexForColsResolved,
+          ),
+        getCollapsedColLeaves: parent =>
+          getCollapsedColLeavesForNodes(
+            parent,
+            nextExpandedCols,
+            nextTree.cols,
+          ),
+        countDimDepth,
+        isMetricGrandTotalNode,
+        isMetricSubtotalNode,
+        isMetricTokenValue,
+      };
+    },
     [
       colTotals,
       countDimDepth,
       depthSorter,
       effectiveColSubtotalPosition,
+      findMetricIndex,
       getCollapsedColLeavesForNodes,
       getCollapsedRowChildrenForNodes,
       getColChildrenForNodes,
@@ -2101,6 +2133,10 @@ function PivotTableChart(props: PivotTableProps) {
       isMetricSubtotalNode,
       isMetricTokenValue,
       isMultiMetric,
+      metricIndexOnCols,
+      metricIndexOnRows,
+      metricLayoutIndexOnCols,
+      metricLayoutIndexOnRows,
       metricsFirstOnCols,
       normalizedColSubtotalLevels,
       normalizedRowSubtotalLevels,
@@ -2114,6 +2150,14 @@ function PivotTableChart(props: PivotTableProps) {
   const getVisibleExpansionKeys = useCallback(
     (nextRows: Set<string>, nextCols: Set<string>) => {
       const nextTree = treeRef.current;
+      const metricIndexForRowsResolved =
+        findMetricIndex(nextTree.rows) ??
+        metricLayoutIndexOnRows ??
+        metricIndexOnRows;
+      const metricIndexForColsResolved =
+        findMetricIndex(nextTree.cols) ??
+        metricLayoutIndexOnCols ??
+        metricIndexOnCols;
       const nextRenderModel = buildRenderModel({
         tree: nextTree,
         expandedRows: nextRows,
@@ -2130,7 +2174,12 @@ function PivotTableChart(props: PivotTableProps) {
         skipRowRoot: nextRenderModel.skipRowRoot,
         showRowRoot: nextRenderModel.showRowRoot,
         rowTotalPosition: resolvedColTotalPosition,
-        getRowChildren: parent => getRowChildrenForNodes(parent, nextTree.rows),
+        getRowChildren: parent =>
+          getRowChildrenForNodes(
+            parent,
+            nextTree.rows,
+            metricIndexForRowsResolved,
+          ),
         getCollapsedRowChildren: parent =>
           getCollapsedRowChildrenForNodes(parent, nextRows, nextTree.rows),
         skipColRoot: nextRenderModel.skipColRoot,
@@ -2140,7 +2189,12 @@ function PivotTableChart(props: PivotTableProps) {
         rowTotals,
         colTotalPosition: resolvedRowTotalPosition,
         resolvedColSubtotalPosition: effectiveColSubtotalPosition,
-        getColChildren: parent => getColChildrenForNodes(parent, nextTree.cols),
+        getColChildren: parent =>
+          getColChildrenForNodes(
+            parent,
+            nextTree.cols,
+            metricIndexForColsResolved,
+          ),
         getCollapsedColLeaves: parent =>
           getCollapsedColLeavesForNodes(parent, nextCols, nextTree.cols),
         isMetricGrandTotalNode,
@@ -2158,6 +2212,7 @@ function PivotTableChart(props: PivotTableProps) {
       countDimDepth,
       depthSorter,
       effectiveColSubtotalPosition,
+      findMetricIndex,
       getCollapsedColLeavesForNodes,
       getCollapsedRowChildrenForNodes,
       getColChildrenForNodes,
@@ -2165,6 +2220,10 @@ function PivotTableChart(props: PivotTableProps) {
       isMetricGrandTotalNode,
       isMetricSubtotalNode,
       isMetricTokenValue,
+      metricIndexOnCols,
+      metricIndexOnRows,
+      metricLayoutIndexOnCols,
+      metricLayoutIndexOnRows,
       normalizedColSubtotalLevels,
       resolvedColTotalPosition,
       resolvedRowTotalPosition,
@@ -2237,8 +2296,12 @@ function PivotTableChart(props: PivotTableProps) {
     metricIndexForCols,
     isMetricTokenValue,
     countDimDepth,
+    expandRowsLevelRaw,
+    expandColumnsLevelRaw,
     ownState,
+    mergeOwnState,
     setDataMask,
+    shouldPersistExpansionState: persistExpansionState,
     getVisibleExpansionKeys,
     buildRenderModelConfig: buildEngineRenderModelConfig,
     getFetchPath,
@@ -2458,43 +2521,68 @@ function PivotTableChart(props: PivotTableProps) {
       nextExpandedRows: Set<string>,
       nextExpandedCols: Set<string>,
       nextTree: PivotTreeData,
-    ): RenderModelConfig => ({
-      groupbyRowsLength: groupbyRows.length,
-      groupbyColumnsLength: groupbyColumns.length,
-      normalizedRowSubtotalLevels,
-      normalizedColSubtotalLevels,
-      rowTotals,
-      colTotals,
-      rowTotalPosition: resolvedColTotalPosition,
-      colTotalPosition: resolvedRowTotalPosition,
-      resolvedColSubtotalPosition: effectiveColSubtotalPosition,
-      resolvedMetricsLayout,
-      isMultiMetric,
-      metricsFirstOnCols,
-      hideMetricHeaderOnRows,
-      hideMetricHeaderOnCols,
-      rowSorter,
-      colSorter,
-      getRowChildren: parent => getRowChildrenForNodes(parent, nextTree.rows),
-      getCollapsedRowChildren: parent =>
-        getCollapsedRowChildrenForNodes(
-          parent,
-          nextExpandedRows,
-          nextTree.rows,
-        ),
-      getColChildren: parent => getColChildrenForNodes(parent, nextTree.cols),
-      getCollapsedColLeaves: parent =>
-        getCollapsedColLeavesForNodes(parent, nextExpandedCols, nextTree.cols),
-      countDimDepth,
-      isMetricGrandTotalNode,
-      isMetricSubtotalNode,
-      isMetricTokenValue,
-    }),
+    ): RenderModelConfig => {
+      const metricIndexForRowsResolved =
+        findMetricIndex(nextTree.rows) ??
+        metricLayoutIndexOnRows ??
+        metricIndexOnRows;
+      const metricIndexForColsResolved =
+        findMetricIndex(nextTree.cols) ??
+        metricLayoutIndexOnCols ??
+        metricIndexOnCols;
+      return {
+        groupbyRowsLength: groupbyRows.length,
+        groupbyColumnsLength: groupbyColumns.length,
+        normalizedRowSubtotalLevels,
+        normalizedColSubtotalLevels,
+        rowTotals,
+        colTotals,
+        rowTotalPosition: resolvedColTotalPosition,
+        colTotalPosition: resolvedRowTotalPosition,
+        resolvedColSubtotalPosition: effectiveColSubtotalPosition,
+        resolvedMetricsLayout,
+        isMultiMetric,
+        metricsFirstOnCols,
+        hideMetricHeaderOnRows,
+        hideMetricHeaderOnCols,
+        rowSorter,
+        colSorter,
+        getRowChildren: parent =>
+          getRowChildrenForNodes(
+            parent,
+            nextTree.rows,
+            metricIndexForRowsResolved,
+          ),
+        getCollapsedRowChildren: parent =>
+          getCollapsedRowChildrenForNodes(
+            parent,
+            nextExpandedRows,
+            nextTree.rows,
+          ),
+        getColChildren: parent =>
+          getColChildrenForNodes(
+            parent,
+            nextTree.cols,
+            metricIndexForColsResolved,
+          ),
+        getCollapsedColLeaves: parent =>
+          getCollapsedColLeavesForNodes(
+            parent,
+            nextExpandedCols,
+            nextTree.cols,
+          ),
+        countDimDepth,
+        isMetricGrandTotalNode,
+        isMetricSubtotalNode,
+        isMetricTokenValue,
+      };
+    },
     [
       colSorter,
       colTotals,
       countDimDepth,
       effectiveColSubtotalPosition,
+      findMetricIndex,
       getCollapsedColLeavesForNodes,
       getCollapsedRowChildrenForNodes,
       getColChildrenForNodes,
@@ -2507,6 +2595,10 @@ function PivotTableChart(props: PivotTableProps) {
       isMetricSubtotalNode,
       isMetricTokenValue,
       isMultiMetric,
+      metricIndexOnCols,
+      metricIndexOnRows,
+      metricLayoutIndexOnCols,
+      metricLayoutIndexOnRows,
       metricsFirstOnCols,
       normalizedColSubtotalLevels,
       normalizedRowSubtotalLevels,

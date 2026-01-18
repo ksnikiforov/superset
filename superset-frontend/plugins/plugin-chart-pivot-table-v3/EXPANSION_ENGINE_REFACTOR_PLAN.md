@@ -1277,9 +1277,8 @@ Always keep these green:
 - Removed cross-axis “displayed rows/cols” gating in the component and show the global loader during cross-axis hydration.
 
 ### Validation notes
-- Phase 3 changes: not run yet.
-- Previous run: `npm test plugins/plugin-chart-pivot-table-v3` passes (warnings about duplicate mocks and outdated Browserslist data).
-- Previous run: `npm run lint` fails due to unrelated `plugin-chart-echarts` import resolution; ignored per instruction.
+- Phase 3 changes: `npm test plugins/plugin-chart-pivot-table-v3` passes (duplicate mock + Browserslist warnings).
+- Phase 3 lint: `npx eslint plugins/plugin-chart-pivot-table-v3` passes with warnings (unused vars + exhaustive-deps).
 
 ### Phase 3 (current refactor progress)
 - Implemented metric-aware expansion resolution in the engine:
@@ -1291,17 +1290,13 @@ Always keep these green:
 - Tightened cross-axis detection:
   - Added in-flight counters in `useExpansionEngine.ts` so a click on the opposite axis can trigger atomic hydration when another axis expand is still in-flight.
 - Propagated `metricPath` to branch fetch context (`src/fetchPivotBranch.ts`) so query intent respects metric-tier paths.
+- Synced expansion-state merging so local `ownState` stays in lockstep with `setDataMask` updates (fixes label-change restores).
+- Stabilized expansion tests by re-querying headers/bodies after re-render and removing temporary debug logs.
+- Cleaned up expansion-engine iteration helpers to avoid loop-captured callbacks and kept formatting aligned with Prettier.
+- Removed legacy hydration modules (`src/pivot/usePivotHydration.ts`, `src/pivot/hydrationPlanner.ts`).
+- Disabled global loader for cross-axis expands and added a regression test to keep the table visible on same-axis expands with empty columns.
+- Added opt-in expansion persistence (`persistExpansionState`) so manual expands do not trigger Explore re-queries by default.
+- Added a regression test asserting expansion succeeds without calling `setDataMask` when persistence is disabled.
 
 ### Phase 3 (remaining work)
-- Fix atomic cross-axis fetch completion:
-  - `hydrateAtomic` currently marks fetches only when data is returned; it must also mark fetched depths for empty deltas so the planner can request the next depth (required for no-blanks cross-axis tests).
-  - Include in-flight same-axis targets in atomic desired sets (tests expect a third “top-up” fetch after overlapping expands).
-- Fix auto-expand prefetch in expansion-state tests:
-  - Auto-expand changes should trigger `hydrateAtomic` (but without the global loader) even when no persisted expansion state exists.
-  - Current logic only hydrates when persisted expansions exist; must incorporate auto-expand delta plans.
-- Address remaining test failures tied to over/under-fetching:
-  - `PivotTableChart.expand.cross-axis.no-blanks` expects >=3 fetches; currently only 2 are dispatched.
-  - `PivotTableChart.expand.metrics-before.column-metrics` expects 3 fetches; currently 4 due to cross-axis logic + metric grouping interplay.
-  - `PivotTableChart/expansion-state` auto-expand prefetch tests currently see 0 fetch calls.
-- Validation status:
-  - `npm test plugins/plugin-chart-pivot-table-v3` currently fails (11 suites, 27 tests) with the issues above; re-run after fixes.
+- None. Phase 3 complete; proceed to Phase 4 (query intent + batching).

@@ -25,7 +25,10 @@ import {
   buildTreeFromRecords,
   METRICS_PLACEHOLDER,
 } from '../../../../src/utils';
-import { fetchPivotBranch } from '../../../../src/fetchPivotBranch';
+import {
+  clearPivotBranchCache,
+  fetchPivotBranch,
+} from '../../../../src/fetchPivotBranch';
 import { buildFormData } from '../../fixtures/pivotFormData';
 
 jest.mock('../../../../src/fetchPivotBranch', () => {
@@ -39,7 +42,9 @@ jest.mock('../../../../src/fetchPivotBranch', () => {
 describe('PivotTableChart expansion with metrics between dimensions (expansion)', () => {
   const fetchPivotBranchMock = fetchPivotBranch as jest.Mock;
   beforeEach(() => {
-    fetchPivotBranchMock.mockClear();
+    fetchPivotBranchMock.mockReset();
+    fetchPivotBranchMock.mockResolvedValue({ data: undefined });
+    clearPivotBranchCache();
   });
 
   const metrics = ['averageOrderValue', 'weightedDiscount'];
@@ -972,7 +977,6 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
     const baseTree = buildTreeAtDepth(records, 1);
     const metricBranch = buildCollapsedBranch(records, 2);
     const shipModeBranch = buildTreeAtDepth(records, 3);
-
     fetchPivotBranchMock
       .mockResolvedValueOnce({ data: metricBranch })
       .mockResolvedValueOnce({ data: shipModeBranch });
