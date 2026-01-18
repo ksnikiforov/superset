@@ -8,7 +8,7 @@ Scope: `superset-frontend/plugins/plugin-chart-pivot-table-v3/` only.
 
 - The UI **MUST NOT** show blank intersection cells caused by missing data while an expansion is considered “applied”.
 - The UI **MUST NOT** visually collapse already-expanded structure and then re-expand it as new responses arrive.
-- The fetch/query phase **MAY** be fully parallel; only the **reveal** (what the user sees) may wait for completeness.
+- The fetch/query phase **MUST** be as parallel as possible; only the **reveal** (what the user sees) waits for completeness.
 - The system must support both:
   - ordered, user-driven “expand one layer at a time” operations, and
   - known-target expansion (auto-expand).
@@ -40,7 +40,7 @@ The user expands **one layer at a time** (ordered operations). For this mode:
 
 - The implementation **MUST** treat each user step as an ordered transaction boundary.
 - The implementation **MUST** preserve the order of user intent, even if queries resolve out-of-order.
-- The implementation **MAY** run requests in parallel within a step.
+- The implementation **MUST** run requests in parallel within a step.
 
 Example (rows step, then columns step):
 
@@ -64,14 +64,14 @@ Auto-expand has a known target expansion depth/shape. For this mode:
 
 ## When a transaction is used
 
-Transactions are used only for **cross-axis** actions (row+col), not for persisted hydration.
+This spec covers transactions used for **cross-axis manual actions** (row+col). Persisted restore and auto-expand also use atomic reveal, but their transaction boundaries are defined by their drivers (dashboard load, known target).
 
 ### Start / Extend criteria
 
 On a user expand click:
 
 - If there is an **in-flight expand** on the *other axis*, the implementation **MUST** start or extend a transaction.
-- Optionally, if there was a click on the other axis within a short **coalescing window** (e.g. `0–50ms`), the implementation **MAY** treat it as a transaction even if the first request already resolved.
+- If there was a click on the other axis within the **coalescing window** (`COALESCE_WINDOW_MS = 50`), the implementation **MUST** start or extend a transaction even if the first request already resolved.
 
 Rationale: cross-axis expands can require intersection cells that are not present in earlier responses fetched at a smaller opposite-axis depth.
 
@@ -107,34 +107,39 @@ Rationale: cross-axis expands can require intersection cells that are not presen
   - keep the prior stable state visible,
   - show per-toggle spinners for toggles involved in the transaction,
   - disable those toggles to avoid reentrancy.
-- The UI **MUST NOT** show global chart loading for manual transactions (global loading is reserved for persisted hydration semantics).
+- The UI **MUST** show a blocking chart-level overlay spinner while the transaction is pending (atomic reveal guarantee). Same-axis non-transaction expands keep the table interactive and use per-toggle spinners only.
 
 ### 4) Cancellation / superseding rules
 
-If the user interacts while a transaction is pending, the implementation **MUST** follow a deterministic rule:
+If the user interacts while a transaction is pending, the implementation **MUST** follow deterministic rules:
 
-- **Collapse of a key involved in the transaction**:
-  - Either (A) cancel the transaction and keep the previous stable state, or (B) recompute and restart the transaction with the new desired final state.
-  - The chosen behavior must be consistent across axes and covered by tests.
-- **New expand on the same axis not included in the transaction**:
-  - Either add it to the same transaction (extend desired state) or queue it as a separate action after completion.
+- **Collapse (any axis)**:
+  - **MUST** cancel the transaction immediately (Cancel-and-revert), keep the prior committed state visible, clear spinners/overlay.
+  - The collapse intent is then processed against the committed state as a separate action (no partial transaction reveal).
+- **New expand (either axis)**:
+  - **MUST** extend the existing transaction: incorporate the new desired final state, recompute the required plan, dispatch any additional requests in parallel, and keep the overlay until the updated final state is satisfied.
 - **Dataset/epoch change** (Update Now, filter change):
-  - MUST cancel/ignore all buffered results (epoch gating), clear transaction state.
+  - **MUST** cancel/ignore all buffered results (epoch gating) and clear transaction state.
 
 ### 5) Error / timeout rules
 
 - If any required request fails:
   - The transaction **MUST** fail closed: keep the prior stable state, show an error message, clear spinners, allow retry.
 - If a required request never resolves:
-  - The transaction **MUST** time out (configured threshold) and fail closed as above.
+  - The transaction **MUST** time out (`TRANSACTION_TIMEOUT_MS = 30000`) and fail closed as above.
 
 ## Required tests (must exist and enforce rules)
 
-Tests should live under `test/plugin/expand/`:
+Tests should live under `test/plugin/expand/` and should be explicit about request ordering (resolve/reject/never-resolve):
 
 - **Cross-axis atomic apply**: assert no structure/value changes are applied until all required responses resolve.
+- **No blank values even briefly**: assert the committed table remains visible until reveal; never show an “expanded but empty intersection” state.
 - **No collapse flicker**: assert that previously-visible expanded nodes never disappear while a cross-axis transaction is pending.
-- **Parallel fetch / gated reveal**: assert that requests can resolve in any order and are staged without immediate reveal.
+- **Parallel fetch / gated reveal**: assert requests are started without awaiting each other and may resolve in any order; reveal still happens once.
+- **Extend transaction on new expand**: click row expand, then col expand, then another row expand while pending; assert the transaction extends and reveal occurs once when the final plan is satisfied.
+- **Cancel-and-revert on collapse**: start a cross-axis transaction, click collapse while pending; assert the transaction is canceled, committed UI remains stable, and late responses are ignored.
+- **Failure closed**: one request rejects; assert no reveal, overlay clears, error displayed.
+- **Timeout closed**: one request never resolves; advance timers; assert no reveal, overlay clears, error displayed.
 
 ## Notes
 
