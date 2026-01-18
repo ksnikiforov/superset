@@ -772,43 +772,6 @@ describe('PivotTableChart expansion state persistence', () => {
     await waitFor(() => expect(screen.queryAllByText('X').length).toEqual(0));
   });
 
-  it('persists auto-expand rows when cleared to zero', async () => {
-    const setControlValue = jest.fn();
-    const { rerender } = render(
-      buildChartProps({
-        data: buildTree(2),
-        setControlValue,
-        formDataOverrides: {
-          expandRowsLevel: 2,
-        },
-      }),
-    );
-
-    await waitFor(() =>
-      expect(screen.getAllByText('X').length).toBeGreaterThan(0),
-    );
-    setControlValue.mockClear();
-
-    rerender(
-      buildChartProps({
-        data: buildTree(2),
-        setControlValue,
-        formDataOverrides: {
-          expandRowsLevel: undefined,
-        },
-      }),
-    );
-
-    await waitFor(() =>
-      expect(
-        setControlValue.mock.calls.some(
-          ([controlName, value]) =>
-            controlName === 'expandRowsLevel' && value === 0,
-        ),
-      ).toBe(true),
-    );
-  });
-
   it('keeps manual expansions when auto-expand is set to zero', async () => {
     const deepGroupby = ['r1', 'r2', 'r3'];
     const deepRecords = [

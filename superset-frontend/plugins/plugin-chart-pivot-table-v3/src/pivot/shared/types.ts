@@ -17,11 +17,29 @@
  * under the License.
  */
 
-import {
-  PivotExpansionPlan,
-  planExpansionForAxis,
-} from './engine/expansionPlanner';
+import { type HeaderCellInfo } from '../viewModel';
+import { type VisibleCellEntry } from '../cellUtils';
+import { type PivotTreeNode } from '../../types';
 
-export type PivotHydrationPlan = PivotExpansionPlan;
+export type RenderModel = {
+  visibleRows: PivotTreeNode[];
+  visibleCols: PivotTreeNode[];
+  colLeaves: PivotTreeNode[];
+  columnHeaderRows: HeaderCellInfo[][];
+  visibleCellEntries: VisibleCellEntry[];
+  showRowRoot: boolean;
+  showColRoot: boolean;
+  skipRowRoot: boolean;
+  skipColRoot: boolean;
+  hideMetricHeaderOnRows: boolean;
+  hideMetricHeaderOnCols: boolean;
+  shouldHideMetricGrandTotalsOnRows: boolean;
+  shouldHideMetricGrandTotalsOnCols: boolean;
+  shouldSuppressColRoot: boolean;
+};
 
-export const planHydrationForAxis = planExpansionForAxis;
+export type FormattingKeys = {
+  backgroundColor?: string;
+  textColor?: string;
+  d3Format?: string;
+};

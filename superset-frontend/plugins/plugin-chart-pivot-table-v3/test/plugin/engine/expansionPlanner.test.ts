@@ -1,0 +1,219 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+import { PivotAxis, PivotTreeNode } from '../../../src/types';
+import { planExpansionForAxis } from '../../../src/pivot/engine/expansionPlanner';
+import { serializePath } from '../../../src/utils';
+import { rootKey } from '../../../src/pivot/viewModel';
+
+const makeNode = ({
+  axis,
+  path,
+  hasChildren = false,
+  label,
+}: {
+  axis: PivotAxis;
+  path: PivotTreeNode['path'];
+  hasChildren?: boolean;
+  label?: string;
+}): PivotTreeNode => ({
+  axis,
+  key: serializePath(path),
+  path,
+  label: label ?? String(path[path.length - 1] ?? 'Grand total'),
+  formattedLabel: label ?? String(path[path.length - 1] ?? 'Grand total'),
+  level: path.length,
+  hasChildren,
+  isSubtotal: false,
+});
+
+const sortKeys = (keys: Set<string>) => Array.from(keys).sort();
+
+describe('expansionPlanner', () => {
+  it('treats nodes as satisfied when fetched depth meets the requirement', () => {
+    const keyA = serializePath(['A']);
+    const nodes: Record<string, PivotTreeNode> = {
+      [rootKey]: makeNode({ axis: 'row', path: [], hasChildren: true }),
+      [keyA]: makeNode({ axis: 'row', path: ['A'], hasChildren: true }),
+    };
+
+    const plan = planExpansionForAxis({
+      axis: 'row',
+      expandedKeys: new Set([rootKey, keyA]),
+      nodes,
+      requiredDepth: 1,
+      fetchedDepthByKey: new Map([[keyA, 1]]),
+      hasLoadedChildren: () => true,
+    });
+
+    expect(sortKeys(plan.fetchKeys)).toEqual([]);
+    expect(sortKeys(plan.pendingKeys)).toEqual([]);
+    expect(plan.hasMissingNodes).toBe(false);
+  });
+
+  it('requires a fetch when the required depth increases', () => {
+    const keyA = serializePath(['A']);
+    const nodes: Record<string, PivotTreeNode> = {
+      [rootKey]: makeNode({ axis: 'row', path: [], hasChildren: true }),
+      [keyA]: makeNode({ axis: 'row', path: ['A'], hasChildren: true }),
+    };
+
+    const plan = planExpansionForAxis({
+      axis: 'row',
+      expandedKeys: new Set([rootKey, keyA]),
+      nodes,
+      requiredDepth: 2,
+      fetchedDepthByKey: new Map([[keyA, 1]]),
+      hasLoadedChildren: () => true,
+    });
+
+    expect(sortKeys(plan.fetchKeys)).toEqual([keyA]);
+    expect(sortKeys(plan.pendingKeys)).toEqual([keyA]);
+  });
+
+  it('treats nodes as pending when children are not loaded at depth zero', () => {
+    const keyA = serializePath(['A']);
+    const nodes: Record<string, PivotTreeNode> = {
+      [rootKey]: makeNode({ axis: 'row', path: [], hasChildren: true }),
+      [keyA]: makeNode({ axis: 'row', path: ['A'], hasChildren: true }),
+    };
+
+    const plan = planExpansionForAxis({
+      axis: 'row',
+      expandedKeys: new Set([rootKey, keyA]),
+      nodes,
+      requiredDepth: 0,
+      fetchedDepthByKey: new Map(),
+      hasLoadedChildren: () => false,
+    });
+
+    expect(sortKeys(plan.fetchKeys)).toEqual([keyA]);
+    expect(sortKeys(plan.pendingKeys)).toEqual([keyA]);
+  });
+
+  it('fetches missing keys when the nearest ancestor is satisfied', () => {
+    const keyA = serializePath(['A']);
+    const keyAB = serializePath(['A', 'B']);
+    const nodes: Record<string, PivotTreeNode> = {
+      [rootKey]: makeNode({ axis: 'row', path: [], hasChildren: true }),
+      [keyA]: makeNode({ axis: 'row', path: ['A'], hasChildren: true }),
+    };
+
+    const plan = planExpansionForAxis({
+      axis: 'row',
+      expandedKeys: new Set([rootKey, keyA, keyAB]),
+      nodes,
+      requiredDepth: 1,
+      fetchedDepthByKey: new Map([[keyA, 1]]),
+      hasLoadedChildren: () => true,
+    });
+
+    expect(sortKeys(plan.fetchKeys)).toEqual([keyAB]);
+    expect(sortKeys(plan.pendingKeys)).toEqual([keyAB]);
+    expect(plan.hasMissingNodes).toBe(true);
+  });
+
+  it('fetches the ancestor when a missing key needs deeper data', () => {
+    const keyA = serializePath(['A']);
+    const keyAB = serializePath(['A', 'B']);
+    const nodes: Record<string, PivotTreeNode> = {
+      [rootKey]: makeNode({ axis: 'row', path: [], hasChildren: true }),
+      [keyA]: makeNode({ axis: 'row', path: ['A'], hasChildren: true }),
+    };
+
+    const plan = planExpansionForAxis({
+      axis: 'row',
+      expandedKeys: new Set([rootKey, keyA, keyAB]),
+      nodes,
+      requiredDepth: 2,
+      fetchedDepthByKey: new Map([[keyA, 1]]),
+      hasLoadedChildren: () => true,
+    });
+
+    expect(sortKeys(plan.fetchKeys)).toEqual([keyA]);
+    expect(sortKeys(plan.pendingKeys)).toEqual([keyA, keyAB]);
+    expect(plan.hasMissingNodes).toBe(true);
+  });
+
+  it('updates planned fetches as expansion and depth evolve', () => {
+    const keyA = serializePath(['A']);
+    const keyAB = serializePath(['A', 'B']);
+    const baseNodes: Record<string, PivotTreeNode> = {
+      [rootKey]: makeNode({ axis: 'row', path: [], hasChildren: true }),
+      [keyA]: makeNode({ axis: 'row', path: ['A'], hasChildren: true }),
+    };
+    const hasLoadedChildren = () => true;
+
+    const plan1 = planExpansionForAxis({
+      axis: 'row',
+      expandedKeys: new Set([rootKey, keyA]),
+      nodes: baseNodes,
+      requiredDepth: 1,
+      fetchedDepthByKey: new Map(),
+      hasLoadedChildren,
+    });
+    expect(sortKeys(plan1.fetchKeys)).toEqual([keyA]);
+
+    const fetchedDepth = new Map([[keyA, 1]]);
+    const plan2 = planExpansionForAxis({
+      axis: 'row',
+      expandedKeys: new Set([rootKey, keyA]),
+      nodes: baseNodes,
+      requiredDepth: 1,
+      fetchedDepthByKey: fetchedDepth,
+      hasLoadedChildren,
+    });
+    expect(sortKeys(plan2.fetchKeys)).toEqual([]);
+
+    const plan3 = planExpansionForAxis({
+      axis: 'row',
+      expandedKeys: new Set([rootKey, keyA, keyAB]),
+      nodes: baseNodes,
+      requiredDepth: 1,
+      fetchedDepthByKey: fetchedDepth,
+      hasLoadedChildren,
+    });
+    expect(sortKeys(plan3.fetchKeys)).toEqual([keyAB]);
+
+    const plan4 = planExpansionForAxis({
+      axis: 'row',
+      expandedKeys: new Set([rootKey, keyA, keyAB]),
+      nodes: baseNodes,
+      requiredDepth: 2,
+      fetchedDepthByKey: fetchedDepth,
+      hasLoadedChildren,
+    });
+    expect(sortKeys(plan4.fetchKeys)).toEqual([keyA]);
+    expect(sortKeys(plan4.pendingKeys)).toEqual([keyA, keyAB]);
+
+    const nodesWithChild: Record<string, PivotTreeNode> = {
+      ...baseNodes,
+      [keyAB]: makeNode({ axis: 'row', path: ['A', 'B'] }),
+    };
+    const plan5 = planExpansionForAxis({
+      axis: 'row',
+      expandedKeys: new Set([rootKey, keyA, keyAB]),
+      nodes: nodesWithChild,
+      requiredDepth: 2,
+      fetchedDepthByKey: new Map([[keyA, 2]]),
+      hasLoadedChildren,
+    });
+    expect(sortKeys(plan5.fetchKeys)).toEqual([]);
+  });
+});

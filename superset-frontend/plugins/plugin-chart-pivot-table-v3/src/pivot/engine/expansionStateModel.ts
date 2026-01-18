@@ -17,22 +17,22 @@
  * under the License.
  */
 
-import { PivotPath, PivotTreeNode, TotalPosition } from '../types';
+import { PivotPath, PivotTreeNode, TotalPosition } from '../../types';
 import {
   decodeMetricKey,
   isSubtotalToken,
   parsePath,
   serializePath,
-} from '../utils';
+} from '../../utils';
 import {
   buildVisibleCols,
   buildVisibleRows,
   createColLeavesBuilder,
-} from './visibility';
-import { countDimDepth } from './metricsTotals';
-import { rootKey } from './viewModel';
+} from '../visibility';
+import { countDimDepth } from '../metricsTotals';
+import { rootKey } from '../viewModel';
 
-type PivotExpansionStateKeys = {
+export type PivotExpansionStateKeys = {
   rows: string[];
   cols: string[];
   collapsedRows: string[];

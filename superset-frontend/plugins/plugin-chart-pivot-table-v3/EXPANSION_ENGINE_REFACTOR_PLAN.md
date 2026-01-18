@@ -16,7 +16,7 @@ Notes for implementers:
 - New `.ts`/`.tsx` files must include the ASF license header.
 - Quality gates:
   - tests: `npm test plugins/plugin-chart-pivot-table-v3`
-  - lint: `npm run lint`
+  - lint: `npx lint plugins/plugin-chart-pivot-table-v3`
 
 ## 0) Why this refactor exists
 
@@ -1239,3 +1239,69 @@ Exit criteria (Phase 6):
 Always keep these green:
 - `npm test plugins/plugin-chart-pivot-table-v3`
 - plugin lint (`npm run lint` or `eslint` subset)
+
+## Refactor log (work completed)
+
+### Phase 0 + early Phase 1
+- Removed legacy knobs/aliases:
+  - `maxDepthPerFetch`, `formData.expansionState`, `colSubTotals`, alias fields (`conditionalFormatting`, `extraFormData`, `timeRange`), `legacy_order_by`.
+- Swapped totals semantics (rowTotals/colTotals) across types, control panel, query building, fetch, and rendering.
+- Removed depth bumping from `buildQuery.ts` (persisted expansion no longer increases initial depths).
+- Simplified branch fetch depth to one level per expand (no auto bump).
+- Updated README/requirements to reflect the new config surface (no maxDepthPerFetch).
+- Updated tests/fixtures to use canonical fields only and new totals semantics.
+- Expansion persistence now uses ownState only (no formData persistence).
+- Added engine state model:
+  - New `src/pivot/engine/expansionStateModel.ts` (moved logic from `src/pivot/expansionPersistence.ts`).
+  - Added unit tests: `test/plugin/engine/expansionStateModel.test.ts`.
+  - Removed `src/pivot/expansionPersistence.ts` and rewired `PivotTableChart.tsx` imports.
+
+### Phase 1 continuation
+- Added engine expansion planner:
+  - New `src/pivot/engine/expansionPlanner.ts` (pure planner extracted from hydration logic).
+  - Added unit tests: `test/plugin/engine/expansionPlanner.test.ts`.
+  - `src/pivot/hydrationPlanner.ts` now re-exports `planExpansionForAxis` to keep legacy wiring aligned.
+
+### Phase 2
+- Added fetch coordinator + staging tree primitives:
+  - New `src/pivot/engine/fetchCoordinator.ts` with LRU cache, in-flight dedupe, epoch gating, and cancellation semantics.
+  - New `src/pivot/engine/stagingTree.ts` for order-independent delta merging.
+  - Added unit tests: `test/plugin/engine/fetchCoordinator.test.ts`, `test/plugin/engine/stagingTree.test.ts`.
+
+### Phase 3 (partial)
+- Rendering split started:
+  - Added `src/pivot/render/renderModel.ts` + `src/pivot/shared/types.ts` (RenderModel + formatting keys).
+  - Added `src/pivot/render/PivotTableView.tsx` and moved table rendering into the view component.
+  - Added tests: `test/plugin/render/renderModel.test.ts`, `test/plugin/render/PivotTableView.test.tsx`.
+- PivotTableChart now builds a RenderModel and delegates rendering to `PivotTableView`.
+- Removed cross-axis “displayed rows/cols” gating in the component and show the global loader during cross-axis hydration.
+
+### Validation notes
+- Phase 3 changes: not run yet.
+- Previous run: `npm test plugins/plugin-chart-pivot-table-v3` passes (warnings about duplicate mocks and outdated Browserslist data).
+- Previous run: `npm run lint` fails due to unrelated `plugin-chart-echarts` import resolution; ignored per instruction.
+
+### Phase 3 (current refactor progress)
+- Implemented metric-aware expansion resolution in the engine:
+  - Added metric-pattern expansion helpers (e.g. `expandMetricPatternExpansions`, `resolveExpandedForMetrics`) and collapse-aware pruning in `src/pivot/engine/useExpansionEngine.ts`.
+  - Added fetched-depth pruning on collapse to avoid stale expansion depth entries.
+- Reworked same-axis expansion hydration to avoid refetch storms:
+  - Same-axis expands now iterate a bounded hydration loop and group fetch keys by their metric-less path to reuse a single branch fetch across metric tier keys.
+  - Added representative-key selection and per-branch fetched-depth tracking to avoid re-fetching already satisfied metric siblings.
+- Tightened cross-axis detection:
+  - Added in-flight counters in `useExpansionEngine.ts` so a click on the opposite axis can trigger atomic hydration when another axis expand is still in-flight.
+- Propagated `metricPath` to branch fetch context (`src/fetchPivotBranch.ts`) so query intent respects metric-tier paths.
+
+### Phase 3 (remaining work)
+- Fix atomic cross-axis fetch completion:
+  - `hydrateAtomic` currently marks fetches only when data is returned; it must also mark fetched depths for empty deltas so the planner can request the next depth (required for no-blanks cross-axis tests).
+  - Include in-flight same-axis targets in atomic desired sets (tests expect a third “top-up” fetch after overlapping expands).
+- Fix auto-expand prefetch in expansion-state tests:
+  - Auto-expand changes should trigger `hydrateAtomic` (but without the global loader) even when no persisted expansion state exists.
+  - Current logic only hydrates when persisted expansions exist; must incorporate auto-expand delta plans.
+- Address remaining test failures tied to over/under-fetching:
+  - `PivotTableChart.expand.cross-axis.no-blanks` expects >=3 fetches; currently only 2 are dispatched.
+  - `PivotTableChart.expand.metrics-before.column-metrics` expects 3 fetches; currently 4 due to cross-axis logic + metric grouping interplay.
+  - `PivotTableChart/expansion-state` auto-expand prefetch tests currently see 0 fetch calls.
+- Validation status:
+  - `npm test plugins/plugin-chart-pivot-table-v3` currently fails (11 suites, 27 tests) with the issues above; re-run after fixes.

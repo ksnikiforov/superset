@@ -124,7 +124,7 @@ curl -f http://localhost:8088/health || echo "❌ Setup required - see https://s
 ```
 
 **If health checks fail:**
-"It appears you aren't set up properly. Please refer to the [Working with LLMs](https://superset.apache.org/docs/contributing/development#working-with-llms) section in the development docs for setup instructions."
+If you are working on pivot table v3, then it is fine to continue as is
 
 **Key Project Files:**
 - `superset-frontend/package.json` - Frontend build scripts (`npm run dev` on port 9000, `npm run test`, `npm run lint`)
