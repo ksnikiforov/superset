@@ -119,6 +119,10 @@ const StyledTable = styled.table<{ $stickyHeaders: boolean }>`
     font-weight: 600;
   }
 
+  .pivot-null-label {
+    color: ${({ theme }) => theme.colorTextQuaternary};
+  }
+
   .pivot-sticky-corner {
     ${({ $stickyHeaders }) =>
       $stickyHeaders
@@ -208,6 +212,14 @@ const normalizeD3Format = (rawValue: unknown) => {
   }
   const value = rawValue.trim();
   return value.length > 0 ? value : undefined;
+};
+
+const isNullLabelValue = (node: PivotTreeNode) => {
+  if (!node.path || node.path.length === 0) {
+    return false;
+  }
+  const last = node.path[node.path.length - 1];
+  return last === null || last === undefined;
 };
 
 const shouldApplyMetricFormatting = (
@@ -417,7 +429,15 @@ export const PivotTableView = ({
                               )}
                             </ToggleButton>
                           )}
-                          <span>{formatLabel(cell.node, 'col')}</span>
+                          <span
+                            className={
+                              isNullLabelValue(cell.node)
+                                ? 'pivot-null-label'
+                                : undefined
+                            }
+                          >
+                            {formatLabel(cell.node, 'col')}
+                          </span>
                           {showColSpinner(cell.node.key) && <Spinner />}
                         </ColumnHeaderCell>
                       </th>
@@ -474,7 +494,13 @@ export const PivotTableView = ({
                           )}
                         </ToggleButton>
                       ) : null}
-                      <span>{formatLabel(row, 'row')}</span>
+                      <span
+                        className={
+                          isNullLabelValue(row) ? 'pivot-null-label' : undefined
+                        }
+                      >
+                        {formatLabel(row, 'row')}
+                      </span>
                       {showRowSpinner(row.key) && <Spinner />}
                     </HeaderCell>
                   </th>

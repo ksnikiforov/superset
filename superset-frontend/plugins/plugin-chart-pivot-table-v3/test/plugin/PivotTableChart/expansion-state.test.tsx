@@ -31,8 +31,10 @@ import {
   applyMetricAxis,
   buildTreeFromRecords,
   injectRowSubtotalLeaves,
+  mergeTrees,
   METRIC_TOKEN_PREFIX,
   PATH_DIVIDER,
+  parsePath,
   SUBTOTAL_TOKEN,
 } from '../../../src/utils';
 import {
@@ -40,6 +42,11 @@ import {
   peekPivotBranchCache,
 } from '../../../src/fetchPivotBranch';
 import type { FetchPivotBranchResult } from '../../../src/fetchPivotBranch';
+import {
+  fetchPivotBranchesBatch,
+  type FetchPivotBranchesBatchParams,
+  type FetchPivotBranchesBatchResult,
+} from '../../../src/pivot/engine/query/fetchPivotBranchesBatch';
 import { buildFormData } from '../fixtures/pivotFormData';
 
 jest.mock('../../../src/fetchPivotBranch', () => {
@@ -51,9 +58,44 @@ jest.mock('../../../src/fetchPivotBranch', () => {
   };
 });
 
+jest.mock('../../../src/pivot/engine/query/fetchPivotBranchesBatch', () => ({
+  fetchPivotBranchesBatch: jest.fn(),
+}));
+
 describe('PivotTableChart expansion state persistence', () => {
   const fetchPivotBranchMock = fetchPivotBranch as jest.Mock;
   const peekPivotBranchCacheMock = peekPivotBranchCache as jest.Mock;
+  const fetchPivotBranchesBatchMock =
+    fetchPivotBranchesBatch as jest.MockedFunction<
+      typeof fetchPivotBranchesBatch
+    >;
+
+  const resolveBatchWithSingles = async ({
+    batch,
+    formData,
+    currentTree,
+    visibleRowDepth,
+    visibleColDepth,
+    getFetchPath,
+  }: FetchPivotBranchesBatchParams): Promise<FetchPivotBranchesBatchResult> => {
+    let merged: PivotTreeData | undefined;
+    for (const target of batch.targets) {
+      const path = parsePath(target.pathKey);
+      const result = await Promise.resolve(
+        fetchPivotBranchMock({
+          formData,
+          axis: batch.axis,
+          path: getFetchPath(path),
+          metricPath: path,
+          currentTree,
+          visibleRowDepth,
+          visibleColDepth,
+        }),
+      );
+      merged = mergeTrees(merged, result.data);
+    }
+    return { data: merged };
+  };
 
   const createDeferred = <T,>() => {
     let resolve: ((value: T) => void) | undefined;
@@ -173,7 +215,9 @@ describe('PivotTableChart expansion state persistence', () => {
   beforeEach(() => {
     fetchPivotBranchMock.mockClear();
     peekPivotBranchCacheMock.mockClear();
+    fetchPivotBranchesBatchMock.mockReset();
     peekPivotBranchCacheMock.mockReturnValue(undefined);
+    fetchPivotBranchesBatchMock.mockImplementation(resolveBatchWithSingles);
   });
 
   it('stores expansion state via setControlValue when toggled', async () => {
@@ -1667,11 +1711,8 @@ describe('PivotTableChart expansion state persistence', () => {
   });
 
   it('shows a global loader for persisted expansion prefetch', async () => {
-    const deferredA = createDeferred<FetchPivotBranchResult>();
-    const deferredB = createDeferred<FetchPivotBranchResult>();
-    fetchPivotBranchMock
-      .mockReturnValueOnce(deferredA.promise)
-      .mockReturnValueOnce(deferredB.promise);
+    const deferred = createDeferred<FetchPivotBranchResult>();
+    fetchPivotBranchMock.mockImplementation(() => deferred.promise);
 
     const pivotExpansionState = {
       rowKeys: rowGroupby,
@@ -1689,15 +1730,13 @@ describe('PivotTableChart expansion state persistence', () => {
       }),
     );
 
-    await waitFor(() =>
-      expect(fetchPivotBranchMock.mock.calls.length).toBeGreaterThanOrEqual(2),
-    );
+    await waitFor(() => expect(fetchPivotBranchMock).toHaveBeenCalled());
     expect(
       screen.getByRole('status', { name: /loading/i }),
     ).toBeInTheDocument();
 
-    deferredA.resolve({ data: buildTree(2) });
-    deferredB.resolve({ data: buildTree(2) });
+    deferred.resolve({ data: buildTree(2) });
+    await fetchPivotBranchMock.mock.results[0]?.value;
 
     await waitFor(() =>
       expect(

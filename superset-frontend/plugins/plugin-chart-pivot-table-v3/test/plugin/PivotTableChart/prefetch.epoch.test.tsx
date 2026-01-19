@@ -23,12 +23,19 @@ import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
 import {
   applyMetricAxis,
   buildTreeFromRecords,
+  mergeTrees,
+  parsePath,
 } from '../../../src/utils';
 import {
   fetchPivotBranch,
   peekPivotBranchCache,
 } from '../../../src/fetchPivotBranch';
 import type { FetchPivotBranchResult } from '../../../src/fetchPivotBranch';
+import {
+  fetchPivotBranchesBatch,
+  type FetchPivotBranchesBatchParams,
+  type FetchPivotBranchesBatchResult,
+} from '../../../src/pivot/engine/query/fetchPivotBranchesBatch';
 import { buildFormData } from '../fixtures/pivotFormData';
 
 jest.mock('../../../src/fetchPivotBranch', () => {
@@ -39,6 +46,10 @@ jest.mock('../../../src/fetchPivotBranch', () => {
     peekPivotBranchCache: jest.fn(),
   };
 });
+
+jest.mock('../../../src/pivot/engine/query/fetchPivotBranchesBatch', () => ({
+  fetchPivotBranchesBatch: jest.fn(),
+}));
 
 type Deferred<T> = {
   promise: Promise<T>;
@@ -90,11 +101,44 @@ describe('PivotTableChart persisted prefetch ignores stale results', () => {
   const peekPivotBranchCacheMock = peekPivotBranchCache as jest.MockedFunction<
     typeof peekPivotBranchCache
   >;
+  const fetchPivotBranchesBatchMock =
+    fetchPivotBranchesBatch as jest.MockedFunction<
+      typeof fetchPivotBranchesBatch
+    >;
+
+  const resolveBatchWithSingles = async ({
+    batch,
+    formData,
+    currentTree,
+    visibleRowDepth,
+    visibleColDepth,
+    getFetchPath,
+  }: FetchPivotBranchesBatchParams): Promise<FetchPivotBranchesBatchResult> => {
+    let merged: PivotTreeData | undefined;
+    for (const target of batch.targets) {
+      const path = parsePath(target.pathKey);
+      const result = await Promise.resolve(
+        fetchPivotBranchMock({
+          formData,
+          axis: batch.axis,
+          path: getFetchPath(path),
+          metricPath: path,
+          currentTree,
+          visibleRowDepth,
+          visibleColDepth,
+        }),
+      );
+      merged = mergeTrees(merged, result.data);
+    }
+    return { data: merged };
+  };
 
   beforeEach(() => {
     fetchPivotBranchMock.mockReset();
     peekPivotBranchCacheMock.mockReset();
+    fetchPivotBranchesBatchMock.mockReset();
     peekPivotBranchCacheMock.mockReturnValue(undefined);
+    fetchPivotBranchesBatchMock.mockImplementation(resolveBatchWithSingles);
   });
 
   it('does not apply an in-flight prefetch result after base data changes', async () => {
@@ -130,6 +174,14 @@ describe('PivotTableChart persisted prefetch ignores stale results', () => {
           colTotals: false,
           rowTotals: false,
           rowSubTotals: false,
+          pivotExpansionState: {
+            rowKeys: rowGroupby,
+            colKeys: colGroupby,
+            rows: [['A']],
+            cols: [],
+            collapsedRows: [],
+            collapsedCols: [],
+          },
         })}
         metrics={metrics}
         groupbyRows={rowGroupby}
@@ -154,16 +206,6 @@ describe('PivotTableChart persisted prefetch ignores stale results', () => {
         setDataMask={jest.fn()}
         metricColorFormatters={[]}
         dateFormatters={{}}
-        ownState={{
-          expansionState: {
-            rowKeys: rowGroupby,
-            colKeys: colGroupby,
-            rows: [['A']],
-            cols: [],
-            collapsedRows: [],
-            collapsedCols: [],
-          },
-        }}
       />
     );
 

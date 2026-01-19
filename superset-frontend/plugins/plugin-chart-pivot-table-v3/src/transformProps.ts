@@ -38,13 +38,9 @@ import {
 import {
   applyMetricAxis,
   buildTreeFromRecords,
-  collectDimensionFormattingMetricsForQuery,
-  collectMetricFormattingMetricsForQuery,
-  collectMetricDatabarMetricsForQuery,
   getMetricKeys,
   getStableColumnKey,
   mergeTrees,
-  mergeMetrics,
   normalizeDimensionFormattingMapWithKeys,
   normalizeDimensionSortingMapWithKeys,
   normalizeMetricFormattingMapWithKeys,
@@ -57,8 +53,9 @@ import {
   labelRowSubtotalLeaves,
   serializeCellKey,
   serializePath,
-  collectDimensionSortingMetricsForQuery,
 } from './utils';
+import { buildQueryShape } from './pivot/engine/query/queryShape';
+import { type QueryIntent } from './pivot/engine/query/queryIntent';
 
 const { DATABASE_DATETIME } = TimeFormats;
 
@@ -87,10 +84,6 @@ export default function transformProps(
     formData.metricDatabars,
     metrics,
   );
-  const formattingMetrics =
-    collectMetricFormattingMetricsForQuery(metricFormatting);
-  const databarMetrics = collectMetricDatabarMetricsForQuery(metricDatabars);
-  const metricsForQuery = mergeMetrics(metrics, formattingMetrics);
   const groupbyRowsRaw = ensureIsArray(formData.groupbyRows || []);
   const groupbyColumnsRaw = ensureIsArray(formData.groupbyColumns || []);
   const placement = resolveMetricPlacement(groupbyRowsRaw, groupbyColumnsRaw, {
@@ -115,29 +108,6 @@ export default function transformProps(
     formData.colSorting,
     groupbyColumns,
   );
-  const rowFormattingMetrics = collectDimensionFormattingMetricsForQuery(
-    rowFormatting,
-    groupbyRows,
-  );
-  const colFormattingMetrics = collectDimensionFormattingMetricsForQuery(
-    colFormatting,
-    groupbyColumns,
-  );
-  const rowSortingMetrics = collectDimensionSortingMetricsForQuery(
-    rowSorting,
-    groupbyRows,
-  );
-  const colSortingMetrics = collectDimensionSortingMetricsForQuery(
-    colSorting,
-    groupbyColumns,
-  );
-  const metricsForQueryWithFormatting = mergeMetrics(metricsForQuery, [
-    ...databarMetrics,
-    ...rowFormattingMetrics,
-    ...colFormattingMetrics,
-    ...rowSortingMetrics,
-    ...colSortingMetrics,
-  ]);
   const rowSubTotalsEnabled = formData.rowSubTotals ?? true;
   const maxRowSubtotalDepth = Math.max(groupbyRows.length - 1, 0);
   const rowSubtotalLevels = normalizeSubtotalLevels(
@@ -156,6 +126,37 @@ export default function transformProps(
     false,
     false,
   ).filter(level => level > 0);
+  const needsTotals =
+    !!formData.rowTotals ||
+    !!formData.colTotals ||
+    rowSubtotalLevels.length > 0 ||
+    colSubtotalLevels.length > 0;
+  const intent: QueryIntent = {
+    kind: 'wholeLevel',
+    targetRowDepth: groupbyRows.length,
+    targetColDepth: groupbyColumns.length,
+    needsValueCells: true,
+    needsTotals,
+    needsMetricFormatting: Object.keys(metricFormatting || {}).length > 0,
+    needsDatabars: Object.keys(metricDatabars || {}).length > 0,
+    needsRowOrdering: Object.keys(rowSorting || {}).length > 0,
+    needsColOrdering: Object.keys(colSorting || {}).length > 0,
+    needsRowDimensionFormatting: Object.keys(rowFormatting || {}).length > 0,
+    needsColDimensionFormatting: Object.keys(colFormatting || {}).length > 0,
+  };
+  const { metrics: metricsForQueryWithFormatting } = buildQueryShape({
+    intent,
+    rowGroupby: groupbyRows,
+    colGroupby: groupbyColumns,
+    metrics,
+    metricFormattingScope: formData.metricFormattingScope,
+    metricFormatting,
+    metricDatabars,
+    rowFormatting,
+    colFormatting,
+    rowSorting,
+    colSorting,
+  });
   const rowTotalPosition =
     (formData.rowTotalPosition as TotalPosition) || 'start';
   const rowSubtotalPosition =

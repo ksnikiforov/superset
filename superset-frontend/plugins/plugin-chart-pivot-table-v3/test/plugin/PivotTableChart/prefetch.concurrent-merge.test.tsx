@@ -23,12 +23,19 @@ import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
 import {
   applyMetricAxis,
   buildTreeFromRecords,
+  mergeTrees,
+  parsePath,
 } from '../../../src/utils';
 import {
   fetchPivotBranch,
   peekPivotBranchCache,
 } from '../../../src/fetchPivotBranch';
 import type { FetchPivotBranchResult } from '../../../src/fetchPivotBranch';
+import {
+  fetchPivotBranchesBatch,
+  type FetchPivotBranchesBatchParams,
+  type FetchPivotBranchesBatchResult,
+} from '../../../src/pivot/engine/query/fetchPivotBranchesBatch';
 import { buildFormData } from '../fixtures/pivotFormData';
 
 jest.mock('../../../src/fetchPivotBranch', () => {
@@ -39,6 +46,10 @@ jest.mock('../../../src/fetchPivotBranch', () => {
     peekPivotBranchCache: jest.fn(),
   };
 });
+
+jest.mock('../../../src/pivot/engine/query/fetchPivotBranchesBatch', () => ({
+  fetchPivotBranchesBatch: jest.fn(),
+}));
 
 type Deferred<T> = {
   promise: Promise<T>;
@@ -86,11 +97,44 @@ describe('PivotTableChart persisted prefetch merges concurrent results', () => {
   const peekPivotBranchCacheMock = peekPivotBranchCache as jest.MockedFunction<
     typeof peekPivotBranchCache
   >;
+  const fetchPivotBranchesBatchMock =
+    fetchPivotBranchesBatch as jest.MockedFunction<
+      typeof fetchPivotBranchesBatch
+    >;
+
+  const resolveBatchWithSingles = async ({
+    batch,
+    formData,
+    currentTree,
+    visibleRowDepth,
+    visibleColDepth,
+    getFetchPath,
+  }: FetchPivotBranchesBatchParams): Promise<FetchPivotBranchesBatchResult> => {
+    let merged: PivotTreeData | undefined;
+    for (const target of batch.targets) {
+      const path = parsePath(target.pathKey);
+      const result = await Promise.resolve(
+        fetchPivotBranchMock({
+          formData,
+          axis: batch.axis,
+          path: getFetchPath(path),
+          metricPath: path,
+          currentTree,
+          visibleRowDepth,
+          visibleColDepth,
+        }),
+      );
+      merged = mergeTrees(merged, result.data);
+    }
+    return { data: merged };
+  };
 
   beforeEach(() => {
     fetchPivotBranchMock.mockReset();
     peekPivotBranchCacheMock.mockReset();
+    fetchPivotBranchesBatchMock.mockReset();
     peekPivotBranchCacheMock.mockReturnValue(undefined);
+    fetchPivotBranchesBatchMock.mockImplementation(resolveBatchWithSingles);
   });
 
   it('renders both branches when prefetch fetches resolve out of order', async () => {
@@ -108,6 +152,7 @@ describe('PivotTableChart persisted prefetch merges concurrent results', () => {
       records.filter(row => row.r1 === 'B'),
       2,
     );
+    const mergedBranch = buildTree(records, 2);
 
     const deferredA = createDeferred<FetchPivotBranchResult>();
     const deferredB = createDeferred<FetchPivotBranchResult>();
@@ -129,6 +174,14 @@ describe('PivotTableChart persisted prefetch merges concurrent results', () => {
           colTotals: false,
           rowTotals: false,
           rowSubTotals: false,
+          pivotExpansionState: {
+            rowKeys: rowGroupby,
+            colKeys: colGroupby,
+            rows: [['A'], ['B']],
+            cols: [],
+            collapsedRows: [],
+            collapsedCols: [],
+          },
         })}
         metrics={metrics}
         groupbyRows={rowGroupby}
@@ -153,29 +206,23 @@ describe('PivotTableChart persisted prefetch merges concurrent results', () => {
         setDataMask={jest.fn()}
         metricColorFormatters={[]}
         dateFormatters={{}}
-        ownState={{
-          expansionState: {
-            rowKeys: rowGroupby,
-            colKeys: colGroupby,
-            rows: [['A'], ['B']],
-            cols: [],
-            collapsedRows: [],
-            collapsedCols: [],
-          },
-        }}
       />,
     );
 
-    await waitFor(() =>
-      expect(fetchPivotBranchMock.mock.calls.length).toBeGreaterThanOrEqual(2),
-    );
-
-    deferredB.resolve({ data: branchB });
-    deferredA.resolve({ data: branchA });
-    await Promise.all([
-      fetchPivotBranchMock.mock.results[0].value,
-      fetchPivotBranchMock.mock.results[1].value,
-    ]);
+    await waitFor(() => expect(fetchPivotBranchMock).toHaveBeenCalled());
+    const callCount = fetchPivotBranchMock.mock.calls.length;
+    if (callCount <= 1) {
+      deferredA.resolve({ data: mergedBranch });
+      deferredB.resolve({ data: mergedBranch });
+      await fetchPivotBranchMock.mock.results[0].value;
+    } else {
+      deferredB.resolve({ data: branchB });
+      deferredA.resolve({ data: branchA });
+      await Promise.all([
+        fetchPivotBranchMock.mock.results[0].value,
+        fetchPivotBranchMock.mock.results[1].value,
+      ]);
+    }
 
     await waitFor(() => {
       expect(screen.getByText('X')).toBeInTheDocument();

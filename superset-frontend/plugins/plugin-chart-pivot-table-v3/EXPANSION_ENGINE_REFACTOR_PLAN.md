@@ -1332,6 +1332,8 @@ Always keep these green:
 ### Phase 3 (remaining work)
 - None. Phase 3 complete; proceed to Phase 4 (query intent + batching).
 
+Status: Phase 3 complete.
+
 ### Phase 3 (latest updates)
 - Fixed Explore persistence wiring by passing `setControlValue` into `useExpansionEngine`.
 - Adjusted Prettier formatting in `useExpansionEngine.ts` and expansion-state tests.
@@ -1354,3 +1356,16 @@ Always keep these green:
 - Ran `npm test -- plugins/plugin-chart-pivot-table-v3/test/plugin/PivotTableChart/expansion-state.test.tsx` (passes; duplicate mock + Browserslist warnings).
 - Ran `npx eslint plugins/plugin-chart-pivot-table-v3` (fails due to existing warnings/Prettier errors in unrelated files; see lint output).
 - Added a dashboard refresh regression test to ensure `pivotExpansionState` restores expanded rows after filter apply; ran `npm test -- plugins/plugin-chart-pivot-table-v3/test/plugin/PivotTableChart/expansion-state.test.tsx` (passes; duplicate mock + Browserslist warnings).
+
+### Phase 4 (in progress)
+- Added `pivot/engine/query/queryIntent.ts` + `queryShape.ts` with unit tests for metric/column minimization and deterministic unions.
+- Refactored `src/fetchPivotBranch.ts` and `src/transformProps.ts` to use intent-driven query shape instead of unconditional formatting metric merges.
+- Ran `npm test -- plugins/plugin-chart-pivot-table-v3/test/plugin/query/queryShape.test.ts`, `npm test -- plugins/plugin-chart-pivot-table-v3/test/plugin/fetchPivotBranch.test.ts`, and `npm test -- plugins/plugin-chart-pivot-table-v3/test/plugin/transformProps.test.ts` (passes; duplicate mock + Browserslist warnings).
+- Added batching primitives (`fetchPlanOptimizer`, `batchSignature`, `fetchPivotBranchesBatch`) and reused branch query-pair/tree builders for batch fetches.
+- Wired batching into same-axis expansion and atomic hydration (cache-aware, IN batching for sibling targets, per-target pruning on merge).
+- Added unit coverage for batching optimizer and batched query filters; ran `npm test -- plugins/plugin-chart-pivot-table-v3/test/plugin/query/fetchPlanOptimizer.test.ts`, `npm test -- plugins/plugin-chart-pivot-table-v3/test/plugin/query/fetchPivotBranchesBatch.test.ts`, and `npm test -- plugins/plugin-chart-pivot-table-v3/test/plugin/fetchPivotBranch.test.ts` (passes; duplicate mock + Browserslist warnings).
+- Added null-label styling for true NULL dimension values (muted label color) and a render-unit test; ran `npm test -- plugins/plugin-chart-pivot-table-v3/test/plugin/render/PivotTableView.test.tsx` (passes; duplicate mock + Browserslist warnings).
+- Added RTL batching coverage for persisted restore (query count + out-of-order batch merge); ran `npm test -- plugins/plugin-chart-pivot-table-v3/test/plugin/PivotTableChart/prefetch.batching.test.tsx` (passes; duplicate mock + Browserslist warnings).
+- Fixed branch tree construction to use full groupby lengths (via `rowGroupbyForQueryFull`/`colGroupbyForQueryFull`) so nodes retain expand toggles when query intent truncates groupby depth.
+- Updated prefetch/persistence RTL coverage to drive persisted restores through `pivotExpansionState` in form data and tolerate single-root/batched fetches; added batch->single test adapters for prefetch/expansion-state/ancestor-subtotals suites.
+- Ran `npm test -- plugins/plugin-chart-pivot-table-v3` (passes; duplicate mock + Browserslist warnings; Jest open-handles warning).

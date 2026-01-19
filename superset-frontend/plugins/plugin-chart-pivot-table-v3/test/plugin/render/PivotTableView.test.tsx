@@ -21,7 +21,8 @@ import { createRef } from 'react';
 import { render, screen } from '../../testUtils';
 import { PivotTableView } from '../../../src/pivot/render/PivotTableView';
 import { type RenderModel } from '../../../src/pivot/shared/types';
-import { type PivotTreeData } from '../../../src/types';
+import { type PivotTreeData, type PivotTreeNode } from '../../../src/types';
+import { serializePath } from '../../../src/utils';
 
 const baseRenderModel: RenderModel = {
   visibleRows: [],
@@ -96,5 +97,65 @@ describe('PivotTableView', () => {
   it('hides the table when loading', () => {
     renderView(true);
     expect(screen.queryByText('Rows')).not.toBeInTheDocument();
+  });
+
+  it('marks actual null labels as muted', () => {
+    const nullRow: PivotTreeNode = {
+      axis: 'row',
+      key: serializePath([null]),
+      path: [null],
+      label: '(NULL)',
+      formattedLabel: '(NULL)',
+      level: 1,
+      hasChildren: false,
+    };
+    const renderModel: RenderModel = {
+      ...baseRenderModel,
+      visibleRows: [nullRow],
+      visibleCols: [],
+      columnHeaderRows: [],
+    };
+    render(
+      <PivotTableView
+        height={300}
+        width={400}
+        renderModel={renderModel}
+        tree={baseTree}
+        expandedRows={new Set()}
+        expandedCols={new Set()}
+        showGlobalLoader={false}
+        stickyHeaders={false}
+        headerOffset={0}
+        headerRowOffsets={[]}
+        headerRef={createRef()}
+        rowTotalPosition="start"
+        metricFormattingScope="values"
+        metricDatabars={{}}
+        formattingKeyMap={{}}
+        databarColumnMinWidths={new Map()}
+        onToggleNode={jest.fn()}
+        shouldShowToggle={() => false}
+        showRowSpinner={() => false}
+        showColSpinner={() => false}
+        formatLabel={node => node.label}
+        isRowAggregateBold={() => false}
+        isColAggregateBold={() => false}
+        getNodeDimDepth={() => 0}
+        getTotalBackground={() => undefined}
+        resolveDimensionStyle={() => undefined}
+        deriveMetricKey={() => ''}
+        isMetricGrandTotalNode={() => false}
+        isMetricSubtotalNode={() => false}
+        isExplicitSubtotalNode={() => false}
+        renderCellContent={() => null}
+        renderDatabarContent={() => null}
+        handleCellClick={jest.fn()}
+        handleCellKeyDown={jest.fn()}
+        handleCellContextMenu={jest.fn()}
+      />,
+    );
+
+    const nullLabel = screen.getByText('(NULL)');
+    expect(nullLabel).toHaveClass('pivot-null-label');
   });
 });

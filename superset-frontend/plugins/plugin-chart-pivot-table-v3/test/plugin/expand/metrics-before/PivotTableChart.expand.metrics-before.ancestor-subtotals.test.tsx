@@ -20,7 +20,7 @@
 import { JsonResponse, SupersetClient } from '@superset-ui/core';
 import { render, fireEvent, waitFor, within } from '../../../testUtils';
 import PivotTableChart from '../../fixtures/TestPivotTableChart';
-import { MetricsLayoutEnum } from '../../../../src/types';
+import { MetricsLayoutEnum, PivotTreeData } from '../../../../src/types';
 import { baseFormData, buildFormData } from '../../fixtures/pivotFormData';
 import {
   applyMetricAxis,
@@ -28,6 +28,7 @@ import {
   METRICS_PLACEHOLDER,
   mergeTrees,
   parseCellKey,
+  parsePath,
   serializeCellKey,
   serializePath,
   SUBTOTAL_TOKEN,
@@ -36,6 +37,11 @@ import {
   fetchPivotBranch,
   peekPivotBranchCache,
 } from '../../../../src/fetchPivotBranch';
+import {
+  fetchPivotBranchesBatch,
+  type FetchPivotBranchesBatchParams,
+  type FetchPivotBranchesBatchResult,
+} from '../../../../src/pivot/engine/query/fetchPivotBranchesBatch';
 import { formatQueryName } from '../../../../src/buildQuery';
 
 jest.mock('../../../../src/fetchPivotBranch', () => {
@@ -47,11 +53,48 @@ jest.mock('../../../../src/fetchPivotBranch', () => {
   };
 });
 
+jest.mock('../../../../src/pivot/engine/query/fetchPivotBranchesBatch', () => ({
+  fetchPivotBranchesBatch: jest.fn(),
+}));
+
 describe('PivotTableChart expansion with metrics before dimensions (ancestor-subtotals)', () => {
   const fetchPivotBranchMock = fetchPivotBranch as jest.Mock;
   const peekPivotBranchCacheMock = peekPivotBranchCache as jest.Mock;
+  const fetchPivotBranchesBatchMock =
+    fetchPivotBranchesBatch as jest.MockedFunction<
+      typeof fetchPivotBranchesBatch
+    >;
+
+  const resolveBatchWithSingles = async ({
+    batch,
+    formData,
+    currentTree,
+    visibleRowDepth,
+    visibleColDepth,
+    getFetchPath,
+  }: FetchPivotBranchesBatchParams): Promise<FetchPivotBranchesBatchResult> => {
+    let merged: PivotTreeData | undefined;
+    for (const target of batch.targets) {
+      const path = parsePath(target.pathKey);
+      const result = await Promise.resolve(
+        fetchPivotBranchMock({
+          formData,
+          axis: batch.axis,
+          path: getFetchPath(path),
+          metricPath: path,
+          currentTree,
+          visibleRowDepth,
+          visibleColDepth,
+        }),
+      );
+      merged = mergeTrees(merged, result.data);
+    }
+    return { data: merged };
+  };
   beforeEach(() => {
     fetchPivotBranchMock.mockClear();
+    fetchPivotBranchesBatchMock.mockReset();
+    fetchPivotBranchesBatchMock.mockImplementation(resolveBatchWithSingles);
   });
 
   it('keeps ancestor row values when expanding columns under a deeper row', async () => {

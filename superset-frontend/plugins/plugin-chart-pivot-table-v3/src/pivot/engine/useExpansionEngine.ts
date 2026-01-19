@@ -48,6 +48,13 @@ import {
   type StagingTreeState,
 } from './stagingTree';
 import { fetchPivotBranch, peekPivotBranchCache } from '../../fetchPivotBranch';
+import { buildBatchSignature } from './query/batchSignature';
+import {
+  optimizeFetchPlan,
+  type BatchCandidate,
+  type BatchGroup,
+} from './query/fetchPlanOptimizer';
+import { fetchPivotBranchesBatch } from './query/fetchPivotBranchesBatch';
 import {
   buildRenderModel,
   type RenderModelConfig,
@@ -59,6 +66,20 @@ import {
 } from '../visibility';
 
 const MAX_HYDRATION_ITERATIONS = 12;
+
+type SingleFetchResult = {
+  kind: 'single';
+  target: FetchTarget;
+  data?: PivotTreeData;
+};
+
+type BatchFetchResult = {
+  kind: 'batch';
+  batch: BatchGroup;
+  data?: PivotTreeData;
+};
+
+type CombinedFetchResult = SingleFetchResult | BatchFetchResult;
 
 const getStablePrefixLength = (prev: string[], next: string[]) => {
   const max = Math.min(prev.length, next.length);
@@ -719,6 +740,35 @@ export const useExpansionEngine = ({
     [pruneMergedTree],
   );
 
+  const applyBatchDelta = useCallback(
+    (
+      currentTree: PivotTreeData,
+      axis: PivotAxis,
+      keys: string[],
+      branch?: PivotTreeData,
+      expandedRows?: Set<string>,
+      expandedCols?: Set<string>,
+    ) => {
+      if (!branch) {
+        return currentTree;
+      }
+      let nextTree = mergeTrees(currentTree, branch);
+      keys.forEach(key => {
+        const parent = axis === 'row' ? nextTree.rows[key] : nextTree.cols[key];
+        nextTree = pruneMergedTree({
+          axis,
+          tree: nextTree,
+          parent,
+          branch,
+          expandedRows: expandedRows ?? expandedRowsRef.current,
+          expandedCols: expandedCols ?? expandedColsRef.current,
+        });
+      });
+      return nextTree;
+    },
+    [pruneMergedTree],
+  );
+
   const expandSameAxis = useCallback(
     async (axis: PivotAxis, node: PivotTreeNode) => {
       const inFlightRef = axis === 'row' ? inFlightRowsRef : inFlightColsRef;
@@ -809,6 +859,36 @@ export const useExpansionEngine = ({
         }
       };
 
+      const fetchBatchForGroup = async ({
+        batch,
+        treeSnapshot,
+        visibleRowDepth,
+        visibleColDepth,
+      }: {
+        batch: BatchGroup;
+        treeSnapshot: PivotTreeData;
+        visibleRowDepth: number;
+        visibleColDepth: number;
+      }) => {
+        batch.targets.forEach(target => updateLoadingKey(target.pathKey, 1));
+        try {
+          const result = await fetchPivotBranchesBatch({
+            formData: fetchFormData,
+            batch,
+            currentTree: treeSnapshot,
+            visibleRowDepth,
+            visibleColDepth,
+            getFetchPath,
+          });
+          if (result.error) {
+            setErrorMessage(result.error.message);
+          }
+          return { batch, data: result.data };
+        } finally {
+          batch.targets.forEach(target => updateLoadingKey(target.pathKey, -1));
+        }
+      };
+
       const touchedKeys = new Set<string>();
       try {
         for (
@@ -863,26 +943,92 @@ export const useExpansionEngine = ({
               fetchGroups.set(groupKey, [key]);
             }
           }
-          const fetchPromises: Array<ReturnType<typeof fetchBranchForKey>> = [];
+          const targets: FetchTarget[] = [];
           const groupKeyMap = new Map<string, string[]>();
           for (const keys of fetchGroups.values()) {
             const representative =
               keys.find(key => getMetriclessKey(key) === key && nodes[key]) ??
               keys.find(key => nodes[key]) ??
               keys[0];
+            const target: FetchTarget = {
+              axis,
+              pathKey: representative,
+              childDepth: parsePath(representative).length + 1,
+              requiredOppositeDepth: requiredDepth,
+            };
+            targets.push(target);
             groupKeyMap.set(representative, keys);
+          }
+          const cachedResults: SingleFetchResult[] = [];
+          const batchCandidates: BatchCandidate[] = [];
+          targets.forEach(target => {
+            const path = parsePath(target.pathKey);
+            const cached = peekPivotBranchCache({
+              axis: target.axis,
+              path: getFetchPath(path),
+              metricPath: path,
+              formData: fetchFormData,
+              currentTree,
+              visibleRowDepth,
+              visibleColDepth,
+            });
+            if (cached) {
+              cachedResults.push({
+                kind: 'single',
+                target,
+                data: cached,
+              });
+              return;
+            }
+            const batchSignature = buildBatchSignature({
+              formData: fetchFormData,
+              axis: target.axis,
+              path: getFetchPath(path),
+              metricPath: path,
+              currentTree,
+              visibleRowDepth,
+              visibleColDepth,
+            });
+            batchCandidates.push({ ...target, batchSignature });
+          });
+          const { batches, singles } = optimizeFetchPlan({
+            targets: batchCandidates,
+          });
+          const fetchPromises: Array<Promise<CombinedFetchResult>> = [];
+          singles.forEach(target => {
             fetchPromises.push(
               fetchBranchForKey({
-                key: representative,
+                key: target.pathKey,
                 treeSnapshot: currentTree,
                 visibleRowDepth,
                 visibleColDepth,
                 requiredDepth,
-              }),
+              }).then(result => ({
+                kind: 'single',
+                target,
+                data: result.data,
+              })),
             );
-          }
+          });
+          batches.forEach(batch => {
+            fetchPromises.push(
+              fetchBatchForGroup({
+                batch,
+                treeSnapshot: currentTree,
+                visibleRowDepth,
+                visibleColDepth,
+              }).then(result => ({
+                kind: 'batch',
+                batch,
+                data: result.data,
+              })),
+            );
+          });
           // eslint-disable-next-line no-await-in-loop
-          const results = await Promise.all(fetchPromises);
+          const results: CombinedFetchResult[] = [
+            ...cachedResults,
+            ...(await Promise.all(fetchPromises)),
+          ];
           if (
             dataEpochRef.current !== requestEpoch ||
             transactionIdRef.current !== requestId
@@ -890,20 +1036,52 @@ export const useExpansionEngine = ({
             return;
           }
           let didMerge = false;
-          for (const { key, data, requiredDepth: depth } of results) {
-            const keys = groupKeyMap.get(key) ?? [key];
-            keys.forEach(groupKey => {
-              fetchedKeysRef.current.set(groupKey, depth);
+          for (const result of results) {
+            if (result.kind === 'single') {
+              const { target, data } = result;
+              const keys = groupKeyMap.get(target.pathKey) ?? [target.pathKey];
+              keys.forEach(groupKey => {
+                fetchedKeysRef.current.set(
+                  groupKey,
+                  target.requiredOppositeDepth,
+                );
+              });
+              if (!data) {
+                continue;
+              }
+              didMerge = true;
+              touchedKeys.add(target.pathKey);
+              currentTree = applyBranchDelta(
+                currentTree,
+                axis,
+                target.pathKey,
+                data,
+                expandedRowsForDepth,
+                expandedColsForDepth,
+              );
+              continue;
+            }
+            const { batch, data } = result;
+            batch.targets.forEach(target => {
+              const keys = groupKeyMap.get(target.pathKey) ?? [target.pathKey];
+              keys.forEach(groupKey => {
+                fetchedKeysRef.current.set(
+                  groupKey,
+                  target.requiredOppositeDepth,
+                );
+              });
             });
             if (!data) {
               continue;
             }
             didMerge = true;
-            touchedKeys.add(key);
-            currentTree = applyBranchDelta(
+            batch.targets.forEach(target => {
+              touchedKeys.add(target.pathKey);
+            });
+            currentTree = applyBatchDelta(
               currentTree,
               axis,
-              key,
+              batch.targets.map(target => target.pathKey),
               data,
               expandedRowsForDepth,
               expandedColsForDepth,
@@ -980,6 +1158,7 @@ export const useExpansionEngine = ({
       }
     },
     [
+      applyBatchDelta,
       applyBranchDelta,
       buildHasLoadedChildrenForIteration,
       computeVisibleDepths,
@@ -1090,7 +1269,7 @@ export const useExpansionEngine = ({
 
       let stagingState: StagingTreeState = createStagingTree(treeRef.current);
 
-      const fetchTarget = async (
+      const fetchSingleTarget = async (
         target: FetchTarget,
         context: {
           stagedTree: PivotTreeData;
@@ -1099,18 +1278,6 @@ export const useExpansionEngine = ({
         },
       ) => {
         const path = parsePath(target.pathKey);
-        const cached = peekPivotBranchCache({
-          axis: target.axis,
-          path: getFetchPath(path),
-          metricPath: path,
-          formData: fetchFormData,
-          currentTree: context.stagedTree,
-          visibleRowDepth: context.visibleRowDepth,
-          visibleColDepth: context.visibleColDepth,
-        });
-        if (cached) {
-          return { target, data: cached, cached: true };
-        }
         updateLoadingKey(target.pathKey, 1);
         try {
           const result = await fetchPivotBranch({
@@ -1123,14 +1290,41 @@ export const useExpansionEngine = ({
             visibleColDepth: context.visibleColDepth,
           });
           if (!result) {
-            return { target, data: undefined, cached: false };
+            return { target, data: undefined };
           }
           if (result.error) {
             setErrorMessage(result.error.message);
           }
-          return { target, data: result.data, cached: false };
+          return { target, data: result.data };
         } finally {
           updateLoadingKey(target.pathKey, -1);
+        }
+      };
+
+      const fetchBatchTarget = async (
+        batch: BatchGroup,
+        context: {
+          stagedTree: PivotTreeData;
+          visibleRowDepth: number;
+          visibleColDepth: number;
+        },
+      ) => {
+        batch.targets.forEach(target => updateLoadingKey(target.pathKey, 1));
+        try {
+          const result = await fetchPivotBranchesBatch({
+            formData: fetchFormData,
+            batch,
+            currentTree: context.stagedTree,
+            visibleRowDepth: context.visibleRowDepth,
+            visibleColDepth: context.visibleColDepth,
+            getFetchPath,
+          });
+          if (result.error) {
+            setErrorMessage(result.error.message);
+          }
+          return { batch, data: result.data };
+        } finally {
+          batch.targets.forEach(target => updateLoadingKey(target.pathKey, -1));
         }
       };
 
@@ -1307,31 +1501,99 @@ export const useExpansionEngine = ({
         });
 
         const fetchContext = { stagedTree, visibleRowDepth, visibleColDepth };
-        const fetchPromises: Array<ReturnType<typeof fetchTarget>> = [];
-        for (const target of targets) {
-          fetchPromises.push(fetchTarget(target, fetchContext));
-        }
+        const cachedResults: SingleFetchResult[] = [];
+        const batchCandidates: BatchCandidate[] = [];
+        targets.forEach(target => {
+          const path = parsePath(target.pathKey);
+          const cached = peekPivotBranchCache({
+            axis: target.axis,
+            path: getFetchPath(path),
+            metricPath: path,
+            formData: fetchFormData,
+            currentTree: fetchContext.stagedTree,
+            visibleRowDepth,
+            visibleColDepth,
+          });
+          if (cached) {
+            cachedResults.push({ kind: 'single', target, data: cached });
+            return;
+          }
+          const batchSignature = buildBatchSignature({
+            formData: fetchFormData,
+            axis: target.axis,
+            path: getFetchPath(path),
+            metricPath: path,
+            currentTree: fetchContext.stagedTree,
+            visibleRowDepth,
+            visibleColDepth,
+          });
+          batchCandidates.push({ ...target, batchSignature });
+        });
+        const { batches, singles } = optimizeFetchPlan({
+          targets: batchCandidates,
+        });
+        const fetchPromises: Array<Promise<CombinedFetchResult>> = [];
+        singles.forEach(target => {
+          fetchPromises.push(
+            fetchSingleTarget(target, fetchContext).then(result => ({
+              kind: 'single',
+              target,
+              data: result.data,
+            })),
+          );
+        });
+        batches.forEach(batch => {
+          fetchPromises.push(
+            fetchBatchTarget(batch, fetchContext).then(result => ({
+              kind: 'batch',
+              batch,
+              data: result.data,
+            })),
+          );
+        });
         // eslint-disable-next-line no-await-in-loop
-        const results = await Promise.all(fetchPromises);
+        const results: CombinedFetchResult[] = [
+          ...cachedResults,
+          ...(await Promise.all(fetchPromises)),
+        ];
 
         if (transactionIdRef.current !== transactionId) {
           finalizeHydration();
           return;
         }
 
-        for (const { target, data } of results) {
-          const fetchedKeysRef =
-            target.axis === 'row' ? fetchedRowKeysRef : fetchedColKeysRef;
-          const groupKey = JSON.stringify([target.axis, target.pathKey]);
-          const keys = groupKeyMap.get(groupKey) ?? [target.pathKey];
-          keys.forEach(key => {
-            fetchedKeysRef.current.set(key, target.requiredOppositeDepth);
-          });
-          if (!data) {
+        for (const result of results) {
+          if (result.kind === 'single') {
+            const { target, data } = result;
+            const fetchedKeysRef =
+              target.axis === 'row' ? fetchedRowKeysRef : fetchedColKeysRef;
+            const groupKey = JSON.stringify([target.axis, target.pathKey]);
+            const keys = groupKeyMap.get(groupKey) ?? [target.pathKey];
+            keys.forEach(key => {
+              fetchedKeysRef.current.set(key, target.requiredOppositeDepth);
+            });
+            if (!data) {
+              continue;
+            }
+            const deltaKey = JSON.stringify([target.axis, target.pathKey]);
+            stagingState = stageDelta(stagingState, deltaKey, data);
             continue;
           }
-          const deltaKey = JSON.stringify([target.axis, target.pathKey]);
-          stagingState = stageDelta(stagingState, deltaKey, data);
+          const { batch, data } = result;
+          batch.targets.forEach(target => {
+            const fetchedKeysRef =
+              target.axis === 'row' ? fetchedRowKeysRef : fetchedColKeysRef;
+            const groupKey = JSON.stringify([target.axis, target.pathKey]);
+            const keys = groupKeyMap.get(groupKey) ?? [target.pathKey];
+            keys.forEach(key => {
+              fetchedKeysRef.current.set(key, target.requiredOppositeDepth);
+            });
+            if (!data) {
+              return;
+            }
+            const deltaKey = JSON.stringify([target.axis, target.pathKey]);
+            stagingState = stageDelta(stagingState, deltaKey, data);
+          });
         }
 
         const updatedTree = buildStagedTree(stagingState);
