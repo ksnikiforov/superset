@@ -124,8 +124,12 @@ test('ignores expansionState when resolving initial depths', () => {
       initialDepth: 1,
     }),
     expansionState: {
+      rowKeys: ['row1', 'row2', 'row3'],
+      colKeys: ['col1', 'col2'],
       rows: [['A'], ['A', dividerValue], ['A', dividerValue, 'C']],
       cols: [['X'], ['X', 'Y']],
+      collapsedRows: [],
+      collapsedCols: [],
     },
   } as any);
   const names = queryContext.queries.map(q => q.query_name);

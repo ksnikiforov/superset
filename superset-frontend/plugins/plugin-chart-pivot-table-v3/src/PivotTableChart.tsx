@@ -474,6 +474,7 @@ function PivotTableChart(props: PivotTableProps) {
     allowRenderHtml,
     ownState,
     setDataMask,
+    setControlValue,
     emitCrossFilters,
     persistExpansionState: persistExpansionStateProp,
     onContextMenu,
@@ -535,7 +536,7 @@ function PivotTableChart(props: PivotTableProps) {
   );
   const resolvedMetricsLayout =
     (formData.metricsLayout as MetricsLayoutEnum) || metricsLayout;
-  const persistExpansionState = persistExpansionStateProp ?? false;
+  const persistExpansionState = persistExpansionStateProp ?? true;
   const metricFormattingScope =
     (formData.metricFormattingScope as MetricFormattingScope) ||
     'values_totals';
@@ -2148,8 +2149,7 @@ function PivotTableChart(props: PivotTableProps) {
   );
 
   const getVisibleExpansionKeys = useCallback(
-    (nextRows: Set<string>, nextCols: Set<string>) => {
-      const nextTree = treeRef.current;
+    (nextRows: Set<string>, nextCols: Set<string>, nextTree: PivotTreeData) => {
       const metricIndexForRowsResolved =
         findMetricIndex(nextTree.rows) ??
         metricLayoutIndexOnRows ??
@@ -2298,9 +2298,8 @@ function PivotTableChart(props: PivotTableProps) {
     countDimDepth,
     expandRowsLevelRaw,
     expandColumnsLevelRaw,
-    ownState,
-    mergeOwnState,
-    setDataMask,
+    setControlValue,
+    pivotExpansionState: formData.pivotExpansionState,
     shouldPersistExpansionState: persistExpansionState,
     getVisibleExpansionKeys,
     buildRenderModelConfig: buildEngineRenderModelConfig,

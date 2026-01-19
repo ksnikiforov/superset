@@ -141,13 +141,13 @@ export type PivotAxisValueRef = {
   path: PivotPath;
 };
 
-export type PivotExpansionKey = string | PivotPath;
-
 export type PivotExpansionState = {
-  rows: PivotExpansionKey[];
-  cols: PivotExpansionKey[];
-  collapsedRows?: PivotExpansionKey[];
-  collapsedCols?: PivotExpansionKey[];
+  rowKeys: string[];
+  colKeys: string[];
+  rows: PivotPath[];
+  cols: PivotPath[];
+  collapsedRows?: PivotPath[];
+  collapsedCols?: PivotPath[];
 };
 
 export type PivotDimensionSorting = {
@@ -175,6 +175,7 @@ export interface PivotTableCustomizeProps {
   initialDepth?: number;
   expandRowsLevel?: number;
   expandColumnsLevel?: number;
+  pivotExpansionState?: PivotExpansionState;
   rowTotals: boolean;
   colTotals: boolean;
   rowSubTotals?: boolean;

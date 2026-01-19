@@ -23,7 +23,6 @@ import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
 import {
   applyMetricAxis,
   buildTreeFromRecords,
-  serializePath,
 } from '../../../src/utils';
 import {
   fetchPivotBranch,
@@ -158,8 +157,12 @@ describe('PivotTableChart persisted prefetch hydrates until targets satisfied', 
         dateFormatters={{}}
         ownState={{
           expansionState: {
-            rows: [serializePath(['A']), serializePath(['A', 'X'])],
+            rowKeys: rowGroupby,
+            colKeys: colGroupby,
+            rows: [['A'], ['A', 'X']],
             cols: [],
+            collapsedRows: [],
+            collapsedCols: [],
           },
         }}
       />,

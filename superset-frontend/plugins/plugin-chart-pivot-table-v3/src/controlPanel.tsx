@@ -484,6 +484,24 @@ const config: ControlPanelConfig = {
             },
           },
         ],
+        [
+          {
+            name: 'pivotExpansionState',
+            config: {
+              type: 'HiddenControl',
+              default: {
+                rowKeys: [],
+                colKeys: [],
+                rows: [],
+                cols: [],
+                collapsedRows: [],
+                collapsedCols: [],
+              },
+              dontRefreshOnChange: true,
+              renderTrigger: false,
+            },
+          },
+        ],
         ['adhoc_filters'],
         ['series_limit'],
         [

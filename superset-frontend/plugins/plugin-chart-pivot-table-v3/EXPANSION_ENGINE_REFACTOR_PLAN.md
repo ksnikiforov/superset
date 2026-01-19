@@ -36,7 +36,10 @@ These decisions are locked for this refactor:
 - Remove depth bumping in `src/buildQuery.ts` (§8).
 - Remove `maxDepthPerFetch` (§2.3).
 - Swap `rowTotals`/`colTotals` naming to match pivot terminology (§5.12).
-- Remove `formData.expansionState` (persist via `ownState`/engine only) (§2.4).
+- Replace legacy `formData.expansionState` with a dedicated hidden control
+  (`pivotExpansionState`) for Explore-only Save/Update persistence (§2.4).
+- Keep persistence plugin-only: no Superset core changes; use `setControlValue`
+  with a hidden control instead of changing global persistence behavior.
 - Use query intent + minimization over unconditional “formatting metrics everywhere” (§5.10).
 
 ## 1) Current code map (starting point)
@@ -329,24 +332,38 @@ Current references:
 Tests required:
 - Unit tests in the new state model must cover all behaviors currently provided by this file.
 
-#### Remove `formData.expansionState` entirely (engine owns persisted state)
+#### Replace legacy `formData.expansionState` with a hidden persistence control
 
-This plugin is not released yet; we simplify persistence:
-- Keep persisted expansion state only in `ownState` (dashboard) and/or engine-managed local state.
-- Do not store/round-trip expansion state through `formData` / Explore controls.
+We do not allow expansion state to affect queries, but Explore must persist expansion
+state on Save/Update without triggering re-queries.
+
+Decision:
+- Introduce a hidden control (e.g. `pivotExpansionState`) stored in `formData`.
+- Mark it `dontRefreshOnChange: true` and `renderTrigger: false` so it never
+  triggers Explore queries or refresh warnings.
+- The engine writes this hidden control whenever `setControlValue` is available
+  (Explore + dashboards) and does not use `ownState` for expansion persistence.
+- Plugin-only: do not change Superset core persistence; avoid `setDataMask` for
+  expansion persistence in all contexts.
+- `buildQuery.ts` must ignore all expansion persistence fields (no depth bumping).
 
 Rationale:
-- We already removed buildQuery depth bumping (§8), so `formData.expansionState` does not affect initial queries.
-- Storing large/complex expansion state in form data increases surface area and creates confusing interactions with query building.
+- Explore Save/Update serializes `formData` only; `ownState` is not persisted.
+- Dashboards already merge `extraControls` into `formData`, so the same hidden
+  control works for dashboard refreshes without new core behavior.
+- A hidden control keeps persistence explicit and avoids re-query side effects.
 
 Implementation:
-- Remove `expansionState` from `PivotTableCustomizeProps` / `PivotTableProps` in `src/types.ts`.
-- Remove `setControlValue('expansionState', ...)` logic from `src/PivotTableChart.tsx` (today: `src/PivotTableChart.tsx:3166`).
-- Update `src/buildQuery.ts` to ignore/remove any handling of `formData.expansionState` (depth bumping removal is already planned in §8).
+- `src/controlPanel.tsx`: add `pivotExpansionState` as `HiddenControl`.
+- `src/types.ts`: add `pivotExpansionState` to chart form-data types.
+- `src/PivotTableChart.tsx` / engine: read/write `pivotExpansionState` for Explore persistence.
+- Gate Explore writeback behind `persistExpansionState` and use `setControlValue`
+  (do not trigger a data fetch).
+- `src/buildQuery.ts`: ignore any persisted expansion state (already required in §8).
 
 Tests required:
-- RTL: persisted restore works from `ownState.expansionState` only (dashboard behavior).
-- RTL: Explore “Update Now” does not persist expansion state across reloads (aligns with Requirement #5).
+- RTL: Explore expand updates the hidden control without triggering a global requery.
+- RTL: Save/Update restores expansion state via the hidden control.
 
 #### Remove legacy `colSubTotals` boolean + hidden control plumbing
 
@@ -439,7 +456,9 @@ Current behavior:
 
 Simplification:
 - Treat auto-expand as a pure input to the engine (and don’t mutate Explore controls as a side-effect of runtime state).
-- If we remove `formData.expansionState` (above), this becomes more consistent: Explore controls define the initial shape only; runtime expansion is dashboard-only/persisted via `ownState`.
+- With the hidden persistence control (`pivotExpansionState`), Explore controls still define the
+  initial shape, while runtime expansion is persisted via `pivotExpansionState` in both Explore
+  and dashboards without requery.
 
 Tests required:
 - RTL: clearing auto-expand does not trigger unexpected control mutations and does not change persisted expansion behavior.
@@ -482,7 +501,9 @@ Required behavior:
 
 ### 4.2 Persisted restore (dashboard initial load / chart refresh)
 
-Input: many expansions already persisted in `ownState.expansionState` (dashboard). We intentionally remove `formData.expansionState` (see §2.4).
+Input: many expansions already persisted in `formData.pivotExpansionState`
+(Explore Save/Update + dashboard extraControls). Legacy `formData.expansionState`
+is removed (see §2.4).
 
 Current entry points (for reference):
 - persistence normalization + “visible-only” filtering:
@@ -551,6 +572,8 @@ Tests (unit):
   - expanding ancestor makes it eligible again.
 - Auto-expand exception:
   - if rows auto-expand is active, row expansions are not persisted; col expansions still are (and vice versa).
+- Metrics changes:
+  - adding/removing/reordering measures does not prune expansions; only row/col prefix changes may prune.
 
 ### 5.2 `expansionPlanner.ts` (pure)
 
@@ -1056,7 +1079,7 @@ Unit tests:
 Decision: remove depth bumping entirely.
 
 What “depth bumping” is today:
-- `src/buildQuery.ts` computes `rowDepthLimit`/`colDepthLimit` from the initial UI shape (expand level), then raises them based on persisted `formData.expansionState` depth.
+- `src/buildQuery.ts` computes `rowDepthLimit`/`colDepthLimit` from the initial UI shape (expand level), then raises them based on persisted expansion depth (legacy `formData.expansionState`).
 - This happens here:
   - bump rows: `src/buildQuery.ts:253`
   - bump cols: `src/buildQuery.ts:262`
@@ -1069,7 +1092,7 @@ Why we remove it:
 
 Implementation checklist (TDD):
 - Update `src/buildQuery.ts`:
-  - delete `resolveExpansionDepth(...)` usage for `formData.expansionState` bumping (leave expand level logic intact).
+  - delete `resolveExpansionDepth(...)` usage for persisted expansion bumping (legacy `formData.expansionState` only; `pivotExpansionState` must never affect queries).
   - ensure totals/subtotals queries still include required `(rowDepth,colDepth)` pairs based on the *visible* initial shape.
 - Add/adjust unit tests for `buildQuery`:
   - persisted `expansionState` must not increase `rowDepthLimit`/`colDepthLimit` (snapshot or structural assertions on generated `columns`).
@@ -1103,7 +1126,8 @@ Principles:
   - add the RTL toggle matrix for totals semantics and copy assertions.
 
 0.4) Remove legacy/duplicate config fields (unreleased plugin simplification)
-- Remove `formData.expansionState` (engine/ownState only): see §2.4.
+- Remove legacy `formData.expansionState` and replace with `pivotExpansionState`
+  hidden control (plugin-only, no Superset core changes) for Explore-only persistence: see §2.4.
 - Remove `colSubTotals` legacy boolean (levels only): see §2.4.
 - Remove alias fields (`conditionalFormatting`, `extraFormData`, `timeRange`): see §2.4.
 - Remove `legacy_order_by`: see §2.4.
@@ -1112,7 +1136,8 @@ Principles:
 
 Exit criteria (Phase 0):
 - `buildQuery` no longer bumps depths from persisted expansions.
-- Chart config surface area is smaller: no `maxDepthPerFetch`, no `formData.expansionState`, no `colSubTotals`, no legacy aliases, no `legacy_order_by`.
+- Chart config surface area is smaller: no `maxDepthPerFetch`, no legacy `formData.expansionState`, no `colSubTotals`, no legacy aliases, no `legacy_order_by`.
+- Explore persistence uses hidden `pivotExpansionState` without triggering queries (via `setControlValue`).
 - Totals naming is correct and tested.
 
 ### Phase 1 — Extract pure state model + planner (engine core, no UI wiring yet)
@@ -1244,13 +1269,14 @@ Always keep these green:
 
 ### Phase 0 + early Phase 1
 - Removed legacy knobs/aliases:
-  - `maxDepthPerFetch`, `formData.expansionState`, `colSubTotals`, alias fields (`conditionalFormatting`, `extraFormData`, `timeRange`), `legacy_order_by`.
+  - `maxDepthPerFetch`, legacy `formData.expansionState` (replacement hidden control planned), `colSubTotals`, alias fields (`conditionalFormatting`, `extraFormData`, `timeRange`), `legacy_order_by`.
 - Swapped totals semantics (rowTotals/colTotals) across types, control panel, query building, fetch, and rendering.
 - Removed depth bumping from `buildQuery.ts` (persisted expansion no longer increases initial depths).
 - Simplified branch fetch depth to one level per expand (no auto bump).
 - Updated README/requirements to reflect the new config surface (no maxDepthPerFetch).
 - Updated tests/fixtures to use canonical fields only and new totals semantics.
-- Expansion persistence now uses ownState only (no formData persistence).
+- Expansion persistence uses the hidden control (`pivotExpansionState`) via `setControlValue`
+  and does not rely on `ownState`.
 - Added engine state model:
   - New `src/pivot/engine/expansionStateModel.ts` (moved logic from `src/pivot/expansionPersistence.ts`).
   - Added unit tests: `test/plugin/engine/expansionStateModel.test.ts`.
@@ -1290,13 +1316,41 @@ Always keep these green:
 - Tightened cross-axis detection:
   - Added in-flight counters in `useExpansionEngine.ts` so a click on the opposite axis can trigger atomic hydration when another axis expand is still in-flight.
 - Propagated `metricPath` to branch fetch context (`src/fetchPivotBranch.ts`) so query intent respects metric-tier paths.
-- Synced expansion-state merging so local `ownState` stays in lockstep with `setDataMask` updates (fixes label-change restores).
+- Removed `ownState`-based expansion persistence; `setControlValue('pivotExpansionState', ...)` is the only write path.
 - Stabilized expansion tests by re-querying headers/bodies after re-render and removing temporary debug logs.
 - Cleaned up expansion-engine iteration helpers to avoid loop-captured callbacks and kept formatting aligned with Prettier.
 - Removed legacy hydration modules (`src/pivot/usePivotHydration.ts`, `src/pivot/hydrationPlanner.ts`).
 - Disabled global loader for cross-axis expands and added a regression test to keep the table visible on same-axis expands with empty columns.
 - Added opt-in expansion persistence (`persistExpansionState`) so manual expands do not trigger Explore re-queries by default.
 - Added a regression test asserting expansion succeeds without calling `setDataMask` when persistence is disabled.
+- Added an RTL regression test ensuring expansions persist when metrics change.
+- Added Explore persistence via `pivotExpansionState` hidden control (no requery):
+  - `setControlValue` writeback when persistence is enabled.
+  - Restore from form data on rerender.
+  - Tests for Explore persistence and groupby append/insertion behavior.
 
 ### Phase 3 (remaining work)
 - None. Phase 3 complete; proceed to Phase 4 (query intent + batching).
+
+### Phase 3 (latest updates)
+- Fixed Explore persistence wiring by passing `setControlValue` into `useExpansionEngine`.
+- Adjusted Prettier formatting in `useExpansionEngine.ts` and expansion-state tests.
+- Re-ran `npm test plugins/plugin-chart-pivot-table-v3` and `npx eslint plugins/plugin-chart-pivot-table-v3` (warnings only).
+- Defaulted expansion persistence to on, persisting `pivotExpansionState` via `setControlValue` in Explore and dashboards.
+- Engine now uses form-data `pivotExpansionState` for all contexts (no `ownState` fallback).
+- Added tests for default Explore persistence and dashboard persistence with `dashboardId`.
+- Ran `npm test -- plugins/plugin-chart-pivot-table-v3/test/plugin/PivotTableChart/expansion-state.test.tsx` (warnings about duplicate mocks/Browserslist).
+- Pivot expansion persistence now stores `rowKeys`/`colKeys` plus path arrays (no concatenated key strings); dropped string-key rehydration.
+- Expansion pruning now uses persisted `rowKeys`/`colKeys` for stable-prefix matching when restoring.
+- Added Explore test for column expansion persistence via `setControlValue`.
+- On layout changes or invalid persisted state, we now reset persisted expansions to the pruned manual set and update `rowKeys`/`colKeys` immediately.
+- Re-ran `npm test -- plugins/plugin-chart-pivot-table-v3/test/plugin/PivotTableChart/expansion-state.test.tsx` (warnings only).
+- `getVisibleExpansionKeys` now uses the engine’s current tree instead of a stale chart ref, so column expansions persist after layout changes.
+- `getVisibleExpansionKeys` now keeps visible column keys even when nodes are virtual (not in the tree map), preventing column expansion persistence from dropping; added `expansionStateModel` unit test and ran `npm test -- plugins/plugin-chart-pivot-table-v3/test/plugin/engine/expansionStateModel.test.ts`.
+- Cross-axis expansion persistence now writes both row and column keys after atomic hydration; added a regression test covering row+col expansions and ran `npm test -- plugins/plugin-chart-pivot-table-v3/test/plugin/PivotTableChart/expansion-state.test.tsx`.
+- Collapsed expansion deltas are now only persisted when auto-expand is active (baseline > 0), preventing empty collapse payloads when auto-expand is off; added a regression test and ran `npm test -- plugins/plugin-chart-pivot-table-v3/test/plugin/PivotTableChart/expansion-state.test.tsx`.
+- Removed dashboard `ownState` expansion persistence/caching (non-enumerable hack removed); expansion state now round-trips via `pivotExpansionState` only.
+- Unified expansion persistence on `pivotExpansionState` (no dashboard fallback), and updated expansion-state RTL coverage to read from `setControlValue`.
+- Ran `npm test -- plugins/plugin-chart-pivot-table-v3/test/plugin/PivotTableChart/expansion-state.test.tsx` (passes; duplicate mock + Browserslist warnings).
+- Ran `npx eslint plugins/plugin-chart-pivot-table-v3` (fails due to existing warnings/Prettier errors in unrelated files; see lint output).
+- Added a dashboard refresh regression test to ensure `pivotExpansionState` restores expanded rows after filter apply; ran `npm test -- plugins/plugin-chart-pivot-table-v3/test/plugin/PivotTableChart/expansion-state.test.tsx` (passes; duplicate mock + Browserslist warnings).

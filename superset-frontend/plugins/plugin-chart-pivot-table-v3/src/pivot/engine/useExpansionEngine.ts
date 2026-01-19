@@ -17,8 +17,9 @@
  * under the License.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { type JsonObject } from '@superset-ui/core';
+import { type HandlerFunction } from '@superset-ui/core';
 import {
+  type PivotExpansionState,
   type PivotAxis,
   type PivotPath,
   type PivotTableQueryFormData,
@@ -66,6 +67,16 @@ const getStablePrefixLength = (prev: string[], next: string[]) => {
     prefix += 1;
   }
   return prefix;
+};
+
+const isSameLayout = (left?: string[], right?: string[]) => {
+  if (!left || !right) {
+    return false;
+  }
+  if (left.length !== right.length) {
+    return false;
+  }
+  return left.every((value, idx) => value === right[idx]);
 };
 
 const addAncestors = (
@@ -280,13 +291,13 @@ export type ExpansionEngineConfig = {
   countDimDepth: (path: PivotTreeNode['path']) => number;
   expandRowsLevelRaw?: number;
   expandColumnsLevelRaw?: number;
-  ownState?: JsonObject;
-  mergeOwnState?: (partial: JsonObject) => JsonObject;
-  setDataMask: (mask: { ownState: JsonObject }) => void;
+  setControlValue?: HandlerFunction;
+  pivotExpansionState?: PivotExpansionState;
   shouldPersistExpansionState: boolean;
   getVisibleExpansionKeys: (
     rows: Set<string>,
     cols: Set<string>,
+    tree: PivotTreeData,
   ) => { rows: Set<string>; cols: Set<string> };
   buildRenderModelConfig: (
     expandedRows: Set<string>,
@@ -323,9 +334,8 @@ export const useExpansionEngine = ({
   countDimDepth,
   expandRowsLevelRaw,
   expandColumnsLevelRaw,
-  ownState,
-  mergeOwnState: mergeOwnStateProp,
-  setDataMask,
+  setControlValue,
+  pivotExpansionState,
   shouldPersistExpansionState,
   getVisibleExpansionKeys: getVisibleExpansionKeysBase,
   buildRenderModelConfig,
@@ -363,7 +373,9 @@ export const useExpansionEngine = ({
   const fetchedRowKeysRef = useRef<Map<string, number>>(new Map());
   const fetchedColKeysRef = useRef<Map<string, number>>(new Map());
   const transactionIdRef = useRef(0);
-  const ownStateRef = useRef<JsonObject>(ownState ?? {});
+  const pivotExpansionStateRef = useRef<PivotExpansionState | undefined>(
+    pivotExpansionState,
+  );
   const dataEpochRef = useRef(0);
   const previousLayoutRef = useRef({
     rows: groupbyRowKeys,
@@ -391,8 +403,8 @@ export const useExpansionEngine = ({
   }, [pendingCols]);
 
   useEffect(() => {
-    ownStateRef.current = ownState ?? {};
-  }, [ownState]);
+    pivotExpansionStateRef.current = pivotExpansionState;
+  }, [pivotExpansionState]);
 
   const updateLoadingKey = useCallback((key: string, delta: number) => {
     const counts = new Map(loadingCountsRef.current);
@@ -467,21 +479,6 @@ export const useExpansionEngine = ({
     [isMetricTokenValue],
   );
 
-  const mergeOwnStateSafe = useCallback((partial: JsonObject) => {
-    const next = { ...ownStateRef.current, ...partial };
-    ownStateRef.current = next;
-    return next;
-  }, []);
-  const mergeOwnState = useCallback(
-    (partial: JsonObject) => {
-      const next = mergeOwnStateProp
-        ? mergeOwnStateProp(partial)
-        : mergeOwnStateSafe(partial);
-      ownStateRef.current = next;
-      return next;
-    },
-    [mergeOwnStateProp, mergeOwnStateSafe],
-  );
   const reportAsyncError = useCallback(
     (error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);
@@ -489,10 +486,37 @@ export const useExpansionEngine = ({
     },
     [setErrorMessage],
   );
+  const persistExpansionStateToStore = useCallback(
+    (nextState: PivotExpansionStateKeys) => {
+      if (!shouldPersistExpansionState || !setControlValue) {
+        return;
+      }
+      const toPathArray = (keys: string[]) => keys.map(key => parsePath(key));
+      const payload = {
+        rowKeys: groupbyRowKeys,
+        colKeys: groupbyColumnKeys,
+        rows: toPathArray(nextState.rows),
+        cols: toPathArray(nextState.cols),
+        collapsedRows: toPathArray(nextState.collapsedRows ?? []),
+        collapsedCols: toPathArray(nextState.collapsedCols ?? []),
+      };
+      setControlValue('pivotExpansionState', payload);
+    },
+    [
+      groupbyColumnKeys,
+      groupbyRowKeys,
+      setControlValue,
+      shouldPersistExpansionState,
+    ],
+  );
 
   const persistExpansionState = useCallback(
     (nextRows: Set<string>, nextCols: Set<string>) => {
-      const visibleKeys = getVisibleExpansionKeysBase(nextRows, nextCols);
+      const visibleKeys = getVisibleExpansionKeysBase(
+        nextRows,
+        nextCols,
+        treeRef.current,
+      );
       const filterVisible = (
         keys: Set<string>,
         visible: Set<string>,
@@ -507,38 +531,37 @@ export const useExpansionEngine = ({
         visibleKeys.cols,
       );
       const visibleCollapsedRows = filterVisible(
-        explicitCollapsedRowsRef.current,
+        resolvedExpandRowsLevel > 0
+          ? explicitCollapsedRowsRef.current
+          : new Set<string>(),
         visibleKeys.rows,
       );
       const visibleCollapsedCols = filterVisible(
-        explicitCollapsedColsRef.current,
+        resolvedExpandColumnsLevel > 0
+          ? explicitCollapsedColsRef.current
+          : new Set<string>(),
         visibleKeys.cols,
       );
       explicitExpandedRowsRef.current = new Set(visibleRows);
       explicitExpandedColsRef.current = new Set(visibleCols);
       explicitCollapsedRowsRef.current = new Set(visibleCollapsedRows);
       explicitCollapsedColsRef.current = new Set(visibleCollapsedCols);
-      if (!shouldPersistExpansionState) {
-        return;
-      }
-      setDataMask({
-        ownState: {
-          ...mergeOwnState({
-            expansionState: {
-              rows: visibleRows,
-              cols: visibleCols,
-              collapsedRows: visibleCollapsedRows,
-              collapsedCols: visibleCollapsedCols,
-            },
-          }),
-        },
+      persistExpansionStateToStore({
+        rowKeys: groupbyRowKeys,
+        colKeys: groupbyColumnKeys,
+        rows: visibleRows,
+        cols: visibleCols,
+        collapsedRows: visibleCollapsedRows,
+        collapsedCols: visibleCollapsedCols,
       });
     },
     [
       getVisibleExpansionKeysBase,
-      mergeOwnState,
-      shouldPersistExpansionState,
-      setDataMask,
+      groupbyColumnKeys,
+      groupbyRowKeys,
+      persistExpansionStateToStore,
+      resolvedExpandColumnsLevel,
+      resolvedExpandRowsLevel,
     ],
   );
 
@@ -1211,11 +1234,15 @@ export const useExpansionEngine = ({
             desiredCols,
             mergedTree,
           );
+          treeRef.current = mergedTree;
           setTree(mergedTree);
           setExpandedRowsState(resolvedRows);
           setExpandedColsState(resolvedCols);
           setPendingRowsState(new Set());
           setPendingColsState(new Set());
+          if (reason === 'cross-axis') {
+            persistExpansionState(resolvedRows, resolvedCols);
+          }
           finalizeHydration();
           return;
         }
@@ -1354,6 +1381,7 @@ export const useExpansionEngine = ({
       getFetchPath,
       hasLoadedChildrenForTree,
       getMetriclessKey,
+      persistExpansionState,
       updateLoadingKey,
       resolveExpandedForMetrics,
     ],
@@ -1442,9 +1470,11 @@ export const useExpansionEngine = ({
     const effectiveExpandColsLevel = isColsLevelCleared
       ? 0
       : resolvedExpandColumnsLevel;
+    const formExpansionState = coerceExpansionState(
+      pivotExpansionStateRef.current,
+    );
     const sessionExpansionState: PivotExpansionStateKeys | undefined =
-      coerceExpansionState(ownStateRef.current?.expansionState);
-
+      formExpansionState ?? undefined;
     const metricLabelSetForDepth = new Set(Array.from(metricLabelSet));
 
     const currentLayout = {
@@ -1453,13 +1483,16 @@ export const useExpansionEngine = ({
     };
     const previousLayout = previousLayoutRef.current;
     previousLayoutRef.current = currentLayout;
-
+    const layoutRowsForPrune =
+      sessionExpansionState?.rowKeys ?? previousLayout.rows;
+    const layoutColsForPrune =
+      sessionExpansionState?.colKeys ?? previousLayout.cols;
     const rowStablePrefix = getStablePrefixLength(
-      previousLayout.rows,
+      layoutRowsForPrune,
       currentLayout.rows,
     );
     const colStablePrefix = getStablePrefixLength(
-      previousLayout.cols,
+      layoutColsForPrune,
       currentLayout.cols,
     );
 
@@ -1493,10 +1526,25 @@ export const useExpansionEngine = ({
       (prevAutoExpandCols === null || prevAutoExpandCols === 0) &&
       sessionCols.length + sessionCollapsedCols.length > 0;
 
+    const allowRowCollapsed = effectiveExpandRowsLevel > 0;
+    const allowColCollapsed = effectiveExpandColsLevel > 0;
     const manualRows = shouldClearRowCache ? [] : sessionRows;
     const manualCols = shouldClearColCache ? [] : sessionCols;
-    const manualCollapsedRows = shouldClearRowCache ? [] : sessionCollapsedRows;
-    const manualCollapsedCols = shouldClearColCache ? [] : sessionCollapsedCols;
+    const manualCollapsedRows =
+      shouldClearRowCache || !allowRowCollapsed ? [] : sessionCollapsedRows;
+    const manualCollapsedCols =
+      shouldClearColCache || !allowColCollapsed ? [] : sessionCollapsedCols;
+
+    const layoutMismatch =
+      !isSameLayout(sessionExpansionState?.rowKeys, currentLayout.rows) ||
+      !isSameLayout(sessionExpansionState?.colKeys, currentLayout.cols);
+    const hasPersistedExpansionState =
+      pivotExpansionStateRef.current !== undefined &&
+      pivotExpansionStateRef.current !== null;
+    const shouldResetPersistedLayout =
+      shouldPersistExpansionState &&
+      hasPersistedExpansionState &&
+      (!sessionExpansionState || layoutMismatch);
 
     const normalizedRowCache =
       effectiveExpandRowsLevel === 0 &&
@@ -1523,36 +1571,91 @@ export const useExpansionEngine = ({
           })
         : { keys: manualCols, collapsedKeys: manualCollapsedCols };
 
-    if (
-      (shouldClearRowCache || shouldClearColCache) &&
-      shouldPersistExpansionState
-    ) {
-      setDataMask({
-        ownState: {
-          ...mergeOwnState({
-            expansionState: {
-              rows: shouldClearRowCache ? [] : sessionRows,
-              cols: shouldClearColCache ? [] : sessionCols,
-              collapsedRows: shouldClearRowCache ? [] : sessionCollapsedRows,
-              collapsedCols: shouldClearColCache ? [] : sessionCollapsedCols,
-            },
-          }),
-        },
+    if (shouldClearRowCache || shouldClearColCache) {
+      persistExpansionStateToStore({
+        rowKeys: groupbyRowKeys,
+        colKeys: groupbyColumnKeys,
+        rows: shouldClearRowCache ? [] : sessionRows,
+        cols: shouldClearColCache ? [] : sessionCols,
+        collapsedRows: shouldClearRowCache ? [] : sessionCollapsedRows,
+        collapsedCols: shouldClearColCache ? [] : sessionCollapsedCols,
       });
     }
 
-    explicitExpandedRowsRef.current = new Set(
-      normalizedRowCache.keys.filter(key => key !== rootKey),
+    const pruneManualKeys = (
+      keys: string[],
+      stablePrefix: number,
+      nodes: Record<string, PivotTreeNode>,
+    ) => {
+      if (!shouldResetExpanded) {
+        return keys.filter(key => key !== rootKey);
+      }
+      const expanded = new Set<string>([rootKey, ...keys]);
+      const pruned = pruneExpandedToStablePrefix({
+        expanded,
+        nodes,
+        stablePrefix,
+        metricLabelSet: metricLabelSetForDepth,
+      });
+      pruned.delete(rootKey);
+      return Array.from(pruned);
+    };
+
+    const pruneCollapsedKeys = (
+      keys: string[],
+      stablePrefix: number,
+      nodes: Record<string, PivotTreeNode>,
+    ) => {
+      if (!shouldResetExpanded) {
+        return keys.filter(key => key !== rootKey);
+      }
+      return keys.filter(key => {
+        if (key === rootKey) {
+          return false;
+        }
+        const node = nodes[key];
+        const path = node ? node.path : parsePath(key);
+        const depth = countDimDepth(path, metricLabelSetForDepth);
+        return depth <= stablePrefix;
+      });
+    };
+
+    const prunedManualRows = pruneManualKeys(
+      normalizedRowCache.keys,
+      rowStablePrefix,
+      data.rows,
     );
-    explicitExpandedColsRef.current = new Set(
-      normalizedColCache.keys.filter(key => key !== rootKey),
+    const prunedManualCols = pruneManualKeys(
+      normalizedColCache.keys,
+      colStablePrefix,
+      data.cols,
     );
-    explicitCollapsedRowsRef.current = new Set(
-      normalizedRowCache.collapsedKeys.filter(key => key !== rootKey),
+    const prunedCollapsedRows = pruneCollapsedKeys(
+      normalizedRowCache.collapsedKeys,
+      rowStablePrefix,
+      data.rows,
     );
-    explicitCollapsedColsRef.current = new Set(
-      normalizedColCache.collapsedKeys.filter(key => key !== rootKey),
+    const prunedCollapsedCols = pruneCollapsedKeys(
+      normalizedColCache.collapsedKeys,
+      colStablePrefix,
+      data.cols,
     );
+
+    explicitExpandedRowsRef.current = new Set(prunedManualRows);
+    explicitExpandedColsRef.current = new Set(prunedManualCols);
+    explicitCollapsedRowsRef.current = new Set(prunedCollapsedRows);
+    explicitCollapsedColsRef.current = new Set(prunedCollapsedCols);
+
+    if (shouldResetPersistedLayout) {
+      persistExpansionStateToStore({
+        rowKeys: groupbyRowKeys,
+        colKeys: groupbyColumnKeys,
+        rows: prunedManualRows,
+        cols: prunedManualCols,
+        collapsedRows: prunedCollapsedRows,
+        collapsedCols: prunedCollapsedCols,
+      });
+    }
 
     const seededRows = seedExpandedByLevel(
       data.rows,
@@ -1667,13 +1770,11 @@ export const useExpansionEngine = ({
     groupbyColumnKeys,
     groupbyRowKeys,
     hasLoadedChildrenForTree,
-    mergeOwnState,
     metricLabelSet,
-    ownState,
+    persistExpansionStateToStore,
     shouldPersistExpansionState,
     resolvedExpandColumnsLevel,
     resolvedExpandRowsLevel,
-    setDataMask,
     shouldExpandMetricCols,
     shouldExpandMetricRows,
     hydrateAtomic,

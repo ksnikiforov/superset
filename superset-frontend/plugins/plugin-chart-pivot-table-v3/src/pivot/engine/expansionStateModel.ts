@@ -33,6 +33,8 @@ import { countDimDepth } from '../metricsTotals';
 import { rootKey } from '../viewModel';
 
 export type PivotExpansionStateKeys = {
+  rowKeys: string[];
+  colKeys: string[];
   rows: string[];
   cols: string[];
   collapsedRows: string[];
@@ -69,19 +71,20 @@ export const seedExpandedByLevel = (
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
+const coerceAxisKeys = (value: unknown): string[] | undefined => {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const keys = value.filter((item): item is string => typeof item === 'string');
+  return keys.length === value.length ? keys : undefined;
+};
+
 const coerceExpansionAxis = (value: unknown): string[] | undefined => {
   if (!Array.isArray(value)) {
     return undefined;
   }
   const resolved: string[] = [];
   value.forEach(item => {
-    if (typeof item === 'string') {
-      if (parsePath(item).some(isSubtotalToken)) {
-        return;
-      }
-      resolved.push(item);
-      return;
-    }
     if (Array.isArray(item)) {
       if ((item as unknown[]).some(isSubtotalToken)) {
         return;
@@ -98,14 +101,18 @@ export const coerceExpansionState = (
   if (!isRecord(value)) {
     return undefined;
   }
+  const rowKeys = coerceAxisKeys(value.rowKeys);
+  const colKeys = coerceAxisKeys(value.colKeys);
   const rows = coerceExpansionAxis(value.rows);
   const cols = coerceExpansionAxis(value.cols);
   const collapsedRows = coerceExpansionAxis(value.collapsedRows);
   const collapsedCols = coerceExpansionAxis(value.collapsedCols);
-  if (!rows || !cols) {
+  if (!rowKeys || !colKeys || !rows || !cols) {
     return undefined;
   }
   return {
+    rowKeys,
+    colKeys,
     rows,
     cols,
     collapsedRows: collapsedRows || [],
@@ -285,9 +292,7 @@ export const getVisibleExpansionKeys = ({
   visibleCols.forEach(col => {
     for (let idx = 0; idx <= col.path.length; idx += 1) {
       const key = serializePath(col.path.slice(0, idx));
-      if (colsNodes[key]) {
-        visibleColKeys.add(key);
-      }
+      visibleColKeys.add(key);
     }
   });
 

@@ -57,15 +57,19 @@ const makeNode = ({
 describe('expansionStateModel', () => {
   it('coerces persisted expansion state and drops subtotal tokens', () => {
     const expansionState = coerceExpansionState({
-      rows: [['A'], 'B', ['A', SUBTOTAL_TOKEN]],
-      cols: [['X'], 'Y', ['X', SUBTOTAL_TOKEN]],
+      rowKeys: ['r1'],
+      colKeys: ['c1'],
+      rows: [['A'], ['B'], ['A', SUBTOTAL_TOKEN]],
+      cols: [['X'], ['Y'], ['X', SUBTOTAL_TOKEN]],
       collapsedRows: [['A', 'Z'], [SUBTOTAL_TOKEN]],
       collapsedCols: [['X', 'Z']],
     });
 
     expect(expansionState).toEqual({
-      rows: [serializePath(['A']), 'B'],
-      cols: [serializePath(['X']), 'Y'],
+      rowKeys: ['r1'],
+      colKeys: ['c1'],
+      rows: [serializePath(['A']), serializePath(['B'])],
+      cols: [serializePath(['X']), serializePath(['Y'])],
       collapsedRows: [serializePath(['A', 'Z'])],
       collapsedCols: [serializePath(['X', 'Z'])],
     });
@@ -73,7 +77,15 @@ describe('expansionStateModel', () => {
 
   it('returns undefined when expansion state is malformed', () => {
     expect(coerceExpansionState(null)).toBeUndefined();
-    expect(coerceExpansionState({ rows: [], cols: 'nope' })).toBeUndefined();
+    expect(
+      coerceExpansionState({
+        rowKeys: ['r1'],
+        colKeys: ['c1'],
+        rows: [],
+        cols: 'nope',
+      }),
+    ).toBeUndefined();
+    expect(coerceExpansionState({ rows: [], cols: [] })).toBeUndefined();
   });
 
   it('seeds expansion keys by depth and supports metric depth zero', () => {
@@ -203,5 +215,46 @@ describe('expansionStateModel', () => {
     expect(visibleRows.has(serializePath(['A', 'X']))).toBe(false);
     expect(visibleRows.has(serializePath(['A']))).toBe(true);
     expect(visibleCols.has(serializePath(['C']))).toBe(true);
+  });
+
+  it('keeps visible column keys that are not present in the node map', () => {
+    const rows: Record<string, PivotTreeNode> = {
+      [rootKey]: makeNode({ axis: 'row', path: [], hasChildren: true }),
+    };
+    const cols: Record<string, PivotTreeNode> = {
+      [rootKey]: makeNode({ axis: 'col', path: [], hasChildren: true }),
+    };
+    const virtualCol = makeNode({ axis: 'col', path: ['virtual'] });
+
+    const { cols: visibleCols } = getVisibleExpansionKeys({
+      rowsNodes: rows,
+      colsNodes: cols,
+      expandedRows: new Set([rootKey]),
+      expandedCols: new Set([rootKey]),
+      rowSorter: (a, b) => a.key.localeCompare(b.key),
+      colSorter: (a, b) => a.key.localeCompare(b.key),
+      skipRowRoot: false,
+      showRowRoot: true,
+      rowTotalPosition: 'start',
+      getRowChildren: parent => findChildren(rows, parent),
+      getCollapsedRowChildren: () => [],
+      skipColRoot: false,
+      countDimDepth: path => countDimDepth(path, new Set()),
+      normalizedColSubtotalLevels: [],
+      showColRoot: true,
+      rowTotals: false,
+      colTotalPosition: 'start',
+      resolvedColSubtotalPosition: 'start',
+      getColChildren: () => [],
+      getCollapsedColLeaves: () => [virtualCol],
+      isMetricGrandTotalNode: () => false,
+      isMetricSubtotalNode: () => false,
+      isMetricTokenValue: () => false,
+      shouldHideMetricGrandTotalsOnRows: false,
+      shouldHideMetricGrandTotalsOnCols: false,
+      shouldSuppressColRoot: false,
+    });
+
+    expect(visibleCols.has(serializePath(['virtual']))).toBe(true);
   });
 });
