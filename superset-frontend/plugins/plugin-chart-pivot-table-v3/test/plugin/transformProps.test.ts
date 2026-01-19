@@ -55,6 +55,33 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
           coltypes: [0],
           query_name: formatQueryName(0, 0),
         },
+      ],
+      hooks: { setDataMask: jest.fn() },
+      filterState: { selectedFilters: {} },
+      datasource: {
+        verboseMap: {},
+        columnFormats: {},
+        currencyFormats: {},
+        columns: [
+          { column_name: 'row1', type_generic: GenericDataType.String },
+          { column_name: 'col1', type_generic: GenericDataType.String },
+        ],
+      },
+      theme: supersetTheme,
+    });
+
+    const result = transformProps(chartProps as ChartProps<PivotTableQueryFormData>);
+    expect(Object.keys(result.data.rows)).toEqual([rootKey]);
+    expect(result.data.cols).toHaveProperty(rootKey);
+    expect(result.data.cells[serializeCellKey(rootKey, rootKey)]?.values.metric1).toBe(10);
+  });
+
+  it('builds hierarchy nodes from non-zero depth results', () => {
+    const chartProps = new ChartProps({
+      formData: baseFormData,
+      width: 400,
+      height: 300,
+      queriesData: [
         {
           data: [{ row1: 'A', col1: 'B', metric1: 10 }],
           colnames: ['row1', 'col1', 'metric1'],
@@ -77,9 +104,55 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
     });
 
     const result = transformProps(chartProps as ChartProps<PivotTableQueryFormData>);
-    expect(Object.keys(result.data.rows)).toEqual([rootKey]);
-    expect(Object.keys(result.data.cols)).toEqual([rootKey]);
-    expect(result.data.cells[serializeCellKey(rootKey, rootKey)]?.values.metric1).toBe(10);
+    const rowKey = serializePath(['A']);
+    const colKey = serializePath(['B']);
+    expect(result.data.rows).toHaveProperty(rootKey);
+    expect(result.data.rows).toHaveProperty(rowKey);
+    expect(result.data.cols).toHaveProperty(rootKey);
+    expect(result.data.cols).toHaveProperty(colKey);
+    expect(result.data.cells[serializeCellKey(rowKey, colKey)]?.values.metric1).toBe(10);
+  });
+
+  it('maps unnamed query results to the bootstrap order', () => {
+    const chartProps = new ChartProps({
+      formData: {
+        ...baseFormData,
+        colTotals: true,
+        rowTotals: false,
+      },
+      width: 400,
+      height: 300,
+      queriesData: [
+        {
+          data: [{ col1: 'B', metric1: 5 }],
+          colnames: ['col1', 'metric1'],
+          coltypes: [1, 0],
+        },
+        {
+          data: [{ row1: 'A', col1: 'B', metric1: 10 }],
+          colnames: ['row1', 'col1', 'metric1'],
+          coltypes: [1, 1, 0],
+        },
+      ],
+      hooks: { setDataMask: jest.fn() },
+      filterState: { selectedFilters: {} },
+      datasource: {
+        verboseMap: {},
+        columnFormats: {},
+        currencyFormats: {},
+        columns: [
+          { column_name: 'row1', type_generic: GenericDataType.String },
+          { column_name: 'col1', type_generic: GenericDataType.String },
+        ],
+      },
+      theme: supersetTheme,
+    });
+
+    const result = transformProps(chartProps as ChartProps<PivotTableQueryFormData>);
+    const rowKey = serializePath(['A']);
+    const colKey = serializePath(['B']);
+    expect(result.data.cells[serializeCellKey(rootKey, colKey)]?.values.metric1).toBe(5);
+    expect(result.data.cells[serializeCellKey(rowKey, colKey)]?.values.metric1).toBe(10);
   });
 
   it('uses datasource column types when present', () => {

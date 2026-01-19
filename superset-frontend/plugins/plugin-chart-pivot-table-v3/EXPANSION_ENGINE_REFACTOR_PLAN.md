@@ -41,6 +41,9 @@ These decisions are locked for this refactor:
 - Keep persistence plugin-only: no Superset core changes; use `setControlValue`
   with a hidden control instead of changing global persistence behavior.
 - Use query intent + minimization over unconditional “formatting metrics everywhere” (§5.10).
+- Do not rely on `query_name` being returned by the server; when missing, map
+  query results to a deterministic query-pair order derived from form data
+  (shared between `buildQuery.ts` and `transformProps.ts`).
 
 ## 1) Current code map (starting point)
 
@@ -1253,12 +1256,15 @@ Implementation:
 - `src/transformProps.ts`:
   - stop merging query slices into the full tree (`src/transformProps.ts:300` becomes obsolete).
   - provide a minimal initial `tree` (root nodes only) and pass through the necessary config/hooks for the engine to fetch.
+  - if `query_name` is absent in query results, fall back to the deterministic
+    query-pair order used by `buildQuery.ts` (do not assume full depth).
 - Engine:
   - on mount, start an initial “load transaction” (global loader) to fetch the desired initial shape (auto-expand levels + totals/subtotals requirements), then reveal once.
 
 Exit criteria (Phase 6):
 - First-load Explore and dashboard use the coordinator fetch path (same code path as expansions).
 - No depth inference from `parseDepth` is needed in `transformProps.ts`.
+- Unnamed query results still hydrate correctly via the shared query-pair order.
 - Initial load remains fast (parallel fetch + batching where applicable) and preserves totals/subtotals correctness.
 
 ### Phase 7 — Load-state refactor (deterministic, single-source-of-truth)
@@ -1427,6 +1433,9 @@ Status: Phase 4 complete. Proceed to Phase 5.
 ### Phase 6 (complete)
 - Replaced the initial multi-query matrix with a single bootstrap query in `src/buildQuery.ts`.
 - Simplified `src/transformProps.ts` to build a root-only tree and use the first query for grand totals only.
+- When query results omit `query_name`, map them to the shared query-pair order
+  (same ordering as `buildQuery.ts`) to avoid undefined-path merges; added a
+  regression test in `test/plugin/transformProps.test.ts`.
 - Updated expansion planner/root satisfaction and fetched-depth seeding to rely on actual loaded children before skipping prefetch.
 - Adjusted RTL suites to align with bootstrap-first hydration and initial global loader timing:
   - `test/plugin/PivotTableChart/prefetch.epoch.test.tsx`

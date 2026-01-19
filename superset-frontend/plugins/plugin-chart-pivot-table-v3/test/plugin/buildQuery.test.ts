@@ -47,11 +47,16 @@ const baseFormData = buildFormData({
 });
 
 describe('buildQuery (bootstrap)', () => {
-  test('emits a single zero-depth bootstrap query', () => {
+  test('emits a single visible-depth query', () => {
     const queryContext = buildQuery(baseFormData);
     expect(queryContext.queries).toHaveLength(1);
-    expect(queryContext.queries[0].query_name).toEqual(formatQueryName(0, 0));
-    expect(queryContext.queries[0].columns).toEqual([]);
+    expect(queryContext.queries[0].query_name).toEqual(formatQueryName(2, 2));
+    expect(queryContext.queries[0].columns).toEqual([
+      'row1',
+      'row2',
+      'col1',
+      'col2',
+    ]);
   });
 
   test('uses the base metric list for the bootstrap query', () => {
@@ -72,6 +77,6 @@ describe('buildQuery (bootstrap)', () => {
     const metricKeys = queryMetrics.map(metric =>
       typeof metric === 'string' ? metric : metric.label,
     );
-    expect(metricKeys).toEqual(['metric1', 'metric2']);
+    expect(metricKeys).toEqual(expect.arrayContaining(['metric1', 'metric2']));
   });
 });

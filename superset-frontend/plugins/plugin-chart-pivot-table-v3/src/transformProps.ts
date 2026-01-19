@@ -36,7 +36,6 @@ import {
   TotalPosition,
 } from './types';
 import {
-  applyMetricAxis,
   buildTreeFromRecords,
   getMetricKeys,
   getStableColumnKey,
@@ -44,13 +43,15 @@ import {
   normalizeDimensionSortingMapWithKeys,
   normalizeMetricFormattingMapWithKeys,
   normalizeMetricDatabarMapWithKeys,
+  parseDepth,
+  resolveExpandLevel,
   resolveMetricPlacement,
   stripMetricsPlaceholder,
   normalizeSubtotalLevels,
-  labelRowSubtotalLeaves,
-  serializeCellKey,
   serializePath,
 } from './utils';
+import { buildBranchTreeFromResults } from './fetchPivotBranch';
+import { QUERY_NAME_PREFIX, resolveQueryPairs } from './buildQuery';
 import { buildQueryShape } from './pivot/engine/query/queryShape';
 import { type QueryIntent } from './pivot/engine/query/queryIntent';
 
@@ -128,6 +129,30 @@ export default function transformProps(
     false,
     false,
   ).filter(level => level > 0);
+  const resolvedStartCollapsed = formData.startCollapsed ?? true;
+  const resolvedInitialDepth = formData.initialDepth ?? 1;
+  const resolvedExpandRowsLevel = resolveExpandLevel(
+    formData.expandRowsLevel,
+    groupbyRows.length,
+    resolvedStartCollapsed,
+    resolvedInitialDepth,
+  );
+  const resolvedExpandColumnsLevel = resolveExpandLevel(
+    formData.expandColumnsLevel,
+    groupbyColumns.length,
+    resolvedStartCollapsed,
+    resolvedInitialDepth,
+  );
+  const baseRowDepth = groupbyRows.length > 0 ? 1 : 0;
+  const baseColDepth = groupbyColumns.length > 0 ? 1 : 0;
+  const targetRowDepth = Math.min(
+    Math.max(resolvedExpandRowsLevel, baseRowDepth),
+    groupbyRows.length,
+  );
+  const targetColDepth = Math.min(
+    Math.max(resolvedExpandColumnsLevel, baseColDepth),
+    groupbyColumns.length,
+  );
   const needsTotals =
     !!formData.rowTotals ||
     !!formData.colTotals ||
@@ -180,7 +205,6 @@ export default function transformProps(
         : groupbyColumns.length;
   const granularity = extractTimegrain(rawFormData);
   const metricKeysForQuery = getMetricKeys(metricsForQueryWithFormatting);
-  const metricKeySetForQuery = new Set(metricKeysForQuery.filter(key => key));
   const queryFormData: PivotTableQueryFormData = {
     ...rawFormData,
     metricsLayout,
@@ -259,55 +283,52 @@ export default function transformProps(
     rowSubtotalLevels,
     colSubtotalLevels,
   });
-  const baseTree = buildTreeFromRecords(
-    [],
-    metricsForQueryWithFormatting,
-    groupbyRows,
-    groupbyColumns,
-    0,
-    0,
-  );
-  const nextTree = applyMetricAxis(
-    baseTree,
-    metrics,
-    metricsLayout,
-    groupbyRows,
-    groupbyColumns,
-    metricInsertIndex,
-  );
   const rootKey = serializePath([]);
-  const bootstrapQuery = queriesData[0];
-  const bootstrapRecord = bootstrapQuery?.data?.[0];
-  const bootstrapKeys = (bootstrapQuery?.colnames || [])
-    .map((name: string) => String(name))
-    .filter(key => metricKeySetForQuery.has(key));
-  if (bootstrapRecord && bootstrapKeys.length > 0) {
-    const grandValues = bootstrapKeys.reduce(
-      (acc, key) => ({ ...acc, [key]: (bootstrapRecord as any)[key] }),
-      {} as Record<string, DataRecordValue>,
-    );
-    if (Object.keys(grandValues).length > 0) {
-      const rootCellKey = serializeCellKey(rootKey, rootKey);
-      nextTree.rows[rootKey] = {
-        ...nextTree.rows[rootKey],
-        values: { ...(nextTree.rows[rootKey]?.values || {}), ...grandValues },
-      };
-      nextTree.cols[rootKey] = {
-        ...nextTree.cols[rootKey],
-        values: { ...(nextTree.cols[rootKey]?.values || {}), ...grandValues },
-      };
-      nextTree.cells[rootCellKey] = {
-        rowKey: rootKey,
-        colKey: rootKey,
-        values: {
-          ...(nextTree.cells[rootCellKey]?.values || {}),
-          ...grandValues,
-        },
-        isSubtotal: true,
-      };
+  const fallbackQueryPairs = resolveQueryPairs({
+    groupbyRows,
+    groupbyColumns,
+    rowSubtotalLevels,
+    colSubtotalLevels,
+    targetRowDepth,
+    targetColDepth,
+    rowTotals: formData.rowTotals,
+    colTotals: formData.colTotals,
+  });
+  const queryPairs = queriesData.map((query, idx) => {
+    const queryName = query?.query_name;
+    const hasQueryName =
+      typeof queryName === 'string' &&
+      queryName.startsWith(QUERY_NAME_PREFIX);
+    if (hasQueryName) {
+      return parseDepth(queryName);
     }
-  }
-  const nextTreeLabeled = labelRowSubtotalLeaves(nextTree, metrics);
+    return fallbackQueryPairs[idx] || parseDepth(queryName);
+  });
+  const results = queriesData.map(query => ({
+    data: query?.data as Record<string, unknown>[] | undefined,
+  }));
+  const nextTreeLabeled: PivotTreeData =
+    results.length > 0
+      ? buildBranchTreeFromResults({
+          results,
+          queryPairs,
+          metricsForQuery: metricsForQueryWithFormatting,
+          formData,
+          rowGroupby: groupbyRows,
+          colGroupby: groupbyColumns,
+          rowSubtotalLevels,
+          colSubtotalLevels,
+          metricsLayoutResolved: metricsLayout,
+          metricInsertIndex,
+        })
+      : buildTreeFromRecords(
+          [],
+          metricsForQueryWithFormatting,
+          groupbyRows,
+          groupbyColumns,
+          0,
+          0,
+        );
   if (nextTreeLabeled.rows[rootKey]) {
     nextTreeLabeled.rows[rootKey] = {
       ...nextTreeLabeled.rows[rootKey],
