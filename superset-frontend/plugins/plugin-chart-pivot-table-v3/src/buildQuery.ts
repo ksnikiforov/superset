@@ -17,306 +17,37 @@
  * under the License.
  */
 import {
-  AdhocColumn,
   buildQueryContext,
   ensureIsArray,
-  isPhysicalColumn,
-  QueryFormColumn,
   QueryFormOrderBy,
 } from '@superset-ui/core';
-import { MetricsLayoutEnum, PivotTableQueryFormData } from './types';
-import {
-  collectMetricFormattingMetricsForQuery,
-  collectMetricDatabarMetricsForQuery,
-  collectDimensionFormattingMetricsForQuery,
-  collectDimensionSortingMetricsForQuery,
-  hasTotalSorting,
-  mergeMetrics,
-  normalizeSubtotalLevels,
-  resolveExpandLevel,
-  resolveMetricPlacement,
-  stripMetricsPlaceholder,
-} from './utils';
+import { PivotTableQueryFormData } from './types';
 
 export const QUERY_NAME_PREFIX = 'pivot_v3';
 export const formatQueryName = (rowDepth: number, colDepth: number) =>
   `${QUERY_NAME_PREFIX}|row${rowDepth}|col${colDepth}`;
 
-const normalizeColumn = (
-  col: QueryFormColumn,
-  time_grain_sqla?: string,
-  isTemporal?: boolean,
-) => {
-  if (isPhysicalColumn(col) && time_grain_sqla && isTemporal) {
-    return {
-      timeGrain: time_grain_sqla,
-      columnType: 'BASE_AXIS',
-      sqlExpression: col,
-      label: col,
-      expressionType: 'SQL',
-    } as AdhocColumn;
-  }
-  return col;
-};
-
 export default function buildQuery(formData: PivotTableQueryFormData) {
-  const {
-    groupbyColumns = [],
-    groupbyRows = [],
-    extra_form_data,
-    startCollapsed = true,
-    expandRowsLevel,
-    expandColumnsLevel,
-    rowTotals,
-    colTotals,
-    rowSubTotals,
-    rowSubtotalLevels,
-    colSubtotalLevels,
-    initialDepth = 1,
-  } = formData;
-
-  const time_grain_sqla =
-    extra_form_data?.time_grain_sqla || formData.time_grain_sqla;
-
-  const rowGroupbyRaw = ensureIsArray<QueryFormColumn>(groupbyRows);
-  const colGroupbyRaw = ensureIsArray<QueryFormColumn>(groupbyColumns);
   const metrics = ensureIsArray(formData.metrics);
-  const metricFormattingMetrics = collectMetricFormattingMetricsForQuery(
-    formData.metricFormatting,
-    metrics,
-  );
-  const metricDatabarMetrics = collectMetricDatabarMetricsForQuery(
-    formData.metricDatabars,
-    metrics,
-  );
-  const placement = resolveMetricPlacement(rowGroupbyRaw, colGroupbyRaw, {
-    hasMetrics: metrics.length > 0,
-    preferredAxis: formData.metricsLayout as MetricsLayoutEnum,
-  });
-  const rowGroupby = stripMetricsPlaceholder(placement.rows);
-  const colGroupby = stripMetricsPlaceholder(placement.cols);
-  const rowFormattingMetrics = collectDimensionFormattingMetricsForQuery(
-    formData.rowFormatting,
-    rowGroupby,
-    metrics,
-  );
-  const colFormattingMetrics = collectDimensionFormattingMetricsForQuery(
-    formData.colFormatting,
-    colGroupby,
-    metrics,
-  );
-  const rowSortingMetrics = collectDimensionSortingMetricsForQuery(
-    formData.rowSorting,
-    rowGroupby,
-    metrics,
-  );
-  const colSortingMetrics = collectDimensionSortingMetricsForQuery(
-    formData.colSorting,
-    colGroupby,
-    metrics,
-  );
-  const formattingMetrics = [
-    ...metricFormattingMetrics,
-    ...metricDatabarMetrics,
-    ...rowFormattingMetrics,
-    ...colFormattingMetrics,
-    ...rowSortingMetrics,
-    ...colSortingMetrics,
-  ];
-  const metricsForQuery = mergeMetrics(metrics, formattingMetrics);
-  const hasRowTotalSorting = hasTotalSorting(formData.rowSorting, rowGroupby);
-  const hasColTotalSorting = hasTotalSorting(formData.colSorting, colGroupby);
-  const metricsOnRows = placement.layout === MetricsLayoutEnum.ROWS;
-  const metricInsertIndex =
-    placement.metricPosition >= 0 ? placement.metricPosition : undefined;
-  const hasTotalRow = colTotals || ensureIsArray(rowSubtotalLevels).includes(0);
-  const hasTotalColumn =
-    rowTotals || ensureIsArray(colSubtotalLevels).includes(0);
-  const shouldIncludeGrandTotalQuery =
-    (rowGroupby.length === 0 && colGroupby.length === 0) ||
-    (hasTotalRow && hasTotalColumn) ||
-    (metricsOnRows && metricInsertIndex === 0 && hasTotalColumn) ||
-    (!metricsOnRows && metricInsertIndex === 0 && hasTotalRow);
-
-  const rowSubTotalsEnabled = rowSubTotals ?? true;
-  const maxRowSubtotalDepth = Math.max(rowGroupby.length - 1, 0);
-  const rowLevels = normalizeSubtotalLevels(
-    rowSubtotalLevels,
-    maxRowSubtotalDepth,
-    colTotals,
-    rowSubTotalsEnabled,
-  );
-  const maxColSubtotalDepth = Math.max(colGroupby.length - 1, 0);
-  const colSubtotalLevelsRaw = ensureIsArray<number>(colSubtotalLevels);
-  const colLevelsBase = normalizeSubtotalLevels(
-    colSubtotalLevelsRaw,
-    maxColSubtotalDepth,
-    false,
-    false,
-  ).filter(level => level > 0);
-  const colLevels = rowTotals ? [0, ...colLevelsBase] : colLevelsBase;
-  const hasRowSubtotals = rowLevels.some(level => level > 0);
-  const hasColSubtotals = colLevels.some(level => level > 0);
-  const isTotalsEnabled =
-    rowTotals || colTotals || rowSubTotalsEnabled || colLevelsBase.length > 0;
-  const isLevelTotalsEnabled = hasRowSubtotals || hasColSubtotals;
-  const needsFormattingTotals =
-    rowFormattingMetrics.length > 0 || colFormattingMetrics.length > 0;
-  const needsSortingTotals = hasRowTotalSorting || hasColTotalSorting;
-  const resolvedExpandRowsLevel = resolveExpandLevel(
-    expandRowsLevel,
-    rowGroupby.length,
-    startCollapsed,
-    initialDepth || 1,
-  );
-  const resolvedExpandColsLevel = resolveExpandLevel(
-    expandColumnsLevel,
-    colGroupby.length,
-    startCollapsed,
-    initialDepth || 1,
-  );
-  const isFullyExpanded =
-    resolvedExpandRowsLevel >= rowGroupby.length &&
-    resolvedExpandColsLevel >= colGroupby.length;
-  const requireMultiQuery =
-    !isFullyExpanded ||
-    isTotalsEnabled ||
-    isLevelTotalsEnabled ||
-    needsFormattingTotals ||
-    needsSortingTotals;
-
-  const adjustForMetricFront = (depth: number, onAxis: boolean) => {
-    if (!onAxis) {
-      return depth;
-    }
-    // If metrics sit at position 0 on this axis, one visible level is the metric tier itself.
-    if (metricInsertIndex === 0) {
-      return Math.max(depth - 1, 0);
-    }
-    return depth;
-  };
-
-  const rowDepthLimit = Math.min(
-    rowGroupby.length,
-    Math.max(
-      0,
-      adjustForMetricFront(resolvedExpandRowsLevel + 1, metricsOnRows),
-    ),
-  );
-  const colDepthLimit = Math.min(
-    colGroupby.length,
-    Math.max(
-      0,
-      adjustForMetricFront(resolvedExpandColsLevel + 1, !metricsOnRows),
-    ),
-  );
-
-  const temporalLookup = formData?.temporal_columns_lookup || {};
-  const isTemporalColumn = (col: QueryFormColumn) =>
-    isPhysicalColumn(col) &&
-    (temporalLookup?.[col as string] || formData.granularity_sqla === col);
   return buildQueryContext(formData, baseQueryObject => {
     const { series_limit_metric, order_desc } = baseQueryObject;
     const queryMetrics =
-      metricsForQuery.length > 0 ? metricsForQuery : baseQueryObject.metrics;
+      metrics.length > 0 ? metrics : baseQueryObject.metrics;
     let orderby: QueryFormOrderBy[] | undefined;
     if (series_limit_metric) {
       orderby = [[series_limit_metric, !order_desc]];
-    } else if (Array.isArray(metrics)) {
-      orderby = metrics[0] ? [[metrics[0], !order_desc]] : undefined;
     } else if (Array.isArray(queryMetrics)) {
       orderby = queryMetrics[0] ? [[queryMetrics[0], !order_desc]] : undefined;
     }
 
-    if (!requireMultiQuery) {
-      return [
-        {
-          ...baseQueryObject,
-          metrics: queryMetrics,
-          orderby,
-          columns: [...rowGroupby, ...colGroupby].map(col =>
-            normalizeColumn(col, time_grain_sqla, isTemporalColumn(col)),
-          ),
-          query_name: formatQueryName(rowGroupby.length, colGroupby.length),
-        },
-      ];
-    }
-
-    const rowLevelsForInitial = rowLevels.filter(
-      level => level <= rowDepthLimit,
-    );
-    const colLevelsForInitial = colLevels.filter(
-      level => level <= colDepthLimit,
-    );
-
-    const rowDepths = new Set<number>(rowLevelsForInitial);
-    const colDepths = new Set<number>(colLevelsForInitial);
-
-    // always include the initial visible depth for each axis
-    rowDepths.add(rowDepthLimit || 0);
-    colDepths.add(colDepthLimit || 0);
-    if (rowFormattingMetrics.length > 0 || hasRowTotalSorting) {
-      colDepths.add(0);
-    }
-    if (colFormattingMetrics.length > 0 || hasColTotalSorting) {
-      rowDepths.add(0);
-    }
-    if (metricsOnRows && metricInsertIndex === 0 && rowTotals) {
-      rowDepths.add(0);
-    }
-
-    let queries = Array.from(rowDepths).flatMap(rowDepth =>
-      Array.from(colDepths).map(colDepth => ({
-        ...baseQueryObject,
-        metrics: queryMetrics,
-        orderby,
-        columns: [
-          ...rowGroupby
-            .slice(0, rowDepth)
-            .map(col =>
-              normalizeColumn(col, time_grain_sqla, isTemporalColumn(col)),
-            ),
-          ...colGroupby
-            .slice(0, colDepth)
-            .map(col =>
-              normalizeColumn(col, time_grain_sqla, isTemporalColumn(col)),
-            ),
-        ],
-        query_name: formatQueryName(rowDepth, colDepth),
-      })),
-    );
-
-    if (!shouldIncludeGrandTotalQuery) {
-      queries = queries.filter(
-        query => query.query_name !== formatQueryName(0, 0),
-      );
-    }
-
-    if (hasTotalRow && hasTotalColumn) {
-      const hasGrandTotalSlice = queries.some(
-        query => query.query_name === formatQueryName(0, 0),
-      );
-      if (!hasGrandTotalSlice) {
-        queries.unshift({
-          ...baseQueryObject,
-          metrics: queryMetrics,
-          orderby,
-          columns: [],
-          query_name: formatQueryName(0, 0),
-        });
-      }
-    }
-
-    if (queries.length === 0) {
-      queries.push({
+    return [
+      {
         ...baseQueryObject,
         metrics: queryMetrics,
         orderby,
         columns: [],
         query_name: formatQueryName(0, 0),
-      });
-    }
-
-    return queries;
+      },
+    ];
   });
 }

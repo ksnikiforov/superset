@@ -1261,6 +1261,51 @@ Exit criteria (Phase 6):
 - No depth inference from `parseDepth` is needed in `transformProps.ts`.
 - Initial load remains fast (parallel fetch + batching where applicable) and preserves totals/subtotals correctness.
 
+### Phase 7 — Load-state refactor (deterministic, single-source-of-truth)
+
+Goal: eliminate heuristic “loaded” inference and unify metric-tier rules so fetch decisions are deterministic, cheap, and testable.
+
+7.1) Split evidence collection from fetch policy
+- Introduce a pure “loaded evidence” builder (per tree snapshot) that summarizes:
+  - direct child presence by axis,
+  - descendant depth coverage by base-path,
+  - metric-tier variants and placement,
+  - subtotal token presence.
+- Add a pure policy function that decides `shouldFetch` from evidence + layout context.
+- Replace `hasLoadedChildren` with `getLoadedEvidence` + `shouldFetchBranch`.
+- Tests:
+  - unit tests for evidence extraction across metric-first/metrics-between/subtotal cases.
+  - policy rule table tests for fetch/no-fetch decisions.
+
+7.2) Make engine load state authoritative
+- Track per-node “loaded depth” in the engine after each fetch/merge.
+- Remove inference from cells/nodes when determining fetch needs.
+- Use `requiredDepth > loadedDepth` as the primary planner predicate.
+- Tests:
+  - unit test for loaded-depth updates on single/batched fetch merges.
+  - regression test ensuring no extra fetches when deeper cells exist without explicit load.
+
+7.3) Normalize metric-tier handling
+- Introduce a metric-tier model object with:
+  - intended metric index,
+  - observed metric index,
+  - metric-tier node sets by axis.
+- Rewire all metric-tier checks to use the model (expansion, visibility, render).
+- Tests:
+  - metric-tier model unit tests covering metric-first/metrics-between/metrics-last.
+
+7.4) Deterministic visibility
+- Visibility should rely only on render-model + loaded-depths.
+- Remove descendant scans from visibility decisions.
+- Tests:
+  - ensure visible rows/cols stability across identical trees with different cell distributions.
+
+Exit criteria (Phase 7):
+- `hasLoadedChildren` heuristics removed.
+- Planner uses explicit load-state for fetch decisions.
+- Metric-tier logic consolidated into a single model.
+- All plugin tests pass; new unit tests cover evidence/policy and load-state updates.
+
 Always keep these green:
 - `npm test plugins/plugin-chart-pivot-table-v3`
 - plugin lint (`npm run lint` or `eslint` subset)
@@ -1379,4 +1424,17 @@ Status: Phase 4 complete. Proceed to Phase 5.
 - Ran `npm test -- plugins/plugin-chart-pivot-table-v3` (passes; duplicate mock + Browserslist warnings; Babel deprecation warning).
 - Ran `npx eslint plugins/plugin-chart-pivot-table-v3` (fails with pre-existing warnings/errors; see lint output).
 
-Status: Phase 5 complete. Proceed to Phase 6.
+### Phase 6 (complete)
+- Replaced the initial multi-query matrix with a single bootstrap query in `src/buildQuery.ts`.
+- Simplified `src/transformProps.ts` to build a root-only tree and use the first query for grand totals only.
+- Updated expansion planner/root satisfaction and fetched-depth seeding to rely on actual loaded children before skipping prefetch.
+- Adjusted RTL suites to align with bootstrap-first hydration and initial global loader timing:
+  - `test/plugin/PivotTableChart/prefetch.epoch.test.tsx`
+  - `test/plugin/PivotTableChart/prefetch.batching.test.tsx`
+  - `test/plugin/PivotTableChart/expansion-state.test.tsx`
+- Ran `npm test -- plugins/plugin-chart-pivot-table-v3/test/plugin/PivotTableChart/prefetch.epoch.test.tsx plugins/plugin-chart-pivot-table-v3/test/plugin/PivotTableChart/prefetch.batching.test.tsx plugins/plugin-chart-pivot-table-v3/test/plugin/PivotTableChart/expansion-state.test.tsx` (passes; duplicate mock + Browserslist + Babel deprecation warnings).
+- Tightened auto-expansion seeding for metric-tier nodes so metrics-between layouts do not prefetch at the auto-expand boundary; removed debug logging.
+- Ran `npm test -- --runTestsByPath plugins/plugin-chart-pivot-table-v3/test/plugin/PivotTableChart/totals/rows.test.tsx` (passes; duplicate mock + Browserslist + Babel deprecation warnings).
+- Refined `hasLoadedChildren` to avoid prefetching for early metric subtotal branches while still fetching when metrics appear before the intended tier (keeps metric-first and metrics-between expansions correct).
+
+Status: Phase 6 complete.

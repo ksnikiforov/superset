@@ -963,6 +963,10 @@ function PivotTableChart(props: PivotTableProps) {
     }
     return metricInsertIndexOnCols;
   }, [data.cols, findMetricIndex, metricInsertIndexOnCols]);
+  const metricIntentIndexOnRows =
+    metricInsertIndexOnRows ?? metricIndexOnRows;
+  const metricIntentIndexOnCols =
+    metricInsertIndexOnCols ?? metricIndexOnCols;
   const metricDimIndexOnRows = useMemo(() => {
     if (resolvedMetricsLayout !== MetricsLayoutEnum.ROWS) {
       return undefined;
@@ -1188,6 +1192,14 @@ function PivotTableChart(props: PivotTableProps) {
 
   const countDimDepth = useCallback(
     (path: PivotTreeNode['path']) => countDimDepthBase(path, metricLabelSet),
+    [metricLabelSet],
+  );
+  const countEngineDimDepth = useCallback(
+    (path: PivotTreeNode['path']) =>
+      countDimDepthBase(
+        path.filter(val => !isSubtotalToken(val)),
+        metricLabelSet,
+      ),
     [metricLabelSet],
   );
 
@@ -2292,10 +2304,10 @@ function PivotTableChart(props: PivotTableProps) {
     shouldExpandMetricRows,
     shouldExpandMetricCols,
     metricLabelSet,
-    metricIndexForRows,
-    metricIndexForCols,
+    metricIndexForRows: metricIntentIndexOnRows,
+    metricIndexForCols: metricIntentIndexOnCols,
     isMetricTokenValue,
-    countDimDepth,
+    countDimDepth: countEngineDimDepth,
     expandRowsLevelRaw,
     expandColumnsLevelRaw,
     setControlValue,

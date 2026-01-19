@@ -17,188 +17,76 @@
  * under the License.
  */
 
-import { ChartProps, supersetTheme } from '@superset-ui/core';
+import { ChartProps, GenericDataType, supersetTheme } from '@superset-ui/core';
 import transformProps from '../../src/transformProps';
 import { MetricsLayoutEnum, PivotTableQueryFormData } from '../../src/types';
 import { formatQueryName } from '../../src/buildQuery';
-import {
-  encodeMetricKey,
-  serializeCellKey,
-  serializePath,
-} from '../../src/utils';
+import { serializeCellKey, serializePath } from '../../src/utils';
 
-describe('Pivot Table v3 transformProps', () => {
-  const formData: Partial<PivotTableQueryFormData> = {
-    groupbyRows: ['row1'],
-    groupbyColumns: ['col1'],
-    metrics: ['metric1'],
-    aggregateFunction: 'Sum',
-    colTotals: true,
-    rowTotals: true,
-    rowSubTotals: false,
-    startCollapsed: true,
-    initialDepth: 1,
-    rowOrder: 'key_a_to_z',
-    colOrder: 'key_a_to_z',
-    metricsLayout: MetricsLayoutEnum.COLUMNS,
-    viz_type: 'pivot_table_v3',
-    datasource: '1__table',
-  };
+const baseFormData: Partial<PivotTableQueryFormData> = {
+  groupbyRows: ['row1'],
+  groupbyColumns: ['col1'],
+  metrics: ['metric1'],
+  aggregateFunction: 'Sum',
+  colTotals: true,
+  rowTotals: true,
+  rowSubTotals: false,
+  startCollapsed: true,
+  initialDepth: 1,
+  rowOrder: 'key_a_to_z',
+  colOrder: 'key_a_to_z',
+  metricsLayout: MetricsLayoutEnum.COLUMNS,
+  viz_type: 'pivot_table_v3',
+  datasource: '1__table',
+};
 
-  const chartProps = new ChartProps({
-    formData,
-    width: 400,
-    height: 300,
-    queriesData: [
-      {
-        data: [{ row1: 'A', col1: 'B', metric1: 10 }],
-        colnames: ['row1', 'col1', 'metric1'],
-        coltypes: [1, 1, 0],
-        query_name: formatQueryName(1, 1),
-      },
-    ],
-    hooks: { setDataMask: jest.fn() },
-    filterState: { selectedFilters: {} },
-    datasource: { verboseMap: {}, columnFormats: {}, currencyFormats: {} },
-    theme: supersetTheme,
-  });
-  const rowKey = serializePath(['A']);
-  const colKey = serializePath(['B', encodeMetricKey('metric1')]);
-  const cellKey = serializeCellKey(rowKey, colKey);
+describe('Pivot Table v3 transformProps (bootstrap)', () => {
+  const rootKey = serializePath([]);
 
-  it('builds a tree from query results', () => {
-    const result = transformProps(chartProps as any);
-    expect(result.data.rows).toBeDefined();
-    expect(result.data.cols).toBeDefined();
-    expect(result.data.cells[cellKey]).toBeDefined();
-    expect(result.metrics).toEqual(['metric1']);
-  });
-
-  it('keeps conditional formatting metric values in the tree', () => {
-    const props = new ChartProps({
-      ...chartProps,
-      formData: {
-        ...formData,
-        metricFormatting: {
-          metric1: {
-            backgroundColor: {
-              expressionType: 'SQL',
-              sqlExpression: 'CASE WHEN SUM(sales) > 0 THEN "#111111" END',
-              label: 'metric1_bg',
-            },
-          },
-        },
-      },
+  it('builds a minimal tree and uses the bootstrap query for grand totals', () => {
+    const chartProps = new ChartProps({
+      formData: baseFormData,
+      width: 400,
+      height: 300,
       queriesData: [
         {
-          data: [{ row1: 'A', col1: 'B', metric1: 10, metric1_bg: '#111111' }],
-          colnames: ['row1', 'col1', 'metric1', 'metric1_bg'],
-          coltypes: [1, 1, 0, 1],
+          data: [{ metric1: 10 }],
+          colnames: ['metric1'],
+          coltypes: [0],
+          query_name: formatQueryName(0, 0),
+        },
+        {
+          data: [{ row1: 'A', col1: 'B', metric1: 10 }],
+          colnames: ['row1', 'col1', 'metric1'],
+          coltypes: [1, 1, 0],
           query_name: formatQueryName(1, 1),
         },
       ],
+      hooks: { setDataMask: jest.fn() },
+      filterState: { selectedFilters: {} },
+      datasource: {
+        verboseMap: {},
+        columnFormats: {},
+        currencyFormats: {},
+        columns: [
+          { column_name: 'row1', type_generic: GenericDataType.String },
+          { column_name: 'col1', type_generic: GenericDataType.String },
+        ],
+      },
+      theme: supersetTheme,
     });
-    const result = transformProps(props as ChartProps<PivotTableQueryFormData>);
-    expect(result.data.cells[cellKey].values.metric1_bg).toBe('#111111');
+
+    const result = transformProps(chartProps as ChartProps<PivotTableQueryFormData>);
+    expect(Object.keys(result.data.rows)).toEqual([rootKey]);
+    expect(Object.keys(result.data.cols)).toEqual([rootKey]);
+    expect(result.data.cells[serializeCellKey(rootKey, rootKey)]?.values.metric1).toBe(10);
   });
 
-  it('keeps databar color metric values in the tree', () => {
-    const props = new ChartProps({
-      ...chartProps,
-      formData: {
-        ...formData,
-        metricDatabars: {
-          metric1: {
-            type: 'bar',
-            colorMode: 'byMetric',
-            colorMetric: {
-              expressionType: 'SQL',
-              sqlExpression: 'CASE WHEN SUM(sales) > 0 THEN "#111111" END',
-              label: 'metric1_color',
-            },
-          },
-        },
-      },
-      queriesData: [
-        {
-          data: [
-            {
-              row1: 'A',
-              col1: 'B',
-              metric1: 10,
-              metric1_color: '#111111',
-            },
-          ],
-          colnames: ['row1', 'col1', 'metric1', 'metric1_color'],
-          coltypes: [1, 1, 0, 1],
-          query_name: formatQueryName(1, 1),
-        },
-      ],
-    });
-    const result = transformProps(props as ChartProps<PivotTableQueryFormData>);
-    expect(result.data.cells[cellKey].values.metric1_color).toBe('#111111');
-  });
-
-  it('keeps row and column formatting metric values in the tree', () => {
-    const props = new ChartProps({
-      ...chartProps,
-      formData: {
-        ...formData,
-        rowFormatting: {
-          row1: {
-            backgroundColor: {
-              expressionType: 'SQL',
-              sqlExpression: 'SUM(sales)',
-              label: 'row_bg',
-            },
-          },
-        },
-        colFormatting: {
-          col1: {
-            textColor: {
-              expressionType: 'SQL',
-              sqlExpression: 'SUM(profit)',
-              label: 'col_text',
-            },
-          },
-        },
-      },
-      queriesData: [
-        {
-          data: [{ row1: 'A', metric1: 10, row_bg: '#111111' }],
-          colnames: ['row1', 'metric1', 'row_bg'],
-          coltypes: [1, 0, 1],
-          query_name: formatQueryName(1, 0),
-        },
-        {
-          data: [{ col1: 'B', metric1: 10, col_text: '#00ff00' }],
-          colnames: ['col1', 'metric1', 'col_text'],
-          coltypes: [1, 0, 1],
-          query_name: formatQueryName(0, 1),
-        },
-      ],
-    });
-    const result = transformProps(props as ChartProps<PivotTableQueryFormData>);
-    const rowKey = serializePath(['A']);
-    const colKey = serializePath(['B']);
-    const rootKey = serializePath([]);
-    expect(
-      result.data.cells[serializeCellKey(rowKey, rootKey)].values.row_bg,
-    ).toBe('#111111');
-    expect(
-      result.data.cells[serializeCellKey(rootKey, colKey)].values.col_text,
-    ).toBe('#00ff00');
-  });
-
-  it('normalizes row and column subtotal selections', () => {
-    const customProps = new ChartProps({
-      ...chartProps,
-      formData: {
-        ...formData,
-        colTotals: true,
-        rowTotals: false,
-        colSubtotalLevels: [0, 1, 5],
-      },
+  it('uses datasource column types when present', () => {
+    const chartProps = new ChartProps({
+      formData: baseFormData,
+      width: 400,
+      height: 300,
       queriesData: [
         {
           data: [{ metric1: 5 }],
@@ -207,225 +95,56 @@ describe('Pivot Table v3 transformProps', () => {
           query_name: formatQueryName(0, 0),
         },
       ],
+      hooks: { setDataMask: jest.fn() },
+      filterState: { selectedFilters: {} },
+      datasource: {
+        verboseMap: {},
+        columnFormats: {},
+        currencyFormats: {},
+        columns: [
+          { column_name: 'row1', type_generic: GenericDataType.Temporal },
+          { column_name: 'col1', type_generic: GenericDataType.Numeric },
+        ],
+      },
+      theme: supersetTheme,
     });
-    const result = transformProps(customProps as any);
+
+    const result = transformProps(chartProps as ChartProps<PivotTableQueryFormData>);
+    expect(result.colTypeMap?.row1).toBe(GenericDataType.Temporal);
+    expect(result.colTypeMap?.col1).toBe(GenericDataType.Numeric);
+  });
+
+  it('normalizes row and column subtotal selections', () => {
+    const chartProps = new ChartProps({
+      formData: {
+        ...baseFormData,
+        colTotals: true,
+        rowTotals: false,
+        colSubtotalLevels: [0, 1, 5],
+      },
+      width: 400,
+      height: 300,
+      queriesData: [
+        {
+          data: [{ metric1: 5 }],
+          colnames: ['metric1'],
+          coltypes: [0],
+          query_name: formatQueryName(0, 0),
+        },
+      ],
+      hooks: { setDataMask: jest.fn() },
+      filterState: { selectedFilters: {} },
+      datasource: {
+        verboseMap: {},
+        columnFormats: {},
+        currencyFormats: {},
+        columns: [],
+      },
+      theme: supersetTheme,
+    });
+
+    const result = transformProps(chartProps as ChartProps<PivotTableQueryFormData>);
     expect(result.rowSubtotalLevels).toEqual([0]);
     expect(result.colSubtotalLevels).toEqual([]);
-  });
-
-  it('merges row and column totals including the grand-total intersection for single-metric sums', () => {
-    const queriesData = [
-      {
-        data: [{ metric1: 15 }],
-        colnames: ['metric1'],
-        coltypes: [0],
-        query_name: formatQueryName(0, 0),
-      },
-      {
-        data: [
-          { row1: 'A', metric1: 6 },
-          { row1: 'B', metric1: 9 },
-        ],
-        colnames: ['row1', 'metric1'],
-        coltypes: [1, 0],
-        query_name: formatQueryName(1, 0),
-      },
-      {
-        data: [
-          { col1: 'X', metric1: 10 },
-          { col1: 'Y', metric1: 5 },
-        ],
-        colnames: ['col1', 'metric1'],
-        coltypes: [1, 0],
-        query_name: formatQueryName(0, 1),
-      },
-      {
-        data: [
-          { row1: 'A', col1: 'X', metric1: 4 },
-          { row1: 'A', col1: 'Y', metric1: 2 },
-          { row1: 'B', col1: 'X', metric1: 6 },
-          { row1: 'B', col1: 'Y', metric1: 3 },
-        ],
-        colnames: ['row1', 'col1', 'metric1'],
-        coltypes: [1, 1, 0],
-        query_name: formatQueryName(1, 1),
-      },
-    ];
-
-    const props = new ChartProps({
-      formData: {
-        ...formData,
-        colTotals: true,
-        rowTotals: true,
-        startCollapsed: true,
-        groupbyRows: ['row1'],
-        groupbyColumns: ['col1', '__MEASURES__'],
-        metrics: ['metric1'],
-      },
-      width: 400,
-      height: 300,
-      queriesData,
-      hooks: { setDataMask: jest.fn() },
-      filterState: { selectedFilters: {} },
-      datasource: { verboseMap: {}, columnFormats: {}, currencyFormats: {} },
-      theme: supersetTheme,
-    });
-
-    const { data: tree } = transformProps(props as any);
-    const rootKey = serializePath([]);
-
-    expect(
-      tree.cells[serializeCellKey(serializePath(['A']), rootKey)]?.values
-        .metric1,
-    ).toBe(6);
-    expect(
-      tree.cells[serializeCellKey(serializePath(['B']), rootKey)]?.values
-        .metric1,
-    ).toBe(9);
-    expect(
-      tree.cells[serializeCellKey(rootKey, serializePath(['X']))]?.values
-        .metric1,
-    ).toBe(10);
-    expect(
-      tree.cells[serializeCellKey(rootKey, serializePath(['Y']))]?.values
-        .metric1,
-    ).toBe(5);
-    expect(tree.cells[serializeCellKey(rootKey, rootKey)]?.values.metric1).toBe(
-      15,
-    );
-  });
-
-  it('uses metric-only queries as grand totals even when query depth metadata is wrong', () => {
-    const queriesData = [
-      {
-        data: [{ r1: 'A', r2: 'B', c1: 'X', metric1: 10 }],
-        colnames: ['r1', 'r2', 'c1', 'metric1'],
-        coltypes: [1, 1, 1, 0],
-        query_name: formatQueryName(2, 1),
-      },
-      {
-        data: [
-          { c1: 'X', metric1: 100 },
-          { c1: 'Y', metric1: 200 },
-        ],
-        colnames: ['c1', 'metric1'],
-        coltypes: [1, 0],
-        query_name: formatQueryName(0, 1),
-      },
-      {
-        data: [{ r1: 'A', r2: 'B', metric1: 300 }],
-        colnames: ['r1', 'r2', 'metric1'],
-        coltypes: [1, 1, 0],
-        query_name: formatQueryName(2, 0),
-      },
-      {
-        data: [{ metric1: 999 }],
-        colnames: ['metric1'],
-        coltypes: [0],
-        query_name: formatQueryName(2, 1),
-      },
-    ];
-
-    const props = new ChartProps({
-      formData: {
-        ...formData,
-        groupbyRows: ['r1', 'r2'],
-        groupbyColumns: ['c1', '__MEASURES__'],
-        metrics: ['metric1'],
-        metricsLayout: MetricsLayoutEnum.COLUMNS,
-        colTotals: true,
-        rowTotals: true,
-      },
-      width: 400,
-      height: 300,
-      queriesData,
-      hooks: { setDataMask: jest.fn() },
-      filterState: { selectedFilters: {} },
-      datasource: { verboseMap: {}, columnFormats: {}, currencyFormats: {} },
-      theme: supersetTheme,
-    });
-
-    const { data: tree } = transformProps(props as any);
-    const rootKey = serializePath([]);
-    expect(tree.cells[serializeCellKey(rootKey, rootKey)]?.values.metric1).toBe(
-      999,
-    );
-  });
-
-  it('infers column depth when query metadata is shallow but column groupbys are present', () => {
-    const props = new ChartProps({
-      formData: {
-        ...formData,
-        groupbyRows: ['row1'],
-        groupbyColumns: ['col1', 'col2', '__MEASURES__'],
-        metrics: ['metric1'],
-        metricsLayout: MetricsLayoutEnum.COLUMNS,
-      },
-      width: 400,
-      height: 300,
-      queriesData: [
-        {
-          data: [{ row1: 'A', col1: 'X', col2: 'Y', metric1: 10 }],
-          colnames: ['row1', 'col1', 'col2', 'metric1'],
-          coltypes: [1, 1, 1, 0],
-          query_name: formatQueryName(1, 0),
-        },
-      ],
-      hooks: { setDataMask: jest.fn() },
-      filterState: { selectedFilters: {} },
-      datasource: { verboseMap: {}, columnFormats: {}, currencyFormats: {} },
-      theme: supersetTheme,
-    });
-
-    const { data: tree } = transformProps(props as any);
-    expect(tree.cols[serializePath(['X'])]).toBeDefined();
-  });
-
-  it('avoids inferring full depth when query metadata is missing', () => {
-    const props = new ChartProps({
-      ...chartProps,
-      queriesData: [
-        {
-          data: [{ metric1: 10 }],
-        },
-      ],
-    });
-    const result = transformProps(props as ChartProps<PivotTableQueryFormData>);
-    const root = serializePath([]);
-    expect(Object.keys(result.data.rows)).toEqual([root]);
-    expect(Object.keys(result.data.cols)).toEqual(
-      expect.arrayContaining([
-        root,
-        serializePath([encodeMetricKey('metric1')]),
-      ]),
-    );
-    expect(Object.keys(result.data.rows)).toHaveLength(1);
-  });
-
-  it('propagates rowSubTotals when enabled', () => {
-    const props = new ChartProps({
-      formData: {
-        ...formData,
-        rowSubTotals: true,
-        colTotals: true,
-      },
-      width: 400,
-      height: 300,
-      queriesData: [
-        {
-          data: [{ row1: 'A', metric1: 10 }],
-          colnames: ['row1', 'metric1'],
-          coltypes: [1, 0],
-          query_name: formatQueryName(1, 0),
-        },
-      ],
-      hooks: { setDataMask: jest.fn() },
-      filterState: { selectedFilters: {} },
-      datasource: { verboseMap: {}, columnFormats: {}, currencyFormats: {} },
-      theme: supersetTheme,
-    });
-
-    const result = transformProps(props as any);
-    expect(result.rowSubTotals).toBe(true);
   });
 });

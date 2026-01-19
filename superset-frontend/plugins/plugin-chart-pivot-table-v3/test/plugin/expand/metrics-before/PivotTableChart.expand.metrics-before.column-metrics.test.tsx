@@ -41,7 +41,8 @@ jest.mock('../../../../src/fetchPivotBranch', () => {
 describe('PivotTableChart expansion with metrics before dimensions (column-metrics)', () => {
   const fetchPivotBranchMock = fetchPivotBranch as jest.Mock;
   beforeEach(() => {
-    fetchPivotBranchMock.mockClear();
+    fetchPivotBranchMock.mockReset();
+    fetchPivotBranchMock.mockResolvedValue({ data: undefined });
   });
 
   const buildRowGroupby = (depth: number) =>
@@ -487,11 +488,26 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
       0,
     );
 
-    fetchPivotBranchMock
-      .mockResolvedValueOnce({ data: columnBranchWithMetrics })
-      .mockResolvedValueOnce({ data: usaRowBranchWithMetrics })
-      .mockResolvedValueOnce({ data: columnRefetchWithMetrics })
-      .mockResolvedValueOnce({ data: canRowBranchWithMetrics });
+    type FetchPivotBranchArgs = Parameters<typeof fetchPivotBranch>[0];
+    fetchPivotBranchMock.mockImplementation(
+      ({ axis, path, visibleRowDepth }: FetchPivotBranchArgs) => {
+        if (axis === 'col') {
+          return Promise.resolve({
+            data:
+              visibleRowDepth >= 2
+                ? columnRefetchWithMetrics
+                : columnBranchWithMetrics,
+          });
+        }
+        if (path[0] === 'USA') {
+          return Promise.resolve({ data: usaRowBranchWithMetrics });
+        }
+        if (path[0] === 'CAN') {
+          return Promise.resolve({ data: canRowBranchWithMetrics });
+        }
+        return Promise.resolve({ data: undefined });
+      },
+    );
 
     const { container, getByText } = render(
       <PivotTableChart
@@ -553,7 +569,7 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
     const canRow = getByText('CAN').closest('tr') as HTMLTableRowElement;
     fireEvent.click(within(canRow).getByLabelText('plus-square'));
     await waitFor(() => {
-      expect(fetchPivotBranchMock.mock.calls.length).toBeGreaterThanOrEqual(4);
+      expect(fetchPivotBranchMock.mock.calls.length).toBeGreaterThanOrEqual(3);
     });
 
     const tbody = container.querySelector('tbody') as HTMLElement;

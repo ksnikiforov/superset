@@ -17,7 +17,7 @@
  * under the License.
  */
 
-import { render, screen, within } from '../../../testUtils';
+import { render, screen, waitFor, within } from '../../../testUtils';
 import PivotTableChart from '../../fixtures/TestPivotTableChart';
 import {
   MetricsLayoutEnum,
@@ -63,7 +63,15 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     verboseMap: {},
   };
 
-  it('renders selected column subtotals at the configured position using aggregated values', () => {
+  const waitForPivotReady = async () => {
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('status', { name: /loading/i }),
+      ).not.toBeInTheDocument(),
+    );
+  };
+
+  it('renders selected column subtotals at the configured position using aggregated values', async () => {
     const detail = buildTreeFromRecords(
       [
         { region: 'US', category: 'Tech', subcategory: 'Laptop', metric1: 2 },
@@ -133,6 +141,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       />,
     );
 
+    await waitForPivotReady();
     const regionRow = screen
       .getByText('US')
       .closest('tr') as HTMLTableRowElement;
@@ -142,7 +151,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     expect(values.slice(1)).toEqual(expect.arrayContaining(['2', '3']));
   });
 
-  it('hides column subtotals for unselected levels', () => {
+  it('hides column subtotals for unselected levels', async () => {
     const detail = buildTreeFromRecords(
       [{ row1: 'A', col1: 'F', col2: 'X', col3: 'Z', metric1: 1 }],
       ['metric1'],
@@ -217,11 +226,12 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       />,
     );
 
+    await waitForPivotReady();
     expect(screen.queryByText('999')).not.toBeInTheDocument();
     expect(screen.queryByText('555')).toBeInTheDocument();
   });
 
-  it('renders multi-metric column subtotals at the end even when configured at the start', () => {
+  it('renders multi-metric column subtotals at the end even when configured at the start', async () => {
     const metrics = ['m1', 'm2'];
     const detail = buildTreeFromRecords(
       [
@@ -292,6 +302,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       />,
     );
 
+    await waitForPivotReady();
     const regionRow = screen
       .getByText('US')
       .closest('tr') as HTMLTableRowElement;
@@ -301,7 +312,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     expect(values).toEqual(['1', '10', '2', '20', '100', '200']);
   });
 
-  it('avoids duplicating metric subtotal columns when subtotal tokens are present', () => {
+  it('avoids duplicating metric subtotal columns when subtotal tokens are present', async () => {
     const metrics = ['grossRevenue', 'countCustomers'];
     const detail = buildTreeFromRecords(
       [
@@ -416,6 +427,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       />,
     );
 
+    await waitForPivotReady();
     const headerRow = container.querySelector('thead tr') as HTMLElement;
     const headerLabels = within(headerRow)
       .getAllByRole('columnheader')
@@ -431,7 +443,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     expect(countCustomersCount).toBe(1);
   });
 
-  it('keeps column grand totals when column subtotals exist with multiple metrics', () => {
+  it('keeps column grand totals when column subtotals exist with multiple metrics', async () => {
     const metrics = ['grossRevenue', 'countCustomers'];
     const detail = buildTreeFromRecords(
       [
@@ -554,6 +566,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       />,
     );
 
+    await waitForPivotReady();
     const headerLabels = within(container.querySelector('thead') as HTMLElement)
       .getAllByRole('columnheader')
       .map(cell => cell.textContent?.trim())
@@ -563,7 +576,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     );
   });
 
-  it('keeps column group headers when collapsed after deeper expansion data exists', () => {
+  it('keeps column group headers when collapsed after deeper expansion data exists', async () => {
     const metrics = ['grossRevenue', 'countCustomers'];
     const detail = buildTreeFromRecords(
       [
@@ -648,6 +661,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       />,
     );
 
+    await waitForPivotReady();
     const headerRows = Array.from(
       container.querySelectorAll('thead tr'),
     ) as HTMLElement[];
@@ -670,7 +684,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
 
   test.each(['start', 'end'] as const)(
     'positions grand totals at the %s for rows and columns when configured',
-    position => {
+    async position => {
       const totalsOnly = buildTreeFromRecords(
         [{ metric1: 12 }],
         ['metric1'],
@@ -739,6 +753,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
         />,
       );
 
+      await waitForPivotReady();
       const headerRow = container.querySelector(
         'thead tr:first-child',
       ) as HTMLElement;
@@ -762,7 +777,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     },
   );
 
-  it('shows column grand total when enabled without selecting level 0', () => {
+  it('shows column grand total when enabled without selecting level 0', async () => {
     const detail = buildTreeFromRecords(
       [{ region: 'US', category: 'Tech', metric1: 5 }],
       ['metric1'],
@@ -829,13 +844,14 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       />,
     );
 
+    await waitForPivotReady();
     const header = container.querySelector('thead') as HTMLElement;
     expect(within(header).getByText('Grand total')).toBeInTheDocument();
     const bodyRow = container.querySelector('tbody tr') as HTMLElement;
     expect(within(bodyRow).getByText('8')).toBeInTheDocument();
   });
 
-  it('renders metric-specific column grand totals when metrics are on columns', () => {
+  it('renders metric-specific column grand totals when metrics are on columns', async () => {
     const metricsVariants = [
       ['averageOrderValue', 'weightedDiscount'],
       ['averageOrderValue', 'weightedDiscount', 'countOrders'],
@@ -846,7 +862,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
         return acc;
       }, {});
 
-    metricsVariants.forEach(metrics => {
+    for (const metrics of metricsVariants) {
       const detail = buildTreeFromRecords(
         [
           {
@@ -924,6 +940,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
         />,
       );
 
+      await waitForPivotReady();
       const header = container.querySelector('thead') as HTMLElement;
       const headers = within(header)
         .getAllByRole('columnheader')
@@ -946,10 +963,10 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       );
       expect(values).toEqual(expect.arrayContaining(expectedTotals));
       unmount();
-    });
+    }
   });
 
-  it('orders metric columns by selection when metrics are on columns', () => {
+  it('orders metric columns by selection when metrics are on columns', async () => {
     const metrics = ['metricB', 'metricA', 'metricC'];
     const tree = applyMetricAxis(
       buildTreeFromRecords(
@@ -1013,6 +1030,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       />,
     );
 
+    await waitForPivotReady();
     const headerRow = container.querySelector(
       'thead tr:last-child',
     ) as HTMLElement;
@@ -1023,7 +1041,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     expect(headerLabels).toEqual(metrics);
   });
 
-  it('omits the grand total column when multiple metrics are on columns and keeps the grand total row', () => {
+  it('omits the grand total column when multiple metrics are on columns and keeps the grand total row', async () => {
     const metrics = ['m1', 'm2'];
     const detail = buildTreeFromRecords(
       [{ orderPriority: '1-URGENT', shipMode: 'AIR', m1: 10, m2: 20 }],
@@ -1091,6 +1109,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       />,
     );
 
+    await waitForPivotReady();
     const header = container.querySelector('thead') as HTMLElement;
     const headerLabels = within(header)
       .getAllByRole('columnheader')
@@ -1104,7 +1123,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     expect(rowHeaders).toContain('Grand total');
   });
 
-  it('does not render metric total headers when metrics are the first column level', () => {
+  it('does not render metric total headers when metrics are the first column level', async () => {
     const metrics = ['measure1', 'measure2'];
     const measure1Token = encodeMetricKey('measure1');
     const measure2Token = encodeMetricKey('measure2');
@@ -1297,6 +1316,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       />,
     );
 
+    await waitForPivotReady();
     const headerLabels = within(container.querySelector('thead') as HTMLElement)
       .getAllByRole('columnheader')
       .map(cell => cell.textContent?.trim())
@@ -1306,7 +1326,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     );
   });
 
-  it('renders metric-specific column grand totals when metrics are nested at depth 2', () => {
+  it('renders metric-specific column grand totals when metrics are nested at depth 2', async () => {
     const metrics = ['measure1', 'measure2'];
     const detail = buildTreeFromRecords(
       [
@@ -1388,6 +1408,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       />,
     );
 
+    await waitForPivotReady();
     const headerLabels = within(container.querySelector('thead') as HTMLElement)
       .getAllByRole('columnheader')
       .map(cell => cell.textContent?.trim())
@@ -1397,7 +1418,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     );
   });
 
-  it('renders metric-specific column grand totals when metrics are nested at depth 3', () => {
+  it('renders metric-specific column grand totals when metrics are nested at depth 3', async () => {
     const metrics = ['measure1', 'measure2'];
     const detail = buildTreeFromRecords(
       [
@@ -1480,6 +1501,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       />,
     );
 
+    await waitForPivotReady();
     const headerLabels = within(container.querySelector('thead') as HTMLElement)
       .getAllByRole('columnheader')
       .map(cell => cell.textContent?.trim())
@@ -1489,7 +1511,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     );
   });
 
-  it('renders metric-specific column subtotals even when they match grand totals', () => {
+  it('renders metric-specific column subtotals even when they match grand totals', async () => {
     const metrics = ['measure1', 'measure2'];
     const detail = buildTreeFromRecords(
       [
@@ -1588,6 +1610,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       />,
     );
 
+    await waitForPivotReady();
     const headerLabels = within(container.querySelector('thead') as HTMLElement)
       .getAllByRole('columnheader')
       .map(cell => cell.textContent?.trim())
@@ -1602,7 +1625,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     );
   });
 
-  it('does not render parent column totals as leaves when branch subtotals exist under multiple column roots', () => {
+  it('does not render parent column totals as leaves when branch subtotals exist under multiple column roots', async () => {
     const rootKey = serializePath([]);
     const rowKey = serializePath(['US']);
     const makeColNode = (
@@ -1748,6 +1771,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       />,
     );
 
+    await waitForPivotReady();
     const headerRow = container.querySelector(
       'thead tr:last-child',
     ) as HTMLElement;
@@ -1759,7 +1783,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     expect(labels).not.toContain('N');
   });
 
-  it('currently renders both parent total and subtotal leaves when column subtotals are enabled (duplication)', () => {
+  it('currently renders both parent total and subtotal leaves when column subtotals are enabled (duplication)', async () => {
     const rootKey = serializePath([]);
     const rowKey = serializePath(['US']);
     const makeColNode = (
@@ -1892,6 +1916,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       />,
     );
 
+    await waitForPivotReady();
     const headerRow = container.querySelector(
       'thead tr:last-child',
     ) as HTMLElement;
@@ -1906,7 +1931,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     );
   });
 
-  it('suppresses duplicated ancestor subtotal leaves on deeper column levels', () => {
+  it('suppresses duplicated ancestor subtotal leaves on deeper column levels', async () => {
     const rootKey = serializePath([]);
     const rowKey = serializePath(['US']);
     const makeColNode = (
@@ -2059,6 +2084,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       />,
     );
 
+    await waitForPivotReady();
     const headerRow = container.querySelector(
       'thead tr:last-child',
     ) as HTMLElement;
@@ -2083,7 +2109,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('orders deep column totals and subtotals according to positions across five levels (end)', () => {
+  it('orders deep column totals and subtotals according to positions across five levels (end)', async () => {
     const rootKey = serializePath([]);
     const rowKey = serializePath(['US']);
     const cols: Record<string, PivotTreeNode> = {};
@@ -2200,6 +2226,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       />,
     );
 
+    await waitForPivotReady();
     const allHeaders = within(container.querySelector('thead') as HTMLElement)
       .getAllByRole('columnheader')
       .map(cell => cell.textContent?.trim())
@@ -2213,7 +2240,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     );
   });
 
-  it('orders deep column totals and subtotals at the start when configured across five levels', () => {
+  it('orders deep column totals and subtotals at the start when configured across five levels', async () => {
     const rootKey = serializePath([]);
     const rowKey = serializePath(['US']);
     const cols: Record<string, PivotTreeNode> = {};
@@ -2330,6 +2357,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       />,
     );
 
+    await waitForPivotReady();
     const allHeaders = within(container.querySelector('thead') as HTMLElement)
       .getAllByRole('columnheader')
       .map(cell => cell.textContent?.trim())
@@ -2343,7 +2371,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     );
   });
 
-  it('does not render expansion toggles for subtotal headers', () => {
+  it('does not render expansion toggles for subtotal headers', async () => {
     const rootKey = serializePath([]);
     const rowKey = serializePath(['US']);
     const makeColNode = (
@@ -2456,6 +2484,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       />,
     );
 
+    await waitForPivotReady();
     const headerRow = container.querySelector(
       'thead tr:last-child',
     ) as HTMLElement;

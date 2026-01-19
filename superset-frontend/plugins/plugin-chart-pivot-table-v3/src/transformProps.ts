@@ -40,16 +40,13 @@ import {
   buildTreeFromRecords,
   getMetricKeys,
   getStableColumnKey,
-  mergeTrees,
   normalizeDimensionFormattingMapWithKeys,
   normalizeDimensionSortingMapWithKeys,
   normalizeMetricFormattingMapWithKeys,
   normalizeMetricDatabarMapWithKeys,
-  parseDepth,
   resolveMetricPlacement,
   stripMetricsPlaceholder,
   normalizeSubtotalLevels,
-  injectRowSubtotalLeaves,
   labelRowSubtotalLeaves,
   serializeCellKey,
   serializePath,
@@ -70,10 +67,16 @@ export default function transformProps(
     rawFormData,
     hooks: { setDataMask = () => {}, onContextMenu, setControlValue },
     filterState,
-    datasource: { verboseMap = {}, columnFormats = {}, currencyFormats = {} },
+    datasource,
     emitCrossFilters,
     theme,
   } = chartProps;
+  const {
+    verboseMap = {},
+    columnFormats = {},
+    currencyFormats = {},
+    columns = [],
+  } = datasource || {};
   const metrics = ensureIsArray(formData.metrics || []);
   const metricFormatting = normalizeMetricFormattingMapWithKeys(
     formData.metricFormatting,
@@ -183,46 +186,14 @@ export default function transformProps(
     metricsLayout,
   };
 
-  const resolveQueryDepth = (query: (typeof queriesData)[number]) => {
-    const queryName = (query as any)?.query_name || (query as any)?.queryName;
-    let { rowDepth, colDepth } = parseDepth(queryName);
-    const hasQueryName = !!queryName;
-    const colSet = new Set(
-      (query.colnames || []).map((name: any) => String(name)),
-    );
-    const inferredRowDepth = groupbyRows.filter(col =>
-      colSet.has(String(getColumnLabel(col))),
-    ).length;
-    const inferredColDepth = groupbyColumns.filter(col =>
-      colSet.has(String(getColumnLabel(col))),
-    ).length;
-    if (colSet.size > 0) {
-      rowDepth = inferredRowDepth;
-      colDepth = inferredColDepth;
-    }
-    const hasGroupbyCols = inferredRowDepth > 0 || inferredColDepth > 0;
-    const hasMetricCols =
-      metricKeySetForQuery.size > 0 &&
-      Array.from(metricKeySetForQuery).some(key => colSet.has(String(key)));
-    const isMetricOnlyQuery =
-      colSet.size > 0 && !hasGroupbyCols && hasMetricCols;
-    if (
-      rowDepth === 0 &&
-      colDepth === 0 &&
-      (query.data || []).length > 0 &&
-      !isMetricOnlyQuery &&
-      hasQueryName
-    ) {
-      rowDepth = groupbyRows.length;
-      colDepth = groupbyColumns.length;
-    }
-    rowDepth = Math.min(rowDepth || 0, groupbyRows.length);
-    colDepth = Math.min(colDepth || 0, groupbyColumns.length);
-    return { rowDepth, colDepth };
-  };
-
   const combinedData = queriesData.flatMap(({ data }) => data || []);
   const colTypeMap: Record<string, GenericDataType> = {};
+  columns.forEach(column => {
+    const columnName = column.column_name;
+    if (columnName && column.type_generic !== undefined) {
+      colTypeMap[columnName] = column.type_generic;
+    }
+  });
   queriesData.forEach(query => {
     const colnames = query?.colnames || [];
     const coltypes = query?.coltypes || [];
@@ -288,26 +259,16 @@ export default function transformProps(
     rowSubtotalLevels,
     colSubtotalLevels,
   });
-  const baseTree: PivotTreeData = { rows: {}, cols: {}, cells: {} };
-  const nextTreeRaw = queriesData.reduce<PivotTreeData>((acc, query) => {
-    const { rowDepth, colDepth } = resolveQueryDepth(query);
-    const branch = buildTreeFromRecords(
-      query.data || [],
-      metricsForQueryWithFormatting,
-      groupbyRows,
-      groupbyColumns,
-      rowDepth,
-      colDepth,
-    );
-    return mergeTrees(acc, branch);
-  }, baseTree);
-  const rowSubtotalDepths = rowSubtotalLevels.filter(level => level > 0);
-  const nextTreeWithRowSubtotals = rowSubtotalDepths.reduce(
-    (acc, depth) => injectRowSubtotalLeaves(acc, depth, groupbyRows.length),
-    nextTreeRaw,
+  const baseTree = buildTreeFromRecords(
+    [],
+    metricsForQueryWithFormatting,
+    groupbyRows,
+    groupbyColumns,
+    0,
+    0,
   );
   const nextTree = applyMetricAxis(
-    nextTreeWithRowSubtotals,
+    baseTree,
     metrics,
     metricsLayout,
     groupbyRows,
@@ -315,17 +276,14 @@ export default function transformProps(
     metricInsertIndex,
   );
   const rootKey = serializePath([]);
-  const zeroDepthQuery = queriesData.find(query => {
-    const { rowDepth: rd, colDepth: cd } = resolveQueryDepth(query);
-    return rd === 0 && cd === 0;
-  });
-  const grandTotalRecord = zeroDepthQuery?.data?.[0];
-  if (grandTotalRecord) {
-    const grandValues = metricKeysForQuery.reduce(
-      (acc, key) => {
-        if (!key) return acc;
-        return { ...acc, [key]: (grandTotalRecord as any)[key] };
-      },
+  const bootstrapQuery = queriesData[0];
+  const bootstrapRecord = bootstrapQuery?.data?.[0];
+  const bootstrapKeys = (bootstrapQuery?.colnames || [])
+    .map((name: string) => String(name))
+    .filter(key => metricKeySetForQuery.has(key));
+  if (bootstrapRecord && bootstrapKeys.length > 0) {
+    const grandValues = bootstrapKeys.reduce(
+      (acc, key) => ({ ...acc, [key]: (bootstrapRecord as any)[key] }),
       {} as Record<string, DataRecordValue>,
     );
     if (Object.keys(grandValues).length > 0) {

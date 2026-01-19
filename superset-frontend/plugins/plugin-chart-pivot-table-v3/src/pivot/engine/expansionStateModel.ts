@@ -53,16 +53,21 @@ export const seedExpandedByLevel = (
 ) => {
   const next = new Set<string>([rootKey]);
   Object.values(nodes).forEach(node => {
+    const lastValue = node.path[node.path.length - 1];
+    const decodedMetric = decodeMetricKey(lastValue);
+    const isMetricNode = decodedMetric
+      ? metricLabelSet.has(decodedMetric)
+      : false;
     const depth = countDimDepth(node.path, metricLabelSet);
-    if (depth > 0 && depth <= expandLevel) {
+    if (
+      depth > 0 &&
+      (isMetricNode ? depth < expandLevel : depth <= expandLevel)
+    ) {
       next.add(node.key);
       return;
     }
-    if (options?.includeMetricDepthZero && depth === 0) {
-      const decoded = decodeMetricKey(node.path[node.path.length - 1]);
-      if (decoded && metricLabelSet.has(decoded)) {
-        next.add(node.key);
-      }
+    if (options?.includeMetricDepthZero && depth === 0 && isMetricNode) {
+      next.add(node.key);
     }
   });
   return next;

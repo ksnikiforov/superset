@@ -47,6 +47,14 @@ describe('PivotTableChart expansion with metrics between dimensions (column-metr
     fetchPivotBranchMock.mockClear();
   });
 
+  const waitForPivotReady = async () => {
+    await waitFor(() => {
+      expect(
+        document.querySelector('[role="status"][aria-label="Loading"]'),
+      ).not.toBeInTheDocument();
+    });
+  };
+
   const metrics = ['measure1', 'measure2'];
   const rowGroupby = ['orderPriority', 'discountBand', 'customerSegment'];
   const colGroupby = ['revenueBand', 'col1', 'col2', 'col3'];
@@ -91,7 +99,7 @@ describe('PivotTableChart expansion with metrics between dimensions (column-metr
     );
   };
 
-  it('renders metric headers without prefixed group labels when metrics are between columns', () => {
+  it('renders metric headers without prefixed group labels when metrics are between columns', async () => {
     const baseTree = buildBaseTree();
 
     const { container } = render(
@@ -136,6 +144,7 @@ describe('PivotTableChart expansion with metrics between dimensions (column-metr
       />,
     );
 
+    await waitForPivotReady();
     const headerLabels = within(container.querySelector('thead') as HTMLElement)
       .getAllByRole('columnheader')
       .map(cell => cell.textContent?.trim())
@@ -192,6 +201,7 @@ describe('PivotTableChart expansion with metrics between dimensions (column-metr
       />,
     );
 
+    await waitForPivotReady();
     const thead = container.querySelector('thead') as HTMLElement;
     const metricCell = within(thead)
       .getByText('measure1')
@@ -273,6 +283,7 @@ describe('PivotTableChart expansion with metrics between dimensions (column-metr
       />,
     );
 
+    await waitForPivotReady();
     const thead = container.querySelector('thead') as HTMLElement;
     const metricCell = within(thead)
       .getByText('measure1')
@@ -395,6 +406,7 @@ describe('PivotTableChart expansion with metrics between dimensions (column-metr
       />,
     );
 
+    await waitForPivotReady();
     const thead = container.querySelector('thead') as HTMLElement;
     const metricCell = within(thead)
       .getByText('measure1')

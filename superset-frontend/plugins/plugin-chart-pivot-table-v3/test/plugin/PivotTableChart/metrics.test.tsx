@@ -51,6 +51,14 @@ jest.mock('../../../src/fetchPivotBranch', () => {
 
 const fetchPivotBranchMock = fetchPivotBranch as jest.Mock;
 
+const waitForPivotReady = async () => {
+  await waitFor(() =>
+    expect(
+      screen.queryByRole('status', { name: /loading/i }),
+    ).not.toBeInTheDocument(),
+  );
+};
+
 const baseFormData: Partial<PivotTableQueryFormData> = {
   groupbyRows: ['r1'],
   groupbyColumns: ['c1'],
@@ -196,7 +204,7 @@ describe('PivotTableChart metric tier suppression', () => {
     fetchPivotBranchMock.mockClear();
   });
 
-  it('hides the metric column header when there is a single metric at the last column level', () => {
+  it('hides the metric column header when there is a single metric at the last column level', async () => {
     const props: Partial<PivotTableProps> = {
       data: baseTree,
       formData: buildFormData(baseFormData),
@@ -227,12 +235,13 @@ describe('PivotTableChart metric tier suppression', () => {
     };
 
     render(<PivotTableChart {...props} />);
+    await waitForPivotReady();
 
     expect(screen.queryByText('metric1')).not.toBeInTheDocument();
     expect(screen.getByText('C1')).toBeInTheDocument();
   });
 
-  it('applies background and text colors from formatting metrics', () => {
+  it('applies background and text colors from formatting metrics', async () => {
     const formattedTree: PivotTreeData = {
       ...baseTree,
       cells: {
@@ -299,6 +308,7 @@ describe('PivotTableChart metric tier suppression', () => {
       />,
     );
 
+    await waitForPivotReady();
     const cell = screen.getByText('10').closest('td');
     expect(cell).toHaveStyle({
       backgroundColor: '#111111',
@@ -306,7 +316,7 @@ describe('PivotTableChart metric tier suppression', () => {
     });
   });
 
-  it('renders databars for configured metrics', () => {
+  it('renders databars for configured metrics', async () => {
     render(
       <PivotTableChart
         data={baseTree}
@@ -346,12 +356,13 @@ describe('PivotTableChart metric tier suppression', () => {
       />,
     );
 
+    await waitForPivotReady();
     const databars = screen.getAllByTestId('pivot-databar');
     expect(databars.length).toBeGreaterThan(0);
     expect(screen.getByText('10')).toBeInTheDocument();
   });
 
-  it('scales databars using union of scale-like group values', () => {
+  it('scales databars using union of scale-like group values', async () => {
     const tree = applyMetricAxis(
       buildTreeFromRecords(
         [
@@ -416,6 +427,7 @@ describe('PivotTableChart metric tier suppression', () => {
       />,
     );
 
+    await waitForPivotReady();
     const cell = screen.getByText('10').closest('td');
     expect(cell).toBeTruthy();
     if (!cell) {
@@ -426,7 +438,7 @@ describe('PivotTableChart metric tier suppression', () => {
     expect(widthPct).toBeCloseTo(10, 1);
   });
 
-  it('caps databar scale width for visual comparability', () => {
+  it('caps databar scale width for visual comparability', async () => {
     const tree = applyMetricAxis(
       buildTreeFromRecords(
         [
@@ -490,6 +502,7 @@ describe('PivotTableChart metric tier suppression', () => {
       />,
     );
 
+    await waitForPivotReady();
     const scales = screen.getAllByTestId('pivot-databar-scale');
     expect(scales).toHaveLength(2);
     const expectedMaxWidth = `${supersetTheme.sizeUnit * 12}px`;
@@ -498,7 +511,7 @@ describe('PivotTableChart metric tier suppression', () => {
     });
   });
 
-  it('renders databars on row grand totals', () => {
+  it('renders databars on row grand totals', async () => {
     const treeWithTotal: PivotTreeData = {
       ...baseTree,
       cells: {
@@ -549,6 +562,7 @@ describe('PivotTableChart metric tier suppression', () => {
       />,
     );
 
+    await waitForPivotReady();
     const totalCell = screen.getByText('50').closest('td');
     expect(totalCell).toBeTruthy();
     if (!totalCell) {
@@ -557,7 +571,7 @@ describe('PivotTableChart metric tier suppression', () => {
     expect(within(totalCell).getByTestId('pivot-databar')).toBeInTheDocument();
   });
 
-  it('reverses waterfall flow when row totals are on top', () => {
+  it('reverses waterfall flow when row totals are on top', async () => {
     const rootKey = serializePath([]);
     const tree = applyMetricAxis(
       buildTreeFromRecords(
@@ -582,7 +596,9 @@ describe('PivotTableChart metric tier suppression', () => {
       values: { metric1: 30 },
     };
 
-    const renderWithTotalsPosition = (colTotalPosition: 'start' | 'end') => {
+    const renderWithTotalsPosition = async (
+      colTotalPosition: 'start' | 'end',
+    ) => {
       const { unmount } = render(
         <PivotTableChart
           data={tree}
@@ -621,6 +637,7 @@ describe('PivotTableChart metric tier suppression', () => {
         />,
       );
 
+      await waitForPivotReady();
       const cell = screen.getByText('10').closest('td');
       expect(cell).toBeTruthy();
       if (!cell) {
@@ -633,12 +650,12 @@ describe('PivotTableChart metric tier suppression', () => {
       return left;
     };
 
-    const topTotalLeft = renderWithTotalsPosition('start');
-    const bottomTotalLeft = renderWithTotalsPosition('end');
+    const topTotalLeft = await renderWithTotalsPosition('start');
+    const bottomTotalLeft = await renderWithTotalsPosition('end');
     expect(topTotalLeft).toBeGreaterThan(bottomTotalLeft);
   });
 
-  it('allocates left padding for negative waterfall labels above zero', () => {
+  it('allocates left padding for negative waterfall labels above zero', async () => {
     const tree = applyMetricAxis(
       buildTreeFromRecords(
         [
@@ -692,6 +709,7 @@ describe('PivotTableChart metric tier suppression', () => {
       />,
     );
 
+    await waitForPivotReady();
     const labelNodes = screen.getAllByText('-10');
     const databarCell = labelNodes
       .map(node => node.closest('td'))
@@ -705,7 +723,7 @@ describe('PivotTableChart metric tier suppression', () => {
     expect(paddingLeft).toBeGreaterThan(supersetTheme.sizeUnit * 2);
   });
 
-  it('applies row and column formatting with metric priority', () => {
+  it('applies row and column formatting with metric priority', async () => {
     const formattedTree: PivotTreeData = {
       ...baseTree,
       cells: {
@@ -788,6 +806,7 @@ describe('PivotTableChart metric tier suppression', () => {
       />,
     );
 
+    await waitForPivotReady();
     const cell = screen.getByText('10').closest('td');
     expect(cell).toHaveStyle({
       backgroundColor: '#333333',
@@ -807,7 +826,7 @@ describe('PivotTableChart metric tier suppression', () => {
     });
   });
 
-  it('applies label-only formatting scope to headers', () => {
+  it('applies label-only formatting scope to headers', async () => {
     const formattedTree: PivotTreeData = {
       ...baseTree,
       cells: {
@@ -873,6 +892,7 @@ describe('PivotTableChart metric tier suppression', () => {
       />,
     );
 
+    await waitForPivotReady();
     const cell = screen.getByText('10').closest('td');
     expect(cell).not.toHaveStyle({ backgroundColor: '#111111' });
 
@@ -883,7 +903,7 @@ describe('PivotTableChart metric tier suppression', () => {
     expect(colHeader).toHaveStyle({ backgroundColor: '#222222' });
   });
 
-  it('renders metric headers without dimension prefixes when metrics are last on columns', () => {
+  it('renders metric headers without dimension prefixes when metrics are last on columns', async () => {
     const metrics = ['averageOrderValue', 'weightedDiscount'];
     const treeRaw = buildTreeFromRecords(
       [
@@ -946,6 +966,7 @@ describe('PivotTableChart metric tier suppression', () => {
     };
 
     const { container } = render(<PivotTableChart {...props} />);
+    await waitForPivotReady();
     const header = container.querySelector('thead') as HTMLElement;
     const headerLabels = within(header)
       .getAllByRole('columnheader')
@@ -958,7 +979,7 @@ describe('PivotTableChart metric tier suppression', () => {
     });
   });
 
-  it('shows year headers once with metric labels on the next row when metrics are last on columns', () => {
+  it('shows year headers once with metric labels on the next row when metrics are last on columns', async () => {
     const metrics = ['grossRevenue', 'countCustomers'];
     const treeRaw = buildTreeFromRecords(
       [
@@ -1031,6 +1052,7 @@ describe('PivotTableChart metric tier suppression', () => {
     };
 
     const { container } = render(<PivotTableChart {...props} />);
+    await waitForPivotReady();
     const headerRows =
       container.querySelectorAll<HTMLTableRowElement>('thead tr');
     const topLabels = within(headerRows[0])
@@ -1162,6 +1184,7 @@ describe('PivotTableChart metric tier suppression', () => {
     };
 
     const { container } = render(<PivotTableChart {...props} />);
+    await waitForPivotReady();
     const initialHeaderRows =
       container.querySelectorAll<HTMLTableRowElement>('thead tr');
     const yearHeader = within(initialHeaderRows[0])
@@ -1285,6 +1308,7 @@ describe('PivotTableChart metric tier suppression', () => {
     };
 
     const { container } = render(<PivotTableChart {...props} />);
+    await waitForPivotReady();
     const initialHeaderRows =
       container.querySelectorAll<HTMLTableRowElement>('thead tr');
     const yearHeader = within(initialHeaderRows[0])
@@ -1413,6 +1437,7 @@ describe('PivotTableChart metric tier suppression', () => {
     };
 
     const { container } = render(<PivotTableChart {...props} />);
+    await waitForPivotReady();
     const initialHeaderRows =
       container.querySelectorAll<HTMLTableRowElement>('thead tr');
     const yearHeader = within(initialHeaderRows[0])
@@ -1443,7 +1468,7 @@ describe('PivotTableChart metric tier suppression', () => {
     );
   });
 
-  it('keeps metric tier hidden on rows when the metric is at the bottom of the hierarchy', () => {
+  it('keeps metric tier hidden on rows when the metric is at the bottom of the hierarchy', async () => {
     const treeWithMetricBottom: PivotTreeData = {
       rows: {
         '': {
@@ -1534,6 +1559,7 @@ describe('PivotTableChart metric tier suppression', () => {
 
     render(<PivotTableChart {...props} />);
 
+    await waitForPivotReady();
     // Metric label should not show as a row header; the second level should be orderPriority.
     expect(screen.queryAllByText('countCustomers')).toHaveLength(0);
     expect(screen.getByText('1-URGENT')).toBeInTheDocument();
@@ -1546,8 +1572,8 @@ describe('PivotTableChart multi-metric visibility', () => {
     ['measure1', 'measure2', 'measure3'],
   ];
 
-  it('shows metrics under a collapsed row group when multiple metrics are selected', () => {
-    metricsVariants.forEach(metrics => {
+  it('shows metrics under a collapsed row group when multiple metrics are selected', async () => {
+    for (const metrics of metricsVariants) {
       const treeRaw = buildTreeFromRecords(
         [
           {
@@ -1616,6 +1642,7 @@ describe('PivotTableChart multi-metric visibility', () => {
         />,
       );
 
+      await waitForPivotReady();
       const rowHeaders = Array.from(
         container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
       ).map(cell => cell.textContent?.trim());
@@ -1642,11 +1669,11 @@ describe('PivotTableChart multi-metric visibility', () => {
         within(metricRow).queryByLabelText('minus-square'),
       ).not.toBeInTheDocument();
       unmount();
-    });
+    }
   });
 
-  it('shows metrics under collapsed columns when multiple metrics are selected', () => {
-    metricsVariants.forEach(metrics => {
+  it('shows metrics under collapsed columns when multiple metrics are selected', async () => {
+    for (const metrics of metricsVariants) {
       const treeRaw = buildTreeFromRecords(
         [
           {
@@ -1715,6 +1742,7 @@ describe('PivotTableChart multi-metric visibility', () => {
         />,
       );
 
+      await waitForPivotReady();
       const headerLabels = Array.from(
         container.querySelectorAll('thead th') as NodeListOf<HTMLElement>,
       ).map(cell => cell.textContent?.trim());
@@ -1724,10 +1752,10 @@ describe('PivotTableChart multi-metric visibility', () => {
         expect.arrayContaining(['Road', 'Mountain']),
       );
       unmount();
-    });
+    }
   });
 
-  it('keeps metrics on columns when both row and column hierarchies are present', () => {
+  it('keeps metrics on columns when both row and column hierarchies are present', async () => {
     const treeRaw = buildTreeFromRecords(
       [
         {
@@ -1798,6 +1826,7 @@ describe('PivotTableChart multi-metric visibility', () => {
       />,
     );
 
+    await waitForPivotReady();
     const rowHeaders = Array.from(
       container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
     ).map(cell => cell.textContent?.trim());

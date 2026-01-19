@@ -48,6 +48,14 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     fetchPivotBranchMock.mockClear();
   });
 
+  const waitForPivotReady = async () => {
+    await waitFor(() =>
+      expect(
+        document.querySelector('[role="status"][aria-label="Loading"]'),
+      ).not.toBeInTheDocument(),
+    );
+  };
+
   const metrics = ['averageOrderValue', 'weightedDiscount'];
 
   it('keeps metric toggle state and values consistent after collapsing orderPriority', async () => {
@@ -175,6 +183,7 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
         dateFormatters={{}}
       />,
     );
+    await waitForPivotReady();
 
     const tbody = container.querySelector('tbody') as HTMLElement;
     const orderPriorityRow = getByText('1-URGENT').closest(
@@ -414,6 +423,7 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
         dateFormatters={{}}
       />,
     );
+    await waitForPivotReady();
 
     const tbody = container.querySelector('tbody') as HTMLElement;
     const orderPriorityRow = getByText('1-URGENT').closest(
@@ -604,6 +614,7 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
         dateFormatters={{}}
       />,
     );
+    await waitForPivotReady();
 
     const tbody = container.querySelector('tbody') as HTMLElement;
     const orderPriorityRow = getByText('1-URGENT').closest(
@@ -798,6 +809,7 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
         dateFormatters={{}}
       />,
     );
+    await waitForPivotReady();
 
     const tbody = container.querySelector('tbody') as HTMLElement;
     const thead = container.querySelector('thead') as HTMLElement;
@@ -963,6 +975,7 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
         dateFormatters={{}}
       />,
     );
+    await waitForPivotReady();
 
     const tbody = container.querySelector('tbody') as HTMLElement;
     const metricLabel = within(tbody).getAllByText('averageOrderValue')[0];

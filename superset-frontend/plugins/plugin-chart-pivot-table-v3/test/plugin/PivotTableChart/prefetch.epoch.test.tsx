@@ -69,7 +69,7 @@ const colGroupby: string[] = [];
 const metrics = ['m1'];
 
 const buildTree = (
-  records: Array<{ r1: string; r2: string; m1: number }>,
+  records: Array<Record<string, string | number>>,
   rowDepth: number,
 ): PivotTreeData => {
   const raw = buildTreeFromRecords(
@@ -150,16 +150,22 @@ describe('PivotTableChart persisted prefetch ignores stale results', () => {
       { r1: 'A', r2: 'Q', m1: 100 },
       { r1: 'B', r2: 'W', m1: 120 },
     ];
-
-    const baseTreeV1 = buildTree(recordsV1, 1);
-    const baseTreeV2 = buildTree(recordsV2, 1);
+    const baseTreeV1 = buildTree([], 0);
+    const baseTreeV2 = buildTree([], 0);
     const branchAV1 = buildTree(
       recordsV1.filter(row => row.r1 === 'A'),
       2,
     );
+    const branchAV2 = buildTree(
+      recordsV2.filter(row => row.r1 === 'A'),
+      2,
+    );
 
-    const deferred = createDeferred<FetchPivotBranchResult>();
-    fetchPivotBranchMock.mockReturnValueOnce(deferred.promise);
+    const deferredV1 = createDeferred<FetchPivotBranchResult>();
+    const deferredV2 = createDeferred<FetchPivotBranchResult>();
+    fetchPivotBranchMock
+      .mockReturnValueOnce(deferredV1.promise)
+      .mockReturnValueOnce(deferredV2.promise);
 
     const makeChart = (data: PivotTreeData) => (
       <PivotTableChart
@@ -217,28 +223,26 @@ describe('PivotTableChart persisted prefetch ignores stale results', () => {
 
     rerender(makeChart(baseTreeV2));
 
-    await waitFor(() => {
-      const table = getPivotTable(container);
-      if (!table) {
-        throw new Error('Pivot table not found');
-      }
-      expect(within(table).getByText('100')).toBeInTheDocument();
-    });
+    await waitFor(() =>
+      expect(fetchPivotBranchMock.mock.calls.length).toBeGreaterThanOrEqual(2),
+    );
 
-    deferred.resolve({ data: branchAV1 });
+    deferredV1.resolve({ data: branchAV1 });
     await fetchPivotBranchMock.mock.results[0].value;
     await Promise.resolve();
 
-    const table = getPivotTable(container);
-    expect(table).not.toBeNull();
-    expect(
-      within(table as HTMLTableElement).getByText('100'),
-    ).toBeInTheDocument();
-    expect(
-      within(table as HTMLTableElement).queryByText('10'),
-    ).not.toBeInTheDocument();
-    expect(
-      within(table as HTMLTableElement).queryByText('X'),
-    ).not.toBeInTheDocument();
+    deferredV2.resolve({ data: branchAV2 });
+    await fetchPivotBranchMock.mock.results[1].value;
+
+    await waitFor(() => {
+      const updatedTable = getPivotTable(container);
+      if (!updatedTable) {
+        throw new Error('Pivot table not found');
+      }
+      expect(within(updatedTable).getByText('Q')).toBeInTheDocument();
+      expect(
+        within(updatedTable).queryByText('X'),
+      ).not.toBeInTheDocument();
+    });
   });
 });

@@ -281,6 +281,24 @@ const pruneTreeByPrefixes = (
   return { ...tree, rows: nextRows, cols: nextCols, cells: nextCells };
 };
 
+const hasNestedPendingKeys = (keys: Set<string>) => {
+  if (keys.size < 2) {
+    return false;
+  }
+  const paths = Array.from(keys).map(key => parsePath(key));
+  return paths.some((candidate, idx) =>
+    paths.some((prefix, otherIdx) => {
+      if (idx === otherIdx) {
+        return false;
+      }
+      if (prefix.length === 0 || prefix.length >= candidate.length) {
+        return false;
+      }
+      return prefix.every((val, index) => val === candidate[index]);
+    }),
+  );
+};
+
 export type ExpansionEngineResult = {
   tree: PivotTreeData;
   expandedRows: Set<string>;
@@ -390,6 +408,8 @@ export const useExpansionEngine = ({
   const prevAutoExpandColsRef = useRef<number | null>(null);
   const prevExpandRowsLevelRawRef = useRef<number | undefined>(undefined);
   const prevExpandColsLevelRawRef = useRef<number | undefined>(undefined);
+  const autoExpandRowsLevelRef = useRef<number>(resolvedExpandRowsLevel);
+  const autoExpandColsLevelRef = useRef<number>(resolvedExpandColumnsLevel);
   const expandedStateSignatureRef = useRef<string | null>(null);
   const fetchedRowKeysRef = useRef<Map<string, number>>(new Map());
   const fetchedColKeysRef = useRef<Map<string, number>>(new Map());
@@ -439,10 +459,20 @@ export const useExpansionEngine = ({
     setLoadingKeys(new Set(counts.keys()));
   }, []);
 
-  const getMetriclessKey = useCallback(
-    (key: string) =>
-      serializePath(parsePath(key).filter(value => !isMetricTokenValue(value))),
-    [isMetricTokenValue],
+  const getGroupedFetchKey = useCallback(
+    (axis: PivotAxis, key: string) => {
+      const intendedIndex =
+        axis === 'row' ? metricIndexForRows : metricIndexForCols;
+      const path = parsePath(key);
+      const metricIndex = findMetricIndex(path, isMetricTokenValue);
+      if (metricIndex >= 0) {
+        if (intendedIndex === undefined || metricIndex < intendedIndex) {
+          return key;
+        }
+      }
+      return serializePath(path.filter(value => !isMetricTokenValue(value)));
+    },
+    [isMetricTokenValue, metricIndexForCols, metricIndexForRows],
   );
 
   const collectInFlightExpanded = useCallback((axis: PivotAxis) => {
@@ -641,6 +671,50 @@ export const useExpansionEngine = ({
       isMetricTokenValue,
       metricIndexForCols,
       metricIndexForRows,
+    ],
+  );
+
+  const buildDesiredExpanded = useCallback(
+    (axis: PivotAxis, nextTree: PivotTreeData) => {
+      const nodes = axis === 'row' ? nextTree.rows : nextTree.cols;
+      const autoLevel =
+        axis === 'row'
+          ? autoExpandRowsLevelRef.current
+          : autoExpandColsLevelRef.current;
+      const autoSeeded = seedExpandedByLevel(
+        nodes,
+        autoLevel,
+        new Set(Array.from(metricLabelSet)),
+        {
+          includeMetricDepthZero:
+            axis === 'row' ? shouldExpandMetricRows : shouldExpandMetricCols,
+        },
+      );
+      const manualExpanded =
+        axis === 'row'
+          ? explicitExpandedRowsRef.current
+          : explicitExpandedColsRef.current;
+      const manualCollapsed =
+        axis === 'row'
+          ? explicitCollapsedRowsRef.current
+          : explicitCollapsedColsRef.current;
+      const pending =
+        axis === 'row' ? pendingRowsRef.current : pendingColsRef.current;
+      const inFlight = collectInFlightExpanded(axis);
+      const next = new Set<string>([
+        ...autoSeeded,
+        ...manualExpanded,
+        ...pending,
+        ...inFlight,
+      ]);
+      manualCollapsed.forEach(key => next.delete(key));
+      return next;
+    },
+    [
+      collectInFlightExpanded,
+      metricLabelSet,
+      shouldExpandMetricCols,
+      shouldExpandMetricRows,
     ],
   );
 
@@ -935,7 +1009,7 @@ export const useExpansionEngine = ({
           }
           const fetchGroups = new Map<string, string[]>();
           for (const key of plan.fetchKeys) {
-            const groupKey = getMetriclessKey(key);
+            const groupKey = getGroupedFetchKey(axis, key);
             const keys = fetchGroups.get(groupKey);
             if (keys) {
               keys.push(key);
@@ -947,7 +1021,9 @@ export const useExpansionEngine = ({
           const groupKeyMap = new Map<string, string[]>();
           for (const keys of fetchGroups.values()) {
             const representative =
-              keys.find(key => getMetriclessKey(key) === key && nodes[key]) ??
+              keys.find(
+                key => getGroupedFetchKey(axis, key) === key && nodes[key],
+              ) ??
               keys.find(key => nodes[key]) ??
               keys[0];
             const target: FetchTarget = {
@@ -1166,7 +1242,7 @@ export const useExpansionEngine = ({
       getFetchPath,
       hasLoadedChildrenForTree,
       persistExpansionState,
-      getMetriclessKey,
+      getGroupedFetchKey,
       resolveExpandedForMetrics,
       updateLoadingKey,
     ],
@@ -1250,17 +1326,6 @@ export const useExpansionEngine = ({
         setIsHydrating(true);
       }
 
-      const desiredRows = new Set([
-        ...expandedRowsRef.current,
-        ...pendingRowsRef.current,
-      ]);
-      const desiredCols = new Set([
-        ...expandedColsRef.current,
-        ...pendingColsRef.current,
-      ]);
-      collectInFlightExpanded('row').forEach(key => desiredRows.add(key));
-      collectInFlightExpanded('col').forEach(key => desiredCols.add(key));
-
       const finalizeHydration = () => {
         if (shouldShowLoader) {
           setIsHydrating(false);
@@ -1268,6 +1333,8 @@ export const useExpansionEngine = ({
       };
 
       let stagingState: StagingTreeState = createStagingTree(treeRef.current);
+      let desiredRows = new Set<string>();
+      let desiredCols = new Set<string>();
 
       const fetchSingleTarget = async (
         target: FetchTarget,
@@ -1338,6 +1405,8 @@ export const useExpansionEngine = ({
           return;
         }
         const stagedTree = buildStagedTree(stagingState);
+        desiredRows = buildDesiredExpanded('row', stagedTree);
+        desiredCols = buildDesiredExpanded('col', stagedTree);
         const { visibleRowDepth, visibleColDepth } = computeVisibleDepths(
           desiredRows,
           desiredCols,
@@ -1449,7 +1518,7 @@ export const useExpansionEngine = ({
         ) => {
           const groups = new Map<string, string[]>();
           fetchKeys.forEach(key => {
-            const groupKey = getMetriclessKey(key);
+            const groupKey = getGroupedFetchKey(axis, key);
             const existing = groups.get(groupKey);
             if (existing) {
               existing.push(key);
@@ -1461,7 +1530,9 @@ export const useExpansionEngine = ({
           const groupKeyMap = new Map<string, string[]>();
           for (const keys of groups.values()) {
             const representative =
-              keys.find(key => getMetriclessKey(key) === key && nodes[key]) ??
+              keys.find(
+                key => getGroupedFetchKey(axis, key) === key && nodes[key],
+              ) ??
               keys.find(key => nodes[key]) ??
               keys[0];
             const target: FetchTarget = {
@@ -1642,7 +1713,7 @@ export const useExpansionEngine = ({
       fetchFormData,
       getFetchPath,
       hasLoadedChildrenForTree,
-      getMetriclessKey,
+      getGroupedFetchKey,
       persistExpansionState,
       updateLoadingKey,
       resolveExpandedForMetrics,
@@ -1679,7 +1750,7 @@ export const useExpansionEngine = ({
         axis === 'row' ? visibleColDepth : visibleRowDepth;
       const isAtomic =
         oppositeVisibleDepth > 0 &&
-        (otherExpanded.size > 1 || otherPending.size > 0 || otherInFlight);
+        (otherPending.size > 0 || otherInFlight);
 
       if (isAtomic) {
         const nextPending = new Set(pending);
@@ -1732,6 +1803,8 @@ export const useExpansionEngine = ({
     const effectiveExpandColsLevel = isColsLevelCleared
       ? 0
       : resolvedExpandColumnsLevel;
+    autoExpandRowsLevelRef.current = effectiveExpandRowsLevel;
+    autoExpandColsLevelRef.current = effectiveExpandColsLevel;
     const formExpansionState = coerceExpansionState(
       pivotExpansionStateRef.current,
     );
@@ -1979,6 +2052,35 @@ export const useExpansionEngine = ({
       resolvedCols,
       data,
     );
+    const seedFetchedDepths = (
+      axis: PivotAxis,
+      expandedKeys: Set<string>,
+      requiredOppositeDepth: number,
+    ) => {
+      const nodes = axis === 'row' ? data.rows : data.cols;
+      const fetchedKeysRef =
+        axis === 'row' ? fetchedRowKeysRef : fetchedColKeysRef;
+      expandedKeys.forEach(key => {
+        const node = nodes[key];
+        if (!node) {
+          return;
+        }
+        if (
+          !hasLoadedChildrenForTree(
+            data,
+            axis,
+            node,
+            visibleRowDepth,
+            visibleColDepth,
+          )
+        ) {
+          return;
+        }
+        fetchedKeysRef.current.set(key, requiredOppositeDepth);
+      });
+    };
+    seedFetchedDepths('row', resolvedRows, visibleColDepth);
+    seedFetchedDepths('col', resolvedCols, visibleRowDepth);
     const rowPlan = planExpansionForAxis({
       axis: 'row',
       expandedKeys: resolvedRows,
@@ -2009,16 +2111,36 @@ export const useExpansionEngine = ({
           visibleColDepth,
         ),
     });
+    const isRootOnly =
+      resolvedRows.size === 1 &&
+      resolvedRows.has(rootKey) &&
+      resolvedCols.size === 1 &&
+      resolvedCols.has(rootKey);
+    const hasManualExpansions =
+      prunedManualRows.length > 0 ||
+      prunedManualCols.length > 0 ||
+      prunedCollapsedRows.length > 0 ||
+      prunedCollapsedCols.length > 0;
+    const hasAutoExpansions =
+      effectiveExpandRowsLevel > 0 || effectiveExpandColsLevel > 0;
+    const shouldSkipRootPrefetch =
+      isRootOnly && !hasManualExpansions && !hasAutoExpansions;
+    const shouldShowPrefetchLoader =
+      hasNestedPendingKeys(rowPlan.pendingKeys) ||
+      hasNestedPendingKeys(colPlan.pendingKeys);
     if (rowPlan.pendingKeys.size + colPlan.pendingKeys.size > 0) {
-      const showLoader =
-        explicitExpandedRowsRef.current.size +
-          explicitExpandedColsRef.current.size >
-        0;
-      hydrateAtomic('prefetch', { showLoader }).catch(error => {
+      if (shouldSkipRootPrefetch) {
+        setIsHydrating(false);
+        return;
+      }
+      if (!shouldShowPrefetchLoader) {
+        setIsHydrating(false);
+      }
+      hydrateAtomic('prefetch', {
+        showLoader: shouldShowPrefetchLoader,
+      }).catch(error => {
         reportAsyncError(error);
-        if (showLoader) {
-          setIsHydrating(false);
-        }
+        setIsHydrating(false);
       });
       return;
     }

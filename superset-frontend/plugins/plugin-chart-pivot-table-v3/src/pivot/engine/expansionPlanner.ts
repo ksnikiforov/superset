@@ -18,7 +18,7 @@
  */
 
 import { PivotAxis, PivotTreeNode } from '../../types';
-import { parsePath, serializePath } from '../../utils';
+import { decodeMetricKey, parsePath, serializePath } from '../../utils';
 import { rootKey } from '../viewModel';
 
 export type PivotExpansionPlan = {
@@ -43,6 +43,9 @@ const isSatisfiedNode = ({
   hasLoadedChildren: (axis: PivotAxis, node: PivotTreeNode) => boolean;
 }) => {
   if (!node.hasChildren) {
+    return true;
+  }
+  if (key === rootKey && hasLoadedChildren(axis, node)) {
     return true;
   }
   if (requiredDepth === 0 && hasLoadedChildren(axis, node)) {
@@ -97,52 +100,111 @@ export const planExpansionForAxis = ({
   const fetchKeys = new Set<string>();
   const pendingKeys = new Set<string>();
   let hasMissingNodes = false;
+  const metricPrefixesByToken = new Map<string, PivotTreeNode['path'][]>();
+  const hasNonRootExpanded =
+    expandedKeys.size > 1 ||
+    (expandedKeys.size === 1 && !expandedKeys.has(rootKey));
 
-  Array.from(expandedKeys)
-    .filter(key => key !== rootKey)
-    .forEach(key => {
-      const node = nodes[key];
-      if (node) {
-        if (
-          isSatisfiedNode({
-            axis,
-            key,
-            node,
-            requiredDepth,
-            fetchedDepthByKey,
-            hasLoadedChildren,
-          })
-        ) {
-          return;
-        }
-        fetchKeys.add(key);
-        pendingKeys.add(key);
-        return;
+  const isPrefix = (
+    prefix: PivotTreeNode['path'],
+    candidate: PivotTreeNode['path'],
+  ) => {
+    if (prefix.length > candidate.length) {
+      return false;
+    }
+    for (let idx = 0; idx < prefix.length; idx += 1) {
+      if (prefix[idx] !== candidate[idx]) {
+        return false;
       }
+    }
+    return true;
+  };
 
-      hasMissingNodes = true;
-      const ancestorKey = resolveNearestPresentAncestorKey(nodes, key);
-      const ancestor = nodes[ancestorKey];
-      if (!ancestor) {
-        return;
-      }
+  expandedKeys.forEach(key => {
+    const node = nodes[key];
+    if (!node) {
+      return;
+    }
+    const metricIndex = node.path.findIndex(value => !!decodeMetricKey(value));
+    if (metricIndex < 0) {
+      return;
+    }
+    const metricToken = decodeMetricKey(node.path[metricIndex]);
+    if (!metricToken) {
+      return;
+    }
+    const prefixes = metricPrefixesByToken.get(metricToken) ?? [];
+    prefixes.push(node.path.slice(0, metricIndex));
+    metricPrefixesByToken.set(metricToken, prefixes);
+  });
+
+  Array.from(expandedKeys).forEach(key => {
+    if (key === rootKey && hasNonRootExpanded) {
+      return;
+    }
+    const node = nodes[key];
+    if (node) {
       if (
         isSatisfiedNode({
           axis,
-          key: ancestorKey,
-          node: ancestor,
+          key,
+          node,
           requiredDepth,
           fetchedDepthByKey,
           hasLoadedChildren,
         })
       ) {
-        fetchKeys.add(key);
-        pendingKeys.add(key);
         return;
       }
-      fetchKeys.add(ancestorKey);
+      fetchKeys.add(key);
       pendingKeys.add(key);
-    });
+      return;
+    }
+
+    const missingPath = parsePath(key);
+    const metricIndex = missingPath.findIndex(
+      value => !!decodeMetricKey(value),
+    );
+    if (metricIndex >= 0) {
+      const metricToken = decodeMetricKey(missingPath[metricIndex]);
+      const prefixes = metricToken
+        ? metricPrefixesByToken.get(metricToken)
+        : undefined;
+      if (
+        prefixes?.some(prefix => isPrefix(prefix, missingPath.slice(0, metricIndex)))
+      ) {
+        return;
+      }
+    }
+
+    hasMissingNodes = true;
+    const ancestorKey = resolveNearestPresentAncestorKey(nodes, key);
+    const ancestor = nodes[ancestorKey];
+    if (!ancestor) {
+      return;
+    }
+    if (
+      isSatisfiedNode({
+        axis,
+        key: ancestorKey,
+        node: ancestor,
+        requiredDepth,
+        fetchedDepthByKey,
+        hasLoadedChildren,
+      })
+    ) {
+      fetchKeys.add(key);
+      pendingKeys.add(key);
+      return;
+    }
+    fetchKeys.add(ancestorKey);
+    pendingKeys.add(key);
+  });
+
+  if (fetchKeys.size > 1 && fetchKeys.has(rootKey)) {
+    fetchKeys.delete(rootKey);
+    pendingKeys.delete(rootKey);
+  }
 
   return { fetchKeys, pendingKeys, hasMissingNodes };
 };

@@ -17,10 +17,8 @@
  * under the License.
  */
 
-import { ChartProps, supersetTheme } from '@superset-ui/core';
 import { render, screen, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
-import transformProps from '../../../src/transformProps';
 import {
   MetricsLayoutEnum,
   PivotResultCell,
@@ -28,7 +26,6 @@ import {
   PivotTreeData,
   PivotTreeNode,
 } from '../../../src/types';
-import { formatQueryName } from '../../../src/buildQuery';
 import { buildFormData } from '../fixtures/pivotFormData';
 import {
   applyMetricAxis,
@@ -237,109 +234,7 @@ describe('PivotTableChart initial depth on collapsed render', () => {
     expect(headers).not.toEqual(['Grand total']);
   });
 
-  it('fails when only grand total column renders for multi-column selection (regression guard)', () => {
-    // Simulate a broken response that labels colDepth=0 but still returns column groupbys.
-    const metrics = ['quantitySold', 'profit', 'discount'];
-    const formData = buildFormData({
-      ...(baseProps as Partial<PivotTableQueryFormData>),
-      groupbyRows: ['orderStatus'],
-      groupbyColumns: [
-        'orderPriority',
-        'revenueBand',
-        'returnFlag',
-        METRICS_PLACEHOLDER,
-      ],
-      metricsLayout: MetricsLayoutEnum.COLUMNS,
-      metrics,
-      viz_type: 'pivot_table_v3',
-      datasource: '1__table',
-    });
-    const chartProps = new ChartProps({
-      formData,
-      width: 600,
-      height: 300,
-      queriesData: [
-        {
-          data: [
-            {
-              orderStatus: 'F',
-              orderPriority: 'A',
-              revenueBand: '10k-50k',
-              returnFlag: 'Y',
-              quantitySold: 10,
-              profit: 3,
-              discount: 1,
-            },
-            {
-              orderStatus: 'O',
-              orderPriority: 'N',
-              revenueBand: '1k-5k',
-              returnFlag: 'N',
-              quantitySold: 5,
-              profit: 2,
-              discount: 0,
-            },
-          ],
-          colnames: [
-            'orderStatus',
-            'orderPriority',
-            'revenueBand',
-            'returnFlag',
-            'quantitySold',
-            'profit',
-            'discount',
-          ],
-          coltypes: [1, 1, 1, 1, 0, 0, 0],
-          query_name: formatQueryName(1, 0),
-        },
-      ],
-      hooks: { setDataMask: jest.fn() },
-      filterState: { selectedFilters: {} },
-      datasource: { verboseMap: {}, columnFormats: {}, currencyFormats: {} },
-      theme: supersetTheme,
-    });
-    const { data: tree } = transformProps(chartProps);
-
-    const { container } = render(
-      <PivotTableChart
-        data={tree}
-        formData={buildFormData(formData)}
-        metrics={metrics}
-        groupbyRows={['orderStatus']}
-        groupbyColumns={['orderPriority', 'revenueBand', 'returnFlag']}
-        aggregateFunction="Sum"
-        width={600}
-        height={300}
-        startCollapsed
-        initialDepth={1}
-        colTotals={false}
-        rowTotals={false}
-        rowSubTotals={false}
-        rowSubtotalLevels={[]}
-        colSubtotalLevels={[]}
-        rowOrder="key_a_to_z"
-        colOrder="key_a_to_z"
-        valueFormat=""
-        columnFormats={{}}
-        currencyFormats={{}}
-        allowRenderHtml={false}
-        emitCrossFilters={false}
-        setDataMask={jest.fn()}
-        metricColorFormatters={[]}
-        dateFormatters={{}}
-      />,
-    );
-
-    const headerRow = container.querySelector(
-      'thead tr:last-child',
-    ) as HTMLElement;
-    const headers = within(headerRow)
-      .getAllByRole('columnheader')
-      .map(cell => cell.textContent?.trim())
-      .filter(label => label && label !== 'Rows');
-    expect(headers.length).toBeGreaterThan(1);
-    expect(headers).not.toEqual(['Grand total']);
-  });
+  // transformProps-driven header regressions now live in transformProps tests.
 
   it('does not render row grand total when row totals/subtotals are disabled', () => {
     metricsVariants.forEach(metrics => {

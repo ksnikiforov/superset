@@ -343,21 +343,95 @@ export const hasLoadedChildren = ({
       return true;
     }).length;
   const children = getRawChildren(axis, node);
-  if (children.length === 0) {
-    return false;
-  }
   const groupbyLength = axis === 'row' ? groupbyRowsLength : groupbyColsLength;
   const parentDimDepth = countBaseDimDepth(node.path);
   const metricIndex = axis === 'row' ? metricIndexForRows : metricIndexForCols;
   const parentHasMetric = node.path.some(val => isMetricTokenValue(val));
+  const metricsExpectedAtParent =
+    node.path.some(isSubtotalToken) ||
+    (metricIndex !== undefined &&
+      metricIndex >= 0 &&
+      parentDimDepth === metricIndex &&
+      !parentHasMetric);
+  const isAboveMetricTier =
+    metricIndex !== undefined && parentDimDepth < metricIndex;
+  const axisNodes = axis === 'row' ? rows : cols;
+  const nodeMetricIndex = node.path.findIndex(val => isMetricTokenValue(val));
+  const basePath = node.path.filter(
+    val => !isMetricTokenValue(val) && !isSubtotalToken(val),
+  );
+  const allowMetricVariant =
+    metricIndex !== undefined &&
+    parentDimDepth >= metricIndex &&
+    !node.path.some(isSubtotalToken);
+  const hasMetricVariant =
+    allowMetricVariant &&
+    !parentHasMetric &&
+    Object.values(axisNodes).some(candidate => {
+      if (!candidate.path.some(val => isMetricTokenValue(val))) {
+        return false;
+      }
+      const candidatePath = candidate.path.filter(
+        val => !isMetricTokenValue(val),
+      );
+      if (candidatePath.length !== node.path.length) {
+        return false;
+      }
+      return candidatePath.every((val, idx) => val === node.path[idx]);
+    });
+  if (hasMetricVariant) {
+    return true;
+  }
+  if (
+    metricIndex !== undefined &&
+    nodeMetricIndex >= 0 &&
+    nodeMetricIndex < metricIndex
+  ) {
+    const hasDeeperBaseDescendant = Object.values(axisNodes).some(candidate => {
+      const candidateBase = candidate.path.filter(
+        val => !isMetricTokenValue(val) && !isSubtotalToken(val),
+      );
+      if (candidateBase.length <= basePath.length) {
+        return false;
+      }
+      return basePath.every((val, idx) => val === candidateBase[idx]);
+    });
+    if (hasDeeperBaseDescendant) {
+      return true;
+    }
+  }
   if (
     metricIndex !== undefined &&
     parentDimDepth < metricIndex &&
     !parentHasMetric &&
-    children.some(child => child.path.some(val => isMetricTokenValue(val)))
+    !node.path.some(isSubtotalToken)
   ) {
-    // Metrics are showing before their configured position; fetch the missing dimension.
-    return false;
+    const hasMetricChildren = children.some(child =>
+      child.path.some(val => isMetricTokenValue(val)),
+    );
+    if (hasMetricChildren) {
+      const hasDescendantAtMetricIndex = Object.values(axisNodes).some(
+        candidate => {
+          const candidateMetricIndex = candidate.path.findIndex(val =>
+            isMetricTokenValue(val),
+          );
+          if (candidateMetricIndex < metricIndex) {
+            return false;
+          }
+          const candidateBase = candidate.path.filter(
+            val => !isMetricTokenValue(val) && !isSubtotalToken(val),
+          );
+          if (candidateBase.length <= basePath.length) {
+            return false;
+          }
+          return basePath.every((val, idx) => val === candidateBase[idx]);
+        },
+      );
+      if (!hasDescendantAtMetricIndex) {
+        // Metrics are showing before their configured position; fetch the missing dimension.
+        return false;
+      }
+    }
   }
   const childDimDepths = children.map(child => countBaseDimDepth(child.path));
   const maxChildDimDepth = Math.max(...childDimDepths, 0);
@@ -381,13 +455,91 @@ export const hasLoadedChildren = ({
       return matches;
     }),
   );
-  const maxChildRowDepth = Math.max(...childCellRowDepths, 0);
-  const maxChildColDepth = Math.max(...childCellColDepths, 0);
+  const descendantRowDepths: number[] = [];
+  const descendantColDepths: number[] = [];
+  const shouldScanDescendants =
+    !hasChildCells &&
+    !(metricIndex === 0 && parentHasMetric && nodeMetricIndex === 0);
+  if (shouldScanDescendants) {
+    Object.keys(cells).forEach(key => {
+      const { rowKey, colKey } = parseCellKey(key);
+      const axisKey = axis === 'row' ? rowKey : colKey;
+      if (axisKey === node.key) {
+        return;
+      }
+      const axisNode = axisNodes[axisKey];
+      if (!axisNode) {
+        return;
+      }
+      const axisPath = axisNode.path;
+      if (parentHasMetric) {
+        if (axisPath.length < node.path.length) {
+          return;
+        }
+        if (!node.path.every((val, idx) => val === axisPath[idx])) {
+          return;
+        }
+      } else {
+        const metriclessPath = axisPath.filter(
+          val => !isMetricTokenValue(val),
+        );
+        if (metriclessPath.length < node.path.length) {
+          return;
+        }
+        if (!node.path.every((val, idx) => val === metriclessPath[idx])) {
+          return;
+        }
+      }
+      const rowNode = rows[rowKey];
+      const colNode = cols[colKey];
+      if (rowNode) {
+        descendantRowDepths.push(countDimDepth(rowNode.path));
+      }
+      if (colNode) {
+        descendantColDepths.push(countDimDepth(colNode.path));
+      }
+    });
+  }
+  const effectiveChildRowDepths =
+    childCellRowDepths.length > 0 ? childCellRowDepths : descendantRowDepths;
+  const effectiveChildColDepths =
+    childCellColDepths.length > 0 ? childCellColDepths : descendantColDepths;
+  const effectiveHasChildCells =
+    hasChildCells ||
+    descendantRowDepths.length > 0 ||
+    descendantColDepths.length > 0;
+  const maxChildRowDepth = Math.max(...effectiveChildRowDepths, 0);
+  const maxChildColDepth = Math.max(...effectiveChildColDepths, 0);
+  const maxChildAxisDepth =
+    axis === 'row' ? maxChildRowDepth : maxChildColDepth;
+  if (children.length === 0) {
+    if (effectiveHasChildCells && maxChildAxisDepth > parentDimDepth) {
+      return true;
+    }
+    if (node.path.some(isSubtotalToken)) {
+      return true;
+    }
+    return false;
+  }
+  const hasVisibleRowDepth = effectiveChildRowDepths.some(
+    depth => depth === visibleRowDepth,
+  );
+  const hasVisibleColDepth = effectiveChildColDepths.some(
+    depth => depth === visibleColDepth,
+  );
   if (
     parentDimDepth < groupbyLength &&
-    (maxChildDimDepth <= parentDimDepth || !hasChildCells)
+    (maxChildDimDepth <= parentDimDepth || !effectiveHasChildCells)
   ) {
     // Only metric-tier children or placeholder nodes are present; treat as not loaded.
+    if (!metricsExpectedAtParent && !(isAboveMetricTier && effectiveHasChildCells)) {
+      return false;
+    }
+  }
+  if (axis === 'col' && !hasVisibleRowDepth && childCellRowDepths.length > 0) {
+    return false;
+  }
+  if (axis === 'row' && !hasVisibleColDepth && childCellColDepths.length > 0) {
     return false;
   }
   if (axis === 'col' && visibleRowDepth > maxChildRowDepth) {

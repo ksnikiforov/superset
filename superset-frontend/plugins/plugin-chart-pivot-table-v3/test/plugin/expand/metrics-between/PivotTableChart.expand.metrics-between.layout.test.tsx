@@ -43,6 +43,14 @@ describe('PivotTableChart expansion with metrics between dimensions (layout)', (
     fetchPivotBranchMock.mockClear();
   });
 
+  const waitForPivotReady = async () => {
+    await waitFor(() => {
+      expect(
+        document.querySelector('[role="status"][aria-label="Loading"]'),
+      ).not.toBeInTheDocument();
+    });
+  };
+
   const metrics = ['averageOrderValue', 'weightedDiscount'];
   const colGroupby = ['customerSegment'];
   const buildRowGroupby = (depth: number) =>
@@ -67,7 +75,7 @@ describe('PivotTableChart expansion with metrics between dimensions (layout)', (
 
   test.each([2, 3, 4])(
     'shows metric toggle when metrics sit between the first row dimension and the rest (depth %i)',
-    depth => {
+    async depth => {
       const rowGroupby = buildRowGroupby(depth);
       const levelValues = buildLevelValues(depth);
       const records = [
@@ -147,6 +155,7 @@ describe('PivotTableChart expansion with metrics between dimensions (layout)', (
         />,
       );
 
+      await waitForPivotReady();
       const firstRow = getByText(levelValues[0]).closest(
         'tr',
       ) as HTMLTableRowElement;
@@ -236,6 +245,7 @@ describe('PivotTableChart expansion with metrics between dimensions (layout)', (
         />,
       );
 
+      await waitForPivotReady();
       const topRow = getByText(levelValues[0]).closest(
         'tr',
       ) as HTMLTableRowElement;
@@ -325,6 +335,7 @@ describe('PivotTableChart expansion with metrics between dimensions (layout)', (
       />,
     );
 
+    await waitForPivotReady();
     expect(queryAllByText('Bike1')).toHaveLength(2);
 
     const metricRows = queryAllByText('m2');
@@ -458,6 +469,7 @@ describe('PivotTableChart expansion with metrics between dimensions (layout)', (
       />,
     );
 
+    await waitForPivotReady();
     const tbody = container.querySelector('tbody') as HTMLElement;
     const airRow = getByText('AIR').closest('tr') as HTMLTableRowElement;
     expect(within(airRow).getByLabelText('plus-square')).toBeInTheDocument();
@@ -623,6 +635,7 @@ describe('PivotTableChart expansion with metrics between dimensions (layout)', (
       />,
     );
 
+    await waitForPivotReady();
     const tbody = container.querySelector('tbody') as HTMLElement;
     const airRow = getByText('AIR').closest('tr') as HTMLTableRowElement;
     fireEvent.click(within(airRow).getByLabelText('plus-square'));
@@ -674,7 +687,7 @@ describe('PivotTableChart expansion with metrics between dimensions (layout)', (
     ).toBeInTheDocument();
   });
 
-  it('shows dimension rows before metrics when totals data includes metric-only rows', () => {
+  it('shows dimension rows before metrics when totals data includes metric-only rows', async () => {
     const metrics = ['averageOrderValue', 'weightedDiscount'];
     const rowGroupby = ['orderPriority', 'shipMode', 'orderStatus'];
     const colGroupby = ['shipInstruction', 'customerSegment', 'returnFlag'];
@@ -770,6 +783,7 @@ describe('PivotTableChart expansion with metrics between dimensions (layout)', (
       />,
     );
 
+    await waitForPivotReady();
     const urgentRow = getByText('1-URGENT').closest(
       'tr',
     ) as HTMLTableRowElement;
