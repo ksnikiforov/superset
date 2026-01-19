@@ -17,7 +17,12 @@
  * under the License.
  */
 
-import { MetricsLayoutEnum, PivotTreeData } from '../../src/types';
+import {
+  MetricsLayoutEnum,
+  PivotTreeData,
+  PivotTreeNode,
+} from '../../src/types';
+import { buildColumnHeaderRows } from '../../src/pivot/viewModel';
 import {
   applyMetricAxis,
   buildTreeFromRecords,
@@ -78,6 +83,39 @@ const baseTree: PivotTreeData = {
     },
   },
 };
+
+describe('null label formatting', () => {
+  it('labels null row values as (NULL)', () => {
+    const tree = buildTreeFromRecords(
+      [{ state: null, m1: 10 }],
+      ['m1'],
+      ['state'],
+      [],
+      1,
+      0,
+    );
+    const nullKey = serializePath([null]);
+    expect(tree.rows[nullKey].label).toBe('(NULL)');
+    expect(tree.rows[nullKey].formattedLabel).toBe('(NULL)');
+  });
+
+  it('renders null column headers as (NULL)', () => {
+    const nullKey = serializePath([null]);
+    const nullNode: PivotTreeNode = {
+      axis: 'col',
+      key: nullKey,
+      path: [null],
+      label: '',
+      formattedLabel: '',
+      level: 1,
+      hasChildren: false,
+      isSubtotal: false,
+    };
+    const rows = buildColumnHeaderRows([nullNode], {});
+    expect(rows[0][0].node.label).toBe('(NULL)');
+    expect(rows[0][0].node.formattedLabel).toBe('(NULL)');
+  });
+});
 
 describe('applyMetricAxis', () => {
   it('preserves dimension nodes when metrics are inserted at the front of rows', () => {

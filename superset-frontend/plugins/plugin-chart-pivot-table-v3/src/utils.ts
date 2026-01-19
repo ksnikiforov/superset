@@ -262,6 +262,19 @@ export const parsePath = (key: string): PivotPath => {
   return parts.map(deserializePathValue);
 };
 
+export const formatPivotLabelValue = (
+  value: DataRecordValue,
+  fallback = '',
+) => {
+  if (value === null) {
+    return '(NULL)';
+  }
+  if (value === undefined) {
+    return fallback;
+  }
+  return String(value);
+};
+
 export const serializeCellKey = (rowKey: string, colKey: string) =>
   `${rowKey}${CELL_KEY_DIVIDER}${colKey}`;
 
@@ -1553,11 +1566,12 @@ export const applyMetricAxis = (
     const nodes = axis === 'row' ? result.rows : result.cols;
     const key = serializePath(path);
     if (nodes[key]) return nodes[key];
+    const rawValue = path[path.length - 1];
     const rawLabel =
       path.length === 0
         ? 'Grand total'
-        : (path[path.length - 1]?.toString() ?? 'Grand total');
-    const metricLabel = decodeMetricKey(path[path.length - 1]);
+        : formatPivotLabelValue(rawValue, 'Grand total');
+    const metricLabel = decodeMetricKey(rawValue);
     const label = metricLabel || rawLabel;
     const isMetricNode = metricTokenSet.has(
       String(path[path.length - 1] ?? ''),
@@ -1817,10 +1831,11 @@ export const buildTreeFromRecords = (
     const nodes = axis === 'row' ? tree.rows : tree.cols;
     const key = serializePath(path);
     if (nodes[key]) return;
+    const rawValue = path[path.length - 1];
     const label =
       path.length === 0
         ? 'Grand total'
-        : (path[path.length - 1]?.toString() ?? totalLabel);
+        : formatPivotLabelValue(rawValue, totalLabel);
     nodes[key] = {
       axis,
       key,

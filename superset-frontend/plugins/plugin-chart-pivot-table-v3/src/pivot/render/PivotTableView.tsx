@@ -219,7 +219,7 @@ const isNullLabelValue = (node: PivotTreeNode) => {
     return false;
   }
   const last = node.path[node.path.length - 1];
-  return last === null || last === undefined;
+  return last === null;
 };
 
 const shouldApplyMetricFormatting = (

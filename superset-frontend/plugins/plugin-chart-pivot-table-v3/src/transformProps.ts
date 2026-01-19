@@ -73,7 +73,6 @@ export default function transformProps(
     datasource: { verboseMap = {}, columnFormats = {}, currencyFormats = {} },
     emitCrossFilters,
     theme,
-    ownState,
   } = chartProps;
   const metrics = ensureIsArray(formData.metrics || []);
   const metricFormatting = normalizeMetricFormattingMapWithKeys(
@@ -289,10 +288,7 @@ export default function transformProps(
     rowSubtotalLevels,
     colSubtotalLevels,
   });
-  const baseTree =
-    ownState?.treeData && ownState?.treeDataSignature === treeDataSignature
-      ? ownState.treeData
-      : ({} as PivotTreeData);
+  const baseTree: PivotTreeData = { rows: {}, cols: {}, cells: {} };
   const nextTreeRaw = queriesData.reduce<PivotTreeData>((acc, query) => {
     const { rowDepth, colDepth } = resolveQueryDepth(query);
     const branch = buildTreeFromRecords(

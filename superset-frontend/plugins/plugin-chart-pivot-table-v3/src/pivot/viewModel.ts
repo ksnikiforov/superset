@@ -23,7 +23,12 @@ import {
   getNumberFormatter,
 } from '@superset-ui/core';
 import { PivotTreeNode } from '../types';
-import { decodeMetricKey, isSubtotalToken, serializePath } from '../utils';
+import {
+  decodeMetricKey,
+  formatPivotLabelValue,
+  isSubtotalToken,
+  serializePath,
+} from '../utils';
 
 export const rootKey = serializePath([]);
 
@@ -127,8 +132,9 @@ export const buildColumnHeaderRows = (
       const headerPath = path.slice(0, level + 1);
       const key = serializePath(headerPath);
       let node = nodes[key];
+      const rawValue = headerPath[level];
       const headerLabel =
-        decodeMetricKey(headerPath[level]) ?? String(headerPath[level] ?? '');
+        decodeMetricKey(rawValue) ?? formatPivotLabelValue(rawValue, '');
       if (!node) {
         if (level === lastLevel) {
           node = {

@@ -1357,7 +1357,7 @@ Status: Phase 3 complete.
 - Ran `npx eslint plugins/plugin-chart-pivot-table-v3` (fails due to existing warnings/Prettier errors in unrelated files; see lint output).
 - Added a dashboard refresh regression test to ensure `pivotExpansionState` restores expanded rows after filter apply; ran `npm test -- plugins/plugin-chart-pivot-table-v3/test/plugin/PivotTableChart/expansion-state.test.tsx` (passes; duplicate mock + Browserslist warnings).
 
-### Phase 4 (in progress)
+### Phase 4 (complete)
 - Added `pivot/engine/query/queryIntent.ts` + `queryShape.ts` with unit tests for metric/column minimization and deterministic unions.
 - Refactored `src/fetchPivotBranch.ts` and `src/transformProps.ts` to use intent-driven query shape instead of unconditional formatting metric merges.
 - Ran `npm test -- plugins/plugin-chart-pivot-table-v3/test/plugin/query/queryShape.test.ts`, `npm test -- plugins/plugin-chart-pivot-table-v3/test/plugin/fetchPivotBranch.test.ts`, and `npm test -- plugins/plugin-chart-pivot-table-v3/test/plugin/transformProps.test.ts` (passes; duplicate mock + Browserslist warnings).
@@ -1369,3 +1369,14 @@ Status: Phase 3 complete.
 - Fixed branch tree construction to use full groupby lengths (via `rowGroupbyForQueryFull`/`colGroupbyForQueryFull`) so nodes retain expand toggles when query intent truncates groupby depth.
 - Updated prefetch/persistence RTL coverage to drive persisted restores through `pivotExpansionState` in form data and tolerate single-root/batched fetches; added batch->single test adapters for prefetch/expansion-state/ancestor-subtotals suites.
 - Ran `npm test -- plugins/plugin-chart-pivot-table-v3` (passes; duplicate mock + Browserslist warnings; Jest open-handles warning).
+
+Status: Phase 4 complete. Proceed to Phase 5.
+
+### Phase 5 (complete)
+- Added a shared NULL label formatter and applied it to tree construction and header rendering; NULL dimension values now render as `(NULL)` and use the muted label styling.
+- Removed `ownState` tree snapshot caching from `src/transformProps.ts`.
+- Deleted `src/react-pivottable/` legacy directory.
+- Ran `npm test -- plugins/plugin-chart-pivot-table-v3` (passes; duplicate mock + Browserslist warnings; Babel deprecation warning).
+- Ran `npx eslint plugins/plugin-chart-pivot-table-v3` (fails with pre-existing warnings/errors; see lint output).
+
+Status: Phase 5 complete. Proceed to Phase 6.
