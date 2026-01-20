@@ -1,0 +1,250 @@
+• A) Rapid expand/collapse (same axis)
+
+  - Q-A1: If a user expands a node and collapses it before the fetch returns, do we (a) abort the request, (b) let it finish but ignore apply, (c) apply into cache only?
+    a - abort the request
+  - Q-A2: If we abort, do we still want to keep any partial response that already arrived (streaming not applicable, but
+    chunks may arrive) or treat as “no data”?
+    Lets keep them in cache.
+  - Q-A3: If the response returns after collapse, should we still merge it into the in-memory data cache (warm re-expand) as
+    long as filterSignature matches?
+    I guess same as the above - keep it in cache
+  - Q-A4: If we keep it as cache-warm, do we cap “wasted work” (e.g. don’t warm-cache if user collapsed within <200ms)?
+  Not sure what you mean, explain if further and give options and their conceqences.
+  - Q-A5: If the user re-expands immediately after collapsing, should the UI reuse the in-flight request (dedupe by specId)
+    instead of re-issuing?
+    Well, i case there is cache, we just use cache. I don't think that it is reasonble to write delays and do complex logic for this case, just issue another request. If there are any other such cases in the codebase (that have to do with timing), highlight them to me
+  - Q-A6: If a child fetch is in-flight and the user collapses the parent, do we cancel all descendant in-flight fetches
+    automatically?
+    Yep
+  - Q-A7: If the user collapses a node while multiple sibling batch fetches are in-flight, do we allow the batch to continue
+    (since it also serves other siblings) or do we split/cancel?
+    This is a hard one, present options
+  - Q-A8: Should “collapse” immediately remove children rows from the committed view (optimistic collapse), or wait until
+    pending state converges?
+    Expand on this
+  - Q-A9: Should “expand” immediately show empty child placeholders (optimistic expand) or only show spinner on header cell
+    until data arrives?
+    No, we never show empty cells. We only expand when we know we can fully fill the expanded area. It may be two step expand, like lets say a user expanded rows and columns, and with the current responses we can already expand the columns. Then we expand the columns (stop its loader), then wait, then expand the rows. About the loader, here technically the column node still sends requests, but we stop the loader as soon as the node is expanded. And we only show loaders for expansions, they do not represent quesries made to the database. They are tied to user intent, so a row expansion should not trigger a column loader.
+  - Q-A10: What is the rule for the per-node spinner when toggles happen rapidly (e.g. expand→collapse→expand): last-intent
+    wins, but should spinner persist continuously or reset?
+    Persisting continuously is fine. But in the above case, on the collapse the loader will stop, becasue cached values will be instantly loaded, as we stated from the collapsed state.
+
+  B) Rapid expand/collapse (cross-axis interactions)
+
+  - Q-B1: If a user expands rows while a column expansion fetch is pending (or vice versa), are these independent transactions
+    or one combined “desired state” transaction?
+    Asses this and present options and thier conceqences
+  - Q-B2: If cross-axis expansions change required opposite-depth, do we prioritize “fill visible grid” over “load children
+    lists” when resources are constrained?
+    Expand on this
+  - Q-B3: If expanding columns increases visibleColDepth, should already-expanded row branches automatically schedule
+    refetches to populate missing intersection cells (today’s hydration loop behavior)? If yes, how aggressively?
+    If this means that if we expand column and it runs through multiple rows with different levels of expansion, should we do queries to fill those rows, then of course we should. There is a rule - we do not show users empty grid. If this means something else - expand on it.
+  - Q-B4: If the user immediately collapses the deeper columns again, do we cancel those “refill” fetches, or let them warm-
+    cache?
+    Don't understand this, expand further.
+  - Q-B5: If the user toggles both axes quickly, do we allow multiple hydration iterations concurrently, or enforce a single
+    serialized planner loop with cancellation?
+    Suggest what you think will be best going forward.
+
+  C) “Large string of inputs” (event storms / last-intent semantics)
+
+  - Q-C1: What is the global rule under event storms: queue all intents vs coalesce to latest desired state?
+    For now lets do the queue. If you have a critique, or a better solution, suggest it to me. What do you mean coalesce?
+  - Q-C2: Which actions are coalescable? (expand/collapse, reorder, add/remove dimension, toggle measure leaf, toggle totals)
+  Expand on this.
+  - Q-C3: Do we debounce planning (e.g. 50–150ms) to coalesce rapid sequences into one fetch plan? If yes, which actions
+    trigger immediate plan vs debounced plan?
+    I think we should do an immediate plan.
+  - Q-C4: Should “expand all visible level” (if added later) be incremental with progress, or one huge planned batch set?
+    Good question. I think we should cancel the previous request, and overwrite it with an efficient expand all. (Expand level will always start from the most shallow non-expanded level. Collapse level will always start from the deepest expanded layer)
+  - Q-C5: Should we impose a max “in-flight planned query objects” budget and degrade (e.g. stop prefetching deeper, only
+    fetch on scroll/visibility)?
+    Explain this one to me.
+  - Q-C6: How do we keep the UI interactive during storms (no main-thread stalls from repeated render-model rebuilds)?
+    Well, as stated previously, they only trigger row level loaders. During those a user can still scroll the table in a previous state, so all seems fine.
+
+  D) Runtime layout builder (drag/drop fast, many operations)
+
+  - Q-D1: Do layout changes apply on drop only, or do we preview live while dragging (would trigger many plans)?
+    We do not preview on dragging, only drop triggers an action.
+  - Q-D2: If the user drags multiple dimensions quickly (drop, pick again, drop), do we (a) start a transaction per drop, (b)
+    debounce and only execute last drop?
+    the thing is it depends on layer of the drop. In simplest case when new dimesion is put at the bottom we do not do anything as it is deeper than current expansion. When change is destructive, we collapse the pivot to the last cached expansion and still don't do anything. And only if the new dimesion is the first in the stack then we do a request to get that dimesion. But otherwise, collapse all the destroyed layers, add [+] where new layers appear, but no queries.
+  - Q-D3: If a layout transaction is pending and the user drags again, do we cancel pending fetches and start new, or allow
+    both and ignore stale results (transaction-id only)?
+    answered above
+  - Q-D4: When a dimension moves rows↔cols (lossy), do we warn the user that some expansions will be pruned, or silently
+    prune?
+    If prining means collapsing, then yes, we can just collapse them.
+  - Q-D5: For reordering dimensions within an axis: do we treat as destructive (prune expansions) or attempt a migration
+    heuristic? If heuristic exists, what is it?
+    Can we do a migration? I don't think we can, correct me if i am wrong. A good heuristinc for this type of quesion is - Assume all measures we are working with are non-additive. And assume they are so complex we cannot compute them at superset level. Do this for all such questions.
+  - Q-D6: If the user removes a dimension (shrinks depth), do we keep its expansions “remembered” in case they add it back
+    (within session), or drop immediately?
+    drop immediately
+  - Q-D7: If the user adds a dimension at the end (non-destructive), do we automatically prefetch children for all currently-
+    expanded parents, or wait until user expands deeper?
+    answered above, we just add [+] where relevant and wait
+  - Q-D8: If user changes layout while scrolled deep, do we preserve scroll position relative to committed table, or snap to
+    top?
+    We do preserve scroll position. This is also true for filter changes. If the compexity of this is overwhelmingly high, then this is negotiable and a developer should ask a question during implementation.
+  - Q-D9: During pending layout update, does expand/collapse apply to the committed layout, the desired layout, or both (with
+    reconciliation)?
+    Not sure, expand on this.
+
+  E) Multi-level measures (leaf toggles fast, constraints)
+
+  - Q-E1: If the user toggles many measure leaves quickly (Value/IXYA/%YA/DYA), do we debounce and only fetch last selection?
+  What do you mean? They behave the same way as regular measures.
+  - Q-E2: If they toggle from [Value] to [Value, IXYA, DYA], do we treat as non-destructive (preserve expansions) and run an
+    incremental transaction?
+    Yes, it is non-destructive. It is as if a filter was changed, (preferably preserve scroll, trigger a gloabl load, but top left loader with cached table still visible)
+  - Q-E3: If they toggle to [IXYA] only (collapse to 1-tier + label change), do we preserve expansions exactly (since paths
+    shouldn’t include leaf tier), and how do we avoid “key churn” in render?
+    Yes, we do preserve expansions. I think maybe we should kinda treat it as two cells still, but show as 1??? I am not sure what would be architecturally better, you suggest a solution.
+  - Q-E4: If they deselect all leaves for all measures (empty selection), do we show a deterministic empty-state immediately
+    without firing queries?
+    Lets show the "Value" state. So as if only Value is selected.
+  - Q-E5: If they select many measures at once (e.g. 30), what is the max allowed before UI becomes unusable? Do we enforce a
+    cap?
+    We do not.
+  - Q-E6: If measures are multi-metric and totals/subtotals require extra query pairs, do we still guarantee “minimum query
+    objects” (batch where possible) under large measure sets?
+    Expand on this. But generally, yes, we should be efficient with our queries. The other thing is that trere are two modes of queries. (1) predefined within superset. So for ex a user can select "IXYA" and then the feature will work in a simmilar way to this feature in regular table visual. Basically two queries sent instead of one, with different time filters. And some light assembly on front-end. OR, a user can put in a custom measure. With this there is no split requests, and we just get it. This is usefull for cubeJs, which can calculate and pre-cache those using time intellegence.
+  - Q-E7: Are measure leaf computations always tied to the base metric (“coupled with upper value”): if so, is there ever a
+    case where leaf selection changes groupby shape vs only metrics list?
+    I don't get this question. But generally an additional computation cannot be on its own, it is attached to a metric. But it is not always a derivative of that metric, as is the case with above example, where a different measure from cubejs can be used to fill this.
+  - Q-E8: When measure selection changes, do we drop cached branch results because query shape changed, or keep them if they
+    are a strict subset/superset (shape-compatibility rules)?
+    Expand on this.
+
+  F) Filters & refresh with “keep previous table visible”
+
+  - Q-F1: If filters change while there is committed data, do we keep the old table fully interactive, or put it in a “stale”
+    mode (interactions disabled)?
+    We still want to keep the table interactive.
+  - Q-F2: If the user expands/collapses during a filter-update transaction, should that intent apply to the new filter state
+    only, or also mutate the committed view optimistically?
+    Whichever is easier. But here are two things we DO NOT do. 1) we do not cancel the user's expansion. 2) We do not show data or query data using the old filter context, when the new one is avaialbe.
+  - Q-F3: If the user expands during filter update, do we fetch for the new filters immediately (preferred), or defer until
+    filter update completes?
+    immediately
+  - Q-F4: If the filter update is slow and the user keeps interacting, do we keep updating the “desired” state transaction and
+    cancel older pending fetches?
+    Expand on this.
+  - Q-F5: If filters change repeatedly (slider drag), do we throttle requests (e.g. only every N ms) and always discard
+    intermediate?
+    We cancel the request and start a new one. Generally filters do not change rapidly.
+  - Q-F6: Do we allow the user to “cancel update” (stop fetching new filter state) and stay on old committed table?
+    No, we do not. The state should reflect current filters and selection and not go out of sync with it.
+
+  G) Query planning, batching, bundling under heavy interaction
+
+  - Q-G1: When multiple branch targets are known at once (e.g. persisted expansions, or multiple rapid expands), do we always
+    bundle into a single /chart/data request unless size limits force split?
+    I think yes, but i do not fully understand the implications of this. Explain to me.
+  - Q-G2: If bundling must split, do we fire splits in parallel, and how do we surface progress (one spinner, multiple
+    spinners, progress bar)?
+    Parallel. Superset core handles the query control, we just tell it what we need. 
+  - Q-G3: When do we apply batch optimization vs bundling: do we batch first (reduce query objects) then bundle (reduce
+    requests) always?
+    Do we even need batching? Explain its purpose.
+  - Q-G4: How do we set the caps: MAX_BATCH_SIBLINGS, MAX_QUERIES_PER_REQUEST, and a payload-size limit (bytes)? What happens
+    when user exceeds caps?
+    We don't. It's on superset or databse owner to handle this. We just request what we need.
+  - Q-G5: If a batched IN (...) query hits row_limit, do we mark all included siblings as “partial” (since we can’t attribute
+    truncation), and how is that shown in UI?
+    I think there is a built-in allert in superset currently. If any query that has hit the row limit is currently displayed (expanded), we trigger that allert. If it is not easy to trigger that, then show our own allert in the top left cell (named "Rows")
+  - Q-G6: If a single sibling consistently truncates, do we ever split it out of the batch to reduce collateral truncation, or
+    is truncation behavior accepted as-is?
+    We do not split it.
+  - Q-G7: If expansion paths include NULL/undefined, batching requires separate IS NULL handling—do we run two batch queries
+    (nullish + non-null) concurrently, and how do we label partials?
+    The requests are parrallel as all other requests. Partials are the same as above.
+  - Q-G8: If user expands 200 siblings under one parent, do we schedule 4 batches of 50 concurrently, or sequentially with
+    backpressure?
+    No, all parralel. This is for Superset and DB to figure out, not us. I am not sure we should be doing batches of 50, explain when is this ever applied.
+  - Q-G9: For persisted expansions on reload, do we prefetch all persisted expansions immediately, or only those required for
+    currently visible viewport (if we add virtualization)?
+    Don't understand the question, expand on it.
+
+  H) Cancellation, deduplication, and result application
+
+  - Q-H1: Do we use AbortController to cancel in-flight requests when a transaction becomes stale, or rely purely on “ignore
+    stale results”?
+    We use the standard superset api for request cancelation. Whateve happens when you press "Stop". If that does not support partial query cancels, then this come back to me with options.
+  - Q-H2: If we cancel, do we cancel at (a) request level, (b) per-query-object level (not possible in a bundled request), or
+    (c) by not scheduling future bundles?
+    This is an interesting question. Lets think about it. I am not even sure about bundling feature itself.
+  - Q-H3: Do we dedupe identical QuerySpecs across transactions (same filterSignature/layoutSignature/specId), or only within
+    a single transaction?
+    What is better performance-wise and more reasonable, we do that.
+  - Q-H4: If results arrive out-of-order, do we apply them as they arrive (progressive fill), or only commit when minimum
+    coverage is satisfied?
+    Well, if user expanded something (cross axis, multiple expnads, does not matter). If we get a completed expansion, we expand. (this of course in cross-axis case will require the other expansion to be more complete. We likely expnaded the one with fewer queries sent and recieved. this is ok.)
+  - Q-H5: What is “minimum coverage” for commit (grid + totals + ordering prerequisites)? Is it different for initial load vs
+    background update?
+    I don't get this question.
+
+  I) Persistence store under rapid interaction
+
+  - Q-I1: Do we write expansion intent to persistence on every toggle, or throttle (e.g. write after 250ms idle)?
+  no throttle
+  - Q-I2: If persistence writes are throttled and the tab crashes, is losing last ~250ms of toggles acceptable?
+  no throttle
+  - Q-I3: In dashboards, setDataMask updates can be expensive—do we batch writes and merge atomically?
+  Explain when they are used and why they are expensive.
+  - Q-I4: If persistence fails (permission, payload too large), do we warn or silently fall back to memory-only?
+  What would memory-only look like. Why would persistance fail?
+  - Q-I5: If the user changes layout rapidly, do we persist the migrated/pruned expansion state immediately, or only when
+    stable?
+    Don't understand the question. Expand.
+
+  J) Rendering/perf edge cases (large trees, large strings)
+
+  - Q-J1: If dimension values are huge strings (or contain separators), do we guarantee stable serialization/escaping end-to-
+    end (so expansion keys never corrupt)?
+    If your question is "should the plugin fail for large strings, or strings with separators, or strings with special characters", the answer - it should not. If this requires an architecture change, we do that change.
+  - Q-J2: If the tree becomes very large (many expanded nodes), do we virtualize rows/cols? If not, what is the max supported
+    before UI degrades?
+    What do you mean "virtualize"? Generally lets not put limits for now.
+  - Q-J3: If the user scrolls while pending update is building, do we keep scroll smooth (avoid reflow) and avoid collapsing
+    sticky headers?
+    Well, sticky headers will update, this is fine. The scroll, we keep it if it is not too much work. As i understand the table is pure HTML, so all the regular HTML behaviour applies.
+  - Q-J4: If the user rapidly expands while scrolled, do we auto-scroll to reveal children, or keep scroll position fixed?
+    We keep the position fixed. It is on user do decide the scroll, we do not highjack it.
+  - Q-J5: Are there “render storms” from repeated buildRenderModel() calls—do we memoize by signatures and only rebuild when
+    inputs materially change?
+    Expand on this.
+
+  K) Error/retry UX
+
+  - Q-K1: If a single branch/batch query fails (network/server), do we keep the committed table and show an inline error on
+    that node, or show a global toast?
+    For now lets invalidate the whole table and show the error we encountered during the request. So not table abymore, just the error (same a regular pivot on first load if it encounters and error)
+  - Q-K2: Do we allow retry per node, per batch, or whole transaction?
+    no
+  - Q-K3: If one query in a bundled request fails but others succeed (server may return partial errors), how do we surface and
+    merge safely?
+    pivot error
+  - Q-K4: If server returns “query cancelled” (because user navigated), do we treat as benign and keep committed view?
+  Expand on this.
+  - Q-K5: Do we ever fallback from batched query to per-branch queries on repeated failures (e.g. DB can’t handle huge IN)?
+  Not sure about batched queries yet.
+
+  L) UX feedback (loaders/spinners)
+
+  - Q-L1: What are the exact loader rules: initial full loader only when no committed data; otherwise top-left “updating”
+    indicator + per-node spinners?
+    Yes, initial - full loader. On expansion - per row / per column loader. On non-destructive changes - no loader, instant show. On destructive changes top left loader when request is made (new dimension is at the top). On measure change / IXYA change - top left loader.
+  - Q-L2: If a layout update is pending, should expanding nodes show spinners tied to the pending transaction even though
+    committed table is shown?
+    Not sure.
+  - Q-L3: If the user keeps toggling during update, do spinners reset, accumulate, or show “Updating…” continuously?
+  Not sure, but should be consistent with other answers.
+  - Q-L4: Should we show progress (e.g. “Loading 3/10 batches”) for massive expansions?
+   Not as of now
+  - Q-L5: When do we clear “updating” indicator—on first results, or only on commit?
+  only when we show the user the result.
+

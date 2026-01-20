@@ -17,7 +17,8 @@
  * under the License.
  */
 
-import buildQuery, { formatQueryName } from '../../src/buildQuery';
+import buildQuery from '../../src/buildQuery';
+import { formatQueryName } from '../../src/pivot/engine/query/queryName';
 import { buildFormData } from './fixtures/pivotFormData';
 
 const baseFormData = buildFormData({
@@ -27,8 +28,8 @@ const baseFormData = buildFormData({
   colTotals: false,
   rowTotals: false,
   rowSubTotals: false,
-  startCollapsed: false,
-  initialDepth: 2,
+  startCollapsed: true,
+  initialDepth: 1,
   datasource: '5__table',
   viz_type: 'pivot_table_v3',
   width: 400,
@@ -47,16 +48,26 @@ const baseFormData = buildFormData({
 });
 
 describe('buildQuery (bootstrap)', () => {
-  test('emits a single visible-depth query', () => {
+  test('emits minimal bootstrap queries for totals + top-level axes', () => {
     const queryContext = buildQuery(baseFormData);
-    expect(queryContext.queries).toHaveLength(1);
-    expect(queryContext.queries[0].query_name).toEqual(formatQueryName(2, 2));
-    expect(queryContext.queries[0].columns).toEqual([
-      'row1',
-      'row2',
-      'col1',
-      'col2',
-    ]);
+    expect(queryContext.queries).toHaveLength(2);
+    expect(queryContext.queries[0].query_name).toEqual(formatQueryName(0, 0));
+    expect(queryContext.queries[0].columns).toEqual([]);
+    expect(queryContext.queries[1].query_name).toEqual(formatQueryName(1, 1));
+    expect(queryContext.queries[1].columns).toEqual(['row1', 'col1']);
+  });
+
+  test('includes row/column totals queries when totals are enabled', () => {
+    const queryContext = buildQuery({
+      ...baseFormData,
+      rowTotals: true,
+      colTotals: true,
+    });
+    expect(queryContext.queries).toHaveLength(4);
+    expect(queryContext.queries[0].query_name).toEqual(formatQueryName(0, 0));
+    expect(queryContext.queries[1].query_name).toEqual(formatQueryName(1, 1));
+    expect(queryContext.queries[2].query_name).toEqual(formatQueryName(1, 0));
+    expect(queryContext.queries[3].query_name).toEqual(formatQueryName(0, 1));
   });
 
   test('uses the base metric list for the bootstrap query', () => {
@@ -73,10 +84,65 @@ describe('buildQuery (bootstrap)', () => {
         },
       },
     });
-    const queryMetrics = queryContext.queries[0].metrics || [];
-    const metricKeys = queryMetrics.map(metric =>
-      typeof metric === 'string' ? metric : metric.label,
+    queryContext.queries.forEach(query => {
+      const queryMetrics = query.metrics || [];
+      const metricKeys = queryMetrics.map(metric =>
+        typeof metric === 'string' ? metric : metric.label,
+      );
+      expect(metricKeys).toEqual(
+        expect.arrayContaining(['metric1', 'metric2']),
+      );
+      expect(metricKeys[0]).toEqual('metric1');
+      expect(metricKeys[1]).toEqual('metric2');
+    });
+  });
+
+  test('prefetches persisted expansions in the initial query plan', () => {
+    const queryContext = buildQuery({
+      ...baseFormData,
+      pivotExpansionState: {
+        rowKeys: ['row1', 'row2'],
+        colKeys: ['col1', 'col2'],
+        rows: [['A']],
+        cols: [['B']],
+        collapsedRows: [],
+        collapsedCols: [],
+      },
+    });
+    const names = queryContext.queries.map(query => query.query_name || '');
+    expect(names.some(name => name.includes('|branch:row:A'))).toBe(true);
+    expect(names.some(name => name.includes('|branch:col:B'))).toBe(true);
+  });
+
+  test('uses persisted column expansions to increase branch query depth', () => {
+    const queryContext = buildQuery({
+      ...baseFormData,
+      expandColumnsLevel: 0,
+      expandRowsLevel: 0,
+      pivotExpansionState: {
+        rowKeys: ['row1', 'row2'],
+        colKeys: ['col1', 'col2'],
+        rows: [['A']],
+        cols: [['B']],
+        collapsedRows: [],
+        collapsedCols: [],
+      },
+    });
+    const rowBranchQueries = queryContext.queries.filter(query =>
+      query.query_name?.includes('|branch:row:A'),
     );
-    expect(metricKeys).toEqual(expect.arrayContaining(['metric1', 'metric2']));
+    expect(rowBranchQueries.length).toBeGreaterThan(0);
+    expect(
+      rowBranchQueries.some(query => (query.columns || []).includes('col2')),
+    ).toBe(true);
+  });
+
+  test('adds root prefetch queries when auto-expand goes beyond depth 1', () => {
+    const queryContext = buildQuery({
+      ...baseFormData,
+      startCollapsed: false,
+    });
+    const names = queryContext.queries.map(query => query.query_name || '');
+    expect(names.some(name => name.includes('|root'))).toBe(true);
   });
 });

@@ -480,9 +480,7 @@ export const hasLoadedChildren = ({
           return;
         }
       } else {
-        const metriclessPath = axisPath.filter(
-          val => !isMetricTokenValue(val),
-        );
+        const metriclessPath = axisPath.filter(val => !isMetricTokenValue(val));
         if (metriclessPath.length < node.path.length) {
           return;
         }
@@ -532,7 +530,10 @@ export const hasLoadedChildren = ({
     (maxChildDimDepth <= parentDimDepth || !effectiveHasChildCells)
   ) {
     // Only metric-tier children or placeholder nodes are present; treat as not loaded.
-    if (!metricsExpectedAtParent && !(isAboveMetricTier && effectiveHasChildCells)) {
+    if (
+      !metricsExpectedAtParent &&
+      !(isAboveMetricTier && effectiveHasChildCells)
+    ) {
       return false;
     }
   }

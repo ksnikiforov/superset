@@ -48,7 +48,7 @@ import {
   PivotTreeData,
   PivotTreeNode,
 } from './types';
-import { formatQueryName } from './buildQuery';
+import { formatQueryName } from './pivot/engine/query/queryName';
 
 export const PATH_DIVIDER = '\u0000';
 export const CELL_KEY_DIVIDER = '\u0001';

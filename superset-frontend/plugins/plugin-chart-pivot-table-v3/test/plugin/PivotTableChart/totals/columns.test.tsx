@@ -753,6 +753,8 @@ describe('PivotTableChart totals & subtotals - columns', () => {
         />,
       );
 
+      // eslint-disable-next-line no-await-in-loop
+      // eslint-disable-next-line no-await-in-loop
       await waitForPivotReady();
       const headerRow = container.querySelector(
         'thead tr:first-child',
@@ -940,6 +942,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
         />,
       );
 
+      // eslint-disable-next-line no-await-in-loop
       await waitForPivotReady();
       const header = container.querySelector('thead') as HTMLElement;
       const headers = within(header)

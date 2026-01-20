@@ -16,7 +16,10 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { optimizeFetchPlan, MAX_BATCH_SIBLINGS } from '../../../src/pivot/engine/query/fetchPlanOptimizer';
+import {
+  optimizeFetchPlan,
+  MAX_BATCH_SIBLINGS,
+} from '../../../src/pivot/engine/query/fetchPlanOptimizer';
 import { parsePath, serializePath } from '../../../src/utils';
 import { type FetchTarget } from '../../../src/pivot/engine/fetchCoordinator';
 import { type PivotPathValue } from '../../../src/types';
@@ -34,10 +37,7 @@ const makeTarget = (
 
 describe('fetchPlanOptimizer', () => {
   it('groups compatible sibling targets into a batch', () => {
-    const targets = [
-      makeTarget(['US', 'CA']),
-      makeTarget(['US', 'NY']),
-    ];
+    const targets = [makeTarget(['US', 'CA']), makeTarget(['US', 'NY'])];
     const plan = optimizeFetchPlan({ targets });
 
     expect(plan.batches).toHaveLength(1);
@@ -73,8 +73,7 @@ describe('fetchPlanOptimizer', () => {
     const hasMaxBatch = batchSizes.includes(MAX_BATCH_SIBLINGS);
     expect(hasMaxBatch).toBe(true);
     expect(
-      batchSizes.reduce((sum, size) => sum + size, 0) +
-        plan.singles.length,
+      batchSizes.reduce((sum, size) => sum + size, 0) + plan.singles.length,
     ).toBe(MAX_BATCH_SIBLINGS + 1);
   });
 

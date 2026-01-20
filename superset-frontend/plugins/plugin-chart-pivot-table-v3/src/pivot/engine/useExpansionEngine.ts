@@ -32,7 +32,10 @@ import {
   serializePath,
   mergeTrees,
 } from '../../utils';
-import { planExpansionForAxis } from './expansionPlanner';
+import {
+  planExpansionForAxis,
+  type PivotExpansionPlan,
+} from './expansionPlanner';
 import {
   coerceExpansionState,
   pruneExpandedToStablePrefix,
@@ -726,13 +729,81 @@ export const useExpansionEngine = ({
         expandedCols: nextCols,
         config: buildRenderModelConfig(nextRows, nextCols, nextTree),
       });
-      return getVisibleDepths(
+      const { visibleRowDepth, visibleColDepth } = getVisibleDepths(
         renderModel.visibleRows,
         renderModel.visibleCols,
         countDimDepth,
       );
+      return {
+        visibleRowDepth,
+        visibleColDepth,
+      };
     },
     [buildRenderModelConfig, countDimDepth],
+  );
+
+  const applyCrossAxisRootFetch = useCallback(
+    ({
+      tree: nextTree,
+      rowPlan,
+      colPlan,
+      visibleRowDepth,
+      visibleColDepth,
+    }: {
+      tree: PivotTreeData;
+      rowPlan: PivotExpansionPlan;
+      colPlan: PivotExpansionPlan;
+      visibleRowDepth: number;
+      visibleColDepth: number;
+    }) => {
+      const nextRowPlan = {
+        ...rowPlan,
+        fetchKeys: new Set(rowPlan.fetchKeys),
+        pendingKeys: new Set(rowPlan.pendingKeys),
+      };
+      const nextColPlan = {
+        ...colPlan,
+        fetchKeys: new Set(colPlan.fetchKeys),
+        pendingKeys: new Set(colPlan.pendingKeys),
+      };
+      const hasRowNodes = Object.keys(nextTree.rows).some(
+        key => key !== rootKey,
+      );
+      const hasColNodes = Object.keys(nextTree.cols).some(
+        key => key !== rootKey,
+      );
+      const hasIntersectionCells = Object.values(nextTree.cells).some(cell => {
+        const rowNode = nextTree.rows[cell.rowKey];
+        const colNode = nextTree.cols[cell.colKey];
+        if (!rowNode || !colNode) {
+          return false;
+        }
+        return (
+          countDimDepth(rowNode.path) > 0 && countDimDepth(colNode.path) > 0
+        );
+      });
+      const shouldForceRootFetch =
+        hasRowNodes &&
+        hasColNodes &&
+        visibleRowDepth > 0 &&
+        visibleColDepth > 0 &&
+        !hasIntersectionCells;
+      if (
+        shouldForceRootFetch &&
+        !nextRowPlan.fetchKeys.has(rootKey) &&
+        !nextColPlan.fetchKeys.has(rootKey)
+      ) {
+        if (groupbyRowsLength > 0) {
+          nextRowPlan.fetchKeys.add(rootKey);
+          nextRowPlan.pendingKeys.add(rootKey);
+        } else if (groupbyColumnsLength > 0) {
+          nextColPlan.fetchKeys.add(rootKey);
+          nextColPlan.pendingKeys.add(rootKey);
+        }
+      }
+      return { rowPlan: nextRowPlan, colPlan: nextColPlan };
+    },
+    [countDimDepth, groupbyColumnsLength, groupbyRowsLength],
   );
 
   const hasLoadedChildrenForTree = useCallback(
@@ -1037,7 +1108,7 @@ export const useExpansionEngine = ({
           }
           const cachedResults: SingleFetchResult[] = [];
           const batchCandidates: BatchCandidate[] = [];
-          targets.forEach(target => {
+          for (const target of targets) {
             const path = parsePath(target.pathKey);
             const cached = peekPivotBranchCache({
               axis: target.axis,
@@ -1054,7 +1125,7 @@ export const useExpansionEngine = ({
                 target,
                 data: cached,
               });
-              return;
+              continue;
             }
             const batchSignature = buildBatchSignature({
               formData: fetchFormData,
@@ -1066,12 +1137,12 @@ export const useExpansionEngine = ({
               visibleColDepth,
             });
             batchCandidates.push({ ...target, batchSignature });
-          });
+          }
           const { batches, singles } = optimizeFetchPlan({
             targets: batchCandidates,
           });
           const fetchPromises: Array<Promise<CombinedFetchResult>> = [];
-          singles.forEach(target => {
+          for (const target of singles) {
             fetchPromises.push(
               fetchBranchForKey({
                 key: target.pathKey,
@@ -1085,8 +1156,8 @@ export const useExpansionEngine = ({
                 data: result.data,
               })),
             );
-          });
-          batches.forEach(batch => {
+          }
+          for (const batch of batches) {
             fetchPromises.push(
               fetchBatchForGroup({
                 batch,
@@ -1099,11 +1170,12 @@ export const useExpansionEngine = ({
                 data: result.data,
               })),
             );
-          });
+          }
           // eslint-disable-next-line no-await-in-loop
+          const fetchedResults = await Promise.all(fetchPromises);
           const results: CombinedFetchResult[] = [
             ...cachedResults,
-            ...(await Promise.all(fetchPromises)),
+            ...fetchedResults,
           ];
           if (
             dataEpochRef.current !== requestEpoch ||
@@ -1461,6 +1533,14 @@ export const useExpansionEngine = ({
             pendingKeys: new Set(),
           };
         }
+        ({ rowPlan: effectiveRowPlan, colPlan: effectiveColPlan } =
+          applyCrossAxisRootFetch({
+            tree: stagedTree,
+            rowPlan: effectiveRowPlan,
+            colPlan: effectiveColPlan,
+            visibleRowDepth,
+            visibleColDepth,
+          }));
 
         if (
           effectiveRowPlan.pendingKeys.size === 0 &&
@@ -1574,7 +1654,7 @@ export const useExpansionEngine = ({
         const fetchContext = { stagedTree, visibleRowDepth, visibleColDepth };
         const cachedResults: SingleFetchResult[] = [];
         const batchCandidates: BatchCandidate[] = [];
-        targets.forEach(target => {
+        for (const target of targets) {
           const path = parsePath(target.pathKey);
           const cached = peekPivotBranchCache({
             axis: target.axis,
@@ -1587,7 +1667,7 @@ export const useExpansionEngine = ({
           });
           if (cached) {
             cachedResults.push({ kind: 'single', target, data: cached });
-            return;
+            continue;
           }
           const batchSignature = buildBatchSignature({
             formData: fetchFormData,
@@ -1599,12 +1679,12 @@ export const useExpansionEngine = ({
             visibleColDepth,
           });
           batchCandidates.push({ ...target, batchSignature });
-        });
+        }
         const { batches, singles } = optimizeFetchPlan({
           targets: batchCandidates,
         });
         const fetchPromises: Array<Promise<CombinedFetchResult>> = [];
-        singles.forEach(target => {
+        for (const target of singles) {
           fetchPromises.push(
             fetchSingleTarget(target, fetchContext).then(result => ({
               kind: 'single',
@@ -1612,8 +1692,8 @@ export const useExpansionEngine = ({
               data: result.data,
             })),
           );
-        });
-        batches.forEach(batch => {
+        }
+        for (const batch of batches) {
           fetchPromises.push(
             fetchBatchTarget(batch, fetchContext).then(result => ({
               kind: 'batch',
@@ -1621,11 +1701,12 @@ export const useExpansionEngine = ({
               data: result.data,
             })),
           );
-        });
+        }
         // eslint-disable-next-line no-await-in-loop
+        const fetchedResults = await Promise.all(fetchPromises);
         const results: CombinedFetchResult[] = [
           ...cachedResults,
-          ...(await Promise.all(fetchPromises)),
+          ...fetchedResults,
         ];
 
         if (transactionIdRef.current !== transactionId) {
@@ -1651,7 +1732,7 @@ export const useExpansionEngine = ({
             continue;
           }
           const { batch, data } = result;
-          batch.targets.forEach(target => {
+          for (const target of batch.targets) {
             const fetchedKeysRef =
               target.axis === 'row' ? fetchedRowKeysRef : fetchedColKeysRef;
             const groupKey = JSON.stringify([target.axis, target.pathKey]);
@@ -1660,11 +1741,11 @@ export const useExpansionEngine = ({
               fetchedKeysRef.current.set(key, target.requiredOppositeDepth);
             });
             if (!data) {
-              return;
+              continue;
             }
             const deltaKey = JSON.stringify([target.axis, target.pathKey]);
             stagingState = stageDelta(stagingState, deltaKey, data);
-          });
+          }
         }
 
         const updatedTree = buildStagedTree(stagingState);
@@ -1707,6 +1788,7 @@ export const useExpansionEngine = ({
       finalizeHydration();
     },
     [
+      applyCrossAxisRootFetch,
       buildHasLoadedChildrenForIteration,
       computeVisibleDepths,
       collectInFlightExpanded,
@@ -1749,8 +1831,7 @@ export const useExpansionEngine = ({
       const oppositeVisibleDepth =
         axis === 'row' ? visibleColDepth : visibleRowDepth;
       const isAtomic =
-        oppositeVisibleDepth > 0 &&
-        (otherPending.size > 0 || otherInFlight);
+        oppositeVisibleDepth > 0 && (otherPending.size > 0 || otherInFlight);
 
       if (isAtomic) {
         const nextPending = new Set(pending);
@@ -2052,6 +2133,16 @@ export const useExpansionEngine = ({
       resolvedCols,
       data,
     );
+    const hasRowExpansionRequests =
+      effectiveExpandRowsLevel > 0 ||
+      prunedManualRows.length > 0 ||
+      prunedCollapsedRows.length > 0;
+    const hasColExpansionRequests =
+      effectiveExpandColsLevel > 0 ||
+      prunedManualCols.length > 0 ||
+      prunedCollapsedCols.length > 0;
+    const shouldPlanRows = hasRowExpansionRequests;
+    const shouldPlanCols = hasColExpansionRequests;
     const seedFetchedDepths = (
       axis: PivotAxis,
       expandedKeys: Set<string>,
@@ -2081,36 +2172,56 @@ export const useExpansionEngine = ({
     };
     seedFetchedDepths('row', resolvedRows, visibleColDepth);
     seedFetchedDepths('col', resolvedCols, visibleRowDepth);
-    const rowPlan = planExpansionForAxis({
-      axis: 'row',
-      expandedKeys: resolvedRows,
-      nodes: data.rows,
-      requiredDepth: visibleColDepth,
-      fetchedDepthByKey: fetchedRowKeysRef.current,
-      hasLoadedChildren: (axis, node) =>
-        hasLoadedChildrenForTree(
-          data,
-          axis,
-          node,
-          visibleRowDepth,
-          visibleColDepth,
-        ),
-    });
-    const colPlan = planExpansionForAxis({
-      axis: 'col',
-      expandedKeys: resolvedCols,
-      nodes: data.cols,
-      requiredDepth: visibleRowDepth,
-      fetchedDepthByKey: fetchedColKeysRef.current,
-      hasLoadedChildren: (axis, node) =>
-        hasLoadedChildrenForTree(
-          data,
-          axis,
-          node,
-          visibleRowDepth,
-          visibleColDepth,
-        ),
-    });
+    const rowPlan = shouldPlanRows
+      ? planExpansionForAxis({
+          axis: 'row',
+          expandedKeys: resolvedRows,
+          nodes: data.rows,
+          requiredDepth: visibleColDepth,
+          fetchedDepthByKey: fetchedRowKeysRef.current,
+          hasLoadedChildren: (axis, node) =>
+            hasLoadedChildrenForTree(
+              data,
+              axis,
+              node,
+              visibleRowDepth,
+              visibleColDepth,
+            ),
+        })
+      : {
+          fetchKeys: new Set(),
+          pendingKeys: new Set(),
+          hasMissingNodes: false,
+        };
+    const colPlan = shouldPlanCols
+      ? planExpansionForAxis({
+          axis: 'col',
+          expandedKeys: resolvedCols,
+          nodes: data.cols,
+          requiredDepth: visibleRowDepth,
+          fetchedDepthByKey: fetchedColKeysRef.current,
+          hasLoadedChildren: (axis, node) =>
+            hasLoadedChildrenForTree(
+              data,
+              axis,
+              node,
+              visibleRowDepth,
+              visibleColDepth,
+            ),
+        })
+      : {
+          fetchKeys: new Set(),
+          pendingKeys: new Set(),
+          hasMissingNodes: false,
+        };
+    const { rowPlan: nextRowPlan, colPlan: nextColPlan } =
+      applyCrossAxisRootFetch({
+        tree: data,
+        rowPlan,
+        colPlan,
+        visibleRowDepth,
+        visibleColDepth,
+      });
     const isRootOnly =
       resolvedRows.size === 1 &&
       resolvedRows.has(rootKey) &&
@@ -2123,12 +2234,18 @@ export const useExpansionEngine = ({
       prunedCollapsedCols.length > 0;
     const hasAutoExpansions =
       effectiveExpandRowsLevel > 0 || effectiveExpandColsLevel > 0;
+    const hasRowNodes = Object.keys(data.rows).some(key => key !== rootKey);
+    const hasColNodes = Object.keys(data.cols).some(key => key !== rootKey);
     const shouldSkipRootPrefetch =
-      isRootOnly && !hasManualExpansions && !hasAutoExpansions;
+      isRootOnly &&
+      !hasManualExpansions &&
+      !hasAutoExpansions &&
+      !hasRowNodes &&
+      !hasColNodes;
     const shouldShowPrefetchLoader =
-      hasNestedPendingKeys(rowPlan.pendingKeys) ||
-      hasNestedPendingKeys(colPlan.pendingKeys);
-    if (rowPlan.pendingKeys.size + colPlan.pendingKeys.size > 0) {
+      hasNestedPendingKeys(nextRowPlan.pendingKeys) ||
+      hasNestedPendingKeys(nextColPlan.pendingKeys);
+    if (nextRowPlan.pendingKeys.size + nextColPlan.pendingKeys.size > 0) {
       if (shouldSkipRootPrefetch) {
         setIsHydrating(false);
         return;
@@ -2161,6 +2278,7 @@ export const useExpansionEngine = ({
     resolvedExpandRowsLevel,
     shouldExpandMetricCols,
     shouldExpandMetricRows,
+    applyCrossAxisRootFetch,
     hydrateAtomic,
     resolveExpandedForMetrics,
     reportAsyncError,

@@ -56,7 +56,8 @@ type BatchGroupSeed = {
   nullTargets: CandidateWithPath[];
 };
 
-const isNullish = (value: PivotPathValue) => value === null || value === undefined;
+const isNullish = (value: PivotPathValue) =>
+  value === null || value === undefined;
 
 const chunkTargets = (
   targets: CandidateWithPath[],
@@ -142,11 +143,7 @@ export const optimizeFetchPlan = ({
       seed.nonNullTargets,
       maxBatchSize,
     );
-    const nullBatches = buildBatchGroups(
-      seed,
-      seed.nullTargets,
-      maxBatchSize,
-    );
+    const nullBatches = buildBatchGroups(seed, seed.nullTargets, maxBatchSize);
     [...nonNullBatches, ...nullBatches].forEach(group => {
       if (group.targets.length <= 1) {
         singles.push(...group.targets);

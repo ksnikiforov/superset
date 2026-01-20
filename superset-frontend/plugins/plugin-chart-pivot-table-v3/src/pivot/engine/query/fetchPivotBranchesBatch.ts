@@ -31,7 +31,7 @@ import {
   buildBranchTreeFromResults,
   resolveFetchContextForBatch,
 } from '../../../fetchPivotBranch';
-import { formatQueryName } from '../../../buildQuery';
+import { formatQueryName } from './queryName';
 import {
   PivotAxis,
   PivotPath,
@@ -56,7 +56,8 @@ export type FetchPivotBranchesBatchResult = {
   error?: Error;
 };
 
-const isNullish = (value: PivotPathValue) => value === null || value === undefined;
+const isNullish = (value: PivotPathValue) =>
+  value === null || value === undefined;
 
 const buildPrefixFilters = (
   groupby: QueryFormColumn[],

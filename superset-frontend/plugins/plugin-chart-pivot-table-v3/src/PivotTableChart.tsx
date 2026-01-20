@@ -963,10 +963,8 @@ function PivotTableChart(props: PivotTableProps) {
     }
     return metricInsertIndexOnCols;
   }, [data.cols, findMetricIndex, metricInsertIndexOnCols]);
-  const metricIntentIndexOnRows =
-    metricInsertIndexOnRows ?? metricIndexOnRows;
-  const metricIntentIndexOnCols =
-    metricInsertIndexOnCols ?? metricIndexOnCols;
+  const metricIntentIndexOnRows = metricInsertIndexOnRows ?? metricIndexOnRows;
+  const metricIntentIndexOnCols = metricInsertIndexOnCols ?? metricIndexOnCols;
   const metricDimIndexOnRows = useMemo(() => {
     if (resolvedMetricsLayout !== MetricsLayoutEnum.ROWS) {
       return undefined;

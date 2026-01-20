@@ -171,7 +171,9 @@ export const planExpansionForAxis = ({
         ? metricPrefixesByToken.get(metricToken)
         : undefined;
       if (
-        prefixes?.some(prefix => isPrefix(prefix, missingPath.slice(0, metricIndex)))
+        prefixes?.some(prefix =>
+          isPrefix(prefix, missingPath.slice(0, metricIndex)),
+        )
       ) {
         return;
       }

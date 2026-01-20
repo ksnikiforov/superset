@@ -18,7 +18,6 @@
  */
 import {
   AdhocColumn,
-  BinaryQueryObjectFilterClause,
   buildQueryContext,
   ensureIsArray,
   getColumnLabel,
@@ -28,9 +27,8 @@ import {
   QueryObject,
   QueryObjectFilterClause,
   SupersetClient,
-  UnaryQueryObjectFilterClause,
 } from '@superset-ui/core';
-import { formatQueryName } from './buildQuery';
+import { formatQueryName } from './pivot/engine/query/queryName';
 import {
   MetricsLayoutEnum,
   PivotAxis,
@@ -59,6 +57,7 @@ import {
   SUBTOTAL_TOKEN,
 } from './utils';
 import { buildQueryShape } from './pivot/engine/query/queryShape';
+import { buildPathFilters } from './pivot/engine/query/pathFilters';
 import { type QueryIntent } from './pivot/engine/query/queryIntent';
 
 export interface FetchPivotBranchResult {
@@ -75,6 +74,8 @@ export interface FetchPivotBranchParams {
   currentTree?: PivotTreeData;
   visibleRowDepth?: number;
   visibleColDepth?: number;
+  targetRowDepth?: number;
+  targetColDepth?: number;
 }
 
 const cache = new Map<string, PivotTreeData>();
@@ -174,24 +175,6 @@ const buildCacheKey = (
 export const peekPivotBranchCacheByKey = (key: string) => readCache(key);
 export const clearPivotBranchCache = () => cache.clear();
 
-const buildPathFilters = (
-  groupby: QueryFormColumn[],
-  path: PivotPath,
-): QueryObjectFilterClause[] =>
-  path.map((value, index) => {
-    if (value === null || value === undefined) {
-      return {
-        col: getColumnLabel(groupby[index]),
-        op: 'IS NULL',
-      } as UnaryQueryObjectFilterClause;
-    }
-    return {
-      col: getColumnLabel(groupby[index]),
-      op: '==',
-      val: value,
-    } as BinaryQueryObjectFilterClause;
-  });
-
 export interface ResolvedFetchContext {
   rowGroupbyRaw: QueryFormColumn[];
   colGroupbyRaw: QueryFormColumn[];
@@ -226,6 +209,8 @@ const resolveFetchContext = ({
   currentTree,
   visibleRowDepth,
   visibleColDepth,
+  targetRowDepth,
+  targetColDepth,
 }: FetchPivotBranchParams): ResolvedFetchContext => {
   const rowGroupbyRaw = ensureIsArray<QueryFormColumn>(formData.groupbyRows);
   const colGroupbyRaw = ensureIsArray<QueryFormColumn>(formData.groupbyColumns);
@@ -371,14 +356,20 @@ const resolveFetchContext = ({
       ? Math.min(visibleColDepth, colGroupby.length)
       : getCurrentDepth(currentTree?.cols, 'col');
 
-  const rowDepth =
+  let rowDepth =
     axis === 'row'
       ? Math.min(rowGroupby.length, sanitizedPath.length + depthIncrement)
       : Math.min(rowGroupby.length, currentRowDepth);
-  const colDepth =
+  let colDepth =
     axis === 'col'
       ? Math.min(colGroupby.length, sanitizedPath.length + depthIncrement)
       : Math.min(colGroupby.length, currentColDepth);
+  if (targetRowDepth !== undefined) {
+    rowDepth = Math.min(rowGroupby.length, Math.max(targetRowDepth, 0));
+  }
+  if (targetColDepth !== undefined) {
+    colDepth = Math.min(colGroupby.length, Math.max(targetColDepth, 0));
+  }
 
   const filterKey = buildFilterKey(formData);
   const rowGroupbyForQueryFull = rowGroupby.map(col =>
@@ -631,11 +622,7 @@ export const buildBranchQueryPairs = ({
       addDepthPair(rowDepthVal, colDepthVal),
     );
   });
-  const queryPairs = filterDepthPairsForAxis(
-    depthPairs,
-    axis,
-    pathLength,
-  );
+  const queryPairs = filterDepthPairsForAxis(depthPairs, axis, pathLength);
   const hasTotalRow = formData.colTotals || rowSubtotalLevels.includes(0);
   const hasTotalColumn = formData.rowTotals || colSubtotalLevels.includes(0);
   const shouldIncludeGrandTotalPair =

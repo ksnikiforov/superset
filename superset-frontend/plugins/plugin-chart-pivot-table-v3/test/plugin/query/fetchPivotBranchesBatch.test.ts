@@ -117,7 +117,7 @@ describe('fetchPivotBranchesBatch', () => {
     });
 
     const payload = mockPost.mock.calls[0][0].jsonPayload;
-    const filters = payload.queries[0].filters;
+    const { filters } = payload.queries[0];
     expect(filters).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ col: 'country', op: '==', val: 'US' }),
@@ -171,7 +171,7 @@ describe('fetchPivotBranchesBatch', () => {
     });
 
     const payload = mockPost.mock.calls[0][0].jsonPayload;
-    const filters = payload.queries[0].filters;
+    const { filters } = payload.queries[0];
     expect(filters).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ col: 'country', op: '==', val: 'US' }),

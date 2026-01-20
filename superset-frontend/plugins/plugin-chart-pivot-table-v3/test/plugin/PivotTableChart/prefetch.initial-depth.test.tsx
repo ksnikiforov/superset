@@ -1,0 +1,132 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+
+import { render, waitFor, within } from '../../testUtils';
+import PivotTableChart from '../fixtures/TestPivotTableChart';
+import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
+import {
+  applyMetricAxis,
+  buildTreeFromRecords,
+  mergeTrees,
+} from '../../../src/utils';
+import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
+import { buildFormData } from '../fixtures/pivotFormData';
+
+jest.mock('../../../src/fetchPivotBranch', () => {
+  const actual = jest.requireActual('../../../src/fetchPivotBranch');
+  return {
+    ...actual,
+    fetchPivotBranch: jest.fn(),
+  };
+});
+
+const rowGroupby = ['r1'];
+const colGroupby = ['c1'];
+const metrics = ['m1'];
+
+const buildTree = (
+  records: Array<{ r1: string; c1: string; m1: number }>,
+  rowDepth: number,
+  colDepth: number,
+): PivotTreeData => {
+  const raw = buildTreeFromRecords(
+    records,
+    metrics,
+    rowGroupby,
+    colGroupby,
+    rowDepth,
+    colDepth,
+  );
+  return applyMetricAxis(
+    raw,
+    metrics,
+    MetricsLayoutEnum.COLUMNS,
+    rowGroupby,
+    colGroupby,
+    1,
+  );
+};
+
+describe('PivotTableChart initial depth prefetch', () => {
+  const fetchPivotBranchMock = fetchPivotBranch as jest.MockedFunction<
+    typeof fetchPivotBranch
+  >;
+
+  beforeEach(() => {
+    fetchPivotBranchMock.mockReset();
+  });
+
+  it('prefetches cross-axis intersections when bootstrap lacks cells', async () => {
+    const totalsTree = buildTree([{ r1: 'A', c1: 'B', m1: 30 }], 0, 0);
+    const rowTree = buildTree([{ r1: 'A', c1: 'B', m1: 10 }], 1, 0);
+    const colTree = buildTree([{ r1: 'A', c1: 'B', m1: 20 }], 0, 1);
+    const baseTree = mergeTrees(mergeTrees(totalsTree, rowTree), colTree);
+    const branchTree = buildTree([{ r1: 'A', c1: 'B', m1: 100 }], 1, 1);
+    fetchPivotBranchMock.mockResolvedValue({ data: branchTree });
+
+    const { container } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={buildFormData({
+          groupbyRows: rowGroupby,
+          groupbyColumns: colGroupby,
+          metrics,
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+          startCollapsed: true,
+          initialDepth: 1,
+          colTotals: false,
+          rowTotals: false,
+          rowSubTotals: false,
+        })}
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={colGroupby}
+        aggregateFunction="Sum"
+        width={600}
+        height={300}
+        startCollapsed
+        initialDepth={1}
+        colTotals={false}
+        rowTotals={false}
+        rowSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    await waitFor(() => expect(fetchPivotBranchMock).toHaveBeenCalled());
+
+    const table = container.querySelector('table');
+    expect(table).not.toBeNull();
+    const tableScope = within(table as HTMLTableElement);
+    await waitFor(() => expect(tableScope.getByText('A')).toBeInTheDocument());
+    expect(tableScope.getByText('B')).toBeInTheDocument();
+    expect(tableScope.getByText('100')).toBeInTheDocument();
+  });
+});

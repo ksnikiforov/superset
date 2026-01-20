@@ -114,22 +114,26 @@ describe('PivotTableChart persisted prefetch ignores stale results', () => {
     visibleColDepth,
     getFetchPath,
   }: FetchPivotBranchesBatchParams): Promise<FetchPivotBranchesBatchResult> => {
-    let merged: PivotTreeData | undefined;
-    for (const target of batch.targets) {
-      const path = parsePath(target.pathKey);
-      const result = await Promise.resolve(
-        fetchPivotBranchMock({
-          formData,
-          axis: batch.axis,
-          path: getFetchPath(path),
-          metricPath: path,
-          currentTree,
-          visibleRowDepth,
-          visibleColDepth,
-        }),
-      );
-      merged = mergeTrees(merged, result.data);
-    }
+    const results = await Promise.all(
+      batch.targets.map(target => {
+        const path = parsePath(target.pathKey);
+        return Promise.resolve(
+          fetchPivotBranchMock({
+            formData,
+            axis: batch.axis,
+            path: getFetchPath(path),
+            metricPath: path,
+            currentTree,
+            visibleRowDepth,
+            visibleColDepth,
+          }),
+        );
+      }),
+    );
+    const merged = results.reduce<PivotTreeData | undefined>(
+      (acc, result) => mergeTrees(acc, result.data),
+      undefined,
+    );
     return { data: merged };
   };
 
@@ -240,9 +244,7 @@ describe('PivotTableChart persisted prefetch ignores stale results', () => {
         throw new Error('Pivot table not found');
       }
       expect(within(updatedTable).getByText('Q')).toBeInTheDocument();
-      expect(
-        within(updatedTable).queryByText('X'),
-      ).not.toBeInTheDocument();
+      expect(within(updatedTable).queryByText('X')).not.toBeInTheDocument();
     });
   });
 });

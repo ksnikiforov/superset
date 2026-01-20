@@ -23,7 +23,6 @@ import {
   GenericDataType,
   getTimeFormatter,
   getTimeFormatterForGranularity,
-  getColumnLabel,
   SMART_DATE_ID,
   TimeFormats,
   ensureIsArray,
@@ -36,24 +35,20 @@ import {
   TotalPosition,
 } from './types';
 import {
-  buildTreeFromRecords,
   getMetricKeys,
   getStableColumnKey,
-  normalizeDimensionFormattingMapWithKeys,
+  mergeMetrics,
+  mergeTrees,
   normalizeDimensionSortingMapWithKeys,
   normalizeMetricFormattingMapWithKeys,
   normalizeMetricDatabarMapWithKeys,
-  parseDepth,
-  resolveExpandLevel,
   resolveMetricPlacement,
   stripMetricsPlaceholder,
   normalizeSubtotalLevels,
   serializePath,
 } from './utils';
+import { buildInitialQueryPlan } from './pivot/engine/initialQueryPlan';
 import { buildBranchTreeFromResults } from './fetchPivotBranch';
-import { QUERY_NAME_PREFIX, resolveQueryPairs } from './buildQuery';
-import { buildQueryShape } from './pivot/engine/query/queryShape';
-import { type QueryIntent } from './pivot/engine/query/queryIntent';
 
 const { DATABASE_DATETIME } = TimeFormats;
 
@@ -95,14 +90,6 @@ export default function transformProps(
   });
   const groupbyRows = stripMetricsPlaceholder(placement.rows);
   const groupbyColumns = stripMetricsPlaceholder(placement.cols);
-  const rowFormatting = normalizeDimensionFormattingMapWithKeys(
-    formData.rowFormatting,
-    groupbyRows,
-  );
-  const colFormatting = normalizeDimensionFormattingMapWithKeys(
-    formData.colFormatting,
-    groupbyColumns,
-  );
   const rowSorting = normalizeDimensionSortingMapWithKeys(
     formData.rowSorting,
     groupbyRows,
@@ -129,61 +116,11 @@ export default function transformProps(
     false,
     false,
   ).filter(level => level > 0);
-  const resolvedStartCollapsed = formData.startCollapsed ?? true;
-  const resolvedInitialDepth = formData.initialDepth ?? 1;
-  const resolvedExpandRowsLevel = resolveExpandLevel(
-    formData.expandRowsLevel,
-    groupbyRows.length,
-    resolvedStartCollapsed,
-    resolvedInitialDepth,
-  );
-  const resolvedExpandColumnsLevel = resolveExpandLevel(
-    formData.expandColumnsLevel,
-    groupbyColumns.length,
-    resolvedStartCollapsed,
-    resolvedInitialDepth,
-  );
-  const baseRowDepth = groupbyRows.length > 0 ? 1 : 0;
-  const baseColDepth = groupbyColumns.length > 0 ? 1 : 0;
-  const targetRowDepth = Math.min(
-    Math.max(resolvedExpandRowsLevel, baseRowDepth),
-    groupbyRows.length,
-  );
-  const targetColDepth = Math.min(
-    Math.max(resolvedExpandColumnsLevel, baseColDepth),
-    groupbyColumns.length,
-  );
-  const needsTotals =
-    !!formData.rowTotals ||
-    !!formData.colTotals ||
-    rowSubtotalLevels.length > 0 ||
-    colSubtotalLevels.length > 0;
-  const intent: QueryIntent = {
-    kind: 'wholeLevel',
-    targetRowDepth: groupbyRows.length,
-    targetColDepth: groupbyColumns.length,
-    needsValueCells: true,
-    needsTotals,
-    needsMetricFormatting: Object.keys(metricFormatting || {}).length > 0,
-    needsDatabars: Object.keys(metricDatabars || {}).length > 0,
-    needsRowOrdering: Object.keys(rowSorting || {}).length > 0,
-    needsColOrdering: Object.keys(colSorting || {}).length > 0,
-    needsRowDimensionFormatting: Object.keys(rowFormatting || {}).length > 0,
-    needsColDimensionFormatting: Object.keys(colFormatting || {}).length > 0,
-  };
-  const { metrics: metricsForQueryWithFormatting } = buildQueryShape({
-    intent,
-    rowGroupby: groupbyRows,
-    colGroupby: groupbyColumns,
+  const initialPlan = buildInitialQueryPlan(formData);
+  const planMetrics = initialPlan.targets.reduce(
+    (acc, target) => mergeMetrics(acc, target.metricsForQuery),
     metrics,
-    metricFormattingScope: formData.metricFormattingScope,
-    metricFormatting,
-    metricDatabars,
-    rowFormatting,
-    colFormatting,
-    rowSorting,
-    colSorting,
-  });
+  );
   const rowTotalPosition =
     (formData.rowTotalPosition as TotalPosition) || 'start';
   const rowSubtotalPosition =
@@ -204,7 +141,7 @@ export default function transformProps(
         ? Math.min(placement.metricPosition, groupbyColumns.length)
         : groupbyColumns.length;
   const granularity = extractTimegrain(rawFormData);
-  const metricKeysForQuery = getMetricKeys(metricsForQueryWithFormatting);
+  const metricKeysForQuery = getMetricKeys(planMetrics);
   const queryFormData: PivotTableQueryFormData = {
     ...rawFormData,
     metricsLayout,
@@ -284,61 +221,38 @@ export default function transformProps(
     colSubtotalLevels,
   });
   const rootKey = serializePath([]);
-  const fallbackQueryPairs = resolveQueryPairs({
-    groupbyRows,
-    groupbyColumns,
-    rowSubtotalLevels,
-    colSubtotalLevels,
-    targetRowDepth,
-    targetColDepth,
-    rowTotals: formData.rowTotals,
-    colTotals: formData.colTotals,
-  });
-  const queryPairs = queriesData.map((query, idx) => {
-    const queryName = query?.query_name;
-    const hasQueryName =
-      typeof queryName === 'string' &&
-      queryName.startsWith(QUERY_NAME_PREFIX);
-    if (hasQueryName) {
-      return parseDepth(queryName);
-    }
-    return fallbackQueryPairs[idx] || parseDepth(queryName);
-  });
-  const results = queriesData.map(query => ({
-    data: query?.data as Record<string, unknown>[] | undefined,
-  }));
-  const nextTreeLabeled: PivotTreeData =
-    results.length > 0
-      ? buildBranchTreeFromResults({
-          results,
-          queryPairs,
-          metricsForQuery: metricsForQueryWithFormatting,
-          formData,
-          rowGroupby: groupbyRows,
-          colGroupby: groupbyColumns,
-          rowSubtotalLevels,
-          colSubtotalLevels,
-          metricsLayoutResolved: metricsLayout,
-          metricInsertIndex,
-        })
-      : buildTreeFromRecords(
-          [],
-          metricsForQueryWithFormatting,
-          groupbyRows,
-          groupbyColumns,
-          0,
-          0,
-        );
-  if (nextTreeLabeled.rows[rootKey]) {
-    nextTreeLabeled.rows[rootKey] = {
-      ...nextTreeLabeled.rows[rootKey],
+  const emptyTree: PivotTreeData = { rows: {}, cols: {}, cells: {} };
+  let queryIndex = 0;
+  const nextTreeWithLabels = initialPlan.targets.reduce((acc, target) => {
+    const slice = queriesData.slice(
+      queryIndex,
+      queryIndex + target.queryPairs.length,
+    );
+    queryIndex += target.queryPairs.length;
+    const nextTree = buildBranchTreeFromResults({
+      results: slice,
+      queryPairs: target.queryPairs,
+      metricsForQuery: target.metricsForQuery,
+      formData,
+      rowGroupby: target.rowGroupbyForQueryFull,
+      colGroupby: target.colGroupbyForQueryFull,
+      rowSubtotalLevels: target.rowSubtotalLevels,
+      colSubtotalLevels: target.colSubtotalLevels,
+      metricsLayoutResolved: target.metricsLayoutResolved,
+      metricInsertIndex: target.metricInsertIndex,
+    });
+    return mergeTrees(acc, nextTree);
+  }, emptyTree);
+  if (nextTreeWithLabels.rows[rootKey]) {
+    nextTreeWithLabels.rows[rootKey] = {
+      ...nextTreeWithLabels.rows[rootKey],
       label: 'Grand total',
       formattedLabel: 'Grand total',
     };
   }
-  if (nextTreeLabeled.cols[rootKey]) {
-    nextTreeLabeled.cols[rootKey] = {
-      ...nextTreeLabeled.cols[rootKey],
+  if (nextTreeWithLabels.cols[rootKey]) {
+    nextTreeWithLabels.cols[rootKey] = {
+      ...nextTreeWithLabels.cols[rootKey],
       label: 'Grand total',
       formattedLabel: 'Grand total',
     };
@@ -350,7 +264,7 @@ export default function transformProps(
     width,
     height,
     margin: (formData as any).margin ?? 0,
-    data: nextTreeLabeled,
+    data: nextTreeWithLabels,
     formData: {
       ...formData,
       metricsLayout,
@@ -391,7 +305,7 @@ export default function transformProps(
     dateFormatters,
     onContextMenu,
     timeGrainSqla: formData.time_grain_sqla,
-    treeData: nextTreeLabeled,
+    treeData: nextTreeWithLabels,
     colTypeMap,
     rowTotalPosition,
     rowSubtotalPosition,

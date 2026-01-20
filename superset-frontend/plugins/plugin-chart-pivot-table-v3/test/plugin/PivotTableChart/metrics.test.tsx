@@ -637,6 +637,9 @@ describe('PivotTableChart metric tier suppression', () => {
         />,
       );
 
+      // eslint-disable-next-line no-await-in-loop
+      // eslint-disable-next-line no-await-in-loop
+      // eslint-disable-next-line no-await-in-loop
       await waitForPivotReady();
       const cell = screen.getByText('10').closest('td');
       expect(cell).toBeTruthy();
@@ -1642,6 +1645,7 @@ describe('PivotTableChart multi-metric visibility', () => {
         />,
       );
 
+      // eslint-disable-next-line no-await-in-loop
       await waitForPivotReady();
       const rowHeaders = Array.from(
         container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
@@ -1742,6 +1746,7 @@ describe('PivotTableChart multi-metric visibility', () => {
         />,
       );
 
+      // eslint-disable-next-line no-await-in-loop
       await waitForPivotReady();
       const headerLabels = Array.from(
         container.querySelectorAll('thead th') as NodeListOf<HTMLElement>,

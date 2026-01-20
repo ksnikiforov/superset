@@ -110,5 +110,4 @@ describe('PivotTableChart expand without global loader for same-axis actions', (
     expect(container.querySelector('table')).toBeInTheDocument();
     expect(await findByText('REV-A')).toBeInTheDocument();
   });
-
 });

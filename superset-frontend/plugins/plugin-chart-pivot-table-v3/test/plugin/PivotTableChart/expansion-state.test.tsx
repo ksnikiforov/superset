@@ -78,22 +78,26 @@ describe('PivotTableChart expansion state persistence', () => {
     visibleColDepth,
     getFetchPath,
   }: FetchPivotBranchesBatchParams): Promise<FetchPivotBranchesBatchResult> => {
-    let merged: PivotTreeData | undefined;
-    for (const target of batch.targets) {
-      const path = parsePath(target.pathKey);
-      const result = await Promise.resolve(
-        fetchPivotBranchMock({
-          formData,
-          axis: batch.axis,
-          path: getFetchPath(path),
-          metricPath: path,
-          currentTree,
-          visibleRowDepth,
-          visibleColDepth,
-        }),
-      );
-      merged = mergeTrees(merged, result.data);
-    }
+    const results = await Promise.all(
+      batch.targets.map(target => {
+        const path = parsePath(target.pathKey);
+        return Promise.resolve(
+          fetchPivotBranchMock({
+            formData,
+            axis: batch.axis,
+            path: getFetchPath(path),
+            metricPath: path,
+            currentTree,
+            visibleRowDepth,
+            visibleColDepth,
+          }),
+        );
+      }),
+    );
+    const merged = results.reduce<PivotTreeData | undefined>(
+      (acc, result) => mergeTrees(acc, result.data),
+      undefined,
+    );
     return { data: merged };
   };
 
@@ -1949,7 +1953,9 @@ describe('PivotTableChart expansion state persistence', () => {
     const colPaths = fetchPivotBranchMock.mock.calls
       .filter(([args]) => args.axis === 'col')
       .map(call => JSON.stringify(call[0].path));
-    expect(rowPaths).toEqual(expect.arrayContaining([JSON.stringify(['A', 'X'])]));
+    expect(rowPaths).toEqual(
+      expect.arrayContaining([JSON.stringify(['A', 'X'])]),
+    );
     expect(colPaths).toEqual(
       expect.arrayContaining([JSON.stringify(['C']), JSON.stringify(['D'])]),
     );

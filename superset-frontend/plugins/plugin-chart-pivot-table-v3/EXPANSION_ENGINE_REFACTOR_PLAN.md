@@ -38,12 +38,14 @@ These decisions are locked for this refactor:
 - Swap `rowTotals`/`colTotals` naming to match pivot terminology (§5.12).
 - Replace legacy `formData.expansionState` with a dedicated hidden control
   (`pivotExpansionState`) for Explore-only Save/Update persistence (§2.4).
+- No legacy compatibility for expansion persistence: ignore legacy shapes/fields; invalid persisted state is dropped without migration.
 - Keep persistence plugin-only: no Superset core changes; use `setControlValue`
   with a hidden control instead of changing global persistence behavior.
 - Use query intent + minimization over unconditional “formatting metrics everywhere” (§5.10).
 - Do not rely on `query_name` being returned by the server; when missing, map
   query results to a deterministic query-pair order derived from form data
   (shared between `buildQuery.ts` and `transformProps.ts`).
+- Global loader policy is narrow: only full-table transactions (initial load, filter/datasource/layout changes, explicit rebuild) use the blocking overlay; user expand/collapse uses per-toggle loaders only (cross-axis remains atomic but non-blocking).
 
 ## 1) Current code map (starting point)
 
@@ -211,7 +213,8 @@ Remove:
 - `src/PivotTableChart.tsx:3289` (`displayedRows` / `displayedCols` filtering)
 
 Replacement:
-- atomic reveal via engine: keep rendering the last committed `RenderModel` and show a blocking overlay until satisfied.
+- atomic reveal via engine: keep rendering the last committed `RenderModel`.
+- Use the blocking overlay only for full-table transactions; expansions (including cross-axis) show per-toggle loaders and remain non-blocking.
 
 Tests required:
 - RTL: “no collapse flicker” and “no blanks” enforced under out-of-order responses.
@@ -349,6 +352,7 @@ Decision:
 - Plugin-only: do not change Superset core persistence; avoid `setDataMask` for
   expansion persistence in all contexts.
 - `buildQuery.ts` must ignore all expansion persistence fields (no depth bumping).
+- No legacy compatibility: ignore `formData.expansionState`; drop invalid or legacy-shaped `pivotExpansionState` without migration.
 
 Rationale:
 - Explore Save/Update serializes `formData` only; `ownState` is not persisted.
@@ -435,7 +439,7 @@ Simplification goal:
 
 Decision:
 - The initial load is an engine-driven transaction. We delete the “initial multi-query matrix → transformProps merge” pipeline as a primary data path.
-- `buildQuery.ts` becomes a minimal bootstrap query (single query) and does not attempt to prefetch the table shape.
+- `buildQuery.ts` becomes a minimal bootstrap query set (totals + top-level row/col keys only) and does not attempt to prefetch the table shape.
 - The engine then fetches the real table state via the coordinator, using the same query builder used for expansions.
 
 Concrete current references to delete/simplify:
@@ -447,7 +451,7 @@ Concrete current references to delete/simplify:
   - merging slices into a single tree: `src/transformProps.ts:300`
 
 Tests required:
-- RTL: first-load (dashboard + Explore) shows global loader and reveals once (atomic).
+- RTL: first-load (dashboard + Explore) uses the global overlay and reveals once (atomic full-table transaction).
 - RTL: totals/subtotals correctness is preserved on first load (engine fetch path), without relying on `buildQuery.ts` multi-query matrix.
 
 #### Delete “persist auto-expand zero back into form data” hacks
@@ -516,7 +520,7 @@ Current entry points (for reference):
   - `src/pivot/usePivotHydration.ts:83` (hydration `useEffect`)
 
 Required behavior:
-- global loader stays up until satisfied (Requirement #3),
+- full-table transactions (initial load / full reload) keep the global overlay up until satisfied (Requirement #3),
 - fetch is parallel; responses can arrive in any order,
 - reveal happens only when all persisted targets satisfied.
 
@@ -657,15 +661,17 @@ Current anti-pattern to delete (for clarity):
 - Hiding nodes during cross-axis pending by filtering the rendered lists:
   - `src/PivotTableChart.tsx:3244` (`shouldGateCrossAxisReveal`)
   - `src/PivotTableChart.tsx:3289` (`displayedRows`/`displayedCols`)
-This causes visible “collapse → expand” flicker and must be replaced by atomic reveal (keep old committed render + overlay).
+This causes visible “collapse → expand” flicker and must be replaced by atomic reveal (keep old committed render; overlay only for full-table transactions).
 
 Policies required:
-- Persisted restore: global loader + atomic reveal when satisfied.
+- Full-table transactions (initial load / filter-datasource-layout changes / explicit rebuild): global overlay + atomic reveal when satisfied.
 - Manual:
   - same-axis expand/collapse: apply incrementally per response (table stays interactive; per-toggle loader only)
-  - cross-axis expand clicks within the coalescing window or while the other axis has an in-flight expand: atomic reveal transaction (blocking overlay; last committed table stays visible until satisfied)
-- Auto-expand: atomic reveal when satisfied.
-- Buffered layer expand: ordered steps; atomic reveal per step.
+  - cross-axis expand clicks within the coalescing window or while the other axis has an in-flight expand: atomic reveal transaction (no global overlay; last committed table stays visible until satisfied)
+- Auto-expand:
+  - if part of a full-table transaction, included in the global overlay + atomic reveal.
+  - otherwise treated like manual expansions (per-toggle loader; atomic across axis when needed).
+- Buffered layer expand: ordered steps; atomic reveal per step (no global overlay unless part of a full-table transaction).
 
 Tests (unit):
 - For each policy, given a matrix of pending/satisfied states, assert reveal/no-reveal and loader mode.
@@ -831,18 +837,18 @@ Create a view component that renders only from a `RenderModel` + loader flags an
 Responsibilities:
 - render table layout (headers + body) from `RenderModel`
 - show loaders:
-  - **global blocking overlay** for atomic reveal transactions (persisted restore, auto-expand, cross-axis transaction)
-  - per-toggle spinners for incremental same-axis expands
+  - **global blocking overlay** only for full-table transactions (initial load, filter/datasource/layout change, explicit rebuild)
+  - per-toggle spinners for expand/collapse actions (same-axis and cross-axis)
 - emit user intents:
   - `onToggleNode(axis: PivotAxis, key: PivotKey): void`
 
 Important invariant:
-- When an atomic transaction is pending, render the **last committed** `RenderModel` and show a blocking overlay. Do not hide nodes or partially mutate visible rows/cols to “avoid blanks” (that causes collapse flicker).
+- When an atomic transaction is pending, render the **last committed** `RenderModel`. Show a blocking overlay only for full-table transactions; otherwise use per-toggle loaders. Do not hide nodes or partially mutate visible rows/cols to “avoid blanks” (that causes collapse flicker).
 
 Tests (RTL):
 - Loader semantics:
-  - atomic transaction keeps old table visible + global overlay spinner until reveal
-  - same-axis expand keeps table interactive and shows only per-toggle loader
+  - full-table transaction keeps old table visible + global overlay spinner until reveal
+  - expand/collapse keeps table interactive and shows only per-toggle loader (same-axis and cross-axis)
 - “No collapse flicker” regression:
   - expanding on the other axis must not visually collapse already-expanded nodes while loading
 
@@ -1058,13 +1064,13 @@ Minimum scenarios (each is a separate test; “test every little thing”):
 
 6) **Auto-expand + persisted restore interplay**
 - Persisted expansions exist, auto-expand enabled on one axis (exception rule).
-- Assert that persisted expansions for that axis are ignored, other axis still restored, and reveal gated globally.
+- Assert that persisted expansions for that axis are ignored, other axis still restored, and reveal gated by the full-table transaction.
 
 ## 7) Persisted restore (dashboard load): batching and correctness
 
 Persisted restore is the highest ROI for batching:
 - many targets known up-front,
-- global loader already blocks reveal until satisfied,
+- full-table transaction already blocks reveal until satisfied,
 - parallel fetch is desirable to reduce wall-clock time.
 
 Tests (RTL integration):
@@ -1108,7 +1114,7 @@ This migration must include §8, plus the naming cleanups and query minimization
 
 Principles:
 - Implement **pure modules first** (unit tests), then minimal wiring, then RTL integration tests.
-- Keep the UI stable during refactors by rendering the **last committed** table when transactions are pending (overlay loader), rather than mutating visible lists mid-flight.
+- Keep the UI stable during refactors by rendering the **last committed** table when transactions are pending (overlay only for full-table transactions; otherwise per-toggle loaders), rather than mutating visible lists mid-flight.
 - Land changes in small, test-locked increments; each phase leaves the suite green.
 
 ### Phase 0 — Remove legacy query behavior (required, before engine)
@@ -1194,11 +1200,11 @@ Exit criteria (Phase 2):
 3.2) Add `PivotTableView.tsx` (RTL tests)
 - Render-only component: headers + body + loaders, emits toggle intents.
 - Tests:
-  - global overlay for atomic transactions, per-toggle loader for incremental same-axis expands.
+  - global overlay only for full-table transactions; per-toggle loader for all expand/collapse actions.
   - “no collapse flicker” regression.
 
 3.3) Add `useExpansionEngine.ts` and wire into `PivotTableChart.tsx`
-- Start with persisted restore only (global loader), then manual expand, then auto-expand.
+- Start with full-table transactions only (global overlay), then manual expand, then auto-expand.
 - Tests:
   - reuse existing persisted restore tests and add the strict cross-axis transaction suite.
 
@@ -1244,39 +1250,46 @@ Exit criteria (Phase 4):
   - `src/react-pivottable/` (delete directory)
   - `ownState.treeData` snapshot caching in `src/transformProps.ts` (engine owns trees)
 
-### Phase 6 — Unify the initial-load query pipeline (required, “one fetch system”)
+### Phase 6 — Unify the initial-load query pipeline (required, “single-plan + single-wave”)
 
-Implement the “single fetch system” decision from §2.4:
-- Replace the `buildQuery.ts` multi-query matrix + `transformProps.ts` slice-merging with an engine-driven initial transaction.
+Implement the “single fetch system” decision from §2.4 with a **single deterministic planner**:
+- The initial request must include the full desired table shape (bootstrap + persisted expansions + auto-expand depth).
+- No follow-up hydration pass for persisted expansions on mount.
 
 Implementation:
+- Add a pure `initialQueryPlan.ts` (single planner):
+  - Inputs: `formData`, `pivotExpansionState`, auto-expand settings, totals/subtotals config.
+  - Outputs: **ordered query targets** for:
+    - `bootstrap` (totals only when a deeper prefetch exists; otherwise minimal top-level grid + totals)
+    - `root prefetch` (full-table depth for auto-expand, using the same depth-pair rules as branch fetch)
+    - `branch prefetch` (persisted expansion targets, pruned to stable prefix)
+  - Computes `visibleRowDepth`/`visibleColDepth` for the initial tree (no runtime inference).
 - `src/buildQuery.ts`:
-  - emit exactly one minimal bootstrap query (no depth matrix, no persisted-expansion bumping).
-  - keep `query_name` stable for debugging, but do not use it to infer table shape.
+  - emit **all** query targets from `initialQueryPlan` in a single request.
+  - no post-bootstrap re-fetch for persisted expansions.
 - `src/transformProps.ts`:
-  - stop merging query slices into the full tree (`src/transformProps.ts:300` becomes obsolete).
-  - provide a minimal initial `tree` (root nodes only) and pass through the necessary config/hooks for the engine to fetch.
-  - if `query_name` is absent in query results, fall back to the deterministic
-    query-pair order used by `buildQuery.ts` (do not assume full depth).
+  - merge **all** query targets (bootstrap + root + branch) into one committed tree before render.
+  - no incremental slice merge; no reliance on `query_name` ordering beyond the plan.
 - Engine:
-  - on mount, start an initial “load transaction” (global loader) to fetch the desired initial shape (auto-expand levels + totals/subtotals requirements), then reveal once.
+  - on mount, **skip prefetch hydration** for persisted expansions (already in the tree).
+  - only show loaders for later user-triggered expansions or full-table transactions.
 
 Exit criteria (Phase 6):
-- First-load Explore and dashboard use the coordinator fetch path (same code path as expansions).
-- No depth inference from `parseDepth` is needed in `transformProps.ts`.
-- Unnamed query results still hydrate correctly via the shared query-pair order.
-- Initial load remains fast (parallel fetch + batching where applicable) and preserves totals/subtotals correctness.
+- First-load Explore and dashboard issue **one query wave** that includes persisted expansions.
+- No sequential “bootstrap → persisted branch fetch” on mount.
+- Initial render shows the **final desired shape** (no flicker, no per-branch loaders).
+- Auto-expand depth is respected on initial load via the root prefetch plan.
 
 ### Phase 7 — Load-state refactor (deterministic, single-source-of-truth)
 
 Goal: eliminate heuristic “loaded” inference and unify metric-tier rules so fetch decisions are deterministic, cheap, and testable.
+This phase remains relevant after Phase 6; bootstrap reduces guesswork but does not remove the need to formalize load-state.
 
 7.1) Split evidence collection from fetch policy
-- Introduce a pure “loaded evidence” builder (per tree snapshot) that summarizes:
+- With bootstrap + engine-owned load state, the evidence builder should be thin:
   - direct child presence by axis,
-  - descendant depth coverage by base-path,
-  - metric-tier variants and placement,
-  - subtotal token presence.
+  - explicit loaded depth per node,
+  - metric-tier placement.
 - Add a pure policy function that decides `shouldFetch` from evidence + layout context.
 - Replace `hasLoadedChildren` with `getLoadedEvidence` + `shouldFetchBranch`.
 - Tests:
@@ -1348,10 +1361,10 @@ Always keep these green:
 ### Phase 3 (partial)
 - Rendering split started:
   - Added `src/pivot/render/renderModel.ts` + `src/pivot/shared/types.ts` (RenderModel + formatting keys).
-  - Added `src/pivot/render/PivotTableView.tsx` and moved table rendering into the view component.
-  - Added tests: `test/plugin/render/renderModel.test.ts`, `test/plugin/render/PivotTableView.test.tsx`.
+- Added `src/pivot/render/PivotTableView.tsx` and moved table rendering into the view component.
+- Added tests: `test/plugin/render/renderModel.test.ts`, `test/plugin/render/PivotTableView.test.tsx`.
 - PivotTableChart now builds a RenderModel and delegates rendering to `PivotTableView`.
-- Removed cross-axis “displayed rows/cols” gating in the component and show the global loader during cross-axis hydration.
+- Removed cross-axis “displayed rows/cols” gating in the component; loader policy now restricts the global overlay to full-table transactions.
 
 ### Validation notes
 - Phase 3 changes: `npm test plugins/plugin-chart-pivot-table-v3` passes (duplicate mock + Browserslist warnings).
@@ -1431,13 +1444,32 @@ Status: Phase 4 complete. Proceed to Phase 5.
 - Ran `npx eslint plugins/plugin-chart-pivot-table-v3` (fails with pre-existing warnings/errors; see lint output).
 
 ### Phase 6 (complete)
-- Replaced the initial multi-query matrix with a single bootstrap query in `src/buildQuery.ts`.
-- Simplified `src/transformProps.ts` to build a root-only tree and use the first query for grand totals only.
-- When query results omit `query_name`, map them to the shared query-pair order
+- Replaced the initial multi-query matrix with a bootstrap planner that emits totals + top-level grid + optional row/col totals.
+- Simplified `src/transformProps.ts` to build a top-level-only tree by merging bootstrap targets (no depth slice merges), then apply the metric axis for proper column/row headers.
+- When query results omit `query_name`, map them to the shared bootstrap target order
   (same ordering as `buildQuery.ts`) to avoid undefined-path merges; added a
   regression test in `test/plugin/transformProps.test.ts`.
+
+### Phase 6 (realignment plan)
+- Emit the minimal bootstrap query set (totals + top-level row/col keys; no depth matrix).
+- Remove query-slice tree hydration in `transformProps.ts`.
+- Add test coverage: `buildQuery` returns the bootstrap set; initial load hydrates via engine.
+
+### Phase 6 (realignment complete)
+- Added `bootstrapPlanner.ts` + query-shape wiring; `buildQuery.ts` now emits totals +
+  the top-level grid (`row0/col0`, `row1/col1`) plus row/col totals when needed.
+- `transformProps.ts` now merges bootstrap target trees, applies the metric axis, and
+  labels grand totals, with no depth slice merges.
+- Updated `test/plugin/buildQuery.test.ts` and `test/plugin/transformProps.test.ts`
+  to assert the bootstrap query set behavior (including grid queries and metric headers).
+- Ensured initialDepth-driven prefetch runs even with a top-level bootstrap tree;
+  added `prefetch.initial-depth.test.tsx` to guard against grand-total-only renders.
+- Ensured cross-axis prefetch still triggers when visible row/col depths exist but
+  intersection cells are missing (root fetch fallback).
+- Ran `npm test -- plugins/plugin-chart-pivot-table-v3` (passes; duplicate mocks +
+  Browserslist + Babel deprecation warnings).
 - Updated expansion planner/root satisfaction and fetched-depth seeding to rely on actual loaded children before skipping prefetch.
-- Adjusted RTL suites to align with bootstrap-first hydration and initial global loader timing:
+- Adjusted RTL suites to align with bootstrap-first hydration and initial full-table overlay timing:
   - `test/plugin/PivotTableChart/prefetch.epoch.test.tsx`
   - `test/plugin/PivotTableChart/prefetch.batching.test.tsx`
   - `test/plugin/PivotTableChart/expansion-state.test.tsx`
@@ -1445,5 +1477,25 @@ Status: Phase 4 complete. Proceed to Phase 5.
 - Tightened auto-expansion seeding for metric-tier nodes so metrics-between layouts do not prefetch at the auto-expand boundary; removed debug logging.
 - Ran `npm test -- --runTestsByPath plugins/plugin-chart-pivot-table-v3/test/plugin/PivotTableChart/totals/rows.test.tsx` (passes; duplicate mock + Browserslist + Babel deprecation warnings).
 - Refined `hasLoadedChildren` to avoid prefetching for early metric subtotal branches while still fetching when metrics appear before the intended tier (keeps metric-first and metrics-between expansions correct).
+- Ran `npm test plugins/plugin-chart-pivot-table-v3` and `npx eslint plugins/plugin-chart-pivot-table-v3` (warnings only).
 
 Status: Phase 6 complete.
+
+### Phase 6 (single-plan + single-wave implementation)
+- Added `initialQueryPlan.ts` to emit a single initial query wave (bootstrap + root prefetch + persisted branch targets).
+- Moved query naming constants into `pivot/engine/query/queryName.ts` to avoid circular imports.
+- Added `pivot/engine/query/pathFilters.ts` and reused it in `buildQuery.ts` and `fetchPivotBranch.ts`.
+- `buildQuery.ts` now emits branch/root queries (with path filters) for persisted expansions and auto-expand depth.
+- `transformProps.ts` now merges all initial plan targets via `buildBranchTreeFromResults`, so the initial tree includes persisted expansions.
+- Added tests for persisted expansion prefetch and root prefetch in `test/plugin/buildQuery.test.ts`.
+- Added a transformProps regression test to assert persisted expansion branches land in the initial tree.
+- Ran `npm test -- plugins/plugin-chart-pivot-table-v3` (passes; duplicate mock + Browserslist + Babel deprecation warnings).
+- Ran `npx eslint plugins/plugin-chart-pivot-table-v3` (warnings only).
+
+## TODO (unimplemented)
+
+- Align loader policy in `revealPolicy.ts` and RTL tests to only use the global overlay for full-table transactions.
+- Phase 7 load-state refactor:
+  - replace `hasLoadedChildren` heuristics with explicit loaded-depth evidence + policy.
+  - consolidate metric-tier handling into the single metric-tier model.
+  - deterministic visibility driven by render-model + loaded-depths.
