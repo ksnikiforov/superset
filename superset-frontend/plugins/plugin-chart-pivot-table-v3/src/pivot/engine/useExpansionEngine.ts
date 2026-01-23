@@ -17,6 +17,7 @@
  * under the License.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { nanoid } from 'nanoid';
 import { type HandlerFunction } from '@superset-ui/core';
 import {
   type PivotExpansionState,
@@ -51,12 +52,15 @@ import {
   type StagingTreeState,
 } from './stagingTree';
 import { fetchPivotBranch, peekPivotBranchCache } from '../../fetchPivotBranch';
+import { type ChartDataWarning } from '../data/ChartDataClient';
+import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import { buildBatchSignature } from '../query/batchSignature';
 import {
   optimizeFetchPlan,
   type BatchCandidate,
   type BatchGroup,
 } from '../query/fetchPlanOptimizer';
+import { stableStringify } from '../shared/stableStringify';
 import { fetchPivotBranchesBatch } from './query/fetchPivotBranchesBatch';
 import {
   buildRenderModel,
@@ -311,6 +315,7 @@ export type ExpansionEngineResult = {
   pendingCols: Set<string>;
   isHydrating: boolean;
   errorMessage?: string;
+  warnings: ChartDataWarning[];
   handleToggle: (axis: PivotAxis, node: PivotTreeNode) => void;
 };
 
@@ -406,6 +411,8 @@ export const useExpansionEngine = ({
   const inFlightExpandedColsRef = useRef<Map<number, Set<string>>>(new Map());
   const inFlightExpansionIdRef = useRef(0);
   const [errorMessage, setErrorMessage] = useState<string>();
+  const [warnings, setWarnings] = useState<ChartDataWarning[]>([]);
+  const warningsRef = useRef<Map<string, ChartDataWarning>>(new Map());
   const [isHydrating, setIsHydrating] = useState(false);
   const prevAutoExpandRowsRef = useRef<number | null>(null);
   const prevAutoExpandColsRef = useRef<number | null>(null);
@@ -417,6 +424,8 @@ export const useExpansionEngine = ({
   const fetchedRowKeysRef = useRef<Map<string, number>>(new Map());
   const fetchedColKeysRef = useRef<Map<string, number>>(new Map());
   const transactionIdRef = useRef(0);
+  const requestGroupPrefixRef = useRef(nanoid());
+  const activeRequestGroupIdsRef = useRef(new Set<string>());
   const pivotExpansionStateRef = useRef<PivotExpansionState | undefined>(
     pivotExpansionState,
   );
@@ -540,6 +549,73 @@ export const useExpansionEngine = ({
     },
     [setErrorMessage],
   );
+
+  const addWarnings = useCallback(
+    (nextWarnings?: ChartDataWarning[]) => {
+      if (!nextWarnings || nextWarnings.length === 0) {
+        return;
+      }
+      const map = new Map(warningsRef.current);
+      let didChange = false;
+      nextWarnings.forEach(warning => {
+        const key = stableStringify(warning);
+        if (map.has(key)) {
+          return;
+        }
+        map.set(key, warning);
+        didChange = true;
+      });
+      if (!didChange) {
+        return;
+      }
+      warningsRef.current = map;
+      setWarnings(Array.from(map.values()));
+    },
+    [setWarnings],
+  );
+
+  const cancelInFlightRequestGroups = useCallback(() => {
+    activeRequestGroupIdsRef.current.forEach(requestGroupId => {
+      supersetChartDataClient.cancel(requestGroupId);
+    });
+    activeRequestGroupIdsRef.current.clear();
+  }, []);
+
+  const buildRequestGroupId = useCallback(
+    (
+      payload: Record<string, unknown>,
+      transactionId: number = transactionIdRef.current,
+    ) =>
+      stableStringify({
+        instanceId: requestGroupPrefixRef.current,
+        transactionId,
+        ...payload,
+      }),
+    [],
+  );
+
+  const trackRequestGroup = useCallback(
+    async <T,>(
+      requestGroupId: string,
+      fetcher: () => Promise<T>,
+    ): Promise<T> => {
+      activeRequestGroupIdsRef.current.add(requestGroupId);
+      try {
+        return await fetcher();
+      } finally {
+        activeRequestGroupIdsRef.current.delete(requestGroupId);
+      }
+    },
+    [],
+  );
+
+  useEffect(
+    () => () => {
+      cancelInFlightRequestGroups();
+    },
+    [cancelInFlightRequestGroups],
+  );
+
   const persistExpansionStateToStore = useCallback(
     (nextState: PivotExpansionStateKeys) => {
       if (!shouldPersistExpansionState || !setControlValue) {
@@ -981,26 +1057,47 @@ export const useExpansionEngine = ({
         if (cached) {
           return { key, data: cached, requiredDepth };
         }
-        updateLoadingKey(key, 1);
-        try {
-          const result = await fetchPivotBranch({
+        if (transactionIdRef.current === requestId) {
+          updateLoadingKey(key, 1);
+        }
+        const requestGroupId = buildRequestGroupId(
+          {
+            kind: 'branch',
             axis,
-            path: getFetchPath(path),
-            metricPath: path,
-            formData: fetchFormData,
-            currentTree: treeSnapshot,
+            pathKey: key,
             visibleRowDepth,
             visibleColDepth,
-          });
+            requiredDepth,
+          },
+          requestId,
+        );
+        try {
+          const result = await trackRequestGroup(requestGroupId, () =>
+            fetchPivotBranch({
+              axis,
+              path: getFetchPath(path),
+              metricPath: path,
+              formData: fetchFormData,
+              currentTree: treeSnapshot,
+              visibleRowDepth,
+              visibleColDepth,
+              requestGroupId,
+            }),
+          );
           if (!result) {
             return { key, data: undefined, requiredDepth };
           }
-          if (result.error) {
-            setErrorMessage(result.error.message);
+          if (transactionIdRef.current === requestId) {
+            addWarnings(result.warnings);
+            if (result.error) {
+              setErrorMessage(result.error.message);
+            }
           }
           return { key, data: result.data, requiredDepth };
         } finally {
-          updateLoadingKey(key, -1);
+          if (transactionIdRef.current === requestId) {
+            updateLoadingKey(key, -1);
+          }
         }
       };
 
@@ -1015,22 +1112,44 @@ export const useExpansionEngine = ({
         visibleRowDepth: number;
         visibleColDepth: number;
       }) => {
-        batch.targets.forEach(target => updateLoadingKey(target.pathKey, 1));
+        if (transactionIdRef.current === requestId) {
+          batch.targets.forEach(target => updateLoadingKey(target.pathKey, 1));
+        }
+        const requestGroupId = buildRequestGroupId(
+          {
+            kind: 'batch',
+            axis: batch.axis,
+            parentPathKey: batch.parentPathKey,
+            childDepth: batch.childDepth,
+            requiredOppositeDepth: batch.requiredOppositeDepth,
+            signature: batch.signature,
+            targetKeys: [...batch.targets.map(target => target.pathKey)].sort(),
+          },
+          requestId,
+        );
         try {
-          const result = await fetchPivotBranchesBatch({
-            formData: fetchFormData,
-            batch,
-            currentTree: treeSnapshot,
-            visibleRowDepth,
-            visibleColDepth,
-            getFetchPath,
-          });
-          if (result.error) {
-            setErrorMessage(result.error.message);
+          const result = await trackRequestGroup(requestGroupId, () =>
+            fetchPivotBranchesBatch({
+              formData: fetchFormData,
+              batch,
+              currentTree: treeSnapshot,
+              visibleRowDepth,
+              visibleColDepth,
+              getFetchPath,
+              requestGroupId,
+            }),
+          );
+          if (transactionIdRef.current === requestId) {
+            addWarnings(result.warnings);
+            if (result.error) {
+              setErrorMessage(result.error.message);
+            }
           }
           return { batch, data: result.data };
         } finally {
-          batch.targets.forEach(target => updateLoadingKey(target.pathKey, -1));
+          if (transactionIdRef.current === requestId) {
+            batch.targets.forEach(target => updateLoadingKey(target.pathKey, -1));
+          }
         }
       };
 
@@ -1306,9 +1425,11 @@ export const useExpansionEngine = ({
       }
     },
     [
+      addWarnings,
       applyBatchDelta,
       applyBranchDelta,
       buildHasLoadedChildrenForIteration,
+      buildRequestGroupId,
       computeVisibleDepths,
       fetchFormData,
       getFetchPath,
@@ -1316,6 +1437,7 @@ export const useExpansionEngine = ({
       persistExpansionState,
       getGroupedFetchKey,
       resolveExpandedForMetrics,
+      trackRequestGroup,
       updateLoadingKey,
     ],
   );
@@ -1394,6 +1516,9 @@ export const useExpansionEngine = ({
       const shouldShowLoader = options?.showLoader ?? false;
       const transactionId = transactionIdRef.current + 1;
       transactionIdRef.current = transactionId;
+      cancelInFlightRequestGroups();
+      loadingCountsRef.current = new Map();
+      setLoadingKeys(new Set());
       if (shouldShowLoader) {
         setIsHydrating(true);
       }
@@ -1417,26 +1542,48 @@ export const useExpansionEngine = ({
         },
       ) => {
         const path = parsePath(target.pathKey);
-        updateLoadingKey(target.pathKey, 1);
-        try {
-          const result = await fetchPivotBranch({
+        if (transactionIdRef.current === transactionId) {
+          updateLoadingKey(target.pathKey, 1);
+        }
+        const requestGroupId = buildRequestGroupId(
+          {
+            kind: `hydrate:${reason}`,
             axis: target.axis,
-            path: getFetchPath(path),
-            metricPath: path,
-            formData: fetchFormData,
-            currentTree: context.stagedTree,
+            pathKey: target.pathKey,
+            childDepth: target.childDepth,
+            requiredOppositeDepth: target.requiredOppositeDepth,
             visibleRowDepth: context.visibleRowDepth,
             visibleColDepth: context.visibleColDepth,
-          });
+          },
+          transactionId,
+        );
+        try {
+          const result = await trackRequestGroup(requestGroupId, () =>
+            fetchPivotBranch({
+              axis: target.axis,
+              path: getFetchPath(path),
+              metricPath: path,
+              formData: fetchFormData,
+              currentTree: context.stagedTree,
+              visibleRowDepth: context.visibleRowDepth,
+              visibleColDepth: context.visibleColDepth,
+              requestGroupId,
+            }),
+          );
           if (!result) {
             return { target, data: undefined };
           }
-          if (result.error) {
-            setErrorMessage(result.error.message);
+          if (transactionIdRef.current === transactionId) {
+            addWarnings(result.warnings);
+            if (result.error) {
+              setErrorMessage(result.error.message);
+            }
           }
           return { target, data: result.data };
         } finally {
-          updateLoadingKey(target.pathKey, -1);
+          if (transactionIdRef.current === transactionId) {
+            updateLoadingKey(target.pathKey, -1);
+          }
         }
       };
 
@@ -1448,22 +1595,46 @@ export const useExpansionEngine = ({
           visibleColDepth: number;
         },
       ) => {
-        batch.targets.forEach(target => updateLoadingKey(target.pathKey, 1));
-        try {
-          const result = await fetchPivotBranchesBatch({
-            formData: fetchFormData,
-            batch,
-            currentTree: context.stagedTree,
+        if (transactionIdRef.current === transactionId) {
+          batch.targets.forEach(target => updateLoadingKey(target.pathKey, 1));
+        }
+        const requestGroupId = buildRequestGroupId(
+          {
+            kind: `hydrate:${reason}`,
+            axis: batch.axis,
+            parentPathKey: batch.parentPathKey,
+            childDepth: batch.childDepth,
+            requiredOppositeDepth: batch.requiredOppositeDepth,
+            signature: batch.signature,
+            targetKeys: [...batch.targets.map(target => target.pathKey)].sort(),
             visibleRowDepth: context.visibleRowDepth,
             visibleColDepth: context.visibleColDepth,
-            getFetchPath,
-          });
-          if (result.error) {
-            setErrorMessage(result.error.message);
+          },
+          transactionId,
+        );
+        try {
+          const result = await trackRequestGroup(requestGroupId, () =>
+            fetchPivotBranchesBatch({
+              formData: fetchFormData,
+              batch,
+              currentTree: context.stagedTree,
+              visibleRowDepth: context.visibleRowDepth,
+              visibleColDepth: context.visibleColDepth,
+              getFetchPath,
+              requestGroupId,
+            }),
+          );
+          if (transactionIdRef.current === transactionId) {
+            addWarnings(result.warnings);
+            if (result.error) {
+              setErrorMessage(result.error.message);
+            }
           }
           return { batch, data: result.data };
         } finally {
-          batch.targets.forEach(target => updateLoadingKey(target.pathKey, -1));
+          if (transactionIdRef.current === transactionId) {
+            batch.targets.forEach(target => updateLoadingKey(target.pathKey, -1));
+          }
         }
       };
 
@@ -1788,8 +1959,11 @@ export const useExpansionEngine = ({
       finalizeHydration();
     },
     [
+      addWarnings,
       applyCrossAxisRootFetch,
       buildHasLoadedChildrenForIteration,
+      buildRequestGroupId,
+      cancelInFlightRequestGroups,
       computeVisibleDepths,
       collectInFlightExpanded,
       fetchFormData,
@@ -1797,6 +1971,7 @@ export const useExpansionEngine = ({
       hasLoadedChildrenForTree,
       getGroupedFetchKey,
       persistExpansionState,
+      trackRequestGroup,
       updateLoadingKey,
       resolveExpandedForMetrics,
     ],
@@ -1811,6 +1986,10 @@ export const useExpansionEngine = ({
       const isOpen = expanded.has(node.key) || pending.has(node.key);
       if (isOpen) {
         transactionIdRef.current += 1;
+        cancelInFlightRequestGroups();
+        loadingCountsRef.current = new Map();
+        setLoadingKeys(new Set());
+        setIsHydrating(false);
         collapseNode(axis, node);
         return;
       }
@@ -1859,6 +2038,7 @@ export const useExpansionEngine = ({
       expandSameAxis(axis, node).catch(reportAsyncError);
     },
     [
+      cancelInFlightRequestGroups,
       collapseNode,
       computeVisibleDepths,
       expandSameAxis,
@@ -1914,6 +2094,10 @@ export const useExpansionEngine = ({
 
     dataEpochRef.current += 1;
     transactionIdRef.current += 1;
+    cancelInFlightRequestGroups();
+    setIsHydrating(false);
+    warningsRef.current = new Map();
+    setWarnings([]);
     treeRef.current = data;
     setTree(data);
     setErrorMessage(undefined);
@@ -2263,6 +2447,7 @@ export const useExpansionEngine = ({
     }
     setIsHydrating(false);
   }, [
+    cancelInFlightRequestGroups,
     data,
     expandedStateSignature,
     computeVisibleDepths,
@@ -2293,6 +2478,7 @@ export const useExpansionEngine = ({
     pendingCols,
     isHydrating,
     errorMessage,
+    warnings,
     handleToggle,
   };
 };

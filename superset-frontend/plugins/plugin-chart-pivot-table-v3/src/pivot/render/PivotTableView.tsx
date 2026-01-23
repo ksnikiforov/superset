@@ -40,6 +40,7 @@ import {
   type TotalPosition,
 } from '../../types';
 import { serializeCellKey } from '../../utils';
+import { type ChartDataWarning } from '../data/ChartDataClient';
 import { rootKey } from '../viewModel';
 import { type RenderModel, type FormattingKeys } from '../shared/types';
 
@@ -244,6 +245,7 @@ type PivotTableViewProps = {
   expandedRows: Set<string>;
   expandedCols: Set<string>;
   errorMessage?: string;
+  warnings?: ChartDataWarning[];
   showGlobalLoader: boolean;
   stickyHeaders: boolean;
   headerOffset: number;

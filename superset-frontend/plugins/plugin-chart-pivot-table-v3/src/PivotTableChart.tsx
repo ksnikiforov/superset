@@ -2241,6 +2241,7 @@ function PivotTableChart(props: PivotTableProps) {
     expandedCols,
     loadingKeys,
     errorMessage,
+    warnings,
     isHydrating,
     handleToggle,
   } = useExpansionEngine({
@@ -3685,6 +3686,7 @@ function PivotTableChart(props: PivotTableProps) {
       expandedRows={expandedRows}
       expandedCols={expandedCols}
       errorMessage={errorMessage}
+      warnings={warnings}
       showGlobalLoader={showGlobalLoader}
       stickyHeaders={resolvedStickyHeaders}
       headerOffset={headerOffset}

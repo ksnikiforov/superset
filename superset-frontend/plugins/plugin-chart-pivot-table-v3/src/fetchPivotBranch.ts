@@ -17,13 +17,9 @@
  * under the License.
  */
 import {
-  buildQueryContext,
   ensureIsArray,
-  getColumnLabel,
   type QueryFormColumn,
   type QueryFormMetric,
-  type QueryObject,
-  SupersetClient,
 } from '@superset-ui/core';
 import {
   MetricsLayoutEnum,
@@ -36,7 +32,6 @@ import {
   buildTreeFromRecords,
   applyMetricAxis,
   mergeTrees,
-  getMetricKeys,
   serializePath,
   injectRowSubtotalLeaves,
   labelRowSubtotalLeaves,
@@ -44,19 +39,30 @@ import {
   SUBTOTAL_LABEL,
   SUBTOTAL_TOKEN,
 } from './utils';
-import { handleChartDataResponse } from './pivot/engine/query/handleChartDataResponse';
-import { buildLayoutContext, type LayoutContext } from './pivot/layout/LayoutContext';
+import {
+  buildFilterSignature,
+  buildPivotBranchCacheKey,
+  clearPivotBranchCache as clearPivotBranchCacheBase,
+  readPivotBranchCache,
+  writePivotBranchCache,
+} from './pivot/data/cache';
+import { type ChartDataWarning } from './pivot/data/ChartDataClient';
+import { supersetChartDataClient } from './pivot/data/SupersetChartDataClient';
+import {
+  buildLayoutContext,
+  type LayoutContext,
+} from './pivot/layout/LayoutContext';
 import {
   resolveFetchContext as resolveFetchContextBase,
   type ResolvedFetchContext as ResolvedQueryFetchContext,
 } from './pivot/query/resolveFetchContext';
 import { buildBranchQuerySpecs } from './pivot/query/specs';
-import { toChartDataQueries } from './pivot/query/toChartDataQueries';
 import { stableStringify as stableStringifyBase } from './pivot/shared/stableStringify';
 
 export interface FetchPivotBranchResult {
   data?: PivotTreeData;
   cached?: boolean;
+  warnings?: ChartDataWarning[];
   error?: Error;
 }
 
@@ -70,91 +76,14 @@ export interface FetchPivotBranchParams {
   visibleColDepth?: number;
   targetRowDepth?: number;
   targetColDepth?: number;
+  requestGroupId?: string;
 }
-
-const cache = new Map<string, PivotTreeData>();
-const CACHE_MAX_ENTRIES = 200;
-
-const touchCache = (key: string, value: PivotTreeData) => {
-  if (cache.has(key)) {
-    cache.delete(key);
-  }
-  cache.set(key, value);
-  if (cache.size > CACHE_MAX_ENTRIES) {
-    const oldestKey = cache.keys().next().value;
-    if (oldestKey !== undefined) {
-      cache.delete(oldestKey);
-    }
-  }
-};
-
-const readCache = (key: string) => {
-  const cached = cache.get(key);
-  if (!cached) {
-    return undefined;
-  }
-  touchCache(key, cached);
-  return cached;
-};
 
 export const stableStringify = stableStringifyBase;
 
-const getExtraFormData = (
-  formData: PivotTableQueryFormData,
-): PivotTableQueryFormData['extra_form_data'] | undefined =>
-  formData.extra_form_data;
-
-const getTimeRange = (formData: PivotTableQueryFormData) => formData.time_range;
-
-const buildFilterKey = (formData: PivotTableQueryFormData) =>
-  stableStringify({
-    time_range: getTimeRange(formData),
-    since: formData.since,
-    until: formData.until,
-    filters: formData.filters,
-    adhoc_filters: formData.adhoc_filters,
-    extra_filters: formData.extra_filters,
-    extra_form_data: getExtraFormData(formData),
-    time_grain_sqla: getExtraFormData(formData)?.time_grain_sqla,
-    granularity: formData.granularity,
-    granularity_sqla: formData.granularity_sqla,
-    row_limit: formData.row_limit,
-    row_offset: formData.row_offset,
-    series_limit: formData.series_limit,
-    series_limit_metric: formData.series_limit_metric,
-    order_desc: formData.order_desc,
-    row_order: formData.rowOrder,
-    col_order: formData.colOrder,
-    post_processing: formData.post_processing,
-  });
-
-const buildCacheKey = (
-  axis: PivotAxis,
-  path: PivotPath,
-  rowDepth: number,
-  colDepth: number,
-  rowGroupby: QueryFormColumn[],
-  colGroupby: QueryFormColumn[],
-  metrics: QueryFormMetric[],
-  aggregateFunction?: string,
-  filterKey?: string,
-  cacheMeta?: Record<string, unknown>,
-) =>
-  stableStringify({
-    axis,
-    path: serializePath(path),
-    rowDepth,
-    colDepth,
-    rowGroupby: rowGroupby.map(getColumnLabel),
-    colGroupby: colGroupby.map(getColumnLabel),
-    metrics: getMetricKeys(metrics),
-    aggregateFunction: aggregateFunction || '',
-    filterKey: filterKey || '',
-    ...(cacheMeta || {}),
-  });
-
-export const peekPivotBranchCacheByKey = (key: string) => readCache(key);
-export const clearPivotBranchCache = () => cache.clear();
+export const peekPivotBranchCacheByKey = (key: string) =>
+  readPivotBranchCache(key);
+export const clearPivotBranchCache = () => clearPivotBranchCacheBase();
 
 export type ResolvedFetchContext = ResolvedQueryFetchContext & {
   cacheKey: string;
@@ -186,18 +115,21 @@ const resolveFetchContext = ({
     targetColDepth,
   });
   const pathForMetrics = metricPath ?? path;
-  const filterKey = buildFilterKey(formData);
-  const cacheKey = buildCacheKey(
+  const filterSignature = buildFilterSignature(formData);
+  const cacheKey = buildPivotBranchCacheKey({
     axis,
-    pathForMetrics,
-    queryCtx.rowDepth,
-    queryCtx.colDepth,
-    queryCtx.rowGroupbyForQuery,
-    queryCtx.colGroupbyForQuery,
-    queryCtx.metricsForQuery.length > 0 ? queryCtx.metricsForQuery : queryCtx.metrics,
-    formData.aggregateFunction,
-    filterKey,
-    {
+    path: pathForMetrics,
+    rowDepth: queryCtx.rowDepth,
+    colDepth: queryCtx.colDepth,
+    rowGroupby: queryCtx.rowGroupbyForQuery,
+    colGroupby: queryCtx.colGroupbyForQuery,
+    metrics:
+      queryCtx.metricsForQuery.length > 0
+        ? queryCtx.metricsForQuery
+        : queryCtx.metrics,
+    aggregateFunction: formData.aggregateFunction,
+    filterSignature,
+    cacheMeta: {
       datasource: formData.datasource,
       time_grain_sqla: queryCtx.timeGrainSqla,
       granularity: formData.granularity,
@@ -210,13 +142,13 @@ const resolveFetchContext = ({
       metricsLayoutResolved: queryCtx.metricsLayoutResolved,
       metricInsertIndex: queryCtx.metricInsertIndex,
     },
-  );
+  });
   return { ...queryCtx, cacheKey, layout };
 };
 
 export const peekPivotBranchCache = (params: FetchPivotBranchParams) => {
   const ctx = resolveFetchContext(params);
-  return readCache(ctx.cacheKey);
+  return readPivotBranchCache(ctx.cacheKey);
 };
 
 // Exported for tests
@@ -347,6 +279,22 @@ const injectColumnSubtotalLeaves = (
   return next;
 };
 
+const isAbortError = (error: unknown): boolean => {
+  if (
+    typeof DOMException !== 'undefined' &&
+    error instanceof DOMException &&
+    error.name === 'AbortError'
+  ) {
+    return true;
+  }
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'name' in error &&
+    (error as { name?: unknown }).name === 'AbortError'
+  );
+};
+
 export async function fetchPivotBranch({
   formData,
   axis,
@@ -355,6 +303,7 @@ export async function fetchPivotBranch({
   currentTree,
   visibleRowDepth,
   visibleColDepth,
+  requestGroupId,
 }: FetchPivotBranchParams): Promise<FetchPivotBranchResult> {
   const {
     rowGroupbyForQueryFull,
@@ -382,7 +331,7 @@ export async function fetchPivotBranch({
       ? { ...formData, metrics: metricsForQuery }
       : formData;
 
-  const cached = readCache(cacheKey);
+  const cached = readPivotBranchCache(cacheKey);
   if (cached) {
     return { data: cached, cached: true };
   }
@@ -402,24 +351,17 @@ export async function fetchPivotBranch({
     colDepth: spec.meta.colDepth,
   }));
 
-  const queryContext = buildQueryContext(
-    queryFormData,
-    (baseQueryObject: QueryObject) =>
-      toChartDataQueries({ specs, baseQueryObject }),
-  );
-
   try {
-    const { json, response } = await SupersetClient.post({
-      endpoint: '/api/v1/chart/data',
-      jsonPayload: queryContext,
+    const results = await supersetChartDataClient.fetch({
+      formData: queryFormData,
+      specs,
+      requestGroupId,
     });
-    const resolved = await handleChartDataResponse({ response, json });
-    const results = ensureIsArray(resolved) as Array<{
-      data?: Record<string, unknown>[];
-      query?: { query_name?: string };
-      query_name?: string;
-    }>;
-    const resultsByQueryName = new Map<string, { data?: Record<string, unknown>[] }>();
+    const warnings = results.flatMap(result => result.warnings ?? []);
+    const resultsByQueryName = new Map<
+      string,
+      { data?: Record<string, unknown>[] }
+    >();
     results.forEach(result => {
       const name =
         typeof result.query?.query_name === 'string'
@@ -447,9 +389,15 @@ export async function fetchPivotBranch({
       metricsLayoutResolved,
       metricInsertIndex,
     });
-    touchCache(cacheKey, labeledBranch);
-    return { data: labeledBranch };
+    writePivotBranchCache(cacheKey, labeledBranch);
+    return {
+      data: labeledBranch,
+      ...(warnings.length > 0 ? { warnings } : {}),
+    };
   } catch (error) {
+    if (isAbortError(error)) {
+      return {};
+    }
     return {
       error: error instanceof Error ? error : new Error(String(error)),
     };

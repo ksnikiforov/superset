@@ -17,12 +17,6 @@
  * under the License.
  */
 import {
-  buildQueryContext,
-  ensureIsArray,
-  type QueryObject,
-  SupersetClient,
-} from '@superset-ui/core';
-import {
   PivotPath,
   PivotTableQueryFormData,
   PivotTreeData,
@@ -30,9 +24,9 @@ import {
 import { type BatchGroup } from '../../query/fetchPlanOptimizer';
 import { buildLayoutContext } from '../../layout/LayoutContext';
 import { buildBatchQuerySpecs } from '../../query/specs';
-import { toChartDataQueries } from '../../query/toChartDataQueries';
 import { buildBranchTreeFromResults } from '../../../fetchPivotBranch';
-import { handleChartDataResponse } from './handleChartDataResponse';
+import { supersetChartDataClient } from '../../data/SupersetChartDataClient';
+import { type ChartDataWarning } from '../../data/ChartDataClient';
 
 export type FetchPivotBranchesBatchParams = {
   formData: PivotTableQueryFormData;
@@ -41,11 +35,29 @@ export type FetchPivotBranchesBatchParams = {
   visibleRowDepth: number;
   visibleColDepth: number;
   getFetchPath: (path: PivotPath) => PivotPath;
+  requestGroupId?: string;
 };
 
 export type FetchPivotBranchesBatchResult = {
   data?: PivotTreeData;
+  warnings?: ChartDataWarning[];
   error?: Error;
+};
+
+const isAbortError = (error: unknown): boolean => {
+  if (
+    typeof DOMException !== 'undefined' &&
+    error instanceof DOMException &&
+    error.name === 'AbortError'
+  ) {
+    return true;
+  }
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'name' in error &&
+    (error as { name?: unknown }).name === 'AbortError'
+  );
 };
 
 export const fetchPivotBranchesBatch = async ({
@@ -55,6 +67,7 @@ export const fetchPivotBranchesBatch = async ({
   visibleRowDepth,
   visibleColDepth,
   getFetchPath,
+  requestGroupId,
 }: FetchPivotBranchesBatchParams): Promise<FetchPivotBranchesBatchResult> => {
   const layout = buildLayoutContext(formData);
   const specs = buildBatchQuerySpecs({
@@ -76,26 +89,21 @@ export const fetchPivotBranchesBatch = async ({
   }));
   const metricsForQuery = specs[0].metrics;
   const queryFormData =
-    metricsForQuery.length > 0 ? { ...formData, metrics: metricsForQuery } : formData;
-
-  const queryContext = buildQueryContext(
-    queryFormData,
-    (baseQueryObject: QueryObject) =>
-      toChartDataQueries({ specs, baseQueryObject }),
-  );
+    metricsForQuery.length > 0
+      ? { ...formData, metrics: metricsForQuery }
+      : formData;
 
   try {
-    const { json, response } = await SupersetClient.post({
-      endpoint: '/api/v1/chart/data',
-      jsonPayload: queryContext,
+    const results = await supersetChartDataClient.fetch({
+      formData: queryFormData,
+      specs,
+      requestGroupId,
     });
-    const resolved = await handleChartDataResponse({ response, json });
-    const results = ensureIsArray(resolved) as Array<{
-      data?: Record<string, unknown>[];
-      query?: { query_name?: string };
-      query_name?: string;
-    }>;
-    const resultsByQueryName = new Map<string, { data?: Record<string, unknown>[] }>();
+    const warnings = results.flatMap(result => result.warnings ?? []);
+    const resultsByQueryName = new Map<
+      string,
+      { data?: Record<string, unknown>[] }
+    >();
     results.forEach(result => {
       const name =
         typeof result.query?.query_name === 'string'
@@ -123,8 +131,14 @@ export const fetchPivotBranchesBatch = async ({
       metricsLayoutResolved: specs[0].meta.metricsLayoutResolved,
       metricInsertIndex: specs[0].meta.metricInsertIndex,
     });
-    return { data: tree };
+    return {
+      data: tree,
+      ...(warnings.length > 0 ? { warnings } : {}),
+    };
   } catch (error) {
+    if (isAbortError(error)) {
+      return {};
+    }
     return {
       error: error instanceof Error ? error : new Error(String(error)),
     };
