@@ -17,15 +17,22 @@ specific language governing permissions and limitations
 under the License.
 -->
 
-# Pivot Table v3 — Modularization Refactor Plan
+# Pivot Table v3 — Plugin Improvement Plan (Modularization + Future Features)
 
-This is a concrete, incremental refactor plan to streamline Pivot Table v3 into well-bounded modules with clear ownership. The intent is to improve maintainability **without changing behavior** until an explicit “behavior change” phase.
+This is a concrete, incremental improvement plan for Pivot Table v3. It includes:
+- a **modularization refactor** (to create clear boundaries and make the codebase outsource-friendly), and
+- a set of **explicit, separately-scoped behavior changes** required for upcoming major features.
+
+Unless a section is explicitly labeled **Behavior change**, the work MUST be behavior-preserving.
 
 Source-of-truth for current behavior: code in `superset-frontend/plugins/plugin-chart-pivot-table-v3/src`.
 
 Related docs:
 - Architecture deep dive: `superset-frontend/plugins/plugin-chart-pivot-table-v3/ARCHITECTURE.md`
 - Expansion methodology: `superset-frontend/plugins/plugin-chart-pivot-table-v3/EXPANSION_QUERY_METHODOLOGY.md`
+
+Canonical doc note:
+- `EXPANSION_ENGINE_REFACTOR_PLAN.md` (developer log/spec) has been merged into this document where relevant (see “Current state: expansion engine”), and the standalone file has been deleted to avoid spec drift.
 
 ---
 
@@ -66,6 +73,8 @@ These terms are used throughout the plan/spec.
 - **Stable prefix**: the longest prefix length where two axis dimension-key arrays match exactly (used to prune/migrate expansions on layout changes; see `getStablePrefixLength()` and `pruneExpandedToStablePrefix()` patterns in `useExpansionEngine.ts`).
 - **Layout signature**: a deterministic string that changes whenever the *meaning* of expansions changes (groupbys, metric placement, totals/subtotals selections, etc). Today this is equivalent to `expandedStateSignature` in `PivotTableChart.tsx`.
 - **Filter signature**: a deterministic string that changes whenever the *data slice* changes (time range, filters, extra_form_data, limits, etc). Today this is equivalent to `buildFilterKey()` in `fetchPivotBranch.ts`.
+- **Global Async Queries (GAQ)**: a Superset feature flag (`FeatureFlag.GlobalAsyncQueries`) that can cause `/api/v1/chart/data` to return **HTTP 202** (Accepted) instead of **HTTP 200**. In that case the response body describes an async job, and the client must wait for completion and then fetch the cached results from `result_url` (Superset core does this in `superset-frontend/src/components/Chart/chartAction.js` via `waitForAsyncData` from `superset-frontend/src/middleware/asyncEvent.ts`).
+- **HTTP 202 (Accepted)**: the server accepted the request but did not return results synchronously. It is not an error; it means “wait for async completion”.
 - **Branch fetch**: a fetch operation that applies path filters for a specific expanded node (implemented as one branch/batch query object, possibly bundled with other query objects inside the same chart-data request).
 - **Query object**: a single entry in the `/api/v1/chart/data` payload list (one aggregate query with its own `columns`, `filters`, `metrics`, and `query_name`).
 - **Chart data request**: one network call to `/api/v1/chart/data` that may include **multiple** query objects in a single payload.
@@ -344,14 +353,15 @@ Requirements:
 
 This requirement makes the “simultaneous row1 bootstrap + row2 prefetch” objective explicit.
 
-1) The initial plan output (bootstrap + optional root + optional branch/batch prefetch) MUST be executed with **minimum network round-trips**:
-   - The client SHOULD send all planned query objects in **one** `/api/v1/chart/data` request payload (multi-query).
-2) If the request cannot fit in one payload due to payload-size or server constraints, the client MAY split it into multiple `/api/v1/chart/data` requests.
-3) If splitting is required (case 2), the client MUST still avoid an artificial dependency between requests:
-   - requests MUST be started **without waiting** for earlier request results, unless a request truly depends on another request’s results (the initial plan queries do not; they are determined fully by `formData` + persisted expansion state).
-4) This bundling policy MUST be shared by:
-   - initial load (this BR)
-   - filter reloads / runtime layout updates (FC-3; Contract 2.A)
+1) The initial plan output (bootstrap + optional root + optional branch/batch prefetch) MUST be executed in a single `/api/v1/chart/data` HTTP request:
+   - In Explore, this is achieved by having `buildQuery.ts` return a QueryContext with **all** planned query objects.
+   - Superset core then POSTs that QueryContext as one request (default Explore behavior).
+2) The plugin MUST NOT rely on “follow-up requests” to satisfy the initial visible grid when persisted expansions exist:
+   - persisted expansion prefetch targets (BR-4.7) MUST be included in the same initial QueryContext.
+3) Payload-size limits exist in real Superset deployments (e.g. Superset’s Docker nginx sets `client_max_body_size 10m` in `docker/nginx/nginx.conf`, and proxies commonly return HTTP 413 for larger bodies).
+   - Explore-driven initial load cannot be transparently split by the pivot plugin (it emits one QueryContext and Superset core sends one request).
+   - Therefore, initial-load robustness MUST come primarily from **minimizing query objects** (batch optimization, BR-4.7/BR-6), not from request splitting.
+4) Runtime (non-Explore) fetches executed by `ChartDataClient` MUST implement a deterministic split-on-413 retry policy (Contract 2.A / Contract 6.B).
 
 ### BR-5 — Branch fetch semantics (single)
 
@@ -703,7 +713,7 @@ Then:
 - the UI MUST collapse immediately (subtree hidden) and the per-node spinner for `["A"]` MUST stop immediately
 - `RG-1` MUST be cancelled/aborted **if and only if** no still-needed specs remain inside `RG-1` (Contract 6.A.2)
 - if results from `RG-1` still arrive (abort is best-effort), they MUST NOT be applied to the visible table (Contract 6.A.4)
-- those results MAY still warm cache if cache-key signatures match (Contract 6.A.4; BR-9)
+- those results MUST still warm cache if cache-key signatures match (Contract 6.A.4; BR-9)
 
 ### AS-20 — Collapsing one sibling does not abort a shared batched request when other siblings still need it
 
@@ -719,7 +729,7 @@ Then:
 - when results arrive, the engine MUST apply only what is still needed for the desired intent:
   - `["B"]` becomes expanded when coverage is sufficient
   - `["A"]` remains collapsed (and MUST NOT show newly-visible children)
-- results MAY warm cache for `["A"]` as well (so re-expanding `["A"]` can be instant if coverage is satisfied)
+- results MUST warm cache for `["A"]` as well (so re-expanding `["A"]` can be instant if coverage is satisfied)
 
 ### AS-21 — Interactive expansion requests are not bundled across unrelated cancellation scopes
 
@@ -831,7 +841,7 @@ This section explains the runtime flow **today** and the intended flow **after m
 2) `ExpansionStateStore` updates **memory-first** state immediately (UX source of truth).
 3) The expansion planner produces a `FetchPlan` (a set of missing branch targets/specs).
 4) Batch optimization runs on that plan (BR-6) to reduce query objects when multiple siblings are eligible.
-5) `ChartDataClient` bundles the resulting query objects when possible and executes them; `TreeAssembler` merges results; rendering updates.
+5) `ChartDataClient` bundles the resulting query objects per cancellation scope (Contract 6.B) and executes them; `TreeAssembler` merges results; rendering updates.
 
 **Filter change / data refresh**
 1) `ChartDataClient` invalidates branch-result caches on `filterSignature` changes.
@@ -843,6 +853,53 @@ This section explains the runtime flow **today** and the intended flow **after m
 Net result: expansion intent is an explicit “store”, and branch-result caching is just an optimization.
 
 ---
+
+## Current state: expansion engine (post-refactor summary)
+
+This section captures the outcomes and non-negotiable invariants from the (now completed) expansion engine refactor, so implementers do not need to consult a separate drifting document.
+
+### Why the engine refactor exists (context)
+
+Pivot Table v3 fetches **branches** of a hierarchy and may receive results **out of order**. A branch may also be **incomplete** relative to the current opposite-axis visible depth (missing intersection cells). The engine must:
+- keep the table snappy (parallel fetch where possible),
+- never show blank intersection cells due to missing fetch coverage (“no empty grid”),
+- avoid flicker/collapse due to async ordering,
+- support manual expand/collapse + persisted expansion restore + auto-expand.
+
+### UX invariants (engine-level)
+
+These are treated as non-negotiable UX constraints for engine work:
+1) **No empty grid**: expansions only become visible when the engine has enough data to fully render the expanded area for the current opposite-axis visible depth.
+2) **Cross-axis atomic reveal**: if an expansion on one axis requires additional work on the other axis, the reveal is coordinated so we do not render incomplete intersections.
+3) **Loaders represent user intent, not DB work**:
+   - expanding rows shows row spinners only; expanding columns shows column spinners only
+   - global overlay loader is reserved for full-table transactions when there is no committed table to show (FC-3).
+
+### Engine architecture (what exists in code today)
+
+Key modules introduced by the engine refactor (names are representative; search by symbol if paths drift):
+- `pivot/engine/expansionStateModel.ts`: the canonical expansion intent model (pure)
+- `pivot/engine/expansionPlanner.ts`: computes fetch targets for a desired expansion state (pure)
+- `pivot/engine/fetchCoordinator.ts`: in-flight dedupe + epoch gating + cache priming (side-effects, but testable)
+- `pivot/engine/stagingTree.ts`: order-independent merge of branch deltas (pure)
+- `pivot/engine/query/*`: query-intent helpers + batching optimizer
+- `pivot/render/renderModel.ts` + `pivot/render/PivotTableView.tsx`: render model is pure; view is presentational
+- `pivot/engine/useExpansionEngine.ts`: wiring layer (React state/effects; delegates to pure modules)
+
+### What was completed (high signal)
+
+Completed work includes (summary):
+- Removed legacy expansion knobs/aliases (`maxDepthPerFetch`, legacy expansion state plumbing, and other unreleased/alias fields).
+- Stabilized totals semantics across the plugin (rowTotals/colTotals naming consistency).
+- Removed `buildQuery.ts` “depth bumping” hacks; branch fetch depth is explicit and predictable.
+- Introduced a unified bootstrap planner for initial load (minimal bootstrap query set), and a single initial plan (“single-plan + single-wave”) that can include persisted expansion prefetch targets.
+- Introduced fetch coordination primitives (cache + in-flight dedupe + epoch gating), and split render model vs view for testability.
+
+### Remaining TODOs (explicitly tracked)
+
+Engine-level TODOs that are intentionally deferred:
+- Align loader policy strictly in `revealPolicy.ts` so the global overlay is used only for full-table transactions.
+- Replace heuristic “hasLoadedChildren” logic with explicit loaded-depth evidence + policy (Phase 7 in the engine plan).
 
 ## Architecture critique (current state) (informative)
 
@@ -874,7 +931,7 @@ This section is intentionally critical: it highlights why the refactor plan exis
 3. **Explicit I/O boundary**
    - Only one module talks to `/api/v1/chart/data` and owns caching/concurrency/tracing.
 4. **Expansion persistence is a store, not a side-effect**
-   - Remember user-driven expands/collapses at least until page reload, and persist through filter-driven refreshes when possible (Explore `setControlValue`, dashboard `setDataMask`/`ownState` fallback).
+   - Remember user-driven expands/collapses at least until page reload, and persist through filter-driven refreshes via the best-effort persistence policy (Explore `setControlValue`, dashboard `setDataMask`/`ownState`, otherwise memory-only).
 5. **Expansion engine is a state machine, not a React component**
    - The hook becomes a thin adapter around a testable core.
 6. **Rendering is pure**
@@ -882,7 +939,7 @@ This section is intentionally critical: it highlights why the refactor plan exis
 7. **`PivotTableChart.tsx` becomes composition glue**
    - Orchestrates, but does not implement domain logic.
 8. **Query construction is optimized and unified**
-   - The planner MUST minimize query objects (batch siblings where possible) and minimize round-trips (bundle multiple query objects into a single chart-data request where possible), without compromising cache correctness or UX (BR-4.7, BR-6, FC-3).
+   - The planner MUST minimize query objects (batch siblings where possible) and minimize round-trips (bundle query objects within cancellation scopes, with split-on-413 fallback), without compromising cache correctness or UX (BR-4.7, BR-6, FC-3).
 
 Non-goals (in this plan):
 - Rewriting UI markup/styling or swapping component libraries.
@@ -923,9 +980,31 @@ Requirements:
 
    Forbidden example (rows axis):
    - `GrossRevenue → OrderStatus → (Value, IXYA, DYA)` ❌ (dimension tier inside the measure stack)
-4) Measure leaves MUST be selectable at runtime, and query planning MUST request **only** selected leaves:
-   - If a leaf (e.g. `IXYA`) is deselected for a measure (e.g. `GrossRevenue`), query specs MUST NOT include that derived metric in `metrics`.
-   - If `Value` is deselected, query specs MUST NOT include the raw/base metric value metric in `metrics`.
+4) Measure leaves MUST be selectable at runtime, and query planning MUST request **only the minimal required source data** to produce the selected leaf outputs:
+   - Leaf selection controls the *output shape* (what the pivot renders as measure leaves), not necessarily the exact backend metric list.
+   - The planner MUST compute a “leaf plan” per measure that determines:
+     - which backend metric(s) are required (source metrics), and
+     - which leaf outputs are computed client-side vs returned directly by the backend.
+   - Deselecting a leaf MUST remove its output and SHOULD remove any now-unused source requirements (do not keep unused “warm” metrics).
+   - If `Value` is deselected:
+     - the `Value` leaf output MUST not be rendered, and
+     - the base metric SHOULD be omitted from the requested metrics *if and only if* no remaining selected leaf requires it as a dependency.
+       - If a selected derived leaf requires the base metric (common for time-comparison-derived leaves), the base metric MAY still be requested as an internal dependency even though the `Value` output is not shown.
+
+4.1) **Default implementation for “Superset-style” derived leaves: reuse time-comparison source data, compute leaf outputs client-side**
+   - Superset’s regular Table chart supports time comparison by requesting `time_offsets` (from `formData.time_compare`) and relying on the standard metric-offset naming convention `${metricLabel}__${offset}` (see `TIME_COMPARISON_SEPARATOR = "__"` and `getMetricOffsetsMap()` in `superset-frontend/packages/superset-ui-chart-controls/src/operators/utils/getMetricOffsetsMap.ts`).
+   - Pivot v3 MUST prefer the same “single query object returns base + offsets” approach for derived leaves that depend on time offsets, rather than issuing separate query objects per derived leaf.
+   - Because pivot v3 needs to support multiple derived leaf outputs simultaneously (e.g. `Value`, `DYA`, `%YA`, `IXYA`), it MUST NOT rely on the single-output `compare` post-processing operator alone (it supports one `compare_type` at a time).
+   - Therefore, the default design is:
+     - request the minimal set of source metrics + required time offsets, and
+     - compute the derived leaf outputs as a pure post-fetch assembly step.
+
+4.2) **Responsibility boundaries (robustness requirement)**
+   - UI is responsible only for capturing leaf selection (and storing it in `ownState` / layout spec).
+   - `pivot/layout` is responsible for validating selection + enforcing hard constraints (max 2 tiers; atomic measure stack; no dimensions inside).
+   - `pivot/query` is responsible for translating a leaf selection into QuerySpecs (source metrics + time offsets + any required query flags).
+   - `pivot/core` (or tree assembly code) is responsible for computing derived leaf outputs from the returned source values as a pure function.
+   - The expansion engine MUST remain agnostic: it operates on the resulting tree/cell values regardless of how leaves were produced.
 5) The measure leaf tier MUST NOT be modeled as “expand/collapse”:
    - it is always present in the tree when enabled by selection
    - expansion persistence MUST NOT store keys that exist only because of the measure-leaf tier (same spirit as “do not persist `SUBTOTAL_TOKEN` paths”)
@@ -978,10 +1057,19 @@ Requirements:
    - A change is non-destructive for an axis if the new dimension key list shares a stable prefix with the previous list (e.g. append/remove-at-end changes).
    - Toggling measure leaves (FC-1) and toggling totals/subtotals positions are non-destructive changes with respect to expansion intent (they MUST NOT collapse expansions).
    - Moving a dimension between axes (rows ↔ columns) is **lossy**: some previously-expanded nodes no longer exist as a single axis node (they become “split” across axes).
-     - The system SHOULD preserve expansion intent where it remains representable:
-       - Exact axis swap: MUST migrate expansion sets by swapping row/col expansions.
-       - Otherwise: MUST preserve expansions that still correspond to valid prefix nodes under the new axis dimension order; non-mappable expansions MUST be pruned.
-     - Reordering earlier dimensions is also lossy/ambiguous; treat as prune-by-mappability unless a dedicated migration feature is implemented.
+     - The system MUST migrate/prune expansion intent using deterministic “representable-only” rules (no heuristics):
+       - **Exact axis swap**: if and only if `{newRowKeys === oldColKeys}` and `{newColKeys === oldRowKeys}` (same ordering), the system MUST migrate expansion intent by swapping the axis sets:
+         - `rows ↔ cols`
+         - `collapsedRows ↔ collapsedCols`
+         - then apply stable-prefix pruning (BR-4.1) against the new keys.
+       - **All other cross-axis moves**: the system MUST NOT attempt to “infer” a mapping of expansions across axes.
+         - It MUST preserve only expansions that remain valid prefix nodes on their original axis under stable-prefix pruning (BR-4.1).
+         - Any expansion that relied on a dimension that moved to the other axis MUST be pruned (dropped).
+     - Reordering earlier dimensions is also lossy/ambiguous; it MUST be handled by stable-prefix pruning (BR-4.1) with no migration heuristics.
+     - Rationale (why “no heuristics”):
+       - Cross-axis remapping is under-specified and can easily become incorrect in subtle ways (e.g. “same label” does not imply “same semantic node” after re-layout).
+       - Heuristic remaps would also create hard-to-debug “phantom expansions” (UI shows expanded nodes, but they map to different SQL groupings than the user originally expanded).
+       - Therefore: if a future product requirement needs more aggressive migration, it MUST be specified as a separate, explicitly-designed feature (not a one-off heuristic inside the planner/store).
 5) Data fetching for runtime layout changes MUST be incremental and scoped:
    - the engine MUST compute what additional queries are needed to satisfy the new visible grid
    - it MUST NOT throw away already-fetched branch results when `filterSignature` is unchanged, unless the query shape truly differs
@@ -1009,9 +1097,10 @@ Definitions:
 
 Requirements:
 1) Loader policy MUST be two-tier:
-   - **Initial load (no committed data)**: a full-table loader MAY be shown.
-   - **Any subsequent update when committed data exists**: the table MUST remain visible and interactive; only a lightweight “updating” indicator SHOULD be shown (e.g. in the top-left header cell near “Rows”).
-   - Scroll position SHOULD be preserved across non-destructive updates (filter changes, measure-leaf toggles, and runtime layout changes) as long as the previously-committed table remains visible; if implementation complexity is unexpectedly high, the implementer MUST raise it as a product question (do not silently drop this behavior).
+   - **Initial load (no committed data)**: a full-table loader MUST be shown.
+   - **Any subsequent update when committed data exists**: the table MUST remain visible and interactive; a lightweight “updating” indicator MUST be shown (e.g. in the top-left header cell near “Rows”).
+     - The “updating” indicator MUST remain visible until the new committed view is swapped in (i.e. until the user can see the new data).
+   - Scroll position MUST be preserved across non-destructive updates (filter changes, measure-leaf toggles, and runtime layout changes) as long as the previously-committed table remains visible; if implementation complexity is unexpectedly high, the implementer MUST raise it as a product question (do not silently drop this behavior).
 2) Updates MUST be transaction-scoped:
    - Any layout/filter/selection change MUST start (or advance) an update transaction.
    - Query results MUST be tagged to a transaction; results from older transactions MUST NOT be merged into the pending/desired tree.
@@ -1021,7 +1110,7 @@ Requirements:
    - The planner MUST either:
      - **append**: extend the pending fetch plan (if the transaction’s layout + filterSignature remain the same), or
      - **reset**: cancel/restart planning (if layout or filterSignature changed).
-   - When the desired `filterSignature` differs from the committed `filterSignature`, branch fetches SHOULD be executed only for the desired transaction (avoid fetching “old filter” branches); the committed view MAY still reflect the toggle UI state via spinners/pending indicators.
+   - When the desired `filterSignature` differs from the committed `filterSignature`, branch fetches MUST be executed only for the desired transaction (avoid fetching “old filter” branches); the committed view MAY still reflect the toggle UI state via spinners/pending indicators.
    - The committed view MAY reflect toggles optimistically, but MUST NOT block the update transaction from converging to the desired state.
 4) Commit semantics MUST be explicit:
    - The system MUST define what “ready to swap” means (minimum query coverage for the visible grid + required totals).
@@ -1100,7 +1189,7 @@ These contracts are the guardrails that keep the refactor from devolving into th
 
 **API shape (conceptual):**
 - `buildLayoutContext(layoutSpec, datasource?) => LayoutContext`
-  - `layoutSpec` MAY be derived from Explore `formData` or from runtime builder state (`ownState`) (FC-2).
+  - `layoutSpec` MUST be derivable from Explore `formData` or from runtime builder state (`ownState`) (FC-2).
 
 **Invariants:**
 - Pure + deterministic: same inputs → byte-for-byte equivalent output.
@@ -1164,9 +1253,20 @@ This clarifies what happens to existing “batching” logic and where the “qu
      - `queries = QueryBuilder.toChartDataQueries(specs, baseQueryObject)`
      - `return buildQueryContext(formData, () => queries)`
    - runtime mode (FC-2/FC-3) MUST call the same `QueryPlanner` + `QueryBuilder` via `ChartDataClient` (without mutating Explore controls).
-4) Request bundling SHOULD be used whenever multiple query objects are ready at once:
+4) Request bundling MUST be used whenever multiple query objects are ready at once (within the same cancellation scope; Contract 6.B):
    - example: bootstrap/root queries plus persisted expansion batch-prefetch queries MUST be included in the same request payload (no extra round-trip).
-   - example: a hydration iteration that decides multiple independent batch/single fetches SHOULD bundle them (subject to payload-size limits) and send them together.
+   - example: a hydration iteration that decides multiple independent batch/single fetches MUST bundle them (per cancel-scope keys) and send them together.
+
+**Bundling split policy (“split-on-413”, required):**
+1) `ChartDataClient` MUST attempt to execute each request group as a **single** `/api/v1/chart/data` request containing all query objects for that group.
+2) If the server rejects the request with HTTP 413 (or an equivalent “request too large” failure), `ChartDataClient` MUST retry by splitting the request group into smaller bundles and reissuing them (in parallel).
+   - Splitting MUST be deterministic: order specs by stable `specId` and chunk/split consistently (so “same inputs” yields the same split sets).
+   - Splitting MUST continue until either all bundles succeed, or a bundle contains a single spec and still fails (in which case the transaction fails per Contract 6.C).
+3) Split execution MUST preserve semantics:
+   - all split requests belong to the same `transactionId`
+   - results are mapped back to `QuerySpec` ids (Contract 2) and merged order-independently
+   - any single-request failure still follows the chart-level error policy (Contract 6.C)
+4) Limitation (Explore initial load): Explore-driven initial load emits one QueryContext and Superset core sends one request; it cannot be transparently split by the pivot plugin. See BR-4.8.
 
 **Batch optimization usage (when it runs, and when it does not):**
 1) Batch optimization MUST run on **planned branch-prefetches** (including “persisted expansions prefetch” and “hydration fetch plan”), not on bootstrap/root intents:
@@ -1182,7 +1282,7 @@ This clarifies what happens to existing “batching” logic and where the “qu
 **Hybrid cancellation constraints (why bundling cannot be unconditional):**
 1) Superset request cancellation is HTTP-request scoped (AbortController). It is not “per query object” within a bundled payload.
 2) Therefore, request bundling MUST respect the desired cancellation granularity:
-   - Initial load and filter/layout updates SHOULD bundle aggressively (BR-4.8; FC-3).
+   - Initial load and filter/layout updates MUST bundle aggressively (BR-4.8; FC-3).
    - Interactive expansion fetches MUST NOT be bundled across unrelated cancellation scopes (Contract 6), otherwise collapsing one node would require cancelling work for other nodes (or accepting “soft cancel only”).
 
 ### Contract 3 — Only `ChartDataClient` performs I/O and owns cache correctness
@@ -1201,8 +1301,14 @@ This clarifies what happens to existing “batching” logic and where the “qu
   - Today, concurrency is effectively unbounded fan-out (`Promise.all`) in the expansion engine.
   - This refactor MUST NOT introduce concurrency throttling unless explicitly declared as a behavior change.
 - Request cancellation is HTTP-request scoped:
-  - cancellation MUST be implemented via `AbortController` passed to `SupersetClient` (`signal`) when possible
+  - cancellation MUST be implemented via `AbortController` passed to `SupersetClient` (`signal`)
   - there is no supported concept of “cancel one query object inside a bundled payload”; cancellation granularity is determined by request grouping (Contract 6.B)
+- Global Async Queries (GAQ) MUST be supported using the same policy as Superset core:
+  - When `FeatureFlag.GlobalAsyncQueries` is enabled, `/api/v1/chart/data` MAY return **HTTP 202**.
+  - `ChartDataClient` MUST mirror `handleChartDataResponse()` behavior from `superset-frontend/src/components/Chart/chartAction.js`:
+    - on **HTTP 200**: return `json.result` (or `json` if `result` is absent)
+    - on **HTTP 202**: call `waitForAsyncData(asyncEvent)` from `superset-frontend/src/middleware/asyncEvent.ts` and return the resolved results
+    - on any other status: treat as an error
 - Returns structured warnings alongside data (e.g. truncation/partial results), rather than requiring callers to infer them ad-hoc.
 
 **Enforcement:**
@@ -1271,15 +1377,17 @@ This clarifies what happens to existing “batching” logic and where the “qu
 - Collapse semantics MUST be immediate and cancel work:
   - collapsing a node MUST immediately remove its children from the visible model (no waiting for pending fetches).
   - collapsing a node MUST cancel (or render irrelevant) all in-flight fetches that exist solely to satisfy that node’s subtree (including descendant expansions).
-- Expand semantics MUST be “no empty grid”:
-  - expanding a node MUST show a per-node spinner immediately,
-  - but MUST NOT expand the UI (render the newly-visible children/cells) until the engine has enough data to fully render the expanded area for the current opposite-axis visible depth (FC-3.6).
+- Expand semantics MUST be “no empty grid” and cache-first:
+  - expanding a node MUST immediately update the desired expansion intent,
+  - before showing a spinner or issuing any network request, the engine MUST attempt to satisfy the expansion from cache (Contract 6.A.3),
+  - if cache coverage is sufficient, the UI MUST expand immediately (and MUST NOT show a spinner),
+  - if cache coverage is not sufficient, the node MUST show a per-node spinner, and the UI MUST NOT expand (render the newly-visible children/cells) until the engine has enough data to fully render the expanded area for the current opposite-axis visible depth (FC-3.6).
 - Event storms MUST converge to the latest desired state:
   - user intents are never “lost”, but network work MUST NOT accumulate as a long backlog of obsolete intermediate states.
   - the engine MUST cancel/ignore stale request groups and prioritize executing the minimal work required to satisfy the latest desired state.
-- Fetch cancellation SHOULD be implemented using Superset’s request cancellation mechanism when available:
+- Fetch cancellation MUST be implemented using Superset’s request cancellation mechanism:
   - If a request cannot be cancelled at a fine-grained level (e.g. because multiple query objects were bundled into one HTTP request), stale results MUST be ignored for the expansion intent that no longer exists.
-  - Any fully-received and parsed results MAY still be stored in cache (filter-scoped) to make immediate re-expansion snappy.
+  - Any fully-received and parsed results MUST still be stored in cache (filter-scoped) to make immediate re-expansion snappy.
 
 #### Contract 6.A — Hybrid cancellation model (abort + soft-cancel apply)
 
@@ -1300,7 +1408,7 @@ This is required because Superset cancellation is request-scoped (AbortControlle
 
 1) **Correctness is transaction-scoped**
    - Every fetch execution MUST be tagged with the current update `transactionId`.
-   - Results from a different `transactionId` MUST NOT be applied (they are stale). They MAY be cached if their `{layoutSignature, filterSignature, spec key}` matches (BR-9).
+   - Results from a different `transactionId` MUST NOT be applied (they are stale). They MUST be cached if their `{layoutSignature, filterSignature, spec key}` matches (BR-9).
 
 2) **Collapse is immediate, and cancels work**
    - Collapsing a node MUST immediately remove its subtree from the *visible* model (no waiting for fetch completion).
@@ -1309,14 +1417,14 @@ This is required because Superset cancellation is request-scoped (AbortControlle
    - If an in-flight request group contains a mix of still-needed and no-longer-needed specs, it MUST NOT be aborted; instead, apply rules (4) decide what to do with results.
 
 3) **Expand is immediate intent, but commits only when renderable**
-   - Expanding a node MUST immediately update the desired expansion intent and show a per-node spinner for that node.
-   - Before issuing any network request, the engine SHOULD attempt to satisfy the expansion from cache (BR-9):
-     - If cache coverage is sufficient to fully render the expanded area (FC-3.6), the UI MUST expand immediately and SHOULD avoid showing a spinner (or it may flash briefly but must not persist).
-   - If cache coverage is not sufficient, the node MUST remain unexpanded (spinner shown) until fetch results provide full coverage (FC-3.6).
+   - Expanding a node MUST immediately update the desired expansion intent.
+   - Before showing a spinner or issuing any network request, the engine MUST attempt to satisfy the expansion from cache (BR-9).
+     - If cache coverage is sufficient to fully render the expanded area (FC-3.6), the UI MUST expand immediately and MUST NOT show a spinner.
+   - If cache coverage is not sufficient, the node MUST remain unexpanded and MUST show a spinner until fetch results provide full coverage (FC-3.6).
 
 4) **Soft-cancel apply is required**
    - If results arrive for a spec that is no longer needed (e.g. the node was collapsed, or the transaction advanced), the engine MUST NOT apply them to the visible table.
-   - Those results MAY still warm cache if and only if:
+   - Those results MUST still warm cache if and only if:
      - they are fully received and parsed (no “partial response caching”), and
      - the cache key matches the current `{layoutSignature, filterSignature, spec key}` rules (BR-9).
 
@@ -1332,7 +1440,7 @@ Scenario:
 Expected behavior:
 - UI collapses immediately (subtree hidden).
 - `RG-1` is aborted if it is now entirely unnecessary.
-- If `RG-1` still resolves (abort may be best-effort), results are ignored for apply; they MAY warm cache.
+- If `RG-1` still resolves (abort may be best-effort), results are ignored for apply; they MUST warm cache (if cache keys match).
 
 #### Contract 6.B — Request grouping and bundling policy (cancellation-aware)
 
@@ -1349,13 +1457,13 @@ This section defines *how to choose request groups* so cancellation semantics re
 ##### Requirements
 
 1) **Initial load and update transactions (plan known up-front)**
-   - For initial load (BR-4.8), `ChartDataClient` SHOULD bundle the entire initial plan into one HTTP request when feasible.
-   - For filter/layout updates (FC-3), `ChartDataClient` SHOULD bundle the planned specs into the minimum number of HTTP requests, subject to payload limits.
+   - For any plan-known-up-front transaction executed by `ChartDataClient` (e.g. runtime layout mode, or FC-3 background updates), the client MUST bundle the planned specs into the minimum number of HTTP requests.
+   - If a bundle is rejected with HTTP 413, the client MUST split and retry per the split-on-413 policy (Contract 2.A).
 
 2) **Interactive expansion/hydration (preserve cancellation granularity)**
    - During interactive expansion/hydration, `ChartDataClient` MUST NOT bundle query objects across different `cancelScopeKey` values into the same HTTP request.
    - The intent is: collapsing one node (or cancelling one subtree) should not require cancelling unrelated work for other nodes.
-   - Within one `cancelScopeKey`, the client MAY bundle all query objects required by the planner for that scope (e.g. multiple queryPairs for totals/formatting).
+   - Within one `cancelScopeKey`, the client MUST bundle all query objects required by the planner for that scope (e.g. multiple queryPairs for totals/formatting), subject only to split-on-413 retries (Contract 2.A).
 
 3) **Batching creates shared cancellation fate**
    - If BR-6 batching combines multiple sibling expansions under the same parent into one `|batch:` spec, those siblings necessarily share a `cancelScopeKey`.
@@ -1399,7 +1507,11 @@ Concurrency bounding/backpressure is explicitly **out of scope** for this refact
 
 ---
 
-## Concrete Phase Plan (small PRs, behavior-preserving)
+## Improvement Roadmap (TDD, minimal risk)
+
+Quality gates (keep green throughout):
+- tests: `npm test plugins/plugin-chart-pivot-table-v3`
+- lint (plugin scope): `npx eslint plugins/plugin-chart-pivot-table-v3`
 
 ### Phase 0 — Safety net and invariants (1 PR)
 
@@ -1417,6 +1529,22 @@ Files likely touched:
 
 Exit criteria:
 - Baseline tests pass and cover the scenarios you consider “must not regress” (metrics-first layouts, subtotal selections, persisted expansions, batching).
+
+---
+
+### Phase 0.5 — Global Async Queries (HTTP 202) support for plugin-owned fetches (1 PR)
+
+**Purpose:** Ensure the plugin behaves correctly when Superset executes `/api/v1/chart/data` asynchronously (GAQ enabled).
+
+Changes:
+- Implement GAQ handling using the same policy as Superset core:
+  - mirror `handleChartDataResponse()` in `superset-frontend/src/components/Chart/chartAction.js`
+  - use `waitForAsyncData()` from `superset-frontend/src/middleware/asyncEvent.ts` for HTTP 202
+- Apply this to all plugin-owned calls (today: `fetchPivotBranch.ts`; future: `pivot/data/ChartDataClient`).
+
+Exit criteria:
+- Manual expand/collapse continues to work with GAQ enabled (no “async job object treated as data” failures).
+- The change is behavior-preserving for non-GAQ environments.
 
 ---
 
@@ -1553,13 +1681,28 @@ Add cross-cutting concerns here (behavior-preserving initially):
   - Concurrency limiting/backpressure is a deferred optimization and is not required for this refactor.
 - **Truncation warnings**: detect `rowcount == row_limit` in any result and expose a typed warning to UI (the code currently doesn’t surface this).
  - **Filter-scoped caching**: branch-result caches must be keyed by a `filterSignature` (time range + filters + extra_form_data + row_limit + etc). When filters change, it is correct to invalidate branch-result cache while keeping expansion intent.
- - **Request bundling**: accept many `QuerySpec`s and send them as a single `/api/v1/chart/data` request payload (multi-query), splitting into multiple requests only when a configurable size/limit threshold is exceeded (Contract 2.A).
+ - **Request bundling**: accept many `QuerySpec`s and send them as a single `/api/v1/chart/data` request payload (multi-query) per request group; if the server rejects a bundle with HTTP 413, split and retry (Contract 2.A).
 
 Exit criteria:
 - No other module imports `SupersetClient`.
 - Cache + concurrency are centralized.
 - Request bundling is centralized:
-  - the plugin can execute a set of `QuerySpec`s as one multi-query `/api/v1/chart/data` request payload (splitting only when required), so “simultaneous bootstrap + batch prefetch” is not implemented via ad-hoc multiple calls.
+  - the plugin can execute a set of `QuerySpec`s as one multi-query `/api/v1/chart/data` request payload, and deterministically split-on-413 (Contract 2.A), so “simultaneous bootstrap + batch prefetch” is not implemented via ad-hoc multiple calls.
+
+---
+
+### Phase 4.5 — Error UX: full-chart failure + Retry (1 PR) (**behavior change**)
+
+**Purpose:** Adopt the simplified error policy (Contract 6.C) in a dedicated behavior-change PR, after `ChartDataClient` centralizes error mapping and GAQ handling.
+
+Changes:
+- Any fetch error (initial load, branch expansion, cross-axis hydration) renders a full-chart error UI (no table).
+- The error UI exposes one “Retry” action that starts a new transaction for the current state.
+- Layout/filter changes while failed are handled by standard rules (no special “error mode” logic).
+
+Exit criteria:
+- Error behavior matches Contract 6.C and AS-22/AS-23.
+- No other runtime behavior changes are introduced in this PR.
 
 ---
 
@@ -1654,6 +1797,7 @@ Once the boundaries are clean, you can safely tackle behavior enhancements (each
 - Better truncation warnings and partial-results UX.
 - Clear “expand all in level” commands.
 - More predictable ordering of subtotals vs metric tiers (policy becomes explicit in `layout`).
+- FC-3 “keep previous table visible” (stale-while-revalidate): implement committed vs pending transactions and replace global overlay loaders with a lightweight updating indicator once committed data exists (approved as a separate behavior-change phase).
 
 Do not mix these with the modularization PRs; keep refactors behavior-preserving.
 
@@ -1672,10 +1816,14 @@ Do not mix these with the modularization PRs; keep refactors behavior-preserving
 
 ## Suggested first PR order (lowest risk first)
 
-1) Phase 1: `LayoutContext` (no file moves yet; mostly “stop recomputing”).
-2) Phase 4: `ChartDataClient` boundary (wrap I/O; keep old API).
-3) Phase 3: query spec unification (use the data client; keep old names).
-4) Phase 2: split `utils.ts` into `core/*` (mostly mechanical, after call sites stabilize).
-5) Phase 5.A: `ExpansionStateStore` (memory-first persistence; dashboard fallback).
-6) Phase 5.B: split expansion engine (biggest change, now safer).
-7) Phase 6: split the chart component.
+1) Phase 0: Safety net and invariants (tests first).
+2) Phase 0.5: GAQ (HTTP 202) support for plugin-owned fetches (behavior-preserving).
+3) Phase 1: `LayoutContext` (no file moves yet; mostly “stop recomputing”).
+4) Phase 4: `ChartDataClient` boundary (wrap I/O; centralize GAQ + error mapping).
+5) Phase 3: query spec unification (use the data client; keep old names).
+6) Phase 2: split `utils.ts` into `core/*` (mostly mechanical, after call sites stabilize).
+7) Phase 4.5: error UX (full-chart failure + Retry) (**behavior change**).
+8) Phase 5.A: `ExpansionStateStore` (memory-first persistence; dashboard fallback).
+9) Phase 5.B: split expansion engine further (biggest change, now safer).
+10) Phase 6: split the chart component.
+11) Feature work (separate PR series): FC-1 (multi-level measures), FC-2 (runtime builder), FC-3 (stale-while-revalidate; approved as a behavior-change phase after modularization).

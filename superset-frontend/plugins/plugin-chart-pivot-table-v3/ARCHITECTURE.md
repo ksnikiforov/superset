@@ -527,6 +527,7 @@ One important distinction:
 In today’s code:
 - Initial load already uses request bundling (`buildQuery.ts` returns a multi-query payload).
 - Hydration often issues **multiple** `/api/v1/chart/data` requests in parallel (one per single/batch query object), rather than bundling them into one request. The refactor plan makes bundling a first-class responsibility of `ChartDataClient` (see `superset-frontend/plugins/plugin-chart-pivot-table-v3/REFACTOR_PLAN.md`).
+  - `ChartDataClient` also owns split-on-413 retries: attempt one bundled request per cancellation scope, and if a proxy rejects a bundle (HTTP 413), split and retry deterministically. (Explore initial load cannot be transparently split.)
 
 #### Single branch fetch
 
@@ -756,7 +757,7 @@ These are useful context, but treat them as *design or planning documents* unles
 
 - `REQUIREMENTS.md`: implementation map + current behavior notes
 - `EXPANSION_QUERY_METHODOLOGY.md`: the intended query-planning rules (the engine largely follows these)
-- `EXPANSION_ENGINE_REFACTOR_PLAN.md`: detailed refactor log; great for rationale, but may include intermediate states
+- `REFACTOR_PLAN.md`: plugin improvement plan (module boundaries + future features); also includes the expansion engine refactor summary/log to avoid spec drift
 - `CODE_REVIEW_COMPLAINTS.md`: historical critique of earlier approaches; some items have been addressed by the current expansion engine
 
 When in doubt: trace the runtime path from `buildQuery.ts` → `transformProps.ts` → `useExpansionEngine.ts` → `fetchPivotBranch.ts`.
