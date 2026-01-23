@@ -52,6 +52,13 @@ import { buildBranchTreeFromResults } from './fetchPivotBranch';
 
 const { DATABASE_DATETIME } = TimeFormats;
 
+declare const process: {
+  env?: {
+    NODE_ENV?: string;
+    WEBPACK_MODE?: string;
+  };
+};
+
 export default function transformProps(
   chartProps: ChartProps<PivotTableQueryFormData>,
 ) {
@@ -256,6 +263,28 @@ export default function transformProps(
       label: 'Grand total',
       formattedLabel: 'Grand total',
     };
+  }
+
+  const isDevBuild =
+    process.env?.WEBPACK_MODE === 'development' ||
+    process.env?.NODE_ENV === 'test';
+  if (isDevBuild) {
+    if (
+      Object.keys(nextTreeWithLabels.rows).length > 0 &&
+      !nextTreeWithLabels.rows[rootKey]
+    ) {
+      throw new Error(
+        'PivotTable v3 invariant violated: missing row root node',
+      );
+    }
+    if (
+      Object.keys(nextTreeWithLabels.cols).length > 0 &&
+      !nextTreeWithLabels.cols[rootKey]
+    ) {
+      throw new Error(
+        'PivotTable v3 invariant violated: missing column root node',
+      );
+    }
   }
 
   const { selectedFilters } = filterState;
