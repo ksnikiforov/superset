@@ -39,9 +39,9 @@ import {
   normalizeMetricDatabarMapWithKeys,
   serializePath,
 } from './utils';
-import { buildInitialQueryPlanFromLayout } from './pivot/engine/initialQueryPlan';
 import { buildBranchTreeFromResults } from './fetchPivotBranch';
 import { buildLayoutContext } from './pivot/layout/LayoutContext';
+import { buildInitialQuerySpecs } from './pivot/query/specs';
 
 const { DATABASE_DATETIME } = TimeFormats;
 
@@ -104,9 +104,9 @@ export default function transformProps(
     formData.colSorting,
     groupbyColumns,
   );
-  const initialPlan = buildInitialQueryPlanFromLayout(layout, formData);
-  const planMetrics = initialPlan.targets.reduce(
-    (acc, target) => mergeMetrics(acc, target.metricsForQuery),
+  const initialSpecs = buildInitialQuerySpecs(formData, layout);
+  const planMetrics = initialSpecs.reduce(
+    (acc, spec) => mergeMetrics(acc, spec.metrics),
     metrics,
   );
   const pivotTheme = formData.pivotTheme || 'none';
@@ -193,24 +193,49 @@ export default function transformProps(
   });
   const rootKey = serializePath([]);
   const emptyTree: PivotTreeData = { rows: {}, cols: {}, cells: {} };
-  let queryIndex = 0;
-  const nextTreeWithLabels = initialPlan.targets.reduce((acc, target) => {
-    const slice = queriesData.slice(
-      queryIndex,
-      queryIndex + target.queryPairs.length,
-    );
-    queryIndex += target.queryPairs.length;
+  const getQueryName = (result: unknown): string | undefined => {
+    if (!result || typeof result !== 'object') {
+      return undefined;
+    }
+    const record = result as Record<string, unknown>;
+    const query = record.query;
+    if (query && typeof query === 'object') {
+      const queryRecord = query as Record<string, unknown>;
+      const name = queryRecord.query_name;
+      if (typeof name === 'string') {
+        return name;
+      }
+    }
+    const name = record.query_name;
+    return typeof name === 'string' ? name : undefined;
+  };
+  const resultsByName = new Map<string, (typeof queriesData)[number]>();
+  queriesData.forEach(result => {
+    const name = getQueryName(result);
+    if (name) {
+      resultsByName.set(name, result);
+    }
+  });
+  const nextTreeWithLabels = initialSpecs.reduce((acc, spec, idx) => {
+    const result =
+      resultsByName.get(spec.queryName) ??
+      queriesData[idx] ??
+      ({
+        data: [],
+        colnames: [],
+        coltypes: [],
+      } as (typeof queriesData)[number]);
     const nextTree = buildBranchTreeFromResults({
-      results: slice,
-      queryPairs: target.queryPairs,
-      metricsForQuery: target.metricsForQuery,
+      results: [result],
+      queryPairs: [{ rowDepth: spec.meta.rowDepth, colDepth: spec.meta.colDepth }],
+      metricsForQuery: spec.metrics,
       formData,
-      rowGroupby: target.rowGroupbyForQueryFull,
-      colGroupby: target.colGroupbyForQueryFull,
-      rowSubtotalLevels: target.rowSubtotalLevels,
-      colSubtotalLevels: target.colSubtotalLevels,
-      metricsLayoutResolved: target.metricsLayoutResolved,
-      metricInsertIndex: target.metricInsertIndex,
+      rowGroupby: spec.meta.rowGroupbyForQueryFull,
+      colGroupby: spec.meta.colGroupbyForQueryFull,
+      rowSubtotalLevels: spec.meta.rowSubtotalLevels,
+      colSubtotalLevels: spec.meta.colSubtotalLevels,
+      metricsLayoutResolved: spec.meta.metricsLayoutResolved,
+      metricInsertIndex: spec.meta.metricInsertIndex,
     });
     return mergeTrees(acc, nextTree);
   }, emptyTree);

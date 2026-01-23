@@ -18,9 +18,10 @@
  */
 import { ChartProps, GenericDataType, supersetTheme } from '@superset-ui/core';
 import transformProps from '../../../src/transformProps';
-import { buildInitialQueryPlan } from '../../../src/pivot/engine/initialQueryPlan';
 import { MetricsLayoutEnum, PivotTableQueryFormData } from '../../../src/types';
 import { buildFormData } from '../fixtures/pivotFormData';
+import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
+import { buildInitialQuerySpecs } from '../../../src/pivot/query/specs';
 
 describe('layout resolution (contracts)', () => {
   it('keeps transformProps layout/subtotal normalization consistent with the initial query plan', () => {
@@ -35,7 +36,8 @@ describe('layout resolution (contracts)', () => {
       colSubtotalLevels: [0, 1],
     });
 
-    const plan = buildInitialQueryPlan(formData);
+    const layout = buildLayoutContext(formData);
+    const specs = buildInitialQuerySpecs(formData, layout);
     const chartProps = new ChartProps({
       formData,
       width: 400,
@@ -67,22 +69,22 @@ describe('layout resolution (contracts)', () => {
       colSubtotalLevels: number[];
     };
 
-    expect(result.groupbyRows).toEqual(plan.rowGroupby);
-    expect(result.groupbyColumns).toEqual(plan.colGroupby);
+    expect(result.groupbyRows).toEqual(layout.groupbyRows);
+    expect(result.groupbyColumns).toEqual(layout.groupbyColumns);
 
-    const bootstrapTarget = plan.targets.find(t => t.kind === 'bootstrap');
-    expect(bootstrapTarget).toBeDefined();
+    const bootstrapSpec = specs.find(spec => spec.meta.kind === 'bootstrap');
+    expect(bootstrapSpec).toBeDefined();
     expect(signature.metricsLayout).toBe(
-      bootstrapTarget?.metricsLayoutResolved,
+      bootstrapSpec?.meta.metricsLayoutResolved,
     );
     expect(signature.metricInsertIndex).toBe(
-      bootstrapTarget?.metricInsertIndex,
+      bootstrapSpec?.meta.metricInsertIndex,
     );
     expect(signature.rowSubtotalLevels).toEqual(
-      bootstrapTarget?.rowSubtotalLevels,
+      bootstrapSpec?.meta.rowSubtotalLevels,
     );
     expect(signature.colSubtotalLevels).toEqual(
-      bootstrapTarget?.colSubtotalLevels,
+      bootstrapSpec?.meta.colSubtotalLevels,
     );
   });
 });

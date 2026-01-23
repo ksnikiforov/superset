@@ -25,7 +25,7 @@ import {
   serializeCellKey,
   serializePath,
 } from '../../src/utils';
-import { buildInitialQueryPlan } from '../../src/pivot/engine/initialQueryPlan';
+import { buildInitialQuerySpecs } from '../../src/pivot/query/specs';
 
 const baseFormData: Partial<PivotTableQueryFormData> = {
   groupbyRows: ['row1'],
@@ -95,6 +95,82 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
     );
     expect(result.data.rows).toHaveProperty(rowKey);
     expect(result.data.cols).toHaveProperty(colKey);
+    expect(
+      result.data.cells[serializeCellKey(rootKey, rootKey)]?.values.metric1,
+    ).toBe(30);
+    expect(
+      result.data.cells[serializeCellKey(rowKey, colKey)]?.values.metric1,
+    ).toBe(15);
+    expect(
+      result.data.cells[serializeCellKey(rowKey, rootKey)]?.values.metric1,
+    ).toBe(10);
+    expect(
+      result.data.cells[serializeCellKey(rootKey, colKey)]?.values.metric1,
+    ).toBe(20);
+  });
+
+  it('maps query results by query_name rather than array order (Contract 2)', () => {
+    const formData = baseFormData as PivotTableQueryFormData;
+    const specs = buildInitialQuerySpecs(formData);
+    const queryResults = specs.map(spec => {
+      if (spec.meta.rowDepth === 0 && spec.meta.colDepth === 0) {
+        return {
+          query: { query_name: spec.queryName },
+          data: [{ metric1: 30 }],
+          colnames: ['metric1'],
+          coltypes: [0],
+        };
+      }
+      if (spec.meta.rowDepth === 1 && spec.meta.colDepth === 1) {
+        return {
+          query: { query_name: spec.queryName },
+          data: [{ row1: 'A', col1: 'B', metric1: 15 }],
+          colnames: ['row1', 'col1', 'metric1'],
+          coltypes: [1, 1, 0],
+        };
+      }
+      if (spec.meta.rowDepth === 1 && spec.meta.colDepth === 0) {
+        return {
+          query: { query_name: spec.queryName },
+          data: [{ row1: 'A', metric1: 10 }],
+          colnames: ['row1', 'metric1'],
+          coltypes: [1, 0],
+        };
+      }
+      if (spec.meta.rowDepth === 0 && spec.meta.colDepth === 1) {
+        return {
+          query: { query_name: spec.queryName },
+          data: [{ col1: 'B', metric1: 20 }],
+          colnames: ['col1', 'metric1'],
+          coltypes: [1, 0],
+        };
+      }
+      return { query: { query_name: spec.queryName }, data: [] };
+    });
+    const shuffled = [...queryResults].reverse();
+
+    const rowKey = serializePath(['A']);
+    const colKey = serializePath(['B']);
+    const chartProps = new ChartProps({
+      formData,
+      width: 400,
+      height: 300,
+      queriesData: shuffled,
+      hooks: { setDataMask: jest.fn() },
+      filterState: { selectedFilters: {} },
+      datasource: {
+        verboseMap: {},
+        columnFormats: {},
+        currencyFormats: {},
+        columns: [
+          { column_name: 'row1', type_generic: GenericDataType.String },
+          { column_name: 'col1', type_generic: GenericDataType.String },
+        ],
+      },
+      theme: supersetTheme,
+    });
+
+    const result = transformProps(chartProps);
     expect(
       result.data.cells[serializeCellKey(rootKey, rootKey)]?.values.metric1,
     ).toBe(30);
@@ -352,47 +428,52 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
         collapsedCols: [],
       },
     };
-    const plan = buildInitialQueryPlan(formData as PivotTableQueryFormData);
-    const queriesData = plan.targets.flatMap(target =>
-      target.queryPairs.map(pair => {
-        if (target.kind === 'branch') {
+    const specs = buildInitialQuerySpecs(formData as PivotTableQueryFormData);
+    const queriesData = specs.map(spec => {
+      if (spec.meta.kind === 'bootstrap') {
+        if (spec.meta.rowDepth === 0 && spec.meta.colDepth === 0) {
           return {
-            data: [{ row1: 'A', row2: 'B', col1: 'C', metric1: 11 }],
-            colnames: ['row1', 'row2', 'col1', 'metric1'],
-            coltypes: [1, 1, 1, 0],
-          };
-        }
-        if (pair.rowDepth === 0 && pair.colDepth === 0) {
-          return {
+            query: { query_name: spec.queryName },
             data: [{ metric1: 30 }],
             colnames: ['metric1'],
             coltypes: [0],
           };
         }
-        if (pair.rowDepth === 1 && pair.colDepth === 1) {
+        if (spec.meta.rowDepth === 1 && spec.meta.colDepth === 1) {
           return {
+            query: { query_name: spec.queryName },
             data: [{ row1: 'A', col1: 'C', metric1: 10 }],
             colnames: ['row1', 'col1', 'metric1'],
             coltypes: [1, 1, 0],
           };
         }
-        if (pair.rowDepth === 1 && pair.colDepth === 0) {
+        if (spec.meta.rowDepth === 1 && spec.meta.colDepth === 0) {
           return {
+            query: { query_name: spec.queryName },
             data: [{ row1: 'A', metric1: 10 }],
             colnames: ['row1', 'metric1'],
             coltypes: [1, 0],
           };
         }
-        if (pair.rowDepth === 0 && pair.colDepth === 1) {
+        if (spec.meta.rowDepth === 0 && spec.meta.colDepth === 1) {
           return {
+            query: { query_name: spec.queryName },
             data: [{ col1: 'C', metric1: 10 }],
             colnames: ['col1', 'metric1'],
             coltypes: [1, 0],
           };
         }
-        return { data: [] };
-      }),
-    );
+      }
+      if (spec.meta.kind === 'branch' || spec.meta.kind === 'batch') {
+        return {
+          query: { query_name: spec.queryName },
+          data: [{ row1: 'A', row2: 'B', col1: 'C', metric1: 11 }],
+          colnames: ['row1', 'row2', 'col1', 'metric1'],
+          coltypes: [1, 1, 1, 0],
+        };
+      }
+      return { query: { query_name: spec.queryName }, data: [] };
+    });
 
     const chartProps = new ChartProps({
       formData,

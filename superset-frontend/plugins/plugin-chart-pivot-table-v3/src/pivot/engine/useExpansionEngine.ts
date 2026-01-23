@@ -51,12 +51,12 @@ import {
   type StagingTreeState,
 } from './stagingTree';
 import { fetchPivotBranch, peekPivotBranchCache } from '../../fetchPivotBranch';
-import { buildBatchSignature } from './query/batchSignature';
+import { buildBatchSignature } from '../query/batchSignature';
 import {
   optimizeFetchPlan,
   type BatchCandidate,
   type BatchGroup,
-} from './query/fetchPlanOptimizer';
+} from '../query/fetchPlanOptimizer';
 import { fetchPivotBranchesBatch } from './query/fetchPivotBranchesBatch';
 import {
   buildRenderModel,

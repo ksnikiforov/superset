@@ -17,31 +17,21 @@
  * under the License.
  */
 import {
-  BinaryQueryObjectFilterClause,
   buildQueryContext,
   ensureIsArray,
-  getColumnLabel,
-  QueryFormColumn,
-  QueryObject,
-  QueryObjectFilterClause,
+  type QueryObject,
   SupersetClient,
-  UnaryQueryObjectFilterClause,
 } from '@superset-ui/core';
 import {
-  buildBranchQueryPairs,
-  buildBranchTreeFromResults,
-  resolveFetchContextForBatch,
-} from '../../../fetchPivotBranch';
-import { formatQueryName } from './queryName';
-import {
-  PivotAxis,
   PivotPath,
-  PivotPathValue,
   PivotTableQueryFormData,
   PivotTreeData,
 } from '../../../types';
-import { parsePath, serializePath } from '../../../utils';
-import { BatchGroup } from './fetchPlanOptimizer';
+import { type BatchGroup } from '../../query/fetchPlanOptimizer';
+import { buildLayoutContext } from '../../layout/LayoutContext';
+import { buildBatchQuerySpecs } from '../../query/specs';
+import { toChartDataQueries } from '../../query/toChartDataQueries';
+import { buildBranchTreeFromResults } from '../../../fetchPivotBranch';
 import { handleChartDataResponse } from './handleChartDataResponse';
 
 export type FetchPivotBranchesBatchParams = {
@@ -58,56 +48,6 @@ export type FetchPivotBranchesBatchResult = {
   error?: Error;
 };
 
-const isNullish = (value: PivotPathValue) =>
-  value === null || value === undefined;
-
-const buildPrefixFilters = (
-  groupby: QueryFormColumn[],
-  prefix: PivotPath,
-): QueryObjectFilterClause[] =>
-  prefix.map((value, index) => {
-    if (isNullish(value)) {
-      return {
-        col: getColumnLabel(groupby[index]),
-        op: 'IS NULL',
-      } as UnaryQueryObjectFilterClause;
-    }
-    return {
-      col: getColumnLabel(groupby[index]),
-      op: '==',
-      val: value,
-    } as BinaryQueryObjectFilterClause;
-  });
-
-const buildSiblingFilter = (
-  groupby: QueryFormColumn[],
-  siblingIndex: number,
-  siblings: PivotPathValue[],
-): QueryObjectFilterClause[] => {
-  if (siblings.length === 0) {
-    return [];
-  }
-  const column = groupby[siblingIndex];
-  if (!column) {
-    return [];
-  }
-  if (siblings.some(isNullish)) {
-    return [
-      {
-        col: getColumnLabel(column),
-        op: 'IS NULL',
-      } as UnaryQueryObjectFilterClause,
-    ];
-  }
-  return [
-    {
-      col: getColumnLabel(column),
-      op: 'IN',
-      val: siblings,
-    } as BinaryQueryObjectFilterClause,
-  ];
-};
-
 export const fetchPivotBranchesBatch = async ({
   formData,
   batch,
@@ -116,70 +56,32 @@ export const fetchPivotBranchesBatch = async ({
   visibleColDepth,
   getFetchPath,
 }: FetchPivotBranchesBatchParams): Promise<FetchPivotBranchesBatchResult> => {
-  const representativeKey = batch.targets[0]?.pathKey;
-  if (!representativeKey) {
-    return { data: undefined };
-  }
-  const metricPath = parsePath(representativeKey);
-  const path = getFetchPath(metricPath);
-  const ctx = resolveFetchContextForBatch({
+  const layout = buildLayoutContext(formData);
+  const specs = buildBatchQuerySpecs({
     formData,
-    axis: batch.axis,
-    path,
-    metricPath,
+    layout,
+    batch,
+    getFetchPath,
     currentTree,
     visibleRowDepth,
     visibleColDepth,
+    chunkIndex: 0,
   });
+  if (specs.length === 0) {
+    return { data: undefined };
+  }
+  const queryPairs = specs.map(spec => ({
+    rowDepth: spec.meta.rowDepth,
+    colDepth: spec.meta.colDepth,
+  }));
+  const metricsForQuery = specs[0].metrics;
   const queryFormData =
-    ctx.metricsForQuery.length > 0
-      ? { ...formData, metrics: ctx.metricsForQuery }
-      : formData;
-  const queryPairs = buildBranchQueryPairs({
-    axis: batch.axis,
-    pathLength: ctx.sanitizedPath.length,
-    rowDepth: ctx.rowDepth,
-    colDepth: ctx.colDepth,
-    rowGroupby: ctx.rowGroupby,
-    colGroupby: ctx.colGroupby,
-    rowSubtotalLevels: ctx.rowSubtotalLevels,
-    colSubtotalLevels: ctx.colSubtotalLevels,
-    hasRowFormatting: ctx.hasRowFormatting,
-    hasColFormatting: ctx.hasColFormatting,
-    hasRowTotalSorting: ctx.hasRowTotalSorting,
-    hasColTotalSorting: ctx.hasColTotalSorting,
-    metricsLayoutResolved: ctx.metricsLayoutResolved,
-    metricInsertIndex: ctx.metricInsertIndex,
-    formData,
-  });
-
-  const parentPath = parsePath(batch.parentPathKey);
-  const groupby =
-    batch.axis === 'row' ? ctx.rowGroupbyForQuery : ctx.colGroupbyForQuery;
-  const baseFilters = buildPrefixFilters(groupby, parentPath);
-  const siblingFilters = buildSiblingFilter(
-    groupby,
-    parentPath.length,
-    batch.siblingValues,
-  );
-  const batchFilters = [...baseFilters, ...siblingFilters];
-  const batchKey = serializePath(parentPath);
+    metricsForQuery.length > 0 ? { ...formData, metrics: metricsForQuery } : formData;
 
   const queryContext = buildQueryContext(
     queryFormData,
     (baseQueryObject: QueryObject) =>
-      queryPairs.map(pair => ({
-        ...baseQueryObject,
-        columns: [
-          ...ctx.rowGroupbyForQuery.slice(0, pair.rowDepth),
-          ...ctx.colGroupbyForQuery.slice(0, pair.colDepth),
-        ],
-        filters: [
-          ...(baseQueryObject.filters || []),
-          ...(batchFilters as QueryObjectFilterClause[]),
-        ],
-        query_name: `${formatQueryName(pair.rowDepth, pair.colDepth)}|batch:${batch.axis}:${batchKey}`,
-      })),
+      toChartDataQueries({ specs, baseQueryObject }),
   );
 
   try {
@@ -190,18 +92,36 @@ export const fetchPivotBranchesBatch = async ({
     const resolved = await handleChartDataResponse({ response, json });
     const results = ensureIsArray(resolved) as Array<{
       data?: Record<string, unknown>[];
+      query?: { query_name?: string };
+      query_name?: string;
     }>;
+    const resultsByQueryName = new Map<string, { data?: Record<string, unknown>[] }>();
+    results.forEach(result => {
+      const name =
+        typeof result.query?.query_name === 'string'
+          ? result.query.query_name
+          : typeof result.query_name === 'string'
+            ? result.query_name
+            : undefined;
+      if (name) {
+        resultsByQueryName.set(name, result);
+      }
+    });
+    const orderedResults =
+      resultsByQueryName.size > 0
+        ? specs.map(spec => resultsByQueryName.get(spec.queryName) ?? { data: [] })
+        : results;
     const tree = buildBranchTreeFromResults({
-      results,
+      results: orderedResults,
       queryPairs,
-      metricsForQuery: ctx.metricsForQuery,
+      metricsForQuery,
       formData,
-      rowGroupby: ctx.rowGroupbyForQueryFull,
-      colGroupby: ctx.colGroupbyForQueryFull,
-      rowSubtotalLevels: ctx.rowSubtotalLevels,
-      colSubtotalLevels: ctx.colSubtotalLevels,
-      metricsLayoutResolved: ctx.metricsLayoutResolved,
-      metricInsertIndex: ctx.metricInsertIndex,
+      rowGroupby: specs[0].meta.rowGroupbyForQueryFull,
+      colGroupby: specs[0].meta.colGroupbyForQueryFull,
+      rowSubtotalLevels: specs[0].meta.rowSubtotalLevels,
+      colSubtotalLevels: specs[0].meta.colSubtotalLevels,
+      metricsLayoutResolved: specs[0].meta.metricsLayoutResolved,
+      metricInsertIndex: specs[0].meta.metricInsertIndex,
     });
     return { data: tree };
   } catch (error) {

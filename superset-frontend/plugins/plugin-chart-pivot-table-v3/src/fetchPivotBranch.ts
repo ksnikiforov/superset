@@ -17,23 +17,18 @@
  * under the License.
  */
 import {
-  AdhocColumn,
   buildQueryContext,
   ensureIsArray,
   getColumnLabel,
-  isPhysicalColumn,
-  QueryFormColumn,
-  QueryFormMetric,
-  QueryObject,
-  QueryObjectFilterClause,
+  type QueryFormColumn,
+  type QueryFormMetric,
+  type QueryObject,
   SupersetClient,
 } from '@superset-ui/core';
-import { formatQueryName } from './pivot/engine/query/queryName';
 import {
   MetricsLayoutEnum,
   PivotAxis,
   PivotPath,
-  PivotTreeNode,
   PivotTableQueryFormData,
   PivotTreeData,
 } from './types';
@@ -41,23 +36,23 @@ import {
   buildTreeFromRecords,
   applyMetricAxis,
   mergeTrees,
-  collectDimensionFormattingMetricsForQuery,
-  collectDimensionSortingMetricsForQuery,
   getMetricKeys,
   serializePath,
   injectRowSubtotalLeaves,
   labelRowSubtotalLeaves,
-  decodeMetricKey,
   serializeCellKey,
-  hasTotalSorting,
   SUBTOTAL_LABEL,
   SUBTOTAL_TOKEN,
 } from './utils';
-import { buildQueryShape } from './pivot/engine/query/queryShape';
-import { buildPathFilters } from './pivot/engine/query/pathFilters';
-import { type QueryIntent } from './pivot/engine/query/queryIntent';
 import { handleChartDataResponse } from './pivot/engine/query/handleChartDataResponse';
-import { buildLayoutContext } from './pivot/layout/LayoutContext';
+import { buildLayoutContext, type LayoutContext } from './pivot/layout/LayoutContext';
+import {
+  resolveFetchContext as resolveFetchContextBase,
+  type ResolvedFetchContext as ResolvedQueryFetchContext,
+} from './pivot/query/resolveFetchContext';
+import { buildBranchQuerySpecs } from './pivot/query/specs';
+import { toChartDataQueries } from './pivot/query/toChartDataQueries';
+import { stableStringify as stableStringifyBase } from './pivot/shared/stableStringify';
 
 export interface FetchPivotBranchResult {
   data?: PivotTreeData;
@@ -102,20 +97,7 @@ const readCache = (key: string) => {
   return cached;
 };
 
-export const stableStringify = (value: unknown): string => {
-  if (Array.isArray(value)) {
-    return `[${value.map(stableStringify).join(',')}]`;
-  }
-  if (value && typeof value === 'object') {
-    const record = value as Record<string, unknown>;
-    return `{${Object.keys(record)
-      .sort()
-      .map(key => `${JSON.stringify(key)}:${stableStringify(record[key])}`)
-      .join(',')}}`;
-  }
-  const serialized = JSON.stringify(value);
-  return serialized === undefined ? 'undefined' : serialized;
-};
+export const stableStringify = stableStringifyBase;
 
 const getExtraFormData = (
   formData: PivotTableQueryFormData,
@@ -174,31 +156,10 @@ const buildCacheKey = (
 export const peekPivotBranchCacheByKey = (key: string) => readCache(key);
 export const clearPivotBranchCache = () => cache.clear();
 
-export interface ResolvedFetchContext {
-  rowGroupbyRaw: QueryFormColumn[];
-  colGroupbyRaw: QueryFormColumn[];
-  rowGroupby: QueryFormColumn[];
-  colGroupby: QueryFormColumn[];
-  rowGroupbyForQueryFull: QueryFormColumn[];
-  colGroupbyForQueryFull: QueryFormColumn[];
-  rowGroupbyForQuery: QueryFormColumn[];
-  colGroupbyForQuery: QueryFormColumn[];
-  metrics: QueryFormMetric[];
-  metricsForQuery: QueryFormMetric[];
-  metricsLayoutResolved: MetricsLayoutEnum;
-  metricInsertIndex: number;
-  sanitizedPath: PivotPath;
-  rowDepth: number;
-  colDepth: number;
+export type ResolvedFetchContext = ResolvedQueryFetchContext & {
   cacheKey: string;
-  rowSubtotalLevels: number[];
-  colSubtotalLevels: number[];
-  hasRowFormatting: boolean;
-  hasColFormatting: boolean;
-  hasRowTotalSorting: boolean;
-  hasColTotalSorting: boolean;
-  timeGrainSqla?: string;
-}
+  layout: LayoutContext;
+};
 
 const resolveFetchContext = ({
   formData,
@@ -212,266 +173,45 @@ const resolveFetchContext = ({
   targetColDepth,
 }: FetchPivotBranchParams): ResolvedFetchContext => {
   const layout = buildLayoutContext(formData);
-  const rowGroupbyRaw = layout.groupbyRowsRaw;
-  const colGroupbyRaw = layout.groupbyColumnsRaw;
-  const {
-    metrics,
-    metricLabelSet,
-    metricsLayoutResolved,
-    metricInsertIndex: metricInsertIndexBase,
-  } = layout;
-  const extraFormData = getExtraFormData(formData);
-  const timeGrainSqla =
-    extraFormData?.time_grain_sqla || formData.time_grain_sqla;
-  const temporalLookup = formData?.temporal_columns_lookup || {};
-  const isTemporalColumn = (col: QueryFormColumn) =>
-    isPhysicalColumn(col) &&
-    (temporalLookup?.[col as string] || formData.granularity_sqla === col);
-  const normalizeColumn = (
-    col: QueryFormColumn,
-    time_grain_sqla?: string,
-    isTemporal?: boolean,
-  ) => {
-    if (isPhysicalColumn(col) && time_grain_sqla && isTemporal) {
-      return {
-        timeGrain: time_grain_sqla,
-        columnType: 'BASE_AXIS',
-        sqlExpression: col,
-        label: col,
-        expressionType: 'SQL',
-      } as AdhocColumn;
-    }
-    return col;
-  };
-  let rowGroupby = layout.groupbyRows;
-  let colGroupby = layout.groupbyColumns;
-  const metricsAxis: PivotAxis =
-    metricsLayoutResolved === MetricsLayoutEnum.ROWS ? 'row' : 'col';
-  const pathForMetrics = metricPath ?? path;
-  const getMetricIndex = (candidatePath: PivotPath) =>
-    candidatePath.findIndex(val => {
-      const decoded = decodeMetricKey(val);
-      if (decoded !== undefined && metricLabelSet.has(decoded)) {
-        return true;
-      }
-      return typeof val === 'string' && metricLabelSet.has(val);
-    });
-  const metricIndexInPath =
-    metricsAxis === axis ? getMetricIndex(pathForMetrics) : -1;
-  const shouldCollapseRowDims =
-    metricsAxis === 'row' &&
-    axis === 'row' &&
-    metricIndexInPath >= 0 &&
-    metricIndexInPath < metricInsertIndexBase;
-  const shouldCollapseColDims =
-    metricsAxis === 'col' &&
-    axis === 'col' &&
-    metricIndexInPath >= 0 &&
-    metricIndexInPath < metricInsertIndexBase;
-
-  if (shouldCollapseRowDims) {
-    rowGroupby = rowGroupby.filter(
-      (_, idx) => idx < metricIndexInPath || idx >= metricInsertIndexBase,
-    );
-  }
-  if (shouldCollapseColDims) {
-    colGroupby = colGroupby.filter(
-      (_, idx) => idx < metricIndexInPath || idx >= metricInsertIndexBase,
-    );
-  }
-
-  const hasRowTotalSorting = hasTotalSorting(formData.rowSorting, rowGroupby);
-  const hasColTotalSorting = hasTotalSorting(formData.colSorting, colGroupby);
-
-  const maxRowSubtotalDepth = Math.max(rowGroupby.length - 1, 0);
-  const rowSubtotalLevels = layout.rowSubtotalLevels.filter(
-    level => level <= maxRowSubtotalDepth,
-  );
-  const maxColSubtotalDepth = Math.max(colGroupby.length - 1, 0);
-  const colSubtotalLevels = layout.colSubtotalLevelsForQuery.filter(
-    level => level <= maxColSubtotalDepth,
-  );
-
-  const metricInsertIndex =
-    (shouldCollapseRowDims || shouldCollapseColDims) && metricIndexInPath >= 0
-      ? metricIndexInPath
-      : metricInsertIndexBase;
-
-  const stripMetricFromPath = (
-    p: PivotPath,
-    targetAxis: PivotAxis,
-    metricIndexOverride?: number,
-  ) => {
-    if (metricsAxis !== targetAxis) {
-      return p;
-    }
-    const idx =
-      metricIndexOverride !== undefined
-        ? metricIndexOverride
-        : getMetricIndex(p);
-    if (idx < 0) {
-      return p;
-    }
-    return [...p.slice(0, idx), ...p.slice(idx + 1)];
-  };
-
-  const sanitizedPath = stripMetricFromPath(path, axis, metricIndexInPath);
-  const depthIncrement = 1;
-
-  const getCurrentDepth = (
-    nodes: Record<string, PivotTreeNode> | undefined,
-    targetAxis: PivotAxis,
-  ) =>
-    Math.max(
-      0,
-      ...Object.values(nodes || {}).map(
-        node => stripMetricFromPath(node.path, targetAxis).length,
-      ),
-    );
-
-  const currentRowDepth =
-    visibleRowDepth !== undefined
-      ? Math.min(visibleRowDepth, rowGroupby.length)
-      : getCurrentDepth(currentTree?.rows, 'row');
-  const currentColDepth =
-    visibleColDepth !== undefined
-      ? Math.min(visibleColDepth, colGroupby.length)
-      : getCurrentDepth(currentTree?.cols, 'col');
-
-  let rowDepth =
-    axis === 'row'
-      ? Math.min(rowGroupby.length, sanitizedPath.length + depthIncrement)
-      : Math.min(rowGroupby.length, currentRowDepth);
-  let colDepth =
-    axis === 'col'
-      ? Math.min(colGroupby.length, sanitizedPath.length + depthIncrement)
-      : Math.min(colGroupby.length, currentColDepth);
-  if (targetRowDepth !== undefined) {
-    rowDepth = Math.min(rowGroupby.length, Math.max(targetRowDepth, 0));
-  }
-  if (targetColDepth !== undefined) {
-    colDepth = Math.min(colGroupby.length, Math.max(targetColDepth, 0));
-  }
-
-  const filterKey = buildFilterKey(formData);
-  const rowGroupbyForQueryFull = rowGroupby.map(col =>
-    normalizeColumn(col, timeGrainSqla, isTemporalColumn(col)),
-  );
-  const colGroupbyForQueryFull = colGroupby.map(col =>
-    normalizeColumn(col, timeGrainSqla, isTemporalColumn(col)),
-  );
-  const needsMetricFormatting =
-    Object.keys(formData.metricFormatting || {}).length > 0;
-  const needsDatabars = Object.keys(formData.metricDatabars || {}).length > 0;
-  const hasRowFormatting =
-    collectDimensionFormattingMetricsForQuery(
-      formData.rowFormatting,
-      rowGroupby,
-      metrics,
-    ).length > 0;
-  const hasColFormatting =
-    collectDimensionFormattingMetricsForQuery(
-      formData.colFormatting,
-      colGroupby,
-      metrics,
-    ).length > 0;
-  const needsRowOrdering =
-    collectDimensionSortingMetricsForQuery(
-      formData.rowSorting,
-      rowGroupby,
-      metrics,
-    ).length > 0;
-  const needsColOrdering =
-    collectDimensionSortingMetricsForQuery(
-      formData.colSorting,
-      colGroupby,
-      metrics,
-    ).length > 0;
-  const needsTotals =
-    !!formData.rowTotals ||
-    !!formData.colTotals ||
-    rowSubtotalLevels.length > 0 ||
-    colSubtotalLevels.length > 0;
-  const intent: QueryIntent = {
-    kind: 'branch',
+  const queryCtx = resolveFetchContextBase({
+    formData,
+    layout,
     axis,
-    targetRowDepth: rowDepth,
-    targetColDepth: colDepth,
-    needsValueCells: true,
-    needsTotals,
-    needsMetricFormatting,
-    needsDatabars,
-    needsRowOrdering,
-    needsColOrdering,
-    needsRowDimensionFormatting: hasRowFormatting,
-    needsColDimensionFormatting: hasColFormatting,
-  };
-  const queryShape = buildQueryShape({
-    intent,
-    rowGroupby: rowGroupbyForQueryFull,
-    colGroupby: colGroupbyForQueryFull,
-    metrics,
-    metricFormattingScope: formData.metricFormattingScope,
-    metricFormatting: formData.metricFormatting,
-    metricDatabars: formData.metricDatabars,
-    rowFormatting: formData.rowFormatting,
-    colFormatting: formData.colFormatting,
-    rowSorting: formData.rowSorting,
-    colSorting: formData.colSorting,
+    path,
+    metricPath,
+    currentTree,
+    visibleRowDepth,
+    visibleColDepth,
+    targetRowDepth,
+    targetColDepth,
   });
-  const rowGroupbyForQuery = queryShape.rowGroupby;
-  const colGroupbyForQuery = queryShape.colGroupby;
-  const metricsForQuery = queryShape.metrics;
+  const pathForMetrics = metricPath ?? path;
+  const filterKey = buildFilterKey(formData);
   const cacheKey = buildCacheKey(
     axis,
     pathForMetrics,
-    rowDepth,
-    colDepth,
-    rowGroupbyForQuery,
-    colGroupbyForQuery,
-    metricsForQuery.length > 0 ? metricsForQuery : metrics,
+    queryCtx.rowDepth,
+    queryCtx.colDepth,
+    queryCtx.rowGroupbyForQuery,
+    queryCtx.colGroupbyForQuery,
+    queryCtx.metricsForQuery.length > 0 ? queryCtx.metricsForQuery : queryCtx.metrics,
     formData.aggregateFunction,
     filterKey,
     {
       datasource: formData.datasource,
-      time_grain_sqla: timeGrainSqla,
+      time_grain_sqla: queryCtx.timeGrainSqla,
       granularity: formData.granularity,
       granularity_sqla: formData.granularity_sqla,
-      rowTotals: layout.rowTotals,
-      colTotals: layout.colTotals,
-      rowSubTotals: layout.rowSubTotals,
-      rowSubtotalLevels,
-      colSubtotalLevels,
-      metricsLayoutResolved,
-      metricInsertIndex,
+      rowTotals: formData.rowTotals ?? false,
+      colTotals: formData.colTotals ?? false,
+      rowSubTotals: formData.rowSubTotals ?? true,
+      rowSubtotalLevels: queryCtx.rowSubtotalLevels,
+      colSubtotalLevels: queryCtx.colSubtotalLevels,
+      metricsLayoutResolved: queryCtx.metricsLayoutResolved,
+      metricInsertIndex: queryCtx.metricInsertIndex,
     },
   );
-
-  return {
-    rowGroupbyRaw,
-    colGroupbyRaw,
-    rowGroupby,
-    colGroupby,
-    rowGroupbyForQueryFull,
-    colGroupbyForQueryFull,
-    rowGroupbyForQuery,
-    colGroupbyForQuery,
-    metrics,
-    metricsForQuery,
-    metricsLayoutResolved,
-    metricInsertIndex,
-    sanitizedPath,
-    rowDepth,
-    colDepth,
-    cacheKey,
-    rowSubtotalLevels,
-    colSubtotalLevels,
-    hasRowFormatting,
-    hasColFormatting,
-    hasRowTotalSorting,
-    hasColTotalSorting,
-    timeGrainSqla,
-  };
+  return { ...queryCtx, cacheKey, layout };
 };
 
 export const peekPivotBranchCache = (params: FetchPivotBranchParams) => {
@@ -483,143 +223,7 @@ export const peekPivotBranchCache = (params: FetchPivotBranchParams) => {
 export const resolveFetchContextForTest = resolveFetchContext;
 export const resolveFetchContextForBatch = resolveFetchContext;
 
-export const buildBranchQueryPairs = ({
-  axis,
-  pathLength,
-  rowDepth,
-  colDepth,
-  rowGroupby,
-  colGroupby,
-  rowSubtotalLevels,
-  colSubtotalLevels,
-  hasRowFormatting,
-  hasColFormatting,
-  hasRowTotalSorting,
-  hasColTotalSorting,
-  metricsLayoutResolved,
-  metricInsertIndex,
-  formData,
-}: {
-  axis: PivotAxis;
-  pathLength: number;
-  rowDepth: number;
-  colDepth: number;
-  rowGroupby: QueryFormColumn[];
-  colGroupby: QueryFormColumn[];
-  rowSubtotalLevels: number[];
-  colSubtotalLevels: number[];
-  hasRowFormatting: boolean;
-  hasColFormatting: boolean;
-  hasRowTotalSorting: boolean;
-  hasColTotalSorting: boolean;
-  metricsLayoutResolved: MetricsLayoutEnum;
-  metricInsertIndex: number;
-  formData: PivotTableQueryFormData;
-}) => {
-  const depthPairs: Array<{ rowDepth: number; colDepth: number }> = [];
-  const addDepthPair = (rowDepthVal: number, colDepthVal: number) => {
-    const key = `${rowDepthVal}|${colDepthVal}`;
-    if (depthPairs.find(pair => `${pair.rowDepth}|${pair.colDepth}` === key)) {
-      return;
-    }
-    depthPairs.push({ rowDepth: rowDepthVal, colDepth: colDepthVal });
-  };
-  addDepthPair(rowDepth, colDepth);
-
-  const needsMetricFrontRoot =
-    metricsLayoutResolved === MetricsLayoutEnum.ROWS &&
-    metricInsertIndex === 0 &&
-    axis === 'col' &&
-    rowDepth > 0;
-  if (needsMetricFrontRoot) {
-    addDepthPair(0, colDepth);
-  }
-  const needsMetricFrontColumnRootForRows =
-    metricsLayoutResolved === MetricsLayoutEnum.COLUMNS &&
-    metricInsertIndex === 0 &&
-    axis === 'row' &&
-    colDepth > 0;
-  if (needsMetricFrontColumnRootForRows) {
-    addDepthPair(rowDepth, 0);
-  }
-  if (axis === 'col' && rowDepth > 0 && colDepth > 0) {
-    addDepthPair(Math.max(rowDepth - 1, 0), colDepth);
-  }
-  if (axis === 'col' && colDepth > 0 && rowDepth > 0) {
-    const colParentDepth = Math.max(colDepth - 1, 0);
-    for (let depth = 1; depth <= rowDepth; depth += 1) {
-      addDepthPair(depth, colDepth);
-      if (colParentDepth !== colDepth) {
-        addDepthPair(depth, colParentDepth);
-      }
-    }
-  }
-  if (axis === 'row' && colDepth > 0) {
-    const rowParentDepth = Math.max(rowDepth - 1, 0);
-    for (let depth = 1; depth <= colDepth; depth += 1) {
-      addDepthPair(rowDepth, depth);
-      if (rowDepth > 0) {
-        addDepthPair(rowParentDepth, depth);
-      }
-    }
-  }
-  if (metricsLayoutResolved === MetricsLayoutEnum.COLUMNS && colDepth > 0) {
-    const colParentDepth = Math.max(colDepth - 1, 0);
-    if (axis === 'col') {
-      addDepthPair(rowDepth, colParentDepth);
-      if (rowDepth > 0) {
-        addDepthPair(Math.max(rowDepth - 1, 0), colDepth);
-        addDepthPair(Math.max(rowDepth - 1, 0), colParentDepth);
-      }
-    } else if (axis === 'row') {
-      addDepthPair(rowDepth, colParentDepth);
-      if (rowDepth > 0) {
-        addDepthPair(Math.max(rowDepth - 1, 0), colDepth);
-        addDepthPair(Math.max(rowDepth - 1, 0), colParentDepth);
-      }
-    }
-  }
-
-  const includeRowTotalForColFormatting =
-    axis === 'col' && (hasColFormatting || hasColTotalSorting);
-  const includeColTotalForRowFormatting =
-    axis === 'row' && (hasRowFormatting || hasRowTotalSorting);
-  const effectiveRowLevels = Array.from(
-    new Set([
-      ...rowSubtotalLevels,
-      ...(includeRowTotalForColFormatting ? [0] : []),
-    ]),
-  ).filter(level => level <= rowDepth);
-  const effectiveColLevels = Array.from(
-    new Set([
-      ...colSubtotalLevels,
-      ...(formData.rowTotals ? [0] : []),
-      ...(includeColTotalForRowFormatting ? [0] : []),
-    ]),
-  ).filter(level => level <= colDepth);
-  const subtotalRowDepths = new Set<number>([rowDepth, ...effectiveRowLevels]);
-  const subtotalColDepths = new Set<number>([colDepth, ...effectiveColLevels]);
-  subtotalRowDepths.forEach(rowDepthVal => {
-    subtotalColDepths.forEach(colDepthVal =>
-      addDepthPair(rowDepthVal, colDepthVal),
-    );
-  });
-  const queryPairs = filterDepthPairsForAxis(depthPairs, axis, pathLength);
-  const hasTotalRow = formData.colTotals || rowSubtotalLevels.includes(0);
-  const hasTotalColumn = formData.rowTotals || colSubtotalLevels.includes(0);
-  const shouldIncludeGrandTotalPair =
-    (rowGroupby.length === 0 && colGroupby.length === 0) ||
-    (hasTotalRow && hasTotalColumn) ||
-    (metricsLayoutResolved === MetricsLayoutEnum.ROWS &&
-      metricInsertIndex === 0 &&
-      hasTotalColumn) ||
-    (metricsLayoutResolved === MetricsLayoutEnum.COLUMNS &&
-      metricInsertIndex === 0 &&
-      hasTotalRow);
-  return shouldIncludeGrandTotalPair
-    ? queryPairs
-    : queryPairs.filter(pair => !(pair.rowDepth === 0 && pair.colDepth === 0));
-};
+export { buildBranchQueryPairs } from './pivot/query/branchQueryPairs';
 
 export const buildBranchTreeFromResults = ({
   results,
@@ -691,19 +295,6 @@ export const buildBranchTreeFromResults = ({
   );
 };
 
-const filterDepthPairsForAxis = (
-  pairs: Array<{ rowDepth: number; colDepth: number }>,
-  axis: PivotAxis,
-  pathLength: number,
-) => {
-  if (pathLength === 0) {
-    return pairs;
-  }
-  return pairs.filter(pair =>
-    axis === 'row' ? pair.rowDepth >= pathLength : pair.colDepth >= pathLength,
-  );
-};
-
 const injectColumnSubtotalLeaves = (
   tree: PivotTreeData,
   depth: number,
@@ -766,25 +357,15 @@ export async function fetchPivotBranch({
   visibleColDepth,
 }: FetchPivotBranchParams): Promise<FetchPivotBranchResult> {
   const {
-    rowGroupby,
-    colGroupby,
-    rowGroupbyForQuery,
-    colGroupbyForQuery,
     rowGroupbyForQueryFull,
     colGroupbyForQueryFull,
     metricsForQuery,
     metricsLayoutResolved,
     metricInsertIndex,
-    sanitizedPath,
-    rowDepth,
-    colDepth,
     cacheKey,
     rowSubtotalLevels,
     colSubtotalLevels,
-    hasRowFormatting,
-    hasColFormatting,
-    hasRowTotalSorting,
-    hasColTotalSorting,
+    layout,
   } = resolveFetchContext({
     formData,
     axis,
@@ -794,6 +375,8 @@ export async function fetchPivotBranch({
     visibleRowDepth,
     visibleColDepth,
   });
+  const treeSnapshot = currentTree ?? { rows: {}, cols: {}, cells: {} };
+  const resolvedMetricPath = metricPath ?? path;
   const queryFormData =
     metricsForQuery.length > 0
       ? { ...formData, metrics: metricsForQuery }
@@ -804,46 +387,25 @@ export async function fetchPivotBranch({
     return { data: cached, cached: true };
   }
 
-  const filteredQueryPairs = buildBranchQueryPairs({
-    axis,
-    pathLength: sanitizedPath.length,
-    rowDepth,
-    colDepth,
-    rowGroupby,
-    colGroupby,
-    rowSubtotalLevels,
-    colSubtotalLevels,
-    hasRowFormatting,
-    hasColFormatting,
-    hasRowTotalSorting,
-    hasColTotalSorting,
-    metricsLayoutResolved,
-    metricInsertIndex,
+  const specs = buildBranchQuerySpecs({
     formData,
+    layout,
+    axis,
+    path,
+    metricPath: resolvedMetricPath,
+    currentTree: treeSnapshot,
+    visibleRowDepth,
+    visibleColDepth,
   });
-
-  const filters =
-    axis === 'row'
-      ? buildPathFilters(rowGroupbyForQuery, sanitizedPath)
-      : buildPathFilters(colGroupbyForQuery, sanitizedPath);
+  const queryPairs = specs.map(spec => ({
+    rowDepth: spec.meta.rowDepth,
+    colDepth: spec.meta.colDepth,
+  }));
 
   const queryContext = buildQueryContext(
     queryFormData,
     (baseQueryObject: QueryObject) =>
-      filteredQueryPairs.map(pair => ({
-        ...baseQueryObject,
-        columns: [
-          ...rowGroupbyForQuery.slice(0, pair.rowDepth),
-          ...colGroupbyForQuery.slice(0, pair.colDepth),
-        ],
-        filters: [
-          ...(baseQueryObject.filters || []),
-          ...(filters as QueryObjectFilterClause[]),
-        ],
-        query_name: `${formatQueryName(pair.rowDepth, pair.colDepth)}|branch:${axis}:${serializePath(
-          path,
-        )}`,
-      })),
+      toChartDataQueries({ specs, baseQueryObject }),
   );
 
   try {
@@ -854,10 +416,28 @@ export async function fetchPivotBranch({
     const resolved = await handleChartDataResponse({ response, json });
     const results = ensureIsArray(resolved) as Array<{
       data?: Record<string, unknown>[];
+      query?: { query_name?: string };
+      query_name?: string;
     }>;
+    const resultsByQueryName = new Map<string, { data?: Record<string, unknown>[] }>();
+    results.forEach(result => {
+      const name =
+        typeof result.query?.query_name === 'string'
+          ? result.query.query_name
+          : typeof result.query_name === 'string'
+            ? result.query_name
+            : undefined;
+      if (name) {
+        resultsByQueryName.set(name, result);
+      }
+    });
+    const orderedResults =
+      resultsByQueryName.size > 0
+        ? specs.map(spec => resultsByQueryName.get(spec.queryName) ?? { data: [] })
+        : results;
     const labeledBranch = buildBranchTreeFromResults({
-      results,
-      queryPairs: filteredQueryPairs,
+      results: orderedResults,
+      queryPairs,
       metricsForQuery,
       formData,
       rowGroupby: rowGroupbyForQueryFull,

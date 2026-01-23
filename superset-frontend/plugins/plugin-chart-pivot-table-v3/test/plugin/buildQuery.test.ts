@@ -20,6 +20,7 @@
 import buildQuery from '../../src/buildQuery';
 import { formatQueryName } from '../../src/pivot/engine/query/queryName';
 import { buildFormData } from './fixtures/pivotFormData';
+import { serializePath } from '../../src/utils';
 
 const baseFormData = buildFormData({
   groupbyRows: ['row1', 'row2'],
@@ -144,5 +145,63 @@ describe('buildQuery (bootstrap)', () => {
     });
     const names = queryContext.queries.map(query => query.query_name || '');
     expect(names.some(name => name.includes('|root'))).toBe(true);
+  });
+
+  test('does not prefetch root when only persisted expansions are deep (BR-4.2)', () => {
+    const queryContext = buildQuery({
+      ...baseFormData,
+      expandRowsLevel: 0,
+      expandColumnsLevel: 0,
+      pivotExpansionState: {
+        rowKeys: ['row1', 'row2'],
+        colKeys: ['col1', 'col2'],
+        rows: [['A']],
+        cols: [],
+        collapsedRows: [],
+        collapsedCols: [],
+      },
+    });
+    const names = queryContext.queries.map(query => query.query_name || '');
+    expect(names.some(name => name.includes('|root'))).toBe(false);
+    expect(names.some(name => name.includes('|branch:row:A'))).toBe(true);
+  });
+
+  test('batches sibling persisted expansions into |batch: queries (BR-4.7)', () => {
+    const queryContext = buildQuery(
+      buildFormData({
+        groupbyRows: ['country', 'state'],
+        groupbyColumns: [],
+        metrics: ['m1'],
+        startCollapsed: true,
+        initialDepth: 1,
+        expandRowsLevel: 0,
+        expandColumnsLevel: 0,
+        pivotExpansionState: {
+          rowKeys: ['country', 'state'],
+          colKeys: [],
+          rows: [
+            ['US', 'CA'],
+            ['US', 'NY'],
+          ],
+          cols: [],
+          collapsedRows: [],
+          collapsedCols: [],
+        },
+      }),
+    );
+    const names = queryContext.queries.map(query => query.query_name || '');
+    expect(
+      names.some(name => name.includes(`|batch:row:${serializePath(['US'])}`)),
+    ).toBe(true);
+    expect(
+      names.some(name =>
+        name.includes(`|branch:row:${serializePath(['US', 'CA'])}`),
+      ),
+    ).toBe(false);
+    expect(
+      names.some(name =>
+        name.includes(`|branch:row:${serializePath(['US', 'NY'])}`),
+      ),
+    ).toBe(false);
   });
 });

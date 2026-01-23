@@ -21,23 +21,23 @@ import { PATH_DIVIDER, serializePath } from '../../../src/utils';
 import { buildFormData } from '../fixtures/pivotFormData';
 
 describe('query naming (contracts)', () => {
-  it('uses serializePath() for branch suffixes, including null/undefined/divider values', () => {
+  it('uses serializePath() for branch suffixes, including divider values', () => {
     const dividerValue = `A${PATH_DIVIDER}B`;
-    const formData = buildFormData({
-      groupbyRows: ['r1'],
-      groupbyColumns: [],
-      metrics: ['m1'],
-      pivotExpansionState: {
-        rowKeys: ['r1'],
-        colKeys: [],
-        rows: [[dividerValue], [null], [undefined]],
-        cols: [],
-        collapsedRows: [],
-        collapsedCols: [],
-      },
-    });
-
-    const queryContext = buildQuery(formData);
+    const queryContext = buildQuery(
+      buildFormData({
+        groupbyRows: ['r1'],
+        groupbyColumns: [],
+        metrics: ['m1'],
+        pivotExpansionState: {
+          rowKeys: ['r1'],
+          colKeys: [],
+          rows: [[dividerValue]],
+          cols: [],
+          collapsedRows: [],
+          collapsedCols: [],
+        },
+      }),
+    );
     const names = queryContext.queries.map(query => query.query_name || '');
 
     expect(
@@ -45,9 +45,48 @@ describe('query naming (contracts)', () => {
         name.includes(`|branch:row:${serializePath([dividerValue])}`),
       ),
     ).toBe(true);
+  });
+
+  it('uses serializePath() for branch suffixes, including null values', () => {
+    const queryContext = buildQuery(
+      buildFormData({
+        groupbyRows: ['r1'],
+        groupbyColumns: [],
+        metrics: ['m1'],
+        pivotExpansionState: {
+          rowKeys: ['r1'],
+          colKeys: [],
+          rows: [[null]],
+          cols: [],
+          collapsedRows: [],
+          collapsedCols: [],
+        },
+      }),
+    );
+    const names = queryContext.queries.map(query => query.query_name || '');
+
     expect(
       names.some(name => name.includes(`|branch:row:${serializePath([null])}`)),
     ).toBe(true);
+  });
+
+  it('uses serializePath() for branch suffixes, including undefined values', () => {
+    const queryContext = buildQuery(
+      buildFormData({
+      groupbyRows: ['r1'],
+      groupbyColumns: [],
+      metrics: ['m1'],
+      pivotExpansionState: {
+        rowKeys: ['r1'],
+        colKeys: [],
+        rows: [[undefined]],
+        cols: [],
+        collapsedRows: [],
+        collapsedCols: [],
+      },
+    }),
+    );
+    const names = queryContext.queries.map(query => query.query_name || '');
     expect(
       names.some(name =>
         name.includes(`|branch:row:${serializePath([undefined])}`),

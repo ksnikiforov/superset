@@ -18,56 +18,26 @@
  */
 import { buildQueryContext, QueryFormOrderBy } from '@superset-ui/core';
 import { PivotTableQueryFormData } from './types';
-import { buildInitialQueryPlan } from './pivot/engine/initialQueryPlan';
-import { buildPathFilters } from './pivot/engine/query/pathFilters';
-import { formatQueryName } from './pivot/engine/query/queryName';
-import { serializePath } from './utils';
+import { buildLayoutContext } from './pivot/layout/LayoutContext';
+import { buildInitialQuerySpecs } from './pivot/query/specs';
+import { toChartDataQueries } from './pivot/query/toChartDataQueries';
 
 export default function buildQuery(formData: PivotTableQueryFormData) {
-  const plan = buildInitialQueryPlan(formData);
+  const layout = buildLayoutContext(formData);
+  const specs = buildInitialQuerySpecs(formData, layout);
   return buildQueryContext(formData, baseQueryObject => {
     const { series_limit_metric, order_desc } = baseQueryObject;
     const queryMetrics =
-      plan.metrics.length > 0 ? plan.metrics : baseQueryObject.metrics || [];
+      layout.metrics.length > 0 ? layout.metrics : baseQueryObject.metrics || [];
     let orderby: QueryFormOrderBy[] | undefined;
     if (series_limit_metric) {
       orderby = [[series_limit_metric, !order_desc]];
     } else if (Array.isArray(queryMetrics) && queryMetrics.length > 0) {
       orderby = [[queryMetrics[0], !order_desc]];
     }
-    return plan.targets.flatMap(target => {
-      const metricsForQuery =
-        target.metricsForQuery.length > 0
-          ? target.metricsForQuery
-          : queryMetrics;
-      return target.queryPairs.map(pair => {
-        const queryName = formatQueryName(pair.rowDepth, pair.colDepth);
-        const suffix =
-          target.kind === 'branch'
-            ? `|branch:${target.axis}:${serializePath(target.path)}`
-            : target.kind === 'root'
-              ? '|root'
-              : '';
-        const axisGroupby =
-          target.axis === 'row'
-            ? target.rowGroupbyForQuery
-            : target.colGroupbyForQuery;
-        const filters =
-          target.kind === 'branch' && target.axis && axisGroupby
-            ? buildPathFilters(axisGroupby, target.sanitizedPath)
-            : [];
-        return {
-          ...baseQueryObject,
-          metrics: metricsForQuery,
-          orderby,
-          columns: [
-            ...target.rowGroupbyForQuery.slice(0, pair.rowDepth),
-            ...target.colGroupbyForQuery.slice(0, pair.colDepth),
-          ],
-          filters: [...(baseQueryObject.filters || []), ...filters],
-          query_name: `${queryName}${suffix}`,
-        };
-      });
+    return toChartDataQueries({
+      specs,
+      baseQueryObject: { ...baseQueryObject, orderby },
     });
   });
 }

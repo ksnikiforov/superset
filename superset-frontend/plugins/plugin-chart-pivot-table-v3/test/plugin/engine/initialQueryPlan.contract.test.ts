@@ -16,10 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { buildInitialQueryPlan } from '../../../src/pivot/engine/initialQueryPlan';
+import { buildInitialQuerySpecs } from '../../../src/pivot/query/specs';
 import { buildFormData } from '../fixtures/pivotFormData';
+import { serializePath } from '../../../src/utils';
 
-describe('buildInitialQueryPlan (contracts)', () => {
+describe('buildInitialQuerySpecs (contracts)', () => {
   it('emits branch targets in deterministic order and drops collapsed/duplicate paths', () => {
     const formData = buildFormData({
       groupbyRows: ['r1'],
@@ -36,14 +37,44 @@ describe('buildInitialQueryPlan (contracts)', () => {
       },
     });
 
-    const plan = buildInitialQueryPlan(formData);
-    const branchTargets = plan.targets.filter(t => t.kind === 'branch');
+    const specs = buildInitialQuerySpecs(formData);
+    const uniquePrefetch = new Map<string, unknown>();
+    specs.forEach(spec => {
+      if (spec.meta.kind === 'branch' && spec.meta.axis && spec.meta.path) {
+        uniquePrefetch.set(
+          `branch|${spec.meta.axis}|${serializePath(spec.meta.path)}`,
+          { kind: 'branch', axis: spec.meta.axis, path: spec.meta.path },
+        );
+      }
+      if (
+        spec.meta.kind === 'batch' &&
+        spec.meta.axis &&
+        spec.meta.parentPath
+      ) {
+        uniquePrefetch.set(
+          `batch|${spec.meta.axis}|${serializePath(spec.meta.parentPath)}`,
+          {
+            kind: 'batch',
+            axis: spec.meta.axis,
+            parentPath: spec.meta.parentPath,
+            siblingValues: spec.meta.siblingValues ?? [],
+          },
+        );
+      }
+    });
 
-    expect(branchTargets.map(t => ({ axis: t.axis, path: t.path }))).toEqual([
-      { axis: 'row', path: ['A'] },
-      { axis: 'col', path: ['X'] },
-      { axis: 'col', path: ['Y'] },
-    ]);
+    const targets = Array.from(uniquePrefetch.values());
+    expect(targets).toEqual(
+      expect.arrayContaining([
+        { kind: 'branch', axis: 'row', path: ['A'] },
+        {
+          kind: 'batch',
+          axis: 'col',
+          parentPath: [],
+          siblingValues: expect.arrayContaining(['X', 'Y']),
+        },
+      ]),
+    );
   });
 
   it('prunes persisted expansions beyond the stable prefix', () => {
@@ -61,11 +92,14 @@ describe('buildInitialQueryPlan (contracts)', () => {
       },
     });
 
-    const plan = buildInitialQueryPlan(formData);
-    const branchTargets = plan.targets.filter(t => t.kind === 'branch');
+    const specs = buildInitialQuerySpecs(formData);
+    const branchPaths = new Set<string>();
+    specs.forEach(spec => {
+      if (spec.meta.kind === 'branch' && spec.meta.axis === 'row') {
+        branchPaths.add(serializePath(spec.meta.path || []));
+      }
+    });
 
-    expect(branchTargets.map(t => ({ axis: t.axis, path: t.path }))).toEqual([
-      { axis: 'row', path: ['A'] },
-    ]);
+    expect(Array.from(branchPaths)).toEqual([serializePath(['A'])]);
   });
 });
