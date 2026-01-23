@@ -96,7 +96,6 @@ import {
   type RenderModelConfig,
 } from './pivot/render/renderModel';
 import { type FormattingKeys } from './pivot/shared/types';
-import { getVisibleExpansionKeys as getVisibleExpansionKeysBase } from './pivot/engine/expansionStateModel';
 import { useExpansionEngine } from './pivot/engine/useExpansionEngine';
 import { buildColumnDisplayPath } from './pivot/columnDisplay';
 import {
@@ -2015,186 +2014,6 @@ function PivotTableChart(props: PivotTableProps) {
     ],
   );
 
-  const depthSorter = useCallback(
-    (_a: PivotTreeNode, _b: PivotTreeNode) => 0,
-    [],
-  );
-  const buildEngineRenderModelConfig = useCallback(
-    (
-      nextExpandedRows: Set<string>,
-      nextExpandedCols: Set<string>,
-      nextTree: PivotTreeData,
-    ): RenderModelConfig => {
-      const metricIndexForRowsResolved =
-        findMetricIndex(nextTree.rows) ??
-        metricLayoutIndexOnRows ??
-        metricIndexOnRows;
-      const metricIndexForColsResolved =
-        findMetricIndex(nextTree.cols) ??
-        metricLayoutIndexOnCols ??
-        metricIndexOnCols;
-      return {
-        groupbyRowsLength: groupbyRows.length,
-        groupbyColumnsLength: groupbyColumns.length,
-        normalizedRowSubtotalLevels,
-        normalizedColSubtotalLevels,
-        rowTotals,
-        colTotals,
-        rowTotalPosition: resolvedColTotalPosition,
-        colTotalPosition: resolvedRowTotalPosition,
-        resolvedColSubtotalPosition: effectiveColSubtotalPosition,
-        resolvedMetricsLayout,
-        isMultiMetric,
-        metricsFirstOnCols,
-        hideMetricHeaderOnRows,
-        hideMetricHeaderOnCols,
-        rowSorter: depthSorter,
-        colSorter: depthSorter,
-        getRowChildren: parent =>
-          getRowChildrenForNodes(
-            parent,
-            nextTree.rows,
-            metricIndexForRowsResolved,
-          ),
-        getCollapsedRowChildren: parent =>
-          getCollapsedRowChildrenForNodes(
-            parent,
-            nextExpandedRows,
-            nextTree.rows,
-          ),
-        getColChildren: parent =>
-          getColChildrenForNodes(
-            parent,
-            nextTree.cols,
-            metricIndexForColsResolved,
-          ),
-        getCollapsedColLeaves: parent =>
-          getCollapsedColLeavesForNodes(
-            parent,
-            nextExpandedCols,
-            nextTree.cols,
-          ),
-        countDimDepth,
-        isMetricGrandTotalNode,
-        isMetricSubtotalNode,
-        isMetricTokenValue,
-      };
-    },
-    [
-      colTotals,
-      countDimDepth,
-      depthSorter,
-      effectiveColSubtotalPosition,
-      findMetricIndex,
-      getCollapsedColLeavesForNodes,
-      getCollapsedRowChildrenForNodes,
-      getColChildrenForNodes,
-      getRowChildrenForNodes,
-      groupbyColumns.length,
-      groupbyRows.length,
-      hideMetricHeaderOnCols,
-      hideMetricHeaderOnRows,
-      isMetricGrandTotalNode,
-      isMetricSubtotalNode,
-      isMetricTokenValue,
-      isMultiMetric,
-      metricIndexOnCols,
-      metricIndexOnRows,
-      metricLayoutIndexOnCols,
-      metricLayoutIndexOnRows,
-      metricsFirstOnCols,
-      normalizedColSubtotalLevels,
-      normalizedRowSubtotalLevels,
-      resolvedColTotalPosition,
-      resolvedMetricsLayout,
-      resolvedRowTotalPosition,
-      rowTotals,
-    ],
-  );
-
-  const getVisibleExpansionKeys = useCallback(
-    (nextRows: Set<string>, nextCols: Set<string>, nextTree: PivotTreeData) => {
-      const metricIndexForRowsResolved =
-        findMetricIndex(nextTree.rows) ??
-        metricLayoutIndexOnRows ??
-        metricIndexOnRows;
-      const metricIndexForColsResolved =
-        findMetricIndex(nextTree.cols) ??
-        metricLayoutIndexOnCols ??
-        metricIndexOnCols;
-      const nextRenderModel = buildRenderModel({
-        tree: nextTree,
-        expandedRows: nextRows,
-        expandedCols: nextCols,
-        config: buildEngineRenderModelConfig(nextRows, nextCols, nextTree),
-      });
-      return getVisibleExpansionKeysBase({
-        rowsNodes: nextTree.rows,
-        colsNodes: nextTree.cols,
-        expandedRows: nextRows,
-        expandedCols: nextCols,
-        rowSorter: depthSorter,
-        colSorter: depthSorter,
-        skipRowRoot: nextRenderModel.skipRowRoot,
-        showRowRoot: nextRenderModel.showRowRoot,
-        rowTotalPosition: resolvedColTotalPosition,
-        getRowChildren: parent =>
-          getRowChildrenForNodes(
-            parent,
-            nextTree.rows,
-            metricIndexForRowsResolved,
-          ),
-        getCollapsedRowChildren: parent =>
-          getCollapsedRowChildrenForNodes(parent, nextRows, nextTree.rows),
-        skipColRoot: nextRenderModel.skipColRoot,
-        countDimDepth,
-        normalizedColSubtotalLevels,
-        showColRoot: nextRenderModel.showColRoot,
-        rowTotals,
-        colTotalPosition: resolvedRowTotalPosition,
-        resolvedColSubtotalPosition: effectiveColSubtotalPosition,
-        getColChildren: parent =>
-          getColChildrenForNodes(
-            parent,
-            nextTree.cols,
-            metricIndexForColsResolved,
-          ),
-        getCollapsedColLeaves: parent =>
-          getCollapsedColLeavesForNodes(parent, nextCols, nextTree.cols),
-        isMetricGrandTotalNode,
-        isMetricSubtotalNode,
-        isMetricTokenValue,
-        shouldHideMetricGrandTotalsOnRows:
-          nextRenderModel.shouldHideMetricGrandTotalsOnRows,
-        shouldHideMetricGrandTotalsOnCols:
-          nextRenderModel.shouldHideMetricGrandTotalsOnCols,
-        shouldSuppressColRoot: nextRenderModel.shouldSuppressColRoot,
-      });
-    },
-    [
-      buildEngineRenderModelConfig,
-      countDimDepth,
-      depthSorter,
-      effectiveColSubtotalPosition,
-      findMetricIndex,
-      getCollapsedColLeavesForNodes,
-      getCollapsedRowChildrenForNodes,
-      getColChildrenForNodes,
-      getRowChildrenForNodes,
-      isMetricGrandTotalNode,
-      isMetricSubtotalNode,
-      isMetricTokenValue,
-      metricIndexOnCols,
-      metricIndexOnRows,
-      metricLayoutIndexOnCols,
-      metricLayoutIndexOnRows,
-      normalizedColSubtotalLevels,
-      resolvedColTotalPosition,
-      resolvedRowTotalPosition,
-      rowTotals,
-    ],
-  );
-
   const pruneMergedTree = useCallback(
     ({
       axis,
@@ -2264,10 +2083,11 @@ function PivotTableChart(props: PivotTableProps) {
     expandRowsLevelRaw,
     expandColumnsLevelRaw,
     setControlValue,
-    pivotExpansionState: formData.pivotExpansionState,
+    setDataMask,
+    mergeOwnState,
+    persistedExpansionState:
+      formData.pivotExpansionState ?? ownState?.['pivotExpansionState'],
     shouldPersistExpansionState: persistExpansionState,
-    getVisibleExpansionKeys,
-    buildRenderModelConfig: buildEngineRenderModelConfig,
     getFetchPath,
     pruneMergedTree,
   });

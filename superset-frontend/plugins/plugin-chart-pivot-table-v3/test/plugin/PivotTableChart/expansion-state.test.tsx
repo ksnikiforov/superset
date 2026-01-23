@@ -504,6 +504,38 @@ describe('PivotTableChart expansion state persistence', () => {
     expect(setDataMask).not.toHaveBeenCalled();
   });
 
+  it('persists expansion state via setDataMask when setControlValue is unavailable', async () => {
+    fetchPivotBranchMock.mockResolvedValueOnce({ data: buildTree(2) });
+    const setDataMask = jest.fn();
+    render(
+      buildChartProps({
+        data: buildTree(1),
+        setDataMask,
+        persistExpansionState: true,
+        formDataOverrides: { dashboardId: 1 },
+      }),
+    );
+
+    await waitForLabel('A');
+    const rowLabel = screen.getByText('A');
+    const rowCell = rowLabel.closest('th');
+    expect(rowCell).not.toBeNull();
+    const toggle = rowCell?.querySelector('button');
+    expect(toggle).not.toBeNull();
+    fireEvent.click(toggle as HTMLButtonElement);
+
+    await waitFor(() => expect(setDataMask).toHaveBeenCalled());
+    const lastCall = setDataMask.mock.calls.slice(-1)[0];
+    const ownState = lastCall?.[0]?.ownState as Record<string, unknown>;
+    const persisted = ownState?.pivotExpansionState as PivotExpansionState;
+    expect(persisted).toMatchObject({
+      rowKeys: rowGroupby,
+      colKeys: [],
+      rows: [['A']],
+      cols: [],
+    });
+  });
+
   it('restores expansion state on dashboard refresh via pivotExpansionState', async () => {
     const setControlValue = jest.fn();
     fetchPivotBranchMock.mockResolvedValueOnce({ data: buildTree(2) });
@@ -630,6 +662,84 @@ describe('PivotTableChart expansion state persistence', () => {
     expect(setDataMask.mock.calls.length).toBe(1);
     const lastExpansionState = getLastExpansionState(setControlValue);
     expect(lastExpansionState?.rows).toContainEqual(['A']);
+  });
+
+  it('merges expansion state into ownState when persisting via setDataMask', async () => {
+    const setDataMask = jest.fn();
+    render(
+      buildChartProps({
+        data: buildTree(2),
+        setDataMask,
+        emitCrossFilters: true,
+      }),
+    );
+
+    await waitForValueCell();
+    const valueCell = document.querySelector('td.value-cell[role="button"]');
+    expect(valueCell).not.toBeNull();
+    fireEvent.click(valueCell as HTMLTableCellElement);
+
+    await waitFor(() => expect(setDataMask).toHaveBeenCalled());
+    const firstCall = setDataMask.mock.calls[setDataMask.mock.calls.length - 1];
+    const firstOwnState = firstCall?.[0]?.ownState as Record<string, unknown>;
+    const treeDataSignature = firstOwnState?.treeDataSignature;
+    expect(treeDataSignature).toBeDefined();
+
+    await waitForLabel('A');
+    const rowLabel = screen.getByText('A');
+    const rowCell = rowLabel.closest('th');
+    expect(rowCell).not.toBeNull();
+    const toggle = rowCell?.querySelector('button');
+    expect(toggle).not.toBeNull();
+    fireEvent.click(toggle as HTMLButtonElement);
+
+    await waitFor(() => expect(setDataMask.mock.calls.length).toBeGreaterThan(1));
+    const lastCall = setDataMask.mock.calls[setDataMask.mock.calls.length - 1];
+    const lastOwnState = lastCall?.[0]?.ownState as Record<string, unknown>;
+    const persisted = lastOwnState?.pivotExpansionState as PivotExpansionState;
+    expect(lastOwnState?.treeDataSignature).toBe(treeDataSignature);
+    expect(persisted?.rows).toContainEqual(['A']);
+  });
+
+  it('keeps expanded rows visible across data refresh without setControlValue', async () => {
+    const setDataMask = jest.fn();
+    const baseTree = buildTree(1);
+    const expandedTree = buildTree(2);
+    fetchPivotBranchMock.mockResolvedValue({ data: expandedTree });
+
+    const { rerender } = render(
+      buildChartProps({
+        data: baseTree,
+        setDataMask,
+        persistExpansionState: true,
+        formDataOverrides: { dashboardId: 1 },
+      }),
+    );
+
+    await waitForLabel('A');
+    const rowLabel = screen.getByText('A');
+    const rowCell = rowLabel.closest('th');
+    expect(rowCell).not.toBeNull();
+    const toggle = rowCell?.querySelector('button');
+    expect(toggle).not.toBeNull();
+    fireEvent.click(toggle as HTMLButtonElement);
+
+    await waitFor(() => expect(screen.getByText('X')).toBeInTheDocument());
+
+    fetchPivotBranchMock.mockClear();
+    fetchPivotBranchMock.mockResolvedValue({ data: expandedTree });
+
+    rerender(
+      buildChartProps({
+        data: buildTree(1),
+        setDataMask,
+        persistExpansionState: true,
+        formDataOverrides: { dashboardId: 1, time_range: 'Last week' },
+      }),
+    );
+
+    await waitFor(() => expect(fetchPivotBranchMock).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByText('X')).toBeInTheDocument());
   });
 
   it('restores expansion state by fetching expanded branches', async () => {
