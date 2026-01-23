@@ -1533,6 +1533,32 @@ This section tracks what has been implemented in this working tree. It does not 
   - Moved path/token/tree implementations out of `src/utils.ts` and kept it as a compatibility re-export barrel.
   - Added unit tests under `test/plugin/pivot/core/*`.
   - Verified: `npm test plugins/plugin-chart-pivot-table-v3` and `npx eslint plugins/plugin-chart-pivot-table-v3`.
+- [x] Phase 3 — Unify query specification under `pivot/query`
+  - Added query-spec contract + builders: `src/pivot/query/types.ts`, `src/pivot/query/specs.ts`, `src/pivot/query/toChartDataQueries.ts`.
+  - Routed initial load and expansion fetches through query specs: `src/buildQuery.ts`, `src/fetchPivotBranch.ts`, `src/pivot/engine/query/fetchPivotBranchesBatch.ts`.
+  - Centralized batching primitives under `src/pivot/query/*` (`batchSignature.ts`, `fetchPlanOptimizer.ts`) and reused them across hydration/prefetch.
+  - Verified: `npm test plugins/plugin-chart-pivot-table-v3`.
+- [x] Phase 4 — Create a `ChartDataClient` boundary in `pivot/data`
+  - Added `src/pivot/data/ChartDataClient.ts`, `src/pivot/data/SupersetChartDataClient.ts`, `src/pivot/data/cache.ts`.
+  - Centralized multi-query bundling + split-on-413 retry and GAQ handling inside `SupersetChartDataClient`.
+  - Moved branch-result caching behind `pivot/data/cache` (keyed by `filterSignature`) and removed direct `SupersetClient` usage elsewhere.
+  - Verified: `npm test plugins/plugin-chart-pivot-table-v3`.
+- [ ] Phase 4.5 — Error UX: full-chart failure + Retry (**behavior change**) (not started)
+- [x] Phase 5 — Split expansion engine into pure planner + thin hook
+  - Added `src/pivot/expansion/store.ts` (`ExpansionStateStore`, memory-first; best-effort persistence via `setControlValue` or dashboard `ownState`).
+  - Added `src/pivot/expansion/planner.ts` + `src/pivot/expansion/engine.ts` and refactored `src/pivot/expansion/useExpansionEngine.ts` to delegate hydration planning/visibility decisions.
+  - Kept compatibility re-export at `src/pivot/engine/useExpansionEngine.ts`.
+  - Added unit tests under `test/plugin/expansion/*` and updated expansion persistence tests (`test/plugin/PivotTableChart/expansion-state.test.tsx`).
+  - Verified: `npm test plugins/plugin-chart-pivot-table-v3/test/plugin`.
+- [x] Phase 6 — Decompose `PivotTableChart.tsx` into a composition root
+  - Extracted chart orchestration hooks under `src/pivot/chart/*`:
+    - `usePivotLayout.ts` (layout + signatures + prune callbacks)
+    - `usePivotRenderModel.ts` (sorters + `buildRenderModel()` wiring)
+    - `usePivotFormatting.tsx` (formatting maps + databar model + cell renderers)
+    - `usePivotInteractions.ts` (cross-filter + context-menu payload builders)
+    - `useStickyHeaders.ts` (sticky header offset calculation)
+  - Reduced `src/PivotTableChart.tsx` to a wiring-only composition root (layout → expansion → render model → formatting → view).
+  - Verified: `npm test plugins/plugin-chart-pivot-table-v3/test/plugin`.
 
 ### Phase 0 — Safety net and invariants (1 PR)
 
