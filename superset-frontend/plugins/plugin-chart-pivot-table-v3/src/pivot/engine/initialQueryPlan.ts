@@ -16,36 +16,23 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import {
-  ensureIsArray,
-  QueryFormColumn,
-  QueryFormMetric,
-} from '@superset-ui/core';
+import { QueryFormColumn, QueryFormMetric } from '@superset-ui/core';
 import {
   MetricsLayoutEnum,
   PivotAxis,
   PivotPath,
   PivotTableQueryFormData,
 } from '../../types';
-import {
-  decodeMetricKey,
-  getMetricKeys,
-  getStableColumnKey,
-  normalizeSubtotalLevels,
-  parsePath,
-  resolveExpandLevel,
-  resolveMetricPlacement,
-  serializePath,
-  stripMetricsPlaceholder,
-} from '../../utils';
+import { getStableColumnKey, parsePath, serializePath } from '../../utils';
 import { countDimDepth } from '../metricsTotals';
 import { coerceExpansionState } from './expansionStateModel';
-import { buildBootstrapPlan } from './bootstrapPlanner';
+import { buildBootstrapPlanFromLayout } from './bootstrapPlanner';
 import { buildQueryShape } from './query/queryShape';
 import {
   buildBranchQueryPairs,
   resolveFetchContextForBatch,
 } from '../../fetchPivotBranch';
+import { buildLayoutContext, LayoutContext } from '../layout/LayoutContext';
 
 export type InitialQueryTarget = {
   kind: 'bootstrap' | 'root' | 'branch';
@@ -83,15 +70,6 @@ const getStablePrefixLength = (prev: string[], next: string[]) => {
   }
   return prefix;
 };
-
-const normalizeMetricPath = (path: PivotPath, metricLabelSet: Set<string>) =>
-  path.map(val => {
-    const decoded = decodeMetricKey(val);
-    if (decoded && metricLabelSet.has(decoded)) {
-      return decoded;
-    }
-    return val;
-  });
 
 const dedupePairs = (pairs: Array<{ rowDepth: number; colDepth: number }>) => {
   const seen = new Set<string>();
@@ -178,24 +156,26 @@ const resolvePersisted = (
   };
 };
 
-const collapseSet = (paths: PivotPath[], metricLabelSet: Set<string>) => {
+const collapseSet = (
+  paths: PivotPath[],
+  getFetchPath: (path: PivotPath) => PivotPath,
+) => {
   const collapsed = new Set<string>();
   paths.forEach(path => {
-    const sanitized = normalizeMetricPath(path, metricLabelSet);
-    collapsed.add(serializePath(sanitized));
+    collapsed.add(serializePath(getFetchPath(path)));
   });
   return collapsed;
 };
 
 const uniqueTargets = (
   paths: PivotPath[],
-  metricLabelSet: Set<string>,
+  getFetchPath: (path: PivotPath) => PivotPath,
   collapsed: Set<string>,
 ) => {
   const result: Array<{ path: PivotPath; metricPath: PivotPath }> = [];
   const seen = new Set<string>();
   paths.forEach(metricPath => {
-    const path = normalizeMetricPath(metricPath, metricLabelSet);
+    const path = getFetchPath(metricPath);
     const key = serializePath(path);
     if (collapsed.has(key) || seen.has(key)) {
       return;
@@ -210,50 +190,27 @@ const createEmptyTree = () => ({ rows: {}, cols: {}, cells: {} });
 
 export const buildInitialQueryPlan = (
   formData: PivotTableQueryFormData,
+): InitialQueryPlan =>
+  buildInitialQueryPlanFromLayout(buildLayoutContext(formData), formData);
+
+export const buildInitialQueryPlanFromLayout = (
+  layout: LayoutContext,
+  formData: PivotTableQueryFormData,
 ): InitialQueryPlan => {
-  const rowGroupbyRaw = ensureIsArray<QueryFormColumn>(formData.groupbyRows);
-  const colGroupbyRaw = ensureIsArray<QueryFormColumn>(formData.groupbyColumns);
-  const metrics = ensureIsArray<QueryFormMetric>(formData.metrics);
-  const metricLabelSet = new Set(getMetricKeys(metrics));
-  const placement = resolveMetricPlacement(rowGroupbyRaw, colGroupbyRaw, {
-    hasMetrics: metrics.length > 0,
-    preferredAxis: formData.metricsLayout as MetricsLayoutEnum,
-  });
-  const rowGroupby = stripMetricsPlaceholder(placement.rows);
-  const colGroupby = stripMetricsPlaceholder(placement.cols);
+  const {
+    groupbyRows: rowGroupby,
+    groupbyColumns: colGroupby,
+    metrics,
+  } = layout;
+  const { metricLabelSet } = layout;
   const rowKeys = rowGroupby.map(getStableColumnKey);
   const colKeys = colGroupby.map(getStableColumnKey);
-
-  const resolvedStartCollapsed = formData.startCollapsed ?? true;
-  const resolvedInitialDepth = formData.initialDepth ?? 1;
-  const resolvedExpandRowsLevel = resolveExpandLevel(
-    formData.expandRowsLevel ?? undefined,
-    rowGroupby.length,
-    resolvedStartCollapsed,
-    resolvedInitialDepth,
-  );
-  const resolvedExpandColsLevel = resolveExpandLevel(
-    formData.expandColumnsLevel ?? undefined,
-    colGroupby.length,
-    resolvedStartCollapsed,
-    resolvedInitialDepth,
-  );
-
-  const rowSubTotalsEnabled = formData.rowSubTotals ?? true;
-  const maxRowSubtotalDepth = Math.max(rowGroupby.length - 1, 0);
-  const rowSubtotalLevels = normalizeSubtotalLevels(
-    formData.rowSubtotalLevels,
-    maxRowSubtotalDepth,
-    formData.colTotals,
-    rowSubTotalsEnabled,
-  );
-  const maxColSubtotalDepth = Math.max(colGroupby.length - 1, 0);
-  const colSubtotalLevels = normalizeSubtotalLevels(
-    ensureIsArray<number>(formData.colSubtotalLevels),
-    maxColSubtotalDepth,
-    false,
-    false,
-  ).filter(level => level > 0);
+  const {
+    rowSubtotalLevels,
+    colSubtotalLevelsForQuery: colSubtotalLevels,
+    resolvedExpandRowsLevel,
+    resolvedExpandColsLevel,
+  } = layout;
 
   const { rows, cols, collapsedRows, collapsedCols } = resolvePersisted(
     formData,
@@ -285,29 +242,20 @@ export const buildInitialQueryPlan = (
   const visibleColDepth = Math.max(baseColDepth, persistedColDepth);
   const rowCollapsedSet =
     resolvedExpandRowsLevel > 0
-      ? collapseSet(collapsedRows, metricLabelSet)
+      ? collapseSet(collapsedRows, layout.getFetchPath)
       : new Set<string>();
   const colCollapsedSet =
     resolvedExpandColsLevel > 0
-      ? collapseSet(collapsedCols, metricLabelSet)
+      ? collapseSet(collapsedCols, layout.getFetchPath)
       : new Set<string>();
 
-  const rowTargets = uniqueTargets(rows, metricLabelSet, rowCollapsedSet);
-  const colTargets = uniqueTargets(cols, metricLabelSet, colCollapsedSet);
+  const rowTargets = uniqueTargets(rows, layout.getFetchPath, rowCollapsedSet);
+  const colTargets = uniqueTargets(cols, layout.getFetchPath, colCollapsedSet);
 
   const shouldPrefetchRoot = visibleRowDepth > 1 || visibleColDepth > 1;
-  const bootstrapPlan = buildBootstrapPlan(formData);
+  const bootstrapPlan = buildBootstrapPlanFromLayout(layout, formData);
   const emptyTree = createEmptyTree();
   const targets: InitialQueryTarget[] = [];
-
-  const metricInsertIndex =
-    placement.layout === MetricsLayoutEnum.ROWS
-      ? placement.metricPosition >= 0
-        ? Math.min(placement.metricPosition, rowGroupby.length)
-        : rowGroupby.length
-      : placement.metricPosition >= 0
-        ? Math.min(placement.metricPosition, colGroupby.length)
-        : colGroupby.length;
 
   const bootstrapTargets = shouldPrefetchRoot
     ? bootstrapPlan.targets.slice(0, 1)
@@ -343,8 +291,8 @@ export const buildInitialQueryPlan = (
       rowGroupbyForQueryFull: rowGroupby,
       colGroupbyForQueryFull: colGroupby,
       metricsForQuery: queryShape.metrics,
-      metricsLayoutResolved: placement.layout,
-      metricInsertIndex,
+      metricsLayoutResolved: layout.metricsLayoutResolved,
+      metricInsertIndex: layout.metricInsertIndex,
       rowSubtotalLevels,
       colSubtotalLevels,
     });

@@ -45,9 +45,6 @@ import {
   collectDimensionSortingMetricsForQuery,
   getMetricKeys,
   serializePath,
-  resolveMetricPlacement,
-  stripMetricsPlaceholder,
-  normalizeSubtotalLevels,
   injectRowSubtotalLeaves,
   labelRowSubtotalLeaves,
   decodeMetricKey,
@@ -60,6 +57,7 @@ import { buildQueryShape } from './pivot/engine/query/queryShape';
 import { buildPathFilters } from './pivot/engine/query/pathFilters';
 import { type QueryIntent } from './pivot/engine/query/queryIntent';
 import { handleChartDataResponse } from './pivot/engine/query/handleChartDataResponse';
+import { buildLayoutContext } from './pivot/layout/LayoutContext';
 
 export interface FetchPivotBranchResult {
   data?: PivotTreeData;
@@ -213,11 +211,15 @@ const resolveFetchContext = ({
   targetRowDepth,
   targetColDepth,
 }: FetchPivotBranchParams): ResolvedFetchContext => {
-  const rowGroupbyRaw = ensureIsArray<QueryFormColumn>(formData.groupbyRows);
-  const colGroupbyRaw = ensureIsArray<QueryFormColumn>(formData.groupbyColumns);
-  const metrics = ensureIsArray(formData.metrics);
-  const metricLabels = getMetricKeys(metrics);
-  const metricLabelSet = new Set(metricLabels);
+  const layout = buildLayoutContext(formData);
+  const rowGroupbyRaw = layout.groupbyRowsRaw;
+  const colGroupbyRaw = layout.groupbyColumnsRaw;
+  const {
+    metrics,
+    metricLabelSet,
+    metricsLayoutResolved,
+    metricInsertIndex: metricInsertIndexBase,
+  } = layout;
   const extraFormData = getExtraFormData(formData);
   const timeGrainSqla =
     extraFormData?.time_grain_sqla || formData.time_grain_sqla;
@@ -241,22 +243,11 @@ const resolveFetchContext = ({
     }
     return col;
   };
-  const placement = resolveMetricPlacement(rowGroupbyRaw, colGroupbyRaw, {
-    hasMetrics: metrics.length > 0,
-    preferredAxis: formData.metricsLayout as MetricsLayoutEnum,
-  });
-  let rowGroupby = stripMetricsPlaceholder(placement.rows);
-  let colGroupby = stripMetricsPlaceholder(placement.cols);
-  const metricsLayoutResolved = placement.layout;
+  let rowGroupby = layout.groupbyRows;
+  let colGroupby = layout.groupbyColumns;
   const metricsAxis: PivotAxis =
     metricsLayoutResolved === MetricsLayoutEnum.ROWS ? 'row' : 'col';
   const pathForMetrics = metricPath ?? path;
-  const metricInsertIndexBase =
-    placement.metricPosition >= 0
-      ? placement.metricPosition
-      : metricsAxis === 'row'
-        ? rowGroupby.length
-        : colGroupby.length;
   const getMetricIndex = (candidatePath: PivotPath) =>
     candidatePath.findIndex(val => {
       const decoded = decodeMetricKey(val);
@@ -292,24 +283,14 @@ const resolveFetchContext = ({
   const hasRowTotalSorting = hasTotalSorting(formData.rowSorting, rowGroupby);
   const hasColTotalSorting = hasTotalSorting(formData.colSorting, colGroupby);
 
-  const rowSubTotalsEnabled = formData.rowSubTotals ?? true;
   const maxRowSubtotalDepth = Math.max(rowGroupby.length - 1, 0);
-  const rowSubtotalLevels = normalizeSubtotalLevels(
-    formData.rowSubtotalLevels,
-    maxRowSubtotalDepth,
-    formData.colTotals,
-    rowSubTotalsEnabled,
+  const rowSubtotalLevels = layout.rowSubtotalLevels.filter(
+    level => level <= maxRowSubtotalDepth,
   );
   const maxColSubtotalDepth = Math.max(colGroupby.length - 1, 0);
-  const colSubtotalLevelsRaw = ensureIsArray<number>(
-    formData.colSubtotalLevels,
+  const colSubtotalLevels = layout.colSubtotalLevelsForQuery.filter(
+    level => level <= maxColSubtotalDepth,
   );
-  const colSubtotalLevels = normalizeSubtotalLevels(
-    colSubtotalLevelsRaw,
-    maxColSubtotalDepth,
-    false,
-    false,
-  ).filter(level => level > 0);
 
   const metricInsertIndex =
     (shouldCollapseRowDims || shouldCollapseColDims) && metricIndexInPath >= 0
@@ -456,9 +437,9 @@ const resolveFetchContext = ({
       time_grain_sqla: timeGrainSqla,
       granularity: formData.granularity,
       granularity_sqla: formData.granularity_sqla,
-      rowTotals: formData.rowTotals,
-      colTotals: formData.colTotals,
-      rowSubTotals: formData.rowSubTotals,
+      rowTotals: layout.rowTotals,
+      colTotals: layout.colTotals,
+      rowSubTotals: layout.rowSubTotals,
       rowSubtotalLevels,
       colSubtotalLevels,
       metricsLayoutResolved,

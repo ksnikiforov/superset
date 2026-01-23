@@ -28,12 +28,7 @@ import {
   ensureIsArray,
 } from '@superset-ui/core';
 import { getColorFormatters } from '@superset-ui/chart-controls';
-import {
-  MetricsLayoutEnum,
-  PivotTableQueryFormData,
-  PivotTreeData,
-  TotalPosition,
-} from './types';
+import { PivotTableQueryFormData, PivotTreeData } from './types';
 import {
   getMetricKeys,
   getStableColumnKey,
@@ -42,13 +37,11 @@ import {
   normalizeDimensionSortingMapWithKeys,
   normalizeMetricFormattingMapWithKeys,
   normalizeMetricDatabarMapWithKeys,
-  resolveMetricPlacement,
-  stripMetricsPlaceholder,
-  normalizeSubtotalLevels,
   serializePath,
 } from './utils';
-import { buildInitialQueryPlan } from './pivot/engine/initialQueryPlan';
+import { buildInitialQueryPlanFromLayout } from './pivot/engine/initialQueryPlan';
 import { buildBranchTreeFromResults } from './fetchPivotBranch';
+import { buildLayoutContext } from './pivot/layout/LayoutContext';
 
 const { DATABASE_DATETIME } = TimeFormats;
 
@@ -80,7 +73,21 @@ export default function transformProps(
     currencyFormats = {},
     columns = [],
   } = datasource || {};
-  const metrics = ensureIsArray(formData.metrics || []);
+  const layout = buildLayoutContext(formData, datasource);
+  const {
+    metrics,
+    groupbyRows,
+    groupbyColumns,
+    rowSubTotals: rowSubTotalsEnabled,
+    rowSubtotalLevels,
+    colSubtotalLevelsForQuery: colSubtotalLevels,
+    rowTotalPosition,
+    rowSubtotalPosition,
+    colTotalPosition,
+    colSubtotalPosition,
+    metricsLayoutResolved: metricsLayout,
+    metricInsertIndex,
+  } = layout;
   const metricFormatting = normalizeMetricFormattingMapWithKeys(
     formData.metricFormatting,
     metrics,
@@ -89,14 +96,6 @@ export default function transformProps(
     formData.metricDatabars,
     metrics,
   );
-  const groupbyRowsRaw = ensureIsArray(formData.groupbyRows || []);
-  const groupbyColumnsRaw = ensureIsArray(formData.groupbyColumns || []);
-  const placement = resolveMetricPlacement(groupbyRowsRaw, groupbyColumnsRaw, {
-    hasMetrics: metrics.length > 0,
-    preferredAxis: formData.metricsLayout as MetricsLayoutEnum,
-  });
-  const groupbyRows = stripMetricsPlaceholder(placement.rows);
-  const groupbyColumns = stripMetricsPlaceholder(placement.cols);
   const rowSorting = normalizeDimensionSortingMapWithKeys(
     formData.rowSorting,
     groupbyRows,
@@ -105,48 +104,13 @@ export default function transformProps(
     formData.colSorting,
     groupbyColumns,
   );
-  const rowSubTotalsEnabled = formData.rowSubTotals ?? true;
-  const maxRowSubtotalDepth = Math.max(groupbyRows.length - 1, 0);
-  const rowSubtotalLevels = normalizeSubtotalLevels(
-    formData.rowSubtotalLevels,
-    maxRowSubtotalDepth,
-    formData.colTotals,
-    rowSubTotalsEnabled,
-  );
-  const maxColSubtotalDepth = Math.max(groupbyColumns.length - 1, 0);
-  const colSubtotalLevelsRaw = ensureIsArray<number>(
-    formData.colSubtotalLevels,
-  );
-  const colSubtotalLevels = normalizeSubtotalLevels(
-    colSubtotalLevelsRaw,
-    maxColSubtotalDepth,
-    false,
-    false,
-  ).filter(level => level > 0);
-  const initialPlan = buildInitialQueryPlan(formData);
+  const initialPlan = buildInitialQueryPlanFromLayout(layout, formData);
   const planMetrics = initialPlan.targets.reduce(
     (acc, target) => mergeMetrics(acc, target.metricsForQuery),
     metrics,
   );
-  const rowTotalPosition =
-    (formData.rowTotalPosition as TotalPosition) || 'start';
-  const rowSubtotalPosition =
-    (formData.rowSubtotalPosition as TotalPosition) || 'start';
-  const colTotalPosition =
-    (formData.colTotalPosition as TotalPosition) || 'start';
-  const colSubtotalPosition =
-    (formData.colSubtotalPosition as TotalPosition) || 'start';
   const pivotTheme = formData.pivotTheme || 'none';
   const pivotThemeColors = formData.pivotThemeColors || '';
-  const metricsLayout = placement.layout;
-  const metricInsertIndex =
-    metricsLayout === MetricsLayoutEnum.ROWS
-      ? placement.metricPosition >= 0
-        ? Math.min(placement.metricPosition, groupbyRows.length)
-        : groupbyRows.length
-      : placement.metricPosition >= 0
-        ? Math.min(placement.metricPosition, groupbyColumns.length)
-        : groupbyColumns.length;
   const granularity = extractTimegrain(rawFormData);
   const metricKeysForQuery = getMetricKeys(planMetrics);
   const queryFormData: PivotTableQueryFormData = {
@@ -309,8 +273,8 @@ export default function transformProps(
     aggregateFunction: formData.aggregateFunction,
     rowSorting,
     colSorting,
-    startCollapsed: formData.startCollapsed ?? true,
-    initialDepth: formData.initialDepth ?? 1,
+    startCollapsed: layout.startCollapsed,
+    initialDepth: layout.initialDepth,
     rowTotals: formData.rowTotals,
     colTotals: formData.colTotals,
     rowSubTotals: rowSubTotalsEnabled,

@@ -76,11 +76,8 @@ import {
   normalizeDimensionSortingMapWithKeys,
   normalizeMetricFormattingMapWithKeys,
   normalizeMetricDatabarMapWithKeys,
-  normalizeSubtotalLevels,
   parseThemeColors,
   PIVOT_THEME_PRESETS,
-  resolveMetricPlacement,
-  resolveExpandLevel,
   serializeCellKey,
   serializePath,
   SUBTOTAL_LABEL,
@@ -116,6 +113,7 @@ import {
 } from './pivot/metricsTotals';
 import { getExpandedDepths } from './pivot/visibility';
 import { buildCellFilters, buildContextMenuFilters } from './pivot/filters';
+import { buildLayoutContext } from './pivot/layout/LayoutContext';
 import {
   buildFormattingValueMaps,
   deriveMetricKey as deriveMetricKeyBase,
@@ -497,45 +495,59 @@ function PivotTableChart(props: PivotTableProps) {
     theme = supersetTheme,
   } = props;
   const fetchFormData = queryFormData || formData;
-  const resolvedStartCollapsed =
-    startCollapsed ?? formData.startCollapsed ?? true;
-  const resolvedInitialDepth = initialDepth ?? formData.initialDepth ?? 1;
   const expandRowsLevelRaw =
     expandRowsLevelProp ?? formData.expandRowsLevel ?? undefined;
   const expandColumnsLevelRaw =
     expandColumnsLevelProp ?? formData.expandColumnsLevel ?? undefined;
-  const resolvedExpandRowsLevel = useMemo(
+  const layout = useMemo(
     () =>
-      resolveExpandLevel(
-        expandRowsLevelRaw,
-        groupbyRows.length,
-        resolvedStartCollapsed,
-        resolvedInitialDepth,
-      ),
+      buildLayoutContext({
+        groupbyRows: formData.groupbyRows,
+        groupbyColumns: formData.groupbyColumns,
+        metrics,
+        metricsLayout:
+          (formData.metricsLayout as MetricsLayoutEnum) || metricsLayout,
+        rowTotals,
+        colTotals,
+        rowSubTotals,
+        rowSubtotalLevels,
+        colSubtotalLevels,
+        rowTotalPosition: formData.rowTotalPosition || rowTotalPosition,
+        rowSubtotalPosition:
+          formData.rowSubtotalPosition || rowSubtotalPosition,
+        colTotalPosition: formData.colTotalPosition || colTotalPosition,
+        colSubtotalPosition:
+          formData.colSubtotalPosition || colSubtotalPosition,
+        startCollapsed,
+        initialDepth,
+        expandRowsLevel: expandRowsLevelRaw,
+        expandColumnsLevel: expandColumnsLevelRaw,
+      }),
     [
-      expandRowsLevelRaw,
-      groupbyRows.length,
-      resolvedInitialDepth,
-      resolvedStartCollapsed,
-    ],
-  );
-  const resolvedExpandColumnsLevel = useMemo(
-    () =>
-      resolveExpandLevel(
-        expandColumnsLevelRaw,
-        groupbyColumns.length,
-        resolvedStartCollapsed,
-        resolvedInitialDepth,
-      ),
-    [
+      colSubtotalLevels,
+      colSubtotalPosition,
+      colTotalPosition,
+      colTotals,
       expandColumnsLevelRaw,
-      groupbyColumns.length,
-      resolvedInitialDepth,
-      resolvedStartCollapsed,
+      expandRowsLevelRaw,
+      formData,
+      initialDepth,
+      metrics,
+      metricsLayout,
+      rowSubtotalLevels,
+      rowSubtotalPosition,
+      rowTotalPosition,
+      rowTotals,
+      rowSubTotals,
+      startCollapsed,
     ],
   );
-  const resolvedMetricsLayout =
-    (formData.metricsLayout as MetricsLayoutEnum) || metricsLayout;
+  const {
+    resolvedExpandRowsLevel,
+    resolvedExpandColsLevel: resolvedExpandColumnsLevel,
+    metricsLayoutResolved: resolvedMetricsLayout,
+    metricInsertIndex,
+  } = layout;
   const persistExpansionState = persistExpansionStateProp ?? true;
   const metricFormattingScope =
     (formData.metricFormattingScope as MetricFormattingScope) ||
@@ -670,85 +682,59 @@ function PivotTableChart(props: PivotTableProps) {
     () => Object.keys(rowSortingKeyMap).length > 0,
     [rowSortingKeyMap],
   );
-  const resolvedRowTotalPosition =
-    formData.rowTotalPosition || rowTotalPosition;
-  const resolvedRowSubtotalPosition =
-    formData.rowSubtotalPosition || rowSubtotalPosition;
-  const resolvedColTotalPosition =
-    formData.colTotalPosition || colTotalPosition;
-  const resolvedColSubtotalPosition =
-    formData.colSubtotalPosition || colSubtotalPosition;
+  const resolvedRowTotalPosition = layout.rowTotalPosition;
+  const resolvedRowSubtotalPosition = layout.rowSubtotalPosition;
+  const resolvedColTotalPosition = layout.colTotalPosition;
+  const resolvedColSubtotalPosition = layout.colSubtotalPosition;
 
-  const normalizedRowSubtotalLevels = useMemo(
-    () =>
-      normalizeSubtotalLevels(
-        rowSubtotalLevels,
-        Math.max(groupbyRows.length - 1, 0),
-        colTotals,
-        rowSubTotals ?? true,
-      ),
-    [colTotals, groupbyRows.length, rowSubTotals, rowSubtotalLevels],
-  );
+  const normalizedRowSubtotalLevels = layout.rowSubtotalLevels;
   const rowSubtotalDepths = useMemo(
     () => normalizedRowSubtotalLevels.filter(level => level > 0),
     [normalizedRowSubtotalLevels],
   );
-  const normalizedColSubtotalLevels = useMemo(
-    () =>
-      normalizeSubtotalLevels(
-        colSubtotalLevels,
-        Math.max(groupbyColumns.length - 1, 0),
-        rowTotals,
-        false,
-      ),
-    [colSubtotalLevels, groupbyColumns.length, rowTotals],
-  );
-  const metricPlacement = useMemo(
-    () =>
-      resolveMetricPlacement(formData.groupbyRows, formData.groupbyColumns, {
-        hasMetrics: metrics.length > 0,
-        preferredAxis: resolvedMetricsLayout,
-      }),
-    [
-      formData.groupbyColumns,
-      formData.groupbyRows,
-      metrics.length,
-      resolvedMetricsLayout,
-    ],
-  );
+  const normalizedColSubtotalLevels = useMemo(() => {
+    if (rowTotals && !layout.colSubtotalLevels.includes(0)) {
+      return [0, ...layout.colSubtotalLevels];
+    }
+    return layout.colSubtotalLevels;
+  }, [layout.colSubtotalLevels, rowTotals]);
   const metricInsertIndexOnRows = useMemo(() => {
     if (
       resolvedMetricsLayout !== MetricsLayoutEnum.ROWS ||
-      metricPlacement.metricPosition < 0
+      metrics.length === 0
     ) {
       return undefined;
     }
-    return Math.min(metricPlacement.metricPosition, groupbyRows.length);
+    return Math.min(layout.metricInsertIndex, groupbyRows.length);
   }, [
     groupbyRows.length,
-    metricPlacement.metricPosition,
+    layout.metricInsertIndex,
+    metrics.length,
     resolvedMetricsLayout,
   ]);
   const metricInsertIndexOnCols = useMemo(() => {
     if (
       resolvedMetricsLayout !== MetricsLayoutEnum.COLUMNS ||
-      metricPlacement.metricPosition < 0
+      metrics.length === 0
     ) {
       return undefined;
     }
-    return Math.min(metricPlacement.metricPosition, groupbyColumns.length);
+    return Math.min(layout.metricInsertIndex, groupbyColumns.length);
   }, [
     groupbyColumns.length,
-    metricPlacement.metricPosition,
+    layout.metricInsertIndex,
+    metrics.length,
     resolvedMetricsLayout,
   ]);
   const shouldExpandMetricRows =
     resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
-    metricPlacement.metricPosition === 0 &&
+    metrics.length > 0 &&
+    layout.metricInsertIndex === 0 &&
     resolvedExpandRowsLevel > 0;
   const shouldExpandMetricCols =
     resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS &&
-    metricPlacement.metricPosition === 0 &&
+    metrics.length > 0 &&
+    layout.metricInsertIndex === 0 &&
     resolvedExpandColumnsLevel > 0;
   const metricsForQueryWithFormatting = useMemo(() => {
     const formattingMetrics = collectMetricFormattingMetricsForQuery(
@@ -798,21 +784,6 @@ function PivotTableChart(props: PivotTableProps) {
     rowFormatting,
     rowSorting,
   ]);
-  const metricInsertIndex = useMemo(() => {
-    if (resolvedMetricsLayout === MetricsLayoutEnum.ROWS) {
-      return metricPlacement.metricPosition >= 0
-        ? Math.min(metricPlacement.metricPosition, groupbyRows.length)
-        : groupbyRows.length;
-    }
-    return metricPlacement.metricPosition >= 0
-      ? Math.min(metricPlacement.metricPosition, groupbyColumns.length)
-      : groupbyColumns.length;
-  }, [
-    groupbyColumns.length,
-    groupbyRows.length,
-    metricPlacement.metricPosition,
-    resolvedMetricsLayout,
-  ]);
   const groupbyRowKeys = useMemo(
     () => groupbyRows.map(getStableColumnKey),
     [groupbyRows],
@@ -832,15 +803,15 @@ function PivotTableChart(props: PivotTableProps) {
       metricsLayout: resolvedMetricsLayout,
       metricInsertIndex,
       rowSubtotalLevels: normalizedRowSubtotalLevels,
-      colSubtotalLevels: normalizedColSubtotalLevels.filter(level => level > 0),
+      colSubtotalLevels: layout.colSubtotalLevelsForQuery,
     });
   }, [
     formData.treeDataSignature,
+    layout.colSubtotalLevelsForQuery,
     metricInsertIndex,
     metricsForQueryWithFormatting,
     groupbyColumnKeys,
     groupbyRowKeys,
-    normalizedColSubtotalLevels,
     normalizedRowSubtotalLevels,
     resolvedMetricsLayout,
   ]);
@@ -851,7 +822,7 @@ function PivotTableChart(props: PivotTableProps) {
         cols: groupbyColumnKeys,
         metrics: metrics.map(getMetricKey),
         metricsLayout: resolvedMetricsLayout,
-        metricPosition: metricPlacement.metricPosition,
+        metricPosition: metrics.length > 0 ? metricInsertIndex : -1,
         rowSubtotalLevels: normalizedRowSubtotalLevels,
         colSubtotalLevels: normalizedColSubtotalLevels,
         rowTotals,
@@ -864,7 +835,7 @@ function PivotTableChart(props: PivotTableProps) {
       colTotals,
       groupbyColumnKeys,
       groupbyRowKeys,
-      metricPlacement.metricPosition,
+      metricInsertIndex,
       metrics,
       normalizedColSubtotalLevels,
       normalizedRowSubtotalLevels,
@@ -896,21 +867,14 @@ function PivotTableChart(props: PivotTableProps) {
     [valueFormat],
   );
 
-  const metricLabels = useMemo(
-    () => metrics.map(getMetricKey).filter(label => label.length > 0),
-    [metrics],
-  );
-  const metricLabelSet = useMemo(() => new Set(metricLabels), [metricLabels]);
+  const {
+    metricKeys: metricLabels,
+    metricLabelSet,
+    isMetricTokenValue,
+  } = layout;
   const metricOrderMap = useMemo(
     () => new Map(metricLabels.map((label, idx) => [label, idx])),
     [metricLabels],
-  );
-  const isMetricTokenValue = useCallback(
-    (val: unknown) => {
-      const decoded = decodeMetricKey(val);
-      return !!decoded && metricLabelSet.has(decoded);
-    },
-    [metricLabelSet],
   );
   const isMultiMetric = metricLabels.length > 1;
   const maxColDimDepth = useMemo(
@@ -1094,17 +1058,7 @@ function PivotTableChart(props: PivotTableProps) {
       getMetricLabelFromPathBase(path, metricLabelSet),
     [metricLabelSet],
   );
-  const getFetchPath = useCallback(
-    (path: PivotTreeNode['path']) =>
-      path.map(val => {
-        const decoded = decodeMetricKey(val);
-        if (decoded && metricLabelSet.has(decoded)) {
-          return decoded;
-        }
-        return val;
-      }),
-    [metricLabelSet],
-  );
+  const { getFetchPath } = layout;
 
   const compareMetricOrder = useCallback(
     (a: PivotTreeNode, b: PivotTreeNode) => {

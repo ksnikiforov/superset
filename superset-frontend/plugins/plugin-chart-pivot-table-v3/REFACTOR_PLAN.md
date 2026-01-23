@@ -1513,6 +1513,22 @@ Quality gates (keep green throughout):
 - tests: `npm test plugins/plugin-chart-pivot-table-v3`
 - lint (plugin scope): `npx eslint plugins/plugin-chart-pivot-table-v3`
 
+### Implementation status (non-normative)
+
+This section tracks what has been implemented in this working tree. It does not change the acceptance criteria below.
+
+- [x] Phase 0 — Safety net and invariants
+  - Added contract tests under `test/plugin/contracts/*` + `test/plugin/engine/initialQueryPlan.contract.test.ts`.
+  - Added a dev/test-only runtime invariant in `src/transformProps.ts` to catch missing axis root nodes early.
+- [x] Phase 0.5 — Global Async Queries (HTTP 202) support for plugin-owned fetches
+  - Added GAQ response handling (`src/pivot/engine/query/handleChartDataResponse.ts`) and applied it to plugin-owned fetches (`src/fetchPivotBranch.ts`, `src/pivot/engine/query/fetchPivotBranchesBatch.ts`).
+  - Added unit tests under `test/plugin/gaq/*`.
+- [x] Phase 1 — Introduce `LayoutContext`
+  - Added `src/pivot/layout/LayoutContext.ts` and routed layout resolution through it (single entrypoint).
+  - Updated callers to consume `LayoutContext`: `src/transformProps.ts`, `src/fetchPivotBranch.ts`, `src/pivot/engine/initialQueryPlan.ts`, `src/pivot/engine/bootstrapPlanner.ts`, `src/PivotTableChart.tsx`.
+  - Preserved subtotal semantics by differentiating `colSubtotalLevels` (includes 0) vs `colSubtotalLevelsForQuery` (> 0) for query planning.
+  - Verified: `npm test plugins/plugin-chart-pivot-table-v3` and `npx eslint plugins/plugin-chart-pivot-table-v3`.
+
 ### Phase 0 — Safety net and invariants (1 PR)
 
 **Purpose:** Make refactors safe by locking down behavior with a few high-signal tests and invariants.

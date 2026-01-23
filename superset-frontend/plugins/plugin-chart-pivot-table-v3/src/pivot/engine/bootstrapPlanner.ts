@@ -16,19 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import {
-  ensureIsArray,
-  QueryFormColumn,
-  QueryFormMetric,
-} from '@superset-ui/core';
-import { MetricsLayoutEnum, PivotTableQueryFormData } from '../../types';
-import {
-  normalizeSubtotalLevels,
-  resolveMetricPlacement,
-  hasTotalSorting,
-  stripMetricsPlaceholder,
-} from '../../utils';
+import { QueryFormColumn, QueryFormMetric } from '@superset-ui/core';
+import { PivotTableQueryFormData } from '../../types';
+import { hasTotalSorting } from '../../utils';
 import { type QueryIntent } from './query/queryIntent';
+import { buildLayoutContext, LayoutContext } from '../layout/LayoutContext';
 
 export type BootstrapTargetKind = 'totals' | 'grid' | 'rows' | 'cols';
 
@@ -82,31 +74,20 @@ const buildIntent = ({
 
 export const buildBootstrapPlan = (
   formData: PivotTableQueryFormData,
+): BootstrapPlan =>
+  buildBootstrapPlanFromLayout(buildLayoutContext(formData), formData);
+
+export const buildBootstrapPlanFromLayout = (
+  layout: LayoutContext,
+  formData: PivotTableQueryFormData,
 ): BootstrapPlan => {
-  const rowGroupbyRaw = ensureIsArray<QueryFormColumn>(formData.groupbyRows);
-  const colGroupbyRaw = ensureIsArray<QueryFormColumn>(formData.groupbyColumns);
-  const metrics = ensureIsArray<QueryFormMetric>(formData.metrics);
-  const placement = resolveMetricPlacement(rowGroupbyRaw, colGroupbyRaw, {
-    hasMetrics: metrics.length > 0,
-    preferredAxis: formData.metricsLayout as MetricsLayoutEnum,
-  });
-  const rowGroupby = stripMetricsPlaceholder(placement.rows);
-  const colGroupby = stripMetricsPlaceholder(placement.cols);
-  const rowSubTotalsEnabled = formData.rowSubTotals ?? true;
-  const maxRowSubtotalDepth = Math.max(rowGroupby.length - 1, 0);
-  const rowSubtotalLevels = normalizeSubtotalLevels(
-    formData.rowSubtotalLevels,
-    maxRowSubtotalDepth,
-    formData.colTotals,
-    rowSubTotalsEnabled,
-  );
-  const maxColSubtotalDepth = Math.max(colGroupby.length - 1, 0);
-  const colSubtotalLevels = normalizeSubtotalLevels(
-    ensureIsArray<number>(formData.colSubtotalLevels),
-    maxColSubtotalDepth,
-    false,
-    false,
-  ).filter(level => level > 0);
+  const {
+    groupbyRows: rowGroupby,
+    groupbyColumns: colGroupby,
+    metrics,
+  } = layout;
+  const { rowSubtotalLevels, colSubtotalLevelsForQuery: colSubtotalLevels } =
+    layout;
   const needsTotals =
     !!formData.rowTotals ||
     !!formData.colTotals ||
