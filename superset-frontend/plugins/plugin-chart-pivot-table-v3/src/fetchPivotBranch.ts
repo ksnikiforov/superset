@@ -59,6 +59,7 @@ import {
 import { buildQueryShape } from './pivot/engine/query/queryShape';
 import { buildPathFilters } from './pivot/engine/query/pathFilters';
 import { type QueryIntent } from './pivot/engine/query/queryIntent';
+import { handleChartDataResponse } from './pivot/engine/query/handleChartDataResponse';
 
 export interface FetchPivotBranchResult {
   data?: PivotTreeData;
@@ -865,11 +866,14 @@ export async function fetchPivotBranch({
   );
 
   try {
-    const { json = {} } = await SupersetClient.post({
+    const { json, response } = await SupersetClient.post({
       endpoint: '/api/v1/chart/data',
       jsonPayload: queryContext,
     });
-    const results = ((json as any).result || []) as any[];
+    const resolved = await handleChartDataResponse({ response, json });
+    const results = ensureIsArray(resolved) as Array<{
+      data?: Record<string, unknown>[];
+    }>;
     const labeledBranch = buildBranchTreeFromResults({
       results,
       queryPairs: filteredQueryPairs,
@@ -885,6 +889,8 @@ export async function fetchPivotBranch({
     touchCache(cacheKey, labeledBranch);
     return { data: labeledBranch };
   } catch (error) {
-    return { error: error as Error };
+    return {
+      error: error instanceof Error ? error : new Error(String(error)),
+    };
   }
 }

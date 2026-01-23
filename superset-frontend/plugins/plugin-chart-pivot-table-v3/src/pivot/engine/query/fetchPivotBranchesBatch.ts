@@ -19,6 +19,7 @@
 import {
   BinaryQueryObjectFilterClause,
   buildQueryContext,
+  ensureIsArray,
   getColumnLabel,
   QueryFormColumn,
   QueryObject,
@@ -41,6 +42,7 @@ import {
 } from '../../../types';
 import { parsePath, serializePath } from '../../../utils';
 import { BatchGroup } from './fetchPlanOptimizer';
+import { handleChartDataResponse } from './handleChartDataResponse';
 
 export type FetchPivotBranchesBatchParams = {
   formData: PivotTableQueryFormData;
@@ -181,11 +183,12 @@ export const fetchPivotBranchesBatch = async ({
   );
 
   try {
-    const { json = {} } = await SupersetClient.post({
+    const { json, response } = await SupersetClient.post({
       endpoint: '/api/v1/chart/data',
       jsonPayload: queryContext,
     });
-    const results = ((json as any).result || []) as Array<{
+    const resolved = await handleChartDataResponse({ response, json });
+    const results = ensureIsArray(resolved) as Array<{
       data?: Record<string, unknown>[];
     }>;
     const tree = buildBranchTreeFromResults({
@@ -202,6 +205,8 @@ export const fetchPivotBranchesBatch = async ({
     });
     return { data: tree };
   } catch (error) {
-    return { error: error as Error };
+    return {
+      error: error instanceof Error ? error : new Error(String(error)),
+    };
   }
 };

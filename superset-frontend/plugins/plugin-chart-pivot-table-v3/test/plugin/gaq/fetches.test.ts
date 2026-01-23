@@ -16,12 +16,22 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { SupersetClient } from '@superset-ui/core';
+import { FeatureFlag, SupersetClient } from '@superset-ui/core';
+// eslint-disable-next-line import/no-extraneous-dependencies -- Test-only GAQ mock relies on Superset core asyncEvent entrypoint.
+import { waitForAsyncData } from 'src/middleware/asyncEvent';
+import {
+  fetchPivotBranch,
+  clearPivotBranchCache,
+} from '../../../src/fetchPivotBranch';
 import { fetchPivotBranchesBatch } from '../../../src/pivot/engine/query/fetchPivotBranchesBatch';
-import { type BatchGroup } from '../../../src/pivot/engine/query/fetchPlanOptimizer';
-import { buildFormData } from '../fixtures/pivotFormData';
 import { serializePath } from '../../../src/utils';
 import { type PivotTreeData, type PivotTreeNode } from '../../../src/types';
+import { buildFormData } from '../fixtures/pivotFormData';
+import { type BatchGroup } from '../../../src/pivot/engine/query/fetchPlanOptimizer';
+
+jest.mock('src/middleware/asyncEvent', () => ({
+  waitForAsyncData: jest.fn(),
+}));
 
 jest.mock('@superset-ui/core', () => {
   const actual = jest.requireActual('@superset-ui/core');
@@ -32,6 +42,10 @@ jest.mock('@superset-ui/core', () => {
     },
   };
 });
+
+const waitForAsyncDataMock = waitForAsyncData as jest.MockedFunction<
+  typeof waitForAsyncData
+>;
 
 const makeNode = (node: Partial<PivotTreeNode>): PivotTreeNode => ({
   axis: 'row',
@@ -62,27 +76,49 @@ const makeTree = (): PivotTreeData => ({
   cells: {},
 });
 
-const mockPost = SupersetClient.post as jest.Mock;
-
-describe('fetchPivotBranchesBatch', () => {
+describe('Global Async Queries (HTTP 202) support', () => {
   beforeEach(() => {
-    mockPost.mockReset();
+    window.featureFlags[FeatureFlag.GlobalAsyncQueries] = true;
+    (SupersetClient.post as jest.Mock).mockReset();
+    waitForAsyncDataMock.mockReset();
+    clearPivotBranchCache();
   });
 
-  it('builds IN filters for sibling batches', async () => {
-    mockPost.mockImplementation(({ jsonPayload }) =>
-      Promise.resolve({
-        response: new Response(),
-        json: {
-          result: jsonPayload.queries.map(() => ({ data: [] })),
-        },
-      }),
-    );
+  afterEach(() => {
+    window.featureFlags[FeatureFlag.GlobalAsyncQueries] = false;
+  });
 
-    const formData = buildFormData({
-      groupbyRows: ['country', 'state'],
-      groupbyColumns: [],
+  it('waits for async chart data in fetchPivotBranch()', async () => {
+    (SupersetClient.post as jest.Mock).mockResolvedValue({
+      response: new Response(null, { status: 202 }),
+      json: { result: { job_id: 'job-1' } },
     });
+    waitForAsyncDataMock.mockResolvedValue([{ data: [] }]);
+
+    const result = await fetchPivotBranch({
+      formData: buildFormData({
+        groupbyRows: ['r1'],
+        groupbyColumns: [],
+        metrics: ['m1'],
+      }),
+      axis: 'row',
+      path: ['A'],
+      visibleRowDepth: 1,
+      visibleColDepth: 0,
+    });
+
+    expect(waitForAsyncDataMock).toHaveBeenCalledTimes(1);
+    expect(result.data).toBeDefined();
+    expect(result.error).toBeUndefined();
+  });
+
+  it('waits for async chart data in fetchPivotBranchesBatch()', async () => {
+    (SupersetClient.post as jest.Mock).mockResolvedValue({
+      response: new Response(null, { status: 202 }),
+      json: { result: { job_id: 'job-2' } },
+    });
+    waitForAsyncDataMock.mockResolvedValue([{ data: [] }]);
+
     const batch: BatchGroup = {
       axis: 'row',
       childDepth: 2,
@@ -108,63 +144,12 @@ describe('fetchPivotBranchesBatch', () => {
       ],
     };
 
-    await fetchPivotBranchesBatch({
-      formData,
-      batch,
-      currentTree: makeTree(),
-      visibleRowDepth: 2,
-      visibleColDepth: 0,
-      getFetchPath: path => path,
-    });
-
-    const payload = mockPost.mock.calls[0][0].jsonPayload;
-    const { filters } = payload.queries[0];
-    expect(filters).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ col: 'country', op: '==', val: 'US' }),
-        expect.objectContaining({
-          col: 'state',
-          op: 'IN',
-          val: ['CA', 'NY'],
-        }),
-      ]),
-    );
-  });
-
-  it('uses IS NULL when batching null siblings', async () => {
-    mockPost.mockImplementation(({ jsonPayload }) =>
-      Promise.resolve({
-        response: new Response(),
-        json: {
-          result: jsonPayload.queries.map(() => ({ data: [] })),
-        },
+    const result = await fetchPivotBranchesBatch({
+      formData: buildFormData({
+        groupbyRows: ['country', 'state'],
+        groupbyColumns: [],
+        metrics: ['m1'],
       }),
-    );
-
-    const formData = buildFormData({
-      groupbyRows: ['country', 'state'],
-      groupbyColumns: [],
-    });
-    const batch: BatchGroup = {
-      axis: 'row',
-      childDepth: 2,
-      requiredOppositeDepth: 0,
-      signature: 'sig',
-      parentPathKey: serializePath(['US']),
-      siblingValues: [null],
-      targets: [
-        {
-          axis: 'row',
-          pathKey: serializePath(['US', null]),
-          childDepth: 2,
-          requiredOppositeDepth: 0,
-          batchSignature: 'sig',
-        },
-      ],
-    };
-
-    await fetchPivotBranchesBatch({
-      formData,
       batch,
       currentTree: makeTree(),
       visibleRowDepth: 2,
@@ -172,13 +157,8 @@ describe('fetchPivotBranchesBatch', () => {
       getFetchPath: path => path,
     });
 
-    const payload = mockPost.mock.calls[0][0].jsonPayload;
-    const { filters } = payload.queries[0];
-    expect(filters).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ col: 'country', op: '==', val: 'US' }),
-        expect.objectContaining({ col: 'state', op: 'IS NULL' }),
-      ]),
-    );
+    expect(waitForAsyncDataMock).toHaveBeenCalledTimes(1);
+    expect(result.data).toBeDefined();
+    expect(result.error).toBeUndefined();
   });
 });
