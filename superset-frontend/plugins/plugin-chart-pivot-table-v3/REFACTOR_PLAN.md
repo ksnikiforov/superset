@@ -1528,6 +1528,11 @@ This section tracks what has been implemented in this working tree. It does not 
   - Updated callers to consume `LayoutContext`: `src/transformProps.ts`, `src/fetchPivotBranch.ts`, `src/pivot/engine/initialQueryPlan.ts`, `src/pivot/engine/bootstrapPlanner.ts`, `src/PivotTableChart.tsx`.
   - Preserved subtotal semantics by differentiating `colSubtotalLevels` (includes 0) vs `colSubtotalLevelsForQuery` (> 0) for query planning.
   - Verified: `npm test plugins/plugin-chart-pivot-table-v3` and `npx eslint plugins/plugin-chart-pivot-table-v3`.
+- [x] Phase 2 — Extract “tree transforms” into `pivot/core`
+  - Added `src/pivot/core/path.ts`, `src/pivot/core/tokens.ts`, `src/pivot/core/tree.ts`.
+  - Moved path/token/tree implementations out of `src/utils.ts` and kept it as a compatibility re-export barrel.
+  - Added unit tests under `test/plugin/pivot/core/*`.
+  - Verified: `npm test plugins/plugin-chart-pivot-table-v3` and `npx eslint plugins/plugin-chart-pivot-table-v3`.
 
 ### Phase 0 — Safety net and invariants (1 PR)
 

@@ -17,8 +17,6 @@
  * under the License.
  */
 import {
-  DataRecord,
-  DataRecordValue,
   getColumnLabel,
   getMetricLabel,
   Metric,
@@ -44,19 +42,50 @@ import {
   PivotSortMode,
   PivotSortOrder,
   PivotPath,
-  PivotResultCell,
-  PivotTreeData,
-  PivotTreeNode,
 } from './types';
 import { formatQueryName } from './pivot/engine/query/queryName';
+import {
+  getFormattingMetricKey,
+  getMetricKey,
+  getMetricKeys,
+  isMetricsPlaceholder,
+  METRICS_PLACEHOLDER,
+  normalizePlaceholder,
+} from './pivot/core/tokens';
 
-export const PATH_DIVIDER = '\u0000';
-export const CELL_KEY_DIVIDER = '\u0001';
-export const METRICS_PLACEHOLDER = '__MEASURES__';
-export const METRICS_PLACEHOLDER_LABEL = 'Σ Values';
-export const METRIC_TOKEN_PREFIX = '__metric__';
-export const SUBTOTAL_TOKEN = '\u0002subtotal';
-export const SUBTOTAL_LABEL = 'Subtotal';
+export {
+  CELL_KEY_DIVIDER,
+  parseCellKey,
+  parsePath,
+  PATH_DIVIDER,
+  serializeCellKey,
+  serializePath,
+} from './pivot/core/path';
+export {
+  decodeMetricKey,
+  encodeMetricKey,
+  getFormattingMetricKey,
+  getMetricKey,
+  getMetricKeys,
+  isMetricToken,
+  isMetricsPlaceholder,
+  isSubtotalToken,
+  METRICS_PLACEHOLDER,
+  METRICS_PLACEHOLDER_LABEL,
+  METRIC_TOKEN_PREFIX,
+  normalizePlaceholder,
+  stripMetricsPlaceholder,
+  SUBTOTAL_LABEL,
+  SUBTOTAL_TOKEN,
+} from './pivot/core/tokens';
+export {
+  applyMetricAxis,
+  buildTreeFromRecords,
+  formatPivotLabelValue,
+  injectRowSubtotalLeaves,
+  labelRowSubtotalLeaves,
+  mergeTrees,
+} from './pivot/core/tree';
 export const PIVOT_THEME_PRESETS: Record<string, string> = {
   blue: supersetTheme.colorPrimaryBg,
   peach: supersetTheme.colorWarningBg,
@@ -64,17 +93,6 @@ export const PIVOT_THEME_PRESETS: Record<string, string> = {
 };
 export const DEFAULT_DATABAR_POSITIVE_COLOR = supersetTheme.colorSuccess;
 export const DEFAULT_DATABAR_NEGATIVE_COLOR = supersetTheme.colorError;
-
-export const isSubtotalToken = (val: unknown) => val === SUBTOTAL_TOKEN;
-
-export const encodeMetricKey = (metricKey: string) =>
-  `${METRIC_TOKEN_PREFIX}${metricKey}`;
-
-export const isMetricToken = (val: unknown): val is string =>
-  typeof val === 'string' && val.startsWith(METRIC_TOKEN_PREFIX);
-
-export const decodeMetricKey = (val: unknown): string | undefined =>
-  isMetricToken(val) ? val.slice(METRIC_TOKEN_PREFIX.length) : undefined;
 
 const normalizeThemeHexColor = (value: string) => {
   if (!/^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(value)) {
@@ -185,125 +203,10 @@ export const parseThemeColors = (value?: string) =>
     .map(color => normalizeThemeColor(color))
     .filter((color): color is string => !!color);
 
-export const normalizePlaceholder = (val: QueryFormColumn) => {
-  if (val === METRICS_PLACEHOLDER) return METRICS_PLACEHOLDER;
-  if (
-    typeof val === 'object' &&
-    ((val as any).column_name === METRICS_PLACEHOLDER ||
-      (val as any).label === METRICS_PLACEHOLDER)
-  ) {
-    return METRICS_PLACEHOLDER;
-  }
-  return val;
-};
-
-export const isMetricsPlaceholder = (val: QueryFormColumn) =>
-  normalizePlaceholder(val) === METRICS_PLACEHOLDER;
-
-export const stripMetricsPlaceholder = (groupby: QueryFormColumn[]) =>
-  groupby.filter(col => {
-    if (isMetricsPlaceholder(col)) return false;
-    return true;
-  });
-
 export const getStableColumnKey = (column: QueryFormColumn) =>
   typeof column === 'string'
     ? column
     : column.sqlExpression || column.label || '';
-
-const escapePathDivider = (value: string) =>
-  value.split(PATH_DIVIDER).join(`${PATH_DIVIDER}${PATH_DIVIDER}`);
-
-const serializePathValue = (value: PivotPath[number]) => {
-  if (value === null) {
-    return '__NULL__';
-  }
-  if (value === undefined) {
-    return '__UNDEFINED__';
-  }
-  return escapePathDivider(String(value));
-};
-
-export const serializePath = (path: PivotPath = []) =>
-  path.map(serializePathValue).join(PATH_DIVIDER);
-
-const deserializePathValue = (value: string): PivotPath[number] => {
-  if (value === '__NULL__') {
-    return null;
-  }
-  if (value === '__UNDEFINED__') {
-    return undefined;
-  }
-  return value;
-};
-
-export const parsePath = (key: string): PivotPath => {
-  if (!key) {
-    return [];
-  }
-  const parts: string[] = [];
-  let buffer = '';
-  for (let idx = 0; idx < key.length; idx += 1) {
-    const char = key[idx];
-    if (char !== PATH_DIVIDER) {
-      buffer += char;
-      continue;
-    }
-    const nextChar = key[idx + 1];
-    if (nextChar === PATH_DIVIDER) {
-      buffer += PATH_DIVIDER;
-      idx += 1;
-      continue;
-    }
-    parts.push(buffer);
-    buffer = '';
-  }
-  parts.push(buffer);
-  return parts.map(deserializePathValue);
-};
-
-export const formatPivotLabelValue = (
-  value: DataRecordValue,
-  fallback = '',
-) => {
-  if (value === null) {
-    return '(NULL)';
-  }
-  if (value === undefined) {
-    return fallback;
-  }
-  return String(value);
-};
-
-export const serializeCellKey = (rowKey: string, colKey: string) =>
-  `${rowKey}${CELL_KEY_DIVIDER}${colKey}`;
-
-export const parseCellKey = (key: string) => {
-  const dividerIndex = key.indexOf(CELL_KEY_DIVIDER);
-  if (dividerIndex < 0) {
-    return { rowKey: key, colKey: '' };
-  }
-  return {
-    rowKey: key.slice(0, dividerIndex),
-    colKey: key.slice(dividerIndex + CELL_KEY_DIVIDER.length),
-  };
-};
-
-export const getMetricKey = (metric: QueryFormMetric | Metric) => {
-  if (typeof metric === 'string') {
-    return metric;
-  }
-  if ('expressionType' in metric) {
-    return getMetricLabel(metric) || '';
-  }
-  if ('metric_name' in metric && metric.metric_name) {
-    return metric.verbose_name || metric.metric_name;
-  }
-  return '';
-};
-
-export const getMetricKeys = (metrics: QueryFormMetric[]) =>
-  metrics.map(getMetricKey).filter((m): m is string => !!m);
 
 type MetricSelectValue = {
   value: string | number;
@@ -317,19 +220,6 @@ const isMetricSelectValue = (value: unknown): value is MetricSelectValue =>
   isRecord(value) &&
   'value' in value &&
   (typeof value.value === 'string' || typeof value.value === 'number');
-
-const getMetricOptionName = (metric: QueryFormMetric | Metric) => {
-  if (isRecord(metric)) {
-    const { optionName } = metric;
-    if (typeof optionName === 'string' && optionName.trim().length > 0) {
-      return optionName;
-    }
-  }
-  return undefined;
-};
-
-export const getFormattingMetricKey = (metric: QueryFormMetric | Metric) =>
-  getMetricOptionName(metric) || getMetricKey(metric);
 
 const coerceExpressionType = (
   value: Record<string, unknown>,
@@ -562,6 +452,18 @@ const normalizeFormattingMetricForQuery = (
   if (typeof metric === 'string') {
     return metric;
   }
+  const getMetricOptionName = (value: QueryFormMetric) => {
+    if (typeof value === 'string') {
+      return undefined;
+    }
+    if (isRecord(value)) {
+      const { optionName } = value;
+      if (typeof optionName === 'string' && optionName.trim().length > 0) {
+        return optionName;
+      }
+    }
+    return undefined;
+  };
   const optionName = getMetricOptionName(metric);
   if (optionName && metric.label !== optionName) {
     return { ...metric, label: optionName };
@@ -1216,146 +1118,6 @@ export const normalizeSubtotalLevels = (
   return Array.from(next).sort((a, b) => a - b);
 };
 
-export const injectRowSubtotalLeaves = (
-  tree: PivotTreeData,
-  depth: number,
-  fullDepth: number,
-) => {
-  if (depth <= 0 || depth >= fullDepth) {
-    return tree;
-  }
-  const next: PivotTreeData = {
-    rows: { ...tree.rows },
-    cols: { ...tree.cols },
-    cells: { ...tree.cells },
-  };
-  const subtotalNodes = Object.values(tree.rows).filter(
-    node =>
-      node.path.length === depth &&
-      node.path.length > 0 &&
-      !node.path.some(val => isSubtotalToken(val)),
-  );
-  subtotalNodes.forEach(node => {
-    const subtotalPath = [...node.path, SUBTOTAL_TOKEN];
-    const subtotalKey = serializePath(subtotalPath);
-    if (!next.rows[subtotalKey]) {
-      next.rows[subtotalKey] = {
-        ...node,
-        key: subtotalKey,
-        path: subtotalPath,
-        label: SUBTOTAL_LABEL,
-        formattedLabel: SUBTOTAL_LABEL,
-        level: subtotalPath.length,
-        hasChildren: false,
-        isSubtotal: true,
-      };
-    }
-  });
-  Object.values(tree.cells).forEach(cell => {
-    const baseRowPath = tree.rows[cell.rowKey]?.path;
-    if (
-      !baseRowPath ||
-      baseRowPath.length !== depth ||
-      baseRowPath.length === 0 ||
-      baseRowPath.some(val => isSubtotalToken(val))
-    ) {
-      return;
-    }
-    const subtotalRowKey = serializePath([...baseRowPath, SUBTOTAL_TOKEN]);
-    const cellKey = serializeCellKey(subtotalRowKey, cell.colKey);
-    next.cells[cellKey] = {
-      ...cell,
-      rowKey: subtotalRowKey,
-      isSubtotal: true,
-    };
-  });
-  return next;
-};
-
-export const labelRowSubtotalLeaves = (
-  tree: PivotTreeData,
-  metrics: QueryFormMetric[],
-) => {
-  const metricLabels = new Set(getMetricKeys(metrics));
-  const isSingleMetric = metricLabels.size === 1;
-  const getMetricLabelFromValue = (val: unknown) => {
-    const decoded = decodeMetricKey(val);
-    if (!decoded) {
-      return undefined;
-    }
-    return metricLabels.has(decoded) ? decoded : undefined;
-  };
-  const nextRows: Record<string, PivotTreeNode> = { ...tree.rows };
-  let hasChanges = false;
-
-  Object.values(tree.rows).forEach(node => {
-    const subtotalIndex = node.path.findIndex(isSubtotalToken);
-    if (subtotalIndex < 0) {
-      return;
-    }
-    let baseLabel = '';
-    let baseLabelIndex: number | undefined;
-    for (let i = subtotalIndex - 1; i >= 0; i -= 1) {
-      const val = node.path[i];
-      if (!getMetricLabelFromValue(val) && !isSubtotalToken(val)) {
-        baseLabel = String(val ?? '');
-        baseLabelIndex = i;
-        break;
-      }
-    }
-    if (!baseLabel) {
-      return;
-    }
-    let metricLabel: string | undefined;
-    let metricLabelIndex: number | undefined;
-    for (let i = subtotalIndex + 1; i < node.path.length; i += 1) {
-      const val = node.path[i];
-      const decoded = getMetricLabelFromValue(val);
-      if (!decoded) {
-        continue;
-      }
-      metricLabel = decoded;
-      metricLabelIndex = i;
-      break;
-    }
-    if (!metricLabel) {
-      for (let i = subtotalIndex - 1; i >= 0; i -= 1) {
-        const val = node.path[i];
-        const decoded = getMetricLabelFromValue(val);
-        if (!decoded) {
-          continue;
-        }
-        metricLabel = decoded;
-        metricLabelIndex = i;
-        break;
-      }
-    }
-    const hasMetricLabel = !!metricLabel;
-    const metricBeforeBase =
-      metricLabelIndex !== undefined &&
-      baseLabelIndex !== undefined &&
-      metricLabelIndex < baseLabelIndex;
-    const useMetricLabel =
-      !isSingleMetric && hasMetricLabel && !metricBeforeBase;
-    const nextLabel = useMetricLabel
-      ? `${baseLabel} ${metricLabel}`
-      : `${baseLabel} Total`;
-    if (node.label !== nextLabel || node.formattedLabel !== nextLabel) {
-      nextRows[node.key] = {
-        ...node,
-        label: nextLabel,
-        formattedLabel: nextLabel,
-      };
-      hasChanges = true;
-    }
-  });
-
-  if (!hasChanges) {
-    return tree;
-  }
-  return { ...tree, rows: nextRows };
-};
-
 export const parseDepth = (queryName?: string) => {
   if (
     !queryName ||
@@ -1395,66 +1157,6 @@ export const resolveExpandLevel = (
   }
   const resolvedDepth = Math.max(initialDepth || 1, 1) - 1;
   return Math.min(Math.max(resolvedDepth, 0), groupbyLength);
-};
-
-export const mergeTrees = (
-  left?: PivotTreeData,
-  right?: PivotTreeData,
-): PivotTreeData => {
-  const mergeNodeMaps = (
-    target?: Record<string, PivotTreeNode>,
-    source?: Record<string, PivotTreeNode>,
-  ) => {
-    const result: Record<string, PivotTreeNode> = { ...(target || {}) };
-    Object.entries(source || {}).forEach(([key, node]) => {
-      const existing = result[key];
-      if (!existing) {
-        result[key] = node;
-        return;
-      }
-      const mergedValues =
-        node.values && Object.keys(node.values).length > 0
-          ? { ...(existing.values || {}), ...node.values }
-          : existing.values;
-      result[key] = {
-        ...existing,
-        ...node,
-        ...(mergedValues ? { values: mergedValues } : {}),
-      };
-    });
-    return result;
-  };
-
-  const mergeCells = (
-    target?: Record<string, PivotResultCell>,
-    source?: Record<string, PivotResultCell>,
-  ) => {
-    const result = { ...(target ?? {}) } as Record<string, PivotResultCell>;
-    Object.entries(source || {}).forEach(([key, cell]) => {
-      const existing = result[key];
-      if (!existing) {
-        result[key] = cell;
-        return;
-      }
-      const mergedValues =
-        cell.values && Object.keys(cell.values).length > 0
-          ? { ...(existing.values || {}), ...cell.values }
-          : existing.values;
-      result[key] = {
-        ...existing,
-        ...cell,
-        ...(mergedValues ? { values: mergedValues } : {}),
-        isSubtotal: cell.isSubtotal ?? existing.isSubtotal,
-      };
-    });
-    return result;
-  };
-
-  return {
-    rows: mergeNodeMaps(left?.rows, right?.rows),
-    cols: mergeNodeMaps(left?.cols, right?.cols),
-    cells: mergeCells(left?.cells, right?.cells),
-  };
 };
 
 export const resolveMetricPlacement = (
@@ -1539,396 +1241,4 @@ export const resolveMetricPlacement = (
     axis === 'row' ? MetricsLayoutEnum.ROWS : MetricsLayoutEnum.COLUMNS;
 
   return { rows, cols, axis, layout, metricPosition: insertIndex };
-};
-
-export const applyMetricAxis = (
-  tree: PivotTreeData,
-  metrics: QueryFormMetric[],
-  metricsLayout: MetricsLayoutEnum,
-  rowGroupby: QueryFormColumn[],
-  colGroupby: QueryFormColumn[],
-  metricPosition?: number,
-): PivotTreeData => {
-  const metricKeys = getMetricKeys(metrics);
-  if (metricKeys.length === 0) {
-    return tree;
-  }
-
-  const result: PivotTreeData = { rows: {}, cols: {}, cells: {} };
-  const metricTokenSet = new Set(metricKeys.map(encodeMetricKey));
-
-  const ensureNode = (
-    axis: 'row' | 'col',
-    path: PivotPath,
-    fullDepth: number,
-    isSubtotal?: boolean,
-  ) => {
-    const nodes = axis === 'row' ? result.rows : result.cols;
-    const key = serializePath(path);
-    if (nodes[key]) return nodes[key];
-    const rawValue = path[path.length - 1];
-    const rawLabel =
-      path.length === 0
-        ? 'Grand total'
-        : formatPivotLabelValue(rawValue, 'Grand total');
-    const metricLabel = decodeMetricKey(rawValue);
-    const label = metricLabel || rawLabel;
-    const isMetricNode = metricTokenSet.has(
-      String(path[path.length - 1] ?? ''),
-    );
-    let hasChildren = path.length < fullDepth;
-    if (isMetricNode) {
-      if (
-        axis === 'row' &&
-        metricsLayout === MetricsLayoutEnum.ROWS &&
-        (metricPosition ?? rowGroupby.length) >= rowGroupby.length
-      ) {
-        hasChildren = false;
-      }
-      if (
-        axis === 'col' &&
-        metricsLayout === MetricsLayoutEnum.COLUMNS &&
-        (metricPosition ?? colGroupby.length) >= colGroupby.length
-      ) {
-        hasChildren = false;
-      }
-    }
-    const isSubtotalValue =
-      isSubtotal ??
-      (path.length < fullDepth && !(isMetricNode && hasChildren === false));
-    const node = {
-      axis,
-      key,
-      path,
-      label,
-      formattedLabel: label,
-      level: path.length,
-      hasChildren,
-      isSubtotal: isSubtotalValue,
-    };
-    nodes[key] = node;
-    return node;
-  };
-
-  if (metricsLayout === MetricsLayoutEnum.ROWS) {
-    const rowDepthWithMetrics = rowGroupby.length + 1;
-    const insertIndex = Math.min(
-      metricPosition ?? rowGroupby.length,
-      rowGroupby.length,
-    );
-
-    // Preserve the original row hierarchy so dimensions remain expandable when
-    // metrics are inserted ahead of them.
-    Object.values(tree.rows).forEach(rowNode =>
-      ensureNode(
-        'row',
-        rowNode.path,
-        rowGroupby.length,
-        rowNode.isSubtotal || undefined,
-      ),
-    );
-
-    // preserve column nodes
-    Object.values(tree.cols).forEach(colNode => {
-      ensureNode(
-        'col',
-        colNode.path,
-        colGroupby.length,
-        colNode.isSubtotal || undefined,
-      );
-    });
-
-    Object.values(tree.cells).forEach(cell => {
-      const baseRow = tree.rows[cell.rowKey];
-      const baseCol = tree.cols[cell.colKey];
-      const rowPath = baseRow?.path || [];
-      const colPath = baseCol?.path || [];
-      const rowPrefix = rowPath.slice(0, insertIndex);
-      const rowSuffix = rowPath.slice(insertIndex);
-
-      const rowKey = serializePath(rowPath);
-
-      metricKeys.forEach(metric => {
-        const mergedValues = {
-          [metric]: cell.values[metric],
-          ...cell.values,
-        };
-        const metricToken = encodeMetricKey(metric);
-        const hasSubtotalAtInsert =
-          rowSuffix.length > 0 && isSubtotalToken(rowSuffix[0]);
-        const newRowPath = hasSubtotalAtInsert
-          ? [...rowPrefix, rowSuffix[0], metricToken, ...rowSuffix.slice(1)]
-          : [...rowPrefix, metricToken, ...rowSuffix];
-        // ensure row hierarchy nodes
-        for (let depth = 0; depth <= newRowPath.length; depth += 1) {
-          const subPath = newRowPath.slice(0, depth);
-          ensureNode(
-            'row',
-            subPath,
-            rowDepthWithMetrics,
-            baseRow?.isSubtotal || undefined,
-          );
-        }
-        const newRowKey = serializePath(newRowPath);
-
-        const colKey = serializePath(colPath);
-        ensureNode(
-          'col',
-          colPath,
-          colGroupby.length,
-          baseCol?.isSubtotal || undefined,
-        );
-
-        result.cells[serializeCellKey(newRowKey, colKey)] = {
-          rowKey: newRowKey,
-          colKey,
-          values: mergedValues,
-          isSubtotal: cell.isSubtotal,
-        };
-        // If there is only one metric, also surface the value at the base row
-        // path so collapsed views (before expanding into the metric tier) can render.
-        if (metricKeys.length === 1 && metricPosition !== 0) {
-          const cellKey = serializeCellKey(rowKey, colKey);
-          result.cells[cellKey] = result.cells[cellKey] || {
-            rowKey,
-            colKey,
-            values: mergedValues,
-            isSubtotal: cell.isSubtotal,
-          };
-        }
-        if (metricKeys.length === 1 && metricPosition === 0) {
-          const cellKey = serializeCellKey(rowKey, colKey);
-          result.cells[cellKey] = result.cells[cellKey] || {
-            rowKey,
-            colKey,
-            values: mergedValues,
-            isSubtotal: cell.isSubtotal,
-          };
-        }
-      });
-    });
-  } else {
-    const colDepthWithMetrics = colGroupby.length + 1;
-    const insertIndex = Math.min(
-      metricPosition ?? colGroupby.length,
-      colGroupby.length,
-    );
-
-    // Preserve the original column hierarchy so dimensions remain expandable when
-    // metrics are inserted ahead of them.
-    Object.values(tree.cols).forEach(colNode =>
-      ensureNode(
-        'col',
-        colNode.path,
-        colGroupby.length,
-        colNode.isSubtotal || undefined,
-      ),
-    );
-
-    // preserve row nodes
-    Object.values(tree.rows).forEach(rowNode =>
-      ensureNode(
-        'row',
-        rowNode.path,
-        rowGroupby.length,
-        rowNode.isSubtotal || undefined,
-      ),
-    );
-
-    Object.values(tree.cells).forEach(cell => {
-      const baseRow = tree.rows[cell.rowKey];
-      const baseCol = tree.cols[cell.colKey];
-      const rowPath = baseRow?.path || [];
-      const colPath = baseCol?.path || [];
-      const colPrefix = colPath.slice(0, insertIndex);
-      const colSuffix = colPath.slice(insertIndex);
-
-      metricKeys.forEach(metric => {
-        const mergedValues = {
-          [metric]: cell.values[metric],
-          ...cell.values,
-        };
-        const metricToken = encodeMetricKey(metric);
-        const newColPath = [...colPrefix, metricToken, ...colSuffix];
-        for (let depth = 0; depth <= newColPath.length; depth += 1) {
-          const subPath = newColPath.slice(0, depth);
-          ensureNode(
-            'col',
-            subPath,
-            colDepthWithMetrics,
-            baseCol?.isSubtotal || undefined,
-          );
-        }
-        const newColKey = serializePath(newColPath);
-
-        const rowKey = serializePath(rowPath);
-        ensureNode(
-          'row',
-          rowPath,
-          rowGroupby.length,
-          baseRow?.isSubtotal || undefined,
-        );
-
-        result.cells[serializeCellKey(rowKey, newColKey)] = {
-          rowKey,
-          colKey: newColKey,
-          values: mergedValues,
-          isSubtotal: cell.isSubtotal,
-        };
-        if (metricKeys.length === 1 && metricPosition === 0) {
-          const rootColKey = serializePath(colPrefix);
-          const cellKey = serializeCellKey(rowKey, rootColKey);
-          result.cells[cellKey] = result.cells[cellKey] || {
-            rowKey,
-            colKey: rootColKey,
-            values: mergedValues,
-            isSubtotal: cell.isSubtotal,
-          };
-        }
-        // If there is only one metric and the metric tier is at the end,
-        // also surface the value at the base column path so collapsed views
-        // (before expanding into the metric tier) can render.
-        if (
-          metricKeys.length === 1 &&
-          (metricPosition === undefined ||
-            metricPosition >= colGroupby.length ||
-            metricPosition === 0)
-        ) {
-          const baseColKey = serializePath(colPath);
-          const cellKey = serializeCellKey(rowKey, baseColKey);
-          result.cells[cellKey] = result.cells[cellKey] || {
-            rowKey,
-            colKey: baseColKey,
-            values: mergedValues,
-            isSubtotal: cell.isSubtotal,
-          };
-        }
-      });
-    });
-  }
-
-  return result;
-};
-
-export const buildTreeFromRecords = (
-  records: DataRecord[],
-  metrics: QueryFormMetric[],
-  rowGroupby: QueryFormColumn[],
-  colGroupby: QueryFormColumn[],
-  rowDepth: number,
-  colDepth: number,
-): PivotTreeData => {
-  const tree: PivotTreeData = { rows: {}, cols: {}, cells: {} };
-  const metricKeys = getMetricKeys(metrics);
-  const rootKey = serializePath([]);
-  let grandTotalValues: Record<string, DataRecordValue> = {};
-
-  const ensureNode = (
-    axis: 'row' | 'col',
-    path: DataRecordValue[],
-    totalLabel: string,
-  ) => {
-    const nodes = axis === 'row' ? tree.rows : tree.cols;
-    const key = serializePath(path);
-    if (nodes[key]) return;
-    const rawValue = path[path.length - 1];
-    const label =
-      path.length === 0
-        ? 'Grand total'
-        : formatPivotLabelValue(rawValue, totalLabel);
-    nodes[key] = {
-      axis,
-      key,
-      path,
-      label,
-      formattedLabel: label,
-      level: path.length,
-      hasChildren:
-        path.length < (axis === 'row' ? rowGroupby.length : colGroupby.length),
-      isSubtotal:
-        path.length < (axis === 'row' ? rowGroupby.length : colGroupby.length),
-    };
-  };
-
-  records.forEach(record => {
-    const rowPath = rowGroupby
-      .slice(0, rowDepth)
-      .map(col => record[getColumnLabel(col)]);
-    const colPath = colGroupby
-      .slice(0, colDepth)
-      .map(col => record[getColumnLabel(col)]);
-
-    // create intermediate row nodes
-    for (let i = 0; i <= rowPath.length; i += 1) {
-      ensureNode('row', rowPath.slice(0, i), 'Total');
-    }
-    // create intermediate col nodes
-    for (let i = 0; i <= colPath.length; i += 1) {
-      ensureNode('col', colPath.slice(0, i), 'Total');
-    }
-
-    const rowKey = serializePath(rowPath);
-    const colKey = serializePath(colPath);
-
-    const values = metricKeys.reduce(
-      (acc, key) => ({
-        ...acc,
-        [key]: record[key as string],
-      }),
-      {} as Record<string, DataRecordValue>,
-    );
-
-    const isRowTotalRecord = colPath.length === 0;
-    const isColTotalRecord = rowPath.length === 0;
-    if (isRowTotalRecord) {
-      tree.rows[rowKey].values = {
-        ...(tree.rows[rowKey].values || {}),
-        ...values,
-      };
-    }
-    if (isColTotalRecord) {
-      tree.cols[colKey].values = {
-        ...(tree.cols[colKey].values || {}),
-        ...values,
-      };
-    }
-    tree.cells[serializeCellKey(rowKey, colKey)] = {
-      rowKey,
-      colKey,
-      values,
-      isSubtotal:
-        rowPath.length < rowGroupby.length ||
-        colPath.length < colGroupby.length,
-    };
-
-    if (rowPath.length === 0 && colPath.length === 0) {
-      grandTotalValues = { ...grandTotalValues, ...values };
-    }
-  });
-
-  ensureNode('row', [], 'Grand total');
-  ensureNode('col', [], 'Grand total');
-  const mergedRootValues = {
-    ...(tree.rows[rootKey]?.values || {}),
-    ...(tree.cols[rootKey]?.values || {}),
-    ...(Object.keys(grandTotalValues).length > 0 ? grandTotalValues : {}),
-  };
-  const hasGrandTotalValues = Object.keys(grandTotalValues).length > 0;
-  const allowRootFallback = rowDepth === 0 && colDepth === 0;
-  const rootValues = hasGrandTotalValues
-    ? mergedRootValues
-    : allowRootFallback && Object.keys(mergedRootValues).length > 0
-      ? mergedRootValues
-      : undefined;
-  const rootCellKey = serializeCellKey(rootKey, rootKey);
-  if (rootValues && !tree.cells[rootCellKey]) {
-    tree.cells[rootCellKey] = {
-      rowKey: rootKey,
-      colKey: rootKey,
-      values: rootValues,
-      isSubtotal: true,
-    };
-  }
-
-  return tree;
 };
