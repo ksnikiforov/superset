@@ -29,9 +29,10 @@ import {
   MinusSquareOutlined,
   PlusSquareOutlined,
 } from '@ant-design/icons';
-import { styled, t } from '@superset-ui/core';
+import { type DataRecordValue, styled, t } from '@superset-ui/core';
 import { Alert, Button, Loading } from '@superset-ui/core/components';
 import {
+  type MetricFormattingField,
   type MetricFormattingScope,
   type PivotMetricDatabarMap,
   type PivotResultCell,
@@ -273,6 +274,12 @@ type PivotTableViewProps = {
   metricFormattingScope: MetricFormattingScope;
   metricDatabars: PivotMetricDatabarMap;
   formattingKeyMap: Record<string, FormattingKeys>;
+  evaluateExcelMetricFormatting: (
+    metricKey: string,
+    field: MetricFormattingField,
+    values: Record<string, DataRecordValue | undefined>,
+    currentValue: DataRecordValue | undefined,
+  ) => unknown;
   databarColumnMinWidths: Map<string, number>;
   onToggleNode: (axis: 'row' | 'col', node: PivotTreeNode) => void;
   shouldShowToggle: (axis: 'row' | 'col', node: PivotTreeNode) => boolean;
@@ -336,6 +343,7 @@ export const PivotTableView = ({
   metricFormattingScope,
   metricDatabars,
   formattingKeyMap,
+  evaluateExcelMetricFormatting,
   databarColumnMinWidths,
   onToggleNode,
   shouldShowToggle,
@@ -556,33 +564,62 @@ export const PivotTableView = ({
                       : undefined;
                     const applyColorFormatting = !!(
                       cell &&
-                      formattingKeys &&
+                      metricKey &&
                       shouldApplyMetricFormatting(
                         metricFormattingScope,
                         isSubtotalCell,
                         isGrandTotalCell,
                       )
                     );
-                    const applyD3Formatting = !!(
-                      cell && formattingKeys?.d3Format
-                    );
+                    const currentValue =
+                      cell && metricKey ? cell.values[metricKey] : undefined;
                     const backgroundColor =
-                      applyColorFormatting && formattingKeys?.backgroundColor
+                      (applyColorFormatting
+                        ? normalizeCssColor(
+                            evaluateExcelMetricFormatting(
+                              metricKey,
+                              'backgroundColor',
+                              cell.values,
+                              currentValue,
+                            ),
+                          )
+                        : undefined) ??
+                      (applyColorFormatting && formattingKeys?.backgroundColor
                         ? normalizeCssColor(
                             cell.values[formattingKeys.backgroundColor],
                           )
-                        : undefined;
+                        : undefined);
                     const textColor =
-                      applyColorFormatting && formattingKeys?.textColor
+                      (applyColorFormatting
+                        ? normalizeCssColor(
+                            evaluateExcelMetricFormatting(
+                              metricKey,
+                              'textColor',
+                              cell.values,
+                              currentValue,
+                            ),
+                          )
+                        : undefined) ??
+                      (applyColorFormatting && formattingKeys?.textColor
                         ? normalizeCssColor(
                             cell.values[formattingKeys.textColor],
                           )
-                        : undefined;
+                        : undefined);
                     const d3FormatKey = formattingKeys?.d3Format;
                     const d3FormatOverride =
-                      applyD3Formatting && d3FormatKey
+                      (cell && metricKey
+                        ? normalizeD3Format(
+                            evaluateExcelMetricFormatting(
+                              metricKey,
+                              'd3Format',
+                              cell.values,
+                              currentValue,
+                            ),
+                          )
+                        : undefined) ??
+                      (cell && d3FormatKey
                         ? normalizeD3Format(cell.values[d3FormatKey])
-                        : undefined;
+                        : undefined);
                     const cellTotalBg = rowTotalBg;
                     const databarConfig = metricKey
                       ? metricDatabars[metricKey]

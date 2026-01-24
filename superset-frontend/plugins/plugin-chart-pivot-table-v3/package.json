@@ -10,6 +10,9 @@
     "esm",
     "lib"
   ],
+  "dependencies": {
+    "fast-formula-parser": "^1.0.19"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/apache/superset.git",

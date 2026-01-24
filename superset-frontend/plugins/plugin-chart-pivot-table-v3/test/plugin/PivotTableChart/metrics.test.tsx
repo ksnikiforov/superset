@@ -829,6 +829,52 @@ describe('PivotTableChart metric tier suppression', () => {
     });
   });
 
+  it('uses dimension value in excel formatting', async () => {
+    render(
+      <PivotTableChart
+        data={baseTree}
+        formData={buildFormData({
+          ...baseFormData,
+          rowFormatting: {
+            r1: {
+              backgroundColor: {
+                kind: 'excel',
+                formula: '=IF(value="A","#111111","#222222")',
+              },
+            },
+          },
+        })}
+        metrics={['metric1']}
+        groupbyRows={['r1']}
+        groupbyColumns={['c1']}
+        aggregateFunction="Sum"
+        width={400}
+        height={300}
+        startCollapsed={false}
+        initialDepth={1}
+        colTotals={false}
+        rowTotals={false}
+        rowSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+      />,
+    );
+
+    await waitForPivotReady();
+    const rowHeader = screen.getByText('A').closest('th');
+    expect(rowHeader).toHaveStyle({ backgroundColor: '#111111' });
+  });
+
   it('applies label-only formatting scope to headers', async () => {
     const formattedTree: PivotTreeData = {
       ...baseTree,

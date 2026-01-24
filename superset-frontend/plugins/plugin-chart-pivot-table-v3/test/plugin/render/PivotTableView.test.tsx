@@ -66,6 +66,7 @@ const renderView = (showGlobalLoader: boolean) =>
       metricFormattingScope="values"
       metricDatabars={{}}
       formattingKeyMap={{}}
+      evaluateExcelMetricFormatting={() => undefined}
       databarColumnMinWidths={new Map()}
       onToggleNode={jest.fn()}
       shouldShowToggle={() => false}
@@ -133,6 +134,7 @@ describe('PivotTableView', () => {
         metricFormattingScope="values"
         metricDatabars={{}}
         formattingKeyMap={{}}
+        evaluateExcelMetricFormatting={() => undefined}
         databarColumnMinWidths={new Map()}
         onToggleNode={jest.fn()}
         shouldShowToggle={() => false}

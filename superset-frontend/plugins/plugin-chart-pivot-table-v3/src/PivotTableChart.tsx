@@ -241,6 +241,7 @@ function PivotTableChart(props: PivotTableProps) {
       metricFormattingScope={formatting.metricFormattingScope}
       metricDatabars={formatting.metricDatabars}
       formattingKeyMap={formatting.formattingKeyMap}
+      evaluateExcelMetricFormatting={formatting.evaluateExcelMetricFormatting}
       databarColumnMinWidths={formatting.databarColumnMinWidths}
       onToggleNode={handleToggle}
       shouldShowToggle={renderModelResult.shouldShowToggle}

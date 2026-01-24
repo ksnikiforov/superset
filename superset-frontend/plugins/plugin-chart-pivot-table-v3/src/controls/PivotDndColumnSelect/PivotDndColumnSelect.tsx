@@ -74,6 +74,7 @@ import {
   PivotSortMode,
   PivotSortOrder,
   MetricsLayoutEnum,
+  PivotDimensionFormattingValue,
 } from '../../types';
 import {
   MetricFormatSelector,
@@ -598,7 +599,7 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
     (
       dimensionKey: string,
       field: DimensionFormattingField | 'applyTo',
-      value?: QueryFormMetric | DimensionFormattingScope,
+      value?: PivotDimensionFormattingValue | DimensionFormattingScope,
     ) => {
       if (!dimensionKey || !setControlValue) {
         return;
@@ -614,7 +615,7 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
           (value as DimensionFormattingScope) ??
           DEFAULT_DIMENSION_FORMATTING_SCOPE;
       } else if (value) {
-        nextEntry[field] = value as QueryFormMetric;
+        nextEntry[field] = value as PivotDimensionFormattingValue;
       } else {
         delete nextEntry[field];
       }
@@ -807,6 +808,7 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
                     key={selector.field}
                     label={selector.label}
                     tooltip={selector.tooltip}
+                    enableExcel
                     value={formatting?.[selector.field]}
                     metrics={availableMetrics as MetricOptionValue[]}
                     onChange={metric =>

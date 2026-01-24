@@ -56,6 +56,7 @@ import {
   PivotMetricDatabar,
   PivotMetricDatabarMap,
   METRIC_FORMATTING_FIELDS,
+  PivotMetricFormattingValue,
 } from '../../types';
 import {
   collectMetricFormattingMetrics,
@@ -65,6 +66,7 @@ import {
   normalizeMetricDatabarMapWithKeys,
   normalizeMetricFormattingMapWithKeys,
 } from '../../utils';
+import { isPivotExcelFormula } from '../../pivot/formatting/excelFormulaReferences';
 
 const EMPTY_OBJECT: Record<string, never> = {};
 const DND_ACCEPTED_TYPES = [DndItemType.Column, DndItemType.Metric];
@@ -265,8 +267,11 @@ export const updateMetricConfigForRename = ({
   }
   const replacementMetric = normalizeMetricReferenceValue(newMetric);
 
-  const replaceReference = (metric?: QueryFormMetric) => {
+  const replaceReference = (metric?: PivotMetricFormattingValue) => {
     if (!metric) {
+      return metric;
+    }
+    if (isPivotExcelFormula(metric)) {
       return metric;
     }
     if (typeof metric === 'string') {
@@ -567,7 +572,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
     (
       metricKey: string,
       field: keyof PivotMetricFormatting,
-      metric?: QueryFormMetric,
+      metric?: PivotMetricFormattingValue,
     ) => {
       if (!setControlValue) {
         return;

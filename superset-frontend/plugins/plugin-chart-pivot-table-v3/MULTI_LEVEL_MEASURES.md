@@ -6,6 +6,85 @@ It is intentionally scoped to the Pivot Table v3 plugin and assumes Phases 0–N
 
 ---
 
+## 0) Implemented supporting work — Client-side conditional formatting (“Custom Excel”)
+
+Multi-level measures (FC-1) compute derived leaves **client-side** (e.g. `IX 1YA`, `∆ 1YA`, `∆% 1YA`). That breaks the legacy pattern of using “formatting metrics” as **SQL** expressions (e.g. a `CASE WHEN ... THEN "#fff" END` metric), because there is no longer a 1:1 “SQL metric” for every displayed leaf output.
+
+To unblock formatting for derived outputs (and multi-level measures in general), we added a **plugin-only, user-side** formula option for metric formatting fields: **Custom Excel** formulas evaluated on query results using `fast-formula-parser`.
+
+### 0.1 UX: Add Metric → `Custom SQL` | `Custom Excel`
+
+In the metric “Conditional formatting” popover, each formatting selector (`backgroundColor`, `textColor`, `d3Format`) supports:
+- selecting an existing metric (dataset metric / query metric key)
+- creating an ad-hoc formatting metric (`Custom SQL`) (existing behavior)
+- creating a user-side formatting formula (`Custom Excel`) (new)
+
+The “Add metric” button now opens a small popover with tabs:
+- `Custom SQL`: unchanged ad-hoc metric creation (disabled when the dataset disallows ad-hoc metrics)
+- `Custom Excel`: a textarea for a spreadsheet-like formula (always available; user-side only)
+
+Saved formulas show up in the selector as `Custom Excel: <formula>`.
+
+### 0.2 Formula syntax (for formatting fields)
+
+Custom Excel formulas are evaluated **per cell** and can reference:
+- `value` (no braces): the current measure value for the cell being formatted
+- `[metric]`: any other metric key; the referenced metric is pulled into the SQL query, then provided to the formula evaluator from `PivotResultCell.values`
+
+Notes:
+- A leading `=` is optional (it is stripped).
+- The formula must evaluate to a **string** to be used as:
+  - `backgroundColor` / `textColor`: a CSS color string (e.g. `#ff0000`, `rgb(255,0,0)`, `red`)
+  - `d3Format`: a d3-format string (e.g. `',.2f'`)
+- No custom helpers (e.g. `RGB()`/`RGBA()`) were added; return CSS strings directly.
+
+Examples:
+- Background: `IF(value > 0, "#1FA971", "#D64550")`
+- Text: `IF([sum__profit] < 0, "white", "black")`
+- Format: `IF([sum__sales] > 1000, ",.0f", ",.2f")`
+
+### 0.3 Implementation details (plugin-only)
+
+- We store Excel formulas as `PivotExcelFormula` objects:
+  - `{ kind: "excel", formula: string }`
+- `fast-formula-parser` does not support `[metric]`-style identifiers, so formulas are preprocessed:
+  - `value` → `A1`
+  - each `[metric]` → `B1`, `C1`, … (stable per formula)
+  - values are fed via the parser `onCell`/`onRange` callbacks using a 1-row “spreadsheet”
+- Formulas are compiled once per `(metricKey, field)` and cached.
+- The UI validates formulas by compiling + evaluating them with sample values; invalid formulas show an error message and are not saved.
+
+### 0.4 Query planning integration (so `[metric]` works)
+
+When a Custom Excel formula references `[metric]`, that referenced metric must exist in the query results. The plugin now:
+- extracts `[metric]` references from formatting formulas
+- adds them to the “extra metrics” list via `collectMetricFormattingMetricsForQuery()`
+- relies on the existing `buildQueryShape()` / `mergeMetrics()` pipeline to include those metrics in queries when metric formatting is needed
+
+### 0.5 Rendering integration
+
+- `usePivotFormatting()` compiles formulas and exposes `evaluateExcelMetricFormatting(metricKey, field, cell.values, cell.values[metricKey])`.
+- `PivotTableView` prefers Excel results for:
+  - background / text color (still gated by `metricFormattingScope`)
+  - d3 format override (falls back to the legacy SQL-metric-based format key when no Excel formula is defined or it returns a non-string)
+- Databar label-width measurement also honors Excel `d3Format` overrides to prevent clipping.
+
+### 0.6 Code touchpoints
+
+All changes are scoped to `superset-frontend/plugins/plugin-chart-pivot-table-v3`:
+- `package.json`: add `fast-formula-parser`
+- `types/external.d.ts`: local TS declaration for `fast-formula-parser`
+- `src/types.ts`: add `PivotExcelFormula` + widen `metricFormatting` value type
+- `src/pivot/formatting/excelFormulaReferences.ts`: parse/transform `value` + `[metric]` refs
+- `src/pivot/formatting/excelFormula.ts`: compile/evaluate/validate formulas (cached)
+- `src/utils.ts`: normalize formatting values + include referenced metrics in queries
+- `src/controls/PivotDndMetricSelect/PivotMetricDefinitionValue.tsx`: “Custom Excel” tab + selector support
+- `src/pivot/chart/usePivotFormatting.tsx`: compile formulas + provide evaluator
+- `src/pivot/render/PivotTableView.tsx` + `src/PivotTableChart.tsx`: apply evaluator results during rendering
+- `test/plugin/render/PivotTableView.test.tsx`: update props for new evaluator
+
+---
+
 ## 1) Goals and constraints (from `REFACTOR_PLAN.md`)
 
 ### Primary goal
@@ -291,13 +370,13 @@ Save behavior:
 Custom mode:
 - A toggle enables “custom name + custom measure”.
 - The user sets a custom name (always manually typed; can equal a built-in default and overwrite it).
-- The user sets a custom measure formula (free-form expression, like conditional formatting).
+- The user sets a custom measure formula (free-form expression; ideally reuse the same Excel-formula syntax/engine as conditional formatting — see §0).
 - The user may optionally set an offset for that formula; default is **no offset**.
 
 #### 3.5.3 How leaves show up in the metric UI
 Under each base metric, render its leaves as “child rows” that:
 - display the leaf label (e.g. `IX 1YA`)
-- support conditional formatting exactly like normal measures
+- support conditional formatting exactly like normal measures (including client-side “Custom Excel” formulas — see §0)
 - can be removed (except the base/current `Value` leaf in the current UI)
 
 Baseline leaf:

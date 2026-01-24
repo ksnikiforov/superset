@@ -23,3 +23,50 @@ declare module '*.png' {
 }
 
 declare module '*.jpg';
+
+declare module 'fast-formula-parser' {
+  export type FormulaPosition = {
+    row: number;
+    col: number;
+    sheet?: string;
+  };
+
+  export type CellRef = {
+    sheet?: string;
+    row: number;
+    col: number;
+  };
+
+  export type RangeRef = {
+    sheet?: string;
+    from: { row: number; col: number };
+    to: { row: number; col: number };
+  };
+
+  export type FormulaParserConfig = {
+    onVariable?: (
+      name: string,
+      sheetName?: string,
+      position?: FormulaPosition,
+    ) => unknown;
+    onCell?: (ref: CellRef) => unknown;
+    onRange?: (ref: RangeRef) => unknown;
+    functions?: Record<string, (...args: unknown[]) => unknown>;
+    functionsNeedContext?: Record<string, (...args: unknown[]) => unknown>;
+  };
+
+  export default class FormulaParser {
+    constructor(config?: FormulaParserConfig, isTest?: boolean);
+    parse(
+      inputText: string,
+      position?: FormulaPosition,
+      allowReturnArray?: boolean,
+    ): unknown;
+    parseAsync(
+      inputText: string,
+      position?: FormulaPosition,
+      allowReturnArray?: boolean,
+    ): Promise<unknown>;
+    static FormulaError: { new (...args: unknown[]): Error };
+  }
+}

@@ -16,7 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { ReactNode, type ComponentProps, useCallback, useMemo } from 'react';
+import {
+  ReactNode,
+  type ComponentProps,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 import {
   getCategoricalSchemeRegistry,
   getMetricLabel,
@@ -32,6 +39,8 @@ import {
   type ColorValue,
   Divider,
   InfoTooltip,
+  Input,
+  EmptyState,
   Popover,
   Select,
   Space,
@@ -39,6 +48,7 @@ import {
   Typography,
 } from '@superset-ui/core/components';
 import { Icons } from '@superset-ui/core/components/Icons';
+import Tabs from '@superset-ui/core/components/Tabs';
 import { ColumnMeta } from '@superset-ui/chart-controls';
 import {
   AdhocMetric,
@@ -51,8 +61,10 @@ import {
   PivotDatabarType,
   PivotMetricDatabar,
   PivotMetricDatabarMap,
+  PivotExcelFormula,
   PivotMetricFormatting,
   PivotMetricFormattingMap,
+  PivotMetricFormattingValue,
 } from '../../types';
 import {
   DEFAULT_DATABAR_NEGATIVE_COLOR,
@@ -60,6 +72,11 @@ import {
   getFormattingMetricKey,
   getMetricKey,
 } from '../../utils';
+import {
+  isPivotExcelFormula,
+  normalizePivotExcelFormula,
+} from '../../pivot/formatting/excelFormulaReferences';
+import { validateExcelFormula } from '../../pivot/formatting/excelFormula';
 
 const MetricFormattingButton = styled(Button)`
   height: ${({ theme }) => theme.sizeUnit * 5}px;
@@ -75,7 +92,7 @@ const MetricFormattingButtonWrap = styled.div`
   padding-right: ${({ theme }) => theme.sizeUnit}px;
 `;
 
-type ValueType = Metric | AdhocMetric | QueryFormMetric;
+type ValueType = Metric | AdhocMetric | QueryFormMetric | PivotExcelFormula;
 type SavedMetric = savedMetricType & { error_text?: string };
 type AdhocMetricPopoverDatasource = ComponentProps<
   typeof AdhocMetricPopoverTrigger
@@ -130,7 +147,7 @@ type PivotMetricDefinitionValueProps = {
   onMetricFormattingChange: (
     metricKey: string,
     field: keyof PivotMetricFormatting,
-    metric?: QueryFormMetric,
+    metric?: PivotMetricFormattingValue,
   ) => void;
   metricDatabars: PivotMetricDatabarMap;
   onMetricDatabarChange: (
@@ -163,6 +180,28 @@ const getSelectValueKey = (option: unknown) => {
   return undefined;
 };
 
+const EXCEL_FORMULA_OPTION_PREFIX = '__excel__';
+
+const hashString = (input: string): string => {
+  let hash = 5381;
+  for (let i = 0; i < input.length; i += 1) {
+    hash = (hash * 33) ^ input.charCodeAt(i);
+  }
+  return (hash >>> 0).toString(36);
+};
+
+const formatExcelFormulaLabel = (formula: string): string => {
+  const trimmed = formula.trim();
+  const maxLen = 48;
+  if (trimmed.length <= maxLen) {
+    return trimmed;
+  }
+  return `${trimmed.slice(0, maxLen - 1)}…`;
+};
+
+const getExcelFormulaOptionValue = (formula: PivotExcelFormula): string =>
+  `${EXCEL_FORMULA_OPTION_PREFIX}:${hashString(formula.formula)}`;
+
 const resolveMetricLabel = (option: MetricOptionValue) => {
   if (isMetricSelectValue(option)) {
     if (typeof option.label === 'string' && option.label.length > 0) {
@@ -170,6 +209,9 @@ const resolveMetricLabel = (option: MetricOptionValue) => {
     }
     const key = getSelectValueKey(option);
     return key || t('Metric');
+  }
+  if (isPivotExcelFormula(option)) {
+    return `${t('Custom Excel')}: ${formatExcelFormulaLabel(option.formula)}`;
   }
   if (option instanceof AdhocMetric) {
     return getMetricLabel(option as QueryFormMetric);
@@ -197,10 +239,24 @@ const resolveMetricKey = (option: MetricOptionValue) => {
   if (selectKey) {
     return selectKey;
   }
+  if (isPivotExcelFormula(option)) {
+    return getExcelFormulaOptionValue(option);
+  }
   if (isMetricSelectValue(option)) {
     return undefined;
   }
   return getMetricKey(option as QueryFormMetric | Metric);
+};
+
+const isIxMetricIdentifier = (value?: string) => {
+  if (!value) {
+    return false;
+  }
+  const lowered = value.toLowerCase();
+  if (lowered.includes('__calc__ix:') || lowered.includes('__mleaf__ix:')) {
+    return true;
+  }
+  return /\bix\b/i.test(value);
 };
 
 const getMetricOptionValue = (
@@ -209,6 +265,9 @@ const getMetricOptionValue = (
   const selectValue = getSelectValueKey(option);
   if (selectValue) {
     return selectValue;
+  }
+  if (isPivotExcelFormula(option)) {
+    return getExcelFormulaOptionValue(option);
   }
   if (option instanceof AdhocMetric) {
     if (typeof option.optionName === 'string' && option.optionName.length > 0) {
@@ -261,10 +320,13 @@ const buildMetricOptions = (metrics: MetricOptionValue[]) => {
 
 const normalizeFormattingMetric = (
   metric: MetricOptionValue,
-): QueryFormMetric => {
+): PivotMetricFormattingValue => {
   const selectValueKey = getSelectValueKey(metric);
   if (selectValueKey) {
     return selectValueKey;
+  }
+  if (isPivotExcelFormula(metric)) {
+    return metric;
   }
   if (isRecord(metric) && 'metric_name' in metric) {
     const metricName = metric.metric_name;
@@ -347,31 +409,63 @@ const FORMAT_SELECTOR_CONFIG: Array<{
 
 const METRIC_SELECT_WIDTH = 220;
 
-export const MetricFormatSelector = ({
-  label,
-  tooltip,
-  value,
-  metrics,
-  onChange,
-  disabled = false,
-  columns,
-  savedMetrics,
-  datasource,
-}: {
+type MetricFormatSelectorSharedProps = {
   label: string;
   tooltip: ReactNode;
-  value?: QueryFormMetric | MetricSelectValue;
   metrics: MetricOptionValue[];
-  onChange: (metric?: QueryFormMetric) => void;
   disabled?: boolean;
   columns: ColumnMeta[];
   savedMetrics: Metric[];
   datasource?: AdhocMetricPopoverDatasource;
-}) => {
-  const options = useMemo(
-    () => buildMetricOptions(value ? [...metrics, value] : metrics),
-    [metrics, value],
+  allowCustomSql?: boolean;
+  allowSavedMetrics?: boolean;
+  excelOnly?: boolean;
+};
+
+type MetricFormatSelectorProps =
+  | (MetricFormatSelectorSharedProps & {
+      enableExcel: true;
+      value?: MetricOptionValue;
+      onChange: (metric?: PivotMetricFormattingValue) => void;
+    })
+  | (MetricFormatSelectorSharedProps & {
+      enableExcel?: false;
+      value?: MetricOptionValue;
+      onChange: (metric?: QueryFormMetric) => void;
+    });
+
+export const MetricFormatSelector = (props: MetricFormatSelectorProps) => {
+  const { label, tooltip, value, metrics, columns, savedMetrics, datasource } =
+    props;
+  const disabled = props.disabled ?? false;
+  const enableExcel = props.enableExcel === true;
+  const excelOnly = props.excelOnly === true;
+  const allowCustomSql = !excelOnly && (props.allowCustomSql ?? true);
+  const allowSavedMetrics = !excelOnly && (props.allowSavedMetrics ?? true);
+
+  const handleChangeValue = useCallback(
+    (next?: PivotMetricFormattingValue) => {
+      if (excelOnly && next && !isPivotExcelFormula(next)) {
+        return;
+      }
+      if (props.enableExcel) {
+        props.onChange(next);
+        return;
+      }
+      if (next && isPivotExcelFormula(next)) {
+        return;
+      }
+      props.onChange(next);
+    },
+    [props],
   );
+
+  const options = useMemo(() => {
+    const baseMetrics = excelOnly
+      ? metrics.filter(isPivotExcelFormula)
+      : metrics;
+    return buildMetricOptions(value ? [...baseMetrics, value] : baseMetrics);
+  }, [excelOnly, metrics, value]);
   const popoverColumns = useMemo(
     () =>
       columns.map(column => ({
@@ -435,8 +529,21 @@ export const MetricFormatSelector = ({
       }
     }
     return undefined;
-  }, [savedMetrics, value]);
+  }, [enableExcel, savedMetrics, value]);
+  const savedMetricOptions = useMemo(
+    () =>
+      savedMetricsForPopover
+        .filter(metric => metric.metric_name)
+        .map(metric => ({
+          value: metric.metric_name,
+          label: metric.verbose_name || metric.metric_name,
+        })),
+    [savedMetricsForPopover],
+  );
   const adhocMetricForPopover = useMemo(() => {
+    if (enableExcel) {
+      return new AdhocMetric({});
+    }
     if (value instanceof AdhocMetric) {
       return value;
     }
@@ -473,7 +580,31 @@ export const MetricFormatSelector = ({
       });
     }
     return new AdhocMetric({});
-  }, [savedMetricForPopover, value]);
+  }, [enableExcel, savedMetricForPopover, value]);
+
+  const disallowAdhocMetrics = useMemo(() => {
+    const rawExtra = datasource?.extra;
+    if (!rawExtra) {
+      return false;
+    }
+    if (typeof rawExtra === 'string') {
+      try {
+        const parsed = JSON.parse(rawExtra) as {
+          disallow_adhoc_metrics?: boolean;
+        };
+        return Boolean(parsed.disallow_adhoc_metrics);
+      } catch {
+        return false;
+      }
+    }
+    if (typeof rawExtra === 'object') {
+      const parsed = rawExtra as {
+        disallow_adhoc_metrics?: boolean;
+      };
+      return Boolean(parsed.disallow_adhoc_metrics);
+    }
+    return false;
+  }, [datasource?.extra]);
 
   const addMetricButton = (
     <Tooltip title={t('Add metric')}>
@@ -482,15 +613,335 @@ export const MetricFormatSelector = ({
         icon={<Icons.PlusOutlined iconSize="s" />}
         size="small"
         type="text"
-        disabled={!datasourceForPopover}
+        disabled={disabled || (!datasourceForPopover && !enableExcel)}
       />
     </Tooltip>
   );
 
-  const addMetricPopover = datasourceForPopover ? (
+  const [customMetricPopoverOpen, setCustomMetricPopoverOpen] = useState(false);
+  const [customMetricTab, setCustomMetricTab] = useState<
+    'sql' | 'excel' | 'saved'
+  >('sql');
+  const [customSqlLabel, setCustomSqlLabel] = useState('');
+  const [customSqlExpression, setCustomSqlExpression] = useState('');
+  const [customExcelFormula, setCustomExcelFormula] = useState('');
+  const [customSavedMetricName, setCustomSavedMetricName] = useState('');
+  const [customMetricError, setCustomMetricError] = useState<string>();
+
+  useEffect(() => {
+    if (customMetricTab === 'saved' && !allowSavedMetrics) {
+      setCustomMetricTab('excel');
+    }
+    if (customMetricTab === 'sql' && !allowCustomSql) {
+      setCustomMetricTab('excel');
+    }
+  }, [allowCustomSql, allowSavedMetrics, customMetricTab]);
+
+  const openCustomMetricPopover = useCallback(() => {
+    setCustomMetricError(undefined);
+    if (isPivotExcelFormula(value)) {
+      setCustomMetricTab('excel');
+      setCustomExcelFormula(value.formula);
+      setCustomSqlExpression('');
+      setCustomSqlLabel('');
+      setCustomSavedMetricName('');
+      return;
+    }
+    if (
+      allowSavedMetrics &&
+      ((typeof value === 'string' && value.length > 0) ||
+        (isRecord(value) &&
+          'metric_name' in value &&
+          typeof value.metric_name === 'string'))
+    ) {
+      const metricName =
+        typeof value === 'string'
+          ? value
+          : (value.metric_name as string | undefined);
+      if (
+        metricName &&
+        savedMetricsForPopover.some(metric => metric.metric_name === metricName)
+      ) {
+        setCustomMetricTab('saved');
+        setCustomSavedMetricName(metricName);
+        setCustomExcelFormula('');
+        setCustomSqlExpression('');
+        setCustomSqlLabel('');
+        return;
+      }
+    }
+    if (
+      allowCustomSql &&
+      isRecord(value) &&
+      !isMetricSelectValue(value) &&
+      'expressionType' in value &&
+      value.expressionType === 'SQL'
+    ) {
+      const sqlExpression =
+        typeof value.sqlExpression === 'string' ? value.sqlExpression : '';
+      setCustomMetricTab(
+        disallowAdhocMetrics || !allowCustomSql ? 'excel' : 'sql',
+      );
+      setCustomSqlExpression(sqlExpression);
+      setCustomSqlLabel(typeof value.label === 'string' ? value.label : '');
+      setCustomExcelFormula('');
+      setCustomSavedMetricName('');
+      return;
+    }
+    if (allowSavedMetrics && savedMetricOptions.length > 0) {
+      setCustomMetricTab('saved');
+    } else if (disallowAdhocMetrics || !allowCustomSql) {
+      setCustomMetricTab('excel');
+    } else {
+      setCustomMetricTab('sql');
+    }
+    setCustomSqlExpression('');
+    setCustomSqlLabel('');
+    setCustomExcelFormula('');
+    setCustomSavedMetricName('');
+  }, [
+    allowCustomSql,
+    allowSavedMetrics,
+    disallowAdhocMetrics,
+    savedMetricOptions,
+    savedMetricsForPopover,
+    value,
+  ]);
+
+  const closeCustomMetricPopover = useCallback(() => {
+    setCustomMetricPopoverOpen(false);
+    setCustomMetricError(undefined);
+  }, []);
+
+  const saveCustomExcelFormula = useCallback(() => {
+    const normalized = normalizePivotExcelFormula({
+      kind: 'excel',
+      formula: customExcelFormula,
+    });
+    if (!normalized) {
+      setCustomMetricError(t('Custom Excel formula is empty.'));
+      return;
+    }
+    const validation = validateExcelFormula(normalized.formula);
+    if (!validation.valid) {
+      setCustomMetricError(validation.message);
+      return;
+    }
+    handleChangeValue(normalized);
+    closeCustomMetricPopover();
+  }, [closeCustomMetricPopover, customExcelFormula, handleChangeValue]);
+
+  const saveCustomSqlMetric = useCallback(() => {
+    if (!datasourceForPopover) {
+      return;
+    }
+    if (disallowAdhocMetrics || !allowCustomSql) {
+      return;
+    }
+    const sqlExpression = customSqlExpression.trim();
+    if (!sqlExpression) {
+      setCustomMetricError(t('Custom SQL expression is empty.'));
+      return;
+    }
+    const labelValue = customSqlLabel.trim();
+    const metric = new AdhocMetric({
+      expressionType: 'SQL',
+      sqlExpression,
+      ...(labelValue ? { label: labelValue, hasCustomLabel: true } : {}),
+    });
+    handleChangeValue(normalizeFormattingMetric(metric));
+    closeCustomMetricPopover();
+  }, [
+    allowCustomSql,
+    closeCustomMetricPopover,
+    customSqlExpression,
+    customSqlLabel,
+    datasourceForPopover,
+    disallowAdhocMetrics,
+    handleChangeValue,
+  ]);
+  const saveCustomSavedMetric = useCallback(() => {
+    if (!customSavedMetricName) {
+      setCustomMetricError(t('Select a saved metric.'));
+      return;
+    }
+    handleChangeValue(customSavedMetricName);
+    closeCustomMetricPopover();
+  }, [closeCustomMetricPopover, customSavedMetricName, handleChangeValue]);
+
+  const canSaveCustomSql =
+    allowCustomSql &&
+    !disabled &&
+    Boolean(datasourceForPopover) &&
+    !disallowAdhocMetrics;
+  const canSaveCustomExcel = !disabled;
+  const canSaveCustomSaved =
+    allowSavedMetrics && !disabled && Boolean(customSavedMetricName);
+
+  const customMetricPopoverContent = (
+    <div data-ignore-control-popover>
+      <Space direction="vertical" size={8}>
+        <Tabs
+          activeKey={customMetricTab}
+          onChange={key => setCustomMetricTab(key as 'sql' | 'excel' | 'saved')}
+          items={[
+            ...(allowSavedMetrics
+              ? [
+                  {
+                    key: 'saved',
+                    label: t('Saved'),
+                    children:
+                      savedMetricOptions.length > 0 ? (
+                        <Space direction="vertical" size={8}>
+                          <Select
+                            ariaLabel={t('Saved metric')}
+                            placeholder={t('Select a saved metric')}
+                            options={savedMetricOptions}
+                            value={customSavedMetricName || undefined}
+                            onChange={nextValue =>
+                              setCustomSavedMetricName(
+                                typeof nextValue === 'string' ? nextValue : '',
+                              )
+                            }
+                            allowClear
+                          />
+                        </Space>
+                      ) : (
+                        <EmptyState
+                          image="empty.svg"
+                          size="small"
+                          title={t('No saved metrics found')}
+                          description={t(
+                            'Add metrics to dataset in "Edit datasource" modal',
+                          )}
+                        />
+                      ),
+                  },
+                ]
+              : []),
+            ...(allowCustomSql
+              ? [
+                  {
+                    key: 'sql',
+                    label: disallowAdhocMetrics ? (
+                      <Tooltip
+                        title={t(
+                          'Custom SQL ad-hoc metrics are not enabled for this dataset',
+                        )}
+                      >
+                        {t('Custom SQL')}
+                      </Tooltip>
+                    ) : (
+                      t('Custom SQL')
+                    ),
+                    disabled: !datasourceForPopover || disallowAdhocMetrics,
+                    children: (
+                      <Space direction="vertical" size={8}>
+                        <Input
+                          aria-label={t('Metric label')}
+                          placeholder={t('Optional metric label')}
+                          value={customSqlLabel}
+                          onChange={event =>
+                            setCustomSqlLabel(event.target.value)
+                          }
+                        />
+                        <Input.TextArea
+                          aria-label={t('Custom SQL')}
+                          placeholder={t('SQL expression')}
+                          autoSize={{ minRows: 3, maxRows: 8 }}
+                          value={customSqlExpression}
+                          onChange={event =>
+                            setCustomSqlExpression(event.target.value)
+                          }
+                        />
+                      </Space>
+                    ),
+                  },
+                ]
+              : []),
+            {
+              key: 'excel',
+              label: t('Custom Excel'),
+              children: (
+                <Space direction="vertical" size={8}>
+                  <Typography.Text type="secondary">
+                    {t(
+                      "Use 'value' for the current measure value and [metric] to reference another metric value.",
+                    )}
+                  </Typography.Text>
+                  <Input.TextArea
+                    aria-label={t('Custom Excel')}
+                    placeholder={t('Excel formula')}
+                    autoSize={{ minRows: 3, maxRows: 8 }}
+                    value={customExcelFormula}
+                    onChange={event =>
+                      setCustomExcelFormula(event.target.value)
+                    }
+                  />
+                </Space>
+              ),
+            },
+          ]}
+        />
+        {customMetricError && (
+          <Typography.Text type="danger">{customMetricError}</Typography.Text>
+        )}
+        <Space size={8}>
+          <Button
+            size="small"
+            buttonStyle="secondary"
+            onClick={closeCustomMetricPopover}
+          >
+            {t('Close')}
+          </Button>
+          <Button
+            size="small"
+            buttonStyle="primary"
+            disabled={
+              customMetricTab === 'excel'
+                ? !canSaveCustomExcel
+                : customMetricTab === 'saved'
+                  ? !canSaveCustomSaved
+                  : !canSaveCustomSql
+            }
+            onClick={
+              customMetricTab === 'excel'
+                ? saveCustomExcelFormula
+                : customMetricTab === 'saved'
+                  ? saveCustomSavedMetric
+                  : saveCustomSqlMetric
+            }
+          >
+            {t('Save')}
+          </Button>
+        </Space>
+      </Space>
+    </div>
+  );
+
+  const addMetricPopover = enableExcel ? (
+    <Popover
+      content={customMetricPopoverContent}
+      overlayStyle={{ width: 360 }}
+      trigger="click"
+      placement="right"
+      getPopupContainer={() => document.body}
+      open={customMetricPopoverOpen}
+      onOpenChange={open => {
+        if (open) {
+          openCustomMetricPopover();
+        }
+        setCustomMetricPopoverOpen(open);
+      }}
+    >
+      {addMetricButton}
+    </Popover>
+  ) : datasourceForPopover ? (
     <AdhocMetricPopoverTrigger
       adhocMetric={adhocMetricForPopover}
-      onMetricEdit={newMetric => onChange(normalizeFormattingMetric(newMetric))}
+      onMetricEdit={newMetric =>
+        handleChangeValue(normalizeFormattingMetric(newMetric))
+      }
       columns={popoverColumns}
       savedMetricsOptions={savedMetricsForPopover}
       savedMetric={savedMetricForPopover || { metric_name: '', expression: '' }}
@@ -512,7 +963,7 @@ export const MetricFormatSelector = ({
       <Space size={8} align="start">
         <Select
           allowClear
-          allowNewOptions
+          allowNewOptions={!excelOnly}
           ariaLabel={label}
           placeholder={t('Select a metric')}
           css={{ width: METRIC_SELECT_WIDTH }}
@@ -524,18 +975,20 @@ export const MetricFormatSelector = ({
           }))}
           onChange={nextValue => {
             if (!nextValue) {
-              onChange(undefined);
+              handleChangeValue(undefined);
               return;
             }
             const nextValueKey = getSelectValueKey(nextValue);
             if (!nextValueKey) {
-              onChange(undefined);
+              handleChangeValue(undefined);
               return;
             }
             const nextMetric = optionMap.get(nextValueKey);
-            onChange(normalizeFormattingMetric(nextMetric ?? nextValueKey));
+            handleChangeValue(
+              normalizeFormattingMetric(nextMetric ?? nextValueKey),
+            );
           }}
-          onClear={() => onChange(undefined)}
+          onClear={() => handleChangeValue(undefined)}
           showSearch
           optionFilterProps={['label', 'value']}
         />
@@ -569,6 +1022,10 @@ export default function PivotMetricDefinitionValue(
     }
     return metricLabel !== t('Metric') ? metricLabel : '';
   }, [metricLabel, option]);
+  const isIxMetric = useMemo(
+    () => isIxMetricIdentifier(metricLabel) || isIxMetricIdentifier(metricKey),
+    [metricKey, metricLabel],
+  );
   const presetColors = useMemo(() => {
     const categoricalScheme = getCategoricalSchemeRegistry().get();
     return categoricalScheme?.colors.slice(0, 9) || [];
@@ -662,7 +1119,10 @@ export default function PivotMetricDefinitionValue(
       databar.type,
   );
   const handleFormattingChange = useCallback(
-    (field: keyof PivotMetricFormatting, metric?: QueryFormMetric) => {
+    (
+      field: keyof PivotMetricFormatting,
+      metric?: PivotMetricFormattingValue,
+    ) => {
       if (!formattingKey) {
         return;
       }
@@ -756,6 +1216,8 @@ export default function PivotMetricDefinitionValue(
         {FORMAT_SELECTOR_CONFIG.map(selector => (
           <MetricFormatSelector
             key={selector.field}
+            enableExcel
+            excelOnly={isIxMetric}
             label={selector.label}
             tooltip={selector.tooltip}
             value={formatting[selector.field]}

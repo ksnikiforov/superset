@@ -119,13 +119,22 @@ export type DimensionFormattingField =
 export type DimensionFormattingScope = 'all' | 'label';
 
 export type PivotMetricFormatting = Partial<
-  Record<MetricFormattingField, QueryFormMetric>
+  Record<MetricFormattingField, PivotMetricFormattingValue>
 >;
 
 export type PivotMetricFormattingMap = Record<string, PivotMetricFormatting>;
 
+export type PivotExcelFormula = {
+  kind: 'excel';
+  formula: string;
+};
+
+export type PivotMetricFormattingValue = QueryFormMetric | PivotExcelFormula;
+
+export type PivotDimensionFormattingValue = PivotMetricFormattingValue;
+
 export type PivotDimensionFormatting = Partial<
-  Record<DimensionFormattingField, QueryFormMetric>
+  Record<DimensionFormattingField, PivotDimensionFormattingValue>
 > & { applyTo?: DimensionFormattingScope };
 
 export type PivotDimensionFormattingMap = Record<
