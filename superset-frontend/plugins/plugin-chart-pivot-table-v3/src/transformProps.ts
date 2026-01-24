@@ -49,7 +49,7 @@ import { buildInitialQuerySpecs } from './pivot/query/specs';
 const { DATABASE_DATETIME } = TimeFormats;
 
 declare const process: {
-  env?: {
+  env: {
     NODE_ENV?: string;
     WEBPACK_MODE?: string;
   };
@@ -262,8 +262,8 @@ export default function transformProps(
   }
 
   const isDevBuild =
-    process.env?.WEBPACK_MODE === 'development' ||
-    process.env?.NODE_ENV === 'test';
+    process.env.WEBPACK_MODE === 'development' ||
+    process.env.NODE_ENV === 'test';
   if (isDevBuild) {
     if (
       Object.keys(nextTreeWithLabels.rows).length > 0 &&

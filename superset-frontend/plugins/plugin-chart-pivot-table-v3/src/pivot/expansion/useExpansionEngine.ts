@@ -102,6 +102,7 @@ export type ExpansionEngineResult = {
   errorMessage?: string;
   warnings: ChartDataWarning[];
   handleToggle: (axis: PivotAxis, node: PivotTreeNode) => void;
+  handleRetry: () => void;
 };
 
 export type ExpansionEngineConfig = {
@@ -318,13 +319,18 @@ export const useExpansionEngine = ({
     setPendingCols(next);
   }, []);
 
-  const reportAsyncError = useCallback(
-    (error: unknown) => {
-      const message = error instanceof Error ? error.message : String(error);
-      setErrorMessage(message);
-    },
-    [setErrorMessage],
-  );
+  const reportAsyncError = useCallback((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    transactionIdRef.current += 1;
+    activeRequestGroupIdsRef.current.forEach(requestGroupId => {
+      supersetChartDataClient.cancel(requestGroupId);
+    });
+    activeRequestGroupIdsRef.current.clear();
+    loadingCountsRef.current = new Map();
+    setLoadingKeys(new Set());
+    setIsHydrating(false);
+    setErrorMessage(message);
+  }, []);
 
   const addWarnings = useCallback(
     (nextWarnings?: ChartDataWarning[]) => {
@@ -738,7 +744,7 @@ export const useExpansionEngine = ({
           if (transactionIdRef.current === requestId) {
             addWarnings(result.warnings);
             if (result.error) {
-              setErrorMessage(result.error.message);
+              throw result.error;
             }
           }
           return { key, data: result.data, requiredDepth };
@@ -790,7 +796,7 @@ export const useExpansionEngine = ({
           if (transactionIdRef.current === requestId) {
             addWarnings(result.warnings);
             if (result.error) {
-              setErrorMessage(result.error.message);
+              throw result.error;
             }
           }
           return { batch, data: result.data };
@@ -1210,7 +1216,7 @@ export const useExpansionEngine = ({
           if (transactionIdRef.current === transactionId) {
             addWarnings(result.warnings);
             if (result.error) {
-              setErrorMessage(result.error.message);
+              throw result.error;
             }
           }
           return { target, data: result.data };
@@ -1261,7 +1267,7 @@ export const useExpansionEngine = ({
           if (transactionIdRef.current === transactionId) {
             addWarnings(result.warnings);
             if (result.error) {
-              setErrorMessage(result.error.message);
+              throw result.error;
             }
           }
           return { batch, data: result.data };
@@ -1983,6 +1989,14 @@ export const useExpansionEngine = ({
     visibilityConfig,
   ]);
 
+  const handleRetry = useCallback(() => {
+    setErrorMessage(undefined);
+    warningsRef.current = new Map();
+    setWarnings([]);
+
+    hydrateAtomic('prefetch', { showLoader: true }).catch(reportAsyncError);
+  }, [hydrateAtomic, reportAsyncError]);
+
   return {
     tree,
     expandedRows,
@@ -1994,5 +2008,6 @@ export const useExpansionEngine = ({
     errorMessage,
     warnings,
     handleToggle,
+    handleRetry,
   };
 };

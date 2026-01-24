@@ -124,6 +124,7 @@ function PivotTableChart(props: PivotTableProps) {
     warnings,
     isHydrating,
     handleToggle,
+    handleRetry,
   } = useExpansionEngine({
     data,
     expandedStateSignature: layoutResult.expandedStateSignature,
@@ -228,6 +229,7 @@ function PivotTableChart(props: PivotTableProps) {
       expandedRows={expandedRows}
       expandedCols={expandedCols}
       errorMessage={errorMessage}
+      onRetry={handleRetry}
       warnings={warnings}
       showGlobalLoader={renderModelResult.showGlobalLoader}
       stickyHeaders={resolvedStickyHeaders}

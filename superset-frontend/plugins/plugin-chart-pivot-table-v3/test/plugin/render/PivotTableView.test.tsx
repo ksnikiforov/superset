@@ -57,6 +57,7 @@ const renderView = (showGlobalLoader: boolean) =>
       expandedRows={new Set()}
       expandedCols={new Set()}
       showGlobalLoader={showGlobalLoader}
+      onRetry={jest.fn()}
       stickyHeaders={false}
       headerOffset={0}
       headerRowOffsets={[]}
@@ -123,6 +124,7 @@ describe('PivotTableView', () => {
         expandedRows={new Set()}
         expandedCols={new Set()}
         showGlobalLoader={false}
+        onRetry={jest.fn()}
         stickyHeaders={false}
         headerOffset={0}
         headerRowOffsets={[]}

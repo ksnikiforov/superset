@@ -30,7 +30,7 @@ import {
   PlusSquareOutlined,
 } from '@ant-design/icons';
 import { styled, t } from '@superset-ui/core';
-import { Loading } from '@superset-ui/core/components';
+import { Alert, Button, Loading } from '@superset-ui/core/components';
 import {
   type MetricFormattingScope,
   type PivotMetricDatabarMap,
@@ -53,6 +53,22 @@ const Container = styled.div<{ height: number; width: number }>`
     overflow: auto;
     position: relative;
   `}
+`;
+
+const ErrorWrapper = styled.div`
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: ${({ theme }) => theme.sizeLG}px;
+`;
+
+const ErrorContent = styled.div`
+  max-width: 640px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.sizeMD}px;
 `;
 
 const StyledTable = styled.table<{ $stickyHeaders: boolean }>`
@@ -245,6 +261,7 @@ type PivotTableViewProps = {
   expandedRows: Set<string>;
   expandedCols: Set<string>;
   errorMessage?: string;
+  onRetry: () => void;
   warnings?: ChartDataWarning[];
   showGlobalLoader: boolean;
   stickyHeaders: boolean;
@@ -308,6 +325,7 @@ export const PivotTableView = ({
   expandedRows,
   expandedCols,
   errorMessage,
+  onRetry,
   showGlobalLoader,
   stickyHeaders,
   headerOffset,
@@ -348,8 +366,21 @@ export const PivotTableView = ({
 
   return (
     <Container height={height} width={width} style={containerStyle}>
-      {errorMessage && <div>{t('Error loading branch: %s', errorMessage)}</div>}
-      {showGlobalLoader ? (
+      {errorMessage ? (
+        <ErrorWrapper>
+          <ErrorContent>
+            <Alert
+              type="error"
+              showIcon
+              message={t('Error loading Pivot Table')}
+              description={errorMessage}
+            />
+            <Button type="primary" onClick={onRetry}>
+              {t('Retry')}
+            </Button>
+          </ErrorContent>
+        </ErrorWrapper>
+      ) : showGlobalLoader ? (
         <Loading />
       ) : (
         <StyledTable

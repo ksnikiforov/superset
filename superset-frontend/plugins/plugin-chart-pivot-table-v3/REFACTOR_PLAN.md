@@ -1543,7 +1543,11 @@ This section tracks what has been implemented in this working tree. It does not 
   - Centralized multi-query bundling + split-on-413 retry and GAQ handling inside `SupersetChartDataClient`.
   - Moved branch-result caching behind `pivot/data/cache` (keyed by `filterSignature`) and removed direct `SupersetClient` usage elsewhere.
   - Verified: `npm test plugins/plugin-chart-pivot-table-v3`.
-- [ ] Phase 4.5 — Error UX: full-chart failure + Retry (**behavior change**) (not started)
+- [x] Phase 4.5 — Error UX: full-chart failure + Retry (**behavior change**)
+  - Added a full-chart error UI + single “Retry” action in `src/pivot/render/PivotTableView.tsx` (no table visible while failed).
+  - Treated any branch/batch fetch error as transaction-fatal (Contract 6.C): cancel in-flight request groups and avoid partial apply.
+  - Added tests under `test/plugin/PivotTableChart/error-ux.test.tsx` for AS-22 and AS-23.
+  - Verified: `NODE_ENV=test npx jest plugins/plugin-chart-pivot-table-v3/test/plugin --runInBand` and `npx eslint plugins/plugin-chart-pivot-table-v3 --max-warnings=0`.
 - [x] Phase 5 — Split expansion engine into pure planner + thin hook
   - Added `src/pivot/expansion/store.ts` (`ExpansionStateStore`, memory-first; best-effort persistence via `setControlValue` or dashboard `ownState`).
   - Added `src/pivot/expansion/planner.ts` + `src/pivot/expansion/engine.ts` and refactored `src/pivot/expansion/useExpansionEngine.ts` to delegate hydration planning/visibility decisions.
