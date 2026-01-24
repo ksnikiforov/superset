@@ -17,8 +17,8 @@
  * under the License.
  */
 import { SupersetClient } from '@superset-ui/core';
-import { fetchPivotBranchesBatch } from '../../../src/pivot/engine/query/fetchPivotBranchesBatch';
-import { type BatchGroup } from '../../../src/pivot/engine/query/fetchPlanOptimizer';
+import { fetchPivotBranchesBatch } from '../../../src/pivot/query/fetchPivotBranchesBatch';
+import { type BatchGroup } from '../../../src/pivot/query/fetchPlanOptimizer';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { serializePath } from '../../../src/utils';
 import { type PivotTreeData, type PivotTreeNode } from '../../../src/types';

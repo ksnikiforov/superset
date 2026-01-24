@@ -28,4 +28,3 @@ export type QuerySpec = {
   metrics: QueryFormMetric[];
   filters: QueryObjectFilterClause[];
 };
-

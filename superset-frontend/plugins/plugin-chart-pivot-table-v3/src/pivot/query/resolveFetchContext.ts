@@ -18,7 +18,6 @@
  */
 import {
   type AdhocColumn,
-  ensureIsArray,
   isPhysicalColumn,
   type QueryFormColumn,
   type QueryFormMetric,
@@ -37,7 +36,10 @@ import {
   decodeMetricKey,
   hasTotalSorting,
 } from '../../utils';
-import { buildLayoutContext, type LayoutContext } from '../layout/LayoutContext';
+import {
+  buildLayoutContext,
+  type LayoutContext,
+} from '../layout/LayoutContext';
 import { buildQueryShape } from './queryShape';
 import { type QueryIntent } from './queryIntent';
 

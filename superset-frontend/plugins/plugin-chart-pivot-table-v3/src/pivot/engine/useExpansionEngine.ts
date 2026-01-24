@@ -22,4 +22,3 @@ export {
   type ExpansionEngineConfig,
   type ExpansionEngineResult,
 } from '../expansion/useExpansionEngine';
-

@@ -237,10 +237,15 @@ export class SupersetChartDataClient implements ChartDataClient {
     }
 
     const resolvedSignal =
-      signal ?? (requestGroupId ? this.beginRequestGroup(requestGroupId) : undefined);
+      signal ??
+      (requestGroupId ? this.beginRequestGroup(requestGroupId) : undefined);
 
     try {
-      return await this.fetchWithSplit({ formData, specs, signal: resolvedSignal });
+      return await this.fetchWithSplit({
+        formData,
+        specs,
+        signal: resolvedSignal,
+      });
     } finally {
       if (requestGroupId && !signal) {
         this.controllers.delete(requestGroupId);

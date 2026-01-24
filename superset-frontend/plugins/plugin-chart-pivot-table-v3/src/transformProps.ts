@@ -25,10 +25,13 @@ import {
   getTimeFormatterForGranularity,
   SMART_DATE_ID,
   TimeFormats,
-  ensureIsArray,
 } from '@superset-ui/core';
 import { getColorFormatters } from '@superset-ui/chart-controls';
-import { PivotTableQueryFormData, PivotTreeData } from './types';
+import {
+  PivotTableProps,
+  PivotTableQueryFormData,
+  PivotTreeData,
+} from './types';
 import {
   getMetricKeys,
   getStableColumnKey,
@@ -53,27 +56,29 @@ declare const process: {
 };
 
 export default function transformProps(
-  chartProps: ChartProps<PivotTableQueryFormData>,
-) {
+  chartProps: ChartProps,
+): PivotTableProps {
   const {
     width,
     height,
     queriesData,
-    formData,
-    rawFormData,
+    formData: rawFormDataCamel,
+    rawFormData: rawFormDataBase,
     hooks: { setDataMask = () => {}, onContextMenu, setControlValue },
     filterState,
     datasource,
     emitCrossFilters,
     theme,
   } = chartProps;
+  const formData = rawFormDataCamel as PivotTableQueryFormData;
+  const rawFormData = rawFormDataBase as PivotTableQueryFormData;
   const {
     verboseMap = {},
     columnFormats = {},
     currencyFormats = {},
     columns = [],
   } = datasource || {};
-  const layout = buildLayoutContext(formData, datasource);
+  const layout = buildLayoutContext(formData);
   const {
     metrics,
     groupbyRows,
@@ -198,7 +203,7 @@ export default function transformProps(
       return undefined;
     }
     const record = result as Record<string, unknown>;
-    const query = record.query;
+    const { query } = record;
     if (query && typeof query === 'object') {
       const queryRecord = query as Record<string, unknown>;
       const name = queryRecord.query_name;
@@ -227,7 +232,9 @@ export default function transformProps(
       } as (typeof queriesData)[number]);
     const nextTree = buildBranchTreeFromResults({
       results: [result],
-      queryPairs: [{ rowDepth: spec.meta.rowDepth, colDepth: spec.meta.colDepth }],
+      queryPairs: [
+        { rowDepth: spec.meta.rowDepth, colDepth: spec.meta.colDepth },
+      ],
       metricsForQuery: spec.metrics,
       formData,
       rowGroupby: spec.meta.rowGroupbyForQueryFull,
@@ -281,7 +288,7 @@ export default function transformProps(
   return {
     width,
     height,
-    margin: (formData as any).margin ?? 0,
+    margin: formData.margin ?? 0,
     data: nextTreeWithLabels,
     formData: {
       ...formData,
@@ -322,7 +329,7 @@ export default function transformProps(
     metricColorFormatters,
     dateFormatters,
     onContextMenu,
-    timeGrainSqla: formData.time_grain_sqla,
+    timeGrainSqla: formData.timeGrainSqla ?? formData.time_grain_sqla,
     treeData: nextTreeWithLabels,
     colTypeMap,
     rowTotalPosition,

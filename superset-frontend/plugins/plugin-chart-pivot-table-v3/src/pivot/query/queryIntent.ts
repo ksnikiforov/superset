@@ -54,4 +54,3 @@ export const shouldIncludeMetricFormatting = (
 
 export const shouldIncludeDatabars = (intent: QueryIntent): boolean =>
   intent.needsDatabars && intent.needsValueCells;
-

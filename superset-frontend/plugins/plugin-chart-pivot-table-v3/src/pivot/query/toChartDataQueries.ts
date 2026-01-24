@@ -43,4 +43,3 @@ export const toChartDataQueries = ({
     ],
     query_name: spec.queryName,
   }));
-

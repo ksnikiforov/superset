@@ -17,13 +17,8 @@
  * under the License.
  */
 
-import { PivotPath, PivotTreeNode, TotalPosition } from '../../types';
-import {
-  decodeMetricKey,
-  isSubtotalToken,
-  parsePath,
-  serializePath,
-} from '../../utils';
+import { PivotTreeNode, TotalPosition } from '../../types';
+import { decodeMetricKey, parsePath, serializePath } from '../../utils';
 import {
   buildVisibleCols,
   buildVisibleRows,
@@ -32,14 +27,10 @@ import {
 import { countDimDepth } from '../metricsTotals';
 import { rootKey } from '../viewModel';
 
-export type PivotExpansionStateKeys = {
-  rowKeys: string[];
-  colKeys: string[];
-  rows: string[];
-  cols: string[];
-  collapsedRows: string[];
-  collapsedCols: string[];
-};
+export {
+  coerceExpansionState,
+  type PivotExpansionStateKeys,
+} from '../query/persistedExpansionState';
 
 type SeedExpandedOptions = {
   includeMetricDepthZero?: boolean;
@@ -71,58 +62,6 @@ export const seedExpandedByLevel = (
     }
   });
   return next;
-};
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  typeof value === 'object' && value !== null;
-
-const coerceAxisKeys = (value: unknown): string[] | undefined => {
-  if (!Array.isArray(value)) {
-    return undefined;
-  }
-  const keys = value.filter((item): item is string => typeof item === 'string');
-  return keys.length === value.length ? keys : undefined;
-};
-
-const coerceExpansionAxis = (value: unknown): string[] | undefined => {
-  if (!Array.isArray(value)) {
-    return undefined;
-  }
-  const resolved: string[] = [];
-  value.forEach(item => {
-    if (Array.isArray(item)) {
-      if ((item as unknown[]).some(isSubtotalToken)) {
-        return;
-      }
-      resolved.push(serializePath(item as PivotPath));
-    }
-  });
-  return resolved;
-};
-
-export const coerceExpansionState = (
-  value: unknown,
-): PivotExpansionStateKeys | undefined => {
-  if (!isRecord(value)) {
-    return undefined;
-  }
-  const rowKeys = coerceAxisKeys(value.rowKeys);
-  const colKeys = coerceAxisKeys(value.colKeys);
-  const rows = coerceExpansionAxis(value.rows);
-  const cols = coerceExpansionAxis(value.cols);
-  const collapsedRows = coerceExpansionAxis(value.collapsedRows);
-  const collapsedCols = coerceExpansionAxis(value.collapsedCols);
-  if (!rowKeys || !colKeys || !rows || !cols) {
-    return undefined;
-  }
-  return {
-    rowKeys,
-    colKeys,
-    rows,
-    cols,
-    collapsedRows: collapsedRows || [],
-    collapsedCols: collapsedCols || [],
-  };
 };
 
 export const stripAutoSeededExpansions = ({

@@ -23,11 +23,11 @@ import {
   fetchPivotBranch,
   clearPivotBranchCache,
 } from '../../../src/fetchPivotBranch';
-import { fetchPivotBranchesBatch } from '../../../src/pivot/engine/query/fetchPivotBranchesBatch';
+import { fetchPivotBranchesBatch } from '../../../src/pivot/query/fetchPivotBranchesBatch';
 import { serializePath } from '../../../src/utils';
 import { type PivotTreeData, type PivotTreeNode } from '../../../src/types';
 import { buildFormData } from '../fixtures/pivotFormData';
-import { type BatchGroup } from '../../../src/pivot/engine/query/fetchPlanOptimizer';
+import { type BatchGroup } from '../../../src/pivot/query/fetchPlanOptimizer';
 
 jest.mock('src/middleware/asyncEvent', () => ({
   waitForAsyncData: jest.fn(),

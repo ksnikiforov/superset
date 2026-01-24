@@ -19,10 +19,11 @@
 import {
   BinaryQueryObjectFilterClause,
   DataRecordValue,
-  getColumnLabel,
   QueryFormColumn,
   QueryFormMetric,
   QueryObjectFilterClause,
+  UnaryQueryObjectFilterClause,
+  getColumnLabel,
 } from '@superset-ui/core';
 import { DateFormatter, MetricsLayoutEnum, PivotTreeNode } from '../types';
 import { decodeMetricKey, getMetricKeys, isSubtotalToken } from '../utils';
@@ -36,25 +37,13 @@ const stripMetricPath = (
   const shouldStripMetric =
     (axis === 'row' && metricsLayout === MetricsLayoutEnum.ROWS) ||
     (axis === 'col' && metricsLayout === MetricsLayoutEnum.COLUMNS);
-  if (axis === 'row' && metricsLayout === MetricsLayoutEnum.ROWS) {
-    return path.filter(val => {
-      if (isSubtotalToken(val)) {
-        return false;
-      }
-      const decoded = decodeMetricKey(val);
-      return !(shouldStripMetric && decoded && metricLabels.has(decoded));
-    });
-  }
-  if (axis === 'col' && metricsLayout === MetricsLayoutEnum.COLUMNS) {
-    return path.filter(val => {
-      if (isSubtotalToken(val)) {
-        return false;
-      }
-      const decoded = decodeMetricKey(val);
-      return !(shouldStripMetric && decoded && metricLabels.has(decoded));
-    });
-  }
-  return path.filter(val => !isSubtotalToken(val));
+  return path.filter(val => {
+    if (isSubtotalToken(val)) {
+      return false;
+    }
+    const decoded = decodeMetricKey(val);
+    return !(shouldStripMetric && decoded && metricLabels.has(decoded));
+  });
 };
 
 type CellFiltersParams = {
@@ -87,17 +76,20 @@ export const buildCellFilters = ({
     metricsLayout,
     metricLabelSet,
   );
+  const toFilter = (
+    col: QueryFormColumn,
+    val: PivotTreeNode['path'][number],
+  ): QueryObjectFilterClause => {
+    if (val === null || val === undefined) {
+      const clause: UnaryQueryObjectFilterClause = { col, op: 'IS NULL' };
+      return clause;
+    }
+    const clause: BinaryQueryObjectFilterClause = { col, op: '==', val };
+    return clause;
+  };
   return [
-    ...normalizedRowPath.map((val, i) => ({
-      col: getColumnLabel(groupbyRows[i]),
-      op: (val === null || val === undefined ? 'IS NULL' : '==') as any,
-      val: val === undefined ? null : val,
-    })),
-    ...normalizedColPath.map((val, i) => ({
-      col: getColumnLabel(groupbyColumns[i]),
-      op: (val === null || val === undefined ? 'IS NULL' : '==') as any,
-      val: val === undefined ? null : val,
-    })),
+    ...normalizedRowPath.map((val, i) => toFilter(groupbyRows[i], val)),
+    ...normalizedColPath.map((val, i) => toFilter(groupbyColumns[i], val)),
   ];
 };
 
@@ -123,8 +115,9 @@ const buildAxisContextFilters = (
 ) =>
   stripMetricPath(node.path, axis, metricsLayout, metricLabels).map(
     (val, idx) => {
-      const col = getColumnLabel(columns[idx]);
-      const formatter = dateFormatters[col];
+      const col = columns[idx];
+      const colLabel = getColumnLabel(col);
+      const formatter = dateFormatters[colLabel];
       const normalizedVal = val === undefined ? null : val;
       return {
         col,

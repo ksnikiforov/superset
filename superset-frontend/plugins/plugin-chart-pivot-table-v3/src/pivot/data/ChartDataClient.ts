@@ -47,4 +47,3 @@ export interface ChartDataClient {
   fetch(params: ChartDataFetchParams): Promise<ChartDataQueryResult[]>;
   cancel(requestGroupId: string): void;
 }
-

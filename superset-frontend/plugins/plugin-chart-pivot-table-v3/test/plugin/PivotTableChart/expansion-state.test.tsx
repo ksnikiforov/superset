@@ -46,7 +46,7 @@ import {
   fetchPivotBranchesBatch,
   type FetchPivotBranchesBatchParams,
   type FetchPivotBranchesBatchResult,
-} from '../../../src/pivot/engine/query/fetchPivotBranchesBatch';
+} from '../../../src/pivot/query/fetchPivotBranchesBatch';
 import { buildFormData } from '../fixtures/pivotFormData';
 
 jest.mock('../../../src/fetchPivotBranch', () => {
@@ -58,7 +58,7 @@ jest.mock('../../../src/fetchPivotBranch', () => {
   };
 });
 
-jest.mock('../../../src/pivot/engine/query/fetchPivotBranchesBatch', () => ({
+jest.mock('../../../src/pivot/query/fetchPivotBranchesBatch', () => ({
   fetchPivotBranchesBatch: jest.fn(),
 }));
 
@@ -693,7 +693,9 @@ describe('PivotTableChart expansion state persistence', () => {
     expect(toggle).not.toBeNull();
     fireEvent.click(toggle as HTMLButtonElement);
 
-    await waitFor(() => expect(setDataMask.mock.calls.length).toBeGreaterThan(1));
+    await waitFor(() =>
+      expect(setDataMask.mock.calls.length).toBeGreaterThan(1),
+    );
     const lastCall = setDataMask.mock.calls[setDataMask.mock.calls.length - 1];
     const lastOwnState = lastCall?.[0]?.ownState as Record<string, unknown>;
     const persisted = lastOwnState?.pivotExpansionState as PivotExpansionState;
@@ -1382,7 +1384,6 @@ describe('PivotTableChart expansion state persistence', () => {
         deepGroupby,
         [],
       );
-    const shallowTree = buildTreeWithDepth(1);
     const midTree = buildTreeWithDepth(2);
     const deepTree = buildTreeWithDepth(3);
     fetchPivotBranchMock

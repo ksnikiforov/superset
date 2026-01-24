@@ -16,17 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import {
+import type {
   PivotPath,
   PivotTableQueryFormData,
   PivotTreeData,
-} from '../../../types';
-import { type BatchGroup } from '../../query/fetchPlanOptimizer';
-import { buildLayoutContext } from '../../layout/LayoutContext';
-import { buildBatchQuerySpecs } from '../../query/specs';
-import { buildBranchTreeFromResults } from '../../../fetchPivotBranch';
-import { supersetChartDataClient } from '../../data/SupersetChartDataClient';
-import { type ChartDataWarning } from '../../data/ChartDataClient';
+} from '../../types';
+import { type BatchGroup } from './fetchPlanOptimizer';
+import { buildLayoutContext } from '../layout/LayoutContext';
+import { buildBatchQuerySpecs } from './specs';
+import { buildBranchTreeFromResults } from '../../fetchPivotBranch';
+import { supersetChartDataClient } from '../data/SupersetChartDataClient';
+import { type ChartDataWarning } from '../data/ChartDataClient';
 
 export type FetchPivotBranchesBatchParams = {
   formData: PivotTableQueryFormData;
@@ -117,7 +117,9 @@ export const fetchPivotBranchesBatch = async ({
     });
     const orderedResults =
       resultsByQueryName.size > 0
-        ? specs.map(spec => resultsByQueryName.get(spec.queryName) ?? { data: [] })
+        ? specs.map(
+            spec => resultsByQueryName.get(spec.queryName) ?? { data: [] },
+          )
         : results;
     const tree = buildBranchTreeFromResults({
       results: orderedResults,

@@ -21,7 +21,7 @@ import transformProps from './transformProps';
 import controlPanel from './controlPanel';
 import buildQuery from './buildQuery';
 import thumbnail from './images/thumbnail.png';
-import { PivotTableProps, PivotTableQueryFormData } from './types';
+import { PivotTableQueryFormData } from './types';
 
 export * from './types';
 
@@ -40,16 +40,12 @@ const metadata = new ChartMetadata({
   thumbnail,
 });
 
-export default class PivotTableV3ChartPlugin extends ChartPlugin<
-  PivotTableQueryFormData,
-  PivotTableProps
-> {
+export default class PivotTableV3ChartPlugin extends ChartPlugin<PivotTableQueryFormData> {
   constructor() {
     super({
       loadChart: () => import('./PivotTableChart'),
       metadata,
-      // Casting because the chart consumes a richer prop shape than the base ChartProps type captures.
-      transformProps: transformProps as any,
+      transformProps,
       controlPanel,
       buildQuery,
     });

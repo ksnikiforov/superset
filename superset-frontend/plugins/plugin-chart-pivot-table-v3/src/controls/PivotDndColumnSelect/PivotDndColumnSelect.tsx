@@ -84,7 +84,7 @@ import PivotDndSelectLabel from './PivotSelectLabel';
 import { OptionSelector } from './optionSelector';
 
 const DEFAULT_DRAG_TYPE = 'pivot_v3_dnd';
-const NOOP_CLICK_CLOSE = (_index: number) => {};
+const NOOP_CLICK_CLOSE = () => {};
 
 const DEFAULT_DIMENSION_FORMATTING_SCOPE: DimensionFormattingScope = 'all';
 const DEFAULT_DIMENSION_SORT_ORDER: PivotSortOrder = 'asc';

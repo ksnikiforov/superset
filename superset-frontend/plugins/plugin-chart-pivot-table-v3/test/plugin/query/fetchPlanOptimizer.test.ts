@@ -19,7 +19,7 @@
 import {
   optimizeFetchPlan,
   MAX_BATCH_SIBLINGS,
-} from '../../../src/pivot/engine/query/fetchPlanOptimizer';
+} from '../../../src/pivot/query/fetchPlanOptimizer';
 import { parsePath, serializePath } from '../../../src/utils';
 import { type FetchTarget } from '../../../src/pivot/engine/fetchCoordinator';
 import { type PivotPathValue } from '../../../src/types';

@@ -35,7 +35,7 @@ import {
   fetchPivotBranchesBatch,
   type FetchPivotBranchesBatchParams,
   type FetchPivotBranchesBatchResult,
-} from '../../../src/pivot/engine/query/fetchPivotBranchesBatch';
+} from '../../../src/pivot/query/fetchPivotBranchesBatch';
 import { buildFormData } from '../fixtures/pivotFormData';
 
 jest.mock('../../../src/fetchPivotBranch', () => {
@@ -47,7 +47,7 @@ jest.mock('../../../src/fetchPivotBranch', () => {
   };
 });
 
-jest.mock('../../../src/pivot/engine/query/fetchPivotBranchesBatch', () => ({
+jest.mock('../../../src/pivot/query/fetchPivotBranchesBatch', () => ({
   fetchPivotBranchesBatch: jest.fn(),
 }));
 

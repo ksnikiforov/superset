@@ -252,7 +252,7 @@ type PivotTableViewProps = {
   headerRowOffsets: number[];
   headerRef: RefObject<HTMLTableSectionElement>;
   themeColor?: string;
-  rowTotalPosition: TotalPosition;
+  colTotalPosition: TotalPosition;
   metricFormattingScope: MetricFormattingScope;
   metricDatabars: PivotMetricDatabarMap;
   formattingKeyMap: Record<string, FormattingKeys>;
@@ -273,7 +273,6 @@ type PivotTableViewProps = {
   ) => CSSProperties | undefined;
   deriveMetricKey: (rowNode: PivotTreeNode, colNode: PivotTreeNode) => string;
   isMetricGrandTotalNode: (node: PivotTreeNode) => boolean;
-  isMetricSubtotalNode: (node: PivotTreeNode) => boolean;
   renderCellContent: (
     rowNode: PivotTreeNode,
     colNode: PivotTreeNode,
@@ -315,7 +314,7 @@ export const PivotTableView = ({
   headerRowOffsets,
   headerRef,
   themeColor,
-  rowTotalPosition,
+  colTotalPosition,
   metricFormattingScope,
   metricDatabars,
   formattingKeyMap,
@@ -332,7 +331,6 @@ export const PivotTableView = ({
   resolveDimensionStyle,
   deriveMetricKey,
   isMetricGrandTotalNode,
-  isMetricSubtotalNode,
   renderCellContent,
   renderDatabarContent,
   emitCrossFilters,
@@ -347,7 +345,6 @@ export const PivotTableView = ({
   } = {
     '--pivot-header-offset': `${stickyHeaders ? headerOffset : 0}px`,
   };
-  const isRowTotalAtStart = rowTotalPosition === 'start' && showRowRoot;
 
   return (
     <Container height={height} width={width} style={containerStyle}>
@@ -456,7 +453,7 @@ export const PivotTableView = ({
               const isSubtotalHeader = rowAggregateBold;
               const isGrandTotalRow = showRowRoot && row.key === rootKey;
               const grandTotalPositionClass =
-                rowTotalPosition === 'end'
+                colTotalPosition === 'end'
                   ? 'pivot-grand-total-row--bottom'
                   : 'pivot-grand-total-row--top';
               const rowClassName = isGrandTotalRow

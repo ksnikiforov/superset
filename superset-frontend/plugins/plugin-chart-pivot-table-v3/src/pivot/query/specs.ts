@@ -20,7 +20,6 @@ import {
   type BinaryQueryObjectFilterClause,
   getColumnLabel,
   type QueryFormColumn,
-  type QueryFormMetric,
   type QueryObjectFilterClause,
   type UnaryQueryObjectFilterClause,
 } from '@superset-ui/core';
@@ -34,7 +33,10 @@ import {
 } from '../../types';
 import { getStableColumnKey } from '../../utils';
 import { serializePath, parsePath } from '../core/path';
-import { buildLayoutContext, type LayoutContext } from '../layout/LayoutContext';
+import {
+  buildLayoutContext,
+  type LayoutContext,
+} from '../layout/LayoutContext';
 import { countDimDepth } from '../metricsTotals';
 import { buildBatchSignature } from './batchSignature';
 import { buildBranchQueryPairs } from './branchQueryPairs';
@@ -74,7 +76,11 @@ export type PlannedQuerySpec = QuerySpec & {
 
 type DepthPair = { rowDepth: number; colDepth: number };
 
-const createEmptyTree = (): PivotTreeData => ({ rows: {}, cols: {}, cells: {} });
+const createEmptyTree = (): PivotTreeData => ({
+  rows: {},
+  cols: {},
+  cells: {},
+});
 
 const getStablePrefixLength = (prev: string[], next: string[]) => {
   const limit = Math.min(prev.length, next.length);

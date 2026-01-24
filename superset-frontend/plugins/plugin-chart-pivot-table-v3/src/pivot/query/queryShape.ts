@@ -127,4 +127,3 @@ export const buildQueryShape = ({
     metrics: mergeMetrics(metrics, extraMetrics),
   };
 };
-

@@ -52,8 +52,7 @@ const buildSelectedFilters = (
   const selected: Record<string, DataRecordValue[]> = {};
   filters.forEach(filter => {
     const key = getColumnLabel(filter.col);
-    const value: DataRecordValue =
-      'val' in filter ? filter.val : (null as DataRecordValue);
+    const value: DataRecordValue = 'val' in filter ? filter.val : null;
     selected[key] = [value];
   });
   return selected;
@@ -207,7 +206,6 @@ export const usePivotInteractions = ({
       onContextMenu,
       ownState,
       resolvedMetricsLayout,
-      setDataMask,
       treeDataSignature,
       treeRef,
       timeGrainSqla,

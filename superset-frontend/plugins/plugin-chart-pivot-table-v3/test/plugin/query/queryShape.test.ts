@@ -16,8 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { buildQueryShape } from '../../../src/pivot/engine/query/queryShape';
-import { type QueryIntent } from '../../../src/pivot/engine/query/queryIntent';
+import { buildQueryShape } from '../../../src/pivot/query/queryShape';
+import { type QueryIntent } from '../../../src/pivot/query/queryIntent';
 
 describe('queryShape', () => {
   const baseIntent: QueryIntent = {

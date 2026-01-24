@@ -26,8 +26,8 @@ import {
 import { getStableColumnKey, parsePath, serializePath } from '../../utils';
 import { countDimDepth } from '../metricsTotals';
 import { coerceExpansionState } from './expansionStateModel';
-import { buildBootstrapPlanFromLayout } from './bootstrapPlanner';
-import { buildQueryShape } from './query/queryShape';
+import { buildBootstrapPlanFromLayout } from '../query/bootstrapPlanner';
+import { buildQueryShape } from '../query/queryShape';
 import {
   buildBranchQueryPairs,
   resolveFetchContextForBatch,
@@ -188,15 +188,10 @@ const uniqueTargets = (
 
 const createEmptyTree = () => ({ rows: {}, cols: {}, cells: {} });
 
-export const buildInitialQueryPlan = (
-  formData: PivotTableQueryFormData,
-): InitialQueryPlan =>
-  buildInitialQueryPlanFromLayout(buildLayoutContext(formData), formData);
-
-export const buildInitialQueryPlanFromLayout = (
+export function buildInitialQueryPlanFromLayout(
   layout: LayoutContext,
   formData: PivotTableQueryFormData,
-): InitialQueryPlan => {
+): InitialQueryPlan {
   const {
     groupbyRows: rowGroupby,
     groupbyColumns: colGroupby,
@@ -427,4 +422,9 @@ export const buildInitialQueryPlanFromLayout = (
     colGroupby,
     metrics,
   };
-};
+}
+
+export const buildInitialQueryPlan = (
+  formData: PivotTableQueryFormData,
+): InitialQueryPlan =>
+  buildInitialQueryPlanFromLayout(buildLayoutContext(formData), formData);

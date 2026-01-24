@@ -16,7 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { type CSSProperties, type ReactNode, useCallback, useMemo } from 'react';
+import {
+  type CSSProperties,
+  type ReactNode,
+  useCallback,
+  useMemo,
+} from 'react';
 import {
   DataRecordValue,
   addAlpha,
@@ -50,6 +55,7 @@ import {
   DEFAULT_DATABAR_POSITIVE_COLOR,
   getFormattingMetricKey,
   getMetricKeys,
+  isSubtotalToken,
   mergeMetrics,
   normalizeDimensionFormattingMapWithKeys,
   normalizeDimensionSortingMapWithKeys,
@@ -60,19 +66,14 @@ import {
   serializeCellKey,
   serializePath,
 } from '../../utils';
-import {
-  formatMetricValue,
-  rootKey,
-} from '../viewModel';
+import { formatMetricValue, rootKey } from '../viewModel';
 import {
   deriveMetricKey as deriveMetricKeyBase,
   formatNodeLabel as formatNodeLabelBase,
   shouldHideRowValues as shouldHideRowValuesBase,
 } from '../cellUtils';
-import { isSubtotalToken } from '../../utils';
-import { type FormattingKeys } from '../shared/types';
+import { type FormattingKeys, type RenderModel } from '../shared/types';
 import { type PivotLayoutResult } from './usePivotLayout';
-import { type RenderModel } from '../shared/types';
 
 const DatabarContent = styled.div`
   position: absolute;
@@ -429,7 +430,9 @@ const buildFormattingKeyMap = (metricFormatting: PivotMetricFormattingMap) => {
     }
     const formattingKeys = METRIC_FORMATTING_FIELDS.reduce((acc, field) => {
       const formattingMetric = formatting?.[field];
-      const key = formattingMetric ? getFormattingMetricKey(formattingMetric) : '';
+      const key = formattingMetric
+        ? getFormattingMetricKey(formattingMetric)
+        : '';
       if (key) {
         acc[field] = key;
       }
@@ -453,7 +456,9 @@ const buildDimensionFormattingKeyMap = (
     const formattingKeys = DIMENSION_FORMATTING_FIELDS.reduce(
       (acc, field) => {
         const formattingMetric = dimensionFormatting?.[field];
-        const key = formattingMetric ? getFormattingMetricKey(formattingMetric) : '';
+        const key = formattingMetric
+          ? getFormattingMetricKey(formattingMetric)
+          : '';
         if (key) {
           acc[field] = key;
         }
@@ -513,10 +518,12 @@ export const usePivotFormatting = ({
   theme: PivotTableProps['theme'];
 }): PivotFormattingResult => {
   const metricFormattingScope =
-    (formData.metricFormattingScope as MetricFormattingScope) || 'values_totals';
+    (formData.metricFormattingScope as MetricFormattingScope) ||
+    'values_totals';
 
   const metricFormatting = useMemo(
-    () => normalizeMetricFormattingMapWithKeys(formData.metricFormatting, metrics),
+    () =>
+      normalizeMetricFormattingMapWithKeys(formData.metricFormatting, metrics),
     [formData.metricFormatting, metrics],
   );
   const metricDatabars = useMemo(
@@ -524,20 +531,29 @@ export const usePivotFormatting = ({
     [formData.metricDatabars, metrics],
   );
   const rowFormatting = useMemo(
-    () => normalizeDimensionFormattingMapWithKeys(formData.rowFormatting, groupbyRows),
+    () =>
+      normalizeDimensionFormattingMapWithKeys(
+        formData.rowFormatting,
+        groupbyRows,
+      ),
     [formData.rowFormatting, groupbyRows],
   );
   const colFormatting = useMemo(
     () =>
-      normalizeDimensionFormattingMapWithKeys(formData.colFormatting, groupbyColumns),
+      normalizeDimensionFormattingMapWithKeys(
+        formData.colFormatting,
+        groupbyColumns,
+      ),
     [formData.colFormatting, groupbyColumns],
   );
   const rowSorting = useMemo(
-    () => normalizeDimensionSortingMapWithKeys(formData.rowSorting, groupbyRows),
+    () =>
+      normalizeDimensionSortingMapWithKeys(formData.rowSorting, groupbyRows),
     [formData.rowSorting, groupbyRows],
   );
   const colSorting = useMemo(
-    () => normalizeDimensionSortingMapWithKeys(formData.colSorting, groupbyColumns),
+    () =>
+      normalizeDimensionSortingMapWithKeys(formData.colSorting, groupbyColumns),
     [formData.colSorting, groupbyColumns],
   );
 
@@ -560,7 +576,10 @@ export const usePivotFormatting = ({
       metricFormatting,
       metrics,
     );
-    const databarMetrics = collectMetricDatabarMetricsForQuery(metricDatabars, metrics);
+    const databarMetrics = collectMetricDatabarMetricsForQuery(
+      metricDatabars,
+      metrics,
+    );
     const rowFormattingMetrics = collectDimensionFormattingMetricsForQuery(
       rowFormatting,
       groupbyRows,
@@ -640,8 +659,13 @@ export const usePivotFormatting = ({
       if (target === 'cell' && formatting.applyTo !== 'all') {
         return undefined;
       }
-      const nonMetricKey = serializePath(layout.getNonMetricPathParts(node.path));
-      const values = axis === 'row' ? rowValuesMap.get(nonMetricKey) : colValuesMap.get(nonMetricKey);
+      const nonMetricKey = serializePath(
+        layout.getNonMetricPathParts(node.path),
+      );
+      const values =
+        axis === 'row'
+          ? rowValuesMap.get(nonMetricKey)
+          : colValuesMap.get(nonMetricKey);
       if (!values) {
         return undefined;
       }
@@ -668,7 +692,10 @@ export const usePivotFormatting = ({
     ],
   );
 
-  const numberFormatter = useMemo(() => getNumberFormatter(valueFormat), [valueFormat]);
+  const numberFormatter = useMemo(
+    () => getNumberFormatter(valueFormat),
+    [valueFormat],
+  );
   const renderValue = useCallback(
     (metric: string, value: DataRecordValue, d3FormatOverride?: string) =>
       formatMetricValue(
@@ -712,7 +739,10 @@ export const usePivotFormatting = ({
     [renderModel.showRowRoot, themeColor],
   );
 
-  const databarMetricKeys = useMemo(() => Object.keys(metricDatabars), [metricDatabars]);
+  const databarMetricKeys = useMemo(
+    () => Object.keys(metricDatabars),
+    [metricDatabars],
+  );
   const databarScaleWidth = theme.sizeUnit * 12;
   const databarPaddingX = theme.sizeUnit * 2;
 
@@ -757,7 +787,10 @@ export const usePivotFormatting = ({
   } = useMemo(() => {
     const emptyScaleMap = new Map<string, DatabarScale>();
     const emptyOffsets = new Map<string, WaterfallOffset>();
-    const emptyLabelSpaces = new Map<string, { positive: number; negative: number }>();
+    const emptyLabelSpaces = new Map<
+      string,
+      { positive: number; negative: number }
+    >();
     const emptyWidths = new Map<string, number>();
     const emptyBridges = new Map<
       string,
@@ -804,7 +837,8 @@ export const usePivotFormatting = ({
       const isGrandTotalRow = isRowGrandTotalNode(rowNode);
       const shouldReset =
         layout.isExplicitSubtotalNode(rowNode) && !isGrandTotalRow;
-      const isExpandedGroup = rowNode.hasChildren && expandedRows.has(rowNode.key);
+      const isExpandedGroup =
+        rowNode.hasChildren && expandedRows.has(rowNode.key);
       if (shouldReset) {
         cumulative.clear();
         prevKeys.clear();
@@ -851,8 +885,13 @@ export const usePivotFormatting = ({
             offsets.set(prevKey, { ...prevOffset, connectBelow: true });
           }
         }
-        const shouldHoldCumulative = isExpandedGroup && !(isGrandTotalRow && isRowTotalAtStart);
-        const nextCumulative = shouldReset ? 0 : shouldHoldCumulative ? start : end;
+        const shouldHoldCumulative =
+          isExpandedGroup && !(isGrandTotalRow && isRowTotalAtStart);
+        const nextCumulative = shouldReset
+          ? 0
+          : shouldHoldCumulative
+            ? start
+            : end;
         cumulative.set(cumulativeKey, nextCumulative);
         if (!shouldReset) {
           prevKeys.set(cumulativeKey, cellKey);
@@ -983,7 +1022,8 @@ export const usePivotFormatting = ({
               const betweenRow = visibleRows[idx];
               const betweenKey = serializeCellKey(betweenRow.key, colNode.key);
               const betweenOffset = offsets.get(betweenKey);
-              const betweenScaleKey = betweenOffset?.scaleKey ?? previous.scaleKey;
+              const betweenScaleKey =
+                betweenOffset?.scaleKey ?? previous.scaleKey;
               if (betweenOffset && betweenScaleKey !== previous.scaleKey) {
                 continue;
               }
@@ -995,7 +1035,8 @@ export const usePivotFormatting = ({
               const existing = bridgeMap.get(betweenKey);
               if (existing) {
                 const alreadySet = existing.some(
-                  item => item.value === entry.value && item.depth === entry.depth,
+                  item =>
+                    item.value === entry.value && item.depth === entry.depth,
                 );
                 if (!alreadySet) {
                   existing.push(entry);
@@ -1078,13 +1119,23 @@ export const usePivotFormatting = ({
         return '';
       }
       const metricKey = metricKeyOverride || deriveMetricKey(rowNode, colNode);
-      const value = renderValue(metricKey, cell.values[metricKey], d3FormatOverride);
+      const value = renderValue(
+        metricKey,
+        cell.values[metricKey],
+        d3FormatOverride,
+      );
       if (allowRenderHtml && typeof value === 'string' && value.includes('<')) {
         return safeHtmlSpan(value);
       }
       return value;
     },
-    [allowRenderHtml, deriveMetricKey, renderValue, shouldHideRowValues, tree.cells],
+    [
+      allowRenderHtml,
+      deriveMetricKey,
+      renderValue,
+      shouldHideRowValues,
+      tree.cells,
+    ],
   );
 
   const renderDatabarContent = useCallback(
@@ -1136,9 +1187,13 @@ export const usePivotFormatting = ({
       const offsetKey = serializeCellKey(rowNode.key, colNode.key);
       const waterfallOffset = waterfallOffsets.get(offsetKey);
       const connectorAboveValue =
-        config.type === 'waterfall' ? waterfallOffset?.connectAboveValue : undefined;
+        config.type === 'waterfall'
+          ? waterfallOffset?.connectAboveValue
+          : undefined;
       const connectorBelowValue =
-        config.type === 'waterfall' ? waterfallOffset?.connectBelowValue : undefined;
+        config.type === 'waterfall'
+          ? waterfallOffset?.connectBelowValue
+          : undefined;
       const connectorAbovePct =
         connectorAboveValue === undefined
           ? undefined
@@ -1147,7 +1202,8 @@ export const usePivotFormatting = ({
         connectorBelowValue === undefined
           ? undefined
           : toPercent(connectorBelowValue, scale);
-      const renderConnector = config.type === 'waterfall' && value !== undefined;
+      const renderConnector =
+        config.type === 'waterfall' && value !== undefined;
       const connectorTopStyle =
         connectorAbovePct === undefined
           ? undefined
@@ -1217,12 +1273,14 @@ export const usePivotFormatting = ({
         isPositive = value >= 0;
         const defaultPositiveColor =
           theme.colorSuccess ||
-          (theme as { colors?: { success?: { base?: string } } }).colors?.success?.base ||
+          (theme as { colors?: { success?: { base?: string } } }).colors
+            ?.success?.base ||
           supersetTheme.colorSuccess ||
           DEFAULT_DATABAR_POSITIVE_COLOR;
         const defaultNegativeColor =
           theme.colorError ||
-          (theme as { colors?: { error?: { base?: string } } }).colors?.error?.base ||
+          (theme as { colors?: { error?: { base?: string } } }).colors?.error
+            ?.base ||
           supersetTheme.colorError ||
           DEFAULT_DATABAR_NEGATIVE_COLOR;
         const positiveColor = config.positiveColor ?? defaultPositiveColor;
@@ -1260,20 +1318,24 @@ export const usePivotFormatting = ({
                   style={bridge.style}
                 />
               ))}
-              {renderConnector && waterfallOffset?.connectAbove && connectorTopStyle && (
-                <DatabarConnector
-                  $color={baselineColor}
-                  $width={connectorWidth}
-                  style={connectorTopStyle}
-                />
-              )}
-              {renderConnector && waterfallOffset?.connectBelow && connectorBottomStyle && (
-                <DatabarConnector
-                  $color={baselineColor}
-                  $width={connectorWidth}
-                  style={connectorBottomStyle}
-                />
-              )}
+              {renderConnector &&
+                waterfallOffset?.connectAbove &&
+                connectorTopStyle && (
+                  <DatabarConnector
+                    $color={baselineColor}
+                    $width={connectorWidth}
+                    style={connectorTopStyle}
+                  />
+                )}
+              {renderConnector &&
+                waterfallOffset?.connectBelow &&
+                connectorBottomStyle && (
+                  <DatabarConnector
+                    $color={baselineColor}
+                    $width={connectorWidth}
+                    style={connectorBottomStyle}
+                  />
+                )}
               {value !== undefined ? (
                 config.type === 'lollipop' ? (
                   <>

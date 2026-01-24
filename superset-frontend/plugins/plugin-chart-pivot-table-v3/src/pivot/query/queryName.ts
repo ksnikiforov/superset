@@ -20,4 +20,3 @@
 export const QUERY_NAME_PREFIX = 'pivot_v3';
 export const formatQueryName = (rowDepth: number, colDepth: number) =>
   `${QUERY_NAME_PREFIX}|row${rowDepth}|col${colDepth}`;
-

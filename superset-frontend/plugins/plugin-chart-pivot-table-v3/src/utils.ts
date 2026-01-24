@@ -43,7 +43,7 @@ import {
   PivotSortOrder,
   PivotPath,
 } from './types';
-import { formatQueryName } from './pivot/engine/query/queryName';
+import { formatQueryName } from './pivot/query/queryName';
 import {
   getFormattingMetricKey,
   getMetricKey,

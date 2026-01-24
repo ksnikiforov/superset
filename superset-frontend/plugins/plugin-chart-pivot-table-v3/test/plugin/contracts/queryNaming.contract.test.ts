@@ -73,18 +73,18 @@ describe('query naming (contracts)', () => {
   it('uses serializePath() for branch suffixes, including undefined values', () => {
     const queryContext = buildQuery(
       buildFormData({
-      groupbyRows: ['r1'],
-      groupbyColumns: [],
-      metrics: ['m1'],
-      pivotExpansionState: {
-        rowKeys: ['r1'],
-        colKeys: [],
-        rows: [[undefined]],
-        cols: [],
-        collapsedRows: [],
-        collapsedCols: [],
-      },
-    }),
+        groupbyRows: ['r1'],
+        groupbyColumns: [],
+        metrics: ['m1'],
+        pivotExpansionState: {
+          rowKeys: ['r1'],
+          colKeys: [],
+          rows: [[undefined]],
+          cols: [],
+          collapsedRows: [],
+          collapsedCols: [],
+        },
+      }),
     );
     const names = queryContext.queries.map(query => query.query_name || '');
     expect(

@@ -17,7 +17,11 @@
  * under the License.
  */
 import { useCallback, useMemo } from 'react';
-import { DataRecordValue, GenericDataType, getColumnLabel } from '@superset-ui/core';
+import {
+  DataRecordValue,
+  GenericDataType,
+  getColumnLabel,
+} from '@superset-ui/core';
 import {
   type PivotSortMode,
   type PivotSortOrder,
@@ -27,12 +31,8 @@ import {
   MetricsLayoutEnum,
 } from '../../types';
 import { buildColumnDisplayPath } from '../columnDisplay';
-import {
-  getExpandedDepths,
-} from '../visibility';
-import {
-  buildFormattingValueMaps,
-} from '../cellUtils';
+import { getExpandedDepths } from '../visibility';
+import { buildFormattingValueMaps } from '../cellUtils';
 import {
   normalizeDimensionSortingMapWithKeys,
   getFormattingMetricKey,
@@ -44,7 +44,10 @@ import {
 } from '../render/renderModel';
 import { compareValues, rootKey, sortByOrder } from '../viewModel';
 import { type RenderModel } from '../shared/types';
-import { isExplicitTotalNode as isExplicitTotalNodeBase, getNodeDimDepth as getNodeDimDepthBase } from '../metricsTotals';
+import {
+  isExplicitTotalNode as isExplicitTotalNodeBase,
+  getNodeDimDepth as getNodeDimDepthBase,
+} from '../metricsTotals';
 import { type PivotLayoutResult } from './usePivotLayout';
 
 type DimensionSortingKeys = {
@@ -120,7 +123,8 @@ export const usePivotRenderModel = ({
   layout: PivotLayoutResult;
 }): PivotRenderModelResult => {
   const rowSorting = useMemo(
-    () => normalizeDimensionSortingMapWithKeys(formData.rowSorting, groupbyRows),
+    () =>
+      normalizeDimensionSortingMapWithKeys(formData.rowSorting, groupbyRows),
     [formData.rowSorting, groupbyRows],
   );
   const colSorting = useMemo(
@@ -128,9 +132,18 @@ export const usePivotRenderModel = ({
       normalizeDimensionSortingMapWithKeys(formData.colSorting, groupbyColumns),
     [formData.colSorting, groupbyColumns],
   );
-  const rowSortingKeyMap = useMemo(() => buildDimensionSortingKeyMap(rowSorting), [rowSorting]);
-  const colSortingKeyMap = useMemo(() => buildDimensionSortingKeyMap(colSorting), [colSorting]);
-  const hasRowSorting = useMemo(() => Object.keys(rowSortingKeyMap).length > 0, [rowSortingKeyMap]);
+  const rowSortingKeyMap = useMemo(
+    () => buildDimensionSortingKeyMap(rowSorting),
+    [rowSorting],
+  );
+  const colSortingKeyMap = useMemo(
+    () => buildDimensionSortingKeyMap(colSorting),
+    [colSorting],
+  );
+  const hasRowSorting = useMemo(
+    () => Object.keys(rowSortingKeyMap).length > 0,
+    [rowSortingKeyMap],
+  );
 
   const { rowValuesMap, colValuesMap } = useMemo(
     () =>
@@ -149,7 +162,8 @@ export const usePivotRenderModel = ({
   const resolveSortConfig = useCallback(
     (axis: 'row' | 'col', a: PivotTreeNode, b: PivotTreeNode) => {
       const dimensionKey =
-        layout.getDimensionKeyForNode(a, axis) || layout.getDimensionKeyForNode(b, axis);
+        layout.getDimensionKeyForNode(a, axis) ||
+        layout.getDimensionKeyForNode(b, axis);
       if (!dimensionKey) {
         return undefined;
       }
@@ -161,11 +175,14 @@ export const usePivotRenderModel = ({
 
   const getSortValue = useCallback(
     (axis: 'row' | 'col', node: PivotTreeNode, metricKey: string) => {
-      const nonMetricKey = serializePath(layout.getNonMetricPathParts(node.path));
-      const valuesMap = axis === 'row' ? rowSortingValuesMap : colSortingValuesMap;
+      const nonMetricKey = serializePath(
+        layout.getNonMetricPathParts(node.path),
+      );
+      const valuesMap =
+        axis === 'row' ? rowSortingValuesMap : colSortingValuesMap;
       return valuesMap.get(nonMetricKey)?.[metricKey];
     },
-    [colSortingValuesMap, layout.getNonMetricPathParts, rowSortingValuesMap],
+    [colSortingValuesMap, layout, rowSortingValuesMap],
   );
 
   const compareMetricSort = useCallback(
@@ -176,7 +193,8 @@ export const usePivotRenderModel = ({
       }
       if (!config.metricKey) {
         const dimensionKey =
-          layout.getDimensionKeyForNode(a, axis) || layout.getDimensionKeyForNode(b, axis);
+          layout.getDimensionKeyForNode(a, axis) ||
+          layout.getDimensionKeyForNode(b, axis);
         const type = dimensionKey ? colTypeMap?.[dimensionKey] : undefined;
         const cmp = compareValues(a.label, b.label, type);
         return config.order === 'asc' ? cmp : -cmp;
@@ -210,7 +228,12 @@ export const usePivotRenderModel = ({
       (rowSubTotals && layout.effectiveRowSubtotalPosition === 'end');
     const pullMetricTotalsToStart =
       colTotals && layout.resolvedColTotalPosition === 'start';
-    if (!rowSubTotals && !pushMetricTotalsToEnd && !pullMetricTotalsToStart && !hasRowSorting) {
+    if (
+      !rowSubTotals &&
+      !pushMetricTotalsToEnd &&
+      !pullMetricTotalsToStart &&
+      !hasRowSorting
+    ) {
       return baseSorter;
     }
     return (a: PivotTreeNode, b: PivotTreeNode) => {
@@ -287,7 +310,7 @@ export const usePivotRenderModel = ({
       }
     });
     return depthMap;
-  }, [layout.getNonMetricPathParts, tree.cols]);
+  }, [layout, tree.cols]);
 
   const hasDeeperNonMetricDescendants = useCallback(
     (col: PivotTreeNode) => {
@@ -296,7 +319,7 @@ export const usePivotRenderModel = ({
       const maxDepth = colNonMetricDepths.get(key) ?? parts.length;
       return maxDepth > parts.length;
     },
-    [colNonMetricDepths, layout.getNonMetricPathParts],
+    [colNonMetricDepths, layout],
   );
 
   const getColumnDisplayPath = useCallback(
@@ -319,7 +342,8 @@ export const usePivotRenderModel = ({
         metricsLayout: layout.resolvedMetricsLayout,
         metricsFirstOnCols: layout.metricsFirstOnCols,
         metricsAtColEnd: layout.metricsAtColEnd,
-        allowMetricSubtotalLabels: layout.normalizedColSubtotalLevels.length > 0,
+        allowMetricSubtotalLabels:
+          layout.normalizedColSubtotalLevels.length > 0,
         hasDeeperNonMetricDescendants,
         metricLabels: layout.metricLabels,
         isExplicitSubtotalNode: layout.isExplicitSubtotalNode,
@@ -329,11 +353,7 @@ export const usePivotRenderModel = ({
         isMetricSubtotalNode: layout.isMetricSubtotalNode,
       });
     },
-    [
-      expandedCols,
-      hasDeeperNonMetricDescendants,
-      layout,
-    ],
+    [expandedCols, hasDeeperNonMetricDescendants, layout],
   );
 
   const buildRenderModelConfig = useCallback(
@@ -368,13 +388,29 @@ export const usePivotRenderModel = ({
         rowSorter,
         colSorter,
         getRowChildren: parent =>
-          layout.getRowChildrenForNodes(parent, nextTree.rows, metricIndexForRowsResolved),
+          layout.getRowChildrenForNodes(
+            parent,
+            nextTree.rows,
+            metricIndexForRowsResolved,
+          ),
         getCollapsedRowChildren: parent =>
-          layout.getCollapsedRowChildrenForNodes(parent, nextExpandedRows, nextTree.rows),
+          layout.getCollapsedRowChildrenForNodes(
+            parent,
+            nextExpandedRows,
+            nextTree.rows,
+          ),
         getColChildren: parent =>
-          layout.getColChildrenForNodes(parent, nextTree.cols, metricIndexForColsResolved),
+          layout.getColChildrenForNodes(
+            parent,
+            nextTree.cols,
+            metricIndexForColsResolved,
+          ),
         getCollapsedColLeaves: parent =>
-          layout.getCollapsedColLeavesForNodes(parent, nextExpandedCols, nextTree.cols),
+          layout.getCollapsedColLeavesForNodes(
+            parent,
+            nextExpandedCols,
+            nextTree.cols,
+          ),
         countDimDepth: layout.countDimDepth,
         isMetricGrandTotalNode: layout.isMetricGrandTotalNode,
         isMetricSubtotalNode: layout.isMetricSubtotalNode,
@@ -433,7 +469,11 @@ export const usePivotRenderModel = ({
         metricsFirstOnRows: layout.metricsFirstOnRows,
         metricsFirstOnCols: layout.metricsFirstOnCols,
       }),
-    [layout.metricLabelSet, layout.metricsFirstOnCols, layout.metricsFirstOnRows],
+    [
+      layout.metricLabelSet,
+      layout.metricsFirstOnCols,
+      layout.metricsFirstOnRows,
+    ],
   );
 
   const getNodeDimDepth = useCallback(
@@ -457,7 +497,10 @@ export const usePivotRenderModel = ({
       if (!node || !node.hasChildren || node.path.length === 0) {
         return false;
       }
-      if (layout.isExplicitSubtotalNode(node) || layout.isMetricGrandTotalNode(node)) {
+      if (
+        layout.isExplicitSubtotalNode(node) ||
+        layout.isMetricGrandTotalNode(node)
+      ) {
         return false;
       }
       const hideMetricParentToggle =
@@ -501,7 +544,7 @@ export const usePivotRenderModel = ({
       }
       return expandedRowDepths.has(dimDepth);
     },
-    [expandedRowDepths, groupbyRows.length, isExplicitTotalNode, layout.countDimDepth],
+    [expandedRowDepths, groupbyRows.length, isExplicitTotalNode, layout],
   );
 
   const isColAggregateBold = useCallback(
@@ -521,11 +564,17 @@ export const usePivotRenderModel = ({
       }
       return expandedColDepths.has(dimDepth);
     },
-    [expandedColDepths, groupbyColumns.length, isExplicitTotalNode, layout.countDimDepth],
+    [expandedColDepths, groupbyColumns.length, isExplicitTotalNode, layout],
   );
 
-  const showRowSpinner = useCallback((key: string) => loadingKeys.has(key), [loadingKeys]);
-  const showColSpinner = useCallback((key: string) => loadingKeys.has(key), [loadingKeys]);
+  const showRowSpinner = useCallback(
+    (key: string) => loadingKeys.has(key),
+    [loadingKeys],
+  );
+  const showColSpinner = useCallback(
+    (key: string) => loadingKeys.has(key),
+    [loadingKeys],
+  );
   const showGlobalLoader = isHydrating;
 
   return {

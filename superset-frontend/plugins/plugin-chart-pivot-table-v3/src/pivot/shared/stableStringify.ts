@@ -31,4 +31,3 @@ export const stableStringify = (value: unknown): string => {
   const serialized = JSON.stringify(value);
   return serialized === undefined ? 'undefined' : serialized;
 };
-

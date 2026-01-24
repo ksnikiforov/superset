@@ -101,7 +101,8 @@ export const buildBatchSignature = ({
   );
 
   const queries = queryContext.queries.map(query => {
-    const { query_name, ...rest } = query;
+    const rest = { ...query };
+    delete (rest as { query_name?: unknown }).query_name;
     return rest;
   });
 

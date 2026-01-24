@@ -18,6 +18,7 @@
  */
 import {
   CurrencyFormatter,
+  type Currency,
   DataRecordValue,
   GenericDataType,
   getNumberFormatter,
@@ -182,14 +183,28 @@ export const compareValues = (
   if (a === b) return 0;
   if (a === null || a === undefined) return -1;
   if (b === null || b === undefined) return 1;
+  const toDateMs = (value: DataRecordValue): number => {
+    if (value === null) {
+      return 0;
+    }
+    if (value instanceof Date) {
+      const ms = value.getTime();
+      return Number.isFinite(ms) ? ms : 0;
+    }
+    const valueForDate: string | number =
+      typeof value === 'string'
+        ? value
+        : typeof value === 'number'
+          ? value
+          : Number(value);
+    const ms = new Date(valueForDate).getTime();
+    return Number.isFinite(ms) ? ms : 0;
+  };
   switch (type) {
     case GenericDataType.Numeric:
       return (Number(a) || 0) - (Number(b) || 0);
     case GenericDataType.Temporal:
-      return (
-        (new Date(a as any).getTime() || 0) -
-        (new Date(b as any).getTime() || 0)
-      );
+      return toDateMs(a) - toDateMs(b);
     default:
       return String(a).localeCompare(String(b));
   }
@@ -217,7 +232,7 @@ export const formatMetricValue = (
   metric: string,
   value: DataRecordValue,
   columnFormats: Record<string, string>,
-  currencyFormats: Record<string, any>,
+  currencyFormats: Record<string, Currency>,
   defaultFormatter: (v: number | null | undefined) => string,
   d3FormatOverride?: string,
 ) => {

@@ -37,7 +37,7 @@ import {
   serializePath,
   SUBTOTAL_TOKEN,
 } from '../../src/utils';
-import { formatQueryName } from '../../src/pivot/engine/query/queryName';
+import { formatQueryName } from '../../src/pivot/query/queryName';
 import { buildFormData } from './fixtures/pivotFormData';
 
 jest.mock('@superset-ui/core', () => {

@@ -52,7 +52,8 @@ describe('pivot/expansion/engine', () => {
       key,
       path,
       label: path.length === 0 ? 'Total' : String(path[path.length - 1]),
-      formattedLabel: path.length === 0 ? 'Total' : String(path[path.length - 1]),
+      formattedLabel:
+        path.length === 0 ? 'Total' : String(path[path.length - 1]),
       level: path.length,
       hasChildren,
     };

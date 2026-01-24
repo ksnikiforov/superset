@@ -18,7 +18,7 @@
  */
 
 import buildQuery from '../../src/buildQuery';
-import { formatQueryName } from '../../src/pivot/engine/query/queryName';
+import { formatQueryName } from '../../src/pivot/query/queryName';
 import { buildFormData } from './fixtures/pivotFormData';
 import { serializePath } from '../../src/utils';
 

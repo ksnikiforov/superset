@@ -16,7 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { getColumnLabel, type QueryFormColumn, type QueryFormMetric } from '@superset-ui/core';
+import {
+  getColumnLabel,
+  type QueryFormColumn,
+  type QueryFormMetric,
+} from '@superset-ui/core';
 import {
   type PivotAxis,
   type PivotPath,
@@ -123,4 +127,3 @@ export const buildPivotBranchCacheKey = ({
     filterSignature: filterSignature || '',
     ...(cacheMeta || {}),
   });
-

@@ -30,11 +30,7 @@ import {
   type PivotTreeData,
   type PivotTreeNode,
 } from '../../types';
-import {
-  parsePath,
-  serializePath,
-  mergeTrees,
-} from '../../utils';
+import { parsePath, serializePath, mergeTrees } from '../../utils';
 import {
   coerceExpansionState,
   pruneExpandedToStablePrefix,
@@ -58,7 +54,7 @@ import {
   type BatchGroup,
 } from '../query/fetchPlanOptimizer';
 import { stableStringify } from '../shared/stableStringify';
-import { fetchPivotBranchesBatch } from '../engine/query/fetchPivotBranchesBatch';
+import { fetchPivotBranchesBatch } from '../query/fetchPivotBranchesBatch';
 import { rootKey } from '../viewModel';
 import { planGroupedExpansionTargets } from './planner';
 import { createExpansionStateStore, type ExpansionStateStore } from './store';
@@ -231,7 +227,12 @@ export const useExpansionEngine = ({
       setDataMask,
       mergeOwnState,
     });
-  }, [mergeOwnState, setControlValue, setDataMask, shouldPersistExpansionState]);
+  }, [
+    mergeOwnState,
+    setControlValue,
+    setDataMask,
+    shouldPersistExpansionState,
+  ]);
 
   useEffect(() => {
     persistedExpansionStateRef.current = persistedExpansionState;
@@ -370,7 +371,7 @@ export const useExpansionEngine = ({
   );
 
   const trackRequestGroup = useCallback(
-    async <T,>(
+    async <T>(
       requestGroupId: string,
       fetcher: () => Promise<T>,
     ): Promise<T> => {
@@ -795,7 +796,9 @@ export const useExpansionEngine = ({
           return { batch, data: result.data };
         } finally {
           if (transactionIdRef.current === requestId) {
-            batch.targets.forEach(target => updateLoadingKey(target.pathKey, -1));
+            batch.targets.forEach(target =>
+              updateLoadingKey(target.pathKey, -1),
+            );
           }
         }
       };
@@ -1059,6 +1062,8 @@ export const useExpansionEngine = ({
       persistExpansionState,
       getGroupedFetchKey,
       resolveExpandedForMetrics,
+      setExpandedColsState,
+      setExpandedRowsState,
       trackRequestGroup,
       updateLoadingKey,
     ],
@@ -1127,7 +1132,14 @@ export const useExpansionEngine = ({
         axis === 'col' ? resolvedExpanded : expandedColsRef.current,
       );
     },
-    [persistExpansionState, resolveExpandedForMetrics],
+    [
+      persistExpansionState,
+      resolveExpandedForMetrics,
+      setExpandedColsState,
+      setExpandedRowsState,
+      setPendingColsState,
+      setPendingRowsState,
+    ],
   );
 
   const hydrateAtomic = useCallback(
@@ -1255,7 +1267,9 @@ export const useExpansionEngine = ({
           return { batch, data: result.data };
         } finally {
           if (transactionIdRef.current === transactionId) {
-            batch.targets.forEach(target => updateLoadingKey(target.pathKey, -1));
+            batch.targets.forEach(target =>
+              updateLoadingKey(target.pathKey, -1),
+            );
           }
         }
       };
@@ -1477,9 +1491,12 @@ export const useExpansionEngine = ({
       getFetchPath,
       hasLoadedChildrenForTree,
       getGroupedFetchKey,
-      planHydrationIteration,
       persistExpansionState,
       pruneMergedTree,
+      setExpandedColsState,
+      setExpandedRowsState,
+      setPendingColsState,
+      setPendingRowsState,
       trackRequestGroup,
       updateLoadingKey,
       resolveExpandedForMetrics,
@@ -1504,8 +1521,6 @@ export const useExpansionEngine = ({
         return;
       }
 
-      const otherExpanded =
-        axis === 'row' ? expandedColsRef.current : expandedRowsRef.current;
       const otherPending =
         axis === 'row' ? pendingColsRef.current : pendingRowsRef.current;
       const otherInFlight =
@@ -1554,6 +1569,8 @@ export const useExpansionEngine = ({
       expandSameAxis,
       hydrateAtomic,
       reportAsyncError,
+      setPendingColsState,
+      setPendingRowsState,
     ],
   );
 
@@ -1591,7 +1608,9 @@ export const useExpansionEngine = ({
         collapsedRows: [],
         collapsedCols: [],
       } satisfies PivotExpansionStateKeys);
-    const persistedSeed = coerceExpansionState(persistedExpansionStateRef.current);
+    const persistedSeed = coerceExpansionState(
+      persistedExpansionStateRef.current,
+    );
     const metricLabelSetForDepth = new Set(Array.from(metricLabelSet));
 
     const currentLayout = {
@@ -1600,8 +1619,10 @@ export const useExpansionEngine = ({
     };
     const previousLayout = previousLayoutRef.current;
     previousLayoutRef.current = currentLayout;
-    const layoutRowsForPrune = sessionExpansionState.rowKeys ?? previousLayout.rows;
-    const layoutColsForPrune = sessionExpansionState.colKeys ?? previousLayout.cols;
+    const layoutRowsForPrune =
+      sessionExpansionState.rowKeys ?? previousLayout.rows;
+    const layoutColsForPrune =
+      sessionExpansionState.colKeys ?? previousLayout.cols;
     const rowStablePrefix = getStablePrefixLength(
       layoutRowsForPrune,
       currentLayout.rows,
@@ -1776,7 +1797,9 @@ export const useExpansionEngine = ({
         collapsedCols: prunedCollapsedCols,
       },
       {
-        persist: shouldResetPersistedLayout || (!isInitialMount && shouldResetExpanded),
+        persist:
+          shouldResetPersistedLayout ||
+          (!isInitialMount && shouldResetExpanded),
       },
     );
 
@@ -1877,8 +1900,8 @@ export const useExpansionEngine = ({
     };
     seedFetchedDepths('row', resolvedRows, visibleColDepth);
     seedFetchedDepths('col', resolvedCols, visibleRowDepth);
-    const { rowPlan: nextRowPlan, colPlan: nextColPlan } = planHydrationIteration(
-      {
+    const { rowPlan: nextRowPlan, colPlan: nextColPlan } =
+      planHydrationIteration({
         tree: data,
         desiredRows: resolvedRows,
         desiredCols: resolvedCols,
@@ -1890,8 +1913,7 @@ export const useExpansionEngine = ({
         pendingCols: new Set(),
         planRows: shouldPlanRows,
         planCols: shouldPlanCols,
-      },
-    );
+      });
     const isRootOnly =
       resolvedRows.size === 1 &&
       resolvedRows.has(rootKey) &&
@@ -1934,6 +1956,7 @@ export const useExpansionEngine = ({
     setIsHydrating(false);
   }, [
     cancelInFlightRequestGroups,
+    countDimDepth,
     data,
     expandedStateSignature,
     computeVisibleDepths,
@@ -1953,6 +1976,11 @@ export const useExpansionEngine = ({
     resolveExpandedForMetrics,
     reportAsyncError,
     getGroupedFetchKey,
+    setExpandedColsState,
+    setExpandedRowsState,
+    setPendingColsState,
+    setPendingRowsState,
+    visibilityConfig,
   ]);
 
   return {

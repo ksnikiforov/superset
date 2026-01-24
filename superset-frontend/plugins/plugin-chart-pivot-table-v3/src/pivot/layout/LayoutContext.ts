@@ -98,7 +98,6 @@ const normalizeTotalPosition = (value: unknown): TotalPosition =>
 
 export const buildLayoutContext = (
   layoutSpec: PivotLayoutSpec,
-  _datasource?: unknown,
 ): LayoutContext => {
   const groupbyRowsRaw = ensureIsArray<QueryFormColumn>(layoutSpec.groupbyRows);
   const groupbyColumnsRaw = ensureIsArray<QueryFormColumn>(

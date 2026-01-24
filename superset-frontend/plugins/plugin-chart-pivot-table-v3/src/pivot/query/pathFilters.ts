@@ -45,4 +45,3 @@ export const buildPathFilters = (
       val: value,
     } as BinaryQueryObjectFilterClause;
   });
-

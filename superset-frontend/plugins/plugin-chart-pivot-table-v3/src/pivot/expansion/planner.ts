@@ -29,6 +29,62 @@ export type PlannedFetchTarget = FetchTarget & {
   id: string;
 };
 
+export function buildGroupedFetchTargets({
+  axis,
+  fetchKeys,
+  nodes,
+  requiredOppositeDepth,
+  getGroupedFetchKey,
+}: {
+  axis: PivotAxis;
+  fetchKeys: Set<string>;
+  nodes: Record<string, PivotTreeNode>;
+  requiredOppositeDepth: number;
+  getGroupedFetchKey: (axis: PivotAxis, key: string) => string;
+}): {
+  targets: PlannedFetchTarget[];
+  groupKeyMap: Map<string, string[]>;
+} {
+  const groups = new Map<string, string[]>();
+  fetchKeys.forEach(key => {
+    const groupKey = getGroupedFetchKey(axis, key);
+    const existing = groups.get(groupKey);
+    if (existing) {
+      existing.push(key);
+    } else {
+      groups.set(groupKey, [key]);
+    }
+  });
+
+  const targets: PlannedFetchTarget[] = [];
+  const groupKeyMap = new Map<string, string[]>();
+
+  for (const keys of groups.values()) {
+    const representative =
+      keys.find(key => getGroupedFetchKey(axis, key) === key && nodes[key]) ??
+      keys.find(key => nodes[key]) ??
+      keys[0];
+
+    const childDepth = parsePath(representative).length + 1;
+    targets.push({
+      id: JSON.stringify([
+        axis,
+        representative,
+        childDepth,
+        requiredOppositeDepth,
+      ]),
+      axis,
+      pathKey: representative,
+      childDepth,
+      requiredOppositeDepth,
+    });
+
+    groupKeyMap.set(JSON.stringify([axis, representative]), keys);
+  }
+
+  return { targets, groupKeyMap };
+}
+
 export const planGroupedExpansionTargets = ({
   axis,
   expandedKeys,
@@ -68,55 +124,4 @@ export const planGroupedExpansionTargets = ({
   });
 
   return { plan, targets: grouped.targets, groupKeyMap: grouped.groupKeyMap };
-};
-
-export const buildGroupedFetchTargets = ({
-  axis,
-  fetchKeys,
-  nodes,
-  requiredOppositeDepth,
-  getGroupedFetchKey,
-}: {
-  axis: PivotAxis;
-  fetchKeys: Set<string>;
-  nodes: Record<string, PivotTreeNode>;
-  requiredOppositeDepth: number;
-  getGroupedFetchKey: (axis: PivotAxis, key: string) => string;
-}): {
-  targets: PlannedFetchTarget[];
-  groupKeyMap: Map<string, string[]>;
-} => {
-  const groups = new Map<string, string[]>();
-  fetchKeys.forEach(key => {
-    const groupKey = getGroupedFetchKey(axis, key);
-    const existing = groups.get(groupKey);
-    if (existing) {
-      existing.push(key);
-    } else {
-      groups.set(groupKey, [key]);
-    }
-  });
-
-  const targets: PlannedFetchTarget[] = [];
-  const groupKeyMap = new Map<string, string[]>();
-
-  for (const keys of groups.values()) {
-    const representative =
-      keys.find(key => getGroupedFetchKey(axis, key) === key && nodes[key]) ??
-      keys.find(key => nodes[key]) ??
-      keys[0];
-
-    const childDepth = parsePath(representative).length + 1;
-    targets.push({
-      id: JSON.stringify([axis, representative, childDepth, requiredOppositeDepth]),
-      axis,
-      pathKey: representative,
-      childDepth,
-      requiredOppositeDepth,
-    });
-
-    groupKeyMap.set(JSON.stringify([axis, representative]), keys);
-  }
-
-  return { targets, groupKeyMap };
 };

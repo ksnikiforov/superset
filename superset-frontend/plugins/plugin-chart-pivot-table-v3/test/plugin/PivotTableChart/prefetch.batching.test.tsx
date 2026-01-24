@@ -28,7 +28,7 @@ import {
   fetchPivotBranch,
   peekPivotBranchCache,
 } from '../../../src/fetchPivotBranch';
-import { fetchPivotBranchesBatch } from '../../../src/pivot/engine/query/fetchPivotBranchesBatch';
+import { fetchPivotBranchesBatch } from '../../../src/pivot/query/fetchPivotBranchesBatch';
 import { buildFormData } from '../fixtures/pivotFormData';
 
 jest.mock('../../../src/fetchPivotBranch', () => {
@@ -40,7 +40,7 @@ jest.mock('../../../src/fetchPivotBranch', () => {
   };
 });
 
-jest.mock('../../../src/pivot/engine/query/fetchPivotBranchesBatch', () => ({
+jest.mock('../../../src/pivot/query/fetchPivotBranchesBatch', () => ({
   fetchPivotBranchesBatch: jest.fn(),
 }));
 

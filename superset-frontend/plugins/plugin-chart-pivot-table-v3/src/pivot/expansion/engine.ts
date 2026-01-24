@@ -17,15 +17,29 @@
  * under the License.
  */
 
-import { MetricsLayoutEnum, type PivotAxis, type PivotTreeData, type PivotTreeNode } from '../../types';
+import {
+  MetricsLayoutEnum,
+  type PivotAxis,
+  type PivotTreeData,
+  type PivotTreeNode,
+} from '../../types';
 import { isSubtotalToken, parsePath, serializePath } from '../../utils';
-import { planExpansionForAxis, type PivotExpansionPlan } from '../engine/expansionPlanner';
-import { getVisibleExpansionKeys as getVisibleExpansionKeysBase, seedExpandedByLevel } from '../engine/expansionStateModel';
+import {
+  planExpansionForAxis,
+  type PivotExpansionPlan,
+} from '../engine/expansionPlanner';
+import {
+  getVisibleExpansionKeys as getVisibleExpansionKeysBase,
+  seedExpandedByLevel,
+} from '../engine/expansionStateModel';
 import {
   buildRenderModel,
   type RenderModelConfig,
 } from '../render/renderModel';
-import { getVisibleDepths, hasLoadedChildren as hasLoadedChildrenBase } from '../visibility';
+import {
+  getVisibleDepths,
+  hasLoadedChildren as hasLoadedChildrenBase,
+} from '../visibility';
 import { findChildren, rootKey } from '../viewModel';
 import {
   isMetricGrandTotalNode as isMetricGrandTotalNodeBase,
@@ -73,7 +87,7 @@ export type HydrationIterationPlan =
       groupKeyMap: Map<string, string[]>;
     };
 
-const depthSorter = (_a: PivotTreeNode, _b: PivotTreeNode) => 0;
+const depthSorter = () => 0;
 
 const findMetricIndex = (
   path: PivotTreeNode['path'],
@@ -210,7 +224,11 @@ export const pruneFetchedDepths = ({
   if (fetchedDepths.size === 0) {
     return;
   }
-  const remaining = dropDescendants(parentPath, new Set(fetchedDepths.keys()), nodes);
+  const remaining = dropDescendants(
+    parentPath,
+    new Set(fetchedDepths.keys()),
+    nodes,
+  );
   remaining.delete(parentKey);
   const next = new Map<string, number>();
   remaining.forEach(key => {
@@ -363,36 +381,38 @@ export const computeVisibleDepths = ({
   return { visibleRowDepth, visibleColDepth };
 };
 
-export const buildHasLoadedChildren = ({
-  tree,
-  visibleRowDepth,
-  visibleColDepth,
-  config,
-}: {
-  tree: PivotTreeData;
-  visibleRowDepth: number;
-  visibleColDepth: number;
-  config: ExpansionVisibilityConfig;
-}) => (axis: PivotAxis, node: PivotTreeNode) =>
-  hasLoadedChildrenBase({
-    axis,
-    node,
-    getRawChildren: (targetAxis, parent) =>
-      targetAxis === 'row'
-        ? findChildren(tree.rows, parent)
-        : findChildren(tree.cols, parent),
-    groupbyRowsLength: config.groupbyRowsLength,
-    groupbyColsLength: config.groupbyColumnsLength,
-    isMetricTokenValue: config.isMetricTokenValue,
-    metricIndexForRows: config.metricIndexForRows,
-    metricIndexForCols: config.metricIndexForCols,
-    cells: tree.cells,
-    rows: tree.rows,
-    cols: tree.cols,
+export const buildHasLoadedChildren =
+  ({
+    tree,
     visibleRowDepth,
     visibleColDepth,
-    countDimDepth: config.countDimDepth,
-  });
+    config,
+  }: {
+    tree: PivotTreeData;
+    visibleRowDepth: number;
+    visibleColDepth: number;
+    config: ExpansionVisibilityConfig;
+  }) =>
+  (axis: PivotAxis, node: PivotTreeNode) =>
+    hasLoadedChildrenBase({
+      axis,
+      node,
+      getRawChildren: (targetAxis, parent) =>
+        targetAxis === 'row'
+          ? findChildren(tree.rows, parent)
+          : findChildren(tree.cols, parent),
+      groupbyRowsLength: config.groupbyRowsLength,
+      groupbyColsLength: config.groupbyColumnsLength,
+      isMetricTokenValue: config.isMetricTokenValue,
+      metricIndexForRows: config.metricIndexForRows,
+      metricIndexForCols: config.metricIndexForCols,
+      cells: tree.cells,
+      rows: tree.rows,
+      cols: tree.cols,
+      visibleRowDepth,
+      visibleColDepth,
+      countDimDepth: config.countDimDepth,
+    });
 
 export const getMetricIndexFromNodes = ({
   nodes,
@@ -410,7 +430,9 @@ export const getMetricIndexFromNodes = ({
     }
     if (node.path.some(val => isSubtotalToken(val))) {
       foundFromSubtotal =
-        foundFromSubtotal === undefined ? idx : Math.max(foundFromSubtotal, idx);
+        foundFromSubtotal === undefined
+          ? idx
+          : Math.max(foundFromSubtotal, idx);
       return;
     }
     found = found === undefined ? idx : Math.max(found, idx);
@@ -435,7 +457,8 @@ export const resolveExpandedForMetrics = ({
 }) => {
   const nodes = axis === 'row' ? tree.rows : tree.cols;
   const metricIndex =
-    getMetricIndexFromNodes({ nodes, isMetricTokenValue }) ?? fallbackMetricIndex;
+    getMetricIndexFromNodes({ nodes, isMetricTokenValue }) ??
+    fallbackMetricIndex;
   const resolved = expandMetricPatternExpansions({
     expanded,
     nodes,
@@ -499,9 +522,14 @@ export const buildDesiredExpandedKeys = ({
   inFlightKeys: Set<string>;
 }) => {
   const nodes = axis === 'row' ? tree.rows : tree.cols;
-  const autoSeeded = seedExpandedByLevel(nodes, autoExpandLevel, metricLabelSet, {
-    includeMetricDepthZero,
-  });
+  const autoSeeded = seedExpandedByLevel(
+    nodes,
+    autoExpandLevel,
+    metricLabelSet,
+    {
+      includeMetricDepthZero,
+    },
+  );
   const next = new Set<string>([
     ...autoSeeded,
     ...manualExpanded,
@@ -643,7 +671,11 @@ export const planHydrationIteration = ({
     !rowPlan.hasMissingNodes &&
     pendingRows.size === 0
   ) {
-    effectiveRowPlan = { ...rowPlan, fetchKeys: new Set(), pendingKeys: new Set() };
+    effectiveRowPlan = {
+      ...rowPlan,
+      fetchKeys: new Set(),
+      pendingKeys: new Set(),
+    };
   }
   if (
     activeAxis === 'row' &&
@@ -651,7 +683,11 @@ export const planHydrationIteration = ({
     !colPlan.hasMissingNodes &&
     pendingCols.size === 0
   ) {
-    effectiveColPlan = { ...colPlan, fetchKeys: new Set(), pendingKeys: new Set() };
+    effectiveColPlan = {
+      ...colPlan,
+      fetchKeys: new Set(),
+      pendingKeys: new Set(),
+    };
   }
 
   ({ rowPlan: effectiveRowPlan, colPlan: effectiveColPlan } =
@@ -757,8 +793,10 @@ export const getVisibleExpansionKeys = ({
     isMetricGrandTotalNode: resolvedConfig.isMetricGrandTotalNode,
     isMetricSubtotalNode: resolvedConfig.isMetricSubtotalNode,
     isMetricTokenValue: resolvedConfig.isMetricTokenValue,
-    shouldHideMetricGrandTotalsOnRows: renderModel.shouldHideMetricGrandTotalsOnRows,
-    shouldHideMetricGrandTotalsOnCols: renderModel.shouldHideMetricGrandTotalsOnCols,
+    shouldHideMetricGrandTotalsOnRows:
+      renderModel.shouldHideMetricGrandTotalsOnRows,
+    shouldHideMetricGrandTotalsOnCols:
+      renderModel.shouldHideMetricGrandTotalsOnCols,
     shouldSuppressColRoot: renderModel.shouldSuppressColRoot,
   });
 };

@@ -61,7 +61,7 @@ const renderView = (showGlobalLoader: boolean) =>
       headerOffset={0}
       headerRowOffsets={[]}
       headerRef={createRef()}
-      rowTotalPosition="start"
+      colTotalPosition="start"
       metricFormattingScope="values"
       metricDatabars={{}}
       formattingKeyMap={{}}
@@ -78,7 +78,6 @@ const renderView = (showGlobalLoader: boolean) =>
       resolveDimensionStyle={() => undefined}
       deriveMetricKey={() => ''}
       isMetricGrandTotalNode={() => false}
-      isMetricSubtotalNode={() => false}
       isExplicitSubtotalNode={() => false}
       renderCellContent={() => null}
       renderDatabarContent={() => null}
@@ -128,7 +127,7 @@ describe('PivotTableView', () => {
         headerOffset={0}
         headerRowOffsets={[]}
         headerRef={createRef()}
-        rowTotalPosition="start"
+        colTotalPosition="start"
         metricFormattingScope="values"
         metricDatabars={{}}
         formattingKeyMap={{}}
@@ -145,7 +144,6 @@ describe('PivotTableView', () => {
         resolveDimensionStyle={() => undefined}
         deriveMetricKey={() => ''}
         isMetricGrandTotalNode={() => false}
-        isMetricSubtotalNode={() => false}
         isExplicitSubtotalNode={() => false}
         renderCellContent={() => null}
         renderDatabarContent={() => null}

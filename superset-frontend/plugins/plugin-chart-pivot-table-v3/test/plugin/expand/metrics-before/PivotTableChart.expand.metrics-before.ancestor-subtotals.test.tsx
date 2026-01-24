@@ -41,8 +41,8 @@ import {
   fetchPivotBranchesBatch,
   type FetchPivotBranchesBatchParams,
   type FetchPivotBranchesBatchResult,
-} from '../../../../src/pivot/engine/query/fetchPivotBranchesBatch';
-import { formatQueryName } from '../../../../src/pivot/engine/query/queryName';
+} from '../../../../src/pivot/query/fetchPivotBranchesBatch';
+import { formatQueryName } from '../../../../src/pivot/query/queryName';
 
 jest.mock('../../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../../src/fetchPivotBranch');
@@ -53,7 +53,7 @@ jest.mock('../../../../src/fetchPivotBranch', () => {
   };
 });
 
-jest.mock('../../../../src/pivot/engine/query/fetchPivotBranchesBatch', () => ({
+jest.mock('../../../../src/pivot/query/fetchPivotBranchesBatch', () => ({
   fetchPivotBranchesBatch: jest.fn(),
 }));
 

@@ -161,4 +161,3 @@ export const optimizeFetchPlan = ({
 
   return { batches, singles };
 };
-

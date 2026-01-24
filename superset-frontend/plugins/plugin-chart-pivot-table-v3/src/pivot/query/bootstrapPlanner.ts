@@ -19,7 +19,10 @@
 import { type QueryFormColumn, type QueryFormMetric } from '@superset-ui/core';
 import { type PivotTableQueryFormData } from '../../types';
 import { hasTotalSorting } from '../../utils';
-import { type LayoutContext, buildLayoutContext } from '../layout/LayoutContext';
+import {
+  type LayoutContext,
+  buildLayoutContext,
+} from '../layout/LayoutContext';
 import { type QueryIntent } from './queryIntent';
 
 export type BootstrapTargetKind = 'totals' | 'grid' | 'rows' | 'cols';
@@ -72,15 +75,10 @@ const buildIntent = ({
   needsColDimensionFormatting,
 });
 
-export const buildBootstrapPlan = (
-  formData: PivotTableQueryFormData,
-): BootstrapPlan =>
-  buildBootstrapPlanFromLayout(buildLayoutContext(formData), formData);
-
-export const buildBootstrapPlanFromLayout = (
+export function buildBootstrapPlanFromLayout(
   layout: LayoutContext,
   formData: PivotTableQueryFormData,
-): BootstrapPlan => {
+): BootstrapPlan {
   const {
     groupbyRows: rowGroupby,
     groupbyColumns: colGroupby,
@@ -192,5 +190,9 @@ export const buildBootstrapPlanFromLayout = (
     colGroupby,
     metrics,
   };
-};
+}
 
+export const buildBootstrapPlan = (
+  formData: PivotTableQueryFormData,
+): BootstrapPlan =>
+  buildBootstrapPlanFromLayout(buildLayoutContext(formData), formData);

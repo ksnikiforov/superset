@@ -17,6 +17,7 @@
  * under the License.
  */
 import {
+  type ControlConfig,
   ControlPanelConfig,
   ControlPanelState,
   ControlState,
@@ -31,6 +32,7 @@ import {
   getColumnLabel,
   isAdhocColumn,
   isPhysicalColumn,
+  type QueryFormColumn,
   isQueryFormColumn,
   SMART_DATE_ID,
   supersetTheme,
@@ -58,7 +60,13 @@ const THEME_BLUE = 'blue';
 const THEME_PEACH = 'peach';
 const THEME_GREY = 'grey';
 
-const themeOptions = [
+type ThemeOption = {
+  value: string;
+  label: string;
+  colors: string[];
+};
+
+const themeOptions: ThemeOption[] = [
   {
     value: THEME_BLUE,
     label: t('Blue'),
@@ -95,94 +103,116 @@ const renderThemeSwatches = (colors: string[]) => (
   </span>
 );
 
-const renderThemeOption = (option: any) => (
+const renderThemeOption = (option: ThemeOption) => (
   <span style={{ display: 'inline-flex', alignItems: 'center' }}>
     <span>{option.label}</span>
     {option.colors?.length ? renderThemeSwatches(option.colors) : null}
   </span>
 );
 
-const withMetricsPlaceholder = (axis: 'row' | 'col') => (config: any) => ({
-  ...config,
-  shouldMapStateToProps: () => true,
-  mapStateToProps: (state: any, controlState: any, chart: any) => {
-    const base =
-      typeof config.mapStateToProps === 'function'
-        ? config.mapStateToProps(state, controlState, chart)
-        : {};
-    const metricsValue = ensureIsArray(state?.controls?.metrics?.value);
-    const hasMetrics = metricsValue.length > 0;
-    const options = ensureIsArray(base?.options);
-    const hasPlaceholder = options.some(
-      (opt: any) => (opt?.column_name || opt?.label) === METRICS_PLACEHOLDER,
-    );
-    const placeholderOption = {
-      column_name: METRICS_PLACEHOLDER,
-      verbose_name: t(METRICS_PLACEHOLDER_LABEL),
-      label: t(METRICS_PLACEHOLDER_LABEL),
-      type: 'VARCHAR',
-      groupby: true,
-      filterable: false,
-      is_dttm: false,
-      is_placeholder: true,
-      canDelete: false,
-    };
-    const nextOptions = hasMetrics
-      ? hasPlaceholder
-        ? options
-        : [...options, placeholderOption]
-      : options.filter(
-          (opt: any) =>
-            (opt?.column_name || opt?.label) !== METRICS_PLACEHOLDER,
-        );
-    const rowsRaw =
-      axis === 'row'
-        ? ensureIsArray(controlState?.value)
-        : ensureIsArray(state?.controls?.groupbyRows?.value);
-    const colsRaw =
-      axis === 'col'
-        ? ensureIsArray(controlState?.value)
-        : ensureIsArray(state?.controls?.groupbyColumns?.value);
-    const preferredLayout =
-      (state?.controls?.metricsLayout?.value as MetricsLayoutEnum) ||
-      (state?.form_data?.metricsLayout as MetricsLayoutEnum) ||
-      MetricsLayoutEnum.COLUMNS;
-    const resolved = resolveMetricPlacement(rowsRaw, colsRaw, {
-      hasMetrics,
-      preferredAxis: preferredLayout,
-    });
-    if ((window as WindowWithPivotDebug).PIVOT_V3_DEBUG_PLACEMENT) {
-      // eslint-disable-next-line no-console
-      console.log('[pivot-v3] placement', {
-        axis,
-        rowsRaw,
-        colsRaw,
-        resolvedRows: resolved.rows,
-        resolvedCols: resolved.cols,
-        preferredLayout,
+const getOptionKey = (opt: unknown) => {
+  if (typeof opt !== 'object' || opt === null) {
+    return undefined;
+  }
+  const record = opt as Record<string, unknown>;
+  const key = record.column_name ?? record.label;
+  return typeof key === 'string' ? key : undefined;
+};
+
+const withMetricsPlaceholder =
+  (axis: 'row' | 'col') =>
+  (config: ControlConfig): ControlConfig => ({
+    ...config,
+    shouldMapStateToProps: () => true,
+    mapStateToProps: (
+      state: ControlPanelState,
+      controlState: ControlState,
+      chartState?: unknown,
+    ) => {
+      const base =
+        typeof config.mapStateToProps === 'function'
+          ? config.mapStateToProps(state, controlState, chartState)
+          : {};
+      const metricsValue = ensureIsArray(state?.controls?.metrics?.value);
+      const hasMetrics = metricsValue.length > 0;
+      const options = ensureIsArray<unknown>(base?.options);
+      const hasPlaceholder = options.some(
+        opt => getOptionKey(opt) === METRICS_PLACEHOLDER,
+      );
+      const placeholderOption = {
+        column_name: METRICS_PLACEHOLDER,
+        verbose_name: t(METRICS_PLACEHOLDER_LABEL),
+        label: t(METRICS_PLACEHOLDER_LABEL),
+        type: 'VARCHAR',
+        groupby: true,
+        filterable: false,
+        is_dttm: false,
+        is_placeholder: true,
+        canDelete: false,
+      };
+      const nextOptions = hasMetrics
+        ? hasPlaceholder
+          ? options
+          : [...options, placeholderOption]
+        : options.filter(opt => getOptionKey(opt) !== METRICS_PLACEHOLDER);
+      const rowsRaw =
+        axis === 'row'
+          ? ensureIsArray<QueryFormColumn>(
+              controlState?.value as QueryFormColumn | QueryFormColumn[],
+            )
+          : ensureIsArray<QueryFormColumn>(
+              state?.controls?.groupbyRows?.value as
+                | QueryFormColumn
+                | QueryFormColumn[],
+            );
+      const colsRaw =
+        axis === 'col'
+          ? ensureIsArray<QueryFormColumn>(
+              controlState?.value as QueryFormColumn | QueryFormColumn[],
+            )
+          : ensureIsArray<QueryFormColumn>(
+              state?.controls?.groupbyColumns?.value as
+                | QueryFormColumn
+                | QueryFormColumn[],
+            );
+      const preferredLayout =
+        (state?.controls?.metricsLayout?.value as MetricsLayoutEnum) ||
+        (state?.form_data?.metricsLayout as MetricsLayoutEnum) ||
+        MetricsLayoutEnum.COLUMNS;
+      const resolved = resolveMetricPlacement(rowsRaw, colsRaw, {
         hasMetrics,
-        hasSetControlValue: !!state?.actions?.setControlValue,
+        preferredAxis: preferredLayout,
       });
-    }
-    const value = axis === 'row' ? resolved.rows : resolved.cols;
-    return {
-      ...base,
-      options: nextOptions,
-      value,
-      placeholder: !hasMetrics,
-      pivotPlacement: {
-        axis: axis === 'row' ? 'rows' : 'cols',
-        rows: resolved.rows,
-        cols: resolved.cols,
-        preferredAxis: resolved.layout,
-        hasMetrics,
-        controlNames: { rows: 'groupbyRows', cols: 'groupbyColumns' },
-        resolve: resolveMetricPlacement,
-        setControlValue: state?.actions?.setControlValue,
-      },
-    };
-  },
-});
+      if ((window as WindowWithPivotDebug).PIVOT_V3_DEBUG_PLACEMENT) {
+        // eslint-disable-next-line no-console
+        console.log('[pivot-v3] placement', {
+          axis,
+          rowsRaw,
+          colsRaw,
+          resolvedRows: resolved.rows,
+          resolvedCols: resolved.cols,
+          preferredLayout,
+          hasMetrics,
+        });
+      }
+      const value = axis === 'row' ? resolved.rows : resolved.cols;
+      return {
+        ...base,
+        options: nextOptions,
+        value,
+        placeholder: !hasMetrics,
+        pivotPlacement: {
+          axis: axis === 'row' ? 'rows' : 'cols',
+          rows: resolved.rows,
+          cols: resolved.cols,
+          preferredAxis: resolved.layout,
+          hasMetrics,
+          controlNames: { rows: 'groupbyRows', cols: 'groupbyColumns' },
+          resolve: resolveMetricPlacement,
+        },
+      };
+    },
+  });
 
 type ColumnSubtotalOption = {
   value: number;

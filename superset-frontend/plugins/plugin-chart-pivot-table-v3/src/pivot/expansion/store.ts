@@ -17,7 +17,11 @@
  * under the License.
  */
 
-import { type HandlerFunction, type JsonObject, type SetDataMaskHook } from '@superset-ui/core';
+import {
+  type HandlerFunction,
+  type JsonObject,
+  type SetDataMaskHook,
+} from '@superset-ui/core';
 import { type PivotExpansionState } from '../../types';
 import { parsePath } from '../../utils';
 import {
@@ -46,7 +50,9 @@ export type ExpansionStateStoreDeps = {
   mergeOwnState?: (partial: JsonObject) => JsonObject;
 };
 
-const toPersistedPayload = (state: PivotExpansionStateKeys): PivotExpansionState => {
+const toPersistedPayload = (
+  state: PivotExpansionStateKeys,
+): PivotExpansionState => {
   const toPathArray = (keys: string[]) => keys.map(key => parsePath(key));
   return {
     rowKeys: state.rowKeys,
@@ -86,7 +92,8 @@ export const createExpansionStateStore = (
       }
       const seed = coerceExpansionState(persistedState);
       memory =
-        seed ?? ({
+        seed ??
+        ({
           rowKeys: defaultRowKeys,
           colKeys: defaultColKeys,
           rows: [],
@@ -109,4 +116,3 @@ export const createExpansionStateStore = (
     },
   };
 };
-

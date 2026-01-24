@@ -18,7 +18,11 @@
  */
 import { useCallback, useEffect, useRef } from 'react';
 import { supersetTheme, type JsonObject } from '@superset-ui/core';
-import { type PivotTableProps, MetricsLayoutEnum, type PivotTreeData } from './types';
+import {
+  type PivotTableProps,
+  MetricsLayoutEnum,
+  type PivotTreeData,
+} from './types';
 import { PivotTableView } from './pivot/render/PivotTableView';
 import { useExpansionEngine } from './pivot/engine/useExpansionEngine';
 import { usePivotLayout } from './pivot/chart/usePivotLayout';
@@ -143,7 +147,7 @@ function PivotTableChart(props: PivotTableProps) {
     setDataMask,
     mergeOwnState,
     persistedExpansionState:
-      formData.pivotExpansionState ?? ownState?.['pivotExpansionState'],
+      formData.pivotExpansionState ?? ownState?.pivotExpansionState,
     shouldPersistExpansionState: persistExpansionState,
     getFetchPath: layoutResult.getFetchPath,
     pruneMergedTree: layoutResult.pruneMergedTree,
@@ -231,7 +235,7 @@ function PivotTableChart(props: PivotTableProps) {
       headerRowOffsets={headerRowOffsets}
       headerRef={headerRef}
       themeColor={formatting.themeColor}
-      rowTotalPosition={layoutResult.resolvedColTotalPosition}
+      colTotalPosition={layoutResult.resolvedColTotalPosition}
       metricFormattingScope={formatting.metricFormattingScope}
       metricDatabars={formatting.metricDatabars}
       formattingKeyMap={formatting.formattingKeyMap}
@@ -248,7 +252,6 @@ function PivotTableChart(props: PivotTableProps) {
       resolveDimensionStyle={formatting.resolveDimensionStyle}
       deriveMetricKey={formatting.deriveMetricKey}
       isMetricGrandTotalNode={layoutResult.isMetricGrandTotalNode}
-      isMetricSubtotalNode={layoutResult.isMetricSubtotalNode}
       renderCellContent={formatting.renderCellContent}
       renderDatabarContent={formatting.renderDatabarContent}
       emitCrossFilters={emitCrossFilters}

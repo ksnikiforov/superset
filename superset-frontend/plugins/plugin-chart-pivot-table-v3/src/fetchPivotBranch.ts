@@ -157,6 +157,58 @@ export const resolveFetchContextForBatch = resolveFetchContext;
 
 export { buildBranchQueryPairs } from './pivot/query/branchQueryPairs';
 
+function injectColumnSubtotalLeaves(
+  tree: PivotTreeData,
+  depth: number,
+  fullDepth: number,
+) {
+  if (depth <= 0 || depth >= fullDepth) {
+    return tree;
+  }
+  const next: PivotTreeData = {
+    rows: { ...tree.rows },
+    cols: { ...tree.cols },
+    cells: { ...tree.cells },
+  };
+  const subtotalNodes = Object.values(tree.cols).filter(
+    node => node.path.length === depth && node.path.length > 0,
+  );
+  subtotalNodes.forEach(node => {
+    const subtotalPath = [...node.path, SUBTOTAL_TOKEN];
+    const subtotalKey = serializePath(subtotalPath);
+    if (!next.cols[subtotalKey]) {
+      next.cols[subtotalKey] = {
+        ...node,
+        key: subtotalKey,
+        path: subtotalPath,
+        label: SUBTOTAL_LABEL,
+        formattedLabel: SUBTOTAL_LABEL,
+        level: subtotalPath.length,
+        hasChildren: subtotalPath.length < fullDepth,
+        isSubtotal: true,
+      };
+    }
+  });
+  Object.values(tree.cells).forEach(cell => {
+    const baseColPath = tree.cols[cell.colKey]?.path;
+    if (
+      !baseColPath ||
+      baseColPath.length !== depth ||
+      baseColPath.length === 0
+    ) {
+      return;
+    }
+    const subtotalColKey = serializePath([...baseColPath, SUBTOTAL_TOKEN]);
+    const cellKey = serializeCellKey(cell.rowKey, subtotalColKey);
+    next.cells[cellKey] = {
+      ...cell,
+      colKey: subtotalColKey,
+      isSubtotal: true,
+    };
+  });
+  return next;
+}
+
 export const buildBranchTreeFromResults = ({
   results,
   queryPairs,
@@ -225,58 +277,6 @@ export const buildBranchTreeFromResults = ({
     branchWithMetrics,
     ensureIsArray(formData.metrics),
   );
-};
-
-const injectColumnSubtotalLeaves = (
-  tree: PivotTreeData,
-  depth: number,
-  fullDepth: number,
-) => {
-  if (depth <= 0 || depth >= fullDepth) {
-    return tree;
-  }
-  const next: PivotTreeData = {
-    rows: { ...tree.rows },
-    cols: { ...tree.cols },
-    cells: { ...tree.cells },
-  };
-  const subtotalNodes = Object.values(tree.cols).filter(
-    node => node.path.length === depth && node.path.length > 0,
-  );
-  subtotalNodes.forEach(node => {
-    const subtotalPath = [...node.path, SUBTOTAL_TOKEN];
-    const subtotalKey = serializePath(subtotalPath);
-    if (!next.cols[subtotalKey]) {
-      next.cols[subtotalKey] = {
-        ...node,
-        key: subtotalKey,
-        path: subtotalPath,
-        label: SUBTOTAL_LABEL,
-        formattedLabel: SUBTOTAL_LABEL,
-        level: subtotalPath.length,
-        hasChildren: subtotalPath.length < fullDepth,
-        isSubtotal: true,
-      };
-    }
-  });
-  Object.values(tree.cells).forEach(cell => {
-    const baseColPath = tree.cols[cell.colKey]?.path;
-    if (
-      !baseColPath ||
-      baseColPath.length !== depth ||
-      baseColPath.length === 0
-    ) {
-      return;
-    }
-    const subtotalColKey = serializePath([...baseColPath, SUBTOTAL_TOKEN]);
-    const cellKey = serializeCellKey(cell.rowKey, subtotalColKey);
-    next.cells[cellKey] = {
-      ...cell,
-      colKey: subtotalColKey,
-      isSubtotal: true,
-    };
-  });
-  return next;
 };
 
 const isAbortError = (error: unknown): boolean => {
@@ -375,7 +375,9 @@ export async function fetchPivotBranch({
     });
     const orderedResults =
       resultsByQueryName.size > 0
-        ? specs.map(spec => resultsByQueryName.get(spec.queryName) ?? { data: [] })
+        ? specs.map(
+            spec => resultsByQueryName.get(spec.queryName) ?? { data: [] },
+          )
         : results;
     const labeledBranch = buildBranchTreeFromResults({
       results: orderedResults,

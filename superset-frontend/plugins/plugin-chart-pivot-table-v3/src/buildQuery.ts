@@ -28,7 +28,9 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
   return buildQueryContext(formData, baseQueryObject => {
     const { series_limit_metric, order_desc } = baseQueryObject;
     const queryMetrics =
-      layout.metrics.length > 0 ? layout.metrics : baseQueryObject.metrics || [];
+      layout.metrics.length > 0
+        ? layout.metrics
+        : baseQueryObject.metrics || [];
     let orderby: QueryFormOrderBy[] | undefined;
     if (series_limit_metric) {
       orderby = [[series_limit_metric, !order_desc]];

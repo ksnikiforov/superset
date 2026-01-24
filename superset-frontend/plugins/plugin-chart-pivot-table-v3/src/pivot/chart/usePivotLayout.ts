@@ -192,9 +192,11 @@ export const usePivotLayout = ({
         rowSubtotalLevels,
         colSubtotalLevels,
         rowTotalPosition: formData.rowTotalPosition || rowTotalPosition,
-        rowSubtotalPosition: formData.rowSubtotalPosition || rowSubtotalPosition,
+        rowSubtotalPosition:
+          formData.rowSubtotalPosition || rowSubtotalPosition,
         colTotalPosition: formData.colTotalPosition || colTotalPosition,
-        colSubtotalPosition: formData.colSubtotalPosition || colSubtotalPosition,
+        colSubtotalPosition:
+          formData.colSubtotalPosition || colSubtotalPosition,
         startCollapsed,
         initialDepth,
         expandRowsLevel: expandRowsLevelRaw,
@@ -250,7 +252,10 @@ export const usePivotLayout = ({
   }, [layout.colSubtotalLevels, rowTotals]);
 
   const metricInsertIndexOnRows = useMemo(() => {
-    if (resolvedMetricsLayout !== MetricsLayoutEnum.ROWS || metrics.length === 0) {
+    if (
+      resolvedMetricsLayout !== MetricsLayoutEnum.ROWS ||
+      metrics.length === 0
+    ) {
       return undefined;
     }
     return Math.min(layout.metricInsertIndex, groupbyRows.length);
@@ -331,7 +336,10 @@ export const usePivotLayout = ({
     () =>
       Object.values(data.cols).reduce(
         (max, node) =>
-          Math.max(max, getNonMetricPathPartsBase(node.path, metricLabelSet).length),
+          Math.max(
+            max,
+            getNonMetricPathPartsBase(node.path, metricLabelSet).length,
+          ),
         0,
       ),
     [data.cols, metricLabelSet],
@@ -460,7 +468,8 @@ export const usePivotLayout = ({
   const metricsFirstOnRows =
     resolvedMetricsLayout === MetricsLayoutEnum.ROWS && metricIndexOnRows === 0;
   const metricsFirstOnCols =
-    resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS && metricIndexOnCols === 0;
+    resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS &&
+    metricIndexOnCols === 0;
 
   const resolvedRowTotalPosition = layout.rowTotalPosition;
   const resolvedRowSubtotalPosition = layout.rowSubtotalPosition;
@@ -487,7 +496,12 @@ export const usePivotLayout = ({
       metricLabels.length === 1 &&
       metricIndexOnRows !== undefined &&
       metricIndexOnRows === groupbyRows.length,
-    [groupbyRows.length, metricIndexOnRows, metricLabels.length, resolvedMetricsLayout],
+    [
+      groupbyRows.length,
+      metricIndexOnRows,
+      metricLabels.length,
+      resolvedMetricsLayout,
+    ],
   );
   const hideMetricHeaderOnCols = useMemo(
     () =>
@@ -495,11 +509,17 @@ export const usePivotLayout = ({
       metricLabels.length === 1 &&
       metricIndexOnCols !== undefined &&
       metricIndexOnCols === groupbyColumns.length,
-    [groupbyColumns.length, metricIndexOnCols, metricLabels.length, resolvedMetricsLayout],
+    [
+      groupbyColumns.length,
+      metricIndexOnCols,
+      metricLabels.length,
+      resolvedMetricsLayout,
+    ],
   );
 
   const getMetricLabelFromPath = useCallback(
-    (path: PivotTreeNode['path']) => getMetricLabelFromPathBase(path, metricLabelSet),
+    (path: PivotTreeNode['path']) =>
+      getMetricLabelFromPathBase(path, metricLabelSet),
     [metricLabelSet],
   );
 
@@ -521,19 +541,24 @@ export const usePivotLayout = ({
   );
 
   const getNonMetricPathParts = useCallback(
-    (path: PivotTreeNode['path']) => getNonMetricPathPartsBase(path, metricLabelSet),
+    (path: PivotTreeNode['path']) =>
+      getNonMetricPathPartsBase(path, metricLabelSet),
     [metricLabelSet],
   );
   const getDimensionKeyForNode = useCallback(
     (node: PivotTreeNode, axis: 'row' | 'col') => {
       const nonMetricParts = getNonMetricPathParts(node.path);
-      const nonSubtotalParts = nonMetricParts.filter(part => !isSubtotalToken(part));
+      const nonSubtotalParts = nonMetricParts.filter(
+        part => !isSubtotalToken(part),
+      );
       if (nonSubtotalParts.length === 0) {
         return undefined;
       }
       const dimensionIndex = nonSubtotalParts.length - 1;
       const dimension =
-        axis === 'row' ? groupbyRows[dimensionIndex] : groupbyColumns[dimensionIndex];
+        axis === 'row'
+          ? groupbyRows[dimensionIndex]
+          : groupbyColumns[dimensionIndex];
       if (!dimension) {
         return undefined;
       }
@@ -599,7 +624,9 @@ export const usePivotLayout = ({
       if (metricIndex < 0) {
         return 'end';
       }
-      return node.path.length > metricIndex + 1 ? resolvedRowSubtotalPosition : 'end';
+      return node.path.length > metricIndex + 1
+        ? resolvedRowSubtotalPosition
+        : 'end';
     },
     [forceRowSubtotalEnd, isMetricTokenValue, resolvedRowSubtotalPosition],
   );
@@ -743,8 +770,8 @@ export const usePivotLayout = ({
         }
         const hasChildren = metricsAtColEnd
           ? false
-          : findChildren(nodes, { ...parent, path: collapsedPath }).length > 0 ||
-            hasMetricChildren;
+          : findChildren(nodes, { ...parent, path: collapsedPath }).length >
+              0 || hasMetricChildren;
         return {
           ...(sourceNode || metricNodes[0]),
           key: collapsedKey,
@@ -776,7 +803,10 @@ export const usePivotLayout = ({
     ) => {
       const rowSubtotalPositionForParent = getRowSubtotalPosition(parent);
       const isMetricSubtotalAtMetricTier = (node: PivotTreeNode) => {
-        if (resolvedMetricsLayout !== MetricsLayoutEnum.ROWS || !isMultiMetric) {
+        if (
+          resolvedMetricsLayout !== MetricsLayoutEnum.ROWS ||
+          !isMultiMetric
+        ) {
           return false;
         }
         const subtotalIndex = node.path.findIndex(val => isSubtotalToken(val));
@@ -838,7 +868,9 @@ export const usePivotLayout = ({
         parent.axis === 'row' &&
         parent.level >= groupbyRows.length
       ) {
-        filtered = filtered.filter(child => !isMetricTokenValue(child.path[parent.level]));
+        filtered = filtered.filter(
+          child => !isMetricTokenValue(child.path[parent.level]),
+        );
       }
       if (metricsFirstOnRows) {
         filtered = filtered.filter(child => !isMetricGrandTotalNode(child));
@@ -901,7 +933,11 @@ export const usePivotLayout = ({
           });
         }
       }
-      if (rowSubTotals && resolvedMetricsLayout === MetricsLayoutEnum.ROWS && isMultiMetric) {
+      if (
+        rowSubTotals &&
+        resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
+        isMultiMetric
+      ) {
         filtered = filtered.filter(child => {
           if (!isExplicitSubtotalNode(child)) {
             return true;
@@ -937,7 +973,9 @@ export const usePivotLayout = ({
         });
       }
       if (rowSubTotals && !isMultiMetric) {
-        filtered = filtered.filter(child => !isMetricSubtotalAtMetricTier(child));
+        filtered = filtered.filter(
+          child => !isMetricSubtotalAtMetricTier(child),
+        );
       }
       return filtered;
     },
@@ -962,7 +1000,11 @@ export const usePivotLayout = ({
   );
 
   const pruneCollapsedMetricRows = useCallback(
-    (currentTree: PivotTreeData, parent: PivotTreeNode, expanded: Set<string>) => {
+    (
+      currentTree: PivotTreeData,
+      parent: PivotTreeNode,
+      expanded: Set<string>,
+    ) => {
       if (resolvedMetricsLayout !== MetricsLayoutEnum.ROWS) {
         return currentTree;
       }
@@ -1073,7 +1115,11 @@ export const usePivotLayout = ({
   );
 
   const pruneStaleCollapsedRows = useCallback(
-    (currentTree: PivotTreeData, parent: PivotTreeNode, branch?: PivotTreeData) => {
+    (
+      currentTree: PivotTreeData,
+      parent: PivotTreeNode,
+      branch?: PivotTreeData,
+    ) => {
       if (!branch) {
         return currentTree;
       }
@@ -1124,7 +1170,9 @@ export const usePivotLayout = ({
       const removedKeys = new Set<string>();
       Object.values(currentTree.rows).forEach(node => {
         if (
-          removedPrefixes.some(prefix => prefix.every((val, idx) => val === node.path[idx]))
+          removedPrefixes.some(prefix =>
+            prefix.every((val, idx) => val === node.path[idx]),
+          )
         ) {
           removedKeys.add(node.key);
         }
@@ -1153,7 +1201,11 @@ export const usePivotLayout = ({
   );
 
   const pruneCollapsedMetricCols = useCallback(
-    (currentTree: PivotTreeData, parent: PivotTreeNode, expanded: Set<string>) => {
+    (
+      currentTree: PivotTreeData,
+      parent: PivotTreeNode,
+      expanded: Set<string>,
+    ) => {
       if (resolvedMetricsLayout !== MetricsLayoutEnum.COLUMNS) {
         return currentTree;
       }
@@ -1266,7 +1318,11 @@ export const usePivotLayout = ({
   );
 
   const pruneStaleCollapsedCols = useCallback(
-    (currentTree: PivotTreeData, parent: PivotTreeNode, branch?: PivotTreeData) => {
+    (
+      currentTree: PivotTreeData,
+      parent: PivotTreeNode,
+      branch?: PivotTreeData,
+    ) => {
       if (!branch) {
         return currentTree;
       }
@@ -1317,7 +1373,9 @@ export const usePivotLayout = ({
       const removedKeys = new Set<string>();
       Object.values(currentTree.cols).forEach(node => {
         if (
-          removedPrefixes.some(prefix => prefix.every((val, idx) => val === node.path[idx]))
+          removedPrefixes.some(prefix =>
+            prefix.every((val, idx) => val === node.path[idx]),
+          )
         ) {
           removedKeys.add(node.key);
         }
@@ -1392,7 +1450,9 @@ export const usePivotLayout = ({
         parent.axis === 'col' &&
         parent.level >= groupbyColumns.length
       ) {
-        filtered = filtered.filter(child => !isMetricTokenValue(child.path[parent.level]));
+        filtered = filtered.filter(
+          child => !isMetricTokenValue(child.path[parent.level]),
+        );
       }
       if (metricsFirstOnCols) {
         filtered = filtered.filter(child => !isMetricGrandTotalNode(child));
@@ -1433,7 +1493,11 @@ export const usePivotLayout = ({
         return nextTree;
       }
       if (axis === 'row') {
-        let pruned = pruneCollapsedMetricRows(nextTree, parent, nextExpandedRows);
+        let pruned = pruneCollapsedMetricRows(
+          nextTree,
+          parent,
+          nextExpandedRows,
+        );
         pruned = pruneStaleCollapsedRows(pruned, parent, branch);
         return pruned;
       }
@@ -1508,4 +1572,3 @@ export const usePivotLayout = ({
     pruneMergedTree,
   };
 };
-

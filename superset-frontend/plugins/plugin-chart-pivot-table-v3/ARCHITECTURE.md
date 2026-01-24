@@ -248,7 +248,7 @@ This is built by `buildBranchQueryPairs()` in `src/fetchPivotBranch.ts`.
 
 ### 4.3 `bootstrapPlanner.ts`: why the initial plan often starts with `(0,0)`
 
-`buildBootstrapPlan()` (`src/pivot/engine/bootstrapPlanner.ts`) always includes a “totals-only” intent:
+`buildBootstrapPlan()` (`src/pivot/query/bootstrapPlanner.ts`) always includes a “totals-only” intent:
 
 - `targetRowDepth: 0`
 - `targetColDepth: 0`
@@ -281,7 +281,7 @@ This reduces “redundant” bootstrap queries when we already know we need deep
 
 ### 4.5 Query naming (mostly for debugging + tests)
 
-In `src/pivot/engine/query/queryName.ts`:
+In `src/pivot/query/queryName.ts`:
 
 ```ts
 formatQueryName(2, 1) // "pivot_v3|row2|col1"
@@ -328,8 +328,8 @@ When a user enables features like:
 …the chart may need additional metric values in the result beyond “the metrics being displayed”.
 
 This is handled by:
-- `src/pivot/engine/query/queryIntent.ts`
-- `src/pivot/engine/query/queryShape.ts`
+- `src/pivot/query/queryIntent.ts`
+- `src/pivot/query/queryShape.ts`
 
 The shape builder:
 - slices groupby to the required depth
@@ -543,9 +543,9 @@ In today’s code:
 If the user expands multiple siblings under the same parent, v3 can often combine them into one query.
 
 This is orchestrated by:
-- `buildBatchSignature()` (`src/pivot/engine/query/batchSignature.ts`)
-- `optimizeFetchPlan()` (`src/pivot/engine/query/fetchPlanOptimizer.ts`)
-- `fetchPivotBranchesBatch()` (`src/pivot/engine/query/fetchPivotBranchesBatch.ts`)
+- `buildBatchSignature()` (`src/pivot/query/batchSignature.ts`)
+- `optimizeFetchPlan()` (`src/pivot/query/fetchPlanOptimizer.ts`)
+- `fetchPivotBranchesBatch()` (`src/pivot/query/fetchPivotBranchesBatch.ts`)
 
 The batching rule (simplified):
 
@@ -669,7 +669,7 @@ Metric formatting can apply to:
 - values + totals + grand totals
 
 This is controlled by `metricFormattingScope` and interpreted by:
-- `shouldIncludeMetricFormatting()` (`src/pivot/engine/query/queryIntent.ts`)
+- `shouldIncludeMetricFormatting()` (`src/pivot/query/queryIntent.ts`)
 
 If formatting requires additional metrics, the query shape includes them (see “QueryShape” earlier).
 

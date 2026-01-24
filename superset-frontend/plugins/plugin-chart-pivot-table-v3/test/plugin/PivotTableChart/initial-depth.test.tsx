@@ -30,7 +30,6 @@ import { buildFormData } from '../fixtures/pivotFormData';
 import {
   applyMetricAxis,
   buildTreeFromRecords,
-  METRICS_PLACEHOLDER,
   serializeCellKey,
   serializePath,
   SUBTOTAL_TOKEN,
