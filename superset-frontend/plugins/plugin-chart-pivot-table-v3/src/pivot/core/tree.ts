@@ -687,14 +687,15 @@ export const applyMeasureHierarchyAxis = (
         const hasSubtotalAtInsert =
           rowSuffix.length > 0 && isSubtotalToken(rowSuffix[0]);
         const metricPath = hasSubtotalAtInsert
-          ? [...rowPrefix, rowSuffix[0], metricToken, ...rowSuffix.slice(1)]
-          : [...rowPrefix, metricToken, ...rowSuffix];
+          ? [...rowPrefix, rowSuffix[0], metricToken]
+          : [...rowPrefix, metricToken];
+        const rowTail = hasSubtotalAtInsert ? rowSuffix.slice(1) : rowSuffix;
 
         const leafTargets = leafTierVisible ? group.leaves : [group.leaves[0]];
         leafTargets.forEach(leaf => {
           const newRowPath = leafTierVisible
-            ? [...metricPath, encodeMeasureLeafKey(leaf.id)]
-            : metricPath;
+            ? [...metricPath, encodeMeasureLeafKey(leaf.id), ...rowTail]
+            : [...metricPath, ...rowTail];
           for (let depth = 0; depth <= newRowPath.length; depth += 1) {
             const subPath = newRowPath.slice(0, depth);
             ensureNode(
@@ -789,12 +790,13 @@ export const applyMeasureHierarchyAxis = (
           ...cell.values,
         };
         const metricToken = encodeMetricKey(metric);
-        const baseMetricPath = [...colPrefix, metricToken, ...colSuffix];
+        const baseMetricPath = [...colPrefix, metricToken];
+        const colTail = colSuffix;
         const leafTargets = leafTierVisible ? group.leaves : [group.leaves[0]];
         leafTargets.forEach(leaf => {
           const newColPath = leafTierVisible
-            ? [...baseMetricPath, encodeMeasureLeafKey(leaf.id)]
-            : baseMetricPath;
+            ? [...baseMetricPath, encodeMeasureLeafKey(leaf.id), ...colTail]
+            : [...baseMetricPath, ...colTail];
           for (let depth = 0; depth <= newColPath.length; depth += 1) {
             const subPath = newColPath.slice(0, depth);
             ensureNode(

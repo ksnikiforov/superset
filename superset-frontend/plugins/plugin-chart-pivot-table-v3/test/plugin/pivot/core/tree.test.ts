@@ -227,6 +227,83 @@ describe('pivot/core/tree', () => {
     ).toBe(10);
   });
 
+  it('keeps measure leaf tiers adjacent to metric groups between dimensions', () => {
+    const valueLeaf = buildValueLeaf();
+    const ixLeaf = buildBuiltInLeaf('ix', {
+      n: 1,
+      unit: 'year',
+      direction: 'past',
+    });
+
+    const rowTree = applyMeasureHierarchyAxis(
+      buildTreeFromRecords(
+        [{ r1: 'A', r2: 'B', m1: 10 }],
+        ['m1'],
+        ['r1', 'r2'],
+        [],
+        2,
+        0,
+      ),
+      {
+        kind: 'measureStackV1',
+        groups: [{ metricKey: 'm1', leaves: [valueLeaf, ixLeaf] }],
+        leafTierVisibility: 'visible',
+      },
+      MetricsLayoutEnum.ROWS,
+      ['r1', 'r2'],
+      [],
+      1,
+    );
+    const rowLeafPath = serializePath([
+      'A',
+      encodeMetricKey('m1'),
+      encodeMeasureLeafKey(ixLeaf.id),
+      'B',
+    ]);
+    const rowMisplacedPath = serializePath([
+      'A',
+      encodeMetricKey('m1'),
+      'B',
+      encodeMeasureLeafKey(ixLeaf.id),
+    ]);
+    expect(rowTree.rows[rowLeafPath]).toBeDefined();
+    expect(rowTree.rows[rowMisplacedPath]).toBeUndefined();
+
+    const colTree = applyMeasureHierarchyAxis(
+      buildTreeFromRecords(
+        [{ c1: 'C1', c2: 'C2', m1: 10 }],
+        ['m1'],
+        [],
+        ['c1', 'c2'],
+        0,
+        2,
+      ),
+      {
+        kind: 'measureStackV1',
+        groups: [{ metricKey: 'm1', leaves: [valueLeaf, ixLeaf] }],
+        leafTierVisibility: 'visible',
+      },
+      MetricsLayoutEnum.COLUMNS,
+      [],
+      ['c1', 'c2'],
+      1,
+    );
+    const colLeafPath = serializePath([
+      'C1',
+      encodeMetricKey('m1'),
+      encodeMeasureLeafKey(ixLeaf.id),
+      'C2',
+    ]);
+    const colMisplacedPath = serializePath([
+      'C1',
+      encodeMetricKey('m1'),
+      'C2',
+      encodeMeasureLeafKey(ixLeaf.id),
+    ]);
+    expect(colTree.cols[colLeafPath]).toBeDefined();
+    expect(colTree.cols[colMisplacedPath]).toBeUndefined();
+  });
+
   it('keeps metrics flat when leaf tier is hidden', () => {
     const tree = buildTreeFromRecords(
       [{ region: 'A', m1: 10 }],

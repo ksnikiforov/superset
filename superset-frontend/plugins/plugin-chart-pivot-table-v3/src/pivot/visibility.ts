@@ -17,7 +17,7 @@
  * under the License.
  */
 import { PivotResultCell, PivotTreeNode, TotalPosition } from '../types';
-import { isSubtotalToken, parseCellKey } from '../utils';
+import { decodeMeasureLeafId, isSubtotalToken, parseCellKey } from '../utils';
 import { buildVisibleList, rootKey } from './viewModel';
 
 type VisibleRowsParams = {
@@ -124,9 +124,12 @@ export const createColLeavesBuilder = ({
       if (!hasDeeperLeaves) {
         return leaves;
       }
-      return leaves.filter(
-        leaf => !isSubtotalTokenForNode(leaf) && !isMetricSubtotalForNode(leaf),
-      );
+      return leaves.filter(leaf => {
+        if (leaf.path.some(val => decodeMeasureLeafId(val))) {
+          return true;
+        }
+        return !isSubtotalTokenForNode(leaf) && !isMetricSubtotalForNode(leaf);
+      });
     };
     if (!expandedCols.has(node.key) || children.length === 0) {
       const collapsedMetricLeaves = getCollapsedColLeaves(node);

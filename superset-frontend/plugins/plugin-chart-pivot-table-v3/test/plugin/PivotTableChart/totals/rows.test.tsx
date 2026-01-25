@@ -29,6 +29,7 @@ import {
 import { buildFormData } from '../../fixtures/pivotFormData';
 import {
   applyMetricAxis,
+  applyMeasureHierarchyAxis,
   buildTreeFromRecords,
   encodeMetricKey,
   injectRowSubtotalLeaves,
@@ -39,6 +40,11 @@ import {
   serializePath,
   SUBTOTAL_TOKEN,
 } from '../../../../src/utils';
+import {
+  applyMeasureLeafValuesToTree,
+  buildBuiltInLeaf,
+  buildValueLeaf,
+} from '../../../../src/pivot/measureLeaves';
 
 describe('PivotTableChart totals & subtotals - rows', () => {
   const baseProps = {
@@ -3429,5 +3435,76 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(rowHeaders).not.toEqual(
       expect.arrayContaining(['Total measure1', 'Total measure2']),
     );
+  });
+
+  it('keeps the grand total row last when totals are at the end with measure leaves', () => {
+    const metricKey = 'grossRevenue';
+    const valueLeaf = buildValueLeaf();
+    const ixLeaf = buildBuiltInLeaf('ix', {
+      n: 1,
+      unit: 'year',
+      direction: 'past',
+    });
+    const measureHierarchy = {
+      kind: 'measureStackV1' as const,
+      groups: [{ metricKey, leaves: [valueLeaf, ixLeaf] }],
+      leafTierVisibility: 'visible' as const,
+    };
+    const tree = applyMeasureHierarchyAxis(
+      applyMeasureLeafValuesToTree({
+        tree: buildTreeFromRecords(
+          [
+            {
+              region: 'EMEA',
+              category: 'OFFICE',
+              grossRevenue: 10,
+              'grossRevenue__1 year ago': 8,
+            },
+          ],
+          [metricKey],
+          ['region', 'category'],
+          [],
+          2,
+          0,
+        ),
+        measureHierarchy,
+      }),
+      measureHierarchy,
+      MetricsLayoutEnum.ROWS,
+      ['region', 'category'],
+      [],
+      1,
+    );
+
+    const { container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={buildFormData({
+          ...(baseProps as Partial<PivotTableQueryFormData>),
+          groupbyRows: ['region', METRICS_PLACEHOLDER, 'category'],
+          groupbyColumns: [],
+          metricsLayout: MetricsLayoutEnum.ROWS,
+          metrics: [metricKey],
+          measureLeavesByMetric: {
+            [metricKey]: [valueLeaf, ixLeaf],
+          },
+          colTotals: true,
+          rowTotalPosition: 'end',
+        })}
+        metrics={[metricKey]}
+        groupbyRows={['region', 'category']}
+        groupbyColumns={[]}
+        {...baseProps}
+        colTotals
+        rowTotalPosition="end"
+      />,
+    );
+
+    const rowHeaders = Array.from(
+      container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
+    )
+      .map(cell => cell.textContent?.trim() ?? '')
+      .filter(label => label.length > 0);
+    expect(rowHeaders[rowHeaders.length - 1]).toBe('Grand total');
   });
 });

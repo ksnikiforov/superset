@@ -130,6 +130,10 @@ export const isMetricSubtotalNode = (
     return false;
   }
   const hasSubtotalToken = node.path.some(isSubtotalToken);
+  const hasMeasureLeaf = node.path.some(val => decodeMeasureLeafId(val));
+  if (hasMeasureLeaf) {
+    return hasSubtotalToken;
+  }
   return hasSubtotalToken || node.isSubtotal === true || node.hasChildren;
 };
 
@@ -244,7 +248,12 @@ export const getNodeDimDepth = (
     hasMetric
       ? 1
       : 0;
-  const depth = adjustedDimDepth + metricDepth;
+  const leafDepth =
+    metricsLayout === MetricsLayoutEnum.ROWS &&
+    node.path.some(val => decodeMeasureLeafId(val))
+      ? 1
+      : 0;
+  const depth = adjustedDimDepth + metricDepth + leafDepth;
   if (!isExplicitSubtotalNode(node)) {
     return depth;
   }

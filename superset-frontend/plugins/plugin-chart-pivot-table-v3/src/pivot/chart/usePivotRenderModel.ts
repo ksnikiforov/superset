@@ -31,13 +31,12 @@ import {
   MetricsLayoutEnum,
 } from '../../types';
 import { buildColumnDisplayPath } from '../columnDisplay';
-import { getExpandedDepths } from '../visibility';
 import { buildFormattingValueMaps } from '../cellUtils';
 import {
   normalizeDimensionSortingMapWithKeys,
   getFormattingMetricKey,
-  isMeasureLeafToken,
   serializePath,
+  decodeMeasureLeafId,
 } from '../../utils';
 import {
   buildRenderModel,
@@ -380,8 +379,8 @@ export const usePivotRenderModel = ({
         normalizedColSubtotalLevels: layout.normalizedColSubtotalLevels,
         rowTotals,
         colTotals,
-        rowTotalPosition: layout.resolvedColTotalPosition,
-        colTotalPosition: layout.resolvedRowTotalPosition,
+        rowTotalPosition: layout.resolvedRowTotalPosition,
+        colTotalPosition: layout.resolvedColTotalPosition,
         resolvedColSubtotalPosition: layout.effectiveColSubtotalPosition,
         resolvedMetricsLayout: layout.resolvedMetricsLayout,
         isMultiMetric: layout.isMultiMetric,
@@ -481,37 +480,6 @@ export const usePivotRenderModel = ({
     ],
   );
 
-  const expandedRowDepths = useMemo(
-    () =>
-      getExpandedDepths(
-        expandedRowsForRender,
-        tree.rows,
-        groupbyRows.length,
-        layout.countDimDepth,
-      ),
-    [
-      expandedRowsForRender,
-      groupbyRows.length,
-      layout.countDimDepth,
-      tree.rows,
-    ],
-  );
-  const expandedColDepths = useMemo(
-    () =>
-      getExpandedDepths(
-        expandedColsForRender,
-        tree.cols,
-        groupbyColumns.length,
-        layout.countDimDepth,
-      ),
-    [
-      expandedColsForRender,
-      groupbyColumns.length,
-      layout.countDimDepth,
-      tree.cols,
-    ],
-  );
-
   const isExplicitTotalNode = useCallback(
     (node: PivotTreeNode) =>
       isExplicitTotalNodeBase(node, {
@@ -574,8 +542,21 @@ export const usePivotRenderModel = ({
       }
       if (isLeafTierVisible) {
         const tail = node.path[node.path.length - 1];
-        if (layout.isMetricTokenValue(tail) || isMeasureLeafToken(tail)) {
+        if (layout.isMetricTokenValue(tail)) {
           return false;
+        }
+        if (node.path.some(val => decodeMeasureLeafId(val))) {
+          const dimDepth = layout.countDimDepth(node.path);
+          const maxDepth =
+            axis === 'row' ? groupbyRows.length : groupbyColumns.length;
+          if (dimDepth >= maxDepth) {
+            return false;
+          }
+          const metricsAtEnd =
+            axis === 'row' ? layout.metricsAtRowEnd : layout.metricsAtColEnd;
+          if (metricsAtEnd) {
+            return false;
+          }
         }
       }
       return true;
@@ -588,19 +569,12 @@ export const usePivotRenderModel = ({
       if (!row) {
         return false;
       }
-      if (isExplicitTotalNode(row)) {
-        return true;
-      }
-      if (!row.hasChildren) {
+      if (row.path.length === 0 && groupbyRows.length === 0) {
         return false;
       }
-      const dimDepth = layout.countDimDepth(row.path);
-      if (dimDepth >= groupbyRows.length) {
-        return false;
-      }
-      return expandedRowDepths.has(dimDepth);
+      return isExplicitTotalNode(row) || layout.isMetricSubtotalNode(row);
     },
-    [expandedRowDepths, groupbyRows.length, isExplicitTotalNode, layout],
+    [groupbyRows.length, isExplicitTotalNode, layout],
   );
 
   const isColAggregateBold = useCallback(
@@ -608,19 +582,12 @@ export const usePivotRenderModel = ({
       if (!col) {
         return false;
       }
-      if (isExplicitTotalNode(col)) {
-        return true;
-      }
-      if (!col.hasChildren) {
+      if (col.path.length === 0 && groupbyColumns.length === 0) {
         return false;
       }
-      const dimDepth = layout.countDimDepth(col.path);
-      if (dimDepth >= groupbyColumns.length) {
-        return false;
-      }
-      return expandedColDepths.has(dimDepth);
+      return isExplicitTotalNode(col) || layout.isMetricSubtotalNode(col);
     },
-    [expandedColDepths, groupbyColumns.length, isExplicitTotalNode, layout],
+    [groupbyColumns.length, isExplicitTotalNode, layout],
   );
 
   const showRowSpinner = useCallback(

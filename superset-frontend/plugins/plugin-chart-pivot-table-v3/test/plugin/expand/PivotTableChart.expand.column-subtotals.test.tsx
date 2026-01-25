@@ -313,6 +313,7 @@ describe('PivotTableChart column subtotal placement during expansion', () => {
           rowSubTotals: true,
           rowTotals: true,
           rowTotalPosition: 'end',
+          colTotalPosition: 'end',
         })}
         metrics={metrics}
         groupbyRows={rowGroupby}
@@ -327,6 +328,7 @@ describe('PivotTableChart column subtotal placement during expansion', () => {
         rowSubTotals
         rowSubtotalLevels={[]}
         colSubtotalLevels={[1, 2, 3]}
+        colTotalPosition="end"
         rowOrder="key_a_to_z"
         colOrder="key_a_to_z"
         valueFormat=""
