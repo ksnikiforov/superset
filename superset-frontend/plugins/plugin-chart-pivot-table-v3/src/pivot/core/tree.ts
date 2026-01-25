@@ -25,6 +25,7 @@ import {
 } from '@superset-ui/core';
 import {
   MetricsLayoutEnum,
+  MeasureHierarchy,
   PivotPath,
   PivotResultCell,
   PivotTreeData,
@@ -33,12 +34,15 @@ import {
 import { serializeCellKey, serializePath } from './path';
 import {
   decodeMetricKey,
+  decodeMeasureLeafId,
   encodeMetricKey,
+  encodeMeasureLeafKey,
   getMetricKeys,
   isSubtotalToken,
   SUBTOTAL_LABEL,
   SUBTOTAL_TOKEN,
 } from './tokens';
+import { isValueLeaf } from '../measureLeaves';
 
 export const formatPivotLabelValue = (
   value: DataRecordValue,
@@ -515,6 +519,338 @@ export const applyMetricAxis = (
             isSubtotal: cell.isSubtotal,
           };
         }
+      });
+    });
+  }
+
+  return result;
+};
+
+export const applyMeasureHierarchyAxis = (
+  tree: PivotTreeData,
+  measureHierarchy: MeasureHierarchy,
+  metricsLayout: MetricsLayoutEnum,
+  rowGroupby: QueryFormColumn[],
+  colGroupby: QueryFormColumn[],
+  metricPosition?: number,
+): PivotTreeData => {
+  if (measureHierarchy.kind === 'flatMetrics') {
+    return applyMetricAxis(
+      tree,
+      measureHierarchy.metricKeys,
+      metricsLayout,
+      rowGroupby,
+      colGroupby,
+      metricPosition,
+    );
+  }
+  const { groups } = measureHierarchy;
+  if (groups.length === 0) {
+    return tree;
+  }
+  const metricKeys = groups.map(group => group.metricKey);
+  const leafTierVisible = measureHierarchy.leafTierVisibility === 'visible';
+  const metricTokenSet = new Set(metricKeys.map(encodeMetricKey));
+  const leafLabelMap = new Map<string, string>();
+  const singleLeafByMetric = new Map<
+    string,
+    { label: string; isValue: boolean }
+  >();
+  groups.forEach(group => {
+    group.leaves.forEach(leaf => {
+      if (!leafLabelMap.has(leaf.id)) {
+        leafLabelMap.set(leaf.id, leaf.label);
+      }
+    });
+    if (group.leaves.length === 1) {
+      const leaf = group.leaves[0];
+      singleLeafByMetric.set(group.metricKey, {
+        label: leaf.label,
+        isValue: isValueLeaf(leaf),
+      });
+    }
+  });
+
+  const ensureNode = (
+    axis: 'row' | 'col',
+    path: PivotPath,
+    fullDepth: number,
+    isSubtotal?: boolean,
+  ) => {
+    const nodes = axis === 'row' ? result.rows : result.cols;
+    const key = serializePath(path);
+    if (nodes[key]) return nodes[key];
+    const rawValue = path[path.length - 1];
+    const rawLabel =
+      path.length === 0
+        ? 'Grand total'
+        : formatPivotLabelValue(rawValue, 'Grand total');
+    const metricLabel = decodeMetricKey(rawValue);
+    const leafId = decodeMeasureLeafId(rawValue);
+    let label = metricLabel || rawLabel;
+    if (leafId) {
+      label = leafLabelMap.get(leafId) ?? rawLabel;
+    }
+    if (metricLabel && !leafTierVisible) {
+      const leaf = singleLeafByMetric.get(metricLabel);
+      if (leaf && !leaf.isValue) {
+        label = `${metricLabel} ${leaf.label}`;
+      }
+    }
+    const isMetricNode = metricTokenSet.has(
+      String(path[path.length - 1] ?? ''),
+    );
+    const isLeafNode = leafId !== undefined;
+    let hasChildren = path.length < fullDepth;
+    if (isMetricNode && !leafTierVisible) {
+      if (
+        axis === 'row' &&
+        metricsLayout === MetricsLayoutEnum.ROWS &&
+        (metricPosition ?? rowGroupby.length) >= rowGroupby.length
+      ) {
+        hasChildren = false;
+      }
+      if (
+        axis === 'col' &&
+        metricsLayout === MetricsLayoutEnum.COLUMNS &&
+        (metricPosition ?? colGroupby.length) >= colGroupby.length
+      ) {
+        hasChildren = false;
+      }
+    }
+    if (isLeafNode && !leafTierVisible) {
+      hasChildren = false;
+    }
+    const isSubtotalValue =
+      isSubtotal ??
+      (path.length < fullDepth &&
+        !(isMetricNode && hasChildren === false) &&
+        !(isLeafNode && hasChildren === false));
+    const node = {
+      axis,
+      key,
+      path,
+      label,
+      formattedLabel: label,
+      level: path.length,
+      hasChildren,
+      isSubtotal: isSubtotalValue,
+    };
+    nodes[key] = node;
+    return node;
+  };
+
+  const result: PivotTreeData = { rows: {}, cols: {}, cells: {} };
+
+  if (metricsLayout === MetricsLayoutEnum.ROWS) {
+    const rowDepthWithMeasures = rowGroupby.length + (leafTierVisible ? 2 : 1);
+    const insertIndex = Math.min(
+      metricPosition ?? rowGroupby.length,
+      rowGroupby.length,
+    );
+
+    Object.values(tree.rows).forEach(rowNode =>
+      ensureNode(
+        'row',
+        rowNode.path,
+        rowGroupby.length,
+        rowNode.isSubtotal || undefined,
+      ),
+    );
+
+    Object.values(tree.cols).forEach(colNode => {
+      ensureNode(
+        'col',
+        colNode.path,
+        colGroupby.length,
+        colNode.isSubtotal || undefined,
+      );
+    });
+
+    Object.values(tree.cells).forEach(cell => {
+      const baseRow = tree.rows[cell.rowKey];
+      const baseCol = tree.cols[cell.colKey];
+      const rowPath = baseRow?.path || [];
+      const colPath = baseCol?.path || [];
+      const rowPrefix = rowPath.slice(0, insertIndex);
+      const rowSuffix = rowPath.slice(insertIndex);
+
+      const rowKey = serializePath(rowPath);
+
+      groups.forEach(group => {
+        const metric = group.metricKey;
+        const mergedValues = {
+          [metric]: cell.values[metric],
+          ...cell.values,
+        };
+        const metricToken = encodeMetricKey(metric);
+        const hasSubtotalAtInsert =
+          rowSuffix.length > 0 && isSubtotalToken(rowSuffix[0]);
+        const metricPath = hasSubtotalAtInsert
+          ? [...rowPrefix, rowSuffix[0], metricToken, ...rowSuffix.slice(1)]
+          : [...rowPrefix, metricToken, ...rowSuffix];
+
+        const leafTargets = leafTierVisible ? group.leaves : [group.leaves[0]];
+        leafTargets.forEach(leaf => {
+          const newRowPath = leafTierVisible
+            ? [...metricPath, encodeMeasureLeafKey(leaf.id)]
+            : metricPath;
+          for (let depth = 0; depth <= newRowPath.length; depth += 1) {
+            const subPath = newRowPath.slice(0, depth);
+            ensureNode(
+              'row',
+              subPath,
+              rowDepthWithMeasures,
+              baseRow?.isSubtotal || undefined,
+            );
+          }
+          const newRowKey = serializePath(newRowPath);
+
+          const colKey = serializePath(colPath);
+          ensureNode(
+            'col',
+            colPath,
+            colGroupby.length,
+            baseCol?.isSubtotal || undefined,
+          );
+
+          result.cells[serializeCellKey(newRowKey, colKey)] = {
+            rowKey: newRowKey,
+            colKey,
+            values: mergedValues,
+            isSubtotal: cell.isSubtotal,
+          };
+          if (
+            metricKeys.length === 1 &&
+            metricPosition !== 0 &&
+            (!leafTierVisible || leafTargets.length === 1)
+          ) {
+            const cellKey = serializeCellKey(rowKey, colKey);
+            result.cells[cellKey] = result.cells[cellKey] || {
+              rowKey,
+              colKey,
+              values: mergedValues,
+              isSubtotal: cell.isSubtotal,
+            };
+          }
+          if (
+            metricKeys.length === 1 &&
+            metricPosition === 0 &&
+            (!leafTierVisible || leafTargets.length === 1)
+          ) {
+            const cellKey = serializeCellKey(rowKey, colKey);
+            result.cells[cellKey] = result.cells[cellKey] || {
+              rowKey,
+              colKey,
+              values: mergedValues,
+              isSubtotal: cell.isSubtotal,
+            };
+          }
+        });
+      });
+    });
+  } else {
+    const colDepthWithMeasures = colGroupby.length + (leafTierVisible ? 2 : 1);
+    const insertIndex = Math.min(
+      metricPosition ?? colGroupby.length,
+      colGroupby.length,
+    );
+
+    Object.values(tree.cols).forEach(colNode =>
+      ensureNode(
+        'col',
+        colNode.path,
+        colGroupby.length,
+        colNode.isSubtotal || undefined,
+      ),
+    );
+
+    Object.values(tree.rows).forEach(rowNode =>
+      ensureNode(
+        'row',
+        rowNode.path,
+        rowGroupby.length,
+        rowNode.isSubtotal || undefined,
+      ),
+    );
+
+    Object.values(tree.cells).forEach(cell => {
+      const baseRow = tree.rows[cell.rowKey];
+      const baseCol = tree.cols[cell.colKey];
+      const rowPath = baseRow?.path || [];
+      const colPath = baseCol?.path || [];
+      const colPrefix = colPath.slice(0, insertIndex);
+      const colSuffix = colPath.slice(insertIndex);
+
+      groups.forEach(group => {
+        const metric = group.metricKey;
+        const mergedValues = {
+          [metric]: cell.values[metric],
+          ...cell.values,
+        };
+        const metricToken = encodeMetricKey(metric);
+        const baseMetricPath = [...colPrefix, metricToken, ...colSuffix];
+        const leafTargets = leafTierVisible ? group.leaves : [group.leaves[0]];
+        leafTargets.forEach(leaf => {
+          const newColPath = leafTierVisible
+            ? [...baseMetricPath, encodeMeasureLeafKey(leaf.id)]
+            : baseMetricPath;
+          for (let depth = 0; depth <= newColPath.length; depth += 1) {
+            const subPath = newColPath.slice(0, depth);
+            ensureNode(
+              'col',
+              subPath,
+              colDepthWithMeasures,
+              baseCol?.isSubtotal || undefined,
+            );
+          }
+          const newColKey = serializePath(newColPath);
+
+          const rowKey = serializePath(rowPath);
+          ensureNode(
+            'row',
+            rowPath,
+            rowGroupby.length,
+            baseRow?.isSubtotal || undefined,
+          );
+
+          result.cells[serializeCellKey(rowKey, newColKey)] = {
+            rowKey,
+            colKey: newColKey,
+            values: mergedValues,
+            isSubtotal: cell.isSubtotal,
+          };
+          if (
+            metricKeys.length === 1 &&
+            metricPosition === 0 &&
+            (!leafTierVisible || leafTargets.length === 1)
+          ) {
+            const rootColKey = serializePath(colPrefix);
+            const cellKey = serializeCellKey(rowKey, rootColKey);
+            result.cells[cellKey] = result.cells[cellKey] || {
+              rowKey,
+              colKey: rootColKey,
+              values: mergedValues,
+              isSubtotal: cell.isSubtotal,
+            };
+          }
+          if (
+            metricKeys.length === 1 &&
+            (metricPosition === undefined ||
+              metricPosition >= colGroupby.length ||
+              metricPosition === 0) &&
+            (!leafTierVisible || leafTargets.length === 1)
+          ) {
+            const baseColKey = serializePath(colPath);
+            const cellKey = serializeCellKey(rowKey, baseColKey);
+            result.cells[cellKey] = result.cells[cellKey] || {
+              rowKey,
+              colKey: baseColKey,
+              values: mergedValues,
+              isSubtotal: cell.isSubtotal,
+            };
+          }
+        });
       });
     });
   }

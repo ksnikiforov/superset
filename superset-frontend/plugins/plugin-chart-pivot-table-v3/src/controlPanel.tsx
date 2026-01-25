@@ -439,6 +439,15 @@ const config: ControlPanelConfig = {
         ],
         [
           {
+            name: 'measureLeavesByMetric',
+            config: {
+              type: 'HiddenControl',
+              default: {},
+            },
+          },
+        ],
+        [
+          {
             name: 'metricFormattingScope',
             config: {
               type: 'SelectControl',

@@ -19,8 +19,11 @@
 import { QueryFormColumn } from '@superset-ui/core';
 import {
   decodeMetricKey,
+  decodeMeasureLeafId,
   encodeMetricKey,
+  encodeMeasureLeafKey,
   isMetricToken,
+  isMeasureLeafToken,
   isMetricsPlaceholder,
   METRICS_PLACEHOLDER,
   normalizePlaceholder,
@@ -32,6 +35,13 @@ describe('pivot/core/tokens', () => {
     expect(isMetricToken(encoded)).toBe(true);
     expect(decodeMetricKey(encoded)).toBe('metric1');
     expect(decodeMetricKey('not-a-token')).toBeUndefined();
+  });
+
+  it('encodes and decodes measure leaf tokens', () => {
+    const encoded = encodeMeasureLeafKey('leaf1');
+    expect(isMeasureLeafToken(encoded)).toBe(true);
+    expect(decodeMeasureLeafId(encoded)).toBe('leaf1');
+    expect(decodeMeasureLeafId('not-a-token')).toBeUndefined();
   });
 
   it('normalizes metrics placeholder from object columns', () => {

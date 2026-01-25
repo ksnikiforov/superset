@@ -20,6 +20,7 @@ import { useCallback, useMemo } from 'react';
 import { getColumnLabel } from '@superset-ui/core';
 import {
   MetricsLayoutEnum,
+  MeasureHierarchy,
   type PivotPath,
   type PivotTableProps,
   type PivotTreeData,
@@ -50,6 +51,7 @@ import {
 
 export type PivotLayoutResult = {
   layout: ReturnType<typeof buildLayoutContext>;
+  measureHierarchy: MeasureHierarchy;
   expandedStateSignature: string;
   expandRowsLevelRaw?: number;
   expandColumnsLevelRaw?: number;
@@ -315,11 +317,13 @@ export const usePivotLayout = ({
         rowSubTotals,
         expandRowsLevel: resolvedExpandRowsLevel,
         expandColumnsLevel: resolvedExpandColumnsLevel,
+        measureHierarchy: layout.measureHierarchy,
       }),
     [
       colTotals,
       groupbyColumnKeys,
       groupbyRowKeys,
+      layout.measureHierarchy,
       metricInsertIndex,
       metrics,
       normalizedColSubtotalLevels,
@@ -1515,6 +1519,7 @@ export const usePivotLayout = ({
 
   return {
     layout,
+    measureHierarchy: layout.measureHierarchy,
     expandedStateSignature,
     expandRowsLevelRaw,
     expandColumnsLevelRaw,

@@ -557,6 +557,7 @@ export const buildInitialQuerySpecs = (
       colFormatting: formData.colFormatting,
       rowSorting: formData.rowSorting,
       colSorting: formData.colSorting,
+      measureHierarchy: layout.measureHierarchy,
     });
     specs.push({
       queryName: formatQueryName(

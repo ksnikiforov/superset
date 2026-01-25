@@ -522,6 +522,17 @@ export const usePivotRenderModel = ({
       if (hideMetricParentToggle) {
         return false;
       }
+      const isLeafTierVisible =
+        layout.measureHierarchy.kind === 'measureStackV1' &&
+        layout.measureHierarchy.leafTierVisibility === 'visible';
+      if (
+        isLeafTierVisible &&
+        ((axis === 'row' && layout.metricsAtRowEnd) ||
+          (axis === 'col' && layout.metricsAtColEnd)) &&
+        layout.isMetricTokenValue(node.path[node.path.length - 1])
+      ) {
+        return false;
+      }
       return true;
     },
     [groupbyColumns.length, groupbyRows.length, layout],

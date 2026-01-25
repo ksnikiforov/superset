@@ -24,6 +24,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { useDragLayer } from 'react-dnd';
 import { nanoid } from 'nanoid';
 import {
   ensureIsArray,
@@ -36,6 +37,16 @@ import {
   t,
   tn,
 } from '@superset-ui/core';
+import {
+  Input,
+  InputNumber,
+  Modal,
+  Radio,
+  Select,
+  Space,
+  Switch,
+  Typography,
+} from '@superset-ui/core/components';
 import { isEqual } from 'lodash';
 import { ColumnMeta } from '@superset-ui/chart-controls';
 import {
@@ -50,6 +61,7 @@ import {
 } from '../../exploreImports';
 import PivotDndSelectLabel from '../PivotDndColumnSelect/PivotSelectLabel';
 import PivotMetricDefinitionValue from './PivotMetricDefinitionValue';
+import MeasureLeafValue from './MeasureLeafValue';
 import {
   PivotMetricFormatting,
   PivotMetricFormattingMap,
@@ -57,6 +69,10 @@ import {
   PivotMetricDatabarMap,
   METRIC_FORMATTING_FIELDS,
   PivotMetricFormattingValue,
+  MeasureLeafOffsetDirection,
+  MeasureLeafOffsetUnit,
+  MeasureLeafOperator,
+  MeasureLeavesByMetricKey,
 } from '../../types';
 import {
   collectMetricFormattingMetrics,
@@ -66,10 +82,48 @@ import {
   normalizeMetricDatabarMapWithKeys,
   normalizeMetricFormattingMapWithKeys,
 } from '../../utils';
-import { isPivotExcelFormula } from '../../pivot/formatting/excelFormulaReferences';
+import {
+  buildBuiltInLeaf,
+  buildCustomLeaf,
+  buildMeasureLeafLabel,
+  buildMeasureLeafOutputKey,
+  buildValueLeaf,
+  coerceMeasureLeavesByMetric,
+  isValueLeaf,
+} from '../../pivot/measureLeaves';
+import {
+  isPivotExcelFormula,
+  normalizeExcelFormulaInput,
+} from '../../pivot/formatting/excelFormulaReferences';
+import { validateExcelFormula } from '../../pivot/formatting/excelFormula';
 
 const EMPTY_OBJECT: Record<string, never> = {};
 const DND_ACCEPTED_TYPES = [DndItemType.Column, DndItemType.Metric];
+const LEAF_OPERATOR_OPTIONS: Array<{
+  value: MeasureLeafOperator;
+  label: string;
+}> = [
+  { value: 'ix', label: 'IX' },
+  { value: 'delta', label: '∆' },
+  { value: 'delta_pct', label: '∆%' },
+  { value: 'offset_value', label: t('Value') },
+];
+const LEAF_UNIT_OPTIONS: Array<{
+  value: MeasureLeafOffsetUnit;
+  label: string;
+}> = [
+  { value: 'year', label: t('Year') },
+  { value: 'month', label: t('Month') },
+  { value: 'week', label: t('Week') },
+  { value: 'day', label: t('Day') },
+];
+const LEAF_DIRECTION_OPTIONS: Array<{
+  value: MeasureLeafOffsetDirection;
+  label: string;
+}> = [
+  { value: 'past', label: t('Ago') },
+  { value: 'future', label: t('Later') },
+];
 type AdhocMetricPopoverDatasource = ComponentProps<
   typeof AdhocMetricPopoverTrigger
 >['datasource'];
@@ -476,6 +530,116 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
     [savedMetrics],
   );
 
+  const [value, setValue] = useState<ValueType[]>(
+    coerceMetrics(
+      props.value as QueryFormMetric | QueryFormMetric[] | null,
+      savedMetrics,
+      props.columns,
+    ),
+  );
+  const metricKeys = useMemo(
+    () =>
+      value
+        .map(metric => resolveMetricKey(metric))
+        .filter((key): key is string => Boolean(key)),
+    [value],
+  );
+  const measureLeavesFromFormData = useMemo(
+    () =>
+      coerceMeasureLeavesByMetric(
+        metricKeys,
+        props.formData?.measureLeavesByMetric as
+          | MeasureLeavesByMetricKey
+          | undefined,
+      ),
+    [metricKeys, props.formData?.measureLeavesByMetric],
+  );
+  const [measureLeavesByMetric, setMeasureLeavesByMetric] =
+    useState<MeasureLeavesByMetricKey>(measureLeavesFromFormData);
+  const measureLeavesRef = useRef<MeasureLeavesByMetricKey>(
+    measureLeavesFromFormData,
+  );
+  const [droppedItem, setDroppedItem] = useState<
+    DatasourcePanelDndItem | typeof EMPTY_OBJECT
+  >({});
+  const [newMetricPopoverVisible, setNewMetricPopoverVisible] = useState(false);
+  const [measureSelectorVisible, setMeasureSelectorVisible] = useState(false);
+  const [measureSelectorMetricKey, setMeasureSelectorMetricKey] = useState<
+    string | null
+  >(null);
+  const [measureSelectorMetricLabel, setMeasureSelectorMetricLabel] =
+    useState('');
+  const [leafOperator, setLeafOperator] = useState<MeasureLeafOperator>('ix');
+  const [leafOffsetN, setLeafOffsetN] = useState(1);
+  const [leafOffsetUnit, setLeafOffsetUnit] =
+    useState<MeasureLeafOffsetUnit>('year');
+  const [leafOffsetDirection, setLeafOffsetDirection] =
+    useState<MeasureLeafOffsetDirection>('past');
+  const [customMeasureEnabled, setCustomMeasureEnabled] = useState(false);
+  const [customMeasureLabel, setCustomMeasureLabel] = useState('');
+  const [customMeasureFormula, setCustomMeasureFormula] = useState('');
+  const [customMeasureOffsetEnabled, setCustomMeasureOffsetEnabled] =
+    useState(false);
+  const [customMeasureError, setCustomMeasureError] = useState<
+    string | undefined
+  >(undefined);
+
+  const coercedMetrics = useMemo(
+    () =>
+      coerceMetrics(
+        props.value as QueryFormMetric | QueryFormMetric[] | null,
+        savedMetrics,
+        props.columns,
+      ),
+    [props.columns, props.value, savedMetrics],
+  );
+
+  useEffect(() => {
+    setValue(coercedMetrics);
+  }, [coercedMetrics]);
+  useEffect(() => {
+    if (!isEqual(measureLeavesRef.current, measureLeavesFromFormData)) {
+      measureLeavesRef.current = measureLeavesFromFormData;
+      setMeasureLeavesByMetric(measureLeavesFromFormData);
+    }
+  }, [measureLeavesFromFormData]);
+
+  const metricRowType = useMemo(
+    () => `${DndItemType.AdhocMetricOption}_${props.name}_${props.label}`,
+    [props.label, props.name],
+  );
+  const { itemType: dragItemType, item: dragItem } = useDragLayer(monitor => ({
+    itemType: monitor.getItemType(),
+    item: monitor.getItem() as { dragIndex?: number } | null,
+  }));
+  const draggedMetricKey = useMemo(() => {
+    if (typeof dragItemType === 'string') {
+      if (dragItemType.startsWith('measure-leaf-')) {
+        return dragItemType.replace('measure-leaf-', '');
+      }
+    }
+    if (dragItemType !== metricRowType || !dragItem) {
+      return null;
+    }
+    const { dragIndex } = dragItem;
+    if (typeof dragIndex !== 'number' || dragIndex < 0) {
+      return null;
+    }
+    const metric = value[dragIndex];
+    return metric ? resolveMetricKey(metric) : null;
+  }, [dragItem, dragItemType, metricRowType, value]);
+
+  const updateMeasureLeaves = useCallback(
+    (next: MeasureLeavesByMetricKey, persist = false) => {
+      measureLeavesRef.current = next;
+      setMeasureLeavesByMetric(next);
+      if (persist && setControlValue) {
+        setControlValue('measureLeavesByMetric', next);
+      }
+    },
+    [setControlValue],
+  );
+
   const handleChange = useCallback(
     (opts: ValueType | ValueType[] | null) => {
       if (opts === null) {
@@ -495,10 +659,22 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
           return option as QueryFormMetric;
         })
         .filter(option => option);
+      const nextMetricKeys = optionValues
+        .map(option => resolveMetricKey(option as ValueType))
+        .filter((key): key is string => Boolean(key));
+      const nextLeaves = coerceMeasureLeavesByMetric(
+        nextMetricKeys,
+        measureLeavesRef.current,
+      );
       if (setControlValue) {
         const activeMetricKeys = collectActiveMetricKeys(
           optionValues as ValueType[],
         );
+        Object.entries(nextLeaves).forEach(([metricKey, leaves]) => {
+          leaves.forEach(leaf => {
+            activeMetricKeys.add(buildMeasureLeafOutputKey(metricKey, leaf));
+          });
+        });
         const baseFormatting = metricFormattingRef.current || {};
         const nextFormatting = Object.fromEntries(
           Object.entries(baseFormatting).filter(([key]) =>
@@ -536,37 +712,14 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
           setLocalMetricDatabars(cleanedDatabars);
           setControlValue('metricDatabars', cleanedDatabars);
         }
+        if (!isEqual(nextLeaves, measureLeavesRef.current)) {
+          updateMeasureLeaves(nextLeaves, true);
+        }
       }
       onChange(multi ? optionValues : optionValues[0]);
     },
-    [multi, onChange, setControlValue],
+    [multi, onChange, setControlValue, updateMeasureLeaves],
   );
-
-  const [value, setValue] = useState<ValueType[]>(
-    coerceMetrics(
-      props.value as QueryFormMetric | QueryFormMetric[] | null,
-      savedMetrics,
-      props.columns,
-    ),
-  );
-  const [droppedItem, setDroppedItem] = useState<
-    DatasourcePanelDndItem | typeof EMPTY_OBJECT
-  >({});
-  const [newMetricPopoverVisible, setNewMetricPopoverVisible] = useState(false);
-
-  const coercedMetrics = useMemo(
-    () =>
-      coerceMetrics(
-        props.value as QueryFormMetric | QueryFormMetric[] | null,
-        savedMetrics,
-        props.columns,
-      ),
-    [props.columns, props.value, savedMetrics],
-  );
-
-  useEffect(() => {
-    setValue(coercedMetrics);
-  }, [coercedMetrics]);
 
   const handleMetricFormattingChange = useCallback(
     (
@@ -687,6 +840,142 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
     ]);
   }, [localMetricDatabars, localMetricFormatting, savedMetrics, value]);
 
+  const openMeasureSelector = useCallback(
+    (metricKey: string, metricLabel: string) => {
+      setMeasureSelectorMetricKey(metricKey);
+      setMeasureSelectorMetricLabel(metricLabel);
+      setLeafOperator('ix');
+      setLeafOffsetN(1);
+      setLeafOffsetUnit('year');
+      setLeafOffsetDirection('past');
+      setCustomMeasureEnabled(false);
+      setCustomMeasureLabel('');
+      setCustomMeasureFormula('');
+      setCustomMeasureOffsetEnabled(false);
+      setCustomMeasureError(undefined);
+      setMeasureSelectorVisible(true);
+    },
+    [],
+  );
+
+  const closeMeasureSelector = useCallback(() => {
+    setMeasureSelectorVisible(false);
+    setCustomMeasureError(undefined);
+  }, []);
+
+  const handleSaveMeasureLeaf = useCallback(() => {
+    if (!measureSelectorMetricKey) {
+      return;
+    }
+    setCustomMeasureError(undefined);
+    const offset = {
+      n: leafOffsetN,
+      unit: leafOffsetUnit,
+      direction: leafOffsetDirection,
+    };
+    const nextLeaf = customMeasureEnabled
+      ? (() => {
+          const label = customMeasureLabel.trim();
+          if (!label) {
+            setCustomMeasureError(t('Custom label is empty.'));
+            return null;
+          }
+          const normalizedFormula =
+            normalizeExcelFormulaInput(customMeasureFormula);
+          if (!normalizedFormula) {
+            setCustomMeasureError(t('Custom formula is empty.'));
+            return null;
+          }
+          const validation = validateExcelFormula(normalizedFormula);
+          if (!validation.valid) {
+            setCustomMeasureError(validation.message);
+            return null;
+          }
+          return buildCustomLeaf({
+            label,
+            formula: normalizedFormula,
+            offset: customMeasureOffsetEnabled ? offset : undefined,
+          });
+        })()
+      : buildBuiltInLeaf(leafOperator, offset);
+    if (!nextLeaf) {
+      return;
+    }
+    const leaves = measureLeavesRef.current[measureSelectorMetricKey] ?? [
+      buildValueLeaf(),
+    ];
+    const existingIndex = leaves.findIndex(
+      leaf => leaf.label === nextLeaf.label,
+    );
+    const nextLeaves = [...leaves];
+    if (existingIndex >= 0) {
+      nextLeaves[existingIndex] = nextLeaf;
+    } else {
+      nextLeaves.push(nextLeaf);
+    }
+    updateMeasureLeaves(
+      {
+        ...measureLeavesRef.current,
+        [measureSelectorMetricKey]: nextLeaves,
+      },
+      true,
+    );
+    closeMeasureSelector();
+  }, [
+    closeMeasureSelector,
+    customMeasureEnabled,
+    customMeasureFormula,
+    customMeasureLabel,
+    customMeasureOffsetEnabled,
+    leafOffsetDirection,
+    leafOffsetN,
+    leafOffsetUnit,
+    leafOperator,
+    measureSelectorMetricKey,
+    updateMeasureLeaves,
+  ]);
+
+  const handleRemoveMeasureLeaf = useCallback(
+    (metricKey: string, index: number) => {
+      const leaves = measureLeavesRef.current[metricKey] ?? [buildValueLeaf()];
+      const target = leaves[index];
+      if (target && isValueLeaf(target)) {
+        return;
+      }
+      const nextLeaves = leaves.filter((_, idx) => idx !== index);
+      const resolvedLeaves =
+        nextLeaves.length > 0 ? nextLeaves : [buildValueLeaf()];
+      updateMeasureLeaves(
+        { ...measureLeavesRef.current, [metricKey]: resolvedLeaves },
+        true,
+      );
+    },
+    [updateMeasureLeaves],
+  );
+
+  const moveMeasureLeaf = useCallback(
+    (metricKey: string, dragIndex: number, hoverIndex: number) => {
+      const leaves = measureLeavesRef.current[metricKey] ?? [];
+      if (!leaves[dragIndex] || !leaves[hoverIndex]) {
+        return;
+      }
+      const nextLeaves = [...leaves];
+      [nextLeaves[hoverIndex], nextLeaves[dragIndex]] = [
+        nextLeaves[dragIndex],
+        nextLeaves[hoverIndex],
+      ];
+      updateMeasureLeaves(
+        { ...measureLeavesRef.current, [metricKey]: nextLeaves },
+        false,
+      );
+    },
+    [updateMeasureLeaves],
+  );
+
+  const handleDropMeasureLeaf = useCallback(() => {
+    updateMeasureLeaves({ ...measureLeavesRef.current }, true);
+  }, [updateMeasureLeaves]);
+
   const canDrop = useCallback(
     (item: DatasourcePanelDndItem) => {
       if (
@@ -753,6 +1042,16 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
           setControlValue('metricDatabars', nextDatabars);
         }
       }
+      const oldKey = resolveMetricKey(oldMetric as ValueType);
+      const nextKey = resolveMetricKey(changedMetric as ValueType);
+      if (oldKey && nextKey && oldKey !== nextKey) {
+        const nextLeaves = { ...measureLeavesRef.current };
+        if (nextLeaves[oldKey]) {
+          nextLeaves[nextKey] = nextLeaves[oldKey];
+          delete nextLeaves[oldKey];
+          updateMeasureLeaves(nextLeaves, true);
+        }
+      }
       const newValue = value.map(value => {
         if (
           ('metric_name' in oldMetric && value === oldMetric.metric_name) ||
@@ -767,7 +1066,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       setValue(newValue);
       handleChange(newValue);
     },
-    [handleChange, setControlValue, value],
+    [handleChange, setControlValue, updateMeasureLeaves, value],
   );
 
   const onRemoveMetric = useCallback(
@@ -831,6 +1130,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
         option={option}
         onMetricEdit={onMetricEdit}
         onRemoveMetric={onRemoveMetric}
+        onAddMeasureLeaf={openMeasureSelector}
         columns={props.columns}
         savedMetrics={savedMetrics}
         savedMetricsOptions={getSavedMetricOptionsForMetric(index)}
@@ -843,7 +1143,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
         datasource={props.datasource}
         onMoveLabel={moveLabel}
         onDropLabel={handleDropLabel}
-        type={`${DndItemType.AdhocMetricOption}_${props.name}_${props.label}`}
+        type={metricRowType}
         multi={multi}
         datasourceWarningMessage={
           option instanceof AdhocMetric && option.datasourceWarning
@@ -860,11 +1160,13 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       handleDropLabel,
       localMetricDatabars,
       localMetricFormatting,
+      metricRowType,
       moveLabel,
       multi,
       value,
       onMetricEdit,
       onRemoveMetric,
+      openMeasureSelector,
       props.columns,
       props.datasource,
       props.label,
@@ -874,8 +1176,66 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
   );
 
   const valuesRenderer = useCallback(
-    () => value.map((value, index) => valueRenderer(value, index)),
-    [value, valueRenderer],
+    () =>
+      value.flatMap((metric, index) => {
+        const metricKey = resolveMetricKey(metric);
+        const metricLabel = resolveMetricLabel(metric);
+        const baseRow = valueRenderer(metric, index);
+        if (!metricKey) {
+          return [baseRow];
+        }
+        const leaves = measureLeavesByMetric[metricKey] ?? [];
+        const isGroupDragging =
+          !!draggedMetricKey && draggedMetricKey === metricKey;
+        const leafRows = leaves
+          .map((leaf, leafIndex) => ({ leaf, leafIndex }))
+          .filter(({ leaf }) => !isValueLeaf(leaf))
+          .map(({ leaf, leafIndex }) => (
+            <MeasureLeafValue
+              key={`${metricKey}-${leaf.id}`}
+              metricLabel={metricLabel}
+              metricKey={metricKey}
+              leaf={leaf}
+              index={leafIndex}
+              onRemoveLeaf={leafIdx =>
+                handleRemoveMeasureLeaf(metricKey, leafIdx)
+              }
+              onMoveLeaf={(dragIndex, hoverIndex) =>
+                moveMeasureLeaf(metricKey, dragIndex, hoverIndex)
+              }
+              onDropLeaf={handleDropMeasureLeaf}
+              metricFormatting={localMetricFormatting}
+              onMetricFormattingChange={handleMetricFormattingChange}
+              metricDatabars={localMetricDatabars}
+              onMetricDatabarChange={handleMetricDatabarChange}
+              availableMetrics={availableMetrics}
+              selectedMetrics={value}
+              savedMetrics={savedMetrics}
+              columns={props.columns}
+              datasource={props.datasource}
+              type={`measure-leaf-${metricKey}`}
+              isGroupDragging={isGroupDragging}
+            />
+          ));
+        return [baseRow, ...leafRows];
+      }),
+    [
+      availableMetrics,
+      draggedMetricKey,
+      handleDropMeasureLeaf,
+      handleMetricDatabarChange,
+      handleMetricFormattingChange,
+      handleRemoveMeasureLeaf,
+      localMetricDatabars,
+      localMetricFormatting,
+      measureLeavesByMetric,
+      moveMeasureLeaf,
+      props.columns,
+      props.datasource,
+      savedMetrics,
+      value,
+      valueRenderer,
+    ],
   );
 
   const togglePopover = useCallback((visible: boolean) => {
@@ -942,6 +1302,29 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       })),
     [props.columns],
   );
+  const leafPreviewLabel = useMemo(() => {
+    if (customMeasureEnabled) {
+      const label = customMeasureLabel.trim();
+      return label || t('Custom');
+    }
+    return buildMeasureLeafLabel(leafOperator, {
+      n: leafOffsetN,
+      unit: leafOffsetUnit,
+      direction: leafOffsetDirection,
+    });
+  }, [
+    customMeasureEnabled,
+    customMeasureLabel,
+    leafOffsetDirection,
+    leafOffsetN,
+    leafOffsetUnit,
+    leafOperator,
+  ]);
+  const canSaveMeasureLeaf =
+    !!measureSelectorMetricKey &&
+    (!customMeasureEnabled ||
+      (customMeasureLabel.trim().length > 0 &&
+        normalizeExcelFormulaInput(customMeasureFormula).length > 0));
 
   return (
     <div className="metrics-select">
@@ -955,6 +1338,175 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
         onClickGhostButton={handleClickGhostButton}
         {...props}
       />
+      <Modal
+        title={t('Measure selector')}
+        show={measureSelectorVisible}
+        onHide={closeMeasureSelector}
+        onHandledPrimaryAction={handleSaveMeasureLeaf}
+        primaryButtonName={t('Save')}
+        disablePrimaryButton={!canSaveMeasureLeaf}
+        destroyOnHidden
+      >
+        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+          <Typography.Text type="secondary">
+            {t('Metric: %s', measureSelectorMetricLabel)}
+          </Typography.Text>
+          <Space align="center" size={8}>
+            <Switch
+              checked={customMeasureEnabled}
+              onChange={checked => {
+                setCustomMeasureEnabled(checked);
+                setCustomMeasureError(undefined);
+              }}
+            />
+            <Typography.Text>{t('Custom measure')}</Typography.Text>
+          </Space>
+          {customMeasureEnabled ? (
+            <>
+              <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                <Typography.Text>{t('Custom label')}</Typography.Text>
+                <Input
+                  aria-label={t('Custom label')}
+                  placeholder={t('Label')}
+                  value={customMeasureLabel}
+                  onChange={event => setCustomMeasureLabel(event.target.value)}
+                />
+              </Space>
+              <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                <Typography.Text>{t('Custom formula')}</Typography.Text>
+                <Input.TextArea
+                  aria-label={t('Custom formula')}
+                  placeholder={t('Excel formula')}
+                  autoSize={{ minRows: 3, maxRows: 6 }}
+                  value={customMeasureFormula}
+                  onChange={event =>
+                    setCustomMeasureFormula(event.target.value)
+                  }
+                />
+                <Typography.Text type="secondary">
+                  {t(
+                    "Use 'value' for the current measure value and [metric] to reference another metric value.",
+                  )}
+                </Typography.Text>
+              </Space>
+              <Space align="center" size={8}>
+                <Switch
+                  checked={customMeasureOffsetEnabled}
+                  onChange={checked => setCustomMeasureOffsetEnabled(checked)}
+                />
+                <Typography.Text>{t('Apply time offset')}</Typography.Text>
+              </Space>
+              {customMeasureOffsetEnabled && (
+                <>
+                  <Space
+                    direction="vertical"
+                    size={8}
+                    style={{ width: '100%' }}
+                  >
+                    <Typography.Text>{t('Period')}</Typography.Text>
+                    <Space size={8}>
+                      <InputNumber
+                        min={1}
+                        value={leafOffsetN}
+                        onChange={value =>
+                          setLeafOffsetN(
+                            typeof value === 'number' && value > 0 ? value : 1,
+                          )
+                        }
+                      />
+                      <Select
+                        ariaLabel={t('Period unit')}
+                        options={LEAF_UNIT_OPTIONS}
+                        value={leafOffsetUnit}
+                        onChange={value =>
+                          setLeafOffsetUnit(value as MeasureLeafOffsetUnit)
+                        }
+                        css={{ width: 160 }}
+                      />
+                    </Space>
+                  </Space>
+                  <Space
+                    direction="vertical"
+                    size={8}
+                    style={{ width: '100%' }}
+                  >
+                    <Typography.Text>{t('Direction')}</Typography.Text>
+                    <Radio.Group
+                      options={LEAF_DIRECTION_OPTIONS}
+                      optionType="button"
+                      value={leafOffsetDirection}
+                      onChange={event =>
+                        setLeafOffsetDirection(
+                          event.target.value as MeasureLeafOffsetDirection,
+                        )
+                      }
+                    />
+                  </Space>
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                <Typography.Text>{t('Operation')}</Typography.Text>
+                <Select
+                  ariaLabel={t('Operation')}
+                  options={LEAF_OPERATOR_OPTIONS}
+                  value={leafOperator}
+                  onChange={value =>
+                    setLeafOperator(value as MeasureLeafOperator)
+                  }
+                  css={{ width: 220 }}
+                />
+              </Space>
+              <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                <Typography.Text>{t('Period')}</Typography.Text>
+                <Space size={8}>
+                  <InputNumber
+                    min={1}
+                    value={leafOffsetN}
+                    onChange={value =>
+                      setLeafOffsetN(
+                        typeof value === 'number' && value > 0 ? value : 1,
+                      )
+                    }
+                  />
+                  <Select
+                    ariaLabel={t('Period unit')}
+                    options={LEAF_UNIT_OPTIONS}
+                    value={leafOffsetUnit}
+                    onChange={value =>
+                      setLeafOffsetUnit(value as MeasureLeafOffsetUnit)
+                    }
+                    css={{ width: 160 }}
+                  />
+                </Space>
+              </Space>
+              <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                <Typography.Text>{t('Direction')}</Typography.Text>
+                <Radio.Group
+                  options={LEAF_DIRECTION_OPTIONS}
+                  optionType="button"
+                  value={leafOffsetDirection}
+                  onChange={event =>
+                    setLeafOffsetDirection(
+                      event.target.value as MeasureLeafOffsetDirection,
+                    )
+                  }
+                />
+              </Space>
+            </>
+          )}
+          {customMeasureError && (
+            <Typography.Text type="danger">
+              {customMeasureError}
+            </Typography.Text>
+          )}
+          <Typography.Text>
+            {t('Preview: %s', leafPreviewLabel)}
+          </Typography.Text>
+        </Space>
+      </Modal>
       <AdhocMetricPopoverTrigger
         adhocMetric={adhocMetric}
         onMetricEdit={onNewMetric}

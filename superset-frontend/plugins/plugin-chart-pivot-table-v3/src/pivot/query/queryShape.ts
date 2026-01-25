@@ -23,10 +23,12 @@ import {
   type PivotDimensionSortingMap,
   type PivotMetricDatabarMap,
   type PivotMetricFormattingMap,
+  type MeasureHierarchy,
 } from '../../types';
 import {
   collectDimensionFormattingMetricsForQuery,
   collectDimensionSortingMetricsForQuery,
+  collectMeasureLeafMetricsForQuery,
   collectMetricDatabarMetricsForQuery,
   collectMetricFormattingMetricsForQuery,
   mergeMetrics,
@@ -55,6 +57,7 @@ export type QueryShapeInput = {
   colFormatting?: PivotDimensionFormattingMap;
   rowSorting?: PivotDimensionSortingMap;
   colSorting?: PivotDimensionSortingMap;
+  measureHierarchy?: MeasureHierarchy;
 };
 
 export const buildQueryShape = ({
@@ -69,6 +72,7 @@ export const buildQueryShape = ({
   colFormatting,
   rowSorting,
   colSorting,
+  measureHierarchy,
 }: QueryShapeInput): QueryShape => {
   const rowGroupbyForQuery = rowGroupby.slice(0, intent.targetRowDepth);
   const colGroupbyForQuery = colGroupby.slice(0, intent.targetColDepth);
@@ -120,6 +124,9 @@ export const buildQueryShape = ({
       ),
     );
   }
+  extraMetrics.push(
+    ...collectMeasureLeafMetricsForQuery(measureHierarchy, metrics),
+  );
 
   return {
     rowGroupby: rowGroupbyForQuery,

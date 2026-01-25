@@ -21,12 +21,20 @@ import {
   serializeCellKey,
   serializePath,
 } from '../../../../src/pivot/core/path';
-import { encodeMetricKey } from '../../../../src/pivot/core/tokens';
+import {
+  encodeMeasureLeafKey,
+  encodeMetricKey,
+} from '../../../../src/pivot/core/tokens';
 import {
   applyMetricAxis,
+  applyMeasureHierarchyAxis,
   buildTreeFromRecords,
   mergeTrees,
 } from '../../../../src/pivot/core/tree';
+import {
+  buildBuiltInLeaf,
+  buildValueLeaf,
+} from '../../../../src/pivot/measureLeaves';
 
 describe('pivot/core/tree', () => {
   it('labels null row values as (NULL)', () => {
@@ -166,5 +174,75 @@ describe('pivot/core/tree', () => {
       withMetrics.cells[serializeCellKey(serializePath(['A']), rootKey)]?.values
         .m1,
     ).toBe(10);
+  });
+
+  it('inserts measure leaf tiers when configured', () => {
+    const tree = buildTreeFromRecords(
+      [{ region: 'A', m1: 10 }],
+      ['m1'],
+      ['region'],
+      [],
+      1,
+      0,
+    );
+    const valueLeaf = buildValueLeaf();
+    const ixLeaf = buildBuiltInLeaf('ix', {
+      n: 1,
+      unit: 'year',
+      direction: 'past',
+    });
+    const withLeaves = applyMeasureHierarchyAxis(
+      tree,
+      {
+        kind: 'measureStackV1',
+        groups: [{ metricKey: 'm1', leaves: [valueLeaf, ixLeaf] }],
+        leafTierVisibility: 'visible',
+      },
+      MetricsLayoutEnum.ROWS,
+      ['region'],
+      [],
+      1,
+    );
+    const leafKey = serializePath([
+      'A',
+      encodeMetricKey('m1'),
+      encodeMeasureLeafKey(ixLeaf.id),
+    ]);
+    expect(withLeaves.rows[leafKey]?.label).toBe(ixLeaf.label);
+    expect(
+      withLeaves.cells[serializeCellKey(leafKey, serializePath([]))]?.values.m1,
+    ).toBe(10);
+  });
+
+  it('keeps metrics flat when leaf tier is hidden', () => {
+    const tree = buildTreeFromRecords(
+      [{ region: 'A', m1: 10 }],
+      ['m1'],
+      ['region'],
+      [],
+      1,
+      0,
+    );
+    const valueLeaf = buildValueLeaf();
+    const flat = applyMeasureHierarchyAxis(
+      tree,
+      {
+        kind: 'measureStackV1',
+        groups: [{ metricKey: 'm1', leaves: [valueLeaf] }],
+        leafTierVisibility: 'hidden',
+      },
+      MetricsLayoutEnum.ROWS,
+      ['region'],
+      [],
+      1,
+    );
+    const metricKey = serializePath(['A', encodeMetricKey('m1')]);
+    const leafKey = serializePath([
+      'A',
+      encodeMetricKey('m1'),
+      encodeMeasureLeafKey(valueLeaf.id),
+    ]);
+    expect(flat.rows[metricKey]).toBeDefined();
+    expect(flat.rows[leafKey]).toBeUndefined();
   });
 });

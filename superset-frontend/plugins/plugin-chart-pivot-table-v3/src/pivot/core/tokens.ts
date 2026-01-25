@@ -26,6 +26,7 @@ import {
 export const METRICS_PLACEHOLDER = '__MEASURES__';
 export const METRICS_PLACEHOLDER_LABEL = 'Σ Values';
 export const METRIC_TOKEN_PREFIX = '__metric__';
+export const MEASURE_LEAF_TOKEN_PREFIX = '__mleaf__';
 export const SUBTOTAL_TOKEN = '\u0002subtotal';
 export const SUBTOTAL_LABEL = 'Subtotal';
 
@@ -42,6 +43,17 @@ export const isMetricToken = (val: unknown): val is string =>
 
 export const decodeMetricKey = (val: unknown): string | undefined =>
   isMetricToken(val) ? val.slice(METRIC_TOKEN_PREFIX.length) : undefined;
+
+export const encodeMeasureLeafKey = (leafId: string) =>
+  `${MEASURE_LEAF_TOKEN_PREFIX}${leafId}`;
+
+export const isMeasureLeafToken = (val: unknown): val is string =>
+  typeof val === 'string' && val.startsWith(MEASURE_LEAF_TOKEN_PREFIX);
+
+export const decodeMeasureLeafId = (val: unknown): string | undefined =>
+  isMeasureLeafToken(val)
+    ? val.slice(MEASURE_LEAF_TOKEN_PREFIX.length)
+    : undefined;
 
 export const normalizePlaceholder = (val: QueryFormColumn) => {
   if (val === METRICS_PLACEHOLDER) return METRICS_PLACEHOLDER;

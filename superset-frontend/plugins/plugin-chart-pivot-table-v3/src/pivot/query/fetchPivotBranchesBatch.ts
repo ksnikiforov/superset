@@ -92,10 +92,17 @@ export const fetchPivotBranchesBatch = async ({
     metricsForQuery.length > 0
       ? { ...formData, metrics: metricsForQuery }
       : formData;
+  const timeOffsets = Array.from(
+    new Set([...(formData.time_offsets ?? []), ...layout.requiredTimeOffsets]),
+  );
+  const queryFormDataWithOffsets =
+    timeOffsets.length > 0
+      ? { ...queryFormData, time_offsets: timeOffsets }
+      : queryFormData;
 
   try {
     const results = await supersetChartDataClient.fetch({
-      formData: queryFormData,
+      formData: queryFormDataWithOffsets,
       specs,
       requestGroupId,
     });
@@ -126,6 +133,7 @@ export const fetchPivotBranchesBatch = async ({
       queryPairs,
       metricsForQuery,
       formData,
+      measureHierarchy: layout.measureHierarchy,
       rowGroupby: specs[0].meta.rowGroupbyForQueryFull,
       colGroupby: specs[0].meta.colGroupbyForQueryFull,
       rowSubtotalLevels: specs[0].meta.rowSubtotalLevels,

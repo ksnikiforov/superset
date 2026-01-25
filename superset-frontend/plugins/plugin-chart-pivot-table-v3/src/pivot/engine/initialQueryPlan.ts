@@ -269,6 +269,7 @@ export function buildInitialQueryPlanFromLayout(
       colFormatting: formData.colFormatting,
       rowSorting: formData.rowSorting,
       colSorting: formData.colSorting,
+      measureHierarchy: layout.measureHierarchy,
     });
     targets.push({
       kind: 'bootstrap',

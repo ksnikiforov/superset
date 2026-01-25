@@ -96,6 +96,54 @@ export type MetricFormattingField = (typeof METRIC_FORMATTING_FIELDS)[number];
 
 export type PivotDatabarType = 'bar' | 'lollipop' | 'waterfall';
 
+export type MeasureLeafOffsetUnit = 'year' | 'month' | 'week' | 'day';
+
+export type MeasureLeafOffsetDirection = 'past' | 'future';
+
+export type MeasureLeafOffset = {
+  n: number;
+  unit: MeasureLeafOffsetUnit;
+  direction: MeasureLeafOffsetDirection;
+};
+
+export type MeasureLeafOperator =
+  | 'value'
+  | 'ix'
+  | 'delta'
+  | 'delta_pct'
+  | 'offset_value';
+
+export type MeasureLeafId = string;
+
+export type MeasureLeafSpec =
+  | {
+      kind: 'builtIn';
+      id: MeasureLeafId;
+      operator: MeasureLeafOperator;
+      offset?: MeasureLeafOffset;
+      label: string;
+    }
+  | {
+      kind: 'custom';
+      id: MeasureLeafId;
+      label: string;
+      formula: string;
+      offset?: MeasureLeafOffset;
+    };
+
+export type MeasureLeavesByMetricKey = Record<string, MeasureLeafSpec[]>;
+
+export type MeasureHierarchy =
+  | { kind: 'flatMetrics'; metricKeys: string[] }
+  | {
+      kind: 'measureStackV1';
+      groups: Array<{
+        metricKey: string;
+        leaves: MeasureLeafSpec[];
+      }>;
+      leafTierVisibility: 'hidden' | 'visible';
+    };
+
 export type PivotMetricDatabar = {
   type?: PivotDatabarType;
   scaleGroup?: string;
@@ -172,6 +220,7 @@ export interface PivotTableCustomizeProps {
   groupbyRows: QueryFormColumn[];
   groupbyColumns: QueryFormColumn[];
   metrics: QueryFormMetric[];
+  measureLeavesByMetric?: MeasureLeavesByMetricKey;
   metricFormatting?: PivotMetricFormattingMap;
   metricDatabars?: PivotMetricDatabarMap;
   metricFormattingScope?: MetricFormattingScope;

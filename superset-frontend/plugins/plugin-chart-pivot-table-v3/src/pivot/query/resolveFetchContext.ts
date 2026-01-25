@@ -34,6 +34,7 @@ import {
   collectDimensionFormattingMetricsForQuery,
   collectDimensionSortingMetricsForQuery,
   decodeMetricKey,
+  isMeasureLeafToken,
   hasTotalSorting,
 } from '../../utils';
 import {
@@ -185,16 +186,18 @@ export const resolveFetchContext = ({
     metricIndexOverride?: number,
   ) => {
     if (metricsAxis !== targetAxis) {
-      return p;
+      return p.filter(val => !isMeasureLeafToken(val));
     }
     const idx =
       metricIndexOverride !== undefined
         ? metricIndexOverride
         : getMetricIndex(p);
     if (idx < 0) {
-      return p;
+      return p.filter(val => !isMeasureLeafToken(val));
     }
-    return [...p.slice(0, idx), ...p.slice(idx + 1)];
+    return [...p.slice(0, idx), ...p.slice(idx + 1)].filter(
+      val => !isMeasureLeafToken(val),
+    );
   };
 
   const sanitizedPath = stripMetricFromPath(path, axis, metricIndexInPath);
@@ -299,6 +302,7 @@ export const resolveFetchContext = ({
     colFormatting: formData.colFormatting,
     rowSorting: formData.rowSorting,
     colSorting: formData.colSorting,
+    measureHierarchy: layout.measureHierarchy,
   });
   const rowGroupbyForQuery = queryShape.rowGroupby;
   const colGroupbyForQuery = queryShape.colGroupby;

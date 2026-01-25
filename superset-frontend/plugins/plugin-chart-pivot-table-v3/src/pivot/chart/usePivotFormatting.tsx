@@ -24,8 +24,10 @@ import {
 } from 'react';
 import {
   DataRecordValue,
+  Currency,
   addAlpha,
   getNumberFormatter,
+  NumberFormats,
   safeHtmlSpan,
   styled,
   supersetTheme,
@@ -68,6 +70,7 @@ import {
   serializePath,
 } from '../../utils';
 import { formatMetricValue, rootKey } from '../viewModel';
+import { buildMeasureLeafOutputKey, isValueLeaf } from '../measureLeaves';
 import {
   deriveMetricKey as deriveMetricKeyBase,
   formatNodeLabel as formatNodeLabelBase,
@@ -80,6 +83,8 @@ import {
   type CompiledExcelFormula,
 } from '../formatting/excelFormula';
 import { isPivotExcelFormula } from '../formatting/excelFormulaReferences';
+
+const { PERCENT_3_POINT, FLOAT_2_POINT } = NumberFormats;
 
 const DatabarContent = styled.div`
   position: absolute;
@@ -606,6 +611,48 @@ export const usePivotFormatting = ({
     [formData.colSorting, groupbyColumns],
   );
 
+  const derivedFormatOverrides = useMemo(() => {
+    if (layout.measureHierarchy.kind !== 'measureStackV1') {
+      return { columnOverrides: {}, currencyOverrides: {} };
+    }
+    const columnOverrides: Record<string, string> = {};
+    const currencyOverrides: Record<string, Currency> = {};
+    layout.measureHierarchy.groups.forEach(group => {
+      const baseFormat = columnFormats?.[group.metricKey];
+      const baseCurrency = currencyFormats?.[group.metricKey];
+      group.leaves.forEach(leaf => {
+        if (isValueLeaf(leaf)) {
+          return;
+        }
+        const outputKey = buildMeasureLeafOutputKey(group.metricKey, leaf);
+        if (leaf.kind === 'builtIn' && leaf.operator === 'delta_pct') {
+          columnOverrides[outputKey] = PERCENT_3_POINT;
+          return;
+        }
+        if (leaf.kind === 'builtIn' && leaf.operator === 'ix') {
+          columnOverrides[outputKey] = FLOAT_2_POINT;
+          return;
+        }
+        if (baseFormat) {
+          columnOverrides[outputKey] = baseFormat;
+        }
+        if (baseCurrency) {
+          currencyOverrides[outputKey] = baseCurrency;
+        }
+      });
+    });
+    return { columnOverrides, currencyOverrides };
+  }, [columnFormats, currencyFormats, layout.measureHierarchy]);
+
+  const effectiveColumnFormats = useMemo(
+    () => ({ ...columnFormats, ...derivedFormatOverrides.columnOverrides }),
+    [columnFormats, derivedFormatOverrides.columnOverrides],
+  );
+  const effectiveCurrencyFormats = useMemo(
+    () => ({ ...currencyFormats, ...derivedFormatOverrides.currencyOverrides }),
+    [currencyFormats, derivedFormatOverrides.currencyOverrides],
+  );
+
   const formattingKeyMap = useMemo(
     () => buildFormattingKeyMap(metricFormatting),
     [metricFormatting],
@@ -727,12 +774,14 @@ export const usePivotFormatting = ({
       metricInsertIndex: layout.metricInsertIndex,
       rowSubtotalLevels: layout.normalizedRowSubtotalLevels,
       colSubtotalLevels: layout.layout.colSubtotalLevelsForQuery,
+      measureHierarchy: layout.measureHierarchy,
     });
   }, [
     formData.treeDataSignature,
     layout.groupbyColumnKeys,
     layout.groupbyRowKeys,
     layout.layout.colSubtotalLevelsForQuery,
+    layout.measureHierarchy,
     layout.metricInsertIndex,
     layout.normalizedRowSubtotalLevels,
     layout.resolvedMetricsLayout,
@@ -762,15 +811,19 @@ export const usePivotFormatting = ({
       if (target === 'cell' && applyTo !== 'all') {
         return undefined;
       }
-      const nonMetricKey = serializePath(
-        layout.getNonMetricPathParts(node.path),
+      const nonMetricParts = layout.getNonMetricPathParts(node.path);
+      const nonSubtotalParts = nonMetricParts.filter(
+        part => !isSubtotalToken(part),
       );
+      const nonMetricKey = serializePath(nonMetricParts);
+      const dimensionValue =
+        nonSubtotalParts.length > 0
+          ? nonSubtotalParts[nonSubtotalParts.length - 1]
+          : (node.path[node.path.length - 1] ?? node.label ?? undefined);
       const values =
         axis === 'row'
           ? rowValuesMap.get(nonMetricKey)
           : colValuesMap.get(nonMetricKey);
-      const dimensionValue =
-        node.path[node.path.length - 1] ?? node.label ?? undefined;
       const resolveExcelValue = (formula: CompiledExcelFormula | undefined) => {
         if (!formula) {
           return undefined;
@@ -822,12 +875,12 @@ export const usePivotFormatting = ({
       formatMetricValue(
         metric,
         value,
-        columnFormats,
-        currencyFormats,
+        effectiveColumnFormats,
+        effectiveCurrencyFormats,
         val => numberFormatter(val as number),
         d3FormatOverride,
       ),
-    [columnFormats, currencyFormats, numberFormatter],
+    [effectiveColumnFormats, effectiveCurrencyFormats, numberFormatter],
   );
 
   const deriveMetricKey = useCallback(
@@ -838,8 +891,14 @@ export const usePivotFormatting = ({
         metrics,
         metricsLayout: layout.resolvedMetricsLayout,
         cells: tree.cells,
+        measureHierarchy: layout.measureHierarchy,
       }),
-    [layout.resolvedMetricsLayout, metrics, tree.cells],
+    [
+      layout.measureHierarchy,
+      layout.resolvedMetricsLayout,
+      metrics,
+      tree.cells,
+    ],
   );
 
   const themeColor = useMemo(() => {

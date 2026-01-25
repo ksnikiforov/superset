@@ -44,6 +44,7 @@ import {
   PivotPath,
   PivotMetricFormattingValue,
   PivotDimensionFormattingValue,
+  MeasureHierarchy,
 } from './types';
 import { formatQueryName } from './pivot/query/queryName';
 import {
@@ -55,6 +56,9 @@ import {
   getFormattingMetricKey,
   getMetricKey,
   getMetricKeys,
+  encodeMeasureLeafKey,
+  decodeMeasureLeafId,
+  isMeasureLeafToken,
   isMetricsPlaceholder,
   METRICS_PLACEHOLDER,
   normalizePlaceholder,
@@ -71,10 +75,13 @@ export {
 export {
   decodeMetricKey,
   encodeMetricKey,
+  encodeMeasureLeafKey,
+  decodeMeasureLeafId,
   getFormattingMetricKey,
   getMetricKey,
   getMetricKeys,
   isMetricToken,
+  isMeasureLeafToken,
   isMetricsPlaceholder,
   isSubtotalToken,
   METRICS_PLACEHOLDER,
@@ -86,6 +93,7 @@ export {
   SUBTOTAL_TOKEN,
 } from './pivot/core/tokens';
 export {
+  applyMeasureHierarchyAxis,
   applyMetricAxis,
   buildTreeFromRecords,
   formatPivotLabelValue,
@@ -1118,6 +1126,40 @@ export const collectMetricDatabarMetricsForQuery = (
         : normalizeFormattingMetricForQuery(resolved),
     ];
   });
+
+export const collectMeasureLeafMetricsForQuery = (
+  measureHierarchy: MeasureHierarchy | undefined,
+  metrics: QueryFormMetric[] = [],
+): QueryFormMetric[] => {
+  if (!measureHierarchy || measureHierarchy.kind !== 'measureStackV1') {
+    return [];
+  }
+  const existingMetricKeys = new Set<string>();
+  metrics.forEach(metric => {
+    [
+      getFormattingMetricKey(metric),
+      getMetricKey(metric),
+      getMetricLabel(metric),
+    ]
+      .filter((key): key is string => Boolean(key))
+      .forEach(key => existingMetricKeys.add(key));
+  });
+
+  const referencedMetrics = new Set<string>();
+  measureHierarchy.groups.forEach(group => {
+    group.leaves.forEach(leaf => {
+      if (leaf.kind !== 'custom') {
+        return;
+      }
+      extractMetricReferencesFromExcelFormula(leaf.formula).forEach(ref => {
+        if (!existingMetricKeys.has(ref)) {
+          referencedMetrics.add(ref);
+        }
+      });
+    });
+  });
+  return Array.from(referencedMetrics);
+};
 
 export const mergeMetrics = (
   metrics: QueryFormMetric[],

@@ -26,6 +26,8 @@ import {
   PivotPath,
   PivotTableQueryFormData,
   TotalPosition,
+  MeasureHierarchy,
+  MeasureLeavesByMetricKey,
 } from '../../types';
 import {
   decodeMetricKey,
@@ -34,7 +36,12 @@ import {
   resolveExpandLevel,
   resolveMetricPlacement,
   stripMetricsPlaceholder,
+  isMeasureLeafToken,
 } from '../../utils';
+import {
+  coerceMeasureLeavesByMetric,
+  collectRequiredTimeOffsets,
+} from '../measureLeaves';
 
 export type PivotLayoutSpec = Pick<
   PivotTableQueryFormData,
@@ -59,11 +66,6 @@ export type PivotLayoutSpec = Pick<
   lastMoved?: 'row' | 'col';
 };
 
-export type MeasureHierarchy = {
-  kind: 'flatMetrics';
-  metricKeys: string[];
-};
-
 export type LayoutContext = {
   groupbyRowsRaw: QueryFormColumn[];
   groupbyColumnsRaw: QueryFormColumn[];
@@ -73,6 +75,7 @@ export type LayoutContext = {
   metricKeys: string[];
   metricLabelSet: Set<string>;
   measureHierarchy: MeasureHierarchy;
+  requiredTimeOffsets: string[];
   metricsLayoutResolved: MetricsLayoutEnum;
   metricInsertIndex: number;
   rowSubtotalLevels: number[];
@@ -106,6 +109,23 @@ export const buildLayoutContext = (
   const metrics = ensureIsArray<QueryFormMetric>(layoutSpec.metrics);
   const metricKeys = getMetricKeys(metrics);
   const metricLabelSet = new Set(metricKeys);
+  const measureLeavesByMetric = coerceMeasureLeavesByMetric(
+    metricKeys,
+    layoutSpec.measureLeavesByMetric as MeasureLeavesByMetricKey | undefined,
+  );
+  const measureHierarchy: MeasureHierarchy = {
+    kind: 'measureStackV1',
+    groups: metricKeys.map(metricKey => ({
+      metricKey,
+      leaves: measureLeavesByMetric[metricKey] ?? [],
+    })),
+    leafTierVisibility: metricKeys.some(
+      metricKey => (measureLeavesByMetric[metricKey] ?? []).length > 1,
+    )
+      ? 'visible'
+      : 'hidden',
+  };
+  const requiredTimeOffsets = collectRequiredTimeOffsets(measureHierarchy);
 
   const placement = resolveMetricPlacement(groupbyRowsRaw, groupbyColumnsRaw, {
     hasMetrics: metrics.length > 0,
@@ -168,12 +188,15 @@ export const buildLayoutContext = (
     return !!decoded && metricLabelSet.has(decoded);
   };
   const getFetchPath = (path: PivotPath) =>
-    path.map(val => {
+    path.flatMap(val => {
+      if (isMeasureLeafToken(val)) {
+        return [];
+      }
       const decoded = decodeMetricKey(val);
       if (decoded && metricLabelSet.has(decoded)) {
-        return decoded;
+        return [decoded];
       }
-      return val;
+      return [val];
     });
 
   return {
@@ -184,7 +207,8 @@ export const buildLayoutContext = (
     metrics,
     metricKeys,
     metricLabelSet,
-    measureHierarchy: { kind: 'flatMetrics', metricKeys },
+    measureHierarchy,
+    requiredTimeOffsets,
     metricsLayoutResolved,
     metricInsertIndex,
     rowSubtotalLevels,

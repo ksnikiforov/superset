@@ -17,7 +17,11 @@
  * under the License.
  */
 import { MetricsLayoutEnum, PivotTreeNode } from '../types';
-import { decodeMetricKey, isSubtotalToken } from '../utils';
+import {
+  decodeMetricKey,
+  decodeMeasureLeafId,
+  isSubtotalToken,
+} from '../utils';
 
 type MetricTotalsConfig = {
   metricLabelSet: Set<string>;
@@ -54,6 +58,9 @@ export const getNonMetricPathParts = (
   path.filter(val => {
     const decoded = decodeMetricKey(val);
     if (decoded && metricLabelSet.has(decoded)) {
+      return false;
+    }
+    if (decodeMeasureLeafId(val)) {
       return false;
     }
     if (isSubtotalToken(val)) {
@@ -179,7 +186,13 @@ export const countDimDepth = (
 ) =>
   path.filter(val => {
     const decoded = decodeMetricKey(val);
-    return !(decoded && metricLabelSet.has(decoded));
+    if (decoded && metricLabelSet.has(decoded)) {
+      return false;
+    }
+    if (decodeMeasureLeafId(val)) {
+      return false;
+    }
+    return true;
   }).length;
 
 export const isExplicitTotalNode = (

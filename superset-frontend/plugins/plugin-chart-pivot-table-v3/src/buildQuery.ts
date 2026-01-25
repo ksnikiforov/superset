@@ -37,9 +37,19 @@ export default function buildQuery(formData: PivotTableQueryFormData) {
     } else if (Array.isArray(queryMetrics) && queryMetrics.length > 0) {
       orderby = [[queryMetrics[0], !order_desc]];
     }
+    const timeOffsets = Array.from(
+      new Set([
+        ...((baseQueryObject.time_offsets as string[]) ?? []),
+        ...layout.requiredTimeOffsets,
+      ]),
+    );
     return toChartDataQueries({
       specs,
-      baseQueryObject: { ...baseQueryObject, orderby },
+      baseQueryObject: {
+        ...baseQueryObject,
+        orderby,
+        ...(timeOffsets.length > 0 ? { time_offsets: timeOffsets } : {}),
+      },
     });
   });
 }

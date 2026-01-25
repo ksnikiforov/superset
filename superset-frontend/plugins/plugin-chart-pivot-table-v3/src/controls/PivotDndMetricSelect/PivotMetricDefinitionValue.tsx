@@ -92,6 +92,15 @@ const MetricFormattingButtonWrap = styled.div`
   padding-right: ${({ theme }) => theme.sizeUnit}px;
 `;
 
+const MeasureLeafButton = styled(Button)`
+  height: ${({ theme }) => theme.sizeUnit * 5}px;
+  min-height: ${({ theme }) => theme.sizeUnit * 5}px;
+  min-width: ${({ theme }) => theme.sizeUnit * 5}px;
+  width: ${({ theme }) => theme.sizeUnit * 5}px;
+  padding: 0;
+  font-weight: ${({ theme }) => theme.fontWeightStrong};
+`;
+
 type ValueType = Metric | AdhocMetric | QueryFormMetric | PivotExcelFormula;
 type SavedMetric = savedMetricType & { error_text?: string };
 type AdhocMetricPopoverDatasource = ComponentProps<
@@ -138,6 +147,7 @@ type PivotMetricDefinitionValueProps = {
   onRemoveMetric: (index: number) => void;
   onMoveLabel: (dragIndex: number, hoverIndex: number) => void;
   onDropLabel: () => void;
+  onAddMeasureLeaf?: (metricKey: string, metricLabel: string) => void;
   columns: ColumnMeta[];
   savedMetrics: Metric[];
   savedMetricsOptions: savedMetricType[];
@@ -1026,6 +1036,12 @@ export default function PivotMetricDefinitionValue(
     () => isIxMetricIdentifier(metricLabel) || isIxMetricIdentifier(metricKey),
     [metricKey, metricLabel],
   );
+  const handleAddMeasureLeaf = useCallback(() => {
+    if (!metricKey || metricLabel === t('Metric')) {
+      return;
+    }
+    props.onAddMeasureLeaf?.(metricKey, metricLabel);
+  }, [metricKey, metricLabel, props]);
   const presetColors = useMemo(() => {
     const categoricalScheme = getCategoricalSchemeRegistry().get();
     return categoricalScheme?.colors.slice(0, 9) || [];
@@ -1299,25 +1315,39 @@ export default function PivotMetricDefinitionValue(
   );
 
   const formattingControl = (
-    <Popover
-      content={formattingPopoverContent}
-      overlayStyle={{ width: 'fit-content' }}
-      trigger="click"
-      placement="right"
-      getPopupContainer={() => document.body}
-    >
-      <Tooltip title={t('Add conditional formatting')}>
-        <MetricFormattingButtonWrap data-ignore-control-popover>
-          <MetricFormattingButton
-            aria-label={t('Add conditional formatting for %s', metricLabel)}
-            data-test="pivot-metric-formatting-button"
-            icon={<Icons.FormatPainterOutlined iconSize="s" />}
+    <Space size={4}>
+      {props.onAddMeasureLeaf && (
+        <Tooltip title={t('Add measure leaf')}>
+          <MeasureLeafButton
+            aria-label={t('Add measure leaf for %s', metricLabel)}
             size="small"
-            buttonStyle={hasFormatting ? 'primary' : 'tertiary'}
-          />
-        </MetricFormattingButtonWrap>
-      </Tooltip>
-    </Popover>
+            buttonStyle="tertiary"
+            onClick={handleAddMeasureLeaf}
+          >
+            IX
+          </MeasureLeafButton>
+        </Tooltip>
+      )}
+      <Popover
+        content={formattingPopoverContent}
+        overlayStyle={{ width: 'fit-content' }}
+        trigger="click"
+        placement="right"
+        getPopupContainer={() => document.body}
+      >
+        <Tooltip title={t('Add conditional formatting')}>
+          <MetricFormattingButtonWrap data-ignore-control-popover>
+            <MetricFormattingButton
+              aria-label={t('Add conditional formatting for %s', metricLabel)}
+              data-test="pivot-metric-formatting-button"
+              icon={<Icons.FormatPainterOutlined iconSize="s" />}
+              size="small"
+              buttonStyle={hasFormatting ? 'primary' : 'tertiary'}
+            />
+          </MetricFormattingButtonWrap>
+        </Tooltip>
+      </Popover>
+    </Space>
   );
 
   const normalizedSavedMetrics = useMemo<SavedMetric[]>(

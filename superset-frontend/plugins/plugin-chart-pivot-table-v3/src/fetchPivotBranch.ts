@@ -30,7 +30,7 @@ import {
 } from './types';
 import {
   buildTreeFromRecords,
-  applyMetricAxis,
+  applyMeasureHierarchyAxis,
   mergeTrees,
   serializePath,
   injectRowSubtotalLeaves,
@@ -39,6 +39,7 @@ import {
   SUBTOTAL_LABEL,
   SUBTOTAL_TOKEN,
 } from './utils';
+import { applyMeasureLeafValuesToTree } from './pivot/measureLeaves';
 import {
   buildFilterSignature,
   buildPivotBranchCacheKey,
@@ -141,6 +142,7 @@ const resolveFetchContext = ({
       colSubtotalLevels: queryCtx.colSubtotalLevels,
       metricsLayoutResolved: queryCtx.metricsLayoutResolved,
       metricInsertIndex: queryCtx.metricInsertIndex,
+      timeOffsets: layout.requiredTimeOffsets,
     },
   });
   return { ...queryCtx, cacheKey, layout };
@@ -214,6 +216,7 @@ export const buildBranchTreeFromResults = ({
   queryPairs,
   metricsForQuery,
   formData,
+  measureHierarchy,
   rowGroupby,
   colGroupby,
   rowSubtotalLevels,
@@ -225,6 +228,7 @@ export const buildBranchTreeFromResults = ({
   queryPairs: Array<{ rowDepth: number; colDepth: number }>;
   metricsForQuery: QueryFormMetric[];
   formData: PivotTableQueryFormData;
+  measureHierarchy: LayoutContext['measureHierarchy'];
   rowGroupby: QueryFormColumn[];
   colGroupby: QueryFormColumn[];
   rowSubtotalLevels: number[];
@@ -265,16 +269,16 @@ export const buildBranchTreeFromResults = ({
       ),
     {} as PivotTreeData,
   );
-  const branchWithMetrics = applyMetricAxis(
-    branchTree,
-    ensureIsArray(formData.metrics),
+  const branchWithMeasures = applyMeasureHierarchyAxis(
+    applyMeasureLeafValuesToTree({ tree: branchTree, measureHierarchy }),
+    measureHierarchy,
     metricsLayoutResolved,
     rowGroupby,
     colGroupby,
     metricInsertIndex,
   );
   return labelRowSubtotalLeaves(
-    branchWithMetrics,
+    branchWithMeasures,
     ensureIsArray(formData.metrics),
   );
 };
@@ -326,10 +330,20 @@ export async function fetchPivotBranch({
   });
   const treeSnapshot = currentTree ?? { rows: {}, cols: {}, cells: {} };
   const resolvedMetricPath = metricPath ?? path;
+  const timeOffsets = Array.from(
+    new Set([...(formData.time_offsets ?? []), ...layout.requiredTimeOffsets]),
+  );
   const queryFormData =
     metricsForQuery.length > 0
-      ? { ...formData, metrics: metricsForQuery }
-      : formData;
+      ? {
+          ...formData,
+          metrics: metricsForQuery,
+          ...(timeOffsets.length > 0 ? { time_offsets: timeOffsets } : {}),
+        }
+      : {
+          ...formData,
+          ...(timeOffsets.length > 0 ? { time_offsets: timeOffsets } : {}),
+        };
 
   const cached = readPivotBranchCache(cacheKey);
   if (cached) {
@@ -384,6 +398,7 @@ export async function fetchPivotBranch({
       queryPairs,
       metricsForQuery,
       formData,
+      measureHierarchy: layout.measureHierarchy,
       rowGroupby: rowGroupbyForQueryFull,
       colGroupby: colGroupbyForQueryFull,
       rowSubtotalLevels,

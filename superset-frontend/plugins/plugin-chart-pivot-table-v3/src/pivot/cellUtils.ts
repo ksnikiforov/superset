@@ -17,13 +17,20 @@
  * under the License.
  */
 import { DataRecordValue, QueryFormMetric } from '@superset-ui/core';
-import { MetricsLayoutEnum, PivotResultCell, PivotTreeNode } from '../types';
 import {
+  MeasureHierarchy,
+  MetricsLayoutEnum,
+  PivotResultCell,
+  PivotTreeNode,
+} from '../types';
+import {
+  decodeMeasureLeafId,
   decodeMetricKey,
   getMetricKey,
   serializeCellKey,
   serializePath,
 } from '../utils';
+import { buildMeasureLeafOutputKey } from './measureLeaves';
 
 type DeriveMetricKeyParams = {
   rowNode: PivotTreeNode;
@@ -31,6 +38,7 @@ type DeriveMetricKeyParams = {
   metrics: QueryFormMetric[];
   metricsLayout: MetricsLayoutEnum;
   cells: Record<string, PivotResultCell>;
+  measureHierarchy?: MeasureHierarchy;
 };
 
 export const deriveMetricKey = ({
@@ -39,18 +47,34 @@ export const deriveMetricKey = ({
   metrics,
   metricsLayout,
   cells,
+  measureHierarchy,
 }: DeriveMetricKeyParams) => {
   const metricLabels = metrics
     .map(getMetricKey)
     .filter(label => label.length > 0);
-  // When metrics are on rows, the metric key is the last element in the row path.
-  // When metrics are on cols, it is the last element in the col path.
-  const metricCandidate =
-    metricsLayout === MetricsLayoutEnum.ROWS
-      ? rowNode.path[rowNode.path.length - 1]
-      : colNode.path[colNode.path.length - 1];
+  const metricPath =
+    metricsLayout === MetricsLayoutEnum.ROWS ? rowNode.path : colNode.path;
+  const metricCandidate = [...metricPath].reverse().find(val => {
+    const decoded = decodeMetricKey(val);
+    return decoded !== undefined && metricLabels.includes(decoded);
+  });
   const decodedCandidate = decodeMetricKey(metricCandidate);
   if (decodedCandidate && metricLabels.includes(decodedCandidate)) {
+    if (measureHierarchy?.kind === 'measureStackV1') {
+      const leafId = [...metricPath]
+        .reverse()
+        .map(val => decodeMeasureLeafId(val))
+        .find((candidate): candidate is string => !!candidate);
+      const group = measureHierarchy.groups.find(
+        entry => entry.metricKey === decodedCandidate,
+      );
+      const leaf =
+        (leafId && group?.leaves.find(item => item.id === leafId)) ||
+        group?.leaves[0];
+      if (leaf) {
+        return buildMeasureLeafOutputKey(decodedCandidate, leaf);
+      }
+    }
     return decodedCandidate;
   }
   // Fallback: first available metric in the cell values.

@@ -195,6 +195,7 @@ export default function transformProps(
     metricInsertIndex,
     rowSubtotalLevels,
     colSubtotalLevels,
+    measureHierarchy: layout.measureHierarchy,
   });
   const rootKey = serializePath([]);
   const emptyTree: PivotTreeData = { rows: {}, cols: {}, cells: {} };
@@ -237,6 +238,7 @@ export default function transformProps(
       ],
       metricsForQuery: spec.metrics,
       formData,
+      measureHierarchy: layout.measureHierarchy,
       rowGroupby: spec.meta.rowGroupbyForQueryFull,
       colGroupby: spec.meta.colGroupbyForQueryFull,
       rowSubtotalLevels: spec.meta.rowSubtotalLevels,

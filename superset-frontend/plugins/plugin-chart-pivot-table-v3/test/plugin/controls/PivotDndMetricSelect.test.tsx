@@ -54,19 +54,21 @@ const renderOptions = {
   },
 };
 
+const getFormattingButton = (label: string) =>
+  screen.getByLabelText(`Add conditional formatting for ${label}`);
+
 describe('PivotDndMetricSelect', () => {
   it('renders a formatting button for each metric', () => {
     render(<PivotDndMetricSelect {...baseProps} />, renderOptions);
 
-    const buttons = screen.getAllByTestId('pivot-metric-formatting-button');
-    expect(buttons).toHaveLength(2);
+    expect(getFormattingButton('sum__value')).toBeInTheDocument();
+    expect(getFormattingButton('avg__value')).toBeInTheDocument();
   });
 
   it('opens the formatting popover on click', async () => {
     render(<PivotDndMetricSelect {...baseProps} />, renderOptions);
 
-    const buttons = screen.getAllByTestId('pivot-metric-formatting-button');
-    await userEvent.click(buttons[0]);
+    await userEvent.click(getFormattingButton('sum__value'));
 
     expect(
       await screen.findByText('Conditional formatting'),
@@ -88,9 +90,7 @@ describe('PivotDndMetricSelect', () => {
       renderOptions,
     );
 
-    await userEvent.click(
-      screen.getAllByTestId('pivot-metric-formatting-button')[0],
-    );
+    await userEvent.click(getFormattingButton('sum__value'));
     await screen.findByText('Conditional formatting');
 
     const backgroundSelect = screen.getByRole('combobox', {
@@ -121,9 +121,7 @@ describe('PivotDndMetricSelect', () => {
       renderOptions,
     );
 
-    await userEvent.click(
-      screen.getAllByTestId('pivot-metric-formatting-button')[0],
-    );
+    await userEvent.click(getFormattingButton('sum__value'));
     await screen.findByText('Conditional formatting');
 
     const backgroundSelect = screen.getByRole('combobox', {
@@ -173,9 +171,7 @@ describe('PivotDndMetricSelect', () => {
       renderOptions,
     );
 
-    await userEvent.click(
-      screen.getAllByTestId('pivot-metric-formatting-button')[0],
-    );
+    await userEvent.click(getFormattingButton('sum__value'));
     await screen.findByText('Databars');
 
     const typeSelect = screen.getByRole('combobox', { name: /databar type/i });
@@ -216,9 +212,7 @@ describe('PivotDndMetricSelect', () => {
       renderOptions,
     );
 
-    await userEvent.click(
-      screen.getAllByTestId('pivot-metric-formatting-button')[1],
-    );
+    await userEvent.click(getFormattingButton('avg__value'));
     await screen.findByText('Databars');
 
     const scaleLikeSelect = screen.getByRole('combobox', {
@@ -254,9 +248,7 @@ describe('PivotDndMetricSelect', () => {
       renderOptions,
     );
 
-    await userEvent.click(
-      screen.getAllByTestId('pivot-metric-formatting-button')[2],
-    );
+    await userEvent.click(getFormattingButton('count__value'));
     await screen.findByText('Databars');
 
     const scaleLikeSelect = screen.getByRole('combobox', {
@@ -413,9 +405,7 @@ describe('PivotDndMetricSelect', () => {
       renderOptions,
     );
 
-    await userEvent.click(
-      screen.getAllByTestId('pivot-metric-formatting-button')[0],
-    );
+    await userEvent.click(getFormattingButton('sum__value'));
     await screen.findByText('Conditional formatting');
 
     const backgroundSelect = screen.getByRole('combobox', {
@@ -453,9 +443,7 @@ describe('PivotDndMetricSelect', () => {
       renderOptions,
     );
 
-    await userEvent.click(
-      screen.getAllByTestId('pivot-metric-formatting-button')[0],
-    );
+    await userEvent.click(getFormattingButton('sum__value'));
     await screen.findByText('Conditional formatting');
 
     const backgroundSelect = screen.getByRole('combobox', {
@@ -496,9 +484,7 @@ describe('PivotDndMetricSelect', () => {
       renderOptions,
     );
 
-    await userEvent.click(
-      screen.getAllByTestId('pivot-metric-formatting-button')[0],
-    );
+    await userEvent.click(getFormattingButton('avg__order_value'));
     await screen.findByText('Conditional formatting');
 
     const backgroundSelect = screen.getByRole('combobox', {
@@ -549,9 +535,7 @@ describe('PivotDndMetricSelect', () => {
       renderOptions,
     );
 
-    await userEvent.click(
-      screen.getAllByTestId('pivot-metric-formatting-button')[0],
-    );
+    await userEvent.click(getFormattingButton('sum__value'));
     await screen.findByText('Conditional formatting');
 
     const backgroundSelect = screen.getByRole('combobox', {
