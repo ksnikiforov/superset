@@ -22,6 +22,10 @@ import { MetricsLayoutEnum, PivotTableQueryFormData } from '../../../src/types';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
 import { buildInitialQuerySpecs } from '../../../src/pivot/query/specs';
+import {
+  buildBuiltInLeaf,
+  buildValueLeaf,
+} from '../../../src/pivot/measureLeaves';
 
 describe('layout resolution (contracts)', () => {
   it('keeps transformProps layout/subtotal normalization consistent with the initial query plan', () => {
@@ -86,5 +90,25 @@ describe('layout resolution (contracts)', () => {
     expect(signature.colSubtotalLevels).toEqual(
       bootstrapSpec?.meta.colSubtotalLevels,
     );
+  });
+
+  it('keeps leaf tiers visible when measure leaves are defined', () => {
+    const formData = buildFormData({
+      metrics: ['m1'],
+      measureLeavesByMetric: {
+        m1: [
+          buildValueLeaf(),
+          buildBuiltInLeaf('ix', {
+            n: 1,
+            unit: 'year',
+            direction: 'past',
+          }),
+        ],
+      },
+    });
+
+    const layout = buildLayoutContext(formData);
+
+    expect(layout.measureHierarchy.leafTierVisibility).toBe('visible');
   });
 });

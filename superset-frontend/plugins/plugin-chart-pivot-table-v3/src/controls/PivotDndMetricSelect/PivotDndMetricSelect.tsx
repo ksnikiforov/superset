@@ -60,7 +60,9 @@ import {
   type savedMetricType,
 } from '../../exploreImports';
 import PivotDndSelectLabel from '../PivotDndColumnSelect/PivotSelectLabel';
-import PivotMetricDefinitionValue from './PivotMetricDefinitionValue';
+import PivotMetricDefinitionValue, {
+  MetricFormatSelector,
+} from './PivotMetricDefinitionValue';
 import MeasureLeafValue from './MeasureLeafValue';
 import {
   PivotMetricFormatting,
@@ -90,12 +92,9 @@ import {
   buildValueLeaf,
   coerceMeasureLeavesByMetric,
   isValueLeaf,
+  sortMeasureLeaves,
 } from '../../pivot/measureLeaves';
-import {
-  isPivotExcelFormula,
-  normalizeExcelFormulaInput,
-} from '../../pivot/formatting/excelFormulaReferences';
-import { validateExcelFormula } from '../../pivot/formatting/excelFormula';
+import { isPivotExcelFormula } from '../../pivot/formatting/excelFormulaReferences';
 
 const EMPTY_OBJECT: Record<string, never> = {};
 const DND_ACCEPTED_TYPES = [DndItemType.Column, DndItemType.Metric];
@@ -577,7 +576,8 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
     useState<MeasureLeafOffsetDirection>('past');
   const [customMeasureEnabled, setCustomMeasureEnabled] = useState(false);
   const [customMeasureLabel, setCustomMeasureLabel] = useState('');
-  const [customMeasureFormula, setCustomMeasureFormula] = useState('');
+  const [customMeasureMetric, setCustomMeasureMetric] =
+    useState<QueryFormMetric>();
   const [customMeasureOffsetEnabled, setCustomMeasureOffsetEnabled] =
     useState(false);
   const [customMeasureError, setCustomMeasureError] = useState<
@@ -631,10 +631,16 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
 
   const updateMeasureLeaves = useCallback(
     (next: MeasureLeavesByMetricKey, persist = false) => {
-      measureLeavesRef.current = next;
-      setMeasureLeavesByMetric(next);
+      const sorted = Object.fromEntries(
+        Object.entries(next).map(([metricKey, leaves]) => [
+          metricKey,
+          sortMeasureLeaves(leaves),
+        ]),
+      );
+      measureLeavesRef.current = sorted;
+      setMeasureLeavesByMetric(sorted);
       if (persist && setControlValue) {
-        setControlValue('measureLeavesByMetric', next);
+        setControlValue('measureLeavesByMetric', sorted);
       }
     },
     [setControlValue],
@@ -839,6 +845,10 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       ...savedMetricNames,
     ]);
   }, [localMetricDatabars, localMetricFormatting, savedMetrics, value]);
+  const measureSelectorMetrics = useMemo(
+    () => dedupeMetrics([...value, ...savedMetrics]),
+    [savedMetrics, value],
+  );
 
   const openMeasureSelector = useCallback(
     (metricKey: string, metricLabel: string) => {
@@ -850,7 +860,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       setLeafOffsetDirection('past');
       setCustomMeasureEnabled(false);
       setCustomMeasureLabel('');
-      setCustomMeasureFormula('');
+      setCustomMeasureMetric(undefined);
       setCustomMeasureOffsetEnabled(false);
       setCustomMeasureError(undefined);
       setMeasureSelectorVisible(true);
@@ -880,20 +890,20 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
             setCustomMeasureError(t('Custom label is empty.'));
             return null;
           }
-          const normalizedFormula =
-            normalizeExcelFormulaInput(customMeasureFormula);
-          if (!normalizedFormula) {
-            setCustomMeasureError(t('Custom formula is empty.'));
+          if (!customMeasureMetric) {
+            setCustomMeasureError(t('Select a custom measure.'));
             return null;
           }
-          const validation = validateExcelFormula(normalizedFormula);
-          if (!validation.valid) {
-            setCustomMeasureError(validation.message);
+          if (isPivotExcelFormula(customMeasureMetric)) {
+            setCustomMeasureError(t('Custom Excel is not supported here.'));
             return null;
           }
+          const normalizedMetric = normalizeMetricReferenceValue(
+            customMeasureMetric as ValueType,
+          );
           return buildCustomLeaf({
             label,
-            formula: normalizedFormula,
+            metric: normalizedMetric,
             offset: customMeasureOffsetEnabled ? offset : undefined,
           });
         })()
@@ -924,8 +934,8 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
   }, [
     closeMeasureSelector,
     customMeasureEnabled,
-    customMeasureFormula,
     customMeasureLabel,
+    customMeasureMetric,
     customMeasureOffsetEnabled,
     leafOffsetDirection,
     leafOffsetN,
@@ -1323,8 +1333,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
   const canSaveMeasureLeaf =
     !!measureSelectorMetricKey &&
     (!customMeasureEnabled ||
-      (customMeasureLabel.trim().length > 0 &&
-        normalizeExcelFormulaInput(customMeasureFormula).length > 0));
+      (customMeasureLabel.trim().length > 0 && !!customMeasureMetric));
 
   return (
     <div className="metrics-select">
@@ -1372,23 +1381,26 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
                   onChange={event => setCustomMeasureLabel(event.target.value)}
                 />
               </Space>
-              <Space direction="vertical" size={8} style={{ width: '100%' }}>
-                <Typography.Text>{t('Custom formula')}</Typography.Text>
-                <Input.TextArea
-                  aria-label={t('Custom formula')}
-                  placeholder={t('Excel formula')}
-                  autoSize={{ minRows: 3, maxRows: 6 }}
-                  value={customMeasureFormula}
-                  onChange={event =>
-                    setCustomMeasureFormula(event.target.value)
+              <MetricFormatSelector
+                enableExcel
+                allowExcel={false}
+                label={t('Measure')}
+                tooltip={t('Metric used for this custom measure.')}
+                value={customMeasureMetric}
+                metrics={measureSelectorMetrics}
+                onChange={metric => {
+                  if (metric && isPivotExcelFormula(metric)) {
+                    return;
                   }
-                />
-                <Typography.Text type="secondary">
-                  {t(
-                    "Use 'value' for the current measure value and [metric] to reference another metric value.",
-                  )}
-                </Typography.Text>
-              </Space>
+                  setCustomMeasureMetric(metric);
+                  setCustomMeasureError(undefined);
+                }}
+                columns={props.columns}
+                savedMetrics={savedMetrics}
+                datasource={props.datasource}
+                allowCustomSql={!extra.disallow_adhoc_metrics}
+                allowSavedMetrics
+              />
               <Space align="center" size={8}>
                 <Switch
                   checked={customMeasureOffsetEnabled}

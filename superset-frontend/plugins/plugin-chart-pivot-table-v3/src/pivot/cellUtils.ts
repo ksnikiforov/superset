@@ -52,19 +52,26 @@ export const deriveMetricKey = ({
   const metricLabels = metrics
     .map(getMetricKey)
     .filter(label => label.length > 0);
-  const metricPath =
+  const primaryPath =
     metricsLayout === MetricsLayoutEnum.ROWS ? rowNode.path : colNode.path;
-  const metricCandidate = [...metricPath].reverse().find(val => {
-    const decoded = decodeMetricKey(val);
-    return decoded !== undefined && metricLabels.includes(decoded);
-  });
+  const secondaryPath =
+    metricsLayout === MetricsLayoutEnum.ROWS ? colNode.path : rowNode.path;
+  const findMetricToken = (path: PivotTreeNode['path']) =>
+    [...path].reverse().find(val => {
+      const decoded = decodeMetricKey(val);
+      return decoded !== undefined && metricLabels.includes(decoded);
+    });
+  const metricCandidate =
+    findMetricToken(primaryPath) ?? findMetricToken(secondaryPath);
   const decodedCandidate = decodeMetricKey(metricCandidate);
   if (decodedCandidate && metricLabels.includes(decodedCandidate)) {
     if (measureHierarchy?.kind === 'measureStackV1') {
-      const leafId = [...metricPath]
-        .reverse()
-        .map(val => decodeMeasureLeafId(val))
-        .find((candidate): candidate is string => !!candidate);
+      const findLeafId = (path: PivotTreeNode['path']) =>
+        [...path]
+          .reverse()
+          .map(val => decodeMeasureLeafId(val))
+          .find((candidate): candidate is string => !!candidate);
+      const leafId = findLeafId(primaryPath) ?? findLeafId(secondaryPath);
       const group = measureHierarchy.groups.find(
         entry => entry.metricKey === decodedCandidate,
       );

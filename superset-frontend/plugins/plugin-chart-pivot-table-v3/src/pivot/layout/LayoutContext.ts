@@ -48,6 +48,7 @@ export type PivotLayoutSpec = Pick<
   | 'groupbyRows'
   | 'groupbyColumns'
   | 'metrics'
+  | 'measureLeavesByMetric'
   | 'metricsLayout'
   | 'rowTotals'
   | 'colTotals'

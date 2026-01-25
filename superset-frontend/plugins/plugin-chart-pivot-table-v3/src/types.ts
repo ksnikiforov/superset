@@ -127,7 +127,7 @@ export type MeasureLeafSpec =
       kind: 'custom';
       id: MeasureLeafId;
       label: string;
-      formula: string;
+      metric: QueryFormMetric;
       offset?: MeasureLeafOffset;
     };
 

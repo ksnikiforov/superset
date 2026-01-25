@@ -16,14 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { DataRecordValue } from '@superset-ui/core';
+import { DataRecordValue, QueryFormMetric } from '@superset-ui/core';
 import {
   MeasureLeafOffset,
   MeasureLeafOperator,
   MeasureLeafSpec,
   MeasureLeavesByMetricKey,
 } from '../types';
-import { compileExcelFormula } from './formatting/excelFormula';
+import { getMetricKey } from '../utils';
 
 export const MEASURE_CALC_PREFIX = '__calc__';
 
@@ -100,6 +100,14 @@ export const buildValueLeaf = (): MeasureLeafSpec => ({
   label: buildMeasureLeafLabel('value'),
 });
 
+export const sortMeasureLeaves = (
+  leaves: MeasureLeafSpec[],
+): MeasureLeafSpec[] => {
+  const valueLeaf = leaves.find(isValueLeaf) ?? buildValueLeaf();
+  const nonValueLeaves = leaves.filter(leaf => !isValueLeaf(leaf));
+  return [valueLeaf, ...nonValueLeaves];
+};
+
 export const buildBuiltInLeaf = (
   operator: MeasureLeafOperator,
   offset?: MeasureLeafOffset,
@@ -113,17 +121,17 @@ export const buildBuiltInLeaf = (
 
 export const buildCustomLeaf = ({
   label,
-  formula,
+  metric,
   offset,
 }: {
   label: string;
-  formula: string;
+  metric: QueryFormMetric;
   offset?: MeasureLeafOffset;
 }): MeasureLeafSpec => ({
   kind: 'custom',
   id: buildMeasureLeafId({ label }),
   label,
-  formula,
+  metric,
   ...(offset ? { offset } : {}),
 });
 
@@ -187,8 +195,9 @@ export const coerceMeasureLeavesByMetric = (
   const next: MeasureLeavesByMetricKey = {};
   metrics.forEach(metricKey => {
     const existingLeaves = existing?.[metricKey] ?? [];
-    next[metricKey] =
+    const resolvedLeaves =
       existingLeaves.length > 0 ? existingLeaves : [buildValueLeaf()];
+    next[metricKey] = sortMeasureLeaves(resolvedLeaves);
   });
   return next;
 };
@@ -215,10 +224,14 @@ export const computeMeasureLeafValue = ({
 }): DataRecordValue | undefined => {
   const baseValue = values[metricKey];
   if (leaf.kind === 'custom') {
-    const currentValue = resolveOffsetValue(values, metricKey, leaf.offset);
-    const compiled = compileExcelFormula(leaf.formula);
-    const resolvedCurrent = currentValue ?? baseValue;
-    return compiled.evaluate(values, resolvedCurrent) as DataRecordValue;
+    const customMetricKey = getMetricKey(leaf.metric);
+    if (!customMetricKey) {
+      return undefined;
+    }
+    if (leaf.offset) {
+      return resolveOffsetValue(values, customMetricKey, leaf.offset);
+    }
+    return values[customMetricKey];
   }
   if (leaf.operator === 'value') {
     return baseValue;

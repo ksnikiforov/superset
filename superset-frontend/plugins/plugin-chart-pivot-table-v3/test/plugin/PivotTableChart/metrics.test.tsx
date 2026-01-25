@@ -30,6 +30,7 @@ import { buildFormData } from '../fixtures/pivotFormData';
 import {
   applyMetricAxis,
   buildTreeFromRecords,
+  applyMeasureHierarchyAxis,
   encodeMetricKey,
   METRICS_PLACEHOLDER,
   mergeTrees,
@@ -38,6 +39,11 @@ import {
   SUBTOTAL_LABEL,
   SUBTOTAL_TOKEN,
 } from '../../../src/utils';
+import {
+  applyMeasureLeafValuesToTree,
+  buildBuiltInLeaf,
+  buildValueLeaf,
+} from '../../../src/pivot/measureLeaves';
 import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
 
 jest.mock('../../../src/fetchPivotBranch', () => {
@@ -1131,6 +1137,101 @@ describe('PivotTableChart metric tier suppression', () => {
     expect(
       within(yearHeader).getByLabelText('plus-square'),
     ).toBeInTheDocument();
+  });
+
+  it('orders measure leaf headers with value first and UI order next', async () => {
+    const metricKey = 'grossRevenue';
+    const secondaryMetric = 'countCustomers';
+    const valueLeaf = buildValueLeaf();
+    const ixLeaf = buildBuiltInLeaf('ix', {
+      n: 1,
+      unit: 'year',
+      direction: 'past',
+    });
+    const offsetLeaf = buildBuiltInLeaf('offset_value', {
+      n: 1,
+      unit: 'year',
+      direction: 'past',
+    });
+    const measureHierarchy = {
+      kind: 'measureStackV1' as const,
+      groups: [
+        {
+          metricKey,
+          leaves: [valueLeaf, ixLeaf, offsetLeaf],
+        },
+        {
+          metricKey: secondaryMetric,
+          leaves: [valueLeaf],
+        },
+      ],
+      leafTierVisibility: 'visible' as const,
+    };
+    const baseTree = buildTreeFromRecords(
+      [
+        {
+          c1: 'C1',
+          grossRevenue: 100,
+          'grossRevenue__1 year ago': 80,
+          countCustomers: 10,
+        },
+      ],
+      [metricKey, secondaryMetric],
+      [],
+      ['c1'],
+      0,
+      1,
+    );
+    const treeWithLeaves = applyMeasureHierarchyAxis(
+      applyMeasureLeafValuesToTree({ tree: baseTree, measureHierarchy }),
+      measureHierarchy,
+      MetricsLayoutEnum.COLUMNS,
+      [],
+      ['c1'],
+      1,
+    );
+
+    const { container } = render(
+      <PivotTableChart
+        data={treeWithLeaves}
+        formData={{
+          ...baseFormData,
+          groupbyRows: [],
+          groupbyColumns: ['c1'],
+          metrics: [metricKey, secondaryMetric],
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+          measureLeavesByMetric: {
+            [metricKey]: [valueLeaf, ixLeaf, offsetLeaf],
+            [secondaryMetric]: [valueLeaf],
+          },
+          startCollapsed: false,
+        }}
+        metrics={[metricKey, secondaryMetric]}
+        groupbyRows={[]}
+        groupbyColumns={['c1']}
+        width={400}
+        height={300}
+        columnFormats={{}}
+        currencyFormats={{}}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+      />,
+    );
+
+    await waitForPivotReady();
+    const header = container.querySelector('thead') as HTMLElement;
+    const headerRows = within(header).getAllByRole('row');
+    const leafLabels = within(headerRows[headerRows.length - 1])
+      .getAllByRole('columnheader')
+      .map(cell => cell.textContent?.trim() ?? '')
+      .filter(label => label.length > 0);
+
+    expect(leafLabels.slice(0, 3)).toEqual(['Value', 'IX 1YA', '1YA']);
   });
 
   it('expands to the next column dimension on first toggle when metrics are last on columns', async () => {

@@ -29,6 +29,7 @@ import {
 } from '../../types';
 import {
   decodeMetricKey,
+  decodeMeasureLeafId,
   encodeMetricKey,
   getMetricKey,
   getStableColumnKey,
@@ -186,6 +187,7 @@ export const usePivotLayout = ({
         groupbyRows: formData.groupbyRows,
         groupbyColumns: formData.groupbyColumns,
         metrics,
+        measureLeavesByMetric: formData.measureLeavesByMetric,
         metricsLayout:
           (formData.metricsLayout as MetricsLayoutEnum) || metricsLayout,
         rowTotals,
@@ -223,6 +225,9 @@ export const usePivotLayout = ({
       startCollapsed,
     ],
   );
+  const isLeafTierVisible =
+    layout.measureHierarchy.kind === 'measureStackV1' &&
+    layout.measureHierarchy.leafTierVisibility === 'visible';
 
   const {
     resolvedExpandRowsLevel,
@@ -527,10 +532,45 @@ export const usePivotLayout = ({
     [metricLabelSet],
   );
 
+  const measureLeafOrderMap = useMemo(() => {
+    const next = new Map<string, Map<string, number>>();
+    if (layout.measureHierarchy.kind !== 'measureStackV1') {
+      return next;
+    }
+    layout.measureHierarchy.groups.forEach(group => {
+      const order = new Map<string, number>();
+      group.leaves.forEach((leaf, index) => {
+        order.set(leaf.id, index);
+      });
+      next.set(group.metricKey, order);
+    });
+    return next;
+  }, [layout.measureHierarchy]);
+
   const compareMetricOrder = useCallback(
     (a: PivotTreeNode, b: PivotTreeNode) => {
       const aMetric = getMetricLabelFromPath(a.path);
       const bMetric = getMetricLabelFromPath(b.path);
+      if (aMetric && bMetric && aMetric === bMetric) {
+        const leafOrder = measureLeafOrderMap.get(aMetric);
+        if (leafOrder) {
+          const resolveLeafId = (node: PivotTreeNode) =>
+            [...node.path]
+              .reverse()
+              .map(val => decodeMeasureLeafId(val))
+              .find((candidate): candidate is string => Boolean(candidate));
+          const aLeaf = resolveLeafId(a);
+          const bLeaf = resolveLeafId(b);
+          if (aLeaf && bLeaf && aLeaf !== bLeaf) {
+            const aIndex = leafOrder.get(aLeaf);
+            const bIndex = leafOrder.get(bLeaf);
+            if (aIndex !== undefined && bIndex !== undefined) {
+              return aIndex - bIndex;
+            }
+          }
+        }
+        return 0;
+      }
       if (!aMetric || !bMetric || aMetric === bMetric) {
         return 0;
       }
@@ -541,7 +581,7 @@ export const usePivotLayout = ({
       }
       return aIndex - bIndex;
     },
-    [getMetricLabelFromPath, metricOrderMap],
+    [getMetricLabelFromPath, measureLeafOrderMap, metricOrderMap],
   );
 
   const getNonMetricPathParts = useCallback(
@@ -1003,6 +1043,22 @@ export const usePivotLayout = ({
     ],
   );
 
+  const expandMetricNodes = useCallback(
+    (nodes: Record<string, PivotTreeNode>, expandedSet: Set<string>) => {
+      if (!isLeafTierVisible) {
+        return expandedSet;
+      }
+      const next = new Set(expandedSet);
+      Object.values(nodes).forEach(node => {
+        if (isMetricTokenValue(node.path[node.path.length - 1])) {
+          next.add(node.key);
+        }
+      });
+      return next;
+    },
+    [isLeafTierVisible, isMetricTokenValue],
+  );
+
   const pruneCollapsedMetricRows = useCallback(
     (
       currentTree: PivotTreeData,
@@ -1021,12 +1077,13 @@ export const usePivotLayout = ({
       if (metricLayoutIndexOnRows <= parent.level) {
         return currentTree;
       }
+      const expandedWithMetrics = expandMetricNodes(currentTree.rows, expanded);
       const removedRowKeys = new Set<string>();
       const shouldPruneLeafChildren =
         metricLayoutIndexOnRows < groupbyRows.length &&
         metricLayoutIndexOnRows > parent.level;
       const rowNodes = Object.values(currentTree.rows);
-      const expandedCollapsedNodes = Array.from(expanded)
+      const expandedCollapsedNodes = Array.from(expandedWithMetrics)
         .map(key => currentTree.rows[key])
         .filter((node): node is PivotTreeNode => {
           if (!node) {
@@ -1108,6 +1165,7 @@ export const usePivotLayout = ({
       return { ...currentTree, rows: nextRows, cells: nextCells };
     },
     [
+      expandMetricNodes,
       groupbyRows.length,
       isExplicitSubtotalNode,
       isMetricGrandTotalNode,
@@ -1222,12 +1280,13 @@ export const usePivotLayout = ({
       if (metricLayoutIndexOnCols <= parent.level) {
         return currentTree;
       }
+      const expandedWithMetrics = expandMetricNodes(currentTree.cols, expanded);
       const removedColKeys = new Set<string>();
       const shouldPruneLeafChildren =
         metricLayoutIndexOnCols < groupbyColumns.length &&
         metricLayoutIndexOnCols > parent.level;
       const colNodes = Object.values(currentTree.cols);
-      const expandedCollapsedNodes = Array.from(expanded)
+      const expandedCollapsedNodes = Array.from(expandedWithMetrics)
         .map(key => currentTree.cols[key])
         .filter((node): node is PivotTreeNode => {
           if (!node) {
@@ -1311,6 +1370,7 @@ export const usePivotLayout = ({
       return { ...currentTree, cols: nextCols, cells: nextCells };
     },
     [
+      expandMetricNodes,
       groupbyColumns.length,
       isExplicitSubtotalNode,
       isMetricGrandTotalNode,

@@ -181,4 +181,50 @@ describe('fetchPivotBranchesBatch', () => {
       ]),
     );
   });
+
+  it('propagates time offsets into batch queries', async () => {
+    mockPost.mockImplementation(({ jsonPayload }) =>
+      Promise.resolve({
+        response: new Response(),
+        json: {
+          result: jsonPayload.queries.map(() => ({ data: [] })),
+        },
+      }),
+    );
+
+    const formData = buildFormData({
+      time_offsets: ['1 year ago'],
+      groupbyRows: ['country'],
+      groupbyColumns: [],
+    });
+    const batch: BatchGroup = {
+      axis: 'row',
+      childDepth: 1,
+      requiredOppositeDepth: 0,
+      signature: 'sig',
+      parentPathKey: serializePath([]),
+      siblingValues: ['US'],
+      targets: [
+        {
+          axis: 'row',
+          pathKey: serializePath(['US']),
+          childDepth: 1,
+          requiredOppositeDepth: 0,
+          batchSignature: 'sig',
+        },
+      ],
+    };
+
+    await fetchPivotBranchesBatch({
+      formData,
+      batch,
+      currentTree: makeTree(),
+      visibleRowDepth: 1,
+      visibleColDepth: 0,
+      getFetchPath: path => path,
+    });
+
+    const payload = mockPost.mock.calls[0][0].jsonPayload;
+    expect(payload.queries[0].time_offsets).toEqual(['1 year ago']);
+  });
 });

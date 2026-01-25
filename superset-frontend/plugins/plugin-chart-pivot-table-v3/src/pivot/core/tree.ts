@@ -868,6 +868,20 @@ export const buildTreeFromRecords = (
 ): PivotTreeData => {
   const tree: PivotTreeData = { rows: {}, cols: {}, cells: {} };
   const metricKeys = getMetricKeys(metrics);
+  const metricKeySet = new Set(metricKeys);
+  const metricPrefixes = metricKeys.map(key => `${key}__`);
+  const firstRecord = records[0];
+  const metricValueKeys =
+    firstRecord && metricPrefixes.length > 0
+      ? [
+          ...metricKeys,
+          ...Object.keys(firstRecord).filter(
+            key =>
+              !metricKeySet.has(key) &&
+              metricPrefixes.some(prefix => key.startsWith(prefix)),
+          ),
+        ]
+      : metricKeys;
   const rootKey = serializePath([]);
   let grandTotalValues: Record<string, DataRecordValue> = {};
 
@@ -918,7 +932,7 @@ export const buildTreeFromRecords = (
     const rowKey = serializePath(rowPath);
     const colKey = serializePath(colPath);
 
-    const values = metricKeys.reduce(
+    const values = metricValueKeys.reduce(
       (acc, key) => ({
         ...acc,
         [key]: record[key as string],

@@ -51,6 +51,19 @@ describe('pivot/core/tree', () => {
     expect(tree.rows[nullKey].formattedLabel).toBe('(NULL)');
   });
 
+  it('keeps time offset metric values in cells', () => {
+    const tree = buildTreeFromRecords(
+      [{ region: 'A', m1: 10, 'm1__1 year ago': 5 }],
+      ['m1'],
+      ['region'],
+      [],
+      1,
+      0,
+    );
+    const cellKey = serializeCellKey(serializePath(['A']), serializePath([]));
+    expect(tree.cells[cellKey]?.values['m1__1 year ago']).toBe(5);
+  });
+
   it('merges branch cell values into an existing tree', () => {
     const rootKey = serializePath([]);
     const baseTree: PivotTreeData = {

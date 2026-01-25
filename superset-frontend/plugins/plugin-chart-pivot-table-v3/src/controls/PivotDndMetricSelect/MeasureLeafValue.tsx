@@ -21,6 +21,7 @@ import {
   getCategoricalSchemeRegistry,
   Metric,
   QueryFormMetric,
+  styled,
   t,
   useTheme,
 } from '@superset-ui/core';
@@ -62,6 +63,20 @@ import {
   MetricFormatSelector,
   type MetricOptionValue,
 } from './PivotMetricDefinitionValue';
+
+const MetricFormattingButton = styled(Button)`
+  height: ${({ theme }) => theme.sizeUnit * 5}px;
+  min-height: ${({ theme }) => theme.sizeUnit * 5}px;
+  min-width: ${({ theme }) => theme.sizeUnit * 5}px;
+  width: ${({ theme }) => theme.sizeUnit * 5}px;
+  padding: 0;
+`;
+
+const MetricFormattingButtonWrap = styled.div`
+  display: flex;
+  align-items: center;
+  padding-right: ${({ theme }) => theme.sizeUnit}px;
+`;
 
 const rgbToHex = (color: ColorValue): string => {
   const { r, g, b, a = 1 } = color.toRgb();
@@ -374,13 +389,15 @@ export default function MeasureLeafValue({
       getPopupContainer={() => document.body}
     >
       <Tooltip title={t('Add conditional formatting')}>
-        <Button
-          aria-label={t('Add conditional formatting for %s', leaf.label)}
-          data-test="pivot-metric-formatting-button"
-          icon={<Icons.FormatPainterOutlined iconSize="s" />}
-          size="small"
-          buttonStyle={hasFormatting ? 'primary' : 'tertiary'}
-        />
+        <MetricFormattingButtonWrap data-ignore-control-popover>
+          <MetricFormattingButton
+            aria-label={t('Add conditional formatting for %s', leaf.label)}
+            data-test="pivot-metric-formatting-button"
+            icon={<Icons.FormatPainterOutlined iconSize="s" />}
+            size="small"
+            buttonStyle={hasFormatting ? 'primary' : 'tertiary'}
+          />
+        </MetricFormattingButtonWrap>
       </Tooltip>
     </Popover>
   );

@@ -185,7 +185,7 @@ function PivotTableChart(props: PivotTableProps) {
   const formatting = usePivotFormatting({
     tree,
     renderModel: renderModelResult.renderModel,
-    expandedRows,
+    expandedRows: renderModelResult.expandedRowsForRender,
     formData,
     groupbyRows,
     groupbyColumns,
@@ -226,8 +226,8 @@ function PivotTableChart(props: PivotTableProps) {
       width={width}
       renderModel={renderModelResult.renderModel}
       tree={tree}
-      expandedRows={expandedRows}
-      expandedCols={expandedCols}
+      expandedRows={renderModelResult.expandedRowsForRender}
+      expandedCols={renderModelResult.expandedColsForRender}
       errorMessage={errorMessage}
       onRetry={handleRetry}
       warnings={warnings}

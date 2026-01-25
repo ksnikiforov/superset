@@ -16,13 +16,28 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { PivotTreeData, PivotTreeNode } from '../../../src/types';
+import {
+  PivotTreeData,
+  PivotTreeNode,
+  MetricsLayoutEnum,
+} from '../../../src/types';
 import { getNonMetricPathParts } from '../../../src/pivot/metricsTotals';
 import {
   buildFormattingValueMaps,
   buildVisibleCellEntries,
+  deriveMetricKey,
 } from '../../../src/pivot/cellUtils';
-import { serializeCellKey, serializePath } from '../../../src/utils';
+import {
+  encodeMeasureLeafKey,
+  encodeMetricKey,
+  serializeCellKey,
+  serializePath,
+} from '../../../src/utils';
+import {
+  buildBuiltInLeaf,
+  buildMeasureLeafOutputKey,
+  buildValueLeaf,
+} from '../../../src/pivot/measureLeaves';
 
 const rootKey = serializePath([]);
 
@@ -132,5 +147,43 @@ describe('cellUtils helpers', () => {
         serializeCellKey(rowAKey, colC1Key),
       ]),
     );
+  });
+
+  it('derives leaf output keys when leaf tokens live on the other axis', () => {
+    const metricKey = 'sales';
+    const ixLeaf = buildBuiltInLeaf('ix', {
+      n: 1,
+      unit: 'year',
+      direction: 'past',
+    });
+    const rowNode = buildNode('row', [
+      'Region',
+      encodeMeasureLeafKey(ixLeaf.id),
+    ]);
+    const colNode = buildNode('col', [encodeMetricKey(metricKey)]);
+    const cells = {
+      [serializeCellKey(rowNode.key, colNode.key)]: {
+        rowKey: rowNode.key,
+        colKey: colNode.key,
+        values: {
+          [metricKey]: 10,
+          [buildMeasureLeafOutputKey(metricKey, ixLeaf)]: 25,
+        },
+      },
+    };
+
+    const result = deriveMetricKey({
+      rowNode,
+      colNode,
+      metrics: [metricKey],
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      cells,
+      measureHierarchy: {
+        kind: 'measureStackV1',
+        groups: [{ metricKey, leaves: [buildValueLeaf(), ixLeaf] }],
+      },
+    });
+
+    expect(result).toBe(buildMeasureLeafOutputKey(metricKey, ixLeaf));
   });
 });

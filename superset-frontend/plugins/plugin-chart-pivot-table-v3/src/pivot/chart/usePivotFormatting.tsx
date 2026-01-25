@@ -84,7 +84,7 @@ import {
 } from '../formatting/excelFormula';
 import { isPivotExcelFormula } from '../formatting/excelFormulaReferences';
 
-const { PERCENT_3_POINT, FLOAT_2_POINT } = NumberFormats;
+const { PERCENT, INTEGER } = NumberFormats;
 
 const DatabarContent = styled.div`
   position: absolute;
@@ -626,11 +626,11 @@ export const usePivotFormatting = ({
         }
         const outputKey = buildMeasureLeafOutputKey(group.metricKey, leaf);
         if (leaf.kind === 'builtIn' && leaf.operator === 'delta_pct') {
-          columnOverrides[outputKey] = PERCENT_3_POINT;
+          columnOverrides[outputKey] = PERCENT;
           return;
         }
         if (leaf.kind === 'builtIn' && leaf.operator === 'ix') {
-          columnOverrides[outputKey] = FLOAT_2_POINT;
+          columnOverrides[outputKey] = INTEGER;
           return;
         }
         if (baseFormat) {
@@ -645,11 +645,11 @@ export const usePivotFormatting = ({
   }, [columnFormats, currencyFormats, layout.measureHierarchy]);
 
   const effectiveColumnFormats = useMemo(
-    () => ({ ...columnFormats, ...derivedFormatOverrides.columnOverrides }),
+    () => ({ ...derivedFormatOverrides.columnOverrides, ...columnFormats }),
     [columnFormats, derivedFormatOverrides.columnOverrides],
   );
   const effectiveCurrencyFormats = useMemo(
-    () => ({ ...currencyFormats, ...derivedFormatOverrides.currencyOverrides }),
+    () => ({ ...derivedFormatOverrides.currencyOverrides, ...currencyFormats }),
     [currencyFormats, derivedFormatOverrides.currencyOverrides],
   );
 

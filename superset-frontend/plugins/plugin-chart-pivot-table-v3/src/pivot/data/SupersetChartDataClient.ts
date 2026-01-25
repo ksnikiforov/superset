@@ -170,8 +170,16 @@ export class SupersetChartDataClient implements ChartDataClient {
   }): Promise<ChartDataQueryResult[]> {
     const queryContext = buildQueryContext(
       formData,
-      (baseQueryObject: QueryObject) =>
-        toChartDataQueries({ specs, baseQueryObject }),
+      (baseQueryObject: QueryObject) => {
+        const resolvedTimeOffsets =
+          (baseQueryObject.time_offsets as string[] | undefined) ??
+          (formData.time_offsets as string[] | undefined);
+        const baseWithOffsets =
+          resolvedTimeOffsets && resolvedTimeOffsets.length > 0
+            ? { ...baseQueryObject, time_offsets: resolvedTimeOffsets }
+            : baseQueryObject;
+        return toChartDataQueries({ specs, baseQueryObject: baseWithOffsets });
+      },
     );
 
     const { json, response } = await SupersetClient.post({

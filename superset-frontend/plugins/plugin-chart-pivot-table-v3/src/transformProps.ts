@@ -44,6 +44,7 @@ import {
 } from './utils';
 import { buildBranchTreeFromResults } from './fetchPivotBranch';
 import { buildLayoutContext } from './pivot/layout/LayoutContext';
+import { applyMeasureLeafValuesToTree } from './pivot/measureLeaves';
 import { buildInitialQuerySpecs } from './pivot/query/specs';
 
 const { DATABASE_DATETIME } = TimeFormats;
@@ -262,6 +263,10 @@ export default function transformProps(
       formattedLabel: 'Grand total',
     };
   }
+  const nextTreeWithLeaves = applyMeasureLeafValuesToTree({
+    tree: nextTreeWithLabels,
+    measureHierarchy: layout.measureHierarchy,
+  });
 
   const isDevBuild =
     process.env.WEBPACK_MODE === 'development' ||
@@ -291,7 +296,7 @@ export default function transformProps(
     width,
     height,
     margin: formData.margin ?? 0,
-    data: nextTreeWithLabels,
+    data: nextTreeWithLeaves,
     formData: {
       ...formData,
       metricsLayout,
@@ -332,7 +337,7 @@ export default function transformProps(
     dateFormatters,
     onContextMenu,
     timeGrainSqla: formData.timeGrainSqla ?? formData.time_grain_sqla,
-    treeData: nextTreeWithLabels,
+    treeData: nextTreeWithLeaves,
     colTypeMap,
     rowTotalPosition,
     rowSubtotalPosition,

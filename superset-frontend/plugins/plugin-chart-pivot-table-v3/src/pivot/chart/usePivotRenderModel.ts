@@ -36,6 +36,7 @@ import { buildFormattingValueMaps } from '../cellUtils';
 import {
   normalizeDimensionSortingMapWithKeys,
   getFormattingMetricKey,
+  isMeasureLeafToken,
   serializePath,
 } from '../../utils';
 import {
@@ -69,6 +70,8 @@ export type PivotRenderModelResult = {
   getNodeDimDepth: (node: PivotTreeNode) => number;
   rowValuesMap: Map<string, Record<string, DataRecordValue>>;
   colValuesMap: Map<string, Record<string, DataRecordValue>>;
+  expandedRowsForRender: Set<string>;
+  expandedColsForRender: Set<string>;
 };
 
 const buildDimensionSortingKeyMap = (sorting: PivotDimensionSortingMap) => {
@@ -430,36 +433,83 @@ export const usePivotRenderModel = ({
     ],
   );
 
+  const isLeafTierVisible =
+    layout.measureHierarchy.kind === 'measureStackV1' &&
+    layout.measureHierarchy.leafTierVisibility === 'visible';
+  const expandedRowsForRender = useMemo(() => {
+    if (!isLeafTierVisible) {
+      return expandedRows;
+    }
+    const next = new Set(expandedRows);
+    Object.values(tree.rows).forEach(node => {
+      if (layout.isMetricTokenValue(node.path[node.path.length - 1])) {
+        next.add(node.key);
+      }
+    });
+    return next;
+  }, [expandedRows, isLeafTierVisible, layout, tree.rows]);
+  const expandedColsForRender = useMemo(() => {
+    if (!isLeafTierVisible) {
+      return expandedCols;
+    }
+    const next = new Set(expandedCols);
+    Object.values(tree.cols).forEach(node => {
+      if (layout.isMetricTokenValue(node.path[node.path.length - 1])) {
+        next.add(node.key);
+      }
+    });
+    return next;
+  }, [expandedCols, isLeafTierVisible, layout, tree.cols]);
+
   const renderModel = useMemo(
     () =>
       buildRenderModel({
         tree,
-        expandedRows,
-        expandedCols,
-        config: buildRenderModelConfig(expandedRows, expandedCols, tree),
+        expandedRows: expandedRowsForRender,
+        expandedCols: expandedColsForRender,
+        config: buildRenderModelConfig(
+          expandedRowsForRender,
+          expandedColsForRender,
+          tree,
+        ),
       }),
-    [buildRenderModelConfig, expandedCols, expandedRows, tree],
+    [
+      buildRenderModelConfig,
+      expandedColsForRender,
+      expandedRowsForRender,
+      tree,
+    ],
   );
 
   const expandedRowDepths = useMemo(
     () =>
       getExpandedDepths(
-        expandedRows,
+        expandedRowsForRender,
         tree.rows,
         groupbyRows.length,
         layout.countDimDepth,
       ),
-    [expandedRows, groupbyRows.length, layout.countDimDepth, tree.rows],
+    [
+      expandedRowsForRender,
+      groupbyRows.length,
+      layout.countDimDepth,
+      tree.rows,
+    ],
   );
   const expandedColDepths = useMemo(
     () =>
       getExpandedDepths(
-        expandedCols,
+        expandedColsForRender,
         tree.cols,
         groupbyColumns.length,
         layout.countDimDepth,
       ),
-    [expandedCols, groupbyColumns.length, layout.countDimDepth, tree.cols],
+    [
+      expandedColsForRender,
+      groupbyColumns.length,
+      layout.countDimDepth,
+      tree.cols,
+    ],
   );
 
   const isExplicitTotalNode = useCallback(
@@ -522,20 +572,15 @@ export const usePivotRenderModel = ({
       if (hideMetricParentToggle) {
         return false;
       }
-      const isLeafTierVisible =
-        layout.measureHierarchy.kind === 'measureStackV1' &&
-        layout.measureHierarchy.leafTierVisibility === 'visible';
-      if (
-        isLeafTierVisible &&
-        ((axis === 'row' && layout.metricsAtRowEnd) ||
-          (axis === 'col' && layout.metricsAtColEnd)) &&
-        layout.isMetricTokenValue(node.path[node.path.length - 1])
-      ) {
-        return false;
+      if (isLeafTierVisible) {
+        const tail = node.path[node.path.length - 1];
+        if (layout.isMetricTokenValue(tail) || isMeasureLeafToken(tail)) {
+          return false;
+        }
       }
       return true;
     },
-    [groupbyColumns.length, groupbyRows.length, layout],
+    [groupbyColumns.length, groupbyRows.length, isLeafTierVisible, layout],
   );
 
   const isRowAggregateBold = useCallback(
@@ -590,6 +635,8 @@ export const usePivotRenderModel = ({
 
   return {
     renderModel,
+    expandedRowsForRender,
+    expandedColsForRender,
     showRowSpinner,
     showColSpinner,
     showGlobalLoader,

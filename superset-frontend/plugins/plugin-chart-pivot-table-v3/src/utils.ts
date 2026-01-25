@@ -1145,20 +1145,38 @@ export const collectMeasureLeafMetricsForQuery = (
       .forEach(key => existingMetricKeys.add(key));
   });
 
-  const referencedMetrics = new Set<string>();
+  const referencedMetrics: QueryFormMetric[] = [];
+  const referencedMetricKeys = new Set<string>();
+  const addMetric = (metric: QueryFormMetric) => {
+    const resolved = resolveMetricReferenceForQuery(metric, metrics);
+    const candidateKeys = [
+      getFormattingMetricKey(resolved),
+      getMetricKey(resolved),
+      getMetricLabel(resolved),
+    ].filter((key): key is string => Boolean(key));
+    if (candidateKeys.some(key => existingMetricKeys.has(key))) {
+      return;
+    }
+    const primaryKey = candidateKeys[0];
+    if (!primaryKey || referencedMetricKeys.has(primaryKey)) {
+      return;
+    }
+    referencedMetricKeys.add(primaryKey);
+    referencedMetrics.push(
+      metrics.includes(resolved)
+        ? resolved
+        : normalizeFormattingMetricForQuery(resolved),
+    );
+  };
   measureHierarchy.groups.forEach(group => {
     group.leaves.forEach(leaf => {
       if (leaf.kind !== 'custom') {
         return;
       }
-      extractMetricReferencesFromExcelFormula(leaf.formula).forEach(ref => {
-        if (!existingMetricKeys.has(ref)) {
-          referencedMetrics.add(ref);
-        }
-      });
+      addMetric(leaf.metric);
     });
   });
-  return Array.from(referencedMetrics);
+  return referencedMetrics;
 };
 
 export const mergeMetrics = (
