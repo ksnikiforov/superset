@@ -17,7 +17,7 @@
  * under the License.
  */
 import { MetricsLayoutEnum, PivotTreeNode } from '../types';
-import { decodeMetricKey } from '../utils';
+import { decodeMeasureLeafId, decodeMetricKey } from '../utils';
 
 type ColumnDisplayConfig = {
   metricsLayout: MetricsLayoutEnum;
@@ -27,7 +27,8 @@ type ColumnDisplayConfig = {
   hasDeeperNonMetricDescendants: (node: PivotTreeNode) => boolean;
   metricLabels: string[];
   isExplicitSubtotalNode: (node: PivotTreeNode) => boolean;
-  getMetricLabelFromPath: (path: PivotTreeNode['path']) => string | undefined;
+  getMetricKeyFromPath: (path: PivotTreeNode['path']) => string | undefined;
+  getMetricDisplayLabelForKey: (metricKey: string) => string;
   getNonMetricPathParts: (path: PivotTreeNode['path']) => PivotTreeNode['path'];
   isMetricGrandTotalNode: (node: PivotTreeNode) => boolean;
   isMetricSubtotalNode: (node: PivotTreeNode) => boolean;
@@ -46,7 +47,8 @@ export const buildColumnDisplayPath = (
     hasDeeperNonMetricDescendants,
     metricLabels,
     isExplicitSubtotalNode,
-    getMetricLabelFromPath,
+    getMetricKeyFromPath,
+    getMetricDisplayLabelForKey,
     getNonMetricPathParts,
     isMetricGrandTotalNode,
     isMetricSubtotalNode,
@@ -58,16 +60,20 @@ export const buildColumnDisplayPath = (
     if (!isExplicitSubtotalNode(col) || path.length >= maxDepth) {
       return path;
     }
-    const lastLabel =
-      decodeMetricKey(path[path.length - 1]) ??
-      String(path[path.length - 1] ?? '');
+    const decoded = decodeMetricKey(path[path.length - 1]);
+    const lastLabel = decoded
+      ? getMetricDisplayLabelForKey(decoded)
+      : String(path[path.length - 1] ?? '');
     return [
       ...path,
       ...Array(Math.max(maxDepth - path.length, 0)).fill(lastLabel),
     ];
   };
-  const metricLabel = getMetricLabelFromPath(col.path);
-  if (!metricLabel) {
+  const metricKey = getMetricKeyFromPath(col.path);
+  const metricLabel = metricKey
+    ? getMetricDisplayLabelForKey(metricKey)
+    : undefined;
+  if (!metricKey || !metricLabel) {
     return padToDepth(col.path);
   }
   const nonMetricParts = getNonMetricPathParts(col.path);
@@ -81,13 +87,21 @@ export const buildColumnDisplayPath = (
     return displayParts;
   };
   if (isMetricGrandTotalNode(col)) {
+    const leafPath = col.path.filter(val => decodeMeasureLeafId(val));
     if (metricLabels.length === 1) {
       const totalLabel = 'Grand total';
-      return metricsAtColEnd
-        ? [totalLabel]
-        : [totalLabel, ...Array(Math.max(maxDepth - 1, 0)).fill(totalLabel)];
+      if (leafPath.length > 0) {
+        return [totalLabel, ...leafPath];
+      }
+      if (metricsAtColEnd) {
+        return [totalLabel];
+      }
+      return [totalLabel, ...Array(Math.max(maxDepth - 1, 0)).fill(totalLabel)];
     }
     const totalLabel = `Total ${metricLabel}`;
+    if (leafPath.length > 0) {
+      return [totalLabel, ...leafPath];
+    }
     if (metricsAtColEnd) {
       return [totalLabel];
     }
@@ -99,7 +113,7 @@ export const buildColumnDisplayPath = (
   }
   const metricIsLeaf =
     (decodeMetricKey(col.path[col.path.length - 1]) ??
-      String(col.path[col.path.length - 1] ?? '')) === metricLabel;
+      String(col.path[col.path.length - 1] ?? '')) === metricKey;
   if (metricIsLeaf && nonMetricParts.length > 0) {
     if (
       metricsAtColEnd &&

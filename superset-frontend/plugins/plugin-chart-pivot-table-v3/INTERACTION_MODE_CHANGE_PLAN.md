@@ -24,6 +24,11 @@ This plan covers two items, in order:
 
 ## Part A — Fix metric label rendering (must land first)
 
+**Status:** implemented; tests green.  
+**Quality gate (this part):**
+- `npm run test -- plugins/plugin-chart-pivot-table-v3` ✅ (warnings: duplicate Jest mocks, browserslist stale, babel deprecation).
+- `npm run lint -- plugins/plugin-chart-pivot-table-v3` ⏱️ timed out after 120s (eslint scans whole repo).
+
 ### Problem
 Pivot headers (metric tier) display **metric key** instead of **metric label**.
 
@@ -57,6 +62,45 @@ Pivot headers (metric tier) display **metric key** instead of **metric label**.
 ---
 
 ## Part B — Interaction Mode (User controlled)
+
+**Status:** in progress (panel + chip strips + filter dropdown + tests added).
+
+**Completed so far**
+- Interaction panel (measures dropdown with deferred commit, comparisons chips, dimensions row/col toggles).
+- Chip strips outside the table (top + left) with close [x] on dimension chips.
+- Filter icon dropdown (multi-select) per dimension; applies data mask filters.
+- Custom ordered toggles (numbers inside) + smaller chip styling + Value chip variant.
+- UI state is now optimistic (panel updates without waiting for query refresh).
+- Resolver + control panel plumbing in place.
+- Tests: runtime resolver + interaction panel coverage.
+- Table layout now re-renders in user-controlled mode for UI-driven measure reordering without changing fixed-mode behavior.
+- New test: interaction-mode measure reorder updates the header order (no requery).
+- Filters keyed by stable column key; clear-all filters control added.
+- Vertical chip labels flipped + close button positioned opposite.
+- Measures dropdown now scrolls to show full list.
+- Comparison leaf selection order persisted; value leaf can be disabled (metrics removed).
+- Dashboard-only Apply button gates runtime layout updates.
+- Chip strip spacing tightened; vertical chips narrowed with end-aligned close buttons.
+- Table rendering now uses **applied/query layout** (UI-only changes no longer re-shape totals/hierarchy before a data refresh).
+- New interaction layout test covers multi-metric Value leaf headers (user-controlled mode) and asserts no expand toggles when metrics are last on columns.
+- Metrics-at-end detection now uses dimension counts (placeholder-safe) to avoid false expand toggles on Value headers.
+- New test ensures applied query form data drives table header hierarchy when UI runtime layout differs.
+- Removed forced column-header padding that created empty trailing header rows; header depth now follows the resolved display paths.
+- Updated `buildColumnHeaderRows` test to assert deepest path length (no extra empty header rows).
+- Added interaction-layout test covering row totals so metric-only totals do not interleave with column dimensions.
+- Added assertions that total headers collapse per metric (colSpan aligns with leaf count).
+- Updated metric grand total detection to treat metric + leaf totals as grand totals.
+- Adjusted column display paths for metric grand totals (metrics-at-end) to keep totals above metric/leaf tiers.
+- Column header labels now resolve measure leaf tokens to leaf labels (no `__mleaf__` in headers), with regression coverage.
+
+**Quality gate (latest run)**
+- `npm run test -- plugins/plugin-chart-pivot-table-v3` ✅ (warnings: duplicate Jest mocks, browserslist stale, babel deprecation).
+- `npm run lint -- plugins/plugin-chart-pivot-table-v3` ❌ blocked by unrelated `plugins/plugin-chart-echarts/src/Gantt/transformProps.ts` import/no-unresolved.
+
+**Still pending / needs follow-up**
+- Drag-and-drop (dimensions between axes / reorder; Value chip drag between axes).
+- Filter values source (currently derived from tree; consider async values for large domains).
+- Chip strip drag reorder to mirror runtime layout changes.
 
 ### Summary of behavior (final UX)
 - **Explore controls**: Rows + Columns are replaced by a single **Dimensions** list.
@@ -143,6 +187,8 @@ Pivot headers (metric tier) display **metric key** instead of **metric label**.
 
 ## Test Checklist
 - **Metric label fix**: header labels and leaf labels use correct display label.
+- **Totals + leaf stack**: `Total <metric>` headers flow directly to leaf labels (no repeated metric label tier).
+- **Totals toggles**: no expand/collapse toggle appears on `Total <metric>` headers.
 - **Runtime layout resolution**: row/col order, value placement rule, leaf toggles.
 - **Persistence**: runtime layout stored and re-applied after refresh.
 - **User controlled UI**:

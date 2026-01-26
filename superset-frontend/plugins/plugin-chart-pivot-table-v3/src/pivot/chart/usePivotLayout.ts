@@ -62,6 +62,7 @@ export type PivotLayoutResult = {
   metricInsertIndex: number;
   metricLabels: string[];
   metricLabelSet: Set<string>;
+  metricLabelMap: Map<string, string>;
   isMetricTokenValue: (value: unknown) => boolean;
   isMultiMetric: boolean;
   groupbyRowKeys: string[];
@@ -94,6 +95,10 @@ export type PivotLayoutResult = {
   getFetchPath: (path: PivotPath) => PivotPath;
   compareMetricOrder: (a: PivotTreeNode, b: PivotTreeNode) => number;
   getMetricLabelFromPath: (path: PivotTreeNode['path']) => string | undefined;
+  getMetricDisplayLabelForKey: (metricKey: string) => string;
+  getMetricDisplayLabelFromPath: (
+    path: PivotTreeNode['path'],
+  ) => string | undefined;
   getNonMetricPathParts: (path: PivotTreeNode['path']) => PivotTreeNode['path'];
   getDimensionKeyForNode: (
     node: PivotTreeNode,
@@ -236,6 +241,7 @@ export const usePivotLayout = ({
     metricInsertIndex,
     metricKeys: metricLabels,
     metricLabelSet,
+    metricLabelMap,
     isMetricTokenValue,
     getFetchPath,
   } = layout;
@@ -258,6 +264,9 @@ export const usePivotLayout = ({
     return layout.colSubtotalLevels;
   }, [layout.colSubtotalLevels, rowTotals]);
 
+  const rowDimCount = layout.groupbyRows.length;
+  const colDimCount = layout.groupbyColumns.length;
+
   const metricInsertIndexOnRows = useMemo(() => {
     if (
       resolvedMetricsLayout !== MetricsLayoutEnum.ROWS ||
@@ -265,12 +274,12 @@ export const usePivotLayout = ({
     ) {
       return undefined;
     }
-    return Math.min(layout.metricInsertIndex, groupbyRows.length);
+    return Math.min(layout.metricInsertIndex, rowDimCount);
   }, [
-    groupbyRows.length,
     layout.metricInsertIndex,
     metrics.length,
     resolvedMetricsLayout,
+    rowDimCount,
   ]);
   const metricInsertIndexOnCols = useMemo(() => {
     if (
@@ -279,9 +288,9 @@ export const usePivotLayout = ({
     ) {
       return undefined;
     }
-    return Math.min(layout.metricInsertIndex, groupbyColumns.length);
+    return Math.min(layout.metricInsertIndex, colDimCount);
   }, [
-    groupbyColumns.length,
+    colDimCount,
     layout.metricInsertIndex,
     metrics.length,
     resolvedMetricsLayout,
@@ -469,11 +478,11 @@ export const usePivotLayout = ({
   const metricsAtRowEnd =
     resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
     metricInsertIndexOnRows !== undefined &&
-    metricInsertIndexOnRows >= groupbyRows.length;
+    metricInsertIndexOnRows >= rowDimCount;
   const metricsAtColEnd =
     resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS &&
     metricInsertIndexOnCols !== undefined &&
-    metricInsertIndexOnCols >= groupbyColumns.length;
+    metricInsertIndexOnCols >= colDimCount;
   const metricsFirstOnRows =
     resolvedMetricsLayout === MetricsLayoutEnum.ROWS && metricIndexOnRows === 0;
   const metricsFirstOnCols =
@@ -504,12 +513,12 @@ export const usePivotLayout = ({
       resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
       metricLabels.length === 1 &&
       metricIndexOnRows !== undefined &&
-      metricIndexOnRows === groupbyRows.length,
+      metricIndexOnRows === rowDimCount,
     [
-      groupbyRows.length,
       metricIndexOnRows,
       metricLabels.length,
       resolvedMetricsLayout,
+      rowDimCount,
     ],
   );
   const hideMetricHeaderOnCols = useMemo(
@@ -530,6 +539,17 @@ export const usePivotLayout = ({
     (path: PivotTreeNode['path']) =>
       getMetricLabelFromPathBase(path, metricLabelSet),
     [metricLabelSet],
+  );
+  const getMetricDisplayLabelForKey = useCallback(
+    (metricKey: string) => metricLabelMap.get(metricKey) ?? metricKey,
+    [metricLabelMap],
+  );
+  const getMetricDisplayLabelFromPath = useCallback(
+    (path: PivotTreeNode['path']) => {
+      const key = getMetricLabelFromPathBase(path, metricLabelSet);
+      return key ? getMetricDisplayLabelForKey(key) : undefined;
+    },
+    [getMetricDisplayLabelForKey, metricLabelSet],
   );
 
   const measureLeafOrderMap = useMemo(() => {
@@ -1589,6 +1609,7 @@ export const usePivotLayout = ({
     metricInsertIndex,
     metricLabels,
     metricLabelSet,
+    metricLabelMap,
     isMetricTokenValue,
     isMultiMetric,
     groupbyRowKeys,
@@ -1621,6 +1642,8 @@ export const usePivotLayout = ({
     getFetchPath,
     compareMetricOrder,
     getMetricLabelFromPath,
+    getMetricDisplayLabelForKey,
+    getMetricDisplayLabelFromPath,
     getNonMetricPathParts,
     getDimensionKeyForNode,
     isMetricGrandTotalNode,

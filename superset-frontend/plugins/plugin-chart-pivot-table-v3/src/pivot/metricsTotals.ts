@@ -95,23 +95,23 @@ export const isMetricGrandTotalNode = (
   if (nonMetricParts.length !== 0) {
     return false;
   }
-  if (node.axis === 'row' && metricsFirstOnRows) {
-    const firstLabel =
-      decodeMetricKey(node.path[0]) ?? String(node.path[0] ?? '');
-    return firstLabel === metricLabel;
-  }
-  if (node.axis === 'col' && metricsFirstOnCols) {
-    const firstLabel =
-      decodeMetricKey(node.path[0]) ?? String(node.path[0] ?? '');
-    return firstLabel === metricLabel;
-  }
-  const lastLabel =
-    decodeMetricKey(node.path[node.path.length - 1]) ??
-    String(node.path[node.path.length - 1] ?? '');
-  if (lastLabel !== metricLabel) {
+  const metricTokens = node.path
+    .map(val => decodeMetricKey(val))
+    .filter((decoded): decoded is string =>
+      decoded ? metricLabelSet.has(decoded) : false,
+    );
+  if (metricTokens.length === 0) {
     return false;
   }
-  return nonMetricParts.length === 0;
+  const firstMetric = metricTokens[0];
+  const lastMetric = metricTokens[metricTokens.length - 1];
+  if (node.axis === 'row' && metricsFirstOnRows) {
+    return firstMetric === metricLabel;
+  }
+  if (node.axis === 'col' && metricsFirstOnCols) {
+    return firstMetric === metricLabel;
+  }
+  return lastMetric === metricLabel;
 };
 
 export const isMetricSubtotalNode = (

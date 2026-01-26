@@ -61,6 +61,7 @@ export type RenderModelConfig = {
     col: PivotTreeNode,
     maxDepth: number,
   ) => PivotTreeNode['path'];
+  getColumnHeaderLabel?: (value: unknown) => string;
 };
 
 export type RenderModelInput = {
@@ -151,6 +152,7 @@ export const buildRenderModel = ({
     visibleCols,
     tree.cols,
     config.getColumnDisplayPath,
+    config.getColumnHeaderLabel,
   );
 
   const visibleRowKeySet = new Set(visibleRows.map(row => row.key));

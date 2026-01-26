@@ -41,7 +41,7 @@ import {
 } from '@superset-ui/core';
 import { Checkbox, Space, Typography } from '@superset-ui/core/components';
 import { CheckboxChangeEvent } from '@superset-ui/core/components/Checkbox/types';
-import { MetricsLayoutEnum } from './types';
+import { MetricsLayoutEnum, PivotInteractionMode } from './types';
 import {
   METRICS_PLACEHOLDER,
   METRICS_PLACEHOLDER_LABEL,
@@ -53,12 +53,15 @@ import {
 } from './utils';
 import PivotDndColumnSelect from './controls/PivotDndColumnSelect/PivotDndColumnSelect';
 import PivotDndMetricSelect from './controls/PivotDndMetricSelect/PivotDndMetricSelect';
+import { resolveInteractionFormData } from './pivot/layout/resolveInteractionLayout';
 
 type WindowWithPivotDebug = Window & { PIVOT_V3_DEBUG_PLACEMENT?: boolean };
 
 const THEME_BLUE = 'blue';
 const THEME_PEACH = 'peach';
 const THEME_GREY = 'grey';
+const INTERACTION_MODE_FIXED: PivotInteractionMode = 'fixed';
+const INTERACTION_MODE_USER: PivotInteractionMode = 'user_controlled';
 
 type ThemeOption = {
   value: string;
@@ -109,6 +112,29 @@ const renderThemeOption = (option: ThemeOption) => (
     {option.colors?.length ? renderThemeSwatches(option.colors) : null}
   </span>
 );
+
+const getInteractionMode = (
+  controls?: ControlPanelState['controls'],
+  formData?: ControlPanelState['form_data'],
+): PivotInteractionMode => {
+  const fromControls = controls?.interactionMode?.value as PivotInteractionMode;
+  const fromFormData = formData?.interactionMode as PivotInteractionMode;
+  if (fromControls === INTERACTION_MODE_USER) {
+    return INTERACTION_MODE_USER;
+  }
+  if (fromControls === INTERACTION_MODE_FIXED) {
+    return INTERACTION_MODE_FIXED;
+  }
+  return fromFormData === INTERACTION_MODE_USER
+    ? INTERACTION_MODE_USER
+    : INTERACTION_MODE_FIXED;
+};
+
+const isUserControlledMode = ({
+  controls,
+  formData,
+}: Pick<ControlPanelState, 'controls' | 'form_data'>) =>
+  getInteractionMode(controls, formData) === INTERACTION_MODE_USER;
 
 const getOptionKey = (opt: unknown) => {
   if (typeof opt !== 'object' || opt === null) {
@@ -318,6 +344,59 @@ const config: ControlPanelConfig = {
       controlSetRows: [
         [
           {
+            name: 'interactionMode',
+            config: {
+              type: 'RadioButtonControl',
+              label: t('Interaction mode'),
+              default: INTERACTION_MODE_FIXED,
+              options: [
+                [INTERACTION_MODE_FIXED, t('Fixed')],
+                [INTERACTION_MODE_USER, t('User controlled')],
+              ],
+              rerender: [
+                'groupbyRows',
+                'groupbyColumns',
+                'dimensions',
+                'time_grain_sqla',
+              ],
+            },
+          },
+        ],
+        [
+          {
+            name: 'dimensions',
+            config: {
+              ...sharedControls.groupby,
+              type: PivotDndColumnSelect,
+              dragTypeOverride: 'pivot_v3_dnd',
+              label: t('Dimensions'),
+              description: t('Dimensions available for interactive layout'),
+              mapStateToProps: (
+                state: ControlPanelState,
+                controlState: ControlState,
+                chartState?: Record<string, unknown>,
+              ) => {
+                const base =
+                  typeof sharedControls.groupby.mapStateToProps === 'function'
+                    ? sharedControls.groupby.mapStateToProps(
+                        state,
+                        controlState,
+                        chartState,
+                      )
+                    : {};
+                return {
+                  ...base,
+                  formData: state.form_data,
+                  datasource: state.datasource,
+                };
+              },
+              visibility: isUserControlledMode,
+              resetOnHide: false,
+            },
+          },
+        ],
+        [
+          {
             name: 'groupbyRows',
             config: withMetricsPlaceholder('row')({
               ...sharedControls.groupby,
@@ -344,6 +423,9 @@ const config: ControlPanelConfig = {
                   datasource: state.datasource,
                 };
               },
+              visibility: ({ controls, formData }) =>
+                !isUserControlledMode({ controls, formData }),
+              resetOnHide: false,
             }),
           },
         ],
@@ -375,6 +457,9 @@ const config: ControlPanelConfig = {
                   datasource: state.datasource,
                 };
               },
+              visibility: ({ controls, formData }) =>
+                !isUserControlledMode({ controls, formData }),
+              resetOnHide: false,
             }),
           },
         ],
@@ -383,17 +468,28 @@ const config: ControlPanelConfig = {
             name: 'time_grain_sqla',
             config: {
               ...sharedControls.time_grain_sqla,
-              visibility: ({ controls }) => {
+              visibility: ({ controls, formData }) => {
+                const useDimensions = isUserControlledMode({
+                  controls,
+                  formData,
+                });
+                const options = useDimensions
+                  ? controls?.dimensions?.options
+                  : controls?.groupbyColumns?.options;
                 const dttmLookup = Object.fromEntries(
-                  ensureIsArray(controls?.groupbyColumns?.options).map(
-                    option => [option.column_name, option.is_dttm],
-                  ),
+                  ensureIsArray(options).map(option => [
+                    option.column_name,
+                    option.is_dttm,
+                  ]),
                 );
 
-                return [
-                  ...ensureIsArray(controls?.groupbyColumns.value),
-                  ...ensureIsArray(controls?.groupbyRows.value),
-                ]
+                const selected = useDimensions
+                  ? ensureIsArray(controls?.dimensions?.value)
+                  : [
+                      ...ensureIsArray(controls?.groupbyColumns?.value),
+                      ...ensureIsArray(controls?.groupbyRows?.value),
+                    ];
+                return selected
                   .map(selection => {
                     if (isAdhocColumn(selection)) {
                       return true;
@@ -443,6 +539,15 @@ const config: ControlPanelConfig = {
             config: {
               type: 'HiddenControl',
               default: {},
+            },
+          },
+        ],
+        [
+          {
+            name: 'pivotRuntimeLayout',
+            config: {
+              type: 'HiddenControl',
+              default: null,
             },
           },
         ],
@@ -921,9 +1026,28 @@ const config: ControlPanelConfig = {
     },
   ],
   formDataOverrides: formData => {
+    if (formData.interactionMode === INTERACTION_MODE_USER) {
+      const resolved = resolveInteractionFormData({
+        formData,
+        runtimeLayout: formData.pivotRuntimeLayout,
+      });
+      return {
+        ...resolved,
+        metricsLayout: resolved.metricsLayout ?? formData.metricsLayout,
+      };
+    }
     const metrics = ensureIsArray(formData.metrics);
-    const rows = ensureIsArray(formData.groupbyRows);
-    const cols = ensureIsArray(formData.groupbyColumns);
+    const hasUserDimensions =
+      ensureIsArray(formData.dimensions).length > 0 &&
+      metrics.length > 0 &&
+      ensureIsArray(formData.groupbyRows).length === 0 &&
+      ensureIsArray(formData.groupbyColumns).length === 0;
+    const rows = hasUserDimensions
+      ? ensureIsArray(formData.dimensions)
+      : ensureIsArray(formData.groupbyRows);
+    const cols = hasUserDimensions
+      ? []
+      : ensureIsArray(formData.groupbyColumns);
     const resolved = resolveMetricPlacement(rows, cols, {
       hasMetrics: metrics.length > 0,
       preferredAxis: formData.metricsLayout as MetricsLayoutEnum,

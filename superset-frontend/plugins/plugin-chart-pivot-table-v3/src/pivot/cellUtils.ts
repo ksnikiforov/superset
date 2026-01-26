@@ -137,7 +137,8 @@ type FormatLabelParams = {
   metricsLayout: MetricsLayoutEnum;
   metricIndexOnRows?: number;
   isMetricGrandTotalNode: (node: PivotTreeNode) => boolean;
-  getMetricLabelFromPath: (path: PivotTreeNode['path']) => string | undefined;
+  getMetricKeyFromPath: (path: PivotTreeNode['path']) => string | undefined;
+  getMetricDisplayLabelForKey: (metricKey: string) => string;
   translate: (label: string) => string;
   subtotalLabel: string;
   isSubtotalToken: (val: unknown) => boolean;
@@ -149,18 +150,32 @@ export const formatNodeLabel = ({
   metricsLayout,
   metricIndexOnRows,
   isMetricGrandTotalNode,
-  getMetricLabelFromPath,
+  getMetricKeyFromPath,
+  getMetricDisplayLabelForKey,
   translate,
   subtotalLabel,
   isSubtotalToken,
 }: FormatLabelParams) => {
   const rawLabel = node.formattedLabel || node.label;
-  const metricLabelFromPath = getMetricLabelFromPath(node.path);
+  const metricKeyFromPath = getMetricKeyFromPath(node.path);
+  const metricDisplayLabel = metricKeyFromPath
+    ? getMetricDisplayLabelForKey(metricKeyFromPath)
+    : undefined;
   const decodedLabel = decodeMetricKey(rawLabel);
-  const resolvedLabel =
-    decodedLabel && metricLabelFromPath === decodedLabel
-      ? decodedLabel
-      : rawLabel;
+  let resolvedLabel = rawLabel;
+  if (
+    decodedLabel &&
+    metricKeyFromPath === decodedLabel &&
+    metricDisplayLabel
+  ) {
+    resolvedLabel = metricDisplayLabel;
+  } else if (
+    metricKeyFromPath &&
+    rawLabel === metricKeyFromPath &&
+    metricDisplayLabel
+  ) {
+    resolvedLabel = metricDisplayLabel;
+  }
   const normalizedLabel = isSubtotalToken(resolvedLabel)
     ? subtotalLabel
     : resolvedLabel;
@@ -174,9 +189,8 @@ export const formatNodeLabel = ({
     metricIndexOnRows > 0 &&
     isMetricGrandTotalNode(node)
   ) {
-    const metricLabel = getMetricLabelFromPath(node.path);
-    if (metricLabel) {
-      return `Total ${metricLabel}`;
+    if (metricDisplayLabel) {
+      return `Total ${metricDisplayLabel}`;
     }
   }
   return normalizedLabel;

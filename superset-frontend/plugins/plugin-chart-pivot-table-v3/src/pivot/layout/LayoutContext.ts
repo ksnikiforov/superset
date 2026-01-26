@@ -18,6 +18,7 @@
  */
 import {
   ensureIsArray,
+  getMetricLabel,
   QueryFormColumn,
   QueryFormMetric,
 } from '@superset-ui/core';
@@ -31,6 +32,7 @@ import {
 } from '../../types';
 import {
   decodeMetricKey,
+  getMetricKey,
   getMetricKeys,
   normalizeSubtotalLevels,
   resolveExpandLevel,
@@ -49,6 +51,7 @@ export type PivotLayoutSpec = Pick<
   | 'groupbyColumns'
   | 'metrics'
   | 'measureLeavesByMetric'
+  | 'metricLabelMap'
   | 'metricsLayout'
   | 'rowTotals'
   | 'colTotals'
@@ -75,6 +78,7 @@ export type LayoutContext = {
   metrics: QueryFormMetric[];
   metricKeys: string[];
   metricLabelSet: Set<string>;
+  metricLabelMap: Map<string, string>;
   measureHierarchy: MeasureHierarchy;
   requiredTimeOffsets: string[];
   metricsLayoutResolved: MetricsLayoutEnum;
@@ -110,6 +114,20 @@ export const buildLayoutContext = (
   const metrics = ensureIsArray<QueryFormMetric>(layoutSpec.metrics);
   const metricKeys = getMetricKeys(metrics);
   const metricLabelSet = new Set(metricKeys);
+  const labelOverrides =
+    (layoutSpec.metricLabelMap as Record<string, string> | undefined) ?? {};
+  const metricLabelMap = metrics.reduce<Map<string, string>>((acc, metric) => {
+    const key = getMetricKey(metric);
+    if (!key) {
+      return acc;
+    }
+    const override =
+      (typeof metric === 'string' && labelOverrides[metric]) ||
+      labelOverrides[key];
+    const label = override || getMetricLabel(metric) || key;
+    acc.set(key, label);
+    return acc;
+  }, new Map());
   const measureLeavesByMetric = coerceMeasureLeavesByMetric(
     metricKeys,
     layoutSpec.measureLeavesByMetric as MeasureLeavesByMetricKey | undefined,
@@ -208,6 +226,7 @@ export const buildLayoutContext = (
     metrics,
     metricKeys,
     metricLabelSet,
+    metricLabelMap,
     measureHierarchy,
     requiredTimeOffsets,
     metricsLayoutResolved,

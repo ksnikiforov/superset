@@ -36,6 +36,8 @@ import {
   normalizeDimensionSortingMapWithKeys,
   getFormattingMetricKey,
   serializePath,
+  decodeMetricKey,
+  formatPivotLabelValue,
   decodeMeasureLeafId,
 } from '../../utils';
 import {
@@ -331,7 +333,7 @@ export const usePivotRenderModel = ({
         layout.metricsFirstOnCols &&
         expandedCols.has(col.key)
       ) {
-        const metricLabel = layout.getMetricLabelFromPath(col.path);
+        const metricLabel = layout.getMetricDisplayLabelFromPath(col.path);
         if (metricLabel && col.path.length < maxDepth) {
           const totalLabel = metricLabel;
           return [
@@ -344,18 +346,42 @@ export const usePivotRenderModel = ({
         metricsLayout: layout.resolvedMetricsLayout,
         metricsFirstOnCols: layout.metricsFirstOnCols,
         metricsAtColEnd: layout.metricsAtColEnd,
-        allowMetricSubtotalLabels:
-          layout.normalizedColSubtotalLevels.length > 0,
+        allowMetricSubtotalLabels: layout.normalizedColSubtotalLevels.some(
+          level => level > 0,
+        ),
         hasDeeperNonMetricDescendants,
         metricLabels: layout.metricLabels,
         isExplicitSubtotalNode: layout.isExplicitSubtotalNode,
-        getMetricLabelFromPath: layout.getMetricLabelFromPath,
+        getMetricKeyFromPath: layout.getMetricLabelFromPath,
+        getMetricDisplayLabelForKey: layout.getMetricDisplayLabelForKey,
         getNonMetricPathParts: layout.getNonMetricPathParts,
         isMetricGrandTotalNode: layout.isMetricGrandTotalNode,
         isMetricSubtotalNode: layout.isMetricSubtotalNode,
       });
     },
     [expandedCols, hasDeeperNonMetricDescendants, layout],
+  );
+
+  const getColumnHeaderLabel = useCallback(
+    (rawValue: DataRecordValue) => {
+      const decoded = decodeMetricKey(rawValue);
+      if (decoded) {
+        return layout.getMetricDisplayLabelForKey(decoded);
+      }
+      const leafId = decodeMeasureLeafId(rawValue);
+      if (leafId) {
+        if (layout.measureHierarchy.kind === 'measureStackV1') {
+          const leafLabel = layout.measureHierarchy.groups
+            .flatMap(group => group.leaves)
+            .find(leaf => leaf.id === leafId)?.label;
+          if (leafLabel) {
+            return leafLabel;
+          }
+        }
+      }
+      return formatPivotLabelValue(rawValue, '');
+    },
+    [layout],
   );
 
   const buildRenderModelConfig = useCallback(
@@ -418,12 +444,14 @@ export const usePivotRenderModel = ({
         isMetricSubtotalNode: layout.isMetricSubtotalNode,
         isMetricTokenValue: layout.isMetricTokenValue,
         getColumnDisplayPath,
+        getColumnHeaderLabel,
       };
     },
     [
       colSorter,
       colTotals,
       getColumnDisplayPath,
+      getColumnHeaderLabel,
       groupbyColumns.length,
       groupbyRows.length,
       layout,
@@ -515,6 +543,10 @@ export const usePivotRenderModel = ({
       if (!node || !node.hasChildren || node.path.length === 0) {
         return false;
       }
+      const axisNodes = axis === 'row' ? tree.rows : tree.cols;
+      if (!axisNodes[node.key]) {
+        return false;
+      }
       if (
         layout.isExplicitSubtotalNode(node) ||
         layout.isMetricGrandTotalNode(node)
@@ -561,7 +593,14 @@ export const usePivotRenderModel = ({
       }
       return true;
     },
-    [groupbyColumns.length, groupbyRows.length, isLeafTierVisible, layout],
+    [
+      groupbyColumns.length,
+      groupbyRows.length,
+      isLeafTierVisible,
+      layout,
+      tree.cols,
+      tree.rows,
+    ],
   );
 
   const isRowAggregateBold = useCallback(

@@ -26,6 +26,7 @@ import { buildColumnHeaderRows } from '../../src/pivot/viewModel';
 import {
   applyMetricAxis,
   buildTreeFromRecords,
+  decodeMetricKey,
   encodeMetricKey,
   mergeTrees,
   METRICS_PLACEHOLDER,
@@ -39,6 +40,7 @@ import {
   serializePath,
   SUBTOTAL_TOKEN,
   transferDimensionSettingsAcrossAxes,
+  formatPivotLabelValue,
 } from '../../src/utils';
 
 const rootKey = serializePath([]);
@@ -115,6 +117,56 @@ describe('null label formatting', () => {
     expect(rows[0][0].node.label).toBe('(NULL)');
     expect(rows[0][0].node.formattedLabel).toBe('(NULL)');
   });
+
+  it('uses the deepest column path length for header rows', () => {
+    const colKey = serializePath(['A', 'B', 'C']);
+    const colNode: PivotTreeNode = {
+      axis: 'col',
+      key: colKey,
+      path: ['A', 'B', 'C'],
+      label: 'C',
+      formattedLabel: 'C',
+      level: 3,
+      hasChildren: false,
+      isSubtotal: false,
+    };
+    const rows = buildColumnHeaderRows([colNode], {});
+    expect(rows).toHaveLength(3);
+  });
+});
+
+describe('metric label display', () => {
+  it('uses metric display labels in column headers', () => {
+    const metricKey = 'sum__revenue';
+    const metricLabelMap: Record<string, string> = {
+      [metricKey]: 'Revenue',
+    };
+    const colKey = serializePath([encodeMetricKey(metricKey)]);
+    const colNode: PivotTreeNode = {
+      axis: 'col',
+      key: colKey,
+      path: [encodeMetricKey(metricKey)],
+      label: metricKey,
+      formattedLabel: metricKey,
+      level: 1,
+      hasChildren: false,
+      isSubtotal: false,
+    };
+    const resolveHeaderLabel = (rawValue: unknown) => {
+      const decoded = decodeMetricKey(rawValue);
+      if (decoded && metricLabelMap[decoded]) {
+        return metricLabelMap[decoded];
+      }
+      return formatPivotLabelValue(rawValue, '');
+    };
+    const rows = buildColumnHeaderRows(
+      [colNode],
+      {},
+      undefined,
+      resolveHeaderLabel,
+    );
+    expect(rows[0][0].node.label).toBe('Revenue');
+  });
 });
 
 describe('applyMetricAxis', () => {
@@ -144,6 +196,25 @@ describe('applyMetricAxis', () => {
 
     expect(result.cols[rootKey]).toBeDefined();
     expect(result.cols[serializePath([encodeMetricKey('m1')])]).toBeDefined();
+  });
+
+  it('uses metric display labels when provided', () => {
+    const metricKey = 'sum__revenue';
+    const metricLabelMap: Record<string, string> = {
+      [metricKey]: 'Revenue',
+    };
+    const result = applyMetricAxis(
+      baseTree,
+      [metricKey],
+      MetricsLayoutEnum.COLUMNS,
+      ['r1'],
+      ['c1'],
+      0,
+      metricLabelMap,
+    );
+    const metricNode = result.cols[serializePath([encodeMetricKey(metricKey)])];
+    expect(metricNode.label).toBe('Revenue');
+    expect(metricNode.formattedLabel).toBe('Revenue');
   });
 
   it('surfaces single metric values on the base column when the metric is first', () => {

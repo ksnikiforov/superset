@@ -93,19 +93,17 @@ export const buildColumnHeaderRows = (
     col: PivotTreeNode,
     maxDepth: number,
   ) => PivotTreeNode['path'],
+  getHeaderLabel?: (value: unknown) => string,
 ) => {
   if (cols.length === 0) {
     return [] as HeaderCellInfo[][];
   }
-  const baseMaxDepth = Math.max(
-    ...cols.map(col => Math.max(col.path.length, 1)),
-  );
+  const baseMaxDepth = Math.max(...cols.map(col => col.path.length || 1));
   const resolvedCols = cols.map(col => ({
     col,
     path: getDisplayPath ? getDisplayPath(col, baseMaxDepth) : col.path,
   }));
   const maxDepth = Math.max(
-    baseMaxDepth,
     ...resolvedCols.map(({ path }) => Math.max(path.length, 1)),
   );
   const rows: HeaderCellInfo[][] = Array.from({ length: maxDepth }, () => []);
@@ -134,8 +132,9 @@ export const buildColumnHeaderRows = (
       const key = serializePath(headerPath);
       let node = nodes[key];
       const rawValue = headerPath[level];
-      const headerLabel =
-        decodeMetricKey(rawValue) ?? formatPivotLabelValue(rawValue, '');
+      const headerLabel = getHeaderLabel
+        ? getHeaderLabel(rawValue)
+        : (decodeMetricKey(rawValue) ?? formatPivotLabelValue(rawValue, ''));
       if (!node) {
         if (level === lastLevel) {
           node = {

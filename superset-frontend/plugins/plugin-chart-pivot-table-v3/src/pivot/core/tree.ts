@@ -176,6 +176,7 @@ export const injectRowSubtotalLeaves = (
 export const labelRowSubtotalLeaves = (
   tree: PivotTreeData,
   metrics: QueryFormMetric[],
+  metricLabelMap?: Record<string, string>,
 ) => {
   const metricLabels = new Set(getMetricKeys(metrics));
   const isSingleMetric = metricLabels.size === 1;
@@ -186,6 +187,8 @@ export const labelRowSubtotalLeaves = (
     }
     return metricLabels.has(decoded) ? decoded : undefined;
   };
+  const getDisplayLabel = (metricKey: string) =>
+    metricLabelMap?.[metricKey] ?? metricKey;
   const nextRows: Record<string, PivotTreeNode> = { ...tree.rows };
   let hasChanges = false;
 
@@ -239,7 +242,7 @@ export const labelRowSubtotalLeaves = (
     const useMetricLabel =
       !isSingleMetric && hasMetricLabel && !metricBeforeBase;
     const nextLabel = useMetricLabel
-      ? `${baseLabel} ${metricLabel}`
+      ? `${baseLabel} ${getDisplayLabel(metricLabel)}`
       : `${baseLabel} Total`;
     if (node.label !== nextLabel || node.formattedLabel !== nextLabel) {
       nextRows[node.key] = {
@@ -264,6 +267,7 @@ export const applyMetricAxis = (
   rowGroupby: QueryFormColumn[],
   colGroupby: QueryFormColumn[],
   metricPosition?: number,
+  metricLabelMap?: Record<string, string>,
 ): PivotTreeData => {
   const metricKeys = getMetricKeys(metrics);
   if (metricKeys.length === 0) {
@@ -287,7 +291,10 @@ export const applyMetricAxis = (
       path.length === 0
         ? 'Grand total'
         : formatPivotLabelValue(rawValue, 'Grand total');
-    const metricLabel = decodeMetricKey(rawValue);
+    const metricKey = decodeMetricKey(rawValue);
+    const metricLabel = metricKey
+      ? (metricLabelMap?.[metricKey] ?? metricKey)
+      : undefined;
     const label = metricLabel || rawLabel;
     const isMetricNode = metricTokenSet.has(
       String(path[path.length - 1] ?? ''),
@@ -533,6 +540,7 @@ export const applyMeasureHierarchyAxis = (
   rowGroupby: QueryFormColumn[],
   colGroupby: QueryFormColumn[],
   metricPosition?: number,
+  metricLabelMap?: Record<string, string>,
 ): PivotTreeData => {
   if (measureHierarchy.kind === 'flatMetrics') {
     return applyMetricAxis(
@@ -542,6 +550,7 @@ export const applyMeasureHierarchyAxis = (
       rowGroupby,
       colGroupby,
       metricPosition,
+      metricLabelMap,
     );
   }
   const { groups } = measureHierarchy;
@@ -585,16 +594,19 @@ export const applyMeasureHierarchyAxis = (
       path.length === 0
         ? 'Grand total'
         : formatPivotLabelValue(rawValue, 'Grand total');
-    const metricLabel = decodeMetricKey(rawValue);
+    const metricKey = decodeMetricKey(rawValue);
+    const metricDisplayLabel = metricKey
+      ? (metricLabelMap?.[metricKey] ?? metricKey)
+      : undefined;
     const leafId = decodeMeasureLeafId(rawValue);
-    let label = metricLabel || rawLabel;
+    let label = metricDisplayLabel || rawLabel;
     if (leafId) {
       label = leafLabelMap.get(leafId) ?? rawLabel;
     }
-    if (metricLabel && !leafTierVisible) {
-      const leaf = singleLeafByMetric.get(metricLabel);
+    if (metricKey && !leafTierVisible) {
+      const leaf = singleLeafByMetric.get(metricKey);
       if (leaf && !leaf.isValue) {
-        label = `${metricLabel} ${leaf.label}`;
+        label = `${metricDisplayLabel ?? metricKey} ${leaf.label}`;
       }
     }
     const isMetricNode = metricTokenSet.has(

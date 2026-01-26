@@ -39,6 +39,18 @@ export type PivotPathValue = DataRecordValue | undefined;
 export type PivotPath = PivotPathValue[];
 export type TotalPosition = 'start' | 'end';
 export type PivotTheme = 'none' | 'blue' | 'peach' | 'grey' | 'custom';
+export type PivotInteractionMode = 'fixed' | 'user_controlled';
+
+export type PivotRuntimeLayout = {
+  version: 1;
+  rows: string[];
+  cols: string[];
+  metrics: string[];
+  leafSelection: Record<string, boolean>;
+  leafOrder?: string[];
+  valuePlacement: { axis: PivotAxis; index: number };
+  lastMoved?: PivotAxis;
+};
 
 export interface PivotTableStylesProps {
   height: number;
@@ -217,10 +229,16 @@ export type PivotDimensionSorting = {
 export type PivotDimensionSortingMap = Record<string, PivotDimensionSorting>;
 
 export interface PivotTableCustomizeProps {
+  interactionMode?: PivotInteractionMode;
+  dimensions?: QueryFormColumn[];
   groupbyRows: QueryFormColumn[];
   groupbyColumns: QueryFormColumn[];
   metrics: QueryFormMetric[];
+  metricsBase?: QueryFormMetric[];
+  metricLabelMap?: Record<string, string>;
+  pivotRuntimeLayout?: PivotRuntimeLayout;
   measureLeavesByMetric?: MeasureLeavesByMetricKey;
+  measureLeavesByMetricBase?: MeasureLeavesByMetricKey;
   metricFormatting?: PivotMetricFormattingMap;
   metricDatabars?: PivotMetricDatabarMap;
   metricFormattingScope?: MetricFormattingScope;

@@ -23,6 +23,7 @@ import {
   GenericDataType,
   getTimeFormatter,
   getTimeFormatterForGranularity,
+  getMetricLabel,
   SMART_DATE_ID,
   TimeFormats,
 } from '@superset-ui/core';
@@ -34,6 +35,7 @@ import {
 } from './types';
 import {
   getMetricKeys,
+  getMetricKey,
   getStableColumnKey,
   mergeMetrics,
   mergeTrees,
@@ -44,6 +46,7 @@ import {
 } from './utils';
 import { buildBranchTreeFromResults } from './fetchPivotBranch';
 import { buildLayoutContext } from './pivot/layout/LayoutContext';
+import { resolveInteractionFormData } from './pivot/layout/resolveInteractionLayout';
 import { applyMeasureLeafValuesToTree } from './pivot/measureLeaves';
 import { buildInitialQuerySpecs } from './pivot/query/specs';
 
@@ -70,9 +73,19 @@ export default function transformProps(
     datasource,
     emitCrossFilters,
     theme,
+    ownState,
   } = chartProps;
-  const formData = rawFormDataCamel as PivotTableQueryFormData;
+  const baseFormData = rawFormDataCamel as PivotTableQueryFormData;
   const rawFormData = rawFormDataBase as PivotTableQueryFormData;
+  const runtimeLayout =
+    baseFormData.pivotRuntimeLayout ??
+    (ownState?.pivotRuntimeLayout as
+      | PivotTableQueryFormData['pivotRuntimeLayout']
+      | undefined);
+  const formData = resolveInteractionFormData({
+    formData: baseFormData,
+    runtimeLayout,
+  });
   const {
     verboseMap = {},
     columnFormats = {},
@@ -94,6 +107,26 @@ export default function transformProps(
     metricsLayoutResolved: metricsLayout,
     metricInsertIndex,
   } = layout;
+  const metricLabelMap = metrics.reduce<Record<string, string>>(
+    (acc, metric) => {
+      const key = getMetricKey(metric);
+      if (!key) {
+        return acc;
+      }
+      let label = getMetricLabel(metric) || key;
+      if (typeof metric === 'string') {
+        const savedMetric = datasource?.metrics?.find(
+          candidate => candidate.metric_name === metric,
+        );
+        if (savedMetric?.verbose_name) {
+          label = savedMetric.verbose_name;
+        }
+      }
+      acc[key] = label;
+      return acc;
+    },
+    {},
+  );
   const metricFormatting = normalizeMetricFormattingMapWithKeys(
     formData.metricFormatting,
     metrics,
@@ -121,7 +154,9 @@ export default function transformProps(
   const metricKeysForQuery = getMetricKeys(planMetrics);
   const queryFormData: PivotTableQueryFormData = {
     ...rawFormData,
+    ...formData,
     metricsLayout,
+    metricLabelMap,
   };
 
   const combinedData = queriesData.flatMap(({ data }) => data || []);
@@ -301,6 +336,10 @@ export default function transformProps(
       ...formData,
       metricsLayout,
       treeDataSignature,
+      metricLabelMap,
+      metricsBase: rawFormData.metrics ?? baseFormData.metrics,
+      measureLeavesByMetricBase:
+        rawFormData.measureLeavesByMetric ?? baseFormData.measureLeavesByMetric,
     },
     queryFormData,
     metrics,

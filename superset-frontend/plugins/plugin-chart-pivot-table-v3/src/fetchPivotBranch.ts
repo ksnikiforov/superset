@@ -276,10 +276,12 @@ export const buildBranchTreeFromResults = ({
     rowGroupby,
     colGroupby,
     metricInsertIndex,
+    formData.metricLabelMap as Record<string, string> | undefined,
   );
   return labelRowSubtotalLeaves(
     branchWithMeasures,
     ensureIsArray(formData.metrics),
+    formData.metricLabelMap as Record<string, string> | undefined,
   );
 };
 

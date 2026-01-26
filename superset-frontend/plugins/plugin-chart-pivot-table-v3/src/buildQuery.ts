@@ -19,13 +19,18 @@
 import { buildQueryContext, QueryFormOrderBy } from '@superset-ui/core';
 import { PivotTableQueryFormData } from './types';
 import { buildLayoutContext } from './pivot/layout/LayoutContext';
+import { resolveInteractionFormData } from './pivot/layout/resolveInteractionLayout';
 import { buildInitialQuerySpecs } from './pivot/query/specs';
 import { toChartDataQueries } from './pivot/query/toChartDataQueries';
 
 export default function buildQuery(formData: PivotTableQueryFormData) {
-  const layout = buildLayoutContext(formData);
-  const specs = buildInitialQuerySpecs(formData, layout);
-  return buildQueryContext(formData, baseQueryObject => {
+  const resolvedFormData = resolveInteractionFormData({
+    formData,
+    runtimeLayout: formData.pivotRuntimeLayout,
+  });
+  const layout = buildLayoutContext(resolvedFormData);
+  const specs = buildInitialQuerySpecs(resolvedFormData, layout);
+  return buildQueryContext(resolvedFormData, baseQueryObject => {
     const { series_limit_metric, order_desc } = baseQueryObject;
     const queryMetrics =
       layout.metrics.length > 0

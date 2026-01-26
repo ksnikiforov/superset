@@ -197,7 +197,7 @@ export const coerceMeasureLeavesByMetric = (
     const existingLeaves = existing?.[metricKey] ?? [];
     const resolvedLeaves =
       existingLeaves.length > 0 ? existingLeaves : [buildValueLeaf()];
-    next[metricKey] = sortMeasureLeaves(resolvedLeaves);
+    next[metricKey] = resolvedLeaves;
   });
   return next;
 };
