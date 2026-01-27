@@ -368,6 +368,107 @@ describe('PivotTableChart interaction layout', () => {
     );
   });
 
+  it('does not duplicate metric headers when leaf tier is visible with row totals', () => {
+    const metrics = ['m1', 'm2', 'm3'];
+    const valueLeaf = buildValueLeaf();
+    const ixLeaf = buildBuiltInLeaf('ix', {
+      n: 1,
+      unit: 'year',
+      direction: 'past',
+    });
+    const measureHierarchy = {
+      kind: 'measureStackV1' as const,
+      groups: [
+        { metricKey: 'm1', leaves: [valueLeaf, ixLeaf] },
+        { metricKey: 'm2', leaves: [valueLeaf, ixLeaf] },
+        { metricKey: 'm3', leaves: [valueLeaf] },
+      ],
+      leafTierVisibility: 'visible' as const,
+    };
+    const records = [
+      {
+        row1: 'R1',
+        m1: 10,
+        'm1__1 year ago': 8,
+        m2: 5,
+        'm2__1 year ago': 4,
+        m3: 7,
+      },
+    ];
+    const baseTree = buildTreeFromRecords(records, metrics, ['row1'], [], 1, 0);
+    const tree = applyMeasureHierarchyAxis(
+      applyMeasureLeafValuesToTree({ tree: baseTree, measureHierarchy }),
+      measureHierarchy,
+      MetricsLayoutEnum.COLUMNS,
+      ['row1'],
+      [],
+      0,
+    );
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: ['row1'],
+      cols: [],
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: ['row1'],
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      measureLeavesByMetric: {
+        m1: [valueLeaf, ixLeaf],
+        m2: [valueLeaf, ixLeaf],
+        m3: [valueLeaf],
+      },
+      pivotRuntimeLayout: runtimeLayout,
+      rowTotals: true,
+    });
+
+    const { container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+        rowTotals
+      />,
+    );
+
+    const headerRow = container.querySelector('thead tr');
+    if (!headerRow) {
+      throw new Error('Table header row not found');
+    }
+    const headerCells = within(headerRow).getAllByRole('columnheader');
+    const metricHeaderCells = headerCells.filter(cell =>
+      metrics.includes(cell.textContent?.trim() ?? ''),
+    );
+    expect(metricHeaderCells).toHaveLength(metrics.length);
+    const metricHeader = (metric: string) => {
+      const matches = metricHeaderCells.filter(
+        cell => cell.textContent?.trim() === metric,
+      );
+      if (matches.length !== 1) {
+        throw new Error(
+          `Expected 1 header for ${metric}, found ${matches.length}`,
+        );
+      }
+      return matches[0];
+    };
+    expect(metricHeader('m1').colSpan).toBe(2);
+    expect(metricHeader('m2').colSpan).toBe(2);
+    expect(metricHeader('m3').colSpan).toBe(1);
+    metricHeaderCells.forEach(cell => {
+      expect(cell.rowSpan).toBe(1);
+    });
+  });
+
   it('does not interleave metric totals with column dimensions when row totals are present', () => {
     const metrics = ['m1', 'm2', 'm3'];
     const valueLeaf = buildValueLeaf();

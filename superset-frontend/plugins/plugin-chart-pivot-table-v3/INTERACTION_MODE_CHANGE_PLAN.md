@@ -99,6 +99,8 @@ Pivot headers (metric tier) display **metric key** instead of **metric label**.
 - Added end-of-strip drop zones so dimensions can be dropped at the end without precision issues.
 - Dragging a dimension to the end is now explicit: default insertions keep Value last, but explicit drops can place a dimension after Value; tests cover both cases.
 - Drag preview layer is isolated in a memoized component to avoid re-rendering the full chart on pointer moves (reduces DnD lag).
+- Fixed duplicate metric headers when measure leaves are visible with row totals (no column dimensions); new interaction-layout regression test added.
+- Ensured metric label map is injected before layout/tree building so headers consistently use metric labels (transformProps regression test added).
 
 **Quality gate (latest run)**
 - `npm run test -- plugins/plugin-chart-pivot-table-v3` ✅ (warnings: duplicate Jest mocks, browserslist stale, babel deprecation).

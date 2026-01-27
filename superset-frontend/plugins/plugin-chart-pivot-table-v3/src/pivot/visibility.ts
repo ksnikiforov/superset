@@ -17,7 +17,12 @@
  * under the License.
  */
 import { PivotResultCell, PivotTreeNode, TotalPosition } from '../types';
-import { decodeMeasureLeafId, isSubtotalToken, parseCellKey } from '../utils';
+import {
+  decodeMeasureLeafId,
+  decodeMetricKey,
+  isSubtotalToken,
+  parseCellKey,
+} from '../utils';
 import { buildVisibleList, rootKey } from './viewModel';
 
 type VisibleRowsParams = {
@@ -95,6 +100,9 @@ export const createColLeavesBuilder = ({
     const dimDepth = countDimDepth(node.path);
     const hasChildren = children.length > 0;
     const hasMetricGrandTotals = children.some(isMetricGrandTotalNode);
+    const isMetricGroup = Boolean(
+      decodeMetricKey(node.path[node.path.length - 1]),
+    );
     const includeSubtotal =
       hasChildren &&
       ((rowTotals && dimDepth === 0) ||
@@ -145,6 +153,10 @@ export const createColLeavesBuilder = ({
         ? resolvedColTotalPosition
         : resolvedColSubtotalPosition) === 'start';
     const childLeaves = children.flatMap(buildColLeavesWithSubtotals);
+    const hasMeasureLeafDescendants = childLeaves.some(leaf =>
+      leaf.path.some(val => decodeMeasureLeafId(val)),
+    );
+    const suppressMetricGroupLeaf = isMetricGroup && hasMeasureLeafDescendants;
     if (!includeSubtotal) {
       return filterHiddenSubtotals(childLeaves);
     }
@@ -227,6 +239,9 @@ export const createColLeavesBuilder = ({
       return placeAtFront
         ? [subtotalLeaf, ...remainingLeaves]
         : [...remainingLeaves, subtotalLeaf];
+    }
+    if (suppressMetricGroupLeaf) {
+      return childLeaves;
     }
     return placeAtFront ? [node, ...childLeaves] : [...childLeaves, node];
   };

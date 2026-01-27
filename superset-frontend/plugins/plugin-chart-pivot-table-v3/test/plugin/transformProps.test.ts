@@ -109,6 +109,66 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
     ).toBe(20);
   });
 
+  it('uses metric display labels when building metric header nodes', () => {
+    const metricKey = 'metric1';
+    const metricLabel = 'Revenue';
+    const rowKey = serializePath(['A']);
+    const colKey = serializePath(['B']);
+    const metricNodeKey = serializePath(['B', encodeMetricKey(metricKey)]);
+    const chartProps = new ChartProps({
+      formData: {
+        ...baseFormData,
+        metrics: [metricKey],
+      },
+      width: 400,
+      height: 300,
+      queriesData: [
+        {
+          data: [{ metric1: 30 }],
+          colnames: ['metric1'],
+          coltypes: [0],
+        },
+        {
+          data: [{ row1: 'A', col1: 'B', metric1: 15 }],
+          colnames: ['row1', 'col1', 'metric1'],
+          coltypes: [1, 1, 0],
+        },
+        {
+          data: [{ row1: 'A', metric1: 10 }],
+          colnames: ['row1', 'metric1'],
+          coltypes: [1, 0],
+        },
+        {
+          data: [{ col1: 'B', metric1: 20 }],
+          colnames: ['col1', 'metric1'],
+          coltypes: [1, 0],
+        },
+      ],
+      hooks: { setDataMask: jest.fn() },
+      filterState: { selectedFilters: {} },
+      datasource: {
+        verboseMap: {},
+        columnFormats: {},
+        currencyFormats: {},
+        columns: [
+          { column_name: 'row1', type_generic: GenericDataType.String },
+          { column_name: 'col1', type_generic: GenericDataType.String },
+        ],
+        metrics: [{ metric_name: metricKey, verbose_name: metricLabel }],
+      },
+      theme: supersetTheme,
+    });
+
+    const result = transformProps(chartProps);
+    expect(result.data.rows).toHaveProperty(rowKey);
+    expect(result.data.cols).toHaveProperty(colKey);
+    const metricNode = result.data.cols[metricNodeKey];
+    if (!metricNode) {
+      throw new Error('Metric header node missing from column tree');
+    }
+    expect(metricNode.label).toBe(metricLabel);
+  });
+
   it('maps query results by query_name rather than array order (Contract 2)', () => {
     const formData = baseFormData as PivotTableQueryFormData;
     const specs = buildInitialQuerySpecs(formData);

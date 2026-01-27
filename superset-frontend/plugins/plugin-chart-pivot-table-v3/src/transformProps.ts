@@ -19,6 +19,7 @@
 import {
   ChartProps,
   DataRecordValue,
+  ensureIsArray,
   extractTimegrain,
   GenericDataType,
   getTimeFormatter,
@@ -86,28 +87,8 @@ export default function transformProps(
     formData: baseFormData,
     runtimeLayout,
   });
-  const {
-    verboseMap = {},
-    columnFormats = {},
-    currencyFormats = {},
-    columns = [],
-  } = datasource || {};
-  const layout = buildLayoutContext(formData);
-  const {
-    metrics,
-    groupbyRows,
-    groupbyColumns,
-    rowSubTotals: rowSubTotalsEnabled,
-    rowSubtotalLevels,
-    colSubtotalLevelsForQuery: colSubtotalLevels,
-    rowTotalPosition,
-    rowSubtotalPosition,
-    colTotalPosition,
-    colSubtotalPosition,
-    metricsLayoutResolved: metricsLayout,
-    metricInsertIndex,
-  } = layout;
-  const metricLabelMap = metrics.reduce<Record<string, string>>(
+  const metricsForLabels = ensureIsArray(formData.metrics);
+  const metricLabelMapBase = metricsForLabels.reduce<Record<string, string>>(
     (acc, metric) => {
       const key = getMetricKey(metric);
       if (!key) {
@@ -127,6 +108,32 @@ export default function transformProps(
     },
     {},
   );
+  const metricLabelMap = {
+    ...metricLabelMapBase,
+    ...(formData.metricLabelMap ?? {}),
+  };
+  const formDataWithMetricLabels = { ...formData, metricLabelMap };
+  const {
+    verboseMap = {},
+    columnFormats = {},
+    currencyFormats = {},
+    columns = [],
+  } = datasource || {};
+  const layout = buildLayoutContext(formDataWithMetricLabels);
+  const {
+    metrics,
+    groupbyRows,
+    groupbyColumns,
+    rowSubTotals: rowSubTotalsEnabled,
+    rowSubtotalLevels,
+    colSubtotalLevelsForQuery: colSubtotalLevels,
+    rowTotalPosition,
+    rowSubtotalPosition,
+    colTotalPosition,
+    colSubtotalPosition,
+    metricsLayoutResolved: metricsLayout,
+    metricInsertIndex,
+  } = layout;
   const metricFormatting = normalizeMetricFormattingMapWithKeys(
     formData.metricFormatting,
     metrics,
@@ -143,7 +150,7 @@ export default function transformProps(
     formData.colSorting,
     groupbyColumns,
   );
-  const initialSpecs = buildInitialQuerySpecs(formData, layout);
+  const initialSpecs = buildInitialQuerySpecs(formDataWithMetricLabels, layout);
   const planMetrics = initialSpecs.reduce(
     (acc, spec) => mergeMetrics(acc, spec.metrics),
     metrics,
@@ -154,7 +161,7 @@ export default function transformProps(
   const metricKeysForQuery = getMetricKeys(planMetrics);
   const queryFormData: PivotTableQueryFormData = {
     ...rawFormData,
-    ...formData,
+    ...formDataWithMetricLabels,
     metricsLayout,
     metricLabelMap,
   };
@@ -273,7 +280,7 @@ export default function transformProps(
         { rowDepth: spec.meta.rowDepth, colDepth: spec.meta.colDepth },
       ],
       metricsForQuery: spec.metrics,
-      formData,
+      formData: formDataWithMetricLabels,
       measureHierarchy: layout.measureHierarchy,
       rowGroupby: spec.meta.rowGroupbyForQueryFull,
       colGroupby: spec.meta.colGroupbyForQueryFull,
@@ -333,7 +340,7 @@ export default function transformProps(
     margin: formData.margin ?? 0,
     data: nextTreeWithLeaves,
     formData: {
-      ...formData,
+      ...formDataWithMetricLabels,
       metricsLayout,
       treeDataSignature,
       metricLabelMap,
