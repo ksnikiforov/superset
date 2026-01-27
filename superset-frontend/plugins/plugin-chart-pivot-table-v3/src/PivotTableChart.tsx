@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   DataRecordValue,
   ensureIsArray,
@@ -27,9 +27,12 @@ import {
   t,
 } from '@superset-ui/core';
 import { Icons } from '@superset-ui/core/components/Icons';
+import { useDrag, useDragLayer, useDrop } from 'react-dnd';
+import { getEmptyImage } from 'react-dnd-html5-backend';
 import {
   type PivotTableProps,
   MetricsLayoutEnum,
+  type PivotAxis,
   PivotRuntimeLayout,
 } from './types';
 import { PivotTableView } from './pivot/render/PivotTableView';
@@ -42,6 +45,12 @@ import { usePivotInteractions } from './pivot/chart/usePivotInteractions';
 import { PivotInteractionPanel } from './pivot/chart/PivotInteractionPanel';
 import { stableStringify } from './pivot/shared/stableStringify';
 import { resolveInteractionFormData } from './pivot/layout/resolveInteractionLayout';
+import {
+  applyDimensionDrag,
+  applyValueDrag,
+  INTERACTION_DIMENSION_DND_TYPE,
+  INTERACTION_VALUE_DND_TYPE,
+} from './pivot/layout/interactionDrag';
 import {
   getMetricKeys,
   getStableColumnKey,
@@ -86,6 +95,12 @@ const ChipRow = styled.div`
   overflow: hidden;
 `;
 
+const ChipRowDropZone = styled.div`
+  flex: 1 1 auto;
+  min-width: ${({ theme }) => theme.sizeSM}px;
+  height: 100%;
+`;
+
 const ChipColumn = styled.div`
   display: flex;
   flex-direction: column;
@@ -97,6 +112,13 @@ const ChipColumn = styled.div`
   align-items: center;
 `;
 
+const ChipColumnDropZone = styled.div`
+  flex: 1 1 auto;
+  min-height: ${({ theme }) => theme.sizeSM}px;
+  width: 100%;
+  align-self: stretch;
+`;
+
 const Chip = styled.div`
   flex: 0 1 auto;
   min-width: 0;
@@ -104,10 +126,13 @@ const Chip = styled.div`
   padding: 2px 8px;
   border-radius: 10px;
   background: ${({ theme }) => theme.colorFillSecondary};
+  background-clip: padding-box;
+  overflow: hidden;
   font-size: 11px;
   display: inline-flex;
   align-items: center;
   gap: ${({ theme }) => theme.sizeXXS}px;
+  cursor: grab;
 `;
 
 const ValueChip = styled(Chip)`
@@ -167,11 +192,273 @@ const VerticalChipCloseButton = styled(ChipCloseButton)`
   transform: translateX(-50%);
 `;
 
+const DragPreviewWrap = styled.div`
+  position: fixed;
+  pointer-events: none;
+  z-index: 2000;
+  top: 0;
+  left: 0;
+`;
+
+const DragPreviewChip = styled(Chip)`
+  box-shadow: ${({ theme }) => theme.boxShadowSecondary};
+`;
+
+const DragPreviewValueChip = styled(ValueChip)`
+  box-shadow: ${({ theme }) => theme.boxShadowSecondary};
+`;
+
 const TableRow = styled.div`
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
 `;
+
+type InteractionChipProps = {
+  axis: PivotAxis;
+  chip: ChipItem;
+  chipIndex: number;
+  vertical?: boolean;
+  onRegisterRef?: (node: HTMLDivElement | null) => void;
+  onDropDimension: (
+    dimensionKey: string,
+    targetAxis: PivotAxis,
+    targetChipIndex: number,
+    insertBeforeValue: boolean,
+    sourceAxis?: PivotAxis,
+    sourceChipIndex?: number,
+  ) => void;
+  onDropValue: (
+    targetAxis: PivotAxis,
+    targetChipIndex: number,
+    sourceAxis: PivotAxis,
+    sourceChipIndex?: number,
+  ) => void;
+  onRemove?: (dimensionKey: string) => void;
+};
+
+const InteractionChip = ({
+  axis,
+  chip,
+  chipIndex,
+  vertical = false,
+  onRegisterRef,
+  onDropDimension,
+  onDropValue,
+  onRemove,
+}: InteractionChipProps) => {
+  const isValue = chip.kind === 'value';
+  const ref = useRef<HTMLDivElement>(null);
+  const [{ isDragging }, drag, preview] = useDrag<
+    DragItem,
+    void,
+    { isDragging: boolean }
+  >({
+    item: isValue
+      ? {
+          type: valueDndType,
+          kind: 'value',
+          label: chip.label,
+          sourceAxis: axis,
+          sourceChipIndex: chipIndex,
+        }
+      : {
+          type: dimensionDndType,
+          kind: 'dimension',
+          label: chip.label,
+          dimensionKey: chip.id,
+          sourceAxis: axis,
+          sourceChipIndex: chipIndex,
+        },
+    collect: monitor => ({
+      isDragging: monitor.isDragging(),
+    }),
+  });
+
+  useEffect(() => {
+    preview(getEmptyImage(), { captureDraggingState: true });
+  }, [preview]);
+
+  const [, drop] = useDrop<DragItem>({
+    accept: [dimensionDndType, valueDndType],
+    drop: (item, monitor) => {
+      let handled = false;
+      const clientOffset = monitor.getClientOffset();
+      const rect = ref.current?.getBoundingClientRect();
+      const dropRatio = 0.33;
+      const isAfter =
+        rect && clientOffset
+          ? vertical
+            ? clientOffset.y > rect.top + rect.height * dropRatio
+            : clientOffset.x > rect.left + rect.width * dropRatio
+          : false;
+      const targetChipIndex = chipIndex + (isAfter ? 1 : 0);
+      const insertBeforeValue = isValue && !isAfter;
+
+      if (item.kind === 'dimension') {
+        if (item.dimensionKey === chip.id && item.sourceAxis === axis) {
+          return undefined;
+        }
+        onDropDimension(
+          item.dimensionKey,
+          axis,
+          targetChipIndex,
+          insertBeforeValue,
+          item.sourceAxis,
+          item.sourceChipIndex,
+        );
+        handled = true;
+      } else if (!(isValue && item.sourceAxis === axis && !isAfter)) {
+        onDropValue(
+          axis,
+          targetChipIndex,
+          item.sourceAxis,
+          item.sourceChipIndex,
+        );
+        handled = true;
+      }
+      return handled ? { handled: true } : undefined;
+    },
+  });
+
+  drag(drop(ref));
+  useEffect(() => {
+    onRegisterRef?.(ref.current);
+    return () => {
+      onRegisterRef?.(null);
+    };
+  }, [onRegisterRef]);
+  const ChipComponent =
+    chip.kind === 'value'
+      ? vertical
+        ? VerticalValueChip
+        : ValueChip
+      : vertical
+        ? VerticalChip
+        : Chip;
+  const LabelComponent = vertical ? VerticalChipLabel : ChipLabel;
+  const CloseComponent = vertical ? VerticalChipCloseButton : ChipCloseButton;
+
+  return (
+    <ChipComponent ref={ref} style={{ opacity: isDragging ? 0.4 : 1 }}>
+      <LabelComponent>{chip.label}</LabelComponent>
+      {chip.kind === 'dimension' && onRemove ? (
+        <CloseComponent
+          type="button"
+          onClick={event => {
+            event.stopPropagation();
+            onRemove(chip.id);
+          }}
+          aria-label={t('Remove dimension')}
+        >
+          <Icons.CloseOutlined iconSize="xs" iconColor="currentColor" />
+        </CloseComponent>
+      ) : null}
+    </ChipComponent>
+  );
+};
+
+type StripDropZoneProps = {
+  axis: PivotAxis;
+  chipCount: number;
+  onDropDimension: InteractionChipProps['onDropDimension'];
+  onDropValue: InteractionChipProps['onDropValue'];
+};
+
+const StripDropZone = ({
+  axis,
+  chipCount,
+  onDropDimension,
+  onDropValue,
+}: StripDropZoneProps) => {
+  const [, drop] = useDrop<DragItem>({
+    accept: [dimensionDndType, valueDndType],
+    drop: item => {
+      if (item.kind === 'dimension') {
+        onDropDimension(
+          item.dimensionKey,
+          axis,
+          chipCount,
+          false,
+          item.sourceAxis,
+          item.sourceChipIndex,
+        );
+      } else {
+        onDropValue(axis, chipCount, item.sourceAxis, item.sourceChipIndex);
+      }
+      return { handled: true };
+    },
+  });
+
+  return axis === 'row' ? (
+    <ChipColumnDropZone ref={drop} />
+  ) : (
+    <ChipRowDropZone ref={drop} />
+  );
+};
+
+const PivotDragLayer = memo(() => {
+  const dragLayer = useDragLayer(monitor => ({
+    item: monitor.getItem() as DragItem | null,
+    isDragging: monitor.isDragging(),
+    currentOffset: monitor.getClientOffset(),
+  }));
+
+  if (
+    !dragLayer.isDragging ||
+    !dragLayer.item?.label ||
+    !dragLayer.currentOffset
+  ) {
+    return null;
+  }
+
+  return (
+    <DragPreviewWrap
+      style={{
+        transform: `translate(${dragLayer.currentOffset.x}px, ${dragLayer.currentOffset.y}px) translate(-50%, -50%)`,
+      }}
+    >
+      {dragLayer.item.kind === 'value' ? (
+        <DragPreviewValueChip>
+          <ChipLabel>{dragLayer.item.label}</ChipLabel>
+        </DragPreviewValueChip>
+      ) : (
+        <DragPreviewChip>
+          <ChipLabel>{dragLayer.item.label}</ChipLabel>
+        </DragPreviewChip>
+      )}
+    </DragPreviewWrap>
+  );
+});
+
+type ChipItem = {
+  id: string;
+  label: string;
+  kind: 'dimension' | 'value';
+};
+
+type DimensionDragItem = {
+  type: string;
+  kind: 'dimension';
+  label?: string;
+  dimensionKey: string;
+  sourceAxis?: PivotAxis;
+  sourceChipIndex?: number;
+};
+
+type ValueDragItem = {
+  type: string;
+  kind: 'value';
+  label?: string;
+  sourceAxis: PivotAxis;
+  sourceChipIndex?: number;
+};
+
+type DragItem = DimensionDragItem | ValueDragItem;
+
+const dimensionDndType =
+  INTERACTION_DIMENSION_DND_TYPE || 'pivot-v3-interaction-dimension';
+const valueDndType = INTERACTION_VALUE_DND_TYPE || 'pivot-v3-interaction-value';
 
 const normalizeRuntimeLayout = (
   layout: PivotRuntimeLayout | undefined,
@@ -758,6 +1045,35 @@ function PivotTableChart(props: PivotTableProps) {
     : height;
   const rowChips = chipItems('row');
   const colChips = chipItems('col');
+  const rowChipRefs = useRef<Array<HTMLDivElement | null>>([]);
+  const colChipRefs = useRef<Array<HTMLDivElement | null>>([]);
+
+  const getStripDropIndex = useCallback(
+    (axis: PivotAxis, clientOffset: { x: number; y: number } | null) => {
+      const chips = axis === 'row' ? rowChips : colChips;
+      const refs = axis === 'row' ? rowChipRefs.current : colChipRefs.current;
+      const nodes = refs
+        .slice(0, chips.length)
+        .filter((node): node is HTMLDivElement => node !== null);
+      if (!clientOffset || nodes.length === 0) {
+        return 0;
+      }
+      const dropRatio = 0.33;
+      for (let index = 0; index < nodes.length; index += 1) {
+        const rect = nodes[index].getBoundingClientRect();
+        const pivot =
+          axis === 'row'
+            ? rect.top + rect.height * dropRatio
+            : rect.left + rect.width * dropRatio;
+        const offset = axis === 'row' ? clientOffset.y : clientOffset.x;
+        if (offset < pivot) {
+          return index;
+        }
+      }
+      return nodes.length;
+    },
+    [colChips, rowChips],
+  );
 
   const removeDimensionFromLayout = useCallback(
     (dimensionKey: string) => {
@@ -796,6 +1112,110 @@ function PivotTableChart(props: PivotTableProps) {
     [handleRuntimeLayoutChange, removeDimensionFromLayout],
   );
 
+  const metricsAvailable = metricKeys.length > 0;
+
+  const handleDimensionDrop = useCallback(
+    (
+      dimensionKey: string,
+      targetAxis: PivotAxis,
+      targetChipIndex: number | undefined,
+      insertBeforeValue: boolean,
+      sourceAxis?: PivotAxis,
+      sourceChipIndex?: number,
+    ) => {
+      const nextLayout = applyDimensionDrag(uiRuntimeLayout, {
+        dimensionKey,
+        targetAxis,
+        targetChipIndex,
+        insertBeforeValue,
+        sourceAxis,
+        sourceChipIndex,
+        metricsAvailable,
+      });
+      handleRuntimeLayoutChange(nextLayout);
+    },
+    [handleRuntimeLayoutChange, metricsAvailable, uiRuntimeLayout],
+  );
+
+  const handleValueDrop = useCallback(
+    (
+      targetAxis: PivotAxis,
+      targetChipIndex: number | undefined,
+      sourceAxis: PivotAxis,
+      sourceChipIndex?: number,
+    ) => {
+      const nextLayout = applyValueDrag(uiRuntimeLayout, {
+        targetAxis,
+        targetChipIndex,
+        sourceAxis,
+        sourceChipIndex,
+        metricsAvailable,
+      });
+      handleRuntimeLayoutChange(nextLayout);
+    },
+    [handleRuntimeLayoutChange, metricsAvailable, uiRuntimeLayout],
+  );
+
+  const [, dropOnRowStrip] = useDrop<DragItem>({
+    accept: [dimensionDndType, valueDndType],
+    drop: (item, monitor) => {
+      if (monitor.didDrop()) {
+        return;
+      }
+      const targetChipIndex = getStripDropIndex(
+        'row',
+        monitor.getClientOffset(),
+      );
+      if (item.kind === 'dimension') {
+        handleDimensionDrop(
+          item.dimensionKey,
+          'row',
+          targetChipIndex,
+          false,
+          item.sourceAxis,
+          item.sourceChipIndex,
+        );
+      } else {
+        handleValueDrop(
+          'row',
+          targetChipIndex,
+          item.sourceAxis,
+          item.sourceChipIndex,
+        );
+      }
+    },
+  });
+
+  const [, dropOnColStrip] = useDrop<DragItem>({
+    accept: [dimensionDndType, valueDndType],
+    drop: (item, monitor) => {
+      if (monitor.didDrop()) {
+        return;
+      }
+      const targetChipIndex = getStripDropIndex(
+        'col',
+        monitor.getClientOffset(),
+      );
+      if (item.kind === 'dimension') {
+        handleDimensionDrop(
+          item.dimensionKey,
+          'col',
+          targetChipIndex,
+          false,
+          item.sourceAxis,
+          item.sourceChipIndex,
+        );
+      } else {
+        handleValueDrop(
+          'col',
+          targetChipIndex,
+          item.sourceAxis,
+          item.sourceChipIndex,
+        );
+      }
+    },
+  });
+
   return isUserControlled ? (
     <InteractionLayout>
       <InteractionPanelWrap>
@@ -818,49 +1238,52 @@ function PivotTableChart(props: PivotTableProps) {
         />
       </InteractionPanelWrap>
       <InteractionTableWrap>
-        <ChipRow>
-          {colChips.map(chip =>
-            chip.kind === 'value' ? (
-              <ValueChip key={`col-${chip.id}`} title={chip.label}>
-                <ChipLabel>{chip.label}</ChipLabel>
-              </ValueChip>
-            ) : (
-              <Chip key={`col-${chip.id}`} title={chip.label}>
-                <ChipLabel>{chip.label}</ChipLabel>
-                <ChipCloseButton
-                  type="button"
-                  onClick={() => handleChipRemove(chip.id)}
-                  aria-label={t('Remove dimension')}
-                >
-                  <Icons.CloseOutlined iconSize="xs" iconColor="currentColor" />
-                </ChipCloseButton>
-              </Chip>
-            ),
-          )}
+        <PivotDragLayer />
+        <ChipRow ref={dropOnColStrip}>
+          {colChips.map((chip, index) => (
+            <InteractionChip
+              key={`col-${chip.id}`}
+              axis="col"
+              chip={chip}
+              chipIndex={index}
+              onRegisterRef={node => {
+                colChipRefs.current[index] = node;
+              }}
+              onDropDimension={handleDimensionDrop}
+              onDropValue={handleValueDrop}
+              onRemove={handleChipRemove}
+            />
+          ))}
+          <StripDropZone
+            axis="col"
+            chipCount={colChips.length}
+            onDropDimension={handleDimensionDrop}
+            onDropValue={handleValueDrop}
+          />
         </ChipRow>
         <TableRow>
-          <ChipColumn>
-            {rowChips.map(chip =>
-              chip.kind === 'value' ? (
-                <VerticalValueChip key={`row-${chip.id}`} title={chip.label}>
-                  <VerticalChipLabel>{chip.label}</VerticalChipLabel>
-                </VerticalValueChip>
-              ) : (
-                <VerticalChip key={`row-${chip.id}`} title={chip.label}>
-                  <VerticalChipLabel>{chip.label}</VerticalChipLabel>
-                  <VerticalChipCloseButton
-                    type="button"
-                    onClick={() => handleChipRemove(chip.id)}
-                    aria-label={t('Remove dimension')}
-                  >
-                    <Icons.CloseOutlined
-                      iconSize="xs"
-                      iconColor="currentColor"
-                    />
-                  </VerticalChipCloseButton>
-                </VerticalChip>
-              ),
-            )}
+          <ChipColumn ref={dropOnRowStrip}>
+            {rowChips.map((chip, index) => (
+              <InteractionChip
+                key={`row-${chip.id}`}
+                axis="row"
+                chip={chip}
+                chipIndex={index}
+                onRegisterRef={node => {
+                  rowChipRefs.current[index] = node;
+                }}
+                vertical
+                onDropDimension={handleDimensionDrop}
+                onDropValue={handleValueDrop}
+                onRemove={handleChipRemove}
+              />
+            ))}
+            <StripDropZone
+              axis="row"
+              chipCount={rowChips.length}
+              onDropDimension={handleDimensionDrop}
+              onDropValue={handleValueDrop}
+            />
           </ChipColumn>
           <PivotTableView
             height={tableHeight}

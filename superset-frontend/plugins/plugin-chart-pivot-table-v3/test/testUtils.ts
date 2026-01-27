@@ -17,4 +17,12 @@
  * under the License.
  */
 /* eslint-disable import/no-extraneous-dependencies */
+import { render as baseRender } from 'spec/helpers/testing-library';
+
+type BaseRender = typeof baseRender;
+type RenderOptions = Parameters<BaseRender>[1];
+
 export * from 'spec/helpers/testing-library';
+
+export const render: BaseRender = (ui, options?: RenderOptions) =>
+  baseRender(ui, { ...options, useDnd: options?.useDnd ?? true });

@@ -92,15 +92,20 @@ Pivot headers (metric tier) display **metric key** instead of **metric label**.
 - Updated metric grand total detection to treat metric + leaf totals as grand totals.
 - Adjusted column display paths for metric grand totals (metrics-at-end) to keep totals above metric/leaf tiers.
 - Column header labels now resolve measure leaf tokens to leaf labels (no `__mleaf__` in headers), with regression coverage.
+- Drag-and-drop layout helpers (`applyDimensionDrag`/`applyValueDrag`) with unit tests.
+- Chip strips now accept drops to reorder/move dimensions; Value chip is draggable between axes.
+- Dimension list now exposes a drag handle for cross-axis moves.
+- Pivot tests now render with a DnD provider via `test/testUtils` to keep DnD hooks stable.
+- Added end-of-strip drop zones so dimensions can be dropped at the end without precision issues.
+- Dragging a dimension to the end is now explicit: default insertions keep Value last, but explicit drops can place a dimension after Value; tests cover both cases.
+- Drag preview layer is isolated in a memoized component to avoid re-rendering the full chart on pointer moves (reduces DnD lag).
 
 **Quality gate (latest run)**
 - `npm run test -- plugins/plugin-chart-pivot-table-v3` ✅ (warnings: duplicate Jest mocks, browserslist stale, babel deprecation).
 - `npm run lint -- plugins/plugin-chart-pivot-table-v3` ❌ blocked by unrelated `plugins/plugin-chart-echarts/src/Gantt/transformProps.ts` import/no-unresolved.
 
 **Still pending / needs follow-up**
-- Drag-and-drop (dimensions between axes / reorder; Value chip drag between axes).
 - Filter values source (currently derived from tree; consider async values for large domains).
-- Chip strip drag reorder to mirror runtime layout changes.
 
 ### Summary of behavior (final UX)
 - **Explore controls**: Rows + Columns are replaced by a single **Dimensions** list.

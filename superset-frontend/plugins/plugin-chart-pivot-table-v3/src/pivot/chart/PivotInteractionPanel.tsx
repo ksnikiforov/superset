@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   DataRecordValue,
   ensureIsArray,
@@ -37,9 +37,12 @@ import {
   Typography,
 } from '@superset-ui/core/components';
 import { Icons } from '@superset-ui/core/components/Icons';
+import { useDrag } from 'react-dnd';
+import { getEmptyImage } from 'react-dnd-html5-backend';
 import { MeasureLeavesByMetricKey, PivotRuntimeLayout } from '../../types';
 import { getMetricKey, getStableColumnKey } from '../../utils';
 import { isValueLeaf } from '../measureLeaves';
+import { INTERACTION_DIMENSION_DND_TYPE } from '../layout/interactionDrag';
 
 const PanelSection = styled.div`
   display: flex;
@@ -117,6 +120,15 @@ const DimensionControls = styled.div`
   display: flex;
   align-items: center;
   gap: ${({ theme }) => theme.sizeXXS}px;
+`;
+
+const DimensionDragRegion = styled.div`
+  display: inline-flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.sizeXXS}px;
+  min-width: 0;
+  flex: 1 1 auto;
+  cursor: grab;
 `;
 
 const DimensionLeft = styled.div`
@@ -222,6 +234,13 @@ type LeafOption = {
   label: string;
 };
 
+type DimensionDragItem = {
+  type: string;
+  kind: 'dimension';
+  label?: string;
+  dimensionKey: string;
+};
+
 type PivotInteractionPanelProps = {
   dimensions: QueryFormColumn[];
   metrics: QueryFormMetric[];
@@ -322,6 +341,44 @@ const formatFilterValue = (value: DataRecordValue): string => {
     return t('NULL');
   }
   return String(value);
+};
+
+const dimensionDndType =
+  INTERACTION_DIMENSION_DND_TYPE || 'pivot-v3-interaction-dimension';
+
+const DimensionDragHandle = ({
+  dimensionKey,
+  label,
+  children,
+}: {
+  dimensionKey: string;
+  label: string;
+  children: ReactNode;
+}) => {
+  const [{ isDragging }, drag, preview] = useDrag<
+    DimensionDragItem,
+    void,
+    { isDragging: boolean }
+  >({
+    item: {
+      type: dimensionDndType,
+      kind: 'dimension',
+      label,
+      dimensionKey,
+    },
+    collect: monitor => ({
+      isDragging: monitor.isDragging(),
+    }),
+  });
+  useEffect(() => {
+    preview(getEmptyImage(), { captureDraggingState: true });
+  }, [preview]);
+  return (
+    <DimensionDragRegion ref={drag} style={{ opacity: isDragging ? 0.4 : 1 }}>
+      <Icons.Drag iconSize="s" />
+      {children}
+    </DimensionDragRegion>
+  );
 };
 
 export const PivotInteractionPanel = ({
@@ -636,9 +693,14 @@ export const PivotInteractionPanel = ({
                       {colIndex >= 0 ? colIndex + 1 : ''}
                     </OrderedToggle>
                   </DimensionControls>
-                  <DimensionLabel ellipsis={{ tooltip: label }}>
-                    {label}
-                  </DimensionLabel>
+                  <DimensionDragHandle
+                    dimensionKey={dimensionKey}
+                    label={label}
+                  >
+                    <DimensionLabel ellipsis={{ tooltip: label }}>
+                      {label}
+                    </DimensionLabel>
+                  </DimensionDragHandle>
                 </DimensionLeft>
                 {onFilterChange ? (
                   <DimensionRight>
