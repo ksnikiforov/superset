@@ -17,6 +17,7 @@
  * under the License.
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { isEqual } from 'lodash';
 import {
   DataRecordValue,
   ensureIsArray,
@@ -35,6 +36,7 @@ import {
   MetricsLayoutEnum,
   type PivotAxis,
   PivotRuntimeLayout,
+  type PivotTreeData,
 } from './types';
 import { PivotTableView } from './pivot/render/PivotTableView';
 import { useExpansionEngine } from './pivot/engine/useExpansionEngine';
@@ -44,8 +46,15 @@ import { useStickyHeaders } from './pivot/chart/useStickyHeaders';
 import { usePivotFormatting } from './pivot/chart/usePivotFormatting';
 import { usePivotInteractions } from './pivot/chart/usePivotInteractions';
 import { PivotInteractionPanel } from './pivot/chart/PivotInteractionPanel';
-import { stableStringify } from './pivot/shared/stableStringify';
 import { resolveInteractionFormData } from './pivot/layout/resolveInteractionLayout';
+import { buildLayoutContext } from './pivot/layout/LayoutContext';
+import { shouldFetchForLayoutChange } from './pivot/layout/shouldFetchForLayoutChange';
+import { buildInitialQuerySpecs } from './pivot/query/specs';
+import { supersetChartDataClient } from './pivot/data/SupersetChartDataClient';
+import {
+  type ChartDataQueryResult,
+  type ChartDataWarning,
+} from './pivot/data/ChartDataClient';
 import {
   applyDimensionDrag,
   applyValueDrag,
@@ -53,15 +62,94 @@ import {
   INTERACTION_VALUE_DND_TYPE,
 } from './pivot/layout/interactionDrag';
 import {
+  mergeTrees,
   getMetricKeys,
   getStableColumnKey,
   isSubtotalToken,
   METRICS_PLACEHOLDER,
+  serializePath,
 } from './utils';
+import { applyMeasureLeafValuesToTree } from './pivot/measureLeaves';
+import { buildBranchTreeFromResults } from './fetchPivotBranch';
+import { stableStringify } from './pivot/shared/stableStringify';
 
 const PANEL_WIDTH = 230;
 const TOP_CHIPS_HEIGHT = 36;
 const SIDE_CHIPS_WIDTH = 24;
+const SEAMLESS_REQUEST_GROUP = 'pivot-v3-seamless';
+
+const resolveQueryName = (result: ChartDataQueryResult): string | undefined => {
+  if (typeof result.query?.query_name === 'string') {
+    return result.query.query_name;
+  }
+  if (typeof result.query_name === 'string') {
+    return result.query_name;
+  }
+  return undefined;
+};
+
+const buildTreeFromQueryResults = ({
+  results,
+  specs,
+  layout,
+  formData,
+}: {
+  results: ChartDataQueryResult[];
+  specs: ReturnType<typeof buildInitialQuerySpecs>;
+  layout: ReturnType<typeof buildLayoutContext>;
+  formData: PivotTableProps['formData'];
+}): PivotTreeData => {
+  const rootKey = serializePath([]);
+  const emptyTree: PivotTreeData = { rows: {}, cols: {}, cells: {} };
+  const resultsByName = new Map<string, ChartDataQueryResult>();
+  results.forEach(result => {
+    const name = resolveQueryName(result);
+    if (name) {
+      resultsByName.set(name, result);
+    }
+  });
+  const mergedTree = specs.reduce((acc, spec, idx) => {
+    const fallbackResult = results[idx] ?? { data: [] };
+    const result = resultsByName.get(spec.queryName) ?? fallbackResult;
+    const nextTree = buildBranchTreeFromResults({
+      results: [result],
+      queryPairs: [
+        { rowDepth: spec.meta.rowDepth, colDepth: spec.meta.colDepth },
+      ],
+      metricsForQuery: spec.metrics,
+      formData,
+      measureHierarchy: layout.measureHierarchy,
+      rowGroupby: spec.meta.rowGroupbyForQueryFull,
+      colGroupby: spec.meta.colGroupbyForQueryFull,
+      rowSubtotalLevels: spec.meta.rowSubtotalLevels,
+      colSubtotalLevels: spec.meta.colSubtotalLevels,
+      metricsLayoutResolved: spec.meta.metricsLayoutResolved,
+      metricInsertIndex: spec.meta.metricInsertIndex,
+    });
+    return mergeTrees(acc, nextTree);
+  }, emptyTree);
+  if (mergedTree.rows[rootKey]) {
+    mergedTree.rows[rootKey] = {
+      ...mergedTree.rows[rootKey],
+      label: 'Grand total',
+      formattedLabel: 'Grand total',
+    };
+  }
+  if (mergedTree.cols[rootKey]) {
+    mergedTree.cols[rootKey] = {
+      ...mergedTree.cols[rootKey],
+      label: 'Grand total',
+      formattedLabel: 'Grand total',
+    };
+  }
+  return applyMeasureLeafValuesToTree({
+    tree: mergedTree,
+    measureHierarchy: layout.measureHierarchy,
+  });
+};
+
+const collectWarnings = (results: ChartDataQueryResult[]): ChartDataWarning[] =>
+  results.flatMap(result => result.warnings ?? []);
 
 const InteractionLayout = styled.div`
   display: flex;
@@ -504,6 +592,59 @@ const normalizeRuntimeLayout = (
   };
 };
 
+const arraysEqual = (left: string[], right: string[]) =>
+  left.length === right.length &&
+  left.every((value, index) => value === right[index]);
+
+const hasSameSet = (left: string[], right: string[]) =>
+  left.length === right.length && left.every(value => right.includes(value));
+
+const selectionSignature = (selection: PivotRuntimeLayout['leafSelection']) =>
+  stableStringify(selection ?? {});
+
+const valuePlacementSignature = (
+  placement: PivotRuntimeLayout['valuePlacement'],
+) => stableStringify(placement ?? {});
+
+const leafOrderSignature = (order?: PivotRuntimeLayout['leafOrder']) =>
+  stableStringify(order ?? []);
+
+const isMetricOrderOnlyChange = (
+  prev: PivotRuntimeLayout,
+  next: PivotRuntimeLayout,
+) => {
+  if (!arraysEqual(prev.rows, next.rows)) {
+    return false;
+  }
+  if (!arraysEqual(prev.cols, next.cols)) {
+    return false;
+  }
+  if (!hasSameSet(prev.metrics, next.metrics)) {
+    return false;
+  }
+  if (arraysEqual(prev.metrics, next.metrics)) {
+    return false;
+  }
+  if (
+    selectionSignature(prev.leafSelection) !==
+    selectionSignature(next.leafSelection)
+  ) {
+    return false;
+  }
+  if (
+    leafOrderSignature(prev.leafOrder) !== leafOrderSignature(next.leafOrder)
+  ) {
+    return false;
+  }
+  if (
+    valuePlacementSignature(prev.valuePlacement) !==
+    valuePlacementSignature(next.valuePlacement)
+  ) {
+    return false;
+  }
+  return true;
+};
+
 function PivotTableChart(props: PivotTableProps) {
   const {
     data,
@@ -552,19 +693,39 @@ function PivotTableChart(props: PivotTableProps) {
 
   const { interactionMode } = formData;
   const isUserControlled = interactionMode === 'user_controlled';
-  const isDashboardView = !setControlValue;
 
-  const fetchFormData = queryFormData || formData;
-  const appliedFormData = fetchFormData;
+  const fetchFormDataBase = queryFormData || formData;
+  const appliedFormData = fetchFormDataBase;
   const persistExpansionState = persistExpansionStateProp ?? true;
   const resolvedStickyHeaders = formData.stickyHeaders ?? stickyHeaders;
 
-  const treeRef = useRef<PivotTableProps['data']>(data);
+  const [committedTree, setCommittedTree] = useState<PivotTreeData>(data);
+  const [committedFilters, setCommittedFilters] = useState<
+    Record<string, DataRecordValue[]>
+  >(selectedFilters ?? {});
+  const [seamlessLoading, setSeamlessLoading] = useState(false);
+  const [seamlessWarnings, setSeamlessWarnings] = useState<ChartDataWarning[]>(
+    [],
+  );
+  const [seamlessError, setSeamlessError] = useState<string | undefined>(
+    undefined,
+  );
+  const seamlessRequestRef = useRef(0);
+  const dataForRender = isUserControlled ? committedTree : data;
+
+  const treeRef = useRef<PivotTableProps['data']>(dataForRender);
   const ownStateRef = useRef<JsonObject>(ownState ?? {});
 
   useEffect(() => {
     ownStateRef.current = ownState ?? {};
   }, [ownState]);
+
+  useEffect(() => {
+    setCommittedTree(data);
+    setSeamlessWarnings([]);
+    setSeamlessError(undefined);
+    setSeamlessLoading(false);
+  }, [data]);
 
   const mergeOwnState = useCallback((partial: JsonObject) => {
     const next = { ...ownStateRef.current, ...partial };
@@ -614,33 +775,31 @@ function PivotTableChart(props: PivotTableProps) {
       (ownState?.pivotRuntimeLayout as PivotRuntimeLayout | undefined);
     return normalizeRuntimeLayout(persisted, dimensionKeys, metricKeys);
   }, [dimensionKeys, formData.pivotRuntimeLayout, metricKeys, ownState]);
+  const [committedRuntimeLayout, setCommittedRuntimeLayout] =
+    useState<PivotRuntimeLayout>(runtimeLayout);
   const [uiRuntimeLayout, setUiRuntimeLayout] =
     useState<PivotRuntimeLayout>(runtimeLayout);
   const [uiSelectedFilters, setUiSelectedFilters] = useState<
     Record<string, DataRecordValue[]>
   >(selectedFilters ?? {});
+
+  useEffect(() => {
+    setCommittedRuntimeLayout(runtimeLayout);
+  }, [runtimeLayout]);
   const appliedRuntimeLayout = useMemo(() => {
     if (!isUserControlled) {
       return runtimeLayout;
     }
-    const persisted =
-      queryFormData?.pivotRuntimeLayout ??
-      (!queryFormData
-        ? (formData.pivotRuntimeLayout ??
-          (ownState?.pivotRuntimeLayout as PivotRuntimeLayout | undefined))
-        : undefined);
     return normalizeRuntimeLayout(
-      persisted,
+      committedRuntimeLayout,
       appliedDimensionKeys,
       appliedMetricKeys,
     );
   }, [
     appliedDimensionKeys,
     appliedMetricKeys,
-    formData.pivotRuntimeLayout,
+    committedRuntimeLayout,
     isUserControlled,
-    ownState?.pivotRuntimeLayout,
-    queryFormData,
     runtimeLayout,
   ]);
   const appliedLayoutFormData = useMemo(() => {
@@ -740,46 +899,190 @@ function PivotTableChart(props: PivotTableProps) {
     [dimensionMap],
   );
 
+  const committedFilterPayload = useMemo(
+    () => buildFilterPayload(committedFilters),
+    [buildFilterPayload, committedFilters],
+  );
+
+  const fetchFormData = useMemo(() => {
+    if (!isUserControlled || !committedFilterPayload.hasFilters) {
+      return appliedLayoutFormData;
+    }
+    return {
+      ...appliedLayoutFormData,
+      extra_form_data: {
+        ...(appliedLayoutFormData.extra_form_data ?? {}),
+        filters: committedFilterPayload.filters ?? [],
+      },
+    };
+  }, [appliedLayoutFormData, committedFilterPayload, isUserControlled]);
+
   useEffect(() => {
     setUiRuntimeLayout(runtimeLayout);
   }, [runtimeLayout]);
 
-  useEffect(() => {
-    setUiSelectedFilters(normalizeSelectedFilters(selectedFilters));
-  }, [normalizeSelectedFilters, selectedFilters]);
+  const persistedSelectedFilters = useMemo(() => {
+    if (!isUserControlled) {
+      return normalizeSelectedFilters(selectedFilters);
+    }
+    const ownFilters = ownState?.pivotSelectedFilters as
+      | Record<string, DataRecordValue[]>
+      | undefined;
+    if (ownFilters && Object.keys(ownFilters).length > 0) {
+      return normalizeSelectedFilters(ownFilters);
+    }
+    if (Object.keys(committedFilters).length > 0) {
+      return normalizeSelectedFilters(committedFilters);
+    }
+    return normalizeSelectedFilters(selectedFilters);
+  }, [
+    committedFilters,
+    isUserControlled,
+    normalizeSelectedFilters,
+    ownState?.pivotSelectedFilters,
+    selectedFilters,
+  ]);
 
-  const layoutApplySignature = useMemo(
-    () =>
-      stableStringify({
-        metrics: runtimeLayout.metrics,
-        leafSelection: runtimeLayout.leafSelection,
-        leafOrder: runtimeLayout.leafOrder ?? [],
-      }),
-    [runtimeLayout],
+  useEffect(() => {
+    const shouldSyncFilters =
+      !isEqual(persistedSelectedFilters, committedFilters) ||
+      !isEqual(persistedSelectedFilters, uiSelectedFilters);
+    if (!shouldSyncFilters) {
+      return;
+    }
+    if (!isUserControlled) {
+      setCommittedFilters(persistedSelectedFilters);
+      setUiSelectedFilters(persistedSelectedFilters);
+      return;
+    }
+    const hasLocalFilters =
+      Object.keys(uiSelectedFilters).length > 0 ||
+      Object.keys(committedFilters).length > 0;
+    if (!hasLocalFilters) {
+      setCommittedFilters(persistedSelectedFilters);
+      setUiSelectedFilters(persistedSelectedFilters);
+    }
+  }, [
+    committedFilters,
+    isUserControlled,
+    persistedSelectedFilters,
+    uiSelectedFilters,
+  ]);
+
+  const persistRuntimeState = useCallback(
+    (
+      layout: PivotRuntimeLayout,
+      filters: Record<string, DataRecordValue[]>,
+    ) => {
+      setCommittedRuntimeLayout(layout);
+      const nextOwnState = mergeOwnState({
+        pivotRuntimeLayout: layout,
+        pivotSelectedFilters: filters,
+      });
+      if (!isUserControlled) {
+        if (setControlValue) {
+          setControlValue('pivotRuntimeLayout', layout);
+        }
+        setDataMask({ ownState: { ...nextOwnState } });
+      }
+    },
+    [isUserControlled, mergeOwnState, setControlValue, setDataMask],
   );
-  const uiLayoutApplySignature = useMemo(
-    () =>
-      stableStringify({
-        metrics: uiRuntimeLayout.metrics,
-        leafSelection: uiRuntimeLayout.leafSelection,
-        leafOrder: uiRuntimeLayout.leafOrder ?? [],
-      }),
-    [uiRuntimeLayout],
+
+  const applySeamlessUpdate = useCallback(
+    async (
+      nextLayout: PivotRuntimeLayout,
+      nextFilters: Record<string, DataRecordValue[]>,
+    ) => {
+      const normalized = normalizeRuntimeLayout(
+        nextLayout,
+        dimensionKeys,
+        metricKeys,
+      );
+      const { filters, hasFilters } = buildFilterPayload(nextFilters);
+      const pendingFormData = hasFilters
+        ? {
+            ...fetchFormDataBase,
+            extra_form_data: {
+              ...(fetchFormDataBase.extra_form_data ?? {}),
+              filters: filters ?? [],
+            },
+          }
+        : fetchFormDataBase;
+      const resolvedFormData = resolveInteractionFormData({
+        formData: pendingFormData,
+        runtimeLayout: normalized,
+      });
+      const layout = buildLayoutContext(resolvedFormData);
+      const timeOffsets = Array.from(
+        new Set([
+          ...(resolvedFormData.time_offsets ?? []),
+          ...layout.requiredTimeOffsets,
+        ]),
+      );
+      const resolvedFormDataWithOffsets =
+        timeOffsets.length > 0
+          ? { ...resolvedFormData, time_offsets: timeOffsets }
+          : resolvedFormData;
+      const specs = buildInitialQuerySpecs(resolvedFormDataWithOffsets, layout);
+      const requestId = seamlessRequestRef.current + 1;
+      seamlessRequestRef.current = requestId;
+      supersetChartDataClient.cancel(SEAMLESS_REQUEST_GROUP);
+      setSeamlessLoading(true);
+      setSeamlessError(undefined);
+      try {
+        const results = await supersetChartDataClient.fetch({
+          formData: resolvedFormDataWithOffsets,
+          specs,
+          requestGroupId: SEAMLESS_REQUEST_GROUP,
+        });
+        if (requestId !== seamlessRequestRef.current) {
+          return;
+        }
+        const nextTree = buildTreeFromQueryResults({
+          results,
+          specs,
+          layout,
+          formData: resolvedFormDataWithOffsets,
+        });
+        setCommittedTree(nextTree);
+        setCommittedRuntimeLayout(normalized);
+        setCommittedFilters(nextFilters);
+        setSeamlessWarnings(collectWarnings(results));
+        persistRuntimeState(normalized, nextFilters);
+      } catch (error) {
+        if (requestId !== seamlessRequestRef.current) {
+          return;
+        }
+        if (
+          typeof DOMException !== 'undefined' &&
+          error instanceof DOMException &&
+          error.name === 'AbortError'
+        ) {
+          return;
+        }
+        setSeamlessError(
+          error instanceof Error ? error.message : t('Failed to update data'),
+        );
+      } finally {
+        if (requestId === seamlessRequestRef.current) {
+          setSeamlessLoading(false);
+        }
+      }
+    },
+    [
+      buildFilterPayload,
+      dimensionKeys,
+      fetchFormDataBase,
+      metricKeys,
+      persistRuntimeState,
+      setCommittedFilters,
+      setCommittedTree,
+      setSeamlessError,
+      setSeamlessLoading,
+      setSeamlessWarnings,
+    ],
   );
-  const appliedFiltersSignature = useMemo(
-    () => stableStringify(normalizeSelectedFilters(selectedFilters)),
-    [normalizeSelectedFilters, selectedFilters],
-  );
-  const uiFiltersSignature = useMemo(
-    () => stableStringify(uiSelectedFilters),
-    [uiSelectedFilters],
-  );
-  const hasPendingLayoutChanges =
-    uiLayoutApplySignature !== layoutApplySignature;
-  const hasPendingFilterChanges =
-    uiFiltersSignature !== appliedFiltersSignature;
-  const hasPendingLayoutChangesOrFilters =
-    hasPendingLayoutChanges || hasPendingFilterChanges;
 
   const handleRuntimeLayoutChange = useCallback(
     (nextLayout: PivotRuntimeLayout) => {
@@ -789,65 +1092,31 @@ function PivotTableChart(props: PivotTableProps) {
         metricKeys,
       );
       setUiRuntimeLayout(normalized);
-      const nextApplySignature = stableStringify({
-        metrics: normalized.metrics,
-        leafSelection: normalized.leafSelection,
-        leafOrder: normalized.leafOrder ?? [],
-      });
-      const requiresApply = nextApplySignature !== layoutApplySignature;
-      if (requiresApply || hasPendingFilterChanges) {
+      const skipMetricOrderCommit =
+        isUserControlled &&
+        queryFormData &&
+        isMetricOrderOnlyChange(committedRuntimeLayout, normalized);
+      if (shouldFetchForLayoutChange(committedRuntimeLayout, normalized)) {
+        applySeamlessUpdate(normalized, uiSelectedFilters);
         return;
       }
-      if (setControlValue) {
-        setControlValue('pivotRuntimeLayout', normalized);
+      if (skipMetricOrderCommit) {
+        return;
       }
-      const nextOwnState = mergeOwnState({ pivotRuntimeLayout: normalized });
-      setDataMask({ ownState: { ...nextOwnState } });
+      setCommittedRuntimeLayout(normalized);
+      persistRuntimeState(normalized, uiSelectedFilters);
     },
     [
+      applySeamlessUpdate,
+      committedRuntimeLayout,
       dimensionKeys,
-      hasPendingFilterChanges,
-      layoutApplySignature,
-      mergeOwnState,
       metricKeys,
-      setControlValue,
-      setDataMask,
+      persistRuntimeState,
+      queryFormData,
+      isUserControlled,
+      uiSelectedFilters,
     ],
   );
-
-  const handleApplyRuntimeLayout = useCallback(() => {
-    const normalized = normalizeRuntimeLayout(
-      uiRuntimeLayout,
-      dimensionKeys,
-      metricKeys,
-    );
-    if (setControlValue) {
-      setControlValue('pivotRuntimeLayout', normalized);
-    }
-    const nextOwnState = mergeOwnState({ pivotRuntimeLayout: normalized });
-    const { filters, filterStateSelected, hasFilters } = buildFilterPayload(
-      uiSelectedFilters,
-    );
-    setDataMask({
-      extraFormData: {
-        filters,
-      },
-      filterState: {
-        value: hasFilters ? Object.values(filterStateSelected) : null,
-        selectedFilters: hasFilters ? filterStateSelected : null,
-      },
-      ownState: { ...nextOwnState },
-    });
-  }, [
-    buildFilterPayload,
-    dimensionKeys,
-    mergeOwnState,
-    metricKeys,
-    setDataMask,
-    setControlValue,
-    uiSelectedFilters,
-    uiRuntimeLayout,
-  ]);
 
   const dimensionLabelMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -887,7 +1156,7 @@ function PivotTableChart(props: PivotTableProps) {
   );
 
   const layoutResult = usePivotLayout({
-    data,
+    data: dataForRender,
     formData: appliedLayoutFormData,
     metrics: layoutMetrics,
     groupbyRows: layoutGroupbyRows,
@@ -907,6 +1176,13 @@ function PivotTableChart(props: PivotTableProps) {
     colTotalPosition,
     colSubtotalPosition,
   });
+  const shouldPersistExpansionState =
+    persistExpansionState && !isUserControlled;
+  const expansionSetControlValue = isUserControlled
+    ? undefined
+    : setControlValue;
+  const expansionSetDataMask = isUserControlled ? undefined : setDataMask;
+  const expansionMergeOwnState = isUserControlled ? undefined : mergeOwnState;
 
   const {
     tree,
@@ -919,7 +1195,7 @@ function PivotTableChart(props: PivotTableProps) {
     handleToggle,
     handleRetry,
   } = useExpansionEngine({
-    data,
+    data: dataForRender,
     expandedStateSignature: layoutResult.expandedStateSignature,
     fetchFormData,
     groupbyRowKeys: layoutResult.groupbyRowKeys,
@@ -937,13 +1213,13 @@ function PivotTableChart(props: PivotTableProps) {
     countDimDepth: layoutResult.countEngineDimDepth,
     expandRowsLevelRaw: layoutResult.expandRowsLevelRaw,
     expandColumnsLevelRaw: layoutResult.expandColumnsLevelRaw,
-    setControlValue,
-    setDataMask,
-    mergeOwnState,
+    setControlValue: expansionSetControlValue,
+    setDataMask: expansionSetDataMask,
+    mergeOwnState: expansionMergeOwnState,
     persistedExpansionState:
       appliedLayoutFormData.pivotExpansionState ??
       ownState?.pivotExpansionState,
-    shouldPersistExpansionState: persistExpansionState,
+    shouldPersistExpansionState,
     getFetchPath: layoutResult.getFetchPath,
     pruneMergedTree: layoutResult.pruneMergedTree,
   });
@@ -1033,16 +1309,19 @@ function PivotTableChart(props: PivotTableProps) {
         delete nextSelected[dimensionKey];
       }
       setUiSelectedFilters(nextSelected);
+      applySeamlessUpdate(uiRuntimeLayout, nextSelected);
     },
-    [uiSelectedFilters],
+    [applySeamlessUpdate, uiRuntimeLayout, uiSelectedFilters],
   );
 
   const handleClearAllFilters = useCallback(() => {
     if (Object.keys(uiSelectedFilters).length === 0) {
       return;
     }
-    setUiSelectedFilters({});
-  }, [uiSelectedFilters]);
+    const nextSelected: Record<string, DataRecordValue[]> = {};
+    setUiSelectedFilters(nextSelected);
+    applySeamlessUpdate(uiRuntimeLayout, nextSelected);
+  }, [applySeamlessUpdate, uiRuntimeLayout, uiSelectedFilters]);
 
   const { headerOffset, headerRowOffsets, headerRef } = useStickyHeaders({
     enabled: resolvedStickyHeaders,
@@ -1089,6 +1368,17 @@ function PivotTableChart(props: PivotTableProps) {
     dateFormatters,
     timeGrainSqla,
   });
+
+  const combinedWarnings = useMemo(
+    () => [...warnings, ...seamlessWarnings],
+    [seamlessWarnings, warnings],
+  );
+  const activeErrorMessage = seamlessError ?? errorMessage;
+  const cornerLoaderVisible = isUserControlled
+    ? seamlessLoading || renderModelResult.showGlobalLoader
+    : renderModelResult.showGlobalLoader;
+  const tableOverlayVisible =
+    !isUserControlled && renderModelResult.showGlobalLoader;
 
   const tableWidth = isUserControlled
     ? Math.max(0, width - PANEL_WIDTH - SIDE_CHIPS_WIDTH)
@@ -1283,9 +1573,6 @@ function PivotTableChart(props: PivotTableProps) {
           selectedFilters={uiSelectedFilters}
           onFilterChange={handleDimensionFilterChange}
           onClearFilters={handleClearAllFilters}
-          onApply={handleApplyRuntimeLayout}
-          showApply
-          applyDisabled={!hasPendingLayoutChangesOrFilters}
           runtimeLayout={uiRuntimeLayout}
           onChange={handleRuntimeLayoutChange}
         />
@@ -1346,10 +1633,11 @@ function PivotTableChart(props: PivotTableProps) {
               tree={tree}
               expandedRows={renderModelResult.expandedRowsForRender}
               expandedCols={renderModelResult.expandedColsForRender}
-              errorMessage={errorMessage}
+              errorMessage={activeErrorMessage}
               onRetry={handleRetry}
-              warnings={warnings}
+              warnings={combinedWarnings}
               showGlobalLoader={false}
+              showCornerLoader={cornerLoaderVisible}
               stickyHeaders={resolvedStickyHeaders}
               headerOffset={headerOffset}
               headerRowOffsets={headerRowOffsets}
@@ -1382,7 +1670,7 @@ function PivotTableChart(props: PivotTableProps) {
               handleCellKeyDown={interactions.handleCellKeyDown}
               handleCellContextMenu={interactions.handleCellContextMenu}
             />
-            {renderModelResult.showGlobalLoader ? <Loading /> : null}
+            {tableOverlayVisible ? <Loading /> : null}
           </TableArea>
         </TableRow>
       </InteractionTableWrap>
@@ -1395,10 +1683,11 @@ function PivotTableChart(props: PivotTableProps) {
       tree={tree}
       expandedRows={renderModelResult.expandedRowsForRender}
       expandedCols={renderModelResult.expandedColsForRender}
-      errorMessage={errorMessage}
+      errorMessage={activeErrorMessage}
       onRetry={handleRetry}
-      warnings={warnings}
+      warnings={combinedWarnings}
       showGlobalLoader={renderModelResult.showGlobalLoader}
+      showCornerLoader={renderModelResult.showGlobalLoader}
       stickyHeaders={resolvedStickyHeaders}
       headerOffset={headerOffset}
       headerRowOffsets={headerRowOffsets}

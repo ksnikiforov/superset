@@ -581,12 +581,8 @@ describe('PivotTableChart measure leaf tier indentation', () => {
     if (!ixHeader) {
       throw new Error('IX header not found');
     }
-    const valueToggle =
-      within(valueHeader).queryByLabelText('plus-square') ??
-      within(valueHeader).queryByLabelText('minus-square');
-    const ixToggle =
-      within(ixHeader).queryByLabelText('plus-square') ??
-      within(ixHeader).queryByLabelText('minus-square');
+    const valueToggle = within(valueHeader).queryByRole('button');
+    const ixToggle = within(ixHeader).queryByRole('button');
     expect(valueToggle).toBeInTheDocument();
     expect(ixToggle).toBeInTheDocument();
   });
@@ -667,12 +663,8 @@ describe('PivotTableChart measure leaf tier indentation', () => {
     if (!ixRow) {
       throw new Error('IX row not found');
     }
-    const valueToggle =
-      within(valueRow).queryByLabelText('plus-square') ??
-      within(valueRow).queryByLabelText('minus-square');
-    const ixToggle =
-      within(ixRow).queryByLabelText('plus-square') ??
-      within(ixRow).queryByLabelText('minus-square');
+    const valueToggle = within(valueRow).queryByRole('button');
+    const ixToggle = within(ixRow).queryByRole('button');
     expect(valueToggle).toBeInTheDocument();
     expect(ixToggle).toBeInTheDocument();
   });

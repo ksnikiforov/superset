@@ -221,8 +221,15 @@ const ToggleButton = styled.button`
 
 const Spinner = styled(LoadingOutlined)`
   font-size: 13px;
-  color: ${({ theme }) => theme.colorText};
-  text-shadow: 0 0 0 currentColor, 0 0 1px currentColor;
+  color: ${({ theme }) => theme.colorTextHeading};
+  text-shadow:
+    0 0 1px currentColor,
+    0 0 2px currentColor;
+
+  & svg {
+    stroke: currentColor;
+    stroke-width: 1;
+  }
 `;
 
 const normalizeCssColor = (rawValue: unknown) => {
@@ -277,6 +284,7 @@ type PivotTableViewProps = {
   onRetry: () => void;
   warnings?: ChartDataWarning[];
   showGlobalLoader: boolean;
+  showCornerLoader?: boolean;
   stickyHeaders: boolean;
   headerOffset: number;
   headerRowOffsets: number[];
@@ -346,6 +354,7 @@ export const PivotTableView = ({
   errorMessage,
   onRetry,
   showGlobalLoader,
+  showCornerLoader = false,
   stickyHeaders,
   headerOffset,
   headerRowOffsets,
@@ -418,7 +427,11 @@ export const PivotTableView = ({
                       : { fontWeight: 600 }
                   }
                 >
-                  {t('Rows')}
+                  {showCornerLoader ? (
+                    <Spinner aria-label={t('Loading')} />
+                  ) : (
+                    t('Rows')
+                  )}
                 </th>
               </tr>
             ) : (
@@ -434,7 +447,11 @@ export const PivotTableView = ({
                           : { fontWeight: 600 }
                       }
                     >
-                      {t('Rows')}
+                      {showCornerLoader ? (
+                        <Spinner aria-label={t('Loading')} />
+                      ) : (
+                        t('Rows')
+                      )}
                     </th>
                   )}
                   {rowCells.map(cell => {

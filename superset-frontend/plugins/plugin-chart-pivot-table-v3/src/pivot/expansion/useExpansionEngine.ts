@@ -65,9 +65,9 @@ import {
   computeVisibleDepths as computeVisibleDepthsBase,
   dropDescendants,
   getVisibleExpansionKeys as getVisibleExpansionKeysBase,
+  isSameLayout,
   getStablePrefixLength,
   hasNestedPendingKeys,
-  isSameLayout,
   planHydrationIteration,
   pruneFetchedDepths,
   pruneTreeByPrefixes,
@@ -90,6 +90,165 @@ type BatchFetchResult = {
 };
 
 type CombinedFetchResult = SingleFetchResult | BatchFetchResult;
+
+const isPrefix = (prefix: string[], target: string[]) =>
+  prefix.length <= target.length &&
+  prefix.every((value, idx) => value === target[idx]);
+
+const trimAxisByDepth = ({
+  tree,
+  axis,
+  maxDepth,
+  countDimDepth,
+}: {
+  tree: PivotTreeData;
+  axis: PivotAxis;
+  maxDepth: number;
+  countDimDepth: (path: PivotTreeNode['path']) => number;
+}) => {
+  const nodes = axis === 'row' ? tree.rows : tree.cols;
+  const nextNodes: Record<string, PivotTreeNode> = {};
+  const removedKeys = new Set<string>();
+  let hasChanges = false;
+  Object.entries(nodes).forEach(([key, node]) => {
+    const depth = countDimDepth(node.path);
+    if (depth > maxDepth) {
+      removedKeys.add(key);
+      hasChanges = true;
+      return;
+    }
+    let nextNode = node;
+    if (depth >= maxDepth && node.hasChildren) {
+      nextNode = { ...node, hasChildren: false };
+      hasChanges = true;
+    }
+    nextNodes[key] = nextNode;
+  });
+  if (!hasChanges) {
+    return { tree, removedKeys };
+  }
+  const nextTree =
+    axis === 'row'
+      ? { ...tree, rows: nextNodes }
+      : { ...tree, cols: nextNodes };
+  return { tree: nextTree, removedKeys };
+};
+
+const promoteAxisForDepth = ({
+  tree,
+  axis,
+  maxDepth,
+  countDimDepth,
+  isMetricTokenValue,
+}: {
+  tree: PivotTreeData;
+  axis: PivotAxis;
+  maxDepth: number;
+  countDimDepth: (path: PivotTreeNode['path']) => number;
+  isMetricTokenValue: (value: unknown) => boolean;
+}) => {
+  const nodes = axis === 'row' ? tree.rows : tree.cols;
+  let hasChanges = false;
+  const nextNodes: Record<string, PivotTreeNode> = { ...nodes };
+  Object.entries(nodes).forEach(([key, node]) => {
+    if (node.path.some(isMetricTokenValue)) {
+      return;
+    }
+    const depth = countDimDepth(node.path);
+    if (depth < maxDepth && !node.hasChildren) {
+      nextNodes[key] = { ...node, hasChildren: true };
+      hasChanges = true;
+    }
+  });
+  if (!hasChanges) {
+    return tree;
+  }
+  return axis === 'row'
+    ? { ...tree, rows: nextNodes }
+    : { ...tree, cols: nextNodes };
+};
+
+const trimTreeForLayout = ({
+  tree,
+  trimRowDepth,
+  trimColDepth,
+  countDimDepth,
+}: {
+  tree: PivotTreeData;
+  trimRowDepth?: number;
+  trimColDepth?: number;
+  countDimDepth: (path: PivotTreeNode['path']) => number;
+}) => {
+  let nextTree = tree;
+  const removedRows = new Set<string>();
+  const removedCols = new Set<string>();
+  if (trimRowDepth !== undefined) {
+    const result = trimAxisByDepth({
+      tree: nextTree,
+      axis: 'row',
+      maxDepth: trimRowDepth,
+      countDimDepth,
+    });
+    nextTree = result.tree;
+    result.removedKeys.forEach(key => removedRows.add(key));
+  }
+  if (trimColDepth !== undefined) {
+    const result = trimAxisByDepth({
+      tree: nextTree,
+      axis: 'col',
+      maxDepth: trimColDepth,
+      countDimDepth,
+    });
+    nextTree = result.tree;
+    result.removedKeys.forEach(key => removedCols.add(key));
+  }
+  if (removedRows.size === 0 && removedCols.size === 0) {
+    return nextTree;
+  }
+  const nextCells: PivotTreeData['cells'] = {};
+  Object.entries(nextTree.cells).forEach(([key, cell]) => {
+    if (removedRows.has(cell.rowKey) || removedCols.has(cell.colKey)) {
+      return;
+    }
+    nextCells[key] = cell;
+  });
+  return { ...nextTree, cells: nextCells };
+};
+
+const promoteTreeForLayout = ({
+  tree,
+  promoteRowDepth,
+  promoteColDepth,
+  countDimDepth,
+  isMetricTokenValue,
+}: {
+  tree: PivotTreeData;
+  promoteRowDepth?: number;
+  promoteColDepth?: number;
+  countDimDepth: (path: PivotTreeNode['path']) => number;
+  isMetricTokenValue: (value: unknown) => boolean;
+}) => {
+  let nextTree = tree;
+  if (promoteRowDepth !== undefined) {
+    nextTree = promoteAxisForDepth({
+      tree: nextTree,
+      axis: 'row',
+      maxDepth: promoteRowDepth,
+      countDimDepth,
+      isMetricTokenValue,
+    });
+  }
+  if (promoteColDepth !== undefined) {
+    nextTree = promoteAxisForDepth({
+      tree: nextTree,
+      axis: 'col',
+      maxDepth: promoteColDepth,
+      countDimDepth,
+      isMetricTokenValue,
+    });
+  }
+  return nextTree;
+};
 
 export type ExpansionEngineResult = {
   tree: PivotTreeData;
@@ -207,6 +366,7 @@ export const useExpansionEngine = ({
   const expansionStateStoreRef = useRef<ExpansionStateStore>();
   const persistedExpansionStateRef = useRef<unknown>(persistedExpansionState);
   const dataEpochRef = useRef(0);
+  const previousDataRef = useRef<PivotTreeData | null>(null);
   const previousLayoutRef = useRef({
     rows: groupbyRowKeys,
     cols: groupbyColumnKeys,
@@ -1625,6 +1785,12 @@ export const useExpansionEngine = ({
     };
     const previousLayout = previousLayoutRef.current;
     previousLayoutRef.current = currentLayout;
+    const hasNewData = previousDataRef.current !== data;
+    previousDataRef.current = data;
+    const layoutChanged =
+      !isSameLayout(previousLayout.rows, currentLayout.rows) ||
+      !isSameLayout(previousLayout.cols, currentLayout.cols);
+    const sourceTree = hasNewData || !layoutChanged ? data : treeRef.current;
     const layoutRowsForPrune =
       sessionExpansionState.rowKeys ?? previousLayout.rows;
     const layoutColsForPrune =
@@ -1637,6 +1803,45 @@ export const useExpansionEngine = ({
       layoutColsForPrune,
       currentLayout.cols,
     );
+    const shouldTrimRows =
+      currentLayout.rows.length < previousLayout.rows.length &&
+      isPrefix(currentLayout.rows, previousLayout.rows);
+    const shouldTrimCols =
+      currentLayout.cols.length < previousLayout.cols.length &&
+      isPrefix(currentLayout.cols, previousLayout.cols);
+    const shouldExpandRows =
+      currentLayout.rows.length > previousLayout.rows.length &&
+      isPrefix(previousLayout.rows, currentLayout.rows);
+    const shouldExpandCols =
+      currentLayout.cols.length > previousLayout.cols.length &&
+      isPrefix(previousLayout.cols, currentLayout.cols);
+    const baseTree =
+      shouldTrimRows || shouldTrimCols
+        ? trimTreeForLayout({
+            tree: sourceTree,
+            trimRowDepth: shouldTrimRows
+              ? currentLayout.rows.length
+              : undefined,
+            trimColDepth: shouldTrimCols
+              ? currentLayout.cols.length
+              : undefined,
+            countDimDepth,
+          })
+        : sourceTree;
+    const normalizedTree =
+      shouldExpandRows || shouldExpandCols
+        ? promoteTreeForLayout({
+            tree: baseTree,
+            promoteRowDepth: shouldExpandRows
+              ? currentLayout.rows.length
+              : undefined,
+            promoteColDepth: shouldExpandCols
+              ? currentLayout.cols.length
+              : undefined,
+            countDimDepth,
+            isMetricTokenValue,
+          })
+        : baseTree;
 
     dataEpochRef.current += 1;
     transactionIdRef.current += 1;
@@ -1644,8 +1849,8 @@ export const useExpansionEngine = ({
     setIsHydrating(false);
     warningsRef.current = new Map();
     setWarnings([]);
-    treeRef.current = data;
-    setTree(data);
+    treeRef.current = normalizedTree;
+    setTree(normalizedTree);
     setErrorMessage(undefined);
     fetchedRowKeysRef.current = new Map();
     fetchedColKeysRef.current = new Map();
@@ -1700,7 +1905,7 @@ export const useExpansionEngine = ({
         ? stripAutoSeededExpansions({
             keys: manualRows,
             collapsedKeys: manualCollapsedRows,
-            nodes: data.rows,
+            nodes: normalizedTree.rows,
             metricLabelSet: metricLabelSetForDepth,
             includeMetricDepthZero: shouldExpandMetricRows,
           })
@@ -1712,7 +1917,7 @@ export const useExpansionEngine = ({
         ? stripAutoSeededExpansions({
             keys: manualCols,
             collapsedKeys: manualCollapsedCols,
-            nodes: data.cols,
+            nodes: normalizedTree.cols,
             metricLabelSet: metricLabelSetForDepth,
             includeMetricDepthZero: shouldExpandMetricCols,
           })
@@ -1770,22 +1975,22 @@ export const useExpansionEngine = ({
     const prunedManualRows = pruneManualKeys(
       normalizedRowCache.keys,
       rowStablePrefix,
-      data.rows,
+      normalizedTree.rows,
     );
     const prunedManualCols = pruneManualKeys(
       normalizedColCache.keys,
       colStablePrefix,
-      data.cols,
+      normalizedTree.cols,
     );
     const prunedCollapsedRows = pruneCollapsedKeys(
       normalizedRowCache.collapsedKeys,
       rowStablePrefix,
-      data.rows,
+      normalizedTree.rows,
     );
     const prunedCollapsedCols = pruneCollapsedKeys(
       normalizedColCache.collapsedKeys,
       colStablePrefix,
-      data.cols,
+      normalizedTree.cols,
     );
 
     explicitExpandedRowsRef.current = new Set(prunedManualRows);
@@ -1811,7 +2016,7 @@ export const useExpansionEngine = ({
 
     const nextExpandedRows = buildDesiredExpandedKeys({
       axis: 'row',
-      tree: data,
+      tree: normalizedTree,
       autoExpandLevel: effectiveExpandRowsLevel,
       metricLabelSet: metricLabelSetForDepth,
       includeMetricDepthZero: shouldExpandMetricRows,
@@ -1822,7 +2027,7 @@ export const useExpansionEngine = ({
     });
     const nextExpandedCols = buildDesiredExpandedKeys({
       axis: 'col',
-      tree: data,
+      tree: normalizedTree,
       autoExpandLevel: effectiveExpandColsLevel,
       metricLabelSet: metricLabelSetForDepth,
       includeMetricDepthZero: shouldExpandMetricCols,
@@ -1835,7 +2040,7 @@ export const useExpansionEngine = ({
     const prunedRows = shouldResetExpanded
       ? pruneExpandedToStablePrefix({
           expanded: nextExpandedRows,
-          nodes: data.rows,
+          nodes: normalizedTree.rows,
           stablePrefix: rowStablePrefix,
           metricLabelSet: metricLabelSetForDepth,
         })
@@ -1843,14 +2048,22 @@ export const useExpansionEngine = ({
     const prunedCols = shouldResetExpanded
       ? pruneExpandedToStablePrefix({
           expanded: nextExpandedCols,
-          nodes: data.cols,
+          nodes: normalizedTree.cols,
           stablePrefix: colStablePrefix,
           metricLabelSet: metricLabelSetForDepth,
         })
       : nextExpandedCols;
 
-    const resolvedRows = resolveExpandedForMetrics('row', prunedRows, data);
-    const resolvedCols = resolveExpandedForMetrics('col', prunedCols, data);
+    const resolvedRows = resolveExpandedForMetrics(
+      'row',
+      prunedRows,
+      normalizedTree,
+    );
+    const resolvedCols = resolveExpandedForMetrics(
+      'col',
+      prunedCols,
+      normalizedTree,
+    );
 
     setExpandedRowsState(resolvedRows);
     setExpandedColsState(resolvedCols);
@@ -1865,7 +2078,7 @@ export const useExpansionEngine = ({
     const { visibleRowDepth, visibleColDepth } = computeVisibleDepths(
       resolvedRows,
       resolvedCols,
-      data,
+      normalizedTree,
     );
     const hasRowExpansionRequests =
       effectiveExpandRowsLevel > 0 ||
@@ -1882,7 +2095,7 @@ export const useExpansionEngine = ({
       expandedKeys: Set<string>,
       requiredOppositeDepth: number,
     ) => {
-      const nodes = axis === 'row' ? data.rows : data.cols;
+      const nodes = axis === 'row' ? normalizedTree.rows : normalizedTree.cols;
       const fetchedKeysRef =
         axis === 'row' ? fetchedRowKeysRef : fetchedColKeysRef;
       expandedKeys.forEach(key => {
@@ -1892,7 +2105,7 @@ export const useExpansionEngine = ({
         }
         if (
           !hasLoadedChildrenForTree(
-            data,
+            normalizedTree,
             axis,
             node,
             visibleRowDepth,
@@ -1908,7 +2121,7 @@ export const useExpansionEngine = ({
     seedFetchedDepths('col', resolvedCols, visibleRowDepth);
     const { rowPlan: nextRowPlan, colPlan: nextColPlan } =
       planHydrationIteration({
-        tree: data,
+        tree: normalizedTree,
         desiredRows: resolvedRows,
         desiredCols: resolvedCols,
         fetchedRowDepthByKey: fetchedRowKeysRef.current,
@@ -1932,8 +2145,12 @@ export const useExpansionEngine = ({
       prunedCollapsedCols.length > 0;
     const hasAutoExpansions =
       effectiveExpandRowsLevel > 0 || effectiveExpandColsLevel > 0;
-    const hasRowNodes = Object.keys(data.rows).some(key => key !== rootKey);
-    const hasColNodes = Object.keys(data.cols).some(key => key !== rootKey);
+    const hasRowNodes = Object.keys(normalizedTree.rows).some(
+      key => key !== rootKey,
+    );
+    const hasColNodes = Object.keys(normalizedTree.cols).some(
+      key => key !== rootKey,
+    );
     const shouldSkipRootPrefetch =
       isRootOnly &&
       !hasManualExpansions &&
@@ -1971,6 +2188,7 @@ export const useExpansionEngine = ({
     groupbyColumnKeys,
     groupbyRowKeys,
     hasLoadedChildrenForTree,
+    isMetricTokenValue,
     metricLabelSet,
     persistExpansionStateToStore,
     shouldPersistExpansionState,

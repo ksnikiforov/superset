@@ -1138,7 +1138,7 @@ export const usePivotFormatting = ({
           metricKey,
           'd3Format',
           cell.values,
-          cell.values[metricKey],
+          rawValue,
         );
         const excelOverride =
           typeof excelFormatResult === 'string'
@@ -1392,8 +1392,7 @@ export const usePivotFormatting = ({
         connectorBelowValue === undefined
           ? undefined
           : toPercent(connectorBelowValue, scale);
-      const renderConnector =
-        config.type === 'waterfall' && !!waterfallOffset;
+      const renderConnector = config.type === 'waterfall' && !!waterfallOffset;
       const connectorTopStyle =
         connectorAbovePct === undefined
           ? undefined

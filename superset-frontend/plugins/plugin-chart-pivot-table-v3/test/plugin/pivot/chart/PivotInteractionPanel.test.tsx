@@ -268,7 +268,7 @@ describe('PivotInteractionPanel', () => {
     expect(onChange.mock.calls[0][0].cols).toEqual(['country']);
   });
 
-  it('shows comparison chips only when non-value leaves exist', () => {
+  it('shows leaf chips only when non-value leaves exist', () => {
     const onChange = jest.fn();
     const { rerender } = render(
       <PivotInteractionPanel
@@ -282,7 +282,7 @@ describe('PivotInteractionPanel', () => {
       />,
     );
 
-    expect(screen.queryByText('Comparisons')).not.toBeInTheDocument();
+    expect(screen.queryByText('IX 1YA')).not.toBeInTheDocument();
 
     rerender(
       <PivotInteractionPanel
@@ -299,7 +299,7 @@ describe('PivotInteractionPanel', () => {
       />,
     );
 
-    expect(screen.getByText('Comparisons')).toBeInTheDocument();
+    expect(screen.getByText('IX 1YA')).toBeInTheDocument();
   });
 
   it('clears all filters from the header control', () => {
@@ -334,7 +334,7 @@ describe('PivotInteractionPanel', () => {
       />,
     );
 
-    fireEvent.click(screen.getByText('Apply'));
+    fireEvent.click(screen.getByText('Update chart'));
     expect(onApply).toHaveBeenCalledTimes(1);
   });
 });
