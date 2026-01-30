@@ -94,11 +94,11 @@ describe('shouldFetchForLayoutChange', () => {
     expect(shouldFetchForLayoutChange(baseLayout, nextLayout)).toBe(false);
   });
 
-  it('returns false when only value placement changes', () => {
+  it('returns true when only value placement changes', () => {
     const nextLayout: PivotRuntimeLayout = {
       ...baseLayout,
       valuePlacement: { axis: 'row', index: 0 },
     };
-    expect(shouldFetchForLayoutChange(baseLayout, nextLayout)).toBe(false);
+    expect(shouldFetchForLayoutChange(baseLayout, nextLayout)).toBe(true);
   });
 });

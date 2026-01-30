@@ -30,6 +30,10 @@ const hasSameSet = (a: string[], b: string[]) =>
 const selectionSignature = (selection: PivotRuntimeLayout['leafSelection']) =>
   stableStringify(selection ?? {});
 
+const valuePlacementSignature = (
+  placement: PivotRuntimeLayout['valuePlacement'],
+) => stableStringify(placement ?? {});
+
 export const shouldFetchForLayoutChange = (
   prev: PivotRuntimeLayout,
   next: PivotRuntimeLayout,
@@ -48,6 +52,12 @@ export const shouldFetchForLayoutChange = (
   if (
     selectionSignature(prev.leafSelection) !==
     selectionSignature(next.leafSelection)
+  ) {
+    return true;
+  }
+  if (
+    valuePlacementSignature(prev.valuePlacement) !==
+    valuePlacementSignature(next.valuePlacement)
   ) {
     return true;
   }
