@@ -54,6 +54,32 @@ const InteractionHarness = ({
   );
 };
 
+const LayoutHarness = ({
+  dimensions,
+  metrics,
+  runtimeLayout = baseLayout,
+}: {
+  dimensions: string[];
+  metrics: string[];
+  runtimeLayout?: PivotRuntimeLayout;
+}) => {
+  const [layout, setLayout] = useState<PivotRuntimeLayout>(runtimeLayout);
+  return (
+    <>
+      <PivotInteractionPanel
+        dimensions={dimensions}
+        metrics={metrics}
+        runtimeLayout={layout}
+        onChange={setLayout}
+      />
+      <div data-test="layout-cols">{layout.cols.join(',')}</div>
+      <div data-test="layout-value">
+        {`${layout.valuePlacement.axis}:${layout.valuePlacement.index}`}
+      </div>
+    </>
+  );
+};
+
 describe('PivotInteractionPanel', () => {
   it('commits metrics order when the measures popover closes', () => {
     const onChange = jest.fn();
@@ -167,6 +193,57 @@ describe('PivotInteractionPanel', () => {
     const colButtonsAfter = screen.getAllByLabelText('Toggle column dimension');
     expect(colButtonsAfter[0]).toHaveTextContent('1');
     expect(colButtonsAfter[1]).toHaveTextContent('2');
+  });
+
+  it('inserts new column dimensions after existing columns when value is in the middle', () => {
+    const onChange = jest.fn();
+    const layout: PivotRuntimeLayout = {
+      ...baseLayout,
+      cols: ['col1', 'col2'],
+      valuePlacement: { axis: 'col', index: 1 },
+    };
+    render(
+      <PivotInteractionPanel
+        dimensions={['col1', 'col2', 'col3']}
+        metrics={['sum__sales']}
+        runtimeLayout={layout}
+        onChange={onChange}
+      />,
+    );
+
+    const colButtons = screen.getAllByLabelText('Toggle column dimension');
+    fireEvent.click(colButtons[2]);
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange.mock.calls[0][0].cols).toEqual(['col1', 'col2', 'col3']);
+    expect(onChange.mock.calls[0][0].valuePlacement).toEqual({
+      axis: 'col',
+      index: 1,
+    });
+  });
+
+  it('keeps value placement stable when re-adding a column dimension', () => {
+    render(
+      <LayoutHarness
+        dimensions={['col1', 'col2', 'col3']}
+        metrics={['sum__sales']}
+        runtimeLayout={{
+          ...baseLayout,
+          cols: ['col1', 'col2'],
+          valuePlacement: { axis: 'col', index: 1 },
+        }}
+      />,
+    );
+
+    const colButtons = screen.getAllByLabelText('Toggle column dimension');
+    fireEvent.click(colButtons[2]);
+    fireEvent.click(colButtons[1]);
+    fireEvent.click(colButtons[1]);
+
+    expect(screen.getByTestId('layout-cols')).toHaveTextContent(
+      'col1,col3,col2',
+    );
+    expect(screen.getByTestId('layout-value')).toHaveTextContent('col:1');
   });
 
   it('moves a dimension to the column axis when the column checkbox is clicked', () => {

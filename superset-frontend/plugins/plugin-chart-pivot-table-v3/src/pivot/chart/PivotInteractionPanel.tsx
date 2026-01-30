@@ -525,30 +525,30 @@ export const PivotInteractionPanel = ({
         }
       }
       if (targetAxis === 'row') {
-        const insertIndex =
-          nextValuePlacement.axis === 'row'
-            ? Math.min(nextValuePlacement.index, nextRows.length)
-            : nextRows.length;
+        const rowLength = nextRows.length;
+        const insertIndex = rowLength;
         nextRows.splice(insertIndex, 0, dimensionKey);
         if (
           nextValuePlacement.axis === 'row' &&
-          nextValuePlacement.index >= nextRows.length - 1 &&
-          insertIndex === nextRows.length - 1
+          nextValuePlacement.index === rowLength
         ) {
-          nextValuePlacement.index = nextRows.length;
+          nextValuePlacement.index = Math.min(
+            nextRows.length,
+            nextValuePlacement.index + 1,
+          );
         }
       } else if (targetAxis === 'col') {
-        const insertIndex =
-          nextValuePlacement.axis === 'col'
-            ? Math.min(nextValuePlacement.index, nextCols.length)
-            : nextCols.length;
+        const colLength = nextCols.length;
+        const insertIndex = colLength;
         nextCols.splice(insertIndex, 0, dimensionKey);
         if (
           nextValuePlacement.axis === 'col' &&
-          nextValuePlacement.index >= nextCols.length - 1 &&
-          insertIndex === nextCols.length - 1
+          nextValuePlacement.index === colLength
         ) {
-          nextValuePlacement.index = nextCols.length;
+          nextValuePlacement.index = Math.min(
+            nextCols.length,
+            nextValuePlacement.index + 1,
+          );
         }
       }
       onChange({

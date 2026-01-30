@@ -101,6 +101,9 @@ Pivot headers (metric tier) display **metric key** instead of **metric label**.
 - Drag preview layer is isolated in a memoized component to avoid re-rendering the full chart on pointer moves (reduces DnD lag).
 - Fixed duplicate metric headers when measure leaves are visible with row totals (no column dimensions); new interaction-layout regression test added.
 - Ensured metric label map is injected before layout/tree building so headers consistently use metric labels (transformProps regression test added).
+- Dimension checkbox selection now inserts by dimension list order even when Value sits mid-stack; regression test added.
+- Re-adding a dimension keeps Value placement stable (no unintended Value shift); regression test added.
+- Checkbox selection now appends dimensions to the end of the axis (click order), while keeping Value last when it is last.
 
 **Quality gate (latest run)**
 - `npm run test -- plugins/plugin-chart-pivot-table-v3` ✅ (warnings: duplicate Jest mocks, browserslist stale, babel deprecation).
