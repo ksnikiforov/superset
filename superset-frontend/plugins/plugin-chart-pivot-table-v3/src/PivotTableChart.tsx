@@ -26,6 +26,7 @@ import {
   styled,
   t,
 } from '@superset-ui/core';
+import { Loading } from '@superset-ui/core/components';
 import { Icons } from '@superset-ui/core/components/Icons';
 import { useDrag, useDragLayer, useDrop } from 'react-dnd';
 import { getEmptyImage } from 'react-dnd-html5-backend';
@@ -220,6 +221,14 @@ const TableRow = styled.div`
   flex: 1 1 auto;
   min-height: 0;
   display: flex;
+`;
+
+const TableArea = styled.div<{ $height: number; $width: number }>`
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  width: ${({ $width }) => $width}px;
+  height: ${({ $height }) => $height}px;
 `;
 
 type InteractionChipProps = {
@@ -693,6 +702,44 @@ function PivotTableChart(props: PivotTableProps) {
     [dimensionList, dimensionMap],
   );
 
+  const buildFilterPayload = useCallback(
+    (selection: Record<string, DataRecordValue[]>) => {
+      const filterKeys = Object.keys(selection);
+      const filters =
+        filterKeys.length === 0
+          ? undefined
+          : filterKeys.map(key => {
+              const col = dimensionMap.get(key) ?? key;
+              const vals = selection[key] ?? [];
+              if (
+                vals.length === 1 &&
+                (vals[0] === null || vals[0] === undefined)
+              ) {
+                return { col, op: 'IS NULL' as const };
+              }
+              return {
+                col,
+                op: 'IN' as const,
+                val: vals as (string | number | boolean)[],
+              };
+            });
+      const filterStateSelected = Object.entries(selection).reduce<
+        Record<string, DataRecordValue[]>
+      >((acc, [key, vals]) => {
+        const col = dimensionMap.get(key);
+        const label = col ? getColumnLabel(col) : key;
+        acc[label] = vals;
+        return acc;
+      }, {});
+      return {
+        filters,
+        filterStateSelected,
+        hasFilters: filterKeys.length > 0,
+      };
+    },
+    [dimensionMap],
+  );
+
   useEffect(() => {
     setUiRuntimeLayout(runtimeLayout);
   }, [runtimeLayout]);
@@ -700,6 +747,39 @@ function PivotTableChart(props: PivotTableProps) {
   useEffect(() => {
     setUiSelectedFilters(normalizeSelectedFilters(selectedFilters));
   }, [normalizeSelectedFilters, selectedFilters]);
+
+  const layoutApplySignature = useMemo(
+    () =>
+      stableStringify({
+        metrics: runtimeLayout.metrics,
+        leafSelection: runtimeLayout.leafSelection,
+        leafOrder: runtimeLayout.leafOrder ?? [],
+      }),
+    [runtimeLayout],
+  );
+  const uiLayoutApplySignature = useMemo(
+    () =>
+      stableStringify({
+        metrics: uiRuntimeLayout.metrics,
+        leafSelection: uiRuntimeLayout.leafSelection,
+        leafOrder: uiRuntimeLayout.leafOrder ?? [],
+      }),
+    [uiRuntimeLayout],
+  );
+  const appliedFiltersSignature = useMemo(
+    () => stableStringify(normalizeSelectedFilters(selectedFilters)),
+    [normalizeSelectedFilters, selectedFilters],
+  );
+  const uiFiltersSignature = useMemo(
+    () => stableStringify(uiSelectedFilters),
+    [uiSelectedFilters],
+  );
+  const hasPendingLayoutChanges =
+    uiLayoutApplySignature !== layoutApplySignature;
+  const hasPendingFilterChanges =
+    uiFiltersSignature !== appliedFiltersSignature;
+  const hasPendingLayoutChangesOrFilters =
+    hasPendingLayoutChanges || hasPendingFilterChanges;
 
   const handleRuntimeLayoutChange = useCallback(
     (nextLayout: PivotRuntimeLayout) => {
@@ -709,18 +789,25 @@ function PivotTableChart(props: PivotTableProps) {
         metricKeys,
       );
       setUiRuntimeLayout(normalized);
-      if (!isDashboardView && setControlValue) {
-        setControlValue('pivotRuntimeLayout', normalized);
+      const nextApplySignature = stableStringify({
+        metrics: normalized.metrics,
+        leafSelection: normalized.leafSelection,
+        leafOrder: normalized.leafOrder ?? [],
+      });
+      const requiresApply = nextApplySignature !== layoutApplySignature;
+      if (requiresApply || hasPendingFilterChanges) {
         return;
       }
-      if (!isDashboardView) {
-        const nextOwnState = mergeOwnState({ pivotRuntimeLayout: normalized });
-        setDataMask({ ownState: { ...nextOwnState } });
+      if (setControlValue) {
+        setControlValue('pivotRuntimeLayout', normalized);
       }
+      const nextOwnState = mergeOwnState({ pivotRuntimeLayout: normalized });
+      setDataMask({ ownState: { ...nextOwnState } });
     },
     [
       dimensionKeys,
-      isDashboardView,
+      hasPendingFilterChanges,
+      layoutApplySignature,
       mergeOwnState,
       metricKeys,
       setControlValue,
@@ -728,33 +815,37 @@ function PivotTableChart(props: PivotTableProps) {
     ],
   );
 
-  const appliedLayoutSignature = useMemo(
-    () => stableStringify(runtimeLayout),
-    [runtimeLayout],
-  );
-  const uiLayoutSignature = useMemo(
-    () => stableStringify(uiRuntimeLayout),
-    [uiRuntimeLayout],
-  );
-  const hasPendingLayoutChanges = uiLayoutSignature !== appliedLayoutSignature;
-
   const handleApplyRuntimeLayout = useCallback(() => {
-    if (!isDashboardView) {
-      return;
-    }
     const normalized = normalizeRuntimeLayout(
       uiRuntimeLayout,
       dimensionKeys,
       metricKeys,
     );
+    if (setControlValue) {
+      setControlValue('pivotRuntimeLayout', normalized);
+    }
     const nextOwnState = mergeOwnState({ pivotRuntimeLayout: normalized });
-    setDataMask({ ownState: { ...nextOwnState } });
+    const { filters, filterStateSelected, hasFilters } = buildFilterPayload(
+      uiSelectedFilters,
+    );
+    setDataMask({
+      extraFormData: {
+        filters,
+      },
+      filterState: {
+        value: hasFilters ? Object.values(filterStateSelected) : null,
+        selectedFilters: hasFilters ? filterStateSelected : null,
+      },
+      ownState: { ...nextOwnState },
+    });
   }, [
+    buildFilterPayload,
     dimensionKeys,
-    isDashboardView,
     mergeOwnState,
     metricKeys,
     setDataMask,
+    setControlValue,
+    uiSelectedFilters,
     uiRuntimeLayout,
   ]);
 
@@ -942,45 +1033,8 @@ function PivotTableChart(props: PivotTableProps) {
         delete nextSelected[dimensionKey];
       }
       setUiSelectedFilters(nextSelected);
-      const filterKeys = Object.keys(nextSelected);
-      const filters =
-        filterKeys.length === 0
-          ? undefined
-          : filterKeys.map(key => {
-              const col = dimensionMap.get(key) ?? key;
-              const vals = nextSelected[key] ?? [];
-              if (
-                vals.length === 1 &&
-                (vals[0] === null || vals[0] === undefined)
-              ) {
-                return { col, op: 'IS NULL' as const };
-              }
-              return {
-                col,
-                op: 'IN' as const,
-                val: vals as (string | number | boolean)[],
-              };
-            });
-      const filterStateSelected = Object.entries(nextSelected).reduce<
-        Record<string, DataRecordValue[]>
-      >((acc, [key, vals]) => {
-        const col = dimensionMap.get(key);
-        const label = col ? getColumnLabel(col) : key;
-        acc[label] = vals;
-        return acc;
-      }, {});
-      setDataMask({
-        extraFormData: {
-          filters,
-        },
-        filterState: {
-          value:
-            filterKeys.length > 0 ? Object.values(filterStateSelected) : null,
-          selectedFilters: filterKeys.length > 0 ? filterStateSelected : null,
-        },
-      });
     },
-    [dimensionMap, setDataMask, uiSelectedFilters],
+    [uiSelectedFilters],
   );
 
   const handleClearAllFilters = useCallback(() => {
@@ -988,16 +1042,7 @@ function PivotTableChart(props: PivotTableProps) {
       return;
     }
     setUiSelectedFilters({});
-    setDataMask({
-      extraFormData: {
-        filters: undefined,
-      },
-      filterState: {
-        value: null,
-        selectedFilters: null,
-      },
-    });
-  }, [setDataMask, uiSelectedFilters]);
+  }, [uiSelectedFilters]);
 
   const { headerOffset, headerRowOffsets, headerRef } = useStickyHeaders({
     enabled: resolvedStickyHeaders,
@@ -1239,8 +1284,8 @@ function PivotTableChart(props: PivotTableProps) {
           onFilterChange={handleDimensionFilterChange}
           onClearFilters={handleClearAllFilters}
           onApply={handleApplyRuntimeLayout}
-          showApply={isDashboardView}
-          applyDisabled={!hasPendingLayoutChanges}
+          showApply
+          applyDisabled={!hasPendingLayoutChangesOrFilters}
           runtimeLayout={uiRuntimeLayout}
           onChange={handleRuntimeLayoutChange}
         />
@@ -1293,49 +1338,52 @@ function PivotTableChart(props: PivotTableProps) {
               onDropValue={handleValueDrop}
             />
           </ChipColumn>
-          <PivotTableView
-            height={tableHeight}
-            width={tableWidth}
-            renderModel={renderModelResult.renderModel}
-            tree={tree}
-            expandedRows={renderModelResult.expandedRowsForRender}
-            expandedCols={renderModelResult.expandedColsForRender}
-            errorMessage={errorMessage}
-            onRetry={handleRetry}
-            warnings={warnings}
-            showGlobalLoader={renderModelResult.showGlobalLoader}
-            stickyHeaders={resolvedStickyHeaders}
-            headerOffset={headerOffset}
-            headerRowOffsets={headerRowOffsets}
-            headerRef={headerRef}
-            themeColor={formatting.themeColor}
-            colTotalPosition={layoutResult.resolvedColTotalPosition}
-            metricFormattingScope={formatting.metricFormattingScope}
-            metricDatabars={formatting.metricDatabars}
-            formattingKeyMap={formatting.formattingKeyMap}
-            evaluateExcelMetricFormatting={
-              formatting.evaluateExcelMetricFormatting
-            }
-            databarColumnMinWidths={formatting.databarColumnMinWidths}
-            onToggleNode={handleToggle}
-            shouldShowToggle={renderModelResult.shouldShowToggle}
-            showRowSpinner={renderModelResult.showRowSpinner}
-            showColSpinner={renderModelResult.showColSpinner}
-            formatLabel={formatting.formatLabel}
-            isRowAggregateBold={renderModelResult.isRowAggregateBold}
-            isColAggregateBold={renderModelResult.isColAggregateBold}
-            getNodeDimDepth={renderModelResult.getNodeDimDepth}
-            getTotalBackground={formatting.getTotalBackground}
-            resolveDimensionStyle={formatting.resolveDimensionStyle}
-            deriveMetricKey={formatting.deriveMetricKey}
-            isMetricGrandTotalNode={layoutResult.isMetricGrandTotalNode}
-            renderCellContent={formatting.renderCellContent}
-            renderDatabarContent={formatting.renderDatabarContent}
-            emitCrossFilters={emitCrossFilters}
-            handleCellClick={interactions.handleCellClick}
-            handleCellKeyDown={interactions.handleCellKeyDown}
-            handleCellContextMenu={interactions.handleCellContextMenu}
-          />
+          <TableArea $height={tableHeight} $width={tableWidth}>
+            <PivotTableView
+              height={tableHeight}
+              width={tableWidth}
+              renderModel={renderModelResult.renderModel}
+              tree={tree}
+              expandedRows={renderModelResult.expandedRowsForRender}
+              expandedCols={renderModelResult.expandedColsForRender}
+              errorMessage={errorMessage}
+              onRetry={handleRetry}
+              warnings={warnings}
+              showGlobalLoader={false}
+              stickyHeaders={resolvedStickyHeaders}
+              headerOffset={headerOffset}
+              headerRowOffsets={headerRowOffsets}
+              headerRef={headerRef}
+              themeColor={formatting.themeColor}
+              colTotalPosition={layoutResult.resolvedColTotalPosition}
+              metricFormattingScope={formatting.metricFormattingScope}
+              metricDatabars={formatting.metricDatabars}
+              formattingKeyMap={formatting.formattingKeyMap}
+              evaluateExcelMetricFormatting={
+                formatting.evaluateExcelMetricFormatting
+              }
+              databarColumnMinWidths={formatting.databarColumnMinWidths}
+              onToggleNode={handleToggle}
+              shouldShowToggle={renderModelResult.shouldShowToggle}
+              showRowSpinner={renderModelResult.showRowSpinner}
+              showColSpinner={renderModelResult.showColSpinner}
+              formatLabel={formatting.formatLabel}
+              isRowAggregateBold={renderModelResult.isRowAggregateBold}
+              isColAggregateBold={renderModelResult.isColAggregateBold}
+              getNodeDimDepth={renderModelResult.getNodeDimDepth}
+              getTotalBackground={formatting.getTotalBackground}
+              resolveDimensionStyle={formatting.resolveDimensionStyle}
+              deriveMetricKey={formatting.deriveMetricKey}
+              isMetricGrandTotalNode={layoutResult.isMetricGrandTotalNode}
+              renderCellContent={formatting.renderCellContent}
+              renderDatabarContent={formatting.renderDatabarContent}
+              emitCrossFilters={emitCrossFilters}
+              handleCellClick={interactions.handleCellClick}
+              handleCellKeyDown={interactions.handleCellKeyDown}
+              handleCellContextMenu={interactions.handleCellContextMenu}
+            />
+            {renderModelResult.showGlobalLoader ? <Loading /> : null}
+          </TableArea>
         </TableRow>
       </InteractionTableWrap>
     </InteractionLayout>

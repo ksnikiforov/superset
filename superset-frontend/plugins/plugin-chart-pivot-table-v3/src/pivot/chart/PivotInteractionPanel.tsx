@@ -121,6 +121,10 @@ const ToggleIcon = styled.svg`
   height: 12px;
 `;
 
+const ActionButton = styled(Button)`
+  width: 100%;
+`;
+
 const DimensionsHeaderLeft = styled.div`
   display: flex;
   align-items: center;
@@ -275,7 +279,7 @@ const FilterMenuHeader = styled.div`
 const PanelFooter = styled.div`
   display: flex;
   justify-content: flex-end;
-  padding-top: ${({ theme }) => theme.sizeSM}px;
+  padding-top: ${({ theme }) => theme.sizeXXS}px;
   margin-top: auto;
 `;
 
@@ -684,9 +688,9 @@ export const PivotInteractionPanel = ({
           open={measuresOpen}
           onOpenChange={handleMeasuresOpenChange}
         >
-          <Button size="small" type="primary" ghost>
+          <ActionButton size="small" type="primary" ghost>
             {t('Select measures')}
-          </Button>
+          </ActionButton>
         </Popover>
       </MeasuresSection>
 
@@ -868,14 +872,14 @@ export const PivotInteractionPanel = ({
       </DimensionsSection>
       {showApply ? (
         <PanelFooter>
-          <Button
+          <ActionButton
             type="primary"
             size="small"
             onClick={onApply}
             disabled={applyDisabled}
           >
-            {t('Apply')}
-          </Button>
+            {t('Update chart')}
+          </ActionButton>
         </PanelFooter>
       ) : null}
     </PanelStack>

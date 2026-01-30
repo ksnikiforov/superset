@@ -208,6 +208,9 @@ const ToggleButton = styled.button`
   cursor: pointer;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
   color: ${({ theme }) => theme.colorText};
 
   &:disabled {
@@ -217,7 +220,9 @@ const ToggleButton = styled.button`
 `;
 
 const Spinner = styled(LoadingOutlined)`
-  font-size: 12px;
+  font-size: 13px;
+  color: ${({ theme }) => theme.colorText};
+  text-shadow: 0 0 0 currentColor, 0 0 1px currentColor;
 `;
 
 const normalizeCssColor = (rawValue: unknown) => {
@@ -466,8 +471,11 @@ export const PivotTableView = ({
                             <ToggleButton
                               type="button"
                               onClick={() => onToggleNode('col', cell.node)}
+                              disabled={showColSpinner(cell.node.key)}
                             >
-                              {expandedCols.has(cell.node.key) ? (
+                              {showColSpinner(cell.node.key) ? (
+                                <Spinner />
+                              ) : expandedCols.has(cell.node.key) ? (
                                 <MinusSquareOutlined />
                               ) : (
                                 <PlusSquareOutlined />
@@ -483,7 +491,6 @@ export const PivotTableView = ({
                           >
                             {formatLabel(cell.node, 'col')}
                           </span>
-                          {showColSpinner(cell.node.key) && <Spinner />}
                         </ColumnHeaderCell>
                       </th>
                     );
@@ -531,8 +538,11 @@ export const PivotTableView = ({
                         <ToggleButton
                           type="button"
                           onClick={() => onToggleNode('row', row)}
+                          disabled={showRowSpinner(row.key)}
                         >
-                          {expandedRows.has(row.key) ? (
+                          {showRowSpinner(row.key) ? (
+                            <Spinner />
+                          ) : expandedRows.has(row.key) ? (
                             <MinusSquareOutlined />
                           ) : (
                             <PlusSquareOutlined />
@@ -546,7 +556,6 @@ export const PivotTableView = ({
                       >
                         {formatLabel(row, 'row')}
                       </span>
-                      {showRowSpinner(row.key) && <Spinner />}
                     </HeaderCell>
                   </th>
                   {visibleCols.map(col => {
