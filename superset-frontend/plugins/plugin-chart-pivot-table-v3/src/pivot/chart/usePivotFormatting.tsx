@@ -989,9 +989,6 @@ export const usePivotFormatting = ({
 
     const scaleMap = new Map<string, DatabarScale>();
     visibleCells.forEach(({ rowNode, colNode, cell }) => {
-      if (isRowGrandTotalNode(rowNode)) {
-        return;
-      }
       const metricKey = deriveMetricKey(rowNode, colNode);
       if (!metricsForScale.has(metricKey)) {
         return;
@@ -1025,20 +1022,18 @@ export const usePivotFormatting = ({
       }
       visibleCols.forEach(colNode => {
         const cellKey = serializeCellKey(rowNode.key, colNode.key);
-        const cell = tree.cells[cellKey];
-        if (!cell) {
+        const metricKey = deriveMetricKey(rowNode, colNode);
+        if (!metricKey) {
           return;
         }
-        const metricKey = deriveMetricKey(rowNode, colNode);
         const config = metricDatabars[metricKey];
         if (!config || config.type !== 'waterfall') {
           return;
         }
         const scaleKey = resolveScaleGroupKey(metricKey, metricDatabars);
-        const value = getNumericValue(cell.values[metricKey]);
-        if (value === undefined) {
-          return;
-        }
+        const cell = tree.cells[cellKey];
+        const value = getNumericValue(cell?.values[metricKey]);
+        const deltaValue = value ?? 0;
         const cumulativeKey = serializeCellKey(colNode.key, metricKey);
         const prevEndValue = cumulative.get(cumulativeKey) ?? 0;
         const start = shouldReset || isGrandTotalRow ? 0 : prevEndValue;
@@ -1046,7 +1041,8 @@ export const usePivotFormatting = ({
           isGrandTotalRow ||
           layout.isExplicitSubtotalNode(rowNode) ||
           layout.isMetricSubtotalNode(rowNode);
-        const delta = isTotalRow || !isRowTotalAtStart ? value : -value;
+        const delta =
+          isTotalRow || !isRowTotalAtStart ? deltaValue : -deltaValue;
         const end = start + delta;
         const prevKey = prevKeys.get(cumulativeKey);
         const connectAbove = !shouldReset && !!prevKey;
@@ -1397,7 +1393,7 @@ export const usePivotFormatting = ({
           ? undefined
           : toPercent(connectorBelowValue, scale);
       const renderConnector =
-        config.type === 'waterfall' && value !== undefined;
+        config.type === 'waterfall' && !!waterfallOffset;
       const connectorTopStyle =
         connectorAbovePct === undefined
           ? undefined

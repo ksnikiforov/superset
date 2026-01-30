@@ -58,7 +58,7 @@ import {
   METRICS_PLACEHOLDER,
 } from './utils';
 
-const PANEL_WIDTH = 280;
+const PANEL_WIDTH = 230;
 const TOP_CHIPS_HEIGHT = 36;
 const SIDE_CHIPS_WIDTH = 24;
 
@@ -72,10 +72,17 @@ const InteractionPanelWrap = styled.div`
   width: ${PANEL_WIDTH}px;
   flex: 0 0 ${PANEL_WIDTH}px;
   padding: ${({ theme }) =>
-    `${theme.sizeMD}px 0 ${theme.sizeMD}px ${theme.sizeMD}px`};
+    `${theme.sizeXXS}px ${theme.sizeSM}px ${theme.sizeXXS}px ${theme.sizeXXS}px`};
   border-right: 1px solid ${({ theme }) => theme.colorBorderSecondary};
   height: 100%;
-  overflow: auto;
+  overflow: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+
+  &::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
 `;
 
 const InteractionTableWrap = styled.div`
@@ -83,6 +90,7 @@ const InteractionTableWrap = styled.div`
   min-width: 0;
   display: flex;
   flex-direction: column;
+  height: 100%;
 `;
 
 const ChipRow = styled.div`
@@ -1217,7 +1225,7 @@ function PivotTableChart(props: PivotTableProps) {
   });
 
   return isUserControlled ? (
-    <InteractionLayout>
+    <InteractionLayout style={height ? { height } : undefined}>
       <InteractionPanelWrap>
         <PivotInteractionPanel
           dimensions={dimensionList}

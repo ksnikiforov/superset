@@ -53,6 +53,13 @@ const Container = styled.div<{ height: number; width: number }>`
     width: ${width}px;
     overflow: auto;
     position: relative;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+
+    &::-webkit-scrollbar {
+      width: 0;
+      height: 0;
+    }
   `}
 `;
 
@@ -655,21 +662,24 @@ export const PivotTableView = ({
                     };
                     const style =
                       Object.keys(cellStyle).length > 0 ? cellStyle : undefined;
-                    const cellContent =
-                      databarConfig?.type && metricKey && cell
-                        ? renderDatabarContent(
-                            row,
-                            col,
-                            cell,
-                            metricKey,
-                            d3FormatOverride,
-                          )
-                        : renderCellContent(
-                            row,
-                            col,
-                            metricKey,
-                            d3FormatOverride,
-                          );
+                    const shouldRenderDatabar =
+                      !!databarConfig?.type &&
+                      !!metricKey &&
+                      (cell || databarConfig.type === 'waterfall');
+                    const cellContent = shouldRenderDatabar
+                      ? renderDatabarContent(
+                          row,
+                          col,
+                          cell,
+                          metricKey,
+                          d3FormatOverride,
+                        )
+                      : renderCellContent(
+                          row,
+                          col,
+                          metricKey,
+                          d3FormatOverride,
+                        );
                     const cellInteractionProps = emitCrossFilters
                       ? {
                           onClick: () => handleCellClick(row, col),

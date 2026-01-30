@@ -47,8 +47,21 @@ import { INTERACTION_DIMENSION_DND_TYPE } from '../layout/interactionDrag';
 const PanelSection = styled.div`
   display: flex;
   flex-direction: column;
-  gap: ${({ theme }) => theme.sizeXS}px;
+  gap: ${({ theme }) => theme.sizeXXS}px;
   width: 100%;
+`;
+
+const MeasuresSection = styled(PanelSection)`
+  padding-bottom: ${({ theme }) => theme.sizeXXS}px;
+`;
+
+const PanelStack = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: ${({ theme }) => theme.sizeXXS}px;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
 `;
 
 const SectionTitle = styled(Typography.Text)`
@@ -102,6 +115,36 @@ const ToggleLabel = styled(Typography.Text)`
   font-size: 12px;
 `;
 
+const ToggleIcon = styled.svg`
+  display: block;
+  width: 12px;
+  height: 12px;
+`;
+
+const DimensionsHeaderLeft = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.sizeXS}px;
+  flex: 1 1 auto;
+  min-width: 0;
+`;
+
+const DimensionsHeaderControls = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.sizeXXS}px;
+  flex: 0 0 auto;
+`;
+
+const DimensionsHeaderIcon = styled.span`
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: ${({ theme }) => theme.colorTextSecondary};
+`;
+
 const DimensionRow = styled.div`
   display: flex;
   align-items: center;
@@ -151,6 +194,17 @@ const DimensionsList = styled.div`
   display: flex;
   flex-direction: column;
   width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+
+  &::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
 `;
 
 const DimensionLabel = styled(Typography.Text)`
@@ -222,6 +276,22 @@ const PanelFooter = styled.div`
   display: flex;
   justify-content: flex-end;
   padding-top: ${({ theme }) => theme.sizeSM}px;
+  margin-top: auto;
+`;
+
+const CompactDivider = styled(Divider)`
+  margin: ${({ theme }) => theme.sizeXXS}px 0;
+`;
+
+const DimensionsSection = styled(PanelSection)`
+  flex: 1 1 auto;
+  min-height: 0;
+`;
+
+const ClearFiltersButton = styled(Button)`
+  min-height: ${({ theme }) => theme.sizeUnit * 4}px;
+  height: ${({ theme }) => theme.sizeUnit * 4}px;
+  padding: 0 ${({ theme }) => theme.sizeXXS}px;
 `;
 
 type MetricOption = {
@@ -375,11 +445,28 @@ const DimensionDragHandle = ({
   }, [preview]);
   return (
     <DimensionDragRegion ref={drag} style={{ opacity: isDragging ? 0.4 : 1 }}>
-      <Icons.Drag iconSize="s" />
       {children}
     </DimensionDragRegion>
   );
 };
+
+const RowLinesIcon = () => (
+  <ToggleIcon viewBox="0 0 12 12" fill="none" aria-hidden="true">
+    <line x1="1" y1="2" x2="11" y2="2" stroke="currentColor" />
+    <line x1="1" y1="4.5" x2="11" y2="4.5" stroke="currentColor" />
+    <line x1="1" y1="7" x2="11" y2="7" stroke="currentColor" />
+    <line x1="1" y1="9.5" x2="11" y2="9.5" stroke="currentColor" />
+  </ToggleIcon>
+);
+
+const ColLinesIcon = () => (
+  <ToggleIcon viewBox="0 0 12 12" fill="none" aria-hidden="true">
+    <line x1="2" y1="1" x2="2" y2="11" stroke="currentColor" />
+    <line x1="4.5" y1="1" x2="4.5" y2="11" stroke="currentColor" />
+    <line x1="7" y1="1" x2="7" y2="11" stroke="currentColor" />
+    <line x1="9.5" y1="1" x2="9.5" y2="11" stroke="currentColor" />
+  </ToggleIcon>
+);
 
 export const PivotInteractionPanel = ({
   dimensions,
@@ -589,23 +676,23 @@ export const PivotInteractionPanel = ({
   );
 
   return (
-    <Space direction="vertical" size="middle">
-      <PanelSection>
-        <SectionTitle>{t('Measures')}</SectionTitle>
+    <PanelStack>
+      <MeasuresSection>
         <Popover
           content={measuresContent}
           trigger="click"
           open={measuresOpen}
           onOpenChange={handleMeasuresOpenChange}
         >
-          <Button>{t('Select measures')}</Button>
+          <Button size="small" type="primary" ghost>
+            {t('Select measures')}
+          </Button>
         </Popover>
-      </PanelSection>
+      </MeasuresSection>
 
       {showLeafChips ? (
         <PanelSection>
-          <SectionTitle>{t('Comparisons')}</SectionTitle>
-          <Space wrap size={[8, 8]}>
+          <Space wrap size={[4, 4]}>
             {leafOptions.map(leaf => {
               const enabled = hasExplicitLeafSelection
                 ? resolvedLayout.leafSelection[leaf.id] === true
@@ -624,14 +711,28 @@ export const PivotInteractionPanel = ({
         </PanelSection>
       ) : null}
 
-      <Divider />
+      <CompactDivider />
 
-      <PanelSection>
+      <DimensionsSection>
         <SectionHeader>
-          <SectionTitle>{t('Dimensions')}</SectionTitle>
+          <DimensionsHeaderLeft>
+            <DimensionsHeaderControls>
+              <Tooltip title={t('Select row placement')}>
+                <DimensionsHeaderIcon>
+                  <RowLinesIcon />
+                </DimensionsHeaderIcon>
+              </Tooltip>
+              <Tooltip title={t('Select column placement')}>
+                <DimensionsHeaderIcon>
+                  <ColLinesIcon />
+                </DimensionsHeaderIcon>
+              </Tooltip>
+            </DimensionsHeaderControls>
+            <SectionTitle>{t('Dimensions')}</SectionTitle>
+          </DimensionsHeaderLeft>
           {onClearFilters ? (
             <Tooltip title={t('Clear filters')}>
-              <Button
+              <ClearFiltersButton
                 type="text"
                 size="small"
                 icon={<Icons.ClearOutlined iconSize="s" />}
@@ -747,18 +848,16 @@ export const PivotInteractionPanel = ({
                         </FilterMenu>
                       }
                     >
-                      <Tooltip title={t('Filter values')}>
-                        <FilterIconButton
-                          type="button"
-                          $active={hasFilter}
-                          aria-label={t('Filter values')}
-                        >
-                          <Icons.FilterOutlined
-                            iconSize="s"
-                            iconColor="currentColor"
-                          />
-                        </FilterIconButton>
-                      </Tooltip>
+                      <FilterIconButton
+                        type="button"
+                        $active={hasFilter}
+                        aria-label={t('Filter values')}
+                      >
+                        <Icons.FilterOutlined
+                          iconSize="s"
+                          iconColor="currentColor"
+                        />
+                      </FilterIconButton>
                     </Popover>
                   </DimensionRight>
                 ) : null}
@@ -766,7 +865,7 @@ export const PivotInteractionPanel = ({
             );
           })}
         </DimensionsList>
-      </PanelSection>
+      </DimensionsSection>
       {showApply ? (
         <PanelFooter>
           <Button
@@ -779,6 +878,6 @@ export const PivotInteractionPanel = ({
           </Button>
         </PanelFooter>
       ) : null}
-    </Space>
+    </PanelStack>
   );
 };
