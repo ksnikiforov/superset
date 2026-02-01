@@ -390,6 +390,8 @@ export const usePivotRenderModel = ({
       nextExpandedCols: Set<string>,
       nextTree: PivotTreeData,
     ): RenderModelConfig => {
+      const resolvedGroupbyRowsLength = layout.layout.groupbyRows.length;
+      const resolvedGroupbyColumnsLength = layout.layout.groupbyColumns.length;
       const metricIndexForRowsResolved =
         layout.findMetricIndex(nextTree.rows) ??
         layout.metricLayoutIndexOnRows ??
@@ -399,8 +401,8 @@ export const usePivotRenderModel = ({
         layout.metricLayoutIndexOnCols ??
         layout.metricIndexOnCols;
       return {
-        groupbyRowsLength: groupbyRows.length,
-        groupbyColumnsLength: groupbyColumns.length,
+        groupbyRowsLength: resolvedGroupbyRowsLength,
+        groupbyColumnsLength: resolvedGroupbyColumnsLength,
         normalizedRowSubtotalLevels: layout.normalizedRowSubtotalLevels,
         normalizedColSubtotalLevels: layout.normalizedColSubtotalLevels,
         rowTotals,
@@ -452,8 +454,6 @@ export const usePivotRenderModel = ({
       colTotals,
       getColumnDisplayPath,
       getColumnHeaderLabel,
-      groupbyColumns.length,
-      groupbyRows.length,
       layout,
       rowSorter,
       rowTotals,

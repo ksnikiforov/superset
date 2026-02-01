@@ -513,7 +513,8 @@ export const usePivotLayout = ({
       resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
       metricLabels.length === 1 &&
       metricIndexOnRows !== undefined &&
-      metricIndexOnRows === rowDimCount,
+      metricIndexOnRows === rowDimCount &&
+      rowDimCount > 0,
     [
       metricIndexOnRows,
       metricLabels.length,
@@ -526,9 +527,10 @@ export const usePivotLayout = ({
       resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS &&
       metricLabels.length === 1 &&
       metricIndexOnCols !== undefined &&
-      metricIndexOnCols === groupbyColumns.length,
+      metricIndexOnCols === colDimCount &&
+      colDimCount > 0,
     [
-      groupbyColumns.length,
+      colDimCount,
       metricIndexOnCols,
       metricLabels.length,
       resolvedMetricsLayout,

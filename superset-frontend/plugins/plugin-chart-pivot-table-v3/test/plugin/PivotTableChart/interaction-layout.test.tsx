@@ -157,6 +157,64 @@ describe('PivotTableChart interaction layout', () => {
     expect(headerLabels.indexOf('A')).toBeLessThan(headerLabels.indexOf('m1'));
   });
 
+  it('suppresses the grand total column when columns only contain Values in user-controlled mode', () => {
+    const metrics = ['m1'];
+    const rowGroupby = ['row1'];
+    const baseTree = buildTreeFromRecords(
+      [{ row1: 'A', m1: 10 }],
+      metrics,
+      rowGroupby,
+      [],
+      1,
+      0,
+    );
+    const tree = applyMetricAxis(
+      baseTree,
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      rowGroupby,
+      [],
+      0,
+    );
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: rowGroupby,
+      cols: [],
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: rowGroupby,
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      rowTotals: true,
+      colTotals: false,
+    });
+
+    const { container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+      />,
+    );
+
+    const headerLabels = Array.from(container.querySelectorAll('thead th'))
+      .map(th => th.textContent?.trim())
+      .filter(label => label && label !== 'Rows');
+    expect(headerLabels).toContain('m1');
+    expect(headerLabels).not.toContain('Grand total');
+  });
+
   it('does not render expand toggles for Value leaf when metrics are last on columns in user-controlled mode', () => {
     const metricKey = 'grossRevenue';
     const secondaryMetric = 'netRevenue';

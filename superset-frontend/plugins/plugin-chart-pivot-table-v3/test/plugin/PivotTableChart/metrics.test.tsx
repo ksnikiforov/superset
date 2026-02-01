@@ -86,6 +86,52 @@ const baseFormData: Partial<PivotTableQueryFormData> = {
   dateFormatters: {},
 };
 
+it('renders the metric header without a grand total when columns only contain Values', () => {
+  const metrics = ['metric1'];
+  const rowGroupby = ['row1'];
+  const colGroupby: string[] = [];
+  const baseTreeRaw = buildTreeFromRecords(
+    [{ row1: 'A', metric1: 10 }],
+    metrics,
+    rowGroupby,
+    colGroupby,
+    1,
+    0,
+  );
+  const tree = applyMetricAxis(
+    baseTreeRaw,
+    metrics,
+    MetricsLayoutEnum.COLUMNS,
+    rowGroupby,
+    colGroupby,
+    0,
+  );
+
+  const { container } = render(
+    <PivotTableChart
+      data={tree}
+      formData={buildFormData({
+        ...(baseFormData as Partial<PivotTableQueryFormData>),
+        groupbyRows: rowGroupby,
+        groupbyColumns: [METRICS_PLACEHOLDER],
+        metricsLayout: MetricsLayoutEnum.COLUMNS,
+        metrics,
+        rowTotals: false,
+        colTotals: false,
+      })}
+      metrics={metrics}
+      groupbyRows={rowGroupby}
+      groupbyColumns={colGroupby}
+    />,
+  );
+
+  const headerLabels = Array.from(container.querySelectorAll('thead th'))
+    .map(th => th.textContent?.trim())
+    .filter(label => label && label !== 'Rows');
+  expect(headerLabels).toContain('metric1');
+  expect(headerLabels).not.toContain('Grand total');
+});
+
 const baseTree: PivotTreeData = {
   rows: {
     '': {
