@@ -29,12 +29,12 @@ const baseLayout: PivotRuntimeLayout = {
 };
 
 describe('shouldFetchForLayoutChange', () => {
-  it('returns false for row reorder within the same axis', () => {
+  it('returns true for row reorder within the same axis', () => {
     const nextLayout: PivotRuntimeLayout = {
       ...baseLayout,
       rows: ['state', 'country'],
     };
-    expect(shouldFetchForLayoutChange(baseLayout, nextLayout)).toBe(false);
+    expect(shouldFetchForLayoutChange(baseLayout, nextLayout)).toBe(true);
   });
 
   it('returns true when moving a dimension across axes', () => {

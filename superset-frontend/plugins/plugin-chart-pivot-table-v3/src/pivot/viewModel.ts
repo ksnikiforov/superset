@@ -138,9 +138,14 @@ export const buildColumnHeaderRows = (
       if (!node) {
         if (level === lastLevel) {
           node = {
-            ...col,
+            axis: 'col',
+            key,
+            path: headerPath,
             label: headerLabel,
             formattedLabel: headerLabel,
+            level: headerPath.length,
+            hasChildren: false,
+            isSubtotal: headerPath.some(isSubtotalToken),
           };
         } else {
           node = {

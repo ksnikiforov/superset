@@ -979,14 +979,13 @@ function PivotTableChart(props: PivotTableProps) {
         pivotRuntimeLayout: layout,
         pivotSelectedFilters: filters,
       });
-      if (!isUserControlled) {
-        if (setControlValue) {
-          setControlValue('pivotRuntimeLayout', layout);
-        }
-        setDataMask({ ownState: { ...nextOwnState } });
+      if (setControlValue) {
+        setControlValue('pivotRuntimeLayout', layout);
+        return;
       }
+      setDataMask({ ownState: { ...nextOwnState } });
     },
-    [isUserControlled, mergeOwnState, setControlValue, setDataMask],
+    [mergeOwnState, setControlValue, setDataMask],
   );
 
   const applySeamlessUpdate = useCallback(
@@ -1197,6 +1196,7 @@ function PivotTableChart(props: PivotTableProps) {
   } = useExpansionEngine({
     data: dataForRender,
     expandedStateSignature: layoutResult.expandedStateSignature,
+    expandedStateSharedSignature: layoutResult.expandedStateSharedSignature,
     fetchFormData,
     groupbyRowKeys: layoutResult.groupbyRowKeys,
     groupbyColumnKeys: layoutResult.groupbyColumnKeys,

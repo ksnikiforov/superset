@@ -267,6 +267,7 @@ export type ExpansionEngineResult = {
 export type ExpansionEngineConfig = {
   data: PivotTreeData;
   expandedStateSignature: string;
+  expandedStateSharedSignature: string;
   fetchFormData: PivotTableQueryFormData;
   groupbyRowKeys: string[];
   groupbyColumnKeys: string[];
@@ -302,6 +303,7 @@ export type ExpansionEngineConfig = {
 export const useExpansionEngine = ({
   data,
   expandedStateSignature,
+  expandedStateSharedSignature,
   fetchFormData,
   groupbyRowKeys,
   groupbyColumnKeys,
@@ -358,6 +360,7 @@ export const useExpansionEngine = ({
   const autoExpandRowsLevelRef = useRef<number>(resolvedExpandRowsLevel);
   const autoExpandColsLevelRef = useRef<number>(resolvedExpandColumnsLevel);
   const expandedStateSignatureRef = useRef<string | null>(null);
+  const expandedStateSharedSignatureRef = useRef<string | null>(null);
   const fetchedRowKeysRef = useRef<Map<string, number>>(new Map());
   const fetchedColKeysRef = useRef<Map<string, number>>(new Map());
   const transactionIdRef = useRef(0);
@@ -1742,9 +1745,14 @@ export const useExpansionEngine = ({
 
   useEffect(() => {
     const previousSignature = expandedStateSignatureRef.current;
-    const shouldResetExpanded = previousSignature !== expandedStateSignature;
+    const shouldResetExpandedState =
+      previousSignature !== expandedStateSignature;
     const isInitialMount = previousSignature === null;
     expandedStateSignatureRef.current = expandedStateSignature;
+    const previousSharedSignature = expandedStateSharedSignatureRef.current;
+    const sharedSignatureChanged =
+      previousSharedSignature !== expandedStateSharedSignature;
+    expandedStateSharedSignatureRef.current = expandedStateSharedSignature;
     const prevExpandRowsLevelRaw = prevExpandRowsLevelRawRef.current;
     const prevExpandColsLevelRaw = prevExpandColsLevelRawRef.current;
     const isRowsLevelCleared =
@@ -1787,9 +1795,15 @@ export const useExpansionEngine = ({
     previousLayoutRef.current = currentLayout;
     const hasNewData = previousDataRef.current !== data;
     previousDataRef.current = data;
-    const layoutChanged =
-      !isSameLayout(previousLayout.rows, currentLayout.rows) ||
-      !isSameLayout(previousLayout.cols, currentLayout.cols);
+    const rowsChanged = !isSameLayout(previousLayout.rows, currentLayout.rows);
+    const colsChanged = !isSameLayout(previousLayout.cols, currentLayout.cols);
+    const shouldResetExpandedRows =
+      shouldResetExpandedState && (sharedSignatureChanged || rowsChanged);
+    const shouldResetExpandedCols =
+      shouldResetExpandedState && (sharedSignatureChanged || colsChanged);
+    const shouldResetExpanded =
+      shouldResetExpandedRows || shouldResetExpandedCols;
+    const layoutChanged = rowsChanged || colsChanged;
     const sourceTree = hasNewData || !layoutChanged ? data : treeRef.current;
     const layoutRowsForPrune =
       sessionExpansionState.rowKeys ?? previousLayout.rows;
@@ -1938,8 +1952,9 @@ export const useExpansionEngine = ({
       keys: string[],
       stablePrefix: number,
       nodes: Record<string, PivotTreeNode>,
+      shouldReset: boolean,
     ) => {
-      if (!shouldResetExpanded) {
+      if (!shouldReset) {
         return keys.filter(key => key !== rootKey);
       }
       const expanded = new Set<string>([rootKey, ...keys]);
@@ -1957,8 +1972,9 @@ export const useExpansionEngine = ({
       keys: string[],
       stablePrefix: number,
       nodes: Record<string, PivotTreeNode>,
+      shouldReset: boolean,
     ) => {
-      if (!shouldResetExpanded) {
+      if (!shouldReset) {
         return keys.filter(key => key !== rootKey);
       }
       return keys.filter(key => {
@@ -1976,21 +1992,25 @@ export const useExpansionEngine = ({
       normalizedRowCache.keys,
       rowStablePrefix,
       normalizedTree.rows,
+      shouldResetExpandedRows,
     );
     const prunedManualCols = pruneManualKeys(
       normalizedColCache.keys,
       colStablePrefix,
       normalizedTree.cols,
+      shouldResetExpandedCols,
     );
     const prunedCollapsedRows = pruneCollapsedKeys(
       normalizedRowCache.collapsedKeys,
       rowStablePrefix,
       normalizedTree.rows,
+      shouldResetExpandedRows,
     );
     const prunedCollapsedCols = pruneCollapsedKeys(
       normalizedColCache.collapsedKeys,
       colStablePrefix,
       normalizedTree.cols,
+      shouldResetExpandedCols,
     );
 
     explicitExpandedRowsRef.current = new Set(prunedManualRows);
@@ -2037,7 +2057,7 @@ export const useExpansionEngine = ({
       inFlightKeys: new Set(),
     });
 
-    const prunedRows = shouldResetExpanded
+    const prunedRows = shouldResetExpandedRows
       ? pruneExpandedToStablePrefix({
           expanded: nextExpandedRows,
           nodes: normalizedTree.rows,
@@ -2045,7 +2065,7 @@ export const useExpansionEngine = ({
           metricLabelSet: metricLabelSetForDepth,
         })
       : nextExpandedRows;
-    const prunedCols = shouldResetExpanded
+    const prunedCols = shouldResetExpandedCols
       ? pruneExpandedToStablePrefix({
           expanded: nextExpandedCols,
           nodes: normalizedTree.cols,
@@ -2182,6 +2202,7 @@ export const useExpansionEngine = ({
     countDimDepth,
     data,
     expandedStateSignature,
+    expandedStateSharedSignature,
     computeVisibleDepths,
     expandColumnsLevelRaw,
     expandRowsLevelRaw,

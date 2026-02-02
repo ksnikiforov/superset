@@ -54,6 +54,7 @@ export type PivotLayoutResult = {
   layout: ReturnType<typeof buildLayoutContext>;
   measureHierarchy: MeasureHierarchy;
   expandedStateSignature: string;
+  expandedStateSharedSignature: string;
   expandRowsLevelRaw?: number;
   expandColumnsLevelRaw?: number;
   resolvedExpandRowsLevel: number;
@@ -337,6 +338,35 @@ export const usePivotLayout = ({
       colTotals,
       groupbyColumnKeys,
       groupbyRowKeys,
+      layout.measureHierarchy,
+      metricInsertIndex,
+      metrics,
+      normalizedColSubtotalLevels,
+      normalizedRowSubtotalLevels,
+      resolvedMetricsLayout,
+      resolvedExpandColumnsLevel,
+      resolvedExpandRowsLevel,
+      rowSubTotals,
+      rowTotals,
+    ],
+  );
+  const expandedStateSharedSignature = useMemo(
+    () =>
+      JSON.stringify({
+        metrics: metrics.map(getMetricKey),
+        metricsLayout: resolvedMetricsLayout,
+        metricPosition: metrics.length > 0 ? metricInsertIndex : -1,
+        rowSubtotalLevels: normalizedRowSubtotalLevels,
+        colSubtotalLevels: normalizedColSubtotalLevels,
+        rowTotals,
+        colTotals,
+        rowSubTotals,
+        expandRowsLevel: resolvedExpandRowsLevel,
+        expandColumnsLevel: resolvedExpandColumnsLevel,
+        measureHierarchy: layout.measureHierarchy,
+      }),
+    [
+      colTotals,
       layout.measureHierarchy,
       metricInsertIndex,
       metrics,
@@ -1603,6 +1633,7 @@ export const usePivotLayout = ({
     layout,
     measureHierarchy: layout.measureHierarchy,
     expandedStateSignature,
+    expandedStateSharedSignature,
     expandRowsLevelRaw,
     expandColumnsLevelRaw,
     resolvedExpandRowsLevel,

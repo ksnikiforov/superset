@@ -38,12 +38,10 @@ export const shouldFetchForLayoutChange = (
   prev: PivotRuntimeLayout,
   next: PivotRuntimeLayout,
 ): boolean => {
-  const rowsSameSet = hasSameSet(prev.rows, next.rows);
-  const colsSameSet = hasSameSet(prev.cols, next.cols);
-  if (!rowsSameSet) {
+  if (!arraysEqual(prev.rows, next.rows)) {
     return true;
   }
-  if (!colsSameSet) {
+  if (!arraysEqual(prev.cols, next.cols)) {
     return true;
   }
   if (!hasSameSet(prev.metrics, next.metrics)) {

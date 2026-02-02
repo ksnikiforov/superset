@@ -39,6 +39,7 @@ import {
   decodeMetricKey,
   formatPivotLabelValue,
   decodeMeasureLeafId,
+  SUBTOTAL_TOKEN,
 } from '../../utils';
 import {
   buildRenderModel,
@@ -335,10 +336,13 @@ export const usePivotRenderModel = ({
       ) {
         const metricLabel = layout.getMetricDisplayLabelFromPath(col.path);
         if (metricLabel && col.path.length < maxDepth) {
-          const totalLabel = metricLabel;
+          const nonMetricParts = layout.getNonMetricPathParts(col.path);
+          if (nonMetricParts.length === 0) {
+            return [...col.path, SUBTOTAL_TOKEN];
+          }
           return [
             ...col.path,
-            ...Array(Math.max(maxDepth - col.path.length, 0)).fill(totalLabel),
+            ...Array(Math.max(maxDepth - col.path.length, 0)).fill(metricLabel),
           ];
         }
       }

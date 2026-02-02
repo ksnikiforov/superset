@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { fireEvent, render, screen, within } from '../../testUtils';
+import { fireEvent, render, screen, waitFor, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { buildFormData } from '../fixtures/pivotFormData';
 import {
@@ -33,6 +33,67 @@ import {
 } from '../../../src/pivot/measureLeaves';
 
 describe('PivotTableChart interaction layout', () => {
+  it('persists runtime layout via setControlValue in user controlled mode', async () => {
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: ['row1'],
+      cols: [],
+      metrics: ['m1', 'm2'],
+      leafSelection: {},
+      valuePlacement: { axis: 'row', index: 1 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: ['row1'],
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics: ['m1', 'm2'],
+      metricsLayout: MetricsLayoutEnum.ROWS,
+      pivotRuntimeLayout: runtimeLayout,
+    });
+    const baseTree = buildTreeFromRecords(
+      [{ row1: 'A', m1: 10, m2: 20 }],
+      ['m1', 'm2'],
+      ['row1'],
+      [],
+      1,
+      0,
+    );
+    const tree = applyMetricAxis(
+      baseTree,
+      ['m1', 'm2'],
+      MetricsLayoutEnum.ROWS,
+      ['row1'],
+      [],
+      1,
+    );
+    const setControlValue = jest.fn();
+    render(
+      <PivotTableChart
+        data={tree}
+        formData={formData}
+        rawFormData={formData}
+        metrics={['m1', 'm2']}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+        setControlValue={setControlValue}
+      />,
+    );
+
+    const initialCalls = setControlValue.mock.calls.length;
+
+    fireEvent.click(screen.getByText('Select measures'));
+    fireEvent.click(screen.getByLabelText('Toggle measure m1'));
+    fireEvent.click(screen.getByLabelText('Toggle measure m1'));
+    fireEvent.click(screen.getByText('Select measures'));
+    await waitFor(() =>
+      expect(setControlValue.mock.calls.length).toBeGreaterThan(initialCalls),
+    );
+    const lastCall = setControlValue.mock.calls.slice(-1)[0];
+    expect(lastCall[0]).toBe('pivotRuntimeLayout');
+    expect((lastCall[1] as PivotRuntimeLayout).metrics).toEqual(['m2', 'm1']);
+  });
+
   it('keeps the applied header order until query form data updates', () => {
     const runtimeLayout: PivotRuntimeLayout = {
       version: 1,

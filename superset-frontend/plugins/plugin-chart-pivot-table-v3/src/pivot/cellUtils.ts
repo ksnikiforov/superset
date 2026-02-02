@@ -182,6 +182,26 @@ export const formatNodeLabel = ({
   if (node.level === 0) {
     return translate(normalizedLabel || 'Grand total');
   }
+  const hasNonMetricParts = node.path.some(value => {
+    if (isSubtotalToken(value)) {
+      return false;
+    }
+    if (decodeMetricKey(value)) {
+      return false;
+    }
+    if (decodeMeasureLeafId(value)) {
+      return false;
+    }
+    return true;
+  });
+  if (
+    axis === 'col' &&
+    metricsLayout === MetricsLayoutEnum.COLUMNS &&
+    isMetricGrandTotalNode(node) &&
+    !hasNonMetricParts
+  ) {
+    return translate('Total');
+  }
   if (
     axis === 'row' &&
     metricsLayout === MetricsLayoutEnum.ROWS &&

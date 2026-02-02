@@ -1044,6 +1044,72 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     expect(headerLabels).toEqual(metrics);
   });
 
+  it('shows the grand total row when no column dimensions exist', async () => {
+    const metrics = ['metric1'];
+    const tree = applyMetricAxis(
+      buildTreeFromRecords(
+        [{ orderPriority: '1-URGENT', metric1: 10 }],
+        metrics,
+        ['orderPriority'],
+        [],
+        1,
+        0,
+      ),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      ['orderPriority'],
+      [],
+      0,
+    );
+
+    const { container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={buildFormData({
+          ...(baseProps as Partial<PivotTableQueryFormData>),
+          groupbyRows: ['orderPriority'],
+          groupbyColumns: [METRICS_PLACEHOLDER],
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+          metrics,
+          colTotals: true,
+        })}
+        metrics={metrics}
+        groupbyRows={['orderPriority']}
+        groupbyColumns={[]}
+        aggregateFunction="Sum"
+        width={600}
+        height={300}
+        startCollapsed={false}
+        initialDepth={1}
+        colTotals
+        rowTotals={false}
+        rowSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        colTotalPosition="start"
+        colSubtotalPosition="start"
+        rowTotalPosition="start"
+      />,
+    );
+
+    await waitForPivotReady();
+    const rowHeaders = Array.from(
+      container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
+    ).map(cell => cell.textContent?.trim());
+    expect(rowHeaders).toContain('1-URGENT');
+    expect(rowHeaders).toContain('Grand total');
+  });
+
   it('omits the grand total column when multiple metrics are on columns and keeps the grand total row', async () => {
     const metrics = ['m1', 'm2'];
     const detail = buildTreeFromRecords(

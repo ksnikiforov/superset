@@ -126,8 +126,7 @@ export const buildRenderModel = ({
   const shouldHideMetricGrandTotalsOnCols = !showColRoot;
   const shouldSuppressColRoot =
     config.resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS &&
-    config.metricsFirstOnCols &&
-    config.isMultiMetric;
+    config.metricsFirstOnCols;
   const visibleColsBase = buildVisibleCols({
     cols: tree.cols,
     skipColRoot,
