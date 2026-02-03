@@ -93,10 +93,7 @@ export const buildColumnDisplayPath = (
       if (leafPath.length > 0) {
         return [totalLabel, ...leafPath];
       }
-      if (metricsAtColEnd) {
-        return [totalLabel];
-      }
-      return [totalLabel, ...Array(Math.max(maxDepth - 1, 0)).fill(totalLabel)];
+      return [totalLabel];
     }
     const totalLabel = `Total ${metricLabel}`;
     if (leafPath.length > 0) {
@@ -105,11 +102,7 @@ export const buildColumnDisplayPath = (
     if (metricsAtColEnd) {
       return [totalLabel];
     }
-    if (maxDepth <= 2) {
-      return [totalLabel, metricLabel];
-    }
-    const padCount = Math.max(maxDepth - 2, 0);
-    return [totalLabel, ...Array(padCount).fill(totalLabel), metricLabel];
+    return [totalLabel];
   }
   const metricIsLeaf =
     (decodeMetricKey(col.path[col.path.length - 1]) ??

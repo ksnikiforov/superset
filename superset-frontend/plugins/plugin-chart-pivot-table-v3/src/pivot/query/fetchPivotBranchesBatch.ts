@@ -21,6 +21,7 @@ import type {
   PivotTableQueryFormData,
   PivotTreeData,
 } from '../../types';
+import { type DataRecord } from '@superset-ui/core';
 import { type BatchGroup } from './fetchPlanOptimizer';
 import { buildLayoutContext } from '../layout/LayoutContext';
 import { buildBatchQuerySpecs } from './specs';
@@ -107,10 +108,7 @@ export const fetchPivotBranchesBatch = async ({
       requestGroupId,
     });
     const warnings = results.flatMap(result => result.warnings ?? []);
-    const resultsByQueryName = new Map<
-      string,
-      { data?: Record<string, unknown>[] }
-    >();
+    const resultsByQueryName = new Map<string, { data?: DataRecord[] }>();
     results.forEach(result => {
       const name =
         typeof result.query?.query_name === 'string'

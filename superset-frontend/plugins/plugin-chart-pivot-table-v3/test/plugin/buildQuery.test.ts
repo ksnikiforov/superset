@@ -110,7 +110,9 @@ describe('buildQuery (bootstrap)', () => {
         collapsedCols: [],
       },
     });
-    const names = queryContext.queries.map(query => query.query_name || '');
+    const names = queryContext.queries.map(query =>
+      typeof query.query_name === 'string' ? query.query_name : '',
+    );
     expect(names.some(name => name.includes('|branch:row:A'))).toBe(true);
     expect(names.some(name => name.includes('|branch:col:B'))).toBe(true);
   });
@@ -129,8 +131,10 @@ describe('buildQuery (bootstrap)', () => {
         collapsedCols: [],
       },
     });
-    const rowBranchQueries = queryContext.queries.filter(query =>
-      query.query_name?.includes('|branch:row:A'),
+    const rowBranchQueries = queryContext.queries.filter(
+      query =>
+        typeof query.query_name === 'string' &&
+        query.query_name.includes('|branch:row:A'),
     );
     expect(rowBranchQueries.length).toBeGreaterThan(0);
     expect(
@@ -143,7 +147,9 @@ describe('buildQuery (bootstrap)', () => {
       ...baseFormData,
       startCollapsed: false,
     });
-    const names = queryContext.queries.map(query => query.query_name || '');
+    const names = queryContext.queries.map(query =>
+      typeof query.query_name === 'string' ? query.query_name : '',
+    );
     expect(names.some(name => name.includes('|root'))).toBe(true);
   });
 
@@ -161,7 +167,9 @@ describe('buildQuery (bootstrap)', () => {
         collapsedCols: [],
       },
     });
-    const names = queryContext.queries.map(query => query.query_name || '');
+    const names = queryContext.queries.map(query =>
+      typeof query.query_name === 'string' ? query.query_name : '',
+    );
     expect(names.some(name => name.includes('|root'))).toBe(false);
     expect(names.some(name => name.includes('|branch:row:A'))).toBe(true);
   });
@@ -189,7 +197,9 @@ describe('buildQuery (bootstrap)', () => {
         },
       }),
     );
-    const names = queryContext.queries.map(query => query.query_name || '');
+    const names = queryContext.queries.map(query =>
+      typeof query.query_name === 'string' ? query.query_name : '',
+    );
     expect(
       names.some(name => name.includes(`|batch:row:${serializePath(['US'])}`)),
     ).toBe(true);

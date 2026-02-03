@@ -17,6 +17,7 @@
  * under the License.
  */
 
+import { DataRecordValue } from '@superset-ui/core';
 import {
   MetricsLayoutEnum,
   PivotTreeData,
@@ -157,7 +158,7 @@ describe('metric label display', () => {
       if (decoded && metricLabelMap[decoded]) {
         return metricLabelMap[decoded];
       }
-      return formatPivotLabelValue(rawValue, '');
+      return formatPivotLabelValue(rawValue as DataRecordValue, '');
     };
     const rows = buildColumnHeaderRows(
       [colNode],
@@ -568,6 +569,37 @@ describe('applyMetricAxis + buildTreeFromRecords integration', () => {
       MetricsLayoutEnum.COLUMNS,
       ['priority'],
       ['category'],
+      1,
+    );
+    expect(
+      withMetrics.cells[
+        serializeCellKey(serializePath(['1-URGENT']), serializePath(['AUTO']))
+      ]?.values.metric1,
+    ).toBe(10);
+  });
+
+  it('populates collapsed column cells when a single metric sits between columns', () => {
+    const tree = buildTreeFromRecords(
+      [
+        {
+          priority: '1-URGENT',
+          category: 'AUTO',
+          subcategory: 'SUB1',
+          metric1: 10,
+        },
+      ],
+      ['metric1'],
+      ['priority'],
+      ['category', 'subcategory'],
+      1,
+      1,
+    );
+    const withMetrics = applyMetricAxis(
+      tree,
+      ['metric1'],
+      MetricsLayoutEnum.COLUMNS,
+      ['priority'],
+      ['category', 'subcategory'],
       1,
     );
     expect(

@@ -66,6 +66,8 @@ export type PivotLayoutResult = {
   metricLabelMap: Map<string, string>;
   isMetricTokenValue: (value: unknown) => boolean;
   isMultiMetric: boolean;
+  singleMetricBetweenRows: boolean;
+  singleMetricBetweenCols: boolean;
   groupbyRowKeys: string[];
   groupbyColumnKeys: string[];
   normalizedRowSubtotalLevels: number[];
@@ -296,6 +298,18 @@ export const usePivotLayout = ({
     metrics.length,
     resolvedMetricsLayout,
   ]);
+  const singleMetricBetweenRows =
+    metricLabels.length === 1 &&
+    resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
+    metricInsertIndexOnRows !== undefined &&
+    metricInsertIndexOnRows > 0 &&
+    metricInsertIndexOnRows < rowDimCount;
+  const singleMetricBetweenCols =
+    metricLabels.length === 1 &&
+    resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS &&
+    metricInsertIndexOnCols !== undefined &&
+    metricInsertIndexOnCols > 0 &&
+    metricInsertIndexOnCols < colDimCount;
 
   const shouldExpandMetricRows =
     resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
@@ -734,7 +748,7 @@ export const usePivotLayout = ({
       nodes: Record<string, PivotTreeNode>,
     ) => {
       if (
-        !isMultiMetric ||
+        (!isMultiMetric && !singleMetricBetweenRows) ||
         resolvedMetricsLayout !== MetricsLayoutEnum.ROWS ||
         expandedSet.has(parent.key)
       ) {
@@ -803,6 +817,7 @@ export const usePivotLayout = ({
       isMetricSubtotalNode,
       isMetricTokenValue,
       isMultiMetric,
+      singleMetricBetweenRows,
       metricsAtRowEnd,
       resolvedMetricsLayout,
     ],
@@ -815,7 +830,7 @@ export const usePivotLayout = ({
       nodes: Record<string, PivotTreeNode>,
     ) => {
       if (
-        !isMultiMetric ||
+        (!isMultiMetric && !singleMetricBetweenCols) ||
         resolvedMetricsLayout !== MetricsLayoutEnum.COLUMNS ||
         expandedSet.has(parent.key)
       ) {
@@ -886,6 +901,7 @@ export const usePivotLayout = ({
       isMetricSubtotalNode,
       isMetricTokenValue,
       isMultiMetric,
+      singleMetricBetweenCols,
       metricsAtColEnd,
       resolvedMetricsLayout,
     ],
@@ -928,6 +944,22 @@ export const usePivotLayout = ({
             return metricAtIndex;
           });
       let filtered = filteredByMetricPosition;
+      if (
+        metricsAtRowEnd &&
+        parent.axis === 'row' &&
+        parent.level < groupbyRows.length
+      ) {
+        const nonMetricChildren = children.filter(child => {
+          const metricAtLevel = isMetricTokenValue(child.path[parent.level]);
+          if (!metricAtLevel) {
+            return true;
+          }
+          return isMetricGrandTotalNode(child) || isMetricSubtotalNode(child);
+        });
+        if (nonMetricChildren.length > 0) {
+          filtered = nonMetricChildren;
+        }
+      }
       if (
         resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
         parent.axis === 'row' &&
@@ -1092,6 +1124,7 @@ export const usePivotLayout = ({
       metricsFirstOnRows,
       resolvedMetricsLayout,
       rowSubTotals,
+      metricsAtRowEnd,
     ],
   );
 
@@ -1121,6 +1154,9 @@ export const usePivotLayout = ({
         return currentTree;
       }
       if (metricLayoutIndexOnRows === undefined) {
+        return currentTree;
+      }
+      if (metricsAtRowEnd) {
         return currentTree;
       }
       if (parent.path.some(val => isMetricTokenValue(val))) {
@@ -1167,7 +1203,8 @@ export const usePivotLayout = ({
           const valAtIndex = descendant.path[metricLayoutIndexOnRows];
           return isMetricTokenValue(valAtIndex);
         });
-      const shouldPruneCollapsedChildren = hasMetricAtLayoutIndex(parent);
+      const shouldPruneCollapsedChildren =
+        !metricsAtColEnd && hasMetricAtLayoutIndex(parent);
       rowNodes.forEach(node => {
         if (node.path.length <= parent.path.length) {
           return;
@@ -1225,6 +1262,7 @@ export const usePivotLayout = ({
       isMetricTokenValue,
       metricLayoutIndexOnRows,
       resolvedMetricsLayout,
+      metricsAtRowEnd,
     ],
   );
 
@@ -1428,6 +1466,7 @@ export const usePivotLayout = ({
       isMetricGrandTotalNode,
       isMetricSubtotalNode,
       isMetricTokenValue,
+      metricsAtColEnd,
       metricLayoutIndexOnCols,
       resolvedMetricsLayout,
     ],
@@ -1474,6 +1513,9 @@ export const usePivotLayout = ({
         if (validChildKeys.has(node.key)) {
           return;
         }
+        if (metricsAtColEnd && isMetricTokenValue(node.path[parent.level])) {
+          return;
+        }
         if (
           isExplicitSubtotalNode(node) ||
           isMetricGrandTotalNode(node) ||
@@ -1514,6 +1556,7 @@ export const usePivotLayout = ({
       isMetricGrandTotalNode,
       isMetricSubtotalNode,
       isMetricTokenValue,
+      metricsAtColEnd,
       metricLayoutIndexOnCols,
       resolvedMetricsLayout,
     ],
@@ -1645,6 +1688,8 @@ export const usePivotLayout = ({
     metricLabelMap,
     isMetricTokenValue,
     isMultiMetric,
+    singleMetricBetweenRows,
+    singleMetricBetweenCols,
     groupbyRowKeys,
     groupbyColumnKeys,
     normalizedRowSubtotalLevels,

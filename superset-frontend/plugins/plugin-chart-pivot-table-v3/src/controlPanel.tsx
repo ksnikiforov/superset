@@ -17,7 +17,7 @@
  * under the License.
  */
 import {
-  type ControlConfig,
+  type BaseControlConfig,
   ControlPanelConfig,
   ControlPanelState,
   ControlState,
@@ -41,7 +41,11 @@ import {
 } from '@superset-ui/core';
 import { Checkbox, Space, Typography } from '@superset-ui/core/components';
 import { CheckboxChangeEvent } from '@superset-ui/core/components/Checkbox/types';
-import { MetricsLayoutEnum, PivotInteractionMode } from './types';
+import {
+  MetricsLayoutEnum,
+  PivotInteractionMode,
+  type PivotTableQueryFormData,
+} from './types';
 import {
   METRICS_PLACEHOLDER,
   METRICS_PLACEHOLDER_LABEL,
@@ -132,7 +136,7 @@ const getInteractionMode = (
 
 const isUserControlledMode = ({
   controls,
-  formData,
+  form_data: formData,
 }: Pick<ControlPanelState, 'controls' | 'form_data'>) =>
   getInteractionMode(controls, formData) === INTERACTION_MODE_USER;
 
@@ -147,13 +151,13 @@ const getOptionKey = (opt: unknown) => {
 
 const withMetricsPlaceholder =
   (axis: 'row' | 'col') =>
-  (config: ControlConfig): ControlConfig => ({
+  <T extends BaseControlConfig>(config: T): T => ({
     ...config,
     shouldMapStateToProps: () => true,
     mapStateToProps: (
       state: ControlPanelState,
       controlState: ControlState,
-      chartState?: unknown,
+      chartState?: Record<string, unknown>,
     ) => {
       const base =
         typeof config.mapStateToProps === 'function'
@@ -423,8 +427,8 @@ const config: ControlPanelConfig = {
                   datasource: state.datasource,
                 };
               },
-              visibility: ({ controls, formData }) =>
-                !isUserControlledMode({ controls, formData }),
+              visibility: ({ controls, form_data }) =>
+                !isUserControlledMode({ controls, form_data }),
               resetOnHide: false,
             }),
           },
@@ -457,8 +461,8 @@ const config: ControlPanelConfig = {
                   datasource: state.datasource,
                 };
               },
-              visibility: ({ controls, formData }) =>
-                !isUserControlledMode({ controls, formData }),
+              visibility: ({ controls, form_data }) =>
+                !isUserControlledMode({ controls, form_data }),
               resetOnHide: false,
             }),
           },
@@ -468,10 +472,10 @@ const config: ControlPanelConfig = {
             name: 'time_grain_sqla',
             config: {
               ...sharedControls.time_grain_sqla,
-              visibility: ({ controls, formData }) => {
+              visibility: ({ controls, form_data }) => {
                 const useDimensions = isUserControlledMode({
                   controls,
-                  formData,
+                  form_data,
                 });
                 const options = useDimensions
                   ? controls?.dimensions?.options
@@ -1026,31 +1030,32 @@ const config: ControlPanelConfig = {
     },
   ],
   formDataOverrides: formData => {
-    if (formData.interactionMode === INTERACTION_MODE_USER) {
+    const pivotFormData = formData as PivotTableQueryFormData;
+    if (pivotFormData.interactionMode === INTERACTION_MODE_USER) {
       const resolved = resolveInteractionFormData({
-        formData,
-        runtimeLayout: formData.pivotRuntimeLayout,
+        formData: pivotFormData,
+        runtimeLayout: pivotFormData.pivotRuntimeLayout,
       });
       return {
         ...resolved,
-        metricsLayout: resolved.metricsLayout ?? formData.metricsLayout,
+        metricsLayout: resolved.metricsLayout ?? pivotFormData.metricsLayout,
       };
     }
-    const metrics = ensureIsArray(formData.metrics);
+    const metrics = ensureIsArray(pivotFormData.metrics);
     const hasUserDimensions =
-      ensureIsArray(formData.dimensions).length > 0 &&
+      ensureIsArray(pivotFormData.dimensions).length > 0 &&
       metrics.length > 0 &&
-      ensureIsArray(formData.groupbyRows).length === 0 &&
-      ensureIsArray(formData.groupbyColumns).length === 0;
+      ensureIsArray(pivotFormData.groupbyRows).length === 0 &&
+      ensureIsArray(pivotFormData.groupbyColumns).length === 0;
     const rows = hasUserDimensions
-      ? ensureIsArray(formData.dimensions)
-      : ensureIsArray(formData.groupbyRows);
+      ? ensureIsArray(pivotFormData.dimensions)
+      : ensureIsArray(pivotFormData.groupbyRows);
     const cols = hasUserDimensions
       ? []
-      : ensureIsArray(formData.groupbyColumns);
+      : ensureIsArray(pivotFormData.groupbyColumns);
     const resolved = resolveMetricPlacement(rows, cols, {
       hasMetrics: metrics.length > 0,
-      preferredAxis: formData.metricsLayout as MetricsLayoutEnum,
+      preferredAxis: pivotFormData.metricsLayout as MetricsLayoutEnum,
     });
 
     return {

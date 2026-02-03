@@ -18,6 +18,7 @@
  */
 import {
   ensureIsArray,
+  type DataRecord,
   type QueryFormColumn,
   type QueryFormMetric,
 } from '@superset-ui/core';
@@ -224,7 +225,7 @@ export const buildBranchTreeFromResults = ({
   metricsLayoutResolved,
   metricInsertIndex,
 }: {
-  results: Array<{ data?: Record<string, unknown>[] }>;
+  results: Array<{ data?: DataRecord[] }>;
   queryPairs: Array<{ rowDepth: number; colDepth: number }>;
   metricsForQuery: QueryFormMetric[];
   formData: PivotTableQueryFormData;
@@ -374,10 +375,7 @@ export async function fetchPivotBranch({
       requestGroupId,
     });
     const warnings = results.flatMap(result => result.warnings ?? []);
-    const resultsByQueryName = new Map<
-      string,
-      { data?: Record<string, unknown>[] }
-    >();
+    const resultsByQueryName = new Map<string, { data?: DataRecord[] }>();
     results.forEach(result => {
       const name =
         typeof result.query?.query_name === 'string'

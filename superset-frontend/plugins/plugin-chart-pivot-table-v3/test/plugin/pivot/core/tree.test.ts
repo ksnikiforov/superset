@@ -335,4 +335,38 @@ describe('pivot/core/tree', () => {
     expect(flat.rows[metricKey]).toBeDefined();
     expect(flat.rows[leafKey]).toBeUndefined();
   });
+
+  it('surfaces collapsed column values when a single metric sits between columns with hidden leaves', () => {
+    const valueLeaf = buildValueLeaf();
+    const ixLeaf = buildBuiltInLeaf('ix', {
+      n: 1,
+      unit: 'year',
+      direction: 'past',
+    });
+    const tree = buildTreeFromRecords(
+      [{ c1: 'C1', c2: 'C2', m1: 10 }],
+      ['m1'],
+      [],
+      ['c1', 'c2'],
+      0,
+      1,
+    );
+    const withMeasures = applyMeasureHierarchyAxis(
+      tree,
+      {
+        kind: 'measureStackV1',
+        groups: [{ metricKey: 'm1', leaves: [valueLeaf, ixLeaf] }],
+        leafTierVisibility: 'hidden',
+      },
+      MetricsLayoutEnum.COLUMNS,
+      [],
+      ['c1', 'c2'],
+      1,
+    );
+    expect(
+      withMeasures.cells[
+        serializeCellKey(serializePath([]), serializePath(['C1']))
+      ]?.values.m1,
+    ).toBe(10);
+  });
 });

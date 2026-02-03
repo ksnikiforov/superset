@@ -66,7 +66,7 @@ describe('layout resolution (contracts)', () => {
     const result = transformProps(
       chartProps as ChartProps<PivotTableQueryFormData>,
     );
-    const signature = JSON.parse(result.formData.treeDataSignature) as {
+    const signature = JSON.parse(result.formData.treeDataSignature ?? '{}') as {
       metricsLayout: MetricsLayoutEnum;
       metricInsertIndex: number;
       rowSubtotalLevels: number[];
@@ -109,6 +109,9 @@ describe('layout resolution (contracts)', () => {
 
     const layout = buildLayoutContext(formData);
 
-    expect(layout.measureHierarchy.leafTierVisibility).toBe('visible');
+    expect(layout.measureHierarchy.kind).toBe('measureStackV1');
+    if (layout.measureHierarchy.kind === 'measureStackV1') {
+      expect(layout.measureHierarchy.leafTierVisibility).toBe('visible');
+    }
   });
 });

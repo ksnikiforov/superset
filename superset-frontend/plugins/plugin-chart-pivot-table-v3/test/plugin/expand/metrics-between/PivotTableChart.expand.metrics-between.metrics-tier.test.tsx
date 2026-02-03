@@ -177,21 +177,11 @@ describe('PivotTableChart expansion with metrics between dimensions (metrics-tie
     const orderPriorityRow = getByText('1-URGENT').closest(
       'tr',
     ) as HTMLTableRowElement;
-    const avgRowCollapsed = within(tbody)
-      .getByText('averageOrderValue')
-      .closest('tr') as HTMLTableRowElement;
-    const discountRowCollapsed = within(tbody)
-      .getByText('weightedDiscount')
-      .closest('tr') as HTMLTableRowElement;
     expect(
       within(orderPriorityRow).getByLabelText('plus-square'),
     ).toBeInTheDocument();
-    expect(
-      within(avgRowCollapsed).queryByLabelText('plus-square'),
-    ).not.toBeInTheDocument();
-    expect(
-      within(discountRowCollapsed).queryByLabelText('plus-square'),
-    ).not.toBeInTheDocument();
+    expect(within(tbody).queryByText('averageOrderValue')).not.toBeInTheDocument();
+    expect(within(tbody).queryByText('weightedDiscount')).not.toBeInTheDocument();
     expect(within(tbody).queryByText('AIR')).not.toBeInTheDocument();
 
     fireEvent.click(within(orderPriorityRow).getByLabelText('plus-square'));
@@ -200,30 +190,24 @@ describe('PivotTableChart expansion with metrics between dimensions (metrics-tie
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
     });
 
-    const shipModeRow = within(tbody)
+    const updatedTbody = container.querySelector('tbody') as HTMLElement;
+    const shipModeRow = within(updatedTbody)
       .getByText('AIR')
-      .closest('tr') as HTMLTableRowElement;
-    const avgRow = within(tbody)
-      .getByText('averageOrderValue')
-      .closest('tr') as HTMLTableRowElement;
-    const discountRow = within(tbody)
-      .getByText('weightedDiscount')
       .closest('tr') as HTMLTableRowElement;
     expect(
       within(shipModeRow).getByLabelText('plus-square'),
     ).toBeInTheDocument();
     expect(
-      within(avgRow).queryByLabelText('plus-square'),
+      within(updatedTbody).queryByText('averageOrderValue'),
     ).not.toBeInTheDocument();
     expect(
-      within(discountRow).queryByLabelText('plus-square'),
+      within(updatedTbody).queryByText('weightedDiscount'),
     ).not.toBeInTheDocument();
 
-    const rows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));
+    const rows = Array.from(updatedTbody.querySelectorAll<HTMLElement>('tr'));
     expect(rows.indexOf(orderPriorityRow)).toBeLessThan(
       rows.indexOf(shipModeRow),
     );
-    expect(rows.indexOf(shipModeRow)).toBeLessThan(rows.indexOf(avgRow));
   });
 
   it('does not show metric toggles after expanding orderPriority', async () => {
@@ -321,13 +305,9 @@ describe('PivotTableChart expansion with metrics between dimensions (metrics-tie
     });
 
     const tbody = container.querySelector('tbody') as HTMLElement;
-    const avgMetricLabels = within(tbody).getAllByText('averageOrderValue');
-    avgMetricLabels.forEach(label => {
-      const avgRow = label.closest('tr') as HTMLTableRowElement;
-      expect(
-        within(avgRow).queryByLabelText('plus-square'),
-      ).not.toBeInTheDocument();
-    });
+    expect(within(tbody).getByText('AIR')).toBeInTheDocument();
+    expect(within(tbody).queryByText('averageOrderValue')).not.toBeInTheDocument();
+    expect(within(tbody).queryByText('weightedDiscount')).not.toBeInTheDocument();
     expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
   });
 

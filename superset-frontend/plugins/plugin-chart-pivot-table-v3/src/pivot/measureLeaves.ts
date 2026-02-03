@@ -22,6 +22,7 @@ import {
   MeasureLeafOperator,
   MeasureLeafSpec,
   MeasureLeavesByMetricKey,
+  type PivotTreeData,
 } from '../types';
 import { getMetricKey } from '../utils';
 
@@ -275,11 +276,7 @@ export const applyMeasureLeafValuesToTree = ({
   tree,
   measureHierarchy,
 }: {
-  tree: {
-    rows: Record<string, { values?: Record<string, DataRecordValue> }>;
-    cols: Record<string, { values?: Record<string, DataRecordValue> }>;
-    cells: Record<string, { values: Record<string, DataRecordValue> }>;
-  };
+  tree: PivotTreeData;
   measureHierarchy: {
     kind: 'flatMetrics' | 'measureStackV1';
     groups?: Array<{ metricKey: string; leaves: MeasureLeafSpec[] }>;

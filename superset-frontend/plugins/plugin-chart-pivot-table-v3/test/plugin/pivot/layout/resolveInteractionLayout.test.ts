@@ -30,10 +30,11 @@ import {
   PivotRuntimeLayout,
   PivotTableQueryFormData,
 } from '../../../../src/types';
+import { buildFormData } from '../../fixtures/pivotFormData';
 
 describe('resolveInteractionFormData', () => {
   it('uses runtime layout for rows/cols, metrics order, and value placement', () => {
-    const formData = {
+    const formData: PivotTableQueryFormData = buildFormData({
       interactionMode: 'user_controlled',
       dimensions: ['country', 'state'],
       groupbyRows: [],
@@ -43,7 +44,7 @@ describe('resolveInteractionFormData', () => {
         sum__sales: [buildValueLeaf()],
         sum__profit: [buildValueLeaf()],
       },
-    } as PivotTableQueryFormData;
+    });
 
     const runtimeLayout: PivotRuntimeLayout = {
       version: 1,
@@ -67,7 +68,7 @@ describe('resolveInteractionFormData', () => {
       direction: 'past',
     });
     const valueLeaf = buildValueLeaf();
-    const formData = {
+    const formData: PivotTableQueryFormData = buildFormData({
       interactionMode: 'user_controlled',
       dimensions: ['country'],
       groupbyRows: [],
@@ -76,7 +77,7 @@ describe('resolveInteractionFormData', () => {
       measureLeavesByMetric: {
         sum__sales: [valueLeaf, leafIx],
       },
-    } as PivotTableQueryFormData;
+    });
 
     const runtimeLayout: PivotRuntimeLayout = {
       version: 1,
@@ -95,7 +96,7 @@ describe('resolveInteractionFormData', () => {
 
   it('allows removing the value leaf to disable metrics', () => {
     const valueLeaf = buildValueLeaf();
-    const formData = {
+    const formData: PivotTableQueryFormData = buildFormData({
       interactionMode: 'user_controlled',
       dimensions: ['country'],
       groupbyRows: [],
@@ -104,7 +105,7 @@ describe('resolveInteractionFormData', () => {
       measureLeavesByMetric: {
         sum__sales: [valueLeaf],
       },
-    } as PivotTableQueryFormData;
+    });
 
     const runtimeLayout: PivotRuntimeLayout = {
       version: 1,

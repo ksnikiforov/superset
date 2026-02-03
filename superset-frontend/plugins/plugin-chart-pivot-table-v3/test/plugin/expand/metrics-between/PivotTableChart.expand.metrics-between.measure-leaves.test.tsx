@@ -175,8 +175,6 @@ describe('PivotTableChart expansion with measure leaves between dimensions', () 
 
     await waitForPivotReady();
     const thead = container.querySelector('thead') as HTMLElement;
-    const col1Cell = within(thead).getByText('C1').closest('th') as HTMLElement;
-    fireEvent.click(within(col1Cell).getByLabelText('plus-square'));
     const valueCell = await waitFor(() => {
       const cell = within(thead).getAllByText('Value')[0].closest('th');
       if (!cell) {
@@ -296,8 +294,6 @@ describe('PivotTableChart expansion with measure leaves between dimensions', () 
 
     await waitForPivotReady();
     const thead = container.querySelector('thead') as HTMLElement;
-    const col1Cell = within(thead).getByText('C1').closest('th') as HTMLElement;
-    fireEvent.click(within(col1Cell).getByLabelText('plus-square'));
     const valueCell = await waitFor(() => {
       const cell = within(thead).getAllByText('Value')[0].closest('th');
       if (!cell) {
@@ -424,10 +420,6 @@ describe('PivotTableChart expansion with measure leaves between dimensions', () 
 
     await waitForPivotReady();
     const tbody = container.querySelector('tbody') as HTMLElement;
-    const rowHeader = within(tbody)
-      .getByText('A')
-      .closest('tr') as HTMLTableRowElement;
-    fireEvent.click(within(rowHeader).getByLabelText('plus-square'));
     const valueRow = await waitFor(() => {
       const cell = within(tbody).getAllByText('Value')[0].closest('tr');
       if (!cell) {
@@ -520,10 +512,6 @@ describe('PivotTableChart expansion with measure leaves between dimensions', () 
 
     await waitForPivotReady();
     const tbody = container.querySelector('tbody') as HTMLElement;
-    const rowHeader = within(tbody)
-      .getByText('A')
-      .closest('tr') as HTMLTableRowElement;
-    fireEvent.click(within(rowHeader).getByLabelText('plus-square'));
     const valueRow = await waitFor(
       () =>
         within(tbody)

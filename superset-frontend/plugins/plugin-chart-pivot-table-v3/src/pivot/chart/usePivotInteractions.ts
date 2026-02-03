@@ -52,8 +52,9 @@ const buildSelectedFilters = (
   const selected: Record<string, DataRecordValue[]> = {};
   filters.forEach(filter => {
     const key = getColumnLabel(filter.col);
-    const value: DataRecordValue = 'val' in filter ? filter.val : null;
-    selected[key] = [value];
+    const rawValue = 'val' in filter ? filter.val : null;
+    const values = Array.isArray(rawValue) ? rawValue : [rawValue];
+    selected[key] = values;
   });
   return selected;
 };

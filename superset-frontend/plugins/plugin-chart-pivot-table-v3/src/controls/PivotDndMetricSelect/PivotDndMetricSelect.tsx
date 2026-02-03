@@ -320,11 +320,10 @@ export const updateMetricConfigForRename = ({
   }
   const replacementMetric = normalizeMetricReferenceValue(newMetric);
 
-  const replaceReference = (metric?: PivotMetricFormattingValue) => {
+  const replaceMetricReference = (
+    metric?: QueryFormMetric,
+  ): QueryFormMetric | undefined => {
     if (!metric) {
-      return metric;
-    }
-    if (isPivotExcelFormula(metric)) {
       return metric;
     }
     if (typeof metric === 'string') {
@@ -337,6 +336,18 @@ export const updateMetricConfigForRename = ({
       }
     }
     return metric;
+  };
+
+  const replaceFormattingReference = (
+    metric?: PivotMetricFormattingValue,
+  ): PivotMetricFormattingValue | undefined => {
+    if (!metric) {
+      return metric;
+    }
+    if (isPivotExcelFormula(metric)) {
+      return metric;
+    }
+    return replaceMetricReference(metric);
   };
 
   const renameMapKey = <T extends Record<string, unknown>>(
@@ -364,7 +375,7 @@ export const updateMetricConfigForRename = ({
   ).reduce<PivotMetricFormattingMap>((acc, [key, formatting]) => {
     const nextFormatting = { ...formatting };
     METRIC_FORMATTING_FIELDS.forEach(field => {
-      const updatedMetric = replaceReference(formatting[field]);
+      const updatedMetric = replaceFormattingReference(formatting[field]);
       if (updatedMetric !== formatting[field]) {
         nextFormatting[field] = updatedMetric;
       }
@@ -378,8 +389,8 @@ export const updateMetricConfigForRename = ({
     updatedDatabarsBase,
   ).reduce<PivotMetricDatabarMap>((acc, [key, config]) => {
     const nextConfig: PivotMetricDatabar = { ...config };
-    const nextScaleLike = replaceReference(config.scaleLike);
-    const nextColorMetric = replaceReference(config.colorMetric);
+    const nextScaleLike = replaceMetricReference(config.scaleLike);
+    const nextColorMetric = replaceMetricReference(config.colorMetric);
     if (nextScaleLike !== config.scaleLike) {
       nextConfig.scaleLike = nextScaleLike;
     }

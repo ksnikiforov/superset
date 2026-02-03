@@ -64,18 +64,30 @@ export default function transformProps(
   chartProps: ChartProps,
 ): PivotTableProps {
   const {
+    annotationData,
     width,
     height,
     queriesData,
     formData: rawFormDataCamel,
     rawFormData: rawFormDataBase,
-    hooks: { setDataMask = () => {}, onContextMenu, setControlValue },
+    hooks,
     filterState,
     datasource,
+    rawDatasource,
+    initialValues,
+    legendState,
+    legendIndex,
+    behaviors,
+    displaySettings,
+    appSection,
+    isRefreshing,
+    inputRef,
+    inContextMenu,
     emitCrossFilters,
     theme,
     ownState,
   } = chartProps;
+  const { setDataMask = () => {}, onContextMenu, setControlValue } = hooks;
   const baseFormData = rawFormDataCamel as PivotTableQueryFormData;
   const rawFormData = rawFormDataBase as PivotTableQueryFormData;
   const runtimeLayout =
@@ -335,8 +347,12 @@ export default function transformProps(
   const { selectedFilters } = filterState;
 
   return {
+    annotationData,
     width,
     height,
+    datasource,
+    rawDatasource,
+    initialValues,
     margin: formData.margin ?? 0,
     data: nextTreeWithLeaves,
     formData: {
@@ -348,6 +364,20 @@ export default function transformProps(
       measureLeavesByMetricBase:
         rawFormData.measureLeavesByMetric ?? baseFormData.measureLeavesByMetric,
     },
+    rawFormData: rawFormData,
+    hooks,
+    ownState,
+    filterState,
+    legendState,
+    legendIndex,
+    queriesData,
+    behaviors,
+    displaySettings,
+    appSection,
+    isRefreshing,
+    inputRef,
+    inContextMenu,
+    theme,
     queryFormData,
     metrics,
     metricFormatting,
@@ -383,7 +413,6 @@ export default function transformProps(
     dateFormatters,
     onContextMenu,
     timeGrainSqla: formData.timeGrainSqla ?? formData.time_grain_sqla,
-    treeData: nextTreeWithLeaves,
     colTypeMap,
     rowTotalPosition,
     rowSubtotalPosition,

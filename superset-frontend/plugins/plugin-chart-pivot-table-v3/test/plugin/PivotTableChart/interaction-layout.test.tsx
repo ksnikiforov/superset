@@ -360,7 +360,7 @@ describe('PivotTableChart interaction layout', () => {
     const valueHeaders = within(tableHeader)
       .getAllByText('Value')
       .map(node => node.closest('th'))
-      .filter((node): node is HTMLElement => node !== null);
+      .filter((node): node is HTMLTableCellElement => node !== null);
     if (valueHeaders.length === 0) {
       const headerLabels = Array.from(tableHeader.querySelectorAll('th')).map(
         node => node.textContent || '',
@@ -468,7 +468,9 @@ describe('PivotTableChart interaction layout', () => {
       />,
     );
 
-    const headerRow = container.querySelector('thead tr');
+    const headerRow = container.querySelector(
+      'thead tr',
+    ) as HTMLTableRowElement | null;
     if (!headerRow) {
       throw new Error('Table header row not found');
     }
@@ -560,11 +562,15 @@ describe('PivotTableChart interaction layout', () => {
       />,
     );
 
-    const headerRow = container.querySelector('thead tr');
+    const headerRow = container.querySelector(
+      'thead tr',
+    ) as HTMLTableRowElement | null;
     if (!headerRow) {
       throw new Error('Table header row not found');
     }
-    const headerCells = within(headerRow).getAllByRole('columnheader');
+    const headerCells = within(headerRow).getAllByRole(
+      'columnheader',
+    ) as HTMLTableCellElement[];
     const metricHeaderCells = headerCells.filter(cell =>
       metrics.includes(cell.textContent?.trim() ?? ''),
     );
@@ -707,7 +713,9 @@ describe('PivotTableChart interaction layout', () => {
       />,
     );
 
-    const headerRow = container.querySelector('thead tr');
+    const headerRow = container.querySelector(
+      'thead tr',
+    ) as HTMLTableRowElement | null;
     if (!headerRow) {
       throw new Error('Table header row not found');
     }
@@ -723,15 +731,19 @@ describe('PivotTableChart interaction layout', () => {
     totalLabels.forEach(totalLabel => {
       expect(labels).toContain(totalLabel);
     });
-    const headerCells = within(headerRow).getAllByRole('columnheader');
+    const headerCells = within(headerRow).getAllByRole(
+      'columnheader',
+    ) as HTMLTableCellElement[];
     const totalHeaderFor = (label: string) =>
       headerCells.filter(cell => cell.textContent?.trim() === label);
+    const getColSpan = (label: string) =>
+      (totalHeaderFor(label)[0] as HTMLTableCellElement).colSpan;
     expect(totalHeaderFor('Total m1')).toHaveLength(1);
-    expect(totalHeaderFor('Total m1')[0].colSpan).toBe(2);
+    expect(getColSpan('Total m1')).toBe(2);
     expect(totalHeaderFor('Total m2')).toHaveLength(1);
-    expect(totalHeaderFor('Total m2')[0].colSpan).toBe(2);
+    expect(getColSpan('Total m2')).toBe(2);
     expect(totalHeaderFor('Total m3')).toHaveLength(1);
-    expect(totalHeaderFor('Total m3')[0].colSpan).toBe(1);
+    expect(getColSpan('Total m3')).toBe(1);
     const allHeaderLabels = Array.from(container.querySelectorAll('thead th'))
       .map(cell => cell.textContent?.trim() ?? '')
       .filter(label => label.length > 0);

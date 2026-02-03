@@ -384,10 +384,9 @@ const InteractionChip = ({
     preview(getEmptyImage(), { captureDraggingState: true });
   }, [preview]);
 
-  const [, drop] = useDrop<DragItem>({
+  const [, drop] = useDrop<DragItem, void, unknown>({
     accept: [dimensionDndType, valueDndType],
     drop: (item, monitor) => {
-      let handled = false;
       const clientOffset = monitor.getClientOffset();
       const rect = ref.current?.getBoundingClientRect();
       const dropRatio = 0.33;
@@ -402,7 +401,7 @@ const InteractionChip = ({
 
       if (item.kind === 'dimension') {
         if (item.dimensionKey === chip.id && item.sourceAxis === axis) {
-          return undefined;
+          return;
         }
         onDropDimension(
           item.dimensionKey,
@@ -412,17 +411,16 @@ const InteractionChip = ({
           item.sourceAxis,
           item.sourceChipIndex,
         );
-        handled = true;
-      } else if (!(isValue && item.sourceAxis === axis && !isAfter)) {
+        return;
+      }
+      if (!(isValue && item.sourceAxis === axis && !isAfter)) {
         onDropValue(
           axis,
           targetChipIndex,
           item.sourceAxis,
           item.sourceChipIndex,
         );
-        handled = true;
       }
-      return handled ? { handled: true } : undefined;
     },
   });
 
@@ -476,7 +474,7 @@ const StripDropZone = ({
   onDropDimension,
   onDropValue,
 }: StripDropZoneProps) => {
-  const [, drop] = useDrop<DragItem>({
+  const [, drop] = useDrop<DragItem, void, unknown>({
     accept: [dimensionDndType, valueDndType],
     drop: item => {
       if (item.kind === 'dimension') {
@@ -491,7 +489,6 @@ const StripDropZone = ({
       } else {
         onDropValue(axis, chipCount, item.sourceAxis, item.sourceChipIndex);
       }
-      return { handled: true };
     },
   });
 
@@ -765,10 +762,6 @@ function PivotTableChart(props: PivotTableProps) {
     () => appliedFormData.metricsBase ?? appliedFormData.metrics ?? metrics,
     [appliedFormData.metrics, appliedFormData.metricsBase, metrics],
   );
-  const appliedMetricKeys = useMemo(
-    () => getMetricKeys(ensureIsArray(appliedMetrics)),
-    [appliedMetrics],
-  );
   const runtimeLayout = useMemo(() => {
     const persisted =
       formData.pivotRuntimeLayout ??
@@ -786,6 +779,26 @@ function PivotTableChart(props: PivotTableProps) {
   useEffect(() => {
     setCommittedRuntimeLayout(runtimeLayout);
   }, [runtimeLayout]);
+  const appliedMetricKeysBase = useMemo(
+    () => getMetricKeys(ensureIsArray(appliedMetrics)),
+    [appliedMetrics],
+  );
+  const appliedMetricKeys = useMemo(() => {
+    if (!isUserControlled) {
+      return appliedMetricKeysBase;
+    }
+    const committedMetrics = committedRuntimeLayout.metrics ?? [];
+    if (committedMetrics.length === 0) {
+      return appliedMetricKeysBase;
+    }
+    const merged = [...appliedMetricKeysBase];
+    committedMetrics.forEach(metricKey => {
+      if (!merged.includes(metricKey)) {
+        merged.push(metricKey);
+      }
+    });
+    return merged;
+  }, [appliedMetricKeysBase, committedRuntimeLayout.metrics, isUserControlled]);
   const appliedRuntimeLayout = useMemo(() => {
     if (!isUserControlled) {
       return runtimeLayout;
@@ -806,11 +819,26 @@ function PivotTableChart(props: PivotTableProps) {
     if (!isUserControlled) {
       return appliedFormData;
     }
+    const metricsForLayout =
+      appliedFormData.metricsBase ??
+      formData.metricsBase ??
+      appliedFormData.metrics ??
+      formData.metrics;
+    const leavesForLayout =
+      appliedFormData.measureLeavesByMetricBase ??
+      formData.measureLeavesByMetricBase ??
+      appliedFormData.measureLeavesByMetric ??
+      formData.measureLeavesByMetric;
     return resolveInteractionFormData({
-      formData: appliedFormData,
+      formData: {
+        ...appliedFormData,
+        metrics: metricsForLayout ?? appliedFormData.metrics,
+        measureLeavesByMetric:
+          leavesForLayout ?? appliedFormData.measureLeavesByMetric,
+      },
       runtimeLayout: appliedRuntimeLayout,
     });
-  }, [appliedFormData, appliedRuntimeLayout, isUserControlled]);
+  }, [appliedFormData, appliedRuntimeLayout, formData, isUserControlled]);
   const layoutMetrics = useMemo(
     () =>
       isUserControlled ? ensureIsArray(appliedLayoutFormData.metrics) : metrics,
@@ -1008,8 +1036,21 @@ function PivotTableChart(props: PivotTableProps) {
             },
           }
         : fetchFormDataBase;
+      const metricsForLayout =
+        formData.metricsBase ?? formData.metrics ?? pendingFormData.metrics;
+      const leavesForLayout =
+        formData.measureLeavesByMetricBase ??
+        formData.measureLeavesByMetric ??
+        pendingFormData.measureLeavesByMetric;
       const resolvedFormData = resolveInteractionFormData({
-        formData: pendingFormData,
+        formData: isUserControlled
+          ? {
+              ...pendingFormData,
+              metrics: metricsForLayout ?? pendingFormData.metrics,
+              measureLeavesByMetric:
+                leavesForLayout ?? pendingFormData.measureLeavesByMetric,
+            }
+          : pendingFormData,
         runtimeLayout: normalized,
       });
       const layout = buildLayoutContext(resolvedFormData);
@@ -1073,6 +1114,8 @@ function PivotTableChart(props: PivotTableProps) {
       buildFilterPayload,
       dimensionKeys,
       fetchFormDataBase,
+      formData,
+      isUserControlled,
       metricKeys,
       persistRuntimeState,
       setCommittedFilters,
@@ -1128,7 +1171,7 @@ function PivotTableChart(props: PivotTableProps) {
   const chipItems = useCallback(
     (axis: 'row' | 'col') => {
       const keys = axis === 'row' ? uiRuntimeLayout.rows : uiRuntimeLayout.cols;
-      const labels = keys.map(key => ({
+      const labels: ChipItem[] = keys.map(key => ({
         id: key,
         label: dimensionLabelMap.get(key) ?? key,
         kind: 'dimension' as const,
@@ -1245,6 +1288,7 @@ function PivotTableChart(props: PivotTableProps) {
     rowSubTotals,
     layout: layoutResult,
   });
+  const { renderTree } = renderModelResult;
 
   const dimensionFilterValues = useMemo(() => {
     const valuesMap = new Map<string, Set<DataRecordValue>>();
@@ -1280,8 +1324,8 @@ function PivotTableChart(props: PivotTableProps) {
         });
       });
     };
-    collectValues(tree.rows, rowKeys);
-    collectValues(tree.cols, colKeys);
+    collectValues(renderTree.rows, rowKeys);
+    collectValues(renderTree.cols, colKeys);
     return Object.fromEntries(
       Array.from(valuesMap.entries()).map(([key, set]) => [
         key,
@@ -1292,8 +1336,8 @@ function PivotTableChart(props: PivotTableProps) {
     layoutGroupbyColumns,
     layoutGroupbyRows,
     layoutResult,
-    tree.cols,
-    tree.rows,
+    renderTree.cols,
+    renderTree.rows,
   ]);
 
   const handleDimensionFilterChange = useCallback(
@@ -1332,7 +1376,7 @@ function PivotTableChart(props: PivotTableProps) {
   });
 
   const formatting = usePivotFormatting({
-    tree,
+    tree: renderTree,
     renderModel: renderModelResult.renderModel,
     expandedRows: renderModelResult.expandedRowsForRender,
     formData: appliedLayoutFormData,
@@ -1499,7 +1543,7 @@ function PivotTableChart(props: PivotTableProps) {
     [handleRuntimeLayoutChange, metricsAvailable, uiRuntimeLayout],
   );
 
-  const [, dropOnRowStrip] = useDrop<DragItem>({
+  const [, dropOnRowStrip] = useDrop<DragItem, void, unknown>({
     accept: [dimensionDndType, valueDndType],
     drop: (item, monitor) => {
       if (monitor.didDrop()) {
@@ -1529,7 +1573,7 @@ function PivotTableChart(props: PivotTableProps) {
     },
   });
 
-  const [, dropOnColStrip] = useDrop<DragItem>({
+  const [, dropOnColStrip] = useDrop<DragItem, void, unknown>({
     accept: [dimensionDndType, valueDndType],
     drop: (item, monitor) => {
       if (monitor.didDrop()) {
@@ -1630,7 +1674,7 @@ function PivotTableChart(props: PivotTableProps) {
               height={tableHeight}
               width={tableWidth}
               renderModel={renderModelResult.renderModel}
-              tree={tree}
+              tree={renderTree}
               expandedRows={renderModelResult.expandedRowsForRender}
               expandedCols={renderModelResult.expandedColsForRender}
               errorMessage={activeErrorMessage}
@@ -1680,7 +1724,7 @@ function PivotTableChart(props: PivotTableProps) {
       height={height}
       width={width}
       renderModel={renderModelResult.renderModel}
-      tree={tree}
+      tree={renderTree}
       expandedRows={renderModelResult.expandedRowsForRender}
       expandedCols={renderModelResult.expandedColsForRender}
       errorMessage={activeErrorMessage}

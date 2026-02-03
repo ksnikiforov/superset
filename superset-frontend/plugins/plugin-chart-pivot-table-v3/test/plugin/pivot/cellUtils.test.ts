@@ -181,6 +181,7 @@ describe('cellUtils helpers', () => {
       measureHierarchy: {
         kind: 'measureStackV1',
         groups: [{ metricKey, leaves: [buildValueLeaf(), ixLeaf] }],
+        leafTierVisibility: 'visible',
       },
     });
 

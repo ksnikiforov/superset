@@ -16,6 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import { type DataRecord } from '@superset-ui/core';
 import { type PivotTableQueryFormData } from '../../types';
 import { type QuerySpec } from '../query/types';
 
@@ -29,7 +30,7 @@ export type TruncationWarning = {
 export type ChartDataWarning = TruncationWarning;
 
 export type ChartDataQueryResult = {
-  data?: Record<string, unknown>[];
+  data?: DataRecord[];
   query?: { query_name?: string };
   query_name?: string;
   rowcount?: number;

@@ -1192,9 +1192,16 @@ export const useExpansionEngine = ({
         const touchedPrefixes = Array.from(touchedKeys).map(key =>
           parsePath(key),
         );
+        const preserveMetricChildren =
+          axis === 'col' &&
+          metricIndexForCols !== undefined &&
+          metricIndexForCols >= groupbyColumnsLength;
         const preservedTree =
           touchedPrefixes.length > 0
-            ? pruneTreeByPrefixes(treeRef.current, axis, touchedPrefixes)
+            ? pruneTreeByPrefixes(treeRef.current, axis, touchedPrefixes, {
+                preserveMetricChildren,
+                isMetricTokenValue,
+              })
             : treeRef.current;
         const mergedTree = mergeTrees(currentTree, preservedTree);
         const finalExpanded = resolveExpandedForMetrics(
@@ -1983,7 +1990,7 @@ export const useExpansionEngine = ({
         }
         const node = nodes[key];
         const path = node ? node.path : parsePath(key);
-        const depth = countDimDepth(path, metricLabelSetForDepth);
+        const depth = countDimDepth(path);
         return depth <= stablePrefix;
       });
     };

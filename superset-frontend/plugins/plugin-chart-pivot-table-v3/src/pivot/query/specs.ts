@@ -17,10 +17,11 @@
  * under the License.
  */
 import {
-  type BinaryQueryObjectFilterClause,
+  type DataRecordValue,
   getColumnLabel,
   type QueryFormColumn,
   type QueryObjectFilterClause,
+  type SetQueryObjectFilterClause,
   type UnaryQueryObjectFilterClause,
 } from '@superset-ui/core';
 import {
@@ -334,14 +335,13 @@ const buildBatchFilterClauses = ({
       } as UnaryQueryObjectFilterClause,
     ];
   }
-  return [
-    ...prefixFilters,
-    {
-      col: getColumnLabel(siblingColumn),
-      op: 'IN',
-      val: siblingValues,
-    } as BinaryQueryObjectFilterClause,
-  ];
+  const resolvedSiblingValues = siblingValues as DataRecordValue[];
+  const siblingClause: SetQueryObjectFilterClause = {
+    col: getColumnLabel(siblingColumn),
+    op: 'IN',
+    val: resolvedSiblingValues,
+  };
+  return [...prefixFilters, siblingClause];
 };
 
 const buildBatchSpecs = ({

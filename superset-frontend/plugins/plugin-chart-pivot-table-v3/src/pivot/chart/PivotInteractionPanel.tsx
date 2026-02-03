@@ -827,7 +827,6 @@ export const PivotInteractionPanel = ({
                           </FilterMenuHeader>
                           <Select
                             mode="multiple"
-                            size="small"
                             allowClear
                             placeholder={t('Filter values')}
                             options={options}
@@ -844,8 +843,8 @@ export const PivotInteractionPanel = ({
                               )
                             }
                             showSearch
-                            optionFilterProp="label"
-                            style={{ width: '100%' }}
+                            optionFilterProps={['label']}
+                            css={{ width: '100%' }}
                             maxTagCount="responsive"
                             notFoundContent={t('No values')}
                           />

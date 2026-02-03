@@ -206,17 +206,21 @@ export const buildLayoutContext = (
     const decoded = decodeMetricKey(val);
     return !!decoded && metricLabelSet.has(decoded);
   };
-  const getFetchPath = (path: PivotPath) =>
-    path.flatMap(val => {
+  const getFetchPath = (path: PivotPath): PivotPath => {
+    const next: PivotPath = [];
+    path.forEach(val => {
       if (isMeasureLeafToken(val)) {
-        return [];
+        return;
       }
       const decoded = decodeMetricKey(val);
       if (decoded && metricLabelSet.has(decoded)) {
-        return [decoded];
+        next.push(decoded);
+        return;
       }
-      return [val];
+      next.push(val);
     });
+    return next;
+  };
 
   return {
     groupbyRowsRaw,

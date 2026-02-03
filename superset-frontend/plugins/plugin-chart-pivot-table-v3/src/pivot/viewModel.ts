@@ -134,7 +134,8 @@ export const buildColumnHeaderRows = (
       const rawValue = headerPath[level];
       const headerLabel = getHeaderLabel
         ? getHeaderLabel(rawValue)
-        : (decodeMetricKey(rawValue) ?? formatPivotLabelValue(rawValue, ''));
+        : (decodeMetricKey(rawValue) ??
+            formatPivotLabelValue(rawValue ?? null, ''));
       if (!node) {
         if (level === lastLevel) {
           node = {

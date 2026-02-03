@@ -242,7 +242,7 @@ export const labelRowSubtotalLeaves = (
     const useMetricLabel =
       !isSingleMetric && hasMetricLabel && !metricBeforeBase;
     const nextLabel = useMetricLabel
-      ? `${baseLabel} ${getDisplayLabel(metricLabel)}`
+      ? `${baseLabel} ${getDisplayLabel(metricLabel ?? '')}`
       : `${baseLabel} Total`;
     if (node.label !== nextLabel || node.formattedLabel !== nextLabel) {
       nextRows[node.key] = {
@@ -290,7 +290,7 @@ export const applyMetricAxis = (
     const rawLabel =
       path.length === 0
         ? 'Grand total'
-        : formatPivotLabelValue(rawValue, 'Grand total');
+        : formatPivotLabelValue(rawValue ?? null, 'Grand total');
     const metricKey = decodeMetricKey(rawValue);
     const metricLabel = metricKey
       ? (metricLabelMap?.[metricKey] ?? metricKey)
@@ -339,6 +339,7 @@ export const applyMetricAxis = (
       metricPosition ?? rowGroupby.length,
       rowGroupby.length,
     );
+    const metricsAtRowEnd = insertIndex >= rowGroupby.length;
 
     // Preserve the original row hierarchy so dimensions remain expandable when
     // metrics are inserted ahead of them.
@@ -370,6 +371,34 @@ export const applyMetricAxis = (
       const rowSuffix = rowPath.slice(insertIndex);
 
       const rowKey = serializePath(rowPath);
+      const colKey = serializePath(colPath);
+      const isTotalRow = rowPath.length === 0 || rowPath.some(isSubtotalToken);
+      if (
+        metricsAtRowEnd &&
+        rowPath.length < rowGroupby.length &&
+        !isTotalRow
+      ) {
+        ensureNode(
+          'row',
+          rowPath,
+          rowGroupby.length,
+          baseRow?.isSubtotal || undefined,
+        );
+        ensureNode(
+          'col',
+          colPath,
+          colGroupby.length,
+          baseCol?.isSubtotal || undefined,
+        );
+        const cellKey = serializeCellKey(rowKey, colKey);
+        result.cells[cellKey] = result.cells[cellKey] || {
+          rowKey,
+          colKey,
+          values: cell.values,
+          isSubtotal: cell.isSubtotal,
+        };
+        return;
+      }
 
       metricKeys.forEach(metric => {
         const mergedValues = {
@@ -394,7 +423,6 @@ export const applyMetricAxis = (
         }
         const newRowKey = serializePath(newRowPath);
 
-        const colKey = serializePath(colPath);
         ensureNode(
           'col',
           colPath,
@@ -515,7 +543,10 @@ export const applyMetricAxis = (
           metricKeys.length === 1 &&
           (metricPosition === undefined ||
             metricPosition >= colGroupby.length ||
-            metricPosition === 0)
+            metricPosition === 0 ||
+            (metricPosition > 0 &&
+              metricPosition < colGroupby.length &&
+              colPath.length <= metricPosition))
         ) {
           const baseColKey = serializePath(colPath);
           const cellKey = serializeCellKey(rowKey, baseColKey);
@@ -593,7 +624,7 @@ export const applyMeasureHierarchyAxis = (
     const rawLabel =
       path.length === 0
         ? 'Grand total'
-        : formatPivotLabelValue(rawValue, 'Grand total');
+        : formatPivotLabelValue(rawValue ?? null, 'Grand total');
     const metricKey = decodeMetricKey(rawValue);
     const metricDisplayLabel = metricKey
       ? (metricLabelMap?.[metricKey] ?? metricKey)
@@ -660,6 +691,7 @@ export const applyMeasureHierarchyAxis = (
       metricPosition ?? rowGroupby.length,
       rowGroupby.length,
     );
+    const metricsAtRowEnd = insertIndex >= rowGroupby.length;
 
     Object.values(tree.rows).forEach(rowNode =>
       ensureNode(
@@ -688,6 +720,34 @@ export const applyMeasureHierarchyAxis = (
       const rowSuffix = rowPath.slice(insertIndex);
 
       const rowKey = serializePath(rowPath);
+      const colKey = serializePath(colPath);
+      const isTotalRow = rowPath.length === 0 || rowPath.some(isSubtotalToken);
+      if (
+        metricsAtRowEnd &&
+        rowPath.length < rowGroupby.length &&
+        !isTotalRow
+      ) {
+        ensureNode(
+          'row',
+          rowPath,
+          rowGroupby.length,
+          baseRow?.isSubtotal || undefined,
+        );
+        ensureNode(
+          'col',
+          colPath,
+          colGroupby.length,
+          baseCol?.isSubtotal || undefined,
+        );
+        const cellKey = serializeCellKey(rowKey, colKey);
+        result.cells[cellKey] = result.cells[cellKey] || {
+          rowKey,
+          colKey,
+          values: cell.values,
+          isSubtotal: cell.isSubtotal,
+        };
+        return;
+      }
 
       groups.forEach(group => {
         const metric = group.metricKey;
@@ -719,7 +779,6 @@ export const applyMeasureHierarchyAxis = (
           }
           const newRowKey = serializePath(newRowPath);
 
-          const colKey = serializePath(colPath);
           ensureNode(
             'col',
             colPath,
@@ -852,7 +911,10 @@ export const applyMeasureHierarchyAxis = (
             metricKeys.length === 1 &&
             (metricPosition === undefined ||
               metricPosition >= colGroupby.length ||
-              metricPosition === 0) &&
+              metricPosition === 0 ||
+              (metricPosition > 0 &&
+                metricPosition < colGroupby.length &&
+                colPath.length <= metricPosition)) &&
             (!leafTierVisible || leafTargets.length === 1)
           ) {
             const baseColKey = serializePath(colPath);

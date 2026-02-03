@@ -80,7 +80,6 @@ const renderView = (showGlobalLoader: boolean) =>
       resolveDimensionStyle={() => undefined}
       deriveMetricKey={() => ''}
       isMetricGrandTotalNode={() => false}
-      isExplicitSubtotalNode={() => false}
       renderCellContent={() => null}
       renderDatabarContent={() => null}
       handleCellClick={jest.fn()}
@@ -148,7 +147,6 @@ describe('PivotTableView', () => {
         resolveDimensionStyle={() => undefined}
         deriveMetricKey={() => ''}
         isMetricGrandTotalNode={() => false}
-        isExplicitSubtotalNode={() => false}
         renderCellContent={() => null}
         renderDatabarContent={() => null}
         handleCellClick={jest.fn()}

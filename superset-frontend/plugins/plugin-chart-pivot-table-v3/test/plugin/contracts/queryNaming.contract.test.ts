@@ -38,7 +38,9 @@ describe('query naming (contracts)', () => {
         },
       }),
     );
-    const names = queryContext.queries.map(query => query.query_name || '');
+    const names = queryContext.queries.map(query =>
+      typeof query.query_name === 'string' ? query.query_name : '',
+    );
 
     expect(
       names.some(name =>
@@ -63,7 +65,9 @@ describe('query naming (contracts)', () => {
         },
       }),
     );
-    const names = queryContext.queries.map(query => query.query_name || '');
+    const names = queryContext.queries.map(query =>
+      typeof query.query_name === 'string' ? query.query_name : '',
+    );
 
     expect(
       names.some(name => name.includes(`|branch:row:${serializePath([null])}`)),
@@ -86,7 +90,9 @@ describe('query naming (contracts)', () => {
         },
       }),
     );
-    const names = queryContext.queries.map(query => query.query_name || '');
+    const names = queryContext.queries.map(query =>
+      typeof query.query_name === 'string' ? query.query_name : '',
+    );
     expect(
       names.some(name =>
         name.includes(`|branch:row:${serializePath([undefined])}`),

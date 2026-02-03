@@ -1240,7 +1240,7 @@ describe('PivotTableChart metric tier suppression', () => {
     const { container } = render(
       <PivotTableChart
         data={treeWithLeaves}
-        formData={{
+        formData={buildFormData({
           ...baseFormData,
           groupbyRows: [],
           groupbyColumns: ['c1'],
@@ -1251,7 +1251,12 @@ describe('PivotTableChart metric tier suppression', () => {
             [secondaryMetric]: [valueLeaf],
           },
           startCollapsed: false,
-        }}
+          datasource: baseFormData.datasource ?? '1__table',
+          viz_type: baseFormData.viz_type ?? 'pivot_table_v3',
+          height: 300,
+          width: 400,
+          margin: 0,
+        })}
         metrics={[metricKey, secondaryMetric]}
         groupbyRows={[]}
         groupbyColumns={['c1']}

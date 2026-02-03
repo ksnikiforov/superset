@@ -247,23 +247,42 @@ export const pruneTreeByPrefixes = (
   tree: PivotTreeData,
   axis: PivotAxis,
   prefixes: PivotTreeNode['path'][],
+  options?: {
+    preserveMetricChildren?: boolean;
+    isMetricTokenValue?: (val: unknown) => boolean;
+  },
 ) => {
   if (prefixes.length === 0) {
     return tree;
   }
+  const { preserveMetricChildren, isMetricTokenValue } = options || {};
   const isUnderPrefix = (path: PivotTreeNode['path']) =>
     prefixes.some(prefix => prefix.every((val, idx) => val === path[idx]));
+  const shouldPreserveMetricChild = (path: PivotTreeNode['path']) => {
+    if (!preserveMetricChildren || !isMetricTokenValue) {
+      return false;
+    }
+    return prefixes.some(prefix => {
+      if (!prefix.every((val, idx) => val === path[idx])) {
+        return false;
+      }
+      if (path.length !== prefix.length + 1) {
+        return false;
+      }
+      return isMetricTokenValue(path[prefix.length]);
+    });
+  };
   const removedRowKeys = new Set<string>();
   const removedColKeys = new Set<string>();
   if (axis === 'row') {
     Object.values(tree.rows).forEach(node => {
-      if (isUnderPrefix(node.path)) {
+      if (isUnderPrefix(node.path) && !shouldPreserveMetricChild(node.path)) {
         removedRowKeys.add(node.key);
       }
     });
   } else {
     Object.values(tree.cols).forEach(node => {
-      if (isUnderPrefix(node.path)) {
+      if (isUnderPrefix(node.path) && !shouldPreserveMetricChild(node.path)) {
         removedColKeys.add(node.key);
       }
     });
@@ -650,7 +669,11 @@ export const planHydrationIteration = ({
         fetchedDepthByKey: fetchedRowDepthByKey,
         hasLoadedChildren,
       })
-    : { fetchKeys: new Set(), pendingKeys: new Set(), hasMissingNodes: false };
+    : {
+        fetchKeys: new Set<string>(),
+        pendingKeys: new Set<string>(),
+        hasMissingNodes: false,
+      };
   const colPlan = planCols
     ? planExpansionForAxis({
         axis: 'col',
@@ -660,7 +683,11 @@ export const planHydrationIteration = ({
         fetchedDepthByKey: fetchedColDepthByKey,
         hasLoadedChildren,
       })
-    : { fetchKeys: new Set(), pendingKeys: new Set(), hasMissingNodes: false };
+    : {
+        fetchKeys: new Set<string>(),
+        pendingKeys: new Set<string>(),
+        hasMissingNodes: false,
+      };
 
   let effectiveRowPlan: PivotExpansionPlan = rowPlan;
   let effectiveColPlan: PivotExpansionPlan = colPlan;
@@ -673,8 +700,8 @@ export const planHydrationIteration = ({
   ) {
     effectiveRowPlan = {
       ...rowPlan,
-      fetchKeys: new Set(),
-      pendingKeys: new Set(),
+      fetchKeys: new Set<string>(),
+      pendingKeys: new Set<string>(),
     };
   }
   if (
@@ -685,8 +712,8 @@ export const planHydrationIteration = ({
   ) {
     effectiveColPlan = {
       ...colPlan,
-      fetchKeys: new Set(),
-      pendingKeys: new Set(),
+      fetchKeys: new Set<string>(),
+      pendingKeys: new Set<string>(),
     };
   }
 

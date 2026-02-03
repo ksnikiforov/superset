@@ -491,10 +491,11 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
     type FetchPivotBranchArgs = Parameters<typeof fetchPivotBranch>[0];
     fetchPivotBranchMock.mockImplementation(
       ({ axis, path, visibleRowDepth }: FetchPivotBranchArgs) => {
+        const resolvedVisibleRowDepth = visibleRowDepth ?? 0;
         if (axis === 'col') {
           return Promise.resolve({
             data:
-              visibleRowDepth >= 2
+              resolvedVisibleRowDepth >= 2
                 ? columnRefetchWithMetrics
                 : columnBranchWithMetrics,
           });
@@ -1280,7 +1281,7 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
       data: mergeTrees(baseTree, expandedTree),
     });
 
-    const { container, getAllByLabelText } = render(
+    const { container } = render(
       <PivotTableChart
         data={baseTree}
         formData={buildFormData({

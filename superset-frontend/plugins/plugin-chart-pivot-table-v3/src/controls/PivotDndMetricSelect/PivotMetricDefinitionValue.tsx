@@ -27,6 +27,8 @@ import {
 import {
   getCategoricalSchemeRegistry,
   getMetricLabel,
+  isAdhocMetricSimple,
+  isAdhocMetricSQL,
   Metric,
   QueryFormMetric,
   styled,
@@ -570,12 +572,8 @@ export const MetricFormatSelector = (props: MetricFormatSelectorProps) => {
     if (savedMetricForPopover) {
       return new AdhocMetric({});
     }
-    if (
-      isRecord(value) &&
-      !isMetricSelectValue(value) &&
-      'expressionType' in value
-    ) {
-      const metricValue = value as Exclude<QueryFormMetric, string>;
+    if (isAdhocMetricSimple(value) || isAdhocMetricSQL(value)) {
+      const metricValue = value;
       const rawLabel = metricValue.label;
       const inferredHasCustomLabel =
         typeof metricValue.hasCustomLabel === 'boolean'
@@ -693,15 +691,8 @@ export const MetricFormatSelector = (props: MetricFormatSelectorProps) => {
         return;
       }
     }
-    if (
-      allowCustomSql &&
-      isRecord(value) &&
-      !isMetricSelectValue(value) &&
-      'expressionType' in value &&
-      value.expressionType === 'SQL'
-    ) {
-      const sqlExpression =
-        typeof value.sqlExpression === 'string' ? value.sqlExpression : '';
+    if (allowCustomSql && isAdhocMetricSQL(value)) {
+      const sqlExpression = value.sqlExpression;
       setCustomMetricTab(
         disallowAdhocMetrics || !allowCustomSql
           ? allowExcel
@@ -1393,7 +1384,11 @@ export default function PivotMetricDefinitionValue(
     ) {
       return props.option;
     }
-    if (isRecord(props.option) && 'expressionType' in props.option) {
+    if (
+      isRecord(props.option) &&
+      !isPivotExcelFormula(props.option) &&
+      'expressionType' in props.option
+    ) {
       return new AdhocMetric(props.option as QueryFormMetric);
     }
     return props.option as Metric;

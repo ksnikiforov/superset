@@ -425,13 +425,12 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       initialDepth: 1,
     });
 
-    let resolveFetch:
-      | ((value: Array<{ data: typeof records }>) => void)
-      | null = null;
+    type FetchResult = Array<{ data: typeof records }>;
+    let resolveFetch: ((value: FetchResult) => void) | undefined;
     fetchMock.mockImplementation(
       () =>
-        new Promise(resolve => {
-          resolveFetch = resolve as typeof resolveFetch;
+        new Promise<FetchResult>(resolve => {
+          resolveFetch = resolve;
         }),
     );
 
@@ -489,9 +488,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     expect(screen.getByLabelText('Loading')).toBeInTheDocument();
 
-    if (resolveFetch) {
-      resolveFetch([{ data: records }]);
-    }
+    resolveFetch?.([{ data: records }]);
   });
 
   it('keeps expanded columns after adding a row dimension', async () => {
@@ -576,13 +573,12 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       initialDepth: 1,
     });
 
-    let resolveFetch:
-      | ((value: Array<{ data: typeof updatedRecords }>) => void)
-      | null = null;
+    type FetchResult = Array<{ data: typeof updatedRecords }>;
+    let resolveFetch: ((value: FetchResult) => void) | undefined;
     fetchMock.mockImplementation(
       () =>
-        new Promise(resolve => {
-          resolveFetch = resolve as typeof resolveFetch;
+        new Promise<FetchResult>(resolve => {
+          resolveFetch = resolve;
         }),
     );
 
@@ -641,9 +637,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     fireEvent.click(within(row2Row).getByLabelText('Toggle row dimension'));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
-    if (resolveFetch) {
-      resolveFetch([{ data: updatedRecords }]);
-    }
+    resolveFetch?.([{ data: updatedRecords }]);
 
     await waitFor(() => expect(screen.getByText('R1-new')).toBeInTheDocument());
     await waitFor(() =>
@@ -663,5 +657,83 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       );
       expect(match).toBeTruthy();
     });
+  });
+
+  it('keeps newly added metrics in the layout after a seamless fetch', async () => {
+    const metrics = ['m1', 'm2'];
+    const columns = ['c1', 'c2'];
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: [],
+      cols: columns,
+      metrics: ['m1'],
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 1 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: columns,
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      startCollapsed: false,
+      initialDepth: 2,
+    });
+    const queryFormData = buildFormData({
+      ...formData,
+      metrics: ['m1'],
+    });
+
+    const baseTree = applyMetricAxis(
+      buildTreeFromRecords(
+        [{ c1: 'A', c2: 'B', m1: 10 }],
+        ['m1'],
+        [],
+        columns,
+        0,
+        2,
+      ),
+      ['m1'],
+      MetricsLayoutEnum.COLUMNS,
+      [],
+      columns,
+      1,
+    );
+
+    fetchMock.mockImplementation(async ({ specs }: { specs: Array<unknown> }) =>
+      specs.map(() => ({
+        data: [{ c1: 'A', c2: 'B', m1: 10, m2: 20 }],
+      })),
+    );
+
+    const { container } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={queryFormData}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={columns}
+        width={600}
+        height={300}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('Select measures'));
+    fireEvent.click(screen.getByLabelText('Toggle measure m2'));
+    fireEvent.click(screen.getByText('Select measures'));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(screen.getAllByText('m2').length).toBeGreaterThan(0),
+    );
+
+    const headerLabels = Array.from(container.querySelectorAll('thead th')).map(
+      th => th.textContent ?? '',
+    );
+    expect(headerLabels).toEqual(expect.arrayContaining(['m2']));
   });
 });
