@@ -114,4 +114,17 @@ describe('layout resolution (contracts)', () => {
       expect(layout.measureHierarchy.leafTierVisibility).toBe('visible');
     }
   });
+
+  it('normalizes legacy total position values', () => {
+    const formData = buildFormData({
+      colTotals: true,
+      colTotalPosition: 'bottom' as PivotTableQueryFormData['colTotalPosition'],
+      rowTotalPosition: 'top' as PivotTableQueryFormData['rowTotalPosition'],
+    });
+
+    const layout = buildLayoutContext(formData);
+
+    expect(layout.colTotalPosition).toBe('end');
+    expect(layout.rowTotalPosition).toBe('start');
+  });
 });

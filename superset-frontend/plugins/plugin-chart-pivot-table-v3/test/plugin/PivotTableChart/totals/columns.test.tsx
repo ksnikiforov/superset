@@ -576,6 +576,78 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     );
   });
 
+  it('positions the column grand total row using colTotalPosition even when rowTotalPosition differs', async () => {
+    const records = [
+      { region: 'A', metric1: 10 },
+      { region: 'B', metric1: 12 },
+    ];
+    const rowGroupby = ['region'];
+    const colGroupby: string[] = [];
+    const metrics = ['metric1'];
+    const tree = applyMetricAxis(
+      buildTreeFromRecords(records, metrics, rowGroupby, colGroupby, 1, 0),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      rowGroupby,
+      colGroupby,
+      0,
+    );
+
+    const { container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={buildFormData({
+          ...(baseProps as Partial<PivotTableQueryFormData>),
+          groupbyRows: rowGroupby,
+          groupbyColumns: colGroupby,
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+          metrics,
+          colTotals: true,
+          colTotalPosition: 'end',
+          rowTotalPosition: 'start',
+        })}
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={colGroupby}
+        aggregateFunction="Sum"
+        width={400}
+        height={300}
+        startCollapsed={false}
+        initialDepth={1}
+        colTotals
+        rowTotals={false}
+        rowSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        colTotalPosition="end"
+        rowTotalPosition="start"
+      />,
+    );
+
+    await waitForPivotReady();
+
+    const bodyRows = within(
+      container.querySelector('tbody') as HTMLElement,
+    ).getAllByRole('row');
+    const getRowLabel = (row: HTMLElement) =>
+      (row.querySelector('th')?.textContent || '').trim();
+    const firstRowLabel = getRowLabel(bodyRows[0]);
+    const lastRowLabel = getRowLabel(bodyRows[bodyRows.length - 1]);
+
+    expect(firstRowLabel).not.toBe('Grand total');
+    expect(lastRowLabel).toBe('Grand total');
+  });
+
   it('keeps column group headers when collapsed after deeper expansion data exists', async () => {
     const metrics = ['grossRevenue', 'countCustomers'];
     const detail = buildTreeFromRecords(

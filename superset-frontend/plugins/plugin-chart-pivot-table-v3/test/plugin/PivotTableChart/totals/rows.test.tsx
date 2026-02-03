@@ -3489,14 +3489,14 @@ describe('PivotTableChart totals & subtotals - rows', () => {
             [metricKey]: [valueLeaf, ixLeaf],
           },
           colTotals: true,
-          rowTotalPosition: 'end',
+          colTotalPosition: 'end',
         })}
         metrics={[metricKey]}
         groupbyRows={['region', 'category']}
         groupbyColumns={[]}
         {...baseProps}
         colTotals
-        rowTotalPosition="end"
+        colTotalPosition="end"
       />,
     );
 

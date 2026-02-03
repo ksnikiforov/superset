@@ -94,13 +94,16 @@ export const buildRenderModel = ({
   const skipColRoot = config.groupbyColumnsLength === 0 || !showColRoot;
 
   const shouldHideMetricGrandTotalsOnRows = !showRowRootBase;
+  const totalRowPosition = config.colTotals
+    ? config.colTotalPosition
+    : config.rowTotalPosition;
   const visibleRowsBase = buildVisibleRows({
     rows: tree.rows,
     expandedRows,
     rowSorter: config.rowSorter,
     skipRowRoot,
     showRowRoot,
-    rowTotalPosition: config.rowTotalPosition,
+    rowTotalPosition: totalRowPosition,
     getRowChildren: config.getRowChildren,
     getCollapsedRowChildren: config.getCollapsedRowChildren,
   });

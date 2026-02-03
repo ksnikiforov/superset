@@ -101,8 +101,15 @@ export type LayoutContext = {
   getFetchPath: (path: PivotPath) => PivotPath;
 };
 
-const normalizeTotalPosition = (value: unknown): TotalPosition =>
-  value === 'end' ? 'end' : 'start';
+const normalizeTotalPosition = (value: unknown): TotalPosition => {
+  if (value === 'end' || value === 'bottom') {
+    return 'end';
+  }
+  if (value === 'start' || value === 'top') {
+    return 'start';
+  }
+  return 'start';
+};
 
 export const buildLayoutContext = (
   layoutSpec: PivotLayoutSpec,

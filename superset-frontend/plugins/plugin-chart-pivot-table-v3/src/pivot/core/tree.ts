@@ -341,16 +341,19 @@ export const applyMetricAxis = (
     );
     const metricsAtRowEnd = insertIndex >= rowGroupby.length;
 
-    // Preserve the original row hierarchy so dimensions remain expandable when
-    // metrics are inserted ahead of them.
-    Object.values(tree.rows).forEach(rowNode =>
-      ensureNode(
-        'row',
-        rowNode.path,
-        rowGroupby.length,
-        rowNode.isSubtotal || undefined,
-      ),
-    );
+    const metricsAtRowStart = insertIndex === 0;
+    if (metricsAtRowStart || metricsAtRowEnd) {
+      // Preserve the original row hierarchy so dimensions remain expandable when
+      // metrics are appended after the last row dimension or inserted first.
+      Object.values(tree.rows).forEach(rowNode =>
+        ensureNode(
+          'row',
+          rowNode.path,
+          rowGroupby.length,
+          rowNode.isSubtotal || undefined,
+        ),
+      );
+    }
 
     // preserve column nodes
     Object.values(tree.cols).forEach(colNode => {
@@ -465,16 +468,20 @@ export const applyMetricAxis = (
       colGroupby.length,
     );
 
-    // Preserve the original column hierarchy so dimensions remain expandable when
-    // metrics are inserted ahead of them.
-    Object.values(tree.cols).forEach(colNode =>
-      ensureNode(
-        'col',
-        colNode.path,
-        colGroupby.length,
-        colNode.isSubtotal || undefined,
-      ),
-    );
+    const metricsAtColStart = insertIndex === 0;
+    const metricsAtColEnd = insertIndex >= colGroupby.length;
+    if (metricsAtColStart || metricsAtColEnd) {
+      // Preserve the original column hierarchy so dimensions remain expandable when
+      // metrics are appended after the last column dimension or inserted first.
+      Object.values(tree.cols).forEach(colNode =>
+        ensureNode(
+          'col',
+          colNode.path,
+          colGroupby.length,
+          colNode.isSubtotal || undefined,
+        ),
+      );
+    }
 
     // preserve row nodes
     Object.values(tree.rows).forEach(rowNode =>
