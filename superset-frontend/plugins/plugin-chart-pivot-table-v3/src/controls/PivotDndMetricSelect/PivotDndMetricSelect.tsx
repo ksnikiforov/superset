@@ -79,6 +79,7 @@ import {
 import {
   collectMetricFormattingMetrics,
   collectMetricDatabarMetrics,
+  buildMetricLabelMap,
   getFormattingMetricKey,
   getMetricKey,
   normalizeMetricDatabarMapWithKeys,
@@ -192,12 +193,21 @@ const getOptionsForSavedMetrics = (
 
 type ValueType = Metric | AdhocMetric | QueryFormMetric;
 
-const resolveMetricLabel = (option: ValueType) => {
+const resolveMetricLabel = (
+  option: ValueType,
+  metricLabelMap?: Record<string, string>,
+) => {
   if (option instanceof AdhocMetric) {
     return getMetricLabel(option as QueryFormMetric);
   }
   if (typeof option === 'string') {
-    return option;
+    return metricLabelMap?.[option] ?? option;
+  }
+  if ('metric_name' in option && option.metric_name) {
+    const mappedLabel = metricLabelMap?.[option.metric_name];
+    if (mappedLabel) {
+      return mappedLabel;
+    }
   }
   if ('verbose_name' in option && option.verbose_name) {
     return option.verbose_name;
@@ -217,7 +227,10 @@ const resolveMetricLabel = (option: ValueType) => {
 const resolveMetricKey = (option: ValueType) =>
   getMetricKey(option as QueryFormMetric | Metric);
 
-const collectMetricIdentifiers = (metric: ValueType) => {
+const collectMetricIdentifiers = (
+  metric: ValueType,
+  metricLabelMap?: Record<string, string>,
+) => {
   const identifiers = new Set<string>();
   if (typeof metric === 'string') {
     if (metric.length > 0) {
@@ -235,7 +248,7 @@ const collectMetricIdentifiers = (metric: ValueType) => {
   if (metricKey) {
     identifiers.add(metricKey);
   }
-  const label = resolveMetricLabel(metric);
+  const label = resolveMetricLabel(metric, metricLabelMap);
   if (label && label !== t('Metric')) {
     identifiers.add(label);
   }
@@ -421,10 +434,13 @@ const dedupeMetrics = (metrics: ValueType[]) => {
   });
 };
 
-const collectActiveMetricKeys = (metrics: ValueType[]) => {
+const collectActiveMetricKeys = (
+  metrics: ValueType[],
+  metricLabelMap?: Record<string, string>,
+) => {
   const keys = new Set<string>();
   metrics.forEach(metric => {
-    collectMetricIdentifiers(metric).forEach(identifier => {
+    collectMetricIdentifiers(metric, metricLabelMap).forEach(identifier => {
       if (identifier) {
         keys.add(identifier);
       }
@@ -443,6 +459,14 @@ export type PivotDndMetricSelectProps = DndControlProps<QueryFormMetric> & {
 export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
   const { onChange, multi, datasource, savedMetrics } = props;
   const setControlValue = props.actions?.setControlValue;
+  const metricLabelMap = useMemo(
+    () =>
+      buildMetricLabelMap(
+        savedMetrics,
+        props.formData?.metricLabelMap as Record<string, string> | undefined,
+      ),
+    [props.formData?.metricLabelMap, savedMetrics],
+  );
   const savedMetricsOptions = useMemo<savedMetricType[]>(
     () =>
       savedMetrics.map(metric => ({
@@ -686,6 +710,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       if (setControlValue) {
         const activeMetricKeys = collectActiveMetricKeys(
           optionValues as ValueType[],
+          metricLabelMap,
         );
         Object.entries(nextLeaves).forEach(([metricKey, leaves]) => {
           leaves.forEach(leaf => {
@@ -735,7 +760,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       }
       onChange(multi ? optionValues : optionValues[0]);
     },
-    [multi, onChange, setControlValue, updateMeasureLeaves],
+    [metricLabelMap, multi, onChange, setControlValue, updateMeasureLeaves],
   );
 
   const handleMetricFormattingChange = useCallback(
@@ -782,7 +807,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       }
       const baseDatabars = metricDatabarsRef.current || {};
       if (field === 'scaleLike' && nextValue) {
-        const activeMetricKeys = collectActiveMetricKeys(value);
+        const activeMetricKeys = collectActiveMetricKeys(value, metricLabelMap);
         const { sources, targets } = Object.entries(baseDatabars).reduce<{
           sources: Set<string>;
           targets: Set<string>;
@@ -837,7 +862,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       metricDatabarsRef.current = nextDatabars;
       setControlValue('metricDatabars', nextDatabars);
     },
-    [setControlValue, value],
+    [metricLabelMap, setControlValue, value],
   );
 
   const availableMetrics = useMemo(() => {
@@ -1157,6 +1182,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
         savedMetricsOptions={getSavedMetricOptionsForMetric(index)}
         availableMetrics={availableMetrics}
         selectedMetrics={value}
+        metricLabelMap={metricLabelMap}
         metricFormatting={localMetricFormatting}
         onMetricFormattingChange={handleMetricFormattingChange}
         metricDatabars={localMetricDatabars}
@@ -1181,6 +1207,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       handleDropLabel,
       localMetricDatabars,
       localMetricFormatting,
+      metricLabelMap,
       metricRowType,
       moveLabel,
       multi,
@@ -1200,7 +1227,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
     () =>
       value.flatMap((metric, index) => {
         const metricKey = resolveMetricKey(metric);
-        const metricLabel = resolveMetricLabel(metric);
+        const metricLabel = resolveMetricLabel(metric, metricLabelMap);
         const baseRow = valueRenderer(metric, index);
         if (!metricKey) {
           return [baseRow];
@@ -1231,6 +1258,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
               onMetricDatabarChange={handleMetricDatabarChange}
               availableMetrics={availableMetrics}
               selectedMetrics={value}
+              metricLabelMap={metricLabelMap}
               savedMetrics={savedMetrics}
               columns={props.columns}
               datasource={props.datasource}
@@ -1249,6 +1277,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       handleRemoveMeasureLeaf,
       localMetricDatabars,
       localMetricFormatting,
+      metricLabelMap,
       measureLeavesByMetric,
       moveMeasureLeaf,
       props.columns,

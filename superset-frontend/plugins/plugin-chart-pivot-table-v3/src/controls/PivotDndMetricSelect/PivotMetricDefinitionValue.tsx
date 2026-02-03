@@ -71,6 +71,7 @@ import {
 import {
   DEFAULT_DATABAR_NEGATIVE_COLOR,
   DEFAULT_DATABAR_POSITIVE_COLOR,
+  buildMetricLabelMap,
   getFormattingMetricKey,
   getMetricKey,
 } from '../../utils';
@@ -155,6 +156,7 @@ type PivotMetricDefinitionValueProps = {
   savedMetricsOptions: savedMetricType[];
   availableMetrics: ValueType[];
   selectedMetrics: ValueType[];
+  metricLabelMap?: Record<string, string>;
   metricFormatting: PivotMetricFormattingMap;
   onMetricFormattingChange: (
     metricKey: string,
@@ -214,12 +216,18 @@ const formatExcelFormulaLabel = (formula: string): string => {
 const getExcelFormulaOptionValue = (formula: PivotExcelFormula): string =>
   `${EXCEL_FORMULA_OPTION_PREFIX}:${hashString(formula.formula)}`;
 
-const resolveMetricLabel = (option: MetricOptionValue) => {
+const resolveMetricLabel = (
+  option: MetricOptionValue,
+  metricLabelMap?: Record<string, string>,
+) => {
   if (isMetricSelectValue(option)) {
     if (typeof option.label === 'string' && option.label.length > 0) {
       return option.label;
     }
     const key = getSelectValueKey(option);
+    if (key && metricLabelMap?.[key]) {
+      return metricLabelMap[key];
+    }
     return key || t('Metric');
   }
   if (isPivotExcelFormula(option)) {
@@ -229,7 +237,13 @@ const resolveMetricLabel = (option: MetricOptionValue) => {
     return getMetricLabel(option as QueryFormMetric);
   }
   if (typeof option === 'string') {
-    return option;
+    return metricLabelMap?.[option] ?? option;
+  }
+  if ('metric_name' in option && option.metric_name) {
+    const mappedLabel = metricLabelMap?.[option.metric_name];
+    if (mappedLabel) {
+      return mappedLabel;
+    }
   }
   if ('verbose_name' in option && option.verbose_name) {
     return option.verbose_name;
@@ -311,10 +325,13 @@ type MetricOption = {
   metric: MetricOptionValue;
 };
 
-const buildMetricOptions = (metrics: MetricOptionValue[]) => {
+const buildMetricOptions = (
+  metrics: MetricOptionValue[],
+  metricLabelMap?: Record<string, string>,
+) => {
   const seen = new Set<string>();
   return metrics.reduce<MetricOption[]>((acc, metric) => {
-    const label = resolveMetricLabel(metric);
+    const label = resolveMetricLabel(metric, metricLabelMap);
     const value =
       getMetricOptionValue(metric) || (label !== t('Metric') ? label : '');
     if (!value || seen.has(value)) {
@@ -425,6 +442,7 @@ type MetricFormatSelectorSharedProps = {
   label: string;
   tooltip: ReactNode;
   metrics: MetricOptionValue[];
+  metricLabelMap?: Record<string, string>;
   disabled?: boolean;
   columns: ColumnMeta[];
   savedMetrics: Metric[];
@@ -448,14 +466,27 @@ type MetricFormatSelectorProps =
     });
 
 export const MetricFormatSelector = (props: MetricFormatSelectorProps) => {
-  const { label, tooltip, value, metrics, columns, savedMetrics, datasource } =
-    props;
+  const {
+    label,
+    tooltip,
+    value,
+    metrics,
+    metricLabelMap,
+    columns,
+    savedMetrics,
+    datasource,
+  } = props;
   const disabled = props.disabled ?? false;
   const enableExcel = props.enableExcel === true;
   const excelOnly = props.excelOnly === true;
   const allowCustomSql = !excelOnly && (props.allowCustomSql ?? true);
   const allowSavedMetrics = !excelOnly && (props.allowSavedMetrics ?? true);
   const allowExcel = enableExcel && (props.allowExcel ?? true);
+
+  const mergedMetricLabelMap = useMemo(
+    () => buildMetricLabelMap(savedMetrics, metricLabelMap),
+    [metricLabelMap, savedMetrics],
+  );
 
   const handleChangeValue = useCallback(
     (next?: PivotMetricFormattingValue) => {
@@ -486,8 +517,9 @@ export const MetricFormatSelector = (props: MetricFormatSelectorProps) => {
       : baseMetrics;
     return buildMetricOptions(
       value ? [...resolvedMetrics, value] : resolvedMetrics,
+      mergedMetricLabelMap,
     );
-  }, [allowExcel, excelOnly, metrics, value]);
+  }, [allowExcel, excelOnly, mergedMetricLabelMap, metrics, value]);
   const popoverColumns = useMemo(
     () =>
       columns.map(column => ({
@@ -517,9 +549,9 @@ export const MetricFormatSelector = (props: MetricFormatSelectorProps) => {
     if (key) {
       return key;
     }
-    const label = resolveMetricLabel(value);
+    const label = resolveMetricLabel(value, mergedMetricLabelMap);
     return label !== t('Metric') ? label : undefined;
-  }, [value]);
+  }, [mergedMetricLabelMap, value]);
   const datasourceForPopover = datasource;
   const savedMetricForPopover = useMemo(() => {
     if (typeof value === 'string') {
@@ -558,9 +590,12 @@ export const MetricFormatSelector = (props: MetricFormatSelectorProps) => {
         .filter(metric => metric.metric_name)
         .map(metric => ({
           value: metric.metric_name,
-          label: metric.verbose_name || metric.metric_name,
+          label:
+            mergedMetricLabelMap[metric.metric_name] ||
+            metric.verbose_name ||
+            metric.metric_name,
         })),
-    [savedMetricsForPopover],
+    [mergedMetricLabelMap, savedMetricsForPopover],
   );
   const adhocMetricForPopover = useMemo(() => {
     if (enableExcel) {
@@ -1030,6 +1065,7 @@ export default function PivotMetricDefinitionValue(
   const {
     metricDatabars,
     metricFormatting,
+    metricLabelMap,
     onMetricDatabarChange,
     onMetricFormattingChange,
     option,
@@ -1039,7 +1075,14 @@ export default function PivotMetricDefinitionValue(
     theme.colorSuccess || DEFAULT_DATABAR_POSITIVE_COLOR;
   const defaultNegativeColor =
     theme.colorError || DEFAULT_DATABAR_NEGATIVE_COLOR;
-  const metricLabel = useMemo(() => resolveMetricLabel(option), [option]);
+  const mergedMetricLabelMap = useMemo(
+    () => buildMetricLabelMap(savedMetrics, metricLabelMap),
+    [metricLabelMap, savedMetrics],
+  );
+  const metricLabel = useMemo(
+    () => resolveMetricLabel(option, mergedMetricLabelMap),
+    [mergedMetricLabelMap, option],
+  );
   const metricKey = useMemo(() => {
     const key = resolveMetricKey(option);
     if (key) {
@@ -1253,6 +1296,7 @@ export default function PivotMetricDefinitionValue(
             tooltip={selector.tooltip}
             value={formatting[selector.field]}
             metrics={props.availableMetrics}
+            metricLabelMap={mergedMetricLabelMap}
             onChange={metric => handleFormattingChange(selector.field, metric)}
             columns={props.columns}
             savedMetrics={props.savedMetrics}
@@ -1282,6 +1326,7 @@ export default function PivotMetricDefinitionValue(
                 tooltip={t('Scale this databar to the selected metric.')}
                 value={databar.scaleLike}
                 metrics={scaleLikeMetrics}
+                metricLabelMap={mergedMetricLabelMap}
                 onChange={metric => handleDatabarChange('scaleLike', metric)}
                 disabled={scaleLikeDisabled}
                 columns={props.columns}
@@ -1293,6 +1338,7 @@ export default function PivotMetricDefinitionValue(
                 tooltip={t('Metric that returns a color for the databar.')}
                 value={databar.colorMetric}
                 metrics={props.availableMetrics}
+                metricLabelMap={mergedMetricLabelMap}
                 onChange={metric => handleDatabarChange('colorMetric', metric)}
                 columns={props.columns}
                 savedMetrics={props.savedMetrics}

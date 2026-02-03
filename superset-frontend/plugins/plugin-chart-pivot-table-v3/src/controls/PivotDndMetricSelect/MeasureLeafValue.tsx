@@ -125,6 +125,7 @@ export type MeasureLeafValueProps = {
   ) => void;
   availableMetrics: MetricOptionValue[];
   selectedMetrics: MetricOptionValue[];
+  metricLabelMap?: Record<string, string>;
   savedMetrics: Metric[];
   columns: ColumnMeta[];
   datasource?: React.ComponentProps<
@@ -177,6 +178,7 @@ export default function MeasureLeafValue({
   onMetricDatabarChange,
   availableMetrics,
   selectedMetrics,
+  metricLabelMap,
   savedMetrics,
   columns,
   datasource,
@@ -304,6 +306,7 @@ export default function MeasureLeafValue({
             tooltip={selector.tooltip}
             value={formatting[selector.field]}
             metrics={availableMetrics}
+            metricLabelMap={metricLabelMap}
             onChange={metric => handleFormattingChange(selector.field, metric)}
             columns={columns}
             savedMetrics={savedMetrics}
@@ -333,6 +336,7 @@ export default function MeasureLeafValue({
                 tooltip={t('Scale this databar to the selected metric.')}
                 value={databar.scaleLike}
                 metrics={scaleLikeMetrics}
+                metricLabelMap={metricLabelMap}
                 onChange={metric => handleDatabarChange('scaleLike', metric)}
                 disabled={scaleLikeDisabled}
                 columns={columns}
@@ -344,6 +348,7 @@ export default function MeasureLeafValue({
                 tooltip={t('Metric that returns a color for the databar.')}
                 value={databar.colorMetric}
                 metrics={availableMetrics}
+                metricLabelMap={metricLabelMap}
                 onChange={metric => handleDatabarChange('colorMetric', metric)}
                 columns={columns}
                 savedMetrics={savedMetrics}

@@ -660,6 +660,7 @@ function PivotTableChart(props: PivotTableProps) {
     colOrder,
     valueFormat,
     columnFormats,
+    verboseMap,
     currencyFormats,
     allowRenderHtml,
     ownState,
@@ -690,6 +691,20 @@ function PivotTableChart(props: PivotTableProps) {
 
   const { interactionMode } = formData;
   const isUserControlled = interactionMode === 'user_controlled';
+
+  const dimensionLabelOverrides = useMemo(
+    () =>
+      Object.entries(verboseMap ?? {}).reduce<Record<string, string>>(
+        (acc, [key, value]) => {
+          if (typeof value === 'string') {
+            acc[key] = value;
+          }
+          return acc;
+        },
+        {},
+      ),
+    [verboseMap],
+  );
 
   const fetchFormDataBase = queryFormData || formData;
   const appliedFormData = fetchFormDataBase;
@@ -1163,10 +1178,16 @@ function PivotTableChart(props: PivotTableProps) {
   const dimensionLabelMap = useMemo(() => {
     const map = new Map<string, string>();
     dimensionList.forEach(dimension => {
-      map.set(getStableColumnKey(dimension), getColumnLabel(dimension));
+      const key = getStableColumnKey(dimension);
+      const baseLabel = getColumnLabel(dimension);
+      const label =
+        typeof dimension === 'string'
+          ? dimensionLabelOverrides[key] ?? baseLabel
+          : baseLabel;
+      map.set(key, label);
     });
     return map;
-  }, [dimensionList]);
+  }, [dimensionLabelOverrides, dimensionList]);
 
   const chipItems = useCallback(
     (axis: 'row' | 'col') => {
@@ -1613,6 +1634,7 @@ function PivotTableChart(props: PivotTableProps) {
             formData.measureLeavesByMetricBase ?? formData.measureLeavesByMetric
           }
           metricLabelMap={formData.metricLabelMap}
+          dimensionLabelMap={dimensionLabelOverrides}
           dimensionFilterValues={dimensionFilterValues}
           selectedFilters={uiSelectedFilters}
           onFilterChange={handleDimensionFilterChange}

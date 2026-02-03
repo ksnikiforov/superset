@@ -16,6 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import { Metric } from '@superset-ui/core';
 import { render, screen, userEvent, waitFor, within } from '../../testUtils';
 import PivotDndColumnSelect from '../../../src/controls/PivotDndColumnSelect/PivotDndColumnSelect';
 
@@ -209,6 +210,78 @@ describe('PivotDndColumnSelect', () => {
         },
       }),
     );
+  });
+
+  it('shows metric labels when selecting sorting metrics', async () => {
+    const setControlValue = jest.fn();
+    const savedMetrics: Metric[] = [
+      {
+        metric_name: 'metric1',
+        verbose_name: 'Metric One',
+        expression: 'SUM(metric1)',
+      } as Metric,
+    ];
+    render(
+      <PivotDndColumnSelect
+        {...baseProps}
+        actions={{ setControlValue }}
+        savedMetrics={savedMetrics}
+        formData={{
+          datasource: '1__table',
+          metrics: ['metric1'],
+          rowSorting: {},
+          viz_type: 'pivot_table_v3',
+        }}
+      />,
+      renderOptions,
+    );
+
+    await userEvent.click(
+      screen.getAllByTestId('pivot-dimension-sorting-button')[0],
+    );
+    await screen.findByText('Sorting');
+
+    const metricSelect = screen.getByRole('combobox', {
+      name: /sort by metric/i,
+    });
+    await userEvent.click(metricSelect);
+    expect(
+      await waitFor(() =>
+        within(screen.getByRole('listbox')).getByText('Metric One'),
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('shows metric labels when selecting formatting metrics', async () => {
+    render(
+      <PivotDndColumnSelect
+        {...baseProps}
+        formData={{
+          datasource: '1__table',
+          metrics: ['metric1'],
+          metricLabelMap: { metric1: 'Metric One' },
+          rowFormatting: {},
+          viz_type: 'pivot_table_v3',
+        }}
+      />,
+      renderOptions,
+    );
+
+    await userEvent.click(
+      screen.getAllByTestId('pivot-dimension-formatting-button')[0],
+    );
+    await screen.findByText('Conditional formatting');
+
+    const backgroundSelect = screen.getByRole('combobox', {
+      name: /background color metric/i,
+    });
+    await userEvent.click(backgroundSelect);
+
+    expect(
+      await waitFor(() =>
+        within(screen.getByRole('listbox')).getByText('Metric One'),
+      ),
+    ).toBeInTheDocument();
   });
 
   it('updates sorting order without a metric', async () => {

@@ -17,7 +17,7 @@
  * under the License.
  */
 import { type ComponentProps } from 'react';
-import { QueryFormMetric } from '@superset-ui/core';
+import { Metric, QueryFormMetric } from '@superset-ui/core';
 import { render, screen, userEvent, waitFor, within } from '../../testUtils';
 import PivotDndMetricSelect, {
   updateMetricConfigForRename,
@@ -63,6 +63,26 @@ describe('PivotDndMetricSelect', () => {
 
     expect(getFormattingButton('sum__value')).toBeInTheDocument();
     expect(getFormattingButton('avg__value')).toBeInTheDocument();
+  });
+
+  it('uses saved metric verbose names in labels', () => {
+    const savedMetrics: Metric[] = [
+      {
+        metric_name: 'sum__value',
+        verbose_name: 'Sum Value',
+        expression: 'SUM(value)',
+      } as Metric,
+    ];
+    render(
+      <PivotDndMetricSelect
+        {...baseProps}
+        value={['sum__value']}
+        savedMetrics={savedMetrics}
+      />,
+      renderOptions,
+    );
+
+    expect(getFormattingButton('Sum Value')).toBeInTheDocument();
   });
 
   it('opens the formatting popover on click', async () => {
@@ -484,7 +504,7 @@ describe('PivotDndMetricSelect', () => {
       renderOptions,
     );
 
-    await userEvent.click(getFormattingButton('avg__order_value'));
+    await userEvent.click(getFormattingButton(savedMetric.verbose_name));
     await screen.findByText('Conditional formatting');
 
     const backgroundSelect = screen.getByRole('combobox', {

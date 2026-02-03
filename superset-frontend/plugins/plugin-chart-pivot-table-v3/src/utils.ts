@@ -106,6 +106,22 @@ export const PIVOT_THEME_PRESETS: Record<string, string> = {
 export const DEFAULT_DATABAR_POSITIVE_COLOR = supersetTheme.colorSuccess;
 export const DEFAULT_DATABAR_NEGATIVE_COLOR = supersetTheme.colorError;
 
+export const buildMetricLabelMap = (
+  savedMetrics: Metric[],
+  overrides?: Record<string, string>,
+): Record<string, string> => {
+  const merged: Record<string, string> = { ...(overrides ?? {}) };
+  savedMetrics.forEach(metric => {
+    const metricKey = metric.metric_name;
+    if (!metricKey || merged[metricKey]) {
+      return;
+    }
+    const label = metric.verbose_name || metricKey;
+    merged[metricKey] = label;
+  });
+  return merged;
+};
+
 const normalizeThemeHexColor = (value: string) => {
   if (!/^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(value)) {
     return null;

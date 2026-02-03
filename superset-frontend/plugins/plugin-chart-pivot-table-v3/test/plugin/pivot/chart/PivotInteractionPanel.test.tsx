@@ -104,6 +104,38 @@ describe('PivotInteractionPanel', () => {
     ]);
   });
 
+  it('uses metric labels in the measures selector', () => {
+    render(
+      <PivotInteractionPanel
+        dimensions={['country']}
+        metrics={['sum__sales']}
+        metricLabelMap={{ sum__sales: 'Total Sales' }}
+        runtimeLayout={baseLayout}
+        onChange={jest.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('Select measures'));
+
+    expect(
+      screen.getByLabelText('Toggle measure Total Sales'),
+    ).toBeInTheDocument();
+  });
+
+  it('uses dimension labels from the label map', () => {
+    render(
+      <PivotInteractionPanel
+        dimensions={['shipMode']}
+        metrics={['sum__sales']}
+        dimensionLabelMap={{ shipMode: 'Delivery Type' }}
+        runtimeLayout={baseLayout}
+        onChange={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Delivery Type')).toBeInTheDocument();
+  });
+
   it('respects the order that measures are selected', () => {
     const onChange = jest.fn();
     render(

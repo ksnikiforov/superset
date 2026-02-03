@@ -99,7 +99,9 @@ export default function transformProps(
     formData: baseFormData,
     runtimeLayout,
   });
-  const metricsForLabels = ensureIsArray(formData.metrics);
+  const metricsForLabels = ensureIsArray(
+    rawFormData.metrics ?? baseFormData.metrics ?? formData.metrics,
+  );
   const metricLabelMapBase = metricsForLabels.reduce<Record<string, string>>(
     (acc, metric) => {
       const key = getMetricKey(metric);

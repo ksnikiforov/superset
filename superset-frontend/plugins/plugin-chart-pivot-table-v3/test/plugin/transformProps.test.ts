@@ -169,6 +169,73 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
     expect(metricNode.label).toBe(metricLabel);
   });
 
+  it('keeps metric labels for base metrics in user-controlled mode', () => {
+    const chartProps = new ChartProps({
+      formData: {
+        ...baseFormData,
+        interactionMode: 'user_controlled',
+        dimensions: ['row1', 'col1'],
+        metrics: ['metric1', 'metric2'],
+        pivotRuntimeLayout: {
+          version: 1,
+          rows: ['row1'],
+          cols: ['col1'],
+          metrics: ['metric1'],
+          leafSelection: {},
+          valuePlacement: { axis: 'col', index: 0 },
+        },
+      },
+      width: 400,
+      height: 300,
+      queriesData: [
+        {
+          data: [{ metric1: 30 }],
+          colnames: ['metric1'],
+          coltypes: [0],
+        },
+        {
+          data: [{ row1: 'A', col1: 'B', metric1: 15 }],
+          colnames: ['row1', 'col1', 'metric1'],
+          coltypes: [1, 1, 0],
+        },
+        {
+          data: [{ row1: 'A', metric1: 10 }],
+          colnames: ['row1', 'metric1'],
+          coltypes: [1, 0],
+        },
+        {
+          data: [{ col1: 'B', metric1: 20 }],
+          colnames: ['col1', 'metric1'],
+          coltypes: [1, 0],
+        },
+      ],
+      hooks: { setDataMask: jest.fn() },
+      filterState: { selectedFilters: {} },
+      datasource: {
+        verboseMap: {},
+        columnFormats: {},
+        currencyFormats: {},
+        columns: [
+          { column_name: 'row1', type_generic: GenericDataType.String },
+          { column_name: 'col1', type_generic: GenericDataType.String },
+        ],
+        metrics: [
+          { metric_name: 'metric1', verbose_name: 'Metric One' },
+          { metric_name: 'metric2', verbose_name: 'Metric Two' },
+        ],
+      },
+      theme: supersetTheme,
+    });
+
+    const result = transformProps(
+      chartProps as ChartProps<PivotTableQueryFormData>,
+    );
+    expect(result.formData.metricLabelMap).toMatchObject({
+      metric1: 'Metric One',
+      metric2: 'Metric Two',
+    });
+  });
+
   it('maps query results by query_name rather than array order (Contract 2)', () => {
     const formData = baseFormData as PivotTableQueryFormData;
     const specs = buildInitialQuerySpecs(formData);

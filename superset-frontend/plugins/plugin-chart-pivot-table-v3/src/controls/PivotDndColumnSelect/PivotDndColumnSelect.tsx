@@ -59,6 +59,7 @@ import {
 } from '../../exploreImports';
 import {
   METRICS_PLACEHOLDER,
+  buildMetricLabelMap,
   mergeMetrics,
   normalizeDimensionFormattingMapWithKeys,
   normalizeDimensionSortingMapWithKeys,
@@ -327,6 +328,15 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
       .filter(Boolean) as QueryFormMetric[];
     return mergeMetrics(selectedMetrics, savedMetricNames);
   }, [formData?.metrics, savedMetrics]);
+
+  const metricLabelMap = useMemo(
+    () =>
+      buildMetricLabelMap(
+        savedMetrics,
+        formData?.metricLabelMap as Record<string, string> | undefined,
+      ),
+    [formData?.metricLabelMap, savedMetrics],
+  );
 
   const resetHover = useCallback(() => {
     lastHoverRef.current = { index: null, listId: undefined };
@@ -804,20 +814,21 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
                     : t('Column: %s', dimensionLabel)}
                 </Typography.Text>
                 {DIMENSION_FORMAT_SELECTOR_CONFIG.map(selector => (
-                  <MetricFormatSelector
-                    key={selector.field}
-                    label={selector.label}
-                    tooltip={selector.tooltip}
-                    enableExcel
-                    value={formatting?.[selector.field]}
-                    metrics={availableMetrics as MetricOptionValue[]}
-                    onChange={metric =>
-                      updateFormatting(dimensionKey, selector.field, metric)
-                    }
-                    columns={options}
-                    savedMetrics={savedMetrics}
-                    datasource={datasource}
-                  />
+                <MetricFormatSelector
+                  key={selector.field}
+                  label={selector.label}
+                  tooltip={selector.tooltip}
+                  enableExcel
+                  value={formatting?.[selector.field]}
+                  metrics={availableMetrics as MetricOptionValue[]}
+                  metricLabelMap={metricLabelMap}
+                  onChange={metric =>
+                    updateFormatting(dimensionKey, selector.field, metric)
+                  }
+                  columns={options}
+                  savedMetrics={savedMetrics}
+                  datasource={datasource}
+                />
                 ))}
                 <Radio.Group
                   value={formattingScope}
@@ -856,6 +867,7 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
                   )}
                   value={sortingMetric}
                   metrics={availableMetrics as MetricOptionValue[]}
+                  metricLabelMap={metricLabelMap}
                   onChange={metric => updateSortingMetric(dimensionKey, metric)}
                   columns={options}
                   savedMetrics={savedMetrics}
@@ -1016,6 +1028,7 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
       isTemporal,
       localFormatting,
       localSorting,
+      metricLabelMap,
       onClickClose,
       onShiftOptions,
       optionSelector,

@@ -320,6 +320,7 @@ type PivotInteractionPanelProps = {
   metrics: QueryFormMetric[];
   measureLeavesByMetric?: MeasureLeavesByMetricKey;
   metricLabelMap?: Record<string, string>;
+  dimensionLabelMap?: Record<string, string>;
   dimensionFilterValues?: Record<string, DataRecordValue[]>;
   selectedFilters?: Record<string, DataRecordValue[]>;
   onFilterChange?: (
@@ -477,6 +478,7 @@ export const PivotInteractionPanel = ({
   metrics,
   measureLeavesByMetric,
   metricLabelMap,
+  dimensionLabelMap,
   dimensionFilterValues,
   selectedFilters,
   onFilterChange,
@@ -507,6 +509,18 @@ export const PivotInteractionPanel = ({
   const showLeafChips = useMemo(
     () => hasComparisonLeaves(measureLeavesByMetric),
     [measureLeavesByMetric],
+  );
+  const resolveDimensionLabel = useCallback(
+    (dimension: QueryFormColumn) => {
+      if (typeof dimension === 'string') {
+        const mapped = dimensionLabelMap?.[dimension];
+        if (mapped) {
+          return mapped;
+        }
+      }
+      return getColumnLabel(dimension);
+    },
+    [dimensionLabelMap],
   );
   const hasAnyFilters = useMemo(
     () => Object.keys(selectedFilters ?? {}).length > 0,
@@ -752,7 +766,7 @@ export const PivotInteractionPanel = ({
             const dimensionKey = getStableColumnKey(dimension);
             const rowIndex = resolvedLayout.rows.indexOf(dimensionKey);
             const colIndex = resolvedLayout.cols.indexOf(dimensionKey);
-            const label = getColumnLabel(dimension);
+            const label = resolveDimensionLabel(dimension);
             const availableValues = dimensionFilterValues?.[dimensionKey] ?? [];
             const valueMap = new Map<string, DataRecordValue>();
             availableValues.forEach(value => {
