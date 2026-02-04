@@ -16,7 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  ReactNode,
+  type ComponentType,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+import { isEqual } from 'lodash';
 import {
   DataRecordValue,
   ensureIsArray,
@@ -36,6 +44,7 @@ import {
   Tooltip,
   Typography,
 } from '@superset-ui/core/components';
+import type { SelectProps } from '@superset-ui/core/components/Select';
 import { Icons } from '@superset-ui/core/components/Icons';
 import { useDrag } from 'react-dnd';
 import { getEmptyImage } from 'react-dnd-html5-backend';
@@ -270,12 +279,6 @@ const FilterMenu = styled.div`
   min-width: 280px;
 `;
 
-const FilterMenuHeader = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-`;
-
 const PanelFooter = styled.div`
   display: flex;
   justify-content: flex-end;
@@ -321,8 +324,11 @@ type PivotInteractionPanelProps = {
   measureLeavesByMetric?: MeasureLeavesByMetricKey;
   metricLabelMap?: Record<string, string>;
   dimensionLabelMap?: Record<string, string>;
+  dateFormatters?: Record<string, (value: DataRecordValue) => string>;
   dimensionFilterValues?: Record<string, DataRecordValue[]>;
+  dimensionFilterLoading?: Record<string, boolean>;
   selectedFilters?: Record<string, DataRecordValue[]>;
+  onFilterValuesOpen?: (dimension: QueryFormColumn) => void;
   onFilterChange?: (
     dimension: QueryFormColumn,
     values: DataRecordValue[],
@@ -411,9 +417,15 @@ const encodeFilterValue = (value: DataRecordValue): string => {
   return `other:${String(value)}`;
 };
 
-const formatFilterValue = (value: DataRecordValue): string => {
+const formatFilterValue = (
+  value: DataRecordValue,
+  formatter?: (value: DataRecordValue) => string,
+): string => {
   if (value === null || value === undefined) {
     return t('NULL');
+  }
+  if (formatter) {
+    return formatter(value);
   }
   return String(value);
 };
@@ -455,6 +467,13 @@ const DimensionDragHandle = ({
   );
 };
 
+type SelectWithOpenProps = SelectProps & {
+  open?: boolean;
+  defaultOpen?: boolean;
+};
+
+const SelectWithOpen = Select as ComponentType<SelectWithOpenProps>;
+
 const RowLinesIcon = () => (
   <ToggleIcon viewBox="0 0 12 12" fill="none" aria-hidden="true">
     <line x1="1" y1="2" x2="11" y2="2" stroke="currentColor" />
@@ -479,8 +498,11 @@ export const PivotInteractionPanel = ({
   measureLeavesByMetric,
   metricLabelMap,
   dimensionLabelMap,
+  dateFormatters,
   dimensionFilterValues,
+  dimensionFilterLoading,
   selectedFilters,
+  onFilterValuesOpen,
   onFilterChange,
   onClearFilters,
   onApply,
@@ -490,6 +512,10 @@ export const PivotInteractionPanel = ({
   onChange,
 }: PivotInteractionPanelProps) => {
   const dimensionList = ensureIsArray(dimensions);
+  const [openFilterKey, setOpenFilterKey] = useState<string | null>(null);
+  const [pendingFilterValues, setPendingFilterValues] = useState<
+    Record<string, DataRecordValue[]>
+  >({});
   const dimensionKeys = useMemo(
     () => dimensionList.map(dim => getStableColumnKey(dim)),
     [dimensionList],
@@ -522,9 +548,53 @@ export const PivotInteractionPanel = ({
     },
     [dimensionLabelMap],
   );
+  const resolveFilterFormatter = useCallback(
+    (dimension: QueryFormColumn) => {
+      const label = getColumnLabel(dimension);
+      return dateFormatters?.[label];
+    },
+    [dateFormatters],
+  );
   const hasAnyFilters = useMemo(
     () => Object.keys(selectedFilters ?? {}).length > 0,
     [selectedFilters],
+  );
+  const handleFilterPopoverChange = useCallback(
+    (dimensionKey: string, dimension: QueryFormColumn, open: boolean) => {
+      setOpenFilterKey(open ? dimensionKey : null);
+      if (open) {
+        onFilterValuesOpen?.(dimension);
+        setPendingFilterValues(current => {
+          if (current[dimensionKey]) {
+            return current;
+          }
+          const selected = selectedFilters?.[dimensionKey] ?? [];
+          return { ...current, [dimensionKey]: selected };
+        });
+        return;
+      }
+      if (onFilterChange) {
+        const pending = pendingFilterValues[dimensionKey];
+        const selected = selectedFilters?.[dimensionKey] ?? [];
+        if (pending && !isEqual(pending, selected)) {
+          onFilterChange(dimension, pending);
+        }
+      }
+      setPendingFilterValues(current => {
+        if (!current[dimensionKey]) {
+          return current;
+        }
+        const next = { ...current };
+        delete next[dimensionKey];
+        return next;
+      });
+    },
+    [
+      onFilterChange,
+      onFilterValuesOpen,
+      pendingFilterValues,
+      selectedFilters,
+    ],
   );
 
   const resolvedLayout = useMemo(
@@ -749,20 +819,27 @@ export const PivotInteractionPanel = ({
             const rowIndex = resolvedLayout.rows.indexOf(dimensionKey);
             const colIndex = resolvedLayout.cols.indexOf(dimensionKey);
             const label = resolveDimensionLabel(dimension);
+            const formatter = resolveFilterFormatter(dimension);
+            const isFilterOpen = openFilterKey === dimensionKey;
+            const isFilterLoading =
+              dimensionFilterLoading?.[dimensionKey] === true;
             const availableValues = dimensionFilterValues?.[dimensionKey] ?? [];
+            const pendingValues =
+              pendingFilterValues[dimensionKey] ??
+              selectedFilters?.[dimensionKey] ??
+              [];
             const valueMap = new Map<string, DataRecordValue>();
             availableValues.forEach(value => {
               valueMap.set(encodeFilterValue(value), value);
             });
             const options = availableValues.map(value => ({
               value: encodeFilterValue(value),
-              label: formatFilterValue(value),
+              label: formatFilterValue(value, formatter),
             }));
-            const selectedValues = selectedFilters?.[dimensionKey] ?? [];
-            const selectedValueKeys = selectedValues.map(value =>
+            const selectedValueKeys = pendingValues.map(value =>
               encodeFilterValue(value),
             );
-            const hasFilter = selectedValues.length > 0;
+            const hasFilter = (selectedFilters?.[dimensionKey] ?? []).length > 0;
             return (
               <DimensionRow key={dimensionKey}>
                 <DimensionLeft>
@@ -808,35 +885,43 @@ export const PivotInteractionPanel = ({
                     <Popover
                       trigger="click"
                       overlayStyle={{ minWidth: 280 }}
+                      open={isFilterOpen}
+                      onOpenChange={open => {
+                        handleFilterPopoverChange(
+                          dimensionKey,
+                          dimension,
+                          open,
+                        );
+                      }}
+                      onVisibleChange={open => {
+                        handleFilterPopoverChange(
+                          dimensionKey,
+                          dimension,
+                          open,
+                        );
+                      }}
                       content={
                         <FilterMenu>
-                          <FilterMenuHeader>
-                            <Button
-                              type="text"
-                              size="small"
-                              icon={<Icons.ClearOutlined iconSize="s" />}
-                              disabled={!hasFilter}
-                              onClick={() => onFilterChange(dimension, [])}
-                            >
-                              {t('Clear')}
-                            </Button>
-                          </FilterMenuHeader>
-                          <Select
+                          <SelectWithOpen
                             mode="multiple"
                             allowClear
+                            allowSelectAll
+                            autoFocus
+                            open={isFilterOpen}
+                            loading={isFilterLoading}
                             placeholder={t('Filter values')}
                             options={options}
                             value={selectedValueKeys}
                             onChange={values =>
-                              onFilterChange(
-                                dimension,
-                                (values as string[])
+                              setPendingFilterValues(current => ({
+                                ...current,
+                                [dimensionKey]: (values as string[])
                                   .map(value => valueMap.get(value))
                                   .filter(
                                     (value): value is DataRecordValue =>
                                       value !== undefined,
                                   ),
-                              )
+                              }))
                             }
                             showSearch
                             optionFilterProps={['label']}

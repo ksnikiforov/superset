@@ -18,6 +18,7 @@
  */
 import {
   type DataRecordValue,
+  type GenericDataType,
   getColumnLabel,
   type QueryFormColumn,
   type QueryObjectFilterClause,
@@ -48,7 +49,7 @@ import {
   optimizeFetchPlan,
 } from './fetchPlanOptimizer';
 import { formatQueryName } from './queryName';
-import { buildPathFilters } from './pathFilters';
+import { buildPathFilters, coerceValueForColumn } from './pathFilters';
 import { coerceExpansionState } from './persistedExpansionState';
 import { resolveFetchContextForBatch } from './resolveFetchContext';
 import { buildQueryShape } from './queryShape';
@@ -266,7 +267,11 @@ const buildBranchSpecs = ({
 
   const axisGroupby =
     axis === 'row' ? ctx.rowGroupbyForQuery : ctx.colGroupbyForQuery;
-  const pathFilters = buildPathFilters(axisGroupby, ctx.sanitizedPath);
+  const pathFilters = buildPathFilters(
+    axisGroupby,
+    ctx.sanitizedPath,
+    formData.colTypeMap,
+  );
   const suffix = `|branch:${axis}:${serializePath(path)}`;
 
   return queryPairs.map(pair => ({
@@ -312,12 +317,14 @@ const buildBatchFilterClauses = ({
   axisGroupby,
   parentPath,
   siblingValues,
+  colTypeMap,
 }: {
   axisGroupby: QueryFormColumn[];
   parentPath: PivotPath;
   siblingValues: PivotPathValue[];
+  colTypeMap?: Record<string, GenericDataType>;
 }): QueryObjectFilterClause[] => {
-  const prefixFilters = buildPathFilters(axisGroupby, parentPath);
+  const prefixFilters = buildPathFilters(axisGroupby, parentPath, colTypeMap);
   if (siblingValues.length === 0) {
     return prefixFilters;
   }
@@ -335,7 +342,9 @@ const buildBatchFilterClauses = ({
       } as UnaryQueryObjectFilterClause,
     ];
   }
-  const resolvedSiblingValues = siblingValues as DataRecordValue[];
+  const resolvedSiblingValues = siblingValues.map(value =>
+    coerceValueForColumn(value, siblingColumn, colTypeMap),
+  ) as DataRecordValue[];
   const siblingClause: SetQueryObjectFilterClause = {
     col: getColumnLabel(siblingColumn),
     op: 'IN',
@@ -401,6 +410,7 @@ const buildBatchSpecs = ({
     axisGroupby,
     parentPath,
     siblingValues,
+    colTypeMap: formData.colTypeMap,
   });
   const suffix = `|batch:${axis}:${parentPathKey}|chunk:${chunkIndex}`;
 

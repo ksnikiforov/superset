@@ -49,6 +49,7 @@ import { buildBranchTreeFromResults } from './fetchPivotBranch';
 import { buildLayoutContext } from './pivot/layout/LayoutContext';
 import { resolveInteractionFormData } from './pivot/layout/resolveInteractionLayout';
 import { applyMeasureLeafValuesToTree } from './pivot/measureLeaves';
+import { normalizeFormDataExtraFilters } from './pivot/query/normalizeExtraFormData';
 import { buildInitialQuerySpecs } from './pivot/query/specs';
 
 const { DATABASE_DATETIME } = TimeFormats;
@@ -198,45 +199,82 @@ export default function transformProps(
       }
     });
   });
+  const colTypeMapWithAliases: Record<string, GenericDataType> = {
+    ...colTypeMap,
+  };
+  columns.forEach(column => {
+    const columnName = column.column_name;
+    const type = columnName ? colTypeMap[columnName] : undefined;
+    if (type === undefined) {
+      return;
+    }
+    const verbose = column.verbose_name || verboseMap[columnName];
+    if (verbose) {
+      colTypeMapWithAliases[verbose] = type;
+    }
+  });
 
-  const temporalColumns = Object.keys(colTypeMap).filter(
-    colname => colTypeMap[colname] === GenericDataType.Temporal,
+  const temporalColumns = Object.keys(colTypeMapWithAliases).filter(
+    colname => colTypeMapWithAliases[colname] === GenericDataType.Temporal,
   );
-  const dateFormatters = temporalColumns.reduce(
-    (
-      acc: Record<string, ((value: DataRecordValue) => string) | undefined>,
-      temporalColname,
-    ) => {
-      let formatter: ((value: DataRecordValue) => string) | undefined;
-      if (formData.dateFormat === SMART_DATE_ID) {
-        if (granularity) {
-          const base = getTimeFormatterForGranularity(granularity);
-          formatter = (value: DataRecordValue) =>
-            base(value as number | Date | null | undefined);
-        } else if (
-          combinedData.every(
-            row =>
-              row[temporalColname] === null ||
-              row[temporalColname] === undefined ||
-              typeof row[temporalColname] === 'number',
-          )
-        ) {
-          const base = getTimeFormatter(DATABASE_DATETIME);
-          formatter = (value: DataRecordValue) =>
-            base(value as number | Date | null | undefined);
-        }
-      } else if (formData.dateFormat) {
-        const base = getTimeFormatter(formData.dateFormat);
+  const dateFormatters = columns.reduce<
+    Record<string, ((value: DataRecordValue) => string) | undefined>
+  >((acc, column) => {
+    const columnName = column.column_name;
+    const format = column.python_date_format;
+    if (columnName && typeof format === 'string' && format.length > 0) {
+      const base = getTimeFormatter(format);
+      const formatter = (value: DataRecordValue) =>
+        base(value as number | Date | null | undefined);
+      acc[columnName] = formatter;
+      if (column.verbose_name) {
+        acc[column.verbose_name] = formatter;
+      }
+      const verbose = verboseMap[columnName];
+      if (verbose) {
+        acc[verbose] = formatter;
+      }
+    }
+    return acc;
+  }, {});
+  temporalColumns.forEach(temporalColname => {
+    if (dateFormatters[temporalColname]) {
+      return;
+    }
+    let formatter: ((value: DataRecordValue) => string) | undefined;
+    if (formData.dateFormat === SMART_DATE_ID) {
+      if (granularity) {
+        const base = getTimeFormatterForGranularity(granularity);
+        formatter = (value: DataRecordValue) =>
+          base(value as number | Date | null | undefined);
+      } else if (
+        combinedData.every(
+          row =>
+            row[temporalColname] === null ||
+            row[temporalColname] === undefined ||
+            typeof row[temporalColname] === 'number',
+        )
+      ) {
+        const base = getTimeFormatter(DATABASE_DATETIME);
         formatter = (value: DataRecordValue) =>
           base(value as number | Date | null | undefined);
       }
-      if (formatter) {
-        acc[temporalColname] = formatter;
-      }
-      return acc;
-    },
-    {},
-  );
+    } else if (formData.dateFormat) {
+      const base = getTimeFormatter(formData.dateFormat);
+      formatter = (value: DataRecordValue) =>
+        base(value as number | Date | null | undefined);
+    }
+    if (formatter) {
+      dateFormatters[temporalColname] = formatter;
+    }
+  });
+
+  const queryFormDataWithTypes: PivotTableQueryFormData = {
+    ...queryFormData,
+    colTypeMap: colTypeMapWithAliases,
+  };
+  const normalizedQueryFormData =
+    normalizeFormDataExtraFilters(queryFormDataWithTypes);
 
   const metricColorFormatters = getColorFormatters(
     formData.conditional_formatting,
@@ -279,6 +317,11 @@ export default function transformProps(
       resultsByName.set(name, result);
     }
   });
+  const formDataForTree: PivotTableQueryFormData = {
+    ...formDataWithMetricLabels,
+    dateFormatters,
+    colTypeMap: colTypeMapWithAliases,
+  };
   const nextTreeWithLabels = initialSpecs.reduce((acc, spec, idx) => {
     const result =
       resultsByName.get(spec.queryName) ??
@@ -294,7 +337,7 @@ export default function transformProps(
         { rowDepth: spec.meta.rowDepth, colDepth: spec.meta.colDepth },
       ],
       metricsForQuery: spec.metrics,
-      formData: formDataWithMetricLabels,
+      formData: formDataForTree,
       measureHierarchy: layout.measureHierarchy,
       rowGroupby: spec.meta.rowGroupbyForQueryFull,
       colGroupby: spec.meta.colGroupbyForQueryFull,
@@ -348,6 +391,11 @@ export default function transformProps(
 
   const { selectedFilters } = filterState;
 
+  const queryFormDataWithFormatters: PivotTableQueryFormData = {
+    ...normalizedQueryFormData,
+    dateFormatters,
+  };
+
   return {
     annotationData,
     width,
@@ -365,6 +413,9 @@ export default function transformProps(
       metricsBase: rawFormData.metrics ?? baseFormData.metrics,
       measureLeavesByMetricBase:
         rawFormData.measureLeavesByMetric ?? baseFormData.measureLeavesByMetric,
+      extra_form_data: normalizedQueryFormData.extra_form_data,
+      dateFormatters,
+      colTypeMap: colTypeMapWithAliases,
     },
     rawFormData: rawFormData,
     hooks,
@@ -380,7 +431,7 @@ export default function transformProps(
     inputRef,
     inContextMenu,
     theme,
-    queryFormData,
+    queryFormData: queryFormDataWithFormatters,
     metrics,
     metricFormatting,
     metricDatabars,
@@ -415,7 +466,7 @@ export default function transformProps(
     dateFormatters,
     onContextMenu,
     timeGrainSqla: formData.timeGrainSqla ?? formData.time_grain_sqla,
-    colTypeMap,
+    colTypeMap: colTypeMapWithAliases,
     rowTotalPosition,
     rowSubtotalPosition,
     colTotalPosition,

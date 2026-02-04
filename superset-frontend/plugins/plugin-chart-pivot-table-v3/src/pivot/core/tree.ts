@@ -26,6 +26,7 @@ import {
 import {
   MetricsLayoutEnum,
   MeasureHierarchy,
+  type DateFormatter,
   PivotPath,
   PivotResultCell,
   PivotTreeData,
@@ -210,6 +211,15 @@ export const labelRowSubtotalLeaves = (
     if (!baseLabel) {
       return;
     }
+    const basePath =
+      baseLabelIndex !== undefined
+        ? node.path.slice(0, baseLabelIndex + 1)
+        : undefined;
+    const baseNode =
+      basePath && basePath.length > 0
+        ? tree.rows[serializePath(basePath)]
+        : undefined;
+    const resolvedBaseLabel = baseNode?.formattedLabel ?? baseLabel;
     let metricLabel: string | undefined;
     let metricLabelIndex: number | undefined;
     for (let i = subtotalIndex + 1; i < node.path.length; i += 1) {
@@ -242,8 +252,8 @@ export const labelRowSubtotalLeaves = (
     const useMetricLabel =
       !isSingleMetric && hasMetricLabel && !metricBeforeBase;
     const nextLabel = useMetricLabel
-      ? `${baseLabel} ${getDisplayLabel(metricLabel ?? '')}`
-      : `${baseLabel} Total`;
+      ? `${resolvedBaseLabel} ${getDisplayLabel(metricLabel ?? '')}`
+      : `${resolvedBaseLabel} Total`;
     if (node.label !== nextLabel || node.formattedLabel !== nextLabel) {
       nextRows[node.key] = {
         ...node,
@@ -286,16 +296,19 @@ export const applyMetricAxis = (
     const nodes = axis === 'row' ? result.rows : result.cols;
     const key = serializePath(path);
     if (nodes[key]) return nodes[key];
+    const sourceNodes = axis === 'row' ? tree.rows : tree.cols;
+    const sourceNode = sourceNodes[key];
     const rawValue = path[path.length - 1];
     const rawLabel =
       path.length === 0
         ? 'Grand total'
         : formatPivotLabelValue(rawValue ?? null, 'Grand total');
+    const baseLabel = sourceNode?.formattedLabel ?? rawLabel;
     const metricKey = decodeMetricKey(rawValue);
     const metricLabel = metricKey
       ? (metricLabelMap?.[metricKey] ?? metricKey)
       : undefined;
-    const label = metricLabel || rawLabel;
+    const label = metricLabel || baseLabel;
     const isMetricNode = metricTokenSet.has(
       String(path[path.length - 1] ?? ''),
     );
@@ -627,19 +640,22 @@ export const applyMeasureHierarchyAxis = (
     const nodes = axis === 'row' ? result.rows : result.cols;
     const key = serializePath(path);
     if (nodes[key]) return nodes[key];
+    const sourceNodes = axis === 'row' ? tree.rows : tree.cols;
+    const sourceNode = sourceNodes[key];
     const rawValue = path[path.length - 1];
     const rawLabel =
       path.length === 0
         ? 'Grand total'
         : formatPivotLabelValue(rawValue ?? null, 'Grand total');
+    const baseLabel = sourceNode?.formattedLabel ?? rawLabel;
     const metricKey = decodeMetricKey(rawValue);
     const metricDisplayLabel = metricKey
       ? (metricLabelMap?.[metricKey] ?? metricKey)
       : undefined;
     const leafId = decodeMeasureLeafId(rawValue);
-    let label = metricDisplayLabel || rawLabel;
+    let label = metricDisplayLabel || baseLabel;
     if (leafId) {
-      label = leafLabelMap.get(leafId) ?? rawLabel;
+      label = leafLabelMap.get(leafId) ?? baseLabel;
     }
     if (metricKey && !leafTierVisible) {
       const leaf = singleLeafByMetric.get(metricKey);
@@ -948,6 +964,7 @@ export const buildTreeFromRecords = (
   colGroupby: QueryFormColumn[],
   rowDepth: number,
   colDepth: number,
+  dateFormatters?: Record<string, DateFormatter | undefined>,
 ): PivotTreeData => {
   const tree: PivotTreeData = { rows: {}, cols: {}, cells: {} };
   const metricKeys = getMetricKeys(metrics);
@@ -981,12 +998,22 @@ export const buildTreeFromRecords = (
       path.length === 0
         ? 'Grand total'
         : formatPivotLabelValue(rawValue, totalLabel);
+    const groupby = axis === 'row' ? rowGroupby : colGroupby;
+    const column = groupby[path.length - 1];
+    const columnLabel = column ? getColumnLabel(column) : undefined;
+    const formatter = columnLabel ? dateFormatters?.[columnLabel] : undefined;
+    const formattedLabel =
+      path.length === 0 || rawValue === null || rawValue === undefined
+        ? label
+        : formatter
+          ? formatter(rawValue)
+          : label;
     nodes[key] = {
       axis,
       key,
       path,
       label,
-      formattedLabel: label,
+      formattedLabel,
       level: path.length,
       hasChildren:
         path.length < (axis === 'row' ? rowGroupby.length : colGroupby.length),

@@ -23,6 +23,7 @@ import {
   ensureIsArray,
   getColumnLabel,
   supersetTheme,
+  type QueryObjectFilterClause,
   type JsonObject,
   styled,
   t,
@@ -51,6 +52,8 @@ import { buildLayoutContext } from './pivot/layout/LayoutContext';
 import { shouldFetchForLayoutChange } from './pivot/layout/shouldFetchForLayoutChange';
 import { buildInitialQuerySpecs } from './pivot/query/specs';
 import { supersetChartDataClient } from './pivot/data/SupersetChartDataClient';
+import { normalizeFormDataExtraFilters } from './pivot/query/normalizeExtraFormData';
+import { type QuerySpec } from './pivot/query/types';
 import {
   type ChartDataQueryResult,
   type ChartDataWarning,
@@ -77,6 +80,11 @@ const PANEL_WIDTH = 230;
 const TOP_CHIPS_HEIGHT = 36;
 const SIDE_CHIPS_WIDTH = 24;
 const SEAMLESS_REQUEST_GROUP = 'pivot-v3-seamless';
+const DIMENSION_VALUES_REQUEST_GROUP = 'pivot-v3-dimension-values';
+const DIMENSION_VALUES_QUERY_PREFIX = 'pivot_v3|dimension-values';
+
+const buildDimensionValuesQueryName = (dimensionKey: string) =>
+  `${DIMENSION_VALUES_QUERY_PREFIX}|${dimensionKey}`;
 
 const resolveQueryName = (result: ChartDataQueryResult): string | undefined => {
   if (typeof result.query?.query_name === 'string') {
@@ -913,12 +921,6 @@ function PivotTableChart(props: PivotTableProps) {
           : filterKeys.map(key => {
               const col = dimensionMap.get(key) ?? key;
               const vals = selection[key] ?? [];
-              if (
-                vals.length === 1 &&
-                (vals[0] === null || vals[0] === undefined)
-              ) {
-                return { col, op: 'IS NULL' as const };
-              }
               return {
                 col,
                 op: 'IN' as const,
@@ -942,6 +944,23 @@ function PivotTableChart(props: PivotTableProps) {
     [dimensionMap],
   );
 
+  const mergeExtraFilters = useCallback(
+    (
+      baseExtra: PivotTableProps['formData']['extra_form_data'] | undefined,
+      extraFilters: QueryObjectFilterClause[] | undefined,
+    ) => {
+      if (!extraFilters || extraFilters.length === 0) {
+        return baseExtra;
+      }
+      const existing = baseExtra?.filters ?? [];
+      return {
+        ...(baseExtra ?? {}),
+        filters: [...existing, ...extraFilters],
+      };
+    },
+    [],
+  );
+
   const committedFilterPayload = useMemo(
     () => buildFilterPayload(committedFilters),
     [buildFilterPayload, committedFilters],
@@ -951,14 +970,20 @@ function PivotTableChart(props: PivotTableProps) {
     if (!isUserControlled || !committedFilterPayload.hasFilters) {
       return appliedLayoutFormData;
     }
-    return {
+    const merged = {
       ...appliedLayoutFormData,
-      extra_form_data: {
-        ...(appliedLayoutFormData.extra_form_data ?? {}),
-        filters: committedFilterPayload.filters ?? [],
-      },
+      extra_form_data: mergeExtraFilters(
+        appliedLayoutFormData.extra_form_data,
+        committedFilterPayload.filters,
+      ),
     };
-  }, [appliedLayoutFormData, committedFilterPayload, isUserControlled]);
+    return normalizeFormDataExtraFilters(merged);
+  }, [
+    appliedLayoutFormData,
+    committedFilterPayload,
+    isUserControlled,
+    mergeExtraFilters,
+  ]);
 
   useEffect(() => {
     setUiRuntimeLayout(runtimeLayout);
@@ -967,6 +992,12 @@ function PivotTableChart(props: PivotTableProps) {
   const persistedSelectedFilters = useMemo(() => {
     if (!isUserControlled) {
       return normalizeSelectedFilters(selectedFilters);
+    }
+    if (
+      formData.pivotSelectedFilters &&
+      Object.keys(formData.pivotSelectedFilters).length > 0
+    ) {
+      return normalizeSelectedFilters(formData.pivotSelectedFilters);
     }
     const ownFilters = ownState?.pivotSelectedFilters as
       | Record<string, DataRecordValue[]>
@@ -982,6 +1013,7 @@ function PivotTableChart(props: PivotTableProps) {
     committedFilters,
     isUserControlled,
     normalizeSelectedFilters,
+    formData.pivotSelectedFilters,
     ownState?.pivotSelectedFilters,
     selectedFilters,
   ]);
@@ -1024,6 +1056,7 @@ function PivotTableChart(props: PivotTableProps) {
       });
       if (setControlValue) {
         setControlValue('pivotRuntimeLayout', layout);
+        setControlValue('pivotSelectedFilters', filters);
         return;
       }
       setDataMask({ ownState: { ...nextOwnState } });
@@ -1045,27 +1078,32 @@ function PivotTableChart(props: PivotTableProps) {
       const pendingFormData = hasFilters
         ? {
             ...fetchFormDataBase,
-            extra_form_data: {
-              ...(fetchFormDataBase.extra_form_data ?? {}),
-              filters: filters ?? [],
-            },
+            extra_form_data: mergeExtraFilters(
+              fetchFormDataBase.extra_form_data,
+              filters,
+            ),
           }
         : fetchFormDataBase;
+      const normalizedPendingFormData =
+        normalizeFormDataExtraFilters(pendingFormData);
       const metricsForLayout =
-        formData.metricsBase ?? formData.metrics ?? pendingFormData.metrics;
+        formData.metricsBase ??
+        formData.metrics ??
+        normalizedPendingFormData.metrics;
       const leavesForLayout =
         formData.measureLeavesByMetricBase ??
         formData.measureLeavesByMetric ??
-        pendingFormData.measureLeavesByMetric;
+        normalizedPendingFormData.measureLeavesByMetric;
       const resolvedFormData = resolveInteractionFormData({
         formData: isUserControlled
           ? {
-              ...pendingFormData,
-              metrics: metricsForLayout ?? pendingFormData.metrics,
+              ...normalizedPendingFormData,
+              metrics: metricsForLayout ?? normalizedPendingFormData.metrics,
               measureLeavesByMetric:
-                leavesForLayout ?? pendingFormData.measureLeavesByMetric,
+                leavesForLayout ??
+                normalizedPendingFormData.measureLeavesByMetric,
             }
-          : pendingFormData,
+          : normalizedPendingFormData,
         runtimeLayout: normalized,
       });
       const layout = buildLayoutContext(resolvedFormData);
@@ -1132,6 +1170,7 @@ function PivotTableChart(props: PivotTableProps) {
       formData,
       isUserControlled,
       metricKeys,
+      mergeExtraFilters,
       persistRuntimeState,
       setCommittedFilters,
       setCommittedTree,
@@ -1239,11 +1278,8 @@ function PivotTableChart(props: PivotTableProps) {
     colTotalPosition,
     colSubtotalPosition,
   });
-  const shouldPersistExpansionState =
-    persistExpansionState && !isUserControlled;
-  const expansionSetControlValue = isUserControlled
-    ? undefined
-    : setControlValue;
+  const shouldPersistExpansionState = persistExpansionState;
+  const expansionSetControlValue = setControlValue;
   const expansionSetDataMask = isUserControlled ? undefined : setDataMask;
   const expansionMergeOwnState = isUserControlled ? undefined : mergeOwnState;
 
@@ -1311,42 +1347,62 @@ function PivotTableChart(props: PivotTableProps) {
   });
   const { renderTree } = renderModelResult;
 
-  const dimensionFilterValues = useMemo(() => {
+  const treeDimensionFilterValues = useMemo(() => {
     const valuesMap = new Map<string, Set<DataRecordValue>>();
-    const rowKeys = layoutGroupbyRows
-      .filter(column => getStableColumnKey(column) !== METRICS_PLACEHOLDER)
-      .map(column => getStableColumnKey(column));
-    const colKeys = layoutGroupbyColumns
-      .filter(column => getStableColumnKey(column) !== METRICS_PLACEHOLDER)
-      .map(column => getStableColumnKey(column));
+    const aliasMap = new Map<string, Set<string>>();
+    const addAlias = (from?: string, to?: string) => {
+      if (!from || !to) {
+        return;
+      }
+      const set = aliasMap.get(from) ?? new Set<string>();
+      set.add(to);
+      aliasMap.set(from, set);
+    };
+    dimensionList.forEach(dimension => {
+      const stableKey = getStableColumnKey(dimension);
+      const labelKey = getColumnLabel(dimension);
+      addAlias(stableKey, stableKey);
+      addAlias(labelKey, stableKey);
+    });
+    Object.entries(verboseMap ?? {}).forEach(([key, verbose]) => {
+      if (typeof verbose !== 'string' || verbose.length === 0) {
+        return;
+      }
+      addAlias(key, verbose);
+      addAlias(verbose, verbose);
+    });
+    const addValue = (key: string, value: DataRecordValue) => {
+      const set = valuesMap.get(key) ?? new Set<DataRecordValue>();
+      set.add(value);
+      valuesMap.set(key, set);
+    };
+    const resolveAliases = (key: string) => aliasMap.get(key) ?? new Set([key]);
     const collectValues = (
-      nodes: Record<
-        string,
-        { path: (DataRecordValue | undefined)[]; isSubtotal?: boolean }
-      >,
-      keys: string[],
+      nodes: Record<string, PivotTreeNode>,
+      axis: 'row' | 'col',
     ) => {
       Object.values(nodes).forEach(node => {
         if (node.isSubtotal) {
           return;
         }
+        const dimensionKey = layoutResult.getDimensionKeyForNode(node, axis);
+        if (!dimensionKey) {
+          return;
+        }
         const parts = layoutResult
           .getNonMetricPathParts(node.path)
           .filter(part => !isSubtotalToken(part));
-        parts.forEach((value, index) => {
-          const key = keys[index];
-          if (!key) {
-            return;
-          }
-          const normalized = value ?? null;
-          const set = valuesMap.get(key) ?? new Set<DataRecordValue>();
-          set.add(normalized);
-          valuesMap.set(key, set);
+        if (parts.length === 0) {
+          return;
+        }
+        const normalized = (parts[parts.length - 1] ?? null) as DataRecordValue;
+        resolveAliases(dimensionKey).forEach(key => {
+          addValue(key, normalized);
         });
       });
     };
-    collectValues(renderTree.rows, rowKeys);
-    collectValues(renderTree.cols, colKeys);
+    collectValues(renderTree.rows, 'row');
+    collectValues(renderTree.cols, 'col');
     return Object.fromEntries(
       Array.from(valuesMap.entries()).map(([key, set]) => [
         key,
@@ -1354,12 +1410,122 @@ function PivotTableChart(props: PivotTableProps) {
       ]),
     );
   }, [
+    dimensionList,
     layoutGroupbyColumns,
     layoutGroupbyRows,
     layoutResult,
     renderTree.cols,
     renderTree.rows,
+    verboseMap,
   ]);
+  const [fetchedDimensionFilterValues, setFetchedDimensionFilterValues] =
+    useState<Record<string, DataRecordValue[]>>({});
+  const [dimensionFilterLoading, setDimensionFilterLoading] = useState<
+    Record<string, boolean>
+  >({});
+  const dimensionFilterValues = useMemo(
+    () => ({
+      ...treeDimensionFilterValues,
+      ...fetchedDimensionFilterValues,
+    }),
+    [fetchedDimensionFilterValues, treeDimensionFilterValues],
+  );
+  const dimensionFilterValuesVersion = useRef(0);
+  const dimensionFilterValuesInFlight = useRef(new Set<string>());
+  const dimensionFilterValuesRef = useRef(treeDimensionFilterValues);
+
+  useEffect(() => {
+    if (isEqual(dimensionFilterValuesRef.current, treeDimensionFilterValues)) {
+      return;
+    }
+    dimensionFilterValuesRef.current = treeDimensionFilterValues;
+    dimensionFilterValuesVersion.current += 1;
+    setFetchedDimensionFilterValues({});
+  }, [treeDimensionFilterValues]);
+
+  const handleFetchDimensionValues = useCallback(
+    async (dimension: PivotTableProps['groupbyRows'][number]) => {
+      const dimensionKey = getStableColumnKey(dimension);
+      if (
+        Object.prototype.hasOwnProperty.call(
+          fetchedDimensionFilterValues,
+          dimensionKey,
+        )
+      ) {
+        return;
+      }
+      if (dimensionFilterValuesInFlight.current.has(dimensionKey)) {
+        return;
+      }
+      dimensionFilterValuesInFlight.current.add(dimensionKey);
+      setDimensionFilterLoading(current => ({
+        ...current,
+        [dimensionKey]: true,
+      }));
+      const requestVersion = dimensionFilterValuesVersion.current;
+      try {
+        const selection = { ...uiSelectedFilters };
+        delete selection[dimensionKey];
+        const { filters } = buildFilterPayload(selection);
+        const pendingFormData = filters
+          ? {
+              ...fetchFormDataBase,
+              extra_form_data: mergeExtraFilters(
+                fetchFormDataBase.extra_form_data,
+                filters,
+              ),
+            }
+          : fetchFormDataBase;
+        const normalizedFormData =
+          normalizeFormDataExtraFilters(pendingFormData);
+        const spec: QuerySpec = {
+          queryName: buildDimensionValuesQueryName(dimensionKey),
+          columns: [dimension],
+          metrics: [],
+          filters: [],
+        };
+        const results = await supersetChartDataClient.fetch({
+          formData: normalizedFormData,
+          specs: [spec],
+          requestGroupId: `${DIMENSION_VALUES_REQUEST_GROUP}-${dimensionKey}`,
+        });
+        if (dimensionFilterValuesVersion.current !== requestVersion) {
+          return;
+        }
+        const result = results[0];
+        const label = getColumnLabel(dimension);
+        const values = new Set<DataRecordValue>();
+        (result?.data ?? []).forEach(row => {
+          if (row && typeof row === 'object' && label in row) {
+            values.add((row as Record<string, DataRecordValue>)[label]);
+          }
+        });
+        setFetchedDimensionFilterValues(current => ({
+          ...current,
+          [dimensionKey]: Array.from(values.values()),
+        }));
+      } catch (error) {
+        // Ignore errors for dimension value lookups; filtering still works.
+      } finally {
+        dimensionFilterValuesInFlight.current.delete(dimensionKey);
+        setDimensionFilterLoading(current => {
+          if (!current[dimensionKey]) {
+            return current;
+          }
+          const next = { ...current };
+          delete next[dimensionKey];
+          return next;
+        });
+      }
+    },
+    [
+      buildFilterPayload,
+      fetchedDimensionFilterValues,
+      fetchFormDataBase,
+      mergeExtraFilters,
+      uiSelectedFilters,
+    ],
+  );
 
   const handleDimensionFilterChange = useCallback(
     (
@@ -1635,10 +1801,13 @@ function PivotTableChart(props: PivotTableProps) {
           }
           metricLabelMap={formData.metricLabelMap}
           dimensionLabelMap={dimensionLabelOverrides}
+          dateFormatters={dateFormatters}
           dimensionFilterValues={dimensionFilterValues}
+          dimensionFilterLoading={dimensionFilterLoading}
           selectedFilters={uiSelectedFilters}
           onFilterChange={handleDimensionFilterChange}
           onClearFilters={handleClearAllFilters}
+          onFilterValuesOpen={handleFetchDimensionValues}
           runtimeLayout={uiRuntimeLayout}
           onChange={handleRuntimeLayoutChange}
         />

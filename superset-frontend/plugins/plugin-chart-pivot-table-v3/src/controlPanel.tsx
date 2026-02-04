@@ -557,6 +557,17 @@ const config: ControlPanelConfig = {
         ],
         [
           {
+            name: 'pivotSelectedFilters',
+            config: {
+              type: 'HiddenControl',
+              default: {},
+              dontRefreshOnChange: true,
+              renderTrigger: false,
+            },
+          },
+        ],
+        [
+          {
             name: 'metricFormattingScope',
             config: {
               type: 'SelectControl',

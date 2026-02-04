@@ -251,6 +251,7 @@ export const buildBranchTreeFromResults = ({
             colGroupby,
             pair.rowDepth,
             pair.colDepth,
+            formData.dateFormatters,
           );
           if (colSubtotalLevels.includes(pair.colDepth)) {
             tree = injectColumnSubtotalLeaves(

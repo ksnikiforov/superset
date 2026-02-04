@@ -16,17 +16,79 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { buildQueryContext, QueryFormOrderBy } from '@superset-ui/core';
+import {
+  buildQueryContext,
+  type DataRecordValue,
+  ensureIsArray,
+  type QueryFormColumn,
+  QueryFormOrderBy,
+  type QueryObjectFilterClause,
+} from '@superset-ui/core';
 import { PivotTableQueryFormData } from './types';
 import { buildLayoutContext } from './pivot/layout/LayoutContext';
 import { resolveInteractionFormData } from './pivot/layout/resolveInteractionLayout';
+import { normalizeFormDataExtraFilters } from './pivot/query/normalizeExtraFormData';
 import { buildInitialQuerySpecs } from './pivot/query/specs';
 import { toChartDataQueries } from './pivot/query/toChartDataQueries';
+import { getStableColumnKey } from './utils';
+
+const buildLocalFilterClauses = (
+  formData: PivotTableQueryFormData,
+): QueryObjectFilterClause[] => {
+  if (formData.interactionMode !== 'user_controlled') {
+    return [];
+  }
+  const selection = formData.pivotSelectedFilters;
+  if (!selection || Object.keys(selection).length === 0) {
+    return [];
+  }
+  const dimensionList = ensureIsArray(formData.dimensions);
+  const fallbackList =
+    dimensionList.length > 0
+      ? dimensionList
+      : [
+          ...ensureIsArray(formData.groupbyRows),
+          ...ensureIsArray(formData.groupbyColumns),
+        ];
+  const dimensionMap = new Map<string, QueryFormColumn>();
+  fallbackList.forEach(dimension => {
+    dimensionMap.set(getStableColumnKey(dimension), dimension);
+  });
+  return Object.entries(selection).flatMap(([key, values]) => {
+    if (!Array.isArray(values) || values.length === 0) {
+      return [];
+    }
+    const col = dimensionMap.get(key) ?? (key as unknown as QueryFormColumn);
+    return [
+      {
+        col,
+        op: 'IN' as const,
+        val: values as DataRecordValue[],
+      },
+    ];
+  });
+};
 
 export default function buildQuery(formData: PivotTableQueryFormData) {
+  const localFilters = buildLocalFilterClauses(formData);
+  const normalizedFormData = normalizeFormDataExtraFilters(
+    localFilters.length > 0
+      ? {
+          ...formData,
+          extra_form_data: {
+            ...(formData.extra_form_data ?? {}),
+            filters: [
+              ...((formData.extra_form_data?.filters ??
+                []) as QueryObjectFilterClause[]),
+              ...localFilters,
+            ],
+          },
+        }
+      : formData,
+  );
   const resolvedFormData = resolveInteractionFormData({
-    formData,
-    runtimeLayout: formData.pivotRuntimeLayout,
+    formData: normalizedFormData,
+    runtimeLayout: normalizedFormData.pivotRuntimeLayout,
   });
   const layout = buildLayoutContext(resolvedFormData);
   const specs = buildInitialQuerySpecs(resolvedFormData, layout);

@@ -237,6 +237,7 @@ export interface PivotTableCustomizeProps {
   metricsBase?: QueryFormMetric[];
   metricLabelMap?: Record<string, string>;
   pivotRuntimeLayout?: PivotRuntimeLayout;
+  pivotSelectedFilters?: Record<string, DataRecordValue[]>;
   measureLeavesByMetric?: MeasureLeavesByMetricKey;
   measureLeavesByMetricBase?: MeasureLeavesByMetricKey;
   metricFormatting?: PivotMetricFormattingMap;
