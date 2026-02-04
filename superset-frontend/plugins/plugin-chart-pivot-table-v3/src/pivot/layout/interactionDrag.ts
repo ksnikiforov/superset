@@ -156,7 +156,8 @@ export const applyDimensionDrag = (
   if (
     !hasExplicitTarget &&
     valueIndex !== undefined &&
-    dimInsertIndex === valueIndex
+    dimInsertIndex === valueIndex &&
+    valueIndex < dimCount
   ) {
     shouldInsertBeforeValue = true;
   }

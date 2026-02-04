@@ -107,11 +107,13 @@ export const pruneExpandedToStablePrefix = ({
   nodes,
   stablePrefix,
   metricLabelSet,
+  includeMetricDepth = false,
 }: {
   expanded: Set<string>;
   nodes: Record<string, PivotTreeNode>;
   stablePrefix: number;
   metricLabelSet: Set<string>;
+  includeMetricDepth?: boolean;
 }): Set<string> => {
   if (stablePrefix <= 0) {
     return new Set<string>([rootKey]);
@@ -120,7 +122,13 @@ export const pruneExpandedToStablePrefix = ({
   expanded.forEach(key => {
     const node = nodes[key];
     const path = node ? node.path : parsePath(key);
-    const depth = countDimDepth(path, metricLabelSet);
+    const baseDepth = countDimDepth(path, metricLabelSet);
+    const hasMetric = path.some(val => {
+      const decoded = decodeMetricKey(val);
+      return decoded !== undefined && metricLabelSet.has(decoded);
+    });
+    const depth =
+      includeMetricDepth && hasMetric ? baseDepth + 1 : baseDepth;
     if (depth <= stablePrefix) {
       next.add(key);
     }

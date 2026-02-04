@@ -719,11 +719,13 @@ export const usePivotRenderModel = ({
 
   const shouldShowToggle = useCallback(
     (axis: 'row' | 'col', node?: PivotTreeNode) => {
-      if (!node || !node.hasChildren || node.path.length === 0) {
+      if (!node || node.path.length === 0) {
         return false;
       }
-      const axisNodes = axis === 'row' ? tree.rows : tree.cols;
-      if (!axisNodes[node.key]) {
+      const dimDepth = layout.countDimDepth(node.path);
+      const maxDepth =
+        axis === 'row' ? groupbyRows.length : groupbyColumns.length;
+      if (dimDepth >= maxDepth) {
         return false;
       }
       if (
@@ -751,9 +753,6 @@ export const usePivotRenderModel = ({
       if (hideMetricParentToggle) {
         return false;
       }
-      const dimDepth = layout.countDimDepth(node.path);
-      const maxDepth =
-        axis === 'row' ? groupbyRows.length : groupbyColumns.length;
       const metricsAtEnd =
         axis === 'row' ? layout.metricsAtRowEnd : layout.metricsAtColEnd;
       if (metricsAtEnd && dimDepth >= maxDepth) {

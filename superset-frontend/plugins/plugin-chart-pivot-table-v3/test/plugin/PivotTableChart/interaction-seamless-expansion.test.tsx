@@ -20,7 +20,12 @@ import { fireEvent, render, screen, waitFor, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { MetricsLayoutEnum, PivotRuntimeLayout } from '../../../src/types';
-import { applyMetricAxis, buildTreeFromRecords } from '../../../src/utils';
+import {
+  applyMetricAxis,
+  buildTreeFromRecords,
+  getStableColumnKey,
+  METRICS_PLACEHOLDER,
+} from '../../../src/utils';
 import { supersetChartDataClient } from '../../../src/pivot/data/SupersetChartDataClient';
 import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
 
@@ -214,6 +219,130 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     expect(
       within(airRow).queryByLabelText('plus-square'),
     ).not.toBeInTheDocument();
+  });
+
+  it('shows column expand toggles after appending a column in user-controlled mode', async () => {
+    const metrics = ['averageOrderValue', 'weightedDiscount'];
+    const initialCols = ['discountBand'];
+    const initialRecords = [
+      {
+        discountBand: '0-2%',
+        averageOrderValue: 100,
+        weightedDiscount: 0.05,
+      },
+    ];
+    const updatedRecords = [
+      {
+        discountBand: '0-2%',
+        orderStatus: 'OS-F',
+        averageOrderValue: 100,
+        weightedDiscount: 0.05,
+      },
+    ];
+    const baseTree = applyMetricAxis(
+      buildTreeFromRecords(initialRecords, metrics, [], initialCols, 0, 1),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      [],
+      initialCols,
+      1,
+    );
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: [],
+      cols: initialCols,
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 1 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: [...initialCols, 'orderStatus'],
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      startCollapsed: true,
+      initialDepth: 1,
+    });
+
+    fetchMock.mockImplementation(async ({ specs }: { specs: Array<unknown> }) =>
+      specs.map(() => ({ data: updatedRecords })),
+    );
+
+    const { container } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={initialCols}
+        startCollapsed
+        initialDepth={1}
+        width={600}
+        height={300}
+      />,
+    );
+
+    const thead = container.querySelector('thead') as HTMLElement;
+    await waitFor(() =>
+      expect(within(thead).getByText('0-2%')).toBeInTheDocument(),
+    );
+
+    const discountCell = within(thead)
+      .getByText('0-2%')
+      .closest('th') as HTMLElement;
+    const discountToggle = within(discountCell).queryByLabelText('plus-square');
+    if (discountToggle) {
+      fireEvent.click(discountToggle);
+    }
+
+    await waitFor(() =>
+      expect(
+        within(thead).getByText('averageOrderValue'),
+      ).toBeInTheDocument(),
+    );
+
+    const colButtons = screen.getAllByLabelText('Toggle column dimension');
+    fireEvent.click(colButtons[1]);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const lastFetch = fetchMock.mock.calls.at(-1)?.[0];
+    expect(lastFetch?.requestGroupId).toBe('pivot-v3-seamless');
+    const nextGroupbyColumns = (
+      lastFetch?.formData.groupbyColumns ?? []
+    ).map(getStableColumnKey);
+    expect(nextGroupbyColumns).toEqual([
+      'discountBand',
+      METRICS_PLACEHOLDER,
+      'orderStatus',
+    ]);
+
+    await waitFor(() => {
+      const refreshedThead = container.querySelector('thead') as HTMLElement;
+      expect(
+        within(refreshedThead).getByText('averageOrderValue'),
+      ).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      const refreshedThead = container.querySelector('thead') as HTMLElement;
+      const headerToggles = within(refreshedThead).queryAllByLabelText(
+        'plus-square',
+      );
+      const headerMinus = within(refreshedThead).queryAllByLabelText(
+        'minus-square',
+      );
+      expect(headerToggles.length + headerMinus.length).toBeGreaterThan(0);
+      const metricCell = within(refreshedThead)
+        .getByText('averageOrderValue')
+        .closest('th') as HTMLElement;
+      expect(
+        within(metricCell).queryByLabelText('plus-square'),
+      ).toBeInTheDocument();
+    });
   });
 
   it('clears stale order priority rows after trimming and reordering rows', async () => {

@@ -633,28 +633,10 @@ export const PivotInteractionPanel = ({
         const rowLength = nextRows.length;
         const insertIndex = rowLength;
         nextRows.splice(insertIndex, 0, dimensionKey);
-        if (
-          nextValuePlacement.axis === 'row' &&
-          nextValuePlacement.index === rowLength
-        ) {
-          nextValuePlacement.index = Math.min(
-            nextRows.length,
-            nextValuePlacement.index + 1,
-          );
-        }
       } else if (targetAxis === 'col') {
         const colLength = nextCols.length;
         const insertIndex = colLength;
         nextCols.splice(insertIndex, 0, dimensionKey);
-        if (
-          nextValuePlacement.axis === 'col' &&
-          nextValuePlacement.index === colLength
-        ) {
-          nextValuePlacement.index = Math.min(
-            nextCols.length,
-            nextValuePlacement.index + 1,
-          );
-        }
       }
       onChange({
         ...resolvedLayout,
