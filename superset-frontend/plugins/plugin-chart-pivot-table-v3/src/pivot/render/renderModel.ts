@@ -44,6 +44,7 @@ export type RenderModelConfig = {
   resolvedColSubtotalPosition: TotalPosition;
   resolvedMetricsLayout: MetricsLayoutEnum;
   isMultiMetric: boolean;
+  hasMultipleMeasures: boolean;
   metricsFirstOnCols: boolean;
   hideMetricHeaderOnRows: boolean;
   hideMetricHeaderOnCols: boolean;
@@ -80,17 +81,14 @@ export const buildRenderModel = ({
   const showRowRootBase =
     config.groupbyRowsLength > 0 &&
     (config.normalizedRowSubtotalLevels.includes(0) || config.colTotals);
-  const showRowRoot =
-    showRowRootBase &&
-    !(
-      config.resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
-      config.isMultiMetric
-    );
+  const showRowRoot = showRowRootBase && !config.hasMultipleMeasures;
   const showColRoot =
     config.groupbyColumnsLength > 0 &&
     (config.normalizedColSubtotalLevels.includes(0) || config.rowTotals);
 
-  const skipRowRoot = config.groupbyRowsLength > 0 && !showRowRoot;
+  const skipRowRoot =
+    (config.groupbyRowsLength > 0 && !showRowRoot) ||
+    (config.groupbyRowsLength === 0 && config.hasMultipleMeasures);
   const skipColRoot = config.groupbyColumnsLength === 0 || !showColRoot;
 
   const shouldHideMetricGrandTotalsOnRows = !showRowRootBase;

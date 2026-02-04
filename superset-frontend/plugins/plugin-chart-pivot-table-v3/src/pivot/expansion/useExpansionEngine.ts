@@ -569,6 +569,11 @@ export const useExpansionEngine = ({
       colTotals: fetchFormData.colTotals ?? false,
       metricsLayout: fetchFormData.metricsLayout,
       metricLabelSet,
+      hasMultipleMeasures:
+        metricLabelSet.size > 1 ||
+        Object.values(fetchFormData.measureLeavesByMetric ?? {}).some(
+          leaves => leaves.length > 1,
+        ),
       metricIndexForRows,
       metricIndexForCols,
       isMetricTokenValue,
@@ -578,6 +583,7 @@ export const useExpansionEngine = ({
       countDimDepth,
       fetchFormData.colTotals,
       fetchFormData.metricsLayout,
+      fetchFormData.measureLeavesByMetric,
       fetchFormData.rowTotals,
       groupbyColumnsLength,
       groupbyRowsLength,

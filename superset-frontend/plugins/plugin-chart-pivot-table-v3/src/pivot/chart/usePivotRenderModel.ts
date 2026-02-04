@@ -47,6 +47,7 @@ import {
   buildRenderModel,
   type RenderModelConfig,
 } from '../render/renderModel';
+import { buildDesiredExpandedKeys } from '../expansion/engine';
 import { compareValues, rootKey, sortByOrder } from '../viewModel';
 import { type RenderModel } from '../shared/types';
 import {
@@ -411,6 +412,21 @@ export const usePivotRenderModel = ({
     return depthMap;
   }, [layout, renderTree.cols]);
 
+  const rowNonMetricDepths = useMemo(() => {
+    const depthMap = new Map<string, number>();
+    Object.values(renderTree.rows).forEach(node => {
+      const parts = layout.getNonMetricPathParts(node.path);
+      for (let i = 0; i <= parts.length; i += 1) {
+        const prefixKey = serializePath(parts.slice(0, i));
+        const prev = depthMap.get(prefixKey) ?? 0;
+        if (parts.length > prev) {
+          depthMap.set(prefixKey, parts.length);
+        }
+      }
+    });
+    return depthMap;
+  }, [layout, renderTree.rows]);
+
   const hasDeeperNonMetricDescendants = useCallback(
     (col: PivotTreeNode) => {
       const parts = layout.getNonMetricPathParts(col.path);
@@ -419,6 +435,16 @@ export const usePivotRenderModel = ({
       return maxDepth > parts.length;
     },
     [colNonMetricDepths, layout],
+  );
+
+  const hasDeeperNonMetricRowDescendants = useCallback(
+    (row: PivotTreeNode) => {
+      const parts = layout.getNonMetricPathParts(row.path);
+      const key = serializePath(parts);
+      const maxDepth = rowNonMetricDepths.get(key) ?? parts.length;
+      return maxDepth > parts.length;
+    },
+    [layout, rowNonMetricDepths],
   );
 
   const getColumnDisplayPath = useCallback(
@@ -518,6 +544,7 @@ export const usePivotRenderModel = ({
         resolvedColSubtotalPosition: layout.effectiveColSubtotalPosition,
         resolvedMetricsLayout: layout.resolvedMetricsLayout,
         isMultiMetric: layout.isMultiMetric,
+        hasMultipleMeasures: layout.hasMultipleMeasures,
         metricsFirstOnCols: layout.metricsFirstOnCols,
         hideMetricHeaderOnRows: layout.hideMetricHeaderOnRows,
         hideMetricHeaderOnCols: layout.hideMetricHeaderOnCols,
@@ -593,6 +620,52 @@ export const usePivotRenderModel = ({
     });
     return next;
   }, [expandedCols, isLeafTierVisible, layout, renderTree.cols]);
+
+  const autoExpandedRows = useMemo(
+    () =>
+      buildDesiredExpandedKeys({
+        axis: 'row',
+        tree: renderTree,
+        autoExpandLevel: layout.resolvedExpandRowsLevel,
+        metricLabelSet: layout.metricLabelSet,
+        includeMetricDepthZero: layout.shouldExpandMetricRows,
+        manualExpanded: new Set(),
+        manualCollapsed: new Set(),
+        pendingKeys: new Set(),
+        inFlightKeys: new Set(),
+      }),
+    [
+      layout.metricLabelSet,
+      layout.resolvedExpandRowsLevel,
+      layout.shouldExpandMetricRows,
+      renderTree,
+    ],
+  );
+
+  const manualExpandedRows = useMemo(() => {
+    const next = new Set(expandedRows);
+    autoExpandedRows.forEach(key => next.delete(key));
+    return next;
+  }, [autoExpandedRows, expandedRows]);
+
+  const manualExpandedRowDepths = useMemo(() => {
+    const depths = new Set<number>();
+    manualExpandedRows.forEach(key => {
+      const node = renderTree.rows[key];
+      if (!node) {
+        return;
+      }
+      if (!node.hasChildren) {
+        return;
+      }
+      depths.add(layout.countDimDepth(node.path));
+    });
+    return depths;
+  }, [
+    layout,
+    manualExpandedRows,
+    renderTree.rows,
+  ]);
 
   const renderModel = useMemo(
     () =>
@@ -736,9 +809,21 @@ export const usePivotRenderModel = ({
       if (row.path.length === 0 && groupbyRows.length === 0) {
         return false;
       }
-      return isExplicitTotalNode(row) || layout.isMetricSubtotalNode(row);
+      if (isExplicitTotalNode(row)) {
+        return true;
+      }
+      const dimDepth = layout.countDimDepth(row.path);
+      if (!manualExpandedRowDepths.has(dimDepth) || !row.hasChildren) {
+        return false;
+      }
+      return true;
     },
-    [groupbyRows.length, isExplicitTotalNode, layout],
+    [
+      groupbyRows.length,
+      isExplicitTotalNode,
+      manualExpandedRowDepths,
+      layout,
+    ],
   );
 
   const isColAggregateBold = useCallback(

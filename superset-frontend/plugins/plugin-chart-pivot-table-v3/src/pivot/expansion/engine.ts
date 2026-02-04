@@ -54,6 +54,7 @@ export type ExpansionVisibilityConfig = {
   colTotals: boolean;
   metricsLayout?: MetricsLayoutEnum;
   metricLabelSet: Set<string>;
+  hasMultipleMeasures?: boolean;
   metricIndexForRows?: number;
   metricIndexForCols?: number;
   isMetricTokenValue: (value: unknown) => boolean;
@@ -341,6 +342,7 @@ export const buildExpansionRenderModelConfig = (
     resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS &&
     config.metricIndexForCols === 0;
   const isMultiMetric = config.metricLabelSet.size > 1;
+  const hasMultipleMeasures = config.hasMultipleMeasures ?? isMultiMetric;
   return {
     groupbyRowsLength: config.groupbyRowsLength,
     groupbyColumnsLength: config.groupbyColumnsLength,
@@ -353,6 +355,7 @@ export const buildExpansionRenderModelConfig = (
     resolvedColSubtotalPosition: 'start',
     resolvedMetricsLayout,
     isMultiMetric,
+    hasMultipleMeasures,
     metricsFirstOnCols,
     hideMetricHeaderOnRows: false,
     hideMetricHeaderOnCols: false,

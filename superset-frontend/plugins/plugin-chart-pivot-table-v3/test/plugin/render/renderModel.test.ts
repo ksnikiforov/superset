@@ -103,6 +103,7 @@ describe('buildRenderModel', () => {
         resolvedColSubtotalPosition: 'start',
         resolvedMetricsLayout: MetricsLayoutEnum.COLUMNS,
         isMultiMetric: false,
+        hasMultipleMeasures: false,
         metricsFirstOnCols: false,
         hideMetricHeaderOnRows: false,
         hideMetricHeaderOnCols: false,

@@ -22,6 +22,7 @@ import PivotTableChart from '../../fixtures/TestPivotTableChart';
 import {
   MetricsLayoutEnum,
   PivotResultCell,
+  PivotExpansionState,
   PivotTableQueryFormData,
   PivotTreeData,
   PivotTreeNode,
@@ -2063,6 +2064,374 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(totalCells[grandIndex].textContent?.trim()).toBe('100');
   });
 
+  it('omits the grand total row when only metrics are on rows with multiple measures', () => {
+    const metrics = ['averageOrderValue', 'weightedDiscount'];
+    const detail = buildTreeFromRecords(
+      [{ shipMode: 'AIR', averageOrderValue: 10, weightedDiscount: 20 }],
+      metrics,
+      [],
+      ['shipMode'],
+      0,
+      1,
+    );
+    const totals = buildTreeFromRecords(
+      [{ averageOrderValue: 100, weightedDiscount: 200 }],
+      metrics,
+      [],
+      ['shipMode'],
+      0,
+      0,
+    );
+    const tree = applyMetricAxis(
+      mergeTrees(detail, totals),
+      metrics,
+      MetricsLayoutEnum.ROWS,
+      [],
+      ['shipMode'],
+      0,
+    );
+
+    const { container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={buildFormData({
+          ...(baseProps as Partial<PivotTableQueryFormData>),
+          groupbyRows: [],
+          groupbyColumns: ['shipMode'],
+          metricsLayout: MetricsLayoutEnum.ROWS,
+          metrics,
+          colTotals: true,
+          rowTotals: true,
+        })}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={['shipMode']}
+        aggregateFunction="Sum"
+        width={600}
+        height={300}
+        startCollapsed={false}
+        initialDepth={1}
+        colTotals
+        rowTotals
+        rowSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        colTotalPosition="start"
+        colSubtotalPosition="start"
+        rowTotalPosition="end"
+      />,
+    );
+
+    const rowHeaders = Array.from(
+      container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
+    ).map(cell => cell.textContent?.trim());
+    expect(rowHeaders).not.toContain('Grand total');
+    expect(rowHeaders).toEqual(
+      expect.arrayContaining(['averageOrderValue', 'weightedDiscount']),
+    );
+  });
+
+  it('bolds expanded metric headers when metrics are first on rows', () => {
+    const metrics = ['averageOrderValue', 'weightedDiscount'];
+    const rowGroupby = ['discountBand'];
+    const detail = buildTreeFromRecords(
+      [
+        { discountBand: '0-2%', averageOrderValue: 10, weightedDiscount: 20 },
+        { discountBand: '10-15%', averageOrderValue: 30, weightedDiscount: 40 },
+      ],
+      metrics,
+      rowGroupby,
+      [],
+      1,
+      0,
+    );
+    const tree = applyMetricAxis(
+      detail,
+      metrics,
+      MetricsLayoutEnum.ROWS,
+      rowGroupby,
+      [],
+      0,
+    );
+
+    const pivotExpansionState: PivotExpansionState = {
+      rowKeys: rowGroupby,
+      colKeys: [],
+      rows: [[encodeMetricKey('averageOrderValue')]],
+      cols: [],
+    };
+
+    render(
+      <PivotTableChart
+        data={tree}
+        formData={buildFormData({
+          ...(baseProps as Partial<PivotTableQueryFormData>),
+          groupbyRows: [METRICS_PLACEHOLDER, 'discountBand'],
+          groupbyColumns: [],
+          metricsLayout: MetricsLayoutEnum.ROWS,
+          metrics,
+          startCollapsed: true,
+          initialDepth: 1,
+          rowTotals: false,
+          colTotals: false,
+          pivotExpansionState,
+        })}
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={[]}
+        aggregateFunction="Sum"
+        width={600}
+        height={300}
+        startCollapsed
+        initialDepth={1}
+        colTotals={false}
+        rowTotals={false}
+        rowSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        colTotalPosition="start"
+        colSubtotalPosition="start"
+        rowTotalPosition="start"
+      />,
+    );
+
+    const metricHeader = screen
+      .getByText('averageOrderValue')
+      .closest('th') as HTMLElement;
+    const siblingMetricHeader = screen
+      .getByText('weightedDiscount')
+      .closest('th') as HTMLElement;
+    const childHeader = screen
+      .getByText('0-2%')
+      .closest('th') as HTMLElement;
+    expect(metricHeader).toHaveClass('subtotal-cell');
+    expect(siblingMetricHeader).toHaveClass('subtotal-cell');
+    expect(childHeader).not.toHaveClass('subtotal-cell');
+  });
+
+  it('bolds expanded row dimensions when metrics are on columns', () => {
+    const metrics = ['averageOrderValue', 'weightedDiscount'];
+    const rowGroupby = ['discountBand', 'shipMode'];
+    const detail = buildTreeFromRecords(
+      [
+        {
+          discountBand: '0-2%',
+          shipMode: 'AIR',
+          averageOrderValue: 10,
+          weightedDiscount: 20,
+        },
+        {
+          discountBand: '10-15%',
+          shipMode: 'AIR',
+          averageOrderValue: 50,
+          weightedDiscount: 60,
+        },
+        {
+          discountBand: '0-2%',
+          shipMode: 'FOB',
+          averageOrderValue: 30,
+          weightedDiscount: 40,
+        },
+      ],
+      metrics,
+      rowGroupby,
+      [],
+      2,
+      0,
+    );
+    const tree = applyMetricAxis(
+      detail,
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      rowGroupby,
+      [],
+      0,
+    );
+    const pivotExpansionState: PivotExpansionState = {
+      rowKeys: rowGroupby,
+      colKeys: [],
+      rows: [['0-2%']],
+      cols: [],
+    };
+
+    render(
+      <PivotTableChart
+        data={tree}
+        formData={buildFormData({
+          ...(baseProps as Partial<PivotTableQueryFormData>),
+          groupbyRows: rowGroupby,
+          groupbyColumns: [METRICS_PLACEHOLDER],
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+          metrics,
+          startCollapsed: true,
+          initialDepth: 1,
+          rowTotals: false,
+          colTotals: false,
+          pivotExpansionState,
+        })}
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={[]}
+        aggregateFunction="Sum"
+        width={600}
+        height={300}
+        startCollapsed
+        initialDepth={1}
+        colTotals={false}
+        rowTotals={false}
+        rowSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        colTotalPosition="start"
+        colSubtotalPosition="start"
+        rowTotalPosition="start"
+      />,
+    );
+
+    const bandHeader = screen.getByText('0-2%').closest('th') as HTMLElement;
+    const siblingBandHeader = screen
+      .getByText('10-15%')
+      .closest('th') as HTMLElement;
+    const childHeader = screen.getByText('AIR').closest('th') as HTMLElement;
+    expect(bandHeader).toHaveClass('subtotal-cell');
+    expect(siblingBandHeader).toHaveClass('subtotal-cell');
+    expect(childHeader).not.toHaveClass('subtotal-cell');
+  });
+
+  it('keeps expanded dimension rows bold under metrics-first layouts', () => {
+    const metrics = ['averageOrderValue', 'weightedDiscount'];
+    const rowGroupby = ['discountBand', 'shipMode'];
+    const detail = buildTreeFromRecords(
+      [
+        {
+          discountBand: '0-2%',
+          shipMode: 'AIR',
+          averageOrderValue: 10,
+          weightedDiscount: 20,
+        },
+        {
+          discountBand: '0-2%',
+          shipMode: 'FOB',
+          averageOrderValue: 30,
+          weightedDiscount: 40,
+        },
+        {
+          discountBand: '10-15%',
+          shipMode: 'AIR',
+          averageOrderValue: 15,
+          weightedDiscount: 25,
+        },
+      ],
+      metrics,
+      rowGroupby,
+      [],
+      2,
+      0,
+    );
+    const tree = applyMetricAxis(
+      detail,
+      metrics,
+      MetricsLayoutEnum.ROWS,
+      rowGroupby,
+      [],
+      0,
+    );
+    const metricToken = encodeMetricKey('averageOrderValue');
+    const pivotExpansionState: PivotExpansionState = {
+      rowKeys: rowGroupby,
+      colKeys: [],
+      rows: [[metricToken], [metricToken, '0-2%']],
+      cols: [],
+    };
+
+    render(
+      <PivotTableChart
+        data={tree}
+        formData={buildFormData({
+          ...(baseProps as Partial<PivotTableQueryFormData>),
+          groupbyRows: [METRICS_PLACEHOLDER, 'discountBand', 'shipMode'],
+          groupbyColumns: [],
+          metricsLayout: MetricsLayoutEnum.ROWS,
+          metrics,
+          startCollapsed: true,
+          initialDepth: 1,
+          rowTotals: false,
+          colTotals: false,
+          pivotExpansionState,
+        })}
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={[]}
+        aggregateFunction="Sum"
+        width={600}
+        height={300}
+        startCollapsed
+        initialDepth={1}
+        colTotals={false}
+        rowTotals={false}
+        rowSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        colTotalPosition="start"
+        colSubtotalPosition="start"
+        rowTotalPosition="start"
+      />,
+    );
+
+    const metricHeader = screen
+      .getByText('averageOrderValue')
+      .closest('th') as HTMLElement;
+    const bandHeader = screen.getByText('0-2%').closest('th') as HTMLElement;
+    const siblingBandHeader = screen
+      .getByText('10-15%')
+      .closest('th') as HTMLElement;
+    const childHeader = screen.getByText('AIR').closest('th') as HTMLElement;
+    expect(metricHeader).toHaveClass('subtotal-cell');
+    expect(bandHeader).toHaveClass('subtotal-cell');
+    expect(siblingBandHeader).toHaveClass('subtotal-cell');
+    expect(childHeader).not.toHaveClass('subtotal-cell');
+  });
+
   it('avoids duplicate metric rows from subtotal queries when metrics are last on rows', () => {
     const metrics = ['averageOrderValue', 'countOrders'];
     const detail = buildTreeFromRecords(
@@ -3437,7 +3806,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     );
   });
 
-  it('keeps the grand total row last when totals are at the end with measure leaves', () => {
+  it('omits the grand total row when multiple measure leaves are visible', () => {
     const metricKey = 'grossRevenue';
     const valueLeaf = buildValueLeaf();
     const ixLeaf = buildBuiltInLeaf('ix', {
@@ -3505,6 +3874,6 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     )
       .map(cell => cell.textContent?.trim() ?? '')
       .filter(label => label.length > 0);
-    expect(rowHeaders[rowHeaders.length - 1]).toBe('Grand total');
+    expect(rowHeaders).not.toContain('Grand total');
   });
 });

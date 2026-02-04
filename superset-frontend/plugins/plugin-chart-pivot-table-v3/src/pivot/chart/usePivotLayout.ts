@@ -53,6 +53,7 @@ import {
 export type PivotLayoutResult = {
   layout: ReturnType<typeof buildLayoutContext>;
   measureHierarchy: MeasureHierarchy;
+  hasMultipleMeasures: boolean;
   expandedStateSignature: string;
   expandedStateSharedSignature: string;
   expandRowsLevelRaw?: number;
@@ -254,6 +255,10 @@ export const usePivotLayout = ({
     [metricLabels],
   );
   const isMultiMetric = metricLabels.length > 1;
+  const hasMultipleMeasures =
+    isMultiMetric ||
+    (layout.measureHierarchy.kind === 'measureStackV1' &&
+      layout.measureHierarchy.groups.some(group => group.leaves.length > 1));
 
   const normalizedRowSubtotalLevels = layout.rowSubtotalLevels;
   const rowSubtotalDepths = useMemo(
@@ -1675,6 +1680,7 @@ export const usePivotLayout = ({
   return {
     layout,
     measureHierarchy: layout.measureHierarchy,
+    hasMultipleMeasures,
     expandedStateSignature,
     expandedStateSharedSignature,
     expandRowsLevelRaw,

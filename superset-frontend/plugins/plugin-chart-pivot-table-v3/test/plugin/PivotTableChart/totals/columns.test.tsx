@@ -1182,7 +1182,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     expect(rowHeaders).toContain('Grand total');
   });
 
-  it('omits the grand total column when multiple metrics are on columns and keeps the grand total row', async () => {
+  it('omits the grand total column and row when multiple metrics are on columns', async () => {
     const metrics = ['m1', 'm2'];
     const detail = buildTreeFromRecords(
       [{ orderPriority: '1-URGENT', shipMode: 'AIR', m1: 10, m2: 20 }],
@@ -1261,7 +1261,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     const rowHeaders = Array.from(
       container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
     ).map(cell => cell.textContent?.trim());
-    expect(rowHeaders).toContain('Grand total');
+    expect(rowHeaders).not.toContain('Grand total');
   });
 
   it('does not render metric total headers when metrics are the first column level', async () => {
