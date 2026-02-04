@@ -25,7 +25,7 @@ import logging
 import re
 import uuid
 from collections.abc import Hashable
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, cast, NamedTuple, Optional, TYPE_CHECKING, Union
 
 import dateutil.parser
@@ -1270,18 +1270,36 @@ class ExploreMixin:  # pylint: disable=too-many-public-methods
         def handle_single_value(value: Optional[FilterValue]) -> Optional[FilterValue]:
             if operator == utils.FilterOperator.TEMPORAL_RANGE:
                 return value
-            if (
-                isinstance(value, (float, int))
-                and target_generic_type == utils.GenericDataType.TEMPORAL
-                and target_native_type is not None
-                and db_engine_spec is not None
-            ):
-                value = db_engine_spec.convert_dttm(
-                    target_type=target_native_type,
-                    dttm=datetime.utcfromtimestamp(value / 1000),
-                    db_extra=db_extra,
-                )
-                value = literal_column(value)
+            if target_generic_type == utils.GenericDataType.TEMPORAL and db_engine_spec:
+                epoch_value: int | None = None
+                if isinstance(value, (float, int)):
+                    epoch_value = int(value)
+                elif isinstance(value, str):
+                    stripped = value.strip()
+                    if stripped.lstrip("-").isdigit():
+                        try:
+                            epoch_value = int(stripped)
+                        except (ValueError, TypeError):
+                            epoch_value = None
+                if epoch_value is not None and abs(epoch_value) >= 1e11:
+                    dttm_value = datetime.utcfromtimestamp(epoch_value / 1000)
+                    if db_engine_spec.engine == "cubejs":
+                        return dttm_value.strftime("%Y-%m-%d %H:%M:%S")
+                    if target_native_type is not None:
+                        sql = db_engine_spec.convert_dttm(
+                            target_type=target_native_type,
+                            dttm=dttm_value,
+                            db_extra=db_extra,
+                        )
+                        if sql:
+                            return literal_column(sql)
+                    try:
+                        sql = db_engine_spec.epoch_ms_to_dttm().replace(
+                            "{col}", str(epoch_value)
+                        )
+                    except NotImplementedError:
+                        return value
+                    return literal_column(sql)
             if isinstance(value, str):
                 value = value.strip("\t\n")
 
@@ -1483,6 +1501,10 @@ class ExploreMixin:  # pylint: disable=too-many-public-methods
 
     def dttm_sql_literal(self, dttm: datetime, col: "TableColumn") -> str:
         """Convert datetime object to a SQL expression string"""
+        if self.db_engine_spec.engine == "cubejs":
+            if dttm.tzinfo is not None:
+                dttm = dttm.astimezone(timezone.utc).replace(tzinfo=None)
+            return f"'{dttm.strftime('%Y-%m-%d %H:%M:%S')}'"
 
         sql = (
             self.db_engine_spec.convert_dttm(col.type, dttm, db_extra=self.db_extra)
@@ -2049,6 +2071,8 @@ class ExploreMixin:  # pylint: disable=too-many-public-methods
                     target_generic_type = col_spec.generic_type
                 else:
                     target_generic_type = GenericDataType.STRING
+                if col_obj and col_obj.is_temporal:
+                    target_generic_type = GenericDataType.TEMPORAL
                 eq = self.filter_values_handler(
                     values=val,
                     operator=op,
