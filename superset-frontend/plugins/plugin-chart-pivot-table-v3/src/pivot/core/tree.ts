@@ -1006,7 +1006,7 @@ export const buildTreeFromRecords = (
       path.length === 0 || rawValue === null || rawValue === undefined
         ? label
         : formatter
-          ? formatter(rawValue)
+          ? (formatter as (value: DataRecordValue) => string)(rawValue)
           : label;
     nodes[key] = {
       axis,

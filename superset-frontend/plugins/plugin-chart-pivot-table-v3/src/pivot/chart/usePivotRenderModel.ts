@@ -412,21 +412,6 @@ export const usePivotRenderModel = ({
     return depthMap;
   }, [layout, renderTree.cols]);
 
-  const rowNonMetricDepths = useMemo(() => {
-    const depthMap = new Map<string, number>();
-    Object.values(renderTree.rows).forEach(node => {
-      const parts = layout.getNonMetricPathParts(node.path);
-      for (let i = 0; i <= parts.length; i += 1) {
-        const prefixKey = serializePath(parts.slice(0, i));
-        const prev = depthMap.get(prefixKey) ?? 0;
-        if (parts.length > prev) {
-          depthMap.set(prefixKey, parts.length);
-        }
-      }
-    });
-    return depthMap;
-  }, [layout, renderTree.rows]);
-
   const hasDeeperNonMetricDescendants = useCallback(
     (col: PivotTreeNode) => {
       const parts = layout.getNonMetricPathParts(col.path);
@@ -435,16 +420,6 @@ export const usePivotRenderModel = ({
       return maxDepth > parts.length;
     },
     [colNonMetricDepths, layout],
-  );
-
-  const hasDeeperNonMetricRowDescendants = useCallback(
-    (row: PivotTreeNode) => {
-      const parts = layout.getNonMetricPathParts(row.path);
-      const key = serializePath(parts);
-      const maxDepth = rowNonMetricDepths.get(key) ?? parts.length;
-      return maxDepth > parts.length;
-    },
-    [layout, rowNonMetricDepths],
   );
 
   const getColumnDisplayPath = useCallback(

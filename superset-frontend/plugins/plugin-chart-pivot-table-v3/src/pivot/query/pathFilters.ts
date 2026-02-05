@@ -76,7 +76,7 @@ export const coerceValueForColumn = (
   }
   const label = getColumnLabel(column);
   const type = colTypeMap[label];
-  if (!type) {
+  if (type === undefined) {
     return value;
   }
   if (type === GenericDataType.Numeric) {

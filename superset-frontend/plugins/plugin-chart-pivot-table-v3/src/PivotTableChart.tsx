@@ -38,6 +38,7 @@ import {
   type PivotAxis,
   PivotRuntimeLayout,
   type PivotTreeData,
+  type PivotTreeNode,
 } from './types';
 import { PivotTableView } from './pivot/render/PivotTableView';
 import { useExpansionEngine } from './pivot/engine/useExpansionEngine';
@@ -69,7 +70,6 @@ import {
   getMetricKeys,
   getStableColumnKey,
   isSubtotalToken,
-  METRICS_PLACEHOLDER,
   serializePath,
 } from './utils';
 import { applyMeasureLeafValuesToTree } from './pivot/measureLeaves';

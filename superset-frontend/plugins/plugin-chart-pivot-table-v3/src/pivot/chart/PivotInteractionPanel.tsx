@@ -48,7 +48,11 @@ import type { SelectProps } from '@superset-ui/core/components/Select';
 import { Icons } from '@superset-ui/core/components/Icons';
 import { useDrag } from 'react-dnd';
 import { getEmptyImage } from 'react-dnd-html5-backend';
-import { MeasureLeavesByMetricKey, PivotRuntimeLayout } from '../../types';
+import {
+  DateFormatter,
+  MeasureLeavesByMetricKey,
+  PivotRuntimeLayout,
+} from '../../types';
 import { getMetricKey, getStableColumnKey } from '../../utils';
 import { isValueLeaf } from '../measureLeaves';
 import { INTERACTION_DIMENSION_DND_TYPE } from '../layout/interactionDrag';
@@ -324,7 +328,7 @@ type PivotInteractionPanelProps = {
   measureLeavesByMetric?: MeasureLeavesByMetricKey;
   metricLabelMap?: Record<string, string>;
   dimensionLabelMap?: Record<string, string>;
-  dateFormatters?: Record<string, (value: DataRecordValue) => string>;
+  dateFormatters?: Record<string, DateFormatter | undefined>;
   dimensionFilterValues?: Record<string, DataRecordValue[]>;
   dimensionFilterLoading?: Record<string, boolean>;
   selectedFilters?: Record<string, DataRecordValue[]>;
@@ -419,13 +423,14 @@ const encodeFilterValue = (value: DataRecordValue): string => {
 
 const formatFilterValue = (
   value: DataRecordValue,
-  formatter?: (value: DataRecordValue) => string,
+  formatter?: DateFormatter,
 ): string => {
   if (value === null || value === undefined) {
     return t('NULL');
   }
   if (formatter) {
-    return formatter(value);
+    const safeFormatter = formatter as (value: DataRecordValue) => string;
+    return safeFormatter(value);
   }
   return String(value);
 };
@@ -467,7 +472,7 @@ const DimensionDragHandle = ({
   );
 };
 
-type SelectWithOpenProps = SelectProps & {
+type SelectWithOpenProps = Omit<SelectProps, 'ref'> & {
   open?: boolean;
   defaultOpen?: boolean;
 };

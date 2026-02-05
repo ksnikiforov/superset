@@ -17,18 +17,16 @@
  * under the License.
  */
 import {
+  type BinaryQueryObjectFilterClause,
   type DataRecordValue,
   type ExtraFormData,
   GenericDataType,
+  getColumnLabel,
+  type QueryFormColumn,
+  type SetQueryObjectFilterClause,
 } from '@superset-ui/core';
 import { type PivotTableQueryFormData } from '../../types';
 import { normalizeTemporalValue } from './pathFilters';
-
-type ExtraFormDataFilter = {
-  col?: string;
-  op?: string;
-  val?: DataRecordValue | DataRecordValue[];
-};
 
 const looksLikeEpoch = (value: DataRecordValue): boolean => {
   const numeric =
@@ -47,16 +45,17 @@ const shouldCoerceTemporalValue = ({
   temporalLookup,
 }: {
   value: DataRecordValue;
-  column?: string;
+  column?: QueryFormColumn;
   colTypeMap?: Record<string, GenericDataType>;
   temporalLookup?: Record<string, boolean>;
 }): boolean => {
-  if (column) {
-    const type = colTypeMap?.[column];
+  const columnLabel = column ? getColumnLabel(column) : undefined;
+  if (columnLabel) {
+    const type = colTypeMap?.[columnLabel];
     if (type === GenericDataType.Temporal) {
       return true;
     }
-    if (temporalLookup?.[column]) {
+    if (temporalLookup?.[columnLabel]) {
       return true;
     }
   }
@@ -77,7 +76,7 @@ const normalizeFilterValue = ({
   temporalLookup,
 }: {
   value: DataRecordValue;
-  column?: string;
+  column?: QueryFormColumn;
   colTypeMap?: Record<string, GenericDataType>;
   temporalLookup?: Record<string, boolean>;
 }): DataRecordValue =>
@@ -95,14 +94,12 @@ const normalizeExtraFormDataFilters = (
   }
   let hasChanges = false;
   const nextFilters = extraFormData.filters.map(filter => {
-    if (!filter || typeof filter !== 'object') {
+    if (!('val' in filter)) {
       return filter;
     }
-    const { col, val } = filter as ExtraFormDataFilter;
-    if (val === undefined) {
-      return filter;
-    }
+    const { col, val } = filter;
     if (Array.isArray(val)) {
+      const filterWithArray = filter as SetQueryObjectFilterClause;
       let arrayChanged = false;
       const nextValues = val.map(item => {
         const normalized = normalizeFilterValue({
@@ -120,8 +117,9 @@ const normalizeExtraFormDataFilters = (
         return filter;
       }
       hasChanges = true;
-      return { ...filter, val: nextValues };
+      return { ...filterWithArray, val: nextValues };
     }
+    const filterWithValue = filter as BinaryQueryObjectFilterClause;
     const nextValue = normalizeFilterValue({
       value: val,
       column: col,
@@ -132,7 +130,7 @@ const normalizeExtraFormDataFilters = (
       return filter;
     }
     hasChanges = true;
-    return { ...filter, val: nextValue };
+    return { ...filterWithValue, val: nextValue };
   });
   if (!hasChanges) {
     return extraFormData;
