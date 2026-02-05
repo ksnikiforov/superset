@@ -18,6 +18,7 @@
  */
 import {
   ChartProps,
+  Column,
   DataRecordValue,
   ensureIsArray,
   extractTimegrain,
@@ -54,6 +55,11 @@ import { normalizeFormDataExtraFilters } from './pivot/query/normalizeExtraFormD
 import { buildInitialQuerySpecs } from './pivot/query/specs';
 
 const { DATABASE_DATETIME } = TimeFormats;
+
+type DatasetColumnMeta = Pick<
+  Column,
+  'column_name' | 'verbose_name' | 'python_date_format' | 'type_generic'
+>;
 
 declare const process: {
   env: {
@@ -129,16 +135,20 @@ export default function transformProps(
     ...(formData.metricLabelMap ?? {}),
   };
   const formDataWithMetricLabels = { ...formData, metricLabelMap };
-  const {
-    verboseMap: datasourceVerboseMap = {},
-    columnFormats = {},
-    currencyFormats = {},
-    columns: datasourceColumns = [],
-  } = datasource || {};
-  const {
-    verboseMap: rawDatasourceVerboseMap = {},
-    columns: rawDatasourceColumns = [],
-  } = rawDatasource || {};
+  const datasourceVerboseMap = datasource?.verboseMap ?? {};
+  const columnFormats = datasource?.columnFormats ?? {};
+  const currencyFormats = datasource?.currencyFormats ?? {};
+  const datasourceColumns = datasource?.columns ?? [];
+  const rawDatasourceRecord = (rawDatasource ?? {}) as {
+    verboseMap?: Record<string, string>;
+    verbose_map?: Record<string, string>;
+    columns?: DatasetColumnMeta[] | DatasetColumnMeta;
+  };
+  const rawDatasourceVerboseMap =
+    rawDatasourceRecord.verboseMap ?? rawDatasourceRecord.verbose_map ?? {};
+  const rawDatasourceColumns = ensureIsArray<DatasetColumnMeta>(
+    rawDatasourceRecord.columns,
+  );
   const columns =
     datasourceColumns.length > 0 ? datasourceColumns : rawDatasourceColumns;
   const columnVerboseMap = columns.reduce<Record<string, string>>(

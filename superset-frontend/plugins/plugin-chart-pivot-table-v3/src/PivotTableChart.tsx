@@ -773,7 +773,10 @@ function PivotTableChart(props: PivotTableProps) {
     [extraVerboseMap, verboseMap],
   );
   const resolvedDateFormatters = useMemo(() => {
-    const merged: Record<string, (value: DataRecordValue) => string> = {
+    const merged: Record<
+      string,
+      PivotTableProps['dateFormatters'][string]
+    > = {
       // Prefer dataset column formats (python_date_format) when available.
       // Dashboard payloads may omit python_date_format, so transformProps falls
       // back to a generic formatter. The dataset meta fetch should override

@@ -35,6 +35,7 @@ import { buildColumnDisplayPath } from '../columnDisplay';
 import { buildFormattingValueMaps } from '../cellUtils';
 import {
   normalizeDimensionSortingMapWithKeys,
+  coerceEpochMsStringToNumber,
   getFormattingMetricKey,
   serializePath,
   decodeMetricKey,
@@ -201,7 +202,22 @@ export const usePivotRenderModel = ({
         if (rawValue === null || rawValue === undefined) {
           return;
         }
-        const formatted = formatter(rawValue);
+        const normalizedRawValue = coerceEpochMsStringToNumber(rawValue);
+        let formatterInput: number;
+        if (typeof normalizedRawValue === 'number') {
+          formatterInput = normalizedRawValue;
+        } else if (normalizedRawValue instanceof Date) {
+          formatterInput = normalizedRawValue.getTime();
+        } else if (typeof normalizedRawValue === 'string') {
+          const parsed = Date.parse(normalizedRawValue);
+          if (!Number.isFinite(parsed)) {
+            return;
+          }
+          formatterInput = parsed;
+        } else {
+          return;
+        }
+        const formatted = formatter(formatterInput);
         if (formatted !== node.formattedLabel) {
           nextNodes[node.key] = { ...node, formattedLabel: formatted };
           hasChanges = true;
