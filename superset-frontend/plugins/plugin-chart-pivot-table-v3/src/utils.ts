@@ -24,6 +24,7 @@ import {
   QueryFormMetric,
   ensureIsArray,
   supersetTheme,
+  DataRecordValue,
 } from '@superset-ui/core';
 import {
   MetricsLayoutEnum,
@@ -105,6 +106,27 @@ export const PIVOT_THEME_PRESETS: Record<string, string> = {
 };
 export const DEFAULT_DATABAR_POSITIVE_COLOR = supersetTheme.colorSuccess;
 export const DEFAULT_DATABAR_NEGATIVE_COLOR = supersetTheme.colorError;
+
+const EPOCH_MS_ABS_THRESHOLD = 1e11;
+
+// Cube/Postgres can return temporal values as epoch-ms strings. Superset time
+// formatters expect `number | Date`, so coerce only epoch-like values.
+export const coerceEpochMsStringToNumber = (
+  value: DataRecordValue,
+): DataRecordValue => {
+  if (typeof value !== 'string') {
+    return value;
+  }
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return value;
+  }
+  const numeric = Number(trimmed);
+  if (!Number.isFinite(numeric)) {
+    return value;
+  }
+  return Math.abs(numeric) >= EPOCH_MS_ABS_THRESHOLD ? numeric : value;
+};
 
 export const buildMetricLabelMap = (
   savedMetrics: Metric[],

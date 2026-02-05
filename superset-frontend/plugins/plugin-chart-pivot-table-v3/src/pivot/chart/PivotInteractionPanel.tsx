@@ -543,20 +543,19 @@ export const PivotInteractionPanel = ({
   );
   const resolveDimensionLabel = useCallback(
     (dimension: QueryFormColumn) => {
-      if (typeof dimension === 'string') {
-        const mapped = dimensionLabelMap?.[dimension];
-        if (mapped) {
-          return mapped;
-        }
-      }
-      return getColumnLabel(dimension);
+      const key = getStableColumnKey(dimension);
+      const mapped =
+        dimensionLabelMap?.[key] ||
+        (typeof dimension === 'string' ? dimensionLabelMap?.[dimension] : null);
+      return mapped || getColumnLabel(dimension);
     },
     [dimensionLabelMap],
   );
   const resolveFilterFormatter = useCallback(
     (dimension: QueryFormColumn) => {
       const label = getColumnLabel(dimension);
-      return dateFormatters?.[label];
+      const key = getStableColumnKey(dimension);
+      return dateFormatters?.[label] || dateFormatters?.[key];
     },
     [dateFormatters],
   );
@@ -594,12 +593,7 @@ export const PivotInteractionPanel = ({
         return next;
       });
     },
-    [
-      onFilterChange,
-      onFilterValuesOpen,
-      pendingFilterValues,
-      selectedFilters,
-    ],
+    [onFilterChange, onFilterValuesOpen, pendingFilterValues, selectedFilters],
   );
 
   const resolvedLayout = useMemo(
@@ -844,7 +838,8 @@ export const PivotInteractionPanel = ({
             const selectedValueKeys = pendingValues.map(value =>
               encodeFilterValue(value),
             );
-            const hasFilter = (selectedFilters?.[dimensionKey] ?? []).length > 0;
+            const hasFilter =
+              (selectedFilters?.[dimensionKey] ?? []).length > 0;
             return (
               <DimensionRow key={dimensionKey}>
                 <DimensionLeft>

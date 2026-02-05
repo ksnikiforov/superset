@@ -43,6 +43,7 @@ import {
   normalizeDimensionSortingMapWithKeys,
   normalizeMetricFormattingMapWithKeys,
   normalizeMetricDatabarMapWithKeys,
+  coerceEpochMsStringToNumber,
   serializePath,
 } from './utils';
 import { buildBranchTreeFromResults } from './fetchPivotBranch';
@@ -129,11 +130,32 @@ export default function transformProps(
   };
   const formDataWithMetricLabels = { ...formData, metricLabelMap };
   const {
-    verboseMap = {},
+    verboseMap: datasourceVerboseMap = {},
     columnFormats = {},
     currencyFormats = {},
-    columns = [],
+    columns: datasourceColumns = [],
   } = datasource || {};
+  const {
+    verboseMap: rawDatasourceVerboseMap = {},
+    columns: rawDatasourceColumns = [],
+  } = rawDatasource || {};
+  const columns =
+    datasourceColumns.length > 0 ? datasourceColumns : rawDatasourceColumns;
+  const columnVerboseMap = columns.reduce<Record<string, string>>(
+    (acc, column) => {
+      if (column.column_name && column.verbose_name) {
+        acc[column.column_name] = column.verbose_name;
+      }
+      return acc;
+    },
+    {},
+  );
+  const verboseMap = {
+    ...columnVerboseMap,
+    ...rawDatasourceVerboseMap,
+    ...datasourceVerboseMap,
+    ...(formData.verboseMap ?? {}),
+  };
   const layout = buildLayoutContext(formDataWithMetricLabels);
   const {
     metrics,
@@ -214,6 +236,18 @@ export default function transformProps(
     }
   });
 
+  Object.entries(formData.temporal_columns_lookup ?? {}).forEach(
+    ([columnName, isTemporal]) => {
+      if (!isTemporal) {
+        return;
+      }
+      colTypeMapWithAliases[columnName] = GenericDataType.Temporal;
+      const verbose = verboseMap[columnName];
+      if (verbose) {
+        colTypeMapWithAliases[verbose] = GenericDataType.Temporal;
+      }
+    },
+  );
   const temporalColumns = Object.keys(colTypeMapWithAliases).filter(
     colname => colTypeMapWithAliases[colname] === GenericDataType.Temporal,
   );
@@ -225,7 +259,13 @@ export default function transformProps(
     if (columnName && typeof format === 'string' && format.length > 0) {
       const base = getTimeFormatter(format);
       const formatter = (value: DataRecordValue) =>
-        base(value as number | Date | null | undefined);
+        base(
+          coerceEpochMsStringToNumber(value) as
+            | number
+            | Date
+            | null
+            | undefined,
+        );
       acc[columnName] = formatter;
       if (column.verbose_name) {
         acc[column.verbose_name] = formatter;
@@ -246,23 +286,43 @@ export default function transformProps(
       if (granularity) {
         const base = getTimeFormatterForGranularity(granularity);
         formatter = (value: DataRecordValue) =>
-          base(value as number | Date | null | undefined);
+          base(
+            coerceEpochMsStringToNumber(value) as
+              | number
+              | Date
+              | null
+              | undefined,
+          );
       } else if (
-        combinedData.every(
-          row =>
-            row[temporalColname] === null ||
-            row[temporalColname] === undefined ||
-            typeof row[temporalColname] === 'number',
-        )
+        combinedData.every(row => {
+          const value = row[temporalColname];
+          if (value === null || value === undefined) {
+            return true;
+          }
+          const normalized = coerceEpochMsStringToNumber(value);
+          return typeof normalized === 'number' || normalized instanceof Date;
+        })
       ) {
         const base = getTimeFormatter(DATABASE_DATETIME);
         formatter = (value: DataRecordValue) =>
-          base(value as number | Date | null | undefined);
+          base(
+            coerceEpochMsStringToNumber(value) as
+              | number
+              | Date
+              | null
+              | undefined,
+          );
       }
     } else if (formData.dateFormat) {
       const base = getTimeFormatter(formData.dateFormat);
       formatter = (value: DataRecordValue) =>
-        base(value as number | Date | null | undefined);
+        base(
+          coerceEpochMsStringToNumber(value) as
+            | number
+            | Date
+            | null
+            | undefined,
+        );
     }
     if (formatter) {
       dateFormatters[temporalColname] = formatter;
@@ -273,8 +333,9 @@ export default function transformProps(
     ...queryFormData,
     colTypeMap: colTypeMapWithAliases,
   };
-  const normalizedQueryFormData =
-    normalizeFormDataExtraFilters(queryFormDataWithTypes);
+  const normalizedQueryFormData = normalizeFormDataExtraFilters(
+    queryFormDataWithTypes,
+  );
 
   const metricColorFormatters = getColorFormatters(
     formData.conditional_formatting,
@@ -417,7 +478,7 @@ export default function transformProps(
       dateFormatters,
       colTypeMap: colTypeMapWithAliases,
     },
-    rawFormData: rawFormData,
+    rawFormData,
     hooks,
     ownState,
     filterState,

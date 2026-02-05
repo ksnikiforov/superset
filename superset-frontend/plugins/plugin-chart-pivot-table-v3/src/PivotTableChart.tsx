@@ -22,7 +22,11 @@ import {
   DataRecordValue,
   ensureIsArray,
   getColumnLabel,
+  getTimeFormatter,
+  SMART_DATE_ID,
+  SupersetClient,
   supersetTheme,
+  TimeFormats,
   type QueryObjectFilterClause,
   type JsonObject,
   styled,
@@ -70,6 +74,7 @@ import {
   getMetricKeys,
   getStableColumnKey,
   isSubtotalToken,
+  coerceEpochMsStringToNumber,
   serializePath,
 } from './utils';
 import { applyMeasureLeafValuesToTree } from './pivot/measureLeaves';
@@ -82,6 +87,8 @@ const SIDE_CHIPS_WIDTH = 24;
 const SEAMLESS_REQUEST_GROUP = 'pivot-v3-seamless';
 const DIMENSION_VALUES_REQUEST_GROUP = 'pivot-v3-dimension-values';
 const DIMENSION_VALUES_QUERY_PREFIX = 'pivot_v3|dimension-values';
+
+const { DATABASE_DATETIME } = TimeFormats;
 
 const buildDimensionValuesQueryName = (dimensionKey: string) =>
   `${DIMENSION_VALUES_QUERY_PREFIX}|${dimensionKey}`;
@@ -188,6 +195,14 @@ const InteractionTableWrap = styled.div`
   display: flex;
   flex-direction: column;
   height: 100%;
+`;
+
+const MetaLoadingWrap = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
 `;
 
 const ChipRow = styled.div`
@@ -604,6 +619,51 @@ const arraysEqual = (left: string[], right: string[]) =>
 const hasSameSet = (left: string[], right: string[]) =>
   left.length === right.length && left.every(value => right.includes(value));
 
+type DatasetColumnMeta = {
+  column_name?: string;
+  verbose_name?: string | null;
+  python_date_format?: string | null;
+};
+
+type DatasetMeta = {
+  verboseMap?: Record<string, string>;
+  verbose_map?: Record<string, string>;
+  columns?: DatasetColumnMeta[];
+};
+
+type MetaState = 'idle' | 'loading' | 'ready' | 'failed';
+
+const datasetMetaCache = new Map<number, DatasetMeta>();
+
+const buildDateFormattersFromColumns = (
+  columns: DatasetColumnMeta[],
+  verboseMap: Record<string, string>,
+) =>
+  columns.reduce<Record<string, (value: DataRecordValue) => string>>(
+    (acc, column) => {
+      const columnName = column.column_name;
+      const format = column.python_date_format;
+      if (columnName && typeof format === 'string' && format.length > 0) {
+        const base = getTimeFormatter(format);
+        const formatter = (value: DataRecordValue) =>
+          base(
+            coerceEpochMsStringToNumber(value) as
+              | number
+              | Date
+              | null
+              | undefined,
+          );
+        acc[columnName] = formatter;
+        const verbose = column.verbose_name || verboseMap[columnName];
+        if (verbose) {
+          acc[verbose] = formatter;
+        }
+      }
+      return acc;
+    },
+    {},
+  );
+
 const selectionSignature = (selection: PivotRuntimeLayout['leafSelection']) =>
   stableStringify(selection ?? {});
 
@@ -699,10 +759,82 @@ function PivotTableChart(props: PivotTableProps) {
 
   const { interactionMode } = formData;
   const isUserControlled = interactionMode === 'user_controlled';
+  const fetchFormDataBase = queryFormData || formData;
+
+  const [extraVerboseMap, setExtraVerboseMap] = useState<
+    Record<string, string>
+  >({});
+  const [extraDateFormatters, setExtraDateFormatters] = useState<
+    Record<string, (value: DataRecordValue) => string>
+  >({});
+  const [metaState, setMetaState] = useState<MetaState>('idle');
+  const resolvedVerboseMap = useMemo(
+    () => ({ ...extraVerboseMap, ...(verboseMap ?? {}) }),
+    [extraVerboseMap, verboseMap],
+  );
+  const resolvedDateFormatters = useMemo(() => {
+    const merged: Record<string, (value: DataRecordValue) => string> = {
+      // Prefer dataset column formats (python_date_format) when available.
+      // Dashboard payloads may omit python_date_format, so transformProps falls
+      // back to a generic formatter. The dataset meta fetch should override
+      // that fallback.
+      ...dateFormatters,
+      ...extraDateFormatters,
+    };
+
+    const temporalLookup = fetchFormDataBase.temporal_columns_lookup ?? {};
+    const shouldCreateFallback =
+      Object.keys(temporalLookup).length > 0 &&
+      typeof fetchFormDataBase.dateFormat === 'string';
+    if (!shouldCreateFallback) {
+      return merged;
+    }
+
+    const formatId =
+      fetchFormDataBase.dateFormat === SMART_DATE_ID
+        ? DATABASE_DATETIME
+        : fetchFormDataBase.dateFormat;
+    const base = getTimeFormatter(formatId);
+    const fallbackFormatter = (value: DataRecordValue) => {
+      const normalized = coerceEpochMsStringToNumber(value);
+      if (normalized === null || normalized === undefined) {
+        return `${normalized}`;
+      }
+      if (typeof normalized === 'number' || normalized instanceof Date) {
+        return base(normalized as number | Date | null | undefined);
+      }
+      if (typeof normalized === 'string') {
+        const parsed = Date.parse(normalized);
+        if (Number.isFinite(parsed)) {
+          return base(parsed);
+        }
+      }
+      return String(value);
+    };
+
+    Object.entries(temporalLookup).forEach(([columnLabel, isTemporal]) => {
+      if (!isTemporal || merged[columnLabel]) {
+        return;
+      }
+      merged[columnLabel] = fallbackFormatter;
+      const verbose = resolvedVerboseMap[columnLabel];
+      if (verbose && !merged[verbose]) {
+        merged[verbose] = fallbackFormatter;
+      }
+    });
+
+    return merged;
+  }, [
+    dateFormatters,
+    extraDateFormatters,
+    fetchFormDataBase.dateFormat,
+    fetchFormDataBase.temporal_columns_lookup,
+    resolvedVerboseMap,
+  ]);
 
   const dimensionLabelOverrides = useMemo(
     () =>
-      Object.entries(verboseMap ?? {}).reduce<Record<string, string>>(
+      Object.entries(resolvedVerboseMap ?? {}).reduce<Record<string, string>>(
         (acc, [key, value]) => {
           if (typeof value === 'string') {
             acc[key] = value;
@@ -711,11 +843,18 @@ function PivotTableChart(props: PivotTableProps) {
         },
         {},
       ),
-    [verboseMap],
+    [resolvedVerboseMap],
   );
 
-  const fetchFormDataBase = queryFormData || formData;
-  const appliedFormData = fetchFormDataBase;
+  const fetchFormDataBaseWithFormatters = useMemo(
+    () => ({
+      ...fetchFormDataBase,
+      dateFormatters: resolvedDateFormatters,
+      verboseMap: resolvedVerboseMap,
+    }),
+    [fetchFormDataBase, resolvedDateFormatters, resolvedVerboseMap],
+  );
+  const appliedFormData = fetchFormDataBaseWithFormatters;
   const persistExpansionState = persistExpansionStateProp ?? true;
   const resolvedStickyHeaders = formData.stickyHeaders ?? stickyHeaders;
 
@@ -776,6 +915,102 @@ function PivotTableChart(props: PivotTableProps) {
     });
     return map;
   }, [dimensionList]);
+  const datasourceId = useMemo(() => {
+    const datasource = formData.datasource || '';
+    const [idPart] = datasource.split('__');
+    const id = Number(idPart);
+    return Number.isFinite(id) ? id : null;
+  }, [formData.datasource]);
+  useEffect(() => {
+    setMetaState('idle');
+    setExtraVerboseMap({});
+    setExtraDateFormatters({});
+  }, [datasourceId]);
+  const needsVerboseMap = useMemo(
+    () =>
+      dimensionList.some(dimension => {
+        const key = getStableColumnKey(dimension);
+        const mapped =
+          resolvedVerboseMap[key] ||
+          (typeof dimension === 'string'
+            ? resolvedVerboseMap[dimension]
+            : null);
+        return !mapped;
+      }),
+    [dimensionList, resolvedVerboseMap],
+  );
+  const needsDateFormatters = useMemo(() => {
+    const lookup = formData.temporal_columns_lookup ?? {};
+    return Object.entries(lookup).some(([key, isTemporal]) => {
+      if (!isTemporal) {
+        return false;
+      }
+      const verbose = resolvedVerboseMap[key];
+      return (
+        !resolvedDateFormatters[key] &&
+        (!verbose || !resolvedDateFormatters[verbose])
+      );
+    });
+  }, [
+    formData.temporal_columns_lookup,
+    resolvedDateFormatters,
+    resolvedVerboseMap,
+  ]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const cleanup = () => {
+      cancelled = true;
+    };
+
+    if (datasourceId === null) {
+      setMetaState('ready');
+      return cleanup;
+    }
+    if (!needsVerboseMap && !needsDateFormatters) {
+      setMetaState('ready');
+      return cleanup;
+    }
+    const cached = datasetMetaCache.get(datasourceId);
+    if (cached) {
+      const cachedVerbose = cached.verboseMap ?? cached.verbose_map ?? {};
+      setExtraVerboseMap(cachedVerbose);
+      const cachedColumns = Array.isArray(cached.columns) ? cached.columns : [];
+      setExtraDateFormatters(
+        buildDateFormattersFromColumns(cachedColumns, cachedVerbose),
+      );
+      setMetaState('ready');
+      return cleanup;
+    }
+    setMetaState('loading');
+    SupersetClient.get({ endpoint: `/api/v1/dataset/${datasourceId}` })
+      .then(({ json }) => {
+        if (cancelled) {
+          return;
+        }
+        const { result } = json as { result?: DatasetMeta };
+        if (!result) {
+          setMetaState('failed');
+          return;
+        }
+        datasetMetaCache.set(datasourceId, result);
+        const verboseFromApi = result.verboseMap ?? result.verbose_map ?? {};
+        const columnsFromApi = Array.isArray(result.columns)
+          ? result.columns
+          : [];
+        setExtraVerboseMap(verboseFromApi);
+        setExtraDateFormatters(
+          buildDateFormattersFromColumns(columnsFromApi, verboseFromApi),
+        );
+        setMetaState('ready');
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setMetaState('failed');
+        }
+      });
+    return cleanup;
+  }, [datasourceId, needsDateFormatters, needsVerboseMap]);
   const metricsForUi = useMemo(
     () => formData.metricsBase ?? formData.metrics ?? metrics,
     [formData.metrics, formData.metricsBase, metrics],
@@ -1077,13 +1312,13 @@ function PivotTableChart(props: PivotTableProps) {
       const { filters, hasFilters } = buildFilterPayload(nextFilters);
       const pendingFormData = hasFilters
         ? {
-            ...fetchFormDataBase,
+            ...fetchFormDataBaseWithFormatters,
             extra_form_data: mergeExtraFilters(
-              fetchFormDataBase.extra_form_data,
+              fetchFormDataBaseWithFormatters.extra_form_data,
               filters,
             ),
           }
-        : fetchFormDataBase;
+        : fetchFormDataBaseWithFormatters;
       const normalizedPendingFormData =
         normalizeFormDataExtraFilters(pendingFormData);
       const metricsForLayout =
@@ -1166,7 +1401,7 @@ function PivotTableChart(props: PivotTableProps) {
     [
       buildFilterPayload,
       dimensionKeys,
-      fetchFormDataBase,
+      fetchFormDataBaseWithFormatters,
       formData,
       isUserControlled,
       metricKeys,
@@ -1221,7 +1456,7 @@ function PivotTableChart(props: PivotTableProps) {
       const baseLabel = getColumnLabel(dimension);
       const label =
         typeof dimension === 'string'
-          ? dimensionLabelOverrides[key] ?? baseLabel
+          ? (dimensionLabelOverrides[key] ?? baseLabel)
           : baseLabel;
       map.set(key, label);
     });
@@ -1364,7 +1599,7 @@ function PivotTableChart(props: PivotTableProps) {
       addAlias(stableKey, stableKey);
       addAlias(labelKey, stableKey);
     });
-    Object.entries(verboseMap ?? {}).forEach(([key, verbose]) => {
+    Object.entries(resolvedVerboseMap ?? {}).forEach(([key, verbose]) => {
       if (typeof verbose !== 'string' || verbose.length === 0) {
         return;
       }
@@ -1416,7 +1651,7 @@ function PivotTableChart(props: PivotTableProps) {
     layoutResult,
     renderTree.cols,
     renderTree.rows,
-    verboseMap,
+    resolvedVerboseMap,
   ]);
   const [fetchedDimensionFilterValues, setFetchedDimensionFilterValues] =
     useState<Record<string, DataRecordValue[]>>({});
@@ -1469,13 +1704,13 @@ function PivotTableChart(props: PivotTableProps) {
         const { filters } = buildFilterPayload(selection);
         const pendingFormData = filters
           ? {
-              ...fetchFormDataBase,
+              ...fetchFormDataBaseWithFormatters,
               extra_form_data: mergeExtraFilters(
-                fetchFormDataBase.extra_form_data,
+                fetchFormDataBaseWithFormatters.extra_form_data,
                 filters,
               ),
             }
-          : fetchFormDataBase;
+          : fetchFormDataBaseWithFormatters;
         const normalizedFormData =
           normalizeFormDataExtraFilters(pendingFormData);
         const spec: QuerySpec = {
@@ -1521,7 +1756,7 @@ function PivotTableChart(props: PivotTableProps) {
     [
       buildFilterPayload,
       fetchedDimensionFilterValues,
-      fetchFormDataBase,
+      fetchFormDataBaseWithFormatters,
       mergeExtraFilters,
       uiSelectedFilters,
     ],
@@ -1596,7 +1831,7 @@ function PivotTableChart(props: PivotTableProps) {
     resolvedMetricsLayout: layoutResult.resolvedMetricsLayout,
     onContextMenu,
     ownState,
-    dateFormatters,
+    dateFormatters: resolvedDateFormatters,
     timeGrainSqla,
   });
 
@@ -1790,6 +2025,19 @@ function PivotTableChart(props: PivotTableProps) {
     },
   });
 
+  const shouldDelayRender =
+    datasourceId !== null &&
+    (metaState === 'loading' ||
+      (metaState === 'idle' && (needsVerboseMap || needsDateFormatters)));
+
+  if (shouldDelayRender) {
+    return (
+      <MetaLoadingWrap>
+        <Loading />
+      </MetaLoadingWrap>
+    );
+  }
+
   return isUserControlled ? (
     <InteractionLayout style={height ? { height } : undefined}>
       <InteractionPanelWrap>
@@ -1801,7 +2049,7 @@ function PivotTableChart(props: PivotTableProps) {
           }
           metricLabelMap={formData.metricLabelMap}
           dimensionLabelMap={dimensionLabelOverrides}
-          dateFormatters={dateFormatters}
+          dateFormatters={resolvedDateFormatters}
           dimensionFilterValues={dimensionFilterValues}
           dimensionFilterLoading={dimensionFilterLoading}
           selectedFilters={uiSelectedFilters}

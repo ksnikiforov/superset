@@ -170,6 +170,46 @@ export const usePivotRenderModel = ({
   }, [layout.measureHierarchy]);
 
   const renderTree = useMemo(() => {
+    const { dateFormatters } = formData;
+
+    const formatAxisNodes = (
+      nodes: Record<string, PivotTreeNode>,
+      axis: 'row' | 'col',
+    ) => {
+      if (!dateFormatters || Object.keys(dateFormatters).length === 0) {
+        return nodes;
+      }
+      let hasChanges = false;
+      const nextNodes: Record<string, PivotTreeNode> = { ...nodes };
+      Object.values(nodes).forEach(node => {
+        if (node.path.length === 0 || node.path.some(isSubtotalToken)) {
+          return;
+        }
+        const dimensionKey = layout.getDimensionKeyForNode(node, axis);
+        if (!dimensionKey) {
+          return;
+        }
+        const formatter = dateFormatters[dimensionKey];
+        if (!formatter) {
+          return;
+        }
+        const nonMetricParts = layout.getNonMetricPathParts(node.path);
+        const nonSubtotalParts = nonMetricParts.filter(
+          part => !isSubtotalToken(part),
+        );
+        const rawValue = nonSubtotalParts[nonSubtotalParts.length - 1];
+        if (rawValue === null || rawValue === undefined) {
+          return;
+        }
+        const formatted = formatter(rawValue);
+        if (formatted !== node.formattedLabel) {
+          nextNodes[node.key] = { ...node, formattedLabel: formatted };
+          hasChanges = true;
+        }
+      });
+      return hasChanges ? nextNodes : nodes;
+    };
+
     const normalizeAxis = (
       nodes: Record<string, PivotTreeNode>,
       axis: 'row' | 'col',
@@ -239,11 +279,21 @@ export const usePivotRenderModel = ({
     const nextCols = layout.metricsAtColEnd
       ? normalizeAxis(tree.cols, 'col', groupbyColumns.length)
       : tree.cols;
-    if (nextCols === tree.cols) {
-      return tree;
+    const baseTree =
+      nextCols === tree.cols ? tree : { ...tree, cols: nextCols };
+    const nextRows = formatAxisNodes(baseTree.rows, 'row');
+    const nextColsFormatted = formatAxisNodes(baseTree.cols, 'col');
+    if (nextRows === baseTree.rows && nextColsFormatted === baseTree.cols) {
+      return baseTree;
     }
-    return { ...tree, cols: nextCols };
-  }, [groupbyColumns.length, layout, measureLeafLabelMap, tree]);
+    return { ...baseTree, rows: nextRows, cols: nextColsFormatted };
+  }, [
+    formData.dateFormatters,
+    groupbyColumns.length,
+    layout,
+    measureLeafLabelMap,
+    tree,
+  ]);
 
   const { rowValuesMap, colValuesMap } = useMemo(
     () =>
@@ -636,11 +686,7 @@ export const usePivotRenderModel = ({
       depths.add(layout.countDimDepth(node.path));
     });
     return depths;
-  }, [
-    layout,
-    manualExpandedRows,
-    renderTree.rows,
-  ]);
+  }, [layout, manualExpandedRows, renderTree.rows]);
 
   const renderModel = useMemo(
     () =>
@@ -792,12 +838,7 @@ export const usePivotRenderModel = ({
       }
       return true;
     },
-    [
-      groupbyRows.length,
-      isExplicitTotalNode,
-      manualExpandedRowDepths,
-      layout,
-    ],
+    [groupbyRows.length, isExplicitTotalNode, manualExpandedRowDepths, layout],
   );
 
   const isColAggregateBold = useCallback(
