@@ -1,0 +1,161 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+import { GenericDataType } from '@superset-ui/core';
+import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
+import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
+import {
+  buildBatchQuerySpecs,
+  buildBranchQuerySpecs,
+} from '../../../src/pivot/query/specs';
+import { formatQueryName } from '../../../src/pivot/query/queryName';
+import { serializePath } from '../../../src/utils';
+import { type BatchGroup } from '../../../src/pivot/query/fetchPlanOptimizer';
+import { buildFormData } from '../fixtures/pivotFormData';
+
+type FilterClause = {
+  col?: string;
+  op?: string;
+  val?: unknown;
+};
+
+const emptyTree: PivotTreeData = {
+  rows: {},
+  cols: {},
+  cells: {},
+};
+
+const findEqFilter = (filters: FilterClause[], column: string) =>
+  filters.find(filter => filter.col === column && filter.op === '==');
+
+describe('temporal branch query specs contract', () => {
+  it('buildBranchQuerySpecs keeps temporal equality filters backend-safe', () => {
+    const formData = buildFormData({
+      groupbyRows: ['orderYear', 'orderMonth'],
+      groupbyColumns: [],
+      metrics: ['grossSales'],
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      rowTotals: false,
+      colTotals: false,
+      rowSubTotals: false,
+      time_grain_sqla: 'P1D',
+      temporal_columns_lookup: {
+        orderYear: true,
+        orderMonth: true,
+      },
+      colTypeMap: {
+        orderYear: GenericDataType.Temporal,
+        orderMonth: GenericDataType.Temporal,
+        grossSales: GenericDataType.Numeric,
+      },
+    });
+    const layout = buildLayoutContext(formData);
+    const path = ['1483228800000'];
+    const specs = buildBranchQuerySpecs({
+      formData,
+      layout,
+      axis: 'row',
+      path,
+      metricPath: path,
+      currentTree: emptyTree,
+      visibleRowDepth: 1,
+      visibleColDepth: 0,
+    });
+
+    expect(specs.length).toBeGreaterThan(0);
+    specs.forEach(spec => {
+      const temporalFilter = findEqFilter(
+        spec.filters as FilterClause[],
+        'orderYear',
+      );
+      expect(temporalFilter).toBeDefined();
+      expect(temporalFilter?.val).toBe(1483228800000);
+      expect(spec.queryName).toBe(
+        `${formatQueryName(spec.meta.rowDepth, spec.meta.colDepth)}|branch:row:${serializePath(path)}`,
+      );
+    });
+  });
+
+  it('buildBatchQuerySpecs keeps temporal sibling filters backend-safe', () => {
+    const formData = buildFormData({
+      groupbyRows: ['orderYear', 'orderMonth'],
+      groupbyColumns: [],
+      metrics: ['grossSales'],
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      rowTotals: false,
+      colTotals: false,
+      rowSubTotals: false,
+      time_grain_sqla: 'P1D',
+      temporal_columns_lookup: {
+        orderYear: true,
+        orderMonth: true,
+      },
+      colTypeMap: {
+        orderYear: GenericDataType.Temporal,
+        orderMonth: GenericDataType.Temporal,
+        grossSales: GenericDataType.Numeric,
+      },
+    });
+    const layout = buildLayoutContext(formData);
+    const batch: BatchGroup = {
+      axis: 'row',
+      childDepth: 1,
+      requiredOppositeDepth: 0,
+      signature: 'temporal-batch',
+      parentPathKey: '',
+      siblingValues: ['1483228800000', '1514764800000'],
+      targets: [
+        {
+          axis: 'row',
+          pathKey: serializePath(['1483228800000']),
+          childDepth: 1,
+          requiredOppositeDepth: 0,
+          batchSignature: 'temporal-batch',
+        },
+        {
+          axis: 'row',
+          pathKey: serializePath(['1514764800000']),
+          childDepth: 1,
+          requiredOppositeDepth: 0,
+          batchSignature: 'temporal-batch',
+        },
+      ],
+    };
+
+    const specs = buildBatchQuerySpecs({
+      formData,
+      layout,
+      batch,
+      currentTree: emptyTree,
+      visibleRowDepth: 0,
+      visibleColDepth: 0,
+    });
+
+    expect(specs.length).toBeGreaterThan(0);
+    specs.forEach(spec => {
+      const inFilter = (spec.filters as FilterClause[]).find(
+        filter => filter.col === 'orderYear' && filter.op === 'IN',
+      );
+      expect(inFilter).toBeDefined();
+      expect(inFilter?.val).toEqual([1483228800000, 1514764800000]);
+      expect(spec.queryName).toBe(
+        `${formatQueryName(spec.meta.rowDepth, spec.meta.colDepth)}|batch:row:|chunk:0`,
+      );
+    });
+  });
+});
