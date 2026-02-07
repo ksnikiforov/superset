@@ -5,5 +5,8 @@ We are using test driven development. When tackling bugs, FIRST write a test or 
 To run tests use **npm test plugins/plugin-chart-pivot-table-v3** From superset-frontend folder
 Run tests after every significant change
 
+To run pivot table v3 e2e use **PATH="/opt/homebrew/opt/node@20/bin:$PATH" npm run cypress-run-chrome -- --spec cypress/e2e/explore/visualizations/pivot_table_v3.test.ts --config baseUrl=http://localhost:8081,video=false** from `superset-frontend/cypress-base` folder
+Run e2e when validating dashboard-level behavior/regressions
+
 To run lint use **npx eslint plugins/plugin-chart-pivot-table-v3** from superset-frontend folder
 Run lint after every significant change
