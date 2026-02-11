@@ -495,6 +495,90 @@ describe('PivotTableChart interaction layout', () => {
     );
   });
 
+  it('keeps metric labels when datetime columns are formatted with Values at column end', () => {
+    const metrics = ['m1', 'm2'];
+    const rowGroupby = ['row2'];
+    const colGroupby = ['orderDate'];
+    const tree = applyMetricAxis(
+      buildTreeFromRecords(
+        [
+          {
+            row2: 'R1',
+            orderDate: '1992-01-01T00:00:00.000Z',
+            m1: 10,
+            m2: 20,
+          },
+          {
+            row2: 'R1',
+            orderDate: '1993-01-01T00:00:00.000Z',
+            m1: 15,
+            m2: 30,
+          },
+        ],
+        metrics,
+        rowGroupby,
+        colGroupby,
+        1,
+        1,
+      ),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      rowGroupby,
+      colGroupby,
+      1,
+    );
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: rowGroupby,
+      cols: colGroupby,
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 1 },
+    };
+    const orderDateFormatter = (value: number | Date) =>
+      `Year ${new Date(value).getUTCFullYear()}`;
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: [...rowGroupby, ...colGroupby],
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      startCollapsed: false,
+      initialDepth: 1,
+    });
+
+    const { container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+        dateFormatters={{ orderDate: orderDateFormatter }}
+      />,
+    );
+
+    const headerRows =
+      container.querySelectorAll<HTMLTableRowElement>('thead tr');
+    const topLabels = within(headerRows[0])
+      .getAllByRole('columnheader')
+      .map(cell => cell.textContent?.trim() ?? '')
+      .filter(label => label.length > 0 && label !== 'Rows');
+    expect(topLabels).toEqual(
+      expect.arrayContaining(['Year 1992', 'Year 1993']),
+    );
+
+    const metricLabels = within(headerRows[1])
+      .getAllByRole('columnheader')
+      .map(cell => cell.textContent?.trim() ?? '')
+      .filter(label => label.length > 0 && label !== 'Rows');
+    expect(metricLabels).toEqual(['m1', 'm2', 'm1', 'm2']);
+  });
+
   it('does not duplicate metric headers when leaf tier is visible with row totals', () => {
     const metrics = ['m1', 'm2', 'm3'];
     const valueLeaf = buildValueLeaf();
@@ -598,6 +682,228 @@ describe('PivotTableChart interaction layout', () => {
     metricHeaderCells.forEach(cell => {
       expect(cell.rowSpan).toBe(1);
     });
+  });
+
+  it('keeps metric columns visible in interaction mode with value-first layout and row totals', () => {
+    const metrics = ['m1', 'm2'];
+    const rowGroupby = ['name'];
+    const detail = buildTreeFromRecords(
+      [
+        { name: 'A', m1: 10, m2: 20 },
+        { name: 'B', m1: 12, m2: 24 },
+      ],
+      metrics,
+      rowGroupby,
+      [],
+      1,
+      0,
+    );
+    const totals = buildTreeFromRecords(
+      [{ m1: 22, m2: 44 }],
+      metrics,
+      rowGroupby,
+      [],
+      0,
+      0,
+    );
+    const tree = applyMetricAxis(
+      mergeTrees(detail, totals),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      rowGroupby,
+      [],
+      0,
+    );
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: rowGroupby,
+      cols: [],
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: [...rowGroupby],
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      rowTotals: true,
+      colTotals: false,
+      startCollapsed: false,
+      initialDepth: 1,
+    });
+
+    const { container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+        rowTotals
+        colTotals={false}
+      />,
+    );
+
+    const headerLabels = Array.from(container.querySelectorAll('thead th'))
+      .map(cell => cell.textContent?.trim() ?? '')
+      .filter(label => label.length > 0 && label !== 'Rows');
+    expect(headerLabels).toEqual(expect.arrayContaining(metrics));
+    expect(headerLabels).not.toContain('Grand total');
+
+    const rowHeaders = Array.from(
+      container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
+    ).map(cell => cell.textContent?.trim());
+    expect(rowHeaders).not.toContain('Grand total');
+  });
+
+  it('renders column grand total row in interaction mode with multiple metrics', () => {
+    const metrics = ['m1', 'm2'];
+    const rowGroupby = ['name'];
+    const detail = buildTreeFromRecords(
+      [
+        { name: 'A', m1: 10, m2: 20 },
+        { name: 'B', m1: 12, m2: 24 },
+      ],
+      metrics,
+      rowGroupby,
+      [],
+      1,
+      0,
+    );
+    const totals = buildTreeFromRecords(
+      [{ m1: 22, m2: 44 }],
+      metrics,
+      rowGroupby,
+      [],
+      0,
+      0,
+    );
+    const tree = applyMetricAxis(
+      mergeTrees(detail, totals),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      rowGroupby,
+      [],
+      0,
+    );
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: rowGroupby,
+      cols: [],
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: [...rowGroupby],
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      rowTotals: false,
+      colTotals: true,
+      startCollapsed: false,
+      initialDepth: 1,
+    });
+
+    const { container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+        rowTotals={false}
+        colTotals
+      />,
+    );
+
+    const rowHeaders = Array.from(
+      container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
+    ).map(cell => cell.textContent?.trim());
+    expect(rowHeaders).toContain('Grand total');
+
+    const grandTotalRow = screen
+      .getByText('Grand total')
+      .closest('tr') as HTMLTableRowElement;
+    const values = within(grandTotalRow)
+      .getAllByRole('cell')
+      .map(cell => cell.textContent?.trim());
+    expect(values).toEqual(['22', '44']);
+  });
+
+  it('keeps value-first interaction stable when totals are disabled', () => {
+    const metrics = ['m1', 'm2'];
+    const rowGroupby = ['name'];
+    const tree = applyMetricAxis(
+      buildTreeFromRecords(
+        [
+          { name: 'A', m1: 10, m2: 20 },
+          { name: 'B', m1: 12, m2: 24 },
+        ],
+        metrics,
+        rowGroupby,
+        [],
+        1,
+        0,
+      ),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      rowGroupby,
+      [],
+      0,
+    );
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: rowGroupby,
+      cols: [],
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: [...rowGroupby],
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      rowTotals: false,
+      colTotals: false,
+      startCollapsed: false,
+      initialDepth: 1,
+    });
+
+    const { container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+        rowTotals={false}
+        colTotals={false}
+      />,
+    );
+
+    const headerLabels = Array.from(container.querySelectorAll('thead th'))
+      .map(cell => cell.textContent?.trim() ?? '')
+      .filter(label => label.length > 0 && label !== 'Rows');
+    expect(headerLabels).toEqual(expect.arrayContaining(metrics));
+    expect(headerLabels).not.toContain('Grand total');
   });
 
   it('does not interleave metric totals with column dimensions when row totals are present', () => {

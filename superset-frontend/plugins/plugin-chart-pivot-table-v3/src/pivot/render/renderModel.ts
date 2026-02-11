@@ -81,7 +81,11 @@ export const buildRenderModel = ({
   const showRowRootBase =
     config.groupbyRowsLength > 0 &&
     (config.normalizedRowSubtotalLevels.includes(0) || config.colTotals);
-  const showRowRoot = showRowRootBase && !config.hasMultipleMeasures;
+  const suppressRowRootForMultiMeasure =
+    config.hasMultipleMeasures &&
+    (config.resolvedMetricsLayout === MetricsLayoutEnum.ROWS ||
+      config.rowTotals);
+  const showRowRoot = showRowRootBase && !suppressRowRootForMultiMeasure;
   const showColRoot =
     config.groupbyColumnsLength > 0 &&
     (config.normalizedColSubtotalLevels.includes(0) || config.rowTotals);

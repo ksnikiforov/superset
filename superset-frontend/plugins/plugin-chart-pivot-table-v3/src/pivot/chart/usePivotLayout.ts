@@ -28,6 +28,7 @@ import {
   type TotalPosition,
 } from '../../types';
 import {
+  resolveMetricDisplayLabel,
   decodeMetricKey,
   decodeMeasureLeafId,
   encodeMetricKey,
@@ -249,6 +250,9 @@ export const usePivotLayout = ({
     isMetricTokenValue,
     getFetchPath,
   } = layout;
+  const metricVerboseMap = formData.verboseMap as
+    | Record<string, string>
+    | undefined;
 
   const metricOrderMap = useMemo(
     () => new Map(metricLabels.map((label, idx) => [label, idx])),
@@ -328,12 +332,12 @@ export const usePivotLayout = ({
     resolvedExpandColumnsLevel > 0;
 
   const groupbyRowKeys = useMemo(
-    () => groupbyRows.map(getStableColumnKey),
-    [groupbyRows],
+    () => layout.groupbyRows.map(getStableColumnKey),
+    [layout.groupbyRows],
   );
   const groupbyColumnKeys = useMemo(
-    () => groupbyColumns.map(getStableColumnKey),
-    [groupbyColumns],
+    () => layout.groupbyColumns.map(getStableColumnKey),
+    [layout.groupbyColumns],
   );
 
   const expandedStateSignature = useMemo(
@@ -592,8 +596,13 @@ export const usePivotLayout = ({
     [metricLabelSet],
   );
   const getMetricDisplayLabelForKey = useCallback(
-    (metricKey: string) => metricLabelMap.get(metricKey) ?? metricKey,
-    [metricLabelMap],
+    (metricKey: string) =>
+      resolveMetricDisplayLabel(metricKey, {
+        metricLabelMap,
+        verboseMap: metricVerboseMap,
+        metrics,
+      }),
+    [metricLabelMap, metricVerboseMap, metrics],
   );
   const getMetricDisplayLabelFromPath = useCallback(
     (path: PivotTreeNode['path']) => {

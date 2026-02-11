@@ -54,6 +54,9 @@ export const buildVisibleRows = ({
     getRowChildren,
     getCollapsedRowChildren,
   );
+  if (ordered.length === 0 && rows[rootKey]) {
+    return [rows[rootKey]];
+  }
   if (rowTotalPosition === 'end' && showRowRoot) {
     const rootIdx = ordered.findIndex(row => row.key === rootKey);
     if (rootIdx >= 0) {

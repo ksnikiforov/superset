@@ -131,4 +131,71 @@ describe('buildRenderModel', () => {
       colKey,
     ]);
   });
+
+  it('keeps root row visible when there are no row dimensions and multiple measures', () => {
+    const metricColKey = 'm1';
+    const tree: PivotTreeData = {
+      rows: {
+        [rootKey]: makeNode({
+          axis: 'row',
+          key: rootKey,
+          path: [],
+          label: 'Grand total',
+          hasChildren: false,
+        }),
+      },
+      cols: {
+        [rootKey]: makeNode({
+          axis: 'col',
+          key: rootKey,
+          path: [],
+          label: 'Grand total',
+          hasChildren: true,
+        }),
+        [metricColKey]: makeNode({
+          axis: 'col',
+          key: metricColKey,
+          path: ['m1'],
+          label: 'm1',
+          hasChildren: false,
+        }),
+      },
+      cells: {},
+    };
+
+    const renderModel = buildRenderModel({
+      tree,
+      expandedRows: new Set([rootKey]),
+      expandedCols: new Set([rootKey, metricColKey]),
+      config: {
+        groupbyRowsLength: 0,
+        groupbyColumnsLength: 0,
+        normalizedRowSubtotalLevels: [],
+        normalizedColSubtotalLevels: [],
+        rowTotals: false,
+        colTotals: true,
+        rowTotalPosition: 'start',
+        colTotalPosition: 'start',
+        resolvedColSubtotalPosition: 'start',
+        resolvedMetricsLayout: MetricsLayoutEnum.COLUMNS,
+        isMultiMetric: true,
+        hasMultipleMeasures: true,
+        metricsFirstOnCols: false,
+        hideMetricHeaderOnRows: false,
+        hideMetricHeaderOnCols: false,
+        rowSorter: (a, b) => a.label.localeCompare(b.label),
+        colSorter: (a, b) => a.label.localeCompare(b.label),
+        getRowChildren: parent => findChildren(tree.rows, parent),
+        getCollapsedRowChildren: () => [],
+        getColChildren: parent => findChildren(tree.cols, parent),
+        getCollapsedColLeaves: () => [],
+        countDimDepth: path => path.length,
+        isMetricGrandTotalNode: () => false,
+        isMetricSubtotalNode: () => false,
+        isMetricTokenValue: () => false,
+      },
+    });
+
+    expect(renderModel.visibleRows.map(node => node.key)).toEqual([rootKey]);
+  });
 });

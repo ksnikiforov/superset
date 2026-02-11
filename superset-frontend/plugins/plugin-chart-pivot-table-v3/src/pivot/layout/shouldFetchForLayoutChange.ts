@@ -72,6 +72,16 @@ export const shouldFetchForLayoutChange = (
     valuePlacementSignature(prev.valuePlacement) !==
     valuePlacementSignature(next.valuePlacement)
   ) {
+    const prevValueAxis = valueAxisKeys(prev);
+    const nextValueAxis = valueAxisKeys(next);
+    const indexChanged =
+      prev.valuePlacement.index !== next.valuePlacement.index;
+    if (
+      indexChanged &&
+      (prevValueAxis.length > 0 || nextValueAxis.length > 0)
+    ) {
+      return true;
+    }
     return false;
   }
   return false;

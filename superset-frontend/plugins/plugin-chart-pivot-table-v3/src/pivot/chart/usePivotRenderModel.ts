@@ -108,8 +108,8 @@ export const usePivotRenderModel = ({
   formData,
   rowOrder,
   colOrder,
-  groupbyRows,
-  groupbyColumns,
+  groupbyRows: _groupbyRows,
+  groupbyColumns: _groupbyColumns,
   colTypeMap,
   rowTotals,
   colTotals,
@@ -132,15 +132,26 @@ export const usePivotRenderModel = ({
   rowSubTotals: boolean;
   layout: PivotLayoutResult;
 }): PivotRenderModelResult => {
+  const resolvedGroupbyRows = layout.layout.groupbyRows;
+  const resolvedGroupbyColumns = layout.layout.groupbyColumns;
+  const resolvedGroupbyRowsLength = resolvedGroupbyRows.length;
+  const resolvedGroupbyColumnsLength = resolvedGroupbyColumns.length;
+
   const rowSorting = useMemo(
     () =>
-      normalizeDimensionSortingMapWithKeys(formData.rowSorting, groupbyRows),
-    [formData.rowSorting, groupbyRows],
+      normalizeDimensionSortingMapWithKeys(
+        formData.rowSorting,
+        resolvedGroupbyRows,
+      ),
+    [formData.rowSorting, resolvedGroupbyRows],
   );
   const colSorting = useMemo(
     () =>
-      normalizeDimensionSortingMapWithKeys(formData.colSorting, groupbyColumns),
-    [formData.colSorting, groupbyColumns],
+      normalizeDimensionSortingMapWithKeys(
+        formData.colSorting,
+        resolvedGroupbyColumns,
+      ),
+    [formData.colSorting, resolvedGroupbyColumns],
   );
   const rowSortingKeyMap = useMemo(
     () => buildDimensionSortingKeyMap(rowSorting),
@@ -173,6 +184,69 @@ export const usePivotRenderModel = ({
   const renderTree = useMemo(() => {
     const { dateFormatters } = formData;
 
+    const pruneAxisToGroupbyDepth = (
+      nodes: Record<string, PivotTreeNode>,
+      groupbyLength: number,
+    ) => {
+      let hasChanges = false;
+      const nextNodes: Record<string, PivotTreeNode> = {};
+      Object.values(nodes).forEach(node => {
+        if (layout.countEngineDimDepth(node.path) > groupbyLength) {
+          hasChanges = true;
+          return;
+        }
+        nextNodes[node.key] = node;
+      });
+      if (!hasChanges) {
+        return { nodes, changed: false };
+      }
+      const parentKeys = new Set<string>();
+      Object.values(nextNodes).forEach(node => {
+        if (node.path.length === 0) {
+          return;
+        }
+        parentKeys.add(serializePath(node.path.slice(0, -1)));
+      });
+      Object.values(nextNodes).forEach(node => {
+        // Keep engine-promoted hasChildren hints so expand controls remain
+        // available after optimistic layout changes (before branch fetch).
+        const hasChildren = node.hasChildren || parentKeys.has(node.key);
+        if (node.hasChildren === hasChildren) {
+          return;
+        }
+        nextNodes[node.key] = { ...node, hasChildren };
+      });
+      return { nodes: nextNodes, changed: true };
+    };
+
+    const pruneTreeToLayoutDepth = (source: PivotTreeData) => {
+      const prunedRows = pruneAxisToGroupbyDepth(
+        source.rows,
+        resolvedGroupbyRowsLength,
+      );
+      const prunedCols = pruneAxisToGroupbyDepth(
+        source.cols,
+        resolvedGroupbyColumnsLength,
+      );
+      if (!prunedRows.changed && !prunedCols.changed) {
+        return source;
+      }
+      const nextCells = Object.entries(source.cells).reduce<
+        Record<string, PivotTreeData['cells'][string]>
+      >((acc, [cellKey, cell]) => {
+        if (!prunedRows.nodes[cell.rowKey] || !prunedCols.nodes[cell.colKey]) {
+          return acc;
+        }
+        acc[cellKey] = cell;
+        return acc;
+      }, {});
+      return {
+        rows: prunedRows.nodes,
+        cols: prunedCols.nodes,
+        cells: nextCells,
+      };
+    };
+
     const formatAxisNodes = (
       nodes: Record<string, PivotTreeNode>,
       axis: 'row' | 'col',
@@ -184,6 +258,10 @@ export const usePivotRenderModel = ({
       const nextNodes: Record<string, PivotTreeNode> = { ...nodes };
       Object.values(nodes).forEach(node => {
         if (node.path.length === 0 || node.path.some(isSubtotalToken)) {
+          return;
+        }
+        const tail = node.path[node.path.length - 1];
+        if (decodeMetricKey(tail) || decodeMeasureLeafId(tail)) {
           return;
         }
         const dimensionKey = layout.getDimensionKeyForNode(node, axis);
@@ -292,11 +370,14 @@ export const usePivotRenderModel = ({
       return hasChanges ? nextNodes : nodes;
     };
 
+    const depthPrunedTree = pruneTreeToLayoutDepth(tree);
     const nextCols = layout.metricsAtColEnd
-      ? normalizeAxis(tree.cols, 'col', groupbyColumns.length)
-      : tree.cols;
+      ? normalizeAxis(depthPrunedTree.cols, 'col', resolvedGroupbyColumnsLength)
+      : depthPrunedTree.cols;
     const baseTree =
-      nextCols === tree.cols ? tree : { ...tree, cols: nextCols };
+      nextCols === depthPrunedTree.cols
+        ? depthPrunedTree
+        : { ...depthPrunedTree, cols: nextCols };
     const nextRows = formatAxisNodes(baseTree.rows, 'row');
     const nextColsFormatted = formatAxisNodes(baseTree.cols, 'col');
     if (nextRows === baseTree.rows && nextColsFormatted === baseTree.cols) {
@@ -305,7 +386,8 @@ export const usePivotRenderModel = ({
     return { ...baseTree, rows: nextRows, cols: nextColsFormatted };
   }, [
     formData.dateFormatters,
-    groupbyColumns.length,
+    resolvedGroupbyColumnsLength,
+    resolvedGroupbyRowsLength,
     layout,
     measureLeafLabelMap,
     tree,
@@ -387,7 +469,7 @@ export const usePivotRenderModel = ({
     const baseSorter = sortByOrder(
       rowOrder,
       colTypeMap,
-      groupbyRows.map(getColumnLabel),
+      resolvedGroupbyRows.map(getColumnLabel),
     );
     const pushMetricTotalsToEnd =
       (colTotals && layout.resolvedColTotalPosition === 'end') ||
@@ -437,7 +519,7 @@ export const usePivotRenderModel = ({
     colTotals,
     colTypeMap,
     compareMetricSort,
-    groupbyRows,
+    resolvedGroupbyRows,
     hasRowSorting,
     layout,
     rowOrder,
@@ -448,7 +530,7 @@ export const usePivotRenderModel = ({
     const baseSorter = sortByOrder(
       colOrder,
       colTypeMap,
-      groupbyColumns.map(getColumnLabel),
+      resolvedGroupbyColumns.map(getColumnLabel),
     );
     return (a: PivotTreeNode, b: PivotTreeNode) => {
       const metricOrder = layout.compareMetricOrder(a, b);
@@ -461,7 +543,7 @@ export const usePivotRenderModel = ({
       }
       return baseSorter(a, b);
     };
-  }, [colOrder, colTypeMap, compareMetricSort, groupbyColumns, layout]);
+  }, [colOrder, colTypeMap, compareMetricSort, layout, resolvedGroupbyColumns]);
 
   const colNonMetricDepths = useMemo(() => {
     const depthMap = new Map<string, number>();
@@ -768,7 +850,9 @@ export const usePivotRenderModel = ({
       }
       const dimDepth = layout.countDimDepth(node.path);
       const maxDepth =
-        axis === 'row' ? groupbyRows.length : groupbyColumns.length;
+        axis === 'row'
+          ? resolvedGroupbyRowsLength
+          : resolvedGroupbyColumnsLength;
       const metricsAtEnd =
         axis === 'row' ? layout.metricsAtRowEnd : layout.metricsAtColEnd;
       const hasMetricToken = node.path.some(val =>
@@ -792,14 +876,14 @@ export const usePivotRenderModel = ({
             (layout.isMultiMetric || layout.singleMetricBetweenRows) &&
             layout.metricLayoutIndexOnRows !== undefined &&
             layout.metricLayoutIndexOnRows > 0 &&
-            layout.metricLayoutIndexOnRows < groupbyRows.length &&
+            layout.metricLayoutIndexOnRows < resolvedGroupbyRowsLength &&
             node.path.length === layout.metricLayoutIndexOnRows &&
             !node.path.some(val => layout.isMetricTokenValue(val))
           : layout.resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS &&
             (layout.isMultiMetric || layout.singleMetricBetweenCols) &&
             layout.metricLayoutIndexOnCols !== undefined &&
             layout.metricLayoutIndexOnCols > 0 &&
-            layout.metricLayoutIndexOnCols < groupbyColumns.length &&
+            layout.metricLayoutIndexOnCols < resolvedGroupbyColumnsLength &&
             node.path.length === layout.metricLayoutIndexOnCols &&
             !node.path.some(val => layout.isMetricTokenValue(val));
       if (hideMetricParentToggle) {
@@ -841,10 +925,10 @@ export const usePivotRenderModel = ({
       return true;
     },
     [
-      groupbyColumns.length,
-      groupbyRows.length,
       isLeafTierVisible,
       layout,
+      resolvedGroupbyColumnsLength,
+      resolvedGroupbyRowsLength,
       tree.cols,
       tree.rows,
     ],
@@ -855,7 +939,7 @@ export const usePivotRenderModel = ({
       if (!row) {
         return false;
       }
-      if (row.path.length === 0 && groupbyRows.length === 0) {
+      if (row.path.length === 0 && resolvedGroupbyRowsLength === 0) {
         return false;
       }
       if (isExplicitTotalNode(row)) {
@@ -867,7 +951,12 @@ export const usePivotRenderModel = ({
       }
       return true;
     },
-    [groupbyRows.length, isExplicitTotalNode, manualExpandedRowDepths, layout],
+    [
+      isExplicitTotalNode,
+      layout,
+      manualExpandedRowDepths,
+      resolvedGroupbyRowsLength,
+    ],
   );
 
   const isColAggregateBold = useCallback(
@@ -875,12 +964,12 @@ export const usePivotRenderModel = ({
       if (!col) {
         return false;
       }
-      if (col.path.length === 0 && groupbyColumns.length === 0) {
+      if (col.path.length === 0 && resolvedGroupbyColumnsLength === 0) {
         return false;
       }
       return isExplicitTotalNode(col) || layout.isMetricSubtotalNode(col);
     },
-    [groupbyColumns.length, isExplicitTotalNode, layout],
+    [isExplicitTotalNode, layout, resolvedGroupbyColumnsLength],
   );
 
   const showRowSpinner = useCallback(

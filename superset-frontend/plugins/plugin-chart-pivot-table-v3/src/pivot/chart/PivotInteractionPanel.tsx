@@ -29,7 +29,6 @@ import {
   DataRecordValue,
   ensureIsArray,
   getColumnLabel,
-  getMetricLabel,
   QueryFormColumn,
   QueryFormMetric,
   t,
@@ -53,7 +52,11 @@ import {
   MeasureLeavesByMetricKey,
   PivotRuntimeLayout,
 } from '../../types';
-import { getMetricKey, getStableColumnKey } from '../../utils';
+import {
+  getMetricKey,
+  getStableColumnKey,
+  resolveMetricDisplayLabel,
+} from '../../utils';
 import { isValueLeaf } from '../measureLeaves';
 import { INTERACTION_DIMENSION_DND_TYPE } from '../layout/interactionDrag';
 
@@ -355,7 +358,10 @@ const buildMetricOptions = (
       if (!key) {
         return undefined;
       }
-      const label = metricLabelMap?.[key] || getMetricLabel(metric) || key;
+      const label = resolveMetricDisplayLabel(key, {
+        metricLabelMap,
+        metrics,
+      });
       return { key, label };
     })
     .filter((option): option is MetricOption => Boolean(option));

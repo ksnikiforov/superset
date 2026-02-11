@@ -74,6 +74,7 @@ import {
   buildMetricLabelMap,
   getFormattingMetricKey,
   getMetricKey,
+  resolveMetricDisplayLabel,
 } from '../../utils';
 import {
   isPivotExcelFormula,
@@ -233,28 +234,14 @@ const resolveMetricLabel = (
   if (isPivotExcelFormula(option)) {
     return `${t('Custom Excel')}: ${formatExcelFormulaLabel(option.formula)}`;
   }
+  const metricKey = getMetricKey(option as QueryFormMetric | Metric);
+  if (metricKey) {
+    return resolveMetricDisplayLabel(metricKey, {
+      metricLabelMap,
+      metrics: [option as QueryFormMetric | Metric],
+    });
+  }
   if (option instanceof AdhocMetric) {
-    return getMetricLabel(option as QueryFormMetric);
-  }
-  if (typeof option === 'string') {
-    return metricLabelMap?.[option] ?? option;
-  }
-  if ('metric_name' in option && option.metric_name) {
-    const mappedLabel = metricLabelMap?.[option.metric_name];
-    if (mappedLabel) {
-      return mappedLabel;
-    }
-  }
-  if ('verbose_name' in option && option.verbose_name) {
-    return option.verbose_name;
-  }
-  if ('label' in option && typeof option.label === 'string') {
-    return option.label;
-  }
-  if ('metric_name' in option && option.metric_name) {
-    return option.metric_name;
-  }
-  if ('expressionType' in option) {
     return getMetricLabel(option as QueryFormMetric);
   }
   return t('Metric');
@@ -727,7 +714,7 @@ export const MetricFormatSelector = (props: MetricFormatSelectorProps) => {
       }
     }
     if (allowCustomSql && isAdhocMetricSQL(value)) {
-      const sqlExpression = value.sqlExpression;
+      const { sqlExpression } = value;
       setCustomMetricTab(
         disallowAdhocMetrics || !allowCustomSql
           ? allowExcel

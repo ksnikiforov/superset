@@ -1611,6 +1611,108 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     expect(totalValue.textContent?.trim()).toBe('100');
   });
 
+  it('uses the metric display label for row grand totals and never renders "Total count"', () => {
+    const metrics = ['sum__num', 'count'];
+    const detail = buildTreeFromRecords(
+      [
+        {
+          name: 'A',
+          sum__num: 10,
+          count: 2,
+        },
+      ],
+      metrics,
+      ['name'],
+      [],
+      1,
+      0,
+    );
+    const totals = buildTreeFromRecords(
+      [
+        {
+          sum__num: 10,
+          count: 2,
+        },
+      ],
+      metrics,
+      ['name'],
+      [],
+      0,
+      0,
+    );
+    const tree = applyMetricAxis(
+      mergeTrees(detail, totals),
+      metrics,
+      MetricsLayoutEnum.ROWS,
+      ['name'],
+      [],
+      1,
+      {
+        sum__num: 'sum__num',
+        count: 'count',
+      },
+    );
+
+    const formData = buildFormData({
+      ...(baseProps as Partial<PivotTableQueryFormData>),
+      groupbyRows: ['name', METRICS_PLACEHOLDER],
+      groupbyColumns: [],
+      metricsLayout: MetricsLayoutEnum.ROWS,
+      metrics,
+      colTotals: true,
+      colTotalPosition: 'end',
+      metricLabelMap: {
+        sum__num: 'sum__num',
+        count: 'count',
+      },
+    });
+
+    const { container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={formData}
+        metrics={metrics}
+        groupbyRows={['name']}
+        groupbyColumns={[]}
+        aggregateFunction="Sum"
+        width={600}
+        height={300}
+        startCollapsed={false}
+        initialDepth={1}
+        colTotals
+        rowTotals={false}
+        rowSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        colTotalPosition="end"
+        colSubtotalPosition="start"
+        rowTotalPosition="start"
+        verboseMap={{
+          count: 'COUNT(*)',
+        }}
+      />,
+    );
+
+    const rowHeaders = Array.from(
+      container.querySelectorAll('tbody th') as NodeListOf<HTMLElement>,
+    ).map(cell => cell.textContent?.trim());
+
+    expect(rowHeaders).toEqual(
+      expect.arrayContaining(['Total COUNT(*)', 'Total sum__num']),
+    );
+    expect(rowHeaders).not.toContain('Total count');
+  });
+
   describe('metric grand totals with metrics between row dimensions', () => {
     const buildMetrics = (count: number) =>
       Array.from({ length: count }, (_, idx) => `A_METRIC_${idx + 1}`);
@@ -2221,9 +2323,7 @@ describe('PivotTableChart totals & subtotals - rows', () => {
     const siblingMetricHeader = screen
       .getByText('weightedDiscount')
       .closest('th') as HTMLElement;
-    const childHeader = screen
-      .getByText('0-2%')
-      .closest('th') as HTMLElement;
+    const childHeader = screen.getByText('0-2%').closest('th') as HTMLElement;
     expect(metricHeader).toHaveClass('subtotal-cell');
     expect(siblingMetricHeader).toHaveClass('subtotal-cell');
     expect(childHeader).not.toHaveClass('subtotal-cell');

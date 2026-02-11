@@ -172,11 +172,25 @@ describe('shouldFetchForLayoutChange', () => {
     expect(shouldFetchForLayoutChange(baseLayout, nextLayout)).toBe(true);
   });
 
-  it('returns false when only value placement index changes on same axis', () => {
+  it('returns true when value placement index changes on a populated axis', () => {
     const nextLayout: PivotRuntimeLayout = {
       ...baseLayout,
       valuePlacement: { axis: 'col', index: 0 },
     };
-    expect(shouldFetchForLayoutChange(baseLayout, nextLayout)).toBe(false);
+    expect(shouldFetchForLayoutChange(baseLayout, nextLayout)).toBe(true);
+  });
+
+  it('returns false when value placement index changes on an empty axis', () => {
+    const prevLayout: PivotRuntimeLayout = {
+      ...baseLayout,
+      rows: [],
+      cols: [],
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const nextLayout: PivotRuntimeLayout = {
+      ...prevLayout,
+      valuePlacement: { axis: 'col', index: 1 },
+    };
+    expect(shouldFetchForLayoutChange(prevLayout, nextLayout)).toBe(false);
   });
 });

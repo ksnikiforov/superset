@@ -95,6 +95,9 @@ const isPrefix = (prefix: string[], target: string[]) =>
   prefix.length <= target.length &&
   prefix.every((value, idx) => value === target[idx]);
 
+const buildLayoutSignature = (rows: string[], cols: string[]) =>
+  stableStringify({ rows, cols });
+
 const trimAxisByDepth = ({
   tree,
   axis,
@@ -382,6 +385,7 @@ export const useExpansionEngine = ({
     rows: groupbyRowKeys,
     cols: groupbyColumnKeys,
   });
+  const layoutTreeCacheRef = useRef<Map<string, PivotTreeData>>(new Map());
 
   if (!expansionStateStoreRef.current) {
     expansionStateStoreRef.current = createExpansionStateStore({
@@ -1826,6 +1830,14 @@ export const useExpansionEngine = ({
       cols: groupbyColumnKeys,
     };
     const previousLayout = previousLayoutRef.current;
+    const currentLayoutSignature = buildLayoutSignature(
+      currentLayout.rows,
+      currentLayout.cols,
+    );
+    const previousLayoutSignature = buildLayoutSignature(
+      previousLayout.rows,
+      previousLayout.cols,
+    );
     const hasNewData = previousDataRef.current !== data;
     const shouldReinitialize =
       isInitialMount ||
@@ -1841,20 +1853,60 @@ export const useExpansionEngine = ({
     previousDataRef.current = data;
     const rowsChanged = !isSameLayout(previousLayout.rows, currentLayout.rows);
     const colsChanged = !isSameLayout(previousLayout.cols, currentLayout.cols);
+    if (hasNewData) {
+      layoutTreeCacheRef.current = new Map<string, PivotTreeData>([
+        [currentLayoutSignature, data],
+      ]);
+    } else if ((rowsChanged || colsChanged) && treeRef.current) {
+      layoutTreeCacheRef.current.set(previousLayoutSignature, treeRef.current);
+    }
+    const shouldExpandRows =
+      currentLayout.rows.length > previousLayout.rows.length &&
+      isPrefix(previousLayout.rows, currentLayout.rows);
+    const shouldExpandCols =
+      currentLayout.cols.length > previousLayout.cols.length &&
+      isPrefix(previousLayout.cols, currentLayout.cols);
     const shouldResetExpandedRows =
-      shouldResetExpandedState && (sharedSignatureChanged || rowsChanged);
+      shouldResetExpandedState &&
+      (sharedSignatureChanged || (rowsChanged && !shouldExpandRows));
     const shouldResetExpandedCols =
-      shouldResetExpandedState && (sharedSignatureChanged || colsChanged);
+      shouldResetExpandedState &&
+      (sharedSignatureChanged || (colsChanged && !shouldExpandCols));
     const shouldResetExpanded =
       shouldResetExpandedRows || shouldResetExpandedCols;
     const layoutChanged = rowsChanged || colsChanged;
-    const sourceTree = hasNewData || !layoutChanged ? data : treeRef.current;
+    const sourceTree =
+      hasNewData || !layoutChanged
+        ? data
+        : (layoutTreeCacheRef.current.get(currentLayoutSignature) ??
+          treeRef.current);
+    const hasAxisDepthCoverage = (
+      nodes: Record<string, PivotTreeNode>,
+      targetDepth: number,
+    ) => {
+      if (targetDepth <= 0) {
+        return true;
+      }
+      return Object.values(nodes).some(
+        node => countDimDepth(node.path) >= targetDepth,
+      );
+    };
+    const canReuseExpandedRowData =
+      shouldExpandRows &&
+      hasAxisDepthCoverage(sourceTree.rows, currentLayout.rows.length);
+    const canReuseExpandedColData =
+      shouldExpandCols &&
+      hasAxisDepthCoverage(sourceTree.cols, currentLayout.cols.length);
+    const shouldPruneRowsForLayoutChange =
+      rowsChanged && !hasNewData && !canReuseExpandedRowData;
+    const shouldPruneColsForLayoutChange =
+      colsChanged && !hasNewData && !canReuseExpandedColData;
     const layoutRowsForPrune = rowsChanged
       ? previousLayout.rows
-      : sessionExpansionState.rowKeys ?? previousLayout.rows;
+      : (sessionExpansionState.rowKeys ?? previousLayout.rows);
     const layoutColsForPrune = colsChanged
       ? previousLayout.cols
-      : sessionExpansionState.colKeys ?? previousLayout.cols;
+      : (sessionExpansionState.colKeys ?? previousLayout.cols);
     const rowStablePrefix = getStablePrefixLength(
       layoutRowsForPrune,
       currentLayout.rows,
@@ -1863,18 +1915,6 @@ export const useExpansionEngine = ({
       layoutColsForPrune,
       currentLayout.cols,
     );
-    const shouldTrimRows =
-      currentLayout.rows.length < previousLayout.rows.length &&
-      isPrefix(currentLayout.rows, previousLayout.rows);
-    const shouldTrimCols =
-      currentLayout.cols.length < previousLayout.cols.length &&
-      isPrefix(currentLayout.cols, previousLayout.cols);
-    const shouldExpandRows =
-      currentLayout.rows.length > previousLayout.rows.length &&
-      isPrefix(previousLayout.rows, currentLayout.rows);
-    const shouldExpandCols =
-      currentLayout.cols.length > previousLayout.cols.length &&
-      isPrefix(previousLayout.cols, currentLayout.cols);
     const allowMetricRowPromotion =
       metricIndexForRows !== undefined &&
       metricIndexForRows < groupbyRowsLength;
@@ -1882,26 +1922,26 @@ export const useExpansionEngine = ({
       metricIndexForCols !== undefined &&
       metricIndexForCols < groupbyColumnsLength;
     const baseTree =
-      shouldTrimRows || shouldTrimCols
+      shouldPruneRowsForLayoutChange || shouldPruneColsForLayoutChange
         ? trimTreeForLayout({
             tree: sourceTree,
-            trimRowDepth: shouldTrimRows
-              ? currentLayout.rows.length
+            trimRowDepth: shouldPruneRowsForLayoutChange
+              ? rowStablePrefix
               : undefined,
-            trimColDepth: shouldTrimCols
-              ? currentLayout.cols.length
+            trimColDepth: shouldPruneColsForLayoutChange
+              ? colStablePrefix
               : undefined,
             countDimDepth,
           })
         : sourceTree;
     const normalizedTree =
-      shouldExpandRows || shouldExpandCols
+      shouldPruneRowsForLayoutChange || shouldPruneColsForLayoutChange
         ? promoteTreeForLayout({
             tree: baseTree,
-            promoteRowDepth: shouldExpandRows
+            promoteRowDepth: shouldPruneRowsForLayoutChange
               ? currentLayout.rows.length
               : undefined,
-            promoteColDepth: shouldExpandCols
+            promoteColDepth: shouldPruneColsForLayoutChange
               ? currentLayout.cols.length
               : undefined,
             countDimDepth,
@@ -1919,6 +1959,7 @@ export const useExpansionEngine = ({
     setWarnings([]);
     treeRef.current = normalizedTree;
     setTree(normalizedTree);
+    layoutTreeCacheRef.current.set(currentLayoutSignature, normalizedTree);
     setErrorMessage(undefined);
     fetchedRowKeysRef.current = new Map();
     fetchedColKeysRef.current = new Map();
@@ -2017,10 +2058,10 @@ export const useExpansionEngine = ({
       keys: string[],
       stablePrefix: number,
       nodes: Record<string, PivotTreeNode>,
-      shouldReset: boolean,
+      shouldPrune: boolean,
       includeMetricDepth: boolean,
     ) => {
-      if (!shouldReset) {
+      if (!shouldPrune) {
         return keys.filter(key => key !== rootKey);
       }
       const expanded = new Set<string>([rootKey, ...keys]);
@@ -2039,10 +2080,10 @@ export const useExpansionEngine = ({
       keys: string[],
       stablePrefix: number,
       nodes: Record<string, PivotTreeNode>,
-      shouldReset: boolean,
+      shouldPrune: boolean,
       includeMetricDepth: boolean,
     ) => {
-      if (!shouldReset) {
+      if (!shouldPrune) {
         return keys.filter(key => key !== rootKey);
       }
       return keys.filter(key => {
@@ -2056,60 +2097,36 @@ export const useExpansionEngine = ({
       });
     };
 
-    const stripMetricTierKeys = (
-      keys: string[],
-      nodes: Record<string, PivotTreeNode>,
-      enabled: boolean,
-    ) => {
-      if (!enabled || keys.length === 0) {
-        return keys;
-      }
-      return keys.filter(key => {
-        const node = nodes[key];
-        const path = node ? node.path : parsePath(key);
-        return !path.some(isMetricTokenValue);
-      });
-    };
-
     const prunedManualRows = pruneManualKeys(
       normalizedRowCache.keys,
       rowStablePrefix,
       normalizedTree.rows,
-      shouldResetExpandedRows,
+      shouldResetExpandedRows || rowsChanged,
       allowMetricRowPromotion,
     );
     const prunedManualCols = pruneManualKeys(
       normalizedColCache.keys,
       colStablePrefix,
       normalizedTree.cols,
-      shouldResetExpandedCols,
+      shouldResetExpandedCols || colsChanged,
       allowMetricColPromotion,
     );
-    const prunedManualRowsResolved = stripMetricTierKeys(
-      prunedManualRows,
-      normalizedTree.rows,
-      shouldExpandRows && allowMetricRowPromotion,
-    );
-    const prunedManualColsResolved = stripMetricTierKeys(
-      prunedManualCols,
-      normalizedTree.cols,
-      shouldExpandCols && allowMetricColPromotion,
-    );
+    const prunedManualRowsResolved = prunedManualRows;
+    const prunedManualColsResolved = prunedManualCols;
     const prunedCollapsedRows = pruneCollapsedKeys(
       normalizedRowCache.collapsedKeys,
       rowStablePrefix,
       normalizedTree.rows,
-      shouldResetExpandedRows,
+      shouldResetExpandedRows || rowsChanged,
       allowMetricRowPromotion,
     );
     const prunedCollapsedCols = pruneCollapsedKeys(
       normalizedColCache.collapsedKeys,
       colStablePrefix,
       normalizedTree.cols,
-      shouldResetExpandedCols,
+      shouldResetExpandedCols || colsChanged,
       allowMetricColPromotion,
     );
-
     explicitExpandedRowsRef.current = new Set(prunedManualRowsResolved);
     explicitExpandedColsRef.current = new Set(prunedManualColsResolved);
     explicitCollapsedRowsRef.current = new Set(prunedCollapsedRows);
@@ -2154,24 +2171,26 @@ export const useExpansionEngine = ({
       inFlightKeys: new Set(),
     });
 
-    const prunedRows = shouldResetExpandedRows
-      ? pruneExpandedToStablePrefix({
-          expanded: nextExpandedRows,
-          nodes: normalizedTree.rows,
-          stablePrefix: rowStablePrefix,
-          metricLabelSet: metricLabelSetForDepth,
-          includeMetricDepth: allowMetricRowPromotion,
-        })
-      : nextExpandedRows;
-    const prunedCols = shouldResetExpandedCols
-      ? pruneExpandedToStablePrefix({
-          expanded: nextExpandedCols,
-          nodes: normalizedTree.cols,
-          stablePrefix: colStablePrefix,
-          metricLabelSet: metricLabelSetForDepth,
-          includeMetricDepth: allowMetricColPromotion,
-        })
-      : nextExpandedCols;
+    const prunedRows =
+      shouldResetExpandedRows || rowsChanged
+        ? pruneExpandedToStablePrefix({
+            expanded: nextExpandedRows,
+            nodes: normalizedTree.rows,
+            stablePrefix: rowStablePrefix,
+            metricLabelSet: metricLabelSetForDepth,
+            includeMetricDepth: allowMetricRowPromotion,
+          })
+        : nextExpandedRows;
+    const prunedCols =
+      shouldResetExpandedCols || colsChanged
+        ? pruneExpandedToStablePrefix({
+            expanded: nextExpandedCols,
+            nodes: normalizedTree.cols,
+            stablePrefix: colStablePrefix,
+            metricLabelSet: metricLabelSetForDepth,
+            includeMetricDepth: allowMetricColPromotion,
+          })
+        : nextExpandedCols;
 
     const resolvedRows = resolveExpandedForMetrics(
       'row',

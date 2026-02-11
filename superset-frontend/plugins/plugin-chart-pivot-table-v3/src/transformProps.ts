@@ -34,6 +34,7 @@ import {
   PivotTreeData,
 } from './types';
 import {
+  buildResolvedMetricLabelMap,
   getMetricKeys,
   getMetricKey,
   getStableColumnKey,
@@ -128,11 +129,10 @@ export default function transformProps(
     },
     {},
   );
-  const metricLabelMap = {
+  const baseMetricLabelOverrides = {
     ...metricLabelMapBase,
     ...(formData.metricLabelMap ?? {}),
   };
-  const formDataWithMetricLabels = { ...formData, metricLabelMap };
   const datasourceVerboseMap = datasource?.verboseMap ?? {};
   const columnFormats = datasource?.columnFormats ?? {};
   const currencyFormats = datasource?.currencyFormats ?? {};
@@ -164,6 +164,14 @@ export default function transformProps(
     ...datasourceVerboseMap,
     ...(formData.verboseMap ?? {}),
   };
+  const metricLabelMap = Object.fromEntries(
+    buildResolvedMetricLabelMap({
+      metrics: metricsForLabels,
+      metricLabelMap: baseMetricLabelOverrides,
+      verboseMap,
+    }),
+  );
+  const formDataWithMetricLabels = { ...formData, metricLabelMap };
   const layout = buildLayoutContext(formDataWithMetricLabels);
   const {
     metrics,

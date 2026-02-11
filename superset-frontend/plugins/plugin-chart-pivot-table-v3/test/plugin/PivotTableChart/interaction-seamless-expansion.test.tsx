@@ -25,6 +25,7 @@ import {
   applyMetricAxis,
   buildTreeFromRecords,
   getStableColumnKey,
+  mergeTrees,
   serializePath,
 } from '../../../src/utils';
 import { supersetChartDataClient } from '../../../src/pivot/data/SupersetChartDataClient';
@@ -218,6 +219,540 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     expect(
       within(airRow).queryByLabelText('plus-square'),
     ).not.toBeInTheDocument();
+  });
+
+  it('shows grand total and restores row members after removing then re-adding the last row dimension', async () => {
+    const metrics = ['m1', 'm2'];
+    const initialRows = ['r1'];
+    const detailTree = buildTreeFromRecords(
+      [
+        { r1: 'A', m1: 10, m2: 20 },
+        { r1: 'B', m1: 12, m2: 24 },
+      ],
+      metrics,
+      initialRows,
+      [],
+      1,
+      0,
+    );
+    const totalsTree = buildTreeFromRecords(
+      [{ m1: 22, m2: 44 }],
+      metrics,
+      initialRows,
+      [],
+      0,
+      0,
+    );
+    const baseTree = applyMetricAxis(
+      mergeTrees(detailTree, totalsTree),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      initialRows,
+      [],
+      0,
+    );
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: initialRows,
+      cols: [],
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: initialRows,
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      colTotals: true,
+      rowTotals: false,
+      startCollapsed: false,
+      initialDepth: 1,
+    });
+
+    render(
+      <PivotTableChart
+        data={baseTree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={initialRows}
+        groupbyColumns={[]}
+        colTotals
+        rowTotals={false}
+        width={600}
+        height={300}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText('A')).toBeInTheDocument());
+
+    const rowToggle = screen.getByLabelText(
+      'Toggle row dimension',
+    ) as HTMLButtonElement;
+    fireEvent.click(rowToggle);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    await waitFor(() =>
+      expect(screen.getByText('Grand total')).toBeInTheDocument(),
+    );
+    const totalRow = screen.getByText('Grand total').closest('tr');
+    if (!totalRow) {
+      throw new Error('Grand total row not found');
+    }
+    const totalValues = within(totalRow)
+      .getAllByRole('cell')
+      .map(cell => cell.textContent?.trim() ?? '');
+    expect(totalValues).toEqual(expect.arrayContaining(['22', '44']));
+
+    const rowToggleAfterTrim = screen.getByLabelText(
+      'Toggle row dimension',
+    ) as HTMLButtonElement;
+    fireEvent.click(rowToggleAfterTrim);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    await waitFor(() => expect(screen.getByText('A')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('B')).toBeInTheDocument());
+  });
+
+  it('shows grand total column and restores column members after removing then re-adding the last column dimension', async () => {
+    const metrics = ['m1', 'm2'];
+    const initialCols = ['c1'];
+    const detailTree = buildTreeFromRecords(
+      [
+        { c1: 'A', m1: 10, m2: 20 },
+        { c1: 'B', m1: 12, m2: 24 },
+      ],
+      metrics,
+      [],
+      initialCols,
+      0,
+      1,
+    );
+    const totalsTree = buildTreeFromRecords(
+      [{ m1: 22, m2: 44 }],
+      metrics,
+      [],
+      initialCols,
+      0,
+      0,
+    );
+    const baseTree = applyMetricAxis(
+      mergeTrees(detailTree, totalsTree),
+      metrics,
+      MetricsLayoutEnum.ROWS,
+      [],
+      initialCols,
+      0,
+    );
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: [],
+      cols: initialCols,
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'row', index: 0 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: initialCols,
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.ROWS,
+      pivotRuntimeLayout: runtimeLayout,
+      rowTotals: true,
+      colTotals: false,
+      startCollapsed: false,
+      initialDepth: 1,
+    });
+
+    const { container } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={initialCols}
+        rowTotals
+        colTotals={false}
+        width={600}
+        height={300}
+      />,
+    );
+
+    await waitFor(() => {
+      const thead = container.querySelector('thead') as HTMLElement;
+      expect(within(thead).getByText('A')).toBeInTheDocument();
+    });
+
+    const colToggle = screen.getByLabelText(
+      'Toggle column dimension',
+    ) as HTMLButtonElement;
+    fireEvent.click(colToggle);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    await waitFor(() => {
+      const thead = container.querySelector('thead') as HTMLElement;
+      expect(within(thead).getByText('Grand total')).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      const tbody = container.querySelector('tbody') as HTMLElement;
+      expect(within(tbody).getByText('m1')).toBeInTheDocument();
+      expect(within(tbody).getByText('m2')).toBeInTheDocument();
+    });
+
+    const colToggleAfterTrim = screen.getByLabelText(
+      'Toggle column dimension',
+    ) as HTMLButtonElement;
+    fireEvent.click(colToggleAfterTrim);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    await waitFor(() => {
+      const thead = container.querySelector('thead') as HTMLElement;
+      expect(within(thead).getByText('A')).toBeInTheDocument();
+      expect(within(thead).getByText('B')).toBeInTheDocument();
+    });
+  });
+
+  it('clears stale expanded state values after trimming a column dimension when Values is first', async () => {
+    const metrics = ['m1', 'm2'];
+    const initialCols = ['gender', 'state'];
+    const records = [
+      { gender: 'F', state: 'CA', m1: 10, m2: 20 },
+      { gender: 'F', state: 'WA', m1: 12, m2: 22 },
+      { gender: 'M', state: 'TX', m1: 14, m2: 24 },
+    ];
+    const baseTree = applyMetricAxis(
+      buildTreeFromRecords(records, metrics, [], initialCols, 0, 2),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      [],
+      initialCols,
+      0,
+    );
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: [],
+      cols: initialCols,
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: initialCols,
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      startCollapsed: true,
+      initialDepth: 1,
+    });
+
+    const { container } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={initialCols}
+        width={600}
+        height={300}
+      />,
+    );
+
+    const thead = container.querySelector('thead') as HTMLElement;
+    await waitFor(() =>
+      expect(within(thead).getByText('m1')).toBeInTheDocument(),
+    );
+
+    const metricCell = within(thead)
+      .getByText('m1')
+      .closest('th') as HTMLElement;
+    const metricExpand = within(metricCell).queryByLabelText('plus-square');
+    if (metricExpand) {
+      fireEvent.click(metricExpand);
+    }
+
+    await waitFor(() =>
+      expect(within(thead).getAllByText('F').length).toBeGreaterThan(0),
+    );
+    const genderCell = within(thead)
+      .getAllByText('F')[0]
+      .closest('th') as HTMLElement;
+    const genderExpand = within(genderCell).queryByLabelText('plus-square');
+    if (genderExpand) {
+      fireEvent.click(genderExpand);
+    }
+
+    await waitFor(() =>
+      expect(within(thead).getAllByText('CA').length).toBeGreaterThan(0),
+    );
+
+    const columnButtons = screen.getAllByLabelText('Toggle column dimension');
+    fireEvent.click(columnButtons[1]);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    await waitFor(() => {
+      const refreshedThead = container.querySelector('thead') as HTMLElement;
+      expect(within(refreshedThead).queryAllByText('CA')).toHaveLength(0);
+      expect(within(refreshedThead).queryAllByText('WA')).toHaveLength(0);
+      const refreshedGenderCell = within(refreshedThead)
+        .getAllByText('F')[0]
+        .closest('th') as HTMLElement;
+      expect(
+        within(refreshedGenderCell).queryByLabelText('plus-square'),
+      ).not.toBeInTheDocument();
+      expect(
+        within(refreshedGenderCell).queryByLabelText('minus-square'),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  it('keeps the pivot expanded when re-adding a trimmed column dimension in Values-first layout', async () => {
+    const metrics = ['m1', 'm2'];
+    const initialCols = ['gender', 'state'];
+    const records = [
+      { gender: 'F', state: 'CA', m1: 10, m2: 20 },
+      { gender: 'F', state: 'WA', m1: 12, m2: 22 },
+      { gender: 'M', state: 'TX', m1: 14, m2: 24 },
+    ];
+    const baseTree = applyMetricAxis(
+      buildTreeFromRecords(records, metrics, [], initialCols, 0, 2),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      [],
+      initialCols,
+      0,
+    );
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: [],
+      cols: initialCols,
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: initialCols,
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      startCollapsed: true,
+      initialDepth: 1,
+    });
+
+    const { container } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={initialCols}
+        width={600}
+        height={300}
+      />,
+    );
+
+    const thead = container.querySelector('thead') as HTMLElement;
+    const getMetricCell = () =>
+      within(thead).getByText('m1').closest('th') as HTMLElement;
+
+    const metricExpand = within(getMetricCell()).queryByLabelText('plus-square');
+    if (metricExpand) {
+      fireEvent.click(metricExpand);
+    }
+    await waitFor(() =>
+      expect(within(thead).getAllByText('F').length).toBeGreaterThan(0),
+    );
+    const genderCell = within(thead)
+      .getAllByText('F')[0]
+      .closest('th') as HTMLElement;
+    const genderExpand = within(genderCell).queryByLabelText('plus-square');
+    if (genderExpand) {
+      fireEvent.click(genderExpand);
+    }
+    await waitFor(() =>
+      expect(within(thead).getAllByText('CA').length).toBeGreaterThan(0),
+    );
+
+    const columnButtons = screen.getAllByLabelText('Toggle column dimension');
+    fireEvent.click(columnButtons[1]);
+    await waitFor(() => expect(within(thead).queryAllByText('CA')).toHaveLength(0));
+    await waitFor(() =>
+      expect(
+        within(getMetricCell()).queryByLabelText('minus-square'),
+      ).not.toBeNull(),
+    );
+
+    const columnButtonsAfterTrim =
+      screen.getAllByLabelText('Toggle column dimension');
+    fireEvent.click(columnButtonsAfterTrim[1]);
+
+    await waitFor(() =>
+      expect(within(thead).getAllByText('F').length).toBeGreaterThan(0),
+    );
+    await waitFor(() =>
+      expect(
+        within(getMetricCell()).queryByLabelText('minus-square'),
+      ).not.toBeNull(),
+    );
+    await waitFor(() => {
+      const refreshedGenderCell = within(thead)
+        .getAllByText('F')[0]
+        .closest('th') as HTMLElement;
+      const genderToggle =
+        within(refreshedGenderCell).queryByLabelText('plus-square') ??
+        within(refreshedGenderCell).queryByLabelText('minus-square');
+      expect(genderToggle).not.toBeNull();
+    });
+  });
+
+  it('clears stale cached column leaves when removing one dimension and later adding another', async () => {
+    const metrics = ['m1', 'm2'];
+    const initialCols = ['gender', 'state'];
+    const records = [
+      { gender: 'F', state: 'CA', city: 'SF', m1: 10, m2: 20 },
+      { gender: 'F', state: 'WA', city: 'SEA', m1: 12, m2: 22 },
+      { gender: 'M', state: 'TX', city: 'AUS', m1: 14, m2: 24 },
+    ];
+    const baseTree = applyMetricAxis(
+      buildTreeFromRecords(records, metrics, [], initialCols, 0, 2),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      [],
+      initialCols,
+      0,
+    );
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: [],
+      cols: initialCols,
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: [...initialCols, 'city'],
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      startCollapsed: true,
+      initialDepth: 1,
+    });
+
+    const { container } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={initialCols}
+        width={600}
+        height={300}
+      />,
+    );
+
+    const thead = container.querySelector('thead') as HTMLElement;
+    const metricCell = within(thead).getByText('m1').closest('th') as HTMLElement;
+    const metricExpand = within(metricCell).queryByLabelText('plus-square');
+    if (metricExpand) {
+      fireEvent.click(metricExpand);
+    }
+    await waitFor(() =>
+      expect(within(thead).getAllByText('F').length).toBeGreaterThan(0),
+    );
+
+    const genderCell = within(thead)
+      .getAllByText('F')[0]
+      .closest('th') as HTMLElement;
+    const genderExpand = within(genderCell).queryByLabelText('plus-square');
+    if (genderExpand) {
+      fireEvent.click(genderExpand);
+    }
+    await waitFor(() =>
+      expect(within(thead).getAllByText('CA').length).toBeGreaterThan(0),
+    );
+
+    const findDimensionRow = (label: string) => {
+      const nodes = screen.getAllByText(label);
+      for (const node of nodes) {
+        let current: HTMLElement | null = node as HTMLElement;
+        while (current) {
+          if (within(current).queryByLabelText('Toggle column dimension')) {
+            return current;
+          }
+          current = current.parentElement;
+        }
+      }
+      throw new Error(`Missing dimension row for ${label}`);
+    };
+
+    const stateRow = findDimensionRow('state');
+    const stateToggle = within(stateRow).getByLabelText(
+      'Toggle column dimension',
+    ) as HTMLButtonElement;
+    fireEvent.click(stateToggle);
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    await waitFor(() => expect(within(thead).queryAllByText('CA')).toHaveLength(0));
+    await waitFor(() => expect(within(thead).queryAllByText('WA')).toHaveLength(0));
+    await waitFor(() => expect(within(thead).queryAllByText('TX')).toHaveLength(0));
+    await waitFor(() => {
+      const refreshedStateRow = findDimensionRow('state');
+      const refreshedStateToggle = within(refreshedStateRow).getByLabelText(
+        'Toggle column dimension',
+      ) as HTMLButtonElement;
+      expect(refreshedStateToggle.getAttribute('aria-pressed')).toBe('false');
+    });
+
+    const cityRow = findDimensionRow('city');
+    const cityToggle = within(cityRow).getByLabelText(
+      'Toggle column dimension',
+    ) as HTMLButtonElement;
+    fireEvent.click(cityToggle);
+    await waitFor(() => {
+      const refreshedCityRow = findDimensionRow('city');
+      const refreshedCityToggle = within(refreshedCityRow).getByLabelText(
+        'Toggle column dimension',
+      ) as HTMLButtonElement;
+      expect(refreshedCityToggle.getAttribute('aria-pressed')).toBe('true');
+    });
+
+    await waitFor(() => expect(within(thead).queryAllByText('CA')).toHaveLength(0));
+    await waitFor(() => expect(within(thead).queryAllByText('WA')).toHaveLength(0));
+    await waitFor(() => expect(within(thead).queryAllByText('TX')).toHaveLength(0));
+
+    await waitFor(() => {
+      const refreshedGenderCell = within(thead)
+        .getAllByText('F')[0]
+        .closest('th') as HTMLElement;
+      const toggle =
+        within(refreshedGenderCell).queryByLabelText('plus-square') ??
+        within(refreshedGenderCell).queryByLabelText('minus-square');
+      expect(toggle).not.toBeNull();
+    });
   });
 
   it('shows column expand toggles after inserting before trailing values without a seamless reload', async () => {
@@ -898,6 +1433,231 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     await waitFor(() => {
       expect(screen.getAllByText('measure1').length).toBeGreaterThan(0);
       expect(screen.getAllByText('measure2').length).toBeGreaterThan(0);
+    });
+  });
+
+  it('seamless-reloads when moving Values to the front on a populated column axis', async () => {
+    const metrics = ['m1', 'm2'];
+    const rowGroupby = ['r1'];
+    const records = [{ r1: 'R1', c1: 'C1', m1: 10, m2: 20 }];
+    const baseTree = applyMetricAxis(
+      buildTreeFromRecords(records, metrics, rowGroupby, [], 1, 0),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      rowGroupby,
+      [],
+      0,
+    );
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: rowGroupby,
+      cols: [],
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: [...rowGroupby, 'c1'],
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      startCollapsed: true,
+      initialDepth: 1,
+    });
+
+    fetchMock.mockImplementation(async ({ specs }: { specs: Array<unknown> }) =>
+      specs.map(() => ({ data: records })),
+    );
+
+    render(
+      <PivotTableChart
+        data={baseTree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={[]}
+        width={600}
+        height={300}
+      />,
+    );
+
+    const findDimensionRow = (label: string) => {
+      const nodes = screen.getAllByText(label);
+      for (const node of nodes) {
+        let current: HTMLElement | null = node as HTMLElement;
+        while (current) {
+          if (
+            within(current).queryByLabelText('Toggle row dimension') ||
+            within(current).queryByLabelText('Toggle column dimension')
+          ) {
+            return current;
+          }
+          current = current.parentElement;
+        }
+      }
+      throw new Error(`Missing dimension row for ${label}`);
+    };
+
+    const c1Row = findDimensionRow('c1');
+    fireEvent.click(within(c1Row).getByLabelText('Toggle column dimension'));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const afterAddCall = fetchMock.mock.calls.at(-1)?.[0];
+    expect(
+      (afterAddCall?.formData?.groupbyColumns ?? []).map(getStableColumnKey),
+    ).toEqual(['c1', METRICS_PLACEHOLDER]);
+
+    const getColChips = () =>
+      screen
+        .getAllByLabelText('Remove dimension')
+        .map(button => button.parentElement)
+        .filter((node): node is HTMLElement => Boolean(node));
+    const getColChip = (label: string) => {
+      const chips = getColChips();
+      const chip = chips.find(node => node.textContent?.includes(label));
+      if (!chip) {
+        throw new Error(`Missing column chip for ${label}`);
+      }
+      return chip;
+    };
+
+    const valueLabel = screen
+      .getAllByText('Value')
+      .find(node => !node.closest('thead') && !node.closest('tbody'));
+    if (!valueLabel) {
+      throw new Error('Missing Value chip label');
+    }
+    const valueChip = valueLabel.parentElement as HTMLElement | null;
+    if (!valueChip) {
+      throw new Error('Missing Value chip element');
+    }
+    const c1Chip = getColChip('c1');
+
+    const dataTransfer = {
+      data: {} as Record<string, string>,
+      setData(type: string, value: string) {
+        this.data[type] = value;
+      },
+      getData(type: string) {
+        return this.data[type];
+      },
+      dropEffect: 'move',
+      effectAllowed: 'all',
+    };
+
+    fireEvent.dragStart(valueChip, { dataTransfer });
+    fireEvent.dragEnter(c1Chip, { dataTransfer });
+    fireEvent.dragOver(c1Chip, { dataTransfer });
+    fireEvent.drop(c1Chip, { dataTransfer });
+    fireEvent.dragEnd(valueChip, { dataTransfer });
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const afterMoveCall = fetchMock.mock.calls.at(-1)?.[0];
+    expect(afterMoveCall?.formData?.metricsLayout).toBe(
+      MetricsLayoutEnum.COLUMNS,
+    );
+    expect(
+      (afterMoveCall?.formData?.groupbyColumns ?? []).map(getStableColumnKey),
+    ).toEqual([METRICS_PLACEHOLDER, 'c1']);
+  });
+
+  it('keeps visible column headers after adding the first column dimension to a Values-only column axis', async () => {
+    const metrics = ['m1', 'm2'];
+    const records = [
+      { c1: 'A', m1: 10, m2: 20 },
+      { c1: 'B', m1: 12, m2: 24 },
+    ];
+    const baseTree = applyMetricAxis(
+      buildTreeFromRecords(records, metrics, [], [], 0, 0),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      [],
+      [],
+      0,
+    );
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: [],
+      cols: [],
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: ['c1'],
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      startCollapsed: true,
+      initialDepth: 1,
+    });
+
+    fetchMock.mockImplementation(async ({ specs }: { specs: Array<unknown> }) =>
+      specs.map(() => ({ data: records })),
+    );
+
+    const { container } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+        width={600}
+        height={300}
+      />,
+    );
+
+    const findDimensionRow = (label: string) => {
+      const nodes = screen.getAllByText(label);
+      for (const node of nodes) {
+        let current: HTMLElement | null = node as HTMLElement;
+        while (current) {
+          if (within(current).queryByLabelText('Toggle column dimension')) {
+            return current;
+          }
+          current = current.parentElement;
+        }
+      }
+      throw new Error(`Missing dimension row for ${label}`);
+    };
+
+    const c1Row = findDimensionRow('c1');
+    fireEvent.click(within(c1Row).getByLabelText('Toggle column dimension'));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const fetchCall = fetchMock.mock.calls.at(-1)?.[0];
+    const plannedSpecs = fetchCall?.specs ?? [];
+    expect(plannedSpecs.length).toBeGreaterThan(0);
+    expect(
+      plannedSpecs.some(
+        (spec: { meta?: { colDepth?: number } }) => (spec.meta?.colDepth ?? 0) >= 1,
+      ),
+    ).toBe(true);
+    expect(
+      plannedSpecs.some(
+        (spec: { meta?: { colGroupbyForQueryFull?: string[] } }) =>
+          (spec.meta?.colGroupbyForQueryFull ?? []).includes('c1'),
+      ),
+    ).toBe(true);
+    expect(
+      (fetchCall?.formData?.groupbyColumns ?? []).map(getStableColumnKey),
+    ).toEqual(['c1', METRICS_PLACEHOLDER]);
+
+    await waitFor(() => {
+      const thead = container.querySelector('thead') as HTMLElement;
+      expect(within(thead).getByText('A')).toBeInTheDocument();
+      expect(within(thead).getByText('B')).toBeInTheDocument();
     });
   });
 

@@ -144,6 +144,176 @@ export const buildMetricLabelMap = (
   return merged;
 };
 
+type MetricLabelLookup = Record<string, string> | Map<string, string>;
+
+const normalizeMetricLabelToken = (value: unknown): string | undefined => {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
+const getMetricLookupLabel = (
+  lookup: MetricLabelLookup | undefined,
+  key: string,
+): string | undefined => {
+  if (!lookup) {
+    return undefined;
+  }
+  if (lookup instanceof Map) {
+    return normalizeMetricLabelToken(lookup.get(key));
+  }
+  return normalizeMetricLabelToken(lookup[key]);
+};
+
+const getMetricObjectField = (
+  metric: QueryFormMetric | Metric,
+  field: 'metric_name' | 'verbose_name' | 'label',
+): string | undefined => {
+  if (typeof metric === 'string') {
+    return undefined;
+  }
+  const value = (metric as Record<string, unknown>)[field];
+  return normalizeMetricLabelToken(value);
+};
+
+const collectMetricLabelIdentifiers = (
+  metric: QueryFormMetric | Metric,
+): string[] => {
+  const identifiers = new Set<string>();
+  const metricKey = normalizeMetricLabelToken(getMetricKey(metric));
+  if (metricKey) {
+    identifiers.add(metricKey);
+  }
+  const metricName = getMetricObjectField(metric, 'metric_name');
+  if (metricName) {
+    identifiers.add(metricName);
+  }
+  const verboseName = getMetricObjectField(metric, 'verbose_name');
+  if (verboseName) {
+    identifiers.add(verboseName);
+  }
+  const label = getMetricObjectField(metric, 'label');
+  if (label) {
+    identifiers.add(label);
+  }
+  const queryLabel = normalizeMetricLabelToken(
+    getMetricLabel(metric as QueryFormMetric),
+  );
+  if (queryLabel) {
+    identifiers.add(queryLabel);
+  }
+  return Array.from(identifiers);
+};
+
+const getMetricIntrinsicLabel = (
+  metric: QueryFormMetric | Metric,
+): string | undefined => {
+  const verboseName = getMetricObjectField(metric, 'verbose_name');
+  if (verboseName) {
+    return verboseName;
+  }
+  const label = getMetricObjectField(metric, 'label');
+  if (label) {
+    return label;
+  }
+  return normalizeMetricLabelToken(getMetricLabel(metric as QueryFormMetric));
+};
+
+export const resolveMetricDisplayLabel = (
+  metricKey: string,
+  options?: {
+    metricLabelMap?: MetricLabelLookup;
+    verboseMap?: Record<string, string>;
+    metrics?: Array<QueryFormMetric | Metric>;
+  },
+): string => {
+  const normalizedKey = normalizeMetricLabelToken(metricKey);
+  if (!normalizedKey) {
+    return metricKey;
+  }
+
+  const { metricLabelMap, verboseMap, metrics = [] } = options ?? {};
+  const candidates: string[] = [];
+  const addCandidate = (value: unknown) => {
+    const normalized = normalizeMetricLabelToken(value);
+    if (normalized) {
+      candidates.push(normalized);
+    }
+  };
+  const addLookupCandidates = (key: string) => {
+    addCandidate(getMetricLookupLabel(metricLabelMap, key));
+    addCandidate(verboseMap?.[key]);
+  };
+
+  addLookupCandidates(normalizedKey);
+
+  metrics.forEach(metric => {
+    const identifiers = collectMetricLabelIdentifiers(metric);
+    if (!identifiers.includes(normalizedKey)) {
+      return;
+    }
+    identifiers.forEach(identifier => addLookupCandidates(identifier));
+    addCandidate(getMetricIntrinsicLabel(metric));
+  });
+
+  const uniqueCandidates = Array.from(new Set(candidates));
+  const preferred = uniqueCandidates.find(label => label !== normalizedKey);
+  if (preferred) {
+    return preferred;
+  }
+  return uniqueCandidates[0] ?? normalizedKey;
+};
+
+export const buildResolvedMetricLabelMap = ({
+  metrics,
+  metricLabelMap,
+  verboseMap,
+}: {
+  metrics: Array<QueryFormMetric | Metric>;
+  metricLabelMap?: MetricLabelLookup;
+  verboseMap?: Record<string, string>;
+}): Map<string, string> => {
+  const resolved = new Map<string, string>();
+  const seed = (key: string, label: string) => {
+    const normalizedKey = normalizeMetricLabelToken(key);
+    const normalizedLabel = normalizeMetricLabelToken(label);
+    if (!normalizedKey || !normalizedLabel) {
+      return;
+    }
+    resolved.set(normalizedKey, normalizedLabel);
+  };
+
+  if (metricLabelMap instanceof Map) {
+    metricLabelMap.forEach((label, key) => seed(key, label));
+  } else {
+    Object.entries(metricLabelMap ?? {}).forEach(([key, label]) =>
+      seed(key, label),
+    );
+  }
+
+  metrics.forEach(metric => {
+    const identifiers = collectMetricLabelIdentifiers(metric);
+    if (identifiers.length === 0) {
+      return;
+    }
+    const label = resolveMetricDisplayLabel(identifiers[0], {
+      metricLabelMap: resolved,
+      verboseMap,
+      metrics,
+    });
+    identifiers.forEach(identifier => {
+      const existing = resolved.get(identifier);
+      if (!existing || existing === identifier) {
+        resolved.set(identifier, label);
+      }
+    });
+  });
+
+  return resolved;
+};
+
 const normalizeThemeHexColor = (value: string) => {
   if (!/^#([0-9a-fA-F]{3,4}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(value)) {
     return null;

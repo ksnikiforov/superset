@@ -10,3 +10,11 @@ Run e2e when validating dashboard-level behavior/regressions
 
 To run lint use **npx eslint plugins/plugin-chart-pivot-table-v3** from superset-frontend folder
 Run lint after every significant change
+
+## Totals Terminology (Must Stay Consistent)
+
+- **Row total** means total of rows, and it appears on the **columns axis** (as total column header/cells).
+- **Column total** means total of columns, and it appears on the **rows axis** (as total row).
+- **Row total position** supports **front** or **end**.
+- **Column total position** supports **top** or **bottom**.
+- Never swap these meanings in code, tests, docs, or review comments.
