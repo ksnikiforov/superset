@@ -54,6 +54,76 @@ describe('shouldFetchForLayoutChange', () => {
     expect(shouldFetchForLayoutChange(baseLayout, nextLayout)).toBe(false);
   });
 
+  it('returns true when inserting a value-axis dimension at the first position before Values', () => {
+    const prevLayout: PivotRuntimeLayout = {
+      ...baseLayout,
+      cols: ['col1', 'col2'],
+      valuePlacement: { axis: 'col', index: 2 },
+    };
+    const nextLayout: PivotRuntimeLayout = {
+      ...prevLayout,
+      cols: ['col0', 'col1', 'col2'],
+      valuePlacement: { axis: 'col', index: 3 },
+    };
+    expect(shouldFetchForLayoutChange(prevLayout, nextLayout)).toBe(true);
+  });
+
+  it('returns false when inserting a value-axis dimension in the middle before Values', () => {
+    const prevLayout: PivotRuntimeLayout = {
+      ...baseLayout,
+      cols: ['col1', 'col2'],
+      valuePlacement: { axis: 'col', index: 2 },
+    };
+    const nextLayout: PivotRuntimeLayout = {
+      ...prevLayout,
+      cols: ['col1', 'colX', 'col2'],
+      valuePlacement: { axis: 'col', index: 3 },
+    };
+    expect(shouldFetchForLayoutChange(prevLayout, nextLayout)).toBe(false);
+  });
+
+  it('returns false when reordering non-leading value-axis dimensions before Values', () => {
+    const prevLayout: PivotRuntimeLayout = {
+      ...baseLayout,
+      cols: ['col1', 'col2', 'col3'],
+      valuePlacement: { axis: 'col', index: 3 },
+    };
+    const nextLayout: PivotRuntimeLayout = {
+      ...prevLayout,
+      cols: ['col1', 'col3', 'col2'],
+      valuePlacement: { axis: 'col', index: 3 },
+    };
+    expect(shouldFetchForLayoutChange(prevLayout, nextLayout)).toBe(false);
+  });
+
+  it('returns true when reordering changes the leading value-axis dimension', () => {
+    const prevLayout: PivotRuntimeLayout = {
+      ...baseLayout,
+      cols: ['col1', 'col2', 'col3'],
+      valuePlacement: { axis: 'col', index: 3 },
+    };
+    const nextLayout: PivotRuntimeLayout = {
+      ...prevLayout,
+      cols: ['col2', 'col1', 'col3'],
+      valuePlacement: { axis: 'col', index: 3 },
+    };
+    expect(shouldFetchForLayoutChange(prevLayout, nextLayout)).toBe(true);
+  });
+
+  it('returns false when only appending at the end of value-axis stack before trailing Values', () => {
+    const prevLayout: PivotRuntimeLayout = {
+      ...baseLayout,
+      cols: ['col1', 'col2'],
+      valuePlacement: { axis: 'col', index: 2 },
+    };
+    const nextLayout: PivotRuntimeLayout = {
+      ...prevLayout,
+      cols: ['col1', 'col2', 'col3'],
+      valuePlacement: { axis: 'col', index: 3 },
+    };
+    expect(shouldFetchForLayoutChange(prevLayout, nextLayout)).toBe(false);
+  });
+
   it('returns false when inserting a dimension in the middle', () => {
     const nextLayout: PivotRuntimeLayout = {
       ...baseLayout,
@@ -94,10 +164,18 @@ describe('shouldFetchForLayoutChange', () => {
     expect(shouldFetchForLayoutChange(baseLayout, nextLayout)).toBe(false);
   });
 
-  it('returns false when only value placement changes', () => {
+  it('returns true when value placement axis changes', () => {
     const nextLayout: PivotRuntimeLayout = {
       ...baseLayout,
       valuePlacement: { axis: 'row', index: 0 },
+    };
+    expect(shouldFetchForLayoutChange(baseLayout, nextLayout)).toBe(true);
+  });
+
+  it('returns false when only value placement index changes on same axis', () => {
+    const nextLayout: PivotRuntimeLayout = {
+      ...baseLayout,
+      valuePlacement: { axis: 'col', index: 0 },
     };
     expect(shouldFetchForLayoutChange(baseLayout, nextLayout)).toBe(false);
   });

@@ -39,6 +39,12 @@
 - [x] Add/adjust panel and seamless-expansion tests to cover both "value in middle" and "value trailing" paths.
 - [x] Validate with full plugin test command.
 
+### Phase 3.8: Values-Axis Switch Robustness (Multi-Measure)
+- [x] Treat `Values` axis flips (`col` <-> `row`) as seamless-fetch changes so tree orientation is rebuilt correctly.
+- [x] Keep index-only `Values` moves on the same axis local/no-fetch.
+- [x] Add interaction test for dragging `Value` chip from columns to rows and assert no stale column metric headers remain.
+- [x] Add leading-key-aware fetch policy/tests: first-position changes on active value axis fetch; non-leading middle/reorder edits stay local.
+
 ### Phase 4: Validation
 - [x] Run targeted plugin unit tests for planner and interaction seamless behavior.
 - [x] Run lint on plugin scope and resolve any issues.
@@ -51,4 +57,6 @@
 - Seamless update planning now snapshots current expansion keys into the initial plan request to reduce post-filter reload rubber-banding.
 - `time_grain_sqla` control is removed from pivot v3; branch queries now use raw grouped columns from SQL output instead of plugin-side time-grain rewrites.
 - Panel checkbox-add semantics are explicitly covered by tests and now distinguish `Values`-in-middle vs `Values`-trailing cases.
+- `Values` axis flips now run through seamless update fetch, preventing mixed/stale metric-axis rendering after multi-measure row/column switches.
+- Dimension edits on the active value axis now fetch only when the leading key changes; middle/non-leading stack edits remain no-fetch for instant UX.
 - Deeper expansion-engine unification and strict single-transaction filter hydration can be added as a follow-up phase.

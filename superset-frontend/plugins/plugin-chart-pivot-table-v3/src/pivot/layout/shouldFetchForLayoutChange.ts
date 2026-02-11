@@ -34,17 +34,30 @@ const valuePlacementSignature = (
   placement: PivotRuntimeLayout['valuePlacement'],
 ) => stableStringify(placement ?? {});
 
+const valueAxisKeys = (layout: PivotRuntimeLayout): string[] =>
+  layout.valuePlacement.axis === 'row' ? layout.rows : layout.cols;
+
 export const shouldFetchForLayoutChange = (
   prev: PivotRuntimeLayout,
   next: PivotRuntimeLayout,
 ): boolean => {
+  // Switching Values axis fundamentally changes metric-tier orientation.
+  if (prev.valuePlacement.axis !== next.valuePlacement.axis) {
+    return true;
+  }
+
   // Dimension axis edits are rendered optimistically; data is fetched when users
-  // explicitly expand nodes into newly added hierarchy levels.
+  // change the leading key on the active Values axis (top-level path changes).
   if (
     !arraysEqual(prev.rows, next.rows) ||
     !arraysEqual(prev.cols, next.cols)
   ) {
-    return false;
+    const prevValueAxis = valueAxisKeys(prev);
+    const nextValueAxis = valueAxisKeys(next);
+    if (arraysEqual(prevValueAxis, nextValueAxis)) {
+      return false;
+    }
+    return prevValueAxis[0] !== nextValueAxis[0];
   }
   if (!hasSameSet(prev.metrics, next.metrics)) {
     return true;

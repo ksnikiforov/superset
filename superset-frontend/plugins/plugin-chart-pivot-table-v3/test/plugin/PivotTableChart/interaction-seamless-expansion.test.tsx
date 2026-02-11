@@ -21,8 +21,10 @@ import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { MetricsLayoutEnum, PivotRuntimeLayout } from '../../../src/types';
 import {
+  METRICS_PLACEHOLDER,
   applyMetricAxis,
   buildTreeFromRecords,
+  getStableColumnKey,
   serializePath,
 } from '../../../src/utils';
 import { supersetChartDataClient } from '../../../src/pivot/data/SupersetChartDataClient';
@@ -600,6 +602,303 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(screen.queryByLabelText('Loading')).not.toBeInTheDocument();
+  });
+
+  it('does not seamless-reload for non-leading reorders on the value axis stack', async () => {
+    const metrics = ['measure1', 'measure2'];
+    const colGroupby = ['col1', 'col2', 'col3'];
+    const records = [
+      { col1: 'A', col2: 'B', col3: 'C', measure1: 10, measure2: 20 },
+    ];
+    const baseTree = applyMetricAxis(
+      buildTreeFromRecords(records, metrics, [], colGroupby, 0, 3),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      [],
+      colGroupby,
+      3,
+    );
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: [],
+      cols: colGroupby,
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 3 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: colGroupby,
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      startCollapsed: true,
+      initialDepth: 1,
+    });
+
+    fetchMock.mockImplementation(async ({ specs }: { specs: Array<unknown> }) =>
+      specs.map(() => ({ data: records })),
+    );
+
+    render(
+      <PivotTableChart
+        data={baseTree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={colGroupby}
+        width={600}
+        height={300}
+      />,
+    );
+
+    const getColChips = () =>
+      screen
+        .getAllByLabelText('Remove dimension')
+        .map(button => button.parentElement)
+        .filter((node): node is HTMLElement => Boolean(node));
+
+    const getColChip = (label: string) => {
+      const chips = getColChips();
+      const chip = chips.find(node => node.textContent?.includes(label));
+      if (!chip) {
+        throw new Error(`Missing column chip for ${label}`);
+      }
+      return chip;
+    };
+
+    const dataTransfer = {
+      data: {} as Record<string, string>,
+      setData(type: string, value: string) {
+        this.data[type] = value;
+      },
+      getData(type: string) {
+        return this.data[type];
+      },
+      dropEffect: 'move',
+      effectAllowed: 'all',
+    };
+
+    const col3Chip = getColChip('col3');
+    const col2Chip = getColChip('col2');
+    fireEvent.dragStart(col3Chip, { dataTransfer });
+    fireEvent.dragEnter(col2Chip, { dataTransfer });
+    fireEvent.dragOver(col2Chip, { dataTransfer });
+    fireEvent.drop(col2Chip, { dataTransfer });
+    fireEvent.dragEnd(col3Chip, { dataTransfer });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('seamless-reloads when reordering changes the leading value-axis key', async () => {
+    const metrics = ['measure1', 'measure2'];
+    const colGroupby = ['col1', 'col2', 'col3'];
+    const records = [
+      { col1: 'A', col2: 'B', col3: 'C', measure1: 10, measure2: 20 },
+    ];
+    const baseTree = applyMetricAxis(
+      buildTreeFromRecords(records, metrics, [], colGroupby, 0, 3),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      [],
+      colGroupby,
+      3,
+    );
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: [],
+      cols: colGroupby,
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 3 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: colGroupby,
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      startCollapsed: true,
+      initialDepth: 1,
+    });
+
+    fetchMock.mockImplementation(async ({ specs }: { specs: Array<unknown> }) =>
+      specs.map(() => ({ data: records })),
+    );
+
+    render(
+      <PivotTableChart
+        data={baseTree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={colGroupby}
+        width={600}
+        height={300}
+      />,
+    );
+
+    const getColChips = () =>
+      screen
+        .getAllByLabelText('Remove dimension')
+        .map(button => button.parentElement)
+        .filter((node): node is HTMLElement => Boolean(node));
+
+    const getColChip = (label: string) => {
+      const chips = getColChips();
+      const chip = chips.find(node => node.textContent?.includes(label));
+      if (!chip) {
+        throw new Error(`Missing column chip for ${label}`);
+      }
+      return chip;
+    };
+
+    const dataTransfer = {
+      data: {} as Record<string, string>,
+      setData(type: string, value: string) {
+        this.data[type] = value;
+      },
+      getData(type: string) {
+        return this.data[type];
+      },
+      dropEffect: 'move',
+      effectAllowed: 'all',
+    };
+
+    const col3Chip = getColChip('col3');
+    const col1Chip = getColChip('col1');
+    fireEvent.dragStart(col3Chip, { dataTransfer });
+    fireEvent.dragEnter(col1Chip, { dataTransfer });
+    fireEvent.dragOver(col1Chip, { dataTransfer });
+    fireEvent.drop(col1Chip, { dataTransfer });
+    fireEvent.dragEnd(col3Chip, { dataTransfer });
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+  });
+
+  it('moves Values to rows for multi-metric interaction without leaving stale column metrics', async () => {
+    const metrics = ['measure1', 'measure2'];
+    const rowGroupby = ['row1'];
+    const colGroupby = ['col1'];
+    const records = [{ row1: 'R1', col1: 'C1', measure1: 10, measure2: 20 }];
+    const baseTree = applyMetricAxis(
+      buildTreeFromRecords(records, metrics, rowGroupby, colGroupby, 1, 1),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      rowGroupby,
+      colGroupby,
+      1,
+    );
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: rowGroupby,
+      cols: colGroupby,
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 1 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: [...rowGroupby, ...colGroupby],
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      startCollapsed: true,
+      initialDepth: 1,
+    });
+
+    fetchMock.mockImplementation(async ({ specs }: { specs: Array<unknown> }) =>
+      specs.map(() => ({ data: records })),
+    );
+
+    const { container } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={colGroupby}
+        width={600}
+        height={300}
+      />,
+    );
+
+    const thead = container.querySelector('thead') as HTMLElement;
+    expect(within(thead).getByText('measure1')).toBeInTheDocument();
+    expect(within(thead).getByText('measure2')).toBeInTheDocument();
+
+    const getRowChips = () =>
+      screen
+        .getAllByLabelText('Remove dimension')
+        .map(button => button.parentElement)
+        .filter((node): node is HTMLElement => Boolean(node));
+
+    const row1Chip = getRowChips().find(node =>
+      node.textContent?.includes('row1'),
+    ) as HTMLElement | undefined;
+    if (!row1Chip) {
+      throw new Error('Missing row chip for row1');
+    }
+
+    const valueLabel = screen
+      .getAllByText('Value')
+      .find(node => !node.closest('thead') && !node.closest('tbody'));
+    if (!valueLabel) {
+      throw new Error('Missing Value chip label');
+    }
+    const valueChip = valueLabel.parentElement as HTMLElement | null;
+    if (!valueChip) {
+      throw new Error('Missing Value chip element');
+    }
+
+    const dataTransfer = {
+      data: {} as Record<string, string>,
+      setData(type: string, value: string) {
+        this.data[type] = value;
+      },
+      getData(type: string) {
+        return this.data[type];
+      },
+      dropEffect: 'move',
+      effectAllowed: 'all',
+    };
+
+    fireEvent.dragStart(valueChip, { dataTransfer });
+    fireEvent.dragEnter(row1Chip, { dataTransfer });
+    fireEvent.dragOver(row1Chip, { dataTransfer });
+    fireEvent.drop(row1Chip, { dataTransfer });
+    fireEvent.dragEnd(valueChip, { dataTransfer });
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+
+    const lastFetch = fetchMock.mock.calls.at(-1)?.[0];
+    expect(lastFetch?.formData?.metricsLayout).toBe(MetricsLayoutEnum.ROWS);
+    expect(
+      (lastFetch?.formData?.groupbyRows ?? []).map(getStableColumnKey),
+    ).toEqual(expect.arrayContaining(['row1', METRICS_PLACEHOLDER]));
+
+    await waitFor(() => {
+      const nextThead = container.querySelector('thead') as HTMLElement;
+      expect(within(nextThead).queryByText('measure1')).not.toBeInTheDocument();
+      expect(within(nextThead).queryByText('measure2')).not.toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByText('measure1').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('measure2').length).toBeGreaterThan(0);
+    });
   });
 
   it('keeps expanded columns after adding a row dimension without seamless reload', async () => {
