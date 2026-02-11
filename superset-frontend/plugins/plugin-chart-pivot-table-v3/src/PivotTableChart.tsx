@@ -27,7 +27,6 @@ import {
   SupersetClient,
   supersetTheme,
   TimeFormats,
-  type QueryObjectFilterClause,
   type JsonObject,
   styled,
   t,
@@ -56,6 +55,11 @@ import { resolveInteractionFormData } from './pivot/layout/resolveInteractionLay
 import { buildLayoutContext } from './pivot/layout/LayoutContext';
 import { shouldFetchForLayoutChange } from './pivot/layout/shouldFetchForLayoutChange';
 import { buildInitialQuerySpecs } from './pivot/query/specs';
+import {
+  buildInitialPivotUpdatePlan,
+  buildSelectionFilterClauses,
+  mergeExtraFilters as mergeSelectionExtraFilters,
+} from './pivot/update/initialUpdatePlan';
 import { supersetChartDataClient } from './pivot/data/SupersetChartDataClient';
 import { normalizeFormDataExtraFilters } from './pivot/query/normalizeExtraFormData';
 import { type QuerySpec } from './pivot/query/types';
@@ -73,6 +77,7 @@ import {
   mergeTrees,
   getMetricKeys,
   getStableColumnKey,
+  METRICS_PLACEHOLDER,
   isSubtotalToken,
   coerceEpochMsStringToNumber,
   serializePath,
@@ -674,6 +679,37 @@ const valuePlacementSignature = (
 const leafOrderSignature = (order?: PivotRuntimeLayout['leafOrder']) =>
   stableStringify(order ?? []);
 
+const addValuePlaceholder = ({
+  keys,
+  shouldInsert,
+  index,
+}: {
+  keys: string[];
+  shouldInsert: boolean;
+  index: number;
+}) => {
+  if (!shouldInsert) {
+    return keys;
+  }
+  const next = [...keys];
+  const safeIndex = Math.max(0, Math.min(index, next.length));
+  next.splice(safeIndex, 0, METRICS_PLACEHOLDER);
+  return next;
+};
+
+const buildExpansionLayoutKeys = (layout: PivotRuntimeLayout) => ({
+  rowKeys: addValuePlaceholder({
+    keys: layout.rows,
+    shouldInsert: layout.valuePlacement.axis === 'row',
+    index: layout.valuePlacement.index,
+  }),
+  colKeys: addValuePlaceholder({
+    keys: layout.cols,
+    shouldInsert: layout.valuePlacement.axis === 'col',
+    index: layout.valuePlacement.index,
+  }),
+});
+
 const isMetricOrderOnlyChange = (
   prev: PivotRuntimeLayout,
   next: PivotRuntimeLayout,
@@ -773,10 +809,7 @@ function PivotTableChart(props: PivotTableProps) {
     [extraVerboseMap, verboseMap],
   );
   const resolvedDateFormatters = useMemo(() => {
-    const merged: Record<
-      string,
-      PivotTableProps['dateFormatters'][string]
-    > = {
+    const merged: Record<string, PivotTableProps['dateFormatters'][string]> = {
       // Prefer dataset column formats (python_date_format) when available.
       // Dashboard payloads may omit python_date_format, so transformProps falls
       // back to a generic formatter. The dataset meta fetch should override
@@ -873,6 +906,8 @@ function PivotTableChart(props: PivotTableProps) {
     undefined,
   );
   const seamlessRequestRef = useRef(0);
+  const expandedRowsForSeamlessRef = useRef<Set<string>>(new Set());
+  const expandedColsForSeamlessRef = useRef<Set<string>>(new Set());
   const dataForRender = isUserControlled ? committedTree : data;
 
   const treeRef = useRef<PivotTableProps['data']>(dataForRender);
@@ -1150,78 +1185,28 @@ function PivotTableChart(props: PivotTableProps) {
     [dimensionList, dimensionMap],
   );
 
-  const buildFilterPayload = useCallback(
-    (selection: Record<string, DataRecordValue[]>) => {
-      const filterKeys = Object.keys(selection);
-      const filters =
-        filterKeys.length === 0
-          ? undefined
-          : filterKeys.map(key => {
-              const col = dimensionMap.get(key) ?? key;
-              const vals = selection[key] ?? [];
-              return {
-                col,
-                op: 'IN' as const,
-                val: vals as (string | number | boolean)[],
-              };
-            });
-      const filterStateSelected = Object.entries(selection).reduce<
-        Record<string, DataRecordValue[]>
-      >((acc, [key, vals]) => {
-        const col = dimensionMap.get(key);
-        const label = col ? getColumnLabel(col) : key;
-        acc[label] = vals;
-        return acc;
-      }, {});
-      return {
-        filters,
-        filterStateSelected,
-        hasFilters: filterKeys.length > 0,
-      };
-    },
-    [dimensionMap],
-  );
-
-  const mergeExtraFilters = useCallback(
-    (
-      baseExtra: PivotTableProps['formData']['extra_form_data'] | undefined,
-      extraFilters: QueryObjectFilterClause[] | undefined,
-    ) => {
-      if (!extraFilters || extraFilters.length === 0) {
-        return baseExtra;
-      }
-      const existing = baseExtra?.filters ?? [];
-      return {
-        ...(baseExtra ?? {}),
-        filters: [...existing, ...extraFilters],
-      };
-    },
-    [],
-  );
-
-  const committedFilterPayload = useMemo(
-    () => buildFilterPayload(committedFilters),
-    [buildFilterPayload, committedFilters],
+  const committedSelectionFilters = useMemo(
+    () =>
+      buildSelectionFilterClauses({
+        formData: fetchFormDataBaseWithFormatters,
+        selection: committedFilters,
+      }),
+    [committedFilters, fetchFormDataBaseWithFormatters],
   );
 
   const fetchFormData = useMemo(() => {
-    if (!isUserControlled || !committedFilterPayload.hasFilters) {
+    if (!isUserControlled || committedSelectionFilters.length === 0) {
       return appliedLayoutFormData;
     }
     const merged = {
       ...appliedLayoutFormData,
-      extra_form_data: mergeExtraFilters(
+      extra_form_data: mergeSelectionExtraFilters(
         appliedLayoutFormData.extra_form_data,
-        committedFilterPayload.filters,
+        committedSelectionFilters,
       ),
     };
     return normalizeFormDataExtraFilters(merged);
-  }, [
-    appliedLayoutFormData,
-    committedFilterPayload,
-    isUserControlled,
-    mergeExtraFilters,
-  ]);
+  }, [appliedLayoutFormData, committedSelectionFilters, isUserControlled]);
 
   useEffect(() => {
     setUiRuntimeLayout(runtimeLayout);
@@ -1312,50 +1297,44 @@ function PivotTableChart(props: PivotTableProps) {
         dimensionKeys,
         metricKeys,
       );
-      const { filters, hasFilters } = buildFilterPayload(nextFilters);
-      const pendingFormData = hasFilters
-        ? {
-            ...fetchFormDataBaseWithFormatters,
-            extra_form_data: mergeExtraFilters(
-              fetchFormDataBaseWithFormatters.extra_form_data,
-              filters,
-            ),
-          }
-        : fetchFormDataBaseWithFormatters;
-      const normalizedPendingFormData =
-        normalizeFormDataExtraFilters(pendingFormData);
       const metricsForLayout =
         formData.metricsBase ??
         formData.metrics ??
-        normalizedPendingFormData.metrics;
+        fetchFormDataBaseWithFormatters.metrics;
       const leavesForLayout =
         formData.measureLeavesByMetricBase ??
         formData.measureLeavesByMetric ??
-        normalizedPendingFormData.measureLeavesByMetric;
-      const resolvedFormData = resolveInteractionFormData({
-        formData: isUserControlled
-          ? {
-              ...normalizedPendingFormData,
-              metrics: metricsForLayout ?? normalizedPendingFormData.metrics,
-              measureLeavesByMetric:
-                leavesForLayout ??
-                normalizedPendingFormData.measureLeavesByMetric,
-            }
-          : normalizedPendingFormData,
+        fetchFormDataBaseWithFormatters.measureLeavesByMetric;
+      const formDataForPlan = (() => {
+        if (!isUserControlled) {
+          return fetchFormDataBaseWithFormatters;
+        }
+        const { rowKeys, colKeys } = buildExpansionLayoutKeys(normalized);
+        return {
+          ...fetchFormDataBaseWithFormatters,
+          pivotExpansionState: {
+            rowKeys,
+            colKeys,
+            rows: Array.from(expandedRowsForSeamlessRef.current),
+            cols: Array.from(expandedColsForSeamlessRef.current),
+            collapsedRows: [],
+            collapsedCols: [],
+          },
+        };
+      })();
+      const {
+        formData: resolvedFormDataWithOffsets,
+        layout,
+        specs,
+      } = buildInitialPivotUpdatePlan({
+        formData: formDataForPlan,
         runtimeLayout: normalized,
+        selection: nextFilters,
+        metricsOverride: isUserControlled ? metricsForLayout : undefined,
+        measureLeavesByMetricOverride: isUserControlled
+          ? leavesForLayout
+          : undefined,
       });
-      const layout = buildLayoutContext(resolvedFormData);
-      const timeOffsets = Array.from(
-        new Set([
-          ...(resolvedFormData.time_offsets ?? []),
-          ...layout.requiredTimeOffsets,
-        ]),
-      );
-      const resolvedFormDataWithOffsets =
-        timeOffsets.length > 0
-          ? { ...resolvedFormData, time_offsets: timeOffsets }
-          : resolvedFormData;
-      const specs = buildInitialQuerySpecs(resolvedFormDataWithOffsets, layout);
       const requestId = seamlessRequestRef.current + 1;
       seamlessRequestRef.current = requestId;
       supersetChartDataClient.cancel(SEAMLESS_REQUEST_GROUP);
@@ -1402,13 +1381,11 @@ function PivotTableChart(props: PivotTableProps) {
       }
     },
     [
-      buildFilterPayload,
       dimensionKeys,
       fetchFormDataBaseWithFormatters,
       formData,
       isUserControlled,
       metricKeys,
-      mergeExtraFilters,
       persistRuntimeState,
       setCommittedFilters,
       setCommittedTree,
@@ -1563,6 +1540,14 @@ function PivotTableChart(props: PivotTableProps) {
   });
 
   useEffect(() => {
+    expandedRowsForSeamlessRef.current = expandedRows;
+  }, [expandedRows]);
+
+  useEffect(() => {
+    expandedColsForSeamlessRef.current = expandedCols;
+  }, [expandedCols]);
+
+  useEffect(() => {
     treeRef.current = tree;
   }, [tree]);
 
@@ -1704,16 +1689,20 @@ function PivotTableChart(props: PivotTableProps) {
       try {
         const selection = { ...uiSelectedFilters };
         delete selection[dimensionKey];
-        const { filters } = buildFilterPayload(selection);
-        const pendingFormData = filters
-          ? {
-              ...fetchFormDataBaseWithFormatters,
-              extra_form_data: mergeExtraFilters(
-                fetchFormDataBaseWithFormatters.extra_form_data,
-                filters,
-              ),
-            }
-          : fetchFormDataBaseWithFormatters;
+        const filters = buildSelectionFilterClauses({
+          formData: fetchFormDataBaseWithFormatters,
+          selection,
+        });
+        const pendingFormData =
+          filters.length > 0
+            ? {
+                ...fetchFormDataBaseWithFormatters,
+                extra_form_data: mergeSelectionExtraFilters(
+                  fetchFormDataBaseWithFormatters.extra_form_data,
+                  filters,
+                ),
+              }
+            : fetchFormDataBaseWithFormatters;
         const normalizedFormData =
           normalizeFormDataExtraFilters(pendingFormData);
         const spec: QuerySpec = {
@@ -1757,10 +1746,8 @@ function PivotTableChart(props: PivotTableProps) {
       }
     },
     [
-      buildFilterPayload,
       fetchedDimensionFilterValues,
       fetchFormDataBaseWithFormatters,
-      mergeExtraFilters,
       uiSelectedFilters,
     ],
   );
@@ -2029,6 +2016,7 @@ function PivotTableChart(props: PivotTableProps) {
   });
 
   const shouldDelayRender =
+    !isUserControlled &&
     datasourceId !== null &&
     (metaState === 'loading' ||
       (metaState === 'idle' && (needsVerboseMap || needsDateFormatters)));

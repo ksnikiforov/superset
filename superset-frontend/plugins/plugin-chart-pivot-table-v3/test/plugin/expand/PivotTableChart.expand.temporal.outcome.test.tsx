@@ -202,10 +202,10 @@ describe('PivotTableChart temporal expansion outcome', () => {
     let callCount = 0;
     postMock.mockImplementation(async ({ jsonPayload }) => {
       callCount += 1;
-      const payload = (jsonPayload as QueryPayload | undefined) ?? {};
-      if (callCount === 1 && hasInvalidTemporalLiteral(payload)) {
+      if (callCount === 1) {
         return Promise.reject(responseLike);
       }
+      const payload = (jsonPayload as QueryPayload | undefined) ?? {};
       return {
         response: { status: 200 } as Response,
         json: {

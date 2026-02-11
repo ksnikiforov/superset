@@ -227,7 +227,7 @@ describe('PivotInteractionPanel', () => {
     expect(colButtonsAfter[1]).toHaveTextContent('2');
   });
 
-  it('inserts new column dimensions after existing columns when value is in the middle', () => {
+  it('inserts new column dimensions at the end when value is in the middle', () => {
     const onChange = jest.fn();
     const layout: PivotRuntimeLayout = {
       ...baseLayout,
@@ -276,6 +276,60 @@ describe('PivotInteractionPanel', () => {
       'col1,col3,col2',
     );
     expect(screen.getByTestId('layout-value')).toHaveTextContent('col:1');
+  });
+
+  it('inserts before value when value is last on the target axis', () => {
+    const onChange = jest.fn();
+    const layout: PivotRuntimeLayout = {
+      ...baseLayout,
+      cols: ['col1', 'col2'],
+      valuePlacement: { axis: 'col', index: 2 },
+    };
+    render(
+      <PivotInteractionPanel
+        dimensions={['col1', 'col2', 'col3']}
+        metrics={['sum__sales']}
+        runtimeLayout={layout}
+        onChange={onChange}
+      />,
+    );
+
+    const colButtons = screen.getAllByLabelText('Toggle column dimension');
+    fireEvent.click(colButtons[2]);
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange.mock.calls[0][0].cols).toEqual(['col1', 'col2', 'col3']);
+    expect(onChange.mock.calls[0][0].valuePlacement).toEqual({
+      axis: 'col',
+      index: 3,
+    });
+  });
+
+  it('inserts before value when value is the only chip on the target axis', () => {
+    const onChange = jest.fn();
+    const layout: PivotRuntimeLayout = {
+      ...baseLayout,
+      rows: [],
+      cols: [],
+      valuePlacement: { axis: 'row', index: 0 },
+    };
+    render(
+      <PivotInteractionPanel
+        dimensions={['row1']}
+        metrics={['sum__sales']}
+        runtimeLayout={layout}
+        onChange={onChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText('Toggle row dimension'));
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange.mock.calls[0][0].rows).toEqual(['row1']);
+    expect(onChange.mock.calls[0][0].valuePlacement).toEqual({
+      axis: 'row',
+      index: 1,
+    });
   });
 
   it('moves a dimension to the column axis when the column checkbox is clicked', () => {

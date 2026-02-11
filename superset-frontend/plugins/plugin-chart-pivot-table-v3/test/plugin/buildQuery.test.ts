@@ -142,6 +142,19 @@ describe('buildQuery (bootstrap)', () => {
     ).toBe(true);
   });
 
+  test('ignores time grain from stale form data', () => {
+    const queryContext = buildQuery({
+      ...baseFormData,
+      time_grain_sqla: 'P1D',
+      extra_form_data: {
+        time_grain_sqla: 'P1W',
+      },
+    });
+    queryContext.queries.forEach(query => {
+      expect(query.time_grain_sqla).toBeUndefined();
+    });
+  });
+
   test('adds root prefetch queries when auto-expand goes beyond depth 1', () => {
     const queryContext = buildQuery({
       ...baseFormData,

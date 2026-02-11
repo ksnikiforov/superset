@@ -30,8 +30,6 @@ import {
 import {
   ensureIsArray,
   getColumnLabel,
-  isAdhocColumn,
-  isPhysicalColumn,
   type QueryFormColumn,
   isQueryFormColumn,
   SMART_DATE_ID,
@@ -357,12 +355,7 @@ const config: ControlPanelConfig = {
                 [INTERACTION_MODE_FIXED, t('Fixed')],
                 [INTERACTION_MODE_USER, t('User controlled')],
               ],
-              rerender: [
-                'groupbyRows',
-                'groupbyColumns',
-                'dimensions',
-                'time_grain_sqla',
-              ],
+              rerender: ['groupbyRows', 'groupbyColumns', 'dimensions'],
             },
           },
         ],
@@ -467,48 +460,7 @@ const config: ControlPanelConfig = {
             }),
           },
         ],
-        [
-          {
-            name: 'time_grain_sqla',
-            config: {
-              ...sharedControls.time_grain_sqla,
-              visibility: ({ controls, form_data }) => {
-                const useDimensions = isUserControlledMode({
-                  controls,
-                  form_data,
-                });
-                const options = useDimensions
-                  ? controls?.dimensions?.options
-                  : controls?.groupbyColumns?.options;
-                const dttmLookup = Object.fromEntries(
-                  ensureIsArray(options).map(option => [
-                    option.column_name,
-                    option.is_dttm,
-                  ]),
-                );
-
-                const selected = useDimensions
-                  ? ensureIsArray(controls?.dimensions?.value)
-                  : [
-                      ...ensureIsArray(controls?.groupbyColumns?.value),
-                      ...ensureIsArray(controls?.groupbyRows?.value),
-                    ];
-                return selected
-                  .map(selection => {
-                    if (isAdhocColumn(selection)) {
-                      return true;
-                    }
-                    if (isPhysicalColumn(selection)) {
-                      return !!dttmLookup[selection];
-                    }
-                    return false;
-                  })
-                  .some(Boolean);
-              },
-            },
-          },
-          'temporal_columns_lookup',
-        ],
+        ['temporal_columns_lookup'],
         [
           {
             name: 'metrics',

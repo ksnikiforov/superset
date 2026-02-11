@@ -38,11 +38,13 @@ export const shouldFetchForLayoutChange = (
   prev: PivotRuntimeLayout,
   next: PivotRuntimeLayout,
 ): boolean => {
-  if (!arraysEqual(prev.rows, next.rows)) {
-    return true;
-  }
-  if (!arraysEqual(prev.cols, next.cols)) {
-    return true;
+  // Dimension axis edits are rendered optimistically; data is fetched when users
+  // explicitly expand nodes into newly added hierarchy levels.
+  if (
+    !arraysEqual(prev.rows, next.rows) ||
+    !arraysEqual(prev.cols, next.cols)
+  ) {
+    return false;
   }
   if (!hasSameSet(prev.metrics, next.metrics)) {
     return true;
@@ -57,7 +59,7 @@ export const shouldFetchForLayoutChange = (
     valuePlacementSignature(prev.valuePlacement) !==
     valuePlacementSignature(next.valuePlacement)
   ) {
-    return true;
+    return false;
   }
   return false;
 };

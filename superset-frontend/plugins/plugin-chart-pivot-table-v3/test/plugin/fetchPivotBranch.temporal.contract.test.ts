@@ -48,6 +48,7 @@ type QueryFilter = {
 type QueryPayload = {
   queries?: Array<{
     filters?: QueryFilter[];
+    columns?: unknown[];
   }>;
 };
 
@@ -75,6 +76,17 @@ const assertNoInvalidTemporalIso = (filters: QueryFilter[]) => {
   temporalEqualsFilters.forEach(filter => {
     expect(typeof filter.val).toBe('number');
     expect(String(filter.val)).not.toMatch(/T\d{2}:\d{2}:\d{2}\.\d{3}Z/);
+  });
+};
+
+const assertColumnsUseRawSqlOutput = (payload?: {
+  jsonPayload?: QueryPayload;
+}) => {
+  const queries = payload?.jsonPayload?.queries ?? [];
+  queries.forEach(query => {
+    (query.columns ?? []).forEach(column => {
+      expect(typeof column).toBe('string');
+    });
   });
 };
 
@@ -142,6 +154,7 @@ describe('fetchPivotBranch temporal payload contract', () => {
       | { jsonPayload?: QueryPayload }
       | undefined;
     assertNoInvalidTemporalIso(flattenFilters(payload));
+    assertColumnsUseRawSqlOutput(payload);
   });
 
   it('builds backend-safe temporal filters for column expansion', async () => {
@@ -192,5 +205,6 @@ describe('fetchPivotBranch temporal payload contract', () => {
       | { jsonPayload?: QueryPayload }
       | undefined;
     assertNoInvalidTemporalIso(flattenFilters(payload));
+    assertColumnsUseRawSqlOutput(payload);
   });
 });

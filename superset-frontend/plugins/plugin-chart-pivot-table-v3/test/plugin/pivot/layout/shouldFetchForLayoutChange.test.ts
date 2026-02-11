@@ -29,45 +29,45 @@ const baseLayout: PivotRuntimeLayout = {
 };
 
 describe('shouldFetchForLayoutChange', () => {
-  it('returns true for row reorder within the same axis', () => {
+  it('returns false for row reorder within the same axis', () => {
     const nextLayout: PivotRuntimeLayout = {
       ...baseLayout,
       rows: ['state', 'country'],
     };
-    expect(shouldFetchForLayoutChange(baseLayout, nextLayout)).toBe(true);
+    expect(shouldFetchForLayoutChange(baseLayout, nextLayout)).toBe(false);
   });
 
-  it('returns true when moving a dimension across axes', () => {
+  it('returns false when moving a dimension across axes', () => {
     const nextLayout: PivotRuntimeLayout = {
       ...baseLayout,
       rows: ['country'],
       cols: ['product', 'state'],
     };
-    expect(shouldFetchForLayoutChange(baseLayout, nextLayout)).toBe(true);
+    expect(shouldFetchForLayoutChange(baseLayout, nextLayout)).toBe(false);
   });
 
-  it('returns true when appending a dimension at the end', () => {
+  it('returns false when appending a dimension at the end', () => {
     const nextLayout: PivotRuntimeLayout = {
       ...baseLayout,
       rows: ['country', 'state', 'city'],
     };
-    expect(shouldFetchForLayoutChange(baseLayout, nextLayout)).toBe(true);
+    expect(shouldFetchForLayoutChange(baseLayout, nextLayout)).toBe(false);
   });
 
-  it('returns true when inserting a dimension in the middle', () => {
+  it('returns false when inserting a dimension in the middle', () => {
     const nextLayout: PivotRuntimeLayout = {
       ...baseLayout,
       rows: ['country', 'city', 'state'],
     };
-    expect(shouldFetchForLayoutChange(baseLayout, nextLayout)).toBe(true);
+    expect(shouldFetchForLayoutChange(baseLayout, nextLayout)).toBe(false);
   });
 
-  it('returns true when trimming a dimension from the end', () => {
+  it('returns false when trimming a dimension from the end', () => {
     const nextLayout: PivotRuntimeLayout = {
       ...baseLayout,
       rows: ['country'],
     };
-    expect(shouldFetchForLayoutChange(baseLayout, nextLayout)).toBe(true);
+    expect(shouldFetchForLayoutChange(baseLayout, nextLayout)).toBe(false);
   });
 
   it('returns true when metrics selection changes', () => {
@@ -94,11 +94,11 @@ describe('shouldFetchForLayoutChange', () => {
     expect(shouldFetchForLayoutChange(baseLayout, nextLayout)).toBe(false);
   });
 
-  it('returns true when only value placement changes', () => {
+  it('returns false when only value placement changes', () => {
     const nextLayout: PivotRuntimeLayout = {
       ...baseLayout,
       valuePlacement: { axis: 'row', index: 0 },
     };
-    expect(shouldFetchForLayoutChange(baseLayout, nextLayout)).toBe(true);
+    expect(shouldFetchForLayoutChange(baseLayout, nextLayout)).toBe(false);
   });
 });

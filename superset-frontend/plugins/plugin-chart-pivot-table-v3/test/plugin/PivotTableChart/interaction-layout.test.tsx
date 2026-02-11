@@ -89,9 +89,15 @@ describe('PivotTableChart interaction layout', () => {
     await waitFor(() =>
       expect(setControlValue.mock.calls.length).toBeGreaterThan(initialCalls),
     );
-    const lastCall = setControlValue.mock.calls.slice(-1)[0];
-    expect(lastCall[0]).toBe('pivotRuntimeLayout');
-    expect((lastCall[1] as PivotRuntimeLayout).metrics).toEqual(['m2', 'm1']);
+    const runtimeLayoutCalls = setControlValue.mock.calls.filter(
+      call => call[0] === 'pivotRuntimeLayout',
+    );
+    const lastRuntimeLayoutCall = runtimeLayoutCalls.slice(-1)[0];
+    expect(lastRuntimeLayoutCall).toBeDefined();
+    expect((lastRuntimeLayoutCall[1] as PivotRuntimeLayout).metrics).toEqual([
+      'm2',
+      'm1',
+    ]);
   });
 
   it('keeps the applied header order until query form data updates', () => {

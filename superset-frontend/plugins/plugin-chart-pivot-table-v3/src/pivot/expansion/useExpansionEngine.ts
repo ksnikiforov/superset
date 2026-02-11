@@ -1335,9 +1335,16 @@ export const useExpansionEngine = ({
   const hydrateAtomic = useCallback(
     async (
       reason: 'prefetch' | 'cross-axis',
-      options?: { showLoader?: boolean; activeAxis?: PivotAxis },
+      options?: {
+        showLoader?: boolean;
+        activeAxis?: PivotAxis;
+        planRows?: boolean;
+        planCols?: boolean;
+      },
     ) => {
       const shouldShowLoader = options?.showLoader ?? false;
+      const shouldPlanRows = options?.planRows ?? true;
+      const shouldPlanCols = options?.planCols ?? true;
       const transactionId = transactionIdRef.current + 1;
       transactionIdRef.current = transactionId;
       cancelInFlightRequestGroups();
@@ -1487,6 +1494,8 @@ export const useExpansionEngine = ({
           activeAxis: options?.activeAxis,
           pendingRows: pendingRowsRef.current,
           pendingCols: pendingColsRef.current,
+          planRows: shouldPlanRows,
+          planCols: shouldPlanCols,
         });
         const { visibleRowDepth, visibleColDepth } = hydrationPlan;
 
@@ -1776,6 +1785,10 @@ export const useExpansionEngine = ({
     expandedStateSharedSignatureRef.current = expandedStateSharedSignature;
     const prevExpandRowsLevelRaw = prevExpandRowsLevelRawRef.current;
     const prevExpandColsLevelRaw = prevExpandColsLevelRawRef.current;
+    const expandRowsLevelChanged =
+      prevExpandRowsLevelRaw !== expandRowsLevelRaw;
+    const expandColsLevelChanged =
+      prevExpandColsLevelRaw !== expandColumnsLevelRaw;
     const isRowsLevelCleared =
       expandRowsLevelRaw === undefined && prevExpandRowsLevelRaw !== undefined;
     const isColsLevelCleared =
@@ -1813,8 +1826,18 @@ export const useExpansionEngine = ({
       cols: groupbyColumnKeys,
     };
     const previousLayout = previousLayoutRef.current;
-    previousLayoutRef.current = currentLayout;
     const hasNewData = previousDataRef.current !== data;
+    const shouldReinitialize =
+      isInitialMount ||
+      shouldResetExpandedState ||
+      sharedSignatureChanged ||
+      hasNewData ||
+      expandRowsLevelChanged ||
+      expandColsLevelChanged;
+    if (!shouldReinitialize) {
+      return;
+    }
+    previousLayoutRef.current = currentLayout;
     previousDataRef.current = data;
     const rowsChanged = !isSameLayout(previousLayout.rows, currentLayout.rows);
     const colsChanged = !isSameLayout(previousLayout.cols, currentLayout.cols);
@@ -2266,6 +2289,8 @@ export const useExpansionEngine = ({
       }
       hydrateAtomic('prefetch', {
         showLoader: shouldShowPrefetchLoader,
+        planRows: shouldPlanRows,
+        planCols: shouldPlanCols,
       }).catch(error => {
         reportAsyncError(error);
         setIsHydrating(false);

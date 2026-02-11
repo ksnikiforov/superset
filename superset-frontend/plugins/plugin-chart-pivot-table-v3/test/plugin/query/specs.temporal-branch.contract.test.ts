@@ -43,6 +43,12 @@ const emptyTree: PivotTreeData = {
 const findEqFilter = (filters: FilterClause[], column: string) =>
   filters.find(filter => filter.col === column && filter.op === '==');
 
+const assertColumnsUseRawSqlOutput = (columns: unknown[]) => {
+  columns.forEach(column => {
+    expect(typeof column).toBe('string');
+  });
+};
+
 describe('temporal branch query specs contract', () => {
   it('buildBranchQuerySpecs keeps temporal equality filters backend-safe', () => {
     const formData = buildFormData({
@@ -79,6 +85,7 @@ describe('temporal branch query specs contract', () => {
 
     expect(specs.length).toBeGreaterThan(0);
     specs.forEach(spec => {
+      assertColumnsUseRawSqlOutput(spec.columns as unknown[]);
       const temporalFilter = findEqFilter(
         spec.filters as FilterClause[],
         'orderYear',
@@ -148,6 +155,7 @@ describe('temporal branch query specs contract', () => {
 
     expect(specs.length).toBeGreaterThan(0);
     specs.forEach(spec => {
+      assertColumnsUseRawSqlOutput(spec.columns as unknown[]);
       const inFilter = (spec.filters as FilterClause[]).find(
         filter => filter.col === 'orderYear' && filter.op === 'IN',
       );

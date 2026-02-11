@@ -133,7 +133,6 @@ const resolveFetchContext = ({
     filterSignature,
     cacheMeta: {
       datasource: formData.datasource,
-      time_grain_sqla: queryCtx.timeGrainSqla,
       granularity: formData.granularity,
       granularity_sqla: formData.granularity_sqla,
       rowTotals: formData.rowTotals ?? false,

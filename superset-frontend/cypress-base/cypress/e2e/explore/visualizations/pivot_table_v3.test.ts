@@ -70,6 +70,7 @@ const PIVOT_TABLE_V3_FORM_DATA = {
   startCollapsed: true,
   initialDepth: 1,
 };
+
 const runTemporalExpandAssertions = (
   formData: Record<string, unknown>,
   expectedYearPattern: RegExp,

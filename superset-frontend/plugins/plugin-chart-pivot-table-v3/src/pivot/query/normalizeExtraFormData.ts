@@ -28,16 +28,6 @@ import {
 import { type PivotTableQueryFormData } from '../../types';
 import { normalizeTemporalValue } from './pathFilters';
 
-const looksLikeEpoch = (value: DataRecordValue): boolean => {
-  const numeric =
-    typeof value === 'number'
-      ? value
-      : typeof value === 'string'
-        ? Number(value)
-        : NaN;
-  return Number.isFinite(numeric) && Math.abs(numeric) >= 1e11;
-};
-
 const shouldCoerceTemporalValue = ({
   value,
   column,
@@ -59,7 +49,7 @@ const shouldCoerceTemporalValue = ({
       return true;
     }
   }
-  return looksLikeEpoch(value);
+  return false;
 };
 
 const coerceTemporalValue = (value: DataRecordValue): DataRecordValue => {

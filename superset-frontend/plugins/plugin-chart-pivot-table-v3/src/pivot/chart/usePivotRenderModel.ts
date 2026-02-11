@@ -759,10 +759,25 @@ export const usePivotRenderModel = ({
       if (!node || node.path.length === 0) {
         return false;
       }
+      const syntheticMetricTotalLabel =
+        node.path.length === 1 &&
+        typeof node.path[0] === 'string' &&
+        layout.metricLabels.some(label => node.path[0] === `Total ${label}`);
+      if (syntheticMetricTotalLabel) {
+        return false;
+      }
       const dimDepth = layout.countDimDepth(node.path);
       const maxDepth =
         axis === 'row' ? groupbyRows.length : groupbyColumns.length;
+      const metricsAtEnd =
+        axis === 'row' ? layout.metricsAtRowEnd : layout.metricsAtColEnd;
+      const hasMetricToken = node.path.some(val =>
+        layout.isMetricTokenValue(val),
+      );
       if (dimDepth >= maxDepth) {
+        return false;
+      }
+      if (hasMetricToken && metricsAtEnd) {
         return false;
       }
       if (
@@ -790,8 +805,6 @@ export const usePivotRenderModel = ({
       if (hideMetricParentToggle) {
         return false;
       }
-      const metricsAtEnd =
-        axis === 'row' ? layout.metricsAtRowEnd : layout.metricsAtColEnd;
       if (metricsAtEnd && dimDepth >= maxDepth) {
         return false;
       }

@@ -23,8 +23,7 @@ import { MetricsLayoutEnum, PivotRuntimeLayout } from '../../../src/types';
 import {
   applyMetricAxis,
   buildTreeFromRecords,
-  getStableColumnKey,
-  METRICS_PLACEHOLDER,
+  serializePath,
 } from '../../../src/utils';
 import { supersetChartDataClient } from '../../../src/pivot/data/SupersetChartDataClient';
 import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
@@ -60,7 +59,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     fetchPivotBranchMock.mockClear();
   });
 
-  it('expands with updated groupby rows after layout changes', async () => {
+  it('expands with updated groupby rows after instant layout changes', async () => {
     const metrics = ['grossRevenue'];
     const initialRows = ['shipMode', 'orderPriority'];
     const updatedRows = ['shipMode', 'revenueBand'];
@@ -120,9 +119,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     const rowTogglesAfter = screen.getAllByLabelText('Toggle row dimension');
     fireEvent.click(rowTogglesAfter[2]);
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
-    const lastFetch = fetchMock.mock.calls.at(-1)?.[0];
-    expect(lastFetch?.formData.groupbyRows).toEqual(updatedRows);
+    expect(fetchMock).not.toHaveBeenCalled();
 
     await waitFor(() => {
       const plusButtons = screen.queryAllByLabelText('plus-square');
@@ -221,7 +218,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('shows column expand toggles after appending a column in user-controlled mode', async () => {
+  it('shows column expand toggles after inserting before trailing values without a seamless reload', async () => {
     const metrics = ['averageOrderValue', 'weightedDiscount'];
     const initialCols = ['discountBand'];
     const initialRecords = [
@@ -301,25 +298,13 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     }
 
     await waitFor(() =>
-      expect(
-        within(thead).getByText('averageOrderValue'),
-      ).toBeInTheDocument(),
+      expect(within(thead).getByText('averageOrderValue')).toBeInTheDocument(),
     );
 
     const colButtons = screen.getAllByLabelText('Toggle column dimension');
     fireEvent.click(colButtons[1]);
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
-    const lastFetch = fetchMock.mock.calls.at(-1)?.[0];
-    expect(lastFetch?.requestGroupId).toBe('pivot-v3-seamless');
-    const nextGroupbyColumns = (
-      lastFetch?.formData.groupbyColumns ?? []
-    ).map(getStableColumnKey);
-    expect(nextGroupbyColumns).toEqual([
-      'discountBand',
-      METRICS_PLACEHOLDER,
-      'orderStatus',
-    ]);
+    expect(fetchMock).not.toHaveBeenCalled();
 
     await waitFor(() => {
       const refreshedThead = container.querySelector('thead') as HTMLElement;
@@ -329,19 +314,27 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     });
     await waitFor(() => {
       const refreshedThead = container.querySelector('thead') as HTMLElement;
-      const headerToggles = within(refreshedThead).queryAllByLabelText(
-        'plus-square',
-      );
-      const headerMinus = within(refreshedThead).queryAllByLabelText(
-        'minus-square',
-      );
+      const headerToggles =
+        within(refreshedThead).queryAllByLabelText('plus-square');
+      const headerMinus =
+        within(refreshedThead).queryAllByLabelText('minus-square');
       expect(headerToggles.length + headerMinus.length).toBeGreaterThan(0);
+      const discountCell = within(refreshedThead)
+        .getByText('0-2%')
+        .closest('th') as HTMLElement;
       const metricCell = within(refreshedThead)
         .getByText('averageOrderValue')
         .closest('th') as HTMLElement;
+      const discountToggle =
+        within(discountCell).queryByLabelText('plus-square') ??
+        within(discountCell).queryByLabelText('minus-square');
+      expect(discountToggle).not.toBeNull();
       expect(
         within(metricCell).queryByLabelText('plus-square'),
-      ).toBeInTheDocument();
+      ).not.toBeInTheDocument();
+      expect(
+        within(metricCell).queryByLabelText('minus-square'),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -519,7 +512,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     );
   });
 
-  it('shows the corner loader when reordering row chips in user-controlled mode', async () => {
+  it('reorders row chips instantly without triggering seamless reload', async () => {
     const metrics = ['measure1', 'measure2'];
     const rowGroupby = ['row1', 'row2'];
     const colGroupby = ['col1'];
@@ -553,15 +546,6 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       startCollapsed: true,
       initialDepth: 1,
     });
-
-    type FetchResult = Array<{ data: typeof records }>;
-    let resolveFetch: ((value: FetchResult) => void) | undefined;
-    fetchMock.mockImplementation(
-      () =>
-        new Promise<FetchResult>(resolve => {
-          resolveFetch = resolve;
-        }),
-    );
 
     render(
       <PivotTableChart
@@ -614,13 +598,11 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     fireEvent.drop(row1Chip, { dataTransfer });
     fireEvent.dragEnd(row2Chip, { dataTransfer });
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
-    expect(screen.getByLabelText('Loading')).toBeInTheDocument();
-
-    resolveFetch?.([{ data: records }]);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText('Loading')).not.toBeInTheDocument();
   });
 
-  it('keeps expanded columns after adding a row dimension', async () => {
+  it('keeps expanded columns after adding a row dimension without seamless reload', async () => {
     const metrics = ['measure1'];
     const rowGroupby = ['row1'];
     const colGroupby = ['col1'];
@@ -702,15 +684,6 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       initialDepth: 1,
     });
 
-    type FetchResult = Array<{ data: typeof updatedRecords }>;
-    let resolveFetch: ((value: FetchResult) => void) | undefined;
-    fetchMock.mockImplementation(
-      () =>
-        new Promise<FetchResult>(resolve => {
-          resolveFetch = resolve;
-        }),
-    );
-
     const { container } = render(
       <PivotTableChart
         data={baseTree}
@@ -765,13 +738,8 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     const row2Row = findDimensionRow('row2');
     fireEvent.click(within(row2Row).getByLabelText('Toggle row dimension'));
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
-    resolveFetch?.([{ data: updatedRecords }]);
-
-    await waitFor(() => expect(screen.getByText('R1-new')).toBeInTheDocument());
-    await waitFor(() =>
-      expect(screen.queryByText('R1-old')).not.toBeInTheDocument(),
-    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByText('R1-old')).toBeInTheDocument());
     await waitFor(() =>
       expect(screen.getAllByText('C1').length).toBeGreaterThan(0),
     );
@@ -864,5 +832,85 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       th => th.textContent ?? '',
     );
     expect(headerLabels).toEqual(expect.arrayContaining(['m2']));
+  });
+
+  it('reuses current expansion state during seamless metric updates to avoid rubber-banding', async () => {
+    const metrics = ['m1', 'm2'];
+    const rows = ['r1', 'r2'];
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows,
+      cols: [],
+      metrics: ['m1'],
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: rows,
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      pivotExpansionState: {
+        rowKeys: rows,
+        colKeys: [],
+        rows: [serializePath(['A'])],
+        cols: [],
+        collapsedRows: [],
+        collapsedCols: [],
+      },
+      startCollapsed: true,
+      initialDepth: 1,
+    });
+    const queryFormData = buildFormData({
+      ...formData,
+      metrics: ['m1'],
+    });
+    const records = [
+      { r1: 'A', r2: 'B', m1: 10, m2: 20 },
+      { r1: 'A', r2: 'C', m1: 12, m2: 24 },
+    ];
+    const baseRecords = records.map(({ r1, r2, m1 }) => ({ r1, r2, m1 }));
+    const baseTree = applyMetricAxis(
+      buildTreeFromRecords(baseRecords, ['m1'], rows, [], 2, 0),
+      ['m1'],
+      MetricsLayoutEnum.COLUMNS,
+      rows,
+      [],
+    );
+    fetchMock.mockImplementation(async ({ specs }: { specs: Array<unknown> }) =>
+      specs.map(() => ({
+        data: records,
+      })),
+    );
+
+    render(
+      <PivotTableChart
+        data={baseTree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={queryFormData}
+        metrics={metrics}
+        groupbyRows={rows}
+        groupbyColumns={[]}
+        width={600}
+        height={300}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('Select measures'));
+    fireEvent.click(screen.getByLabelText('Toggle measure m2'));
+    fireEvent.click(screen.getByText('Select measures'));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const lastFetch = fetchMock.mock.calls.at(-1)?.[0];
+    expect(
+      lastFetch?.formData?.pivotExpansionState?.rows?.length,
+    ).toBeGreaterThan(0);
+    await waitFor(() =>
+      expect(screen.getAllByText('m2').length).toBeGreaterThan(0),
+    );
   });
 });

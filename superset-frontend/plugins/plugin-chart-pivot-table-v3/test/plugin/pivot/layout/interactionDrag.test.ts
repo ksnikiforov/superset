@@ -93,6 +93,22 @@ describe('interaction drag layout helpers', () => {
     expect(next.valuePlacement).toEqual({ axis: 'row', index: 2 });
   });
 
+  it('keeps value last on default cross-axis move', () => {
+    const layout = baseLayout({
+      rows: ['r1'],
+      cols: ['c1'],
+      valuePlacement: { axis: 'row', index: 1 },
+    });
+    const next = applyDimensionDrag(layout, {
+      dimensionKey: 'c1',
+      targetAxis: 'row',
+      metricsAvailable: true,
+    });
+    expect(next.rows).toEqual(['r1', 'c1']);
+    expect(next.cols).toEqual([]);
+    expect(next.valuePlacement).toEqual({ axis: 'row', index: 2 });
+  });
+
   it('allows explicitly dropping a dimension after value', () => {
     const layout = baseLayout({
       rows: ['a', 'b'],

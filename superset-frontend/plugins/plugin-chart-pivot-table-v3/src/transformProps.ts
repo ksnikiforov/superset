@@ -21,10 +21,8 @@ import {
   Column,
   DataRecordValue,
   ensureIsArray,
-  extractTimegrain,
   GenericDataType,
   getTimeFormatter,
-  getTimeFormatterForGranularity,
   getMetricLabel,
   SMART_DATE_ID,
   TimeFormats,
@@ -204,7 +202,6 @@ export default function transformProps(
   );
   const pivotTheme = formData.pivotTheme || 'none';
   const pivotThemeColors = formData.pivotThemeColors || '';
-  const granularity = extractTimegrain(rawFormData);
   const metricKeysForQuery = getMetricKeys(planMetrics);
   const queryFormData: PivotTableQueryFormData = {
     ...rawFormData,
@@ -293,17 +290,7 @@ export default function transformProps(
     }
     let formatter: ((value: DataRecordValue) => string) | undefined;
     if (formData.dateFormat === SMART_DATE_ID) {
-      if (granularity) {
-        const base = getTimeFormatterForGranularity(granularity);
-        formatter = (value: DataRecordValue) =>
-          base(
-            coerceEpochMsStringToNumber(value) as
-              | number
-              | Date
-              | null
-              | undefined,
-          );
-      } else if (
+      if (
         combinedData.every(row => {
           const value = row[temporalColname];
           if (value === null || value === undefined) {
@@ -536,7 +523,6 @@ export default function transformProps(
     metricColorFormatters,
     dateFormatters,
     onContextMenu,
-    timeGrainSqla: formData.timeGrainSqla ?? formData.time_grain_sqla,
     colTypeMap: colTypeMapWithAliases,
     rowTotalPosition,
     rowSubtotalPosition,

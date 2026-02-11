@@ -43,7 +43,24 @@ const getControl = (name: string) => {
   return control;
 };
 
+const getControlNames = () =>
+  controlPanel.controlPanelSections
+    .flatMap(section => (section ? section.controlSetRows : []))
+    .flatMap(row => row)
+    .filter((controlItem): controlItem is CustomControlItem =>
+      isCustomControlItem(controlItem),
+    )
+    .map(controlItem => controlItem.name);
+
 describe('pivot table v3 control panel', () => {
+  it('does not expose time grain control in pivot v3', () => {
+    expect(getControlNames()).not.toContain('time_grain_sqla');
+    const interactionModeControl = getControl('interactionMode');
+    expect(interactionModeControl.config.rerender).not.toContain(
+      'time_grain_sqla',
+    );
+  });
+
   it('exposes auto-expand level controls with blank defaults', () => {
     const expandRowsLevelControl = getControl('expandRowsLevel');
     const expandColumnsLevelControl = getControl('expandColumnsLevel');

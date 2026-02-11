@@ -61,7 +61,7 @@ export const normalizeTemporalValue = (
     return value;
   }
   if (Math.abs(parsed) >= 1e11) {
-    return new Date(parsed).toISOString();
+    return parsed;
   }
   return value;
 };

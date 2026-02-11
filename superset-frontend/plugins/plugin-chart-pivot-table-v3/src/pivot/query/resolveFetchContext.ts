@@ -16,12 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import {
-  type AdhocColumn,
-  isPhysicalColumn,
-  type QueryFormColumn,
-  type QueryFormMetric,
-} from '@superset-ui/core';
+import { type QueryFormColumn, type QueryFormMetric } from '@superset-ui/core';
 import {
   MetricsLayoutEnum,
   type PivotAxis,
@@ -79,7 +74,6 @@ export type ResolvedFetchContext = {
   hasColFormatting: boolean;
   hasRowTotalSorting: boolean;
   hasColTotalSorting: boolean;
-  timeGrainSqla?: string;
 };
 
 export const resolveFetchContext = ({
@@ -103,29 +97,6 @@ export const resolveFetchContext = ({
     metricsLayoutResolved,
     metricInsertIndex: metricInsertIndexBase,
   } = layout;
-  const extraFormData = formData.extra_form_data;
-  const timeGrainSqla =
-    extraFormData?.time_grain_sqla || formData.time_grain_sqla;
-  const temporalLookup = formData?.temporal_columns_lookup || {};
-  const isTemporalColumn = (col: QueryFormColumn) =>
-    isPhysicalColumn(col) &&
-    (temporalLookup?.[col as string] || formData.granularity_sqla === col);
-  const normalizeColumn = (
-    col: QueryFormColumn,
-    time_grain_sqla?: string,
-    isTemporal?: boolean,
-  ) => {
-    if (isPhysicalColumn(col) && time_grain_sqla && isTemporal) {
-      return {
-        timeGrain: time_grain_sqla,
-        columnType: 'BASE_AXIS',
-        sqlExpression: col,
-        label: col,
-        expressionType: 'SQL',
-      } as AdhocColumn;
-    }
-    return col;
-  };
   let rowGroupby = layout.groupbyRows;
   let colGroupby = layout.groupbyColumns;
   const metricsAxis: PivotAxis =
@@ -238,12 +209,8 @@ export const resolveFetchContext = ({
     colDepth = Math.min(colGroupby.length, Math.max(targetColDepth, 0));
   }
 
-  const rowGroupbyForQueryFull = rowGroupby.map(col =>
-    normalizeColumn(col, timeGrainSqla, isTemporalColumn(col)),
-  );
-  const colGroupbyForQueryFull = colGroupby.map(col =>
-    normalizeColumn(col, timeGrainSqla, isTemporalColumn(col)),
-  );
+  const rowGroupbyForQueryFull = rowGroupby;
+  const colGroupbyForQueryFull = colGroupby;
   const needsMetricFormatting =
     Object.keys(formData.metricFormatting || {}).length > 0;
   const needsDatabars = Object.keys(formData.metricDatabars || {}).length > 0;
@@ -330,7 +297,6 @@ export const resolveFetchContext = ({
     hasColFormatting,
     hasRowTotalSorting,
     hasColTotalSorting,
-    timeGrainSqla,
   };
 };
 

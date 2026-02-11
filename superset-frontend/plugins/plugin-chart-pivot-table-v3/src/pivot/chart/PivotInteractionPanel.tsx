@@ -700,12 +700,24 @@ export const PivotInteractionPanel = ({
       }
       if (targetAxis === 'row') {
         const rowLength = nextRows.length;
-        const insertIndex = rowLength;
-        nextRows.splice(insertIndex, 0, dimensionKey);
+        const valueOnRows = nextValuePlacement.axis === 'row';
+        const valueAtEnd = nextValuePlacement.index === rowLength;
+        if (valueOnRows && valueAtEnd) {
+          nextRows.splice(nextValuePlacement.index, 0, dimensionKey);
+          nextValuePlacement.index += 1;
+        } else {
+          nextRows.push(dimensionKey);
+        }
       } else if (targetAxis === 'col') {
         const colLength = nextCols.length;
-        const insertIndex = colLength;
-        nextCols.splice(insertIndex, 0, dimensionKey);
+        const valueOnCols = nextValuePlacement.axis === 'col';
+        const valueAtEnd = nextValuePlacement.index === colLength;
+        if (valueOnCols && valueAtEnd) {
+          nextCols.splice(nextValuePlacement.index, 0, dimensionKey);
+          nextValuePlacement.index += 1;
+        } else {
+          nextCols.push(dimensionKey);
+        }
       }
       onChange({
         ...resolvedLayout,
