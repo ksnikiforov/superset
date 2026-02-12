@@ -1804,8 +1804,6 @@ export const useExpansionEngine = ({
     const effectiveExpandColsLevel = isColsLevelCleared
       ? 0
       : resolvedExpandColumnsLevel;
-    autoExpandRowsLevelRef.current = effectiveExpandRowsLevel;
-    autoExpandColsLevelRef.current = effectiveExpandColsLevel;
     const sessionExpansionState =
       expansionStateStoreRef.current?.init({
         persistedState: persistedExpansionStateRef.current,
@@ -1915,6 +1913,16 @@ export const useExpansionEngine = ({
       layoutColsForPrune,
       currentLayout.cols,
     );
+    const autoExpandRowsLevelForDesired =
+      shouldPruneRowsForLayoutChange && shouldExpandRows && rowStablePrefix > 0
+        ? Math.min(effectiveExpandRowsLevel, Math.max(rowStablePrefix - 1, 0))
+        : effectiveExpandRowsLevel;
+    const autoExpandColsLevelForDesired =
+      shouldPruneColsForLayoutChange && shouldExpandCols && colStablePrefix > 0
+        ? Math.min(effectiveExpandColsLevel, Math.max(colStablePrefix - 1, 0))
+        : effectiveExpandColsLevel;
+    autoExpandRowsLevelRef.current = autoExpandRowsLevelForDesired;
+    autoExpandColsLevelRef.current = autoExpandColsLevelForDesired;
     const allowMetricRowPromotion =
       metricIndexForRows !== undefined &&
       metricIndexForRows < groupbyRowsLength;
@@ -2151,7 +2159,7 @@ export const useExpansionEngine = ({
     const nextExpandedRows = buildDesiredExpandedKeys({
       axis: 'row',
       tree: normalizedTree,
-      autoExpandLevel: effectiveExpandRowsLevel,
+      autoExpandLevel: autoExpandRowsLevelForDesired,
       metricLabelSet: metricLabelSetForDepth,
       includeMetricDepthZero: shouldExpandMetricRows,
       manualExpanded: explicitExpandedRowsRef.current,
@@ -2162,7 +2170,7 @@ export const useExpansionEngine = ({
     const nextExpandedCols = buildDesiredExpandedKeys({
       axis: 'col',
       tree: normalizedTree,
-      autoExpandLevel: effectiveExpandColsLevel,
+      autoExpandLevel: autoExpandColsLevelForDesired,
       metricLabelSet: metricLabelSetForDepth,
       includeMetricDepthZero: shouldExpandMetricCols,
       manualExpanded: explicitExpandedColsRef.current,
@@ -2171,26 +2179,28 @@ export const useExpansionEngine = ({
       inFlightKeys: new Set(),
     });
 
-    const prunedRows =
-      shouldResetExpandedRows || rowsChanged
-        ? pruneExpandedToStablePrefix({
-            expanded: nextExpandedRows,
-            nodes: normalizedTree.rows,
-            stablePrefix: rowStablePrefix,
-            metricLabelSet: metricLabelSetForDepth,
-            includeMetricDepth: allowMetricRowPromotion,
-          })
-        : nextExpandedRows;
-    const prunedCols =
-      shouldResetExpandedCols || colsChanged
-        ? pruneExpandedToStablePrefix({
-            expanded: nextExpandedCols,
-            nodes: normalizedTree.cols,
-            stablePrefix: colStablePrefix,
-            metricLabelSet: metricLabelSetForDepth,
-            includeMetricDepth: allowMetricColPromotion,
-          })
-        : nextExpandedCols;
+    const shouldPruneRowsByStablePrefix =
+      shouldResetExpandedRows || (rowsChanged && !hasNewData);
+    const shouldPruneColsByStablePrefix =
+      shouldResetExpandedCols || (colsChanged && !hasNewData);
+    const prunedRows = shouldPruneRowsByStablePrefix
+      ? pruneExpandedToStablePrefix({
+          expanded: nextExpandedRows,
+          nodes: normalizedTree.rows,
+          stablePrefix: rowStablePrefix,
+          metricLabelSet: metricLabelSetForDepth,
+          includeMetricDepth: allowMetricRowPromotion,
+        })
+      : nextExpandedRows;
+    const prunedCols = shouldPruneColsByStablePrefix
+      ? pruneExpandedToStablePrefix({
+          expanded: nextExpandedCols,
+          nodes: normalizedTree.cols,
+          stablePrefix: colStablePrefix,
+          metricLabelSet: metricLabelSetForDepth,
+          includeMetricDepth: allowMetricColPromotion,
+        })
+      : nextExpandedCols;
 
     const resolvedRows = resolveExpandedForMetrics(
       'row',
@@ -2282,7 +2292,7 @@ export const useExpansionEngine = ({
       prunedCollapsedRows.length > 0 ||
       prunedCollapsedCols.length > 0;
     const hasAutoExpansions =
-      effectiveExpandRowsLevel > 0 || effectiveExpandColsLevel > 0;
+      autoExpandRowsLevelForDesired > 0 || autoExpandColsLevelForDesired > 0;
     const hasRowNodes = Object.keys(normalizedTree.rows).some(
       key => key !== rootKey,
     );

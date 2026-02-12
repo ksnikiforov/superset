@@ -374,8 +374,6 @@ export const hasLoadedChildren = ({
       metricIndex >= 0 &&
       parentDimDepth === metricIndex &&
       !parentHasMetric);
-  const isAboveMetricTier =
-    metricIndex !== undefined && parentDimDepth < metricIndex;
   const axisNodes = axis === 'row' ? rows : cols;
   const nodeMetricIndex = node.path.findIndex(val => isMetricTokenValue(val));
   const basePath = node.path.filter(
@@ -400,7 +398,24 @@ export const hasLoadedChildren = ({
       }
       return candidatePath.every((val, idx) => val === node.path[idx]);
     });
-  if (hasMetricVariant) {
+  const hasMetricVariantCells =
+    hasMetricVariant &&
+    Object.keys(cells).some(key => {
+      const { rowKey, colKey } = parseCellKey(key);
+      const axisKey = axis === 'row' ? rowKey : colKey;
+      const axisNode = axisNodes[axisKey];
+      if (!axisNode || !axisNode.path.some(isMetricTokenValue)) {
+        return false;
+      }
+      const candidatePath = axisNode.path.filter(
+        val => !isMetricTokenValue(val) && !isSubtotalToken(val),
+      );
+      if (candidatePath.length !== basePath.length) {
+        return false;
+      }
+      return candidatePath.every((value, index) => value === basePath[index]);
+    });
+  if (hasMetricVariant && hasMetricVariantCells) {
     return true;
   }
   if (
@@ -551,10 +566,7 @@ export const hasLoadedChildren = ({
     (maxChildDimDepth <= parentDimDepth || !effectiveHasChildCells)
   ) {
     // Only metric-tier children or placeholder nodes are present; treat as not loaded.
-    if (
-      !metricsExpectedAtParent &&
-      !(isAboveMetricTier && effectiveHasChildCells)
-    ) {
+    if (!metricsExpectedAtParent) {
       return false;
     }
   }

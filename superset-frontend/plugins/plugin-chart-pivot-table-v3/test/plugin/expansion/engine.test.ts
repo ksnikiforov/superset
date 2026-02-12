@@ -22,8 +22,17 @@ import {
   type ExpansionVisibilityConfig,
 } from '../../../src/pivot/expansion/engine';
 import { rootKey } from '../../../src/pivot/viewModel';
-import { serializeCellKey, serializePath } from '../../../src/utils';
-import { type PivotTreeData, type PivotTreeNode } from '../../../src/types';
+import {
+  METRICS_PLACEHOLDER,
+  SUBTOTAL_TOKEN,
+  serializeCellKey,
+  serializePath,
+} from '../../../src/utils';
+import {
+  MetricsLayoutEnum,
+  type PivotTreeData,
+  type PivotTreeNode,
+} from '../../../src/types';
 
 describe('pivot/expansion/engine', () => {
   const config: ExpansionVisibilityConfig = {
@@ -207,5 +216,108 @@ describe('pivot/expansion/engine', () => {
       throw new Error('Expected a fetch plan');
     }
     expect(plan.targets.map(target => target.axis)).toEqual(['col']);
+  });
+
+  it('fetches expanded row branches when only stale metric variants exist', () => {
+    const aKey = serializePath(['A']);
+    const aMetricKey = serializePath(['A', METRICS_PLACEHOLDER]);
+    const xKey = serializePath(['X']);
+    const tree: PivotTreeData = {
+      rows: {
+        [rootKey]: makeNode('row', [], true),
+        [aKey]: makeNode('row', ['A'], true),
+        [aMetricKey]: makeNode('row', ['A', METRICS_PLACEHOLDER], false),
+      },
+      cols: {
+        [rootKey]: makeNode('col', [], true),
+        [xKey]: makeNode('col', ['X'], false),
+      },
+      cells: {
+        [serializeCellKey(aKey, xKey)]: {
+          rowKey: aKey,
+          colKey: xKey,
+          values: {},
+        },
+      },
+    };
+    const metricConfig: ExpansionVisibilityConfig = {
+      ...config,
+      metricsLayout: MetricsLayoutEnum.ROWS,
+      metricIndexForRows: 1,
+      isMetricTokenValue: value => value === METRICS_PLACEHOLDER,
+      countDimDepth: path =>
+        path.filter(value => value !== METRICS_PLACEHOLDER).length,
+    };
+
+    const plan = planHydrationIteration({
+      tree,
+      desiredRows: new Set([rootKey, aKey]),
+      desiredCols: new Set([rootKey, xKey]),
+      fetchedRowDepthByKey: new Map(),
+      fetchedColDepthByKey: new Map(),
+      config: metricConfig,
+      getGroupedFetchKey,
+      pendingRows: new Set(),
+      pendingCols: new Set(),
+    });
+
+    expect(plan.rowPlan.fetchKeys.has(aKey)).toBe(true);
+    expect(plan.kind).toBe('fetch');
+  });
+
+  it('fetches expanded row branches when only subtotal+metric descendants exist at same base depth', () => {
+    const metricToken = '__metric__m1';
+    const aKey = serializePath(['A']);
+    const subtotalKey = serializePath(['A', SUBTOTAL_TOKEN]);
+    const subtotalMetricKey = serializePath(['A', SUBTOTAL_TOKEN, metricToken]);
+    const xKey = serializePath(['X']);
+    const tree: PivotTreeData = {
+      rows: {
+        [rootKey]: makeNode('row', [], true),
+        [aKey]: makeNode('row', ['A'], true),
+        [subtotalKey]: makeNode('row', ['A', SUBTOTAL_TOKEN], true),
+        [subtotalMetricKey]: makeNode(
+          'row',
+          ['A', SUBTOTAL_TOKEN, metricToken],
+          false,
+        ),
+      },
+      cols: {
+        [rootKey]: makeNode('col', [], true),
+        [xKey]: makeNode('col', ['X'], false),
+      },
+      cells: {
+        [serializeCellKey(subtotalMetricKey, xKey)]: {
+          rowKey: subtotalMetricKey,
+          colKey: xKey,
+          values: {},
+        },
+      },
+    };
+    const metricConfig: ExpansionVisibilityConfig = {
+      ...config,
+      groupbyRowsLength: 3,
+      metricsLayout: MetricsLayoutEnum.ROWS,
+      metricIndexForRows: 2,
+      isMetricTokenValue: value => value === metricToken,
+      countDimDepth: path =>
+        path.filter(value => value !== metricToken && value !== SUBTOTAL_TOKEN)
+          .length,
+    };
+
+    const plan = planHydrationIteration({
+      tree,
+      desiredRows: new Set([rootKey, aKey]),
+      desiredCols: new Set([rootKey, xKey]),
+      fetchedRowDepthByKey: new Map(),
+      fetchedColDepthByKey: new Map(),
+      config: metricConfig,
+      getGroupedFetchKey,
+      pendingRows: new Set(),
+      pendingCols: new Set(),
+    });
+
+    expect(plan.rowPlan.fetchKeys.has(aKey)).toBe(true);
+    expect(plan.kind).toBe('fetch');
   });
 });

@@ -16,10 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import { getColumnLabel, QueryFormColumn } from '@superset-ui/core';
 import { fireEvent, render, screen, waitFor, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { buildFormData } from '../fixtures/pivotFormData';
-import { MetricsLayoutEnum, PivotRuntimeLayout } from '../../../src/types';
+import {
+  MetricsLayoutEnum,
+  PivotRuntimeLayout,
+  PivotTreeData,
+} from '../../../src/types';
 import {
   METRICS_PLACEHOLDER,
   applyMetricAxis,
@@ -59,8 +64,20 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
 
   beforeEach(() => {
     fetchMock.mockReset();
-    fetchPivotBranchMock.mockClear();
+    fetchPivotBranchMock.mockReset();
+    fetchPivotBranchMock.mockResolvedValue({ data: undefined });
   });
+
+  const hasColumnKey = (
+    columns: Array<string | QueryFormColumn> | undefined,
+    key: string,
+  ) =>
+    (columns ?? []).some(column => {
+      if (typeof column === 'string') {
+        return column === key;
+      }
+      return getColumnLabel(column) === key;
+    });
 
   it('expands with updated groupby rows after instant layout changes', async () => {
     const metrics = ['grossRevenue'];
@@ -100,7 +117,27 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     });
 
     fetchMock.mockImplementation(async ({ specs }: { specs: Array<unknown> }) =>
-      specs.map(() => ({ data: updatedRecords })),
+      specs.map(spec => {
+        const { columns } = spec as {
+          columns?: Array<string | QueryFormColumn>;
+        };
+        if (hasColumnKey(columns, 'revenueBand')) {
+          return { data: updatedRecords };
+        }
+        const metricKey = metrics[0];
+        return {
+          data: [
+            {
+              [metricKey]: updatedRecords.reduce(
+                (sum, row) =>
+                  sum +
+                  (Number((row as Record<string, unknown>)[metricKey]) || 0),
+                0,
+              ),
+            },
+          ],
+        };
+      }),
     );
 
     render(
@@ -273,6 +310,23 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       initialDepth: 1,
     });
 
+    fetchMock.mockImplementation(async ({ specs }: { specs: Array<unknown> }) =>
+      specs.map(spec => {
+        const { columns } = spec as {
+          columns?: Array<string | QueryFormColumn>;
+        };
+        if (hasColumnKey(columns, 'r1')) {
+          return {
+            data: [
+              { r1: 'A', m1: 10, m2: 20 },
+              { r1: 'B', m1: 12, m2: 24 },
+            ],
+          };
+        }
+        return { data: [{ m1: 22, m2: 44 }] };
+      }),
+    );
+
     render(
       <PivotTableChart
         data={baseTree}
@@ -313,10 +367,406 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       'Toggle row dimension',
     ) as HTMLButtonElement;
     fireEvent.click(rowToggleAfterTrim);
-    expect(fetchMock).not.toHaveBeenCalled();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const rowRestoreFetch = fetchMock.mock.calls[0]?.[0];
+    expect(
+      (rowRestoreFetch?.formData?.groupbyRows ?? []).map(getStableColumnKey),
+    ).toEqual(['r1']);
 
     await waitFor(() => expect(screen.getByText('A')).toBeInTheDocument());
     await waitFor(() => expect(screen.getByText('B')).toBeInTheDocument());
+  });
+
+  it('reloads data when replacing the leading row dimension in user-controlled mode', async () => {
+    const metrics = ['m1'];
+    const initialRows = ['row1'];
+    const initialRecords = [
+      { row1: 'A', m1: 10 },
+      { row1: 'B', m1: 20 },
+    ];
+    const updatedRecords = [
+      { row2: 'X', m1: 30 },
+      { row2: 'Y', m1: 40 },
+    ];
+    const baseTree = applyMetricAxis(
+      buildTreeFromRecords(initialRecords, metrics, initialRows, [], 1, 0),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      initialRows,
+      [],
+      0,
+    );
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: initialRows,
+      cols: [],
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: ['row1', 'row2'],
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      startCollapsed: false,
+      initialDepth: 1,
+    });
+
+    fetchMock.mockImplementation(async ({ specs }: { specs: Array<unknown> }) =>
+      specs.map(() => ({ data: updatedRecords })),
+    );
+
+    const { container } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={initialRows}
+        groupbyColumns={[]}
+        width={600}
+        height={300}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText('A')).toBeInTheDocument());
+
+    const findRowDimensionControl = (label: string) => {
+      const nodes = screen.getAllByText(label);
+      for (const node of nodes) {
+        let current: HTMLElement | null = node as HTMLElement;
+        while (current) {
+          if (within(current).queryByLabelText('Toggle row dimension')) {
+            return current;
+          }
+          current = current.parentElement;
+        }
+      }
+      throw new Error(`Missing row dimension control for ${label}`);
+    };
+
+    const row2Control = findRowDimensionControl('row2');
+    const row2Toggle = within(row2Control).getByLabelText(
+      'Toggle row dimension',
+    ) as HTMLButtonElement;
+    const callsBeforeRow2Enable = fetchMock.mock.calls.length;
+    fireEvent.click(row2Toggle);
+    expect(fetchMock.mock.calls.length).toBe(callsBeforeRow2Enable);
+
+    const callsBeforeLeadingSwap = fetchMock.mock.calls.length;
+
+    const row1Control = findRowDimensionControl('row1');
+    const row1Toggle = within(row1Control).getByLabelText(
+      'Toggle row dimension',
+    ) as HTMLButtonElement;
+    fireEvent.click(row1Toggle);
+
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.length).toBeGreaterThan(
+        callsBeforeLeadingSwap,
+      ),
+    );
+    const matchingCalls = fetchMock.mock.calls
+      .slice(callsBeforeLeadingSwap)
+      .filter(call => {
+        const payload = call[0] as
+          | {
+              formData?: { groupbyRows?: string[] };
+              specs?: Array<{ columns?: string[] }>;
+            }
+          | undefined;
+        return (
+          Array.isArray(payload?.formData?.groupbyRows) &&
+          payload?.formData?.groupbyRows.length === 1 &&
+          payload.formData.groupbyRows[0] === 'row2'
+        );
+      });
+    expect(matchingCalls.length).toBeGreaterThan(0);
+
+    const hasRow2DetailSpec = matchingCalls.some(call => {
+      const payload = call[0] as {
+        specs?: Array<{ columns?: Array<string | QueryFormColumn> }>;
+      };
+      return (payload.specs ?? []).some(spec =>
+        hasColumnKey(spec.columns, 'row2'),
+      );
+    });
+    expect(hasRow2DetailSpec).toBe(true);
+    const hasStaleRow1Spec = matchingCalls.some(call => {
+      const payload = call[0] as {
+        specs?: Array<{ columns?: Array<string | QueryFormColumn> }>;
+      };
+      return (payload.specs ?? []).some(spec =>
+        hasColumnKey(spec.columns, 'row1'),
+      );
+    });
+    expect(hasStaleRow1Spec).toBe(false);
+
+    await waitFor(() => {
+      const tbody = container.querySelector('tbody') as HTMLElement;
+      expect(within(tbody).getByText('X')).toBeInTheDocument();
+      expect(within(tbody).getByText('Y')).toBeInTheDocument();
+    });
+  });
+
+  it('reloads when adding the first row dimension after clearing rows in user-controlled mode', async () => {
+    const metrics = ['m1'];
+    const initialRows = ['name'];
+    const initialRecords = [
+      { name: 'A', m1: 10 },
+      { name: 'B', m1: 20 },
+    ];
+    const updatedRecords = [
+      { city: 'NY', m1: 30 },
+      { city: 'SF', m1: 40 },
+    ];
+    const baseTree = applyMetricAxis(
+      buildTreeFromRecords(initialRecords, metrics, initialRows, [], 1, 0),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      initialRows,
+      [],
+      0,
+    );
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: initialRows,
+      cols: [],
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: ['name', 'city'],
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      startCollapsed: false,
+      initialDepth: 1,
+    });
+
+    fetchMock.mockImplementation(async ({ specs }: { specs: Array<unknown> }) =>
+      specs.map(() => ({ data: updatedRecords })),
+    );
+
+    const { container } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={initialRows}
+        groupbyColumns={[]}
+        width={600}
+        height={300}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText('A')).toBeInTheDocument());
+
+    const findRowDimensionControl = (label: string) => {
+      const nodes = screen.getAllByText(label);
+      for (const node of nodes) {
+        let current: HTMLElement | null = node as HTMLElement;
+        while (current) {
+          if (within(current).queryByLabelText('Toggle row dimension')) {
+            return current;
+          }
+          current = current.parentElement;
+        }
+      }
+      throw new Error(`Missing row dimension control for ${label}`);
+    };
+
+    const nameControl = findRowDimensionControl('name');
+    const nameToggle = within(nameControl).getByLabelText(
+      'Toggle row dimension',
+    ) as HTMLButtonElement;
+    const callsBeforeRemove = fetchMock.mock.calls.length;
+    fireEvent.click(nameToggle);
+    expect(fetchMock.mock.calls.length).toBe(callsBeforeRemove);
+    await waitFor(() =>
+      expect(screen.getByText('Grand total')).toBeInTheDocument(),
+    );
+
+    const cityControl = findRowDimensionControl('city');
+    const cityToggle = within(cityControl).getByLabelText(
+      'Toggle row dimension',
+    ) as HTMLButtonElement;
+    const callsBeforeAdd = fetchMock.mock.calls.length;
+    fireEvent.click(cityToggle);
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.length).toBeGreaterThan(callsBeforeAdd),
+    );
+    const cityFetchCalls = fetchMock.mock.calls.slice(callsBeforeAdd);
+    const hasCityQuery = cityFetchCalls.some(call =>
+      (
+        (call[0]?.formData?.groupbyRows ?? []) as Array<
+          string | QueryFormColumn
+        >
+      )
+        .map(getStableColumnKey)
+        .includes('city'),
+    );
+    expect(hasCityQuery).toBe(true);
+
+    await waitFor(() => {
+      const tbody = container.querySelector('tbody') as HTMLElement;
+      expect(within(tbody).getByText('NY')).toBeInTheDocument();
+      expect(within(tbody).getByText('SF')).toBeInTheDocument();
+    });
+  });
+
+  it('fetches only when the first row key changes in a multistep row-toggle sequence', async () => {
+    const metrics = ['m1'];
+    const initialRows = ['name'];
+    const initialRecords = [
+      { name: 'A', m1: 10 },
+      { name: 'B', m1: 20 },
+    ];
+    const stateRecords = [
+      { state: 'CA', m1: 30 },
+      { state: 'NY', m1: 40 },
+    ];
+    const cityRecords = [
+      { city: 'SF', m1: 50 },
+      { city: 'SEA', m1: 60 },
+    ];
+    const stateCityRecords = [
+      { state: 'CA', city: 'SF', m1: 50 },
+      { state: 'NY', city: 'SEA', m1: 60 },
+    ];
+
+    const baseTree = applyMetricAxis(
+      buildTreeFromRecords(initialRecords, metrics, initialRows, [], 1, 0),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      initialRows,
+      [],
+      0,
+    );
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: initialRows,
+      cols: [],
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: ['name', 'state', 'city'],
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      startCollapsed: false,
+      initialDepth: 1,
+    });
+
+    fetchMock.mockImplementation(
+      async ({
+        formData: nextFormData,
+        specs,
+      }: {
+        formData?: { groupbyRows?: Array<string | QueryFormColumn> };
+        specs: Array<unknown>;
+      }) => {
+        const rowKeys = (nextFormData?.groupbyRows ?? []).map(
+          getStableColumnKey,
+        );
+        const rows =
+          rowKeys.length === 1 && rowKeys[0] === 'state'
+            ? stateRecords
+            : rowKeys.length === 1 && rowKeys[0] === 'city'
+              ? cityRecords
+              : rowKeys.includes('state') && rowKeys.includes('city')
+                ? stateCityRecords
+                : initialRecords;
+        return specs.map(() => ({ data: rows }));
+      },
+    );
+
+    const { container } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={initialRows}
+        groupbyColumns={[]}
+        width={600}
+        height={300}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText('A')).toBeInTheDocument());
+
+    const findRowDimensionControl = (label: string) => {
+      const nodes = screen.getAllByText(label);
+      for (const node of nodes) {
+        let current: HTMLElement | null = node as HTMLElement;
+        while (current) {
+          if (within(current).queryByLabelText('Toggle row dimension')) {
+            return current;
+          }
+          current = current.parentElement;
+        }
+      }
+      throw new Error(`Missing row dimension control for ${label}`);
+    };
+
+    const nameControl = findRowDimensionControl('name');
+    fireEvent.click(within(nameControl).getByLabelText('Toggle row dimension'));
+    expect(fetchMock).not.toHaveBeenCalled();
+    await waitFor(() =>
+      expect(screen.getByText('Grand total')).toBeInTheDocument(),
+    );
+
+    const stateControl = findRowDimensionControl('state');
+    fireEvent.click(
+      within(stateControl).getByLabelText('Toggle row dimension'),
+    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const firstFetch = fetchMock.mock.calls[0]?.[0];
+    expect(
+      (firstFetch?.formData?.groupbyRows ?? []).map(getStableColumnKey),
+    ).toEqual(['state']);
+    await waitFor(() => expect(screen.getByText('CA')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('NY')).toBeInTheDocument());
+
+    const cityControl = findRowDimensionControl('city');
+    fireEvent.click(within(cityControl).getByLabelText('Toggle row dimension'));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const stateControlAfterAdd = findRowDimensionControl('state');
+    fireEvent.click(
+      within(stateControlAfterAdd).getByLabelText('Toggle row dimension'),
+    );
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const secondFetch = fetchMock.mock.calls[1]?.[0];
+    expect(
+      (secondFetch?.formData?.groupbyRows ?? []).map(getStableColumnKey),
+    ).toEqual(['city']);
+
+    await waitFor(() => {
+      const tbody = container.querySelector('tbody') as HTMLElement;
+      expect(within(tbody).getByText('SF')).toBeInTheDocument();
+      expect(within(tbody).getByText('SEA')).toBeInTheDocument();
+      expect(within(tbody).queryByText('CA')).not.toBeInTheDocument();
+      expect(within(tbody).queryByText('NY')).not.toBeInTheDocument();
+    });
   });
 
   it('shows grand total column and restores column members after removing then re-adding the last column dimension', async () => {
@@ -371,6 +821,23 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       initialDepth: 1,
     });
 
+    fetchMock.mockImplementation(async ({ specs }: { specs: Array<unknown> }) =>
+      specs.map(spec => {
+        const { columns } = spec as {
+          columns?: Array<string | QueryFormColumn>;
+        };
+        if (hasColumnKey(columns, 'c1')) {
+          return {
+            data: [
+              { c1: 'A', m1: 10, m2: 20 },
+              { c1: 'B', m1: 12, m2: 24 },
+            ],
+          };
+        }
+        return { data: [{ m1: 22, m2: 44 }] };
+      }),
+    );
+
     const { container } = render(
       <PivotTableChart
         data={baseTree}
@@ -412,7 +879,11 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       'Toggle column dimension',
     ) as HTMLButtonElement;
     fireEvent.click(colToggleAfterTrim);
-    expect(fetchMock).not.toHaveBeenCalled();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const colRestoreFetch = fetchMock.mock.calls[0]?.[0];
+    expect(
+      (colRestoreFetch?.formData?.groupbyColumns ?? []).map(getStableColumnKey),
+    ).toEqual(['c1']);
 
     await waitFor(() => {
       const thead = container.querySelector('thead') as HTMLElement;
@@ -574,7 +1045,8 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     const getMetricCell = () =>
       within(thead).getByText('m1').closest('th') as HTMLElement;
 
-    const metricExpand = within(getMetricCell()).queryByLabelText('plus-square');
+    const metricExpand =
+      within(getMetricCell()).queryByLabelText('plus-square');
     if (metricExpand) {
       fireEvent.click(metricExpand);
     }
@@ -594,15 +1066,18 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
 
     const columnButtons = screen.getAllByLabelText('Toggle column dimension');
     fireEvent.click(columnButtons[1]);
-    await waitFor(() => expect(within(thead).queryAllByText('CA')).toHaveLength(0));
+    await waitFor(() =>
+      expect(within(thead).queryAllByText('CA')).toHaveLength(0),
+    );
     await waitFor(() =>
       expect(
         within(getMetricCell()).queryByLabelText('minus-square'),
-      ).not.toBeNull(),
+      ).toBeInTheDocument(),
     );
 
-    const columnButtonsAfterTrim =
-      screen.getAllByLabelText('Toggle column dimension');
+    const columnButtonsAfterTrim = screen.getAllByLabelText(
+      'Toggle column dimension',
+    );
     fireEvent.click(columnButtonsAfterTrim[1]);
 
     await waitFor(() =>
@@ -611,7 +1086,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     await waitFor(() =>
       expect(
         within(getMetricCell()).queryByLabelText('minus-square'),
-      ).not.toBeNull(),
+      ).toBeInTheDocument(),
     );
     await waitFor(() => {
       const refreshedGenderCell = within(thead)
@@ -675,7 +1150,9 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     );
 
     const thead = container.querySelector('thead') as HTMLElement;
-    const metricCell = within(thead).getByText('m1').closest('th') as HTMLElement;
+    const metricCell = within(thead)
+      .getByText('m1')
+      .closest('th') as HTMLElement;
     const metricExpand = within(metricCell).queryByLabelText('plus-square');
     if (metricExpand) {
       fireEvent.click(metricExpand);
@@ -716,15 +1193,21 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     fireEvent.click(stateToggle);
 
     expect(fetchMock).not.toHaveBeenCalled();
-    await waitFor(() => expect(within(thead).queryAllByText('CA')).toHaveLength(0));
-    await waitFor(() => expect(within(thead).queryAllByText('WA')).toHaveLength(0));
-    await waitFor(() => expect(within(thead).queryAllByText('TX')).toHaveLength(0));
+    await waitFor(() =>
+      expect(within(thead).queryAllByText('CA')).toHaveLength(0),
+    );
+    await waitFor(() =>
+      expect(within(thead).queryAllByText('WA')).toHaveLength(0),
+    );
+    await waitFor(() =>
+      expect(within(thead).queryAllByText('TX')).toHaveLength(0),
+    );
     await waitFor(() => {
       const refreshedStateRow = findDimensionRow('state');
       const refreshedStateToggle = within(refreshedStateRow).getByLabelText(
         'Toggle column dimension',
       ) as HTMLButtonElement;
-      expect(refreshedStateToggle.getAttribute('aria-pressed')).toBe('false');
+      expect(refreshedStateToggle).toHaveAttribute('aria-pressed', 'false');
     });
 
     const cityRow = findDimensionRow('city');
@@ -737,12 +1220,18 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       const refreshedCityToggle = within(refreshedCityRow).getByLabelText(
         'Toggle column dimension',
       ) as HTMLButtonElement;
-      expect(refreshedCityToggle.getAttribute('aria-pressed')).toBe('true');
+      expect(refreshedCityToggle).toHaveAttribute('aria-pressed', 'true');
     });
 
-    await waitFor(() => expect(within(thead).queryAllByText('CA')).toHaveLength(0));
-    await waitFor(() => expect(within(thead).queryAllByText('WA')).toHaveLength(0));
-    await waitFor(() => expect(within(thead).queryAllByText('TX')).toHaveLength(0));
+    await waitFor(() =>
+      expect(within(thead).queryAllByText('CA')).toHaveLength(0),
+    );
+    await waitFor(() =>
+      expect(within(thead).queryAllByText('WA')).toHaveLength(0),
+    );
+    await waitFor(() =>
+      expect(within(thead).queryAllByText('TX')).toHaveLength(0),
+    );
 
     await waitFor(() => {
       const refreshedGenderCell = within(thead)
@@ -1049,7 +1538,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     );
   });
 
-  it('reorders row chips instantly without triggering seamless reload', async () => {
+  it('seamless-reloads when row chip reorder changes the leading row key', async () => {
     const metrics = ['measure1', 'measure2'];
     const rowGroupby = ['row1', 'row2'];
     const colGroupby = ['col1'];
@@ -1083,6 +1572,10 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       startCollapsed: true,
       initialDepth: 1,
     });
+
+    fetchMock.mockImplementation(async ({ specs }: { specs: Array<unknown> }) =>
+      specs.map(() => ({ data: records })),
+    );
 
     render(
       <PivotTableChart
@@ -1135,8 +1628,11 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     fireEvent.drop(row1Chip, { dataTransfer });
     fireEvent.dragEnd(row2Chip, { dataTransfer });
 
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(screen.queryByLabelText('Loading')).not.toBeInTheDocument();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const reorderFetch = fetchMock.mock.calls.at(-1)?.[0];
+    expect(
+      (reorderFetch?.formData?.groupbyRows ?? []).map(getStableColumnKey),
+    ).toEqual(['row2', 'row1']);
   });
 
   it('does not seamless-reload for non-leading reorders on the value axis stack', async () => {
@@ -1325,7 +1821,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     const colGroupby = ['col1'];
     const records = [{ row1: 'R1', col1: 'C1', measure1: 10, measure2: 20 }];
     const baseTree = applyMetricAxis(
-      buildTreeFromRecords(records, metrics, rowGroupby, colGroupby, 1, 1),
+      buildTreeFromRecords(records, metrics, rowGroupby, colGroupby, 2, 1),
       metrics,
       MetricsLayoutEnum.COLUMNS,
       rowGroupby,
@@ -1348,8 +1844,8 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       metrics,
       metricsLayout: MetricsLayoutEnum.COLUMNS,
       pivotRuntimeLayout: runtimeLayout,
-      startCollapsed: true,
-      initialDepth: 1,
+      startCollapsed: false,
+      initialDepth: 2,
     });
 
     fetchMock.mockImplementation(async ({ specs }: { specs: Array<unknown> }) =>
@@ -1434,6 +1930,495 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       expect(screen.getAllByText('measure1').length).toBeGreaterThan(0);
       expect(screen.getAllByText('measure2').length).toBeGreaterThan(0);
     });
+  });
+
+  it('keeps Value on the source axis until a seamless value-axis move settles', async () => {
+    const metrics = ['measure1', 'measure2'];
+    const rowGroupby = ['row1'];
+    const colGroupby = ['col1'];
+    const records = [{ row1: 'R1', col1: 'C1', measure1: 10, measure2: 20 }];
+    const baseTree = applyMetricAxis(
+      buildTreeFromRecords(records, metrics, rowGroupby, colGroupby, 2, 1),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      rowGroupby,
+      colGroupby,
+      1,
+    );
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: rowGroupby,
+      cols: colGroupby,
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 1 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: [...rowGroupby, ...colGroupby],
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      startCollapsed: false,
+      initialDepth: 2,
+    });
+
+    let resolveSeamlessFetch: (() => void) | undefined;
+    const seamlessFetchPromise = new Promise<void>(resolve => {
+      resolveSeamlessFetch = resolve;
+    });
+    fetchMock.mockImplementation(
+      async ({
+        specs,
+        requestGroupId,
+      }: {
+        specs: Array<unknown>;
+        requestGroupId?: string;
+      }) => {
+        if (requestGroupId === 'pivot-v3-seamless') {
+          await seamlessFetchPromise;
+        }
+        return specs.map(() => ({ data: records }));
+      },
+    );
+
+    const { rerender } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={colGroupby}
+        width={600}
+        height={300}
+      />,
+    );
+
+    const valueLabel = screen
+      .getAllByText('Value')
+      .find(node => !node.closest('thead') && !node.closest('tbody'));
+    if (!valueLabel) {
+      throw new Error('Missing Value chip label');
+    }
+    const valueChip = valueLabel.parentElement as HTMLElement | null;
+    if (!valueChip) {
+      throw new Error('Missing Value chip element');
+    }
+    const row1Chip = screen
+      .getAllByLabelText('Remove dimension')
+      .map(button => button.parentElement)
+      .filter((node): node is HTMLElement => Boolean(node))
+      .find(node => node.textContent?.includes('row1'));
+    if (!row1Chip) {
+      throw new Error('Missing row chip for row1');
+    }
+
+    const dataTransfer = {
+      data: {} as Record<string, string>,
+      setData(type: string, value: string) {
+        this.data[type] = value;
+      },
+      getData(type: string) {
+        return this.data[type];
+      },
+      dropEffect: 'move',
+      effectAllowed: 'all',
+    };
+
+    fireEvent.dragStart(valueChip, { dataTransfer });
+    fireEvent.dragEnter(row1Chip, { dataTransfer });
+    fireEvent.dragOver(row1Chip, { dataTransfer });
+    fireEvent.drop(row1Chip, { dataTransfer });
+    fireEvent.dragEnd(valueChip, { dataTransfer });
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+
+    const parentSyncedLayout: PivotRuntimeLayout = {
+      ...runtimeLayout,
+      valuePlacement: { axis: 'row', index: 0 },
+    };
+    const parentSyncedFormData = {
+      ...formData,
+      pivotRuntimeLayout: parentSyncedLayout,
+    };
+    rerender(
+      <PivotTableChart
+        data={baseTree}
+        formData={parentSyncedFormData}
+        rawFormData={parentSyncedFormData}
+        queryFormData={parentSyncedFormData}
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={colGroupby}
+        width={600}
+        height={300}
+      />,
+    );
+
+    const colStrip = screen.getByTestId('pivot-v3-col-chip-strip');
+    const rowStrip = screen.getByTestId('pivot-v3-row-chip-strip');
+    expect(within(colStrip).queryByText('Value')).toBeInTheDocument();
+    expect(within(rowStrip).queryByText('Value')).not.toBeInTheDocument();
+
+    if (!resolveSeamlessFetch) {
+      throw new Error('Missing seamless fetch resolver');
+    }
+    resolveSeamlessFetch();
+
+    await waitFor(() =>
+      expect(within(rowStrip).queryByText('Value')).toBeInTheDocument(),
+    );
+    await waitFor(() =>
+      expect(within(colStrip).queryByText('Value')).not.toBeInTheDocument(),
+    );
+  });
+
+  it('keeps the previous expanded table visible (without inline column loaders) until seamless hydration settles', async () => {
+    const metrics = ['m1', 'm2'];
+    const rowGroupby = ['r1', 'r2'];
+    const colGroupby = ['c1'];
+    const records = [
+      { r1: 'A', r2: 'a1', c1: 'X', m1: 10, m2: 20 },
+      { r1: 'A', r2: 'a2', c1: 'Y', m1: 12, m2: 24 },
+    ];
+    const baseTree = applyMetricAxis(
+      buildTreeFromRecords(records, metrics, rowGroupby, colGroupby, 2, 1),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      rowGroupby,
+      colGroupby,
+      1,
+    );
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: rowGroupby,
+      cols: colGroupby,
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 1 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: [...rowGroupby, ...colGroupby],
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      startCollapsed: false,
+      initialDepth: 2,
+    });
+
+    fetchMock.mockImplementation(async ({ specs }: { specs: Array<unknown> }) =>
+      specs.map(spec => {
+        const { columns } = spec as {
+          columns?: Array<string | QueryFormColumn>;
+        };
+        if (hasColumnKey(columns, 'r2')) {
+          return { data: [] };
+        }
+        return { data: [{ r1: 'A', c1: 'X', m1: 10, m2: 20 }] };
+      }),
+    );
+
+    let resolveBranch:
+      | ((value: { data: PivotTreeData | undefined }) => void)
+      | undefined;
+    const branchPromise = new Promise<{ data: PivotTreeData | undefined }>(
+      resolve => {
+        resolveBranch = resolve;
+      },
+    );
+    fetchPivotBranchMock.mockImplementation(
+      async ({ axis }: { axis?: string }) => {
+        if (axis === 'row') {
+          return branchPromise;
+        }
+        return { data: undefined };
+      },
+    );
+
+    const { container } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={colGroupby}
+        width={600}
+        height={300}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText('a1')).toBeInTheDocument());
+
+    const valueLabel = screen
+      .getAllByText('Value')
+      .find(node => !node.closest('thead') && !node.closest('tbody'));
+    if (!valueLabel) {
+      throw new Error('Missing Value chip label');
+    }
+    const valueChip = valueLabel.parentElement as HTMLElement | null;
+    if (!valueChip) {
+      throw new Error('Missing Value chip element');
+    }
+    const rowChip = screen
+      .getAllByLabelText('Remove dimension')
+      .map(button => button.parentElement)
+      .filter((node): node is HTMLElement => Boolean(node))
+      .find(node => node.textContent?.includes('r1'));
+    if (!rowChip) {
+      throw new Error('Missing row chip for r1');
+    }
+
+    const dataTransfer = {
+      data: {} as Record<string, string>,
+      setData(type: string, value: string) {
+        this.data[type] = value;
+      },
+      getData(type: string) {
+        return this.data[type];
+      },
+      dropEffect: 'move',
+      effectAllowed: 'all',
+    };
+
+    fireEvent.dragStart(valueChip, { dataTransfer });
+    fireEvent.dragEnter(rowChip, { dataTransfer });
+    fireEvent.dragOver(rowChip, { dataTransfer });
+    fireEvent.drop(rowChip, { dataTransfer });
+    fireEvent.dragEnd(valueChip, { dataTransfer });
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    await waitFor(() => expect(fetchPivotBranchMock).toHaveBeenCalled());
+
+    const tbody = container.querySelector('tbody') as HTMLElement;
+    expect(within(tbody).getByText('a1')).toBeInTheDocument();
+    expect(within(tbody).getByText('a2')).toBeInTheDocument();
+
+    const thead = container.querySelector('thead') as HTMLElement;
+    expect(within(thead).getAllByText('m1').length).toBeGreaterThan(0);
+    expect(within(thead).getAllByText('m2').length).toBeGreaterThan(0);
+    const disabledColumnToggles = Array.from(
+      thead.querySelectorAll('button[disabled]'),
+    );
+    expect(disabledColumnToggles).toHaveLength(0);
+
+    if (resolveBranch) {
+      resolveBranch({ data: undefined });
+    }
+  });
+
+  it('keeps expanded row descendants visible after moving Values to rows at axis end', async () => {
+    const metrics = ['m1', 'm2'];
+    const rowGroupby = ['r1', 'r2'];
+    const colGroupby = ['c1'];
+    const records = [
+      { r1: 'A', r2: 'a1', c1: 'X', m1: 10, m2: 20 },
+      { r1: 'A', r2: 'a2', c1: 'X', m1: 12, m2: 24 },
+      { r1: 'B', r2: 'b1', c1: 'X', m1: 14, m2: 28 },
+      { r1: 'B', r2: 'b2', c1: 'X', m1: 16, m2: 32 },
+    ];
+    const baseTree = applyMetricAxis(
+      buildTreeFromRecords(records, metrics, rowGroupby, colGroupby, 1, 1),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      rowGroupby,
+      colGroupby,
+      1,
+    );
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: rowGroupby,
+      cols: colGroupby,
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 1 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: [...rowGroupby, ...colGroupby],
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      startCollapsed: true,
+      initialDepth: 1,
+    });
+
+    fetchMock.mockImplementation(async ({ specs }: { specs: Array<unknown> }) =>
+      specs.map(() => ({ data: records })),
+    );
+
+    const rowsValueTree = applyMetricAxis(
+      buildTreeFromRecords(records, metrics, rowGroupby, colGroupby, 3, 1),
+      metrics,
+      MetricsLayoutEnum.ROWS,
+      rowGroupby,
+      colGroupby,
+      2,
+    );
+    fetchPivotBranchMock.mockResolvedValue({ data: rowsValueTree });
+
+    const { container } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={colGroupby}
+        width={600}
+        height={300}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText('a1')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('a2')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('b1')).toBeInTheDocument());
+    const rowB = screen.getByText('B').closest('tr') as HTMLElement | null;
+    if (!rowB) {
+      throw new Error('Missing row for B');
+    }
+    const collapseB = within(rowB).queryByLabelText('minus-square');
+    if (collapseB) {
+      fireEvent.click(collapseB);
+    }
+    await waitFor(() =>
+      expect(screen.queryByText('b1')).not.toBeInTheDocument(),
+    );
+    await waitFor(() =>
+      expect(screen.queryByText('b2')).not.toBeInTheDocument(),
+    );
+    await waitFor(() => expect(screen.getByText('a1')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('a2')).toBeInTheDocument());
+    const rowA = screen.getByText('A').closest('tr') as HTMLElement | null;
+    if (!rowA) {
+      throw new Error('Missing row for A');
+    }
+    const collapseA = within(rowA).queryByLabelText('minus-square');
+    if (collapseA) {
+      fireEvent.click(collapseA);
+    }
+    await waitFor(() =>
+      expect(screen.queryByText('a1')).not.toBeInTheDocument(),
+    );
+    await waitFor(() =>
+      expect(screen.queryByText('a2')).not.toBeInTheDocument(),
+    );
+    const rowAAfterCollapse = screen
+      .getByText('A')
+      .closest('tr') as HTMLElement;
+    const expandA = within(rowAAfterCollapse).getByLabelText('plus-square');
+    fireEvent.click(expandA);
+    await waitFor(() => expect(screen.getByText('a1')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('a2')).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByText('b1')).not.toBeInTheDocument(),
+    );
+    await waitFor(() =>
+      expect(screen.queryByText('b2')).not.toBeInTheDocument(),
+    );
+    const branchCallsBeforeMove = fetchPivotBranchMock.mock.calls.length;
+
+    const valueLabel = screen
+      .getAllByText('Value')
+      .find(node => !node.closest('thead') && !node.closest('tbody'));
+    if (!valueLabel) {
+      throw new Error('Missing Value chip label');
+    }
+    const valueChip = valueLabel.parentElement as HTMLElement | null;
+    if (!valueChip) {
+      throw new Error('Missing Value chip element');
+    }
+    const row2Chip = screen
+      .getAllByLabelText('Remove dimension')
+      .map(button => button.parentElement)
+      .filter((node): node is HTMLElement => Boolean(node))
+      .find(node => node.textContent?.includes('r2'));
+    if (!row2Chip) {
+      throw new Error('Missing row chip for r2');
+    }
+    const rowStrip = row2Chip.parentElement as HTMLElement | null;
+    if (!rowStrip) {
+      throw new Error('Missing row strip element');
+    }
+
+    const dataTransfer = {
+      data: {} as Record<string, string>,
+      setData(type: string, value: string) {
+        this.data[type] = value;
+      },
+      getData(type: string) {
+        return this.data[type];
+      },
+      dropEffect: 'move',
+      effectAllowed: 'all',
+    };
+
+    fireEvent.dragStart(valueChip, { dataTransfer, clientX: 10, clientY: 10 });
+    fireEvent.dragEnter(rowStrip, {
+      dataTransfer,
+      clientX: 220,
+      clientY: 9999,
+    });
+    fireEvent.dragOver(rowStrip, { dataTransfer, clientX: 220, clientY: 9999 });
+    fireEvent.drop(rowStrip, { dataTransfer, clientX: 220, clientY: 9999 });
+    fireEvent.dragEnd(valueChip, { dataTransfer, clientX: 220, clientY: 9999 });
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    const lastFetch = fetchMock.mock.calls.at(-1)?.[0];
+    expect(lastFetch?.formData?.metricsLayout).toBe(MetricsLayoutEnum.ROWS);
+    expect(
+      (lastFetch?.formData?.groupbyRows ?? []).map(getStableColumnKey),
+    ).toEqual(['r1', 'r2', METRICS_PLACEHOLDER]);
+    const persistedRows = (lastFetch?.formData?.pivotExpansionState?.rows ??
+      []) as unknown[];
+    expect(
+      persistedRows.map(path =>
+        Array.isArray(path) ? serializePath(path) : String(path),
+      ),
+    ).toContain('A');
+    const plannedSpecs = lastFetch?.specs ?? [];
+    const plannedSummary = plannedSpecs.map(
+      (spec: {
+        meta?: {
+          kind?: string;
+          axis?: string;
+          path?: unknown[];
+          rowDepth?: number;
+          colDepth?: number;
+        };
+      }) =>
+        `${spec.meta?.kind ?? 'unknown'}:${spec.meta?.axis ?? 'none'}:${serializePath(
+          spec.meta?.path ?? [],
+        )}:${spec.meta?.rowDepth ?? 0}:${spec.meta?.colDepth ?? 0}`,
+    );
+    expect(plannedSummary).toContain('branch:row:A:2:1');
+
+    const tbody = container.querySelector('tbody') as HTMLElement;
+    await waitFor(() =>
+      expect(within(tbody).getByText('a1')).toBeInTheDocument(),
+    );
+    await waitFor(() =>
+      expect(within(tbody).getByText('a2')).toBeInTheDocument(),
+    );
+    await waitFor(() =>
+      expect(within(tbody).queryByText('b1')).not.toBeInTheDocument(),
+    );
+    await waitFor(() =>
+      expect(within(tbody).queryByText('b2')).not.toBeInTheDocument(),
+    );
+
+    expect(fetchPivotBranchMock).toHaveBeenCalledTimes(branchCallsBeforeMove);
   });
 
   it('seamless-reloads when moving Values to the front on a populated column axis', async () => {
@@ -1641,7 +2626,8 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     expect(plannedSpecs.length).toBeGreaterThan(0);
     expect(
       plannedSpecs.some(
-        (spec: { meta?: { colDepth?: number } }) => (spec.meta?.colDepth ?? 0) >= 1,
+        (spec: { meta?: { colDepth?: number } }) =>
+          (spec.meta?.colDepth ?? 0) >= 1,
       ),
     ).toBe(true);
     expect(

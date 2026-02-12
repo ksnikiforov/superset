@@ -88,10 +88,45 @@
 - [x] Add layout-tree snapshot cache in expansion engine so previously seen layouts restore from cached tree state (avoids blank/stale state on remove/re-add cycles).
 - [x] Validate with standard command `npm test plugins/plugin-chart-pivot-table-v3`.
 
+### Phase 3.17: Seamless Hydration Atomicity (No Rubber-Banding)
+- [x] Lock leading-key fetch policy in tests for complex multistep sequences (`first on stack` fetches, non-leading edits stay local).
+- [x] Add failing interaction regression proving seamless updates must keep the previous expanded table visible while hydration is still in flight.
+- [x] Add failing interaction guard against inline/axis spinner artifacts during seamless hydration windows.
+- [x] Implement deferred seamless-view commit:
+  - Snapshot the current rendered pivot view at seamless update start.
+  - Keep rendering the snapshot while seamless request + expansion hydration settle.
+  - Suppress inline row/column loading spinners during the deferred window.
+  - Release snapshot only when `seamlessLoading=false`, `isHydrating=false`, `loadingKeys=0`, `pendingRows=0`, `pendingCols=0`.
+- [x] Validate with standard command `npm test plugins/plugin-chart-pivot-table-v3`.
+
 ### Phase 4: Validation
 - [x] Run targeted plugin unit tests for planner and interaction seamless behavior.
 - [x] Run lint on plugin scope and resolve any issues.
 - [x] Update this document with completion notes and any follow-up work.
+
+### Phase 4.1: Values-To-Rows Expanded-Branch Guard
+- [x] Add/strengthen interaction regression for `cols:[c1,Value], rows:[r1,r2]` with one branch expanded, then move `Value` to row-axis end.
+- [x] Assert seamless payload shape uses `groupbyRows:[r1,r2,__MEASURES__]`.
+- [x] Assert expanded branch descendants stay visible and collapsed sibling descendants stay hidden after the move.
+- [x] Validate with standard command `npm test plugins/plugin-chart-pivot-table-v3`.
+
+### Phase 4.2: Stale Metric-Variant Hydration Guard
+- [x] Add failing unit coverage for `hasLoadedChildren` when a branch has only metric-variant placeholder children and no child-level cells.
+- [x] Harden `hasLoadedChildren` so metric variants are considered loaded only when matching metric-variant cells exist (not by node shape alone).
+- [x] Add planner-level regression to ensure expanded row branches still request fetches in this stale-variant scenario.
+- [x] Validate with standard command `npm test plugins/plugin-chart-pivot-table-v3`.
+
+### Phase 4.3: Stale Subtotal+Metric Descendant Guard
+- [x] Add failing unit coverage for `hasLoadedChildren` when an expanded branch has only subtotal+metric descendants at the same base dimension depth (no real next-dimension children).
+- [x] Treat this shape as not loaded so hydration plans a fetch instead of leaving expanded nodes with no visible descendants.
+- [x] Add expansion-engine regression to assert row-branch fetch planning for this case.
+- [x] Validate with standard command `npm test plugins/plugin-chart-pivot-table-v3`.
+
+### Phase 4.4: Seamless Expansion State Payload Contract
+- [x] Add failing interaction assertion proving seamless `Value -> rows` move must include a `branch:row:A:2:1` spec in the initial request (no bootstrap-only plan).
+- [x] Fix seamless payload contract: write `pivotExpansionState.rows/cols` as path arrays (not serialized strings) so query planning can restore expanded branches.
+- [x] Validate no extra post-seamless prefetch call is triggered for the preserved branch.
+- [x] Validate with standard command `npm test plugins/plugin-chart-pivot-table-v3`.
 
 ## Notes
 - Existing unrelated local changes were preserved.
@@ -110,4 +145,10 @@
 - Added baseline smoke coverage in `test/plugin/PivotTableChart/basic-regression-smoke.test.tsx` to protect against simple UX regressions (totals disappearing, no expansion, hidden headers after first column add).
 - Added explicit value-first interaction guardrails for both totals-on and totals-off cases in `test/plugin/PivotTableChart/interaction-layout.test.tsx`, focused on visible metric headers and no phantom `Grand total` artifacts.
 - Empty-row-dimension interaction path no longer blanks the table: root row fallback is enforced and prior layout snapshots are restored when a dimension is re-added.
+- Seamless updates now render atomically from the user perspective: while post-query hydration is pending, the previous expanded table remains visible (no partial tree/rubber-banding), then swaps to the new hydrated state in one commit.
+- Inline row/column loading icons are suppressed during deferred seamless hydration windows, preventing false loader artifacts (including value-axis moves that previously showed irrelevant column loaders).
+- Added a dedicated interaction guard for the reported `Value -> rows-end` branch-preservation path (single expanded branch, sibling collapsed) to prevent regressions in expanded-state continuity after value-axis moves.
+- Expansion hydration no longer short-circuits on stale metric-variant nodes without real child cells; this prevents false "already loaded" states that could leave expanded nodes rendered with no descendants.
+- Expansion hydration now also rejects stale subtotal+metric-only descendants at unchanged base depth as "loaded"; this forces proper branch fetches and prevents `minus` rows without visible children after value-axis moves.
+- Seamless update planner was silently dropping expansion targets because `pivotExpansionState.rows/cols` were being sent as serialized strings; payloads are now path arrays, restoring branch-prefetch specs in the first request and removing the second-stage expansion fetch for this flow.
 - Deeper expansion-engine unification and strict single-transaction filter hydration can be added as a follow-up phase.

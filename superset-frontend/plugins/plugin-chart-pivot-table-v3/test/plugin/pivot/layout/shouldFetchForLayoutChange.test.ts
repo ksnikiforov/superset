@@ -29,12 +29,26 @@ const baseLayout: PivotRuntimeLayout = {
 };
 
 describe('shouldFetchForLayoutChange', () => {
-  it('returns false for row reorder within the same axis', () => {
+  it('returns true when row reorder changes the leading row key', () => {
     const nextLayout: PivotRuntimeLayout = {
       ...baseLayout,
       rows: ['state', 'country'],
     };
-    expect(shouldFetchForLayoutChange(baseLayout, nextLayout)).toBe(false);
+    expect(shouldFetchForLayoutChange(baseLayout, nextLayout)).toBe(true);
+  });
+
+  it('returns false for row reorder that does not change the leading row key', () => {
+    const prevLayout: PivotRuntimeLayout = {
+      ...baseLayout,
+      rows: ['country', 'state', 'city'],
+      cols: ['product'],
+      valuePlacement: { axis: 'col', index: 1 },
+    };
+    const nextLayout: PivotRuntimeLayout = {
+      ...prevLayout,
+      rows: ['country', 'city', 'state'],
+    };
+    expect(shouldFetchForLayoutChange(prevLayout, nextLayout)).toBe(false);
   });
 
   it('returns false when moving a dimension across axes', () => {
@@ -138,6 +152,74 @@ describe('shouldFetchForLayoutChange', () => {
       rows: ['country'],
     };
     expect(shouldFetchForLayoutChange(baseLayout, nextLayout)).toBe(false);
+  });
+
+  it('returns true when removing the leading non-value row dimension while keeping another row dimension', () => {
+    const prevLayout: PivotRuntimeLayout = {
+      ...baseLayout,
+      rows: ['row1', 'row2'],
+      cols: [],
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const nextLayout: PivotRuntimeLayout = {
+      ...prevLayout,
+      rows: ['row2'],
+    };
+    expect(shouldFetchForLayoutChange(prevLayout, nextLayout)).toBe(true);
+  });
+
+  it('returns true when adding the first non-value row dimension from totals state', () => {
+    const prevLayout: PivotRuntimeLayout = {
+      ...baseLayout,
+      rows: [],
+      cols: [],
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const nextLayout: PivotRuntimeLayout = {
+      ...prevLayout,
+      rows: ['row2'],
+    };
+    expect(shouldFetchForLayoutChange(prevLayout, nextLayout)).toBe(true);
+  });
+
+  it('follows first-on-stack fetch semantics across a multistep row layout sequence', () => {
+    const layout0: PivotRuntimeLayout = {
+      ...baseLayout,
+      rows: ['name'],
+      cols: [],
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const layout1: PivotRuntimeLayout = {
+      ...layout0,
+      rows: [],
+    };
+    const layout2: PivotRuntimeLayout = {
+      ...layout1,
+      rows: ['state'],
+    };
+    const layout3: PivotRuntimeLayout = {
+      ...layout2,
+      rows: ['state', 'city'],
+    };
+    const layout4: PivotRuntimeLayout = {
+      ...layout3,
+      rows: ['city', 'state'],
+    };
+    const layout5: PivotRuntimeLayout = {
+      ...layout4,
+      rows: ['city'],
+    };
+    const layout6: PivotRuntimeLayout = {
+      ...layout5,
+      rows: ['state'],
+    };
+
+    expect(shouldFetchForLayoutChange(layout0, layout1)).toBe(false);
+    expect(shouldFetchForLayoutChange(layout1, layout2)).toBe(true);
+    expect(shouldFetchForLayoutChange(layout2, layout3)).toBe(false);
+    expect(shouldFetchForLayoutChange(layout3, layout4)).toBe(true);
+    expect(shouldFetchForLayoutChange(layout4, layout5)).toBe(false);
+    expect(shouldFetchForLayoutChange(layout5, layout6)).toBe(true);
   });
 
   it('returns true when metrics selection changes', () => {

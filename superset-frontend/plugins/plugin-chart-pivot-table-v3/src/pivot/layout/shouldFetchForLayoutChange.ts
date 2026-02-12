@@ -37,6 +37,22 @@ const valuePlacementSignature = (
 const valueAxisKeys = (layout: PivotRuntimeLayout): string[] =>
   layout.valuePlacement.axis === 'row' ? layout.rows : layout.cols;
 
+const shouldFetchForLeadingKeyChange = (
+  prevAxisKeys: string[],
+  nextAxisKeys: string[],
+) => {
+  const prevLeading = prevAxisKeys[0];
+  const nextLeading = nextAxisKeys[0];
+  if (prevLeading === nextLeading) {
+    return false;
+  }
+  // Collapsing an axis to totals-only reuses existing aggregate rows/cols.
+  if (prevLeading !== undefined && nextLeading === undefined) {
+    return false;
+  }
+  return true;
+};
+
 export const shouldFetchForLayoutChange = (
   prev: PivotRuntimeLayout,
   next: PivotRuntimeLayout,
@@ -47,17 +63,19 @@ export const shouldFetchForLayoutChange = (
   }
 
   // Dimension axis edits are rendered optimistically; data is fetched when users
-  // change the leading key on the active Values axis (top-level path changes).
+  // change the leading key on either axis (top-level path changes). This keeps
+  // first-on-stack transitions robust while avoiding unnecessary mid-stack loads.
   if (
     !arraysEqual(prev.rows, next.rows) ||
     !arraysEqual(prev.cols, next.cols)
   ) {
-    const prevValueAxis = valueAxisKeys(prev);
-    const nextValueAxis = valueAxisKeys(next);
-    if (arraysEqual(prevValueAxis, nextValueAxis)) {
-      return false;
+    if (shouldFetchForLeadingKeyChange(prev.rows, next.rows)) {
+      return true;
     }
-    return prevValueAxis[0] !== nextValueAxis[0];
+    if (shouldFetchForLeadingKeyChange(prev.cols, next.cols)) {
+      return true;
+    }
+    return false;
   }
   if (!hasSameSet(prev.metrics, next.metrics)) {
     return true;
