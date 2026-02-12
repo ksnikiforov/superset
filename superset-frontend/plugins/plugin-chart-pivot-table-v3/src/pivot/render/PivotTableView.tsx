@@ -49,7 +49,9 @@ import { type ChartDataWarning } from '../data/ChartDataClient';
 import { rootKey } from '../viewModel';
 import { type RenderModel, type FormattingKeys } from '../shared/types';
 
-const ROW_INDENT_PX = 16;
+const ROW_INDENT_PX = 14;
+const ROW_TOGGLE_SLOT_PX = 16;
+const ROW_LABEL_GAP_PX = 3;
 const STICKY_TOTAL_ROW_FALLBACK_HEIGHT_PX = 28;
 
 const Container = styled.div<{ height: number; width: number }>`
@@ -200,12 +202,24 @@ const StyledTable = styled.table<{ $stickyHeaders: boolean }>`
 const HeaderCell = styled.div`
   display: flex;
   align-items: center;
-  gap: ${({ theme }) => theme.sizeXS}px;
+  gap: ${ROW_LABEL_GAP_PX}px;
 `;
 
 const ColumnHeaderCell = styled(HeaderCell)`
   align-items: flex-start;
   line-height: 1.2;
+`;
+
+const RowHeaderCell = styled(HeaderCell)``;
+
+const RowToggleSlot = styled.span`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: ${ROW_TOGGLE_SLOT_PX}px;
+  min-width: ${ROW_TOGGLE_SLOT_PX}px;
+  height: ${ROW_TOGGLE_SLOT_PX}px;
+  flex: 0 0 ${ROW_TOGGLE_SLOT_PX}px;
 `;
 
 const ToggleButton = styled.button`
@@ -631,6 +645,7 @@ export const PivotTableView = ({
               const rowIndent =
                 (isMetricGrandTotalRow ? 0 : getNodeDimDepth(row)) *
                 ROW_INDENT_PX;
+              const isRowLoading = showRowSpinner(row.key);
               return (
                 <tr
                   key={row.key}
@@ -648,22 +663,26 @@ export const PivotTableView = ({
                     className={isSubtotalHeader ? 'subtotal-cell' : undefined}
                     style={rowHeaderStyleResolved}
                   >
-                    <HeaderCell style={{ paddingLeft: rowIndent }}>
-                      {showToggle ? (
-                        <ToggleButton
-                          type="button"
-                          onClick={() => onToggleNode('row', row)}
-                          disabled={showRowSpinner(row.key)}
-                        >
-                          {showRowSpinner(row.key) ? (
-                            <Spinner />
-                          ) : expandedRows.has(row.key) ? (
-                            <MinusSquareOutlined />
-                          ) : (
-                            <PlusSquareOutlined />
-                          )}
-                        </ToggleButton>
-                      ) : null}
+                    <RowHeaderCell style={{ paddingLeft: rowIndent }}>
+                      <RowToggleSlot className="pivot-row-toggle-slot">
+                        {showToggle ? (
+                          <ToggleButton
+                            type="button"
+                            onClick={() => onToggleNode('row', row)}
+                            disabled={isRowLoading}
+                          >
+                            {isRowLoading ? (
+                              <Spinner />
+                            ) : expandedRows.has(row.key) ? (
+                              <MinusSquareOutlined />
+                            ) : (
+                              <PlusSquareOutlined />
+                            )}
+                          </ToggleButton>
+                        ) : isRowLoading ? (
+                          <Spinner aria-label={t('Loading')} />
+                        ) : null}
+                      </RowToggleSlot>
                       <span
                         className={
                           isNullLabelValue(row) ? 'pivot-null-label' : undefined
@@ -671,7 +690,7 @@ export const PivotTableView = ({
                       >
                         {formatLabel(row, 'row')}
                       </span>
-                    </HeaderCell>
+                    </RowHeaderCell>
                   </th>
                   {visibleCols.map(col => {
                     const cellKey = serializeCellKey(row.key, col.key);
