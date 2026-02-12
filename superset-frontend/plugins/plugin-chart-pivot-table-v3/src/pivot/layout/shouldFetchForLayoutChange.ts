@@ -53,6 +53,25 @@ const shouldFetchForLeadingKeyChange = (
   return true;
 };
 
+const movedLeadingKeyAcrossAxes = ({
+  prevSource,
+  nextSource,
+  nextTarget,
+}: {
+  prevSource: string[];
+  nextSource: string[];
+  nextTarget: string[];
+}) => {
+  const leading = prevSource[0];
+  if (!leading) {
+    return false;
+  }
+  if (nextSource.includes(leading)) {
+    return false;
+  }
+  return nextTarget.includes(leading);
+};
+
 export const shouldFetchForLayoutChange = (
   prev: PivotRuntimeLayout,
   next: PivotRuntimeLayout,
@@ -73,6 +92,24 @@ export const shouldFetchForLayoutChange = (
       return true;
     }
     if (shouldFetchForLeadingKeyChange(prev.cols, next.cols)) {
+      return true;
+    }
+    if (
+      movedLeadingKeyAcrossAxes({
+        prevSource: prev.rows,
+        nextSource: next.rows,
+        nextTarget: next.cols,
+      })
+    ) {
+      return true;
+    }
+    if (
+      movedLeadingKeyAcrossAxes({
+        prevSource: prev.cols,
+        nextSource: next.cols,
+        nextTarget: next.rows,
+      })
+    ) {
       return true;
     }
     return false;

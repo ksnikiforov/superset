@@ -60,6 +60,22 @@ describe('shouldFetchForLayoutChange', () => {
     expect(shouldFetchForLayoutChange(baseLayout, nextLayout)).toBe(false);
   });
 
+  it('returns true when moving the leading row key across axes', () => {
+    const prevLayout: PivotRuntimeLayout = {
+      ...baseLayout,
+      rows: ['r1'],
+      cols: ['c1'],
+      valuePlacement: { axis: 'row', index: 1 },
+    };
+    const nextLayout: PivotRuntimeLayout = {
+      ...prevLayout,
+      rows: [],
+      cols: ['c1', 'r1'],
+      valuePlacement: { axis: 'row', index: 0 },
+    };
+    expect(shouldFetchForLayoutChange(prevLayout, nextLayout)).toBe(true);
+  });
+
   it('returns false when appending a dimension at the end', () => {
     const nextLayout: PivotRuntimeLayout = {
       ...baseLayout,

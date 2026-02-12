@@ -1510,11 +1510,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
         formData={buildFormData({
           ...(baseProps as Partial<PivotTableQueryFormData>),
           groupbyRows: rowGroupby,
-          groupbyColumns: [
-            colGroupby[0],
-            METRICS_PLACEHOLDER,
-            colGroupby[1],
-          ],
+          groupbyColumns: [colGroupby[0], METRICS_PLACEHOLDER, colGroupby[1]],
           metricsLayout: MetricsLayoutEnum.COLUMNS,
           metrics,
           rowTotals: true,

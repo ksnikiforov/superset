@@ -34,7 +34,10 @@ import {
   serializePath,
 } from '../../../src/utils';
 import { supersetChartDataClient } from '../../../src/pivot/data/SupersetChartDataClient';
-import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
+import {
+  fetchPivotBranch,
+  peekPivotBranchCache,
+} from '../../../src/fetchPivotBranch';
 
 jest.mock('../../../src/pivot/data/SupersetChartDataClient', () => {
   const actual = jest.requireActual(
@@ -61,11 +64,14 @@ jest.mock('../../../src/fetchPivotBranch', () => {
 describe('PivotTableChart seamless expansion uses committed layout', () => {
   const fetchMock = supersetChartDataClient.fetch as jest.Mock;
   const fetchPivotBranchMock = fetchPivotBranch as jest.Mock;
+  const peekPivotBranchCacheMock = peekPivotBranchCache as jest.Mock;
 
   beforeEach(() => {
     fetchMock.mockReset();
     fetchPivotBranchMock.mockReset();
     fetchPivotBranchMock.mockResolvedValue({ data: undefined });
+    peekPivotBranchCacheMock.mockReset();
+    peekPivotBranchCacheMock.mockReturnValue(undefined);
   });
 
   const hasColumnKey = (
@@ -217,7 +223,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       metrics,
       metricsLayout: MetricsLayoutEnum.COLUMNS,
       pivotRuntimeLayout: runtimeLayout,
-      startCollapsed: true,
+      startCollapsed: false,
       initialDepth: 1,
     });
 
@@ -256,6 +262,431 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     expect(
       within(airRow).queryByLabelText('plus-square'),
     ).not.toBeInTheDocument();
+  });
+
+  it('does not fetch when removing a trailing row dimension after expanding a top-level row', async () => {
+    const metrics = ['m1'];
+    const initialRows = ['r1', 'r2', 'r3'];
+    const records = [
+      { r1: 'A', r2: 'A1', r3: 'X', m1: 10 },
+      { r1: 'A', r2: 'A2', r3: 'Y', m1: 12 },
+      { r1: 'B', r2: 'B1', r3: 'Z', m1: 7 },
+    ];
+    const baseTree = applyMetricAxis(
+      buildTreeFromRecords(records, metrics, initialRows, [], 2, 0),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      initialRows,
+      [],
+      0,
+    );
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: initialRows,
+      cols: [],
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: initialRows,
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      pivotExpansionState: {
+        rowKeys: initialRows,
+        colKeys: [],
+        rows: [['A']],
+        cols: [],
+        collapsedRows: [],
+        collapsedCols: [],
+      },
+      startCollapsed: true,
+      initialDepth: 2,
+    });
+
+    render(
+      <PivotTableChart
+        data={baseTree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={initialRows}
+        groupbyColumns={[]}
+        width={600}
+        height={300}
+      />,
+    );
+    await waitFor(() =>
+      expect(screen.queryAllByLabelText('minus-square').length).toBeGreaterThan(
+        0,
+      ),
+    );
+
+    fetchMock.mockClear();
+    fetchPivotBranchMock.mockClear();
+
+    const findDimensionRow = (label: string) => {
+      const nodes = screen.getAllByText(label);
+      for (const node of nodes) {
+        let current: HTMLElement | null = node as HTMLElement;
+        while (current) {
+          if (within(current).queryByLabelText('Toggle row dimension')) {
+            return current;
+          }
+          current = current.parentElement;
+        }
+      }
+      throw new Error(`Missing dimension row for ${label}`);
+    };
+
+    const lineStatusRow = findDimensionRow('r3');
+    fireEvent.click(
+      within(lineStatusRow).getByLabelText('Toggle row dimension'),
+    );
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchPivotBranchMock).not.toHaveBeenCalled();
+
+    await waitFor(() =>
+      expect(screen.getAllByLabelText('minus-square').length).toBeGreaterThan(
+        0,
+      ),
+    );
+  });
+
+  it('keeps expanded row hierarchy stable (no loader bounce) when trimming trailing row dimension', async () => {
+    const metrics = ['m1', 'm2'];
+    const initialRows = ['r1', 'r2', 'r3'];
+    const records = [
+      { r1: 'A', r2: 'A1', r3: 'X', m1: 10, m2: 20 },
+      { r1: 'A', r2: 'A2', r3: 'Y', m1: 12, m2: 24 },
+      { r1: 'B', r2: 'B1', r3: 'Z', m1: 7, m2: 14 },
+    ];
+    const baseTree = applyMetricAxis(
+      buildTreeFromRecords(records, metrics, initialRows, [], 3, 0),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      initialRows,
+      [],
+      0,
+    );
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: initialRows,
+      cols: [],
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: initialRows,
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      pivotExpansionState: {
+        rowKeys: initialRows,
+        colKeys: [],
+        rows: [['A']],
+        cols: [],
+        collapsedRows: [],
+        collapsedCols: [],
+      },
+      startCollapsed: true,
+      initialDepth: 2,
+    });
+
+    render(
+      <PivotTableChart
+        data={baseTree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={initialRows}
+        groupbyColumns={[]}
+        width={600}
+        height={300}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText('A1')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('A2')).toBeInTheDocument());
+
+    fetchMock.mockClear();
+    fetchPivotBranchMock.mockClear();
+
+    const findDimensionRow = (label: string) => {
+      const nodes = screen.getAllByText(label);
+      for (const node of nodes) {
+        let current: HTMLElement | null = node as HTMLElement;
+        while (current) {
+          if (within(current).queryByLabelText('Toggle row dimension')) {
+            return current;
+          }
+          current = current.parentElement;
+        }
+      }
+      throw new Error(`Missing dimension row for ${label}`);
+    };
+
+    const r3Row = findDimensionRow('r3');
+    fireEvent.click(within(r3Row).getByLabelText('Toggle row dimension'));
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchPivotBranchMock).not.toHaveBeenCalled();
+    expect(screen.getByText('A1')).toBeInTheDocument();
+    expect(screen.getByText('A2')).toBeInTheDocument();
+    expect(screen.queryAllByLabelText('Loading')).toHaveLength(0);
+    expect(screen.queryByText('A1')).toBeInTheDocument();
+    expect(screen.queryByText('A2')).toBeInTheDocument();
+  });
+
+  it('keeps expanded rows stable when trailing trim coincides with stale parent data refresh', async () => {
+    const metrics = ['m1', 'm2'];
+    const initialRows = ['r1', 'r2', 'r3'];
+    const records = [
+      { r1: 'A', r2: 'A1', r3: 'X', m1: 10, m2: 20 },
+      { r1: 'A', r2: 'A2', r3: 'Y', m1: 12, m2: 24 },
+      { r1: 'B', r2: 'B1', r3: 'Z', m1: 7, m2: 14 },
+    ];
+    const hydratedTree = applyMetricAxis(
+      buildTreeFromRecords(records, metrics, initialRows, [], 3, 0),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      initialRows,
+      [],
+      0,
+    );
+    const staleTree = applyMetricAxis(
+      buildTreeFromRecords(records, metrics, initialRows, [], 1, 0),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      initialRows,
+      [],
+      0,
+    );
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: initialRows,
+      cols: [],
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: initialRows,
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      pivotExpansionState: {
+        rowKeys: initialRows,
+        colKeys: [],
+        rows: [['A']],
+        cols: [],
+        collapsedRows: [],
+        collapsedCols: [],
+      },
+      startCollapsed: true,
+      initialDepth: 2,
+    });
+
+    fetchPivotBranchMock.mockImplementation(() => new Promise(() => undefined));
+
+    const { rerender } = render(
+      <PivotTableChart
+        data={hydratedTree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={initialRows}
+        groupbyColumns={[]}
+        width={600}
+        height={300}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText('A1')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('A2')).toBeInTheDocument());
+
+    fetchMock.mockClear();
+    fetchPivotBranchMock.mockClear();
+
+    const findDimensionRow = (label: string) => {
+      const nodes = screen.getAllByText(label);
+      for (const node of nodes) {
+        let current: HTMLElement | null = node as HTMLElement;
+        while (current) {
+          if (within(current).queryByLabelText('Toggle row dimension')) {
+            return current;
+          }
+          current = current.parentElement;
+        }
+      }
+      throw new Error(`Missing dimension row for ${label}`);
+    };
+
+    const r3Row = findDimensionRow('r3');
+    fireEvent.click(within(r3Row).getByLabelText('Toggle row dimension'));
+
+    rerender(
+      <PivotTableChart
+        data={staleTree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={initialRows}
+        groupbyColumns={[]}
+        width={600}
+        height={300}
+      />,
+    );
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchPivotBranchMock).not.toHaveBeenCalled();
+    expect(screen.queryAllByLabelText('Loading')).toHaveLength(0);
+    expect(screen.getByText('A1')).toBeInTheDocument();
+    expect(screen.getByText('A2')).toBeInTheDocument();
+  });
+
+  it('does not prefetch again when removing trailing row dimension after deep expansion is already loaded', async () => {
+    const metrics = ['m1', 'm2'];
+    const initialRows = ['r1', 'r2', 'r3'];
+    const records = [
+      { r1: 'A', r2: 'A1', r3: 'X', m1: 10, m2: 20 },
+      { r1: 'A', r2: 'A1', r3: 'Y', m1: 12, m2: 24 },
+      { r1: 'A', r2: 'A2', r3: 'Z', m1: 7, m2: 14 },
+      { r1: 'B', r2: 'B1', r3: 'Q', m1: 5, m2: 10 },
+    ];
+    const baseTree = applyMetricAxis(
+      buildTreeFromRecords(records, metrics, initialRows, [], 3, 0),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      initialRows,
+      [],
+      0,
+    );
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: initialRows,
+      cols: [],
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: initialRows,
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      pivotExpansionState: {
+        rowKeys: initialRows,
+        colKeys: [],
+        rows: [['A'], ['A', 'A1']],
+        cols: [],
+        collapsedRows: [],
+        collapsedCols: [],
+      },
+      startCollapsed: true,
+      initialDepth: 2,
+    });
+    peekPivotBranchCacheMock.mockImplementation(
+      ({
+        path,
+        formData: branchFormData,
+      }: {
+        path: Array<string | number>;
+        formData: {
+          groupbyRows?: Array<string | QueryFormColumn>;
+        };
+      }) => {
+        const groupbyRows = (branchFormData.groupbyRows ?? []).map(
+          getStableColumnKey,
+        );
+        if (groupbyRows.length === 0) {
+          return undefined;
+        }
+        const filtered = records.filter(record =>
+          path.every(
+            (value, index) =>
+              String(
+                (record as Record<string, unknown>)[groupbyRows[index]],
+              ) === String(value),
+          ),
+        );
+        const rowDepth = Math.min(path.length + 1, groupbyRows.length);
+        return applyMetricAxis(
+          buildTreeFromRecords(filtered, metrics, groupbyRows, [], rowDepth, 0),
+          metrics,
+          MetricsLayoutEnum.COLUMNS,
+          groupbyRows,
+          [],
+          0,
+        );
+      },
+    );
+
+    render(
+      <PivotTableChart
+        data={baseTree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={initialRows}
+        groupbyColumns={[]}
+        width={600}
+        height={300}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText('A1')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('X')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('Y')).toBeInTheDocument());
+
+    fetchMock.mockClear();
+    fetchPivotBranchMock.mockClear();
+    peekPivotBranchCacheMock.mockClear();
+
+    const findDimensionRow = (label: string) => {
+      const nodes = screen.getAllByText(label);
+      for (const node of nodes) {
+        let current: HTMLElement | null = node as HTMLElement;
+        while (current) {
+          if (within(current).queryByLabelText('Toggle row dimension')) {
+            return current;
+          }
+          current = current.parentElement;
+        }
+      }
+      throw new Error(`Missing dimension row for ${label}`);
+    };
+
+    const r3Row = findDimensionRow('r3');
+    fireEvent.click(within(r3Row).getByLabelText('Toggle row dimension'));
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchPivotBranchMock).not.toHaveBeenCalled();
+    expect(peekPivotBranchCacheMock).not.toHaveBeenCalled();
+    expect(screen.queryByText('X')).not.toBeInTheDocument();
+    expect(screen.queryByText('Y')).not.toBeInTheDocument();
+    expect(screen.getByText('A1')).toBeInTheDocument();
+    expect(screen.queryAllByLabelText('Loading')).toHaveLength(0);
   });
 
   it('shows grand total and restores row members after removing then re-adding the last row dimension', async () => {
@@ -1929,6 +2360,173 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     await waitFor(() => {
       expect(screen.getAllByText('measure1').length).toBeGreaterThan(0);
       expect(screen.getAllByText('measure2').length).toBeGreaterThan(0);
+    });
+  });
+
+  it('keeps rows populated when moving the last row dimension to columns with Values on rows', async () => {
+    const metrics = ['m1', 'm2'];
+    const rowGroupby = ['r1'];
+    const records = [
+      { r1: 'A', c1: 'X', m1: 10, m2: 20 },
+      { r1: 'B', c1: 'X', m1: 12, m2: 24 },
+      { r1: 'A', c1: 'Y', m1: 14, m2: 28 },
+    ];
+    const baseTree = applyMetricAxis(
+      buildTreeFromRecords(records, metrics, rowGroupby, [], 1, 0),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      rowGroupby,
+      [],
+      0,
+    );
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: rowGroupby,
+      cols: [],
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: ['r1', 'c1'],
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      startCollapsed: false,
+      initialDepth: 1,
+    });
+
+    fetchMock.mockImplementation(async ({ specs }: { specs: Array<unknown> }) =>
+      specs.map(() => ({ data: records })),
+    );
+
+    const { container } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={rowGroupby}
+        groupbyColumns={[]}
+        width={600}
+        height={300}
+      />,
+    );
+
+    const valueLabel = screen
+      .getAllByText('Value')
+      .find(node => !node.closest('thead') && !node.closest('tbody'));
+    if (!valueLabel) {
+      throw new Error('Missing Value chip label');
+    }
+    const valueChip = valueLabel.parentElement as HTMLElement | null;
+    if (!valueChip) {
+      throw new Error('Missing Value chip element');
+    }
+    const rowStrip = screen.getByTestId('pivot-v3-row-chip-strip');
+
+    const dataTransfer = {
+      data: {} as Record<string, string>,
+      setData(type: string, value: string) {
+        this.data[type] = value;
+      },
+      getData(type: string) {
+        return this.data[type];
+      },
+      dropEffect: 'move',
+      effectAllowed: 'all',
+    };
+
+    fireEvent.dragStart(valueChip, { dataTransfer, clientX: 10, clientY: 10 });
+    fireEvent.dragEnter(rowStrip, {
+      dataTransfer,
+      clientX: 180,
+      clientY: 9999,
+    });
+    fireEvent.dragOver(rowStrip, { dataTransfer, clientX: 180, clientY: 9999 });
+    fireEvent.drop(rowStrip, { dataTransfer, clientX: 180, clientY: 9999 });
+    fireEvent.dragEnd(valueChip, { dataTransfer, clientX: 180, clientY: 9999 });
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const afterValueMove = fetchMock.mock.calls.at(-1)?.[0];
+    expect(afterValueMove?.formData?.metricsLayout).toBe(
+      MetricsLayoutEnum.ROWS,
+    );
+    expect(
+      (afterValueMove?.formData?.groupbyRows ?? []).map(getStableColumnKey),
+    ).toEqual(['r1', METRICS_PLACEHOLDER]);
+
+    const findDimensionRow = (label: string) => {
+      const nodes = screen.getAllByText(label);
+      for (const node of nodes) {
+        let current: HTMLElement | null = node as HTMLElement;
+        while (current) {
+          if (within(current).queryByLabelText('Toggle column dimension')) {
+            return current;
+          }
+          current = current.parentElement;
+        }
+      }
+      throw new Error(`Missing dimension row for ${label}`);
+    };
+
+    const c1Row = findDimensionRow('c1');
+    fireEvent.click(within(c1Row).getByLabelText('Toggle column dimension'));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const afterC1Add = fetchMock.mock.calls.at(-1)?.[0];
+    expect(afterC1Add?.formData?.metricsLayout).toBe(MetricsLayoutEnum.ROWS);
+    expect(
+      (afterC1Add?.formData?.groupbyColumns ?? []).map(getStableColumnKey),
+    ).toEqual(['c1']);
+    expect(
+      (afterC1Add?.formData?.groupbyRows ?? []).map(getStableColumnKey),
+    ).toEqual(['r1', METRICS_PLACEHOLDER]);
+
+    const rowChip = screen
+      .getAllByLabelText('Remove dimension')
+      .map(button => button.parentElement)
+      .filter((node): node is HTMLElement => Boolean(node))
+      .find(node => node.textContent?.includes('r1'));
+    if (!rowChip) {
+      throw new Error('Missing row chip for r1');
+    }
+    const colStrip = screen.getByTestId('pivot-v3-col-chip-strip');
+
+    fireEvent.dragStart(rowChip, { dataTransfer, clientX: 10, clientY: 10 });
+    fireEvent.dragEnter(colStrip, {
+      dataTransfer,
+      clientX: 9999,
+      clientY: 10,
+    });
+    fireEvent.dragOver(colStrip, { dataTransfer, clientX: 9999, clientY: 10 });
+    fireEvent.drop(colStrip, { dataTransfer, clientX: 9999, clientY: 10 });
+    fireEvent.dragEnd(rowChip, { dataTransfer, clientX: 9999, clientY: 10 });
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    const afterRowMoveToCols = fetchMock.mock.calls.at(-1)?.[0];
+    expect(afterRowMoveToCols?.formData?.metricsLayout).toBe(
+      MetricsLayoutEnum.ROWS,
+    );
+    expect(
+      (afterRowMoveToCols?.formData?.groupbyRows ?? []).map(getStableColumnKey),
+    ).toEqual([METRICS_PLACEHOLDER]);
+    expect(
+      (afterRowMoveToCols?.formData?.groupbyColumns ?? []).map(
+        getStableColumnKey,
+      ),
+    ).toEqual(['c1', 'r1']);
+
+    await waitFor(() => {
+      const tbody = container.querySelector('tbody') as HTMLElement;
+      expect(within(tbody).getByText('m1')).toBeInTheDocument();
+      expect(within(tbody).getByText('m2')).toBeInTheDocument();
+      expect(within(tbody).queryByText('A')).not.toBeInTheDocument();
+      expect(within(tbody).queryByText('B')).not.toBeInTheDocument();
     });
   });
 

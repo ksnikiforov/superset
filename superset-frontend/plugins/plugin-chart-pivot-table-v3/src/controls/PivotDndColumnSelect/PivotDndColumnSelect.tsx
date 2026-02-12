@@ -814,21 +814,21 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
                     : t('Column: %s', dimensionLabel)}
                 </Typography.Text>
                 {DIMENSION_FORMAT_SELECTOR_CONFIG.map(selector => (
-                <MetricFormatSelector
-                  key={selector.field}
-                  label={selector.label}
-                  tooltip={selector.tooltip}
-                  enableExcel
-                  value={formatting?.[selector.field]}
-                  metrics={availableMetrics as MetricOptionValue[]}
-                  metricLabelMap={metricLabelMap}
-                  onChange={metric =>
-                    updateFormatting(dimensionKey, selector.field, metric)
-                  }
-                  columns={options}
-                  savedMetrics={savedMetrics}
-                  datasource={datasource}
-                />
+                  <MetricFormatSelector
+                    key={selector.field}
+                    label={selector.label}
+                    tooltip={selector.tooltip}
+                    enableExcel
+                    value={formatting?.[selector.field]}
+                    metrics={availableMetrics as MetricOptionValue[]}
+                    metricLabelMap={metricLabelMap}
+                    onChange={metric =>
+                      updateFormatting(dimensionKey, selector.field, metric)
+                    }
+                    columns={options}
+                    savedMetrics={savedMetrics}
+                    datasource={datasource}
+                  />
                 ))}
                 <Radio.Group
                   value={formattingScope}

@@ -30,7 +30,12 @@ import {
   type PivotTreeData,
   type PivotTreeNode,
 } from '../../types';
-import { parsePath, serializePath, mergeTrees } from '../../utils';
+import {
+  parsePath,
+  serializePath,
+  serializeCellKey,
+  mergeTrees,
+} from '../../utils';
 import {
   coerceExpansionState,
   pruneExpandedToStablePrefix,
@@ -95,8 +100,78 @@ const isPrefix = (prefix: string[], target: string[]) =>
   prefix.length <= target.length &&
   prefix.every((value, idx) => value === target[idx]);
 
-const buildLayoutSignature = (rows: string[], cols: string[]) =>
-  stableStringify({ rows, cols });
+const shouldFetchForLeadingKeyChange = (
+  prevAxisKeys: string[],
+  nextAxisKeys: string[],
+) => {
+  const prevLeading = prevAxisKeys[0];
+  const nextLeading = nextAxisKeys[0];
+  if (prevLeading === nextLeading) {
+    return false;
+  }
+  // Collapsing an axis to totals-only can reuse already loaded aggregates.
+  if (prevLeading !== undefined && nextLeading === undefined) {
+    return false;
+  }
+  return true;
+};
+
+const movedLeadingKeyAcrossAxes = ({
+  prevSource,
+  nextSource,
+  nextTarget,
+}: {
+  prevSource: string[];
+  nextSource: string[];
+  nextTarget: string[];
+}) => {
+  const leading = prevSource[0];
+  if (!leading) {
+    return false;
+  }
+  if (nextSource.includes(leading)) {
+    return false;
+  }
+  return nextTarget.includes(leading);
+};
+
+const layoutChangeRequiresSeamlessFetch = ({
+  previousRows,
+  previousCols,
+  nextRows,
+  nextCols,
+}: {
+  previousRows: string[];
+  previousCols: string[];
+  nextRows: string[];
+  nextCols: string[];
+}) => {
+  if (shouldFetchForLeadingKeyChange(previousRows, nextRows)) {
+    return true;
+  }
+  if (shouldFetchForLeadingKeyChange(previousCols, nextCols)) {
+    return true;
+  }
+  if (
+    movedLeadingKeyAcrossAxes({
+      prevSource: previousRows,
+      nextSource: nextRows,
+      nextTarget: nextCols,
+    })
+  ) {
+    return true;
+  }
+  if (
+    movedLeadingKeyAcrossAxes({
+      prevSource: previousCols,
+      nextSource: nextCols,
+      nextTarget: nextRows,
+    })
+  ) {
+    return true;
+  }
+  return false;
+};
 
 const trimAxisByDepth = ({
   tree,
@@ -210,14 +285,227 @@ const trimTreeForLayout = ({
   if (removedRows.size === 0 && removedCols.size === 0) {
     return nextTree;
   }
+  const resolveNearestSurvivingKey = (
+    nodes: Record<string, PivotTreeNode>,
+    key: string,
+  ) => {
+    if (nodes[key]) {
+      return key;
+    }
+    const path = parsePath(key);
+    for (let size = path.length - 1; size >= 0; size -= 1) {
+      const candidate = serializePath(path.slice(0, size));
+      if (nodes[candidate]) {
+        return candidate;
+      }
+    }
+    return nodes[rootKey] ? rootKey : undefined;
+  };
+  const mergeCellValues = (
+    left?: Record<string, unknown>,
+    right?: Record<string, unknown>,
+  ) => {
+    if (!left && !right) {
+      return undefined;
+    }
+    const merged: Record<string, unknown> = { ...(left ?? {}) };
+    Object.entries(right ?? {}).forEach(([metric, value]) => {
+      const current = merged[metric];
+      const leftNum = Number(current);
+      const rightNum = Number(value);
+      if (Number.isFinite(leftNum) && Number.isFinite(rightNum)) {
+        merged[metric] = leftNum + rightNum;
+        return;
+      }
+      if (current === undefined || current === null) {
+        merged[metric] = value;
+        return;
+      }
+      if (value !== undefined && value !== null) {
+        merged[metric] = value;
+      }
+    });
+    return merged;
+  };
   const nextCells: PivotTreeData['cells'] = {};
-  Object.entries(nextTree.cells).forEach(([key, cell]) => {
-    if (removedRows.has(cell.rowKey) || removedCols.has(cell.colKey)) {
+  Object.entries(nextTree.cells).forEach(([, cell]) => {
+    const rowKey =
+      removedRows.has(cell.rowKey) || !nextTree.rows[cell.rowKey]
+        ? resolveNearestSurvivingKey(nextTree.rows, cell.rowKey)
+        : cell.rowKey;
+    const colKey =
+      removedCols.has(cell.colKey) || !nextTree.cols[cell.colKey]
+        ? resolveNearestSurvivingKey(nextTree.cols, cell.colKey)
+        : cell.colKey;
+    const collapsedToRowRoot =
+      trimRowDepth === 0 && cell.rowKey !== rootKey && rowKey === rootKey;
+    const collapsedToColRoot =
+      trimColDepth === 0 && cell.colKey !== rootKey && colKey === rootKey;
+    if (collapsedToRowRoot || collapsedToColRoot) {
       return;
     }
-    nextCells[key] = cell;
+    if (rowKey === undefined || colKey === undefined) {
+      return;
+    }
+    const nextKey = serializeCellKey(rowKey, colKey);
+    const existing = nextCells[nextKey];
+    const mergedValues = mergeCellValues(existing?.values, cell.values);
+    nextCells[nextKey] = {
+      ...(existing ?? cell),
+      ...cell,
+      rowKey,
+      colKey,
+      ...(mergedValues ? { values: mergedValues } : {}),
+      isSubtotal:
+        cell.isSubtotal ||
+        existing?.isSubtotal ||
+        rowKey !== cell.rowKey ||
+        colKey !== cell.colKey,
+    };
   });
   return { ...nextTree, cells: nextCells };
+};
+
+const remapFetchedDepthsForStableTrim = ({
+  fetchedDepthByKey,
+  previousNodes,
+  nextNodes,
+  stablePrefix,
+  countDimDepth,
+}: {
+  fetchedDepthByKey: Map<string, number>;
+  previousNodes: Record<string, PivotTreeNode>;
+  nextNodes: Record<string, PivotTreeNode>;
+  stablePrefix: number;
+  countDimDepth: (path: PivotTreeNode['path']) => number;
+}) => {
+  if (fetchedDepthByKey.size === 0 || stablePrefix <= 0) {
+    return new Map<string, number>();
+  }
+  const resolveNearestSurvivingKey = (key: string) => {
+    if (nextNodes[key]) {
+      return key;
+    }
+    const path = parsePath(key);
+    for (let size = path.length - 1; size >= 0; size -= 1) {
+      const candidate = serializePath(path.slice(0, size));
+      if (nextNodes[candidate]) {
+        return candidate;
+      }
+    }
+    return nextNodes[rootKey] ? rootKey : undefined;
+  };
+  const next = new Map<string, number>();
+  fetchedDepthByKey.forEach((requiredDepth, key) => {
+    const node = previousNodes[key];
+    const path = node ? node.path : parsePath(key);
+    let candidatePath = path;
+    while (
+      candidatePath.length > 0 &&
+      countDimDepth(candidatePath) > stablePrefix
+    ) {
+      candidatePath = candidatePath.slice(0, candidatePath.length - 1);
+    }
+    const candidateKey = serializePath(candidatePath);
+    const resolvedKey = resolveNearestSurvivingKey(candidateKey);
+    if (resolvedKey === undefined) {
+      return;
+    }
+    if (resolvedKey === rootKey && key !== rootKey) {
+      return;
+    }
+    const existingDepth = next.get(resolvedKey);
+    next.set(
+      resolvedKey,
+      existingDepth === undefined
+        ? requiredDepth
+        : Math.max(existingDepth, requiredDepth),
+    );
+  });
+  return next;
+};
+
+const mapExpandedCoverageForStableTrim = ({
+  expandedKeys,
+  previousNodes,
+  nextNodes,
+  stablePrefix,
+  requiredOppositeDepth,
+  countDimDepth,
+}: {
+  expandedKeys: Set<string>;
+  previousNodes: Record<string, PivotTreeNode>;
+  nextNodes: Record<string, PivotTreeNode>;
+  stablePrefix: number;
+  requiredOppositeDepth: number;
+  countDimDepth: (path: PivotTreeNode['path']) => number;
+}) => {
+  if (expandedKeys.size === 0 || stablePrefix <= 0) {
+    return new Map<string, number>();
+  }
+  const resolveNearestSurvivingKey = (key: string) => {
+    if (nextNodes[key]) {
+      return key;
+    }
+    const path = parsePath(key);
+    for (let size = path.length - 1; size >= 0; size -= 1) {
+      const candidate = serializePath(path.slice(0, size));
+      if (nextNodes[candidate]) {
+        return candidate;
+      }
+    }
+    return nextNodes[rootKey] ? rootKey : undefined;
+  };
+  const next = new Map<string, number>();
+  expandedKeys.forEach(key => {
+    if (key === rootKey) {
+      return;
+    }
+    const node = previousNodes[key];
+    if (!node) {
+      return;
+    }
+    const hasPreviousDescendants = Object.values(previousNodes).some(
+      candidate => {
+        if (candidate.key === node.key) {
+          return false;
+        }
+        if (candidate.path.length <= node.path.length) {
+          return false;
+        }
+        return node.path.every(
+          (value, index) => value === candidate.path[index],
+        );
+      },
+    );
+    if (!node.hasChildren && !hasPreviousDescendants) {
+      return;
+    }
+    let candidatePath = node.path;
+    while (
+      candidatePath.length > 0 &&
+      countDimDepth(candidatePath) > stablePrefix
+    ) {
+      candidatePath = candidatePath.slice(0, candidatePath.length - 1);
+    }
+    const candidateKey = serializePath(candidatePath);
+    const resolvedKey = resolveNearestSurvivingKey(candidateKey);
+    if (resolvedKey === undefined || resolvedKey === rootKey) {
+      return;
+    }
+    const resolvedNode = nextNodes[resolvedKey];
+    if (!resolvedNode || countDimDepth(resolvedNode.path) > stablePrefix) {
+      return;
+    }
+    const existingDepth = next.get(resolvedKey);
+    next.set(
+      resolvedKey,
+      existingDepth === undefined
+        ? requiredOppositeDepth
+        : Math.max(existingDepth, requiredOppositeDepth),
+    );
+  });
+  return next;
 };
 
 const promoteTreeForLayout = ({
@@ -385,7 +673,6 @@ export const useExpansionEngine = ({
     rows: groupbyRowKeys,
     cols: groupbyColumnKeys,
   });
-  const layoutTreeCacheRef = useRef<Map<string, PivotTreeData>>(new Map());
 
   if (!expansionStateStoreRef.current) {
     expansionStateStoreRef.current = createExpansionStateStore({
@@ -1828,14 +2115,6 @@ export const useExpansionEngine = ({
       cols: groupbyColumnKeys,
     };
     const previousLayout = previousLayoutRef.current;
-    const currentLayoutSignature = buildLayoutSignature(
-      currentLayout.rows,
-      currentLayout.cols,
-    );
-    const previousLayoutSignature = buildLayoutSignature(
-      previousLayout.rows,
-      previousLayout.cols,
-    );
     const hasNewData = previousDataRef.current !== data;
     const shouldReinitialize =
       isInitialMount ||
@@ -1851,13 +2130,6 @@ export const useExpansionEngine = ({
     previousDataRef.current = data;
     const rowsChanged = !isSameLayout(previousLayout.rows, currentLayout.rows);
     const colsChanged = !isSameLayout(previousLayout.cols, currentLayout.cols);
-    if (hasNewData) {
-      layoutTreeCacheRef.current = new Map<string, PivotTreeData>([
-        [currentLayoutSignature, data],
-      ]);
-    } else if ((rowsChanged || colsChanged) && treeRef.current) {
-      layoutTreeCacheRef.current.set(previousLayoutSignature, treeRef.current);
-    }
     const shouldExpandRows =
       currentLayout.rows.length > previousLayout.rows.length &&
       isPrefix(previousLayout.rows, currentLayout.rows);
@@ -1873,11 +2145,20 @@ export const useExpansionEngine = ({
     const shouldResetExpanded =
       shouldResetExpandedRows || shouldResetExpandedCols;
     const layoutChanged = rowsChanged || colsChanged;
-    const sourceTree =
-      hasNewData || !layoutChanged
+    const shouldUseCurrentTreeForLayoutProjection =
+      layoutChanged &&
+      !hasNewData &&
+      !layoutChangeRequiresSeamlessFetch({
+        previousRows: previousLayout.rows,
+        previousCols: previousLayout.cols,
+        nextRows: currentLayout.rows,
+        nextCols: currentLayout.cols,
+      });
+    const sourceTree = shouldUseCurrentTreeForLayoutProjection
+      ? treeRef.current
+      : hasNewData || !layoutChanged
         ? data
-        : (layoutTreeCacheRef.current.get(currentLayoutSignature) ??
-          treeRef.current);
+        : treeRef.current;
     const hasAxisDepthCoverage = (
       nodes: Record<string, PivotTreeNode>,
       targetDepth: number,
@@ -1959,6 +2240,78 @@ export const useExpansionEngine = ({
           })
         : baseTree;
 
+    const shouldCarryFetchedRowsForTrim =
+      !hasNewData &&
+      currentLayout.rows.length < previousLayout.rows.length &&
+      isPrefix(currentLayout.rows, previousLayout.rows) &&
+      rowStablePrefix > 0;
+    const shouldCarryFetchedColsForTrim =
+      !hasNewData &&
+      currentLayout.cols.length < previousLayout.cols.length &&
+      isPrefix(currentLayout.cols, previousLayout.cols) &&
+      colStablePrefix > 0;
+    const remappedFetchedRows = shouldCarryFetchedRowsForTrim
+      ? remapFetchedDepthsForStableTrim({
+          fetchedDepthByKey: fetchedRowKeysRef.current,
+          previousNodes: sourceTree.rows,
+          nextNodes: normalizedTree.rows,
+          stablePrefix: rowStablePrefix,
+          countDimDepth,
+        })
+      : new Map<string, number>();
+    const remappedFetchedCols = shouldCarryFetchedColsForTrim
+      ? remapFetchedDepthsForStableTrim({
+          fetchedDepthByKey: fetchedColKeysRef.current,
+          previousNodes: sourceTree.cols,
+          nextNodes: normalizedTree.cols,
+          stablePrefix: colStablePrefix,
+          countDimDepth,
+        })
+      : new Map<string, number>();
+    const {
+      visibleRowDepth: previousVisibleRowDepth,
+      visibleColDepth: previousVisibleColDepth,
+    } = computeVisibleDepthsBase({
+      tree: sourceTree,
+      expandedRows: expandedRowsRef.current,
+      expandedCols: expandedColsRef.current,
+      config: visibilityConfig,
+    });
+    const expandedRowCoverage = shouldCarryFetchedRowsForTrim
+      ? mapExpandedCoverageForStableTrim({
+          expandedKeys: expandedRowsRef.current,
+          previousNodes: sourceTree.rows,
+          nextNodes: normalizedTree.rows,
+          stablePrefix: rowStablePrefix,
+          requiredOppositeDepth: previousVisibleColDepth,
+          countDimDepth,
+        })
+      : new Map<string, number>();
+    const expandedColCoverage = shouldCarryFetchedColsForTrim
+      ? mapExpandedCoverageForStableTrim({
+          expandedKeys: expandedColsRef.current,
+          previousNodes: sourceTree.cols,
+          nextNodes: normalizedTree.cols,
+          stablePrefix: colStablePrefix,
+          requiredOppositeDepth: previousVisibleRowDepth,
+          countDimDepth,
+        })
+      : new Map<string, number>();
+    expandedRowCoverage.forEach((depth, key) => {
+      const existing = remappedFetchedRows.get(key);
+      remappedFetchedRows.set(
+        key,
+        existing === undefined ? depth : Math.max(existing, depth),
+      );
+    });
+    expandedColCoverage.forEach((depth, key) => {
+      const existing = remappedFetchedCols.get(key);
+      remappedFetchedCols.set(
+        key,
+        existing === undefined ? depth : Math.max(existing, depth),
+      );
+    });
+
     dataEpochRef.current += 1;
     transactionIdRef.current += 1;
     cancelInFlightRequestGroups();
@@ -1967,10 +2320,9 @@ export const useExpansionEngine = ({
     setWarnings([]);
     treeRef.current = normalizedTree;
     setTree(normalizedTree);
-    layoutTreeCacheRef.current.set(currentLayoutSignature, normalizedTree);
     setErrorMessage(undefined);
-    fetchedRowKeysRef.current = new Map();
-    fetchedColKeysRef.current = new Map();
+    fetchedRowKeysRef.current = remappedFetchedRows;
+    fetchedColKeysRef.current = remappedFetchedCols;
     loadingCountsRef.current = new Map();
     setLoadingKeys(new Set());
     inFlightExpandedRowsRef.current.clear();

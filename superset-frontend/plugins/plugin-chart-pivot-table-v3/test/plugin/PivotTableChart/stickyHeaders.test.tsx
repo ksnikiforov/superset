@@ -20,7 +20,13 @@
 import { render, waitFor, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { buildFormData } from '../fixtures/pivotFormData';
-import { buildTreeFromRecords, METRICS_PLACEHOLDER } from '../../../src/utils';
+import {
+  applyMetricAxis,
+  buildTreeFromRecords,
+  mergeTrees,
+  METRICS_PLACEHOLDER,
+} from '../../../src/utils';
+import { MetricsLayoutEnum } from '../../../src/types';
 
 describe('PivotTableChart sticky headers', () => {
   const metrics = ['metric1'];
@@ -168,5 +174,104 @@ describe('PivotTableChart sticky headers', () => {
     });
 
     getBoundingClientRectSpy.mockRestore();
+  });
+
+  it('renders row metric totals as grand-total rows with grand-total indentation', () => {
+    const rowMetrics = ['sum__num', 'count'];
+    const detailTree = buildTreeFromRecords(
+      [
+        {
+          name: 'A',
+          sum__num: 10,
+          count: 2,
+        },
+      ],
+      rowMetrics,
+      ['name'],
+      [],
+      1,
+      0,
+    );
+    const totalTree = buildTreeFromRecords(
+      [
+        {
+          sum__num: 10,
+          count: 2,
+        },
+      ],
+      rowMetrics,
+      ['name'],
+      [],
+      0,
+      0,
+    );
+    const treeWithMetricsOnRows = applyMetricAxis(
+      mergeTrees(detailTree, totalTree),
+      rowMetrics,
+      MetricsLayoutEnum.ROWS,
+      ['name'],
+      [],
+      1,
+      {
+        sum__num: 'sum__num',
+        count: 'count',
+      },
+    );
+
+    const { container } = render(
+      <PivotTableChart
+        data={treeWithMetricsOnRows}
+        formData={buildFormData({
+          groupbyRows: ['name', METRICS_PLACEHOLDER],
+          groupbyColumns: [],
+          metrics: rowMetrics,
+          metricsLayout: MetricsLayoutEnum.ROWS,
+          colTotals: true,
+          colTotalPosition: 'start',
+          stickyHeaders: true,
+          metricLabelMap: {
+            sum__num: 'sum__num',
+            count: 'count',
+          },
+        })}
+        metrics={rowMetrics}
+        groupbyRows={['name']}
+        groupbyColumns={[]}
+        colTotals
+        colTotalPosition="start"
+        stickyHeaders
+        verboseMap={{
+          count: 'COUNT(*)',
+        }}
+      />,
+    );
+
+    const tbody = container.querySelector('tbody') as HTMLElement;
+    expect(within(tbody).queryByText('Grand total')).not.toBeInTheDocument();
+
+    const assertMetricTotalRow = (label: string) => {
+      const row = within(tbody)
+        .getByText(label)
+        .closest('tr') as HTMLTableRowElement;
+      expect(row).toHaveClass('pivot-grand-total-row');
+      expect(row).toHaveClass('pivot-grand-total-row--top');
+      const headerCell = within(row)
+        .getByText(label)
+        .closest('div') as HTMLElement;
+      expect(Number.parseInt(headerCell.style.paddingLeft || '0', 10)).toBe(0);
+      return row;
+    };
+
+    const firstTotalRow = assertMetricTotalRow('Total sum__num');
+    const secondTotalRow = assertMetricTotalRow('Total COUNT(*)');
+
+    return waitFor(() => {
+      expect(
+        firstTotalRow.style.getPropertyValue('--pivot-grand-total-offset'),
+      ).toBe('0px');
+      expect(
+        secondTotalRow.style.getPropertyValue('--pivot-grand-total-offset'),
+      ).toBe('28px');
+    });
   });
 });

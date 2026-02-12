@@ -23,6 +23,10 @@ import {
   type MouseEvent,
   type ReactNode,
   type RefObject,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
 } from 'react';
 import {
   LoadingOutlined,
@@ -46,6 +50,7 @@ import { rootKey } from '../viewModel';
 import { type RenderModel, type FormattingKeys } from '../shared/types';
 
 const ROW_INDENT_PX = 16;
+const STICKY_TOTAL_ROW_FALLBACK_HEIGHT_PX = 28;
 
 const Container = styled.div<{ height: number; width: number }>`
   ${({ height, width }) => `
@@ -171,14 +176,16 @@ const StyledTable = styled.table<{ $stickyHeaders: boolean }>`
     tbody tr.pivot-grand-total-row--top td,
     tbody tr.pivot-grand-total-row--top th {
       position: sticky;
-      top: var(--pivot-header-offset, 0px);
+      top: calc(
+        var(--pivot-header-offset, 0px) + var(--pivot-grand-total-offset, 0px)
+      );
       z-index: 3;
     }
 
     tbody tr.pivot-grand-total-row--bottom td,
     tbody tr.pivot-grand-total-row--bottom th {
       position: sticky;
-      bottom: 0;
+      bottom: var(--pivot-grand-total-offset, 0px);
       z-index: 3;
     }
 
@@ -387,7 +394,74 @@ export const PivotTableView = ({
 }: PivotTableViewProps) => {
   const { visibleRows, visibleCols, columnHeaderRows, showRowRoot } =
     renderModel;
-  const containerStyle: React.CSSProperties & {
+  const stickyRowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
+  const [stickyTotalRowOffsets, setStickyTotalRowOffsets] = useState<
+    Record<string, number>
+  >({});
+
+  const isGrandTotalLikeRow = useMemo(
+    () => (row: PivotTreeNode) =>
+      (showRowRoot && row.key === rootKey) || isMetricGrandTotalNode(row),
+    [isMetricGrandTotalNode, showRowRoot],
+  );
+
+  const stickyTopRows = useMemo(
+    () =>
+      colTotalPosition === 'end'
+        ? []
+        : visibleRows.filter(row => isGrandTotalLikeRow(row)),
+    [colTotalPosition, isGrandTotalLikeRow, visibleRows],
+  );
+  const stickyBottomRows = useMemo(
+    () =>
+      colTotalPosition === 'end'
+        ? visibleRows.filter(row => isGrandTotalLikeRow(row))
+        : [],
+    [colTotalPosition, isGrandTotalLikeRow, visibleRows],
+  );
+
+  useLayoutEffect(() => {
+    if (!stickyHeaders) {
+      if (Object.keys(stickyTotalRowOffsets).length > 0) {
+        setStickyTotalRowOffsets({});
+      }
+      return;
+    }
+
+    const nextOffsets: Record<string, number> = {};
+    let runningTopOffset = 0;
+    stickyTopRows.forEach(row => {
+      nextOffsets[row.key] = runningTopOffset;
+      const measuredHeight =
+        stickyRowRefs.current[row.key]?.getBoundingClientRect().height ?? 0;
+      runningTopOffset +=
+        measuredHeight > 0
+          ? measuredHeight
+          : STICKY_TOTAL_ROW_FALLBACK_HEIGHT_PX;
+    });
+
+    let runningBottomOffset = 0;
+    [...stickyBottomRows].reverse().forEach(row => {
+      nextOffsets[row.key] = runningBottomOffset;
+      const measuredHeight =
+        stickyRowRefs.current[row.key]?.getBoundingClientRect().height ?? 0;
+      runningBottomOffset +=
+        measuredHeight > 0
+          ? measuredHeight
+          : STICKY_TOTAL_ROW_FALLBACK_HEIGHT_PX;
+    });
+
+    const prevKeys = Object.keys(stickyTotalRowOffsets);
+    const nextKeys = Object.keys(nextOffsets);
+    const hasSameShape =
+      prevKeys.length === nextKeys.length &&
+      prevKeys.every(key => nextOffsets[key] === stickyTotalRowOffsets[key]);
+    if (!hasSameShape) {
+      setStickyTotalRowOffsets(nextOffsets);
+    }
+  }, [stickyHeaders, stickyBottomRows, stickyTopRows, stickyTotalRowOffsets]);
+
+  const containerStyle: CSSProperties & {
     '--pivot-header-offset': string;
   } = {
     '--pivot-header-offset': `${stickyHeaders ? headerOffset : 0}px`,
@@ -522,13 +596,24 @@ export const PivotTableView = ({
               const rowAggregateBold = isRowAggregateBold(row);
               const isSubtotalHeader = rowAggregateBold;
               const isGrandTotalRow = showRowRoot && row.key === rootKey;
+              const isMetricGrandTotalRow = isMetricGrandTotalNode(row);
+              const isGrandTotalLike = isGrandTotalRow || isMetricGrandTotalRow;
               const grandTotalPositionClass =
                 colTotalPosition === 'end'
                   ? 'pivot-grand-total-row--bottom'
                   : 'pivot-grand-total-row--top';
-              const rowClassName = isGrandTotalRow
+              const rowClassName = isGrandTotalLike
                 ? `pivot-grand-total-row ${grandTotalPositionClass}`
                 : undefined;
+              const rowStickyOffset = stickyTotalRowOffsets[row.key] ?? 0;
+              const rowStyle =
+                isGrandTotalLike && stickyHeaders
+                  ? ({
+                      '--pivot-grand-total-offset': `${rowStickyOffset}px`,
+                    } as CSSProperties & {
+                      '--pivot-grand-total-offset': string;
+                    })
+                  : undefined;
               const rowTotalBg = getTotalBackground(row);
               const rowHeaderFormatting = resolveDimensionStyle(
                 'row',
@@ -543,9 +628,22 @@ export const PivotTableView = ({
                 Object.keys(rowHeaderStyle).length > 0
                   ? rowHeaderStyle
                   : undefined;
-              const rowIndent = getNodeDimDepth(row) * ROW_INDENT_PX;
+              const rowIndent =
+                (isMetricGrandTotalRow ? 0 : getNodeDimDepth(row)) *
+                ROW_INDENT_PX;
               return (
-                <tr key={row.key} className={rowClassName}>
+                <tr
+                  key={row.key}
+                  className={rowClassName}
+                  style={rowStyle}
+                  ref={
+                    isGrandTotalLike
+                      ? rowElement => {
+                          stickyRowRefs.current[row.key] = rowElement;
+                        }
+                      : undefined
+                  }
+                >
                   <th
                     className={isSubtotalHeader ? 'subtotal-cell' : undefined}
                     style={rowHeaderStyleResolved}

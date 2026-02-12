@@ -109,22 +109,20 @@ describe('PivotTableChart basic regression smoke guardrails', () => {
       const bodyRows = within(
         container.querySelector('tbody') as HTMLElement,
       ).getAllByRole('row');
-      const rowLabels = bodyRows.map(
-        row => (row.querySelector('th')?.textContent || '').trim(),
+      const rowLabels = bodyRows.map(row =>
+        (row.querySelector('th')?.textContent || '').trim(),
       );
       expect(rowLabels).toContain('Grand total');
     });
 
-    const headerLabels = within(
-      container.querySelector('thead') as HTMLElement,
-    )
+    const headerLabels = within(container.querySelector('thead') as HTMLElement)
       .getAllByRole('columnheader')
       .map(cell => cell.textContent?.trim())
       .filter(Boolean);
     expect(headerLabels).toContain('Grand total');
-    expect(document.querySelectorAll('th.subtotal-cell').length).toBeGreaterThan(
-      0,
-    );
+    expect(
+      document.querySelectorAll('th.subtotal-cell').length,
+    ).toBeGreaterThan(0);
   });
 
   it('expands a collapsed row and shows the next hierarchy level', async () => {
@@ -185,7 +183,9 @@ describe('PivotTableChart basic regression smoke guardrails', () => {
       const minusToggle = within(rowA).getByLabelText('minus-square');
       fireEvent.click(minusToggle);
       await waitFor(() =>
-        expect(within(rowA).queryByLabelText('plus-square')).toBeInTheDocument(),
+        expect(
+          within(rowA).queryByLabelText('plus-square'),
+        ).toBeInTheDocument(),
       );
       fireEvent.click(within(rowA).getByLabelText('plus-square'));
     }
@@ -269,7 +269,8 @@ describe('PivotTableChart basic regression smoke guardrails', () => {
     ).toEqual(['c1', METRICS_PLACEHOLDER]);
     expect(
       (fetchCall?.specs ?? []).some(
-        (spec: { meta?: { colDepth?: number } }) => (spec.meta?.colDepth ?? 0) >= 1,
+        (spec: { meta?: { colDepth?: number } }) =>
+          (spec.meta?.colDepth ?? 0) >= 1,
       ),
     ).toBe(true);
 
@@ -337,8 +338,8 @@ describe('PivotTableChart basic regression smoke guardrails', () => {
       const bodyRows = within(
         container.querySelector('tbody') as HTMLElement,
       ).getAllByRole('row');
-      const rowLabels = bodyRows.map(
-        row => (row.querySelector('th')?.textContent || '').trim(),
+      const rowLabels = bodyRows.map(row =>
+        (row.querySelector('th')?.textContent || '').trim(),
       );
       expect(rowLabels).toContain('Grand total');
     });

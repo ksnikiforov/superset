@@ -128,6 +128,47 @@
 - [x] Validate no extra post-seamless prefetch call is triggered for the preserved branch.
 - [x] Validate with standard command `npm test plugins/plugin-chart-pivot-table-v3`.
 
+### Phase 4.5: Value-Axis Cross-Move Non-Blank Guard
+- [x] Add failing interaction regression for sequence: `rows:[r1], cols:[Value] -> rows:[r1,Value] -> cols:[c1] -> cols:[c1,r1], rows:[Value]`.
+- [x] Ensure final state renders metric rows (no blank tbody) and requests seamless fetch for the last move.
+- [x] Extend `shouldFetchForLayoutChange` with a leading-key cross-axis move rule (leading source key moved to target axis must fetch).
+- [x] Add unit coverage for leading row-key cross-axis moves.
+- [x] Validate with standard command `npm test plugins/plugin-chart-pivot-table-v3`.
+
+### Phase 4.6: Row Metric-Total Sticky + Indent Parity
+- [x] Add failing sticky-header regression for metrics-on-rows totals (`Total sum__num`, `Total COUNT(*)`) to require grand-total row class parity and zero-indent parity.
+- [x] Update row rendering so metric grand-total rows share grand-total sticky row classes (`pivot-grand-total-row`, position top/bottom).
+- [x] Keep metric grand-total row indentation at root level (same visual depth as `Grand total`).
+- [x] Validate with focused sticky test, full plugin suite, and eslint on touched files.
+
+### Phase 4.7: Multi-Total Sticky Stacking
+- [x] Add failing sticky-header assertion that top metric total rows must not overlap (`--pivot-grand-total-offset` increments by row).
+- [x] Implement stacked sticky offsets for all grand-total-like rows (top and bottom positions), with measured row-height accumulation and fallback height.
+- [x] Keep existing class-based sticky behavior while adding per-row offset CSS variable consumed by sticky top/bottom rules.
+- [x] Validate with focused sticky test, standard full plugin suite command, and eslint on touched files.
+
+### Phase 4.8: Trailing-Dimension Trim Rubber-Banding Guard
+- [x] Keep existing no-fetch regression for trailing row-dimension removal after top-level expansion.
+- [x] Add failing interaction regression for deep expanded hierarchy (`rows:[r1,r2,r3]`, expanded `A`) where trimming `r3` must not trigger hydration prefetch/loaders.
+- [x] Fix trim-path cell handling by remapping removed-depth cells to nearest surviving ancestors (with value merge) so local trimmed views remain immediately renderable.
+- [x] Preserve totals-only collapse behavior by not remapping trimmed leaf cells into root when collapsing an axis to depth `0`.
+- [x] Validate with standard command `npm test -- plugins/plugin-chart-pivot-table-v3/test/plugin/PivotTableChart`.
+
+### Phase 4.9: Layout Reinit Source-Of-Truth Simplification
+- [x] Remove layout replay from `layoutTreeCacheRef` during interaction reinit; derive non-new-data layout transitions strictly from the currently rendered tree (`treeRef.current`).
+- [x] Keep trim/promotion/remap logic intact while eliminating stale cached-layout restores that can cause collapse/re-expand rubber-banding after quick row/column toggles.
+- [x] Tighten interaction test mocks to use the real cache hook symbol (`peekPivotBranchCache`) and assert no cache-hydration lookup on deep trailing-dimension trim.
+- [x] Validate with standard command `npm test -- plugins/plugin-chart-pivot-table-v3` (79 suites / 546 tests passing).
+
+### Phase 4.10: Stale Data Refresh Guard During No-Fetch Layout Edits
+- [x] Add a failing interaction regression for trailing row-dimension trim where a stale parent `data` refresh lands immediately after the local edit; assert no prefetch call and no loader bounce.
+- [x] Guard user-controlled committed tree updates: ignore incoming `data` snapshots while parent runtime layout is out-of-sync with local committed runtime layout.
+- [x] Keep layout projection preference for current tree only on no-fetch layout transitions **without** new payload (`!hasNewData`), so true new-data transitions still use authoritative payloads.
+- [x] Validate with targeted suites:
+  - `npm test -- plugins/plugin-chart-pivot-table-v3/test/plugin/PivotTableChart/interaction-seamless-expansion.test.tsx`
+  - `npm test -- plugins/plugin-chart-pivot-table-v3/test/plugin/PivotTableChart/expansion-state.test.tsx`
+- [x] Validate with standard command `npm test -- plugins/plugin-chart-pivot-table-v3` (79 suites / 547 tests passing).
+
 ## Notes
 - Existing unrelated local changes were preserved.
 - Interaction mode no longer blocks initial render on dataset metadata fetch.
@@ -151,4 +192,8 @@
 - Expansion hydration no longer short-circuits on stale metric-variant nodes without real child cells; this prevents false "already loaded" states that could leave expanded nodes rendered with no descendants.
 - Expansion hydration now also rejects stale subtotal+metric-only descendants at unchanged base depth as "loaded"; this forces proper branch fetches and prevents `minus` rows without visible children after value-axis moves.
 - Seamless update planner was silently dropping expansion targets because `pivotExpansionState.rows/cols` were being sent as serialized strings; payloads are now path arrays, restoring branch-prefetch specs in the first request and removing the second-stage expansion fetch for this flow.
+- Cross-axis moves that relocate the leading source-axis dimension (for example `rows:[r1,Value] -> rows:[Value], cols:[...,r1]`) now trigger seamless fetch; this prevents blank-table states caused by optimistic reuse of incompatible tree shape.
+- When `Values` are on rows, metric grand-total rows (`Total <metric>`) now render with grand-total sticky row treatment and root-level indentation parity.
+- Grand-total-like sticky rows are now stacked by offset (instead of sharing one `top`/`bottom`), so multi-metric total rows stick simultaneously without overlap.
+- Trailing row-dimension trims on already-expanded hierarchies now stay local and stable: no hydration prefetch bounce, no transient inline loader flash, and no collapse/re-expand of the expanded branch.
 - Deeper expansion-engine unification and strict single-transaction filter hydration can be added as a follow-up phase.

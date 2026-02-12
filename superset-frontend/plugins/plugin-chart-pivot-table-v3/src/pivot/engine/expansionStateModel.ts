@@ -127,8 +127,7 @@ export const pruneExpandedToStablePrefix = ({
       const decoded = decodeMetricKey(val);
       return decoded !== undefined && metricLabelSet.has(decoded);
     });
-    const depth =
-      includeMetricDepth && hasMetric ? baseDepth + 1 : baseDepth;
+    const depth = includeMetricDepth && hasMetric ? baseDepth + 1 : baseDepth;
     if (depth <= stablePrefix) {
       next.add(key);
     }

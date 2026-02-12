@@ -79,7 +79,10 @@ const normalizeExtraFormDataFilters = (
   colTypeMap?: Record<string, GenericDataType>,
   temporalLookup?: Record<string, boolean>,
 ): ExtraFormData => {
-  if (!Array.isArray(extraFormData.filters) || extraFormData.filters.length === 0) {
+  if (
+    !Array.isArray(extraFormData.filters) ||
+    extraFormData.filters.length === 0
+  ) {
     return extraFormData;
   }
   let hasChanges = false;

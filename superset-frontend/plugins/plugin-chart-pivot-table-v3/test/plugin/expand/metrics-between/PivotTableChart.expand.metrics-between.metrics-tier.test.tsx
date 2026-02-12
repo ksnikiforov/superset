@@ -180,8 +180,12 @@ describe('PivotTableChart expansion with metrics between dimensions (metrics-tie
     expect(
       within(orderPriorityRow).getByLabelText('plus-square'),
     ).toBeInTheDocument();
-    expect(within(tbody).queryByText('averageOrderValue')).not.toBeInTheDocument();
-    expect(within(tbody).queryByText('weightedDiscount')).not.toBeInTheDocument();
+    expect(
+      within(tbody).queryByText('averageOrderValue'),
+    ).not.toBeInTheDocument();
+    expect(
+      within(tbody).queryByText('weightedDiscount'),
+    ).not.toBeInTheDocument();
     expect(within(tbody).queryByText('AIR')).not.toBeInTheDocument();
 
     fireEvent.click(within(orderPriorityRow).getByLabelText('plus-square'));
@@ -306,8 +310,12 @@ describe('PivotTableChart expansion with metrics between dimensions (metrics-tie
 
     const tbody = container.querySelector('tbody') as HTMLElement;
     expect(within(tbody).getByText('AIR')).toBeInTheDocument();
-    expect(within(tbody).queryByText('averageOrderValue')).not.toBeInTheDocument();
-    expect(within(tbody).queryByText('weightedDiscount')).not.toBeInTheDocument();
+    expect(
+      within(tbody).queryByText('averageOrderValue'),
+    ).not.toBeInTheDocument();
+    expect(
+      within(tbody).queryByText('weightedDiscount'),
+    ).not.toBeInTheDocument();
     expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
   });
 

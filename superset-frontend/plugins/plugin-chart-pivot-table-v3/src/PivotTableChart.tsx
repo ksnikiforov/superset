@@ -967,15 +967,6 @@ function PivotTableChart(props: PivotTableProps) {
     ownStateRef.current = ownState ?? {};
   }, [ownState]);
 
-  useEffect(() => {
-    setCommittedTree(data);
-    setSeamlessWarnings([]);
-    setSeamlessError(undefined);
-    setSeamlessLoading(false);
-    setFrozenUserViewProps(null);
-    pendingSeamlessLayoutRef.current = null;
-  }, [data]);
-
   const mergeOwnState = useCallback((partial: JsonObject) => {
     const next = { ...ownStateRef.current, ...partial };
     ownStateRef.current = next;
@@ -1123,6 +1114,21 @@ function PivotTableChart(props: PivotTableProps) {
   const [uiSelectedFilters, setUiSelectedFilters] = useState<
     Record<string, DataRecordValue[]>
   >(selectedFilters ?? {});
+
+  useEffect(() => {
+    if (
+      isUserControlled &&
+      !isSameRuntimeLayout(runtimeLayout, committedRuntimeLayout)
+    ) {
+      return;
+    }
+    setCommittedTree(data);
+    setSeamlessWarnings([]);
+    setSeamlessError(undefined);
+    setSeamlessLoading(false);
+    setFrozenUserViewProps(null);
+    pendingSeamlessLayoutRef.current = null;
+  }, [committedRuntimeLayout, data, isUserControlled, runtimeLayout]);
 
   useEffect(() => {
     const pendingLayout = pendingSeamlessLayoutRef.current;
