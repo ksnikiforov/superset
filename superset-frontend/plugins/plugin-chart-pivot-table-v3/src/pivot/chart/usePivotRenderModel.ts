@@ -37,6 +37,7 @@ import {
   normalizeDimensionSortingMapWithKeys,
   coerceEpochMsStringToNumber,
   getFormattingMetricKey,
+  serializeCellKey,
   serializePath,
   decodeMetricKey,
   formatPivotLabelValue,
@@ -61,6 +62,12 @@ type DimensionSortingKeys = {
   metricKey?: string;
   order: PivotSortOrder;
   mode: PivotSortMode;
+};
+
+type UiColumnSortState = {
+  colKey: string;
+  metricKey: string;
+  order: PivotSortOrder;
 };
 
 const DEFAULT_DIMENSION_SORT_ORDER: PivotSortOrder = 'asc';
@@ -115,6 +122,7 @@ export const usePivotRenderModel = ({
   colTotals,
   rowSubTotals,
   layout,
+  uiColumnSort,
 }: {
   tree: PivotTreeData;
   expandedRows: Set<string>;
@@ -131,6 +139,7 @@ export const usePivotRenderModel = ({
   colTotals: boolean;
   rowSubTotals: boolean;
   layout: PivotLayoutResult;
+  uiColumnSort?: UiColumnSortState | null;
 }): PivotRenderModelResult => {
   const resolvedGroupbyRows = layout.layout.groupbyRows;
   const resolvedGroupbyColumns = layout.layout.groupbyColumns;
@@ -452,8 +461,16 @@ export const usePivotRenderModel = ({
       }
       const aValue = getSortValue(axis, a, config.metricKey);
       const bValue = getSortValue(axis, b, config.metricKey);
-      if (aValue === undefined || bValue === undefined) {
+      const aMissing = aValue === null || aValue === undefined;
+      const bMissing = bValue === null || bValue === undefined;
+      if (aMissing && bMissing) {
         return 0;
+      }
+      if (aMissing) {
+        return 1;
+      }
+      if (bMissing) {
+        return -1;
       }
       const type =
         typeof aValue === 'number' && typeof bValue === 'number'
@@ -463,6 +480,38 @@ export const usePivotRenderModel = ({
       return config.order === 'asc' ? cmp : -cmp;
     },
     [colTypeMap, getSortValue, layout, resolveSortConfig],
+  );
+
+  const compareUiColumnSort = useCallback(
+    (a: PivotTreeNode, b: PivotTreeNode) => {
+      if (!uiColumnSort) {
+        return 0;
+      }
+      const aCell =
+        renderTree.cells[serializeCellKey(a.key, uiColumnSort.colKey)];
+      const bCell =
+        renderTree.cells[serializeCellKey(b.key, uiColumnSort.colKey)];
+      const aValue = aCell?.values[uiColumnSort.metricKey];
+      const bValue = bCell?.values[uiColumnSort.metricKey];
+      const aMissing = aValue === null || aValue === undefined;
+      const bMissing = bValue === null || bValue === undefined;
+      if (aMissing && bMissing) {
+        return 0;
+      }
+      if (aMissing) {
+        return 1;
+      }
+      if (bMissing) {
+        return -1;
+      }
+      const type =
+        typeof aValue === 'number' && typeof bValue === 'number'
+          ? GenericDataType.Numeric
+          : undefined;
+      const cmp = compareValues(aValue, bValue, type);
+      return uiColumnSort.order === 'asc' ? cmp : -cmp;
+    },
+    [renderTree.cells, uiColumnSort],
   );
 
   const rowSorter = useMemo(() => {
@@ -480,7 +529,8 @@ export const usePivotRenderModel = ({
       !rowSubTotals &&
       !pushMetricTotalsToEnd &&
       !pullMetricTotalsToStart &&
-      !hasRowSorting
+      !hasRowSorting &&
+      !uiColumnSort
     ) {
       return baseSorter;
     }
@@ -509,6 +559,10 @@ export const usePivotRenderModel = ({
       if (metricOrder !== 0) {
         return metricOrder;
       }
+      const uiColumnSortCmp = compareUiColumnSort(a, b);
+      if (uiColumnSortCmp !== 0) {
+        return uiColumnSortCmp;
+      }
       const metricSort = compareMetricSort('row', a, b);
       if (metricSort !== 0) {
         return metricSort;
@@ -519,11 +573,13 @@ export const usePivotRenderModel = ({
     colTotals,
     colTypeMap,
     compareMetricSort,
+    compareUiColumnSort,
     resolvedGroupbyRows,
     hasRowSorting,
     layout,
     rowOrder,
     rowSubTotals,
+    uiColumnSort,
   ]);
 
   const colSorter = useMemo(() => {

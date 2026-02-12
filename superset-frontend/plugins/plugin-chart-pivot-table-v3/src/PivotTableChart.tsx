@@ -596,6 +596,11 @@ type ValueDragItem = {
 
 type DragItem = DimensionDragItem | ValueDragItem;
 type PivotViewProps = ComponentProps<typeof PivotTableView>;
+type UiColumnSortState = {
+  colKey: string;
+  metricKey: string;
+  order: 'asc' | 'desc';
+};
 
 const dimensionDndType =
   INTERACTION_DIMENSION_DND_TYPE || 'pivot-v3-interaction-dimension';
@@ -949,6 +954,8 @@ function PivotTableChart(props: PivotTableProps) {
   const [seamlessError, setSeamlessError] = useState<string | undefined>(
     undefined,
   );
+  const [activeColumnSort, setActiveColumnSort] =
+    useState<UiColumnSortState | null>(null);
   const [frozenUserViewProps, setFrozenUserViewProps] =
     useState<PivotViewProps | null>(null);
   const seamlessRequestRef = useRef(0);
@@ -1706,8 +1713,50 @@ function PivotTableChart(props: PivotTableProps) {
     colTotals,
     rowSubTotals,
     layout: layoutResult,
+    uiColumnSort: activeColumnSort,
   });
   const { renderTree } = renderModelResult;
+
+  const resolveColumnSortMetric = useCallback(
+    (node: PivotTreeNode) => layoutResult.getMetricLabelFromPath(node.path),
+    [layoutResult],
+  );
+
+  const isColumnSortable = useCallback(
+    (node: PivotTreeNode) => Boolean(resolveColumnSortMetric(node)),
+    [resolveColumnSortMetric],
+  );
+
+  const getColumnSortOrder = useCallback(
+    (node: PivotTreeNode) =>
+      activeColumnSort?.colKey === node.key
+        ? activeColumnSort.order
+        : undefined,
+    [activeColumnSort],
+  );
+
+  const handleColumnSort = useCallback(
+    (node: PivotTreeNode) => {
+      const metricKey = resolveColumnSortMetric(node);
+      if (!metricKey) {
+        return;
+      }
+      setActiveColumnSort(current => {
+        if (
+          current &&
+          current.colKey === node.key &&
+          current.metricKey === metricKey
+        ) {
+          if (current.order === 'asc') {
+            return { ...current, order: 'desc' };
+          }
+          return null;
+        }
+        return { colKey: node.key, metricKey, order: 'asc' };
+      });
+    },
+    [resolveColumnSortMetric],
+  );
 
   const treeDimensionFilterValues = useMemo(() => {
     const valuesMap = new Map<string, Set<DataRecordValue>>();
@@ -2004,6 +2053,9 @@ function PivotTableChart(props: PivotTableProps) {
     evaluateExcelMetricFormatting: formatting.evaluateExcelMetricFormatting,
     databarColumnMinWidths: formatting.databarColumnMinWidths,
     onToggleNode: handleToggle,
+    onSortColumn: handleColumnSort,
+    isColumnSortable,
+    getColumnSortOrder,
     shouldShowToggle: renderModelResult.shouldShowToggle,
     showRowSpinner: renderModelResult.showRowSpinner,
     showColSpinner: renderModelResult.showColSpinner,
@@ -2320,6 +2372,9 @@ function PivotTableChart(props: PivotTableProps) {
       evaluateExcelMetricFormatting={formatting.evaluateExcelMetricFormatting}
       databarColumnMinWidths={formatting.databarColumnMinWidths}
       onToggleNode={handleToggle}
+      onSortColumn={handleColumnSort}
+      isColumnSortable={isColumnSortable}
+      getColumnSortOrder={getColumnSortOrder}
       shouldShowToggle={renderModelResult.shouldShowToggle}
       showRowSpinner={renderModelResult.showRowSpinner}
       showColSpinner={renderModelResult.showColSpinner}

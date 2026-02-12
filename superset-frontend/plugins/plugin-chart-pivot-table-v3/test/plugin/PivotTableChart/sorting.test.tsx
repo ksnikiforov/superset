@@ -17,12 +17,42 @@
  * under the License.
  */
 
-import { render, screen } from '../../testUtils';
+import { fireEvent, render, screen } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { buildFormData } from '../fixtures/pivotFormData';
-import { buildTreeFromRecords } from '../../../src/utils';
+import { MetricsLayoutEnum } from '../../../src/types';
+import {
+  applyMeasureHierarchyAxis,
+  buildTreeFromRecords,
+} from '../../../src/utils';
 
 describe('PivotTableChart sorting', () => {
+  const withMetricsOnColumns = (
+    tree: ReturnType<typeof buildTreeFromRecords>,
+    metrics: string[],
+    groupbyRows: string[],
+    groupbyColumns: string[],
+  ) =>
+    applyMeasureHierarchyAxis(
+      tree,
+      { kind: 'flatMetrics', metricKeys: metrics },
+      MetricsLayoutEnum.COLUMNS,
+      groupbyRows,
+      groupbyColumns,
+    );
+
+  const getBodyRowLabels = (container: HTMLElement) =>
+    Array.from(container.querySelectorAll('tbody tr'))
+      .map(row => row.querySelector('th')?.textContent?.trim())
+      .filter((label): label is string => Boolean(label));
+
+  const getHeaderCell = (label: string) => {
+    const headerText = screen
+      .getAllByText(label)
+      .find(node => node.closest('thead') !== null);
+    return headerText?.closest('th') ?? null;
+  };
+
   it('sorts rows by metric totals when configured', () => {
     const metrics = ['metric1'];
     const groupbyRows = ['country'];
@@ -141,5 +171,245 @@ describe('PivotTableChart sorting', () => {
       row.querySelector('th')?.textContent?.trim(),
     );
     expect(labels).toEqual(['Brazil', 'Argentina']);
+  });
+
+  it('keeps null metric totals at bottom for dimension row sorting', () => {
+    const metrics = ['metric1'];
+    const groupbyRows = ['country'];
+    const groupbyColumns: string[] = [];
+    const tree = buildTreeFromRecords(
+      [
+        { country: 'A', metric1: 30 },
+        { country: 'B', metric1: null },
+        { country: 'C', metric1: 10 },
+      ],
+      metrics,
+      groupbyRows,
+      groupbyColumns,
+      1,
+      0,
+    );
+
+    const { rerender, container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={buildFormData({
+          groupbyRows,
+          groupbyColumns,
+          metrics,
+          rowSorting: {
+            country: { metric: 'metric1', order: 'asc', mode: 'total' },
+          },
+        })}
+        metrics={metrics}
+        groupbyRows={groupbyRows}
+        groupbyColumns={groupbyColumns}
+        startCollapsed={false}
+        colTotals={false}
+        rowTotals={false}
+        rowSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        width={400}
+        height={300}
+        margin={0}
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        verboseMap={{}}
+      />,
+    );
+
+    expect(getBodyRowLabels(container)).toEqual(['C', 'A', 'B']);
+
+    rerender(
+      <PivotTableChart
+        data={tree}
+        formData={buildFormData({
+          groupbyRows,
+          groupbyColumns,
+          metrics,
+          rowSorting: {
+            country: { metric: 'metric1', order: 'desc', mode: 'total' },
+          },
+        })}
+        metrics={metrics}
+        groupbyRows={groupbyRows}
+        groupbyColumns={groupbyColumns}
+        startCollapsed={false}
+        colTotals={false}
+        rowTotals={false}
+        rowSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        width={400}
+        height={300}
+        margin={0}
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        verboseMap={{}}
+      />,
+    );
+
+    expect(getBodyRowLabels(container)).toEqual(['A', 'C', 'B']);
+  });
+
+  it('does not sort when clicking a non-metric column header under multi-metric layout', () => {
+    const metrics = ['m1', 'm2'];
+    const groupbyRows = ['country'];
+    const groupbyColumns = ['year'];
+    const tree = withMetricsOnColumns(
+      buildTreeFromRecords(
+        [
+          { country: 'A', year: '2024', m1: 30, m2: 1 },
+          { country: 'B', year: '2024', m1: 10, m2: 3 },
+          { country: 'C', year: '2024', m1: 20, m2: 2 },
+        ],
+        metrics,
+        groupbyRows,
+        groupbyColumns,
+        1,
+        1,
+      ),
+      metrics,
+      groupbyRows,
+      groupbyColumns,
+    );
+
+    const { container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={buildFormData({
+          groupbyRows,
+          groupbyColumns,
+          metrics,
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+        })}
+        metrics={metrics}
+        groupbyRows={groupbyRows}
+        groupbyColumns={groupbyColumns}
+        startCollapsed={false}
+        colTotals={false}
+        rowTotals={false}
+        rowSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        width={400}
+        height={300}
+        margin={0}
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        verboseMap={{}}
+      />,
+    );
+
+    expect(getBodyRowLabels(container)).toEqual(['A', 'B', 'C']);
+    const nonMetricHeaderCell = getHeaderCell('2024');
+    expect(nonMetricHeaderCell).not.toBeNull();
+    fireEvent.click(nonMetricHeaderCell as HTMLTableCellElement);
+    expect(getBodyRowLabels(container)).toEqual(['A', 'B', 'C']);
+  });
+
+  it('cycles metric header sorting asc desc none and keeps nulls at bottom', () => {
+    const metrics = ['m1', 'm2'];
+    const groupbyRows = ['country'];
+    const groupbyColumns = ['year'];
+    const tree = withMetricsOnColumns(
+      buildTreeFromRecords(
+        [
+          { country: 'A', year: '2024', m1: 30, m2: 1 },
+          { country: 'B', year: '2024', m1: null, m2: 2 },
+          { country: 'C', year: '2024', m1: 20, m2: 3 },
+          { country: 'D', year: '2024', m1: 10, m2: 4 },
+        ],
+        metrics,
+        groupbyRows,
+        groupbyColumns,
+        1,
+        1,
+      ),
+      metrics,
+      groupbyRows,
+      groupbyColumns,
+    );
+
+    const { container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={buildFormData({
+          groupbyRows,
+          groupbyColumns,
+          metrics,
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+        })}
+        metrics={metrics}
+        groupbyRows={groupbyRows}
+        groupbyColumns={groupbyColumns}
+        startCollapsed={false}
+        colTotals={false}
+        rowTotals={false}
+        rowSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        width={400}
+        height={300}
+        margin={0}
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        verboseMap={{}}
+      />,
+    );
+
+    const metricHeaderCell = getHeaderCell('m1');
+    expect(metricHeaderCell).not.toBeNull();
+    expect(getBodyRowLabels(container)).toEqual(['A', 'B', 'C', 'D']);
+
+    fireEvent.click(metricHeaderCell as HTMLTableCellElement);
+    expect(getBodyRowLabels(container)).toEqual(['D', 'C', 'A', 'B']);
+    const metricHeaderLabel = screen
+      .getAllByText('m1')
+      .find(node => node.closest('thead') !== null);
+    const sortedAscendingIcon = screen.getByLabelText('Sorted ascending');
+    expect(metricHeaderLabel).not.toBeNull();
+    expect(
+      metricHeaderLabel!.compareDocumentPosition(sortedAscendingIcon),
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+
+    fireEvent.click(metricHeaderCell as HTMLTableCellElement);
+    expect(getBodyRowLabels(container)).toEqual(['A', 'C', 'D', 'B']);
+
+    fireEvent.click(metricHeaderCell as HTMLTableCellElement);
+    expect(getBodyRowLabels(container)).toEqual(['A', 'B', 'C', 'D']);
   });
 });

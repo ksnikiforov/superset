@@ -29,9 +29,11 @@ import {
   useState,
 } from 'react';
 import {
+  DownOutlined,
   LoadingOutlined,
   MinusSquareOutlined,
   PlusSquareOutlined,
+  UpOutlined,
 } from '@ant-design/icons';
 import { type DataRecordValue, styled, t } from '@superset-ui/core';
 import { Alert, Button, Loading } from '@superset-ui/core/components';
@@ -222,6 +224,23 @@ const RowToggleSlot = styled.span`
   flex: 0 0 ${ROW_TOGGLE_SLOT_PX}px;
 `;
 
+const ColumnControlSlot = styled.span`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: ${ROW_TOGGLE_SLOT_PX}px;
+  min-width: ${ROW_TOGGLE_SLOT_PX}px;
+  height: ${ROW_TOGGLE_SLOT_PX}px;
+  flex: 0 0 ${ROW_TOGGLE_SLOT_PX}px;
+`;
+
+const SortIndicator = styled.span`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: ${({ theme }) => theme.colorTextSecondary};
+`;
+
 const ToggleButton = styled.button`
   border: none;
   background: transparent;
@@ -323,6 +342,9 @@ type PivotTableViewProps = {
   ) => unknown;
   databarColumnMinWidths: Map<string, number>;
   onToggleNode: (axis: 'row' | 'col', node: PivotTreeNode) => void;
+  onSortColumn?: (node: PivotTreeNode) => void;
+  isColumnSortable?: (node: PivotTreeNode) => boolean;
+  getColumnSortOrder?: (node: PivotTreeNode) => 'asc' | 'desc' | undefined;
   shouldShowToggle: (axis: 'row' | 'col', node: PivotTreeNode) => boolean;
   showRowSpinner: (key: string) => boolean;
   showColSpinner: (key: string) => boolean;
@@ -388,6 +410,9 @@ export const PivotTableView = ({
   evaluateExcelMetricFormatting,
   databarColumnMinWidths,
   onToggleNode,
+  onSortColumn,
+  isColumnSortable,
+  getColumnSortOrder,
   shouldShowToggle,
   showRowSpinner,
   showColSpinner,
@@ -544,6 +569,8 @@ export const PivotTableView = ({
                   )}
                   {rowCells.map(cell => {
                     const showToggle = shouldShowToggle('col', cell.node);
+                    const sortable = isColumnSortable?.(cell.node) ?? false;
+                    const sortOrder = getColumnSortOrder?.(cell.node);
                     const isSubtotalHeader = isColAggregateBold(cell.node);
                     const colHeaderFormatting = resolveDimensionStyle(
                       'col',
@@ -570,23 +597,33 @@ export const PivotTableView = ({
                           isSubtotalHeader ? 'subtotal-cell' : undefined
                         }
                         style={colHeaderStyleResolved}
+                        onClick={
+                          sortable && onSortColumn
+                            ? () => onSortColumn(cell.node)
+                            : undefined
+                        }
                       >
                         <ColumnHeaderCell>
-                          {showToggle && (
-                            <ToggleButton
-                              type="button"
-                              onClick={() => onToggleNode('col', cell.node)}
-                              disabled={showColSpinner(cell.node.key)}
-                            >
-                              {showColSpinner(cell.node.key) ? (
-                                <Spinner />
-                              ) : expandedCols.has(cell.node.key) ? (
-                                <MinusSquareOutlined />
-                              ) : (
-                                <PlusSquareOutlined />
-                              )}
-                            </ToggleButton>
-                          )}
+                          <ColumnControlSlot>
+                            {showToggle && (
+                              <ToggleButton
+                                type="button"
+                                onClick={event => {
+                                  event.stopPropagation();
+                                  onToggleNode('col', cell.node);
+                                }}
+                                disabled={showColSpinner(cell.node.key)}
+                              >
+                                {showColSpinner(cell.node.key) ? (
+                                  <Spinner />
+                                ) : expandedCols.has(cell.node.key) ? (
+                                  <MinusSquareOutlined />
+                                ) : (
+                                  <PlusSquareOutlined />
+                                )}
+                              </ToggleButton>
+                            )}
+                          </ColumnControlSlot>
                           <span
                             className={
                               isNullLabelValue(cell.node)
@@ -596,6 +633,23 @@ export const PivotTableView = ({
                           >
                             {formatLabel(cell.node, 'col')}
                           </span>
+                          <ColumnControlSlot>
+                            {sortOrder ? (
+                              <SortIndicator
+                                aria-label={
+                                  sortOrder === 'desc'
+                                    ? t('Sorted descending')
+                                    : t('Sorted ascending')
+                                }
+                              >
+                                {sortOrder === 'desc' ? (
+                                  <DownOutlined />
+                                ) : (
+                                  <UpOutlined />
+                                )}
+                              </SortIndicator>
+                            ) : null}
+                          </ColumnControlSlot>
                         </ColumnHeaderCell>
                       </th>
                     );
