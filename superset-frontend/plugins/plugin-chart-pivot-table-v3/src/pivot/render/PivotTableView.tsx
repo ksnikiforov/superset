@@ -385,6 +385,7 @@ type PivotTableViewProps = {
     rowNode: PivotTreeNode,
     colNode: PivotTreeNode,
   ) => void;
+  rowAxisLabels?: string[];
 };
 
 export const PivotTableView = ({
@@ -430,6 +431,7 @@ export const PivotTableView = ({
   handleCellClick,
   handleCellKeyDown,
   handleCellContextMenu,
+  rowAxisLabels = [],
 }: PivotTableViewProps) => {
   const { visibleRows, visibleCols, columnHeaderRows, showRowRoot } =
     renderModel;
@@ -526,8 +528,10 @@ export const PivotTableView = ({
         <Loading />
       ) : (
         <StyledTable
+          className="pivot-v3-table pvtTable"
           $stickyHeaders={stickyHeaders}
           data-sticky-headers={stickyHeaders}
+          data-pivot-row-axis-labels={JSON.stringify(rowAxisLabels)}
         >
           <thead ref={headerRef}>
             {columnHeaderRows.length === 0 ? (
@@ -696,9 +700,10 @@ export const PivotTableView = ({
                 Object.keys(rowHeaderStyle).length > 0
                   ? rowHeaderStyle
                   : undefined;
-              const rowIndent =
-                (isMetricGrandTotalRow ? 0 : getNodeDimDepth(row)) *
-                ROW_INDENT_PX;
+              const rowDepthForExport = isMetricGrandTotalRow
+                ? 0
+                : getNodeDimDepth(row);
+              const rowIndent = rowDepthForExport * ROW_INDENT_PX;
               const isRowLoading = showRowSpinner(row.key);
               return (
                 <tr
@@ -717,7 +722,10 @@ export const PivotTableView = ({
                     className={isSubtotalHeader ? 'subtotal-cell' : undefined}
                     style={rowHeaderStyleResolved}
                   >
-                    <RowHeaderCell style={{ paddingLeft: rowIndent }}>
+                    <RowHeaderCell
+                      style={{ paddingLeft: rowIndent }}
+                      data-pivot-row-depth={rowDepthForExport}
+                    >
                       <RowToggleSlot className="pivot-row-toggle-slot">
                         {showToggle ? (
                           <ToggleButton
@@ -738,6 +746,7 @@ export const PivotTableView = ({
                         ) : null}
                       </RowToggleSlot>
                       <span
+                        data-pivot-row-label
                         className={
                           isNullLabelValue(row) ? 'pivot-null-label' : undefined
                         }

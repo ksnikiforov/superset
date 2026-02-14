@@ -57,6 +57,7 @@ import {
   DEFAULT_DATABAR_NEGATIVE_COLOR,
   DEFAULT_DATABAR_POSITIVE_COLOR,
   getFormattingMetricKey,
+  getMetricKey,
   getMetricKeys,
   isSubtotalToken,
   mergeMetrics,
@@ -618,13 +619,17 @@ export const usePivotFormatting = ({
     const columnOverrides: Record<string, string> = {};
     const currencyOverrides: Record<string, Currency> = {};
     layout.measureHierarchy.groups.forEach(group => {
-      const baseFormat = columnFormats?.[group.metricKey];
-      const baseCurrency = currencyFormats?.[group.metricKey];
       group.leaves.forEach(leaf => {
         if (isValueLeaf(leaf)) {
           return;
         }
         const outputKey = buildMeasureLeafOutputKey(group.metricKey, leaf);
+        const customMetricKey =
+          leaf.kind === 'custom' ? getMetricKey(leaf.metric) : undefined;
+        const formatMetricKey =
+          leaf.kind === 'custom' ? customMetricKey : group.metricKey;
+        const leafFormat = columnFormats?.[formatMetricKey];
+        const leafCurrency = currencyFormats?.[formatMetricKey];
         if (leaf.kind === 'builtIn' && leaf.operator === 'delta_pct') {
           columnOverrides[outputKey] = PERCENT;
           return;
@@ -633,11 +638,11 @@ export const usePivotFormatting = ({
           columnOverrides[outputKey] = INTEGER;
           return;
         }
-        if (baseFormat) {
-          columnOverrides[outputKey] = baseFormat;
+        if (leafFormat) {
+          columnOverrides[outputKey] = leafFormat;
         }
-        if (baseCurrency) {
-          currencyOverrides[outputKey] = baseCurrency;
+        if (leafCurrency) {
+          currencyOverrides[outputKey] = leafCurrency;
         }
       });
     });

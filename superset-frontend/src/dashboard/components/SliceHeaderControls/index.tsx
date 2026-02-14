@@ -61,6 +61,7 @@ import DrillDetailModal from 'src/components/Chart/DrillDetail/DrillDetailModal'
 import { usePermissions } from 'src/hooks/usePermissions';
 import { useDatasetDrillInfo } from 'src/hooks/apiResources/datasets';
 import { ResourceStatus } from 'src/hooks/apiResources/apiResources';
+import exportPivotV3Excel from 'src/utils/exportPivotV3Excel';
 import { useCrossFiltersScopingModal } from '../nativeFilters/FilterBar/CrossFilters/ScopingModal/useCrossFiltersScopingModal';
 import { ViewResultsModalTrigger } from './ViewResultsModalTrigger';
 
@@ -273,10 +274,17 @@ const SliceHeaderControls = (
       }
       case MenuKeys.ExportPivotXlsx: {
         const sliceSelector = `#chart-id-${props.slice.slice_id}`;
-        props.exportPivotExcel?.(
-          `${sliceSelector} .pvtTable`,
-          props.slice.slice_name,
-        );
+        if (props.slice.viz_type === VizType.PivotTableV3) {
+          exportPivotV3Excel(
+            `${sliceSelector} .pivot-v3-table`,
+            props.slice.slice_name,
+          );
+        } else {
+          props.exportPivotExcel?.(
+            `${sliceSelector} .pvtTable`,
+            props.slice.slice_name,
+          );
+        }
         break;
       }
       case MenuKeys.CrossFilterScoping: {
@@ -319,6 +327,7 @@ const SliceHeaderControls = (
   } = props;
   const isTable = slice.viz_type === VizType.Table;
   const isPivotTable = slice.viz_type === VizType.PivotTable;
+  const isPivotTableV3 = slice.viz_type === VizType.PivotTableV3;
   const cachedWhen = (cachedDttm || []).map(itemCachedDttm =>
     extendedDayjs.utc(itemCachedDttm).fromNow(),
   );
@@ -512,11 +521,21 @@ const SliceHeaderControls = (
               },
             ]
           : []),
-        {
-          key: MenuKeys.ExportXlsx,
-          label: t('Export to Excel'),
-          icon: <Icons.FileOutlined css={dropdownIconsStyles} />,
-        },
+        ...(isPivotTableV3
+          ? [
+              {
+                key: MenuKeys.ExportPivotXlsx,
+                label: t('Export to Excel'),
+                icon: <Icons.FileOutlined css={dropdownIconsStyles} />,
+              },
+            ]
+          : [
+              {
+                key: MenuKeys.ExportXlsx,
+                label: t('Export to Excel'),
+                icon: <Icons.FileOutlined css={dropdownIconsStyles} />,
+              },
+            ]),
         ...(isFeatureEnabled(FeatureFlag.AllowFullCsvExport) &&
         props.supersetCanCSV &&
         isTable

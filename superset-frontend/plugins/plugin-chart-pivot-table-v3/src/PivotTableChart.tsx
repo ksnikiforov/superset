@@ -84,6 +84,7 @@ import {
 } from './pivot/layout/interactionDrag';
 import {
   mergeTrees,
+  decodeMeasureLeafId,
   getMetricKeys,
   getStableColumnKey,
   METRICS_PLACEHOLDER,
@@ -92,7 +93,10 @@ import {
   parsePath,
   serializePath,
 } from './utils';
-import { applyMeasureLeafValuesToTree } from './pivot/measureLeaves';
+import {
+  applyMeasureLeafValuesToTree,
+  buildMeasureLeafOutputKey,
+} from './pivot/measureLeaves';
 import { buildBranchTreeFromResults } from './fetchPivotBranch';
 import { stableStringify } from './pivot/shared/stableStringify';
 
@@ -1223,6 +1227,10 @@ function PivotTableChart(props: PivotTableProps) {
         : groupbyColumns,
     [appliedLayoutFormData.groupbyColumns, groupbyColumns, isUserControlled],
   );
+  const rowAxisLabels = useMemo(
+    () => layoutGroupbyRows.map(dimension => getColumnLabel(dimension)),
+    [layoutGroupbyRows],
+  );
   const layoutMetricsLayout = useMemo(
     () =>
       isUserControlled
@@ -1718,7 +1726,30 @@ function PivotTableChart(props: PivotTableProps) {
   const { renderTree } = renderModelResult;
 
   const resolveColumnSortMetric = useCallback(
-    (node: PivotTreeNode) => layoutResult.getMetricLabelFromPath(node.path),
+    (node: PivotTreeNode) => {
+      const metricKey = layoutResult.getMetricLabelFromPath(node.path);
+      if (!metricKey) {
+        return undefined;
+      }
+      if (layoutResult.measureHierarchy.kind !== 'measureStackV1') {
+        return metricKey;
+      }
+      const leafId = [...node.path]
+        .reverse()
+        .map(value => decodeMeasureLeafId(value))
+        .find((value): value is string => Boolean(value));
+      if (!leafId) {
+        return metricKey;
+      }
+      const group = layoutResult.measureHierarchy.groups.find(
+        candidate => candidate.metricKey === metricKey,
+      );
+      const leaf = group?.leaves.find(candidate => candidate.id === leafId);
+      if (!leaf) {
+        return metricKey;
+      }
+      return buildMeasureLeafOutputKey(metricKey, leaf);
+    },
     [layoutResult],
   );
 
@@ -2073,6 +2104,7 @@ function PivotTableChart(props: PivotTableProps) {
     handleCellClick: interactions.handleCellClick,
     handleCellKeyDown: interactions.handleCellKeyDown,
     handleCellContextMenu: interactions.handleCellContextMenu,
+    rowAxisLabels,
   };
   if (isUserControlled) {
     currentUserViewPropsRef.current = liveUserPivotViewProps;
@@ -2392,6 +2424,7 @@ function PivotTableChart(props: PivotTableProps) {
       handleCellClick={interactions.handleCellClick}
       handleCellKeyDown={interactions.handleCellKeyDown}
       handleCellContextMenu={interactions.handleCellContextMenu}
+      rowAxisLabels={rowAxisLabels}
     />
   );
 }

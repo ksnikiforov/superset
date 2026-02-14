@@ -42,6 +42,7 @@ import {
 import {
   applyMeasureLeafValuesToTree,
   buildBuiltInLeaf,
+  buildCustomLeaf,
   buildValueLeaf,
 } from '../../../src/pivot/measureLeaves';
 import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
@@ -1283,6 +1284,212 @@ describe('PivotTableChart metric tier suppression', () => {
       .filter(label => label.length > 0);
 
     expect(leafLabels.slice(0, 3)).toEqual(['Value', 'IX 1YA', '1YA']);
+  });
+
+  it('formats custom measure leaves with the custom metric format', async () => {
+    const metricKey = 'grossRevenue';
+    const secondaryMetric = 'countCustomers';
+    const customMetricKey = 'conversionRate';
+    const valueLeaf = buildValueLeaf();
+    const customLeaf = buildCustomLeaf({
+      label: 'Conversion',
+      metric: customMetricKey,
+    });
+    const measureHierarchy = {
+      kind: 'measureStackV1' as const,
+      groups: [
+        {
+          metricKey,
+          leaves: [valueLeaf, customLeaf],
+        },
+        {
+          metricKey: secondaryMetric,
+          leaves: [valueLeaf],
+        },
+      ],
+      leafTierVisibility: 'visible' as const,
+    };
+    const baseTree = buildTreeFromRecords(
+      [{ c1: 'C1', grossRevenue: 100, countCustomers: 10 }],
+      [metricKey, secondaryMetric],
+      [],
+      ['c1'],
+      0,
+      1,
+    );
+    const treeWithCustomMetric: PivotTreeData = {
+      ...baseTree,
+      cells: Object.fromEntries(
+        Object.entries(baseTree.cells).map(([cellKey, cell]) => [
+          cellKey,
+          {
+            ...cell,
+            values: {
+              ...cell.values,
+              [customMetricKey]: 0.25,
+            },
+          },
+        ]),
+      ),
+    };
+    const treeWithLeaves = applyMeasureHierarchyAxis(
+      applyMeasureLeafValuesToTree({
+        tree: treeWithCustomMetric,
+        measureHierarchy,
+      }),
+      measureHierarchy,
+      MetricsLayoutEnum.COLUMNS,
+      [],
+      ['c1'],
+      1,
+    );
+
+    render(
+      <PivotTableChart
+        data={treeWithLeaves}
+        formData={buildFormData({
+          ...baseFormData,
+          groupbyRows: [],
+          groupbyColumns: ['c1'],
+          metrics: [metricKey, secondaryMetric],
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+          measureLeavesByMetric: {
+            [metricKey]: [valueLeaf, customLeaf],
+            [secondaryMetric]: [valueLeaf],
+          },
+          startCollapsed: false,
+          datasource: baseFormData.datasource ?? '1__table',
+          viz_type: baseFormData.viz_type ?? 'pivot_table_v3',
+          height: 300,
+          width: 400,
+          margin: 0,
+        })}
+        metrics={[metricKey, secondaryMetric]}
+        groupbyRows={[]}
+        groupbyColumns={['c1']}
+        width={400}
+        height={300}
+        columnFormats={{
+          [metricKey]: '.2f',
+          [secondaryMetric]: ',d',
+          [customMetricKey]: '.0%',
+        }}
+        currencyFormats={{}}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+      />,
+    );
+
+    await waitForPivotReady();
+    expect(screen.getByText('25%')).toBeInTheDocument();
+  });
+
+  it('does not inherit parent d3 format for custom measure leaves', async () => {
+    const metricKey = 'grossRevenue';
+    const secondaryMetric = 'countCustomers';
+    const customMetricKey = 'conversionRate';
+    const valueLeaf = buildValueLeaf();
+    const customLeaf = buildCustomLeaf({
+      label: 'Conversion',
+      metric: customMetricKey,
+    });
+    const measureHierarchy = {
+      kind: 'measureStackV1' as const,
+      groups: [
+        {
+          metricKey,
+          leaves: [valueLeaf, customLeaf],
+        },
+        {
+          metricKey: secondaryMetric,
+          leaves: [valueLeaf],
+        },
+      ],
+      leafTierVisibility: 'visible' as const,
+    };
+    const baseTree = buildTreeFromRecords(
+      [{ c1: 'C1', grossRevenue: 100, countCustomers: 10 }],
+      [metricKey, secondaryMetric],
+      [],
+      ['c1'],
+      0,
+      1,
+    );
+    const treeWithCustomMetric: PivotTreeData = {
+      ...baseTree,
+      cells: Object.fromEntries(
+        Object.entries(baseTree.cells).map(([cellKey, cell]) => [
+          cellKey,
+          {
+            ...cell,
+            values: {
+              ...cell.values,
+              [customMetricKey]: 0.25,
+            },
+          },
+        ]),
+      ),
+    };
+    const treeWithLeaves = applyMeasureHierarchyAxis(
+      applyMeasureLeafValuesToTree({
+        tree: treeWithCustomMetric,
+        measureHierarchy,
+      }),
+      measureHierarchy,
+      MetricsLayoutEnum.COLUMNS,
+      [],
+      ['c1'],
+      1,
+    );
+
+    render(
+      <PivotTableChart
+        data={treeWithLeaves}
+        formData={buildFormData({
+          ...baseFormData,
+          groupbyRows: [],
+          groupbyColumns: ['c1'],
+          metrics: [metricKey, secondaryMetric],
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+          measureLeavesByMetric: {
+            [metricKey]: [valueLeaf, customLeaf],
+            [secondaryMetric]: [valueLeaf],
+          },
+          startCollapsed: false,
+          datasource: baseFormData.datasource ?? '1__table',
+          viz_type: baseFormData.viz_type ?? 'pivot_table_v3',
+          height: 300,
+          width: 400,
+          margin: 0,
+        })}
+        metrics={[metricKey, secondaryMetric]}
+        groupbyRows={[]}
+        groupbyColumns={['c1']}
+        width={400}
+        height={300}
+        columnFormats={{
+          [metricKey]: '.0%',
+          [secondaryMetric]: ',d',
+        }}
+        currencyFormats={{}}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        rowTotals={false}
+        colTotals={false}
+        rowSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+      />,
+    );
+
+    await waitForPivotReady();
+    expect(screen.getByText('0.25')).toBeInTheDocument();
+    expect(screen.queryByText('25%')).not.toBeInTheDocument();
   });
 
   it('expands to the next column dimension on first toggle when metrics are last on columns', async () => {

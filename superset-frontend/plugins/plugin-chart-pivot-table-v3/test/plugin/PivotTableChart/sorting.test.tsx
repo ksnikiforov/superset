@@ -25,6 +25,11 @@ import {
   applyMeasureHierarchyAxis,
   buildTreeFromRecords,
 } from '../../../src/utils';
+import {
+  applyMeasureLeafValuesToTree,
+  buildBuiltInLeaf,
+  buildValueLeaf,
+} from '../../../src/pivot/measureLeaves';
 
 describe('PivotTableChart sorting', () => {
   const withMetricsOnColumns = (
@@ -411,5 +416,103 @@ describe('PivotTableChart sorting', () => {
 
     fireEvent.click(metricHeaderCell as HTMLTableCellElement);
     expect(getBodyRowLabels(container)).toEqual(['A', 'B', 'C', 'D']);
+  });
+
+  it('sorts by the clicked measure leaf metric when measure hierarchy is enabled', () => {
+    const metrics = ['m1', 'm2'];
+    const groupbyRows = ['country'];
+    const groupbyColumns = ['year'];
+    const valueLeaf = buildValueLeaf();
+    const ixLeaf = buildBuiltInLeaf('ix', {
+      n: 1,
+      unit: 'year',
+      direction: 'past',
+    });
+    const measureHierarchy = {
+      kind: 'measureStackV1' as const,
+      groups: [
+        { metricKey: 'm1', leaves: [valueLeaf, ixLeaf] },
+        { metricKey: 'm2', leaves: [valueLeaf] },
+      ],
+      leafTierVisibility: 'visible' as const,
+    };
+    const tree = applyMeasureHierarchyAxis(
+      applyMeasureLeafValuesToTree({
+        tree: buildTreeFromRecords(
+          [
+            {
+              country: 'Zeta',
+              year: '2024',
+              m1: 100,
+              'm1__1 year ago': 50,
+              m2: 10,
+            },
+            {
+              country: 'Alpha',
+              year: '2024',
+              m1: 50,
+              'm1__1 year ago': 5,
+              m2: 20,
+            },
+          ],
+          metrics,
+          groupbyRows,
+          groupbyColumns,
+          1,
+          1,
+        ),
+        measureHierarchy,
+      }),
+      measureHierarchy,
+      MetricsLayoutEnum.COLUMNS,
+      groupbyRows,
+      groupbyColumns,
+      1,
+    );
+
+    const { container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={buildFormData({
+          groupbyRows,
+          groupbyColumns,
+          metrics,
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+          measureLeavesByMetric: {
+            m1: [valueLeaf, ixLeaf],
+            m2: [valueLeaf],
+          },
+        })}
+        metrics={metrics}
+        groupbyRows={groupbyRows}
+        groupbyColumns={groupbyColumns}
+        startCollapsed={false}
+        colTotals={false}
+        rowTotals={false}
+        rowSubTotals={false}
+        rowSubtotalLevels={[]}
+        colSubtotalLevels={[]}
+        rowOrder="key_a_to_z"
+        colOrder="key_a_to_z"
+        width={400}
+        height={300}
+        margin={0}
+        valueFormat=""
+        columnFormats={{}}
+        currencyFormats={{}}
+        allowRenderHtml={false}
+        emitCrossFilters={false}
+        setDataMask={jest.fn()}
+        metricColorFormatters={[]}
+        dateFormatters={{}}
+        verboseMap={{}}
+      />,
+    );
+
+    expect(getBodyRowLabels(container)).toEqual(['Alpha', 'Zeta']);
+    const ixHeaderCell = getHeaderCell('IX 1YA');
+    expect(ixHeaderCell).not.toBeNull();
+    fireEvent.click(ixHeaderCell as HTMLTableCellElement);
+    expect(getBodyRowLabels(container)).toEqual(['Zeta', 'Alpha']);
   });
 });

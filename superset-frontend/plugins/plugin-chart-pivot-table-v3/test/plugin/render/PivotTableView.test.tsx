@@ -89,6 +89,12 @@ const renderView = (showGlobalLoader: boolean) =>
   );
 
 describe('PivotTableView', () => {
+  it('marks exportable table with pivot-v3 selector class', () => {
+    const { container } = renderView(false);
+    const table = container.querySelector('table');
+    expect(table).toHaveClass('pivot-v3-table');
+  });
+
   it('renders the rows header when not loading', () => {
     renderView(false);
     expect(screen.getByText('Rows')).toBeInTheDocument();
