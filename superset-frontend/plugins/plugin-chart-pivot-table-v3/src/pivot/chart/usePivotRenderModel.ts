@@ -49,6 +49,7 @@ import {
   buildRenderModel,
   type RenderModelConfig,
 } from '../render/renderModel';
+import { resolveMeasureSortMetricKey } from '../measureLeaves';
 import { buildDesiredExpandedKeys } from '../expansion/engine';
 import { compareValues, rootKey, sortByOrder } from '../viewModel';
 import { type RenderModel } from '../shared/types';
@@ -66,6 +67,7 @@ type DimensionSortingKeys = {
 
 type UiColumnSortState = {
   colKey: string;
+  displayColKey?: string;
   metricKey: string;
   order: PivotSortOrder;
 };
@@ -88,14 +90,20 @@ export type PivotRenderModelResult = {
   expandedColsForRender: Set<string>;
 };
 
-const buildDimensionSortingKeyMap = (sorting: PivotDimensionSortingMap) => {
+const buildDimensionSortingKeyMap = (
+  sorting: PivotDimensionSortingMap,
+  layout: PivotLayoutResult,
+) => {
   const next: Record<string, DimensionSortingKeys> = {};
   Object.entries(sorting).forEach(([dimensionKey, dimensionSorting]) => {
     if (!dimensionKey) {
       return;
     }
     const metricKey = dimensionSorting.metric
-      ? getFormattingMetricKey(dimensionSorting.metric)
+      ? resolveMeasureSortMetricKey({
+          metricKey: getFormattingMetricKey(dimensionSorting.metric),
+          measureHierarchy: layout.measureHierarchy,
+        })
       : '';
     next[dimensionKey] = {
       metricKey: metricKey || undefined,
@@ -163,12 +171,12 @@ export const usePivotRenderModel = ({
     [formData.colSorting, resolvedGroupbyColumns],
   );
   const rowSortingKeyMap = useMemo(
-    () => buildDimensionSortingKeyMap(rowSorting),
-    [rowSorting],
+    () => buildDimensionSortingKeyMap(rowSorting, layout),
+    [layout, rowSorting],
   );
   const colSortingKeyMap = useMemo(
-    () => buildDimensionSortingKeyMap(colSorting),
-    [colSorting],
+    () => buildDimensionSortingKeyMap(colSorting, layout),
+    [colSorting, layout],
   );
   const hasRowSorting = useMemo(
     () => Object.keys(rowSortingKeyMap).length > 0,

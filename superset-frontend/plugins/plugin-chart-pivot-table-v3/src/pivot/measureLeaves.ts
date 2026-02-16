@@ -22,6 +22,7 @@ import {
   MeasureLeafOperator,
   MeasureLeafSpec,
   MeasureLeavesByMetricKey,
+  MeasureHierarchy,
   type PivotTreeData,
 } from '../types';
 import { getMetricKey } from '../utils';
@@ -147,6 +148,26 @@ export const buildMeasureLeafOutputKey = (
     return metricKey;
   }
   return `${MEASURE_CALC_PREFIX}${leaf.id}__${metricKey}`;
+};
+
+export const resolveMeasureSortMetricKey = ({
+  metricKey,
+  measureHierarchy,
+}: {
+  metricKey: string;
+  measureHierarchy?: MeasureHierarchy;
+}): string => {
+  if (measureHierarchy?.kind !== 'measureStackV1') {
+    return metricKey;
+  }
+  const group = measureHierarchy.groups.find(
+    candidate => candidate.metricKey === metricKey,
+  );
+  if (!group || group.leaves.length === 0) {
+    return metricKey;
+  }
+  const preferredLeaf = group.leaves.find(isValueLeaf) ?? group.leaves[0];
+  return buildMeasureLeafOutputKey(metricKey, preferredLeaf);
 };
 
 export const buildOffsetMetricKey = (

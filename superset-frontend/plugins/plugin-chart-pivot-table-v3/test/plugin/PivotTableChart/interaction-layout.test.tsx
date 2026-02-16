@@ -68,6 +68,7 @@ describe('PivotTableChart interaction layout', () => {
       1,
     );
     const setControlValue = jest.fn();
+    const setDataMask = jest.fn();
     render(
       <PivotTableChart
         data={tree}
@@ -77,6 +78,7 @@ describe('PivotTableChart interaction layout', () => {
         groupbyRows={[]}
         groupbyColumns={[]}
         setControlValue={setControlValue}
+        setDataMask={setDataMask}
       />,
     );
 
@@ -98,6 +100,76 @@ describe('PivotTableChart interaction layout', () => {
       'm2',
       'm1',
     ]);
+    expect(setDataMask).toHaveBeenCalled();
+    const setDataMaskCalls = setDataMask.mock.calls.map(call => call[0]);
+    const ownStatePayload = setDataMaskCalls.find(
+      payload => payload?.ownState?.pivotRuntimeLayout,
+    );
+    expect(ownStatePayload).toBeDefined();
+    expect(ownStatePayload.ownState.pivotRuntimeLayout.metrics).toEqual([
+      'm2',
+      'm1',
+    ]);
+  });
+
+  it('persists runtime layout via ownState only in dashboard mode', async () => {
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: ['row1'],
+      cols: [],
+      metrics: ['m1', 'm2'],
+      leafSelection: {},
+      valuePlacement: { axis: 'row', index: 1 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: ['row1'],
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics: ['m1', 'm2'],
+      metricsLayout: MetricsLayoutEnum.ROWS,
+      pivotRuntimeLayout: runtimeLayout,
+      dashboardId: 1,
+    });
+    const baseTree = buildTreeFromRecords(
+      [{ row1: 'A', m1: 10, m2: 20 }],
+      ['m1', 'm2'],
+      ['row1'],
+      [],
+      1,
+      0,
+    );
+    const tree = applyMetricAxis(
+      baseTree,
+      ['m1', 'm2'],
+      MetricsLayoutEnum.ROWS,
+      ['row1'],
+      [],
+      1,
+    );
+    const setControlValue = jest.fn();
+    const setDataMask = jest.fn();
+    render(
+      <PivotTableChart
+        data={tree}
+        formData={formData}
+        rawFormData={formData}
+        metrics={['m1', 'm2']}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+        setControlValue={setControlValue}
+        setDataMask={setDataMask}
+      />,
+    );
+
+    fireEvent.click(screen.getByText('Select measures'));
+    fireEvent.click(screen.getByLabelText('Toggle measure m1'));
+    fireEvent.click(screen.getByLabelText('Toggle measure m1'));
+    fireEvent.click(screen.getByText('Select measures'));
+
+    await waitFor(() => expect(setControlValue).toHaveBeenCalledTimes(0));
+    expect(setControlValue).not.toHaveBeenCalled();
+    expect(setDataMask).not.toHaveBeenCalled();
   });
 
   it('keeps the applied header order until query form data updates', () => {
@@ -577,6 +649,69 @@ describe('PivotTableChart interaction layout', () => {
       .map(cell => cell.textContent?.trim() ?? '')
       .filter(label => label.length > 0 && label !== 'Rows');
     expect(metricLabels).toEqual(['m1', 'm2', 'm1', 'm2']);
+  });
+
+  it('prefers ownState runtime layout over formData runtime layout in user-controlled mode', () => {
+    const metricKey = 'm1';
+    const dimensionKey = 'row1';
+    const metrics = [metricKey];
+    const tree = applyMetricAxis(
+      buildTreeFromRecords(
+        [{ row1: 'A', m1: 10 }],
+        metrics,
+        [dimensionKey],
+        [],
+        1,
+        0,
+      ),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      [dimensionKey],
+      [],
+      0,
+    );
+    const ownRuntimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: [dimensionKey],
+      cols: [],
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const formRuntimeLayout: PivotRuntimeLayout = {
+      ...ownRuntimeLayout,
+      rows: [],
+      cols: [dimensionKey],
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: [dimensionKey],
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: formRuntimeLayout,
+      startCollapsed: false,
+      initialDepth: 1,
+    });
+
+    const { container } = render(
+      <PivotTableChart
+        data={tree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+        ownState={{ pivotRuntimeLayout: ownRuntimeLayout }}
+      />,
+    );
+
+    const rowLabel = container.querySelector(
+      'tbody [data-pivot-row-label="true"]',
+    );
+    expect(rowLabel?.textContent).toBe('A');
   });
 
   it('does not duplicate metric headers when leaf tier is visible with row totals', () => {

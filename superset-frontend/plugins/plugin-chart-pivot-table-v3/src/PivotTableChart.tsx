@@ -96,6 +96,7 @@ import {
 import {
   applyMeasureLeafValuesToTree,
   buildMeasureLeafOutputKey,
+  resolveMeasureSortMetricKey,
 } from './pivot/measureLeaves';
 import { buildBranchTreeFromResults } from './fetchPivotBranch';
 import { stableStringify } from './pivot/shared/stableStringify';
@@ -602,6 +603,7 @@ type DragItem = DimensionDragItem | ValueDragItem;
 type PivotViewProps = ComponentProps<typeof PivotTableView>;
 type UiColumnSortState = {
   colKey: string;
+  displayColKey?: string;
   metricKey: string;
   order: 'asc' | 'desc';
 };
@@ -844,10 +846,15 @@ function PivotTableChart(props: PivotTableProps) {
     pivotThemeColors = '',
     stickyHeaders = true,
     theme = supersetTheme,
+    appSection,
   } = props;
 
   const { interactionMode } = formData;
   const isUserControlled = interactionMode === 'user_controlled';
+  const isDashboardContext =
+    appSection === 'dashboard' || formData.dashboardId !== undefined;
+  const shouldPersistExternalState = !(isUserControlled && isDashboardContext);
+  const shouldPersistControlValue = shouldPersistExternalState;
   const fetchFormDataBase = queryFormData || formData;
 
   const [extraVerboseMap, setExtraVerboseMap] = useState<
@@ -1114,8 +1121,8 @@ function PivotTableChart(props: PivotTableProps) {
   );
   const runtimeLayout = useMemo(() => {
     const persisted =
-      formData.pivotRuntimeLayout ??
-      (ownState?.pivotRuntimeLayout as PivotRuntimeLayout | undefined);
+      (ownState?.pivotRuntimeLayout as PivotRuntimeLayout | undefined) ??
+      formData.pivotRuntimeLayout;
     return normalizeRuntimeLayout(persisted, dimensionKeys, metricKeys);
   }, [dimensionKeys, formData.pivotRuntimeLayout, metricKeys, ownState]);
   const [committedRuntimeLayout, setCommittedRuntimeLayout] =
@@ -1358,14 +1365,21 @@ function PivotTableChart(props: PivotTableProps) {
         pivotRuntimeLayout: layout,
         pivotSelectedFilters: filters,
       });
-      if (setControlValue) {
+      if (shouldPersistControlValue && setControlValue) {
         setControlValue('pivotRuntimeLayout', layout);
         setControlValue('pivotSelectedFilters', filters);
-        return;
       }
-      setDataMask({ ownState: { ...nextOwnState } });
+      if (shouldPersistExternalState) {
+        setDataMask({ ownState: { ...nextOwnState } });
+      }
     },
-    [mergeOwnState, setControlValue, setDataMask],
+    [
+      mergeOwnState,
+      setControlValue,
+      setDataMask,
+      shouldPersistControlValue,
+      shouldPersistExternalState,
+    ],
   );
 
   const applySeamlessUpdate = useCallback(
@@ -1616,9 +1630,15 @@ function PivotTableChart(props: PivotTableProps) {
     colSubtotalPosition,
   });
   const shouldPersistExpansionState = persistExpansionState;
-  const expansionSetControlValue = setControlValue;
-  const expansionSetDataMask = isUserControlled ? undefined : setDataMask;
-  const expansionMergeOwnState = isUserControlled ? undefined : mergeOwnState;
+  const expansionSetControlValue = shouldPersistExternalState
+    ? setControlValue
+    : undefined;
+  const expansionSetDataMask = shouldPersistExternalState
+    ? setDataMask
+    : undefined;
+  const expansionMergeOwnState = shouldPersistExternalState
+    ? mergeOwnState
+    : undefined;
 
   const {
     tree,
@@ -1739,18 +1759,82 @@ function PivotTableChart(props: PivotTableProps) {
         .map(value => decodeMeasureLeafId(value))
         .find((value): value is string => Boolean(value));
       if (!leafId) {
-        return metricKey;
+        return resolveMeasureSortMetricKey({
+          metricKey,
+          measureHierarchy: layoutResult.measureHierarchy,
+        });
       }
       const group = layoutResult.measureHierarchy.groups.find(
         candidate => candidate.metricKey === metricKey,
       );
       const leaf = group?.leaves.find(candidate => candidate.id === leafId);
       if (!leaf) {
-        return metricKey;
+        return resolveMeasureSortMetricKey({
+          metricKey,
+          measureHierarchy: layoutResult.measureHierarchy,
+        });
       }
       return buildMeasureLeafOutputKey(metricKey, leaf);
     },
     [layoutResult],
+  );
+
+  const resolveColumnSortDataKey = useCallback(
+    (node: PivotTreeNode, metricKey: string) => {
+      const baseMetricKey = layoutResult.getMetricLabelFromPath(node.path);
+      if (!baseMetricKey) {
+        return node.key;
+      }
+      if (layoutResult.measureHierarchy.kind !== 'measureStackV1') {
+        return node.key;
+      }
+      const sortLeafId = layoutResult.measureHierarchy.groups
+        .find(group => group.metricKey === baseMetricKey)
+        ?.leaves.find(
+          leaf => buildMeasureLeafOutputKey(baseMetricKey, leaf) === metricKey,
+        )?.id;
+      if (!sortLeafId) {
+        return node.key;
+      }
+      const nodeLeafId = [...node.path]
+        .reverse()
+        .map(value => decodeMeasureLeafId(value))
+        .find((value): value is string => Boolean(value));
+      if (nodeLeafId === sortLeafId) {
+        return node.key;
+      }
+      const descendant = Object.values(renderTree.cols)
+        .filter(candidate => {
+          if (candidate.key === node.key) {
+            return false;
+          }
+          if (candidate.path.length <= node.path.length) {
+            return false;
+          }
+          return node.path.every(
+            (value, index) => candidate.path[index] === value,
+          );
+        })
+        .map(candidate => {
+          const candidateLeafId = [...candidate.path]
+            .reverse()
+            .map(value => decodeMeasureLeafId(value))
+            .find((value): value is string => Boolean(value));
+          return { candidate, candidateLeafId };
+        })
+        .filter(
+          (
+            entry,
+          ): entry is { candidate: PivotTreeNode; candidateLeafId: string } =>
+            entry.candidateLeafId === sortLeafId,
+        )
+        .sort(
+          (left, right) =>
+            left.candidate.path.length - right.candidate.path.length,
+        )[0];
+      return descendant?.candidate.key ?? node.key;
+    },
+    [layoutResult, renderTree.cols],
   );
 
   const isColumnSortable = useCallback(
@@ -1760,7 +1844,8 @@ function PivotTableChart(props: PivotTableProps) {
 
   const getColumnSortOrder = useCallback(
     (node: PivotTreeNode) =>
-      activeColumnSort?.colKey === node.key
+      (activeColumnSort?.displayColKey ?? activeColumnSort?.colKey) ===
+      node.key
         ? activeColumnSort.order
         : undefined,
     [activeColumnSort],
@@ -1772,10 +1857,12 @@ function PivotTableChart(props: PivotTableProps) {
       if (!metricKey) {
         return;
       }
+      const dataColKey = resolveColumnSortDataKey(node, metricKey);
       setActiveColumnSort(current => {
+        const currentDisplayKey = current?.displayColKey ?? current?.colKey;
         if (
           current &&
-          current.colKey === node.key &&
+          currentDisplayKey === node.key &&
           current.metricKey === metricKey
         ) {
           if (current.order === 'asc') {
@@ -1783,11 +1870,53 @@ function PivotTableChart(props: PivotTableProps) {
           }
           return null;
         }
-        return { colKey: node.key, metricKey, order: 'asc' };
+        return {
+          colKey: dataColKey,
+          displayColKey: node.key,
+          metricKey,
+          order: 'asc',
+        };
       });
     },
-    [resolveColumnSortMetric],
+    [resolveColumnSortDataKey, resolveColumnSortMetric],
   );
+
+  useEffect(() => {
+    setActiveColumnSort(current => {
+      if (!current) {
+        return current;
+      }
+      const displayNode =
+        (current.displayColKey && renderTree.cols[current.displayColKey]) ||
+        renderTree.cols[current.colKey];
+      if (!displayNode) {
+        return null;
+      }
+      const nextMetricKey = resolveColumnSortMetric(displayNode);
+      if (!nextMetricKey) {
+        return null;
+      }
+      const nextDataColKey = resolveColumnSortDataKey(
+        displayNode,
+        nextMetricKey,
+      );
+      const nextDisplayColKey = displayNode.key;
+      const currentDisplayColKey = current.displayColKey ?? current.colKey;
+      if (
+        current.metricKey === nextMetricKey &&
+        current.colKey === nextDataColKey &&
+        currentDisplayColKey === nextDisplayColKey
+      ) {
+        return current;
+      }
+      return {
+        ...current,
+        metricKey: nextMetricKey,
+        colKey: nextDataColKey,
+        displayColKey: nextDisplayColKey,
+      };
+    });
+  }, [renderTree.cols, resolveColumnSortDataKey, resolveColumnSortMetric]);
 
   const treeDimensionFilterValues = useMemo(() => {
     const valuesMap = new Map<string, Set<DataRecordValue>>();

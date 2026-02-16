@@ -80,6 +80,32 @@ const LayoutHarness = ({
   );
 };
 
+const LeafOrderHarness = ({
+  dimensions,
+  metrics,
+  runtimeLayout = baseLayout,
+  measureLeavesByMetric,
+}: {
+  dimensions: string[];
+  metrics: string[];
+  runtimeLayout?: PivotRuntimeLayout;
+  measureLeavesByMetric?: Record<string, ReturnType<typeof buildValueLeaf>[]>;
+}) => {
+  const [layout, setLayout] = useState<PivotRuntimeLayout>(runtimeLayout);
+  return (
+    <>
+      <PivotInteractionPanel
+        dimensions={dimensions}
+        metrics={metrics}
+        runtimeLayout={layout}
+        measureLeavesByMetric={measureLeavesByMetric}
+        onChange={setLayout}
+      />
+      <div data-test="leaf-order">{(layout.leafOrder ?? []).join(',')}</div>
+    </>
+  );
+};
+
 describe('PivotInteractionPanel', () => {
   it('commits metrics order when the measures popover closes', () => {
     const onChange = jest.fn();
@@ -386,6 +412,48 @@ describe('PivotInteractionPanel', () => {
     );
 
     expect(screen.getByText('IX 1YA')).toBeInTheDocument();
+  });
+
+  it('keeps leaf order in user selection order across value deselect/reselect', () => {
+    const valueLeaf = buildValueLeaf();
+    const ixLeaf = buildBuiltInLeaf('ix', {
+      n: 1,
+      unit: 'year',
+      direction: 'past',
+    });
+    const deltaLeaf = buildBuiltInLeaf('delta', {
+      n: 1,
+      unit: 'year',
+      direction: 'past',
+    });
+    const initialLayout: PivotRuntimeLayout = {
+      ...baseLayout,
+      leafSelection: {
+        [valueLeaf.id]: true,
+        [ixLeaf.id]: false,
+        [deltaLeaf.id]: false,
+      },
+      leafOrder: [valueLeaf.id],
+    };
+    render(
+      <LeafOrderHarness
+        dimensions={['country']}
+        metrics={['sum__sales']}
+        runtimeLayout={initialLayout}
+        measureLeavesByMetric={{
+          sum__sales: [valueLeaf, ixLeaf, deltaLeaf],
+        }}
+      />,
+    );
+
+    fireEvent.click(screen.getByLabelText('Toggle leaf IX 1YA'));
+    fireEvent.click(screen.getByLabelText('Toggle leaf Value'));
+    fireEvent.click(screen.getByLabelText('Toggle leaf Value'));
+    fireEvent.click(screen.getByLabelText('Toggle leaf ∆ 1YA'));
+
+    expect(screen.getByTestId('leaf-order')).toHaveTextContent(
+      [ixLeaf.id, valueLeaf.id, deltaLeaf.id].join(','),
+    );
   });
 
   it('clears all filters from the header control', () => {

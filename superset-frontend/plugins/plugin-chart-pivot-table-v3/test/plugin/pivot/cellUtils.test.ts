@@ -187,4 +187,41 @@ describe('cellUtils helpers', () => {
 
     expect(result).toBe(buildMeasureLeafOutputKey(metricKey, ixLeaf));
   });
+
+  it('derives selected single-leaf output keys when metric and leaf tokens are hidden', () => {
+    const metricKey = 'sales';
+    const ixLeaf = buildBuiltInLeaf('ix', {
+      n: 1,
+      unit: 'year',
+      direction: 'past',
+    });
+    const rowNode = buildNode('row', ['A']);
+    const colNode = buildNode('col', ['2024']);
+    const outputKey = buildMeasureLeafOutputKey(metricKey, ixLeaf);
+    const cells = {
+      [serializeCellKey(rowNode.key, colNode.key)]: {
+        rowKey: rowNode.key,
+        colKey: colNode.key,
+        values: {
+          [metricKey]: 10,
+          [outputKey]: 2,
+        },
+      },
+    };
+
+    const result = deriveMetricKey({
+      rowNode,
+      colNode,
+      metrics: [metricKey],
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      cells,
+      measureHierarchy: {
+        kind: 'measureStackV1',
+        groups: [{ metricKey, leaves: [ixLeaf] }],
+        leafTierVisibility: 'hidden',
+      },
+    });
+
+    expect(result).toBe(outputKey);
+  });
 });

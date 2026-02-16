@@ -49,6 +49,8 @@ export const deriveMetricKey = ({
   cells,
   measureHierarchy,
 }: DeriveMetricKeyParams) => {
+  const cellValues =
+    cells[serializeCellKey(rowNode.key, colNode.key)]?.values || {};
   const metricLabels = metrics
     .map(getMetricKey)
     .filter(label => label.length > 0);
@@ -84,10 +86,24 @@ export const deriveMetricKey = ({
     }
     return decodedCandidate;
   }
+  if (
+    measureHierarchy?.kind === 'measureStackV1' &&
+    metricLabels.length === 1
+  ) {
+    const metricKey = metricLabels[0];
+    const group = measureHierarchy.groups.find(
+      entry => entry.metricKey === metricKey,
+    );
+    const leaf = group?.leaves[0];
+    if (leaf) {
+      const outputKey = buildMeasureLeafOutputKey(metricKey, leaf);
+      if (outputKey in cellValues) {
+        return outputKey;
+      }
+    }
+  }
   // Fallback: first available metric in the cell values.
-  return Object.keys(
-    cells[serializeCellKey(rowNode.key, colNode.key)]?.values || {},
-  )[0];
+  return Object.keys(cellValues)[0];
 };
 
 type ShouldHideRowValuesParams = {

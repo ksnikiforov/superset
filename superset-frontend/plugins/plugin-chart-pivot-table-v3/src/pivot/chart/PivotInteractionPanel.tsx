@@ -610,12 +610,6 @@ export const PivotInteractionPanel = ({
     () => leafOptions.map(option => option.id),
     [leafOptions],
   );
-  const normalizedLeafOrder = useMemo(() => {
-    const provided = resolvedLayout.leafOrder ?? [];
-    const filtered = provided.filter(id => baseLeafOrder.includes(id));
-    const missing = baseLeafOrder.filter(id => !filtered.includes(id));
-    return [...filtered, ...missing];
-  }, [baseLeafOrder, resolvedLayout.leafOrder]);
 
   const [measuresOpen, setMeasuresOpen] = useState(false);
   const [pendingMetrics, setPendingMetrics] = useState<string[]>(
@@ -661,7 +655,14 @@ export const PivotInteractionPanel = ({
       const nextSelection = hasExplicitLeafSelection
         ? { ...resolvedLayout.leafSelection }
         : Object.fromEntries(baseLeafOrder.map(id => [id, true] as const));
-      const nextOrder = [...normalizedLeafOrder];
+      const selectedLeafIds = baseLeafOrder.filter(
+        id => nextSelection[id] === true,
+      );
+      const providedOrder = resolvedLayout.leafOrder ?? [];
+      const nextOrder = [
+        ...providedOrder.filter(id => selectedLeafIds.includes(id)),
+        ...selectedLeafIds.filter(id => !providedOrder.includes(id)),
+      ];
       const current = nextSelection[leafId] === true;
       nextSelection[leafId] = !current;
       if (current) {
@@ -669,7 +670,11 @@ export const PivotInteractionPanel = ({
         if (index >= 0) {
           nextOrder.splice(index, 1);
         }
-      } else if (!nextOrder.includes(leafId)) {
+      } else {
+        const index = nextOrder.indexOf(leafId);
+        if (index >= 0) {
+          nextOrder.splice(index, 1);
+        }
         nextOrder.push(leafId);
       }
       onChange({
@@ -681,7 +686,6 @@ export const PivotInteractionPanel = ({
     [
       baseLeafOrder,
       hasExplicitLeafSelection,
-      normalizedLeafOrder,
       onChange,
       resolvedLayout,
     ],
@@ -789,6 +793,8 @@ export const PivotInteractionPanel = ({
                   key={leaf.id}
                   $active={enabled}
                   onClick={() => toggleLeaf(leaf.id)}
+                  aria-label={`Toggle leaf ${leaf.label}`}
+                  aria-pressed={enabled}
                 >
                   {leaf.label}
                 </LeafChip>
