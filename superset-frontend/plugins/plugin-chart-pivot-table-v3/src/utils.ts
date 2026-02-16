@@ -174,7 +174,12 @@ const getMetricObjectField = (
   if (typeof metric === 'string') {
     return undefined;
   }
-  const value = (metric as Record<string, unknown>)[field];
+  const metricObject = metric as unknown as {
+    metric_name?: unknown;
+    verbose_name?: unknown;
+    label?: unknown;
+  };
+  const value = metricObject[field];
   return normalizeMetricLabelToken(value);
 };
 

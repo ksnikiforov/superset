@@ -628,8 +628,12 @@ export const usePivotFormatting = ({
           leaf.kind === 'custom' ? getMetricKey(leaf.metric) : undefined;
         const formatMetricKey =
           leaf.kind === 'custom' ? customMetricKey : group.metricKey;
-        const leafFormat = columnFormats?.[formatMetricKey];
-        const leafCurrency = currencyFormats?.[formatMetricKey];
+        const leafFormat = formatMetricKey
+          ? columnFormats?.[formatMetricKey]
+          : undefined;
+        const leafCurrency = formatMetricKey
+          ? currencyFormats?.[formatMetricKey]
+          : undefined;
         if (leaf.kind === 'builtIn' && leaf.operator === 'delta_pct') {
           columnOverrides[outputKey] = PERCENT;
           return;

@@ -369,4 +369,39 @@ describe('pivot/core/tree', () => {
       ]?.values.m1,
     ).toBe(10);
   });
+
+  it('surfaces collapsed column values when a single metric has visible leaves', () => {
+    const valueLeaf = buildValueLeaf();
+    const deltaLeaf = buildBuiltInLeaf('delta', {
+      n: 1,
+      unit: 'year',
+      direction: 'past',
+    });
+    const tree = buildTreeFromRecords(
+      [{ c1: 'C1', m1: 10, 'm1__1 year ago': 5 }],
+      ['m1'],
+      [],
+      ['c1'],
+      0,
+      1,
+    );
+    const withMeasures = applyMeasureHierarchyAxis(
+      tree,
+      {
+        kind: 'measureStackV1',
+        groups: [{ metricKey: 'm1', leaves: [valueLeaf, deltaLeaf] }],
+        leafTierVisibility: 'visible',
+      },
+      MetricsLayoutEnum.COLUMNS,
+      [],
+      ['c1'],
+      1,
+    );
+
+    expect(
+      withMeasures.cells[
+        serializeCellKey(serializePath([]), serializePath(['C1']))
+      ]?.values.m1,
+    ).toBe(10);
+  });
 });

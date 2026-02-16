@@ -149,6 +149,7 @@ describe('PivotTableChart temporal expansion outcome', () => {
     postMock.mockReset();
     getMock.mockReset();
     getMock.mockResolvedValue({
+      response: { status: 200 } as Response,
       json: {
         result: {
           verbose_map: {

@@ -198,6 +198,7 @@ export const usePivotLayout = ({
         groupbyColumns: formData.groupbyColumns,
         metrics,
         measureLeavesByMetric: formData.measureLeavesByMetric,
+        verboseMap: formData.verboseMap,
         metricsLayout:
           (formData.metricsLayout as MetricsLayoutEnum) || metricsLayout,
         rowTotals,
@@ -564,11 +565,13 @@ export const usePivotLayout = ({
   const hideMetricHeaderOnRows = useMemo(
     () =>
       resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
+      !isLeafTierVisible &&
       metricLabels.length === 1 &&
       metricIndexOnRows !== undefined &&
       metricIndexOnRows === rowDimCount &&
       rowDimCount > 0,
     [
+      isLeafTierVisible,
       metricIndexOnRows,
       metricLabels.length,
       resolvedMetricsLayout,
@@ -578,12 +581,14 @@ export const usePivotLayout = ({
   const hideMetricHeaderOnCols = useMemo(
     () =>
       resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS &&
+      !isLeafTierVisible &&
       metricLabels.length === 1 &&
       metricIndexOnCols !== undefined &&
       metricIndexOnCols === colDimCount &&
       colDimCount > 0,
     [
       colDimCount,
+      isLeafTierVisible,
       metricIndexOnCols,
       metricLabels.length,
       resolvedMetricsLayout,
@@ -761,8 +766,12 @@ export const usePivotLayout = ({
       expandedSet: Set<string>,
       nodes: Record<string, PivotTreeNode>,
     ) => {
+      const shouldExposeCollapsedMetricTier =
+        isMultiMetric ||
+        singleMetricBetweenRows ||
+        (isLeafTierVisible && metricsAtRowEnd);
       if (
-        (!isMultiMetric && !singleMetricBetweenRows) ||
+        !shouldExposeCollapsedMetricTier ||
         resolvedMetricsLayout !== MetricsLayoutEnum.ROWS ||
         expandedSet.has(parent.key)
       ) {
@@ -830,6 +839,7 @@ export const usePivotLayout = ({
       isExplicitSubtotalNode,
       isMetricSubtotalNode,
       isMetricTokenValue,
+      isLeafTierVisible,
       isMultiMetric,
       singleMetricBetweenRows,
       metricsAtRowEnd,
@@ -843,8 +853,12 @@ export const usePivotLayout = ({
       expandedSet: Set<string>,
       nodes: Record<string, PivotTreeNode>,
     ) => {
+      const shouldExposeCollapsedMetricTier =
+        isMultiMetric ||
+        singleMetricBetweenCols ||
+        (isLeafTierVisible && metricsAtColEnd);
       if (
-        (!isMultiMetric && !singleMetricBetweenCols) ||
+        !shouldExposeCollapsedMetricTier ||
         resolvedMetricsLayout !== MetricsLayoutEnum.COLUMNS ||
         expandedSet.has(parent.key)
       ) {
@@ -914,6 +928,7 @@ export const usePivotLayout = ({
       groupbyColumns.length,
       isMetricSubtotalNode,
       isMetricTokenValue,
+      isLeafTierVisible,
       isMultiMetric,
       singleMetricBetweenCols,
       metricsAtColEnd,

@@ -295,7 +295,19 @@ export const applyMetricAxis = (
   ) => {
     const nodes = axis === 'row' ? result.rows : result.cols;
     const key = serializePath(path);
-    if (nodes[key]) return nodes[key];
+    if (nodes[key]) {
+      const existing = nodes[key];
+      // A base tree node can be terminal before we inject metric/leaf tiers.
+      // Promote it to an internal node when a deeper hierarchy is added.
+      if (path.length < fullDepth && !existing.hasChildren) {
+        nodes[key] = {
+          ...existing,
+          hasChildren: true,
+          isSubtotal: true,
+        };
+      }
+      return nodes[key];
+    }
     const sourceNodes = axis === 'row' ? tree.rows : tree.cols;
     const sourceNode = sourceNodes[key];
     const rawValue = path[path.length - 1];
@@ -815,11 +827,7 @@ export const applyMeasureHierarchyAxis = (
             values: mergedValues,
             isSubtotal: cell.isSubtotal,
           };
-          if (
-            metricKeys.length === 1 &&
-            metricPosition !== 0 &&
-            (!leafTierVisible || leafTargets.length === 1)
-          ) {
+          if (metricKeys.length === 1 && metricPosition !== 0) {
             const cellKey = serializeCellKey(rowKey, colKey);
             result.cells[cellKey] = result.cells[cellKey] || {
               rowKey,
@@ -828,11 +836,7 @@ export const applyMeasureHierarchyAxis = (
               isSubtotal: cell.isSubtotal,
             };
           }
-          if (
-            metricKeys.length === 1 &&
-            metricPosition === 0 &&
-            (!leafTierVisible || leafTargets.length === 1)
-          ) {
+          if (metricKeys.length === 1 && metricPosition === 0) {
             const cellKey = serializeCellKey(rowKey, colKey);
             result.cells[cellKey] = result.cells[cellKey] || {
               rowKey,
@@ -916,11 +920,7 @@ export const applyMeasureHierarchyAxis = (
             values: mergedValues,
             isSubtotal: cell.isSubtotal,
           };
-          if (
-            metricKeys.length === 1 &&
-            metricPosition === 0 &&
-            (!leafTierVisible || leafTargets.length === 1)
-          ) {
+          if (metricKeys.length === 1 && metricPosition === 0) {
             const rootColKey = serializePath(colPrefix);
             const cellKey = serializeCellKey(rowKey, rootColKey);
             result.cells[cellKey] = result.cells[cellKey] || {
@@ -937,8 +937,7 @@ export const applyMeasureHierarchyAxis = (
               metricPosition === 0 ||
               (metricPosition > 0 &&
                 metricPosition < colGroupby.length &&
-                colPath.length <= metricPosition)) &&
-            (!leafTierVisible || leafTargets.length === 1)
+                colPath.length <= metricPosition))
           ) {
             const baseColKey = serializePath(colPath);
             const cellKey = serializeCellKey(rowKey, baseColKey);

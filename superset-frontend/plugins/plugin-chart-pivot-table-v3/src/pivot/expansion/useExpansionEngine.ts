@@ -19,6 +19,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { nanoid } from 'nanoid';
 import {
+  type DataRecordValue,
   type HandlerFunction,
   type JsonObject,
   type SetDataMaskHook,
@@ -302,13 +303,13 @@ const trimTreeForLayout = ({
     return nodes[rootKey] ? rootKey : undefined;
   };
   const mergeCellValues = (
-    left?: Record<string, unknown>,
-    right?: Record<string, unknown>,
+    left?: Record<string, DataRecordValue>,
+    right?: Record<string, DataRecordValue>,
   ) => {
     if (!left && !right) {
       return undefined;
     }
-    const merged: Record<string, unknown> = { ...(left ?? {}) };
+    const merged: Record<string, DataRecordValue> = { ...(left ?? {}) };
     Object.entries(right ?? {}).forEach(([metric, value]) => {
       const current = merged[metric];
       const leftNum = Number(current);

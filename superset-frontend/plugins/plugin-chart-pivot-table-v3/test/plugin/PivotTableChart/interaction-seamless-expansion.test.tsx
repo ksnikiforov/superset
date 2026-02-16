@@ -22,6 +22,7 @@ import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { buildFormData } from '../fixtures/pivotFormData';
 import {
   MetricsLayoutEnum,
+  PivotPath,
   PivotRuntimeLayout,
   PivotTreeData,
 } from '../../../src/types';
@@ -2991,7 +2992,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
         meta?: {
           kind?: string;
           axis?: string;
-          path?: unknown[];
+          path?: PivotPath;
           rowDepth?: number;
           colDepth?: number;
         };
@@ -3499,7 +3500,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       pivotExpansionState: {
         rowKeys: rows,
         colKeys: [],
-        rows: [serializePath(['A'])],
+        rows: [['A']],
         cols: [],
         collapsedRows: [],
         collapsedCols: [],

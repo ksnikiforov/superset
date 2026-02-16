@@ -28,6 +28,7 @@ import {
 import { unstable_batchedUpdates } from 'react-dom';
 import { isEqual } from 'lodash';
 import {
+  AppSection,
   DataRecordValue,
   ensureIsArray,
   getColumnLabel,
@@ -852,7 +853,7 @@ function PivotTableChart(props: PivotTableProps) {
   const { interactionMode } = formData;
   const isUserControlled = interactionMode === 'user_controlled';
   const isDashboardContext =
-    appSection === 'dashboard' || formData.dashboardId !== undefined;
+    appSection === AppSection.Dashboard || formData.dashboardId !== undefined;
   const shouldPersistExternalState = !(isUserControlled && isDashboardContext);
   const shouldPersistControlValue = shouldPersistExternalState;
   const fetchFormDataBase = queryFormData || formData;
@@ -1448,7 +1449,7 @@ function PivotTableChart(props: PivotTableProps) {
             ...snapshot,
             expandedRows: new Set(snapshot.expandedRows),
             expandedCols: new Set(snapshot.expandedCols),
-            warnings: [...snapshot.warnings],
+            warnings: [...(snapshot.warnings ?? [])],
             showGlobalLoader: false,
             showCornerLoader: true,
             showRowSpinner: () => false,
@@ -1843,11 +1844,15 @@ function PivotTableChart(props: PivotTableProps) {
   );
 
   const getColumnSortOrder = useCallback(
-    (node: PivotTreeNode) =>
-      (activeColumnSort?.displayColKey ?? activeColumnSort?.colKey) ===
-      node.key
+    (node: PivotTreeNode) => {
+      if (!activeColumnSort) {
+        return undefined;
+      }
+      return (activeColumnSort.displayColKey ?? activeColumnSort.colKey) ===
+        node.key
         ? activeColumnSort.order
-        : undefined,
+        : undefined;
+    },
     [activeColumnSort],
   );
 

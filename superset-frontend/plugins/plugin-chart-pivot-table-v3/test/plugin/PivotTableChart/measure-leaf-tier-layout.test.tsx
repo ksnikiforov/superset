@@ -587,6 +587,149 @@ describe('PivotTableChart measure leaf tier indentation', () => {
     expect(ixToggle).toBeInTheDocument();
   });
 
+  it('shows leaf headers when a single metric sits at the last column level', () => {
+    const metricKey = 'grossRevenue';
+    const valueLeaf = buildValueLeaf();
+    const ixLeaf = buildBuiltInLeaf('ix', {
+      n: 1,
+      unit: 'year',
+      direction: 'past',
+    });
+    const measureHierarchy = {
+      kind: 'measureStackV1' as const,
+      groups: [{ metricKey, leaves: [valueLeaf, ixLeaf] }],
+      leafTierVisibility: 'visible' as const,
+    };
+    const expandedProps = {
+      ...baseProps,
+      startCollapsed: true,
+      initialDepth: 1,
+    };
+    const tree = applyMeasureHierarchyAxis(
+      applyMeasureLeafValuesToTree({
+        tree: buildTreeFromRecords(
+          [
+            {
+              col1: 'C1',
+              grossRevenue: 10,
+              'grossRevenue__1 year ago': 8,
+            },
+          ],
+          [metricKey],
+          [],
+          ['col1'],
+          0,
+          1,
+        ),
+        measureHierarchy,
+      }),
+      measureHierarchy,
+      MetricsLayoutEnum.COLUMNS,
+      [],
+      ['col1'],
+      1,
+    );
+
+    render(
+      <PivotTableChart
+        data={tree}
+        formData={buildFormData({
+          ...(expandedProps as Partial<PivotTableQueryFormData>),
+          groupbyRows: [],
+          groupbyColumns: ['col1', METRICS_PLACEHOLDER],
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+          metrics: [metricKey],
+          measureLeavesByMetric: {
+            [metricKey]: [valueLeaf, ixLeaf],
+          },
+        })}
+        metrics={[metricKey]}
+        groupbyRows={[]}
+        groupbyColumns={['col1']}
+        {...expandedProps}
+      />,
+    );
+
+    const thead = document.querySelector('thead');
+    if (!thead) {
+      throw new Error('Table header not found');
+    }
+    expect(within(thead).getByText('Value')).toBeInTheDocument();
+    expect(within(thead).getByText('IX 1YA')).toBeInTheDocument();
+  });
+
+  it('shows leaf headers with row dimensions when a single metric is last on columns', () => {
+    const metricKey = 'grossRevenue';
+    const valueLeaf = buildValueLeaf();
+    const ixLeaf = buildBuiltInLeaf('ix', {
+      n: 1,
+      unit: 'year',
+      direction: 'past',
+    });
+    const measureHierarchy = {
+      kind: 'measureStackV1' as const,
+      groups: [{ metricKey, leaves: [valueLeaf, ixLeaf] }],
+      leafTierVisibility: 'visible' as const,
+    };
+    const expandedProps = {
+      ...baseProps,
+      startCollapsed: true,
+      initialDepth: 1,
+    };
+    const tree = applyMeasureHierarchyAxis(
+      applyMeasureLeafValuesToTree({
+        tree: buildTreeFromRecords(
+          [
+            {
+              row1: 'R1',
+              col1: 'C1',
+              grossRevenue: 10,
+              'grossRevenue__1 year ago': 8,
+            },
+          ],
+          [metricKey],
+          ['row1'],
+          ['col1'],
+          1,
+          1,
+        ),
+        measureHierarchy,
+      }),
+      measureHierarchy,
+      MetricsLayoutEnum.COLUMNS,
+      ['row1'],
+      ['col1'],
+      1,
+    );
+
+    render(
+      <PivotTableChart
+        data={tree}
+        formData={buildFormData({
+          ...(expandedProps as Partial<PivotTableQueryFormData>),
+          groupbyRows: ['row1'],
+          groupbyColumns: ['col1', METRICS_PLACEHOLDER],
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+          metrics: [metricKey],
+          measureLeavesByMetric: {
+            [metricKey]: [valueLeaf, ixLeaf],
+          },
+        })}
+        metrics={[metricKey]}
+        groupbyRows={['row1']}
+        groupbyColumns={['col1']}
+        {...expandedProps}
+      />,
+    );
+
+    const thead = document.querySelector('thead');
+    if (!thead) {
+      throw new Error('Table header not found');
+    }
+    expect(within(thead).getByText('Value')).toBeInTheDocument();
+    expect(within(thead).getByText('IX 1YA')).toBeInTheDocument();
+  });
+
   it('shows toggles on leaf rows when metrics sit between row dimensions', () => {
     const metricKey = 'grossRevenue';
     const valueLeaf = buildValueLeaf();
