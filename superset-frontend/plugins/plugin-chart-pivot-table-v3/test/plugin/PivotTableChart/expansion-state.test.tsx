@@ -24,6 +24,7 @@ import {
   MetricsLayoutEnum,
   PivotExpansionState,
   PivotPath,
+  PivotRuntimeLayout,
   PivotTableQueryFormData,
   PivotTreeData,
 } from '../../../src/types';
@@ -528,6 +529,56 @@ describe('PivotTableChart expansion state persistence', () => {
     const lastCall = setDataMask.mock.calls.slice(-1)[0];
     const ownState = lastCall?.[0]?.ownState as Record<string, unknown>;
     const persisted = ownState?.pivotExpansionState as PivotExpansionState;
+    expect(persisted).toMatchObject({
+      rowKeys: rowGroupby,
+      colKeys: [],
+      rows: [['A']],
+      cols: [],
+    });
+  });
+
+  it('persists expansion state via setControlValue in user-controlled dashboard mode', async () => {
+    fetchPivotBranchMock.mockResolvedValueOnce({ data: buildTree(2) });
+    const setDataMask = jest.fn();
+    const setControlValue = jest.fn();
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: rowGroupby,
+      cols: [],
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    render(
+      buildChartProps({
+        data: buildTree(1),
+        setDataMask,
+        setControlValue,
+        persistExpansionState: true,
+        formDataOverrides: {
+          dashboardId: 1,
+          interactionMode: 'user_controlled',
+          dimensions: rowGroupby,
+          groupbyRows: [],
+          groupbyColumns: [],
+          metrics,
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+          pivotRuntimeLayout: runtimeLayout,
+        },
+      }),
+    );
+
+    await waitForLabel('A');
+    const rowLabel = screen.getByText('A');
+    const rowCell = rowLabel.closest('th');
+    expect(rowCell).not.toBeNull();
+    const toggle = rowCell?.querySelector('button');
+    expect(toggle).not.toBeNull();
+    fireEvent.click(toggle as HTMLButtonElement);
+
+    await waitFor(() => expect(setControlValue).toHaveBeenCalled());
+    expect(setDataMask).not.toHaveBeenCalled();
+    const persisted = getLastExpansionState(setControlValue);
     expect(persisted).toMatchObject({
       rowKeys: rowGroupby,
       colKeys: [],

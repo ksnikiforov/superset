@@ -112,7 +112,7 @@ describe('PivotTableChart interaction layout', () => {
     ]);
   });
 
-  it('persists runtime layout via ownState only in dashboard mode', async () => {
+  it('persists runtime layout and panel filters via setControlValue in dashboard mode', async () => {
     const runtimeLayout: PivotRuntimeLayout = {
       version: 1,
       rows: ['row1'],
@@ -147,9 +147,9 @@ describe('PivotTableChart interaction layout', () => {
       [],
       1,
     );
-    const setControlValue = jest.fn();
     const setDataMask = jest.fn();
-    render(
+    const setControlValue = jest.fn();
+    const { rerender } = render(
       <PivotTableChart
         data={tree}
         formData={formData}
@@ -157,6 +157,7 @@ describe('PivotTableChart interaction layout', () => {
         metrics={['m1', 'm2']}
         groupbyRows={[]}
         groupbyColumns={[]}
+        selectedFilters={{ row1: ['A'] }}
         setControlValue={setControlValue}
         setDataMask={setDataMask}
       />,
@@ -167,9 +168,48 @@ describe('PivotTableChart interaction layout', () => {
     fireEvent.click(screen.getByLabelText('Toggle measure m1'));
     fireEvent.click(screen.getByText('Select measures'));
 
-    await waitFor(() => expect(setControlValue).toHaveBeenCalledTimes(0));
-    expect(setControlValue).not.toHaveBeenCalled();
+    await waitFor(() => expect(setControlValue).toHaveBeenCalled());
+    const runtimeLayoutCalls = setControlValue.mock.calls.filter(
+      call => call[0] === 'pivotRuntimeLayout',
+    );
+    const selectedFiltersCalls = setControlValue.mock.calls.filter(
+      call => call[0] === 'pivotSelectedFilters',
+    );
+    const persistedRuntimeLayout = runtimeLayoutCalls.slice(-1)[0]?.[1] as
+      | PivotRuntimeLayout
+      | undefined;
+    const persistedSelectedFilters = selectedFiltersCalls.slice(-1)[0]?.[1] as
+      | Record<string, string[]>
+      | undefined;
+    expect(persistedRuntimeLayout).toBeDefined();
+    expect(persistedRuntimeLayout?.metrics).toEqual(['m2', 'm1']);
+    expect(persistedSelectedFilters).toEqual({
+      row1: ['A'],
+    });
     expect(setDataMask).not.toHaveBeenCalled();
+
+    const refreshedFormData = {
+      ...formData,
+      pivotRuntimeLayout: persistedRuntimeLayout,
+      pivotSelectedFilters: persistedSelectedFilters,
+    };
+
+    rerender(
+      <PivotTableChart
+        data={tree}
+        formData={refreshedFormData}
+        rawFormData={refreshedFormData}
+        queryFormData={{ ...refreshedFormData, time_range: 'Last week' }}
+        metrics={['m1', 'm2']}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+        selectedFilters={{}}
+        setControlValue={setControlValue}
+        setDataMask={setDataMask}
+      />,
+    );
+
+    expect(screen.getByLabelText('Clear filters')).toBeEnabled();
   });
 
   it('keeps the applied header order until query form data updates', () => {

@@ -854,8 +854,8 @@ function PivotTableChart(props: PivotTableProps) {
   const isUserControlled = interactionMode === 'user_controlled';
   const isDashboardContext =
     appSection === AppSection.Dashboard || formData.dashboardId !== undefined;
-  const shouldPersistExternalState = !(isUserControlled && isDashboardContext);
-  const shouldPersistControlValue = shouldPersistExternalState;
+  const shouldPersistControlValue = true;
+  const shouldPersistOwnState = !(isUserControlled && isDashboardContext);
   const fetchFormDataBase = queryFormData || formData;
 
   const [extraVerboseMap, setExtraVerboseMap] = useState<
@@ -1370,7 +1370,7 @@ function PivotTableChart(props: PivotTableProps) {
         setControlValue('pivotRuntimeLayout', layout);
         setControlValue('pivotSelectedFilters', filters);
       }
-      if (shouldPersistExternalState) {
+      if (shouldPersistOwnState) {
         setDataMask({ ownState: { ...nextOwnState } });
       }
     },
@@ -1379,7 +1379,7 @@ function PivotTableChart(props: PivotTableProps) {
       setControlValue,
       setDataMask,
       shouldPersistControlValue,
-      shouldPersistExternalState,
+      shouldPersistOwnState,
     ],
   );
 
@@ -1631,13 +1631,11 @@ function PivotTableChart(props: PivotTableProps) {
     colSubtotalPosition,
   });
   const shouldPersistExpansionState = persistExpansionState;
-  const expansionSetControlValue = shouldPersistExternalState
+  const expansionSetControlValue = shouldPersistControlValue
     ? setControlValue
     : undefined;
-  const expansionSetDataMask = shouldPersistExternalState
-    ? setDataMask
-    : undefined;
-  const expansionMergeOwnState = shouldPersistExternalState
+  const expansionSetDataMask = shouldPersistOwnState ? setDataMask : undefined;
+  const expansionMergeOwnState = shouldPersistOwnState
     ? mergeOwnState
     : undefined;
 
