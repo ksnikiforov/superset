@@ -92,6 +92,22 @@ export type ResolvedFetchContext = ResolvedQueryFetchContext & {
   layout: LayoutContext;
 };
 
+const buildMeasureLeafSelectionSignature = (
+  measureHierarchy: LayoutContext['measureHierarchy'],
+): string => {
+  if (measureHierarchy.kind !== 'measureStackV1') {
+    return '';
+  }
+  return measureHierarchy.groups
+    .map(group => ({
+      metricKey: group.metricKey,
+      leafIds: group.leaves.map(leaf => leaf.id).sort(),
+    }))
+    .sort((left, right) => left.metricKey.localeCompare(right.metricKey))
+    .map(group => `${group.metricKey}:${group.leafIds.join(',')}`)
+    .join('|');
+};
+
 const resolveFetchContext = ({
   formData,
   axis,
@@ -143,6 +159,9 @@ const resolveFetchContext = ({
       metricsLayoutResolved: queryCtx.metricsLayoutResolved,
       metricInsertIndex: queryCtx.metricInsertIndex,
       timeOffsets: layout.requiredTimeOffsets,
+      measureLeafSelection: buildMeasureLeafSelectionSignature(
+        layout.measureHierarchy,
+      ),
     },
   });
   return { ...queryCtx, cacheKey, layout };

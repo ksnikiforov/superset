@@ -29,6 +29,10 @@ import {
   resolveFetchContextForTest,
 } from '../../src/fetchPivotBranch';
 import {
+  buildBuiltInLeaf,
+  buildValueLeaf,
+} from '../../src/pivot/measureLeaves';
+import {
   encodeMetricKey,
   applyMetricAxis,
   buildTreeFromRecords,
@@ -217,6 +221,78 @@ describe('resolveFetchContext', () => {
     });
 
     expect(ctx.rowDepth).toBe(1);
+  });
+
+  it('changes branch cache key when measure leaf selection changes', () => {
+    const deltaLeaf = buildBuiltInLeaf('delta', {
+      n: 1,
+      unit: 'year',
+      direction: 'past',
+    });
+    const valueLeaf = buildValueLeaf();
+    const currentTree: PivotTreeData = {
+      rows: {
+        '': makeNode({ axis: 'row', path: [], hasChildren: true }),
+        A: makeNode({
+          axis: 'row',
+          path: ['A'],
+          level: 1,
+          hasChildren: true,
+          label: 'A',
+          formattedLabel: 'A',
+        }),
+      },
+      cols: {
+        '': makeNode({ axis: 'col', path: [], hasChildren: true }),
+        [serializePath([encodeMetricKey('m1')])]: makeNode({
+          axis: 'col',
+          path: [encodeMetricKey('m1')],
+          level: 1,
+          hasChildren: true,
+          label: 'm1',
+          formattedLabel: 'm1',
+        }),
+      },
+      cells: {},
+    };
+
+    const deltaOnly = buildFormData({
+      groupbyRows: ['r1', 'r2'],
+      groupbyColumns: [METRICS_PLACEHOLDER, 'c1'],
+      metrics: ['m1'],
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      rowSubTotals: false,
+      measureLeavesByMetric: {
+        m1: [deltaLeaf],
+      },
+    });
+
+    const valueAndDelta = {
+      ...deltaOnly,
+      measureLeavesByMetric: {
+        m1: [deltaLeaf, valueLeaf],
+      },
+    };
+
+    const deltaOnlyContext = resolveFetchContextForTest({
+      formData: deltaOnly,
+      axis: 'row',
+      path: ['A'],
+      currentTree,
+    });
+    const valueAndDeltaContext = resolveFetchContextForTest({
+      formData: valueAndDelta,
+      axis: 'row',
+      path: ['A'],
+      currentTree,
+    });
+
+    expect(deltaOnlyContext.layout.requiredTimeOffsets).toEqual(
+      valueAndDeltaContext.layout.requiredTimeOffsets,
+    );
+    expect(deltaOnlyContext.cacheKey).not.toEqual(
+      valueAndDeltaContext.cacheKey,
+    );
   });
 
   it('fetches metric-front column expansion with root metrics populated', async () => {
