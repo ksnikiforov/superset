@@ -29,6 +29,8 @@ import { MetricsLayoutEnum, PivotRuntimeLayout } from '../../../src/types';
 import {
   applyMeasureLeafValuesToTree,
   buildBuiltInLeaf,
+  buildCustomLeaf,
+  buildMeasureLeafOutputKey,
   buildValueLeaf,
 } from '../../../src/pivot/measureLeaves';
 
@@ -1373,5 +1375,241 @@ describe('PivotTableChart interaction layout', () => {
     const hasRawLeafToken = labels.some(label => label.includes('__mleaf__'));
     expect(hasRawLeafToken).toBe(false);
     expect(labels).toEqual(expect.arrayContaining(['Value', 'IX 1YA']));
+  });
+
+  it('re-applies derived measure leaf values when upstream data refreshes in user-controlled mode', async () => {
+    const metricKey = 'm1';
+    const rowGroupby = ['row1'];
+    const valueLeaf = buildValueLeaf();
+    const deltaLeaf = buildBuiltInLeaf('delta', {
+      n: 1,
+      unit: 'year',
+      direction: 'past',
+    });
+    const measureHierarchy = {
+      kind: 'measureStackV1' as const,
+      groups: [{ metricKey, leaves: [valueLeaf, deltaLeaf] }],
+      leafTierVisibility: 'visible' as const,
+    };
+    const deltaMetricKey = buildMeasureLeafOutputKey(metricKey, deltaLeaf);
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: rowGroupby,
+      cols: [],
+      metrics: [metricKey],
+      leafSelection: {
+        [valueLeaf.id]: true,
+        [deltaLeaf.id]: true,
+      },
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: rowGroupby,
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics: [metricKey],
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      measureLeavesByMetric: {
+        [metricKey]: [valueLeaf, deltaLeaf],
+      },
+      metricDatabars: {
+        [deltaMetricKey]: { type: 'bar' },
+      },
+      pivotRuntimeLayout: runtimeLayout,
+      startCollapsed: false,
+    });
+
+    const baseTree = buildTreeFromRecords(
+      [{ row1: 'A', m1: 150, 'm1__1 year ago': 117 }],
+      [metricKey],
+      rowGroupby,
+      [],
+      1,
+      0,
+    );
+    const treeWithLeafValues = applyMeasureHierarchyAxis(
+      applyMeasureLeafValuesToTree({ tree: baseTree, measureHierarchy }),
+      measureHierarchy,
+      MetricsLayoutEnum.COLUMNS,
+      rowGroupby,
+      [],
+      0,
+    );
+
+    const refreshedBaseTree = buildTreeFromRecords(
+      [{ row1: 'A', m1: 180, 'm1__1 year ago': 140 }],
+      [metricKey],
+      rowGroupby,
+      [],
+      1,
+      0,
+    );
+    const refreshedTreeWithoutLeafValues = applyMeasureHierarchyAxis(
+      refreshedBaseTree,
+      measureHierarchy,
+      MetricsLayoutEnum.COLUMNS,
+      rowGroupby,
+      [],
+      0,
+    );
+
+    const { container, rerender } = render(
+      <PivotTableChart
+        data={treeWithLeafValues}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={[metricKey]}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+      />,
+    );
+
+    const rowMetricValues = () =>
+      Array.from(container.querySelectorAll('tbody td.value-cell')).map(
+        cell => {
+          const text = (cell.textContent ?? '').replace(/,/g, '').trim();
+          if (text.length === 0) {
+            return null;
+          }
+          const value = Number(text);
+          return Number.isFinite(value) ? value : null;
+        },
+      );
+
+    expect(rowMetricValues()).toEqual(expect.arrayContaining([150, 33]));
+
+    rerender(
+      <PivotTableChart
+        data={refreshedTreeWithoutLeafValues}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={[metricKey]}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(rowMetricValues()).toEqual(expect.arrayContaining([180, 40])),
+    );
+  });
+
+  it('keeps committed data when upstream refresh omits required custom leaf source metrics', async () => {
+    const metricKey = 'm1';
+    const customMetricKey = 'm1_custom';
+    const rowGroupby = ['row1'];
+    const valueLeaf = buildValueLeaf();
+    const customLeaf = buildCustomLeaf({
+      label: 'Custom delta',
+      metric: customMetricKey,
+    });
+    const measureHierarchy = {
+      kind: 'measureStackV1' as const,
+      groups: [{ metricKey, leaves: [valueLeaf, customLeaf] }],
+      leafTierVisibility: 'visible' as const,
+    };
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: rowGroupby,
+      cols: [],
+      metrics: [metricKey],
+      leafSelection: {
+        [valueLeaf.id]: true,
+        [customLeaf.id]: true,
+      },
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: rowGroupby,
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics: [metricKey],
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      measureLeavesByMetric: {
+        [metricKey]: [valueLeaf, customLeaf],
+      },
+      pivotRuntimeLayout: runtimeLayout,
+      startCollapsed: false,
+    });
+
+    const treeWithLeafSources = applyMeasureHierarchyAxis(
+      applyMeasureLeafValuesToTree({
+        tree: buildTreeFromRecords(
+          [{ row1: 'A', m1: 150, [customMetricKey]: 33 }],
+          [metricKey, customMetricKey],
+          rowGroupby,
+          [],
+          1,
+          0,
+        ),
+        measureHierarchy,
+      }),
+      measureHierarchy,
+      MetricsLayoutEnum.COLUMNS,
+      rowGroupby,
+      [],
+      0,
+    );
+    const staleTreeWithoutLeafSources = applyMeasureHierarchyAxis(
+      buildTreeFromRecords(
+        [{ row1: 'A', m1: 180 }],
+        [metricKey, customMetricKey],
+        rowGroupby,
+        [],
+        1,
+        0,
+      ),
+      measureHierarchy,
+      MetricsLayoutEnum.COLUMNS,
+      rowGroupby,
+      [],
+      0,
+    );
+
+    const { container, rerender } = render(
+      <PivotTableChart
+        data={treeWithLeafSources}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={[metricKey]}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+      />,
+    );
+
+    const rowMetricValues = () =>
+      Array.from(container.querySelectorAll('tbody td.value-cell')).map(
+        cell => {
+          const text = (cell.textContent ?? '').replace(/,/g, '').trim();
+          if (text.length === 0) {
+            return null;
+          }
+          const value = Number(text);
+          return Number.isFinite(value) ? value : null;
+        },
+      );
+
+    expect(rowMetricValues()).toEqual(expect.arrayContaining([150, 33]));
+
+    rerender(
+      <PivotTableChart
+        data={staleTreeWithoutLeafSources}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={[metricKey]}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(rowMetricValues()).toEqual(expect.arrayContaining([150, 33])),
+    );
   });
 });
