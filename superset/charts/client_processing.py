@@ -304,6 +304,7 @@ def table(
 
 post_processors = {
     "pivot_table_v2": pivot_table_v2,
+    "pivot_table_v3": pivot_table_v2,
     "table": table,
 }
 

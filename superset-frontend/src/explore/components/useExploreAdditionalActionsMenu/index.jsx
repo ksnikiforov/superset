@@ -50,6 +50,7 @@ import {
   LOG_ACTIONS_CHART_DOWNLOAD_AS_XLS,
 } from 'src/logger/LogUtils';
 import exportPivotExcel from 'src/utils/downloadAsPivotExcel';
+import exportPivotV3Excel from 'src/utils/exportPivotV3Excel';
 import ViewQueryModal from '../controls/ViewQueryModal';
 import EmbedCodeContent from '../EmbedCodeContent';
 import { useDashboardsMenuItems } from './DashboardsSubMenu';
@@ -80,6 +81,7 @@ const MENU_KEYS = {
 };
 
 const VIZ_TYPES_PIVOTABLE = [VizType.PivotTable];
+const VIZ_TYPES_PIVOTABLE_V3 = [VizType.PivotTableV3];
 
 export const MenuItemWithCheckboxContainer = styled.div`
   ${({ theme }) => css`
@@ -149,6 +151,12 @@ export const useExploreAdditionalActionsMenu = (
   });
 
   const { datasource } = latestQueryFormData;
+  const isPivotTable = VIZ_TYPES_PIVOTABLE.includes(
+    latestQueryFormData.viz_type,
+  );
+  const isPivotTableV3 = VIZ_TYPES_PIVOTABLE_V3.includes(
+    latestQueryFormData.viz_type,
+  );
 
   // Get dashboard menu items using the hook
   const dashboardMenuItems = useDashboardsMenuItems({
@@ -180,7 +188,7 @@ export const useExploreAdditionalActionsMenu = (
             resultFormat: 'csv',
           })
         : null,
-    [canDownloadCSV, latestQueryFormData],
+    [canDownloadCSV, latestQueryFormData, ownState],
   );
 
   const exportCSVPivoted = useCallback(
@@ -293,7 +301,7 @@ export const useExploreAdditionalActionsMenu = (
     // Download submenu
     const downloadChildren = [];
 
-    if (VIZ_TYPES_PIVOTABLE.includes(latestQueryFormData.viz_type)) {
+    if (isPivotTable) {
       downloadChildren.push(
         {
           key: MENU_KEYS.EXPORT_TO_CSV,
@@ -336,6 +344,47 @@ export const useExploreAdditionalActionsMenu = (
             const sliceSelector = `#chart-id-${slice?.slice_id}`;
             exportPivotExcel(
               `${sliceSelector} .pvtTable`,
+              slice?.slice_name ?? t('pivoted_xlsx'),
+            );
+            setIsDropdownVisible(false);
+            dispatch(
+              logEvent(LOG_ACTIONS_CHART_DOWNLOAD_AS_XLS, {
+                chartId: slice?.slice_id,
+                chartName: slice?.slice_name,
+              }),
+            );
+          },
+        },
+      );
+    } else if (isPivotTableV3) {
+      downloadChildren.push(
+        {
+          key: MENU_KEYS.EXPORT_TO_CSV,
+          label: t('Export to .CSV'),
+          icon: <Icons.FileOutlined />,
+          disabled: !canDownloadCSV,
+          onClick: () => {
+            exportCSV();
+            setIsDropdownVisible(false);
+            dispatch(
+              logEvent(LOG_ACTIONS_CHART_DOWNLOAD_AS_CSV, {
+                chartId: slice?.slice_id,
+                chartName: slice?.slice_name,
+              }),
+            );
+          },
+        },
+        {
+          key: MENU_KEYS.EXPORT_TO_PIVOT_XLSX,
+          label: t('Export to Excel'),
+          icon: <Icons.FileOutlined />,
+          disabled: !canDownloadCSV,
+          onClick: () => {
+            const tableSelector = slice?.slice_id
+              ? `#chart-id-${slice.slice_id} .pivot-v3-table`
+              : '.pivot-v3-table';
+            exportPivotV3Excel(
+              tableSelector,
               slice?.slice_name ?? t('pivoted_xlsx'),
             );
             setIsDropdownVisible(false);
@@ -404,22 +453,26 @@ export const useExploreAdditionalActionsMenu = (
           );
         },
       },
-      {
-        key: MENU_KEYS.EXPORT_TO_XLSX,
-        label: t('Export to Excel'),
-        icon: <Icons.FileOutlined />,
-        disabled: !canDownloadCSV,
-        onClick: () => {
-          exportExcel();
-          setIsDropdownVisible(false);
-          dispatch(
-            logEvent(LOG_ACTIONS_CHART_DOWNLOAD_AS_XLS, {
-              chartId: slice?.slice_id,
-              chartName: slice?.slice_name,
-            }),
-          );
-        },
-      },
+      ...(!isPivotTableV3
+        ? [
+            {
+              key: MENU_KEYS.EXPORT_TO_XLSX,
+              label: t('Export to Excel'),
+              icon: <Icons.FileOutlined />,
+              disabled: !canDownloadCSV,
+              onClick: () => {
+                exportExcel();
+                setIsDropdownVisible(false);
+                dispatch(
+                  logEvent(LOG_ACTIONS_CHART_DOWNLOAD_AS_XLS, {
+                    chartId: slice?.slice_id,
+                    chartName: slice?.slice_name,
+                  }),
+                );
+              },
+            },
+          ]
+        : []),
     );
 
     menuItems.push({
@@ -541,6 +594,8 @@ export const useExploreAdditionalActionsMenu = (
     reportMenuItem,
     shareByEmail,
     showDashboardSearch,
+    isPivotTable,
+    isPivotTableV3,
     slice,
     theme.sizeUnit,
   ]);

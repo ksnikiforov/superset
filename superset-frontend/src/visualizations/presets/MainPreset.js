@@ -78,6 +78,7 @@ import {
   TimeGrainFilterPlugin,
 } from 'src/filters/components';
 import { PivotTableChartPlugin as PivotTableChartPluginV2 } from '@superset-ui/plugin-chart-pivot-table';
+import PivotTableV3ChartPlugin from '@superset-ui/plugin-chart-pivot-table-v3';
 import { HandlebarsChartPlugin } from '@superset-ui/plugin-chart-handlebars';
 import { FilterPlugins } from 'src/constants';
 import AgGridTableChartPlugin from '@superset-ui/plugin-chart-ag-grid-table';
@@ -133,6 +134,9 @@ export default class MainPreset extends Preset {
         new PartitionChartPlugin().configure({ key: VizType.Partition }),
         new EchartsPieChartPlugin().configure({ key: VizType.Pie }),
         new PivotTableChartPluginV2().configure({ key: VizType.PivotTable }),
+        new PivotTableV3ChartPlugin().configure({
+          key: VizType.PivotTableV3,
+        }),
         new RoseChartPlugin().configure({ key: VizType.Rose }),
         new TableChartPlugin().configure({ key: VizType.Table }),
         new TimePivotChartPlugin().configure({ key: VizType.TimePivot }),
