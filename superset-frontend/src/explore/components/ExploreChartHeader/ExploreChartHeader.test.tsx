@@ -29,6 +29,8 @@ import fetchMock from 'fetch-mock';
 import * as chartAction from 'src/components/Chart/chartAction';
 import * as saveModalActions from 'src/explore/actions/saveModalActions';
 import * as downloadAsImage from 'src/utils/downloadAsImage';
+import * as downloadAsPivotExcel from 'src/utils/downloadAsPivotExcel';
+import * as exportPivotV3Excel from 'src/utils/exportPivotV3Excel';
 import * as exploreUtils from 'src/explore/exploreUtils';
 import { FeatureFlag, VizType } from '@superset-ui/core';
 import { useUnsavedChangesPrompt } from 'src/hooks/useUnsavedChangesPrompt';
@@ -508,10 +510,14 @@ describe('Additional actions tests', () => {
   describe('Download', () => {
     let spyDownloadAsImage = sinon.spy();
     let spyExportChart = sinon.spy();
+    let spyExportPivotExcel = sinon.spy();
+    let spyExportPivotV3Excel = sinon.spy();
 
     beforeEach(() => {
       spyDownloadAsImage = sinon.spy(downloadAsImage, 'default');
       spyExportChart = sinon.spy(exploreUtils, 'exportChart');
+      spyExportPivotExcel = sinon.spy(downloadAsPivotExcel, 'default');
+      spyExportPivotV3Excel = sinon.spy(exportPivotV3Excel, 'default');
 
       (useUnsavedChangesPrompt as jest.Mock).mockReturnValue({
         showModal: false,
@@ -525,6 +531,8 @@ describe('Additional actions tests', () => {
     afterEach(async () => {
       spyDownloadAsImage.restore();
       spyExportChart.restore();
+      spyExportPivotExcel.restore();
+      spyExportPivotV3Excel.restore();
       // Wait for any pending effects to complete
       await new Promise(resolve => setTimeout(resolve, 0));
     });
@@ -666,6 +674,36 @@ describe('Additional actions tests', () => {
       const exportExcelElement = await screen.findByText('Export to Excel');
       userEvent.click(exportExcelElement);
       expect(spyExportChart.callCount).toBe(1);
+    });
+
+    test('Pivot Table v3 keeps CSV option and exports as-is Excel from DOM', async () => {
+      const props = createProps();
+      props.canDownload = true;
+      props.chart.latestQueryFormData.viz_type = VizType.PivotTableV3;
+      render(<ExploreHeader {...props} />, {
+        useRedux: true,
+      });
+
+      userEvent.click(screen.getByLabelText('Menu actions trigger'));
+      userEvent.hover(screen.getByText('Download'));
+
+      expect(await screen.findByText('Export to .CSV')).toBeInTheDocument();
+      expect(
+        screen.queryByText('Export to original .CSV'),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText('Export to pivoted .CSV'),
+      ).not.toBeInTheDocument();
+
+      const exportExcelElement = await screen.findByText('Export to Excel');
+      userEvent.click(exportExcelElement);
+      expect(spyExportPivotExcel.callCount).toBe(0);
+      expect(spyExportPivotV3Excel.callCount).toBe(1);
+      expect(spyExportPivotV3Excel.firstCall.args).toEqual([
+        '#chart-id-318 .pivot-v3-table',
+        'Age distribution of respondents',
+      ]);
+      expect(spyExportChart.callCount).toBe(0);
     });
   });
 });
