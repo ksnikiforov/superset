@@ -1,0 +1,363 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+import { Metric } from '@superset-ui/core';
+import { render, screen, userEvent, waitFor, within } from '../../testUtils';
+import PivotDndColumnSelect from '../../../src/controls/PivotDndColumnSelect/PivotDndColumnSelect';
+
+jest.setTimeout(60000);
+
+const baseProps = {
+  type: PivotDndColumnSelect,
+  actions: { setControlValue: jest.fn() },
+  name: 'groupbyRows',
+  label: 'Rows',
+  onChange: jest.fn(),
+  value: ['country'],
+  options: [{ column_name: 'country', verbose_name: 'Country' }],
+  multi: true,
+  savedMetrics: [],
+};
+
+const columnProps = {
+  ...baseProps,
+  name: 'groupbyColumns',
+  label: 'Columns',
+};
+
+const renderOptions = {
+  useDnd: true,
+  useRedux: true,
+  initialState: {
+    explore: {
+      datasource: {
+        type: 'table',
+      },
+    },
+  },
+};
+
+const axisCases = [
+  { axis: 'rows', props: baseProps },
+  { axis: 'columns', props: columnProps },
+];
+
+describe('PivotDndColumnSelect', () => {
+  it('renders a formatting button for each column', () => {
+    render(<PivotDndColumnSelect {...baseProps} />, renderOptions);
+
+    const buttons = screen.getAllByTestId('pivot-dimension-formatting-button');
+    expect(buttons).toHaveLength(1);
+  });
+
+  it('renders a sorting button for each column', () => {
+    render(<PivotDndColumnSelect {...baseProps} />, renderOptions);
+
+    const buttons = screen.getAllByTestId('pivot-dimension-sorting-button');
+    expect(buttons).toHaveLength(1);
+  });
+
+  it.each(axisCases)(
+    'does not open the column selector when opening formatting for %s',
+    async ({ props }) => {
+      render(<PivotDndColumnSelect {...props} />, renderOptions);
+
+      await userEvent.click(
+        screen.getAllByTestId('pivot-dimension-formatting-button')[0],
+      );
+
+      expect(
+        await screen.findByText('Conditional formatting'),
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('tab', { name: 'Simple' }),
+      ).not.toBeInTheDocument();
+    },
+  );
+
+  it.each(axisCases)(
+    'does not open the column selector when interacting with formatting for %s',
+    async ({ props }) => {
+      render(<PivotDndColumnSelect {...props} />, renderOptions);
+
+      await userEvent.click(
+        screen.getAllByTestId('pivot-dimension-formatting-button')[0],
+      );
+
+      const formattingTitle = await screen.findByText('Conditional formatting');
+      await userEvent.click(formattingTitle);
+
+      expect(
+        screen.queryByRole('tab', { name: 'Simple' }),
+      ).not.toBeInTheDocument();
+    },
+  );
+
+  it('merges background and text formatting selections for rows', async () => {
+    const setControlValue = jest.fn();
+    render(
+      <PivotDndColumnSelect
+        {...baseProps}
+        actions={{ setControlValue }}
+        formData={{
+          datasource: '1__table',
+          metrics: ['metric1', 'metric2'],
+          rowFormatting: {},
+          viz_type: 'pivot_table_v3',
+        }}
+      />,
+      renderOptions,
+    );
+
+    await userEvent.click(
+      screen.getAllByTestId('pivot-dimension-formatting-button')[0],
+    );
+    await screen.findByText('Conditional formatting');
+
+    const backgroundSelect = screen.getByRole('combobox', {
+      name: /background color metric/i,
+    });
+    const textSelect = screen.getByRole('combobox', {
+      name: /text color metric/i,
+    });
+
+    await userEvent.click(backgroundSelect);
+    const backgroundOption = await waitFor(() =>
+      within(screen.getByRole('listbox')).getByText('metric1'),
+    );
+    await userEvent.click(backgroundOption);
+
+    await userEvent.click(textSelect);
+    const textOption = await waitFor(() =>
+      within(screen.getByRole('listbox')).getByText('metric2'),
+    );
+    await userEvent.click(textOption);
+
+    await waitFor(() =>
+      expect(setControlValue).toHaveBeenLastCalledWith('rowFormatting', {
+        country: {
+          backgroundColor: 'metric1',
+          textColor: 'metric2',
+          applyTo: 'all',
+        },
+      }),
+    );
+  });
+
+  it('updates sorting metric and order for rows', async () => {
+    const setControlValue = jest.fn();
+    render(
+      <PivotDndColumnSelect
+        {...baseProps}
+        actions={{ setControlValue }}
+        formData={{
+          datasource: '1__table',
+          metrics: ['metric1', 'metric2'],
+          rowSorting: {},
+          viz_type: 'pivot_table_v3',
+        }}
+      />,
+      renderOptions,
+    );
+
+    await userEvent.click(
+      screen.getAllByTestId('pivot-dimension-sorting-button')[0],
+    );
+    await screen.findByText('Sorting');
+
+    const metricSelect = screen.getByRole('combobox', {
+      name: /sort by metric/i,
+    });
+    await userEvent.click(metricSelect);
+    const metricOption = await waitFor(() =>
+      within(screen.getByRole('listbox')).getByText('metric1'),
+    );
+    await userEvent.click(metricOption);
+
+    await waitFor(() =>
+      expect(setControlValue).toHaveBeenLastCalledWith('rowSorting', {
+        country: {
+          metric: 'metric1',
+          order: 'asc',
+          mode: 'total',
+        },
+      }),
+    );
+
+    await userEvent.click(screen.getByRole('radio', { name: /descending/i }));
+
+    await waitFor(() =>
+      expect(setControlValue).toHaveBeenLastCalledWith('rowSorting', {
+        country: {
+          metric: 'metric1',
+          order: 'desc',
+          mode: 'total',
+        },
+      }),
+    );
+  });
+
+  it('shows metric labels when selecting sorting metrics', async () => {
+    const setControlValue = jest.fn();
+    const savedMetrics: Metric[] = [
+      {
+        metric_name: 'metric1',
+        verbose_name: 'Metric One',
+        expression: 'SUM(metric1)',
+      } as Metric,
+    ];
+    render(
+      <PivotDndColumnSelect
+        {...baseProps}
+        actions={{ setControlValue }}
+        savedMetrics={savedMetrics}
+        formData={{
+          datasource: '1__table',
+          metrics: ['metric1'],
+          rowSorting: {},
+          viz_type: 'pivot_table_v3',
+        }}
+      />,
+      renderOptions,
+    );
+
+    await userEvent.click(
+      screen.getAllByTestId('pivot-dimension-sorting-button')[0],
+    );
+    await screen.findByText('Sorting');
+
+    const metricSelect = screen.getByRole('combobox', {
+      name: /sort by metric/i,
+    });
+    await userEvent.click(metricSelect);
+    expect(
+      await waitFor(() =>
+        within(screen.getByRole('listbox')).getByText('Metric One'),
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('shows metric labels when selecting formatting metrics', async () => {
+    render(
+      <PivotDndColumnSelect
+        {...baseProps}
+        formData={{
+          datasource: '1__table',
+          metrics: ['metric1'],
+          metricLabelMap: { metric1: 'Metric One' },
+          rowFormatting: {},
+          viz_type: 'pivot_table_v3',
+        }}
+      />,
+      renderOptions,
+    );
+
+    await userEvent.click(
+      screen.getAllByTestId('pivot-dimension-formatting-button')[0],
+    );
+    await screen.findByText('Conditional formatting');
+
+    const backgroundSelect = screen.getByRole('combobox', {
+      name: /background color metric/i,
+    });
+    await userEvent.click(backgroundSelect);
+
+    expect(
+      await waitFor(() =>
+        within(screen.getByRole('listbox')).getByText('Metric One'),
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('updates sorting order without a metric', async () => {
+    const setControlValue = jest.fn();
+    render(
+      <PivotDndColumnSelect
+        {...baseProps}
+        actions={{ setControlValue }}
+        formData={{
+          datasource: '1__table',
+          metrics: ['metric1', 'metric2'],
+          rowSorting: {},
+          viz_type: 'pivot_table_v3',
+        }}
+      />,
+      renderOptions,
+    );
+
+    await userEvent.click(
+      screen.getAllByTestId('pivot-dimension-sorting-button')[0],
+    );
+    await screen.findByText('Sorting');
+
+    await userEvent.click(screen.getByRole('radio', { name: /descending/i }));
+
+    await waitFor(() =>
+      expect(setControlValue).toHaveBeenLastCalledWith('rowSorting', {
+        country: {
+          order: 'desc',
+          mode: 'total',
+        },
+      }),
+    );
+  });
+
+  it('updates the apply-to scope when toggled', async () => {
+    const setControlValue = jest.fn();
+    render(
+      <PivotDndColumnSelect
+        {...baseProps}
+        actions={{ setControlValue }}
+        formData={{
+          datasource: '1__table',
+          metrics: ['metric1'],
+          rowFormatting: {},
+          viz_type: 'pivot_table_v3',
+        }}
+      />,
+      renderOptions,
+    );
+
+    await userEvent.click(
+      screen.getAllByTestId('pivot-dimension-formatting-button')[0],
+    );
+    await screen.findByText('Conditional formatting');
+
+    const backgroundSelect = screen.getByRole('combobox', {
+      name: /background color metric/i,
+    });
+    await userEvent.click(backgroundSelect);
+    const backgroundOption = await waitFor(() =>
+      within(screen.getByRole('listbox')).getByText('metric1'),
+    );
+    await userEvent.click(backgroundOption);
+
+    await userEvent.click(
+      screen.getByRole('radio', { name: /apply to value/i }),
+    );
+
+    await waitFor(() =>
+      expect(setControlValue).toHaveBeenLastCalledWith('rowFormatting', {
+        country: {
+          backgroundColor: 'metric1',
+          applyTo: 'label',
+        },
+      }),
+    );
+  });
+});

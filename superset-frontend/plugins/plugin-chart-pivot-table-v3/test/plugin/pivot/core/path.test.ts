@@ -1,0 +1,44 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+import {
+  parseCellKey,
+  parsePath,
+  PATH_DIVIDER,
+  serializeCellKey,
+  serializePath,
+} from '../../../../src/pivot/core/path';
+
+describe('pivot/core/path', () => {
+  it('round-trips divider-containing strings', () => {
+    const dividerValue = `A${PATH_DIVIDER}B`;
+    const key = serializePath([dividerValue]);
+    expect(key).toBe(`A${PATH_DIVIDER}${PATH_DIVIDER}B`);
+    expect(parsePath(key)).toEqual([dividerValue]);
+  });
+
+  it('round-trips null and undefined values', () => {
+    expect(parsePath(serializePath([null]))).toEqual([null]);
+    expect(parsePath(serializePath([undefined]))).toEqual([undefined]);
+  });
+
+  it('serializes and parses cell keys', () => {
+    const key = serializeCellKey('rowKey', 'colKey');
+    expect(parseCellKey(key)).toEqual({ rowKey: 'rowKey', colKey: 'colKey' });
+  });
+});
