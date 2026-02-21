@@ -1,0 +1,198 @@
+/**
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+import {
+  ensureIsArray,
+  QueryFormColumn,
+  QueryFormMetric,
+} from '@superset-ui/core';
+import {
+  MetricsLayoutEnum,
+  PivotRuntimeLayout,
+  PivotTableQueryFormData,
+} from '../../types';
+import {
+  METRICS_PLACEHOLDER,
+  getMetricKey,
+  getStableColumnKey,
+} from '../../utils';
+import { coerceMeasureLeavesByMetric } from '../measureLeaves';
+
+type ResolvedLayoutParams = {
+  formData: PivotTableQueryFormData;
+  runtimeLayout?: PivotRuntimeLayout;
+};
+
+const clamp = (value: number, min: number, max: number) =>
+  Math.max(min, Math.min(value, max));
+
+const resolveDimensionMap = (dimensions: QueryFormColumn[]) => {
+  const map = new Map<string, QueryFormColumn>();
+  dimensions.forEach(dimension => {
+    map.set(getStableColumnKey(dimension), dimension);
+  });
+  return map;
+};
+
+const resolveMetricMap = (metrics: QueryFormMetric[]) => {
+  const map = new Map<string, QueryFormMetric>();
+  metrics.forEach(metric => {
+    const key = getMetricKey(metric);
+    if (key) {
+      map.set(key, metric);
+    }
+  });
+  return map;
+};
+
+const normalizeRuntimeLayout = (
+  layout: PivotRuntimeLayout | undefined,
+  dimensionKeys: string[],
+): PivotRuntimeLayout => {
+  if (layout && layout.version === 1) {
+    return layout;
+  }
+  return {
+    version: 1,
+    rows: [],
+    cols: [],
+    metrics: [],
+    leafSelection: {},
+    valuePlacement: { axis: 'col', index: 0 },
+  };
+};
+
+export const resolveInteractionFormData = ({
+  formData,
+  runtimeLayout,
+}: ResolvedLayoutParams): PivotTableQueryFormData => {
+  if (formData.interactionMode !== 'user_controlled') {
+    return formData;
+  }
+
+  const dimensions = ensureIsArray<QueryFormColumn>(formData.dimensions);
+  const dimensionMap = resolveDimensionMap(dimensions);
+  const dimensionKeys = Array.from(dimensionMap.keys());
+  const resolvedLayout = normalizeRuntimeLayout(runtimeLayout, dimensionKeys);
+
+  const rows = resolvedLayout.rows.filter(key => dimensionMap.has(key));
+  const cols = resolvedLayout.cols.filter(key => dimensionMap.has(key));
+  const resolvedRows = rows;
+  const resolvedCols = cols;
+
+  const metrics = ensureIsArray<QueryFormMetric>(formData.metrics);
+  const metricMap = resolveMetricMap(metrics);
+  const availableMetricKeys = Array.from(metricMap.keys());
+  const runtimeMetricKeys = resolvedLayout.metrics.filter(key =>
+    metricMap.has(key),
+  );
+  const resolvedMetricKeys =
+    runtimeMetricKeys.length > 0 ? runtimeMetricKeys : availableMetricKeys;
+
+  const placement = resolvedLayout.valuePlacement ?? {
+    axis: 'col',
+    index: resolvedCols.length,
+  };
+  const { axis } = placement;
+  const axisLength = axis === 'row' ? resolvedRows.length : resolvedCols.length;
+  const insertIndex = clamp(placement.index, 0, axisLength);
+
+  const rowGroupby = resolvedRows.map(key => dimensionMap.get(key));
+  const colGroupby = resolvedCols.map(key => dimensionMap.get(key));
+
+  const resolvedRowGroupby = rowGroupby.filter(
+    (value): value is QueryFormColumn => Boolean(value),
+  );
+  const resolvedColGroupby = colGroupby.filter(
+    (value): value is QueryFormColumn => Boolean(value),
+  );
+
+  const baseLeaves = coerceMeasureLeavesByMetric(
+    resolvedMetricKeys,
+    formData.measureLeavesByMetric,
+  );
+  const selection = resolvedLayout.leafSelection || {};
+  const hasExplicitSelection = Object.keys(selection).length > 0;
+  const baseLeafIds: string[] = [];
+  resolvedMetricKeys.forEach(metricKey => {
+    (baseLeaves[metricKey] ?? []).forEach(leaf => {
+      if (!baseLeafIds.includes(leaf.id)) {
+        baseLeafIds.push(leaf.id);
+      }
+    });
+  });
+  const providedOrder = resolvedLayout.leafOrder ?? [];
+  const filteredOrder = providedOrder.filter(id => baseLeafIds.includes(id));
+  const normalizedOrder = [
+    ...filteredOrder,
+    ...baseLeafIds.filter(id => !filteredOrder.includes(id)),
+  ];
+  const orderIndex = new Map(
+    normalizedOrder.map((id, index) => [id, index] as const),
+  );
+  const resolvedLeaves = Object.fromEntries(
+    Object.entries(baseLeaves).map(([metricKey, leaves]) => {
+      const filtered = hasExplicitSelection
+        ? leaves.filter(leaf => selection[leaf.id] === true)
+        : leaves;
+      const ordered = filtered
+        .map((leaf, index) => ({
+          leaf,
+          rank: orderIndex.get(leaf.id) ?? normalizedOrder.length + index,
+        }))
+        .sort((a, b) => a.rank - b.rank)
+        .map(({ leaf }) => leaf);
+      return [metricKey, ordered];
+    }),
+  );
+  const activeMetricKeys = resolvedMetricKeys.filter(
+    key => (resolvedLeaves[key] ?? []).length > 0,
+  );
+  const resolvedMetrics = activeMetricKeys
+    .map(key => metricMap.get(key))
+    .filter((metric): metric is QueryFormMetric => Boolean(metric));
+  const resolvedLeavesByMetric = Object.fromEntries(
+    activeMetricKeys.map(metricKey => [
+      metricKey,
+      resolvedLeaves[metricKey] ?? [],
+    ]),
+  );
+
+  if (resolvedMetrics.length > 0) {
+    if (axis === 'row') {
+      resolvedRowGroupby.splice(insertIndex, 0, METRICS_PLACEHOLDER);
+    } else {
+      resolvedColGroupby.splice(insertIndex, 0, METRICS_PLACEHOLDER);
+    }
+  }
+
+  return {
+    ...formData,
+    groupbyRows: resolvedRowGroupby,
+    groupbyColumns: resolvedColGroupby,
+    metrics:
+      resolvedMetricKeys.length === 0
+        ? metrics
+        : resolvedMetrics.length > 0
+          ? resolvedMetrics
+          : [],
+    measureLeavesByMetric: resolvedLeavesByMetric,
+    metricsLayout:
+      axis === 'row' ? MetricsLayoutEnum.ROWS : MetricsLayoutEnum.COLUMNS,
+  };
+};
