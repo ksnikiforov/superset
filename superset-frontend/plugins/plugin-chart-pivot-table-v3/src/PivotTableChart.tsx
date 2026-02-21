@@ -111,6 +111,10 @@ const SIDE_CHIPS_WIDTH = 24;
 const SEAMLESS_REQUEST_GROUP = 'pivot-v3-seamless';
 const DIMENSION_VALUES_REQUEST_GROUP = 'pivot-v3-dimension-values';
 const DIMENSION_VALUES_QUERY_PREFIX = 'pivot_v3|dimension-values';
+const EMPTY_SELECTED_FILTERS: Record<string, DataRecordValue[]> = {};
+const hasSelectedFilters = (
+  filters: Record<string, DataRecordValue[]>,
+): boolean => Object.keys(filters).length > 0;
 
 const { DATABASE_DATETIME } = TimeFormats;
 
@@ -1057,7 +1061,7 @@ function PivotTableChart(props: PivotTableProps) {
   const [committedTree, setCommittedTree] = useState<PivotTreeData>(data);
   const [committedFilters, setCommittedFilters] = useState<
     Record<string, DataRecordValue[]>
-  >(selectedFilters ?? {});
+  >(selectedFilters ?? EMPTY_SELECTED_FILTERS);
   const [seamlessLoading, setSeamlessLoading] = useState(false);
   const [seamlessWarnings, setSeamlessWarnings] = useState<ChartDataWarning[]>(
     [],
@@ -1231,14 +1235,44 @@ function PivotTableChart(props: PivotTableProps) {
     useState<PivotRuntimeLayout>(runtimeLayout);
   const [uiSelectedFilters, setUiSelectedFilters] = useState<
     Record<string, DataRecordValue[]>
-  >(selectedFilters ?? {});
+  >(selectedFilters ?? EMPTY_SELECTED_FILTERS);
+  const selectedFiltersFromProps = selectedFilters ?? EMPTY_SELECTED_FILTERS;
+  const lastPersistedSelectionRef = useRef(selectedFiltersFromProps);
+  const pendingPersistedSelectionSyncRef = useRef(false);
+  const suppressStalePersistedFilterRestoreRef = useRef(false);
+  const selectedFiltersFromOwnState =
+    (ownState?.pivotSelectedFilters as
+      | Record<string, DataRecordValue[]>
+      | undefined) ?? EMPTY_SELECTED_FILTERS;
+  const selectedFiltersForTreeSync = useMemo(() => {
+    if (!isUserControlled) {
+      return selectedFiltersFromProps;
+    }
+    if (
+      formData.pivotSelectedFilters &&
+      Object.keys(formData.pivotSelectedFilters).length > 0
+    ) {
+      return formData.pivotSelectedFilters;
+    }
+    if (Object.keys(selectedFiltersFromOwnState).length > 0) {
+      return selectedFiltersFromOwnState;
+    }
+    return selectedFiltersFromProps;
+  }, [
+    formData.pivotSelectedFilters,
+    isUserControlled,
+    selectedFiltersFromOwnState,
+    selectedFiltersFromProps,
+  ]);
 
   useEffect(() => {
     const pendingLayout = pendingSeamlessLayoutRef.current;
     if (pendingLayout && isSameRuntimeLayout(runtimeLayout, pendingLayout)) {
       return;
     }
-    setCommittedRuntimeLayout(runtimeLayout);
+    setCommittedRuntimeLayout(current =>
+      isSameRuntimeLayout(current, runtimeLayout) ? current : runtimeLayout,
+    );
   }, [runtimeLayout]);
   const appliedMetricKeysBase = useMemo(
     () => getMetricKeys(ensureIsArray(appliedMetrics)),
@@ -1319,16 +1353,29 @@ function PivotTableChart(props: PivotTableProps) {
       }),
     [appliedLayoutFormData, committedTreeFromProps, isUserControlled],
   );
-  useEffect(() => {
-    if (
-      isUserControlled &&
-      !isSameRuntimeLayout(runtimeLayout, committedRuntimeLayout)
-    ) {
-      return;
+  const shouldSyncCommittedTreeFromProps = useMemo(() => {
+    if (!isUserControlled) {
+      return true;
     }
-    // Ignore stale upstream trees that dropped source metrics required by
-    // active measure leaves; keep last committed tree until compatible data arrives.
-    if (isUserControlled && !committedTreeFromPropsHasLeafSources) {
+    if (!isSameRuntimeLayout(runtimeLayout, committedRuntimeLayout)) {
+      return false;
+    }
+    if (!isEqual(selectedFiltersForTreeSync, committedFilters)) {
+      return false;
+    }
+    return committedTreeFromPropsHasLeafSources;
+  }, [
+    committedFilters,
+    committedRuntimeLayout,
+    committedTreeFromPropsHasLeafSources,
+    isUserControlled,
+    runtimeLayout,
+    selectedFiltersForTreeSync,
+  ]);
+  useEffect(() => {
+    // Ignore stale upstream updates while a local interaction update is still
+    // pending or while upstream data is incompatible with active measure leaves.
+    if (!shouldSyncCommittedTreeFromProps) {
       return;
     }
     setCommittedTree(committedTreeFromProps);
@@ -1337,13 +1384,7 @@ function PivotTableChart(props: PivotTableProps) {
     setSeamlessLoading(false);
     setFrozenUserViewProps(null);
     pendingSeamlessLayoutRef.current = null;
-  }, [
-    committedRuntimeLayout,
-    committedTreeFromPropsHasLeafSources,
-    committedTreeFromProps,
-    isUserControlled,
-    runtimeLayout,
-  ]);
+  }, [committedTreeFromProps, shouldSyncCommittedTreeFromProps]);
   const layoutMetrics = useMemo(
     () =>
       isUserControlled ? ensureIsArray(appliedLayoutFormData.metrics) : metrics,
@@ -1459,6 +1500,18 @@ function PivotTableChart(props: PivotTableProps) {
   ]);
 
   useEffect(() => {
+    if (!isUserControlled || !pendingPersistedSelectionSyncRef.current) {
+      return;
+    }
+    if (isEqual(persistedSelectedFilters, lastPersistedSelectionRef.current)) {
+      pendingPersistedSelectionSyncRef.current = false;
+    }
+  }, [isUserControlled, persistedSelectedFilters]);
+
+  useEffect(() => {
+    if (isUserControlled && pendingPersistedSelectionSyncRef.current) {
+      return;
+    }
     const shouldSyncFilters =
       !isEqual(persistedSelectedFilters, committedFilters) ||
       !isEqual(persistedSelectedFilters, uiSelectedFilters);
@@ -1471,9 +1524,15 @@ function PivotTableChart(props: PivotTableProps) {
       return;
     }
     const hasLocalFilters =
-      Object.keys(uiSelectedFilters).length > 0 ||
-      Object.keys(committedFilters).length > 0;
+      hasSelectedFilters(uiSelectedFilters) ||
+      hasSelectedFilters(committedFilters);
     if (!hasLocalFilters) {
+      if (
+        suppressStalePersistedFilterRestoreRef.current &&
+        hasSelectedFilters(persistedSelectedFilters)
+      ) {
+        return;
+      }
       setCommittedFilters(persistedSelectedFilters);
       setUiSelectedFilters(persistedSelectedFilters);
     }
@@ -1489,7 +1548,13 @@ function PivotTableChart(props: PivotTableProps) {
       layout: PivotRuntimeLayout,
       filters: Record<string, DataRecordValue[]>,
     ) => {
-      setCommittedRuntimeLayout(layout);
+      if (!isEqual(lastPersistedSelectionRef.current, filters)) {
+        lastPersistedSelectionRef.current = filters;
+        pendingPersistedSelectionSyncRef.current = true;
+      }
+      setCommittedRuntimeLayout(current =>
+        isSameRuntimeLayout(current, layout) ? current : layout,
+      );
       const nextOwnState = mergeOwnState({
         pivotRuntimeLayout: layout,
         pivotSelectedFilters: filters,
@@ -1608,7 +1673,6 @@ function PivotTableChart(props: PivotTableProps) {
         unstable_batchedUpdates(() => {
           setCommittedTree(nextTree);
           setUiRuntimeLayout(normalized);
-          setCommittedRuntimeLayout(normalized);
           setCommittedFilters(nextFilters);
           setSeamlessWarnings(collectWarnings(results));
           persistRuntimeState(normalized, nextFilters);
@@ -1679,7 +1743,6 @@ function PivotTableChart(props: PivotTableProps) {
       if (skipMetricOrderCommit) {
         return;
       }
-      setCommittedRuntimeLayout(normalized);
       persistRuntimeState(normalized, uiSelectedFilters);
     },
     [
@@ -2247,9 +2310,16 @@ function PivotTableChart(props: PivotTableProps) {
       const dimensionKey = getStableColumnKey(dimension);
       const nextSelected = { ...uiSelectedFilters };
       if (values.length > 0) {
+        suppressStalePersistedFilterRestoreRef.current = false;
         nextSelected[dimensionKey] = values;
       } else {
         delete nextSelected[dimensionKey];
+        if (
+          hasSelectedFilters(uiSelectedFilters) &&
+          !hasSelectedFilters(nextSelected)
+        ) {
+          suppressStalePersistedFilterRestoreRef.current = true;
+        }
       }
       setUiSelectedFilters(nextSelected);
       applySeamlessUpdate(uiRuntimeLayout, nextSelected);
@@ -2258,9 +2328,10 @@ function PivotTableChart(props: PivotTableProps) {
   );
 
   const handleClearAllFilters = useCallback(() => {
-    if (Object.keys(uiSelectedFilters).length === 0) {
+    if (!hasSelectedFilters(uiSelectedFilters)) {
       return;
     }
+    suppressStalePersistedFilterRestoreRef.current = true;
     const nextSelected: Record<string, DataRecordValue[]> = {};
     setUiSelectedFilters(nextSelected);
     applySeamlessUpdate(uiRuntimeLayout, nextSelected);

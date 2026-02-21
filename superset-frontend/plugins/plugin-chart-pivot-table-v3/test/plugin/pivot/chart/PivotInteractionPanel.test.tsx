@@ -474,6 +474,34 @@ describe('PivotInteractionPanel', () => {
     expect(onClearFilters).toHaveBeenCalledTimes(1);
   });
 
+  it('closes filter popover and discards pending values when clearing all filters', async () => {
+    const onChange = jest.fn();
+    const onClearFilters = jest.fn();
+    const onFilterChange = jest.fn();
+    render(
+      <PivotInteractionPanel
+        dimensions={['country']}
+        metrics={['sum__sales']}
+        runtimeLayout={baseLayout}
+        selectedFilters={{ country: ['US'] }}
+        dimensionFilterValues={{ country: ['US', 'CA'] }}
+        onFilterChange={onFilterChange}
+        onClearFilters={onClearFilters}
+        onChange={onChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filter values' }));
+    expect(await screen.findByRole('listbox')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText('CA'));
+    fireEvent.click(screen.getByLabelText('Clear filters'));
+
+    expect(onClearFilters).toHaveBeenCalledTimes(1);
+    expect(onFilterChange).not.toHaveBeenCalled();
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
+
   it('renders an apply button when enabled', () => {
     const onChange = jest.fn();
     const onApply = jest.fn();
