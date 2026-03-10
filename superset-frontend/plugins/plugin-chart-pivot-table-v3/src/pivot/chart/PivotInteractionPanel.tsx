@@ -727,7 +727,7 @@ export const PivotInteractionPanel = ({
     [dimensionList],
   );
   const dimensionByKey = useMemo(() => {
-    const entries = dimensionList.map(dimension => [
+    const entries: [string, QueryFormColumn][] = dimensionList.map(dimension => [
       getStableColumnKey(dimension),
       dimension,
     ]);
