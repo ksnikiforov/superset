@@ -17,7 +17,14 @@
  * under the License.
  */
 import { useState } from 'react';
-import { fireEvent, render, screen } from '../../../testUtils';
+import { Constants } from '@superset-ui/core/components';
+import {
+  fireEvent,
+  render,
+  screen,
+  userEvent,
+  waitFor,
+} from '../../../testUtils';
 import { PivotInteractionPanel } from '../../../../src/pivot/chart/PivotInteractionPanel';
 import { PivotRuntimeLayout } from '../../../../src/types';
 import {
@@ -500,6 +507,60 @@ describe('PivotInteractionPanel', () => {
     expect(onClearFilters).toHaveBeenCalledTimes(1);
     expect(onFilterChange).not.toHaveBeenCalled();
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
+
+  it('shows formatted selected filter labels instead of encoded values', async () => {
+    const onChange = jest.fn();
+    render(
+      <PivotInteractionPanel
+        dimensions={['country']}
+        metrics={['sum__sales']}
+        runtimeLayout={baseLayout}
+        selectedFilters={{ country: ['US'] }}
+        dimensionFilterValues={{ country: [] }}
+        onFilterChange={jest.fn()}
+        onChange={onChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Filter values' }));
+    expect(await screen.findByRole('listbox')).toBeInTheDocument();
+
+    expect(screen.getByText('US')).toBeInTheDocument();
+    expect(screen.queryByText('str:US')).not.toBeInTheDocument();
+  });
+
+  it('emits a debounced search callback for filter values', async () => {
+    jest.useFakeTimers();
+    try {
+      const onChange = jest.fn();
+      const onFilterValuesSearch = jest.fn();
+      render(
+        <PivotInteractionPanel
+          {...({
+            dimensions: ['country'],
+            metrics: ['sum__sales'],
+            runtimeLayout: baseLayout,
+            dimensionFilterValues: { country: ['US', 'CA'] },
+            onFilterChange: jest.fn(),
+            onFilterValuesSearch,
+            onChange,
+          } as any)}
+        />,
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Filter values' }));
+      expect(await screen.findByRole('listbox')).toBeInTheDocument();
+
+      await userEvent.type(screen.getByRole('combobox'), 'ca');
+      jest.advanceTimersByTime(Constants.SLOW_DEBOUNCE);
+
+      await waitFor(() =>
+        expect(onFilterValuesSearch).toHaveBeenLastCalledWith('country', 'ca'),
+      );
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('renders an apply button when enabled', () => {

@@ -26,7 +26,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { isEqual } from 'lodash';
+import { debounce, isEqual } from 'lodash';
 import {
   DataRecordValue,
   ensureIsArray,
@@ -44,6 +44,7 @@ import {
   Space,
   Tooltip,
   Typography,
+  Constants,
 } from '@superset-ui/core/components';
 import type { SelectProps } from '@superset-ui/core/components/Select';
 import { Icons } from '@superset-ui/core/components/Icons';
@@ -349,6 +350,7 @@ type PivotInteractionPanelProps = {
   dimensionFilterLoading?: Record<string, boolean>;
   selectedFilters?: Record<string, DataRecordValue[]>;
   onFilterValuesOpen?: (dimension: QueryFormColumn) => void;
+  onFilterValuesSearch?: (dimension: QueryFormColumn, search: string) => void;
   onFilterChange?: (
     dimension: QueryFormColumn,
     values: DataRecordValue[],
@@ -531,6 +533,7 @@ type DimensionFilterPopoverProps = {
     dimensionKey: string,
     values: DataRecordValue[],
   ) => void;
+  onFilterValuesSearch?: (dimension: QueryFormColumn, search: string) => void;
 };
 
 const DimensionFilterPopover = memo(
@@ -545,55 +548,55 @@ const DimensionFilterPopover = memo(
     hasFilter,
     onFilterPopoverChange,
     onPendingFilterValuesChange,
+    onFilterValuesSearch,
   }: DimensionFilterPopoverProps) => {
-    const [sessionAvailableValues, setSessionAvailableValues] =
-      useState<DataRecordValue[]>(availableValues);
-    const previousOpenRef = useRef(isFilterOpen);
     const filterMenuRef = useRef<HTMLDivElement | null>(null);
 
     useEffect(() => {
-      const wasOpen = previousOpenRef.current;
-      setSessionAvailableValues(current => {
-        if (!isFilterOpen) {
-          return availableValues;
-        }
-        if (!wasOpen) {
-          return availableValues;
-        }
-        if (current.length === 0 && availableValues.length > 0) {
-          return availableValues;
-        }
-        return current;
-      });
       let frameId: number | undefined;
-      if (isFilterOpen && !wasOpen) {
+      if (isFilterOpen) {
         frameId = window.requestAnimationFrame(() => {
           openFilterCombobox(filterMenuRef.current);
         });
       }
-      previousOpenRef.current = isFilterOpen;
       return () => {
         if (frameId !== undefined) {
           window.cancelAnimationFrame(frameId);
         }
       };
-    }, [availableValues, isFilterOpen]);
+    }, [isFilterOpen]);
+
+    const handleSearch = useMemo(
+      () =>
+        debounce((search: string) => {
+          onFilterValuesSearch?.(dimension, search);
+        }, Constants.SLOW_DEBOUNCE),
+      [dimension, onFilterValuesSearch],
+    );
+
+    useEffect(() => () => handleSearch.cancel(), [handleSearch]);
 
     const { options, valueMap } = useMemo(() => {
       const nextValueMap = new Map<string, DataRecordValue>();
-      const nextOptions = sessionAvailableValues.map(value => {
+      const valuesForOptions = [...pendingValues, ...availableValues];
+      const nextOptions = valuesForOptions.flatMap(value => {
         const encodedValue = encodeFilterValue(value);
+        if (nextValueMap.has(encodedValue)) {
+          return [];
+        }
         nextValueMap.set(encodedValue, value);
-        return {
-          value: encodedValue,
-          label: formatFilterValue(value, formatter),
-        };
+        return [
+          {
+            value: encodedValue,
+            label: formatFilterValue(value, formatter),
+          },
+        ];
       });
       return {
         options: nextOptions,
         valueMap: nextValueMap,
       };
-    }, [formatter, sessionAvailableValues]);
+    }, [availableValues, formatter, pendingValues]);
     const selectedValueKeys = useMemo(
       () => pendingValues.map(value => encodeFilterValue(value)),
       [pendingValues],
@@ -613,6 +616,9 @@ const DimensionFilterPopover = memo(
       },
       [dimensionKey, onPendingFilterValuesChange, valueMap],
     );
+    const handleBlur = useCallback(() => {
+      handleSearch('');
+    }, [handleSearch]);
     return (
       <Popover
         trigger="click"
@@ -625,7 +631,7 @@ const DimensionFilterPopover = memo(
             <SelectWithOpen
               mode="multiple"
               allowClear
-              allowSelectAll
+              allowSelectAll={!onFilterValuesSearch}
               defaultActiveFirstOption={false}
               loading={isFilterLoading}
               ariaLabel={t('Filter values')}
@@ -633,6 +639,9 @@ const DimensionFilterPopover = memo(
               options={options}
               value={selectedValueKeys}
               onChange={handleChange}
+              onSearch={handleSearch}
+              onClear={() => handleSearch('')}
+              onBlur={handleBlur}
               showSearch
               optionFilterProps={['label']}
               css={{ width: '100%' }}
@@ -664,6 +673,7 @@ const DimensionFilterPopover = memo(
     previous.hasFilter === next.hasFilter &&
     previous.onFilterPopoverChange === next.onFilterPopoverChange &&
     previous.onPendingFilterValuesChange === next.onPendingFilterValuesChange &&
+    previous.onFilterValuesSearch === next.onFilterValuesSearch &&
     areDataRecordValueArraysEqual(
       previous.availableValues,
       next.availableValues,
@@ -700,6 +710,7 @@ export const PivotInteractionPanel = ({
   dimensionFilterLoading,
   selectedFilters,
   onFilterValuesOpen,
+  onFilterValuesSearch,
   onFilterChange,
   onClearFilters,
   onApply,
@@ -727,10 +738,9 @@ export const PivotInteractionPanel = ({
     [dimensionList],
   );
   const dimensionByKey = useMemo(() => {
-    const entries: [string, QueryFormColumn][] = dimensionList.map(dimension => [
-      getStableColumnKey(dimension),
-      dimension,
-    ]);
+    const entries: [string, QueryFormColumn][] = dimensionList.map(
+      dimension => [getStableColumnKey(dimension), dimension],
+    );
     return new Map<string, QueryFormColumn>(entries);
   }, [dimensionList]);
   const metricOptions = useMemo(
@@ -1150,6 +1160,7 @@ export const PivotInteractionPanel = ({
                       onPendingFilterValuesChange={
                         handlePendingFilterValuesChange
                       }
+                      onFilterValuesSearch={onFilterValuesSearch}
                     />
                   </DimensionRight>
                 ) : null}

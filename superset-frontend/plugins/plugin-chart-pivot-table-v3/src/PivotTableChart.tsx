@@ -31,6 +31,7 @@ import {
   AppSection,
   DataRecordValue,
   ensureIsArray,
+  GenericDataType,
   getColumnLabel,
   getTimeFormatter,
   SMART_DATE_ID,
@@ -38,6 +39,7 @@ import {
   supersetTheme,
   TimeFormats,
   type JsonObject,
+  type QueryObjectFilterClause,
   styled,
   t,
 } from '@superset-ui/core';
@@ -111,6 +113,7 @@ const SIDE_CHIPS_WIDTH = 24;
 const SEAMLESS_REQUEST_GROUP = 'pivot-v3-seamless';
 const DIMENSION_VALUES_REQUEST_GROUP = 'pivot-v3-dimension-values';
 const DIMENSION_VALUES_QUERY_PREFIX = 'pivot_v3|dimension-values';
+const EMPTY_FILTER_VALUES: DataRecordValue[] = [];
 const EMPTY_SELECTED_FILTERS: Record<string, DataRecordValue[]> = {};
 const hasSelectedFilters = (
   filters: Record<string, DataRecordValue[]>,
@@ -120,6 +123,39 @@ const { DATABASE_DATETIME } = TimeFormats;
 
 const buildDimensionValuesQueryName = (dimensionKey: string) =>
   `${DIMENSION_VALUES_QUERY_PREFIX}|${dimensionKey}`;
+
+const buildDimensionValueSearchFilters = ({
+  dimension,
+  dimensionKey,
+  colTypeMap,
+  search,
+}: {
+  dimension: PivotTableProps['groupbyRows'][number];
+  dimensionKey: string;
+  colTypeMap?: Record<string, GenericDataType>;
+  search: string;
+}): QueryObjectFilterClause[] => {
+  const normalizedSearch = search.trim();
+  if (!normalizedSearch) {
+    return [];
+  }
+  const label = getColumnLabel(dimension);
+  const dimensionType = colTypeMap?.[label] ?? colTypeMap?.[dimensionKey];
+  if (
+    dimensionType === GenericDataType.String ||
+    (dimensionType === GenericDataType.Numeric &&
+      !Number.isNaN(Number(normalizedSearch)))
+  ) {
+    return [
+      {
+        col: dimension,
+        op: 'ILIKE',
+        val: `%${normalizedSearch}%`,
+      },
+    ];
+  }
+  return [];
+};
 
 const resolveQueryName = (result: ChartDataQueryResult): string | undefined => {
   if (typeof result.query?.query_name === 'string') {
@@ -1075,11 +1111,20 @@ function PivotTableChart(props: PivotTableProps) {
     useState<PivotViewProps | null>(null);
   const seamlessRequestRef = useRef(0);
   const pendingSeamlessLayoutRef = useRef<PivotRuntimeLayout | null>(null);
+  const lastUpstreamQueryContextRef = useRef<{
+    data: PivotTreeData;
+    signature: string;
+  } | null>(null);
   const expandedRowsForSeamlessRef = useRef<Set<string>>(new Set());
   const expandedColsForSeamlessRef = useRef<Set<string>>(new Set());
   const pendingRowsForSeamlessRef = useRef<Set<string>>(new Set());
   const pendingColsForSeamlessRef = useRef<Set<string>>(new Set());
   const currentUserViewPropsRef = useRef<PivotViewProps | null>(null);
+  const lastSeamlessSyncRef = useRef<{
+    filtersSignature: string | null;
+    layoutSignature: string;
+    upstreamSignature: string;
+  } | null>(null);
   const dataForRender = isUserControlled ? committedTree : data;
 
   const treeRef = useRef<PivotTableProps['data']>(dataForRender);
@@ -1353,38 +1398,6 @@ function PivotTableChart(props: PivotTableProps) {
       }),
     [appliedLayoutFormData, committedTreeFromProps, isUserControlled],
   );
-  const shouldSyncCommittedTreeFromProps = useMemo(() => {
-    if (!isUserControlled) {
-      return true;
-    }
-    if (!isSameRuntimeLayout(runtimeLayout, committedRuntimeLayout)) {
-      return false;
-    }
-    if (!isEqual(selectedFiltersForTreeSync, committedFilters)) {
-      return false;
-    }
-    return committedTreeFromPropsHasLeafSources;
-  }, [
-    committedFilters,
-    committedRuntimeLayout,
-    committedTreeFromPropsHasLeafSources,
-    isUserControlled,
-    runtimeLayout,
-    selectedFiltersForTreeSync,
-  ]);
-  useEffect(() => {
-    // Ignore stale upstream updates while a local interaction update is still
-    // pending or while upstream data is incompatible with active measure leaves.
-    if (!shouldSyncCommittedTreeFromProps) {
-      return;
-    }
-    setCommittedTree(committedTreeFromProps);
-    setSeamlessWarnings([]);
-    setSeamlessError(undefined);
-    setSeamlessLoading(false);
-    setFrozenUserViewProps(null);
-    pendingSeamlessLayoutRef.current = null;
-  }, [committedTreeFromProps, shouldSyncCommittedTreeFromProps]);
   const layoutMetrics = useMemo(
     () =>
       isUserControlled ? ensureIsArray(appliedLayoutFormData.metrics) : metrics,
@@ -1461,6 +1474,99 @@ function PivotTableChart(props: PivotTableProps) {
     };
     return normalizeFormDataExtraFilters(merged);
   }, [appliedLayoutFormData, committedSelectionFilters, isUserControlled]);
+
+  const upstreamDashboardQueryContextSignature = useMemo(() => {
+    if (!isUserControlled || !isDashboardContext || !queryFormData) {
+      return null;
+    }
+    const normalizedQueryFormData =
+      normalizeFormDataExtraFilters(queryFormData);
+    return stableStringify({
+      adhoc_filters: normalizedQueryFormData.adhoc_filters ?? [],
+      extra_form_data: normalizedQueryFormData.extra_form_data ?? null,
+      extras: normalizedQueryFormData.extras ?? null,
+      granularity_sqla: normalizedQueryFormData.granularity_sqla ?? null,
+      time_grain_sqla: normalizedQueryFormData.time_grain_sqla ?? null,
+      time_offsets: normalizedQueryFormData.time_offsets ?? [],
+      time_range: normalizedQueryFormData.time_range ?? null,
+    });
+  }, [isDashboardContext, isUserControlled, queryFormData]);
+
+  const persistedInteractionFilters = useMemo(() => {
+    if (!isUserControlled) {
+      return EMPTY_SELECTED_FILTERS;
+    }
+    if (
+      formData.pivotSelectedFilters &&
+      Object.keys(formData.pivotSelectedFilters).length > 0
+    ) {
+      return normalizeSelectedFilters(formData.pivotSelectedFilters);
+    }
+    const ownFilters = ownState?.pivotSelectedFilters as
+      | Record<string, DataRecordValue[]>
+      | undefined;
+    if (ownFilters && Object.keys(ownFilters).length > 0) {
+      return normalizeSelectedFilters(ownFilters);
+    }
+    return EMPTY_SELECTED_FILTERS;
+  }, [
+    formData.pivotSelectedFilters,
+    isUserControlled,
+    normalizeSelectedFilters,
+    ownState?.pivotSelectedFilters,
+  ]);
+  const persistedInteractionFiltersSignature = useMemo(
+    () =>
+      hasSelectedFilters(persistedInteractionFilters)
+        ? stableStringify(persistedInteractionFilters)
+        : null,
+    [persistedInteractionFilters],
+  );
+  const upstreamSeamlessSignature = useMemo(
+    () =>
+      stableStringify({
+        dashboardQueryContext:
+          upstreamDashboardQueryContextSignature ?? EMPTY_SELECTED_FILTERS,
+        treeDataSignature: formData.treeDataSignature ?? null,
+      }),
+    [formData.treeDataSignature, upstreamDashboardQueryContextSignature],
+  );
+  const shouldSyncCommittedTreeFromProps = useMemo(() => {
+    if (!isUserControlled) {
+      return true;
+    }
+    if (hasSelectedFilters(persistedInteractionFilters)) {
+      return false;
+    }
+    if (!isSameRuntimeLayout(runtimeLayout, committedRuntimeLayout)) {
+      return false;
+    }
+    if (!isEqual(selectedFiltersForTreeSync, committedFilters)) {
+      return false;
+    }
+    return committedTreeFromPropsHasLeafSources;
+  }, [
+    committedFilters,
+    committedRuntimeLayout,
+    committedTreeFromPropsHasLeafSources,
+    isUserControlled,
+    persistedInteractionFilters,
+    runtimeLayout,
+    selectedFiltersForTreeSync,
+  ]);
+  useEffect(() => {
+    // Ignore stale upstream updates while a local interaction update is still
+    // pending or while upstream data is incompatible with active measure leaves.
+    if (!shouldSyncCommittedTreeFromProps) {
+      return;
+    }
+    setCommittedTree(committedTreeFromProps);
+    setSeamlessWarnings([]);
+    setSeamlessError(undefined);
+    setSeamlessLoading(false);
+    setFrozenUserViewProps(null);
+    pendingSeamlessLayoutRef.current = null;
+  }, [committedTreeFromProps, shouldSyncCommittedTreeFromProps]);
 
   useEffect(() => {
     const pendingLayout = pendingSeamlessLayoutRef.current;
@@ -1677,6 +1783,14 @@ function PivotTableChart(props: PivotTableProps) {
           setSeamlessWarnings(collectWarnings(results));
           persistRuntimeState(normalized, nextFilters);
         });
+        lastSeamlessSyncRef.current = {
+          filtersSignature:
+            Object.keys(nextFilters).length > 0
+              ? stableStringify(nextFilters)
+              : null,
+          layoutSignature: stableStringify(normalized),
+          upstreamSignature: upstreamSeamlessSignature,
+        };
       } catch (error) {
         if (requestId !== seamlessRequestRef.current) {
           return;
@@ -1710,6 +1824,7 @@ function PivotTableChart(props: PivotTableProps) {
       setSeamlessError,
       setSeamlessLoading,
       setSeamlessWarnings,
+      upstreamSeamlessSignature,
     ],
   );
 
@@ -1756,6 +1871,65 @@ function PivotTableChart(props: PivotTableProps) {
       uiSelectedFilters,
     ],
   );
+
+  useEffect(() => {
+    if (!upstreamDashboardQueryContextSignature) {
+      lastUpstreamQueryContextRef.current = null;
+      return;
+    }
+    const previous = lastUpstreamQueryContextRef.current;
+    lastUpstreamQueryContextRef.current = {
+      data,
+      signature: upstreamDashboardQueryContextSignature,
+    };
+    if (!previous) {
+      return;
+    }
+    if (previous.signature === upstreamDashboardQueryContextSignature) {
+      return;
+    }
+    if (previous.data !== data) {
+      return;
+    }
+    applySeamlessUpdate(uiRuntimeLayout, uiSelectedFilters);
+  }, [
+    applySeamlessUpdate,
+    data,
+    uiRuntimeLayout,
+    uiSelectedFilters,
+    upstreamDashboardQueryContextSignature,
+  ]);
+
+  useEffect(() => {
+    if (!isUserControlled || !hasSelectedFilters(persistedInteractionFilters)) {
+      return;
+    }
+    if (
+      !isEqual(committedFilters, persistedInteractionFilters) ||
+      !isEqual(uiSelectedFilters, persistedInteractionFilters)
+    ) {
+      return;
+    }
+    const layoutSignature = stableStringify(uiRuntimeLayout);
+    const currentSync = lastSeamlessSyncRef.current;
+    if (
+      currentSync?.filtersSignature === persistedInteractionFiltersSignature &&
+      currentSync.layoutSignature === layoutSignature &&
+      currentSync.upstreamSignature === upstreamSeamlessSignature
+    ) {
+      return;
+    }
+    applySeamlessUpdate(uiRuntimeLayout, persistedInteractionFilters);
+  }, [
+    applySeamlessUpdate,
+    committedFilters,
+    isUserControlled,
+    persistedInteractionFilters,
+    persistedInteractionFiltersSignature,
+    uiRuntimeLayout,
+    uiSelectedFilters,
+    upstreamSeamlessSignature,
+  ]);
 
   const dimensionLabelMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -2193,18 +2367,40 @@ function PivotTableChart(props: PivotTableProps) {
   ]);
   const [fetchedDimensionFilterValues, setFetchedDimensionFilterValues] =
     useState<Record<string, DataRecordValue[]>>({});
+  const [dimensionFilterSearchText, setDimensionFilterSearchText] = useState<
+    Record<string, string>
+  >({});
   const [dimensionFilterLoading, setDimensionFilterLoading] = useState<
     Record<string, boolean>
   >({});
   const dimensionFilterValues = useMemo(
-    () => ({
-      ...treeDimensionFilterValues,
-      ...fetchedDimensionFilterValues,
-    }),
-    [fetchedDimensionFilterValues, treeDimensionFilterValues],
+    () =>
+      Object.fromEntries(
+        dimensionList.map(dimension => {
+          const dimensionKey = getStableColumnKey(dimension);
+          const search = dimensionFilterSearchText[dimensionKey]?.trim() ?? '';
+          const fetchedValues =
+            fetchedDimensionFilterValues[dimensionKey] ?? EMPTY_FILTER_VALUES;
+          if (search.length > 0) {
+            return [dimensionKey, fetchedValues];
+          }
+          const treeValues =
+            treeDimensionFilterValues[dimensionKey] ?? EMPTY_FILTER_VALUES;
+          return [
+            dimensionKey,
+            Array.from(new Set([...treeValues, ...fetchedValues])),
+          ];
+        }),
+      ),
+    [
+      dimensionFilterSearchText,
+      dimensionList,
+      fetchedDimensionFilterValues,
+      treeDimensionFilterValues,
+    ],
   );
   const dimensionFilterValuesVersion = useRef(0);
-  const dimensionFilterValuesInFlight = useRef(new Set<string>());
+  const dimensionFilterRequestVersion = useRef<Record<string, number>>({});
   const dimensionFilterValuesRef = useRef(treeDimensionFilterValues);
 
   useEffect(() => {
@@ -2214,28 +2410,26 @@ function PivotTableChart(props: PivotTableProps) {
     dimensionFilterValuesRef.current = treeDimensionFilterValues;
     dimensionFilterValuesVersion.current += 1;
     setFetchedDimensionFilterValues({});
+    setDimensionFilterSearchText({});
   }, [treeDimensionFilterValues]);
 
   const handleFetchDimensionValues = useCallback(
-    async (dimension: PivotTableProps['groupbyRows'][number]) => {
+    async (dimension: PivotTableProps['groupbyRows'][number], search = '') => {
       const dimensionKey = getStableColumnKey(dimension);
-      if (
-        Object.prototype.hasOwnProperty.call(
-          fetchedDimensionFilterValues,
-          dimensionKey,
-        )
-      ) {
-        return;
-      }
-      if (dimensionFilterValuesInFlight.current.has(dimensionKey)) {
-        return;
-      }
-      dimensionFilterValuesInFlight.current.add(dimensionKey);
+      const normalizedSearch = search.trim();
+      setDimensionFilterSearchText(current =>
+        current[dimensionKey] === normalizedSearch
+          ? current
+          : { ...current, [dimensionKey]: normalizedSearch },
+      );
       setDimensionFilterLoading(current => ({
         ...current,
         [dimensionKey]: true,
       }));
       const requestVersion = dimensionFilterValuesVersion.current;
+      const nextRequestVersion =
+        (dimensionFilterRequestVersion.current[dimensionKey] ?? 0) + 1;
+      dimensionFilterRequestVersion.current[dimensionKey] = nextRequestVersion;
       try {
         const selection = { ...uiSelectedFilters };
         delete selection[dimensionKey];
@@ -2259,14 +2453,23 @@ function PivotTableChart(props: PivotTableProps) {
           queryName: buildDimensionValuesQueryName(dimensionKey),
           columns: [dimension],
           metrics: [],
-          filters: [],
+          filters: buildDimensionValueSearchFilters({
+            dimension,
+            dimensionKey,
+            colTypeMap,
+            search: normalizedSearch,
+          }),
         };
         const results = await supersetChartDataClient.fetch({
           formData: normalizedFormData,
           specs: [spec],
           requestGroupId: `${DIMENSION_VALUES_REQUEST_GROUP}-${dimensionKey}`,
         });
-        if (dimensionFilterValuesVersion.current !== requestVersion) {
+        if (
+          dimensionFilterValuesVersion.current !== requestVersion ||
+          dimensionFilterRequestVersion.current[dimensionKey] !==
+            nextRequestVersion
+        ) {
           return;
         }
         const result = results[0];
@@ -2282,24 +2485,31 @@ function PivotTableChart(props: PivotTableProps) {
           [dimensionKey]: Array.from(values.values()),
         }));
       } catch (error) {
+        if (
+          typeof DOMException !== 'undefined' &&
+          error instanceof DOMException &&
+          error.name === 'AbortError'
+        ) {
+          return;
+        }
         // Ignore errors for dimension value lookups; filtering still works.
       } finally {
-        dimensionFilterValuesInFlight.current.delete(dimensionKey);
-        setDimensionFilterLoading(current => {
-          if (!current[dimensionKey]) {
-            return current;
-          }
-          const next = { ...current };
-          delete next[dimensionKey];
-          return next;
-        });
+        if (
+          dimensionFilterRequestVersion.current[dimensionKey] ===
+          nextRequestVersion
+        ) {
+          setDimensionFilterLoading(current => {
+            if (!current[dimensionKey]) {
+              return current;
+            }
+            const next = { ...current };
+            delete next[dimensionKey];
+            return next;
+          });
+        }
       }
     },
-    [
-      fetchedDimensionFilterValues,
-      fetchFormDataBaseWithFormatters,
-      uiSelectedFilters,
-    ],
+    [colTypeMap, fetchFormDataBaseWithFormatters, uiSelectedFilters],
   );
 
   const handleDimensionFilterChange = useCallback(
@@ -2655,6 +2865,7 @@ function PivotTableChart(props: PivotTableProps) {
           onFilterChange={handleDimensionFilterChange}
           onClearFilters={handleClearAllFilters}
           onFilterValuesOpen={handleFetchDimensionValues}
+          onFilterValuesSearch={handleFetchDimensionValues}
           runtimeLayout={uiRuntimeLayout}
           onChange={handleRuntimeLayoutChange}
         />

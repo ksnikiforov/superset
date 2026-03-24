@@ -131,11 +131,16 @@ describe('PivotTableChart interaction filter seamless updates', () => {
     };
 
     fetchMock.mockImplementation(
-      async ({ requestGroupId, specs, formData: requestFormData }: FetchArgs) => {
+      async ({
+        requestGroupId,
+        specs,
+        formData: requestFormData,
+      }: FetchArgs) => {
         if (requestGroupId !== 'pivot-v3-seamless') {
           return specs.map(() => ({ data: records }));
         }
-        const selectionFilters = requestFormData?.extra_form_data?.filters ?? [];
+        const selectionFilters =
+          requestFormData?.extra_form_data?.filters ?? [];
         const hasRow1Filter = selectionFilters.some(
           filter => filter.col === 'row1' && filter.op === 'IN',
         );
@@ -188,7 +193,9 @@ describe('PivotTableChart interaction filter seamless updates', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Clear chart filters' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Clear chart filters' }),
+    );
 
     await waitFor(() =>
       expect(setControlValue).toHaveBeenCalledWith('pivotSelectedFilters', {}),
@@ -212,9 +219,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
     );
 
     await waitFor(() => {
-      const rowLabels = within(
-        container.querySelector('tbody') as HTMLElement,
-      )
+      const rowLabels = within(container.querySelector('tbody') as HTMLElement)
         .getAllByRole('row')
         .map(row => (row.querySelector('th')?.textContent || '').trim());
       expect(rowLabels).toContain('A');
@@ -239,13 +244,251 @@ describe('PivotTableChart interaction filter seamless updates', () => {
     );
 
     await waitFor(() => {
-      const rowLabels = within(
-        container.querySelector('tbody') as HTMLElement,
-      )
+      const rowLabels = within(container.querySelector('tbody') as HTMLElement)
         .getAllByRole('row')
         .map(row => (row.querySelector('th')?.textContent || '').trim());
       expect(rowLabels).toContain('A');
       expect(rowLabels).toContain('B');
+    });
+  });
+
+  it('refetches when dashboard extra_form_data changes in user controlled mode', async () => {
+    const metrics = ['m1'];
+    const rows = ['row1'];
+    const allRecords = [
+      { row1: 'A', m1: 10 },
+      { row1: 'B', m1: 20 },
+    ];
+    const filteredRecords = [{ row1: 'A', m1: 10 }];
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows,
+      cols: [],
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dashboardId: 1,
+      dimensions: rows,
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      startCollapsed: false,
+      initialDepth: 1,
+    });
+    const baseTree = applyMetricAxis(
+      buildTreeFromRecords(allRecords, metrics, rows, [], 1, 0),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      rows,
+      [],
+      0,
+    );
+
+    type FetchArgs = {
+      requestGroupId?: string;
+      specs: Array<unknown>;
+      formData?: {
+        extra_form_data?: {
+          filters?: Array<{ col?: string; op?: string; val?: unknown }>;
+        };
+      };
+    };
+
+    fetchMock.mockImplementation(
+      async ({
+        requestGroupId,
+        specs,
+        formData: requestFormData,
+      }: FetchArgs) => {
+        if (requestGroupId !== 'pivot-v3-seamless') {
+          return specs.map(() => ({ data: allRecords }));
+        }
+        const dashboardFilters =
+          requestFormData?.extra_form_data?.filters ?? [];
+        const hasDashboardFilter = dashboardFilters.some(
+          filter =>
+            filter.col === 'row1' &&
+            filter.op === 'IN' &&
+            Array.isArray(filter.val) &&
+            filter.val.includes('A'),
+        );
+        return specs.map(() => ({
+          data: hasDashboardFilter ? filteredRecords : allRecords,
+        }));
+      },
+    );
+
+    const { container, rerender } = render(
+      <PivotTableChart
+        data={baseTree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+        width={600}
+        height={300}
+      />,
+    );
+
+    fetchMock.mockClear();
+
+    const dashboardFilteredFormData = {
+      ...formData,
+      extra_form_data: {
+        filters: [{ col: 'row1', op: 'IN', val: ['A'] }],
+      },
+    };
+
+    rerender(
+      <PivotTableChart
+        data={baseTree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={dashboardFilteredFormData}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+        width={600}
+        height={300}
+      />,
+    );
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestGroupId: 'pivot-v3-seamless',
+        formData: expect.objectContaining({
+          extra_form_data: expect.objectContaining({
+            filters: expect.arrayContaining([
+              expect.objectContaining({
+                col: 'row1',
+                op: 'IN',
+                val: ['A'],
+              }),
+            ]),
+          }),
+        }),
+      }),
+    );
+
+    await waitFor(() => {
+      const rowLabels = within(container.querySelector('tbody') as HTMLElement)
+        .getAllByRole('row')
+        .map(row => (row.querySelector('th')?.textContent || '').trim());
+      expect(rowLabels).toEqual(['A']);
+    });
+  });
+
+  it('restores persisted interaction-filter data and keeps it across width rerenders', async () => {
+    const metrics = ['m1'];
+    const rows = ['row1'];
+    const allRecords = [
+      { row1: 'A', m1: 10 },
+      { row1: 'B', m1: 20 },
+    ];
+    const filteredRecords = [{ row1: 'A', m1: 10 }];
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows,
+      cols: [],
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dashboardId: 1,
+      dimensions: rows,
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      pivotSelectedFilters: { row1: ['A'] },
+      startCollapsed: false,
+      initialDepth: 1,
+    });
+    const tree = applyMetricAxis(
+      buildTreeFromRecords(allRecords, metrics, rows, [], 1, 0),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      rows,
+      [],
+      0,
+    );
+
+    fetchMock.mockImplementation(
+      async ({
+        requestGroupId,
+        specs,
+      }: {
+        requestGroupId?: string;
+        specs: [];
+      }) =>
+        requestGroupId === 'pivot-v3-seamless'
+          ? specs.map(() => ({ data: filteredRecords }))
+          : specs.map(() => ({ data: allRecords })),
+    );
+
+    const { container, rerender } = render(
+      <PivotTableChart
+        data={tree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+        selectedFilters={{}}
+        width={600}
+        height={300}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          requestGroupId: 'pivot-v3-seamless',
+        }),
+      ),
+    );
+
+    await waitFor(() => {
+      const rowLabels = within(container.querySelector('tbody') as HTMLElement)
+        .getAllByRole('row')
+        .map(row => (row.querySelector('th')?.textContent || '').trim());
+      expect(rowLabels).toContain('A');
+      expect(rowLabels).not.toContain('B');
+    });
+
+    rerender(
+      <PivotTableChart
+        data={tree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+        selectedFilters={{}}
+        width={480}
+        height={300}
+      />,
+    );
+
+    await waitFor(() => {
+      const rowLabels = within(container.querySelector('tbody') as HTMLElement)
+        .getAllByRole('row')
+        .map(row => (row.querySelector('th')?.textContent || '').trim());
+      expect(rowLabels).toContain('A');
+      expect(rowLabels).not.toContain('B');
     });
   });
 });
