@@ -198,6 +198,51 @@ describe('shouldFetchForLayoutChange', () => {
     expect(shouldFetchForLayoutChange(prevLayout, nextLayout)).toBe(true);
   });
 
+  it('returns false when adding the first non-value column dimension after leading Values while rows stay stable', () => {
+    const prevLayout: PivotRuntimeLayout = {
+      ...baseLayout,
+      rows: ['row1', 'row2'],
+      cols: [],
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const nextLayout: PivotRuntimeLayout = {
+      ...prevLayout,
+      cols: ['col1'],
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    expect(shouldFetchForLayoutChange(prevLayout, nextLayout)).toBe(false);
+  });
+
+  it('returns true when adding the first non-value column dimension before trailing Values while rows stay stable', () => {
+    const prevLayout: PivotRuntimeLayout = {
+      ...baseLayout,
+      rows: ['row1', 'row2'],
+      cols: [],
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const nextLayout: PivotRuntimeLayout = {
+      ...prevLayout,
+      cols: ['col1'],
+      valuePlacement: { axis: 'col', index: 1 },
+    };
+    expect(shouldFetchForLayoutChange(prevLayout, nextLayout)).toBe(true);
+  });
+
+  it('returns true when adding the first non-value column dimension from values-only layout', () => {
+    const prevLayout: PivotRuntimeLayout = {
+      ...baseLayout,
+      rows: [],
+      cols: [],
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const nextLayout: PivotRuntimeLayout = {
+      ...prevLayout,
+      cols: ['col1'],
+      valuePlacement: { axis: 'col', index: 1 },
+    };
+    expect(shouldFetchForLayoutChange(prevLayout, nextLayout)).toBe(true);
+  });
+
   it('follows first-on-stack fetch semantics across a multistep row layout sequence', () => {
     const layout0: PivotRuntimeLayout = {
       ...baseLayout,

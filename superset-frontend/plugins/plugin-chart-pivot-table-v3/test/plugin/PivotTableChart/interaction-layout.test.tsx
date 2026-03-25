@@ -33,6 +33,7 @@ import {
   buildMeasureLeafOutputKey,
   buildValueLeaf,
 } from '../../../src/pivot/measureLeaves';
+import { supersetChartDataClient } from '../../../src/pivot/data/SupersetChartDataClient';
 
 describe('PivotTableChart interaction layout', () => {
   it('persists runtime layout via setControlValue in user controlled mode', async () => {
@@ -1611,5 +1612,407 @@ describe('PivotTableChart interaction layout', () => {
     await waitFor(() =>
       expect(rowMetricValues()).toEqual(expect.arrayContaining([150, 33])),
     );
+  });
+
+  it('keeps local column layout on stale dashboard rerender after seamless update', async () => {
+    const metrics = ['m1'];
+    const rows = ['row1'];
+    const cols = ['col1'];
+    const staleRecords = [{ row1: 'A', m1: 10 }];
+    const recoveredRecords = [{ row1: 'A', col1: 'ColorA', m1: 10 }];
+    const staleRuntimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows,
+      cols: [],
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const baseFormData = buildFormData({
+      interactionMode: 'user_controlled',
+      dashboardId: 1,
+      dimensions: [...rows, ...cols],
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: staleRuntimeLayout,
+      startCollapsed: false,
+      initialDepth: 1,
+    });
+    const staleTree = applyMetricAxis(
+      buildTreeFromRecords(staleRecords, metrics, rows, [], 1, 0),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      rows,
+      [],
+      0,
+    );
+    const setControlValue = jest.fn();
+    const fetchSpy = jest
+      .spyOn(supersetChartDataClient, 'fetch')
+      .mockImplementation(async ({ requestGroupId, specs }) =>
+        requestGroupId === 'pivot-v3-seamless'
+          ? specs.map(() => ({ data: recoveredRecords }))
+          : specs.map(() => ({ data: staleRecords })),
+      );
+    const cancelSpy = jest
+      .spyOn(supersetChartDataClient, 'cancel')
+      .mockImplementation(() => undefined);
+
+    const { rerender } = render(
+      <PivotTableChart
+        data={staleTree}
+        formData={baseFormData}
+        rawFormData={baseFormData}
+        queryFormData={baseFormData}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+        setControlValue={setControlValue}
+        width={600}
+        height={300}
+      />,
+    );
+
+    fireEvent.click(screen.getAllByLabelText('Toggle column dimension')[1]);
+
+    await waitFor(() =>
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          requestGroupId: 'pivot-v3-seamless',
+        }),
+      ),
+    );
+    await waitFor(() => expect(screen.getByText('ColorA')).toBeInTheDocument());
+
+    const staleRerenderFormData = {
+      ...baseFormData,
+      pivotRuntimeLayout: { ...staleRuntimeLayout },
+    };
+
+    rerender(
+      <PivotTableChart
+        data={staleTree}
+        formData={staleRerenderFormData}
+        rawFormData={staleRerenderFormData}
+        queryFormData={{ ...staleRerenderFormData }}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+        setControlValue={setControlValue}
+        width={480}
+        height={300}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText('ColorA')).toBeInTheDocument());
+
+    fetchSpy.mockRestore();
+    cancelSpy.mockRestore();
+  });
+
+  it('keeps column dimension headers after stale dashboard rerender when startCollapsed is enabled', async () => {
+    const metrics = ['m1'];
+    const rows = ['row1'];
+    const cols = ['col1'];
+    const staleRecords = [{ row1: 'A', m1: 10 }];
+    const recoveredRecords = [{ row1: 'A', col1: 'ColorA', m1: 10 }];
+    const staleRuntimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows,
+      cols: [],
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const baseFormData = buildFormData({
+      interactionMode: 'user_controlled',
+      dashboardId: 1,
+      dimensions: [...rows, ...cols],
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: staleRuntimeLayout,
+      startCollapsed: true,
+      initialDepth: 1,
+    });
+    const staleTree = applyMetricAxis(
+      buildTreeFromRecords(staleRecords, metrics, rows, [], 1, 0),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      rows,
+      [],
+      0,
+    );
+    const setControlValue = jest.fn();
+    const fetchSpy = jest
+      .spyOn(supersetChartDataClient, 'fetch')
+      .mockImplementation(async ({ requestGroupId, specs }) =>
+        requestGroupId === 'pivot-v3-seamless'
+          ? specs.map(() => ({ data: recoveredRecords }))
+          : specs.map(() => ({ data: staleRecords })),
+      );
+    const cancelSpy = jest
+      .spyOn(supersetChartDataClient, 'cancel')
+      .mockImplementation(() => undefined);
+
+    const { rerender } = render(
+      <PivotTableChart
+        data={staleTree}
+        formData={baseFormData}
+        rawFormData={baseFormData}
+        queryFormData={baseFormData}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+        setControlValue={setControlValue}
+        width={600}
+        height={300}
+      />,
+    );
+
+    fireEvent.click(screen.getAllByLabelText('Toggle column dimension')[1]);
+
+    await waitFor(() =>
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          requestGroupId: 'pivot-v3-seamless',
+        }),
+      ),
+    );
+    await waitFor(() => expect(screen.getByText('ColorA')).toBeInTheDocument());
+
+    const staleRerenderFormData = {
+      ...baseFormData,
+      pivotRuntimeLayout: { ...staleRuntimeLayout },
+    };
+
+    rerender(
+      <PivotTableChart
+        data={staleTree}
+        formData={staleRerenderFormData}
+        rawFormData={staleRerenderFormData}
+        queryFormData={{ ...staleRerenderFormData }}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+        setControlValue={setControlValue}
+        width={480}
+        height={300}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText('ColorA')).toBeInTheDocument());
+
+    fetchSpy.mockRestore();
+    cancelSpy.mockRestore();
+  });
+
+  it('keeps seamless data after stale dashboard rerender with unchanged query context', async () => {
+    const metrics = ['m1'];
+    const rows = ['row1'];
+    const cols = ['col1'];
+    const staleRecords = [{ row1: 'A', col1: 'ColorA', m1: 111 }];
+    const recoveredRecords = [{ row1: 'A', col1: 'ColorA', m1: 999 }];
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows,
+      cols: [],
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 1 },
+    };
+    const baseFormData = buildFormData({
+      interactionMode: 'user_controlled',
+      dashboardId: 1,
+      dimensions: [...rows, ...cols],
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      startCollapsed: false,
+      initialDepth: 1,
+      treeDataSignature: 'stable-signature',
+    });
+    const staleTree = applyMetricAxis(
+      buildTreeFromRecords(staleRecords, metrics, rows, cols, 1, 1),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      rows,
+      cols,
+      1,
+    );
+    const fetchSpy = jest
+      .spyOn(supersetChartDataClient, 'fetch')
+      .mockImplementation(async ({ requestGroupId, specs }) =>
+        requestGroupId === 'pivot-v3-seamless'
+          ? specs.map(() => ({ data: recoveredRecords }))
+          : specs.map(() => ({ data: staleRecords })),
+      );
+    const cancelSpy = jest
+      .spyOn(supersetChartDataClient, 'cancel')
+      .mockImplementation(() => undefined);
+
+    const { rerender } = render(
+      <PivotTableChart
+        data={staleTree}
+        formData={baseFormData}
+        rawFormData={baseFormData}
+        queryFormData={baseFormData}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+        width={600}
+        height={300}
+      />,
+    );
+
+    fireEvent.click(screen.getAllByLabelText('Toggle column dimension')[1]);
+
+    await waitFor(() =>
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          requestGroupId: 'pivot-v3-seamless',
+        }),
+      ),
+    );
+    await waitFor(() => expect(screen.getByText('999')).toBeInTheDocument());
+
+    const staleRerenderFormData = {
+      ...baseFormData,
+      pivotRuntimeLayout: {
+        ...runtimeLayout,
+        cols,
+      },
+      treeDataSignature: 'stable-signature',
+    };
+
+    rerender(
+      <PivotTableChart
+        data={staleTree}
+        formData={staleRerenderFormData}
+        rawFormData={staleRerenderFormData}
+        queryFormData={{ ...staleRerenderFormData }}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+        width={480}
+        height={300}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.queryByText('111')).not.toBeInTheDocument(),
+    );
+    expect(screen.getByText('999')).toBeInTheDocument();
+
+    fetchSpy.mockRestore();
+    cancelSpy.mockRestore();
+  });
+
+  it('keeps seamless data after stale dashboard rerender when only treeDataSignature changes', async () => {
+    const metrics = ['m1'];
+    const rows = ['row1'];
+    const cols = ['col1'];
+    const staleRecords = [{ row1: 'A', col1: 'ColorA', m1: 111 }];
+    const recoveredRecords = [{ row1: 'A', col1: 'ColorA', m1: 999 }];
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows,
+      cols: [],
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 1 },
+    };
+    const baseFormData = buildFormData({
+      interactionMode: 'user_controlled',
+      dashboardId: 1,
+      dimensions: [...rows, ...cols],
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      startCollapsed: false,
+      initialDepth: 1,
+      treeDataSignature: 'signature-a',
+    });
+    const staleTree = applyMetricAxis(
+      buildTreeFromRecords(staleRecords, metrics, rows, cols, 1, 1),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      rows,
+      cols,
+      1,
+    );
+    const fetchSpy = jest
+      .spyOn(supersetChartDataClient, 'fetch')
+      .mockImplementation(async ({ requestGroupId, specs }) =>
+        requestGroupId === 'pivot-v3-seamless'
+          ? specs.map(() => ({ data: recoveredRecords }))
+          : specs.map(() => ({ data: staleRecords })),
+      );
+    const cancelSpy = jest
+      .spyOn(supersetChartDataClient, 'cancel')
+      .mockImplementation(() => undefined);
+
+    const { rerender } = render(
+      <PivotTableChart
+        data={staleTree}
+        formData={baseFormData}
+        rawFormData={baseFormData}
+        queryFormData={baseFormData}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+        width={600}
+        height={300}
+      />,
+    );
+
+    fireEvent.click(screen.getAllByLabelText('Toggle column dimension')[1]);
+
+    await waitFor(() =>
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          requestGroupId: 'pivot-v3-seamless',
+        }),
+      ),
+    );
+    await waitFor(() => expect(screen.getByText('999')).toBeInTheDocument());
+
+    const staleRerenderFormData = {
+      ...baseFormData,
+      pivotRuntimeLayout: {
+        ...runtimeLayout,
+        cols,
+      },
+      treeDataSignature: 'signature-b',
+    };
+
+    rerender(
+      <PivotTableChart
+        data={staleTree}
+        formData={staleRerenderFormData}
+        rawFormData={staleRerenderFormData}
+        queryFormData={{ ...staleRerenderFormData }}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+        width={480}
+        height={300}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.queryByText('111')).not.toBeInTheDocument(),
+    );
+    expect(screen.getByText('999')).toBeInTheDocument();
+
+    fetchSpy.mockRestore();
+    cancelSpy.mockRestore();
   });
 });

@@ -66,6 +66,11 @@ import { PivotInteractionPanel } from './pivot/chart/PivotInteractionPanel';
 import { resolveInteractionFormData } from './pivot/layout/resolveInteractionLayout';
 import { buildLayoutContext } from './pivot/layout/LayoutContext';
 import { shouldFetchForLayoutChange } from './pivot/layout/shouldFetchForLayoutChange';
+import {
+  shouldSyncCommittedTreeFromProps as shouldSyncCommittedTreeFromPropsBase,
+  treeHasStaleCoverageRegression,
+  treeHasRuntimeLayoutCoverage,
+} from './pivot/layout/committedTreeSyncGuard';
 import { buildInitialQuerySpecs } from './pivot/query/specs';
 import {
   buildInitialPivotUpdatePlan,
@@ -1125,6 +1130,7 @@ function PivotTableChart(props: PivotTableProps) {
     layoutSignature: string;
     upstreamSignature: string;
   } | null>(null);
+  const lastLocalSyncDashboardQueryContextRef = useRef<string | null>(null);
   const dataForRender = isUserControlled ? committedTree : data;
 
   const treeRef = useRef<PivotTableProps['data']>(dataForRender);
@@ -1281,6 +1287,8 @@ function PivotTableChart(props: PivotTableProps) {
   const [uiSelectedFilters, setUiSelectedFilters] = useState<
     Record<string, DataRecordValue[]>
   >(selectedFilters ?? EMPTY_SELECTED_FILTERS);
+  const lastPersistedRuntimeLayoutRef = useRef(runtimeLayout);
+  const pendingPersistedRuntimeLayoutSyncRef = useRef(false);
   const selectedFiltersFromProps = selectedFilters ?? EMPTY_SELECTED_FILTERS;
   const lastPersistedSelectionRef = useRef(selectedFiltersFromProps);
   const pendingPersistedSelectionSyncRef = useRef(false);
@@ -1311,6 +1319,13 @@ function PivotTableChart(props: PivotTableProps) {
   ]);
 
   useEffect(() => {
+    if (
+      isUserControlled &&
+      isDashboardContext &&
+      pendingPersistedRuntimeLayoutSyncRef.current
+    ) {
+      return;
+    }
     const pendingLayout = pendingSeamlessLayoutRef.current;
     if (pendingLayout && isSameRuntimeLayout(runtimeLayout, pendingLayout)) {
       return;
@@ -1318,7 +1333,21 @@ function PivotTableChart(props: PivotTableProps) {
     setCommittedRuntimeLayout(current =>
       isSameRuntimeLayout(current, runtimeLayout) ? current : runtimeLayout,
     );
-  }, [runtimeLayout]);
+  }, [isDashboardContext, isUserControlled, runtimeLayout]);
+  useEffect(() => {
+    if (
+      !isUserControlled ||
+      !isDashboardContext ||
+      !pendingPersistedRuntimeLayoutSyncRef.current
+    ) {
+      return;
+    }
+    if (
+      isSameRuntimeLayout(runtimeLayout, lastPersistedRuntimeLayoutRef.current)
+    ) {
+      pendingPersistedRuntimeLayoutSyncRef.current = false;
+    }
+  }, [isDashboardContext, isUserControlled, runtimeLayout]);
   const appliedMetricKeysBase = useMemo(
     () => getMetricKeys(ensureIsArray(appliedMetrics)),
     [appliedMetrics],
@@ -1397,6 +1426,27 @@ function PivotTableChart(props: PivotTableProps) {
         formData: appliedLayoutFormData,
       }),
     [appliedLayoutFormData, committedTreeFromProps, isUserControlled],
+  );
+  const committedTreeHasRuntimeLayoutCoverage = useMemo(
+    () =>
+      !isUserControlled ||
+      treeHasRuntimeLayoutCoverage(committedTree, committedRuntimeLayout),
+    [committedRuntimeLayout, committedTree, isUserControlled],
+  );
+  const committedTreeHasStaleCoverageRegression = useMemo(
+    () =>
+      isUserControlled &&
+      treeHasStaleCoverageRegression(committedTree, committedRuntimeLayout),
+    [committedRuntimeLayout, committedTree, isUserControlled],
+  );
+  const committedTreeFromPropsHasStaleCoverageRegression = useMemo(
+    () =>
+      isUserControlled &&
+      treeHasStaleCoverageRegression(
+        committedTreeFromProps,
+        committedRuntimeLayout,
+      ),
+    [committedRuntimeLayout, committedTreeFromProps, isUserControlled],
   );
   const layoutMetrics = useMemo(
     () =>
@@ -1531,29 +1581,47 @@ function PivotTableChart(props: PivotTableProps) {
       }),
     [formData.treeDataSignature, upstreamDashboardQueryContextSignature],
   );
-  const shouldSyncCommittedTreeFromProps = useMemo(() => {
-    if (!isUserControlled) {
-      return true;
-    }
-    if (hasSelectedFilters(persistedInteractionFilters)) {
-      return false;
-    }
-    if (!isSameRuntimeLayout(runtimeLayout, committedRuntimeLayout)) {
-      return false;
-    }
-    if (!isEqual(selectedFiltersForTreeSync, committedFilters)) {
-      return false;
-    }
-    return committedTreeFromPropsHasLeafSources;
-  }, [
-    committedFilters,
-    committedRuntimeLayout,
-    committedTreeFromPropsHasLeafSources,
-    isUserControlled,
-    persistedInteractionFilters,
-    runtimeLayout,
-    selectedFiltersForTreeSync,
-  ]);
+  const hasLocalSyncForCurrentDashboardQueryContext =
+    isDashboardContext &&
+    upstreamDashboardQueryContextSignature !== null &&
+    lastLocalSyncDashboardQueryContextRef.current ===
+      upstreamDashboardQueryContextSignature;
+  const shouldSyncCommittedTreeFromProps = useMemo(
+    () =>
+      shouldSyncCommittedTreeFromPropsBase({
+        isUserControlled,
+        isDashboardContext,
+        hasLocalSyncForCurrentDashboardQueryContext,
+        hasPersistedInteractionFilters: hasSelectedFilters(
+          persistedInteractionFilters,
+        ),
+        runtimeLayoutMatchesCommitted: isSameRuntimeLayout(
+          runtimeLayout,
+          committedRuntimeLayout,
+        ),
+        selectedFiltersMatchCommitted: isEqual(
+          selectedFiltersForTreeSync,
+          committedFilters,
+        ),
+        propsTreeHasRequiredLeafSources: committedTreeFromPropsHasLeafSources,
+        committedTreeHasRuntimeLayoutCoverage,
+        propsTreeHasStaleCoverageRegression:
+          committedTreeFromPropsHasStaleCoverageRegression,
+      }),
+    [
+      committedFilters,
+      committedRuntimeLayout,
+      committedTreeFromPropsHasLeafSources,
+      committedTreeFromPropsHasStaleCoverageRegression,
+      committedTreeHasRuntimeLayoutCoverage,
+      hasLocalSyncForCurrentDashboardQueryContext,
+      isDashboardContext,
+      isUserControlled,
+      persistedInteractionFilters,
+      runtimeLayout,
+      selectedFiltersForTreeSync,
+    ],
+  );
   useEffect(() => {
     // Ignore stale upstream updates while a local interaction update is still
     // pending or while upstream data is incompatible with active measure leaves.
@@ -1569,12 +1637,19 @@ function PivotTableChart(props: PivotTableProps) {
   }, [committedTreeFromProps, shouldSyncCommittedTreeFromProps]);
 
   useEffect(() => {
+    if (
+      isUserControlled &&
+      isDashboardContext &&
+      pendingPersistedRuntimeLayoutSyncRef.current
+    ) {
+      return;
+    }
     const pendingLayout = pendingSeamlessLayoutRef.current;
     if (pendingLayout && isSameRuntimeLayout(runtimeLayout, pendingLayout)) {
       return;
     }
     setUiRuntimeLayout(runtimeLayout);
-  }, [runtimeLayout]);
+  }, [isDashboardContext, isUserControlled, runtimeLayout]);
 
   const persistedSelectedFilters = useMemo(() => {
     if (!isUserControlled) {
@@ -1654,6 +1729,18 @@ function PivotTableChart(props: PivotTableProps) {
       layout: PivotRuntimeLayout,
       filters: Record<string, DataRecordValue[]>,
     ) => {
+      if (
+        isUserControlled &&
+        isDashboardContext &&
+        !isSameRuntimeLayout(lastPersistedRuntimeLayoutRef.current, layout)
+      ) {
+        lastPersistedRuntimeLayoutRef.current = layout;
+        pendingPersistedRuntimeLayoutSyncRef.current = true;
+      }
+      if (isUserControlled && isDashboardContext) {
+        lastLocalSyncDashboardQueryContextRef.current =
+          upstreamDashboardQueryContextSignature;
+      }
       if (!isEqual(lastPersistedSelectionRef.current, filters)) {
         lastPersistedSelectionRef.current = filters;
         pendingPersistedSelectionSyncRef.current = true;
@@ -1674,11 +1761,14 @@ function PivotTableChart(props: PivotTableProps) {
       }
     },
     [
+      isDashboardContext,
+      isUserControlled,
       mergeOwnState,
       setControlValue,
       setDataMask,
       shouldPersistControlValue,
       shouldPersistOwnState,
+      upstreamDashboardQueryContextSignature,
     ],
   );
 
@@ -1783,6 +1873,8 @@ function PivotTableChart(props: PivotTableProps) {
           setSeamlessWarnings(collectWarnings(results));
           persistRuntimeState(normalized, nextFilters);
         });
+        lastLocalSyncDashboardQueryContextRef.current =
+          upstreamDashboardQueryContextSignature;
         lastSeamlessSyncRef.current = {
           filtersSignature:
             Object.keys(nextFilters).length > 0
@@ -1825,8 +1917,10 @@ function PivotTableChart(props: PivotTableProps) {
       setSeamlessLoading,
       setSeamlessWarnings,
       upstreamSeamlessSignature,
+      upstreamDashboardQueryContextSignature,
     ],
   );
+  const staleCoverageRecoverySignatureRef = useRef<string | null>(null);
 
   const handleRuntimeLayoutChange = useCallback(
     (nextLayout: PivotRuntimeLayout) => {
@@ -1859,6 +1953,14 @@ function PivotTableChart(props: PivotTableProps) {
         return;
       }
       persistRuntimeState(normalized, uiSelectedFilters);
+      lastSeamlessSyncRef.current = {
+        filtersSignature:
+          Object.keys(uiSelectedFilters).length > 0
+            ? stableStringify(uiSelectedFilters)
+            : null,
+        layoutSignature: stableStringify(normalized),
+        upstreamSignature: upstreamSeamlessSignature,
+      };
     },
     [
       applySeamlessUpdate,
@@ -1869,6 +1971,7 @@ function PivotTableChart(props: PivotTableProps) {
       queryFormData,
       isUserControlled,
       uiSelectedFilters,
+      upstreamSeamlessSignature,
     ],
   );
 
@@ -1930,6 +2033,44 @@ function PivotTableChart(props: PivotTableProps) {
     uiSelectedFilters,
     upstreamSeamlessSignature,
   ]);
+
+  useEffect(() => {
+    if (
+      !isUserControlled ||
+      !isDashboardContext ||
+      hasSelectedFilters(persistedInteractionFilters) ||
+      !committedTreeHasStaleCoverageRegression ||
+      seamlessLoading
+    ) {
+      return;
+    }
+    const recoverySignature = stableStringify({
+      layout: uiRuntimeLayout,
+      filters: uiSelectedFilters,
+      upstreamSignature: upstreamSeamlessSignature,
+    });
+    if (staleCoverageRecoverySignatureRef.current === recoverySignature) {
+      return;
+    }
+    staleCoverageRecoverySignatureRef.current = recoverySignature;
+    applySeamlessUpdate(uiRuntimeLayout, uiSelectedFilters);
+  }, [
+    applySeamlessUpdate,
+    committedTreeHasStaleCoverageRegression,
+    isDashboardContext,
+    isUserControlled,
+    persistedInteractionFilters,
+    seamlessLoading,
+    uiRuntimeLayout,
+    uiSelectedFilters,
+    upstreamSeamlessSignature,
+  ]);
+
+  useEffect(() => {
+    if (committedTreeHasRuntimeLayoutCoverage) {
+      staleCoverageRecoverySignatureRef.current = null;
+    }
+  }, [committedTreeHasRuntimeLayoutCoverage]);
 
   const dimensionLabelMap = useMemo(() => {
     const map = new Map<string, string>();

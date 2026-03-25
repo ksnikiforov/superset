@@ -491,4 +491,77 @@ describe('PivotTableChart interaction filter seamless updates', () => {
       expect(rowLabels).not.toContain('B');
     });
   });
+
+  it('recovers stale dashboard remount tree when runtime layout requires a missing column dimension', async () => {
+    const metrics = ['m1'];
+    const rows = ['row1'];
+    const cols = ['col1'];
+    const staleRecords = [{ row1: 'A', m1: 10 }];
+    const recoveredRecords = [{ row1: 'A', col1: 'ColorA', m1: 10 }];
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows,
+      cols,
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dashboardId: 1,
+      dimensions: [...rows, ...cols],
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: runtimeLayout,
+      startCollapsed: false,
+      initialDepth: 1,
+    });
+    const staleTree = applyMetricAxis(
+      buildTreeFromRecords(staleRecords, metrics, rows, [], 1, 0),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      rows,
+      [],
+      0,
+    );
+
+    fetchMock.mockImplementation(
+      async ({
+        requestGroupId,
+        specs,
+      }: {
+        requestGroupId?: string;
+        specs: unknown[];
+      }) =>
+        requestGroupId === 'pivot-v3-seamless'
+          ? specs.map(() => ({ data: recoveredRecords }))
+          : specs.map(() => ({ data: staleRecords })),
+    );
+
+    render(
+      <PivotTableChart
+        data={staleTree}
+        formData={formData}
+        rawFormData={formData}
+        queryFormData={formData}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+        width={600}
+        height={300}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          requestGroupId: 'pivot-v3-seamless',
+        }),
+      ),
+    );
+
+    await waitFor(() => expect(screen.getByText('ColorA')).toBeInTheDocument());
+  });
 });
