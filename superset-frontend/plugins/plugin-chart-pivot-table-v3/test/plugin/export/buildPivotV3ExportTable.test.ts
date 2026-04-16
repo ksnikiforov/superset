@@ -112,4 +112,380 @@ describe('buildPivotV3ExportTable', () => {
     );
     expect(headerCells).toEqual(['Row 1', 'Row 2', 'Metric']);
   });
+
+  it('does not create extra row header columns when axis labels are shorter than depth markers', () => {
+    document.body.innerHTML = `
+      <table class="pivot-v3-table" data-pivot-row-axis-labels='["resellerName"]'>
+        <thead>
+          <tr>
+            <th>Rows</th>
+            <th>Sales</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th>
+              <div data-pivot-row-depth="1">
+                <span data-pivot-row-label>A Bike Store</span>
+              </div>
+            </th>
+            <td>10</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    const original = document.querySelector('table') as HTMLTableElement;
+    const exported = buildPivotV3ExportTable(original);
+
+    const headerCells = Array.from(exported.tHead?.rows[0].cells ?? []).map(
+      cell => cell.textContent?.trim(),
+    );
+    const rowCells = Array.from(exported.tBodies[0].rows[0].cells).map(cell =>
+      cell.textContent?.trim(),
+    );
+
+    expect(headerCells).toEqual(['resellerName', 'Sales']);
+    expect(rowCells).toEqual(['A Bike Store', '10']);
+  });
+
+  it('normalizes one-based depth markers to keep row labels in correct columns', () => {
+    document.body.innerHTML = `
+      <table class="pivot-v3-table" data-pivot-row-axis-labels='["productModel","productColor","productName"]'>
+        <thead>
+          <tr>
+            <th>Rows</th>
+            <th>Sales</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th>
+              <div data-pivot-row-depth="1">
+                <span data-pivot-row-label>Road-250</span>
+              </div>
+            </th>
+            <td>100</td>
+          </tr>
+          <tr>
+            <th>
+              <div data-pivot-row-depth="2">
+                <span data-pivot-row-label>Red</span>
+              </div>
+            </th>
+            <td>40</td>
+          </tr>
+          <tr>
+            <th>
+              <div data-pivot-row-depth="3">
+                <span data-pivot-row-label>Road-250 Red, 58</span>
+              </div>
+            </th>
+            <td>20</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    const original = document.querySelector('table') as HTMLTableElement;
+    const exported = buildPivotV3ExportTable(original);
+
+    const bodyRows = Array.from(exported.tBodies[0].rows).map(row =>
+      Array.from(row.cells).map(cell => cell.textContent?.trim() ?? ''),
+    );
+
+    expect(bodyRows[0]).toEqual(['Road-250', '', '', '100']);
+    expect(bodyRows[1]).toEqual(['Road-250', 'Red', '', '40']);
+    expect(bodyRows[2]).toEqual(['Road-250', 'Red', 'Road-250 Red, 58', '20']);
+  });
+
+  it('normalizes one-based depths even when a grand total row is depth 0', () => {
+    document.body.innerHTML = `
+      <table class="pivot-v3-table" data-pivot-row-axis-labels='["productModel","productColor","productName"]'>
+        <thead>
+          <tr>
+            <th>Rows</th>
+            <th>Sales</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th>
+              <div data-pivot-row-depth="0">
+                <span data-pivot-row-label>Grand Total</span>
+              </div>
+            </th>
+            <td>1000</td>
+          </tr>
+          <tr>
+            <th>
+              <div data-pivot-row-depth="1">
+                <span data-pivot-row-label>Road-250</span>
+              </div>
+            </th>
+            <td>500</td>
+          </tr>
+          <tr>
+            <th>
+              <div data-pivot-row-depth="2">
+                <span data-pivot-row-label>Red</span>
+              </div>
+            </th>
+            <td>300</td>
+          </tr>
+          <tr>
+            <th>
+              <div data-pivot-row-depth="3">
+                <span data-pivot-row-label>Road-250 Red, 58</span>
+              </div>
+            </th>
+            <td>100</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    const original = document.querySelector('table') as HTMLTableElement;
+    const exported = buildPivotV3ExportTable(original);
+
+    const bodyRows = Array.from(exported.tBodies[0].rows).map(row =>
+      Array.from(row.cells).map(cell => cell.textContent?.trim() ?? ''),
+    );
+
+    expect(bodyRows[0]).toEqual(['Grand Total', '', '', '1000']);
+    expect(bodyRows[1]).toEqual(['Road-250', '', '', '500']);
+    expect(bodyRows[2]).toEqual(['Road-250', 'Red', '', '300']);
+    expect(bodyRows[3]).toEqual(['Road-250', 'Red', 'Road-250 Red, 58', '100']);
+  });
+
+  it('keeps alignment when subtotal rows are placed at the bottom', () => {
+    document.body.innerHTML = `
+      <table class="pivot-v3-table" data-pivot-row-axis-labels='["productModel","productColor","productName"]'>
+        <thead>
+          <tr>
+            <th>Rows</th>
+            <th>Sales</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th>
+              <div data-pivot-row-depth="1">
+                <span data-pivot-row-label>Road-250</span>
+              </div>
+            </th>
+            <td>900</td>
+          </tr>
+          <tr>
+            <th>
+              <div data-pivot-row-depth="2">
+                <span data-pivot-row-label>Red</span>
+              </div>
+            </th>
+            <td>400</td>
+          </tr>
+          <tr>
+            <th>
+              <div data-pivot-row-depth="3">
+                <span data-pivot-row-label>Road-250 Red, 58</span>
+              </div>
+            </th>
+            <td>100</td>
+          </tr>
+          <tr>
+            <th>
+              <div data-pivot-row-depth="3">
+                <span data-pivot-row-label>Road-250 Red, 44</span>
+              </div>
+            </th>
+            <td>120</td>
+          </tr>
+          <tr>
+            <th>
+              <div data-pivot-row-depth="2">
+                <span data-pivot-row-label>Subtotal</span>
+              </div>
+            </th>
+            <td>220</td>
+          </tr>
+          <tr>
+            <th>
+              <div data-pivot-row-depth="2">
+                <span data-pivot-row-label>Black</span>
+              </div>
+            </th>
+            <td>500</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    const original = document.querySelector('table') as HTMLTableElement;
+    const exported = buildPivotV3ExportTable(original);
+
+    const bodyRows = Array.from(exported.tBodies[0].rows).map(row =>
+      Array.from(row.cells).map(cell => cell.textContent?.trim() ?? ''),
+    );
+
+    expect(bodyRows[0]).toEqual(['Road-250', '', '', '900']);
+    expect(bodyRows[1]).toEqual(['Road-250', 'Red', '', '400']);
+    expect(bodyRows[2]).toEqual(['Road-250', 'Red', 'Road-250 Red, 58', '100']);
+    expect(bodyRows[3]).toEqual(['Road-250', 'Red', 'Road-250 Red, 44', '120']);
+    expect(bodyRows[4]).toEqual(['Road-250', 'Subtotal', '', '220']);
+    expect(bodyRows[5]).toEqual(['Road-250', 'Black', '', '500']);
+  });
+
+  it('keeps row/header alignment when a row header depth marker is missing', () => {
+    document.body.innerHTML = `
+      <table class="pivot-v3-table" data-pivot-row-axis-labels='["Region","City"]'>
+        <thead>
+          <tr>
+            <th>Rows</th>
+            <th>Sales</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th>
+              <div data-pivot-row-depth="0">
+                <span data-pivot-row-label>West</span>
+              </div>
+            </th>
+            <td>10</td>
+          </tr>
+          <tr>
+            <th>
+              <div>
+                <span data-pivot-row-label>Grand Total</span>
+              </div>
+            </th>
+            <td>15</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    const original = document.querySelector('table') as HTMLTableElement;
+    const exported = buildPivotV3ExportTable(original);
+
+    const bodyRows = Array.from(exported.tBodies[0].rows).map(row =>
+      Array.from(row.cells).map(cell => cell.textContent?.trim() ?? ''),
+    );
+
+    expect(bodyRows[0]).toEqual(['West', '', '10']);
+    expect(bodyRows[1]).toEqual(['Grand Total', '', '15']);
+    expect(bodyRows[0]).toHaveLength(3);
+    expect(bodyRows[1]).toHaveLength(3);
+  });
+
+  it('keeps alignment with multi-level column headers and grand total rows', () => {
+    document.body.innerHTML = `
+      <table class="pivot-v3-table" data-pivot-row-axis-labels='["Region","City"]'>
+        <thead>
+          <tr>
+            <th rowspan="2">Rows</th>
+            <th colspan="2">2025</th>
+            <th colspan="2">Grand Total</th>
+          </tr>
+          <tr>
+            <th>Sales</th>
+            <th>Profit</th>
+            <th>Sales</th>
+            <th>Profit</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th>
+              <div data-pivot-row-depth="0">
+                <span data-pivot-row-label>West</span>
+              </div>
+            </th>
+            <td>10</td>
+            <td>1</td>
+            <td>20</td>
+            <td>2</td>
+          </tr>
+          <tr>
+            <th>
+              <div data-pivot-row-depth="1">
+                <span data-pivot-row-label>San Francisco</span>
+              </div>
+            </th>
+            <td>5</td>
+            <td>0.5</td>
+            <td>8</td>
+            <td>0.8</td>
+          </tr>
+          <tr>
+            <th>
+              <div>
+                <span data-pivot-row-label>Grand Total</span>
+              </div>
+            </th>
+            <td>15</td>
+            <td>1.5</td>
+            <td>28</td>
+            <td>2.8</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    const original = document.querySelector('table') as HTMLTableElement;
+    const exported = buildPivotV3ExportTable(original);
+
+    const topHeaderCells = Array.from(exported.tHead?.rows[0].cells ?? []).map(
+      cell => cell.textContent?.trim(),
+    );
+    const bodyRows = Array.from(exported.tBodies[0].rows).map(row =>
+      Array.from(row.cells).map(cell => cell.textContent?.trim() ?? ''),
+    );
+
+    expect(topHeaderCells).toEqual(['Region', 'City', '2025', 'Grand Total']);
+    expect(bodyRows[0]).toEqual(['West', '', '10', '1', '20', '2']);
+    expect(bodyRows[1]).toEqual([
+      'West',
+      'San Francisco',
+      '5',
+      '0.5',
+      '8',
+      '0.8',
+    ]);
+    expect(bodyRows[2]).toEqual(['Grand Total', '', '15', '1.5', '28', '2.8']);
+    expect(bodyRows[0]).toHaveLength(6);
+    expect(bodyRows[1]).toHaveLength(6);
+    expect(bodyRows[2]).toHaveLength(6);
+  });
+
+  it('exports numeric-marked cells as raw numeric values for Excel typing', () => {
+    document.body.innerHTML = `
+      <table class="pivot-v3-table" data-pivot-row-axis-labels='["Region"]'>
+        <thead>
+          <tr>
+            <th>Rows</th>
+            <th>Revenue</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th>
+              <div data-pivot-row-depth="0">
+                <span data-pivot-row-label>West</span>
+              </div>
+            </th>
+            <td data-pivot-export-type="number" data-pivot-export-value="1234.567890123456">1,234.57</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    const original = document.querySelector('table') as HTMLTableElement;
+    const exported = buildPivotV3ExportTable(original);
+    const numericCell = exported.tBodies[0].rows[0].cells[1];
+
+    expect(numericCell.textContent?.trim()).toBe('1234.567890123456');
+    expect(numericCell.dataset.t).toBe('n');
+    expect(numericCell.dataset.v).toBe('1234.567890123456');
+  });
 });

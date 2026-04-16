@@ -20,6 +20,8 @@
 const ROW_DEPTH_ATTR = 'data-pivot-row-depth';
 const ROW_LABEL_ATTR = 'data-pivot-row-label';
 const ROW_AXIS_LABELS_ATTR = 'data-pivot-row-axis-labels';
+const EXPORT_CELL_TYPE_ATTR = 'data-pivot-export-type';
+const EXPORT_CELL_VALUE_ATTR = 'data-pivot-export-value';
 
 const getText = (value: string | null | undefined) =>
   (value ?? '').replace(/\s+/g, ' ').trim();
@@ -58,6 +60,10 @@ const resolveDepthCount = (
   rows: HTMLTableRowElement[],
   axisLabels: string[],
 ): number => {
+  if (axisLabels.length > 0) {
+    return axisLabels.length;
+  }
+
   let maxDepth = -1;
   rows.forEach(row => {
     const depth = parseDepth(row);
@@ -65,7 +71,7 @@ const resolveDepthCount = (
       maxDepth = depth;
     }
   });
-  return Math.max(maxDepth + 1, axisLabels.length);
+  return maxDepth + 1;
 };
 
 const toHeaderLabels = (depthCount: number, axisLabels: string[]): string[] =>
@@ -111,38 +117,79 @@ const splitRowHeadersIntoColumns = (
     table.querySelectorAll<HTMLTableRowElement>('tbody tr'),
   );
   const activePath: string[] = [];
+  const parsedDepths = bodyRows
+    .map(parseDepth)
+    .filter((depth): depth is number => typeof depth === 'number');
+  const positiveDepths = parsedDepths.filter(depth => depth > 0);
+  const shouldNormalizeOneBasedDepth =
+    positiveDepths.length > 0 &&
+    positiveDepths.every(depth => depth <= depthCount) &&
+    positiveDepths.some(depth => depth === depthCount);
 
   bodyRows.forEach(row => {
-    const sourceHeader = row.querySelector('th');
-    if (!sourceHeader) {
-      return;
-    }
-
-    const depth = parseDepth(row);
-    if (typeof depth !== 'number') {
-      return;
-    }
+    const firstCell = row.cells[0];
+    const sourceHeader =
+      firstCell?.tagName === 'TH' ? (firstCell as HTMLTableCellElement) : null;
+    const parsedDepth = parseDepth(row);
+    const depth =
+      typeof parsedDepth === 'number'
+        ? shouldNormalizeOneBasedDepth && parsedDepth > 0
+          ? parsedDepth - 1
+          : parsedDepth
+        : sourceHeader
+          ? 0
+          : null;
 
     const rowLabelNode = row.querySelector<HTMLElement>(`[${ROW_LABEL_ATTR}]`);
     const rowLabel = getText(
-      rowLabelNode?.textContent ?? sourceHeader.textContent,
+      rowLabelNode?.textContent ?? sourceHeader?.textContent,
     );
-    const clampedDepth = Math.max(0, Math.min(depth, depthCount - 1));
+    const clampedDepth =
+      typeof depth === 'number'
+        ? Math.max(0, Math.min(depth, depthCount - 1))
+        : null;
 
-    activePath.length = clampedDepth;
-    activePath[clampedDepth] = rowLabel;
+    if (typeof clampedDepth === 'number') {
+      activePath.length = clampedDepth;
+      activePath[clampedDepth] = rowLabel;
+    }
 
     const rowValues = Array.from({ length: depthCount }, (_, index) =>
-      index <= clampedDepth ? (activePath[index] ?? '') : '',
+      typeof clampedDepth === 'number' && index <= clampedDepth
+        ? (activePath[index] ?? '')
+        : '',
     );
 
-    sourceHeader.remove();
+    sourceHeader?.remove();
 
     rowValues.forEach((value, index) => {
       const replacement = table.ownerDocument.createElement('th');
       replacement.textContent = value;
       row.insertBefore(replacement, row.cells[index] ?? null);
     });
+  });
+};
+
+const coerceNumericCellsForExcel = (table: HTMLTableElement) => {
+  const numericCells = Array.from(
+    table.querySelectorAll<HTMLTableCellElement>(
+      `td[${EXPORT_CELL_TYPE_ATTR}="number"][${EXPORT_CELL_VALUE_ATTR}]`,
+    ),
+  );
+
+  numericCells.forEach(numericCell => {
+    const cell = numericCell;
+    const rawValue = cell.getAttribute(EXPORT_CELL_VALUE_ATTR)?.trim();
+    if (!rawValue) {
+      return;
+    }
+    const parsed = Number(rawValue);
+    if (!Number.isFinite(parsed)) {
+      return;
+    }
+    cell.textContent = rawValue;
+    cell.setAttribute('data-t', 'n');
+    cell.setAttribute('data-v', rawValue);
   });
 };
 
@@ -162,6 +209,7 @@ export const buildPivotV3ExportTable = (
 
   replaceCornerWithAxisLabels(cloned, toHeaderLabels(depthCount, axisLabels));
   splitRowHeadersIntoColumns(cloned, depthCount);
+  coerceNumericCellsForExcel(cloned);
 
   return cloned;
 };

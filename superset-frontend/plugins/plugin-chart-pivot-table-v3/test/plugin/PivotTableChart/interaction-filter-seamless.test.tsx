@@ -342,7 +342,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
     const dashboardFilteredFormData = {
       ...formData,
       extra_form_data: {
-        filters: [{ col: 'row1', op: 'IN', val: ['A'] }],
+        filters: [{ col: 'row1', op: 'IN' as const, val: ['A'] }],
       },
     };
 

@@ -786,6 +786,11 @@ export const PivotTableView = ({
                     );
                     const currentValue =
                       cell && metricKey ? cell.values[metricKey] : undefined;
+                    const exportNumericValue =
+                      typeof currentValue === 'number' &&
+                      Number.isFinite(currentValue)
+                        ? currentValue
+                        : undefined;
                     const backgroundColor =
                       (applyColorFormatting
                         ? normalizeCssColor(
@@ -901,6 +906,16 @@ export const PivotTableView = ({
                         key={cellKey}
                         className={cellClassName}
                         style={style}
+                        data-pivot-export-type={
+                          exportNumericValue !== undefined
+                            ? 'number'
+                            : undefined
+                        }
+                        data-pivot-export-value={
+                          exportNumericValue !== undefined
+                            ? String(exportNumericValue)
+                            : undefined
+                        }
                         {...cellInteractionProps}
                         onContextMenu={event =>
                           handleCellContextMenu(event, row, col)
