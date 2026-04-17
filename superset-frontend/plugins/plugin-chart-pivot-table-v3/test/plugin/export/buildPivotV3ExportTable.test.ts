@@ -209,7 +209,7 @@ describe('buildPivotV3ExportTable', () => {
           </tr>
         </thead>
         <tbody>
-          <tr>
+          <tr class="pivot-grand-total-row pivot-grand-total-row--top">
             <th>
               <div data-pivot-row-depth="0">
                 <span data-pivot-row-label>Grand Total</span>
@@ -256,6 +256,56 @@ describe('buildPivotV3ExportTable', () => {
     expect(bodyRows[1]).toEqual(['Road-250', '', '', '500']);
     expect(bodyRows[2]).toEqual(['Road-250', 'Red', '', '300']);
     expect(bodyRows[3]).toEqual(['Road-250', 'Red', 'Road-250 Red, 58', '100']);
+  });
+
+  it('normalizes one-based depths when subtotal rows use depth 0', () => {
+    document.body.innerHTML = `
+      <table class="pivot-v3-table" data-pivot-row-axis-labels='["productColor","productModel","productName"]'>
+        <thead>
+          <tr>
+            <th>Rows</th>
+            <th>Sales</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th class="subtotal-cell">
+              <div data-pivot-row-depth="0">
+                <span data-pivot-row-label>(NULL)</span>
+              </div>
+            </th>
+            <td>100</td>
+          </tr>
+          <tr>
+            <th>
+              <div data-pivot-row-depth="1">
+                <span data-pivot-row-label>Blue</span>
+              </div>
+            </th>
+            <td>80</td>
+          </tr>
+          <tr>
+            <th>
+              <div data-pivot-row-depth="2">
+                <span data-pivot-row-label>Classic Vest</span>
+              </div>
+            </th>
+            <td>30</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    const original = document.querySelector('table') as HTMLTableElement;
+    const exported = buildPivotV3ExportTable(original);
+
+    const bodyRows = Array.from(exported.tBodies[0].rows).map(row =>
+      Array.from(row.cells).map(cell => cell.textContent?.trim() ?? ''),
+    );
+
+    expect(bodyRows[0]).toEqual(['(NULL)', '', '100']);
+    expect(bodyRows[1]).toEqual(['Blue', '', '80']);
+    expect(bodyRows[2]).toEqual(['Blue', 'Classic Vest', '30']);
   });
 
   it('keeps alignment when subtotal rows are placed at the bottom', () => {
@@ -335,6 +385,56 @@ describe('buildPivotV3ExportTable', () => {
     expect(bodyRows[5]).toEqual(['Road-250', 'Black', '', '500']);
   });
 
+  it('keeps top grand total isolated and aligns one-based partial expansions', () => {
+    document.body.innerHTML = `
+      <table class="pivot-v3-table" data-pivot-row-axis-labels='["productColor","productModel","productName"]'>
+        <thead>
+          <tr>
+            <th>Rows</th>
+            <th>Sales</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="pivot-grand-total-row pivot-grand-total-row--top">
+            <th>
+              <div data-pivot-row-depth="0">
+                <span data-pivot-row-label>Grand total</span>
+              </div>
+            </th>
+            <td>999</td>
+          </tr>
+          <tr>
+            <th>
+              <div data-pivot-row-depth="1">
+                <span data-pivot-row-label>Blue</span>
+              </div>
+            </th>
+            <td>500</td>
+          </tr>
+          <tr>
+            <th>
+              <div data-pivot-row-depth="2">
+                <span data-pivot-row-label>Classic Vest</span>
+              </div>
+            </th>
+            <td>120</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    const original = document.querySelector('table') as HTMLTableElement;
+    const exported = buildPivotV3ExportTable(original);
+
+    const bodyRows = Array.from(exported.tBodies[0].rows).map(row =>
+      Array.from(row.cells).map(cell => cell.textContent?.trim() ?? ''),
+    );
+
+    expect(bodyRows[0]).toEqual(['Grand total', '', '999']);
+    expect(bodyRows[1]).toEqual(['Blue', '', '500']);
+    expect(bodyRows[2]).toEqual(['Blue', 'Classic Vest', '120']);
+  });
+
   it('keeps row/header alignment when a row header depth marker is missing', () => {
     document.body.innerHTML = `
       <table class="pivot-v3-table" data-pivot-row-axis-labels='["Region","City"]'>
@@ -372,10 +472,10 @@ describe('buildPivotV3ExportTable', () => {
       Array.from(row.cells).map(cell => cell.textContent?.trim() ?? ''),
     );
 
-    expect(bodyRows[0]).toEqual(['West', '', '10']);
-    expect(bodyRows[1]).toEqual(['Grand Total', '', '15']);
-    expect(bodyRows[0]).toHaveLength(3);
-    expect(bodyRows[1]).toHaveLength(3);
+    expect(bodyRows[0]).toEqual(['West', '10']);
+    expect(bodyRows[1]).toEqual(['Grand Total', '15']);
+    expect(bodyRows[0]).toHaveLength(2);
+    expect(bodyRows[1]).toHaveLength(2);
   });
 
   it('keeps alignment with multi-level column headers and grand total rows', () => {
@@ -487,5 +587,164 @@ describe('buildPivotV3ExportTable', () => {
     expect(numericCell.textContent?.trim()).toBe('1234.567890123456');
     expect(numericCell.dataset.t).toBe('n');
     expect(numericCell.dataset.v).toBe('1234.567890123456');
+  });
+
+  it('exports only visible row levels and adds Total label for subtotal rows', () => {
+    document.body.innerHTML = `
+      <table class="pivot-v3-table" data-pivot-row-axis-labels='["resellerName","productModel","productName"]'>
+        <thead>
+          <tr>
+            <th>Rows</th>
+            <th>Продажи в деньгах</th>
+            <th>Продажи в шт</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="pivot-grand-total-row pivot-grand-total-row--top">
+            <th class="subtotal-cell">
+              <div data-pivot-row-depth="0">
+                <span data-pivot-row-label>Grand total</span>
+              </div>
+            </th>
+            <td>110336782.1</td>
+            <td>274776</td>
+          </tr>
+          <tr>
+            <th>
+              <div data-pivot-row-depth="1">
+                <span data-pivot-row-label>[Not Applicable]</span>
+              </div>
+            </th>
+            <td>29358677.22</td>
+            <td>60398</td>
+          </tr>
+          <tr>
+            <th class="subtotal-cell">
+              <div data-pivot-row-depth="1">
+                <span data-pivot-row-label>A Bike Store</span>
+              </div>
+            </th>
+            <td>85177.0812</td>
+            <td>121</td>
+          </tr>
+          <tr>
+            <th>
+              <div data-pivot-row-depth="2">
+                <span data-pivot-row-label>LL Road Frame</span>
+              </div>
+            </th>
+            <td>2737.6434</td>
+            <td>15</td>
+          </tr>
+          <tr>
+            <th class="subtotal-cell">
+              <div data-pivot-row-depth="1">
+                <span data-pivot-row-label>A Great Bicycle Company</span>
+              </div>
+            </th>
+            <td>9055.2903</td>
+            <td>21</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    const original = document.querySelector('table') as HTMLTableElement;
+    const exported = buildPivotV3ExportTable(original);
+
+    const headerCells = Array.from(exported.tHead?.rows[0].cells ?? []).map(
+      cell => cell.textContent?.trim(),
+    );
+    const bodyRows = Array.from(exported.tBodies[0].rows).map(row =>
+      Array.from(row.cells).map(cell => cell.textContent?.trim() ?? ''),
+    );
+
+    expect(headerCells).toEqual([
+      'resellerName',
+      'productModel',
+      'Продажи в деньгах',
+      'Продажи в шт',
+    ]);
+    expect(bodyRows[0]).toEqual(['Grand total', '', '110336782.1', '274776']);
+    expect(bodyRows[1]).toEqual([
+      '[Not Applicable]',
+      '',
+      '29358677.22',
+      '60398',
+    ]);
+    expect(bodyRows[2]).toEqual(['A Bike Store', 'Total', '85177.0812', '121']);
+    expect(bodyRows[3]).toEqual([
+      'A Bike Store',
+      'LL Road Frame',
+      '2737.6434',
+      '15',
+    ]);
+    expect(bodyRows[4]).toEqual([
+      'A Great Bicycle Company',
+      '',
+      '9055.2903',
+      '21',
+    ]);
+  });
+
+  it('uses header cells for grand total and subtotal values so Excel can render totals in bold', () => {
+    document.body.innerHTML = `
+      <table class="pivot-v3-table" data-pivot-row-axis-labels='["resellerName","productModel"]' data-pivot-row-total-label="Total">
+        <thead>
+          <tr>
+            <th>Rows</th>
+            <th>Sales</th>
+            <th>Qty</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="pivot-grand-total-row pivot-grand-total-row--top">
+            <th class="subtotal-cell">
+              <div data-pivot-row-depth="0">
+                <span data-pivot-row-label>Grand total</span>
+              </div>
+            </th>
+            <td data-pivot-export-type="number" data-pivot-export-value="1000">1,000</td>
+            <td data-pivot-export-type="number" data-pivot-export-value="10">10</td>
+          </tr>
+          <tr>
+            <th class="subtotal-cell">
+              <div data-pivot-row-depth="1">
+                <span data-pivot-row-label>A Bike Store</span>
+              </div>
+            </th>
+            <td data-pivot-export-type="number" data-pivot-export-value="100">100</td>
+            <td data-pivot-export-type="number" data-pivot-export-value="1">1</td>
+          </tr>
+          <tr>
+            <th>
+              <div data-pivot-row-depth="2">
+                <span data-pivot-row-label>Road-150</span>
+              </div>
+            </th>
+            <td data-pivot-export-type="number" data-pivot-export-value="60">60</td>
+            <td data-pivot-export-type="number" data-pivot-export-value="1">1</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    const original = document.querySelector('table') as HTMLTableElement;
+    const exported = buildPivotV3ExportTable(original);
+    const grandTotalRow = exported.tBodies[0].rows[0];
+    const subtotalRow = exported.tBodies[0].rows[1];
+
+    expect(grandTotalRow.cells[0].tagName).toBe('TH');
+    expect(grandTotalRow.cells[1].tagName).toBe('TH');
+    expect(grandTotalRow.cells[2].tagName).toBe('TH');
+    expect(grandTotalRow.cells[2].dataset.t).toBe('n');
+    expect(grandTotalRow.cells[2].dataset.v).toBe('1000');
+
+    expect(subtotalRow.cells[0].tagName).toBe('TH');
+    expect(subtotalRow.cells[1].textContent?.trim()).toBe('Total');
+    expect(subtotalRow.cells[1].tagName).toBe('TH');
+    expect(subtotalRow.cells[2].tagName).toBe('TH');
+    expect(subtotalRow.cells[2].dataset.t).toBe('n');
+    expect(subtotalRow.cells[2].dataset.v).toBe('100');
   });
 });

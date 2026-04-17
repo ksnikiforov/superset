@@ -67,6 +67,7 @@ import { resolveInteractionFormData } from './pivot/layout/resolveInteractionLay
 import { buildLayoutContext } from './pivot/layout/LayoutContext';
 import { shouldFetchForLayoutChange } from './pivot/layout/shouldFetchForLayoutChange';
 import {
+  canProjectValueAxisShrinkWithoutFetch,
   shouldSyncCommittedTreeFromProps as shouldSyncCommittedTreeFromPropsBase,
   treeHasStaleCoverageRegression,
   treeHasRuntimeLayoutCoverage,
@@ -1468,8 +1469,18 @@ function PivotTableChart(props: PivotTableProps) {
     [appliedLayoutFormData.groupbyColumns, groupbyColumns, isUserControlled],
   );
   const rowAxisLabels = useMemo(
-    () => layoutGroupbyRows.map(dimension => getColumnLabel(dimension)),
-    [layoutGroupbyRows],
+    () =>
+      layoutGroupbyRows.map(dimension => {
+        const baseLabel = getColumnLabel(dimension);
+        const stableKey = getStableColumnKey(dimension);
+        return (
+          dimensionLabelOverrides[stableKey] ??
+          (typeof dimension === 'string'
+            ? (dimensionLabelOverrides[dimension] ?? baseLabel)
+            : baseLabel)
+        );
+      }),
+    [dimensionLabelOverrides, layoutGroupbyRows],
   );
   const layoutMetricsLayout = useMemo(
     () =>
@@ -1933,7 +1944,22 @@ function PivotTableChart(props: PivotTableProps) {
         isUserControlled &&
         queryFormData &&
         isMetricOrderOnlyChange(committedRuntimeLayout, normalized);
-      if (shouldFetchForLayoutChange(committedRuntimeLayout, normalized)) {
+      const needsStructuralFetch = shouldFetchForLayoutChange(
+        committedRuntimeLayout,
+        normalized,
+      );
+      const projectionTree =
+        Object.keys(treeRef.current.cells).length > 0
+          ? mergeTrees(committedTree, treeRef.current)
+          : committedTree;
+      const needsProjectionFetch =
+        !needsStructuralFetch &&
+        !canProjectValueAxisShrinkWithoutFetch({
+          tree: projectionTree,
+          prev: committedRuntimeLayout,
+          next: normalized,
+        });
+      if (needsStructuralFetch || needsProjectionFetch) {
         const shouldDeferUiLayoutCommit =
           committedRuntimeLayout.valuePlacement.axis !==
             normalized.valuePlacement.axis ||
@@ -1965,6 +1991,7 @@ function PivotTableChart(props: PivotTableProps) {
     [
       applySeamlessUpdate,
       committedRuntimeLayout,
+      committedTree,
       dimensionKeys,
       metricKeys,
       persistRuntimeState,

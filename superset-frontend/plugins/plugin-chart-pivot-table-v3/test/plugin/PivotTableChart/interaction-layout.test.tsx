@@ -19,6 +19,10 @@
 import { fireEvent, render, screen, waitFor, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { buildFormData } from '../fixtures/pivotFormData';
+import { buildBranchTreeFromResults } from '../../../src/fetchPivotBranch';
+import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
+import { resolveInteractionFormData } from '../../../src/pivot/layout/resolveInteractionLayout';
+import { buildInitialQuerySpecs } from '../../../src/pivot/query/specs';
 import {
   applyMeasureHierarchyAxis,
   applyMetricAxis,
@@ -34,6 +38,52 @@ import {
   buildValueLeaf,
 } from '../../../src/pivot/measureLeaves';
 import { supersetChartDataClient } from '../../../src/pivot/data/SupersetChartDataClient';
+
+const buildInitialBootstrapTree = ({
+  formData,
+  runtimeLayout,
+  resultsByDepth,
+}: {
+  formData: ReturnType<typeof buildFormData>;
+  runtimeLayout: PivotRuntimeLayout;
+  resultsByDepth: Record<string, Record<string, unknown>[]>;
+}) => {
+  const resolvedFormData = resolveInteractionFormData({
+    formData,
+    runtimeLayout,
+  });
+  const layout = buildLayoutContext(resolvedFormData);
+  const specs = buildInitialQuerySpecs(resolvedFormData, layout);
+
+  return specs.reduce(
+    (tree, spec) =>
+      mergeTrees(
+        tree,
+        buildBranchTreeFromResults({
+          results: [
+            {
+              data:
+                resultsByDepth[`${spec.meta.rowDepth}|${spec.meta.colDepth}`] ??
+                [],
+            },
+          ],
+          queryPairs: [
+            { rowDepth: spec.meta.rowDepth, colDepth: spec.meta.colDepth },
+          ],
+          metricsForQuery: spec.metrics,
+          formData: resolvedFormData,
+          measureHierarchy: layout.measureHierarchy,
+          rowGroupby: spec.meta.rowGroupbyForQueryFull,
+          colGroupby: spec.meta.colGroupbyForQueryFull,
+          rowSubtotalLevels: spec.meta.rowSubtotalLevels,
+          colSubtotalLevels: spec.meta.colSubtotalLevels,
+          metricsLayoutResolved: spec.meta.metricsLayoutResolved,
+          metricInsertIndex: spec.meta.metricInsertIndex,
+        }),
+      ),
+    { rows: {}, cols: {}, cells: {} },
+  );
+};
 
 describe('PivotTableChart interaction layout', () => {
   it('persists runtime layout via setControlValue in user controlled mode', async () => {
@@ -1707,6 +1757,250 @@ describe('PivotTableChart interaction layout', () => {
     );
 
     await waitFor(() => expect(screen.getByText('ColorA')).toBeInTheDocument());
+
+    fetchSpy.mockRestore();
+    cancelSpy.mockRestore();
+  });
+
+  it('keeps seamless multi-metric values-only cells after stale dashboard rerender', async () => {
+    const metrics = ['m1', 'm2'];
+    const rows = ['row1'];
+    const cols = ['col1'];
+    const staleRecords = [{ row1: 'A', col1: 'ColorA', m1: 111, m2: 222 }];
+    const recoveredRecords = [{ row1: 'A', m1: 999, m2: 777 }];
+    const initialRuntimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows,
+      cols,
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 1 },
+    };
+    const valuesOnlyRuntimeLayout: PivotRuntimeLayout = {
+      ...initialRuntimeLayout,
+      cols: [],
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const baseFormData = buildFormData({
+      interactionMode: 'user_controlled',
+      dashboardId: 1,
+      dimensions: [...rows, ...cols],
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: initialRuntimeLayout,
+      startCollapsed: false,
+      initialDepth: 1,
+      treeDataSignature: 'stable-signature',
+    });
+    const staleTree = applyMetricAxis(
+      buildTreeFromRecords(staleRecords, metrics, rows, cols, 1, 1),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      rows,
+      cols,
+      1,
+    );
+    const fetchSpy = jest
+      .spyOn(supersetChartDataClient, 'fetch')
+      .mockImplementation(async ({ requestGroupId, specs }) =>
+        requestGroupId === 'pivot-v3-seamless'
+          ? specs.map(() => ({ data: recoveredRecords }))
+          : specs.map(() => ({ data: staleRecords })),
+      );
+    const cancelSpy = jest
+      .spyOn(supersetChartDataClient, 'cancel')
+      .mockImplementation(() => undefined);
+
+    const { container, rerender } = render(
+      <PivotTableChart
+        data={staleTree}
+        formData={baseFormData}
+        rawFormData={baseFormData}
+        queryFormData={baseFormData}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+        width={600}
+        height={300}
+      />,
+    );
+
+    const rowMetricValues = () =>
+      Array.from(container.querySelectorAll('tbody td.value-cell')).map(cell =>
+        Number(cell.textContent?.trim()),
+      );
+
+    fireEvent.click(screen.getAllByLabelText('Toggle column dimension')[1]);
+
+    await waitFor(() =>
+      expect(fetchSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          requestGroupId: 'pivot-v3-seamless',
+        }),
+      ),
+    );
+    await waitFor(() =>
+      expect(rowMetricValues()).toEqual(expect.arrayContaining([999, 777])),
+    );
+
+    const staleRerenderFormData = {
+      ...baseFormData,
+      pivotRuntimeLayout: valuesOnlyRuntimeLayout,
+      treeDataSignature: 'stable-signature',
+    };
+
+    rerender(
+      <PivotTableChart
+        data={staleTree}
+        formData={staleRerenderFormData}
+        rawFormData={staleRerenderFormData}
+        queryFormData={{ ...staleRerenderFormData }}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+        width={480}
+        height={300}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(rowMetricValues()).toEqual(expect.arrayContaining([999, 777])),
+    );
+
+    fetchSpy.mockRestore();
+    cancelSpy.mockRestore();
+  });
+
+  it('keeps multi-metric Values cells visible after adding and removing a column dimension', async () => {
+    const metrics = ['m1', 'm2'];
+    const rows = ['row1'];
+    const cols = ['col1'];
+    const valuesOnlyRuntimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows,
+      cols: [],
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const baseFormData = buildFormData({
+      interactionMode: 'user_controlled',
+      dashboardId: 1,
+      dimensions: [...rows, ...cols],
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      pivotRuntimeLayout: valuesOnlyRuntimeLayout,
+      startCollapsed: false,
+      initialDepth: 1,
+    });
+    const initialTree = buildInitialBootstrapTree({
+      formData: baseFormData,
+      runtimeLayout: valuesOnlyRuntimeLayout,
+      resultsByDepth: {
+        '0|0': [{ m1: 100, m2: 200 }],
+        '1|0': [
+          { row1: 'A', m1: 10, m2: 20 },
+          { row1: 'B', m1: 30, m2: 40 },
+        ],
+      },
+    });
+    const fetchSpy = jest
+      .spyOn(supersetChartDataClient, 'fetch')
+      .mockImplementation(async ({ specs }) => {
+        const includesColumnDepth = specs.some(
+          spec =>
+            (spec as { meta?: { colDepth?: number } }).meta?.colDepth === 1,
+        );
+        const resultsByDepth = includesColumnDepth
+          ? {
+              '0|0': [{ m1: 100, m2: 200 }],
+              '1|1': [
+                { row1: 'A', col1: 'X', m1: 10, m2: 20 },
+                { row1: 'B', col1: 'Y', m1: 30, m2: 40 },
+              ],
+              '1|0': [
+                { row1: 'A', m1: 10, m2: 20 },
+                { row1: 'B', m1: 30, m2: 40 },
+              ],
+              '0|1': [
+                { col1: 'X', m1: 10, m2: 20 },
+                { col1: 'Y', m1: 30, m2: 40 },
+              ],
+            }
+          : {
+              '0|0': [{ m1: 100, m2: 200 }],
+              '1|0': [
+                { row1: 'A', m1: 10, m2: 20 },
+                { row1: 'B', m1: 30, m2: 40 },
+              ],
+            };
+        return specs.map(spec => ({
+          data:
+            resultsByDepth[
+              `${(spec as { meta: { rowDepth: number; colDepth: number } }).meta.rowDepth}|${
+                (spec as { meta: { rowDepth: number; colDepth: number } }).meta
+                  .colDepth
+              }`
+            ] ?? [],
+        }));
+      });
+    const cancelSpy = jest
+      .spyOn(supersetChartDataClient, 'cancel')
+      .mockImplementation(() => undefined);
+
+    const { container } = render(
+      <PivotTableChart
+        data={initialTree}
+        formData={baseFormData}
+        rawFormData={baseFormData}
+        queryFormData={baseFormData}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+        width={600}
+        height={300}
+      />,
+    );
+
+    const rowMetricValues = () =>
+      Array.from(container.querySelectorAll('tbody td.value-cell')).map(cell =>
+        Number(cell.textContent?.trim()),
+      );
+
+    expect(rowMetricValues()).toEqual(expect.arrayContaining([10, 20, 30, 40]));
+
+    fireEvent.click(screen.getAllByLabelText('Toggle column dimension')[1]);
+
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
+    expect(
+      new Set(
+        fetchSpy.mock.calls[0][0].specs.map(
+          spec => `${spec.meta.rowDepth}|${spec.meta.colDepth}`,
+        ),
+      ),
+    ).toEqual(new Set(['0|0', '1|1', '1|0']));
+    await waitFor(() => expect(screen.getByText('X')).toBeInTheDocument());
+
+    fireEvent.click(screen.getAllByLabelText('Remove dimension')[0]);
+
+    await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
+    expect(
+      new Set(
+        fetchSpy.mock.calls[1][0].specs.map(
+          spec => `${spec.meta.rowDepth}|${spec.meta.colDepth}`,
+        ),
+      ),
+    ).toEqual(new Set(['0|0', '1|0']));
+    await waitFor(() =>
+      expect(rowMetricValues()).toEqual(
+        expect.arrayContaining([10, 20, 30, 40]),
+      ),
+    );
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
 
     fetchSpy.mockRestore();
     cancelSpy.mockRestore();

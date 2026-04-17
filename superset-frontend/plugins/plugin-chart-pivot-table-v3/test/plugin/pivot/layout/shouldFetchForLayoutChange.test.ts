@@ -243,6 +243,193 @@ describe('shouldFetchForLayoutChange', () => {
     expect(shouldFetchForLayoutChange(prevLayout, nextLayout)).toBe(true);
   });
 
+  it('returns false when removing the only column dimension before trailing Values with multiple metrics', () => {
+    const prevLayout: PivotRuntimeLayout = {
+      ...baseLayout,
+      rows: ['row1'],
+      cols: ['col1'],
+      metrics: ['m1', 'm2'],
+      valuePlacement: { axis: 'col', index: 1 },
+    };
+    const nextLayout: PivotRuntimeLayout = {
+      ...prevLayout,
+      cols: [],
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+
+    expect(shouldFetchForLayoutChange(prevLayout, nextLayout)).toBe(false);
+  });
+
+  it('returns false when removing the only column dimension after leading Values with multiple metrics', () => {
+    const prevLayout: PivotRuntimeLayout = {
+      ...baseLayout,
+      rows: ['row1'],
+      cols: ['col1'],
+      metrics: ['m1', 'm2'],
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const nextLayout: PivotRuntimeLayout = {
+      ...prevLayout,
+      cols: [],
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+
+    expect(shouldFetchForLayoutChange(prevLayout, nextLayout)).toBe(false);
+  });
+
+  it('returns false when removing the only column dimension before trailing Values with a single metric', () => {
+    const prevLayout: PivotRuntimeLayout = {
+      ...baseLayout,
+      rows: ['row1'],
+      cols: ['col1'],
+      metrics: ['m1'],
+      valuePlacement: { axis: 'col', index: 1 },
+    };
+    const nextLayout: PivotRuntimeLayout = {
+      ...prevLayout,
+      cols: [],
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+
+    expect(shouldFetchForLayoutChange(prevLayout, nextLayout)).toBe(false);
+  });
+
+  it('returns false when removing the only row dimension before trailing Values with multiple metrics', () => {
+    const prevLayout: PivotRuntimeLayout = {
+      ...baseLayout,
+      rows: ['row1'],
+      cols: ['col1'],
+      metrics: ['m1', 'm2'],
+      valuePlacement: { axis: 'row', index: 1 },
+    };
+    const nextLayout: PivotRuntimeLayout = {
+      ...prevLayout,
+      rows: [],
+      valuePlacement: { axis: 'row', index: 0 },
+    };
+
+    expect(shouldFetchForLayoutChange(prevLayout, nextLayout)).toBe(false);
+  });
+
+  it('returns false when removing the only row dimension after leading Values with multiple metrics', () => {
+    const prevLayout: PivotRuntimeLayout = {
+      ...baseLayout,
+      rows: ['row1'],
+      cols: ['col1'],
+      metrics: ['m1', 'm2'],
+      valuePlacement: { axis: 'row', index: 0 },
+    };
+    const nextLayout: PivotRuntimeLayout = {
+      ...prevLayout,
+      rows: [],
+      valuePlacement: { axis: 'row', index: 0 },
+    };
+
+    expect(shouldFetchForLayoutChange(prevLayout, nextLayout)).toBe(false);
+  });
+
+  it('returns false when removing the only row dimension with a single metric', () => {
+    const prevLayout: PivotRuntimeLayout = {
+      ...baseLayout,
+      rows: ['row1'],
+      cols: ['col1'],
+      metrics: ['m1'],
+      valuePlacement: { axis: 'row', index: 1 },
+    };
+    const nextLayout: PivotRuntimeLayout = {
+      ...prevLayout,
+      rows: [],
+      valuePlacement: { axis: 'row', index: 0 },
+    };
+
+    expect(shouldFetchForLayoutChange(prevLayout, nextLayout)).toBe(false);
+  });
+
+  it('returns false when shrinking the column value axis from two dimensions to one with multiple metrics', () => {
+    const prevLayout: PivotRuntimeLayout = {
+      ...baseLayout,
+      rows: ['row1'],
+      cols: ['col1', 'col2'],
+      metrics: ['m1', 'm2'],
+      valuePlacement: { axis: 'col', index: 2 },
+    };
+    const nextLayout: PivotRuntimeLayout = {
+      ...prevLayout,
+      cols: ['col1'],
+      valuePlacement: { axis: 'col', index: 1 },
+    };
+
+    expect(shouldFetchForLayoutChange(prevLayout, nextLayout)).toBe(false);
+  });
+
+  it('returns false when shrinking the leading-value column axis from two dimensions to one with multiple metrics', () => {
+    const prevLayout: PivotRuntimeLayout = {
+      ...baseLayout,
+      rows: ['row1'],
+      cols: ['col1', 'col2'],
+      metrics: ['m1', 'm2'],
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const nextLayout: PivotRuntimeLayout = {
+      ...prevLayout,
+      cols: ['col1'],
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+
+    expect(shouldFetchForLayoutChange(prevLayout, nextLayout)).toBe(false);
+  });
+
+  it('returns false when shrinking the column value axis from two dimensions to one with a single metric', () => {
+    const prevLayout: PivotRuntimeLayout = {
+      ...baseLayout,
+      rows: ['row1'],
+      cols: ['col1', 'col2'],
+      metrics: ['m1'],
+      valuePlacement: { axis: 'col', index: 2 },
+    };
+    const nextLayout: PivotRuntimeLayout = {
+      ...prevLayout,
+      cols: ['col1'],
+      valuePlacement: { axis: 'col', index: 1 },
+    };
+
+    expect(shouldFetchForLayoutChange(prevLayout, nextLayout)).toBe(false);
+  });
+
+  it('returns false when shrinking the row value axis from two dimensions to one with multiple metrics', () => {
+    const prevLayout: PivotRuntimeLayout = {
+      ...baseLayout,
+      rows: ['row1', 'row2'],
+      cols: ['col1'],
+      metrics: ['m1', 'm2'],
+      valuePlacement: { axis: 'row', index: 2 },
+    };
+    const nextLayout: PivotRuntimeLayout = {
+      ...prevLayout,
+      rows: ['row1'],
+      valuePlacement: { axis: 'row', index: 1 },
+    };
+
+    expect(shouldFetchForLayoutChange(prevLayout, nextLayout)).toBe(false);
+  });
+
+  it('returns false when shrinking the row value axis from two dimensions to one with a single metric', () => {
+    const prevLayout: PivotRuntimeLayout = {
+      ...baseLayout,
+      rows: ['row1', 'row2'],
+      cols: ['col1'],
+      metrics: ['m1'],
+      valuePlacement: { axis: 'row', index: 2 },
+    };
+    const nextLayout: PivotRuntimeLayout = {
+      ...prevLayout,
+      rows: ['row1'],
+      valuePlacement: { axis: 'row', index: 1 },
+    };
+
+    expect(shouldFetchForLayoutChange(prevLayout, nextLayout)).toBe(false);
+  });
+
   it('follows first-on-stack fetch semantics across a multistep row layout sequence', () => {
     const layout0: PivotRuntimeLayout = {
       ...baseLayout,

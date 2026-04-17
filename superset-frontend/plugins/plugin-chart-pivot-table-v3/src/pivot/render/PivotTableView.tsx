@@ -532,6 +532,7 @@ export const PivotTableView = ({
           $stickyHeaders={stickyHeaders}
           data-sticky-headers={stickyHeaders}
           data-pivot-row-axis-labels={JSON.stringify(rowAxisLabels)}
+          data-pivot-row-total-label={t('Total')}
         >
           <thead ref={headerRef}>
             {columnHeaderRows.length === 0 ? (

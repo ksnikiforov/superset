@@ -34,9 +34,6 @@ const valuePlacementSignature = (
   placement: PivotRuntimeLayout['valuePlacement'],
 ) => stableStringify(placement ?? {});
 
-const valueAxisKeys = (layout: PivotRuntimeLayout): string[] =>
-  layout.valuePlacement.axis === 'row' ? layout.rows : layout.cols;
-
 const shouldFetchForLeadingKeyChange = (
   prevAxisKeys: string[],
   nextAxisKeys: string[],
@@ -84,6 +81,44 @@ const canProjectFirstColumnDimensionWithoutFetch = (
   prev.rows.length > 0 &&
   arraysEqual(prev.rows, next.rows);
 
+export const shouldFetchForDimensionAxisChange = ({
+  prevRows,
+  prevCols,
+  nextRows,
+  nextCols,
+}: {
+  prevRows: string[];
+  prevCols: string[];
+  nextRows: string[];
+  nextCols: string[];
+}) => {
+  if (shouldFetchForLeadingKeyChange(prevRows, nextRows)) {
+    return true;
+  }
+  if (shouldFetchForLeadingKeyChange(prevCols, nextCols)) {
+    return true;
+  }
+  if (
+    movedLeadingKeyAcrossAxes({
+      prevSource: prevRows,
+      nextSource: nextRows,
+      nextTarget: nextCols,
+    })
+  ) {
+    return true;
+  }
+  if (
+    movedLeadingKeyAcrossAxes({
+      prevSource: prevCols,
+      nextSource: nextCols,
+      nextTarget: nextRows,
+    })
+  ) {
+    return true;
+  }
+  return false;
+};
+
 export const shouldFetchForLayoutChange = (
   prev: PivotRuntimeLayout,
   next: PivotRuntimeLayout,
@@ -103,31 +138,12 @@ export const shouldFetchForLayoutChange = (
     if (canProjectFirstColumnDimensionWithoutFetch(prev, next)) {
       return false;
     }
-    if (shouldFetchForLeadingKeyChange(prev.rows, next.rows)) {
-      return true;
-    }
-    if (shouldFetchForLeadingKeyChange(prev.cols, next.cols)) {
-      return true;
-    }
-    if (
-      movedLeadingKeyAcrossAxes({
-        prevSource: prev.rows,
-        nextSource: next.rows,
-        nextTarget: next.cols,
-      })
-    ) {
-      return true;
-    }
-    if (
-      movedLeadingKeyAcrossAxes({
-        prevSource: prev.cols,
-        nextSource: next.cols,
-        nextTarget: next.rows,
-      })
-    ) {
-      return true;
-    }
-    return false;
+    return shouldFetchForDimensionAxisChange({
+      prevRows: prev.rows,
+      prevCols: prev.cols,
+      nextRows: next.rows,
+      nextCols: next.cols,
+    });
   }
   if (!hasSameSet(prev.metrics, next.metrics)) {
     return true;
@@ -142,8 +158,10 @@ export const shouldFetchForLayoutChange = (
     valuePlacementSignature(prev.valuePlacement) !==
     valuePlacementSignature(next.valuePlacement)
   ) {
-    const prevValueAxis = valueAxisKeys(prev);
-    const nextValueAxis = valueAxisKeys(next);
+    const prevValueAxis =
+      prev.valuePlacement.axis === 'row' ? prev.rows : prev.cols;
+    const nextValueAxis =
+      next.valuePlacement.axis === 'row' ? next.rows : next.cols;
     const indexChanged =
       prev.valuePlacement.index !== next.valuePlacement.index;
     if (

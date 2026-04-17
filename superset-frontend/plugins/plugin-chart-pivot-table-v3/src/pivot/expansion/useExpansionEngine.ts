@@ -64,6 +64,7 @@ import { fetchPivotBranchesBatch } from '../query/fetchPivotBranchesBatch';
 import { rootKey } from '../viewModel';
 import { planGroupedExpansionTargets } from './planner';
 import { createExpansionStateStore, type ExpansionStateStore } from './store';
+import { shouldFetchForDimensionAxisChange } from '../layout/shouldFetchForLayoutChange';
 import {
   addAncestors,
   buildDesiredExpandedKeys,
@@ -100,79 +101,6 @@ type CombinedFetchResult = SingleFetchResult | BatchFetchResult;
 const isPrefix = (prefix: string[], target: string[]) =>
   prefix.length <= target.length &&
   prefix.every((value, idx) => value === target[idx]);
-
-const shouldFetchForLeadingKeyChange = (
-  prevAxisKeys: string[],
-  nextAxisKeys: string[],
-) => {
-  const prevLeading = prevAxisKeys[0];
-  const nextLeading = nextAxisKeys[0];
-  if (prevLeading === nextLeading) {
-    return false;
-  }
-  // Collapsing an axis to totals-only can reuse already loaded aggregates.
-  if (prevLeading !== undefined && nextLeading === undefined) {
-    return false;
-  }
-  return true;
-};
-
-const movedLeadingKeyAcrossAxes = ({
-  prevSource,
-  nextSource,
-  nextTarget,
-}: {
-  prevSource: string[];
-  nextSource: string[];
-  nextTarget: string[];
-}) => {
-  const leading = prevSource[0];
-  if (!leading) {
-    return false;
-  }
-  if (nextSource.includes(leading)) {
-    return false;
-  }
-  return nextTarget.includes(leading);
-};
-
-const layoutChangeRequiresSeamlessFetch = ({
-  previousRows,
-  previousCols,
-  nextRows,
-  nextCols,
-}: {
-  previousRows: string[];
-  previousCols: string[];
-  nextRows: string[];
-  nextCols: string[];
-}) => {
-  if (shouldFetchForLeadingKeyChange(previousRows, nextRows)) {
-    return true;
-  }
-  if (shouldFetchForLeadingKeyChange(previousCols, nextCols)) {
-    return true;
-  }
-  if (
-    movedLeadingKeyAcrossAxes({
-      prevSource: previousRows,
-      nextSource: nextRows,
-      nextTarget: nextCols,
-    })
-  ) {
-    return true;
-  }
-  if (
-    movedLeadingKeyAcrossAxes({
-      prevSource: previousCols,
-      nextSource: nextCols,
-      nextTarget: nextRows,
-    })
-  ) {
-    return true;
-  }
-  return false;
-};
 
 const trimAxisByDepth = ({
   tree,
@@ -2149,14 +2077,15 @@ export const useExpansionEngine = ({
     const shouldUseCurrentTreeForLayoutProjection =
       layoutChanged &&
       !hasNewData &&
-      !layoutChangeRequiresSeamlessFetch({
-        previousRows: previousLayout.rows,
-        previousCols: previousLayout.cols,
+      !shouldFetchForDimensionAxisChange({
+        prevRows: previousLayout.rows,
+        prevCols: previousLayout.cols,
         nextRows: currentLayout.rows,
         nextCols: currentLayout.cols,
       });
+    const projectionTree = mergeTrees(data, treeRef.current);
     const sourceTree = shouldUseCurrentTreeForLayoutProjection
-      ? treeRef.current
+      ? projectionTree
       : hasNewData || !layoutChanged
         ? data
         : treeRef.current;
