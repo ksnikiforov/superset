@@ -44,6 +44,9 @@ import {
   SUBTOTAL_TOKEN,
 } from '../../src/utils';
 import { formatQueryName } from '../../src/pivot/query/queryName';
+import { buildLayoutContext } from '../../src/pivot/layout/LayoutContext';
+import { buildBranchQuerySpecs } from '../../src/pivot/query/specs';
+import { createPivotFactStore } from '../../src/pivot/runtime/factStore';
 import { buildFormData } from './fixtures/pivotFormData';
 
 jest.mock('@superset-ui/core', () => {
@@ -1544,6 +1547,81 @@ describe('fetchPivotBranch delta-only contract', () => {
     expect(
       result.data?.cells[serializeCellKey(unrelatedRowKey, metricColKey)],
     ).toBeUndefined();
+  });
+
+  it('materializes from an exact fact-store hit without fetching', async () => {
+    const postMock = SupersetClient.post as jest.Mock;
+    const formData = buildFormData({
+      groupbyRows: ['r1', 'r2'],
+      groupbyColumns: [],
+      metrics: ['m1'],
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      rowSubTotals: false,
+      rowTotals: false,
+      colTotals: false,
+      datasource: '1__table',
+      viz_type: 'pivot_table_v3',
+    });
+    const currentTree = applyMetricAxis(
+      buildTreeFromRecords(
+        [{ r1: 'A', m1: 0 }],
+        ['m1'],
+        ['r1', 'r2'],
+        [],
+        1,
+        0,
+      ),
+      ['m1'],
+      MetricsLayoutEnum.COLUMNS,
+      ['r1', 'r2'],
+      [],
+      0,
+    );
+    const layout = buildLayoutContext(formData);
+    const specs = buildBranchQuerySpecs({
+      formData,
+      layout,
+      axis: 'row',
+      path: ['A'],
+      currentTree,
+    });
+    expect(specs).toHaveLength(1);
+
+    const [spec] = specs;
+    const store = createPivotFactStore();
+    store.upsertBatch({
+      coverage: spec.meta.coverage,
+      queryName: spec.queryName,
+      facts: [
+        {
+          rowPath: ['A', 'B'],
+          columnPath: [],
+          valueKey: 'm1',
+          value: 42,
+          role: 'visible',
+          coverage: spec.meta.coverage,
+          queryName: spec.queryName,
+        },
+      ],
+    });
+
+    const result = await fetchPivotBranch({
+      formData,
+      axis: 'row',
+      path: ['A'],
+      currentTree,
+      factStore: store,
+    });
+
+    const rowKey = serializePath(['A', 'B']);
+    const metricColKey = serializePath([encodeMetricKey('m1')]);
+
+    expect(result.factStoreHit).toBe(true);
+    expect(postMock).not.toHaveBeenCalled();
+    expect(result.data?.rows[rowKey]).toBeDefined();
+    expect(
+      result.data?.cells[serializeCellKey(rowKey, metricColKey)]?.values.m1,
+    ).toBe(42);
   });
 
   it('cache hits are independent of the caller currentTree', async () => {

@@ -41,11 +41,20 @@ import {
 } from './pivot/query/resolveFetchContext';
 import { buildBranchQuerySpecs } from './pivot/query/specs';
 import { stableStringify as stableStringifyBase } from './pivot/shared/stableStringify';
-import { buildBranchTreeFromSpecResults } from './pivot/runtime/ingestQueryResults';
+import {
+  buildBranchTreeFromFactStore,
+  canMaterializeSpecsFromFactStore,
+  createPivotFactStore,
+  type PivotFactStore,
+  type PivotFactStoreBatch,
+  upsertQueryResultsIntoFactStore,
+} from './pivot/runtime/ingestQueryResults';
 
 export interface FetchPivotBranchResult {
   data?: PivotTreeData;
   cached?: boolean;
+  factStoreHit?: boolean;
+  factBatches?: PivotFactStoreBatch[];
   warnings?: ChartDataWarning[];
   error?: Error;
 }
@@ -60,6 +69,7 @@ export interface FetchPivotBranchParams {
   targetRowDepth?: number;
   targetColDepth?: number;
   requestGroupId?: string;
+  factStore?: PivotFactStore;
 }
 
 export const stableStringify = stableStringifyBase;
@@ -178,6 +188,7 @@ export async function fetchPivotBranch({
   visibleRowDepth,
   visibleColDepth,
   requestGroupId,
+  factStore,
 }: FetchPivotBranchParams): Promise<FetchPivotBranchResult> {
   const { metricsForQuery, requiredTimeOffsets, cacheKey, layout } =
     resolveFetchContext({
@@ -221,6 +232,23 @@ export async function fetchPivotBranch({
   if (specs.length === 0) {
     return { data: undefined };
   }
+  if (
+    factStore &&
+    canMaterializeSpecsFromFactStore({
+      specs,
+      store: factStore,
+    })
+  ) {
+    return {
+      data: buildBranchTreeFromFactStore({
+        specs,
+        store: factStore,
+        formData,
+        measureHierarchy: layout.measureHierarchy,
+      }),
+      factStoreHit: true,
+    };
+  }
 
   try {
     const results = await supersetChartDataClient.fetch({
@@ -229,15 +257,23 @@ export async function fetchPivotBranch({
       requestGroupId,
     });
     const warnings = results.flatMap(result => result.warnings ?? []);
-    const labeledBranch = buildBranchTreeFromSpecResults({
+    const store = factStore ?? createPivotFactStore();
+    const factBatches = upsertQueryResultsIntoFactStore({
+      store,
       specs,
       results,
+      fallback: 'empty',
+    });
+    const labeledBranch = buildBranchTreeFromFactStore({
+      specs,
+      store,
       formData,
       measureHierarchy: layout.measureHierarchy,
     });
     writePivotBranchCache(cacheKey, labeledBranch);
     return {
       data: labeledBranch,
+      factBatches,
       ...(warnings.length > 0 ? { warnings } : {}),
     };
   } catch (error) {

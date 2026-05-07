@@ -87,3 +87,20 @@ test('uses query name as the fallback identity when coverage is missing', () => 
     store.getFacts({ queryName: 'second' }).map(fact => fact.value),
   ).toEqual([2]);
 });
+
+test('tracks loaded coverage even when the query returns no facts', () => {
+  const store = createPivotFactStore();
+
+  expect(store.hasCoverage({ coverage, queryName: 'pivot_v3|1|1' })).toBe(
+    false,
+  );
+
+  store.upsertBatch({
+    coverage,
+    queryName: 'pivot_v3|1|1',
+    facts: [],
+  });
+
+  expect(store.hasCoverage({ coverage, queryName: 'pivot_v3|1|1' })).toBe(true);
+  expect(store.getFacts({ coverage, queryName: 'pivot_v3|1|1' })).toEqual([]);
+});

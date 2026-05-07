@@ -66,6 +66,11 @@ import { createExpansionStateStore, type ExpansionStateStore } from './store';
 import { shouldFetchForDimensionAxisChange } from '../layout/shouldFetchForLayoutChange';
 import { buildAxisCoverageKeyFromPathKey } from '../runtime/paths';
 import type { PivotProgram } from '../runtime/types';
+import {
+  createPivotFactStore,
+  type PivotFactStore,
+  type PivotFactStoreBatch,
+} from '../runtime/factStore';
 import { METRICS_PLACEHOLDER } from '../core/tokens';
 import {
   addAncestors,
@@ -85,6 +90,7 @@ import {
 } from './engine';
 
 const MAX_HYDRATION_ITERATIONS = 12;
+const EMPTY_FACT_BATCHES: PivotFactStoreBatch[] = [];
 
 type SingleFetchResult = {
   kind: 'single';
@@ -480,6 +486,7 @@ export type ExpansionEngineResult = {
 
 export type ExpansionEngineConfig = {
   data: PivotTreeData;
+  factBatches?: PivotFactStoreBatch[];
   expandedStateSignature: string;
   expandedStateSharedSignature: string;
   fetchFormData: PivotTableQueryFormData;
@@ -516,6 +523,7 @@ export type ExpansionEngineConfig = {
 
 export const useExpansionEngine = ({
   data,
+  factBatches = EMPTY_FACT_BATCHES,
   expandedStateSignature,
   expandedStateSharedSignature,
   fetchFormData,
@@ -544,6 +552,12 @@ export const useExpansionEngine = ({
 }: ExpansionEngineConfig): ExpansionEngineResult => {
   const [tree, setTree] = useState<PivotTreeData>(data);
   const treeRef = useRef(tree);
+  const factStoreRef = useRef<PivotFactStore>();
+  if (!factStoreRef.current) {
+    const store = createPivotFactStore();
+    store.upsertBatches(factBatches);
+    factStoreRef.current = store;
+  }
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [expandedCols, setExpandedCols] = useState<Set<string>>(new Set());
   const expandedRowsRef = useRef(expandedRows);
@@ -1127,6 +1141,7 @@ export const useExpansionEngine = ({
               visibleRowDepth,
               visibleColDepth,
               requestGroupId,
+              factStore: factStoreRef.current,
             }),
           );
           if (!result) {
@@ -1181,6 +1196,7 @@ export const useExpansionEngine = ({
               visibleRowDepth,
               visibleColDepth,
               requestGroupId,
+              factStore: factStoreRef.current,
             }),
           );
           if (transactionIdRef.current === requestId) {
@@ -1608,6 +1624,7 @@ export const useExpansionEngine = ({
               visibleRowDepth: context.visibleRowDepth,
               visibleColDepth: context.visibleColDepth,
               requestGroupId,
+              factStore: factStoreRef.current,
             }),
           );
           if (!result) {
@@ -1661,6 +1678,7 @@ export const useExpansionEngine = ({
               visibleRowDepth: context.visibleRowDepth,
               visibleColDepth: context.visibleColDepth,
               requestGroupId,
+              factStore: factStoreRef.current,
             }),
           );
           if (transactionIdRef.current === transactionId) {
@@ -2227,6 +2245,9 @@ export const useExpansionEngine = ({
     dataEpochRef.current += 1;
     transactionIdRef.current += 1;
     cancelInFlightRequestGroups();
+    const nextFactStore = createPivotFactStore();
+    nextFactStore.upsertBatches(factBatches);
+    factStoreRef.current = nextFactStore;
     setIsHydrating(false);
     warningsRef.current = new Map();
     setWarnings([]);
@@ -2595,6 +2616,7 @@ export const useExpansionEngine = ({
     data,
     expandedStateSignature,
     expandedStateSharedSignature,
+    factBatches,
     computeVisibleDepths,
     expandColumnsLevelRaw,
     expandRowsLevelRaw,

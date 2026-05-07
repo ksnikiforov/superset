@@ -323,20 +323,29 @@ Gate 2 has started:
   by coverage, row path, column path, value key, and visible/support role.
   Initial, branch, and batch materialization upsert ingested facts into a local
   store before reading coverage-specific fact batches back out.
+- Initial loads and seamless layout/filter refreshes now return fact batches
+  alongside the rendered tree. `useExpansionEngine` seeds a runtime-owned fact
+  store from those batches and keeps it alive across branch and batch expansion
+  fetches.
+- Branch and batch fetches can now materialize directly from the runtime fact
+  store when every planned coverage is already loaded. Network results upsert
+  exact fact batches back into the same store, including empty result coverage,
+  before tree materialization.
 
 Immediate next step:
 
-- Continue Gate 3 by making the fact store survive across incremental branch
-  fetches inside the runtime controller. This should let exact coverage already
-  fetched for support metrics or visible branches be reused instead of rebuilt
-  from tree state.
+- Continue Gate 3 by replacing the old rendered-tree branch cache with a
+  fact-batch cache or deleting it once runtime fact-store reuse covers the same
+  scenarios. The goal is to stop treating rendered branch trees as reusable data.
+- Start using fact-store coverage to simplify fetched-depth bookkeeping in
+  `useExpansionEngine`, so loaded state comes from exact planned coverage rather
+  than tree-shape inspection.
 - Continue shrinking `resolveFetchContext`: it now owns metric/leaf scope and
   support metric selection, but should eventually become a thin adapter around
   coverage planning plus query-shape construction.
-- Decide whether support metrics fetched for one branch should be stored as
-  reusable support facts. Today they ride with the visible branch request; a fact
-  store can avoid re-requesting the same support key when exact coverage already
-  exists.
+- Measure whether support metrics fetched for one branch are now reusable in the
+  practical expansion paths we care about, and add a targeted regression test if
+  any path still re-requests an already loaded exact support coverage.
 - Before deleting any broad behavior branch, bring inconsistent behavior or
   edge-case behavior that unlocks large deletion wins to the user for approval
   with UX impact and deletion upside.

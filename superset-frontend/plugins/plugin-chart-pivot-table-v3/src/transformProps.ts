@@ -44,7 +44,7 @@ import { buildLayoutContext } from './pivot/layout/LayoutContext';
 import { resolveInteractionFormData } from './pivot/layout/resolveInteractionLayout';
 import { normalizeFormDataExtraFilters } from './pivot/query/normalizeExtraFormData';
 import { buildInitialQuerySpecs } from './pivot/query/specs';
-import { buildInitialTreeFromSpecResults } from './pivot/runtime/ingestQueryResults';
+import { buildInitialRuntimeFromSpecResults } from './pivot/runtime/ingestQueryResults';
 
 const { DATABASE_DATETIME } = TimeFormats;
 
@@ -356,12 +356,13 @@ export default function transformProps(
     dateFormatters,
     colTypeMap: colTypeMapWithAliases,
   };
-  const nextTreeWithLeaves = buildInitialTreeFromSpecResults({
-    specs: initialSpecs,
-    results: queriesData,
-    layout,
-    formData: formDataForTree,
-  });
+  const { tree: nextTreeWithLeaves, factBatches } =
+    buildInitialRuntimeFromSpecResults({
+      specs: initialSpecs,
+      results: queriesData,
+      layout,
+      formData: formDataForTree,
+    });
   const rootKey = '';
 
   const isDevBuild =
@@ -402,6 +403,7 @@ export default function transformProps(
     initialValues,
     margin: formData.margin ?? 0,
     data: nextTreeWithLeaves,
+    factBatches,
     formData: {
       ...formDataWithMetricLabels,
       metricsLayout,

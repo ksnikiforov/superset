@@ -20,8 +20,19 @@ import { SupersetClient } from '@superset-ui/core';
 import { fetchPivotBranchesBatch } from '../../../src/pivot/query/fetchPivotBranchesBatch';
 import { type BatchGroup } from '../../../src/pivot/query/fetchPlanOptimizer';
 import { buildFormData } from '../fixtures/pivotFormData';
-import { serializePath } from '../../../src/utils';
-import { type PivotTreeData, type PivotTreeNode } from '../../../src/types';
+import {
+  encodeMetricKey,
+  serializeCellKey,
+  serializePath,
+} from '../../../src/utils';
+import {
+  MetricsLayoutEnum,
+  type PivotTreeData,
+  type PivotTreeNode,
+} from '../../../src/types';
+import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
+import { buildBatchQuerySpecs } from '../../../src/pivot/query/specs';
+import { createPivotFactStore } from '../../../src/pivot/runtime/factStore';
 
 jest.mock('@superset-ui/core', () => {
   const actual = jest.requireActual('@superset-ui/core');
@@ -223,5 +234,86 @@ describe('fetchPivotBranchesBatch', () => {
 
     const payload = mockPost.mock.calls[0][0].jsonPayload;
     expect(payload.queries[0].time_offsets).toEqual(['1 year ago']);
+  });
+
+  it('materializes from an exact fact-store hit without fetching', async () => {
+    const formData = buildFormData({
+      groupbyRows: ['country', 'state', 'city'],
+      groupbyColumns: [],
+      metrics: ['m1'],
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+    });
+    const batch: BatchGroup = {
+      axis: 'row',
+      childDepth: 2,
+      requiredOppositeDepth: 0,
+      signature: 'sig',
+      parentPathKey: serializePath(['US']),
+      siblingValues: ['CA', 'NY'],
+      targets: [
+        {
+          axis: 'row',
+          pathKey: serializePath(['US', 'CA']),
+          childDepth: 2,
+          requiredOppositeDepth: 0,
+          batchSignature: 'sig',
+        },
+        {
+          axis: 'row',
+          pathKey: serializePath(['US', 'NY']),
+          childDepth: 2,
+          requiredOppositeDepth: 0,
+          batchSignature: 'sig',
+        },
+      ],
+    };
+    const currentTree = makeTree();
+    const layout = buildLayoutContext(formData);
+    const specs = buildBatchQuerySpecs({
+      formData,
+      layout,
+      batch,
+      currentTree,
+      visibleRowDepth: 2,
+      visibleColDepth: 0,
+    });
+    expect(specs).toHaveLength(1);
+
+    const [spec] = specs;
+    const store = createPivotFactStore();
+    store.upsertBatch({
+      coverage: spec.meta.coverage,
+      queryName: spec.queryName,
+      facts: [
+        {
+          rowPath: ['US', 'CA', 'SF'],
+          columnPath: [],
+          valueKey: 'm1',
+          value: 7,
+          role: 'visible',
+          coverage: spec.meta.coverage,
+          queryName: spec.queryName,
+        },
+      ],
+    });
+
+    const result = await fetchPivotBranchesBatch({
+      formData,
+      batch,
+      currentTree,
+      visibleRowDepth: 2,
+      visibleColDepth: 0,
+      factStore: store,
+    });
+
+    const rowKey = serializePath(['US', 'CA', 'SF']);
+    const metricColKey = serializePath([encodeMetricKey('m1')]);
+
+    expect(result.factStoreHit).toBe(true);
+    expect(mockPost).not.toHaveBeenCalled();
+    expect(result.data?.rows[rowKey]).toBeDefined();
+    expect(
+      result.data?.cells[serializeCellKey(rowKey, metricColKey)]?.values.m1,
+    ).toBe(7);
   });
 });

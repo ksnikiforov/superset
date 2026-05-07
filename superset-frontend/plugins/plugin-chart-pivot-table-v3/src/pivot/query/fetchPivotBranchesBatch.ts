@@ -20,7 +20,14 @@ import type { PivotTableQueryFormData, PivotTreeData } from '../../types';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import { buildLayoutContext } from '../layout/LayoutContext';
-import { buildBranchTreeFromSpecResults } from '../runtime/ingestQueryResults';
+import {
+  buildBranchTreeFromFactStore,
+  canMaterializeSpecsFromFactStore,
+  createPivotFactStore,
+  type PivotFactStore,
+  type PivotFactStoreBatch,
+  upsertQueryResultsIntoFactStore,
+} from '../runtime/ingestQueryResults';
 import { type BatchGroup } from './fetchPlanOptimizer';
 import { buildBatchQuerySpecs } from './specs';
 
@@ -31,10 +38,13 @@ export type FetchPivotBranchesBatchParams = {
   visibleRowDepth: number;
   visibleColDepth: number;
   requestGroupId?: string;
+  factStore?: PivotFactStore;
 };
 
 export type FetchPivotBranchesBatchResult = {
   data?: PivotTreeData;
+  factStoreHit?: boolean;
+  factBatches?: PivotFactStoreBatch[];
   warnings?: ChartDataWarning[];
   error?: Error;
 };
@@ -62,6 +72,7 @@ export const fetchPivotBranchesBatch = async ({
   visibleRowDepth,
   visibleColDepth,
   requestGroupId,
+  factStore,
 }: FetchPivotBranchesBatchParams): Promise<FetchPivotBranchesBatchResult> => {
   const layout = buildLayoutContext(formData);
   const specs = buildBatchQuerySpecs({
@@ -75,6 +86,23 @@ export const fetchPivotBranchesBatch = async ({
   });
   if (specs.length === 0) {
     return { data: undefined };
+  }
+  if (
+    factStore &&
+    canMaterializeSpecsFromFactStore({
+      specs,
+      store: factStore,
+    })
+  ) {
+    return {
+      data: buildBranchTreeFromFactStore({
+        specs,
+        store: factStore,
+        formData,
+        measureHierarchy: layout.measureHierarchy,
+      }),
+      factStoreHit: true,
+    };
   }
   const metricsForQuery = specs[0].metrics;
   const queryFormData =
@@ -99,14 +127,22 @@ export const fetchPivotBranchesBatch = async ({
       requestGroupId,
     });
     const warnings = results.flatMap(result => result.warnings ?? []);
-    const tree = buildBranchTreeFromSpecResults({
+    const store = factStore ?? createPivotFactStore();
+    const factBatches = upsertQueryResultsIntoFactStore({
+      store,
       specs,
       results,
+      fallback: 'empty',
+    });
+    const tree = buildBranchTreeFromFactStore({
+      specs,
+      store,
       formData,
       measureHierarchy: layout.measureHierarchy,
     });
     return {
       data: tree,
+      factBatches,
       ...(warnings.length > 0 ? { warnings } : {}),
     };
   } catch (error) {

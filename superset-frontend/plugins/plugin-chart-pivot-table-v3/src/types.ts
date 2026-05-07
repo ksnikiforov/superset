@@ -33,6 +33,7 @@ import {
   GenericDataType,
 } from '@superset-ui/core';
 import { ColorFormatters } from '@superset-ui/chart-controls';
+import { type PivotFactStoreBatch } from './pivot/runtime/factStore';
 
 export type PivotAxis = 'row' | 'col';
 export type PivotPathValue = DataRecordValue | undefined;
@@ -303,6 +304,7 @@ export interface PivotTableProps
   extends BaseChartProps<PivotTableQueryFormData>,
     PivotTableStylesProps {
   data: PivotTreeData;
+  factBatches?: PivotFactStoreBatch[];
   formData: PivotTableQueryFormData;
   queryFormData?: PivotTableQueryFormData;
   persistExpansionState?: boolean;

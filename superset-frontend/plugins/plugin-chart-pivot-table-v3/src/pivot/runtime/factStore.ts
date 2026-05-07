@@ -39,9 +39,16 @@ type PivotFactSelector = {
   queryName: string;
 };
 
+export type PivotFactStoreBatch = PivotFactSelector & {
+  facts: PivotFact[];
+};
+
 export type PivotFactStore = {
+  upsertBatch: (batch: PivotFactStoreBatch) => void;
+  upsertBatches: (batches: PivotFactStoreBatch[]) => void;
   upsertMany: (facts: PivotFact[]) => void;
   getFacts: (selector: PivotFactSelector) => PivotFact[];
+  hasCoverage: (selector: PivotFactSelector) => boolean;
   getAll: () => PivotFact[];
   size: () => number;
 };
@@ -62,15 +69,32 @@ export const createPivotFactStore = (): PivotFactStore => {
   const factsByKey = new Map<string, PivotFact>();
   const factKeysByCoverage = new Map<string, Set<string>>();
 
-  const upsertMany = (facts: PivotFact[]) => {
+  const upsertBatch = ({ facts, ...selector }: PivotFactStoreBatch) => {
+    const key = coverageKey(selector);
+    const coverageFactKeys = factKeysByCoverage.get(key) ?? new Set<string>();
     facts.forEach(fact => {
       const factKey = buildPivotFactKey(fact);
       factsByKey.set(factKey, fact);
-      const key = coverageKey(fact);
-      const coverageFactKeys = factKeysByCoverage.get(key) ?? new Set<string>();
       coverageFactKeys.add(factKey);
-      factKeysByCoverage.set(key, coverageFactKeys);
     });
+    factKeysByCoverage.set(key, coverageFactKeys);
+  };
+
+  const upsertMany = (facts: PivotFact[]) => {
+    const batchesByCoverage = new Map<string, PivotFactStoreBatch>();
+    facts.forEach(fact => {
+      const key = coverageKey(fact);
+      const batch =
+        batchesByCoverage.get(key) ??
+        ({
+          coverage: fact.coverage,
+          queryName: fact.queryName,
+          facts: [],
+        } satisfies PivotFactStoreBatch);
+      batch.facts.push(fact);
+      batchesByCoverage.set(key, batch);
+    });
+    Array.from(batchesByCoverage.values()).forEach(upsertBatch);
   };
 
   const getFacts = (selector: PivotFactSelector) =>
@@ -79,8 +103,11 @@ export const createPivotFactStore = (): PivotFactStore => {
       .filter((fact): fact is PivotFact => fact !== undefined);
 
   return {
+    upsertBatch,
+    upsertBatches: batches => batches.forEach(upsertBatch),
     upsertMany,
     getFacts,
+    hasCoverage: selector => factKeysByCoverage.has(coverageKey(selector)),
     getAll: () => Array.from(factsByKey.values()),
     size: () => factsByKey.size,
   };

@@ -104,7 +104,10 @@ import {
   coerceMeasureLeavesByMetric,
   resolveMeasureSortMetricKey,
 } from './pivot/measureLeaves';
-import { buildInitialTreeFromSpecResults } from './pivot/runtime/ingestQueryResults';
+import {
+  buildInitialRuntimeFromSpecResults,
+  type PivotFactStoreBatch,
+} from './pivot/runtime/ingestQueryResults';
 import { stableStringify } from './pivot/shared/stableStringify';
 
 const PANEL_WIDTH = 230;
@@ -115,6 +118,7 @@ const DIMENSION_VALUES_REQUEST_GROUP = 'pivot-v3-dimension-values';
 const DIMENSION_VALUES_QUERY_PREFIX = 'pivot_v3|dimension-values';
 const EMPTY_FILTER_VALUES: DataRecordValue[] = [];
 const EMPTY_SELECTED_FILTERS: Record<string, DataRecordValue[]> = {};
+const EMPTY_FACT_BATCHES: PivotFactStoreBatch[] = [];
 const hasSelectedFilters = (
   filters: Record<string, DataRecordValue[]>,
 ): boolean => Object.keys(filters).length > 0;
@@ -874,6 +878,7 @@ const isSameRuntimeLayout = (
 function PivotTableChart(props: PivotTableProps) {
   const {
     data,
+    factBatches = EMPTY_FACT_BATCHES,
     formData,
     queryFormData,
     width,
@@ -1025,6 +1030,8 @@ function PivotTableChart(props: PivotTableProps) {
   const resolvedStickyHeaders = formData.stickyHeaders ?? stickyHeaders;
 
   const [committedTree, setCommittedTree] = useState<PivotTreeData>(data);
+  const [committedFactBatches, setCommittedFactBatches] =
+    useState<PivotFactStoreBatch[]>(factBatches);
   const [committedFilters, setCommittedFilters] = useState<
     Record<string, DataRecordValue[]>
   >(selectedFilters ?? EMPTY_SELECTED_FILTERS);
@@ -1057,6 +1064,9 @@ function PivotTableChart(props: PivotTableProps) {
   } | null>(null);
   const lastLocalSyncDashboardQueryContextRef = useRef<string | null>(null);
   const dataForRender = isUserControlled ? committedTree : data;
+  const factBatchesForRender = isUserControlled
+    ? committedFactBatches
+    : factBatches;
 
   const treeRef = useRef<PivotTableProps['data']>(dataForRender);
   const ownStateRef = useRef<JsonObject>(ownState ?? {});
@@ -1564,12 +1574,13 @@ function PivotTableChart(props: PivotTableProps) {
       return;
     }
     setCommittedTree(committedTreeFromProps);
+    setCommittedFactBatches(factBatches);
     setSeamlessWarnings([]);
     setSeamlessError(undefined);
     setSeamlessLoading(false);
     setFrozenUserViewProps(null);
     pendingSeamlessLayoutRef.current = null;
-  }, [committedTreeFromProps, shouldSyncCommittedTreeFromProps]);
+  }, [committedTreeFromProps, factBatches, shouldSyncCommittedTreeFromProps]);
 
   useEffect(() => {
     if (
@@ -1795,14 +1806,16 @@ function PivotTableChart(props: PivotTableProps) {
         if (requestId !== seamlessRequestRef.current) {
           return;
         }
-        const nextTree = buildInitialTreeFromSpecResults({
-          results,
-          specs,
-          layout,
-          formData: resolvedFormDataWithOffsets,
-        });
+        const { tree: nextTree, factBatches: nextFactBatches } =
+          buildInitialRuntimeFromSpecResults({
+            results,
+            specs,
+            layout,
+            formData: resolvedFormDataWithOffsets,
+          });
         unstable_batchedUpdates(() => {
           setCommittedTree(nextTree);
+          setCommittedFactBatches(nextFactBatches);
           setUiRuntimeLayout(normalized);
           setCommittedFilters(nextFilters);
           setSeamlessWarnings(collectWarnings(results));
@@ -2110,6 +2123,7 @@ function PivotTableChart(props: PivotTableProps) {
     handleRetry,
   } = useExpansionEngine({
     data: dataForRender,
+    factBatches: factBatchesForRender,
     expandedStateSignature: layoutResult.expandedStateSignature,
     expandedStateSharedSignature: layoutResult.expandedStateSharedSignature,
     fetchFormData,

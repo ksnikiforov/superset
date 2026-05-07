@@ -48,11 +48,17 @@ import {
   createPivotFactStore,
   type PivotFact,
   type PivotFactRole,
+  type PivotFactStoreBatch,
   type PivotFactStore,
 } from './factStore';
 
 export { buildPivotFactKey, createPivotFactStore } from './factStore';
-export type { PivotFact, PivotFactRole, PivotFactStore } from './factStore';
+export type {
+  PivotFact,
+  PivotFactRole,
+  PivotFactStore,
+  PivotFactStoreBatch,
+} from './factStore';
 
 export type QueryResultWithData = {
   data?: DataRecord[];
@@ -219,19 +225,60 @@ export const ingestQueryResults = <T extends QueryResultWithData>({
   });
 };
 
-type PivotFactBatch = {
+type MaterializationFactBatch = {
   facts: PivotFact[];
   rowDepth: number;
   colDepth: number;
+};
+
+const factStoreBatchFromIngested = ({
+  spec,
+  facts,
+}: Pick<
+  IngestedQueryResult<QueryResultWithData>,
+  'spec' | 'facts'
+>): PivotFactStoreBatch => ({
+  coverage: spec.meta.coverage,
+  queryName: spec.queryName,
+  facts,
+});
+
+export const upsertIngestedFactsIntoStore = ({
+  store,
+  ingested,
+}: {
+  store: PivotFactStore;
+  ingested: Array<IngestedQueryResult<QueryResultWithData>>;
+}): PivotFactStoreBatch[] => {
+  const batches = ingested.map(factStoreBatchFromIngested);
+  store.upsertBatches(batches);
+  return batches;
+};
+
+export const upsertQueryResultsIntoFactStore = <T extends QueryResultWithData>({
+  store,
+  specs,
+  results,
+  fallback,
+}: {
+  store: PivotFactStore;
+  specs: PlannedQuerySpec[];
+  results: T[];
+  fallback?: QueryResultFallback;
+}): PivotFactStoreBatch[] => {
+  const ingested = ingestQueryResults({
+    specs,
+    results,
+    fallback,
+  });
+  return upsertIngestedFactsIntoStore({ store, ingested });
 };
 
 const buildFactStore = (
   batches: IngestedQueryResult<QueryResultWithData>[],
 ) => {
   const store = createPivotFactStore();
-  batches.forEach(({ facts }) => {
-    store.upsertMany(facts);
-  });
+  upsertIngestedFactsIntoStore({ store, ingested: batches });
   return store;
 };
 
@@ -241,7 +288,7 @@ const factBatchFromStore = ({
 }: {
   store: PivotFactStore;
   spec: PlannedQuerySpec;
-}): PivotFactBatch => ({
+}): MaterializationFactBatch => ({
   facts: store.getFacts({
     coverage: spec.meta.coverage,
     queryName: spec.queryName,
@@ -433,7 +480,7 @@ const buildTreeFromFactBatch = ({
   rowSubtotalLevels,
   colSubtotalLevels,
 }: {
-  batch: PivotFactBatch;
+  batch: MaterializationFactBatch;
   formData: PivotTableQueryFormData;
   rowGroupby: QueryFormColumn[];
   colGroupby: QueryFormColumn[];
@@ -472,7 +519,7 @@ const buildBranchTreeFromFactBatches = ({
   metricsLayoutResolved,
   metricInsertIndex,
 }: {
-  batches: PivotFactBatch[];
+  batches: MaterializationFactBatch[];
   metricsForQuery: QueryFormMetric[];
   formData: PivotTableQueryFormData;
   measureHierarchy: MeasureHierarchy;
@@ -524,6 +571,51 @@ const buildBranchTreeFromFactBatches = ({
   );
 };
 
+export const canMaterializeSpecsFromFactStore = ({
+  specs,
+  store,
+}: {
+  specs: PlannedQuerySpec[];
+  store: PivotFactStore;
+}) =>
+  specs.every(spec =>
+    store.hasCoverage({
+      coverage: spec.meta.coverage,
+      queryName: spec.queryName,
+    }),
+  );
+
+export const buildBranchTreeFromFactStore = ({
+  specs,
+  store,
+  formData,
+  measureHierarchy,
+}: {
+  specs: PlannedQuerySpec[];
+  store: PivotFactStore;
+  formData: PivotTableQueryFormData;
+  measureHierarchy: MeasureHierarchy;
+}): PivotTreeData => {
+  const firstSpec = specs[0];
+  if (!firstSpec) {
+    return { rows: {}, cols: {}, cells: {} };
+  }
+  return buildBranchTreeFromFactBatches({
+    batches: specs.map(spec => factBatchFromStore({ store, spec })),
+    metricsForQuery: firstSpec.metrics,
+    formData,
+    measureHierarchy,
+    materializedMetrics: firstSpec.meta.materializedMetrics,
+    materializedMeasureHierarchy: firstSpec.meta.materializedMeasureHierarchy,
+    rowGroupby: firstSpec.meta.rowGroupbyForQueryFull,
+    colGroupby: firstSpec.meta.colGroupbyForQueryFull,
+    rowSubtotalLevels: firstSpec.meta.rowSubtotalLevels,
+    colSubtotalLevels: firstSpec.meta.colSubtotalLevels,
+    metricsLayoutResolved: firstSpec.meta.metricsLayoutResolved,
+    metricInsertIndex: firstSpec.meta.metricInsertIndex,
+  });
+};
+
 export const buildBranchTreeFromSpecResults = ({
   specs,
   results,
@@ -545,23 +637,15 @@ export const buildBranchTreeFromSpecResults = ({
     fallback: 'empty',
   });
   const store = buildFactStore(ingested);
-  return buildBranchTreeFromFactBatches({
-    batches: ingested.map(({ spec }) => factBatchFromStore({ store, spec })),
-    metricsForQuery: firstSpec.metrics,
+  return buildBranchTreeFromFactStore({
+    specs,
+    store,
     formData,
     measureHierarchy,
-    materializedMetrics: firstSpec.meta.materializedMetrics,
-    materializedMeasureHierarchy: firstSpec.meta.materializedMeasureHierarchy,
-    rowGroupby: firstSpec.meta.rowGroupbyForQueryFull,
-    colGroupby: firstSpec.meta.colGroupbyForQueryFull,
-    rowSubtotalLevels: firstSpec.meta.rowSubtotalLevels,
-    colSubtotalLevels: firstSpec.meta.colSubtotalLevels,
-    metricsLayoutResolved: firstSpec.meta.metricsLayoutResolved,
-    metricInsertIndex: firstSpec.meta.metricInsertIndex,
   });
 };
 
-export const buildInitialTreeFromSpecResults = ({
+export const buildInitialRuntimeFromSpecResults = ({
   specs,
   results,
   layout,
@@ -571,11 +655,12 @@ export const buildInitialTreeFromSpecResults = ({
   results: QueryResultWithData[];
   layout: LayoutContext;
   formData: PivotTableQueryFormData;
-}): PivotTreeData => {
+}): { tree: PivotTreeData; factBatches: PivotFactStoreBatch[] } => {
   const rootKey = serializePath([]);
   const emptyTree: PivotTreeData = { rows: {}, cols: {}, cells: {} };
   const ingested = ingestQueryResults({ specs, results });
   const store = buildFactStore(ingested);
+  const factBatches = ingested.map(factStoreBatchFromIngested);
   const mergedTree = ingested.reduce((acc, { spec }) => {
     const nextTree = buildBranchTreeFromFactBatches({
       batches: [factBatchFromStore({ store, spec })],
@@ -607,8 +692,15 @@ export const buildInitialTreeFromSpecResults = ({
       formattedLabel: 'Grand total',
     };
   }
-  return applyMeasureLeafValuesToTree({
-    tree: mergedTree,
-    measureHierarchy: layout.measureHierarchy,
-  });
+  return {
+    tree: applyMeasureLeafValuesToTree({
+      tree: mergedTree,
+      measureHierarchy: layout.measureHierarchy,
+    }),
+    factBatches,
+  };
 };
+
+export const buildInitialTreeFromSpecResults = (
+  params: Parameters<typeof buildInitialRuntimeFromSpecResults>[0],
+): PivotTreeData => buildInitialRuntimeFromSpecResults(params).tree;
