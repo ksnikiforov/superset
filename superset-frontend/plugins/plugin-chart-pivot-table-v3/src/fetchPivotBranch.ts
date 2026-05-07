@@ -17,30 +17,11 @@
  * under the License.
  */
 import {
-  ensureIsArray,
-  type DataRecord,
-  type QueryFormColumn,
-  type QueryFormMetric,
-} from '@superset-ui/core';
-import {
-  MetricsLayoutEnum,
   PivotAxis,
   PivotPath,
   PivotTableQueryFormData,
   PivotTreeData,
 } from './types';
-import {
-  buildTreeFromRecords,
-  applyMeasureHierarchyAxis,
-  mergeTrees,
-  serializePath,
-  injectRowSubtotalLeaves,
-  labelRowSubtotalLeaves,
-  serializeCellKey,
-  SUBTOTAL_LABEL,
-  SUBTOTAL_TOKEN,
-} from './utils';
-import { applyMeasureLeafValuesToTree } from './pivot/measureLeaves';
 import {
   buildFilterSignature,
   buildPivotBranchCacheKey,
@@ -60,6 +41,9 @@ import {
 } from './pivot/query/resolveFetchContext';
 import { buildBranchQuerySpecs } from './pivot/query/specs';
 import { stableStringify as stableStringifyBase } from './pivot/shared/stableStringify';
+import { buildBranchTreeFromSpecResults } from './pivot/runtime/ingestQueryResults';
+
+export { buildBranchTreeFromResults } from './pivot/runtime/ingestQueryResults';
 
 export interface FetchPivotBranchResult {
   data?: PivotTreeData;
@@ -172,143 +156,6 @@ export const peekPivotBranchCache = (params: FetchPivotBranchParams) => {
 export const resolveFetchContextForTest = resolveFetchContext;
 export const resolveFetchContextForBatch = resolveFetchContext;
 
-function injectColumnSubtotalLeaves(
-  tree: PivotTreeData,
-  depth: number,
-  fullDepth: number,
-) {
-  if (depth <= 0 || depth >= fullDepth) {
-    return tree;
-  }
-  const next: PivotTreeData = {
-    rows: { ...tree.rows },
-    cols: { ...tree.cols },
-    cells: { ...tree.cells },
-  };
-  const subtotalNodes = Object.values(tree.cols).filter(
-    node => node.path.length === depth && node.path.length > 0,
-  );
-  subtotalNodes.forEach(node => {
-    const subtotalPath = [...node.path, SUBTOTAL_TOKEN];
-    const subtotalKey = serializePath(subtotalPath);
-    if (!next.cols[subtotalKey]) {
-      next.cols[subtotalKey] = {
-        ...node,
-        key: subtotalKey,
-        path: subtotalPath,
-        label: SUBTOTAL_LABEL,
-        formattedLabel: SUBTOTAL_LABEL,
-        level: subtotalPath.length,
-        hasChildren: subtotalPath.length < fullDepth,
-        isSubtotal: true,
-      };
-    }
-  });
-  Object.values(tree.cells).forEach(cell => {
-    const baseColPath = tree.cols[cell.colKey]?.path;
-    if (
-      !baseColPath ||
-      baseColPath.length !== depth ||
-      baseColPath.length === 0
-    ) {
-      return;
-    }
-    const subtotalColKey = serializePath([...baseColPath, SUBTOTAL_TOKEN]);
-    const cellKey = serializeCellKey(cell.rowKey, subtotalColKey);
-    next.cells[cellKey] = {
-      ...cell,
-      colKey: subtotalColKey,
-      isSubtotal: true,
-    };
-  });
-  return next;
-}
-
-export const buildBranchTreeFromResults = ({
-  results,
-  queryPairs,
-  metricsForQuery,
-  formData,
-  measureHierarchy,
-  materializedMetrics,
-  materializedMeasureHierarchy,
-  rowGroupby,
-  colGroupby,
-  rowSubtotalLevels,
-  colSubtotalLevels,
-  metricsLayoutResolved,
-  metricInsertIndex,
-}: {
-  results: Array<{ data?: DataRecord[] }>;
-  queryPairs: Array<{ rowDepth: number; colDepth: number }>;
-  metricsForQuery: QueryFormMetric[];
-  formData: PivotTableQueryFormData;
-  measureHierarchy: LayoutContext['measureHierarchy'];
-  materializedMetrics?: QueryFormMetric[];
-  materializedMeasureHierarchy?: LayoutContext['measureHierarchy'];
-  rowGroupby: QueryFormColumn[];
-  colGroupby: QueryFormColumn[];
-  rowSubtotalLevels: number[];
-  colSubtotalLevels: number[];
-  metricsLayoutResolved: MetricsLayoutEnum;
-  metricInsertIndex: number;
-}): PivotTreeData => {
-  const queryMetrics =
-    metricsForQuery.length > 0 ? metricsForQuery : formData.metrics;
-  const visibleMetrics = materializedMetrics ?? queryMetrics;
-  const visibleMeasureHierarchy =
-    materializedMeasureHierarchy ?? measureHierarchy;
-  const branchTree = queryPairs.reduce<PivotTreeData>(
-    (acc, pair, idx) =>
-      mergeTrees(
-        acc,
-        (() => {
-          let tree = buildTreeFromRecords(
-            results[idx]?.data || [],
-            queryMetrics,
-            rowGroupby,
-            colGroupby,
-            pair.rowDepth,
-            pair.colDepth,
-            formData.dateFormatters,
-          );
-          if (colSubtotalLevels.includes(pair.colDepth)) {
-            tree = injectColumnSubtotalLeaves(
-              tree,
-              pair.colDepth,
-              colGroupby.length,
-            );
-          }
-          const rowSubtotalDepths = rowSubtotalLevels.filter(
-            level => level > 0 && level <= pair.rowDepth,
-          );
-          rowSubtotalDepths.forEach(depth => {
-            tree = injectRowSubtotalLeaves(tree, depth, rowGroupby.length);
-          });
-          return tree;
-        })(),
-      ),
-    {} as PivotTreeData,
-  );
-  const branchWithMeasures = applyMeasureHierarchyAxis(
-    applyMeasureLeafValuesToTree({
-      tree: branchTree,
-      measureHierarchy: visibleMeasureHierarchy,
-    }),
-    visibleMeasureHierarchy,
-    metricsLayoutResolved,
-    rowGroupby,
-    colGroupby,
-    metricInsertIndex,
-    formData.metricLabelMap as Record<string, string> | undefined,
-  );
-  return labelRowSubtotalLeaves(
-    branchWithMeasures,
-    ensureIsArray(visibleMetrics),
-    formData.metricLabelMap as Record<string, string> | undefined,
-  );
-};
-
 const isAbortError = (error: unknown): boolean => {
   if (
     typeof DOMException !== 'undefined' &&
@@ -334,27 +181,15 @@ export async function fetchPivotBranch({
   visibleColDepth,
   requestGroupId,
 }: FetchPivotBranchParams): Promise<FetchPivotBranchResult> {
-  const {
-    rowGroupbyForQueryFull,
-    colGroupbyForQueryFull,
-    materializedMetrics,
-    metricsForQuery,
-    materializedMeasureHierarchy,
-    requiredTimeOffsets,
-    metricsLayoutResolved,
-    metricInsertIndex,
-    cacheKey,
-    rowSubtotalLevels,
-    colSubtotalLevels,
-    layout,
-  } = resolveFetchContext({
-    formData,
-    axis,
-    path,
-    currentTree,
-    visibleRowDepth,
-    visibleColDepth,
-  });
+  const { metricsForQuery, requiredTimeOffsets, cacheKey, layout } =
+    resolveFetchContext({
+      formData,
+      axis,
+      path,
+      currentTree,
+      visibleRowDepth,
+      visibleColDepth,
+    });
   const treeSnapshot = currentTree ?? { rows: {}, cols: {}, cells: {} };
   const timeOffsets = Array.from(
     new Set([...(formData.time_offsets ?? []), ...requiredTimeOffsets]),
@@ -385,10 +220,6 @@ export async function fetchPivotBranch({
     visibleRowDepth,
     visibleColDepth,
   });
-  const queryPairs = specs.map(spec => ({
-    rowDepth: spec.meta.rowDepth,
-    colDepth: spec.meta.colDepth,
-  }));
   if (specs.length === 0) {
     return { data: undefined };
   }
@@ -400,38 +231,11 @@ export async function fetchPivotBranch({
       requestGroupId,
     });
     const warnings = results.flatMap(result => result.warnings ?? []);
-    const resultsByQueryName = new Map<string, { data?: DataRecord[] }>();
-    results.forEach(result => {
-      const name =
-        typeof result.query?.query_name === 'string'
-          ? result.query.query_name
-          : typeof result.query_name === 'string'
-            ? result.query_name
-            : undefined;
-      if (name) {
-        resultsByQueryName.set(name, result);
-      }
-    });
-    const orderedResults =
-      resultsByQueryName.size > 0
-        ? specs.map(
-            spec => resultsByQueryName.get(spec.queryName) ?? { data: [] },
-          )
-        : results;
-    const labeledBranch = buildBranchTreeFromResults({
-      results: orderedResults,
-      queryPairs,
-      metricsForQuery,
+    const labeledBranch = buildBranchTreeFromSpecResults({
+      specs,
+      results,
       formData,
       measureHierarchy: layout.measureHierarchy,
-      materializedMetrics,
-      materializedMeasureHierarchy,
-      rowGroupby: rowGroupbyForQueryFull,
-      colGroupby: colGroupbyForQueryFull,
-      rowSubtotalLevels,
-      colSubtotalLevels,
-      metricsLayoutResolved,
-      metricInsertIndex,
     });
     writePivotBranchCache(cacheKey, labeledBranch);
     return {

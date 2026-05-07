@@ -28,30 +28,23 @@ import {
   TimeFormats,
 } from '@superset-ui/core';
 import { getColorFormatters } from '@superset-ui/chart-controls';
-import {
-  PivotTableProps,
-  PivotTableQueryFormData,
-  PivotTreeData,
-} from './types';
+import { PivotTableProps, PivotTableQueryFormData } from './types';
 import {
   buildResolvedMetricLabelMap,
   getMetricKeys,
   getMetricKey,
   getStableColumnKey,
   mergeMetrics,
-  mergeTrees,
   normalizeDimensionSortingMapWithKeys,
   normalizeMetricFormattingMapWithKeys,
   normalizeMetricDatabarMapWithKeys,
   coerceEpochMsStringToNumber,
-  serializePath,
 } from './utils';
-import { buildBranchTreeFromResults } from './fetchPivotBranch';
 import { buildLayoutContext } from './pivot/layout/LayoutContext';
 import { resolveInteractionFormData } from './pivot/layout/resolveInteractionLayout';
-import { applyMeasureLeafValuesToTree } from './pivot/measureLeaves';
 import { normalizeFormDataExtraFilters } from './pivot/query/normalizeExtraFormData';
 import { buildInitialQuerySpecs } from './pivot/query/specs';
+import { buildInitialTreeFromSpecResults } from './pivot/runtime/ingestQueryResults';
 
 const { DATABASE_DATETIME } = TimeFormats;
 
@@ -358,98 +351,34 @@ export default function transformProps(
     colSubtotalLevels,
     measureHierarchy: layout.measureHierarchy,
   });
-  const rootKey = serializePath([]);
-  const emptyTree: PivotTreeData = { rows: {}, cols: {}, cells: {} };
-  const getQueryName = (result: unknown): string | undefined => {
-    if (!result || typeof result !== 'object') {
-      return undefined;
-    }
-    const record = result as Record<string, unknown>;
-    const { query } = record;
-    if (query && typeof query === 'object') {
-      const queryRecord = query as Record<string, unknown>;
-      const name = queryRecord.query_name;
-      if (typeof name === 'string') {
-        return name;
-      }
-    }
-    const name = record.query_name;
-    return typeof name === 'string' ? name : undefined;
-  };
-  const resultsByName = new Map<string, (typeof queriesData)[number]>();
-  queriesData.forEach(result => {
-    const name = getQueryName(result);
-    if (name) {
-      resultsByName.set(name, result);
-    }
-  });
   const formDataForTree: PivotTableQueryFormData = {
     ...formDataWithMetricLabels,
     dateFormatters,
     colTypeMap: colTypeMapWithAliases,
   };
-  const nextTreeWithLabels = initialSpecs.reduce((acc, spec, idx) => {
-    const result =
-      resultsByName.get(spec.queryName) ??
-      queriesData[idx] ??
-      ({
-        data: [],
-        colnames: [],
-        coltypes: [],
-      } as (typeof queriesData)[number]);
-    const nextTree = buildBranchTreeFromResults({
-      results: [result],
-      queryPairs: [
-        { rowDepth: spec.meta.rowDepth, colDepth: spec.meta.colDepth },
-      ],
-      metricsForQuery: spec.metrics,
-      formData: formDataForTree,
-      measureHierarchy: layout.measureHierarchy,
-      materializedMetrics: spec.meta.materializedMetrics,
-      materializedMeasureHierarchy: spec.meta.materializedMeasureHierarchy,
-      rowGroupby: spec.meta.rowGroupbyForQueryFull,
-      colGroupby: spec.meta.colGroupbyForQueryFull,
-      rowSubtotalLevels: spec.meta.rowSubtotalLevels,
-      colSubtotalLevels: spec.meta.colSubtotalLevels,
-      metricsLayoutResolved: spec.meta.metricsLayoutResolved,
-      metricInsertIndex: spec.meta.metricInsertIndex,
-    });
-    return mergeTrees(acc, nextTree);
-  }, emptyTree);
-  if (nextTreeWithLabels.rows[rootKey]) {
-    nextTreeWithLabels.rows[rootKey] = {
-      ...nextTreeWithLabels.rows[rootKey],
-      label: 'Grand total',
-      formattedLabel: 'Grand total',
-    };
-  }
-  if (nextTreeWithLabels.cols[rootKey]) {
-    nextTreeWithLabels.cols[rootKey] = {
-      ...nextTreeWithLabels.cols[rootKey],
-      label: 'Grand total',
-      formattedLabel: 'Grand total',
-    };
-  }
-  const nextTreeWithLeaves = applyMeasureLeafValuesToTree({
-    tree: nextTreeWithLabels,
-    measureHierarchy: layout.measureHierarchy,
+  const nextTreeWithLeaves = buildInitialTreeFromSpecResults({
+    specs: initialSpecs,
+    results: queriesData,
+    layout,
+    formData: formDataForTree,
   });
+  const rootKey = '';
 
   const isDevBuild =
     process.env.WEBPACK_MODE === 'development' ||
     process.env.NODE_ENV === 'test';
   if (isDevBuild) {
     if (
-      Object.keys(nextTreeWithLabels.rows).length > 0 &&
-      !nextTreeWithLabels.rows[rootKey]
+      Object.keys(nextTreeWithLeaves.rows).length > 0 &&
+      !nextTreeWithLeaves.rows[rootKey]
     ) {
       throw new Error(
         'PivotTable v3 invariant violated: missing row root node',
       );
     }
     if (
-      Object.keys(nextTreeWithLabels.cols).length > 0 &&
-      !nextTreeWithLabels.cols[rootKey]
+      Object.keys(nextTreeWithLeaves.cols).length > 0 &&
+      !nextTreeWithLeaves.cols[rootKey]
     ) {
       throw new Error(
         'PivotTable v3 invariant violated: missing column root node',

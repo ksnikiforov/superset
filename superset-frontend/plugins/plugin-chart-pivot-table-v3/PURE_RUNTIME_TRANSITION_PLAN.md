@@ -303,17 +303,25 @@ Gate 2 has started:
 - `branchQueryPairs.ts` has been deleted. Branch, batch, and root query specs
   now consume `buildBranchFactCoverages` from `src/pivot/runtime/coverage.ts`
   and receive `PivotFactCoverage[]` directly.
+- Branch, batch, and root query specs now use one coverage-to-query-spec
+  assembly helper in `specs.ts`. Metadata, query names, columns, filters, and
+  materialized metrics flow through the same path for all coverage-driven
+  fetches.
+- `src/pivot/runtime/ingestQueryResults.ts` now owns the first fact-store
+  boundary. It orders chart-data results by planned query name, extracts
+  `PivotFact[]` batches from DB records and coverage metadata, and centralizes
+  planned-spec-to-tree materialization for initial load, seamless refresh,
+  branch fetch, and batch fetch.
 
 Immediate next step:
 
-- Collapse duplicated coverage-to-spec mapping in branch, batch, and root spec
-  construction. The coverage planner is centralized, but `specs.ts` still has
-  repeated metadata assembly that should become one helper.
+- Continue Gate 3 by making tree materialization consume ingested facts instead
+  of reusing raw chart-data records internally. The new ingestion boundary
+  already exposes facts, but `buildBranchTreeFromResults` still materializes
+  through the legacy record-to-tree helper.
 - Continue shrinking `resolveFetchContext`: it now owns metric/leaf scope and
   support metric selection, but should eventually become a thin adapter around
   coverage planning plus query-shape construction.
-- Start extracting the fact store boundary so tree materialization reads from
-  coverage/facts instead of relying on fetched branch tree shapes.
 - Decide whether support metrics fetched for one branch should be stored as
   reusable support facts. Today they ride with the visible branch request; a fact
   store can avoid re-requesting the same support key when exact coverage already

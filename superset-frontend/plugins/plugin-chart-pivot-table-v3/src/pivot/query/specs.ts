@@ -52,7 +52,10 @@ import {
 import { formatQueryName } from './queryName';
 import { buildPathFilters, coerceValueForColumn } from './pathFilters';
 import { coerceExpansionState } from './persistedExpansionState';
-import { resolveFetchContextForBatch } from './resolveFetchContext';
+import {
+  type ResolvedFetchContext,
+  resolveFetchContextForBatch,
+} from './resolveFetchContext';
 import { buildQueryShape } from './queryShape';
 import { type QuerySpec } from './types';
 import {
@@ -63,7 +66,10 @@ import {
   buildAxisCoverageKey,
   projectAxisPathToDimensions,
 } from '../runtime/paths';
-import { type PivotFactCoverage } from '../runtime/types';
+import {
+  type PivotCoverageReason,
+  type PivotFactCoverage,
+} from '../runtime/types';
 
 export type QuerySpecMeta = {
   kind: 'bootstrap' | 'root' | 'branch' | 'batch';
@@ -241,6 +247,81 @@ const columnsForCoverage = (coverage: PivotFactCoverage) => [
   ...coverage.columnDimensions,
 ];
 
+type CoverageQueryMeta =
+  | { kind: 'root' }
+  | { kind: 'branch'; axis: PivotAxis; path: PivotPath }
+  | {
+      kind: 'batch';
+      axis: PivotAxis;
+      parentPath: PivotPath;
+      siblingValues: PivotPathValue[];
+    };
+
+const buildSpecsForCoverages = ({
+  coverages,
+  ctx,
+  filters,
+  suffix,
+  meta,
+}: {
+  coverages: PivotFactCoverage[];
+  ctx: ResolvedFetchContext;
+  filters: QueryObjectFilterClause[];
+  suffix: string;
+  meta: CoverageQueryMeta;
+}): PlannedQuerySpec[] =>
+  coverages.map(coverage => ({
+    queryName: `${formatQueryName(coverage.rowDepth, coverage.columnDepth)}${suffix}`,
+    columns: columnsForCoverage(coverage),
+    metrics: ctx.metricsForQuery,
+    filters,
+    meta: {
+      ...meta,
+      rowDepth: coverage.rowDepth,
+      colDepth: coverage.columnDepth,
+      rowGroupbyForQueryFull: ctx.rowGroupbyForQueryFull,
+      colGroupbyForQueryFull: ctx.colGroupbyForQueryFull,
+      rowSubtotalLevels: ctx.rowSubtotalLevels,
+      colSubtotalLevels: ctx.colSubtotalLevels,
+      materializedMetrics: ctx.materializedMetrics,
+      materializedMeasureHierarchy: ctx.materializedMeasureHierarchy,
+      requiredTimeOffsets: ctx.requiredTimeOffsets,
+      metricsLayoutResolved: ctx.metricsLayoutResolved,
+      metricInsertIndex: ctx.metricInsertIndex,
+      coverage,
+    },
+  }));
+
+const buildCoveragesForContext = ({
+  formData,
+  layout,
+  axis,
+  ctx,
+  reason,
+}: {
+  formData: PivotTableQueryFormData;
+  layout: LayoutContext;
+  axis: PivotAxis;
+  ctx: ResolvedFetchContext;
+  reason: PivotCoverageReason;
+}) =>
+  buildBranchFactCoverages({
+    program: layout.pivotProgram,
+    axis,
+    pathLength: ctx.sanitizedPath.length,
+    rowDepth: ctx.rowDepth,
+    columnDepth: ctx.colDepth,
+    rowSubtotalLevels: ctx.rowSubtotalLevels,
+    columnSubtotalLevels: ctx.colSubtotalLevels,
+    rowTotals: formData.rowTotals,
+    columnTotals: formData.colTotals,
+    includeRowTotalForColumnFormatting:
+      axis === 'col' && (ctx.hasColFormatting || ctx.hasColTotalSorting),
+    includeColumnTotalForRowFormatting:
+      axis === 'row' && (ctx.hasRowFormatting || ctx.hasRowTotalSorting),
+    reason,
+  });
+
 const buildBranchSpecs = ({
   formData,
   layout,
@@ -277,20 +358,11 @@ const buildBranchSpecs = ({
     visibleRowDepth,
     visibleColDepth,
   });
-  const coverages = buildBranchFactCoverages({
-    program: layout.pivotProgram,
+  const coverages = buildCoveragesForContext({
+    formData,
+    layout,
     axis,
-    pathLength: ctx.sanitizedPath.length,
-    rowDepth: ctx.rowDepth,
-    columnDepth: ctx.colDepth,
-    rowSubtotalLevels: ctx.rowSubtotalLevels,
-    columnSubtotalLevels: ctx.colSubtotalLevels,
-    rowTotals: formData.rowTotals,
-    columnTotals: formData.colTotals,
-    includeRowTotalForColumnFormatting:
-      axis === 'col' && (ctx.hasColFormatting || ctx.hasColTotalSorting),
-    includeColumnTotalForRowFormatting:
-      axis === 'row' && (ctx.hasRowFormatting || ctx.hasRowTotalSorting),
+    ctx,
     reason: 'expand',
   });
 
@@ -303,29 +375,13 @@ const buildBranchSpecs = ({
   );
   const suffix = `|branch:${axis}:${serializePath(path)}`;
 
-  return coverages.map(coverage => ({
-    queryName: `${formatQueryName(coverage.rowDepth, coverage.columnDepth)}${suffix}`,
-    columns: columnsForCoverage(coverage),
-    metrics: ctx.metricsForQuery,
+  return buildSpecsForCoverages({
+    coverages,
+    ctx,
     filters: pathFilters,
-    meta: {
-      kind: 'branch',
-      axis,
-      path,
-      rowDepth: coverage.rowDepth,
-      colDepth: coverage.columnDepth,
-      rowGroupbyForQueryFull: ctx.rowGroupbyForQueryFull,
-      colGroupbyForQueryFull: ctx.colGroupbyForQueryFull,
-      rowSubtotalLevels: ctx.rowSubtotalLevels,
-      colSubtotalLevels: ctx.colSubtotalLevels,
-      materializedMetrics: ctx.materializedMetrics,
-      materializedMeasureHierarchy: ctx.materializedMeasureHierarchy,
-      requiredTimeOffsets: ctx.requiredTimeOffsets,
-      metricsLayoutResolved: ctx.metricsLayoutResolved,
-      metricInsertIndex: ctx.metricInsertIndex,
-      coverage,
-    },
-  }));
+    suffix,
+    meta: { kind: 'branch', axis, path },
+  });
 };
 
 export const buildBranchQuerySpecs = (params: {
@@ -429,20 +485,11 @@ const buildBatchSpecs = ({
     visibleRowDepth,
     visibleColDepth,
   });
-  const coverages = buildBranchFactCoverages({
-    program: layout.pivotProgram,
+  const coverages = buildCoveragesForContext({
+    formData,
+    layout,
     axis,
-    pathLength: ctx.sanitizedPath.length,
-    rowDepth: ctx.rowDepth,
-    columnDepth: ctx.colDepth,
-    rowSubtotalLevels: ctx.rowSubtotalLevels,
-    columnSubtotalLevels: ctx.colSubtotalLevels,
-    rowTotals: formData.rowTotals,
-    columnTotals: formData.colTotals,
-    includeRowTotalForColumnFormatting:
-      axis === 'col' && (ctx.hasColFormatting || ctx.hasColTotalSorting),
-    includeColumnTotalForRowFormatting:
-      axis === 'row' && (ctx.hasRowFormatting || ctx.hasRowTotalSorting),
+    ctx,
     reason: 'expand',
   });
   const axisGroupby =
@@ -455,30 +502,13 @@ const buildBatchSpecs = ({
   });
   const suffix = `|batch:${axis}:${parentPathKey}|chunk:${chunkIndex}`;
 
-  return coverages.map(coverage => ({
-    queryName: `${formatQueryName(coverage.rowDepth, coverage.columnDepth)}${suffix}`,
-    columns: columnsForCoverage(coverage),
-    metrics: ctx.metricsForQuery,
+  return buildSpecsForCoverages({
+    coverages,
+    ctx,
     filters,
-    meta: {
-      kind: 'batch',
-      axis,
-      parentPath,
-      siblingValues,
-      rowDepth: coverage.rowDepth,
-      colDepth: coverage.columnDepth,
-      rowGroupbyForQueryFull: ctx.rowGroupbyForQueryFull,
-      colGroupbyForQueryFull: ctx.colGroupbyForQueryFull,
-      rowSubtotalLevels: ctx.rowSubtotalLevels,
-      colSubtotalLevels: ctx.colSubtotalLevels,
-      materializedMetrics: ctx.materializedMetrics,
-      materializedMeasureHierarchy: ctx.materializedMeasureHierarchy,
-      requiredTimeOffsets: ctx.requiredTimeOffsets,
-      metricsLayoutResolved: ctx.metricsLayoutResolved,
-      metricInsertIndex: ctx.metricInsertIndex,
-      coverage,
-    },
-  }));
+    suffix,
+    meta: { kind: 'batch', axis, parentPath, siblingValues },
+  });
 };
 
 export const buildBatchQuerySpecs = ({
@@ -643,58 +673,29 @@ export const buildInitialQuerySpecs = (
       targetRowDepth: baseRowDepth,
       targetColDepth: baseColDepth,
     });
-    const rowCoverages = buildBranchFactCoverages({
-      program: layout.pivotProgram,
+    const rowCoverages = buildCoveragesForContext({
+      formData,
+      layout,
       axis: 'row',
-      pathLength: 0,
-      rowDepth: rootContext.rowDepth,
-      columnDepth: rootContext.colDepth,
-      rowSubtotalLevels: rootContext.rowSubtotalLevels,
-      columnSubtotalLevels: rootContext.colSubtotalLevels,
-      rowTotals: formData.rowTotals,
-      columnTotals: formData.colTotals,
-      includeColumnTotalForRowFormatting:
-        rootContext.hasRowFormatting || rootContext.hasRowTotalSorting,
+      ctx: rootContext,
       reason: 'initial',
     });
-    const colCoverages = buildBranchFactCoverages({
-      program: layout.pivotProgram,
+    const colCoverages = buildCoveragesForContext({
+      formData,
+      layout,
       axis: 'col',
-      pathLength: 0,
-      rowDepth: rootContext.rowDepth,
-      columnDepth: rootContext.colDepth,
-      rowSubtotalLevels: rootContext.rowSubtotalLevels,
-      columnSubtotalLevels: rootContext.colSubtotalLevels,
-      rowTotals: formData.rowTotals,
-      columnTotals: formData.colTotals,
-      includeRowTotalForColumnFormatting:
-        rootContext.hasColFormatting || rootContext.hasColTotalSorting,
+      ctx: rootContext,
       reason: 'initial',
     });
-    dedupeCoverages([...rowCoverages, ...colCoverages]).forEach(coverage => {
-      specs.push({
-        queryName: `${formatQueryName(coverage.rowDepth, coverage.columnDepth)}|root`,
-        columns: columnsForCoverage(coverage),
-        metrics: rootContext.metricsForQuery,
+    specs.push(
+      ...buildSpecsForCoverages({
+        coverages: dedupeCoverages([...rowCoverages, ...colCoverages]),
+        ctx: rootContext,
         filters: [],
-        meta: {
-          kind: 'root',
-          rowDepth: coverage.rowDepth,
-          colDepth: coverage.columnDepth,
-          rowGroupbyForQueryFull: rootContext.rowGroupbyForQueryFull,
-          colGroupbyForQueryFull: rootContext.colGroupbyForQueryFull,
-          rowSubtotalLevels: rootContext.rowSubtotalLevels,
-          colSubtotalLevels: rootContext.colSubtotalLevels,
-          materializedMetrics: rootContext.materializedMetrics,
-          materializedMeasureHierarchy:
-            rootContext.materializedMeasureHierarchy,
-          requiredTimeOffsets: rootContext.requiredTimeOffsets,
-          metricsLayoutResolved: rootContext.metricsLayoutResolved,
-          metricInsertIndex: rootContext.metricInsertIndex,
-          coverage,
-        },
-      });
-    });
+        suffix: '|root',
+        meta: { kind: 'root' },
+      }),
+    );
   }
 
   const buildPrefetchSpecsForAxis = (axis: PivotAxis, entries: PivotPath[]) => {

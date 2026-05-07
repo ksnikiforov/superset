@@ -16,12 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { type DataRecord } from '@superset-ui/core';
 import type { PivotTableQueryFormData, PivotTreeData } from '../../types';
-import { buildBranchTreeFromResults } from '../../fetchPivotBranch';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import { buildLayoutContext } from '../layout/LayoutContext';
+import { buildBranchTreeFromSpecResults } from '../runtime/ingestQueryResults';
 import { type BatchGroup } from './fetchPlanOptimizer';
 import { buildBatchQuerySpecs } from './specs';
 
@@ -77,10 +76,6 @@ export const fetchPivotBranchesBatch = async ({
   if (specs.length === 0) {
     return { data: undefined };
   }
-  const queryPairs = specs.map(spec => ({
-    rowDepth: spec.meta.rowDepth,
-    colDepth: spec.meta.colDepth,
-  }));
   const metricsForQuery = specs[0].metrics;
   const queryFormData =
     metricsForQuery.length > 0
@@ -104,38 +99,11 @@ export const fetchPivotBranchesBatch = async ({
       requestGroupId,
     });
     const warnings = results.flatMap(result => result.warnings ?? []);
-    const resultsByQueryName = new Map<string, { data?: DataRecord[] }>();
-    results.forEach(result => {
-      const name =
-        typeof result.query?.query_name === 'string'
-          ? result.query.query_name
-          : typeof result.query_name === 'string'
-            ? result.query_name
-            : undefined;
-      if (name) {
-        resultsByQueryName.set(name, result);
-      }
-    });
-    const orderedResults =
-      resultsByQueryName.size > 0
-        ? specs.map(
-            spec => resultsByQueryName.get(spec.queryName) ?? { data: [] },
-          )
-        : results;
-    const tree = buildBranchTreeFromResults({
-      results: orderedResults,
-      queryPairs,
-      metricsForQuery,
+    const tree = buildBranchTreeFromSpecResults({
+      specs,
+      results,
       formData,
       measureHierarchy: layout.measureHierarchy,
-      materializedMetrics: specs[0].meta.materializedMetrics,
-      materializedMeasureHierarchy: specs[0].meta.materializedMeasureHierarchy,
-      rowGroupby: specs[0].meta.rowGroupbyForQueryFull,
-      colGroupby: specs[0].meta.colGroupbyForQueryFull,
-      rowSubtotalLevels: specs[0].meta.rowSubtotalLevels,
-      colSubtotalLevels: specs[0].meta.colSubtotalLevels,
-      metricsLayoutResolved: specs[0].meta.metricsLayoutResolved,
-      metricInsertIndex: specs[0].meta.metricInsertIndex,
     });
     return {
       data: tree,

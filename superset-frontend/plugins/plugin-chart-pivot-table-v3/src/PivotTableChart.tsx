@@ -64,7 +64,6 @@ import { usePivotFormatting } from './pivot/chart/usePivotFormatting';
 import { usePivotInteractions } from './pivot/chart/usePivotInteractions';
 import { PivotInteractionPanel } from './pivot/chart/PivotInteractionPanel';
 import { resolveInteractionFormData } from './pivot/layout/resolveInteractionLayout';
-import { buildLayoutContext } from './pivot/layout/LayoutContext';
 import { shouldFetchForLayoutChange } from './pivot/layout/shouldFetchForLayoutChange';
 import {
   canProjectValueAxisShrinkWithoutFetch,
@@ -72,7 +71,6 @@ import {
   treeHasStaleCoverageRegression,
   treeHasRuntimeLayoutCoverage,
 } from './pivot/layout/committedTreeSyncGuard';
-import { buildInitialQuerySpecs } from './pivot/query/specs';
 import {
   buildInitialPivotUpdatePlan,
   buildSelectionFilterClauses,
@@ -81,10 +79,7 @@ import {
 import { supersetChartDataClient } from './pivot/data/SupersetChartDataClient';
 import { normalizeFormDataExtraFilters } from './pivot/query/normalizeExtraFormData';
 import { type QuerySpec } from './pivot/query/types';
-import {
-  type ChartDataQueryResult,
-  type ChartDataWarning,
-} from './pivot/data/ChartDataClient';
+import { type ChartDataWarning } from './pivot/data/ChartDataClient';
 import {
   applyDimensionDrag,
   applyValueDrag,
@@ -101,7 +96,6 @@ import {
   isSubtotalToken,
   coerceEpochMsStringToNumber,
   parsePath,
-  serializePath,
 } from './utils';
 import {
   applyMeasureLeafValuesToTree,
@@ -110,7 +104,7 @@ import {
   coerceMeasureLeavesByMetric,
   resolveMeasureSortMetricKey,
 } from './pivot/measureLeaves';
-import { buildBranchTreeFromResults } from './fetchPivotBranch';
+import { buildInitialTreeFromSpecResults } from './pivot/runtime/ingestQueryResults';
 import { stableStringify } from './pivot/shared/stableStringify';
 
 const PANEL_WIDTH = 230;
@@ -161,78 +155,6 @@ const buildDimensionValueSearchFilters = ({
     ];
   }
   return [];
-};
-
-const resolveQueryName = (result: ChartDataQueryResult): string | undefined => {
-  if (typeof result.query?.query_name === 'string') {
-    return result.query.query_name;
-  }
-  if (typeof result.query_name === 'string') {
-    return result.query_name;
-  }
-  return undefined;
-};
-
-const buildTreeFromQueryResults = ({
-  results,
-  specs,
-  layout,
-  formData,
-}: {
-  results: ChartDataQueryResult[];
-  specs: ReturnType<typeof buildInitialQuerySpecs>;
-  layout: ReturnType<typeof buildLayoutContext>;
-  formData: PivotTableProps['formData'];
-}): PivotTreeData => {
-  const rootKey = serializePath([]);
-  const emptyTree: PivotTreeData = { rows: {}, cols: {}, cells: {} };
-  const resultsByName = new Map<string, ChartDataQueryResult>();
-  results.forEach(result => {
-    const name = resolveQueryName(result);
-    if (name) {
-      resultsByName.set(name, result);
-    }
-  });
-  const mergedTree = specs.reduce((acc, spec, idx) => {
-    const fallbackResult = results[idx] ?? { data: [] };
-    const result = resultsByName.get(spec.queryName) ?? fallbackResult;
-    const nextTree = buildBranchTreeFromResults({
-      results: [result],
-      queryPairs: [
-        { rowDepth: spec.meta.rowDepth, colDepth: spec.meta.colDepth },
-      ],
-      metricsForQuery: spec.metrics,
-      formData,
-      measureHierarchy: layout.measureHierarchy,
-      materializedMetrics: spec.meta.materializedMetrics,
-      materializedMeasureHierarchy: spec.meta.materializedMeasureHierarchy,
-      rowGroupby: spec.meta.rowGroupbyForQueryFull,
-      colGroupby: spec.meta.colGroupbyForQueryFull,
-      rowSubtotalLevels: spec.meta.rowSubtotalLevels,
-      colSubtotalLevels: spec.meta.colSubtotalLevels,
-      metricsLayoutResolved: spec.meta.metricsLayoutResolved,
-      metricInsertIndex: spec.meta.metricInsertIndex,
-    });
-    return mergeTrees(acc, nextTree);
-  }, emptyTree);
-  if (mergedTree.rows[rootKey]) {
-    mergedTree.rows[rootKey] = {
-      ...mergedTree.rows[rootKey],
-      label: 'Grand total',
-      formattedLabel: 'Grand total',
-    };
-  }
-  if (mergedTree.cols[rootKey]) {
-    mergedTree.cols[rootKey] = {
-      ...mergedTree.cols[rootKey],
-      label: 'Grand total',
-      formattedLabel: 'Grand total',
-    };
-  }
-  return applyMeasureLeafValuesToTree({
-    tree: mergedTree,
-    measureHierarchy: layout.measureHierarchy,
-  });
 };
 
 const materializeTreeForMeasureLeaves = ({
@@ -1873,7 +1795,7 @@ function PivotTableChart(props: PivotTableProps) {
         if (requestId !== seamlessRequestRef.current) {
           return;
         }
-        const nextTree = buildTreeFromQueryResults({
+        const nextTree = buildInitialTreeFromSpecResults({
           results,
           specs,
           layout,
