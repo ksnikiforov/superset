@@ -117,7 +117,8 @@ describe('cellUtils helpers', () => {
       cells: tree.cells,
       rows: tree.rows,
       cols: tree.cols,
-      getNonMetricPathParts: path => getNonMetricPathParts(path, new Set()),
+      getRowNonMetricPathParts: path => getNonMetricPathParts(path, new Set()),
+      getColNonMetricPathParts: path => getNonMetricPathParts(path, new Set()),
       rootKey,
     });
 

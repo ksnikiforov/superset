@@ -36,6 +36,7 @@ import {
   buildRenderModel,
   type RenderModelConfig,
 } from '../render/renderModel';
+import { type PivotProgram } from '../runtime/types';
 import {
   getVisibleDepths,
   hasLoadedChildren as hasLoadedChildrenBase,
@@ -48,6 +49,7 @@ import {
 import { buildGroupedFetchTargets } from './planner';
 
 export type ExpansionVisibilityConfig = {
+  pivotProgram: PivotProgram;
   groupbyRowsLength: number;
   groupbyColumnsLength: number;
   rowTotals: boolean;
@@ -423,6 +425,7 @@ export const buildHasLoadedChildren =
         targetAxis === 'row'
           ? findChildren(tree.rows, parent)
           : findChildren(tree.cols, parent),
+      program: config.pivotProgram,
       groupbyRowsLength: config.groupbyRowsLength,
       groupbyColsLength: config.groupbyColumnsLength,
       isMetricTokenValue: config.isMetricTokenValue,

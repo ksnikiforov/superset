@@ -49,6 +49,7 @@ import {
   buildRenderModel,
   type RenderModelConfig,
 } from '../render/renderModel';
+import { resolveAxisProjection } from '../runtime/projection';
 import { resolveMeasureSortMetricKey } from '../measureLeaves';
 import { buildDesiredExpandedKeys } from '../expansion/engine';
 import { compareValues, rootKey, sortByOrder } from '../viewModel';
@@ -410,16 +411,35 @@ export const usePivotRenderModel = ({
     tree,
   ]);
 
+  const getProjectedPathParts = useCallback(
+    (axis: 'row' | 'col', path: PivotTreeNode['path']) =>
+      resolveAxisProjection({
+        program: layout.layout.pivotProgram,
+        axis,
+        path: path.filter(value => !isSubtotalToken(value)),
+      }).projectedDimensionPath,
+    [layout.layout.pivotProgram],
+  );
+  const getRowProjectedPathParts = useCallback(
+    (path: PivotTreeNode['path']) => getProjectedPathParts('row', path),
+    [getProjectedPathParts],
+  );
+  const getColumnProjectedPathParts = useCallback(
+    (path: PivotTreeNode['path']) => getProjectedPathParts('col', path),
+    [getProjectedPathParts],
+  );
+
   const { rowValuesMap, colValuesMap } = useMemo(
     () =>
       buildFormattingValueMaps({
         cells: renderTree.cells,
         rows: renderTree.rows,
         cols: renderTree.cols,
-        getNonMetricPathParts: layout.getNonMetricPathParts,
+        getRowNonMetricPathParts: getRowProjectedPathParts,
+        getColNonMetricPathParts: getColumnProjectedPathParts,
         rootKey,
       }),
-    [layout.getNonMetricPathParts, renderTree],
+    [getColumnProjectedPathParts, getRowProjectedPathParts, renderTree],
   );
   const rowSortingValuesMap = rowValuesMap;
   const colSortingValuesMap = colValuesMap;
@@ -441,13 +461,13 @@ export const usePivotRenderModel = ({
   const getSortValue = useCallback(
     (axis: 'row' | 'col', node: PivotTreeNode, metricKey: string) => {
       const nonMetricKey = serializePath(
-        layout.getNonMetricPathParts(node.path),
+        getProjectedPathParts(axis, node.path),
       );
       const valuesMap =
         axis === 'row' ? rowSortingValuesMap : colSortingValuesMap;
       return valuesMap.get(nonMetricKey)?.[metricKey];
     },
-    [colSortingValuesMap, layout, rowSortingValuesMap],
+    [colSortingValuesMap, getProjectedPathParts, rowSortingValuesMap],
   );
 
   const compareMetricSort = useCallback(
@@ -612,7 +632,7 @@ export const usePivotRenderModel = ({
   const colNonMetricDepths = useMemo(() => {
     const depthMap = new Map<string, number>();
     Object.values(renderTree.cols).forEach(node => {
-      const parts = layout.getNonMetricPathParts(node.path);
+      const parts = getColumnProjectedPathParts(node.path);
       for (let i = 0; i <= parts.length; i += 1) {
         const prefixKey = serializePath(parts.slice(0, i));
         const prev = depthMap.get(prefixKey) ?? 0;
@@ -622,16 +642,16 @@ export const usePivotRenderModel = ({
       }
     });
     return depthMap;
-  }, [layout, renderTree.cols]);
+  }, [getColumnProjectedPathParts, renderTree.cols]);
 
   const hasDeeperNonMetricDescendants = useCallback(
     (col: PivotTreeNode) => {
-      const parts = layout.getNonMetricPathParts(col.path);
+      const parts = getColumnProjectedPathParts(col.path);
       const key = serializePath(parts);
       const maxDepth = colNonMetricDepths.get(key) ?? parts.length;
       return maxDepth > parts.length;
     },
-    [colNonMetricDepths, layout],
+    [colNonMetricDepths, getColumnProjectedPathParts],
   );
 
   const getColumnDisplayPath = useCallback(
@@ -643,7 +663,7 @@ export const usePivotRenderModel = ({
       ) {
         const metricLabel = layout.getMetricDisplayLabelFromPath(col.path);
         if (metricLabel && col.path.length < maxDepth) {
-          const nonMetricParts = layout.getNonMetricPathParts(col.path);
+          const nonMetricParts = getColumnProjectedPathParts(col.path);
           if (nonMetricParts.length === 0) {
             return [...col.path, SUBTOTAL_TOKEN];
           }
@@ -665,12 +685,17 @@ export const usePivotRenderModel = ({
         isExplicitSubtotalNode: layout.isExplicitSubtotalNode,
         getMetricKeyFromPath: layout.getMetricLabelFromPath,
         getMetricDisplayLabelForKey: layout.getMetricDisplayLabelForKey,
-        getNonMetricPathParts: layout.getNonMetricPathParts,
+        getNonMetricPathParts: getColumnProjectedPathParts,
         isMetricGrandTotalNode: layout.isMetricGrandTotalNode,
         isMetricSubtotalNode: layout.isMetricSubtotalNode,
       });
     },
-    [expandedCols, hasDeeperNonMetricDescendants, layout],
+    [
+      expandedCols,
+      getColumnProjectedPathParts,
+      hasDeeperNonMetricDescendants,
+      layout,
+    ],
   );
 
   const getColumnHeaderLabel = useCallback(
@@ -912,61 +937,23 @@ export const usePivotRenderModel = ({
       if (syntheticMetricTotalLabel) {
         return false;
       }
-      const dimDepth = layout.countDimDepth(node.path);
-      const maxDepth =
-        axis === 'row'
-          ? resolvedGroupbyRowsLength
-          : resolvedGroupbyColumnsLength;
-      const metricsAtEnd =
-        axis === 'row' ? layout.metricsAtRowEnd : layout.metricsAtColEnd;
-      const hasMetricToken = node.path.some(val =>
-        layout.isMetricTokenValue(val),
-      );
-      if (dimDepth >= maxDepth) {
-        return false;
-      }
-      if (hasMetricToken && metricsAtEnd) {
-        return false;
-      }
       if (
         layout.isExplicitSubtotalNode(node) ||
         layout.isMetricGrandTotalNode(node)
       ) {
         return false;
       }
-      const hideMetricParentToggle =
-        axis === 'row'
-          ? layout.resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
-            (layout.isMultiMetric || layout.singleMetricBetweenRows) &&
-            layout.metricLayoutIndexOnRows !== undefined &&
-            layout.metricLayoutIndexOnRows > 0 &&
-            layout.metricLayoutIndexOnRows < resolvedGroupbyRowsLength &&
-            node.path.length === layout.metricLayoutIndexOnRows &&
-            !node.path.some(val => layout.isMetricTokenValue(val))
-          : layout.resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS &&
-            (layout.isMultiMetric || layout.singleMetricBetweenCols) &&
-            layout.metricLayoutIndexOnCols !== undefined &&
-            layout.metricLayoutIndexOnCols > 0 &&
-            layout.metricLayoutIndexOnCols < resolvedGroupbyColumnsLength &&
-            node.path.length === layout.metricLayoutIndexOnCols &&
-            !node.path.some(val => layout.isMetricTokenValue(val));
-      if (hideMetricParentToggle) {
-        return false;
-      }
-      if (metricsAtEnd && dimDepth >= maxDepth) {
+      const projection = resolveAxisProjection({
+        program: layout.layout.pivotProgram,
+        axis,
+        path: node.path.filter(value => !isSubtotalToken(value)),
+      });
+      if (!projection.nextLevel) {
         return false;
       }
       if (
-        axis === 'row' &&
-        layout.resolvedMetricsLayout !== MetricsLayoutEnum.ROWS &&
-        dimDepth >= maxDepth
-      ) {
-        return false;
-      }
-      if (
-        axis === 'col' &&
-        layout.resolvedMetricsLayout !== MetricsLayoutEnum.COLUMNS &&
-        dimDepth >= maxDepth
+        projection.nextLevel.kind === 'values' &&
+        !projection.valuesLevelSeen
       ) {
         return false;
       }
@@ -975,27 +962,10 @@ export const usePivotRenderModel = ({
         if (layout.isMetricTokenValue(tail)) {
           return false;
         }
-        if (node.path.some(val => decodeMeasureLeafId(val))) {
-          if (dimDepth >= maxDepth) {
-            return false;
-          }
-          const metricsAtEnd =
-            axis === 'row' ? layout.metricsAtRowEnd : layout.metricsAtColEnd;
-          if (metricsAtEnd) {
-            return false;
-          }
-        }
       }
       return true;
     },
-    [
-      isLeafTierVisible,
-      layout,
-      resolvedGroupbyColumnsLength,
-      resolvedGroupbyRowsLength,
-      tree.cols,
-      tree.rows,
-    ],
+    [isLeafTierVisible, layout],
   );
 
   const isRowAggregateBold = useCallback(

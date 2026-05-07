@@ -23,6 +23,8 @@ import {
   isSubtotalToken,
   parseCellKey,
 } from '../utils';
+import { resolveAxisProjection } from './runtime/projection';
+import { type PivotProgram } from './runtime/types';
 import { buildVisibleList, rootKey } from './viewModel';
 
 type VisibleRowsParams = {
@@ -323,6 +325,7 @@ type HasLoadedChildrenParams = {
   axis: 'row' | 'col';
   node: PivotTreeNode;
   getRawChildren: (axis: 'row' | 'col', node: PivotTreeNode) => PivotTreeNode[];
+  program?: PivotProgram;
   groupbyRowsLength: number;
   groupbyColsLength: number;
   isMetricTokenValue: (val: unknown) => boolean;
@@ -340,6 +343,7 @@ export const hasLoadedChildren = ({
   axis,
   node,
   getRawChildren,
+  program,
   groupbyRowsLength,
   groupbyColsLength,
   isMetricTokenValue,
@@ -352,8 +356,22 @@ export const hasLoadedChildren = ({
   visibleColDepth,
   countDimDepth,
 }: HasLoadedChildrenParams) => {
-  const countBaseDimDepth = (path: PivotTreeNode['path']) =>
-    path.filter(val => {
+  const projectablePath = (path: PivotTreeNode['path']) =>
+    path.filter(val => !isSubtotalToken(val));
+  const resolveProjection = (path: PivotTreeNode['path']) =>
+    program
+      ? resolveAxisProjection({
+          program,
+          axis,
+          path: projectablePath(path),
+        })
+      : undefined;
+  const projectComparablePath = (path: PivotTreeNode['path']) => {
+    const projection = resolveProjection(path);
+    if (projection) {
+      return projection.projectedDimensionPath;
+    }
+    return path.filter(val => {
       const value = String(val ?? '');
       if (isMetricTokenValue(value)) {
         return false;
@@ -362,12 +380,23 @@ export const hasLoadedChildren = ({
         return false;
       }
       return true;
-    }).length;
+    });
+  };
+  const pathHasValuesToken = (path: PivotTreeNode['path']) => {
+    const projection = resolveProjection(path);
+    return projection
+      ? projection.valuesLevelSeen
+      : path.some(val => isMetricTokenValue(val));
+  };
+  const pathHasSkippedPreValuesProjection = (path: PivotTreeNode['path']) =>
+    (resolveProjection(path)?.skippedPreValuesLevels.length ?? 0) > 0;
+  const countBaseDimDepth = (path: PivotTreeNode['path']) =>
+    projectComparablePath(path).length;
   const children = getRawChildren(axis, node);
   const groupbyLength = axis === 'row' ? groupbyRowsLength : groupbyColsLength;
   const parentDimDepth = countBaseDimDepth(node.path);
   const metricIndex = axis === 'row' ? metricIndexForRows : metricIndexForCols;
-  const parentHasMetric = node.path.some(val => isMetricTokenValue(val));
+  const parentHasMetric = pathHasValuesToken(node.path);
   const metricsExpectedAtParent =
     node.path.some(isSubtotalToken) ||
     (metricIndex !== undefined &&
@@ -376,9 +405,7 @@ export const hasLoadedChildren = ({
       !parentHasMetric);
   const axisNodes = axis === 'row' ? rows : cols;
   const nodeMetricIndex = node.path.findIndex(val => isMetricTokenValue(val));
-  const basePath = node.path.filter(
-    val => !isMetricTokenValue(val) && !isSubtotalToken(val),
-  );
+  const basePath = projectComparablePath(node.path);
   const allowMetricVariant =
     metricIndex !== undefined &&
     parentDimDepth >= metricIndex &&
@@ -387,16 +414,14 @@ export const hasLoadedChildren = ({
     allowMetricVariant &&
     !parentHasMetric &&
     Object.values(axisNodes).some(candidate => {
-      if (!candidate.path.some(val => isMetricTokenValue(val))) {
+      if (!pathHasValuesToken(candidate.path)) {
         return false;
       }
-      const candidatePath = candidate.path.filter(
-        val => !isMetricTokenValue(val),
-      );
-      if (candidatePath.length !== node.path.length) {
+      const candidatePath = projectComparablePath(candidate.path);
+      if (candidatePath.length !== basePath.length) {
         return false;
       }
-      return candidatePath.every((val, idx) => val === node.path[idx]);
+      return candidatePath.every((val, idx) => val === basePath[idx]);
     });
   const hasMetricVariantCells =
     hasMetricVariant &&
@@ -404,12 +429,10 @@ export const hasLoadedChildren = ({
       const { rowKey, colKey } = parseCellKey(key);
       const axisKey = axis === 'row' ? rowKey : colKey;
       const axisNode = axisNodes[axisKey];
-      if (!axisNode || !axisNode.path.some(isMetricTokenValue)) {
+      if (!axisNode || !pathHasValuesToken(axisNode.path)) {
         return false;
       }
-      const candidatePath = axisNode.path.filter(
-        val => !isMetricTokenValue(val) && !isSubtotalToken(val),
-      );
+      const candidatePath = projectComparablePath(axisNode.path);
       if (candidatePath.length !== basePath.length) {
         return false;
       }
@@ -419,14 +442,15 @@ export const hasLoadedChildren = ({
     return true;
   }
   if (
-    metricIndex !== undefined &&
-    nodeMetricIndex >= 0 &&
-    nodeMetricIndex < metricIndex
+    (program &&
+      parentHasMetric &&
+      pathHasSkippedPreValuesProjection(node.path)) ||
+    (metricIndex !== undefined &&
+      nodeMetricIndex >= 0 &&
+      nodeMetricIndex < metricIndex)
   ) {
     const hasDeeperBaseDescendant = Object.values(axisNodes).some(candidate => {
-      const candidateBase = candidate.path.filter(
-        val => !isMetricTokenValue(val) && !isSubtotalToken(val),
-      );
+      const candidateBase = projectComparablePath(candidate.path);
       if (candidateBase.length <= basePath.length) {
         return false;
       }
@@ -443,20 +467,21 @@ export const hasLoadedChildren = ({
     !node.path.some(isSubtotalToken)
   ) {
     const hasMetricChildren = children.some(child =>
-      child.path.some(val => isMetricTokenValue(val)),
+      pathHasValuesToken(child.path),
     );
     if (hasMetricChildren) {
       const hasDescendantAtMetricIndex = Object.values(axisNodes).some(
         candidate => {
+          if (!pathHasValuesToken(candidate.path)) {
+            return false;
+          }
           const candidateMetricIndex = candidate.path.findIndex(val =>
             isMetricTokenValue(val),
           );
-          if (candidateMetricIndex < metricIndex) {
+          if (!program && candidateMetricIndex < metricIndex) {
             return false;
           }
-          const candidateBase = candidate.path.filter(
-            val => !isMetricTokenValue(val) && !isSubtotalToken(val),
-          );
+          const candidateBase = projectComparablePath(candidate.path);
           if (candidateBase.length <= basePath.length) {
             return false;
           }
@@ -508,21 +533,12 @@ export const hasLoadedChildren = ({
         return;
       }
       const axisPath = axisNode.path;
-      if (parentHasMetric) {
-        if (axisPath.length < node.path.length) {
-          return;
-        }
-        if (!node.path.every((val, idx) => val === axisPath[idx])) {
-          return;
-        }
-      } else {
-        const metriclessPath = axisPath.filter(val => !isMetricTokenValue(val));
-        if (metriclessPath.length < node.path.length) {
-          return;
-        }
-        if (!node.path.every((val, idx) => val === metriclessPath[idx])) {
-          return;
-        }
+      const axisComparablePath = projectComparablePath(axisPath);
+      if (axisComparablePath.length < basePath.length) {
+        return;
+      }
+      if (!basePath.every((val, idx) => val === axisComparablePath[idx])) {
+        return;
       }
       const rowNode = rows[rowKey];
       const colNode = cols[colKey];

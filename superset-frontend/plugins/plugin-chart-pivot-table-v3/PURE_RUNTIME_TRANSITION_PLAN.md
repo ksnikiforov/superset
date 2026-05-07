@@ -362,16 +362,16 @@ Gate 2 has started:
 
 Immediate next step:
 
-- Move the axis-neutral projection descriptor to the next consumers:
-  coverage-key construction, visibility, toggle eligibility, and tree/render
-  projection. `resolveFetchContext` now delegates metric/leaf scope and
-  sanitized query path to `src/pivot/runtime/projection.ts`, but several render
-  and visibility files still decode metric/measure-leaf tokens directly.
-- Start with tests for skipped pre-Values row and column branches in visibility
-  and toggles, then replace one local path/projection branch at a time. The goal
-  is to make query planning, loaded-state checks, materialization, and render
-  visibility read the same projected axis descriptor instead of rediscovering
-  Values placement.
+- Finish moving the axis-neutral projection descriptor through tree/render
+  projection. `resolveFetchContext`, branch/batch coverage planning,
+  `hasLoadedChildren`, `usePivotRenderModel.shouldShowToggle`, and column
+  display projection now use `src/pivot/runtime/projection.ts`, but
+  collapsed-child projection and render normalization still have local
+  metric/measure-leaf token checks.
+- Start with the collapsed row/column child helpers.
+  The goal is to make query planning, loaded-state checks, materialization, and
+  render visibility read the same projected axis descriptor instead of
+  rediscovering Values placement.
 - Measure whether support metrics fetched for one branch are now reusable in the
   practical expansion paths we care about, and add a targeted regression test if
   any path still re-requests an already loaded exact support coverage.
@@ -429,6 +429,19 @@ Values -> returnFlag`. Keeping this behavior preserves current UX, but it
   child coverage, while projected metric branches report loaded children once
   post-Values cells exist; row and column metric toggles stay available and flip
   from expand to collapse after the projected branch loads.
+- Runtime loaded-child checks now receive the compiled `PivotProgram` and use
+  `resolveAxisProjection` for comparable axis paths. This replaces local
+  metric-token stripping in the visibility path and makes skipped pre-Values
+  row/column branches follow the same projection contract as query planning.
+- `usePivotRenderModel.shouldShowToggle` now uses `resolveAxisProjection` to
+  decide toggle eligibility from the next axis level. This deleted the local
+  `hideMetricParentToggle`, `hasMetricToken && metricsAtEnd`, and measure-leaf
+  placement branches while preserving row and column Values-placement behavior.
+- Column render projection now also uses `resolveAxisProjection` for axis-aware
+  formatting/sorting value maps, non-metric column depth detection,
+  metrics-first display padding, and `buildColumnDisplayPath`. This keeps
+  column headers on the same projected axis contract as query planning,
+  loaded-state checks, and toggle eligibility.
 
 ### Gate 1: One compiled layout model
 

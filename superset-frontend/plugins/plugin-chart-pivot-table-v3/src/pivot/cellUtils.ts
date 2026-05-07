@@ -278,7 +278,12 @@ type BuildFormattingValueMapsParams = {
   cells: Record<string, PivotResultCell>;
   rows: Record<string, PivotTreeNode>;
   cols: Record<string, PivotTreeNode>;
-  getNonMetricPathParts: (path: PivotTreeNode['path']) => PivotTreeNode['path'];
+  getRowNonMetricPathParts: (
+    path: PivotTreeNode['path'],
+  ) => PivotTreeNode['path'];
+  getColNonMetricPathParts: (
+    path: PivotTreeNode['path'],
+  ) => PivotTreeNode['path'];
   rootKey: string;
 };
 
@@ -286,7 +291,8 @@ export const buildFormattingValueMaps = ({
   cells,
   rows,
   cols,
-  getNonMetricPathParts,
+  getRowNonMetricPathParts,
+  getColNonMetricPathParts,
   rootKey,
 }: BuildFormattingValueMapsParams) => {
   const rowValuesMap = new Map<string, Record<string, DataRecordValue>>();
@@ -297,8 +303,8 @@ export const buildFormattingValueMaps = ({
     if (!rowNode || !colNode) {
       return;
     }
-    const rowKey = serializePath(getNonMetricPathParts(rowNode.path));
-    const colKey = serializePath(getNonMetricPathParts(colNode.path));
+    const rowKey = serializePath(getRowNonMetricPathParts(rowNode.path));
+    const colKey = serializePath(getColNonMetricPathParts(colNode.path));
     if (colKey === rootKey && !rowValuesMap.has(rowKey)) {
       rowValuesMap.set(rowKey, cell.values);
     }

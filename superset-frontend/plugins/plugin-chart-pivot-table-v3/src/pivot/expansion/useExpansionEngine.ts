@@ -838,6 +838,7 @@ export const useExpansionEngine = ({
 
   const visibilityConfig = useMemo<ExpansionVisibilityConfig>(
     () => ({
+      pivotProgram,
       groupbyRowsLength,
       groupbyColumnsLength,
       rowTotals: fetchFormData.rowTotals ?? false,
@@ -866,6 +867,7 @@ export const useExpansionEngine = ({
       metricIndexForCols,
       metricIndexForRows,
       metricLabelSet,
+      pivotProgram,
     ],
   );
 

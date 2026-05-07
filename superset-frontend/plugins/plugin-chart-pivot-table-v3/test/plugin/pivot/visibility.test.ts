@@ -17,8 +17,13 @@
  * under the License.
  */
 
-import { type PivotTreeData, type PivotTreeNode } from '../../../src/types';
+import {
+  MetricsLayoutEnum,
+  type PivotTreeData,
+  type PivotTreeNode,
+} from '../../../src/types';
 import { hasLoadedChildren } from '../../../src/pivot/visibility';
+import { compilePivotProgram } from '../../../src/pivot/runtime/compilePivotProgram';
 import {
   encodeMetricKey,
   METRICS_PLACEHOLDER,
@@ -286,6 +291,19 @@ describe('pivot/visibility.hasLoadedChildren', () => {
     'treats a skipped pre-Values %s parent as not loaded',
     axis => {
       const metricToken = encodeMetricKey('sales');
+      const program = compilePivotProgram({
+        groupbyRows:
+          axis === 'row'
+            ? ['country', 'state', METRICS_PLACEHOLDER, 'city']
+            : ['period'],
+        groupbyColumns:
+          axis === 'col'
+            ? ['country', 'state', METRICS_PLACEHOLDER, 'city']
+            : ['period'],
+        metrics: ['sales'],
+        metricsLayout:
+          axis === 'row' ? MetricsLayoutEnum.ROWS : MetricsLayoutEnum.COLUMNS,
+      });
       const rootKey = serializePath([]);
       const parentKey = serializePath(['US']);
       const metricKey = serializePath(['US', metricToken]);
@@ -330,6 +348,7 @@ describe('pivot/visibility.hasLoadedChildren', () => {
         axis,
         node: axis === 'row' ? rows[parentKey] : cols[parentKey],
         getRawChildren: getRawChildren(rows, cols),
+        program,
         groupbyRowsLength: axis === 'row' ? 3 : 1,
         groupbyColsLength: axis === 'col' ? 3 : 1,
         isMetricTokenValue: value => value === metricToken,
@@ -352,6 +371,19 @@ describe('pivot/visibility.hasLoadedChildren', () => {
     'treats a skipped pre-Values %s metric branch as loaded from post-Values cells',
     axis => {
       const metricToken = encodeMetricKey('sales');
+      const program = compilePivotProgram({
+        groupbyRows:
+          axis === 'row'
+            ? ['country', 'state', METRICS_PLACEHOLDER, 'city']
+            : ['period'],
+        groupbyColumns:
+          axis === 'col'
+            ? ['country', 'state', METRICS_PLACEHOLDER, 'city']
+            : ['period'],
+        metrics: ['sales'],
+        metricsLayout:
+          axis === 'row' ? MetricsLayoutEnum.ROWS : MetricsLayoutEnum.COLUMNS,
+      });
       const rootKey = serializePath([]);
       const parentKey = serializePath(['US']);
       const metricKey = serializePath(['US', metricToken]);
@@ -396,6 +428,7 @@ describe('pivot/visibility.hasLoadedChildren', () => {
         axis,
         node: axis === 'row' ? rows[metricKey] : cols[metricKey],
         getRawChildren: getRawChildren(rows, cols),
+        program,
         groupbyRowsLength: axis === 'row' ? 3 : 1,
         groupbyColsLength: axis === 'col' ? 3 : 1,
         isMetricTokenValue: value => value === metricToken,
