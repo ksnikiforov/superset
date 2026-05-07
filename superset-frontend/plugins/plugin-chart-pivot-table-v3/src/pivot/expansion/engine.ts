@@ -630,7 +630,7 @@ export const planHydrationIteration = ({
   fetchedRowDepthByKey,
   fetchedColDepthByKey,
   config,
-  getGroupedFetchKey,
+  getCoverageKey,
   activeAxis,
   pendingRows,
   pendingCols,
@@ -643,7 +643,7 @@ export const planHydrationIteration = ({
   fetchedRowDepthByKey: Map<string, number>;
   fetchedColDepthByKey: Map<string, number>;
   config: ExpansionVisibilityConfig;
-  getGroupedFetchKey: (axis: PivotAxis, key: string) => string;
+  getCoverageKey: (axis: PivotAxis, key: string) => string;
   activeAxis?: PivotAxis;
   pendingRows: Set<string>;
   pendingCols: Set<string>;
@@ -671,6 +671,7 @@ export const planHydrationIteration = ({
         requiredDepth: visibleColDepth,
         fetchedDepthByKey: fetchedRowDepthByKey,
         hasLoadedChildren,
+        getCoverageKey,
       })
     : {
         fetchKeys: new Set<string>(),
@@ -685,6 +686,7 @@ export const planHydrationIteration = ({
         requiredDepth: visibleRowDepth,
         fetchedDepthByKey: fetchedColDepthByKey,
         hasLoadedChildren,
+        getCoverageKey,
       })
     : {
         fetchKeys: new Set<string>(),
@@ -752,14 +754,14 @@ export const planHydrationIteration = ({
     fetchKeys: effectiveRowPlan.fetchKeys,
     nodes: tree.rows,
     requiredOppositeDepth: visibleColDepth,
-    getGroupedFetchKey,
+    getCoverageKey,
   });
   const colGroups = buildGroupedFetchTargets({
     axis: 'col',
     fetchKeys: effectiveColPlan.fetchKeys,
     nodes: tree.cols,
     requiredOppositeDepth: visibleRowDepth,
-    getGroupedFetchKey,
+    getCoverageKey,
   });
   const groupKeyMap = new Map<string, string[]>();
   rowGroups.groupKeyMap.forEach((value, key) => {

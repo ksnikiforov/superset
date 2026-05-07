@@ -64,6 +64,9 @@ import { rootKey } from '../viewModel';
 import { planGroupedExpansionTargets } from './planner';
 import { createExpansionStateStore, type ExpansionStateStore } from './store';
 import { shouldFetchForDimensionAxisChange } from '../layout/shouldFetchForLayoutChange';
+import { buildAxisCoverageKeyFromPathKey } from '../runtime/paths';
+import type { PivotProgram } from '../runtime/types';
+import { METRICS_PLACEHOLDER } from '../core/tokens';
 import {
   addAncestors,
   buildDesiredExpandedKeys,
@@ -296,55 +299,34 @@ const trimTreeForLayout = ({
 
 const remapFetchedDepthsForStableTrim = ({
   fetchedDepthByKey,
-  previousNodes,
-  nextNodes,
   stablePrefix,
   countDimDepth,
 }: {
   fetchedDepthByKey: Map<string, number>;
-  previousNodes: Record<string, PivotTreeNode>;
-  nextNodes: Record<string, PivotTreeNode>;
   stablePrefix: number;
   countDimDepth: (path: PivotTreeNode['path']) => number;
 }) => {
   if (fetchedDepthByKey.size === 0 || stablePrefix <= 0) {
     return new Map<string, number>();
   }
-  const resolveNearestSurvivingKey = (key: string) => {
-    if (nextNodes[key]) {
-      return key;
-    }
-    const path = parsePath(key);
-    for (let size = path.length - 1; size >= 0; size -= 1) {
-      const candidate = serializePath(path.slice(0, size));
-      if (nextNodes[candidate]) {
-        return candidate;
-      }
-    }
-    return nextNodes[rootKey] ? rootKey : undefined;
-  };
+  const countCoverageDimDepth = (path: PivotTreeNode['path']) =>
+    countDimDepth(path.filter(value => value !== METRICS_PLACEHOLDER));
   const next = new Map<string, number>();
   fetchedDepthByKey.forEach((requiredDepth, key) => {
-    const node = previousNodes[key];
-    const path = node ? node.path : parsePath(key);
-    let candidatePath = path;
+    let candidatePath = parsePath(key);
     while (
       candidatePath.length > 0 &&
-      countDimDepth(candidatePath) > stablePrefix
+      countCoverageDimDepth(candidatePath) > stablePrefix
     ) {
       candidatePath = candidatePath.slice(0, candidatePath.length - 1);
     }
     const candidateKey = serializePath(candidatePath);
-    const resolvedKey = resolveNearestSurvivingKey(candidateKey);
-    if (resolvedKey === undefined) {
+    if (candidateKey === rootKey && key !== rootKey) {
       return;
     }
-    if (resolvedKey === rootKey && key !== rootKey) {
-      return;
-    }
-    const existingDepth = next.get(resolvedKey);
+    const existingDepth = next.get(candidateKey);
     next.set(
-      resolvedKey,
+      candidateKey,
       existingDepth === undefined
         ? requiredDepth
         : Math.max(existingDepth, requiredDepth),
@@ -354,19 +336,23 @@ const remapFetchedDepthsForStableTrim = ({
 };
 
 const mapExpandedCoverageForStableTrim = ({
+  axis,
   expandedKeys,
   previousNodes,
   nextNodes,
   stablePrefix,
   requiredOppositeDepth,
   countDimDepth,
+  getCoverageKey,
 }: {
+  axis: PivotAxis;
   expandedKeys: Set<string>;
   previousNodes: Record<string, PivotTreeNode>;
   nextNodes: Record<string, PivotTreeNode>;
   stablePrefix: number;
   requiredOppositeDepth: number;
   countDimDepth: (path: PivotTreeNode['path']) => number;
+  getCoverageKey: (axis: PivotAxis, key: string) => string;
 }) => {
   if (expandedKeys.size === 0 || stablePrefix <= 0) {
     return new Map<string, number>();
@@ -425,9 +411,10 @@ const mapExpandedCoverageForStableTrim = ({
     if (!resolvedNode || countDimDepth(resolvedNode.path) > stablePrefix) {
       return;
     }
-    const existingDepth = next.get(resolvedKey);
+    const coverageKey = getCoverageKey(axis, resolvedKey);
+    const existingDepth = next.get(coverageKey);
     next.set(
-      resolvedKey,
+      coverageKey,
       existingDepth === undefined
         ? requiredOppositeDepth
         : Math.max(existingDepth, requiredOppositeDepth),
@@ -508,6 +495,7 @@ export type ExpansionEngineConfig = {
   metricIndexForRows?: number;
   metricIndexForCols?: number;
   isMetricTokenValue: (value: unknown) => boolean;
+  pivotProgram: PivotProgram;
   countDimDepth: (path: PivotTreeNode['path']) => number;
   expandRowsLevelRaw?: number;
   expandColumnsLevelRaw?: number;
@@ -543,6 +531,7 @@ export const useExpansionEngine = ({
   metricIndexForRows,
   metricIndexForCols,
   isMetricTokenValue,
+  pivotProgram,
   countDimDepth,
   expandRowsLevelRaw,
   expandColumnsLevelRaw,
@@ -659,20 +648,30 @@ export const useExpansionEngine = ({
     setLoadingKeys(new Set(counts.keys()));
   }, []);
 
-  const getGroupedFetchKey = useCallback(
-    (axis: PivotAxis, key: string) => {
-      const intendedIndex =
-        axis === 'row' ? metricIndexForRows : metricIndexForCols;
-      const path = parsePath(key);
-      const metricIndex = path.findIndex(value => isMetricTokenValue(value));
-      if (metricIndex >= 0) {
-        if (intendedIndex === undefined || metricIndex < intendedIndex) {
-          return key;
-        }
-      }
-      return serializePath(path.filter(value => !isMetricTokenValue(value)));
+  const getCoverageKey = useCallback(
+    (axis: PivotAxis, key: string) =>
+      buildAxisCoverageKeyFromPathKey({
+        program: pivotProgram,
+        axis,
+        key,
+      }),
+    [pivotProgram],
+  );
+
+  const markFetchedCoverage = useCallback(
+    (axis: PivotAxis, key: string, requiredOppositeDepth: number) => {
+      const fetchedKeysRef =
+        axis === 'row' ? fetchedRowKeysRef : fetchedColKeysRef;
+      const coverageKey = getCoverageKey(axis, key);
+      const existingDepth = fetchedKeysRef.current.get(coverageKey);
+      fetchedKeysRef.current.set(
+        coverageKey,
+        existingDepth === undefined
+          ? requiredOppositeDepth
+          : Math.max(existingDepth, requiredOppositeDepth),
+      );
     },
-    [isMetricTokenValue, metricIndexForCols, metricIndexForRows],
+    [getCoverageKey],
   );
 
   const collectInFlightExpanded = useCallback((axis: PivotAxis) => {
@@ -1240,7 +1239,7 @@ export const useExpansionEngine = ({
             requiredOppositeDepth: requiredDepth,
             fetchedDepthByKey: fetchedKeysRef.current,
             hasLoadedChildren: hasLoadedChildrenForIteration,
-            getGroupedFetchKey,
+            getCoverageKey,
           });
           if (plan.fetchKeys.size === 0) {
             break;
@@ -1327,7 +1326,8 @@ export const useExpansionEngine = ({
               const groupKey = JSON.stringify([target.axis, target.pathKey]);
               const keys = groupKeyMap.get(groupKey) ?? [target.pathKey];
               keys.forEach(groupKey => {
-                fetchedKeysRef.current.set(
+                markFetchedCoverage(
+                  target.axis,
                   groupKey,
                   target.requiredOppositeDepth,
                 );
@@ -1352,7 +1352,8 @@ export const useExpansionEngine = ({
               const groupKey = JSON.stringify([target.axis, target.pathKey]);
               const keys = groupKeyMap.get(groupKey) ?? [target.pathKey];
               keys.forEach(groupKey => {
-                fetchedKeysRef.current.set(
+                markFetchedCoverage(
+                  target.axis,
                   groupKey,
                   target.requiredOppositeDepth,
                 );
@@ -1400,10 +1401,7 @@ export const useExpansionEngine = ({
             ) {
               continue;
             }
-            const existingDepth = fetchedKeysRef.current.get(key);
-            if (existingDepth === undefined || existingDepth < requiredDepth) {
-              fetchedKeysRef.current.set(key, requiredDepth);
-            }
+            markFetchedCoverage(axis, key, requiredDepth);
           }
           resolvedExpanded = nextResolvedExpanded;
         }
@@ -1461,12 +1459,13 @@ export const useExpansionEngine = ({
       fetchFormData,
       hasLoadedChildrenForTree,
       persistExpansionState,
-      getGroupedFetchKey,
+      getCoverageKey,
       resolveExpandedForMetrics,
       setExpandedColsState,
       setExpandedRowsState,
       trackRequestGroup,
       updateLoadingKey,
+      markFetchedCoverage,
     ],
   );
 
@@ -1699,7 +1698,7 @@ export const useExpansionEngine = ({
           fetchedRowDepthByKey: fetchedRowKeysRef.current,
           fetchedColDepthByKey: fetchedColKeysRef.current,
           config: visibilityConfig,
-          getGroupedFetchKey,
+          getCoverageKey,
           activeAxis: options?.activeAxis,
           pendingRows: pendingRowsRef.current,
           pendingCols: pendingColsRef.current,
@@ -1818,12 +1817,14 @@ export const useExpansionEngine = ({
         for (const result of results) {
           if (result.kind === 'single') {
             const { target, data } = result;
-            const fetchedKeysRef =
-              target.axis === 'row' ? fetchedRowKeysRef : fetchedColKeysRef;
             const groupKey = JSON.stringify([target.axis, target.pathKey]);
             const keys = groupKeyMap.get(groupKey) ?? [target.pathKey];
             keys.forEach(key => {
-              fetchedKeysRef.current.set(key, target.requiredOppositeDepth);
+              markFetchedCoverage(
+                target.axis,
+                key,
+                target.requiredOppositeDepth,
+              );
             });
             if (!data) {
               continue;
@@ -1834,12 +1835,14 @@ export const useExpansionEngine = ({
           }
           const { batch, data } = result;
           for (const target of batch.targets) {
-            const fetchedKeysRef =
-              target.axis === 'row' ? fetchedRowKeysRef : fetchedColKeysRef;
             const groupKey = JSON.stringify([target.axis, target.pathKey]);
             const keys = groupKeyMap.get(groupKey) ?? [target.pathKey];
             keys.forEach(key => {
-              fetchedKeysRef.current.set(key, target.requiredOppositeDepth);
+              markFetchedCoverage(
+                target.axis,
+                key,
+                target.requiredOppositeDepth,
+              );
             });
             if (!data) {
               continue;
@@ -1856,8 +1859,6 @@ export const useExpansionEngine = ({
           requiredOppositeDepth: number,
         ) => {
           const nodes = axis === 'row' ? updatedTree.rows : updatedTree.cols;
-          const fetchedKeysRef =
-            axis === 'row' ? fetchedRowKeysRef : fetchedColKeysRef;
           expandedKeys.forEach(key => {
             const node = nodes[key];
             if (!node) {
@@ -1873,13 +1874,7 @@ export const useExpansionEngine = ({
             if (!hasChildrenLoaded) {
               return;
             }
-            const existingDepth = fetchedKeysRef.current.get(key);
-            if (
-              existingDepth === undefined ||
-              existingDepth < requiredOppositeDepth
-            ) {
-              fetchedKeysRef.current.set(key, requiredOppositeDepth);
-            }
+            markFetchedCoverage(axis, key, requiredOppositeDepth);
           });
         };
         markExpandedAsFetched('row', desiredRows, visibleColDepth);
@@ -1895,7 +1890,8 @@ export const useExpansionEngine = ({
       cancelInFlightRequestGroups,
       fetchFormData,
       hasLoadedChildrenForTree,
-      getGroupedFetchKey,
+      getCoverageKey,
+      markFetchedCoverage,
       persistExpansionState,
       pruneMergedTree,
       setExpandedColsState,
@@ -2169,8 +2165,6 @@ export const useExpansionEngine = ({
     const remappedFetchedRows = shouldCarryFetchedRowsForTrim
       ? remapFetchedDepthsForStableTrim({
           fetchedDepthByKey: fetchedRowKeysRef.current,
-          previousNodes: sourceTree.rows,
-          nextNodes: normalizedTree.rows,
           stablePrefix: rowStablePrefix,
           countDimDepth,
         })
@@ -2178,8 +2172,6 @@ export const useExpansionEngine = ({
     const remappedFetchedCols = shouldCarryFetchedColsForTrim
       ? remapFetchedDepthsForStableTrim({
           fetchedDepthByKey: fetchedColKeysRef.current,
-          previousNodes: sourceTree.cols,
-          nextNodes: normalizedTree.cols,
           stablePrefix: colStablePrefix,
           countDimDepth,
         })
@@ -2195,22 +2187,26 @@ export const useExpansionEngine = ({
     });
     const expandedRowCoverage = shouldCarryFetchedRowsForTrim
       ? mapExpandedCoverageForStableTrim({
+          axis: 'row',
           expandedKeys: expandedRowsRef.current,
           previousNodes: sourceTree.rows,
           nextNodes: normalizedTree.rows,
           stablePrefix: rowStablePrefix,
           requiredOppositeDepth: previousVisibleColDepth,
           countDimDepth,
+          getCoverageKey,
         })
       : new Map<string, number>();
     const expandedColCoverage = shouldCarryFetchedColsForTrim
       ? mapExpandedCoverageForStableTrim({
+          axis: 'col',
           expandedKeys: expandedColsRef.current,
           previousNodes: sourceTree.cols,
           nextNodes: normalizedTree.cols,
           stablePrefix: colStablePrefix,
           requiredOppositeDepth: previousVisibleRowDepth,
           countDimDepth,
+          getCoverageKey,
         })
       : new Map<string, number>();
     expandedRowCoverage.forEach((depth, key) => {
@@ -2512,8 +2508,6 @@ export const useExpansionEngine = ({
       requiredOppositeDepth: number,
     ) => {
       const nodes = axis === 'row' ? normalizedTree.rows : normalizedTree.cols;
-      const fetchedKeysRef =
-        axis === 'row' ? fetchedRowKeysRef : fetchedColKeysRef;
       expandedKeys.forEach(key => {
         const node = nodes[key];
         if (!node) {
@@ -2530,7 +2524,7 @@ export const useExpansionEngine = ({
         ) {
           return;
         }
-        fetchedKeysRef.current.set(key, requiredOppositeDepth);
+        markFetchedCoverage(axis, key, requiredOppositeDepth);
       });
     };
     seedFetchedDepths('row', resolvedRows, visibleColDepth);
@@ -2543,7 +2537,7 @@ export const useExpansionEngine = ({
         fetchedRowDepthByKey: fetchedRowKeysRef.current,
         fetchedColDepthByKey: fetchedColKeysRef.current,
         config: visibilityConfig,
-        getGroupedFetchKey,
+        getCoverageKey,
         pendingRows: new Set(),
         pendingCols: new Set(),
         planRows: shouldPlanRows,
@@ -2618,7 +2612,8 @@ export const useExpansionEngine = ({
     hydrateAtomic,
     resolveExpandedForMetrics,
     reportAsyncError,
-    getGroupedFetchKey,
+    getCoverageKey,
+    markFetchedCoverage,
     setExpandedColsState,
     setExpandedRowsState,
     setPendingColsState,

@@ -19,6 +19,7 @@
 import { type QueryFormColumn, type QueryFormMetric } from '@superset-ui/core';
 import {
   MetricsLayoutEnum,
+  type MeasureHierarchy,
   type PivotAxis,
   type PivotPath,
   type PivotTreeData,
@@ -28,12 +29,16 @@ import {
 import {
   collectDimensionFormattingMetricsForQuery,
   collectDimensionSortingMetricsForQuery,
+  decodeMeasureLeafId,
+  decodeMetricKey,
+  getMetricKey,
   hasTotalSorting,
 } from '../../utils';
 import {
   buildLayoutContext,
   type LayoutContext,
 } from '../layout/LayoutContext';
+import { collectRequiredTimeOffsets } from '../measureLeaves';
 import { projectAxisPathToDimensions } from '../runtime/paths';
 import { buildQueryShape } from './queryShape';
 import { type QueryIntent } from './queryIntent';
@@ -57,8 +62,10 @@ export type ResolvedFetchContext = {
   colGroupbyForQueryFull: QueryFormColumn[];
   rowGroupbyForQuery: QueryFormColumn[];
   colGroupbyForQuery: QueryFormColumn[];
-  metrics: QueryFormMetric[];
+  materializedMetrics: QueryFormMetric[];
   metricsForQuery: QueryFormMetric[];
+  materializedMeasureHierarchy: MeasureHierarchy;
+  requiredTimeOffsets: string[];
   metricsLayoutResolved: MetricsLayoutEnum;
   metricInsertIndex: number;
   sanitizedPath: PivotPath;
@@ -70,6 +77,84 @@ export type ResolvedFetchContext = {
   hasColFormatting: boolean;
   hasRowTotalSorting: boolean;
   hasColTotalSorting: boolean;
+};
+
+const collectPathMetricKeys = (
+  path: PivotPath,
+  metricKeys: Set<string>,
+): string[] => {
+  const result: string[] = [];
+  const seen = new Set<string>();
+  path.forEach(value => {
+    const metricKey = decodeMetricKey(value);
+    if (!metricKey || !metricKeys.has(metricKey) || seen.has(metricKey)) {
+      return;
+    }
+    seen.add(metricKey);
+    result.push(metricKey);
+  });
+  return result;
+};
+
+const collectPathMeasureLeafIds = (path: PivotPath): string[] => {
+  const result: string[] = [];
+  const seen = new Set<string>();
+  path.forEach(value => {
+    const leafId = decodeMeasureLeafId(value);
+    if (!leafId || seen.has(leafId)) {
+      return;
+    }
+    seen.add(leafId);
+    result.push(leafId);
+  });
+  return result;
+};
+
+const filterMetricsByScope = (
+  metrics: QueryFormMetric[],
+  metricKeys: string[],
+): QueryFormMetric[] => {
+  if (metricKeys.length === 0) {
+    return metrics;
+  }
+  const metricKeySet = new Set(metricKeys);
+  return metrics.filter(metric => metricKeySet.has(getMetricKey(metric)));
+};
+
+const filterMeasureHierarchyByScope = ({
+  measureHierarchy,
+  metricKeys,
+  leafIds,
+}: {
+  measureHierarchy: MeasureHierarchy;
+  metricKeys: string[];
+  leafIds: string[];
+}): MeasureHierarchy => {
+  if (measureHierarchy.kind === 'flatMetrics') {
+    return metricKeys.length > 0
+      ? {
+          kind: 'flatMetrics',
+          metricKeys: measureHierarchy.metricKeys.filter(metricKey =>
+            metricKeys.includes(metricKey),
+          ),
+        }
+      : measureHierarchy;
+  }
+
+  const metricKeySet = metricKeys.length > 0 ? new Set(metricKeys) : undefined;
+  const leafIdSet = leafIds.length > 0 ? new Set(leafIds) : undefined;
+  return {
+    ...measureHierarchy,
+    groups: measureHierarchy.groups
+      .filter(group => !metricKeySet || metricKeySet.has(group.metricKey))
+      .map(group => ({
+        ...group,
+        leaves: leafIdSet
+          ? group.leaves.filter(leaf => leafIdSet.has(leaf.id))
+          : group.leaves,
+      }))
+      .filter(group => group.leaves.length > 0),
+  };
 };
 
 export const resolveFetchContext = ({
@@ -86,6 +171,7 @@ export const resolveFetchContext = ({
   const layout = layoutParam ?? buildLayoutContext(formData);
   const {
     metrics,
+    metricLabelSet,
     metricsLayoutResolved,
     metricInsertIndex: metricInsertIndexBase,
   } = layout;
@@ -181,6 +267,17 @@ export const resolveFetchContext = ({
       colGroupby,
       metrics,
     ).length > 0;
+  const scopedMetricKeys = collectPathMetricKeys(path, metricLabelSet);
+  const scopedLeafIds = collectPathMeasureLeafIds(path);
+  const materializedMetrics = filterMetricsByScope(metrics, scopedMetricKeys);
+  const materializedMeasureHierarchy = filterMeasureHierarchyByScope({
+    measureHierarchy: layout.measureHierarchy,
+    metricKeys: scopedMetricKeys,
+    leafIds: scopedLeafIds,
+  });
+  const requiredTimeOffsets = collectRequiredTimeOffsets(
+    materializedMeasureHierarchy,
+  );
   const needsTotals =
     !!formData.rowTotals ||
     !!formData.colTotals ||
@@ -204,7 +301,8 @@ export const resolveFetchContext = ({
     intent,
     rowGroupby: rowGroupbyForQueryFull,
     colGroupby: colGroupbyForQueryFull,
-    metrics,
+    metrics: materializedMetrics,
+    availableMetrics: metrics,
     metricFormattingScope: formData.metricFormattingScope,
     metricFormatting: formData.metricFormatting,
     metricDatabars: formData.metricDatabars,
@@ -212,7 +310,7 @@ export const resolveFetchContext = ({
     colFormatting: formData.colFormatting,
     rowSorting: formData.rowSorting,
     colSorting: formData.colSorting,
-    measureHierarchy: layout.measureHierarchy,
+    measureHierarchy: materializedMeasureHierarchy,
   });
   const rowGroupbyForQuery = queryShape.rowGroupby;
   const colGroupbyForQuery = queryShape.colGroupby;
@@ -225,8 +323,10 @@ export const resolveFetchContext = ({
     colGroupbyForQueryFull,
     rowGroupbyForQuery,
     colGroupbyForQuery,
-    metrics,
+    materializedMetrics,
     metricsForQuery,
+    materializedMeasureHierarchy,
+    requiredTimeOffsets,
     metricsLayoutResolved,
     metricInsertIndex,
     sanitizedPath,

@@ -280,27 +280,70 @@ Gate 2 has started:
 - Raw metric-label expansion tolerance has been removed. This is an approved
   compatibility break: old persisted expansion state with raw metric labels may
   reset, while future behavior uses canonical encoded paths.
+- `LayoutContext.getFetchPath` has been deleted. Query specs and expansion
+  planning now use `src/pivot/runtime/paths.ts` for axis coverage keys.
+- The old metric-index grouped fetch-key heuristic in `useExpansionEngine` has
+  been deleted. Fetched state is keyed by canonical axis coverage.
+- Canonical coverage keys keep the Values-tier marker and the encoded
+  metric/measure-leaf scope. This keeps `before Values` and `after Values`
+  expansion branches separate, and prevents expanding one metric or one
+  measure leaf from marking sibling metrics/leaves as loaded.
+- The metric-prefix missing-node workaround in `expansionPlanner.ts` has been
+  deleted; expansion satisfaction now flows through canonical coverage keys.
+- Branch fetch now separates query support metrics from visible/materialized
+  metrics. Sorting, formatting, databars, and custom measure-leaf dependencies
+  can ride in the same request, but only the expanded metric/leaf branch is
+  materialized into the returned tree.
+- Branch measure-leaf fetches now scope required time offsets to the selected
+  visible leaf. Expanding `IX 1YA` does not request unrelated sibling offsets
+  such as `1 month ago`.
+- Tests now cover metric sibling split loading, support metric query inclusion,
+  non-materialization of support metrics, IX/time-offset scoping, and planner
+  fetch-target separation for metric siblings.
 
 Immediate next step:
 
-- Replace the remaining axis-key projection bridges (`LayoutContext.getFetchPath`
-  and `useExpansionEngine` grouped fetch-key heuristics) with the canonical path
-  projection helper, then delete the old token-stripping logic.
 - Move branch and batch target selection fully behind coverage planning, then
   delete placement-specific depth-pair branches from `branchQueryPairs.ts`.
+- Continue shrinking `resolveFetchContext`: it now owns metric/leaf scope and
+  support metric selection, but should eventually become a thin adapter around
+  coverage planning plus query-shape construction.
+- Start extracting the fact store boundary so tree materialization reads from
+  coverage/facts instead of relying on fetched branch tree shapes.
+- Decide whether support metrics fetched for one branch should be stored as
+  reusable support facts. Today they ride with the visible branch request; a fact
+  store can avoid re-requesting the same support key when exact coverage already
+  exists.
 - Before deleting any broad behavior branch, bring inconsistent behavior or
   edge-case behavior that unlocks large deletion wins to the user for approval
   with UX impact and deletion upside.
 
-Potential approval checkpoint:
+Resolved approval checkpoint:
 
 - Loaded/fetched state is still partly keyed by rendered axis paths and partly by
-  projected fetch paths. Standardizing it on canonical dimension coverage keys
-  should remove the metric-index heuristic in `useExpansionEngine` and the
-  no-axis `getFetchPath` bridge in `LayoutContext`. UX impact to review: metric
-  sibling branches may share loading/fetched state when they resolve to the same
-  DB fact coverage, which should reduce duplicate requests and spinners but may
-  change very granular per-metric loading indicators.
+  projected fetch paths. Standardizing it on canonical axis coverage keys should
+  remove the metric-index heuristic in `useExpansionEngine` and the no-axis
+  `getFetchPath` bridge in `LayoutContext`.
+- Approved and implemented with one refinement: coverage keys are not pure
+  dimension-only keys. They preserve the Values tier as `__MEASURES__`, because
+  deleting that tier made `before Values` and `after Values` branches look like
+  the same coverage and caused metrics-between expansion to underfetch.
+- Refined after query-efficiency review: coverage keys also preserve the encoded
+  metric and measure-leaf tokens. Metric siblings do not share loaded state.
+  Support metrics may be queried with the visible branch, but they do not mark
+  sibling visible branches as loaded or materialize extra headers/cells.
+
+Potential future approval checkpoint:
+
+- Metrics-between layouts currently allow a metric branch under a hidden
+  pre-Values dimension to reveal post-Values dimensions. Example:
+  `orderPriority -> Values -> returnFlag` can load while `shipMode` is still
+  hidden, even when the full axis program is `orderPriority -> shipMode ->
+Values -> returnFlag`. Keeping this behavior preserves current UX, but it
+  forces runtime projection to support "skipped pre-Values dimension" branches.
+  Standardizing expansion so post-Values dimensions are only reachable after all
+  pre-Values dimensions on that branch are visible would simplify branch
+  projection and fetched coverage, but it would be a noticeable UX change.
 
 ### Gate 1: One compiled layout model
 
@@ -521,14 +564,14 @@ Exit criteria:
 These are directional targets, not promises. They should be measured after each
 gate with `wc -l` and compared against the baseline.
 
-| Area | Removal source | Expected reduction |
-| --- | --- | --- |
-| Query planning | placement-specific branch pairs and fetch context surgery | high |
-| Tree construction | duplicate initial, branch, update, and export materialization | high |
-| Expansion | ref-heavy orchestration and duplicate fetch loops | high |
-| Render model | tree repair and loaded-state inference | medium |
-| Chart component | persistence/fetch/materialization orchestration | high |
-| Utilities | kitchen-sink layout, metric, subtotal helpers | medium |
+| Area              | Removal source                                                | Expected reduction |
+| ----------------- | ------------------------------------------------------------- | ------------------ |
+| Query planning    | placement-specific branch pairs and fetch context surgery     | high               |
+| Tree construction | duplicate initial, branch, update, and export materialization | high               |
+| Expansion         | ref-heavy orchestration and duplicate fetch loops             | high               |
+| Render model      | tree repair and loaded-state inference                        | medium             |
+| Chart component   | persistence/fetch/materialization orchestration               | high               |
+| Utilities         | kitchen-sink layout, metric, subtotal helpers                 | medium             |
 
 The project should track both total line count and number of files that can be
 deleted or reduced to thin call sites.

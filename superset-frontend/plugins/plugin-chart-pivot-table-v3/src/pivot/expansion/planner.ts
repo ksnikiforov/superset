@@ -34,20 +34,20 @@ export function buildGroupedFetchTargets({
   fetchKeys,
   nodes,
   requiredOppositeDepth,
-  getGroupedFetchKey,
+  getCoverageKey,
 }: {
   axis: PivotAxis;
   fetchKeys: Set<string>;
   nodes: Record<string, PivotTreeNode>;
   requiredOppositeDepth: number;
-  getGroupedFetchKey: (axis: PivotAxis, key: string) => string;
+  getCoverageKey: (axis: PivotAxis, key: string) => string;
 }): {
   targets: PlannedFetchTarget[];
   groupKeyMap: Map<string, string[]>;
 } {
   const groups = new Map<string, string[]>();
   fetchKeys.forEach(key => {
-    const groupKey = getGroupedFetchKey(axis, key);
+    const groupKey = getCoverageKey(axis, key);
     const existing = groups.get(groupKey);
     if (existing) {
       existing.push(key);
@@ -61,7 +61,7 @@ export function buildGroupedFetchTargets({
 
   for (const keys of groups.values()) {
     const representative =
-      keys.find(key => getGroupedFetchKey(axis, key) === key && nodes[key]) ??
+      keys.find(key => getCoverageKey(axis, key) === key && nodes[key]) ??
       keys.find(key => nodes[key]) ??
       keys[0];
 
@@ -92,7 +92,7 @@ export const planGroupedExpansionTargets = ({
   requiredOppositeDepth,
   fetchedDepthByKey,
   hasLoadedChildren,
-  getGroupedFetchKey,
+  getCoverageKey,
 }: {
   axis: PivotAxis;
   expandedKeys: Set<string>;
@@ -100,7 +100,7 @@ export const planGroupedExpansionTargets = ({
   requiredOppositeDepth: number;
   fetchedDepthByKey: Map<string, number>;
   hasLoadedChildren: (axis: PivotAxis, node: PivotTreeNode) => boolean;
-  getGroupedFetchKey: (axis: PivotAxis, key: string) => string;
+  getCoverageKey: (axis: PivotAxis, key: string) => string;
 }): {
   plan: PivotExpansionPlan;
   targets: PlannedFetchTarget[];
@@ -113,6 +113,7 @@ export const planGroupedExpansionTargets = ({
     requiredDepth: requiredOppositeDepth,
     fetchedDepthByKey,
     hasLoadedChildren,
+    getCoverageKey,
   });
 
   const grouped = buildGroupedFetchTargets({
@@ -120,7 +121,7 @@ export const planGroupedExpansionTargets = ({
     fetchKeys: plan.fetchKeys,
     nodes,
     requiredOppositeDepth,
-    getGroupedFetchKey,
+    getCoverageKey,
   });
 
   return { plan, targets: grouped.targets, groupKeyMap: grouped.groupKeyMap };

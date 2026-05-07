@@ -53,7 +53,7 @@ describe('pivot/expansion/planner', () => {
       requiredOppositeDepth: 1,
       fetchedDepthByKey: new Map(),
       hasLoadedChildren: () => false,
-      getGroupedFetchKey: (_axis, key) => key,
+      getCoverageKey: (_axis, key) => key,
     });
 
     expect(Array.from(plan.fetchKeys)).toEqual([aKey]);
@@ -67,5 +67,57 @@ describe('pivot/expansion/planner', () => {
       },
     ]);
     expect(groupKeyMap.get(JSON.stringify(['row', aKey]))).toEqual([aKey]);
+  });
+
+  it('keeps rendered metric siblings as separate fetch targets when coverage keys differ', () => {
+    const metricAKey = serializePath(['A', '__metric__sales']);
+    const metricBKey = serializePath(['A', '__metric__profit']);
+    const nodes: Record<string, PivotTreeNode> = {
+      [rootKey]: {
+        axis: 'row',
+        key: rootKey,
+        path: [],
+        label: 'Total',
+        formattedLabel: 'Total',
+        level: 0,
+        hasChildren: true,
+      },
+      [metricAKey]: {
+        axis: 'row',
+        key: metricAKey,
+        path: ['A', '__metric__sales'],
+        label: 'sales',
+        formattedLabel: 'sales',
+        level: 2,
+        hasChildren: true,
+      },
+      [metricBKey]: {
+        axis: 'row',
+        key: metricBKey,
+        path: ['A', '__metric__profit'],
+        label: 'profit',
+        formattedLabel: 'profit',
+        level: 2,
+        hasChildren: true,
+      },
+    };
+
+    const { targets, groupKeyMap } = planGroupedExpansionTargets({
+      axis: 'row',
+      expandedKeys: new Set([metricAKey, metricBKey]),
+      nodes,
+      requiredOppositeDepth: 1,
+      fetchedDepthByKey: new Map(),
+      hasLoadedChildren: () => false,
+      getCoverageKey: (_axis, key) => key,
+    });
+
+    expect(targets).toHaveLength(2);
+    expect(groupKeyMap.get(JSON.stringify(['row', metricAKey]))).toEqual([
+      metricAKey,
+    ]);
+    expect(groupKeyMap.get(JSON.stringify(['row', metricBKey]))).toEqual([
+      metricBKey,
+    ]);
   });
 });

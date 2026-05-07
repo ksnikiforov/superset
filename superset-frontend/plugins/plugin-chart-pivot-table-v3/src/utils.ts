@@ -1336,6 +1336,7 @@ export const collectMetricDatabarMetricsForQuery = (
 export const collectMeasureLeafMetricsForQuery = (
   measureHierarchy: MeasureHierarchy | undefined,
   metrics: QueryFormMetric[] = [],
+  availableMetrics: QueryFormMetric[] = metrics,
 ): QueryFormMetric[] => {
   if (!measureHierarchy || measureHierarchy.kind !== 'measureStackV1') {
     return [];
@@ -1354,7 +1355,7 @@ export const collectMeasureLeafMetricsForQuery = (
   const referencedMetrics: QueryFormMetric[] = [];
   const referencedMetricKeys = new Set<string>();
   const addMetric = (metric: QueryFormMetric) => {
-    const resolved = resolveMetricReferenceForQuery(metric, metrics);
+    const resolved = resolveMetricReferenceForQuery(metric, availableMetrics);
     const candidateKeys = [
       getFormattingMetricKey(resolved),
       getMetricKey(resolved),
@@ -1369,7 +1370,7 @@ export const collectMeasureLeafMetricsForQuery = (
     }
     referencedMetricKeys.add(primaryKey);
     referencedMetrics.push(
-      metrics.includes(resolved)
+      availableMetrics.includes(resolved)
         ? resolved
         : normalizeFormattingMetricForQuery(resolved),
     );

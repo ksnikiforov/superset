@@ -24,6 +24,7 @@ import { baseFormData, buildFormData } from '../../fixtures/pivotFormData';
 import {
   applyMetricAxis,
   buildTreeFromRecords,
+  decodeMetricKey,
   METRICS_PLACEHOLDER,
   mergeTrees,
 } from '../../../../src/utils';
@@ -852,45 +853,50 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
       0,
     );
 
-    const colBranchRaw = buildTreeFromRecords(
-      [
-        {
-          orderPriority: '1-URGENT',
-          discountBand: 'LOW',
-          customerSegment: 'CONSUMER',
-          col2: 'C2-A',
-          measure1: 10,
-          measure2: 20,
-          measure3: 30,
-          measure4: 40,
-        },
-        {
-          orderPriority: '1-URGENT',
-          discountBand: 'LOW',
-          customerSegment: 'CONSUMER',
-          col2: 'C2-B',
-          measure1: 11,
-          measure2: 21,
-          measure3: 31,
-          measure4: 41,
-        },
-      ],
-      metrics,
-      rowGroupby,
-      colGroupby,
-      1,
-      1,
-    );
-    const colBranchWithMetrics = applyMetricAxis(
-      colBranchRaw,
-      metrics,
-      MetricsLayoutEnum.COLUMNS,
-      rowGroupby,
-      colGroupby,
-      0,
-    );
+    const branchRecords = [
+      {
+        orderPriority: '1-URGENT',
+        discountBand: 'LOW',
+        customerSegment: 'CONSUMER',
+        col2: 'C2-A',
+        measure1: 10,
+        measure2: 20,
+        measure3: 30,
+        measure4: 40,
+      },
+      {
+        orderPriority: '1-URGENT',
+        discountBand: 'LOW',
+        customerSegment: 'CONSUMER',
+        col2: 'C2-B',
+        measure1: 11,
+        measure2: 21,
+        measure3: 31,
+        measure4: 41,
+      },
+    ];
+    const buildMetricBranch = (metric: string) =>
+      applyMetricAxis(
+        buildTreeFromRecords(
+          branchRecords,
+          [metric],
+          rowGroupby,
+          colGroupby,
+          1,
+          1,
+        ),
+        [metric],
+        MetricsLayoutEnum.COLUMNS,
+        rowGroupby,
+        colGroupby,
+        0,
+      );
 
-    fetchPivotBranchMock.mockResolvedValue({ data: colBranchWithMetrics });
+    fetchPivotBranchMock.mockImplementation(({ path }) =>
+      Promise.resolve({
+        data: buildMetricBranch(decodeMetricKey(path?.[0]) ?? 'measure1'),
+      }),
+    );
 
     const { container } = render(
       <PivotTableChart
@@ -1005,45 +1011,50 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
       0,
     );
 
-    const colBranchRaw = buildTreeFromRecords(
-      [
-        {
-          orderPriority: '1-URGENT',
-          discountBand: 'LOW',
-          customerSegment: 'CONSUMER',
-          col2: 'C2-A',
-          measure1: 10,
-          measure2: 20,
-          measure3: 30,
-          measure4: 40,
-        },
-        {
-          orderPriority: '1-URGENT',
-          discountBand: 'LOW',
-          customerSegment: 'CONSUMER',
-          col2: 'C2-B',
-          measure1: 11,
-          measure2: 21,
-          measure3: 31,
-          measure4: 41,
-        },
-      ],
-      metrics,
-      rowGroupby,
-      colGroupby,
-      1,
-      1,
-    );
-    const colBranchWithMetrics = applyMetricAxis(
-      colBranchRaw,
-      metrics,
-      MetricsLayoutEnum.COLUMNS,
-      rowGroupby,
-      colGroupby,
-      0,
-    );
+    const branchRecords = [
+      {
+        orderPriority: '1-URGENT',
+        discountBand: 'LOW',
+        customerSegment: 'CONSUMER',
+        col2: 'C2-A',
+        measure1: 10,
+        measure2: 20,
+        measure3: 30,
+        measure4: 40,
+      },
+      {
+        orderPriority: '1-URGENT',
+        discountBand: 'LOW',
+        customerSegment: 'CONSUMER',
+        col2: 'C2-B',
+        measure1: 11,
+        measure2: 21,
+        measure3: 31,
+        measure4: 41,
+      },
+    ];
+    const buildMetricBranch = (metric: string) =>
+      applyMetricAxis(
+        buildTreeFromRecords(
+          branchRecords,
+          [metric],
+          rowGroupby,
+          colGroupby,
+          1,
+          1,
+        ),
+        [metric],
+        MetricsLayoutEnum.COLUMNS,
+        rowGroupby,
+        colGroupby,
+        0,
+      );
 
-    fetchPivotBranchMock.mockResolvedValue({ data: colBranchWithMetrics });
+    fetchPivotBranchMock.mockImplementation(({ path }) =>
+      Promise.resolve({
+        data: buildMetricBranch(decodeMetricKey(path?.[0]) ?? 'measure1'),
+      }),
+    );
 
     const { container } = render(
       <PivotTableChart

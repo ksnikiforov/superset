@@ -63,6 +63,13 @@ export const buildBatchSignature = ({
     ctx.metricsForQuery.length > 0
       ? { ...formData, metrics: ctx.metricsForQuery }
       : formData;
+  const timeOffsets = Array.from(
+    new Set([...(formData.time_offsets ?? []), ...ctx.requiredTimeOffsets]),
+  );
+  const queryFormDataWithOffsets =
+    timeOffsets.length > 0
+      ? { ...queryFormData, time_offsets: timeOffsets }
+      : queryFormData;
   const queryPairs = buildBranchQueryPairs({
     axis,
     pathLength: ctx.sanitizedPath.length,
@@ -92,7 +99,7 @@ export const buildBatchSignature = ({
   }));
 
   const queryContext = buildQueryContext(
-    queryFormData,
+    queryFormDataWithOffsets,
     (baseQueryObject: QueryObject) =>
       toChartDataQueries({ specs, baseQueryObject }),
   );

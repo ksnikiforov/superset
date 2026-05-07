@@ -23,7 +23,6 @@ import {
 } from '@superset-ui/core';
 import {
   MetricsLayoutEnum,
-  PivotPath,
   PivotTableQueryFormData,
   TotalPosition,
   MeasureHierarchy,
@@ -35,7 +34,6 @@ import {
   getMetricKeys,
   normalizeSubtotalLevels,
   resolveExpandLevel,
-  isMeasureLeafToken,
 } from '../../utils';
 import {
   coerceMeasureLeavesByMetric,
@@ -99,7 +97,6 @@ export type LayoutContext = {
   resolvedExpandRowsLevel: number;
   resolvedExpandColsLevel: number;
   isMetricTokenValue: (val: unknown) => boolean;
-  getFetchPath: (path: PivotPath) => PivotPath;
 };
 
 const normalizeTotalPosition = (value: unknown): TotalPosition => {
@@ -204,16 +201,6 @@ export const buildLayoutContext = (
     const decoded = decodeMetricKey(val);
     return !!decoded && metricLabelSet.has(decoded);
   };
-  const getFetchPath = (path: PivotPath): PivotPath => {
-    const next: PivotPath = [];
-    path.forEach(val => {
-      if (isMeasureLeafToken(val) || isMetricTokenValue(val)) {
-        return;
-      }
-      next.push(val);
-    });
-    return next;
-  };
 
   return {
     groupbyRowsRaw,
@@ -244,6 +231,5 @@ export const buildLayoutContext = (
     resolvedExpandRowsLevel,
     resolvedExpandColsLevel,
     isMetricTokenValue,
-    getFetchPath,
   };
 };

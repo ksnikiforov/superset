@@ -48,7 +48,7 @@ describe('pivot/expansion/engine', () => {
     countDimDepth: path => path.length,
   };
 
-  const getGroupedFetchKey = (_axis: 'row' | 'col', key: string) => key;
+  const getCoverageKey = (_axis: 'row' | 'col', key: string) => key;
 
   const makeNode = (
     axis: 'row' | 'col',
@@ -106,7 +106,7 @@ describe('pivot/expansion/engine', () => {
       fetchedRowDepthByKey: new Map(),
       fetchedColDepthByKey: new Map(),
       config,
-      getGroupedFetchKey,
+      getCoverageKey,
       pendingRows: new Set(),
       pendingCols: new Set(),
     });
@@ -142,7 +142,7 @@ describe('pivot/expansion/engine', () => {
       fetchedRowDepthByKey: new Map(),
       fetchedColDepthByKey: new Map(),
       config,
-      getGroupedFetchKey,
+      getCoverageKey,
       activeAxis: 'col',
       pendingRows: new Set(),
       pendingCols: new Set(),
@@ -174,7 +174,7 @@ describe('pivot/expansion/engine', () => {
       fetchedRowDepthByKey: new Map(),
       fetchedColDepthByKey: new Map(),
       config,
-      getGroupedFetchKey,
+      getCoverageKey,
       pendingRows: new Set(),
       pendingCols: new Set(),
     });
@@ -202,7 +202,7 @@ describe('pivot/expansion/engine', () => {
       fetchedRowDepthByKey: new Map(),
       fetchedColDepthByKey: new Map(),
       config,
-      getGroupedFetchKey,
+      getCoverageKey,
       pendingRows: new Set(),
       pendingCols: new Set(),
       planRows: false,
@@ -256,7 +256,7 @@ describe('pivot/expansion/engine', () => {
       fetchedRowDepthByKey: new Map(),
       fetchedColDepthByKey: new Map(),
       config: metricConfig,
-      getGroupedFetchKey,
+      getCoverageKey,
       pendingRows: new Set(),
       pendingCols: new Set(),
     });
@@ -312,7 +312,7 @@ describe('pivot/expansion/engine', () => {
       fetchedRowDepthByKey: new Map(),
       fetchedColDepthByKey: new Map(),
       config: metricConfig,
-      getGroupedFetchKey,
+      getCoverageKey,
       pendingRows: new Set(),
       pendingCols: new Set(),
     });

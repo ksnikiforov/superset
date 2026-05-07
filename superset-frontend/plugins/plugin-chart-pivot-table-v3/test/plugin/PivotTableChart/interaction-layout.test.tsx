@@ -73,6 +73,8 @@ const buildInitialBootstrapTree = ({
           metricsForQuery: spec.metrics,
           formData: resolvedFormData,
           measureHierarchy: layout.measureHierarchy,
+          materializedMetrics: spec.meta.materializedMetrics,
+          materializedMeasureHierarchy: spec.meta.materializedMeasureHierarchy,
           rowGroupby: spec.meta.rowGroupbyForQueryFull,
           colGroupby: spec.meta.colGroupbyForQueryFull,
           rowSubtotalLevels: spec.meta.rowSubtotalLevels,

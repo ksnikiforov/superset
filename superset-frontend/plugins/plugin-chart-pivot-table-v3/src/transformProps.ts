@@ -405,6 +405,8 @@ export default function transformProps(
       metricsForQuery: spec.metrics,
       formData: formDataForTree,
       measureHierarchy: layout.measureHierarchy,
+      materializedMetrics: spec.meta.materializedMetrics,
+      materializedMeasureHierarchy: spec.meta.materializedMeasureHierarchy,
       rowGroupby: spec.meta.rowGroupbyForQueryFull,
       colGroupby: spec.meta.colGroupbyForQueryFull,
       rowSubtotalLevels: spec.meta.rowSubtotalLevels,

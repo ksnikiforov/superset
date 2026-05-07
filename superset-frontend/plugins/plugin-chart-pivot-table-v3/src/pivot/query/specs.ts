@@ -21,11 +21,13 @@ import {
   type GenericDataType,
   getColumnLabel,
   type QueryFormColumn,
+  type QueryFormMetric,
   type QueryObjectFilterClause,
   type SetQueryObjectFilterClause,
   type UnaryQueryObjectFilterClause,
 } from '@superset-ui/core';
 import {
+  type MeasureHierarchy,
   type MetricsLayoutEnum,
   type PivotAxis,
   type PivotPath,
@@ -58,7 +60,10 @@ import {
   buildFactCoverage,
   expansionRevealsValuesLevel,
 } from '../runtime/coverage';
-import { projectAxisPathToDimensions } from '../runtime/paths';
+import {
+  buildAxisCoverageKey,
+  projectAxisPathToDimensions,
+} from '../runtime/paths';
 import { type PivotFactCoverage } from '../runtime/types';
 
 export type QuerySpecMeta = {
@@ -73,6 +78,9 @@ export type QuerySpecMeta = {
   colGroupbyForQueryFull: QueryFormColumn[];
   rowSubtotalLevels: number[];
   colSubtotalLevels: number[];
+  materializedMetrics: QueryFormMetric[];
+  materializedMeasureHierarchy: MeasureHierarchy;
+  requiredTimeOffsets: string[];
   metricsLayoutResolved: MetricsLayoutEnum;
   metricInsertIndex: number;
   coverage?: PivotFactCoverage;
@@ -184,24 +192,32 @@ const resolvePersisted = ({
 
 const collapseSet = (
   paths: PivotPath[],
-  getFetchPath: (path: PivotPath) => PivotPath,
+  layout: LayoutContext,
+  axis: PivotAxis,
 ) => {
   const collapsed = new Set<string>();
   paths.forEach(path => {
-    collapsed.add(serializePath(getFetchPath(path)));
+    collapsed.add(
+      buildAxisCoverageKey({ program: layout.pivotProgram, axis, path }),
+    );
   });
   return collapsed;
 };
 
 const uniqueTargets = (
   paths: PivotPath[],
-  getFetchPath: (path: PivotPath) => PivotPath,
+  layout: LayoutContext,
+  axis: PivotAxis,
   collapsed: Set<string>,
 ) => {
   const result: PivotPath[] = [];
   const seen = new Set<string>();
   paths.forEach(path => {
-    const key = serializePath(getFetchPath(path));
+    const key = buildAxisCoverageKey({
+      program: layout.pivotProgram,
+      axis,
+      path,
+    });
     if (collapsed.has(key) || seen.has(key)) {
       return;
     }
@@ -314,6 +330,9 @@ const buildBranchSpecs = ({
         colGroupbyForQueryFull: ctx.colGroupbyForQueryFull,
         rowSubtotalLevels: ctx.rowSubtotalLevels,
         colSubtotalLevels: ctx.colSubtotalLevels,
+        materializedMetrics: ctx.materializedMetrics,
+        materializedMeasureHierarchy: ctx.materializedMeasureHierarchy,
+        requiredTimeOffsets: ctx.requiredTimeOffsets,
         metricsLayoutResolved: ctx.metricsLayoutResolved,
         metricInsertIndex: ctx.metricInsertIndex,
         coverage,
@@ -474,6 +493,9 @@ const buildBatchSpecs = ({
         colGroupbyForQueryFull: ctx.colGroupbyForQueryFull,
         rowSubtotalLevels: ctx.rowSubtotalLevels,
         colSubtotalLevels: ctx.colSubtotalLevels,
+        materializedMetrics: ctx.materializedMetrics,
+        materializedMeasureHierarchy: ctx.materializedMeasureHierarchy,
+        requiredTimeOffsets: ctx.requiredTimeOffsets,
         metricsLayoutResolved: ctx.metricsLayoutResolved,
         metricInsertIndex: ctx.metricInsertIndex,
         coverage,
@@ -570,15 +592,15 @@ export const buildInitialQuerySpecs = (
 
   const rowCollapsedSet =
     resolvedExpandRowsLevel > 0
-      ? collapseSet(collapsedRows, layout.getFetchPath)
+      ? collapseSet(collapsedRows, layout, 'row')
       : new Set<string>();
   const colCollapsedSet =
     resolvedExpandColsLevel > 0
-      ? collapseSet(collapsedCols, layout.getFetchPath)
+      ? collapseSet(collapsedCols, layout, 'col')
       : new Set<string>();
 
-  const rowTargets = uniqueTargets(rows, layout.getFetchPath, rowCollapsedSet);
-  const colTargets = uniqueTargets(cols, layout.getFetchPath, colCollapsedSet);
+  const rowTargets = uniqueTargets(rows, layout, 'row', rowCollapsedSet);
+  const colTargets = uniqueTargets(cols, layout, 'col', colCollapsedSet);
 
   const shouldPrefetchRoot = baseRowDepth > 1 || baseColDepth > 1;
   const bootstrapPlan = buildBootstrapPlanFromLayout(layout, formData);
@@ -621,6 +643,9 @@ export const buildInitialQuerySpecs = (
         colGroupbyForQueryFull: colGroupby,
         rowSubtotalLevels,
         colSubtotalLevels,
+        materializedMetrics: metrics,
+        materializedMeasureHierarchy: layout.measureHierarchy,
+        requiredTimeOffsets: layout.requiredTimeOffsets,
         metricsLayoutResolved: layout.metricsLayoutResolved,
         metricInsertIndex: layout.metricInsertIndex,
         coverage: target.coverage,
@@ -697,6 +722,10 @@ export const buildInitialQuerySpecs = (
           colGroupbyForQueryFull: rootContext.colGroupbyForQueryFull,
           rowSubtotalLevels: rootContext.rowSubtotalLevels,
           colSubtotalLevels: rootContext.colSubtotalLevels,
+          materializedMetrics: rootContext.materializedMetrics,
+          materializedMeasureHierarchy:
+            rootContext.materializedMeasureHierarchy,
+          requiredTimeOffsets: rootContext.requiredTimeOffsets,
           metricsLayoutResolved: rootContext.metricsLayoutResolved,
           metricInsertIndex: rootContext.metricInsertIndex,
           coverage,
@@ -711,7 +740,7 @@ export const buildInitialQuerySpecs = (
     }
 
     const groupedKeyForPath = (path: PivotPath) =>
-      serializePath(layout.getFetchPath(path));
+      buildAxisCoverageKey({ program: layout.pivotProgram, axis, path });
 
     const representativeByKey = new Map<string, PivotPath>();
     entries.forEach(path => {

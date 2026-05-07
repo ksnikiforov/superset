@@ -17,7 +17,12 @@
  * under the License.
  */
 import type { PivotAxis, PivotPath } from '../../types';
-import { decodeMetricKey, isMeasureLeafToken } from '../core/tokens';
+import {
+  decodeMetricKey,
+  isMeasureLeafToken,
+  METRICS_PLACEHOLDER,
+} from '../core/tokens';
+import { parsePath, serializePath } from '../core/path';
 import type { PivotAxisLevel, PivotProgram } from './types';
 
 export type AxisPathInput = {
@@ -29,6 +34,10 @@ export type AxisPathInput = {
 export type AxisPathProjection = {
   dimensionPath: PivotPath;
   nextLevel?: PivotAxisLevel;
+};
+
+export type AxisPathKeyInput = Omit<AxisPathInput, 'path'> & {
+  key: string;
 };
 
 const axisProgramFor = (program: PivotProgram, axis: PivotAxis) =>
@@ -88,3 +97,32 @@ export const projectAxisPathToDimensions = (input: AxisPathInput): PivotPath =>
 export const getNextAxisLevelForPath = (
   input: AxisPathInput,
 ): PivotAxisLevel | undefined => projectAxisPath(input).nextLevel;
+
+export const projectAxisPathToCoverageDimensions = ({
+  program,
+  path,
+}: AxisPathInput): PivotPath => {
+  const coveragePath: PivotPath = [];
+  let consumedValuesTier = false;
+  path.forEach(value => {
+    if (isCanonicalValuesPathToken(value, program)) {
+      if (!consumedValuesTier) {
+        coveragePath.push(METRICS_PLACEHOLDER);
+        consumedValuesTier = true;
+      }
+      coveragePath.push(value);
+      return;
+    }
+    coveragePath.push(value);
+  });
+  return coveragePath;
+};
+
+export const buildAxisCoverageKey = (input: AxisPathInput): string =>
+  serializePath(projectAxisPathToCoverageDimensions(input));
+
+export const buildAxisCoverageKeyFromPathKey = ({
+  key,
+  ...input
+}: AxisPathKeyInput): string =>
+  buildAxisCoverageKey({ ...input, path: parsePath(key) });

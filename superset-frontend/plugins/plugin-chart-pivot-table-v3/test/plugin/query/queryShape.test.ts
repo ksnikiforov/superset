@@ -131,4 +131,28 @@ describe('queryShape', () => {
 
     expect(shape.metrics).toEqual(['m1', 'm2']);
   });
+
+  it('resolves support metrics against the full metric set without materializing hidden metric siblings', () => {
+    const shape = buildQueryShape({
+      intent: {
+        ...baseIntent,
+        needsMetricFormatting: true,
+        needsColOrdering: true,
+      },
+      metrics: ['m1'],
+      availableMetrics: ['m1', 'm2', 'm3', 'm4'],
+      rowGroupby: ['r1'],
+      colGroupby: ['c1'],
+      metricFormattingScope: 'values',
+      metricFormatting: {
+        m1: { backgroundColor: 'm3' },
+        m2: { backgroundColor: 'm4' },
+      },
+      colSorting: {
+        c1: { metric: 'm4', mode: 'axis_value' },
+      },
+    });
+
+    expect(shape.metrics).toEqual(['m1', 'm3', 'm4']);
+  });
 });

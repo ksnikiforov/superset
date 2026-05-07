@@ -21,7 +21,6 @@ import { getColumnLabel } from '@superset-ui/core';
 import {
   MetricsLayoutEnum,
   MeasureHierarchy,
-  type PivotPath,
   type PivotTableProps,
   type PivotTreeData,
   type PivotTreeNode,
@@ -97,7 +96,6 @@ export type PivotLayoutResult = {
   metricsAtColEnd: boolean;
   shouldExpandMetricRows: boolean;
   shouldExpandMetricCols: boolean;
-  getFetchPath: (path: PivotPath) => PivotPath;
   compareMetricOrder: (a: PivotTreeNode, b: PivotTreeNode) => number;
   getMetricLabelFromPath: (path: PivotTreeNode['path']) => string | undefined;
   getMetricDisplayLabelForKey: (metricKey: string) => string;
@@ -249,7 +247,6 @@ export const usePivotLayout = ({
     metricLabelSet,
     metricLabelMap,
     isMetricTokenValue,
-    getFetchPath,
   } = layout;
   const metricVerboseMap = formData.verboseMap as
     | Record<string, string>
@@ -1747,7 +1744,6 @@ export const usePivotLayout = ({
     metricsAtColEnd,
     shouldExpandMetricRows,
     shouldExpandMetricCols,
-    getFetchPath,
     compareMetricOrder,
     getMetricLabelFromPath,
     getMetricDisplayLabelForKey,

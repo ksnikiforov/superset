@@ -18,7 +18,7 @@
  */
 
 import { PivotAxis, PivotTreeNode } from '../../types';
-import { decodeMetricKey, parsePath, serializePath } from '../../utils';
+import { parsePath, serializePath } from '../../utils';
 import { rootKey } from '../viewModel';
 
 export type PivotExpansionPlan = {
@@ -34,6 +34,7 @@ const isSatisfiedNode = ({
   requiredDepth,
   fetchedDepthByKey,
   hasLoadedChildren,
+  getCoverageKey,
 }: {
   axis: PivotAxis;
   key: string;
@@ -41,6 +42,7 @@ const isSatisfiedNode = ({
   requiredDepth: number;
   fetchedDepthByKey: Map<string, number>;
   hasLoadedChildren: (axis: PivotAxis, node: PivotTreeNode) => boolean;
+  getCoverageKey: (axis: PivotAxis, key: string) => string;
 }) => {
   if (!node.hasChildren) {
     return true;
@@ -51,7 +53,7 @@ const isSatisfiedNode = ({
   if (requiredDepth === 0 && hasLoadedChildren(axis, node)) {
     return true;
   }
-  const fetchedDepth = fetchedDepthByKey.get(key);
+  const fetchedDepth = fetchedDepthByKey.get(getCoverageKey(axis, key));
   if (fetchedDepth === requiredDepth) {
     return true;
   }
@@ -89,6 +91,7 @@ export const planExpansionForAxis = ({
   requiredDepth,
   fetchedDepthByKey,
   hasLoadedChildren,
+  getCoverageKey = (_axis, key) => key,
 }: {
   axis: PivotAxis;
   expandedKeys: Set<string>;
@@ -96,47 +99,14 @@ export const planExpansionForAxis = ({
   requiredDepth: number;
   fetchedDepthByKey: Map<string, number>;
   hasLoadedChildren: (axis: PivotAxis, node: PivotTreeNode) => boolean;
+  getCoverageKey?: (axis: PivotAxis, key: string) => string;
 }): PivotExpansionPlan => {
   const fetchKeys = new Set<string>();
   const pendingKeys = new Set<string>();
   let hasMissingNodes = false;
-  const metricPrefixesByToken = new Map<string, PivotTreeNode['path'][]>();
   const hasNonRootExpanded =
     expandedKeys.size > 1 ||
     (expandedKeys.size === 1 && !expandedKeys.has(rootKey));
-
-  const isPrefix = (
-    prefix: PivotTreeNode['path'],
-    candidate: PivotTreeNode['path'],
-  ) => {
-    if (prefix.length > candidate.length) {
-      return false;
-    }
-    for (let idx = 0; idx < prefix.length; idx += 1) {
-      if (prefix[idx] !== candidate[idx]) {
-        return false;
-      }
-    }
-    return true;
-  };
-
-  expandedKeys.forEach(key => {
-    const node = nodes[key];
-    if (!node) {
-      return;
-    }
-    const metricIndex = node.path.findIndex(value => !!decodeMetricKey(value));
-    if (metricIndex < 0) {
-      return;
-    }
-    const metricToken = decodeMetricKey(node.path[metricIndex]);
-    if (!metricToken) {
-      return;
-    }
-    const prefixes = metricPrefixesByToken.get(metricToken) ?? [];
-    prefixes.push(node.path.slice(0, metricIndex));
-    metricPrefixesByToken.set(metricToken, prefixes);
-  });
 
   Array.from(expandedKeys).forEach(key => {
     if (key === rootKey && hasNonRootExpanded) {
@@ -152,6 +122,7 @@ export const planExpansionForAxis = ({
           requiredDepth,
           fetchedDepthByKey,
           hasLoadedChildren,
+          getCoverageKey,
         })
       ) {
         return;
@@ -161,24 +132,11 @@ export const planExpansionForAxis = ({
       return;
     }
 
-    const missingPath = parsePath(key);
-    const metricIndex = missingPath.findIndex(
-      value => !!decodeMetricKey(value),
-    );
-    if (metricIndex >= 0) {
-      const metricToken = decodeMetricKey(missingPath[metricIndex]);
-      const prefixes = metricToken
-        ? metricPrefixesByToken.get(metricToken)
-        : undefined;
-      if (
-        prefixes?.some(prefix =>
-          isPrefix(prefix, missingPath.slice(0, metricIndex)),
-        )
-      ) {
-        return;
-      }
+    const missingCoverageKey = getCoverageKey(axis, key);
+    const fetchedDepth = fetchedDepthByKey.get(missingCoverageKey);
+    if (fetchedDepth !== undefined && fetchedDepth >= requiredDepth) {
+      return;
     }
-
     hasMissingNodes = true;
     const ancestorKey = resolveNearestPresentAncestorKey(nodes, key);
     const ancestor = nodes[ancestorKey];
@@ -193,8 +151,12 @@ export const planExpansionForAxis = ({
         requiredDepth,
         fetchedDepthByKey,
         hasLoadedChildren,
+        getCoverageKey,
       })
     ) {
+      if (missingCoverageKey === getCoverageKey(axis, ancestorKey)) {
+        return;
+      }
       fetchKeys.add(key);
       pendingKeys.add(key);
       return;

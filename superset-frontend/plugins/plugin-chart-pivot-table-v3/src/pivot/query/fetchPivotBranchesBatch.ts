@@ -87,7 +87,10 @@ export const fetchPivotBranchesBatch = async ({
       ? { ...formData, metrics: metricsForQuery }
       : formData;
   const timeOffsets = Array.from(
-    new Set([...(formData.time_offsets ?? []), ...layout.requiredTimeOffsets]),
+    new Set([
+      ...(formData.time_offsets ?? []),
+      ...specs.flatMap(spec => spec.meta.requiredTimeOffsets),
+    ]),
   );
   const queryFormDataWithOffsets =
     timeOffsets.length > 0
@@ -125,6 +128,8 @@ export const fetchPivotBranchesBatch = async ({
       metricsForQuery,
       formData,
       measureHierarchy: layout.measureHierarchy,
+      materializedMetrics: specs[0].meta.materializedMetrics,
+      materializedMeasureHierarchy: specs[0].meta.materializedMeasureHierarchy,
       rowGroupby: specs[0].meta.rowGroupbyForQueryFull,
       colGroupby: specs[0].meta.colGroupbyForQueryFull,
       rowSubtotalLevels: specs[0].meta.rowSubtotalLevels,

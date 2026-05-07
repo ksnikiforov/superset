@@ -30,10 +30,12 @@ import {
 } from '../../src/fetchPivotBranch';
 import {
   buildBuiltInLeaf,
+  buildMeasureLeafOutputKey,
   buildValueLeaf,
 } from '../../src/pivot/measureLeaves';
 import {
   encodeMetricKey,
+  encodeMeasureLeafKey,
   applyMetricAxis,
   buildTreeFromRecords,
   METRICS_PLACEHOLDER,
@@ -66,6 +68,10 @@ const makeNode = (node: Partial<PivotTreeNode>): PivotTreeNode => ({
 });
 
 type QueryPayload = {
+  columns?: unknown[];
+  metrics?: unknown[];
+  query_name?: string;
+  time_offsets?: string[];
   time_range?: string;
   filters?: Array<{ col?: string; op?: string; val?: string }>;
 };
@@ -582,6 +588,328 @@ describe('resolveFetchContext', () => {
       'REV-A',
     ]);
     expect(result.data?.cols[expandedColKey]).toBeTruthy();
+  });
+
+  it('queries and materializes only the expanded metric branch', async () => {
+    const postMock = SupersetClient.post as jest.Mock;
+    postMock.mockImplementationOnce(
+      ({ jsonPayload }: { jsonPayload?: { queries?: QueryPayload[] } }) => ({
+        json: {
+          result: (jsonPayload?.queries || []).map(query =>
+            query.columns?.includes('revenueBand')
+              ? {
+                  data: [
+                    {
+                      orderPriority: '1-URGENT',
+                      revenueBand: 'REV-A',
+                      measure1: 10,
+                      measure2: 20,
+                    },
+                  ],
+                }
+              : {
+                  data: [
+                    {
+                      orderPriority: '1-URGENT',
+                      measure1: 30,
+                      measure2: 40,
+                    },
+                  ],
+                },
+          ),
+        },
+      }),
+    );
+
+    const metrics = ['measure1', 'measure2'];
+    const currentTreeRaw = buildTreeFromRecords(
+      [{ orderPriority: '1-URGENT', measure1: 30, measure2: 40 }],
+      metrics,
+      ['orderPriority'],
+      ['revenueBand'],
+      1,
+      0,
+    );
+    const currentTree = applyMetricAxis(
+      currentTreeRaw,
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      ['orderPriority'],
+      ['revenueBand'],
+      0,
+    );
+
+    const result = await fetchPivotBranch({
+      formData: buildFormData({
+        groupbyRows: ['orderPriority'],
+        groupbyColumns: [METRICS_PLACEHOLDER, 'revenueBand'],
+        metrics,
+        metricsLayout: MetricsLayoutEnum.COLUMNS,
+        rowSubTotals: false,
+      }),
+      axis: 'col',
+      path: [encodeMetricKey('measure1')],
+      currentTree,
+    });
+
+    const queries =
+      (
+        postMock.mock.calls[0][0] as {
+          jsonPayload?: { queries?: QueryPayload[] };
+        }
+      ).jsonPayload?.queries || [];
+    expect(queries.length).toBeGreaterThan(0);
+    queries.forEach(query => {
+      expect(query.metrics).toEqual(['measure1']);
+    });
+    expect(
+      result.data?.cols[serializePath([encodeMetricKey('measure1'), 'REV-A'])],
+    ).toBeTruthy();
+    expect(
+      result.data?.cols[serializePath([encodeMetricKey('measure2'), 'REV-A'])],
+    ).toBeUndefined();
+  });
+
+  it('keeps sorting support metrics in the same request without materializing sibling measures', async () => {
+    const postMock = SupersetClient.post as jest.Mock;
+    postMock.mockImplementationOnce(
+      ({ jsonPayload }: { jsonPayload?: { queries?: QueryPayload[] } }) => ({
+        json: {
+          result: (jsonPayload?.queries || []).map(query =>
+            query.columns?.includes('revenueBand')
+              ? {
+                  data: [
+                    {
+                      orderPriority: '1-URGENT',
+                      revenueBand: 'REV-A',
+                      measure1: 10,
+                      measure2: 20,
+                      sortMetric: 99,
+                    },
+                  ],
+                }
+              : {
+                  data: [
+                    {
+                      orderPriority: '1-URGENT',
+                      measure1: 30,
+                      measure2: 40,
+                      sortMetric: 199,
+                    },
+                  ],
+                },
+          ),
+        },
+      }),
+    );
+
+    const metrics = ['measure1', 'measure2'];
+    const currentTreeRaw = buildTreeFromRecords(
+      [{ orderPriority: '1-URGENT', measure1: 30, measure2: 40 }],
+      metrics,
+      ['orderPriority'],
+      ['revenueBand'],
+      1,
+      0,
+    );
+    const currentTree = applyMetricAxis(
+      currentTreeRaw,
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      ['orderPriority'],
+      ['revenueBand'],
+      0,
+    );
+
+    const result = await fetchPivotBranch({
+      formData: buildFormData({
+        groupbyRows: ['orderPriority'],
+        groupbyColumns: [METRICS_PLACEHOLDER, 'revenueBand'],
+        metrics,
+        metricsLayout: MetricsLayoutEnum.COLUMNS,
+        rowSubTotals: false,
+        colSorting: {
+          revenueBand: { metric: 'sortMetric', mode: 'axis_value' },
+        },
+      }),
+      axis: 'col',
+      path: [encodeMetricKey('measure1')],
+      currentTree,
+    });
+
+    const queries =
+      (
+        postMock.mock.calls[0][0] as {
+          jsonPayload?: { queries?: QueryPayload[] };
+        }
+      ).jsonPayload?.queries || [];
+    expect(queries.length).toBeGreaterThan(0);
+    queries.forEach(query => {
+      expect(query.metrics).toEqual(['measure1', 'sortMetric']);
+    });
+    expect(
+      result.data?.cols[
+        serializePath([encodeMetricKey('sortMetric'), 'REV-A'])
+      ],
+    ).toBeUndefined();
+    expect(
+      result.data?.cells[
+        serializeCellKey(
+          serializePath(['1-URGENT']),
+          serializePath([encodeMetricKey('measure1'), 'REV-A']),
+        )
+      ]?.values.sortMetric,
+    ).toBe(99);
+  });
+
+  it('scopes IX 1YA measure-leaf requests to the selected metric and offset', async () => {
+    const postMock = SupersetClient.post as jest.Mock;
+    const valueLeaf = buildValueLeaf();
+    const ixYearLeaf = buildBuiltInLeaf('ix', {
+      n: 1,
+      unit: 'year',
+      direction: 'past',
+    });
+    const deltaMonthLeaf = buildBuiltInLeaf('delta', {
+      n: 1,
+      unit: 'month',
+      direction: 'past',
+    });
+    const netMonthLeaf = buildBuiltInLeaf('ix', {
+      n: 1,
+      unit: 'month',
+      direction: 'past',
+    });
+
+    postMock.mockImplementationOnce(
+      ({ jsonPayload }: { jsonPayload?: { queries?: QueryPayload[] } }) => ({
+        json: {
+          result: (jsonPayload?.queries || []).map(query =>
+            query.columns?.includes('revenueBand')
+              ? {
+                  data: [
+                    {
+                      orderPriority: '1-URGENT',
+                      revenueBand: 'REV-A',
+                      grossRevenue: 100,
+                      'grossRevenue__1 year ago': 50,
+                      netRevenue: 80,
+                      'netRevenue__1 month ago': 40,
+                    },
+                  ],
+                }
+              : {
+                  data: [
+                    {
+                      orderPriority: '1-URGENT',
+                      grossRevenue: 200,
+                      'grossRevenue__1 year ago': 100,
+                      netRevenue: 160,
+                      'netRevenue__1 month ago': 80,
+                    },
+                  ],
+                },
+          ),
+        },
+      }),
+    );
+
+    const metrics = ['grossRevenue', 'netRevenue'];
+    const currentTreeRaw = buildTreeFromRecords(
+      [
+        {
+          orderPriority: '1-URGENT',
+          grossRevenue: 200,
+          'grossRevenue__1 year ago': 100,
+          netRevenue: 160,
+          'netRevenue__1 month ago': 80,
+        },
+      ],
+      metrics,
+      ['orderPriority'],
+      ['revenueBand'],
+      1,
+      0,
+    );
+    const currentTree = applyMetricAxis(
+      currentTreeRaw,
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      ['orderPriority'],
+      ['revenueBand'],
+      0,
+    );
+
+    const result = await fetchPivotBranch({
+      formData: buildFormData({
+        groupbyRows: ['orderPriority'],
+        groupbyColumns: [METRICS_PLACEHOLDER, 'revenueBand'],
+        metrics,
+        metricsLayout: MetricsLayoutEnum.COLUMNS,
+        rowSubTotals: false,
+        measureLeavesByMetric: {
+          grossRevenue: [valueLeaf, ixYearLeaf, deltaMonthLeaf],
+          netRevenue: [valueLeaf, netMonthLeaf],
+        },
+      }),
+      axis: 'col',
+      path: [
+        encodeMetricKey('grossRevenue'),
+        encodeMeasureLeafKey(ixYearLeaf.id),
+      ],
+      currentTree,
+    });
+
+    const queries =
+      (
+        postMock.mock.calls[0][0] as {
+          jsonPayload?: { queries?: QueryPayload[] };
+        }
+      ).jsonPayload?.queries || [];
+    expect(queries.length).toBeGreaterThan(0);
+    queries.forEach(query => {
+      expect(query.metrics).toEqual(['grossRevenue']);
+      expect(query.time_offsets).toEqual(['1 year ago']);
+    });
+    expect(
+      result.data?.cols[
+        serializePath([
+          encodeMetricKey('grossRevenue'),
+          encodeMeasureLeafKey(ixYearLeaf.id),
+          'REV-A',
+        ])
+      ],
+    ).toBeTruthy();
+    expect(
+      result.data?.cols[
+        serializePath([
+          encodeMetricKey('grossRevenue'),
+          encodeMeasureLeafKey(deltaMonthLeaf.id),
+          'REV-A',
+        ])
+      ],
+    ).toBeUndefined();
+    expect(
+      result.data?.cols[
+        serializePath([
+          encodeMetricKey('netRevenue'),
+          encodeMeasureLeafKey(netMonthLeaf.id),
+          'REV-A',
+        ])
+      ],
+    ).toBeUndefined();
+    expect(
+      result.data?.cells[
+        serializeCellKey(
+          serializePath(['1-URGENT']),
+          serializePath([
+            encodeMetricKey('grossRevenue'),
+            encodeMeasureLeafKey(ixYearLeaf.id),
+            'REV-A',
+          ]),
+        )
+      ]?.values[buildMeasureLeafOutputKey('grossRevenue', ixYearLeaf)],
+    ).toBe(200);
   });
 
   it('fetches parent column depth when expanding rows under expanded columns', async () => {

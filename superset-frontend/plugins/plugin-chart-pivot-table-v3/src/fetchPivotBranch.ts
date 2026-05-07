@@ -140,7 +140,7 @@ const resolveFetchContext = ({
     metrics:
       queryCtx.metricsForQuery.length > 0
         ? queryCtx.metricsForQuery
-        : queryCtx.metrics,
+        : queryCtx.materializedMetrics,
     aggregateFunction: formData.aggregateFunction,
     filterSignature,
     cacheMeta: {
@@ -154,9 +154,9 @@ const resolveFetchContext = ({
       colSubtotalLevels: queryCtx.colSubtotalLevels,
       metricsLayoutResolved: queryCtx.metricsLayoutResolved,
       metricInsertIndex: queryCtx.metricInsertIndex,
-      timeOffsets: layout.requiredTimeOffsets,
+      timeOffsets: queryCtx.requiredTimeOffsets,
       measureLeafSelection: buildMeasureLeafSelectionSignature(
-        layout.measureHierarchy,
+        queryCtx.materializedMeasureHierarchy,
       ),
     },
   });
@@ -232,6 +232,8 @@ export const buildBranchTreeFromResults = ({
   metricsForQuery,
   formData,
   measureHierarchy,
+  materializedMetrics,
+  materializedMeasureHierarchy,
   rowGroupby,
   colGroupby,
   rowSubtotalLevels,
@@ -244,6 +246,8 @@ export const buildBranchTreeFromResults = ({
   metricsForQuery: QueryFormMetric[];
   formData: PivotTableQueryFormData;
   measureHierarchy: LayoutContext['measureHierarchy'];
+  materializedMetrics?: QueryFormMetric[];
+  materializedMeasureHierarchy?: LayoutContext['measureHierarchy'];
   rowGroupby: QueryFormColumn[];
   colGroupby: QueryFormColumn[];
   rowSubtotalLevels: number[];
@@ -253,6 +257,9 @@ export const buildBranchTreeFromResults = ({
 }): PivotTreeData => {
   const queryMetrics =
     metricsForQuery.length > 0 ? metricsForQuery : formData.metrics;
+  const visibleMetrics = materializedMetrics ?? queryMetrics;
+  const visibleMeasureHierarchy =
+    materializedMeasureHierarchy ?? measureHierarchy;
   const branchTree = queryPairs.reduce<PivotTreeData>(
     (acc, pair, idx) =>
       mergeTrees(
@@ -286,8 +293,11 @@ export const buildBranchTreeFromResults = ({
     {} as PivotTreeData,
   );
   const branchWithMeasures = applyMeasureHierarchyAxis(
-    applyMeasureLeafValuesToTree({ tree: branchTree, measureHierarchy }),
-    measureHierarchy,
+    applyMeasureLeafValuesToTree({
+      tree: branchTree,
+      measureHierarchy: visibleMeasureHierarchy,
+    }),
+    visibleMeasureHierarchy,
     metricsLayoutResolved,
     rowGroupby,
     colGroupby,
@@ -296,7 +306,7 @@ export const buildBranchTreeFromResults = ({
   );
   return labelRowSubtotalLeaves(
     branchWithMeasures,
-    ensureIsArray(formData.metrics),
+    ensureIsArray(visibleMetrics),
     formData.metricLabelMap as Record<string, string> | undefined,
   );
 };
@@ -329,7 +339,10 @@ export async function fetchPivotBranch({
   const {
     rowGroupbyForQueryFull,
     colGroupbyForQueryFull,
+    materializedMetrics,
     metricsForQuery,
+    materializedMeasureHierarchy,
+    requiredTimeOffsets,
     metricsLayoutResolved,
     metricInsertIndex,
     cacheKey,
@@ -346,7 +359,7 @@ export async function fetchPivotBranch({
   });
   const treeSnapshot = currentTree ?? { rows: {}, cols: {}, cells: {} };
   const timeOffsets = Array.from(
-    new Set([...(formData.time_offsets ?? []), ...layout.requiredTimeOffsets]),
+    new Set([...(formData.time_offsets ?? []), ...requiredTimeOffsets]),
   );
   const queryFormData =
     metricsForQuery.length > 0
@@ -413,6 +426,8 @@ export async function fetchPivotBranch({
       metricsForQuery,
       formData,
       measureHierarchy: layout.measureHierarchy,
+      materializedMetrics,
+      materializedMeasureHierarchy,
       rowGroupby: rowGroupbyForQueryFull,
       colGroupby: colGroupbyForQueryFull,
       rowSubtotalLevels,

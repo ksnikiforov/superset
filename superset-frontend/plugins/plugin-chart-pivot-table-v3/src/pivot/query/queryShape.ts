@@ -31,6 +31,7 @@ import {
   collectMeasureLeafMetricsForQuery,
   collectMetricDatabarMetricsForQuery,
   collectMetricFormattingMetricsForQuery,
+  getMetricKey,
   mergeMetrics,
 } from '../../utils';
 import {
@@ -50,6 +51,7 @@ export type QueryShapeInput = {
   rowGroupby: QueryFormColumn[];
   colGroupby: QueryFormColumn[];
   metrics: QueryFormMetric[];
+  availableMetrics?: QueryFormMetric[];
   metricFormattingScope?: MetricFormattingScope;
   metricFormatting?: PivotMetricFormattingMap;
   metricDatabars?: PivotMetricDatabarMap;
@@ -65,6 +67,7 @@ export const buildQueryShape = ({
   rowGroupby,
   colGroupby,
   metrics,
+  availableMetrics = metrics,
   metricFormattingScope,
   metricFormatting,
   metricDatabars,
@@ -76,16 +79,35 @@ export const buildQueryShape = ({
 }: QueryShapeInput): QueryShape => {
   const rowGroupbyForQuery = rowGroupby.slice(0, intent.targetRowDepth);
   const colGroupbyForQuery = colGroupby.slice(0, intent.targetColDepth);
+  const metricKeys = new Set(
+    metrics.map(getMetricKey).filter((key): key is string => Boolean(key)),
+  );
+  const filterMetricKeyedMap = <T>(
+    map: Record<string, T> | undefined,
+  ): Record<string, T> | undefined => {
+    if (!map) {
+      return undefined;
+    }
+    return Object.fromEntries(
+      Object.entries(map).filter(([metricKey]) => metricKeys.has(metricKey)),
+    );
+  };
 
   const extraMetrics: QueryFormMetric[] = [];
   if (shouldIncludeMetricFormatting(metricFormattingScope, intent)) {
     extraMetrics.push(
-      ...collectMetricFormattingMetricsForQuery(metricFormatting, metrics),
+      ...collectMetricFormattingMetricsForQuery(
+        filterMetricKeyedMap(metricFormatting),
+        availableMetrics,
+      ),
     );
   }
   if (shouldIncludeDatabars(intent)) {
     extraMetrics.push(
-      ...collectMetricDatabarMetricsForQuery(metricDatabars, metrics),
+      ...collectMetricDatabarMetricsForQuery(
+        filterMetricKeyedMap(metricDatabars),
+        availableMetrics,
+      ),
     );
   }
   if (intent.needsRowDimensionFormatting) {
@@ -93,7 +115,7 @@ export const buildQueryShape = ({
       ...collectDimensionFormattingMetricsForQuery(
         rowFormatting,
         rowGroupbyForQuery,
-        metrics,
+        availableMetrics,
       ),
     );
   }
@@ -102,7 +124,7 @@ export const buildQueryShape = ({
       ...collectDimensionFormattingMetricsForQuery(
         colFormatting,
         colGroupbyForQuery,
-        metrics,
+        availableMetrics,
       ),
     );
   }
@@ -111,7 +133,7 @@ export const buildQueryShape = ({
       ...collectDimensionSortingMetricsForQuery(
         rowSorting,
         rowGroupbyForQuery,
-        metrics,
+        availableMetrics,
       ),
     );
   }
@@ -120,12 +142,16 @@ export const buildQueryShape = ({
       ...collectDimensionSortingMetricsForQuery(
         colSorting,
         colGroupbyForQuery,
-        metrics,
+        availableMetrics,
       ),
     );
   }
   extraMetrics.push(
-    ...collectMeasureLeafMetricsForQuery(measureHierarchy, metrics),
+    ...collectMeasureLeafMetricsForQuery(
+      measureHierarchy,
+      metrics,
+      availableMetrics,
+    ),
   );
 
   return {
