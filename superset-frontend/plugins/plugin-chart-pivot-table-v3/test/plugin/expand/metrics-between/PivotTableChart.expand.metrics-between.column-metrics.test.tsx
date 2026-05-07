@@ -206,12 +206,21 @@ describe('PivotTableChart expansion with metrics between dimensions (column-metr
     const metricCell = within(thead)
       .getByText('measure1')
       .closest('th') as HTMLElement;
+    expect(
+      within(metricCell).getByLabelText('plus-square'),
+    ).toBeInTheDocument();
     fireEvent.click(within(metricCell).getByLabelText('plus-square'));
 
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
     });
     expect(await findByText('C2-A')).toBeInTheDocument();
+    const expandedMetricCell = within(thead)
+      .getByText('measure1')
+      .closest('th') as HTMLElement;
+    expect(
+      within(expandedMetricCell).getByLabelText('minus-square'),
+    ).toBeInTheDocument();
   });
 
   it('keeps the next column level visible when metric subtotals exist', async () => {

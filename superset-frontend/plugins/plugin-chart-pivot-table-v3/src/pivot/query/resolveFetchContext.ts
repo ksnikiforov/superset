@@ -28,8 +28,6 @@ import {
 import {
   collectDimensionFormattingMetricsForQuery,
   collectDimensionSortingMetricsForQuery,
-  decodeMeasureLeafId,
-  decodeMetricKey,
   getMetricKey,
   hasTotalSorting,
 } from '../../utils';
@@ -39,6 +37,10 @@ import {
 } from '../layout/LayoutContext';
 import { collectRequiredTimeOffsets } from '../measureLeaves';
 import { projectAxisPathToDimensions } from '../runtime/paths';
+import {
+  type PivotAxisProjection,
+  resolveAxisProjection,
+} from '../runtime/projection';
 import { buildQueryShape } from './queryShape';
 import { type QueryIntent } from './queryIntent';
 
@@ -55,6 +57,7 @@ export type ResolveFetchContextParams = {
 };
 
 export type ResolvedFetchContext = {
+  projection: PivotAxisProjection;
   rowGroupbyForQuery: QueryFormColumn[];
   colGroupbyForQuery: QueryFormColumn[];
   materializedMetrics: QueryFormMetric[];
@@ -70,37 +73,6 @@ export type ResolvedFetchContext = {
   hasColFormatting: boolean;
   hasRowTotalSorting: boolean;
   hasColTotalSorting: boolean;
-};
-
-const collectPathMetricKeys = (
-  path: PivotPath,
-  metricKeys: Set<string>,
-): string[] => {
-  const result: string[] = [];
-  const seen = new Set<string>();
-  path.forEach(value => {
-    const metricKey = decodeMetricKey(value);
-    if (!metricKey || !metricKeys.has(metricKey) || seen.has(metricKey)) {
-      return;
-    }
-    seen.add(metricKey);
-    result.push(metricKey);
-  });
-  return result;
-};
-
-const collectPathMeasureLeafIds = (path: PivotPath): string[] => {
-  const result: string[] = [];
-  const seen = new Set<string>();
-  path.forEach(value => {
-    const leafId = decodeMeasureLeafId(value);
-    if (!leafId || seen.has(leafId)) {
-      return;
-    }
-    seen.add(leafId);
-    result.push(leafId);
-  });
-  return result;
 };
 
 const filterMetricsByScope = (
@@ -162,7 +134,7 @@ export const resolveFetchContext = ({
   targetColDepth,
 }: ResolveFetchContextParams): ResolvedFetchContext => {
   const layout = layoutParam ?? buildLayoutContext(formData);
-  const { metrics, metricLabelSet } = layout;
+  const { metrics } = layout;
   const rowGroupby = layout.groupbyRows;
   const colGroupby = layout.groupbyColumns;
 
@@ -178,11 +150,12 @@ export const resolveFetchContext = ({
     level => level <= maxColSubtotalDepth,
   );
 
-  const sanitizedPath = projectAxisPathToDimensions({
+  const projection = resolveAxisProjection({
     program: layout.pivotProgram,
     axis,
     path,
   });
+  const sanitizedPath = projection.filterDimensionPath;
   const depthIncrement = 1;
 
   const getCurrentDepth = (
@@ -252,13 +225,14 @@ export const resolveFetchContext = ({
       colGroupby,
       metrics,
     ).length > 0;
-  const scopedMetricKeys = collectPathMetricKeys(path, metricLabelSet);
-  const scopedLeafIds = collectPathMeasureLeafIds(path);
-  const materializedMetrics = filterMetricsByScope(metrics, scopedMetricKeys);
+  const materializedMetrics = filterMetricsByScope(
+    metrics,
+    projection.metricKeys,
+  );
   const materializedMeasureHierarchy = filterMeasureHierarchyByScope({
     measureHierarchy: layout.measureHierarchy,
-    metricKeys: scopedMetricKeys,
-    leafIds: scopedLeafIds,
+    metricKeys: projection.metricKeys,
+    leafIds: projection.measureLeafIds,
   });
   const requiredTimeOffsets = collectRequiredTimeOffsets(
     materializedMeasureHierarchy,
@@ -302,6 +276,7 @@ export const resolveFetchContext = ({
   const metricsForQuery = queryShape.metrics;
 
   return {
+    projection,
     rowGroupbyForQuery,
     colGroupbyForQuery,
     materializedMetrics,

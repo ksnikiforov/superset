@@ -310,7 +310,7 @@ const buildCoveragesForContext = ({
   buildBranchFactCoverages({
     program: layout.pivotProgram,
     axis,
-    pathLength: ctx.sanitizedPath.length,
+    projection: ctx.projection,
     rowDepth: ctx.rowDepth,
     columnDepth: ctx.colDepth,
     rowSubtotalLevels: ctx.rowSubtotalLevels,

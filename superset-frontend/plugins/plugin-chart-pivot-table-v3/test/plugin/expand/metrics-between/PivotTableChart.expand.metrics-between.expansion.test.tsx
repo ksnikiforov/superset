@@ -173,6 +173,9 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
       const tbody = container.querySelector('tbody') as HTMLElement;
       const metricLabel = within(tbody).getAllByText('averageOrderValue')[0];
       const metricRow = metricLabel.closest('tr') as HTMLTableRowElement;
+      expect(
+        within(metricRow).getByLabelText('plus-square'),
+      ).toBeInTheDocument();
       fireEvent.click(within(metricRow).getByLabelText('plus-square'));
 
       await waitFor(() => {
@@ -180,6 +183,12 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
       });
 
       expect(within(tbody).getByText(tailValues[0])).toBeInTheDocument();
+      const expandedMetricRow = within(tbody)
+        .getAllByText('averageOrderValue')[0]
+        .closest('tr') as HTMLTableRowElement;
+      expect(
+        within(expandedMetricRow).getByLabelText('minus-square'),
+      ).toBeInTheDocument();
     },
   );
 

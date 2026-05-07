@@ -20,6 +20,7 @@
 import { type PivotTreeData, type PivotTreeNode } from '../../../src/types';
 import { hasLoadedChildren } from '../../../src/pivot/visibility';
 import {
+  encodeMetricKey,
   METRICS_PLACEHOLDER,
   SUBTOTAL_TOKEN,
   serializeCellKey,
@@ -45,6 +46,18 @@ const makeNode = (
 };
 
 describe('pivot/visibility.hasLoadedChildren', () => {
+  const getRawChildren =
+    (rows: PivotTreeData['rows'], cols: PivotTreeData['cols']) =>
+    (axis: 'row' | 'col', parent: PivotTreeNode) =>
+      Object.values(axis === 'row' ? rows : cols).filter(candidate => {
+        if (candidate.path.length !== parent.path.length + 1) {
+          return false;
+        }
+        return parent.path.every(
+          (value, index) => value === candidate.path[index],
+        );
+      });
+
   it('treats metric-only children above the metric tier as not loaded', () => {
     const metricToken = '__metric__m1';
     const rowRootKey = serializePath([]);
@@ -268,4 +281,136 @@ describe('pivot/visibility.hasLoadedChildren', () => {
 
     expect(loaded).toBe(true);
   });
+
+  it.each(['row', 'col'] as const)(
+    'treats a skipped pre-Values %s parent as not loaded',
+    axis => {
+      const metricToken = encodeMetricKey('sales');
+      const rootKey = serializePath([]);
+      const parentKey = serializePath(['US']);
+      const metricKey = serializePath(['US', metricToken]);
+      const cityKey = serializePath(['US', metricToken, 'Boston']);
+      const oppositeKey = serializePath(['Current']);
+      const rows: PivotTreeData['rows'] =
+        axis === 'row'
+          ? {
+              [rootKey]: makeNode('row', [], true),
+              [parentKey]: makeNode('row', ['US'], true),
+              [metricKey]: makeNode('row', ['US', metricToken], true),
+              [cityKey]: makeNode('row', ['US', metricToken, 'Boston'], false),
+            }
+          : {
+              [rootKey]: makeNode('row', [], true),
+              [oppositeKey]: makeNode('row', ['Current'], false),
+            };
+      const cols: PivotTreeData['cols'] =
+        axis === 'col'
+          ? {
+              [rootKey]: makeNode('col', [], true),
+              [parentKey]: makeNode('col', ['US'], true),
+              [metricKey]: makeNode('col', ['US', metricToken], true),
+              [cityKey]: makeNode('col', ['US', metricToken, 'Boston'], false),
+            }
+          : {
+              [rootKey]: makeNode('col', [], true),
+              [oppositeKey]: makeNode('col', ['Current'], false),
+            };
+      const cells: PivotTreeData['cells'] = {
+        [serializeCellKey(
+          axis === 'row' ? cityKey : oppositeKey,
+          axis === 'col' ? cityKey : oppositeKey,
+        )]: {
+          rowKey: axis === 'row' ? cityKey : oppositeKey,
+          colKey: axis === 'col' ? cityKey : oppositeKey,
+          values: { sales: 10 },
+        },
+      };
+
+      const loaded = hasLoadedChildren({
+        axis,
+        node: axis === 'row' ? rows[parentKey] : cols[parentKey],
+        getRawChildren: getRawChildren(rows, cols),
+        groupbyRowsLength: axis === 'row' ? 3 : 1,
+        groupbyColsLength: axis === 'col' ? 3 : 1,
+        isMetricTokenValue: value => value === metricToken,
+        metricIndexForRows: axis === 'row' ? 2 : undefined,
+        metricIndexForCols: axis === 'col' ? 2 : undefined,
+        cells,
+        rows,
+        cols,
+        visibleRowDepth: axis === 'row' ? 2 : 1,
+        visibleColDepth: axis === 'col' ? 2 : 1,
+        countDimDepth: path =>
+          path.filter(value => value !== metricToken).length,
+      });
+
+      expect(loaded).toBe(false);
+    },
+  );
+
+  it.each(['row', 'col'] as const)(
+    'treats a skipped pre-Values %s metric branch as loaded from post-Values cells',
+    axis => {
+      const metricToken = encodeMetricKey('sales');
+      const rootKey = serializePath([]);
+      const parentKey = serializePath(['US']);
+      const metricKey = serializePath(['US', metricToken]);
+      const cityKey = serializePath(['US', metricToken, 'Boston']);
+      const oppositeKey = serializePath(['Current']);
+      const rows: PivotTreeData['rows'] =
+        axis === 'row'
+          ? {
+              [rootKey]: makeNode('row', [], true),
+              [parentKey]: makeNode('row', ['US'], true),
+              [metricKey]: makeNode('row', ['US', metricToken], true),
+              [cityKey]: makeNode('row', ['US', metricToken, 'Boston'], false),
+            }
+          : {
+              [rootKey]: makeNode('row', [], true),
+              [oppositeKey]: makeNode('row', ['Current'], false),
+            };
+      const cols: PivotTreeData['cols'] =
+        axis === 'col'
+          ? {
+              [rootKey]: makeNode('col', [], true),
+              [parentKey]: makeNode('col', ['US'], true),
+              [metricKey]: makeNode('col', ['US', metricToken], true),
+              [cityKey]: makeNode('col', ['US', metricToken, 'Boston'], false),
+            }
+          : {
+              [rootKey]: makeNode('col', [], true),
+              [oppositeKey]: makeNode('col', ['Current'], false),
+            };
+      const cells: PivotTreeData['cells'] = {
+        [serializeCellKey(
+          axis === 'row' ? cityKey : oppositeKey,
+          axis === 'col' ? cityKey : oppositeKey,
+        )]: {
+          rowKey: axis === 'row' ? cityKey : oppositeKey,
+          colKey: axis === 'col' ? cityKey : oppositeKey,
+          values: { sales: 10 },
+        },
+      };
+
+      const loaded = hasLoadedChildren({
+        axis,
+        node: axis === 'row' ? rows[metricKey] : cols[metricKey],
+        getRawChildren: getRawChildren(rows, cols),
+        groupbyRowsLength: axis === 'row' ? 3 : 1,
+        groupbyColsLength: axis === 'col' ? 3 : 1,
+        isMetricTokenValue: value => value === metricToken,
+        metricIndexForRows: axis === 'row' ? 2 : undefined,
+        metricIndexForCols: axis === 'col' ? 2 : undefined,
+        cells,
+        rows,
+        cols,
+        visibleRowDepth: axis === 'row' ? 2 : 1,
+        visibleColDepth: axis === 'col' ? 2 : 1,
+        countDimDepth: path =>
+          path.filter(value => value !== metricToken).length,
+      });
+
+      expect(loaded).toBe(true);
+    },
+  );
 });

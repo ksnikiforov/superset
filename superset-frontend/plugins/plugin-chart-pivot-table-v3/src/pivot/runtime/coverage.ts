@@ -18,6 +18,7 @@
  */
 import { MetricsLayoutEnum, type PivotAxis, type PivotPath } from '../../types';
 import { getNextAxisLevelForPath } from './paths';
+import type { PivotAxisProjection } from './projection';
 import type {
   PivotAxisLevel,
   PivotCoverageReason,
@@ -57,7 +58,7 @@ export type ExpansionValuesLevelInput = {
 export type BranchFactCoverageInput = {
   program: PivotProgram;
   axis: PivotAxis;
-  pathLength: number;
+  projection: PivotAxisProjection;
   rowDepth: number;
   columnDepth: number;
   rowSubtotalLevels: number[];
@@ -196,7 +197,7 @@ export const buildExpansionFactCoverage = ({
 export const buildBranchFactCoverages = ({
   program,
   axis,
-  pathLength,
+  projection,
   rowDepth,
   columnDepth,
   rowSubtotalLevels,
@@ -292,13 +293,14 @@ export const buildBranchFactCoverages = ({
     [columnDepth, ...effectiveColumnLevels],
   );
 
+  const branchAnchorDepth = projection.filterDimensionPath.length;
   const queryPairs =
-    pathLength === 0
+    branchAnchorDepth === 0
       ? depthPairs
       : depthPairs.filter(pair =>
           axis === 'row'
-            ? pair.rowDepth >= pathLength
-            : pair.columnDepth >= pathLength,
+            ? pair.rowDepth >= branchAnchorDepth
+            : pair.columnDepth >= branchAnchorDepth,
         );
   const hasTotalRow = columnTotals || rowSubtotalLevels.includes(0);
   const hasTotalColumn = rowTotals || columnSubtotalLevels.includes(0);

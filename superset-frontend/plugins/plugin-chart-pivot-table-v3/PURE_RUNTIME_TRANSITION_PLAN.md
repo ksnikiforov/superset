@@ -362,12 +362,16 @@ Gate 2 has started:
 
 Immediate next step:
 
-- Continue shrinking `resolveFetchContext`: it still owns metric/leaf scope,
-  depth resolution, support metric selection, and formatting/sorting flags. The
-  next useful split is likely an axis-neutral projection/query-scope helper that
-  describes sanitized dimension path, skipped pre-Values levels, selected metric
-  scope, selected measure-leaf scope, and target depths before query shape is
-  assembled.
+- Move the axis-neutral projection descriptor to the next consumers:
+  coverage-key construction, visibility, toggle eligibility, and tree/render
+  projection. `resolveFetchContext` now delegates metric/leaf scope and
+  sanitized query path to `src/pivot/runtime/projection.ts`, but several render
+  and visibility files still decode metric/measure-leaf tokens directly.
+- Start with tests for skipped pre-Values row and column branches in visibility
+  and toggles, then replace one local path/projection branch at a time. The goal
+  is to make query planning, loaded-state checks, materialization, and render
+  visibility read the same projected axis descriptor instead of rediscovering
+  Values placement.
 - Measure whether support metrics fetched for one branch are now reusable in the
   practical expansion paths we care about, and add a targeted regression test if
   any path still re-requests an already loaded exact support coverage.
@@ -410,6 +414,21 @@ Values -> returnFlag`. Keeping this behavior preserves current UX, but it
   account for legitimate row/column differences through a small axis policy or
   adapter, rather than forcing all rendering and totals behavior into one
   oversized helper.
+- `src/pivot/runtime/projection.ts` now contains the first axis-neutral
+  projection helper. It describes the source axis program, query filter
+  dimension path, projected dimension path, post-Values dimension path, skipped
+  pre-Values dimension levels, metric scope, measure-leaf scope, and next source
+  level. `resolveFetchContext` now consumes this helper for sanitized query path
+  and metric/measure-leaf scope instead of rediscovering those details locally.
+- Branch and batch coverage planning now consume that projection descriptor
+  directly. Coverage filtering is anchored to the projected query filter depth,
+  not the raw canonical Values path length, so skipped pre-Values row and column
+  branches follow the same axis-neutral rule.
+- Tests now cover skipped pre-Values projection behavior in visibility and
+  toggles. Parent dimension nodes above the skipped level still report missing
+  child coverage, while projected metric branches report loaded children once
+  post-Values cells exist; row and column metric toggles stay available and flip
+  from expand to collapse after the projected branch loads.
 
 ### Gate 1: One compiled layout model
 

@@ -16,12 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { METRICS_PLACEHOLDER } from '../../../../src/pivot/core/tokens';
+import {
+  encodeMetricKey,
+  METRICS_PLACEHOLDER,
+} from '../../../../src/pivot/core/tokens';
 import { compilePivotProgram } from '../../../../src/pivot/runtime/compilePivotProgram';
 import {
+  buildBranchFactCoverages,
   buildExpansionFactCoverage,
   buildVisibleFactCoverage,
 } from '../../../../src/pivot/runtime/coverage';
+import { resolveAxisProjection } from '../../../../src/pivot/runtime/projection';
 import { MetricsLayoutEnum } from '../../../../src/types';
 
 describe('visible fact coverage', () => {
@@ -145,4 +150,73 @@ describe('visible fact coverage', () => {
 
     expect(coverage).toEqual([]);
   });
+});
+
+describe('branch fact coverage', () => {
+  it.each([
+    ['row', MetricsLayoutEnum.ROWS],
+    ['col', MetricsLayoutEnum.COLUMNS],
+  ] as const)(
+    'uses the %s projection filter depth instead of the raw Values path length',
+    (axis, metricsLayout) => {
+      const program = compilePivotProgram({
+        [axis === 'row' ? 'groupbyRows' : 'groupbyColumns']: [
+          'country',
+          'state',
+          METRICS_PLACEHOLDER,
+          'city',
+        ],
+        metrics: ['sales'],
+        metricsLayout,
+      });
+      const projection = resolveAxisProjection({
+        program,
+        axis,
+        path: ['US', encodeMetricKey('sales'), 'Boston'],
+      });
+
+      const coverage = buildBranchFactCoverages({
+        program,
+        axis,
+        projection,
+        rowDepth: axis === 'row' ? 2 : 0,
+        columnDepth: axis === 'col' ? 2 : 0,
+        rowSubtotalLevels: [],
+        columnSubtotalLevels: [],
+      });
+
+      expect(projection.filterDimensionPath).toEqual(['US']);
+      expect(projection.projectedDimensionPath).toEqual(['US', 'Boston']);
+      expect(
+        projection.skippedPreValuesLevels.map(level => level.column),
+      ).toEqual(['state']);
+      expect(
+        coverage.every(item =>
+          axis === 'row' ? item.rowDepth >= 1 : item.columnDepth >= 1,
+        ),
+      ).toBe(true);
+      expect(coverage).toEqual(
+        expect.arrayContaining([
+          {
+            reason: 'expand',
+            rowDepth: axis === 'row' ? 2 : 0,
+            columnDepth: axis === 'col' ? 2 : 0,
+            rowDimensions: axis === 'row' ? ['country', 'state'] : [],
+            columnDimensions: axis === 'col' ? ['country', 'state'] : [],
+          },
+        ]),
+      );
+      expect(coverage).not.toEqual(
+        expect.arrayContaining([
+          {
+            reason: 'expand',
+            rowDepth: 0,
+            columnDepth: 0,
+            rowDimensions: [],
+            columnDimensions: [],
+          },
+        ]),
+      );
+    },
+  );
 });
