@@ -23,12 +23,12 @@ import { serializePath } from '../../../src/utils';
 describe('buildInitialQuerySpecs (contracts)', () => {
   it('emits branch targets in deterministic order and drops collapsed/duplicate paths', () => {
     const formData = buildFormData({
-      groupbyRows: ['r1'],
+      groupbyRows: ['r1', 'r2'],
       groupbyColumns: ['c1'],
       metrics: ['m1'],
       expandRowsLevel: 1,
       pivotExpansionState: {
-        rowKeys: ['r1'],
+        rowKeys: ['r1', 'r2'],
         colKeys: ['c1'],
         rows: [['B'], ['A'], ['A']],
         cols: [['Y'], ['X']],

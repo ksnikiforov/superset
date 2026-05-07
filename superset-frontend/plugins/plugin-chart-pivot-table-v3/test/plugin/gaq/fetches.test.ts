@@ -97,7 +97,7 @@ describe('Global Async Queries (HTTP 202) support', () => {
 
     const result = await fetchPivotBranch({
       formData: buildFormData({
-        groupbyRows: ['r1'],
+        groupbyRows: ['r1', 'r2'],
         groupbyColumns: [],
         metrics: ['m1'],
       }),
@@ -146,7 +146,7 @@ describe('Global Async Queries (HTTP 202) support', () => {
 
     const result = await fetchPivotBranchesBatch({
       formData: buildFormData({
-        groupbyRows: ['country', 'state'],
+        groupbyRows: ['country', 'state', 'city'],
         groupbyColumns: [],
         metrics: ['m1'],
       }),

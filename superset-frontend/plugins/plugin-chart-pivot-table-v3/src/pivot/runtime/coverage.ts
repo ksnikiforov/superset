@@ -17,9 +17,9 @@
  * under the License.
  */
 import type { PivotAxis } from '../../types';
+import { isMeasureLeafToken } from '../core/tokens';
 import type {
   PivotAxisLevel,
-  PivotAxisProgram,
   PivotCoverageReason,
   PivotFactCoverage,
   PivotProgram,
@@ -27,6 +27,14 @@ import type {
 
 export type VisibleFactCoverageInput = {
   program: PivotProgram;
+  rowDepth: number;
+  columnDepth: number;
+  reason?: PivotCoverageReason;
+};
+
+export type FactCoverageInput = {
+  rowDimensions: PivotProgram['rowDimensions'];
+  columnDimensions: PivotProgram['columnDimensions'];
   rowDepth: number;
   columnDepth: number;
   reason?: PivotCoverageReason;
@@ -40,6 +48,13 @@ export type ExpansionFactCoverageInput = {
   currentColumnDepth: number;
 };
 
+export type ExpansionValuesLevelInput = {
+  program: PivotProgram;
+  axis: PivotAxis;
+  path: unknown[];
+  isMetricTokenValue: (value: unknown) => boolean;
+};
+
 const clampDepth = (depth: number, maxDepth: number) => {
   if (!Number.isFinite(depth)) {
     return 0;
@@ -50,8 +65,25 @@ const clampDepth = (depth: number, maxDepth: number) => {
 const axisProgramFor = (program: PivotProgram, axis: PivotAxis) =>
   axis === 'row' ? program.rows : program.columns;
 
+const isStrictValuesPathToken = (
+  value: unknown,
+  isMetricTokenValue: (value: unknown) => boolean,
+) => isMetricTokenValue(value) || isMeasureLeafToken(value);
+
+const isValuesLevelPathToken = ({
+  value,
+  program,
+  isMetricTokenValue,
+}: {
+  value: unknown;
+  program: PivotProgram;
+  isMetricTokenValue: (value: unknown) => boolean;
+}) =>
+  isStrictValuesPathToken(value, isMetricTokenValue) ||
+  (typeof value === 'string' && program.metricKeys.includes(value));
+
 const countDimensionsThroughLevel = (
-  axisProgram: PivotAxisProgram,
+  axisProgram: PivotProgram['rows'],
   levelIndex: number,
 ) =>
   axisProgram
@@ -60,6 +92,68 @@ const countDimensionsThroughLevel = (
       (level): level is Extract<PivotAxisLevel, { kind: 'dimension' }> =>
         level.kind === 'dimension',
     ).length;
+
+const getNextAxisLevelForPath = ({
+  program,
+  axis,
+  path,
+  isMetricTokenValue,
+}: ExpansionValuesLevelInput): PivotAxisLevel | undefined => {
+  let pathIndex = 0;
+
+  for (const level of axisProgramFor(program, axis)) {
+    if (pathIndex >= path.length) {
+      return level;
+    }
+    const value = path[pathIndex];
+    if (level.kind === 'dimension') {
+      if (isStrictValuesPathToken(value, isMetricTokenValue)) {
+        return level;
+      }
+      pathIndex += 1;
+      continue;
+    }
+
+    let consumedValuesToken = false;
+    while (
+      pathIndex < path.length &&
+      isValuesLevelPathToken({
+        value: path[pathIndex],
+        program,
+        isMetricTokenValue,
+      })
+    ) {
+      consumedValuesToken = true;
+      pathIndex += 1;
+    }
+    if (!consumedValuesToken) {
+      return level;
+    }
+  }
+  return undefined;
+};
+
+export const expansionRevealsValuesLevel = (input: ExpansionValuesLevelInput) =>
+  getNextAxisLevelForPath(input)?.kind === 'values';
+
+export const buildFactCoverage = ({
+  rowDimensions,
+  columnDimensions,
+  rowDepth,
+  columnDepth,
+  reason = 'expand',
+}: FactCoverageInput): PivotFactCoverage => {
+  const visibleRowDepth = clampDepth(rowDepth, rowDimensions.length);
+  const visibleColumnDepth = clampDepth(columnDepth, columnDimensions.length);
+
+  return {
+    reason,
+    rowDepth: visibleRowDepth,
+    columnDepth: visibleColumnDepth,
+    rowDimensions: rowDimensions.slice(0, visibleRowDepth),
+    columnDimensions: columnDimensions.slice(0, visibleColumnDepth),
+  };
+};
 
 export const buildVisibleFactCoverage = ({
   program,
@@ -71,20 +165,14 @@ export const buildVisibleFactCoverage = ({
     return [];
   }
 
-  const visibleRowDepth = clampDepth(rowDepth, program.rowDimensions.length);
-  const visibleColumnDepth = clampDepth(
-    columnDepth,
-    program.columnDimensions.length,
-  );
-
   return [
-    {
+    buildFactCoverage({
       reason,
-      rowDepth: visibleRowDepth,
-      columnDepth: visibleColumnDepth,
-      rowDimensions: program.rowDimensions.slice(0, visibleRowDepth),
-      columnDimensions: program.columnDimensions.slice(0, visibleColumnDepth),
-    },
+      rowDimensions: program.rowDimensions,
+      columnDimensions: program.columnDimensions,
+      rowDepth,
+      columnDepth,
+    }),
   ];
 };
 

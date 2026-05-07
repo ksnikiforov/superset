@@ -56,7 +56,7 @@ import {
   type PivotTreeNode,
 } from './types';
 import { PivotTableView } from './pivot/render/PivotTableView';
-import { useExpansionEngine } from './pivot/engine/useExpansionEngine';
+import { useExpansionEngine } from './pivot/expansion/useExpansionEngine';
 import { usePivotLayout } from './pivot/chart/usePivotLayout';
 import { usePivotRenderModel } from './pivot/chart/usePivotRenderModel';
 import { useStickyHeaders } from './pivot/chart/useStickyHeaders';

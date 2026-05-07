@@ -1063,7 +1063,7 @@ describe('resolveFetchContext', () => {
     };
 
     const formData = buildFormData({
-      groupbyRows: ['orderPriority'],
+      groupbyRows: ['orderPriority', 'customerName'],
       groupbyColumns: [],
       metrics: ['countCustomers'],
       metricsLayout: MetricsLayoutEnum.ROWS,
@@ -1126,7 +1126,7 @@ describe('resolveFetchContext', () => {
 
     await fetchPivotBranch({
       formData: buildFormData({
-        groupbyRows: ['orderPriority'],
+        groupbyRows: ['orderPriority', 'customerName'],
         groupbyColumns: [],
         metrics: ['countCustomers'],
         metricsLayout: MetricsLayoutEnum.ROWS,
@@ -1143,7 +1143,7 @@ describe('resolveFetchContext', () => {
 
     await fetchPivotBranch({
       formData: buildFormData({
-        groupbyRows: ['orderPriority'],
+        groupbyRows: ['orderPriority', 'customerName'],
         groupbyColumns: [],
         metrics: ['countCustomers'],
         metricsLayout: MetricsLayoutEnum.ROWS,

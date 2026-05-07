@@ -386,6 +386,9 @@ export async function fetchPivotBranch({
     rowDepth: spec.meta.rowDepth,
     colDepth: spec.meta.colDepth,
   }));
+  if (specs.length === 0) {
+    return { data: undefined };
+  }
 
   try {
     const results = await supersetChartDataClient.fetch({

@@ -80,7 +80,7 @@ describe('fetchPivotBranchesBatch', () => {
     );
 
     const formData = buildFormData({
-      groupbyRows: ['country', 'state'],
+      groupbyRows: ['country', 'state', 'city'],
       groupbyColumns: [],
     });
     const batch: BatchGroup = {
@@ -142,7 +142,7 @@ describe('fetchPivotBranchesBatch', () => {
     );
 
     const formData = buildFormData({
-      groupbyRows: ['country', 'state'],
+      groupbyRows: ['country', 'state', 'city'],
       groupbyColumns: [],
     });
     const batch: BatchGroup = {
@@ -194,7 +194,7 @@ describe('fetchPivotBranchesBatch', () => {
 
     const formData = buildFormData({
       time_offsets: ['1 year ago'],
-      groupbyRows: ['country'],
+      groupbyRows: ['country', 'state'],
       groupbyColumns: [],
     });
     const batch: BatchGroup = {

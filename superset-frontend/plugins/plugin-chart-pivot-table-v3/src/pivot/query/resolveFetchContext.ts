@@ -53,8 +53,6 @@ export type ResolveFetchContextParams = {
 };
 
 export type ResolvedFetchContext = {
-  rowGroupbyRaw: QueryFormColumn[];
-  colGroupbyRaw: QueryFormColumn[];
   rowGroupby: QueryFormColumn[];
   colGroupby: QueryFormColumn[];
   rowGroupbyForQueryFull: QueryFormColumn[];
@@ -89,8 +87,6 @@ export const resolveFetchContext = ({
   targetColDepth,
 }: ResolveFetchContextParams): ResolvedFetchContext => {
   const layout = layoutParam ?? buildLayoutContext(formData);
-  const rowGroupbyRaw = layout.groupbyRowsRaw;
-  const colGroupbyRaw = layout.groupbyColumnsRaw;
   const {
     metrics,
     metricLabelSet,
@@ -276,8 +272,6 @@ export const resolveFetchContext = ({
   const metricsForQuery = queryShape.metrics;
 
   return {
-    rowGroupbyRaw,
-    colGroupbyRaw,
     rowGroupby,
     colGroupby,
     rowGroupbyForQueryFull,

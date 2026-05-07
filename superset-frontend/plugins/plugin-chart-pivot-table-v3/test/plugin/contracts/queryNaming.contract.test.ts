@@ -25,11 +25,11 @@ describe('query naming (contracts)', () => {
     const dividerValue = `A${PATH_DIVIDER}B`;
     const queryContext = buildQuery(
       buildFormData({
-        groupbyRows: ['r1'],
+        groupbyRows: ['r1', 'r2'],
         groupbyColumns: [],
         metrics: ['m1'],
         pivotExpansionState: {
-          rowKeys: ['r1'],
+          rowKeys: ['r1', 'r2'],
           colKeys: [],
           rows: [[dividerValue]],
           cols: [],
@@ -52,11 +52,11 @@ describe('query naming (contracts)', () => {
   it('uses serializePath() for branch suffixes, including null values', () => {
     const queryContext = buildQuery(
       buildFormData({
-        groupbyRows: ['r1'],
+        groupbyRows: ['r1', 'r2'],
         groupbyColumns: [],
         metrics: ['m1'],
         pivotExpansionState: {
-          rowKeys: ['r1'],
+          rowKeys: ['r1', 'r2'],
           colKeys: [],
           rows: [[null]],
           cols: [],
@@ -77,11 +77,11 @@ describe('query naming (contracts)', () => {
   it('uses serializePath() for branch suffixes, including undefined values', () => {
     const queryContext = buildQuery(
       buildFormData({
-        groupbyRows: ['r1'],
+        groupbyRows: ['r1', 'r2'],
         groupbyColumns: [],
         metrics: ['m1'],
         pivotExpansionState: {
-          rowKeys: ['r1'],
+          rowKeys: ['r1', 'r2'],
           colKeys: [],
           rows: [[undefined]],
           cols: [],

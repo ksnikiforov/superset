@@ -16,18 +16,18 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import { type DataRecord } from '@superset-ui/core';
 import type {
   PivotPath,
   PivotTableQueryFormData,
   PivotTreeData,
 } from '../../types';
-import { type DataRecord } from '@superset-ui/core';
-import { type BatchGroup } from './fetchPlanOptimizer';
-import { buildLayoutContext } from '../layout/LayoutContext';
-import { buildBatchQuerySpecs } from './specs';
 import { buildBranchTreeFromResults } from '../../fetchPivotBranch';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import { type ChartDataWarning } from '../data/ChartDataClient';
+import { buildLayoutContext } from '../layout/LayoutContext';
+import { type BatchGroup } from './fetchPlanOptimizer';
+import { buildBatchQuerySpecs } from './specs';
 
 export type FetchPivotBranchesBatchParams = {
   formData: PivotTableQueryFormData;

@@ -190,7 +190,7 @@ describe('buildQuery (bootstrap)', () => {
   test('batches sibling persisted expansions into |batch: queries (BR-4.7)', () => {
     const queryContext = buildQuery(
       buildFormData({
-        groupbyRows: ['country', 'state'],
+        groupbyRows: ['country', 'state', 'city'],
         groupbyColumns: [],
         metrics: ['m1'],
         startCollapsed: true,
@@ -198,7 +198,7 @@ describe('buildQuery (bootstrap)', () => {
         expandRowsLevel: 0,
         expandColumnsLevel: 0,
         pivotExpansionState: {
-          rowKeys: ['country', 'state'],
+          rowKeys: ['country', 'state', 'city'],
           colKeys: [],
           rows: [
             ['US', 'CA'],

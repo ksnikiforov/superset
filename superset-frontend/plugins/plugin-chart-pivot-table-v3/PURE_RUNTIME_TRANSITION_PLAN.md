@@ -46,6 +46,10 @@ and tested.
   each runtime layer moves to the compiled model.
 - Prefer direct replacement over long-lived compatibility adapters.
 - Keep the table interactive while any load is in flight.
+- Bring potential large deletion wins from edge-case behavior to the user for
+  approval before removing that behavior.
+- Bring inconsistent behavior that blocks major simplification to the user for
+  approval before changing it, even when it is not a narrow edge case.
 
 ## Non-goals
 
@@ -60,6 +64,11 @@ and tested.
 - Do not introduce speculative prefetching for hidden or collapsed layers.
 - Do not use global loading locks that block scrolling, dragging, row/column
   selection, measure selection, or expansion of already-loaded branches.
+- Do not silently remove edge-case behavior just because it unlocks a large code
+  deletion. Those simplifications need an explicit approval checkpoint.
+- Do not silently normalize inconsistent behavior when that behavior change is
+  the reason a large deletion becomes possible. First describe the current
+  behavior, proposed simpler behavior, UX impact, and expected deletion upside.
 
 ## Current Problem
 
@@ -250,13 +259,24 @@ Gate 2 has started:
 - Bootstrap query metadata records the visible coverage it requested.
 - The unused duplicate `src/pivot/engine/initialQueryPlan.ts` planner has been
   deleted.
-- Branch and batch query paths still use the old planner shape.
+- Root, branch, and batch query specs now record fact coverage metadata and use
+  that coverage to derive query columns.
+- Branch and batch query specs return no DB query when expansion only reveals
+  synthetic Values.
+- `fetchPivotBranch` treats an empty branch spec list as a no-op instead of
+  sending an empty chart-data request.
+- `resolveFetchContext` no longer returns unused raw groupby fields.
+- The compatibility `pivot/engine/useExpansionEngine.ts` re-export has been
+  deleted; the chart imports the expansion hook directly.
 
 Immediate next step:
 
-- Extend visible coverage from bootstrap targets into branch/batch planning,
-  then delete placement-specific depth-pair branches from `branchQueryPairs.ts`
-  and path surgery from `resolveFetchContext.ts`.
+- Move branch and batch target selection fully behind coverage planning, then
+  delete placement-specific depth-pair branches from `branchQueryPairs.ts` and
+  path surgery from `resolveFetchContext.ts`.
+- Before deleting any broad behavior branch, bring inconsistent behavior or
+  edge-case behavior that unlocks large deletion wins to the user for approval
+  with UX impact and deletion upside.
 
 ### Gate 1: One compiled layout model
 

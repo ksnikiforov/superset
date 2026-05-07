@@ -54,6 +54,10 @@ import { coerceExpansionState } from './persistedExpansionState';
 import { resolveFetchContextForBatch } from './resolveFetchContext';
 import { buildQueryShape } from './queryShape';
 import { type QuerySpec } from './types';
+import {
+  buildFactCoverage,
+  expansionRevealsValuesLevel,
+} from '../runtime/coverage';
 import { type PivotFactCoverage } from '../runtime/types';
 
 export type QuerySpecMeta = {
@@ -220,6 +224,11 @@ const dedupePairs = (pairs: DepthPair[]) => {
   });
 };
 
+const columnsForCoverage = (coverage: PivotFactCoverage) => [
+  ...coverage.rowDimensions,
+  ...coverage.columnDimensions,
+];
+
 const buildBranchSpecs = ({
   formData,
   layout,
@@ -239,6 +248,17 @@ const buildBranchSpecs = ({
   visibleRowDepth?: number;
   visibleColDepth?: number;
 }): PlannedQuerySpec[] => {
+  if (
+    expansionRevealsValuesLevel({
+      program: layout.pivotProgram,
+      axis,
+      path: metricPath,
+      isMetricTokenValue: layout.isMetricTokenValue,
+    })
+  ) {
+    return [];
+  }
+
   const ctx = resolveFetchContextForBatch({
     formData,
     layout,
@@ -276,29 +296,36 @@ const buildBranchSpecs = ({
   );
   const suffix = `|branch:${axis}:${serializePath(path)}`;
 
-  return queryPairs.map(pair => ({
-    queryName: `${formatQueryName(pair.rowDepth, pair.colDepth)}${suffix}`,
-    columns: [
-      ...ctx.rowGroupbyForQuery.slice(0, pair.rowDepth),
-      ...ctx.colGroupbyForQuery.slice(0, pair.colDepth),
-    ],
-    metrics: ctx.metricsForQuery,
-    filters: pathFilters,
-    meta: {
-      kind: 'branch',
-      axis,
-      path,
-      metricPath,
+  return queryPairs.map(pair => {
+    const coverage = buildFactCoverage({
+      rowDimensions: ctx.rowGroupbyForQuery,
+      columnDimensions: ctx.colGroupbyForQuery,
       rowDepth: pair.rowDepth,
-      colDepth: pair.colDepth,
-      rowGroupbyForQueryFull: ctx.rowGroupbyForQueryFull,
-      colGroupbyForQueryFull: ctx.colGroupbyForQueryFull,
-      rowSubtotalLevels: ctx.rowSubtotalLevels,
-      colSubtotalLevels: ctx.colSubtotalLevels,
-      metricsLayoutResolved: ctx.metricsLayoutResolved,
-      metricInsertIndex: ctx.metricInsertIndex,
-    },
-  }));
+      columnDepth: pair.colDepth,
+      reason: 'expand',
+    });
+    return {
+      queryName: `${formatQueryName(pair.rowDepth, pair.colDepth)}${suffix}`,
+      columns: columnsForCoverage(coverage),
+      metrics: ctx.metricsForQuery,
+      filters: pathFilters,
+      meta: {
+        kind: 'branch',
+        axis,
+        path,
+        metricPath,
+        rowDepth: coverage.rowDepth,
+        colDepth: coverage.columnDepth,
+        rowGroupbyForQueryFull: ctx.rowGroupbyForQueryFull,
+        colGroupbyForQueryFull: ctx.colGroupbyForQueryFull,
+        rowSubtotalLevels: ctx.rowSubtotalLevels,
+        colSubtotalLevels: ctx.colSubtotalLevels,
+        metricsLayoutResolved: ctx.metricsLayoutResolved,
+        metricInsertIndex: ctx.metricInsertIndex,
+        coverage,
+      },
+    };
+  });
 };
 
 export const buildBranchQuerySpecs = (params: {
@@ -378,6 +405,17 @@ const buildBatchSpecs = ({
   visibleRowDepth: number;
   visibleColDepth: number;
 }): PlannedQuerySpec[] => {
+  if (
+    expansionRevealsValuesLevel({
+      program: layout.pivotProgram,
+      axis,
+      path: representative.metricPath,
+      isMetricTokenValue: layout.isMetricTokenValue,
+    })
+  ) {
+    return [];
+  }
+
   const parentPath = parsePath(parentPathKey);
   const ctx = resolveFetchContextForBatch({
     formData,
@@ -416,29 +454,36 @@ const buildBatchSpecs = ({
   });
   const suffix = `|batch:${axis}:${parentPathKey}|chunk:${chunkIndex}`;
 
-  return queryPairs.map(pair => ({
-    queryName: `${formatQueryName(pair.rowDepth, pair.colDepth)}${suffix}`,
-    columns: [
-      ...ctx.rowGroupbyForQuery.slice(0, pair.rowDepth),
-      ...ctx.colGroupbyForQuery.slice(0, pair.colDepth),
-    ],
-    metrics: ctx.metricsForQuery,
-    filters,
-    meta: {
-      kind: 'batch',
-      axis,
-      parentPath,
-      siblingValues,
+  return queryPairs.map(pair => {
+    const coverage = buildFactCoverage({
+      rowDimensions: ctx.rowGroupbyForQuery,
+      columnDimensions: ctx.colGroupbyForQuery,
       rowDepth: pair.rowDepth,
-      colDepth: pair.colDepth,
-      rowGroupbyForQueryFull: ctx.rowGroupbyForQueryFull,
-      colGroupbyForQueryFull: ctx.colGroupbyForQueryFull,
-      rowSubtotalLevels: ctx.rowSubtotalLevels,
-      colSubtotalLevels: ctx.colSubtotalLevels,
-      metricsLayoutResolved: ctx.metricsLayoutResolved,
-      metricInsertIndex: ctx.metricInsertIndex,
-    },
-  }));
+      columnDepth: pair.colDepth,
+      reason: 'expand',
+    });
+    return {
+      queryName: `${formatQueryName(pair.rowDepth, pair.colDepth)}${suffix}`,
+      columns: columnsForCoverage(coverage),
+      metrics: ctx.metricsForQuery,
+      filters,
+      meta: {
+        kind: 'batch',
+        axis,
+        parentPath,
+        siblingValues,
+        rowDepth: coverage.rowDepth,
+        colDepth: coverage.columnDepth,
+        rowGroupbyForQueryFull: ctx.rowGroupbyForQueryFull,
+        colGroupbyForQueryFull: ctx.colGroupbyForQueryFull,
+        rowSubtotalLevels: ctx.rowSubtotalLevels,
+        colSubtotalLevels: ctx.colSubtotalLevels,
+        metricsLayoutResolved: ctx.metricsLayoutResolved,
+        metricInsertIndex: ctx.metricInsertIndex,
+        coverage,
+      },
+    };
+  });
 };
 
 export const buildBatchQuerySpecs = ({
@@ -644,24 +689,29 @@ export const buildInitialQuerySpecs = (
     });
     const queryPairs = dedupePairs([...rowPairs, ...colPairs]);
     queryPairs.forEach(pair => {
+      const coverage = buildFactCoverage({
+        rowDimensions: rootContext.rowGroupbyForQuery,
+        columnDimensions: rootContext.colGroupbyForQuery,
+        rowDepth: pair.rowDepth,
+        columnDepth: pair.colDepth,
+        reason: 'initial',
+      });
       specs.push({
         queryName: `${formatQueryName(pair.rowDepth, pair.colDepth)}|root`,
-        columns: [
-          ...rootContext.rowGroupbyForQuery.slice(0, pair.rowDepth),
-          ...rootContext.colGroupbyForQuery.slice(0, pair.colDepth),
-        ],
+        columns: columnsForCoverage(coverage),
         metrics: rootContext.metricsForQuery,
         filters: [],
         meta: {
           kind: 'root',
-          rowDepth: pair.rowDepth,
-          colDepth: pair.colDepth,
+          rowDepth: coverage.rowDepth,
+          colDepth: coverage.columnDepth,
           rowGroupbyForQueryFull: rootContext.rowGroupbyForQueryFull,
           colGroupbyForQueryFull: rootContext.colGroupbyForQueryFull,
           rowSubtotalLevels: rootContext.rowSubtotalLevels,
           colSubtotalLevels: rootContext.colSubtotalLevels,
           metricsLayoutResolved: rootContext.metricsLayoutResolved,
           metricInsertIndex: rootContext.metricInsertIndex,
+          coverage,
         },
       });
     });
