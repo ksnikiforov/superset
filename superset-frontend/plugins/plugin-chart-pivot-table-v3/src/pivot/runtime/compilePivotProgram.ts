@@ -43,6 +43,14 @@ export type CompilePivotProgramInput = {
   lastMoved?: PivotAxis;
 };
 
+export type PivotProgramPlacement = {
+  rows: QueryFormColumn[];
+  cols: QueryFormColumn[];
+  axis: PivotAxis;
+  layout: MetricsLayoutEnum;
+  metricPosition: number;
+};
+
 const toColumns = (
   values?: QueryFormColumn[] | QueryFormColumn,
 ): QueryFormColumn[] =>
@@ -158,3 +166,38 @@ export const compilePivotProgram = ({
     metricInsertIndex,
   };
 };
+
+export const pivotProgramToPlacement = (
+  program: PivotProgram,
+): PivotProgramPlacement => {
+  const fallbackAxis =
+    program.metricsLayoutResolved === MetricsLayoutEnum.ROWS ? 'row' : 'col';
+  const rows =
+    program.valueAxis === 'row'
+      ? [
+          ...program.rowDimensions.slice(0, program.metricInsertIndex),
+          METRICS_PLACEHOLDER,
+          ...program.rowDimensions.slice(program.metricInsertIndex),
+        ]
+      : program.rowDimensions;
+  const cols =
+    program.valueAxis === 'col'
+      ? [
+          ...program.columnDimensions.slice(0, program.metricInsertIndex),
+          METRICS_PLACEHOLDER,
+          ...program.columnDimensions.slice(program.metricInsertIndex),
+        ]
+      : program.columnDimensions;
+
+  return {
+    rows,
+    cols,
+    axis: program.valueAxis ?? fallbackAxis,
+    layout: program.metricsLayoutResolved,
+    metricPosition: program.metricInsertIndex,
+  };
+};
+
+export const resolvePivotProgramPlacement = (
+  input: CompilePivotProgramInput,
+): PivotProgramPlacement => pivotProgramToPlacement(compilePivotProgram(input));

@@ -49,13 +49,13 @@ import {
   METRICS_PLACEHOLDER_LABEL,
   parseThemeColors,
   PIVOT_THEME_PRESETS,
-  resolveMetricPlacement,
   stripMetricsPlaceholder,
   normalizeSubtotalLevels,
 } from './utils';
 import PivotDndColumnSelect from './controls/PivotDndColumnSelect/PivotDndColumnSelect';
 import PivotDndMetricSelect from './controls/PivotDndMetricSelect/PivotDndMetricSelect';
 import { resolveInteractionFormData } from './pivot/layout/resolveInteractionLayout';
+import { resolvePivotProgramPlacement } from './pivot/runtime/compilePivotProgram';
 
 type WindowWithPivotDebug = Window & { PIVOT_V3_DEBUG_PLACEMENT?: boolean };
 
@@ -207,9 +207,11 @@ const withMetricsPlaceholder =
         (state?.controls?.metricsLayout?.value as MetricsLayoutEnum) ||
         (state?.form_data?.metricsLayout as MetricsLayoutEnum) ||
         MetricsLayoutEnum.COLUMNS;
-      const resolved = resolveMetricPlacement(rowsRaw, colsRaw, {
-        hasMetrics,
-        preferredAxis: preferredLayout,
+      const resolved = resolvePivotProgramPlacement({
+        groupbyRows: rowsRaw,
+        groupbyColumns: colsRaw,
+        metrics: hasMetrics ? metricsValue : [],
+        metricsLayout: preferredLayout,
       });
       if ((window as WindowWithPivotDebug).PIVOT_V3_DEBUG_PLACEMENT) {
         // eslint-disable-next-line no-console
@@ -234,9 +236,9 @@ const withMetricsPlaceholder =
           rows: resolved.rows,
           cols: resolved.cols,
           preferredAxis: resolved.layout,
-          hasMetrics,
+          metrics: metricsValue,
           controlNames: { rows: 'groupbyRows', cols: 'groupbyColumns' },
-          resolve: resolveMetricPlacement,
+          resolve: resolvePivotProgramPlacement,
         },
       };
     },
@@ -1016,9 +1018,11 @@ const config: ControlPanelConfig = {
     const cols = hasUserDimensions
       ? []
       : ensureIsArray(pivotFormData.groupbyColumns);
-    const resolved = resolveMetricPlacement(rows, cols, {
-      hasMetrics: metrics.length > 0,
-      preferredAxis: pivotFormData.metricsLayout as MetricsLayoutEnum,
+    const resolved = resolvePivotProgramPlacement({
+      groupbyRows: rows,
+      groupbyColumns: cols,
+      metrics,
+      metricsLayout: pivotFormData.metricsLayout as MetricsLayoutEnum,
     });
 
     return {

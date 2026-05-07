@@ -17,7 +17,10 @@
  * under the License.
  */
 import { METRICS_PLACEHOLDER } from '../../../../src/pivot/core/tokens';
-import { compilePivotProgram } from '../../../../src/pivot/runtime/compilePivotProgram';
+import {
+  compilePivotProgram,
+  resolvePivotProgramPlacement,
+} from '../../../../src/pivot/runtime/compilePivotProgram';
 import type { PivotAxisProgram } from '../../../../src/pivot/runtime/types';
 import { MetricsLayoutEnum } from '../../../../src/types';
 
@@ -115,5 +118,46 @@ describe('compilePivotProgram', () => {
       'values',
     ]);
     expect(program.metricInsertIndex).toBe(2);
+  });
+
+  it('dedupes Values across axes favoring last moved', () => {
+    const resolved = resolvePivotProgramPlacement({
+      groupbyRows: ['region', METRICS_PLACEHOLDER],
+      groupbyColumns: [METRICS_PLACEHOLDER],
+      metrics: ['m1'],
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      lastMoved: 'row',
+    });
+
+    expect(resolved.axis).toEqual('row');
+    expect(resolved.rows).toEqual(['region', METRICS_PLACEHOLDER]);
+    expect(resolved.cols).toEqual([]);
+    expect(resolved.layout).toEqual(MetricsLayoutEnum.ROWS);
+  });
+
+  it('removes Values when metrics are empty', () => {
+    const resolved = resolvePivotProgramPlacement({
+      groupbyRows: ['country', METRICS_PLACEHOLDER],
+      metrics: [],
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+    });
+
+    expect(resolved.rows).toEqual(['country']);
+    expect(resolved.cols).toEqual([]);
+    expect(resolved.metricPosition).toBe(-1);
+  });
+
+  it('auto-inserts Values on the preferred axis when missing', () => {
+    const resolved = resolvePivotProgramPlacement({
+      groupbyRows: ['country'],
+      groupbyColumns: ['segment'],
+      metrics: ['m1'],
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+    });
+
+    expect(resolved.axis).toEqual('col');
+    expect(resolved.cols).toEqual(['segment', METRICS_PLACEHOLDER]);
+    expect(resolved.layout).toEqual(MetricsLayoutEnum.COLUMNS);
+    expect(resolved.metricPosition).toBe(1);
   });
 });

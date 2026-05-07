@@ -172,18 +172,16 @@ export type PivotPlacement = {
   axis: 'rows' | 'cols';
   rows: QueryFormColumn[];
   cols: QueryFormColumn[];
-  hasMetrics: boolean;
+  metrics: QueryFormMetric[];
   preferredAxis?: MetricsLayoutEnum;
   controlNames?: { rows: string; cols: string };
-  resolve?: (
-    rows: QueryFormColumn[],
-    cols: QueryFormColumn[],
-    options: {
-      hasMetrics: boolean;
-      preferredAxis?: MetricsLayoutEnum;
-      lastMoved?: 'row' | 'col';
-    },
-  ) => {
+  resolve?: (options: {
+    groupbyRows: QueryFormColumn[];
+    groupbyColumns: QueryFormColumn[];
+    metrics: QueryFormMetric[];
+    metricsLayout?: MetricsLayoutEnum;
+    lastMoved?: 'row' | 'col';
+  }) => {
     rows: QueryFormColumn[];
     cols: QueryFormColumn[];
     layout?: MetricsLayoutEnum;
@@ -367,9 +365,11 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
             val => val === METRICS_PLACEHOLDER || !colsNext.includes(val),
           );
         }
-        const resolved = pivotPlacement.resolve(rowsNext, colsNext, {
-          hasMetrics: pivotPlacement.hasMetrics,
-          preferredAxis: pivotPlacement.preferredAxis,
+        const resolved = pivotPlacement.resolve({
+          groupbyRows: rowsNext,
+          groupbyColumns: colsNext,
+          metrics: pivotPlacement.metrics,
+          metricsLayout: pivotPlacement.preferredAxis,
           lastMoved: pivotPlacement.axis === 'rows' ? 'row' : 'col',
         });
         if (debugOn) {

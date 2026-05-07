@@ -26,7 +26,6 @@ import {
   DataRecordValue,
 } from '@superset-ui/core';
 import {
-  MetricsLayoutEnum,
   METRIC_FORMATTING_FIELDS,
   DIMENSION_FORMATTING_FIELDS,
   DimensionFormattingScope,
@@ -57,9 +56,7 @@ import {
   getMetricKey,
   getMetricKeys,
   isMetricsPlaceholder,
-  METRICS_PLACEHOLDER,
 } from './pivot/core/tokens';
-import { compilePivotProgram } from './pivot/runtime/compilePivotProgram';
 
 export {
   CELL_KEY_DIVIDER,
@@ -1470,49 +1467,4 @@ export const resolveExpandLevel = (
   }
   const resolvedDepth = Math.max(initialDepth || 1, 1) - 1;
   return Math.min(Math.max(resolvedDepth, 0), groupbyLength);
-};
-
-export const resolveMetricPlacement = (
-  rowsRaw: QueryFormColumn[] = [],
-  colsRaw: QueryFormColumn[] = [],
-  options: {
-    hasMetrics: boolean;
-    preferredAxis?: MetricsLayoutEnum;
-    lastMoved?: 'row' | 'col';
-  },
-) => {
-  const preferred =
-    options.preferredAxis === MetricsLayoutEnum.ROWS ? 'row' : 'col';
-  const program = compilePivotProgram({
-    groupbyRows: rowsRaw,
-    groupbyColumns: colsRaw,
-    metrics: options.hasMetrics ? [METRICS_PLACEHOLDER] : [],
-    metricsLayout: options.preferredAxis,
-    lastMoved: options.lastMoved,
-  });
-
-  const rows =
-    program.valueAxis === 'row'
-      ? [
-          ...program.rowDimensions.slice(0, program.metricInsertIndex),
-          METRICS_PLACEHOLDER,
-          ...program.rowDimensions.slice(program.metricInsertIndex),
-        ]
-      : program.rowDimensions;
-  const cols =
-    program.valueAxis === 'col'
-      ? [
-          ...program.columnDimensions.slice(0, program.metricInsertIndex),
-          METRICS_PLACEHOLDER,
-          ...program.columnDimensions.slice(program.metricInsertIndex),
-        ]
-      : program.columnDimensions;
-
-  return {
-    rows,
-    cols,
-    axis: program.valueAxis ?? preferred,
-    layout: program.metricsLayoutResolved,
-    metricPosition: program.metricInsertIndex,
-  };
 };

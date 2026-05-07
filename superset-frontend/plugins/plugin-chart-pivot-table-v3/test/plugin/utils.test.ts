@@ -30,11 +30,9 @@ import {
   decodeMetricKey,
   encodeMetricKey,
   mergeTrees,
-  METRICS_PLACEHOLDER,
   normalizeSubtotalLevels,
   labelRowSubtotalLeaves,
   parseThemeColors,
-  resolveMetricPlacement,
   resolveExpandLevel,
   normalizeExpandLevel,
   serializeCellKey,
@@ -705,46 +703,6 @@ describe('applyMetricAxis + buildTreeFromRecords integration', () => {
     const merged = mergeTrees(totals, detail);
     expect(merged.rows[serializePath(['US'])]?.values?.metric1).toBe(30);
     expect(merged.rows[serializePath(['CA'])]?.values?.metric1).toBe(70);
-  });
-});
-
-describe('resolveMetricPlacement', () => {
-  it('dedupes placeholder across axes favoring last moved', () => {
-    const resolved = resolveMetricPlacement(
-      ['region', METRICS_PLACEHOLDER],
-      [METRICS_PLACEHOLDER],
-      {
-        hasMetrics: true,
-        preferredAxis: MetricsLayoutEnum.COLUMNS,
-        lastMoved: 'row',
-      },
-    );
-    expect(resolved.axis).toEqual('row');
-    expect(resolved.rows).toEqual(['region', METRICS_PLACEHOLDER]);
-    expect(resolved.cols).toEqual([]);
-    expect(resolved.layout).toEqual(MetricsLayoutEnum.ROWS);
-  });
-
-  it('removes placeholder when metrics are empty', () => {
-    const resolved = resolveMetricPlacement(
-      ['country', METRICS_PLACEHOLDER],
-      [],
-      { hasMetrics: false, preferredAxis: MetricsLayoutEnum.COLUMNS },
-    );
-    expect(resolved.rows).toEqual(['country']);
-    expect(resolved.cols).toEqual([]);
-    expect(resolved.metricPosition).toBe(-1);
-  });
-
-  it('auto-inserts placeholder on preferred axis when missing', () => {
-    const resolved = resolveMetricPlacement(['country'], ['segment'], {
-      hasMetrics: true,
-      preferredAxis: MetricsLayoutEnum.COLUMNS,
-    });
-    expect(resolved.axis).toEqual('col');
-    expect(resolved.cols).toEqual(['segment', METRICS_PLACEHOLDER]);
-    expect(resolved.layout).toEqual(MetricsLayoutEnum.COLUMNS);
-    expect(resolved.metricPosition).toBe(1);
   });
 });
 
