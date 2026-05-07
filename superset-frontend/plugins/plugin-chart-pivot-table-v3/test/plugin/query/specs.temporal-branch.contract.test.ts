@@ -77,7 +77,6 @@ describe('temporal branch query specs contract', () => {
       layout,
       axis: 'row',
       path,
-      metricPath: path,
       currentTree: emptyTree,
       visibleRowDepth: 1,
       visibleColDepth: 0,

@@ -23,6 +23,7 @@ import { MetricsLayoutEnum, PivotPath } from '../../../../src/types';
 import {
   applyMetricAxis,
   buildTreeFromRecords,
+  decodeMetricKey,
   METRICS_PLACEHOLDER,
 } from '../../../../src/utils';
 import {
@@ -41,6 +42,8 @@ jest.mock('../../../../src/fetchPivotBranch', () => {
 
 describe('PivotTableChart expansion with metrics between dimensions (expansion)', () => {
   const fetchPivotBranchMock = fetchPivotBranch as jest.Mock;
+  const getMetricKey = (value: unknown) =>
+    decodeMetricKey(value) ?? String(value ?? '');
   beforeEach(() => {
     fetchPivotBranchMock.mockReset();
     fetchPivotBranchMock.mockResolvedValue({ data: undefined });
@@ -414,7 +417,7 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
 
     fetchPivotBranchMock.mockImplementation(({ path }: { path: PivotPath }) => {
       const metricIndex = path.findIndex(val =>
-        metrics.includes(String(val ?? '')),
+        metrics.includes(getMetricKey(val)),
       );
       if (metricIndex === 1) {
         if (path.length === 2) {
@@ -791,7 +794,7 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
 
     fetchPivotBranchMock.mockImplementation(({ path }: { path: PivotPath }) => {
       const metricIndex = path.findIndex(val =>
-        metrics.includes(String(val ?? '')),
+        metrics.includes(getMetricKey(val)),
       );
       if (metricIndex === 1) {
         return Promise.resolve({ data: metricBranch });

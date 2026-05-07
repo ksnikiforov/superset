@@ -16,8 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import type { PivotAxis } from '../../types';
-import { isMeasureLeafToken } from '../core/tokens';
+import type { PivotAxis, PivotPath } from '../../types';
+import { getNextAxisLevelForPath } from './paths';
 import type {
   PivotAxisLevel,
   PivotCoverageReason,
@@ -51,8 +51,7 @@ export type ExpansionFactCoverageInput = {
 export type ExpansionValuesLevelInput = {
   program: PivotProgram;
   axis: PivotAxis;
-  path: unknown[];
-  isMetricTokenValue: (value: unknown) => boolean;
+  path: PivotPath;
 };
 
 const clampDepth = (depth: number, maxDepth: number) => {
@@ -65,23 +64,6 @@ const clampDepth = (depth: number, maxDepth: number) => {
 const axisProgramFor = (program: PivotProgram, axis: PivotAxis) =>
   axis === 'row' ? program.rows : program.columns;
 
-const isStrictValuesPathToken = (
-  value: unknown,
-  isMetricTokenValue: (value: unknown) => boolean,
-) => isMetricTokenValue(value) || isMeasureLeafToken(value);
-
-const isValuesLevelPathToken = ({
-  value,
-  program,
-  isMetricTokenValue,
-}: {
-  value: unknown;
-  program: PivotProgram;
-  isMetricTokenValue: (value: unknown) => boolean;
-}) =>
-  isStrictValuesPathToken(value, isMetricTokenValue) ||
-  (typeof value === 'string' && program.metricKeys.includes(value));
-
 const countDimensionsThroughLevel = (
   axisProgram: PivotProgram['rows'],
   levelIndex: number,
@@ -92,46 +74,6 @@ const countDimensionsThroughLevel = (
       (level): level is Extract<PivotAxisLevel, { kind: 'dimension' }> =>
         level.kind === 'dimension',
     ).length;
-
-const getNextAxisLevelForPath = ({
-  program,
-  axis,
-  path,
-  isMetricTokenValue,
-}: ExpansionValuesLevelInput): PivotAxisLevel | undefined => {
-  let pathIndex = 0;
-
-  for (const level of axisProgramFor(program, axis)) {
-    if (pathIndex >= path.length) {
-      return level;
-    }
-    const value = path[pathIndex];
-    if (level.kind === 'dimension') {
-      if (isStrictValuesPathToken(value, isMetricTokenValue)) {
-        return level;
-      }
-      pathIndex += 1;
-      continue;
-    }
-
-    let consumedValuesToken = false;
-    while (
-      pathIndex < path.length &&
-      isValuesLevelPathToken({
-        value: path[pathIndex],
-        program,
-        isMetricTokenValue,
-      })
-    ) {
-      consumedValuesToken = true;
-      pathIndex += 1;
-    }
-    if (!consumedValuesToken) {
-      return level;
-    }
-  }
-  return undefined;
-};
 
 export const expansionRevealsValuesLevel = (input: ExpansionValuesLevelInput) =>
   getNextAxisLevelForPath(input)?.kind === 'values';

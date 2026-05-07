@@ -94,7 +94,6 @@ describe('PivotTableChart error UX (Phase 4.5)', () => {
     currentTree,
     visibleRowDepth,
     visibleColDepth,
-    getFetchPath,
   }: FetchPivotBranchesBatchParams): Promise<FetchPivotBranchesBatchResult> => {
     const results = await Promise.all(
       batch.targets.map(target => {
@@ -103,8 +102,7 @@ describe('PivotTableChart error UX (Phase 4.5)', () => {
           fetchPivotBranchMock({
             formData,
             axis: batch.axis,
-            path: getFetchPath(path),
-            metricPath: path,
+            path,
             currentTree,
             visibleRowDepth,
             visibleColDepth,

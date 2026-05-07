@@ -114,7 +114,6 @@ describe('fetchPivotBranchesBatch', () => {
       currentTree: makeTree(),
       visibleRowDepth: 2,
       visibleColDepth: 0,
-      getFetchPath: path => path,
     });
 
     const payload = mockPost.mock.calls[0][0].jsonPayload;
@@ -169,7 +168,6 @@ describe('fetchPivotBranchesBatch', () => {
       currentTree: makeTree(),
       visibleRowDepth: 2,
       visibleColDepth: 0,
-      getFetchPath: path => path,
     });
 
     const payload = mockPost.mock.calls[0][0].jsonPayload;
@@ -221,7 +219,6 @@ describe('fetchPivotBranchesBatch', () => {
       currentTree: makeTree(),
       visibleRowDepth: 1,
       visibleColDepth: 0,
-      getFetchPath: path => path,
     });
 
     const payload = mockPost.mock.calls[0][0].jsonPayload;

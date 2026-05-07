@@ -36,7 +36,6 @@ export type BatchSignatureParams = {
   layout?: LayoutContext;
   axis: PivotAxis;
   path: PivotPath;
-  metricPath: PivotPath;
   currentTree: PivotTreeData;
   visibleRowDepth: number;
   visibleColDepth: number;
@@ -47,7 +46,6 @@ export const buildBatchSignature = ({
   layout,
   axis,
   path,
-  metricPath,
   currentTree,
   visibleRowDepth,
   visibleColDepth,
@@ -57,7 +55,6 @@ export const buildBatchSignature = ({
     layout,
     axis,
     path,
-    metricPath,
     currentTree,
     visibleRowDepth,
     visibleColDepth,

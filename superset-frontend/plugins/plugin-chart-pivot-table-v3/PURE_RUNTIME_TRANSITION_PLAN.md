@@ -44,6 +44,8 @@ and tested.
 - Make rendering consume a complete model instead of repairing tree structure.
 - Delete old placement, tree-projection, visibility, and expansion branches as
   each runtime layer moves to the compiled model.
+- Count deletion wins against production/runtime code. Test deletion is not a
+  goal; keep as many tests and test lines as needed to prove the simpler model.
 - Prefer direct replacement over long-lived compatibility adapters.
 - Keep the table interactive while any load is in flight.
 - Bring potential large deletion wins from edge-case behavior to the user for
@@ -64,6 +66,8 @@ and tested.
 - Do not introduce speculative prefetching for hidden or collapsed layers.
 - Do not use global loading locks that block scrolling, dragging, row/column
   selection, measure selection, or expansion of already-loaded branches.
+- Do not optimize for fewer test lines. Test code may grow when it protects a
+  production-code deletion or locks in a simpler behavior contract.
 - Do not silently remove edge-case behavior just because it unlocks a large code
   deletion. Those simplifications need an explicit approval checkpoint.
 - Do not silently normalize inconsistent behavior when that behavior change is
@@ -268,15 +272,35 @@ Gate 2 has started:
 - `resolveFetchContext` no longer returns unused raw groupby fields.
 - The compatibility `pivot/engine/useExpansionEngine.ts` re-export has been
   deleted; the chart imports the expansion hook directly.
+- `src/pivot/runtime/paths.ts` now centralizes canonical axis path projection.
+- Runtime query planning uses one path shape: dimension values stay raw, metric
+  and measure leaves stay encoded, and query filters project dimension paths from
+  that canonical axis path.
+- The old separate `metricPath` branch/fetch/batch API has been deleted.
+- Raw metric-label expansion tolerance has been removed. This is an approved
+  compatibility break: old persisted expansion state with raw metric labels may
+  reset, while future behavior uses canonical encoded paths.
 
 Immediate next step:
 
+- Replace the remaining axis-key projection bridges (`LayoutContext.getFetchPath`
+  and `useExpansionEngine` grouped fetch-key heuristics) with the canonical path
+  projection helper, then delete the old token-stripping logic.
 - Move branch and batch target selection fully behind coverage planning, then
-  delete placement-specific depth-pair branches from `branchQueryPairs.ts` and
-  path surgery from `resolveFetchContext.ts`.
+  delete placement-specific depth-pair branches from `branchQueryPairs.ts`.
 - Before deleting any broad behavior branch, bring inconsistent behavior or
   edge-case behavior that unlocks large deletion wins to the user for approval
   with UX impact and deletion upside.
+
+Potential approval checkpoint:
+
+- Loaded/fetched state is still partly keyed by rendered axis paths and partly by
+  projected fetch paths. Standardizing it on canonical dimension coverage keys
+  should remove the metric-index heuristic in `useExpansionEngine` and the
+  no-axis `getFetchPath` bridge in `LayoutContext`. UX impact to review: metric
+  sibling branches may share loading/fetched state when they resolve to the same
+  DB fact coverage, which should reduce duplicate requests and spinners but may
+  change very granular per-metric loading indicators.
 
 ### Gate 1: One compiled layout model
 

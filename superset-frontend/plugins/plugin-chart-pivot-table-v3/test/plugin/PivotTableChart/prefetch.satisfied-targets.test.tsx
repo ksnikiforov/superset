@@ -108,7 +108,6 @@ describe('PivotTableChart persisted prefetch hydrates until targets satisfied', 
     currentTree,
     visibleRowDepth,
     visibleColDepth,
-    getFetchPath,
   }: FetchPivotBranchesBatchParams): Promise<FetchPivotBranchesBatchResult> => {
     const results = await Promise.all(
       batch.targets.map(target => {
@@ -117,8 +116,7 @@ describe('PivotTableChart persisted prefetch hydrates until targets satisfied', 
           fetchPivotBranchMock({
             formData,
             axis: batch.axis,
-            path: getFetchPath(path),
-            metricPath: path,
+            path,
             currentTree,
             visibleRowDepth,
             visibleColDepth,

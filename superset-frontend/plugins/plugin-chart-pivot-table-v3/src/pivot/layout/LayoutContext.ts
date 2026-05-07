@@ -207,12 +207,7 @@ export const buildLayoutContext = (
   const getFetchPath = (path: PivotPath): PivotPath => {
     const next: PivotPath = [];
     path.forEach(val => {
-      if (isMeasureLeafToken(val)) {
-        return;
-      }
-      const decoded = decodeMetricKey(val);
-      if (decoded && metricLabelSet.has(decoded)) {
-        next.push(decoded);
+      if (isMeasureLeafToken(val) || isMetricTokenValue(val)) {
         return;
       }
       next.push(val);

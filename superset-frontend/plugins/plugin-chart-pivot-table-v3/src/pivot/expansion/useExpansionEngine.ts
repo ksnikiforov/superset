@@ -26,7 +26,6 @@ import {
 } from '@superset-ui/core';
 import {
   type PivotAxis,
-  type PivotPath,
   type PivotTableQueryFormData,
   type PivotTreeData,
   type PivotTreeNode,
@@ -517,7 +516,6 @@ export type ExpansionEngineConfig = {
   mergeOwnState?: (partial: JsonObject) => JsonObject;
   persistedExpansionState?: unknown;
   shouldPersistExpansionState: boolean;
-  getFetchPath: (path: PivotPath) => PivotPath;
   pruneMergedTree: (params: {
     axis: PivotAxis;
     tree: PivotTreeData;
@@ -553,7 +551,6 @@ export const useExpansionEngine = ({
   mergeOwnState,
   persistedExpansionState,
   shouldPersistExpansionState,
-  getFetchPath,
   pruneMergedTree,
 }: ExpansionEngineConfig): ExpansionEngineResult => {
   const [tree, setTree] = useState<PivotTreeData>(data);
@@ -1098,8 +1095,7 @@ export const useExpansionEngine = ({
         const path = parsePath(key);
         const cached = peekPivotBranchCache({
           axis,
-          path: getFetchPath(path),
-          metricPath: path,
+          path,
           formData: fetchFormData,
           currentTree: treeSnapshot,
           visibleRowDepth,
@@ -1126,8 +1122,7 @@ export const useExpansionEngine = ({
           const result = await trackRequestGroup(requestGroupId, () =>
             fetchPivotBranch({
               axis,
-              path: getFetchPath(path),
-              metricPath: path,
+              path,
               formData: fetchFormData,
               currentTree: treeSnapshot,
               visibleRowDepth,
@@ -1186,7 +1181,6 @@ export const useExpansionEngine = ({
               currentTree: treeSnapshot,
               visibleRowDepth,
               visibleColDepth,
-              getFetchPath,
               requestGroupId,
             }),
           );
@@ -1257,8 +1251,7 @@ export const useExpansionEngine = ({
             const path = parsePath(target.pathKey);
             const cached = peekPivotBranchCache({
               axis: target.axis,
-              path: getFetchPath(path),
-              metricPath: path,
+              path,
               formData: fetchFormData,
               currentTree,
               visibleRowDepth,
@@ -1275,8 +1268,7 @@ export const useExpansionEngine = ({
             const batchSignature = buildBatchSignature({
               formData: fetchFormData,
               axis: target.axis,
-              path: getFetchPath(path),
-              metricPath: path,
+              path,
               currentTree,
               visibleRowDepth,
               visibleColDepth,
@@ -1467,7 +1459,6 @@ export const useExpansionEngine = ({
       buildRequestGroupId,
       computeVisibleDepths,
       fetchFormData,
-      getFetchPath,
       hasLoadedChildrenForTree,
       persistExpansionState,
       getGroupedFetchKey,
@@ -1612,8 +1603,7 @@ export const useExpansionEngine = ({
           const result = await trackRequestGroup(requestGroupId, () =>
             fetchPivotBranch({
               axis: target.axis,
-              path: getFetchPath(path),
-              metricPath: path,
+              path,
               formData: fetchFormData,
               currentTree: context.stagedTree,
               visibleRowDepth: context.visibleRowDepth,
@@ -1671,7 +1661,6 @@ export const useExpansionEngine = ({
               currentTree: context.stagedTree,
               visibleRowDepth: context.visibleRowDepth,
               visibleColDepth: context.visibleColDepth,
-              getFetchPath,
               requestGroupId,
             }),
           );
@@ -1772,8 +1761,7 @@ export const useExpansionEngine = ({
           const path = parsePath(target.pathKey);
           const cached = peekPivotBranchCache({
             axis: target.axis,
-            path: getFetchPath(path),
-            metricPath: path,
+            path,
             formData: fetchFormData,
             currentTree: fetchContext.stagedTree,
             visibleRowDepth,
@@ -1786,8 +1774,7 @@ export const useExpansionEngine = ({
           const batchSignature = buildBatchSignature({
             formData: fetchFormData,
             axis: target.axis,
-            path: getFetchPath(path),
-            metricPath: path,
+            path,
             currentTree: fetchContext.stagedTree,
             visibleRowDepth,
             visibleColDepth,
@@ -1907,7 +1894,6 @@ export const useExpansionEngine = ({
       buildRequestGroupId,
       cancelInFlightRequestGroups,
       fetchFormData,
-      getFetchPath,
       hasLoadedChildrenForTree,
       getGroupedFetchKey,
       persistExpansionState,

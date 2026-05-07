@@ -154,7 +154,6 @@ describe('Global Async Queries (HTTP 202) support', () => {
       currentTree: makeTree(),
       visibleRowDepth: 2,
       visibleColDepth: 0,
-      getFetchPath: path => path,
     });
 
     expect(waitForAsyncDataMock).toHaveBeenCalledTimes(1);

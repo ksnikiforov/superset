@@ -500,7 +500,7 @@ describe('resolveFetchContext', () => {
     ).toBe(5);
   });
 
-  it('expands metric-first columns when the metric path uses raw labels', async () => {
+  it('expands metric-first columns with canonical encoded metric paths', async () => {
     const postMock = SupersetClient.post as jest.Mock;
     postMock.mockImplementationOnce(({ jsonPayload }) => ({
       json: {
@@ -563,8 +563,7 @@ describe('resolveFetchContext', () => {
         viz_type: 'pivot_table_v3',
       } as any,
       axis: 'col',
-      path: ['measure1'],
-      metricPath: ['measure1'],
+      path: [encodeMetricKey('measure1')],
       currentTree,
     });
 

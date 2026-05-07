@@ -2211,7 +2211,6 @@ function PivotTableChart(props: PivotTableProps) {
       appliedLayoutFormData.pivotExpansionState ??
       ownState?.pivotExpansionState,
     shouldPersistExpansionState,
-    getFetchPath: layoutResult.getFetchPath,
     pruneMergedTree: layoutResult.pruneMergedTree,
   });
   const treeForRender = useMemo(

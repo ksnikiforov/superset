@@ -72,7 +72,6 @@ export interface FetchPivotBranchParams {
   formData: PivotTableQueryFormData;
   axis: PivotAxis;
   path: PivotPath;
-  metricPath?: PivotPath;
   currentTree?: PivotTreeData;
   visibleRowDepth?: number;
   visibleColDepth?: number;
@@ -112,7 +111,6 @@ const resolveFetchContext = ({
   formData,
   axis,
   path,
-  metricPath,
   currentTree,
   visibleRowDepth,
   visibleColDepth,
@@ -125,18 +123,16 @@ const resolveFetchContext = ({
     layout,
     axis,
     path,
-    metricPath,
     currentTree,
     visibleRowDepth,
     visibleColDepth,
     targetRowDepth,
     targetColDepth,
   });
-  const pathForMetrics = metricPath ?? path;
   const filterSignature = buildFilterSignature(formData);
   const cacheKey = buildPivotBranchCacheKey({
     axis,
-    path: pathForMetrics,
+    path,
     rowDepth: queryCtx.rowDepth,
     colDepth: queryCtx.colDepth,
     rowGroupby: queryCtx.rowGroupbyForQuery,
@@ -325,7 +321,6 @@ export async function fetchPivotBranch({
   formData,
   axis,
   path,
-  metricPath,
   currentTree,
   visibleRowDepth,
   visibleColDepth,
@@ -345,13 +340,11 @@ export async function fetchPivotBranch({
     formData,
     axis,
     path,
-    metricPath,
     currentTree,
     visibleRowDepth,
     visibleColDepth,
   });
   const treeSnapshot = currentTree ?? { rows: {}, cols: {}, cells: {} };
-  const resolvedMetricPath = metricPath ?? path;
   const timeOffsets = Array.from(
     new Set([...(formData.time_offsets ?? []), ...layout.requiredTimeOffsets]),
   );
@@ -377,7 +370,6 @@ export async function fetchPivotBranch({
     layout,
     axis,
     path,
-    metricPath: resolvedMetricPath,
     currentTree: treeSnapshot,
     visibleRowDepth,
     visibleColDepth,

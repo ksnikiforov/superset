@@ -77,7 +77,6 @@ describe('PivotTableChart expansion state persistence', () => {
     currentTree,
     visibleRowDepth,
     visibleColDepth,
-    getFetchPath,
   }: FetchPivotBranchesBatchParams): Promise<FetchPivotBranchesBatchResult> => {
     const results = await Promise.all(
       batch.targets.map(target => {
@@ -86,8 +85,7 @@ describe('PivotTableChart expansion state persistence', () => {
           fetchPivotBranchMock({
             formData,
             axis: batch.axis,
-            path: getFetchPath(path),
-            metricPath: path,
+            path,
             currentTree,
             visibleRowDepth,
             visibleColDepth,

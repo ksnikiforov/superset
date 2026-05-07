@@ -28,14 +28,13 @@ import {
 import {
   collectDimensionFormattingMetricsForQuery,
   collectDimensionSortingMetricsForQuery,
-  decodeMetricKey,
-  isMeasureLeafToken,
   hasTotalSorting,
 } from '../../utils';
 import {
   buildLayoutContext,
   type LayoutContext,
 } from '../layout/LayoutContext';
+import { projectAxisPathToDimensions } from '../runtime/paths';
 import { buildQueryShape } from './queryShape';
 import { type QueryIntent } from './queryIntent';
 
@@ -44,7 +43,6 @@ export type ResolveFetchContextParams = {
   layout?: LayoutContext;
   axis: PivotAxis;
   path: PivotPath;
-  metricPath?: PivotPath;
   currentTree?: PivotTreeData;
   visibleRowDepth?: number;
   visibleColDepth?: number;
@@ -79,7 +77,6 @@ export const resolveFetchContext = ({
   layout: layoutParam,
   axis,
   path,
-  metricPath,
   currentTree,
   visibleRowDepth,
   visibleColDepth,
@@ -89,46 +86,11 @@ export const resolveFetchContext = ({
   const layout = layoutParam ?? buildLayoutContext(formData);
   const {
     metrics,
-    metricLabelSet,
     metricsLayoutResolved,
     metricInsertIndex: metricInsertIndexBase,
   } = layout;
-  let rowGroupby = layout.groupbyRows;
-  let colGroupby = layout.groupbyColumns;
-  const metricsAxis: PivotAxis =
-    metricsLayoutResolved === MetricsLayoutEnum.ROWS ? 'row' : 'col';
-  const pathForMetrics = metricPath ?? path;
-  const getMetricIndex = (candidatePath: PivotPath) =>
-    candidatePath.findIndex(val => {
-      const decoded = decodeMetricKey(val);
-      if (decoded !== undefined && metricLabelSet.has(decoded)) {
-        return true;
-      }
-      return typeof val === 'string' && metricLabelSet.has(val);
-    });
-  const metricIndexInPath =
-    metricsAxis === axis ? getMetricIndex(pathForMetrics) : -1;
-  const shouldCollapseRowDims =
-    metricsAxis === 'row' &&
-    axis === 'row' &&
-    metricIndexInPath >= 0 &&
-    metricIndexInPath < metricInsertIndexBase;
-  const shouldCollapseColDims =
-    metricsAxis === 'col' &&
-    axis === 'col' &&
-    metricIndexInPath >= 0 &&
-    metricIndexInPath < metricInsertIndexBase;
-
-  if (shouldCollapseRowDims) {
-    rowGroupby = rowGroupby.filter(
-      (_, idx) => idx < metricIndexInPath || idx >= metricInsertIndexBase,
-    );
-  }
-  if (shouldCollapseColDims) {
-    colGroupby = colGroupby.filter(
-      (_, idx) => idx < metricIndexInPath || idx >= metricInsertIndexBase,
-    );
-  }
+  const rowGroupby = layout.groupbyRows;
+  const colGroupby = layout.groupbyColumns;
 
   const hasRowTotalSorting = hasTotalSorting(formData.rowSorting, rowGroupby);
   const hasColTotalSorting = hasTotalSorting(formData.colSorting, colGroupby);
@@ -142,32 +104,12 @@ export const resolveFetchContext = ({
     level => level <= maxColSubtotalDepth,
   );
 
-  const metricInsertIndex =
-    (shouldCollapseRowDims || shouldCollapseColDims) && metricIndexInPath >= 0
-      ? metricIndexInPath
-      : metricInsertIndexBase;
-
-  const stripMetricFromPath = (
-    p: PivotPath,
-    targetAxis: PivotAxis,
-    metricIndexOverride?: number,
-  ) => {
-    if (metricsAxis !== targetAxis) {
-      return p.filter(val => !isMeasureLeafToken(val));
-    }
-    const idx =
-      metricIndexOverride !== undefined
-        ? metricIndexOverride
-        : getMetricIndex(p);
-    if (idx < 0) {
-      return p.filter(val => !isMeasureLeafToken(val));
-    }
-    return [...p.slice(0, idx), ...p.slice(idx + 1)].filter(
-      val => !isMeasureLeafToken(val),
-    );
-  };
-
-  const sanitizedPath = stripMetricFromPath(path, axis, metricIndexInPath);
+  const metricInsertIndex = metricInsertIndexBase;
+  const sanitizedPath = projectAxisPathToDimensions({
+    program: layout.pivotProgram,
+    axis,
+    path,
+  });
   const depthIncrement = 1;
 
   const getCurrentDepth = (
@@ -177,7 +119,12 @@ export const resolveFetchContext = ({
     Math.max(
       0,
       ...Object.values(nodes || {}).map(
-        node => stripMetricFromPath(node.path, targetAxis).length,
+        node =>
+          projectAxisPathToDimensions({
+            program: layout.pivotProgram,
+            axis: targetAxis,
+            path: node.path,
+          }).length,
       ),
     );
 

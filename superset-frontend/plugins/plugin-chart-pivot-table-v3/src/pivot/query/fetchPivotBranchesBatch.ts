@@ -17,11 +17,7 @@
  * under the License.
  */
 import { type DataRecord } from '@superset-ui/core';
-import type {
-  PivotPath,
-  PivotTableQueryFormData,
-  PivotTreeData,
-} from '../../types';
+import type { PivotTableQueryFormData, PivotTreeData } from '../../types';
 import { buildBranchTreeFromResults } from '../../fetchPivotBranch';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import { type ChartDataWarning } from '../data/ChartDataClient';
@@ -35,7 +31,6 @@ export type FetchPivotBranchesBatchParams = {
   currentTree: PivotTreeData;
   visibleRowDepth: number;
   visibleColDepth: number;
-  getFetchPath: (path: PivotPath) => PivotPath;
   requestGroupId?: string;
 };
 
@@ -67,7 +62,6 @@ export const fetchPivotBranchesBatch = async ({
   currentTree,
   visibleRowDepth,
   visibleColDepth,
-  getFetchPath,
   requestGroupId,
 }: FetchPivotBranchesBatchParams): Promise<FetchPivotBranchesBatchResult> => {
   const layout = buildLayoutContext(formData);
@@ -75,7 +69,6 @@ export const fetchPivotBranchesBatch = async ({
     formData,
     layout,
     batch,
-    getFetchPath,
     currentTree,
     visibleRowDepth,
     visibleColDepth,

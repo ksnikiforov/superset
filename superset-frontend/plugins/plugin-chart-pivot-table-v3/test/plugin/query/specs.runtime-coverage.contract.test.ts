@@ -53,7 +53,6 @@ describe('runtime coverage query specs contract', () => {
       layout,
       axis: 'row',
       path: ['US'],
-      metricPath: ['US'],
       currentTree: emptyTree,
       visibleRowDepth: 1,
       visibleColDepth: 1,
@@ -89,7 +88,6 @@ describe('runtime coverage query specs contract', () => {
       layout,
       axis: 'col',
       path: ['Furniture'],
-      metricPath: ['Furniture'],
       currentTree: emptyTree,
       visibleRowDepth: 0,
       visibleColDepth: 1,
@@ -109,12 +107,12 @@ describe('runtime coverage query specs contract', () => {
     });
     const layout = buildLayoutContext(formData);
 
+    const path = ['Furniture', encodeMetricKey('sales')];
     const specs = buildBranchQuerySpecs({
       formData,
       layout,
       axis: 'col',
-      path: ['Furniture', 'sales'],
-      metricPath: ['Furniture', encodeMetricKey('sales')],
+      path,
       currentTree: emptyTree,
       visibleRowDepth: 0,
       visibleColDepth: 1,

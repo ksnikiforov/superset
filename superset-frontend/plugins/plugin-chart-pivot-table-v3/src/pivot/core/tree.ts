@@ -793,7 +793,7 @@ export const applyMeasureHierarchyAxis = (
         const metricToken = encodeMetricKey(metric);
         const hasSubtotalAtInsert =
           rowSuffix.length > 0 && isSubtotalToken(rowSuffix[0]);
-        const metricPath = hasSubtotalAtInsert
+        const metricAxisPath = hasSubtotalAtInsert
           ? [...rowPrefix, rowSuffix[0], metricToken]
           : [...rowPrefix, metricToken];
         const rowTail = hasSubtotalAtInsert ? rowSuffix.slice(1) : rowSuffix;
@@ -801,8 +801,8 @@ export const applyMeasureHierarchyAxis = (
         const leafTargets = leafTierVisible ? group.leaves : [group.leaves[0]];
         leafTargets.forEach(leaf => {
           const newRowPath = leafTierVisible
-            ? [...metricPath, encodeMeasureLeafKey(leaf.id), ...rowTail]
-            : [...metricPath, ...rowTail];
+            ? [...metricAxisPath, encodeMeasureLeafKey(leaf.id), ...rowTail]
+            : [...metricAxisPath, ...rowTail];
           for (let depth = 0; depth <= newRowPath.length; depth += 1) {
             const subPath = newRowPath.slice(0, depth);
             ensureNode(

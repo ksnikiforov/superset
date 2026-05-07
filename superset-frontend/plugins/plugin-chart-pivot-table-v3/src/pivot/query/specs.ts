@@ -58,13 +58,13 @@ import {
   buildFactCoverage,
   expansionRevealsValuesLevel,
 } from '../runtime/coverage';
+import { projectAxisPathToDimensions } from '../runtime/paths';
 import { type PivotFactCoverage } from '../runtime/types';
 
 export type QuerySpecMeta = {
   kind: 'bootstrap' | 'root' | 'branch' | 'batch';
   axis?: PivotAxis;
   path?: PivotPath;
-  metricPath?: PivotPath;
   parentPath?: PivotPath;
   siblingValues?: PivotPathValue[];
   rowDepth: number;
@@ -198,16 +198,15 @@ const uniqueTargets = (
   getFetchPath: (path: PivotPath) => PivotPath,
   collapsed: Set<string>,
 ) => {
-  const result: Array<{ path: PivotPath; metricPath: PivotPath }> = [];
+  const result: PivotPath[] = [];
   const seen = new Set<string>();
-  paths.forEach(metricPath => {
-    const path = getFetchPath(metricPath);
-    const key = serializePath(path);
+  paths.forEach(path => {
+    const key = serializePath(getFetchPath(path));
     if (collapsed.has(key) || seen.has(key)) {
       return;
     }
     seen.add(key);
-    result.push({ path, metricPath });
+    result.push(path);
   });
   return result;
 };
@@ -234,7 +233,6 @@ const buildBranchSpecs = ({
   layout,
   axis,
   path,
-  metricPath,
   currentTree,
   visibleRowDepth,
   visibleColDepth,
@@ -243,7 +241,6 @@ const buildBranchSpecs = ({
   layout: LayoutContext;
   axis: PivotAxis;
   path: PivotPath;
-  metricPath: PivotPath;
   currentTree: PivotTreeData;
   visibleRowDepth?: number;
   visibleColDepth?: number;
@@ -252,8 +249,7 @@ const buildBranchSpecs = ({
     expansionRevealsValuesLevel({
       program: layout.pivotProgram,
       axis,
-      path: metricPath,
-      isMetricTokenValue: layout.isMetricTokenValue,
+      path,
     })
   ) {
     return [];
@@ -264,7 +260,6 @@ const buildBranchSpecs = ({
     layout,
     axis,
     path,
-    metricPath,
     currentTree,
     visibleRowDepth,
     visibleColDepth,
@@ -313,7 +308,6 @@ const buildBranchSpecs = ({
         kind: 'branch',
         axis,
         path,
-        metricPath,
         rowDepth: coverage.rowDepth,
         colDepth: coverage.columnDepth,
         rowGroupbyForQueryFull: ctx.rowGroupbyForQueryFull,
@@ -333,7 +327,6 @@ export const buildBranchQuerySpecs = (params: {
   layout: LayoutContext;
   axis: PivotAxis;
   path: PivotPath;
-  metricPath: PivotPath;
   currentTree: PivotTreeData;
   visibleRowDepth?: number;
   visibleColDepth?: number;
@@ -400,7 +393,7 @@ const buildBatchSpecs = ({
   parentPathKey: string;
   siblingValues: PivotPathValue[];
   chunkIndex: number;
-  representative: { path: PivotPath; metricPath: PivotPath };
+  representative: PivotPath;
   currentTree: PivotTreeData;
   visibleRowDepth: number;
   visibleColDepth: number;
@@ -409,20 +402,23 @@ const buildBatchSpecs = ({
     expansionRevealsValuesLevel({
       program: layout.pivotProgram,
       axis,
-      path: representative.metricPath,
-      isMetricTokenValue: layout.isMetricTokenValue,
+      path: representative,
     })
   ) {
     return [];
   }
 
   const parentPath = parsePath(parentPathKey);
+  const parentDimensionPath = projectAxisPathToDimensions({
+    program: layout.pivotProgram,
+    axis,
+    path: parentPath,
+  });
   const ctx = resolveFetchContextForBatch({
     formData,
     layout,
     axis,
-    path: representative.path,
-    metricPath: representative.metricPath,
+    path: representative,
     currentTree,
     visibleRowDepth,
     visibleColDepth,
@@ -448,7 +444,7 @@ const buildBatchSpecs = ({
     axis === 'row' ? ctx.rowGroupbyForQuery : ctx.colGroupbyForQuery;
   const filters = buildBatchFilterClauses({
     axisGroupby,
-    parentPath,
+    parentPath: parentDimensionPath,
     siblingValues,
     colTypeMap: formData.colTypeMap,
   });
@@ -490,7 +486,6 @@ export const buildBatchQuerySpecs = ({
   formData,
   layout,
   batch,
-  getFetchPath,
   currentTree,
   visibleRowDepth,
   visibleColDepth,
@@ -499,7 +494,6 @@ export const buildBatchQuerySpecs = ({
   formData: PivotTableQueryFormData;
   layout: LayoutContext;
   batch: BatchGroup;
-  getFetchPath?: (path: PivotPath) => PivotPath;
   currentTree: PivotTreeData;
   visibleRowDepth: number;
   visibleColDepth: number;
@@ -509,12 +503,7 @@ export const buildBatchQuerySpecs = ({
   if (!representativeKey) {
     return [];
   }
-  const metricPath = parsePath(representativeKey);
-  const resolvedGetFetchPath = getFetchPath ?? layout.getFetchPath;
-  const representative = {
-    path: resolvedGetFetchPath(metricPath),
-    metricPath,
-  };
+  const representative = parsePath(representativeKey);
   return buildBatchSpecs({
     formData,
     layout,
@@ -646,7 +635,6 @@ export const buildInitialQuerySpecs = (
       layout,
       axis,
       path: [],
-      metricPath: [],
       currentTree: emptyTree,
       visibleRowDepth: baseRowDepth,
       visibleColDepth: baseColDepth,
@@ -717,36 +705,29 @@ export const buildInitialQuerySpecs = (
     });
   }
 
-  const buildPrefetchSpecsForAxis = (
-    axis: PivotAxis,
-    entries: Array<{ path: PivotPath; metricPath: PivotPath }>,
-  ) => {
+  const buildPrefetchSpecsForAxis = (axis: PivotAxis, entries: PivotPath[]) => {
     if (entries.length === 0) {
       return;
     }
 
-    const groupedKeyForPath = (metricPath: PivotPath) =>
-      serializePath(metricPath.filter(val => !layout.isMetricTokenValue(val)));
+    const groupedKeyForPath = (path: PivotPath) =>
+      serializePath(layout.getFetchPath(path));
 
-    const representativeByKey = new Map<
-      string,
-      { path: PivotPath; metricPath: PivotPath }
-    >();
-    entries.forEach(entry => {
-      const key = groupedKeyForPath(entry.metricPath);
+    const representativeByKey = new Map<string, PivotPath>();
+    entries.forEach(path => {
+      const key = groupedKeyForPath(path);
       if (!representativeByKey.has(key)) {
-        representativeByKey.set(key, entry);
+        representativeByKey.set(key, path);
       }
     });
 
     const candidates: BatchCandidate[] = [];
-    representativeByKey.forEach((entry, pathKey) => {
+    representativeByKey.forEach((path, pathKey) => {
       const ctx = resolveFetchContextForBatch({
         formData,
         layout,
         axis,
-        path: entry.path,
-        metricPath: entry.metricPath,
+        path,
         currentTree: emptyTree,
         visibleRowDepth,
         visibleColDepth,
@@ -755,8 +736,7 @@ export const buildInitialQuerySpecs = (
         formData,
         layout,
         axis,
-        path: entry.path,
-        metricPath: entry.metricPath,
+        path,
         currentTree: emptyTree,
         visibleRowDepth,
         visibleColDepth,
@@ -832,8 +812,7 @@ export const buildInitialQuerySpecs = (
           formData,
           layout,
           axis,
-          path: rep.path,
-          metricPath: rep.metricPath,
+          path: rep,
           currentTree: emptyTree,
           visibleRowDepth,
           visibleColDepth,

@@ -27,6 +27,7 @@ import {
 import {
   applyMetricAxis,
   buildTreeFromRecords,
+  decodeMetricKey,
   injectRowSubtotalLeaves,
   labelRowSubtotalLeaves,
   METRICS_PLACEHOLDER,
@@ -44,6 +45,8 @@ jest.mock('../../../../src/fetchPivotBranch', () => {
 
 describe('PivotTableChart expansion with metrics between dimensions (regressions)', () => {
   const fetchPivotBranchMock = fetchPivotBranch as jest.Mock;
+  const getMetricKey = (value: unknown) =>
+    decodeMetricKey(value) ?? String(value ?? '');
   beforeEach(() => {
     fetchPivotBranchMock.mockClear();
   });
@@ -746,7 +749,7 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
 
     fetchPivotBranchMock.mockImplementation(({ path }: { path: PivotPath }) => {
       const metricIndex = path.findIndex(val =>
-        metrics.includes(String(val ?? '')),
+        metrics.includes(getMetricKey(val)),
       );
       if (metricIndex >= 0) {
         return Promise.resolve({ data: orderStatusBranch });
