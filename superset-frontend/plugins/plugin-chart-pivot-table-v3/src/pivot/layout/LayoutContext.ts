@@ -35,14 +35,14 @@ import {
   getMetricKeys,
   normalizeSubtotalLevels,
   resolveExpandLevel,
-  resolveMetricPlacement,
-  stripMetricsPlaceholder,
   isMeasureLeafToken,
 } from '../../utils';
 import {
   coerceMeasureLeavesByMetric,
   collectRequiredTimeOffsets,
 } from '../measureLeaves';
+import { compilePivotProgram } from '../runtime/compilePivotProgram';
+import type { PivotProgram } from '../runtime/types';
 
 export type PivotLayoutSpec = Pick<
   PivotTableQueryFormData,
@@ -81,6 +81,7 @@ export type LayoutContext = {
   metricLabelMap: Map<string, string>;
   measureHierarchy: MeasureHierarchy;
   requiredTimeOffsets: string[];
+  pivotProgram: PivotProgram;
   metricsLayoutResolved: MetricsLayoutEnum;
   metricInsertIndex: number;
   rowSubtotalLevels: number[];
@@ -148,27 +149,22 @@ export const buildLayoutContext = (
   };
   const requiredTimeOffsets = collectRequiredTimeOffsets(measureHierarchy);
 
-  const placement = resolveMetricPlacement(groupbyRowsRaw, groupbyColumnsRaw, {
-    hasMetrics: metrics.length > 0,
-    preferredAxis: layoutSpec.metricsLayout as MetricsLayoutEnum,
+  const pivotProgram = compilePivotProgram({
+    groupbyRows: groupbyRowsRaw,
+    groupbyColumns: groupbyColumnsRaw,
+    metrics,
+    metricsLayout: layoutSpec.metricsLayout as MetricsLayoutEnum,
     lastMoved: layoutSpec.lastMoved,
   });
 
-  const groupbyRows = stripMetricsPlaceholder(placement.rows);
-  const groupbyColumns = stripMetricsPlaceholder(placement.cols);
+  const groupbyRows = pivotProgram.rowDimensions;
+  const groupbyColumns = pivotProgram.columnDimensions;
 
   const rowTotals = layoutSpec.rowTotals ?? false;
   const colTotals = layoutSpec.colTotals ?? false;
 
-  const metricsLayoutResolved = placement.layout;
-  const metricInsertIndex =
-    metricsLayoutResolved === MetricsLayoutEnum.ROWS
-      ? placement.metricPosition >= 0
-        ? Math.min(placement.metricPosition, groupbyRows.length)
-        : groupbyRows.length
-      : placement.metricPosition >= 0
-        ? Math.min(placement.metricPosition, groupbyColumns.length)
-        : groupbyColumns.length;
+  const { metricsLayoutResolved } = pivotProgram;
+  const { metricInsertIndex } = pivotProgram;
 
   const rowSubTotalsEnabled = layoutSpec.rowSubTotals ?? true;
   const maxRowSubtotalDepth = Math.max(groupbyRows.length - 1, 0);
@@ -235,6 +231,7 @@ export const buildLayoutContext = (
     metricLabelMap,
     measureHierarchy,
     requiredTimeOffsets,
+    pivotProgram,
     metricsLayoutResolved,
     metricInsertIndex,
     rowSubtotalLevels,

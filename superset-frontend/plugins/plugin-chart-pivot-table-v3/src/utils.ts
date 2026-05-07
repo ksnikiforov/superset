@@ -22,7 +22,6 @@ import {
   Metric,
   QueryFormColumn,
   QueryFormMetric,
-  ensureIsArray,
   supersetTheme,
   DataRecordValue,
 } from '@superset-ui/core';
@@ -59,8 +58,8 @@ import {
   getMetricKeys,
   isMetricsPlaceholder,
   METRICS_PLACEHOLDER,
-  normalizePlaceholder,
 } from './pivot/core/tokens';
+import { compilePivotProgram } from './pivot/runtime/compilePivotProgram';
 
 export {
   CELL_KEY_DIVIDER,
@@ -1482,77 +1481,38 @@ export const resolveMetricPlacement = (
     lastMoved?: 'row' | 'col';
   },
 ) => {
-  const normalizeGroupby = (values: QueryFormColumn[] = []) =>
-    ensureIsArray(values).map(normalizePlaceholder);
-  const rowsNormalized = normalizeGroupby(rowsRaw);
-  const colsNormalized = normalizeGroupby(colsRaw);
-  const rowsBase = rowsNormalized.filter(val => !isMetricsPlaceholder(val));
-  const colsBase = colsNormalized.filter(val => !isMetricsPlaceholder(val));
   const preferred =
     options.preferredAxis === MetricsLayoutEnum.ROWS ? 'row' : 'col';
-
-  if (!options.hasMetrics) {
-    const layout =
-      options.preferredAxis === MetricsLayoutEnum.ROWS
-        ? MetricsLayoutEnum.ROWS
-        : MetricsLayoutEnum.COLUMNS;
-    return {
-      rows: rowsBase,
-      cols: colsBase,
-      axis: preferred,
-      layout,
-      metricPosition: -1,
-    };
-  }
-
-  const rowsHas = rowsNormalized.some(isMetricsPlaceholder);
-  const colsHas = colsNormalized.some(isMetricsPlaceholder);
-
-  let axis: 'row' | 'col' = preferred;
-  if (rowsHas && !colsHas) {
-    axis = 'row';
-  } else if (colsHas && !rowsHas) {
-    axis = 'col';
-  } else if (rowsHas && colsHas) {
-    axis = options.lastMoved || preferred;
-  } else if (!rowsHas && !colsHas) {
-    axis = options.lastMoved || preferred;
-  }
-
-  const insertIndex =
-    axis === 'row'
-      ? Math.min(
-          rowsHas
-            ? rowsNormalized.indexOf(METRICS_PLACEHOLDER)
-            : rowsBase.length,
-          rowsBase.length,
-        )
-      : Math.min(
-          colsHas
-            ? colsNormalized.indexOf(METRICS_PLACEHOLDER)
-            : colsBase.length,
-          colsBase.length,
-        );
+  const program = compilePivotProgram({
+    groupbyRows: rowsRaw,
+    groupbyColumns: colsRaw,
+    metrics: options.hasMetrics ? [METRICS_PLACEHOLDER] : [],
+    metricsLayout: options.preferredAxis,
+    lastMoved: options.lastMoved,
+  });
 
   const rows =
-    axis === 'row'
+    program.valueAxis === 'row'
       ? [
-          ...rowsBase.slice(0, insertIndex),
+          ...program.rowDimensions.slice(0, program.metricInsertIndex),
           METRICS_PLACEHOLDER,
-          ...rowsBase.slice(insertIndex),
+          ...program.rowDimensions.slice(program.metricInsertIndex),
         ]
-      : rowsBase;
+      : program.rowDimensions;
   const cols =
-    axis === 'col'
+    program.valueAxis === 'col'
       ? [
-          ...colsBase.slice(0, insertIndex),
+          ...program.columnDimensions.slice(0, program.metricInsertIndex),
           METRICS_PLACEHOLDER,
-          ...colsBase.slice(insertIndex),
+          ...program.columnDimensions.slice(program.metricInsertIndex),
         ]
-      : colsBase;
+      : program.columnDimensions;
 
-  const layout =
-    axis === 'row' ? MetricsLayoutEnum.ROWS : MetricsLayoutEnum.COLUMNS;
-
-  return { rows, cols, axis, layout, metricPosition: insertIndex };
+  return {
+    rows,
+    cols,
+    axis: program.valueAxis ?? preferred,
+    layout: program.metricsLayoutResolved,
+    metricPosition: program.metricInsertIndex,
+  };
 };
