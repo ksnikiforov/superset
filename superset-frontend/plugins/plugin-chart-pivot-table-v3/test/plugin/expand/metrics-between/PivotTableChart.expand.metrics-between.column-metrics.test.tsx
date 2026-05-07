@@ -149,6 +149,11 @@ describe('PivotTableChart expansion with metrics between dimensions (column-metr
       .getAllByRole('columnheader')
       .map(cell => cell.textContent?.trim())
       .filter(label => label && label !== 'Rows');
+    expect(
+      within(container.querySelector('tbody') as HTMLElement).queryByText(
+        'measure1',
+      ),
+    ).not.toBeInTheDocument();
     expect(headerLabels).toEqual(expect.arrayContaining(metrics));
     expect(headerLabels).not.toContain('REV-A measure1');
   });

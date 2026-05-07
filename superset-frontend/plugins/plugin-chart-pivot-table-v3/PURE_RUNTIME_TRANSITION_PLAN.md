@@ -235,7 +235,75 @@ target in the same change set.
 
 ## Progress Snapshot
 
-As of May 7, 2026:
+As of May 8, 2026:
+
+### Plan Reassessment
+
+The refactor is still directionally correct, but the gate order is now more
+interleaved than the original plan implied:
+
+- Gate 1 is not finished because raw layout interpretation still exists in
+  `usePivotLayout` and `resolveInteractionLayout`.
+- Gate 2 is largely complete for branch, batch, and root query planning. Query
+  specs now consume coverage objects and the shared fetch context instead of
+  branch-pair path surgery.
+- Gate 3 is mostly complete at the ingestion boundary. Initial load, seamless
+  refresh, branch fetch, and batch fetch now ingest planned query results through
+  the same runtime fact path, and branch cache data is fact-store data rather
+  than rendered-tree data.
+- Gate 6 has already started early. Loaded-child checks, toggle eligibility,
+  formatting/sorting value maps, and column display projection now consume the
+  shared projection descriptor.
+
+The current line-count picture is mixed but healthy:
+
+- Compared with baseline `3affd1cc6db691fe08eddf0914e2050207f95ed0`, the full
+  plugin diff is still net additive because the change introduced runtime
+  infrastructure and protective tests.
+- The latest source-only step is deletion-positive: current plugin `src` changes
+  are slightly more deletions than additions.
+- This is acceptable only if the next steps keep collapsing old call sites into
+  the runtime layer. Adding another abstraction without deleting old tree/render
+  branches would be a regression against the plan.
+
+The main remaining complexity is no longer query planning. It is now concentrated
+in three places:
+
+- `usePivotLayout` still owns collapsed metric-tier synthesis and row/column
+  child filtering with duplicated metric-placement rules.
+- `visibility.ts` still contains local loaded-state and descendant-depth
+  inference that overlaps with projection and coverage state.
+- `pivot/core/tree.ts` still contains old tree materialization paths for metric
+  axes, measure leaves, totals, and collapsed value surfacing.
+
+Recommended next sequence:
+
+1. Finish axis-neutral projection in render/tree visibility by extracting a
+   small projected-child helper for collapsed row and column metric tiers.
+2. Use that helper to shrink `usePivotLayout` child filtering and remove
+   duplicated row/column metric-position branches where behavior is already
+   intended to be axis-neutral.
+3. Then move to Gate 4 materialization cleanup. Do not start the full reducer
+   rewrite until tree projection/materialization is thinner, otherwise the
+   reducer will inherit too much old complexity.
+
+Approved collapsed Values projection boundary:
+
+- Rows and columns should share the same semantic collapsed Values projection:
+  given an axis, parent path, and compiled pivot program, the runtime should
+  answer whether a collapsed parent exposes Values/metrics, which metric leaves
+  are visible, what canonical path represents each metric, and whether that
+  metric has a next dimension after Values.
+- Rows and columns should keep separate presentation policy. Rows render
+  collapsed metrics as body rows; columns render collapsed metrics as header
+  leaves. Subtotal placement, total/root display, header padding/colspans, and
+  column stale-leaf pruning remain axis-specific unless a visible UX change is
+  brought back for approval.
+- The intended refactor should not change visible UX. If removing a branch would
+  alter subtotal/header behavior, that becomes an approval checkpoint rather
+  than an internal cleanup.
+
+### Detailed Progress
 
 - Gate 1 is in progress.
 - `PivotProgram`, `PivotAxisLevel`, and visible coverage types exist under
@@ -362,16 +430,12 @@ Gate 2 has started:
 
 Immediate next step:
 
-- Finish moving the axis-neutral projection descriptor through tree/render
-  projection. `resolveFetchContext`, branch/batch coverage planning,
-  `hasLoadedChildren`, `usePivotRenderModel.shouldShowToggle`, and column
-  display projection now use `src/pivot/runtime/projection.ts`, but
-  collapsed-child projection and render normalization still have local
-  metric/measure-leaf token checks.
-- Start with the collapsed row/column child helpers.
-  The goal is to make query planning, loaded-state checks, materialization, and
-  render visibility read the same projected axis descriptor instead of
-  rediscovering Values placement.
+- Continue Gate 4 by replacing the remaining raw metric-position arithmetic
+  inside the shared tree materializer with the compiled `PivotProgram` axis
+  descriptor. The metric-axis and measure-leaf branches are now one
+  materializer, but that materializer still receives raw row/column groupby
+  arrays plus `metricPosition`; the next deletion target is that legacy input
+  shape.
 - Measure whether support metrics fetched for one branch are now reusable in the
   practical expansion paths we care about, and add a targeted regression test if
   any path still re-requests an already loaded exact support coverage.
@@ -442,6 +506,27 @@ Values -> returnFlag`. Keeping this behavior preserves current UX, but it
   metrics-first display padding, and `buildColumnDisplayPath`. This keeps
   column headers on the same projected axis contract as query planning,
   loaded-state checks, and toggle eligibility.
+- `resolveCollapsedValuesProjection` now centralizes the semantic collapsed
+  Values projection. Tests lock that metrics-between rows render metric body rows
+  and metrics-between columns render metric header leaves, while the helper
+  itself only answers metric path and projected-child questions. `usePivotLayout`
+  uses it inside `getCollapsedRowChildrenForNodes` and
+  `getCollapsedColLeavesForNodes`, preserving separate row/column presentation
+  adapters.
+- `resolveAxisChildProjection` now centralizes the semantic child classification
+  used by `usePivotLayout` child filtering. `getRowChildrenForNodes` and
+  `getColChildrenForNodes` still keep their row/column presentation policies,
+  but the first metric-position filtering stage now reads whether a child has
+  entered Values and whether it adds a projected dimension from the shared
+  projection descriptor instead of rediscovering that locally.
+- `pivot/core/tree.ts` now routes flat metric axes and measure-leaf axes through
+  one internal `applyMeasureAxis` materializer. `applyMetricAxis` is now a thin
+  wrapper that normalizes flat metrics into hidden value leaves, while
+  `applyMeasureHierarchyAxis` passes real measure leaves into the same path.
+  The two remaining behavior-policy switches are explicit: flat metrics keep
+  their old source-axis-node preservation rule, and measure stacks keep their
+  old always-preserve rule. This makes the first Gate 4 cleanup deletion-positive
+  without changing the visible metric/measure-leaf layout contract.
 
 ### Gate 1: One compiled layout model
 

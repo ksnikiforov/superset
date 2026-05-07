@@ -20,9 +20,14 @@ import {
   encodeMeasureLeafKey,
   encodeMetricKey,
   METRICS_PLACEHOLDER,
+  SUBTOTAL_TOKEN,
 } from '../../../../src/pivot/core/tokens';
 import { compilePivotProgram } from '../../../../src/pivot/runtime/compilePivotProgram';
-import { resolveAxisProjection } from '../../../../src/pivot/runtime/projection';
+import {
+  resolveAxisProjection,
+  resolveAxisChildProjection,
+  resolveCollapsedValuesProjection,
+} from '../../../../src/pivot/runtime/projection';
 import { MetricsLayoutEnum } from '../../../../src/types';
 
 const skippedColumns = (projection: ReturnType<typeof resolveAxisProjection>) =>
@@ -113,5 +118,196 @@ describe('resolveAxisProjection', () => {
     expect(projection.projectedDimensionPath).toEqual(['Consumer', '2024-01']);
     expect(projection.metricKeys).toEqual(['revenue']);
     expect(projection.measureLeafIds).toEqual(['1 year ago']);
+  });
+
+  it.each([
+    ['row', MetricsLayoutEnum.ROWS],
+    ['col', MetricsLayoutEnum.COLUMNS],
+  ] as const)(
+    'projects collapsed Values metric leaves on %s without deciding presentation',
+    (axis, metricsLayout) => {
+      const program = compilePivotProgram({
+        [axis === 'row' ? 'groupbyRows' : 'groupbyColumns']: [
+          'orderPriority',
+          'shipMode',
+          METRICS_PLACEHOLDER,
+          'returnFlag',
+        ],
+        metrics: ['revenue', 'orders'],
+        metricsLayout,
+      });
+
+      const collapsedMetrics = resolveCollapsedValuesProjection({
+        program,
+        axis,
+        parentPath: ['1-URGENT'],
+        sourceMetricPaths: [
+          ['1-URGENT', encodeMetricKey('revenue')],
+          ['1-URGENT', encodeMetricKey('orders')],
+          ['1-URGENT', encodeMetricKey('revenue'), 'Returned'],
+        ],
+      });
+
+      expect(collapsedMetrics).toEqual([
+        {
+          metricKey: 'revenue',
+          metricToken: encodeMetricKey('revenue'),
+          metricPath: ['1-URGENT', encodeMetricKey('revenue')],
+          sourceMetricPath: ['1-URGENT', encodeMetricKey('revenue')],
+          hasProjectedChildren: true,
+        },
+        {
+          metricKey: 'orders',
+          metricToken: encodeMetricKey('orders'),
+          metricPath: ['1-URGENT', encodeMetricKey('orders')],
+          sourceMetricPath: ['1-URGENT', encodeMetricKey('orders')],
+          hasProjectedChildren: true,
+        },
+      ]);
+    },
+  );
+
+  it('marks collapsed metric paths at Values end as leaf projections', () => {
+    const program = compilePivotProgram({
+      groupbyRows: ['orderPriority', METRICS_PLACEHOLDER],
+      metrics: ['revenue'],
+      metricsLayout: MetricsLayoutEnum.ROWS,
+    });
+
+    const [metric] = resolveCollapsedValuesProjection({
+      program,
+      axis: 'row',
+      parentPath: ['1-URGENT'],
+      sourceMetricPaths: [['1-URGENT', encodeMetricKey('revenue')]],
+    });
+
+    expect(metric).toEqual({
+      metricKey: 'revenue',
+      metricToken: encodeMetricKey('revenue'),
+      metricPath: ['1-URGENT', encodeMetricKey('revenue')],
+      sourceMetricPath: ['1-URGENT', encodeMetricKey('revenue')],
+      hasProjectedChildren: false,
+    });
+  });
+
+  it('does not project another collapsed Values tier below a metric path', () => {
+    const program = compilePivotProgram({
+      groupbyColumns: ['segment', METRICS_PLACEHOLDER, 'month'],
+      metrics: ['revenue'],
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+    });
+
+    expect(
+      resolveCollapsedValuesProjection({
+        program,
+        axis: 'col',
+        parentPath: ['Consumer', encodeMetricKey('revenue')],
+        sourceMetricPaths: [
+          ['Consumer', encodeMetricKey('revenue'), '2024-01'],
+        ],
+      }),
+    ).toEqual([]);
+  });
+
+  it.each([
+    ['row', MetricsLayoutEnum.ROWS],
+    ['col', MetricsLayoutEnum.COLUMNS],
+  ] as const)(
+    'classifies child projection semantics on %s without presentation rules',
+    (axis, metricsLayout) => {
+      const program = compilePivotProgram({
+        [axis === 'row' ? 'groupbyRows' : 'groupbyColumns']: [
+          'orderPriority',
+          'shipMode',
+          METRICS_PLACEHOLDER,
+          'returnFlag',
+        ],
+        metrics: ['revenue'],
+        metricsLayout,
+      });
+
+      expect(
+        resolveAxisChildProjection({
+          program,
+          axis,
+          parentPath: ['1-URGENT'],
+          childPath: ['1-URGENT', 'AIR'],
+        }),
+      ).toMatchObject({
+        introducesValues: false,
+        addsProjectedDimension: true,
+      });
+
+      expect(
+        resolveAxisChildProjection({
+          program,
+          axis,
+          parentPath: ['1-URGENT'],
+          childPath: ['1-URGENT', encodeMetricKey('revenue')],
+        }),
+      ).toMatchObject({
+        valuesTokenIndex: 1,
+        rawValuesTokenIndex: 1,
+        introducesValues: true,
+        addsProjectedDimension: false,
+      });
+
+      expect(
+        resolveAxisChildProjection({
+          program,
+          axis,
+          parentPath: ['1-URGENT', encodeMetricKey('revenue')],
+          childPath: ['1-URGENT', encodeMetricKey('revenue'), 'Returned'],
+        }),
+      ).toMatchObject({
+        valuesTokenIndex: 1,
+        rawValuesTokenIndex: 1,
+        introducesValues: false,
+        addsProjectedDimension: true,
+      });
+    },
+  );
+
+  it('keeps the Values token index distinct from projected dimension order', () => {
+    const program = compilePivotProgram({
+      groupbyColumns: [METRICS_PLACEHOLDER, 'segment'],
+      metrics: ['revenue'],
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+    });
+
+    expect(
+      resolveAxisChildProjection({
+        program,
+        axis: 'col',
+        parentPath: [],
+        childPath: [encodeMetricKey('revenue'), 'Consumer'],
+      }),
+    ).toMatchObject({
+      valuesTokenIndex: 0,
+      rawValuesTokenIndex: 0,
+      introducesValues: true,
+      addsProjectedDimension: true,
+    });
+  });
+
+  it('keeps raw Values index for subtotal header placement', () => {
+    const program = compilePivotProgram({
+      groupbyColumns: ['year', 'shipMode', METRICS_PLACEHOLDER],
+      metrics: ['revenue'],
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+    });
+
+    expect(
+      resolveAxisChildProjection({
+        program,
+        axis: 'col',
+        parentPath: ['1992', SUBTOTAL_TOKEN],
+        childPath: ['1992', SUBTOTAL_TOKEN, encodeMetricKey('revenue')],
+      }),
+    ).toMatchObject({
+      valuesTokenIndex: 1,
+      rawValuesTokenIndex: 2,
+      introducesValues: true,
+    });
   });
 });

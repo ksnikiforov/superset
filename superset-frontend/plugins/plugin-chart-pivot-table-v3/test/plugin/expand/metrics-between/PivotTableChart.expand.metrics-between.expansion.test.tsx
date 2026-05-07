@@ -171,6 +171,10 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
       );
 
       const tbody = container.querySelector('tbody') as HTMLElement;
+      const thead = container.querySelector('thead') as HTMLElement;
+      expect(
+        within(thead).queryByText('averageOrderValue'),
+      ).not.toBeInTheDocument();
       const metricLabel = within(tbody).getAllByText('averageOrderValue')[0];
       const metricRow = metricLabel.closest('tr') as HTMLTableRowElement;
       expect(

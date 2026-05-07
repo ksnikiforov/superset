@@ -26,6 +26,7 @@ import {
 import {
   MetricsLayoutEnum,
   MeasureHierarchy,
+  MeasureLeafSpec,
   type DateFormatter,
   PivotPath,
   PivotResultCell,
@@ -43,7 +44,7 @@ import {
   SUBTOTAL_LABEL,
   SUBTOTAL_TOKEN,
 } from './tokens';
-import { isValueLeaf } from '../measureLeaves';
+import { buildValueLeaf, isValueLeaf } from '../measureLeaves';
 
 export const formatPivotLabelValue = (
   value: DataRecordValue,
@@ -270,358 +271,53 @@ export const labelRowSubtotalLeaves = (
   return { ...tree, rows: nextRows };
 };
 
-export const applyMetricAxis = (
-  tree: PivotTreeData,
-  metrics: QueryFormMetric[],
-  metricsLayout: MetricsLayoutEnum,
-  rowGroupby: QueryFormColumn[],
-  colGroupby: QueryFormColumn[],
-  metricPosition?: number,
-  metricLabelMap?: Record<string, string>,
-): PivotTreeData => {
-  const metricKeys = getMetricKeys(metrics);
-  if (metricKeys.length === 0) {
-    return tree;
-  }
-
-  const result: PivotTreeData = { rows: {}, cols: {}, cells: {} };
-  const metricTokenSet = new Set(metricKeys.map(encodeMetricKey));
-
-  const ensureNode = (
-    axis: 'row' | 'col',
-    path: PivotPath,
-    fullDepth: number,
-    isSubtotal?: boolean,
-  ) => {
-    const nodes = axis === 'row' ? result.rows : result.cols;
-    const key = serializePath(path);
-    if (nodes[key]) {
-      const existing = nodes[key];
-      // A base tree node can be terminal before we inject metric/leaf tiers.
-      // Promote it to an internal node when a deeper hierarchy is added.
-      if (path.length < fullDepth && !existing.hasChildren) {
-        nodes[key] = {
-          ...existing,
-          hasChildren: true,
-          isSubtotal: true,
-        };
-      }
-      return nodes[key];
-    }
-    const sourceNodes = axis === 'row' ? tree.rows : tree.cols;
-    const sourceNode = sourceNodes[key];
-    const rawValue = path[path.length - 1];
-    const rawLabel =
-      path.length === 0
-        ? 'Grand total'
-        : formatPivotLabelValue(rawValue ?? null, 'Grand total');
-    const baseLabel = sourceNode?.formattedLabel ?? rawLabel;
-    const metricKey = decodeMetricKey(rawValue);
-    const metricLabel = metricKey
-      ? (metricLabelMap?.[metricKey] ?? metricKey)
-      : undefined;
-    const label = metricLabel || baseLabel;
-    const isMetricNode = metricTokenSet.has(
-      String(path[path.length - 1] ?? ''),
-    );
-    let hasChildren = path.length < fullDepth;
-    if (isMetricNode) {
-      if (
-        axis === 'row' &&
-        metricsLayout === MetricsLayoutEnum.ROWS &&
-        (metricPosition ?? rowGroupby.length) >= rowGroupby.length
-      ) {
-        hasChildren = false;
-      }
-      if (
-        axis === 'col' &&
-        metricsLayout === MetricsLayoutEnum.COLUMNS &&
-        (metricPosition ?? colGroupby.length) >= colGroupby.length
-      ) {
-        hasChildren = false;
-      }
-    }
-    const isSubtotalValue =
-      isSubtotal ??
-      (path.length < fullDepth && !(isMetricNode && hasChildren === false));
-    const node = {
-      axis,
-      key,
-      path,
-      label,
-      formattedLabel: label,
-      level: path.length,
-      hasChildren,
-      isSubtotal: isSubtotalValue,
-    };
-    nodes[key] = node;
-    return node;
-  };
-
-  if (metricsLayout === MetricsLayoutEnum.ROWS) {
-    const rowDepthWithMetrics = rowGroupby.length + 1;
-    const insertIndex = Math.min(
-      metricPosition ?? rowGroupby.length,
-      rowGroupby.length,
-    );
-    const metricsAtRowEnd = insertIndex >= rowGroupby.length;
-
-    const metricsAtRowStart = insertIndex === 0;
-    if (metricsAtRowStart || metricsAtRowEnd) {
-      // Preserve the original row hierarchy so dimensions remain expandable when
-      // metrics are appended after the last row dimension or inserted first.
-      Object.values(tree.rows).forEach(rowNode =>
-        ensureNode(
-          'row',
-          rowNode.path,
-          rowGroupby.length,
-          rowNode.isSubtotal || undefined,
-        ),
-      );
-    }
-
-    // preserve column nodes
-    Object.values(tree.cols).forEach(colNode => {
-      ensureNode(
-        'col',
-        colNode.path,
-        colGroupby.length,
-        colNode.isSubtotal || undefined,
-      );
-    });
-
-    Object.values(tree.cells).forEach(cell => {
-      const baseRow = tree.rows[cell.rowKey];
-      const baseCol = tree.cols[cell.colKey];
-      const rowPath = baseRow?.path || [];
-      const colPath = baseCol?.path || [];
-      const rowPrefix = rowPath.slice(0, insertIndex);
-      const rowSuffix = rowPath.slice(insertIndex);
-
-      const rowKey = serializePath(rowPath);
-      const colKey = serializePath(colPath);
-      const isTotalRow = rowPath.length === 0 || rowPath.some(isSubtotalToken);
-      if (
-        metricsAtRowEnd &&
-        rowPath.length < rowGroupby.length &&
-        !isTotalRow
-      ) {
-        ensureNode(
-          'row',
-          rowPath,
-          rowGroupby.length,
-          baseRow?.isSubtotal || undefined,
-        );
-        ensureNode(
-          'col',
-          colPath,
-          colGroupby.length,
-          baseCol?.isSubtotal || undefined,
-        );
-        const cellKey = serializeCellKey(rowKey, colKey);
-        result.cells[cellKey] = result.cells[cellKey] || {
-          rowKey,
-          colKey,
-          values: cell.values,
-          isSubtotal: cell.isSubtotal,
-        };
-        return;
-      }
-
-      metricKeys.forEach(metric => {
-        const mergedValues = {
-          [metric]: cell.values[metric],
-          ...cell.values,
-        };
-        const metricToken = encodeMetricKey(metric);
-        const hasSubtotalAtInsert =
-          rowSuffix.length > 0 && isSubtotalToken(rowSuffix[0]);
-        const newRowPath = hasSubtotalAtInsert
-          ? [...rowPrefix, rowSuffix[0], metricToken, ...rowSuffix.slice(1)]
-          : [...rowPrefix, metricToken, ...rowSuffix];
-        // ensure row hierarchy nodes
-        for (let depth = 0; depth <= newRowPath.length; depth += 1) {
-          const subPath = newRowPath.slice(0, depth);
-          ensureNode(
-            'row',
-            subPath,
-            rowDepthWithMetrics,
-            baseRow?.isSubtotal || undefined,
-          );
-        }
-        const newRowKey = serializePath(newRowPath);
-
-        ensureNode(
-          'col',
-          colPath,
-          colGroupby.length,
-          baseCol?.isSubtotal || undefined,
-        );
-
-        result.cells[serializeCellKey(newRowKey, colKey)] = {
-          rowKey: newRowKey,
-          colKey,
-          values: mergedValues,
-          isSubtotal: cell.isSubtotal,
-        };
-        // If there is only one metric, also surface the value at the base row
-        // path so collapsed views (before expanding into the metric tier) can render.
-        if (metricKeys.length === 1 && metricPosition !== 0) {
-          const cellKey = serializeCellKey(rowKey, colKey);
-          result.cells[cellKey] = result.cells[cellKey] || {
-            rowKey,
-            colKey,
-            values: mergedValues,
-            isSubtotal: cell.isSubtotal,
-          };
-        }
-        if (metricKeys.length === 1 && metricPosition === 0) {
-          const cellKey = serializeCellKey(rowKey, colKey);
-          result.cells[cellKey] = result.cells[cellKey] || {
-            rowKey,
-            colKey,
-            values: mergedValues,
-            isSubtotal: cell.isSubtotal,
-          };
-        }
-      });
-    });
-  } else {
-    const colDepthWithMetrics = colGroupby.length + 1;
-    const insertIndex = Math.min(
-      metricPosition ?? colGroupby.length,
-      colGroupby.length,
-    );
-
-    const metricsAtColStart = insertIndex === 0;
-    const metricsAtColEnd = insertIndex >= colGroupby.length;
-    if (metricsAtColStart || metricsAtColEnd) {
-      // Preserve the original column hierarchy so dimensions remain expandable when
-      // metrics are appended after the last column dimension or inserted first.
-      Object.values(tree.cols).forEach(colNode =>
-        ensureNode(
-          'col',
-          colNode.path,
-          colGroupby.length,
-          colNode.isSubtotal || undefined,
-        ),
-      );
-    }
-
-    // preserve row nodes
-    Object.values(tree.rows).forEach(rowNode =>
-      ensureNode(
-        'row',
-        rowNode.path,
-        rowGroupby.length,
-        rowNode.isSubtotal || undefined,
-      ),
-    );
-
-    Object.values(tree.cells).forEach(cell => {
-      const baseRow = tree.rows[cell.rowKey];
-      const baseCol = tree.cols[cell.colKey];
-      const rowPath = baseRow?.path || [];
-      const colPath = baseCol?.path || [];
-      const colPrefix = colPath.slice(0, insertIndex);
-      const colSuffix = colPath.slice(insertIndex);
-
-      metricKeys.forEach(metric => {
-        const mergedValues = {
-          [metric]: cell.values[metric],
-          ...cell.values,
-        };
-        const metricToken = encodeMetricKey(metric);
-        const newColPath = [...colPrefix, metricToken, ...colSuffix];
-        for (let depth = 0; depth <= newColPath.length; depth += 1) {
-          const subPath = newColPath.slice(0, depth);
-          ensureNode(
-            'col',
-            subPath,
-            colDepthWithMetrics,
-            baseCol?.isSubtotal || undefined,
-          );
-        }
-        const newColKey = serializePath(newColPath);
-
-        const rowKey = serializePath(rowPath);
-        ensureNode(
-          'row',
-          rowPath,
-          rowGroupby.length,
-          baseRow?.isSubtotal || undefined,
-        );
-
-        result.cells[serializeCellKey(rowKey, newColKey)] = {
-          rowKey,
-          colKey: newColKey,
-          values: mergedValues,
-          isSubtotal: cell.isSubtotal,
-        };
-        if (metricKeys.length === 1 && metricPosition === 0) {
-          const rootColKey = serializePath(colPrefix);
-          const cellKey = serializeCellKey(rowKey, rootColKey);
-          result.cells[cellKey] = result.cells[cellKey] || {
-            rowKey,
-            colKey: rootColKey,
-            values: mergedValues,
-            isSubtotal: cell.isSubtotal,
-          };
-        }
-        // If there is only one metric and the metric tier is at the end,
-        // also surface the value at the base column path so collapsed views
-        // (before expanding into the metric tier) can render.
-        if (
-          metricKeys.length === 1 &&
-          (metricPosition === undefined ||
-            metricPosition >= colGroupby.length ||
-            metricPosition === 0 ||
-            (metricPosition > 0 &&
-              metricPosition < colGroupby.length &&
-              colPath.length <= metricPosition))
-        ) {
-          const baseColKey = serializePath(colPath);
-          const cellKey = serializeCellKey(rowKey, baseColKey);
-          result.cells[cellKey] = result.cells[cellKey] || {
-            rowKey,
-            colKey: baseColKey,
-            values: mergedValues,
-            isSubtotal: cell.isSubtotal,
-          };
-        }
-      });
-    });
-  }
-
-  return result;
+type MeasureAxisGroup = {
+  metricKey: string;
+  leaves: MeasureLeafSpec[];
 };
 
-export const applyMeasureHierarchyAxis = (
-  tree: PivotTreeData,
-  measureHierarchy: MeasureHierarchy,
+type ApplyMeasureAxisInput = {
+  tree: PivotTreeData;
+  groups: MeasureAxisGroup[];
+  leafTierVisible: boolean;
+  metricsLayout: MetricsLayoutEnum;
+  rowGroupby: QueryFormColumn[];
+  colGroupby: QueryFormColumn[];
+  metricPosition?: number;
+  metricLabelMap?: Record<string, string>;
+  preserveMetricAxisNodes: boolean;
+  promoteExistingNodes: boolean;
+};
+
+const resolveMetricAxisInsertIndex = (
   metricsLayout: MetricsLayoutEnum,
   rowGroupby: QueryFormColumn[],
   colGroupby: QueryFormColumn[],
   metricPosition?: number,
-  metricLabelMap?: Record<string, string>,
-): PivotTreeData => {
-  if (measureHierarchy.kind === 'flatMetrics') {
-    return applyMetricAxis(
-      tree,
-      measureHierarchy.metricKeys,
-      metricsLayout,
-      rowGroupby,
-      colGroupby,
-      metricPosition,
-      metricLabelMap,
-    );
-  }
-  const { groups } = measureHierarchy;
+) => {
+  const axisDepth =
+    metricsLayout === MetricsLayoutEnum.ROWS
+      ? rowGroupby.length
+      : colGroupby.length;
+  return Math.min(metricPosition ?? axisDepth, axisDepth);
+};
+
+const applyMeasureAxis = ({
+  tree,
+  groups,
+  leafTierVisible,
+  metricsLayout,
+  rowGroupby,
+  colGroupby,
+  metricPosition,
+  metricLabelMap,
+  preserveMetricAxisNodes,
+  promoteExistingNodes,
+}: ApplyMeasureAxisInput): PivotTreeData => {
   if (groups.length === 0) {
     return tree;
   }
   const metricKeys = groups.map(group => group.metricKey);
-  const leafTierVisible = measureHierarchy.leafTierVisibility === 'visible';
   const metricTokenSet = new Set(metricKeys.map(encodeMetricKey));
   const leafLabelMap = new Map<string, string>();
   const singleLeafByMetric = new Map<
@@ -643,6 +339,8 @@ export const applyMeasureHierarchyAxis = (
     }
   });
 
+  const result: PivotTreeData = { rows: {}, cols: {}, cells: {} };
+
   const ensureNode = (
     axis: 'row' | 'col',
     path: PivotPath,
@@ -651,7 +349,23 @@ export const applyMeasureHierarchyAxis = (
   ) => {
     const nodes = axis === 'row' ? result.rows : result.cols;
     const key = serializePath(path);
-    if (nodes[key]) return nodes[key];
+    if (nodes[key]) {
+      const existing = nodes[key];
+      // A base tree node can be terminal before we inject metric/leaf tiers.
+      // Promote it to an internal node when a deeper hierarchy is added.
+      if (
+        promoteExistingNodes &&
+        path.length < fullDepth &&
+        !existing.hasChildren
+      ) {
+        nodes[key] = {
+          ...existing,
+          hasChildren: true,
+          isSubtotal: true,
+        };
+      }
+      return nodes[key];
+    }
     const sourceNodes = axis === 'row' ? tree.rows : tree.cols;
     const sourceNode = sourceNodes[key];
     const rawValue = path[path.length - 1];
@@ -718,8 +432,6 @@ export const applyMeasureHierarchyAxis = (
     return node;
   };
 
-  const result: PivotTreeData = { rows: {}, cols: {}, cells: {} };
-
   if (metricsLayout === MetricsLayoutEnum.ROWS) {
     const rowDepthWithMeasures = rowGroupby.length + (leafTierVisible ? 2 : 1);
     const insertIndex = Math.min(
@@ -728,14 +440,16 @@ export const applyMeasureHierarchyAxis = (
     );
     const metricsAtRowEnd = insertIndex >= rowGroupby.length;
 
-    Object.values(tree.rows).forEach(rowNode =>
-      ensureNode(
-        'row',
-        rowNode.path,
-        rowGroupby.length,
-        rowNode.isSubtotal || undefined,
-      ),
-    );
+    if (preserveMetricAxisNodes) {
+      Object.values(tree.rows).forEach(rowNode =>
+        ensureNode(
+          'row',
+          rowNode.path,
+          rowGroupby.length,
+          rowNode.isSubtotal || undefined,
+        ),
+      );
+    }
 
     Object.values(tree.cols).forEach(colNode => {
       ensureNode(
@@ -855,14 +569,16 @@ export const applyMeasureHierarchyAxis = (
       colGroupby.length,
     );
 
-    Object.values(tree.cols).forEach(colNode =>
-      ensureNode(
-        'col',
-        colNode.path,
-        colGroupby.length,
-        colNode.isSubtotal || undefined,
-      ),
-    );
+    if (preserveMetricAxisNodes) {
+      Object.values(tree.cols).forEach(colNode =>
+        ensureNode(
+          'col',
+          colNode.path,
+          colGroupby.length,
+          colNode.isSubtotal || undefined,
+        ),
+      );
+    }
 
     Object.values(tree.rows).forEach(rowNode =>
       ensureNode(
@@ -954,6 +670,77 @@ export const applyMeasureHierarchyAxis = (
   }
 
   return result;
+};
+
+export const applyMetricAxis = (
+  tree: PivotTreeData,
+  metrics: QueryFormMetric[],
+  metricsLayout: MetricsLayoutEnum,
+  rowGroupby: QueryFormColumn[],
+  colGroupby: QueryFormColumn[],
+  metricPosition?: number,
+  metricLabelMap?: Record<string, string>,
+): PivotTreeData => {
+  const metricKeys = getMetricKeys(metrics);
+  const insertIndex = resolveMetricAxisInsertIndex(
+    metricsLayout,
+    rowGroupby,
+    colGroupby,
+    metricPosition,
+  );
+  const axisDepth =
+    metricsLayout === MetricsLayoutEnum.ROWS
+      ? rowGroupby.length
+      : colGroupby.length;
+  return applyMeasureAxis({
+    tree,
+    groups: metricKeys.map(metricKey => ({
+      metricKey,
+      leaves: [buildValueLeaf()],
+    })),
+    leafTierVisible: false,
+    metricsLayout,
+    rowGroupby,
+    colGroupby,
+    metricPosition,
+    metricLabelMap,
+    preserveMetricAxisNodes: insertIndex === 0 || insertIndex >= axisDepth,
+    promoteExistingNodes: true,
+  });
+};
+
+export const applyMeasureHierarchyAxis = (
+  tree: PivotTreeData,
+  measureHierarchy: MeasureHierarchy,
+  metricsLayout: MetricsLayoutEnum,
+  rowGroupby: QueryFormColumn[],
+  colGroupby: QueryFormColumn[],
+  metricPosition?: number,
+  metricLabelMap?: Record<string, string>,
+): PivotTreeData => {
+  if (measureHierarchy.kind === 'flatMetrics') {
+    return applyMetricAxis(
+      tree,
+      measureHierarchy.metricKeys,
+      metricsLayout,
+      rowGroupby,
+      colGroupby,
+      metricPosition,
+      metricLabelMap,
+    );
+  }
+  return applyMeasureAxis({
+    tree,
+    groups: measureHierarchy.groups,
+    leafTierVisible: measureHierarchy.leafTierVisibility === 'visible',
+    metricsLayout,
+    rowGroupby,
+    colGroupby,
+    metricPosition,
+    metricLabelMap,
+    preserveMetricAxisNodes: true,
+    promoteExistingNodes: false,
+  });
 };
 
 export const buildTreeFromRecords = (

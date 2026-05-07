@@ -17,7 +17,12 @@
  * under the License.
  */
 import { type PivotAxis, type PivotPath } from '../../types';
-import { decodeMeasureLeafId, decodeMetricKey } from '../core/tokens';
+import {
+  decodeMeasureLeafId,
+  decodeMetricKey,
+  encodeMetricKey,
+  isSubtotalToken,
+} from '../core/tokens';
 import { isCanonicalValuesPathToken } from './paths';
 import {
   type PivotAxisLevel,
@@ -47,6 +52,37 @@ export type ResolveAxisProjectionInput = {
   program: PivotProgram;
   axis: PivotAxis;
   path: PivotPath;
+};
+
+export type CollapsedValuesMetricProjection = {
+  metricKey: string;
+  metricToken: string;
+  metricPath: PivotPath;
+  sourceMetricPath: PivotPath;
+  hasProjectedChildren: boolean;
+};
+
+export type ResolveCollapsedValuesProjectionInput = {
+  program: PivotProgram;
+  axis: PivotAxis;
+  parentPath: PivotPath;
+  sourceMetricPaths: PivotPath[];
+};
+
+export type AxisChildProjection = {
+  parentProjection: PivotAxisProjection;
+  childProjection: PivotAxisProjection;
+  valuesTokenIndex?: number;
+  rawValuesTokenIndex?: number;
+  introducesValues: boolean;
+  addsProjectedDimension: boolean;
+};
+
+export type ResolveAxisChildProjectionInput = {
+  program: PivotProgram;
+  axis: PivotAxis;
+  parentPath: PivotPath;
+  childPath: PivotPath;
 };
 
 const axisProgramFor = (program: PivotProgram, axis: PivotAxis) =>
@@ -96,6 +132,9 @@ const collectSkippedPreValuesLevels = (
     .filter(
       (level): level is PivotDimensionAxisLevel => level.kind === 'dimension',
     );
+
+const withoutSubtotalTokens = (path: PivotPath) =>
+  path.filter(value => !isSubtotalToken(value));
 
 export const resolveAxisProjection = ({
   program,
@@ -206,4 +245,90 @@ export const resolveAxisProjection = ({
     measureLeafIds,
     valuesLevelSeen,
   };
+};
+
+export const resolveAxisChildProjection = ({
+  program,
+  axis,
+  parentPath,
+  childPath,
+}: ResolveAxisChildProjectionInput): AxisChildProjection => {
+  const projectableParentPath = withoutSubtotalTokens(parentPath);
+  const projectableChildPath = withoutSubtotalTokens(childPath);
+  const parentProjection = resolveAxisProjection({
+    program,
+    axis,
+    path: projectableParentPath,
+  });
+  const childProjection = resolveAxisProjection({
+    program,
+    axis,
+    path: projectableChildPath,
+  });
+  const valuesTokenIndex = projectableChildPath.findIndex(value =>
+    isCanonicalValuesPathToken(value, program),
+  );
+  const rawValuesTokenIndex = childPath.findIndex(value =>
+    isCanonicalValuesPathToken(value, program),
+  );
+  const firstChildValue = projectableChildPath[projectableParentPath.length];
+  return {
+    parentProjection,
+    childProjection,
+    valuesTokenIndex: valuesTokenIndex >= 0 ? valuesTokenIndex : undefined,
+    rawValuesTokenIndex:
+      rawValuesTokenIndex >= 0 ? rawValuesTokenIndex : undefined,
+    introducesValues:
+      !parentProjection.valuesLevelSeen &&
+      childProjection.valuesLevelSeen &&
+      isCanonicalValuesPathToken(firstChildValue, program),
+    addsProjectedDimension:
+      childProjection.projectedDimensionPath.length >
+      parentProjection.projectedDimensionPath.length,
+  };
+};
+
+export const resolveCollapsedValuesProjection = ({
+  program,
+  axis,
+  parentPath,
+  sourceMetricPaths,
+}: ResolveCollapsedValuesProjectionInput): CollapsedValuesMetricProjection[] => {
+  const parentProjection = resolveAxisProjection({
+    program,
+    axis,
+    path: parentPath,
+  });
+  if (parentProjection.valuesLevelSeen) {
+    return [];
+  }
+
+  const metricKeySet = new Set(program.metricKeys);
+  const seen = new Set<string>();
+  const collapsedMetrics: CollapsedValuesMetricProjection[] = [];
+  sourceMetricPaths.forEach(sourceMetricPath => {
+    const metricKey = collectPathMetricKeys(sourceMetricPath, metricKeySet)[0];
+    if (!metricKey || seen.has(metricKey)) {
+      return;
+    }
+    seen.add(metricKey);
+    const metricToken = encodeMetricKey(metricKey);
+    const metricPath = [...parentPath, metricToken];
+    const metricProjection = resolveAxisProjection({
+      program,
+      axis,
+      path: metricPath,
+    });
+    if (!metricProjection.valuesLevelSeen) {
+      return;
+    }
+    collapsedMetrics.push({
+      metricKey,
+      metricToken,
+      metricPath,
+      sourceMetricPath,
+      hasProjectedChildren: metricProjection.nextLevel?.kind === 'dimension',
+    });
+  });
+  return collapsedMetrics;
 };
