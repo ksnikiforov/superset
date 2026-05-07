@@ -23,9 +23,12 @@ import {
   type PivotTableQueryFormData,
   type PivotTreeData,
 } from '../../types';
-import { type LayoutContext } from '../layout/LayoutContext';
+import {
+  buildLayoutContext,
+  type LayoutContext,
+} from '../layout/LayoutContext';
+import { buildBranchFactCoverages } from '../runtime/coverage';
 import { stableStringify } from '../shared/stableStringify';
-import { buildBranchQueryPairs } from './branchQueryPairs';
 import { formatQueryName } from './queryName';
 import { resolveFetchContextForBatch } from './resolveFetchContext';
 import { toChartDataQueries } from './toChartDataQueries';
@@ -50,9 +53,10 @@ export const buildBatchSignature = ({
   visibleRowDepth,
   visibleColDepth,
 }: BatchSignatureParams): string => {
+  const resolvedLayout = layout ?? buildLayoutContext(formData);
   const ctx = resolveFetchContextForBatch({
     formData,
-    layout,
+    layout: resolvedLayout,
     axis,
     path,
     currentTree,
@@ -70,30 +74,25 @@ export const buildBatchSignature = ({
     timeOffsets.length > 0
       ? { ...queryFormData, time_offsets: timeOffsets }
       : queryFormData;
-  const queryPairs = buildBranchQueryPairs({
+  const coverages = buildBranchFactCoverages({
+    program: resolvedLayout.pivotProgram,
     axis,
     pathLength: ctx.sanitizedPath.length,
     rowDepth: ctx.rowDepth,
-    colDepth: ctx.colDepth,
-    rowGroupby: ctx.rowGroupby,
-    colGroupby: ctx.colGroupby,
+    columnDepth: ctx.colDepth,
     rowSubtotalLevels: ctx.rowSubtotalLevels,
-    colSubtotalLevels: ctx.colSubtotalLevels,
-    hasRowFormatting: ctx.hasRowFormatting,
-    hasColFormatting: ctx.hasColFormatting,
-    hasRowTotalSorting: ctx.hasRowTotalSorting,
-    hasColTotalSorting: ctx.hasColTotalSorting,
-    metricsLayoutResolved: ctx.metricsLayoutResolved,
-    metricInsertIndex: ctx.metricInsertIndex,
-    formData,
+    columnSubtotalLevels: ctx.colSubtotalLevels,
+    rowTotals: formData.rowTotals,
+    columnTotals: formData.colTotals,
+    includeRowTotalForColumnFormatting:
+      axis === 'col' && (ctx.hasColFormatting || ctx.hasColTotalSorting),
+    includeColumnTotalForRowFormatting:
+      axis === 'row' && (ctx.hasRowFormatting || ctx.hasRowTotalSorting),
   });
 
-  const specs: QuerySpec[] = queryPairs.map(pair => ({
-    queryName: formatQueryName(pair.rowDepth, pair.colDepth),
-    columns: [
-      ...ctx.rowGroupbyForQuery.slice(0, pair.rowDepth),
-      ...ctx.colGroupbyForQuery.slice(0, pair.colDepth),
-    ],
+  const specs: QuerySpec[] = coverages.map(coverage => ({
+    queryName: formatQueryName(coverage.rowDepth, coverage.columnDepth),
+    columns: [...coverage.rowDimensions, ...coverage.columnDimensions],
     metrics: ctx.metricsForQuery,
     filters: [],
   }));

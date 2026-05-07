@@ -172,8 +172,6 @@ export const peekPivotBranchCache = (params: FetchPivotBranchParams) => {
 export const resolveFetchContextForTest = resolveFetchContext;
 export const resolveFetchContextForBatch = resolveFetchContext;
 
-export { buildBranchQueryPairs } from './pivot/query/branchQueryPairs';
-
 function injectColumnSubtotalLeaves(
   tree: PivotTreeData,
   depth: number,

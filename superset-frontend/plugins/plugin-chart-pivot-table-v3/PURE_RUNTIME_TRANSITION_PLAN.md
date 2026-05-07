@@ -300,11 +300,15 @@ Gate 2 has started:
 - Tests now cover metric sibling split loading, support metric query inclusion,
   non-materialization of support metrics, IX/time-offset scoping, and planner
   fetch-target separation for metric siblings.
+- `branchQueryPairs.ts` has been deleted. Branch, batch, and root query specs
+  now consume `buildBranchFactCoverages` from `src/pivot/runtime/coverage.ts`
+  and receive `PivotFactCoverage[]` directly.
 
 Immediate next step:
 
-- Move branch and batch target selection fully behind coverage planning, then
-  delete placement-specific depth-pair branches from `branchQueryPairs.ts`.
+- Collapse duplicated coverage-to-spec mapping in branch, batch, and root spec
+  construction. The coverage planner is centralized, but `specs.ts` still has
+  repeated metadata assembly that should become one helper.
 - Continue shrinking `resolveFetchContext`: it now owns metric/leaf scope and
   support metric selection, but should eventually become a thin adapter around
   coverage planning plus query-shape construction.
