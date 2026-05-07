@@ -26,7 +26,6 @@ import {
 } from '@superset-ui/core';
 import {
   type MeasureHierarchy,
-  type MetricsLayoutEnum,
   type PivotPath,
   type PivotTableQueryFormData,
   type PivotTreeData,
@@ -43,7 +42,7 @@ import { getMetricKeys, SUBTOTAL_LABEL, SUBTOTAL_TOKEN } from '../core/tokens';
 import { applyMeasureLeafValuesToTree } from '../measureLeaves';
 import { type LayoutContext } from '../layout/LayoutContext';
 import { type PlannedQuerySpec } from '../query/specs';
-import { type PivotFactCoverage } from './types';
+import { type PivotFactCoverage, type PivotProgram } from './types';
 import {
   createPivotFactStore,
   type PivotFact,
@@ -141,29 +140,21 @@ const pathFromRecord = (record: DataRecord, columns: QueryFormColumn[]) =>
 const factsFromRecords = ({
   result,
   metrics,
-  rowGroupby,
-  colGroupby,
-  rowDepth,
-  colDepth,
   queryName,
   coverage,
   materializedMetrics,
 }: {
   result: QueryResultWithData;
   metrics: QueryFormMetric[];
-  rowGroupby: QueryFormColumn[];
-  colGroupby: QueryFormColumn[];
-  rowDepth: number;
-  colDepth: number;
   queryName: string;
-  coverage?: PivotFactCoverage;
+  coverage: PivotFactCoverage;
   materializedMetrics: QueryFormMetric[];
 }): PivotFact[] => {
   const records = result.data ?? [];
   const valueKeys = getMetricValueKeysFromRecord(records[0], metrics);
   const visibleValueKeys = new Set(getMetricKeys(materializedMetrics));
-  const rowColumns = rowGroupby.slice(0, rowDepth);
-  const columnColumns = colGroupby.slice(0, colDepth);
+  const rowColumns = coverage.rowDimensions;
+  const columnColumns = coverage.columnDimensions;
   const roleForValueKey = (valueKey: string): PivotFactRole =>
     visibleValueKeys.has(valueKey) ? 'visible' : 'support';
 
@@ -192,10 +183,6 @@ export const ingestQueryResultFacts = ({
   factsFromRecords({
     result,
     metrics: spec.metrics,
-    rowGroupby: spec.meta.rowGroupbyForQueryFull,
-    colGroupby: spec.meta.colGroupbyForQueryFull,
-    rowDepth: spec.meta.rowDepth,
-    colDepth: spec.meta.colDepth,
     queryName: spec.queryName,
     coverage: spec.meta.coverage,
     materializedMetrics: spec.meta.materializedMetrics,
@@ -227,13 +214,13 @@ export const ingestQueryResults = <T extends QueryResultWithData>({
 
 type MaterializationFactBatch = {
   facts: PivotFact[];
-  rowDepth: number;
-  colDepth: number;
+  coverage: PivotFactCoverage;
 };
 
 const factStoreBatchScopeFromSpec = (
   spec: PlannedQuerySpec,
 ): PivotFactStoreBatch['scope'] => {
+  const { rowDepth, columnDepth } = spec.meta.coverage;
   if (spec.meta.kind === 'branch') {
     if (!spec.meta.axis) {
       return undefined;
@@ -242,8 +229,8 @@ const factStoreBatchScopeFromSpec = (
       kind: 'branch',
       axis: spec.meta.axis,
       path: spec.meta.path ?? [],
-      rowDepth: spec.meta.rowDepth,
-      colDepth: spec.meta.colDepth,
+      rowDepth,
+      colDepth: columnDepth,
     };
   }
   if (spec.meta.kind === 'batch') {
@@ -255,14 +242,14 @@ const factStoreBatchScopeFromSpec = (
       axis: spec.meta.axis,
       parentPath: spec.meta.parentPath ?? [],
       siblingValues: spec.meta.siblingValues ?? [],
-      rowDepth: spec.meta.rowDepth,
-      colDepth: spec.meta.colDepth,
+      rowDepth,
+      colDepth: columnDepth,
     };
   }
   return {
     kind: spec.meta.kind,
-    rowDepth: spec.meta.rowDepth,
-    colDepth: spec.meta.colDepth,
+    rowDepth,
+    colDepth: columnDepth,
   };
 };
 
@@ -329,19 +316,22 @@ const factBatchFromStore = ({
     coverage: spec.meta.coverage,
     queryName: spec.queryName,
   }),
-  rowDepth: spec.meta.rowDepth,
-  colDepth: spec.meta.colDepth,
+  coverage: spec.meta.coverage,
 });
 
 const buildTreeFromFacts = ({
   facts,
-  rowGroupby,
-  colGroupby,
+  rowColumns,
+  columnColumns,
+  rowFullDepth,
+  columnFullDepth,
   dateFormatters,
 }: {
   facts: PivotFact[];
-  rowGroupby: QueryFormColumn[];
-  colGroupby: QueryFormColumn[];
+  rowColumns: QueryFormColumn[];
+  columnColumns: QueryFormColumn[];
+  rowFullDepth: number;
+  columnFullDepth: number;
   dateFormatters?: PivotTableQueryFormData['dateFormatters'];
 }): PivotTreeData => {
   const tree: PivotTreeData = { rows: {}, cols: {}, cells: {} };
@@ -363,7 +353,7 @@ const buildTreeFromFacts = ({
       path.length === 0
         ? 'Grand total'
         : formatPivotLabelValue(rawValue, totalLabel);
-    const groupby = axis === 'row' ? rowGroupby : colGroupby;
+    const groupby = axis === 'row' ? rowColumns : columnColumns;
     const column = groupby[path.length - 1];
     const columnLabel = column ? getColumnLabel(column) : undefined;
     const formatter = columnLabel ? dateFormatters?.[columnLabel] : undefined;
@@ -381,9 +371,9 @@ const buildTreeFromFacts = ({
       formattedLabel,
       level: path.length,
       hasChildren:
-        path.length < (axis === 'row' ? rowGroupby.length : colGroupby.length),
+        path.length < (axis === 'row' ? rowFullDepth : columnFullDepth),
       isSubtotal:
-        path.length < (axis === 'row' ? rowGroupby.length : colGroupby.length),
+        path.length < (axis === 'row' ? rowFullDepth : columnFullDepth),
     };
   };
 
@@ -422,8 +412,7 @@ const buildTreeFromFacts = ({
         ...values,
       },
       isSubtotal:
-        rowPath.length < rowGroupby.length ||
-        colPath.length < colGroupby.length,
+        rowPath.length < rowFullDepth || colPath.length < columnFullDepth,
     };
 
     if (rowPath.length === 0 && colPath.length === 0) {
@@ -511,32 +500,39 @@ function injectColumnSubtotalLeaves(
 const buildTreeFromFactBatch = ({
   batch,
   formData,
-  rowGroupby,
-  colGroupby,
+  pivotProgram,
   rowSubtotalLevels,
   colSubtotalLevels,
 }: {
   batch: MaterializationFactBatch;
   formData: PivotTableQueryFormData;
-  rowGroupby: QueryFormColumn[];
-  colGroupby: QueryFormColumn[];
+  pivotProgram: PivotProgram;
   rowSubtotalLevels: number[];
   colSubtotalLevels: number[];
 }) => {
+  const { coverage } = batch;
+  const rowFullDepth = pivotProgram.rowDimensions.length;
+  const columnFullDepth = pivotProgram.columnDimensions.length;
   let tree = buildTreeFromFacts({
     facts: batch.facts,
-    rowGroupby,
-    colGroupby,
+    rowColumns: coverage.rowDimensions,
+    columnColumns: coverage.columnDimensions,
+    rowFullDepth,
+    columnFullDepth,
     dateFormatters: formData.dateFormatters,
   });
-  if (colSubtotalLevels.includes(batch.colDepth)) {
-    tree = injectColumnSubtotalLeaves(tree, batch.colDepth, colGroupby.length);
+  if (colSubtotalLevels.includes(coverage.columnDepth)) {
+    tree = injectColumnSubtotalLeaves(
+      tree,
+      coverage.columnDepth,
+      columnFullDepth,
+    );
   }
   const rowSubtotalDepths = rowSubtotalLevels.filter(
-    level => level > 0 && level <= batch.rowDepth,
+    level => level > 0 && level <= coverage.rowDepth,
   );
   rowSubtotalDepths.forEach(depth => {
-    tree = injectRowSubtotalLeaves(tree, depth, rowGroupby.length);
+    tree = injectRowSubtotalLeaves(tree, depth, rowFullDepth);
   });
   return tree;
 };
@@ -548,12 +544,9 @@ const buildBranchTreeFromFactBatches = ({
   measureHierarchy,
   materializedMetrics,
   materializedMeasureHierarchy,
-  rowGroupby,
-  colGroupby,
   rowSubtotalLevels,
   colSubtotalLevels,
-  metricsLayoutResolved,
-  metricInsertIndex,
+  pivotProgram,
 }: {
   batches: MaterializationFactBatch[];
   metricsForQuery: QueryFormMetric[];
@@ -561,12 +554,9 @@ const buildBranchTreeFromFactBatches = ({
   measureHierarchy: MeasureHierarchy;
   materializedMetrics?: QueryFormMetric[];
   materializedMeasureHierarchy?: MeasureHierarchy;
-  rowGroupby: QueryFormColumn[];
-  colGroupby: QueryFormColumn[];
   rowSubtotalLevels: number[];
   colSubtotalLevels: number[];
-  metricsLayoutResolved: MetricsLayoutEnum;
-  metricInsertIndex: number;
+  pivotProgram: PivotProgram;
 }): PivotTreeData => {
   const queryMetrics =
     metricsForQuery.length > 0 ? metricsForQuery : formData.metrics;
@@ -580,8 +570,7 @@ const buildBranchTreeFromFactBatches = ({
         buildTreeFromFactBatch({
           batch,
           formData,
-          rowGroupby,
-          colGroupby,
+          pivotProgram,
           rowSubtotalLevels,
           colSubtotalLevels,
         }),
@@ -594,10 +583,7 @@ const buildBranchTreeFromFactBatches = ({
       measureHierarchy: visibleMeasureHierarchy,
     }),
     visibleMeasureHierarchy,
-    metricsLayoutResolved,
-    rowGroupby,
-    colGroupby,
-    metricInsertIndex,
+    pivotProgram,
     formData.metricLabelMap as Record<string, string> | undefined,
   );
   return labelRowSubtotalLeaves(
@@ -643,12 +629,9 @@ export const buildBranchTreeFromFactStore = ({
     measureHierarchy,
     materializedMetrics: firstSpec.meta.materializedMetrics,
     materializedMeasureHierarchy: firstSpec.meta.materializedMeasureHierarchy,
-    rowGroupby: firstSpec.meta.rowGroupbyForQueryFull,
-    colGroupby: firstSpec.meta.colGroupbyForQueryFull,
     rowSubtotalLevels: firstSpec.meta.rowSubtotalLevels,
     colSubtotalLevels: firstSpec.meta.colSubtotalLevels,
-    metricsLayoutResolved: firstSpec.meta.metricsLayoutResolved,
-    metricInsertIndex: firstSpec.meta.metricInsertIndex,
+    pivotProgram: firstSpec.meta.pivotProgram,
   });
 };
 
@@ -705,12 +688,9 @@ export const buildInitialRuntimeFromSpecResults = ({
       measureHierarchy: layout.measureHierarchy,
       materializedMetrics: spec.meta.materializedMetrics,
       materializedMeasureHierarchy: spec.meta.materializedMeasureHierarchy,
-      rowGroupby: spec.meta.rowGroupbyForQueryFull,
-      colGroupby: spec.meta.colGroupbyForQueryFull,
       rowSubtotalLevels: spec.meta.rowSubtotalLevels,
       colSubtotalLevels: spec.meta.colSubtotalLevels,
-      metricsLayoutResolved: spec.meta.metricsLayoutResolved,
-      metricInsertIndex: spec.meta.metricInsertIndex,
+      pivotProgram: spec.meta.pivotProgram,
     });
     return mergeTrees(acc, nextTree);
   }, emptyTree);

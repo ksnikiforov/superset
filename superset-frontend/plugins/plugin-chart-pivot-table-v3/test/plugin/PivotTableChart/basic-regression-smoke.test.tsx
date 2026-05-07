@@ -177,18 +177,15 @@ describe('PivotTableChart basic regression smoke guardrails', () => {
     );
 
     const plusToggle = within(rowA).queryByLabelText('plus-square');
-    if (plusToggle) {
-      fireEvent.click(plusToggle);
-    } else {
+    let expandToggle = plusToggle;
+    if (!expandToggle) {
       const minusToggle = within(rowA).getByLabelText('minus-square');
       fireEvent.click(minusToggle);
-      await waitFor(() =>
-        expect(
-          within(rowA).queryByLabelText('plus-square'),
-        ).toBeInTheDocument(),
+      expandToggle = await waitFor(() =>
+        within(rowA).getByLabelText('plus-square'),
       );
-      fireEvent.click(within(rowA).getByLabelText('plus-square'));
     }
+    fireEvent.click(expandToggle);
 
     await waitFor(() => expect(screen.getByText('X')).toBeInTheDocument());
   });
@@ -269,8 +266,8 @@ describe('PivotTableChart basic regression smoke guardrails', () => {
     ).toEqual(['c1', METRICS_PLACEHOLDER]);
     expect(
       (fetchCall?.specs ?? []).some(
-        (spec: { meta?: { colDepth?: number } }) =>
-          (spec.meta?.colDepth ?? 0) >= 1,
+        (spec: { meta?: { coverage?: { columnDepth?: number } } }) =>
+          (spec.meta?.coverage?.columnDepth ?? 0) >= 1,
       ),
     ).toBe(true);
 

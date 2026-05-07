@@ -240,7 +240,10 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
     const formData = baseFormData as PivotTableQueryFormData;
     const specs = buildInitialQuerySpecs(formData);
     const queryResults = specs.map(spec => {
-      if (spec.meta.rowDepth === 0 && spec.meta.colDepth === 0) {
+      if (
+        spec.meta.coverage.rowDepth === 0 &&
+        spec.meta.coverage.columnDepth === 0
+      ) {
         return {
           query: { query_name: spec.queryName },
           data: [{ metric1: 30 }],
@@ -248,7 +251,10 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
           coltypes: [0],
         };
       }
-      if (spec.meta.rowDepth === 1 && spec.meta.colDepth === 1) {
+      if (
+        spec.meta.coverage.rowDepth === 1 &&
+        spec.meta.coverage.columnDepth === 1
+      ) {
         return {
           query: { query_name: spec.queryName },
           data: [{ row1: 'A', col1: 'B', metric1: 15 }],
@@ -256,7 +262,10 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
           coltypes: [1, 1, 0],
         };
       }
-      if (spec.meta.rowDepth === 1 && spec.meta.colDepth === 0) {
+      if (
+        spec.meta.coverage.rowDepth === 1 &&
+        spec.meta.coverage.columnDepth === 0
+      ) {
         return {
           query: { query_name: spec.queryName },
           data: [{ row1: 'A', metric1: 10 }],
@@ -264,7 +273,10 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
           coltypes: [1, 0],
         };
       }
-      if (spec.meta.rowDepth === 0 && spec.meta.colDepth === 1) {
+      if (
+        spec.meta.coverage.rowDepth === 0 &&
+        spec.meta.coverage.columnDepth === 1
+      ) {
         return {
           query: { query_name: spec.queryName },
           data: [{ col1: 'B', metric1: 20 }],
@@ -558,7 +570,10 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
     const specs = buildInitialQuerySpecs(formData as PivotTableQueryFormData);
     const queriesData = specs.map(spec => {
       if (spec.meta.kind === 'bootstrap') {
-        if (spec.meta.rowDepth === 0 && spec.meta.colDepth === 0) {
+        if (
+          spec.meta.coverage.rowDepth === 0 &&
+          spec.meta.coverage.columnDepth === 0
+        ) {
           return {
             query: { query_name: spec.queryName },
             data: [{ metric1: 30 }],
@@ -566,7 +581,10 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
             coltypes: [0],
           };
         }
-        if (spec.meta.rowDepth === 1 && spec.meta.colDepth === 1) {
+        if (
+          spec.meta.coverage.rowDepth === 1 &&
+          spec.meta.coverage.columnDepth === 1
+        ) {
           return {
             query: { query_name: spec.queryName },
             data: [{ row1: 'A', col1: 'C', metric1: 10 }],
@@ -574,7 +592,10 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
             coltypes: [1, 1, 0],
           };
         }
-        if (spec.meta.rowDepth === 1 && spec.meta.colDepth === 0) {
+        if (
+          spec.meta.coverage.rowDepth === 1 &&
+          spec.meta.coverage.columnDepth === 0
+        ) {
           return {
             query: { query_name: spec.queryName },
             data: [{ row1: 'A', metric1: 10 }],
@@ -582,7 +603,10 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
             coltypes: [1, 0],
           };
         }
-        if (spec.meta.rowDepth === 0 && spec.meta.colDepth === 1) {
+        if (
+          spec.meta.coverage.rowDepth === 0 &&
+          spec.meta.coverage.columnDepth === 1
+        ) {
           return {
             query: { query_name: spec.queryName },
             data: [{ col1: 'C', metric1: 10 }],

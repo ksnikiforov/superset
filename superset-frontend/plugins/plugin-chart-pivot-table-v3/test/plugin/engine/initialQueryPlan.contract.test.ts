@@ -116,8 +116,8 @@ describe('buildInitialQuerySpecs (contracts)', () => {
     const gridSpec = specs.find(
       spec =>
         spec.meta.kind === 'bootstrap' &&
-        spec.meta.rowDepth === 1 &&
-        spec.meta.colDepth === 1,
+        spec.meta.coverage.rowDepth === 1 &&
+        spec.meta.coverage.columnDepth === 1,
     );
 
     expect(gridSpec?.columns).toEqual(['country', 'category']);

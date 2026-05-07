@@ -59,7 +59,10 @@ const buildInitialBootstrapTree = ({
     specs,
     results: specs.map(spec => ({
       query_name: spec.queryName,
-      data: resultsByDepth[`${spec.meta.rowDepth}|${spec.meta.colDepth}`] ?? [],
+      data:
+        resultsByDepth[
+          `${spec.meta.coverage.rowDepth}|${spec.meta.coverage.columnDepth}`
+        ] ?? [],
     })),
     layout,
     formData: resolvedFormData,
@@ -1894,7 +1897,11 @@ describe('PivotTableChart interaction layout', () => {
       .mockImplementation(async ({ specs }) => {
         const includesColumnDepth = specs.some(
           spec =>
-            (spec as { meta?: { colDepth?: number } }).meta?.colDepth === 1,
+            (
+              spec as {
+                meta?: { coverage?: { columnDepth?: number } };
+              }
+            ).meta?.coverage?.columnDepth === 1,
         );
         const resultsByDepth = includesColumnDepth
           ? {
@@ -1919,15 +1926,16 @@ describe('PivotTableChart interaction layout', () => {
                 { row1: 'B', m1: 30, m2: 40 },
               ],
             };
-        return specs.map(spec => ({
-          data:
-            resultsByDepth[
-              `${(spec as { meta: { rowDepth: number; colDepth: number } }).meta.rowDepth}|${
-                (spec as { meta: { rowDepth: number; colDepth: number } }).meta
-                  .colDepth
-              }`
-            ] ?? [],
-        }));
+        return specs.map(spec => {
+          const { rowDepth, columnDepth } = (
+            spec as {
+              meta: { coverage: { rowDepth: number; columnDepth: number } };
+            }
+          ).meta.coverage;
+          return {
+            data: resultsByDepth[`${rowDepth}|${columnDepth}`] ?? [],
+          };
+        });
       });
     const cancelSpy = jest
       .spyOn(supersetChartDataClient, 'cancel')
@@ -1960,7 +1968,8 @@ describe('PivotTableChart interaction layout', () => {
     expect(
       new Set(
         fetchSpy.mock.calls[0][0].specs.map(
-          spec => `${spec.meta.rowDepth}|${spec.meta.colDepth}`,
+          spec =>
+            `${spec.meta.coverage.rowDepth}|${spec.meta.coverage.columnDepth}`,
         ),
       ),
     ).toEqual(new Set(['0|0', '1|1', '1|0']));
@@ -1972,7 +1981,8 @@ describe('PivotTableChart interaction layout', () => {
     expect(
       new Set(
         fetchSpy.mock.calls[1][0].specs.map(
-          spec => `${spec.meta.rowDepth}|${spec.meta.colDepth}`,
+          spec =>
+            `${spec.meta.coverage.rowDepth}|${spec.meta.coverage.columnDepth}`,
         ),
       ),
     ).toEqual(new Set(['0|0', '1|0']));

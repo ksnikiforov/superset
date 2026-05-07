@@ -17,6 +17,7 @@
  * under the License.
  */
 import { type PlannedQuerySpec } from '../../../../src/pivot/query/specs';
+import { compilePivotProgram } from '../../../../src/pivot/runtime/compilePivotProgram';
 import {
   buildBranchTreeFromSpecResults,
   createPivotFactStore,
@@ -29,6 +30,7 @@ import {
 } from '../../../../src/types';
 import {
   encodeMetricKey,
+  METRICS_PLACEHOLDER,
   serializeCellKey,
   serializePath,
   SUBTOTAL_TOKEN,
@@ -64,33 +66,49 @@ const buildSpec = ({
   metricsLayoutResolved?: MetricsLayoutEnum;
   metricInsertIndex?: number;
   materializedMeasureHierarchy?: MeasureHierarchy;
-}): PlannedQuerySpec => ({
-  queryName,
-  columns: [...rowGroupby.slice(0, rowDepth), ...colGroupby.slice(0, colDepth)],
-  metrics,
-  filters: [],
-  meta: {
-    kind: 'root',
-    rowDepth,
-    colDepth,
-    rowGroupbyForQueryFull: rowGroupby,
-    colGroupbyForQueryFull: colGroupby,
-    rowSubtotalLevels,
-    colSubtotalLevels,
-    materializedMetrics,
-    materializedMeasureHierarchy,
-    requiredTimeOffsets: [],
-    metricsLayoutResolved,
-    metricInsertIndex,
-    coverage: {
-      reason: 'initial',
-      rowDepth,
-      columnDepth: colDepth,
-      rowDimensions: rowGroupby.slice(0, rowDepth),
-      columnDimensions: colGroupby.slice(0, colDepth),
+}): PlannedQuerySpec => {
+  const withValuesPlaceholder = (columns: string[]) => [
+    ...columns.slice(0, metricInsertIndex),
+    METRICS_PLACEHOLDER,
+    ...columns.slice(metricInsertIndex),
+  ];
+  return {
+    queryName,
+    columns: [
+      ...rowGroupby.slice(0, rowDepth),
+      ...colGroupby.slice(0, colDepth),
+    ],
+    metrics,
+    filters: [],
+    meta: {
+      kind: 'root',
+      rowSubtotalLevels,
+      colSubtotalLevels,
+      materializedMetrics,
+      materializedMeasureHierarchy,
+      requiredTimeOffsets: [],
+      pivotProgram: compilePivotProgram({
+        groupbyRows:
+          metricsLayoutResolved === MetricsLayoutEnum.ROWS
+            ? withValuesPlaceholder(rowGroupby)
+            : rowGroupby,
+        groupbyColumns:
+          metricsLayoutResolved === MetricsLayoutEnum.COLUMNS
+            ? withValuesPlaceholder(colGroupby)
+            : colGroupby,
+        metrics,
+        metricsLayout: metricsLayoutResolved,
+      }),
+      coverage: {
+        reason: 'initial',
+        rowDepth,
+        columnDepth: colDepth,
+        rowDimensions: rowGroupby.slice(0, rowDepth),
+        columnDimensions: colGroupby.slice(0, colDepth),
+      },
     },
-  },
-});
+  };
+};
 
 test('ingests named query results into ordered fact batches', () => {
   const specs = [

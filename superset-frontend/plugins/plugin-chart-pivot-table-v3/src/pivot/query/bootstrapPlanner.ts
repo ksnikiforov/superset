@@ -24,7 +24,10 @@ import {
   buildLayoutContext,
 } from '../layout/LayoutContext';
 import { type QueryIntent } from './queryIntent';
-import { buildVisibleFactCoverage } from '../runtime/coverage';
+import {
+  buildFactCoverage,
+  buildVisibleFactCoverage,
+} from '../runtime/coverage';
 import { type PivotFactCoverage } from '../runtime/types';
 
 export type BootstrapTargetKind = 'totals' | 'grid' | 'rows' | 'cols';
@@ -32,7 +35,7 @@ export type BootstrapTargetKind = 'totals' | 'grid' | 'rows' | 'cols';
 export type BootstrapTarget = {
   kind: BootstrapTargetKind;
   intent: QueryIntent;
-  coverage?: PivotFactCoverage;
+  coverage: PivotFactCoverage;
 };
 
 export type BootstrapPlan = {
@@ -165,6 +168,13 @@ export function buildBootstrapPlanFromLayout(
   const targets: BootstrapTarget[] = [
     {
       kind: 'totals',
+      coverage: buildFactCoverage({
+        reason: 'initial',
+        rowDimensions: layout.pivotProgram.rowDimensions,
+        columnDimensions: layout.pivotProgram.columnDimensions,
+        rowDepth: 0,
+        columnDepth: 0,
+      }),
       intent: buildIntent({
         kind: 'totals',
         targetRowDepth: 0,

@@ -427,18 +427,19 @@ Gate 2 has started:
 - The old `resolveFetchContextForBatch` alias has been deleted. Branch, batch,
   root, and batch-signature planning now call the same `resolveFetchContext`
   entry point directly.
+- `QuerySpecMeta` no longer carries duplicated `rowDepth` / `colDepth` fields.
+  Planned specs now treat `meta.coverage.rowDepth` and
+  `meta.coverage.columnDepth` as the single source of truth, and fact-store
+  batch scopes derive their depth from coverage during ingestion.
 
 Immediate next step:
 
-- Continue Gate 4 by replacing the remaining raw metric-position arithmetic
-  inside the shared tree materializer with the compiled `PivotProgram` axis
-  descriptor. The metric-axis and measure-leaf branches are now one
-  materializer, but that materializer still receives raw row/column groupby
-  arrays plus `metricPosition`; the next deletion target is that legacy input
-  shape.
 - Measure whether support metrics fetched for one branch are now reusable in the
   practical expansion paths we care about, and add a targeted regression test if
   any path still re-requests an already loaded exact support coverage.
+- Inspect fact-store batch scope depth fields next. They are now derived from
+  coverage, but may still be removable if exact coverage can replace scope depth
+  in fetched-depth reconstruction without changing interactive behavior.
 - Before deleting any broad behavior branch, bring inconsistent behavior or
   edge-case behavior that unlocks large deletion wins to the user for approval
   with UX impact and deletion upside.
@@ -527,6 +528,19 @@ Values -> returnFlag`. Keeping this behavior preserves current UX, but it
   their old source-axis-node preservation rule, and measure stacks keep their
   old always-preserve rule. This makes the first Gate 4 cleanup deletion-positive
   without changing the visible metric/measure-leaf layout contract.
+- Planned query metadata now carries `pivotProgram` instead of separate
+  `metricsLayoutResolved` and `metricInsertIndex` fields. The shared tree
+  materializer derives Values axis, Values insertion depth, axis dimensions, and
+  metric-at-end behavior from that program. Legacy raw-argument wrappers remain
+  only for direct tree test fixtures and normalize through `compilePivotProgram`
+  before reaching the shared materializer.
+- `rowGroupbyForQueryFull` and `colGroupbyForQueryFull` have been deleted from
+  planned query metadata. Fact ingestion reads row and column path columns from
+  `coverage.rowDimensions` and `coverage.columnDimensions`; base dimension-tree
+  materialization reads full axis depth from `pivotProgram.rowDimensions` and
+  `pivotProgram.columnDimensions`. Bootstrap totals now also carry explicit
+  `0 x 0` coverage so initial materialization has one coverage contract for
+  totals, grid, row-only, and column-only specs.
 
 ### Gate 1: One compiled layout model
 

@@ -41,10 +41,13 @@ import {
   encodeMeasureLeafKey,
   getMetricKeys,
   isSubtotalToken,
+  METRICS_PLACEHOLDER,
   SUBTOTAL_LABEL,
   SUBTOTAL_TOKEN,
 } from './tokens';
 import { buildValueLeaf, isValueLeaf } from '../measureLeaves';
+import { compilePivotProgram } from '../runtime/compilePivotProgram';
+import type { PivotProgram } from '../runtime/types';
 
 export const formatPivotLabelValue = (
   value: DataRecordValue,
@@ -280,43 +283,85 @@ type ApplyMeasureAxisInput = {
   tree: PivotTreeData;
   groups: MeasureAxisGroup[];
   leafTierVisible: boolean;
+  program: PivotProgram;
+  metricLabelMap?: Record<string, string>;
+  preserveValueAxisSourceNodes: boolean;
+  promoteExistingNodes: boolean;
+};
+
+const getValueAxis = (program: PivotProgram): 'row' | 'col' =>
+  program.valueAxis ??
+  (program.metricsLayoutResolved === MetricsLayoutEnum.ROWS ? 'row' : 'col');
+
+const getAxisDimensions = (program: PivotProgram, axis: 'row' | 'col') =>
+  axis === 'row' ? program.rowDimensions : program.columnDimensions;
+
+const getAxisProgram = (program: PivotProgram, axis: 'row' | 'col') =>
+  axis === 'row' ? program.rows : program.columns;
+
+const getValuesInsertIndex = (program: PivotProgram) => {
+  const valueAxis = getValueAxis(program);
+  const axisProgram = getAxisProgram(program, valueAxis);
+  const valuesIndex = axisProgram.findIndex(level => level.kind === 'values');
+  if (valuesIndex < 0) {
+    return getAxisDimensions(program, valueAxis).length;
+  }
+  return axisProgram
+    .slice(0, valuesIndex)
+    .filter(level => level.kind === 'dimension').length;
+};
+
+const buildMetricAxisProgram = ({
+  metrics,
+  metricsLayout,
+  rowGroupby,
+  colGroupby,
+  metricPosition,
+}: {
+  metrics: QueryFormMetric[];
   metricsLayout: MetricsLayoutEnum;
   rowGroupby: QueryFormColumn[];
   colGroupby: QueryFormColumn[];
   metricPosition?: number;
-  metricLabelMap?: Record<string, string>;
-  preserveMetricAxisNodes: boolean;
-  promoteExistingNodes: boolean;
-};
-
-const resolveMetricAxisInsertIndex = (
-  metricsLayout: MetricsLayoutEnum,
-  rowGroupby: QueryFormColumn[],
-  colGroupby: QueryFormColumn[],
-  metricPosition?: number,
-) => {
-  const axisDepth =
-    metricsLayout === MetricsLayoutEnum.ROWS
-      ? rowGroupby.length
-      : colGroupby.length;
-  return Math.min(metricPosition ?? axisDepth, axisDepth);
+}): PivotProgram => {
+  const valueAxis =
+    metricsLayout === MetricsLayoutEnum.ROWS ? 'row' : ('col' as const);
+  const axisDepth = valueAxis === 'row' ? rowGroupby.length : colGroupby.length;
+  const metricInsertIndex = Math.min(metricPosition ?? axisDepth, axisDepth);
+  const withValuesPlaceholder = (columns: QueryFormColumn[]) => [
+    ...columns.slice(0, metricInsertIndex),
+    METRICS_PLACEHOLDER,
+    ...columns.slice(metricInsertIndex),
+  ];
+  return compilePivotProgram({
+    groupbyRows:
+      valueAxis === 'row' ? withValuesPlaceholder(rowGroupby) : rowGroupby,
+    groupbyColumns:
+      valueAxis === 'col' ? withValuesPlaceholder(colGroupby) : colGroupby,
+    metrics,
+    metricsLayout,
+  });
 };
 
 const applyMeasureAxis = ({
   tree,
   groups,
   leafTierVisible,
-  metricsLayout,
-  rowGroupby,
-  colGroupby,
-  metricPosition,
+  program,
   metricLabelMap,
-  preserveMetricAxisNodes,
+  preserveValueAxisSourceNodes,
   promoteExistingNodes,
 }: ApplyMeasureAxisInput): PivotTreeData => {
   if (groups.length === 0) {
     return tree;
   }
+  const valueAxis = getValueAxis(program);
+  const rowGroupby = program.rowDimensions;
+  const colGroupby = program.columnDimensions;
+  const insertIndex = getValuesInsertIndex(program);
+  const valueAxisDepth =
+    valueAxis === 'row' ? rowGroupby.length : colGroupby.length;
+  const valuesAtEnd = insertIndex >= valueAxisDepth;
   const metricKeys = groups.map(group => group.metricKey);
   const metricTokenSet = new Set(metricKeys.map(encodeMetricKey));
   const leafLabelMap = new Map<string, string>();
@@ -397,15 +442,15 @@ const applyMeasureAxis = ({
     if (isMetricNode && !leafTierVisible) {
       if (
         axis === 'row' &&
-        metricsLayout === MetricsLayoutEnum.ROWS &&
-        (metricPosition ?? rowGroupby.length) >= rowGroupby.length
+        valueAxis === 'row' &&
+        insertIndex >= rowGroupby.length
       ) {
         hasChildren = false;
       }
       if (
         axis === 'col' &&
-        metricsLayout === MetricsLayoutEnum.COLUMNS &&
-        (metricPosition ?? colGroupby.length) >= colGroupby.length
+        valueAxis === 'col' &&
+        insertIndex >= colGroupby.length
       ) {
         hasChildren = false;
       }
@@ -432,15 +477,10 @@ const applyMeasureAxis = ({
     return node;
   };
 
-  if (metricsLayout === MetricsLayoutEnum.ROWS) {
+  if (valueAxis === 'row') {
     const rowDepthWithMeasures = rowGroupby.length + (leafTierVisible ? 2 : 1);
-    const insertIndex = Math.min(
-      metricPosition ?? rowGroupby.length,
-      rowGroupby.length,
-    );
-    const metricsAtRowEnd = insertIndex >= rowGroupby.length;
 
-    if (preserveMetricAxisNodes) {
+    if (preserveValueAxisSourceNodes) {
       Object.values(tree.rows).forEach(rowNode =>
         ensureNode(
           'row',
@@ -471,11 +511,7 @@ const applyMeasureAxis = ({
       const rowKey = serializePath(rowPath);
       const colKey = serializePath(colPath);
       const isTotalRow = rowPath.length === 0 || rowPath.some(isSubtotalToken);
-      if (
-        metricsAtRowEnd &&
-        rowPath.length < rowGroupby.length &&
-        !isTotalRow
-      ) {
+      if (valuesAtEnd && rowPath.length < rowGroupby.length && !isTotalRow) {
         ensureNode(
           'row',
           rowPath,
@@ -541,16 +577,7 @@ const applyMeasureAxis = ({
             values: mergedValues,
             isSubtotal: cell.isSubtotal,
           };
-          if (metricKeys.length === 1 && metricPosition !== 0) {
-            const cellKey = serializeCellKey(rowKey, colKey);
-            result.cells[cellKey] = result.cells[cellKey] || {
-              rowKey,
-              colKey,
-              values: mergedValues,
-              isSubtotal: cell.isSubtotal,
-            };
-          }
-          if (metricKeys.length === 1 && metricPosition === 0) {
+          if (metricKeys.length === 1) {
             const cellKey = serializeCellKey(rowKey, colKey);
             result.cells[cellKey] = result.cells[cellKey] || {
               rowKey,
@@ -564,12 +591,8 @@ const applyMeasureAxis = ({
     });
   } else {
     const colDepthWithMeasures = colGroupby.length + (leafTierVisible ? 2 : 1);
-    const insertIndex = Math.min(
-      metricPosition ?? colGroupby.length,
-      colGroupby.length,
-    );
 
-    if (preserveMetricAxisNodes) {
+    if (preserveValueAxisSourceNodes) {
       Object.values(tree.cols).forEach(colNode =>
         ensureNode(
           'col',
@@ -636,7 +659,7 @@ const applyMeasureAxis = ({
             values: mergedValues,
             isSubtotal: cell.isSubtotal,
           };
-          if (metricKeys.length === 1 && metricPosition === 0) {
+          if (metricKeys.length === 1 && insertIndex === 0) {
             const rootColKey = serializePath(colPrefix);
             const cellKey = serializeCellKey(rowKey, rootColKey);
             result.cells[cellKey] = result.cells[cellKey] || {
@@ -648,12 +671,11 @@ const applyMeasureAxis = ({
           }
           if (
             metricKeys.length === 1 &&
-            (metricPosition === undefined ||
-              metricPosition >= colGroupby.length ||
-              metricPosition === 0 ||
-              (metricPosition > 0 &&
-                metricPosition < colGroupby.length &&
-                colPath.length <= metricPosition))
+            (insertIndex >= colGroupby.length ||
+              insertIndex === 0 ||
+              (insertIndex > 0 &&
+                insertIndex < colGroupby.length &&
+                colPath.length <= insertIndex))
           ) {
             const baseColKey = serializePath(colPath);
             const cellKey = serializeCellKey(rowKey, baseColKey);
@@ -681,17 +703,17 @@ export const applyMetricAxis = (
   metricPosition?: number,
   metricLabelMap?: Record<string, string>,
 ): PivotTreeData => {
-  const metricKeys = getMetricKeys(metrics);
-  const insertIndex = resolveMetricAxisInsertIndex(
+  const program = buildMetricAxisProgram({
+    metrics,
     metricsLayout,
     rowGroupby,
     colGroupby,
     metricPosition,
-  );
-  const axisDepth =
-    metricsLayout === MetricsLayoutEnum.ROWS
-      ? rowGroupby.length
-      : colGroupby.length;
+  });
+  const { metricKeys } = program;
+  const valueAxis = getValueAxis(program);
+  const insertIndex = getValuesInsertIndex(program);
+  const axisDepth = getAxisDimensions(program, valueAxis).length;
   return applyMeasureAxis({
     tree,
     groups: metricKeys.map(metricKey => ({
@@ -699,17 +721,20 @@ export const applyMetricAxis = (
       leaves: [buildValueLeaf()],
     })),
     leafTierVisible: false,
-    metricsLayout,
-    rowGroupby,
-    colGroupby,
-    metricPosition,
+    program,
     metricLabelMap,
-    preserveMetricAxisNodes: insertIndex === 0 || insertIndex >= axisDepth,
+    preserveValueAxisSourceNodes: insertIndex === 0 || insertIndex >= axisDepth,
     promoteExistingNodes: true,
   });
 };
 
-export const applyMeasureHierarchyAxis = (
+export function applyMeasureHierarchyAxis(
+  tree: PivotTreeData,
+  measureHierarchy: MeasureHierarchy,
+  program: PivotProgram,
+  metricLabelMap?: Record<string, string>,
+): PivotTreeData;
+export function applyMeasureHierarchyAxis(
   tree: PivotTreeData,
   measureHierarchy: MeasureHierarchy,
   metricsLayout: MetricsLayoutEnum,
@@ -717,31 +742,62 @@ export const applyMeasureHierarchyAxis = (
   colGroupby: QueryFormColumn[],
   metricPosition?: number,
   metricLabelMap?: Record<string, string>,
-): PivotTreeData => {
+): PivotTreeData;
+export function applyMeasureHierarchyAxis(
+  tree: PivotTreeData,
+  measureHierarchy: MeasureHierarchy,
+  programOrMetricsLayout: PivotProgram | MetricsLayoutEnum,
+  metricLabelMapOrRowGroupby?: Record<string, string> | QueryFormColumn[],
+  colGroupby?: QueryFormColumn[],
+  metricPosition?: number,
+  legacyMetricLabelMap?: Record<string, string>,
+): PivotTreeData {
+  const usesProgram = typeof programOrMetricsLayout === 'object';
+  const program = usesProgram
+    ? programOrMetricsLayout
+    : buildMetricAxisProgram({
+        metrics:
+          measureHierarchy.kind === 'flatMetrics'
+            ? measureHierarchy.metricKeys
+            : measureHierarchy.groups.map(group => group.metricKey),
+        metricsLayout: programOrMetricsLayout,
+        rowGroupby: Array.isArray(metricLabelMapOrRowGroupby)
+          ? metricLabelMapOrRowGroupby
+          : [],
+        colGroupby: colGroupby ?? [],
+        metricPosition,
+      });
+  const metricLabelMap = usesProgram
+    ? (metricLabelMapOrRowGroupby as Record<string, string> | undefined)
+    : legacyMetricLabelMap;
   if (measureHierarchy.kind === 'flatMetrics') {
-    return applyMetricAxis(
+    const insertIndex = getValuesInsertIndex(program);
+    const valueAxis = getValueAxis(program);
+    const axisDepth = getAxisDimensions(program, valueAxis).length;
+    return applyMeasureAxis({
       tree,
-      measureHierarchy.metricKeys,
-      metricsLayout,
-      rowGroupby,
-      colGroupby,
-      metricPosition,
+      groups: measureHierarchy.metricKeys.map(metricKey => ({
+        metricKey,
+        leaves: [buildValueLeaf()],
+      })),
+      leafTierVisible: false,
+      program,
       metricLabelMap,
-    );
+      preserveValueAxisSourceNodes:
+        insertIndex === 0 || insertIndex >= axisDepth,
+      promoteExistingNodes: true,
+    });
   }
   return applyMeasureAxis({
     tree,
     groups: measureHierarchy.groups,
     leafTierVisible: measureHierarchy.leafTierVisibility === 'visible',
-    metricsLayout,
-    rowGroupby,
-    colGroupby,
-    metricPosition,
+    program,
     metricLabelMap,
-    preserveMetricAxisNodes: true,
+    preserveValueAxisSourceNodes: true,
     promoteExistingNodes: false,
   });
-};
+}
 
 export const buildTreeFromRecords = (
   records: DataRecord[],

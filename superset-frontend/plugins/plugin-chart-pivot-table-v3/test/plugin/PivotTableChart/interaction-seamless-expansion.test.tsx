@@ -3133,13 +3133,17 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
           kind?: string;
           axis?: string;
           path?: PivotPath;
-          rowDepth?: number;
-          colDepth?: number;
+          coverage?: {
+            rowDepth?: number;
+            columnDepth?: number;
+          };
         };
       }) =>
         `${spec.meta?.kind ?? 'unknown'}:${spec.meta?.axis ?? 'none'}:${serializePath(
           spec.meta?.path ?? [],
-        )}:${spec.meta?.rowDepth ?? 0}:${spec.meta?.colDepth ?? 0}`,
+        )}:${spec.meta?.coverage?.rowDepth ?? 0}:${
+          spec.meta?.coverage?.columnDepth ?? 0
+        }`,
     );
     expect(plannedSummary).toContain('branch:row:A:2:1');
 
@@ -3365,14 +3369,14 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     expect(plannedSpecs.length).toBeGreaterThan(0);
     expect(
       plannedSpecs.some(
-        (spec: { meta?: { colDepth?: number } }) =>
-          (spec.meta?.colDepth ?? 0) >= 1,
+        (spec: { meta?: { coverage?: { columnDepth?: number } } }) =>
+          (spec.meta?.coverage?.columnDepth ?? 0) >= 1,
       ),
     ).toBe(true);
     expect(
       plannedSpecs.some(
-        (spec: { meta?: { colGroupbyForQueryFull?: string[] } }) =>
-          (spec.meta?.colGroupbyForQueryFull ?? []).includes('c1'),
+        (spec: { meta?: { coverage?: { columnDimensions?: string[] } } }) =>
+          (spec.meta?.coverage?.columnDimensions ?? []).includes('c1'),
       ),
     ).toBe(true);
     expect(

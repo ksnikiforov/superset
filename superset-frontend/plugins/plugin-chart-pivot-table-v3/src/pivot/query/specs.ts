@@ -28,7 +28,6 @@ import {
 } from '@superset-ui/core';
 import {
   type MeasureHierarchy,
-  type MetricsLayoutEnum,
   type PivotAxis,
   type PivotPath,
   type PivotPathValue,
@@ -69,6 +68,7 @@ import {
 import {
   type PivotCoverageReason,
   type PivotFactCoverage,
+  type PivotProgram,
 } from '../runtime/types';
 
 export type QuerySpecMeta = {
@@ -77,18 +77,13 @@ export type QuerySpecMeta = {
   path?: PivotPath;
   parentPath?: PivotPath;
   siblingValues?: PivotPathValue[];
-  rowDepth: number;
-  colDepth: number;
-  rowGroupbyForQueryFull: QueryFormColumn[];
-  colGroupbyForQueryFull: QueryFormColumn[];
   rowSubtotalLevels: number[];
   colSubtotalLevels: number[];
   materializedMetrics: QueryFormMetric[];
   materializedMeasureHierarchy: MeasureHierarchy;
   requiredTimeOffsets: string[];
-  metricsLayoutResolved: MetricsLayoutEnum;
-  metricInsertIndex: number;
-  coverage?: PivotFactCoverage;
+  pivotProgram: PivotProgram;
+  coverage: PivotFactCoverage;
 };
 
 export type PlannedQuerySpec = QuerySpec & {
@@ -279,17 +274,12 @@ const buildSpecsForCoverages = ({
     filters,
     meta: {
       ...meta,
-      rowDepth: coverage.rowDepth,
-      colDepth: coverage.columnDepth,
-      rowGroupbyForQueryFull: layout.groupbyRows,
-      colGroupbyForQueryFull: layout.groupbyColumns,
       rowSubtotalLevels: ctx.rowSubtotalLevels,
       colSubtotalLevels: ctx.colSubtotalLevels,
       materializedMetrics: ctx.materializedMetrics,
       materializedMeasureHierarchy: ctx.materializedMeasureHierarchy,
       requiredTimeOffsets: ctx.requiredTimeOffsets,
-      metricsLayoutResolved: layout.metricsLayoutResolved,
-      metricInsertIndex: layout.metricInsertIndex,
+      pivotProgram: layout.pivotProgram,
       coverage,
     },
   }));
@@ -648,17 +638,12 @@ export const buildInitialQuerySpecs = (
       filters: [],
       meta: {
         kind: 'bootstrap',
-        rowDepth: target.intent.targetRowDepth,
-        colDepth: target.intent.targetColDepth,
-        rowGroupbyForQueryFull: rowGroupby,
-        colGroupbyForQueryFull: colGroupby,
         rowSubtotalLevels,
         colSubtotalLevels,
         materializedMetrics: metrics,
         materializedMeasureHierarchy: layout.measureHierarchy,
         requiredTimeOffsets: layout.requiredTimeOffsets,
-        metricsLayoutResolved: layout.metricsLayoutResolved,
-        metricInsertIndex: layout.metricInsertIndex,
+        pivotProgram: layout.pivotProgram,
         coverage: target.coverage,
       },
     });

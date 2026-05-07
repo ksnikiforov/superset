@@ -79,10 +79,10 @@ describe('layout resolution (contracts)', () => {
     const bootstrapSpec = specs.find(spec => spec.meta.kind === 'bootstrap');
     expect(bootstrapSpec).toBeDefined();
     expect(signature.metricsLayout).toBe(
-      bootstrapSpec?.meta.metricsLayoutResolved,
+      bootstrapSpec?.meta.pivotProgram.metricsLayoutResolved,
     );
     expect(signature.metricInsertIndex).toBe(
-      bootstrapSpec?.meta.metricInsertIndex,
+      bootstrapSpec?.meta.pivotProgram.metricInsertIndex,
     );
     expect(signature.rowSubtotalLevels).toEqual(
       bootstrapSpec?.meta.rowSubtotalLevels,
@@ -109,10 +109,10 @@ describe('layout resolution (contracts)', () => {
 
     const layout = buildLayoutContext(formData);
 
-    expect(layout.measureHierarchy.kind).toBe('measureStackV1');
-    if (layout.measureHierarchy.kind === 'measureStackV1') {
-      expect(layout.measureHierarchy.leafTierVisibility).toBe('visible');
-    }
+    expect(layout.measureHierarchy).toMatchObject({
+      kind: 'measureStackV1',
+      leafTierVisibility: 'visible',
+    });
   });
 
   it('normalizes legacy total position values', () => {
