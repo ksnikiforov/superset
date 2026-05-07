@@ -54,6 +54,7 @@ import { coerceExpansionState } from './persistedExpansionState';
 import { resolveFetchContextForBatch } from './resolveFetchContext';
 import { buildQueryShape } from './queryShape';
 import { type QuerySpec } from './types';
+import { type PivotFactCoverage } from '../runtime/types';
 
 export type QuerySpecMeta = {
   kind: 'bootstrap' | 'root' | 'branch' | 'batch';
@@ -70,6 +71,7 @@ export type QuerySpecMeta = {
   colSubtotalLevels: number[];
   metricsLayoutResolved: MetricsLayoutEnum;
   metricInsertIndex: number;
+  coverage?: PivotFactCoverage;
 };
 
 export type PlannedQuerySpec = QuerySpec & {
@@ -587,6 +589,7 @@ export const buildInitialQuerySpecs = (
         colSubtotalLevels,
         metricsLayoutResolved: layout.metricsLayoutResolved,
         metricInsertIndex: layout.metricInsertIndex,
+        coverage: target.coverage,
       },
     });
   });

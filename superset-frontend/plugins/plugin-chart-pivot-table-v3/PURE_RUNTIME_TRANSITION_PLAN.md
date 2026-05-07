@@ -220,6 +220,44 @@ The transition should be organized around deletion gates. A phase is not done
 until old code is removed. Any temporary bridge must have a named deletion
 target in the same change set.
 
+## Progress Snapshot
+
+As of May 7, 2026:
+
+- Gate 1 is in progress.
+- `PivotProgram`, `PivotAxisLevel`, and visible coverage types exist under
+  `src/pivot/runtime/`.
+- `LayoutContext` compiles `pivotProgram` and derives its current compatibility
+  fields from that program.
+- Control-panel Values placement uses the runtime compiler.
+- The old `resolveMetricPlacement` helper has been deleted from `utils.ts`.
+- `rg "resolveMetricPlacement"` should return no plugin source or test matches.
+- Tests now cover Values first, middle, and last on both axes.
+- Tests now cover visible coverage rules for hidden/non-expanded layers.
+
+Remaining Gate 1 work:
+
+- Remove raw layout interpretation from `usePivotLayout`.
+- Remove raw layout interpretation from `resolveInteractionLayout`.
+- Remove duplicated Values-placeholder cleanup that still exists around controls
+  and runtime layout conversion.
+
+Gate 2 has started:
+
+- `coverage.ts` exists.
+- Bootstrap query targets consume visible coverage for grid, row, and column
+  axis targets.
+- Bootstrap query metadata records the visible coverage it requested.
+- The unused duplicate `src/pivot/engine/initialQueryPlan.ts` planner has been
+  deleted.
+- Branch and batch query paths still use the old planner shape.
+
+Immediate next step:
+
+- Extend visible coverage from bootstrap targets into branch/batch planning,
+  then delete placement-specific depth-pair branches from `branchQueryPairs.ts`
+  and path surgery from `resolveFetchContext.ts`.
+
 ### Gate 1: One compiled layout model
 
 Add:

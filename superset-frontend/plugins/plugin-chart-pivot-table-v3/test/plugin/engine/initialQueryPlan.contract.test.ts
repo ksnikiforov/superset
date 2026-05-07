@@ -102,4 +102,31 @@ describe('buildInitialQuerySpecs (contracts)', () => {
 
     expect(Array.from(branchPaths)).toEqual([serializePath(['A'])]);
   });
+
+  it('records bootstrap coverage for visible layers only', () => {
+    const formData = buildFormData({
+      groupbyRows: ['country', 'state'],
+      groupbyColumns: ['category', 'subcategory'],
+      metrics: ['sales'],
+      startCollapsed: true,
+      initialDepth: 1,
+    });
+
+    const specs = buildInitialQuerySpecs(formData);
+    const gridSpec = specs.find(
+      spec =>
+        spec.meta.kind === 'bootstrap' &&
+        spec.meta.rowDepth === 1 &&
+        spec.meta.colDepth === 1,
+    );
+
+    expect(gridSpec?.columns).toEqual(['country', 'category']);
+    expect(gridSpec?.meta.coverage).toMatchObject({
+      reason: 'initial',
+      rowDepth: 1,
+      columnDepth: 1,
+      rowDimensions: ['country'],
+      columnDimensions: ['category'],
+    });
+  });
 });

@@ -24,12 +24,15 @@ import {
   buildLayoutContext,
 } from '../layout/LayoutContext';
 import { type QueryIntent } from './queryIntent';
+import { buildVisibleFactCoverage } from '../runtime/coverage';
+import { type PivotFactCoverage } from '../runtime/types';
 
 export type BootstrapTargetKind = 'totals' | 'grid' | 'rows' | 'cols';
 
 export type BootstrapTarget = {
   kind: BootstrapTargetKind;
   intent: QueryIntent;
+  coverage?: PivotFactCoverage;
 };
 
 export type BootstrapPlan = {
@@ -37,6 +40,29 @@ export type BootstrapPlan = {
   rowGroupby: QueryFormColumn[];
   colGroupby: QueryFormColumn[];
   metrics: QueryFormMetric[];
+};
+
+type BuildIntentInput = {
+  kind: BootstrapTargetKind;
+  targetRowDepth: number;
+  targetColDepth: number;
+  needsTotals: boolean;
+  needsMetricFormatting: boolean;
+  needsDatabars: boolean;
+  needsRowOrdering: boolean;
+  needsColOrdering: boolean;
+  needsRowDimensionFormatting: boolean;
+  needsColDimensionFormatting: boolean;
+};
+
+type CoverageTargetInput = Omit<
+  BuildIntentInput,
+  'kind' | 'targetRowDepth' | 'targetColDepth'
+> & {
+  layout: LayoutContext;
+  kind: Exclude<BootstrapTargetKind, 'totals'>;
+  rowDepth: number;
+  colDepth: number;
 };
 
 const buildIntent = ({
@@ -50,18 +76,7 @@ const buildIntent = ({
   needsColOrdering,
   needsRowDimensionFormatting,
   needsColDimensionFormatting,
-}: {
-  kind: BootstrapTargetKind;
-  targetRowDepth: number;
-  targetColDepth: number;
-  needsTotals: boolean;
-  needsMetricFormatting: boolean;
-  needsDatabars: boolean;
-  needsRowOrdering: boolean;
-  needsColOrdering: boolean;
-  needsRowDimensionFormatting: boolean;
-  needsColDimensionFormatting: boolean;
-}): QueryIntent => ({
+}: BuildIntentInput): QueryIntent => ({
   kind: kind === 'totals' ? 'totalsOnly' : 'wholeLevel',
   targetRowDepth,
   targetColDepth,
@@ -74,6 +89,39 @@ const buildIntent = ({
   needsRowDimensionFormatting,
   needsColDimensionFormatting,
 });
+
+const firstVisibleDepth = (groupby: QueryFormColumn[]) =>
+  groupby.length > 0 ? 1 : 0;
+
+const buildCoverageTarget = ({
+  layout,
+  kind,
+  rowDepth,
+  colDepth,
+  ...intentFlags
+}: CoverageTargetInput): BootstrapTarget | undefined => {
+  const [coverage] = buildVisibleFactCoverage({
+    program: layout.pivotProgram,
+    rowDepth,
+    columnDepth: colDepth,
+    reason: 'initial',
+  });
+
+  if (!coverage) {
+    return undefined;
+  }
+
+  return {
+    kind,
+    coverage,
+    intent: buildIntent({
+      kind,
+      targetRowDepth: coverage.rowDepth,
+      targetColDepth: coverage.columnDepth,
+      ...intentFlags,
+    }),
+  };
+};
 
 export function buildBootstrapPlanFromLayout(
   layout: LayoutContext,
@@ -110,7 +158,9 @@ export function buildBootstrapPlanFromLayout(
     (!!formData.colTotals ||
       colSubtotalLevels.length > 0 ||
       hasTotalSorting(formData.colSorting, colGroupby));
-  const needsGrid = rowGroupby.length > 0 && colGroupby.length > 0;
+  const firstRowDepth = firstVisibleDepth(rowGroupby);
+  const firstColDepth = firstVisibleDepth(colGroupby);
+  const needsGrid = firstRowDepth > 0 && firstColDepth > 0;
 
   const targets: BootstrapTarget[] = [
     {
@@ -131,57 +181,60 @@ export function buildBootstrapPlanFromLayout(
   ];
 
   if (needsGrid) {
-    targets.push({
+    const target = buildCoverageTarget({
+      layout,
       kind: 'grid',
-      intent: buildIntent({
-        kind: 'grid',
-        targetRowDepth: 1,
-        targetColDepth: 1,
-        needsTotals: false,
-        needsMetricFormatting,
-        needsDatabars,
-        needsRowOrdering,
-        needsColOrdering,
-        needsRowDimensionFormatting,
-        needsColDimensionFormatting,
-      }),
+      rowDepth: firstRowDepth,
+      colDepth: firstColDepth,
+      needsTotals: false,
+      needsMetricFormatting,
+      needsDatabars,
+      needsRowOrdering,
+      needsColOrdering,
+      needsRowDimensionFormatting,
+      needsColDimensionFormatting,
     });
+    if (target) {
+      targets.push(target);
+    }
   }
 
   if (rowGroupby.length > 0 && (!needsGrid || needsRowTotals)) {
-    targets.push({
+    const target = buildCoverageTarget({
+      layout,
       kind: 'rows',
-      intent: buildIntent({
-        kind: 'rows',
-        targetRowDepth: 1,
-        targetColDepth: 0,
-        needsTotals,
-        needsMetricFormatting,
-        needsDatabars,
-        needsRowOrdering,
-        needsColOrdering: false,
-        needsRowDimensionFormatting,
-        needsColDimensionFormatting: false,
-      }),
+      rowDepth: firstRowDepth,
+      colDepth: 0,
+      needsTotals,
+      needsMetricFormatting,
+      needsDatabars,
+      needsRowOrdering,
+      needsColOrdering: false,
+      needsRowDimensionFormatting,
+      needsColDimensionFormatting: false,
     });
+    if (target) {
+      targets.push(target);
+    }
   }
 
   if (colGroupby.length > 0 && (!needsGrid || needsColTotals)) {
-    targets.push({
+    const target = buildCoverageTarget({
+      layout,
       kind: 'cols',
-      intent: buildIntent({
-        kind: 'cols',
-        targetRowDepth: 0,
-        targetColDepth: 1,
-        needsTotals,
-        needsMetricFormatting,
-        needsDatabars,
-        needsRowOrdering: false,
-        needsColOrdering,
-        needsRowDimensionFormatting: false,
-        needsColDimensionFormatting,
-      }),
+      rowDepth: 0,
+      colDepth: firstColDepth,
+      needsTotals,
+      needsMetricFormatting,
+      needsDatabars,
+      needsRowOrdering: false,
+      needsColOrdering,
+      needsRowDimensionFormatting: false,
+      needsColDimensionFormatting,
     });
+    if (target) {
+      targets.push(target);
+    }
   }
 
   return {
