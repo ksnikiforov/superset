@@ -27,6 +27,7 @@ import {
   clearPivotBranchCache,
   fetchPivotBranch,
   resolveFetchContextForTest,
+  resolvePivotBranchLocalResult,
 } from '../../src/fetchPivotBranch';
 import {
   buildBuiltInLeaf,
@@ -1669,5 +1670,52 @@ describe('fetchPivotBranch delta-only contract', () => {
     const rowKeys = Object.keys(secondResult.data?.rows ?? {});
     expect(rowKeys).not.toContain(serializePath(['Z']));
     expect(rowKeys).not.toContain(serializePath(['Y']));
+  });
+
+  it('resolves branch cache hits through the local result path without network', async () => {
+    const postMock = SupersetClient.post as jest.Mock;
+    postMock.mockResolvedValueOnce({
+      json: {
+        result: [
+          {
+            data: [{ r1: 'A', m1: 7 }],
+          },
+        ],
+      },
+    });
+
+    const formData = buildFormData({
+      groupbyRows: ['r1'],
+      groupbyColumns: [],
+      metrics: ['m1'],
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      rowSubTotals: false,
+      datasource: '1__table',
+      viz_type: 'pivot_table_v3',
+    });
+
+    await fetchPivotBranch({
+      formData,
+      axis: 'row',
+      path: ['A'],
+      currentTree: buildMetricFirstColumnTree([{ r1: 'A', m1: 7 }]),
+    });
+    postMock.mockClear();
+
+    const result = resolvePivotBranchLocalResult({
+      formData,
+      axis: 'row',
+      path: ['A'],
+      currentTree: buildMetricFirstColumnTree([{ r1: 'ignored', m1: 999 }]),
+    });
+
+    const rowKey = serializePath(['A']);
+    const metricColKey = serializePath([encodeMetricKey('m1')]);
+
+    expect(result?.cached).toBe(true);
+    expect(postMock).not.toHaveBeenCalled();
+    expect(
+      result?.data?.cells[serializeCellKey(rowKey, metricColKey)]?.values.m1,
+    ).toBe(7);
   });
 });

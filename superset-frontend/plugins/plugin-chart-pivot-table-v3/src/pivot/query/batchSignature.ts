@@ -30,7 +30,7 @@ import {
 import { buildBranchFactCoverages } from '../runtime/coverage';
 import { stableStringify } from '../shared/stableStringify';
 import { formatQueryName } from './queryName';
-import { resolveFetchContextForBatch } from './resolveFetchContext';
+import { resolveFetchContext } from './resolveFetchContext';
 import { toChartDataQueries } from './toChartDataQueries';
 import { type QuerySpec } from './types';
 
@@ -54,7 +54,7 @@ export const buildBatchSignature = ({
   visibleColDepth,
 }: BatchSignatureParams): string => {
   const resolvedLayout = layout ?? buildLayoutContext(formData);
-  const ctx = resolveFetchContextForBatch({
+  const ctx = resolveFetchContext({
     formData,
     layout: resolvedLayout,
     axis,

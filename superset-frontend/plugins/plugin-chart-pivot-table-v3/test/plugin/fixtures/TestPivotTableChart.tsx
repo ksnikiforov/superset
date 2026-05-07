@@ -25,6 +25,7 @@ import {
 } from '@superset-ui/core';
 import PivotTableChart from '../../../src/PivotTableChart';
 import { PivotTableProps, PivotTreeData } from '../../../src/types';
+import { type PivotFactStoreBatch } from '../../../src/pivot/runtime/factStore';
 import { buildFormData } from './pivotFormData';
 
 const noopSetDataMask: SetDataMaskHook = () => undefined;
@@ -51,6 +52,47 @@ const emptyMetrics: PivotTableProps['metrics'] = [];
 const emptyGroupbyRows: PivotTableProps['groupbyRows'] = [];
 const emptyGroupbyColumns: PivotTableProps['groupbyColumns'] = [];
 const emptyQueriesData: PivotTableProps['queriesData'] = [];
+
+const maxPathDepth = (nodes: PivotTreeData['rows']) =>
+  Object.values(nodes).reduce(
+    (depth, node) => Math.max(depth, node.path.length),
+    0,
+  );
+
+export const buildPreloadedTreeFactBatches = (
+  tree: PivotTreeData | undefined,
+): PivotFactStoreBatch[] => {
+  if (!tree) {
+    return [];
+  }
+  const rowDepth = maxPathDepth(tree.rows);
+  const colDepth = maxPathDepth(tree.cols);
+  const batches: PivotFactStoreBatch[] = [];
+  (
+    [
+      ['row', tree.rows],
+      ['col', tree.cols],
+    ] as const
+  ).forEach(([axis, nodes]) => {
+    Object.values(nodes).forEach(node => {
+      if (!node.hasChildren) {
+        return;
+      }
+      batches.push({
+        queryName: `test-preloaded-${axis}-${node.key}`,
+        facts: [],
+        scope: {
+          kind: 'branch',
+          axis,
+          path: node.path,
+          rowDepth,
+          colDepth,
+        },
+      });
+    });
+  });
+  return batches;
+};
 
 const baseProps: PivotTableProps = {
   data: emptyTree,

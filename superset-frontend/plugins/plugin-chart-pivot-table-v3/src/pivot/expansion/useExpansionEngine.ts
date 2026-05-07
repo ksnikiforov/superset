@@ -49,7 +49,10 @@ import {
   stageDelta,
   type StagingTreeState,
 } from '../engine/stagingTree';
-import { fetchPivotBranch, peekPivotBranchCache } from '../../fetchPivotBranch';
+import {
+  fetchPivotBranch,
+  resolvePivotBranchLocalResult,
+} from '../../fetchPivotBranch';
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import { buildBatchSignature } from '../query/batchSignature';
@@ -688,6 +691,40 @@ export const useExpansionEngine = ({
     [getCoverageKey],
   );
 
+  const seedFetchedCoverageFromFactBatches = useCallback(
+    (batches: PivotFactStoreBatch[]) => {
+      batches.forEach(batch => {
+        const { scope } = batch;
+        if (!scope) {
+          return;
+        }
+        if (scope.kind === 'bootstrap' || scope.kind === 'root') {
+          return;
+        }
+        if (scope.kind === 'branch') {
+          markFetchedCoverage(
+            scope.axis,
+            serializePath(scope.path),
+            scope.axis === 'row' ? scope.colDepth : scope.rowDepth,
+          );
+          return;
+        }
+        const targetPaths =
+          scope.siblingValues.length > 0
+            ? scope.siblingValues.map(value => [...scope.parentPath, value])
+            : [scope.parentPath];
+        targetPaths.forEach(path => {
+          markFetchedCoverage(
+            scope.axis,
+            serializePath(path),
+            scope.axis === 'row' ? scope.colDepth : scope.rowDepth,
+          );
+        });
+      });
+    },
+    [markFetchedCoverage],
+  );
+
   const collectInFlightExpanded = useCallback((axis: PivotAxis) => {
     const source =
       axis === 'row'
@@ -1106,17 +1143,6 @@ export const useExpansionEngine = ({
         requiredDepth: number;
       }) => {
         const path = parsePath(key);
-        const cached = peekPivotBranchCache({
-          axis,
-          path,
-          formData: fetchFormData,
-          currentTree: treeSnapshot,
-          visibleRowDepth,
-          visibleColDepth,
-        });
-        if (cached) {
-          return { key, data: cached, requiredDepth };
-        }
         if (transactionIdRef.current === requestId) {
           updateLoadingKey(key, 1);
         }
@@ -1260,23 +1286,24 @@ export const useExpansionEngine = ({
           if (plan.fetchKeys.size === 0) {
             break;
           }
-          const cachedResults: SingleFetchResult[] = [];
+          const localResults: SingleFetchResult[] = [];
           const batchCandidates: BatchCandidate[] = [];
           for (const target of targets) {
             const path = parsePath(target.pathKey);
-            const cached = peekPivotBranchCache({
+            const localResult = resolvePivotBranchLocalResult({
               axis: target.axis,
               path,
               formData: fetchFormData,
               currentTree,
               visibleRowDepth,
               visibleColDepth,
+              factStore: factStoreRef.current,
             });
-            if (cached) {
-              cachedResults.push({
+            if (localResult) {
+              localResults.push({
                 kind: 'single',
                 target,
-                data: cached,
+                data: localResult.data,
               });
               continue;
             }
@@ -1326,7 +1353,7 @@ export const useExpansionEngine = ({
           // eslint-disable-next-line no-await-in-loop
           const fetchedResults = await Promise.all(fetchPromises);
           const results: CombinedFetchResult[] = [
-            ...cachedResults,
+            ...localResults,
             ...fetchedResults,
           ];
           if (
@@ -1772,20 +1799,25 @@ export const useExpansionEngine = ({
         const { targets, groupKeyMap } = hydrationPlan;
 
         const fetchContext = { stagedTree, visibleRowDepth, visibleColDepth };
-        const cachedResults: SingleFetchResult[] = [];
+        const localResults: SingleFetchResult[] = [];
         const batchCandidates: BatchCandidate[] = [];
         for (const target of targets) {
           const path = parsePath(target.pathKey);
-          const cached = peekPivotBranchCache({
+          const localResult = resolvePivotBranchLocalResult({
             axis: target.axis,
             path,
             formData: fetchFormData,
             currentTree: fetchContext.stagedTree,
             visibleRowDepth,
             visibleColDepth,
+            factStore: factStoreRef.current,
           });
-          if (cached) {
-            cachedResults.push({ kind: 'single', target, data: cached });
+          if (localResult) {
+            localResults.push({
+              kind: 'single',
+              target,
+              data: localResult.data,
+            });
             continue;
           }
           const batchSignature = buildBatchSignature({
@@ -1823,7 +1855,7 @@ export const useExpansionEngine = ({
         // eslint-disable-next-line no-await-in-loop
         const fetchedResults = await Promise.all(fetchPromises);
         const results: CombinedFetchResult[] = [
-          ...cachedResults,
+          ...localResults,
           ...fetchedResults,
         ];
 
@@ -2508,11 +2540,6 @@ export const useExpansionEngine = ({
     prevExpandRowsLevelRawRef.current = expandRowsLevelRaw;
     prevExpandColsLevelRawRef.current = expandColumnsLevelRaw;
 
-    const { visibleRowDepth, visibleColDepth } = computeVisibleDepths(
-      resolvedRows,
-      resolvedCols,
-      normalizedTree,
-    );
     const hasRowExpansionRequests =
       effectiveExpandRowsLevel > 0 ||
       prunedManualRowsResolved.length > 0 ||
@@ -2523,33 +2550,9 @@ export const useExpansionEngine = ({
       prunedCollapsedCols.length > 0;
     const shouldPlanRows = hasRowExpansionRequests;
     const shouldPlanCols = hasColExpansionRequests;
-    const seedFetchedDepths = (
-      axis: PivotAxis,
-      expandedKeys: Set<string>,
-      requiredOppositeDepth: number,
-    ) => {
-      const nodes = axis === 'row' ? normalizedTree.rows : normalizedTree.cols;
-      expandedKeys.forEach(key => {
-        const node = nodes[key];
-        if (!node) {
-          return;
-        }
-        if (
-          !hasLoadedChildrenForTree(
-            normalizedTree,
-            axis,
-            node,
-            visibleRowDepth,
-            visibleColDepth,
-          )
-        ) {
-          return;
-        }
-        markFetchedCoverage(axis, key, requiredOppositeDepth);
-      });
-    };
-    seedFetchedDepths('row', resolvedRows, visibleColDepth);
-    seedFetchedDepths('col', resolvedCols, visibleRowDepth);
+    if (factBatches.length > 0 && (hasNewData || !layoutChanged)) {
+      seedFetchedCoverageFromFactBatches(factBatches);
+    }
     const { rowPlan: nextRowPlan, colPlan: nextColPlan } =
       planHydrationIteration({
         tree: normalizedTree,
@@ -2617,7 +2620,6 @@ export const useExpansionEngine = ({
     expandedStateSignature,
     expandedStateSharedSignature,
     factBatches,
-    computeVisibleDepths,
     expandColumnsLevelRaw,
     expandRowsLevelRaw,
     groupbyColumnKeys,
@@ -2636,6 +2638,7 @@ export const useExpansionEngine = ({
     reportAsyncError,
     getCoverageKey,
     markFetchedCoverage,
+    seedFetchedCoverageFromFactBatches,
     setExpandedColsState,
     setExpandedRowsState,
     setPendingColsState,

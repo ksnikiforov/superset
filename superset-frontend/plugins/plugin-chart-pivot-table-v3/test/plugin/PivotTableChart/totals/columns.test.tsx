@@ -17,8 +17,11 @@
  * under the License.
  */
 
+import { type ComponentProps } from 'react';
 import { render, screen, waitFor, within } from '../../../testUtils';
-import PivotTableChart from '../../fixtures/TestPivotTableChart';
+import TestPivotTableChart, {
+  buildPreloadedTreeFactBatches,
+} from '../../fixtures/TestPivotTableChart';
 import {
   MetricsLayoutEnum,
   PivotResultCell,
@@ -37,6 +40,19 @@ import {
   serializePath,
   SUBTOTAL_TOKEN,
 } from '../../../../src/utils';
+
+type TestPivotTableChartProps = ComponentProps<typeof TestPivotTableChart>;
+
+function PivotTableChart(props: TestPivotTableChartProps) {
+  return (
+    <TestPivotTableChart
+      {...props}
+      factBatches={
+        props.factBatches ?? buildPreloadedTreeFactBatches(props.data)
+      }
+    />
+  );
+}
 
 describe('PivotTableChart totals & subtotals - columns', () => {
   const baseProps = {

@@ -17,7 +17,11 @@
  * under the License.
  */
 import { type DataRecordValue } from '@superset-ui/core';
-import { type PivotPath } from '../../types';
+import {
+  type PivotAxis,
+  type PivotPath,
+  type PivotPathValue,
+} from '../../types';
 import { serializePath } from '../core/path';
 import { stableStringify } from '../shared/stableStringify';
 import { type PivotFactCoverage } from './types';
@@ -41,7 +45,30 @@ type PivotFactSelector = {
 
 export type PivotFactStoreBatch = PivotFactSelector & {
   facts: PivotFact[];
+  scope?: PivotFactStoreBatchScope;
 };
+
+export type PivotFactStoreBatchScope =
+  | {
+      kind: 'bootstrap' | 'root';
+      rowDepth: number;
+      colDepth: number;
+    }
+  | {
+      kind: 'branch';
+      axis: PivotAxis;
+      path: PivotPath;
+      rowDepth: number;
+      colDepth: number;
+    }
+  | {
+      kind: 'batch';
+      axis: PivotAxis;
+      parentPath: PivotPath;
+      siblingValues: PivotPathValue[];
+      rowDepth: number;
+      colDepth: number;
+    };
 
 export type PivotFactStore = {
   upsertBatch: (batch: PivotFactStoreBatch) => void;
@@ -54,7 +81,7 @@ export type PivotFactStore = {
 };
 
 const coverageKey = ({ coverage, queryName }: PivotFactSelector) =>
-  coverage ? stableStringify(coverage) : `query:${queryName}`;
+  stableStringify([coverage ?? null, queryName]);
 
 export const buildPivotFactKey = (fact: PivotFact) =>
   stableStringify([

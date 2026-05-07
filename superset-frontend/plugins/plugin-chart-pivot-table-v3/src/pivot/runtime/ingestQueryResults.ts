@@ -231,6 +231,41 @@ type MaterializationFactBatch = {
   colDepth: number;
 };
 
+const factStoreBatchScopeFromSpec = (
+  spec: PlannedQuerySpec,
+): PivotFactStoreBatch['scope'] => {
+  if (spec.meta.kind === 'branch') {
+    if (!spec.meta.axis) {
+      return undefined;
+    }
+    return {
+      kind: 'branch',
+      axis: spec.meta.axis,
+      path: spec.meta.path ?? [],
+      rowDepth: spec.meta.rowDepth,
+      colDepth: spec.meta.colDepth,
+    };
+  }
+  if (spec.meta.kind === 'batch') {
+    if (!spec.meta.axis) {
+      return undefined;
+    }
+    return {
+      kind: 'batch',
+      axis: spec.meta.axis,
+      parentPath: spec.meta.parentPath ?? [],
+      siblingValues: spec.meta.siblingValues ?? [],
+      rowDepth: spec.meta.rowDepth,
+      colDepth: spec.meta.colDepth,
+    };
+  }
+  return {
+    kind: spec.meta.kind,
+    rowDepth: spec.meta.rowDepth,
+    colDepth: spec.meta.colDepth,
+  };
+};
+
 const factStoreBatchFromIngested = ({
   spec,
   facts,
@@ -240,6 +275,7 @@ const factStoreBatchFromIngested = ({
 >): PivotFactStoreBatch => ({
   coverage: spec.meta.coverage,
   queryName: spec.queryName,
+  scope: factStoreBatchScopeFromSpec(spec),
   facts,
 });
 

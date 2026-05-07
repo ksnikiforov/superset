@@ -88,6 +88,22 @@ test('uses query name as the fallback identity when coverage is missing', () => 
   ).toEqual([2]);
 });
 
+test('does not share facts across different query scopes with the same coverage', () => {
+  const store = createPivotFactStore();
+
+  store.upsertMany([
+    buildFact({ queryName: 'first', value: 1 }),
+    buildFact({ queryName: 'second', value: 2 }),
+  ]);
+
+  expect(
+    store.getFacts({ coverage, queryName: 'first' }).map(fact => fact.value),
+  ).toEqual([1]);
+  expect(
+    store.getFacts({ coverage, queryName: 'second' }).map(fact => fact.value),
+  ).toEqual([2]);
+});
+
 test('tracks loaded coverage even when the query returns no facts', () => {
   const store = createPivotFactStore();
 

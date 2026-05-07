@@ -39,6 +39,7 @@ import {
   fetchPivotBranch,
   peekPivotBranchCache,
 } from '../../../src/fetchPivotBranch';
+import { type PivotFactStoreBatch } from '../../../src/pivot/runtime/factStore';
 
 jest.mock('../../../src/pivot/data/SupersetChartDataClient', () => {
   const actual = jest.requireActual(
@@ -1465,6 +1466,20 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       startCollapsed: true,
       initialDepth: 1,
     });
+    const factBatches: PivotFactStoreBatch[] = [
+      {
+        queryName: 'test-preloaded-col1-branches',
+        facts: [],
+        scope: {
+          kind: 'batch',
+          axis: 'col',
+          parentPath: [],
+          siblingValues: ['X', 'Y'],
+          rowDepth: 1,
+          colDepth: 2,
+        },
+      },
+    ];
 
     fetchMock.mockImplementation(async ({ specs }: { specs: Array<unknown> }) =>
       specs.map(() => ({ data: records })),
@@ -1479,6 +1494,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
         metrics={metrics}
         groupbyRows={['row1']}
         groupbyColumns={initialCols}
+        factBatches={factBatches}
         width={600}
         height={300}
       />,

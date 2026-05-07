@@ -18,7 +18,6 @@
  */
 import { type QueryFormColumn, type QueryFormMetric } from '@superset-ui/core';
 import {
-  MetricsLayoutEnum,
   type MeasureHierarchy,
   type PivotAxis,
   type PivotPath,
@@ -56,18 +55,12 @@ export type ResolveFetchContextParams = {
 };
 
 export type ResolvedFetchContext = {
-  rowGroupby: QueryFormColumn[];
-  colGroupby: QueryFormColumn[];
-  rowGroupbyForQueryFull: QueryFormColumn[];
-  colGroupbyForQueryFull: QueryFormColumn[];
   rowGroupbyForQuery: QueryFormColumn[];
   colGroupbyForQuery: QueryFormColumn[];
   materializedMetrics: QueryFormMetric[];
   metricsForQuery: QueryFormMetric[];
   materializedMeasureHierarchy: MeasureHierarchy;
   requiredTimeOffsets: string[];
-  metricsLayoutResolved: MetricsLayoutEnum;
-  metricInsertIndex: number;
   sanitizedPath: PivotPath;
   rowDepth: number;
   colDepth: number;
@@ -169,12 +162,7 @@ export const resolveFetchContext = ({
   targetColDepth,
 }: ResolveFetchContextParams): ResolvedFetchContext => {
   const layout = layoutParam ?? buildLayoutContext(formData);
-  const {
-    metrics,
-    metricLabelSet,
-    metricsLayoutResolved,
-    metricInsertIndex: metricInsertIndexBase,
-  } = layout;
+  const { metrics, metricLabelSet } = layout;
   const rowGroupby = layout.groupbyRows;
   const colGroupby = layout.groupbyColumns;
 
@@ -190,7 +178,6 @@ export const resolveFetchContext = ({
     level => level <= maxColSubtotalDepth,
   );
 
-  const metricInsertIndex = metricInsertIndexBase;
   const sanitizedPath = projectAxisPathToDimensions({
     program: layout.pivotProgram,
     axis,
@@ -238,8 +225,6 @@ export const resolveFetchContext = ({
     colDepth = Math.min(colGroupby.length, Math.max(targetColDepth, 0));
   }
 
-  const rowGroupbyForQueryFull = rowGroupby;
-  const colGroupbyForQueryFull = colGroupby;
   const needsMetricFormatting =
     Object.keys(formData.metricFormatting || {}).length > 0;
   const needsDatabars = Object.keys(formData.metricDatabars || {}).length > 0;
@@ -299,8 +284,8 @@ export const resolveFetchContext = ({
   };
   const queryShape = buildQueryShape({
     intent,
-    rowGroupby: rowGroupbyForQueryFull,
-    colGroupby: colGroupbyForQueryFull,
+    rowGroupby,
+    colGroupby,
     metrics: materializedMetrics,
     availableMetrics: metrics,
     metricFormattingScope: formData.metricFormattingScope,
@@ -317,18 +302,12 @@ export const resolveFetchContext = ({
   const metricsForQuery = queryShape.metrics;
 
   return {
-    rowGroupby,
-    colGroupby,
-    rowGroupbyForQueryFull,
-    colGroupbyForQueryFull,
     rowGroupbyForQuery,
     colGroupbyForQuery,
     materializedMetrics,
     metricsForQuery,
     materializedMeasureHierarchy,
     requiredTimeOffsets,
-    metricsLayoutResolved,
-    metricInsertIndex,
     sanitizedPath,
     rowDepth,
     colDepth,
@@ -340,5 +319,3 @@ export const resolveFetchContext = ({
     hasColTotalSorting,
   };
 };
-
-export const resolveFetchContextForBatch = resolveFetchContext;

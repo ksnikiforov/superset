@@ -54,7 +54,7 @@ import { buildPathFilters, coerceValueForColumn } from './pathFilters';
 import { coerceExpansionState } from './persistedExpansionState';
 import {
   type ResolvedFetchContext,
-  resolveFetchContextForBatch,
+  resolveFetchContext,
 } from './resolveFetchContext';
 import { buildQueryShape } from './queryShape';
 import { type QuerySpec } from './types';
@@ -260,12 +260,14 @@ type CoverageQueryMeta =
 const buildSpecsForCoverages = ({
   coverages,
   ctx,
+  layout,
   filters,
   suffix,
   meta,
 }: {
   coverages: PivotFactCoverage[];
   ctx: ResolvedFetchContext;
+  layout: LayoutContext;
   filters: QueryObjectFilterClause[];
   suffix: string;
   meta: CoverageQueryMeta;
@@ -279,15 +281,15 @@ const buildSpecsForCoverages = ({
       ...meta,
       rowDepth: coverage.rowDepth,
       colDepth: coverage.columnDepth,
-      rowGroupbyForQueryFull: ctx.rowGroupbyForQueryFull,
-      colGroupbyForQueryFull: ctx.colGroupbyForQueryFull,
+      rowGroupbyForQueryFull: layout.groupbyRows,
+      colGroupbyForQueryFull: layout.groupbyColumns,
       rowSubtotalLevels: ctx.rowSubtotalLevels,
       colSubtotalLevels: ctx.colSubtotalLevels,
       materializedMetrics: ctx.materializedMetrics,
       materializedMeasureHierarchy: ctx.materializedMeasureHierarchy,
       requiredTimeOffsets: ctx.requiredTimeOffsets,
-      metricsLayoutResolved: ctx.metricsLayoutResolved,
-      metricInsertIndex: ctx.metricInsertIndex,
+      metricsLayoutResolved: layout.metricsLayoutResolved,
+      metricInsertIndex: layout.metricInsertIndex,
       coverage,
     },
   }));
@@ -349,7 +351,7 @@ const buildBranchSpecs = ({
     return [];
   }
 
-  const ctx = resolveFetchContextForBatch({
+  const ctx = resolveFetchContext({
     formData,
     layout,
     axis,
@@ -378,6 +380,7 @@ const buildBranchSpecs = ({
   return buildSpecsForCoverages({
     coverages,
     ctx,
+    layout,
     filters: pathFilters,
     suffix,
     meta: { kind: 'branch', axis, path },
@@ -476,7 +479,7 @@ const buildBatchSpecs = ({
     axis,
     path: parentPath,
   });
-  const ctx = resolveFetchContextForBatch({
+  const ctx = resolveFetchContext({
     formData,
     layout,
     axis,
@@ -505,6 +508,7 @@ const buildBatchSpecs = ({
   return buildSpecsForCoverages({
     coverages,
     ctx,
+    layout,
     filters,
     suffix,
     meta: { kind: 'batch', axis, parentPath, siblingValues },
@@ -662,7 +666,7 @@ export const buildInitialQuerySpecs = (
 
   if (shouldPrefetchRoot) {
     const axis: PivotAxis = rowGroupby.length > 0 ? 'row' : 'col';
-    const rootContext = resolveFetchContextForBatch({
+    const rootContext = resolveFetchContext({
       formData,
       layout,
       axis,
@@ -691,6 +695,7 @@ export const buildInitialQuerySpecs = (
       ...buildSpecsForCoverages({
         coverages: dedupeCoverages([...rowCoverages, ...colCoverages]),
         ctx: rootContext,
+        layout,
         filters: [],
         suffix: '|root',
         meta: { kind: 'root' },
@@ -716,7 +721,7 @@ export const buildInitialQuerySpecs = (
 
     const candidates: BatchCandidate[] = [];
     representativeByKey.forEach((path, pathKey) => {
-      const ctx = resolveFetchContextForBatch({
+      const ctx = resolveFetchContext({
         formData,
         layout,
         axis,

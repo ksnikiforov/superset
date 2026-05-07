@@ -26,8 +26,8 @@ import {
   buildFilterSignature,
   buildPivotBranchCacheKey,
   clearPivotBranchCache as clearPivotBranchCacheBase,
-  readPivotBranchCache,
-  writePivotBranchCache,
+  readPivotBranchFactCache,
+  writePivotBranchFactCache,
 } from './pivot/data/cache';
 import { type ChartDataWarning } from './pivot/data/ChartDataClient';
 import { supersetChartDataClient } from './pivot/data/SupersetChartDataClient';
@@ -74,13 +74,17 @@ export interface FetchPivotBranchParams {
 
 export const stableStringify = stableStringifyBase;
 
-export const peekPivotBranchCacheByKey = (key: string) =>
-  readPivotBranchCache(key);
 export const clearPivotBranchCache = () => clearPivotBranchCacheBase();
 
 export type ResolvedFetchContext = ResolvedQueryFetchContext & {
   cacheKey: string;
   layout: LayoutContext;
+};
+
+type ResolvedBranchPlan = {
+  ctx: ResolvedFetchContext;
+  treeSnapshot: PivotTreeData;
+  specs: ReturnType<typeof buildBranchQuerySpecs>;
 };
 
 const buildMeasureLeafSelectionSignature = (
@@ -144,8 +148,8 @@ const resolveFetchContext = ({
       rowSubTotals: formData.rowSubTotals ?? true,
       rowSubtotalLevels: queryCtx.rowSubtotalLevels,
       colSubtotalLevels: queryCtx.colSubtotalLevels,
-      metricsLayoutResolved: queryCtx.metricsLayoutResolved,
-      metricInsertIndex: queryCtx.metricInsertIndex,
+      metricsLayoutResolved: layout.metricsLayoutResolved,
+      metricInsertIndex: layout.metricInsertIndex,
       timeOffsets: queryCtx.requiredTimeOffsets,
       measureLeafSelection: buildMeasureLeafSelectionSignature(
         queryCtx.materializedMeasureHierarchy,
@@ -155,14 +159,80 @@ const resolveFetchContext = ({
   return { ...queryCtx, cacheKey, layout };
 };
 
-export const peekPivotBranchCache = (params: FetchPivotBranchParams) => {
+const resolveBranchPlan = (
+  params: FetchPivotBranchParams,
+): ResolvedBranchPlan => {
   const ctx = resolveFetchContext(params);
-  return readPivotBranchCache(ctx.cacheKey);
+  const treeSnapshot = params.currentTree ?? { rows: {}, cols: {}, cells: {} };
+  const specs = buildBranchQuerySpecs({
+    formData: params.formData,
+    layout: ctx.layout,
+    axis: params.axis,
+    path: params.path,
+    currentTree: treeSnapshot,
+    visibleRowDepth: params.visibleRowDepth,
+    visibleColDepth: params.visibleColDepth,
+  });
+  return { ctx, treeSnapshot, specs };
+};
+
+const resolvePivotBranchLocalResultFromPlan = (
+  params: FetchPivotBranchParams,
+  { ctx, specs }: ResolvedBranchPlan,
+): FetchPivotBranchResult | undefined => {
+  if (specs.length === 0) {
+    return { data: undefined };
+  }
+  if (
+    params.factStore &&
+    canMaterializeSpecsFromFactStore({
+      specs,
+      store: params.factStore,
+    })
+  ) {
+    return {
+      data: buildBranchTreeFromFactStore({
+        specs,
+        store: params.factStore,
+        formData: params.formData,
+        measureHierarchy: ctx.layout.measureHierarchy,
+      }),
+      factStoreHit: true,
+    };
+  }
+  const cachedFactBatches = readPivotBranchFactCache(ctx.cacheKey);
+  if (!cachedFactBatches) {
+    return undefined;
+  }
+  const store = params.factStore ?? createPivotFactStore();
+  store.upsertBatches(cachedFactBatches);
+  return {
+    data: buildBranchTreeFromFactStore({
+      specs,
+      store,
+      formData: params.formData,
+      measureHierarchy: ctx.layout.measureHierarchy,
+    }),
+    cached: true,
+    factBatches: cachedFactBatches,
+  };
+};
+
+export const resolvePivotBranchLocalResult = (
+  params: FetchPivotBranchParams,
+): FetchPivotBranchResult | undefined =>
+  resolvePivotBranchLocalResultFromPlan(params, resolveBranchPlan(params));
+
+export const peekPivotBranchCache = (params: FetchPivotBranchParams) => {
+  const result = resolvePivotBranchLocalResult({
+    ...params,
+    factStore: undefined,
+  });
+  return result?.cached ? result.data : undefined;
 };
 
 // Exported for tests
 export const resolveFetchContextForTest = resolveFetchContext;
-export const resolveFetchContextForBatch = resolveFetchContext;
 
 const isAbortError = (error: unknown): boolean => {
   if (
@@ -190,16 +260,16 @@ export async function fetchPivotBranch({
   requestGroupId,
   factStore,
 }: FetchPivotBranchParams): Promise<FetchPivotBranchResult> {
-  const { metricsForQuery, requiredTimeOffsets, cacheKey, layout } =
-    resolveFetchContext({
-      formData,
-      axis,
-      path,
-      currentTree,
-      visibleRowDepth,
-      visibleColDepth,
-    });
-  const treeSnapshot = currentTree ?? { rows: {}, cols: {}, cells: {} };
+  const plan = resolveBranchPlan({
+    formData,
+    axis,
+    path,
+    currentTree,
+    visibleRowDepth,
+    visibleColDepth,
+  });
+  const { ctx, specs } = plan;
+  const { metricsForQuery, requiredTimeOffsets, cacheKey, layout } = ctx;
   const timeOffsets = Array.from(
     new Set([...(formData.time_offsets ?? []), ...requiredTimeOffsets]),
   );
@@ -215,39 +285,20 @@ export async function fetchPivotBranch({
           ...(timeOffsets.length > 0 ? { time_offsets: timeOffsets } : {}),
         };
 
-  const cached = readPivotBranchCache(cacheKey);
-  if (cached) {
-    return { data: cached, cached: true };
-  }
-
-  const specs = buildBranchQuerySpecs({
-    formData,
-    layout,
-    axis,
-    path,
-    currentTree: treeSnapshot,
-    visibleRowDepth,
-    visibleColDepth,
-  });
-  if (specs.length === 0) {
-    return { data: undefined };
-  }
-  if (
-    factStore &&
-    canMaterializeSpecsFromFactStore({
-      specs,
-      store: factStore,
-    })
-  ) {
-    return {
-      data: buildBranchTreeFromFactStore({
-        specs,
-        store: factStore,
-        formData,
-        measureHierarchy: layout.measureHierarchy,
-      }),
-      factStoreHit: true,
-    };
+  const localResult = resolvePivotBranchLocalResultFromPlan(
+    {
+      formData,
+      axis,
+      path,
+      currentTree,
+      visibleRowDepth,
+      visibleColDepth,
+      factStore,
+    },
+    plan,
+  );
+  if (localResult) {
+    return localResult;
   }
 
   try {
@@ -270,7 +321,7 @@ export async function fetchPivotBranch({
       formData,
       measureHierarchy: layout.measureHierarchy,
     });
-    writePivotBranchCache(cacheKey, labeledBranch);
+    writePivotBranchFactCache(cacheKey, factBatches);
     return {
       data: labeledBranch,
       factBatches,

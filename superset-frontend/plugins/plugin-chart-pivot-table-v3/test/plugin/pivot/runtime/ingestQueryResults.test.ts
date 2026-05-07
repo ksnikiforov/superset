@@ -19,7 +19,9 @@
 import { type PlannedQuerySpec } from '../../../../src/pivot/query/specs';
 import {
   buildBranchTreeFromSpecResults,
+  createPivotFactStore,
   ingestQueryResults,
+  upsertQueryResultsIntoFactStore,
 } from '../../../../src/pivot/runtime/ingestQueryResults';
 import {
   MetricsLayoutEnum,
@@ -159,6 +161,51 @@ test('can avoid index fallback for partially named branch results', () => {
 
   expect(ingested[0].facts).toHaveLength(1);
   expect(ingested[1].facts).toEqual([]);
+});
+
+test('records exact branch scope on fact-store batches', () => {
+  const store = createPivotFactStore();
+  const spec = buildSpec({
+    queryName: 'pivot_v3|2|1|branch:row:France',
+    rowDepth: 2,
+    colDepth: 1,
+    rowGroupby: ['country', 'city'],
+  });
+  const branchSpec: PlannedQuerySpec = {
+    ...spec,
+    meta: {
+      ...spec.meta,
+      kind: 'branch',
+      axis: 'row',
+      path: ['France'],
+    },
+  };
+
+  const [batch] = upsertQueryResultsIntoFactStore({
+    store,
+    specs: [branchSpec],
+    results: [
+      {
+        query_name: branchSpec.queryName,
+        data: [
+          {
+            country: 'France',
+            city: 'Paris',
+            month: '2026-01',
+            sales: 12,
+          },
+        ],
+      },
+    ],
+  });
+
+  expect(batch.scope).toEqual({
+    kind: 'branch',
+    axis: 'row',
+    path: ['France'],
+    rowDepth: 2,
+    colDepth: 1,
+  });
 });
 
 test('keeps support and offset facts without materializing support metric branches', () => {

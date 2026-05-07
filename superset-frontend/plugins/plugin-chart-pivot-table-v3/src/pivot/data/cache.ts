@@ -25,45 +25,46 @@ import {
   type PivotAxis,
   type PivotPath,
   type PivotTableQueryFormData,
-  type PivotTreeData,
 } from '../../types';
 import { serializePath } from '../core/path';
 import { getMetricKeys } from '../core/tokens';
+import { type PivotFactStoreBatch } from '../runtime/factStore';
 import { stableStringify } from '../shared/stableStringify';
 
 export type FilterSignature = string;
 export type CacheKey = string;
 
 const CACHE_MAX_ENTRIES = 200;
-const branchCache = new Map<CacheKey, PivotTreeData>();
+const branchFactCache = new Map<CacheKey, PivotFactStoreBatch[]>();
 
-const touchBranchCache = (key: CacheKey, value: PivotTreeData) => {
-  if (branchCache.has(key)) {
-    branchCache.delete(key);
+const touchBranchFactCache = (key: CacheKey, value: PivotFactStoreBatch[]) => {
+  if (branchFactCache.has(key)) {
+    branchFactCache.delete(key);
   }
-  branchCache.set(key, value);
-  if (branchCache.size > CACHE_MAX_ENTRIES) {
-    const oldestKey = branchCache.keys().next().value;
+  branchFactCache.set(key, value);
+  if (branchFactCache.size > CACHE_MAX_ENTRIES) {
+    const oldestKey = branchFactCache.keys().next().value;
     if (oldestKey !== undefined) {
-      branchCache.delete(oldestKey);
+      branchFactCache.delete(oldestKey);
     }
   }
 };
 
-export const readPivotBranchCache = (key: CacheKey) => {
-  const cached = branchCache.get(key);
+export const readPivotBranchFactCache = (key: CacheKey) => {
+  const cached = branchFactCache.get(key);
   if (!cached) {
     return undefined;
   }
-  touchBranchCache(key, cached);
+  touchBranchFactCache(key, cached);
   return cached;
 };
 
-export const writePivotBranchCache = (key: CacheKey, value: PivotTreeData) => {
-  touchBranchCache(key, value);
-};
+export const writePivotBranchFactCache = (
+  key: CacheKey,
+  value: PivotFactStoreBatch[],
+) => touchBranchFactCache(key, value);
 
-export const clearPivotBranchCache = () => branchCache.clear();
+export const clearPivotBranchCache = () => branchFactCache.clear();
 
 const getExtraFormData = (formData: PivotTableQueryFormData) =>
   formData.extra_form_data;

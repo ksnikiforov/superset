@@ -320,9 +320,10 @@ Gate 2 has started:
   `buildBranchTreeFromResults` compatibility bridge and `fetchPivotBranch`
   re-export have been deleted.
 - `src/pivot/runtime/factStore.ts` now owns exact fact identity. Facts are keyed
-  by coverage, row path, column path, value key, and visible/support role.
-  Initial, branch, and batch materialization upsert ingested facts into a local
-  store before reading coverage-specific fact batches back out.
+  by query scope, coverage, row path, column path, value key, and
+  visible/support role. Initial, branch, and batch materialization upsert
+  ingested facts into a local store before reading scope-specific fact batches
+  back out.
 - Initial loads and seamless layout/filter refreshes now return fact batches
   alongside the rendered tree. `useExpansionEngine` seeds a runtime-owned fact
   store from those batches and keeps it alive across branch and batch expansion
@@ -331,18 +332,42 @@ Gate 2 has started:
   store when every planned coverage is already loaded. Network results upsert
   exact fact batches back into the same store, including empty result coverage,
   before tree materialization.
+- The branch cache no longer stores rendered `PivotTreeData`. It stores
+  `PivotFactStoreBatch[]`, and cache hits materialize a tree from those cached
+  facts. This removes one more tree-as-data cache from the runtime path while
+  preserving branch-cache behavior.
+- Fact batches now carry query-scope metadata. `useExpansionEngine` seeds
+  fetched-depth state from exact branch and batch fact scopes when available,
+  instead of inspecting rendered tree shape.
+- The rendered-tree fetched-depth fallback in `useExpansionEngine` has been
+  deleted. Direct component fixtures that pass prebuilt `PivotTreeData` must now
+  also pass fact batches or an explicit runtime seed describing the preloaded
+  coverage. This removes another production path where rendered tree shape was
+  treated as loaded-state truth.
+- `useExpansionEngine` no longer calls `peekPivotBranchCache` as a separate
+  cache side channel. Branch fact-store hits and branch-cache hits now flow
+  through `resolvePivotBranchLocalResult`, producing the same single-target
+  result shape consumed by the expansion fetch-plan merge path. This keeps
+  cached branches out of batch fetches without requiring the hook to materialize
+  trees from cache directly.
+- `resolveFetchContext` no longer carries raw layout passthrough fields such as
+  full row/column groupby arrays, resolved metrics layout, or metric insertion
+  index. Query spec metadata and branch-cache keys now read those values from
+  `LayoutContext`, while fetch context keeps only query-specific outputs:
+  sanitized path, target depths, query groupbys, scoped metrics, support metrics,
+  subtotal levels, and formatting/sorting coverage flags.
+- The old `resolveFetchContextForBatch` alias has been deleted. Branch, batch,
+  root, and batch-signature planning now call the same `resolveFetchContext`
+  entry point directly.
 
 Immediate next step:
 
-- Continue Gate 3 by replacing the old rendered-tree branch cache with a
-  fact-batch cache or deleting it once runtime fact-store reuse covers the same
-  scenarios. The goal is to stop treating rendered branch trees as reusable data.
-- Start using fact-store coverage to simplify fetched-depth bookkeeping in
-  `useExpansionEngine`, so loaded state comes from exact planned coverage rather
-  than tree-shape inspection.
-- Continue shrinking `resolveFetchContext`: it now owns metric/leaf scope and
-  support metric selection, but should eventually become a thin adapter around
-  coverage planning plus query-shape construction.
+- Continue shrinking `resolveFetchContext`: it still owns metric/leaf scope,
+  depth resolution, support metric selection, and formatting/sorting flags. The
+  next useful split is likely an axis-neutral projection/query-scope helper that
+  describes sanitized dimension path, skipped pre-Values levels, selected metric
+  scope, selected measure-leaf scope, and target depths before query shape is
+  assembled.
 - Measure whether support metrics fetched for one branch are now reusable in the
   practical expansion paths we care about, and add a targeted regression test if
   any path still re-requests an already loaded exact support coverage.
@@ -365,17 +390,26 @@ Resolved approval checkpoint:
   Support metrics may be queried with the visible branch, but they do not mark
   sibling visible branches as loaded or materialize extra headers/cells.
 
-Potential future approval checkpoint:
+Resolved behavior checkpoint:
 
 - Metrics-between layouts currently allow a metric branch under a hidden
   pre-Values dimension to reveal post-Values dimensions. Example:
   `orderPriority -> Values -> returnFlag` can load while `shipMode` is still
   hidden, even when the full axis program is `orderPriority -> shipMode ->
 Values -> returnFlag`. Keeping this behavior preserves current UX, but it
-  forces runtime projection to support "skipped pre-Values dimension" branches.
-  Standardizing expansion so post-Values dimensions are only reachable after all
-  pre-Values dimensions on that branch are visible would simplify branch
-  projection and fetched coverage, but it would be a noticeable UX change.
+  requires runtime projection to support "skipped pre-Values dimension"
+  branches.
+- Decision: this behavior stays. The simplification path is not to remove it,
+  but to represent it explicitly as a projected axis view. Query planning,
+  coverage keys, materialization, visibility, and toggles should all consume the
+  same projection descriptor instead of each layer rediscovering which
+  pre-Values dimensions are currently skipped.
+- The projection model must be axis-neutral because rows and columns support the
+  same user behavior: a branch can expose Values and post-Values levels while
+  omitting intermediate pre-Values dimensions. The implementation should still
+  account for legitimate row/column differences through a small axis policy or
+  adapter, rather than forcing all rendering and totals behavior into one
+  oversized helper.
 
 ### Gate 1: One compiled layout model
 
