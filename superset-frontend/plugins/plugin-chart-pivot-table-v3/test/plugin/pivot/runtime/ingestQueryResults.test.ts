@@ -17,44 +17,75 @@
  * under the License.
  */
 import { type PlannedQuerySpec } from '../../../../src/pivot/query/specs';
-import { ingestQueryResults } from '../../../../src/pivot/runtime/ingestQueryResults';
-import { MetricsLayoutEnum } from '../../../../src/types';
+import {
+  buildBranchTreeFromSpecResults,
+  ingestQueryResults,
+} from '../../../../src/pivot/runtime/ingestQueryResults';
+import {
+  MetricsLayoutEnum,
+  type MeasureHierarchy,
+} from '../../../../src/types';
+import {
+  encodeMetricKey,
+  serializeCellKey,
+  serializePath,
+  SUBTOTAL_TOKEN,
+} from '../../../../src/utils';
+import { buildFormData } from '../../fixtures/pivotFormData';
 
 const buildSpec = ({
   queryName,
   rowDepth,
   colDepth,
+  metrics = ['sales'],
+  materializedMetrics = ['sales'],
+  rowGroupby = ['country'],
+  colGroupby = ['month'],
+  rowSubtotalLevels = [],
+  colSubtotalLevels = [],
+  metricsLayoutResolved = MetricsLayoutEnum.ROWS,
+  metricInsertIndex = 1,
+  materializedMeasureHierarchy = {
+    kind: 'flatMetrics',
+    metricKeys: materializedMetrics,
+  },
 }: {
   queryName: string;
   rowDepth: number;
   colDepth: number;
+  metrics?: string[];
+  materializedMetrics?: string[];
+  rowGroupby?: string[];
+  colGroupby?: string[];
+  rowSubtotalLevels?: number[];
+  colSubtotalLevels?: number[];
+  metricsLayoutResolved?: MetricsLayoutEnum;
+  metricInsertIndex?: number;
+  materializedMeasureHierarchy?: MeasureHierarchy;
 }): PlannedQuerySpec => ({
   queryName,
-  columns: ['country', 'month'],
-  metrics: ['sales'],
+  columns: [...rowGroupby.slice(0, rowDepth), ...colGroupby.slice(0, colDepth)],
+  metrics,
   filters: [],
   meta: {
     kind: 'root',
     rowDepth,
     colDepth,
-    rowGroupbyForQueryFull: ['country'],
-    colGroupbyForQueryFull: ['month'],
-    rowSubtotalLevels: [],
-    colSubtotalLevels: [],
-    materializedMetrics: ['sales'],
-    materializedMeasureHierarchy: {
-      kind: 'flatMetrics',
-      metricKeys: ['sales'],
-    },
+    rowGroupbyForQueryFull: rowGroupby,
+    colGroupbyForQueryFull: colGroupby,
+    rowSubtotalLevels,
+    colSubtotalLevels,
+    materializedMetrics,
+    materializedMeasureHierarchy,
     requiredTimeOffsets: [],
-    metricsLayoutResolved: MetricsLayoutEnum.ROWS,
-    metricInsertIndex: 1,
+    metricsLayoutResolved,
+    metricInsertIndex,
     coverage: {
       reason: 'initial',
       rowDepth,
       columnDepth: colDepth,
-      rowDimensions: rowDepth > 0 ? ['country'] : [],
-      columnDimensions: colDepth > 0 ? ['month'] : [],
+      rowDimensions: rowGroupby.slice(0, rowDepth),
+      columnDimensions: colGroupby.slice(0, colDepth),
     },
   },
 });
@@ -91,6 +122,7 @@ test('ingests named query results into ordered fact batches', () => {
       columnPath: [],
       valueKey: 'sales',
       value: 30,
+      role: 'visible',
       coverage: specs[0].meta.coverage,
       queryName: 'pivot_v3|1|0',
     },
@@ -99,6 +131,7 @@ test('ingests named query results into ordered fact batches', () => {
       columnPath: ['2026-01'],
       valueKey: 'sales',
       value: 12,
+      role: 'visible',
       coverage: specs[1].meta.coverage,
       queryName: 'pivot_v3|1|1',
     },
@@ -126,4 +159,102 @@ test('can avoid index fallback for partially named branch results', () => {
 
   expect(ingested[0].facts).toHaveLength(1);
   expect(ingested[1].facts).toEqual([]);
+});
+
+test('keeps support and offset facts without materializing support metric branches', () => {
+  const spec = buildSpec({
+    queryName: 'pivot_v3|1|0|branch:row:France',
+    rowDepth: 1,
+    colDepth: 0,
+    metrics: ['sales', 'sortMetric'],
+    materializedMetrics: ['sales'],
+  });
+  const result = {
+    query_name: spec.queryName,
+    data: [
+      {
+        country: 'France',
+        sales: 10,
+        sortMetric: 99,
+        'sales__1 year ago': 7,
+      },
+    ],
+  };
+  const [ingested] = ingestQueryResults({
+    specs: [spec],
+    results: [result],
+    fallback: 'empty',
+  });
+
+  expect(ingested.facts.map(fact => fact.valueKey)).toEqual([
+    'sales',
+    'sortMetric',
+    'sales__1 year ago',
+  ]);
+
+  const tree = buildBranchTreeFromSpecResults({
+    specs: [spec],
+    results: [result],
+    formData: buildFormData({
+      metrics: ['sales'],
+      metricLabelMap: { sales: 'Sales', sortMetric: 'Sort metric' },
+    }),
+    measureHierarchy: spec.meta.materializedMeasureHierarchy,
+  });
+  const visibleMetricRowKey = serializePath([
+    'France',
+    encodeMetricKey('sales'),
+  ]);
+  const supportMetricRowKey = serializePath([
+    'France',
+    encodeMetricKey('sortMetric'),
+  ]);
+  const cell = tree.cells[serializeCellKey(visibleMetricRowKey, '')];
+
+  expect(tree.rows[visibleMetricRowKey]).toBeDefined();
+  expect(tree.rows[supportMetricRowKey]).toBeUndefined();
+  expect(cell.values).toMatchObject({
+    sales: 10,
+    sortMetric: 99,
+    'sales__1 year ago': 7,
+  });
+});
+
+test('materializes column subtotal leaves from planned coverage specs', () => {
+  const spec = buildSpec({
+    queryName: 'pivot_v3|1|1|branch:row:France',
+    rowDepth: 1,
+    colDepth: 1,
+    rowGroupby: ['country'],
+    colGroupby: ['category', 'subcategory'],
+    colSubtotalLevels: [1],
+  });
+  const tree = buildBranchTreeFromSpecResults({
+    specs: [spec],
+    results: [
+      {
+        query_name: spec.queryName,
+        data: [{ country: 'France', category: 'Furniture', sales: 12 }],
+      },
+    ],
+    formData: buildFormData({
+      metrics: ['sales'],
+    }),
+    measureHierarchy: spec.meta.materializedMeasureHierarchy,
+  });
+  const metricRowKey = serializePath(['France', encodeMetricKey('sales')]);
+  const subtotalColKey = serializePath(['Furniture', SUBTOTAL_TOKEN]);
+  const subtotalCell =
+    tree.cells[serializeCellKey(metricRowKey, subtotalColKey)];
+
+  expect(tree.cols[subtotalColKey]).toMatchObject({
+    path: ['Furniture', SUBTOTAL_TOKEN],
+    isSubtotal: true,
+  });
+  expect(subtotalCell).toMatchObject({
+    rowKey: metricRowKey,
+    colKey: subtotalColKey,
+    values: expect.objectContaining({ sales: 12 }),
+    isSubtotal: true,
+  });
 });

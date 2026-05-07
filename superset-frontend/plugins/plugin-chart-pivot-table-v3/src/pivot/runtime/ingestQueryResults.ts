@@ -33,7 +33,7 @@ import {
 } from '../../types';
 import {
   applyMeasureHierarchyAxis,
-  buildTreeFromRecords,
+  formatPivotLabelValue,
   injectRowSubtotalLeaves,
   labelRowSubtotalLeaves,
   mergeTrees,
@@ -44,6 +44,15 @@ import { applyMeasureLeafValuesToTree } from '../measureLeaves';
 import { type LayoutContext } from '../layout/LayoutContext';
 import { type PlannedQuerySpec } from '../query/specs';
 import { type PivotFactCoverage } from './types';
+import {
+  createPivotFactStore,
+  type PivotFact,
+  type PivotFactRole,
+  type PivotFactStore,
+} from './factStore';
+
+export { buildPivotFactKey, createPivotFactStore } from './factStore';
+export type { PivotFact, PivotFactRole, PivotFactStore } from './factStore';
 
 export type QueryResultWithData = {
   data?: DataRecord[];
@@ -51,15 +60,6 @@ export type QueryResultWithData = {
     query_name?: unknown;
   };
   query_name?: unknown;
-};
-
-export type PivotFact = {
-  rowPath: PivotPath;
-  columnPath: PivotPath;
-  valueKey: string;
-  value: DataRecordValue;
-  coverage?: PivotFactCoverage;
-  queryName: string;
 };
 
 export type IngestedQueryResult<T extends QueryResultWithData> = {
@@ -132,23 +132,34 @@ const getMetricValueKeysFromRecord = (
 const pathFromRecord = (record: DataRecord, columns: QueryFormColumn[]) =>
   columns.map(column => record[getColumnLabel(column)]);
 
-export const ingestQueryResultFacts = ({
-  spec,
+const factsFromRecords = ({
   result,
+  metrics,
+  rowGroupby,
+  colGroupby,
+  rowDepth,
+  colDepth,
+  queryName,
+  coverage,
+  materializedMetrics,
 }: {
-  spec: PlannedQuerySpec;
   result: QueryResultWithData;
+  metrics: QueryFormMetric[];
+  rowGroupby: QueryFormColumn[];
+  colGroupby: QueryFormColumn[];
+  rowDepth: number;
+  colDepth: number;
+  queryName: string;
+  coverage?: PivotFactCoverage;
+  materializedMetrics: QueryFormMetric[];
 }): PivotFact[] => {
   const records = result.data ?? [];
-  const valueKeys = getMetricValueKeysFromRecord(records[0], spec.metrics);
-  const rowColumns = spec.meta.rowGroupbyForQueryFull.slice(
-    0,
-    spec.meta.rowDepth,
-  );
-  const columnColumns = spec.meta.colGroupbyForQueryFull.slice(
-    0,
-    spec.meta.colDepth,
-  );
+  const valueKeys = getMetricValueKeysFromRecord(records[0], metrics);
+  const visibleValueKeys = new Set(getMetricKeys(materializedMetrics));
+  const rowColumns = rowGroupby.slice(0, rowDepth);
+  const columnColumns = colGroupby.slice(0, colDepth);
+  const roleForValueKey = (valueKey: string): PivotFactRole =>
+    visibleValueKeys.has(valueKey) ? 'visible' : 'support';
 
   return records.flatMap(record => {
     const rowPath = pathFromRecord(record, rowColumns);
@@ -158,11 +169,31 @@ export const ingestQueryResultFacts = ({
       columnPath,
       valueKey,
       value: record[valueKey],
-      coverage: spec.meta.coverage,
-      queryName: spec.queryName,
+      role: roleForValueKey(valueKey),
+      coverage,
+      queryName,
     }));
   });
 };
+
+export const ingestQueryResultFacts = ({
+  spec,
+  result,
+}: {
+  spec: PlannedQuerySpec;
+  result: QueryResultWithData;
+}): PivotFact[] =>
+  factsFromRecords({
+    result,
+    metrics: spec.metrics,
+    rowGroupby: spec.meta.rowGroupbyForQueryFull,
+    colGroupby: spec.meta.colGroupbyForQueryFull,
+    rowDepth: spec.meta.rowDepth,
+    colDepth: spec.meta.colDepth,
+    queryName: spec.queryName,
+    coverage: spec.meta.coverage,
+    materializedMetrics: spec.meta.materializedMetrics,
+  });
 
 export const ingestQueryResults = <T extends QueryResultWithData>({
   specs,
@@ -186,6 +217,160 @@ export const ingestQueryResults = <T extends QueryResultWithData>({
       facts: ingestQueryResultFacts({ spec, result }),
     };
   });
+};
+
+type PivotFactBatch = {
+  facts: PivotFact[];
+  rowDepth: number;
+  colDepth: number;
+};
+
+const buildFactStore = (
+  batches: IngestedQueryResult<QueryResultWithData>[],
+) => {
+  const store = createPivotFactStore();
+  batches.forEach(({ facts }) => {
+    store.upsertMany(facts);
+  });
+  return store;
+};
+
+const factBatchFromStore = ({
+  store,
+  spec,
+}: {
+  store: PivotFactStore;
+  spec: PlannedQuerySpec;
+}): PivotFactBatch => ({
+  facts: store.getFacts({
+    coverage: spec.meta.coverage,
+    queryName: spec.queryName,
+  }),
+  rowDepth: spec.meta.rowDepth,
+  colDepth: spec.meta.colDepth,
+});
+
+const buildTreeFromFacts = ({
+  facts,
+  rowGroupby,
+  colGroupby,
+  dateFormatters,
+}: {
+  facts: PivotFact[];
+  rowGroupby: QueryFormColumn[];
+  colGroupby: QueryFormColumn[];
+  dateFormatters?: PivotTableQueryFormData['dateFormatters'];
+}): PivotTreeData => {
+  const tree: PivotTreeData = { rows: {}, cols: {}, cells: {} };
+  const rootKey = serializePath([]);
+  let grandTotalValues: Record<string, DataRecordValue> = {};
+
+  const ensureNode = (
+    axis: 'row' | 'col',
+    path: PivotPath,
+    totalLabel: string,
+  ) => {
+    const nodes = axis === 'row' ? tree.rows : tree.cols;
+    const key = serializePath(path);
+    if (nodes[key]) {
+      return;
+    }
+    const rawValue = path[path.length - 1];
+    const label =
+      path.length === 0
+        ? 'Grand total'
+        : formatPivotLabelValue(rawValue, totalLabel);
+    const groupby = axis === 'row' ? rowGroupby : colGroupby;
+    const column = groupby[path.length - 1];
+    const columnLabel = column ? getColumnLabel(column) : undefined;
+    const formatter = columnLabel ? dateFormatters?.[columnLabel] : undefined;
+    const formattedLabel =
+      path.length === 0 || rawValue === null || rawValue === undefined
+        ? label
+        : formatter
+          ? formatter(rawValue)
+          : label;
+    nodes[key] = {
+      axis,
+      key,
+      path,
+      label,
+      formattedLabel,
+      level: path.length,
+      hasChildren:
+        path.length < (axis === 'row' ? rowGroupby.length : colGroupby.length),
+      isSubtotal:
+        path.length < (axis === 'row' ? rowGroupby.length : colGroupby.length),
+    };
+  };
+
+  facts.forEach(({ rowPath, columnPath: colPath, valueKey, value }) => {
+    for (let idx = 0; idx <= rowPath.length; idx += 1) {
+      ensureNode('row', rowPath.slice(0, idx), 'Total');
+    }
+    for (let idx = 0; idx <= colPath.length; idx += 1) {
+      ensureNode('col', colPath.slice(0, idx), 'Total');
+    }
+
+    const rowKey = serializePath(rowPath);
+    const colKey = serializePath(colPath);
+    const values = { [valueKey]: value };
+
+    if (colPath.length === 0) {
+      tree.rows[rowKey].values = {
+        ...(tree.rows[rowKey].values || {}),
+        ...values,
+      };
+    }
+    if (rowPath.length === 0) {
+      tree.cols[colKey].values = {
+        ...(tree.cols[colKey].values || {}),
+        ...values,
+      };
+    }
+
+    const cellKey = serializeCellKey(rowKey, colKey);
+    const existingCell = tree.cells[cellKey];
+    tree.cells[cellKey] = {
+      rowKey,
+      colKey,
+      values: {
+        ...(existingCell?.values || {}),
+        ...values,
+      },
+      isSubtotal:
+        rowPath.length < rowGroupby.length ||
+        colPath.length < colGroupby.length,
+    };
+
+    if (rowPath.length === 0 && colPath.length === 0) {
+      grandTotalValues = { ...grandTotalValues, ...values };
+    }
+  });
+
+  ensureNode('row', [], 'Grand total');
+  ensureNode('col', [], 'Grand total');
+  const mergedRootValues = {
+    ...(tree.rows[rootKey]?.values || {}),
+    ...(tree.cols[rootKey]?.values || {}),
+    ...(Object.keys(grandTotalValues).length > 0 ? grandTotalValues : {}),
+  };
+  const hasGrandTotalValues = Object.keys(grandTotalValues).length > 0;
+  const rootValues =
+    hasGrandTotalValues || Object.keys(mergedRootValues).length > 0
+      ? mergedRootValues
+      : undefined;
+  const rootCellKey = serializeCellKey(rootKey, rootKey);
+  if (rootValues && !tree.cells[rootCellKey]) {
+    tree.cells[rootCellKey] = {
+      rowKey: rootKey,
+      colKey: rootKey,
+      values: rootValues,
+      isSubtotal: true,
+    };
+  }
+
+  return tree;
 };
 
 function injectColumnSubtotalLeaves(
@@ -240,9 +425,41 @@ function injectColumnSubtotalLeaves(
   return next;
 }
 
-export const buildBranchTreeFromResults = ({
-  results,
-  queryPairs,
+const buildTreeFromFactBatch = ({
+  batch,
+  formData,
+  rowGroupby,
+  colGroupby,
+  rowSubtotalLevels,
+  colSubtotalLevels,
+}: {
+  batch: PivotFactBatch;
+  formData: PivotTableQueryFormData;
+  rowGroupby: QueryFormColumn[];
+  colGroupby: QueryFormColumn[];
+  rowSubtotalLevels: number[];
+  colSubtotalLevels: number[];
+}) => {
+  let tree = buildTreeFromFacts({
+    facts: batch.facts,
+    rowGroupby,
+    colGroupby,
+    dateFormatters: formData.dateFormatters,
+  });
+  if (colSubtotalLevels.includes(batch.colDepth)) {
+    tree = injectColumnSubtotalLeaves(tree, batch.colDepth, colGroupby.length);
+  }
+  const rowSubtotalDepths = rowSubtotalLevels.filter(
+    level => level > 0 && level <= batch.rowDepth,
+  );
+  rowSubtotalDepths.forEach(depth => {
+    tree = injectRowSubtotalLeaves(tree, depth, rowGroupby.length);
+  });
+  return tree;
+};
+
+const buildBranchTreeFromFactBatches = ({
+  batches,
   metricsForQuery,
   formData,
   measureHierarchy,
@@ -255,8 +472,7 @@ export const buildBranchTreeFromResults = ({
   metricsLayoutResolved,
   metricInsertIndex,
 }: {
-  results: Array<{ data?: DataRecord[] }>;
-  queryPairs: Array<{ rowDepth: number; colDepth: number }>;
+  batches: PivotFactBatch[];
   metricsForQuery: QueryFormMetric[];
   formData: PivotTableQueryFormData;
   measureHierarchy: MeasureHierarchy;
@@ -274,35 +490,18 @@ export const buildBranchTreeFromResults = ({
   const visibleMetrics = materializedMetrics ?? queryMetrics;
   const visibleMeasureHierarchy =
     materializedMeasureHierarchy ?? measureHierarchy;
-  const branchTree = queryPairs.reduce<PivotTreeData>(
-    (acc, pair, idx) =>
+  const branchTree = batches.reduce<PivotTreeData>(
+    (acc, batch) =>
       mergeTrees(
         acc,
-        (() => {
-          let tree = buildTreeFromRecords(
-            results[idx]?.data || [],
-            queryMetrics,
-            rowGroupby,
-            colGroupby,
-            pair.rowDepth,
-            pair.colDepth,
-            formData.dateFormatters,
-          );
-          if (colSubtotalLevels.includes(pair.colDepth)) {
-            tree = injectColumnSubtotalLeaves(
-              tree,
-              pair.colDepth,
-              colGroupby.length,
-            );
-          }
-          const rowSubtotalDepths = rowSubtotalLevels.filter(
-            level => level > 0 && level <= pair.rowDepth,
-          );
-          rowSubtotalDepths.forEach(depth => {
-            tree = injectRowSubtotalLeaves(tree, depth, rowGroupby.length);
-          });
-          return tree;
-        })(),
+        buildTreeFromFactBatch({
+          batch,
+          formData,
+          rowGroupby,
+          colGroupby,
+          rowSubtotalLevels,
+          colSubtotalLevels,
+        }),
       ),
     {} as PivotTreeData,
   );
@@ -345,12 +544,9 @@ export const buildBranchTreeFromSpecResults = ({
     results,
     fallback: 'empty',
   });
-  return buildBranchTreeFromResults({
-    results: ingested.map(({ result }) => result),
-    queryPairs: specs.map(spec => ({
-      rowDepth: spec.meta.rowDepth,
-      colDepth: spec.meta.colDepth,
-    })),
+  const store = buildFactStore(ingested);
+  return buildBranchTreeFromFactBatches({
+    batches: ingested.map(({ spec }) => factBatchFromStore({ store, spec })),
     metricsForQuery: firstSpec.metrics,
     formData,
     measureHierarchy,
@@ -379,12 +575,10 @@ export const buildInitialTreeFromSpecResults = ({
   const rootKey = serializePath([]);
   const emptyTree: PivotTreeData = { rows: {}, cols: {}, cells: {} };
   const ingested = ingestQueryResults({ specs, results });
-  const mergedTree = ingested.reduce((acc, { spec, result }) => {
-    const nextTree = buildBranchTreeFromResults({
-      results: [result],
-      queryPairs: [
-        { rowDepth: spec.meta.rowDepth, colDepth: spec.meta.colDepth },
-      ],
+  const store = buildFactStore(ingested);
+  const mergedTree = ingested.reduce((acc, { spec }) => {
+    const nextTree = buildBranchTreeFromFactBatches({
+      batches: [factBatchFromStore({ store, spec })],
       metricsForQuery: spec.metrics,
       formData,
       measureHierarchy: layout.measureHierarchy,

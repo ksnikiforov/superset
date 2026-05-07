@@ -19,10 +19,10 @@
 import { fireEvent, render, screen, waitFor, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { buildFormData } from '../fixtures/pivotFormData';
-import { buildBranchTreeFromResults } from '../../../src/fetchPivotBranch';
 import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
 import { resolveInteractionFormData } from '../../../src/pivot/layout/resolveInteractionLayout';
 import { buildInitialQuerySpecs } from '../../../src/pivot/query/specs';
+import { buildInitialTreeFromSpecResults } from '../../../src/pivot/runtime/ingestQueryResults';
 import {
   applyMeasureHierarchyAxis,
   applyMetricAxis,
@@ -55,36 +55,15 @@ const buildInitialBootstrapTree = ({
   const layout = buildLayoutContext(resolvedFormData);
   const specs = buildInitialQuerySpecs(resolvedFormData, layout);
 
-  return specs.reduce(
-    (tree, spec) =>
-      mergeTrees(
-        tree,
-        buildBranchTreeFromResults({
-          results: [
-            {
-              data:
-                resultsByDepth[`${spec.meta.rowDepth}|${spec.meta.colDepth}`] ??
-                [],
-            },
-          ],
-          queryPairs: [
-            { rowDepth: spec.meta.rowDepth, colDepth: spec.meta.colDepth },
-          ],
-          metricsForQuery: spec.metrics,
-          formData: resolvedFormData,
-          measureHierarchy: layout.measureHierarchy,
-          materializedMetrics: spec.meta.materializedMetrics,
-          materializedMeasureHierarchy: spec.meta.materializedMeasureHierarchy,
-          rowGroupby: spec.meta.rowGroupbyForQueryFull,
-          colGroupby: spec.meta.colGroupbyForQueryFull,
-          rowSubtotalLevels: spec.meta.rowSubtotalLevels,
-          colSubtotalLevels: spec.meta.colSubtotalLevels,
-          metricsLayoutResolved: spec.meta.metricsLayoutResolved,
-          metricInsertIndex: spec.meta.metricInsertIndex,
-        }),
-      ),
-    { rows: {}, cols: {}, cells: {} },
-  );
+  return buildInitialTreeFromSpecResults({
+    specs,
+    results: specs.map(spec => ({
+      query_name: spec.queryName,
+      data: resultsByDepth[`${spec.meta.rowDepth}|${spec.meta.colDepth}`] ?? [],
+    })),
+    layout,
+    formData: resolvedFormData,
+  });
 };
 
 describe('PivotTableChart interaction layout', () => {

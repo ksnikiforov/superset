@@ -312,13 +312,24 @@ Gate 2 has started:
   `PivotFact[]` batches from DB records and coverage metadata, and centralizes
   planned-spec-to-tree materialization for initial load, seamless refresh,
   branch fetch, and batch fetch.
+- Ingestion-boundary tests now cover support metrics and offset metric values
+  becoming facts/cell values without materializing support metric branches, plus
+  column subtotal leaf materialization from planned coverage specs.
+- Planned-spec tree materialization now consumes ingested `PivotFact[]` batches
+  directly instead of calling the legacy raw-record tree builder. The old
+  `buildBranchTreeFromResults` compatibility bridge and `fetchPivotBranch`
+  re-export have been deleted.
+- `src/pivot/runtime/factStore.ts` now owns exact fact identity. Facts are keyed
+  by coverage, row path, column path, value key, and visible/support role.
+  Initial, branch, and batch materialization upsert ingested facts into a local
+  store before reading coverage-specific fact batches back out.
 
 Immediate next step:
 
-- Continue Gate 3 by making tree materialization consume ingested facts instead
-  of reusing raw chart-data records internally. The new ingestion boundary
-  already exposes facts, but `buildBranchTreeFromResults` still materializes
-  through the legacy record-to-tree helper.
+- Continue Gate 3 by making the fact store survive across incremental branch
+  fetches inside the runtime controller. This should let exact coverage already
+  fetched for support metrics or visible branches be reused instead of rebuilt
+  from tree state.
 - Continue shrinking `resolveFetchContext`: it now owns metric/leaf scope and
   support metric selection, but should eventually become a thin adapter around
   coverage planning plus query-shape construction.

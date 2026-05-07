@@ -43,8 +43,6 @@ import { buildBranchQuerySpecs } from './pivot/query/specs';
 import { stableStringify as stableStringifyBase } from './pivot/shared/stableStringify';
 import { buildBranchTreeFromSpecResults } from './pivot/runtime/ingestQueryResults';
 
-export { buildBranchTreeFromResults } from './pivot/runtime/ingestQueryResults';
-
 export interface FetchPivotBranchResult {
   data?: PivotTreeData;
   cached?: boolean;
