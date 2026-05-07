@@ -57,7 +57,11 @@ function PivotTableChart(props: TestPivotTableChartProps) {
     <TestPivotTableChart
       {...props}
       factBatches={
-        props.factBatches ?? buildPreloadedTreeFactBatches(props.data)
+        props.factBatches ??
+        buildPreloadedTreeFactBatches(props.data, {
+          groupbyRows: props.groupbyRows ?? [],
+          groupbyColumns: props.groupbyColumns ?? [],
+        })
       }
     />
   );

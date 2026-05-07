@@ -431,15 +431,36 @@ Gate 2 has started:
   Planned specs now treat `meta.coverage.rowDepth` and
   `meta.coverage.columnDepth` as the single source of truth, and fact-store
   batch scopes derive their depth from coverage during ingestion.
+- Branch fetch regression coverage now proves that an exact branch coverage
+  containing a visible metric plus a sorting support metric is reused from the
+  fact store on a later request. The support metric stays available to cell
+  values but is not materialized as a visible metric branch, and no duplicate
+  query is issued for the same Values-first coverage.
+- Fact-store batch scopes no longer carry `rowDepth` / `colDepth`. Scope now
+  describes only interaction identity (`branch` path or `batch` sibling set),
+  while fetched-depth reconstruction reads the required opposite depth from
+  `batch.coverage`. Test-only preloaded branch batches now include coverage
+  metadata for the same reason.
+- Facts are now payload-only inside the fact store. `PivotFact.coverage`,
+  `PivotFact.queryName`, the production-unused `upsertMany` API, and the
+  coverage-less query-name fallback have been deleted. Exact coverage and query
+  identity live on `PivotFactStoreBatch`, and the fact key is built from the
+  batch selector plus path/value/role.
+- Fact-store identity no longer uses opaque `queryName`. Batches and selectors
+  are addressed by exact coverage plus typed request scope (`bootstrap`, `root`,
+  `branch` path, or `batch` sibling set). A regression now proves sibling
+  branch scopes with identical depth/dimension coverage do not satisfy each
+  other. Query names remain on query specs for backend result matching only.
 
 Immediate next step:
 
-- Measure whether support metrics fetched for one branch are now reusable in the
-  practical expansion paths we care about, and add a targeted regression test if
-  any path still re-requests an already loaded exact support coverage.
-- Inspect fact-store batch scope depth fields next. They are now derived from
-  coverage, but may still be removable if exact coverage can replace scope depth
-  in fetched-depth reconstruction without changing interactive behavior.
+- Measure whether support metrics are reusable in broader interaction paths that
+  do not use `fetchPivotBranch` directly. If any path re-requests an already
+  loaded exact support coverage, add a targeted regression before changing it.
+- Inspect whether `useExpansionEngine` can consume typed request scopes directly
+  for pending/fetched state, instead of translating branch/batch scope back into
+  axis path keys plus opposite depth. This is the next likely deletion-oriented
+  step in the interactive runtime path.
 - Before deleting any broad behavior branch, bring inconsistent behavior or
   edge-case behavior that unlocks large deletion wins to the user for approval
   with UX impact and deletion upside.

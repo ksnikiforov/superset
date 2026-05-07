@@ -34,58 +34,51 @@ export type PivotFact = {
   valueKey: string;
   value: DataRecordValue;
   role: PivotFactRole;
-  coverage?: PivotFactCoverage;
-  queryName: string;
 };
 
-type PivotFactSelector = {
-  coverage?: PivotFactCoverage;
-  queryName: string;
+export type PivotFactSelector = {
+  coverage: PivotFactCoverage;
+  scope: PivotFactStoreBatchScope;
 };
 
 export type PivotFactStoreBatch = PivotFactSelector & {
   facts: PivotFact[];
-  scope?: PivotFactStoreBatchScope;
 };
 
 export type PivotFactStoreBatchScope =
   | {
       kind: 'bootstrap' | 'root';
-      rowDepth: number;
-      colDepth: number;
     }
   | {
       kind: 'branch';
       axis: PivotAxis;
       path: PivotPath;
-      rowDepth: number;
-      colDepth: number;
     }
   | {
       kind: 'batch';
       axis: PivotAxis;
       parentPath: PivotPath;
       siblingValues: PivotPathValue[];
-      rowDepth: number;
-      colDepth: number;
     };
 
 export type PivotFactStore = {
   upsertBatch: (batch: PivotFactStoreBatch) => void;
   upsertBatches: (batches: PivotFactStoreBatch[]) => void;
-  upsertMany: (facts: PivotFact[]) => void;
   getFacts: (selector: PivotFactSelector) => PivotFact[];
   hasCoverage: (selector: PivotFactSelector) => boolean;
   getAll: () => PivotFact[];
   size: () => number;
 };
 
-const coverageKey = ({ coverage, queryName }: PivotFactSelector) =>
-  stableStringify([coverage ?? null, queryName]);
+const requestKey = ({ coverage, scope }: PivotFactSelector) =>
+  stableStringify([coverage, scope]);
 
-export const buildPivotFactKey = (fact: PivotFact) =>
+export const buildPivotFactKey = (
+  selector: PivotFactSelector,
+  fact: PivotFact,
+) =>
   stableStringify([
-    coverageKey(fact),
+    requestKey(selector),
     serializePath(fact.rowPath),
     serializePath(fact.columnPath),
     fact.valueKey,
@@ -94,47 +87,34 @@ export const buildPivotFactKey = (fact: PivotFact) =>
 
 export const createPivotFactStore = (): PivotFactStore => {
   const factsByKey = new Map<string, PivotFact>();
-  const factKeysByCoverage = new Map<string, Set<string>>();
+  const factKeysByRequest = new Map<string, Set<string>>();
 
-  const upsertBatch = ({ facts, ...selector }: PivotFactStoreBatch) => {
-    const key = coverageKey(selector);
-    const coverageFactKeys = factKeysByCoverage.get(key) ?? new Set<string>();
+  const upsertBatch = (batch: PivotFactStoreBatch) => {
+    const { facts } = batch;
+    const selector = {
+      coverage: batch.coverage,
+      scope: batch.scope,
+    };
+    const key = requestKey(selector);
+    const requestFactKeys = factKeysByRequest.get(key) ?? new Set<string>();
     facts.forEach(fact => {
-      const factKey = buildPivotFactKey(fact);
+      const factKey = buildPivotFactKey(selector, fact);
       factsByKey.set(factKey, fact);
-      coverageFactKeys.add(factKey);
+      requestFactKeys.add(factKey);
     });
-    factKeysByCoverage.set(key, coverageFactKeys);
-  };
-
-  const upsertMany = (facts: PivotFact[]) => {
-    const batchesByCoverage = new Map<string, PivotFactStoreBatch>();
-    facts.forEach(fact => {
-      const key = coverageKey(fact);
-      const batch =
-        batchesByCoverage.get(key) ??
-        ({
-          coverage: fact.coverage,
-          queryName: fact.queryName,
-          facts: [],
-        } satisfies PivotFactStoreBatch);
-      batch.facts.push(fact);
-      batchesByCoverage.set(key, batch);
-    });
-    Array.from(batchesByCoverage.values()).forEach(upsertBatch);
+    factKeysByRequest.set(key, requestFactKeys);
   };
 
   const getFacts = (selector: PivotFactSelector) =>
-    Array.from(factKeysByCoverage.get(coverageKey(selector)) ?? [])
+    Array.from(factKeysByRequest.get(requestKey(selector)) ?? [])
       .map(key => factsByKey.get(key))
       .filter((fact): fact is PivotFact => fact !== undefined);
 
   return {
     upsertBatch,
     upsertBatches: batches => batches.forEach(upsertBatch),
-    upsertMany,
     getFacts,
-    hasCoverage: selector => factKeysByCoverage.has(coverageKey(selector)),
+    hasCoverage: selector => factKeysByRequest.has(requestKey(selector)),
     getAll: () => Array.from(factsByKey.values()),
     size: () => factsByKey.size,
   };

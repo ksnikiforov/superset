@@ -47,6 +47,7 @@ import {
   createPivotFactStore,
   type PivotFact,
   type PivotFactRole,
+  type PivotFactSelector,
   type PivotFactStoreBatch,
   type PivotFactStore,
 } from './factStore';
@@ -140,13 +141,11 @@ const pathFromRecord = (record: DataRecord, columns: QueryFormColumn[]) =>
 const factsFromRecords = ({
   result,
   metrics,
-  queryName,
   coverage,
   materializedMetrics,
 }: {
   result: QueryResultWithData;
   metrics: QueryFormMetric[];
-  queryName: string;
   coverage: PivotFactCoverage;
   materializedMetrics: QueryFormMetric[];
 }): PivotFact[] => {
@@ -167,8 +166,6 @@ const factsFromRecords = ({
       valueKey,
       value: record[valueKey],
       role: roleForValueKey(valueKey),
-      coverage,
-      queryName,
     }));
   });
 };
@@ -183,7 +180,6 @@ export const ingestQueryResultFacts = ({
   factsFromRecords({
     result,
     metrics: spec.metrics,
-    queryName: spec.queryName,
     coverage: spec.meta.coverage,
     materializedMetrics: spec.meta.materializedMetrics,
   });
@@ -220,38 +216,38 @@ type MaterializationFactBatch = {
 const factStoreBatchScopeFromSpec = (
   spec: PlannedQuerySpec,
 ): PivotFactStoreBatch['scope'] => {
-  const { rowDepth, columnDepth } = spec.meta.coverage;
   if (spec.meta.kind === 'branch') {
     if (!spec.meta.axis) {
-      return undefined;
+      throw new Error('Branch fact-store batch requires an axis');
     }
     return {
       kind: 'branch',
       axis: spec.meta.axis,
       path: spec.meta.path ?? [],
-      rowDepth,
-      colDepth: columnDepth,
     };
   }
   if (spec.meta.kind === 'batch') {
     if (!spec.meta.axis) {
-      return undefined;
+      throw new Error('Batch fact-store batch requires an axis');
     }
     return {
       kind: 'batch',
       axis: spec.meta.axis,
       parentPath: spec.meta.parentPath ?? [],
       siblingValues: spec.meta.siblingValues ?? [],
-      rowDepth,
-      colDepth: columnDepth,
     };
   }
   return {
     kind: spec.meta.kind,
-    rowDepth,
-    colDepth: columnDepth,
   };
 };
+
+const factStoreSelectorFromSpec = (
+  spec: PlannedQuerySpec,
+): PivotFactSelector => ({
+  coverage: spec.meta.coverage,
+  scope: factStoreBatchScopeFromSpec(spec),
+});
 
 const factStoreBatchFromIngested = ({
   spec,
@@ -260,9 +256,7 @@ const factStoreBatchFromIngested = ({
   IngestedQueryResult<QueryResultWithData>,
   'spec' | 'facts'
 >): PivotFactStoreBatch => ({
-  coverage: spec.meta.coverage,
-  queryName: spec.queryName,
-  scope: factStoreBatchScopeFromSpec(spec),
+  ...factStoreSelectorFromSpec(spec),
   facts,
 });
 
@@ -312,10 +306,7 @@ const factBatchFromStore = ({
   store: PivotFactStore;
   spec: PlannedQuerySpec;
 }): MaterializationFactBatch => ({
-  facts: store.getFacts({
-    coverage: spec.meta.coverage,
-    queryName: spec.queryName,
-  }),
+  facts: store.getFacts(factStoreSelectorFromSpec(spec)),
   coverage: spec.meta.coverage,
 });
 
@@ -599,14 +590,7 @@ export const canMaterializeSpecsFromFactStore = ({
 }: {
   specs: PlannedQuerySpec[];
   store: PivotFactStore;
-}) =>
-  specs.every(spec =>
-    store.hasCoverage({
-      coverage: spec.meta.coverage,
-      queryName: spec.queryName,
-    }),
-  );
-
+}) => specs.every(spec => store.hasCoverage(factStoreSelectorFromSpec(spec)));
 export const buildBranchTreeFromFactStore = ({
   specs,
   store,

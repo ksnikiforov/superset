@@ -143,8 +143,6 @@ test('ingests named query results into ordered fact batches', () => {
       valueKey: 'sales',
       value: 30,
       role: 'visible',
-      coverage: specs[0].meta.coverage,
-      queryName: 'pivot_v3|1|0',
     },
     {
       rowPath: ['France'],
@@ -152,8 +150,6 @@ test('ingests named query results into ordered fact batches', () => {
       valueKey: 'sales',
       value: 12,
       role: 'visible',
-      coverage: specs[1].meta.coverage,
-      queryName: 'pivot_v3|1|1',
     },
   ]);
 });
@@ -221,8 +217,10 @@ test('records exact branch scope on fact-store batches', () => {
     kind: 'branch',
     axis: 'row',
     path: ['France'],
+  });
+  expect(batch.coverage).toMatchObject({
     rowDepth: 2,
-    colDepth: 1,
+    columnDepth: 1,
   });
 });
 

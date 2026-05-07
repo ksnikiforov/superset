@@ -766,6 +766,109 @@ describe('resolveFetchContext', () => {
     ).toBe(99);
   });
 
+  it('reuses exact branch coverage that included sorting support metrics', async () => {
+    const postMock = SupersetClient.post as jest.Mock;
+    postMock.mockImplementation(
+      ({ jsonPayload }: { jsonPayload?: { queries?: QueryPayload[] } }) => ({
+        json: {
+          result: (jsonPayload?.queries || []).map(query =>
+            query.columns?.includes('revenueBand')
+              ? {
+                  data: [
+                    {
+                      orderPriority: '1-URGENT',
+                      revenueBand: 'REV-A',
+                      measure1: 10,
+                      measure2: 20,
+                      sortMetric: 99,
+                    },
+                  ],
+                }
+              : {
+                  data: [
+                    {
+                      orderPriority: '1-URGENT',
+                      measure1: 30,
+                      measure2: 40,
+                      sortMetric: 199,
+                    },
+                  ],
+                },
+          ),
+        },
+      }),
+    );
+
+    const metrics = ['measure1', 'measure2'];
+    const formData = buildFormData({
+      groupbyRows: ['orderPriority'],
+      groupbyColumns: [METRICS_PLACEHOLDER, 'revenueBand'],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      rowSubTotals: false,
+      colSorting: {
+        revenueBand: { metric: 'sortMetric', mode: 'axis_value' },
+      },
+    });
+    const currentTreeRaw = buildTreeFromRecords(
+      [{ orderPriority: '1-URGENT', measure1: 30, measure2: 40 }],
+      metrics,
+      ['orderPriority'],
+      ['revenueBand'],
+      1,
+      0,
+    );
+    const currentTree = applyMetricAxis(
+      currentTreeRaw,
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      ['orderPriority'],
+      ['revenueBand'],
+      0,
+    );
+    const factStore = createPivotFactStore();
+    const fetchParams = {
+      formData,
+      axis: 'col' as const,
+      path: [encodeMetricKey('measure1')],
+      currentTree,
+      factStore,
+    };
+
+    const firstResult = await fetchPivotBranch(fetchParams);
+
+    const queries =
+      (
+        postMock.mock.calls[0][0] as {
+          jsonPayload?: { queries?: QueryPayload[] };
+        }
+      ).jsonPayload?.queries || [];
+    expect(queries.length).toBeGreaterThan(0);
+    queries.forEach(query => {
+      expect(query.metrics).toEqual(['measure1', 'sortMetric']);
+    });
+    expect(firstResult.factBatches).toHaveLength(queries.length);
+
+    clearPivotBranchCache();
+    const secondResult = await fetchPivotBranch(fetchParams);
+
+    expect(secondResult.factStoreHit).toBe(true);
+    expect(postMock).toHaveBeenCalledTimes(1);
+    expect(
+      secondResult.data?.cols[
+        serializePath([encodeMetricKey('sortMetric'), 'REV-A'])
+      ],
+    ).toBeUndefined();
+    expect(
+      secondResult.data?.cells[
+        serializeCellKey(
+          serializePath(['1-URGENT']),
+          serializePath([encodeMetricKey('measure1'), 'REV-A']),
+        )
+      ]?.values.sortMetric,
+    ).toBe(99);
+  });
+
   it('scopes IX 1YA measure-leaf requests to the selected metric and offset', async () => {
     const postMock = SupersetClient.post as jest.Mock;
     const valueLeaf = buildValueLeaf();
@@ -1592,7 +1695,7 @@ describe('fetchPivotBranch delta-only contract', () => {
     const store = createPivotFactStore();
     store.upsertBatch({
       coverage: spec.meta.coverage,
-      queryName: spec.queryName,
+      scope: { kind: 'branch', axis: 'row', path: ['A'] },
       facts: [
         {
           rowPath: ['A', 'B'],
@@ -1600,8 +1703,6 @@ describe('fetchPivotBranch delta-only contract', () => {
           valueKey: 'm1',
           value: 42,
           role: 'visible',
-          coverage: spec.meta.coverage,
-          queryName: spec.queryName,
         },
       ],
     });

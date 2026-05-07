@@ -283,7 +283,12 @@ describe('fetchPivotBranchesBatch', () => {
     const store = createPivotFactStore();
     store.upsertBatch({
       coverage: spec.meta.coverage,
-      queryName: spec.queryName,
+      scope: {
+        kind: 'batch',
+        axis: 'row',
+        parentPath: ['US'],
+        siblingValues: ['CA', 'NY'],
+      },
       facts: [
         {
           rowPath: ['US', 'CA', 'SF'],
@@ -291,8 +296,6 @@ describe('fetchPivotBranchesBatch', () => {
           valueKey: 'm1',
           value: 7,
           role: 'visible',
-          coverage: spec.meta.coverage,
-          queryName: spec.queryName,
         },
       ],
     });

@@ -701,11 +701,17 @@ export const useExpansionEngine = ({
         if (scope.kind === 'bootstrap' || scope.kind === 'root') {
           return;
         }
+        const { coverage } = batch;
+        if (!coverage) {
+          return;
+        }
+        const requiredOppositeDepth =
+          scope.axis === 'row' ? coverage.columnDepth : coverage.rowDepth;
         if (scope.kind === 'branch') {
           markFetchedCoverage(
             scope.axis,
             serializePath(scope.path),
-            scope.axis === 'row' ? scope.colDepth : scope.rowDepth,
+            requiredOppositeDepth,
           );
           return;
         }
@@ -717,7 +723,7 @@ export const useExpansionEngine = ({
           markFetchedCoverage(
             scope.axis,
             serializePath(path),
-            scope.axis === 'row' ? scope.colDepth : scope.rowDepth,
+            requiredOppositeDepth,
           );
         });
       });

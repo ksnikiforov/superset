@@ -61,6 +61,10 @@ const maxPathDepth = (nodes: PivotTreeData['rows']) =>
 
 export const buildPreloadedTreeFactBatches = (
   tree: PivotTreeData | undefined,
+  groupby: Pick<PivotTableProps, 'groupbyRows' | 'groupbyColumns'> = {
+    groupbyRows: [],
+    groupbyColumns: [],
+  },
 ): PivotFactStoreBatch[] => {
   if (!tree) {
     return [];
@@ -79,14 +83,18 @@ export const buildPreloadedTreeFactBatches = (
         return;
       }
       batches.push({
-        queryName: `test-preloaded-${axis}-${node.key}`,
+        coverage: {
+          reason: 'initial',
+          rowDepth,
+          columnDepth: colDepth,
+          rowDimensions: groupby.groupbyRows.slice(0, rowDepth),
+          columnDimensions: groupby.groupbyColumns.slice(0, colDepth),
+        },
         facts: [],
         scope: {
           kind: 'branch',
           axis,
           path: node.path,
-          rowDepth,
-          colDepth,
         },
       });
     });
