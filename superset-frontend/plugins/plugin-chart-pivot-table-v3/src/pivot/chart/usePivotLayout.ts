@@ -996,12 +996,6 @@ export const usePivotLayout = ({
     ) => {
       const rowSubtotalPositionForParent = getRowSubtotalPosition(parent);
       const isMetricSubtotalAtMetricTier = (node: PivotTreeNode) => {
-        if (
-          resolvedMetricsLayout !== MetricsLayoutEnum.ROWS ||
-          !isMultiMetric
-        ) {
-          return false;
-        }
         const subtotalIndex = node.path.findIndex(val => isSubtotalToken(val));
         if (subtotalIndex <= 0) {
           return false;
@@ -1092,7 +1086,6 @@ export const usePivotLayout = ({
           isMultiMetric &&
           metricDimIndexOnRows !== undefined &&
           countDimDepth(parent.path) > metricDimIndexOnRows;
-        const isSubtotalLevelToken = (val: unknown) => isSubtotalToken(val);
         const subtotalDescendants = Object.values(nodes).filter(node => {
           if (node.path.length <= parent.path.length) {
             return false;
@@ -1107,7 +1100,7 @@ export const usePivotLayout = ({
           ) {
             return false;
           }
-          if (!isSubtotalLevelToken(node.path[parent.path.length])) {
+          if (!isSubtotalToken(node.path[parent.path.length])) {
             return false;
           }
           if (hideMetricHeaderOnRows) {
@@ -1121,7 +1114,11 @@ export const usePivotLayout = ({
         if (subtotalDescendants.length > 0) {
           const seen = new Set(filtered.map(child => child.key));
           subtotalDescendants.forEach(node => {
-            if (isMetricSubtotalAtMetricTier(node)) {
+            if (
+              resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
+              isMultiMetric &&
+              isMetricSubtotalAtMetricTier(node)
+            ) {
               return;
             }
             if (!seen.has(node.key)) {
@@ -1144,35 +1141,6 @@ export const usePivotLayout = ({
           }
           return child.path.some(val => isMetricTokenValue(val));
         });
-      }
-      if (
-        rowSubTotals &&
-        resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
-        isMultiMetric &&
-        metricDimIndexOnRows !== undefined &&
-        metricLayoutIndexOnRows !== undefined &&
-        metricLayoutIndexOnRows < groupbyRows.length &&
-        metricLayoutIndexOnRows > 1
-      ) {
-        const suppressDepth = metricDimIndexOnRows + 1;
-        filtered = filtered.filter(child => {
-          if (!isExplicitSubtotalNode(child)) {
-            return true;
-          }
-          if (metricLayoutIndexOnRows > 1) {
-            return true;
-          }
-          const dimDepth = countDimDepth(child.path);
-          const subtotalDepth = child.path.some(val => isSubtotalToken(val))
-            ? Math.max(dimDepth - 1, 0)
-            : dimDepth;
-          return subtotalDepth !== suppressDepth;
-        });
-      }
-      if (rowSubTotals && !isMultiMetric) {
-        filtered = filtered.filter(
-          child => !isMetricSubtotalAtMetricTier(child),
-        );
       }
       return filtered;
     },

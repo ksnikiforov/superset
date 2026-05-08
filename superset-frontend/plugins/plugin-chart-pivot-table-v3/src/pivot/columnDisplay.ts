@@ -17,7 +17,7 @@
  * under the License.
  */
 import { MetricsLayoutEnum, PivotTreeNode } from '../types';
-import { decodeMeasureLeafId, decodeMetricKey } from '../utils';
+import { decodeMeasureLeafId, decodeMetricKey, SUBTOTAL_TOKEN } from '../utils';
 
 type ColumnDisplayConfig = {
   metricsLayout: MetricsLayoutEnum;
@@ -32,6 +32,7 @@ type ColumnDisplayConfig = {
   getNonMetricPathParts: (path: PivotTreeNode['path']) => PivotTreeNode['path'];
   isMetricGrandTotalNode: (node: PivotTreeNode) => boolean;
   isMetricSubtotalNode: (node: PivotTreeNode) => boolean;
+  isExpanded?: (node: PivotTreeNode) => boolean;
 };
 
 export const buildColumnDisplayPath = (
@@ -52,7 +53,28 @@ export const buildColumnDisplayPath = (
     getNonMetricPathParts,
     isMetricGrandTotalNode,
     isMetricSubtotalNode,
+    isExpanded,
   } = config;
+  const metricKey = getMetricKeyFromPath(col.path);
+  const metricLabel = metricKey
+    ? getMetricDisplayLabelForKey(metricKey)
+    : undefined;
+  if (
+    metricsLayout === MetricsLayoutEnum.COLUMNS &&
+    metricsFirstOnCols &&
+    isExpanded?.(col) &&
+    metricLabel &&
+    col.path.length < maxDepth
+  ) {
+    const nonMetricParts = getNonMetricPathParts(col.path);
+    if (nonMetricParts.length === 0) {
+      return [...col.path, SUBTOTAL_TOKEN];
+    }
+    return [
+      ...col.path,
+      ...Array(Math.max(maxDepth - col.path.length, 0)).fill(metricLabel),
+    ];
+  }
   if (metricsLayout !== MetricsLayoutEnum.COLUMNS || metricsFirstOnCols) {
     return col.path;
   }
@@ -69,10 +91,6 @@ export const buildColumnDisplayPath = (
       ...Array(Math.max(maxDepth - path.length, 0)).fill(lastLabel),
     ];
   };
-  const metricKey = getMetricKeyFromPath(col.path);
-  const metricLabel = metricKey
-    ? getMetricDisplayLabelForKey(metricKey)
-    : undefined;
   if (!metricKey || !metricLabel) {
     return padToDepth(col.path);
   }

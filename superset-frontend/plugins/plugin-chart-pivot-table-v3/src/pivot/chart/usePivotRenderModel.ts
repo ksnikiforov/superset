@@ -43,7 +43,6 @@ import {
   formatPivotLabelValue,
   decodeMeasureLeafId,
   isSubtotalToken,
-  SUBTOTAL_TOKEN,
 } from '../../utils';
 import {
   buildRenderModel,
@@ -496,25 +495,8 @@ export const usePivotRenderModel = ({
   );
 
   const getColumnDisplayPath = useCallback(
-    (col: PivotTreeNode, maxDepth: number) => {
-      if (
-        layout.resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS &&
-        layout.metricsFirstOnCols &&
-        expandedCols.has(col.key)
-      ) {
-        const metricLabel = layout.getMetricDisplayLabelFromPath(col.path);
-        if (metricLabel && col.path.length < maxDepth) {
-          const nonMetricParts = getColumnProjectedPathParts(col.path);
-          if (nonMetricParts.length === 0) {
-            return [...col.path, SUBTOTAL_TOKEN];
-          }
-          return [
-            ...col.path,
-            ...Array(Math.max(maxDepth - col.path.length, 0)).fill(metricLabel),
-          ];
-        }
-      }
-      return buildColumnDisplayPath(col, maxDepth, {
+    (col: PivotTreeNode, maxDepth: number) =>
+      buildColumnDisplayPath(col, maxDepth, {
         metricsLayout: layout.resolvedMetricsLayout,
         metricsFirstOnCols: layout.metricsFirstOnCols,
         metricsAtColEnd: layout.metricsAtColEnd,
@@ -529,8 +511,8 @@ export const usePivotRenderModel = ({
         getNonMetricPathParts: getColumnProjectedPathParts,
         isMetricGrandTotalNode: layout.isMetricGrandTotalNode,
         isMetricSubtotalNode: layout.isMetricSubtotalNode,
-      });
-    },
+        isExpanded: node => expandedCols.has(node.key),
+      }),
     [
       expandedCols,
       getColumnProjectedPathParts,

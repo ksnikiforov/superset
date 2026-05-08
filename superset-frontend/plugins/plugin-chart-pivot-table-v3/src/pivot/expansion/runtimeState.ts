@@ -32,9 +32,6 @@ export type ExpansionRuntimeAction =
       keys: Set<string>;
     }
   | {
-      type: 'clearPending';
-    }
-  | {
       type: 'updateLoadingKey';
       key: string;
       delta: number;
@@ -45,9 +42,6 @@ export type ExpansionRuntimeAction =
   | {
       type: 'setHydrating';
       value: boolean;
-    }
-  | {
-      type: 'resetTransient';
     };
 
 export const createExpansionRuntimeState = (): ExpansionRuntimeState => ({
@@ -85,12 +79,6 @@ export const expansionRuntimeReducer = (
       return action.axis === 'row'
         ? { ...state, pendingRows: new Set(action.keys) }
         : { ...state, pendingCols: new Set(action.keys) };
-    case 'clearPending':
-      return {
-        ...state,
-        pendingRows: new Set(),
-        pendingCols: new Set(),
-      };
     case 'updateLoadingKey':
       return {
         ...state,
@@ -110,8 +98,6 @@ export const expansionRuntimeReducer = (
         ...state,
         isHydrating: action.value,
       };
-    case 'resetTransient':
-      return createExpansionRuntimeState();
     default:
       return state;
   }
