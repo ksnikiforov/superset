@@ -39,9 +39,6 @@ import {
 import { parsePath, mergeTrees } from '../../utils';
 import {
   buildDesiredExpandedKeys,
-  coerceExpansionState,
-  pruneExpandedToStablePrefix,
-  stripAutoSeededExpansions,
   type PivotExpansionStateKeys,
 } from '../engine/expansionStateModel';
 import { type FetchTarget } from '../engine/fetchCoordinator';
@@ -85,10 +82,10 @@ import {
   computeVisibleDepths as computeVisibleDepthsBase,
   dropDescendants,
   getVisibleExpansionKeys as getVisibleExpansionKeysBase,
-  isSameLayout,
   hasNestedPendingKeys,
   planHydrationIteration,
   pruneTreeByPrefixes,
+  resolveReinitializedExpansionState,
   resolveExpandedForMetrics as resolveExpandedForMetricsBase,
   type ExpansionVisibilityConfig,
 } from './engine';
@@ -858,15 +855,9 @@ export const useExpansionEngine = ({
   );
 
   const buildHasLoadedChildrenForIteration = useCallback(
-    (
-      nextTree: PivotTreeData,
-      visibleRowDepth: number,
-      visibleColDepth: number,
-    ) =>
+    (nextTree: PivotTreeData) =>
       buildHasLoadedChildren({
         tree: nextTree,
-        visibleRowDepth,
-        visibleColDepth,
         config: visibilityConfig,
       }),
     [visibilityConfig],
@@ -1004,11 +995,7 @@ export const useExpansionEngine = ({
             axis === 'row' ? visibleColDepth : visibleRowDepth;
           const nodes = axis === 'row' ? currentTree.rows : currentTree.cols;
           const hasLoadedChildrenForIteration =
-            buildHasLoadedChildrenForIteration(
-              currentTree,
-              visibleRowDepth,
-              visibleColDepth,
-            );
+            buildHasLoadedChildrenForIteration(currentTree);
           const { plan, targets } = planGroupedExpansionTargets({
             axis,
             expandedKeys: resolvedExpanded,
@@ -1545,11 +1532,6 @@ export const useExpansionEngine = ({
         collapsedRows: [],
         collapsedCols: [],
       } satisfies PivotExpansionStateKeys);
-    const persistedSeed = coerceExpansionState(
-      persistedExpansionStateRef.current,
-    );
-    const metricLabelSetForDepth = new Set(Array.from(metricLabelSet));
-
     const currentLayout = {
       rows: groupbyRowKeys,
       cols: groupbyColumnKeys,
@@ -1655,239 +1637,55 @@ export const useExpansionEngine = ({
     inFlightExpandedColsRef.current.clear();
     inFlightExpansionIdRef.current = 0;
 
-    const sessionRows = sessionExpansionState.rows ?? [];
-    const sessionCols = sessionExpansionState.cols ?? [];
-    const sessionCollapsedRows = sessionExpansionState.collapsedRows ?? [];
-    const sessionCollapsedCols = sessionExpansionState.collapsedCols ?? [];
-
-    const prevAutoExpandRows = prevAutoExpandRowsRef.current;
-    const prevAutoExpandCols = prevAutoExpandColsRef.current;
-
-    const shouldClearRowCache =
-      effectiveExpandRowsLevel > 0 &&
-      (prevAutoExpandRows === null || prevAutoExpandRows === 0) &&
-      sessionRows.length + sessionCollapsedRows.length > 0;
-    const shouldClearColCache =
-      effectiveExpandColsLevel > 0 &&
-      (prevAutoExpandCols === null || prevAutoExpandCols === 0) &&
-      sessionCols.length + sessionCollapsedCols.length > 0;
-
-    const allowRowCollapsed = effectiveExpandRowsLevel > 0;
-    const allowColCollapsed = effectiveExpandColsLevel > 0;
-    const manualRows = shouldClearRowCache ? [] : sessionRows;
-    const manualCols = shouldClearColCache ? [] : sessionCols;
-    const manualCollapsedRows =
-      shouldClearRowCache || !allowRowCollapsed ? [] : sessionCollapsedRows;
-    const manualCollapsedCols =
-      shouldClearColCache || !allowColCollapsed ? [] : sessionCollapsedCols;
-
-    const persistedLayoutMismatch =
-      !persistedSeed ||
-      !isSameLayout(persistedSeed.rowKeys, currentLayout.rows) ||
-      !isSameLayout(persistedSeed.colKeys, currentLayout.cols);
-    const hasPersistedExpansionState =
-      persistedExpansionStateRef.current !== undefined &&
-      persistedExpansionStateRef.current !== null;
-    const shouldResetPersistedLayout =
-      shouldPersistExpansionState &&
-      hasPersistedExpansionState &&
-      persistedLayoutMismatch;
-
-    const normalizedRowCache =
-      effectiveExpandRowsLevel === 0 &&
-      !shouldClearRowCache &&
-      (prevAutoExpandRows ?? 0) > 0
-        ? stripAutoSeededExpansions({
-            keys: manualRows,
-            collapsedKeys: manualCollapsedRows,
-            nodes: normalizedTree.rows,
-            metricLabelSet: metricLabelSetForDepth,
-            includeMetricDepthZero: shouldExpandMetricRows,
-          })
-        : { keys: manualRows, collapsedKeys: manualCollapsedRows };
-    const normalizedColCache =
-      effectiveExpandColsLevel === 0 &&
-      !shouldClearColCache &&
-      (prevAutoExpandCols ?? 0) > 0
-        ? stripAutoSeededExpansions({
-            keys: manualCols,
-            collapsedKeys: manualCollapsedCols,
-            nodes: normalizedTree.cols,
-            metricLabelSet: metricLabelSetForDepth,
-            includeMetricDepthZero: shouldExpandMetricCols,
-          })
-        : { keys: manualCols, collapsedKeys: manualCollapsedCols };
-
-    if (shouldClearRowCache || shouldClearColCache) {
-      persistExpansionStateToStore({
-        rowKeys: groupbyRowKeys,
-        colKeys: groupbyColumnKeys,
-        rows: shouldClearRowCache ? [] : sessionRows,
-        cols: shouldClearColCache ? [] : sessionCols,
-        collapsedRows: shouldClearRowCache ? [] : sessionCollapsedRows,
-        collapsedCols: shouldClearColCache ? [] : sessionCollapsedCols,
-      });
+    const reinitializedExpansion = resolveReinitializedExpansionState({
+      tree: normalizedTree,
+      currentLayout,
+      sessionState: sessionExpansionState,
+      persistedExpansionState: persistedExpansionStateRef.current,
+      shouldPersistExpansionState,
+      effectiveExpandRowsLevel,
+      effectiveExpandColsLevel,
+      autoExpandRowsLevelForDesired,
+      autoExpandColsLevelForDesired,
+      prevAutoExpandRows: prevAutoExpandRowsRef.current,
+      prevAutoExpandCols: prevAutoExpandColsRef.current,
+      rowStablePrefix,
+      colStablePrefix,
+      shouldExpandMetricRows,
+      shouldExpandMetricCols,
+      shouldResetExpandedRows,
+      shouldResetExpandedCols,
+      rowsChanged,
+      colsChanged,
+      hasNewData,
+      allowMetricRowPromotion,
+      allowMetricColPromotion,
+      metricLabelSet,
+      countDimDepth,
+      isMetricTokenValue,
+    });
+    if (reinitializedExpansion.clearedState) {
+      persistExpansionStateToStore(reinitializedExpansion.clearedState);
     }
-
-    const resolveStableDepth = (
-      path: PivotTreeNode['path'],
-      includeMetricDepth: boolean,
-    ) => {
-      const baseDepth = countDimDepth(path);
-      if (!includeMetricDepth) {
-        return baseDepth;
-      }
-      return path.some(isMetricTokenValue) ? baseDepth + 1 : baseDepth;
-    };
-
-    const pruneManualKeys = (
-      keys: string[],
-      stablePrefix: number,
-      nodes: Record<string, PivotTreeNode>,
-      shouldPrune: boolean,
-      includeMetricDepth: boolean,
-    ) => {
-      if (!shouldPrune) {
-        return keys.filter(key => key !== rootKey);
-      }
-      const expanded = new Set<string>([rootKey, ...keys]);
-      const pruned = pruneExpandedToStablePrefix({
-        expanded,
-        nodes,
-        stablePrefix,
-        metricLabelSet: metricLabelSetForDepth,
-        includeMetricDepth,
-      });
-      pruned.delete(rootKey);
-      return Array.from(pruned);
-    };
-
-    const pruneCollapsedKeys = (
-      keys: string[],
-      stablePrefix: number,
-      nodes: Record<string, PivotTreeNode>,
-      shouldPrune: boolean,
-      includeMetricDepth: boolean,
-    ) => {
-      if (!shouldPrune) {
-        return keys.filter(key => key !== rootKey);
-      }
-      return keys.filter(key => {
-        if (key === rootKey) {
-          return false;
-        }
-        const node = nodes[key];
-        const path = node ? node.path : parsePath(key);
-        const depth = resolveStableDepth(path, includeMetricDepth);
-        return depth <= stablePrefix;
-      });
-    };
-
-    const prunedManualRows = pruneManualKeys(
-      normalizedRowCache.keys,
-      rowStablePrefix,
-      normalizedTree.rows,
-      shouldResetExpandedRows || rowsChanged,
-      allowMetricRowPromotion,
-    );
-    const prunedManualCols = pruneManualKeys(
-      normalizedColCache.keys,
-      colStablePrefix,
-      normalizedTree.cols,
-      shouldResetExpandedCols || colsChanged,
-      allowMetricColPromotion,
-    );
-    const prunedManualRowsResolved = prunedManualRows;
-    const prunedManualColsResolved = prunedManualCols;
-    const prunedCollapsedRows = pruneCollapsedKeys(
-      normalizedRowCache.collapsedKeys,
-      rowStablePrefix,
-      normalizedTree.rows,
-      shouldResetExpandedRows || rowsChanged,
-      allowMetricRowPromotion,
-    );
-    const prunedCollapsedCols = pruneCollapsedKeys(
-      normalizedColCache.collapsedKeys,
-      colStablePrefix,
-      normalizedTree.cols,
-      shouldResetExpandedCols || colsChanged,
-      allowMetricColPromotion,
-    );
-    explicitExpandedRowsRef.current = new Set(prunedManualRowsResolved);
-    explicitExpandedColsRef.current = new Set(prunedManualColsResolved);
-    explicitCollapsedRowsRef.current = new Set(prunedCollapsedRows);
-    explicitCollapsedColsRef.current = new Set(prunedCollapsedCols);
-
-    persistExpansionStateToStore(
-      {
-        rowKeys: groupbyRowKeys,
-        colKeys: groupbyColumnKeys,
-        rows: prunedManualRowsResolved,
-        cols: prunedManualColsResolved,
-        collapsedRows: prunedCollapsedRows,
-        collapsedCols: prunedCollapsedCols,
-      },
-      {
-        persist:
-          shouldResetPersistedLayout ||
-          (!isInitialMount && shouldResetExpanded),
-      },
-    );
-
-    const nextExpandedRows = buildDesiredExpandedKeys({
-      axis: 'row',
-      tree: normalizedTree,
-      autoExpandLevel: autoExpandRowsLevelForDesired,
-      metricLabelSet: metricLabelSetForDepth,
-      includeMetricDepthZero: shouldExpandMetricRows,
-      manualExpanded: explicitExpandedRowsRef.current,
-      manualCollapsed: explicitCollapsedRowsRef.current,
-      pendingKeys: new Set(),
-      inFlightKeys: new Set(),
+    const { persistedState } = reinitializedExpansion;
+    explicitExpandedRowsRef.current = new Set(persistedState.rows);
+    explicitExpandedColsRef.current = new Set(persistedState.cols);
+    explicitCollapsedRowsRef.current = new Set(persistedState.collapsedRows);
+    explicitCollapsedColsRef.current = new Set(persistedState.collapsedCols);
+    persistExpansionStateToStore(persistedState, {
+      persist:
+        reinitializedExpansion.shouldResetPersistedLayout ||
+        (!isInitialMount && shouldResetExpanded),
     });
-    const nextExpandedCols = buildDesiredExpandedKeys({
-      axis: 'col',
-      tree: normalizedTree,
-      autoExpandLevel: autoExpandColsLevelForDesired,
-      metricLabelSet: metricLabelSetForDepth,
-      includeMetricDepthZero: shouldExpandMetricCols,
-      manualExpanded: explicitExpandedColsRef.current,
-      manualCollapsed: explicitCollapsedColsRef.current,
-      pendingKeys: new Set(),
-      inFlightKeys: new Set(),
-    });
-
-    const shouldPruneRowsByStablePrefix =
-      shouldResetExpandedRows || (rowsChanged && !hasNewData);
-    const shouldPruneColsByStablePrefix =
-      shouldResetExpandedCols || (colsChanged && !hasNewData);
-    const prunedRows = shouldPruneRowsByStablePrefix
-      ? pruneExpandedToStablePrefix({
-          expanded: nextExpandedRows,
-          nodes: normalizedTree.rows,
-          stablePrefix: rowStablePrefix,
-          metricLabelSet: metricLabelSetForDepth,
-          includeMetricDepth: allowMetricRowPromotion,
-        })
-      : nextExpandedRows;
-    const prunedCols = shouldPruneColsByStablePrefix
-      ? pruneExpandedToStablePrefix({
-          expanded: nextExpandedCols,
-          nodes: normalizedTree.cols,
-          stablePrefix: colStablePrefix,
-          metricLabelSet: metricLabelSetForDepth,
-          includeMetricDepth: allowMetricColPromotion,
-        })
-      : nextExpandedCols;
 
     const resolvedRows = resolveExpandedForMetrics(
       'row',
-      prunedRows,
+      reinitializedExpansion.expandedRows,
       normalizedTree,
     );
     const resolvedCols = resolveExpandedForMetrics(
       'col',
-      prunedCols,
+      reinitializedExpansion.expandedCols,
       normalizedTree,
     );
 
@@ -1901,16 +1699,14 @@ export const useExpansionEngine = ({
     prevExpandRowsLevelRawRef.current = expandRowsLevelRaw;
     prevExpandColsLevelRawRef.current = expandColumnsLevelRaw;
 
-    const hasRowExpansionRequests =
+    const shouldPlanRows =
       effectiveExpandRowsLevel > 0 ||
-      prunedManualRowsResolved.length > 0 ||
-      prunedCollapsedRows.length > 0;
-    const hasColExpansionRequests =
+      persistedState.rows.length > 0 ||
+      persistedState.collapsedRows.length > 0;
+    const shouldPlanCols =
       effectiveExpandColsLevel > 0 ||
-      prunedManualColsResolved.length > 0 ||
-      prunedCollapsedCols.length > 0;
-    const shouldPlanRows = hasRowExpansionRequests;
-    const shouldPlanCols = hasColExpansionRequests;
+      persistedState.cols.length > 0 ||
+      persistedState.collapsedCols.length > 0;
     if (factBatches.length > 0 && (hasNewData || !layoutChanged)) {
       seedFetchedCoverageFromFactBatches(factBatches);
     }
@@ -1927,30 +1723,19 @@ export const useExpansionEngine = ({
         planRows: shouldPlanRows,
         planCols: shouldPlanCols,
       });
-    const isRootOnly =
+    const shouldSkipRootPrefetch =
       resolvedRows.size === 1 &&
       resolvedRows.has(rootKey) &&
       resolvedCols.size === 1 &&
-      resolvedCols.has(rootKey);
-    const hasManualExpansions =
-      prunedManualRowsResolved.length > 0 ||
-      prunedManualColsResolved.length > 0 ||
-      prunedCollapsedRows.length > 0 ||
-      prunedCollapsedCols.length > 0;
-    const hasAutoExpansions =
-      autoExpandRowsLevelForDesired > 0 || autoExpandColsLevelForDesired > 0;
-    const hasRowNodes = Object.keys(normalizedTree.rows).some(
-      key => key !== rootKey,
-    );
-    const hasColNodes = Object.keys(normalizedTree.cols).some(
-      key => key !== rootKey,
-    );
-    const shouldSkipRootPrefetch =
-      isRootOnly &&
-      !hasManualExpansions &&
-      !hasAutoExpansions &&
-      !hasRowNodes &&
-      !hasColNodes;
+      resolvedCols.has(rootKey) &&
+      persistedState.rows.length === 0 &&
+      persistedState.cols.length === 0 &&
+      persistedState.collapsedRows.length === 0 &&
+      persistedState.collapsedCols.length === 0 &&
+      autoExpandRowsLevelForDesired <= 0 &&
+      autoExpandColsLevelForDesired <= 0 &&
+      !Object.keys(normalizedTree.rows).some(key => key !== rootKey) &&
+      !Object.keys(normalizedTree.cols).some(key => key !== rootKey);
     const shouldShowPrefetchLoader =
       hasNestedPendingKeys(nextRowPlan.pendingKeys) ||
       hasNestedPendingKeys(nextColPlan.pendingKeys);

@@ -330,9 +330,6 @@ type HasLoadedChildrenParams = {
   cells: Record<string, PivotResultCell>;
   rows: Record<string, PivotTreeNode>;
   cols: Record<string, PivotTreeNode>;
-  visibleRowDepth: number;
-  visibleColDepth: number;
-  countDimDepth: (path: PivotTreeNode['path']) => number;
 };
 
 export const hasLoadedChildren = ({
@@ -348,9 +345,6 @@ export const hasLoadedChildren = ({
   cells,
   rows,
   cols,
-  visibleRowDepth,
-  visibleColDepth,
-  countDimDepth,
 }: HasLoadedChildrenParams) => {
   const getPathInfo = (path: PivotTreeNode['path']) => {
     const projection = program
@@ -388,6 +382,7 @@ export const hasLoadedChildren = ({
       parentDimDepth === metricIndex &&
       !parentInfo.hasMetric);
   const axisNodes = axis === 'row' ? rows : cols;
+  const cellKeys = Object.keys(cells);
   const isSameBasePath = (candidatePath: PivotTreeNode['path']) =>
     candidatePath.length === basePath.length &&
     candidatePath.every((val, idx) => val === basePath[idx]);
@@ -407,7 +402,7 @@ export const hasLoadedChildren = ({
     });
   const hasMetricVariantCells =
     hasMetricVariant &&
-    Object.keys(cells).some(key => {
+    cellKeys.some(key => {
       const { rowKey, colKey } = parseCellKey(key);
       const axisKey = axis === 'row' ? rowKey : colKey;
       const axisNode = axisNodes[axisKey];
@@ -417,8 +412,8 @@ export const hasLoadedChildren = ({
       const axisInfo = getPathInfo(axisNode.path);
       return axisInfo.hasMetric && isSameBasePath(axisInfo.basePath);
     });
-  if (hasMetricVariant && hasMetricVariantCells) {
-    return true;
+  if (hasMetricVariant) {
+    return hasMetricVariantCells;
   }
   if (
     (program && parentInfo.hasMetric && parentInfo.skippedPreValues) ||
@@ -466,110 +461,26 @@ export const hasLoadedChildren = ({
     child => getPathInfo(child.path).dimDepth,
   );
   const maxChildDimDepth = Math.max(...childDimDepths, 0);
-  const childCellRowDepths: number[] = [];
-  const childCellColDepths: number[] = [];
-  const hasChildCells = children.some(child =>
-    Object.keys(cells).some(key => {
-      const { rowKey, colKey } = parseCellKey(key);
-      const matches =
-        axis === 'row' ? rowKey === child.key : colKey === child.key;
-      if (matches) {
-        const rowNode = rows[rowKey];
-        const colNode = cols[colKey];
-        if (rowNode) {
-          childCellRowDepths.push(countDimDepth(rowNode.path));
-        }
-        if (colNode) {
-          childCellColDepths.push(countDimDepth(colNode.path));
-        }
-      }
-      return matches;
-    }),
-  );
-  const descendantRowDepths: number[] = [];
-  const descendantColDepths: number[] = [];
-  const shouldScanDescendants =
-    !hasChildCells &&
-    !(
-      metricIndex === 0 &&
-      parentInfo.hasMetric &&
-      parentInfo.metricIndex === 0
-    );
-  if (shouldScanDescendants) {
-    Object.keys(cells).forEach(key => {
-      const { rowKey, colKey } = parseCellKey(key);
-      const axisKey = axis === 'row' ? rowKey : colKey;
-      if (axisKey === node.key) {
-        return;
-      }
-      const axisNode = axisNodes[axisKey];
-      if (!axisNode) {
-        return;
-      }
-      const axisInfo = getPathInfo(axisNode.path);
-      if (
-        axisInfo.basePath.length < basePath.length ||
-        !basePath.every((val, idx) => val === axisInfo.basePath[idx])
-      ) {
-        return;
-      }
-      const rowNode = rows[rowKey];
-      const colNode = cols[colKey];
-      if (rowNode) {
-        descendantRowDepths.push(countDimDepth(rowNode.path));
-      }
-      if (colNode) {
-        descendantColDepths.push(countDimDepth(colNode.path));
-      }
-    });
-  }
-  const effectiveChildRowDepths =
-    childCellRowDepths.length > 0 ? childCellRowDepths : descendantRowDepths;
-  const effectiveChildColDepths =
-    childCellColDepths.length > 0 ? childCellColDepths : descendantColDepths;
-  const effectiveHasChildCells =
-    hasChildCells ||
-    descendantRowDepths.length > 0 ||
-    descendantColDepths.length > 0;
-  const maxChildRowDepth = Math.max(...effectiveChildRowDepths, 0);
-  const maxChildColDepth = Math.max(...effectiveChildColDepths, 0);
-  const maxChildAxisDepth =
-    axis === 'row' ? maxChildRowDepth : maxChildColDepth;
   if (children.length === 0) {
-    if (effectiveHasChildCells && maxChildAxisDepth > parentDimDepth) {
-      return true;
-    }
     if (parentInfo.hasSubtotal) {
       return true;
     }
     return false;
   }
-  const hasVisibleRowDepth = effectiveChildRowDepths.some(
-    depth => depth === visibleRowDepth,
+  const hasDirectChildCells = children.some(child =>
+    cellKeys.some(key => {
+      const { rowKey, colKey } = parseCellKey(key);
+      return axis === 'row' ? rowKey === child.key : colKey === child.key;
+    }),
   );
-  const hasVisibleColDepth = effectiveChildColDepths.some(
-    depth => depth === visibleColDepth,
-  );
-  if (
-    parentDimDepth < groupbyLength &&
-    (maxChildDimDepth <= parentDimDepth || !effectiveHasChildCells)
-  ) {
+  if (parentInfo.hasMetric && !hasDirectChildCells) {
+    return false;
+  }
+  if (parentDimDepth < groupbyLength && maxChildDimDepth <= parentDimDepth) {
     // Only metric-tier children or placeholder nodes are present; treat as not loaded.
     if (!metricsExpectedAtParent) {
       return false;
     }
-  }
-  if (axis === 'col' && !hasVisibleRowDepth && childCellRowDepths.length > 0) {
-    return false;
-  }
-  if (axis === 'row' && !hasVisibleColDepth && childCellColDepths.length > 0) {
-    return false;
-  }
-  if (axis === 'col' && visibleRowDepth > maxChildRowDepth) {
-    return false;
-  }
-  if (axis === 'row' && visibleColDepth > maxChildColDepth) {
-    return false;
   }
   return true;
 };

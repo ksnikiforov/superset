@@ -108,9 +108,6 @@ describe('pivot/visibility.hasLoadedChildren', () => {
       cells,
       rows,
       cols,
-      visibleRowDepth: 1,
-      visibleColDepth: 1,
-      countDimDepth: path => path.filter(value => value !== metricToken).length,
     });
 
     expect(loaded).toBe(false);
@@ -171,11 +168,6 @@ describe('pivot/visibility.hasLoadedChildren', () => {
       cells,
       rows,
       cols,
-      visibleRowDepth: 1,
-      visibleColDepth: 1,
-      countDimDepth: path =>
-        path.filter(value => value !== metricToken && value !== SUBTOTAL_TOKEN)
-          .length,
     });
 
     expect(loaded).toBe(false);
@@ -225,10 +217,6 @@ describe('pivot/visibility.hasLoadedChildren', () => {
       cells,
       rows,
       cols,
-      visibleRowDepth: 1,
-      visibleColDepth: 1,
-      countDimDepth: path =>
-        path.filter(value => value !== METRICS_PLACEHOLDER).length,
     });
 
     expect(loaded).toBe(false);
@@ -278,13 +266,57 @@ describe('pivot/visibility.hasLoadedChildren', () => {
       cells,
       rows,
       cols,
-      visibleRowDepth: 1,
-      visibleColDepth: 1,
-      countDimDepth: path =>
-        path.filter(value => value !== METRICS_PLACEHOLDER).length,
     });
 
     expect(loaded).toBe(true);
+  });
+
+  it('treats metric-first structural children without direct facts as not loaded', () => {
+    const metricToken = encodeMetricKey('sales');
+    const program = compilePivotProgram({
+      groupbyRows: [METRICS_PLACEHOLDER, 'country', 'city'],
+      groupbyColumns: [],
+      metrics: ['sales'],
+      metricsLayout: MetricsLayoutEnum.ROWS,
+    });
+    const rowRootKey = serializePath([]);
+    const rowMetricKey = serializePath([metricToken]);
+    const rowCountryKey = serializePath([metricToken, 'US']);
+    const rowCityKey = serializePath([metricToken, 'US', 'Boston']);
+    const colRootKey = serializePath([]);
+    const rows: PivotTreeData['rows'] = {
+      [rowRootKey]: makeNode('row', [], true),
+      [rowMetricKey]: makeNode('row', [metricToken], true),
+      [rowCountryKey]: makeNode('row', [metricToken, 'US'], true),
+      [rowCityKey]: makeNode('row', [metricToken, 'US', 'Boston'], false),
+    };
+    const cols: PivotTreeData['cols'] = {
+      [colRootKey]: makeNode('col', [], false),
+    };
+    const cells: PivotTreeData['cells'] = {
+      [serializeCellKey(rowCityKey, colRootKey)]: {
+        rowKey: rowCityKey,
+        colKey: colRootKey,
+        values: { sales: 10 },
+      },
+    };
+
+    const loaded = hasLoadedChildren({
+      axis: 'row',
+      node: rows[rowMetricKey],
+      getRawChildren: getRawChildren(rows, cols),
+      program,
+      groupbyRowsLength: 2,
+      groupbyColsLength: 0,
+      isMetricTokenValue: value => value === metricToken,
+      metricIndexForRows: 0,
+      metricIndexForCols: undefined,
+      cells,
+      rows,
+      cols,
+    });
+
+    expect(loaded).toBe(false);
   });
 
   it.each(['row', 'col'] as const)(
@@ -357,10 +389,6 @@ describe('pivot/visibility.hasLoadedChildren', () => {
         cells,
         rows,
         cols,
-        visibleRowDepth: axis === 'row' ? 2 : 1,
-        visibleColDepth: axis === 'col' ? 2 : 1,
-        countDimDepth: path =>
-          path.filter(value => value !== metricToken).length,
       });
 
       expect(loaded).toBe(false);
@@ -437,10 +465,6 @@ describe('pivot/visibility.hasLoadedChildren', () => {
         cells,
         rows,
         cols,
-        visibleRowDepth: axis === 'row' ? 2 : 1,
-        visibleColDepth: axis === 'col' ? 2 : 1,
-        countDimDepth: path =>
-          path.filter(value => value !== metricToken).length,
       });
 
       expect(loaded).toBe(true);

@@ -28,7 +28,14 @@ import {
   planExpansionForAxis,
   type PivotExpansionPlan,
 } from '../engine/expansionPlanner';
-import { getVisibleExpansionKeys as getVisibleExpansionKeysBase } from '../engine/expansionStateModel';
+import {
+  buildDesiredExpandedKeys,
+  coerceExpansionState,
+  getVisibleExpansionKeys as getVisibleExpansionKeysBase,
+  pruneExpandedToStablePrefix,
+  stripAutoSeededExpansions,
+  type PivotExpansionStateKeys,
+} from '../engine/expansionStateModel';
 import {
   buildRenderModel,
   type RenderModelConfig,
@@ -375,13 +382,9 @@ export const computeVisibleDepths = ({
 export const buildHasLoadedChildren =
   ({
     tree,
-    visibleRowDepth,
-    visibleColDepth,
     config,
   }: {
     tree: PivotTreeData;
-    visibleRowDepth: number;
-    visibleColDepth: number;
     config: ExpansionVisibilityConfig;
   }) =>
   (axis: PivotAxis, node: PivotTreeNode) =>
@@ -401,9 +404,6 @@ export const buildHasLoadedChildren =
       cells: tree.cells,
       rows: tree.rows,
       cols: tree.cols,
-      visibleRowDepth,
-      visibleColDepth,
-      countDimDepth: config.countDimDepth,
     });
 
 export const getMetricIndexFromNodes = ({
@@ -490,6 +490,198 @@ export const resolveExpandedForMetrics = ({
     }
   });
   return next;
+};
+
+type ExpansionReinitAxis = {
+  axis: PivotAxis;
+  level: number;
+  desiredLevel: number;
+  prevLevel: number | null;
+  keys: string[];
+  collapsed: string[];
+  nodes: Record<string, PivotTreeNode>;
+  stablePrefix: number;
+  expandMetric: boolean;
+  reset: boolean;
+  changed: boolean;
+  allowMetric: boolean;
+  tree: PivotTreeData;
+  metricLabelSet: Set<string>;
+  countDimDepth: (path: PivotTreeNode['path']) => number;
+  isMetricTokenValue: (value: unknown) => boolean;
+  hasNewData: boolean;
+};
+
+const resolveExpansionCacheAxis = (config: ExpansionReinitAxis) => {
+  const shouldClearCache =
+    config.level > 0 &&
+    (config.prevLevel === null || config.prevLevel === 0) &&
+    config.keys.length + config.collapsed.length > 0;
+  const manualKeys = shouldClearCache ? [] : config.keys;
+  const collapsedKeys =
+    shouldClearCache || config.level <= 0 ? [] : config.collapsed;
+  const normalized =
+    config.level === 0 && !shouldClearCache && (config.prevLevel ?? 0) > 0
+      ? stripAutoSeededExpansions({
+          keys: manualKeys,
+          collapsedKeys,
+          nodes: config.nodes,
+          metricLabelSet: config.metricLabelSet,
+          includeMetricDepthZero: config.expandMetric,
+        })
+      : { keys: manualKeys, collapsedKeys };
+  const shouldPrune = config.reset || config.changed;
+  const pruneExpanded = (expanded: Set<string>) =>
+    pruneExpandedToStablePrefix({
+      expanded,
+      nodes: config.nodes,
+      stablePrefix: config.stablePrefix,
+      metricLabelSet: config.metricLabelSet,
+      includeMetricDepth: config.allowMetric,
+    });
+  const prunedManualKeys = shouldPrune
+    ? Array.from(
+        pruneExpanded(new Set<string>([rootKey, ...normalized.keys])),
+      ).filter(key => key !== rootKey)
+    : normalized.keys.filter(key => key !== rootKey);
+  const prunedCollapsedKeys = normalized.collapsedKeys.filter(key => {
+    if (key === rootKey) {
+      return false;
+    }
+    if (!shouldPrune) {
+      return true;
+    }
+    const path = config.nodes[key]?.path ?? parsePath(key);
+    const depth =
+      config.countDimDepth(path) +
+      (config.allowMetric && path.some(config.isMetricTokenValue) ? 1 : 0);
+    return depth <= config.stablePrefix;
+  });
+  const desiredExpanded = buildDesiredExpandedKeys({
+    axis: config.axis,
+    tree: config.tree,
+    autoExpandLevel: config.desiredLevel,
+    metricLabelSet: config.metricLabelSet,
+    includeMetricDepthZero: config.expandMetric,
+    manualExpanded: new Set(prunedManualKeys),
+    manualCollapsed: new Set(prunedCollapsedKeys),
+    pendingKeys: new Set(),
+    inFlightKeys: new Set(),
+  });
+  const expandedKeys =
+    config.reset || (config.changed && !config.hasNewData)
+      ? pruneExpanded(desiredExpanded)
+      : desiredExpanded;
+  return {
+    shouldClearCache,
+    prunedManualKeys,
+    prunedCollapsedKeys,
+    expandedKeys,
+  };
+};
+
+export const resolveReinitializedExpansionState = (params: {
+  tree: PivotTreeData;
+  currentLayout: { rows: string[]; cols: string[] };
+  sessionState: PivotExpansionStateKeys;
+  persistedExpansionState: unknown;
+  shouldPersistExpansionState: boolean;
+  effectiveExpandRowsLevel: number;
+  effectiveExpandColsLevel: number;
+  autoExpandRowsLevelForDesired: number;
+  autoExpandColsLevelForDesired: number;
+  prevAutoExpandRows: number | null;
+  prevAutoExpandCols: number | null;
+  rowStablePrefix: number;
+  colStablePrefix: number;
+  shouldExpandMetricRows: boolean;
+  shouldExpandMetricCols: boolean;
+  shouldResetExpandedRows: boolean;
+  shouldResetExpandedCols: boolean;
+  rowsChanged: boolean;
+  colsChanged: boolean;
+  hasNewData: boolean;
+  allowMetricRowPromotion: boolean;
+  allowMetricColPromotion: boolean;
+  metricLabelSet: Set<string>;
+  countDimDepth: (path: PivotTreeNode['path']) => number;
+  isMetricTokenValue: (value: unknown) => boolean;
+}) => {
+  const { tree, currentLayout, sessionState } = params;
+  const common = {
+    tree,
+    metricLabelSet: new Set(params.metricLabelSet),
+    countDimDepth: params.countDimDepth,
+    isMetricTokenValue: params.isMetricTokenValue,
+    hasNewData: params.hasNewData,
+  };
+  const rowKeys = sessionState.rows ?? [];
+  const colKeys = sessionState.cols ?? [];
+  const collapsedRowKeys = sessionState.collapsedRows ?? [];
+  const collapsedColKeys = sessionState.collapsedCols ?? [];
+  const rowState = resolveExpansionCacheAxis({
+    ...common,
+    axis: 'row',
+    level: params.effectiveExpandRowsLevel,
+    desiredLevel: params.autoExpandRowsLevelForDesired,
+    prevLevel: params.prevAutoExpandRows,
+    keys: rowKeys,
+    collapsed: collapsedRowKeys,
+    nodes: tree.rows,
+    stablePrefix: params.rowStablePrefix,
+    expandMetric: params.shouldExpandMetricRows,
+    reset: params.shouldResetExpandedRows,
+    changed: params.rowsChanged,
+    allowMetric: params.allowMetricRowPromotion,
+  });
+  const colState = resolveExpansionCacheAxis({
+    ...common,
+    axis: 'col',
+    level: params.effectiveExpandColsLevel,
+    desiredLevel: params.autoExpandColsLevelForDesired,
+    prevLevel: params.prevAutoExpandCols,
+    keys: colKeys,
+    collapsed: collapsedColKeys,
+    nodes: tree.cols,
+    stablePrefix: params.colStablePrefix,
+    expandMetric: params.shouldExpandMetricCols,
+    reset: params.shouldResetExpandedCols,
+    changed: params.colsChanged,
+    allowMetric: params.allowMetricColPromotion,
+  });
+  const persistedSeed = coerceExpansionState(params.persistedExpansionState);
+  const shouldResetPersistedLayout =
+    params.shouldPersistExpansionState &&
+    params.persistedExpansionState !== undefined &&
+    params.persistedExpansionState !== null &&
+    (!persistedSeed ||
+      !isSameLayout(persistedSeed.rowKeys, currentLayout.rows) ||
+      !isSameLayout(persistedSeed.colKeys, currentLayout.cols));
+  const clearedState =
+    rowState.shouldClearCache || colState.shouldClearCache
+      ? {
+          rowKeys: currentLayout.rows,
+          colKeys: currentLayout.cols,
+          rows: rowState.shouldClearCache ? [] : rowKeys,
+          cols: colState.shouldClearCache ? [] : colKeys,
+          collapsedRows: rowState.shouldClearCache ? [] : collapsedRowKeys,
+          collapsedCols: colState.shouldClearCache ? [] : collapsedColKeys,
+        }
+      : undefined;
+  return {
+    clearedState,
+    shouldResetPersistedLayout,
+    persistedState: {
+      rowKeys: currentLayout.rows,
+      colKeys: currentLayout.cols,
+      rows: rowState.prunedManualKeys,
+      cols: colState.prunedManualKeys,
+      collapsedRows: rowState.prunedCollapsedKeys,
+      collapsedCols: colState.prunedCollapsedKeys,
+    },
+    expandedRows: rowState.expandedKeys,
+    expandedCols: colState.expandedKeys,
+  };
 };
 
 export const applyCrossAxisRootFetch = ({
@@ -586,8 +778,6 @@ export const planHydrationIteration = ({
   });
   const hasLoadedChildren = buildHasLoadedChildren({
     tree,
-    visibleRowDepth,
-    visibleColDepth,
     config,
   });
   const fetchedCoverageLookup = createFetchedFactCoverageLookup({

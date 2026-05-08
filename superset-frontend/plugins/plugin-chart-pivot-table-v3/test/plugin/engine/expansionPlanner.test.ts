@@ -80,6 +80,28 @@ describe('expansionPlanner', () => {
     expect(plan.hasMissingNodes).toBe(false);
   });
 
+  it('trusts fetched coverage over local loaded-child inference', () => {
+    const keyA = serializePath(['A']);
+    const nodes: Record<string, PivotTreeNode> = {
+      [rootKey]: makeNode({ axis: 'row', path: [], hasChildren: true }),
+      [keyA]: makeNode({ axis: 'row', path: ['A'], hasChildren: true }),
+    };
+
+    const plan = planExpansionForAxis({
+      axis: 'row',
+      expandedKeys: new Set([rootKey, keyA]),
+      nodes,
+      requiredDepth: 1,
+      fetchedCoverageLookup: fetchedCoverageLookupFromDepths(
+        new Map([[keyA, 2]]),
+      ),
+      hasLoadedChildren: () => false,
+    });
+
+    expect(sortKeys(plan.fetchKeys)).toEqual([]);
+    expect(sortKeys(plan.pendingKeys)).toEqual([]);
+  });
+
   it('requires a fetch when the required depth increases', () => {
     const keyA = serializePath(['A']);
     const nodes: Record<string, PivotTreeNode> = {

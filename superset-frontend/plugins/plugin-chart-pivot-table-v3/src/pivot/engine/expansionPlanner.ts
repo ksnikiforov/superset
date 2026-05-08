@@ -80,14 +80,7 @@ const isSatisfiedNode = ({
   const fetchedDepth = fetchedCoverageLookup.getFetchedDepth(
     buildCoverageProjection(axis, key, requiredDepth),
   );
-  if (fetchedDepth === requiredDepth) {
-    return true;
-  }
-  if (
-    fetchedDepth !== undefined &&
-    fetchedDepth >= requiredDepth &&
-    hasLoadedChildren(axis, node)
-  ) {
+  if (fetchedDepth !== undefined && fetchedDepth >= requiredDepth) {
     return true;
   }
   return false;
