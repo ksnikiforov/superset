@@ -187,69 +187,6 @@ export const usePivotRenderModel = ({
   const renderTree = useMemo(() => {
     const { dateFormatters } = formData;
 
-    const pruneAxisToGroupbyDepth = (
-      nodes: Record<string, PivotTreeNode>,
-      groupbyLength: number,
-    ) => {
-      let hasChanges = false;
-      const nextNodes: Record<string, PivotTreeNode> = {};
-      Object.values(nodes).forEach(node => {
-        if (layout.countEngineDimDepth(node.path) > groupbyLength) {
-          hasChanges = true;
-          return;
-        }
-        nextNodes[node.key] = node;
-      });
-      if (!hasChanges) {
-        return { nodes, changed: false };
-      }
-      const parentKeys = new Set<string>();
-      Object.values(nextNodes).forEach(node => {
-        if (node.path.length === 0) {
-          return;
-        }
-        parentKeys.add(serializePath(node.path.slice(0, -1)));
-      });
-      Object.values(nextNodes).forEach(node => {
-        // Keep engine-promoted hasChildren hints so expand controls remain
-        // available after optimistic layout changes (before branch fetch).
-        const hasChildren = node.hasChildren || parentKeys.has(node.key);
-        if (node.hasChildren === hasChildren) {
-          return;
-        }
-        nextNodes[node.key] = { ...node, hasChildren };
-      });
-      return { nodes: nextNodes, changed: true };
-    };
-
-    const pruneTreeToLayoutDepth = (source: PivotTreeData) => {
-      const prunedRows = pruneAxisToGroupbyDepth(
-        source.rows,
-        resolvedGroupbyRowsLength,
-      );
-      const prunedCols = pruneAxisToGroupbyDepth(
-        source.cols,
-        resolvedGroupbyColumnsLength,
-      );
-      if (!prunedRows.changed && !prunedCols.changed) {
-        return source;
-      }
-      const nextCells = Object.entries(source.cells).reduce<
-        Record<string, PivotTreeData['cells'][string]>
-      >((acc, [cellKey, cell]) => {
-        if (!prunedRows.nodes[cell.rowKey] || !prunedCols.nodes[cell.colKey]) {
-          return acc;
-        }
-        acc[cellKey] = cell;
-        return acc;
-      }, {});
-      return {
-        rows: prunedRows.nodes,
-        cols: prunedCols.nodes,
-        cells: nextCells,
-      };
-    };
-
     const formatAxisNodes = (
       nodes: Record<string, PivotTreeNode>,
       axis: 'row' | 'col',
@@ -307,23 +244,13 @@ export const usePivotRenderModel = ({
       return hasChanges ? nextNodes : nodes;
     };
 
-    const depthPrunedTree = pruneTreeToLayoutDepth(tree);
-    const nextRows = formatAxisNodes(depthPrunedTree.rows, 'row');
-    const nextColsFormatted = formatAxisNodes(depthPrunedTree.cols, 'col');
-    if (
-      nextRows === depthPrunedTree.rows &&
-      nextColsFormatted === depthPrunedTree.cols
-    ) {
-      return depthPrunedTree;
+    const nextRows = formatAxisNodes(tree.rows, 'row');
+    const nextColsFormatted = formatAxisNodes(tree.cols, 'col');
+    if (nextRows === tree.rows && nextColsFormatted === tree.cols) {
+      return tree;
     }
-    return { ...depthPrunedTree, rows: nextRows, cols: nextColsFormatted };
-  }, [
-    formData.dateFormatters,
-    resolvedGroupbyColumnsLength,
-    resolvedGroupbyRowsLength,
-    layout,
-    tree,
-  ]);
+    return { ...tree, rows: nextRows, cols: nextColsFormatted };
+  }, [formData.dateFormatters, layout, tree]);
 
   const getProjectedPathParts = useCallback(
     (axis: 'row' | 'col', path: PivotTreeNode['path']) =>

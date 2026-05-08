@@ -334,7 +334,7 @@ Complete reassessment after the runtime-controller/reducer slice:
 - Simplification/deletion requirement completion: **60%**. The compiler/fact
   store/materializer boundaries exist, but `PivotTableChart.tsx`
   (`3086` lines), `useExpansionEngine.ts` (`2057` lines), and
-  `usePivotRenderModel.ts` (`948` lines) still contain the biggest removable
+  `usePivotRenderModel.ts` (`875` lines) still contain the biggest removable
   orchestration and projection surfaces.
 
 Latest execution of the previous next move:
@@ -367,6 +367,82 @@ Current best next move:
    and subtotal nodes.
 3. Keep `PivotTableChart.tsx` extraction scoped to effect boundaries until
    dimension-filter orchestration can move behind a controller cleanly.
+
+### Source Surface Audit From Pre-Refactor Baseline
+
+Baseline commit: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
+
+Scope: `superset-frontend/plugins/plugin-chart-pivot-table-v3/src` only.
+Tests and Markdown are excluded.
+
+Current diff from baseline:
+
+- `6674` insertions
+- `4661` deletions
+- net `+2013` production source lines
+- current `src` total: `35523` lines
+- implied baseline `src` total: about `33510` lines
+
+By file status:
+
+- Added files: `+4814 / -0` across `16` files
+- Deleted files: `+0 / -630` across `3` files
+- Modified files: `+1860 / -4031`, net `-2171`
+
+By area:
+
+| Area              | Additions | Deletions | Net     | Readout                                                                 |
+| ----------------- | --------: | --------: | ------: | ----------------------------------------------------------------------- |
+| Runtime           |      3655 |         0 | `+3655` | Correct new boundary, but now the largest source of net growth.         |
+| Expansion         |      1554 |      1184 |  `+370` | `useExpansionEngine` shrank, but fetched/layout helper files absorbed it. |
+| Chart hooks       |       366 |       782 |  `-416` | Render/layout repair is now shrinking; more remains in visibility/model policy. |
+| Query             |       592 |       606 |   `-14` | Old branch planner deleted, but specs/bootstrap grew around coverage.   |
+| Core tree         |         3 |       852 |  `-849` | Best completed simplification; raw tree surface mostly collapsed.       |
+| `PivotTableChart` |       135 |       199 |   `-64` | Too little shrinkage for the controller goal.                           |
+| Other             |       369 |      1038 |  `-669` | Utility/transform cleanup is real but not enough to offset runtime.     |
+
+Why deletions are lower than expected:
+
+- We paid the runtime-layer cost first: materializer, fact store, coverage,
+  projection, paths, request lifecycle, chunking, and seamless runtime helpers
+  add `3655` lines before all old callers/repairs have been deleted.
+- Compatibility has not been cut deeply enough. Flexible Values placement stayed
+  and old row/column projection/layout behavior is still being supported in
+  `usePivotLayout`, `visibility`, `usePivotRenderModel`, and `PivotTableChart`.
+- The refactor frequently extracted complexity into new files before deleting
+  the old branch. That improved boundaries but delayed line reduction.
+- Tests correctly grew around regressions, but the production issue is separate:
+  `src` still has both new runtime truth and several old render/layout/persistence
+  interpretation paths.
+
+Code-reduction corrective plan:
+
+1. Treat every new runtime module as a deletion obligation. A runtime helper is
+   only successful when it removes older chart/render/expansion code.
+2. Prioritize Gate 6 render repair deletion before adding more runtime surface.
+   The first target is `usePivotRenderModel.ts` plus `visibility.ts`, replacing
+   render-time loaded/metric/subtotal repair with materialized tree/projection
+   truth.
+3. Prioritize Gate 5 hydration/persistence deletion only where it removes
+   duplicated hook branches. Do not add another large controller file unless
+   `useExpansionEngine.ts` shrinks in the same change.
+4. Stop expanding runtime architecture until a matching production deletion lands.
+   The next meaningful slice should be net-negative in `src`.
+5. Measure every next PR against this baseline and against previous-step `src`
+   totals. Test-line deletion remains a non-goal.
+
+Latest code-reduction slice:
+
+- Deleted the old axis-specific collapsed metric row/column pruning in
+  `usePivotLayout.ts`; `pruneStaleCollapsedAxis` is now the single pruning path.
+- Deleted render-time tree-depth pruning from `usePivotRenderModel.ts`; the
+  render model now trusts the committed/materialized tree and only applies date
+  label formatting.
+- Net production change for this slice: `+8 / -347` across the two touched
+  `src` files.
+- Attempted to remove tree-scanned metric-index compatibility as well, but it
+  changed visible header ordering in `interaction-layout.test.tsx`; that cut is
+  not safe without a deliberate UX decision.
 
 Gate status:
 
