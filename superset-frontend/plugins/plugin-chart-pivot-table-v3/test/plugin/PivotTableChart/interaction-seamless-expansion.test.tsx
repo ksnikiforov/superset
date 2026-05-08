@@ -3363,6 +3363,12 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       (afterAddCall?.formData?.groupbyColumns ?? []).map(getStableColumnKey),
     ).toEqual(['c1', METRICS_PLACEHOLDER]);
 
+    const colStrip = screen.getByTestId('pivot-v3-col-chip-strip');
+    await waitFor(() => {
+      expect(within(colStrip).getByText('c1')).toBeInTheDocument();
+      expect(within(colStrip).getByText('Value')).toBeInTheDocument();
+    });
+
     const getColChips = () =>
       screen
         .getAllByLabelText('Remove dimension')
@@ -3377,9 +3383,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       return chip;
     };
 
-    const valueLabel = screen
-      .getAllByText('Value')
-      .find(node => !node.closest('thead') && !node.closest('tbody'));
+    const valueLabel = within(colStrip).getByText('Value');
     if (!valueLabel) {
       throw new Error('Missing Value chip label');
     }
@@ -3737,14 +3741,12 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     fireEvent.click(screen.getByText('Select measures'));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
-    await waitFor(() =>
-      expect(screen.getAllByText('m2').length).toBeGreaterThan(0),
-    );
-
-    const headerLabels = Array.from(container.querySelectorAll('thead th')).map(
-      th => th.textContent ?? '',
-    );
-    expect(headerLabels).toEqual(expect.arrayContaining(['m2']));
+    await waitFor(() => {
+      const headerLabels = Array.from(
+        container.querySelectorAll('thead th'),
+      ).map(th => th.textContent ?? '');
+      expect(headerLabels).toEqual(expect.arrayContaining(['m2']));
+    });
   });
 
   it('reuses current expansion state during seamless metric updates to avoid rubber-banding', async () => {

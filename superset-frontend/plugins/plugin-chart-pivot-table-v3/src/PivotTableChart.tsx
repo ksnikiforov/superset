@@ -111,6 +111,7 @@ import {
 import {
   createLatestRequestLifecycle,
   executeLatestRequest,
+  executeScheduledLatestRequest,
 } from './pivot/runtime/requestLifecycle';
 import { stableStringify } from './pivot/shared/stableStringify';
 
@@ -118,6 +119,7 @@ const PANEL_WIDTH = 230;
 const TOP_CHIPS_HEIGHT = 36;
 const SIDE_CHIPS_WIDTH = 24;
 const SEAMLESS_REQUEST_GROUP = 'pivot-v3-seamless';
+const SEAMLESS_MATERIALIZATION_GROUP = 'pivot-v3-seamless-materialize';
 const DIMENSION_VALUES_REQUEST_GROUP = 'pivot-v3-dimension-values';
 const DIMENSION_VALUES_QUERY_PREFIX = 'pivot_v3|dimension-values';
 const EMPTY_FILTER_VALUES: DataRecordValue[] = [];
@@ -1077,6 +1079,10 @@ function PivotTableChart(props: PivotTableProps) {
       }),
     [],
   );
+  const seamlessMaterializationLifecycle = useMemo(
+    () => createLatestRequestLifecycle(),
+    [],
+  );
 
   const treeRef = useRef<PivotTableProps['data']>(dataForRender);
   const ownStateRef = useRef<JsonObject>(ownState ?? {});
@@ -1271,8 +1277,7 @@ function PivotTableChart(props: PivotTableProps) {
     ) {
       return;
     }
-    const pendingLayout = pendingSeamlessLayoutRef.current;
-    if (pendingLayout && isSameRuntimeLayout(runtimeLayout, pendingLayout)) {
+    if (pendingSeamlessLayoutRef.current) {
       return;
     }
     setCommittedRuntimeLayout(current =>
@@ -1583,6 +1588,7 @@ function PivotTableChart(props: PivotTableProps) {
     if (!shouldSyncCommittedTreeFromProps) {
       return;
     }
+    seamlessMaterializationLifecycle.invalidate();
     setCommittedTree(committedTreeFromProps);
     setCommittedFactBatches(factBatches);
     setSeamlessWarnings([]);
@@ -1590,7 +1596,12 @@ function PivotTableChart(props: PivotTableProps) {
     setSeamlessLoading(false);
     setFrozenUserViewProps(null);
     pendingSeamlessLayoutRef.current = null;
-  }, [committedTreeFromProps, factBatches, shouldSyncCommittedTreeFromProps]);
+  }, [
+    committedTreeFromProps,
+    factBatches,
+    seamlessMaterializationLifecycle,
+    shouldSyncCommittedTreeFromProps,
+  ]);
 
   useEffect(() => {
     if (
@@ -1600,8 +1611,7 @@ function PivotTableChart(props: PivotTableProps) {
     ) {
       return;
     }
-    const pendingLayout = pendingSeamlessLayoutRef.current;
-    if (pendingLayout && isSameRuntimeLayout(runtimeLayout, pendingLayout)) {
+    if (pendingSeamlessLayoutRef.current) {
       return;
     }
     setUiRuntimeLayout(runtimeLayout);
@@ -1802,10 +1812,11 @@ function PivotTableChart(props: PivotTableProps) {
           });
         }
       }
-      await executeLatestRequest({
+      const fetchResult = await executeLatestRequest({
         lifecycle: seamlessRequestLifecycle,
         requestGroupId: SEAMLESS_REQUEST_GROUP,
         onStart: () => {
+          seamlessMaterializationLifecycle.invalidate();
           setSeamlessLoading(true);
           setSeamlessError(undefined);
         },
@@ -1815,14 +1826,35 @@ function PivotTableChart(props: PivotTableProps) {
             specs,
             requestGroupId: SEAMLESS_REQUEST_GROUP,
           }),
-        onSuccess: results => {
-          const { tree: nextTree, factBatches: nextFactBatches } =
-            buildInitialRuntimeFromSpecResults({
-              results,
-              specs,
-              layout,
-              formData: resolvedFormDataWithOffsets,
-            });
+        onError: error => {
+          setSeamlessError(
+            error instanceof Error
+              ? error.message
+              : t('Failed to update data'),
+          );
+        },
+      });
+      if (fetchResult.status === 'stale') {
+        return;
+      }
+      if (fetchResult.status !== 'success') {
+        pendingSeamlessLayoutRef.current = null;
+        setSeamlessLoading(false);
+        return;
+      }
+
+      const results = fetchResult.value;
+      await executeScheduledLatestRequest({
+        lifecycle: seamlessMaterializationLifecycle,
+        requestGroupId: SEAMLESS_MATERIALIZATION_GROUP,
+        run: () =>
+          buildInitialRuntimeFromSpecResults({
+            results,
+            specs,
+            layout,
+            formData: resolvedFormDataWithOffsets,
+          }),
+        onSuccess: ({ tree: nextTree, factBatches: nextFactBatches }) => {
           unstable_batchedUpdates(() => {
             setCommittedTree(nextTree);
             setCommittedFactBatches(nextFactBatches);
@@ -1862,6 +1894,7 @@ function PivotTableChart(props: PivotTableProps) {
       isUserControlled,
       metricKeys,
       persistRuntimeState,
+      seamlessMaterializationLifecycle,
       seamlessRequestLifecycle,
       setCommittedFilters,
       setCommittedTree,

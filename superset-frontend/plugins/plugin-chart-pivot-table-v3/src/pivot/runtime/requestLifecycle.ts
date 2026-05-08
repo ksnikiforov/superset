@@ -164,6 +164,26 @@ export type ExecuteLatestRequestParams<T> = {
   onSettled?: (token: LatestRequestToken) => void;
 };
 
+export type MainThreadYield = () => Promise<void>;
+
+export const yieldToMainThread = (): Promise<void> =>
+  new Promise(resolve => {
+    setTimeout(resolve, 0);
+  });
+
+class StaleLatestRequestError extends Error {
+  constructor() {
+    super('Latest request is stale');
+    this.name = 'StaleLatestRequestError';
+  }
+}
+
+const assertLatestRequest = (token: LatestRequestToken) => {
+  if (!token.isCurrent()) {
+    throw new StaleLatestRequestError();
+  }
+};
+
 export const executeLatestRequest = async <T>({
   lifecycle,
   requestGroupId,
@@ -199,3 +219,38 @@ export const executeLatestRequest = async <T>({
     }
   }
 };
+
+export type ExecuteScheduledLatestRequestParams<T> = Omit<
+  ExecuteLatestRequestParams<T>,
+  'run'
+> & {
+  run: (token: LatestRequestToken) => T | Promise<T>;
+  yieldBeforeRun?: boolean;
+  yieldBeforeSuccess?: boolean;
+  yieldToMain?: MainThreadYield;
+};
+
+export const executeScheduledLatestRequest = async <T>({
+  run,
+  yieldBeforeRun = true,
+  yieldBeforeSuccess = true,
+  yieldToMain = yieldToMainThread,
+  ...params
+}: ExecuteScheduledLatestRequestParams<T>): Promise<
+  ExecuteLatestRequestResult<T>
+> =>
+  executeLatestRequest({
+    ...params,
+    run: async token => {
+      if (yieldBeforeRun) {
+        await yieldToMain();
+        assertLatestRequest(token);
+      }
+      const value = await run(token);
+      if (yieldBeforeSuccess) {
+        await yieldToMain();
+        assertLatestRequest(token);
+      }
+      return value;
+    },
+  });
