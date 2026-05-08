@@ -246,9 +246,9 @@ mutation out of React hooks and then delete the hook-local branches.
 
 Current diff from baseline `3affd1cc6db691fe08eddf0914e2050207f95ed0`:
 
-- Full plugin: `85` files changed, `7681` insertions, `3095` deletions.
-- Production `src`: `35` files changed, `3493` insertions, `2555` deletions.
-- Tests: `49` files changed, `3711` insertions, `532` deletions.
+- Full plugin: `90` files changed, `8692` insertions, `3829` deletions.
+- Production `src`: `37` files changed, `3971` insertions, `3289` deletions.
+- Tests: `52` files changed, `4217` insertions, `532` deletions.
 
 The total diff is still net additive because the refactor added runtime
 infrastructure and protective tests. That is acceptable only if the next changes
@@ -268,12 +268,12 @@ Gate status:
   refresh, branch fetch, batch fetch, local fact-store hits, and branch-cache
   hits now carry `PivotFactStoreBatch[]`. The remaining dependency is that
   materialization still calls legacy tree helpers.
-- Gate 4 is started but not complete. `applyMeasureAxis` unifies flat metric
-  axes and measure-leaf axes, but `pivot/core/tree.ts` still exposes legacy
-  `buildTreeFromRecords`, `applyMetricAxis`, subtotal injection, and subtotal
-  labeling wrappers. Production materialization is centralized in
-  `ingestQueryResults.ts`, but the materializer is not yet a clean runtime
-  module.
+- Gate 4 is in progress. `src/pivot/runtime/materializePivotTree.ts` now owns
+  production fact-store-to-tree materialization for branch, batch, and initial
+  trees. `ingestQueryResults.ts` is back to ingestion/fact-store orchestration.
+  `pivot/core/tree.ts` still exposes legacy `buildTreeFromRecords`,
+  `applyMetricAxis`, subtotal injection, and subtotal labeling wrappers for
+  direct tree fixtures and compatibility exports.
 - Gate 5 is started but still the largest source of complexity.
   `useExpansionEngine` no longer infers fetched state from rendered trees and
   the planner no longer consumes raw fetched-depth maps, but the hook still owns
@@ -295,9 +295,11 @@ Current largest production hotspots by line count:
   target.
 - `usePivotLayout.ts`: about `1657` lines. This is still the main render/layout
   policy hotspot.
-- `pivot/core/tree.ts`: about `948` lines, plus `ingestQueryResults.ts` at about
-  `718` lines. Tree materialization is centralized in practice but not yet
-  cleanly separated.
+- `pivot/core/tree.ts`: about `948` lines, plus
+  `runtime/materializePivotTree.ts` at about `471` lines. Tree materialization
+  now has a runtime boundary, but the legacy core tree wrappers remain large.
+- `runtime/ingestQueryResults.ts`: about `278` lines after the materialization
+  extraction.
 - `visibility.ts`: about `602` lines. Loaded-state inference should keep
   shrinking as fetched coverage becomes the source of truth.
 - `PivotTableChart.tsx`: about `3088` lines. It should be split later, after
@@ -347,6 +349,16 @@ Latest execution of that sequence:
   at the end is explicit instead of hidden in a duplicated column branch.
 - The broader metrics-between and metrics-at-end component checks passed after
   this extraction, so no visible row/column layout behavior change was taken.
+- `src/pivot/runtime/materializePivotTree.ts` now owns the production-facing
+  fact-store-to-tree materialization boundary. Branch fetch, grouped batch
+  fetch, fact-store hits, and initial runtime materialization now materialize
+  through that module.
+- `src/pivot/runtime/ingestQueryResults.ts` no longer contains the local
+  fact-to-tree materializer or planned-spec materialization loop. It now orders
+  results, extracts facts, upserts fact batches, and calls the runtime
+  materializer for the initial `{ tree, factBatches }` wrapper.
+- The unused `buildBranchTreeFromSpecResults` compatibility wrapper was deleted
+  after production and tests were moved to `buildBranchTreeFromFactStore`.
 - The reducer rewrite remains intentionally deferred. The hook is thinner, but
   materialization and render/layout policy are still better deletion targets
   than a reducer that would absorb legacy behavior.
@@ -456,10 +468,8 @@ Gate 2 has started:
   materialized metrics flow through the same path for all coverage-driven
   fetches.
 - `src/pivot/runtime/ingestQueryResults.ts` now owns the first fact-store
-  boundary. It orders chart-data results by planned query name, extracts
-  `PivotFact[]` batches from DB records and coverage metadata, and centralizes
-  planned-spec-to-tree materialization for initial load, seamless refresh,
-  branch fetch, and batch fetch.
+  boundary. It orders chart-data results by planned query name and extracts
+  `PivotFact[]` batches from DB records and coverage metadata.
 - Ingestion-boundary tests now cover support metrics and offset metric values
   becoming facts/cell values without materializing support metric branches, plus
   column subtotal leaf materialization from planned coverage specs.
@@ -603,13 +613,15 @@ Gate 2 has started:
 
 Immediate next step:
 
-- Return to Gate 4 and introduce an explicit materialization boundary. The
-  likely next deletion-positive cut is to move the production-facing
-  `buildTreeFromFactBatches` / planned-spec materialization logic out of
-  `ingestQueryResults.ts` into `src/pivot/runtime/materializePivotTree.ts`,
-  then leave legacy `buildTreeFromRecords`, `applyMetricAxis`, and
-  `applyMeasureHierarchyAxis` as wrappers only where direct tests still need
-  them.
+- Continue Gate 4 by shrinking the legacy core tree surface. The likely next
+  deletion-positive cut is to move direct test fixtures away from the `utils.ts`
+  barrel exports of `buildTreeFromRecords`, `applyMetricAxis`, and
+  `applyMeasureHierarchyAxis`, then demote those helpers to explicit legacy
+  wrappers in `pivot/core/tree.ts`.
+- After the public helper surface is smaller, decide whether
+  `materializePivotTree.ts` should absorb subtotal leaf injection/labeling from
+  `pivot/core/tree.ts` or keep those pieces as core tree utilities. This should
+  be a pure boundary decision unless it changes visible subtotal labels.
 - Keep shrinking `usePivotLayout` opportunistically where row/column behavior is
   visibly identical. The next safe target is likely collapsed metric child
   exposure, but subtotal/header presentation must stay axis-specific unless an
@@ -715,6 +727,17 @@ Values -> returnFlag`. Keeping this behavior preserves current UX, but it
   `pivotProgram.columnDimensions`. Bootstrap totals now also carry explicit
   `0 x 0` coverage so initial materialization has one coverage contract for
   totals, grid, row-only, and column-only specs.
+- `src/pivot/runtime/materializePivotTree.ts` is now the explicit Gate 4
+  materialization boundary. It owns fact-store selectors, branch/batch
+  materialization from exact fact batches, initial materialization from the fact
+  store, and the temporary bridge to legacy metric/measure-axis tree helpers.
+- Production branch and grouped-batch fetch paths now import
+  `buildBranchTreeFromFactStore`, `buildFactStoreBatchesFromSpecs`, and
+  `canMaterializeSpecsFromFactStore` from the materializer module instead of
+  `ingestQueryResults.ts`.
+- The old `buildBranchTreeFromSpecResults` wrapper was deleted. Materialization
+  tests now exercise the fact-store materializer boundary directly after
+  ingestion upserts facts.
 
 ### Gate 1: One compiled layout model
 

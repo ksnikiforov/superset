@@ -43,14 +43,16 @@ import { buildBranchQuerySpecs } from './pivot/query/specs';
 import { stableStringify as stableStringifyBase } from './pivot/shared/stableStringify';
 import { buildFactCoverage } from './pivot/runtime/coverage';
 import {
-  buildFactStoreBatchesFromSpecs,
-  buildBranchTreeFromFactStore,
-  canMaterializeSpecsFromFactStore,
   createPivotFactStore,
   type PivotFactStore,
   type PivotFactStoreBatch,
-  upsertQueryResultsIntoFactStore,
-} from './pivot/runtime/ingestQueryResults';
+} from './pivot/runtime/factStore';
+import { upsertQueryResultsIntoFactStore } from './pivot/runtime/ingestQueryResults';
+import {
+  buildBranchTreeFromFactStore,
+  buildFactStoreBatchesFromSpecs,
+  canMaterializeSpecsFromFactStore,
+} from './pivot/runtime/materializePivotTree';
 import { appendLoadedBranchCoverageMarkers } from './pivot/runtime/loadedBranchCoverage';
 
 export interface FetchPivotBranchResult {

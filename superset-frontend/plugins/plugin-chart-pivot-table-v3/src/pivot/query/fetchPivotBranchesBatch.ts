@@ -27,14 +27,16 @@ import { type ChartDataWarning } from '../data/ChartDataClient';
 import { buildLayoutContext } from '../layout/LayoutContext';
 import { buildFactCoverage } from '../runtime/coverage';
 import {
-  buildFactStoreBatchesFromSpecs,
-  buildBranchTreeFromFactStore,
-  canMaterializeSpecsFromFactStore,
   createPivotFactStore,
   type PivotFactStore,
   type PivotFactStoreBatch,
-  upsertQueryResultsIntoFactStore,
-} from '../runtime/ingestQueryResults';
+} from '../runtime/factStore';
+import { upsertQueryResultsIntoFactStore } from '../runtime/ingestQueryResults';
+import {
+  buildBranchTreeFromFactStore,
+  buildFactStoreBatchesFromSpecs,
+  canMaterializeSpecsFromFactStore,
+} from '../runtime/materializePivotTree';
 import { appendLoadedBranchCoverageMarkers } from '../runtime/loadedBranchCoverage';
 import { type BatchGroup } from './fetchPlanOptimizer';
 import { buildBatchQuerySpecs } from './specs';

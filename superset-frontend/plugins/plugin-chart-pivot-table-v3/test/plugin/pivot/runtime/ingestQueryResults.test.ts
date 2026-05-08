@@ -19,11 +19,11 @@
 import { type PlannedQuerySpec } from '../../../../src/pivot/query/specs';
 import { compilePivotProgram } from '../../../../src/pivot/runtime/compilePivotProgram';
 import {
-  buildBranchTreeFromSpecResults,
   createPivotFactStore,
   ingestQueryResults,
   upsertQueryResultsIntoFactStore,
 } from '../../../../src/pivot/runtime/ingestQueryResults';
+import { buildBranchTreeFromFactStore } from '../../../../src/pivot/runtime/materializePivotTree';
 import {
   MetricsLayoutEnum,
   type MeasureHierarchy,
@@ -255,9 +255,16 @@ test('keeps support and offset facts without materializing support metric branch
     'sales__1 year ago',
   ]);
 
-  const tree = buildBranchTreeFromSpecResults({
+  const store = createPivotFactStore();
+  upsertQueryResultsIntoFactStore({
+    store,
     specs: [spec],
     results: [result],
+    fallback: 'empty',
+  });
+  const tree = buildBranchTreeFromFactStore({
+    specs: [spec],
+    store,
     formData: buildFormData({
       metrics: ['sales'],
       metricLabelMap: { sales: 'Sales', sortMetric: 'Sort metric' },
@@ -292,7 +299,9 @@ test('materializes column subtotal leaves from planned coverage specs', () => {
     colGroupby: ['category', 'subcategory'],
     colSubtotalLevels: [1],
   });
-  const tree = buildBranchTreeFromSpecResults({
+  const store = createPivotFactStore();
+  upsertQueryResultsIntoFactStore({
+    store,
     specs: [spec],
     results: [
       {
@@ -300,6 +309,11 @@ test('materializes column subtotal leaves from planned coverage specs', () => {
         data: [{ country: 'France', category: 'Furniture', sales: 12 }],
       },
     ],
+    fallback: 'empty',
+  });
+  const tree = buildBranchTreeFromFactStore({
+    specs: [spec],
+    store,
     formData: buildFormData({
       metrics: ['sales'],
     }),
