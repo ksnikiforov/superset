@@ -1897,17 +1897,8 @@ function PivotTableChart(props: PivotTableProps) {
           next: normalized,
         });
       if (needsStructuralFetch || needsProjectionFetch) {
-        const shouldDeferUiLayoutCommit =
-          committedRuntimeLayout.valuePlacement.axis !==
-            normalized.valuePlacement.axis ||
-          committedRuntimeLayout.valuePlacement.index !==
-            normalized.valuePlacement.index;
-        if (shouldDeferUiLayoutCommit) {
-          pendingSeamlessLayoutRef.current = normalized;
-        }
-        if (!shouldDeferUiLayoutCommit) {
-          setUiRuntimeLayout(normalized);
-        }
+        pendingSeamlessLayoutRef.current = normalized;
+        setUiRuntimeLayout(normalized);
         applySeamlessUpdate(normalized, uiSelectedFilters);
         return;
       }
@@ -3024,11 +3015,7 @@ function PivotTableChart(props: PivotTableProps) {
               onDropValue={handleValueDrop}
             />
           </ChipColumn>
-          <TableArea
-            $height={tableHeight}
-            $width={tableWidth}
-            style={frozenUserViewProps ? { pointerEvents: 'none' } : undefined}
-          >
+          <TableArea $height={tableHeight} $width={tableWidth}>
             <PivotTableView {...activeUserPivotViewProps} />
             {tableOverlayVisible ? <Loading /> : null}
           </TableArea>

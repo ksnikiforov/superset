@@ -112,6 +112,22 @@ Loading should be represented as targeted pending coverage, not as a global
 chart lock. A request for one branch must not disable unrelated controls or
 unrelated loaded branches.
 
+Current interactivity checkpoint:
+
+- The pure runtime direction supports this requirement, but only if chart
+  interaction state is treated as a draft separate from committed fact coverage.
+- `PivotTableChart.tsx` still contains old modal-loading behavior and remains a
+  Gate 7/Gate 5 hotspot. The immediate cleanup path is to keep the committed
+  table data visible while updating the layout editor draft immediately, reject
+  stale requests by request id, and avoid pointer-event/global-loader locks
+  during layout fetches. The remaining stale-table fallback should become a
+  display snapshot rather than a broad prop freeze.
+- Large query results can still lag the page because JSON parsing,
+  fact-store ingestion, materialization, and React table commit happen
+  synchronously on the main thread. The architecture should move toward a
+  non-blocking commit lane: request epoch first, then cancellable/chunked
+  materialization, then a low-priority React commit.
+
 ### Queries must follow visibility
 
 The runtime must never request DB coverage for hidden or collapsed layers.
@@ -246,9 +262,10 @@ mutation out of React hooks and then delete the hook-local branches.
 
 Current visible diff from baseline `3affd1cc6db691fe08eddf0914e2050207f95ed0`:
 
-- Full plugin: `91` files changed, `9215` insertions, `3829` deletions.
-- Production `src`: `38` files changed, `4442` insertions, `3289` deletions.
-- Tests: `52` files changed, `4217` insertions, `532` deletions.
+- Full plugin: `111` files changed, `9815` insertions, `4446` deletions.
+- Production `src`: `38` files changed, `4874` insertions, `3752`
+  deletions.
+- Tests: `72` files changed, `4363` insertions, `682` deletions.
 
 The total diff is still net additive because the refactor added runtime
 infrastructure and protective tests. That is acceptable only if the next changes
@@ -257,27 +274,28 @@ remains a non-goal.
 
 ### Completion Reassessment
 
-Overall transition completion estimate: **64%**.
+Overall transition completion estimate: **67%**.
 
 This is a functionality/architecture completion estimate, not a line-deletion
 score. The completed work has moved the runtime toward a compiler/fact-store
 pipeline, but the remaining work is disproportionately concentrated in a few
 large files and in the not-yet-built reducer/controller split.
 
-| Gate                                         | Completion | Assessment                                                                                                                                                                                                          |
-| -------------------------------------------- | ---------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Gate 1: compiled layout model                |        68% | `PivotProgram` exists and is widely consumed, but `usePivotLayout`, interaction layout, and control/layout cleanup still read compatibility layout state.                                                           |
-| Gate 2: query planning from program/coverage |        86% | Initial/root/branch/batch query paths use coverage metadata and canonical paths. Remaining complexity is mostly support/totals coverage composition.                                                                |
-| Gate 3: central fact ingestion/store         |        88% | Fetch paths return fact batches, fact-store hits and cache hits reuse exact coverage, and ingestion is isolated. Remaining coupling is mostly initial wrapper compatibility and materializer handoff.               |
-| Gate 4: one tree materializer                |        66% | `materializePivotTree.ts` is now the production boundary and owns metric/measure axis materialization plus subtotal leaf injection/labeling. `core/tree.ts` is now raw tree fixture construction and merge helpers. |
-| Gate 5: expansion reducer/runtime effects    |        45% | Expansion has stronger pure helpers and typed coverage, but `useExpansionEngine` remains a large hook with orchestration, loading, persistence, hydration, and layout transition responsibilities.                  |
-| Gate 6: pure render model                    |        62% | Projection now drives loaded-state, toggle eligibility, collapsed Values, and column display behavior. `visibility.ts` and `usePivotLayout` still duplicate rendered-tree inference and presentation policy.        |
-| Gate 7: chart component cleanup              |        25% | `PivotTableChart.tsx` is smaller than baseline but still owns controller-level responsibilities, committed-tree sync, seamless refresh, runtime layout checks, and interaction wiring.                              |
+| Gate                                         | Completion | Assessment                                                                                                                                                                                                                          |
+| -------------------------------------------- | ---------: | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Gate 1: compiled layout model                |        70% | `PivotProgram` is established, materialization consumes it directly, and many query/render call sites use it. `usePivotLayout`, interaction layout, and control/layout cleanup still read compatibility layout state.               |
+| Gate 2: query planning from program/coverage |        87% | Initial/root/branch/batch query paths use coverage metadata and canonical paths. Remaining complexity is mostly support/totals coverage composition and old fetched-depth compatibility in expansion planning.                      |
+| Gate 3: central fact ingestion/store         |        91% | Fetch paths return fact batches, fact-store hits and cache hits reuse exact coverage, ingestion is isolated, and materializer handoff is explicit. Remaining coupling is mostly initial wrapper compatibility and tree-shaped APIs. |
+| Gate 4: one tree materializer                |        77% | `materializePivotTree.ts` owns fact-to-tree materialization, Values/metric/measure axes, subtotal leaf injection, and row subtotal labeling. Remaining work is export parity and demoting test-only raw fixtures.                   |
+| Gate 5: expansion reducer/runtime effects    |        46% | Expansion has stronger pure helpers and typed coverage, but `useExpansionEngine` remains a large hook with orchestration, loading, persistence, hydration, and layout transition responsibilities.                                  |
+| Gate 6: pure render model                    |        64% | Projection now drives loaded-state, toggle eligibility, collapsed Values, and column display behavior. `visibility.ts`, `usePivotLayout`, and `usePivotRenderModel` still duplicate some inference/presentation policy.             |
+| Gate 7: chart component cleanup              |        25% | `PivotTableChart.tsx` is smaller than baseline but still owns controller-level responsibilities, committed-tree sync, seamless refresh, runtime layout checks, and interaction wiring.                                              |
 
 Weighted interpretation:
 
 - Strongest completed areas: Gate 2 and Gate 3.
-- Best current deletion target: Gate 4 legacy tree helper surface.
+- Best current deletion target: Gate 4 render repair and test-only raw fixture
+  surface.
 - Biggest remaining architectural risk: Gate 5, because a reducer rewrite before
   more extraction would mostly move the current hook complexity instead of
   simplifying it.
@@ -286,18 +304,18 @@ Weighted interpretation:
 
 Gate status:
 
-- Gate 1 is partially complete (`68%`). `PivotProgram` is established and many call
+- Gate 1 is partially complete (`70%`). `PivotProgram` is established and many call
   sites consume it, but `usePivotLayout` and `resolveInteractionLayout` still
   translate raw layout state into runtime behavior.
-- Gate 2 is largely complete (`86%`). Initial, root, branch, and batch query paths now
+- Gate 2 is largely complete (`87%`). Initial, root, branch, and batch query paths now
   flow through explicit coverage metadata. Remaining complexity is mostly
   support/totals coverage expansion inside `coverage.ts`, not old branch-pair
   planning.
-- Gate 3 is mostly complete at the ingestion boundary (`88%`). Initial load, seamless
+- Gate 3 is mostly complete at the ingestion boundary (`91%`). Initial load, seamless
   refresh, branch fetch, batch fetch, local fact-store hits, and branch-cache
-  hits now carry `PivotFactStoreBatch[]`. The remaining dependency is that
-  materialization still calls legacy tree helpers.
-- Gate 4 is in progress (`66%`). `src/pivot/runtime/materializePivotTree.ts` now owns
+  hits now carry `PivotFactStoreBatch[]`. The remaining dependency is mostly
+  tree-shaped compatibility at the initial/chart boundary.
+- Gate 4 is in progress (`77%`). `src/pivot/runtime/materializePivotTree.ts` now owns
   production fact-store-to-tree materialization for branch, batch, and initial
   trees, metric/measure axis materialization, row and column subtotal leaf
   injection, and row subtotal labeling. `ingestQueryResults.ts` is back to
@@ -306,16 +324,17 @@ Gate status:
   measure-axis, and subtotal helpers live under the materializer boundary.
   The broad `src/utils.ts` utility surface no longer re-exports the raw-record
   tree builders or subtotal materialization helpers.
-- Gate 5 is started but still the largest source of complexity (`45%`).
+- Gate 5 is started but still the largest source of complexity (`46%`).
   `useExpansionEngine` no longer infers fetched state from rendered trees and
   the planner no longer consumes raw fetched-depth maps, but the hook still owns
   layout trimming, local tree projection, fetched-coverage remapping, same-axis
   fetch loops, cross-axis hydration loops, cancellation, loading state,
   persistence, and expansion normalization.
-- Gate 6 is partially complete (`62%`). Projection now drives loaded-child checks,
+- Gate 6 is partially complete (`64%`). Projection now drives loaded-child checks,
   toggle eligibility, column display projection, and collapsed Values semantics.
-  `visibility.ts` still contains descendant/cell scanning loaded-state
-  inference that overlaps with fetched coverage.
+  `visibility.ts`, `usePivotLayout`, and `usePivotRenderModel` still contain
+  descendant/cell scanning and presentation repair that overlap with projection
+  and fetched coverage.
 - Gate 7 has only been lightly reduced (`25%`). `PivotTableChart.tsx` is smaller than
   baseline, but at roughly `3088` lines it still owns committed-tree sync,
   seamless refresh, runtime layout coverage checks, interaction wiring, and
@@ -323,43 +342,46 @@ Gate status:
 
 Current largest production hotspots by line count:
 
-- `useExpansionEngine.ts`: about `2076` lines. This is still a good deletion
-  target.
-- `usePivotLayout.ts`: about `1657` lines. This is still the main render/layout
-  policy hotspot.
-- `pivot/core/tree.ts`: about `948` lines, plus
-  `runtime/materializePivotTree.ts` at about `471` lines. Tree materialization
-  now has a runtime boundary, but the legacy core tree wrappers remain large.
-- `runtime/ingestQueryResults.ts`: about `278` lines after the materialization
+- `PivotTableChart.tsx`: `3088` lines. It still owns committed-tree sync,
+  seamless refresh, runtime layout coverage checks, interaction wiring, and
+  controller-like responsibilities.
+- `useExpansionEngine.ts`: `2076` lines. This is still the largest runtime
+  orchestration and deletion target.
+- `usePivotLayout.ts`: `1657` lines. This remains the main render/layout policy
+  hotspot.
+- `runtime/materializePivotTree.ts`: `1140` lines. This is now the correct Gate
+  4 owner, but should be split into internal materializer modules only when that
+  enables deleting render repair or fixture-only production helpers.
+- `usePivotRenderModel.ts`: `1034` lines. This is the next likely Gate 4/Gate 6
+  deletion surface because render repair should shrink now that materialization
+  creates metric, measure, and subtotal nodes.
+- `visibility.ts`: `602` lines. Loaded-state inference should keep shrinking as
+  fetched coverage becomes the source of truth.
+- `pivot/core/tree.ts`: `256` lines. It is now mostly raw record fixture
+  construction plus `mergeTrees`/label formatting. It has no production reason
+  to keep `buildTreeFromRecords` long term.
+- `runtime/ingestQueryResults.ts`: `275` lines after the materialization
   extraction.
-- `visibility.ts`: about `602` lines. Loaded-state inference should keep
-  shrinking as fetched coverage becomes the source of truth.
-- `PivotTableChart.tsx`: about `3088` lines. It should be split later, after
-  expansion/materialization contracts are thinner.
 
 Recommended next sequence:
 
-1. Finish the fetched-coverage state cleanup inside `useExpansionEngine`.
-   Move collapse pruning, stable-trim remapping, and expanded-coverage remapping
-   behind `fetchedRequests.ts` or a small sibling coverage-state helper. Delete
-   direct `Map<string, number>` manipulation from the hook. This is low UX risk
-   because it preserves current behavior while tightening ownership.
-2. Extract the layout-change projection/reinitialization block from
-   `useExpansionEngine` into a pure transition helper with tests. The target is
-   to remove `trimTreeForLayout`, `promoteTreeForLayout`, local cell-value
-   merging, stable-prefix expansion pruning, and fetched-coverage reconstruction
-   from the React hook body.
-3. Then revisit `usePivotLayout` row/column pruning. The likely deletion is one
-   axis-neutral stale collapsed-branch helper with small row/column presentation
-   adapters. If this changes visible subtotal/header behavior, stop for an
-   approval checkpoint.
-4. After the expansion hook is thinner, return to Gate 4 and create an explicit
-   `materializePivotTree` runtime module. Keep `buildTreeFromRecords` and
-   `applyMetricAxis` as test/compatibility wrappers only until their production
-   callers are gone, then delete or demote their public exports.
-5. Do not start the full reducer rewrite yet. A reducer now would absorb too
-   much hook-local layout projection and fetched-map maintenance. The reducer
-   should come after those pieces are pure helpers.
+1. Continue Gate 4 by deleting render-layer tree repair that is now redundant
+   with `materializePivotTree.ts`. Start in `usePivotRenderModel.ts` and prove
+   that metric/measure/subtotal nodes are model input, not render-created
+   fallback nodes.
+2. Move `buildTreeFromRecords` out of production `src/pivot/core/tree.ts` into a
+   test fixture helper, or replace targeted fixture setup with fact batches. This
+   is production-code deletion; test-line reduction remains a non-goal.
+3. Then return to Gate 5 and extract the next pure effect/controller boundary
+   from `useExpansionEngine`: request lifecycle, hydration loops, or expansion
+   persistence. Do not start the full reducer until those responsibilities are
+   smaller.
+4. Revisit `usePivotLayout`/`visibility.ts` after render repair shrinks. The goal
+   is one source of truth for projection and loaded-state, with row/column
+   presentation adapters only where visible UX truly differs.
+5. Defer `PivotTableChart.tsx` splitting until Gate 4 render repair and Gate 5
+   request lifecycle are thinner; otherwise the split mostly moves the current
+   orchestration around.
 
 Latest execution of that sequence:
 
@@ -391,6 +413,11 @@ Latest execution of that sequence:
   materializer for the initial `{ tree, factBatches }` wrapper.
 - The unused `buildBranchTreeFromSpecResults` compatibility wrapper was deleted
   after production and tests were moved to `buildBranchTreeFromFactStore`.
+- Interaction layout changes now commit the editor draft immediately, including
+  Values-axis moves that require a seamless fetch. The table may still keep the
+  previous committed view visible while hydration settles, but the chip editor is
+  no longer gated on the request finishing and `TableArea` no longer applies a
+  `pointer-events: none` lock during that transition.
 - The reducer rewrite remains intentionally deferred. The hook is thinner, but
   materialization and render/layout policy are still better deletion targets
   than a reducer that would absorb legacy behavior.
@@ -738,14 +765,15 @@ Values -> returnFlag`. Keeping this behavior preserves current UX, but it
   but the first metric-position filtering stage now reads whether a child has
   entered Values and whether it adds a projected dimension from the shared
   projection descriptor instead of rediscovering that locally.
-- `pivot/core/tree.ts` now routes flat metric axes and measure-leaf axes through
-  one internal `applyMeasureAxis` materializer. `applyMetricAxis` is now a thin
-  wrapper that normalizes flat metrics into hidden value leaves, while
-  `applyMeasureHierarchyAxis` passes real measure leaves into the same path.
-  The two remaining behavior-policy switches are explicit: flat metrics keep
-  their old source-axis-node preservation rule, and measure stacks keep their
-  old always-preserve rule. This makes the first Gate 4 cleanup deletion-positive
-  without changing the visible metric/measure-leaf layout contract.
+- `src/pivot/runtime/materializePivotTree.ts` now routes flat metric axes and
+  measure-leaf axes through one internal `applyMeasureAxis` materializer.
+  `applyMetricAxis` is now a thin runtime wrapper that normalizes flat metrics
+  into hidden value leaves, while `applyMeasureHierarchyAxis` passes real
+  measure leaves into the same path. The two remaining behavior-policy switches
+  are explicit: flat metrics keep their old source-axis-node preservation rule,
+  and measure stacks keep their old always-preserve rule. This keeps the visible
+  metric/measure-leaf layout contract while moving the behavior under the Gate 4
+  materializer boundary.
 - Planned query metadata now carries `pivotProgram` instead of separate
   `metricsLayoutResolved` and `metricInsertIndex` fields. The shared tree
   materializer derives Values axis, Values insertion depth, axis dimensions, and
@@ -762,7 +790,8 @@ Values -> returnFlag`. Keeping this behavior preserves current UX, but it
 - `src/pivot/runtime/materializePivotTree.ts` is now the explicit Gate 4
   materialization boundary. It owns fact-store selectors, branch/batch
   materialization from exact fact batches, initial materialization from the fact
-  store, and the temporary bridge to legacy metric/measure-axis tree helpers.
+  store, Values/metric/measure-axis construction, subtotal leaf injection, and
+  row subtotal labeling.
 - Production branch and grouped-batch fetch paths now import
   `buildBranchTreeFromFactStore`, `buildFactStoreBatchesFromSpecs`, and
   `canMaterializeSpecsFromFactStore` from the materializer module instead of
@@ -770,11 +799,11 @@ Values -> returnFlag`. Keeping this behavior preserves current UX, but it
 - The old `buildBranchTreeFromSpecResults` wrapper was deleted. Materialization
   tests now exercise the fact-store materializer boundary directly after
   ingestion upserts facts.
-- `src/utils.ts` no longer re-exports the legacy raw-record tree builders
-  `buildTreeFromRecords`, `applyMetricAxis`, and
-  `applyMeasureHierarchyAxis`. Direct tree fixtures now import those helpers
-  from `src/pivot/core/tree`, making the legacy surface explicit while
-  production paths stay pointed at `runtime/materializePivotTree.ts`.
+- `src/utils.ts` no longer re-exports the legacy raw-record tree builder or
+  materialization helpers. Direct tree fixtures now import `buildTreeFromRecords`
+  from `src/pivot/core/tree` and metric/measure/subtotal helpers from
+  `src/pivot/runtime/materializePivotTree.ts`, making the split between raw
+  fixture construction and runtime materialization explicit.
 - Row subtotal leaf injection and row subtotal labeling moved out of
   `pivot/core/tree.ts` and into `src/pivot/runtime/materializePivotTree.ts`.
   Row and column subtotal leaf injection now share one runtime helper, while
@@ -785,6 +814,10 @@ Values -> returnFlag`. Keeping this behavior preserves current UX, but it
   through core tree helpers for Values/measure tiers, and direct tree fixtures
   now combine `buildTreeFromRecords` from core with `applyMetricAxis` or
   `applyMeasureHierarchyAxis` from the runtime materializer.
+- `usePivotRenderModel.ts` no longer synthesizes missing column ancestor nodes
+  for metrics-at-end layouts. The runtime materializer is now responsible for a
+  complete column hierarchy, and the old component test for renderer-side repair
+  was replaced with a materialization contract check.
 
 ### Gate 1: One compiled layout model
 

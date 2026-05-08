@@ -184,21 +184,6 @@ export const usePivotRenderModel = ({
     [rowSortingKeyMap],
   );
 
-  const measureLeafLabelMap = useMemo(() => {
-    if (layout.measureHierarchy.kind !== 'measureStackV1') {
-      return new Map<string, string>();
-    }
-    const map = new Map<string, string>();
-    layout.measureHierarchy.groups.forEach(group => {
-      group.leaves.forEach(leaf => {
-        if (!map.has(leaf.id)) {
-          map.set(leaf.id, leaf.label);
-        }
-      });
-    });
-    return map;
-  }, [layout.measureHierarchy]);
-
   const renderTree = useMemo(() => {
     const { dateFormatters } = formData;
 
@@ -322,92 +307,21 @@ export const usePivotRenderModel = ({
       return hasChanges ? nextNodes : nodes;
     };
 
-    const normalizeAxis = (
-      nodes: Record<string, PivotTreeNode>,
-      axis: 'row' | 'col',
-      groupbyLength: number,
-    ) => {
-      let hasChanges = false;
-      const nextNodes: Record<string, PivotTreeNode> = { ...nodes };
-      const ensureNode = (path: PivotTreeNode['path']) => {
-        const key = serializePath(path);
-        if (nextNodes[key]) {
-          return;
-        }
-        const rawValue = path[path.length - 1];
-        const metricKey = decodeMetricKey(rawValue);
-        const leafId = decodeMeasureLeafId(rawValue);
-        let label = 'Grand total';
-        if (path.length > 0) {
-          if (metricKey) {
-            label = layout.getMetricDisplayLabelForKey(metricKey);
-          } else if (leafId) {
-            label =
-              measureLeafLabelMap.get(leafId) ??
-              formatPivotLabelValue(rawValue ?? null, 'Total');
-          } else {
-            label = formatPivotLabelValue(rawValue ?? null, 'Total');
-          }
-        }
-        const dimDepth = layout.countDimDepth(path);
-        nextNodes[key] = {
-          axis,
-          key,
-          path,
-          label,
-          formattedLabel: label,
-          level: path.length,
-          hasChildren: false,
-          isSubtotal: path.some(isSubtotalToken) || dimDepth < groupbyLength,
-        };
-        hasChanges = true;
-      };
-
-      Object.values(nodes).forEach(node => {
-        for (let depth = 0; depth <= node.path.length; depth += 1) {
-          ensureNode(node.path.slice(0, depth));
-        }
-      });
-
-      const parentKeys = new Set<string>();
-      Object.values(nextNodes).forEach(node => {
-        if (node.path.length === 0) {
-          return;
-        }
-        parentKeys.add(serializePath(node.path.slice(0, -1)));
-      });
-
-      Object.values(nextNodes).forEach(node => {
-        const hasChildren = node.hasChildren || parentKeys.has(node.key);
-        if (node.hasChildren !== hasChildren) {
-          nextNodes[node.key] = { ...node, hasChildren };
-          hasChanges = true;
-        }
-      });
-
-      return hasChanges ? nextNodes : nodes;
-    };
-
     const depthPrunedTree = pruneTreeToLayoutDepth(tree);
-    const nextCols = layout.metricsAtColEnd
-      ? normalizeAxis(depthPrunedTree.cols, 'col', resolvedGroupbyColumnsLength)
-      : depthPrunedTree.cols;
-    const baseTree =
-      nextCols === depthPrunedTree.cols
-        ? depthPrunedTree
-        : { ...depthPrunedTree, cols: nextCols };
-    const nextRows = formatAxisNodes(baseTree.rows, 'row');
-    const nextColsFormatted = formatAxisNodes(baseTree.cols, 'col');
-    if (nextRows === baseTree.rows && nextColsFormatted === baseTree.cols) {
-      return baseTree;
+    const nextRows = formatAxisNodes(depthPrunedTree.rows, 'row');
+    const nextColsFormatted = formatAxisNodes(depthPrunedTree.cols, 'col');
+    if (
+      nextRows === depthPrunedTree.rows &&
+      nextColsFormatted === depthPrunedTree.cols
+    ) {
+      return depthPrunedTree;
     }
-    return { ...baseTree, rows: nextRows, cols: nextColsFormatted };
+    return { ...depthPrunedTree, rows: nextRows, cols: nextColsFormatted };
   }, [
     formData.dateFormatters,
     resolvedGroupbyColumnsLength,
     resolvedGroupbyRowsLength,
     layout,
-    measureLeafLabelMap,
     tree,
   ]);
 

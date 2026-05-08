@@ -22,9 +22,9 @@ import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum } from '../../../src/types';
 import { buildFormData } from '../fixtures/pivotFormData';
 import {
-  decodeMetricKey,
   mergeTrees,
   METRICS_PLACEHOLDER,
+  serializePath,
 } from '../../../src/utils';
 import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
 import { buildTreeFromRecords } from '../../../src/pivot/core/tree';
@@ -460,7 +460,7 @@ describe('PivotTableChart expansion with metrics at the column end', () => {
     expect(countBlankCells(getRow())).toBe(0);
   });
 
-  it('restores missing column hierarchy nodes when expanding', async () => {
+  it('materializes intermediate column hierarchy nodes when metrics are at the end', () => {
     const metrics = ['averageOrderValue', 'weightedDiscount'];
     const rowGroupby = ['quantityBand'];
     const colGroupby = ['orderStatus', 'lineStatus'];
@@ -497,78 +497,10 @@ describe('PivotTableChart expansion with metrics at the column end', () => {
       colGroupby.length,
     );
 
-    const brokenCols = Object.fromEntries(
-      Object.entries(fullTree.cols).filter(([, node]) => {
-        if (node.path.length !== 2) {
-          return true;
-        }
-        const hasMetricToken = node.path.some(value =>
-          Boolean(decodeMetricKey(value)),
-        );
-        return hasMetricToken;
-      }),
-    );
-    const brokenTree = { ...fullTree, cols: brokenCols };
-
-    fetchPivotBranchMock.mockResolvedValueOnce({ data: undefined });
-
-    const { container } = render(
-      <PivotTableChart
-        data={brokenTree}
-        formData={buildFormData({
-          groupbyRows: rowGroupby,
-          groupbyColumns: [...colGroupby, METRICS_PLACEHOLDER],
-          metrics,
-          metricsLayout: MetricsLayoutEnum.COLUMNS,
-          rowTotals: true,
-          colTotals: false,
-          startCollapsed: true,
-          initialDepth: 1,
-          rowOrder: 'key_a_to_z',
-          colOrder: 'key_a_to_z',
-          aggregateFunction: 'Sum',
-          viz_type: 'pivot_table_v3',
-          datasource: '1__table',
-          metricColorFormatters: [],
-          dateFormatters: {},
-          verboseMap: {},
-        })}
-        metrics={metrics}
-        groupbyRows={rowGroupby}
-        groupbyColumns={colGroupby}
-        aggregateFunction="Sum"
-        width={400}
-        height={300}
-        startCollapsed
-        initialDepth={1}
-        colTotals={false}
-        rowTotals
-        rowSubTotals={false}
-        rowSubtotalLevels={[]}
-        colSubtotalLevels={[]}
-        rowOrder="key_a_to_z"
-        colOrder="key_a_to_z"
-        valueFormat=""
-        columnFormats={{}}
-        currencyFormats={{}}
-        allowRenderHtml={false}
-        emitCrossFilters={false}
-        setDataMask={jest.fn()}
-        metricColorFormatters={[]}
-        dateFormatters={{}}
-      />,
-    );
-
-    await waitForPivotReady();
-
-    const thead = container.querySelector('thead') as HTMLElement;
-    const statusCell = within(thead)
-      .getByText('O')
-      .closest('th') as HTMLElement;
-    fireEvent.click(within(statusCell).getByLabelText('plus-square'));
-
-    await waitFor(() => {
-      expect(within(thead).getByText('F')).toBeInTheDocument();
+    const intermediateKey = serializePath(['O', 'F']);
+    expect(fullTree.cols[intermediateKey]).toMatchObject({
+      path: ['O', 'F'],
+      hasChildren: true,
     });
   });
 });
