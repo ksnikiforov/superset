@@ -17,8 +17,11 @@
  * under the License.
  */
 
+import { type ComponentProps } from 'react';
 import { render, screen, within } from '../../testUtils';
-import PivotTableChart from '../fixtures/TestPivotTableChart';
+import TestPivotTableChart, {
+  buildPreloadedTreeFactBatches,
+} from '../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum, PivotTableQueryFormData } from '../../../src/types';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { METRICS_PLACEHOLDER } from '../../../src/utils';
@@ -29,6 +32,23 @@ import {
 } from '../../../src/pivot/measureLeaves';
 import { buildTreeFromRecords } from '../../../src/pivot/core/tree';
 import { applyMeasureHierarchyAxis } from '../../../src/pivot/runtime/materializePivotTree';
+
+type TestPivotTableChartProps = ComponentProps<typeof TestPivotTableChart>;
+
+function PivotTableChart(props: TestPivotTableChartProps) {
+  return (
+    <TestPivotTableChart
+      {...props}
+      factBatches={
+        props.factBatches ??
+        buildPreloadedTreeFactBatches(props.data, {
+          groupbyRows: props.groupbyRows ?? [],
+          groupbyColumns: props.groupbyColumns ?? [],
+        })
+      }
+    />
+  );
+}
 
 describe('PivotTableChart measure leaf tier indentation', () => {
   const baseProps = {

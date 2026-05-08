@@ -469,31 +469,6 @@ export const usePivotRenderModel = ({
     };
   }, [colOrder, colTypeMap, compareMetricSort, layout, resolvedGroupbyColumns]);
 
-  const colNonMetricDepths = useMemo(() => {
-    const depthMap = new Map<string, number>();
-    Object.values(renderTree.cols).forEach(node => {
-      const parts = getColumnProjectedPathParts(node.path);
-      for (let i = 0; i <= parts.length; i += 1) {
-        const prefixKey = serializePath(parts.slice(0, i));
-        const prev = depthMap.get(prefixKey) ?? 0;
-        if (parts.length > prev) {
-          depthMap.set(prefixKey, parts.length);
-        }
-      }
-    });
-    return depthMap;
-  }, [getColumnProjectedPathParts, renderTree.cols]);
-
-  const hasDeeperNonMetricDescendants = useCallback(
-    (col: PivotTreeNode) => {
-      const parts = getColumnProjectedPathParts(col.path);
-      const key = serializePath(parts);
-      const maxDepth = colNonMetricDepths.get(key) ?? parts.length;
-      return maxDepth > parts.length;
-    },
-    [colNonMetricDepths, getColumnProjectedPathParts],
-  );
-
   const getColumnDisplayPath = useCallback(
     (col: PivotTreeNode, maxDepth: number) =>
       buildColumnDisplayPath(col, maxDepth, {
@@ -503,7 +478,6 @@ export const usePivotRenderModel = ({
         allowMetricSubtotalLabels: layout.normalizedColSubtotalLevels.some(
           level => level > 0,
         ),
-        hasDeeperNonMetricDescendants,
         metricLabels: layout.metricLabels,
         isExplicitSubtotalNode: layout.isExplicitSubtotalNode,
         getMetricKeyFromPath: layout.getMetricLabelFromPath,
@@ -513,12 +487,7 @@ export const usePivotRenderModel = ({
         isMetricSubtotalNode: layout.isMetricSubtotalNode,
         isExpanded: node => expandedCols.has(node.key),
       }),
-    [
-      expandedCols,
-      getColumnProjectedPathParts,
-      hasDeeperNonMetricDescendants,
-      layout,
-    ],
+    [expandedCols, getColumnProjectedPathParts, layout],
   );
 
   const getColumnHeaderLabel = useCallback(

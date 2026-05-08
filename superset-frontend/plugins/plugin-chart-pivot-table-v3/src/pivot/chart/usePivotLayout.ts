@@ -1012,21 +1012,6 @@ export const usePivotLayout = ({
       );
       let filtered = filteredByMetricPosition;
       if (
-        metricsAtRowEnd &&
-        parent.axis === 'row' &&
-        parent.level < groupbyRows.length
-      ) {
-        const nonMetricChildren = filterChildrenIntroducingValues(
-          'row',
-          parent,
-          children,
-          child => isMetricGrandTotalNode(child) || isMetricSubtotalNode(child),
-        );
-        if (nonMetricChildren.length > 0) {
-          filtered = nonMetricChildren;
-        }
-      }
-      if (
         resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
         parent.axis === 'row' &&
         parent.level < groupbyRows.length &&
@@ -1163,7 +1148,6 @@ export const usePivotLayout = ({
       metricsFirstOnRows,
       resolvedMetricsLayout,
       rowSubTotals,
-      metricsAtRowEnd,
     ],
   );
 

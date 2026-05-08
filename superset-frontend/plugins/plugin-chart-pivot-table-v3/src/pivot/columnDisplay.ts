@@ -24,7 +24,6 @@ type ColumnDisplayConfig = {
   metricsFirstOnCols: boolean;
   metricsAtColEnd: boolean;
   allowMetricSubtotalLabels: boolean;
-  hasDeeperNonMetricDescendants: (node: PivotTreeNode) => boolean;
   metricLabels: string[];
   isExplicitSubtotalNode: (node: PivotTreeNode) => boolean;
   getMetricKeyFromPath: (path: PivotTreeNode['path']) => string | undefined;
@@ -45,7 +44,6 @@ export const buildColumnDisplayPath = (
     metricsFirstOnCols,
     metricsAtColEnd,
     allowMetricSubtotalLabels,
-    hasDeeperNonMetricDescendants,
     metricLabels,
     isExplicitSubtotalNode,
     getMetricKeyFromPath,
@@ -130,7 +128,7 @@ export const buildColumnDisplayPath = (
       metricsAtColEnd &&
       allowMetricSubtotalLabels &&
       isMetricSubtotalNode(col) &&
-      hasDeeperNonMetricDescendants(col)
+      col.hasChildren
     ) {
       return buildMetricSubtotalPathAtEnd();
     }

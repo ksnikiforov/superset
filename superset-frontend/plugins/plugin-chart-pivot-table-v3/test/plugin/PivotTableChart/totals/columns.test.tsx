@@ -453,14 +453,9 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       .getAllByRole('columnheader')
       .map(cell => cell.textContent?.trim())
       .filter(label => label && label !== 'Rows');
-    const grossRevenueCount = headerLabels.filter(
-      label => label === '1992 grossRevenue',
-    ).length;
-    const countCustomersCount = headerLabels.filter(
-      label => label === '1992 countCustomers',
-    ).length;
-    expect(grossRevenueCount).toBe(1);
-    expect(countCustomersCount).toBe(1);
+    expect(headerLabels.filter(label => label === '1992')).toHaveLength(1);
+    expect(headerLabels).not.toContain('1992 grossRevenue');
+    expect(headerLabels).not.toContain('1992 countCustomers');
   });
 
   it('keeps column grand totals when column subtotals exist with multiple metrics', async () => {
@@ -1951,12 +1946,16 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       .filter(label => label && label !== 'Rows');
     expect(headerLabels).toEqual(
       expect.arrayContaining([
-        'Group1 measure1',
-        'Group1 measure2',
         'Total measure1',
         'Total measure2',
+        'Group1',
+        'Leaf1',
+        'measure1',
+        'measure2',
       ]),
     );
+    expect(headerLabels).not.toContain('Group1 measure1');
+    expect(headerLabels).not.toContain('Group1 measure2');
   });
 
   it('does not render parent column totals as leaves when branch subtotals exist under multiple column roots', async () => {
