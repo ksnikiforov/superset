@@ -60,6 +60,12 @@ import {
   type PivotFactStore,
   type PivotFactStoreBatch,
 } from './factStore';
+import {
+  assertChunkedWorkCurrent,
+  type ChunkedWorkOptions,
+  maybeYieldChunkedWork,
+  yieldChunkedWork,
+} from './chunkedWork';
 
 type MaterializationFactBatch = {
   facts: PivotFact[];
@@ -125,21 +131,21 @@ const factBatchFromStore = ({
   coverage: spec.meta.coverage,
 });
 
-const buildTreeFromFacts = ({
-  facts,
-  rowColumns,
-  columnColumns,
-  rowFullDepth,
-  columnFullDepth,
-  dateFormatters,
-}: {
-  facts: PivotFact[];
+type FactTreeBuilderInput = {
   rowColumns: QueryFormColumn[];
   columnColumns: QueryFormColumn[];
   rowFullDepth: number;
   columnFullDepth: number;
   dateFormatters?: PivotTableQueryFormData['dateFormatters'];
-}): PivotTreeData => {
+};
+
+const createFactTreeBuilder = ({
+  rowColumns,
+  columnColumns,
+  rowFullDepth,
+  columnFullDepth,
+  dateFormatters,
+}: FactTreeBuilderInput) => {
   const tree: PivotTreeData = { rows: {}, cols: {}, cells: {} };
   const rootKey = serializePath([]);
   let grandTotalValues: Record<string, DataRecordValue> = {};
@@ -158,7 +164,7 @@ const buildTreeFromFacts = ({
     const label =
       path.length === 0
         ? 'Grand total'
-        : formatPivotLabelValue(rawValue, totalLabel);
+        : formatPivotLabelValue(rawValue ?? null, totalLabel);
     const groupby = axis === 'row' ? rowColumns : columnColumns;
     const column = groupby[path.length - 1];
     const columnLabel = column ? getColumnLabel(column) : undefined;
@@ -167,7 +173,9 @@ const buildTreeFromFacts = ({
       path.length === 0 || rawValue === null || rawValue === undefined
         ? label
         : formatter
-          ? formatter(rawValue)
+          ? (formatter as (value: NonNullable<typeof rawValue>) => string)(
+              rawValue,
+            )
           : label;
     nodes[key] = {
       axis,
@@ -183,7 +191,12 @@ const buildTreeFromFacts = ({
     };
   };
 
-  facts.forEach(({ rowPath, columnPath: colPath, valueKey, value }) => {
+  const addFact = ({
+    rowPath,
+    columnPath: colPath,
+    valueKey,
+    value,
+  }: PivotFact) => {
     for (let idx = 0; idx <= rowPath.length; idx += 1) {
       ensureNode('row', rowPath.slice(0, idx), 'Total');
     }
@@ -224,31 +237,74 @@ const buildTreeFromFacts = ({
     if (rowPath.length === 0 && colPath.length === 0) {
       grandTotalValues = { ...grandTotalValues, ...values };
     }
-  });
-
-  ensureNode('row', [], 'Grand total');
-  ensureNode('col', [], 'Grand total');
-  const mergedRootValues = {
-    ...(tree.rows[rootKey]?.values || {}),
-    ...(tree.cols[rootKey]?.values || {}),
-    ...(Object.keys(grandTotalValues).length > 0 ? grandTotalValues : {}),
   };
-  const hasGrandTotalValues = Object.keys(grandTotalValues).length > 0;
-  const rootValues =
-    hasGrandTotalValues || Object.keys(mergedRootValues).length > 0
-      ? mergedRootValues
-      : undefined;
-  const rootCellKey = serializeCellKey(rootKey, rootKey);
-  if (rootValues && !tree.cells[rootCellKey]) {
-    tree.cells[rootCellKey] = {
-      rowKey: rootKey,
-      colKey: rootKey,
-      values: rootValues,
-      isSubtotal: true,
-    };
-  }
 
-  return tree;
+  const finish = () => {
+    ensureNode('row', [], 'Grand total');
+    ensureNode('col', [], 'Grand total');
+    const mergedRootValues = {
+      ...(tree.rows[rootKey]?.values || {}),
+      ...(tree.cols[rootKey]?.values || {}),
+      ...(Object.keys(grandTotalValues).length > 0 ? grandTotalValues : {}),
+    };
+    const hasGrandTotalValues = Object.keys(grandTotalValues).length > 0;
+    const rootValues =
+      hasGrandTotalValues || Object.keys(mergedRootValues).length > 0
+        ? mergedRootValues
+        : undefined;
+    const rootCellKey = serializeCellKey(rootKey, rootKey);
+    if (rootValues && !tree.cells[rootCellKey]) {
+      tree.cells[rootCellKey] = {
+        rowKey: rootKey,
+        colKey: rootKey,
+        values: rootValues,
+        isSubtotal: true,
+      };
+    }
+
+    return tree;
+  };
+
+  return {
+    addFact,
+    finish,
+  };
+};
+
+const buildTreeFromFacts = ({
+  facts,
+  ...params
+}: FactTreeBuilderInput & {
+  facts: PivotFact[];
+}): PivotTreeData => {
+  const builder = createFactTreeBuilder(params);
+  facts.forEach(builder.addFact);
+  return builder.finish();
+};
+
+const buildTreeFromFactsAsync = async ({
+  facts,
+  chunkSize,
+  shouldContinue,
+  yieldToMain,
+  ...params
+}: FactTreeBuilderInput &
+  ChunkedWorkOptions & {
+    facts: PivotFact[];
+  }): Promise<PivotTreeData> => {
+  const builder = createFactTreeBuilder(params);
+  for (let idx = 0; idx < facts.length; idx += 1) {
+    builder.addFact(facts[idx]);
+    // eslint-disable-next-line no-await-in-loop
+    await maybeYieldChunkedWork({
+      processed: idx + 1,
+      chunkSize,
+      shouldContinue,
+      yieldToMain,
+    });
+  }
+  assertChunkedWorkCurrent(shouldContinue);
+  return builder.finish();
 };
 
 const injectAxisSubtotalLeaves = ({
@@ -1000,6 +1056,57 @@ const buildTreeFromFactBatch = ({
   return tree;
 };
 
+const buildTreeFromFactBatchAsync = async ({
+  batch,
+  formData,
+  pivotProgram,
+  rowSubtotalLevels,
+  colSubtotalLevels,
+  chunkSize,
+  shouldContinue,
+  yieldToMain,
+}: {
+  batch: MaterializationFactBatch;
+  formData: PivotTableQueryFormData;
+  pivotProgram: PivotProgram;
+  rowSubtotalLevels: number[];
+  colSubtotalLevels: number[];
+} & ChunkedWorkOptions) => {
+  const { coverage } = batch;
+  const rowFullDepth = pivotProgram.rowDimensions.length;
+  const columnFullDepth = pivotProgram.columnDimensions.length;
+  let tree = await buildTreeFromFactsAsync({
+    facts: batch.facts,
+    rowColumns: coverage.rowDimensions,
+    columnColumns: coverage.columnDimensions,
+    rowFullDepth,
+    columnFullDepth,
+    dateFormatters: formData.dateFormatters,
+    chunkSize,
+    shouldContinue,
+    yieldToMain,
+  });
+  if (colSubtotalLevels.includes(coverage.columnDepth)) {
+    // eslint-disable-next-line no-await-in-loop
+    await yieldChunkedWork({ shouldContinue, yieldToMain });
+    tree = injectColumnSubtotalLeaves(
+      tree,
+      coverage.columnDepth,
+      columnFullDepth,
+    );
+  }
+  const rowSubtotalDepths = rowSubtotalLevels.filter(
+    level => level > 0 && level <= coverage.rowDepth,
+  );
+  for (let idx = 0; idx < rowSubtotalDepths.length; idx += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    await yieldChunkedWork({ shouldContinue, yieldToMain });
+    tree = injectRowSubtotalLeaves(tree, rowSubtotalDepths[idx], rowFullDepth);
+  }
+  assertChunkedWorkCurrent(shouldContinue);
+  return tree;
+};
+
 export const materializePivotTree = ({
   batches,
   metricsForQuery,
@@ -1049,6 +1156,72 @@ export const materializePivotTree = ({
     pivotProgram,
     formData.metricLabelMap as Record<string, string> | undefined,
   );
+  return labelRowSubtotalLeaves(
+    branchWithMeasures,
+    ensureIsArray(visibleMetrics),
+    formData.metricLabelMap as Record<string, string> | undefined,
+  );
+};
+
+export const materializePivotTreeAsync = async ({
+  batches,
+  metricsForQuery,
+  formData,
+  measureHierarchy,
+  materializedMetrics,
+  materializedMeasureHierarchy,
+  rowSubtotalLevels,
+  colSubtotalLevels,
+  pivotProgram,
+  chunkSize,
+  shouldContinue,
+  yieldToMain,
+}: {
+  batches: MaterializationFactBatch[];
+  metricsForQuery: QueryFormMetric[];
+  formData: PivotTableQueryFormData;
+  measureHierarchy: MeasureHierarchy;
+  materializedMetrics?: QueryFormMetric[];
+  materializedMeasureHierarchy?: MeasureHierarchy;
+  rowSubtotalLevels: number[];
+  colSubtotalLevels: number[];
+  pivotProgram: PivotProgram;
+} & ChunkedWorkOptions): Promise<PivotTreeData> => {
+  const queryMetrics =
+    metricsForQuery.length > 0 ? metricsForQuery : formData.metrics;
+  const visibleMetrics = materializedMetrics ?? queryMetrics;
+  const visibleMeasureHierarchy =
+    materializedMeasureHierarchy ?? measureHierarchy;
+  let branchTree = {} as PivotTreeData;
+  for (let idx = 0; idx < batches.length; idx += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    const nextTree = await buildTreeFromFactBatchAsync({
+      batch: batches[idx],
+      formData,
+      pivotProgram,
+      rowSubtotalLevels,
+      colSubtotalLevels,
+      chunkSize,
+      shouldContinue,
+      yieldToMain,
+    });
+    // eslint-disable-next-line no-await-in-loop
+    await yieldChunkedWork({ shouldContinue, yieldToMain });
+    branchTree = mergeTrees(branchTree, nextTree);
+  }
+  await yieldChunkedWork({ shouldContinue, yieldToMain });
+  const treeWithLeafValues = applyMeasureLeafValuesToTree({
+    tree: branchTree,
+    measureHierarchy: visibleMeasureHierarchy,
+  });
+  await yieldChunkedWork({ shouldContinue, yieldToMain });
+  const branchWithMeasures = applyMeasureHierarchyAxis(
+    treeWithLeafValues,
+    visibleMeasureHierarchy,
+    pivotProgram,
+    formData.metricLabelMap as Record<string, string> | undefined,
+  );
+  await yieldChunkedWork({ shouldContinue, yieldToMain });
   return labelRowSubtotalLeaves(
     branchWithMeasures,
     ensureIsArray(visibleMetrics),
@@ -1133,6 +1306,65 @@ export const materializeInitialPivotTreeFromFactStore = ({
       formattedLabel: 'Grand total',
     };
   }
+  return applyMeasureLeafValuesToTree({
+    tree: mergedTree,
+    measureHierarchy: layout.measureHierarchy,
+  });
+};
+
+export const materializeInitialPivotTreeFromFactStoreAsync = async ({
+  specs,
+  store,
+  layout,
+  formData,
+  chunkSize,
+  shouldContinue,
+  yieldToMain,
+}: {
+  specs: PlannedQuerySpec[];
+  store: PivotFactStore;
+  layout: LayoutContext;
+  formData: PivotTableQueryFormData;
+} & ChunkedWorkOptions): Promise<PivotTreeData> => {
+  const rootKey = serializePath([]);
+  const emptyTree: PivotTreeData = { rows: {}, cols: {}, cells: {} };
+  let mergedTree = emptyTree;
+  for (let idx = 0; idx < specs.length; idx += 1) {
+    const spec = specs[idx];
+    // eslint-disable-next-line no-await-in-loop
+    const nextTree = await materializePivotTreeAsync({
+      batches: [factBatchFromStore({ store, spec })],
+      metricsForQuery: spec.metrics,
+      formData,
+      measureHierarchy: layout.measureHierarchy,
+      materializedMetrics: spec.meta.materializedMetrics,
+      materializedMeasureHierarchy: spec.meta.materializedMeasureHierarchy,
+      rowSubtotalLevels: spec.meta.rowSubtotalLevels,
+      colSubtotalLevels: spec.meta.colSubtotalLevels,
+      pivotProgram: spec.meta.pivotProgram,
+      chunkSize,
+      shouldContinue,
+      yieldToMain,
+    });
+    // eslint-disable-next-line no-await-in-loop
+    await yieldChunkedWork({ shouldContinue, yieldToMain });
+    mergedTree = mergeTrees(mergedTree, nextTree);
+  }
+  if (mergedTree.rows[rootKey]) {
+    mergedTree.rows[rootKey] = {
+      ...mergedTree.rows[rootKey],
+      label: 'Grand total',
+      formattedLabel: 'Grand total',
+    };
+  }
+  if (mergedTree.cols[rootKey]) {
+    mergedTree.cols[rootKey] = {
+      ...mergedTree.cols[rootKey],
+      label: 'Grand total',
+      formattedLabel: 'Grand total',
+    };
+  }
+  await yieldChunkedWork({ shouldContinue, yieldToMain });
   return applyMeasureLeafValuesToTree({
     tree: mergedTree,
     measureHierarchy: layout.measureHierarchy,

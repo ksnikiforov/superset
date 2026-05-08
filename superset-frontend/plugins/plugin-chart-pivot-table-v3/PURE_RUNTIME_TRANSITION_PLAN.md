@@ -131,8 +131,13 @@ Current interactivity checkpoint:
   materialization lifecycle. Fetched results yield back to the browser before
   materialization and again before commit, and stale layout requests can be
   rejected before the expensive materializer runs or before a stale result
-  commits. This is the first non-blocking lane, not full chunked/worker
-  materialization yet.
+  commits.
+- Current implementation extension: result ingestion, fact-store upsert, and
+  fact-to-tree materialization now have a cooperative chunked async path for
+  seamless layout refreshes. Large result sets yield between chunks and check the
+  active request token before continuing. This reduces main-thread monopolies,
+  but it is not a Web Worker yet; JSON parsing and each individual chunk still
+  run on the main thread.
 
 ### Queries must follow visibility
 
@@ -268,10 +273,10 @@ mutation out of React hooks and then delete the hook-local branches.
 
 Current visible diff from baseline `3affd1cc6db691fe08eddf0914e2050207f95ed0`:
 
-- Full plugin: `113` files changed, `10718` insertions, `4789` deletions.
-- Production `src`: `39` files changed, `5332` insertions, `4004`
+- Full plugin: `114` files changed, `11382` insertions, `4823` deletions.
+- Production `src`: `40` files changed, `5894` insertions, `4037`
   deletions.
-- Tests: `73` files changed, `4749` insertions, `773` deletions.
+- Tests: `73` files changed, `4841` insertions, `774` deletions.
 
 The total diff is still net additive because the refactor added runtime
 infrastructure and protective tests. That is acceptable only if the next changes
@@ -280,7 +285,7 @@ remains a non-goal.
 
 ### Completion Reassessment
 
-Overall transition completion estimate: **69%**.
+Overall transition completion estimate: **70%**.
 
 This is a functionality/architecture completion estimate, not a line-deletion
 score. The completed work has moved the runtime toward a compiler/fact-store
@@ -293,7 +298,7 @@ large files and in the not-yet-built reducer/controller split.
 | Gate 2: query planning from program/coverage |        87% | Initial/root/branch/batch query paths use coverage metadata and canonical paths. Remaining complexity is mostly support/totals coverage composition and old fetched-depth compatibility in expansion planning.                      |
 | Gate 3: central fact ingestion/store         |        91% | Fetch paths return fact batches, fact-store hits and cache hits reuse exact coverage, ingestion is isolated, and materializer handoff is explicit. Remaining coupling is mostly initial wrapper compatibility and tree-shaped APIs. |
 | Gate 4: one tree materializer                |        77% | `materializePivotTree.ts` owns fact-to-tree materialization, Values/metric/measure axes, subtotal leaf injection, and row subtotal labeling. Remaining work is export parity and demoting test-only raw fixtures.                   |
-| Gate 5: expansion reducer/runtime effects    |        54% | Expansion has stronger pure helpers, typed coverage, shared latest-request lifecycles for seamless/expansion fetches, and a scheduled latest-only materialization lane. The hook still owns loading, persistence, hydration loops, and layout transition responsibilities. |
+| Gate 5: expansion reducer/runtime effects    |        58% | Expansion has stronger pure helpers, typed coverage, shared latest-request lifecycles for seamless/expansion fetches, and a scheduled chunked materialization lane. The hook still owns loading, persistence, hydration loops, and layout transition responsibilities. |
 | Gate 6: pure render model                    |        64% | Projection now drives loaded-state, toggle eligibility, collapsed Values, and column display behavior. `visibility.ts`, `usePivotLayout`, and `usePivotRenderModel` still duplicate some inference/presentation policy.             |
 | Gate 7: chart component cleanup              |        25% | `PivotTableChart.tsx` is smaller than baseline but still owns controller-level responsibilities, committed-tree sync, seamless refresh, runtime layout checks, and interaction wiring.                                              |
 
@@ -330,7 +335,7 @@ Gate status:
   measure-axis, and subtotal helpers live under the materializer boundary.
   The broad `src/utils.ts` utility surface no longer re-exports the raw-record
   tree builders or subtotal materialization helpers.
-- Gate 5 is started but still the largest source of complexity (`54%`).
+- Gate 5 is started but still the largest source of complexity (`58%`).
   `useExpansionEngine` no longer infers fetched state from rendered trees and
   the planner no longer consumes raw fetched-depth maps, but the hook still owns
   layout trimming, local tree projection, fetched-coverage remapping, same-axis
@@ -1001,6 +1006,11 @@ Current status:
 - Seamless result materialization is now scheduled through a second latest-only
   lifecycle, so stale layout edits can cancel pending materialization before it
   starts or before it commits.
+- Seamless initial runtime materialization now uses chunked async ingestion,
+  chunked fact-store upsert, and chunked fact-to-tree construction. Subsequent
+  layout edits are planned against the pending layout baseline, so dragging again
+  during a load cancels/replaces the stale plan instead of being misclassified as
+  a local projection.
 - Remaining deletion target is the reducer/controller split: expansion state,
   pending coverage, persistence, and materialization scheduling still live across
   `PivotTableChart.tsx` and `useExpansionEngine.ts`.

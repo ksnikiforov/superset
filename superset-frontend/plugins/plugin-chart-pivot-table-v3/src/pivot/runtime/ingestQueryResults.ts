@@ -37,7 +37,14 @@ import {
 import {
   factStoreSelectorFromSpec,
   materializeInitialPivotTreeFromFactStore,
+  materializeInitialPivotTreeFromFactStoreAsync,
 } from './materializePivotTree';
+import {
+  assertChunkedWorkCurrent,
+  type ChunkedWorkOptions,
+  maybeYieldChunkedWork,
+  yieldChunkedWork,
+} from './chunkedWork';
 
 export { buildPivotFactKey, createPivotFactStore } from './factStore';
 export type {
@@ -48,10 +55,12 @@ export type {
 } from './factStore';
 
 export type QueryResultWithData = {
-  data?: DataRecord[];
-  query?: {
-    query_name?: unknown;
-  };
+  data?: DataRecord[] | Record<string, unknown>[];
+  query?:
+    | string
+    | {
+        query_name?: unknown;
+      };
   query_name?: unknown;
 };
 
@@ -66,7 +75,11 @@ type QueryResultFallback = 'index' | 'empty';
 export const getQueryResultName = (
   result: QueryResultWithData,
 ): string | undefined => {
-  if (typeof result.query?.query_name === 'string') {
+  if (
+    typeof result.query === 'object' &&
+    result.query !== null &&
+    typeof result.query.query_name === 'string'
+  ) {
     return result.query.query_name;
   }
   if (typeof result.query_name === 'string') {
@@ -136,7 +149,7 @@ const factsFromRecords = ({
   coverage: PivotFactCoverage;
   materializedMetrics: QueryFormMetric[];
 }): PivotFact[] => {
-  const records = result.data ?? [];
+  const records = (result.data ?? []) as DataRecord[];
   const valueKeys = getMetricValueKeysFromRecord(records[0], metrics);
   const visibleValueKeys = new Set(getMetricKeys(materializedMetrics));
   const rowColumns = coverage.rowDimensions;
@@ -157,6 +170,54 @@ const factsFromRecords = ({
   });
 };
 
+const factsFromRecordsAsync = async ({
+  result,
+  metrics,
+  coverage,
+  materializedMetrics,
+  chunkSize,
+  shouldContinue,
+  yieldToMain,
+}: {
+  result: QueryResultWithData;
+  metrics: QueryFormMetric[];
+  coverage: PivotFactCoverage;
+  materializedMetrics: QueryFormMetric[];
+} & ChunkedWorkOptions): Promise<PivotFact[]> => {
+  const records = (result.data ?? []) as DataRecord[];
+  const valueKeys = getMetricValueKeysFromRecord(records[0], metrics);
+  const visibleValueKeys = new Set(getMetricKeys(materializedMetrics));
+  const rowColumns = coverage.rowDimensions;
+  const columnColumns = coverage.columnDimensions;
+  const roleForValueKey = (valueKey: string): PivotFactRole =>
+    visibleValueKeys.has(valueKey) ? 'visible' : 'support';
+  const facts: PivotFact[] = [];
+
+  for (let idx = 0; idx < records.length; idx += 1) {
+    const record = records[idx];
+    const rowPath = pathFromRecord(record, rowColumns);
+    const columnPath = pathFromRecord(record, columnColumns);
+    valueKeys.forEach(valueKey => {
+      facts.push({
+        rowPath,
+        columnPath,
+        valueKey,
+        value: record[valueKey],
+        role: roleForValueKey(valueKey),
+      });
+    });
+    // eslint-disable-next-line no-await-in-loop
+    await maybeYieldChunkedWork({
+      processed: idx + 1,
+      chunkSize,
+      shouldContinue,
+      yieldToMain,
+    });
+  }
+  assertChunkedWorkCurrent(shouldContinue);
+  return facts;
+};
+
 export const ingestQueryResultFacts = ({
   spec,
   result,
@@ -169,6 +230,22 @@ export const ingestQueryResultFacts = ({
     metrics: spec.metrics,
     coverage: spec.meta.coverage,
     materializedMetrics: spec.meta.materializedMetrics,
+  });
+
+export const ingestQueryResultFactsAsync = ({
+  spec,
+  result,
+  ...options
+}: {
+  spec: PlannedQuerySpec;
+  result: QueryResultWithData;
+} & ChunkedWorkOptions): Promise<PivotFact[]> =>
+  factsFromRecordsAsync({
+    result,
+    metrics: spec.metrics,
+    coverage: spec.meta.coverage,
+    materializedMetrics: spec.meta.materializedMetrics,
+    ...options,
   });
 
 export const ingestQueryResults = <T extends QueryResultWithData>({
@@ -193,6 +270,52 @@ export const ingestQueryResults = <T extends QueryResultWithData>({
       facts: ingestQueryResultFacts({ spec, result }),
     };
   });
+};
+
+export const ingestQueryResultsAsync = async <T extends QueryResultWithData>({
+  specs,
+  results,
+  fallback,
+  chunkSize,
+  shouldContinue,
+  yieldToMain,
+}: {
+  specs: PlannedQuerySpec[];
+  results: T[];
+  fallback?: QueryResultFallback;
+} & ChunkedWorkOptions): Promise<
+  IngestedQueryResult<QueryResultWithData>[]
+> => {
+  const orderedResults = orderQueryResultsForSpecs({
+    specs,
+    results,
+    fallback,
+  });
+  const ingested: IngestedQueryResult<QueryResultWithData>[] = [];
+  for (let idx = 0; idx < specs.length; idx += 1) {
+    const spec = specs[idx];
+    const result = orderedResults[idx] ?? {};
+    ingested.push({
+      spec,
+      result,
+      // eslint-disable-next-line no-await-in-loop
+      facts: await ingestQueryResultFactsAsync({
+        spec,
+        result,
+        chunkSize,
+        shouldContinue,
+        yieldToMain,
+      }),
+    });
+    // eslint-disable-next-line no-await-in-loop
+    await maybeYieldChunkedWork({
+      processed: idx + 1,
+      chunkSize,
+      shouldContinue,
+      yieldToMain,
+    });
+  }
+  return ingested;
 };
 
 const factStoreBatchFromIngested = ({
@@ -237,11 +360,60 @@ export const upsertQueryResultsIntoFactStore = <T extends QueryResultWithData>({
   return upsertIngestedFactsIntoStore({ store, ingested });
 };
 
+const upsertFactBatchIntoStoreAsync = async ({
+  store,
+  batch,
+  chunkSize,
+  shouldContinue,
+  yieldToMain,
+}: {
+  store: PivotFactStore;
+  batch: PivotFactStoreBatch;
+} & ChunkedWorkOptions): Promise<void> => {
+  if (batch.facts.length === 0) {
+    store.upsertBatch(batch);
+    // eslint-disable-next-line no-await-in-loop
+    await yieldChunkedWork({ shouldContinue, yieldToMain });
+    return;
+  }
+  const resolvedChunkSize = chunkSize ?? batch.facts.length;
+  for (let start = 0; start < batch.facts.length; start += resolvedChunkSize) {
+    store.upsertBatch({
+      ...batch,
+      facts: batch.facts.slice(start, start + resolvedChunkSize),
+    });
+    // eslint-disable-next-line no-await-in-loop
+    await yieldChunkedWork({ shouldContinue, yieldToMain });
+  }
+};
+
 const buildFactStore = (
   batches: IngestedQueryResult<QueryResultWithData>[],
 ) => {
   const store = createPivotFactStore();
   upsertIngestedFactsIntoStore({ store, ingested: batches });
+  return store;
+};
+
+const buildFactStoreAsync = async ({
+  ingested,
+  chunkSize,
+  shouldContinue,
+  yieldToMain,
+}: {
+  ingested: IngestedQueryResult<QueryResultWithData>[];
+} & ChunkedWorkOptions) => {
+  const store = createPivotFactStore();
+  for (let idx = 0; idx < ingested.length; idx += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    await upsertFactBatchIntoStoreAsync({
+      store,
+      batch: factStoreBatchFromIngested(ingested[idx]),
+      chunkSize,
+      shouldContinue,
+      yieldToMain,
+    });
+  }
   return store;
 };
 
@@ -265,6 +437,52 @@ export const buildInitialRuntimeFromSpecResults = ({
       store,
       layout,
       formData,
+    }),
+    factBatches,
+  };
+};
+
+export const buildInitialRuntimeFromSpecResultsAsync = async ({
+  specs,
+  results,
+  layout,
+  formData,
+  chunkSize,
+  shouldContinue,
+  yieldToMain,
+}: {
+  specs: PlannedQuerySpec[];
+  results: QueryResultWithData[];
+  layout: LayoutContext;
+  formData: PivotTableQueryFormData;
+} & ChunkedWorkOptions): Promise<{
+  tree: PivotTreeData;
+  factBatches: PivotFactStoreBatch[];
+}> => {
+  const ingested = await ingestQueryResultsAsync({
+    specs,
+    results,
+    chunkSize,
+    shouldContinue,
+    yieldToMain,
+  });
+  const factBatches = ingested.map(factStoreBatchFromIngested);
+  const store = await buildFactStoreAsync({
+    ingested,
+    chunkSize,
+    shouldContinue,
+    yieldToMain,
+  });
+  await yieldChunkedWork({ shouldContinue, yieldToMain });
+  return {
+    tree: await materializeInitialPivotTreeFromFactStoreAsync({
+      specs,
+      store,
+      layout,
+      formData,
+      chunkSize,
+      shouldContinue,
+      yieldToMain,
     }),
     factBatches,
   };

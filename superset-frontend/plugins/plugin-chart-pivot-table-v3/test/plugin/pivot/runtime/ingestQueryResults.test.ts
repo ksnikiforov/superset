@@ -19,11 +19,13 @@
 import { type PlannedQuerySpec } from '../../../../src/pivot/query/specs';
 import { compilePivotProgram } from '../../../../src/pivot/runtime/compilePivotProgram';
 import {
+  buildInitialRuntimeFromSpecResultsAsync,
   createPivotFactStore,
   ingestQueryResults,
   upsertQueryResultsIntoFactStore,
 } from '../../../../src/pivot/runtime/ingestQueryResults';
 import { buildBranchTreeFromFactStore } from '../../../../src/pivot/runtime/materializePivotTree';
+import { buildLayoutContext } from '../../../../src/pivot/layout/LayoutContext';
 import {
   MetricsLayoutEnum,
   type MeasureHierarchy,
@@ -334,4 +336,85 @@ test('materializes column subtotal leaves from planned coverage specs', () => {
     values: expect.objectContaining({ sales: 12 }),
     isSubtotal: true,
   });
+});
+
+test('chunked initial runtime materialization yields while preserving facts and tree output', async () => {
+  const spec = buildSpec({
+    queryName: 'pivot_v3|1|1',
+    rowDepth: 1,
+    colDepth: 1,
+    rowGroupby: ['country'],
+    colGroupby: ['month'],
+  });
+  const formData = buildFormData({
+    groupbyRows: ['country', METRICS_PLACEHOLDER],
+    groupbyColumns: ['month'],
+    metrics: ['sales'],
+    metricsLayout: MetricsLayoutEnum.ROWS,
+  });
+  const yieldToMain = jest.fn(async () => undefined);
+
+  const runtime = await buildInitialRuntimeFromSpecResultsAsync({
+    specs: [spec],
+    results: [
+      {
+        query_name: spec.queryName,
+        data: [
+          { country: 'France', month: '2026-01', sales: 12 },
+          { country: 'Spain', month: '2026-02', sales: 7 },
+        ],
+      },
+    ],
+    layout: buildLayoutContext(formData),
+    formData,
+    chunkSize: 1,
+    yieldToMain,
+  });
+
+  const rowKey = serializePath(['France', encodeMetricKey('sales')]);
+  const colKey = serializePath(['2026-01']);
+  expect(runtime.factBatches).toHaveLength(1);
+  expect(runtime.factBatches[0].facts).toHaveLength(2);
+  expect(runtime.tree.cells[serializeCellKey(rowKey, colKey)]?.values).toEqual(
+    expect.objectContaining({ sales: 12 }),
+  );
+  expect(yieldToMain.mock.calls.length).toBeGreaterThan(3);
+});
+
+test('chunked initial runtime materialization aborts stale work before commit', async () => {
+  const spec = buildSpec({
+    queryName: 'pivot_v3|1|1',
+    rowDepth: 1,
+    colDepth: 1,
+    rowGroupby: ['country'],
+    colGroupby: ['month'],
+  });
+  const formData = buildFormData({
+    groupbyRows: ['country', METRICS_PLACEHOLDER],
+    groupbyColumns: ['month'],
+    metrics: ['sales'],
+    metricsLayout: MetricsLayoutEnum.ROWS,
+  });
+  let current = true;
+  const yieldToMain = jest.fn(async () => {
+    current = false;
+  });
+
+  await expect(
+    buildInitialRuntimeFromSpecResultsAsync({
+      specs: [spec],
+      results: [
+        {
+          query_name: spec.queryName,
+          data: [{ country: 'France', month: '2026-01', sales: 12 }],
+        },
+      ],
+      layout: buildLayoutContext(formData),
+      formData,
+      chunkSize: 1,
+      shouldContinue: () => current,
+      yieldToMain,
+    }),
+  ).rejects.toMatchObject({ name: 'StaleChunkedWorkError' });
+  expect(yieldToMain).toHaveBeenCalled();
 });

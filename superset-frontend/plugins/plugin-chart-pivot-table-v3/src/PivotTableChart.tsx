@@ -79,7 +79,10 @@ import {
 import { supersetChartDataClient } from './pivot/data/SupersetChartDataClient';
 import { normalizeFormDataExtraFilters } from './pivot/query/normalizeExtraFormData';
 import { type QuerySpec } from './pivot/query/types';
-import { type ChartDataWarning } from './pivot/data/ChartDataClient';
+import {
+  type ChartDataQueryResult,
+  type ChartDataWarning,
+} from './pivot/data/ChartDataClient';
 import {
   applyDimensionDrag,
   applyValueDrag,
@@ -105,13 +108,14 @@ import {
   resolveMeasureSortMetricKey,
 } from './pivot/measureLeaves';
 import {
-  buildInitialRuntimeFromSpecResults,
+  buildInitialRuntimeFromSpecResultsAsync,
   type PivotFactStoreBatch,
 } from './pivot/runtime/ingestQueryResults';
 import {
   createLatestRequestLifecycle,
   executeLatestRequest,
   executeScheduledLatestRequest,
+  yieldToMainThread,
 } from './pivot/runtime/requestLifecycle';
 import { stableStringify } from './pivot/shared/stableStringify';
 
@@ -1075,7 +1079,8 @@ function PivotTableChart(props: PivotTableProps) {
   const seamlessRequestLifecycle = useMemo(
     () =>
       createLatestRequestLifecycle({
-        cancel: requestGroupId => supersetChartDataClient.cancel(requestGroupId),
+        cancel: requestGroupId =>
+          supersetChartDataClient.cancel(requestGroupId),
       }),
     [],
   );
@@ -1235,6 +1240,11 @@ function PivotTableChart(props: PivotTableProps) {
     useState<PivotRuntimeLayout>(runtimeLayout);
   const [uiRuntimeLayout, setUiRuntimeLayout] =
     useState<PivotRuntimeLayout>(runtimeLayout);
+  const uiRuntimeLayoutRef = useRef(runtimeLayout);
+  const updateUiRuntimeLayout = useCallback((layout: PivotRuntimeLayout) => {
+    uiRuntimeLayoutRef.current = layout;
+    setUiRuntimeLayout(layout);
+  }, []);
   const [uiSelectedFilters, setUiSelectedFilters] = useState<
     Record<string, DataRecordValue[]>
   >(selectedFilters ?? EMPTY_SELECTED_FILTERS);
@@ -1614,8 +1624,13 @@ function PivotTableChart(props: PivotTableProps) {
     if (pendingSeamlessLayoutRef.current) {
       return;
     }
-    setUiRuntimeLayout(runtimeLayout);
-  }, [isDashboardContext, isUserControlled, runtimeLayout]);
+    updateUiRuntimeLayout(runtimeLayout);
+  }, [
+    isDashboardContext,
+    isUserControlled,
+    runtimeLayout,
+    updateUiRuntimeLayout,
+  ]);
 
   const persistedSelectedFilters = useMemo(() => {
     if (!isUserControlled) {
@@ -1828,9 +1843,7 @@ function PivotTableChart(props: PivotTableProps) {
           }),
         onError: error => {
           setSeamlessError(
-            error instanceof Error
-              ? error.message
-              : t('Failed to update data'),
+            error instanceof Error ? error.message : t('Failed to update data'),
           );
         },
       });
@@ -1847,18 +1860,20 @@ function PivotTableChart(props: PivotTableProps) {
       await executeScheduledLatestRequest({
         lifecycle: seamlessMaterializationLifecycle,
         requestGroupId: SEAMLESS_MATERIALIZATION_GROUP,
-        run: () =>
-          buildInitialRuntimeFromSpecResults({
+        run: token =>
+          buildInitialRuntimeFromSpecResultsAsync({
             results,
             specs,
             layout,
             formData: resolvedFormDataWithOffsets,
+            shouldContinue: token.isCurrent,
+            yieldToMain: yieldToMainThread,
           }),
         onSuccess: ({ tree: nextTree, factBatches: nextFactBatches }) => {
           unstable_batchedUpdates(() => {
             setCommittedTree(nextTree);
             setCommittedFactBatches(nextFactBatches);
-            setUiRuntimeLayout(normalized);
+            updateUiRuntimeLayout(normalized);
             setCommittedFilters(nextFilters);
             setSeamlessWarnings(collectWarnings(results));
             persistRuntimeState(normalized, nextFilters);
@@ -1876,9 +1891,7 @@ function PivotTableChart(props: PivotTableProps) {
         },
         onError: error => {
           setSeamlessError(
-            error instanceof Error
-              ? error.message
-              : t('Failed to update data'),
+            error instanceof Error ? error.message : t('Failed to update data'),
           );
         },
         onSettled: () => {
@@ -1903,6 +1916,7 @@ function PivotTableChart(props: PivotTableProps) {
       setSeamlessWarnings,
       upstreamSeamlessSignature,
       upstreamDashboardQueryContextSignature,
+      updateUiRuntimeLayout,
     ],
   );
   const staleCoverageRecoverySignatureRef = useRef<string | null>(null);
@@ -1914,12 +1928,14 @@ function PivotTableChart(props: PivotTableProps) {
         dimensionKeys,
         metricKeys,
       );
+      const fetchBaselineLayout =
+        pendingSeamlessLayoutRef.current ?? committedRuntimeLayout;
       const skipMetricOrderCommit =
         isUserControlled &&
         queryFormData &&
-        isMetricOrderOnlyChange(committedRuntimeLayout, normalized);
+        isMetricOrderOnlyChange(fetchBaselineLayout, normalized);
       const needsStructuralFetch = shouldFetchForLayoutChange(
-        committedRuntimeLayout,
+        fetchBaselineLayout,
         normalized,
       );
       const projectionTree =
@@ -1930,16 +1946,16 @@ function PivotTableChart(props: PivotTableProps) {
         !needsStructuralFetch &&
         !canProjectValueAxisShrinkWithoutFetch({
           tree: projectionTree,
-          prev: committedRuntimeLayout,
+          prev: fetchBaselineLayout,
           next: normalized,
         });
       if (needsStructuralFetch || needsProjectionFetch) {
         pendingSeamlessLayoutRef.current = normalized;
-        setUiRuntimeLayout(normalized);
+        updateUiRuntimeLayout(normalized);
         applySeamlessUpdate(normalized, uiSelectedFilters);
         return;
       }
-      setUiRuntimeLayout(normalized);
+      updateUiRuntimeLayout(normalized);
       if (skipMetricOrderCommit) {
         return;
       }
@@ -1963,6 +1979,7 @@ function PivotTableChart(props: PivotTableProps) {
       queryFormData,
       isUserControlled,
       uiSelectedFilters,
+      updateUiRuntimeLayout,
       upstreamSeamlessSignature,
     ],
   );
@@ -2826,35 +2843,33 @@ function PivotTableChart(props: PivotTableProps) {
     [colChips, rowChips],
   );
 
-  const removeDimensionFromLayout = useCallback(
-    (dimensionKey: string) => {
-      const rowIndex = uiRuntimeLayout.rows.indexOf(dimensionKey);
-      const colIndex = uiRuntimeLayout.cols.indexOf(dimensionKey);
-      if (rowIndex < 0 && colIndex < 0) {
-        return uiRuntimeLayout;
+  const removeDimensionFromLayout = useCallback((dimensionKey: string) => {
+    const currentLayout = uiRuntimeLayoutRef.current;
+    const rowIndex = currentLayout.rows.indexOf(dimensionKey);
+    const colIndex = currentLayout.cols.indexOf(dimensionKey);
+    if (rowIndex < 0 && colIndex < 0) {
+      return currentLayout;
+    }
+    const nextRows = currentLayout.rows.filter(key => key !== dimensionKey);
+    const nextCols = currentLayout.cols.filter(key => key !== dimensionKey);
+    const nextValuePlacement = { ...currentLayout.valuePlacement };
+    if (rowIndex >= 0 && nextValuePlacement.axis === 'row') {
+      if (rowIndex < nextValuePlacement.index) {
+        nextValuePlacement.index = Math.max(0, nextValuePlacement.index - 1);
       }
-      const nextRows = uiRuntimeLayout.rows.filter(key => key !== dimensionKey);
-      const nextCols = uiRuntimeLayout.cols.filter(key => key !== dimensionKey);
-      const nextValuePlacement = { ...uiRuntimeLayout.valuePlacement };
-      if (rowIndex >= 0 && nextValuePlacement.axis === 'row') {
-        if (rowIndex < nextValuePlacement.index) {
-          nextValuePlacement.index = Math.max(0, nextValuePlacement.index - 1);
-        }
+    }
+    if (colIndex >= 0 && nextValuePlacement.axis === 'col') {
+      if (colIndex < nextValuePlacement.index) {
+        nextValuePlacement.index = Math.max(0, nextValuePlacement.index - 1);
       }
-      if (colIndex >= 0 && nextValuePlacement.axis === 'col') {
-        if (colIndex < nextValuePlacement.index) {
-          nextValuePlacement.index = Math.max(0, nextValuePlacement.index - 1);
-        }
-      }
-      return {
-        ...uiRuntimeLayout,
-        rows: nextRows,
-        cols: nextCols,
-        valuePlacement: nextValuePlacement,
-      };
-    },
-    [uiRuntimeLayout],
-  );
+    }
+    return {
+      ...currentLayout,
+      rows: nextRows,
+      cols: nextCols,
+      valuePlacement: nextValuePlacement,
+    };
+  }, []);
 
   const handleChipRemove = useCallback(
     (dimensionKey: string) => {
@@ -2874,7 +2889,7 @@ function PivotTableChart(props: PivotTableProps) {
       sourceAxis?: PivotAxis,
       sourceChipIndex?: number,
     ) => {
-      const nextLayout = applyDimensionDrag(uiRuntimeLayout, {
+      const nextLayout = applyDimensionDrag(uiRuntimeLayoutRef.current, {
         dimensionKey,
         targetAxis,
         targetChipIndex,
@@ -2885,7 +2900,7 @@ function PivotTableChart(props: PivotTableProps) {
       });
       handleRuntimeLayoutChange(nextLayout);
     },
-    [handleRuntimeLayoutChange, metricsAvailable, uiRuntimeLayout],
+    [handleRuntimeLayoutChange, metricsAvailable],
   );
 
   const handleValueDrop = useCallback(
@@ -2895,7 +2910,7 @@ function PivotTableChart(props: PivotTableProps) {
       sourceAxis: PivotAxis,
       sourceChipIndex?: number,
     ) => {
-      const nextLayout = applyValueDrag(uiRuntimeLayout, {
+      const nextLayout = applyValueDrag(uiRuntimeLayoutRef.current, {
         targetAxis,
         targetChipIndex,
         sourceAxis,
@@ -2904,7 +2919,7 @@ function PivotTableChart(props: PivotTableProps) {
       });
       handleRuntimeLayoutChange(nextLayout);
     },
-    [handleRuntimeLayoutChange, metricsAvailable, uiRuntimeLayout],
+    [handleRuntimeLayoutChange, metricsAvailable],
   );
 
   const [, dropOnRowStrip] = useDrop<DragItem, void, unknown>({

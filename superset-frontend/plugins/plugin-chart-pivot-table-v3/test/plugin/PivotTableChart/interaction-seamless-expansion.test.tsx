@@ -3367,10 +3367,13 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     await waitFor(() => {
       expect(within(colStrip).getByText('c1')).toBeInTheDocument();
       expect(within(colStrip).getByText('Value')).toBeInTheDocument();
+      expect((colStrip.textContent ?? '').indexOf('c1')).toBeLessThan(
+        (colStrip.textContent ?? '').indexOf('Value'),
+      );
     });
 
     const getColChips = () =>
-      screen
+      within(colStrip)
         .getAllByLabelText('Remove dimension')
         .map(button => button.parentElement)
         .filter((node): node is HTMLElement => Boolean(node));
@@ -3411,6 +3414,11 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     fireEvent.drop(c1Chip, { dataTransfer });
     fireEvent.dragEnd(valueChip, { dataTransfer });
 
+    await waitFor(() => {
+      expect((colStrip.textContent ?? '').indexOf('Value')).toBeLessThan(
+        (colStrip.textContent ?? '').indexOf('c1'),
+      );
+    });
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     const afterMoveCall = fetchMock.mock.calls.at(-1)?.[0];
     expect(afterMoveCall?.formData?.metricsLayout).toBe(
