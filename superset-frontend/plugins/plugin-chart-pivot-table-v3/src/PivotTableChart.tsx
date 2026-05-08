@@ -79,10 +79,7 @@ import {
 import { supersetChartDataClient } from './pivot/data/SupersetChartDataClient';
 import { normalizeFormDataExtraFilters } from './pivot/query/normalizeExtraFormData';
 import { type QuerySpec } from './pivot/query/types';
-import {
-  type ChartDataQueryResult,
-  type ChartDataWarning,
-} from './pivot/data/ChartDataClient';
+import { type ChartDataWarning } from './pivot/data/ChartDataClient';
 import {
   applyDimensionDrag,
   applyValueDrag,
@@ -107,23 +104,14 @@ import {
   coerceMeasureLeavesByMetric,
   resolveMeasureSortMetricKey,
 } from './pivot/measureLeaves';
-import {
-  buildInitialRuntimeFromSpecResultsAsync,
-  type PivotFactStoreBatch,
-} from './pivot/runtime/ingestQueryResults';
-import {
-  createLatestRequestLifecycle,
-  executeLatestRequest,
-  executeScheduledLatestRequest,
-  yieldToMainThread,
-} from './pivot/runtime/requestLifecycle';
+import { type PivotFactStoreBatch } from './pivot/runtime/ingestQueryResults';
+import { createLatestRequestLifecycle } from './pivot/runtime/requestLifecycle';
+import { fetchAndMaterializeSeamlessRuntimeUpdate } from './pivot/runtime/seamlessRuntimeUpdate';
 import { stableStringify } from './pivot/shared/stableStringify';
 
 const PANEL_WIDTH = 230;
 const TOP_CHIPS_HEIGHT = 36;
 const SIDE_CHIPS_WIDTH = 24;
-const SEAMLESS_REQUEST_GROUP = 'pivot-v3-seamless';
-const SEAMLESS_MATERIALIZATION_GROUP = 'pivot-v3-seamless-materialize';
 const DIMENSION_VALUES_REQUEST_GROUP = 'pivot-v3-dimension-values';
 const DIMENSION_VALUES_QUERY_PREFIX = 'pivot_v3|dimension-values';
 const EMPTY_FILTER_VALUES: DataRecordValue[] = [];
@@ -266,9 +254,6 @@ const treeHasRequiredMeasureLeafSourceData = ({
   });
   return unresolved.size === 0;
 };
-
-const collectWarnings = (results: ChartDataQueryResult[]): ChartDataWarning[] =>
-  results.flatMap(result => result.warnings ?? []);
 
 const InteractionLayout = styled.div`
   display: flex;
@@ -1827,78 +1812,52 @@ function PivotTableChart(props: PivotTableProps) {
           });
         }
       }
-      const fetchResult = await executeLatestRequest({
-        lifecycle: seamlessRequestLifecycle,
-        requestGroupId: SEAMLESS_REQUEST_GROUP,
-        onStart: () => {
-          seamlessMaterializationLifecycle.invalidate();
+      const updateResult = await fetchAndMaterializeSeamlessRuntimeUpdate({
+        requestLifecycle: seamlessRequestLifecycle,
+        materializationLifecycle: seamlessMaterializationLifecycle,
+        formData: resolvedFormDataWithOffsets,
+        specs,
+        layout,
+        fetchData: params => supersetChartDataClient.fetch(params),
+        onFetchStart: () => {
           setSeamlessLoading(true);
           setSeamlessError(undefined);
         },
-        run: () =>
-          supersetChartDataClient.fetch({
-            formData: resolvedFormDataWithOffsets,
-            specs,
-            requestGroupId: SEAMLESS_REQUEST_GROUP,
-          }),
         onError: error => {
           setSeamlessError(
             error instanceof Error ? error.message : t('Failed to update data'),
           );
         },
       });
-      if (fetchResult.status === 'stale') {
+      if (updateResult.status === 'stale') {
         return;
       }
-      if (fetchResult.status !== 'success') {
+      if (updateResult.status !== 'success') {
         pendingSeamlessLayoutRef.current = null;
         setSeamlessLoading(false);
         return;
       }
 
-      const results = fetchResult.value;
-      await executeScheduledLatestRequest({
-        lifecycle: seamlessMaterializationLifecycle,
-        requestGroupId: SEAMLESS_MATERIALIZATION_GROUP,
-        run: token =>
-          buildInitialRuntimeFromSpecResultsAsync({
-            results,
-            specs,
-            layout,
-            formData: resolvedFormDataWithOffsets,
-            shouldContinue: token.isCurrent,
-            yieldToMain: yieldToMainThread,
-          }),
-        onSuccess: ({ tree: nextTree, factBatches: nextFactBatches }) => {
-          unstable_batchedUpdates(() => {
-            setCommittedTree(nextTree);
-            setCommittedFactBatches(nextFactBatches);
-            updateUiRuntimeLayout(normalized);
-            setCommittedFilters(nextFilters);
-            setSeamlessWarnings(collectWarnings(results));
-            persistRuntimeState(normalized, nextFilters);
-          });
-          lastLocalSyncDashboardQueryContextRef.current =
-            upstreamDashboardQueryContextSignature;
-          lastSeamlessSyncRef.current = {
-            filtersSignature:
-              Object.keys(nextFilters).length > 0
-                ? stableStringify(nextFilters)
-                : null,
-            layoutSignature: stableStringify(normalized),
-            upstreamSignature: upstreamSeamlessSignature,
-          };
-        },
-        onError: error => {
-          setSeamlessError(
-            error instanceof Error ? error.message : t('Failed to update data'),
-          );
-        },
-        onSettled: () => {
-          pendingSeamlessLayoutRef.current = null;
-          setSeamlessLoading(false);
-        },
+      unstable_batchedUpdates(() => {
+        setCommittedTree(updateResult.tree);
+        setCommittedFactBatches(updateResult.factBatches);
+        updateUiRuntimeLayout(normalized);
+        setCommittedFilters(nextFilters);
+        setSeamlessWarnings(updateResult.warnings);
+        persistRuntimeState(normalized, nextFilters);
       });
+      lastLocalSyncDashboardQueryContextRef.current =
+        upstreamDashboardQueryContextSignature;
+      lastSeamlessSyncRef.current = {
+        filtersSignature:
+          Object.keys(nextFilters).length > 0
+            ? stableStringify(nextFilters)
+            : null,
+        layoutSignature: stableStringify(normalized),
+        upstreamSignature: upstreamSeamlessSignature,
+      };
+      pendingSeamlessLayoutRef.current = null;
+      setSeamlessLoading(false);
     },
     [
       dimensionKeys,

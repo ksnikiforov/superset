@@ -487,7 +487,3 @@ export const buildInitialRuntimeFromSpecResultsAsync = async ({
     factBatches,
   };
 };
-
-export const buildInitialTreeFromSpecResults = (
-  params: Parameters<typeof buildInitialRuntimeFromSpecResults>[0],
-): PivotTreeData => buildInitialRuntimeFromSpecResults(params).tree;

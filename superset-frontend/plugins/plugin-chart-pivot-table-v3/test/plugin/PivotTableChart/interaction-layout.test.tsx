@@ -16,13 +16,17 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import { type DataRecord } from '@superset-ui/core';
 import { fireEvent, render, screen, waitFor, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
 import { resolveInteractionFormData } from '../../../src/pivot/layout/resolveInteractionLayout';
-import { buildInitialQuerySpecs } from '../../../src/pivot/query/specs';
-import { buildInitialTreeFromSpecResults } from '../../../src/pivot/runtime/ingestQueryResults';
+import {
+  buildInitialQuerySpecs,
+  type PlannedQuerySpec,
+} from '../../../src/pivot/query/specs';
+import { buildInitialRuntimeFromSpecResults } from '../../../src/pivot/runtime/ingestQueryResults';
 import { mergeTrees } from '../../../src/utils';
 import { MetricsLayoutEnum, PivotRuntimeLayout } from '../../../src/types';
 import {
@@ -55,7 +59,7 @@ const buildInitialBootstrapTree = ({
   const layout = buildLayoutContext(resolvedFormData);
   const specs = buildInitialQuerySpecs(resolvedFormData, layout);
 
-  return buildInitialTreeFromSpecResults({
+  return buildInitialRuntimeFromSpecResults({
     specs,
     results: specs.map(spec => ({
       query_name: spec.queryName,
@@ -66,7 +70,7 @@ const buildInitialBootstrapTree = ({
     })),
     layout,
     formData: resolvedFormData,
-  });
+  }).tree;
 };
 
 describe('PivotTableChart interaction layout', () => {
@@ -1903,7 +1907,7 @@ describe('PivotTableChart interaction layout', () => {
               }
             ).meta?.coverage?.columnDepth === 1,
         );
-        const resultsByDepth = includesColumnDepth
+        const resultsByDepth: Record<string, DataRecord[]> = includesColumnDepth
           ? {
               '0|0': [{ m1: 100, m2: 200 }],
               '1|1': [
@@ -1928,9 +1932,7 @@ describe('PivotTableChart interaction layout', () => {
             };
         return specs.map(spec => {
           const { rowDepth, columnDepth } = (
-            spec as {
-              meta: { coverage: { rowDepth: number; columnDepth: number } };
-            }
+            spec as unknown as PlannedQuerySpec
           ).meta.coverage;
           return {
             data: resultsByDepth[`${rowDepth}|${columnDepth}`] ?? [],
@@ -1967,7 +1969,7 @@ describe('PivotTableChart interaction layout', () => {
     await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(1));
     expect(
       new Set(
-        fetchSpy.mock.calls[0][0].specs.map(
+        (fetchSpy.mock.calls[0][0].specs as PlannedQuerySpec[]).map(
           spec =>
             `${spec.meta.coverage.rowDepth}|${spec.meta.coverage.columnDepth}`,
         ),
@@ -1980,7 +1982,7 @@ describe('PivotTableChart interaction layout', () => {
     await waitFor(() => expect(fetchSpy).toHaveBeenCalledTimes(2));
     expect(
       new Set(
-        fetchSpy.mock.calls[1][0].specs.map(
+        (fetchSpy.mock.calls[1][0].specs as PlannedQuerySpec[]).map(
           spec =>
             `${spec.meta.coverage.rowDepth}|${spec.meta.coverage.columnDepth}`,
         ),

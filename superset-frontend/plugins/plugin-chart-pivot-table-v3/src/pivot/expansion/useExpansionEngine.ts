@@ -16,7 +16,14 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react';
 import { nanoid } from 'nanoid';
 import {
   type HandlerFunction,
@@ -92,6 +99,10 @@ import {
   seedFetchedCoverageFromFactBatches as seedFetchedCoverageStateFromFactBatches,
 } from './fetchedRequests';
 import { resolveLayoutTransition } from './layoutTransition';
+import {
+  createExpansionRuntimeState,
+  expansionRuntimeReducer,
+} from './runtimeState';
 
 const MAX_HYDRATION_ITERATIONS = 12;
 const EMPTY_FACT_BATCHES: PivotFactStoreBatch[] = [];
@@ -111,6 +122,200 @@ type BatchFetchResult = {
 };
 
 type CombinedFetchResult = SingleFetchResult | BatchFetchResult;
+
+type TrackExpansionRequest = <T>(
+  requestScope: LatestRequestScope,
+  requestGroupId: string,
+  fetcher: () => Promise<T>,
+) => Promise<T>;
+
+type ExpansionFetchRuntime = {
+  requestScope: LatestRequestScope;
+  fetchFormData: PivotTableQueryFormData;
+  factStore?: PivotFactStore;
+  trackRequestInScope: TrackExpansionRequest;
+  addWarnings: (nextWarnings?: ChartDataWarning[]) => void;
+  updateLoadingKey: (key: string, delta: number) => void;
+};
+
+type ExpansionFetchContext = {
+  tree: PivotTreeData;
+  visibleRowDepth: number;
+  visibleColDepth: number;
+};
+
+const resolveExpansionFetchPlan = ({
+  targets,
+  formData,
+  tree,
+  visibleRowDepth,
+  visibleColDepth,
+  factStore,
+}: {
+  targets: FetchTarget[];
+  formData: PivotTableQueryFormData;
+  tree: PivotTreeData;
+  visibleRowDepth: number;
+  visibleColDepth: number;
+  factStore?: PivotFactStore;
+}): {
+  localResults: SingleFetchResult[];
+  singles: FetchTarget[];
+  batches: BatchGroup[];
+} => {
+  const localResults: SingleFetchResult[] = [];
+  const batchCandidates: BatchCandidate[] = [];
+  for (const target of targets) {
+    const path = parsePath(target.pathKey);
+    const localResult = resolvePivotBranchLocalResult({
+      axis: target.axis,
+      path,
+      formData,
+      currentTree: tree,
+      visibleRowDepth,
+      visibleColDepth,
+      factStore,
+    });
+    if (localResult) {
+      localResults.push({
+        kind: 'single',
+        target,
+        data: localResult.data,
+        factBatches: localResult.factBatches ?? EMPTY_FACT_BATCHES,
+      });
+      continue;
+    }
+    const batchSignature = buildBatchSignature({
+      formData,
+      axis: target.axis,
+      path,
+      currentTree: tree,
+      visibleRowDepth,
+      visibleColDepth,
+    });
+    batchCandidates.push({ ...target, batchSignature });
+  }
+  const { batches, singles } = optimizeFetchPlan({
+    targets: batchCandidates,
+  });
+  return { localResults, singles, batches };
+};
+
+const fetchExpansionSingleTarget = async ({
+  target,
+  context,
+  requestGroupId,
+  runtime,
+}: {
+  target: FetchTarget;
+  context: ExpansionFetchContext;
+  requestGroupId: string;
+  runtime: ExpansionFetchRuntime;
+}): Promise<SingleFetchResult> => {
+  const path = parsePath(target.pathKey);
+  const {
+    addWarnings,
+    factStore,
+    fetchFormData,
+    requestScope,
+    trackRequestInScope,
+    updateLoadingKey,
+  } = runtime;
+  if (requestScope.isCurrent()) {
+    updateLoadingKey(target.pathKey, 1);
+  }
+  try {
+    const result = await trackRequestInScope(requestScope, requestGroupId, () =>
+      fetchPivotBranch({
+        axis: target.axis,
+        path,
+        formData: fetchFormData,
+        currentTree: context.tree,
+        visibleRowDepth: context.visibleRowDepth,
+        visibleColDepth: context.visibleColDepth,
+        requestGroupId,
+        factStore,
+      }),
+    );
+    if (!result) {
+      return {
+        kind: 'single',
+        target,
+        data: undefined,
+        factBatches: EMPTY_FACT_BATCHES,
+      };
+    }
+    if (requestScope.isCurrent()) {
+      addWarnings(result.warnings);
+      if (result.error) {
+        throw result.error;
+      }
+    }
+    return {
+      kind: 'single',
+      target,
+      data: result.data,
+      factBatches: result.factBatches ?? EMPTY_FACT_BATCHES,
+    };
+  } finally {
+    if (requestScope.isCurrent()) {
+      updateLoadingKey(target.pathKey, -1);
+    }
+  }
+};
+
+const fetchExpansionBatchTarget = async ({
+  batch,
+  context,
+  requestGroupId,
+  runtime,
+}: {
+  batch: BatchGroup;
+  context: ExpansionFetchContext;
+  requestGroupId: string;
+  runtime: ExpansionFetchRuntime;
+}): Promise<BatchFetchResult> => {
+  const {
+    addWarnings,
+    factStore,
+    fetchFormData,
+    requestScope,
+    trackRequestInScope,
+    updateLoadingKey,
+  } = runtime;
+  if (requestScope.isCurrent()) {
+    batch.targets.forEach(target => updateLoadingKey(target.pathKey, 1));
+  }
+  try {
+    const result = await trackRequestInScope(requestScope, requestGroupId, () =>
+      fetchPivotBranchesBatch({
+        formData: fetchFormData,
+        batch,
+        currentTree: context.tree,
+        visibleRowDepth: context.visibleRowDepth,
+        visibleColDepth: context.visibleColDepth,
+        requestGroupId,
+        factStore,
+      }),
+    );
+    if (requestScope.isCurrent()) {
+      addWarnings(result.warnings);
+      if (result.error) {
+        throw result.error;
+      }
+    }
+    return {
+      kind: 'batch',
+      batch,
+      data: result.data,
+      factBatches: result.factBatches ?? EMPTY_FACT_BATCHES,
+    };
+  } finally {
+    if (requestScope.isCurrent()) {
+      batch.targets.forEach(target => updateLoadingKey(target.pathKey, -1));
+    }
+  }
+};
 
 export type ExpansionEngineResult = {
   tree: PivotTreeData;
@@ -204,16 +409,22 @@ export const useExpansionEngine = ({
   const [expandedCols, setExpandedCols] = useState<Set<string>>(new Set());
   const expandedRowsRef = useRef(expandedRows);
   const expandedColsRef = useRef(expandedCols);
-  const [pendingRows, setPendingRows] = useState<Set<string>>(new Set());
-  const [pendingCols, setPendingCols] = useState<Set<string>>(new Set());
+  const [runtimeState, dispatchRuntimeState] = useReducer(
+    expansionRuntimeReducer,
+    undefined,
+    createExpansionRuntimeState,
+  );
+  const { loadingCounts, pendingCols, pendingRows, isHydrating } = runtimeState;
+  const loadingKeys = useMemo(
+    () => new Set(loadingCounts.keys()),
+    [loadingCounts],
+  );
   const pendingRowsRef = useRef(pendingRows);
   const pendingColsRef = useRef(pendingCols);
   const explicitExpandedRowsRef = useRef<Set<string>>(new Set());
   const explicitExpandedColsRef = useRef<Set<string>>(new Set());
   const explicitCollapsedRowsRef = useRef<Set<string>>(new Set());
   const explicitCollapsedColsRef = useRef<Set<string>>(new Set());
-  const [loadingKeys, setLoadingKeys] = useState<Set<string>>(new Set());
-  const loadingCountsRef = useRef<Map<string, number>>(new Map());
   const inFlightRowsRef = useRef(0);
   const inFlightColsRef = useRef(0);
   const inFlightExpandedRowsRef = useRef<Map<number, Set<string>>>(new Map());
@@ -222,7 +433,6 @@ export const useExpansionEngine = ({
   const [errorMessage, setErrorMessage] = useState<string>();
   const [warnings, setWarnings] = useState<ChartDataWarning[]>([]);
   const warningsRef = useRef<Map<string, ChartDataWarning>>(new Map());
-  const [isHydrating, setIsHydrating] = useState(false);
   const prevAutoExpandRowsRef = useRef<number | null>(null);
   const prevAutoExpandColsRef = useRef<number | null>(null);
   const prevExpandRowsLevelRawRef = useRef<number | undefined>(undefined);
@@ -236,7 +446,8 @@ export const useExpansionEngine = ({
   const expansionRequestLifecycle = useMemo(
     () =>
       createLatestRequestLifecycle({
-        cancel: requestGroupId => supersetChartDataClient.cancel(requestGroupId),
+        cancel: requestGroupId =>
+          supersetChartDataClient.cancel(requestGroupId),
       }),
     [],
   );
@@ -297,15 +508,15 @@ export const useExpansionEngine = ({
   }, [pendingCols]);
 
   const updateLoadingKey = useCallback((key: string, delta: number) => {
-    const counts = new Map(loadingCountsRef.current);
-    const nextCount = (counts.get(key) ?? 0) + delta;
-    if (nextCount <= 0) {
-      counts.delete(key);
-    } else {
-      counts.set(key, nextCount);
-    }
-    loadingCountsRef.current = counts;
-    setLoadingKeys(new Set(counts.keys()));
+    dispatchRuntimeState({ type: 'updateLoadingKey', key, delta });
+  }, []);
+
+  const clearLoadingState = useCallback(() => {
+    dispatchRuntimeState({ type: 'clearLoading' });
+  }, []);
+
+  const setHydratingState = useCallback((value: boolean) => {
+    dispatchRuntimeState({ type: 'setHydrating', value });
   }, []);
 
   const getCoverageKey = useCallback(
@@ -353,22 +564,24 @@ export const useExpansionEngine = ({
 
   const setPendingRowsState = useCallback((next: Set<string>) => {
     pendingRowsRef.current = next;
-    setPendingRows(next);
+    dispatchRuntimeState({ type: 'setPending', axis: 'row', keys: next });
   }, []);
 
   const setPendingColsState = useCallback((next: Set<string>) => {
     pendingColsRef.current = next;
-    setPendingCols(next);
+    dispatchRuntimeState({ type: 'setPending', axis: 'col', keys: next });
   }, []);
 
-  const reportAsyncError = useCallback((error: unknown) => {
-    const message = error instanceof Error ? error.message : String(error);
-    expansionRequestLifecycle.invalidate();
-    loadingCountsRef.current = new Map();
-    setLoadingKeys(new Set());
-    setIsHydrating(false);
-    setErrorMessage(message);
-  }, [expansionRequestLifecycle]);
+  const reportAsyncError = useCallback(
+    (error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      expansionRequestLifecycle.invalidate();
+      clearLoadingState();
+      setHydratingState(false);
+      setErrorMessage(message);
+    },
+    [clearLoadingState, expansionRequestLifecycle, setHydratingState],
+  );
 
   const addWarnings = useCallback(
     (nextWarnings?: ChartDataWarning[]) => {
@@ -714,136 +927,13 @@ export const useExpansionEngine = ({
         inFlightMap.set(inFlightId, inFlightKeys);
       }
 
-      const fetchBranchForKey = async ({
-        key,
-        treeSnapshot,
-        visibleRowDepth,
-        visibleColDepth,
-        requiredDepth,
-      }: {
-        key: string;
-        treeSnapshot: PivotTreeData;
-        visibleRowDepth: number;
-        visibleColDepth: number;
-        requiredDepth: number;
-      }) => {
-        const path = parsePath(key);
-        if (requestScope.isCurrent()) {
-          updateLoadingKey(key, 1);
-        }
-        const requestGroupId = buildRequestGroupId(
-          {
-            kind: 'branch',
-            axis,
-            pathKey: key,
-            visibleRowDepth,
-            visibleColDepth,
-            requiredDepth,
-          },
-          requestId,
-        );
-        try {
-          const result = await trackRequestInScope(
-            requestScope,
-            requestGroupId,
-            () =>
-              fetchPivotBranch({
-                axis,
-                path,
-                formData: fetchFormData,
-                currentTree: treeSnapshot,
-                visibleRowDepth,
-                visibleColDepth,
-                requestGroupId,
-                factStore: factStoreRef.current,
-              }),
-          );
-          if (!result) {
-            return {
-              key,
-              data: undefined,
-              requiredDepth,
-              factBatches: EMPTY_FACT_BATCHES,
-            };
-          }
-          if (requestScope.isCurrent()) {
-            addWarnings(result.warnings);
-            if (result.error) {
-              throw result.error;
-            }
-          }
-          return {
-            key,
-            data: result.data,
-            requiredDepth,
-            factBatches: result.factBatches ?? EMPTY_FACT_BATCHES,
-          };
-        } finally {
-          if (requestScope.isCurrent()) {
-            updateLoadingKey(key, -1);
-          }
-        }
-      };
-
-      const fetchBatchForGroup = async ({
-        batch,
-        treeSnapshot,
-        visibleRowDepth,
-        visibleColDepth,
-      }: {
-        batch: BatchGroup;
-        treeSnapshot: PivotTreeData;
-        visibleRowDepth: number;
-        visibleColDepth: number;
-      }) => {
-        if (requestScope.isCurrent()) {
-          batch.targets.forEach(target => updateLoadingKey(target.pathKey, 1));
-        }
-        const requestGroupId = buildRequestGroupId(
-          {
-            kind: 'batch',
-            axis: batch.axis,
-            parentPathKey: batch.parentPathKey,
-            childDepth: batch.childDepth,
-            requiredOppositeDepth: batch.requiredOppositeDepth,
-            signature: batch.signature,
-            targetKeys: [...batch.targets.map(target => target.pathKey)].sort(),
-          },
-          requestId,
-        );
-        try {
-          const result = await trackRequestInScope(
-            requestScope,
-            requestGroupId,
-            () =>
-              fetchPivotBranchesBatch({
-                formData: fetchFormData,
-                batch,
-                currentTree: treeSnapshot,
-                visibleRowDepth,
-                visibleColDepth,
-                requestGroupId,
-                factStore: factStoreRef.current,
-              }),
-          );
-          if (requestScope.isCurrent()) {
-            addWarnings(result.warnings);
-            if (result.error) {
-              throw result.error;
-            }
-          }
-          return {
-            batch,
-            data: result.data,
-            factBatches: result.factBatches ?? EMPTY_FACT_BATCHES,
-          };
-        } finally {
-          if (requestScope.isCurrent()) {
-            batch.targets.forEach(target =>
-              updateLoadingKey(target.pathKey, -1),
-            );
-          }
-        }
+      const fetchRuntime: ExpansionFetchRuntime = {
+        requestScope,
+        fetchFormData,
+        factStore: factStoreRef.current,
+        trackRequestInScope,
+        addWarnings,
+        updateLoadingKey,
       };
 
       const touchedKeys = new Set<string>();
@@ -889,71 +979,61 @@ export const useExpansionEngine = ({
           if (plan.fetchKeys.size === 0) {
             break;
           }
-          const localResults: SingleFetchResult[] = [];
-          const batchCandidates: BatchCandidate[] = [];
-          for (const target of targets) {
-            const path = parsePath(target.pathKey);
-            const localResult = resolvePivotBranchLocalResult({
-              axis: target.axis,
-              path,
-              formData: fetchFormData,
-              currentTree,
-              visibleRowDepth,
-              visibleColDepth,
-              factStore: factStoreRef.current,
-            });
-            if (localResult) {
-              localResults.push({
-                kind: 'single',
-                target,
-                data: localResult.data,
-                factBatches: localResult.factBatches ?? EMPTY_FACT_BATCHES,
-              });
-              continue;
-            }
-            const batchSignature = buildBatchSignature({
-              formData: fetchFormData,
-              axis: target.axis,
-              path,
-              currentTree,
-              visibleRowDepth,
-              visibleColDepth,
-            });
-            batchCandidates.push({ ...target, batchSignature });
-          }
-          const { batches, singles } = optimizeFetchPlan({
-            targets: batchCandidates,
+          const { localResults, batches, singles } = resolveExpansionFetchPlan({
+            targets,
+            formData: fetchFormData,
+            tree: currentTree,
+            visibleRowDepth,
+            visibleColDepth,
+            factStore: factStoreRef.current,
           });
           const fetchPromises: Array<Promise<CombinedFetchResult>> = [];
+          const fetchContext = {
+            tree: currentTree,
+            visibleRowDepth,
+            visibleColDepth,
+          };
           for (const target of singles) {
             fetchPromises.push(
-              fetchBranchForKey({
-                key: target.pathKey,
-                treeSnapshot: currentTree,
-                visibleRowDepth,
-                visibleColDepth,
-                requiredDepth,
-              }).then(result => ({
-                kind: 'single',
+              fetchExpansionSingleTarget({
                 target,
-                data: result.data,
-                factBatches: result.factBatches,
-              })),
+                context: fetchContext,
+                requestGroupId: buildRequestGroupId(
+                  {
+                    kind: 'branch',
+                    axis: target.axis,
+                    pathKey: target.pathKey,
+                    visibleRowDepth,
+                    visibleColDepth,
+                    requiredDepth,
+                  },
+                  requestId,
+                ),
+                runtime: fetchRuntime,
+              }),
             );
           }
           for (const batch of batches) {
             fetchPromises.push(
-              fetchBatchForGroup({
+              fetchExpansionBatchTarget({
                 batch,
-                treeSnapshot: currentTree,
-                visibleRowDepth,
-                visibleColDepth,
-              }).then(result => ({
-                kind: 'batch',
-                batch,
-                data: result.data,
-                factBatches: result.factBatches,
-              })),
+                context: fetchContext,
+                requestGroupId: buildRequestGroupId(
+                  {
+                    kind: 'batch',
+                    axis: batch.axis,
+                    parentPathKey: batch.parentPathKey,
+                    childDepth: batch.childDepth,
+                    requiredOppositeDepth: batch.requiredOppositeDepth,
+                    signature: batch.signature,
+                    targetKeys: [
+                      ...batch.targets.map(target => target.pathKey),
+                    ].sort(),
+                  },
+                  requestId,
+                ),
+                runtime: fetchRuntime,
+              }),
             );
           }
           // eslint-disable-next-line no-await-in-loop
@@ -1166,145 +1246,27 @@ export const useExpansionEngine = ({
       const shouldPlanCols = options?.planCols ?? true;
       const requestScope = expansionRequestLifecycle.beginScope();
       const transactionId = requestScope.id;
-      loadingCountsRef.current = new Map();
-      setLoadingKeys(new Set());
+      clearLoadingState();
       if (shouldShowLoader) {
-        setIsHydrating(true);
+        setHydratingState(true);
       }
 
       const finalizeHydration = () => {
         if (shouldShowLoader) {
-          setIsHydrating(false);
+          setHydratingState(false);
         }
       };
 
       let stagingState: StagingTreeState = createStagingTree(treeRef.current);
       let desiredRows = new Set<string>();
       let desiredCols = new Set<string>();
-
-      const fetchSingleTarget = async (
-        target: FetchTarget,
-        context: {
-          stagedTree: PivotTreeData;
-          visibleRowDepth: number;
-          visibleColDepth: number;
-        },
-      ) => {
-        const path = parsePath(target.pathKey);
-        if (requestScope.isCurrent()) {
-          updateLoadingKey(target.pathKey, 1);
-        }
-        const requestGroupId = buildRequestGroupId(
-          {
-            kind: `hydrate:${reason}`,
-            axis: target.axis,
-            pathKey: target.pathKey,
-            childDepth: target.childDepth,
-            requiredOppositeDepth: target.requiredOppositeDepth,
-            visibleRowDepth: context.visibleRowDepth,
-            visibleColDepth: context.visibleColDepth,
-          },
-          transactionId,
-        );
-        try {
-          const result = await trackRequestInScope(
-            requestScope,
-            requestGroupId,
-            () =>
-              fetchPivotBranch({
-                axis: target.axis,
-                path,
-                formData: fetchFormData,
-                currentTree: context.stagedTree,
-                visibleRowDepth: context.visibleRowDepth,
-                visibleColDepth: context.visibleColDepth,
-                requestGroupId,
-                factStore: factStoreRef.current,
-              }),
-          );
-          if (!result) {
-            return {
-              target,
-              data: undefined,
-              factBatches: EMPTY_FACT_BATCHES,
-            };
-          }
-          if (requestScope.isCurrent()) {
-            addWarnings(result.warnings);
-            if (result.error) {
-              throw result.error;
-            }
-          }
-          return {
-            target,
-            data: result.data,
-            factBatches: result.factBatches ?? EMPTY_FACT_BATCHES,
-          };
-        } finally {
-          if (requestScope.isCurrent()) {
-            updateLoadingKey(target.pathKey, -1);
-          }
-        }
-      };
-
-      const fetchBatchTarget = async (
-        batch: BatchGroup,
-        context: {
-          stagedTree: PivotTreeData;
-          visibleRowDepth: number;
-          visibleColDepth: number;
-        },
-      ) => {
-        if (requestScope.isCurrent()) {
-          batch.targets.forEach(target => updateLoadingKey(target.pathKey, 1));
-        }
-        const requestGroupId = buildRequestGroupId(
-          {
-            kind: `hydrate:${reason}`,
-            axis: batch.axis,
-            parentPathKey: batch.parentPathKey,
-            childDepth: batch.childDepth,
-            requiredOppositeDepth: batch.requiredOppositeDepth,
-            signature: batch.signature,
-            targetKeys: [...batch.targets.map(target => target.pathKey)].sort(),
-            visibleRowDepth: context.visibleRowDepth,
-            visibleColDepth: context.visibleColDepth,
-          },
-          transactionId,
-        );
-        try {
-          const result = await trackRequestInScope(
-            requestScope,
-            requestGroupId,
-            () =>
-              fetchPivotBranchesBatch({
-                formData: fetchFormData,
-                batch,
-                currentTree: context.stagedTree,
-                visibleRowDepth: context.visibleRowDepth,
-                visibleColDepth: context.visibleColDepth,
-                requestGroupId,
-                factStore: factStoreRef.current,
-              }),
-          );
-          if (requestScope.isCurrent()) {
-            addWarnings(result.warnings);
-            if (result.error) {
-              throw result.error;
-            }
-          }
-          return {
-            batch,
-            data: result.data,
-            factBatches: result.factBatches ?? EMPTY_FACT_BATCHES,
-          };
-        } finally {
-          if (requestScope.isCurrent()) {
-            batch.targets.forEach(target =>
-              updateLoadingKey(target.pathKey, -1),
-            );
-          }
-        }
+      const fetchRuntime: ExpansionFetchRuntime = {
+        requestScope,
+        fetchFormData,
+        factStore: factStoreRef.current,
+        trackRequestInScope,
+        addWarnings,
+        updateLoadingKey,
       };
 
       for (
@@ -1380,61 +1342,64 @@ export const useExpansionEngine = ({
         }
         const { targets } = hydrationPlan;
 
-        const fetchContext = { stagedTree, visibleRowDepth, visibleColDepth };
-        const localResults: SingleFetchResult[] = [];
-        const batchCandidates: BatchCandidate[] = [];
-        for (const target of targets) {
-          const path = parsePath(target.pathKey);
-          const localResult = resolvePivotBranchLocalResult({
-            axis: target.axis,
-            path,
-            formData: fetchFormData,
-            currentTree: fetchContext.stagedTree,
-            visibleRowDepth,
-            visibleColDepth,
-            factStore: factStoreRef.current,
-          });
-          if (localResult) {
-            localResults.push({
-              kind: 'single',
-              target,
-              data: localResult.data,
-              factBatches: localResult.factBatches ?? EMPTY_FACT_BATCHES,
-            });
-            continue;
-          }
-          const batchSignature = buildBatchSignature({
-            formData: fetchFormData,
-            axis: target.axis,
-            path,
-            currentTree: fetchContext.stagedTree,
-            visibleRowDepth,
-            visibleColDepth,
-          });
-          batchCandidates.push({ ...target, batchSignature });
-        }
-        const { batches, singles } = optimizeFetchPlan({
-          targets: batchCandidates,
+        const fetchContext = {
+          tree: stagedTree,
+          visibleRowDepth,
+          visibleColDepth,
+        };
+        const { localResults, batches, singles } = resolveExpansionFetchPlan({
+          targets,
+          formData: fetchFormData,
+          tree: fetchContext.tree,
+          visibleRowDepth,
+          visibleColDepth,
+          factStore: factStoreRef.current,
         });
         const fetchPromises: Array<Promise<CombinedFetchResult>> = [];
         for (const target of singles) {
           fetchPromises.push(
-            fetchSingleTarget(target, fetchContext).then(result => ({
-              kind: 'single',
+            fetchExpansionSingleTarget({
               target,
-              data: result.data,
-              factBatches: result.factBatches,
-            })),
+              context: fetchContext,
+              requestGroupId: buildRequestGroupId(
+                {
+                  kind: `hydrate:${reason}`,
+                  axis: target.axis,
+                  pathKey: target.pathKey,
+                  childDepth: target.childDepth,
+                  requiredOppositeDepth: target.requiredOppositeDepth,
+                  visibleRowDepth: fetchContext.visibleRowDepth,
+                  visibleColDepth: fetchContext.visibleColDepth,
+                },
+                transactionId,
+              ),
+              runtime: fetchRuntime,
+            }),
           );
         }
         for (const batch of batches) {
           fetchPromises.push(
-            fetchBatchTarget(batch, fetchContext).then(result => ({
-              kind: 'batch',
+            fetchExpansionBatchTarget({
               batch,
-              data: result.data,
-              factBatches: result.factBatches,
-            })),
+              context: fetchContext,
+              requestGroupId: buildRequestGroupId(
+                {
+                  kind: `hydrate:${reason}`,
+                  axis: batch.axis,
+                  parentPathKey: batch.parentPathKey,
+                  childDepth: batch.childDepth,
+                  requiredOppositeDepth: batch.requiredOppositeDepth,
+                  signature: batch.signature,
+                  targetKeys: [
+                    ...batch.targets.map(target => target.pathKey),
+                  ].sort(),
+                  visibleRowDepth: fetchContext.visibleRowDepth,
+                  visibleColDepth: fetchContext.visibleColDepth,
+                },
+                transactionId,
+              ),
+              runtime: fetchRuntime,
+            }),
           );
         }
         // eslint-disable-next-line no-await-in-loop
@@ -1478,6 +1443,7 @@ export const useExpansionEngine = ({
       addWarnings,
       buildDesiredExpanded,
       buildRequestGroupId,
+      clearLoadingState,
       fetchFormData,
       getCoverageKey,
       seedFetchedCoverageFromFactBatches,
@@ -1485,6 +1451,7 @@ export const useExpansionEngine = ({
       pruneMergedTree,
       setExpandedColsState,
       setExpandedRowsState,
+      setHydratingState,
       setPendingColsState,
       setPendingRowsState,
       trackRequestInScope,
@@ -1503,9 +1470,8 @@ export const useExpansionEngine = ({
       const isOpen = expanded.has(node.key) || pending.has(node.key);
       if (isOpen) {
         invalidateInFlightRequests();
-        loadingCountsRef.current = new Map();
-        setLoadingKeys(new Set());
-        setIsHydrating(false);
+        clearLoadingState();
+        setHydratingState(false);
         collapseNode(axis, node);
         return;
       }
@@ -1545,7 +1511,7 @@ export const useExpansionEngine = ({
           showLoader: false,
         }).catch(error => {
           reportAsyncError(error);
-          setIsHydrating(false);
+          setHydratingState(false);
         });
         return;
       }
@@ -1558,6 +1524,8 @@ export const useExpansionEngine = ({
       hydrateAtomic,
       invalidateInFlightRequests,
       reportAsyncError,
+      clearLoadingState,
+      setHydratingState,
       setPendingColsState,
       setPendingRowsState,
     ],
@@ -1702,15 +1670,14 @@ export const useExpansionEngine = ({
     const nextFactStore = createPivotFactStore();
     nextFactStore.upsertBatches(factBatches);
     factStoreRef.current = nextFactStore;
-    setIsHydrating(false);
+    setHydratingState(false);
     warningsRef.current = new Map();
     setWarnings([]);
     treeRef.current = normalizedTree;
     setTree(normalizedTree);
     setErrorMessage(undefined);
     fetchedCoverageRef.current = nextFetchedCoverage;
-    loadingCountsRef.current = new Map();
-    setLoadingKeys(new Set());
+    clearLoadingState();
     inFlightExpandedRowsRef.current.clear();
     inFlightExpandedColsRef.current.clear();
     inFlightExpansionIdRef.current = 0;
@@ -2016,11 +1983,11 @@ export const useExpansionEngine = ({
       hasNestedPendingKeys(nextColPlan.pendingKeys);
     if (nextRowPlan.pendingKeys.size + nextColPlan.pendingKeys.size > 0) {
       if (shouldSkipRootPrefetch) {
-        setIsHydrating(false);
+        setHydratingState(false);
         return;
       }
       if (!shouldShowPrefetchLoader) {
-        setIsHydrating(false);
+        setHydratingState(false);
       }
       hydrateAtomic('prefetch', {
         showLoader: shouldShowPrefetchLoader,
@@ -2028,12 +1995,13 @@ export const useExpansionEngine = ({
         planCols: shouldPlanCols,
       }).catch(error => {
         reportAsyncError(error);
-        setIsHydrating(false);
+        setHydratingState(false);
       });
       return;
     }
-    setIsHydrating(false);
+    setHydratingState(false);
   }, [
+    clearLoadingState,
     countDimDepth,
     data,
     expandedStateSignature,
@@ -2059,6 +2027,7 @@ export const useExpansionEngine = ({
     seedFetchedCoverageFromFactBatches,
     setExpandedColsState,
     setExpandedRowsState,
+    setHydratingState,
     setPendingColsState,
     setPendingRowsState,
     visibilityConfig,
