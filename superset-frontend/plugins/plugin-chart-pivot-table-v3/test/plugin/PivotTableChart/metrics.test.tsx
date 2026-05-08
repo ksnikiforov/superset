@@ -44,7 +44,7 @@ import {
 } from '../../../src/pivot/measureLeaves';
 import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
 import { resolveMockBranchFetchResult } from '../fixtures/factBatches';
-import { buildTreeFromRecords } from '../../../src/pivot/core/tree';
+import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import {
   applyMeasureHierarchyAxis,
   applyMetricAxis,

@@ -17,8 +17,9 @@
  * under the License.
  */
 
-import { render, screen, within } from '../../testUtils';
+// eslint-disable-next-line import/no-extraneous-dependencies
 import { renderHook } from '@testing-library/react-hooks';
+import { render, screen, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum, PivotTableQueryFormData } from '../../../src/types';
 import { buildFormData } from '../fixtures/pivotFormData';
@@ -30,7 +31,7 @@ import {
 } from '../../../src/pivot/measureLeaves';
 import { usePivotLayout } from '../../../src/pivot/chart/usePivotLayout';
 import { usePivotRenderModel } from '../../../src/pivot/chart/usePivotRenderModel';
-import { buildTreeFromRecords } from '../../../src/pivot/core/tree';
+import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import {
   applyMeasureHierarchyAxis,
   applyMetricAxis,

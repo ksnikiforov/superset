@@ -23,7 +23,7 @@ import { MetricsLayoutEnum } from '../../../src/types';
 
 import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
 import { baseFormData, buildFormData } from '../fixtures/pivotFormData';
-import { buildTreeFromRecords } from '../../../src/pivot/core/tree';
+import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../../../src/pivot/runtime/materializePivotTree';
 
 jest.mock('../../../src/fetchPivotBranch', () => {

@@ -21,7 +21,7 @@ import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { MetricsLayoutEnum, PivotRuntimeLayout } from '../../../src/types';
 import { METRICS_PLACEHOLDER, getStableColumnKey } from '../../../src/utils';
-import { buildTreeFromRecords } from '../../../src/pivot/core/tree';
+import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { supersetChartDataClient } from '../../../src/pivot/data/SupersetChartDataClient';
 import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
 import { applyMetricAxis } from '../../../src/pivot/runtime/materializePivotTree';

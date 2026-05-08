@@ -22,7 +22,7 @@ import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { mergeTrees, METRICS_PLACEHOLDER } from '../../../src/utils';
 import { MetricsLayoutEnum } from '../../../src/types';
-import { buildTreeFromRecords } from '../../../src/pivot/core/tree';
+import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../../../src/pivot/runtime/materializePivotTree';
 
 describe('PivotTableChart sticky headers', () => {

@@ -32,7 +32,7 @@ import {
   mergeTrees,
   serializePath,
 } from '../../../src/utils';
-import { buildTreeFromRecords } from '../../../src/pivot/core/tree';
+import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { supersetChartDataClient } from '../../../src/pivot/data/SupersetChartDataClient';
 import {
   fetchPivotBranch,

@@ -32,7 +32,7 @@ import {
   type FetchPivotBranchParams,
 } from '../../../../src/fetchPivotBranch';
 import { buildMockBranchFetchResult } from '../../fixtures/factBatches';
-import { buildTreeFromRecords } from '../../../../src/pivot/core/tree';
+import { buildTreeFromRecords } from '../../fixtures/buildTreeFromRecords';
 import {
   injectRowSubtotalLeaves,
   labelRowSubtotalLeaves,

@@ -28,7 +28,7 @@ import {
   buildValueLeaf,
 } from '../../../../src/pivot/measureLeaves';
 import { fetchPivotBranch } from '../../../../src/fetchPivotBranch';
-import { buildTreeFromRecords } from '../../../../src/pivot/core/tree';
+import { buildTreeFromRecords } from '../../fixtures/buildTreeFromRecords';
 import { applyMeasureHierarchyAxis } from '../../../../src/pivot/runtime/materializePivotTree';
 
 jest.mock('../../../../src/fetchPivotBranch', () => {

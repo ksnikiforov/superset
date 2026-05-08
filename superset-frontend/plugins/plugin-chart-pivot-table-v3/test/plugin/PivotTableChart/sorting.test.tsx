@@ -28,7 +28,7 @@ import {
   buildBuiltInLeaf,
   buildValueLeaf,
 } from '../../../src/pivot/measureLeaves';
-import { buildTreeFromRecords } from '../../../src/pivot/core/tree';
+import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMeasureHierarchyAxis } from '../../../src/pivot/runtime/materializePivotTree';
 
 describe('PivotTableChart sorting', () => {

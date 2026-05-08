@@ -275,10 +275,10 @@ they delete more code than they add in the same slice.
 Current source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `7253` insertions, `5567` deletions, net `+1686`.
-- Current production `src` TypeScript/TSX total: `35196` lines.
+- Production `src`: `7252` insertions, `5729` deletions, net `+1523`.
+- Current production `src` TypeScript/TSX total: `35033` lines.
 - Pre-existing production files are net negative:
-  `+2453 / -5567`, net `-3114`.
+  `+2452 / -5729`, net `-3277`.
 - Added runtime/helper files are still the source of total growth:
   `+4800 / -0` across `16` added files.
 
@@ -290,9 +290,9 @@ than expanding runtime surface.
 
 ### Completion Reassessment
 
-Overall transition completion estimate: **76%**.
+Overall transition completion estimate: **77%**.
 
-Goal-weighted completion estimate: **71%**. This is lower than the architecture
+Goal-weighted completion estimate: **73%**. This is lower than the architecture
 score because the original goal was not only to create a pure runtime boundary,
 but to use it to remove old production code. The runtime pipeline is mostly in
 place; the line-reduction payoff is only about halfway realized.
@@ -309,7 +309,7 @@ pipeline. The remaining work is more concentrated now: `PivotTableChart.tsx`
 | Gate 1: compiled layout model                |        70% | `PivotProgram` is established, materialization consumes it directly, and many query/render call sites use it. `usePivotLayout`, interaction layout, and control/layout cleanup still read compatibility layout state.               |
 | Gate 2: query planning from program/coverage |        88% | Initial/root/branch/batch query paths use coverage metadata and canonical paths. Expansion planning now trusts fetched coverage depth directly. Remaining complexity is mostly support/totals coverage composition.                      |
 | Gate 3: central fact ingestion/store         |        91% | Fetch paths return fact batches, fact-store hits and cache hits reuse exact coverage, ingestion is isolated, and materializer handoff is explicit. Remaining coupling is mostly initial wrapper compatibility and tree-shaped APIs. |
-| Gate 4: one tree materializer                |        81% | `materializePivotTree.ts` owns fact-to-tree materialization, Values/metric/measure axes, subtotal leaf injection, and row subtotal labeling. The last initial-tree compatibility wrapper is deleted; remaining work is export parity, materializer module split only where it deletes callers, and fixture-only raw tree construction. |
+| Gate 4: one tree materializer                |        84% | `materializePivotTree.ts` owns fact-to-tree materialization, Values/metric/measure axes, subtotal leaf injection, and row subtotal labeling. The last initial-tree compatibility wrapper is deleted, and raw-record tree construction has moved out of production `src` into test fixtures. Remaining work is export parity and materializer module split only where it deletes callers. |
 | Gate 5: expansion reducer/runtime effects    |        69% | Expansion has stronger pure helpers, typed coverage, shared latest-request lifecycles, reducer-owned pending/loading state, axis-neutral pending/expanded state setters, shared local/single/batch fetch execution, pure reinitialized expansion-state resolution, and coverage-first planner satisfaction. Auto-expansion seeding now belongs to the state model. The hook still owns hydration iteration, cancellation, and React state commits. |
 | Gate 6: pure render model                    |        77% | Projection now drives loaded-state, toggle eligibility, collapsed Values, and column display behavior. Visible-axis construction is shared by render and expansion-state, collapsed Values projection is axis-neutral in layout, dead row-subtotal branches are gone, metric-first column header presentation is behind `columnDisplay.ts`, loaded-child inference no longer scans descendant cell depths, column subtotal header behavior trusts visible child state, and a row-end Values child-filter bandaid is removed. Remaining duplication is mostly deeper row subtotal policy and remaining child-filter/render policy.             |
 | Gate 7: chart component cleanup              |        30% | `PivotTableChart.tsx` now delegates seamless fetch/materialization to a runtime effect helper, but still owns committed-tree sync, runtime layout checks, dimension filters, and interaction wiring.                                |
@@ -332,8 +332,8 @@ Requirement reassessment:
 - Architecture completion: **75%**. The compiler/fact-store/materializer
   pipeline exists and is used by the main fetch paths. Remaining work is mostly
   deleting old interpretation surfaces, not inventing the architecture.
-- Production line-deletion completion: **60%**. Pre-existing files are net `3114`
-  lines smaller, but total production source is still net `1686` lines larger
+- Production line-deletion completion: **63%**. Pre-existing files are net `3277`
+  lines smaller, but total production source is still net `1523` lines larger
   because of added runtime modules.
 - Interactivity requirement completion: **70%**. Layout refresh and expansion
   fetches have targeted/latest-only state and chunked materialization. The
@@ -342,14 +342,14 @@ Requirement reassessment:
 - Query visibility requirement completion: **86%**. Planning is now strongly
   coverage/visibility based. Remaining risk is support/totals coverage
   composition and hydration edge paths still tied to hook compatibility state.
-- Simplification/deletion requirement completion: **69%**. Recent Gate 5/Gate 6
+- Simplification/deletion requirement completion: **71%**. Recent Gate 4/Gate 6
   work removed duplicate render/visibility policy, but deeper row subtotal
   policy, hydration/persistence, loaded-state fallback, and chart controller
   logic still keep meaningful old complexity alive.
 
 Pipeline goal reassessment:
 
-- Pure runtime pipeline completion: **79%**. The main path now has the intended
+- Pure runtime pipeline completion: **80%**. The main path now has the intended
   shape: `PivotProgram` compiles layout semantics, coverage/query planning
   requests visible fact batches, fact-store ingestion records exact coverage,
   and `materializePivotTree.ts` builds the tree consumed by expansion/render.
@@ -366,8 +366,8 @@ Refactor health:
 - Direction: **good**. The compiler/fact-store/materializer shape is now real
   and production fetch paths use it.
 - Deletion payoff: **not good enough yet, but improving**. Pre-existing source
-  files are net `-3114`, but added runtime/helper files keep the plugin net
-  `+1686`.
+  files are net `-3277`, but added runtime/helper files keep the plugin net
+  `+1523`.
 - Interactivity: **partially improved**. Latest-only requests, reducer loading
   state, chunked materialization, and no-hidden-layer fetch planning are in
   place, but the user-visible lag from large materialization/render commits is
@@ -397,17 +397,17 @@ Tests and Markdown are excluded.
 
 Current diff from baseline:
 
-- `7253` insertions
-- `5567` deletions
-- net `+1686` production source lines
-- current `src` code total: `35196` lines
+- `7252` insertions
+- `5729` deletions
+- net `+1523` production source lines
+- current `src` code total: `35033` lines
 - implied baseline `src` total: about `33510` lines
 
 By file status:
 
 - Added files: `+4800 / -0` across `16` files
 - Deleted files: `+0 / -630` across `3` files
-- Modified files: `+2453 / -4937`, net `-2484`
+- Modified files: `+2452 / -5099`, net `-2647`
 
 By area:
 
@@ -417,7 +417,7 @@ By area:
 | Expansion         |      1840 |      1581 |  `+259` | Helper growth still outweighs hook deletion in this area; future Gate 5 work must delete hook branches immediately. |
 | Chart hooks       |       637 |      1281 |  `-644` | Render/layout repair is shrinking; the latest Gate 6 slice is net-negative. |
 | Query             |       769 |       831 |   `-62` | Old branch planner deleted, but specs/bootstrap grew around coverage.   |
-| Core tree         |         3 |       852 |  `-849` | Best completed simplification; raw tree surface mostly collapsed.       |
+| Core tree         |         2 |      1014 | `-1012` | Best completed simplification; raw-record fixture construction is no longer in production `src`. |
 | `PivotTableChart` |       135 |       199 |   `-64` | Too little shrinkage for the controller goal.                           |
 | Other             |       214 |       823 |  `-609` | Utility/render cleanup is real but not enough to offset runtime.        |
 
@@ -510,8 +510,13 @@ Latest code-reduction slice:
   when the DB aggregate coverage is already present. With that contract locked,
   the row-end Values child-filter bandaid in `usePivotLayout.ts` was deleted.
 - Additional production change for that follow-up: `+2 / -51`, net `-49`.
-- Combined recent Gate 5/Gate 6 source-reduction sequence: `+830 / -1170`, net
-  `-340`.
+- Gate 4 raw-record fixture cleanup: `buildTreeFromRecords` moved from
+  production `src/pivot/core/tree.ts` to `test/plugin/fixtures`, and all test
+  imports now depend on the fixture helper directly. Production tree core now
+  contains only `mergeTrees` and label formatting helpers.
+- Additional production change for that follow-up: `+2 / -165`, net `-163`.
+- Combined recent Gate 4/Gate 5/Gate 6 source-reduction sequence:
+  `+832 / -1335`, net `-503`.
 - Attempted render-model plumbing cleanup around spinner callbacks, sorting
   value-map aliases, leaf-label flattening, and aggregate-bold returns was
   reverted before this slice because it did not pay for itself clearly enough
@@ -534,12 +539,13 @@ Gate status:
   refresh, branch fetch, batch fetch, local fact-store hits, and branch-cache
   hits now carry `PivotFactStoreBatch[]`. The remaining dependency is mostly
   tree-shaped compatibility at the initial/chart boundary.
-- Gate 4 is in progress (`81%`). `src/pivot/runtime/materializePivotTree.ts` now owns
+- Gate 4 is in progress (`84%`). `src/pivot/runtime/materializePivotTree.ts` now owns
   production fact-store-to-tree materialization for branch, batch, and initial
   trees, metric/measure axis materialization, row and column subtotal leaf
   injection, and row subtotal labeling. `ingestQueryResults.ts` is back to
-  ingestion/fact-store orchestration. `pivot/core/tree.ts` now exposes raw tree
-  fixture construction plus merge/label formatting helpers; Values/metric axis,
+  ingestion/fact-store orchestration. `pivot/core/tree.ts` now exposes only
+  production merge/label formatting helpers; raw-record tree fixture
+  construction lives under `test/plugin/fixtures`. Values/metric axis,
   measure-axis, and subtotal helpers live under the materializer boundary.
   The broad `src/utils.ts` utility surface no longer re-exports the raw-record
   tree builders or subtotal materialization helpers. The legacy initial-tree
@@ -587,9 +593,8 @@ Current largest production hotspots by line count:
 - `visibility.ts`: `486` lines. Loaded-state inference is now narrower; the
   remaining deletion upside is smaller than `usePivotLayout` and
   `usePivotRenderModel`.
-- `pivot/core/tree.ts`: `256` lines. It is now mostly raw record fixture
-  construction plus `mergeTrees`/label formatting. It has no production reason
-  to keep `buildTreeFromRecords` long term.
+- `pivot/core/tree.ts`: `93` lines. It now contains only `mergeTrees` and label
+  formatting helpers.
 - `runtime/ingestQueryResults.ts`: `489` lines after the materialization
   extraction.
 
@@ -602,8 +607,8 @@ Recommended next sequence:
    materially larger hook branch than it adds to `expansion/engine.ts`.
 3. Keep shrinking `usePivotLayout` opportunistically where row/column behavior
    is now proven axis-neutral.
-4. Move `buildTreeFromRecords` out of production `src/pivot/core/tree.ts` only
-   if it can be done as production deletion without weakening test coverage.
+4. Keep raw-record tree construction in tests only; any future direct tree
+   fixture work should not reintroduce production materialization helpers.
 5. Defer `PivotTableChart.tsx` splitting until render and expansion contracts
    are thinner; otherwise the split mostly moves the current orchestration
    around.

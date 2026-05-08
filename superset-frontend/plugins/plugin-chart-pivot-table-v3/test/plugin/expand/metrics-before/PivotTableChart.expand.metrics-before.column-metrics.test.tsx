@@ -31,7 +31,7 @@ import {
   buildMockBranchFetchResult,
   resolveMockBranchFetchResult,
 } from '../../fixtures/factBatches';
-import { buildTreeFromRecords } from '../../../../src/pivot/core/tree';
+import { buildTreeFromRecords } from '../../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../../../../src/pivot/runtime/materializePivotTree';
 
 jest.mock('../../../../src/fetchPivotBranch', () => {

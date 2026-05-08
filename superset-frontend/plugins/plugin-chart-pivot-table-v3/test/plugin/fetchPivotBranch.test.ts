@@ -42,7 +42,7 @@ import {
   serializePath,
   SUBTOTAL_TOKEN,
 } from '../../src/utils';
-import { buildTreeFromRecords } from '../../src/pivot/core/tree';
+import { buildTreeFromRecords } from './fixtures/buildTreeFromRecords';
 import { formatQueryName } from '../../src/pivot/query/queryName';
 import { buildLayoutContext } from '../../src/pivot/layout/LayoutContext';
 import { buildBranchQuerySpecs } from '../../src/pivot/query/specs';

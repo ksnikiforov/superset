@@ -23,7 +23,7 @@ import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { clearPivotBranchCache } from '../../../src/fetchPivotBranch';
 import { MetricsLayoutEnum } from '../../../src/types';
 import { buildFormData } from '../fixtures/pivotFormData';
-import { buildTreeFromRecords } from '../../../src/pivot/core/tree';
+import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../../../src/pivot/runtime/materializePivotTree';
 
 jest.mock('@superset-ui/core', () => {
