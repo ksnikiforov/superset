@@ -51,7 +51,7 @@ import {
 } from '../render/renderModel';
 import { resolveAxisProjection } from '../runtime/projection';
 import { resolveMeasureSortMetricKey } from '../measureLeaves';
-import { buildDesiredExpandedKeys } from '../expansion/engine';
+import { seedExpandedByLevel } from '../engine/expansionStateModel';
 import { compareValues, rootKey, sortByOrder } from '../viewModel';
 import { type RenderModel } from '../shared/types';
 import {
@@ -676,17 +676,12 @@ export const usePivotRenderModel = ({
 
   const autoExpandedRows = useMemo(
     () =>
-      buildDesiredExpandedKeys({
-        axis: 'row',
-        tree: renderTree,
-        autoExpandLevel: layout.resolvedExpandRowsLevel,
-        metricLabelSet: layout.metricLabelSet,
-        includeMetricDepthZero: layout.shouldExpandMetricRows,
-        manualExpanded: new Set(),
-        manualCollapsed: new Set(),
-        pendingKeys: new Set(),
-        inFlightKeys: new Set(),
-      }),
+      seedExpandedByLevel(
+        renderTree.rows,
+        layout.resolvedExpandRowsLevel,
+        layout.metricLabelSet,
+        { includeMetricDepthZero: layout.shouldExpandMetricRows },
+      ),
     [
       layout.metricLabelSet,
       layout.resolvedExpandRowsLevel,

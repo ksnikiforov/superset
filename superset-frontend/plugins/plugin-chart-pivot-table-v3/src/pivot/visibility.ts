@@ -114,22 +114,13 @@ export const createColLeavesBuilder = ({
         normalizedColSubtotalLevels.includes(dimDepth) ||
         (dimDepth === 0 && hasMetricGrandTotals)) &&
       !(dimDepth === 0 && !showColRoot);
-    const isSubtotalTokenForNode = (leaf: PivotTreeNode) => {
-      if (!node.path.every((val, idx) => val === leaf.path[idx])) {
-        return false;
-      }
-      const token = leaf.path[node.path.length];
-      return isSubtotalToken(token);
-    };
-    const isMetricSubtotalForNode = (leaf: PivotTreeNode) => {
-      if (!node.path.every((val, idx) => val === leaf.path[idx])) {
-        return false;
-      }
-      if (!isMetricGrandTotalNode(leaf) && !isMetricSubtotalNode(leaf)) {
-        return false;
-      }
-      return countDimDepth(leaf.path) === dimDepth;
-    };
+    const isNodeDescendant = (leaf: PivotTreeNode) =>
+      node.path.every((val, idx) => val === leaf.path[idx]);
+    const isBranchLeaf = (leaf: PivotTreeNode) =>
+      leaf.path.length === node.path.length + 1 && isNodeDescendant(leaf);
+    const isMetricSubtotalAtDepth = (leaf: PivotTreeNode) =>
+      (isMetricGrandTotalNode(leaf) || isMetricSubtotalNode(leaf)) &&
+      countDimDepth(leaf.path) === dimDepth;
     const filterHiddenSubtotals = (leaves: PivotTreeNode[]) => {
       const hasDeeperLeaves = leaves.some(
         leaf => countDimDepth(leaf.path) > dimDepth,
@@ -141,7 +132,11 @@ export const createColLeavesBuilder = ({
         if (leaf.path.some(val => decodeMeasureLeafId(val))) {
           return true;
         }
-        return !isSubtotalTokenForNode(leaf) && !isMetricSubtotalForNode(leaf);
+        return !(
+          isNodeDescendant(leaf) &&
+          (isSubtotalToken(leaf.path[node.path.length]) ||
+            isMetricSubtotalAtDepth(leaf))
+        );
       });
     };
     if (!expandedCols.has(node.key) || children.length === 0) {
@@ -165,20 +160,10 @@ export const createColLeavesBuilder = ({
     if (!includeSubtotal) {
       return filterHiddenSubtotals(childLeaves);
     }
-    const isBranchLeaf = (leaf: PivotTreeNode) =>
-      leaf.path.length === node.path.length + 1 &&
-      node.path.every((val, idx) => val === leaf.path[idx]);
-    const isSubtotalTokenLeaf = (leaf: PivotTreeNode) => {
-      if (!isBranchLeaf(leaf)) {
-        return false;
-      }
-      const token = leaf.path[node.path.length];
-      return isSubtotalToken(token);
-    };
+    const isSubtotalTokenLeaf = (leaf: PivotTreeNode) =>
+      isBranchLeaf(leaf) && isSubtotalToken(leaf.path[node.path.length]);
     const isMetricSubtotalLeaf = (leaf: PivotTreeNode) =>
-      isBranchLeaf(leaf) &&
-      (isMetricGrandTotalNode(leaf) || isMetricSubtotalNode(leaf)) &&
-      countDimDepth(leaf.path) === dimDepth;
+      isBranchLeaf(leaf) && isMetricSubtotalAtDepth(leaf);
     const baseDimDepth = countDimDepth(
       node.path.filter(val => !isSubtotalToken(val)),
     );
@@ -192,41 +177,28 @@ export const createColLeavesBuilder = ({
       return leafBaseDepth === baseDimDepth;
     });
     const hasSubtotalTokenDescendants = subtotalTokenDescendants.length > 0;
-    const explicitSubtotalLeaves = childLeaves.filter(
-      leaf =>
-        isSubtotalTokenLeaf(leaf) ||
-        isMetricGrandTotalNode(leaf) ||
-        (!hasSubtotalTokenDescendants && isMetricSubtotalLeaf(leaf)),
-    );
-    if (hasSubtotalTokenDescendants) {
-      explicitSubtotalLeaves.push(...subtotalTokenDescendants);
-    }
-    const explicitSubtotalLeavesUnique: PivotTreeNode[] = [];
     const explicitSubtotalKeys = new Set<string>();
-    explicitSubtotalLeaves.forEach(leaf => {
+    const resolvedSubtotalLeaves = [
+      ...childLeaves.filter(
+        leaf =>
+          isSubtotalTokenLeaf(leaf) ||
+          isMetricGrandTotalNode(leaf) ||
+          (!hasSubtotalTokenDescendants && isMetricSubtotalLeaf(leaf)),
+      ),
+      ...(hasSubtotalTokenDescendants ? subtotalTokenDescendants : []),
+    ].filter(leaf => {
       if (explicitSubtotalKeys.has(leaf.key)) {
-        return;
+        return false;
       }
       explicitSubtotalKeys.add(leaf.key);
-      explicitSubtotalLeavesUnique.push(leaf);
+      return true;
     });
-    const resolvedSubtotalLeaves = explicitSubtotalLeavesUnique;
-    const isDuplicateSubtotalLeaf = (leaf: PivotTreeNode) => {
-      if (!isBranchLeaf(leaf)) {
-        return false;
-      }
-      if (explicitSubtotalKeys.has(leaf.key)) {
-        return false;
-      }
-      if (hasSubtotalTokenDescendants && isMetricSubtotalLeaf(leaf)) {
-        return true;
-      }
-      const token = leaf.path[node.path.length];
-      if (resolvedSubtotalLeaves.length === 0) {
-        return leaf.label === node.label || node.path.includes(token);
-      }
-      return leaf.label === node.label || node.path.includes(token);
-    };
+    const isDuplicateSubtotalLeaf = (leaf: PivotTreeNode) =>
+      isBranchLeaf(leaf) &&
+      !explicitSubtotalKeys.has(leaf.key) &&
+      ((hasSubtotalTokenDescendants && isMetricSubtotalLeaf(leaf)) ||
+        leaf.label === node.label ||
+        node.path.includes(leaf.path[node.path.length]));
     if (resolvedSubtotalLeaves.length > 0) {
       const remainingLeaves = childLeaves.filter(
         leaf =>
@@ -283,6 +255,53 @@ export const buildVisibleCols = ({
   return leaves;
 };
 
+type VisiblePivotAxesParams = VisibleRowsParams &
+  ColLeavesParams & {
+    cols: Record<string, PivotTreeNode>;
+    skipColRoot: boolean;
+    isMetricTokenValue: (value: unknown) => boolean;
+    shouldHideMetricGrandTotalsOnRows: boolean;
+    shouldHideMetricGrandTotalsOnCols: boolean;
+    shouldSuppressColRoot: boolean;
+  };
+
+export const buildVisiblePivotAxes = ({
+  isMetricTokenValue,
+  shouldHideMetricGrandTotalsOnRows,
+  shouldHideMetricGrandTotalsOnCols,
+  shouldSuppressColRoot,
+  ...params
+}: VisiblePivotAxesParams) => {
+  const { cols, colSorter, getColChildren, isMetricGrandTotalNode } = params;
+  const visibleRowsBase = buildVisibleRows(params);
+  const visibleRows = shouldHideMetricGrandTotalsOnRows
+    ? visibleRowsBase.filter(row => !isMetricGrandTotalNode(row))
+    : visibleRowsBase;
+  const buildColLeavesWithSubtotals = createColLeavesBuilder(params);
+  const visibleColsBase = buildVisibleCols({
+    cols,
+    skipColRoot: params.skipColRoot,
+    colSorter,
+    getColChildren,
+    buildColLeavesWithSubtotals,
+  });
+  let visibleCols = shouldHideMetricGrandTotalsOnCols
+    ? visibleColsBase.filter(col => !isMetricGrandTotalNode(col))
+    : visibleColsBase;
+
+  if (shouldSuppressColRoot) {
+    const hasMetricLeaves = visibleCols.some(col =>
+      col.path.some(val => isMetricTokenValue(val)),
+    );
+    if (hasMetricLeaves) {
+      const withoutRoot = visibleCols.filter(col => col.key !== rootKey);
+      visibleCols = withoutRoot.length > 0 ? withoutRoot : visibleCols;
+    }
+  }
+
+  return { visibleRows, visibleCols };
+};
+
 export const getVisibleDepths = (
   visibleRows: PivotTreeNode[],
   visibleCols: PivotTreeNode[],
@@ -297,29 +316,6 @@ export const getVisibleDepths = (
     ...visibleCols.map(col => countDimDepth(col.path)),
   ),
 });
-
-export const getExpandedDepths = (
-  expandedKeys: Set<string>,
-  nodes: Record<string, PivotTreeNode>,
-  groupbyLength: number,
-  countDimDepth: (path: PivotTreeNode['path']) => number,
-) => {
-  const depths = new Set<number>();
-  expandedKeys.forEach(key => {
-    const node = nodes[key];
-    if (!node || !node.hasChildren) {
-      return;
-    }
-    if (node.path.length === 0) {
-      return;
-    }
-    const dimDepth = countDimDepth(node.path);
-    if (dimDepth < groupbyLength) {
-      depths.add(dimDepth);
-    }
-  });
-  return depths;
-};
 
 type HasLoadedChildrenParams = {
   axis: 'row' | 'col';
@@ -356,72 +352,58 @@ export const hasLoadedChildren = ({
   visibleColDepth,
   countDimDepth,
 }: HasLoadedChildrenParams) => {
-  const projectablePath = (path: PivotTreeNode['path']) =>
-    path.filter(val => !isSubtotalToken(val));
-  const resolveProjection = (path: PivotTreeNode['path']) =>
-    program
+  const getPathInfo = (path: PivotTreeNode['path']) => {
+    const projection = program
       ? resolveAxisProjection({
           program,
           axis,
-          path: projectablePath(path),
+          path: path.filter(val => !isSubtotalToken(val)),
         })
       : undefined;
-  const projectComparablePath = (path: PivotTreeNode['path']) => {
-    const projection = resolveProjection(path);
-    if (projection) {
-      return projection.projectedDimensionPath;
-    }
-    return path.filter(val => {
-      const value = String(val ?? '');
-      if (isMetricTokenValue(value)) {
-        return false;
-      }
-      if (isSubtotalToken(val)) {
-        return false;
-      }
-      return true;
-    });
+    const basePath =
+      projection?.projectedDimensionPath ??
+      path.filter(
+        val => !isSubtotalToken(val) && !isMetricTokenValue(String(val ?? '')),
+      );
+    return {
+      basePath,
+      dimDepth: basePath.length,
+      hasMetric: projection
+        ? projection.valuesLevelSeen
+        : path.some(val => isMetricTokenValue(val)),
+      hasSubtotal: path.some(isSubtotalToken),
+      metricIndex: path.findIndex(val => isMetricTokenValue(val)),
+      skippedPreValues: (projection?.skippedPreValuesLevels.length ?? 0) > 0,
+    };
   };
-  const pathHasValuesToken = (path: PivotTreeNode['path']) => {
-    const projection = resolveProjection(path);
-    return projection
-      ? projection.valuesLevelSeen
-      : path.some(val => isMetricTokenValue(val));
-  };
-  const pathHasSkippedPreValuesProjection = (path: PivotTreeNode['path']) =>
-    (resolveProjection(path)?.skippedPreValuesLevels.length ?? 0) > 0;
-  const countBaseDimDepth = (path: PivotTreeNode['path']) =>
-    projectComparablePath(path).length;
   const children = getRawChildren(axis, node);
   const groupbyLength = axis === 'row' ? groupbyRowsLength : groupbyColsLength;
-  const parentDimDepth = countBaseDimDepth(node.path);
+  const parentInfo = getPathInfo(node.path);
+  const { basePath, dimDepth: parentDimDepth } = parentInfo;
   const metricIndex = axis === 'row' ? metricIndexForRows : metricIndexForCols;
-  const parentHasMetric = pathHasValuesToken(node.path);
   const metricsExpectedAtParent =
-    node.path.some(isSubtotalToken) ||
+    parentInfo.hasSubtotal ||
     (metricIndex !== undefined &&
       metricIndex >= 0 &&
       parentDimDepth === metricIndex &&
-      !parentHasMetric);
+      !parentInfo.hasMetric);
   const axisNodes = axis === 'row' ? rows : cols;
-  const nodeMetricIndex = node.path.findIndex(val => isMetricTokenValue(val));
-  const basePath = projectComparablePath(node.path);
+  const isSameBasePath = (candidatePath: PivotTreeNode['path']) =>
+    candidatePath.length === basePath.length &&
+    candidatePath.every((val, idx) => val === basePath[idx]);
+  const isDeeperBasePath = (candidatePath: PivotTreeNode['path']) =>
+    candidatePath.length > basePath.length &&
+    basePath.every((val, idx) => val === candidatePath[idx]);
   const allowMetricVariant =
     metricIndex !== undefined &&
     parentDimDepth >= metricIndex &&
-    !node.path.some(isSubtotalToken);
+    !parentInfo.hasSubtotal;
   const hasMetricVariant =
     allowMetricVariant &&
-    !parentHasMetric &&
+    !parentInfo.hasMetric &&
     Object.values(axisNodes).some(candidate => {
-      if (!pathHasValuesToken(candidate.path)) {
-        return false;
-      }
-      const candidatePath = projectComparablePath(candidate.path);
-      if (candidatePath.length !== basePath.length) {
-        return false;
-      }
-      return candidatePath.every((val, idx) => val === basePath[idx]);
+      const candidateInfo = getPathInfo(candidate.path);
+      return candidateInfo.hasMetric && isSameBasePath(candidateInfo.basePath);
     });
   const hasMetricVariantCells =
     hasMetricVariant &&
@@ -429,32 +411,24 @@ export const hasLoadedChildren = ({
       const { rowKey, colKey } = parseCellKey(key);
       const axisKey = axis === 'row' ? rowKey : colKey;
       const axisNode = axisNodes[axisKey];
-      if (!axisNode || !pathHasValuesToken(axisNode.path)) {
+      if (!axisNode) {
         return false;
       }
-      const candidatePath = projectComparablePath(axisNode.path);
-      if (candidatePath.length !== basePath.length) {
-        return false;
-      }
-      return candidatePath.every((value, index) => value === basePath[index]);
+      const axisInfo = getPathInfo(axisNode.path);
+      return axisInfo.hasMetric && isSameBasePath(axisInfo.basePath);
     });
   if (hasMetricVariant && hasMetricVariantCells) {
     return true;
   }
   if (
-    (program &&
-      parentHasMetric &&
-      pathHasSkippedPreValuesProjection(node.path)) ||
+    (program && parentInfo.hasMetric && parentInfo.skippedPreValues) ||
     (metricIndex !== undefined &&
-      nodeMetricIndex >= 0 &&
-      nodeMetricIndex < metricIndex)
+      parentInfo.metricIndex >= 0 &&
+      parentInfo.metricIndex < metricIndex)
   ) {
     const hasDeeperBaseDescendant = Object.values(axisNodes).some(candidate => {
-      const candidateBase = projectComparablePath(candidate.path);
-      if (candidateBase.length <= basePath.length) {
-        return false;
-      }
-      return basePath.every((val, idx) => val === candidateBase[idx]);
+      const candidateInfo = getPathInfo(candidate.path);
+      return isDeeperBasePath(candidateInfo.basePath);
     });
     if (hasDeeperBaseDescendant) {
       return true;
@@ -463,29 +437,23 @@ export const hasLoadedChildren = ({
   if (
     metricIndex !== undefined &&
     parentDimDepth < metricIndex &&
-    !parentHasMetric &&
-    !node.path.some(isSubtotalToken)
+    !parentInfo.hasMetric &&
+    !parentInfo.hasSubtotal
   ) {
-    const hasMetricChildren = children.some(child =>
-      pathHasValuesToken(child.path),
+    const hasMetricChildren = children.some(
+      child => getPathInfo(child.path).hasMetric,
     );
     if (hasMetricChildren) {
       const hasDescendantAtMetricIndex = Object.values(axisNodes).some(
         candidate => {
-          if (!pathHasValuesToken(candidate.path)) {
+          const candidateInfo = getPathInfo(candidate.path);
+          if (!candidateInfo.hasMetric) {
             return false;
           }
-          const candidateMetricIndex = candidate.path.findIndex(val =>
-            isMetricTokenValue(val),
-          );
-          if (!program && candidateMetricIndex < metricIndex) {
+          if (!program && candidateInfo.metricIndex < metricIndex) {
             return false;
           }
-          const candidateBase = projectComparablePath(candidate.path);
-          if (candidateBase.length <= basePath.length) {
-            return false;
-          }
-          return basePath.every((val, idx) => val === candidateBase[idx]);
+          return isDeeperBasePath(candidateInfo.basePath);
         },
       );
       if (!hasDescendantAtMetricIndex) {
@@ -494,7 +462,9 @@ export const hasLoadedChildren = ({
       }
     }
   }
-  const childDimDepths = children.map(child => countBaseDimDepth(child.path));
+  const childDimDepths = children.map(
+    child => getPathInfo(child.path).dimDepth,
+  );
   const maxChildDimDepth = Math.max(...childDimDepths, 0);
   const childCellRowDepths: number[] = [];
   const childCellColDepths: number[] = [];
@@ -520,7 +490,11 @@ export const hasLoadedChildren = ({
   const descendantColDepths: number[] = [];
   const shouldScanDescendants =
     !hasChildCells &&
-    !(metricIndex === 0 && parentHasMetric && nodeMetricIndex === 0);
+    !(
+      metricIndex === 0 &&
+      parentInfo.hasMetric &&
+      parentInfo.metricIndex === 0
+    );
   if (shouldScanDescendants) {
     Object.keys(cells).forEach(key => {
       const { rowKey, colKey } = parseCellKey(key);
@@ -532,12 +506,11 @@ export const hasLoadedChildren = ({
       if (!axisNode) {
         return;
       }
-      const axisPath = axisNode.path;
-      const axisComparablePath = projectComparablePath(axisPath);
-      if (axisComparablePath.length < basePath.length) {
-        return;
-      }
-      if (!basePath.every((val, idx) => val === axisComparablePath[idx])) {
+      const axisInfo = getPathInfo(axisNode.path);
+      if (
+        axisInfo.basePath.length < basePath.length ||
+        !basePath.every((val, idx) => val === axisInfo.basePath[idx])
+      ) {
         return;
       }
       const rowNode = rows[rowKey];
@@ -566,7 +539,7 @@ export const hasLoadedChildren = ({
     if (effectiveHasChildCells && maxChildAxisDepth > parentDimDepth) {
       return true;
     }
-    if (node.path.some(isSubtotalToken)) {
+    if (parentInfo.hasSubtotal) {
       return true;
     }
     return false;

@@ -38,6 +38,7 @@ import {
 } from '../../types';
 import { parsePath, mergeTrees } from '../../utils';
 import {
+  buildDesiredExpandedKeys,
   coerceExpansionState,
   pruneExpandedToStablePrefix,
   stripAutoSeededExpansions,
@@ -80,7 +81,6 @@ import {
 } from '../runtime/requestLifecycle';
 import {
   addAncestors,
-  buildDesiredExpandedKeys,
   buildHasLoadedChildren,
   computeVisibleDepths as computeVisibleDepthsBase,
   dropDescendants,

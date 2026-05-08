@@ -792,6 +792,34 @@ export const usePivotLayout = ({
     [getAxisChildProjection, pathHasValuesLevel],
   );
 
+  const filterChildrenIntroducingValues = useCallback(
+    (
+      axis: 'row' | 'col',
+      parent: PivotTreeNode,
+      children: PivotTreeNode[],
+      keepValuesChild: (
+        child: PivotTreeNode,
+        hasNonValuesChildren: boolean,
+      ) => boolean,
+    ) => {
+      const projected = children.map(child => ({
+        child,
+        introducesValues: getAxisChildProjection(axis, parent, child)
+          .introducesValues,
+      }));
+      const hasNonValuesChildren = projected.some(
+        child => !child.introducesValues,
+      );
+      return projected
+        .filter(
+          ({ child, introducesValues }) =>
+            !introducesValues || keepValuesChild(child, hasNonValuesChildren),
+        )
+        .map(({ child }) => child);
+    },
+    [getAxisChildProjection],
+  );
+
   const getRowSubtotalPosition = useCallback(
     (node: PivotTreeNode) => {
       if (!forceRowSubtotalEnd) {
@@ -808,24 +836,39 @@ export const usePivotLayout = ({
     [forceRowSubtotalEnd, isMetricTokenValue, resolvedRowSubtotalPosition],
   );
 
-  const getCollapsedRowChildrenForNodes = useCallback(
-    (
-      parent: PivotTreeNode,
-      expandedSet: Set<string>,
-      nodes: Record<string, PivotTreeNode>,
-    ) => {
-      const shouldExposeCollapsedMetricTier =
-        isMultiMetric ||
-        singleMetricBetweenRows ||
-        (isLeafTierVisible && metricsAtRowEnd);
+  const getCollapsedValuesNodesForAxis = useCallback(
+    ({
+      axis,
+      parent,
+      expandedSet,
+      nodes,
+      exposeCollapsedMetricTier,
+      metricsAtEnd,
+      suppressSubtotalParent,
+      normalizeSubtotalExisting,
+    }: {
+      axis: 'row' | 'col';
+      parent: PivotTreeNode;
+      expandedSet: Set<string>;
+      nodes: Record<string, PivotTreeNode>;
+      exposeCollapsedMetricTier: boolean;
+      metricsAtEnd: boolean;
+      suppressSubtotalParent: boolean;
+      normalizeSubtotalExisting: boolean;
+    }) => {
+      const expectedMetricsLayout =
+        axis === 'row' ? MetricsLayoutEnum.ROWS : MetricsLayoutEnum.COLUMNS;
       if (
-        !shouldExposeCollapsedMetricTier ||
-        resolvedMetricsLayout !== MetricsLayoutEnum.ROWS ||
+        !exposeCollapsedMetricTier ||
+        resolvedMetricsLayout !== expectedMetricsLayout ||
         expandedSet.has(parent.key)
       ) {
         return [] as PivotTreeNode[];
       }
-      if (isExplicitSubtotalNode(parent) || isMetricSubtotalNode(parent)) {
+      if (
+        suppressSubtotalParent &&
+        (isExplicitSubtotalNode(parent) || isMetricSubtotalNode(parent))
+      ) {
         return [] as PivotTreeNode[];
       }
       if (parent.path.some(val => isMetricTokenValue(val))) {
@@ -841,7 +884,7 @@ export const usePivotLayout = ({
       }
       const collapsedMetrics = resolveCollapsedValuesProjection({
         program: layout.pivotProgram,
-        axis: 'row',
+        axis,
         parentPath: parent.path,
         sourceMetricPaths: metricNodes.map(node => node.path),
       });
@@ -849,17 +892,24 @@ export const usePivotLayout = ({
         const collapsedKey = serializePath(metric.metricPath);
         const existing = nodes[collapsedKey];
         const sourceNode = nodes[serializePath(metric.sourceMetricPath)];
+        const hasChildren = metricsAtEnd
+          ? false
+          : findChildren(
+              nodes,
+              existing || { ...parent, path: metric.metricPath },
+            ).length > 0 || metric.hasProjectedChildren;
         if (existing) {
-          const hasChildren = metricsAtRowEnd
-            ? false
-            : findChildren(nodes, existing).length > 0 ||
-              metric.hasProjectedChildren;
+          if (normalizeSubtotalExisting && isMetricSubtotalNode(existing)) {
+            return {
+              ...existing,
+              label: metric.metricKey,
+              formattedLabel: metric.metricKey,
+              isSubtotal: false,
+              hasChildren,
+            };
+          }
           return { ...existing, hasChildren };
         }
-        const hasChildren = metricsAtRowEnd
-          ? false
-          : findChildren(nodes, { ...parent, path: metric.metricPath }).length >
-              0 || metric.hasProjectedChildren;
         return {
           ...(sourceNode || metricNodes[0]),
           key: collapsedKey,
@@ -877,12 +927,36 @@ export const usePivotLayout = ({
       isExplicitSubtotalNode,
       isMetricSubtotalNode,
       isMetricTokenValue,
+      layout.pivotProgram,
+      resolvedMetricsLayout,
+    ],
+  );
+
+  const getCollapsedRowChildrenForNodes = useCallback(
+    (
+      parent: PivotTreeNode,
+      expandedSet: Set<string>,
+      nodes: Record<string, PivotTreeNode>,
+    ) =>
+      getCollapsedValuesNodesForAxis({
+        axis: 'row',
+        parent,
+        expandedSet,
+        nodes,
+        exposeCollapsedMetricTier:
+          isMultiMetric ||
+          singleMetricBetweenRows ||
+          (isLeafTierVisible && metricsAtRowEnd),
+        metricsAtEnd: metricsAtRowEnd,
+        suppressSubtotalParent: true,
+        normalizeSubtotalExisting: false,
+      }),
+    [
+      getCollapsedValuesNodesForAxis,
       isLeafTierVisible,
       isMultiMetric,
-      layout.pivotProgram,
-      singleMetricBetweenRows,
       metricsAtRowEnd,
-      resolvedMetricsLayout,
+      singleMetricBetweenRows,
     ],
   );
 
@@ -891,81 +965,26 @@ export const usePivotLayout = ({
       parent: PivotTreeNode,
       expandedSet: Set<string>,
       nodes: Record<string, PivotTreeNode>,
-    ) => {
-      const shouldExposeCollapsedMetricTier =
-        isMultiMetric ||
-        singleMetricBetweenCols ||
-        (isLeafTierVisible && metricsAtColEnd);
-      if (
-        !shouldExposeCollapsedMetricTier ||
-        resolvedMetricsLayout !== MetricsLayoutEnum.COLUMNS ||
-        expandedSet.has(parent.key)
-      ) {
-        return [] as PivotTreeNode[];
-      }
-      if (parent.path.some(val => isMetricTokenValue(val))) {
-        return [] as PivotTreeNode[];
-      }
-      const metricDepth = getMetricDepthForParent(nodes, parent);
-      if (metricDepth === undefined || parent.path.length > metricDepth) {
-        return [] as PivotTreeNode[];
-      }
-      const metricNodes = getMetricTierNodes(nodes, parent, metricDepth);
-      if (metricNodes.length === 0) {
-        return [] as PivotTreeNode[];
-      }
-      const collapsedMetrics = resolveCollapsedValuesProjection({
-        program: layout.pivotProgram,
+    ) =>
+      getCollapsedValuesNodesForAxis({
         axis: 'col',
-        parentPath: parent.path,
-        sourceMetricPaths: metricNodes.map(node => node.path),
-      });
-      return collapsedMetrics.map(metric => {
-        const collapsedKey = serializePath(metric.metricPath);
-        const sourceNode = nodes[serializePath(metric.sourceMetricPath)];
-        const existing = nodes[collapsedKey];
-        if (existing) {
-          const hasChildren = metricsAtColEnd
-            ? false
-            : findChildren(nodes, existing).length > 0 ||
-              metric.hasProjectedChildren;
-          if (isMetricSubtotalNode(existing)) {
-            return {
-              ...existing,
-              label: metric.metricKey,
-              formattedLabel: metric.metricKey,
-              isSubtotal: false,
-              hasChildren,
-            };
-          }
-          return { ...existing, hasChildren };
-        }
-        const hasChildren = metricsAtColEnd
-          ? false
-          : findChildren(nodes, { ...parent, path: metric.metricPath }).length >
-              0 || metric.hasProjectedChildren;
-        return {
-          ...(sourceNode || metricNodes[0]),
-          key: collapsedKey,
-          path: metric.metricPath,
-          label: metric.metricKey,
-          formattedLabel: metric.metricKey,
-          level: metric.metricPath.length,
-          hasChildren,
-        };
-      });
-    },
+        parent,
+        expandedSet,
+        nodes,
+        exposeCollapsedMetricTier:
+          isMultiMetric ||
+          singleMetricBetweenCols ||
+          (isLeafTierVisible && metricsAtColEnd),
+        metricsAtEnd: metricsAtColEnd,
+        suppressSubtotalParent: false,
+        normalizeSubtotalExisting: true,
+      }),
     [
-      getMetricDepthForParent,
-      getMetricTierNodes,
-      isMetricSubtotalNode,
-      isMetricTokenValue,
+      getCollapsedValuesNodesForAxis,
       isLeafTierVisible,
       isMultiMetric,
-      layout.pivotProgram,
-      singleMetricBetweenCols,
       metricsAtColEnd,
-      resolvedMetricsLayout,
+      singleMetricBetweenCols,
     ],
   );
 
@@ -1003,17 +1022,12 @@ export const usePivotLayout = ({
         parent.axis === 'row' &&
         parent.level < groupbyRows.length
       ) {
-        const nonMetricChildren = children.filter(child => {
-          const { introducesValues } = getAxisChildProjection(
-            'row',
-            parent,
-            child,
-          );
-          if (!introducesValues) {
-            return true;
-          }
-          return isMetricGrandTotalNode(child) || isMetricSubtotalNode(child);
-        });
+        const nonMetricChildren = filterChildrenIntroducingValues(
+          'row',
+          parent,
+          children,
+          child => isMetricGrandTotalNode(child) || isMetricSubtotalNode(child),
+        );
         if (nonMetricChildren.length > 0) {
           filtered = nonMetricChildren;
         }
@@ -1025,36 +1039,25 @@ export const usePivotLayout = ({
         (metricLayoutIndexOnRows === undefined ||
           metricLayoutIndexOnRows > parent.level)
       ) {
-        const hasNonMetricChildren = children.some(child => {
-          const { introducesValues } = getAxisChildProjection(
-            'row',
-            parent,
-            child,
-          );
-          return !introducesValues;
-        });
-        const withoutMetrics = children.filter(child => {
-          const { introducesValues } = getAxisChildProjection(
-            'row',
-            parent,
-            child,
-          );
-          if (!introducesValues) {
-            return true;
-          }
-          if (hasNonMetricChildren) {
-            if (
-              !colTotals &&
-              metricLayoutIndexOnRows !== undefined &&
-              parent.level < metricLayoutIndexOnRows &&
-              metricIndexOnRows === 0
-            ) {
-              return false;
+        const withoutMetrics = filterChildrenIntroducingValues(
+          'row',
+          parent,
+          children,
+          (child, hasNonMetricChildren) => {
+            if (hasNonMetricChildren) {
+              if (
+                !colTotals &&
+                metricLayoutIndexOnRows !== undefined &&
+                parent.level < metricLayoutIndexOnRows &&
+                metricIndexOnRows === 0
+              ) {
+                return false;
+              }
+              return isMetricGrandTotalNode(child);
             }
-            return isMetricGrandTotalNode(child);
-          }
-          return isMetricGrandTotalNode(child) || isMetricSubtotalNode(child);
-        });
+            return isMetricGrandTotalNode(child) || isMetricSubtotalNode(child);
+          },
+        );
         filtered = withoutMetrics.length > 0 ? withoutMetrics : children;
       }
       if (
@@ -1177,7 +1180,7 @@ export const usePivotLayout = ({
       colTotals,
       countDimDepth,
       filterChildrenByMetricPosition,
-      getAxisChildProjection,
+      filterChildrenIntroducingValues,
       getRowSubtotalPosition,
       groupbyRows.length,
       hideMetricHeaderOnRows,
@@ -1218,20 +1221,15 @@ export const usePivotLayout = ({
           metricLayoutIndexOnCols > parent.level)
       ) {
         const allowMetricSubtotals = normalizedColSubtotalLevels.length > 0;
-        const withoutMetrics = children.filter(child => {
-          const { introducesValues } = getAxisChildProjection(
-            'col',
-            parent,
-            child,
-          );
-          if (!introducesValues) {
-            return true;
-          }
-          if (allowMetricSubtotals) {
-            return isMetricGrandTotalNode(child) || isMetricSubtotalNode(child);
-          }
-          return isMetricGrandTotalNode(child);
-        });
+        const withoutMetrics = filterChildrenIntroducingValues(
+          'col',
+          parent,
+          children,
+          child =>
+            allowMetricSubtotals
+              ? isMetricGrandTotalNode(child) || isMetricSubtotalNode(child)
+              : isMetricGrandTotalNode(child),
+        );
         filtered = withoutMetrics.length > 0 ? withoutMetrics : children;
       }
       if (
@@ -1250,7 +1248,7 @@ export const usePivotLayout = ({
     },
     [
       filterChildrenByMetricPosition,
-      getAxisChildProjection,
+      filterChildrenIntroducingValues,
       groupbyColumns.length,
       hideMetricHeaderOnCols,
       isMetricGrandTotalNode,

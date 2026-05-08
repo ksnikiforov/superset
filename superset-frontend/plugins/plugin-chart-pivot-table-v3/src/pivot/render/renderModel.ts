@@ -23,13 +23,9 @@ import {
   type PivotTreeNode,
   type TotalPosition,
 } from '../../types';
-import { buildColumnHeaderRows, rootKey } from '../viewModel';
+import { buildColumnHeaderRows } from '../viewModel';
 import { buildVisibleCellEntries } from '../cellUtils';
-import {
-  buildVisibleCols,
-  buildVisibleRows,
-  createColLeavesBuilder,
-} from '../visibility';
+import { buildVisiblePivotAxes } from '../visibility';
 import { type RenderModel } from '../shared/types';
 
 export type RenderModelConfig = {
@@ -99,58 +95,38 @@ export const buildRenderModel = ({
   const totalRowPosition = config.colTotals
     ? config.colTotalPosition
     : config.rowTotalPosition;
-  const visibleRowsBase = buildVisibleRows({
+  const shouldHideMetricGrandTotalsOnCols = !showColRoot;
+  const shouldSuppressColRoot =
+    config.resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS &&
+    config.metricsFirstOnCols;
+  const { visibleRows, visibleCols } = buildVisiblePivotAxes({
     rows: tree.rows,
+    cols: tree.cols,
     expandedRows,
+    expandedCols,
     rowSorter: config.rowSorter,
+    colSorter: config.colSorter,
     skipRowRoot,
     showRowRoot,
     rowTotalPosition: totalRowPosition,
     getRowChildren: config.getRowChildren,
     getCollapsedRowChildren: config.getCollapsedRowChildren,
-  });
-  const visibleRows = shouldHideMetricGrandTotalsOnRows
-    ? visibleRowsBase.filter(row => !config.isMetricGrandTotalNode(row))
-    : visibleRowsBase;
-
-  const buildColLeavesWithSubtotals = createColLeavesBuilder({
-    getColChildren: config.getColChildren,
-    getCollapsedColLeaves: config.getCollapsedColLeaves,
-    colSorter: config.colSorter,
+    skipColRoot,
     countDimDepth: config.countDimDepth,
-    expandedCols,
     normalizedColSubtotalLevels: config.normalizedColSubtotalLevels,
     showColRoot,
     rowTotals: config.rowTotals,
     resolvedColTotalPosition: config.colTotalPosition,
     resolvedColSubtotalPosition: config.resolvedColSubtotalPosition,
+    getColChildren: config.getColChildren,
+    getCollapsedColLeaves: config.getCollapsedColLeaves,
     isMetricGrandTotalNode: config.isMetricGrandTotalNode,
     isMetricSubtotalNode: config.isMetricSubtotalNode,
+    isMetricTokenValue: config.isMetricTokenValue,
+    shouldHideMetricGrandTotalsOnRows,
+    shouldHideMetricGrandTotalsOnCols,
+    shouldSuppressColRoot,
   });
-
-  const shouldHideMetricGrandTotalsOnCols = !showColRoot;
-  const shouldSuppressColRoot =
-    config.resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS &&
-    config.metricsFirstOnCols;
-  const visibleColsBase = buildVisibleCols({
-    cols: tree.cols,
-    skipColRoot,
-    colSorter: config.colSorter,
-    getColChildren: config.getColChildren,
-    buildColLeavesWithSubtotals,
-  });
-  let visibleCols = shouldHideMetricGrandTotalsOnCols
-    ? visibleColsBase.filter(col => !config.isMetricGrandTotalNode(col))
-    : visibleColsBase;
-  if (shouldSuppressColRoot) {
-    const hasMetricLeaves = visibleCols.some(col =>
-      col.path.some(val => config.isMetricTokenValue(val)),
-    );
-    if (hasMetricLeaves) {
-      const withoutRoot = visibleCols.filter(col => col.key !== rootKey);
-      visibleCols = withoutRoot.length > 0 ? withoutRoot : visibleCols;
-    }
-  }
 
   const columnHeaderRows = buildColumnHeaderRows(
     visibleCols,

@@ -28,10 +28,7 @@ import {
   planExpansionForAxis,
   type PivotExpansionPlan,
 } from '../engine/expansionPlanner';
-import {
-  getVisibleExpansionKeys as getVisibleExpansionKeysBase,
-  seedExpandedByLevel,
-} from '../engine/expansionStateModel';
+import { getVisibleExpansionKeys as getVisibleExpansionKeysBase } from '../engine/expansionStateModel';
 import {
   buildRenderModel,
   type RenderModelConfig,
@@ -492,46 +489,6 @@ export const resolveExpandedForMetrics = ({
       next.delete(key);
     }
   });
-  return next;
-};
-
-export const buildDesiredExpandedKeys = ({
-  axis,
-  tree,
-  autoExpandLevel,
-  metricLabelSet,
-  includeMetricDepthZero,
-  manualExpanded,
-  manualCollapsed,
-  pendingKeys,
-  inFlightKeys,
-}: {
-  axis: PivotAxis;
-  tree: PivotTreeData;
-  autoExpandLevel: number;
-  metricLabelSet: Set<string>;
-  includeMetricDepthZero: boolean;
-  manualExpanded: Set<string>;
-  manualCollapsed: Set<string>;
-  pendingKeys: Set<string>;
-  inFlightKeys: Set<string>;
-}) => {
-  const nodes = axis === 'row' ? tree.rows : tree.cols;
-  const autoSeeded = seedExpandedByLevel(
-    nodes,
-    autoExpandLevel,
-    metricLabelSet,
-    {
-      includeMetricDepthZero,
-    },
-  );
-  const next = new Set<string>([
-    ...autoSeeded,
-    ...manualExpanded,
-    ...pendingKeys,
-    ...inFlightKeys,
-  ]);
-  manualCollapsed.forEach(key => next.delete(key));
   return next;
 };
 

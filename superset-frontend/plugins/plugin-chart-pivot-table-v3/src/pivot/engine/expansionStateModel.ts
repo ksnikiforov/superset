@@ -17,13 +17,14 @@
  * under the License.
  */
 
-import { PivotTreeNode, TotalPosition } from '../../types';
-import { decodeMetricKey, parsePath, serializePath } from '../../utils';
 import {
-  buildVisibleCols,
-  buildVisibleRows,
-  createColLeavesBuilder,
-} from '../visibility';
+  type PivotAxis,
+  type PivotTreeData,
+  PivotTreeNode,
+  TotalPosition,
+} from '../../types';
+import { decodeMetricKey, parsePath, serializePath } from '../../utils';
+import { buildVisiblePivotAxes } from '../visibility';
 import { countDimDepth } from '../metricsTotals';
 import { rootKey } from '../viewModel';
 
@@ -61,6 +62,44 @@ export const seedExpandedByLevel = (
       next.add(node.key);
     }
   });
+  return next;
+};
+
+export const buildDesiredExpandedKeys = ({
+  axis,
+  tree,
+  autoExpandLevel,
+  metricLabelSet,
+  includeMetricDepthZero,
+  manualExpanded,
+  manualCollapsed,
+  pendingKeys,
+  inFlightKeys,
+}: {
+  axis: PivotAxis;
+  tree: PivotTreeData;
+  autoExpandLevel: number;
+  metricLabelSet: Set<string>;
+  includeMetricDepthZero: boolean;
+  manualExpanded: Set<string>;
+  manualCollapsed: Set<string>;
+  pendingKeys: Set<string>;
+  inFlightKeys: Set<string>;
+}) => {
+  const nodes = axis === 'row' ? tree.rows : tree.cols;
+  const autoSeeded = seedExpandedByLevel(
+    nodes,
+    autoExpandLevel,
+    metricLabelSet,
+    { includeMetricDepthZero },
+  );
+  const next = new Set<string>([
+    ...autoSeeded,
+    ...manualExpanded,
+    ...pendingKeys,
+    ...inFlightKeys,
+  ]);
+  manualCollapsed.forEach(key => next.delete(key));
   return next;
 };
 
@@ -190,54 +229,34 @@ export const getVisibleExpansionKeys = ({
   shouldHideMetricGrandTotalsOnCols: boolean;
   shouldSuppressColRoot: boolean;
 }): { rows: Set<string>; cols: Set<string> } => {
-  const visibleRowsBase = buildVisibleRows({
+  const { visibleRows, visibleCols } = buildVisiblePivotAxes({
     rows: rowsNodes,
+    cols: colsNodes,
     expandedRows,
+    expandedCols,
     rowSorter,
+    colSorter,
     skipRowRoot,
     showRowRoot,
     rowTotalPosition,
     getRowChildren,
     getCollapsedRowChildren,
-  });
-  const visibleRows = shouldHideMetricGrandTotalsOnRows
-    ? visibleRowsBase.filter(row => !isMetricGrandTotalNode(row))
-    : visibleRowsBase;
-
-  const buildColLeavesWithSubtotals = createColLeavesBuilder({
-    getColChildren,
-    getCollapsedColLeaves,
-    colSorter,
+    skipColRoot,
     countDimDepth: countDimDepthFn,
-    expandedCols,
     normalizedColSubtotalLevels,
     showColRoot,
     rowTotals,
     resolvedColTotalPosition: colTotalPosition,
     resolvedColSubtotalPosition,
+    getColChildren,
+    getCollapsedColLeaves,
     isMetricGrandTotalNode,
     isMetricSubtotalNode,
+    isMetricTokenValue,
+    shouldHideMetricGrandTotalsOnRows,
+    shouldHideMetricGrandTotalsOnCols,
+    shouldSuppressColRoot,
   });
-  const visibleColsBase = buildVisibleCols({
-    cols: colsNodes,
-    skipColRoot,
-    colSorter,
-    getColChildren,
-    buildColLeavesWithSubtotals,
-  });
-  let visibleCols = shouldHideMetricGrandTotalsOnCols
-    ? visibleColsBase.filter(col => !isMetricGrandTotalNode(col))
-    : visibleColsBase;
-
-  if (shouldSuppressColRoot) {
-    const hasMetricLeaves = visibleCols.some(col =>
-      col.path.some(val => isMetricTokenValue(val)),
-    );
-    if (hasMetricLeaves) {
-      const withoutRoot = visibleCols.filter(col => col.key !== rootKey);
-      visibleCols = withoutRoot.length > 0 ? withoutRoot : visibleCols;
-    }
-  }
 
   const visibleColKeys = new Set<string>();
   visibleCols.forEach(col => {
