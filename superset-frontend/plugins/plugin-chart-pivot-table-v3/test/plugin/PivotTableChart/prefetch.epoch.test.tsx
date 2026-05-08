@@ -20,12 +20,7 @@
 import { render, waitFor, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
-import {
-  applyMetricAxis,
-  buildTreeFromRecords,
-  mergeTrees,
-  parsePath,
-} from '../../../src/utils';
+import { mergeTrees, parsePath } from '../../../src/utils';
 import {
   fetchPivotBranch,
   peekPivotBranchCache,
@@ -37,6 +32,10 @@ import {
   type FetchPivotBranchesBatchResult,
 } from '../../../src/pivot/query/fetchPivotBranchesBatch';
 import { buildFormData } from '../fixtures/pivotFormData';
+import {
+  buildTreeFromRecords,
+  applyMetricAxis,
+} from '../../../src/pivot/core/tree';
 
 jest.mock('../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../src/fetchPivotBranch');

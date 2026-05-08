@@ -19,10 +19,14 @@
 import { GenericDataType, SupersetClient } from '@superset-ui/core';
 import { fireEvent, render, screen, waitFor } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
-import { applyMetricAxis, buildTreeFromRecords } from '../../../src/utils';
+
 import { clearPivotBranchCache } from '../../../src/fetchPivotBranch';
 import { MetricsLayoutEnum } from '../../../src/types';
 import { buildFormData } from '../fixtures/pivotFormData';
+import {
+  buildTreeFromRecords,
+  applyMetricAxis,
+} from '../../../src/pivot/core/tree';
 
 jest.mock('@superset-ui/core', () => {
   const actual = jest.requireActual('@superset-ui/core');

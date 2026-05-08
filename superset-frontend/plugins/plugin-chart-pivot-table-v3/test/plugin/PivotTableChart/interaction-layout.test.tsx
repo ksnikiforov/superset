@@ -23,12 +23,7 @@ import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
 import { resolveInteractionFormData } from '../../../src/pivot/layout/resolveInteractionLayout';
 import { buildInitialQuerySpecs } from '../../../src/pivot/query/specs';
 import { buildInitialTreeFromSpecResults } from '../../../src/pivot/runtime/ingestQueryResults';
-import {
-  applyMeasureHierarchyAxis,
-  applyMetricAxis,
-  buildTreeFromRecords,
-  mergeTrees,
-} from '../../../src/utils';
+import { mergeTrees } from '../../../src/utils';
 import { MetricsLayoutEnum, PivotRuntimeLayout } from '../../../src/types';
 import {
   applyMeasureLeafValuesToTree,
@@ -38,6 +33,11 @@ import {
   buildValueLeaf,
 } from '../../../src/pivot/measureLeaves';
 import { supersetChartDataClient } from '../../../src/pivot/data/SupersetChartDataClient';
+import {
+  applyMetricAxis,
+  buildTreeFromRecords,
+  applyMeasureHierarchyAxis,
+} from '../../../src/pivot/core/tree';
 
 const buildInitialBootstrapTree = ({
   formData,

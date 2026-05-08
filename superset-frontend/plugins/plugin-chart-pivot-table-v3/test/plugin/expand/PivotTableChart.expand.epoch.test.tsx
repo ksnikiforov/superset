@@ -20,13 +20,17 @@
 import { fireEvent, render, screen, waitFor, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
-import { applyMetricAxis, buildTreeFromRecords } from '../../../src/utils';
+
 import {
   fetchPivotBranch,
   peekPivotBranchCache,
 } from '../../../src/fetchPivotBranch';
 import type { FetchPivotBranchResult } from '../../../src/fetchPivotBranch';
 import { buildFormData } from '../fixtures/pivotFormData';
+import {
+  buildTreeFromRecords,
+  applyMetricAxis,
+} from '../../../src/pivot/core/tree';
 
 jest.mock('../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../src/fetchPivotBranch');

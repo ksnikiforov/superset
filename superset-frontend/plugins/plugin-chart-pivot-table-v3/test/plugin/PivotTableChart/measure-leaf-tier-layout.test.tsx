@@ -21,16 +21,16 @@ import { render, screen, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum, PivotTableQueryFormData } from '../../../src/types';
 import { buildFormData } from '../fixtures/pivotFormData';
-import {
-  applyMeasureHierarchyAxis,
-  buildTreeFromRecords,
-  METRICS_PLACEHOLDER,
-} from '../../../src/utils';
+import { METRICS_PLACEHOLDER } from '../../../src/utils';
 import {
   applyMeasureLeafValuesToTree,
   buildBuiltInLeaf,
   buildValueLeaf,
 } from '../../../src/pivot/measureLeaves';
+import {
+  buildTreeFromRecords,
+  applyMeasureHierarchyAxis,
+} from '../../../src/pivot/core/tree';
 
 describe('PivotTableChart measure leaf tier indentation', () => {
   const baseProps = {

@@ -28,9 +28,6 @@ import {
 } from '../../../src/types';
 import { buildFormData } from '../fixtures/pivotFormData';
 import {
-  applyMetricAxis,
-  buildTreeFromRecords,
-  applyMeasureHierarchyAxis,
   encodeMetricKey,
   METRICS_PLACEHOLDER,
   mergeTrees,
@@ -47,6 +44,11 @@ import {
 } from '../../../src/pivot/measureLeaves';
 import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
 import { resolveMockBranchFetchResult } from '../fixtures/factBatches';
+import {
+  buildTreeFromRecords,
+  applyMeasureHierarchyAxis,
+  applyMetricAxis,
+} from '../../../src/pivot/core/tree';
 
 jest.mock('../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../src/fetchPivotBranch');

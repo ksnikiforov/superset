@@ -37,13 +37,15 @@ import {
 import {
   encodeMetricKey,
   encodeMeasureLeafKey,
-  applyMetricAxis,
-  buildTreeFromRecords,
   METRICS_PLACEHOLDER,
   serializeCellKey,
   serializePath,
   SUBTOTAL_TOKEN,
 } from '../../src/utils';
+import {
+  applyMetricAxis,
+  buildTreeFromRecords,
+} from '../../src/pivot/core/tree';
 import { formatQueryName } from '../../src/pivot/query/queryName';
 import { buildLayoutContext } from '../../src/pivot/layout/LayoutContext';
 import { buildBranchQuerySpecs } from '../../src/pivot/query/specs';

@@ -25,8 +25,6 @@ import {
 } from '../../src/types';
 import { buildColumnHeaderRows } from '../../src/pivot/viewModel';
 import {
-  applyMetricAxis,
-  buildTreeFromRecords,
   decodeMetricKey,
   encodeMetricKey,
   mergeTrees,
@@ -41,6 +39,10 @@ import {
   transferDimensionSettingsAcrossAxes,
   formatPivotLabelValue,
 } from '../../src/utils';
+import {
+  buildTreeFromRecords,
+  applyMetricAxis,
+} from '../../src/pivot/core/tree';
 
 const rootKey = serializePath([]);
 

@@ -694,6 +694,7 @@ const applyMeasureAxis = ({
   return result;
 };
 
+// Legacy flat-metric wrapper kept for direct tree fixtures.
 export const applyMetricAxis = (
   tree: PivotTreeData,
   metrics: QueryFormMetric[],
@@ -752,6 +753,8 @@ export function applyMeasureHierarchyAxis(
   metricPosition?: number,
   legacyMetricLabelMap?: Record<string, string>,
 ): PivotTreeData {
+  // Temporary runtime bridge until measure-axis construction fully moves under
+  // runtime/materializePivotTree.
   const usesProgram = typeof programOrMetricsLayout === 'object';
   const program = usesProgram
     ? programOrMetricsLayout
@@ -799,6 +802,8 @@ export function applyMeasureHierarchyAxis(
   });
 }
 
+// Legacy raw-record tree fixture helper. Production paths materialize facts via
+// runtime/materializePivotTree.
 export const buildTreeFromRecords = (
   records: DataRecord[],
   metrics: QueryFormMetric[],

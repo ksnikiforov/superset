@@ -28,12 +28,14 @@ import {
 } from '../../../src/types';
 import {
   METRICS_PLACEHOLDER,
-  applyMetricAxis,
-  buildTreeFromRecords,
   getStableColumnKey,
   mergeTrees,
   serializePath,
 } from '../../../src/utils';
+import {
+  applyMetricAxis,
+  buildTreeFromRecords,
+} from '../../../src/pivot/core/tree';
 import { supersetChartDataClient } from '../../../src/pivot/data/SupersetChartDataClient';
 import {
   fetchPivotBranch,

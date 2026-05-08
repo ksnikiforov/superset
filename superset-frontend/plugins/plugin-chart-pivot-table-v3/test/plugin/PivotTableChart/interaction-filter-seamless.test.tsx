@@ -20,9 +20,13 @@ import { fireEvent, render, screen, waitFor, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { MetricsLayoutEnum, PivotRuntimeLayout } from '../../../src/types';
-import { applyMetricAxis, buildTreeFromRecords } from '../../../src/utils';
+
 import { supersetChartDataClient } from '../../../src/pivot/data/SupersetChartDataClient';
 import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
+import {
+  buildTreeFromRecords,
+  applyMetricAxis,
+} from '../../../src/pivot/core/tree';
 
 jest.mock('../../../src/pivot/chart/PivotInteractionPanel', () => ({
   PivotInteractionPanel: ({

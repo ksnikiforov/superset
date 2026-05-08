@@ -87,9 +87,6 @@ export {
   SUBTOTAL_TOKEN,
 } from './pivot/core/tokens';
 export {
-  applyMeasureHierarchyAxis,
-  applyMetricAxis,
-  buildTreeFromRecords,
   formatPivotLabelValue,
   injectRowSubtotalLeaves,
   labelRowSubtotalLeaves,

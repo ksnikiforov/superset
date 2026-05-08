@@ -21,16 +21,17 @@ import { fireEvent, render, screen } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { MetricsLayoutEnum, PivotRuntimeLayout } from '../../../src/types';
-import {
-  applyMeasureHierarchyAxis,
-  buildTreeFromRecords,
-} from '../../../src/utils';
+
 import {
   applyMeasureLeafValuesToTree,
   buildMeasureLeafOutputKey,
   buildBuiltInLeaf,
   buildValueLeaf,
 } from '../../../src/pivot/measureLeaves';
+import {
+  buildTreeFromRecords,
+  applyMeasureHierarchyAxis,
+} from '../../../src/pivot/core/tree';
 
 describe('PivotTableChart sorting', () => {
   const withMetricsOnColumns = (

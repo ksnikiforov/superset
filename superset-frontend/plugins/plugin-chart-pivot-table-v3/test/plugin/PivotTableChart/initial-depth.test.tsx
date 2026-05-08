@@ -28,12 +28,14 @@ import {
 } from '../../../src/types';
 import { buildFormData } from '../fixtures/pivotFormData';
 import {
-  applyMetricAxis,
-  buildTreeFromRecords,
   serializeCellKey,
   serializePath,
   SUBTOTAL_TOKEN,
 } from '../../../src/utils';
+import {
+  buildTreeFromRecords,
+  applyMetricAxis,
+} from '../../../src/pivot/core/tree';
 
 describe('PivotTableChart initial depth on collapsed render', () => {
   const metricsVariants = [

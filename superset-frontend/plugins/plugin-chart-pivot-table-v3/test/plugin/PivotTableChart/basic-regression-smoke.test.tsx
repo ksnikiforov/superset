@@ -20,12 +20,11 @@ import { fireEvent, render, screen, waitFor, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { MetricsLayoutEnum, PivotRuntimeLayout } from '../../../src/types';
+import { METRICS_PLACEHOLDER, getStableColumnKey } from '../../../src/utils';
 import {
-  METRICS_PLACEHOLDER,
   applyMetricAxis,
   buildTreeFromRecords,
-  getStableColumnKey,
-} from '../../../src/utils';
+} from '../../../src/pivot/core/tree';
 import { supersetChartDataClient } from '../../../src/pivot/data/SupersetChartDataClient';
 import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
 

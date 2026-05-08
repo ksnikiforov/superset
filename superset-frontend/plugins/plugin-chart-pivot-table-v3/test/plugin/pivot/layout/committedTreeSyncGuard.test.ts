@@ -22,18 +22,17 @@ import {
   PivotTreeNode,
   MetricsLayoutEnum,
 } from '../../../../src/types';
-import {
-  applyMetricAxis,
-  buildTreeFromRecords,
-  mergeTrees,
-  serializePath,
-} from '../../../../src/utils';
+import { mergeTrees, serializePath } from '../../../../src/utils';
 import {
   canProjectValueAxisShrinkWithoutFetch,
   shouldSyncCommittedTreeFromProps,
   treeHasStaleCoverageRegression,
   treeHasRuntimeLayoutCoverage,
 } from '../../../../src/pivot/layout/committedTreeSyncGuard';
+import {
+  buildTreeFromRecords,
+  applyMetricAxis,
+} from '../../../../src/pivot/core/tree';
 
 const rootKey = serializePath([]);
 

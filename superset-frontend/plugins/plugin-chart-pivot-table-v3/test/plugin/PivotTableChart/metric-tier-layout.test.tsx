@@ -22,13 +22,7 @@ import { renderHook } from '@testing-library/react-hooks';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum, PivotTableQueryFormData } from '../../../src/types';
 import { buildFormData } from '../fixtures/pivotFormData';
-import {
-  applyMetricAxis,
-  applyMeasureHierarchyAxis,
-  buildTreeFromRecords,
-  METRICS_PLACEHOLDER,
-  serializePath,
-} from '../../../src/utils';
+import { METRICS_PLACEHOLDER, serializePath } from '../../../src/utils';
 import {
   applyMeasureLeafValuesToTree,
   buildBuiltInLeaf,
@@ -36,6 +30,11 @@ import {
 } from '../../../src/pivot/measureLeaves';
 import { usePivotLayout } from '../../../src/pivot/chart/usePivotLayout';
 import { usePivotRenderModel } from '../../../src/pivot/chart/usePivotRenderModel';
+import {
+  applyMeasureHierarchyAxis,
+  buildTreeFromRecords,
+  applyMetricAxis,
+} from '../../../src/pivot/core/tree';
 
 describe('PivotTableChart metric tier indentation and toggles', () => {
   const metricsVariants = [

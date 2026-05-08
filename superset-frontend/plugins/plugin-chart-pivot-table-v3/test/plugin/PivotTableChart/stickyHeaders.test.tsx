@@ -20,13 +20,12 @@
 import { render, waitFor, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { buildFormData } from '../fixtures/pivotFormData';
-import {
-  applyMetricAxis,
-  buildTreeFromRecords,
-  mergeTrees,
-  METRICS_PLACEHOLDER,
-} from '../../../src/utils';
+import { mergeTrees, METRICS_PLACEHOLDER } from '../../../src/utils';
 import { MetricsLayoutEnum } from '../../../src/types';
+import {
+  buildTreeFromRecords,
+  applyMetricAxis,
+} from '../../../src/pivot/core/tree';
 
 describe('PivotTableChart sticky headers', () => {
   const metrics = ['metric1'];

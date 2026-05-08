@@ -22,8 +22,6 @@ import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
 import { baseFormData, buildFormData } from '../fixtures/pivotFormData';
 import {
-  applyMetricAxis,
-  buildTreeFromRecords,
   mergeTrees,
   METRICS_PLACEHOLDER,
   serializeCellKey,
@@ -33,6 +31,10 @@ import {
 } from '../../../src/utils';
 import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
 import { resolveMockBranchFetchResult } from '../fixtures/factBatches';
+import {
+  buildTreeFromRecords,
+  applyMetricAxis,
+} from '../../../src/pivot/core/tree';
 
 jest.mock('../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../src/fetchPivotBranch');

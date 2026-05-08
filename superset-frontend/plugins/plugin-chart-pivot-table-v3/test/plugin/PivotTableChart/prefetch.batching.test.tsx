@@ -23,7 +23,7 @@ import {
   PivotExpansionState,
   PivotTreeData,
 } from '../../../src/types';
-import { applyMetricAxis, buildTreeFromRecords } from '../../../src/utils';
+
 import {
   fetchPivotBranch,
   peekPivotBranchCache,
@@ -38,6 +38,10 @@ import {
   buildMockBatchFetchResult,
   buildMockBranchFetchResult,
 } from '../fixtures/factBatches';
+import {
+  buildTreeFromRecords,
+  applyMetricAxis,
+} from '../../../src/pivot/core/tree';
 
 jest.mock('../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../src/fetchPivotBranch');

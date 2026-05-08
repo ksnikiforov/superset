@@ -31,8 +31,6 @@ import {
 } from '../../../../src/types';
 import { buildFormData } from '../../fixtures/pivotFormData';
 import {
-  applyMetricAxis,
-  buildTreeFromRecords,
   encodeMetricKey,
   mergeTrees,
   METRICS_PLACEHOLDER,
@@ -40,6 +38,10 @@ import {
   serializePath,
   SUBTOTAL_TOKEN,
 } from '../../../../src/utils';
+import {
+  buildTreeFromRecords,
+  applyMetricAxis,
+} from '../../../../src/pivot/core/tree';
 
 type TestPivotTableChartProps = ComponentProps<typeof TestPivotTableChart>;
 
