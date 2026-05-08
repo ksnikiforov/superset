@@ -27,10 +27,8 @@ import {
   buildBuiltInLeaf,
   buildValueLeaf,
 } from '../../../src/pivot/measureLeaves';
-import {
-  buildTreeFromRecords,
-  applyMeasureHierarchyAxis,
-} from '../../../src/pivot/core/tree';
+import { buildTreeFromRecords } from '../../../src/pivot/core/tree';
+import { applyMeasureHierarchyAxis } from '../../../src/pivot/runtime/materializePivotTree';
 
 describe('PivotTableChart measure leaf tier indentation', () => {
   const baseProps = {

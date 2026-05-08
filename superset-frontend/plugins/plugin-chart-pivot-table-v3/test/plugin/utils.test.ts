@@ -29,7 +29,6 @@ import {
   encodeMetricKey,
   mergeTrees,
   normalizeSubtotalLevels,
-  labelRowSubtotalLeaves,
   parseThemeColors,
   resolveExpandLevel,
   normalizeExpandLevel,
@@ -39,10 +38,11 @@ import {
   transferDimensionSettingsAcrossAxes,
   formatPivotLabelValue,
 } from '../../src/utils';
+import { buildTreeFromRecords } from '../../src/pivot/core/tree';
 import {
-  buildTreeFromRecords,
+  labelRowSubtotalLeaves,
   applyMetricAxis,
-} from '../../src/pivot/core/tree';
+} from '../../src/pivot/runtime/materializePivotTree';
 
 const rootKey = serializePath([]);
 

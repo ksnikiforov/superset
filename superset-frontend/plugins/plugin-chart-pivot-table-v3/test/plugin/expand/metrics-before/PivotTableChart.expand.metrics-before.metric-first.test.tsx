@@ -23,8 +23,6 @@ import { MetricsLayoutEnum, type PivotTreeData } from '../../../../src/types';
 import { baseFormData, buildFormData } from '../../fixtures/pivotFormData';
 import {
   encodeMetricKey,
-  injectRowSubtotalLeaves,
-  labelRowSubtotalLeaves,
   METRICS_PLACEHOLDER,
   serializeCellKey,
   serializePath,
@@ -34,10 +32,12 @@ import {
   type FetchPivotBranchParams,
 } from '../../../../src/fetchPivotBranch';
 import { buildMockBranchFetchResult } from '../../fixtures/factBatches';
+import { buildTreeFromRecords } from '../../../../src/pivot/core/tree';
 import {
-  buildTreeFromRecords,
+  injectRowSubtotalLeaves,
+  labelRowSubtotalLeaves,
   applyMetricAxis,
-} from '../../../../src/pivot/core/tree';
+} from '../../../../src/pivot/runtime/materializePivotTree';
 
 jest.mock('../../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../../src/fetchPivotBranch');

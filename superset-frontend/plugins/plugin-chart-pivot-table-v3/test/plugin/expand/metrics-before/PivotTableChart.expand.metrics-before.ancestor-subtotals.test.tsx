@@ -41,10 +41,8 @@ import {
   type FetchPivotBranchesBatchResult,
 } from '../../../../src/pivot/query/fetchPivotBranchesBatch';
 import { formatQueryName } from '../../../../src/pivot/query/queryName';
-import {
-  buildTreeFromRecords,
-  applyMetricAxis,
-} from '../../../../src/pivot/core/tree';
+import { buildTreeFromRecords } from '../../../../src/pivot/core/tree';
+import { applyMetricAxis } from '../../../../src/pivot/runtime/materializePivotTree';
 
 jest.mock('../../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../../src/fetchPivotBranch');

@@ -27,10 +27,8 @@ import {
   serializePath,
 } from '../../../src/utils';
 import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
-import {
-  buildTreeFromRecords,
-  applyMetricAxis,
-} from '../../../src/pivot/core/tree';
+import { buildTreeFromRecords } from '../../../src/pivot/core/tree';
+import { applyMetricAxis } from '../../../src/pivot/runtime/materializePivotTree';
 
 jest.mock('../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../src/fetchPivotBranch');

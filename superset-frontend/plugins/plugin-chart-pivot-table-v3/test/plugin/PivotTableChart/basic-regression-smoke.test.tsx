@@ -21,12 +21,10 @@ import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { MetricsLayoutEnum, PivotRuntimeLayout } from '../../../src/types';
 import { METRICS_PLACEHOLDER, getStableColumnKey } from '../../../src/utils';
-import {
-  applyMetricAxis,
-  buildTreeFromRecords,
-} from '../../../src/pivot/core/tree';
+import { buildTreeFromRecords } from '../../../src/pivot/core/tree';
 import { supersetChartDataClient } from '../../../src/pivot/data/SupersetChartDataClient';
 import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
+import { applyMetricAxis } from '../../../src/pivot/runtime/materializePivotTree';
 
 jest.mock('../../../src/pivot/data/SupersetChartDataClient', () => {
   const actual = jest.requireActual(

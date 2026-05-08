@@ -29,7 +29,6 @@ import {
   PivotTreeData,
 } from '../../../src/types';
 import {
-  injectRowSubtotalLeaves,
   mergeTrees,
   METRIC_TOKEN_PREFIX,
   PATH_DIVIDER,
@@ -54,10 +53,11 @@ import {
   buildMockBranchFetchResult,
   resolveMockBranchFetchResult,
 } from '../fixtures/factBatches';
+import { buildTreeFromRecords } from '../../../src/pivot/core/tree';
 import {
-  buildTreeFromRecords,
+  injectRowSubtotalLeaves,
   applyMetricAxis,
-} from '../../../src/pivot/core/tree';
+} from '../../../src/pivot/runtime/materializePivotTree';
 
 jest.mock('../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../src/fetchPivotBranch');

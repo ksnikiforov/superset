@@ -33,8 +33,6 @@ import {
 import { buildFormData } from '../../fixtures/pivotFormData';
 import {
   encodeMetricKey,
-  injectRowSubtotalLeaves,
-  labelRowSubtotalLeaves,
   mergeTrees,
   METRICS_PLACEHOLDER,
   serializeCellKey,
@@ -46,11 +44,13 @@ import {
   buildBuiltInLeaf,
   buildValueLeaf,
 } from '../../../../src/pivot/measureLeaves';
+import { buildTreeFromRecords } from '../../../../src/pivot/core/tree';
 import {
+  injectRowSubtotalLeaves,
+  labelRowSubtotalLeaves,
   applyMeasureHierarchyAxis,
-  buildTreeFromRecords,
   applyMetricAxis,
-} from '../../../../src/pivot/core/tree';
+} from '../../../../src/pivot/runtime/materializePivotTree';
 
 type TestPivotTableChartProps = ComponentProps<typeof TestPivotTableChart>;
 

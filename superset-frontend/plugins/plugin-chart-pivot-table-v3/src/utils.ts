@@ -86,12 +86,7 @@ export {
   SUBTOTAL_LABEL,
   SUBTOTAL_TOKEN,
 } from './pivot/core/tokens';
-export {
-  formatPivotLabelValue,
-  injectRowSubtotalLeaves,
-  labelRowSubtotalLeaves,
-  mergeTrees,
-} from './pivot/core/tree';
+export { formatPivotLabelValue, mergeTrees } from './pivot/core/tree';
 export const PIVOT_THEME_PRESETS: Record<string, string> = {
   blue: supersetTheme.colorPrimaryBg,
   peach: supersetTheme.colorWarningBg,

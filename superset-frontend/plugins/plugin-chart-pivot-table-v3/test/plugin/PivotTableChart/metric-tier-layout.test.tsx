@@ -30,11 +30,11 @@ import {
 } from '../../../src/pivot/measureLeaves';
 import { usePivotLayout } from '../../../src/pivot/chart/usePivotLayout';
 import { usePivotRenderModel } from '../../../src/pivot/chart/usePivotRenderModel';
+import { buildTreeFromRecords } from '../../../src/pivot/core/tree';
 import {
   applyMeasureHierarchyAxis,
-  buildTreeFromRecords,
   applyMetricAxis,
-} from '../../../src/pivot/core/tree';
+} from '../../../src/pivot/runtime/materializePivotTree';
 
 describe('PivotTableChart metric tier indentation and toggles', () => {
   const metricsVariants = [

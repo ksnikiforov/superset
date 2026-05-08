@@ -42,15 +42,13 @@ import {
   serializePath,
   SUBTOTAL_TOKEN,
 } from '../../src/utils';
-import {
-  applyMetricAxis,
-  buildTreeFromRecords,
-} from '../../src/pivot/core/tree';
+import { buildTreeFromRecords } from '../../src/pivot/core/tree';
 import { formatQueryName } from '../../src/pivot/query/queryName';
 import { buildLayoutContext } from '../../src/pivot/layout/LayoutContext';
 import { buildBranchQuerySpecs } from '../../src/pivot/query/specs';
 import { createPivotFactStore } from '../../src/pivot/runtime/factStore';
 import { buildFormData } from './fixtures/pivotFormData';
+import { applyMetricAxis } from '../../src/pivot/runtime/materializePivotTree';
 
 jest.mock('@superset-ui/core', () => {
   const actual = jest.requireActual('@superset-ui/core');

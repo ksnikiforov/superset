@@ -44,11 +44,11 @@ import {
 } from '../../../src/pivot/measureLeaves';
 import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
 import { resolveMockBranchFetchResult } from '../fixtures/factBatches';
+import { buildTreeFromRecords } from '../../../src/pivot/core/tree';
 import {
-  buildTreeFromRecords,
   applyMeasureHierarchyAxis,
   applyMetricAxis,
-} from '../../../src/pivot/core/tree';
+} from '../../../src/pivot/runtime/materializePivotTree';
 
 jest.mock('../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../src/fetchPivotBranch');

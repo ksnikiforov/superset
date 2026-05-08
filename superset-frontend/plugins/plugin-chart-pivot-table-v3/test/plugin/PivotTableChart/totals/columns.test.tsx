@@ -38,10 +38,8 @@ import {
   serializePath,
   SUBTOTAL_TOKEN,
 } from '../../../../src/utils';
-import {
-  buildTreeFromRecords,
-  applyMetricAxis,
-} from '../../../../src/pivot/core/tree';
+import { buildTreeFromRecords } from '../../../../src/pivot/core/tree';
+import { applyMetricAxis } from '../../../../src/pivot/runtime/materializePivotTree';
 
 type TestPivotTableChartProps = ComponentProps<typeof TestPivotTableChart>;
 

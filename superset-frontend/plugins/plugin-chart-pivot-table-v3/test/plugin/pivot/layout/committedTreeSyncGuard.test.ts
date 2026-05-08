@@ -29,10 +29,8 @@ import {
   treeHasStaleCoverageRegression,
   treeHasRuntimeLayoutCoverage,
 } from '../../../../src/pivot/layout/committedTreeSyncGuard';
-import {
-  buildTreeFromRecords,
-  applyMetricAxis,
-} from '../../../../src/pivot/core/tree';
+import { buildTreeFromRecords } from '../../../../src/pivot/core/tree';
+import { applyMetricAxis } from '../../../../src/pivot/runtime/materializePivotTree';
 
 const rootKey = serializePath([]);
 

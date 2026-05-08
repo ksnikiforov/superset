@@ -33,11 +33,11 @@ import {
   buildValueLeaf,
 } from '../../../src/pivot/measureLeaves';
 import { supersetChartDataClient } from '../../../src/pivot/data/SupersetChartDataClient';
+import { buildTreeFromRecords } from '../../../src/pivot/core/tree';
 import {
   applyMetricAxis,
-  buildTreeFromRecords,
   applyMeasureHierarchyAxis,
-} from '../../../src/pivot/core/tree';
+} from '../../../src/pivot/runtime/materializePivotTree';
 
 const buildInitialBootstrapTree = ({
   formData,

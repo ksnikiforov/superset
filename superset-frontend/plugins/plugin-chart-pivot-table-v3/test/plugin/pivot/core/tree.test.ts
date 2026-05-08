@@ -26,8 +26,6 @@ import {
   encodeMetricKey,
 } from '../../../../src/pivot/core/tokens';
 import {
-  applyMetricAxis,
-  applyMeasureHierarchyAxis,
   buildTreeFromRecords,
   mergeTrees,
 } from '../../../../src/pivot/core/tree';
@@ -35,6 +33,10 @@ import {
   buildBuiltInLeaf,
   buildValueLeaf,
 } from '../../../../src/pivot/measureLeaves';
+import {
+  applyMetricAxis,
+  applyMeasureHierarchyAxis,
+} from '../../../../src/pivot/runtime/materializePivotTree';
 
 describe('pivot/core/tree', () => {
   it('labels null row values as (NULL)', () => {

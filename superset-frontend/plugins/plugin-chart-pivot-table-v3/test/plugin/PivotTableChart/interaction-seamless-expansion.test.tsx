@@ -32,10 +32,7 @@ import {
   mergeTrees,
   serializePath,
 } from '../../../src/utils';
-import {
-  applyMetricAxis,
-  buildTreeFromRecords,
-} from '../../../src/pivot/core/tree';
+import { buildTreeFromRecords } from '../../../src/pivot/core/tree';
 import { supersetChartDataClient } from '../../../src/pivot/data/SupersetChartDataClient';
 import {
   fetchPivotBranch,
@@ -44,6 +41,7 @@ import {
 } from '../../../src/fetchPivotBranch';
 import { type PivotFactStoreBatch } from '../../../src/pivot/runtime/factStore';
 import { buildMockBranchFetchResult } from '../fixtures/factBatches';
+import { applyMetricAxis } from '../../../src/pivot/runtime/materializePivotTree';
 
 jest.mock('../../../src/pivot/data/SupersetChartDataClient', () => {
   const actual = jest.requireActual(
