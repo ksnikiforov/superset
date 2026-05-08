@@ -216,39 +216,6 @@ export const dropDescendants = (
   return next;
 };
 
-export const pruneFetchedDepths = ({
-  parentPath,
-  nodes,
-  fetchedDepths,
-  parentKey,
-}: {
-  parentPath: PivotTreeNode['path'];
-  nodes: Record<string, PivotTreeNode>;
-  fetchedDepths: Map<string, number>;
-  parentKey: string;
-}) => {
-  if (fetchedDepths.size === 0) {
-    return;
-  }
-  const remaining = dropDescendants(
-    parentPath,
-    new Set(fetchedDepths.keys()),
-    nodes,
-  );
-  remaining.delete(parentKey);
-  const next = new Map<string, number>();
-  remaining.forEach(key => {
-    const depth = fetchedDepths.get(key);
-    if (depth !== undefined) {
-      next.set(key, depth);
-    }
-  });
-  fetchedDepths.clear();
-  next.forEach((value, key) => {
-    fetchedDepths.set(key, value);
-  });
-};
-
 export const pruneTreeByPrefixes = (
   tree: PivotTreeData,
   axis: PivotAxis,

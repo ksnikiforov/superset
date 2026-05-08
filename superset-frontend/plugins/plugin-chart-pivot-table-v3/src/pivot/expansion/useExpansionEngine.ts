@@ -19,7 +19,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { nanoid } from 'nanoid';
 import {
-  type DataRecordValue,
   type HandlerFunction,
   type JsonObject,
   type SetDataMaskHook,
@@ -30,12 +29,7 @@ import {
   type PivotTreeData,
   type PivotTreeNode,
 } from '../../types';
-import {
-  parsePath,
-  serializePath,
-  serializeCellKey,
-  mergeTrees,
-} from '../../utils';
+import { parsePath, mergeTrees } from '../../utils';
 import {
   coerceExpansionState,
   pruneExpandedToStablePrefix,
@@ -66,7 +60,6 @@ import { fetchPivotBranchesBatch } from '../query/fetchPivotBranchesBatch';
 import { rootKey } from '../viewModel';
 import { planGroupedExpansionTargets } from './planner';
 import { createExpansionStateStore, type ExpansionStateStore } from './store';
-import { shouldFetchForDimensionAxisChange } from '../layout/shouldFetchForLayoutChange';
 import { buildAxisCoverageKeyFromPathKey } from '../runtime/paths';
 import type { PivotProgram } from '../runtime/types';
 import {
@@ -74,7 +67,6 @@ import {
   type PivotFactStore,
   type PivotFactStoreBatch,
 } from '../runtime/factStore';
-import { METRICS_PLACEHOLDER } from '../core/tokens';
 import {
   addAncestors,
   buildDesiredExpandedKeys,
@@ -83,19 +75,19 @@ import {
   dropDescendants,
   getVisibleExpansionKeys as getVisibleExpansionKeysBase,
   isSameLayout,
-  getStablePrefixLength,
   hasNestedPendingKeys,
   planHydrationIteration,
-  pruneFetchedDepths,
   pruneTreeByPrefixes,
   resolveExpandedForMetrics as resolveExpandedForMetricsBase,
   type ExpansionVisibilityConfig,
 } from './engine';
 import {
+  buildFetchedCoverageForStableTrim,
   createFetchedFactCoverageState,
-  getFetchedAxisDepthMap,
+  pruneFetchedCoverageForCollapsedNode,
   seedFetchedCoverageFromFactBatches as seedFetchedCoverageStateFromFactBatches,
 } from './fetchedRequests';
+import { resolveLayoutTransition } from './layoutTransition';
 
 const MAX_HYDRATION_ITERATIONS = 12;
 const EMPTY_FACT_BATCHES: PivotFactStoreBatch[] = [];
@@ -115,370 +107,6 @@ type BatchFetchResult = {
 };
 
 type CombinedFetchResult = SingleFetchResult | BatchFetchResult;
-
-const isPrefix = (prefix: string[], target: string[]) =>
-  prefix.length <= target.length &&
-  prefix.every((value, idx) => value === target[idx]);
-
-const trimAxisByDepth = ({
-  tree,
-  axis,
-  maxDepth,
-  countDimDepth,
-}: {
-  tree: PivotTreeData;
-  axis: PivotAxis;
-  maxDepth: number;
-  countDimDepth: (path: PivotTreeNode['path']) => number;
-}) => {
-  const nodes = axis === 'row' ? tree.rows : tree.cols;
-  const nextNodes: Record<string, PivotTreeNode> = {};
-  const removedKeys = new Set<string>();
-  let hasChanges = false;
-  Object.entries(nodes).forEach(([key, node]) => {
-    const depth = countDimDepth(node.path);
-    if (depth > maxDepth) {
-      removedKeys.add(key);
-      hasChanges = true;
-      return;
-    }
-    let nextNode = node;
-    if (depth >= maxDepth && node.hasChildren) {
-      nextNode = { ...node, hasChildren: false };
-      hasChanges = true;
-    }
-    nextNodes[key] = nextNode;
-  });
-  if (!hasChanges) {
-    return { tree, removedKeys };
-  }
-  const nextTree =
-    axis === 'row'
-      ? { ...tree, rows: nextNodes }
-      : { ...tree, cols: nextNodes };
-  return { tree: nextTree, removedKeys };
-};
-
-const promoteAxisForDepth = ({
-  tree,
-  axis,
-  maxDepth,
-  countDimDepth,
-  isMetricTokenValue,
-  allowMetricPromotion = false,
-}: {
-  tree: PivotTreeData;
-  axis: PivotAxis;
-  maxDepth: number;
-  countDimDepth: (path: PivotTreeNode['path']) => number;
-  isMetricTokenValue: (value: unknown) => boolean;
-  allowMetricPromotion?: boolean;
-}) => {
-  const nodes = axis === 'row' ? tree.rows : tree.cols;
-  let hasChanges = false;
-  const nextNodes: Record<string, PivotTreeNode> = { ...nodes };
-  Object.entries(nodes).forEach(([key, node]) => {
-    if (!allowMetricPromotion && node.path.some(isMetricTokenValue)) {
-      return;
-    }
-    const depth = countDimDepth(node.path);
-    if (depth < maxDepth && !node.hasChildren) {
-      nextNodes[key] = { ...node, hasChildren: true };
-      hasChanges = true;
-    }
-  });
-  if (!hasChanges) {
-    return tree;
-  }
-  return axis === 'row'
-    ? { ...tree, rows: nextNodes }
-    : { ...tree, cols: nextNodes };
-};
-
-const trimTreeForLayout = ({
-  tree,
-  trimRowDepth,
-  trimColDepth,
-  countDimDepth,
-}: {
-  tree: PivotTreeData;
-  trimRowDepth?: number;
-  trimColDepth?: number;
-  countDimDepth: (path: PivotTreeNode['path']) => number;
-}) => {
-  let nextTree = tree;
-  const removedRows = new Set<string>();
-  const removedCols = new Set<string>();
-  if (trimRowDepth !== undefined) {
-    const result = trimAxisByDepth({
-      tree: nextTree,
-      axis: 'row',
-      maxDepth: trimRowDepth,
-      countDimDepth,
-    });
-    nextTree = result.tree;
-    result.removedKeys.forEach(key => removedRows.add(key));
-  }
-  if (trimColDepth !== undefined) {
-    const result = trimAxisByDepth({
-      tree: nextTree,
-      axis: 'col',
-      maxDepth: trimColDepth,
-      countDimDepth,
-    });
-    nextTree = result.tree;
-    result.removedKeys.forEach(key => removedCols.add(key));
-  }
-  if (removedRows.size === 0 && removedCols.size === 0) {
-    return nextTree;
-  }
-  const resolveNearestSurvivingKey = (
-    nodes: Record<string, PivotTreeNode>,
-    key: string,
-  ) => {
-    if (nodes[key]) {
-      return key;
-    }
-    const path = parsePath(key);
-    for (let size = path.length - 1; size >= 0; size -= 1) {
-      const candidate = serializePath(path.slice(0, size));
-      if (nodes[candidate]) {
-        return candidate;
-      }
-    }
-    return nodes[rootKey] ? rootKey : undefined;
-  };
-  const mergeCellValues = (
-    left?: Record<string, DataRecordValue>,
-    right?: Record<string, DataRecordValue>,
-  ) => {
-    if (!left && !right) {
-      return undefined;
-    }
-    const merged: Record<string, DataRecordValue> = { ...(left ?? {}) };
-    Object.entries(right ?? {}).forEach(([metric, value]) => {
-      const current = merged[metric];
-      const leftNum = Number(current);
-      const rightNum = Number(value);
-      if (Number.isFinite(leftNum) && Number.isFinite(rightNum)) {
-        merged[metric] = leftNum + rightNum;
-        return;
-      }
-      if (current === undefined || current === null) {
-        merged[metric] = value;
-        return;
-      }
-      if (value !== undefined && value !== null) {
-        merged[metric] = value;
-      }
-    });
-    return merged;
-  };
-  const nextCells: PivotTreeData['cells'] = {};
-  Object.entries(nextTree.cells).forEach(([, cell]) => {
-    const rowKey =
-      removedRows.has(cell.rowKey) || !nextTree.rows[cell.rowKey]
-        ? resolveNearestSurvivingKey(nextTree.rows, cell.rowKey)
-        : cell.rowKey;
-    const colKey =
-      removedCols.has(cell.colKey) || !nextTree.cols[cell.colKey]
-        ? resolveNearestSurvivingKey(nextTree.cols, cell.colKey)
-        : cell.colKey;
-    const collapsedToRowRoot =
-      trimRowDepth === 0 && cell.rowKey !== rootKey && rowKey === rootKey;
-    const collapsedToColRoot =
-      trimColDepth === 0 && cell.colKey !== rootKey && colKey === rootKey;
-    if (collapsedToRowRoot || collapsedToColRoot) {
-      return;
-    }
-    if (rowKey === undefined || colKey === undefined) {
-      return;
-    }
-    const nextKey = serializeCellKey(rowKey, colKey);
-    const existing = nextCells[nextKey];
-    const mergedValues = mergeCellValues(existing?.values, cell.values);
-    nextCells[nextKey] = {
-      ...(existing ?? cell),
-      ...cell,
-      rowKey,
-      colKey,
-      ...(mergedValues ? { values: mergedValues } : {}),
-      isSubtotal:
-        cell.isSubtotal ||
-        existing?.isSubtotal ||
-        rowKey !== cell.rowKey ||
-        colKey !== cell.colKey,
-    };
-  });
-  return { ...nextTree, cells: nextCells };
-};
-
-const remapFetchedDepthsForStableTrim = ({
-  fetchedDepthByKey,
-  stablePrefix,
-  countDimDepth,
-}: {
-  fetchedDepthByKey: Map<string, number>;
-  stablePrefix: number;
-  countDimDepth: (path: PivotTreeNode['path']) => number;
-}) => {
-  if (fetchedDepthByKey.size === 0 || stablePrefix <= 0) {
-    return new Map<string, number>();
-  }
-  const countCoverageDimDepth = (path: PivotTreeNode['path']) =>
-    countDimDepth(path.filter(value => value !== METRICS_PLACEHOLDER));
-  const next = new Map<string, number>();
-  fetchedDepthByKey.forEach((requiredDepth, key) => {
-    let candidatePath = parsePath(key);
-    while (
-      candidatePath.length > 0 &&
-      countCoverageDimDepth(candidatePath) > stablePrefix
-    ) {
-      candidatePath = candidatePath.slice(0, candidatePath.length - 1);
-    }
-    const candidateKey = serializePath(candidatePath);
-    if (candidateKey === rootKey && key !== rootKey) {
-      return;
-    }
-    const existingDepth = next.get(candidateKey);
-    next.set(
-      candidateKey,
-      existingDepth === undefined
-        ? requiredDepth
-        : Math.max(existingDepth, requiredDepth),
-    );
-  });
-  return next;
-};
-
-const mapExpandedCoverageForStableTrim = ({
-  axis,
-  expandedKeys,
-  previousNodes,
-  nextNodes,
-  stablePrefix,
-  requiredOppositeDepth,
-  countDimDepth,
-  getCoverageKey,
-}: {
-  axis: PivotAxis;
-  expandedKeys: Set<string>;
-  previousNodes: Record<string, PivotTreeNode>;
-  nextNodes: Record<string, PivotTreeNode>;
-  stablePrefix: number;
-  requiredOppositeDepth: number;
-  countDimDepth: (path: PivotTreeNode['path']) => number;
-  getCoverageKey: (axis: PivotAxis, key: string) => string;
-}) => {
-  if (expandedKeys.size === 0 || stablePrefix <= 0) {
-    return new Map<string, number>();
-  }
-  const resolveNearestSurvivingKey = (key: string) => {
-    if (nextNodes[key]) {
-      return key;
-    }
-    const path = parsePath(key);
-    for (let size = path.length - 1; size >= 0; size -= 1) {
-      const candidate = serializePath(path.slice(0, size));
-      if (nextNodes[candidate]) {
-        return candidate;
-      }
-    }
-    return nextNodes[rootKey] ? rootKey : undefined;
-  };
-  const next = new Map<string, number>();
-  expandedKeys.forEach(key => {
-    if (key === rootKey) {
-      return;
-    }
-    const node = previousNodes[key];
-    if (!node) {
-      return;
-    }
-    const hasPreviousDescendants = Object.values(previousNodes).some(
-      candidate => {
-        if (candidate.key === node.key) {
-          return false;
-        }
-        if (candidate.path.length <= node.path.length) {
-          return false;
-        }
-        return node.path.every(
-          (value, index) => value === candidate.path[index],
-        );
-      },
-    );
-    if (!node.hasChildren && !hasPreviousDescendants) {
-      return;
-    }
-    let candidatePath = node.path;
-    while (
-      candidatePath.length > 0 &&
-      countDimDepth(candidatePath) > stablePrefix
-    ) {
-      candidatePath = candidatePath.slice(0, candidatePath.length - 1);
-    }
-    const candidateKey = serializePath(candidatePath);
-    const resolvedKey = resolveNearestSurvivingKey(candidateKey);
-    if (resolvedKey === undefined || resolvedKey === rootKey) {
-      return;
-    }
-    const resolvedNode = nextNodes[resolvedKey];
-    if (!resolvedNode || countDimDepth(resolvedNode.path) > stablePrefix) {
-      return;
-    }
-    const coverageKey = getCoverageKey(axis, resolvedKey);
-    const existingDepth = next.get(coverageKey);
-    next.set(
-      coverageKey,
-      existingDepth === undefined
-        ? requiredOppositeDepth
-        : Math.max(existingDepth, requiredOppositeDepth),
-    );
-  });
-  return next;
-};
-
-const promoteTreeForLayout = ({
-  tree,
-  promoteRowDepth,
-  promoteColDepth,
-  countDimDepth,
-  isMetricTokenValue,
-  allowMetricRowPromotion,
-  allowMetricColPromotion,
-}: {
-  tree: PivotTreeData;
-  promoteRowDepth?: number;
-  promoteColDepth?: number;
-  countDimDepth: (path: PivotTreeNode['path']) => number;
-  isMetricTokenValue: (value: unknown) => boolean;
-  allowMetricRowPromotion?: boolean;
-  allowMetricColPromotion?: boolean;
-}) => {
-  let nextTree = tree;
-  if (promoteRowDepth !== undefined) {
-    nextTree = promoteAxisForDepth({
-      tree: nextTree,
-      axis: 'row',
-      maxDepth: promoteRowDepth,
-      countDimDepth,
-      isMetricTokenValue,
-      allowMetricPromotion: allowMetricRowPromotion,
-    });
-  }
-  if (promoteColDepth !== undefined) {
-    nextTree = promoteAxisForDepth({
-      tree: nextTree,
-      axis: 'col',
-      maxDepth: promoteColDepth,
-      countDimDepth,
-      isMetricTokenValue,
-      allowMetricPromotion: allowMetricColPromotion,
-    });
-  }
-  return nextTree;
-};
 
 export type ExpansionEngineResult = {
   tree: PivotTreeData;
@@ -1478,14 +1106,11 @@ export const useExpansionEngine = ({
       );
       nextPending.delete(node.key);
 
-      const fetchedDepthByKey = getFetchedAxisDepthMap(
-        fetchedCoverageRef.current,
+      pruneFetchedCoverageForCollapsedNode({
+        fetchedCoverage: fetchedCoverageRef.current,
         axis,
-      );
-      pruneFetchedDepths({
         parentPath: node.path,
         nodes: axis === 'row' ? treeRef.current.rows : treeRef.current.cols,
-        fetchedDepths: fetchedDepthByKey,
         parentKey: node.key,
       });
 
@@ -1989,14 +1614,41 @@ export const useExpansionEngine = ({
     }
     previousLayoutRef.current = currentLayout;
     previousDataRef.current = data;
-    const rowsChanged = !isSameLayout(previousLayout.rows, currentLayout.rows);
-    const colsChanged = !isSameLayout(previousLayout.cols, currentLayout.cols);
-    const shouldExpandRows =
-      currentLayout.rows.length > previousLayout.rows.length &&
-      isPrefix(previousLayout.rows, currentLayout.rows);
-    const shouldExpandCols =
-      currentLayout.cols.length > previousLayout.cols.length &&
-      isPrefix(previousLayout.cols, currentLayout.cols);
+    const {
+      rowsChanged,
+      colsChanged,
+      shouldExpandRows,
+      shouldExpandCols,
+      layoutChanged,
+      sourceTree,
+      normalizedTree,
+      rowStablePrefix,
+      colStablePrefix,
+      autoExpandRowsLevelForDesired,
+      autoExpandColsLevelForDesired,
+      allowMetricRowPromotion,
+      allowMetricColPromotion,
+      shouldCarryFetchedRowsForTrim,
+      shouldCarryFetchedColsForTrim,
+    } = resolveLayoutTransition({
+      data,
+      currentTree: treeRef.current,
+      previousLayout,
+      currentLayout,
+      sessionLayout: {
+        rows: sessionExpansionState.rowKeys,
+        cols: sessionExpansionState.colKeys,
+      },
+      hasNewData,
+      effectiveExpandRowsLevel,
+      effectiveExpandColsLevel,
+      countDimDepth,
+      isMetricTokenValue,
+      metricIndexForRows,
+      metricIndexForCols,
+      groupbyRowsLength,
+      groupbyColumnsLength,
+    });
     const shouldResetExpandedRows =
       shouldResetExpandedState &&
       (sharedSignatureChanged || (rowsChanged && !shouldExpandRows));
@@ -2005,133 +1657,8 @@ export const useExpansionEngine = ({
       (sharedSignatureChanged || (colsChanged && !shouldExpandCols));
     const shouldResetExpanded =
       shouldResetExpandedRows || shouldResetExpandedCols;
-    const layoutChanged = rowsChanged || colsChanged;
-    const shouldUseCurrentTreeForLayoutProjection =
-      layoutChanged &&
-      !hasNewData &&
-      !shouldFetchForDimensionAxisChange({
-        prevRows: previousLayout.rows,
-        prevCols: previousLayout.cols,
-        nextRows: currentLayout.rows,
-        nextCols: currentLayout.cols,
-      });
-    const projectionTree = mergeTrees(data, treeRef.current);
-    const sourceTree = shouldUseCurrentTreeForLayoutProjection
-      ? projectionTree
-      : hasNewData || !layoutChanged
-        ? data
-        : treeRef.current;
-    const hasAxisDepthCoverage = (
-      nodes: Record<string, PivotTreeNode>,
-      targetDepth: number,
-    ) => {
-      if (targetDepth <= 0) {
-        return true;
-      }
-      return Object.values(nodes).some(
-        node => countDimDepth(node.path) >= targetDepth,
-      );
-    };
-    const canReuseExpandedRowData =
-      shouldExpandRows &&
-      hasAxisDepthCoverage(sourceTree.rows, currentLayout.rows.length);
-    const canReuseExpandedColData =
-      shouldExpandCols &&
-      hasAxisDepthCoverage(sourceTree.cols, currentLayout.cols.length);
-    const shouldPruneRowsForLayoutChange =
-      rowsChanged && !hasNewData && !canReuseExpandedRowData;
-    const shouldPruneColsForLayoutChange =
-      colsChanged && !hasNewData && !canReuseExpandedColData;
-    const layoutRowsForPrune = rowsChanged
-      ? previousLayout.rows
-      : (sessionExpansionState.rowKeys ?? previousLayout.rows);
-    const layoutColsForPrune = colsChanged
-      ? previousLayout.cols
-      : (sessionExpansionState.colKeys ?? previousLayout.cols);
-    const rowStablePrefix = getStablePrefixLength(
-      layoutRowsForPrune,
-      currentLayout.rows,
-    );
-    const colStablePrefix = getStablePrefixLength(
-      layoutColsForPrune,
-      currentLayout.cols,
-    );
-    const autoExpandRowsLevelForDesired =
-      shouldPruneRowsForLayoutChange && shouldExpandRows && rowStablePrefix > 0
-        ? Math.min(effectiveExpandRowsLevel, Math.max(rowStablePrefix - 1, 0))
-        : effectiveExpandRowsLevel;
-    const autoExpandColsLevelForDesired =
-      shouldPruneColsForLayoutChange && shouldExpandCols && colStablePrefix > 0
-        ? Math.min(effectiveExpandColsLevel, Math.max(colStablePrefix - 1, 0))
-        : effectiveExpandColsLevel;
     autoExpandRowsLevelRef.current = autoExpandRowsLevelForDesired;
     autoExpandColsLevelRef.current = autoExpandColsLevelForDesired;
-    const allowMetricRowPromotion =
-      metricIndexForRows !== undefined &&
-      metricIndexForRows < groupbyRowsLength;
-    const allowMetricColPromotion =
-      metricIndexForCols !== undefined &&
-      metricIndexForCols < groupbyColumnsLength;
-    const baseTree =
-      shouldPruneRowsForLayoutChange || shouldPruneColsForLayoutChange
-        ? trimTreeForLayout({
-            tree: sourceTree,
-            trimRowDepth: shouldPruneRowsForLayoutChange
-              ? rowStablePrefix
-              : undefined,
-            trimColDepth: shouldPruneColsForLayoutChange
-              ? colStablePrefix
-              : undefined,
-            countDimDepth,
-          })
-        : sourceTree;
-    const normalizedTree =
-      shouldPruneRowsForLayoutChange || shouldPruneColsForLayoutChange
-        ? promoteTreeForLayout({
-            tree: baseTree,
-            promoteRowDepth: shouldPruneRowsForLayoutChange
-              ? currentLayout.rows.length
-              : undefined,
-            promoteColDepth: shouldPruneColsForLayoutChange
-              ? currentLayout.cols.length
-              : undefined,
-            countDimDepth,
-            isMetricTokenValue,
-            allowMetricRowPromotion,
-            allowMetricColPromotion,
-          })
-        : baseTree;
-
-    const shouldCarryFetchedRowsForTrim =
-      !hasNewData &&
-      currentLayout.rows.length < previousLayout.rows.length &&
-      isPrefix(currentLayout.rows, previousLayout.rows) &&
-      rowStablePrefix > 0;
-    const shouldCarryFetchedColsForTrim =
-      !hasNewData &&
-      currentLayout.cols.length < previousLayout.cols.length &&
-      isPrefix(currentLayout.cols, previousLayout.cols) &&
-      colStablePrefix > 0;
-    const remappedFetchedRows = shouldCarryFetchedRowsForTrim
-      ? remapFetchedDepthsForStableTrim({
-          fetchedDepthByKey: getFetchedAxisDepthMap(
-            fetchedCoverageRef.current,
-            'row',
-          ),
-          stablePrefix: rowStablePrefix,
-          countDimDepth,
-        })
-      : new Map<string, number>();
-    const remappedFetchedCols = shouldCarryFetchedColsForTrim
-      ? remapFetchedDepthsForStableTrim({
-          fetchedDepthByKey: getFetchedAxisDepthMap(
-            fetchedCoverageRef.current,
-            'col',
-          ),
-          stablePrefix: colStablePrefix,
-          countDimDepth,
-        })
-      : new Map<string, number>();
     const {
       visibleRowDepth: previousVisibleRowDepth,
       visibleColDepth: previousVisibleColDepth,
@@ -2141,43 +1668,20 @@ export const useExpansionEngine = ({
       expandedCols: expandedColsRef.current,
       config: visibilityConfig,
     });
-    const expandedRowCoverage = shouldCarryFetchedRowsForTrim
-      ? mapExpandedCoverageForStableTrim({
-          axis: 'row',
-          expandedKeys: expandedRowsRef.current,
-          previousNodes: sourceTree.rows,
-          nextNodes: normalizedTree.rows,
-          stablePrefix: rowStablePrefix,
-          requiredOppositeDepth: previousVisibleColDepth,
-          countDimDepth,
-          getCoverageKey,
-        })
-      : new Map<string, number>();
-    const expandedColCoverage = shouldCarryFetchedColsForTrim
-      ? mapExpandedCoverageForStableTrim({
-          axis: 'col',
-          expandedKeys: expandedColsRef.current,
-          previousNodes: sourceTree.cols,
-          nextNodes: normalizedTree.cols,
-          stablePrefix: colStablePrefix,
-          requiredOppositeDepth: previousVisibleRowDepth,
-          countDimDepth,
-          getCoverageKey,
-        })
-      : new Map<string, number>();
-    expandedRowCoverage.forEach((depth, key) => {
-      const existing = remappedFetchedRows.get(key);
-      remappedFetchedRows.set(
-        key,
-        existing === undefined ? depth : Math.max(existing, depth),
-      );
-    });
-    expandedColCoverage.forEach((depth, key) => {
-      const existing = remappedFetchedCols.get(key);
-      remappedFetchedCols.set(
-        key,
-        existing === undefined ? depth : Math.max(existing, depth),
-      );
+    const nextFetchedCoverage = buildFetchedCoverageForStableTrim({
+      fetchedCoverage: fetchedCoverageRef.current,
+      previousTree: sourceTree,
+      nextTree: normalizedTree,
+      expandedRows: expandedRowsRef.current,
+      expandedCols: expandedColsRef.current,
+      shouldCarryRows: shouldCarryFetchedRowsForTrim,
+      shouldCarryCols: shouldCarryFetchedColsForTrim,
+      rowStablePrefix,
+      colStablePrefix,
+      previousVisibleRowDepth,
+      previousVisibleColDepth,
+      countDimDepth,
+      getCoverageKey,
     });
 
     dataEpochRef.current += 1;
@@ -2192,10 +1696,7 @@ export const useExpansionEngine = ({
     treeRef.current = normalizedTree;
     setTree(normalizedTree);
     setErrorMessage(undefined);
-    fetchedCoverageRef.current = createFetchedFactCoverageState({
-      row: remappedFetchedRows,
-      col: remappedFetchedCols,
-    });
+    fetchedCoverageRef.current = nextFetchedCoverage;
     loadingCountsRef.current = new Map();
     setLoadingKeys(new Set());
     inFlightExpandedRowsRef.current.clear();

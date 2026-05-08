@@ -52,6 +52,7 @@ import {
   resolveAxisProjection,
   resolveCollapsedValuesProjection,
 } from '../runtime/projection';
+import { pruneStaleCollapsedAxis } from './pruneCollapsedAxis';
 
 export type PivotLayoutResult = {
   layout: ReturnType<typeof buildLayoutContext>;
@@ -1334,92 +1335,6 @@ export const usePivotLayout = ({
     ],
   );
 
-  const pruneStaleCollapsedRows = useCallback(
-    (
-      currentTree: PivotTreeData,
-      parent: PivotTreeNode,
-      branch?: PivotTreeData,
-    ) => {
-      if (!branch) {
-        return currentTree;
-      }
-      if (resolvedMetricsLayout !== MetricsLayoutEnum.ROWS) {
-        return currentTree;
-      }
-      if (metricLayoutIndexOnRows === undefined) {
-        return currentTree;
-      }
-      if (metricLayoutIndexOnRows <= parent.level) {
-        return currentTree;
-      }
-      if (parent.path.some(val => isMetricTokenValue(val))) {
-        return currentTree;
-      }
-      const branchParent = branch.rows[parent.key];
-      if (!branchParent) {
-        return currentTree;
-      }
-      const branchChildren = findChildren(branch.rows, branchParent);
-      if (branchChildren.length === 0) {
-        return currentTree;
-      }
-      const validChildKeys = new Set(branchChildren.map(child => child.key));
-      const removedPrefixes: PivotTreeNode['path'][] = [];
-      Object.values(currentTree.rows).forEach(node => {
-        if (node.path.length !== parent.path.length + 1) {
-          return;
-        }
-        if (!parent.path.every((val, idx) => val === node.path[idx])) {
-          return;
-        }
-        if (validChildKeys.has(node.key)) {
-          return;
-        }
-        if (
-          isExplicitSubtotalNode(node) ||
-          isMetricGrandTotalNode(node) ||
-          isMetricSubtotalNode(node)
-        ) {
-          return;
-        }
-        removedPrefixes.push(node.path);
-      });
-      if (removedPrefixes.length === 0) {
-        return currentTree;
-      }
-      const removedKeys = new Set<string>();
-      Object.values(currentTree.rows).forEach(node => {
-        if (
-          removedPrefixes.some(prefix =>
-            prefix.every((val, idx) => val === node.path[idx]),
-          )
-        ) {
-          removedKeys.add(node.key);
-        }
-      });
-      const nextRows: PivotTreeData['rows'] = { ...currentTree.rows };
-      removedKeys.forEach(key => {
-        delete nextRows[key];
-      });
-      const nextCells: PivotTreeData['cells'] = {};
-      Object.entries(currentTree.cells).forEach(([key, cell]) => {
-        if (removedKeys.has(cell.rowKey)) {
-          return;
-        }
-        nextCells[key] = cell;
-      });
-      return { ...currentTree, rows: nextRows, cells: nextCells };
-    },
-    [
-      isExplicitSubtotalNode,
-      isMetricGrandTotalNode,
-      isMetricSubtotalNode,
-      isMetricTokenValue,
-      metricLayoutIndexOnRows,
-      resolvedMetricsLayout,
-    ],
-  );
-
   const pruneCollapsedMetricCols = useCallback(
     (
       currentTree: PivotTreeData,
@@ -1539,96 +1454,6 @@ export const usePivotLayout = ({
     ],
   );
 
-  const pruneStaleCollapsedCols = useCallback(
-    (
-      currentTree: PivotTreeData,
-      parent: PivotTreeNode,
-      branch?: PivotTreeData,
-    ) => {
-      if (!branch) {
-        return currentTree;
-      }
-      if (resolvedMetricsLayout !== MetricsLayoutEnum.COLUMNS) {
-        return currentTree;
-      }
-      if (metricLayoutIndexOnCols === undefined) {
-        return currentTree;
-      }
-      if (metricLayoutIndexOnCols <= parent.level) {
-        return currentTree;
-      }
-      if (parent.path.some(val => isMetricTokenValue(val))) {
-        return currentTree;
-      }
-      const branchParent = branch.cols[parent.key];
-      if (!branchParent) {
-        return currentTree;
-      }
-      const branchChildren = findChildren(branch.cols, branchParent);
-      if (branchChildren.length === 0) {
-        return currentTree;
-      }
-      const validChildKeys = new Set(branchChildren.map(child => child.key));
-      const removedPrefixes: PivotTreeNode['path'][] = [];
-      Object.values(currentTree.cols).forEach(node => {
-        if (node.path.length !== parent.path.length + 1) {
-          return;
-        }
-        if (!parent.path.every((val, idx) => val === node.path[idx])) {
-          return;
-        }
-        if (validChildKeys.has(node.key)) {
-          return;
-        }
-        if (metricsAtColEnd && isMetricTokenValue(node.path[parent.level])) {
-          return;
-        }
-        if (
-          isExplicitSubtotalNode(node) ||
-          isMetricGrandTotalNode(node) ||
-          isMetricSubtotalNode(node)
-        ) {
-          return;
-        }
-        removedPrefixes.push(node.path);
-      });
-      if (removedPrefixes.length === 0) {
-        return currentTree;
-      }
-      const removedKeys = new Set<string>();
-      Object.values(currentTree.cols).forEach(node => {
-        if (
-          removedPrefixes.some(prefix =>
-            prefix.every((val, idx) => val === node.path[idx]),
-          )
-        ) {
-          removedKeys.add(node.key);
-        }
-      });
-      const nextCols: PivotTreeData['cols'] = { ...currentTree.cols };
-      removedKeys.forEach(key => {
-        delete nextCols[key];
-      });
-      const nextCells: PivotTreeData['cells'] = {};
-      Object.entries(currentTree.cells).forEach(([key, cell]) => {
-        if (removedKeys.has(cell.colKey)) {
-          return;
-        }
-        nextCells[key] = cell;
-      });
-      return { ...currentTree, cols: nextCols, cells: nextCells };
-    },
-    [
-      isExplicitSubtotalNode,
-      isMetricGrandTotalNode,
-      isMetricSubtotalNode,
-      isMetricTokenValue,
-      metricsAtColEnd,
-      metricLayoutIndexOnCols,
-      resolvedMetricsLayout,
-    ],
-  );
-
   const getColChildrenForNodes = useCallback(
     (
       parent: PivotTreeNode,
@@ -1722,18 +1547,45 @@ export const usePivotLayout = ({
           parent,
           nextExpandedRows,
         );
-        pruned = pruneStaleCollapsedRows(pruned, parent, branch);
-        return pruned;
+        return pruneStaleCollapsedAxis({
+          currentTree: pruned,
+          axis: 'row',
+          parent,
+          branch,
+          resolvedMetricsLayout,
+          metricLayoutIndex: metricLayoutIndexOnRows,
+          isMetricTokenValue,
+          isExplicitSubtotalNode,
+          isMetricGrandTotalNode,
+          isMetricSubtotalNode,
+        });
       }
       let pruned = pruneCollapsedMetricCols(nextTree, parent, nextExpandedCols);
-      pruned = pruneStaleCollapsedCols(pruned, parent, branch);
-      return pruned;
+      return pruneStaleCollapsedAxis({
+        currentTree: pruned,
+        axis: 'col',
+        parent,
+        branch,
+        resolvedMetricsLayout,
+        metricLayoutIndex: metricLayoutIndexOnCols,
+        preserveMetricAtParentLevel: metricsAtColEnd,
+        isMetricTokenValue,
+        isExplicitSubtotalNode,
+        isMetricGrandTotalNode,
+        isMetricSubtotalNode,
+      });
     },
     [
+      isExplicitSubtotalNode,
+      isMetricGrandTotalNode,
+      isMetricSubtotalNode,
+      isMetricTokenValue,
+      metricLayoutIndexOnCols,
+      metricLayoutIndexOnRows,
+      metricsAtColEnd,
       pruneCollapsedMetricCols,
       pruneCollapsedMetricRows,
-      pruneStaleCollapsedCols,
-      pruneStaleCollapsedRows,
+      resolvedMetricsLayout,
     ],
   );
 

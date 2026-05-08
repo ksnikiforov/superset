@@ -291,9 +291,9 @@ Gate status:
 
 Current largest production hotspots by line count:
 
-- `useExpansionEngine.ts`: about `2575` lines. This is now the best deletion
+- `useExpansionEngine.ts`: about `2076` lines. This is still a good deletion
   target.
-- `usePivotLayout.ts`: about `1805` lines. This is still the main render/layout
+- `usePivotLayout.ts`: about `1657` lines. This is still the main render/layout
   policy hotspot.
 - `pivot/core/tree.ts`: about `948` lines, plus `ingestQueryResults.ts` at about
   `718` lines. Tree materialization is centralized in practice but not yet
@@ -327,9 +327,33 @@ Recommended next sequence:
    much hook-local layout projection and fetched-map maintenance. The reducer
    should come after those pieces are pure helpers.
 
+Latest execution of that sequence:
+
+- Collapse pruning, stable-trim fetched-depth remapping, and expanded-coverage
+  remapping now live behind `src/pivot/expansion/fetchedRequests.ts`.
+  `useExpansionEngine` no longer manipulates fetched-depth maps directly during
+  collapse or layout reinitialization.
+- The layout-change transition block is now a pure
+  `src/pivot/expansion/layoutTransition.ts` helper. It owns stable-prefix
+  layout pruning, local projection/promotion, auto-expand depth adjustment, and
+  carried fetched-coverage flags. The hook calls the helper and keeps only the
+  React state/persistence/effect orchestration.
+- Focused tests now cover stable layout trim, missing-depth layer promotion,
+  merged projection over fresh data plus current expansion tree, and fetched
+  coverage carryover after stable trims.
+- Row/column stale collapsed-branch pruning in `usePivotLayout` now shares one
+  axis-neutral `src/pivot/chart/pruneCollapsedAxis.ts` helper. The column-only
+  UX policy that preserves metric children at the parent level when metrics are
+  at the end is explicit instead of hidden in a duplicated column branch.
+- The broader metrics-between and metrics-at-end component checks passed after
+  this extraction, so no visible row/column layout behavior change was taken.
+- The reducer rewrite remains intentionally deferred. The hook is thinner, but
+  materialization and render/layout policy are still better deletion targets
+  than a reducer that would absorb legacy behavior.
+
 Potential approval checkpoints now visible:
 
-- `trimTreeForLayout` still locally merges cells when layout depth is reduced.
+- `layoutTransition.ts` still merges cells when layout depth is reduced.
   Deleting that behavior and showing only exact fetched/materialized coverage
   would remove meaningful code and avoid local aggregation, but it may make
   layout changes show less carried-over data until the new coverage is fetched
@@ -338,10 +362,10 @@ Potential approval checkpoints now visible:
   through stable-prefix pruning and coverage remapping. Simplifying this to a
   stricter reset-on-semantic-change rule could remove code, but it would change
   dashboard restore behavior after row/column edits.
-- Row and column stale collapsed-metric pruning are similar but not identical.
-  Unifying them is a good deletion opportunity only if visible row body behavior
-  and column header behavior remain the same. Any visible subtotal/header change
-  needs approval first.
+- Row and column collapsed-metric child pruning still have similar but not
+  identical branches. Unifying them is a deletion opportunity only if visible row
+  body behavior and column header behavior remain the same. Any visible
+  subtotal/header change needs approval first.
 
 Approved collapsed Values projection boundary:
 
@@ -579,14 +603,17 @@ Gate 2 has started:
 
 Immediate next step:
 
-- With the planner boundary no longer consuming raw fetched-depth maps, the next
-  deletion target is the remaining local map manipulation inside
-  `useExpansionEngine`: collapse pruning and layout-change remapping should move
-  behind the same fetched-coverage helper or disappear once coverage can be
-  rebuilt from fact-batch selectors.
-- After that, extract the layout-change transition block from
-  `useExpansionEngine` into a pure helper. That should make the eventual reducer
-  smaller instead of simply moving the current hook complexity into a new file.
+- Return to Gate 4 and introduce an explicit materialization boundary. The
+  likely next deletion-positive cut is to move the production-facing
+  `buildTreeFromFactBatches` / planned-spec materialization logic out of
+  `ingestQueryResults.ts` into `src/pivot/runtime/materializePivotTree.ts`,
+  then leave legacy `buildTreeFromRecords`, `applyMetricAxis`, and
+  `applyMeasureHierarchyAxis` as wrappers only where direct tests still need
+  them.
+- Keep shrinking `usePivotLayout` opportunistically where row/column behavior is
+  visibly identical. The next safe target is likely collapsed metric child
+  exposure, but subtotal/header presentation must stay axis-specific unless an
+  approval checkpoint says otherwise.
 - Before deleting any broad behavior branch, bring inconsistent behavior or
   edge-case behavior that unlocks large deletion wins to the user for approval
   with UX impact and deletion upside.
