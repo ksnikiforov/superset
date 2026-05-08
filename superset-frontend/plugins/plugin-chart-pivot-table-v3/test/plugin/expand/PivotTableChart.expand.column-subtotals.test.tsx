@@ -32,6 +32,7 @@ import {
   SUBTOTAL_TOKEN,
 } from '../../../src/utils';
 import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
+import { resolveMockBranchFetchResult } from '../fixtures/factBatches';
 
 jest.mock('../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../src/fetchPivotBranch');
@@ -172,6 +173,7 @@ describe('PivotTableChart column subtotal placement during expansion', () => {
 
   beforeEach(() => {
     fetchPivotBranchMock.mockClear();
+    fetchPivotBranchMock.mockImplementation(resolveMockBranchFetchResult());
   });
 
   it('keeps column subtotals adjacent to their col2 groups after expanding col1 then col2 (5 levels)', async () => {
@@ -189,8 +191,12 @@ describe('PivotTableChart column subtotal placement during expansion', () => {
     const depth4Tree = buildTreeWithDepths([1, 2, 3, 4]);
 
     fetchPivotBranchMock
-      .mockResolvedValueOnce({ data: depth2Tree })
-      .mockResolvedValueOnce({ data: depth4Tree });
+      .mockImplementationOnce(
+        resolveMockBranchFetchResult({ data: depth2Tree }),
+      )
+      .mockImplementationOnce(
+        resolveMockBranchFetchResult({ data: depth4Tree }),
+      );
 
     const { container, findByText } = render(
       <PivotTableChart
@@ -297,8 +303,12 @@ describe('PivotTableChart column subtotal placement during expansion', () => {
     const depth4Tree = buildTreeWithDepths([1, 2, 3, 4]);
 
     fetchPivotBranchMock
-      .mockResolvedValueOnce({ data: depth2Tree })
-      .mockResolvedValueOnce({ data: depth4Tree });
+      .mockImplementationOnce(
+        resolveMockBranchFetchResult({ data: depth2Tree }),
+      )
+      .mockImplementationOnce(
+        resolveMockBranchFetchResult({ data: depth4Tree }),
+      );
 
     const { container, findByText } = render(
       <PivotTableChart

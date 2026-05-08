@@ -25,8 +25,12 @@ import {
   fetchPivotBranch,
   peekPivotBranchCache,
 } from '../../../src/fetchPivotBranch';
-import type { FetchPivotBranchResult } from '../../../src/fetchPivotBranch';
+import type {
+  FetchPivotBranchParams,
+  FetchPivotBranchResult,
+} from '../../../src/fetchPivotBranch';
 import { buildFormData } from '../fixtures/pivotFormData';
+import { buildMockBranchFetchResult } from '../fixtures/factBatches';
 
 jest.mock('../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../src/fetchPivotBranch');
@@ -168,15 +172,21 @@ describe('PivotTableChart cross-axis concurrent expands', () => {
 
     const deferredRow = createDeferred<FetchPivotBranchResult>();
     const deferredCol = createDeferred<FetchPivotBranchResult>();
+    let rowParams: FetchPivotBranchParams | undefined;
+    let colParams: FetchPivotBranchParams | undefined;
 
     fetchPivotBranchMock
-      .mockImplementationOnce(() => deferredRow.promise)
-      .mockImplementationOnce(() => deferredCol.promise)
-      .mockImplementation(({ axis }) => {
-        if (axis === 'row') {
-          return Promise.resolve({ data: fullRowBranch });
-        }
-        return Promise.resolve({ data: fullColBranch });
+      .mockImplementationOnce(params => {
+        rowParams = params;
+        return deferredRow.promise;
+      })
+      .mockImplementationOnce(params => {
+        colParams = params;
+        return deferredCol.promise;
+      })
+      .mockImplementation(params => {
+        const data = params.axis === 'row' ? fullRowBranch : fullColBranch;
+        return Promise.resolve(buildMockBranchFetchResult(params, { data }));
       });
 
     const { container } = renderChart(baseTree);
@@ -240,8 +250,24 @@ describe('PivotTableChart cross-axis concurrent expands', () => {
       expect(fetchPivotBranchMock.mock.calls.length).toBeGreaterThanOrEqual(2),
     );
 
-    deferredCol.resolve({ data: colBranch });
-    deferredRow.resolve({ data: rowBranch });
+    expect(colParams).toBeDefined();
+    expect(rowParams).toBeDefined();
+    deferredCol.resolve(
+      buildMockBranchFetchResult(
+        colParams ?? fetchPivotBranchMock.mock.calls[1][0],
+        {
+          data: colBranch,
+        },
+      ),
+    );
+    deferredRow.resolve(
+      buildMockBranchFetchResult(
+        rowParams ?? fetchPivotBranchMock.mock.calls[0][0],
+        {
+          data: rowBranch,
+        },
+      ),
+    );
 
     await Promise.all(
       fetchPivotBranchMock.mock.results.slice(0, 2).map(result => result.value),

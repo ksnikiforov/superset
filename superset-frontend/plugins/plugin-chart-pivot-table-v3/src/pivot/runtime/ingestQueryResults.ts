@@ -260,6 +260,18 @@ const factStoreBatchFromIngested = ({
   facts,
 });
 
+export const buildFactStoreBatchesFromSpecs = ({
+  store,
+  specs,
+}: {
+  store: PivotFactStore;
+  specs: PlannedQuerySpec[];
+}): PivotFactStoreBatch[] =>
+  specs.map(spec => ({
+    ...factStoreSelectorFromSpec(spec),
+    facts: store.getFacts(factStoreSelectorFromSpec(spec)),
+  }));
+
 export const upsertIngestedFactsIntoStore = ({
   store,
   ingested,

@@ -21,6 +21,7 @@ import {
   planHydrationIteration,
   type ExpansionVisibilityConfig,
 } from '../../../src/pivot/expansion/engine';
+import { createFetchedFactCoverageState } from '../../../src/pivot/expansion/fetchedRequests';
 import { rootKey } from '../../../src/pivot/viewModel';
 import {
   METRICS_PLACEHOLDER,
@@ -49,6 +50,7 @@ describe('pivot/expansion/engine', () => {
   };
 
   const getCoverageKey = (_axis: 'row' | 'col', key: string) => key;
+  const emptyFetchedCoverage = () => createFetchedFactCoverageState();
 
   const makeNode = (
     axis: 'row' | 'col',
@@ -103,8 +105,7 @@ describe('pivot/expansion/engine', () => {
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
-      fetchedRowDepthByKey: new Map(),
-      fetchedColDepthByKey: new Map(),
+      fetchedCoverage: emptyFetchedCoverage(),
       config,
       getCoverageKey,
       pendingRows: new Set(),
@@ -139,8 +140,7 @@ describe('pivot/expansion/engine', () => {
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
-      fetchedRowDepthByKey: new Map(),
-      fetchedColDepthByKey: new Map(),
+      fetchedCoverage: emptyFetchedCoverage(),
       config,
       getCoverageKey,
       activeAxis: 'col',
@@ -171,8 +171,7 @@ describe('pivot/expansion/engine', () => {
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
-      fetchedRowDepthByKey: new Map(),
-      fetchedColDepthByKey: new Map(),
+      fetchedCoverage: emptyFetchedCoverage(),
       config,
       getCoverageKey,
       pendingRows: new Set(),
@@ -199,8 +198,7 @@ describe('pivot/expansion/engine', () => {
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
-      fetchedRowDepthByKey: new Map(),
-      fetchedColDepthByKey: new Map(),
+      fetchedCoverage: emptyFetchedCoverage(),
       config,
       getCoverageKey,
       pendingRows: new Set(),
@@ -253,8 +251,7 @@ describe('pivot/expansion/engine', () => {
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
-      fetchedRowDepthByKey: new Map(),
-      fetchedColDepthByKey: new Map(),
+      fetchedCoverage: emptyFetchedCoverage(),
       config: metricConfig,
       getCoverageKey,
       pendingRows: new Set(),
@@ -309,8 +306,7 @@ describe('pivot/expansion/engine', () => {
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
-      fetchedRowDepthByKey: new Map(),
-      fetchedColDepthByKey: new Map(),
+      fetchedCoverage: emptyFetchedCoverage(),
       config: metricConfig,
       getCoverageKey,
       pendingRows: new Set(),

@@ -22,6 +22,7 @@ import { type BatchGroup } from '../../../src/pivot/query/fetchPlanOptimizer';
 import { buildFormData } from '../fixtures/pivotFormData';
 import {
   encodeMetricKey,
+  METRICS_PLACEHOLDER,
   serializeCellKey,
   serializePath,
 } from '../../../src/utils';
@@ -313,10 +314,72 @@ describe('fetchPivotBranchesBatch', () => {
     const metricColKey = serializePath([encodeMetricKey('m1')]);
 
     expect(result.factStoreHit).toBe(true);
+    expect(result.factBatches).toHaveLength(1);
     expect(mockPost).not.toHaveBeenCalled();
     expect(result.data?.rows[rowKey]).toBeDefined();
     expect(
       result.data?.cells[serializeCellKey(rowKey, metricColKey)]?.values.m1,
     ).toBe(7);
+  });
+
+  it('returns a fetched coverage marker when grouped expansion only reveals Values', async () => {
+    const formData = buildFormData({
+      groupbyRows: ['country', METRICS_PLACEHOLDER, 'state'],
+      groupbyColumns: [],
+      metrics: ['sales', 'profit'],
+      metricsLayout: MetricsLayoutEnum.ROWS,
+      rowTotals: false,
+      colTotals: false,
+    });
+    const batch: BatchGroup = {
+      axis: 'row',
+      childDepth: 2,
+      requiredOppositeDepth: 0,
+      signature: 'values-only',
+      parentPathKey: '',
+      siblingValues: ['US', 'CA'],
+      targets: [
+        {
+          axis: 'row',
+          pathKey: serializePath(['US']),
+          childDepth: 2,
+          requiredOppositeDepth: 0,
+          batchSignature: 'values-only',
+        },
+        {
+          axis: 'row',
+          pathKey: serializePath(['CA']),
+          childDepth: 2,
+          requiredOppositeDepth: 0,
+          batchSignature: 'values-only',
+        },
+      ],
+    };
+
+    const result = await fetchPivotBranchesBatch({
+      formData,
+      batch,
+      currentTree: makeTree(),
+      visibleRowDepth: 1,
+      visibleColDepth: 0,
+    });
+
+    expect(mockPost).not.toHaveBeenCalled();
+    expect(result.data).toBeUndefined();
+    expect(result.factBatches).toEqual([
+      expect.objectContaining({
+        coverage: expect.objectContaining({
+          rowDepth: 1,
+          columnDepth: 0,
+        }),
+        scope: {
+          kind: 'batch',
+          axis: 'row',
+          parentPath: [],
+          siblingValues: ['US', 'CA'],
+        },
+        facts: [],
+      }),
+    ]);
   });
 });

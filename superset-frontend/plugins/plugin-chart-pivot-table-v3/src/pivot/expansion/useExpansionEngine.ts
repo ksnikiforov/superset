@@ -91,6 +91,12 @@ import {
   resolveExpandedForMetrics as resolveExpandedForMetricsBase,
   type ExpansionVisibilityConfig,
 } from './engine';
+import {
+  createFetchedFactCoverageState,
+  getFetchedAxisDepthMap,
+  markFetchedAxisCoverage,
+  seedFetchedCoverageFromFactBatches as seedFetchedCoverageStateFromFactBatches,
+} from './fetchedRequests';
 
 const MAX_HYDRATION_ITERATIONS = 12;
 const EMPTY_FACT_BATCHES: PivotFactStoreBatch[] = [];
@@ -99,12 +105,14 @@ type SingleFetchResult = {
   kind: 'single';
   target: FetchTarget;
   data?: PivotTreeData;
+  factBatches: PivotFactStoreBatch[];
 };
 
 type BatchFetchResult = {
   kind: 'batch';
   batch: BatchGroup;
   data?: PivotTreeData;
+  factBatches: PivotFactStoreBatch[];
 };
 
 type CombinedFetchResult = SingleFetchResult | BatchFetchResult;
@@ -592,8 +600,7 @@ export const useExpansionEngine = ({
   const autoExpandColsLevelRef = useRef<number>(resolvedExpandColumnsLevel);
   const expandedStateSignatureRef = useRef<string | null>(null);
   const expandedStateSharedSignatureRef = useRef<string | null>(null);
-  const fetchedRowKeysRef = useRef<Map<string, number>>(new Map());
-  const fetchedColKeysRef = useRef<Map<string, number>>(new Map());
+  const fetchedCoverageRef = useRef(createFetchedFactCoverageState());
   const transactionIdRef = useRef(0);
   const requestGroupPrefixRef = useRef(nanoid());
   const activeRequestGroupIdsRef = useRef(new Set<string>());
@@ -677,58 +684,26 @@ export const useExpansionEngine = ({
 
   const markFetchedCoverage = useCallback(
     (axis: PivotAxis, key: string, requiredOppositeDepth: number) => {
-      const fetchedKeysRef =
-        axis === 'row' ? fetchedRowKeysRef : fetchedColKeysRef;
-      const coverageKey = getCoverageKey(axis, key);
-      const existingDepth = fetchedKeysRef.current.get(coverageKey);
-      fetchedKeysRef.current.set(
-        coverageKey,
-        existingDepth === undefined
-          ? requiredOppositeDepth
-          : Math.max(existingDepth, requiredOppositeDepth),
-      );
+      markFetchedAxisCoverage({
+        fetchedCoverage: fetchedCoverageRef.current,
+        getCoverageKey,
+        axis,
+        pathKey: key,
+        requiredOppositeDepth,
+      });
     },
     [getCoverageKey],
   );
 
   const seedFetchedCoverageFromFactBatches = useCallback(
     (batches: PivotFactStoreBatch[]) => {
-      batches.forEach(batch => {
-        const { scope } = batch;
-        if (!scope) {
-          return;
-        }
-        if (scope.kind === 'bootstrap' || scope.kind === 'root') {
-          return;
-        }
-        const { coverage } = batch;
-        if (!coverage) {
-          return;
-        }
-        const requiredOppositeDepth =
-          scope.axis === 'row' ? coverage.columnDepth : coverage.rowDepth;
-        if (scope.kind === 'branch') {
-          markFetchedCoverage(
-            scope.axis,
-            serializePath(scope.path),
-            requiredOppositeDepth,
-          );
-          return;
-        }
-        const targetPaths =
-          scope.siblingValues.length > 0
-            ? scope.siblingValues.map(value => [...scope.parentPath, value])
-            : [scope.parentPath];
-        targetPaths.forEach(path => {
-          markFetchedCoverage(
-            scope.axis,
-            serializePath(path),
-            requiredOppositeDepth,
-          );
-        });
+      seedFetchedCoverageStateFromFactBatches({
+        fetchedCoverage: fetchedCoverageRef.current,
+        getCoverageKey,
+        batches,
       });
     },
-    [markFetchedCoverage],
+    [getCoverageKey],
   );
 
   const collectInFlightExpanded = useCallback((axis: PivotAxis) => {
@@ -1179,7 +1154,12 @@ export const useExpansionEngine = ({
             }),
           );
           if (!result) {
-            return { key, data: undefined, requiredDepth };
+            return {
+              key,
+              data: undefined,
+              requiredDepth,
+              factBatches: EMPTY_FACT_BATCHES,
+            };
           }
           if (transactionIdRef.current === requestId) {
             addWarnings(result.warnings);
@@ -1187,7 +1167,12 @@ export const useExpansionEngine = ({
               throw result.error;
             }
           }
-          return { key, data: result.data, requiredDepth };
+          return {
+            key,
+            data: result.data,
+            requiredDepth,
+            factBatches: result.factBatches ?? EMPTY_FACT_BATCHES,
+          };
         } finally {
           if (transactionIdRef.current === requestId) {
             updateLoadingKey(key, -1);
@@ -1239,7 +1224,11 @@ export const useExpansionEngine = ({
               throw result.error;
             }
           }
-          return { batch, data: result.data };
+          return {
+            batch,
+            data: result.data,
+            factBatches: result.factBatches ?? EMPTY_FACT_BATCHES,
+          };
         } finally {
           if (transactionIdRef.current === requestId) {
             batch.targets.forEach(target =>
@@ -1274,20 +1263,18 @@ export const useExpansionEngine = ({
           const requiredDepth =
             axis === 'row' ? visibleColDepth : visibleRowDepth;
           const nodes = axis === 'row' ? currentTree.rows : currentTree.cols;
-          const fetchedKeysRef =
-            axis === 'row' ? fetchedRowKeysRef : fetchedColKeysRef;
           const hasLoadedChildrenForIteration =
             buildHasLoadedChildrenForIteration(
               currentTree,
               visibleRowDepth,
               visibleColDepth,
             );
-          const { plan, targets, groupKeyMap } = planGroupedExpansionTargets({
+          const { plan, targets } = planGroupedExpansionTargets({
             axis,
             expandedKeys: resolvedExpanded,
             nodes,
             requiredOppositeDepth: requiredDepth,
-            fetchedDepthByKey: fetchedKeysRef.current,
+            fetchedCoverage: fetchedCoverageRef.current,
             hasLoadedChildren: hasLoadedChildrenForIteration,
             getCoverageKey,
           });
@@ -1312,6 +1299,7 @@ export const useExpansionEngine = ({
                 kind: 'single',
                 target,
                 data: localResult.data,
+                factBatches: localResult.factBatches ?? EMPTY_FACT_BATCHES,
               });
               continue;
             }
@@ -1341,6 +1329,7 @@ export const useExpansionEngine = ({
                 kind: 'single',
                 target,
                 data: result.data,
+                factBatches: result.factBatches,
               })),
             );
           }
@@ -1355,6 +1344,7 @@ export const useExpansionEngine = ({
                 kind: 'batch',
                 batch,
                 data: result.data,
+                factBatches: result.factBatches,
               })),
             );
           }
@@ -1373,16 +1363,8 @@ export const useExpansionEngine = ({
           let didMerge = false;
           for (const result of results) {
             if (result.kind === 'single') {
-              const { target, data } = result;
-              const groupKey = JSON.stringify([target.axis, target.pathKey]);
-              const keys = groupKeyMap.get(groupKey) ?? [target.pathKey];
-              keys.forEach(groupKey => {
-                markFetchedCoverage(
-                  target.axis,
-                  groupKey,
-                  target.requiredOppositeDepth,
-                );
-              });
+              const { target, data, factBatches: resultFactBatches } = result;
+              seedFetchedCoverageFromFactBatches(resultFactBatches);
               if (!data) {
                 continue;
               }
@@ -1398,18 +1380,8 @@ export const useExpansionEngine = ({
               );
               continue;
             }
-            const { batch, data } = result;
-            batch.targets.forEach(target => {
-              const groupKey = JSON.stringify([target.axis, target.pathKey]);
-              const keys = groupKeyMap.get(groupKey) ?? [target.pathKey];
-              keys.forEach(groupKey => {
-                markFetchedCoverage(
-                  target.axis,
-                  groupKey,
-                  target.requiredOppositeDepth,
-                );
-              });
-            });
+            const { batch, data, factBatches: resultFactBatches } = result;
+            seedFetchedCoverageFromFactBatches(resultFactBatches);
             if (!data) {
               continue;
             }
@@ -1517,6 +1489,7 @@ export const useExpansionEngine = ({
       trackRequestGroup,
       updateLoadingKey,
       markFetchedCoverage,
+      seedFetchedCoverageFromFactBatches,
     ],
   );
 
@@ -1557,12 +1530,14 @@ export const useExpansionEngine = ({
       );
       nextPending.delete(node.key);
 
-      const fetchedKeysRef =
-        axis === 'row' ? fetchedRowKeysRef : fetchedColKeysRef;
+      const fetchedDepthByKey = getFetchedAxisDepthMap(
+        fetchedCoverageRef.current,
+        axis,
+      );
       pruneFetchedDepths({
         parentPath: node.path,
         nodes: axis === 'row' ? treeRef.current.rows : treeRef.current.cols,
-        fetchedDepths: fetchedKeysRef.current,
+        fetchedDepths: fetchedDepthByKey,
         parentKey: node.key,
       });
 
@@ -1663,7 +1638,11 @@ export const useExpansionEngine = ({
             }),
           );
           if (!result) {
-            return { target, data: undefined };
+            return {
+              target,
+              data: undefined,
+              factBatches: EMPTY_FACT_BATCHES,
+            };
           }
           if (transactionIdRef.current === transactionId) {
             addWarnings(result.warnings);
@@ -1671,7 +1650,11 @@ export const useExpansionEngine = ({
               throw result.error;
             }
           }
-          return { target, data: result.data };
+          return {
+            target,
+            data: result.data,
+            factBatches: result.factBatches ?? EMPTY_FACT_BATCHES,
+          };
         } finally {
           if (transactionIdRef.current === transactionId) {
             updateLoadingKey(target.pathKey, -1);
@@ -1722,7 +1705,11 @@ export const useExpansionEngine = ({
               throw result.error;
             }
           }
-          return { batch, data: result.data };
+          return {
+            batch,
+            data: result.data,
+            factBatches: result.factBatches ?? EMPTY_FACT_BATCHES,
+          };
         } finally {
           if (transactionIdRef.current === transactionId) {
             batch.targets.forEach(target =>
@@ -1748,8 +1735,7 @@ export const useExpansionEngine = ({
           tree: stagedTree,
           desiredRows,
           desiredCols,
-          fetchedRowDepthByKey: fetchedRowKeysRef.current,
-          fetchedColDepthByKey: fetchedColKeysRef.current,
+          fetchedCoverage: fetchedCoverageRef.current,
           config: visibilityConfig,
           getCoverageKey,
           activeAxis: options?.activeAxis,
@@ -1804,7 +1790,7 @@ export const useExpansionEngine = ({
           finalizeHydration();
           return;
         }
-        const { targets, groupKeyMap } = hydrationPlan;
+        const { targets } = hydrationPlan;
 
         const fetchContext = { stagedTree, visibleRowDepth, visibleColDepth };
         const localResults: SingleFetchResult[] = [];
@@ -1825,6 +1811,7 @@ export const useExpansionEngine = ({
               kind: 'single',
               target,
               data: localResult.data,
+              factBatches: localResult.factBatches ?? EMPTY_FACT_BATCHES,
             });
             continue;
           }
@@ -1848,6 +1835,7 @@ export const useExpansionEngine = ({
               kind: 'single',
               target,
               data: result.data,
+              factBatches: result.factBatches,
             })),
           );
         }
@@ -1857,6 +1845,7 @@ export const useExpansionEngine = ({
               kind: 'batch',
               batch,
               data: result.data,
+              factBatches: result.factBatches,
             })),
           );
         }
@@ -1874,16 +1863,8 @@ export const useExpansionEngine = ({
 
         for (const result of results) {
           if (result.kind === 'single') {
-            const { target, data } = result;
-            const groupKey = JSON.stringify([target.axis, target.pathKey]);
-            const keys = groupKeyMap.get(groupKey) ?? [target.pathKey];
-            keys.forEach(key => {
-              markFetchedCoverage(
-                target.axis,
-                key,
-                target.requiredOppositeDepth,
-              );
-            });
+            const { target, data, factBatches: resultFactBatches } = result;
+            seedFetchedCoverageFromFactBatches(resultFactBatches);
             if (!data) {
               continue;
             }
@@ -1891,17 +1872,9 @@ export const useExpansionEngine = ({
             stagingState = stageDelta(stagingState, deltaKey, data);
             continue;
           }
-          const { batch, data } = result;
+          const { batch, data, factBatches: resultFactBatches } = result;
+          seedFetchedCoverageFromFactBatches(resultFactBatches);
           for (const target of batch.targets) {
-            const groupKey = JSON.stringify([target.axis, target.pathKey]);
-            const keys = groupKeyMap.get(groupKey) ?? [target.pathKey];
-            keys.forEach(key => {
-              markFetchedCoverage(
-                target.axis,
-                key,
-                target.requiredOppositeDepth,
-              );
-            });
             if (!data) {
               continue;
             }
@@ -1950,6 +1923,7 @@ export const useExpansionEngine = ({
       hasLoadedChildrenForTree,
       getCoverageKey,
       markFetchedCoverage,
+      seedFetchedCoverageFromFactBatches,
       persistExpansionState,
       pruneMergedTree,
       setExpandedColsState,
@@ -2222,14 +2196,20 @@ export const useExpansionEngine = ({
       colStablePrefix > 0;
     const remappedFetchedRows = shouldCarryFetchedRowsForTrim
       ? remapFetchedDepthsForStableTrim({
-          fetchedDepthByKey: fetchedRowKeysRef.current,
+          fetchedDepthByKey: getFetchedAxisDepthMap(
+            fetchedCoverageRef.current,
+            'row',
+          ),
           stablePrefix: rowStablePrefix,
           countDimDepth,
         })
       : new Map<string, number>();
     const remappedFetchedCols = shouldCarryFetchedColsForTrim
       ? remapFetchedDepthsForStableTrim({
-          fetchedDepthByKey: fetchedColKeysRef.current,
+          fetchedDepthByKey: getFetchedAxisDepthMap(
+            fetchedCoverageRef.current,
+            'col',
+          ),
           stablePrefix: colStablePrefix,
           countDimDepth,
         })
@@ -2294,8 +2274,10 @@ export const useExpansionEngine = ({
     treeRef.current = normalizedTree;
     setTree(normalizedTree);
     setErrorMessage(undefined);
-    fetchedRowKeysRef.current = remappedFetchedRows;
-    fetchedColKeysRef.current = remappedFetchedCols;
+    fetchedCoverageRef.current = createFetchedFactCoverageState({
+      row: remappedFetchedRows,
+      col: remappedFetchedCols,
+    });
     loadingCountsRef.current = new Map();
     setLoadingKeys(new Set());
     inFlightExpandedRowsRef.current.clear();
@@ -2566,8 +2548,7 @@ export const useExpansionEngine = ({
         tree: normalizedTree,
         desiredRows: resolvedRows,
         desiredCols: resolvedCols,
-        fetchedRowDepthByKey: fetchedRowKeysRef.current,
-        fetchedColDepthByKey: fetchedColKeysRef.current,
+        fetchedCoverage: fetchedCoverageRef.current,
         config: visibilityConfig,
         getCoverageKey,
         pendingRows: new Set(),

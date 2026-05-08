@@ -46,6 +46,7 @@ import {
   buildValueLeaf,
 } from '../../../src/pivot/measureLeaves';
 import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
+import { resolveMockBranchFetchResult } from '../fixtures/factBatches';
 
 jest.mock('../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../src/fetchPivotBranch');
@@ -255,6 +256,7 @@ const injectColumnSubtotalLeaves = (
 describe('PivotTableChart metric tier suppression', () => {
   beforeEach(() => {
     fetchPivotBranchMock.mockClear();
+    fetchPivotBranchMock.mockImplementation(resolveMockBranchFetchResult());
   });
 
   it('hides the metric column header when there is a single metric at the last column level', async () => {
@@ -1552,7 +1554,9 @@ describe('PivotTableChart metric tier suppression', () => {
     );
     const mergedTree = mergeTrees(baseTreeWithMetrics, branchTreeWithMetrics);
 
-    fetchPivotBranchMock.mockResolvedValueOnce({ data: mergedTree });
+    fetchPivotBranchMock.mockImplementationOnce(
+      resolveMockBranchFetchResult({ data: mergedTree }),
+    );
 
     const props: Partial<PivotTableProps> = {
       data: baseTreeWithMetrics,
@@ -1676,7 +1680,9 @@ describe('PivotTableChart metric tier suppression', () => {
     );
     const mergedTree = mergeTrees(baseTreeWithMetrics, branchTreeWithMetrics);
 
-    fetchPivotBranchMock.mockResolvedValueOnce({ data: mergedTree });
+    fetchPivotBranchMock.mockImplementationOnce(
+      resolveMockBranchFetchResult({ data: mergedTree }),
+    );
 
     const props: Partial<PivotTableProps> = {
       data: baseTreeWithMetrics,
@@ -1803,8 +1809,12 @@ describe('PivotTableChart metric tier suppression', () => {
     const mergedTree = mergeTrees(baseTreeWithMetrics, branchTreeWithMetrics);
 
     fetchPivotBranchMock
-      .mockResolvedValueOnce({ data: baseTreeWithMetrics })
-      .mockResolvedValueOnce({ data: mergedTree });
+      .mockImplementationOnce(
+        resolveMockBranchFetchResult({ data: baseTreeWithMetrics }),
+      )
+      .mockImplementationOnce(
+        resolveMockBranchFetchResult({ data: mergedTree }),
+      );
 
     const props: Partial<PivotTableProps> = {
       data: baseTreeWithMetrics,

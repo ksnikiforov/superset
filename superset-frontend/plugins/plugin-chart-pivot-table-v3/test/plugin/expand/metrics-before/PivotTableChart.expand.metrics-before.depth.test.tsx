@@ -21,6 +21,7 @@ import { render, fireEvent, waitFor, within } from '../../../testUtils';
 import PivotTableChart from '../../fixtures/TestPivotTableChart';
 import { PivotTreeData } from '../../../../src/types';
 import { baseFormData, buildFormData } from '../../fixtures/pivotFormData';
+import { resolveMockBranchFetchResult } from '../../fixtures/factBatches';
 import { serializePath } from '../../../../src/utils';
 import { fetchPivotBranch } from '../../../../src/fetchPivotBranch';
 
@@ -37,6 +38,7 @@ describe('PivotTableChart expansion with metrics before dimensions (depth)', () 
   const fetchPivotBranchMock = fetchPivotBranch as jest.Mock;
   beforeEach(() => {
     fetchPivotBranchMock.mockClear();
+    fetchPivotBranchMock.mockImplementation(resolveMockBranchFetchResult());
   });
 
   const buildLabels = (prefix: string, depth: number) =>
@@ -136,7 +138,7 @@ describe('PivotTableChart expansion with metrics before dimensions (depth)', () 
     'expands a %i-level row hierarchy sequentially',
     async depth => {
       fetchPivotBranchMock.mockReset();
-      fetchPivotBranchMock.mockResolvedValue({ data: undefined });
+      fetchPivotBranchMock.mockImplementation(resolveMockBranchFetchResult());
       const { tree, groupbyRows } = buildRowsTree(depth);
       const { container } = render(
         <PivotTableChart
@@ -193,7 +195,7 @@ describe('PivotTableChart expansion with metrics before dimensions (depth)', () 
     'expands a %i-level column hierarchy sequentially',
     async depth => {
       fetchPivotBranchMock.mockReset();
-      fetchPivotBranchMock.mockResolvedValue({ data: undefined });
+      fetchPivotBranchMock.mockImplementation(resolveMockBranchFetchResult());
       const { tree, groupbyColumns } = buildColsTree(depth);
       const { container } = render(
         <PivotTableChart

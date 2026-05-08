@@ -42,13 +42,20 @@ import {
   fetchPivotBranch,
   peekPivotBranchCache,
 } from '../../../src/fetchPivotBranch';
-import type { FetchPivotBranchResult } from '../../../src/fetchPivotBranch';
+import type {
+  FetchPivotBranchParams,
+  FetchPivotBranchResult,
+} from '../../../src/fetchPivotBranch';
 import {
   fetchPivotBranchesBatch,
   type FetchPivotBranchesBatchParams,
   type FetchPivotBranchesBatchResult,
 } from '../../../src/pivot/query/fetchPivotBranchesBatch';
 import { buildFormData } from '../fixtures/pivotFormData';
+import {
+  buildMockBranchFetchResult,
+  resolveMockBranchFetchResult,
+} from '../fixtures/factBatches';
 
 jest.mock('../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../src/fetchPivotBranch');
@@ -97,7 +104,10 @@ describe('PivotTableChart expansion state persistence', () => {
       (acc, result) => mergeTrees(acc, result.data),
       undefined,
     );
-    return { data: merged };
+    return {
+      data: merged,
+      factBatches: results.flatMap(result => result.factBatches),
+    };
   };
 
   const createDeferred = <T,>() => {
@@ -106,6 +116,37 @@ describe('PivotTableChart expansion state persistence', () => {
       resolve = res;
     });
     return { promise, resolve: resolve as (value: T) => void };
+  };
+
+  const createDeferredBranchFetch = () => {
+    const resolvers: Array<(result: Partial<FetchPivotBranchResult>) => void> =
+      [];
+    const promises: Array<Promise<FetchPivotBranchResult>> = [];
+    let resolvedResult: Partial<FetchPivotBranchResult> | undefined;
+    const implementation = (params: FetchPivotBranchParams) => {
+      if (resolvedResult) {
+        const promise = Promise.resolve(
+          buildMockBranchFetchResult(params, resolvedResult),
+        );
+        promises.push(promise);
+        return promise;
+      }
+      const promise = new Promise<FetchPivotBranchResult>(resolve => {
+        resolvers.push(result =>
+          resolve(buildMockBranchFetchResult(params, result)),
+        );
+      });
+      promises.push(promise);
+      return promise;
+    };
+    return {
+      implementation,
+      promises,
+      resolveAll: (result: Partial<FetchPivotBranchResult>) => {
+        resolvedResult = result;
+        resolvers.splice(0).forEach(resolve => resolve(result));
+      },
+    };
   };
 
   const getLastExpansionState = (setControlValue: jest.Mock) => {
@@ -249,6 +290,7 @@ describe('PivotTableChart expansion state persistence', () => {
 
   beforeEach(() => {
     fetchPivotBranchMock.mockClear();
+    fetchPivotBranchMock.mockImplementation(resolveMockBranchFetchResult());
     peekPivotBranchCacheMock.mockClear();
     fetchPivotBranchesBatchMock.mockReset();
     peekPivotBranchCacheMock.mockReturnValue(undefined);
@@ -353,7 +395,9 @@ describe('PivotTableChart expansion state persistence', () => {
         rowGroupby,
         colGroupby,
       );
-    fetchPivotBranchMock.mockResolvedValue({ data: buildTreeWithCols(1, 2) });
+    fetchPivotBranchMock.mockImplementation(
+      resolveMockBranchFetchResult({ data: buildTreeWithCols(1, 2) }),
+    );
 
     const setDataMask = jest.fn();
     const setControlValue = jest.fn();
@@ -410,7 +454,9 @@ describe('PivotTableChart expansion state persistence', () => {
         rowGroupby,
         colGroupby,
       );
-    fetchPivotBranchMock.mockResolvedValue({ data: buildTreeWithCols(2, 2) });
+    fetchPivotBranchMock.mockImplementation(
+      resolveMockBranchFetchResult({ data: buildTreeWithCols(2, 2) }),
+    );
 
     const setControlValue = jest.fn();
     render(
@@ -504,7 +550,9 @@ describe('PivotTableChart expansion state persistence', () => {
   });
 
   it('persists expansion state via setDataMask when setControlValue is unavailable', async () => {
-    fetchPivotBranchMock.mockResolvedValueOnce({ data: buildTree(2) });
+    fetchPivotBranchMock.mockImplementationOnce(
+      resolveMockBranchFetchResult({ data: buildTree(2) }),
+    );
     const setDataMask = jest.fn();
     render(
       buildChartProps({
@@ -536,7 +584,9 @@ describe('PivotTableChart expansion state persistence', () => {
   });
 
   it('persists expansion state via setControlValue in user-controlled dashboard mode', async () => {
-    fetchPivotBranchMock.mockResolvedValueOnce({ data: buildTree(2) });
+    fetchPivotBranchMock.mockImplementationOnce(
+      resolveMockBranchFetchResult({ data: buildTree(2) }),
+    );
     const setDataMask = jest.fn();
     const setControlValue = jest.fn();
     const runtimeLayout: PivotRuntimeLayout = {
@@ -587,7 +637,9 @@ describe('PivotTableChart expansion state persistence', () => {
 
   it('restores expansion state on dashboard refresh via pivotExpansionState', async () => {
     const setControlValue = jest.fn();
-    fetchPivotBranchMock.mockResolvedValueOnce({ data: buildTree(2) });
+    fetchPivotBranchMock.mockImplementationOnce(
+      resolveMockBranchFetchResult({ data: buildTree(2) }),
+    );
 
     const { rerender } = render(
       buildChartProps({
@@ -609,7 +661,9 @@ describe('PivotTableChart expansion state persistence', () => {
     expect(pivotExpansionState).toBeDefined();
 
     fetchPivotBranchMock.mockClear();
-    fetchPivotBranchMock.mockResolvedValueOnce({ data: buildTree(2) });
+    fetchPivotBranchMock.mockImplementationOnce(
+      resolveMockBranchFetchResult({ data: buildTree(2) }),
+    );
 
     rerender(
       buildChartProps({
@@ -652,7 +706,9 @@ describe('PivotTableChart expansion state persistence', () => {
         colGroupby,
       );
 
-    fetchPivotBranchMock.mockResolvedValue({ data: buildTreeWithCols(1, 2) });
+    fetchPivotBranchMock.mockImplementation(
+      resolveMockBranchFetchResult({ data: buildTreeWithCols(1, 2) }),
+    );
     const setControlValue = jest.fn();
     render(
       buildChartProps({
@@ -756,7 +812,9 @@ describe('PivotTableChart expansion state persistence', () => {
     const setDataMask = jest.fn();
     const baseTree = buildTree(1);
     const expandedTree = buildTree(2);
-    fetchPivotBranchMock.mockResolvedValue({ data: expandedTree });
+    fetchPivotBranchMock.mockImplementation(
+      resolveMockBranchFetchResult({ data: expandedTree }),
+    );
 
     const { rerender } = render(
       buildChartProps({
@@ -778,7 +836,9 @@ describe('PivotTableChart expansion state persistence', () => {
     await waitFor(() => expect(screen.getByText('X')).toBeInTheDocument());
 
     fetchPivotBranchMock.mockClear();
-    fetchPivotBranchMock.mockResolvedValue({ data: expandedTree });
+    fetchPivotBranchMock.mockImplementation(
+      resolveMockBranchFetchResult({ data: expandedTree }),
+    );
 
     rerender(
       buildChartProps({
@@ -802,7 +862,9 @@ describe('PivotTableChart expansion state persistence', () => {
       collapsedRows: [],
       collapsedCols: [],
     };
-    fetchPivotBranchMock.mockResolvedValueOnce({ data: buildTree(2) });
+    fetchPivotBranchMock.mockImplementationOnce(
+      resolveMockBranchFetchResult({ data: buildTree(2) }),
+    );
 
     render(
       buildChartProps({
@@ -818,7 +880,9 @@ describe('PivotTableChart expansion state persistence', () => {
   });
 
   it('restores expansion state from form data persistence', async () => {
-    fetchPivotBranchMock.mockResolvedValueOnce({ data: buildTree(2) });
+    fetchPivotBranchMock.mockImplementationOnce(
+      resolveMockBranchFetchResult({ data: buildTree(2) }),
+    );
 
     render(
       buildChartProps({
@@ -1005,8 +1069,8 @@ describe('PivotTableChart expansion state persistence', () => {
     const midTree = buildTreeWithDepth(2);
     const deepTree = buildTreeWithDepth(3);
     fetchPivotBranchMock
-      .mockResolvedValueOnce({ data: midTree })
-      .mockResolvedValueOnce({ data: deepTree });
+      .mockImplementationOnce(resolveMockBranchFetchResult({ data: midTree }))
+      .mockImplementationOnce(resolveMockBranchFetchResult({ data: deepTree }));
 
     const shallowTree = buildTreeWithDepth(1);
     const { rerender } = render(
@@ -1048,8 +1112,8 @@ describe('PivotTableChart expansion state persistence', () => {
 
     fetchPivotBranchMock.mockClear();
     fetchPivotBranchMock
-      .mockResolvedValueOnce({ data: midTree })
-      .mockResolvedValueOnce({ data: deepTree });
+      .mockImplementationOnce(resolveMockBranchFetchResult({ data: midTree }))
+      .mockImplementationOnce(resolveMockBranchFetchResult({ data: deepTree }));
 
     const shallowTreeNext = buildBootstrapTree(deepGroupby);
     rerender(
@@ -1163,9 +1227,11 @@ describe('PivotTableChart expansion state persistence', () => {
         [],
       );
 
-    fetchPivotBranchMock.mockResolvedValueOnce({
-      data: buildTreeForMetrics(2, metrics),
-    });
+    fetchPivotBranchMock.mockImplementationOnce(
+      resolveMockBranchFetchResult({
+        data: buildTreeForMetrics(2, metrics),
+      }),
+    );
 
     const { rerender } = render(
       buildChartProps({
@@ -1187,9 +1253,11 @@ describe('PivotTableChart expansion state persistence', () => {
     expect(expansionState).toBeDefined();
 
     fetchPivotBranchMock.mockClear();
-    fetchPivotBranchMock.mockResolvedValueOnce({
-      data: buildTreeForMetrics(2, metricsNext),
-    });
+    fetchPivotBranchMock.mockImplementationOnce(
+      resolveMockBranchFetchResult({
+        data: buildTreeForMetrics(2, metricsNext),
+      }),
+    );
 
     rerender(
       buildChartProps({
@@ -1436,8 +1504,8 @@ describe('PivotTableChart expansion state persistence', () => {
     const midTree = buildTreeWithDepth(2);
     const deepTree = buildTreeWithDepth(3);
     fetchPivotBranchMock
-      .mockResolvedValueOnce({ data: midTree })
-      .mockResolvedValueOnce({ data: deepTree });
+      .mockImplementationOnce(resolveMockBranchFetchResult({ data: midTree }))
+      .mockImplementationOnce(resolveMockBranchFetchResult({ data: deepTree }));
 
     render(
       buildChartProps({
@@ -1610,7 +1678,9 @@ describe('PivotTableChart expansion state persistence', () => {
       deepGroupby,
       [],
     );
-    fetchPivotBranchMock.mockResolvedValueOnce({ data: deepTree });
+    fetchPivotBranchMock.mockImplementationOnce(
+      resolveMockBranchFetchResult({ data: deepTree }),
+    );
 
     const setControlValue = jest.fn();
     const { rerender } = render(
@@ -1674,7 +1744,9 @@ describe('PivotTableChart expansion state persistence', () => {
         deepGroupby,
         [],
       );
-    fetchPivotBranchMock.mockResolvedValue({ data: buildTreeWithDepth(2) });
+    fetchPivotBranchMock.mockImplementation(
+      resolveMockBranchFetchResult({ data: buildTreeWithDepth(2) }),
+    );
 
     render(
       buildChartProps({
@@ -1782,9 +1854,11 @@ describe('PivotTableChart expansion state persistence', () => {
     const deepTree = buildTreeWithDepth(3);
     const deepestTree = buildTreeWithDepth(4);
     fetchPivotBranchMock
-      .mockResolvedValueOnce({ data: midTree })
-      .mockResolvedValueOnce({ data: deepTree })
-      .mockResolvedValueOnce({ data: deepestTree });
+      .mockImplementationOnce(resolveMockBranchFetchResult({ data: midTree }))
+      .mockImplementationOnce(resolveMockBranchFetchResult({ data: deepTree }))
+      .mockImplementationOnce(
+        resolveMockBranchFetchResult({ data: deepestTree }),
+      );
 
     render(
       buildChartProps({
@@ -1872,7 +1946,9 @@ describe('PivotTableChart expansion state persistence', () => {
     };
     const shallowTree = buildTreeWithDepth(2);
     const deepTree = buildTreeWithDepth(3);
-    fetchPivotBranchMock.mockResolvedValueOnce({ data: deepTree });
+    fetchPivotBranchMock.mockImplementationOnce(
+      resolveMockBranchFetchResult({ data: deepTree }),
+    );
 
     render(
       buildChartProps({
@@ -1928,8 +2004,8 @@ describe('PivotTableChart expansion state persistence', () => {
   });
 
   it('does not show a global loader for persisted expansion prefetch', async () => {
-    const deferred = createDeferred<FetchPivotBranchResult>();
-    fetchPivotBranchMock.mockImplementation(() => deferred.promise);
+    const deferred = createDeferredBranchFetch();
+    fetchPivotBranchMock.mockImplementation(deferred.implementation);
 
     const pivotExpansionState = {
       rowKeys: rowGroupby,
@@ -1952,8 +2028,8 @@ describe('PivotTableChart expansion state persistence', () => {
       screen.queryByRole('status', { name: /loading/i }),
     ).not.toBeInTheDocument();
 
-    deferred.resolve({ data: buildTree(2) });
-    await fetchPivotBranchMock.mock.results[0]?.value;
+    deferred.resolveAll({ data: buildTree(2) });
+    await Promise.all(deferred.promises);
 
     await waitFor(() =>
       expect(
@@ -1963,8 +2039,8 @@ describe('PivotTableChart expansion state persistence', () => {
   });
 
   it('does not show a global loader without persisted expansion state', async () => {
-    const deferred = createDeferred<FetchPivotBranchResult>();
-    fetchPivotBranchMock.mockReturnValue(deferred.promise);
+    const deferred = createDeferredBranchFetch();
+    fetchPivotBranchMock.mockImplementation(deferred.implementation);
 
     render(
       buildChartProps({
@@ -1981,8 +2057,8 @@ describe('PivotTableChart expansion state persistence', () => {
       screen.queryByRole('status', { name: /loading/i }),
     ).not.toBeInTheDocument();
 
-    deferred.resolve({ data: buildTree(1) });
-    await fetchPivotBranchMock.mock.results[0]?.value;
+    deferred.resolveAll({ data: buildTree(1) });
+    await Promise.all(deferred.promises);
 
     await waitFor(() =>
       expect(
@@ -2021,10 +2097,12 @@ describe('PivotTableChart expansion state persistence', () => {
     const rowBranch = buildTreeWithCols(2, 1);
     const colBranch = buildTreeWithCols(1, 2);
 
-    const deferredRow = createDeferred<FetchPivotBranchResult>();
-    const deferredCol = createDeferred<FetchPivotBranchResult>();
-    fetchPivotBranchMock.mockImplementation(({ axis }) =>
-      axis === 'row' ? deferredRow.promise : deferredCol.promise,
+    const deferredRow = createDeferredBranchFetch();
+    const deferredCol = createDeferredBranchFetch();
+    fetchPivotBranchMock.mockImplementation(params =>
+      params.axis === 'row'
+        ? deferredRow.implementation(params)
+        : deferredCol.implementation(params),
     );
 
     render(
@@ -2051,8 +2129,11 @@ describe('PivotTableChart expansion state persistence', () => {
       expect(fetchPivotBranchMock.mock.calls.length).toBeGreaterThanOrEqual(2),
     );
 
-    deferredRow.resolve({ data: rowBranch });
-    deferredCol.resolve({ data: colBranch });
+    expect(deferredRow.promises.length).toBeGreaterThan(0);
+    expect(deferredCol.promises.length).toBeGreaterThan(0);
+    deferredRow.resolveAll({ data: rowBranch });
+    deferredCol.resolveAll({ data: colBranch });
+    await Promise.all([...deferredRow.promises, ...deferredCol.promises]);
 
     await waitFor(() => {
       expect(screen.getByText('X')).toBeInTheDocument();
@@ -2083,7 +2164,9 @@ describe('PivotTableChart expansion state persistence', () => {
         deepRowGroupby,
         deepColGroupby,
       );
-    fetchPivotBranchMock.mockResolvedValue({ data: buildTreeWithDepth(2, 2) });
+    fetchPivotBranchMock.mockImplementation(
+      resolveMockBranchFetchResult({ data: buildTreeWithDepth(2, 2) }),
+    );
 
     render(
       buildChartProps({
@@ -2146,7 +2229,9 @@ describe('PivotTableChart expansion state persistence', () => {
       );
     const shallowTree = buildTreeWithDepth(2);
     const deepTree = buildTreeWithDepth(3);
-    fetchPivotBranchMock.mockResolvedValue({ data: deepTree });
+    fetchPivotBranchMock.mockImplementation(
+      resolveMockBranchFetchResult({ data: deepTree }),
+    );
 
     const { rerender } = render(
       buildChartProps({
@@ -2191,7 +2276,9 @@ describe('PivotTableChart expansion state persistence', () => {
   });
 
   it('does not fetch missing leaf expansions', async () => {
-    fetchPivotBranchMock.mockResolvedValue({ data: buildTree(2) });
+    fetchPivotBranchMock.mockImplementation(
+      resolveMockBranchFetchResult({ data: buildTree(2) }),
+    );
     const pivotExpansionState = {
       rowKeys: rowGroupby,
       colKeys: [],

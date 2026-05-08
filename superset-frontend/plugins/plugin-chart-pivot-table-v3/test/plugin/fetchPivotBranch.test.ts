@@ -853,6 +853,7 @@ describe('resolveFetchContext', () => {
     const secondResult = await fetchPivotBranch(fetchParams);
 
     expect(secondResult.factStoreHit).toBe(true);
+    expect(secondResult.factBatches).toHaveLength(queries.length);
     expect(postMock).toHaveBeenCalledTimes(1);
     expect(
       secondResult.data?.cols[
@@ -1814,9 +1815,48 @@ describe('fetchPivotBranch delta-only contract', () => {
     const metricColKey = serializePath([encodeMetricKey('m1')]);
 
     expect(result?.cached).toBe(true);
+    expect(result?.factBatches).toHaveLength(1);
     expect(postMock).not.toHaveBeenCalled();
     expect(
       result?.data?.cells[serializeCellKey(rowKey, metricColKey)]?.values.m1,
     ).toBe(7);
+  });
+
+  it('returns a fetched coverage marker when expansion only reveals Values', async () => {
+    const postMock = SupersetClient.post as jest.Mock;
+    const formData = buildFormData({
+      groupbyRows: [],
+      groupbyColumns: ['category', METRICS_PLACEHOLDER, 'subcategory'],
+      metrics: ['sales', 'profit'],
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      rowTotals: false,
+      colTotals: false,
+    });
+
+    const result = await fetchPivotBranch({
+      formData,
+      axis: 'col',
+      path: ['Furniture'],
+      currentTree: { rows: {}, cols: {}, cells: {} },
+      visibleRowDepth: 0,
+      visibleColDepth: 1,
+    });
+
+    expect(postMock).not.toHaveBeenCalled();
+    expect(result.data).toBeUndefined();
+    expect(result.factBatches).toEqual([
+      expect.objectContaining({
+        coverage: expect.objectContaining({
+          rowDepth: 0,
+          columnDepth: 1,
+        }),
+        scope: {
+          kind: 'branch',
+          axis: 'col',
+          path: ['Furniture'],
+        },
+        facts: [],
+      }),
+    ]);
   });
 });

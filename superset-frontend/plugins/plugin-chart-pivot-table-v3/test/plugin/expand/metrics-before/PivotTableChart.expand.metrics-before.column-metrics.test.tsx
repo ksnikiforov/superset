@@ -29,6 +29,10 @@ import {
   mergeTrees,
 } from '../../../../src/utils';
 import { fetchPivotBranch } from '../../../../src/fetchPivotBranch';
+import {
+  buildMockBranchFetchResult,
+  resolveMockBranchFetchResult,
+} from '../../fixtures/factBatches';
 
 jest.mock('../../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../../src/fetchPivotBranch');
@@ -43,7 +47,7 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
   const fetchPivotBranchMock = fetchPivotBranch as jest.Mock;
   beforeEach(() => {
     fetchPivotBranchMock.mockReset();
-    fetchPivotBranchMock.mockResolvedValue({ data: undefined });
+    fetchPivotBranchMock.mockImplementation(resolveMockBranchFetchResult());
   });
 
   const buildRowGroupby = (depth: number) =>
@@ -98,7 +102,9 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
       );
       const mergedTree = mergeTrees(baseTree, branchWithMetrics);
 
-      fetchPivotBranchMock.mockResolvedValueOnce({ data: mergedTree });
+      fetchPivotBranchMock.mockImplementationOnce(
+        resolveMockBranchFetchResult({ data: mergedTree }),
+      );
 
       const { findByText, container } = render(
         <PivotTableChart
@@ -150,7 +156,9 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
   );
 
   it('fetches row branch after expanding/collapsing metric-first columns', async () => {
-    fetchPivotBranchMock.mockResolvedValue({ data: undefined });
+    fetchPivotBranchMock.mockImplementation(
+      resolveMockBranchFetchResult({ data: undefined }),
+    );
 
     const baseTreeRaw = buildTreeFromRecords(
       [{ nation: 'USA', segment: 'AUTO', countCustomers: 10 }],
@@ -298,9 +306,15 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
     );
 
     fetchPivotBranchMock
-      .mockResolvedValueOnce({ data: columnBranchWithMetrics })
-      .mockResolvedValueOnce({ data: rowBranchWithMetrics })
-      .mockResolvedValueOnce({ data: finalColBranchWithMetrics });
+      .mockImplementationOnce(
+        resolveMockBranchFetchResult({ data: columnBranchWithMetrics }),
+      )
+      .mockImplementationOnce(
+        resolveMockBranchFetchResult({ data: rowBranchWithMetrics }),
+      )
+      .mockImplementationOnce(
+        resolveMockBranchFetchResult({ data: finalColBranchWithMetrics }),
+      );
 
     const { container, getByText } = render(
       <PivotTableChart
@@ -490,26 +504,35 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
     );
 
     type FetchPivotBranchArgs = Parameters<typeof fetchPivotBranch>[0];
-    fetchPivotBranchMock.mockImplementation(
-      ({ axis, path, visibleRowDepth }: FetchPivotBranchArgs) => {
-        const resolvedVisibleRowDepth = visibleRowDepth ?? 0;
-        if (axis === 'col') {
-          return Promise.resolve({
+    fetchPivotBranchMock.mockImplementation((params: FetchPivotBranchArgs) => {
+      const { axis, path, visibleRowDepth } = params;
+      const resolvedVisibleRowDepth = visibleRowDepth ?? 0;
+      if (axis === 'col') {
+        return Promise.resolve(
+          buildMockBranchFetchResult(params, {
             data:
               resolvedVisibleRowDepth >= 2
                 ? columnRefetchWithMetrics
                 : columnBranchWithMetrics,
-          });
-        }
-        if (path[0] === 'USA') {
-          return Promise.resolve({ data: usaRowBranchWithMetrics });
-        }
-        if (path[0] === 'CAN') {
-          return Promise.resolve({ data: canRowBranchWithMetrics });
-        }
-        return Promise.resolve({ data: undefined });
-      },
-    );
+          }),
+        );
+      }
+      if (path[0] === 'USA') {
+        return Promise.resolve(
+          buildMockBranchFetchResult(params, {
+            data: usaRowBranchWithMetrics,
+          }),
+        );
+      }
+      if (path[0] === 'CAN') {
+        return Promise.resolve(
+          buildMockBranchFetchResult(params, {
+            data: canRowBranchWithMetrics,
+          }),
+        );
+      }
+      return Promise.resolve(buildMockBranchFetchResult(params));
+    });
 
     const { container, getByText } = render(
       <PivotTableChart
@@ -771,7 +794,9 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
       0,
     );
 
-    fetchPivotBranchMock.mockResolvedValueOnce({ data: colBranchWithMetrics });
+    fetchPivotBranchMock.mockImplementationOnce(
+      resolveMockBranchFetchResult({ data: colBranchWithMetrics }),
+    );
 
     const { container, findByText } = render(
       <PivotTableChart
@@ -892,10 +917,14 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
         0,
       );
 
-    fetchPivotBranchMock.mockImplementation(({ path }) =>
-      Promise.resolve({
-        data: buildMetricBranch(decodeMetricKey(path?.[0]) ?? 'measure1'),
-      }),
+    fetchPivotBranchMock.mockImplementation(params =>
+      Promise.resolve(
+        buildMockBranchFetchResult(params, {
+          data: buildMetricBranch(
+            decodeMetricKey(params.path?.[0]) ?? 'measure1',
+          ),
+        }),
+      ),
     );
 
     const { container } = render(
@@ -1050,10 +1079,14 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
         0,
       );
 
-    fetchPivotBranchMock.mockImplementation(({ path }) =>
-      Promise.resolve({
-        data: buildMetricBranch(decodeMetricKey(path?.[0]) ?? 'measure1'),
-      }),
+    fetchPivotBranchMock.mockImplementation(params =>
+      Promise.resolve(
+        buildMockBranchFetchResult(params, {
+          data: buildMetricBranch(
+            decodeMetricKey(params.path?.[0]) ?? 'measure1',
+          ),
+        }),
+      ),
     );
 
     const { container } = render(
@@ -1188,9 +1221,11 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
       0,
     );
 
-    fetchPivotBranchMock.mockResolvedValueOnce({
-      data: mergeTrees(baseTree, expandedTree),
-    });
+    fetchPivotBranchMock.mockImplementationOnce(
+      resolveMockBranchFetchResult({
+        data: mergeTrees(baseTree, expandedTree),
+      }),
+    );
 
     const { container, getAllByLabelText } = render(
       <PivotTableChart
@@ -1288,9 +1323,11 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
       0,
     );
 
-    fetchPivotBranchMock.mockResolvedValueOnce({
-      data: mergeTrees(baseTree, expandedTree),
-    });
+    fetchPivotBranchMock.mockImplementationOnce(
+      resolveMockBranchFetchResult({
+        data: mergeTrees(baseTree, expandedTree),
+      }),
+    );
 
     const { container } = render(
       <PivotTableChart

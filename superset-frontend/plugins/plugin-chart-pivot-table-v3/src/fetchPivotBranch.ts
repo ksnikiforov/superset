@@ -41,7 +41,9 @@ import {
 } from './pivot/query/resolveFetchContext';
 import { buildBranchQuerySpecs } from './pivot/query/specs';
 import { stableStringify as stableStringifyBase } from './pivot/shared/stableStringify';
+import { buildFactCoverage } from './pivot/runtime/coverage';
 import {
+  buildFactStoreBatchesFromSpecs,
   buildBranchTreeFromFactStore,
   canMaterializeSpecsFromFactStore,
   createPivotFactStore,
@@ -54,7 +56,7 @@ export interface FetchPivotBranchResult {
   data?: PivotTreeData;
   cached?: boolean;
   factStoreHit?: boolean;
-  factBatches?: PivotFactStoreBatch[];
+  factBatches: PivotFactStoreBatch[];
   warnings?: ChartDataWarning[];
   error?: Error;
 }
@@ -86,6 +88,8 @@ type ResolvedBranchPlan = {
   treeSnapshot: PivotTreeData;
   specs: ReturnType<typeof buildBranchQuerySpecs>;
 };
+
+const EMPTY_FACT_BATCHES: PivotFactStoreBatch[] = [];
 
 const buildMeasureLeafSelectionSignature = (
   measureHierarchy: LayoutContext['measureHierarchy'],
@@ -181,7 +185,23 @@ const resolvePivotBranchLocalResultFromPlan = (
   { ctx, specs }: ResolvedBranchPlan,
 ): FetchPivotBranchResult | undefined => {
   if (specs.length === 0) {
-    return { data: undefined };
+    const batch: PivotFactStoreBatch = {
+      coverage: buildFactCoverage({
+        reason: 'expand',
+        rowDimensions: ctx.layout.pivotProgram.rowDimensions,
+        columnDimensions: ctx.layout.pivotProgram.columnDimensions,
+        rowDepth: params.visibleRowDepth ?? ctx.rowDepth,
+        columnDepth: params.visibleColDepth ?? ctx.colDepth,
+      }),
+      scope: {
+        kind: 'branch',
+        axis: params.axis,
+        path: params.path,
+      },
+      facts: [],
+    };
+    params.factStore?.upsertBatch(batch);
+    return { data: undefined, factBatches: [batch] };
   }
   if (
     params.factStore &&
@@ -190,6 +210,10 @@ const resolvePivotBranchLocalResultFromPlan = (
       store: params.factStore,
     })
   ) {
+    const factBatches = buildFactStoreBatchesFromSpecs({
+      specs,
+      store: params.factStore,
+    });
     return {
       data: buildBranchTreeFromFactStore({
         specs,
@@ -198,6 +222,7 @@ const resolvePivotBranchLocalResultFromPlan = (
         measureHierarchy: ctx.layout.measureHierarchy,
       }),
       factStoreHit: true,
+      factBatches,
     };
   }
   const cachedFactBatches = readPivotBranchFactCache(ctx.cacheKey);
@@ -329,9 +354,10 @@ export async function fetchPivotBranch({
     };
   } catch (error) {
     if (isAbortError(error)) {
-      return {};
+      return { factBatches: EMPTY_FACT_BATCHES };
     }
     return {
+      factBatches: EMPTY_FACT_BATCHES,
       error: error instanceof Error ? error : new Error(String(error)),
     };
   }

@@ -451,16 +451,67 @@ Gate 2 has started:
   `branch` path, or `batch` sibling set). A regression now proves sibling
   branch scopes with identical depth/dimension coverage do not satisfy each
   other. Query names remain on query specs for backend result matching only.
+- `useExpansionEngine` now consumes typed fact-request identity when seeding and
+  completing fetched state from fact batches. `buildPivotFactRequestKey`
+  provides the shared `coverage + scope` key, branch/batch request projection is
+  covered by focused tests, and fetch/cached fact batches are marked through the
+  typed request path before being projected to the legacy axis-depth map.
+- `src/pivot/expansion/fetchedRequests.ts` now owns the typed fact-request to
+  fetched-depth compatibility bridge. The hook no longer exports projection
+  helpers or keeps an unused request-key set; exact `coverage + scope` request
+  identity remains inside the fact store, while the expansion planner still
+  receives legacy row/column depth maps until that boundary is removed.
+- Hydration and grouped expansion planning now receive one axis-indexed fetched
+  coverage state instead of separate row/column fetched-depth maps. The
+  remaining map lookup is contained behind `fetchedRequests.ts` and the
+  single-axis planner API, so `useExpansionEngine` no longer passes duplicate
+  fetched-depth maps through the planner boundary.
+- Branch and grouped-batch fetch result contracts now always carry
+  `factBatches`. DB fetches, fact-store hits, cache hits, empty/error results,
+  and synthetic Values-tier no-query expansions all return the same field.
+  Values-tier no-query expansions return explicit empty fact batches as fetched
+  coverage markers, so the hook no longer needs to infer loaded coverage from
+  a missing fact-batch result.
+- The local `markFetchedCoverage` fallback branches after fetch results have
+  been deleted from `useExpansionEngine`. The old `groupKeyMap` compatibility
+  return from expansion planning was deleted too, because it existed only to
+  support that fallback.
+- Pending/loading state was inspected during this step. It still needs visible
+  axis path keys for row/column spinners and pending toggles, so it should not
+  be collapsed into request keys until the UI has a separate
+  request-to-visible-node mapping.
+- Component-level branch and batch fetch mocks now use explicit fact-batch test
+  fixtures instead of returning rendered `{ data }` alone. This locks in the
+  production contract that successful fetch/local results describe loaded fact
+  coverage directly.
+- The test fixture contract intentionally marks only dimensional loaded
+  children, not metric or subtotal-only children. This matches the runtime rule
+  that Values can expose synthetic nodes without proving a DB-backed child layer
+  is fetched.
+- Persisted-restore batching tests now model deferred row/column batch fetches
+  with follow-up calls resolved through the same fact-batch helper. This keeps
+  out-of-order batch behavior interactive while avoiding hidden fallback
+  coverage in the hook.
+- Verification for this slice: the focused runtime/component set passed
+  `11` suites / `135` tests, and the full plugin test directory passed `88`
+  suites / `685` tests.
 
 Immediate next step:
 
-- Measure whether support metrics are reusable in broader interaction paths that
-  do not use `fetchPivotBranch` directly. If any path re-requests an already
-  loaded exact support coverage, add a targeted regression before changing it.
-- Inspect whether `useExpansionEngine` can consume typed request scopes directly
-  for pending/fetched state, instead of translating branch/batch scope back into
-  axis path keys plus opposite depth. This is the next likely deletion-oriented
-  step in the interactive runtime path.
+- Reassess the remaining post-merge `markExpandedAsFetched` /
+  `markFetchedCoverage` path in `useExpansionEngine`. It still marks rendered
+  expanded nodes as fetched after a successful tree merge. If exact fact batches
+  now cover every production fetch/local-cache result, this can move behind
+  `fetchedRequests.ts` as a narrow compatibility helper or be deleted for some
+  paths.
+- Add targeted regressions before cutting it. The high-risk cases are persisted
+  multi-level restore, out-of-order row/column batch resolution, skipped
+  pre-Values metric branches, and synthetic Values-only expansions, because
+  those are the places where rendered-tree satisfaction may still hide missing
+  fact coverage.
+- After that, measure support metric reuse in broader interaction paths that do
+  not use `fetchPivotBranch` directly. If any path re-requests an already loaded
+  exact support coverage, add a targeted regression before changing it.
 - Before deleting any broad behavior branch, bring inconsistent behavior or
   edge-case behavior that unlocks large deletion wins to the user for approval
   with UX impact and deletion upside.

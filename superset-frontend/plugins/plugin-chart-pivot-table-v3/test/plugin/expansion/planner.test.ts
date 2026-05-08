@@ -18,11 +18,105 @@
  */
 
 import { planGroupedExpansionTargets } from '../../../src/pivot/expansion/planner';
+import {
+  createFetchedFactCoverageState,
+  projectFactRequestToFetchedCoverage,
+  seedFetchedCoverageFromFactBatches,
+} from '../../../src/pivot/expansion/fetchedRequests';
 import { rootKey } from '../../../src/pivot/viewModel';
 import { serializePath } from '../../../src/utils';
 import { type PivotTreeNode } from '../../../src/types';
 
 describe('pivot/expansion/planner', () => {
+  it('projects a typed branch request scope to fetched coverage', () => {
+    expect(
+      projectFactRequestToFetchedCoverage({
+        coverage: {
+          reason: 'expand',
+          rowDepth: 2,
+          columnDepth: 1,
+          rowDimensions: ['country', 'city'],
+          columnDimensions: ['month'],
+        },
+        scope: {
+          kind: 'branch',
+          axis: 'row',
+          path: ['France'],
+        },
+      }),
+    ).toEqual([
+      {
+        axis: 'row',
+        pathKey: serializePath(['France']),
+        requiredOppositeDepth: 1,
+      },
+    ]);
+  });
+
+  it('projects a typed batch request scope to fetched sibling coverage', () => {
+    expect(
+      projectFactRequestToFetchedCoverage({
+        coverage: {
+          reason: 'expand',
+          rowDepth: 3,
+          columnDepth: 0,
+          rowDimensions: ['country', 'state', 'city'],
+          columnDimensions: [],
+        },
+        scope: {
+          kind: 'batch',
+          axis: 'row',
+          parentPath: ['US'],
+          siblingValues: ['CA', 'NY'],
+        },
+      }),
+    ).toEqual([
+      {
+        axis: 'row',
+        pathKey: serializePath(['US', 'CA']),
+        requiredOppositeDepth: 0,
+      },
+      {
+        axis: 'row',
+        pathKey: serializePath(['US', 'NY']),
+        requiredOppositeDepth: 0,
+      },
+    ]);
+  });
+
+  it('seeds legacy fetched-depth maps from typed fact batches', () => {
+    const fetchedCoverage = createFetchedFactCoverageState({
+      row: new Map([[`row:${serializePath(['France'])}`, 0]]),
+    });
+
+    seedFetchedCoverageFromFactBatches({
+      fetchedCoverage,
+      getCoverageKey: (axis, pathKey) => `${axis}:${pathKey}`,
+      batches: [
+        {
+          coverage: {
+            reason: 'expand',
+            rowDepth: 2,
+            columnDepth: 1,
+            rowDimensions: ['country', 'city'],
+            columnDimensions: ['month'],
+          },
+          scope: {
+            kind: 'branch',
+            axis: 'row',
+            path: ['France'],
+          },
+          facts: [],
+        },
+      ],
+    });
+
+    expect(fetchedCoverage.depthByAxis.row).toEqual(
+      new Map([[`row:${serializePath(['France'])}`, 1]]),
+    );
+    expect(fetchedCoverage.depthByAxis.col).toEqual(new Map());
+  });
+
   it('plans grouped fetch targets for an expanded node', () => {
     const aKey = serializePath(['A']);
     const nodes: Record<string, PivotTreeNode> = {
@@ -46,12 +140,12 @@ describe('pivot/expansion/planner', () => {
       },
     };
 
-    const { plan, targets, groupKeyMap } = planGroupedExpansionTargets({
+    const { plan, targets } = planGroupedExpansionTargets({
       axis: 'row',
       expandedKeys: new Set([rootKey, aKey]),
       nodes,
       requiredOppositeDepth: 1,
-      fetchedDepthByKey: new Map(),
+      fetchedCoverage: createFetchedFactCoverageState(),
       hasLoadedChildren: () => false,
       getCoverageKey: (_axis, key) => key,
     });
@@ -66,7 +160,6 @@ describe('pivot/expansion/planner', () => {
         requiredOppositeDepth: 1,
       },
     ]);
-    expect(groupKeyMap.get(JSON.stringify(['row', aKey]))).toEqual([aKey]);
   });
 
   it('keeps rendered metric siblings as separate fetch targets when coverage keys differ', () => {
@@ -102,22 +195,19 @@ describe('pivot/expansion/planner', () => {
       },
     };
 
-    const { targets, groupKeyMap } = planGroupedExpansionTargets({
+    const { targets } = planGroupedExpansionTargets({
       axis: 'row',
       expandedKeys: new Set([metricAKey, metricBKey]),
       nodes,
       requiredOppositeDepth: 1,
-      fetchedDepthByKey: new Map(),
+      fetchedCoverage: createFetchedFactCoverageState(),
       hasLoadedChildren: () => false,
       getCoverageKey: (_axis, key) => key,
     });
 
     expect(targets).toHaveLength(2);
-    expect(groupKeyMap.get(JSON.stringify(['row', metricAKey]))).toEqual([
-      metricAKey,
-    ]);
-    expect(groupKeyMap.get(JSON.stringify(['row', metricBKey]))).toEqual([
-      metricBKey,
-    ]);
+    expect(new Set(targets.map(target => target.pathKey))).toEqual(
+      new Set([metricAKey, metricBKey]),
+    );
   });
 });

@@ -24,6 +24,10 @@ import {
   planExpansionForAxis,
   type PivotExpansionPlan,
 } from '../engine/expansionPlanner';
+import {
+  getFetchedAxisDepthMap,
+  type FetchedFactCoverageState,
+} from './fetchedRequests';
 
 export type PlannedFetchTarget = FetchTarget & {
   id: string;
@@ -43,7 +47,6 @@ export function buildGroupedFetchTargets({
   getCoverageKey: (axis: PivotAxis, key: string) => string;
 }): {
   targets: PlannedFetchTarget[];
-  groupKeyMap: Map<string, string[]>;
 } {
   const groups = new Map<string, string[]>();
   fetchKeys.forEach(key => {
@@ -57,7 +60,6 @@ export function buildGroupedFetchTargets({
   });
 
   const targets: PlannedFetchTarget[] = [];
-  const groupKeyMap = new Map<string, string[]>();
 
   for (const keys of groups.values()) {
     const representative =
@@ -78,11 +80,9 @@ export function buildGroupedFetchTargets({
       childDepth,
       requiredOppositeDepth,
     });
-
-    groupKeyMap.set(JSON.stringify([axis, representative]), keys);
   }
 
-  return { targets, groupKeyMap };
+  return { targets };
 }
 
 export const planGroupedExpansionTargets = ({
@@ -90,7 +90,7 @@ export const planGroupedExpansionTargets = ({
   expandedKeys,
   nodes,
   requiredOppositeDepth,
-  fetchedDepthByKey,
+  fetchedCoverage,
   hasLoadedChildren,
   getCoverageKey,
 }: {
@@ -98,20 +98,19 @@ export const planGroupedExpansionTargets = ({
   expandedKeys: Set<string>;
   nodes: Record<string, PivotTreeNode>;
   requiredOppositeDepth: number;
-  fetchedDepthByKey: Map<string, number>;
+  fetchedCoverage: FetchedFactCoverageState;
   hasLoadedChildren: (axis: PivotAxis, node: PivotTreeNode) => boolean;
   getCoverageKey: (axis: PivotAxis, key: string) => string;
 }): {
   plan: PivotExpansionPlan;
   targets: PlannedFetchTarget[];
-  groupKeyMap: Map<string, string[]>;
 } => {
   const plan = planExpansionForAxis({
     axis,
     expandedKeys,
     nodes,
     requiredDepth: requiredOppositeDepth,
-    fetchedDepthByKey,
+    fetchedDepthByKey: getFetchedAxisDepthMap(fetchedCoverage, axis),
     hasLoadedChildren,
     getCoverageKey,
   });
@@ -124,5 +123,5 @@ export const planGroupedExpansionTargets = ({
     getCoverageKey,
   });
 
-  return { plan, targets: grouped.targets, groupKeyMap: grouped.groupKeyMap };
+  return { plan, targets: grouped.targets };
 };

@@ -29,7 +29,15 @@ import {
   peekPivotBranchCache,
 } from '../../../src/fetchPivotBranch';
 import { fetchPivotBranchesBatch } from '../../../src/pivot/query/fetchPivotBranchesBatch';
+import type {
+  FetchPivotBranchesBatchParams,
+  FetchPivotBranchesBatchResult,
+} from '../../../src/pivot/query/fetchPivotBranchesBatch';
 import { buildFormData } from '../fixtures/pivotFormData';
+import {
+  buildMockBatchFetchResult,
+  buildMockBranchFetchResult,
+} from '../fixtures/factBatches';
 
 jest.mock('../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../src/fetchPivotBranch');
@@ -44,17 +52,36 @@ jest.mock('../../../src/pivot/query/fetchPivotBranchesBatch', () => ({
   fetchPivotBranchesBatch: jest.fn(),
 }));
 
-type Deferred<T> = {
-  promise: Promise<T>;
-  resolve: (value: T) => void;
-};
+const createDeferredBatchFetch = () => {
+  const resolvers: Array<
+    (result: Partial<FetchPivotBranchesBatchResult>) => void
+  > = [];
+  const promises: Array<Promise<FetchPivotBranchesBatchResult>> = [];
+  let resolvedResult: Partial<FetchPivotBranchesBatchResult> | undefined;
 
-const createDeferred = <T,>(): Deferred<T> => {
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>(res => {
-    resolve = res;
-  });
-  return { promise, resolve };
+  return {
+    implementation: (params: FetchPivotBranchesBatchParams) => {
+      if (resolvedResult) {
+        const promise = Promise.resolve(
+          buildMockBatchFetchResult(params, resolvedResult),
+        );
+        promises.push(promise);
+        return promise;
+      }
+      const promise = new Promise<FetchPivotBranchesBatchResult>(resolve => {
+        resolvers.push(result =>
+          resolve(buildMockBatchFetchResult(params, result)),
+        );
+      });
+      promises.push(promise);
+      return promise;
+    },
+    promises,
+    resolveAll: (result: Partial<FetchPivotBranchesBatchResult>) => {
+      resolvedResult = result;
+      resolvers.splice(0).forEach(resolve => resolve(result));
+    },
+  };
 };
 
 const buildTree = ({
@@ -136,8 +163,12 @@ describe('PivotTableChart batching on persisted restore', () => {
       colDepth: 0,
     });
 
-    fetchPivotBranchesBatchMock.mockResolvedValue({ data: branchTree });
-    fetchPivotBranchMock.mockResolvedValue({ data: branchTree });
+    fetchPivotBranchesBatchMock.mockImplementation(params =>
+      Promise.resolve(buildMockBatchFetchResult(params, { data: branchTree })),
+    );
+    fetchPivotBranchMock.mockImplementation(params =>
+      Promise.resolve(buildMockBranchFetchResult(params, { data: branchTree })),
+    );
 
     const pivotExpansionState: PivotExpansionState = {
       rowKeys: rowGroupby,
@@ -214,12 +245,15 @@ describe('PivotTableChart batching on persisted restore', () => {
       colDepth: 2,
     });
 
-    const deferredRow = createDeferred<{ data?: PivotTreeData }>();
-    const deferredCol = createDeferred<{ data?: PivotTreeData }>();
+    const deferredRow = createDeferredBatchFetch();
+    const deferredCol = createDeferredBatchFetch();
 
-    fetchPivotBranchesBatchMock.mockImplementation(({ batch }) =>
-      batch.axis === 'row' ? deferredRow.promise : deferredCol.promise,
-    );
+    fetchPivotBranchesBatchMock.mockImplementation(params => {
+      if (params.batch.axis === 'row') {
+        return deferredRow.implementation(params);
+      }
+      return deferredCol.implementation(params);
+    });
 
     const pivotExpansionState: PivotExpansionState = {
       rowKeys: rowGroupby,
@@ -258,8 +292,10 @@ describe('PivotTableChart batching on persisted restore', () => {
       expect(fetchPivotBranchesBatchMock).toHaveBeenCalledTimes(2),
     );
 
-    deferredCol.resolve({ data: colBranch });
-    deferredRow.resolve({ data: rowBranch });
+    expect(deferredCol.promises).toHaveLength(1);
+    expect(deferredRow.promises).toHaveLength(1);
+    deferredCol.resolveAll({ data: colBranch });
+    deferredRow.resolveAll({ data: rowBranch });
 
     await waitFor(() => {
       expect(screen.getByText('X')).toBeInTheDocument();

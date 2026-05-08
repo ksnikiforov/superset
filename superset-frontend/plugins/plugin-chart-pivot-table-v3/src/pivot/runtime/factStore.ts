@@ -70,15 +70,17 @@ export type PivotFactStore = {
   size: () => number;
 };
 
-const requestKey = ({ coverage, scope }: PivotFactSelector) =>
-  stableStringify([coverage, scope]);
+export const buildPivotFactRequestKey = ({
+  coverage,
+  scope,
+}: PivotFactSelector) => stableStringify([coverage, scope]);
 
 export const buildPivotFactKey = (
   selector: PivotFactSelector,
   fact: PivotFact,
 ) =>
   stableStringify([
-    requestKey(selector),
+    buildPivotFactRequestKey(selector),
     serializePath(fact.rowPath),
     serializePath(fact.columnPath),
     fact.valueKey,
@@ -95,7 +97,7 @@ export const createPivotFactStore = (): PivotFactStore => {
       coverage: batch.coverage,
       scope: batch.scope,
     };
-    const key = requestKey(selector);
+    const key = buildPivotFactRequestKey(selector);
     const requestFactKeys = factKeysByRequest.get(key) ?? new Set<string>();
     facts.forEach(fact => {
       const factKey = buildPivotFactKey(selector, fact);
@@ -106,7 +108,7 @@ export const createPivotFactStore = (): PivotFactStore => {
   };
 
   const getFacts = (selector: PivotFactSelector) =>
-    Array.from(factKeysByRequest.get(requestKey(selector)) ?? [])
+    Array.from(factKeysByRequest.get(buildPivotFactRequestKey(selector)) ?? [])
       .map(key => factsByKey.get(key))
       .filter((fact): fact is PivotFact => fact !== undefined);
 
@@ -114,7 +116,8 @@ export const createPivotFactStore = (): PivotFactStore => {
     upsertBatch,
     upsertBatches: batches => batches.forEach(upsertBatch),
     getFacts,
-    hasCoverage: selector => factKeysByRequest.has(requestKey(selector)),
+    hasCoverage: selector =>
+      factKeysByRequest.has(buildPivotFactRequestKey(selector)),
     getAll: () => Array.from(factsByKey.values()),
     size: () => factsByKey.size,
   };

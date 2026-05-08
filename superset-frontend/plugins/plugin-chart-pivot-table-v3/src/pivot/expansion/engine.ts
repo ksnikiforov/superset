@@ -47,6 +47,10 @@ import {
   isMetricSubtotalNode as isMetricSubtotalNodeBase,
 } from '../metricsTotals';
 import { buildGroupedFetchTargets } from './planner';
+import {
+  getFetchedAxisDepthMap,
+  type FetchedFactCoverageState,
+} from './fetchedRequests';
 
 export type ExpansionVisibilityConfig = {
   pivotProgram: PivotProgram;
@@ -87,7 +91,6 @@ export type HydrationIterationPlan =
         childDepth: number;
         requiredOppositeDepth: number;
       }>;
-      groupKeyMap: Map<string, string[]>;
     };
 
 const depthSorter = () => 0;
@@ -630,8 +633,7 @@ export const planHydrationIteration = ({
   tree,
   desiredRows,
   desiredCols,
-  fetchedRowDepthByKey,
-  fetchedColDepthByKey,
+  fetchedCoverage,
   config,
   getCoverageKey,
   activeAxis,
@@ -643,8 +645,7 @@ export const planHydrationIteration = ({
   tree: PivotTreeData;
   desiredRows: Set<string>;
   desiredCols: Set<string>;
-  fetchedRowDepthByKey: Map<string, number>;
-  fetchedColDepthByKey: Map<string, number>;
+  fetchedCoverage: FetchedFactCoverageState;
   config: ExpansionVisibilityConfig;
   getCoverageKey: (axis: PivotAxis, key: string) => string;
   activeAxis?: PivotAxis;
@@ -672,7 +673,7 @@ export const planHydrationIteration = ({
         expandedKeys: desiredRows,
         nodes: tree.rows,
         requiredDepth: visibleColDepth,
-        fetchedDepthByKey: fetchedRowDepthByKey,
+        fetchedDepthByKey: getFetchedAxisDepthMap(fetchedCoverage, 'row'),
         hasLoadedChildren,
         getCoverageKey,
       })
@@ -687,7 +688,7 @@ export const planHydrationIteration = ({
         expandedKeys: desiredCols,
         nodes: tree.cols,
         requiredDepth: visibleRowDepth,
-        fetchedDepthByKey: fetchedColDepthByKey,
+        fetchedDepthByKey: getFetchedAxisDepthMap(fetchedCoverage, 'col'),
         hasLoadedChildren,
         getCoverageKey,
       })
@@ -766,13 +767,6 @@ export const planHydrationIteration = ({
     requiredOppositeDepth: visibleRowDepth,
     getCoverageKey,
   });
-  const groupKeyMap = new Map<string, string[]>();
-  rowGroups.groupKeyMap.forEach((value, key) => {
-    groupKeyMap.set(key, value);
-  });
-  colGroups.groupKeyMap.forEach((value, key) => {
-    groupKeyMap.set(key, value);
-  });
   return {
     kind: 'fetch',
     desiredRows,
@@ -782,7 +776,6 @@ export const planHydrationIteration = ({
     rowPlan: effectiveRowPlan,
     colPlan: effectiveColPlan,
     targets: [...rowGroups.targets, ...colGroups.targets],
-    groupKeyMap,
   };
 };
 

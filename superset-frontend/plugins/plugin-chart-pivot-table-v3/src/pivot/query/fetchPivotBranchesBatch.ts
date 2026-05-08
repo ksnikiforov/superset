@@ -17,10 +17,13 @@
  * under the License.
  */
 import type { PivotTableQueryFormData, PivotTreeData } from '../../types';
+import { parsePath } from '../core/path';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import { buildLayoutContext } from '../layout/LayoutContext';
+import { buildFactCoverage } from '../runtime/coverage';
 import {
+  buildFactStoreBatchesFromSpecs,
   buildBranchTreeFromFactStore,
   canMaterializeSpecsFromFactStore,
   createPivotFactStore,
@@ -44,10 +47,12 @@ export type FetchPivotBranchesBatchParams = {
 export type FetchPivotBranchesBatchResult = {
   data?: PivotTreeData;
   factStoreHit?: boolean;
-  factBatches?: PivotFactStoreBatch[];
+  factBatches: PivotFactStoreBatch[];
   warnings?: ChartDataWarning[];
   error?: Error;
 };
+
+const EMPTY_FACT_BATCHES: PivotFactStoreBatch[] = [];
 
 const isAbortError = (error: unknown): boolean => {
   if (
@@ -85,7 +90,24 @@ export const fetchPivotBranchesBatch = async ({
     chunkIndex: 0,
   });
   if (specs.length === 0) {
-    return { data: undefined };
+    const batchMarker: PivotFactStoreBatch = {
+      coverage: buildFactCoverage({
+        reason: 'expand',
+        rowDimensions: layout.pivotProgram.rowDimensions,
+        columnDimensions: layout.pivotProgram.columnDimensions,
+        rowDepth: visibleRowDepth,
+        columnDepth: visibleColDepth,
+      }),
+      scope: {
+        kind: 'batch',
+        axis: batch.axis,
+        parentPath: parsePath(batch.parentPathKey),
+        siblingValues: batch.siblingValues,
+      },
+      facts: [],
+    };
+    factStore?.upsertBatch(batchMarker);
+    return { data: undefined, factBatches: [batchMarker] };
   }
   if (
     factStore &&
@@ -94,6 +116,10 @@ export const fetchPivotBranchesBatch = async ({
       store: factStore,
     })
   ) {
+    const factBatches = buildFactStoreBatchesFromSpecs({
+      specs,
+      store: factStore,
+    });
     return {
       data: buildBranchTreeFromFactStore({
         specs,
@@ -102,6 +128,7 @@ export const fetchPivotBranchesBatch = async ({
         measureHierarchy: layout.measureHierarchy,
       }),
       factStoreHit: true,
+      factBatches,
     };
   }
   const metricsForQuery = specs[0].metrics;
@@ -147,9 +174,10 @@ export const fetchPivotBranchesBatch = async ({
     };
   } catch (error) {
     if (isAbortError(error)) {
-      return {};
+      return { factBatches: EMPTY_FACT_BATCHES };
     }
     return {
+      factBatches: EMPTY_FACT_BATCHES,
       error: error instanceof Error ? error : new Error(String(error)),
     };
   }
