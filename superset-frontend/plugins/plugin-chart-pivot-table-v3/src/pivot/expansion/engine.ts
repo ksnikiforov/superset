@@ -48,7 +48,7 @@ import {
 } from '../metricsTotals';
 import { buildGroupedFetchTargets } from './planner';
 import {
-  getFetchedAxisDepthMap,
+  createFetchedFactCoverageLookup,
   type FetchedFactCoverageState,
 } from './fetchedRequests';
 
@@ -666,6 +666,10 @@ export const planHydrationIteration = ({
     visibleColDepth,
     config,
   });
+  const fetchedCoverageLookup = createFetchedFactCoverageLookup({
+    fetchedCoverage,
+    getCoverageKey,
+  });
 
   const rowPlan = planRows
     ? planExpansionForAxis({
@@ -673,9 +677,8 @@ export const planHydrationIteration = ({
         expandedKeys: desiredRows,
         nodes: tree.rows,
         requiredDepth: visibleColDepth,
-        fetchedDepthByKey: getFetchedAxisDepthMap(fetchedCoverage, 'row'),
+        fetchedCoverageLookup,
         hasLoadedChildren,
-        getCoverageKey,
       })
     : {
         fetchKeys: new Set<string>(),
@@ -688,9 +691,8 @@ export const planHydrationIteration = ({
         expandedKeys: desiredCols,
         nodes: tree.cols,
         requiredDepth: visibleRowDepth,
-        fetchedDepthByKey: getFetchedAxisDepthMap(fetchedCoverage, 'col'),
+        fetchedCoverageLookup,
         hasLoadedChildren,
-        getCoverageKey,
       })
     : {
         fetchKeys: new Set<string>(),

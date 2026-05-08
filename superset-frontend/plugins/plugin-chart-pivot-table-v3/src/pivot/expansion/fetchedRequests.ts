@@ -33,6 +33,16 @@ export type FetchedFactRequestProjection = {
   requiredOppositeDepth: number;
 };
 
+export type FetchedFactCoverageLookup = {
+  getFetchedDepth: (
+    projection: FetchedFactRequestProjection,
+  ) => number | undefined;
+  isSameFetchedCoverage: (
+    left: FetchedFactRequestProjection,
+    right: FetchedFactRequestProjection,
+  ) => boolean;
+};
+
 type CreateFetchedFactCoverageStateConfig = Partial<
   Record<PivotAxis, Map<string, number>>
 >;
@@ -85,6 +95,23 @@ export const getFetchedAxisDepthMap = (
   fetchedCoverage: FetchedFactCoverageState,
   axis: PivotAxis,
 ) => fetchedCoverage.depthByAxis[axis];
+
+export const createFetchedFactCoverageLookup = ({
+  fetchedCoverage,
+  getCoverageKey,
+}: {
+  fetchedCoverage: FetchedFactCoverageState;
+  getCoverageKey: (axis: PivotAxis, pathKey: string) => string;
+}): FetchedFactCoverageLookup => ({
+  getFetchedDepth: ({ axis, pathKey }) =>
+    getFetchedAxisDepthMap(fetchedCoverage, axis).get(
+      getCoverageKey(axis, pathKey),
+    ),
+  isSameFetchedCoverage: (left, right) =>
+    left.axis === right.axis &&
+    getCoverageKey(left.axis, left.pathKey) ===
+      getCoverageKey(right.axis, right.pathKey),
+});
 
 const markFetchedAxisCoverage = ({
   fetchedCoverage,

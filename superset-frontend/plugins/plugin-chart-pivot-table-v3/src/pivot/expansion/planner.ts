@@ -25,7 +25,7 @@ import {
   type PivotExpansionPlan,
 } from '../engine/expansionPlanner';
 import {
-  getFetchedAxisDepthMap,
+  createFetchedFactCoverageLookup,
   type FetchedFactCoverageState,
 } from './fetchedRequests';
 
@@ -105,14 +105,17 @@ export const planGroupedExpansionTargets = ({
   plan: PivotExpansionPlan;
   targets: PlannedFetchTarget[];
 } => {
+  const fetchedCoverageLookup = createFetchedFactCoverageLookup({
+    fetchedCoverage,
+    getCoverageKey,
+  });
   const plan = planExpansionForAxis({
     axis,
     expandedKeys,
     nodes,
     requiredDepth: requiredOppositeDepth,
-    fetchedDepthByKey: getFetchedAxisDepthMap(fetchedCoverage, axis),
+    fetchedCoverageLookup,
     hasLoadedChildren,
-    getCoverageKey,
   });
 
   const grouped = buildGroupedFetchTargets({

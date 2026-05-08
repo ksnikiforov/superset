@@ -239,53 +239,109 @@ As of May 8, 2026:
 
 ### Plan Reassessment
 
-The refactor is still directionally correct, but the gate order is now more
-interleaved than the original plan implied:
+The refactor is still directionally correct, but it has reached the point where
+new abstractions must be paired with deletions. The safest next work is not to
+add another planner layer; it is to move remaining local projection and coverage
+mutation out of React hooks and then delete the hook-local branches.
 
-- Gate 1 is not finished because raw layout interpretation still exists in
-  `usePivotLayout` and `resolveInteractionLayout`.
-- Gate 2 is largely complete for branch, batch, and root query planning. Query
-  specs now consume coverage objects and the shared fetch context instead of
-  branch-pair path surgery.
+Current diff from baseline `3affd1cc6db691fe08eddf0914e2050207f95ed0`:
+
+- Full plugin: `85` files changed, `7681` insertions, `3095` deletions.
+- Production `src`: `35` files changed, `3493` insertions, `2555` deletions.
+- Tests: `49` files changed, `3711` insertions, `532` deletions.
+
+The total diff is still net additive because the refactor added runtime
+infrastructure and protective tests. That is acceptable only if the next changes
+delete production hook/layout/materialization branches. Test-line reduction
+remains a non-goal.
+
+Gate status:
+
+- Gate 1 is partially complete. `PivotProgram` is established and many call
+  sites consume it, but `usePivotLayout` and `resolveInteractionLayout` still
+  translate raw layout state into runtime behavior.
+- Gate 2 is largely complete. Initial, root, branch, and batch query paths now
+  flow through explicit coverage metadata. Remaining complexity is mostly
+  support/totals coverage expansion inside `coverage.ts`, not old branch-pair
+  planning.
 - Gate 3 is mostly complete at the ingestion boundary. Initial load, seamless
-  refresh, branch fetch, and batch fetch now ingest planned query results through
-  the same runtime fact path, and branch cache data is fact-store data rather
-  than rendered-tree data.
-- Gate 6 has already started early. Loaded-child checks, toggle eligibility,
-  formatting/sorting value maps, and column display projection now consume the
-  shared projection descriptor.
+  refresh, branch fetch, batch fetch, local fact-store hits, and branch-cache
+  hits now carry `PivotFactStoreBatch[]`. The remaining dependency is that
+  materialization still calls legacy tree helpers.
+- Gate 4 is started but not complete. `applyMeasureAxis` unifies flat metric
+  axes and measure-leaf axes, but `pivot/core/tree.ts` still exposes legacy
+  `buildTreeFromRecords`, `applyMetricAxis`, subtotal injection, and subtotal
+  labeling wrappers. Production materialization is centralized in
+  `ingestQueryResults.ts`, but the materializer is not yet a clean runtime
+  module.
+- Gate 5 is started but still the largest source of complexity.
+  `useExpansionEngine` no longer infers fetched state from rendered trees and
+  the planner no longer consumes raw fetched-depth maps, but the hook still owns
+  layout trimming, local tree projection, fetched-coverage remapping, same-axis
+  fetch loops, cross-axis hydration loops, cancellation, loading state,
+  persistence, and expansion normalization.
+- Gate 6 is partially complete. Projection now drives loaded-child checks,
+  toggle eligibility, column display projection, and collapsed Values semantics.
+  `visibility.ts` still contains descendant/cell scanning loaded-state
+  inference that overlaps with fetched coverage.
+- Gate 7 has only been lightly reduced. `PivotTableChart.tsx` is smaller than
+  baseline, but at roughly `3088` lines it still owns committed-tree sync,
+  seamless refresh, runtime layout coverage checks, interaction wiring, and
+  controller-like responsibilities.
 
-The current line-count picture is mixed but healthy:
+Current largest production hotspots by line count:
 
-- Compared with baseline `3affd1cc6db691fe08eddf0914e2050207f95ed0`, the full
-  plugin diff is still net additive because the change introduced runtime
-  infrastructure and protective tests.
-- The latest source-only step is deletion-positive: current plugin `src` changes
-  are slightly more deletions than additions.
-- This is acceptable only if the next steps keep collapsing old call sites into
-  the runtime layer. Adding another abstraction without deleting old tree/render
-  branches would be a regression against the plan.
-
-The main remaining complexity is no longer query planning. It is now concentrated
-in three places:
-
-- `usePivotLayout` still owns collapsed metric-tier synthesis and row/column
-  child filtering with duplicated metric-placement rules.
-- `visibility.ts` still contains local loaded-state and descendant-depth
-  inference that overlaps with projection and coverage state.
-- `pivot/core/tree.ts` still contains old tree materialization paths for metric
-  axes, measure leaves, totals, and collapsed value surfacing.
+- `useExpansionEngine.ts`: about `2575` lines. This is now the best deletion
+  target.
+- `usePivotLayout.ts`: about `1805` lines. This is still the main render/layout
+  policy hotspot.
+- `pivot/core/tree.ts`: about `948` lines, plus `ingestQueryResults.ts` at about
+  `718` lines. Tree materialization is centralized in practice but not yet
+  cleanly separated.
+- `visibility.ts`: about `602` lines. Loaded-state inference should keep
+  shrinking as fetched coverage becomes the source of truth.
+- `PivotTableChart.tsx`: about `3088` lines. It should be split later, after
+  expansion/materialization contracts are thinner.
 
 Recommended next sequence:
 
-1. Finish axis-neutral projection in render/tree visibility by extracting a
-   small projected-child helper for collapsed row and column metric tiers.
-2. Use that helper to shrink `usePivotLayout` child filtering and remove
-   duplicated row/column metric-position branches where behavior is already
-   intended to be axis-neutral.
-3. Then move to Gate 4 materialization cleanup. Do not start the full reducer
-   rewrite until tree projection/materialization is thinner, otherwise the
-   reducer will inherit too much old complexity.
+1. Finish the fetched-coverage state cleanup inside `useExpansionEngine`.
+   Move collapse pruning, stable-trim remapping, and expanded-coverage remapping
+   behind `fetchedRequests.ts` or a small sibling coverage-state helper. Delete
+   direct `Map<string, number>` manipulation from the hook. This is low UX risk
+   because it preserves current behavior while tightening ownership.
+2. Extract the layout-change projection/reinitialization block from
+   `useExpansionEngine` into a pure transition helper with tests. The target is
+   to remove `trimTreeForLayout`, `promoteTreeForLayout`, local cell-value
+   merging, stable-prefix expansion pruning, and fetched-coverage reconstruction
+   from the React hook body.
+3. Then revisit `usePivotLayout` row/column pruning. The likely deletion is one
+   axis-neutral stale collapsed-branch helper with small row/column presentation
+   adapters. If this changes visible subtotal/header behavior, stop for an
+   approval checkpoint.
+4. After the expansion hook is thinner, return to Gate 4 and create an explicit
+   `materializePivotTree` runtime module. Keep `buildTreeFromRecords` and
+   `applyMetricAxis` as test/compatibility wrappers only until their production
+   callers are gone, then delete or demote their public exports.
+5. Do not start the full reducer rewrite yet. A reducer now would absorb too
+   much hook-local layout projection and fetched-map maintenance. The reducer
+   should come after those pieces are pure helpers.
+
+Potential approval checkpoints now visible:
+
+- `trimTreeForLayout` still locally merges cells when layout depth is reduced.
+  Deleting that behavior and showing only exact fetched/materialized coverage
+  would remove meaningful code and avoid local aggregation, but it may make
+  layout changes show less carried-over data until the new coverage is fetched
+  or materialized.
+- Persisted expansion state currently tries to survive semantic layout changes
+  through stable-prefix pruning and coverage remapping. Simplifying this to a
+  stricter reset-on-semantic-change rule could remove code, but it would change
+  dashboard restore behavior after row/column edits.
+- Row and column stale collapsed-metric pruning are similar but not identical.
+  Unifying them is a good deletion opportunity only if visible row body behavior
+  and column header behavior remain the same. Any visible subtotal/header change
+  needs approval first.
 
 Approved collapsed Values projection boundary:
 
@@ -512,14 +568,25 @@ Gate 2 has started:
   longer a valid successful fetch contract for expansion planning.
 - Verification after deleting the bridge: the full plugin test directory passed
   `89` suites / `687` tests.
+- Expansion planning now consumes a typed fetched-coverage lookup instead of raw
+  row/column fetched-depth maps plus a coverage-key callback. The remaining
+  axis-depth map shape is contained inside `fetchedRequests.ts` and the local
+  hook state that prunes/remaps coverage during collapse and layout changes.
+- Planner regression coverage now exercises typed branch coverage, typed batch
+  sibling coverage, and metric-sibling split loading through the grouped
+  expansion planner. This locks the no-overfetch rule before removing more of
+  the old coverage-state shape.
 
 Immediate next step:
 
-- With fetched coverage now seeded from returned fact-batch selectors, the next
-  deletion target is the remaining legacy axis-depth fetched-state shape at the
-  planner boundary. Either teach the planner to consume typed coverage
-  projections directly, or keep the projection in `fetchedRequests.ts` and delete
-  any duplicate row/column depth normalization still living outside that file.
+- With the planner boundary no longer consuming raw fetched-depth maps, the next
+  deletion target is the remaining local map manipulation inside
+  `useExpansionEngine`: collapse pruning and layout-change remapping should move
+  behind the same fetched-coverage helper or disappear once coverage can be
+  rebuilt from fact-batch selectors.
+- After that, extract the layout-change transition block from
+  `useExpansionEngine` into a pure helper. That should make the eventual reducer
+  smaller instead of simply moving the current hook complexity into a new file.
 - Before deleting any broad behavior branch, bring inconsistent behavior or
   edge-case behavior that unlocks large deletion wins to the user for approval
   with UX impact and deletion upside.
