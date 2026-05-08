@@ -24,8 +24,10 @@ import { applyMetricAxis, buildTreeFromRecords } from '../../../src/utils';
 import {
   fetchPivotBranch,
   peekPivotBranchCache,
+  type FetchPivotBranchParams,
 } from '../../../src/fetchPivotBranch';
 import { buildFormData } from '../fixtures/pivotFormData';
+import { buildMockBranchFetchResult } from '../fixtures/factBatches';
 
 jest.mock('../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../src/fetchPivotBranch');
@@ -309,7 +311,12 @@ describe('PivotTableChart expand/collapse count stability', () => {
         metricPosition,
       });
 
-      fetchPivotBranchMock.mockResolvedValue({ data: fullTree });
+      fetchPivotBranchMock.mockImplementation(
+        (params: FetchPivotBranchParams) =>
+          Promise.resolve(
+            buildMockBranchFetchResult(params, { data: fullTree }),
+          ),
+      );
 
       const { container } = renderChart({
         data: baseTree,

@@ -38,8 +38,10 @@ import { supersetChartDataClient } from '../../../src/pivot/data/SupersetChartDa
 import {
   fetchPivotBranch,
   peekPivotBranchCache,
+  type FetchPivotBranchParams,
 } from '../../../src/fetchPivotBranch';
 import { type PivotFactStoreBatch } from '../../../src/pivot/runtime/factStore';
+import { buildMockBranchFetchResult } from '../fixtures/factBatches';
 
 jest.mock('../../../src/pivot/data/SupersetChartDataClient', () => {
   const actual = jest.requireActual(
@@ -67,11 +69,14 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
   const fetchMock = supersetChartDataClient.fetch as jest.Mock;
   const fetchPivotBranchMock = fetchPivotBranch as jest.Mock;
   const peekPivotBranchCacheMock = peekPivotBranchCache as jest.Mock;
+  const resolveBranchData =
+    (data?: PivotTreeData) => (params: FetchPivotBranchParams) =>
+      Promise.resolve(buildMockBranchFetchResult(params, { data }));
 
   beforeEach(() => {
     fetchMock.mockReset();
     fetchPivotBranchMock.mockReset();
-    fetchPivotBranchMock.mockResolvedValue({ data: undefined });
+    fetchPivotBranchMock.mockImplementation(resolveBranchData());
     peekPivotBranchCacheMock.mockReset();
     peekPivotBranchCacheMock.mockReturnValue(undefined);
   });
@@ -3008,7 +3013,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       colGroupby,
       2,
     );
-    fetchPivotBranchMock.mockResolvedValue({ data: rowsValueTree });
+    fetchPivotBranchMock.mockImplementation(resolveBranchData(rowsValueTree));
 
     const { container } = render(
       <PivotTableChart
@@ -3448,12 +3453,14 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       colGroupby,
       0,
     );
-    fetchPivotBranchMock.mockImplementation(
-      async ({ formData }: { formData: { groupbyRows?: string[] } }) => ({
-        data: formData.groupbyRows?.includes('row2')
-          ? updatedExpandedTree
-          : expandedTree,
-      }),
+    fetchPivotBranchMock.mockImplementation((params: FetchPivotBranchParams) =>
+      Promise.resolve(
+        buildMockBranchFetchResult(params, {
+          data: params.formData.groupbyRows?.includes('row2')
+            ? updatedExpandedTree
+            : expandedTree,
+        }),
+      ),
     );
 
     const runtimeLayout: PivotRuntimeLayout = {

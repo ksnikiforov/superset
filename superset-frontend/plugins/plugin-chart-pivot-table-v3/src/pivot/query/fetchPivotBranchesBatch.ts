@@ -16,7 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import type { PivotTableQueryFormData, PivotTreeData } from '../../types';
+import type {
+  PivotPath,
+  PivotTableQueryFormData,
+  PivotTreeData,
+} from '../../types';
 import { parsePath } from '../core/path';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import { type ChartDataWarning } from '../data/ChartDataClient';
@@ -31,6 +35,7 @@ import {
   type PivotFactStoreBatch,
   upsertQueryResultsIntoFactStore,
 } from '../runtime/ingestQueryResults';
+import { appendLoadedBranchCoverageMarkers } from '../runtime/loadedBranchCoverage';
 import { type BatchGroup } from './fetchPlanOptimizer';
 import { buildBatchQuerySpecs } from './specs';
 
@@ -53,6 +58,13 @@ export type FetchPivotBranchesBatchResult = {
 };
 
 const EMPTY_FACT_BATCHES: PivotFactStoreBatch[] = [];
+
+const buildBatchTargetPaths = (batch: BatchGroup): PivotPath[] => {
+  const parentPath = parsePath(batch.parentPathKey);
+  return batch.siblingValues.length > 0
+    ? batch.siblingValues.map(value => [...parentPath, value])
+    : [parentPath];
+};
 
 const isAbortError = (error: unknown): boolean => {
   if (
@@ -120,15 +132,24 @@ export const fetchPivotBranchesBatch = async ({
       specs,
       store: factStore,
     });
+    const data = buildBranchTreeFromFactStore({
+      specs,
+      store: factStore,
+      formData,
+      measureHierarchy: layout.measureHierarchy,
+    });
     return {
-      data: buildBranchTreeFromFactStore({
-        specs,
-        store: factStore,
-        formData,
-        measureHierarchy: layout.measureHierarchy,
-      }),
+      data,
       factStoreHit: true,
-      factBatches,
+      factBatches: appendLoadedBranchCoverageMarkers({
+        existingBatches: factBatches,
+        axis: batch.axis,
+        tree: data,
+        basePaths: buildBatchTargetPaths(batch),
+        pivotProgram: layout.pivotProgram,
+        visibleRowDepth,
+        visibleColDepth,
+      }),
     };
   }
   const metricsForQuery = specs[0].metrics;
@@ -169,7 +190,15 @@ export const fetchPivotBranchesBatch = async ({
     });
     return {
       data: tree,
-      factBatches,
+      factBatches: appendLoadedBranchCoverageMarkers({
+        existingBatches: factBatches,
+        axis: batch.axis,
+        tree,
+        basePaths: buildBatchTargetPaths(batch),
+        pivotProgram: layout.pivotProgram,
+        visibleRowDepth,
+        visibleColDepth,
+      }),
       ...(warnings.length > 0 ? { warnings } : {}),
     };
   } catch (error) {

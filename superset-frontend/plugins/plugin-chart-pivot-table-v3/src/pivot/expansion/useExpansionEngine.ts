@@ -94,7 +94,6 @@ import {
 import {
   createFetchedFactCoverageState,
   getFetchedAxisDepthMap,
-  markFetchedAxisCoverage,
   seedFetchedCoverageFromFactBatches as seedFetchedCoverageStateFromFactBatches,
 } from './fetchedRequests';
 
@@ -682,19 +681,6 @@ export const useExpansionEngine = ({
     [pivotProgram],
   );
 
-  const markFetchedCoverage = useCallback(
-    (axis: PivotAxis, key: string, requiredOppositeDepth: number) => {
-      markFetchedAxisCoverage({
-        fetchedCoverage: fetchedCoverageRef.current,
-        getCoverageKey,
-        axis,
-        pathKey: key,
-        requiredOppositeDepth,
-      });
-    },
-    [getCoverageKey],
-  );
-
   const seedFetchedCoverageFromFactBatches = useCallback(
     (batches: PivotFactStoreBatch[]) => {
       seedFetchedCoverageStateFromFactBatches({
@@ -985,22 +971,6 @@ export const useExpansionEngine = ({
     [visibilityConfig],
   );
 
-  const hasLoadedChildrenForTree = useCallback(
-    (
-      tree: PivotTreeData,
-      axis: PivotAxis,
-      node: PivotTreeNode,
-      visibleRowDepth: number,
-      visibleColDepth: number,
-    ) =>
-      buildHasLoadedChildren({
-        tree,
-        visibleRowDepth,
-        visibleColDepth,
-        config: visibilityConfig,
-      })(axis, node),
-    [visibilityConfig],
-  );
   const buildHasLoadedChildrenForIteration = useCallback(
     (
       nextTree: PivotTreeData,
@@ -1406,26 +1376,6 @@ export const useExpansionEngine = ({
             baseExpanded,
             currentTree,
           );
-          const nodesAfterMerge =
-            axis === 'row' ? currentTree.rows : currentTree.cols;
-          for (const key of nextResolvedExpanded) {
-            const node = nodesAfterMerge[key];
-            if (!node) {
-              continue;
-            }
-            if (
-              !hasLoadedChildrenForTree(
-                currentTree,
-                axis,
-                node,
-                visibleRowDepth,
-                visibleColDepth,
-              )
-            ) {
-              continue;
-            }
-            markFetchedCoverage(axis, key, requiredDepth);
-          }
           resolvedExpanded = nextResolvedExpanded;
         }
 
@@ -1480,7 +1430,6 @@ export const useExpansionEngine = ({
       buildRequestGroupId,
       computeVisibleDepths,
       fetchFormData,
-      hasLoadedChildrenForTree,
       persistExpansionState,
       getCoverageKey,
       resolveExpandedForMetrics,
@@ -1488,7 +1437,6 @@ export const useExpansionEngine = ({
       setExpandedRowsState,
       trackRequestGroup,
       updateLoadingKey,
-      markFetchedCoverage,
       seedFetchedCoverageFromFactBatches,
     ],
   );
@@ -1882,34 +1830,6 @@ export const useExpansionEngine = ({
             stagingState = stageDelta(stagingState, deltaKey, data);
           }
         }
-
-        const updatedTree = buildStagedTree(stagingState);
-        const markExpandedAsFetched = (
-          axis: PivotAxis,
-          expandedKeys: Set<string>,
-          requiredOppositeDepth: number,
-        ) => {
-          const nodes = axis === 'row' ? updatedTree.rows : updatedTree.cols;
-          expandedKeys.forEach(key => {
-            const node = nodes[key];
-            if (!node) {
-              return;
-            }
-            const hasChildrenLoaded = hasLoadedChildrenForTree(
-              updatedTree,
-              axis,
-              node,
-              visibleRowDepth,
-              visibleColDepth,
-            );
-            if (!hasChildrenLoaded) {
-              return;
-            }
-            markFetchedCoverage(axis, key, requiredOppositeDepth);
-          });
-        };
-        markExpandedAsFetched('row', desiredRows, visibleColDepth);
-        markExpandedAsFetched('col', desiredCols, visibleRowDepth);
       }
 
       finalizeHydration();
@@ -1920,9 +1840,7 @@ export const useExpansionEngine = ({
       buildRequestGroupId,
       cancelInFlightRequestGroups,
       fetchFormData,
-      hasLoadedChildrenForTree,
       getCoverageKey,
-      markFetchedCoverage,
       seedFetchedCoverageFromFactBatches,
       persistExpansionState,
       pruneMergedTree,
@@ -2613,7 +2531,6 @@ export const useExpansionEngine = ({
     expandRowsLevelRaw,
     groupbyColumnKeys,
     groupbyRowKeys,
-    hasLoadedChildrenForTree,
     isMetricTokenValue,
     metricLabelSet,
     persistExpansionStateToStore,
@@ -2626,7 +2543,6 @@ export const useExpansionEngine = ({
     resolveExpandedForMetrics,
     reportAsyncError,
     getCoverageKey,
-    markFetchedCoverage,
     seedFetchedCoverageFromFactBatches,
     setExpandedColsState,
     setExpandedRowsState,

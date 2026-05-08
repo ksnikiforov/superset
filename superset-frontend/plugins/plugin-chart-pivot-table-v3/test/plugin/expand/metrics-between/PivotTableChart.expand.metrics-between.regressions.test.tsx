@@ -19,11 +19,7 @@
 
 import { render, fireEvent, waitFor, within } from '../../../testUtils';
 import PivotTableChart from '../../fixtures/TestPivotTableChart';
-import {
-  MetricsLayoutEnum,
-  PivotPath,
-  PivotTreeData,
-} from '../../../../src/types';
+import { MetricsLayoutEnum, type PivotTreeData } from '../../../../src/types';
 import {
   applyMetricAxis,
   buildTreeFromRecords,
@@ -32,8 +28,15 @@ import {
   labelRowSubtotalLeaves,
   METRICS_PLACEHOLDER,
 } from '../../../../src/utils';
-import { fetchPivotBranch } from '../../../../src/fetchPivotBranch';
+import {
+  fetchPivotBranch,
+  type FetchPivotBranchParams,
+} from '../../../../src/fetchPivotBranch';
 import { buildFormData } from '../../fixtures/pivotFormData';
+import {
+  buildMockBranchFetchResult,
+  resolveMockBranchFetchResult,
+} from '../../fixtures/factBatches';
 
 jest.mock('../../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../../src/fetchPivotBranch');
@@ -48,7 +51,8 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
   const getMetricKey = (value: unknown) =>
     decodeMetricKey(value) ?? String(value ?? '');
   beforeEach(() => {
-    fetchPivotBranchMock.mockClear();
+    fetchPivotBranchMock.mockReset();
+    fetchPivotBranchMock.mockImplementation(resolveMockBranchFetchResult());
   });
 
   const waitForPivotReady = async () => {
@@ -127,11 +131,21 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     const shipInstructionBranch = buildTreeAtDepth(records, 4);
 
     fetchPivotBranchMock
-      .mockResolvedValueOnce({ data: metricBranch })
-      .mockResolvedValueOnce({ data: returnFlagBranch })
-      .mockResolvedValueOnce({ data: shipModeBranch })
-      .mockResolvedValueOnce({ data: shipModeReturnFlagBranch })
-      .mockResolvedValueOnce({ data: shipInstructionBranch });
+      .mockImplementationOnce(
+        resolveMockBranchFetchResult({ data: metricBranch }),
+      )
+      .mockImplementationOnce(
+        resolveMockBranchFetchResult({ data: returnFlagBranch }),
+      )
+      .mockImplementationOnce(
+        resolveMockBranchFetchResult({ data: shipModeBranch }),
+      )
+      .mockImplementationOnce(
+        resolveMockBranchFetchResult({ data: shipModeReturnFlagBranch }),
+      )
+      .mockImplementationOnce(
+        resolveMockBranchFetchResult({ data: shipInstructionBranch }),
+      );
 
     const { container, getByText } = render(
       <PivotTableChart
@@ -364,11 +378,21 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     const shipInstructionBranch = buildTreeAtDepth(records, 4);
 
     fetchPivotBranchMock
-      .mockResolvedValueOnce({ data: metricBranch })
-      .mockResolvedValueOnce({ data: returnFlagBranch })
-      .mockResolvedValueOnce({ data: shipModeBranch })
-      .mockResolvedValueOnce({ data: shipModeReturnFlagBranch })
-      .mockResolvedValueOnce({ data: shipInstructionBranch });
+      .mockImplementationOnce(
+        resolveMockBranchFetchResult({ data: metricBranch }),
+      )
+      .mockImplementationOnce(
+        resolveMockBranchFetchResult({ data: returnFlagBranch }),
+      )
+      .mockImplementationOnce(
+        resolveMockBranchFetchResult({ data: shipModeBranch }),
+      )
+      .mockImplementationOnce(
+        resolveMockBranchFetchResult({ data: shipModeReturnFlagBranch }),
+      )
+      .mockImplementationOnce(
+        resolveMockBranchFetchResult({ data: shipInstructionBranch }),
+      );
 
     const { container, getByText } = render(
       <PivotTableChart
@@ -559,10 +583,18 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     const shipInstructionBranch = buildTreeAtDepth(records, 4);
 
     fetchPivotBranchMock
-      .mockResolvedValueOnce({ data: shipModeBranch })
-      .mockResolvedValueOnce({ data: returnFlagBranch })
-      .mockResolvedValueOnce({ data: shipInstructionBranch })
-      .mockResolvedValueOnce({ data: shipInstructionBranch });
+      .mockImplementationOnce(
+        resolveMockBranchFetchResult({ data: shipModeBranch }),
+      )
+      .mockImplementationOnce(
+        resolveMockBranchFetchResult({ data: returnFlagBranch }),
+      )
+      .mockImplementationOnce(
+        resolveMockBranchFetchResult({ data: shipInstructionBranch }),
+      )
+      .mockImplementationOnce(
+        resolveMockBranchFetchResult({ data: shipInstructionBranch }),
+      );
 
     const { container, getByText } = render(
       <PivotTableChart
@@ -747,18 +779,25 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     const orderStatusBranch = buildCollapsedBranch(2);
     const shipModeBranch = buildTreeAtDepth(3);
 
-    fetchPivotBranchMock.mockImplementation(({ path }: { path: PivotPath }) => {
-      const metricIndex = path.findIndex(val =>
-        metrics.includes(getMetricKey(val)),
-      );
-      if (metricIndex >= 0) {
-        return Promise.resolve({ data: orderStatusBranch });
-      }
-      if (path.length === 1) {
-        return Promise.resolve({ data: shipModeBranch });
-      }
-      return Promise.resolve({ data: undefined });
-    });
+    fetchPivotBranchMock.mockImplementation(
+      (params: FetchPivotBranchParams) => {
+        const { path } = params;
+        const metricIndex = path.findIndex(val =>
+          metrics.includes(getMetricKey(val)),
+        );
+        if (metricIndex >= 0) {
+          return Promise.resolve(
+            buildMockBranchFetchResult(params, { data: orderStatusBranch }),
+          );
+        }
+        if (path.length === 1) {
+          return Promise.resolve(
+            buildMockBranchFetchResult(params, { data: shipModeBranch }),
+          );
+        }
+        return Promise.resolve(buildMockBranchFetchResult(params));
+      },
+    );
 
     const { container, getByText } = render(
       <PivotTableChart
@@ -915,15 +954,22 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
       'orderClass',
     ]);
 
-    fetchPivotBranchMock.mockImplementation(({ path }: { path: PivotPath }) => {
-      if (path.length === 2) {
-        return Promise.resolve({ data: orderStatusBranch });
-      }
-      if (path.length === 3) {
-        return Promise.resolve({ data: orderClassBranch });
-      }
-      return Promise.resolve({ data: undefined });
-    });
+    fetchPivotBranchMock.mockImplementation(
+      (params: FetchPivotBranchParams) => {
+        const { path } = params;
+        if (path.length === 2) {
+          return Promise.resolve(
+            buildMockBranchFetchResult(params, { data: orderStatusBranch }),
+          );
+        }
+        if (path.length === 3) {
+          return Promise.resolve(
+            buildMockBranchFetchResult(params, { data: orderClassBranch }),
+          );
+        }
+        return Promise.resolve(buildMockBranchFetchResult(params));
+      },
+    );
 
     const { container } = render(
       <PivotTableChart

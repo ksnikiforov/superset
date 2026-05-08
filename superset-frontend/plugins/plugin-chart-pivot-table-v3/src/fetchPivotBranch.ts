@@ -51,6 +51,7 @@ import {
   type PivotFactStoreBatch,
   upsertQueryResultsIntoFactStore,
 } from './pivot/runtime/ingestQueryResults';
+import { appendLoadedBranchCoverageMarkers } from './pivot/runtime/loadedBranchCoverage';
 
 export interface FetchPivotBranchResult {
   data?: PivotTreeData;
@@ -214,15 +215,24 @@ const resolvePivotBranchLocalResultFromPlan = (
       specs,
       store: params.factStore,
     });
+    const data = buildBranchTreeFromFactStore({
+      specs,
+      store: params.factStore,
+      formData: params.formData,
+      measureHierarchy: ctx.layout.measureHierarchy,
+    });
     return {
-      data: buildBranchTreeFromFactStore({
-        specs,
-        store: params.factStore,
-        formData: params.formData,
-        measureHierarchy: ctx.layout.measureHierarchy,
-      }),
+      data,
       factStoreHit: true,
-      factBatches,
+      factBatches: appendLoadedBranchCoverageMarkers({
+        existingBatches: factBatches,
+        axis: params.axis,
+        tree: data,
+        basePaths: [params.path],
+        pivotProgram: ctx.layout.pivotProgram,
+        visibleRowDepth: params.visibleRowDepth ?? ctx.rowDepth,
+        visibleColDepth: params.visibleColDepth ?? ctx.colDepth,
+      }),
     };
   }
   const cachedFactBatches = readPivotBranchFactCache(ctx.cacheKey);
@@ -231,15 +241,24 @@ const resolvePivotBranchLocalResultFromPlan = (
   }
   const store = params.factStore ?? createPivotFactStore();
   store.upsertBatches(cachedFactBatches);
+  const data = buildBranchTreeFromFactStore({
+    specs,
+    store,
+    formData: params.formData,
+    measureHierarchy: ctx.layout.measureHierarchy,
+  });
   return {
-    data: buildBranchTreeFromFactStore({
-      specs,
-      store,
-      formData: params.formData,
-      measureHierarchy: ctx.layout.measureHierarchy,
-    }),
+    data,
     cached: true,
-    factBatches: cachedFactBatches,
+    factBatches: appendLoadedBranchCoverageMarkers({
+      existingBatches: cachedFactBatches,
+      axis: params.axis,
+      tree: data,
+      basePaths: [params.path],
+      pivotProgram: ctx.layout.pivotProgram,
+      visibleRowDepth: params.visibleRowDepth ?? ctx.rowDepth,
+      visibleColDepth: params.visibleColDepth ?? ctx.colDepth,
+    }),
   };
 };
 
@@ -349,7 +368,15 @@ export async function fetchPivotBranch({
     writePivotBranchFactCache(cacheKey, factBatches);
     return {
       data: labeledBranch,
-      factBatches,
+      factBatches: appendLoadedBranchCoverageMarkers({
+        existingBatches: factBatches,
+        axis,
+        tree: labeledBranch,
+        basePaths: [path],
+        pivotProgram: layout.pivotProgram,
+        visibleRowDepth: visibleRowDepth ?? ctx.rowDepth,
+        visibleColDepth: visibleColDepth ?? ctx.colDepth,
+      }),
       ...(warnings.length > 0 ? { warnings } : {}),
     };
   } catch (error) {

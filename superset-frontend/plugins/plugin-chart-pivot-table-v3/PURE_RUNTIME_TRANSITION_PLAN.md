@@ -492,26 +492,34 @@ Gate 2 has started:
   with follow-up calls resolved through the same fact-batch helper. This keeps
   out-of-order batch behavior interactive while avoiding hidden fallback
   coverage in the hook.
-- Verification for this slice: the focused runtime/component set passed
-  `11` suites / `135` tests, and the full plugin test directory passed `88`
-  suites / `685` tests.
+- Branch and grouped-batch fetch results now append loaded-branch coverage
+  markers for metric-rich descendants that were materialized by the returned
+  data. These markers are returned to fetched-coverage seeding only; they are
+  not upserted into the fact store and are not written to the branch cache, so
+  an empty coverage marker cannot later masquerade as materializable facts.
+- `src/pivot/runtime/loadedBranchCoverage.ts` centralizes the marker rule:
+  collect only loaded dimensional children under the requested branch/batch
+  target paths, and ignore metric-only or subtotal-only children. This is the
+  production version of the old test fixture behavior and avoids marking
+  unrelated ancestors such as the root when only one sibling branch was loaded.
+- The post-merge rendered-tree fetched-depth bridge has now been deleted from
+  `useExpansionEngine`, and `markFetchedLoadedTreeCoverage` has been removed
+  from `fetchedRequests.ts`. Same-axis expansion and atomic hydration both rely
+  on fetch/local result fact batches to seed loaded coverage.
+- Component-level branch fetch mocks in metrics-between, metric-first,
+  stability, and seamless expansion suites were upgraded to return fact-batch
+  aware results. This was required because rendered `{ data }` alone is no
+  longer a valid successful fetch contract for expansion planning.
+- Verification after deleting the bridge: the full plugin test directory passed
+  `89` suites / `687` tests.
 
 Immediate next step:
 
-- Reassess the remaining post-merge `markExpandedAsFetched` /
-  `markFetchedCoverage` path in `useExpansionEngine`. It still marks rendered
-  expanded nodes as fetched after a successful tree merge. If exact fact batches
-  now cover every production fetch/local-cache result, this can move behind
-  `fetchedRequests.ts` as a narrow compatibility helper or be deleted for some
-  paths.
-- Add targeted regressions before cutting it. The high-risk cases are persisted
-  multi-level restore, out-of-order row/column batch resolution, skipped
-  pre-Values metric branches, and synthetic Values-only expansions, because
-  those are the places where rendered-tree satisfaction may still hide missing
-  fact coverage.
-- After that, measure support metric reuse in broader interaction paths that do
-  not use `fetchPivotBranch` directly. If any path re-requests an already loaded
-  exact support coverage, add a targeted regression before changing it.
+- With fetched coverage now seeded from returned fact-batch selectors, the next
+  deletion target is the remaining legacy axis-depth fetched-state shape at the
+  planner boundary. Either teach the planner to consume typed coverage
+  projections directly, or keep the projection in `fetchedRequests.ts` and delete
+  any duplicate row/column depth normalization still living outside that file.
 - Before deleting any broad behavior branch, bring inconsistent behavior or
   edge-case behavior that unlocks large deletion wins to the user for approval
   with UX impact and deletion upside.

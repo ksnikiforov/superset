@@ -22,51 +22,17 @@ import {
 } from '../../../src/fetchPivotBranch';
 import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
 import {
+  appendLoadedBranchCoverageMarkers,
+  buildLoadedBranchCoverageMarkers,
+} from '../../../src/pivot/runtime/loadedBranchCoverage';
+import {
   type FetchPivotBranchesBatchParams,
   type FetchPivotBranchesBatchResult,
 } from '../../../src/pivot/query/fetchPivotBranchesBatch';
 import { buildFactCoverage } from '../../../src/pivot/runtime/coverage';
 import { type PivotFactStoreBatch } from '../../../src/pivot/runtime/factStore';
-import { parsePath, serializePath } from '../../../src/pivot/core/path';
-import { isMetricToken, isSubtotalToken } from '../../../src/pivot/core/tokens';
-import {
-  type PivotAxis,
-  type PivotPath,
-  type PivotTreeData,
-} from '../../../src/types';
-
-const collectLoadedBranchPaths = ({
-  axis,
-  data,
-  path,
-}: {
-  axis: PivotAxis;
-  data?: PivotTreeData;
-  path: PivotPath;
-}) => {
-  const pathsByKey = new Map<string, PivotPath>([[serializePath(path), path]]);
-  if (!data) {
-    return Array.from(pathsByKey.values());
-  }
-  const nodes = axis === 'row' ? data.rows : data.cols;
-  const hasLoadedChild = (path: PivotPath) =>
-    Object.values(nodes).some(node => {
-      if (node.path.length !== path.length + 1) {
-        return false;
-      }
-      if (path.some((value, index) => node.path[index] !== value)) {
-        return false;
-      }
-      const childValue = node.path[path.length];
-      return !isMetricToken(childValue) && !isSubtotalToken(childValue);
-    });
-  Object.values(nodes).forEach(node => {
-    if (node.hasChildren && hasLoadedChild(node.path)) {
-      pathsByKey.set(node.key, node.path);
-    }
-  });
-  return Array.from(pathsByKey.values());
-};
+import { parsePath } from '../../../src/pivot/core/path';
+import { type PivotTreeData } from '../../../src/types';
 
 export const buildMockBranchFactBatches = ({
   formData,
@@ -82,22 +48,15 @@ export const buildMockBranchFactBatches = ({
   data?: PivotTreeData;
 }): PivotFactStoreBatch[] => {
   const layout = buildLayoutContext(formData);
-  const coverage = buildFactCoverage({
-    reason: 'expand',
-    rowDimensions: layout.pivotProgram.rowDimensions,
-    columnDimensions: layout.pivotProgram.columnDimensions,
-    rowDepth: visibleRowDepth,
-    columnDepth: visibleColDepth,
+  return buildLoadedBranchCoverageMarkers({
+    axis,
+    tree: data,
+    basePaths: [path],
+    seedPaths: [path],
+    pivotProgram: layout.pivotProgram,
+    visibleRowDepth,
+    visibleColDepth,
   });
-  return collectLoadedBranchPaths({ axis, data, path }).map(branchPath => ({
-    coverage,
-    facts: [],
-    scope: {
-      kind: 'branch',
-      axis,
-      path: branchPath,
-    },
-  }));
 };
 
 export const buildMockBranchFetchResult = (
@@ -128,24 +87,35 @@ export const buildMockBatchFactBatches = ({
   data?: PivotTreeData;
 }): PivotFactStoreBatch[] => {
   const layout = buildLayoutContext(formData);
-  return [
-    {
-      coverage: buildFactCoverage({
-        reason: 'expand',
-        rowDimensions: layout.pivotProgram.rowDimensions,
-        columnDimensions: layout.pivotProgram.columnDimensions,
-        rowDepth: visibleRowDepth,
-        columnDepth: visibleColDepth,
-      }),
-      facts: [],
-      scope: {
-        kind: 'batch',
-        axis: batch.axis,
-        parentPath: parsePath(batch.parentPathKey),
-        siblingValues: batch.siblingValues,
-      },
+  const parentPath = parsePath(batch.parentPathKey);
+  const batchMarker: PivotFactStoreBatch = {
+    coverage: buildFactCoverage({
+      reason: 'expand',
+      rowDimensions: layout.pivotProgram.rowDimensions,
+      columnDimensions: layout.pivotProgram.columnDimensions,
+      rowDepth: visibleRowDepth,
+      columnDepth: visibleColDepth,
+    }),
+    facts: [],
+    scope: {
+      kind: 'batch',
+      axis: batch.axis,
+      parentPath,
+      siblingValues: batch.siblingValues,
     },
-  ];
+  };
+  return appendLoadedBranchCoverageMarkers({
+    existingBatches: [batchMarker],
+    axis: batch.axis,
+    tree: data,
+    basePaths:
+      batch.siblingValues.length > 0
+        ? batch.siblingValues.map(value => [...parentPath, value])
+        : [parentPath],
+    pivotProgram: layout.pivotProgram,
+    visibleRowDepth,
+    visibleColDepth,
+  });
 };
 
 export const buildMockBatchFetchResult = (

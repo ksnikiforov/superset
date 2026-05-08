@@ -19,15 +19,19 @@
 
 import { render, fireEvent, waitFor, within } from '../../../testUtils';
 import PivotTableChart from '../../fixtures/TestPivotTableChart';
-import { MetricsLayoutEnum } from '../../../../src/types';
+import { MetricsLayoutEnum, type PivotTreeData } from '../../../../src/types';
 import {
   applyMetricAxis,
   buildTreeFromRecords,
   METRICS_PLACEHOLDER,
   mergeTrees,
 } from '../../../../src/utils';
-import { fetchPivotBranch } from '../../../../src/fetchPivotBranch';
+import {
+  fetchPivotBranch,
+  type FetchPivotBranchParams,
+} from '../../../../src/fetchPivotBranch';
 import { buildFormData } from '../../fixtures/pivotFormData';
+import { buildMockBranchFetchResult } from '../../fixtures/factBatches';
 
 jest.mock('../../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../../src/fetchPivotBranch');
@@ -39,8 +43,13 @@ jest.mock('../../../../src/fetchPivotBranch', () => {
 
 describe('PivotTableChart expansion with metrics between dimensions (layout)', () => {
   const fetchPivotBranchMock = fetchPivotBranch as jest.Mock;
+  const resolveBranchData =
+    (data?: PivotTreeData) => (params: FetchPivotBranchParams) =>
+      Promise.resolve(buildMockBranchFetchResult(params, { data }));
+
   beforeEach(() => {
-    fetchPivotBranchMock.mockClear();
+    fetchPivotBranchMock.mockReset();
+    fetchPivotBranchMock.mockImplementation(resolveBranchData());
   });
 
   const waitForPivotReady = async () => {
@@ -411,9 +420,9 @@ describe('PivotTableChart expansion with metrics between dimensions (layout)', (
     const revenueBranch = buildTreeAtDepth(airRecords, 4);
 
     fetchPivotBranchMock
-      .mockResolvedValueOnce({ data: returnFlagBranch })
-      .mockResolvedValueOnce({ data: quantityBranch })
-      .mockResolvedValueOnce({ data: revenueBranch });
+      .mockImplementationOnce(resolveBranchData(returnFlagBranch))
+      .mockImplementationOnce(resolveBranchData(quantityBranch))
+      .mockImplementationOnce(resolveBranchData(revenueBranch));
 
     const { container, getByText } = render(
       <PivotTableChart
@@ -576,10 +585,10 @@ describe('PivotTableChart expansion with metrics between dimensions (layout)', (
     const seaReturnFlagBranch = buildTreeAtDepth(seaRecords, 2);
 
     fetchPivotBranchMock
-      .mockResolvedValueOnce({ data: airReturnFlagBranch })
-      .mockResolvedValueOnce({ data: airQuantityBranch })
-      .mockResolvedValueOnce({ data: airRevenueBranch })
-      .mockResolvedValueOnce({ data: seaReturnFlagBranch });
+      .mockImplementationOnce(resolveBranchData(airReturnFlagBranch))
+      .mockImplementationOnce(resolveBranchData(airQuantityBranch))
+      .mockImplementationOnce(resolveBranchData(airRevenueBranch))
+      .mockImplementationOnce(resolveBranchData(seaReturnFlagBranch));
 
     const { container, getByText, findByText } = render(
       <PivotTableChart

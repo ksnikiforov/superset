@@ -19,7 +19,7 @@
 
 import { render, fireEvent, waitFor, within } from '../../../testUtils';
 import PivotTableChart from '../../fixtures/TestPivotTableChart';
-import { MetricsLayoutEnum } from '../../../../src/types';
+import { MetricsLayoutEnum, type PivotTreeData } from '../../../../src/types';
 import { baseFormData, buildFormData } from '../../fixtures/pivotFormData';
 import {
   applyMetricAxis,
@@ -31,7 +31,11 @@ import {
   SUBTOTAL_LABEL,
   SUBTOTAL_TOKEN,
 } from '../../../../src/utils';
-import { fetchPivotBranch } from '../../../../src/fetchPivotBranch';
+import {
+  fetchPivotBranch,
+  type FetchPivotBranchParams,
+} from '../../../../src/fetchPivotBranch';
+import { buildMockBranchFetchResult } from '../../fixtures/factBatches';
 
 jest.mock('../../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../../src/fetchPivotBranch');
@@ -43,8 +47,13 @@ jest.mock('../../../../src/fetchPivotBranch', () => {
 
 describe('PivotTableChart expansion with metrics between dimensions (column-metrics)', () => {
   const fetchPivotBranchMock = fetchPivotBranch as jest.Mock;
+  const resolveBranchData =
+    (data?: PivotTreeData) => (params: FetchPivotBranchParams) =>
+      Promise.resolve(buildMockBranchFetchResult(params, { data }));
+
   beforeEach(() => {
-    fetchPivotBranchMock.mockClear();
+    fetchPivotBranchMock.mockReset();
+    fetchPivotBranchMock.mockImplementation(resolveBranchData());
   });
 
   const waitForPivotReady = async () => {
@@ -162,7 +171,7 @@ describe('PivotTableChart expansion with metrics between dimensions (column-metr
     const baseTree = buildBaseTree();
     const branchTree = buildCollapsedBranch();
 
-    fetchPivotBranchMock.mockResolvedValueOnce({ data: branchTree });
+    fetchPivotBranchMock.mockImplementationOnce(resolveBranchData(branchTree));
 
     const { container, findByText } = render(
       <PivotTableChart
@@ -252,7 +261,7 @@ describe('PivotTableChart expansion with metrics between dimensions (column-metr
       isSubtotal: true,
     };
 
-    fetchPivotBranchMock.mockResolvedValueOnce({ data: branchTree });
+    fetchPivotBranchMock.mockImplementationOnce(resolveBranchData(branchTree));
 
     const { container, findByText } = render(
       <PivotTableChart
@@ -381,8 +390,8 @@ describe('PivotTableChart expansion with metrics between dimensions (column-metr
     );
 
     fetchPivotBranchMock
-      .mockResolvedValueOnce({ data: metricBranch })
-      .mockResolvedValueOnce({ data: col1Branch });
+      .mockImplementationOnce(resolveBranchData(metricBranch))
+      .mockImplementationOnce(resolveBranchData(col1Branch));
 
     const { container, findByText } = render(
       <PivotTableChart

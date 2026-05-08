@@ -19,7 +19,7 @@
 
 import { render, fireEvent, waitFor, within } from '../../../testUtils';
 import PivotTableChart from '../../fixtures/TestPivotTableChart';
-import { MetricsLayoutEnum, PivotTreeData } from '../../../../src/types';
+import { MetricsLayoutEnum, type PivotTreeData } from '../../../../src/types';
 import { baseFormData, buildFormData } from '../../fixtures/pivotFormData';
 import {
   applyMetricAxis,
@@ -31,7 +31,11 @@ import {
   serializeCellKey,
   serializePath,
 } from '../../../../src/utils';
-import { fetchPivotBranch } from '../../../../src/fetchPivotBranch';
+import {
+  fetchPivotBranch,
+  type FetchPivotBranchParams,
+} from '../../../../src/fetchPivotBranch';
+import { buildMockBranchFetchResult } from '../../fixtures/factBatches';
 
 jest.mock('../../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../../src/fetchPivotBranch');
@@ -44,8 +48,13 @@ jest.mock('../../../../src/fetchPivotBranch', () => {
 
 describe('PivotTableChart expansion with metrics before dimensions (metric-first)', () => {
   const fetchPivotBranchMock = fetchPivotBranch as jest.Mock;
+  const resolveBranchData =
+    (data?: PivotTreeData) => (params: FetchPivotBranchParams) =>
+      Promise.resolve(buildMockBranchFetchResult(params, { data }));
+
   beforeEach(() => {
-    fetchPivotBranchMock.mockClear();
+    fetchPivotBranchMock.mockReset();
+    fetchPivotBranchMock.mockImplementation(resolveBranchData());
   });
 
   const treeWithMetricChildOnly: PivotTreeData = {
@@ -335,8 +344,8 @@ describe('PivotTableChart expansion with metrics before dimensions (metric-first
     const orderPriorityTree = buildTreeAtDepth(2);
 
     fetchPivotBranchMock
-      .mockResolvedValueOnce({ data: returnFlagTree })
-      .mockResolvedValueOnce({ data: orderPriorityTree });
+      .mockImplementationOnce(resolveBranchData(returnFlagTree))
+      .mockImplementationOnce(resolveBranchData(orderPriorityTree));
 
     const { container } = render(
       <PivotTableChart
@@ -485,9 +494,9 @@ describe('PivotTableChart expansion with metrics before dimensions (metric-first
     const orderStatusTree = buildTreeAtDepth(3);
 
     fetchPivotBranchMock
-      .mockResolvedValueOnce({ data: returnFlagTree })
-      .mockResolvedValueOnce({ data: orderPriorityTree })
-      .mockResolvedValueOnce({ data: orderStatusTree });
+      .mockImplementationOnce(resolveBranchData(returnFlagTree))
+      .mockImplementationOnce(resolveBranchData(orderPriorityTree))
+      .mockImplementationOnce(resolveBranchData(orderStatusTree));
 
     const { container } = render(
       <PivotTableChart

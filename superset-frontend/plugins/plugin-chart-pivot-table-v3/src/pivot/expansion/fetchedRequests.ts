@@ -86,7 +86,7 @@ export const getFetchedAxisDepthMap = (
   axis: PivotAxis,
 ) => fetchedCoverage.depthByAxis[axis];
 
-export const markFetchedAxisCoverage = ({
+const markFetchedAxisCoverage = ({
   fetchedCoverage,
   getCoverageKey,
   axis,
