@@ -68,6 +68,10 @@ import {
   type PivotFactStoreBatch,
 } from '../runtime/factStore';
 import {
+  createLatestRequestLifecycle,
+  type LatestRequestScope,
+} from '../runtime/requestLifecycle';
+import {
   addAncestors,
   buildDesiredExpandedKeys,
   buildHasLoadedChildren,
@@ -228,9 +232,14 @@ export const useExpansionEngine = ({
   const expandedStateSignatureRef = useRef<string | null>(null);
   const expandedStateSharedSignatureRef = useRef<string | null>(null);
   const fetchedCoverageRef = useRef(createFetchedFactCoverageState());
-  const transactionIdRef = useRef(0);
   const requestGroupPrefixRef = useRef(nanoid());
-  const activeRequestGroupIdsRef = useRef(new Set<string>());
+  const expansionRequestLifecycle = useMemo(
+    () =>
+      createLatestRequestLifecycle({
+        cancel: requestGroupId => supersetChartDataClient.cancel(requestGroupId),
+      }),
+    [],
+  );
   const expansionStateStoreRef = useRef<ExpansionStateStore>();
   const persistedExpansionStateRef = useRef<unknown>(persistedExpansionState);
   const dataEpochRef = useRef(0);
@@ -354,16 +363,12 @@ export const useExpansionEngine = ({
 
   const reportAsyncError = useCallback((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
-    transactionIdRef.current += 1;
-    activeRequestGroupIdsRef.current.forEach(requestGroupId => {
-      supersetChartDataClient.cancel(requestGroupId);
-    });
-    activeRequestGroupIdsRef.current.clear();
+    expansionRequestLifecycle.invalidate();
     loadingCountsRef.current = new Map();
     setLoadingKeys(new Set());
     setIsHydrating(false);
     setErrorMessage(message);
-  }, []);
+  }, [expansionRequestLifecycle]);
 
   const addWarnings = useCallback(
     (nextWarnings?: ChartDataWarning[]) => {
@@ -389,46 +394,44 @@ export const useExpansionEngine = ({
     [setWarnings],
   );
 
-  const cancelInFlightRequestGroups = useCallback(() => {
-    activeRequestGroupIdsRef.current.forEach(requestGroupId => {
-      supersetChartDataClient.cancel(requestGroupId);
-    });
-    activeRequestGroupIdsRef.current.clear();
-  }, []);
+  const invalidateInFlightRequests = useCallback(() => {
+    expansionRequestLifecycle.invalidate();
+  }, [expansionRequestLifecycle]);
 
   const buildRequestGroupId = useCallback(
     (
       payload: Record<string, unknown>,
-      transactionId: number = transactionIdRef.current,
+      transactionId: number = expansionRequestLifecycle.currentId(),
     ) =>
       stableStringify({
         instanceId: requestGroupPrefixRef.current,
         transactionId,
         ...payload,
       }),
-    [],
+    [expansionRequestLifecycle],
   );
 
-  const trackRequestGroup = useCallback(
+  const trackRequestInScope = useCallback(
     async <T>(
+      requestScope: LatestRequestScope,
       requestGroupId: string,
       fetcher: () => Promise<T>,
     ): Promise<T> => {
-      activeRequestGroupIdsRef.current.add(requestGroupId);
+      const token = requestScope.beginRequest(requestGroupId);
       try {
         return await fetcher();
       } finally {
-        activeRequestGroupIdsRef.current.delete(requestGroupId);
+        expansionRequestLifecycle.finish(token);
       }
     },
-    [],
+    [expansionRequestLifecycle],
   );
 
   useEffect(
     () => () => {
-      cancelInFlightRequestGroups();
+      invalidateInFlightRequests();
     },
-    [cancelInFlightRequestGroups],
+    [invalidateInFlightRequests],
   );
 
   const visibilityConfig = useMemo<ExpansionVisibilityConfig>(
@@ -673,7 +676,8 @@ export const useExpansionEngine = ({
     async (axis: PivotAxis, node: PivotTreeNode) => {
       const inFlightRef = axis === 'row' ? inFlightRowsRef : inFlightColsRef;
       inFlightRef.current += 1;
-      const requestId = transactionIdRef.current;
+      const requestScope = expansionRequestLifecycle.currentScope();
+      const requestId = requestScope.id;
       const expanded =
         axis === 'row' ? expandedRowsRef.current : expandedColsRef.current;
       const manualExpandedRef =
@@ -724,7 +728,7 @@ export const useExpansionEngine = ({
         requiredDepth: number;
       }) => {
         const path = parsePath(key);
-        if (transactionIdRef.current === requestId) {
+        if (requestScope.isCurrent()) {
           updateLoadingKey(key, 1);
         }
         const requestGroupId = buildRequestGroupId(
@@ -739,17 +743,20 @@ export const useExpansionEngine = ({
           requestId,
         );
         try {
-          const result = await trackRequestGroup(requestGroupId, () =>
-            fetchPivotBranch({
-              axis,
-              path,
-              formData: fetchFormData,
-              currentTree: treeSnapshot,
-              visibleRowDepth,
-              visibleColDepth,
-              requestGroupId,
-              factStore: factStoreRef.current,
-            }),
+          const result = await trackRequestInScope(
+            requestScope,
+            requestGroupId,
+            () =>
+              fetchPivotBranch({
+                axis,
+                path,
+                formData: fetchFormData,
+                currentTree: treeSnapshot,
+                visibleRowDepth,
+                visibleColDepth,
+                requestGroupId,
+                factStore: factStoreRef.current,
+              }),
           );
           if (!result) {
             return {
@@ -759,7 +766,7 @@ export const useExpansionEngine = ({
               factBatches: EMPTY_FACT_BATCHES,
             };
           }
-          if (transactionIdRef.current === requestId) {
+          if (requestScope.isCurrent()) {
             addWarnings(result.warnings);
             if (result.error) {
               throw result.error;
@@ -772,7 +779,7 @@ export const useExpansionEngine = ({
             factBatches: result.factBatches ?? EMPTY_FACT_BATCHES,
           };
         } finally {
-          if (transactionIdRef.current === requestId) {
+          if (requestScope.isCurrent()) {
             updateLoadingKey(key, -1);
           }
         }
@@ -789,7 +796,7 @@ export const useExpansionEngine = ({
         visibleRowDepth: number;
         visibleColDepth: number;
       }) => {
-        if (transactionIdRef.current === requestId) {
+        if (requestScope.isCurrent()) {
           batch.targets.forEach(target => updateLoadingKey(target.pathKey, 1));
         }
         const requestGroupId = buildRequestGroupId(
@@ -805,18 +812,21 @@ export const useExpansionEngine = ({
           requestId,
         );
         try {
-          const result = await trackRequestGroup(requestGroupId, () =>
-            fetchPivotBranchesBatch({
-              formData: fetchFormData,
-              batch,
-              currentTree: treeSnapshot,
-              visibleRowDepth,
-              visibleColDepth,
-              requestGroupId,
-              factStore: factStoreRef.current,
-            }),
+          const result = await trackRequestInScope(
+            requestScope,
+            requestGroupId,
+            () =>
+              fetchPivotBranchesBatch({
+                formData: fetchFormData,
+                batch,
+                currentTree: treeSnapshot,
+                visibleRowDepth,
+                visibleColDepth,
+                requestGroupId,
+                factStore: factStoreRef.current,
+              }),
           );
-          if (transactionIdRef.current === requestId) {
+          if (requestScope.isCurrent()) {
             addWarnings(result.warnings);
             if (result.error) {
               throw result.error;
@@ -828,7 +838,7 @@ export const useExpansionEngine = ({
             factBatches: result.factBatches ?? EMPTY_FACT_BATCHES,
           };
         } finally {
-          if (transactionIdRef.current === requestId) {
+          if (requestScope.isCurrent()) {
             batch.targets.forEach(target =>
               updateLoadingKey(target.pathKey, -1),
             );
@@ -845,7 +855,7 @@ export const useExpansionEngine = ({
         ) {
           if (
             dataEpochRef.current !== requestEpoch ||
-            transactionIdRef.current !== requestId
+            !requestScope.isCurrent()
           ) {
             return;
           }
@@ -954,7 +964,7 @@ export const useExpansionEngine = ({
           ];
           if (
             dataEpochRef.current !== requestEpoch ||
-            transactionIdRef.current !== requestId
+            !requestScope.isCurrent()
           ) {
             return;
           }
@@ -1007,7 +1017,7 @@ export const useExpansionEngine = ({
           resolvedExpanded = nextResolvedExpanded;
         }
 
-        if (transactionIdRef.current !== requestId) {
+        if (!requestScope.isCurrent()) {
           return;
         }
         const committedExpanded =
@@ -1063,7 +1073,7 @@ export const useExpansionEngine = ({
       resolveExpandedForMetrics,
       setExpandedColsState,
       setExpandedRowsState,
-      trackRequestGroup,
+      trackRequestInScope,
       updateLoadingKey,
       seedFetchedCoverageFromFactBatches,
     ],
@@ -1154,9 +1164,8 @@ export const useExpansionEngine = ({
       const shouldShowLoader = options?.showLoader ?? false;
       const shouldPlanRows = options?.planRows ?? true;
       const shouldPlanCols = options?.planCols ?? true;
-      const transactionId = transactionIdRef.current + 1;
-      transactionIdRef.current = transactionId;
-      cancelInFlightRequestGroups();
+      const requestScope = expansionRequestLifecycle.beginScope();
+      const transactionId = requestScope.id;
       loadingCountsRef.current = new Map();
       setLoadingKeys(new Set());
       if (shouldShowLoader) {
@@ -1182,7 +1191,7 @@ export const useExpansionEngine = ({
         },
       ) => {
         const path = parsePath(target.pathKey);
-        if (transactionIdRef.current === transactionId) {
+        if (requestScope.isCurrent()) {
           updateLoadingKey(target.pathKey, 1);
         }
         const requestGroupId = buildRequestGroupId(
@@ -1198,17 +1207,20 @@ export const useExpansionEngine = ({
           transactionId,
         );
         try {
-          const result = await trackRequestGroup(requestGroupId, () =>
-            fetchPivotBranch({
-              axis: target.axis,
-              path,
-              formData: fetchFormData,
-              currentTree: context.stagedTree,
-              visibleRowDepth: context.visibleRowDepth,
-              visibleColDepth: context.visibleColDepth,
-              requestGroupId,
-              factStore: factStoreRef.current,
-            }),
+          const result = await trackRequestInScope(
+            requestScope,
+            requestGroupId,
+            () =>
+              fetchPivotBranch({
+                axis: target.axis,
+                path,
+                formData: fetchFormData,
+                currentTree: context.stagedTree,
+                visibleRowDepth: context.visibleRowDepth,
+                visibleColDepth: context.visibleColDepth,
+                requestGroupId,
+                factStore: factStoreRef.current,
+              }),
           );
           if (!result) {
             return {
@@ -1217,7 +1229,7 @@ export const useExpansionEngine = ({
               factBatches: EMPTY_FACT_BATCHES,
             };
           }
-          if (transactionIdRef.current === transactionId) {
+          if (requestScope.isCurrent()) {
             addWarnings(result.warnings);
             if (result.error) {
               throw result.error;
@@ -1229,7 +1241,7 @@ export const useExpansionEngine = ({
             factBatches: result.factBatches ?? EMPTY_FACT_BATCHES,
           };
         } finally {
-          if (transactionIdRef.current === transactionId) {
+          if (requestScope.isCurrent()) {
             updateLoadingKey(target.pathKey, -1);
           }
         }
@@ -1243,7 +1255,7 @@ export const useExpansionEngine = ({
           visibleColDepth: number;
         },
       ) => {
-        if (transactionIdRef.current === transactionId) {
+        if (requestScope.isCurrent()) {
           batch.targets.forEach(target => updateLoadingKey(target.pathKey, 1));
         }
         const requestGroupId = buildRequestGroupId(
@@ -1261,18 +1273,21 @@ export const useExpansionEngine = ({
           transactionId,
         );
         try {
-          const result = await trackRequestGroup(requestGroupId, () =>
-            fetchPivotBranchesBatch({
-              formData: fetchFormData,
-              batch,
-              currentTree: context.stagedTree,
-              visibleRowDepth: context.visibleRowDepth,
-              visibleColDepth: context.visibleColDepth,
-              requestGroupId,
-              factStore: factStoreRef.current,
-            }),
+          const result = await trackRequestInScope(
+            requestScope,
+            requestGroupId,
+            () =>
+              fetchPivotBranchesBatch({
+                formData: fetchFormData,
+                batch,
+                currentTree: context.stagedTree,
+                visibleRowDepth: context.visibleRowDepth,
+                visibleColDepth: context.visibleColDepth,
+                requestGroupId,
+                factStore: factStoreRef.current,
+              }),
           );
-          if (transactionIdRef.current === transactionId) {
+          if (requestScope.isCurrent()) {
             addWarnings(result.warnings);
             if (result.error) {
               throw result.error;
@@ -1284,7 +1299,7 @@ export const useExpansionEngine = ({
             factBatches: result.factBatches ?? EMPTY_FACT_BATCHES,
           };
         } finally {
-          if (transactionIdRef.current === transactionId) {
+          if (requestScope.isCurrent()) {
             batch.targets.forEach(target =>
               updateLoadingKey(target.pathKey, -1),
             );
@@ -1297,7 +1312,7 @@ export const useExpansionEngine = ({
         iteration < MAX_HYDRATION_ITERATIONS;
         iteration += 1
       ) {
-        if (transactionIdRef.current !== transactionId) {
+        if (!requestScope.isCurrent()) {
           finalizeHydration();
           return;
         }
@@ -1429,7 +1444,7 @@ export const useExpansionEngine = ({
           ...fetchedResults,
         ];
 
-        if (transactionIdRef.current !== transactionId) {
+        if (!requestScope.isCurrent()) {
           finalizeHydration();
           return;
         }
@@ -1463,7 +1478,6 @@ export const useExpansionEngine = ({
       addWarnings,
       buildDesiredExpanded,
       buildRequestGroupId,
-      cancelInFlightRequestGroups,
       fetchFormData,
       getCoverageKey,
       seedFetchedCoverageFromFactBatches,
@@ -1473,7 +1487,7 @@ export const useExpansionEngine = ({
       setExpandedRowsState,
       setPendingColsState,
       setPendingRowsState,
-      trackRequestGroup,
+      trackRequestInScope,
       updateLoadingKey,
       resolveExpandedForMetrics,
       visibilityConfig,
@@ -1488,8 +1502,7 @@ export const useExpansionEngine = ({
         axis === 'row' ? pendingRowsRef.current : pendingColsRef.current;
       const isOpen = expanded.has(node.key) || pending.has(node.key);
       if (isOpen) {
-        transactionIdRef.current += 1;
-        cancelInFlightRequestGroups();
+        invalidateInFlightRequests();
         loadingCountsRef.current = new Map();
         setLoadingKeys(new Set());
         setIsHydrating(false);
@@ -1539,11 +1552,11 @@ export const useExpansionEngine = ({
       expandSameAxis(axis, node).catch(reportAsyncError);
     },
     [
-      cancelInFlightRequestGroups,
       collapseNode,
       computeVisibleDepths,
       expandSameAxis,
       hydrateAtomic,
+      invalidateInFlightRequests,
       reportAsyncError,
       setPendingColsState,
       setPendingRowsState,
@@ -1685,8 +1698,7 @@ export const useExpansionEngine = ({
     });
 
     dataEpochRef.current += 1;
-    transactionIdRef.current += 1;
-    cancelInFlightRequestGroups();
+    invalidateInFlightRequests();
     const nextFactStore = createPivotFactStore();
     nextFactStore.upsertBatches(factBatches);
     factStoreRef.current = nextFactStore;
@@ -2022,7 +2034,6 @@ export const useExpansionEngine = ({
     }
     setIsHydrating(false);
   }, [
-    cancelInFlightRequestGroups,
     countDimDepth,
     data,
     expandedStateSignature,
@@ -2041,6 +2052,7 @@ export const useExpansionEngine = ({
     shouldExpandMetricCols,
     shouldExpandMetricRows,
     hydrateAtomic,
+    invalidateInFlightRequests,
     resolveExpandedForMetrics,
     reportAsyncError,
     getCoverageKey,

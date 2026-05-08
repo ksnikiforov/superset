@@ -108,6 +108,10 @@ import {
   buildInitialRuntimeFromSpecResults,
   type PivotFactStoreBatch,
 } from './pivot/runtime/ingestQueryResults';
+import {
+  createLatestRequestLifecycle,
+  executeLatestRequest,
+} from './pivot/runtime/requestLifecycle';
 import { stableStringify } from './pivot/shared/stableStringify';
 
 const PANEL_WIDTH = 230;
@@ -1046,7 +1050,6 @@ function PivotTableChart(props: PivotTableProps) {
     useState<UiColumnSortState | null>(null);
   const [frozenUserViewProps, setFrozenUserViewProps] =
     useState<PivotViewProps | null>(null);
-  const seamlessRequestRef = useRef(0);
   const pendingSeamlessLayoutRef = useRef<PivotRuntimeLayout | null>(null);
   const lastUpstreamQueryContextRef = useRef<{
     data: PivotTreeData;
@@ -1067,6 +1070,13 @@ function PivotTableChart(props: PivotTableProps) {
   const factBatchesForRender = isUserControlled
     ? committedFactBatches
     : factBatches;
+  const seamlessRequestLifecycle = useMemo(
+    () =>
+      createLatestRequestLifecycle({
+        cancel: requestGroupId => supersetChartDataClient.cancel(requestGroupId),
+      }),
+    [],
+  );
 
   const treeRef = useRef<PivotTableProps['data']>(dataForRender);
   const ownStateRef = useRef<JsonObject>(ownState ?? {});
@@ -1792,65 +1802,58 @@ function PivotTableChart(props: PivotTableProps) {
           });
         }
       }
-      const requestId = seamlessRequestRef.current + 1;
-      seamlessRequestRef.current = requestId;
-      supersetChartDataClient.cancel(SEAMLESS_REQUEST_GROUP);
-      setSeamlessLoading(true);
-      setSeamlessError(undefined);
-      try {
-        const results = await supersetChartDataClient.fetch({
-          formData: resolvedFormDataWithOffsets,
-          specs,
-          requestGroupId: SEAMLESS_REQUEST_GROUP,
-        });
-        if (requestId !== seamlessRequestRef.current) {
-          return;
-        }
-        const { tree: nextTree, factBatches: nextFactBatches } =
-          buildInitialRuntimeFromSpecResults({
-            results,
-            specs,
-            layout,
+      await executeLatestRequest({
+        lifecycle: seamlessRequestLifecycle,
+        requestGroupId: SEAMLESS_REQUEST_GROUP,
+        onStart: () => {
+          setSeamlessLoading(true);
+          setSeamlessError(undefined);
+        },
+        run: () =>
+          supersetChartDataClient.fetch({
             formData: resolvedFormDataWithOffsets,
+            specs,
+            requestGroupId: SEAMLESS_REQUEST_GROUP,
+          }),
+        onSuccess: results => {
+          const { tree: nextTree, factBatches: nextFactBatches } =
+            buildInitialRuntimeFromSpecResults({
+              results,
+              specs,
+              layout,
+              formData: resolvedFormDataWithOffsets,
+            });
+          unstable_batchedUpdates(() => {
+            setCommittedTree(nextTree);
+            setCommittedFactBatches(nextFactBatches);
+            setUiRuntimeLayout(normalized);
+            setCommittedFilters(nextFilters);
+            setSeamlessWarnings(collectWarnings(results));
+            persistRuntimeState(normalized, nextFilters);
           });
-        unstable_batchedUpdates(() => {
-          setCommittedTree(nextTree);
-          setCommittedFactBatches(nextFactBatches);
-          setUiRuntimeLayout(normalized);
-          setCommittedFilters(nextFilters);
-          setSeamlessWarnings(collectWarnings(results));
-          persistRuntimeState(normalized, nextFilters);
-        });
-        lastLocalSyncDashboardQueryContextRef.current =
-          upstreamDashboardQueryContextSignature;
-        lastSeamlessSyncRef.current = {
-          filtersSignature:
-            Object.keys(nextFilters).length > 0
-              ? stableStringify(nextFilters)
-              : null,
-          layoutSignature: stableStringify(normalized),
-          upstreamSignature: upstreamSeamlessSignature,
-        };
-      } catch (error) {
-        if (requestId !== seamlessRequestRef.current) {
-          return;
-        }
-        if (
-          typeof DOMException !== 'undefined' &&
-          error instanceof DOMException &&
-          error.name === 'AbortError'
-        ) {
-          return;
-        }
-        setSeamlessError(
-          error instanceof Error ? error.message : t('Failed to update data'),
-        );
-      } finally {
-        if (requestId === seamlessRequestRef.current) {
+          lastLocalSyncDashboardQueryContextRef.current =
+            upstreamDashboardQueryContextSignature;
+          lastSeamlessSyncRef.current = {
+            filtersSignature:
+              Object.keys(nextFilters).length > 0
+                ? stableStringify(nextFilters)
+                : null,
+            layoutSignature: stableStringify(normalized),
+            upstreamSignature: upstreamSeamlessSignature,
+          };
+        },
+        onError: error => {
+          setSeamlessError(
+            error instanceof Error
+              ? error.message
+              : t('Failed to update data'),
+          );
+        },
+        onSettled: () => {
           pendingSeamlessLayoutRef.current = null;
           setSeamlessLoading(false);
-        }
-      }
+        },
+      });
     },
     [
       dimensionKeys,
@@ -1859,6 +1862,7 @@ function PivotTableChart(props: PivotTableProps) {
       isUserControlled,
       metricKeys,
       persistRuntimeState,
+      seamlessRequestLifecycle,
       setCommittedFilters,
       setCommittedTree,
       setSeamlessError,

@@ -274,7 +274,7 @@ remains a non-goal.
 
 ### Completion Reassessment
 
-Overall transition completion estimate: **67%**.
+Overall transition completion estimate: **68%**.
 
 This is a functionality/architecture completion estimate, not a line-deletion
 score. The completed work has moved the runtime toward a compiler/fact-store
@@ -287,7 +287,7 @@ large files and in the not-yet-built reducer/controller split.
 | Gate 2: query planning from program/coverage |        87% | Initial/root/branch/batch query paths use coverage metadata and canonical paths. Remaining complexity is mostly support/totals coverage composition and old fetched-depth compatibility in expansion planning.                      |
 | Gate 3: central fact ingestion/store         |        91% | Fetch paths return fact batches, fact-store hits and cache hits reuse exact coverage, ingestion is isolated, and materializer handoff is explicit. Remaining coupling is mostly initial wrapper compatibility and tree-shaped APIs. |
 | Gate 4: one tree materializer                |        77% | `materializePivotTree.ts` owns fact-to-tree materialization, Values/metric/measure axes, subtotal leaf injection, and row subtotal labeling. Remaining work is export parity and demoting test-only raw fixtures.                   |
-| Gate 5: expansion reducer/runtime effects    |        46% | Expansion has stronger pure helpers and typed coverage, but `useExpansionEngine` remains a large hook with orchestration, loading, persistence, hydration, and layout transition responsibilities.                                  |
+| Gate 5: expansion reducer/runtime effects    |        50% | Expansion has stronger pure helpers, typed coverage, and a shared latest-request lifecycle for seamless and expansion fetches. The hook still owns loading, persistence, hydration loops, and layout transition responsibilities.   |
 | Gate 6: pure render model                    |        64% | Projection now drives loaded-state, toggle eligibility, collapsed Values, and column display behavior. `visibility.ts`, `usePivotLayout`, and `usePivotRenderModel` still duplicate some inference/presentation policy.             |
 | Gate 7: chart component cleanup              |        25% | `PivotTableChart.tsx` is smaller than baseline but still owns controller-level responsibilities, committed-tree sync, seamless refresh, runtime layout checks, and interaction wiring.                                              |
 
@@ -324,7 +324,7 @@ Gate status:
   measure-axis, and subtotal helpers live under the materializer boundary.
   The broad `src/utils.ts` utility surface no longer re-exports the raw-record
   tree builders or subtotal materialization helpers.
-- Gate 5 is started but still the largest source of complexity (`46%`).
+- Gate 5 is started but still the largest source of complexity (`50%`).
   `useExpansionEngine` no longer infers fetched state from rendered trees and
   the planner no longer consumes raw fetched-depth maps, but the hook still owns
   layout trimming, local tree projection, fetched-coverage remapping, same-axis
@@ -418,6 +418,15 @@ Latest execution of that sequence:
   previous committed view visible while hydration settles, but the chip editor is
   no longer gated on the request finishing and `TableArea` no longer applies a
   `pointer-events: none` lock during that transition.
+- `src/pivot/runtime/requestLifecycle.ts` now owns the reusable latest-request
+  lifecycle primitive for runtime requests. Seamless layout refresh uses it for
+  request-id creation, request-group cancellation, stale response suppression,
+  abort handling, and latest-only loading cleanup.
+- Expansion same-axis and atomic hydration fetches now use the same lifecycle
+  primitive for branch and grouped-batch requests. `useExpansionEngine` no
+  longer owns `transactionIdRef`, `activeRequestGroupIdsRef`, or a local
+  `trackRequestGroup`; request invalidation and active-group cancellation live
+  behind the runtime lifecycle boundary.
 - The reducer rewrite remains intentionally deferred. The hook is thinner, but
   materialization and render/layout policy are still better deletion targets
   than a reducer that would absorb legacy behavior.
