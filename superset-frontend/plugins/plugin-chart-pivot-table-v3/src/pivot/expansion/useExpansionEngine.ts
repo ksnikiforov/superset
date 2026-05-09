@@ -127,7 +127,6 @@ type ExpansionFetchRuntime = {
 };
 
 type ExpansionFetchContext = {
-  tree: PivotTreeData;
   visibleRowDepth: number;
   visibleColDepth: number;
 };
@@ -997,15 +996,10 @@ export const useExpansionEngine = ({
           if (plan.fetchKeys.size === 0) {
             break;
           }
-          const fetchContext = {
-            tree: currentTree,
-            visibleRowDepth,
-            visibleColDepth,
-          };
           // eslint-disable-next-line no-await-in-loop
           const results = await fetchExpansionTargets({
             targets,
-            context: fetchContext,
+            context: { visibleRowDepth, visibleColDepth },
             runtime: fetchRuntime,
             singleRequestKind: 'branch',
             batchRequestKind: 'batch',
@@ -1186,141 +1180,132 @@ export const useExpansionEngine = ({
         setHydratingState(true);
       }
 
-      const finalizeHydration = () => {
+      try {
+        const stagingBaseTree = treeRef.current;
+        const stagedDeltas = new Map<string, PivotTreeData>();
+        const buildHydrationTree = () => {
+          let merged = stagingBaseTree;
+          Array.from(stagedDeltas.keys())
+            .sort()
+            .forEach(key => {
+              const delta = stagedDeltas.get(key);
+              if (delta) {
+                merged = mergeTrees(merged, delta);
+              }
+            });
+          return merged;
+        };
+        const fetchRuntime: ExpansionFetchRuntime = {
+          requestScope,
+          fetchFormData,
+          factStore: factStoreRef.current,
+          trackRequestInScope,
+          addWarnings,
+          updateLoadingKey,
+        };
+
+        for (
+          let iteration = 0;
+          iteration < MAX_HYDRATION_ITERATIONS;
+          iteration += 1
+        ) {
+          if (!requestScope.isCurrent()) {
+            return;
+          }
+          const stagedTree = buildHydrationTree();
+          const desiredRows = buildDesiredExpanded('row', stagedTree);
+          const desiredCols = buildDesiredExpanded('col', stagedTree);
+          const hydrationPlan = planHydrationIteration({
+            tree: stagedTree,
+            desiredRows,
+            desiredCols,
+            fetchedCoverage: fetchedCoverageRef.current,
+            config: visibilityConfig,
+            getCoverageKey,
+            activeAxis: options?.activeAxis,
+            pendingRows: pendingRowsRef.current,
+            pendingCols: pendingColsRef.current,
+            planRows: shouldPlanRows,
+            planCols: shouldPlanCols,
+          });
+          const { visibleRowDepth, visibleColDepth } = hydrationPlan;
+
+          if (hydrationPlan.kind === 'complete') {
+            let mergedTree = buildHydrationTree();
+            const orderedDeltas = Array.from(stagedDeltas.entries()).sort(
+              ([a], [b]) => a.localeCompare(b),
+            );
+            for (const [key, delta] of orderedDeltas) {
+              const parsed = JSON.parse(key) as [PivotAxis, string];
+              const axis = parsed[0];
+              const targetKey = parsed[1];
+              const parent =
+                axis === 'row'
+                  ? mergedTree.rows[targetKey]
+                  : mergedTree.cols[targetKey];
+              mergedTree = pruneMergedTree({
+                axis,
+                tree: mergedTree,
+                parent,
+                branch: delta,
+              });
+            }
+            const resolvedRows = resolveExpandedForMetrics(
+              'row',
+              desiredRows,
+              mergedTree,
+            );
+            const resolvedCols = resolveExpandedForMetrics(
+              'col',
+              desiredCols,
+              mergedTree,
+            );
+            treeRef.current = mergedTree;
+            setTree(mergedTree);
+            setExpandedState('row', resolvedRows);
+            setExpandedState('col', resolvedCols);
+            setPendingState('row', new Set());
+            setPendingState('col', new Set());
+            if (reason === 'cross-axis') {
+              persistExpansionState(resolvedRows, resolvedCols);
+            }
+            return;
+          }
+          const { targets } = hydrationPlan;
+
+          // eslint-disable-next-line no-await-in-loop
+          const results = await fetchExpansionTargets({
+            targets,
+            context: { visibleRowDepth, visibleColDepth },
+            runtime: fetchRuntime,
+            singleRequestKind: `hydrate:${reason}`,
+            transactionId,
+            buildRequestGroupId,
+          });
+
+          if (!requestScope.isCurrent()) {
+            return;
+          }
+
+          const resultDeltas = collectFetchResultDeltas({
+            results,
+            seedFetchedCoverage: seedFetchedCoverageFromFactBatches,
+          });
+          for (const {
+            targets: deltaTargets,
+            data: deltaTree,
+          } of resultDeltas) {
+            for (const target of deltaTargets) {
+              const deltaKey = JSON.stringify([target.axis, target.pathKey]);
+              stagedDeltas.set(deltaKey, deltaTree);
+            }
+          }
+        }
+      } finally {
         if (shouldShowLoader) {
           setHydratingState(false);
         }
-      };
-
-      const stagingBaseTree = treeRef.current;
-      const stagedDeltas = new Map<string, PivotTreeData>();
-      const buildHydrationTree = () => {
-        let merged = stagingBaseTree;
-        Array.from(stagedDeltas.keys())
-          .sort()
-          .forEach(key => {
-            const delta = stagedDeltas.get(key);
-            if (delta) {
-              merged = mergeTrees(merged, delta);
-            }
-          });
-        return merged;
-      };
-      let desiredRows = new Set<string>();
-      let desiredCols = new Set<string>();
-      const fetchRuntime: ExpansionFetchRuntime = {
-        requestScope,
-        fetchFormData,
-        factStore: factStoreRef.current,
-        trackRequestInScope,
-        addWarnings,
-        updateLoadingKey,
-      };
-
-      for (
-        let iteration = 0;
-        iteration < MAX_HYDRATION_ITERATIONS;
-        iteration += 1
-      ) {
-        if (!requestScope.isCurrent()) {
-          finalizeHydration();
-          return;
-        }
-        const stagedTree = buildHydrationTree();
-        desiredRows = buildDesiredExpanded('row', stagedTree);
-        desiredCols = buildDesiredExpanded('col', stagedTree);
-        const hydrationPlan = planHydrationIteration({
-          tree: stagedTree,
-          desiredRows,
-          desiredCols,
-          fetchedCoverage: fetchedCoverageRef.current,
-          config: visibilityConfig,
-          getCoverageKey,
-          activeAxis: options?.activeAxis,
-          pendingRows: pendingRowsRef.current,
-          pendingCols: pendingColsRef.current,
-          planRows: shouldPlanRows,
-          planCols: shouldPlanCols,
-        });
-        const { visibleRowDepth, visibleColDepth } = hydrationPlan;
-
-        if (hydrationPlan.kind === 'complete') {
-          let mergedTree = buildHydrationTree();
-          const orderedDeltas = Array.from(stagedDeltas.entries()).sort(
-            ([a], [b]) => a.localeCompare(b),
-          );
-          for (const [key, delta] of orderedDeltas) {
-            const parsed = JSON.parse(key) as [PivotAxis, string];
-            const axis = parsed[0];
-            const targetKey = parsed[1];
-            const parent =
-              axis === 'row'
-                ? mergedTree.rows[targetKey]
-                : mergedTree.cols[targetKey];
-            mergedTree = pruneMergedTree({
-              axis,
-              tree: mergedTree,
-              parent,
-              branch: delta,
-            });
-          }
-          const resolvedRows = resolveExpandedForMetrics(
-            'row',
-            desiredRows,
-            mergedTree,
-          );
-          const resolvedCols = resolveExpandedForMetrics(
-            'col',
-            desiredCols,
-            mergedTree,
-          );
-          treeRef.current = mergedTree;
-          setTree(mergedTree);
-          setExpandedState('row', resolvedRows);
-          setExpandedState('col', resolvedCols);
-          setPendingState('row', new Set());
-          setPendingState('col', new Set());
-          if (reason === 'cross-axis') {
-            persistExpansionState(resolvedRows, resolvedCols);
-          }
-          finalizeHydration();
-          return;
-        }
-        const { targets } = hydrationPlan;
-
-        const fetchContext = {
-          tree: stagedTree,
-          visibleRowDepth,
-          visibleColDepth,
-        };
-        // eslint-disable-next-line no-await-in-loop
-        const results = await fetchExpansionTargets({
-          targets,
-          context: fetchContext,
-          runtime: fetchRuntime,
-          singleRequestKind: `hydrate:${reason}`,
-          transactionId,
-          buildRequestGroupId,
-        });
-
-        if (!requestScope.isCurrent()) {
-          finalizeHydration();
-          return;
-        }
-
-        const resultDeltas = collectFetchResultDeltas({
-          results,
-          seedFetchedCoverage: seedFetchedCoverageFromFactBatches,
-        });
-        for (const { targets: deltaTargets, data: deltaTree } of resultDeltas) {
-          for (const target of deltaTargets) {
-            const deltaKey = JSON.stringify([target.axis, target.pathKey]);
-            stagedDeltas.set(deltaKey, deltaTree);
-          }
-        }
       }
-
-      finalizeHydration();
     },
     [
       addWarnings,
