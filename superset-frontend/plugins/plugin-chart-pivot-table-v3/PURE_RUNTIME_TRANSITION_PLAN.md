@@ -657,8 +657,68 @@ Latest code-reduction slice:
   leaf resolution now uses one hierarchy lookup instead of separate group and
   leaf fallback branches.
 - Additional production change for that follow-up: `+22 / -37`, net `-15`.
+- Gate 6/Gate 7 primitive layout cleanup: chart-side primitive runtime-layout
+  values no longer carry memo wrappers, layout metric-header checks no longer
+  guard equality with redundant undefined branches, column metric-index fallback
+  uses one ternary path, and metric/measure comparator fallback now returns
+  directly instead of nesting duplicate zero-result branches.
+- Additional production change for that follow-up: `+22 / -36`, net `-14`.
+- Gate 6 render-model guard cleanup: render metric-index resolution now uses one
+  numeric fallback path, manual row aggregate-depth collection uses a single
+  optional-child guard, and row/column aggregate bolding shares combined
+  missing/root guards instead of adjacent early returns.
+- Additional production change for that follow-up: `+8 / -16`, net `-8`.
+- Gate 6 row-subtotal/render-model single-use cleanup: forced row subtotal
+  placement now resolves with one metric-index branch, metric-tier subtotal
+  descendant checks stay local to the descendant loop, automatic row expansion
+  seeding is scoped to manual aggregate-depth collection, and the render-model
+  spinner predicate is returned directly instead of carrying a separate hook
+  wrapper.
+- Additional production change for that follow-up: `+14 / -36`, net `-22`.
+- Gate 6 render-model config cleanup: the render-model config callback was
+  inlined into the only memo that consumes it, removing the exported
+  `RenderModelConfig` import and the extra current-tree/current-expansion
+  wrapper parameters while keeping metric-index resolution local to render-model
+  construction.
+- Additional production change for that follow-up: `+68 / -90`, net `-22`.
+- Gate 6 render-sort normalization cleanup: row and column dimension-sort
+  normalization now feeds the key-map memos directly instead of carrying two
+  adjacent intermediate sorting memos, and missing-value sort comparison uses
+  one fallback branch instead of three early returns.
+- Additional production change for that follow-up: `+18 / -26`, net `-8`.
+- Gate 6 dimension-key cleanup: render-layout dimension-key resolution now
+  filters non-metric path parts directly instead of carrying a separate
+  intermediate alias.
+- Additional production change for that follow-up: `+1 / -2`, net `-1`.
+- Gate 6 row-subtotal predicate cleanup: row subtotal child filtering now uses
+  direct boolean predicates instead of stacked true/false return blocks while
+  preserving the same explicit subtotal and metric grand-total policy.
+- Additional production change for that follow-up: `+12 / -18`, net `-6`.
+- Gate 6 subtotal ordering predicate cleanup: column Values-child retention now
+  uses one boolean expression, and row subtotal ordering reuses numeric boolean
+  ranks instead of paired ternary totals.
+- Additional production change for that follow-up: `+13 / -15`, net `-2`.
+- Gate 6 layout/render guard cleanup: layout now reuses a single-metric flag,
+  metric-index scans update max positions directly, row subtotal descendant
+  filters share one prefix guard and one metric-token scan, column child
+  retention inlines its subtotal allowance, and column aggregate bolding uses a
+  compact root-depth guard.
+- Additional production change for that follow-up: `+15 / -23`, net `-8`.
+- Gate 6 render/layout rank cleanup: the remaining metric-dimension scan now
+  updates its minimum index directly, metric-order fallback returns through one
+  ternary, row subtotal sorting uses one subtotal rank delta, leaf-tier toggle
+  suppression returns directly, and row aggregate bolding short-circuits through
+  one expression.
+- Additional production change for that follow-up: `+16 / -21`, net `-5`.
+- Gate 6 render/layout guard consolidation: dimension-key lookup now lets the
+  missing dimension fall through naturally, metric-dimension scanning increments
+  only for non-metric/non-subtotal parts, row subtotal descendant merging no
+  longer special-cases the empty list, measure-leaf header fallback returns
+  through one expression, manual aggregate-depth tracking uses one skip guard,
+  and synthetic total toggle suppression is part of the aggregate guard.
+- Additional production change for that follow-up: `+24 / -38`, net `-14`.
 - Combined recent Gate 4/Gate 5/Gate 6/Gate 7 source-reduction sequence:
-  `+1388 / -2716`, net `-1328`.
+  `+1599 / -3037`, net `-1438`.
 - Attempted render-model plumbing cleanup around spinner callbacks, sorting
   value-map aliases, leaf-label flattening, and aggregate-bold returns was
   reverted before this slice because it did not pay for itself clearly enough

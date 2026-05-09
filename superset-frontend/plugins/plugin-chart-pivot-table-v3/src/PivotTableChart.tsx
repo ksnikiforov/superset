@@ -1252,13 +1252,9 @@ function PivotTableChart(props: PivotTableProps) {
       }),
     [dimensionLabelOverrides, layoutGroupbyRows],
   );
-  const layoutMetricsLayout = useMemo(
-    () =>
-      isUserControlled
-        ? (appliedLayoutFormData.metricsLayout ?? metricsLayout)
-        : metricsLayout,
-    [appliedLayoutFormData.metricsLayout, isUserControlled, metricsLayout],
-  );
+  const layoutMetricsLayout = isUserControlled
+    ? (appliedLayoutFormData.metricsLayout ?? metricsLayout)
+    : metricsLayout;
 
   const normalizeSelectedFilters = useCallback(
     (filters?: Record<string, DataRecordValue[]>) => {
@@ -1339,9 +1335,8 @@ function PivotTableChart(props: PivotTableProps) {
     selectedFiltersFromFormData,
     selectedFiltersFromOwnState,
   ]);
-  const persistedInteractionFiltersSignature = useMemo(
-    () => selectedFiltersSignature(persistedInteractionFilters),
-    [persistedInteractionFilters],
+  const persistedInteractionFiltersSignature = selectedFiltersSignature(
+    persistedInteractionFilters,
   );
   const upstreamSeamlessSignature = useMemo(
     () =>
