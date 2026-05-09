@@ -41,7 +41,6 @@ import {
   encodeMetricKey,
   getMetricKeys,
   isSubtotalToken,
-  METRICS_PLACEHOLDER,
   SUBTOTAL_LABEL,
   SUBTOTAL_TOKEN,
 } from '../core/tokens';
@@ -52,7 +51,6 @@ import {
 } from '../measureLeaves';
 import { type LayoutContext } from '../layout/LayoutContext';
 import { type PlannedQuerySpec } from '../query/specs';
-import { compilePivotProgram } from './compilePivotProgram';
 import { type PivotFactCoverage, type PivotProgram } from './types';
 import {
   type PivotFact,
@@ -528,38 +526,6 @@ const getValuesInsertIndex = (program: PivotProgram) => {
     .filter(level => level.kind === 'dimension').length;
 };
 
-const buildMetricAxisProgram = ({
-  metrics,
-  metricsLayout,
-  rowGroupby,
-  colGroupby,
-  metricPosition,
-}: {
-  metrics: QueryFormMetric[];
-  metricsLayout: MetricsLayoutEnum;
-  rowGroupby: QueryFormColumn[];
-  colGroupby: QueryFormColumn[];
-  metricPosition?: number;
-}): PivotProgram => {
-  const valueAxis =
-    metricsLayout === MetricsLayoutEnum.ROWS ? 'row' : ('col' as const);
-  const axisDepth = valueAxis === 'row' ? rowGroupby.length : colGroupby.length;
-  const metricInsertIndex = Math.min(metricPosition ?? axisDepth, axisDepth);
-  const withValuesPlaceholder = (columns: QueryFormColumn[]) => [
-    ...columns.slice(0, metricInsertIndex),
-    METRICS_PLACEHOLDER,
-    ...columns.slice(metricInsertIndex),
-  ];
-  return compilePivotProgram({
-    groupbyRows:
-      valueAxis === 'row' ? withValuesPlaceholder(rowGroupby) : rowGroupby,
-    groupbyColumns:
-      valueAxis === 'col' ? withValuesPlaceholder(colGroupby) : colGroupby,
-    metrics,
-    metricsLayout,
-  });
-};
-
 const applyMeasureAxis = ({
   tree,
   groups,
@@ -911,82 +877,12 @@ const applyMeasureAxis = ({
   return result;
 };
 
-export const applyMetricAxis = (
-  tree: PivotTreeData,
-  metrics: QueryFormMetric[],
-  metricsLayout: MetricsLayoutEnum,
-  rowGroupby: QueryFormColumn[],
-  colGroupby: QueryFormColumn[],
-  metricPosition?: number,
-  metricLabelMap?: Record<string, string>,
-): PivotTreeData => {
-  const program = buildMetricAxisProgram({
-    metrics,
-    metricsLayout,
-    rowGroupby,
-    colGroupby,
-    metricPosition,
-  });
-  const { metricKeys } = program;
-  const valueAxis = getValueAxis(program);
-  const insertIndex = getValuesInsertIndex(program);
-  const axisDepth = getAxisDimensions(program, valueAxis).length;
-  return applyMeasureAxis({
-    tree,
-    groups: metricKeys.map(metricKey => ({
-      metricKey,
-      leaves: [buildValueLeaf()],
-    })),
-    leafTierVisible: false,
-    program,
-    metricLabelMap,
-    preserveValueAxisSourceNodes: insertIndex === 0 || insertIndex >= axisDepth,
-    promoteExistingNodes: true,
-  });
-};
-
-export function applyMeasureHierarchyAxis(
+export const applyMeasureHierarchyAxis = (
   tree: PivotTreeData,
   measureHierarchy: MeasureHierarchy,
   program: PivotProgram,
   metricLabelMap?: Record<string, string>,
-): PivotTreeData;
-export function applyMeasureHierarchyAxis(
-  tree: PivotTreeData,
-  measureHierarchy: MeasureHierarchy,
-  metricsLayout: MetricsLayoutEnum,
-  rowGroupby: QueryFormColumn[],
-  colGroupby: QueryFormColumn[],
-  metricPosition?: number,
-  metricLabelMap?: Record<string, string>,
-): PivotTreeData;
-export function applyMeasureHierarchyAxis(
-  tree: PivotTreeData,
-  measureHierarchy: MeasureHierarchy,
-  programOrMetricsLayout: PivotProgram | MetricsLayoutEnum,
-  metricLabelMapOrRowGroupby?: Record<string, string> | QueryFormColumn[],
-  colGroupby?: QueryFormColumn[],
-  metricPosition?: number,
-  legacyMetricLabelMap?: Record<string, string>,
-): PivotTreeData {
-  const usesProgram = typeof programOrMetricsLayout === 'object';
-  const program = usesProgram
-    ? programOrMetricsLayout
-    : buildMetricAxisProgram({
-        metrics:
-          measureHierarchy.kind === 'flatMetrics'
-            ? measureHierarchy.metricKeys
-            : measureHierarchy.groups.map(group => group.metricKey),
-        metricsLayout: programOrMetricsLayout,
-        rowGroupby: Array.isArray(metricLabelMapOrRowGroupby)
-          ? metricLabelMapOrRowGroupby
-          : [],
-        colGroupby: colGroupby ?? [],
-        metricPosition,
-      });
-  const metricLabelMap = usesProgram
-    ? (metricLabelMapOrRowGroupby as Record<string, string> | undefined)
-    : legacyMetricLabelMap;
+): PivotTreeData => {
   if (measureHierarchy.kind === 'flatMetrics') {
     const insertIndex = getValuesInsertIndex(program);
     const valueAxis = getValueAxis(program);
@@ -1014,7 +910,7 @@ export function applyMeasureHierarchyAxis(
     preserveValueAxisSourceNodes: true,
     promoteExistingNodes: false,
   });
-}
+};
 
 const buildTreeFromFactBatch = ({
   batch,

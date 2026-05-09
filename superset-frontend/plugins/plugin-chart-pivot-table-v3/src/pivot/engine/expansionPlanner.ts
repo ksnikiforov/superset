@@ -59,19 +59,14 @@ const isSatisfiedNode = ({
   node,
   requiredDepth,
   fetchedCoverageLookup,
-  hasLoadedChildren,
 }: {
   axis: PivotAxis;
   key: string;
   node: PivotTreeNode;
   requiredDepth: number;
   fetchedCoverageLookup: PivotExpansionFetchedCoverageLookup;
-  hasLoadedChildren: (axis: PivotAxis, node: PivotTreeNode) => boolean;
 }) => {
   if (!node.hasChildren) {
-    return true;
-  }
-  if (key === rootKey && hasLoadedChildren(axis, node)) {
     return true;
   }
   const fetchedDepth = fetchedCoverageLookup.getFetchedDepth(
@@ -106,14 +101,12 @@ export const planExpansionForAxis = ({
   nodes,
   requiredDepth,
   fetchedCoverageLookup,
-  hasLoadedChildren,
 }: {
   axis: PivotAxis;
   expandedKeys: Set<string>;
   nodes: Record<string, PivotTreeNode>;
   requiredDepth: number;
   fetchedCoverageLookup: PivotExpansionFetchedCoverageLookup;
-  hasLoadedChildren: (axis: PivotAxis, node: PivotTreeNode) => boolean;
 }): PivotExpansionPlan => {
   const fetchKeys = new Set<string>();
   const pendingKeys = new Set<string>();
@@ -135,7 +128,6 @@ export const planExpansionForAxis = ({
           node,
           requiredDepth,
           fetchedCoverageLookup,
-          hasLoadedChildren,
         })
       ) {
         return;
@@ -163,7 +155,6 @@ export const planExpansionForAxis = ({
         node: ancestor,
         requiredDepth,
         fetchedCoverageLookup,
-        hasLoadedChildren,
       })
     ) {
       if (

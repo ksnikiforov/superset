@@ -39,7 +39,7 @@ import {
   SUBTOTAL_TOKEN,
 } from '../../../../src/utils';
 import { buildTreeFromRecords } from '../../fixtures/buildTreeFromRecords';
-import { applyMetricAxis } from '../../../../src/pivot/runtime/materializePivotTree';
+import { applyMetricAxis } from '../../fixtures/metricAxis';
 
 type TestPivotTableChartProps = ComponentProps<typeof TestPivotTableChart>;
 

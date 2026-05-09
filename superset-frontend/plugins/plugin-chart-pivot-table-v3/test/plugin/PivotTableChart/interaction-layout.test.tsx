@@ -41,7 +41,7 @@ import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import {
   applyMetricAxis,
   applyMeasureHierarchyAxis,
-} from '../../../src/pivot/runtime/materializePivotTree';
+} from '../fixtures/metricAxis';
 
 const buildInitialBootstrapRuntime = ({
   formData,

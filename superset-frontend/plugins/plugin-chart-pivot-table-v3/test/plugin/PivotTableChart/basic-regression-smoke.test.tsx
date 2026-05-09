@@ -24,7 +24,7 @@ import { METRICS_PLACEHOLDER, getStableColumnKey } from '../../../src/utils';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { supersetChartDataClient } from '../../../src/pivot/data/SupersetChartDataClient';
 import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
-import { applyMetricAxis } from '../../../src/pivot/runtime/materializePivotTree';
+import { applyMetricAxis } from '../fixtures/metricAxis';
 
 jest.mock('../../../src/pivot/data/SupersetChartDataClient', () => {
   const actual = jest.requireActual(

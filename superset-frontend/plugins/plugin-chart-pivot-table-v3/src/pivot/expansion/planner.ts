@@ -91,7 +91,6 @@ export const planGroupedExpansionTargets = ({
   nodes,
   requiredOppositeDepth,
   fetchedCoverage,
-  hasLoadedChildren,
   getCoverageKey,
 }: {
   axis: PivotAxis;
@@ -99,7 +98,6 @@ export const planGroupedExpansionTargets = ({
   nodes: Record<string, PivotTreeNode>;
   requiredOppositeDepth: number;
   fetchedCoverage: FetchedFactCoverageState;
-  hasLoadedChildren: (axis: PivotAxis, node: PivotTreeNode) => boolean;
   getCoverageKey: (axis: PivotAxis, key: string) => string;
 }): {
   plan: PivotExpansionPlan;
@@ -115,7 +113,6 @@ export const planGroupedExpansionTargets = ({
     nodes,
     requiredDepth: requiredOppositeDepth,
     fetchedCoverageLookup,
-    hasLoadedChildren,
   });
 
   const grouped = buildGroupedFetchTargets({

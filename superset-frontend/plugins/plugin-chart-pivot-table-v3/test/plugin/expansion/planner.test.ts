@@ -184,7 +184,6 @@ describe('pivot/expansion/planner', () => {
       nodes,
       requiredOppositeDepth: 1,
       fetchedCoverage: createFetchedFactCoverageState(),
-      hasLoadedChildren: () => false,
       getCoverageKey: (_axis, key) => key,
     });
 
@@ -237,7 +236,6 @@ describe('pivot/expansion/planner', () => {
       },
       requiredOppositeDepth: 1,
       fetchedCoverage,
-      hasLoadedChildren: () => false,
       getCoverageKey: (_axis, key) => key,
     });
 
@@ -284,7 +282,6 @@ describe('pivot/expansion/planner', () => {
       },
       requiredOppositeDepth: 0,
       fetchedCoverage,
-      hasLoadedChildren: () => false,
       getCoverageKey: (_axis, key) => key,
     });
 
@@ -334,7 +331,6 @@ describe('pivot/expansion/planner', () => {
       },
       requiredOppositeDepth: 1,
       fetchedCoverage,
-      hasLoadedChildren: () => false,
       getCoverageKey: (_axis, key) => key,
     });
 
@@ -381,7 +377,6 @@ describe('pivot/expansion/planner', () => {
       nodes,
       requiredOppositeDepth: 1,
       fetchedCoverage: createFetchedFactCoverageState(),
-      hasLoadedChildren: () => false,
       getCoverageKey: (_axis, key) => key,
     });
 

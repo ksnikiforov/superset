@@ -39,10 +39,7 @@ import {
   formatPivotLabelValue,
 } from '../../src/utils';
 import { buildTreeFromRecords } from './fixtures/buildTreeFromRecords';
-import {
-  labelRowSubtotalLeaves,
-  applyMetricAxis,
-} from '../../src/pivot/runtime/materializePivotTree';
+import { labelRowSubtotalLeaves, applyMetricAxis } from './fixtures/metricAxis';
 
 const rootKey = serializePath([]);
 

@@ -24,7 +24,7 @@ import { clearPivotBranchCache } from '../../../src/fetchPivotBranch';
 import { MetricsLayoutEnum } from '../../../src/types';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
-import { applyMetricAxis } from '../../../src/pivot/runtime/materializePivotTree';
+import { applyMetricAxis } from '../fixtures/metricAxis';
 
 jest.mock('@superset-ui/core', () => {
   const actual = jest.requireActual('@superset-ui/core');

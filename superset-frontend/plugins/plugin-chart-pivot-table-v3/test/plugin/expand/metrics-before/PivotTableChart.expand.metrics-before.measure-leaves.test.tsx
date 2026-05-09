@@ -29,7 +29,7 @@ import {
 } from '../../../../src/pivot/measureLeaves';
 import { fetchPivotBranch } from '../../../../src/fetchPivotBranch';
 import { buildTreeFromRecords } from '../../fixtures/buildTreeFromRecords';
-import { applyMeasureHierarchyAxis } from '../../../../src/pivot/runtime/materializePivotTree';
+import { applyMeasureHierarchyAxis } from '../../fixtures/metricAxis';
 
 jest.mock('../../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../../src/fetchPivotBranch');

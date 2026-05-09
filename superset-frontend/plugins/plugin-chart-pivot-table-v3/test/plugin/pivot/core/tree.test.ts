@@ -34,7 +34,7 @@ import {
 import {
   applyMetricAxis,
   applyMeasureHierarchyAxis,
-} from '../../../../src/pivot/runtime/materializePivotTree';
+} from '../../fixtures/metricAxis';
 
 describe('pivot/core/tree', () => {
   it('labels null row values as (NULL)', () => {

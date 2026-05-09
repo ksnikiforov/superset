@@ -29,7 +29,7 @@ import {
   injectRowSubtotalLeaves,
   labelRowSubtotalLeaves,
   applyMetricAxis,
-} from '../../../../src/pivot/runtime/materializePivotTree';
+} from '../../fixtures/metricAxis';
 
 jest.mock('../../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../../src/fetchPivotBranch');

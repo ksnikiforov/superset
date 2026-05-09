@@ -40,11 +40,7 @@ import {
   buildRenderModel,
   type RenderModelConfig,
 } from '../render/renderModel';
-import { type PivotProgram } from '../runtime/types';
-import {
-  getVisibleDepths,
-  hasLoadedChildren as hasLoadedChildrenBase,
-} from '../visibility';
+import { getVisibleDepths } from '../visibility';
 import { findChildren, rootKey } from '../viewModel';
 import {
   getMetricIndexFromNodes,
@@ -58,7 +54,6 @@ import {
 } from './fetchedRequests';
 
 export type ExpansionVisibilityConfig = {
-  pivotProgram: PivotProgram;
   groupbyRowsLength: number;
   groupbyColumnsLength: number;
   rowTotals: boolean;
@@ -376,33 +371,6 @@ export const computeVisibleDepths = ({
   );
   return { visibleRowDepth, visibleColDepth };
 };
-
-export const buildHasLoadedChildren =
-  ({
-    tree,
-    config,
-  }: {
-    tree: PivotTreeData;
-    config: ExpansionVisibilityConfig;
-  }) =>
-  (axis: PivotAxis, node: PivotTreeNode) =>
-    hasLoadedChildrenBase({
-      axis,
-      node,
-      getRawChildren: (targetAxis, parent) =>
-        targetAxis === 'row'
-          ? findChildren(tree.rows, parent)
-          : findChildren(tree.cols, parent),
-      program: config.pivotProgram,
-      groupbyRowsLength: config.groupbyRowsLength,
-      groupbyColsLength: config.groupbyColumnsLength,
-      isMetricTokenValue: config.isMetricTokenValue,
-      metricIndexForRows: config.metricIndexForRows,
-      metricIndexForCols: config.metricIndexForCols,
-      cells: tree.cells,
-      rows: tree.rows,
-      cols: tree.cols,
-    });
 
 export const resolveExpandedForMetrics = ({
   axis,
@@ -748,10 +716,6 @@ export const planHydrationIteration = ({
     expandedCols: desiredCols,
     config,
   });
-  const hasLoadedChildren = buildHasLoadedChildren({
-    tree,
-    config,
-  });
   const fetchedCoverageLookup = createFetchedFactCoverageLookup({
     fetchedCoverage,
     getCoverageKey,
@@ -764,7 +728,6 @@ export const planHydrationIteration = ({
         nodes: tree.rows,
         requiredDepth: visibleColDepth,
         fetchedCoverageLookup,
-        hasLoadedChildren,
       })
     : {
         fetchKeys: new Set<string>(),
@@ -778,7 +741,6 @@ export const planHydrationIteration = ({
         nodes: tree.cols,
         requiredDepth: visibleRowDepth,
         fetchedCoverageLookup,
-        hasLoadedChildren,
       })
     : {
         fetchKeys: new Set<string>(),

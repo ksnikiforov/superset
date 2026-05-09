@@ -48,7 +48,7 @@ import { buildLayoutContext } from '../../src/pivot/layout/LayoutContext';
 import { buildBranchQuerySpecs } from '../../src/pivot/query/specs';
 import { createPivotFactStore } from '../../src/pivot/runtime/factStore';
 import { buildFormData } from './fixtures/pivotFormData';
-import { applyMetricAxis } from '../../src/pivot/runtime/materializePivotTree';
+import { applyMetricAxis } from './fixtures/metricAxis';
 
 jest.mock('@superset-ui/core', () => {
   const actual = jest.requireActual('@superset-ui/core');

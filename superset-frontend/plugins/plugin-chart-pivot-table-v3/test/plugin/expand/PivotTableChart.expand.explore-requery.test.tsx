@@ -24,7 +24,7 @@ import { MetricsLayoutEnum } from '../../../src/types';
 import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
 import { baseFormData, buildFormData } from '../fixtures/pivotFormData';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
-import { applyMetricAxis } from '../../../src/pivot/runtime/materializePivotTree';
+import { applyMetricAxis } from '../fixtures/metricAxis';
 
 jest.mock('../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../src/fetchPivotBranch');

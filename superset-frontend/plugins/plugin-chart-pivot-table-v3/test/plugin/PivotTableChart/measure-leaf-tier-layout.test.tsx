@@ -34,7 +34,7 @@ import {
   buildValueLeaf,
 } from '../../../src/pivot/measureLeaves';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
-import { applyMeasureHierarchyAxis } from '../../../src/pivot/runtime/materializePivotTree';
+import { applyMeasureHierarchyAxis } from '../fixtures/metricAxis';
 
 type TestPivotTableChartProps = ComponentProps<typeof TestPivotTableChart>;
 

@@ -44,7 +44,7 @@ import {
 } from '../../../src/fetchPivotBranch';
 import { type PivotFactStoreBatch } from '../../../src/pivot/runtime/factStore';
 import { buildMockBranchFetchResult } from '../fixtures/factBatches';
-import { applyMetricAxis } from '../../../src/pivot/runtime/materializePivotTree';
+import { applyMetricAxis } from '../fixtures/metricAxis';
 
 jest.mock('../../../src/pivot/data/SupersetChartDataClient', () => {
   const actual = jest.requireActual(

@@ -42,7 +42,7 @@ import {
 } from '../../../../src/pivot/query/fetchPivotBranchesBatch';
 import { formatQueryName } from '../../../../src/pivot/query/queryName';
 import { buildTreeFromRecords } from '../../fixtures/buildTreeFromRecords';
-import { applyMetricAxis } from '../../../../src/pivot/runtime/materializePivotTree';
+import { applyMetricAxis } from '../../fixtures/metricAxis';
 
 jest.mock('../../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../../src/fetchPivotBranch');

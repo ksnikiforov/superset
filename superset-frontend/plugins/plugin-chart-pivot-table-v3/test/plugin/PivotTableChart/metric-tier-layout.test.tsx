@@ -35,7 +35,7 @@ import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import {
   applyMeasureHierarchyAxis,
   applyMetricAxis,
-} from '../../../src/pivot/runtime/materializePivotTree';
+} from '../fixtures/metricAxis';
 
 describe('PivotTableChart metric tier indentation and toggles', () => {
   const metricsVariants = [

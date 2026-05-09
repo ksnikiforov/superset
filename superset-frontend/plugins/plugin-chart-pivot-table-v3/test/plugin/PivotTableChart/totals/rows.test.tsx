@@ -50,7 +50,7 @@ import {
   labelRowSubtotalLeaves,
   applyMeasureHierarchyAxis,
   applyMetricAxis,
-} from '../../../../src/pivot/runtime/materializePivotTree';
+} from '../../fixtures/metricAxis';
 
 type TestPivotTableChartProps = ComponentProps<typeof TestPivotTableChart>;
 

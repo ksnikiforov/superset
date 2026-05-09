@@ -78,7 +78,6 @@ import {
 } from '../runtime/requestLifecycle';
 import {
   addAncestors,
-  buildHasLoadedChildren,
   computeVisibleDepths as computeVisibleDepthsBase,
   dropDescendants,
   getVisibleExpansionKeys as getVisibleExpansionKeysBase,
@@ -701,7 +700,6 @@ export const useExpansionEngine = ({
 
   const visibilityConfig = useMemo<ExpansionVisibilityConfig>(
     () => ({
-      pivotProgram,
       groupbyRowsLength,
       groupbyColumnsLength,
       rowTotals: fetchFormData.rowTotals ?? false,
@@ -730,7 +728,6 @@ export const useExpansionEngine = ({
       metricIndexForCols,
       metricIndexForRows,
       metricLabelSet,
-      pivotProgram,
     ],
   );
 
@@ -964,10 +961,6 @@ export const useExpansionEngine = ({
             nodes,
             requiredOppositeDepth: requiredDepth,
             fetchedCoverage: fetchedCoverageRef.current,
-            hasLoadedChildren: buildHasLoadedChildren({
-              tree: currentTree,
-              config: visibilityConfig,
-            }),
             getCoverageKey,
           });
           if (plan.fetchKeys.size === 0) {

@@ -32,7 +32,7 @@ import {
 } from '../../../src/pivot/query/fetchPivotBranchesBatch';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
-import { applyMetricAxis } from '../../../src/pivot/runtime/materializePivotTree';
+import { applyMetricAxis } from '../fixtures/metricAxis';
 import { buildMockBranchFetchResult } from '../fixtures/factBatches';
 
 jest.mock('../../../src/fetchPivotBranch', () => {

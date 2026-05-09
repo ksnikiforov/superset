@@ -29,7 +29,7 @@ import {
   buildValueLeaf,
 } from '../../../src/pivot/measureLeaves';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
-import { applyMeasureHierarchyAxis } from '../../../src/pivot/runtime/materializePivotTree';
+import { applyMeasureHierarchyAxis } from '../fixtures/metricAxis';
 
 describe('PivotTableChart sorting', () => {
   const withMetricsOnColumns = (

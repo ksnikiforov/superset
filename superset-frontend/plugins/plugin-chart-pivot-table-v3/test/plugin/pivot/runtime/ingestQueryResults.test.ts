@@ -24,7 +24,7 @@ import {
   ingestQueryResults,
   upsertQueryResultsIntoFactStore,
 } from '../../../../src/pivot/runtime/ingestQueryResults';
-import { buildBranchTreeFromFactStore } from '../../../../src/pivot/runtime/materializePivotTree';
+import { buildBranchTreeFromFactStore } from '../../fixtures/metricAxis';
 import { buildLayoutContext } from '../../../../src/pivot/layout/LayoutContext';
 import {
   MetricsLayoutEnum,
