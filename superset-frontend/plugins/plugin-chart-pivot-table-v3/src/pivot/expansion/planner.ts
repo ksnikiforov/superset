@@ -101,7 +101,7 @@ export const planGroupedExpansionTargets = ({
   requiredOppositeDepth: number;
   fetchedCoverage: FetchedFactCoverageState;
   getCoverageKey: (axis: PivotAxis, key: string) => string;
-  shouldFetchChildren?: PivotExpansionNodeFetchPredicate;
+  shouldFetchChildren: PivotExpansionNodeFetchPredicate;
 }): {
   plan: PivotExpansionPlan;
   targets: PlannedFetchTarget[];

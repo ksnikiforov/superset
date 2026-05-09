@@ -47,6 +47,7 @@ describe('pivot/expansion/engine', () => {
     metricIndexForCols: undefined,
     isMetricTokenValue: () => false,
     countDimDepth: path => path.length,
+    shouldFetchChildren: ({ node }) => node.hasChildren,
   };
 
   const getCoverageKey = (_axis: 'row' | 'col', key: string) => key;

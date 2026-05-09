@@ -87,9 +87,6 @@ const isSatisfiedNode = ({
   return false;
 };
 
-const shouldFetchNodeChildrenFromTreeShape: PivotExpansionNodeFetchPredicate =
-  ({ node }) => node.hasChildren;
-
 const resolveNearestPresentAncestorKey = (
   nodes: Record<string, PivotTreeNode>,
   key: string,
@@ -113,14 +110,14 @@ export const planExpansionForAxis = ({
   nodes,
   requiredDepth,
   fetchedCoverageLookup,
-  shouldFetchChildren = shouldFetchNodeChildrenFromTreeShape,
+  shouldFetchChildren,
 }: {
   axis: PivotAxis;
   expandedKeys: Set<string>;
   nodes: Record<string, PivotTreeNode>;
   requiredDepth: number;
   fetchedCoverageLookup: PivotExpansionFetchedCoverageLookup;
-  shouldFetchChildren?: PivotExpansionNodeFetchPredicate;
+  shouldFetchChildren: PivotExpansionNodeFetchPredicate;
 }): PivotExpansionPlan => {
   const fetchKeys = new Set<string>();
   const pendingKeys = new Set<string>();

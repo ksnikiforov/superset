@@ -56,6 +56,9 @@ const fetchedCoverageLookupFromDepths = (
     left.axis === right.axis && left.pathKey === right.pathKey,
 });
 
+const shouldFetchTreeChildren = ({ node }: { node: PivotTreeNode }) =>
+  node.hasChildren;
+
 describe('expansionPlanner', () => {
   it('treats nodes as satisfied when fetched depth meets the requirement', () => {
     const keyA = serializePath(['A']);
@@ -72,6 +75,7 @@ describe('expansionPlanner', () => {
       fetchedCoverageLookup: fetchedCoverageLookupFromDepths(
         new Map([[keyA, 1]]),
       ),
+      shouldFetchChildren: shouldFetchTreeChildren,
     });
 
     expect(sortKeys(plan.fetchKeys)).toEqual([]);
@@ -79,7 +83,7 @@ describe('expansionPlanner', () => {
     expect(plan.hasMissingNodes).toBe(false);
   });
 
-  it('trusts fetched coverage without rendered-tree loaded-state callbacks', () => {
+  it('trusts fetched coverage for semantically expandable nodes', () => {
     const keyA = serializePath(['A']);
     const nodes: Record<string, PivotTreeNode> = {
       [rootKey]: makeNode({ axis: 'row', path: [], hasChildren: true }),
@@ -94,6 +98,7 @@ describe('expansionPlanner', () => {
       fetchedCoverageLookup: fetchedCoverageLookupFromDepths(
         new Map([[keyA, 2]]),
       ),
+      shouldFetchChildren: shouldFetchTreeChildren,
     });
 
     expect(sortKeys(plan.fetchKeys)).toEqual([]);
@@ -115,6 +120,7 @@ describe('expansionPlanner', () => {
       fetchedCoverageLookup: fetchedCoverageLookupFromDepths(
         new Map([[keyA, 1]]),
       ),
+      shouldFetchChildren: shouldFetchTreeChildren,
     });
 
     expect(sortKeys(plan.fetchKeys)).toEqual([keyA]);
@@ -134,6 +140,7 @@ describe('expansionPlanner', () => {
       nodes,
       requiredDepth: 0,
       fetchedCoverageLookup: fetchedCoverageLookupFromDepths(new Map()),
+      shouldFetchChildren: shouldFetchTreeChildren,
     });
 
     expect(sortKeys(plan.fetchKeys)).toEqual([keyA]);
@@ -156,6 +163,7 @@ describe('expansionPlanner', () => {
       fetchedCoverageLookup: fetchedCoverageLookupFromDepths(
         new Map([[keyA, 1]]),
       ),
+      shouldFetchChildren: shouldFetchTreeChildren,
     });
 
     expect(sortKeys(plan.fetchKeys)).toEqual([keyAB]);
@@ -179,6 +187,7 @@ describe('expansionPlanner', () => {
       fetchedCoverageLookup: fetchedCoverageLookupFromDepths(
         new Map([[keyA, 1]]),
       ),
+      shouldFetchChildren: shouldFetchTreeChildren,
     });
 
     expect(sortKeys(plan.fetchKeys)).toEqual([keyA]);
@@ -199,6 +208,7 @@ describe('expansionPlanner', () => {
       nodes: baseNodes,
       requiredDepth: 1,
       fetchedCoverageLookup: fetchedCoverageLookupFromDepths(new Map()),
+      shouldFetchChildren: shouldFetchTreeChildren,
     });
     expect(sortKeys(plan1.fetchKeys)).toEqual([keyA]);
 
@@ -209,6 +219,7 @@ describe('expansionPlanner', () => {
       nodes: baseNodes,
       requiredDepth: 1,
       fetchedCoverageLookup: fetchedCoverageLookupFromDepths(fetchedDepth),
+      shouldFetchChildren: shouldFetchTreeChildren,
     });
     expect(sortKeys(plan2.fetchKeys)).toEqual([]);
 
@@ -218,6 +229,7 @@ describe('expansionPlanner', () => {
       nodes: baseNodes,
       requiredDepth: 1,
       fetchedCoverageLookup: fetchedCoverageLookupFromDepths(fetchedDepth),
+      shouldFetchChildren: shouldFetchTreeChildren,
     });
     expect(sortKeys(plan3.fetchKeys)).toEqual([keyAB]);
 
@@ -227,6 +239,7 @@ describe('expansionPlanner', () => {
       nodes: baseNodes,
       requiredDepth: 2,
       fetchedCoverageLookup: fetchedCoverageLookupFromDepths(fetchedDepth),
+      shouldFetchChildren: shouldFetchTreeChildren,
     });
     expect(sortKeys(plan4.fetchKeys)).toEqual([keyA]);
     expect(sortKeys(plan4.pendingKeys)).toEqual([keyA, keyAB]);
@@ -243,6 +256,7 @@ describe('expansionPlanner', () => {
       fetchedCoverageLookup: fetchedCoverageLookupFromDepths(
         new Map([[keyA, 2]]),
       ),
+      shouldFetchChildren: shouldFetchTreeChildren,
     });
     expect(sortKeys(plan5.fetchKeys)).toEqual([]);
   });

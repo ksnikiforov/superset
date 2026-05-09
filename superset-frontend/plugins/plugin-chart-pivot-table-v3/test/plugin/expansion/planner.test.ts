@@ -49,6 +49,9 @@ const makeNode = ({
   };
 };
 
+const shouldFetchTreeChildren = ({ node }: { node: PivotTreeNode }) =>
+  node.hasChildren;
+
 describe('pivot/expansion/planner', () => {
   it('projects a typed branch request scope to fetched coverage', () => {
     expect(
@@ -185,6 +188,7 @@ describe('pivot/expansion/planner', () => {
       requiredOppositeDepth: 1,
       fetchedCoverage: createFetchedFactCoverageState(),
       getCoverageKey: (_axis, key) => key,
+      shouldFetchChildren: shouldFetchTreeChildren,
     });
 
     expect(Array.from(plan.fetchKeys)).toEqual([aKey]);
@@ -268,6 +272,7 @@ describe('pivot/expansion/planner', () => {
       requiredOppositeDepth: 1,
       fetchedCoverage,
       getCoverageKey: (_axis, key) => key,
+      shouldFetchChildren: shouldFetchTreeChildren,
     });
 
     expect(Array.from(plan.fetchKeys)).toEqual([bKey]);
@@ -314,6 +319,7 @@ describe('pivot/expansion/planner', () => {
       requiredOppositeDepth: 0,
       fetchedCoverage,
       getCoverageKey: (_axis, key) => key,
+      shouldFetchChildren: shouldFetchTreeChildren,
     });
 
     expect(Array.from(plan.fetchKeys)).toEqual([txKey]);
@@ -363,6 +369,7 @@ describe('pivot/expansion/planner', () => {
       requiredOppositeDepth: 1,
       fetchedCoverage,
       getCoverageKey: (_axis, key) => key,
+      shouldFetchChildren: shouldFetchTreeChildren,
     });
 
     expect(Array.from(plan.fetchKeys)).toEqual([profitKey]);
@@ -409,6 +416,7 @@ describe('pivot/expansion/planner', () => {
       requiredOppositeDepth: 1,
       fetchedCoverage: createFetchedFactCoverageState(),
       getCoverageKey: (_axis, key) => key,
+      shouldFetchChildren: shouldFetchTreeChildren,
     });
 
     expect(targets).toHaveLength(2);

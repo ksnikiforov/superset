@@ -65,7 +65,7 @@ export type ExpansionVisibilityConfig = {
   metricIndexForCols?: number;
   isMetricTokenValue: (value: unknown) => boolean;
   countDimDepth: (path: PivotTreeNode['path']) => number;
-  shouldFetchChildren?: PivotExpansionNodeFetchPredicate;
+  shouldFetchChildren: PivotExpansionNodeFetchPredicate;
 };
 
 export type HydrationIterationPlan =
