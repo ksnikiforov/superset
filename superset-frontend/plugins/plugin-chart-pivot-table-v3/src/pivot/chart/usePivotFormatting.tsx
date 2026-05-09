@@ -465,49 +465,17 @@ const buildFormattingKeyMap = (metricFormatting: PivotMetricFormattingMap) => {
   return next;
 };
 
-const buildDimensionFormattingKeyMap = (
+const buildDimensionFormattingRuntimeMap = (
   formatting: PivotDimensionFormattingMap,
-): Record<string, DimensionFormattingKeys> => {
-  const next: Record<string, DimensionFormattingKeys> = {};
-  Object.entries(formatting).forEach(([dimensionKey, dimensionFormatting]) => {
-    if (!dimensionKey) {
-      return;
-    }
-    const formattingKeys = DIMENSION_FORMATTING_FIELDS.reduce(
-      (acc, field) => {
-        const formattingMetric = dimensionFormatting?.[field];
-        if (!formattingMetric || isPivotExcelFormula(formattingMetric)) {
-          return acc;
-        }
-        const key = getFormattingMetricKey(formattingMetric);
-        if (key) {
-          acc[field] = key;
-        }
-        return acc;
-      },
-      {} as Omit<DimensionFormattingKeys, 'applyTo'>,
-    );
-    const hasExcelFormula = DIMENSION_FORMATTING_FIELDS.some(field => {
-      const value = dimensionFormatting?.[field];
-      return Boolean(value && isPivotExcelFormula(value));
-    });
-    if (Object.keys(formattingKeys).length > 0 || hasExcelFormula) {
-      next[dimensionKey] = {
-        ...formattingKeys,
-        applyTo: dimensionFormatting.applyTo ?? 'all',
-      };
-    }
-  });
-  return next;
-};
-
-const buildDimensionExcelFormattingMap = (
-  formatting: PivotDimensionFormattingMap,
-): Record<
-  string,
-  Partial<Record<DimensionFormattingField, CompiledExcelFormula>>
-> => {
-  const next: Record<
+): {
+  keyMap: Record<string, DimensionFormattingKeys>;
+  excelMap: Record<
+    string,
+    Partial<Record<DimensionFormattingField, CompiledExcelFormula>>
+  >;
+} => {
+  const keyMap: Record<string, DimensionFormattingKeys> = {};
+  const excelMap: Record<
     string,
     Partial<Record<DimensionFormattingField, CompiledExcelFormula>>
   > = {};
@@ -515,20 +483,38 @@ const buildDimensionExcelFormattingMap = (
     if (!dimensionKey) {
       return;
     }
+    const formattingKeys: Omit<DimensionFormattingKeys, 'applyTo'> = {};
     const compiled: Partial<
       Record<DimensionFormattingField, CompiledExcelFormula>
     > = {};
     DIMENSION_FORMATTING_FIELDS.forEach(field => {
       const value = dimensionFormatting?.[field];
-      if (value && isPivotExcelFormula(value)) {
+      if (!value) {
+        return;
+      }
+      if (isPivotExcelFormula(value)) {
         compiled[field] = compileExcelFormula(value.formula);
+        return;
+      }
+      const key = getFormattingMetricKey(value);
+      if (key) {
+        formattingKeys[field] = key;
       }
     });
+    if (
+      Object.keys(formattingKeys).length > 0 ||
+      Object.keys(compiled).length > 0
+    ) {
+      keyMap[dimensionKey] = {
+        ...formattingKeys,
+        applyTo: dimensionFormatting.applyTo ?? 'all',
+      };
+    }
     if (Object.keys(compiled).length > 0) {
-      next[dimensionKey] = compiled;
+      excelMap[dimensionKey] = compiled;
     }
   });
-  return next;
+  return { keyMap, excelMap };
 };
 
 export const usePivotFormatting = ({
@@ -705,20 +691,12 @@ export const usePivotFormatting = ({
     [excelMetricFormattingMap],
   );
 
-  const rowFormattingKeyMap = useMemo(
-    () => buildDimensionFormattingKeyMap(rowFormatting),
+  const rowFormattingRuntimeMap = useMemo(
+    () => buildDimensionFormattingRuntimeMap(rowFormatting),
     [rowFormatting],
   );
-  const colFormattingKeyMap = useMemo(
-    () => buildDimensionFormattingKeyMap(colFormatting),
-    [colFormatting],
-  );
-  const rowExcelFormattingMap = useMemo(
-    () => buildDimensionExcelFormattingMap(rowFormatting),
-    [rowFormatting],
-  );
-  const colExcelFormattingMap = useMemo(
-    () => buildDimensionExcelFormattingMap(colFormatting),
+  const colFormattingRuntimeMap = useMemo(
+    () => buildDimensionFormattingRuntimeMap(colFormatting),
     [colFormatting],
   );
 
@@ -803,13 +781,13 @@ export const usePivotFormatting = ({
         return undefined;
       }
       const dimensionKey = layout.getDimensionKeyForNode(node, axis);
-      const formattingMap =
-        axis === 'row' ? rowFormattingKeyMap : colFormattingKeyMap;
-      const excelFormattingMap =
-        axis === 'row' ? rowExcelFormattingMap : colExcelFormattingMap;
-      const formatting = dimensionKey ? formattingMap[dimensionKey] : undefined;
+      const formattingMaps =
+        axis === 'row' ? rowFormattingRuntimeMap : colFormattingRuntimeMap;
+      const formatting = dimensionKey
+        ? formattingMaps.keyMap[dimensionKey]
+        : undefined;
       const excelFormatting = dimensionKey
-        ? excelFormattingMap[dimensionKey]
+        ? formattingMaps.excelMap[dimensionKey]
         : undefined;
       if (!formatting && !excelFormatting) {
         return undefined;
@@ -863,12 +841,10 @@ export const usePivotFormatting = ({
       };
     },
     [
-      colFormattingKeyMap,
-      colExcelFormattingMap,
+      colFormattingRuntimeMap,
       colValuesMap,
       layout,
-      rowFormattingKeyMap,
-      rowExcelFormattingMap,
+      rowFormattingRuntimeMap,
       rowValuesMap,
     ],
   );

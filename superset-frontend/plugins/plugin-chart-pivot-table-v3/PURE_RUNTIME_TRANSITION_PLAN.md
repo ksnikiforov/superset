@@ -275,10 +275,10 @@ they delete more code than they add in the same slice.
 Current source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `7993` insertions, `8536` deletions, net `-543`.
-- Current production `src` TypeScript/TSX total: `32967` lines.
+- Production `src`: `8036` insertions, `8603` deletions, net `-567`.
+- Current production `src` TypeScript/TSX total: `32943` lines.
 - Pre-existing production files are net negative:
-  `+3282 / -8536`, net `-5254`.
+  `+3325 / -8603`, net `-5278`.
 - Added runtime/helper files are still the source of total growth:
   `+4711 / -0` across `16` added files.
 
@@ -303,7 +303,7 @@ This is a functionality/architecture completion estimate, not a line-deletion
 score. The completed work has moved the runtime toward a compiler/fact-store
 pipeline. The remaining work is more concentrated now: `PivotTableChart.tsx`
 (`2548` lines), `useExpansionEngine.ts` (`1716` lines),
-`usePivotFormatting.tsx` (`1589` lines), `usePivotLayout.ts` (`1071` lines),
+`usePivotFormatting.tsx` (`1565` lines), `usePivotLayout.ts` (`1071` lines),
 `usePivotRenderModel.ts` (`801` lines), `expansion/engine.ts` (`854` lines),
 `materializePivotTree.ts` (`1261` lines), and `visibility.ts` (`266` lines).
 
@@ -423,17 +423,17 @@ Tests and Markdown are excluded.
 
 Current diff from baseline:
 
-- `7993` insertions
-- `8536` deletions
-- net `-543` production source lines
-- current `src` code total: `32967` lines
+- `8036` insertions
+- `8603` deletions
+- net `-567` production source lines
+- current `src` code total: `32943` lines
 - implied baseline `src` total: about `33510` lines
 
 By file status:
 
 - Added files: `+4711 / -0` across `16` files
 - Deleted files: `+0 / -1243` across `7` files
-- Modified files: `+3282 / -7293`, net `-4011`
+- Modified files: `+3325 / -7360`, net `-4035`
 
 By area:
 
@@ -441,11 +441,11 @@ By area:
 | ----------------- | --------: | --------: | ------: | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Runtime           |      3566 |         0 | `+3566` | Correct new boundary, but still the largest source of net growth.                                                                                     |
 | Expansion         |      1994 |      2711 |  `-717` | Recent Gate 5 work made this area net-negative, but future work must still delete hook branches immediately.                                          |
-| Chart hooks       |       972 |      1821 |  `-849` | Render/layout repair is still net-negative, and the formatting/databar setup now carries fewer memoized branches.                                     |
-| Query             |       594 |       618 |   `-24` | Old branch planner deleted, but specs/bootstrap grew around coverage.                                                                                 |
-| Core tree         |         2 |      1014 | `-1012` | Best completed simplification; raw-record fixture construction is no longer in production `src`.                                                      |
+| Chart hooks       |      1015 |      1888 |  `-873` | Render/layout repair is still net-negative, and dimension formatting now builds runtime lookup maps in one pass per axis.                             |
+| Query             |       771 |       843 |   `-72` | Old branch planner deleted, but specs/bootstrap grew around coverage.                                                                                 |
+| Core tree         |         8 |      1014 | `-1006` | Best completed simplification; raw-record fixture construction is no longer in production `src`.                                                      |
 | `PivotTableChart` |       312 |       914 |  `-602` | Chart shrinkage is now visible, and the latest pass removed redundant label/runtime aliases without touching controller behavior.                     |
-| Other             |       553 |      1458 |  `-905` | Utility/render/visibility cleanup now includes the shared child lookup cache, deleted column-display module, and formatting-bundle view prop cleanup. |
+| Other             |       370 |      1233 |  `-863` | Utility/render/visibility cleanup now includes the shared child lookup cache, deleted column-display module, and formatting-bundle view prop cleanup. |
 
 Why deletions are lower than expected:
 
@@ -916,8 +916,15 @@ Latest code-reduction slice:
   interaction layout, basic chart regression smoke, and the seamless snapshot
   regression (`28` tests total), and touched-file ESLint passed from
   `superset-frontend`.
+- Gate 7 dimension formatting runtime-map cleanup: row and column dimension
+  formatting now each build key lookups and compiled Excel formula lookups in a
+  single pass instead of maintaining separate key-map and Excel-map builders.
+- Additional production change for that follow-up: `+43 / -67`, net `-24`.
+- Verification after the dimension formatting cleanup: single-process Jest
+  passed for PivotTableView, basic chart regression smoke, and chart metrics
+  suites (`35` tests), and touched-file ESLint passed from `superset-frontend`.
 - Combined recent Gate 4/Gate 5/Gate 6/Gate 7 source-change sequence:
-  `+2446 / -5063`, net `-2617`.
+  `+2489 / -5130`, net `-2641`.
 - Attempted render-model plumbing cleanup around spinner callbacks, sorting
   value-map aliases, leaf-label flattening, and aggregate-bold returns was
   reverted before this slice because it did not pay for itself clearly enough
@@ -995,7 +1002,7 @@ Current largest production hotspots by line count:
   controller-like responsibilities.
 - `useExpansionEngine.ts`: `1716` lines. This is still the largest runtime
   orchestration and deletion target.
-- `usePivotFormatting.tsx`: `1589` lines. This is still the largest chart hook
+- `usePivotFormatting.tsx`: `1565` lines. This is still the largest chart hook
   hotspot; future formatting/databar cleanup must delete branches or view props
   rather than move rendering logic sideways.
 - `materializePivotTree.ts`: `1261` lines. It is now production-only runtime
