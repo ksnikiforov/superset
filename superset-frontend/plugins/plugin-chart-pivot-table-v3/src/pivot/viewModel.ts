@@ -33,23 +33,44 @@ import {
 
 export const rootKey = serializePath([]);
 
+const childLookupCache = new WeakMap<
+  Record<string, PivotTreeNode>,
+  Map<string, PivotTreeNode[]>
+>();
+
+const getChildLookup = (nodes: Record<string, PivotTreeNode>) => {
+  const cached = childLookupCache.get(nodes);
+  if (cached) {
+    return cached;
+  }
+  const lookup = new Map<string, PivotTreeNode[]>();
+  Object.values(nodes).forEach(child => {
+    if (child.path.length === 0) {
+      return;
+    }
+    const parentKey = serializePath(child.path.slice(0, -1));
+    const children = lookup.get(parentKey);
+    if (children) {
+      children.push(child);
+    } else {
+      lookup.set(parentKey, [child]);
+    }
+  });
+  childLookupCache.set(nodes, lookup);
+  return lookup;
+};
+
 export const findChildren = (
   nodes: Record<string, PivotTreeNode>,
   parent: PivotTreeNode,
-) =>
-  Object.values(nodes).filter(
-    child =>
-      child.path.length === parent.path.length + 1 &&
-      parent.path.every((val, index) => val === child.path[index]),
-  );
+) => [...(getChildLookup(nodes).get(serializePath(parent.path)) ?? [])];
 
 export const buildVisibleList = (
   nodes: Record<string, PivotTreeNode>,
   expanded: Set<string>,
   sorter: (a: PivotTreeNode, b: PivotTreeNode) => number,
   skipRoot = false,
-  getChildren: (node: PivotTreeNode) => PivotTreeNode[] = node =>
-    findChildren(nodes, node),
+  getChildren: (node: PivotTreeNode) => PivotTreeNode[],
   getCollapsedChildren?: (node: PivotTreeNode) => PivotTreeNode[],
 ) => {
   const ordered: PivotTreeNode[] = [];

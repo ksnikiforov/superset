@@ -24,6 +24,7 @@ import {
   type PivotTreeData,
   type PivotTreeNode,
 } from '../../../src/types';
+import { serializePath } from '../../../src/utils';
 
 const makeNode = ({
   axis,
@@ -45,6 +46,51 @@ const makeNode = ({
   formattedLabel: label,
   level: path.length,
   hasChildren,
+});
+
+describe('findChildren', () => {
+  it('returns direct children without exposing cached lookup arrays', () => {
+    const rowAKey = serializePath(['A']);
+    const rowBKey = serializePath(['B']);
+    const rowA1Key = serializePath(['A', 'A1']);
+    const nodes: Record<string, PivotTreeNode> = {
+      [rootKey]: makeNode({
+        axis: 'row',
+        key: rootKey,
+        path: [],
+        label: 'Total',
+      }),
+      [rowAKey]: makeNode({
+        axis: 'row',
+        key: rowAKey,
+        path: ['A'],
+        label: 'A',
+      }),
+      [rowA1Key]: makeNode({
+        axis: 'row',
+        key: rowA1Key,
+        path: ['A', 'A1'],
+        label: 'A1',
+      }),
+      [rowBKey]: makeNode({
+        axis: 'row',
+        key: rowBKey,
+        path: ['B'],
+        label: 'B',
+      }),
+    };
+
+    const rootChildren = findChildren(nodes, nodes[rootKey]);
+    rootChildren.reverse();
+
+    expect(findChildren(nodes, nodes[rootKey]).map(node => node.key)).toEqual([
+      rowAKey,
+      rowBKey,
+    ]);
+    expect(findChildren(nodes, nodes[rowAKey]).map(node => node.key)).toEqual([
+      rowA1Key,
+    ]);
+  });
 });
 
 describe('buildRenderModel', () => {
