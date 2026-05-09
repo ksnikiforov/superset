@@ -23,6 +23,7 @@ import { PivotTableView } from '../../../src/pivot/render/PivotTableView';
 import { type RenderModel } from '../../../src/pivot/shared/types';
 import { type PivotTreeData, type PivotTreeNode } from '../../../src/types';
 import { serializePath } from '../../../src/utils';
+import { type PivotFormattingResult } from '../../../src/pivot/chart/usePivotFormatting';
 
 const baseRenderModel: RenderModel = {
   visibleRows: [],
@@ -36,6 +37,21 @@ const baseTree: PivotTreeData = {
   rows: {},
   cols: {},
   cells: {},
+};
+
+const baseFormatting: PivotFormattingResult = {
+  metricFormattingScope: 'values',
+  metricDatabars: {},
+  formattingKeyMap: {},
+  evaluateExcelMetricFormatting: () => undefined,
+  databarColumnMinWidths: new Map(),
+  treeDataSignature: '',
+  resolveDimensionStyle: () => undefined,
+  deriveMetricKey: () => '',
+  renderCellContent: () => null,
+  renderDatabarContent: () => null,
+  formatLabel: node => node.label,
+  getTotalBackground: () => undefined,
 };
 
 const renderView = (showGlobalLoader: boolean) =>
@@ -54,24 +70,14 @@ const renderView = (showGlobalLoader: boolean) =>
       headerRowOffsets={[]}
       headerRef={createRef()}
       colTotalPosition="start"
-      metricFormattingScope="values"
-      metricDatabars={{}}
-      formattingKeyMap={{}}
-      evaluateExcelMetricFormatting={() => undefined}
-      databarColumnMinWidths={new Map()}
+      formatting={baseFormatting}
       onToggleNode={jest.fn()}
       shouldShowToggle={() => false}
       showSpinner={() => false}
-      formatLabel={node => node.label}
       isRowAggregateBold={() => false}
       isColAggregateBold={() => false}
       getNodeDimDepth={() => 0}
-      getTotalBackground={() => undefined}
-      resolveDimensionStyle={() => undefined}
-      deriveMetricKey={() => ''}
       isMetricGrandTotalNode={() => false}
-      renderCellContent={() => null}
-      renderDatabarContent={() => null}
       handleCellClick={jest.fn()}
       handleCellKeyDown={jest.fn()}
       handleCellContextMenu={jest.fn()}
@@ -126,24 +132,14 @@ describe('PivotTableView', () => {
         headerRowOffsets={[]}
         headerRef={createRef()}
         colTotalPosition="start"
-        metricFormattingScope="values"
-        metricDatabars={{}}
-        formattingKeyMap={{}}
-        evaluateExcelMetricFormatting={() => undefined}
-        databarColumnMinWidths={new Map()}
+        formatting={baseFormatting}
         onToggleNode={jest.fn()}
         shouldShowToggle={() => false}
         showSpinner={() => false}
-        formatLabel={node => node.label}
         isRowAggregateBold={() => false}
         isColAggregateBold={() => false}
         getNodeDimDepth={() => 0}
-        getTotalBackground={() => undefined}
-        resolveDimensionStyle={() => undefined}
-        deriveMetricKey={() => ''}
         isMetricGrandTotalNode={() => false}
-        renderCellContent={() => null}
-        renderDatabarContent={() => null}
         handleCellClick={jest.fn()}
         handleCellKeyDown={jest.fn()}
         handleCellContextMenu={jest.fn()}
@@ -194,24 +190,14 @@ describe('PivotTableView', () => {
         headerRowOffsets={[]}
         headerRef={createRef()}
         colTotalPosition="start"
-        metricFormattingScope="values"
-        metricDatabars={{}}
-        formattingKeyMap={{}}
-        evaluateExcelMetricFormatting={() => undefined}
-        databarColumnMinWidths={new Map()}
+        formatting={baseFormatting}
         onToggleNode={jest.fn()}
         shouldShowToggle={() => false}
         showSpinner={() => false}
-        formatLabel={node => node.label}
         isRowAggregateBold={() => false}
         isColAggregateBold={() => false}
         getNodeDimDepth={() => 0}
-        getTotalBackground={() => undefined}
-        resolveDimensionStyle={() => undefined}
-        deriveMetricKey={() => ''}
         isMetricGrandTotalNode={() => false}
-        renderCellContent={() => null}
-        renderDatabarContent={() => null}
         handleCellClick={jest.fn()}
         handleCellKeyDown={jest.fn()}
         handleCellContextMenu={jest.fn()}
@@ -265,24 +251,14 @@ describe('PivotTableView', () => {
         headerRowOffsets={[]}
         headerRef={createRef()}
         colTotalPosition="start"
-        metricFormattingScope="values"
-        metricDatabars={{}}
-        formattingKeyMap={{}}
-        evaluateExcelMetricFormatting={() => undefined}
-        databarColumnMinWidths={new Map()}
+        formatting={baseFormatting}
         onToggleNode={jest.fn()}
         shouldShowToggle={() => false}
         showSpinner={() => false}
-        formatLabel={node => node.label}
         isRowAggregateBold={() => false}
         isColAggregateBold={() => false}
         getNodeDimDepth={() => 1}
-        getTotalBackground={() => undefined}
-        resolveDimensionStyle={() => undefined}
-        deriveMetricKey={() => ''}
         isMetricGrandTotalNode={() => false}
-        renderCellContent={() => null}
-        renderDatabarContent={() => null}
         handleCellClick={jest.fn()}
         handleCellKeyDown={jest.fn()}
         handleCellContextMenu={jest.fn()}
@@ -335,24 +311,14 @@ describe('PivotTableView', () => {
         headerRowOffsets={[]}
         headerRef={createRef()}
         colTotalPosition="start"
-        metricFormattingScope="values"
-        metricDatabars={{}}
-        formattingKeyMap={{}}
-        evaluateExcelMetricFormatting={() => undefined}
-        databarColumnMinWidths={new Map()}
+        formatting={baseFormatting}
         onToggleNode={jest.fn()}
         shouldShowToggle={() => false}
         showSpinner={() => false}
-        formatLabel={node => node.label}
         isRowAggregateBold={() => false}
         isColAggregateBold={() => false}
         getNodeDimDepth={() => 0}
-        getTotalBackground={() => undefined}
-        resolveDimensionStyle={() => undefined}
-        deriveMetricKey={() => ''}
         isMetricGrandTotalNode={() => false}
-        renderCellContent={() => null}
-        renderDatabarContent={() => null}
         handleCellClick={jest.fn()}
         handleCellKeyDown={jest.fn()}
         handleCellContextMenu={jest.fn()}

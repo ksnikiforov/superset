@@ -21,7 +21,6 @@ import {
   type CSSProperties,
   type KeyboardEvent,
   type MouseEvent,
-  type ReactNode,
   type RefObject,
   useLayoutEffect,
   useMemo,
@@ -35,13 +34,10 @@ import {
   PlusSquareOutlined,
   UpOutlined,
 } from '@ant-design/icons';
-import { type DataRecordValue, styled, t } from '@superset-ui/core';
+import { styled, t } from '@superset-ui/core';
 import { Alert, Button, Loading } from '@superset-ui/core/components';
 import {
-  type MetricFormattingField,
   type MetricFormattingScope,
-  type PivotMetricDatabarMap,
-  type PivotResultCell,
   type PivotTreeData,
   type PivotTreeNode,
   type TotalPosition,
@@ -49,7 +45,8 @@ import {
 import { serializeCellKey } from '../../utils';
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import { rootKey } from '../viewModel';
-import { type RenderModel, type FormattingKeys } from '../shared/types';
+import { type RenderModel } from '../shared/types';
+import { type PivotFormattingResult } from '../chart/usePivotFormatting';
 
 const ROW_INDENT_PX = 14;
 const ROW_TOGGLE_SLOT_PX = 16;
@@ -329,49 +326,18 @@ type PivotTableViewProps = {
   headerOffset: number;
   headerRowOffsets: number[];
   headerRef: RefObject<HTMLTableSectionElement>;
-  themeColor?: string;
   colTotalPosition: TotalPosition;
-  metricFormattingScope: MetricFormattingScope;
-  metricDatabars: PivotMetricDatabarMap;
-  formattingKeyMap: Record<string, FormattingKeys>;
-  evaluateExcelMetricFormatting: (
-    metricKey: string,
-    field: MetricFormattingField,
-    values: Record<string, DataRecordValue | undefined>,
-    currentValue: DataRecordValue | undefined,
-  ) => unknown;
-  databarColumnMinWidths: Map<string, number>;
+  formatting: PivotFormattingResult;
   onToggleNode: (axis: 'row' | 'col', node: PivotTreeNode) => void;
   onSortColumn?: (node: PivotTreeNode) => void;
   isColumnSortable?: (node: PivotTreeNode) => boolean;
   getColumnSortOrder?: (node: PivotTreeNode) => 'asc' | 'desc' | undefined;
   shouldShowToggle: (axis: 'row' | 'col', node: PivotTreeNode) => boolean;
   showSpinner: (key: string) => boolean;
-  formatLabel: (node: PivotTreeNode, axis: 'row' | 'col') => string;
   isRowAggregateBold: (node?: PivotTreeNode) => boolean;
   isColAggregateBold: (node?: PivotTreeNode) => boolean;
   getNodeDimDepth: (node: PivotTreeNode) => number;
-  getTotalBackground: (row?: PivotTreeNode) => string | undefined;
-  resolveDimensionStyle: (
-    axis: 'row' | 'col',
-    node: PivotTreeNode,
-    target: 'label' | 'cell',
-  ) => CSSProperties | undefined;
-  deriveMetricKey: (rowNode: PivotTreeNode, colNode: PivotTreeNode) => string;
   isMetricGrandTotalNode: (node: PivotTreeNode) => boolean;
-  renderCellContent: (
-    rowNode: PivotTreeNode,
-    colNode: PivotTreeNode,
-    metricKey: string,
-    d3FormatOverride?: string,
-  ) => ReactNode;
-  renderDatabarContent: (
-    rowNode: PivotTreeNode,
-    colNode: PivotTreeNode,
-    cell: PivotResultCell,
-    metricKey: string,
-    d3FormatOverride?: string,
-  ) => ReactNode;
   emitCrossFilters?: boolean;
   handleCellClick: (rowNode: PivotTreeNode, colNode: PivotTreeNode) => void;
   handleCellKeyDown: (
@@ -402,29 +368,18 @@ export const PivotTableView = ({
   headerOffset,
   headerRowOffsets,
   headerRef,
-  themeColor,
   colTotalPosition,
-  metricFormattingScope,
-  metricDatabars,
-  formattingKeyMap,
-  evaluateExcelMetricFormatting,
-  databarColumnMinWidths,
+  formatting,
   onToggleNode,
   onSortColumn,
   isColumnSortable,
   getColumnSortOrder,
   shouldShowToggle,
   showSpinner,
-  formatLabel,
   isRowAggregateBold,
   isColAggregateBold,
   getNodeDimDepth,
-  getTotalBackground,
-  resolveDimensionStyle,
-  deriveMetricKey,
   isMetricGrandTotalNode,
-  renderCellContent,
-  renderDatabarContent,
   emitCrossFilters,
   handleCellClick,
   handleCellKeyDown,
@@ -433,6 +388,20 @@ export const PivotTableView = ({
 }: PivotTableViewProps) => {
   const { visibleRows, visibleCols, columnHeaderRows, showRowRoot } =
     renderModel;
+  const {
+    themeColor,
+    metricFormattingScope,
+    metricDatabars,
+    formattingKeyMap,
+    evaluateExcelMetricFormatting,
+    databarColumnMinWidths,
+    formatLabel,
+    getTotalBackground,
+    resolveDimensionStyle,
+    deriveMetricKey,
+    renderCellContent,
+    renderDatabarContent,
+  } = formatting;
   const stickyRowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
   const [stickyTotalRowOffsets, setStickyTotalRowOffsets] = useState<
     Record<string, number>
