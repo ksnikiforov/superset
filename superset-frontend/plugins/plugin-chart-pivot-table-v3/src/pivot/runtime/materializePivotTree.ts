@@ -129,6 +129,31 @@ const factBatchFromStore = ({
   coverage: spec.meta.coverage,
 });
 
+const finalizeInitialPivotTree = ({
+  tree,
+  measureHierarchy,
+}: {
+  tree: PivotTreeData;
+  measureHierarchy: MeasureHierarchy;
+}) => {
+  const rootKey = serializePath([]);
+  const finalizedTree = tree;
+  (['rows', 'cols'] as const).forEach(axis => {
+    const root = finalizedTree[axis][rootKey];
+    if (root) {
+      finalizedTree[axis][rootKey] = {
+        ...root,
+        label: 'Grand total',
+        formattedLabel: 'Grand total',
+      };
+    }
+  });
+  return applyMeasureLeafValuesToTree({
+    tree: finalizedTree,
+    measureHierarchy,
+  });
+};
+
 type FactTreeBuilderInput = {
   rowColumns: QueryFormColumn[];
   columnColumns: QueryFormColumn[];
@@ -1170,7 +1195,6 @@ export const materializeInitialPivotTreeFromFactStore = ({
   layout: LayoutContext;
   formData: PivotTableQueryFormData;
 }): PivotTreeData => {
-  const rootKey = serializePath([]);
   const emptyTree: PivotTreeData = { rows: {}, cols: {}, cells: {} };
   const mergedTree = specs.reduce((acc, spec) => {
     const nextTree = materializePivotTree({
@@ -1186,21 +1210,7 @@ export const materializeInitialPivotTreeFromFactStore = ({
     });
     return mergeTrees(acc, nextTree);
   }, emptyTree);
-  if (mergedTree.rows[rootKey]) {
-    mergedTree.rows[rootKey] = {
-      ...mergedTree.rows[rootKey],
-      label: 'Grand total',
-      formattedLabel: 'Grand total',
-    };
-  }
-  if (mergedTree.cols[rootKey]) {
-    mergedTree.cols[rootKey] = {
-      ...mergedTree.cols[rootKey],
-      label: 'Grand total',
-      formattedLabel: 'Grand total',
-    };
-  }
-  return applyMeasureLeafValuesToTree({
+  return finalizeInitialPivotTree({
     tree: mergedTree,
     measureHierarchy: layout.measureHierarchy,
   });
@@ -1220,7 +1230,6 @@ export const materializeInitialPivotTreeFromFactStoreAsync = async ({
   layout: LayoutContext;
   formData: PivotTableQueryFormData;
 } & ChunkedWorkOptions): Promise<PivotTreeData> => {
-  const rootKey = serializePath([]);
   const emptyTree: PivotTreeData = { rows: {}, cols: {}, cells: {} };
   let mergedTree = emptyTree;
   for (let idx = 0; idx < specs.length; idx += 1) {
@@ -1244,22 +1253,8 @@ export const materializeInitialPivotTreeFromFactStoreAsync = async ({
     await yieldChunkedWork({ shouldContinue, yieldToMain });
     mergedTree = mergeTrees(mergedTree, nextTree);
   }
-  if (mergedTree.rows[rootKey]) {
-    mergedTree.rows[rootKey] = {
-      ...mergedTree.rows[rootKey],
-      label: 'Grand total',
-      formattedLabel: 'Grand total',
-    };
-  }
-  if (mergedTree.cols[rootKey]) {
-    mergedTree.cols[rootKey] = {
-      ...mergedTree.cols[rootKey],
-      label: 'Grand total',
-      formattedLabel: 'Grand total',
-    };
-  }
   await yieldChunkedWork({ shouldContinue, yieldToMain });
-  return applyMeasureLeafValuesToTree({
+  return finalizeInitialPivotTree({
     tree: mergedTree,
     measureHierarchy: layout.measureHierarchy,
   });
