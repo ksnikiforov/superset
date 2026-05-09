@@ -16,6 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import { type QueryFormColumn } from '@superset-ui/core';
 import {
   encodeMetricKey,
   METRICS_PLACEHOLDER,
@@ -144,6 +145,27 @@ describe('runtime layout fact coverage', () => {
     };
 
     expect(factBatchesCoverRuntimeLayout([batch], runtimeLayout)).toBe(false);
+  });
+
+  it('matches object coverage dimensions by stable runtime key', () => {
+    const rowDimension: QueryFormColumn = {
+      sqlExpression: 'row1',
+      label: 'Row',
+      expressionType: 'SQL',
+    };
+    const batch: PivotFactStoreBatch = {
+      coverage: buildFactCoverage({
+        reason: 'initial',
+        rowDimensions: [rowDimension],
+        columnDimensions: ['col1'],
+        rowDepth: 1,
+        columnDepth: 1,
+      }),
+      scope: { kind: 'bootstrap' },
+      facts: [],
+    };
+
+    expect(factBatchesCoverRuntimeLayout([batch], runtimeLayout)).toBe(true);
   });
 
   it('does not treat deeper fact coverage as root runtime-layout coverage', () => {

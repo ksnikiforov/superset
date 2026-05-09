@@ -64,15 +64,15 @@ import { usePivotFormatting } from './pivot/chart/usePivotFormatting';
 import { usePivotInteractions } from './pivot/chart/usePivotInteractions';
 import { PivotInteractionPanel } from './pivot/chart/PivotInteractionPanel';
 import {
+  factBatchesCoverRuntimeLayout,
+  isMetricOrderOnlyChange,
+  isSameRuntimeLayout,
+  shouldFetchRuntimeLayout,
+} from './pivot/runtime/coverage';
+import {
   normalizeRuntimeLayout,
   resolveInteractionFormData,
 } from './pivot/layout/resolveInteractionLayout';
-import {
-  isMetricOrderOnlyChange,
-  isSameRuntimeLayout,
-  shouldFetchForLayoutChange,
-} from './pivot/layout/shouldFetchForLayoutChange';
-import { factBatchesCoverRuntimeLayout } from './pivot/runtime/coverage';
 import {
   buildSelectionFilterClauses,
   mergeExtraFilters as mergeSelectionExtraFilters,
@@ -1523,14 +1523,13 @@ function PivotTableChart(props: PivotTableProps) {
         isUserControlled &&
         queryFormData &&
         isMetricOrderOnlyChange(fetchBaselineLayout, normalized);
-      const needsStructuralFetch = shouldFetchForLayoutChange(
-        fetchBaselineLayout,
-        normalized,
-      );
-      const needsCoverageFetch =
-        !needsStructuralFetch &&
-        !factBatchesCoverRuntimeLayout(committedFactBatches, normalized);
-      if (needsStructuralFetch || needsCoverageFetch) {
+      if (
+        shouldFetchRuntimeLayout({
+          factBatches: committedFactBatches,
+          previousLayout: fetchBaselineLayout,
+          nextLayout: normalized,
+        })
+      ) {
         pendingSeamlessLayoutRef.current = normalized;
         updateUiRuntimeLayout(normalized);
         applySeamlessUpdate(normalized, uiSelectedFilters);

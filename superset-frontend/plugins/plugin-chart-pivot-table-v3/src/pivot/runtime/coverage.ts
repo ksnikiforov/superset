@@ -22,6 +22,7 @@ import {
   type PivotPath,
   type PivotRuntimeLayout,
 } from '../../types';
+import { stableStringify } from '../shared/stableStringify';
 import { getNextAxisLevelForPath } from './paths';
 import type { PivotAxisProjection } from './projection';
 import { type PivotFactStoreBatch } from './factStore';
@@ -86,6 +87,180 @@ const arraysEqual = (left: string[], right: string[]) =>
   left.length === right.length &&
   left.every((value, index) => value === right[index]);
 
+const sortedUnique = (keys: string[]) => Array.from(new Set(keys)).sort();
+
+const hasSameSet = (left: string[], right: string[]) =>
+  arraysEqual(sortedUnique(left), sortedUnique(right));
+
+const columnRefKey = (column: PivotProgram['rowDimensions'][number]) =>
+  typeof column === 'string'
+    ? column
+    : column.sqlExpression || column.label || '';
+
+const columnRefsMatchKeys = (
+  columns: PivotProgram['rowDimensions'],
+  keys: string[],
+) =>
+  columns.length === keys.length &&
+  columns.every((column, index) => columnRefKey(column) === keys[index]);
+
+const selectionSignature = (selection: PivotRuntimeLayout['leafSelection']) =>
+  stableStringify(selection ?? {});
+
+const valuePlacementSignature = (
+  placement: PivotRuntimeLayout['valuePlacement'],
+) => stableStringify(placement ?? {});
+
+const leafOrderSignature = (order?: PivotRuntimeLayout['leafOrder']) =>
+  stableStringify(order ?? []);
+
+const hasSameRuntimeLayoutState = (
+  prev: PivotRuntimeLayout,
+  next: PivotRuntimeLayout,
+  metricsMatch: (left: string[], right: string[]) => boolean,
+) =>
+  arraysEqual(prev.rows, next.rows) &&
+  arraysEqual(prev.cols, next.cols) &&
+  metricsMatch(prev.metrics, next.metrics) &&
+  selectionSignature(prev.leafSelection) ===
+    selectionSignature(next.leafSelection) &&
+  leafOrderSignature(prev.leafOrder) === leafOrderSignature(next.leafOrder) &&
+  valuePlacementSignature(prev.valuePlacement) ===
+    valuePlacementSignature(next.valuePlacement);
+
+export const isMetricOrderOnlyChange = (
+  prev: PivotRuntimeLayout,
+  next: PivotRuntimeLayout,
+) =>
+  !arraysEqual(prev.metrics, next.metrics) &&
+  hasSameRuntimeLayoutState(prev, next, hasSameSet);
+
+export const isSameRuntimeLayout = (
+  prev: PivotRuntimeLayout,
+  next: PivotRuntimeLayout,
+) => hasSameRuntimeLayoutState(prev, next, arraysEqual);
+
+const shouldFetchForLeadingKeyChange = (
+  prevAxisKeys: string[],
+  nextAxisKeys: string[],
+) => {
+  const prevLeading = prevAxisKeys[0];
+  const nextLeading = nextAxisKeys[0];
+  if (prevLeading === nextLeading) {
+    return false;
+  }
+  // Collapsing an axis to totals-only reuses existing aggregate rows/cols.
+  if (prevLeading !== undefined && nextLeading === undefined) {
+    return false;
+  }
+  return true;
+};
+
+const movedLeadingKeyAcrossAxes = ({
+  prevSource,
+  nextSource,
+  nextTarget,
+}: {
+  prevSource: string[];
+  nextSource: string[];
+  nextTarget: string[];
+}) => {
+  const leading = prevSource[0];
+  if (!leading) {
+    return false;
+  }
+  if (nextSource.includes(leading)) {
+    return false;
+  }
+  return nextTarget.includes(leading);
+};
+
+const shouldFetchForDimensionAxisChange = ({
+  prevRows,
+  prevCols,
+  nextRows,
+  nextCols,
+}: {
+  prevRows: string[];
+  prevCols: string[];
+  nextRows: string[];
+  nextCols: string[];
+}) => {
+  if (shouldFetchForLeadingKeyChange(prevRows, nextRows)) {
+    return true;
+  }
+  if (shouldFetchForLeadingKeyChange(prevCols, nextCols)) {
+    return true;
+  }
+  if (
+    movedLeadingKeyAcrossAxes({
+      prevSource: prevRows,
+      nextSource: nextRows,
+      nextTarget: nextCols,
+    })
+  ) {
+    return true;
+  }
+  if (
+    movedLeadingKeyAcrossAxes({
+      prevSource: prevCols,
+      nextSource: nextCols,
+      nextTarget: nextRows,
+    })
+  ) {
+    return true;
+  }
+  return false;
+};
+
+export const shouldFetchForLayoutChange = (
+  prev: PivotRuntimeLayout,
+  next: PivotRuntimeLayout,
+): boolean => {
+  if (prev.valuePlacement.axis !== next.valuePlacement.axis) {
+    return true;
+  }
+  if (
+    !arraysEqual(prev.rows, next.rows) ||
+    !arraysEqual(prev.cols, next.cols)
+  ) {
+    return shouldFetchForDimensionAxisChange({
+      prevRows: prev.rows,
+      prevCols: prev.cols,
+      nextRows: next.rows,
+      nextCols: next.cols,
+    });
+  }
+  if (!hasSameSet(prev.metrics, next.metrics)) {
+    return true;
+  }
+  if (
+    selectionSignature(prev.leafSelection) !==
+    selectionSignature(next.leafSelection)
+  ) {
+    return true;
+  }
+  if (
+    valuePlacementSignature(prev.valuePlacement) !==
+    valuePlacementSignature(next.valuePlacement)
+  ) {
+    const prevValueAxis =
+      prev.valuePlacement.axis === 'row' ? prev.rows : prev.cols;
+    const nextValueAxis =
+      next.valuePlacement.axis === 'row' ? next.rows : next.cols;
+    const indexChanged =
+      prev.valuePlacement.index !== next.valuePlacement.index;
+    if (
+      indexChanged &&
+      (prevValueAxis.length > 0 || nextValueAxis.length > 0)
+    ) {
+      return true;
+    }
+    return false;
+  }
+  return false;
+};
+
 export const expansionRevealsValuesLevel = (input: ExpansionValuesLevelInput) =>
   getNextAxisLevelForPath(input)?.kind === 'values';
 
@@ -145,11 +320,23 @@ export const factBatchesCoverRuntimeLayout = (
         (scope.kind === 'bootstrap' || scope.kind === 'root') &&
         coverage.rowDepth === requiredRowDepth &&
         coverage.columnDepth === requiredColumnDepth &&
-        arraysEqual(coverage.rowDimensions, requiredRows) &&
-        arraysEqual(coverage.columnDimensions, requiredColumns),
+        columnRefsMatchKeys(coverage.rowDimensions, requiredRows) &&
+        columnRefsMatchKeys(coverage.columnDimensions, requiredColumns),
     )
   );
 };
+
+export const shouldFetchRuntimeLayout = ({
+  factBatches,
+  previousLayout,
+  nextLayout,
+}: {
+  factBatches: PivotFactStoreBatch[];
+  previousLayout: PivotRuntimeLayout;
+  nextLayout: PivotRuntimeLayout;
+}) =>
+  shouldFetchForLayoutChange(previousLayout, nextLayout) ||
+  !factBatchesCoverRuntimeLayout(factBatches, nextLayout);
 
 export const buildBranchFactCoverages = ({
   program,

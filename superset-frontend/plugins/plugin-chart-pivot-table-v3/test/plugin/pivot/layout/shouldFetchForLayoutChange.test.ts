@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { shouldFetchForLayoutChange } from '../../../../src/pivot/layout/shouldFetchForLayoutChange';
+import { shouldFetchForLayoutChange } from '../../../../src/pivot/runtime/coverage';
 import { PivotRuntimeLayout } from '../../../../src/types';
 
 const baseLayout: PivotRuntimeLayout = {
