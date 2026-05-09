@@ -275,10 +275,10 @@ they delete more code than they add in the same slice.
 Current source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `8136` insertions, `8737` deletions, net `-601`.
-- Current production `src` TypeScript/TSX total: `32909` lines.
+- Production `src`: `8232` insertions, `8840` deletions, net `-608`.
+- Current production `src` TypeScript/TSX total: `32902` lines.
 - Pre-existing production files are net negative:
-  `+3425 / -8737`, net `-5312`.
+  `+3521 / -8840`, net `-5319`.
 - Added runtime/helper files are still the source of total growth:
   `+4711 / -0` across `16` added files.
 
@@ -296,14 +296,13 @@ Overall transition completion estimate: **80%**.
 Goal-weighted completion estimate: **79%**. This is lower than the architecture
 score because the original goal was not only to create a pure runtime boundary,
 but to use it to remove old production code. The runtime pipeline is mostly in
-place; the line-reduction payoff is now past break-even but still not
-done.
+place; the line-reduction payoff is now past break-even but still not done.
 
 This is a functionality/architecture completion estimate, not a line-deletion
 score. The completed work has moved the runtime toward a compiler/fact-store
 pipeline. The remaining work is more concentrated now: `PivotTableChart.tsx`
 (`2540` lines), `useExpansionEngine.ts` (`1716` lines),
-`usePivotFormatting.tsx` (`1558` lines), `usePivotLayout.ts` (`1071` lines),
+`usePivotFormatting.tsx` (`1632` lines), `usePivotLayout.ts` (`1071` lines),
 `usePivotRenderModel.ts` (`801` lines), `expansion/engine.ts` (`854` lines),
 `materializePivotTree.ts` (`1261` lines), and `visibility.ts` (`266` lines).
 
@@ -336,8 +335,8 @@ Requirement reassessment:
 - Architecture completion: **76%**. The compiler/fact-store/materializer
   pipeline exists and is used by the main fetch paths. Remaining work is mostly
   deleting old interpretation surfaces, not inventing the architecture.
-- Production line-deletion completion: **85%**. Pre-existing files are net `5312`
-  lines smaller, and total production source is now net `601` lines smaller
+- Production line-deletion completion: **85%**. Pre-existing files are net `5319`
+  lines smaller, and total production source is now net `608` lines smaller
   because the runtime materializer, render/visibility, and chart sync surfaces
   have started to shed compatibility API.
 - Interactivity requirement completion: **71%**. Layout refresh and expansion
@@ -376,8 +375,8 @@ Refactor health:
 - Direction: **good**. The compiler/fact-store/materializer shape is now real
   and production fetch paths use it.
 - Deletion payoff: **past break-even and improving**. Pre-existing source files
-  are net `-5312`, and added runtime/helper files now leave the plugin net
-  `-601`.
+  are net `-5319`, and added runtime/helper files now leave the plugin net
+  `-608`.
 - Interactivity: **partially improved**. Latest-only requests, reducer loading
   state, chunked materialization, cheaper child traversal, and no-hidden-layer
   fetch planning are in place, but the user-visible lag from large
@@ -425,29 +424,29 @@ Tests and Markdown are excluded.
 
 Current diff from baseline:
 
-- `8136` insertions
-- `8737` deletions
-- net `-601` production source lines
-- current `src` code total: `32909` lines
+- `8232` insertions
+- `8840` deletions
+- net `-608` production source lines
+- current `src` code total: `32902` lines
 - implied baseline `src` total: about `33510` lines
 
 By file status:
 
 - Added files: `+4711 / -0` across `16` files
 - Deleted files: `+0 / -1243` across `7` files
-- Modified files: `+3425 / -7494`, net `-4069`
+- Modified files: `+3521 / -7597`, net `-4076`
 
 By area:
 
-| Area              | Additions | Deletions |     Net | Readout                                                                                                                                                                                    |
-| ----------------- | --------: | --------: | ------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Runtime           |      3566 |         0 | `+3566` | Correct new boundary, but still the largest source of net growth.                                                                                                                          |
-| Expansion         |      1994 |      2711 |  `-717` | Recent Gate 5 work made this area net-negative, but future work must still delete hook branches immediately.                                                                               |
-| Chart hooks       |      1051 |      1931 |  `-880` | Render/layout repair is still net-negative, and formatting now builds runtime lookup maps in one pass for metrics and dimensions.                                                          |
-| Query             |       771 |       843 |   `-72` | Old branch planner deleted, but specs/bootstrap grew around coverage.                                                                                                                      |
-| Core tree         |         8 |      1014 | `-1006` | Best completed simplification; raw-record fixture construction is no longer in production `src`.                                                                                           |
-| `PivotTableChart` |       362 |       972 |  `-610` | Chart shrinkage is now visible, and the latest pass shared strip-level row/column drop-target plumbing.                                                                                    |
-| Other             |       384 |      1266 |  `-882` | Utility/render/visibility cleanup now includes the shared child lookup cache, deleted column-display module, formatting-bundle view prop cleanup, and shared view corner header rendering. |
+| Area              | Additions | Deletions |     Net | Readout                                                                                                                                                                                  |
+| ----------------- | --------: | --------: | ------: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Runtime           |      3566 |         0 | `+3566` | Correct new boundary, but still the largest source of net growth.                                                                                                                        |
+| Expansion         |      1994 |      2711 |  `-717` | Recent Gate 5 work made this area net-negative, but future work must still delete hook branches immediately.                                                                             |
+| Chart hooks       |      1136 |      1942 |  `-806` | Render/layout repair is still net-negative, and metric formatting semantics now stay behind the formatting hook instead of leaking into the table view.                                  |
+| Query             |       771 |       843 |   `-72` | Old branch planner deleted, but specs/bootstrap grew around coverage.                                                                                                                    |
+| Core tree         |         8 |      1014 | `-1006` | Best completed simplification; raw-record fixture construction is no longer in production `src`.                                                                                         |
+| `PivotTableChart` |       362 |       972 |  `-610` | Chart shrinkage is now visible, and the latest pass shared strip-level row/column drop-target plumbing.                                                                                  |
+| Other             |       395 |      1358 |  `-963` | Utility/render/visibility cleanup now includes the shared child lookup cache, deleted column-display module, formatting-bundle view prop cleanup, and thinner view-owned cell rendering. |
 
 Why deletions are lower than expected:
 
@@ -947,8 +946,20 @@ Latest code-reduction slice:
 - Verification after the view corner-header cleanup: single-process Jest passed
   for PivotTableView and basic chart regression smoke suites (`11` tests), and
   touched-file ESLint passed from `superset-frontend`.
+- Gate 6/Gate 7 metric-formatting boundary cleanup: `PivotTableView` no longer
+  consumes metric formatting key maps or evaluates Excel formula fields while
+  rendering cells. `usePivotFormatting` now resolves metric cell color and d3
+  overrides as one formatting concern, and databar label sizing reuses that same
+  d3 override resolver. This keeps render-time semantic repair out of the table
+  view instead of spreading formatting interpretation across render and chart
+  hooks.
+- Additional production change for that follow-up: `+116 / -123`, net `-7`.
+- Verification after the metric-formatting boundary cleanup: single-process Jest
+  passed for PivotTableView, basic chart regression smoke, and chart metrics
+  suites (`35` tests), and touched-file ESLint passed from
+  `superset-frontend`.
 - Combined recent Gate 4/Gate 5/Gate 6/Gate 7 source-change sequence:
-  `+2595 / -5270`, net `-2675`.
+  `+2711 / -5393`, net `-2682`.
 - Attempted render-model plumbing cleanup around spinner callbacks, sorting
   value-map aliases, leaf-label flattening, and aggregate-bold returns was
   reverted before this slice because it did not pay for itself clearly enough
@@ -1026,7 +1037,7 @@ Current largest production hotspots by line count:
   controller-like responsibilities.
 - `useExpansionEngine.ts`: `1716` lines. This is still the largest runtime
   orchestration and deletion target.
-- `usePivotFormatting.tsx`: `1558` lines. This is still the largest chart hook
+- `usePivotFormatting.tsx`: `1632` lines. This is still the largest chart hook
   hotspot; future formatting/databar cleanup must delete branches or view props
   rather than move rendering logic sideways.
 - `materializePivotTree.ts`: `1261` lines. It is now production-only runtime
@@ -1036,7 +1047,7 @@ Current largest production hotspots by line count:
   pure runtime transition than chart, expansion, and render formatting.
 - `usePivotLayout.ts`: `1071` lines. This remains the main render/layout policy
   hotspot.
-- `PivotTableView.tsx`: `886` lines. The formatting prop surface is narrower,
+- `PivotTableView.tsx`: `805` lines. The formatting prop surface is narrower,
   but the cell rendering body remains dense.
 - `expansion/engine.ts`: `854` lines. It now owns most pure expansion
   state/planning helpers; future Gate 5 moves should delete more hook code than

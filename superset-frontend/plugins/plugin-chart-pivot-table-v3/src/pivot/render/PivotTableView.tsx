@@ -37,7 +37,6 @@ import {
 import { styled, t } from '@superset-ui/core';
 import { Alert, Button, Loading } from '@superset-ui/core/components';
 import {
-  type MetricFormattingScope,
   type PivotTreeData,
   type PivotTreeNode,
   type TotalPosition,
@@ -269,45 +268,12 @@ const Spinner = styled(LoadingOutlined)`
   }
 `;
 
-const normalizeCssColor = (rawValue: unknown) => {
-  if (rawValue === null || rawValue === undefined) {
-    return undefined;
-  }
-  const value = String(rawValue).trim();
-  if (!value) {
-    return undefined;
-  }
-  return value;
-};
-
-const normalizeD3Format = (rawValue: unknown) => {
-  if (typeof rawValue !== 'string') {
-    return undefined;
-  }
-  const value = rawValue.trim();
-  return value.length > 0 ? value : undefined;
-};
-
 const isNullLabelValue = (node: PivotTreeNode) => {
   if (!node.path || node.path.length === 0) {
     return false;
   }
   const last = node.path[node.path.length - 1];
   return last === null;
-};
-
-const shouldApplyMetricFormatting = (
-  scope: MetricFormattingScope,
-  isSubtotal: boolean,
-  isGrandTotal: boolean,
-) => {
-  if (scope === 'values') {
-    return !isSubtotal && !isGrandTotal;
-  }
-  if (scope === 'values_totals') {
-    return !isGrandTotal;
-  }
-  return true;
 };
 
 type PivotTableViewProps = {
@@ -390,14 +356,12 @@ export const PivotTableView = ({
     renderModel;
   const {
     themeColor,
-    metricFormattingScope,
     metricDatabars,
-    formattingKeyMap,
-    evaluateExcelMetricFormatting,
     databarColumnMinWidths,
     formatLabel,
     getTotalBackground,
     resolveDimensionStyle,
+    resolveMetricCellFormatting,
     deriveMetricKey,
     renderCellContent,
     renderDatabarContent,
@@ -709,9 +673,6 @@ export const PivotTableView = ({
                     const cellKey = serializeCellKey(row.key, col.key);
                     const cell = tree.cells[cellKey];
                     const metricKey = deriveMetricKey(row, col);
-                    const formattingKeys = metricKey
-                      ? formattingKeyMap[metricKey]
-                      : undefined;
                     const colAggregateBold = isColAggregateBold(col);
                     const isSubtotalCell = rowAggregateBold || colAggregateBold;
                     const isGrandTotalCell =
@@ -725,15 +686,6 @@ export const PivotTableView = ({
                     const colCellFormatting = !isGrandTotalCell
                       ? resolveDimensionStyle('col', col, 'cell')
                       : undefined;
-                    const applyColorFormatting = !!(
-                      cell &&
-                      metricKey &&
-                      shouldApplyMetricFormatting(
-                        metricFormattingScope,
-                        isSubtotalCell,
-                        isGrandTotalCell,
-                      )
-                    );
                     const currentValue =
                       cell && metricKey ? cell.values[metricKey] : undefined;
                     const exportNumericValue =
@@ -741,53 +693,20 @@ export const PivotTableView = ({
                       Number.isFinite(currentValue)
                         ? currentValue
                         : undefined;
-                    const backgroundColor =
-                      (applyColorFormatting
-                        ? normalizeCssColor(
-                            evaluateExcelMetricFormatting(
-                              metricKey,
-                              'backgroundColor',
-                              cell.values,
-                              currentValue,
-                            ),
+                    const metricCellFormatting =
+                      cell && metricKey
+                        ? resolveMetricCellFormatting(
+                            metricKey,
+                            cell,
+                            isSubtotalCell,
+                            isGrandTotalCell,
                           )
-                        : undefined) ??
-                      (applyColorFormatting && formattingKeys?.backgroundColor
-                        ? normalizeCssColor(
-                            cell.values[formattingKeys.backgroundColor],
-                          )
-                        : undefined);
-                    const textColor =
-                      (applyColorFormatting
-                        ? normalizeCssColor(
-                            evaluateExcelMetricFormatting(
-                              metricKey,
-                              'textColor',
-                              cell.values,
-                              currentValue,
-                            ),
-                          )
-                        : undefined) ??
-                      (applyColorFormatting && formattingKeys?.textColor
-                        ? normalizeCssColor(
-                            cell.values[formattingKeys.textColor],
-                          )
-                        : undefined);
-                    const d3FormatKey = formattingKeys?.d3Format;
-                    const d3FormatOverride =
-                      (cell && metricKey
-                        ? normalizeD3Format(
-                            evaluateExcelMetricFormatting(
-                              metricKey,
-                              'd3Format',
-                              cell.values,
-                              currentValue,
-                            ),
-                          )
-                        : undefined) ??
-                      (cell && d3FormatKey
-                        ? normalizeD3Format(cell.values[d3FormatKey])
-                        : undefined);
+                        : undefined;
+                    const {
+                      backgroundColor,
+                      color: textColor,
+                      d3FormatOverride,
+                    } = metricCellFormatting ?? {};
                     const cellTotalBg = rowTotalBg;
                     const databarConfig = metricKey
                       ? metricDatabars[metricKey]

@@ -413,15 +413,7 @@ type ExcelFormattingMap<Field extends string> = Record<
 >;
 
 export type PivotFormattingResult = {
-  metricFormattingScope: MetricFormattingScope;
   metricDatabars: PivotMetricDatabarMap;
-  formattingKeyMap: Record<string, FormattingKeys>;
-  evaluateExcelMetricFormatting: (
-    metricKey: string,
-    field: MetricFormattingField,
-    values: Record<string, DataRecordValue | undefined>,
-    currentValue: DataRecordValue | undefined,
-  ) => unknown;
   databarColumnMinWidths: Map<string, number>;
   themeColor?: string;
   treeDataSignature: string;
@@ -430,6 +422,12 @@ export type PivotFormattingResult = {
     node: PivotTreeNode,
     target: 'label' | 'cell',
   ) => CSSProperties | undefined;
+  resolveMetricCellFormatting: (
+    metricKey: string,
+    cell: PivotResultCell,
+    isSubtotal: boolean,
+    isGrandTotal: boolean,
+  ) => CSSProperties & { d3FormatOverride?: string };
   deriveMetricKey: (rowNode: PivotTreeNode, colNode: PivotTreeNode) => string;
   renderCellContent: (
     rowNode: PivotTreeNode,
@@ -447,6 +445,22 @@ export type PivotFormattingResult = {
   formatLabel: (node: PivotTreeNode, axis: 'row' | 'col') => string;
   getTotalBackground: (row?: PivotTreeNode) => string | undefined;
 };
+
+const normalizeMetricCssColor = (rawValue: unknown) =>
+  rawValue === null || rawValue === undefined
+    ? undefined
+    : String(rawValue).trim() || undefined;
+
+const shouldApplyMetricFormatting = (
+  scope: MetricFormattingScope,
+  isSubtotal: boolean,
+  isGrandTotal: boolean,
+) =>
+  scope === 'values'
+    ? !isSubtotal && !isGrandTotal
+    : scope === 'values_totals'
+      ? !isGrandTotal
+      : true;
 
 const buildMetricFormattingRuntimeMap = (
   metricFormatting: PivotMetricFormattingMap,
@@ -682,6 +696,83 @@ export const usePivotFormatting = ({
       return compiled.evaluate(values, currentValue);
     },
     [excelMetricFormattingMap],
+  );
+
+  const resolveMetricD3Format = useCallback(
+    (
+      metricKey: string,
+      cell: PivotResultCell,
+      currentValue: DataRecordValue | undefined,
+    ) => {
+      const d3FormatKey = formattingKeyMap[metricKey]?.d3Format;
+      return (
+        normalizeD3Format(
+          evaluateExcelMetricFormatting(
+            metricKey,
+            'd3Format',
+            cell.values,
+            currentValue,
+          ),
+        ) ??
+        (d3FormatKey ? normalizeD3Format(cell.values[d3FormatKey]) : undefined)
+      );
+    },
+    [evaluateExcelMetricFormatting, formattingKeyMap],
+  );
+
+  const resolveMetricCellFormatting = useCallback(
+    (
+      metricKey: string,
+      cell: PivotResultCell,
+      isSubtotal: boolean,
+      isGrandTotal: boolean,
+    ) => {
+      const currentValue = cell.values[metricKey];
+      const formattingKeys = formattingKeyMap[metricKey];
+      const applyColorFormatting = shouldApplyMetricFormatting(
+        metricFormattingScope,
+        isSubtotal,
+        isGrandTotal,
+      );
+      const resolveColor = (
+        field: MetricFormattingField,
+        formattingKey?: string,
+      ) =>
+        applyColorFormatting
+          ? (normalizeMetricCssColor(
+              evaluateExcelMetricFormatting(
+                metricKey,
+                field,
+                cell.values,
+                currentValue,
+              ),
+            ) ??
+            (formattingKey
+              ? normalizeMetricCssColor(cell.values[formattingKey])
+              : undefined))
+          : undefined;
+      const backgroundColor = resolveColor(
+        'backgroundColor',
+        formattingKeys?.backgroundColor,
+      );
+      const color = resolveColor('textColor', formattingKeys?.textColor);
+      const d3FormatOverride = resolveMetricD3Format(
+        metricKey,
+        cell,
+        currentValue,
+      );
+      return {
+        ...(backgroundColor ? { backgroundColor } : {}),
+        ...(color ? { color } : {}),
+        ...(d3FormatOverride ? { d3FormatOverride } : {}),
+      };
+    },
+    [
+      evaluateExcelMetricFormatting,
+      formattingKeyMap,
+      metricFormattingScope,
+      resolveMetricD3Format,
+    ],
   );
 
   const rowFormattingRuntimeMap = useMemo(
@@ -1093,21 +1184,7 @@ export const usePivotFormatting = ({
       if (!scale) {
         return;
       }
-      const formattingKeys = formattingKeyMap[metricKey];
-      const d3FormatKey = formattingKeys?.d3Format;
-      const excelFormatResult = evaluateExcelMetricFormatting(
-        metricKey,
-        'd3Format',
-        cell.values,
-        rawValue,
-      );
-      const excelOverride =
-        typeof excelFormatResult === 'string'
-          ? normalizeD3Format(excelFormatResult)
-          : undefined;
-      const d3FormatOverride =
-        excelOverride ??
-        (d3FormatKey ? normalizeD3Format(cell.values[d3FormatKey]) : undefined);
+      const d3FormatOverride = resolveMetricD3Format(metricKey, cell, rawValue);
       const formatted = renderValue(metricKey, rawValue, d3FormatOverride);
       const labelText =
         formatted === null || formatted === undefined
@@ -1216,15 +1293,14 @@ export const usePivotFormatting = ({
     databarPaddingX,
     databarScaleWidth,
     deriveMetricKey,
-    evaluateExcelMetricFormatting,
     expandedRows,
-    formattingKeyMap,
     getNodeDimDepth,
     isRowTotalAtStart,
     layout,
     metricDatabars,
     metricsForScale,
     renderValue,
+    resolveMetricD3Format,
     shouldHideRowValues,
     theme.sizeUnit,
     tree.cells,
@@ -1541,14 +1617,12 @@ export const usePivotFormatting = ({
   );
 
   return {
-    metricFormattingScope,
     metricDatabars,
-    formattingKeyMap,
-    evaluateExcelMetricFormatting,
     databarColumnMinWidths,
     themeColor,
     treeDataSignature,
     resolveDimensionStyle,
+    resolveMetricCellFormatting,
     deriveMetricKey,
     renderCellContent,
     renderDatabarContent,
