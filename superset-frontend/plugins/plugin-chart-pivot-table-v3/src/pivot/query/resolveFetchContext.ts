@@ -22,7 +22,6 @@ import {
   type PivotAxis,
   type PivotPath,
   type PivotTreeData,
-  type PivotTreeNode,
   type PivotTableQueryFormData,
 } from '../../types';
 import {
@@ -36,7 +35,6 @@ import {
   type LayoutContext,
 } from '../layout/LayoutContext';
 import { collectRequiredTimeOffsets } from '../measureLeaves';
-import { projectAxisPathToDimensions } from '../runtime/paths';
 import {
   type PivotAxisProjection,
   resolveAxisProjection,
@@ -127,9 +125,8 @@ export const resolveFetchContext = ({
   layout: layoutParam,
   axis,
   path,
-  currentTree,
-  visibleRowDepth,
-  visibleColDepth,
+  visibleRowDepth = 0,
+  visibleColDepth = 0,
   targetRowDepth,
   targetColDepth,
 }: ResolveFetchContextParams): ResolvedFetchContext => {
@@ -158,30 +155,8 @@ export const resolveFetchContext = ({
   const sanitizedPath = projection.filterDimensionPath;
   const depthIncrement = 1;
 
-  const getCurrentDepth = (
-    nodes: Record<string, PivotTreeNode> | undefined,
-    targetAxis: PivotAxis,
-  ) =>
-    Math.max(
-      0,
-      ...Object.values(nodes || {}).map(
-        node =>
-          projectAxisPathToDimensions({
-            program: layout.pivotProgram,
-            axis: targetAxis,
-            path: node.path,
-          }).length,
-      ),
-    );
-
-  const currentRowDepth =
-    visibleRowDepth !== undefined
-      ? Math.min(visibleRowDepth, rowGroupby.length)
-      : getCurrentDepth(currentTree?.rows, 'row');
-  const currentColDepth =
-    visibleColDepth !== undefined
-      ? Math.min(visibleColDepth, colGroupby.length)
-      : getCurrentDepth(currentTree?.cols, 'col');
+  const currentRowDepth = Math.min(visibleRowDepth, rowGroupby.length);
+  const currentColDepth = Math.min(visibleColDepth, colGroupby.length);
 
   let rowDepth =
     axis === 'row'

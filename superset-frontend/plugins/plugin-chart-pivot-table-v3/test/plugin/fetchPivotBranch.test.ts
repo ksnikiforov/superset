@@ -233,6 +233,57 @@ describe('resolveFetchContext', () => {
     expect(ctx.rowDepth).toBe(1);
   });
 
+  it('does not infer branch query depth from rendered tree shape', () => {
+    const currentTree: PivotTreeData = {
+      rows: {
+        '': makeNode({ axis: 'row', path: [], hasChildren: true }),
+        A: makeNode({
+          axis: 'row',
+          path: ['A'],
+          level: 1,
+          hasChildren: true,
+          label: 'A',
+          formattedLabel: 'A',
+        }),
+        [serializePath(['A', 'B'])]: makeNode({
+          axis: 'row',
+          path: ['A', 'B'],
+          level: 2,
+          hasChildren: false,
+          label: 'B',
+          formattedLabel: 'B',
+        }),
+      },
+      cols: {
+        '': makeNode({ axis: 'col', path: [], hasChildren: true }),
+        C: makeNode({
+          axis: 'col',
+          path: ['C'],
+          level: 1,
+          hasChildren: true,
+          label: 'C',
+          formattedLabel: 'C',
+        }),
+      },
+      cells: {},
+    };
+
+    const ctx = resolveFetchContextForTest({
+      formData: {
+        groupbyRows: ['r1', 'r2'],
+        groupbyColumns: ['c1', 'c2'],
+        metrics: ['m1'],
+        rowSubTotals: false,
+      } as any,
+      axis: 'col',
+      path: ['C'],
+      currentTree,
+    });
+
+    expect(ctx.rowDepth).toBe(0);
+    expect(ctx.colDepth).toBe(2);
+  });
+
   it('changes branch cache key when measure leaf selection changes', () => {
     const deltaLeaf = buildBuiltInLeaf('delta', {
       n: 1,
@@ -390,6 +441,7 @@ describe('resolveFetchContext', () => {
       axis: 'col',
       path: ['BUILDING'],
       currentTree,
+      visibleRowDepth: 2,
     });
 
     expect(postMock).toHaveBeenCalled();
@@ -492,6 +544,7 @@ describe('resolveFetchContext', () => {
       axis: 'row',
       path: ['USA'],
       currentTree,
+      visibleColDepth: 1,
     });
 
     expect(postMock).toHaveBeenCalled();
@@ -575,6 +628,7 @@ describe('resolveFetchContext', () => {
       axis: 'col',
       path: [encodeMetricKey('measure1')],
       currentTree,
+      visibleRowDepth: 1,
     });
 
     expect(postMock).toHaveBeenCalledTimes(1);
@@ -654,6 +708,7 @@ describe('resolveFetchContext', () => {
       axis: 'col',
       path: [encodeMetricKey('measure1')],
       currentTree,
+      visibleRowDepth: 1,
     });
 
     const queries =
@@ -739,6 +794,7 @@ describe('resolveFetchContext', () => {
       axis: 'col',
       path: [encodeMetricKey('measure1')],
       currentTree,
+      visibleRowDepth: 1,
     });
 
     const queries =
@@ -832,6 +888,7 @@ describe('resolveFetchContext', () => {
       axis: 'col' as const,
       path: [encodeMetricKey('measure1')],
       currentTree,
+      visibleRowDepth: 1,
       factStore,
     };
 
@@ -966,6 +1023,7 @@ describe('resolveFetchContext', () => {
         encodeMeasureLeafKey(ixYearLeaf.id),
       ],
       currentTree,
+      visibleRowDepth: 1,
     });
 
     const queries =
@@ -1075,6 +1133,7 @@ describe('resolveFetchContext', () => {
       axis: 'row',
       path: ['USA'],
       currentTree,
+      visibleColDepth: 2,
     });
 
     expect(postMock).toHaveBeenCalledTimes(1);
