@@ -1416,7 +1416,7 @@ describe('PivotTableChart interaction layout', () => {
     expect(labels).toEqual(expect.arrayContaining(['Value', 'IX 1YA']));
   });
 
-  it('re-applies derived measure leaf values when upstream data refreshes in user-controlled mode', async () => {
+  it('renders materialized derived measure leaf values from upstream refreshes in user-controlled mode', async () => {
     const metricKey = 'm1';
     const rowGroupby = ['row1'];
     const valueLeaf = buildValueLeaf();
@@ -1484,8 +1484,11 @@ describe('PivotTableChart interaction layout', () => {
       1,
       0,
     );
-    const refreshedTreeWithoutLeafValues = applyMeasureHierarchyAxis(
-      refreshedBaseTree,
+    const refreshedTreeWithLeafValues = applyMeasureHierarchyAxis(
+      applyMeasureLeafValuesToTree({
+        tree: refreshedBaseTree,
+        measureHierarchy,
+      }),
       measureHierarchy,
       MetricsLayoutEnum.COLUMNS,
       rowGroupby,
@@ -1521,7 +1524,7 @@ describe('PivotTableChart interaction layout', () => {
 
     rerender(
       <PivotTableChart
-        data={refreshedTreeWithoutLeafValues}
+        data={refreshedTreeWithLeafValues}
         formData={formData}
         rawFormData={formData}
         queryFormData={formData}
@@ -1536,7 +1539,7 @@ describe('PivotTableChart interaction layout', () => {
     );
   });
 
-  it('keeps committed data when upstream refresh omits required custom leaf source metrics', async () => {
+  it('treats upstream refresh data as the materialized source of truth for custom leaves', async () => {
     const metricKey = 'm1';
     const customMetricKey = 'm1_custom';
     const rowGroupby = ['row1'];
@@ -1648,7 +1651,7 @@ describe('PivotTableChart interaction layout', () => {
     );
 
     await waitFor(() =>
-      expect(rowMetricValues()).toEqual(expect.arrayContaining([150, 33])),
+      expect(rowMetricValues()).toEqual(expect.arrayContaining([180, null])),
     );
   });
 

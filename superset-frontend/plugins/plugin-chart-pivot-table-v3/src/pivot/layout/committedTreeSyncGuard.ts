@@ -214,7 +214,6 @@ type ShouldSyncCommittedTreeFromPropsConfig = {
   hasPersistedInteractionFilters: boolean;
   runtimeLayoutMatchesCommitted: boolean;
   selectedFiltersMatchCommitted: boolean;
-  propsTreeHasRequiredLeafSources: boolean;
   committedTreeHasRuntimeLayoutCoverage: boolean;
   propsTreeHasStaleCoverageRegression: boolean;
 };
@@ -226,7 +225,6 @@ export const shouldSyncCommittedTreeFromProps = ({
   hasPersistedInteractionFilters,
   runtimeLayoutMatchesCommitted,
   selectedFiltersMatchCommitted,
-  propsTreeHasRequiredLeafSources,
   committedTreeHasRuntimeLayoutCoverage,
   propsTreeHasStaleCoverageRegression,
 }: ShouldSyncCommittedTreeFromPropsConfig) => {
@@ -243,9 +241,6 @@ export const shouldSyncCommittedTreeFromProps = ({
     return false;
   }
   if (!selectedFiltersMatchCommitted) {
-    return false;
-  }
-  if (!propsTreeHasRequiredLeafSources) {
     return false;
   }
   if (

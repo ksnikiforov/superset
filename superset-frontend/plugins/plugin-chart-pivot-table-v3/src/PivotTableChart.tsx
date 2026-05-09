@@ -89,7 +89,6 @@ import {
 import {
   mergeTrees,
   decodeMeasureLeafId,
-  getMetricKey,
   getMetricKeys,
   getStableColumnKey,
   METRICS_PLACEHOLDER,
@@ -98,10 +97,7 @@ import {
   parsePath,
 } from './utils';
 import {
-  applyMeasureLeafValuesToTree,
-  buildOffsetMetricKey,
   buildMeasureLeafOutputKey,
-  coerceMeasureLeavesByMetric,
   resolveMeasureSortMetricKey,
 } from './pivot/measureLeaves';
 import { type PivotFactStoreBatch } from './pivot/runtime/ingestQueryResults';
@@ -157,102 +153,6 @@ const buildDimensionValueSearchFilters = ({
     ];
   }
   return [];
-};
-
-const materializeTreeForMeasureLeaves = ({
-  tree,
-  formData,
-}: {
-  tree: PivotTreeData;
-  formData: PivotTableProps['formData'];
-}): PivotTreeData => {
-  const metricKeys = getMetricKeys(ensureIsArray(formData.metrics));
-  if (metricKeys.length === 0) {
-    return tree;
-  }
-  const leavesByMetric = coerceMeasureLeavesByMetric(
-    metricKeys,
-    formData.measureLeavesByMetric,
-  );
-  const groups = metricKeys.map(metricKey => ({
-    metricKey,
-    leaves: leavesByMetric[metricKey] ?? [],
-  }));
-  const hasDerivedLeaves = groups.some(group =>
-    group.leaves.some(
-      leaf =>
-        buildMeasureLeafOutputKey(group.metricKey, leaf) !== group.metricKey,
-    ),
-  );
-  if (!hasDerivedLeaves) {
-    return tree;
-  }
-  return applyMeasureLeafValuesToTree({
-    tree,
-    measureHierarchy: {
-      kind: 'measureStackV1',
-      groups,
-    },
-  });
-};
-
-const collectRequiredMeasureLeafSourceKeys = (
-  formData: PivotTableProps['formData'],
-): string[] => {
-  const metricKeys = getMetricKeys(ensureIsArray(formData.metrics));
-  if (metricKeys.length === 0) {
-    return [];
-  }
-  const leavesByMetric = coerceMeasureLeavesByMetric(
-    metricKeys,
-    formData.measureLeavesByMetric,
-  );
-  const required = new Set<string>();
-  metricKeys.forEach(metricKey => {
-    (leavesByMetric[metricKey] ?? []).forEach(leaf => {
-      if (leaf.kind === 'custom') {
-        const customMetricKey = getMetricKey(leaf.metric);
-        if (!customMetricKey) {
-          return;
-        }
-        const sourceKey = leaf.offset
-          ? buildOffsetMetricKey(customMetricKey, leaf.offset)
-          : customMetricKey;
-        required.add(sourceKey);
-        return;
-      }
-      if (leaf.operator === 'value' || !leaf.offset) {
-        return;
-      }
-      required.add(buildOffsetMetricKey(metricKey, leaf.offset));
-    });
-  });
-  return Array.from(required);
-};
-
-const treeHasRequiredMeasureLeafSourceData = ({
-  tree,
-  formData,
-}: {
-  tree: PivotTreeData;
-  formData: PivotTableProps['formData'];
-}): boolean => {
-  const requiredKeys = collectRequiredMeasureLeafSourceKeys(formData);
-  if (requiredKeys.length === 0) {
-    return true;
-  }
-  const unresolved = new Set(requiredKeys);
-  Object.values(tree.cells).forEach(cell => {
-    if (unresolved.size === 0) {
-      return;
-    }
-    unresolved.forEach(key => {
-      if (cell.values[key] !== undefined) {
-        unresolved.delete(key);
-      }
-    });
-  });
-  return unresolved.size === 0;
 };
 
 const InteractionLayout = styled.div`
@@ -1353,25 +1253,7 @@ function PivotTableChart(props: PivotTableProps) {
       runtimeLayout: appliedRuntimeLayout,
     });
   }, [appliedFormData, appliedRuntimeLayout, formData, isUserControlled]);
-  const committedTreeFromProps = useMemo(
-    () =>
-      isUserControlled
-        ? materializeTreeForMeasureLeaves({
-            tree: data,
-            formData: appliedLayoutFormData,
-          })
-        : data,
-    [appliedLayoutFormData, data, isUserControlled],
-  );
-  const committedTreeFromPropsHasLeafSources = useMemo(
-    () =>
-      !isUserControlled ||
-      treeHasRequiredMeasureLeafSourceData({
-        tree: committedTreeFromProps,
-        formData: appliedLayoutFormData,
-      }),
-    [appliedLayoutFormData, committedTreeFromProps, isUserControlled],
-  );
+  const committedTreeFromProps = data;
   const committedTreeHasRuntimeLayoutCoverage = useMemo(
     () =>
       !isUserControlled ||
@@ -1558,7 +1440,6 @@ function PivotTableChart(props: PivotTableProps) {
           selectedFiltersForTreeSync,
           committedFilters,
         ),
-        propsTreeHasRequiredLeafSources: committedTreeFromPropsHasLeafSources,
         committedTreeHasRuntimeLayoutCoverage,
         propsTreeHasStaleCoverageRegression:
           committedTreeFromPropsHasStaleCoverageRegression,
@@ -1566,7 +1447,6 @@ function PivotTableChart(props: PivotTableProps) {
     [
       committedFilters,
       committedRuntimeLayout,
-      committedTreeFromPropsHasLeafSources,
       committedTreeFromPropsHasStaleCoverageRegression,
       committedTreeHasRuntimeLayoutCoverage,
       hasLocalSyncForCurrentDashboardQueryContext,
@@ -1579,7 +1459,7 @@ function PivotTableChart(props: PivotTableProps) {
   );
   useEffect(() => {
     // Ignore stale upstream updates while a local interaction update is still
-    // pending or while upstream data is incompatible with active measure leaves.
+    // pending.
     if (!shouldSyncCommittedTreeFromProps) {
       return;
     }
@@ -2156,14 +2036,7 @@ function PivotTableChart(props: PivotTableProps) {
     shouldPersistExpansionState,
     pruneMergedTree: layoutResult.pruneMergedTree,
   });
-  const treeForRender = useMemo(
-    () =>
-      materializeTreeForMeasureLeaves({
-        tree,
-        formData: appliedLayoutFormData,
-      }),
-    [appliedLayoutFormData, tree],
-  );
+  const treeForRender = tree;
 
   useEffect(() => {
     expandedRowsForSeamlessRef.current = expandedRows;

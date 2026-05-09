@@ -116,7 +116,6 @@ describe('committedTreeSyncGuard', () => {
       hasPersistedInteractionFilters: false,
       runtimeLayoutMatchesCommitted: true,
       selectedFiltersMatchCommitted: true,
-      propsTreeHasRequiredLeafSources: true,
       committedTreeHasRuntimeLayoutCoverage: true,
       propsTreeHasStaleCoverageRegression: true,
     });
@@ -132,7 +131,6 @@ describe('committedTreeSyncGuard', () => {
       hasPersistedInteractionFilters: false,
       runtimeLayoutMatchesCommitted: true,
       selectedFiltersMatchCommitted: true,
-      propsTreeHasRequiredLeafSources: true,
       committedTreeHasRuntimeLayoutCoverage: true,
       propsTreeHasStaleCoverageRegression: false,
     });
@@ -148,7 +146,6 @@ describe('committedTreeSyncGuard', () => {
       hasPersistedInteractionFilters: false,
       runtimeLayoutMatchesCommitted: true,
       selectedFiltersMatchCommitted: true,
-      propsTreeHasRequiredLeafSources: true,
       committedTreeHasRuntimeLayoutCoverage: true,
       propsTreeHasStaleCoverageRegression: false,
     });
