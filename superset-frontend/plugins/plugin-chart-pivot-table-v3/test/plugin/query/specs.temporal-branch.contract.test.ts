@@ -17,7 +17,7 @@
  * under the License.
  */
 import { GenericDataType } from '@superset-ui/core';
-import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
+import { MetricsLayoutEnum } from '../../../src/types';
 import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
 import {
   buildBatchQuerySpecs,
@@ -32,12 +32,6 @@ type FilterClause = {
   col?: string;
   op?: string;
   val?: unknown;
-};
-
-const emptyTree: PivotTreeData = {
-  rows: {},
-  cols: {},
-  cells: {},
 };
 
 const findEqFilter = (filters: FilterClause[], column: string) =>
@@ -77,7 +71,6 @@ describe('temporal branch query specs contract', () => {
       layout,
       axis: 'row',
       path,
-      currentTree: emptyTree,
       visibleRowDepth: 1,
       visibleColDepth: 0,
     });
@@ -150,7 +143,6 @@ describe('temporal branch query specs contract', () => {
       formData,
       layout,
       batch,
-      currentTree: emptyTree,
       visibleRowDepth: 0,
       visibleColDepth: 0,
     });

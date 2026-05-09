@@ -268,13 +268,11 @@ describe('fetchPivotBranchesBatch', () => {
         },
       ],
     };
-    const currentTree = makeTree();
     const layout = buildLayoutContext(formData);
     const specs = buildBatchQuerySpecs({
       formData,
       layout,
       batch,
-      currentTree,
       visibleRowDepth: 2,
       visibleColDepth: 0,
     });
@@ -304,7 +302,6 @@ describe('fetchPivotBranchesBatch', () => {
     const result = await fetchPivotBranchesBatch({
       formData,
       batch,
-      currentTree,
       visibleRowDepth: 2,
       visibleColDepth: 0,
       factStore: store,

@@ -88,7 +88,6 @@ export type ResolvedFetchContext = ResolvedQueryFetchContext & {
 
 type ResolvedBranchPlan = {
   ctx: ResolvedFetchContext;
-  treeSnapshot: PivotTreeData;
   specs: ReturnType<typeof buildBranchQuerySpecs>;
 };
 
@@ -114,7 +113,6 @@ const resolveFetchContext = ({
   formData,
   axis,
   path,
-  currentTree,
   visibleRowDepth,
   visibleColDepth,
   targetRowDepth,
@@ -126,7 +124,6 @@ const resolveFetchContext = ({
     layout,
     axis,
     path,
-    currentTree,
     visibleRowDepth,
     visibleColDepth,
     targetRowDepth,
@@ -170,17 +167,15 @@ const resolveBranchPlan = (
   params: FetchPivotBranchParams,
 ): ResolvedBranchPlan => {
   const ctx = resolveFetchContext(params);
-  const treeSnapshot = params.currentTree ?? { rows: {}, cols: {}, cells: {} };
   const specs = buildBranchQuerySpecs({
     formData: params.formData,
     layout: ctx.layout,
     axis: params.axis,
     path: params.path,
-    currentTree: treeSnapshot,
     visibleRowDepth: params.visibleRowDepth,
     visibleColDepth: params.visibleColDepth,
   });
-  return { ctx, treeSnapshot, specs };
+  return { ctx, specs };
 };
 
 const resolvePivotBranchLocalResultFromPlan = (
@@ -300,7 +295,6 @@ export async function fetchPivotBranch({
   formData,
   axis,
   path,
-  currentTree,
   visibleRowDepth,
   visibleColDepth,
   requestGroupId,
@@ -310,7 +304,6 @@ export async function fetchPivotBranch({
     formData,
     axis,
     path,
-    currentTree,
     visibleRowDepth,
     visibleColDepth,
   });
@@ -336,7 +329,6 @@ export async function fetchPivotBranch({
       formData,
       axis,
       path,
-      currentTree,
       visibleRowDepth,
       visibleColDepth,
       factStore,

@@ -21,7 +21,6 @@ import {
   type PivotAxis,
   type PivotPath,
   type PivotTableQueryFormData,
-  type PivotTreeData,
 } from '../../types';
 import {
   buildLayoutContext,
@@ -39,7 +38,6 @@ export type BatchSignatureParams = {
   layout?: LayoutContext;
   axis: PivotAxis;
   path: PivotPath;
-  currentTree: PivotTreeData;
   visibleRowDepth: number;
   visibleColDepth: number;
 };
@@ -49,7 +47,6 @@ export const buildBatchSignature = ({
   layout,
   axis,
   path,
-  currentTree,
   visibleRowDepth,
   visibleColDepth,
 }: BatchSignatureParams): string => {
@@ -59,7 +56,6 @@ export const buildBatchSignature = ({
     layout: resolvedLayout,
     axis,
     path,
-    currentTree,
     visibleRowDepth,
     visibleColDepth,
   });

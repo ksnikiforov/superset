@@ -135,14 +135,12 @@ type ExpansionFetchContext = {
 const resolveExpansionFetchPlan = ({
   targets,
   formData,
-  tree,
   visibleRowDepth,
   visibleColDepth,
   factStore,
 }: {
   targets: FetchTarget[];
   formData: PivotTableQueryFormData;
-  tree: PivotTreeData;
   visibleRowDepth: number;
   visibleColDepth: number;
   factStore?: PivotFactStore;
@@ -159,7 +157,6 @@ const resolveExpansionFetchPlan = ({
       axis: target.axis,
       path,
       formData,
-      currentTree: tree,
       visibleRowDepth,
       visibleColDepth,
       factStore,
@@ -176,7 +173,6 @@ const resolveExpansionFetchPlan = ({
       formData,
       axis: target.axis,
       path,
-      currentTree: tree,
       visibleRowDepth,
       visibleColDepth,
     });
@@ -217,7 +213,6 @@ const fetchExpansionSingleTarget = async ({
         axis: target.axis,
         path,
         formData: fetchFormData,
-        currentTree: context.tree,
         visibleRowDepth: context.visibleRowDepth,
         visibleColDepth: context.visibleColDepth,
         requestGroupId,
@@ -276,7 +271,6 @@ const fetchExpansionBatchTarget = async ({
       fetchPivotBranchesBatch({
         formData: fetchFormData,
         batch,
-        currentTree: context.tree,
         visibleRowDepth: context.visibleRowDepth,
         visibleColDepth: context.visibleColDepth,
         requestGroupId,
@@ -321,7 +315,6 @@ const fetchExpansionTargets = async ({
   const { localResults, batches, singles } = resolveExpansionFetchPlan({
     targets,
     formData: runtime.fetchFormData,
-    tree: context.tree,
     visibleRowDepth: context.visibleRowDepth,
     visibleColDepth: context.visibleColDepth,
     factStore: runtime.factStore,

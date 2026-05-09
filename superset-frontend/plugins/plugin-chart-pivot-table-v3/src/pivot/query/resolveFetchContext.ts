@@ -21,7 +21,6 @@ import {
   type MeasureHierarchy,
   type PivotAxis,
   type PivotPath,
-  type PivotTreeData,
   type PivotTableQueryFormData,
 } from '../../types';
 import {
@@ -47,7 +46,6 @@ export type ResolveFetchContextParams = {
   layout?: LayoutContext;
   axis: PivotAxis;
   path: PivotPath;
-  currentTree?: PivotTreeData;
   visibleRowDepth?: number;
   visibleColDepth?: number;
   targetRowDepth?: number;

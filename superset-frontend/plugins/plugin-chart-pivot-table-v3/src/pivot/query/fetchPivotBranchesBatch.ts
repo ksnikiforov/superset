@@ -44,7 +44,7 @@ import { buildBatchQuerySpecs } from './specs';
 export type FetchPivotBranchesBatchParams = {
   formData: PivotTableQueryFormData;
   batch: BatchGroup;
-  currentTree: PivotTreeData;
+  currentTree?: PivotTreeData;
   visibleRowDepth: number;
   visibleColDepth: number;
   requestGroupId?: string;
@@ -87,7 +87,6 @@ const isAbortError = (error: unknown): boolean => {
 export const fetchPivotBranchesBatch = async ({
   formData,
   batch,
-  currentTree,
   visibleRowDepth,
   visibleColDepth,
   requestGroupId,
@@ -98,7 +97,6 @@ export const fetchPivotBranchesBatch = async ({
     formData,
     layout,
     batch,
-    currentTree,
     visibleRowDepth,
     visibleColDepth,
     chunkIndex: 0,

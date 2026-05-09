@@ -32,7 +32,6 @@ import {
   type PivotPath,
   type PivotPathValue,
   type PivotTableQueryFormData,
-  type PivotTreeData,
 } from '../../types';
 import { getStableColumnKey } from '../../utils';
 import { serializePath, parsePath } from '../core/path';
@@ -89,12 +88,6 @@ export type QuerySpecMeta = {
 export type PlannedQuerySpec = QuerySpec & {
   meta: QuerySpecMeta;
 };
-
-const createEmptyTree = (): PivotTreeData => ({
-  rows: {},
-  cols: {},
-  cells: {},
-});
 
 const getStablePrefixLength = (prev: string[], next: string[]) => {
   const limit = Math.min(prev.length, next.length);
@@ -319,7 +312,6 @@ const buildBranchSpecs = ({
   layout,
   axis,
   path,
-  currentTree,
   visibleRowDepth,
   visibleColDepth,
 }: {
@@ -327,7 +319,6 @@ const buildBranchSpecs = ({
   layout: LayoutContext;
   axis: PivotAxis;
   path: PivotPath;
-  currentTree: PivotTreeData;
   visibleRowDepth?: number;
   visibleColDepth?: number;
 }): PlannedQuerySpec[] => {
@@ -346,7 +337,6 @@ const buildBranchSpecs = ({
     layout,
     axis,
     path,
-    currentTree,
     visibleRowDepth,
     visibleColDepth,
   });
@@ -382,7 +372,6 @@ export const buildBranchQuerySpecs = (params: {
   layout: LayoutContext;
   axis: PivotAxis;
   path: PivotPath;
-  currentTree: PivotTreeData;
   visibleRowDepth?: number;
   visibleColDepth?: number;
 }): PlannedQuerySpec[] => buildBranchSpecs(params);
@@ -438,7 +427,6 @@ const buildBatchSpecs = ({
   siblingValues,
   chunkIndex,
   representative,
-  currentTree,
   visibleRowDepth,
   visibleColDepth,
 }: {
@@ -449,7 +437,6 @@ const buildBatchSpecs = ({
   siblingValues: PivotPathValue[];
   chunkIndex: number;
   representative: PivotPath;
-  currentTree: PivotTreeData;
   visibleRowDepth: number;
   visibleColDepth: number;
 }): PlannedQuerySpec[] => {
@@ -474,7 +461,6 @@ const buildBatchSpecs = ({
     layout,
     axis,
     path: representative,
-    currentTree,
     visibleRowDepth,
     visibleColDepth,
   });
@@ -509,7 +495,6 @@ export const buildBatchQuerySpecs = ({
   formData,
   layout,
   batch,
-  currentTree,
   visibleRowDepth,
   visibleColDepth,
   chunkIndex = 0,
@@ -517,7 +502,6 @@ export const buildBatchQuerySpecs = ({
   formData: PivotTableQueryFormData;
   layout: LayoutContext;
   batch: BatchGroup;
-  currentTree: PivotTreeData;
   visibleRowDepth: number;
   visibleColDepth: number;
   chunkIndex?: number;
@@ -535,7 +519,6 @@ export const buildBatchQuerySpecs = ({
     siblingValues: batch.siblingValues,
     chunkIndex,
     representative,
-    currentTree,
     visibleRowDepth,
     visibleColDepth,
   });
@@ -605,7 +588,6 @@ export const buildInitialQuerySpecs = (
 
   const shouldPrefetchRoot = baseRowDepth > 1 || baseColDepth > 1;
   const bootstrapPlan = buildBootstrapPlanFromLayout(layout, formData);
-  const emptyTree = createEmptyTree();
 
   const bootstrapTargets = shouldPrefetchRoot
     ? bootstrapPlan.targets.slice(0, 1)
@@ -656,7 +638,6 @@ export const buildInitialQuerySpecs = (
       layout,
       axis,
       path: [],
-      currentTree: emptyTree,
       visibleRowDepth: baseRowDepth,
       visibleColDepth: baseColDepth,
       targetRowDepth: baseRowDepth,
@@ -711,7 +692,6 @@ export const buildInitialQuerySpecs = (
         layout,
         axis,
         path,
-        currentTree: emptyTree,
         visibleRowDepth,
         visibleColDepth,
       });
@@ -720,7 +700,6 @@ export const buildInitialQuerySpecs = (
         layout,
         axis,
         path,
-        currentTree: emptyTree,
         visibleRowDepth,
         visibleColDepth,
       });
@@ -774,7 +753,6 @@ export const buildInitialQuerySpecs = (
           siblingValues: batch.siblingValues,
           chunkIndex: index,
           representative: rep,
-          currentTree: emptyTree,
           visibleRowDepth,
           visibleColDepth,
         }),
@@ -796,7 +774,6 @@ export const buildInitialQuerySpecs = (
           layout,
           axis,
           path: rep,
-          currentTree: emptyTree,
           visibleRowDepth,
           visibleColDepth,
         }),

@@ -25,16 +25,10 @@ import {
   encodeMetricKey,
   METRICS_PLACEHOLDER,
 } from '../../../src/pivot/core/tokens';
-import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
+import { MetricsLayoutEnum } from '../../../src/types';
 import { serializePath } from '../../../src/utils';
 import { type BatchGroup } from '../../../src/pivot/query/fetchPlanOptimizer';
 import { buildFormData } from '../fixtures/pivotFormData';
-
-const emptyTree: PivotTreeData = {
-  rows: {},
-  cols: {},
-  cells: {},
-};
 
 describe('runtime coverage query specs contract', () => {
   it('records branch fact coverage and uses it for query columns', () => {
@@ -53,7 +47,6 @@ describe('runtime coverage query specs contract', () => {
       layout,
       axis: 'row',
       path: ['US'],
-      currentTree: emptyTree,
       visibleRowDepth: 1,
       visibleColDepth: 1,
     });
@@ -88,7 +81,6 @@ describe('runtime coverage query specs contract', () => {
       layout,
       axis: 'col',
       path: ['Furniture'],
-      currentTree: emptyTree,
       visibleRowDepth: 0,
       visibleColDepth: 1,
     });
@@ -113,7 +105,6 @@ describe('runtime coverage query specs contract', () => {
       layout,
       axis: 'col',
       path,
-      currentTree: emptyTree,
       visibleRowDepth: 0,
       visibleColDepth: 1,
     });
@@ -165,7 +156,6 @@ describe('runtime coverage query specs contract', () => {
       formData,
       layout,
       batch,
-      currentTree: emptyTree,
       visibleRowDepth: 1,
       visibleColDepth: 0,
     });

@@ -275,10 +275,10 @@ they delete more code than they add in the same slice.
 Current source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `7893` insertions, `9109` deletions, net `-1216`.
-- Current production `src` TypeScript/TSX total: `32294` lines.
+- Production `src`: `7930` insertions, `9170` deletions, net `-1240`.
+- Current production `src` TypeScript/TSX total: `32270` lines.
 - Pre-existing production files are net negative:
-  `+3483 / -9109`, net `-5626`.
+  `+3520 / -9170`, net `-5650`.
 - Added runtime/helper files are still the source of total growth:
   `+4410 / -0` across `16` added files.
 
@@ -427,17 +427,17 @@ Tests and Markdown are excluded.
 
 Current diff from baseline:
 
-- `7893` insertions
-- `9109` deletions
-- net `-1216` production source lines
-- current `src` code total: `32294` lines
+- `7930` insertions
+- `9170` deletions
+- net `-1240` production source lines
+- current `src` code total: `32270` lines
 - implied baseline `src` total: about `33510` lines
 
 By file status:
 
 - Added files: `+4410 / -0` across `16` files
 - Deleted files: `+0 / -1419` across `8` files
-- Modified files: `+3483 / -7690`, net `-4207`
+- Modified files: `+3520 / -7751`, net `-4231`
 
 By area:
 
@@ -1063,8 +1063,31 @@ Latest code-reduction slice:
   Jest passed for layout transition, expansion engine, seamless expansion, and
   interaction layout suites (`64` tests), and touched-file ESLint passed from
   `superset-frontend`.
+- Gate 5 semantic expansion fetchability fix: expansion planning now asks the
+  compiled pivot program whether an expanded node should fetch children instead
+  of treating rendered `hasChildren: false` as satisfied loaded state. This
+  preserves shallow materialized trees while still fetching the next semantic
+  dimension when a row/column toggle is visible.
+- Additional production change for that fix and follow-up contract tightening:
+  `+56 / -9`, net `+47`.
+- Verification after the semantic expansion fetchability fix: dashboard 12 was
+  checked in the in-app browser; expanding `Online` fetched
+  `branch:row:Online` and rendered its child rows. Single-process Jest passed
+  for expansion planner/engine and affected chart interaction suites, and
+  touched-file ESLint passed from `superset-frontend`.
+- Gate 2 no-tree-shape query-depth cleanup: branch fetch depth now comes from
+  explicit visible depths, requested target depths, and the compiled program.
+  `resolveFetchContext`, branch specs, batch specs, and batch signatures no
+  longer accept `currentTree`, so rendered tree shape cannot flow back into
+  query planning.
+- Additional production change for the query-depth cleanup and planner API
+  tightening: `+6 / -77`, net `-71`.
+- Verification after the query-depth cleanup: touched-file ESLint passed, and
+  single-process Jest passed for branch fetch, batch fetch, runtime coverage
+  specs, temporal branch specs, and seamless expansion interaction coverage
+  (`67` selected tests).
 - Combined recent Gate 4/Gate 5/Gate 6/Gate 7 source-change sequence:
-  `+3065 / -6355`, net `-3290`.
+  `+3127 / -6441`, net `-3314`.
 - Attempted render-model plumbing cleanup around spinner callbacks, sorting
   value-map aliases, leaf-label flattening, and aggregate-bold returns was
   reverted before this slice because it did not pay for itself clearly enough

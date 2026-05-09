@@ -1726,28 +1726,12 @@ describe('fetchPivotBranch delta-only contract', () => {
       datasource: '1__table',
       viz_type: 'pivot_table_v3',
     });
-    const currentTree = applyMetricAxis(
-      buildTreeFromRecords(
-        [{ r1: 'A', m1: 0 }],
-        ['m1'],
-        ['r1', 'r2'],
-        [],
-        1,
-        0,
-      ),
-      ['m1'],
-      MetricsLayoutEnum.COLUMNS,
-      ['r1', 'r2'],
-      [],
-      0,
-    );
     const layout = buildLayoutContext(formData);
     const specs = buildBranchQuerySpecs({
       formData,
       layout,
       axis: 'row',
       path: ['A'],
-      currentTree,
     });
     expect(specs).toHaveLength(1);
 
@@ -1771,7 +1755,6 @@ describe('fetchPivotBranch delta-only contract', () => {
       formData,
       axis: 'row',
       path: ['A'],
-      currentTree,
       factStore: store,
     });
 
