@@ -24,9 +24,15 @@ import {
   supersetTheme,
 } from '@superset-ui/core';
 import PivotTableChart from '../../../src/PivotTableChart';
-import { PivotTableProps, PivotTreeData } from '../../../src/types';
+import {
+  PivotAxis,
+  PivotPath,
+  PivotTableProps,
+  PivotTreeData,
+} from '../../../src/types';
 import { type PivotFactStoreBatch } from '../../../src/pivot/runtime/factStore';
-import { collectLoadedBranchPaths } from '../../../src/pivot/runtime/loadedBranchCoverage';
+import { serializePath } from '../../../src/pivot/core/path';
+import { isMetricToken, isSubtotalToken } from '../../../src/pivot/core/tokens';
 import { buildFormData } from './pivotFormData';
 
 const noopSetDataMask: SetDataMaskHook = () => undefined;
@@ -59,6 +65,53 @@ const maxPathDepth = (nodes: PivotTreeData['rows']) =>
     (depth, node) => Math.max(depth, node.path.length),
     0,
   );
+
+const pathStartsWith = (path: PivotPath, basePath: PivotPath) =>
+  basePath.every((value, index) => path[index] === value);
+
+const isSameOrDescendantPath = (path: PivotPath, basePath: PivotPath) =>
+  path.length >= basePath.length && pathStartsWith(path, basePath);
+
+const isDirectChildPath = (childPath: PivotPath, parentPath: PivotPath) =>
+  childPath.length === parentPath.length + 1 &&
+  pathStartsWith(childPath, parentPath);
+
+const isDimensionalChildValue = (value: PivotPath[number]) =>
+  !isMetricToken(value) && !isSubtotalToken(value);
+
+const collectLoadedBranchPaths = ({
+  axis,
+  tree,
+  basePaths,
+}: {
+  axis: PivotAxis;
+  tree: PivotTreeData;
+  basePaths: PivotPath[];
+}): PivotPath[] => {
+  const pathsByKey = new Map<string, PivotPath>();
+  const nodes = axis === 'row' ? tree.rows : tree.cols;
+  const hasLoadedDimensionalChild = (path: PivotPath) =>
+    Object.values(nodes).some(node => {
+      if (!isDirectChildPath(node.path, path)) {
+        return false;
+      }
+      return isDimensionalChildValue(node.path[path.length]);
+    });
+
+  Object.values(nodes).forEach(node => {
+    if (
+      !node.hasChildren ||
+      !basePaths.some(basePath => isSameOrDescendantPath(node.path, basePath))
+    ) {
+      return;
+    }
+    if (hasLoadedDimensionalChild(node.path)) {
+      pathsByKey.set(serializePath(node.path), node.path);
+    }
+  });
+
+  return Array.from(pathsByKey.values());
+};
 
 export const buildPreloadedBootstrapFactBatches = (
   tree: PivotTreeData | undefined,

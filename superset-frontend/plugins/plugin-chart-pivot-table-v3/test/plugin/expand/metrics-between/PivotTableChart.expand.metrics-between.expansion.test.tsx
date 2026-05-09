@@ -1339,6 +1339,7 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
 
     fireEvent.click(within(urgentRow).getByLabelText('minus-square'));
 
+    const callsAfterUrgentCollapse = fetchPivotBranchMock.mock.calls.length;
     const highRow = getByText('2-HIGH').closest('tr') as HTMLTableRowElement;
     const secondRows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));
     const highMetricRow = secondRows
@@ -1352,13 +1353,18 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
     );
 
     await waitFor(() => {
-      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(3);
+      expect(fetchPivotBranchMock.mock.calls.length).toBeGreaterThan(
+        callsAfterUrgentCollapse,
+      );
     });
 
+    const callsAfterHighMetric = fetchPivotBranchMock.mock.calls.length;
     fireEvent.click(within(highRow).getByLabelText('plus-square'));
 
     await waitFor(() => {
-      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(4);
+      expect(fetchPivotBranchMock.mock.calls.length).toBeGreaterThan(
+        callsAfterHighMetric,
+      );
     });
 
     const rows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));

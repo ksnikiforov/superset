@@ -311,8 +311,7 @@ describe('fetchPivotBranchesBatch', () => {
     const metricColKey = serializePath([encodeMetricKey('m1')]);
 
     expect(result.factStoreHit).toBe(true);
-    expect(result.factBatches).toHaveLength(2);
-    expect(result.factBatches[0]).toEqual(
+    expect(result.factBatches).toEqual([
       expect.objectContaining({
         scope: {
           kind: 'batch',
@@ -321,21 +320,7 @@ describe('fetchPivotBranchesBatch', () => {
           siblingValues: ['CA', 'NY'],
         },
       }),
-    );
-    expect(result.factBatches[1]).toEqual(
-      expect.objectContaining({
-        coverage: expect.objectContaining({
-          rowDepth: 2,
-          columnDepth: 0,
-        }),
-        scope: {
-          kind: 'branch',
-          axis: 'row',
-          path: ['US', 'CA'],
-        },
-        facts: [],
-      }),
-    );
+    ]);
     expect(mockPost).not.toHaveBeenCalled();
     expect(result.data?.rows[rowKey]).toBeDefined();
     expect(

@@ -53,7 +53,6 @@ import {
   buildFactStoreBatchesFromSpecs,
   canMaterializeSpecsFromFactStore,
 } from './pivot/runtime/materializePivotTree';
-import { appendLoadedBranchCoverageMarkers } from './pivot/runtime/loadedBranchCoverage';
 
 export interface FetchPivotBranchResult {
   data?: PivotTreeData;
@@ -221,15 +220,7 @@ const resolvePivotBranchLocalResultFromPlan = (
     return {
       data,
       factStoreHit: true,
-      factBatches: appendLoadedBranchCoverageMarkers({
-        existingBatches: factBatches,
-        axis: params.axis,
-        tree: data,
-        basePaths: [params.path],
-        pivotProgram: ctx.layout.pivotProgram,
-        visibleRowDepth: params.visibleRowDepth ?? ctx.rowDepth,
-        visibleColDepth: params.visibleColDepth ?? ctx.colDepth,
-      }),
+      factBatches,
     };
   }
   const cachedFactBatches = readPivotBranchFactCache(ctx.cacheKey);
@@ -247,15 +238,7 @@ const resolvePivotBranchLocalResultFromPlan = (
   return {
     data,
     cached: true,
-    factBatches: appendLoadedBranchCoverageMarkers({
-      existingBatches: cachedFactBatches,
-      axis: params.axis,
-      tree: data,
-      basePaths: [params.path],
-      pivotProgram: ctx.layout.pivotProgram,
-      visibleRowDepth: params.visibleRowDepth ?? ctx.rowDepth,
-      visibleColDepth: params.visibleColDepth ?? ctx.colDepth,
-    }),
+    factBatches: cachedFactBatches,
   };
 };
 
@@ -362,15 +345,7 @@ export async function fetchPivotBranch({
     writePivotBranchFactCache(cacheKey, factBatches);
     return {
       data: labeledBranch,
-      factBatches: appendLoadedBranchCoverageMarkers({
-        existingBatches: factBatches,
-        axis,
-        tree: labeledBranch,
-        basePaths: [path],
-        pivotProgram: layout.pivotProgram,
-        visibleRowDepth: visibleRowDepth ?? ctx.rowDepth,
-        visibleColDepth: visibleColDepth ?? ctx.colDepth,
-      }),
+      factBatches,
       ...(warnings.length > 0 ? { warnings } : {}),
     };
   } catch (error) {

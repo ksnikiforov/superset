@@ -34,7 +34,10 @@ import {
 import { buildFormData } from '../fixtures/pivotFormData';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';
-import { buildMockBranchFetchResult } from '../fixtures/factBatches';
+import {
+  buildMockBranchFactBatches,
+  buildMockBranchFetchResult,
+} from '../fixtures/factBatches';
 
 jest.mock('../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../src/fetchPivotBranch');
@@ -219,9 +222,17 @@ describe('PivotTableChart persisted prefetch hydrates until targets satisfied', 
 
     const callCount = fetchPivotBranchMock.mock.calls.length;
     if (callCount <= 1) {
+      const firstParams = fetchPivotBranchMock.mock.calls[0][0];
       deferredA.resolve(
-        buildMockBranchFetchResult(fetchPivotBranchMock.mock.calls[0][0], {
+        buildMockBranchFetchResult(firstParams, {
           data: mergedBranch,
+          factBatches: [
+            ...buildMockBranchFactBatches(firstParams),
+            ...buildMockBranchFactBatches({
+              ...firstParams,
+              path: ['A', 'X'],
+            }),
+          ],
         }),
       );
       await fetchPivotBranchMock.mock.results[0]?.value;

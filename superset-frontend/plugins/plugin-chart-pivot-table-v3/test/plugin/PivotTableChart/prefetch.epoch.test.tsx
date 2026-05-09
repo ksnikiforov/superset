@@ -168,7 +168,14 @@ describe('PivotTableChart persisted prefetch ignores stale results', () => {
     const deferredV2 = createDeferred<FetchPivotBranchResult>();
     fetchPivotBranchMock
       .mockReturnValueOnce(deferredV1.promise)
-      .mockReturnValueOnce(deferredV2.promise);
+      .mockReturnValueOnce(deferredV2.promise)
+      .mockImplementation(params =>
+        Promise.resolve(
+          buildMockBranchFetchResult(params, {
+            data: branchAV2,
+          }),
+        ),
+      );
 
     const makeChart = (data: PivotTreeData) => (
       <PivotTableChart
