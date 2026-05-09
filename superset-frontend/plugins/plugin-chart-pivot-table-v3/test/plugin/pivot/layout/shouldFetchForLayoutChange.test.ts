@@ -198,7 +198,7 @@ describe('shouldFetchForLayoutChange', () => {
     expect(shouldFetchForLayoutChange(prevLayout, nextLayout)).toBe(true);
   });
 
-  it('returns false when adding the first non-value column dimension after leading Values while rows stay stable', () => {
+  it('returns true when adding the first non-value column dimension after leading Values while rows stay stable', () => {
     const prevLayout: PivotRuntimeLayout = {
       ...baseLayout,
       rows: ['row1', 'row2'],
@@ -210,7 +210,7 @@ describe('shouldFetchForLayoutChange', () => {
       cols: ['col1'],
       valuePlacement: { axis: 'col', index: 0 },
     };
-    expect(shouldFetchForLayoutChange(prevLayout, nextLayout)).toBe(false);
+    expect(shouldFetchForLayoutChange(prevLayout, nextLayout)).toBe(true);
   });
 
   it('returns true when adding the first non-value column dimension before trailing Values while rows stay stable', () => {

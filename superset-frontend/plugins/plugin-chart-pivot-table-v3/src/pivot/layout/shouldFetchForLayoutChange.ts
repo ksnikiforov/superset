@@ -98,18 +98,6 @@ const movedLeadingKeyAcrossAxes = ({
   return nextTarget.includes(leading);
 };
 
-const canProjectFirstColumnDimensionWithoutFetch = (
-  prev: PivotRuntimeLayout,
-  next: PivotRuntimeLayout,
-) =>
-  prev.valuePlacement.axis === 'col' &&
-  prev.valuePlacement.index === 0 &&
-  next.valuePlacement.index === 0 &&
-  prev.cols.length === 0 &&
-  next.cols.length > 0 &&
-  prev.rows.length > 0 &&
-  arraysEqual(prev.rows, next.rows);
-
 export const shouldFetchForDimensionAxisChange = ({
   prevRows,
   prevCols,
@@ -164,9 +152,6 @@ export const shouldFetchForLayoutChange = (
     !arraysEqual(prev.rows, next.rows) ||
     !arraysEqual(prev.cols, next.cols)
   ) {
-    if (canProjectFirstColumnDimensionWithoutFetch(prev, next)) {
-      return false;
-    }
     return shouldFetchForDimensionAxisChange({
       prevRows: prev.rows,
       prevCols: prev.cols,

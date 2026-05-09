@@ -130,6 +130,22 @@ describe('runtime layout fact coverage', () => {
     ).toBe(true);
   });
 
+  it('rejects depth-matching coverage for a different leading dimension', () => {
+    const batch: PivotFactStoreBatch = {
+      coverage: buildFactCoverage({
+        reason: 'initial',
+        rowDimensions: ['otherRow'],
+        columnDimensions: ['col1'],
+        rowDepth: 1,
+        columnDepth: 1,
+      }),
+      scope: { kind: 'bootstrap' },
+      facts: [],
+    };
+
+    expect(factBatchesCoverRuntimeLayout([batch], runtimeLayout)).toBe(false);
+  });
+
   it('does not treat deeper fact coverage as root runtime-layout coverage', () => {
     expect(
       factBatchesCoverRuntimeLayout([factBatch(2, 1)], runtimeLayout),

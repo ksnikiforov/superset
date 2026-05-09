@@ -82,6 +82,9 @@ const rangeFromOne = (depth: number): number[] =>
   Array.from({ length: depth }, (_, idx) => idx + 1);
 
 const uniqueDepths = (depths: number[]) => Array.from(new Set(depths));
+const arraysEqual = (left: string[], right: string[]) =>
+  left.length === right.length &&
+  left.every((value, index) => value === right[index]);
 
 export const expansionRevealsValuesLevel = (input: ExpansionValuesLevelInput) =>
   getNextAxisLevelForPath(input)?.kind === 'values';
@@ -132,6 +135,8 @@ export const factBatchesCoverRuntimeLayout = (
 ) => {
   const requiredRowDepth = runtimeLayout.rows.length > 0 ? 1 : 0;
   const requiredColumnDepth = runtimeLayout.cols.length > 0 ? 1 : 0;
+  const requiredRows = runtimeLayout.rows.slice(0, requiredRowDepth);
+  const requiredColumns = runtimeLayout.cols.slice(0, requiredColumnDepth);
   return (
     runtimeLayout.metrics.length === 0 ||
     (requiredRowDepth === 0 && requiredColumnDepth === 0) ||
@@ -139,7 +144,9 @@ export const factBatchesCoverRuntimeLayout = (
       ({ coverage, scope }) =>
         (scope.kind === 'bootstrap' || scope.kind === 'root') &&
         coverage.rowDepth === requiredRowDepth &&
-        coverage.columnDepth === requiredColumnDepth,
+        coverage.columnDepth === requiredColumnDepth &&
+        arraysEqual(coverage.rowDimensions, requiredRows) &&
+        arraysEqual(coverage.columnDimensions, requiredColumns),
     )
   );
 };
