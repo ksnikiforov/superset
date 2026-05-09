@@ -474,6 +474,18 @@ export const PivotTableView = ({
   } = {
     '--pivot-header-offset': `${stickyHeaders ? headerOffset : 0}px`,
   };
+  const cornerHeaderStyle = themeColor
+    ? { backgroundColor: themeColor, fontWeight: 600 }
+    : { fontWeight: 600 };
+  const renderCornerHeader = (rowSpan?: number) => (
+    <th
+      rowSpan={rowSpan}
+      className="pivot-sticky-corner"
+      style={cornerHeaderStyle}
+    >
+      {showCornerLoader ? <Spinner aria-label={t('Loading')} /> : t('Rows')}
+    </th>
+  );
 
   return (
     <Container height={height} width={width} style={containerStyle}>
@@ -503,42 +515,11 @@ export const PivotTableView = ({
         >
           <thead ref={headerRef}>
             {columnHeaderRows.length === 0 ? (
-              <tr>
-                <th
-                  className="pivot-sticky-corner"
-                  style={
-                    themeColor
-                      ? { backgroundColor: themeColor, fontWeight: 600 }
-                      : { fontWeight: 600 }
-                  }
-                >
-                  {showCornerLoader ? (
-                    <Spinner aria-label={t('Loading')} />
-                  ) : (
-                    t('Rows')
-                  )}
-                </th>
-              </tr>
+              <tr>{renderCornerHeader()}</tr>
             ) : (
               columnHeaderRows.map((rowCells, rowIdx) => (
                 <tr key={`col-header-row-${rowIdx}`}>
-                  {rowIdx === 0 && (
-                    <th
-                      rowSpan={columnHeaderRows.length}
-                      className="pivot-sticky-corner"
-                      style={
-                        themeColor
-                          ? { backgroundColor: themeColor, fontWeight: 600 }
-                          : { fontWeight: 600 }
-                      }
-                    >
-                      {showCornerLoader ? (
-                        <Spinner aria-label={t('Loading')} />
-                      ) : (
-                        t('Rows')
-                      )}
-                    </th>
-                  )}
+                  {rowIdx === 0 && renderCornerHeader(columnHeaderRows.length)}
                   {rowCells.map(cell => {
                     const showToggle = shouldShowToggle('col', cell.node);
                     const sortable = isColumnSortable?.(cell.node) ?? false;
