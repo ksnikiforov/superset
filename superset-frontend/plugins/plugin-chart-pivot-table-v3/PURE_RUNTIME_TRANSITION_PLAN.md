@@ -275,10 +275,10 @@ they delete more code than they add in the same slice.
 Current source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `7973` insertions, `8497` deletions, net `-524`.
-- Current production `src` TypeScript/TSX total: `32986` lines.
+- Production `src`: `7993` insertions, `8536` deletions, net `-543`.
+- Current production `src` TypeScript/TSX total: `32967` lines.
 - Pre-existing production files are net negative:
-  `+3262 / -8497`, net `-5235`.
+  `+3282 / -8536`, net `-5254`.
 - Added runtime/helper files are still the source of total growth:
   `+4711 / -0` across `16` added files.
 
@@ -296,13 +296,13 @@ Overall transition completion estimate: **80%**.
 Goal-weighted completion estimate: **79%**. This is lower than the architecture
 score because the original goal was not only to create a pure runtime boundary,
 but to use it to remove old production code. The runtime pipeline is mostly in
-place; the line-reduction payoff is now slightly past break-even but still not
+place; the line-reduction payoff is now past break-even but still not
 done.
 
 This is a functionality/architecture completion estimate, not a line-deletion
 score. The completed work has moved the runtime toward a compiler/fact-store
 pipeline. The remaining work is more concentrated now: `PivotTableChart.tsx`
-(`2567` lines), `useExpansionEngine.ts` (`1716` lines),
+(`2548` lines), `useExpansionEngine.ts` (`1716` lines),
 `usePivotFormatting.tsx` (`1589` lines), `usePivotLayout.ts` (`1071` lines),
 `usePivotRenderModel.ts` (`801` lines), `expansion/engine.ts` (`854` lines),
 `materializePivotTree.ts` (`1261` lines), and `visibility.ts` (`266` lines).
@@ -423,17 +423,17 @@ Tests and Markdown are excluded.
 
 Current diff from baseline:
 
-- `7973` insertions
-- `8497` deletions
-- net `-524` production source lines
-- current `src` code total: `32986` lines
+- `7993` insertions
+- `8536` deletions
+- net `-543` production source lines
+- current `src` code total: `32967` lines
 - implied baseline `src` total: about `33510` lines
 
 By file status:
 
 - Added files: `+4711 / -0` across `16` files
 - Deleted files: `+0 / -1243` across `7` files
-- Modified files: `+3262 / -7254`, net `-3992`
+- Modified files: `+3282 / -7293`, net `-4011`
 
 By area:
 
@@ -444,7 +444,7 @@ By area:
 | Chart hooks       |       972 |      1821 |  `-849` | Render/layout repair is still net-negative, and the formatting/databar setup now carries fewer memoized branches.                                     |
 | Query             |       594 |       618 |   `-24` | Old branch planner deleted, but specs/bootstrap grew around coverage.                                                                                 |
 | Core tree         |         2 |      1014 | `-1012` | Best completed simplification; raw-record fixture construction is no longer in production `src`.                                                      |
-| `PivotTableChart` |       292 |       875 |  `-583` | Chart shrinkage is now visible, but controller cleanup still has a long way to go.                                                                    |
+| `PivotTableChart` |       312 |       914 |  `-602` | Chart shrinkage is now visible, and the latest pass removed redundant label/runtime aliases without touching controller behavior.                     |
 | Other             |       553 |      1458 |  `-905` | Utility/render/visibility cleanup now includes the shared child lookup cache, deleted column-display module, and formatting-bundle view prop cleanup. |
 
 Why deletions are lower than expected:
@@ -907,8 +907,17 @@ Latest code-reduction slice:
 - Verification after the databar setup cleanup: single-process Jest passed for
   chart metrics and basic chart regression smoke suites (`28` tests), and
   touched-file ESLint passed from `superset-frontend`.
+- Gate 7 chart alias cleanup: `PivotTableChart.tsx` now uses the resolved
+  verbose map and applied form-data fields directly instead of carrying
+  redundant dimension-label, dimension-list, metric-list, and expansion-persist
+  aliases.
+- Additional production change for that follow-up: `+20 / -39`, net `-19`.
+- Verification after the chart alias cleanup: single-process Jest passed for
+  interaction layout, basic chart regression smoke, and the seamless snapshot
+  regression (`28` tests total), and touched-file ESLint passed from
+  `superset-frontend`.
 - Combined recent Gate 4/Gate 5/Gate 6/Gate 7 source-change sequence:
-  `+2426 / -5024`, net `-2598`.
+  `+2446 / -5063`, net `-2617`.
 - Attempted render-model plumbing cleanup around spinner callbacks, sorting
   value-map aliases, leaf-label flattening, and aggregate-bold returns was
   reverted before this slice because it did not pay for itself clearly enough
@@ -975,13 +984,13 @@ Gate status:
   Remaining work is mostly deeper row subtotal policy.
 - Gate 7 has only been lightly reduced (`47%`). `PivotTableChart.tsx` is smaller than
   baseline, and the view formatting prop surface is narrower, but at roughly
-  `2567` lines the chart still owns committed-tree sync, runtime layout coverage
+  `2548` lines the chart still owns committed-tree sync, runtime layout coverage
   checks, dimension filters, interaction wiring, and controller-like
   responsibilities.
 
 Current largest production hotspots by line count:
 
-- `PivotTableChart.tsx`: `2567` lines. It still owns committed-tree sync,
+- `PivotTableChart.tsx`: `2548` lines. It still owns committed-tree sync,
   runtime layout coverage checks, dimension filters, interaction wiring, and
   controller-like responsibilities.
 - `useExpansionEngine.ts`: `1716` lines. This is still the largest runtime

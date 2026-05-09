@@ -758,20 +758,6 @@ function PivotTableChart(props: PivotTableProps) {
     resolvedVerboseMap,
   ]);
 
-  const dimensionLabelOverrides = useMemo(
-    () =>
-      Object.entries(resolvedVerboseMap ?? {}).reduce<Record<string, string>>(
-        (acc, [key, value]) => {
-          if (typeof value === 'string') {
-            acc[key] = value;
-          }
-          return acc;
-        },
-        {},
-      ),
-    [resolvedVerboseMap],
-  );
-
   const fetchFormDataBaseWithFormatters = useMemo(
     () => ({
       ...fetchFormDataBase,
@@ -851,17 +837,16 @@ function PivotTableChart(props: PivotTableProps) {
     () => ensureIsArray(formData.dimensions),
     [formData.dimensions],
   );
-  const appliedDimensionList = useMemo(
-    () => ensureIsArray(appliedFormData.dimensions),
-    [appliedFormData.dimensions],
-  );
   const dimensionKeys = useMemo(
     () => dimensionList.map(dimension => getStableColumnKey(dimension)),
     [dimensionList],
   );
   const appliedDimensionKeys = useMemo(
-    () => appliedDimensionList.map(dimension => getStableColumnKey(dimension)),
-    [appliedDimensionList],
+    () =>
+      ensureIsArray(appliedFormData.dimensions).map(dimension =>
+        getStableColumnKey(dimension),
+      ),
+    [appliedFormData.dimensions],
   );
   const dimensionMap = useMemo(() => {
     const map = new Map<string, PivotTableProps['groupbyRows'][number]>();
@@ -971,10 +956,6 @@ function PivotTableChart(props: PivotTableProps) {
     [formData.metrics, formData.metricsBase, metrics],
   );
   const metricKeys = useMemo(() => getMetricKeys(metricsForUi), [metricsForUi]);
-  const appliedMetrics = useMemo(
-    () => appliedFormData.metricsBase ?? appliedFormData.metrics ?? metrics,
-    [appliedFormData.metrics, appliedFormData.metricsBase, metrics],
-  );
   const runtimeLayout = useMemo(() => {
     const persisted =
       (ownState?.pivotRuntimeLayout as PivotRuntimeLayout | undefined) ??
@@ -1050,8 +1031,13 @@ function PivotTableChart(props: PivotTableProps) {
     }
   }, [isDashboardRuntimeSync, runtimeLayout]);
   const appliedMetricKeysBase = useMemo(
-    () => getMetricKeys(ensureIsArray(appliedMetrics)),
-    [appliedMetrics],
+    () =>
+      getMetricKeys(
+        ensureIsArray(
+          appliedFormData.metricsBase ?? appliedFormData.metrics ?? metrics,
+        ),
+      ),
+    [appliedFormData.metrics, appliedFormData.metricsBase, metrics],
   );
   const appliedMetricKeys = useMemo(() => {
     if (!isUserControlled) {
@@ -1137,13 +1123,13 @@ function PivotTableChart(props: PivotTableProps) {
         const baseLabel = getColumnLabel(dimension);
         const stableKey = getStableColumnKey(dimension);
         return (
-          dimensionLabelOverrides[stableKey] ??
+          resolvedVerboseMap[stableKey] ??
           (typeof dimension === 'string'
-            ? (dimensionLabelOverrides[dimension] ?? baseLabel)
+            ? (resolvedVerboseMap[dimension] ?? baseLabel)
             : baseLabel)
         );
       }),
-    [dimensionLabelOverrides, layoutGroupbyRows],
+    [layoutGroupbyRows, resolvedVerboseMap],
   );
   const layoutMetricsLayout = isUserControlled
     ? (appliedLayoutFormData.metricsLayout ?? metricsLayout)
@@ -1637,12 +1623,12 @@ function PivotTableChart(props: PivotTableProps) {
       const baseLabel = getColumnLabel(dimension);
       const label =
         typeof dimension === 'string'
-          ? (dimensionLabelOverrides[key] ?? baseLabel)
+          ? (resolvedVerboseMap[key] ?? baseLabel)
           : baseLabel;
       map.set(key, label);
     });
     return map;
-  }, [dimensionLabelOverrides, dimensionList]);
+  }, [dimensionList, resolvedVerboseMap]);
 
   const chipItems = useCallback(
     (axis: 'row' | 'col') => {
@@ -1694,11 +1680,6 @@ function PivotTableChart(props: PivotTableProps) {
     colTotalPosition,
     colSubtotalPosition,
   });
-  const expansionSetDataMask = shouldPersistOwnState ? setDataMask : undefined;
-  const expansionMergeOwnState = shouldPersistOwnState
-    ? mergeOwnState
-    : undefined;
-
   const {
     tree,
     expandedRows,
@@ -1734,8 +1715,8 @@ function PivotTableChart(props: PivotTableProps) {
     expandRowsLevelRaw: layoutResult.expandRowsLevelRaw,
     expandColumnsLevelRaw: layoutResult.expandColumnsLevelRaw,
     setControlValue,
-    setDataMask: expansionSetDataMask,
-    mergeOwnState: expansionMergeOwnState,
+    setDataMask: shouldPersistOwnState ? setDataMask : undefined,
+    mergeOwnState: shouldPersistOwnState ? mergeOwnState : undefined,
     persistedExpansionState:
       appliedLayoutFormData.pivotExpansionState ??
       ownState?.pivotExpansionState,
@@ -2486,7 +2467,7 @@ function PivotTableChart(props: PivotTableProps) {
             formData.measureLeavesByMetricBase ?? formData.measureLeavesByMetric
           }
           metricLabelMap={formData.metricLabelMap}
-          dimensionLabelMap={dimensionLabelOverrides}
+          dimensionLabelMap={resolvedVerboseMap}
           dateFormatters={resolvedDateFormatters}
           dimensionFilterValues={dimensionFilterValues}
           dimensionFilterLoading={dimensionFilterLoading}
