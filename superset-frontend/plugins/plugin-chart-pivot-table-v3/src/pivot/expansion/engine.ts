@@ -40,7 +40,6 @@ import {
   buildRenderModel,
   type RenderModelConfig,
 } from '../render/renderModel';
-import { getVisibleDepths } from '../visibility';
 import { findChildren, rootKey } from '../viewModel';
 import {
   getMetricIndexFromNodes,
@@ -364,12 +363,16 @@ export const computeVisibleDepths = ({
     expandedCols,
     config: buildExpansionRenderModelConfig(tree, config),
   });
-  const { visibleRowDepth, visibleColDepth } = getVisibleDepths(
-    renderModel.visibleRows,
-    renderModel.visibleCols,
-    config.countDimDepth,
-  );
-  return { visibleRowDepth, visibleColDepth };
+  return {
+    visibleRowDepth: Math.max(
+      0,
+      ...renderModel.visibleRows.map(row => config.countDimDepth(row.path)),
+    ),
+    visibleColDepth: Math.max(
+      0,
+      ...renderModel.visibleCols.map(col => config.countDimDepth(col.path)),
+    ),
+  };
 };
 
 export const resolveExpandedForMetrics = ({
