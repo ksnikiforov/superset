@@ -22,13 +22,7 @@ import {
   type PivotTreeData,
   type PivotTreeNode,
 } from '../../types';
-import {
-  mergeTrees,
-  parsePath,
-  serializeCellKey,
-  serializePath,
-} from '../../utils';
-import { shouldFetchForDimensionAxisChange } from '../layout/shouldFetchForLayoutChange';
+import { parsePath, serializeCellKey, serializePath } from '../../utils';
 import { rootKey } from '../viewModel';
 import { getStablePrefixLength, isSameLayout } from './engine';
 
@@ -330,21 +324,7 @@ export const resolveLayoutTransition = ({
     currentLayout.cols.length > previousLayout.cols.length &&
     isPrefix(previousLayout.cols, currentLayout.cols);
   const layoutChanged = rowsChanged || colsChanged;
-  const shouldUseCurrentTreeForLayoutProjection =
-    layoutChanged &&
-    !hasNewData &&
-    !shouldFetchForDimensionAxisChange({
-      prevRows: previousLayout.rows,
-      prevCols: previousLayout.cols,
-      nextRows: currentLayout.rows,
-      nextCols: currentLayout.cols,
-    });
-  const projectionTree = mergeTrees(data, currentTree);
-  const sourceTree = shouldUseCurrentTreeForLayoutProjection
-    ? projectionTree
-    : hasNewData || !layoutChanged
-      ? data
-      : currentTree;
+  const sourceTree = hasNewData || !layoutChanged ? data : currentTree;
   const canReuseExpandedRowData =
     shouldExpandRows &&
     hasAxisDepthCoverage(
@@ -436,7 +416,6 @@ export const resolveLayoutTransition = ({
     shouldExpandRows,
     shouldExpandCols,
     layoutChanged,
-    shouldUseCurrentTreeForLayoutProjection,
     sourceTree,
     normalizedTree,
     shouldPruneRowsForLayoutChange,

@@ -71,22 +71,14 @@ const baseTransitionConfig = {
 };
 
 describe('pivot/expansion/layoutTransition', () => {
-  it('projects layout changes over fresh data and the current expansion tree', () => {
+  it('uses the current expansion tree for layout changes without fresh data', () => {
     const usKey = serializePath(['US']);
     const usCaKey = serializePath(['US', 'CA']);
-    const totalCellKey = serializeCellKey(rootKey, rootKey);
     const data = makeTree({
       rows: [
         makeNode({ axis: 'row', path: [] }),
         makeNode({ axis: 'row', path: ['US'] }),
       ],
-      cells: {
-        [totalCellKey]: {
-          rowKey: rootKey,
-          colKey: rootKey,
-          values: { sales: 5 },
-        },
-      },
     });
     const currentTree = makeTree({
       rows: [
@@ -106,9 +98,7 @@ describe('pivot/expansion/layoutTransition', () => {
     expect(transition.shouldPruneRowsForLayoutChange).toBe(false);
     expect(transition.normalizedTree.rows[usKey]).toBeDefined();
     expect(transition.normalizedTree.rows[usCaKey]).toBeDefined();
-    expect(transition.normalizedTree.cells[totalCellKey]?.values).toEqual({
-      sales: 5,
-    });
+    expect(transition.normalizedTree.cells).toEqual({});
   });
 
   it('trims removed row depth and rolls child cells up to the stable prefix', () => {

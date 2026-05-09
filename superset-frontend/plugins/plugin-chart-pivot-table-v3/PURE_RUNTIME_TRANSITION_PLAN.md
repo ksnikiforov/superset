@@ -275,12 +275,12 @@ they delete more code than they add in the same slice.
 Current source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `8239` insertions, `8855` deletions, net `-616`.
-- Current production `src` TypeScript/TSX total: `32894` lines.
+- Production `src`: `8218` insertions, `8855` deletions, net `-637`.
+- Current production `src` TypeScript/TSX total: `32873` lines.
 - Pre-existing production files are net negative:
   `+3521 / -8855`, net `-5334`.
 - Added runtime/helper files are still the source of total growth:
-  `+4718 / -0` across `16` added files.
+  `+4697 / -0` across `16` added files.
 
 The important read is mixed: production files that predated the refactor have
 shrunk substantially, but the runtime layer has not yet paid for itself in total
@@ -327,7 +327,7 @@ Weighted interpretation:
 - Biggest remaining UX risk: very large result sets can still monopolize JSON
   parsing and React commit despite chunked ingestion/materialization.
 - Biggest remaining line-count debt: the runtime layer is correct, but the
-  `4718` added-file lines still need more old chart/render/expansion code
+  `4697` added-file lines still need more old chart/render/expansion code
   deleted.
 
 Requirement reassessment:
@@ -336,7 +336,7 @@ Requirement reassessment:
   pipeline exists and is used by the main fetch paths. Remaining work is mostly
   deleting old interpretation surfaces, not inventing the architecture.
 - Production line-deletion completion: **85%**. Pre-existing files are net `5334`
-  lines smaller, and total production source is now net `616` lines smaller
+  lines smaller, and total production source is now net `637` lines smaller
   because the runtime materializer, render/visibility, and chart sync surfaces
   have started to shed compatibility API.
 - Interactivity requirement completion: **71%**. Layout refresh and expansion
@@ -376,7 +376,7 @@ Refactor health:
   and production fetch paths use it.
 - Deletion payoff: **past break-even and improving**. Pre-existing source files
   are net `-5334`, and added runtime/helper files now leave the plugin net
-  `-616`.
+  `-637`.
 - Interactivity: **partially improved**. Latest-only requests, reducer loading
   state, chunked materialization, cheaper child traversal, and no-hidden-layer
   fetch planning are in place, but the user-visible lag from large
@@ -424,15 +424,15 @@ Tests and Markdown are excluded.
 
 Current diff from baseline:
 
-- `8239` insertions
+- `8218` insertions
 - `8855` deletions
-- net `-616` production source lines
-- current `src` code total: `32894` lines
+- net `-637` production source lines
+- current `src` code total: `32873` lines
 - implied baseline `src` total: about `33510` lines
 
 By file status:
 
-- Added files: `+4718 / -0` across `16` files
+- Added files: `+4697 / -0` across `16` files
 - Deleted files: `+0 / -1243` across `7` files
 - Modified files: `+3521 / -7612`, net `-4091`
 
@@ -441,7 +441,7 @@ By area:
 | Area              | Additions | Deletions |     Net | Readout                                                                                                                                                                                  |
 | ----------------- | --------: | --------: | ------: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Runtime           |      3573 |         0 | `+3573` | Correct new boundary, and runtime coverage now validates leading row/column identity instead of accepting depth-only matches.                                                            |
-| Expansion         |      1994 |      2711 |  `-717` | Recent Gate 5 work made this area net-negative, but future work must still delete hook branches immediately.                                                                             |
+| Expansion         |      1973 |      2711 |  `-738` | Recent Gate 5 work made this area net-negative, and layout transition no longer projects semantic layout changes through a fresh/current tree hybrid.                                    |
 | Chart hooks       |      1136 |      1942 |  `-806` | Render/layout repair is still net-negative, and metric formatting semantics now stay behind the formatting hook instead of leaking into the table view.                                  |
 | Query             |       771 |       843 |   `-72` | Old branch planner deleted, but specs/bootstrap grew around coverage.                                                                                                                    |
 | Core tree         |         8 |      1014 | `-1006` | Best completed simplification; raw-record fixture construction is no longer in production `src`.                                                                                         |
@@ -968,8 +968,18 @@ Latest code-reduction slice:
   single-process Jest passed for layout fetch policy, runtime coverage, and
   first-column interaction regressions (`45` selected tests), and touched-file
   ESLint passed from `superset-frontend`.
+- Gate 5 local layout-projection cleanup: expansion layout transitions no longer
+  build a `mergeTrees(data, currentTree)` hybrid to project non-fetch semantic
+  layout changes. The transition now uses fresh data only when fresh data
+  arrived; otherwise it keeps the current expansion tree, and the obsolete
+  `shouldUseCurrentTreeForLayoutProjection` result field is gone.
+- Additional production change for that follow-up: `+2 / -23`, net `-21`.
+- Verification after the local layout-projection cleanup: single-process Jest
+  passed for layout-transition, interaction-layout, and seamless interaction
+  regression coverage (`57` tests), and touched-file ESLint passed from
+  `superset-frontend`.
 - Combined recent Gate 4/Gate 5/Gate 6/Gate 7 source-change sequence:
-  `+2719 / -5409`, net `-2690`.
+  `+2721 / -5432`, net `-2711`.
 - Attempted render-model plumbing cleanup around spinner callbacks, sorting
   value-map aliases, leaf-label flattening, and aggregate-bold returns was
   reverted before this slice because it did not pay for itself clearly enough
