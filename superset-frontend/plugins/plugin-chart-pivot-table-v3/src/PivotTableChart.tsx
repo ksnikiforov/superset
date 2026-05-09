@@ -113,6 +113,12 @@ const EMPTY_FACT_BATCHES: PivotFactStoreBatch[] = [];
 const hasSelectedFilters = (
   filters: Record<string, DataRecordValue[]>,
 ): boolean => Object.keys(filters).length > 0;
+const selectedFiltersSignature = (
+  filters: Record<string, DataRecordValue[]>,
+) => (hasSelectedFilters(filters) ? stableStringify(filters) : null);
+const firstSelectedFilters = (
+  ...sources: Array<Record<string, DataRecordValue[]>>
+) => sources.find(hasSelectedFilters) ?? EMPTY_SELECTED_FILTERS;
 
 const { DATABASE_DATETIME } = TimeFormats;
 
@@ -612,6 +618,30 @@ const arraysEqual = (left: string[], right: string[]) =>
 const hasSameSet = (left: string[], right: string[]) =>
   left.length === right.length && left.every(value => right.includes(value));
 
+const selectionSignature = (selection: PivotRuntimeLayout['leafSelection']) =>
+  stableStringify(selection ?? {});
+
+const valuePlacementSignature = (
+  placement: PivotRuntimeLayout['valuePlacement'],
+) => stableStringify(placement ?? {});
+
+const leafOrderSignature = (order?: PivotRuntimeLayout['leafOrder']) =>
+  stableStringify(order ?? []);
+
+const hasSameRuntimeLayoutState = (
+  prev: PivotRuntimeLayout,
+  next: PivotRuntimeLayout,
+  metricsMatch: (left: string[], right: string[]) => boolean,
+) =>
+  arraysEqual(prev.rows, next.rows) &&
+  arraysEqual(prev.cols, next.cols) &&
+  metricsMatch(prev.metrics, next.metrics) &&
+  selectionSignature(prev.leafSelection) ===
+    selectionSignature(next.leafSelection) &&
+  leafOrderSignature(prev.leafOrder) === leafOrderSignature(next.leafOrder) &&
+  valuePlacementSignature(prev.valuePlacement) ===
+    valuePlacementSignature(next.valuePlacement);
+
 type DatasetColumnMeta = {
   column_name?: string;
   verbose_name?: string | null;
@@ -657,16 +687,6 @@ const buildDateFormattersFromColumns = (
     {},
   );
 
-const selectionSignature = (selection: PivotRuntimeLayout['leafSelection']) =>
-  stableStringify(selection ?? {});
-
-const valuePlacementSignature = (
-  placement: PivotRuntimeLayout['valuePlacement'],
-) => stableStringify(placement ?? {});
-
-const leafOrderSignature = (order?: PivotRuntimeLayout['leafOrder']) =>
-  stableStringify(order ?? []);
-
 const addValuePlaceholder = ({
   keys,
   shouldInsert,
@@ -701,71 +721,14 @@ const buildExpansionLayoutKeys = (layout: PivotRuntimeLayout) => ({
 const isMetricOrderOnlyChange = (
   prev: PivotRuntimeLayout,
   next: PivotRuntimeLayout,
-) => {
-  if (!arraysEqual(prev.rows, next.rows)) {
-    return false;
-  }
-  if (!arraysEqual(prev.cols, next.cols)) {
-    return false;
-  }
-  if (!hasSameSet(prev.metrics, next.metrics)) {
-    return false;
-  }
-  if (arraysEqual(prev.metrics, next.metrics)) {
-    return false;
-  }
-  if (
-    selectionSignature(prev.leafSelection) !==
-    selectionSignature(next.leafSelection)
-  ) {
-    return false;
-  }
-  if (
-    leafOrderSignature(prev.leafOrder) !== leafOrderSignature(next.leafOrder)
-  ) {
-    return false;
-  }
-  if (
-    valuePlacementSignature(prev.valuePlacement) !==
-    valuePlacementSignature(next.valuePlacement)
-  ) {
-    return false;
-  }
-  return true;
-};
+) =>
+  !arraysEqual(prev.metrics, next.metrics) &&
+  hasSameRuntimeLayoutState(prev, next, hasSameSet);
 
 const isSameRuntimeLayout = (
   prev: PivotRuntimeLayout,
   next: PivotRuntimeLayout,
-) => {
-  if (!arraysEqual(prev.rows, next.rows)) {
-    return false;
-  }
-  if (!arraysEqual(prev.cols, next.cols)) {
-    return false;
-  }
-  if (!arraysEqual(prev.metrics, next.metrics)) {
-    return false;
-  }
-  if (
-    selectionSignature(prev.leafSelection) !==
-    selectionSignature(next.leafSelection)
-  ) {
-    return false;
-  }
-  if (
-    leafOrderSignature(prev.leafOrder) !== leafOrderSignature(next.leafOrder)
-  ) {
-    return false;
-  }
-  if (
-    valuePlacementSignature(prev.valuePlacement) !==
-    valuePlacementSignature(next.valuePlacement)
-  ) {
-    return false;
-  }
-  return true;
-};
+) => hasSameRuntimeLayoutState(prev, next, arraysEqual);
 
 function PivotTableChart(props: PivotTableProps) {
   const {
@@ -1135,30 +1098,28 @@ function PivotTableChart(props: PivotTableProps) {
   const lastPersistedSelectionRef = useRef(selectedFiltersFromProps);
   const pendingPersistedSelectionSyncRef = useRef(false);
   const suppressStalePersistedFilterRestoreRef = useRef(false);
+  const selectedFiltersFromFormData =
+    formData.pivotSelectedFilters ?? EMPTY_SELECTED_FILTERS;
   const selectedFiltersFromOwnState =
     (ownState?.pivotSelectedFilters as
       | Record<string, DataRecordValue[]>
       | undefined) ?? EMPTY_SELECTED_FILTERS;
-  const selectedFiltersForTreeSync = useMemo(() => {
-    if (!isUserControlled) {
-      return selectedFiltersFromProps;
-    }
-    if (
-      formData.pivotSelectedFilters &&
-      Object.keys(formData.pivotSelectedFilters).length > 0
-    ) {
-      return formData.pivotSelectedFilters;
-    }
-    if (Object.keys(selectedFiltersFromOwnState).length > 0) {
-      return selectedFiltersFromOwnState;
-    }
-    return selectedFiltersFromProps;
-  }, [
-    formData.pivotSelectedFilters,
-    isUserControlled,
-    selectedFiltersFromOwnState,
-    selectedFiltersFromProps,
-  ]);
+  const selectedFiltersForTreeSync = useMemo(
+    () =>
+      isUserControlled
+        ? firstSelectedFilters(
+            selectedFiltersFromFormData,
+            selectedFiltersFromOwnState,
+            selectedFiltersFromProps,
+          )
+        : selectedFiltersFromProps,
+    [
+      isUserControlled,
+      selectedFiltersFromFormData,
+      selectedFiltersFromOwnState,
+      selectedFiltersFromProps,
+    ],
+  );
 
   useEffect(() => {
     if (
@@ -1366,30 +1327,20 @@ function PivotTableChart(props: PivotTableProps) {
     if (!isUserControlled) {
       return EMPTY_SELECTED_FILTERS;
     }
-    if (
-      formData.pivotSelectedFilters &&
-      Object.keys(formData.pivotSelectedFilters).length > 0
-    ) {
-      return normalizeSelectedFilters(formData.pivotSelectedFilters);
-    }
-    const ownFilters = ownState?.pivotSelectedFilters as
-      | Record<string, DataRecordValue[]>
-      | undefined;
-    if (ownFilters && Object.keys(ownFilters).length > 0) {
-      return normalizeSelectedFilters(ownFilters);
-    }
-    return EMPTY_SELECTED_FILTERS;
+    return normalizeSelectedFilters(
+      firstSelectedFilters(
+        selectedFiltersFromFormData,
+        selectedFiltersFromOwnState,
+      ),
+    );
   }, [
-    formData.pivotSelectedFilters,
     isUserControlled,
     normalizeSelectedFilters,
-    ownState?.pivotSelectedFilters,
+    selectedFiltersFromFormData,
+    selectedFiltersFromOwnState,
   ]);
   const persistedInteractionFiltersSignature = useMemo(
-    () =>
-      hasSelectedFilters(persistedInteractionFilters)
-        ? stableStringify(persistedInteractionFilters)
-        : null,
+    () => selectedFiltersSignature(persistedInteractionFilters),
     [persistedInteractionFilters],
   );
   const upstreamSeamlessSignature = useMemo(
@@ -1477,31 +1428,23 @@ function PivotTableChart(props: PivotTableProps) {
 
   const persistedSelectedFilters = useMemo(() => {
     if (!isUserControlled) {
-      return normalizeSelectedFilters(selectedFilters);
+      return normalizeSelectedFilters(selectedFiltersFromProps);
     }
-    if (
-      formData.pivotSelectedFilters &&
-      Object.keys(formData.pivotSelectedFilters).length > 0
-    ) {
-      return normalizeSelectedFilters(formData.pivotSelectedFilters);
-    }
-    const ownFilters = ownState?.pivotSelectedFilters as
-      | Record<string, DataRecordValue[]>
-      | undefined;
-    if (ownFilters && Object.keys(ownFilters).length > 0) {
-      return normalizeSelectedFilters(ownFilters);
-    }
-    if (Object.keys(committedFilters).length > 0) {
-      return normalizeSelectedFilters(committedFilters);
-    }
-    return normalizeSelectedFilters(selectedFilters);
+    return normalizeSelectedFilters(
+      firstSelectedFilters(
+        selectedFiltersFromFormData,
+        selectedFiltersFromOwnState,
+        committedFilters,
+        selectedFiltersFromProps,
+      ),
+    );
   }, [
     committedFilters,
     isUserControlled,
     normalizeSelectedFilters,
-    formData.pivotSelectedFilters,
-    ownState?.pivotSelectedFilters,
-    selectedFilters,
+    selectedFiltersFromFormData,
+    selectedFiltersFromOwnState,
+    selectedFiltersFromProps,
   ]);
 
   useEffect(() => {
@@ -1700,10 +1643,7 @@ function PivotTableChart(props: PivotTableProps) {
         persistRuntimeState(normalized, nextFilters);
       });
       lastSeamlessSyncRef.current = {
-        filtersSignature:
-          Object.keys(nextFilters).length > 0
-            ? stableStringify(nextFilters)
-            : null,
+        filtersSignature: selectedFiltersSignature(nextFilters),
         layoutSignature: stableStringify(normalized),
         upstreamSignature: upstreamSeamlessSignature,
       };
@@ -1757,10 +1697,7 @@ function PivotTableChart(props: PivotTableProps) {
       }
       persistRuntimeState(normalized, uiSelectedFilters);
       lastSeamlessSyncRef.current = {
-        filtersSignature:
-          Object.keys(uiSelectedFilters).length > 0
-            ? stableStringify(uiSelectedFilters)
-            : null,
+        filtersSignature: selectedFiltersSignature(uiSelectedFilters),
         layoutSignature: stableStringify(normalized),
         upstreamSignature: upstreamSeamlessSignature,
       };
@@ -1992,19 +1929,10 @@ function PivotTableChart(props: PivotTableProps) {
 
   useEffect(() => {
     expandedRowsForSeamlessRef.current = expandedRows;
-  }, [expandedRows]);
-
-  useEffect(() => {
     expandedColsForSeamlessRef.current = expandedCols;
-  }, [expandedCols]);
-
-  useEffect(() => {
     pendingRowsForSeamlessRef.current = pendingRows;
-  }, [pendingRows]);
-
-  useEffect(() => {
     pendingColsForSeamlessRef.current = pendingCols;
-  }, [pendingCols]);
+  }, [expandedCols, expandedRows, pendingCols, pendingRows]);
 
   useEffect(() => {
     if (!frozenUserViewProps) {
@@ -2067,14 +1995,12 @@ function PivotTableChart(props: PivotTableProps) {
       if (!leafId) {
         return fallbackMetricKey;
       }
-      const group = layoutResult.measureHierarchy.groups.find(
-        candidate => candidate.metricKey === metricKey,
-      );
-      const leaf = group?.leaves.find(candidate => candidate.id === leafId);
-      if (!leaf) {
-        return fallbackMetricKey;
-      }
-      return buildMeasureLeafOutputKey(metricKey, leaf);
+      const leaf = layoutResult.measureHierarchy.groups
+        .find(candidate => candidate.metricKey === metricKey)
+        ?.leaves.find(candidate => candidate.id === leafId);
+      return leaf
+        ? buildMeasureLeafOutputKey(metricKey, leaf)
+        : fallbackMetricKey;
     },
     [layoutResult],
   );
@@ -2096,37 +2022,24 @@ function PivotTableChart(props: PivotTableProps) {
       if (!sortLeafId) {
         return node.key;
       }
-      const nodeLeafId = findMeasureLeafIdInPath(node.path);
-      if (nodeLeafId === sortLeafId) {
+      if (findMeasureLeafIdInPath(node.path) === sortLeafId) {
         return node.key;
       }
-      const descendant = Object.values(renderTree.cols)
-        .filter(candidate => {
-          if (candidate.key === node.key) {
-            return false;
-          }
-          if (candidate.path.length <= node.path.length) {
-            return false;
-          }
-          return node.path.every(
-            (value, index) => candidate.path[index] === value,
-          );
-        })
-        .map(candidate => {
-          const candidateLeafId = findMeasureLeafIdInPath(candidate.path);
-          return { candidate, candidateLeafId };
-        })
-        .filter(
-          (
-            entry,
-          ): entry is { candidate: PivotTreeNode; candidateLeafId: string } =>
-            entry.candidateLeafId === sortLeafId,
-        )
-        .sort(
-          (left, right) =>
-            left.candidate.path.length - right.candidate.path.length,
-        )[0];
-      return descendant?.candidate.key ?? node.key;
+      let descendant: PivotTreeNode | undefined;
+      Object.values(renderTree.cols).forEach(candidate => {
+        if (
+          candidate.key === node.key ||
+          candidate.path.length <= node.path.length ||
+          !node.path.every((value, index) => candidate.path[index] === value) ||
+          findMeasureLeafIdInPath(candidate.path) !== sortLeafId
+        ) {
+          return;
+        }
+        if (!descendant || candidate.path.length < descendant.path.length) {
+          descendant = candidate;
+        }
+      });
+      return descendant?.key ?? node.key;
     },
     [layoutResult, renderTree.cols],
   );

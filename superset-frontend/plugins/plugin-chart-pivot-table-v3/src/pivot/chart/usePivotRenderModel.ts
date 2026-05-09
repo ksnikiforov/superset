@@ -288,17 +288,6 @@ export const usePivotRenderModel = ({
     [getProjectedPathParts, renderTree],
   );
 
-  const getSortValue = useCallback(
-    (axis: 'row' | 'col', node: PivotTreeNode, metricKey: string) => {
-      const nonMetricKey = serializePath(
-        getProjectedPathParts(axis, node.path),
-      );
-      const valuesMap = axis === 'row' ? rowValuesMap : colValuesMap;
-      return valuesMap.get(nonMetricKey)?.[metricKey];
-    },
-    [colValuesMap, getProjectedPathParts, rowValuesMap],
-  );
-
   const compareMetricSort = useCallback(
     (axis: 'row' | 'col', a: PivotTreeNode, b: PivotTreeNode) => {
       const dimensionKey =
@@ -321,27 +310,25 @@ export const usePivotRenderModel = ({
       if (config.mode !== 'total') {
         return 0;
       }
-      const aValue = getSortValue(axis, a, config.metricKey);
-      const bValue = getSortValue(axis, b, config.metricKey);
+      const { metricKey } = config;
+      const valuesMap = axis === 'row' ? rowValuesMap : colValuesMap;
+      const getSortValue = (node: PivotTreeNode) =>
+        valuesMap.get(serializePath(getProjectedPathParts(axis, node.path)))?.[
+          metricKey
+        ];
+      const aValue = getSortValue(a);
+      const bValue = getSortValue(b);
       return compareSortValues(aValue, bValue, config.order);
     },
-    [colSortingKeyMap, colTypeMap, getSortValue, layout, rowSortingKeyMap],
-  );
-
-  const compareUiColumnSort = useCallback(
-    (a: PivotTreeNode, b: PivotTreeNode) => {
-      if (!uiColumnSort) {
-        return 0;
-      }
-      const aCell =
-        renderTree.cells[serializeCellKey(a.key, uiColumnSort.colKey)];
-      const bCell =
-        renderTree.cells[serializeCellKey(b.key, uiColumnSort.colKey)];
-      const aValue = aCell?.values[uiColumnSort.metricKey];
-      const bValue = bCell?.values[uiColumnSort.metricKey];
-      return compareSortValues(aValue, bValue, uiColumnSort.order);
-    },
-    [renderTree.cells, uiColumnSort],
+    [
+      colSortingKeyMap,
+      colTypeMap,
+      colValuesMap,
+      getProjectedPathParts,
+      layout,
+      rowSortingKeyMap,
+      rowValuesMap,
+    ],
   );
 
   const rowSorter = useMemo(() => {
@@ -389,9 +376,21 @@ export const usePivotRenderModel = ({
       if (metricOrder !== 0) {
         return metricOrder;
       }
-      const uiColumnSortCmp = compareUiColumnSort(a, b);
-      if (uiColumnSortCmp !== 0) {
-        return uiColumnSortCmp;
+      if (uiColumnSort) {
+        const aValue =
+          renderTree.cells[serializeCellKey(a.key, uiColumnSort.colKey)]
+            ?.values[uiColumnSort.metricKey];
+        const bValue =
+          renderTree.cells[serializeCellKey(b.key, uiColumnSort.colKey)]
+            ?.values[uiColumnSort.metricKey];
+        const uiColumnSortCmp = compareSortValues(
+          aValue,
+          bValue,
+          uiColumnSort.order,
+        );
+        if (uiColumnSortCmp !== 0) {
+          return uiColumnSortCmp;
+        }
       }
       const metricSort = compareMetricSort('row', a, b);
       if (metricSort !== 0) {
@@ -403,10 +402,10 @@ export const usePivotRenderModel = ({
     colTotals,
     colTypeMap,
     compareMetricSort,
-    compareUiColumnSort,
     resolvedGroupbyRows,
     hasRowSorting,
     layout,
+    renderTree.cells,
     rowOrder,
     rowSubTotals,
     uiColumnSort,
@@ -560,30 +559,29 @@ export const usePivotRenderModel = ({
   const isLeafTierVisible =
     layout.measureHierarchy.kind === 'measureStackV1' &&
     layout.measureHierarchy.leafTierVisibility === 'visible';
-  const expandedRowsForRender = useMemo(() => {
-    if (!isLeafTierVisible) {
-      return expandedRows;
-    }
-    const next = new Set(expandedRows);
-    Object.values(renderTree.rows).forEach(node => {
-      if (layout.isMetricTokenValue(node.path[node.path.length - 1])) {
-        next.add(node.key);
+  const expandMetricNodesForRender = useCallback(
+    (expanded: Set<string>, nodes: Record<string, PivotTreeNode>) => {
+      if (!isLeafTierVisible) {
+        return expanded;
       }
-    });
-    return next;
-  }, [expandedRows, isLeafTierVisible, layout, renderTree.rows]);
-  const expandedColsForRender = useMemo(() => {
-    if (!isLeafTierVisible) {
-      return expandedCols;
-    }
-    const next = new Set(expandedCols);
-    Object.values(renderTree.cols).forEach(node => {
-      if (layout.isMetricTokenValue(node.path[node.path.length - 1])) {
-        next.add(node.key);
-      }
-    });
-    return next;
-  }, [expandedCols, isLeafTierVisible, layout, renderTree.cols]);
+      const next = new Set(expanded);
+      Object.values(nodes).forEach(node => {
+        if (layout.isMetricTokenValue(node.path[node.path.length - 1])) {
+          next.add(node.key);
+        }
+      });
+      return next;
+    },
+    [isLeafTierVisible, layout],
+  );
+  const expandedRowsForRender = useMemo(
+    () => expandMetricNodesForRender(expandedRows, renderTree.rows),
+    [expandMetricNodesForRender, expandedRows, renderTree.rows],
+  );
+  const expandedColsForRender = useMemo(
+    () => expandMetricNodesForRender(expandedCols, renderTree.cols),
+    [expandMetricNodesForRender, expandedCols, renderTree.cols],
+  );
 
   const autoExpandedRows = useMemo(
     () =>
@@ -601,15 +599,12 @@ export const usePivotRenderModel = ({
     ],
   );
 
-  const manualExpandedRows = useMemo(() => {
-    const next = new Set(expandedRows);
-    autoExpandedRows.forEach(key => next.delete(key));
-    return next;
-  }, [autoExpandedRows, expandedRows]);
-
   const manualExpandedRowDepths = useMemo(() => {
     const depths = new Set<number>();
-    manualExpandedRows.forEach(key => {
+    expandedRows.forEach(key => {
+      if (autoExpandedRows.has(key)) {
+        return;
+      }
       const node = renderTree.rows[key];
       if (!node) {
         return;
@@ -620,7 +615,7 @@ export const usePivotRenderModel = ({
       depths.add(layout.countDimDepth(node.path));
     });
     return depths;
-  }, [layout, manualExpandedRows, renderTree.rows]);
+  }, [autoExpandedRows, expandedRows, layout, renderTree.rows]);
 
   const renderModel = useMemo(
     () =>

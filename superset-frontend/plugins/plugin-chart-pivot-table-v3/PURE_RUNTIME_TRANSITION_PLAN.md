@@ -624,8 +624,41 @@ Latest code-reduction slice:
   creates a redundant local alias, and the seamless-update callback no longer
   lists stable React state setters as dependencies.
 - Additional production change for that follow-up: `+9 / -17`, net `-8`.
+- Gate 7 runtime-layout comparison cleanup: metric-order-only detection and
+  full layout equality now share one comparison helper for row keys, column
+  keys, metric matching, leaf selection, leaf ordering, and Values placement.
+- Additional production change for that follow-up: `+28 / -71`, net `-43`.
+- Gate 7 seamless-sync signature cleanup: persisted-filter sync checks and
+  seamless-sync state commits now share one selected-filter signature helper
+  instead of repeating empty-filter and stringification branches.
+- Additional production change for that follow-up: `+6 / -12`, net `-6`.
+- Gate 7 selected-filter source cleanup: persisted interaction filters and
+  persisted selected filters now reuse the normalized `ownState` filter source
+  and normalized form-data filter source instead of repeating local casts,
+  optional guards, and non-empty checks.
+- Additional production change for that follow-up: `+41 / -55`, net `-14`.
+- Gate 6 primitive render/layout memo cleanup: metric placement indexes,
+  placeholder checks, metric-header hiding, visible measure-leaf metric
+  expansion, and manual row aggregate-depth detection no longer carry
+  unnecessary memoized intermediate state. The same cleanup removed a
+  hook-local wrapper around the pure subtotal predicate, inlined single-use
+  render sorting callbacks, tightened metric-index fallback resolution, and
+  removed collapsed Values metric-depth wrapper callbacks. The child-filter
+  path now computes axis child projection inside the shared policy callback
+  instead of carrying four single-use projection wrappers.
+- Additional production change for that follow-up: `+148 / -284`, net `-136`.
+- Gate 7 seamless ref-sync cleanup: the chart now updates the expanded and
+  pending seamless-layout refs from one effect instead of four adjacent
+  controller-style mirror effects.
+- Additional production change for that follow-up: `+1 / -10`, net `-9`.
+- Gate 7 column-sort data-key cleanup: measure-leaf column sort lookup now scans
+  for the nearest matching descendant leaf directly instead of building,
+  filtering, and sorting an intermediate descendant list, and selected metric
+  leaf resolution now uses one hierarchy lookup instead of separate group and
+  leaf fallback branches.
+- Additional production change for that follow-up: `+22 / -37`, net `-15`.
 - Combined recent Gate 4/Gate 5/Gate 6/Gate 7 source-reduction sequence:
-  `+1142 / -2247`, net `-1105`.
+  `+1388 / -2716`, net `-1328`.
 - Attempted render-model plumbing cleanup around spinner callbacks, sorting
   value-map aliases, leaf-label flattening, and aggregate-bold returns was
   reverted before this slice because it did not pay for itself clearly enough
