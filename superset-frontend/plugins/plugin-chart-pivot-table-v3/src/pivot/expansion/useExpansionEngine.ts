@@ -42,12 +42,6 @@ import {
   type PivotExpansionStateKeys,
 } from '../engine/expansionStateModel';
 import {
-  buildStagedTree,
-  createStagingTree,
-  stageDelta,
-  type StagingTreeState,
-} from '../engine/stagingTree';
-import {
   fetchPivotBranch,
   resolvePivotBranchLocalResult,
 } from '../../fetchPivotBranch';
@@ -1180,7 +1174,20 @@ export const useExpansionEngine = ({
         }
       };
 
-      let stagingState: StagingTreeState = createStagingTree(treeRef.current);
+      const stagingBaseTree = treeRef.current;
+      const stagedDeltas = new Map<string, PivotTreeData>();
+      const buildHydrationTree = () => {
+        let merged = stagingBaseTree;
+        Array.from(stagedDeltas.keys())
+          .sort()
+          .forEach(key => {
+            const delta = stagedDeltas.get(key);
+            if (delta) {
+              merged = mergeTrees(merged, delta);
+            }
+          });
+        return merged;
+      };
       let desiredRows = new Set<string>();
       let desiredCols = new Set<string>();
       const fetchRuntime: ExpansionFetchRuntime = {
@@ -1201,7 +1208,7 @@ export const useExpansionEngine = ({
           finalizeHydration();
           return;
         }
-        const stagedTree = buildStagedTree(stagingState);
+        const stagedTree = buildHydrationTree();
         desiredRows = buildDesiredExpanded('row', stagedTree);
         desiredCols = buildDesiredExpanded('col', stagedTree);
         const hydrationPlan = planHydrationIteration({
@@ -1220,8 +1227,8 @@ export const useExpansionEngine = ({
         const { visibleRowDepth, visibleColDepth } = hydrationPlan;
 
         if (hydrationPlan.kind === 'complete') {
-          let mergedTree = buildStagedTree(stagingState);
-          const orderedDeltas = Array.from(stagingState.deltas.entries()).sort(
+          let mergedTree = buildHydrationTree();
+          const orderedDeltas = Array.from(stagedDeltas.entries()).sort(
             ([a], [b]) => a.localeCompare(b),
           );
           for (const [key, delta] of orderedDeltas) {
@@ -1317,7 +1324,7 @@ export const useExpansionEngine = ({
         for (const { targets: deltaTargets, data: deltaTree } of resultDeltas) {
           for (const target of deltaTargets) {
             const deltaKey = JSON.stringify([target.axis, target.pathKey]);
-            stagingState = stageDelta(stagingState, deltaKey, deltaTree);
+            stagedDeltas.set(deltaKey, deltaTree);
           }
         }
       }

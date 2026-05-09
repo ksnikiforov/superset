@@ -19,10 +19,7 @@
 import { type QueryFormColumn, type QueryFormMetric } from '@superset-ui/core';
 import { type PivotTableQueryFormData } from '../../types';
 import { hasTotalSorting } from '../../utils';
-import {
-  type LayoutContext,
-  buildLayoutContext,
-} from '../layout/LayoutContext';
+import { type LayoutContext } from '../layout/LayoutContext';
 import { type QueryIntent } from './queryIntent';
 import {
   buildFactCoverage,
@@ -254,8 +251,3 @@ export function buildBootstrapPlanFromLayout(
     metrics,
   };
 }
-
-export const buildBootstrapPlan = (
-  formData: PivotTableQueryFormData,
-): BootstrapPlan =>
-  buildBootstrapPlanFromLayout(buildLayoutContext(formData), formData);
