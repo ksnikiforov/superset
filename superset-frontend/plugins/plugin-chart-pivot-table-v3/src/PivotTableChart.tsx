@@ -64,7 +64,6 @@ import { usePivotFormatting } from './pivot/chart/usePivotFormatting';
 import { usePivotInteractions } from './pivot/chart/usePivotInteractions';
 import { PivotInteractionPanel } from './pivot/chart/PivotInteractionPanel';
 import {
-  factBatchesCoverRuntimeLayout,
   isMetricOrderOnlyChange,
   isSameRuntimeLayout,
   shouldFetchRuntimeLayout,
@@ -1137,9 +1136,6 @@ function PivotTableChart(props: PivotTableProps) {
       runtimeLayout: appliedRuntimeLayout,
     });
   }, [appliedFormData, appliedRuntimeLayout, formData, isUserControlled]);
-  const committedFactBatchesCoverRuntimeLayout =
-    !isUserControlled ||
-    factBatchesCoverRuntimeLayout(committedFactBatches, committedRuntimeLayout);
   const layoutMetrics = useMemo(
     () =>
       isUserControlled ? ensureIsArray(appliedLayoutFormData.metrics) : metrics,
@@ -1615,7 +1611,14 @@ function PivotTableChart(props: PivotTableProps) {
   ]);
 
   useEffect(() => {
-    if (committedFactBatchesCoverRuntimeLayout) {
+    if (
+      !isUserControlled ||
+      !shouldFetchRuntimeLayout({
+        factBatches: committedFactBatches,
+        previousLayout: committedRuntimeLayout,
+        nextLayout: committedRuntimeLayout,
+      })
+    ) {
       staleCoverageRecoverySignatureRef.current = null;
       return;
     }
@@ -1638,8 +1641,10 @@ function PivotTableChart(props: PivotTableProps) {
     applySeamlessUpdate(uiRuntimeLayout, uiSelectedFilters);
   }, [
     applySeamlessUpdate,
-    committedFactBatchesCoverRuntimeLayout,
+    committedFactBatches,
+    committedRuntimeLayout,
     isDashboardRuntimeSync,
+    isUserControlled,
     persistedInteractionFilters,
     seamlessLoading,
     uiRuntimeLayout,
