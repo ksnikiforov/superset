@@ -154,11 +154,9 @@ const splitRowHeadersIntoColumns = (
     const isSubtotalRow =
       !isGrandTotalRow && sourceHeader?.classList.contains('subtotal-cell');
     const parsedDepth = parseDepth(row);
-    const depth =
-      typeof parsedDepth === 'number' ? parsedDepth : sourceHeader ? 0 : null;
     const clampedDepth =
-      typeof depth === 'number'
-        ? Math.max(0, Math.min(depth, depthCount - 1))
+      typeof parsedDepth === 'number'
+        ? Math.max(0, Math.min(parsedDepth, depthCount - 1))
         : null;
     const rowLabelNode = row.querySelector<HTMLElement>(`[${ROW_LABEL_ATTR}]`);
     const rowLabel = getText(
@@ -206,17 +204,18 @@ const splitRowHeadersIntoColumns = (
       rowLabel,
     } = exportRow;
 
+    if (!sourceHeader || typeof clampedDepth !== 'number') {
+      return;
+    }
+
     if (isGrandTotalRow) {
       activePath.length = 0;
-    } else if (typeof clampedDepth === 'number') {
+    } else {
       activePath.length = clampedDepth;
       activePath[clampedDepth] = rowLabel;
     }
 
     const rowValues = Array.from({ length: depthCount }, (_, index) => {
-      if (typeof clampedDepth !== 'number') {
-        return '';
-      }
       if (isGrandTotalRow) {
         return index === 0 ? rowLabel : '';
       }
@@ -225,7 +224,6 @@ const splitRowHeadersIntoColumns = (
     if (
       isSubtotalRow &&
       rowHasVisibleChildren(rowIndex) &&
-      typeof clampedDepth === 'number' &&
       clampedDepth + 1 < depthCount
     ) {
       rowValues[clampedDepth + 1] = rowTotalLabel;

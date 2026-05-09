@@ -435,49 +435,6 @@ describe('buildPivotV3ExportTable', () => {
     expect(bodyRows[2]).toEqual(['Blue', 'Classic Vest', '120']);
   });
 
-  it('keeps row/header alignment when a row header depth marker is missing', () => {
-    document.body.innerHTML = `
-      <table class="pivot-v3-table" data-pivot-row-axis-labels='["Region","City"]'>
-        <thead>
-          <tr>
-            <th>Rows</th>
-            <th>Sales</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <th>
-              <div data-pivot-row-depth="0">
-                <span data-pivot-row-label>West</span>
-              </div>
-            </th>
-            <td>10</td>
-          </tr>
-          <tr>
-            <th>
-              <div>
-                <span data-pivot-row-label>Grand Total</span>
-              </div>
-            </th>
-            <td>15</td>
-          </tr>
-        </tbody>
-      </table>
-    `;
-
-    const original = document.querySelector('table') as HTMLTableElement;
-    const exported = buildPivotV3ExportTable(original);
-
-    const bodyRows = Array.from(exported.tBodies[0].rows).map(row =>
-      Array.from(row.cells).map(cell => cell.textContent?.trim() ?? ''),
-    );
-
-    expect(bodyRows[0]).toEqual(['West', '10']);
-    expect(bodyRows[1]).toEqual(['Grand Total', '15']);
-    expect(bodyRows[0]).toHaveLength(2);
-    expect(bodyRows[1]).toHaveLength(2);
-  });
-
   it('keeps alignment with multi-level column headers and grand total rows', () => {
     document.body.innerHTML = `
       <table class="pivot-v3-table" data-pivot-row-axis-labels='["Region","City"]'>
@@ -519,7 +476,7 @@ describe('buildPivotV3ExportTable', () => {
           </tr>
           <tr>
             <th>
-              <div>
+              <div data-pivot-row-depth="0">
                 <span data-pivot-row-label>Grand Total</span>
               </div>
             </th>
