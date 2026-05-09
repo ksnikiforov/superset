@@ -21,6 +21,7 @@ import {
   type PivotTreeData,
   type PivotTreeNode,
 } from '../../types';
+import { type PivotFactStoreBatch } from '../runtime/factStore';
 import {
   decodeMeasureLeafId,
   decodeMetricKey,
@@ -36,21 +37,6 @@ const countRuntimeDimensionDepth = (path: PivotTreeNode['path']) =>
       !decodeMetricKey(part) &&
       !decodeMeasureLeafId(part),
   ).length;
-
-const hasAxisCoverage = (
-  nodes: Record<string, PivotTreeNode>,
-  requiredDepth: number,
-) => {
-  if (requiredDepth <= 0) {
-    return true;
-  }
-  return Object.values(nodes).some(
-    node => countRuntimeDimensionDepth(node.path) >= requiredDepth,
-  );
-};
-
-const hasNonRootNodes = (nodes: Record<string, PivotTreeNode>) =>
-  Object.values(nodes).some(node => node.path.length > 0);
 
 const valueAxisKeys = (layout: PivotRuntimeLayout) =>
   layout.valuePlacement.axis === 'row' ? layout.rows : layout.cols;
@@ -139,37 +125,21 @@ const collectProjectedCellKeysFromRuntimeDepth = ({
   return projectedKeys;
 };
 
-export const treeHasRuntimeLayoutCoverage = (
-  tree: PivotTreeData,
+export const factBatchesCoverRuntimeLayout = (
+  factBatches: PivotFactStoreBatch[],
   runtimeLayout: PivotRuntimeLayout,
 ) => {
   const requiredRowDepth = runtimeLayout.rows.length > 0 ? 1 : 0;
-  const requiredColDepth = runtimeLayout.cols.length > 0 ? 1 : 0;
+  const requiredColumnDepth = runtimeLayout.cols.length > 0 ? 1 : 0;
   return (
-    hasAxisCoverage(tree.rows, requiredRowDepth) &&
-    hasAxisCoverage(tree.cols, requiredColDepth)
-  );
-};
-
-export const treeHasStaleCoverageRegression = (
-  tree: PivotTreeData,
-  runtimeLayout: PivotRuntimeLayout,
-) => {
-  const requiresRows = runtimeLayout.rows.length > 0;
-  const requiresCols = runtimeLayout.cols.length > 0;
-  const hasRowCoverage = hasAxisCoverage(tree.rows, requiresRows ? 1 : 0);
-  const hasColCoverage = hasAxisCoverage(tree.cols, requiresCols ? 1 : 0);
-  if (hasRowCoverage && hasColCoverage) {
-    return false;
-  }
-  const hasRowNodes = hasNonRootNodes(tree.rows);
-  const hasColNodes = hasNonRootNodes(tree.cols);
-  if (!hasRowNodes && !hasColNodes) {
-    return false;
-  }
-  return (
-    (requiresRows && !hasRowCoverage && hasColNodes) ||
-    (requiresCols && !hasColCoverage && hasRowNodes)
+    runtimeLayout.metrics.length === 0 ||
+    (requiredRowDepth === 0 && requiredColumnDepth === 0) ||
+    factBatches.some(
+      ({ coverage, scope }) =>
+        (scope.kind === 'bootstrap' || scope.kind === 'root') &&
+        coverage.rowDepth === requiredRowDepth &&
+        coverage.columnDepth === requiredColumnDepth,
+    )
   );
 };
 
@@ -214,8 +184,6 @@ type ShouldSyncCommittedTreeFromPropsConfig = {
   hasPersistedInteractionFilters: boolean;
   runtimeLayoutMatchesCommitted: boolean;
   selectedFiltersMatchCommitted: boolean;
-  committedTreeHasRuntimeLayoutCoverage: boolean;
-  propsTreeHasStaleCoverageRegression: boolean;
 };
 
 export const shouldSyncCommittedTreeFromProps = ({
@@ -225,8 +193,6 @@ export const shouldSyncCommittedTreeFromProps = ({
   hasPersistedInteractionFilters,
   runtimeLayoutMatchesCommitted,
   selectedFiltersMatchCommitted,
-  committedTreeHasRuntimeLayoutCoverage,
-  propsTreeHasStaleCoverageRegression,
 }: ShouldSyncCommittedTreeFromPropsConfig) => {
   if (!isUserControlled) {
     return true;
@@ -241,13 +207,6 @@ export const shouldSyncCommittedTreeFromProps = ({
     return false;
   }
   if (!selectedFiltersMatchCommitted) {
-    return false;
-  }
-  if (
-    isDashboardContext &&
-    committedTreeHasRuntimeLayoutCoverage &&
-    propsTreeHasStaleCoverageRegression
-  ) {
     return false;
   }
   return true;

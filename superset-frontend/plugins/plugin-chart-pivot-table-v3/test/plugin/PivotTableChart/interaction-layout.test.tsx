@@ -43,7 +43,7 @@ import {
   applyMeasureHierarchyAxis,
 } from '../../../src/pivot/runtime/materializePivotTree';
 
-const buildInitialBootstrapTree = ({
+const buildInitialBootstrapRuntime = ({
   formData,
   runtimeLayout,
   resultsByDepth,
@@ -70,7 +70,7 @@ const buildInitialBootstrapTree = ({
     })),
     layout,
     formData: resolvedFormData,
-  }).tree;
+  });
 };
 
 describe('PivotTableChart interaction layout', () => {
@@ -1888,7 +1888,7 @@ describe('PivotTableChart interaction layout', () => {
       startCollapsed: false,
       initialDepth: 1,
     });
-    const initialTree = buildInitialBootstrapTree({
+    const initialRuntime = buildInitialBootstrapRuntime({
       formData: baseFormData,
       runtimeLayout: valuesOnlyRuntimeLayout,
       resultsByDepth: {
@@ -1948,13 +1948,14 @@ describe('PivotTableChart interaction layout', () => {
 
     const { container } = render(
       <PivotTableChart
-        data={initialTree}
+        data={initialRuntime.tree}
         formData={baseFormData}
         rawFormData={baseFormData}
         queryFormData={baseFormData}
         metrics={metrics}
         groupbyRows={[]}
         groupbyColumns={[]}
+        factBatches={initialRuntime.factBatches}
         width={600}
         height={300}
       />,

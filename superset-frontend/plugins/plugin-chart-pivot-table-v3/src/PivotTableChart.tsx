@@ -67,9 +67,8 @@ import { resolveInteractionFormData } from './pivot/layout/resolveInteractionLay
 import { shouldFetchForLayoutChange } from './pivot/layout/shouldFetchForLayoutChange';
 import {
   canProjectValueAxisShrinkWithoutFetch,
+  factBatchesCoverRuntimeLayout,
   shouldSyncCommittedTreeFromProps as shouldSyncCommittedTreeFromPropsBase,
-  treeHasStaleCoverageRegression,
-  treeHasRuntimeLayoutCoverage,
 } from './pivot/layout/committedTreeSyncGuard';
 import {
   buildInitialPivotUpdatePlan,
@@ -1254,26 +1253,14 @@ function PivotTableChart(props: PivotTableProps) {
     });
   }, [appliedFormData, appliedRuntimeLayout, formData, isUserControlled]);
   const committedTreeFromProps = data;
-  const committedTreeHasRuntimeLayoutCoverage = useMemo(
+  const committedFactBatchesCoverRuntimeLayout = useMemo(
     () =>
       !isUserControlled ||
-      treeHasRuntimeLayoutCoverage(committedTree, committedRuntimeLayout),
-    [committedRuntimeLayout, committedTree, isUserControlled],
-  );
-  const committedTreeHasStaleCoverageRegression = useMemo(
-    () =>
-      isUserControlled &&
-      treeHasStaleCoverageRegression(committedTree, committedRuntimeLayout),
-    [committedRuntimeLayout, committedTree, isUserControlled],
-  );
-  const committedTreeFromPropsHasStaleCoverageRegression = useMemo(
-    () =>
-      isUserControlled &&
-      treeHasStaleCoverageRegression(
-        committedTreeFromProps,
+      factBatchesCoverRuntimeLayout(
+        committedFactBatches,
         committedRuntimeLayout,
       ),
-    [committedRuntimeLayout, committedTreeFromProps, isUserControlled],
+    [committedFactBatches, committedRuntimeLayout, isUserControlled],
   );
   const layoutMetrics = useMemo(
     () =>
@@ -1440,15 +1427,10 @@ function PivotTableChart(props: PivotTableProps) {
           selectedFiltersForTreeSync,
           committedFilters,
         ),
-        committedTreeHasRuntimeLayoutCoverage,
-        propsTreeHasStaleCoverageRegression:
-          committedTreeFromPropsHasStaleCoverageRegression,
       }),
     [
       committedFilters,
       committedRuntimeLayout,
-      committedTreeFromPropsHasStaleCoverageRegression,
-      committedTreeHasRuntimeLayoutCoverage,
       hasLocalSyncForCurrentDashboardQueryContext,
       isDashboardContext,
       isUserControlled,
@@ -1887,7 +1869,7 @@ function PivotTableChart(props: PivotTableProps) {
       !isUserControlled ||
       !isDashboardContext ||
       hasSelectedFilters(persistedInteractionFilters) ||
-      !committedTreeHasStaleCoverageRegression ||
+      committedFactBatchesCoverRuntimeLayout ||
       seamlessLoading
     ) {
       return;
@@ -1904,7 +1886,7 @@ function PivotTableChart(props: PivotTableProps) {
     applySeamlessUpdate(uiRuntimeLayout, uiSelectedFilters);
   }, [
     applySeamlessUpdate,
-    committedTreeHasStaleCoverageRegression,
+    committedFactBatchesCoverRuntimeLayout,
     isDashboardContext,
     isUserControlled,
     persistedInteractionFilters,
@@ -1915,10 +1897,10 @@ function PivotTableChart(props: PivotTableProps) {
   ]);
 
   useEffect(() => {
-    if (committedTreeHasRuntimeLayoutCoverage) {
+    if (committedFactBatchesCoverRuntimeLayout) {
       staleCoverageRecoverySignatureRef.current = null;
     }
-  }, [committedTreeHasRuntimeLayoutCoverage]);
+  }, [committedFactBatchesCoverRuntimeLayout]);
 
   const dimensionLabelMap = useMemo(() => {
     const map = new Map<string, string>();
