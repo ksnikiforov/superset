@@ -58,19 +58,39 @@ const resolveMetricMap = (metrics: QueryFormMetric[]) => {
   return map;
 };
 
-const normalizeRuntimeLayout = (
+export const normalizeRuntimeLayout = (
   layout: PivotRuntimeLayout | undefined,
+  dimensionKeys: string[] = [],
+  metricKeys: string[] = [],
 ): PivotRuntimeLayout => {
-  if (layout && layout.version === 1) {
-    return layout;
-  }
+  const base: PivotRuntimeLayout =
+    layout && layout.version === 1
+      ? layout
+      : {
+          version: 1,
+          rows: [],
+          cols: [],
+          metrics: metricKeys,
+          leafSelection: {},
+          valuePlacement: { axis: 'col', index: 0 },
+        };
+  const rows =
+    dimensionKeys.length > 0
+      ? base.rows.filter(key => dimensionKeys.includes(key))
+      : base.rows;
+  const cols =
+    dimensionKeys.length > 0
+      ? base.cols.filter(key => dimensionKeys.includes(key))
+      : base.cols;
+  const metrics =
+    metricKeys.length > 0
+      ? base.metrics.filter(key => metricKeys.includes(key))
+      : base.metrics;
   return {
-    version: 1,
-    rows: [],
-    cols: [],
-    metrics: [],
-    leafSelection: {},
-    valuePlacement: { axis: 'col', index: 0 },
+    ...base,
+    rows,
+    cols,
+    metrics: metrics.length > 0 ? metrics : metricKeys,
   };
 };
 

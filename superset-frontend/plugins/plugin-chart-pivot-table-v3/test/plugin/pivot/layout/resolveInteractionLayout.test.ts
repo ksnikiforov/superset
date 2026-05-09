@@ -20,7 +20,10 @@ import {
   buildBuiltInLeaf,
   buildValueLeaf,
 } from '../../../../src/pivot/measureLeaves';
-import { resolveInteractionFormData } from '../../../../src/pivot/layout/resolveInteractionLayout';
+import {
+  normalizeRuntimeLayout,
+  resolveInteractionFormData,
+} from '../../../../src/pivot/layout/resolveInteractionLayout';
 import {
   getMetricKeys,
   METRICS_PLACEHOLDER,
@@ -33,6 +36,30 @@ import {
 import { buildFormData } from '../../fixtures/pivotFormData';
 
 describe('resolveInteractionFormData', () => {
+  it('normalizes persisted runtime layout against available dimensions and metrics', () => {
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: ['country', 'missing-row'],
+      cols: ['state', 'missing-col'],
+      metrics: ['sum__sales', 'missing-metric'],
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+
+    expect(
+      normalizeRuntimeLayout(
+        runtimeLayout,
+        ['country', 'state'],
+        ['sum__sales'],
+      ),
+    ).toEqual({
+      ...runtimeLayout,
+      rows: ['country'],
+      cols: ['state'],
+      metrics: ['sum__sales'],
+    });
+  });
+
   it('uses runtime layout for rows/cols, metrics order, and value placement', () => {
     const formData: PivotTableQueryFormData = buildFormData({
       interactionMode: 'user_controlled',

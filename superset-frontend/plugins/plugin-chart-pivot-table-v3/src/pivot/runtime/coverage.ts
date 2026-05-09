@@ -16,9 +16,15 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { MetricsLayoutEnum, type PivotAxis, type PivotPath } from '../../types';
+import {
+  MetricsLayoutEnum,
+  type PivotAxis,
+  type PivotPath,
+  type PivotRuntimeLayout,
+} from '../../types';
 import { getNextAxisLevelForPath } from './paths';
 import type { PivotAxisProjection } from './projection';
+import { type PivotFactStoreBatch } from './factStore';
 import type {
   PivotAxisLevel,
   PivotCoverageReason,
@@ -141,6 +147,24 @@ export const buildVisibleFactCoverage = ({
       columnDepth,
     }),
   ];
+};
+
+export const factBatchesCoverRuntimeLayout = (
+  factBatches: PivotFactStoreBatch[],
+  runtimeLayout: PivotRuntimeLayout,
+) => {
+  const requiredRowDepth = runtimeLayout.rows.length > 0 ? 1 : 0;
+  const requiredColumnDepth = runtimeLayout.cols.length > 0 ? 1 : 0;
+  return (
+    runtimeLayout.metrics.length === 0 ||
+    (requiredRowDepth === 0 && requiredColumnDepth === 0) ||
+    factBatches.some(
+      ({ coverage, scope }) =>
+        (scope.kind === 'bootstrap' || scope.kind === 'root') &&
+        coverage.rowDepth === requiredRowDepth &&
+        coverage.columnDepth === requiredColumnDepth,
+    )
+  );
 };
 
 export const buildExpansionFactCoverage = ({

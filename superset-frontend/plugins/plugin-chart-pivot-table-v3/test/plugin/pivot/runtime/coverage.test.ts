@@ -24,10 +24,13 @@ import { compilePivotProgram } from '../../../../src/pivot/runtime/compilePivotP
 import {
   buildBranchFactCoverages,
   buildExpansionFactCoverage,
+  buildFactCoverage,
   buildVisibleFactCoverage,
+  factBatchesCoverRuntimeLayout,
 } from '../../../../src/pivot/runtime/coverage';
+import { type PivotFactStoreBatch } from '../../../../src/pivot/runtime/factStore';
 import { resolveAxisProjection } from '../../../../src/pivot/runtime/projection';
-import { MetricsLayoutEnum } from '../../../../src/types';
+import { MetricsLayoutEnum, PivotRuntimeLayout } from '../../../../src/types';
 
 describe('visible fact coverage', () => {
   it('does not request coverage for a non-only hidden row layer', () => {
@@ -149,6 +152,60 @@ describe('visible fact coverage', () => {
     });
 
     expect(coverage).toEqual([]);
+  });
+});
+
+describe('runtime layout fact coverage', () => {
+  const runtimeLayout: PivotRuntimeLayout = {
+    version: 1,
+    rows: ['row1'],
+    cols: ['col1'],
+    metrics: ['m1'],
+    leafSelection: {},
+    valuePlacement: { axis: 'col', index: 0 },
+  };
+
+  const factBatch = (
+    rowDepth: number,
+    columnDepth: number,
+    scope: PivotFactStoreBatch['scope'] = { kind: 'bootstrap' },
+  ): PivotFactStoreBatch => ({
+    coverage: buildFactCoverage({
+      reason: 'initial',
+      rowDimensions: ['row1', 'row2'].slice(0, Math.max(rowDepth, 1)),
+      columnDimensions: ['col1', 'col2'].slice(0, Math.max(columnDepth, 1)),
+      rowDepth,
+      columnDepth,
+    }),
+    scope,
+    facts: [],
+  });
+
+  it('detects missing fact coverage when active runtime layout requires a column dimension', () => {
+    expect(
+      factBatchesCoverRuntimeLayout([factBatch(1, 0)], runtimeLayout),
+    ).toBe(false);
+  });
+
+  it('accepts exact bootstrap fact coverage for the active runtime layout', () => {
+    expect(
+      factBatchesCoverRuntimeLayout([factBatch(1, 1)], runtimeLayout),
+    ).toBe(true);
+  });
+
+  it('does not treat deeper fact coverage as root runtime-layout coverage', () => {
+    expect(
+      factBatchesCoverRuntimeLayout([factBatch(2, 1)], runtimeLayout),
+    ).toBe(false);
+  });
+
+  it('ignores branch coverage when checking root runtime-layout coverage', () => {
+    expect(
+      factBatchesCoverRuntimeLayout(
+        [factBatch(1, 1, { kind: 'branch', axis: 'row', path: ['A'] })],
+        runtimeLayout,
+      ),
+    ).toBe(false);
   });
 });
 

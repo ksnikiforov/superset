@@ -398,40 +398,6 @@ export const usePivotLayout = ({
   const metricIntentIndexOnRows = metricInsertIndexOnRows ?? metricIndexOnRows;
   const metricIntentIndexOnCols = metricInsertIndexOnCols ?? metricIndexOnCols;
 
-  const metricDimIndexOnRows = useMemo(() => {
-    if (resolvedMetricsLayout !== MetricsLayoutEnum.ROWS) {
-      return undefined;
-    }
-    const maxDimDepth = Object.values(data.rows).reduce((max, node) => {
-      if (node.path.some(val => isSubtotalToken(val))) {
-        return max;
-      }
-      return Math.max(max, countDimDepthBase(node.path, metricLabelSet));
-    }, 0);
-    let found: number | undefined;
-    Object.values(data.rows).forEach(node => {
-      if (node.path.some(val => isSubtotalToken(val))) {
-        return;
-      }
-      if (countDimDepthBase(node.path, metricLabelSet) !== maxDimDepth) {
-        return;
-      }
-      const idx = node.path.findIndex(val => isMetricTokenValue(val));
-      if (idx < 0) {
-        return;
-      }
-      let dimIndex = 0;
-      for (let i = 0; i < idx; i += 1) {
-        const val = node.path[i];
-        if (!isMetricTokenValue(val) && !isSubtotalToken(val)) {
-          dimIndex += 1;
-        }
-      }
-      found = Math.min(found ?? dimIndex, dimIndex);
-    });
-    return found;
-  }, [data.rows, isMetricTokenValue, metricLabelSet, resolvedMetricsLayout]);
-
   const formRowsHasPlaceholder =
     Array.isArray(formData.groupbyRows) &&
     formData.groupbyRows.some(isMetricsPlaceholder);
@@ -903,8 +869,8 @@ export const usePivotLayout = ({
         const requireMetricLabel =
           resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
           isMultiMetric &&
-          metricDimIndexOnRows !== undefined &&
-          countDimDepth(parent.path) > metricDimIndexOnRows;
+          metricLayoutIndexOnRows !== undefined &&
+          countDimDepth(parent.path) > metricLayoutIndexOnRows;
         const subtotalDescendants = Object.values(nodes).filter(node => {
           if (
             node.path.length <= parent.path.length ||
@@ -968,7 +934,6 @@ export const usePivotLayout = ({
       isMetricSubtotalNode,
       isMetricTokenValue,
       isMultiMetric,
-      metricDimIndexOnRows,
       metricIndexOnRows,
       metricLayoutIndexOnRows,
       metricsFirstOnRows,

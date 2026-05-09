@@ -63,16 +63,16 @@ import { useStickyHeaders } from './pivot/chart/useStickyHeaders';
 import { usePivotFormatting } from './pivot/chart/usePivotFormatting';
 import { usePivotInteractions } from './pivot/chart/usePivotInteractions';
 import { PivotInteractionPanel } from './pivot/chart/PivotInteractionPanel';
-import { resolveInteractionFormData } from './pivot/layout/resolveInteractionLayout';
+import {
+  normalizeRuntimeLayout,
+  resolveInteractionFormData,
+} from './pivot/layout/resolveInteractionLayout';
 import {
   isMetricOrderOnlyChange,
   isSameRuntimeLayout,
   shouldFetchForLayoutChange,
 } from './pivot/layout/shouldFetchForLayoutChange';
-import {
-  factBatchesCoverRuntimeLayout,
-  shouldSyncCommittedTreeFromProps as shouldSyncCommittedTreeFromPropsBase,
-} from './pivot/layout/committedTreeSyncGuard';
+import { factBatchesCoverRuntimeLayout } from './pivot/runtime/coverage';
 import {
   buildSelectionFilterClauses,
   mergeExtraFilters as mergeSelectionExtraFilters,
@@ -583,33 +583,6 @@ type UiColumnSortState = {
   displayColKey?: string;
   metricKey: string;
   order: 'asc' | 'desc';
-};
-
-const normalizeRuntimeLayout = (
-  layout: PivotRuntimeLayout | undefined,
-  dimensionKeys: string[],
-  metricKeys: string[],
-): PivotRuntimeLayout => {
-  const base: PivotRuntimeLayout =
-    layout && layout.version === 1
-      ? layout
-      : {
-          version: 1,
-          rows: [],
-          cols: [],
-          metrics: metricKeys,
-          leafSelection: {},
-          valuePlacement: { axis: 'col', index: 0 },
-        };
-  const rows = base.rows.filter(key => dimensionKeys.includes(key));
-  const cols = base.cols.filter(key => dimensionKeys.includes(key));
-  const metrics = base.metrics.filter(key => metricKeys.includes(key));
-  return {
-    ...base,
-    rows,
-    cols,
-    metrics: metrics.length > 0 ? metrics : metricKeys,
-  };
 };
 
 type DatasetColumnMeta = {
@@ -1136,15 +1109,9 @@ function PivotTableChart(props: PivotTableProps) {
       runtimeLayout: appliedRuntimeLayout,
     });
   }, [appliedFormData, appliedRuntimeLayout, formData, isUserControlled]);
-  const committedFactBatchesCoverRuntimeLayout = useMemo(
-    () =>
-      !isUserControlled ||
-      factBatchesCoverRuntimeLayout(
-        committedFactBatches,
-        committedRuntimeLayout,
-      ),
-    [committedFactBatches, committedRuntimeLayout, isUserControlled],
-  );
+  const committedFactBatchesCoverRuntimeLayout =
+    !isUserControlled ||
+    factBatchesCoverRuntimeLayout(committedFactBatches, committedRuntimeLayout);
   const layoutMetrics = useMemo(
     () =>
       isUserControlled ? ensureIsArray(appliedLayoutFormData.metrics) : metrics,
@@ -1278,35 +1245,12 @@ function PivotTableChart(props: PivotTableProps) {
     upstreamDashboardQueryContextSignature !== null &&
     lastLocalSyncDashboardQueryContextRef.current ===
       upstreamDashboardQueryContextSignature;
-  const shouldSyncCommittedTreeFromProps = useMemo(
-    () =>
-      shouldSyncCommittedTreeFromPropsBase({
-        isUserControlled,
-        isDashboardContext,
-        hasLocalSyncForCurrentDashboardQueryContext,
-        hasPersistedInteractionFilters: hasSelectedFilters(
-          persistedInteractionFilters,
-        ),
-        runtimeLayoutMatchesCommitted: isSameRuntimeLayout(
-          runtimeLayout,
-          committedRuntimeLayout,
-        ),
-        selectedFiltersMatchCommitted: isEqual(
-          selectedFiltersForTreeSync,
-          committedFilters,
-        ),
-      }),
-    [
-      committedFilters,
-      committedRuntimeLayout,
-      hasLocalSyncForCurrentDashboardQueryContext,
-      isDashboardContext,
-      isUserControlled,
-      persistedInteractionFilters,
-      runtimeLayout,
-      selectedFiltersForTreeSync,
-    ],
-  );
+  const shouldSyncCommittedTreeFromProps =
+    !isUserControlled ||
+    (!hasLocalSyncForCurrentDashboardQueryContext &&
+      !hasSelectedFilters(persistedInteractionFilters) &&
+      isSameRuntimeLayout(runtimeLayout, committedRuntimeLayout) &&
+      isEqual(selectedFiltersForTreeSync, committedFilters));
   useEffect(() => {
     // Ignore stale upstream updates while a local interaction update is still
     // pending.
@@ -1654,10 +1598,13 @@ function PivotTableChart(props: PivotTableProps) {
   ]);
 
   useEffect(() => {
+    if (committedFactBatchesCoverRuntimeLayout) {
+      staleCoverageRecoverySignatureRef.current = null;
+      return;
+    }
     if (
       !isDashboardRuntimeSync ||
       hasSelectedFilters(persistedInteractionFilters) ||
-      committedFactBatchesCoverRuntimeLayout ||
       seamlessLoading
     ) {
       return;
@@ -1682,12 +1629,6 @@ function PivotTableChart(props: PivotTableProps) {
     uiSelectedFilters,
     upstreamSeamlessSignature,
   ]);
-
-  useEffect(() => {
-    if (committedFactBatchesCoverRuntimeLayout) {
-      staleCoverageRecoverySignatureRef.current = null;
-    }
-  }, [committedFactBatchesCoverRuntimeLayout]);
 
   const dimensionLabelMap = useMemo(() => {
     const map = new Map<string, string>();
