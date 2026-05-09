@@ -21,6 +21,7 @@ import { type PivotAxis, type PivotTreeNode } from '../../types';
 import { parsePath } from '../../utils';
 import {
   planExpansionForAxis,
+  type PivotExpansionNodeFetchPredicate,
   type PivotExpansionPlan,
 } from '../engine/expansionPlanner';
 import { type FetchTarget } from '../query/fetchPlanOptimizer';
@@ -92,6 +93,7 @@ export const planGroupedExpansionTargets = ({
   requiredOppositeDepth,
   fetchedCoverage,
   getCoverageKey,
+  shouldFetchChildren,
 }: {
   axis: PivotAxis;
   expandedKeys: Set<string>;
@@ -99,6 +101,7 @@ export const planGroupedExpansionTargets = ({
   requiredOppositeDepth: number;
   fetchedCoverage: FetchedFactCoverageState;
   getCoverageKey: (axis: PivotAxis, key: string) => string;
+  shouldFetchChildren?: PivotExpansionNodeFetchPredicate;
 }): {
   plan: PivotExpansionPlan;
   targets: PlannedFetchTarget[];
@@ -113,6 +116,7 @@ export const planGroupedExpansionTargets = ({
     nodes,
     requiredDepth: requiredOppositeDepth,
     fetchedCoverageLookup,
+    shouldFetchChildren,
   });
 
   const grouped = buildGroupedFetchTargets({

@@ -59,7 +59,11 @@ import { fetchPivotBranchesBatch } from '../query/fetchPivotBranchesBatch';
 import { rootKey } from '../viewModel';
 import { planGroupedExpansionTargets } from './planner';
 import { createExpansionStateStore, type ExpansionStateStore } from './store';
-import { buildAxisCoverageKeyFromPathKey } from '../runtime/paths';
+import {
+  buildAxisCoverageKeyFromPathKey,
+  getNextAxisLevelForPath,
+} from '../runtime/paths';
+import { isSubtotalToken } from '../core/tokens';
 import type { PivotProgram } from '../runtime/types';
 import {
   createPivotFactStore,
@@ -711,6 +715,24 @@ export const useExpansionEngine = ({
     [invalidateInFlightRequests],
   );
 
+  const shouldFetchChildren = useCallback(
+    ({
+      axis,
+      node,
+    }: {
+      axis: PivotAxis;
+      key: string;
+      node: PivotTreeNode;
+      requiredDepth: number;
+    }) =>
+      getNextAxisLevelForPath({
+        program: pivotProgram,
+        axis,
+        path: node.path.filter(value => !isSubtotalToken(value)),
+      })?.kind === 'dimension',
+    [pivotProgram],
+  );
+
   const visibilityConfig = useMemo<ExpansionVisibilityConfig>(
     () => ({
       groupbyRowsLength,
@@ -728,6 +750,7 @@ export const useExpansionEngine = ({
       metricIndexForCols,
       isMetricTokenValue,
       countDimDepth,
+      shouldFetchChildren,
     }),
     [
       countDimDepth,
@@ -741,6 +764,7 @@ export const useExpansionEngine = ({
       metricIndexForCols,
       metricIndexForRows,
       metricLabelSet,
+      shouldFetchChildren,
     ],
   );
 
@@ -975,6 +999,7 @@ export const useExpansionEngine = ({
             requiredOppositeDepth: requiredDepth,
             fetchedCoverage: fetchedCoverageRef.current,
             getCoverageKey,
+            shouldFetchChildren,
           });
           if (plan.fetchKeys.size === 0) {
             break;
@@ -1083,6 +1108,7 @@ export const useExpansionEngine = ({
       resolveExpandedForMetrics,
       seedFetchedCoverageFromFactBatches,
       setExpandedState,
+      shouldFetchChildren,
       trackRequestInScope,
       updateLoadingKey,
     ],

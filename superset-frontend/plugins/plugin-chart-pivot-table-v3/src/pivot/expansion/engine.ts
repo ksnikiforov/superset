@@ -26,6 +26,7 @@ import {
 import { parsePath, serializePath } from '../../utils';
 import {
   planExpansionForAxis,
+  type PivotExpansionNodeFetchPredicate,
   type PivotExpansionPlan,
 } from '../engine/expansionPlanner';
 import {
@@ -64,6 +65,7 @@ export type ExpansionVisibilityConfig = {
   metricIndexForCols?: number;
   isMetricTokenValue: (value: unknown) => boolean;
   countDimDepth: (path: PivotTreeNode['path']) => number;
+  shouldFetchChildren?: PivotExpansionNodeFetchPredicate;
 };
 
 export type HydrationIterationPlan =
@@ -741,6 +743,7 @@ export const planHydrationIteration = ({
         nodes: tree.rows,
         requiredDepth: visibleColDepth,
         fetchedCoverageLookup,
+        shouldFetchChildren: config.shouldFetchChildren,
       })
     : {
         fetchKeys: new Set<string>(),
@@ -754,6 +757,7 @@ export const planHydrationIteration = ({
         nodes: tree.cols,
         requiredDepth: visibleRowDepth,
         fetchedCoverageLookup,
+        shouldFetchChildren: config.shouldFetchChildren,
       })
     : {
         fetchKeys: new Set<string>(),

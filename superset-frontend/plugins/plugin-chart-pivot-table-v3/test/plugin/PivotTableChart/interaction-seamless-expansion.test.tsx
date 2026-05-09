@@ -112,6 +112,11 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       initialRows,
       [],
     );
+    Object.values(baseTree.rows).forEach(node => {
+      if (node.path.length === 1) {
+        baseTree.rows[node.key] = { ...node, hasChildren: false };
+      }
+    });
     const runtimeLayout: PivotRuntimeLayout = {
       version: 1,
       rows: initialRows,

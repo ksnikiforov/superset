@@ -199,6 +199,37 @@ describe('pivot/expansion/planner', () => {
     ]);
   });
 
+  it('plans fetches from semantic expandability instead of tree child shape', () => {
+    const aKey = serializePath(['A']);
+    const { plan, targets } = planGroupedExpansionTargets({
+      axis: 'row',
+      expandedKeys: new Set([rootKey, aKey]),
+      nodes: {
+        [rootKey]: makeNode({ axis: 'row', path: [] }),
+        [aKey]: makeNode({
+          axis: 'row',
+          path: ['A'],
+          hasChildren: false,
+        }),
+      },
+      requiredOppositeDepth: 0,
+      fetchedCoverage: createFetchedFactCoverageState(),
+      getCoverageKey: (_axis, key) => key,
+      shouldFetchChildren: ({ key }) => key === aKey,
+    });
+
+    expect(Array.from(plan.fetchKeys)).toEqual([aKey]);
+    expect(targets).toEqual([
+      {
+        id: JSON.stringify(['row', aKey, 2, 0]),
+        axis: 'row',
+        pathKey: aKey,
+        childDepth: 2,
+        requiredOppositeDepth: 0,
+      },
+    ]);
+  });
+
   it('uses typed branch coverage to skip only the covered expanded path', () => {
     const aKey = serializePath(['A']);
     const bKey = serializePath(['B']);

@@ -43,6 +43,13 @@ export type PivotExpansionFetchedCoverageLookup = {
   ) => boolean;
 };
 
+export type PivotExpansionNodeFetchPredicate = (input: {
+  axis: PivotAxis;
+  key: string;
+  node: PivotTreeNode;
+  requiredDepth: number;
+}) => boolean;
+
 const buildCoverageProjection = (
   axis: PivotAxis,
   pathKey: string,
@@ -59,14 +66,16 @@ const isSatisfiedNode = ({
   node,
   requiredDepth,
   fetchedCoverageLookup,
+  shouldFetchChildren,
 }: {
   axis: PivotAxis;
   key: string;
   node: PivotTreeNode;
   requiredDepth: number;
   fetchedCoverageLookup: PivotExpansionFetchedCoverageLookup;
+  shouldFetchChildren: PivotExpansionNodeFetchPredicate;
 }) => {
-  if (!node.hasChildren) {
+  if (!shouldFetchChildren({ axis, key, node, requiredDepth })) {
     return true;
   }
   const fetchedDepth = fetchedCoverageLookup.getFetchedDepth(
@@ -77,6 +86,9 @@ const isSatisfiedNode = ({
   }
   return false;
 };
+
+const shouldFetchNodeChildrenFromTreeShape: PivotExpansionNodeFetchPredicate =
+  ({ node }) => node.hasChildren;
 
 const resolveNearestPresentAncestorKey = (
   nodes: Record<string, PivotTreeNode>,
@@ -101,12 +113,14 @@ export const planExpansionForAxis = ({
   nodes,
   requiredDepth,
   fetchedCoverageLookup,
+  shouldFetchChildren = shouldFetchNodeChildrenFromTreeShape,
 }: {
   axis: PivotAxis;
   expandedKeys: Set<string>;
   nodes: Record<string, PivotTreeNode>;
   requiredDepth: number;
   fetchedCoverageLookup: PivotExpansionFetchedCoverageLookup;
+  shouldFetchChildren?: PivotExpansionNodeFetchPredicate;
 }): PivotExpansionPlan => {
   const fetchKeys = new Set<string>();
   const pendingKeys = new Set<string>();
@@ -128,6 +142,7 @@ export const planExpansionForAxis = ({
           node,
           requiredDepth,
           fetchedCoverageLookup,
+          shouldFetchChildren,
         })
       ) {
         return;
@@ -155,6 +170,7 @@ export const planExpansionForAxis = ({
         node: ancestor,
         requiredDepth,
         fetchedCoverageLookup,
+        shouldFetchChildren,
       })
     ) {
       if (
