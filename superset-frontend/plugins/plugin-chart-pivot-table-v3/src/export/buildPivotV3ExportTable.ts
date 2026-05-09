@@ -25,13 +25,6 @@ const EXPORT_CELL_TYPE_ATTR = 'data-pivot-export-type';
 const EXPORT_CELL_VALUE_ATTR = 'data-pivot-export-value';
 const EXPORT_SUBTOTAL_ROW_ATTR = 'data-pivot-export-subtotal-row';
 
-type RowDepthInfo = {
-  row: HTMLTableRowElement;
-  depth: number;
-  isGrandTotal: boolean;
-  isSubtotal: boolean;
-};
-
 const getText = (value: string | null | undefined) =>
   (value ?? '').replace(/\s+/g, ' ').trim();
 
@@ -71,69 +64,27 @@ const parseRowTotalLabel = (table: HTMLTableElement): string => {
   return parsed || 'Total';
 };
 
-const collectRowDepthInfo = (rows: HTMLTableRowElement[]): RowDepthInfo[] =>
-  rows
-    .map(row => ({
-      row,
-      depth: parseDepth(row),
-      isGrandTotal: row.classList.contains('pivot-grand-total-row'),
-      isSubtotal:
-        row.cells[0]?.tagName === 'TH' &&
-        row.cells[0].classList.contains('subtotal-cell'),
-    }))
-    .filter(
-      (
-        entry,
-      ): entry is {
-        row: HTMLTableRowElement;
-        depth: number;
-        isGrandTotal: boolean;
-        isSubtotal: boolean;
-      } => typeof entry.depth === 'number',
-    );
-
-const resolveOneBasedDepthNormalization = (depthInfo: RowDepthInfo[]) => {
-  const nonGrandDepths = depthInfo
-    .filter(entry => !entry.isGrandTotal)
-    .map(entry => entry.depth);
-  const nonGrandNonSubtotalDepths = depthInfo
-    .filter(entry => !entry.isGrandTotal && !entry.isSubtotal)
-    .map(entry => entry.depth);
-  const depthsForNormalization =
-    nonGrandNonSubtotalDepths.length > 0
-      ? nonGrandNonSubtotalDepths
-      : nonGrandDepths;
-  return (
-    depthsForNormalization.length > 0 &&
-    !depthsForNormalization.some(depth => depth === 0)
-  );
-};
-
-const normalizeDepth = (
-  depth: number,
-  shouldNormalizeOneBasedDepth: boolean,
-) => (shouldNormalizeOneBasedDepth && depth > 0 ? depth - 1 : depth);
-
 const resolveDepthCount = (
   rows: HTMLTableRowElement[],
   axisLabels: string[],
 ): number => {
-  const depthInfo = collectRowDepthInfo(rows);
+  const depthInfo = rows
+    .map(row => ({ row, depth: parseDepth(row) }))
+    .filter(
+      (entry): entry is { row: HTMLTableRowElement; depth: number } =>
+        typeof entry.depth === 'number',
+    );
   if (depthInfo.length === 0) {
     return axisLabels.length;
   }
 
-  const shouldNormalizeOneBasedDepth =
-    resolveOneBasedDepthNormalization(depthInfo);
   const nonGrandDepths = depthInfo
-    .filter(entry => !entry.isGrandTotal)
-    .map(entry => normalizeDepth(entry.depth, shouldNormalizeOneBasedDepth));
+    .filter(entry => !entry.row.classList.contains('pivot-grand-total-row'))
+    .map(entry => entry.depth);
   const normalizedDepths =
     nonGrandDepths.length > 0
       ? nonGrandDepths
-      : depthInfo.map(entry =>
-          normalizeDepth(entry.depth, shouldNormalizeOneBasedDepth),
-        );
+      : depthInfo.map(entry => entry.depth);
   const maxDepth = normalizedDepths.reduce(
     (max, depth) => (depth > max ? depth : max),
     -1,
@@ -194,13 +145,6 @@ const splitRowHeadersIntoColumns = (
     table.querySelectorAll<HTMLTableRowElement>('tbody tr'),
   );
   const activePath: string[] = [];
-  const depthInfo = collectRowDepthInfo(bodyRows);
-  const depthInfoByRow = new WeakMap<HTMLTableRowElement, RowDepthInfo>();
-  depthInfo.forEach(entry => {
-    depthInfoByRow.set(entry.row, entry);
-  });
-  const shouldNormalizeOneBasedDepth =
-    resolveOneBasedDepthNormalization(depthInfo);
 
   const rowsForExport = bodyRows.map(row => {
     const firstCell = row.cells[0];
@@ -209,13 +153,9 @@ const splitRowHeadersIntoColumns = (
     const isGrandTotalRow = row.classList.contains('pivot-grand-total-row');
     const isSubtotalRow =
       !isGrandTotalRow && sourceHeader?.classList.contains('subtotal-cell');
-    const parsedDepth = depthInfoByRow.get(row)?.depth;
+    const parsedDepth = parseDepth(row);
     const depth =
-      typeof parsedDepth === 'number'
-        ? normalizeDepth(parsedDepth, shouldNormalizeOneBasedDepth)
-        : sourceHeader
-          ? 0
-          : null;
+      typeof parsedDepth === 'number' ? parsedDepth : sourceHeader ? 0 : null;
     const clampedDepth =
       typeof depth === 'number'
         ? Math.max(0, Math.min(depth, depthCount - 1))

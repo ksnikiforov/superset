@@ -185,6 +185,18 @@ describe('PivotTableChart basic regression smoke guardrails', () => {
     fireEvent.click(expandToggle);
 
     await waitFor(() => expect(screen.getByText('X')).toBeInTheDocument());
+    expect(
+      screen
+        .getByText('A')
+        .closest('[data-pivot-row-depth]')
+        ?.getAttribute('data-pivot-row-depth'),
+    ).toBe('0');
+    expect(
+      screen
+        .getByText('X')
+        .closest('[data-pivot-row-depth]')
+        ?.getAttribute('data-pivot-row-depth'),
+    ).toBe('1');
   });
 
   it('keeps visible column headers after adding first column dimension in Values-only layout', async () => {

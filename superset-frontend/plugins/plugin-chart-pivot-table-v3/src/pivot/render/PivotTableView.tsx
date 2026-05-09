@@ -614,10 +614,13 @@ export const PivotTableView = ({
                 Object.keys(rowHeaderStyle).length > 0
                   ? rowHeaderStyle
                   : undefined;
-              const rowDepthForExport = isMetricGrandTotalRow
+              const rowDisplayDepth = isMetricGrandTotalRow
                 ? 0
                 : getNodeDimDepth(row);
-              const rowIndent = rowDepthForExport * ROW_INDENT_PX;
+              const rowDepthForExport = isGrandTotalLike
+                ? 0
+                : Math.max(rowDisplayDepth - 1, 0);
+              const rowIndent = rowDisplayDepth * ROW_INDENT_PX;
               const isRowLoading = showSpinner(row.key);
               return (
                 <tr

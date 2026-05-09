@@ -113,7 +113,7 @@ describe('buildPivotV3ExportTable', () => {
     expect(headerCells).toEqual(['Row 1', 'Row 2', 'Metric']);
   });
 
-  it('does not create extra row header columns when axis labels are shorter than depth markers', () => {
+  it('does not create extra row header columns for a single row level', () => {
     document.body.innerHTML = `
       <table class="pivot-v3-table" data-pivot-row-axis-labels='["resellerName"]'>
         <thead>
@@ -125,7 +125,7 @@ describe('buildPivotV3ExportTable', () => {
         <tbody>
           <tr>
             <th>
-              <div data-pivot-row-depth="1">
+              <div data-pivot-row-depth="0">
                 <span data-pivot-row-label>A Bike Store</span>
               </div>
             </th>
@@ -149,7 +149,7 @@ describe('buildPivotV3ExportTable', () => {
     expect(rowCells).toEqual(['A Bike Store', '10']);
   });
 
-  it('normalizes one-based depth markers to keep row labels in correct columns', () => {
+  it('uses semantic depth markers to keep row labels in correct columns', () => {
     document.body.innerHTML = `
       <table class="pivot-v3-table" data-pivot-row-axis-labels='["productModel","productColor","productName"]'>
         <thead>
@@ -161,7 +161,7 @@ describe('buildPivotV3ExportTable', () => {
         <tbody>
           <tr>
             <th>
-              <div data-pivot-row-depth="1">
+              <div data-pivot-row-depth="0">
                 <span data-pivot-row-label>Road-250</span>
               </div>
             </th>
@@ -169,7 +169,7 @@ describe('buildPivotV3ExportTable', () => {
           </tr>
           <tr>
             <th>
-              <div data-pivot-row-depth="2">
+              <div data-pivot-row-depth="1">
                 <span data-pivot-row-label>Red</span>
               </div>
             </th>
@@ -177,7 +177,7 @@ describe('buildPivotV3ExportTable', () => {
           </tr>
           <tr>
             <th>
-              <div data-pivot-row-depth="3">
+              <div data-pivot-row-depth="2">
                 <span data-pivot-row-label>Road-250 Red, 58</span>
               </div>
             </th>
@@ -199,7 +199,7 @@ describe('buildPivotV3ExportTable', () => {
     expect(bodyRows[2]).toEqual(['Road-250', 'Red', 'Road-250 Red, 58', '20']);
   });
 
-  it('normalizes one-based depths even when a grand total row is depth 0', () => {
+  it('keeps grand total isolated with semantic depth markers', () => {
     document.body.innerHTML = `
       <table class="pivot-v3-table" data-pivot-row-axis-labels='["productModel","productColor","productName"]'>
         <thead>
@@ -219,7 +219,7 @@ describe('buildPivotV3ExportTable', () => {
           </tr>
           <tr>
             <th>
-              <div data-pivot-row-depth="1">
+              <div data-pivot-row-depth="0">
                 <span data-pivot-row-label>Road-250</span>
               </div>
             </th>
@@ -227,7 +227,7 @@ describe('buildPivotV3ExportTable', () => {
           </tr>
           <tr>
             <th>
-              <div data-pivot-row-depth="2">
+              <div data-pivot-row-depth="1">
                 <span data-pivot-row-label>Red</span>
               </div>
             </th>
@@ -235,7 +235,7 @@ describe('buildPivotV3ExportTable', () => {
           </tr>
           <tr>
             <th>
-              <div data-pivot-row-depth="3">
+              <div data-pivot-row-depth="2">
                 <span data-pivot-row-label>Road-250 Red, 58</span>
               </div>
             </th>
@@ -258,7 +258,7 @@ describe('buildPivotV3ExportTable', () => {
     expect(bodyRows[3]).toEqual(['Road-250', 'Red', 'Road-250 Red, 58', '100']);
   });
 
-  it('normalizes one-based depths when subtotal rows use depth 0', () => {
+  it('keeps subtotal rows aligned with semantic depth markers', () => {
     document.body.innerHTML = `
       <table class="pivot-v3-table" data-pivot-row-axis-labels='["productColor","productModel","productName"]'>
         <thead>
@@ -278,7 +278,7 @@ describe('buildPivotV3ExportTable', () => {
           </tr>
           <tr>
             <th>
-              <div data-pivot-row-depth="1">
+              <div data-pivot-row-depth="0">
                 <span data-pivot-row-label>Blue</span>
               </div>
             </th>
@@ -286,7 +286,7 @@ describe('buildPivotV3ExportTable', () => {
           </tr>
           <tr>
             <th>
-              <div data-pivot-row-depth="2">
+              <div data-pivot-row-depth="1">
                 <span data-pivot-row-label>Classic Vest</span>
               </div>
             </th>
@@ -320,7 +320,7 @@ describe('buildPivotV3ExportTable', () => {
         <tbody>
           <tr>
             <th>
-              <div data-pivot-row-depth="1">
+              <div data-pivot-row-depth="0">
                 <span data-pivot-row-label>Road-250</span>
               </div>
             </th>
@@ -328,7 +328,7 @@ describe('buildPivotV3ExportTable', () => {
           </tr>
           <tr>
             <th>
-              <div data-pivot-row-depth="2">
+              <div data-pivot-row-depth="1">
                 <span data-pivot-row-label>Red</span>
               </div>
             </th>
@@ -336,7 +336,7 @@ describe('buildPivotV3ExportTable', () => {
           </tr>
           <tr>
             <th>
-              <div data-pivot-row-depth="3">
+              <div data-pivot-row-depth="2">
                 <span data-pivot-row-label>Road-250 Red, 58</span>
               </div>
             </th>
@@ -344,7 +344,7 @@ describe('buildPivotV3ExportTable', () => {
           </tr>
           <tr>
             <th>
-              <div data-pivot-row-depth="3">
+              <div data-pivot-row-depth="2">
                 <span data-pivot-row-label>Road-250 Red, 44</span>
               </div>
             </th>
@@ -352,7 +352,7 @@ describe('buildPivotV3ExportTable', () => {
           </tr>
           <tr>
             <th>
-              <div data-pivot-row-depth="2">
+              <div data-pivot-row-depth="1">
                 <span data-pivot-row-label>Subtotal</span>
               </div>
             </th>
@@ -360,7 +360,7 @@ describe('buildPivotV3ExportTable', () => {
           </tr>
           <tr>
             <th>
-              <div data-pivot-row-depth="2">
+              <div data-pivot-row-depth="1">
                 <span data-pivot-row-label>Black</span>
               </div>
             </th>
@@ -385,7 +385,7 @@ describe('buildPivotV3ExportTable', () => {
     expect(bodyRows[5]).toEqual(['Road-250', 'Black', '', '500']);
   });
 
-  it('keeps top grand total isolated and aligns one-based partial expansions', () => {
+  it('keeps top grand total isolated and aligns partial expansions', () => {
     document.body.innerHTML = `
       <table class="pivot-v3-table" data-pivot-row-axis-labels='["productColor","productModel","productName"]'>
         <thead>
@@ -405,7 +405,7 @@ describe('buildPivotV3ExportTable', () => {
           </tr>
           <tr>
             <th>
-              <div data-pivot-row-depth="1">
+              <div data-pivot-row-depth="0">
                 <span data-pivot-row-label>Blue</span>
               </div>
             </th>
@@ -413,7 +413,7 @@ describe('buildPivotV3ExportTable', () => {
           </tr>
           <tr>
             <th>
-              <div data-pivot-row-depth="2">
+              <div data-pivot-row-depth="1">
                 <span data-pivot-row-label>Classic Vest</span>
               </div>
             </th>
@@ -611,7 +611,7 @@ describe('buildPivotV3ExportTable', () => {
           </tr>
           <tr>
             <th>
-              <div data-pivot-row-depth="1">
+              <div data-pivot-row-depth="0">
                 <span data-pivot-row-label>[Not Applicable]</span>
               </div>
             </th>
@@ -620,7 +620,7 @@ describe('buildPivotV3ExportTable', () => {
           </tr>
           <tr>
             <th class="subtotal-cell">
-              <div data-pivot-row-depth="1">
+              <div data-pivot-row-depth="0">
                 <span data-pivot-row-label>A Bike Store</span>
               </div>
             </th>
@@ -629,7 +629,7 @@ describe('buildPivotV3ExportTable', () => {
           </tr>
           <tr>
             <th>
-              <div data-pivot-row-depth="2">
+              <div data-pivot-row-depth="1">
                 <span data-pivot-row-label>LL Road Frame</span>
               </div>
             </th>
@@ -638,7 +638,7 @@ describe('buildPivotV3ExportTable', () => {
           </tr>
           <tr>
             <th class="subtotal-cell">
-              <div data-pivot-row-depth="1">
+              <div data-pivot-row-depth="0">
                 <span data-pivot-row-label>A Great Bicycle Company</span>
               </div>
             </th>
@@ -709,7 +709,7 @@ describe('buildPivotV3ExportTable', () => {
           </tr>
           <tr>
             <th class="subtotal-cell">
-              <div data-pivot-row-depth="1">
+              <div data-pivot-row-depth="0">
                 <span data-pivot-row-label>A Bike Store</span>
               </div>
             </th>
@@ -718,7 +718,7 @@ describe('buildPivotV3ExportTable', () => {
           </tr>
           <tr>
             <th>
-              <div data-pivot-row-depth="2">
+              <div data-pivot-row-depth="1">
                 <span data-pivot-row-label>Road-150</span>
               </div>
             </th>
