@@ -58,10 +58,10 @@ cells are projections of DB facts, not canonical data.
 ## Current Status
 
 As of May 10, 2026, after
-`c9535fef2b refactor(pivot-table-v3): require export row depth markers`:
+`18f5a03252 refactor(pivot-table-v3): simplify expansion hydration context`:
 
 - Overall transition estimate: **82%**.
-- Goal-weighted completion estimate: **81%**.
+- Goal-weighted completion estimate: **82%**.
 - The runtime architecture exists and is used by the main paths.
 - The project is past line-count break-even, but not done.
 - The remaining work is mostly deletion of old chart, expansion, and render
@@ -70,13 +70,13 @@ As of May 10, 2026, after
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `7734` insertions, `9271` deletions, net `-1537`.
-- Current production `src` TypeScript/TSX total: `31973` lines.
+- Production `src`: `7786` insertions, `9338` deletions, net `-1552`.
+- Current production `src` TypeScript/TSX total: `31958` lines.
 - Implied baseline `src` total: about `33510` lines.
 - Added files: `+4228 / -0` across `15` files.
 - Deleted files: `+0 / -1419` across `8` files.
-- Modified files: `+3506 / -7852`, net `-4346`.
-- Pre-existing production files are net `-5765`.
+- Modified files: `+3558 / -7919`, net `-4361`.
+- Pre-existing production files are net `-5780`.
 
 The readout is mixed but improving: the new runtime files still account for
 `4228` added lines, while old production files have shrunk enough to leave the
@@ -90,7 +90,7 @@ plugin net-negative overall.
 | Gate 2: query planning from coverage      |        90% | Initial/root/branch/batch query paths use explicit coverage metadata. Branch and grouped-batch fetch params no longer expose tree shape. Remaining work is mostly support/totals coverage composition.                                               |
 | Gate 3: central fact ingestion/store      |        91% | Fetch paths return fact batches, cache/fact-store hits use exact coverage, and ingestion is isolated. Remaining coupling is mostly tree-shaped chart/test boundaries.                                                                                |
 | Gate 4: one tree materializer             |        88% | `materializePivotTree.ts` owns fact-to-tree materialization, Values/metric/measure axes, subtotal leaf injection, and measure-leaf value application. Export no longer repairs row depth semantics, but still needs a cleaner model boundary.        |
-| Gate 5: expansion reducer/runtime effects |        78% | Expansion no longer derives fetched state from rendered tree shape. It uses explicit fact coverage, semantic fetchability, shared fetch execution, and request lifecycles. The hook still owns hydration iteration, cancellation, and React commits. |
+| Gate 5: expansion reducer/runtime effects |        79% | Expansion no longer derives fetched state from rendered tree shape. It uses explicit fact coverage, semantic fetchability, shared fetch execution, and request lifecycles. The hook still owns hydration iteration, cancellation, and React commits. |
 | Gate 6: pure render model                 |        85% | Projection drives toggle eligibility, collapsed Values, column display, visible-axis construction, and semantic export row depth. Remaining risk is deeper row subtotal policy and some metric-index compatibility behavior.                         |
 | Gate 7: chart component cleanup           |        52% | The chart delegates runtime fetch decisions and no longer vetoes metric-order-only commits. It still owns committed-tree sync, dimension filters, interaction wiring, and several controller-like effects.                                           |
 
@@ -104,6 +104,8 @@ plugin net-negative overall.
   not through materialized tree shape.
 - Expansion planning asks the compiled pivot program whether a visible toggle
   can fetch a semantic child.
+- Expansion fetch execution carries coverage depths, not a staged tree snapshot,
+  and hydration loader cleanup now uses one finalization path.
 - No-dimension layouts require explicit root coverage before materialization.
 - Branch-cache entries store fact batches, not rendered trees.
 - Measure-leaf value application is inside `materializePivotTree`.
@@ -138,7 +140,7 @@ plugin net-negative overall.
 Largest relevant production files:
 
 - `PivotTableChart.tsx`: `2531` lines.
-- `useExpansionEngine.ts`: `1702` lines.
+- `useExpansionEngine.ts`: `1687` lines.
 - `usePivotFormatting.tsx`: `1632` lines.
 - `PivotDndMetricSelect.tsx`: `1566` lines.
 - `utils.ts`: `1464` lines.
@@ -239,6 +241,9 @@ git diff --check
 
 Recent validation:
 
+- `18f5a03252`: touched-file ESLint passed for `useExpansionEngine.ts`;
+  focused Jest passed for persisted prefetch, stale prefetch, initial-depth
+  prefetch, and cross-axis expansion guardrails (`5` suites).
 - `c9535fef2b`: touched-file ESLint passed for
   `buildPivotV3ExportTable.ts` and export tests; focused Jest passed for export
   table behavior and chart smoke guardrails (`16` tests).
