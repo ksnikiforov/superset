@@ -23,7 +23,6 @@ import {
 import { compilePivotProgram } from '../../../../src/pivot/runtime/compilePivotProgram';
 import {
   buildBranchFactCoverages,
-  buildExpansionFactCoverage,
   buildFactCoverage,
   buildVisibleFactCoverage,
   factBatchesCoverRuntimeLayout,
@@ -90,68 +89,6 @@ describe('visible fact coverage', () => {
     });
 
     expect(coverage[0].rowDimensions).toEqual(['country']);
-  });
-
-  it('does not request DB coverage when expansion only reveals Values', () => {
-    const program = compilePivotProgram({
-      groupbyRows: ['country', METRICS_PLACEHOLDER, 'state'],
-      metrics: ['sales'],
-      metricsLayout: MetricsLayoutEnum.ROWS,
-    });
-
-    const coverage = buildExpansionFactCoverage({
-      program,
-      axis: 'row',
-      expandedAxisLevelIndex: 0,
-      currentRowDepth: 1,
-      currentColumnDepth: 0,
-    });
-
-    expect(coverage).toEqual([]);
-  });
-
-  it('requests only the newly visible dimension after Values expansion', () => {
-    const program = compilePivotProgram({
-      groupbyRows: ['country', METRICS_PLACEHOLDER, 'state'],
-      metrics: ['sales'],
-      metricsLayout: MetricsLayoutEnum.ROWS,
-    });
-
-    const coverage = buildExpansionFactCoverage({
-      program,
-      axis: 'row',
-      expandedAxisLevelIndex: 1,
-      currentRowDepth: 1,
-      currentColumnDepth: 0,
-    });
-
-    expect(coverage).toEqual([
-      {
-        reason: 'expand',
-        rowDepth: 2,
-        columnDepth: 0,
-        rowDimensions: ['country', 'state'],
-        columnDimensions: [],
-      },
-    ]);
-  });
-
-  it('does not request DB coverage when root expansion reveals Values first', () => {
-    const program = compilePivotProgram({
-      groupbyColumns: [METRICS_PLACEHOLDER, 'month'],
-      metrics: ['sales'],
-      metricsLayout: MetricsLayoutEnum.COLUMNS,
-    });
-
-    const coverage = buildExpansionFactCoverage({
-      program,
-      axis: 'col',
-      expandedAxisLevelIndex: -1,
-      currentRowDepth: 0,
-      currentColumnDepth: 0,
-    });
-
-    expect(coverage).toEqual([]);
   });
 });
 

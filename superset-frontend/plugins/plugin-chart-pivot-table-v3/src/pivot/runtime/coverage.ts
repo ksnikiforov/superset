@@ -26,7 +26,6 @@ import { getNextAxisLevelForPath } from './paths';
 import type { PivotAxisProjection } from './projection';
 import { type PivotFactStoreBatch } from './factStore';
 import type {
-  PivotAxisLevel,
   PivotCoverageReason,
   PivotFactCoverage,
   PivotProgram,
@@ -45,14 +44,6 @@ export type FactCoverageInput = {
   rowDepth: number;
   columnDepth: number;
   reason?: PivotCoverageReason;
-};
-
-export type ExpansionFactCoverageInput = {
-  program: PivotProgram;
-  axis: PivotAxis;
-  expandedAxisLevelIndex: number;
-  currentRowDepth: number;
-  currentColumnDepth: number;
 };
 
 export type ExpansionValuesLevelInput = {
@@ -85,26 +76,12 @@ const clampDepth = (depth: number, maxDepth: number) => {
   return Math.min(Math.max(Math.floor(depth), 0), maxDepth);
 };
 
-const axisProgramFor = (program: PivotProgram, axis: PivotAxis) =>
-  axis === 'row' ? program.rows : program.columns;
-
 const parentDepth = (depth: number) => Math.max(depth - 1, 0);
 
 const rangeFromOne = (depth: number): number[] =>
   Array.from({ length: depth }, (_, idx) => idx + 1);
 
 const uniqueDepths = (depths: number[]) => Array.from(new Set(depths));
-
-const countDimensionsThroughLevel = (
-  axisProgram: PivotProgram['rows'],
-  levelIndex: number,
-) =>
-  axisProgram
-    .slice(0, levelIndex + 1)
-    .filter(
-      (level): level is Extract<PivotAxisLevel, { kind: 'dimension' }> =>
-        level.kind === 'dimension',
-    ).length;
 
 export const expansionRevealsValuesLevel = (input: ExpansionValuesLevelInput) =>
   getNextAxisLevelForPath(input)?.kind === 'values';
@@ -165,57 +142,6 @@ export const factBatchesCoverRuntimeLayout = (
         coverage.columnDepth === requiredColumnDepth,
     )
   );
-};
-
-export const buildExpansionFactCoverage = ({
-  program,
-  axis,
-  expandedAxisLevelIndex,
-  currentRowDepth,
-  currentColumnDepth,
-}: ExpansionFactCoverageInput): PivotFactCoverage[] => {
-  const axisProgram = axisProgramFor(program, axis);
-  const nextLevelIndex = expandedAxisLevelIndex + 1;
-  const nextLevel = axisProgram[nextLevelIndex];
-
-  if (!nextLevel || nextLevel.kind === 'values') {
-    return [];
-  }
-
-  const requiredDepth = countDimensionsThroughLevel(
-    axisProgram,
-    nextLevelIndex,
-  );
-
-  if (axis === 'row') {
-    const currentDepth = clampDepth(
-      currentRowDepth,
-      program.rowDimensions.length,
-    );
-    if (requiredDepth <= currentDepth) {
-      return [];
-    }
-    return buildVisibleFactCoverage({
-      program,
-      rowDepth: requiredDepth,
-      columnDepth: currentColumnDepth,
-      reason: 'expand',
-    });
-  }
-
-  const currentDepth = clampDepth(
-    currentColumnDepth,
-    program.columnDimensions.length,
-  );
-  if (requiredDepth <= currentDepth) {
-    return [];
-  }
-  return buildVisibleFactCoverage({
-    program,
-    rowDepth: currentRowDepth,
-    columnDepth: requiredDepth,
-    reason: 'expand',
-  });
 };
 
 export const buildBranchFactCoverages = ({

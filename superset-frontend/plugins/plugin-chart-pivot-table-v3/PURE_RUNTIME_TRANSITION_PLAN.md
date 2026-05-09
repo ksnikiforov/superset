@@ -275,12 +275,12 @@ they delete more code than they add in the same slice.
 Current source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `7884` insertions, `8214` deletions, net `-330`.
-- Current production `src` TypeScript/TSX total: `33180` lines.
+- Production `src`: `7810` insertions, `8214` deletions, net `-404`.
+- Current production `src` TypeScript/TSX total: `33106` lines.
 - Pre-existing production files are net negative:
   `+3094 / -8214`, net `-5120`.
 - Added runtime/helper files are still the source of total growth:
-  `+4790 / -0` across `16` added files.
+  `+4716 / -0` across `16` added files.
 
 The important read is mixed: production files that predated the refactor have
 shrunk substantially, but the runtime layer has not yet paid for itself in total
@@ -328,7 +328,7 @@ Weighted interpretation:
 - Biggest remaining UX risk: very large result sets can still monopolize JSON
   parsing and React commit despite chunked ingestion/materialization.
 - Biggest remaining line-count debt: the runtime layer is correct, but the
-  `4790` added-file lines still need more old chart/render/expansion code
+  `4716` added-file lines still need more old chart/render/expansion code
   deleted.
 
 Requirement reassessment:
@@ -336,8 +336,8 @@ Requirement reassessment:
 - Architecture completion: **76%**. The compiler/fact-store/materializer
   pipeline exists and is used by the main fetch paths. Remaining work is mostly
   deleting old interpretation surfaces, not inventing the architecture.
-- Production line-deletion completion: **84%**. Pre-existing files are net `5120`
-  lines smaller, and total production source is now net `330` lines smaller
+- Production line-deletion completion: **85%**. Pre-existing files are net `5120`
+  lines smaller, and total production source is now net `404` lines smaller
   because the runtime materializer, render/visibility, and chart sync surfaces
   have started to shed compatibility API.
 - Interactivity requirement completion: **71%**. Layout refresh and expansion
@@ -377,7 +377,7 @@ Refactor health:
   and production fetch paths use it.
 - Deletion payoff: **past break-even and improving**. Pre-existing source files
   are net `-5120`, and added runtime/helper files now leave the plugin net
-  `-330`.
+  `-404`.
 - Interactivity: **partially improved**. Latest-only requests, reducer loading
   state, chunked materialization, cheaper child traversal, and no-hidden-layer
   fetch planning are in place, but the user-visible lag from large
@@ -423,15 +423,15 @@ Tests and Markdown are excluded.
 
 Current diff from baseline:
 
-- `7884` insertions
+- `7810` insertions
 - `8214` deletions
-- net `-330` production source lines
-- current `src` code total: `33180` lines
+- net `-404` production source lines
+- current `src` code total: `33106` lines
 - implied baseline `src` total: about `33510` lines
 
 By file status:
 
-- Added files: `+4790 / -0` across `16` files
+- Added files: `+4716 / -0` across `16` files
 - Deleted files: `+0 / -1122` across `6` files
 - Modified files: `+3094 / -7092`, net `-3998`
 
@@ -439,19 +439,19 @@ By area:
 
 | Area              | Additions | Deletions |     Net | Readout                                                                                                      |
 | ----------------- | --------: | --------: | ------: | ------------------------------------------------------------------------------------------------------------ |
-| Runtime           |      3645 |         0 | `+3645` | Correct new boundary, but still the largest source of net growth.                                            |
+| Runtime           |      3571 |         0 | `+3571` | Correct new boundary, but still the largest source of net growth.                                            |
 | Expansion         |      2007 |      2702 |  `-695` | Recent Gate 5 work made this area net-negative, but future work must still delete hook branches immediately. |
 | Chart hooks       |       787 |      1722 |  `-935` | Render/layout repair is shrinking; the latest Gate 6 slices are net-negative.                                |
 | Query             |       594 |       618 |   `-24` | Old branch planner deleted, but specs/bootstrap grew around coverage.                                        |
-| Core tree         |         8 |      1014 | `-1006` | Best completed simplification; raw-record fixture construction is no longer in production `src`.             |
+| Core tree         |         2 |      1014 | `-1012` | Best completed simplification; raw-record fixture construction is no longer in production `src`.             |
 | `PivotTableChart` |       291 |       863 |  `-572` | Chart shrinkage is now visible, but controller cleanup still has a long way to go.                           |
-| Other             |       552 |      1295 |  `-743` | Utility/render/visibility cleanup now includes the shared child lookup cache.                                |
+| Other             |       558 |      1295 |  `-737` | Utility/render/visibility cleanup now includes the shared child lookup cache.                                |
 
 Why deletions are lower than expected:
 
 - We paid the runtime-layer cost first: materializer, fact store, coverage,
   projection, paths, request lifecycle, chunking, and seamless runtime helpers
-  add `3645` lines before all old callers/repairs have been deleted.
+  add `3571` lines before all old callers/repairs have been deleted.
 - Compatibility has not been cut deeply enough. Flexible Values placement stayed
   and old row/column projection/layout behavior is still being supported in
   `usePivotLayout`, `visibility`, `usePivotRenderModel`, and `PivotTableChart`.
@@ -861,8 +861,16 @@ Latest code-reduction slice:
 - Verification after the child lookup cache: single-process Jest passed for
   render model, expansion engine, chart basic regression smoke, and interaction
   layout suites (`36` tests), and touched-file ESLint passed.
+- Runtime coverage API cleanup: the unused `buildExpansionFactCoverage` helper,
+  its input type, and its private depth-counting helpers were deleted. The
+  active expansion/query paths already use branch coverage and Values-level
+  checks instead.
+- Additional production change for that follow-up: `+0 / -74`, net `-74`.
+- Verification after the coverage API cleanup: single-process Jest passed for
+  runtime coverage, runtime-coverage query specs, fetch-branch batching, and
+  expansion planner suites (`26` tests), and touched-file ESLint passed.
 - Combined recent Gate 4/Gate 5/Gate 6/Gate 7 source-change sequence:
-  `+2119 / -4523`, net `-2404`.
+  `+2119 / -4597`, net `-2478`.
 - Attempted render-model plumbing cleanup around spinner callbacks, sorting
   value-map aliases, leaf-label flattening, and aggregate-bold returns was
   reverted before this slice because it did not pay for itself clearly enough
