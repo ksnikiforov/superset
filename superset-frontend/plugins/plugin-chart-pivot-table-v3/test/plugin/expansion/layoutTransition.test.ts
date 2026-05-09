@@ -71,7 +71,7 @@ const baseTransitionConfig = {
 };
 
 describe('pivot/expansion/layoutTransition', () => {
-  it('uses the current expansion tree for layout changes without fresh data', () => {
+  it('does not trust existing deeper tree shape for layout changes without fresh data', () => {
     const usKey = serializePath(['US']);
     const usCaKey = serializePath(['US', 'CA']);
     const data = makeTree({
@@ -95,9 +95,9 @@ describe('pivot/expansion/layoutTransition', () => {
       currentLayout: { rows: ['country', 'state'], cols: [] },
     });
 
-    expect(transition.shouldPruneRowsForLayoutChange).toBe(false);
+    expect(transition.shouldPruneRowsForLayoutChange).toBe(true);
     expect(transition.normalizedTree.rows[usKey]).toBeDefined();
-    expect(transition.normalizedTree.rows[usCaKey]).toBeDefined();
+    expect(transition.normalizedTree.rows[usCaKey]).toBeUndefined();
     expect(transition.normalizedTree.cells).toEqual({});
   });
 

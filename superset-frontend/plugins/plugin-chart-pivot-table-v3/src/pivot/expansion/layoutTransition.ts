@@ -212,19 +212,6 @@ export const promoteTreeForLayout = ({
   return nextTree;
 };
 
-export const hasAxisDepthCoverage = (
-  nodes: Record<string, PivotTreeNode>,
-  targetDepth: number,
-  countDimDepth: (path: PivotTreeNode['path']) => number,
-) => {
-  if (targetDepth <= 0) {
-    return true;
-  }
-  return Object.values(nodes).some(
-    node => countDimDepth(node.path) >= targetDepth,
-  );
-};
-
 export const resolveLayoutTransition = ({
   data,
   currentTree,
@@ -251,24 +238,8 @@ export const resolveLayoutTransition = ({
     isPrefix(previousLayout.cols, currentLayout.cols);
   const layoutChanged = rowsChanged || colsChanged;
   const sourceTree = hasNewData || !layoutChanged ? data : currentTree;
-  const canReuseExpandedRowData =
-    shouldExpandRows &&
-    hasAxisDepthCoverage(
-      sourceTree.rows,
-      currentLayout.rows.length,
-      countDimDepth,
-    );
-  const canReuseExpandedColData =
-    shouldExpandCols &&
-    hasAxisDepthCoverage(
-      sourceTree.cols,
-      currentLayout.cols.length,
-      countDimDepth,
-    );
-  const shouldPruneRowsForLayoutChange =
-    rowsChanged && !hasNewData && !canReuseExpandedRowData;
-  const shouldPruneColsForLayoutChange =
-    colsChanged && !hasNewData && !canReuseExpandedColData;
+  const shouldPruneRowsForLayoutChange = rowsChanged && !hasNewData;
+  const shouldPruneColsForLayoutChange = colsChanged && !hasNewData;
   const layoutRowsForPrune = rowsChanged
     ? previousLayout.rows
     : (sessionLayout?.rows ?? previousLayout.rows);
