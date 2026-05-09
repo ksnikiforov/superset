@@ -40,10 +40,10 @@ import {
   SUBTOTAL_TOKEN,
 } from '../../../../src/utils';
 import {
-  applyMeasureLeafValuesToTree,
   buildBuiltInLeaf,
   buildValueLeaf,
 } from '../../../../src/pivot/measureLeaves';
+import { applyMeasureLeafValuesToTree } from '../../../../src/pivot/runtime/materializePivotTree';
 import { buildTreeFromRecords } from '../../fixtures/buildTreeFromRecords';
 import {
   injectRowSubtotalLeaves,

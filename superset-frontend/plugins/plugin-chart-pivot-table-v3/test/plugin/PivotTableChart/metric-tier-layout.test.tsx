@@ -25,10 +25,10 @@ import { MetricsLayoutEnum, PivotTableQueryFormData } from '../../../src/types';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { METRICS_PLACEHOLDER, serializePath } from '../../../src/utils';
 import {
-  applyMeasureLeafValuesToTree,
   buildBuiltInLeaf,
   buildValueLeaf,
 } from '../../../src/pivot/measureLeaves';
+import { applyMeasureLeafValuesToTree } from '../../../src/pivot/runtime/materializePivotTree';
 import { usePivotLayout } from '../../../src/pivot/chart/usePivotLayout';
 import { usePivotRenderModel } from '../../../src/pivot/chart/usePivotRenderModel';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';

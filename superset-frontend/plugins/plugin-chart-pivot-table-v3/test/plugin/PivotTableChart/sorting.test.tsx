@@ -23,11 +23,11 @@ import { buildFormData } from '../fixtures/pivotFormData';
 import { MetricsLayoutEnum, PivotRuntimeLayout } from '../../../src/types';
 
 import {
-  applyMeasureLeafValuesToTree,
   buildMeasureLeafOutputKey,
   buildBuiltInLeaf,
   buildValueLeaf,
 } from '../../../src/pivot/measureLeaves';
+import { applyMeasureLeafValuesToTree } from '../../../src/pivot/runtime/materializePivotTree';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMeasureHierarchyAxis } from '../fixtures/metricAxis';
 

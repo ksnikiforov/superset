@@ -45,8 +45,9 @@ import {
   SUBTOTAL_TOKEN,
 } from '../core/tokens';
 import {
-  applyMeasureLeafValuesToTree,
+  buildMeasureLeafOutputKey,
   buildValueLeaf,
+  computeMeasureLeafValue,
   isValueLeaf,
 } from '../measureLeaves';
 import { type LayoutContext } from '../layout/LayoutContext';
@@ -128,6 +129,70 @@ const factBatchFromStore = ({
   facts: store.getFacts(factStoreSelectorFromSpec(spec)),
   coverage: spec.meta.coverage,
 });
+
+export function applyMeasureLeafValuesToTree({
+  tree,
+  measureHierarchy,
+}: {
+  tree: PivotTreeData;
+  measureHierarchy: {
+    kind: 'flatMetrics' | 'measureStackV1';
+    groups?: Array<{ metricKey: string; leaves: MeasureLeafSpec[] }>;
+  };
+}) {
+  if (measureHierarchy.kind !== 'measureStackV1') {
+    return tree;
+  }
+  const groups = measureHierarchy.groups ?? [];
+  if (groups.length === 0) {
+    return tree;
+  }
+
+  const applyToValues = (values?: Record<string, DataRecordValue>) => {
+    if (!values) {
+      return values;
+    }
+    const next = { ...values };
+    groups.forEach(group => {
+      group.leaves.forEach(leaf => {
+        const outputKey = buildMeasureLeafOutputKey(group.metricKey, leaf);
+        if (outputKey in next) {
+          return;
+        }
+        const computed = computeMeasureLeafValue({
+          values: next,
+          metricKey: group.metricKey,
+          leaf,
+        });
+        if (computed !== undefined) {
+          next[outputKey] = computed;
+        }
+      });
+    });
+    return next;
+  };
+
+  const nextCells = Object.fromEntries(
+    Object.entries(tree.cells).map(([key, cell]) => [
+      key,
+      { ...cell, values: applyToValues(cell.values) ?? cell.values },
+    ]),
+  );
+  const nextRows = Object.fromEntries(
+    Object.entries(tree.rows).map(([key, node]) => [
+      key,
+      node.values ? { ...node, values: applyToValues(node.values) } : node,
+    ]),
+  );
+  const nextCols = Object.fromEntries(
+    Object.entries(tree.cols).map(([key, node]) => [
+      key,
+      node.values ? { ...node, values: applyToValues(node.values) } : node,
+    ]),
+  );
+
+  return { rows: nextRows, cols: nextCols, cells: nextCells };
+}
 
 const finalizeInitialPivotTree = ({
   tree,

@@ -30,12 +30,12 @@ import { buildInitialRuntimeFromSpecResults } from '../../../src/pivot/runtime/i
 import { mergeTrees } from '../../../src/utils';
 import { MetricsLayoutEnum, PivotRuntimeLayout } from '../../../src/types';
 import {
-  applyMeasureLeafValuesToTree,
   buildBuiltInLeaf,
   buildCustomLeaf,
   buildMeasureLeafOutputKey,
   buildValueLeaf,
 } from '../../../src/pivot/measureLeaves';
+import { applyMeasureLeafValuesToTree } from '../../../src/pivot/runtime/materializePivotTree';
 import { supersetChartDataClient } from '../../../src/pivot/data/SupersetChartDataClient';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import {

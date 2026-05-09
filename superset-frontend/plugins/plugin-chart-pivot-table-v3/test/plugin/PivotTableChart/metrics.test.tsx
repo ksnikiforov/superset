@@ -37,11 +37,11 @@ import {
   SUBTOTAL_TOKEN,
 } from '../../../src/utils';
 import {
-  applyMeasureLeafValuesToTree,
   buildBuiltInLeaf,
   buildCustomLeaf,
   buildValueLeaf,
 } from '../../../src/pivot/measureLeaves';
+import { applyMeasureLeafValuesToTree } from '../../../src/pivot/runtime/materializePivotTree';
 import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
 import { resolveMockBranchFetchResult } from '../fixtures/factBatches';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';

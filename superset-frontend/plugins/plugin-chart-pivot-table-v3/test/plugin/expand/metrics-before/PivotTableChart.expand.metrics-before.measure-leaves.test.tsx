@@ -23,10 +23,10 @@ import { MetricsLayoutEnum } from '../../../../src/types';
 import { baseFormData, buildFormData } from '../../fixtures/pivotFormData';
 import { METRICS_PLACEHOLDER } from '../../../../src/utils';
 import {
-  applyMeasureLeafValuesToTree,
   buildBuiltInLeaf,
   buildValueLeaf,
 } from '../../../../src/pivot/measureLeaves';
+import { applyMeasureLeafValuesToTree } from '../../../../src/pivot/runtime/materializePivotTree';
 import { fetchPivotBranch } from '../../../../src/fetchPivotBranch';
 import { buildTreeFromRecords } from '../../fixtures/buildTreeFromRecords';
 import { applyMeasureHierarchyAxis } from '../../fixtures/metricAxis';
