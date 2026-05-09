@@ -74,7 +74,7 @@ const buildInitialBootstrapRuntime = ({
 };
 
 describe('PivotTableChart interaction layout', () => {
-  it('persists runtime layout via setControlValue in user controlled mode', async () => {
+  it('persists runtime layout via setControlValue with query context in user controlled mode', async () => {
     const runtimeLayout: PivotRuntimeLayout = {
       version: 1,
       rows: ['row1'],
@@ -107,6 +107,7 @@ describe('PivotTableChart interaction layout', () => {
         data={initialRuntime.tree}
         formData={formData}
         rawFormData={formData}
+        queryFormData={formData}
         metrics={['m1', 'm2']}
         groupbyRows={[]}
         groupbyColumns={[]}
@@ -240,7 +241,7 @@ describe('PivotTableChart interaction layout', () => {
     expect(screen.getByLabelText('Clear filters')).toBeEnabled();
   });
 
-  it('keeps the applied header order until query form data updates', () => {
+  it('applies metric order changes locally when query form data has not updated yet', () => {
     const runtimeLayout: PivotRuntimeLayout = {
       version: 1,
       rows: [],
@@ -300,7 +301,7 @@ describe('PivotTableChart interaction layout', () => {
     fireEvent.click(screen.getByText('Select measures'));
 
     const labelsAfter = headerLabels();
-    expect(labelsAfter.indexOf('m1')).toBeLessThan(labelsAfter.indexOf('m2'));
+    expect(labelsAfter.indexOf('m2')).toBeLessThan(labelsAfter.indexOf('m1'));
   });
 
   it('renders the applied layout when query form data is provided', () => {

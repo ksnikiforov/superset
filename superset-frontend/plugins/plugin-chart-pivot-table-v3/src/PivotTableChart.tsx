@@ -64,7 +64,6 @@ import { usePivotFormatting } from './pivot/chart/usePivotFormatting';
 import { usePivotInteractions } from './pivot/chart/usePivotInteractions';
 import { PivotInteractionPanel } from './pivot/chart/PivotInteractionPanel';
 import {
-  isMetricOrderOnlyChange,
   isSameRuntimeLayout,
   shouldFetchRuntimeLayout,
 } from './pivot/runtime/coverage';
@@ -1509,10 +1508,6 @@ function PivotTableChart(props: PivotTableProps) {
       );
       const fetchBaselineLayout =
         pendingSeamlessLayoutRef.current ?? committedRuntimeLayout;
-      const skipMetricOrderCommit =
-        isUserControlled &&
-        queryFormData &&
-        isMetricOrderOnlyChange(fetchBaselineLayout, normalized);
       if (
         shouldFetchRuntimeLayout({
           factBatches: committedFactBatches,
@@ -1526,9 +1521,6 @@ function PivotTableChart(props: PivotTableProps) {
         return;
       }
       updateUiRuntimeLayout(normalized);
-      if (skipMetricOrderCommit) {
-        return;
-      }
       persistRuntimeState(normalized, uiSelectedFilters);
       lastSeamlessSyncRef.current = {
         filtersSignature: selectedFiltersSignature(uiSelectedFilters),
@@ -1543,8 +1535,6 @@ function PivotTableChart(props: PivotTableProps) {
       dimensionKeys,
       metricKeys,
       persistRuntimeState,
-      queryFormData,
-      isUserControlled,
       uiSelectedFilters,
       updateUiRuntimeLayout,
       upstreamSeamlessSignature,

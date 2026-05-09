@@ -128,13 +128,6 @@ const hasSameRuntimeLayoutState = (
   valuePlacementSignature(prev.valuePlacement) ===
     valuePlacementSignature(next.valuePlacement);
 
-export const isMetricOrderOnlyChange = (
-  prev: PivotRuntimeLayout,
-  next: PivotRuntimeLayout,
-) =>
-  !arraysEqual(prev.metrics, next.metrics) &&
-  hasSameRuntimeLayoutState(prev, next, hasSameSet);
-
 export const isSameRuntimeLayout = (
   prev: PivotRuntimeLayout,
   next: PivotRuntimeLayout,
