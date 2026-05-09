@@ -58,10 +58,10 @@ cells are projections of DB facts, not canonical data.
 ## Current Status
 
 As of May 10, 2026, after
-`a03baf30b7 refactor(pivot-table-v3): stop vetoing metric order commits`:
+`33ff2bf04b refactor(pivot-table-v3): emit semantic export row depth`:
 
-- Overall transition estimate: **81%**.
-- Goal-weighted completion estimate: **80%**.
+- Overall transition estimate: **82%**.
+- Goal-weighted completion estimate: **81%**.
 - The runtime architecture exists and is used by the main paths.
 - The project is past line-count break-even, but not done.
 - The remaining work is mostly deletion of old chart, expansion, and render
@@ -70,13 +70,13 @@ As of May 10, 2026, after
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `7712` insertions, `9190` deletions, net `-1478`.
-- Current production `src` TypeScript/TSX total: `32032` lines.
+- Production `src`: `7728` insertions, `9263` deletions, net `-1535`.
+- Current production `src` TypeScript/TSX total: `31975` lines.
 - Implied baseline `src` total: about `33510` lines.
 - Added files: `+4228 / -0` across `15` files.
 - Deleted files: `+0 / -1419` across `8` files.
-- Modified files: `+3484 / -7771`, net `-4287`.
-- Pre-existing production files are net `-5706`.
+- Modified files: `+3500 / -7844`, net `-4344`.
+- Pre-existing production files are net `-5763`.
 
 The readout is mixed but improving: the new runtime files still account for
 `4228` added lines, while old production files have shrunk enough to leave the
@@ -89,9 +89,9 @@ plugin net-negative overall.
 | Gate 1: compiled layout model             |        72% | `PivotProgram` exists and drives many paths. `usePivotLayout` and interaction layout still translate raw form/runtime layout into compatibility fields.                                                                                              |
 | Gate 2: query planning from coverage      |        90% | Initial/root/branch/batch query paths use explicit coverage metadata. Branch and grouped-batch fetch params no longer expose tree shape. Remaining work is mostly support/totals coverage composition.                                               |
 | Gate 3: central fact ingestion/store      |        91% | Fetch paths return fact batches, cache/fact-store hits use exact coverage, and ingestion is isolated. Remaining coupling is mostly tree-shaped chart/test boundaries.                                                                                |
-| Gate 4: one tree materializer             |        87% | `materializePivotTree.ts` owns fact-to-tree materialization, Values/metric/measure axes, subtotal leaf injection, and measure-leaf value application. Remaining work is export parity and module splits only if they delete callers.                 |
+| Gate 4: one tree materializer             |        88% | `materializePivotTree.ts` owns fact-to-tree materialization, Values/metric/measure axes, subtotal leaf injection, and measure-leaf value application. Export no longer repairs row depth semantics, but still needs a cleaner model boundary.        |
 | Gate 5: expansion reducer/runtime effects |        78% | Expansion no longer derives fetched state from rendered tree shape. It uses explicit fact coverage, semantic fetchability, shared fetch execution, and request lifecycles. The hook still owns hydration iteration, cancellation, and React commits. |
-| Gate 6: pure render model                 |        84% | Projection drives toggle eligibility, collapsed Values, column display, and visible-axis construction. Remaining risk is deeper row subtotal policy and some metric-index compatibility behavior.                                                    |
+| Gate 6: pure render model                 |        85% | Projection drives toggle eligibility, collapsed Values, column display, visible-axis construction, and semantic export row depth. Remaining risk is deeper row subtotal policy and some metric-index compatibility behavior.                         |
 | Gate 7: chart component cleanup           |        52% | The chart delegates runtime fetch decisions and no longer vetoes metric-order-only commits. It still owns committed-tree sync, dimension filters, interaction wiring, and several controller-like effects.                                           |
 
 ## What Is Now Solid
@@ -111,6 +111,8 @@ plugin net-negative overall.
   coverage predicates, or metric-order commit vetoes.
 - Pending seamless layout refresh keeps a display snapshot instead of freezing
   the whole view prop bundle.
+- `PivotTableView` emits semantic zero-based row depth for export, so the export
+  path no longer guesses whether rendered depth markers need one-based repair.
 
 ## Remaining Risk
 
@@ -126,7 +128,9 @@ plugin net-negative overall.
 - Large result sets still run JSON parsing and React commits on the main thread.
   Chunked ingestion/materialization reduces monopolization but does not make
   the full commit non-blocking.
-- Export parity is not yet fully proven against the same runtime/render model.
+- Export still clones and reshapes the rendered DOM table. Row-depth semantic
+  repair is gone, but export is not yet a sibling model derived directly from
+  the same tree/program boundary as render.
 
 ## Current Hotspots
 
@@ -142,7 +146,7 @@ Largest relevant production files:
 - `PivotInteractionPanel.tsx`: `1186` lines.
 - `PivotDndColumnSelect.tsx`: `1109` lines.
 - `usePivotLayout.ts`: `1071` lines.
-- `PivotTableView.tsx`: `805` lines.
+- `PivotTableView.tsx`: `808` lines.
 - `usePivotRenderModel.ts`: `801` lines.
 
 Not all large files are equal for this refactor. The next high-impact files are
@@ -174,11 +178,13 @@ pure runtime boundary unless they delete runtime-layout translation code.
    metric-placement branches. Avoid changing subtotal/header UX without an
    explicit approval checkpoint.
 
-4. Prove or remove export drift.
+4. Finish export model cleanup.
 
-   Export should consume the same materialized tree/render model, or a sibling
-   model derived from the same tree and program. It should not rebuild semantic
-   layout from local rules.
+   Export still uses a DOM clone to split the visible row hierarchy into Excel
+   columns. That is acceptable for workbook shaping, but it should not infer
+   semantic layout facts that render can emit directly. The next export slice
+   should either consume a sibling model derived from the same tree/program
+   boundary or delete another DOM-side compatibility rule.
 
 5. Keep every runtime helper under a deletion obligation.
 
@@ -204,6 +210,8 @@ Bring these back before taking the behavior change:
 
 Already resolved:
 
+- Rendered row export depth is now semantic and zero-based; export no longer
+  normalizes one-based depth markers.
 - Metric-order-only UI changes now commit locally instead of being vetoed by the
   chart when query form data is stale. Runtime coverage still decides whether a
   fetch is needed.
@@ -229,6 +237,10 @@ git diff --check
 
 Recent validation:
 
+- `33ff2bf04b`: touched-file ESLint passed for
+  `buildPivotV3ExportTable.ts`, `PivotTableView.tsx`, export tests, and the
+  basic chart smoke suite; focused Jest passed for export table behavior and the
+  chart smoke guardrails (`17` tests).
 - `a03baf30b7`: touched-file ESLint passed for
   `PivotTableChart.tsx`, `runtime/coverage.ts`, and
   `interaction-layout.test.tsx`; focused Jest passed for interaction layout,
@@ -248,6 +260,8 @@ Minimum test coverage for future slices:
   prefetch suites, and one live chart interaction suite.
 - Render/layout changes: render model, interaction layout, totals/metrics
   suites relevant to the touched policy.
+- Export changes: export table tests plus at least one render/chart test that
+  proves the DOM attributes export consumes are emitted in their semantic form.
 - Chart sync changes: interaction layout, interaction seamless expansion,
   interaction filter seamless, and runtime coverage.
 
