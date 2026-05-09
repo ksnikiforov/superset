@@ -926,32 +926,22 @@ export const usePivotFormatting = ({
     [renderModel.showRowRoot, themeColor],
   );
 
-  const databarMetricKeys = useMemo(
-    () => Object.keys(metricDatabars),
-    [metricDatabars],
-  );
   const databarScaleWidth = theme.sizeUnit * 12;
   const databarPaddingX = theme.sizeUnit * 2;
 
-  const scaleLikeTargets = useMemo(() => {
+  const metricsForScale = useMemo(() => {
     const targets = new Set<string>();
-    databarMetricKeys.forEach(metricKey => {
-      const scaleLike = metricDatabars[metricKey]?.scaleLike;
-      if (!scaleLike) {
-        return;
-      }
-      const scaleKey = getFormattingMetricKey(scaleLike);
+    Object.entries(metricDatabars).forEach(([metricKey, config]) => {
+      targets.add(metricKey);
+      const scaleKey = config.scaleLike
+        ? getFormattingMetricKey(config.scaleLike)
+        : '';
       if (scaleKey) {
         targets.add(scaleKey);
       }
     });
     return targets;
-  }, [databarMetricKeys, metricDatabars]);
-
-  const metricsForScale = useMemo(
-    () => new Set<string>([...databarMetricKeys, ...scaleLikeTargets]),
-    [databarMetricKeys, scaleLikeTargets],
-  );
+  }, [metricDatabars]);
 
   const isRowTotalAtStart =
     layout.resolvedColTotalPosition === 'start' && renderModel.showRowRoot;
@@ -1092,12 +1082,9 @@ export const usePivotFormatting = ({
       });
     });
 
-    const waterfallScaleMap = new Map<string, DatabarScale>();
-    if (offsets.size === 0) {
-      scaleMap.forEach((value, key) => {
-        waterfallScaleMap.set(key, value);
-      });
-    } else {
+    const waterfallScaleMap =
+      offsets.size === 0 ? scaleMap : new Map<string, DatabarScale>();
+    if (offsets.size > 0) {
       offsets.forEach(({ start, end, scaleKey }) => {
         const min = Math.min(start, end);
         const max = Math.max(start, end);
@@ -1115,84 +1102,78 @@ export const usePivotFormatting = ({
     const labelPadding = theme.sizeUnit * 0.5;
     const labelCharWidth = theme.sizeUnit * 1.6;
     const spaceMap = new Map<string, { positive: number; negative: number }>();
-    if (databarMetricKeys.length > 0) {
-      visibleCells.forEach(({ rowNode, colNode, cell }) => {
-        if (shouldHideRowValues(rowNode)) {
-          return;
-        }
-        const metricKey = deriveMetricKey(rowNode, colNode);
-        const config = metricDatabars[metricKey];
-        if (!config?.type) {
-          return;
-        }
-        const rawValue = cell.values[metricKey];
-        const value = getNumericValue(rawValue);
-        if (value === undefined) {
-          return;
-        }
-        const scaleKey = resolveScaleGroupKey(metricKey, metricDatabars);
-        const scale =
-          config.type === 'waterfall'
-            ? waterfallScaleMap.get(scaleKey)
-            : scaleMap.get(scaleKey);
-        if (!scale) {
-          return;
-        }
-        const formattingKeys = formattingKeyMap[metricKey];
-        const d3FormatKey = formattingKeys?.d3Format;
-        const excelFormatResult = evaluateExcelMetricFormatting(
-          metricKey,
-          'd3Format',
-          cell.values,
-          rawValue,
-        );
-        const excelOverride =
-          typeof excelFormatResult === 'string'
-            ? normalizeD3Format(excelFormatResult)
-            : undefined;
-        const d3FormatOverride =
-          excelOverride ??
-          (d3FormatKey
-            ? normalizeD3Format(cell.values[d3FormatKey])
-            : undefined);
-        const formatted = renderValue(metricKey, rawValue, d3FormatOverride);
-        const labelText =
-          formatted === null || formatted === undefined
-            ? ''
-            : String(formatted).replace(/<[^>]*>/g, '');
-        const labelWidth =
-          labelText.length * labelCharWidth + labelOffset + labelPadding * 2;
-        const existing = spaceMap.get(scaleKey) ?? { positive: 0, negative: 0 };
-        if (value >= 0) {
-          existing.positive = Math.max(existing.positive, labelWidth);
-        } else {
-          existing.negative = Math.max(existing.negative, labelWidth);
-        }
-        spaceMap.set(scaleKey, existing);
-      });
-    }
+    visibleCells.forEach(({ rowNode, colNode, cell }) => {
+      if (shouldHideRowValues(rowNode)) {
+        return;
+      }
+      const metricKey = deriveMetricKey(rowNode, colNode);
+      const config = metricDatabars[metricKey];
+      if (!config?.type) {
+        return;
+      }
+      const rawValue = cell.values[metricKey];
+      const value = getNumericValue(rawValue);
+      if (value === undefined) {
+        return;
+      }
+      const scaleKey = resolveScaleGroupKey(metricKey, metricDatabars);
+      const scale =
+        config.type === 'waterfall'
+          ? waterfallScaleMap.get(scaleKey)
+          : scaleMap.get(scaleKey);
+      if (!scale) {
+        return;
+      }
+      const formattingKeys = formattingKeyMap[metricKey];
+      const d3FormatKey = formattingKeys?.d3Format;
+      const excelFormatResult = evaluateExcelMetricFormatting(
+        metricKey,
+        'd3Format',
+        cell.values,
+        rawValue,
+      );
+      const excelOverride =
+        typeof excelFormatResult === 'string'
+          ? normalizeD3Format(excelFormatResult)
+          : undefined;
+      const d3FormatOverride =
+        excelOverride ??
+        (d3FormatKey ? normalizeD3Format(cell.values[d3FormatKey]) : undefined);
+      const formatted = renderValue(metricKey, rawValue, d3FormatOverride);
+      const labelText =
+        formatted === null || formatted === undefined
+          ? ''
+          : String(formatted).replace(/<[^>]*>/g, '');
+      const labelWidth =
+        labelText.length * labelCharWidth + labelOffset + labelPadding * 2;
+      const existing = spaceMap.get(scaleKey) ?? { positive: 0, negative: 0 };
+      if (value >= 0) {
+        existing.positive = Math.max(existing.positive, labelWidth);
+      } else {
+        existing.negative = Math.max(existing.negative, labelWidth);
+      }
+      spaceMap.set(scaleKey, existing);
+    });
 
     const widthMap = new Map<string, number>();
-    if (databarMetricKeys.length > 0) {
-      visibleCells.forEach(({ cell, colNode, rowNode }) => {
-        const metricKey = deriveMetricKey(rowNode, colNode);
-        const config = metricDatabars[metricKey];
-        if (!config?.type) {
-          return;
-        }
-        const scaleKey = resolveScaleGroupKey(metricKey, metricDatabars);
-        const labelSpace = spaceMap.get(scaleKey);
-        const minWidth =
-          (labelSpace?.positive ?? 0) +
-          (labelSpace?.negative ?? 0) +
-          databarScaleWidth +
-          databarPaddingX * 2;
-        const current = widthMap.get(cell.colKey) ?? 0;
-        if (minWidth > current) {
-          widthMap.set(cell.colKey, minWidth);
-        }
-      });
-    }
+    visibleCells.forEach(({ cell, colNode, rowNode }) => {
+      const metricKey = deriveMetricKey(rowNode, colNode);
+      const config = metricDatabars[metricKey];
+      if (!config?.type) {
+        return;
+      }
+      const scaleKey = resolveScaleGroupKey(metricKey, metricDatabars);
+      const labelSpace = spaceMap.get(scaleKey);
+      const minWidth =
+        (labelSpace?.positive ?? 0) +
+        (labelSpace?.negative ?? 0) +
+        databarScaleWidth +
+        databarPaddingX * 2;
+      const current = widthMap.get(cell.colKey) ?? 0;
+      if (minWidth > current) {
+        widthMap.set(cell.colKey, minWidth);
+      }
+    });
 
     const bridgeMap = new Map<
       string,
@@ -1263,7 +1244,6 @@ export const usePivotFormatting = ({
       waterfallBridgeOffsets: bridgeMap,
     };
   }, [
-    databarMetricKeys,
     databarPaddingX,
     databarScaleWidth,
     deriveMetricKey,
