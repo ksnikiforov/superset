@@ -97,27 +97,22 @@ import {
 const MAX_HYDRATION_ITERATIONS = 12;
 const EMPTY_FACT_BATCHES: PivotFactStoreBatch[] = [];
 
-type SingleFetchResult = {
-  kind: 'single';
-  target: FetchTarget;
+type ExpansionFetchResult = {
+  targets: FetchTarget[];
   data?: PivotTreeData;
   factBatches: PivotFactStoreBatch[];
 };
-
-type BatchFetchResult = {
-  kind: 'batch';
-  batch: BatchGroup;
-  data?: PivotTreeData;
-  factBatches: PivotFactStoreBatch[];
-};
-
-type CombinedFetchResult = SingleFetchResult | BatchFetchResult;
 
 type TrackExpansionRequest = <T>(
   requestScope: LatestRequestScope,
   requestGroupId: string,
   fetcher: () => Promise<T>,
 ) => Promise<T>;
+
+type BuildExpansionRequestGroupId = (
+  payload: Record<string, unknown>,
+  transactionId?: number,
+) => string;
 
 type ExpansionFetchRuntime = {
   requestScope: LatestRequestScope;
@@ -149,11 +144,11 @@ const resolveExpansionFetchPlan = ({
   visibleColDepth: number;
   factStore?: PivotFactStore;
 }): {
-  localResults: SingleFetchResult[];
+  localResults: ExpansionFetchResult[];
   singles: FetchTarget[];
   batches: BatchGroup[];
 } => {
-  const localResults: SingleFetchResult[] = [];
+  const localResults: ExpansionFetchResult[] = [];
   const batchCandidates: BatchCandidate[] = [];
   for (const target of targets) {
     const path = parsePath(target.pathKey);
@@ -168,8 +163,7 @@ const resolveExpansionFetchPlan = ({
     });
     if (localResult) {
       localResults.push({
-        kind: 'single',
-        target,
+        targets: [target],
         data: localResult.data,
         factBatches: localResult.factBatches ?? EMPTY_FACT_BATCHES,
       });
@@ -201,7 +195,7 @@ const fetchExpansionSingleTarget = async ({
   context: ExpansionFetchContext;
   requestGroupId: string;
   runtime: ExpansionFetchRuntime;
-}): Promise<SingleFetchResult> => {
+}): Promise<ExpansionFetchResult> => {
   const path = parsePath(target.pathKey);
   const {
     addWarnings,
@@ -229,8 +223,7 @@ const fetchExpansionSingleTarget = async ({
     );
     if (!result) {
       return {
-        kind: 'single',
-        target,
+        targets: [target],
         data: undefined,
         factBatches: EMPTY_FACT_BATCHES,
       };
@@ -242,8 +235,7 @@ const fetchExpansionSingleTarget = async ({
       }
     }
     return {
-      kind: 'single',
-      target,
+      targets: [target],
       data: result.data,
       factBatches: result.factBatches ?? EMPTY_FACT_BATCHES,
     };
@@ -264,7 +256,7 @@ const fetchExpansionBatchTarget = async ({
   context: ExpansionFetchContext;
   requestGroupId: string;
   runtime: ExpansionFetchRuntime;
-}): Promise<BatchFetchResult> => {
+}): Promise<ExpansionFetchResult> => {
   const {
     addWarnings,
     factStore,
@@ -295,8 +287,7 @@ const fetchExpansionBatchTarget = async ({
       }
     }
     return {
-      kind: 'batch',
-      batch,
+      targets: batch.targets,
       data: result.data,
       factBatches: result.factBatches ?? EMPTY_FACT_BATCHES,
     };
@@ -311,15 +302,19 @@ const fetchExpansionTargets = async ({
   targets,
   context,
   runtime,
-  buildSingleRequestGroupId,
-  buildBatchRequestGroupId,
+  singleRequestKind,
+  batchRequestKind = singleRequestKind,
+  transactionId,
+  buildRequestGroupId,
 }: {
   targets: FetchTarget[];
   context: ExpansionFetchContext;
   runtime: ExpansionFetchRuntime;
-  buildSingleRequestGroupId: (target: FetchTarget) => string;
-  buildBatchRequestGroupId: (batch: BatchGroup) => string;
-}): Promise<CombinedFetchResult[]> => {
+  singleRequestKind: string;
+  batchRequestKind?: string;
+  transactionId: number;
+  buildRequestGroupId: BuildExpansionRequestGroupId;
+}): Promise<ExpansionFetchResult[]> => {
   const { localResults, batches, singles } = resolveExpansionFetchPlan({
     targets,
     formData: runtime.fetchFormData,
@@ -328,7 +323,33 @@ const fetchExpansionTargets = async ({
     visibleColDepth: context.visibleColDepth,
     factStore: runtime.factStore,
   });
-  const fetchPromises: Array<Promise<CombinedFetchResult>> = [
+  const { visibleRowDepth, visibleColDepth } = context;
+  const buildSingleRequestGroupId = (target: FetchTarget) =>
+    buildRequestGroupId(
+      {
+        kind: singleRequestKind,
+        ...target,
+        visibleRowDepth,
+        visibleColDepth,
+      },
+      transactionId,
+    );
+  const buildBatchRequestGroupId = (batch: BatchGroup) =>
+    buildRequestGroupId(
+      {
+        kind: batchRequestKind,
+        axis: batch.axis,
+        parentPathKey: batch.parentPathKey,
+        childDepth: batch.childDepth,
+        requiredOppositeDepth: batch.requiredOppositeDepth,
+        signature: batch.signature,
+        targetKeys: [...batch.targets.map(target => target.pathKey)].sort(),
+        visibleRowDepth,
+        visibleColDepth,
+      },
+      transactionId,
+    );
+  const fetchPromises: Array<Promise<ExpansionFetchResult>> = [
     ...singles.map(target =>
       fetchExpansionSingleTarget({
         target,
@@ -359,7 +380,7 @@ const collectFetchResultDeltas = ({
   results,
   seedFetchedCoverage,
 }: {
-  results: CombinedFetchResult[];
+  results: ExpansionFetchResult[];
   seedFetchedCoverage: (factBatches: PivotFactStoreBatch[]) => void;
 }) => {
   const deltas: FetchResultDelta[] = [];
@@ -369,8 +390,7 @@ const collectFetchResultDeltas = ({
       return;
     }
     deltas.push({
-      targets:
-        result.kind === 'single' ? [result.target] : result.batch.targets,
+      targets: result.targets,
       data: result.data,
     });
   });
@@ -970,33 +990,10 @@ export const useExpansionEngine = ({
             targets,
             context: fetchContext,
             runtime: fetchRuntime,
-            buildSingleRequestGroupId: target =>
-              buildRequestGroupId(
-                {
-                  kind: 'branch',
-                  axis: target.axis,
-                  pathKey: target.pathKey,
-                  visibleRowDepth,
-                  visibleColDepth,
-                  requiredDepth,
-                },
-                requestId,
-              ),
-            buildBatchRequestGroupId: batch =>
-              buildRequestGroupId(
-                {
-                  kind: 'batch',
-                  axis: batch.axis,
-                  parentPathKey: batch.parentPathKey,
-                  childDepth: batch.childDepth,
-                  requiredOppositeDepth: batch.requiredOppositeDepth,
-                  signature: batch.signature,
-                  targetKeys: [
-                    ...batch.targets.map(target => target.pathKey),
-                  ].sort(),
-                },
-                requestId,
-              ),
+            singleRequestKind: 'branch',
+            batchRequestKind: 'batch',
+            transactionId: requestId,
+            buildRequestGroupId,
           });
           if (
             dataEpochRef.current !== requestEpoch ||
@@ -1077,15 +1074,18 @@ export const useExpansionEngine = ({
       applyFetchDelta,
       buildRequestGroupId,
       computeVisibleDepths,
+      expansionRequestLifecycle,
       fetchFormData,
-      persistExpansionState,
       getCoverageKey,
+      groupbyColumnsLength,
+      isMetricTokenValue,
+      metricIndexForCols,
+      persistExpansionState,
       resolveExpandedForMetrics,
+      seedFetchedCoverageFromFactBatches,
       setExpandedState,
       trackRequestInScope,
       updateLoadingKey,
-      seedFetchedCoverageFromFactBatches,
-      visibilityConfig,
     ],
   );
 
@@ -1280,36 +1280,9 @@ export const useExpansionEngine = ({
           targets,
           context: fetchContext,
           runtime: fetchRuntime,
-          buildSingleRequestGroupId: target =>
-            buildRequestGroupId(
-              {
-                kind: `hydrate:${reason}`,
-                axis: target.axis,
-                pathKey: target.pathKey,
-                childDepth: target.childDepth,
-                requiredOppositeDepth: target.requiredOppositeDepth,
-                visibleRowDepth: fetchContext.visibleRowDepth,
-                visibleColDepth: fetchContext.visibleColDepth,
-              },
-              transactionId,
-            ),
-          buildBatchRequestGroupId: batch =>
-            buildRequestGroupId(
-              {
-                kind: `hydrate:${reason}`,
-                axis: batch.axis,
-                parentPathKey: batch.parentPathKey,
-                childDepth: batch.childDepth,
-                requiredOppositeDepth: batch.requiredOppositeDepth,
-                signature: batch.signature,
-                targetKeys: [
-                  ...batch.targets.map(target => target.pathKey),
-                ].sort(),
-                visibleRowDepth: fetchContext.visibleRowDepth,
-                visibleColDepth: fetchContext.visibleColDepth,
-              },
-              transactionId,
-            ),
+          singleRequestKind: `hydrate:${reason}`,
+          transactionId,
+          buildRequestGroupId,
         });
 
         if (!requestScope.isCurrent()) {
@@ -1336,17 +1309,18 @@ export const useExpansionEngine = ({
       buildDesiredExpanded,
       buildRequestGroupId,
       clearLoadingState,
+      expansionRequestLifecycle,
       fetchFormData,
       getCoverageKey,
-      seedFetchedCoverageFromFactBatches,
       persistExpansionState,
       pruneMergedTree,
+      resolveExpandedForMetrics,
+      seedFetchedCoverageFromFactBatches,
       setExpandedState,
       setHydratingState,
       setPendingState,
       trackRequestInScope,
       updateLoadingKey,
-      resolveExpandedForMetrics,
       visibilityConfig,
     ],
   );
@@ -1693,9 +1667,13 @@ export const useExpansionEngine = ({
     expandColumnsLevelRaw,
     expandRowsLevelRaw,
     groupbyColumnKeys,
+    groupbyColumnsLength,
     groupbyRowKeys,
+    groupbyRowsLength,
     isMetricTokenValue,
     metricLabelSet,
+    metricIndexForCols,
+    metricIndexForRows,
     persistExpansionStateToStore,
     shouldPersistExpansionState,
     resolvedExpandColumnsLevel,
