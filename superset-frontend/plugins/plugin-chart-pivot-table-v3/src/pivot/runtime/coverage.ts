@@ -314,7 +314,6 @@ export const factBatchesCoverRuntimeLayout = (
   const requiredColumns = runtimeLayout.cols.slice(0, requiredColumnDepth);
   return (
     runtimeLayout.metrics.length === 0 ||
-    (requiredRowDepth === 0 && requiredColumnDepth === 0) ||
     factBatches.some(
       ({ coverage, scope }) =>
         (scope.kind === 'bootstrap' || scope.kind === 'root') &&

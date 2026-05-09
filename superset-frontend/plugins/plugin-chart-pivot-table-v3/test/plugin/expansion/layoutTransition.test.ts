@@ -64,14 +64,12 @@ const baseTransitionConfig = {
   hasNewData: false,
   effectiveExpandRowsLevel: 0,
   effectiveExpandColsLevel: 0,
-  countDimDepth: (path: PivotTreeNode['path']) => path.length,
-  isMetricTokenValue: () => false,
   groupbyRowsLength: 1,
   groupbyColumnsLength: 0,
 };
 
 describe('pivot/expansion/layoutTransition', () => {
-  it('does not trust existing deeper tree shape for layout changes without fresh data', () => {
+  it('keeps the current tree as a display snapshot for layout changes without fresh data', () => {
     const usKey = serializePath(['US']);
     const usCaKey = serializePath(['US', 'CA']);
     const data = makeTree({
@@ -95,13 +93,12 @@ describe('pivot/expansion/layoutTransition', () => {
       currentLayout: { rows: ['country', 'state'], cols: [] },
     });
 
-    expect(transition.shouldPruneRowsForLayoutChange).toBe(true);
     expect(transition.normalizedTree.rows[usKey]).toBeDefined();
-    expect(transition.normalizedTree.rows[usCaKey]).toBeUndefined();
+    expect(transition.normalizedTree.rows[usCaKey]).toBeDefined();
     expect(transition.normalizedTree.cells).toEqual({});
   });
 
-  it('trims removed row depth without rolling child cells up locally', () => {
+  it('does not locally trim or roll child cells up to the stable prefix', () => {
     const usKey = serializePath(['US']);
     const usCaKey = serializePath(['US', 'CA']);
     const data = makeTree({
@@ -133,11 +130,11 @@ describe('pivot/expansion/layoutTransition', () => {
       currentTree,
       previousLayout: { rows: ['country', 'state'], cols: [] },
       currentLayout: { rows: ['country'], cols: [] },
+      effectiveExpandRowsLevel: 2,
     });
 
-    expect(transition.shouldPruneRowsForLayoutChange).toBe(true);
     expect(transition.rowStablePrefix).toBe(1);
-    expect(transition.normalizedTree.rows[usCaKey]).toBeUndefined();
+    expect(transition.autoExpandRowsLevelForDesired).toBe(0);
     expect(
       transition.normalizedTree.cells[serializeCellKey(usKey, rootKey)],
     ).toMatchObject({
@@ -147,10 +144,14 @@ describe('pivot/expansion/layoutTransition', () => {
     });
     expect(
       transition.normalizedTree.cells[serializeCellKey(usCaKey, rootKey)],
-    ).toBeUndefined();
+    ).toMatchObject({
+      rowKey: usCaKey,
+      colKey: rootKey,
+      values: { sales: 7 },
+    });
   });
 
-  it('promotes an added deeper row layer only to the stable prefix when coverage is missing', () => {
+  it('limits desired auto-expansion without promoting added layers locally', () => {
     const usKey = serializePath(['US']);
     const data = makeTree({
       rows: [makeNode({ axis: 'row', path: [] })],
@@ -172,11 +173,36 @@ describe('pivot/expansion/layoutTransition', () => {
       groupbyRowsLength: 2,
     });
 
-    expect(transition.shouldPruneRowsForLayoutChange).toBe(true);
     expect(transition.rowStablePrefix).toBe(1);
     expect(transition.autoExpandRowsLevelForDesired).toBe(0);
     expect(transition.normalizedTree.rows[usKey]).toMatchObject({
-      hasChildren: true,
+      hasChildren: false,
     });
+  });
+
+  it('caps auto-expansion to the last stable expandable level on trailing trims', () => {
+    const data = makeTree({
+      rows: [makeNode({ axis: 'row', path: [] })],
+    });
+    const currentTree = makeTree({
+      rows: [
+        makeNode({ axis: 'row', path: [] }),
+        makeNode({ axis: 'row', path: ['US'], hasChildren: true }),
+        makeNode({ axis: 'row', path: ['US', 'CA'], hasChildren: true }),
+      ],
+    });
+
+    const transition = resolveLayoutTransition({
+      ...baseTransitionConfig,
+      data,
+      currentTree,
+      previousLayout: { rows: ['country', 'state', 'city'], cols: [] },
+      currentLayout: { rows: ['country', 'state'], cols: [] },
+      effectiveExpandRowsLevel: 2,
+      groupbyRowsLength: 2,
+    });
+
+    expect(transition.rowStablePrefix).toBe(2);
+    expect(transition.autoExpandRowsLevelForDesired).toBe(1);
   });
 });

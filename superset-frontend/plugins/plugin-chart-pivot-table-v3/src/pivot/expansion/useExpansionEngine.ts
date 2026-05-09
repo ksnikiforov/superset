@@ -1473,8 +1473,6 @@ export const useExpansionEngine = ({
       hasNewData,
       effectiveExpandRowsLevel,
       effectiveExpandColsLevel,
-      countDimDepth,
-      isMetricTokenValue,
       metricIndexForRows,
       metricIndexForCols,
       groupbyRowsLength,

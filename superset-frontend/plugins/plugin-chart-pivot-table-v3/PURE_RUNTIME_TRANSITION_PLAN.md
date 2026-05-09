@@ -275,12 +275,12 @@ they delete more code than they add in the same slice.
 Current source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `8092` insertions, `9095` deletions, net `-1003`.
-- Current production `src` TypeScript/TSX total: `32507` lines.
+- Production `src`: `7886` insertions, `9095` deletions, net `-1209`.
+- Current production `src` TypeScript/TSX total: `32301` lines.
 - Pre-existing production files are net negative:
-  `+3478 / -9095`, net `-5617`.
+  `+3476 / -9095`, net `-5619`.
 - Added runtime/helper files are still the source of total growth:
-  `+4614 / -0` across `16` added files.
+  `+4410 / -0` across `16` added files.
 
 The important read is mixed: production files that predated the refactor have
 shrunk substantially, but the runtime layer has not yet paid for itself in total
@@ -301,20 +301,20 @@ place; the line-reduction payoff is now past break-even but still not done.
 This is a functionality/architecture completion estimate, not a line-deletion
 score. The completed work has moved the runtime toward a compiler/fact-store
 pipeline. The remaining work is more concentrated now: `PivotTableChart.tsx`
-(`2539` lines), `useExpansionEngine.ts` (`1716` lines),
+(`2539` lines), `useExpansionEngine.ts` (`1687` lines),
 `usePivotFormatting.tsx` (`1632` lines), `usePivotLayout.ts` (`1071` lines),
 `usePivotRenderModel.ts` (`801` lines), `expansion/engine.ts` (`854` lines),
-`materializePivotTree.ts` (`1261` lines), and `visibility.ts` (`266` lines).
+`materializePivotTree.ts` (`1326` lines), and `visibility.ts` (`266` lines).
 
-| Gate                                         | Completion | Assessment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
-| -------------------------------------------- | ---------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Gate 1: compiled layout model                |        71% | `PivotProgram` is established, materialization consumes it directly, many query/render call sites use it, and Values placeholder insertion is now shared by program placement, interaction layout, and seamless expansion-state planning. `usePivotLayout`, interaction layout, and control/layout cleanup still read compatibility layout state.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| Gate 2: query planning from program/coverage |        88% | Initial/root/branch/batch query paths use coverage metadata and canonical paths. Expansion planning now trusts fetched coverage depth directly. Remaining complexity is mostly support/totals coverage composition.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Gate 3: central fact ingestion/store         |        91% | Fetch paths return fact batches, fact-store hits and cache hits reuse exact coverage, ingestion is isolated, and materializer handoff is explicit. Remaining coupling is mostly initial wrapper compatibility and tree-shaped APIs.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Gate 4: one tree materializer                |        87% | `materializePivotTree.ts` owns fact-to-tree materialization, Values/metric/measure axes, subtotal leaf injection, row subtotal labeling, and measure-leaf value application consumed by the chart. The last initial-tree compatibility wrapper is deleted, raw-record tree construction has moved out of production `src` into test fixtures, and test-only metric-axis fixture wrappers no longer live in production runtime exports. Remaining work is export parity and materializer module split only where it deletes callers.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Gate 5: expansion reducer/runtime effects    |        75% | Expansion has stronger pure helpers, typed coverage, shared latest-request lifecycles, reducer-owned pending/loading state, axis-neutral pending/expanded state setters, shared local/single/batch fetch execution, one fetch-result shape, shared request-id construction, shared fetched-result delta application, pure reinitialized expansion-state resolution, coverage-only planner satisfaction, and visible-key persistence now reuses the already-built render model. Auto-expansion seeding now belongs to the state model, the unused legacy fetch-coordinator prototype is gone, the single-use staging-tree helper has been folded into hydration, and stable layout trims no longer project cell values, fetched coverage, or existing deep tree shape upward. The hook still owns hydration iteration, cancellation, and React state commits.                                                                                                                                                       |
-| Gate 6: pure render model                    |        84% | Projection now drives toggle eligibility, collapsed Values, and column display behavior. Visible-axis construction is shared by render and expansion-state, collapsed Values projection is axis-neutral in layout, layout-owned metric placement now drives row-subtotal filtering without a rendered-tree scan, dead row-subtotal branches are gone, metric-first column header presentation now lives inside the render-model boundary, rendered-tree loaded-child inference is deleted, column subtotal header behavior trusts visible child state, repeated child lookup scans are cached per immutable node map, the row/column child-filter prelude is shared, single-use visible-axis helpers are folded into the render boundary, and dead layout/render result surface is gone. Remaining duplication is mostly deeper row subtotal policy.                                                                                                                                                               |
-| Gate 7: chart component cleanup              |        48% | `PivotTableChart.tsx` now delegates seamless fetch planning/materialization and runtime-layout comparison to layout/runtime helpers and no longer re-materializes measure leaves, vetoes upstream trees based on leaf source metrics, rejects incoming props trees through the stale-coverage regression branch, checks rendered tree shape for recovery coverage, uses tree projection to decide layout-change fetches, calls a single-use committed-tree sync guard, carries its own runtime-layout normalizer, computes structural and coverage layout-fetch decisions separately, or explodes formatting state into individual view props. The old committed-tree sync guard and layout fetch-policy modules are gone; exact runtime-layout fact coverage and layout-fetch policy now live in the runtime coverage boundary, and `PivotTableView` receives formatting as one render concern. It still owns committed-tree sync, dimension filters, interaction wiring, and several local UI-state controllers. |
+| Gate                                         | Completion | Assessment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| -------------------------------------------- | ---------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Gate 1: compiled layout model                |        71% | `PivotProgram` is established, materialization consumes it directly, many query/render call sites use it, and Values placeholder insertion is now shared by program placement, interaction layout, and seamless expansion-state planning. `usePivotLayout`, interaction layout, and control/layout cleanup still read compatibility layout state.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Gate 2: query planning from program/coverage |        89% | Initial/root/branch/batch query paths use coverage metadata and canonical paths. Expansion planning now trusts fetched coverage depth directly, and no-dimension runtime layouts now require explicit root coverage instead of treating empty shape as implicitly loaded. Remaining complexity is mostly support/totals coverage composition.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Gate 3: central fact ingestion/store         |        91% | Fetch paths return fact batches, fact-store hits and cache hits reuse exact coverage, ingestion is isolated, and materializer handoff is explicit. Remaining coupling is mostly initial wrapper compatibility and tree-shaped APIs.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Gate 4: one tree materializer                |        87% | `materializePivotTree.ts` owns fact-to-tree materialization, Values/metric/measure axes, subtotal leaf injection, row subtotal labeling, and measure-leaf value application consumed by the chart. The last initial-tree compatibility wrapper is deleted, raw-record tree construction has moved out of production `src` into test fixtures, and test-only metric-axis fixture wrappers no longer live in production runtime exports. Remaining work is export parity and materializer module split only where it deletes callers.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Gate 5: expansion reducer/runtime effects    |        77% | Expansion has stronger pure helpers, typed coverage, shared latest-request lifecycles, reducer-owned pending/loading state, axis-neutral pending/expanded state setters, shared local/single/batch fetch execution, one fetch-result shape, shared request-id construction, shared fetched-result delta application, pure reinitialized expansion-state resolution, coverage-only planner satisfaction, and visible-key persistence now reuses the already-built render model. Auto-expansion seeding now belongs to the state model, the unused legacy fetch-coordinator prototype is gone, the single-use staging-tree helper has been folded into hydration, and stable layout trims no longer project cell values, fetched coverage, existing deep tree shape, or locally trimmed/promoted tree nodes across semantic layout changes. The hook still owns hydration iteration, cancellation, and React state commits.                                                                                                                                                      |
+| Gate 6: pure render model                    |        84% | Projection now drives toggle eligibility, collapsed Values, and column display behavior. Visible-axis construction is shared by render and expansion-state, collapsed Values projection is axis-neutral in layout, layout-owned metric placement now drives row-subtotal filtering without a rendered-tree scan, dead row-subtotal branches are gone, metric-first column header presentation now lives inside the render-model boundary, rendered-tree loaded-child inference is deleted, column subtotal header behavior trusts visible child state, repeated child lookup scans are cached per immutable node map, the row/column child-filter prelude is shared, single-use visible-axis helpers are folded into the render boundary, and dead layout/render result surface is gone. Remaining duplication is mostly deeper row subtotal policy.                                                                                                                                                                                                                           |
+| Gate 7: chart component cleanup              |        49% | `PivotTableChart.tsx` now delegates seamless fetch planning/materialization and runtime-layout comparison to layout/runtime helpers and no longer re-materializes measure leaves, vetoes upstream trees based on leaf source metrics, rejects incoming props trees through the stale-coverage regression branch, checks rendered tree shape for recovery coverage, uses tree projection to decide layout-change fetches, calls a single-use committed-tree sync guard, carries its own runtime-layout normalizer, computes structural and coverage layout-fetch decisions separately, or explodes formatting state into individual view props. The old committed-tree sync guard and layout fetch-policy modules are gone; exact runtime-layout fact coverage and layout-fetch policy now live in the runtime coverage boundary, no-dimension layouts fetch/materialize exact root coverage, and `PivotTableView` receives formatting as one render concern. It still owns committed-tree sync, dimension filters, interaction wiring, and several local UI-state controllers. |
 
 Weighted interpretation:
 
@@ -327,7 +327,7 @@ Weighted interpretation:
 - Biggest remaining UX risk: very large result sets can still monopolize JSON
   parsing and React commit despite chunked ingestion/materialization.
 - Biggest remaining line-count debt: the runtime layer is correct, but the
-  `4614` added-file lines still need more old chart/render/expansion code
+  `4410` added-file lines still need more old chart/render/expansion code
   deleted.
 
 Requirement reassessment:
@@ -335,8 +335,8 @@ Requirement reassessment:
 - Architecture completion: **76%**. The compiler/fact-store/materializer
   pipeline exists and is used by the main fetch paths. Remaining work is mostly
   deleting old interpretation surfaces, not inventing the architecture.
-- Production line-deletion completion: **86%**. Pre-existing files are net `5617`
-  lines smaller, and total production source is now net `1003` lines smaller
+- Production line-deletion completion: **87%**. Pre-existing files are net `5619`
+  lines smaller, and total production source is now net `1209` lines smaller
   because the runtime materializer, render/visibility, and chart sync surfaces
   have started to shed compatibility API.
 - Interactivity requirement completion: **71%**. Layout refresh and expansion
@@ -344,19 +344,20 @@ Requirement reassessment:
   shared render traversal now avoids repeated full-node child scans. The plugin
   still needs lower-cost large-result commits and less chart-owned
   fallback/loading orchestration.
-- Query visibility requirement completion: **88%**. Planning is now strongly
+- Query visibility requirement completion: **89%**. Planning is now strongly
   coverage based and no longer treats rendered child/cell shape as fetched
-  coverage. Remaining risk is support/totals coverage composition and hydration
-  edge paths still tied to hook compatibility state.
+  coverage. Empty row/column layouts also require exact root fact coverage
+  before grand-total materialization. Remaining risk is support/totals coverage
+  composition and hydration edge paths still tied to hook compatibility state.
 - Simplification/deletion requirement completion: **84%**. Recent Gate 4/Gate 6
   work removed duplicate render/visibility loaded-state policy and moved
   fixture-only metric-axis helpers out of production runtime code. The latest
   visibility pass also removed single-use visible row/column/depth exports, and
   the chart sync pass removed a single-use committed-tree sync predicate and its
   module. The stable-trim cleanup also removed local cell/fetched-coverage
-  projection across semantic trims, but deeper row subtotal policy,
-  hydration/persistence, and chart controller logic still keep meaningful old
-  complexity alive.
+  projection and local tree-shape repair across semantic trims, but deeper row
+  subtotal policy, hydration/persistence, and chart controller logic still keep
+  meaningful old complexity alive.
 
 Pipeline goal reassessment:
 
@@ -377,8 +378,8 @@ Refactor health:
 - Direction: **good**. The compiler/fact-store/materializer shape is now real
   and production fetch paths use it.
 - Deletion payoff: **past break-even and improving**. Pre-existing source files
-  are net `-5617`, and added runtime/helper files now leave the plugin net
-  `-1003`.
+  are net `-5619`, and added runtime/helper files now leave the plugin net
+  `-1209`.
 - Interactivity: **partially improved**. Latest-only requests, reducer loading
   state, chunked materialization, cheaper child traversal, and no-hidden-layer
   fetch planning are in place, but the user-visible lag from large
@@ -426,35 +427,35 @@ Tests and Markdown are excluded.
 
 Current diff from baseline:
 
-- `8092` insertions
+- `7886` insertions
 - `9095` deletions
-- net `-1003` production source lines
-- current `src` code total: `32507` lines
+- net `-1209` production source lines
+- current `src` code total: `32301` lines
 - implied baseline `src` total: about `33510` lines
 
 By file status:
 
-- Added files: `+4614 / -0` across `16` files
+- Added files: `+4410 / -0` across `16` files
 - Deleted files: `+0 / -1419` across `8` files
-- Modified files: `+3478 / -7676`, net `-4198`
+- Modified files: `+3476 / -7676`, net `-4200`
 
 By area:
 
-| Area              | Additions | Deletions |     Net | Readout                                                                                                                                                                       |
-| ----------------- | --------: | --------: | ------: | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Runtime           |      3825 |         0 | `+3825` | Correct new boundary; runtime coverage now owns runtime layout comparison/fetch decisions, and the materializer owns measure-leaf value application.                          |
-| Expansion         |      1621 |      2721 | `-1100` | Recent Gate 5 work made this area strongly net-negative; layout transitions no longer roll child cells, fetched coverage, or existing deep tree shape across semantic trims.  |
-| Chart hooks       |      1136 |      1942 |  `-806` | Render/layout repair is still net-negative, and metric formatting semantics now stay behind the formatting hook instead of leaking into the table view.                       |
-| Query             |       771 |       843 |   `-72` | Old branch planner deleted, but specs/bootstrap grew around coverage.                                                                                                         |
-| Core tree         |         8 |      1014 | `-1006` | Best completed simplification; raw-record fixture construction is no longer in production `src`.                                                                              |
-| `PivotTableChart` |       365 |       976 |  `-611` | Chart shrinkage is now visible, and runtime-layout fetch decisions are delegated to the runtime coverage boundary.                                                            |
-| Other             |       366 |      1599 | `-1233` | Utility/render/visibility cleanup now includes the shared child lookup cache, deleted column-display and layout fetch-policy modules, and no tree mutation in measure leaves. |
+| Area              | Additions | Deletions |     Net | Readout                                                                                                                                                                                            |
+| ----------------- | --------: | --------: | ------: | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Runtime           |      3824 |         0 | `+3824` | Correct new boundary; runtime coverage now owns runtime layout comparison/fetch decisions, explicit root coverage for no-dimension layouts, and materializer-owned measure-leaf value application. |
+| Expansion         |      1416 |      2721 | `-1305` | Recent Gate 5 work made this area strongly net-negative; layout transitions no longer roll child cells, fetched coverage, existing deep tree shape, or tree trim/promotion across semantic trims.  |
+| Chart hooks       |      1136 |      1942 |  `-806` | Render/layout repair is still net-negative, and metric formatting semantics now stay behind the formatting hook instead of leaking into the table view.                                            |
+| Query             |       771 |       843 |   `-72` | Old branch planner deleted, but specs/bootstrap grew around coverage.                                                                                                                              |
+| Core tree         |         8 |      1014 | `-1006` | Best completed simplification; raw-record fixture construction is no longer in production `src`.                                                                                                   |
+| `PivotTableChart` |       365 |       976 |  `-611` | Chart shrinkage is now visible, and runtime-layout fetch decisions are delegated to the runtime coverage boundary.                                                                                 |
+| Other             |       366 |      1599 | `-1233` | Utility/render/visibility cleanup now includes the shared child lookup cache, deleted column-display and layout fetch-policy modules, and no tree mutation in measure leaves.                      |
 
 Why deletions are lower than expected:
 
 - We paid the runtime-layer cost first: materializer, fact store, coverage,
   projection, paths, request lifecycle, chunking, and seamless runtime helpers
-  add `3825` lines before all old callers/repairs have been deleted.
+  add `3824` lines before all old callers/repairs have been deleted.
 - Compatibility has not been cut deeply enough. Flexible Values placement stayed
   and old row/column projection/layout behavior is still being supported in
   `usePivotLayout`, `visibility`, `usePivotRenderModel`, and `PivotTableChart`.
@@ -1019,8 +1020,21 @@ Latest code-reduction slice:
   measure-leaf-tier, row totals, metric-tier, and expansion measure-leaf suites
   (`118` tests); touched-file ESLint and `git diff --check` passed from
   `superset-frontend`.
+- Gate 5 no-local-tree-projection cleanup: layout transitions no longer trim
+  removed-depth nodes or promote parent nodes when a semantic layout change
+  arrives without fresh data. The helper now keeps the current tree only as a
+  display snapshot, caps stale auto-expansion to the last stable expandable
+  prefix, and leaves tree shape changes to fresh materialization. Runtime
+  coverage also requires explicit root coverage for no-dimension layouts, so
+  grand-total-only transitions fetch/materialize exact facts instead of using
+  stale row or column shape.
+- Additional production change for that follow-up: `+5 / -211`, net `-206`.
+- Verification after the no-local-tree-projection cleanup: single-process Jest
+  passed for layout-transition, seamless interaction, and runtime coverage
+  suites (`47` tests), and touched-file ESLint passed from
+  `superset-frontend`.
 - Combined recent Gate 4/Gate 5/Gate 6/Gate 7 source-change sequence:
-  `+2996 / -6073`, net `-3077`.
+  `+3001 / -6284`, net `-3283`.
 - Attempted render-model plumbing cleanup around spinner callbacks, sorting
   value-map aliases, leaf-label flattening, and aggregate-bold returns was
   reverted before this slice because it did not pay for itself clearly enough
@@ -1037,11 +1051,11 @@ Gate status:
   program placement, interaction layout, and seamless expansion-state planning.
   `usePivotLayout` and `resolveInteractionLayout` still translate raw layout
   state into runtime behavior.
-- Gate 2 is largely complete (`88%`). Initial, root, branch, and batch query paths now
+- Gate 2 is largely complete (`89%`). Initial, root, branch, and batch query paths now
   flow through explicit coverage metadata. Remaining complexity is mostly
   support/totals coverage expansion inside `coverage.ts`; branch-pair planning,
-  fetched-depth shape compatibility, and chart-owned layout fetch branching
-  have been removed from the main path.
+  fetched-depth shape compatibility, implicit root-layout coverage, and
+  chart-owned layout fetch branching have been removed from the main path.
 - Gate 3 is mostly complete at the ingestion boundary (`91%`). Initial load, seamless
   refresh, branch fetch, batch fetch, local fact-store hits, and branch-cache
   hits now carry `PivotFactStoreBatch[]`. The remaining dependency is mostly
@@ -1060,7 +1074,7 @@ Gate status:
   longer performs a second measure-leaf materialization pass, and
   `measureLeaves.ts` no longer mutates trees; runtime/upstream materialization
   owns that contract.
-- Gate 5 is started but still the largest source of complexity (`75%`).
+- Gate 5 is started but still the largest source of complexity (`77%`).
   `useExpansionEngine` no longer infers fetched state from rendered trees and
   the planner no longer consumes raw fetched-depth maps or rendered-child
   loaded-state callbacks. Pending/loading state
@@ -1073,8 +1087,8 @@ Gate status:
   satisfies planned expansions without a local tree-shape recheck, the unused
   legacy fetch coordinator is gone, and the single-use staging-tree helper has
   been folded into hydration. Stable layout trims no longer roll child cell
-  values, fetched coverage, or existing deep tree shape up to surviving parent
-  nodes.
+  values, fetched coverage, existing deep tree shape, or local tree
+  trim/promotion up to surviving parent nodes.
   The hook still owns hydration iteration, cancellation, and React state
   commits.
 - Gate 6 is partially complete (`84%`). Projection now drives toggle eligibility,
@@ -1089,7 +1103,7 @@ Gate status:
   immutable node map, one row-end Values child-filter branch has been deleted,
   and the row/column child-filter prelude is now shared.
   Remaining work is mostly deeper row subtotal policy.
-- Gate 7 has only been lightly reduced (`48%`). `PivotTableChart.tsx` is smaller than
+- Gate 7 has only been lightly reduced (`49%`). `PivotTableChart.tsx` is smaller than
   baseline, and the view formatting prop surface is narrower, but at roughly
   `2539` lines the chart still owns committed-tree sync, dimension filters,
   interaction wiring, and controller-like responsibilities.
@@ -1098,12 +1112,12 @@ Current largest production hotspots by line count:
 
 - `PivotTableChart.tsx`: `2539` lines. It still owns committed-tree sync,
   dimension filters, interaction wiring, and controller-like responsibilities.
-- `useExpansionEngine.ts`: `1716` lines. This is still the largest runtime
+- `useExpansionEngine.ts`: `1687` lines. This is still the largest runtime
   orchestration and deletion target.
 - `usePivotFormatting.tsx`: `1632` lines. This is still the largest chart hook
   hotspot; future formatting/databar cleanup must delete branches or view props
   rather than move rendering logic sideways.
-- `materializePivotTree.ts`: `1261` lines. It is now production-only runtime
+- `materializePivotTree.ts`: `1326` lines. It is now production-only runtime
   materialization surface, but still large enough that splits must be tied to
   caller deletion or export parity.
 - `PivotInteractionPanel.tsx`: `1186` lines. It is large, but less tied to the

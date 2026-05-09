@@ -131,6 +131,23 @@ describe('runtime layout fact coverage', () => {
     ).toBe(true);
   });
 
+  it('requires explicit root coverage for layouts without dimensions', () => {
+    expect(
+      factBatchesCoverRuntimeLayout([], {
+        ...runtimeLayout,
+        rows: [],
+        cols: [],
+      }),
+    ).toBe(false);
+    expect(
+      factBatchesCoverRuntimeLayout([factBatch(0, 0)], {
+        ...runtimeLayout,
+        rows: [],
+        cols: [],
+      }),
+    ).toBe(true);
+  });
+
   it('rejects depth-matching coverage for a different leading dimension', () => {
     const batch: PivotFactStoreBatch = {
       coverage: buildFactCoverage({

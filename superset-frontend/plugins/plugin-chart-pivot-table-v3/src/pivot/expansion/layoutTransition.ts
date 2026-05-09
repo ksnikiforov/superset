@@ -16,11 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import {
-  type PivotAxis,
-  type PivotTreeData,
-  type PivotTreeNode,
-} from '../../types';
+import { type PivotTreeData } from '../../types';
 import { getStablePrefixLength, isSameLayout } from './engine';
 
 export type PivotLayoutKeyState = {
@@ -37,8 +33,6 @@ type ResolveLayoutTransitionInput = {
   hasNewData: boolean;
   effectiveExpandRowsLevel: number;
   effectiveExpandColsLevel: number;
-  countDimDepth: (path: PivotTreeNode['path']) => number;
-  isMetricTokenValue: (value: unknown) => boolean;
   metricIndexForRows?: number;
   metricIndexForCols?: number;
   groupbyRowsLength: number;
@@ -49,169 +43,6 @@ export const isPrefix = (prefix: string[], target: string[]) =>
   prefix.length <= target.length &&
   prefix.every((value, idx) => value === target[idx]);
 
-const trimAxisByDepth = ({
-  tree,
-  axis,
-  maxDepth,
-  countDimDepth,
-}: {
-  tree: PivotTreeData;
-  axis: PivotAxis;
-  maxDepth: number;
-  countDimDepth: (path: PivotTreeNode['path']) => number;
-}) => {
-  const nodes = axis === 'row' ? tree.rows : tree.cols;
-  const nextNodes: Record<string, PivotTreeNode> = {};
-  const removedKeys = new Set<string>();
-  let hasChanges = false;
-  Object.entries(nodes).forEach(([key, node]) => {
-    const depth = countDimDepth(node.path);
-    if (depth > maxDepth) {
-      removedKeys.add(key);
-      hasChanges = true;
-      return;
-    }
-    let nextNode = node;
-    if (depth >= maxDepth && node.hasChildren) {
-      nextNode = { ...node, hasChildren: false };
-      hasChanges = true;
-    }
-    nextNodes[key] = nextNode;
-  });
-  if (!hasChanges) {
-    return { tree, removedKeys };
-  }
-  const nextTree =
-    axis === 'row'
-      ? { ...tree, rows: nextNodes }
-      : { ...tree, cols: nextNodes };
-  return { tree: nextTree, removedKeys };
-};
-
-const promoteAxisForDepth = ({
-  tree,
-  axis,
-  maxDepth,
-  countDimDepth,
-  isMetricTokenValue,
-  allowMetricPromotion = false,
-}: {
-  tree: PivotTreeData;
-  axis: PivotAxis;
-  maxDepth: number;
-  countDimDepth: (path: PivotTreeNode['path']) => number;
-  isMetricTokenValue: (value: unknown) => boolean;
-  allowMetricPromotion?: boolean;
-}) => {
-  const nodes = axis === 'row' ? tree.rows : tree.cols;
-  let hasChanges = false;
-  const nextNodes: Record<string, PivotTreeNode> = { ...nodes };
-  Object.entries(nodes).forEach(([key, node]) => {
-    if (!allowMetricPromotion && node.path.some(isMetricTokenValue)) {
-      return;
-    }
-    const depth = countDimDepth(node.path);
-    if (depth < maxDepth && !node.hasChildren) {
-      nextNodes[key] = { ...node, hasChildren: true };
-      hasChanges = true;
-    }
-  });
-  if (!hasChanges) {
-    return tree;
-  }
-  return axis === 'row'
-    ? { ...tree, rows: nextNodes }
-    : { ...tree, cols: nextNodes };
-};
-
-export const trimTreeForLayout = ({
-  tree,
-  trimRowDepth,
-  trimColDepth,
-  countDimDepth,
-}: {
-  tree: PivotTreeData;
-  trimRowDepth?: number;
-  trimColDepth?: number;
-  countDimDepth: (path: PivotTreeNode['path']) => number;
-}) => {
-  let nextTree = tree;
-  const removedRows = new Set<string>();
-  const removedCols = new Set<string>();
-  if (trimRowDepth !== undefined) {
-    const result = trimAxisByDepth({
-      tree: nextTree,
-      axis: 'row',
-      maxDepth: trimRowDepth,
-      countDimDepth,
-    });
-    nextTree = result.tree;
-    result.removedKeys.forEach(key => removedRows.add(key));
-  }
-  if (trimColDepth !== undefined) {
-    const result = trimAxisByDepth({
-      tree: nextTree,
-      axis: 'col',
-      maxDepth: trimColDepth,
-      countDimDepth,
-    });
-    nextTree = result.tree;
-    result.removedKeys.forEach(key => removedCols.add(key));
-  }
-  if (removedRows.size === 0 && removedCols.size === 0) {
-    return nextTree;
-  }
-  const nextCells: PivotTreeData['cells'] = {};
-  Object.entries(nextTree.cells).forEach(([key, cell]) => {
-    if (!nextTree.rows[cell.rowKey] || !nextTree.cols[cell.colKey]) {
-      return;
-    }
-    nextCells[key] = cell;
-  });
-  return { ...nextTree, cells: nextCells };
-};
-
-export const promoteTreeForLayout = ({
-  tree,
-  promoteRowDepth,
-  promoteColDepth,
-  countDimDepth,
-  isMetricTokenValue,
-  allowMetricRowPromotion,
-  allowMetricColPromotion,
-}: {
-  tree: PivotTreeData;
-  promoteRowDepth?: number;
-  promoteColDepth?: number;
-  countDimDepth: (path: PivotTreeNode['path']) => number;
-  isMetricTokenValue: (value: unknown) => boolean;
-  allowMetricRowPromotion?: boolean;
-  allowMetricColPromotion?: boolean;
-}) => {
-  let nextTree = tree;
-  if (promoteRowDepth !== undefined) {
-    nextTree = promoteAxisForDepth({
-      tree: nextTree,
-      axis: 'row',
-      maxDepth: promoteRowDepth,
-      countDimDepth,
-      isMetricTokenValue,
-      allowMetricPromotion: allowMetricRowPromotion,
-    });
-  }
-  if (promoteColDepth !== undefined) {
-    nextTree = promoteAxisForDepth({
-      tree: nextTree,
-      axis: 'col',
-      maxDepth: promoteColDepth,
-      countDimDepth,
-      isMetricTokenValue,
-      allowMetricPromotion: allowMetricColPromotion,
-    });
-  }
-  return nextTree;
-};
-
 export const resolveLayoutTransition = ({
   data,
   currentTree,
@@ -221,8 +52,6 @@ export const resolveLayoutTransition = ({
   hasNewData,
   effectiveExpandRowsLevel,
   effectiveExpandColsLevel,
-  countDimDepth,
-  isMetricTokenValue,
   metricIndexForRows,
   metricIndexForCols,
   groupbyRowsLength,
@@ -238,8 +67,7 @@ export const resolveLayoutTransition = ({
     isPrefix(previousLayout.cols, currentLayout.cols);
   const layoutChanged = rowsChanged || colsChanged;
   const sourceTree = hasNewData || !layoutChanged ? data : currentTree;
-  const shouldPruneRowsForLayoutChange = rowsChanged && !hasNewData;
-  const shouldPruneColsForLayoutChange = colsChanged && !hasNewData;
+  const layoutChangedWithoutNewData = layoutChanged && !hasNewData;
   const layoutRowsForPrune = rowsChanged
     ? previousLayout.rows
     : (sessionLayout?.rows ?? previousLayout.rows);
@@ -255,11 +83,11 @@ export const resolveLayoutTransition = ({
     currentLayout.cols,
   );
   const autoExpandRowsLevelForDesired =
-    shouldPruneRowsForLayoutChange && shouldExpandRows && rowStablePrefix > 0
+    layoutChangedWithoutNewData && rowsChanged && rowStablePrefix > 0
       ? Math.min(effectiveExpandRowsLevel, Math.max(rowStablePrefix - 1, 0))
       : effectiveExpandRowsLevel;
   const autoExpandColsLevelForDesired =
-    shouldPruneColsForLayoutChange && shouldExpandCols && colStablePrefix > 0
+    layoutChangedWithoutNewData && colsChanged && colStablePrefix > 0
       ? Math.min(effectiveExpandColsLevel, Math.max(colStablePrefix - 1, 0))
       : effectiveExpandColsLevel;
   const allowMetricRowPromotion =
@@ -267,44 +95,13 @@ export const resolveLayoutTransition = ({
   const allowMetricColPromotion =
     metricIndexForCols !== undefined &&
     metricIndexForCols < groupbyColumnsLength;
-  const baseTree =
-    shouldPruneRowsForLayoutChange || shouldPruneColsForLayoutChange
-      ? trimTreeForLayout({
-          tree: sourceTree,
-          trimRowDepth: shouldPruneRowsForLayoutChange
-            ? rowStablePrefix
-            : undefined,
-          trimColDepth: shouldPruneColsForLayoutChange
-            ? colStablePrefix
-            : undefined,
-          countDimDepth,
-        })
-      : sourceTree;
-  const normalizedTree =
-    shouldPruneRowsForLayoutChange || shouldPruneColsForLayoutChange
-      ? promoteTreeForLayout({
-          tree: baseTree,
-          promoteRowDepth: shouldPruneRowsForLayoutChange
-            ? currentLayout.rows.length
-            : undefined,
-          promoteColDepth: shouldPruneColsForLayoutChange
-            ? currentLayout.cols.length
-            : undefined,
-          countDimDepth,
-          isMetricTokenValue,
-          allowMetricRowPromotion,
-          allowMetricColPromotion,
-        })
-      : baseTree;
   return {
     rowsChanged,
     colsChanged,
     shouldExpandRows,
     shouldExpandCols,
     layoutChanged,
-    normalizedTree,
-    shouldPruneRowsForLayoutChange,
-    shouldPruneColsForLayoutChange,
+    normalizedTree: sourceTree,
     rowStablePrefix,
     colStablePrefix,
     autoExpandRowsLevelForDesired,
