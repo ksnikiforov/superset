@@ -404,6 +404,14 @@ const getNumericValue = (value: DataRecordValue | undefined) => {
   return undefined;
 };
 
+type CompiledFormatting<Field extends string> = Partial<
+  Record<Field, CompiledExcelFormula>
+>;
+type ExcelFormattingMap<Field extends string> = Record<
+  string,
+  CompiledFormatting<Field>
+>;
+
 export type PivotFormattingResult = {
   metricFormattingScope: MetricFormattingScope;
   metricDatabars: PivotMetricDatabarMap;
@@ -440,53 +448,58 @@ export type PivotFormattingResult = {
   getTotalBackground: (row?: PivotTreeNode) => string | undefined;
 };
 
-const buildFormattingKeyMap = (metricFormatting: PivotMetricFormattingMap) => {
-  const next: Record<string, FormattingKeys> = {};
+const buildMetricFormattingRuntimeMap = (
+  metricFormatting: PivotMetricFormattingMap,
+): {
+  keyMap: Record<string, FormattingKeys>;
+  excelMap: ExcelFormattingMap<MetricFormattingField>;
+} => {
+  const keyMap: Record<string, FormattingKeys> = {};
+  const excelMap: ExcelFormattingMap<MetricFormattingField> = {};
   Object.entries(metricFormatting).forEach(([metricKey, formatting]) => {
     if (!metricKey) {
       return;
     }
-    const formattingKeys = METRIC_FORMATTING_FIELDS.reduce((acc, field) => {
-      const formattingMetric = formatting?.[field];
-      const key = formattingMetric
-        ? isPivotExcelFormula(formattingMetric)
-          ? ''
-          : getFormattingMetricKey(formattingMetric)
-        : '';
-      if (key) {
-        acc[field] = key;
+    const formattingKeys: FormattingKeys = {};
+    const compiled: CompiledFormatting<MetricFormattingField> = {};
+    METRIC_FORMATTING_FIELDS.forEach(field => {
+      const formattingMetric = formatting[field];
+      if (!formattingMetric) {
+        return;
       }
-      return acc;
-    }, {} as FormattingKeys);
+      if (isPivotExcelFormula(formattingMetric)) {
+        compiled[field] = compileExcelFormula(formattingMetric.formula);
+        return;
+      }
+      const key = getFormattingMetricKey(formattingMetric);
+      if (key) {
+        formattingKeys[field] = key;
+      }
+    });
     if (Object.keys(formattingKeys).length > 0) {
-      next[metricKey] = formattingKeys;
+      keyMap[metricKey] = formattingKeys;
+    }
+    if (Object.keys(compiled).length > 0) {
+      excelMap[metricKey] = compiled;
     }
   });
-  return next;
+  return { keyMap, excelMap };
 };
 
 const buildDimensionFormattingRuntimeMap = (
   formatting: PivotDimensionFormattingMap,
 ): {
   keyMap: Record<string, DimensionFormattingKeys>;
-  excelMap: Record<
-    string,
-    Partial<Record<DimensionFormattingField, CompiledExcelFormula>>
-  >;
+  excelMap: ExcelFormattingMap<DimensionFormattingField>;
 } => {
   const keyMap: Record<string, DimensionFormattingKeys> = {};
-  const excelMap: Record<
-    string,
-    Partial<Record<DimensionFormattingField, CompiledExcelFormula>>
-  > = {};
+  const excelMap: ExcelFormattingMap<DimensionFormattingField> = {};
   Object.entries(formatting).forEach(([dimensionKey, dimensionFormatting]) => {
     if (!dimensionKey) {
       return;
     }
     const formattingKeys: Omit<DimensionFormattingKeys, 'applyTo'> = {};
-    const compiled: Partial<
-      Record<DimensionFormattingField, CompiledExcelFormula>
-    > = {};
+    const compiled: CompiledFormatting<DimensionFormattingField> = {};
     DIMENSION_FORMATTING_FIELDS.forEach(field => {
       const value = dimensionFormatting?.[field];
       if (!value) {
@@ -648,32 +661,12 @@ export const usePivotFormatting = ({
     [currencyFormats, derivedFormatOverrides.currencyOverrides],
   );
 
-  const formattingKeyMap = useMemo(
-    () => buildFormattingKeyMap(metricFormatting),
+  const metricFormattingRuntimeMap = useMemo(
+    () => buildMetricFormattingRuntimeMap(metricFormatting),
     [metricFormatting],
   );
-
-  const excelMetricFormattingMap = useMemo(() => {
-    const next: Record<
-      string,
-      Partial<Record<MetricFormattingField, CompiledExcelFormula>>
-    > = {};
-    Object.entries(metricFormatting).forEach(([metricKey, formatting]) => {
-      const compiled: Partial<
-        Record<MetricFormattingField, CompiledExcelFormula>
-      > = {};
-      METRIC_FORMATTING_FIELDS.forEach(field => {
-        const value = formatting[field];
-        if (value && isPivotExcelFormula(value)) {
-          compiled[field] = compileExcelFormula(value.formula);
-        }
-      });
-      if (Object.keys(compiled).length > 0) {
-        next[metricKey] = compiled;
-      }
-    });
-    return next;
-  }, [metricFormatting]);
+  const { keyMap: formattingKeyMap, excelMap: excelMetricFormattingMap } =
+    metricFormattingRuntimeMap;
 
   const evaluateExcelMetricFormatting = useCallback(
     (
