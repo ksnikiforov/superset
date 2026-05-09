@@ -357,6 +357,33 @@ const fetchExpansionTargets = async ({
   return [...localResults, ...fetchedResults];
 };
 
+type FetchResultDelta = {
+  targets: FetchTarget[];
+  data: PivotTreeData;
+};
+
+const collectFetchResultDeltas = ({
+  results,
+  seedFetchedCoverage,
+}: {
+  results: CombinedFetchResult[];
+  seedFetchedCoverage: (factBatches: PivotFactStoreBatch[]) => void;
+}) => {
+  const deltas: FetchResultDelta[] = [];
+  results.forEach(result => {
+    seedFetchedCoverage(result.factBatches);
+    if (!result.data) {
+      return;
+    }
+    deltas.push({
+      targets:
+        result.kind === 'single' ? [result.target] : result.batch.targets,
+      data: result.data,
+    });
+  });
+  return deltas;
+};
+
 export type ExpansionEngineResult = {
   tree: PivotTreeData;
   expandedRows: Set<string>;
@@ -707,17 +734,6 @@ export const useExpansionEngine = ({
     ],
   );
 
-  const getVisibleExpansionKeys = useCallback(
-    (nextRows: Set<string>, nextCols: Set<string>, nextTree: PivotTreeData) =>
-      getVisibleExpansionKeysBase({
-        tree: nextTree,
-        expandedRows: nextRows,
-        expandedCols: nextCols,
-        config: visibilityConfig,
-      }),
-    [visibilityConfig],
-  );
-
   const persistExpansionStateToStore = useCallback(
     (nextState: PivotExpansionStateKeys, options?: { persist?: boolean }) => {
       expansionStateStoreRef.current?.write(nextState, options);
@@ -727,11 +743,12 @@ export const useExpansionEngine = ({
 
   const persistExpansionState = useCallback(
     (nextRows: Set<string>, nextCols: Set<string>) => {
-      const visibleKeys = getVisibleExpansionKeys(
-        nextRows,
-        nextCols,
-        treeRef.current,
-      );
+      const visibleKeys = getVisibleExpansionKeysBase({
+        tree: treeRef.current,
+        expandedRows: nextRows,
+        expandedCols: nextCols,
+        config: visibilityConfig,
+      });
       const filterVisible = (
         keys: Set<string>,
         visible: Set<string>,
@@ -773,10 +790,10 @@ export const useExpansionEngine = ({
     [
       groupbyColumnKeys,
       groupbyRowKeys,
-      getVisibleExpansionKeys,
       persistExpansionStateToStore,
       resolvedExpandColumnsLevel,
       resolvedExpandRowsLevel,
+      visibilityConfig,
     ],
   );
 
@@ -840,38 +857,7 @@ export const useExpansionEngine = ({
     [visibilityConfig],
   );
 
-  const buildHasLoadedChildrenForIteration = useCallback(
-    (nextTree: PivotTreeData) =>
-      buildHasLoadedChildren({
-        tree: nextTree,
-        config: visibilityConfig,
-      }),
-    [visibilityConfig],
-  );
-
-  const applyBranchDelta = useCallback(
-    (
-      currentTree: PivotTreeData,
-      axis: PivotAxis,
-      key: string,
-      branch?: PivotTreeData,
-    ) => {
-      if (!branch) {
-        return currentTree;
-      }
-      const nextTree = mergeTrees(currentTree, branch);
-      const parent = axis === 'row' ? nextTree.rows[key] : nextTree.cols[key];
-      return pruneMergedTree({
-        axis,
-        tree: nextTree,
-        parent,
-        branch,
-      });
-    },
-    [pruneMergedTree],
-  );
-
-  const applyBatchDelta = useCallback(
+  const applyFetchDelta = useCallback(
     (
       currentTree: PivotTreeData,
       axis: PivotAxis,
@@ -972,15 +958,16 @@ export const useExpansionEngine = ({
           const requiredDepth =
             axis === 'row' ? visibleColDepth : visibleRowDepth;
           const nodes = axis === 'row' ? currentTree.rows : currentTree.cols;
-          const hasLoadedChildrenForIteration =
-            buildHasLoadedChildrenForIteration(currentTree);
           const { plan, targets } = planGroupedExpansionTargets({
             axis,
             expandedKeys: resolvedExpanded,
             nodes,
             requiredOppositeDepth: requiredDepth,
             fetchedCoverage: fetchedCoverageRef.current,
-            hasLoadedChildren: hasLoadedChildrenForIteration,
+            hasLoadedChildren: buildHasLoadedChildren({
+              tree: currentTree,
+              config: visibilityConfig,
+            }),
             getCoverageKey,
           });
           if (plan.fetchKeys.size === 0) {
@@ -1030,41 +1017,25 @@ export const useExpansionEngine = ({
           ) {
             return;
           }
-          let didMerge = false;
-          for (const result of results) {
-            if (result.kind === 'single') {
-              const { target, data, factBatches: resultFactBatches } = result;
-              seedFetchedCoverageFromFactBatches(resultFactBatches);
-              if (!data) {
-                continue;
-              }
-              didMerge = true;
+          const resultDeltas = collectFetchResultDeltas({
+            results,
+            seedFetchedCoverage: seedFetchedCoverageFromFactBatches,
+          });
+          for (const {
+            targets: deltaTargets,
+            data: deltaTree,
+          } of resultDeltas) {
+            for (const target of deltaTargets) {
               touchedKeys.add(target.pathKey);
-              currentTree = applyBranchDelta(
-                currentTree,
-                axis,
-                target.pathKey,
-                data,
-              );
-              continue;
             }
-            const { batch, data, factBatches: resultFactBatches } = result;
-            seedFetchedCoverageFromFactBatches(resultFactBatches);
-            if (!data) {
-              continue;
-            }
-            didMerge = true;
-            batch.targets.forEach(target => {
-              touchedKeys.add(target.pathKey);
-            });
-            currentTree = applyBatchDelta(
+            currentTree = applyFetchDelta(
               currentTree,
               axis,
-              batch.targets.map(target => target.pathKey),
-              data,
+              deltaTargets.map(target => target.pathKey),
+              deltaTree,
             );
           }
-          if (!didMerge) {
+          if (resultDeltas.length === 0) {
             break;
           }
           const nextResolvedExpanded = resolveExpandedForMetrics(
@@ -1116,9 +1087,7 @@ export const useExpansionEngine = ({
     },
     [
       addWarnings,
-      applyBatchDelta,
-      applyBranchDelta,
-      buildHasLoadedChildrenForIteration,
+      applyFetchDelta,
       buildRequestGroupId,
       computeVisibleDepths,
       fetchFormData,
@@ -1129,6 +1098,7 @@ export const useExpansionEngine = ({
       trackRequestInScope,
       updateLoadingKey,
       seedFetchedCoverageFromFactBatches,
+      visibilityConfig,
     ],
   );
 
@@ -1347,25 +1317,14 @@ export const useExpansionEngine = ({
           return;
         }
 
-        for (const result of results) {
-          if (result.kind === 'single') {
-            const { target, data, factBatches: resultFactBatches } = result;
-            seedFetchedCoverageFromFactBatches(resultFactBatches);
-            if (!data) {
-              continue;
-            }
+        const resultDeltas = collectFetchResultDeltas({
+          results,
+          seedFetchedCoverage: seedFetchedCoverageFromFactBatches,
+        });
+        for (const { targets: deltaTargets, data: deltaTree } of resultDeltas) {
+          for (const target of deltaTargets) {
             const deltaKey = JSON.stringify([target.axis, target.pathKey]);
-            stagingState = stageDelta(stagingState, deltaKey, data);
-            continue;
-          }
-          const { batch, data, factBatches: resultFactBatches } = result;
-          seedFetchedCoverageFromFactBatches(resultFactBatches);
-          for (const target of batch.targets) {
-            if (!data) {
-              continue;
-            }
-            const deltaKey = JSON.stringify([target.axis, target.pathKey]);
-            stagingState = stageDelta(stagingState, deltaKey, data);
+            stagingState = stageDelta(stagingState, deltaKey, deltaTree);
           }
         }
       }

@@ -34,6 +34,35 @@ const valuePlacementSignature = (
   placement: PivotRuntimeLayout['valuePlacement'],
 ) => stableStringify(placement ?? {});
 
+const leafOrderSignature = (order?: PivotRuntimeLayout['leafOrder']) =>
+  stableStringify(order ?? []);
+
+const hasSameRuntimeLayoutState = (
+  prev: PivotRuntimeLayout,
+  next: PivotRuntimeLayout,
+  metricsMatch: (left: string[], right: string[]) => boolean,
+) =>
+  arraysEqual(prev.rows, next.rows) &&
+  arraysEqual(prev.cols, next.cols) &&
+  metricsMatch(prev.metrics, next.metrics) &&
+  selectionSignature(prev.leafSelection) ===
+    selectionSignature(next.leafSelection) &&
+  leafOrderSignature(prev.leafOrder) === leafOrderSignature(next.leafOrder) &&
+  valuePlacementSignature(prev.valuePlacement) ===
+    valuePlacementSignature(next.valuePlacement);
+
+export const isMetricOrderOnlyChange = (
+  prev: PivotRuntimeLayout,
+  next: PivotRuntimeLayout,
+) =>
+  !arraysEqual(prev.metrics, next.metrics) &&
+  hasSameRuntimeLayoutState(prev, next, hasSameSet);
+
+export const isSameRuntimeLayout = (
+  prev: PivotRuntimeLayout,
+  next: PivotRuntimeLayout,
+) => hasSameRuntimeLayoutState(prev, next, arraysEqual);
+
 const shouldFetchForLeadingKeyChange = (
   prevAxisKeys: string[],
   nextAxisKeys: string[],

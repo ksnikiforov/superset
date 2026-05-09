@@ -64,13 +64,16 @@ import { usePivotFormatting } from './pivot/chart/usePivotFormatting';
 import { usePivotInteractions } from './pivot/chart/usePivotInteractions';
 import { PivotInteractionPanel } from './pivot/chart/PivotInteractionPanel';
 import { resolveInteractionFormData } from './pivot/layout/resolveInteractionLayout';
-import { shouldFetchForLayoutChange } from './pivot/layout/shouldFetchForLayoutChange';
+import {
+  isMetricOrderOnlyChange,
+  isSameRuntimeLayout,
+  shouldFetchForLayoutChange,
+} from './pivot/layout/shouldFetchForLayoutChange';
 import {
   factBatchesCoverRuntimeLayout,
   shouldSyncCommittedTreeFromProps as shouldSyncCommittedTreeFromPropsBase,
 } from './pivot/layout/committedTreeSyncGuard';
 import {
-  buildInitialPivotUpdatePlan,
   buildSelectionFilterClauses,
   mergeExtraFilters as mergeSelectionExtraFilters,
 } from './pivot/update/initialUpdatePlan';
@@ -88,10 +91,8 @@ import {
   findMeasureLeafIdInPath,
   getMetricKeys,
   getStableColumnKey,
-  METRICS_PLACEHOLDER,
   isSubtotalToken,
   coerceEpochMsStringToNumber,
-  parsePath,
 } from './utils';
 import {
   buildMeasureLeafOutputKey,
@@ -611,37 +612,6 @@ const normalizeRuntimeLayout = (
   };
 };
 
-const arraysEqual = (left: string[], right: string[]) =>
-  left.length === right.length &&
-  left.every((value, index) => value === right[index]);
-
-const hasSameSet = (left: string[], right: string[]) =>
-  left.length === right.length && left.every(value => right.includes(value));
-
-const selectionSignature = (selection: PivotRuntimeLayout['leafSelection']) =>
-  stableStringify(selection ?? {});
-
-const valuePlacementSignature = (
-  placement: PivotRuntimeLayout['valuePlacement'],
-) => stableStringify(placement ?? {});
-
-const leafOrderSignature = (order?: PivotRuntimeLayout['leafOrder']) =>
-  stableStringify(order ?? []);
-
-const hasSameRuntimeLayoutState = (
-  prev: PivotRuntimeLayout,
-  next: PivotRuntimeLayout,
-  metricsMatch: (left: string[], right: string[]) => boolean,
-) =>
-  arraysEqual(prev.rows, next.rows) &&
-  arraysEqual(prev.cols, next.cols) &&
-  metricsMatch(prev.metrics, next.metrics) &&
-  selectionSignature(prev.leafSelection) ===
-    selectionSignature(next.leafSelection) &&
-  leafOrderSignature(prev.leafOrder) === leafOrderSignature(next.leafOrder) &&
-  valuePlacementSignature(prev.valuePlacement) ===
-    valuePlacementSignature(next.valuePlacement);
-
 type DatasetColumnMeta = {
   column_name?: string;
   verbose_name?: string | null;
@@ -686,49 +656,6 @@ const buildDateFormattersFromColumns = (
     },
     {},
   );
-
-const addValuePlaceholder = ({
-  keys,
-  shouldInsert,
-  index,
-}: {
-  keys: string[];
-  shouldInsert: boolean;
-  index: number;
-}) => {
-  if (!shouldInsert) {
-    return keys;
-  }
-  const next = [...keys];
-  const safeIndex = Math.max(0, Math.min(index, next.length));
-  next.splice(safeIndex, 0, METRICS_PLACEHOLDER);
-  return next;
-};
-
-const buildExpansionLayoutKeys = (layout: PivotRuntimeLayout) => ({
-  rowKeys: addValuePlaceholder({
-    keys: layout.rows,
-    shouldInsert: layout.valuePlacement.axis === 'row',
-    index: layout.valuePlacement.index,
-  }),
-  colKeys: addValuePlaceholder({
-    keys: layout.cols,
-    shouldInsert: layout.valuePlacement.axis === 'col',
-    index: layout.valuePlacement.index,
-  }),
-});
-
-const isMetricOrderOnlyChange = (
-  prev: PivotRuntimeLayout,
-  next: PivotRuntimeLayout,
-) =>
-  !arraysEqual(prev.metrics, next.metrics) &&
-  hasSameRuntimeLayoutState(prev, next, hasSameSet);
-
-const isSameRuntimeLayout = (
-  prev: PivotRuntimeLayout,
-  next: PivotRuntimeLayout,
-) => hasSameRuntimeLayoutState(prev, next, arraysEqual);
 
 function PivotTableChart(props: PivotTableProps) {
   const {
@@ -783,7 +710,8 @@ function PivotTableChart(props: PivotTableProps) {
   const isUserControlled = interactionMode === 'user_controlled';
   const isDashboardContext =
     appSection === AppSection.Dashboard || formData.dashboardId !== undefined;
-  const shouldPersistOwnState = !(isUserControlled && isDashboardContext);
+  const isDashboardRuntimeSync = isUserControlled && isDashboardContext;
+  const shouldPersistOwnState = !isDashboardRuntimeSync;
   const fetchFormDataBase = queryFormData || formData;
 
   const [extraVerboseMap, setExtraVerboseMap] = useState<
@@ -1123,8 +1051,7 @@ function PivotTableChart(props: PivotTableProps) {
 
   useEffect(() => {
     if (
-      isUserControlled &&
-      isDashboardContext &&
+      isDashboardRuntimeSync &&
       pendingPersistedRuntimeLayoutSyncRef.current
     ) {
       return;
@@ -1135,11 +1062,10 @@ function PivotTableChart(props: PivotTableProps) {
     setCommittedRuntimeLayout(current =>
       isSameRuntimeLayout(current, runtimeLayout) ? current : runtimeLayout,
     );
-  }, [isDashboardContext, isUserControlled, runtimeLayout]);
+  }, [isDashboardRuntimeSync, runtimeLayout]);
   useEffect(() => {
     if (
-      !isUserControlled ||
-      !isDashboardContext ||
+      !isDashboardRuntimeSync ||
       !pendingPersistedRuntimeLayoutSyncRef.current
     ) {
       return;
@@ -1149,7 +1075,7 @@ function PivotTableChart(props: PivotTableProps) {
     ) {
       pendingPersistedRuntimeLayoutSyncRef.current = false;
     }
-  }, [isDashboardContext, isUserControlled, runtimeLayout]);
+  }, [isDashboardRuntimeSync, runtimeLayout]);
   const appliedMetricKeysBase = useMemo(
     () => getMetricKeys(ensureIsArray(appliedMetrics)),
     [appliedMetrics],
@@ -1303,7 +1229,7 @@ function PivotTableChart(props: PivotTableProps) {
   }, [appliedLayoutFormData, committedSelectionFilters, isUserControlled]);
 
   const upstreamDashboardQueryContextSignature = useMemo(() => {
-    if (!isUserControlled || !isDashboardContext || !queryFormData) {
+    if (!isDashboardRuntimeSync || !queryFormData) {
       return null;
     }
     const normalizedQueryFormData =
@@ -1317,7 +1243,7 @@ function PivotTableChart(props: PivotTableProps) {
       time_offsets: normalizedQueryFormData.time_offsets ?? [],
       time_range: normalizedQueryFormData.time_range ?? null,
     });
-  }, [isDashboardContext, isUserControlled, queryFormData]);
+  }, [isDashboardRuntimeSync, queryFormData]);
 
   const persistedInteractionFilters = useMemo(() => {
     if (!isUserControlled) {
@@ -1492,14 +1418,13 @@ function PivotTableChart(props: PivotTableProps) {
       filters: Record<string, DataRecordValue[]>,
     ) => {
       if (
-        isUserControlled &&
-        isDashboardContext &&
+        isDashboardRuntimeSync &&
         !isSameRuntimeLayout(lastPersistedRuntimeLayoutRef.current, layout)
       ) {
         lastPersistedRuntimeLayoutRef.current = layout;
         pendingPersistedRuntimeLayoutSyncRef.current = true;
       }
-      if (isUserControlled && isDashboardContext) {
+      if (isDashboardRuntimeSync) {
         lastLocalSyncDashboardQueryContextRef.current =
           upstreamDashboardQueryContextSignature;
       }
@@ -1523,8 +1448,7 @@ function PivotTableChart(props: PivotTableProps) {
       }
     },
     [
-      isDashboardContext,
-      isUserControlled,
+      isDashboardRuntimeSync,
       mergeOwnState,
       setControlValue,
       setDataMask,
@@ -1543,56 +1467,8 @@ function PivotTableChart(props: PivotTableProps) {
         dimensionKeys,
         metricKeys,
       );
-      const metricsForLayout =
-        formData.metricsBase ??
-        formData.metrics ??
-        fetchFormDataBaseWithFormatters.metrics;
-      const leavesForLayout =
-        formData.measureLeavesByMetricBase ??
-        formData.measureLeavesByMetric ??
-        fetchFormDataBaseWithFormatters.measureLeavesByMetric;
       const liveSnapshot = currentUserViewPropsRef.current;
-      const expandedRowsForPlan = new Set<string>([
-        ...(liveSnapshot?.expandedRows ?? expandedRowsForSeamlessRef.current),
-        ...pendingRowsForSeamlessRef.current,
-      ]);
-      const expandedColsForPlan = new Set<string>([
-        ...(liveSnapshot?.expandedCols ?? expandedColsForSeamlessRef.current),
-        ...pendingColsForSeamlessRef.current,
-      ]);
-      const toExpansionPaths = (keys: Set<string>) =>
-        Array.from(keys).map(key => parsePath(key));
-      const formDataForPlan = (() => {
-        if (!isUserControlled) {
-          return fetchFormDataBaseWithFormatters;
-        }
-        const { rowKeys, colKeys } = buildExpansionLayoutKeys(normalized);
-        return {
-          ...fetchFormDataBaseWithFormatters,
-          pivotExpansionState: {
-            rowKeys,
-            colKeys,
-            rows: toExpansionPaths(expandedRowsForPlan),
-            cols: toExpansionPaths(expandedColsForPlan),
-            collapsedRows: [],
-            collapsedCols: [],
-          },
-        };
-      })();
-      const {
-        formData: resolvedFormDataWithOffsets,
-        layout,
-        specs,
-      } = buildInitialPivotUpdatePlan({
-        formData: formDataForPlan,
-        runtimeLayout: normalized,
-        selection: nextFilters,
-        metricsOverride: isUserControlled ? metricsForLayout : undefined,
-        measureLeavesByMetricOverride: isUserControlled
-          ? leavesForLayout
-          : undefined,
-      });
-      if (isUserControlled && liveSnapshot) {
+      if (liveSnapshot) {
         setFrozenUserViewProps({
           ...liveSnapshot,
           expandedRows: new Set(liveSnapshot.expandedRows),
@@ -1606,9 +1482,16 @@ function PivotTableChart(props: PivotTableProps) {
       const updateResult = await fetchAndMaterializeSeamlessRuntimeUpdate({
         requestLifecycle: seamlessRequestLifecycle,
         materializationLifecycle: seamlessMaterializationLifecycle,
-        formData: resolvedFormDataWithOffsets,
-        specs,
-        layout,
+        baseFormData: fetchFormDataBaseWithFormatters,
+        sourceFormData: formData,
+        runtimeLayout: normalized,
+        selection: nextFilters,
+        expandedRows:
+          liveSnapshot?.expandedRows ?? expandedRowsForSeamlessRef.current,
+        expandedCols:
+          liveSnapshot?.expandedCols ?? expandedColsForSeamlessRef.current,
+        pendingRows: pendingRowsForSeamlessRef.current,
+        pendingCols: pendingColsForSeamlessRef.current,
         fetchData: params => supersetChartDataClient.fetch(params),
         onFetchStart: () => {
           setSeamlessLoading(true);
@@ -1649,7 +1532,6 @@ function PivotTableChart(props: PivotTableProps) {
       dimensionKeys,
       fetchFormDataBaseWithFormatters,
       formData,
-      isUserControlled,
       metricKeys,
       persistRuntimeState,
       seamlessMaterializationLifecycle,
@@ -1773,8 +1655,7 @@ function PivotTableChart(props: PivotTableProps) {
 
   useEffect(() => {
     if (
-      !isUserControlled ||
-      !isDashboardContext ||
+      !isDashboardRuntimeSync ||
       hasSelectedFilters(persistedInteractionFilters) ||
       committedFactBatchesCoverRuntimeLayout ||
       seamlessLoading
@@ -1794,8 +1675,7 @@ function PivotTableChart(props: PivotTableProps) {
   }, [
     applySeamlessUpdate,
     committedFactBatchesCoverRuntimeLayout,
-    isDashboardContext,
-    isUserControlled,
+    isDashboardRuntimeSync,
     persistedInteractionFilters,
     seamlessLoading,
     uiRuntimeLayout,
@@ -1959,8 +1839,6 @@ function PivotTableChart(props: PivotTableProps) {
     tree,
     expandedRows,
     expandedCols,
-    loadingKeys,
-    isHydrating,
     formData: appliedLayoutFormData,
     rowOrder,
     colOrder,
@@ -2422,8 +2300,8 @@ function PivotTableChart(props: PivotTableProps) {
   );
   const activeErrorMessage = seamlessError ?? errorMessage;
   const cornerLoaderVisible = isUserControlled
-    ? seamlessLoading || renderModelResult.showGlobalLoader
-    : renderModelResult.showGlobalLoader;
+    ? seamlessLoading || isHydrating
+    : isHydrating;
   const tableWidth = isUserControlled
     ? Math.max(0, width - PANEL_WIDTH - SIDE_CHIPS_WIDTH)
     : width;
@@ -2456,7 +2334,7 @@ function PivotTableChart(props: PivotTableProps) {
     isColumnSortable,
     getColumnSortOrder,
     shouldShowToggle: renderModelResult.shouldShowToggle,
-    showSpinner: renderModelResult.showSpinner,
+    showSpinner: key => loadingKeys.has(key),
     formatLabel: formatting.formatLabel,
     isRowAggregateBold: renderModelResult.isRowAggregateBold,
     isColAggregateBold: renderModelResult.isColAggregateBold,
@@ -2477,8 +2355,6 @@ function PivotTableChart(props: PivotTableProps) {
     ...sharedPivotViewProps,
     height: tableHeight,
     width: tableWidth,
-    showGlobalLoader: false,
-    showCornerLoader: cornerLoaderVisible,
   };
   if (isUserControlled) {
     currentUserViewPropsRef.current = liveUserPivotViewProps;
@@ -2752,8 +2628,8 @@ function PivotTableChart(props: PivotTableProps) {
       {...sharedPivotViewProps}
       height={height}
       width={width}
-      showGlobalLoader={renderModelResult.showGlobalLoader}
-      showCornerLoader={renderModelResult.showGlobalLoader}
+      showGlobalLoader={isHydrating}
+      showCornerLoader={isHydrating}
     />
   );
 }

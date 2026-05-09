@@ -184,6 +184,29 @@ export const getMetricTierNodes = (
       })(),
   );
 
+export const getMetricIndexFromNodes = ({
+  nodes,
+  isMetricTokenValue,
+}: {
+  nodes: Record<string, PivotTreeNode>;
+  isMetricTokenValue: (value: unknown) => boolean;
+}): number | undefined => {
+  let found: number | undefined;
+  let foundFromSubtotal: number | undefined;
+  Object.values(nodes).forEach(node => {
+    const idx = node.path.findIndex(val => isMetricTokenValue(val));
+    if (idx < 0) {
+      return;
+    }
+    if (node.path.some(val => isSubtotalToken(val))) {
+      foundFromSubtotal = Math.max(foundFromSubtotal ?? idx, idx);
+      return;
+    }
+    found = Math.max(found ?? idx, idx);
+  });
+  return found ?? foundFromSubtotal;
+};
+
 export const countDimDepth = (
   path: PivotTreeNode['path'],
   metricLabelSet: Set<string>,

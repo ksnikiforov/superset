@@ -87,6 +87,18 @@ const withValuesLevel = (
   ...toDimensionLevels(columns.slice(insertIndex)),
 ];
 
+export const insertValuesPlaceholder = <T>(
+  rows: T[],
+  cols: T[],
+  { axis, index }: { axis: PivotAxis; index: number },
+  value: T,
+) => {
+  const next = { rows: [...rows], cols: [...cols] };
+  const target = axis === 'row' ? next.rows : next.cols;
+  target.splice(Math.max(0, Math.min(index, target.length)), 0, value);
+  return next;
+};
+
 export const compilePivotProgram = ({
   groupbyRows,
   groupbyColumns,
@@ -172,22 +184,17 @@ export const pivotProgramToPlacement = (
 ): PivotProgramPlacement => {
   const fallbackAxis =
     program.metricsLayoutResolved === MetricsLayoutEnum.ROWS ? 'row' : 'col';
-  const rows =
-    program.valueAxis === 'row'
-      ? [
-          ...program.rowDimensions.slice(0, program.metricInsertIndex),
-          METRICS_PLACEHOLDER,
-          ...program.rowDimensions.slice(program.metricInsertIndex),
-        ]
-      : program.rowDimensions;
-  const cols =
-    program.valueAxis === 'col'
-      ? [
-          ...program.columnDimensions.slice(0, program.metricInsertIndex),
-          METRICS_PLACEHOLDER,
-          ...program.columnDimensions.slice(program.metricInsertIndex),
-        ]
-      : program.columnDimensions;
+  const { rows, cols } = program.valueAxis
+    ? insertValuesPlaceholder(
+        program.rowDimensions,
+        program.columnDimensions,
+        { axis: program.valueAxis, index: program.metricInsertIndex },
+        METRICS_PLACEHOLDER,
+      )
+    : {
+        rows: program.rowDimensions,
+        cols: program.columnDimensions,
+      };
 
   return {
     rows,

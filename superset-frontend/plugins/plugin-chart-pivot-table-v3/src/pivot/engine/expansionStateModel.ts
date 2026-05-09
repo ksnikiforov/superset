@@ -17,14 +17,8 @@
  * under the License.
  */
 
-import {
-  type PivotAxis,
-  type PivotTreeData,
-  PivotTreeNode,
-  TotalPosition,
-} from '../../types';
+import { type PivotAxis, type PivotTreeData, PivotTreeNode } from '../../types';
 import { decodeMetricKey, parsePath, serializePath } from '../../utils';
-import { buildVisiblePivotAxes } from '../visibility';
 import { countDimDepth } from '../metricsTotals';
 import { rootKey } from '../viewModel';
 
@@ -174,90 +168,13 @@ export const pruneExpandedToStablePrefix = ({
   return next;
 };
 
-export const getVisibleExpansionKeys = ({
-  rowsNodes,
-  colsNodes,
-  expandedRows,
-  expandedCols,
-  rowSorter,
-  colSorter,
-  skipRowRoot,
-  showRowRoot,
-  rowTotalPosition,
-  getRowChildren,
-  getCollapsedRowChildren,
-  skipColRoot,
-  countDimDepth: countDimDepthFn,
-  normalizedColSubtotalLevels,
-  showColRoot,
-  rowTotals,
-  colTotalPosition,
-  resolvedColSubtotalPosition,
-  getColChildren,
-  getCollapsedColLeaves,
-  isMetricGrandTotalNode,
-  isMetricSubtotalNode,
-  isMetricTokenValue,
-  shouldHideMetricGrandTotalsOnRows,
-  shouldHideMetricGrandTotalsOnCols,
-  shouldSuppressColRoot,
+export const collectVisibleExpansionKeys = ({
+  visibleRows,
+  visibleCols,
 }: {
-  rowsNodes: Record<string, PivotTreeNode>;
-  colsNodes: Record<string, PivotTreeNode>;
-  expandedRows: Set<string>;
-  expandedCols: Set<string>;
-  rowSorter: (a: PivotTreeNode, b: PivotTreeNode) => number;
-  colSorter: (a: PivotTreeNode, b: PivotTreeNode) => number;
-  skipRowRoot: boolean;
-  showRowRoot: boolean;
-  rowTotalPosition: TotalPosition;
-  getRowChildren: (parent: PivotTreeNode) => PivotTreeNode[];
-  getCollapsedRowChildren: (parent: PivotTreeNode) => PivotTreeNode[];
-  skipColRoot: boolean;
-  countDimDepth: (path: PivotTreeNode['path']) => number;
-  normalizedColSubtotalLevels: number[];
-  showColRoot: boolean;
-  rowTotals: boolean;
-  colTotalPosition: TotalPosition;
-  resolvedColSubtotalPosition: TotalPosition;
-  getColChildren: (parent: PivotTreeNode) => PivotTreeNode[];
-  getCollapsedColLeaves: (parent: PivotTreeNode) => PivotTreeNode[];
-  isMetricGrandTotalNode: (node?: PivotTreeNode) => boolean;
-  isMetricSubtotalNode: (node?: PivotTreeNode) => boolean;
-  isMetricTokenValue: (value: unknown) => boolean;
-  shouldHideMetricGrandTotalsOnRows: boolean;
-  shouldHideMetricGrandTotalsOnCols: boolean;
-  shouldSuppressColRoot: boolean;
+  visibleRows: PivotTreeNode[];
+  visibleCols: PivotTreeNode[];
 }): { rows: Set<string>; cols: Set<string> } => {
-  const { visibleRows, visibleCols } = buildVisiblePivotAxes({
-    rows: rowsNodes,
-    cols: colsNodes,
-    expandedRows,
-    expandedCols,
-    rowSorter,
-    colSorter,
-    skipRowRoot,
-    showRowRoot,
-    rowTotalPosition,
-    getRowChildren,
-    getCollapsedRowChildren,
-    skipColRoot,
-    countDimDepth: countDimDepthFn,
-    normalizedColSubtotalLevels,
-    showColRoot,
-    rowTotals,
-    resolvedColTotalPosition: colTotalPosition,
-    resolvedColSubtotalPosition,
-    getColChildren,
-    getCollapsedColLeaves,
-    isMetricGrandTotalNode,
-    isMetricSubtotalNode,
-    isMetricTokenValue,
-    shouldHideMetricGrandTotalsOnRows,
-    shouldHideMetricGrandTotalsOnCols,
-    shouldSuppressColRoot,
-  });
-
   const visibleColKeys = new Set<string>();
   visibleCols.forEach(col => {
     for (let idx = 0; idx <= col.path.length; idx += 1) {

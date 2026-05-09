@@ -51,6 +51,7 @@ import { compareValues, rootKey, sortByOrder } from '../viewModel';
 import { type RenderModel } from '../shared/types';
 import {
   isExplicitTotalNode as isExplicitTotalNodeBase,
+  getMetricIndexFromNodes,
   getNodeDimDepth as getNodeDimDepthBase,
 } from '../metricsTotals';
 import { type PivotLayoutResult } from './usePivotLayout';
@@ -91,8 +92,6 @@ const compareSortValues = (
 export type PivotRenderModelResult = {
   renderTree: PivotTreeData;
   renderModel: RenderModel;
-  showSpinner: (key: string) => boolean;
-  showGlobalLoader: boolean;
   shouldShowToggle: (axis: 'row' | 'col', node?: PivotTreeNode) => boolean;
   isRowAggregateBold: (node?: PivotTreeNode) => boolean;
   isColAggregateBold: (node?: PivotTreeNode) => boolean;
@@ -131,8 +130,6 @@ export const usePivotRenderModel = ({
   tree,
   expandedRows,
   expandedCols,
-  loadingKeys,
-  isHydrating,
   formData,
   rowOrder,
   colOrder,
@@ -146,8 +143,6 @@ export const usePivotRenderModel = ({
   tree: PivotTreeData;
   expandedRows: Set<string>;
   expandedCols: Set<string>;
-  loadingKeys: Set<string>;
-  isHydrating: boolean;
   formData: PivotTableProps['formData'];
   rowOrder: PivotTableProps['rowOrder'];
   colOrder: PivotTableProps['colOrder'];
@@ -493,12 +488,18 @@ export const usePivotRenderModel = ({
     };
     const metricIndexForRowsResolved = resolveMetricIndex(
       layout.metricLayoutIndexOnRows,
-      layout.findMetricIndex(renderTree.rows),
+      getMetricIndexFromNodes({
+        nodes: renderTree.rows,
+        isMetricTokenValue: layout.isMetricTokenValue,
+      }),
       layout.metricIndexOnRows,
     );
     const metricIndexForColsResolved = resolveMetricIndex(
       layout.metricLayoutIndexOnCols,
-      layout.findMetricIndex(renderTree.cols),
+      getMetricIndexFromNodes({
+        nodes: renderTree.cols,
+        isMetricTokenValue: layout.isMetricTokenValue,
+      }),
       layout.metricIndexOnCols,
     );
     return buildRenderModel({
@@ -516,11 +517,8 @@ export const usePivotRenderModel = ({
         colTotalPosition: layout.resolvedColTotalPosition,
         resolvedColSubtotalPosition: layout.effectiveColSubtotalPosition,
         resolvedMetricsLayout: layout.resolvedMetricsLayout,
-        isMultiMetric: layout.isMultiMetric,
         hasMultipleMeasures: layout.hasMultipleMeasures,
         metricsFirstOnCols: layout.metricsFirstOnCols,
-        hideMetricHeaderOnRows: layout.hideMetricHeaderOnRows,
-        hideMetricHeaderOnCols: layout.hideMetricHeaderOnCols,
         rowSorter,
         colSorter,
         getRowChildren: parent =>
@@ -687,8 +685,6 @@ export const usePivotRenderModel = ({
     renderModel,
     expandedRowsForRender,
     expandedColsForRender,
-    showSpinner: key => loadingKeys.has(key),
-    showGlobalLoader: isHydrating,
     shouldShowToggle,
     isRowAggregateBold,
     isColAggregateBold,

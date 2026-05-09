@@ -40,6 +40,7 @@ import { buildLayoutContext } from '../layout/LayoutContext';
 import {
   countDimDepth as countDimDepthBase,
   getMetricDepthForParent as getMetricDepthForParentBase,
+  getMetricIndexFromNodes,
   getMetricLabelFromPath as getMetricLabelFromPathBase,
   getMetricTierNodes as getMetricTierNodesBase,
   getNonMetricPathParts as getNonMetricPathPartsBase,
@@ -69,7 +70,6 @@ export type PivotLayoutResult = {
   metricLabels: string[];
   metricLabelSet: Set<string>;
   isMetricTokenValue: (value: unknown) => boolean;
-  isMultiMetric: boolean;
   groupbyRowKeys: string[];
   groupbyColumnKeys: string[];
   normalizedRowSubtotalLevels: number[];
@@ -87,7 +87,6 @@ export type PivotLayoutResult = {
   metricIntentIndexOnRows?: number;
   metricIntentIndexOnCols?: number;
   hideMetricHeaderOnRows: boolean;
-  hideMetricHeaderOnCols: boolean;
   metricsAtColEnd: boolean;
   shouldExpandMetricRows: boolean;
   shouldExpandMetricCols: boolean;
@@ -105,7 +104,6 @@ export type PivotLayoutResult = {
   countDimDepth: (path: PivotTreeNode['path']) => number;
   countEngineDimDepth: (path: PivotTreeNode['path']) => number;
   getRowSubtotalPosition: (node: PivotTreeNode) => TotalPosition;
-  findMetricIndex: (nodes: Record<string, PivotTreeNode>) => number | undefined;
   getCollapsedRowChildrenForNodes: (
     parent: PivotTreeNode,
     expandedSet: Set<string>,
@@ -381,33 +379,21 @@ export const usePivotLayout = ({
     [data.cols, metricLabelSet],
   );
 
-  const findMetricIndex = useCallback(
-    (nodes: Record<string, PivotTreeNode>) => {
-      let found: number | undefined;
-      let foundFromSubtotal: number | undefined;
-      Object.values(nodes).forEach(node => {
-        const idx = node.path.findIndex(val => isMetricTokenValue(val));
-        if (idx < 0) {
-          return;
-        }
-        if (node.path.some(val => isSubtotalToken(val))) {
-          foundFromSubtotal = Math.max(foundFromSubtotal ?? idx, idx);
-          return;
-        }
-        found = Math.max(found ?? idx, idx);
-      });
-      return found ?? foundFromSubtotal;
-    },
-    [isMetricTokenValue],
-  );
-
   const metricIndexOnRows = useMemo(
-    () => findMetricIndex(data.rows) ?? metricInsertIndexOnRows,
-    [data.rows, findMetricIndex, metricInsertIndexOnRows],
+    () =>
+      getMetricIndexFromNodes({
+        nodes: data.rows,
+        isMetricTokenValue,
+      }) ?? metricInsertIndexOnRows,
+    [data.rows, isMetricTokenValue, metricInsertIndexOnRows],
   );
   const metricIndexOnCols = useMemo(
-    () => findMetricIndex(data.cols) ?? metricInsertIndexOnCols,
-    [data.cols, findMetricIndex, metricInsertIndexOnCols],
+    () =>
+      getMetricIndexFromNodes({
+        nodes: data.cols,
+        isMetricTokenValue,
+      }) ?? metricInsertIndexOnCols,
+    [data.cols, isMetricTokenValue, metricInsertIndexOnCols],
   );
   const metricIntentIndexOnRows = metricInsertIndexOnRows ?? metricIndexOnRows;
   const metricIntentIndexOnCols = metricInsertIndexOnCols ?? metricIndexOnCols;
@@ -1080,7 +1066,6 @@ export const usePivotLayout = ({
     metricLabels,
     metricLabelSet,
     isMetricTokenValue,
-    isMultiMetric,
     groupbyRowKeys,
     groupbyColumnKeys,
     normalizedRowSubtotalLevels,
@@ -1098,7 +1083,6 @@ export const usePivotLayout = ({
     metricIntentIndexOnRows,
     metricIntentIndexOnCols,
     hideMetricHeaderOnRows,
-    hideMetricHeaderOnCols,
     metricsAtColEnd,
     shouldExpandMetricRows,
     shouldExpandMetricCols,
@@ -1113,7 +1097,6 @@ export const usePivotLayout = ({
     countDimDepth,
     countEngineDimDepth,
     getRowSubtotalPosition,
-    findMetricIndex,
     getCollapsedRowChildrenForNodes,
     getCollapsedColLeavesForNodes,
     getRowChildrenForNodes,

@@ -23,15 +23,15 @@ import {
   type PivotTreeData,
   type PivotTreeNode,
 } from '../../types';
-import { isSubtotalToken, parsePath, serializePath } from '../../utils';
+import { parsePath, serializePath } from '../../utils';
 import {
   planExpansionForAxis,
   type PivotExpansionPlan,
 } from '../engine/expansionPlanner';
 import {
   buildDesiredExpandedKeys,
+  collectVisibleExpansionKeys,
   coerceExpansionState,
-  getVisibleExpansionKeys as getVisibleExpansionKeysBase,
   pruneExpandedToStablePrefix,
   stripAutoSeededExpansions,
   type PivotExpansionStateKeys,
@@ -47,6 +47,7 @@ import {
 } from '../visibility';
 import { findChildren, rootKey } from '../viewModel';
 import {
+  getMetricIndexFromNodes,
   isMetricGrandTotalNode as isMetricGrandTotalNodeBase,
   isMetricSubtotalNode as isMetricSubtotalNodeBase,
 } from '../metricsTotals';
@@ -330,11 +331,8 @@ export const buildExpansionRenderModelConfig = (
     colTotalPosition: 'start',
     resolvedColSubtotalPosition: 'start',
     resolvedMetricsLayout,
-    isMultiMetric,
     hasMultipleMeasures,
     metricsFirstOnCols,
-    hideMetricHeaderOnRows: false,
-    hideMetricHeaderOnCols: false,
     rowSorter: depthSorter,
     colSorter: depthSorter,
     getRowChildren: parent => findChildren(tree.rows, parent),
@@ -405,32 +403,6 @@ export const buildHasLoadedChildren =
       rows: tree.rows,
       cols: tree.cols,
     });
-
-export const getMetricIndexFromNodes = ({
-  nodes,
-  isMetricTokenValue,
-}: {
-  nodes: Record<string, PivotTreeNode>;
-  isMetricTokenValue: (value: unknown) => boolean;
-}): number | undefined => {
-  let found: number | undefined;
-  let foundFromSubtotal: number | undefined;
-  Object.values(nodes).forEach(node => {
-    const idx = node.path.findIndex(val => isMetricTokenValue(val));
-    if (idx < 0) {
-      return;
-    }
-    if (node.path.some(val => isSubtotalToken(val))) {
-      foundFromSubtotal =
-        foundFromSubtotal === undefined
-          ? idx
-          : Math.max(foundFromSubtotal, idx);
-      return;
-    }
-    found = found === undefined ? idx : Math.max(found, idx);
-  });
-  return found ?? foundFromSubtotal;
-};
 
 export const resolveExpandedForMetrics = ({
   axis,
@@ -913,34 +885,5 @@ export const getVisibleExpansionKeys = ({
     expandedCols,
     config: resolvedConfig,
   });
-  return getVisibleExpansionKeysBase({
-    rowsNodes: tree.rows,
-    colsNodes: tree.cols,
-    expandedRows,
-    expandedCols,
-    rowSorter: resolvedConfig.rowSorter,
-    colSorter: resolvedConfig.colSorter,
-    skipRowRoot: renderModel.skipRowRoot,
-    showRowRoot: renderModel.showRowRoot,
-    rowTotalPosition: resolvedConfig.rowTotalPosition,
-    getRowChildren: resolvedConfig.getRowChildren,
-    getCollapsedRowChildren: resolvedConfig.getCollapsedRowChildren,
-    skipColRoot: renderModel.skipColRoot,
-    countDimDepth: resolvedConfig.countDimDepth,
-    normalizedColSubtotalLevels: resolvedConfig.normalizedColSubtotalLevels,
-    showColRoot: renderModel.showColRoot,
-    rowTotals: resolvedConfig.rowTotals,
-    colTotalPosition: resolvedConfig.colTotalPosition,
-    resolvedColSubtotalPosition: resolvedConfig.resolvedColSubtotalPosition,
-    getColChildren: resolvedConfig.getColChildren,
-    getCollapsedColLeaves: resolvedConfig.getCollapsedColLeaves,
-    isMetricGrandTotalNode: resolvedConfig.isMetricGrandTotalNode,
-    isMetricSubtotalNode: resolvedConfig.isMetricSubtotalNode,
-    isMetricTokenValue: resolvedConfig.isMetricTokenValue,
-    shouldHideMetricGrandTotalsOnRows:
-      renderModel.shouldHideMetricGrandTotalsOnRows,
-    shouldHideMetricGrandTotalsOnCols:
-      renderModel.shouldHideMetricGrandTotalsOnCols,
-    shouldSuppressColRoot: renderModel.shouldSuppressColRoot,
-  });
+  return collectVisibleExpansionKeys(renderModel);
 };

@@ -102,11 +102,8 @@ describe('buildRenderModel', () => {
         colTotalPosition: 'start',
         resolvedColSubtotalPosition: 'start',
         resolvedMetricsLayout: MetricsLayoutEnum.COLUMNS,
-        isMultiMetric: false,
         hasMultipleMeasures: false,
         metricsFirstOnCols: false,
-        hideMetricHeaderOnRows: false,
-        hideMetricHeaderOnCols: false,
         rowSorter: (a, b) => a.label.localeCompare(b.label),
         colSorter: (a, b) => a.label.localeCompare(b.label),
         getRowChildren: parent => findChildren(tree.rows, parent),
@@ -121,7 +118,6 @@ describe('buildRenderModel', () => {
     });
 
     expect(renderModel.showRowRoot).toBe(true);
-    expect(renderModel.showColRoot).toBe(true);
     expect(renderModel.visibleRows.map(node => node.key)).toEqual([
       rootKey,
       rowKey,
@@ -178,11 +174,8 @@ describe('buildRenderModel', () => {
         colTotalPosition: 'start',
         resolvedColSubtotalPosition: 'start',
         resolvedMetricsLayout: MetricsLayoutEnum.COLUMNS,
-        isMultiMetric: true,
         hasMultipleMeasures: true,
         metricsFirstOnCols: false,
-        hideMetricHeaderOnRows: false,
-        hideMetricHeaderOnCols: false,
         rowSorter: (a, b) => a.label.localeCompare(b.label),
         colSorter: (a, b) => a.label.localeCompare(b.label),
         getRowChildren: parent => findChildren(tree.rows, parent),

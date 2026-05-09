@@ -39,11 +39,8 @@ export type RenderModelConfig = {
   colTotalPosition: TotalPosition;
   resolvedColSubtotalPosition: TotalPosition;
   resolvedMetricsLayout: MetricsLayoutEnum;
-  isMultiMetric: boolean;
   hasMultipleMeasures: boolean;
   metricsFirstOnCols: boolean;
-  hideMetricHeaderOnRows: boolean;
-  hideMetricHeaderOnCols: boolean;
   rowSorter: (a: PivotTreeNode, b: PivotTreeNode) => number;
   colSorter: (a: PivotTreeNode, b: PivotTreeNode) => number;
   getRowChildren: (parent: PivotTreeNode) => PivotTreeNode[];
@@ -148,17 +145,8 @@ export const buildRenderModel = ({
   return {
     visibleRows,
     visibleCols,
-    colLeaves: visibleCols,
     columnHeaderRows,
     visibleCellEntries,
     showRowRoot,
-    showColRoot,
-    skipRowRoot,
-    skipColRoot,
-    hideMetricHeaderOnRows: config.hideMetricHeaderOnRows,
-    hideMetricHeaderOnCols: config.hideMetricHeaderOnCols,
-    shouldHideMetricGrandTotalsOnRows,
-    shouldHideMetricGrandTotalsOnCols,
-    shouldSuppressColRoot,
   };
 };

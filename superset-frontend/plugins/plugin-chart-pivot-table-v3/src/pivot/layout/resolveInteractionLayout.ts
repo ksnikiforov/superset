@@ -32,14 +32,12 @@ import {
   getStableColumnKey,
 } from '../../utils';
 import { coerceMeasureLeavesByMetric } from '../measureLeaves';
+import { insertValuesPlaceholder } from '../runtime/compilePivotProgram';
 
 type ResolvedLayoutParams = {
   formData: PivotTableQueryFormData;
   runtimeLayout?: PivotRuntimeLayout;
 };
-
-const clamp = (value: number, min: number, max: number) =>
-  Math.max(min, Math.min(value, max));
 
 const resolveDimensionMap = (dimensions: QueryFormColumn[]) => {
   const map = new Map<string, QueryFormColumn>();
@@ -105,8 +103,6 @@ export const resolveInteractionFormData = ({
     index: cols.length,
   };
   const { axis } = placement;
-  const axisLength = axis === 'row' ? rows.length : cols.length;
-  const insertIndex = clamp(placement.index, 0, axisLength);
 
   const rowGroupby = rows.map(key => dimensionMap.get(key));
   const colGroupby = cols.map(key => dimensionMap.get(key));
@@ -168,19 +164,20 @@ export const resolveInteractionFormData = ({
       resolvedLeaves[metricKey] ?? [],
     ]),
   );
-
-  if (resolvedMetrics.length > 0) {
-    if (axis === 'row') {
-      resolvedRowGroupby.splice(insertIndex, 0, METRICS_PLACEHOLDER);
-    } else {
-      resolvedColGroupby.splice(insertIndex, 0, METRICS_PLACEHOLDER);
-    }
-  }
+  const resolvedGroupby =
+    resolvedMetrics.length > 0
+      ? insertValuesPlaceholder(
+          resolvedRowGroupby,
+          resolvedColGroupby,
+          placement,
+          METRICS_PLACEHOLDER,
+        )
+      : { rows: resolvedRowGroupby, cols: resolvedColGroupby };
 
   return {
     ...formData,
-    groupbyRows: resolvedRowGroupby,
-    groupbyColumns: resolvedColGroupby,
+    groupbyRows: resolvedGroupby.rows,
+    groupbyColumns: resolvedGroupby.cols,
     metrics:
       resolvedMetricKeys.length === 0
         ? metrics

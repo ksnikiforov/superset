@@ -16,17 +16,24 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { type PivotTableQueryFormData, type PivotTreeData } from '../../types';
+import { type DataRecordValue } from '@superset-ui/core';
+import {
+  type PivotRuntimeLayout,
+  type PivotTableQueryFormData,
+  type PivotTreeData,
+} from '../../types';
+import { METRICS_PLACEHOLDER, parsePath } from '../../utils';
 import {
   type ChartDataQueryResult,
   type ChartDataWarning,
 } from '../data/ChartDataClient';
-import { type LayoutContext } from '../layout/LayoutContext';
 import { type PlannedQuerySpec } from '../query/specs';
+import { buildInitialPivotUpdatePlan } from '../update/initialUpdatePlan';
 import {
   buildInitialRuntimeFromSpecResultsAsync,
   type PivotFactStoreBatch,
 } from './ingestQueryResults';
+import { insertValuesPlaceholder } from './compilePivotProgram';
 import {
   executeLatestRequest,
   executeScheduledLatestRequest,
@@ -55,21 +62,20 @@ export type SeamlessRuntimeUpdateResult =
       error: unknown;
     };
 
-export const fetchAndMaterializeSeamlessRuntimeUpdate = async ({
-  requestLifecycle,
-  materializationLifecycle,
-  formData,
-  specs,
-  layout,
-  fetchData,
-  onFetchStart,
-  onError,
-}: {
+type SeamlessRuntimeUpdatePlanConfig = {
+  baseFormData: PivotTableQueryFormData;
+  sourceFormData: PivotTableQueryFormData;
+  runtimeLayout: PivotRuntimeLayout;
+  selection: Record<string, DataRecordValue[]>;
+  expandedRows?: Set<string>;
+  expandedCols?: Set<string>;
+  pendingRows?: Set<string>;
+  pendingCols?: Set<string>;
+};
+
+type SeamlessRuntimeUpdateConfig = SeamlessRuntimeUpdatePlanConfig & {
   requestLifecycle: LatestRequestLifecycle;
   materializationLifecycle: LatestRequestLifecycle;
-  formData: PivotTableQueryFormData;
-  specs: PlannedQuerySpec[];
-  layout: LayoutContext;
   fetchData: (params: {
     formData: PivotTableQueryFormData;
     specs: PlannedQuerySpec[];
@@ -77,7 +83,66 @@ export const fetchAndMaterializeSeamlessRuntimeUpdate = async ({
   }) => Promise<ChartDataQueryResult[]>;
   onFetchStart?: () => void;
   onError?: (error: unknown) => void;
-}): Promise<SeamlessRuntimeUpdateResult> => {
+};
+
+const toExpansionPaths = (
+  expanded: Set<string> | undefined,
+  pending: Set<string> | undefined,
+) =>
+  Array.from(new Set([...(expanded ?? []), ...(pending ?? [])])).map(parsePath);
+
+const buildSeamlessRuntimeUpdatePlan = ({
+  baseFormData,
+  sourceFormData,
+  runtimeLayout,
+  selection,
+  expandedRows,
+  expandedCols,
+  pendingRows,
+  pendingCols,
+}: SeamlessRuntimeUpdatePlanConfig) => {
+  const { rows: rowKeys, cols: colKeys } = insertValuesPlaceholder(
+    runtimeLayout.rows,
+    runtimeLayout.cols,
+    runtimeLayout.valuePlacement,
+    METRICS_PLACEHOLDER,
+  );
+
+  return buildInitialPivotUpdatePlan({
+    formData: {
+      ...baseFormData,
+      pivotExpansionState: {
+        rowKeys,
+        colKeys,
+        rows: toExpansionPaths(expandedRows, pendingRows),
+        cols: toExpansionPaths(expandedCols, pendingCols),
+        collapsedRows: [],
+        collapsedCols: [],
+      },
+    },
+    runtimeLayout,
+    selection,
+    metricsOverride:
+      sourceFormData.metricsBase ??
+      sourceFormData.metrics ??
+      baseFormData.metrics,
+    measureLeavesByMetricOverride:
+      sourceFormData.measureLeavesByMetricBase ??
+      sourceFormData.measureLeavesByMetric ??
+      baseFormData.measureLeavesByMetric,
+  });
+};
+
+export const fetchAndMaterializeSeamlessRuntimeUpdate = async ({
+  requestLifecycle,
+  materializationLifecycle,
+  fetchData,
+  onFetchStart,
+  onError,
+  ...planConfig
+}: SeamlessRuntimeUpdateConfig): Promise<SeamlessRuntimeUpdateResult> => {
+  const { formData, layout, specs } =
+    buildSeamlessRuntimeUpdatePlan(planConfig);
   const fetchResult = await executeLatestRequest({
     lifecycle: requestLifecycle,
     requestGroupId: SEAMLESS_REQUEST_GROUP,

@@ -27,18 +27,9 @@ import { serializePath } from '../../../src/utils';
 const baseRenderModel: RenderModel = {
   visibleRows: [],
   visibleCols: [],
-  colLeaves: [],
   columnHeaderRows: [],
   visibleCellEntries: [],
   showRowRoot: false,
-  showColRoot: false,
-  skipRowRoot: true,
-  skipColRoot: true,
-  hideMetricHeaderOnRows: false,
-  hideMetricHeaderOnCols: false,
-  shouldHideMetricGrandTotalsOnRows: false,
-  shouldHideMetricGrandTotalsOnCols: false,
-  shouldSuppressColRoot: false,
 };
 
 const baseTree: PivotTreeData = {

@@ -24,18 +24,9 @@ import { type PivotTreeNode } from '../../types';
 export type RenderModel = {
   visibleRows: PivotTreeNode[];
   visibleCols: PivotTreeNode[];
-  colLeaves: PivotTreeNode[];
   columnHeaderRows: HeaderCellInfo[][];
   visibleCellEntries: VisibleCellEntry[];
   showRowRoot: boolean;
-  showColRoot: boolean;
-  skipRowRoot: boolean;
-  skipColRoot: boolean;
-  hideMetricHeaderOnRows: boolean;
-  hideMetricHeaderOnCols: boolean;
-  shouldHideMetricGrandTotalsOnRows: boolean;
-  shouldHideMetricGrandTotalsOnCols: boolean;
-  shouldSuppressColRoot: boolean;
 };
 
 export type FormattingKeys = {

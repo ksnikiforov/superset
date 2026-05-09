@@ -20,7 +20,7 @@
 import { PivotTreeNode } from '../../../src/types';
 import {
   coerceExpansionState,
-  getVisibleExpansionKeys,
+  collectVisibleExpansionKeys,
   pruneExpandedToStablePrefix,
   seedExpandedByLevel,
   stripAutoSeededExpansions,
@@ -30,8 +30,7 @@ import {
   serializePath,
   SUBTOTAL_TOKEN,
 } from '../../../src/utils';
-import { countDimDepth } from '../../../src/pivot/metricsTotals';
-import { findChildren, rootKey } from '../../../src/pivot/viewModel';
+import { rootKey } from '../../../src/pivot/viewModel';
 
 const makeNode = ({
   axis,
@@ -171,7 +170,7 @@ describe('expansionStateModel', () => {
   });
 
   it('filters visible expansion keys to rendered rows and columns', () => {
-    const rows: Record<string, PivotTreeNode> = {
+    const rows = {
       [rootKey]: makeNode({ axis: 'row', path: [], hasChildren: true }),
       A: makeNode({ axis: 'row', path: ['A'], hasChildren: true }),
       [serializePath(['A', 'X'])]: makeNode({
@@ -179,38 +178,15 @@ describe('expansionStateModel', () => {
         path: ['A', 'X'],
       }),
     };
-    const cols: Record<string, PivotTreeNode> = {
+    const cols = {
       [rootKey]: makeNode({ axis: 'col', path: [], hasChildren: true }),
       C: makeNode({ axis: 'col', path: ['C'] }),
     };
-    const { rows: visibleRows, cols: visibleCols } = getVisibleExpansionKeys({
-      rowsNodes: rows,
-      colsNodes: cols,
-      expandedRows: new Set([rootKey]),
-      expandedCols: new Set([rootKey]),
-      rowSorter: (a, b) => a.key.localeCompare(b.key),
-      colSorter: (a, b) => a.key.localeCompare(b.key),
-      skipRowRoot: false,
-      showRowRoot: true,
-      rowTotalPosition: 'start',
-      getRowChildren: parent => findChildren(rows, parent),
-      getCollapsedRowChildren: () => [],
-      skipColRoot: false,
-      countDimDepth: path => countDimDepth(path, new Set()),
-      normalizedColSubtotalLevels: [],
-      showColRoot: true,
-      rowTotals: false,
-      colTotalPosition: 'start',
-      resolvedColSubtotalPosition: 'start',
-      getColChildren: parent => findChildren(cols, parent),
-      getCollapsedColLeaves: () => [],
-      isMetricGrandTotalNode: () => false,
-      isMetricSubtotalNode: () => false,
-      isMetricTokenValue: () => false,
-      shouldHideMetricGrandTotalsOnRows: false,
-      shouldHideMetricGrandTotalsOnCols: false,
-      shouldSuppressColRoot: false,
-    });
+    const { rows: visibleRows, cols: visibleCols } =
+      collectVisibleExpansionKeys({
+        visibleRows: [rows[rootKey], rows.A],
+        visibleCols: [cols.C],
+      });
 
     expect(visibleRows.has(serializePath(['A', 'X']))).toBe(false);
     expect(visibleRows.has(serializePath(['A']))).toBe(true);
@@ -218,41 +194,11 @@ describe('expansionStateModel', () => {
   });
 
   it('keeps visible column keys that are not present in the node map', () => {
-    const rows: Record<string, PivotTreeNode> = {
-      [rootKey]: makeNode({ axis: 'row', path: [], hasChildren: true }),
-    };
-    const cols: Record<string, PivotTreeNode> = {
-      [rootKey]: makeNode({ axis: 'col', path: [], hasChildren: true }),
-    };
     const virtualCol = makeNode({ axis: 'col', path: ['virtual'] });
 
-    const { cols: visibleCols } = getVisibleExpansionKeys({
-      rowsNodes: rows,
-      colsNodes: cols,
-      expandedRows: new Set([rootKey]),
-      expandedCols: new Set([rootKey]),
-      rowSorter: (a, b) => a.key.localeCompare(b.key),
-      colSorter: (a, b) => a.key.localeCompare(b.key),
-      skipRowRoot: false,
-      showRowRoot: true,
-      rowTotalPosition: 'start',
-      getRowChildren: parent => findChildren(rows, parent),
-      getCollapsedRowChildren: () => [],
-      skipColRoot: false,
-      countDimDepth: path => countDimDepth(path, new Set()),
-      normalizedColSubtotalLevels: [],
-      showColRoot: true,
-      rowTotals: false,
-      colTotalPosition: 'start',
-      resolvedColSubtotalPosition: 'start',
-      getColChildren: () => [],
-      getCollapsedColLeaves: () => [virtualCol],
-      isMetricGrandTotalNode: () => false,
-      isMetricSubtotalNode: () => false,
-      isMetricTokenValue: () => false,
-      shouldHideMetricGrandTotalsOnRows: false,
-      shouldHideMetricGrandTotalsOnCols: false,
-      shouldSuppressColRoot: false,
+    const { cols: visibleCols } = collectVisibleExpansionKeys({
+      visibleRows: [],
+      visibleCols: [virtualCol],
     });
 
     expect(visibleCols.has(serializePath(['virtual']))).toBe(true);
