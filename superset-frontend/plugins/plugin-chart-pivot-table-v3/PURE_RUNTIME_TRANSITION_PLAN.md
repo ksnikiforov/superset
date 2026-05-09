@@ -275,12 +275,12 @@ they delete more code than they add in the same slice.
 Current source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `7722` insertions, `9175` deletions, net `-1453`.
-- Current production `src` TypeScript/TSX total: `32057` lines.
+- Production `src`: `7721` insertions, `9182` deletions, net `-1461`.
+- Current production `src` TypeScript/TSX total: `32049` lines.
 - Pre-existing production files are net negative:
-  `+3472 / -9175`, net `-5703`.
+  `+3486 / -9182`, net `-5696`.
 - Added runtime/helper files are still the source of total growth:
-  `+4250 / -0` across `15` added files.
+  `+4235 / -0` across `15` added files.
 
 The important read is mixed: production files that predated the refactor have
 shrunk substantially, but the runtime layer has not yet paid for itself in total
@@ -327,7 +327,7 @@ Weighted interpretation:
 - Biggest remaining UX risk: very large result sets can still monopolize JSON
   parsing and React commit despite chunked ingestion/materialization.
 - Biggest remaining line-count debt: the runtime layer is correct, but the
-  `4250` added-file lines still need more old chart/render/expansion code
+  `4235` added-file lines still need more old chart/render/expansion code
   deleted.
 
 Requirement reassessment:
@@ -335,8 +335,8 @@ Requirement reassessment:
 - Architecture completion: **76%**. The compiler/fact-store/materializer
   pipeline exists and is used by the main fetch paths. Remaining work is mostly
   deleting old interpretation surfaces, not inventing the architecture.
-- Production line-deletion completion: **87%**. Pre-existing files are net `5703`
-  lines smaller, and total production source is now net `1453` lines smaller
+- Production line-deletion completion: **87%**. Pre-existing files are net `5696`
+  lines smaller, and total production source is now net `1461` lines smaller
   because the runtime materializer, render/visibility, and chart sync surfaces
   have started to shed compatibility API.
 - Interactivity requirement completion: **71%**. Layout refresh and expansion
@@ -427,29 +427,29 @@ Tests and Markdown are excluded.
 
 Current diff from baseline:
 
-- `7722` insertions
-- `9175` deletions
-- net `-1453` production source lines
-- current `src` code total: `32057` lines
+- `7721` insertions
+- `9182` deletions
+- net `-1461` production source lines
+- current `src` code total: `32049` lines
 - implied baseline `src` total: about `33510` lines
 
 By file status:
 
-- Added files: `+4250 / -0` across `15` files
+- Added files: `+4235 / -0` across `15` files
 - Deleted files: `+0 / -1419` across `8` files
-- Modified files: `+3472 / -7756`, net `-4284`
+- Modified files: `+3486 / -7763`, net `-4277`
 
 By area:
 
 | Area              | Additions | Deletions |     Net | Readout                                                                                                                                                                                                                                                                                                            |
 | ----------------- | --------: | --------: | ------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Runtime           |      3664 |         0 | `+3664` | Correct new boundary; runtime coverage now owns runtime layout comparison/fetch decisions, explicit root coverage for no-dimension layouts, and materializer-owned measure-leaf value application.                                                                                                                 |
-| Expansion         |      1437 |      2751 | `-1314` | Recent Gate 5 work made this area strongly net-negative; layout transitions no longer roll child cells, fetched coverage, existing deep tree shape, tree trim/promotion, or metric-depth pruning policy across semantic trims.                                                                                     |
-| Chart hooks       |      1136 |      1942 |  `-806` | Render/layout repair is still net-negative, and metric formatting semantics now stay behind the formatting hook instead of leaking into the table view.                                                                                                                                                            |
-| Query             |       771 |       843 |   `-72` | Old branch planner deleted, but specs/bootstrap grew around coverage.                                                                                                                                                                                                                                              |
+| Expansion         |      1452 |      2726 | `-1274` | Recent Gate 5 work made this area strongly net-negative; layout transitions no longer roll child cells, fetched coverage, existing deep tree shape, tree trim/promotion, or metric-depth pruning policy across semantic trims.                                                                                     |
+| Chart hooks       |      1203 |      2177 |  `-974` | Render/layout repair is still net-negative, and metric formatting semantics now stay behind the formatting hook instead of leaking into the table view.                                                                                                                                                            |
+| Query             |       716 |       913 |  `-197` | Old branch planner deleted, but specs/bootstrap grew around coverage.                                                                                                                                                                                                                                              |
 | Core tree         |         8 |      1014 | `-1006` | Best completed simplification; raw-record fixture construction is no longer in production `src`.                                                                                                                                                                                                                   |
 | `PivotTableChart` |       379 |       988 |  `-609` | Chart shrinkage is now visible, runtime-layout fetch decisions are delegated to the runtime coverage boundary, stale-remount recovery reuses that fetch decision instead of a chart-owned exact-coverage predicate, and seamless pending display snapshots only render data instead of the whole view prop bundle. |
-| Other             |       366 |      1599 | `-1233` | Utility/render/visibility cleanup now includes the shared child lookup cache, deleted column-display and layout fetch-policy modules, and no tree mutation in measure leaves.                                                                                                                                      |
+| Other             |       253 |      1343 | `-1090` | Utility/render/visibility cleanup now includes the shared child lookup cache, deleted column-display and layout fetch-policy modules, and no tree mutation in measure leaves.                                                                                                                                      |
 
 Why deletions are lower than expected:
 
@@ -1100,8 +1100,17 @@ Latest code-reduction slice:
   depth/epoch, expansion-state, seamless expansion, interaction layout,
   cross-axis expansion, concurrent expansion, and metrics-between expansion
   suites (`167` selected tests).
+- Gate 2 fetch API cleanup: branch and grouped-batch fetch params no longer
+  expose `currentTree`, and branch fetch params no longer expose target depth
+  overrides. Tree snapshots and caller-chosen target depths now stay out of the
+  public fetch boundary; the lower-level query context keeps explicit target
+  depths only for bootstrap/root planning.
+- Additional production change for the fetch API cleanup: `+0 / -8`, net `-8`.
+- Verification after the fetch API cleanup: touched-file ESLint passed for the
+  fetch modules, and single-process Jest passed for branch fetch, batch fetch,
+  and affected prefetch/expansion-state suites (`79` selected tests).
 - Combined recent Gate 4/Gate 5/Gate 6/Gate 7 source-change sequence:
-  `+3133 / -6660`, net `-3527`.
+  `+3133 / -6668`, net `-3535`.
 - Attempted render-model plumbing cleanup around spinner callbacks, sorting
   value-map aliases, leaf-label flattening, and aggregate-bold returns was
   reverted before this slice because it did not pay for itself clearly enough

@@ -39,7 +39,6 @@ import { buildBatchQuerySpecs } from './specs';
 export type FetchPivotBranchesBatchParams = {
   formData: PivotTableQueryFormData;
   batch: BatchGroup;
-  currentTree?: PivotTreeData;
   visibleRowDepth: number;
   visibleColDepth: number;
   requestGroupId?: string;

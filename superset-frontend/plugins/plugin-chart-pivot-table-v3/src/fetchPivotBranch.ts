@@ -67,11 +67,8 @@ export interface FetchPivotBranchParams {
   formData: PivotTableQueryFormData;
   axis: PivotAxis;
   path: PivotPath;
-  currentTree?: PivotTreeData;
   visibleRowDepth?: number;
   visibleColDepth?: number;
-  targetRowDepth?: number;
-  targetColDepth?: number;
   requestGroupId?: string;
   factStore?: PivotFactStore;
 }
@@ -114,8 +111,6 @@ const resolveFetchContext = ({
   path,
   visibleRowDepth,
   visibleColDepth,
-  targetRowDepth,
-  targetColDepth,
 }: FetchPivotBranchParams): ResolvedFetchContext => {
   const layout = buildLayoutContext(formData);
   const queryCtx = resolveFetchContextBase({
@@ -125,8 +120,6 @@ const resolveFetchContext = ({
     path,
     visibleRowDepth,
     visibleColDepth,
-    targetRowDepth,
-    targetColDepth,
   });
   const filterSignature = buildFilterSignature(formData);
   const cacheKey = buildPivotBranchCacheKey({
