@@ -92,32 +92,25 @@ describe('PivotTableChart interaction layout', () => {
       metricsLayout: MetricsLayoutEnum.ROWS,
       pivotRuntimeLayout: runtimeLayout,
     });
-    const baseTree = buildTreeFromRecords(
-      [{ row1: 'A', m1: 10, m2: 20 }],
-      ['m1', 'm2'],
-      ['row1'],
-      [],
-      1,
-      0,
-    );
-    const tree = applyMetricAxis(
-      baseTree,
-      ['m1', 'm2'],
-      MetricsLayoutEnum.ROWS,
-      ['row1'],
-      [],
-      1,
-    );
+    const initialRuntime = buildInitialBootstrapRuntime({
+      formData,
+      runtimeLayout,
+      resultsByDepth: {
+        '0|0': [{ m1: 10, m2: 20 }],
+        '1|0': [{ row1: 'A', m1: 10, m2: 20 }],
+      },
+    });
     const setControlValue = jest.fn();
     const setDataMask = jest.fn();
     render(
       <PivotTableChart
-        data={tree}
+        data={initialRuntime.tree}
         formData={formData}
         rawFormData={formData}
         metrics={['m1', 'm2']}
         groupbyRows={[]}
         groupbyColumns={[]}
+        factBatches={initialRuntime.factBatches}
         setControlValue={setControlValue}
         setDataMask={setDataMask}
       />,
@@ -172,33 +165,26 @@ describe('PivotTableChart interaction layout', () => {
       pivotRuntimeLayout: runtimeLayout,
       dashboardId: 1,
     });
-    const baseTree = buildTreeFromRecords(
-      [{ row1: 'A', m1: 10, m2: 20 }],
-      ['m1', 'm2'],
-      ['row1'],
-      [],
-      1,
-      0,
-    );
-    const tree = applyMetricAxis(
-      baseTree,
-      ['m1', 'm2'],
-      MetricsLayoutEnum.ROWS,
-      ['row1'],
-      [],
-      1,
-    );
+    const initialRuntime = buildInitialBootstrapRuntime({
+      formData,
+      runtimeLayout,
+      resultsByDepth: {
+        '0|0': [{ m1: 10, m2: 20 }],
+        '1|0': [{ row1: 'A', m1: 10, m2: 20 }],
+      },
+    });
     const setDataMask = jest.fn();
     const setControlValue = jest.fn();
     const { rerender } = render(
       <PivotTableChart
-        data={tree}
+        data={initialRuntime.tree}
         formData={formData}
         rawFormData={formData}
         metrics={['m1', 'm2']}
         groupbyRows={[]}
         groupbyColumns={[]}
         selectedFilters={{ row1: ['A'] }}
+        factBatches={initialRuntime.factBatches}
         setControlValue={setControlValue}
         setDataMask={setDataMask}
       />,
@@ -237,7 +223,7 @@ describe('PivotTableChart interaction layout', () => {
 
     rerender(
       <PivotTableChart
-        data={tree}
+        data={initialRuntime.tree}
         formData={refreshedFormData}
         rawFormData={refreshedFormData}
         queryFormData={{ ...refreshedFormData, time_range: 'Last week' }}
@@ -245,6 +231,7 @@ describe('PivotTableChart interaction layout', () => {
         groupbyRows={[]}
         groupbyColumns={[]}
         selectedFilters={{}}
+        factBatches={initialRuntime.factBatches}
         setControlValue={setControlValue}
         setDataMask={setDataMask}
       />,

@@ -66,7 +66,6 @@ import { PivotInteractionPanel } from './pivot/chart/PivotInteractionPanel';
 import { resolveInteractionFormData } from './pivot/layout/resolveInteractionLayout';
 import { shouldFetchForLayoutChange } from './pivot/layout/shouldFetchForLayoutChange';
 import {
-  canProjectValueAxisShrinkWithoutFetch,
   factBatchesCoverRuntimeLayout,
   shouldSyncCommittedTreeFromProps as shouldSyncCommittedTreeFromPropsBase,
 } from './pivot/layout/committedTreeSyncGuard';
@@ -86,7 +85,6 @@ import {
   INTERACTION_VALUE_DND_TYPE,
 } from './pivot/layout/interactionDrag';
 import {
-  mergeTrees,
   decodeMeasureLeafId,
   getMetricKeys,
   getStableColumnKey,
@@ -1759,18 +1757,10 @@ function PivotTableChart(props: PivotTableProps) {
         fetchBaselineLayout,
         normalized,
       );
-      const projectionTree =
-        Object.keys(treeRef.current.cells).length > 0
-          ? mergeTrees(committedTree, treeRef.current)
-          : committedTree;
-      const needsProjectionFetch =
+      const needsCoverageFetch =
         !needsStructuralFetch &&
-        !canProjectValueAxisShrinkWithoutFetch({
-          tree: projectionTree,
-          prev: fetchBaselineLayout,
-          next: normalized,
-        });
-      if (needsStructuralFetch || needsProjectionFetch) {
+        !factBatchesCoverRuntimeLayout(committedFactBatches, normalized);
+      if (needsStructuralFetch || needsCoverageFetch) {
         pendingSeamlessLayoutRef.current = normalized;
         updateUiRuntimeLayout(normalized);
         applySeamlessUpdate(normalized, uiSelectedFilters);
@@ -1792,8 +1782,8 @@ function PivotTableChart(props: PivotTableProps) {
     },
     [
       applySeamlessUpdate,
+      committedFactBatches,
       committedRuntimeLayout,
-      committedTree,
       dimensionKeys,
       metricKeys,
       persistRuntimeState,

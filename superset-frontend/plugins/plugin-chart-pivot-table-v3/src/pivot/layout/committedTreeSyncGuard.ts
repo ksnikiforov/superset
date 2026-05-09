@@ -16,114 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import {
-  type PivotRuntimeLayout,
-  type PivotTreeData,
-  type PivotTreeNode,
-} from '../../types';
+import { type PivotRuntimeLayout } from '../../types';
 import { type PivotFactStoreBatch } from '../runtime/factStore';
-import {
-  decodeMeasureLeafId,
-  decodeMetricKey,
-  isSubtotalToken,
-  serializeCellKey,
-  serializePath,
-} from '../../utils';
-
-const countRuntimeDimensionDepth = (path: PivotTreeNode['path']) =>
-  path.filter(
-    part =>
-      !isSubtotalToken(part) &&
-      !decodeMetricKey(part) &&
-      !decodeMeasureLeafId(part),
-  ).length;
-
-const valueAxisKeys = (layout: PivotRuntimeLayout) =>
-  layout.valuePlacement.axis === 'row' ? layout.rows : layout.cols;
-
-const treeHasCellAtRuntimeDepth = (
-  tree: PivotTreeData,
-  runtimeLayout: PivotRuntimeLayout,
-) =>
-  Object.values(tree.cells).some(cell => {
-    const rowNode = tree.rows[cell.rowKey];
-    const colNode = tree.cols[cell.colKey];
-    if (!rowNode || !colNode) {
-      return false;
-    }
-    return (
-      countRuntimeDimensionDepth(rowNode.path) === runtimeLayout.rows.length &&
-      countRuntimeDimensionDepth(colNode.path) === runtimeLayout.cols.length
-    );
-  });
-
-const projectPathToRuntimeDepth = (
-  path: PivotTreeNode['path'],
-  targetDepth: number,
-) => {
-  const projected: PivotTreeNode['path'] = [];
-  let seenRuntimeDepth = 0;
-  let removedRuntimePart = false;
-
-  path.forEach(part => {
-    const metricKey = decodeMetricKey(part);
-    const measureLeafId = decodeMeasureLeafId(part);
-    if (metricKey || measureLeafId) {
-      projected.push(part);
-      return;
-    }
-    if (isSubtotalToken(part)) {
-      if (!removedRuntimePart) {
-        projected.push(part);
-      }
-      return;
-    }
-    seenRuntimeDepth += 1;
-    if (seenRuntimeDepth <= targetDepth) {
-      projected.push(part);
-    } else {
-      removedRuntimePart = true;
-    }
-  });
-
-  return projected;
-};
-
-const collectProjectedCellKeysFromRuntimeDepth = ({
-  tree,
-  prev,
-  next,
-}: {
-  tree: PivotTreeData;
-  prev: PivotRuntimeLayout;
-  next: PivotRuntimeLayout;
-}) => {
-  const projectedKeys = new Set<string>();
-  Object.values(tree.cells).forEach(cell => {
-    const rowNode = tree.rows[cell.rowKey];
-    const colNode = tree.cols[cell.colKey];
-    if (!rowNode || !colNode) {
-      return;
-    }
-    if (
-      countRuntimeDimensionDepth(rowNode.path) !== prev.rows.length ||
-      countRuntimeDimensionDepth(colNode.path) !== prev.cols.length
-    ) {
-      return;
-    }
-    projectedKeys.add(
-      serializeCellKey(
-        serializePath(
-          projectPathToRuntimeDepth(rowNode.path, next.rows.length),
-        ),
-        serializePath(
-          projectPathToRuntimeDepth(colNode.path, next.cols.length),
-        ),
-      ),
-    );
-  });
-  return projectedKeys;
-};
 
 export const factBatchesCoverRuntimeLayout = (
   factBatches: PivotFactStoreBatch[],
@@ -141,40 +35,6 @@ export const factBatchesCoverRuntimeLayout = (
         coverage.columnDepth === requiredColumnDepth,
     )
   );
-};
-
-export const canProjectValueAxisShrinkWithoutFetch = ({
-  tree,
-  prev,
-  next,
-}: {
-  tree: PivotTreeData;
-  prev: PivotRuntimeLayout;
-  next: PivotRuntimeLayout;
-}) => {
-  if (Object.keys(tree.cells).length === 0) {
-    return true;
-  }
-  if (prev.valuePlacement.axis !== next.valuePlacement.axis) {
-    return true;
-  }
-  const prevValueAxis = valueAxisKeys(prev);
-  const nextValueAxis = valueAxisKeys(next);
-  if (nextValueAxis.length >= prevValueAxis.length) {
-    return true;
-  }
-  if (next.metrics.length > 1 && nextValueAxis.length === 0) {
-    return false;
-  }
-  const projectedCellKeys = collectProjectedCellKeysFromRuntimeDepth({
-    tree,
-    prev,
-    next,
-  });
-  if (projectedCellKeys.size === 0) {
-    return treeHasCellAtRuntimeDepth(tree, next);
-  }
-  return Array.from(projectedCellKeys).every(cellKey => !!tree.cells[cellKey]);
 };
 
 type ShouldSyncCommittedTreeFromPropsConfig = {

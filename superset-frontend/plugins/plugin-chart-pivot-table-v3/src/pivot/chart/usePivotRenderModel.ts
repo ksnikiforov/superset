@@ -281,8 +281,6 @@ export const usePivotRenderModel = ({
       }),
     [getColumnProjectedPathParts, getRowProjectedPathParts, renderTree],
   );
-  const rowSortingValuesMap = rowValuesMap;
-  const colSortingValuesMap = colValuesMap;
 
   const resolveSortConfig = useCallback(
     (axis: 'row' | 'col', a: PivotTreeNode, b: PivotTreeNode) => {
@@ -303,11 +301,10 @@ export const usePivotRenderModel = ({
       const nonMetricKey = serializePath(
         getProjectedPathParts(axis, node.path),
       );
-      const valuesMap =
-        axis === 'row' ? rowSortingValuesMap : colSortingValuesMap;
+      const valuesMap = axis === 'row' ? rowValuesMap : colValuesMap;
       return valuesMap.get(nonMetricKey)?.[metricKey];
     },
-    [colSortingValuesMap, getProjectedPathParts, rowSortingValuesMap],
+    [colValuesMap, getProjectedPathParts, rowValuesMap],
   );
 
   const compareMetricSort = useCallback(
@@ -518,8 +515,6 @@ export const usePivotRenderModel = ({
       nextExpandedCols: Set<string>,
       nextTree: PivotTreeData,
     ): RenderModelConfig => {
-      const resolvedGroupbyRowsLength = layout.layout.groupbyRows.length;
-      const resolvedGroupbyColumnsLength = layout.layout.groupbyColumns.length;
       const resolveMetricIndex = (...candidates: Array<number | undefined>) => {
         const values = candidates.filter(
           (value): value is number => value !== undefined,
@@ -592,6 +587,8 @@ export const usePivotRenderModel = ({
       getColumnDisplayPath,
       getColumnHeaderLabel,
       layout,
+      resolvedGroupbyColumnsLength,
+      resolvedGroupbyRowsLength,
       rowSorter,
       rowTotals,
     ],
@@ -793,11 +790,7 @@ export const usePivotRenderModel = ({
     [isExplicitTotalNode, layout, resolvedGroupbyColumnsLength],
   );
 
-  const showRowSpinner = useCallback(
-    (key: string) => loadingKeys.has(key),
-    [loadingKeys],
-  );
-  const showColSpinner = useCallback(
+  const showSpinner = useCallback(
     (key: string) => loadingKeys.has(key),
     [loadingKeys],
   );
@@ -808,8 +801,8 @@ export const usePivotRenderModel = ({
     renderModel,
     expandedRowsForRender,
     expandedColsForRender,
-    showRowSpinner,
-    showColSpinner,
+    showRowSpinner: showSpinner,
+    showColSpinner: showSpinner,
     showGlobalLoader,
     shouldShowToggle,
     isRowAggregateBold,
