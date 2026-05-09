@@ -29,7 +29,6 @@ import {
   type PivotTreeData,
   type PivotTreeNode,
   type PivotDimensionSortingMap,
-  MetricsLayoutEnum,
 } from '../../types';
 import { buildColumnDisplayPath } from '../columnDisplay';
 import { buildFormattingValueMaps } from '../cellUtils';
@@ -74,11 +73,34 @@ type UiColumnSortState = {
 
 const DEFAULT_DIMENSION_SORT_ORDER: PivotSortOrder = 'asc';
 
+const compareSortValues = (
+  aValue: DataRecordValue | undefined,
+  bValue: DataRecordValue | undefined,
+  order: PivotSortOrder,
+) => {
+  const aMissing = aValue === null || aValue === undefined;
+  const bMissing = bValue === null || bValue === undefined;
+  if (aMissing && bMissing) {
+    return 0;
+  }
+  if (aMissing) {
+    return 1;
+  }
+  if (bMissing) {
+    return -1;
+  }
+  const type =
+    typeof aValue === 'number' && typeof bValue === 'number'
+      ? GenericDataType.Numeric
+      : undefined;
+  const cmp = compareValues(aValue, bValue, type);
+  return order === 'asc' ? cmp : -cmp;
+};
+
 export type PivotRenderModelResult = {
   renderTree: PivotTreeData;
   renderModel: RenderModel;
-  showRowSpinner: (key: string) => boolean;
-  showColSpinner: (key: string) => boolean;
+  showSpinner: (key: string) => boolean;
   showGlobalLoader: boolean;
   shouldShowToggle: (axis: 'row' | 'col', node?: PivotTreeNode) => boolean;
   isRowAggregateBold: (node?: PivotTreeNode) => boolean;
@@ -123,8 +145,6 @@ export const usePivotRenderModel = ({
   formData,
   rowOrder,
   colOrder,
-  groupbyRows: _groupbyRows,
-  groupbyColumns: _groupbyColumns,
   colTypeMap,
   rowTotals,
   colTotals,
@@ -140,8 +160,6 @@ export const usePivotRenderModel = ({
   formData: PivotTableProps['formData'];
   rowOrder: PivotTableProps['rowOrder'];
   colOrder: PivotTableProps['colOrder'];
-  groupbyRows: PivotTableProps['groupbyRows'];
-  groupbyColumns: PivotTableProps['groupbyColumns'];
   colTypeMap: PivotTableProps['colTypeMap'];
   rowTotals: boolean;
   colTotals: boolean;
@@ -178,14 +196,10 @@ export const usePivotRenderModel = ({
     () => buildDimensionSortingKeyMap(colSorting, layout),
     [colSorting, layout],
   );
-  const hasRowSorting = useMemo(
-    () => Object.keys(rowSortingKeyMap).length > 0,
-    [rowSortingKeyMap],
-  );
+  const hasRowSorting = Object.keys(rowSortingKeyMap).length > 0;
 
+  const { dateFormatters } = formData;
   const renderTree = useMemo(() => {
-    const { dateFormatters } = formData;
-
     const formatAxisNodes = (
       nodes: Record<string, PivotTreeNode>,
       axis: 'row' | 'col',
@@ -249,7 +263,7 @@ export const usePivotRenderModel = ({
       return tree;
     }
     return { ...tree, rows: nextRows, cols: nextColsFormatted };
-  }, [formData.dateFormatters, layout, tree]);
+  }, [dateFormatters, layout, tree]);
 
   const getProjectedPathParts = useCallback(
     (axis: 'row' | 'col', path: PivotTreeNode['path']) =>
@@ -260,14 +274,6 @@ export const usePivotRenderModel = ({
       }).projectedDimensionPath,
     [layout.layout.pivotProgram],
   );
-  const getRowProjectedPathParts = useCallback(
-    (path: PivotTreeNode['path']) => getProjectedPathParts('row', path),
-    [getProjectedPathParts],
-  );
-  const getColumnProjectedPathParts = useCallback(
-    (path: PivotTreeNode['path']) => getProjectedPathParts('col', path),
-    [getProjectedPathParts],
-  );
 
   const { rowValuesMap, colValuesMap } = useMemo(
     () =>
@@ -275,25 +281,11 @@ export const usePivotRenderModel = ({
         cells: renderTree.cells,
         rows: renderTree.rows,
         cols: renderTree.cols,
-        getRowNonMetricPathParts: getRowProjectedPathParts,
-        getColNonMetricPathParts: getColumnProjectedPathParts,
+        getRowNonMetricPathParts: path => getProjectedPathParts('row', path),
+        getColNonMetricPathParts: path => getProjectedPathParts('col', path),
         rootKey,
       }),
-    [getColumnProjectedPathParts, getRowProjectedPathParts, renderTree],
-  );
-
-  const resolveSortConfig = useCallback(
-    (axis: 'row' | 'col', a: PivotTreeNode, b: PivotTreeNode) => {
-      const dimensionKey =
-        layout.getDimensionKeyForNode(a, axis) ||
-        layout.getDimensionKeyForNode(b, axis);
-      if (!dimensionKey) {
-        return undefined;
-      }
-      const map = axis === 'row' ? rowSortingKeyMap : colSortingKeyMap;
-      return map[dimensionKey];
-    },
-    [colSortingKeyMap, layout, rowSortingKeyMap],
+    [getProjectedPathParts, renderTree],
   );
 
   const getSortValue = useCallback(
@@ -309,15 +301,20 @@ export const usePivotRenderModel = ({
 
   const compareMetricSort = useCallback(
     (axis: 'row' | 'col', a: PivotTreeNode, b: PivotTreeNode) => {
-      const config = resolveSortConfig(axis, a, b);
+      const dimensionKey =
+        layout.getDimensionKeyForNode(a, axis) ||
+        layout.getDimensionKeyForNode(b, axis);
+      if (!dimensionKey) {
+        return 0;
+      }
+      const config = (axis === 'row' ? rowSortingKeyMap : colSortingKeyMap)[
+        dimensionKey
+      ];
       if (!config) {
         return 0;
       }
       if (!config.metricKey) {
-        const dimensionKey =
-          layout.getDimensionKeyForNode(a, axis) ||
-          layout.getDimensionKeyForNode(b, axis);
-        const type = dimensionKey ? colTypeMap?.[dimensionKey] : undefined;
+        const type = colTypeMap?.[dimensionKey];
         const cmp = compareValues(a.label, b.label, type);
         return config.order === 'asc' ? cmp : -cmp;
       }
@@ -326,25 +323,9 @@ export const usePivotRenderModel = ({
       }
       const aValue = getSortValue(axis, a, config.metricKey);
       const bValue = getSortValue(axis, b, config.metricKey);
-      const aMissing = aValue === null || aValue === undefined;
-      const bMissing = bValue === null || bValue === undefined;
-      if (aMissing && bMissing) {
-        return 0;
-      }
-      if (aMissing) {
-        return 1;
-      }
-      if (bMissing) {
-        return -1;
-      }
-      const type =
-        typeof aValue === 'number' && typeof bValue === 'number'
-          ? GenericDataType.Numeric
-          : undefined;
-      const cmp = compareValues(aValue, bValue, type);
-      return config.order === 'asc' ? cmp : -cmp;
+      return compareSortValues(aValue, bValue, config.order);
     },
-    [colTypeMap, getSortValue, layout, resolveSortConfig],
+    [colSortingKeyMap, colTypeMap, getSortValue, layout, rowSortingKeyMap],
   );
 
   const compareUiColumnSort = useCallback(
@@ -358,23 +339,7 @@ export const usePivotRenderModel = ({
         renderTree.cells[serializeCellKey(b.key, uiColumnSort.colKey)];
       const aValue = aCell?.values[uiColumnSort.metricKey];
       const bValue = bCell?.values[uiColumnSort.metricKey];
-      const aMissing = aValue === null || aValue === undefined;
-      const bMissing = bValue === null || bValue === undefined;
-      if (aMissing && bMissing) {
-        return 0;
-      }
-      if (aMissing) {
-        return 1;
-      }
-      if (bMissing) {
-        return -1;
-      }
-      const type =
-        typeof aValue === 'number' && typeof bValue === 'number'
-          ? GenericDataType.Numeric
-          : undefined;
-      const cmp = compareValues(aValue, bValue, type);
-      return uiColumnSort.order === 'asc' ? cmp : -cmp;
+      return compareSortValues(aValue, bValue, uiColumnSort.order);
     },
     [renderTree.cells, uiColumnSort],
   );
@@ -479,12 +444,12 @@ export const usePivotRenderModel = ({
         isExplicitSubtotalNode: layout.isExplicitSubtotalNode,
         getMetricKeyFromPath: layout.getMetricLabelFromPath,
         getMetricDisplayLabelForKey: layout.getMetricDisplayLabelForKey,
-        getNonMetricPathParts: getColumnProjectedPathParts,
+        getNonMetricPathParts: path => getProjectedPathParts('col', path),
         isMetricGrandTotalNode: layout.isMetricGrandTotalNode,
         isMetricSubtotalNode: layout.isMetricSubtotalNode,
         isExpanded: node => expandedCols.has(node.key),
       }),
-    [expandedCols, getColumnProjectedPathParts, layout],
+    [expandedCols, getProjectedPathParts, layout],
   );
 
   const getColumnHeaderLabel = useCallback(
@@ -494,14 +459,12 @@ export const usePivotRenderModel = ({
         return layout.getMetricDisplayLabelForKey(decoded);
       }
       const leafId = decodeMeasureLeafId(rawValue);
-      if (leafId) {
-        if (layout.measureHierarchy.kind === 'measureStackV1') {
-          const leafLabel = layout.measureHierarchy.groups
-            .flatMap(group => group.leaves)
-            .find(leaf => leaf.id === leafId)?.label;
-          if (leafLabel) {
-            return leafLabel;
-          }
+      if (leafId && layout.measureHierarchy.kind === 'measureStackV1') {
+        const leafLabel = layout.measureHierarchy.groups
+          .flatMap(group => group.leaves)
+          .find(leaf => leaf.id === leafId)?.label;
+        if (leafLabel) {
+          return leafLabel;
         }
       }
       return formatPivotLabelValue(rawValue, '');
@@ -764,10 +727,7 @@ export const usePivotRenderModel = ({
         return true;
       }
       const dimDepth = layout.countDimDepth(row.path);
-      if (!manualExpandedRowDepths.has(dimDepth) || !row.hasChildren) {
-        return false;
-      }
-      return true;
+      return manualExpandedRowDepths.has(dimDepth) && row.hasChildren;
     },
     [
       isExplicitTotalNode,
@@ -794,16 +754,14 @@ export const usePivotRenderModel = ({
     (key: string) => loadingKeys.has(key),
     [loadingKeys],
   );
-  const showGlobalLoader = isHydrating;
 
   return {
     renderTree,
     renderModel,
     expandedRowsForRender,
     expandedColsForRender,
-    showRowSpinner: showSpinner,
-    showColSpinner: showSpinner,
-    showGlobalLoader,
+    showSpinner,
+    showGlobalLoader: isHydrating,
     shouldShowToggle,
     isRowAggregateBold,
     isColAggregateBold,

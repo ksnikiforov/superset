@@ -102,6 +102,9 @@ export const buildValueLeaf = (): MeasureLeafSpec => ({
   label: buildMeasureLeafLabel('value'),
 });
 
+export const isValueLeaf = (leaf: MeasureLeafSpec): boolean =>
+  leaf.kind === 'builtIn' && leaf.operator === 'value';
+
 export const sortMeasureLeaves = (
   leaves: MeasureLeafSpec[],
 ): MeasureLeafSpec[] => {
@@ -136,9 +139,6 @@ export const buildCustomLeaf = ({
   metric,
   ...(offset ? { offset } : {}),
 });
-
-export const isValueLeaf = (leaf: MeasureLeafSpec): boolean =>
-  leaf.kind === 'builtIn' && leaf.operator === 'value';
 
 export const buildMeasureLeafOutputKey = (
   metricKey: string,

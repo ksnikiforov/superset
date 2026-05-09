@@ -26,6 +26,7 @@ import {
 import {
   decodeMeasureLeafId,
   decodeMetricKey,
+  findMeasureLeafIdInPath,
   getMetricKey,
   serializeCellKey,
   serializePath,
@@ -68,12 +69,9 @@ export const deriveMetricKey = ({
   const decodedCandidate = decodeMetricKey(metricCandidate);
   if (decodedCandidate && metricLabels.includes(decodedCandidate)) {
     if (measureHierarchy?.kind === 'measureStackV1') {
-      const findLeafId = (path: PivotTreeNode['path']) =>
-        [...path]
-          .reverse()
-          .map(val => decodeMeasureLeafId(val))
-          .find((candidate): candidate is string => !!candidate);
-      const leafId = findLeafId(primaryPath) ?? findLeafId(secondaryPath);
+      const leafId =
+        findMeasureLeafIdInPath(primaryPath) ??
+        findMeasureLeafIdInPath(secondaryPath);
       const group = measureHierarchy.groups.find(
         entry => entry.metricKey === decodedCandidate,
       );
@@ -113,7 +111,7 @@ type ShouldHideRowValuesParams = {
   isMetricTokenValue: (val: unknown) => boolean;
   expandedRows: Set<string>;
   countDimDepth: (path: PivotTreeNode['path']) => number;
-  rowSubtotalDepths: number[];
+  rowSubtotalLevels: number[];
   isExplicitSubtotalNode: (node?: PivotTreeNode) => boolean;
 };
 
@@ -124,7 +122,7 @@ export const shouldHideRowValues = ({
   isMetricTokenValue,
   expandedRows,
   countDimDepth,
-  rowSubtotalDepths,
+  rowSubtotalLevels,
   isExplicitSubtotalNode,
 }: ShouldHideRowValuesParams) => {
   if (!rowSubTotals || effectiveRowSubtotalPosition !== 'end') {
@@ -144,7 +142,7 @@ export const shouldHideRowValues = ({
     return false;
   }
   const dimDepth = countDimDepth(rowNode.path);
-  return rowSubtotalDepths.includes(dimDepth);
+  return rowSubtotalLevels.includes(dimDepth);
 };
 
 type FormatLabelParams = {

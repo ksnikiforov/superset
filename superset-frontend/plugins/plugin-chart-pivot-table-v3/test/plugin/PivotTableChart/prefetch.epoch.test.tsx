@@ -34,6 +34,7 @@ import {
 import { buildFormData } from '../fixtures/pivotFormData';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../../../src/pivot/runtime/materializePivotTree';
+import { buildMockBranchFetchResult } from '../fixtures/factBatches';
 
 jest.mock('../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../src/fetchPivotBranch');
@@ -129,7 +130,10 @@ describe('PivotTableChart persisted prefetch ignores stale results', () => {
       (acc, result) => mergeTrees(acc, result.data),
       undefined,
     );
-    return { data: merged };
+    return {
+      data: merged,
+      factBatches: results.flatMap(result => result.factBatches),
+    };
   };
 
   beforeEach(() => {
@@ -226,11 +230,19 @@ describe('PivotTableChart persisted prefetch ignores stale results', () => {
       expect(fetchPivotBranchMock.mock.calls.length).toBeGreaterThanOrEqual(2),
     );
 
-    deferredV1.resolve({ data: branchAV1 });
+    deferredV1.resolve(
+      buildMockBranchFetchResult(fetchPivotBranchMock.mock.calls[0][0], {
+        data: branchAV1,
+      }),
+    );
     await fetchPivotBranchMock.mock.results[0].value;
     await Promise.resolve();
 
-    deferredV2.resolve({ data: branchAV2 });
+    deferredV2.resolve(
+      buildMockBranchFetchResult(fetchPivotBranchMock.mock.calls[1][0], {
+        data: branchAV2,
+      }),
+    );
     await fetchPivotBranchMock.mock.results[1].value;
 
     await waitFor(() => {

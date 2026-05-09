@@ -85,7 +85,7 @@ import {
   INTERACTION_VALUE_DND_TYPE,
 } from './pivot/layout/interactionDrag';
 import {
-  decodeMeasureLeafId,
+  findMeasureLeafIdInPath,
   getMetricKeys,
   getStableColumnKey,
   METRICS_PLACEHOLDER,
@@ -351,6 +351,10 @@ type InteractionChipProps = {
   onRemove?: (dimensionKey: string) => void;
 };
 
+const dimensionDndType =
+  INTERACTION_DIMENSION_DND_TYPE || 'pivot-v3-interaction-dimension';
+const valueDndType = INTERACTION_VALUE_DND_TYPE || 'pivot-v3-interaction-value';
+
 const InteractionChip = ({
   axis,
   chip,
@@ -573,10 +577,6 @@ type UiColumnSortState = {
   metricKey: string;
   order: 'asc' | 'desc';
 };
-
-const dimensionDndType =
-  INTERACTION_DIMENSION_DND_TYPE || 'pivot-v3-interaction-dimension';
-const valueDndType = INTERACTION_VALUE_DND_TYPE || 'pivot-v3-interaction-value';
 
 const normalizeRuntimeLayout = (
   layout: PivotRuntimeLayout | undefined,
@@ -820,7 +820,6 @@ function PivotTableChart(props: PivotTableProps) {
   const isUserControlled = interactionMode === 'user_controlled';
   const isDashboardContext =
     appSection === AppSection.Dashboard || formData.dashboardId !== undefined;
-  const shouldPersistControlValue = true;
   const shouldPersistOwnState = !(isUserControlled && isDashboardContext);
   const fetchFormDataBase = queryFormData || formData;
 
@@ -1250,7 +1249,6 @@ function PivotTableChart(props: PivotTableProps) {
       runtimeLayout: appliedRuntimeLayout,
     });
   }, [appliedFormData, appliedRuntimeLayout, formData, isUserControlled]);
-  const committedTreeFromProps = data;
   const committedFactBatchesCoverRuntimeLayout = useMemo(
     () =>
       !isUserControlled ||
@@ -1444,7 +1442,7 @@ function PivotTableChart(props: PivotTableProps) {
       return;
     }
     seamlessMaterializationLifecycle.invalidate();
-    setCommittedTree(committedTreeFromProps);
+    setCommittedTree(data);
     setCommittedFactBatches(factBatches);
     setSeamlessWarnings([]);
     setSeamlessError(undefined);
@@ -1452,7 +1450,7 @@ function PivotTableChart(props: PivotTableProps) {
     setFrozenUserViewProps(null);
     pendingSeamlessLayoutRef.current = null;
   }, [
-    committedTreeFromProps,
+    data,
     factBatches,
     seamlessMaterializationLifecycle,
     shouldSyncCommittedTreeFromProps,
@@ -1578,7 +1576,7 @@ function PivotTableChart(props: PivotTableProps) {
         pivotRuntimeLayout: layout,
         pivotSelectedFilters: filters,
       });
-      if (shouldPersistControlValue && setControlValue) {
+      if (setControlValue) {
         setControlValue('pivotRuntimeLayout', layout);
         setControlValue('pivotSelectedFilters', filters);
       }
@@ -1592,7 +1590,6 @@ function PivotTableChart(props: PivotTableProps) {
       mergeOwnState,
       setControlValue,
       setDataMask,
-      shouldPersistControlValue,
       shouldPersistOwnState,
       upstreamDashboardQueryContextSignature,
     ],
@@ -1657,20 +1654,16 @@ function PivotTableChart(props: PivotTableProps) {
           ? leavesForLayout
           : undefined,
       });
-      if (isUserControlled) {
-        const snapshot = liveSnapshot;
-        if (snapshot) {
-          setFrozenUserViewProps({
-            ...snapshot,
-            expandedRows: new Set(snapshot.expandedRows),
-            expandedCols: new Set(snapshot.expandedCols),
-            warnings: [...(snapshot.warnings ?? [])],
-            showGlobalLoader: false,
-            showCornerLoader: true,
-            showRowSpinner: () => false,
-            showColSpinner: () => false,
-          });
-        }
+      if (isUserControlled && liveSnapshot) {
+        setFrozenUserViewProps({
+          ...liveSnapshot,
+          expandedRows: new Set(liveSnapshot.expandedRows),
+          expandedCols: new Set(liveSnapshot.expandedCols),
+          warnings: [...(liveSnapshot.warnings ?? [])],
+          showGlobalLoader: false,
+          showCornerLoader: true,
+          showSpinner: () => false,
+        });
       }
       const updateResult = await fetchAndMaterializeSeamlessRuntimeUpdate({
         requestLifecycle: seamlessRequestLifecycle,
@@ -1706,8 +1699,6 @@ function PivotTableChart(props: PivotTableProps) {
         setSeamlessWarnings(updateResult.warnings);
         persistRuntimeState(normalized, nextFilters);
       });
-      lastLocalSyncDashboardQueryContextRef.current =
-        upstreamDashboardQueryContextSignature;
       lastSeamlessSyncRef.current = {
         filtersSignature:
           Object.keys(nextFilters).length > 0
@@ -1728,13 +1719,7 @@ function PivotTableChart(props: PivotTableProps) {
       persistRuntimeState,
       seamlessMaterializationLifecycle,
       seamlessRequestLifecycle,
-      setCommittedFilters,
-      setCommittedTree,
-      setSeamlessError,
-      setSeamlessLoading,
-      setSeamlessWarnings,
       upstreamSeamlessSignature,
-      upstreamDashboardQueryContextSignature,
       updateUiRuntimeLayout,
     ],
   );
@@ -1956,10 +1941,6 @@ function PivotTableChart(props: PivotTableProps) {
     colTotalPosition,
     colSubtotalPosition,
   });
-  const shouldPersistExpansionState = persistExpansionState;
-  const expansionSetControlValue = shouldPersistControlValue
-    ? setControlValue
-    : undefined;
   const expansionSetDataMask = shouldPersistOwnState ? setDataMask : undefined;
   const expansionMergeOwnState = shouldPersistOwnState
     ? mergeOwnState
@@ -1999,16 +1980,15 @@ function PivotTableChart(props: PivotTableProps) {
     countDimDepth: layoutResult.countEngineDimDepth,
     expandRowsLevelRaw: layoutResult.expandRowsLevelRaw,
     expandColumnsLevelRaw: layoutResult.expandColumnsLevelRaw,
-    setControlValue: expansionSetControlValue,
+    setControlValue,
     setDataMask: expansionSetDataMask,
     mergeOwnState: expansionMergeOwnState,
     persistedExpansionState:
       appliedLayoutFormData.pivotExpansionState ??
       ownState?.pivotExpansionState,
-    shouldPersistExpansionState,
+    shouldPersistExpansionState: persistExpansionState,
     pruneMergedTree: layoutResult.pruneMergedTree,
   });
-  const treeForRender = tree;
 
   useEffect(() => {
     expandedRowsForSeamlessRef.current = expandedRows;
@@ -2049,11 +2029,11 @@ function PivotTableChart(props: PivotTableProps) {
   ]);
 
   useEffect(() => {
-    treeRef.current = treeForRender;
-  }, [treeForRender]);
+    treeRef.current = tree;
+  }, [tree]);
 
   const renderModelResult = usePivotRenderModel({
-    tree: treeForRender,
+    tree,
     expandedRows,
     expandedCols,
     loadingKeys,
@@ -2061,8 +2041,6 @@ function PivotTableChart(props: PivotTableProps) {
     formData: appliedLayoutFormData,
     rowOrder,
     colOrder,
-    groupbyRows: layoutResult.layout.groupbyRows,
-    groupbyColumns: layoutResult.layout.groupbyColumns,
     colTypeMap,
     rowTotals,
     colTotals,
@@ -2081,25 +2059,20 @@ function PivotTableChart(props: PivotTableProps) {
       if (layoutResult.measureHierarchy.kind !== 'measureStackV1') {
         return metricKey;
       }
-      const leafId = [...node.path]
-        .reverse()
-        .map(value => decodeMeasureLeafId(value))
-        .find((value): value is string => Boolean(value));
+      const fallbackMetricKey = resolveMeasureSortMetricKey({
+        metricKey,
+        measureHierarchy: layoutResult.measureHierarchy,
+      });
+      const leafId = findMeasureLeafIdInPath(node.path);
       if (!leafId) {
-        return resolveMeasureSortMetricKey({
-          metricKey,
-          measureHierarchy: layoutResult.measureHierarchy,
-        });
+        return fallbackMetricKey;
       }
       const group = layoutResult.measureHierarchy.groups.find(
         candidate => candidate.metricKey === metricKey,
       );
       const leaf = group?.leaves.find(candidate => candidate.id === leafId);
       if (!leaf) {
-        return resolveMeasureSortMetricKey({
-          metricKey,
-          measureHierarchy: layoutResult.measureHierarchy,
-        });
+        return fallbackMetricKey;
       }
       return buildMeasureLeafOutputKey(metricKey, leaf);
     },
@@ -2123,10 +2096,7 @@ function PivotTableChart(props: PivotTableProps) {
       if (!sortLeafId) {
         return node.key;
       }
-      const nodeLeafId = [...node.path]
-        .reverse()
-        .map(value => decodeMeasureLeafId(value))
-        .find((value): value is string => Boolean(value));
+      const nodeLeafId = findMeasureLeafIdInPath(node.path);
       if (nodeLeafId === sortLeafId) {
         return node.key;
       }
@@ -2143,10 +2113,7 @@ function PivotTableChart(props: PivotTableProps) {
           );
         })
         .map(candidate => {
-          const candidateLeafId = [...candidate.path]
-            .reverse()
-            .map(value => decodeMeasureLeafId(value))
-            .find((value): value is string => Boolean(value));
+          const candidateLeafId = findMeasureLeafIdInPath(candidate.path);
           return { candidate, candidateLeafId };
         })
         .filter(
@@ -2170,15 +2137,10 @@ function PivotTableChart(props: PivotTableProps) {
   );
 
   const getColumnSortOrder = useCallback(
-    (node: PivotTreeNode) => {
-      if (!activeColumnSort) {
-        return undefined;
-      }
-      return (activeColumnSort.displayColKey ?? activeColumnSort.colKey) ===
-        node.key
-        ? activeColumnSort.order
-        : undefined;
-    },
+    (node: PivotTreeNode) =>
+      (activeColumnSort?.displayColKey ?? activeColumnSort?.colKey) === node.key
+        ? activeColumnSort?.order
+        : undefined,
     [activeColumnSort],
   );
 
@@ -2313,8 +2275,6 @@ function PivotTableChart(props: PivotTableProps) {
     );
   }, [
     dimensionList,
-    layoutGroupbyColumns,
-    layoutGroupbyRows,
     layoutResult,
     renderTree.cols,
     renderTree.rows,
@@ -2556,17 +2516,13 @@ function PivotTableChart(props: PivotTableProps) {
   const cornerLoaderVisible = isUserControlled
     ? seamlessLoading || renderModelResult.showGlobalLoader
     : renderModelResult.showGlobalLoader;
-  const tableOverlayVisible =
-    !isUserControlled && renderModelResult.showGlobalLoader;
   const tableWidth = isUserControlled
     ? Math.max(0, width - PANEL_WIDTH - SIDE_CHIPS_WIDTH)
     : width;
   const tableHeight = isUserControlled
     ? Math.max(0, height - TOP_CHIPS_HEIGHT)
     : height;
-  const liveUserPivotViewProps: PivotViewProps = {
-    height: tableHeight,
-    width: tableWidth,
+  const sharedPivotViewProps: Omit<PivotViewProps, 'height' | 'width'> = {
     renderModel: renderModelResult.renderModel,
     tree: renderTree,
     expandedRows: renderModelResult.expandedRowsForRender,
@@ -2592,8 +2548,7 @@ function PivotTableChart(props: PivotTableProps) {
     isColumnSortable,
     getColumnSortOrder,
     shouldShowToggle: renderModelResult.shouldShowToggle,
-    showRowSpinner: renderModelResult.showRowSpinner,
-    showColSpinner: renderModelResult.showColSpinner,
+    showSpinner: renderModelResult.showSpinner,
     formatLabel: formatting.formatLabel,
     isRowAggregateBold: renderModelResult.isRowAggregateBold,
     isColAggregateBold: renderModelResult.isColAggregateBold,
@@ -2609,6 +2564,13 @@ function PivotTableChart(props: PivotTableProps) {
     handleCellKeyDown: interactions.handleCellKeyDown,
     handleCellContextMenu: interactions.handleCellContextMenu,
     rowAxisLabels,
+  };
+  const liveUserPivotViewProps: PivotViewProps = {
+    ...sharedPivotViewProps,
+    height: tableHeight,
+    width: tableWidth,
+    showGlobalLoader: false,
+    showCornerLoader: cornerLoaderVisible,
   };
   if (isUserControlled) {
     currentUserViewPropsRef.current = liveUserPivotViewProps;
@@ -2873,57 +2835,17 @@ function PivotTableChart(props: PivotTableProps) {
           </ChipColumn>
           <TableArea $height={tableHeight} $width={tableWidth}>
             <PivotTableView {...activeUserPivotViewProps} />
-            {tableOverlayVisible ? <Loading /> : null}
           </TableArea>
         </TableRow>
       </InteractionTableWrap>
     </InteractionLayout>
   ) : (
     <PivotTableView
+      {...sharedPivotViewProps}
       height={height}
       width={width}
-      renderModel={renderModelResult.renderModel}
-      tree={renderTree}
-      expandedRows={renderModelResult.expandedRowsForRender}
-      expandedCols={renderModelResult.expandedColsForRender}
-      errorMessage={activeErrorMessage}
-      onRetry={handleRetry}
-      warnings={combinedWarnings}
       showGlobalLoader={renderModelResult.showGlobalLoader}
       showCornerLoader={renderModelResult.showGlobalLoader}
-      stickyHeaders={resolvedStickyHeaders}
-      headerOffset={headerOffset}
-      headerRowOffsets={headerRowOffsets}
-      headerRef={headerRef}
-      themeColor={formatting.themeColor}
-      colTotalPosition={layoutResult.resolvedColTotalPosition}
-      metricFormattingScope={formatting.metricFormattingScope}
-      metricDatabars={formatting.metricDatabars}
-      formattingKeyMap={formatting.formattingKeyMap}
-      evaluateExcelMetricFormatting={formatting.evaluateExcelMetricFormatting}
-      databarColumnMinWidths={formatting.databarColumnMinWidths}
-      onToggleNode={handleToggle}
-      onSortColumn={handleColumnSort}
-      isColumnSortable={isColumnSortable}
-      getColumnSortOrder={getColumnSortOrder}
-      shouldShowToggle={renderModelResult.shouldShowToggle}
-      showRowSpinner={renderModelResult.showRowSpinner}
-      showColSpinner={renderModelResult.showColSpinner}
-      formatLabel={formatting.formatLabel}
-      isRowAggregateBold={renderModelResult.isRowAggregateBold}
-      isColAggregateBold={renderModelResult.isColAggregateBold}
-      getNodeDimDepth={renderModelResult.getNodeDimDepth}
-      getTotalBackground={formatting.getTotalBackground}
-      resolveDimensionStyle={formatting.resolveDimensionStyle}
-      deriveMetricKey={formatting.deriveMetricKey}
-      isMetricGrandTotalNode={layoutResult.isMetricGrandTotalNode}
-      renderCellContent={formatting.renderCellContent}
-      renderDatabarContent={formatting.renderDatabarContent}
-      emitCrossFilters={emitCrossFilters}
-      handleCellClick={interactions.handleCellClick}
-      handleCellKeyDown={interactions.handleCellKeyDown}
-      handleCellContextMenu={interactions.handleCellContextMenu}
-      rowAxisLabels={rowAxisLabels}
     />
   );
 }

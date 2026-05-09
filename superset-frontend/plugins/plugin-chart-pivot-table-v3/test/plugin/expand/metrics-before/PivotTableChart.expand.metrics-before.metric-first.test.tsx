@@ -18,7 +18,9 @@
  */
 
 import { render, fireEvent, waitFor, within } from '../../../testUtils';
-import PivotTableChart from '../../fixtures/TestPivotTableChart';
+import PivotTableChart, {
+  buildPreloadedBootstrapFactBatches,
+} from '../../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum, type PivotTreeData } from '../../../../src/types';
 import { baseFormData, buildFormData } from '../../fixtures/pivotFormData';
 import {
@@ -243,6 +245,10 @@ describe('PivotTableChart expansion with metrics before dimensions (metric-first
         metrics={['m1']}
         groupbyRows={['r1', 'r2']}
         groupbyColumns={[]}
+        factBatches={buildPreloadedBootstrapFactBatches(metricFirstTree, {
+          groupbyRows: ['r1', 'r2'],
+          groupbyColumns: [],
+        })}
         aggregateFunction="Sum"
         width={400}
         height={300}

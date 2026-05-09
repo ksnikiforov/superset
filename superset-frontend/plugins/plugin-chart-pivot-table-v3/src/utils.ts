@@ -71,6 +71,7 @@ export {
   encodeMetricKey,
   encodeMeasureLeafKey,
   decodeMeasureLeafId,
+  findMeasureLeafIdInPath,
   getFormattingMetricKey,
   getMetricKey,
   getMetricKeys,

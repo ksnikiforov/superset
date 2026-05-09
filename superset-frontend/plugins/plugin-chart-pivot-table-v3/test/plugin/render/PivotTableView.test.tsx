@@ -70,8 +70,7 @@ const renderView = (showGlobalLoader: boolean) =>
       databarColumnMinWidths={new Map()}
       onToggleNode={jest.fn()}
       shouldShowToggle={() => false}
-      showRowSpinner={() => false}
-      showColSpinner={() => false}
+      showSpinner={() => false}
       formatLabel={node => node.label}
       isRowAggregateBold={() => false}
       isColAggregateBold={() => false}
@@ -143,8 +142,7 @@ describe('PivotTableView', () => {
         databarColumnMinWidths={new Map()}
         onToggleNode={jest.fn()}
         shouldShowToggle={() => false}
-        showRowSpinner={() => false}
-        showColSpinner={() => false}
+        showSpinner={() => false}
         formatLabel={node => node.label}
         isRowAggregateBold={() => false}
         isColAggregateBold={() => false}
@@ -212,8 +210,7 @@ describe('PivotTableView', () => {
         databarColumnMinWidths={new Map()}
         onToggleNode={jest.fn()}
         shouldShowToggle={() => false}
-        showRowSpinner={() => false}
-        showColSpinner={() => false}
+        showSpinner={() => false}
         formatLabel={node => node.label}
         isRowAggregateBold={() => false}
         isColAggregateBold={() => false}
@@ -284,8 +281,7 @@ describe('PivotTableView', () => {
         databarColumnMinWidths={new Map()}
         onToggleNode={jest.fn()}
         shouldShowToggle={() => false}
-        showRowSpinner={() => false}
-        showColSpinner={() => false}
+        showSpinner={() => false}
         formatLabel={node => node.label}
         isRowAggregateBold={() => false}
         isColAggregateBold={() => false}
@@ -355,8 +351,7 @@ describe('PivotTableView', () => {
         databarColumnMinWidths={new Map()}
         onToggleNode={jest.fn()}
         shouldShowToggle={() => false}
-        showRowSpinner={() => false}
-        showColSpinner={() => false}
+        showSpinner={() => false}
         formatLabel={node => node.label}
         isRowAggregateBold={() => false}
         isColAggregateBold={() => false}

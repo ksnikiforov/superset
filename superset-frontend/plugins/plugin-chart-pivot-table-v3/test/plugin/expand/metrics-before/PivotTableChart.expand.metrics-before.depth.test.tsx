@@ -18,7 +18,9 @@
  */
 
 import { render, fireEvent, waitFor, within } from '../../../testUtils';
-import PivotTableChart from '../../fixtures/TestPivotTableChart';
+import PivotTableChart, {
+  buildPreloadedBootstrapFactBatches,
+} from '../../fixtures/TestPivotTableChart';
 import { PivotTreeData } from '../../../../src/types';
 import { baseFormData, buildFormData } from '../../fixtures/pivotFormData';
 import { resolveMockBranchFetchResult } from '../../fixtures/factBatches';
@@ -152,6 +154,10 @@ describe('PivotTableChart expansion with metrics before dimensions (depth)', () 
           metrics={['m1']}
           groupbyRows={groupbyRows}
           groupbyColumns={[]}
+          factBatches={buildPreloadedBootstrapFactBatches(tree, {
+            groupbyRows,
+            groupbyColumns: [],
+          })}
           aggregateFunction="Sum"
           width={400}
           height={300}
@@ -210,6 +216,10 @@ describe('PivotTableChart expansion with metrics before dimensions (depth)', () 
           metrics={['m1']}
           groupbyRows={[]}
           groupbyColumns={groupbyColumns}
+          factBatches={buildPreloadedBootstrapFactBatches(tree, {
+            groupbyRows: [],
+            groupbyColumns,
+          })}
           aggregateFunction="Sum"
           width={400}
           height={300}

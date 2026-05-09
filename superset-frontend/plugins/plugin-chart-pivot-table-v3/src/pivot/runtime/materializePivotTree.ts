@@ -1047,12 +1047,11 @@ const buildTreeFromFactBatch = ({
       columnFullDepth,
     );
   }
-  const rowSubtotalDepths = rowSubtotalLevels.filter(
-    level => level > 0 && level <= coverage.rowDepth,
-  );
-  rowSubtotalDepths.forEach(depth => {
-    tree = injectRowSubtotalLeaves(tree, depth, rowFullDepth);
-  });
+  rowSubtotalLevels
+    .filter(level => level > 0 && level <= coverage.rowDepth)
+    .forEach(depth => {
+      tree = injectRowSubtotalLeaves(tree, depth, rowFullDepth);
+    });
   return tree;
 };
 
@@ -1095,13 +1094,12 @@ const buildTreeFromFactBatchAsync = async ({
       columnFullDepth,
     );
   }
-  const rowSubtotalDepths = rowSubtotalLevels.filter(
+  for (const depth of rowSubtotalLevels.filter(
     level => level > 0 && level <= coverage.rowDepth,
-  );
-  for (let idx = 0; idx < rowSubtotalDepths.length; idx += 1) {
+  )) {
     // eslint-disable-next-line no-await-in-loop
     await yieldChunkedWork({ shouldContinue, yieldToMain });
-    tree = injectRowSubtotalLeaves(tree, rowSubtotalDepths[idx], rowFullDepth);
+    tree = injectRowSubtotalLeaves(tree, depth, rowFullDepth);
   }
   assertChunkedWorkCurrent(shouldContinue);
   return tree;

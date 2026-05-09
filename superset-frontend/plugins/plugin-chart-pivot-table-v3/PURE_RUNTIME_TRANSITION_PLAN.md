@@ -567,8 +567,65 @@ Latest code-reduction slice:
   `PivotLayoutResult` fields and a few render-model aliases/callback duplicates
   were deleted.
 - Additional production change for that follow-up: `+120 / -149`, net `-29`.
+- Gate 5/Gate 6/Gate 7 fact-contract cleanup: expansion planning no longer
+  treats non-root materialized children as loaded without fact coverage, branch
+  and component fixtures now seed explicit runtime fact batches, stale
+  `pruneMergedTree` expanded-state parameters were deleted, render-model
+  groupby aliases were removed, and repeated measure-leaf path scans now share
+  `findMeasureLeafIdInPath`.
+- Additional production change for that follow-up: `+19 / -62`, net `-43`.
+- Gate 7 chart/runtime-layout surface cleanup: always-on control-value
+  persistence indirection, committed-tree and render-tree aliases, unused
+  interaction-layout normalization input, unused temporal filter input, and
+  avoidable DnD/measure-leaf definition-order warnings were removed. This
+  keeps the chart/runtime sync path thinner without changing the committed
+  layout or expansion persistence contract.
+- Additional production change for that follow-up: `+19 / -32`, net `-13`.
+- Gate 6/Gate 7 render-sort follow-up: the stale seamless-update hook
+  dependency left by the chart sync cleanup was removed, and metric sorting plus
+  UI column sorting now share one render-model missing-value/numeric comparison
+  policy instead of keeping duplicate sort-value branches. The metric-sort
+  config resolver was then inlined into the only sort callback that used it, so
+  dimension-key lookup is no longer duplicated. Row/column projected-path
+  wrapper callbacks and a nested measure-leaf header-label guard were also
+  removed from the render model.
+- Additional production change for that follow-up: `+47 / -76`, net `-29`.
+- Gate 4/Gate 6 row-subtotal cleanup: the render/layout boundary no longer
+  exports a derived `rowSubtotalDepths` field, row subtotal value hiding now
+  consumes the normalized subtotal levels already present in the layout result,
+  databar spacing reuses the same hide-row-values predicate as cell rendering,
+  and sync/async materialization no longer keep separate row-subtotal-depth
+  loop variables. The same slice also removed a nested formatting guard and a
+  single-use grand-total callback from render formatting.
+- Additional production change for that follow-up: `+32 / -59`, net `-27`.
+- Gate 7 column-sort cleanup: measure-leaf column sort fallback resolution now
+  uses one local fallback value, and the sort-order display callback no longer
+  carries a separate early-return branch.
+- Additional production change for that follow-up: `+10 / -17`, net `-7`.
+- Gate 6/Gate 7 spinner surface cleanup: the render model now exposes one
+  loading-key spinner predicate instead of duplicate row and column aliases,
+  while the chart still maps it to the existing view props.
+- Additional production change for that follow-up: `+8 / -10`, net `-2`.
+- Gate 7 view-prop assembly cleanup: `PivotTableChart.tsx` now builds the
+  shared `PivotTableView` props once and applies only mode-specific size and
+  loader props for user-controlled versus normal rendering. This removes the
+  duplicated chart/view prop list without changing the view API.
+- Additional production change for that follow-up: `+10 / -41`, net `-31`.
+- Gate 6/Gate 7 spinner API cleanup: `PivotTableView` now accepts the single
+  spinner predicate already produced by the render model, and the chart no
+  longer maps it back to duplicate row/column props. The same cleanup removed a
+  dead non-user overlay branch from the user-controlled table wrapper.
+- Additional production change for that follow-up: `+3 / -12`, net `-9`.
+- Gate 6 render-model micro cleanup: row sorting no longer has an unnecessary
+  memo wrapper, and row aggregate bolding now returns the existing predicate
+  directly instead of carrying a separate false/true branch.
+- Additional production change for that follow-up: `+2 / -8`, net `-6`.
+- Gate 7 seamless snapshot cleanup: the frozen-view snapshot path no longer
+  creates a redundant local alias, and the seamless-update callback no longer
+  lists stable React state setters as dependencies.
+- Additional production change for that follow-up: `+9 / -17`, net `-8`.
 - Combined recent Gate 4/Gate 5/Gate 6/Gate 7 source-reduction sequence:
-  `+983 / -1913`, net `-930`.
+  `+1142 / -2247`, net `-1105`.
 - Attempted render-model plumbing cleanup around spinner callbacks, sorting
   value-map aliases, leaf-label flattening, and aggregate-bold returns was
   reverted before this slice because it did not pay for itself clearly enough
@@ -962,6 +1019,22 @@ Gate 2 has started:
   sibling coverage, and metric-sibling split loading through the grouped
   expansion planner. This locks the no-overfetch rule before removing more of
   the old coverage-state shape.
+- Non-root planner satisfaction now relies on explicit fetched/fact coverage
+  instead of treating rendered descendants as a loaded-state fallback. Tests
+  that pass prebuilt `PivotTreeData` now seed bootstrap, branch, or rendered
+  fixture fact batches explicitly.
+- Verification after this cleanup: focused leaf/sorting, expansion/render,
+  subtotal, and interaction suites passed; the normal full plugin test command
+  passed `94` suites / `706` tests; full plugin ESLint passed with `0` errors
+  and existing warnings. A serialized full-plugin Jest run with
+  `--maxWorkers=1` hit broad timeout/JSDOM teardown failures, but the reported
+  failed suites passed when rerun directly.
+- Verification after the chart/runtime-layout surface cleanup: focused
+  interaction layout, seamless expansion, expansion-state, sorting,
+  interaction-layout resolver, and extra-filter normalization suites passed
+  (`120` tests); the normal full plugin test command passed `94` suites /
+  `706` tests; full plugin ESLint passed with `0` errors and `6` remaining
+  warnings.
 
 Immediate next step:
 

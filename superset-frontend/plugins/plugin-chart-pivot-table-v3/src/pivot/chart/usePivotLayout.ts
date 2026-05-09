@@ -28,7 +28,7 @@ import {
 } from '../../types';
 import {
   resolveMetricDisplayLabel,
-  decodeMeasureLeafId,
+  findMeasureLeafIdInPath,
   getMetricKey,
   getStableColumnKey,
   isMetricsPlaceholder,
@@ -74,7 +74,6 @@ export type PivotLayoutResult = {
   groupbyColumnKeys: string[];
   normalizedRowSubtotalLevels: number[];
   normalizedColSubtotalLevels: number[];
-  rowSubtotalDepths: number[];
   resolvedRowTotalPosition: TotalPosition;
   resolvedColTotalPosition: TotalPosition;
   effectiveRowSubtotalPosition: TotalPosition;
@@ -132,8 +131,6 @@ export type PivotLayoutResult = {
     tree: PivotTreeData;
     parent?: PivotTreeNode;
     branch?: PivotTreeData;
-    expandedRows: Set<string>;
-    expandedCols: Set<string>;
   }) => PivotTreeData;
 };
 
@@ -256,10 +253,6 @@ export const usePivotLayout = ({
       layout.measureHierarchy.groups.some(group => group.leaves.length > 1));
 
   const normalizedRowSubtotalLevels = layout.rowSubtotalLevels;
-  const rowSubtotalDepths = useMemo(
-    () => normalizedRowSubtotalLevels.filter(level => level > 0),
-    [normalizedRowSubtotalLevels],
-  );
   const normalizedColSubtotalLevels = useMemo(() => {
     if (rowTotals && !layout.colSubtotalLevels.includes(0)) {
       return [0, ...layout.colSubtotalLevels];
@@ -622,13 +615,8 @@ export const usePivotLayout = ({
       if (aMetric && bMetric && aMetric === bMetric) {
         const leafOrder = measureLeafOrderMap.get(aMetric);
         if (leafOrder) {
-          const resolveLeafId = (node: PivotTreeNode) =>
-            [...node.path]
-              .reverse()
-              .map(val => decodeMeasureLeafId(val))
-              .find((candidate): candidate is string => Boolean(candidate));
-          const aLeaf = resolveLeafId(a);
-          const bLeaf = resolveLeafId(b);
+          const aLeaf = findMeasureLeafIdInPath(a.path);
+          const bLeaf = findMeasureLeafIdInPath(b.path);
           if (aLeaf && bLeaf && aLeaf !== bLeaf) {
             const aIndex = leafOrder.get(aLeaf);
             const bIndex = leafOrder.get(bLeaf);
@@ -1220,15 +1208,11 @@ export const usePivotLayout = ({
       tree: nextTree,
       parent,
       branch,
-      expandedRows: nextExpandedRows,
-      expandedCols: nextExpandedCols,
     }: {
       axis: 'row' | 'col';
       tree: PivotTreeData;
       parent?: PivotTreeNode;
       branch?: PivotTreeData;
-      expandedRows: Set<string>;
-      expandedCols: Set<string>;
     }) => {
       if (!parent || !branch) {
         return nextTree;
@@ -1280,7 +1264,6 @@ export const usePivotLayout = ({
     groupbyColumnKeys,
     normalizedRowSubtotalLevels,
     normalizedColSubtotalLevels,
-    rowSubtotalDepths,
     resolvedRowTotalPosition,
     resolvedColTotalPosition,
     effectiveRowSubtotalPosition,

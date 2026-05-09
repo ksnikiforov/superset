@@ -26,6 +26,7 @@ import {
 import PivotTableChart from '../../../src/PivotTableChart';
 import { PivotTableProps, PivotTreeData } from '../../../src/types';
 import { type PivotFactStoreBatch } from '../../../src/pivot/runtime/factStore';
+import { collectLoadedBranchPaths } from '../../../src/pivot/runtime/loadedBranchCoverage';
 import { buildFormData } from './pivotFormData';
 
 const noopSetDataMask: SetDataMaskHook = () => undefined;
@@ -59,7 +60,84 @@ const maxPathDepth = (nodes: PivotTreeData['rows']) =>
     0,
   );
 
-export const buildPreloadedTreeFactBatches = (
+export const buildPreloadedBootstrapFactBatches = (
+  tree: PivotTreeData | undefined,
+  groupby: Pick<PivotTableProps, 'groupbyRows' | 'groupbyColumns'> = {
+    groupbyRows: [],
+    groupbyColumns: [],
+  },
+): PivotFactStoreBatch[] => {
+  if (!tree) {
+    return [];
+  }
+  const rowDepth = maxPathDepth(tree.rows);
+  const colDepth = maxPathDepth(tree.cols);
+  const bootstrapRowDepth =
+    groupby.groupbyRows.length > 0 && rowDepth > 0 ? 1 : 0;
+  const bootstrapColDepth =
+    groupby.groupbyColumns.length > 0 && colDepth > 0 ? 1 : 0;
+  return [
+    {
+      coverage: {
+        reason: 'initial',
+        rowDepth: bootstrapRowDepth,
+        columnDepth: bootstrapColDepth,
+        rowDimensions: groupby.groupbyRows.slice(0, bootstrapRowDepth),
+        columnDimensions: groupby.groupbyColumns.slice(0, bootstrapColDepth),
+      },
+      facts: [],
+      scope: {
+        kind: 'bootstrap',
+      },
+    },
+  ];
+};
+
+export const buildPreloadedBranchFactBatches = (
+  tree: PivotTreeData | undefined,
+  groupby: Pick<PivotTableProps, 'groupbyRows' | 'groupbyColumns'> = {
+    groupbyRows: [],
+    groupbyColumns: [],
+  },
+): PivotFactStoreBatch[] => {
+  if (!tree) {
+    return [];
+  }
+  const rowDepth = maxPathDepth(tree.rows);
+  const colDepth = maxPathDepth(tree.cols);
+  const batches: PivotFactStoreBatch[] = [];
+  (
+    [
+      ['row', tree.rows],
+      ['col', tree.cols],
+    ] as const
+  ).forEach(([axis]) => {
+    collectLoadedBranchPaths({
+      axis,
+      tree,
+      basePaths: [[]],
+    }).forEach(path => {
+      batches.push({
+        coverage: {
+          reason: 'initial',
+          rowDepth,
+          columnDepth: colDepth,
+          rowDimensions: groupby.groupbyRows.slice(0, rowDepth),
+          columnDimensions: groupby.groupbyColumns.slice(0, colDepth),
+        },
+        facts: [],
+        scope: {
+          kind: 'branch',
+          axis,
+          path,
+        },
+      });
+    });
+  });
+  return batches;
+};
+
+export const buildPreloadedRenderedBranchFactBatches = (
   tree: PivotTreeData | undefined,
   groupby: Pick<PivotTableProps, 'groupbyRows' | 'groupbyColumns'> = {
     groupbyRows: [],
@@ -101,6 +179,28 @@ export const buildPreloadedTreeFactBatches = (
   });
   return batches;
 };
+
+export const buildPreloadedTreeFactBatches = (
+  tree: PivotTreeData | undefined,
+  groupby: Pick<PivotTableProps, 'groupbyRows' | 'groupbyColumns'> = {
+    groupbyRows: [],
+    groupbyColumns: [],
+  },
+): PivotFactStoreBatch[] => [
+  ...buildPreloadedBootstrapFactBatches(tree, groupby),
+  ...buildPreloadedBranchFactBatches(tree, groupby),
+];
+
+export const buildPreloadedRenderedTreeFactBatches = (
+  tree: PivotTreeData | undefined,
+  groupby: Pick<PivotTableProps, 'groupbyRows' | 'groupbyColumns'> = {
+    groupbyRows: [],
+    groupbyColumns: [],
+  },
+): PivotFactStoreBatch[] => [
+  ...buildPreloadedBootstrapFactBatches(tree, groupby),
+  ...buildPreloadedRenderedBranchFactBatches(tree, groupby),
+];
 
 const baseProps: PivotTableProps = {
   data: emptyTree,
@@ -154,6 +254,18 @@ export default function TestPivotTableChart(props: TestPivotTableChartProps) {
     rawDatasource: props.rawDatasource ?? baseProps.rawDatasource,
     hooks: { ...baseProps.hooks, ...(props.hooks ?? {}) },
   };
+  const runtimeLayout = mergedProps.formData.pivotRuntimeLayout;
 
-  return <PivotTableChart {...mergedProps} />;
+  return (
+    <PivotTableChart
+      {...mergedProps}
+      factBatches={
+        props.factBatches ??
+        buildPreloadedTreeFactBatches(mergedProps.data, {
+          groupbyRows: runtimeLayout?.rows ?? mergedProps.groupbyRows,
+          groupbyColumns: runtimeLayout?.cols ?? mergedProps.groupbyColumns,
+        })
+      }
+    />
+  );
 }

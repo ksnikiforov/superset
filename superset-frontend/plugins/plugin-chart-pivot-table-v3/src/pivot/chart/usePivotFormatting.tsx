@@ -811,10 +811,8 @@ export const usePivotFormatting = ({
       const excelFormatting = dimensionKey
         ? excelFormattingMap[dimensionKey]
         : undefined;
-      if (!formatting) {
-        if (!excelFormatting) {
-          return undefined;
-        }
+      if (!formatting && !excelFormatting) {
+        return undefined;
       }
       const applyTo = formatting?.applyTo ?? 'all';
       if (target === 'cell' && applyTo !== 'all') {
@@ -955,16 +953,25 @@ export const usePivotFormatting = ({
     [databarMetricKeys, scaleLikeTargets],
   );
 
-  const isRowGrandTotalNode = useCallback(
-    (rowNode: PivotTreeNode) =>
-      rowNode.path.length === 0 || layout.isMetricGrandTotalNode(rowNode),
-    [layout],
-  );
-
   const isRowTotalAtStart =
     layout.resolvedColTotalPosition === 'start' && renderModel.showRowRoot;
   const visibleCells = renderModel.visibleCellEntries;
   const { visibleRows, visibleCols } = renderModel;
+
+  const shouldHideRowValues = useCallback(
+    (rowNode: PivotTreeNode) =>
+      shouldHideRowValuesBase({
+        rowNode,
+        rowSubTotals,
+        effectiveRowSubtotalPosition: layout.getRowSubtotalPosition(rowNode),
+        isMetricTokenValue: layout.isMetricTokenValue,
+        expandedRows,
+        countDimDepth: layout.countDimDepth,
+        rowSubtotalLevels: layout.normalizedRowSubtotalLevels,
+        isExplicitSubtotalNode: layout.isExplicitSubtotalNode,
+      }),
+    [expandedRows, layout, rowSubTotals],
+  );
 
   const {
     databarScales,
@@ -1020,7 +1027,8 @@ export const usePivotFormatting = ({
     const cumulative = new Map<string, number>();
     const prevKeys = new Map<string, string>();
     visibleRows.forEach(rowNode => {
-      const isGrandTotalRow = isRowGrandTotalNode(rowNode);
+      const isGrandTotalRow =
+        rowNode.path.length === 0 || layout.isMetricGrandTotalNode(rowNode);
       const shouldReset =
         layout.isExplicitSubtotalNode(rowNode) && !isGrandTotalRow;
       const isExpandedGroup =
@@ -1108,19 +1116,8 @@ export const usePivotFormatting = ({
     const labelCharWidth = theme.sizeUnit * 1.6;
     const spaceMap = new Map<string, { positive: number; negative: number }>();
     if (databarMetricKeys.length > 0) {
-      const shouldHide = (rowNode: PivotTreeNode) =>
-        shouldHideRowValuesBase({
-          rowNode,
-          rowSubTotals,
-          effectiveRowSubtotalPosition: layout.getRowSubtotalPosition(rowNode),
-          isMetricTokenValue: layout.isMetricTokenValue,
-          expandedRows,
-          countDimDepth: layout.countDimDepth,
-          rowSubtotalDepths: layout.rowSubtotalDepths,
-          isExplicitSubtotalNode: layout.isExplicitSubtotalNode,
-        });
       visibleCells.forEach(({ rowNode, colNode, cell }) => {
-        if (shouldHide(rowNode)) {
+        if (shouldHideRowValues(rowNode)) {
           return;
         }
         const metricKey = deriveMetricKey(rowNode, colNode);
@@ -1274,34 +1271,18 @@ export const usePivotFormatting = ({
     expandedRows,
     formattingKeyMap,
     getNodeDimDepth,
-    isRowGrandTotalNode,
     isRowTotalAtStart,
     layout,
     metricDatabars,
     metricsForScale,
     renderValue,
-    rowSubTotals,
+    shouldHideRowValues,
     theme.sizeUnit,
     tree.cells,
     visibleCells,
     visibleCols,
     visibleRows,
   ]);
-
-  const shouldHideRowValues = useCallback(
-    (rowNode: PivotTreeNode) =>
-      shouldHideRowValuesBase({
-        rowNode,
-        rowSubTotals,
-        effectiveRowSubtotalPosition: layout.getRowSubtotalPosition(rowNode),
-        isMetricTokenValue: layout.isMetricTokenValue,
-        expandedRows,
-        countDimDepth: layout.countDimDepth,
-        rowSubtotalDepths: layout.rowSubtotalDepths,
-        isExplicitSubtotalNode: layout.isExplicitSubtotalNode,
-      }),
-    [expandedRows, layout, rowSubTotals],
-  );
 
   const renderCellContent = useCallback(
     (

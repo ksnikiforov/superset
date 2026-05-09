@@ -22,6 +22,7 @@ import {
   decodeMeasureLeafId,
   encodeMetricKey,
   encodeMeasureLeafKey,
+  findMeasureLeafIdInPath,
   isMetricToken,
   isMeasureLeafToken,
   isMetricsPlaceholder,
@@ -42,6 +43,10 @@ describe('pivot/core/tokens', () => {
     expect(isMeasureLeafToken(encoded)).toBe(true);
     expect(decodeMeasureLeafId(encoded)).toBe('leaf1');
     expect(decodeMeasureLeafId('not-a-token')).toBeUndefined();
+    expect(findMeasureLeafIdInPath(['region', encoded])).toBe('leaf1');
+    expect(
+      findMeasureLeafIdInPath([encoded, encodeMeasureLeafKey('leaf2')]),
+    ).toBe('leaf2');
   });
 
   it('normalizes metrics placeholder from object columns', () => {

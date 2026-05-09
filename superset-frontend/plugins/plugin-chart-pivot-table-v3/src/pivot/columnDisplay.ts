@@ -128,7 +128,7 @@ export const buildColumnDisplayPath = (
       metricsAtColEnd &&
       allowMetricSubtotalLabels &&
       isMetricSubtotalNode(col) &&
-      col.hasChildren
+      (col.hasChildren || nonMetricParts.length > 1)
     ) {
       return buildMetricSubtotalPathAtEnd();
     }

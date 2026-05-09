@@ -125,7 +125,7 @@ describe('requestLifecycle', () => {
     expect(cancel).toHaveBeenCalledTimes(2);
     expect(cancel).toHaveBeenNthCalledWith(1, 'pivot-v3-seamless');
     expect(cancel).toHaveBeenNthCalledWith(2, 'pivot-v3-seamless');
-    void second;
+    expect(second).toBeInstanceOf(Promise);
   });
 
   it('treats current aborts as settled requests without calling error handlers', async () => {

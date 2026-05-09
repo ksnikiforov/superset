@@ -19,7 +19,9 @@
 
 import { QueryFormColumn } from '@superset-ui/core';
 import { fireEvent, render, screen, waitFor } from '../../testUtils';
-import PivotTableChart from '../fixtures/TestPivotTableChart';
+import PivotTableChart, {
+  buildPreloadedTreeFactBatches,
+} from '../fixtures/TestPivotTableChart';
 import {
   MetricsLayoutEnum,
   PivotExpansionState,
@@ -43,6 +45,7 @@ import type {
   FetchPivotBranchParams,
   FetchPivotBranchResult,
 } from '../../../src/fetchPivotBranch';
+import { type PivotFactStoreBatch } from '../../../src/pivot/runtime/factStore';
 import {
   fetchPivotBranchesBatch,
   type FetchPivotBranchesBatchParams,
@@ -110,14 +113,6 @@ describe('PivotTableChart expansion state persistence', () => {
       data: merged,
       factBatches: results.flatMap(result => result.factBatches),
     };
-  };
-
-  const createDeferred = <T,>() => {
-    let resolve: ((value: T) => void) | undefined;
-    const promise = new Promise<T>(res => {
-      resolve = res;
-    });
-    return { promise, resolve: resolve as (value: T) => void };
   };
 
   const createDeferredBranchFetch = () => {
@@ -226,6 +221,7 @@ describe('PivotTableChart expansion state persistence', () => {
     persistExpansionState = true,
     omitPersistExpansionState = false,
     metricsOverride,
+    factBatches,
   }: {
     data: PivotTreeData;
     ownState?: Record<string, unknown>;
@@ -239,6 +235,7 @@ describe('PivotTableChart expansion state persistence', () => {
     persistExpansionState?: boolean;
     omitPersistExpansionState?: boolean;
     metricsOverride?: PivotTableQueryFormData['metrics'];
+    factBatches?: PivotFactStoreBatch[];
   }) => {
     const metricsValue = metricsOverride ?? metrics;
     const groupbyRowsValue = groupbyRowsOverride ?? rowGroupby;
@@ -286,6 +283,7 @@ describe('PivotTableChart expansion state persistence', () => {
         setDataMask={setDataMask || jest.fn()}
         setControlValue={setControlValue}
         emitCrossFilters={emitCrossFilters}
+        factBatches={factBatches}
       />
     );
   };
@@ -1998,6 +1996,10 @@ describe('PivotTableChart expansion state persistence', () => {
       buildChartProps({
         data: mergedTree,
         formDataOverrides: { pivotExpansionState },
+        factBatches: buildPreloadedTreeFactBatches(mergedTree, {
+          groupbyRows: rowGroupby,
+          groupbyColumns: [],
+        }),
       }),
     );
 
@@ -2239,6 +2241,10 @@ describe('PivotTableChart expansion state persistence', () => {
       buildChartProps({
         data: shallowTree,
         groupbyRowsOverride: deepGroupby,
+        factBatches: buildPreloadedTreeFactBatches(shallowTree, {
+          groupbyRows: deepGroupby,
+          groupbyColumns: [],
+        }),
         formDataOverrides: {
           expandRowsLevel: 2,
           expandColumnsLevel: 0,
@@ -2255,6 +2261,10 @@ describe('PivotTableChart expansion state persistence', () => {
       buildChartProps({
         data: shallowTree,
         groupbyRowsOverride: deepGroupby,
+        factBatches: buildPreloadedTreeFactBatches(shallowTree, {
+          groupbyRows: deepGroupby,
+          groupbyColumns: [],
+        }),
         formDataOverrides: {
           expandRowsLevel: 3,
           expandColumnsLevel: 0,

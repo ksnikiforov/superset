@@ -346,8 +346,7 @@ type PivotTableViewProps = {
   isColumnSortable?: (node: PivotTreeNode) => boolean;
   getColumnSortOrder?: (node: PivotTreeNode) => 'asc' | 'desc' | undefined;
   shouldShowToggle: (axis: 'row' | 'col', node: PivotTreeNode) => boolean;
-  showRowSpinner: (key: string) => boolean;
-  showColSpinner: (key: string) => boolean;
+  showSpinner: (key: string) => boolean;
   formatLabel: (node: PivotTreeNode, axis: 'row' | 'col') => string;
   isRowAggregateBold: (node?: PivotTreeNode) => boolean;
   isColAggregateBold: (node?: PivotTreeNode) => boolean;
@@ -415,8 +414,7 @@ export const PivotTableView = ({
   isColumnSortable,
   getColumnSortOrder,
   shouldShowToggle,
-  showRowSpinner,
-  showColSpinner,
+  showSpinner,
   formatLabel,
   isRowAggregateBold,
   isColAggregateBold,
@@ -593,6 +591,7 @@ export const PivotTableView = ({
                       Object.keys(colHeaderStyle).length > 0
                         ? colHeaderStyle
                         : undefined;
+                    const isColLoading = showSpinner(cell.node.key);
                     return (
                       <th
                         key={`col-header-${cell.node.key}-${rowIdx}`}
@@ -617,9 +616,9 @@ export const PivotTableView = ({
                                   event.stopPropagation();
                                   onToggleNode('col', cell.node);
                                 }}
-                                disabled={showColSpinner(cell.node.key)}
+                                disabled={isColLoading}
                               >
-                                {showColSpinner(cell.node.key) ? (
+                                {isColLoading ? (
                                   <Spinner />
                                 ) : expandedCols.has(cell.node.key) ? (
                                   <MinusSquareOutlined />
@@ -705,7 +704,7 @@ export const PivotTableView = ({
                 ? 0
                 : getNodeDimDepth(row);
               const rowIndent = rowDepthForExport * ROW_INDENT_PX;
-              const isRowLoading = showRowSpinner(row.key);
+              const isRowLoading = showSpinner(row.key);
               return (
                 <tr
                   key={row.key}

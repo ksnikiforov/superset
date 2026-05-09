@@ -55,6 +55,12 @@ export const decodeMeasureLeafId = (val: unknown): string | undefined =>
     ? val.slice(MEASURE_LEAF_TOKEN_PREFIX.length)
     : undefined;
 
+export const findMeasureLeafIdInPath = (path: readonly unknown[]) =>
+  [...path]
+    .reverse()
+    .map(val => decodeMeasureLeafId(val))
+    .find((candidate): candidate is string => Boolean(candidate));
+
 export const normalizePlaceholder = (val: QueryFormColumn) => {
   if (val === METRICS_PLACEHOLDER) return METRICS_PLACEHOLDER;
   if (

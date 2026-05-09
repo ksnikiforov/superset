@@ -18,7 +18,10 @@
  */
 import { getColumnLabel, QueryFormColumn } from '@superset-ui/core';
 import { fireEvent, render, screen, waitFor, within } from '../../testUtils';
-import PivotTableChart from '../fixtures/TestPivotTableChart';
+import PivotTableChart, {
+  buildPreloadedBranchFactBatches,
+  buildPreloadedTreeFactBatches,
+} from '../fixtures/TestPivotTableChart';
 import { buildFormData } from '../fixtures/pivotFormData';
 import {
   MetricsLayoutEnum,
@@ -324,6 +327,10 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
         metrics={metrics}
         groupbyRows={initialRows}
         groupbyColumns={[]}
+        factBatches={buildPreloadedTreeFactBatches(baseTree, {
+          groupbyRows: initialRows,
+          groupbyColumns: [],
+        })}
         width={600}
         height={300}
       />,
@@ -419,6 +426,10 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
         metrics={metrics}
         groupbyRows={initialRows}
         groupbyColumns={[]}
+        factBatches={buildPreloadedTreeFactBatches(baseTree, {
+          groupbyRows: initialRows,
+          groupbyColumns: [],
+        })}
         width={600}
         height={300}
       />,
@@ -519,6 +530,10 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
         metrics={metrics}
         groupbyRows={initialRows}
         groupbyColumns={[]}
+        factBatches={buildPreloadedTreeFactBatches(hydratedTree, {
+          groupbyRows: initialRows,
+          groupbyColumns: [],
+        })}
         width={600}
         height={300}
       />,
@@ -556,6 +571,10 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
         metrics={metrics}
         groupbyRows={initialRows}
         groupbyColumns={[]}
+        factBatches={buildPreloadedTreeFactBatches(hydratedTree, {
+          groupbyRows: initialRows,
+          groupbyColumns: [],
+        })}
         width={600}
         height={300}
       />,
@@ -657,6 +676,10 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
         metrics={metrics}
         groupbyRows={initialRows}
         groupbyColumns={[]}
+        factBatches={buildPreloadedTreeFactBatches(baseTree, {
+          groupbyRows: initialRows,
+          groupbyColumns: [],
+        })}
         width={600}
         height={300}
       />,
@@ -1379,6 +1402,10 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
         metrics={metrics}
         groupbyRows={[]}
         groupbyColumns={initialCols}
+        factBatches={buildPreloadedBranchFactBatches(baseTree, {
+          groupbyRows: [],
+          groupbyColumns: initialCols,
+        })}
         width={600}
         height={300}
       />,
@@ -1503,7 +1530,13 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
         metrics={metrics}
         groupbyRows={['row1']}
         groupbyColumns={initialCols}
-        factBatches={factBatches}
+        factBatches={[
+          ...factBatches,
+          ...buildPreloadedBranchFactBatches(baseTree, {
+            groupbyRows: ['row1'],
+            groupbyColumns: initialCols,
+          }),
+        ]}
         width={600}
         height={300}
       />,
@@ -1600,6 +1633,10 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
         metrics={metrics}
         groupbyRows={[]}
         groupbyColumns={initialCols}
+        factBatches={buildPreloadedBranchFactBatches(baseTree, {
+          groupbyRows: [],
+          groupbyColumns: initialCols,
+        })}
         width={600}
         height={300}
       />,
@@ -1721,6 +1758,10 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
         metrics={metrics}
         groupbyRows={[]}
         groupbyColumns={initialCols}
+        factBatches={buildPreloadedBranchFactBatches(baseTree, {
+          groupbyRows: [],
+          groupbyColumns: initialCols,
+        })}
         width={600}
         height={300}
       />,

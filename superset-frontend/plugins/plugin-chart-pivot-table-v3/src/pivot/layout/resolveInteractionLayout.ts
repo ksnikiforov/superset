@@ -62,7 +62,6 @@ const resolveMetricMap = (metrics: QueryFormMetric[]) => {
 
 const normalizeRuntimeLayout = (
   layout: PivotRuntimeLayout | undefined,
-  dimensionKeys: string[],
 ): PivotRuntimeLayout => {
   if (layout && layout.version === 1) {
     return layout;
@@ -87,13 +86,10 @@ export const resolveInteractionFormData = ({
 
   const dimensions = ensureIsArray<QueryFormColumn>(formData.dimensions);
   const dimensionMap = resolveDimensionMap(dimensions);
-  const dimensionKeys = Array.from(dimensionMap.keys());
-  const resolvedLayout = normalizeRuntimeLayout(runtimeLayout, dimensionKeys);
+  const resolvedLayout = normalizeRuntimeLayout(runtimeLayout);
 
   const rows = resolvedLayout.rows.filter(key => dimensionMap.has(key));
   const cols = resolvedLayout.cols.filter(key => dimensionMap.has(key));
-  const resolvedRows = rows;
-  const resolvedCols = cols;
 
   const metrics = ensureIsArray<QueryFormMetric>(formData.metrics);
   const metricMap = resolveMetricMap(metrics);
@@ -106,14 +102,14 @@ export const resolveInteractionFormData = ({
 
   const placement = resolvedLayout.valuePlacement ?? {
     axis: 'col',
-    index: resolvedCols.length,
+    index: cols.length,
   };
   const { axis } = placement;
-  const axisLength = axis === 'row' ? resolvedRows.length : resolvedCols.length;
+  const axisLength = axis === 'row' ? rows.length : cols.length;
   const insertIndex = clamp(placement.index, 0, axisLength);
 
-  const rowGroupby = resolvedRows.map(key => dimensionMap.get(key));
-  const colGroupby = resolvedCols.map(key => dimensionMap.get(key));
+  const rowGroupby = rows.map(key => dimensionMap.get(key));
+  const colGroupby = cols.map(key => dimensionMap.get(key));
 
   const resolvedRowGroupby = rowGroupby.filter(
     (value): value is QueryFormColumn => Boolean(value),

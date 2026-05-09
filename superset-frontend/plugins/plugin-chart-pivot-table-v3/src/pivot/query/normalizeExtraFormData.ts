@@ -29,12 +29,10 @@ import { type PivotTableQueryFormData } from '../../types';
 import { normalizeTemporalValue } from './pathFilters';
 
 const shouldCoerceTemporalValue = ({
-  value,
   column,
   colTypeMap,
   temporalLookup,
 }: {
-  value: DataRecordValue;
   column?: QueryFormColumn;
   colTypeMap?: Record<string, GenericDataType>;
   temporalLookup?: Record<string, boolean>;
@@ -70,7 +68,7 @@ const normalizeFilterValue = ({
   colTypeMap?: Record<string, GenericDataType>;
   temporalLookup?: Record<string, boolean>;
 }): DataRecordValue =>
-  shouldCoerceTemporalValue({ value, column, colTypeMap, temporalLookup })
+  shouldCoerceTemporalValue({ column, colTypeMap, temporalLookup })
     ? coerceTemporalValue(value)
     : value;
 

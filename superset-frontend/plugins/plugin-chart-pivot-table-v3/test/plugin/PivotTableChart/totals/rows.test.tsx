@@ -20,7 +20,7 @@
 import { type ComponentProps } from 'react';
 import { render, screen, within } from '../../../testUtils';
 import TestPivotTableChart, {
-  buildPreloadedTreeFactBatches,
+  buildPreloadedRenderedTreeFactBatches,
 } from '../../fixtures/TestPivotTableChart';
 import {
   MetricsLayoutEnum,
@@ -60,7 +60,7 @@ function PivotTableChart(props: TestPivotTableChartProps) {
       {...props}
       factBatches={
         props.factBatches ??
-        buildPreloadedTreeFactBatches(props.data, {
+        buildPreloadedRenderedTreeFactBatches(props.data, {
           groupbyRows: props.groupbyRows ?? [],
           groupbyColumns: props.groupbyColumns ?? [],
         })

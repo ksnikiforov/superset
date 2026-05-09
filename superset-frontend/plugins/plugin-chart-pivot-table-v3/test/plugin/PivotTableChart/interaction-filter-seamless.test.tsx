@@ -551,6 +551,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
         metrics={metrics}
         groupbyRows={[]}
         groupbyColumns={[]}
+        factBatches={[]}
         width={600}
         height={300}
       />,

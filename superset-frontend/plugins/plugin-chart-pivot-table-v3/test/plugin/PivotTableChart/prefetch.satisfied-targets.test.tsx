@@ -34,6 +34,7 @@ import {
 import { buildFormData } from '../fixtures/pivotFormData';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../../../src/pivot/runtime/materializePivotTree';
+import { buildMockBranchFetchResult } from '../fixtures/factBatches';
 
 jest.mock('../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../src/fetchPivotBranch');
@@ -125,7 +126,10 @@ describe('PivotTableChart persisted prefetch hydrates until targets satisfied', 
       (acc, result) => mergeTrees(acc, result.data),
       undefined,
     );
-    return { data: merged };
+    return {
+      data: merged,
+      factBatches: results.flatMap(result => result.factBatches),
+    };
   };
 
   beforeEach(() => {
@@ -215,11 +219,23 @@ describe('PivotTableChart persisted prefetch hydrates until targets satisfied', 
 
     const callCount = fetchPivotBranchMock.mock.calls.length;
     if (callCount <= 1) {
-      deferredA.resolve({ data: mergedBranch });
+      deferredA.resolve(
+        buildMockBranchFetchResult(fetchPivotBranchMock.mock.calls[0][0], {
+          data: mergedBranch,
+        }),
+      );
       await fetchPivotBranchMock.mock.results[0]?.value;
     } else {
-      deferredA.resolve({ data: branchA });
-      deferredAX.resolve({ data: branchAX });
+      deferredA.resolve(
+        buildMockBranchFetchResult(fetchPivotBranchMock.mock.calls[0][0], {
+          data: branchA,
+        }),
+      );
+      deferredAX.resolve(
+        buildMockBranchFetchResult(fetchPivotBranchMock.mock.calls[1][0], {
+          data: branchAX,
+        }),
+      );
       await Promise.all([
         fetchPivotBranchMock.mock.results[0]?.value,
         fetchPivotBranchMock.mock.results[1]?.value,

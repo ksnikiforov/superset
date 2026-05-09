@@ -74,9 +74,6 @@ const isSatisfiedNode = ({
   if (key === rootKey && hasLoadedChildren(axis, node)) {
     return true;
   }
-  if (requiredDepth === 0 && hasLoadedChildren(axis, node)) {
-    return true;
-  }
   const fetchedDepth = fetchedCoverageLookup.getFetchedDepth(
     buildCoverageProjection(axis, key, requiredDepth),
   );

@@ -33,6 +33,7 @@ import {
 import { buildFormData } from '../fixtures/pivotFormData';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../../../src/pivot/runtime/materializePivotTree';
+import { buildMockBranchFetchResult } from '../fixtures/factBatches';
 
 jest.mock('../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../src/fetchPivotBranch');
@@ -115,7 +116,10 @@ describe('PivotTableChart error UX (Phase 4.5)', () => {
       (acc, result) => mergeTrees(acc, result.data),
       undefined,
     );
-    return { data: merged };
+    return {
+      data: merged,
+      factBatches: results.flatMap(result => result.factBatches),
+    };
   };
 
   beforeEach(() => {
@@ -139,8 +143,12 @@ describe('PivotTableChart error UX (Phase 4.5)', () => {
     );
     const error = new Error('kaboom');
     fetchPivotBranchMock
-      .mockResolvedValueOnce({ error })
-      .mockResolvedValue({ data: branchA });
+      .mockImplementationOnce(params =>
+        Promise.resolve(buildMockBranchFetchResult(params, { error })),
+      )
+      .mockImplementation(params =>
+        Promise.resolve(buildMockBranchFetchResult(params, { data: branchA })),
+      );
 
     const formData = buildFormData({
       groupbyRows: rowGroupby,
@@ -213,8 +221,12 @@ describe('PivotTableChart error UX (Phase 4.5)', () => {
     );
     const error = new Error('network down');
     fetchPivotBranchMock
-      .mockResolvedValueOnce({ error })
-      .mockResolvedValue({ data: branchA });
+      .mockImplementationOnce(params =>
+        Promise.resolve(buildMockBranchFetchResult(params, { error })),
+      )
+      .mockImplementation(params =>
+        Promise.resolve(buildMockBranchFetchResult(params, { data: branchA })),
+      );
 
     const formDataV1 = buildFormData({
       groupbyRows: rowGroupby,

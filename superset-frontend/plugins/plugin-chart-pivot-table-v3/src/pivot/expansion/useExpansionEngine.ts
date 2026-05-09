@@ -403,8 +403,6 @@ export type ExpansionEngineConfig = {
     tree: PivotTreeData;
     parent?: PivotTreeNode;
     branch?: PivotTreeData;
-    expandedRows: Set<string>;
-    expandedCols: Set<string>;
   }) => PivotTreeData;
 };
 
@@ -869,8 +867,6 @@ export const useExpansionEngine = ({
       axis: PivotAxis,
       key: string,
       branch?: PivotTreeData,
-      expandedRows?: Set<string>,
-      expandedCols?: Set<string>,
     ) => {
       if (!branch) {
         return currentTree;
@@ -882,8 +878,6 @@ export const useExpansionEngine = ({
         tree: nextTree,
         parent,
         branch,
-        expandedRows: expandedRows ?? expandedRowsRef.current,
-        expandedCols: expandedCols ?? expandedColsRef.current,
       });
     },
     [pruneMergedTree],
@@ -895,8 +889,6 @@ export const useExpansionEngine = ({
       axis: PivotAxis,
       keys: string[],
       branch?: PivotTreeData,
-      expandedRows?: Set<string>,
-      expandedCols?: Set<string>,
     ) => {
       if (!branch) {
         return currentTree;
@@ -909,8 +901,6 @@ export const useExpansionEngine = ({
           tree: nextTree,
           parent,
           branch,
-          expandedRows: expandedRows ?? expandedRowsRef.current,
-          expandedCols: expandedCols ?? expandedColsRef.current,
         });
       });
       return nextTree;
@@ -1067,8 +1057,6 @@ export const useExpansionEngine = ({
                 axis,
                 target.pathKey,
                 data,
-                expandedRowsForDepth,
-                expandedColsForDepth,
               );
               continue;
             }
@@ -1086,8 +1074,6 @@ export const useExpansionEngine = ({
               axis,
               batch.targets.map(target => target.pathKey),
               data,
-              expandedRowsForDepth,
-              expandedColsForDepth,
             );
           }
           if (!didMerge) {
@@ -1306,8 +1292,6 @@ export const useExpansionEngine = ({
               tree: mergedTree,
               parent,
               branch: delta,
-              expandedRows: desiredRows,
-              expandedCols: desiredCols,
             });
           }
           const resolvedRows = resolveExpandedForMetrics(
