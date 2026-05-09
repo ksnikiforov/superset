@@ -579,33 +579,21 @@ export const useExpansionEngine = ({
   );
 
   const collectInFlightExpanded = useCallback((axis: PivotAxis) => {
-    const source =
-      axis === 'row'
-        ? inFlightExpandedRowsRef.current
-        : inFlightExpandedColsRef.current;
     const merged = new Set<string>();
-    source.forEach(keys => {
-      keys.forEach(key => merged.add(key));
-    });
+    (axis === 'row'
+      ? inFlightExpandedRowsRef.current
+      : inFlightExpandedColsRef.current
+    ).forEach(keys => keys.forEach(key => merged.add(key)));
     return merged;
   }, []);
 
   const setExpandedState = useCallback((axis: PivotAxis, next: Set<string>) => {
-    if (axis === 'row') {
-      expandedRowsRef.current = next;
-      setExpandedRows(next);
-      return;
-    }
-    expandedColsRef.current = next;
-    setExpandedCols(next);
+    (axis === 'row' ? expandedRowsRef : expandedColsRef).current = next;
+    (axis === 'row' ? setExpandedRows : setExpandedCols)(next);
   }, []);
 
   const setPendingState = useCallback((axis: PivotAxis, next: Set<string>) => {
-    if (axis === 'row') {
-      pendingRowsRef.current = next;
-    } else {
-      pendingColsRef.current = next;
-    }
+    (axis === 'row' ? pendingRowsRef : pendingColsRef).current = next;
     dispatchRuntimeState({ type: 'setPending', axis, keys: next });
   }, []);
 
@@ -1154,38 +1142,32 @@ export const useExpansionEngine = ({
         axis === 'row' ? explicitExpandedRowsRef : explicitExpandedColsRef;
       const manualCollapsedRef =
         axis === 'row' ? explicitCollapsedRowsRef : explicitCollapsedColsRef;
+      const nodes =
+        axis === 'row' ? treeRef.current.rows : treeRef.current.cols;
 
       manualExpandedRef.current = dropDescendants(
         node.path,
         manualExpandedRef.current,
-        axis === 'row' ? treeRef.current.rows : treeRef.current.cols,
+        nodes,
       );
       manualCollapsedRef.current = dropDescendants(
         node.path,
         manualCollapsedRef.current,
-        axis === 'row' ? treeRef.current.rows : treeRef.current.cols,
+        nodes,
       );
       manualCollapsedRef.current.add(node.key);
 
-      const nextExpanded = dropDescendants(
-        node.path,
-        expanded,
-        axis === 'row' ? treeRef.current.rows : treeRef.current.cols,
-      );
+      const nextExpanded = dropDescendants(node.path, expanded, nodes);
       nextExpanded.delete(node.key);
 
-      const nextPending = dropDescendants(
-        node.path,
-        pending,
-        axis === 'row' ? treeRef.current.rows : treeRef.current.cols,
-      );
+      const nextPending = dropDescendants(node.path, pending, nodes);
       nextPending.delete(node.key);
 
       pruneFetchedCoverageForCollapsedNode({
         fetchedCoverage: fetchedCoverageRef.current,
         axis,
         parentPath: node.path,
-        nodes: axis === 'row' ? treeRef.current.rows : treeRef.current.cols,
+        nodes,
         parentKey: node.key,
       });
 

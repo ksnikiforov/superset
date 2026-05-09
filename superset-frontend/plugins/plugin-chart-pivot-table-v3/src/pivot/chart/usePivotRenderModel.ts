@@ -214,10 +214,9 @@ export const usePivotRenderModel = ({
         if (!formatter) {
           return;
         }
-        const nonMetricParts = layout.getNonMetricPathParts(node.path);
-        const nonSubtotalParts = nonMetricParts.filter(
-          part => !isSubtotalToken(part),
-        );
+        const nonSubtotalParts = layout
+          .getNonMetricPathParts(node.path)
+          .filter(part => !isSubtotalToken(part));
         const rawValue = nonSubtotalParts[nonSubtotalParts.length - 1];
         if (rawValue === null || rawValue === undefined) {
           return;
@@ -640,12 +639,9 @@ export const usePivotRenderModel = ({
         axis,
         path: node.path.filter(value => !isSubtotalToken(value)),
       });
-      if (!projection.nextLevel) {
-        return false;
-      }
       if (
-        projection.nextLevel.kind === 'values' &&
-        !projection.valuesLevelSeen
+        !projection.nextLevel ||
+        (projection.nextLevel.kind === 'values' && !projection.valuesLevelSeen)
       ) {
         return false;
       }

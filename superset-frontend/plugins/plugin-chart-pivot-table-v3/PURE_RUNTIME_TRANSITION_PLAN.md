@@ -717,8 +717,29 @@ Latest code-reduction slice:
   through one expression, manual aggregate-depth tracking uses one skip guard,
   and synthetic total toggle suppression is part of the aggregate guard.
 - Additional production change for that follow-up: `+24 / -38`, net `-14`.
+- Gate 5 collapse-axis cleanup: expansion in-flight key collection now merges
+  from the selected axis map directly, and collapse handling computes the active
+  axis node map once before descendant pruning, pending pruning, and fetched
+  coverage trimming. Row/column expanded and pending state setters now write
+  through the selected axis ref/setter directly instead of carrying separate
+  branch bodies.
+- Additional production change for that follow-up: `+14 / -32`, net `-18`.
+- Gate 6 toggle projection guard cleanup: render toggle eligibility now checks
+  the missing-next-level case and collapsed Values-level case through one
+  projection guard before applying leaf-tier metric suppression.
+- Additional production change for that follow-up: `+2 / -5`, net `-3`.
+- Gate 6 child-filter predicate cleanup: collapsed Values exposure now shares
+  the subtotal-parent and metric-token parent guard, row Values-child retention
+  returns directly from the grand-total predicate plus axis-position allowance,
+  and row subtotal descendant filtering combines adjacent subtotal/metric-tier
+  exclusion checks.
+- Additional production change for that follow-up: `+23 / -29`, net `-6`.
+- Gate 6 date-label/subtotal predicate cleanup: render date-label formatting
+  filters projected non-metric path parts directly, and row subtotal descendant
+  metric-token policy returns through one conditional expression.
+- Additional production change for that follow-up: `+6 / -8`, net `-2`.
 - Combined recent Gate 4/Gate 5/Gate 6/Gate 7 source-reduction sequence:
-  `+1599 / -3037`, net `-1438`.
+  `+1644 / -3111`, net `-1467`.
 - Attempted render-model plumbing cleanup around spinner callbacks, sorting
   value-map aliases, leaf-label flattening, and aggregate-bold returns was
   reverted before this slice because it did not pay for itself clearly enough
@@ -772,26 +793,26 @@ Gate status:
   Values child-filter branch has been deleted, and the row/column child-filter
   prelude is now shared. Remaining work is mostly deeper row subtotal policy.
 - Gate 7 has only been lightly reduced (`40%`). `PivotTableChart.tsx` is smaller than
-  baseline, but at roughly `2931` lines it still owns committed-tree sync,
+  baseline, but at roughly `2761` lines it still owns committed-tree sync,
   runtime layout coverage checks, dimension filters, interaction wiring, and
   controller-like responsibilities.
 
 Current largest production hotspots by line count:
 
-- `PivotTableChart.tsx`: `2931` lines. It still owns committed-tree sync,
+- `PivotTableChart.tsx`: `2761` lines. It still owns committed-tree sync,
   runtime layout coverage checks, dimension filters, interaction wiring, and
   controller-like responsibilities.
-- `useExpansionEngine.ts`: `1813` lines. This is still the largest runtime
+- `useExpansionEngine.ts`: `1779` lines. This is still the largest runtime
   orchestration and deletion target.
 - `expansion/engine.ts`: `946` lines. It now owns most pure expansion
   state/planning helpers; future Gate 5 moves should delete more hook code than
   they add here.
-- `usePivotLayout.ts`: `1319` lines. This remains the main render/layout policy
+- `usePivotLayout.ts`: `1123` lines. This remains the main render/layout policy
   hotspot.
-- `runtime/materializePivotTree.ts`: `1372` lines. This is now the correct Gate
+- `runtime/materializePivotTree.ts`: `1370` lines. This is now the correct Gate
   4 owner, but should be split into internal materializer modules only when that
   enables deleting render repair or fixture-only production helpers.
-- `usePivotRenderModel.ts`: `814` lines. This is the next likely Gate 4/Gate 6
+- `usePivotRenderModel.ts`: `699` lines. This is the next likely Gate 4/Gate 6
   deletion surface because render repair should shrink now that materialization
   creates metric, measure, and subtotal nodes.
 - `visibility.ts`: `486` lines. Loaded-state inference is now narrower; the
