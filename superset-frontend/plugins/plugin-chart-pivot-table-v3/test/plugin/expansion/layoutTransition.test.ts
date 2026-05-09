@@ -101,7 +101,7 @@ describe('pivot/expansion/layoutTransition', () => {
     expect(transition.normalizedTree.cells).toEqual({});
   });
 
-  it('trims removed row depth and rolls child cells up to the stable prefix', () => {
+  it('trims removed row depth without rolling child cells up locally', () => {
     const usKey = serializePath(['US']);
     const usCaKey = serializePath(['US', 'CA']);
     const data = makeTree({
@@ -114,6 +114,11 @@ describe('pivot/expansion/layoutTransition', () => {
         makeNode({ axis: 'row', path: ['US', 'CA'] }),
       ],
       cells: {
+        [serializeCellKey(usKey, rootKey)]: {
+          rowKey: usKey,
+          colKey: rootKey,
+          values: { sales: 100 },
+        },
         [serializeCellKey(usCaKey, rootKey)]: {
           rowKey: usCaKey,
           colKey: rootKey,
@@ -132,16 +137,17 @@ describe('pivot/expansion/layoutTransition', () => {
 
     expect(transition.shouldPruneRowsForLayoutChange).toBe(true);
     expect(transition.rowStablePrefix).toBe(1);
-    expect(transition.shouldCarryFetchedRowsForTrim).toBe(true);
     expect(transition.normalizedTree.rows[usCaKey]).toBeUndefined();
     expect(
       transition.normalizedTree.cells[serializeCellKey(usKey, rootKey)],
     ).toMatchObject({
       rowKey: usKey,
       colKey: rootKey,
-      values: { sales: 7 },
-      isSubtotal: true,
+      values: { sales: 100 },
     });
+    expect(
+      transition.normalizedTree.cells[serializeCellKey(usCaKey, rootKey)],
+    ).toBeUndefined();
   });
 
   it('promotes an added deeper row layer only to the stable prefix when coverage is missing', () => {

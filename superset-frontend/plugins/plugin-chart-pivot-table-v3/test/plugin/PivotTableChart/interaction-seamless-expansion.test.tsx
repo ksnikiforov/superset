@@ -274,7 +274,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('does not fetch when removing a trailing row dimension after expanding a top-level row', async () => {
+  it('fetches exact coverage when removing a trailing row dimension after expanding a top-level row', async () => {
     const metrics = ['m1'];
     const initialRows = ['r1', 'r2', 'r3'];
     const records = [
@@ -343,6 +343,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
 
     fetchMock.mockClear();
     fetchPivotBranchMock.mockClear();
+    fetchMock.mockImplementation(() => new Promise(() => undefined));
 
     const findDimensionRow = (label: string) => {
       const nodes = screen.getAllByText(label);
@@ -363,17 +364,11 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       within(lineStatusRow).getByLabelText('Toggle row dimension'),
     );
 
-    expect(fetchMock).not.toHaveBeenCalled();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     expect(fetchPivotBranchMock).not.toHaveBeenCalled();
-
-    await waitFor(() =>
-      expect(screen.getAllByLabelText('minus-square').length).toBeGreaterThan(
-        0,
-      ),
-    );
   });
 
-  it('keeps expanded row hierarchy stable (no loader bounce) when trimming trailing row dimension', async () => {
+  it('keeps expanded row hierarchy visible while trailing row trim fetches exact coverage', async () => {
     const metrics = ['m1', 'm2'];
     const initialRows = ['r1', 'r2', 'r3'];
     const records = [
@@ -440,6 +435,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
 
     fetchMock.mockClear();
     fetchPivotBranchMock.mockClear();
+    fetchMock.mockImplementation(() => new Promise(() => undefined));
 
     const findDimensionRow = (label: string) => {
       const nodes = screen.getAllByText(label);
@@ -458,11 +454,10 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     const r3Row = findDimensionRow('r3');
     fireEvent.click(within(r3Row).getByLabelText('Toggle row dimension'));
 
-    expect(fetchMock).not.toHaveBeenCalled();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     expect(fetchPivotBranchMock).not.toHaveBeenCalled();
     expect(screen.getByText('A1')).toBeInTheDocument();
     expect(screen.getByText('A2')).toBeInTheDocument();
-    expect(screen.queryAllByLabelText('Loading')).toHaveLength(0);
     expect(screen.queryByText('A1')).toBeInTheDocument();
     expect(screen.queryByText('A2')).toBeInTheDocument();
   });
@@ -544,6 +539,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
 
     fetchMock.mockClear();
     fetchPivotBranchMock.mockClear();
+    fetchMock.mockImplementation(() => new Promise(() => undefined));
 
     const findDimensionRow = (label: string) => {
       const nodes = screen.getAllByText(label);
@@ -580,14 +576,13 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       />,
     );
 
-    expect(fetchMock).not.toHaveBeenCalled();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     expect(fetchPivotBranchMock).not.toHaveBeenCalled();
-    expect(screen.queryAllByLabelText('Loading')).toHaveLength(0);
     expect(screen.getByText('A1')).toBeInTheDocument();
     expect(screen.getByText('A2')).toBeInTheDocument();
   });
 
-  it('does not prefetch again when removing trailing row dimension after deep expansion is already loaded', async () => {
+  it('fetches exact coverage when removing trailing row dimension after deep expansion is loaded', async () => {
     const metrics = ['m1', 'm2'];
     const initialRows = ['r1', 'r2', 'r3'];
     const records = [
@@ -692,6 +687,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     fetchMock.mockClear();
     fetchPivotBranchMock.mockClear();
     peekPivotBranchCacheMock.mockClear();
+    fetchMock.mockImplementation(() => new Promise(() => undefined));
 
     const findDimensionRow = (label: string) => {
       const nodes = screen.getAllByText(label);
@@ -710,13 +706,12 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     const r3Row = findDimensionRow('r3');
     fireEvent.click(within(r3Row).getByLabelText('Toggle row dimension'));
 
-    expect(fetchMock).not.toHaveBeenCalled();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     expect(fetchPivotBranchMock).not.toHaveBeenCalled();
     expect(peekPivotBranchCacheMock).not.toHaveBeenCalled();
     expect(screen.queryByText('X')).not.toBeInTheDocument();
     expect(screen.queryByText('Y')).not.toBeInTheDocument();
     expect(screen.getByText('A1')).toBeInTheDocument();
-    expect(screen.queryAllByLabelText('Loading')).toHaveLength(0);
   });
 
   it('shows grand total and restores row members after removing then re-adding the last row dimension', async () => {

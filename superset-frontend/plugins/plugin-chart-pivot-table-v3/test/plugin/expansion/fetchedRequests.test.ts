@@ -17,13 +17,8 @@
  * under the License.
  */
 
+import { type PivotAxis, type PivotTreeNode } from '../../../src/types';
 import {
-  type PivotAxis,
-  type PivotTreeData,
-  type PivotTreeNode,
-} from '../../../src/types';
-import {
-  buildFetchedCoverageForStableTrim,
   createFetchedFactCoverageState,
   getFetchedAxisDepthMap,
   pruneFetchedCoverageForCollapsedNode,
@@ -47,18 +42,6 @@ const makeNode = ({
   formattedLabel: path.length === 0 ? 'Total' : String(path[path.length - 1]),
   level: path.length,
   hasChildren,
-});
-
-const buildTree = ({
-  rows,
-  cols = [makeNode({ axis: 'col', path: [] })],
-}: {
-  rows: PivotTreeNode[];
-  cols?: PivotTreeNode[];
-}): PivotTreeData => ({
-  rows: Object.fromEntries(rows.map(node => [node.key, node])),
-  cols: Object.fromEntries(cols.map(node => [node.key, node])),
-  cells: {},
 });
 
 describe('pivot/expansion/fetchedRequests', () => {
@@ -90,47 +73,5 @@ describe('pivot/expansion/fetchedRequests', () => {
     expect(Array.from(getFetchedAxisDepthMap(fetchedCoverage, 'row'))).toEqual([
       [cKey, 1],
     ]);
-  });
-
-  it('rebuilds carried fetched coverage for stable layout trims', () => {
-    const usKey = serializePath(['US']);
-    const usCaKey = serializePath(['US', 'CA']);
-    const fetchedCoverage = createFetchedFactCoverageState({
-      row: new Map([[usCaKey, 1]]),
-    });
-    const previousTree = buildTree({
-      rows: [
-        makeNode({ axis: 'row', path: [] }),
-        makeNode({ axis: 'row', path: ['US'] }),
-        makeNode({ axis: 'row', path: ['US', 'CA'], hasChildren: false }),
-      ],
-    });
-    const nextTree = buildTree({
-      rows: [
-        makeNode({ axis: 'row', path: [] }),
-        makeNode({ axis: 'row', path: ['US'] }),
-      ],
-    });
-
-    const nextCoverage = buildFetchedCoverageForStableTrim({
-      fetchedCoverage,
-      previousTree,
-      nextTree,
-      expandedRows: new Set([rootKey, usKey]),
-      expandedCols: new Set(),
-      shouldCarryRows: true,
-      shouldCarryCols: false,
-      rowStablePrefix: 1,
-      colStablePrefix: 0,
-      previousVisibleRowDepth: 0,
-      previousVisibleColDepth: 2,
-      countDimDepth: path => path.length,
-      getCoverageKey: (_axis, key) => key,
-    });
-
-    expect(Array.from(getFetchedAxisDepthMap(nextCoverage, 'row'))).toEqual([
-      [usKey, 2],
-    ]);
-    expect(getFetchedAxisDepthMap(nextCoverage, 'col').size).toBe(0);
   });
 });

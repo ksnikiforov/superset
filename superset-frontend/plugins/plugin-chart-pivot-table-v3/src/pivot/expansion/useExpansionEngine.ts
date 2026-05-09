@@ -83,7 +83,6 @@ import {
   type ExpansionVisibilityConfig,
 } from './engine';
 import {
-  buildFetchedCoverageForStableTrim,
   createFetchedFactCoverageState,
   pruneFetchedCoverageForCollapsedNode,
   seedFetchedCoverageFromFactBatches as seedFetchedCoverageStateFromFactBatches,
@@ -1455,7 +1454,6 @@ export const useExpansionEngine = ({
       shouldExpandRows,
       shouldExpandCols,
       layoutChanged,
-      sourceTree,
       normalizedTree,
       rowStablePrefix,
       colStablePrefix,
@@ -1463,8 +1461,6 @@ export const useExpansionEngine = ({
       autoExpandColsLevelForDesired,
       allowMetricRowPromotion,
       allowMetricColPromotion,
-      shouldCarryFetchedRowsForTrim,
-      shouldCarryFetchedColsForTrim,
     } = resolveLayoutTransition({
       data,
       currentTree: treeRef.current,
@@ -1494,30 +1490,7 @@ export const useExpansionEngine = ({
       shouldResetExpandedRows || shouldResetExpandedCols;
     autoExpandRowsLevelRef.current = autoExpandRowsLevelForDesired;
     autoExpandColsLevelRef.current = autoExpandColsLevelForDesired;
-    const {
-      visibleRowDepth: previousVisibleRowDepth,
-      visibleColDepth: previousVisibleColDepth,
-    } = computeVisibleDepthsBase({
-      tree: sourceTree,
-      expandedRows: expandedRowsRef.current,
-      expandedCols: expandedColsRef.current,
-      config: visibilityConfig,
-    });
-    const nextFetchedCoverage = buildFetchedCoverageForStableTrim({
-      fetchedCoverage: fetchedCoverageRef.current,
-      previousTree: sourceTree,
-      nextTree: normalizedTree,
-      expandedRows: expandedRowsRef.current,
-      expandedCols: expandedColsRef.current,
-      shouldCarryRows: shouldCarryFetchedRowsForTrim,
-      shouldCarryCols: shouldCarryFetchedColsForTrim,
-      rowStablePrefix,
-      colStablePrefix,
-      previousVisibleRowDepth,
-      previousVisibleColDepth,
-      countDimDepth,
-      getCoverageKey,
-    });
+    const nextFetchedCoverage = createFetchedFactCoverageState();
 
     dataEpochRef.current += 1;
     invalidateInFlightRequests();

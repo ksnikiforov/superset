@@ -16,14 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { type DataRecordValue } from '@superset-ui/core';
 import {
   type PivotAxis,
   type PivotTreeData,
   type PivotTreeNode,
 } from '../../types';
-import { parsePath, serializeCellKey, serializePath } from '../../utils';
-import { rootKey } from '../viewModel';
 import { getStablePrefixLength, isSameLayout } from './engine';
 
 export type PivotLayoutKeyState = {
@@ -164,83 +161,12 @@ export const trimTreeForLayout = ({
   if (removedRows.size === 0 && removedCols.size === 0) {
     return nextTree;
   }
-  const resolveNearestSurvivingKey = (
-    nodes: Record<string, PivotTreeNode>,
-    key: string,
-  ) => {
-    if (nodes[key]) {
-      return key;
-    }
-    const path = parsePath(key);
-    for (let size = path.length - 1; size >= 0; size -= 1) {
-      const candidate = serializePath(path.slice(0, size));
-      if (nodes[candidate]) {
-        return candidate;
-      }
-    }
-    return nodes[rootKey] ? rootKey : undefined;
-  };
-  const mergeCellValues = (
-    left?: Record<string, DataRecordValue>,
-    right?: Record<string, DataRecordValue>,
-  ) => {
-    if (!left && !right) {
-      return undefined;
-    }
-    const merged: Record<string, DataRecordValue> = { ...(left ?? {}) };
-    Object.entries(right ?? {}).forEach(([metric, value]) => {
-      const current = merged[metric];
-      const leftNum = Number(current);
-      const rightNum = Number(value);
-      if (Number.isFinite(leftNum) && Number.isFinite(rightNum)) {
-        merged[metric] = leftNum + rightNum;
-        return;
-      }
-      if (current === undefined || current === null) {
-        merged[metric] = value;
-        return;
-      }
-      if (value !== undefined && value !== null) {
-        merged[metric] = value;
-      }
-    });
-    return merged;
-  };
   const nextCells: PivotTreeData['cells'] = {};
-  Object.entries(nextTree.cells).forEach(([, cell]) => {
-    const rowKey =
-      removedRows.has(cell.rowKey) || !nextTree.rows[cell.rowKey]
-        ? resolveNearestSurvivingKey(nextTree.rows, cell.rowKey)
-        : cell.rowKey;
-    const colKey =
-      removedCols.has(cell.colKey) || !nextTree.cols[cell.colKey]
-        ? resolveNearestSurvivingKey(nextTree.cols, cell.colKey)
-        : cell.colKey;
-    const collapsedToRowRoot =
-      trimRowDepth === 0 && cell.rowKey !== rootKey && rowKey === rootKey;
-    const collapsedToColRoot =
-      trimColDepth === 0 && cell.colKey !== rootKey && colKey === rootKey;
-    if (collapsedToRowRoot || collapsedToColRoot) {
+  Object.entries(nextTree.cells).forEach(([key, cell]) => {
+    if (!nextTree.rows[cell.rowKey] || !nextTree.cols[cell.colKey]) {
       return;
     }
-    if (rowKey === undefined || colKey === undefined) {
-      return;
-    }
-    const nextKey = serializeCellKey(rowKey, colKey);
-    const existing = nextCells[nextKey];
-    const mergedValues = mergeCellValues(existing?.values, cell.values);
-    nextCells[nextKey] = {
-      ...(existing ?? cell),
-      ...cell,
-      rowKey,
-      colKey,
-      ...(mergedValues ? { values: mergedValues } : {}),
-      isSubtotal:
-        cell.isSubtotal ||
-        existing?.isSubtotal ||
-        rowKey !== cell.rowKey ||
-        colKey !== cell.colKey,
-    };
+    nextCells[key] = cell;
   });
   return { ...nextTree, cells: nextCells };
 };
@@ -399,24 +325,12 @@ export const resolveLayoutTransition = ({
           allowMetricColPromotion,
         })
       : baseTree;
-  const shouldCarryFetchedRowsForTrim =
-    !hasNewData &&
-    currentLayout.rows.length < previousLayout.rows.length &&
-    isPrefix(currentLayout.rows, previousLayout.rows) &&
-    rowStablePrefix > 0;
-  const shouldCarryFetchedColsForTrim =
-    !hasNewData &&
-    currentLayout.cols.length < previousLayout.cols.length &&
-    isPrefix(currentLayout.cols, previousLayout.cols) &&
-    colStablePrefix > 0;
-
   return {
     rowsChanged,
     colsChanged,
     shouldExpandRows,
     shouldExpandCols,
     layoutChanged,
-    sourceTree,
     normalizedTree,
     shouldPruneRowsForLayoutChange,
     shouldPruneColsForLayoutChange,
@@ -426,7 +340,5 @@ export const resolveLayoutTransition = ({
     autoExpandColsLevelForDesired,
     allowMetricRowPromotion,
     allowMetricColPromotion,
-    shouldCarryFetchedRowsForTrim,
-    shouldCarryFetchedColsForTrim,
   };
 };
