@@ -58,7 +58,7 @@ cells are projections of DB facts, not canonical data.
 ## Current Status
 
 As of May 10, 2026, after
-`33ff2bf04b refactor(pivot-table-v3): emit semantic export row depth`:
+`c9535fef2b refactor(pivot-table-v3): require export row depth markers`:
 
 - Overall transition estimate: **82%**.
 - Goal-weighted completion estimate: **81%**.
@@ -70,13 +70,13 @@ As of May 10, 2026, after
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `7728` insertions, `9263` deletions, net `-1535`.
-- Current production `src` TypeScript/TSX total: `31975` lines.
+- Production `src`: `7734` insertions, `9271` deletions, net `-1537`.
+- Current production `src` TypeScript/TSX total: `31973` lines.
 - Implied baseline `src` total: about `33510` lines.
 - Added files: `+4228 / -0` across `15` files.
 - Deleted files: `+0 / -1419` across `8` files.
-- Modified files: `+3500 / -7844`, net `-4344`.
-- Pre-existing production files are net `-5763`.
+- Modified files: `+3506 / -7852`, net `-4346`.
+- Pre-existing production files are net `-5765`.
 
 The readout is mixed but improving: the new runtime files still account for
 `4228` added lines, while old production files have shrunk enough to leave the
@@ -113,6 +113,7 @@ plugin net-negative overall.
   the whole view prop bundle.
 - `PivotTableView` emits semantic zero-based row depth for export, so the export
   path no longer guesses whether rendered depth markers need one-based repair.
+  It also no longer fills missing row-depth markers as root rows.
 
 ## Remaining Risk
 
@@ -129,8 +130,8 @@ plugin net-negative overall.
   Chunked ingestion/materialization reduces monopolization but does not make
   the full commit non-blocking.
 - Export still clones and reshapes the rendered DOM table. Row-depth semantic
-  repair is gone, but export is not yet a sibling model derived directly from
-  the same tree/program boundary as render.
+  repair and missing-depth fallback are gone, but export is not yet a sibling
+  model derived directly from the same tree/program boundary as render.
 
 ## Current Hotspots
 
@@ -211,7 +212,8 @@ Bring these back before taking the behavior change:
 Already resolved:
 
 - Rendered row export depth is now semantic and zero-based; export no longer
-  normalizes one-based depth markers.
+  normalizes one-based depth markers or fills missing depth markers as root
+  rows.
 - Metric-order-only UI changes now commit locally instead of being vetoed by the
   chart when query form data is stale. Runtime coverage still decides whether a
   fetch is needed.
@@ -237,6 +239,9 @@ git diff --check
 
 Recent validation:
 
+- `c9535fef2b`: touched-file ESLint passed for
+  `buildPivotV3ExportTable.ts` and export tests; focused Jest passed for export
+  table behavior and chart smoke guardrails (`16` tests).
 - `33ff2bf04b`: touched-file ESLint passed for
   `buildPivotV3ExportTable.ts`, `PivotTableView.tsx`, export tests, and the
   basic chart smoke suite; focused Jest passed for export table behavior and the
