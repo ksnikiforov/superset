@@ -616,6 +616,10 @@ type ValueDragItem = {
 
 type DragItem = DimensionDragItem | ValueDragItem;
 type PivotViewProps = ComponentProps<typeof PivotTableView>;
+type PivotDisplaySnapshot = Pick<
+  PivotViewProps,
+  'renderModel' | 'tree' | 'expandedRows' | 'expandedCols'
+>;
 type UiColumnSortState = {
   colKey: string;
   displayColKey?: string;
@@ -823,8 +827,8 @@ function PivotTableChart(props: PivotTableProps) {
   );
   const [activeColumnSort, setActiveColumnSort] =
     useState<UiColumnSortState | null>(null);
-  const [frozenUserViewProps, setFrozenUserViewProps] =
-    useState<PivotViewProps | null>(null);
+  const [pendingDisplaySnapshot, setPendingDisplaySnapshot] =
+    useState<PivotDisplaySnapshot | null>(null);
   const pendingSeamlessLayoutRef = useRef<PivotRuntimeLayout | null>(null);
   const lastUpstreamQueryContextRef = useRef<{
     data: PivotTreeData;
@@ -834,7 +838,7 @@ function PivotTableChart(props: PivotTableProps) {
   const expandedColsForSeamlessRef = useRef<Set<string>>(new Set());
   const pendingRowsForSeamlessRef = useRef<Set<string>>(new Set());
   const pendingColsForSeamlessRef = useRef<Set<string>>(new Set());
-  const currentUserViewPropsRef = useRef<PivotViewProps | null>(null);
+  const displaySnapshotRef = useRef<PivotDisplaySnapshot | null>(null);
   const lastSeamlessSyncRef = useRef<{
     filtersSignature: string | null;
     layoutSignature: string;
@@ -1287,7 +1291,7 @@ function PivotTableChart(props: PivotTableProps) {
     setSeamlessWarnings([]);
     setSeamlessError(undefined);
     setSeamlessLoading(false);
-    setFrozenUserViewProps(null);
+    setPendingDisplaySnapshot(null);
     pendingSeamlessLayoutRef.current = null;
   }, [
     data,
@@ -1435,17 +1439,9 @@ function PivotTableChart(props: PivotTableProps) {
         dimensionKeys,
         metricKeys,
       );
-      const liveSnapshot = currentUserViewPropsRef.current;
-      if (liveSnapshot) {
-        setFrozenUserViewProps({
-          ...liveSnapshot,
-          expandedRows: new Set(liveSnapshot.expandedRows),
-          expandedCols: new Set(liveSnapshot.expandedCols),
-          warnings: [...(liveSnapshot.warnings ?? [])],
-          showGlobalLoader: false,
-          showCornerLoader: true,
-          showSpinner: () => false,
-        });
+      const displaySnapshot = displaySnapshotRef.current;
+      if (displaySnapshot) {
+        setPendingDisplaySnapshot(displaySnapshot);
       }
       const updateResult = await fetchAndMaterializeSeamlessRuntimeUpdate({
         requestLifecycle: seamlessRequestLifecycle,
@@ -1454,10 +1450,8 @@ function PivotTableChart(props: PivotTableProps) {
         sourceFormData: formData,
         runtimeLayout: normalized,
         selection: nextFilters,
-        expandedRows:
-          liveSnapshot?.expandedRows ?? expandedRowsForSeamlessRef.current,
-        expandedCols:
-          liveSnapshot?.expandedCols ?? expandedColsForSeamlessRef.current,
+        expandedRows: expandedRowsForSeamlessRef.current,
+        expandedCols: expandedColsForSeamlessRef.current,
         pendingRows: pendingRowsForSeamlessRef.current,
         pendingCols: pendingColsForSeamlessRef.current,
         fetchData: params => supersetChartDataClient.fetch(params),
@@ -1769,7 +1763,7 @@ function PivotTableChart(props: PivotTableProps) {
   }, [expandedCols, expandedRows, pendingCols, pendingRows]);
 
   useEffect(() => {
-    if (!frozenUserViewProps) {
+    if (!pendingDisplaySnapshot) {
       return;
     }
     const settled =
@@ -1779,13 +1773,13 @@ function PivotTableChart(props: PivotTableProps) {
       pendingRows.size === 0 &&
       pendingCols.size === 0;
     if (settled) {
-      setFrozenUserViewProps(null);
+      setPendingDisplaySnapshot(null);
     }
   }, [
-    frozenUserViewProps,
     isHydrating,
     loadingKeys,
     pendingCols,
+    pendingDisplaySnapshot,
     pendingRows,
     seamlessLoading,
   ]);
@@ -2267,11 +2261,19 @@ function PivotTableChart(props: PivotTableProps) {
   const tableHeight = isUserControlled
     ? Math.max(0, height - TOP_CHIPS_HEIGHT)
     : height;
-  const sharedPivotViewProps: Omit<PivotViewProps, 'height' | 'width'> = {
+  const liveDisplaySnapshot: PivotDisplaySnapshot = {
     renderModel: renderModelResult.renderModel,
     tree: renderTree,
     expandedRows: renderModelResult.expandedRowsForRender,
     expandedCols: renderModelResult.expandedColsForRender,
+  };
+  displaySnapshotRef.current = liveDisplaySnapshot;
+  const activeDisplaySnapshot = pendingDisplaySnapshot ?? liveDisplaySnapshot;
+  const sharedPivotViewProps: Omit<PivotViewProps, 'height' | 'width'> = {
+    renderModel: activeDisplaySnapshot.renderModel,
+    tree: activeDisplaySnapshot.tree,
+    expandedRows: activeDisplaySnapshot.expandedRows,
+    expandedCols: activeDisplaySnapshot.expandedCols,
     errorMessage: activeErrorMessage,
     onRetry: handleRetry,
     warnings: combinedWarnings,
@@ -2288,7 +2290,8 @@ function PivotTableChart(props: PivotTableProps) {
     isColumnSortable,
     getColumnSortOrder,
     shouldShowToggle: renderModelResult.shouldShowToggle,
-    showSpinner: key => loadingKeys.has(key),
+    showSpinner: key =>
+      !pendingDisplaySnapshot && !seamlessLoading && loadingKeys.has(key),
     isRowAggregateBold: renderModelResult.isRowAggregateBold,
     isColAggregateBold: renderModelResult.isColAggregateBold,
     getNodeDimDepth: renderModelResult.getNodeDimDepth,
@@ -2299,16 +2302,6 @@ function PivotTableChart(props: PivotTableProps) {
     handleCellContextMenu: interactions.handleCellContextMenu,
     rowAxisLabels,
   };
-  const liveUserPivotViewProps: PivotViewProps = {
-    ...sharedPivotViewProps,
-    height: tableHeight,
-    width: tableWidth,
-  };
-  if (isUserControlled) {
-    currentUserViewPropsRef.current = liveUserPivotViewProps;
-  }
-  const activeUserPivotViewProps =
-    frozenUserViewProps ?? liveUserPivotViewProps;
   const rowChips = chipItems('row');
   const colChips = chipItems('col');
   const rowChipRefs = useRef<Array<HTMLDivElement | null>>([]);
@@ -2520,7 +2513,11 @@ function PivotTableChart(props: PivotTableProps) {
             />
           </ChipColumn>
           <TableArea $height={tableHeight} $width={tableWidth}>
-            <PivotTableView {...activeUserPivotViewProps} />
+            <PivotTableView
+              {...sharedPivotViewProps}
+              height={tableHeight}
+              width={tableWidth}
+            />
           </TableArea>
         </TableRow>
       </InteractionTableWrap>
