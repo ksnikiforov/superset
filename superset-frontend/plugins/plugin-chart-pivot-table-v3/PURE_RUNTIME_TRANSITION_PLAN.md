@@ -275,10 +275,10 @@ they delete more code than they add in the same slice.
 Current source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `7900` insertions, `9107` deletions, net `-1207`.
-- Current production `src` TypeScript/TSX total: `32303` lines.
+- Production `src`: `7893` insertions, `9109` deletions, net `-1216`.
+- Current production `src` TypeScript/TSX total: `32294` lines.
 - Pre-existing production files are net negative:
-  `+3490 / -9107`, net `-5617`.
+  `+3483 / -9109`, net `-5626`.
 - Added runtime/helper files are still the source of total growth:
   `+4410 / -0` across `16` added files.
 
@@ -301,9 +301,9 @@ place; the line-reduction payoff is now past break-even but still not done.
 This is a functionality/architecture completion estimate, not a line-deletion
 score. The completed work has moved the runtime toward a compiler/fact-store
 pipeline. The remaining work is more concentrated now: `PivotTableChart.tsx`
-(`2541` lines), `useExpansionEngine.ts` (`1687` lines),
+(`2541` lines), `useExpansionEngine.ts` (`1683` lines),
 `usePivotFormatting.tsx` (`1632` lines), `usePivotLayout.ts` (`1071` lines),
-`usePivotRenderModel.ts` (`801` lines), `expansion/engine.ts` (`854` lines),
+`usePivotRenderModel.ts` (`801` lines), `expansion/engine.ts` (`864` lines),
 `materializePivotTree.ts` (`1326` lines), and `visibility.ts` (`266` lines).
 
 | Gate                                         | Completion | Assessment                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
@@ -335,8 +335,8 @@ Requirement reassessment:
 - Architecture completion: **76%**. The compiler/fact-store/materializer
   pipeline exists and is used by the main fetch paths. Remaining work is mostly
   deleting old interpretation surfaces, not inventing the architecture.
-- Production line-deletion completion: **87%**. Pre-existing files are net `5617`
-  lines smaller, and total production source is now net `1207` lines smaller
+- Production line-deletion completion: **87%**. Pre-existing files are net `5626`
+  lines smaller, and total production source is now net `1216` lines smaller
   because the runtime materializer, render/visibility, and chart sync surfaces
   have started to shed compatibility API.
 - Interactivity requirement completion: **71%**. Layout refresh and expansion
@@ -378,8 +378,8 @@ Refactor health:
 - Direction: **good**. The compiler/fact-store/materializer shape is now real
   and production fetch paths use it.
 - Deletion payoff: **past break-even and improving**. Pre-existing source files
-  are net `-5617`, and added runtime/helper files now leave the plugin net
-  `-1207`.
+  are net `-5626`, and added runtime/helper files now leave the plugin net
+  `-1216`.
 - Interactivity: **partially improved**. Latest-only requests, reducer loading
   state, chunked materialization, cheaper child traversal, and no-hidden-layer
   fetch planning are in place, but the user-visible lag from large
@@ -427,24 +427,24 @@ Tests and Markdown are excluded.
 
 Current diff from baseline:
 
-- `7900` insertions
-- `9107` deletions
-- net `-1207` production source lines
-- current `src` code total: `32303` lines
+- `7893` insertions
+- `9109` deletions
+- net `-1216` production source lines
+- current `src` code total: `32294` lines
 - implied baseline `src` total: about `33510` lines
 
 By file status:
 
 - Added files: `+4410 / -0` across `16` files
 - Deleted files: `+0 / -1419` across `8` files
-- Modified files: `+3490 / -7688`, net `-4198`
+- Modified files: `+3483 / -7690`, net `-4207`
 
 By area:
 
 | Area              | Additions | Deletions |     Net | Readout                                                                                                                                                                                                                                                                                                            |
 | ----------------- | --------: | --------: | ------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | Runtime           |      3824 |         0 | `+3824` | Correct new boundary; runtime coverage now owns runtime layout comparison/fetch decisions, explicit root coverage for no-dimension layouts, and materializer-owned measure-leaf value application.                                                                                                                 |
-| Expansion         |      1416 |      2721 | `-1305` | Recent Gate 5 work made this area strongly net-negative; layout transitions no longer roll child cells, fetched coverage, existing deep tree shape, or tree trim/promotion across semantic trims.                                                                                                                  |
+| Expansion         |      1437 |      2751 | `-1314` | Recent Gate 5 work made this area strongly net-negative; layout transitions no longer roll child cells, fetched coverage, existing deep tree shape, tree trim/promotion, or metric-depth pruning policy across semantic trims.                                                                                     |
 | Chart hooks       |      1136 |      1942 |  `-806` | Render/layout repair is still net-negative, and metric formatting semantics now stay behind the formatting hook instead of leaking into the table view.                                                                                                                                                            |
 | Query             |       771 |       843 |   `-72` | Old branch planner deleted, but specs/bootstrap grew around coverage.                                                                                                                                                                                                                                              |
 | Core tree         |         8 |      1014 | `-1006` | Best completed simplification; raw-record fixture construction is no longer in production `src`.                                                                                                                                                                                                                   |
@@ -1053,8 +1053,18 @@ Latest code-reduction slice:
   Jest passed for interaction filter seamless, interaction layout, seamless
   expansion, and runtime coverage suites (`70` tests), and touched-file ESLint
   passed from `superset-frontend`.
+- Gate 5 layout-transition metric-depth cleanup: the layout transition helper
+  no longer computes or returns metric "promotion" flags after the local tree
+  promotion path was deleted. Reinitialized expansion-state pruning now computes
+  metric-depth inclusion inside `expansion/engine.ts`, where stable-prefix
+  pruning already lives.
+- Additional production change for that follow-up: `+21 / -30`, net `-9`.
+- Verification after the layout-transition metric-depth cleanup: single-process
+  Jest passed for layout transition, expansion engine, seamless expansion, and
+  interaction layout suites (`64` tests), and touched-file ESLint passed from
+  `superset-frontend`.
 - Combined recent Gate 4/Gate 5/Gate 6/Gate 7 source-change sequence:
-  `+3044 / -6325`, net `-3281`.
+  `+3065 / -6355`, net `-3290`.
 - Attempted render-model plumbing cleanup around spinner callbacks, sorting
   value-map aliases, leaf-label flattening, and aggregate-bold returns was
   reverted before this slice because it did not pay for itself clearly enough
@@ -1132,7 +1142,7 @@ Current largest production hotspots by line count:
 
 - `PivotTableChart.tsx`: `2541` lines. It still owns committed-tree sync,
   dimension filters, interaction wiring, and controller-like responsibilities.
-- `useExpansionEngine.ts`: `1687` lines. This is still the largest runtime
+- `useExpansionEngine.ts`: `1683` lines. This is still the largest runtime
   orchestration and deletion target.
 - `usePivotFormatting.tsx`: `1632` lines. This is still the largest chart hook
   hotspot; future formatting/databar cleanup must delete branches or view props
@@ -1146,7 +1156,7 @@ Current largest production hotspots by line count:
   hotspot.
 - `PivotTableView.tsx`: `805` lines. The formatting prop surface is narrower,
   but the cell rendering body remains dense.
-- `expansion/engine.ts`: `854` lines. It now owns most pure expansion
+- `expansion/engine.ts`: `864` lines. It now owns most pure expansion
   state/planning helpers; future Gate 5 moves should delete more hook code than
   they add here.
 - `usePivotRenderModel.ts`: `801` lines. This is the next likely Gate 4/Gate 6

@@ -447,7 +447,7 @@ type ExpansionReinitAxis = {
   expandMetric: boolean;
   reset: boolean;
   changed: boolean;
-  allowMetric: boolean;
+  includeMetricDepth: boolean;
   tree: PivotTreeData;
   metricLabelSet: Set<string>;
   countDimDepth: (path: PivotTreeNode['path']) => number;
@@ -480,7 +480,7 @@ const resolveExpansionCacheAxis = (config: ExpansionReinitAxis) => {
       nodes: config.nodes,
       stablePrefix: config.stablePrefix,
       metricLabelSet: config.metricLabelSet,
-      includeMetricDepth: config.allowMetric,
+      includeMetricDepth: config.includeMetricDepth,
     });
   const prunedManualKeys = shouldPrune
     ? Array.from(
@@ -497,7 +497,9 @@ const resolveExpansionCacheAxis = (config: ExpansionReinitAxis) => {
     const path = config.nodes[key]?.path ?? parsePath(key);
     const depth =
       config.countDimDepth(path) +
-      (config.allowMetric && path.some(config.isMetricTokenValue) ? 1 : 0);
+      (config.includeMetricDepth && path.some(config.isMetricTokenValue)
+        ? 1
+        : 0);
     return depth <= config.stablePrefix;
   });
   const desiredExpanded = buildDesiredExpandedKeys({
@@ -544,13 +546,21 @@ export const resolveReinitializedExpansionState = (params: {
   rowsChanged: boolean;
   colsChanged: boolean;
   hasNewData: boolean;
-  allowMetricRowPromotion: boolean;
-  allowMetricColPromotion: boolean;
+  metricIndexForRows?: number;
+  metricIndexForCols?: number;
+  groupbyRowsLength: number;
+  groupbyColumnsLength: number;
   metricLabelSet: Set<string>;
   countDimDepth: (path: PivotTreeNode['path']) => number;
   isMetricTokenValue: (value: unknown) => boolean;
 }) => {
   const { tree, currentLayout, sessionState } = params;
+  const includeMetricRowDepth =
+    params.metricIndexForRows !== undefined &&
+    params.metricIndexForRows < params.groupbyRowsLength;
+  const includeMetricColDepth =
+    params.metricIndexForCols !== undefined &&
+    params.metricIndexForCols < params.groupbyColumnsLength;
   const common = {
     tree,
     metricLabelSet: new Set(params.metricLabelSet),
@@ -575,7 +585,7 @@ export const resolveReinitializedExpansionState = (params: {
     expandMetric: params.shouldExpandMetricRows,
     reset: params.shouldResetExpandedRows,
     changed: params.rowsChanged,
-    allowMetric: params.allowMetricRowPromotion,
+    includeMetricDepth: includeMetricRowDepth,
   });
   const colState = resolveExpansionCacheAxis({
     ...common,
@@ -590,7 +600,7 @@ export const resolveReinitializedExpansionState = (params: {
     expandMetric: params.shouldExpandMetricCols,
     reset: params.shouldResetExpandedCols,
     changed: params.colsChanged,
-    allowMetric: params.allowMetricColPromotion,
+    includeMetricDepth: includeMetricColDepth,
   });
   const persistedSeed = coerceExpansionState(params.persistedExpansionState);
   const shouldResetPersistedLayout =

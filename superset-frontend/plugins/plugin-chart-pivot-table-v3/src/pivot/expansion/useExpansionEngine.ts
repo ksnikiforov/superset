@@ -1459,8 +1459,6 @@ export const useExpansionEngine = ({
       colStablePrefix,
       autoExpandRowsLevelForDesired,
       autoExpandColsLevelForDesired,
-      allowMetricRowPromotion,
-      allowMetricColPromotion,
     } = resolveLayoutTransition({
       data,
       currentTree: treeRef.current,
@@ -1473,10 +1471,6 @@ export const useExpansionEngine = ({
       hasNewData,
       effectiveExpandRowsLevel,
       effectiveExpandColsLevel,
-      metricIndexForRows,
-      metricIndexForCols,
-      groupbyRowsLength,
-      groupbyColumnsLength,
     });
     const shouldResetExpandedRows =
       shouldResetExpandedState &&
@@ -1528,8 +1522,10 @@ export const useExpansionEngine = ({
       rowsChanged,
       colsChanged,
       hasNewData,
-      allowMetricRowPromotion,
-      allowMetricColPromotion,
+      metricIndexForRows,
+      metricIndexForCols,
+      groupbyRowsLength,
+      groupbyColumnsLength,
       metricLabelSet,
       countDimDepth,
       isMetricTokenValue,

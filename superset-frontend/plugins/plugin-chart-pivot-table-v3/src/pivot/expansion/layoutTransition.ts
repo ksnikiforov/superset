@@ -33,10 +33,6 @@ type ResolveLayoutTransitionInput = {
   hasNewData: boolean;
   effectiveExpandRowsLevel: number;
   effectiveExpandColsLevel: number;
-  metricIndexForRows?: number;
-  metricIndexForCols?: number;
-  groupbyRowsLength: number;
-  groupbyColumnsLength: number;
 };
 
 export const isPrefix = (prefix: string[], target: string[]) =>
@@ -52,10 +48,6 @@ export const resolveLayoutTransition = ({
   hasNewData,
   effectiveExpandRowsLevel,
   effectiveExpandColsLevel,
-  metricIndexForRows,
-  metricIndexForCols,
-  groupbyRowsLength,
-  groupbyColumnsLength,
 }: ResolveLayoutTransitionInput) => {
   const rowsChanged = !isSameLayout(previousLayout.rows, currentLayout.rows);
   const colsChanged = !isSameLayout(previousLayout.cols, currentLayout.cols);
@@ -90,11 +82,6 @@ export const resolveLayoutTransition = ({
     layoutChangedWithoutNewData && colsChanged && colStablePrefix > 0
       ? Math.min(effectiveExpandColsLevel, Math.max(colStablePrefix - 1, 0))
       : effectiveExpandColsLevel;
-  const allowMetricRowPromotion =
-    metricIndexForRows !== undefined && metricIndexForRows < groupbyRowsLength;
-  const allowMetricColPromotion =
-    metricIndexForCols !== undefined &&
-    metricIndexForCols < groupbyColumnsLength;
   return {
     rowsChanged,
     colsChanged,
@@ -106,7 +93,5 @@ export const resolveLayoutTransition = ({
     colStablePrefix,
     autoExpandRowsLevelForDesired,
     autoExpandColsLevelForDesired,
-    allowMetricRowPromotion,
-    allowMetricColPromotion,
   };
 };
