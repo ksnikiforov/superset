@@ -519,6 +519,44 @@ const StripDropZone = ({
   );
 };
 
+const useStripDropTarget = (
+  axis: PivotAxis,
+  getDropIndex: (
+    axis: PivotAxis,
+    clientOffset: { x: number; y: number } | null,
+  ) => number,
+  onDropDimension: InteractionChipProps['onDropDimension'],
+  onDropValue: InteractionChipProps['onDropValue'],
+) => {
+  const [, drop] = useDrop<DragItem, void, unknown>({
+    accept: [dimensionDndType, valueDndType],
+    drop: (item, monitor) => {
+      if (monitor.didDrop()) {
+        return;
+      }
+      const targetChipIndex = getDropIndex(axis, monitor.getClientOffset());
+      if (item.kind === 'dimension') {
+        onDropDimension(
+          item.dimensionKey,
+          axis,
+          targetChipIndex,
+          false,
+          item.sourceAxis,
+          item.sourceChipIndex,
+        );
+      } else {
+        onDropValue(
+          axis,
+          targetChipIndex,
+          item.sourceAxis,
+          item.sourceChipIndex,
+        );
+      }
+    },
+  });
+  return drop;
+};
+
 const PivotDragLayer = memo(() => {
   const dragLayer = useDragLayer(monitor => ({
     item: monitor.getItem() as DragItem | null,
@@ -2383,65 +2421,19 @@ function PivotTableChart(props: PivotTableProps) {
     [handleRuntimeLayoutChange, metricsAvailable],
   );
 
-  const [, dropOnRowStrip] = useDrop<DragItem, void, unknown>({
-    accept: [dimensionDndType, valueDndType],
-    drop: (item, monitor) => {
-      if (monitor.didDrop()) {
-        return;
-      }
-      const targetChipIndex = getStripDropIndex(
-        'row',
-        monitor.getClientOffset(),
-      );
-      if (item.kind === 'dimension') {
-        handleDimensionDrop(
-          item.dimensionKey,
-          'row',
-          targetChipIndex,
-          false,
-          item.sourceAxis,
-          item.sourceChipIndex,
-        );
-      } else {
-        handleValueDrop(
-          'row',
-          targetChipIndex,
-          item.sourceAxis,
-          item.sourceChipIndex,
-        );
-      }
-    },
-  });
+  const dropOnRowStrip = useStripDropTarget(
+    'row',
+    getStripDropIndex,
+    handleDimensionDrop,
+    handleValueDrop,
+  );
 
-  const [, dropOnColStrip] = useDrop<DragItem, void, unknown>({
-    accept: [dimensionDndType, valueDndType],
-    drop: (item, monitor) => {
-      if (monitor.didDrop()) {
-        return;
-      }
-      const targetChipIndex = getStripDropIndex(
-        'col',
-        monitor.getClientOffset(),
-      );
-      if (item.kind === 'dimension') {
-        handleDimensionDrop(
-          item.dimensionKey,
-          'col',
-          targetChipIndex,
-          false,
-          item.sourceAxis,
-          item.sourceChipIndex,
-        );
-      } else {
-        handleValueDrop(
-          'col',
-          targetChipIndex,
-          item.sourceAxis,
-          item.sourceChipIndex,
-        );
-      }
-    },
-  });
+  const dropOnColStrip = useStripDropTarget(
+    'col',
+    getStripDropIndex,
+    handleDimensionDrop,
+    handleValueDrop,
+  );
 
   const shouldDelayRender =
     !isUserControlled &&
