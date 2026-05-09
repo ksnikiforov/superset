@@ -41,7 +41,6 @@ import {
   buildDesiredExpandedKeys,
   type PivotExpansionStateKeys,
 } from '../engine/expansionStateModel';
-import { type FetchTarget } from '../engine/fetchCoordinator';
 import {
   buildStagedTree,
   createStagingTree,
@@ -59,6 +58,7 @@ import {
   optimizeFetchPlan,
   type BatchCandidate,
   type BatchGroup,
+  type FetchTarget,
 } from '../query/fetchPlanOptimizer';
 import { stableStringify } from '../shared/stableStringify';
 import { fetchPivotBranchesBatch } from '../query/fetchPivotBranchesBatch';

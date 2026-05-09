@@ -35,7 +35,6 @@ export type ExpansionStateStore = {
     defaultRowKeys: string[];
     defaultColKeys: string[];
   }) => PivotExpansionStateKeys;
-  read: () => PivotExpansionStateKeys | undefined;
   updateDeps: (deps: ExpansionStateStoreDeps) => void;
   write: (
     nextState: PivotExpansionStateKeys,
@@ -103,7 +102,6 @@ export const createExpansionStateStore = (
         } satisfies PivotExpansionStateKeys);
       return memory;
     },
-    read: () => memory,
     updateDeps: nextDeps => {
       deps = nextDeps;
     },

@@ -21,7 +21,6 @@ import { PivotTreeData, PivotTreeNode } from '../../../src/types';
 import {
   buildStagedTree,
   createStagingTree,
-  resetStagingTree,
   stageDelta,
 } from '../../../src/pivot/engine/stagingTree';
 import { serializeCellKey, serializePath } from '../../../src/utils';
@@ -123,23 +122,5 @@ describe('stagingTree', () => {
 
     expect(staged.rows[rowKey]?.hasChildren).toBe(true);
     expect(staged.cells[serializeCellKey(rowKey, rootKey)]?.values.m1).toBe(2);
-  });
-
-  it('clears staged deltas on reset', () => {
-    const base = makeTree();
-    const rowKey = serializePath(['A']);
-    const delta: PivotTreeData = {
-      rows: {
-        [rowKey]: makeNode({ axis: 'row', path: ['A'] }),
-      },
-      cols: {},
-      cells: makeCell(rowKey, rootKey, 1),
-    };
-
-    const withDelta = stageDelta(createStagingTree(base), 'a', delta);
-    const reset = resetStagingTree(withDelta, base);
-    const staged = buildStagedTree(reset);
-
-    expect(staged.rows[rowKey]).toBeUndefined();
   });
 });

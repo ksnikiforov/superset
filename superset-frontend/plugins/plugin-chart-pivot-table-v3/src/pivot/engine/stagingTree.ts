@@ -40,14 +40,6 @@ export const stageDelta = (
   return { base: state.base, deltas };
 };
 
-export const resetStagingTree = (
-  _state: StagingTreeState,
-  base: PivotTreeData,
-): StagingTreeState => ({
-  base,
-  deltas: new Map<string, PivotTreeData>(),
-});
-
 export const buildStagedTree = (state: StagingTreeState): PivotTreeData => {
   let merged = state.base;
   const orderedKeys = Array.from(state.deltas.keys()).sort();

@@ -19,11 +19,11 @@
 
 import { type PivotAxis, type PivotTreeNode } from '../../types';
 import { parsePath } from '../../utils';
-import { type FetchTarget } from '../engine/fetchCoordinator';
 import {
   planExpansionForAxis,
   type PivotExpansionPlan,
 } from '../engine/expansionPlanner';
+import { type FetchTarget } from '../query/fetchPlanOptimizer';
 import {
   createFetchedFactCoverageLookup,
   type FetchedFactCoverageState,
