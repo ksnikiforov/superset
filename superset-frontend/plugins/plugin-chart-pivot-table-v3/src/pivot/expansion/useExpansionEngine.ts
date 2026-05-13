@@ -374,10 +374,18 @@ type FetchResultDelta = {
 
 const collectFetchResultDeltas = ({
   results,
+  context,
   seedFetchedCoverage,
+  seedLoadedMetricNodeCoverage,
 }: {
   results: ExpansionFetchResult[];
+  context: ExpansionFetchContext;
   seedFetchedCoverage: (factBatches: PivotFactStoreBatch[]) => void;
+  seedLoadedMetricNodeCoverage: (
+    loadedTree: PivotTreeData,
+    visibleRowDepth: number,
+    visibleColDepth: number,
+  ) => void;
 }) => {
   const deltas: FetchResultDelta[] = [];
   results.forEach(result => {
@@ -385,6 +393,11 @@ const collectFetchResultDeltas = ({
     if (!result.data) {
       return;
     }
+    seedLoadedMetricNodeCoverage(
+      result.data,
+      context.visibleRowDepth,
+      context.visibleColDepth,
+    );
     deltas.push({
       targets: result.targets,
       data: result.data,
@@ -1033,17 +1046,15 @@ export const useExpansionEngine = ({
           }
           const resultDeltas = collectFetchResultDeltas({
             results,
+            context: { visibleRowDepth, visibleColDepth },
             seedFetchedCoverage: seedFetchedCoverageFromFactBatches,
+            seedLoadedMetricNodeCoverage:
+              seedFetchedCoverageFromLoadedMetricNodes,
           });
           for (const {
             targets: deltaTargets,
             data: deltaTree,
           } of resultDeltas) {
-            seedFetchedCoverageFromLoadedMetricNodes(
-              deltaTree,
-              visibleRowDepth,
-              visibleColDepth,
-            );
             for (const target of deltaTargets) {
               touchedKeys.add(target.pathKey);
             }
@@ -1314,17 +1325,15 @@ export const useExpansionEngine = ({
 
           const resultDeltas = collectFetchResultDeltas({
             results,
+            context: { visibleRowDepth, visibleColDepth },
             seedFetchedCoverage: seedFetchedCoverageFromFactBatches,
+            seedLoadedMetricNodeCoverage:
+              seedFetchedCoverageFromLoadedMetricNodes,
           });
           for (const {
             targets: deltaTargets,
             data: deltaTree,
           } of resultDeltas) {
-            seedFetchedCoverageFromLoadedMetricNodes(
-              deltaTree,
-              visibleRowDepth,
-              visibleColDepth,
-            );
             for (const target of deltaTargets) {
               const deltaKey = JSON.stringify([target.axis, target.pathKey]);
               stagedDeltas.set(deltaKey, deltaTree);
