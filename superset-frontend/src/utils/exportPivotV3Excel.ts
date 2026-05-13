@@ -35,6 +35,17 @@ const toSheetCell = (
   return cell.value;
 };
 
+export function exportPivotV3ExcelFromSheetData(
+  sheetData: PivotV3ExportSheetCell[][],
+  fileName: string,
+) {
+  const worksheet = utils.aoa_to_sheet(
+    sheetData.map(row => row.map(toSheetCell)),
+  );
+  const workbook = utils.book_new(worksheet, 'Sheet1');
+  writeFile(workbook, `${fileName}.xlsx`);
+}
+
 export default function exportPivotV3Excel(
   tableSelector: string,
   fileName: string,
@@ -47,9 +58,5 @@ export default function exportPivotV3Excel(
   if (!sheetData) {
     return;
   }
-  const worksheet = utils.aoa_to_sheet(
-    sheetData.map(row => row.map(toSheetCell)),
-  );
-  const workbook = utils.book_new(worksheet, 'Sheet1');
-  writeFile(workbook, `${fileName}.xlsx`);
+  exportPivotV3ExcelFromSheetData(sheetData, fileName);
 }
