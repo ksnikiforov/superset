@@ -76,15 +76,14 @@ import {
 } from '../runtime/requestLifecycle';
 import {
   addAncestors,
-  buildHydrationPrefetchAction,
   computeVisibleDepths as computeVisibleDepthsBase,
   dropDescendants,
   getVisibleExpansionKeys as getVisibleExpansionKeysBase,
+  planInitialHydrationPrefetch,
   planHydrationIteration,
   pruneTreeByPrefixes,
   resolveReinitializedExpansionState,
   resolveExpandedForMetrics as resolveExpandedForMetricsBase,
-  shouldPlanHydrationPrefetchAxis,
   type ExpansionVisibilityConfig,
 } from './engine';
 import {
@@ -1610,41 +1609,25 @@ export const useExpansionEngine = ({
     prevExpandRowsLevelRawRef.current = expandRowsLevelRaw;
     prevExpandColsLevelRawRef.current = expandColumnsLevelRaw;
 
-    const shouldPlanRows = shouldPlanHydrationPrefetchAxis({
-      effectiveExpandLevel: effectiveExpandRowsLevel,
-      expandedCount: persistedState.rows.length,
-      collapsedCount: persistedState.collapsedRows.length,
-    });
-    const shouldPlanCols = shouldPlanHydrationPrefetchAxis({
-      effectiveExpandLevel: effectiveExpandColsLevel,
-      expandedCount: persistedState.cols.length,
-      collapsedCount: persistedState.collapsedCols.length,
-    });
     if (factBatches.length > 0 && (hasNewData || !layoutChanged)) {
       seedFetchedCoverageFromFactBatches(factBatches);
     }
-    const { rowPlan: nextRowPlan, colPlan: nextColPlan } =
-      planHydrationIteration({
-        tree: normalizedTree,
-        desiredRows: resolvedRows,
-        desiredCols: resolvedCols,
-        fetchedCoverage: fetchedCoverageRef.current,
-        config: visibilityConfig,
-        getCoverageKey,
-        pendingRows: new Set(),
-        pendingCols: new Set(),
-        planRows: shouldPlanRows,
-        planCols: shouldPlanCols,
-      });
-    const prefetchAction = buildHydrationPrefetchAction({
+    const {
+      shouldPlanRows,
+      shouldPlanCols,
+      action: prefetchAction,
+    } = planInitialHydrationPrefetch({
+      tree: normalizedTree,
       resolvedRows,
       resolvedCols,
       persistedState,
+      effectiveExpandRowsLevel,
+      effectiveExpandColsLevel,
       autoExpandRowsLevelForDesired,
       autoExpandColsLevelForDesired,
-      tree: normalizedTree,
-      rowPlan: nextRowPlan,
-      colPlan: nextColPlan,
+      fetchedCoverage: fetchedCoverageRef.current,
+      config: visibilityConfig,
+      getCoverageKey,
     });
     if (prefetchAction.kind !== 'idle') {
       if (prefetchAction.kind === 'skip-root') {

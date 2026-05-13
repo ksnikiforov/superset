@@ -19,6 +19,7 @@
 
 import {
   buildHydrationPrefetchAction,
+  planInitialHydrationPrefetch,
   planHydrationIteration,
   shouldPlanHydrationPrefetchAxis,
   type ExpansionVisibilityConfig,
@@ -434,5 +435,38 @@ describe('pivot/expansion/engine', () => {
         },
       }),
     ).toEqual({ kind: 'hydrate', showLoader: true });
+  });
+
+  it('plans initial hydration prefetch using persisted expansion state', () => {
+    const { tree, aKey } = buildTree({ includeIntersectionCell: true });
+    const prefetch = planInitialHydrationPrefetch({
+      tree,
+      resolvedRows: new Set([rootKey, aKey]),
+      resolvedCols: new Set([rootKey]),
+      persistedState: {
+        rowKeys: ['country'],
+        colKeys: ['month'],
+        rows: [aKey],
+        cols: [],
+        collapsedRows: [],
+        collapsedCols: [],
+      },
+      effectiveExpandRowsLevel: 0,
+      effectiveExpandColsLevel: 0,
+      autoExpandRowsLevelForDesired: 0,
+      autoExpandColsLevelForDesired: 0,
+      fetchedCoverage: emptyFetchedCoverage(),
+      config,
+      getCoverageKey,
+    });
+
+    expect(prefetch.shouldPlanRows).toBe(true);
+    expect(prefetch.shouldPlanCols).toBe(false);
+    expect(prefetch.rowPlan.fetchKeys.has(aKey)).toBe(true);
+    expect(prefetch.colPlan.fetchKeys.size).toBe(0);
+    expect(prefetch.action).toEqual({
+      kind: 'hydrate',
+      showLoader: false,
+    });
   });
 });

@@ -914,6 +914,71 @@ export const buildHydrationPrefetchAction = ({
   };
 };
 
+export const planInitialHydrationPrefetch = ({
+  tree,
+  resolvedRows,
+  resolvedCols,
+  persistedState,
+  effectiveExpandRowsLevel,
+  effectiveExpandColsLevel,
+  autoExpandRowsLevelForDesired,
+  autoExpandColsLevelForDesired,
+  fetchedCoverage,
+  config,
+  getCoverageKey,
+}: {
+  tree: PivotTreeData;
+  resolvedRows: Set<string>;
+  resolvedCols: Set<string>;
+  persistedState: PivotExpansionStateKeys;
+  effectiveExpandRowsLevel: number;
+  effectiveExpandColsLevel: number;
+  autoExpandRowsLevelForDesired: number;
+  autoExpandColsLevelForDesired: number;
+  fetchedCoverage: FetchedFactCoverageState;
+  config: ExpansionVisibilityConfig;
+  getCoverageKey: (axis: PivotAxis, key: string) => string;
+}) => {
+  const shouldPlanRows = shouldPlanHydrationPrefetchAxis({
+    effectiveExpandLevel: effectiveExpandRowsLevel,
+    expandedCount: persistedState.rows.length,
+    collapsedCount: persistedState.collapsedRows.length,
+  });
+  const shouldPlanCols = shouldPlanHydrationPrefetchAxis({
+    effectiveExpandLevel: effectiveExpandColsLevel,
+    expandedCount: persistedState.cols.length,
+    collapsedCount: persistedState.collapsedCols.length,
+  });
+  const { rowPlan, colPlan } = planHydrationIteration({
+    tree,
+    desiredRows: resolvedRows,
+    desiredCols: resolvedCols,
+    fetchedCoverage,
+    config,
+    getCoverageKey,
+    pendingRows: new Set(),
+    pendingCols: new Set(),
+    planRows: shouldPlanRows,
+    planCols: shouldPlanCols,
+  });
+  return {
+    shouldPlanRows,
+    shouldPlanCols,
+    rowPlan,
+    colPlan,
+    action: buildHydrationPrefetchAction({
+      resolvedRows,
+      resolvedCols,
+      persistedState,
+      autoExpandRowsLevelForDesired,
+      autoExpandColsLevelForDesired,
+      tree,
+      rowPlan,
+      colPlan,
+    }),
+  };
+};
+
 export const getVisibleExpansionKeys = ({
   tree,
   expandedRows,
