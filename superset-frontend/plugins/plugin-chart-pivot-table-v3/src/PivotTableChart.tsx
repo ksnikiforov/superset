@@ -103,9 +103,12 @@ import {
   buildSeamlessRuntimeUpstreamSignature,
   fetchAndMaterializeSeamlessRuntimeUpdate,
   shouldApplyPersistedFilterSeamlessUpdate,
+  hasPersistedRuntimeLayoutSyncSettled,
   shouldRecoverStaleDashboardRuntimeCoverage,
+  shouldSyncCommittedRuntimeLayoutFromProps,
   shouldSyncCommittedRuntimeFromProps,
   shouldSyncPersistedSelectedFilters,
+  shouldSyncUiRuntimeLayoutFromProps,
   type SeamlessRuntimeSyncSnapshot,
 } from './pivot/runtime/seamlessRuntimeUpdate';
 
@@ -1046,12 +1049,13 @@ function PivotTableChart(props: PivotTableProps) {
 
   useEffect(() => {
     if (
-      isDashboardRuntimeSync &&
-      pendingPersistedRuntimeLayoutSyncRef.current
+      !shouldSyncCommittedRuntimeLayoutFromProps({
+        isDashboardRuntimeSync,
+        pendingPersistedRuntimeLayoutSync:
+          pendingPersistedRuntimeLayoutSyncRef.current,
+        hasPendingSeamlessLayout: pendingSeamlessLayoutRef.current !== null,
+      })
     ) {
-      return;
-    }
-    if (pendingSeamlessLayoutRef.current) {
       return;
     }
     setCommittedRuntimeLayout(current =>
@@ -1060,13 +1064,13 @@ function PivotTableChart(props: PivotTableProps) {
   }, [isDashboardRuntimeSync, runtimeLayout]);
   useEffect(() => {
     if (
-      !isDashboardRuntimeSync ||
-      !pendingPersistedRuntimeLayoutSyncRef.current
-    ) {
-      return;
-    }
-    if (
-      isSameRuntimeLayout(runtimeLayout, lastPersistedRuntimeLayoutRef.current)
+      hasPersistedRuntimeLayoutSyncSettled({
+        isDashboardRuntimeSync,
+        pendingPersistedRuntimeLayoutSync:
+          pendingPersistedRuntimeLayoutSyncRef.current,
+        runtimeLayout,
+        lastPersistedRuntimeLayout: lastPersistedRuntimeLayoutRef.current,
+      })
     ) {
       pendingPersistedRuntimeLayoutSyncRef.current = false;
     }
@@ -1281,13 +1285,14 @@ function PivotTableChart(props: PivotTableProps) {
 
   useEffect(() => {
     if (
-      isUserControlled &&
-      isDashboardContext &&
-      pendingPersistedRuntimeLayoutSyncRef.current
+      !shouldSyncUiRuntimeLayoutFromProps({
+        isUserControlled,
+        isDashboardContext,
+        pendingPersistedRuntimeLayoutSync:
+          pendingPersistedRuntimeLayoutSyncRef.current,
+        hasPendingSeamlessLayout: pendingSeamlessLayoutRef.current !== null,
+      })
     ) {
-      return;
-    }
-    if (pendingSeamlessLayoutRef.current) {
       return;
     }
     updateUiRuntimeLayout(runtimeLayout);

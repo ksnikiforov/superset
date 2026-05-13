@@ -23,11 +23,14 @@ import { type PivotFactStoreBatch } from '../../../../src/pivot/runtime/factStor
 import {
   buildSeamlessRuntimeSyncSnapshot,
   buildSeamlessRuntimeUpstreamSignature,
+  hasPersistedRuntimeLayoutSyncSettled,
   matchesSeamlessRuntimeSyncSnapshot,
   shouldApplyPersistedFilterSeamlessUpdate,
   shouldRecoverStaleDashboardRuntimeCoverage,
+  shouldSyncCommittedRuntimeLayoutFromProps,
   shouldSyncCommittedRuntimeFromProps,
   shouldSyncPersistedSelectedFilters,
+  shouldSyncUiRuntimeLayoutFromProps,
 } from '../../../../src/pivot/runtime/seamlessRuntimeUpdate';
 
 const runtimeLayout: PivotRuntimeLayout = {
@@ -307,6 +310,82 @@ test('decides when persisted selected filters should sync into local state', () 
       committedFilters: { country: ['Germany'] },
       uiSelectedFilters: {},
       suppressStalePersistedFilterRestore: false,
+    }),
+  ).toBe(false);
+});
+
+test('decides when runtime layouts should sync from props', () => {
+  expect(
+    shouldSyncCommittedRuntimeLayoutFromProps({
+      isDashboardRuntimeSync: false,
+      pendingPersistedRuntimeLayoutSync: true,
+      hasPendingSeamlessLayout: false,
+    }),
+  ).toBe(true);
+  expect(
+    shouldSyncCommittedRuntimeLayoutFromProps({
+      isDashboardRuntimeSync: true,
+      pendingPersistedRuntimeLayoutSync: true,
+      hasPendingSeamlessLayout: false,
+    }),
+  ).toBe(false);
+  expect(
+    shouldSyncCommittedRuntimeLayoutFromProps({
+      isDashboardRuntimeSync: false,
+      pendingPersistedRuntimeLayoutSync: false,
+      hasPendingSeamlessLayout: true,
+    }),
+  ).toBe(false);
+
+  expect(
+    shouldSyncUiRuntimeLayoutFromProps({
+      isUserControlled: true,
+      isDashboardContext: true,
+      pendingPersistedRuntimeLayoutSync: true,
+      hasPendingSeamlessLayout: false,
+    }),
+  ).toBe(false);
+  expect(
+    shouldSyncUiRuntimeLayoutFromProps({
+      isUserControlled: true,
+      isDashboardContext: false,
+      pendingPersistedRuntimeLayoutSync: true,
+      hasPendingSeamlessLayout: false,
+    }),
+  ).toBe(true);
+  expect(
+    shouldSyncUiRuntimeLayoutFromProps({
+      isUserControlled: false,
+      isDashboardContext: true,
+      pendingPersistedRuntimeLayoutSync: true,
+      hasPendingSeamlessLayout: true,
+    }),
+  ).toBe(false);
+});
+
+test('detects settled persisted runtime layout sync', () => {
+  expect(
+    hasPersistedRuntimeLayoutSyncSettled({
+      isDashboardRuntimeSync: true,
+      pendingPersistedRuntimeLayoutSync: true,
+      runtimeLayout,
+      lastPersistedRuntimeLayout: runtimeLayout,
+    }),
+  ).toBe(true);
+  expect(
+    hasPersistedRuntimeLayoutSyncSettled({
+      isDashboardRuntimeSync: true,
+      pendingPersistedRuntimeLayoutSync: true,
+      runtimeLayout: { ...runtimeLayout, rows: ['state'] },
+      lastPersistedRuntimeLayout: runtimeLayout,
+    }),
+  ).toBe(false);
+  expect(
+    hasPersistedRuntimeLayoutSyncSettled({
+      isDashboardRuntimeSync: false,
+      pendingPersistedRuntimeLayoutSync: true,
+      runtimeLayout,
+      lastPersistedRuntimeLayout: runtimeLayout,
     }),
   ).toBe(false);
 });
