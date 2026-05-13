@@ -58,7 +58,7 @@ cells are projections of DB facts, not canonical data.
 ## Current Status
 
 As of May 13, 2026, after
-`8047d8a893 refactor(pivot-table-v3): centralize expansion ref syncing`:
+`4ccf30a73d refactor(pivot-table-v3): tighten hydration plan allocation`:
 
 - Overall transition estimate: **94%**.
 - Goal-weighted completion estimate: **94%**.
@@ -70,8 +70,8 @@ As of May 13, 2026, after
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `11857` insertions, `11375` deletions, net `+482`.
-- Current production `src` TypeScript/TSX total: `33992` lines.
+- Production `src`: `11892` insertions, `11416` deletions, net `+476`.
+- Current production `src` TypeScript/TSX total: `33986` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - Full plugin Jest pass after the column-sort extraction: `91` suites and
   `729` tests.
@@ -121,6 +121,8 @@ Source-only diff from pre-refactor baseline
   suites and `776` tests.
 - Full plugin Jest pass after centralizing expansion ref syncing: `94` suites
   and `776` tests.
+- Full plugin Jest pass after tightening hydration plan allocation: `94`
+  suites and `776` tests.
 
 The readout remains mixed: the new runtime files now put the plugin modestly
 above the baseline line count, but the chart/layout hooks keep losing inline
@@ -186,6 +188,8 @@ React orchestration.
   `useExpansionEngine.ts`.
 - Metric expansion stale-key cleanup now has one path for collapsed and
   non-collapsed states.
+- Hydration planning reuses one empty-plan construction path, and cross-axis
+  root-fetch planning only clones the axis plan it mutates.
 - Expansion state/ref synchronization now uses one local hook instead of six
   repeated effects in `useExpansionEngine.ts`.
 - Branch-cache entries store fact batches, not rendered trees.
@@ -287,7 +291,7 @@ React orchestration.
 Largest relevant production files:
 
 - `PivotDndMetricSelect.tsx`: `1566` lines.
-- `engine.ts`: `1502` lines.
+- `engine.ts`: `1496` lines.
 - `utils.ts`: `1464` lines.
 - `PivotTableChart.tsx`: `1450` lines.
 - `PivotMetricDefinitionValue.tsx`: `1448` lines.
