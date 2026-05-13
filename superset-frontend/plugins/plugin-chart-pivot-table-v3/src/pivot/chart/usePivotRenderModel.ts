@@ -56,18 +56,12 @@ import {
   getNodeDimDepth as getNodeDimDepthBase,
 } from '../metricsTotals';
 import { type PivotLayoutResult } from './usePivotLayout';
+import { type PivotColumnSortState } from './columnSort';
 
 type DimensionSortingKeys = {
   metricKey?: string;
   order: PivotSortOrder;
   mode: PivotSortMode;
-};
-
-type UiColumnSortState = {
-  colKey: string;
-  displayColKey?: string;
-  metricKey: string;
-  order: PivotSortOrder;
 };
 
 type ColumnDisplayConfig = {
@@ -257,7 +251,7 @@ export const usePivotRenderModel = ({
   colTotals: boolean;
   rowSubTotals: boolean;
   layout: PivotLayoutResult;
-  uiColumnSort?: UiColumnSortState | null;
+  uiColumnSort?: PivotColumnSortState | null;
 }): PivotRenderModelResult => {
   const resolvedGroupbyRows = layout.layout.groupbyRows;
   const resolvedGroupbyColumns = layout.layout.groupbyColumns;
