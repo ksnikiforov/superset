@@ -135,7 +135,7 @@ export const shouldSyncCommittedRuntimeFromProps = ({
     isSameRuntimeLayout(runtimeLayout, committedRuntimeLayout) &&
     isEqual(selectedFiltersForTreeSync, committedFilters));
 
-export const shouldRecoverStaleDashboardRuntimeCoverage = ({
+const shouldRecoverStaleDashboardRuntimeCoverage = ({
   isUserControlled,
   isDashboardRuntimeSync,
   persistedInteractionFilters,
@@ -165,9 +165,11 @@ export const prepareSeamlessRuntimeUpdateEffect = ({
   upstreamDashboardQueryContextSignature,
   previousUpstreamState,
   data,
-  shouldRecoverStaleCoverage,
   isUserControlled,
+  isDashboardRuntimeSync,
   persistedInteractionFilters,
+  committedFactBatches,
+  committedRuntimeLayout,
   committedFilters,
   uiSelectedFilters,
   lastSync,
@@ -177,9 +179,11 @@ export const prepareSeamlessRuntimeUpdateEffect = ({
   upstreamDashboardQueryContextSignature: string | null;
   previousUpstreamState: SeamlessRuntimeUpstreamState;
   data: PivotTreeData;
-  shouldRecoverStaleCoverage: boolean;
   isUserControlled: boolean;
+  isDashboardRuntimeSync: boolean;
   persistedInteractionFilters: RuntimeSelection;
+  committedFactBatches: PivotFactStoreBatch[];
+  committedRuntimeLayout: PivotRuntimeLayout;
   committedFilters: RuntimeSelection;
   uiSelectedFilters: RuntimeSelection;
   lastSync: SeamlessRuntimeSyncSnapshot | null;
@@ -194,7 +198,13 @@ export const prepareSeamlessRuntimeUpdateEffect = ({
     : null;
   const shouldApplyStaleUpdate =
     upstreamDashboardQueryContextSignature !== null &&
-    (shouldRecoverStaleCoverage ||
+    (shouldRecoverStaleDashboardRuntimeCoverage({
+      isUserControlled,
+      isDashboardRuntimeSync,
+      persistedInteractionFilters,
+      committedFactBatches,
+      committedRuntimeLayout,
+    }) ||
       (previousUpstreamState !== null &&
         previousUpstreamState.signature !==
           upstreamDashboardQueryContextSignature &&

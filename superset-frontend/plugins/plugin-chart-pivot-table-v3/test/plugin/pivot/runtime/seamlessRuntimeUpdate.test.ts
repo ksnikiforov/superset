@@ -32,7 +32,6 @@ import {
   prepareRuntimeStatePersistence,
   prepareSeamlessRuntimeLayoutChange,
   prepareSeamlessRuntimeUpdateEffect,
-  shouldRecoverStaleDashboardRuntimeCoverage,
   shouldSyncCommittedRuntimeFromProps,
   shouldSyncPersistedSelectedFilters,
 } from '../../../../src/pivot/runtime/seamlessRuntimeUpdate';
@@ -45,6 +44,21 @@ const runtimeLayout: PivotRuntimeLayout = {
   leafSelection: {},
   valuePlacement: { axis: 'col', index: 1 },
 };
+
+const factBatch = (
+  rowDepth: number,
+  columnDepth: number,
+): PivotFactStoreBatch => ({
+  coverage: buildFactCoverage({
+    reason: 'initial',
+    rowDimensions: ['country'].slice(0, rowDepth),
+    columnDimensions: ['month'].slice(0, columnDepth),
+    rowDepth,
+    columnDepth,
+  }),
+  facts: [],
+  scope: { kind: 'bootstrap' },
+});
 
 test('builds stable seamless runtime sync snapshots', () => {
   expect(
@@ -168,53 +182,6 @@ test('decides when committed runtime should sync from upstream props', () => {
   ).toBe(false);
 });
 
-test('decides when dashboard runtime coverage needs stale recovery', () => {
-  const factBatch = (
-    rowDepth: number,
-    columnDepth: number,
-  ): PivotFactStoreBatch => ({
-    coverage: buildFactCoverage({
-      reason: 'initial',
-      rowDimensions: ['country'].slice(0, rowDepth),
-      columnDimensions: ['month'].slice(0, columnDepth),
-      rowDepth,
-      columnDepth,
-    }),
-    facts: [],
-    scope: { kind: 'bootstrap' },
-  });
-
-  expect(
-    shouldRecoverStaleDashboardRuntimeCoverage({
-      isUserControlled: true,
-      isDashboardRuntimeSync: true,
-      persistedInteractionFilters: {},
-      committedFactBatches: [factBatch(1, 0)],
-      committedRuntimeLayout: runtimeLayout,
-    }),
-  ).toBe(true);
-
-  expect(
-    shouldRecoverStaleDashboardRuntimeCoverage({
-      isUserControlled: true,
-      isDashboardRuntimeSync: true,
-      persistedInteractionFilters: {},
-      committedFactBatches: [factBatch(1, 1)],
-      committedRuntimeLayout: runtimeLayout,
-    }),
-  ).toBe(false);
-
-  expect(
-    shouldRecoverStaleDashboardRuntimeCoverage({
-      isUserControlled: true,
-      isDashboardRuntimeSync: true,
-      persistedInteractionFilters: { country: ['France'] },
-      committedFactBatches: [factBatch(1, 0)],
-      committedRuntimeLayout: runtimeLayout,
-    }),
-  ).toBe(false);
-});
-
 test('prepares seamless runtime effect updates in chart application order', () => {
   const currentData: PivotTreeData = { rows: {}, cols: {}, cells: {} };
   const persistedFilters = { country: ['France'] };
@@ -232,9 +199,11 @@ test('prepares seamless runtime effect updates in chart application order', () =
         signature: 'query-a',
       },
       data: currentData,
-      shouldRecoverStaleCoverage: false,
       isUserControlled: true,
+      isDashboardRuntimeSync: true,
       persistedInteractionFilters: persistedFilters,
+      committedFactBatches: [factBatch(1, 0)],
+      committedRuntimeLayout: runtimeLayout,
       committedFilters: persistedFilters,
       uiSelectedFilters: persistedFilters,
       lastSync,
@@ -259,6 +228,51 @@ test('prepares seamless runtime effect updates in chart application order', () =
   });
 });
 
+test('prepares stale coverage recovery updates from committed facts', () => {
+  const currentData: PivotTreeData = { rows: {}, cols: {}, cells: {} };
+
+  expect(
+    prepareSeamlessRuntimeUpdateEffect({
+      upstreamDashboardQueryContextSignature: 'query-a',
+      previousUpstreamState: null,
+      data: currentData,
+      isUserControlled: true,
+      isDashboardRuntimeSync: true,
+      persistedInteractionFilters: {},
+      committedFactBatches: [factBatch(1, 0)],
+      committedRuntimeLayout: runtimeLayout,
+      committedFilters: {},
+      uiSelectedFilters: {},
+      lastSync: null,
+      uiRuntimeLayout: runtimeLayout,
+      upstreamSeamlessSignature: 'query-a',
+    }).updates,
+  ).toEqual([
+    {
+      runtimeLayout,
+      selection: {},
+    },
+  ]);
+
+  expect(
+    prepareSeamlessRuntimeUpdateEffect({
+      upstreamDashboardQueryContextSignature: 'query-a',
+      previousUpstreamState: null,
+      data: currentData,
+      isUserControlled: true,
+      isDashboardRuntimeSync: true,
+      persistedInteractionFilters: {},
+      committedFactBatches: [factBatch(1, 1)],
+      committedRuntimeLayout: runtimeLayout,
+      committedFilters: {},
+      uiSelectedFilters: {},
+      lastSync: null,
+      uiRuntimeLayout: runtimeLayout,
+      upstreamSeamlessSignature: 'query-a',
+    }).updates,
+  ).toEqual([]);
+});
+
 test('skips seamless runtime effect updates for unrelated upstream state', () => {
   const currentData: PivotTreeData = { rows: {}, cols: {}, cells: {} };
   const previousData: PivotTreeData = { rows: {}, cols: {}, cells: {} };
@@ -270,9 +284,11 @@ test('skips seamless runtime effect updates for unrelated upstream state', () =>
         signature: 'query-a',
       },
       data: currentData,
-      shouldRecoverStaleCoverage: false,
       isUserControlled: true,
+      isDashboardRuntimeSync: true,
       persistedInteractionFilters: { country: ['France'] },
+      committedFactBatches: [factBatch(1, 0)],
+      committedRuntimeLayout: runtimeLayout,
       committedFilters: {},
       uiSelectedFilters: { country: ['France'] },
       lastSync: null,
@@ -295,9 +311,11 @@ test('skips seamless runtime effect updates for unrelated upstream state', () =>
         signature: 'query-a',
       },
       data: currentData,
-      shouldRecoverStaleCoverage: true,
       isUserControlled: false,
+      isDashboardRuntimeSync: false,
       persistedInteractionFilters: {},
+      committedFactBatches: [],
+      committedRuntimeLayout: runtimeLayout,
       committedFilters: {},
       uiSelectedFilters: {},
       lastSync: null,
