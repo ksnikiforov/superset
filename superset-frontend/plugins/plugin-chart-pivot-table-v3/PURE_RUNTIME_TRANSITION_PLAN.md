@@ -58,10 +58,10 @@ cells are projections of DB facts, not canonical data.
 ## Current Status
 
 As of May 13, 2026, after
-`44dbf87817 refactor(pivot-table-v3): centralize fetched delta coverage seeding`:
+`bdaf32dc90 refactor(pivot-table-v3): move persisted filter sync policy`:
 
-- Overall transition estimate: **84%**.
-- Goal-weighted completion estimate: **84%**.
+- Overall transition estimate: **85%**.
+- Goal-weighted completion estimate: **85%**.
 - The runtime architecture exists and is used by the main paths.
 - The project is past line-count break-even, but not done.
 - The remaining work is mostly deletion of old chart, expansion, and render
@@ -70,8 +70,8 @@ As of May 13, 2026, after
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `8119` insertions, `9415` deletions, net `-1296`.
-- Current production `src` TypeScript/TSX total: `32214` lines.
+- Production `src`: `8203` insertions, `9424` deletions, net `-1221`.
+- Current production `src` TypeScript/TSX total: `32289` lines.
 - Implied baseline `src` total: about `33510` lines.
 
 The readout is mixed but improving: the new runtime files still account for
@@ -80,15 +80,15 @@ the plugin net-negative overall.
 
 ## Gate Status
 
-| Gate                                      | Completion | Current readout                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| ----------------------------------------- | ---------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Gate 1: compiled layout model             |        72% | `PivotProgram` exists and drives many paths. `usePivotLayout` and interaction layout still translate raw form/runtime layout into compatibility fields.                                                                                                                                                                                                                                                                                                                                                |
-| Gate 2: query planning from coverage      |        91% | Initial/root/branch/batch query paths use explicit coverage metadata. Bootstrap/root fact batches now seed fetched root expansion coverage. Branch and grouped-batch fetch params no longer expose tree shape. Remaining work is mostly support/totals coverage composition.                                                                                                                                                                                                                           |
-| Gate 3: central fact ingestion/store      |        92% | Fetch paths return fact batches, cache/fact-store hits use typed coverage, and ingestion is isolated. Compatible root/bootstrap coverage can now materialize branch specs without matching the original request scope while exact branch coverage remains authoritative. Remaining coupling is mostly tree-shaped chart/test boundaries.                                                                                                                                                               |
-| Gate 4: one tree materializer             |        88% | `materializePivotTree.ts` owns fact-to-tree materialization, Values/metric/measure axes, subtotal leaf injection, and measure-leaf value application. Export no longer repairs row depth semantics, but still needs a cleaner model boundary.                                                                                                                                                                                                                                                          |
-| Gate 5: expansion reducer/runtime effects |        81% | Expansion no longer derives fetched state from rendered tree shape. It uses explicit fact coverage, semantic fetchability, shared fetch execution, and request lifecycles. Loaded terminal metric nodes and metric subtotal nodes now seed coverage through the fetched-coverage utility, and fetched-result delta collection now seeds both fact batches and loaded metric-node coverage for same-axis and hydration paths. The hook still owns hydration iteration, cancellation, and React commits. |
-| Gate 6: pure render model                 |        85% | Projection drives toggle eligibility, collapsed Values, column display, visible-axis construction, and semantic export row depth. Remaining risk is deeper row subtotal policy and some metric-index compatibility behavior.                                                                                                                                                                                                                                                                           |
-| Gate 7: chart component cleanup           |        54% | The chart delegates runtime fetch decisions and no longer vetoes metric-order-only commits or treats rendered tree signatures as seamless refetch identity. Seamless sync snapshots and upstream dashboard query-context signatures now live in the runtime update module. The chart still owns committed-tree sync, dimension filters, interaction wiring, and several controller-like effects.                                                                                                       |
+| Gate                                      | Completion | Current readout                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ----------------------------------------- | ---------: | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Gate 1: compiled layout model             |        72% | `PivotProgram` exists and drives many paths. `usePivotLayout` and interaction layout still translate raw form/runtime layout into compatibility fields.                                                                                                                                                                                                                                                                                                                                                               |
+| Gate 2: query planning from coverage      |        91% | Initial/root/branch/batch query paths use explicit coverage metadata. Bootstrap/root fact batches now seed fetched root expansion coverage. Branch and grouped-batch fetch params no longer expose tree shape. Remaining work is mostly support/totals coverage composition.                                                                                                                                                                                                                                          |
+| Gate 3: central fact ingestion/store      |        92% | Fetch paths return fact batches, cache/fact-store hits use typed coverage, and ingestion is isolated. Compatible root/bootstrap coverage can now materialize branch specs without matching the original request scope while exact branch coverage remains authoritative. Remaining coupling is mostly tree-shaped chart/test boundaries.                                                                                                                                                                              |
+| Gate 4: one tree materializer             |        88% | `materializePivotTree.ts` owns fact-to-tree materialization, Values/metric/measure axes, subtotal leaf injection, and measure-leaf value application. Export no longer repairs row depth semantics, but still needs a cleaner model boundary.                                                                                                                                                                                                                                                                         |
+| Gate 5: expansion reducer/runtime effects |        81% | Expansion no longer derives fetched state from rendered tree shape. It uses explicit fact coverage, semantic fetchability, shared fetch execution, and request lifecycles. Loaded terminal metric nodes and metric subtotal nodes now seed coverage through the fetched-coverage utility, and fetched-result delta collection now seeds both fact batches and loaded metric-node coverage for same-axis and hydration paths. The hook still owns hydration iteration, cancellation, and React commits.                |
+| Gate 6: pure render model                 |        85% | Projection drives toggle eligibility, collapsed Values, column display, visible-axis construction, and semantic export row depth. Remaining risk is deeper row subtotal policy and some metric-index compatibility behavior.                                                                                                                                                                                                                                                                                          |
+| Gate 7: chart component cleanup           |        56% | The chart delegates runtime fetch decisions and no longer vetoes metric-order-only commits or treats rendered tree signatures as seamless refetch identity. Seamless sync snapshots, upstream dashboard query-context signatures, committed-props sync predicates, stale coverage recovery predicates, and persisted-filter seamless reload policy now live in the runtime update module. The chart still owns committed tree/fact state, dimension filters, interaction wiring, and several controller-like effects. |
 
 ## What Is Now Solid
 
@@ -119,8 +119,10 @@ the plugin net-negative overall.
 - The chart no longer contains separate runtime-layout fetch predicates, stale
   coverage predicates, metric-order commit vetoes, or rendered tree signatures
   in seamless refetch identity.
-- Dashboard upstream query-context signatures are built in the seamless runtime
-  module instead of in `PivotTableChart.tsx`.
+- Dashboard upstream query-context signatures, committed-props sync predicates,
+  stale coverage recovery predicates, and persisted-filter seamless reload
+  policy are built in the seamless runtime module instead of in
+  `PivotTableChart.tsx`.
 - Pending seamless layout refresh keeps a display snapshot instead of freezing
   the whole view prop bundle.
 - `PivotTableView` emits semantic zero-based row depth for export, so the export
@@ -291,6 +293,13 @@ Recent validation:
   in `useExpansionEngine.ts`; touched-file ESLint, Prettier, `git diff --check`,
   and focused fetched-requests, seamless expansion, and satisfied-prefetch tests
   (`36` tests) passed.
+- `aa8d14b0dc`: moved committed-props sync and stale dashboard coverage recovery
+  predicates into the seamless runtime module; touched-file ESLint, Prettier,
+  `git diff --check`, focused seamless runtime/filter/layout tests (`33` tests),
+  and the five-suite chart-sync guardrail (`68` tests) passed.
+- `bdaf32dc90`: moved persisted-filter seamless reload policy into the seamless
+  runtime module; touched-file ESLint, Prettier, `git diff --check`, and focused
+  seamless runtime/filter tests (`11` tests) passed.
 
 Minimum test coverage for future slices:
 
