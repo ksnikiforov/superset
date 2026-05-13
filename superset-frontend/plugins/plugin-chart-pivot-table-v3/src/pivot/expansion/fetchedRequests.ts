@@ -16,8 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { type PivotAxis, type PivotTreeNode } from '../../types';
+import {
+  type PivotAxis,
+  type PivotTreeData,
+  type PivotTreeNode,
+} from '../../types';
 import { parsePath, serializePath } from '../core/path';
+import { isSubtotalToken } from '../core/tokens';
 import {
   type PivotFactSelector,
   type PivotFactStoreBatch,
@@ -190,6 +195,46 @@ export const seedFetchedCoverageFromFactBatches = ({
       fetchedCoverage,
       getCoverageKey,
       selector: { coverage: batch.coverage, scope: batch.scope },
+    });
+  });
+};
+
+export const seedFetchedCoverageFromLoadedMetricNodes = ({
+  fetchedCoverage,
+  getCoverageKey,
+  tree,
+  visibleRowDepth,
+  visibleColDepth,
+  isMetricTokenValue,
+}: {
+  fetchedCoverage: FetchedFactCoverageState;
+  getCoverageKey: (axis: PivotAxis, pathKey: string) => string;
+  tree: PivotTreeData;
+  visibleRowDepth: number;
+  visibleColDepth: number;
+  isMetricTokenValue: (value: unknown) => boolean;
+}) => {
+  (
+    [
+      ['row', tree.rows, visibleColDepth],
+      ['col', tree.cols, visibleRowDepth],
+    ] as const
+  ).forEach(([axis, nodes, requiredOppositeDepth]) => {
+    Object.values(nodes).forEach(node => {
+      const hasMetricToken = node.path.some(isMetricTokenValue);
+      if (
+        !hasMetricToken ||
+        (node.hasChildren && !node.path.some(isSubtotalToken))
+      ) {
+        return;
+      }
+      markFetchedAxisCoverage({
+        fetchedCoverage,
+        getCoverageKey,
+        axis,
+        pathKey: serializePath(node.path),
+        requiredOppositeDepth,
+      });
     });
   });
 };

@@ -22,9 +22,15 @@ import {
   createFetchedFactCoverageState,
   getFetchedAxisDepthMap,
   pruneFetchedCoverageForCollapsedNode,
+  seedFetchedCoverageFromLoadedMetricNodes,
 } from '../../../src/pivot/expansion/fetchedRequests';
 import { rootKey } from '../../../src/pivot/viewModel';
-import { serializePath } from '../../../src/utils';
+import {
+  encodeMetricKey,
+  isMetricToken,
+  serializePath,
+  SUBTOTAL_TOKEN,
+} from '../../../src/utils';
 
 const makeNode = ({
   axis,
@@ -73,5 +79,89 @@ describe('pivot/expansion/fetchedRequests', () => {
     expect(Array.from(getFetchedAxisDepthMap(fetchedCoverage, 'row'))).toEqual([
       [cKey, 1],
     ]);
+  });
+
+  it('seeds fetched coverage for loaded terminal metric nodes', () => {
+    const metricPath = ['A', encodeMetricKey('sales')];
+    const fetchedCoverage = createFetchedFactCoverageState();
+
+    seedFetchedCoverageFromLoadedMetricNodes({
+      fetchedCoverage,
+      getCoverageKey: (_axis, pathKey) => pathKey,
+      tree: {
+        rows: {
+          [serializePath(metricPath)]: makeNode({
+            axis: 'row',
+            path: metricPath,
+            hasChildren: false,
+          }),
+        },
+        cols: {},
+        cells: {},
+      },
+      visibleRowDepth: 2,
+      visibleColDepth: 1,
+      isMetricTokenValue: isMetricToken,
+    });
+
+    expect(Array.from(getFetchedAxisDepthMap(fetchedCoverage, 'row'))).toEqual([
+      [serializePath(metricPath), 1],
+    ]);
+  });
+
+  it('seeds fetched coverage for loaded metric subtotal nodes', () => {
+    const metricSubtotalPath = ['A', SUBTOTAL_TOKEN, encodeMetricKey('sales')];
+    const fetchedCoverage = createFetchedFactCoverageState();
+
+    seedFetchedCoverageFromLoadedMetricNodes({
+      fetchedCoverage,
+      getCoverageKey: (_axis, pathKey) => pathKey,
+      tree: {
+        rows: {
+          [serializePath(metricSubtotalPath)]: makeNode({
+            axis: 'row',
+            path: metricSubtotalPath,
+            hasChildren: true,
+          }),
+        },
+        cols: {},
+        cells: {},
+      },
+      visibleRowDepth: 3,
+      visibleColDepth: 2,
+      isMetricTokenValue: isMetricToken,
+    });
+
+    expect(Array.from(getFetchedAxisDepthMap(fetchedCoverage, 'row'))).toEqual([
+      [serializePath(metricSubtotalPath), 2],
+    ]);
+  });
+
+  it('does not seed fetched coverage for expandable non-subtotal metric nodes', () => {
+    const metricPath = ['A', encodeMetricKey('sales')];
+    const fetchedCoverage = createFetchedFactCoverageState();
+
+    seedFetchedCoverageFromLoadedMetricNodes({
+      fetchedCoverage,
+      getCoverageKey: (_axis, pathKey) => pathKey,
+      tree: {
+        rows: {
+          [serializePath(metricPath)]: makeNode({
+            axis: 'row',
+            path: metricPath,
+            hasChildren: true,
+          }),
+        },
+        cols: {},
+        cells: {},
+      },
+      visibleRowDepth: 3,
+      visibleColDepth: 2,
+      isMetricTokenValue: isMetricToken,
+    });
+
+    expect(Array.from(getFetchedAxisDepthMap(fetchedCoverage, 'row'))).toEqual(
+      [],
+    );
   });
 });

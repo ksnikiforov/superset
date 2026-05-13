@@ -90,6 +90,7 @@ import {
   createFetchedFactCoverageState,
   pruneFetchedCoverageForCollapsedNode,
   seedFetchedCoverageFromFactBatches as seedFetchedCoverageStateFromFactBatches,
+  seedFetchedCoverageFromLoadedMetricNodes as seedFetchedLoadedMetricNodeCoverage,
 } from './fetchedRequests';
 import { resolveLayoutTransition } from './layoutTransition';
 import {
@@ -619,52 +620,16 @@ export const useExpansionEngine = ({
       visibleRowDepth: number,
       visibleColDepth: number,
     ) => {
-      const coverage = {
-        reason: 'expand' as const,
-        rowDepth: visibleRowDepth,
-        columnDepth: visibleColDepth,
-        rowDimensions: pivotProgram.rowDimensions.slice(0, visibleRowDepth),
-        columnDimensions: pivotProgram.columnDimensions.slice(
-          0,
-          visibleColDepth,
-        ),
-      };
-      const batches: PivotFactStoreBatch[] = [];
-      (
-        [
-          ['row', loadedTree.rows],
-          ['col', loadedTree.cols],
-        ] as const
-      ).forEach(([axis, nodes]) => {
-        Object.values(nodes).forEach(node => {
-          const hasMetricToken = node.path.some(isMetricTokenValue);
-          if (
-            !hasMetricToken ||
-            (node.hasChildren && !node.path.some(isSubtotalToken))
-          ) {
-            return;
-          }
-          batches.push({
-            coverage,
-            facts: [],
-            scope: {
-              kind: 'branch',
-              axis,
-              path: node.path,
-            },
-          });
-        });
+      seedFetchedLoadedMetricNodeCoverage({
+        fetchedCoverage: fetchedCoverageRef.current,
+        getCoverageKey,
+        tree: loadedTree,
+        visibleRowDepth,
+        visibleColDepth,
+        isMetricTokenValue,
       });
-      if (batches.length > 0) {
-        seedFetchedCoverageFromFactBatches(batches);
-      }
     },
-    [
-      isMetricTokenValue,
-      pivotProgram.columnDimensions,
-      pivotProgram.rowDimensions,
-      seedFetchedCoverageFromFactBatches,
-    ],
+    [getCoverageKey, isMetricTokenValue],
   );
 
   const collectInFlightExpanded = useCallback((axis: PivotAxis) => {
