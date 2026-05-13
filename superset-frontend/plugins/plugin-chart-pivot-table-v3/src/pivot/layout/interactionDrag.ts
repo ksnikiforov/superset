@@ -39,14 +39,10 @@ const resolveValueIndex = (
     ? clampIndex(layout.valuePlacement.index, 0, dimCount)
     : undefined;
 
-type RemoveResult = {
-  layout: PivotRuntimeLayout;
-};
-
 const removeDimension = (
   layout: PivotRuntimeLayout,
   dimensionKey: string,
-): RemoveResult => {
+): PivotRuntimeLayout => {
   const rowIndex = layout.rows.indexOf(dimensionKey);
   const colIndex = layout.cols.indexOf(dimensionKey);
   const nextRows = layout.rows.filter(key => key !== dimensionKey);
@@ -63,19 +59,17 @@ const removeDimension = (
     }
   }
   return {
-    layout: {
-      ...layout,
-      rows: nextRows,
-      cols: nextCols,
-      valuePlacement: nextValuePlacement,
-    },
+    ...layout,
+    rows: nextRows,
+    cols: nextCols,
+    valuePlacement: nextValuePlacement,
   };
 };
 
 export const removeDimensionFromLayout = (
   layout: PivotRuntimeLayout,
   dimensionKey: string,
-): PivotRuntimeLayout => removeDimension(layout, dimensionKey).layout;
+): PivotRuntimeLayout => removeDimension(layout, dimensionKey);
 
 export type InteractionChipItem = {
   id: string;
@@ -164,8 +158,7 @@ export const applyDimensionDrag = (
     metricsAvailable,
   } = options;
   const hasExplicitTarget = targetChipIndex !== undefined;
-  const removed = removeDimension(layout, dimensionKey);
-  const cleaned = removed.layout;
+  const cleaned = removeDimension(layout, dimensionKey);
   const axisKey = getAxisKey(targetAxis);
   const list = [...cleaned[axisKey]];
   const dimCount = list.length;
