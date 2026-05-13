@@ -26,7 +26,7 @@ describe('buildPivotV3ExportTable', () => {
 
   it('splits row hierarchy into columns using row axis labels', () => {
     document.body.innerHTML = `
-      <table class="pivot-v3-table" data-pivot-row-axis-labels='["Region","City"]'>
+      <table class="pivot-v3-table" data-pivot-row-axis-labels='["Region","City"]' data-pivot-row-depth-count="2">
         <thead>
           <tr>
             <th>Rows</th>
@@ -115,7 +115,7 @@ describe('buildPivotV3ExportTable', () => {
 
   it('does not create extra row header columns for a single row level', () => {
     document.body.innerHTML = `
-      <table class="pivot-v3-table" data-pivot-row-axis-labels='["resellerName"]'>
+      <table class="pivot-v3-table" data-pivot-row-axis-labels='["resellerName"]' data-pivot-row-depth-count="1">
         <thead>
           <tr>
             <th>Rows</th>
@@ -151,7 +151,7 @@ describe('buildPivotV3ExportTable', () => {
 
   it('uses semantic depth markers to keep row labels in correct columns', () => {
     document.body.innerHTML = `
-      <table class="pivot-v3-table" data-pivot-row-axis-labels='["productModel","productColor","productName"]'>
+      <table class="pivot-v3-table" data-pivot-row-axis-labels='["productModel","productColor","productName"]' data-pivot-row-depth-count="3">
         <thead>
           <tr>
             <th>Rows</th>
@@ -201,7 +201,7 @@ describe('buildPivotV3ExportTable', () => {
 
   it('keeps grand total isolated with semantic depth markers', () => {
     document.body.innerHTML = `
-      <table class="pivot-v3-table" data-pivot-row-axis-labels='["productModel","productColor","productName"]'>
+      <table class="pivot-v3-table" data-pivot-row-axis-labels='["productModel","productColor","productName"]' data-pivot-row-depth-count="3">
         <thead>
           <tr>
             <th>Rows</th>
@@ -260,7 +260,7 @@ describe('buildPivotV3ExportTable', () => {
 
   it('keeps subtotal rows aligned with semantic depth markers', () => {
     document.body.innerHTML = `
-      <table class="pivot-v3-table" data-pivot-row-axis-labels='["productColor","productModel","productName"]'>
+      <table class="pivot-v3-table" data-pivot-row-axis-labels='["productColor","productModel","productName"]' data-pivot-row-depth-count="2">
         <thead>
           <tr>
             <th>Rows</th>
@@ -310,7 +310,7 @@ describe('buildPivotV3ExportTable', () => {
 
   it('keeps alignment when subtotal rows are placed at the bottom', () => {
     document.body.innerHTML = `
-      <table class="pivot-v3-table" data-pivot-row-axis-labels='["productModel","productColor","productName"]'>
+      <table class="pivot-v3-table" data-pivot-row-axis-labels='["productModel","productColor","productName"]' data-pivot-row-depth-count="3">
         <thead>
           <tr>
             <th>Rows</th>
@@ -387,7 +387,7 @@ describe('buildPivotV3ExportTable', () => {
 
   it('keeps top grand total isolated and aligns partial expansions', () => {
     document.body.innerHTML = `
-      <table class="pivot-v3-table" data-pivot-row-axis-labels='["productColor","productModel","productName"]'>
+      <table class="pivot-v3-table" data-pivot-row-axis-labels='["productColor","productModel","productName"]' data-pivot-row-depth-count="2">
         <thead>
           <tr>
             <th>Rows</th>
@@ -437,7 +437,7 @@ describe('buildPivotV3ExportTable', () => {
 
   it('keeps alignment with multi-level column headers and grand total rows', () => {
     document.body.innerHTML = `
-      <table class="pivot-v3-table" data-pivot-row-axis-labels='["Region","City"]'>
+      <table class="pivot-v3-table" data-pivot-row-axis-labels='["Region","City"]' data-pivot-row-depth-count="2">
         <thead>
           <tr>
             <th rowspan="2">Rows</th>
@@ -517,7 +517,7 @@ describe('buildPivotV3ExportTable', () => {
 
   it('exports numeric-marked cells as raw numeric values for Excel typing', () => {
     document.body.innerHTML = `
-      <table class="pivot-v3-table" data-pivot-row-axis-labels='["Region"]'>
+      <table class="pivot-v3-table" data-pivot-row-axis-labels='["Region"]' data-pivot-row-depth-count="1">
         <thead>
           <tr>
             <th>Rows</th>
@@ -548,7 +548,7 @@ describe('buildPivotV3ExportTable', () => {
 
   it('exports only visible row levels and adds Total label for subtotal rows', () => {
     document.body.innerHTML = `
-      <table class="pivot-v3-table" data-pivot-row-axis-labels='["resellerName","productModel","productName"]'>
+      <table class="pivot-v3-table" data-pivot-row-axis-labels='["resellerName","productModel","productName"]' data-pivot-row-depth-count="2">
         <thead>
           <tr>
             <th>Rows</th>
@@ -646,7 +646,7 @@ describe('buildPivotV3ExportTable', () => {
 
   it('uses header cells for grand total and subtotal values so Excel can render totals in bold', () => {
     document.body.innerHTML = `
-      <table class="pivot-v3-table" data-pivot-row-axis-labels='["resellerName","productModel"]' data-pivot-row-total-label="Total">
+      <table class="pivot-v3-table" data-pivot-row-axis-labels='["resellerName","productModel"]' data-pivot-row-depth-count="2" data-pivot-row-total-label="Total">
         <thead>
           <tr>
             <th>Rows</th>

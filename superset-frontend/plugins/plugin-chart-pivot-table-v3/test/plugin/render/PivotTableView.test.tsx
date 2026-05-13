@@ -330,4 +330,72 @@ describe('PivotTableView', () => {
     expect(rowHeaderCell).toHaveStyle('gap: 3px');
     expect(colHeaderCell).toHaveStyle('gap: 3px');
   });
+
+  it('emits the visible row depth count for export', () => {
+    const grandTotal: PivotTreeNode = {
+      axis: 'row',
+      key: serializePath(['grand']),
+      path: ['grand'],
+      label: 'Grand total',
+      formattedLabel: 'Grand total',
+      level: 1,
+      hasChildren: false,
+    };
+    const parent: PivotTreeNode = {
+      axis: 'row',
+      key: serializePath(['West']),
+      path: ['West'],
+      label: 'West',
+      formattedLabel: 'West',
+      level: 1,
+      hasChildren: true,
+    };
+    const child: PivotTreeNode = {
+      axis: 'row',
+      key: serializePath(['West', 'SF']),
+      path: ['West', 'SF'],
+      label: 'SF',
+      formattedLabel: 'SF',
+      level: 2,
+      hasChildren: false,
+    };
+    const renderModel: RenderModel = {
+      ...baseRenderModel,
+      visibleRows: [grandTotal, parent, child],
+    };
+    const { container } = render(
+      <PivotTableView
+        height={300}
+        width={400}
+        renderModel={renderModel}
+        tree={baseTree}
+        expandedRows={new Set()}
+        expandedCols={new Set()}
+        showGlobalLoader={false}
+        onRetry={jest.fn()}
+        stickyHeaders={false}
+        headerOffset={0}
+        headerRowOffsets={[]}
+        headerRef={createRef()}
+        colTotalPosition="start"
+        formatting={baseFormatting}
+        onToggleNode={jest.fn()}
+        shouldShowToggle={() => false}
+        showSpinner={() => false}
+        isRowAggregateBold={() => false}
+        isColAggregateBold={() => false}
+        getNodeDimDepth={node => node.path.length}
+        isMetricGrandTotalNode={node => node === grandTotal}
+        handleCellClick={jest.fn()}
+        handleCellKeyDown={jest.fn()}
+        handleCellContextMenu={jest.fn()}
+        rowAxisLabels={['Region', 'City', 'Store']}
+      />,
+    );
+
+    expect(container.querySelector('table')).toHaveAttribute(
+      'data-pivot-row-depth-count',
+      '2',
+    );
+  });
 });

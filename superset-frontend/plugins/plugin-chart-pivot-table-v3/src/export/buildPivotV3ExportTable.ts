@@ -18,6 +18,7 @@
  */
 
 const ROW_DEPTH_ATTR = 'data-pivot-row-depth';
+const ROW_DEPTH_COUNT_ATTR = 'data-pivot-row-depth-count';
 const ROW_LABEL_ATTR = 'data-pivot-row-label';
 const ROW_AXIS_LABELS_ATTR = 'data-pivot-row-axis-labels';
 const ROW_TOTAL_LABEL_ATTR = 'data-pivot-row-total-label';
@@ -65,40 +66,20 @@ const parseRowTotalLabel = (table: HTMLTableElement): string => {
 };
 
 const resolveDepthCount = (
-  rows: HTMLTableRowElement[],
+  table: HTMLTableElement,
   axisLabels: string[],
 ): number => {
   if (axisLabels.length === 0) {
     return 0;
   }
-
-  const depthInfo = rows
-    .map(row => ({ row, depth: parseDepth(row) }))
-    .filter(
-      (entry): entry is { row: HTMLTableRowElement; depth: number } =>
-        typeof entry.depth === 'number',
-    );
-  if (depthInfo.length === 0) {
-    return axisLabels.length;
-  }
-
-  const nonGrandDepths = depthInfo
-    .filter(entry => !entry.row.classList.contains('pivot-grand-total-row'))
-    .map(entry => entry.depth);
-  const normalizedDepths =
-    nonGrandDepths.length > 0
-      ? nonGrandDepths
-      : depthInfo.map(entry => entry.depth);
-  const maxDepth = normalizedDepths.reduce(
-    (max, depth) => (depth > max ? depth : max),
-    -1,
+  const parsed = Number.parseInt(
+    table.getAttribute(ROW_DEPTH_COUNT_ATTR) ?? '',
+    10,
   );
-  const observedDepthCount = maxDepth + 1;
-
-  if (observedDepthCount <= 0) {
+  if (!Number.isFinite(parsed) || parsed <= 0) {
     return axisLabels.length;
   }
-  return Math.min(axisLabels.length, observedDepthCount);
+  return Math.min(axisLabels.length, parsed);
 };
 
 const toHeaderLabels = (depthCount: number, axisLabels: string[]): string[] =>
@@ -315,13 +296,10 @@ export const buildPivotV3ExportTable = (
   table: HTMLTableElement,
 ): HTMLTableElement => {
   const cloned = table.cloneNode(true) as HTMLTableElement;
-  const bodyRows = Array.from(
-    cloned.querySelectorAll<HTMLTableRowElement>('tbody tr'),
-  );
 
   const axisLabels = parseRowAxisLabels(cloned);
   const rowTotalLabel = parseRowTotalLabel(cloned);
-  const depthCount = resolveDepthCount(bodyRows, axisLabels);
+  const depthCount = resolveDepthCount(cloned, axisLabels);
   if (depthCount <= 0) {
     return cloned;
   }

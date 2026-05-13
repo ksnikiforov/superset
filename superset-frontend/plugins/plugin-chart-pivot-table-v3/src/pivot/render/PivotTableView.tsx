@@ -441,6 +441,23 @@ export const PivotTableView = ({
   const cornerHeaderStyle = themeColor
     ? { backgroundColor: themeColor, fontWeight: 600 }
     : { fontWeight: 600 };
+  const rowExportDepthCount = useMemo(() => {
+    if (rowAxisLabels.length === 0) {
+      return 0;
+    }
+    const depths = visibleRows
+      .filter(row => !isGrandTotalLikeRow(row))
+      .map(row => Math.max(getNodeDimDepth(row) - 1, 0));
+    const effectiveDepths =
+      depths.length > 0
+        ? depths
+        : visibleRows.map(row => Math.max(getNodeDimDepth(row) - 1, 0));
+    const maxDepth = effectiveDepths.reduce(
+      (max, depth) => (depth > max ? depth : max),
+      -1,
+    );
+    return Math.min(rowAxisLabels.length, maxDepth + 1);
+  }, [getNodeDimDepth, isGrandTotalLikeRow, rowAxisLabels.length, visibleRows]);
   const renderCornerHeader = (rowSpan?: number) => (
     <th
       rowSpan={rowSpan}
@@ -475,6 +492,7 @@ export const PivotTableView = ({
           $stickyHeaders={stickyHeaders}
           data-sticky-headers={stickyHeaders}
           data-pivot-row-axis-labels={JSON.stringify(rowAxisLabels)}
+          data-pivot-row-depth-count={rowExportDepthCount}
           data-pivot-row-total-label={t('Total')}
         >
           <thead ref={headerRef}>
