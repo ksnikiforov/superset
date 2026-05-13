@@ -25,6 +25,7 @@ import {
   useState,
   type MutableRefObject,
 } from 'react';
+import { unstable_batchedUpdates } from 'react-dom';
 import { nanoid } from 'nanoid';
 import {
   type HandlerFunction,
@@ -95,6 +96,14 @@ import {
 
 const MAX_HYDRATION_ITERATIONS = 12;
 const EMPTY_FACT_BATCHES: PivotFactStoreBatch[] = [];
+
+type ExpansionStateCommit = {
+  tree?: PivotTreeData;
+  expandedRows?: Set<string>;
+  expandedCols?: Set<string>;
+  pendingRows?: Set<string>;
+  pendingCols?: Set<string>;
+};
 
 const useSyncRef = <Value>(ref: MutableRefObject<Value>, value: Value) => {
   useEffect(() => {
@@ -334,15 +343,57 @@ export const useExpansionEngine = ({
     return merged;
   }, []);
 
-  const setExpandedState = useCallback((axis: PivotAxis, next: Set<string>) => {
-    (axis === 'row' ? expandedRowsRef : expandedColsRef).current = next;
-    (axis === 'row' ? setExpandedRows : setExpandedCols)(next);
-  }, []);
-
-  const setPendingState = useCallback((axis: PivotAxis, next: Set<string>) => {
-    (axis === 'row' ? pendingRowsRef : pendingColsRef).current = next;
-    dispatchRuntimeState({ type: 'setPending', axis, keys: next });
-  }, []);
+  const commitExpansionState = useCallback(
+    ({
+      tree: nextTree,
+      expandedRows: nextExpandedRows,
+      expandedCols: nextExpandedCols,
+      pendingRows: nextPendingRows,
+      pendingCols: nextPendingCols,
+    }: ExpansionStateCommit) => {
+      if (nextTree) {
+        treeRef.current = nextTree;
+      }
+      if (nextExpandedRows) {
+        expandedRowsRef.current = nextExpandedRows;
+      }
+      if (nextExpandedCols) {
+        expandedColsRef.current = nextExpandedCols;
+      }
+      if (nextPendingRows) {
+        pendingRowsRef.current = nextPendingRows;
+      }
+      if (nextPendingCols) {
+        pendingColsRef.current = nextPendingCols;
+      }
+      unstable_batchedUpdates(() => {
+        if (nextTree) {
+          setTree(nextTree);
+        }
+        if (nextExpandedRows) {
+          setExpandedRows(nextExpandedRows);
+        }
+        if (nextExpandedCols) {
+          setExpandedCols(nextExpandedCols);
+        }
+        if (nextPendingRows) {
+          dispatchRuntimeState({
+            type: 'setPending',
+            axis: 'row',
+            keys: nextPendingRows,
+          });
+        }
+        if (nextPendingCols) {
+          dispatchRuntimeState({
+            type: 'setPending',
+            axis: 'col',
+            keys: nextPendingCols,
+          });
+        }
+      });
+    },
+    [],
+  );
 
   const reportAsyncError = useCallback(
     (error: unknown) => {
@@ -732,9 +783,11 @@ export const useExpansionEngine = ({
           combinedExpanded,
           mergedTree,
         );
-        treeRef.current = mergedTree;
-        setTree(mergedTree);
-        setExpandedState(axis, finalExpanded);
+        commitExpansionState({
+          tree: mergedTree,
+          expandedRows: axis === 'row' ? finalExpanded : undefined,
+          expandedCols: axis === 'col' ? finalExpanded : undefined,
+        });
         persistExpansionState(
           axis === 'row' ? finalExpanded : expandedRowsRef.current,
           axis === 'col' ? finalExpanded : expandedColsRef.current,
@@ -748,6 +801,7 @@ export const useExpansionEngine = ({
       addWarnings,
       buildRequestGroupId,
       computeVisibleDepths,
+      commitExpansionState,
       expansionRequestLifecycle,
       fetchFormData,
       getCoverageKey,
@@ -759,7 +813,6 @@ export const useExpansionEngine = ({
       resolveExpandedForMetrics,
       seedFetchedCoverageFromFactBatches,
       seedFetchedCoverageFromLoadedMetricNodes,
-      setExpandedState,
       shouldFetchChildren,
       trackRequestInScope,
       updateLoadingKey,
@@ -802,19 +855,18 @@ export const useExpansionEngine = ({
         collapsedState.nextExpanded,
         treeRef.current,
       );
-      setExpandedState(axis, resolvedExpanded);
-      setPendingState(axis, collapsedState.nextPending);
+      commitExpansionState({
+        expandedRows: axis === 'row' ? resolvedExpanded : undefined,
+        expandedCols: axis === 'col' ? resolvedExpanded : undefined,
+        pendingRows: axis === 'row' ? collapsedState.nextPending : undefined,
+        pendingCols: axis === 'col' ? collapsedState.nextPending : undefined,
+      });
       persistExpansionState(
         axis === 'row' ? resolvedExpanded : expandedRowsRef.current,
         axis === 'col' ? resolvedExpanded : expandedColsRef.current,
       );
     },
-    [
-      persistExpansionState,
-      resolveExpandedForMetrics,
-      setExpandedState,
-      setPendingState,
-    ],
+    [commitExpansionState, persistExpansionState, resolveExpandedForMetrics],
   );
 
   const hydrateAtomic = useCallback(
@@ -890,12 +942,13 @@ export const useExpansionEngine = ({
             result.desiredCols,
             result.tree,
           );
-          treeRef.current = result.tree;
-          setTree(result.tree);
-          setExpandedState('row', resolvedRows);
-          setExpandedState('col', resolvedCols);
-          setPendingState('row', new Set());
-          setPendingState('col', new Set());
+          commitExpansionState({
+            tree: result.tree,
+            expandedRows: resolvedRows,
+            expandedCols: resolvedCols,
+            pendingRows: new Set(),
+            pendingCols: new Set(),
+          });
           if (reason === 'cross-axis') {
             persistExpansionState(resolvedRows, resolvedCols);
           }
@@ -911,6 +964,7 @@ export const useExpansionEngine = ({
       buildDesiredExpanded,
       buildRequestGroupId,
       clearLoadingState,
+      commitExpansionState,
       expansionRequestLifecycle,
       fetchFormData,
       getCoverageKey,
@@ -919,9 +973,7 @@ export const useExpansionEngine = ({
       resolveExpandedForMetrics,
       seedFetchedCoverageFromFactBatches,
       seedFetchedCoverageFromLoadedMetricNodes,
-      setExpandedState,
       setHydratingState,
-      setPendingState,
       trackRequestInScope,
       updateLoadingKey,
       visibilityConfig,
@@ -971,7 +1023,10 @@ export const useExpansionEngine = ({
       }
 
       if (toggleDecision.kind === 'cross-axis-hydration') {
-        setPendingState(axis, toggleDecision.nextPending);
+        commitExpansionState({
+          pendingRows: axis === 'row' ? toggleDecision.nextPending : undefined,
+          pendingCols: axis === 'col' ? toggleDecision.nextPending : undefined,
+        });
         manualExpandedRef.current = toggleDecision.nextManualExpanded;
         manualCollapsedRef.current = toggleDecision.nextManualCollapsed;
         hydrateAtomic('cross-axis', {
@@ -987,6 +1042,7 @@ export const useExpansionEngine = ({
     },
     [
       collapseNode,
+      commitExpansionState,
       computeVisibleDepths,
       expandSameAxis,
       hydrateAtomic,
@@ -994,7 +1050,6 @@ export const useExpansionEngine = ({
       reportAsyncError,
       clearLoadingState,
       setHydratingState,
-      setPendingState,
     ],
   );
 
@@ -1095,8 +1150,6 @@ export const useExpansionEngine = ({
     setHydratingState(false);
     warningsRef.current = new Map();
     setWarnings([]);
-    treeRef.current = normalizedTree;
-    setTree(normalizedTree);
     setErrorMessage(undefined);
     fetchedCoverageRef.current = nextFetchedCoverage;
     clearLoadingState();
@@ -1158,10 +1211,13 @@ export const useExpansionEngine = ({
       normalizedTree,
     );
 
-    setExpandedState('row', resolvedRows);
-    setExpandedState('col', resolvedCols);
-    setPendingState('row', new Set());
-    setPendingState('col', new Set());
+    commitExpansionState({
+      tree: normalizedTree,
+      expandedRows: resolvedRows,
+      expandedCols: resolvedCols,
+      pendingRows: new Set(),
+      pendingCols: new Set(),
+    });
 
     prevAutoExpandRowsRef.current = effectiveExpandRowsLevel;
     prevAutoExpandColsRef.current = effectiveExpandColsLevel;
@@ -1209,6 +1265,7 @@ export const useExpansionEngine = ({
     setHydratingState(false);
   }, [
     clearLoadingState,
+    commitExpansionState,
     countDimDepth,
     data,
     expandedStateSignature,
@@ -1236,9 +1293,7 @@ export const useExpansionEngine = ({
     reportAsyncError,
     getCoverageKey,
     seedFetchedCoverageFromFactBatches,
-    setExpandedState,
     setHydratingState,
-    setPendingState,
     visibilityConfig,
   ]);
 
