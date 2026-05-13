@@ -78,6 +78,7 @@ import {
 import {
   applyDimensionFilterSelectionChange,
   buildClearSelectedFiltersUpdate,
+  buildTreeDimensionFilterValues,
   firstSelectedFilters,
   normalizePivotSelectedFilters,
 } from './pivot/filters';
@@ -95,7 +96,6 @@ import {
   findMeasureLeafIdInPath,
   getMetricKeys,
   getStableColumnKey,
-  isSubtotalToken,
   coerceEpochMsStringToNumber,
 } from './utils';
 import {
@@ -1860,75 +1860,23 @@ function PivotTableChart(props: PivotTableProps) {
     });
   }, [renderTree.cols, resolveColumnSortDataKey, resolveColumnSortMetric]);
 
-  const treeDimensionFilterValues = useMemo(() => {
-    const valuesMap = new Map<string, Set<DataRecordValue>>();
-    const aliasMap = new Map<string, Set<string>>();
-    const addAlias = (from?: string, to?: string) => {
-      if (!from || !to) {
-        return;
-      }
-      const set = aliasMap.get(from) ?? new Set<string>();
-      set.add(to);
-      aliasMap.set(from, set);
-    };
-    dimensionList.forEach(dimension => {
-      const stableKey = getStableColumnKey(dimension);
-      const labelKey = getColumnLabel(dimension);
-      addAlias(stableKey, stableKey);
-      addAlias(labelKey, stableKey);
-    });
-    Object.entries(resolvedVerboseMap ?? {}).forEach(([key, verbose]) => {
-      if (typeof verbose !== 'string' || verbose.length === 0) {
-        return;
-      }
-      addAlias(key, verbose);
-      addAlias(verbose, verbose);
-    });
-    const addValue = (key: string, value: DataRecordValue) => {
-      const set = valuesMap.get(key) ?? new Set<DataRecordValue>();
-      set.add(value);
-      valuesMap.set(key, set);
-    };
-    const resolveAliases = (key: string) => aliasMap.get(key) ?? new Set([key]);
-    const collectValues = (
-      nodes: Record<string, PivotTreeNode>,
-      axis: 'row' | 'col',
-    ) => {
-      Object.values(nodes).forEach(node => {
-        if (node.isSubtotal) {
-          return;
-        }
-        const dimensionKey = layoutResult.getDimensionKeyForNode(node, axis);
-        if (!dimensionKey) {
-          return;
-        }
-        const parts = layoutResult
-          .getNonMetricPathParts(node.path)
-          .filter(part => !isSubtotalToken(part));
-        if (parts.length === 0) {
-          return;
-        }
-        const normalized = (parts[parts.length - 1] ?? null) as DataRecordValue;
-        resolveAliases(dimensionKey).forEach(key => {
-          addValue(key, normalized);
-        });
-      });
-    };
-    collectValues(renderTree.rows, 'row');
-    collectValues(renderTree.cols, 'col');
-    return Object.fromEntries(
-      Array.from(valuesMap.entries()).map(([key, set]) => [
-        key,
-        Array.from(set.values()),
-      ]),
-    );
-  }, [
-    dimensionList,
-    layoutResult,
-    renderTree.cols,
-    renderTree.rows,
-    resolvedVerboseMap,
-  ]);
+  const treeDimensionFilterValues = useMemo(
+    () =>
+      buildTreeDimensionFilterValues({
+        dimensions: dimensionList,
+        rows: renderTree.rows,
+        cols: renderTree.cols,
+        layout: layoutResult,
+        verboseMap: resolvedVerboseMap,
+      }),
+    [
+      dimensionList,
+      layoutResult,
+      renderTree.cols,
+      renderTree.rows,
+      resolvedVerboseMap,
+    ],
+  );
   const [fetchedDimensionFilterValues, setFetchedDimensionFilterValues] =
     useState<Record<string, DataRecordValue[]>>({});
   const [dimensionFilterSearchText, setDimensionFilterSearchText] = useState<

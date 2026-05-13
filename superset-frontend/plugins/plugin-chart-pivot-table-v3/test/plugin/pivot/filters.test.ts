@@ -20,6 +20,7 @@ import {
   applyDimensionFilterSelectionChange,
   buildCellFilters,
   buildClearSelectedFiltersUpdate,
+  buildTreeDimensionFilterValues,
   firstSelectedFilters,
   hasSelectedFilters,
   normalizePivotSelectedFilters,
@@ -132,6 +133,49 @@ describe('selected filter state helpers', () => {
         dimensions: ['Country'],
       }),
     ).toEqual({});
+  });
+
+  it('collects tree filter values by stable and verbose dimension aliases', () => {
+    const rows = {
+      countryFrance: {
+        key: 'countryFrance',
+        path: ['France'],
+      } as PivotTreeNode,
+      subtotal: {
+        key: 'subtotal',
+        path: [SUBTOTAL_TOKEN],
+        isSubtotal: true,
+      } as PivotTreeNode,
+    };
+    const cols = {
+      regionEu: {
+        key: 'regionEu',
+        path: [encodeMetricKey('metric1'), 'EU'],
+      } as PivotTreeNode,
+    };
+
+    expect(
+      buildTreeDimensionFilterValues({
+        dimensions: ['country', { label: 'Region', sqlExpression: 'region' }],
+        rows,
+        cols,
+        verboseMap: {
+          country: 'Country',
+          region: 'Region',
+        },
+        layout: {
+          getDimensionKeyForNode: (_node, axis) =>
+            axis === 'row' ? 'country' : 'region',
+          getNonMetricPathParts: path =>
+            path.filter(part => part !== encodeMetricKey('metric1')),
+        },
+      }),
+    ).toEqual({
+      country: ['France'],
+      Country: ['France'],
+      region: ['EU'],
+      Region: ['EU'],
+    });
   });
 
   it('updates dimension filter selections and stale restore suppression', () => {

@@ -75,6 +75,90 @@ export const normalizePivotSelectedFilters = ({
   return normalized;
 };
 
+type TreeDimensionFilterLayout = {
+  getDimensionKeyForNode: (
+    node: PivotTreeNode,
+    axis: 'row' | 'col',
+  ) => string | undefined;
+  getNonMetricPathParts: (path: PivotTreeNode['path']) => PivotTreeNode['path'];
+};
+
+export const buildTreeDimensionFilterValues = ({
+  dimensions,
+  rows,
+  cols,
+  layout,
+  verboseMap = {},
+}: {
+  dimensions: QueryFormColumn[];
+  rows: Record<string, PivotTreeNode>;
+  cols: Record<string, PivotTreeNode>;
+  layout: TreeDimensionFilterLayout;
+  verboseMap?: Record<string, string | undefined>;
+}): PivotSelectedFilters => {
+  const valuesMap = new Map<string, Set<DataRecordValue>>();
+  const aliasMap = new Map<string, Set<string>>();
+  const addAlias = (from?: string, to?: string) => {
+    if (!from || !to) {
+      return;
+    }
+    const set = aliasMap.get(from) ?? new Set<string>();
+    set.add(to);
+    aliasMap.set(from, set);
+  };
+  dimensions.forEach(dimension => {
+    const stableKey = getStableColumnKey(dimension);
+    const labelKey = getColumnLabel(dimension);
+    addAlias(stableKey, stableKey);
+    addAlias(labelKey, stableKey);
+  });
+  Object.entries(verboseMap).forEach(([key, verbose]) => {
+    if (typeof verbose !== 'string' || verbose.length === 0) {
+      return;
+    }
+    addAlias(key, verbose);
+    addAlias(verbose, verbose);
+  });
+  const addValue = (key: string, value: DataRecordValue) => {
+    const set = valuesMap.get(key) ?? new Set<DataRecordValue>();
+    set.add(value);
+    valuesMap.set(key, set);
+  };
+  const resolveAliases = (key: string) => aliasMap.get(key) ?? new Set([key]);
+  const collectValues = (
+    nodes: Record<string, PivotTreeNode>,
+    axis: 'row' | 'col',
+  ) => {
+    Object.values(nodes).forEach(node => {
+      if (node.isSubtotal) {
+        return;
+      }
+      const dimensionKey = layout.getDimensionKeyForNode(node, axis);
+      if (!dimensionKey) {
+        return;
+      }
+      const parts = layout
+        .getNonMetricPathParts(node.path)
+        .filter(part => !isSubtotalToken(part));
+      if (parts.length === 0) {
+        return;
+      }
+      const normalized = (parts[parts.length - 1] ?? null) as DataRecordValue;
+      resolveAliases(dimensionKey).forEach(key => {
+        addValue(key, normalized);
+      });
+    });
+  };
+  collectValues(rows, 'row');
+  collectValues(cols, 'col');
+  return Object.fromEntries(
+    Array.from(valuesMap.entries()).map(([key, set]) => [
+      key,
+      Array.from(set.values()),
+    ]),
+  );
+};
+
 export const applyDimensionFilterSelectionChange = ({
   selection,
   dimensionKey,
