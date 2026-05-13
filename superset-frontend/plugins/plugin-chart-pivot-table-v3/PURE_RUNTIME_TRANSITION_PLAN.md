@@ -149,6 +149,8 @@ Source-only diff from pre-refactor baseline
   `94` suites and `775` tests.
 - Focused export/render/chart pass after preserving numeric export typing
   without row-axis metadata: `3` suites and `25` tests.
+- Full plugin Jest pass after preserving numeric export typing without row-axis
+  metadata: `94` suites and `776` tests.
 
 The readout remains mixed: the plugin is still modestly above the baseline line
 count, but the chart/layout hooks keep losing inline policy and the remaining
@@ -439,7 +441,8 @@ Recent validation:
 
 - `de63dbe030`: preserved Excel numeric export typing when a table has no
   row-axis export metadata; touched-file ESLint, Prettier, `git diff --check`,
-  and focused export/render/chart Jest (`25` tests) passed.
+  and focused export/render/chart Jest (`25` tests) passed. The full
+  pivot-table-v3 plugin Jest suite also passed (`94` suites, `776` tests).
 - `bd8b29c520`: merged persisted selected-filter pending-settlement and state
   sync into one chart effect; touched-file ESLint, Prettier,
   `git diff --check`, focused filter/runtime Jest (`18` tests), and focused
