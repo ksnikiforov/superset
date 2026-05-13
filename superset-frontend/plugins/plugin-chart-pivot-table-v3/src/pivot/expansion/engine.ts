@@ -217,6 +217,114 @@ export const dropDescendants = (
   return next;
 };
 
+export type ExpansionToggleDecision =
+  | {
+      kind: 'collapse';
+    }
+  | {
+      kind: 'same-axis';
+    }
+  | {
+      kind: 'cross-axis-hydration';
+      nextPending: Set<string>;
+      nextManualExpanded: Set<string>;
+      nextManualCollapsed: Set<string>;
+    };
+
+export const resolveExpansionToggleDecision = ({
+  axis,
+  node,
+  expanded,
+  pending,
+  otherPending,
+  otherInFlight,
+  visibleRowDepth,
+  visibleColDepth,
+  manualExpanded,
+  manualCollapsed,
+}: {
+  axis: PivotAxis;
+  node: PivotTreeNode;
+  expanded: Set<string>;
+  pending: Set<string>;
+  otherPending: Set<string>;
+  otherInFlight: boolean;
+  visibleRowDepth: number;
+  visibleColDepth: number;
+  manualExpanded: Set<string>;
+  manualCollapsed: Set<string>;
+}): ExpansionToggleDecision => {
+  const isOpen = expanded.has(node.key) || pending.has(node.key);
+  if (isOpen) {
+    return { kind: 'collapse' };
+  }
+
+  const oppositeVisibleDepth =
+    axis === 'row' ? visibleColDepth : visibleRowDepth;
+  const isAtomic =
+    oppositeVisibleDepth > 0 && (otherPending.size > 0 || otherInFlight);
+  if (!isAtomic) {
+    return { kind: 'same-axis' };
+  }
+
+  const nextPending = new Set(pending);
+  addAncestors(node.path, nextPending, expanded);
+  const nextManualExpanded = new Set(manualExpanded);
+  addAncestors(node.path, nextManualExpanded, expanded);
+  const nextManualCollapsed = new Set(manualCollapsed);
+  nextManualCollapsed.delete(node.key);
+  return {
+    kind: 'cross-axis-hydration',
+    nextPending,
+    nextManualExpanded,
+    nextManualCollapsed,
+  };
+};
+
+export type CollapsedExpansionState = {
+  nextExpanded: Set<string>;
+  nextPending: Set<string>;
+  nextManualExpanded: Set<string>;
+  nextManualCollapsed: Set<string>;
+};
+
+export const resolveCollapsedExpansionState = ({
+  node,
+  expanded,
+  pending,
+  manualExpanded,
+  manualCollapsed,
+  nodes,
+}: {
+  node: PivotTreeNode;
+  expanded: Set<string>;
+  pending: Set<string>;
+  manualExpanded: Set<string>;
+  manualCollapsed: Set<string>;
+  nodes: Record<string, PivotTreeNode>;
+}): CollapsedExpansionState => {
+  const nextManualExpanded = dropDescendants(node.path, manualExpanded, nodes);
+  const nextManualCollapsed = dropDescendants(
+    node.path,
+    manualCollapsed,
+    nodes,
+  );
+  nextManualCollapsed.add(node.key);
+
+  const nextExpanded = dropDescendants(node.path, expanded, nodes);
+  nextExpanded.delete(node.key);
+
+  const nextPending = dropDescendants(node.path, pending, nodes);
+  nextPending.delete(node.key);
+
+  return {
+    nextExpanded,
+    nextPending,
+    nextManualExpanded,
+    nextManualCollapsed,
+  };
+};
+
 export const pruneTreeByPrefixes = (
   tree: PivotTreeData,
   axis: PivotAxis,

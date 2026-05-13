@@ -26,7 +26,9 @@ import {
   mergeSameAxisExpansionTree,
   planInitialHydrationPrefetch,
   planHydrationIteration,
+  resolveCollapsedExpansionState,
   resolveExpansionReinitializationDecision,
+  resolveExpansionToggleDecision,
   stageHydrationFetchDeltas,
   shouldPlanHydrationPrefetchAxis,
   type HydrationDeltaMap,
@@ -110,6 +112,106 @@ describe('pivot/expansion/engine', () => {
     };
     return { tree, aKey, xKey };
   };
+
+  it('resolves open expansion toggles as collapse decisions', () => {
+    const node = makeNode('row', ['A'], true);
+    const decision = resolveExpansionToggleDecision({
+      axis: 'row',
+      node,
+      expanded: new Set([node.key]),
+      pending: new Set(),
+      otherPending: new Set(),
+      otherInFlight: false,
+      visibleRowDepth: 1,
+      visibleColDepth: 0,
+      manualExpanded: new Set(),
+      manualCollapsed: new Set(),
+    });
+
+    expect(decision).toEqual({ kind: 'collapse' });
+  });
+
+  it('resolves ordinary expansion toggles as same-axis decisions', () => {
+    const node = makeNode('row', ['A'], true);
+    const decision = resolveExpansionToggleDecision({
+      axis: 'row',
+      node,
+      expanded: new Set(),
+      pending: new Set(),
+      otherPending: new Set(['other']),
+      otherInFlight: true,
+      visibleRowDepth: 1,
+      visibleColDepth: 0,
+      manualExpanded: new Set(),
+      manualCollapsed: new Set([node.key]),
+    });
+
+    expect(decision).toEqual({ kind: 'same-axis' });
+  });
+
+  it('resolves cross-axis expansion toggles with pending and manual state', () => {
+    const parentKey = serializePath(['A']);
+    const node = makeNode('row', ['A', 'B'], true);
+    const pending = new Set<string>();
+    const manualExpanded = new Set(['manual']);
+    const manualCollapsed = new Set([node.key, 'other']);
+    const decision = resolveExpansionToggleDecision({
+      axis: 'row',
+      node,
+      expanded: new Set([parentKey]),
+      pending,
+      otherPending: new Set(['col-pending']),
+      otherInFlight: false,
+      visibleRowDepth: 1,
+      visibleColDepth: 1,
+      manualExpanded,
+      manualCollapsed,
+    });
+
+    expect(decision.kind).toBe('cross-axis-hydration');
+    if (decision.kind !== 'cross-axis-hydration') {
+      return;
+    }
+    expect([...decision.nextPending].sort()).toEqual(
+      [parentKey, node.key].sort(),
+    );
+    expect([...decision.nextManualExpanded].sort()).toEqual(
+      ['manual', parentKey, node.key].sort(),
+    );
+    expect([...decision.nextManualCollapsed]).toEqual(['other']);
+    expect([...pending]).toEqual([]);
+    expect([...manualExpanded]).toEqual(['manual']);
+    expect([...manualCollapsed].sort()).toEqual([node.key, 'other'].sort());
+  });
+
+  it('resolves collapsed expansion state by pruning descendants', () => {
+    const parent = makeNode('row', ['A'], true);
+    const child = makeNode('row', ['A', 'B'], true);
+    const grandchild = makeNode('row', ['A', 'B', 'C'], false);
+    const sibling = makeNode('row', ['D'], false);
+    const result = resolveCollapsedExpansionState({
+      node: child,
+      expanded: new Set([parent.key, child.key, grandchild.key, sibling.key]),
+      pending: new Set([child.key, grandchild.key, sibling.key]),
+      manualExpanded: new Set([child.key, grandchild.key, sibling.key]),
+      manualCollapsed: new Set([grandchild.key, sibling.key]),
+      nodes: {
+        [parent.key]: parent,
+        [child.key]: child,
+        [grandchild.key]: grandchild,
+        [sibling.key]: sibling,
+      },
+    });
+
+    expect([...result.nextExpanded].sort()).toEqual(
+      [parent.key, sibling.key].sort(),
+    );
+    expect([...result.nextPending]).toEqual([sibling.key]);
+    expect([...result.nextManualExpanded]).toEqual([sibling.key]);
+    expect([...result.nextManualCollapsed].sort()).toEqual(
+      [child.key, sibling.key].sort(),
+    );
+  });
 
   it('applies expansion fetch deltas through the supplied pruning policy', () => {
     const aKey = serializePath(['A']);

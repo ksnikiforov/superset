@@ -79,11 +79,12 @@ import {
   buildVisiblePersistedExpansionState,
   buildHydrationStagedTree,
   computeVisibleDepths as computeVisibleDepthsBase,
-  dropDescendants,
   finalizeHydrationTree,
   mergeSameAxisExpansionTree,
   planInitialHydrationPrefetch,
   planHydrationIteration,
+  resolveCollapsedExpansionState,
+  resolveExpansionToggleDecision,
   resolveExpansionReinitializationDecision,
   resolveReinitializedExpansionState,
   resolveExpandedForMetrics as resolveExpandedForMetricsBase,
@@ -1103,24 +1104,16 @@ export const useExpansionEngine = ({
         axis === 'row' ? explicitCollapsedRowsRef : explicitCollapsedColsRef;
       const nodes =
         axis === 'row' ? treeRef.current.rows : treeRef.current.cols;
-
-      manualExpandedRef.current = dropDescendants(
-        node.path,
-        manualExpandedRef.current,
+      const collapsedState = resolveCollapsedExpansionState({
+        node,
+        expanded,
+        pending,
+        manualExpanded: manualExpandedRef.current,
+        manualCollapsed: manualCollapsedRef.current,
         nodes,
-      );
-      manualCollapsedRef.current = dropDescendants(
-        node.path,
-        manualCollapsedRef.current,
-        nodes,
-      );
-      manualCollapsedRef.current.add(node.key);
-
-      const nextExpanded = dropDescendants(node.path, expanded, nodes);
-      nextExpanded.delete(node.key);
-
-      const nextPending = dropDescendants(node.path, pending, nodes);
-      nextPending.delete(node.key);
+      });
+      manualExpandedRef.current = collapsedState.nextManualExpanded;
+      manualCollapsedRef.current = collapsedState.nextManualCollapsed;
 
       pruneFetchedCoverageForCollapsedNode({
         fetchedCoverage: fetchedCoverageRef.current,
@@ -1132,11 +1125,11 @@ export const useExpansionEngine = ({
 
       const resolvedExpanded = resolveExpandedForMetrics(
         axis,
-        nextExpanded,
+        collapsedState.nextExpanded,
         treeRef.current,
       );
       setExpandedState(axis, resolvedExpanded);
-      setPendingState(axis, nextPending);
+      setPendingState(axis, collapsedState.nextPending);
       persistExpansionState(
         axis === 'row' ? resolvedExpanded : expandedRowsRef.current,
         axis === 'col' ? resolvedExpanded : expandedColsRef.current,
@@ -1300,8 +1293,35 @@ export const useExpansionEngine = ({
         axis === 'row' ? expandedRowsRef.current : expandedColsRef.current;
       const pending =
         axis === 'row' ? pendingRowsRef.current : pendingColsRef.current;
-      const isOpen = expanded.has(node.key) || pending.has(node.key);
-      if (isOpen) {
+      const otherPending =
+        axis === 'row' ? pendingColsRef.current : pendingRowsRef.current;
+      const otherInFlight =
+        axis === 'row'
+          ? inFlightColsRef.current > 0
+          : inFlightRowsRef.current > 0;
+      const manualExpandedRef =
+        axis === 'row' ? explicitExpandedRowsRef : explicitExpandedColsRef;
+      const manualCollapsedRef =
+        axis === 'row' ? explicitCollapsedRowsRef : explicitCollapsedColsRef;
+      const { visibleRowDepth, visibleColDepth } = computeVisibleDepths(
+        expandedRowsRef.current,
+        expandedColsRef.current,
+        treeRef.current,
+      );
+      const toggleDecision = resolveExpansionToggleDecision({
+        axis,
+        node,
+        expanded,
+        pending,
+        otherPending,
+        otherInFlight,
+        visibleRowDepth,
+        visibleColDepth,
+        manualExpanded: manualExpandedRef.current,
+        manualCollapsed: manualCollapsedRef.current,
+      });
+
+      if (toggleDecision.kind === 'collapse') {
         invalidateInFlightRequests();
         clearLoadingState();
         setHydratingState(false);
@@ -1309,32 +1329,10 @@ export const useExpansionEngine = ({
         return;
       }
 
-      const otherPending =
-        axis === 'row' ? pendingColsRef.current : pendingRowsRef.current;
-      const otherInFlight =
-        axis === 'row'
-          ? inFlightColsRef.current > 0
-          : inFlightRowsRef.current > 0;
-      const { visibleRowDepth, visibleColDepth } = computeVisibleDepths(
-        expandedRowsRef.current,
-        expandedColsRef.current,
-        treeRef.current,
-      );
-      const oppositeVisibleDepth =
-        axis === 'row' ? visibleColDepth : visibleRowDepth;
-      const isAtomic =
-        oppositeVisibleDepth > 0 && (otherPending.size > 0 || otherInFlight);
-
-      if (isAtomic) {
-        const nextPending = new Set(pending);
-        addAncestors(node.path, nextPending, expanded);
-        setPendingState(axis, nextPending);
-        const manualExpandedRef =
-          axis === 'row' ? explicitExpandedRowsRef : explicitExpandedColsRef;
-        addAncestors(node.path, manualExpandedRef.current, expanded);
-        const manualCollapsedRef =
-          axis === 'row' ? explicitCollapsedRowsRef : explicitCollapsedColsRef;
-        manualCollapsedRef.current.delete(node.key);
+      if (toggleDecision.kind === 'cross-axis-hydration') {
+        setPendingState(axis, toggleDecision.nextPending);
+        manualExpandedRef.current = toggleDecision.nextManualExpanded;
+        manualCollapsedRef.current = toggleDecision.nextManualCollapsed;
         hydrateAtomic('cross-axis', {
           activeAxis: axis,
           showLoader: false,
