@@ -29,6 +29,7 @@ import {
 import {
   METRICS_PLACEHOLDER,
   getMetricKey,
+  getMetricKeys,
   getStableColumnKey,
 } from '../../utils';
 import { coerceMeasureLeavesByMetric } from '../measureLeaves';
@@ -37,6 +38,28 @@ import { insertValuesPlaceholder } from '../runtime/compilePivotProgram';
 type ResolvedLayoutParams = {
   formData: PivotTableQueryFormData;
   runtimeLayout?: PivotRuntimeLayout;
+};
+
+type AppliedInteractionLayoutParams = {
+  isUserControlled: boolean;
+  appliedFormData: PivotTableQueryFormData;
+  formData: PivotTableQueryFormData;
+  metrics: QueryFormMetric[];
+  groupbyRows: QueryFormColumn[];
+  groupbyColumns: QueryFormColumn[];
+  metricsLayout: MetricsLayoutEnum;
+  runtimeLayout: PivotRuntimeLayout;
+  committedRuntimeLayout: PivotRuntimeLayout;
+  appliedDimensionKeys: string[];
+};
+
+export type AppliedInteractionLayout = {
+  appliedRuntimeLayout: PivotRuntimeLayout;
+  appliedLayoutFormData: PivotTableQueryFormData;
+  layoutMetrics: QueryFormMetric[];
+  layoutGroupbyRows: QueryFormColumn[];
+  layoutGroupbyColumns: QueryFormColumn[];
+  layoutMetricsLayout: MetricsLayoutEnum;
 };
 
 const resolveDimensionMap = (dimensions: QueryFormColumn[]) => {
@@ -207,5 +230,78 @@ export const resolveInteractionFormData = ({
     measureLeavesByMetric: resolvedLeavesByMetric,
     metricsLayout:
       axis === 'row' ? MetricsLayoutEnum.ROWS : MetricsLayoutEnum.COLUMNS,
+  };
+};
+
+export const resolveAppliedInteractionLayout = ({
+  isUserControlled,
+  appliedFormData,
+  formData,
+  metrics,
+  groupbyRows,
+  groupbyColumns,
+  metricsLayout,
+  runtimeLayout,
+  committedRuntimeLayout,
+  appliedDimensionKeys,
+}: AppliedInteractionLayoutParams): AppliedInteractionLayout => {
+  if (!isUserControlled) {
+    return {
+      appliedRuntimeLayout: runtimeLayout,
+      appliedLayoutFormData: appliedFormData,
+      layoutMetrics: metrics,
+      layoutGroupbyRows: groupbyRows,
+      layoutGroupbyColumns: groupbyColumns,
+      layoutMetricsLayout: metricsLayout,
+    };
+  }
+
+  const appliedMetricKeysBase = getMetricKeys(
+    ensureIsArray(
+      appliedFormData.metricsBase ?? appliedFormData.metrics ?? metrics,
+    ),
+  );
+  const committedMetrics = committedRuntimeLayout.metrics ?? [];
+  const appliedMetricKeys =
+    committedMetrics.length === 0
+      ? appliedMetricKeysBase
+      : [
+          ...appliedMetricKeysBase,
+          ...committedMetrics.filter(
+            metricKey => !appliedMetricKeysBase.includes(metricKey),
+          ),
+        ];
+  const appliedRuntimeLayout = normalizeRuntimeLayout(
+    committedRuntimeLayout,
+    appliedDimensionKeys,
+    appliedMetricKeys,
+  );
+  const metricsForLayout =
+    appliedFormData.metricsBase ??
+    formData.metricsBase ??
+    appliedFormData.metrics ??
+    formData.metrics;
+  const leavesForLayout =
+    appliedFormData.measureLeavesByMetricBase ??
+    formData.measureLeavesByMetricBase ??
+    appliedFormData.measureLeavesByMetric ??
+    formData.measureLeavesByMetric;
+  const appliedLayoutFormData = resolveInteractionFormData({
+    formData: {
+      ...appliedFormData,
+      metrics: metricsForLayout ?? appliedFormData.metrics,
+      measureLeavesByMetric:
+        leavesForLayout ?? appliedFormData.measureLeavesByMetric,
+    },
+    runtimeLayout: appliedRuntimeLayout,
+  });
+
+  return {
+    appliedRuntimeLayout,
+    appliedLayoutFormData,
+    layoutMetrics: ensureIsArray(appliedLayoutFormData.metrics),
+    layoutGroupbyRows: ensureIsArray(appliedLayoutFormData.groupbyRows),
+    layoutGroupbyColumns: ensureIsArray(appliedLayoutFormData.groupbyColumns),
+    layoutMetricsLayout: appliedLayoutFormData.metricsLayout ?? metricsLayout,
   };
 };

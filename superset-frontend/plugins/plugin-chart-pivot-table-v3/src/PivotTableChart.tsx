@@ -66,7 +66,7 @@ import {
 import { isSameRuntimeLayout } from './pivot/runtime/coverage';
 import {
   normalizeRuntimeLayout,
-  resolveInteractionFormData,
+  resolveAppliedInteractionLayout,
 } from './pivot/layout/resolveInteractionLayout';
 import {
   buildSelectionFilterClauses,
@@ -574,89 +574,38 @@ function PivotTableChart(props: PivotTableProps) {
       pendingPersistedRuntimeLayoutSyncRef.current = false;
     }
   }, [isDashboardRuntimeSync, runtimeLayout]);
-  const appliedMetricKeysBase = useMemo(
+  const {
+    appliedLayoutFormData,
+    layoutMetrics,
+    layoutGroupbyRows,
+    layoutGroupbyColumns,
+    layoutMetricsLayout,
+  } = useMemo(
     () =>
-      getMetricKeys(
-        ensureIsArray(
-          appliedFormData.metricsBase ?? appliedFormData.metrics ?? metrics,
-        ),
-      ),
-    [appliedFormData.metrics, appliedFormData.metricsBase, metrics],
-  );
-  const appliedMetricKeys = useMemo(() => {
-    if (!isUserControlled) {
-      return appliedMetricKeysBase;
-    }
-    const committedMetrics = committedRuntimeLayout.metrics ?? [];
-    if (committedMetrics.length === 0) {
-      return appliedMetricKeysBase;
-    }
-    const merged = [...appliedMetricKeysBase];
-    committedMetrics.forEach(metricKey => {
-      if (!merged.includes(metricKey)) {
-        merged.push(metricKey);
-      }
-    });
-    return merged;
-  }, [appliedMetricKeysBase, committedRuntimeLayout.metrics, isUserControlled]);
-  const appliedRuntimeLayout = useMemo(() => {
-    if (!isUserControlled) {
-      return runtimeLayout;
-    }
-    return normalizeRuntimeLayout(
-      committedRuntimeLayout,
+      resolveAppliedInteractionLayout({
+        isUserControlled,
+        appliedFormData,
+        formData,
+        metrics,
+        groupbyRows,
+        groupbyColumns,
+        metricsLayout,
+        runtimeLayout,
+        committedRuntimeLayout,
+        appliedDimensionKeys,
+      }),
+    [
       appliedDimensionKeys,
-      appliedMetricKeys,
-    );
-  }, [
-    appliedDimensionKeys,
-    appliedMetricKeys,
-    committedRuntimeLayout,
-    isUserControlled,
-    runtimeLayout,
-  ]);
-  const appliedLayoutFormData = useMemo(() => {
-    if (!isUserControlled) {
-      return appliedFormData;
-    }
-    const metricsForLayout =
-      appliedFormData.metricsBase ??
-      formData.metricsBase ??
-      appliedFormData.metrics ??
-      formData.metrics;
-    const leavesForLayout =
-      appliedFormData.measureLeavesByMetricBase ??
-      formData.measureLeavesByMetricBase ??
-      appliedFormData.measureLeavesByMetric ??
-      formData.measureLeavesByMetric;
-    return resolveInteractionFormData({
-      formData: {
-        ...appliedFormData,
-        metrics: metricsForLayout ?? appliedFormData.metrics,
-        measureLeavesByMetric:
-          leavesForLayout ?? appliedFormData.measureLeavesByMetric,
-      },
-      runtimeLayout: appliedRuntimeLayout,
-    });
-  }, [appliedFormData, appliedRuntimeLayout, formData, isUserControlled]);
-  const layoutMetrics = useMemo(
-    () =>
-      isUserControlled ? ensureIsArray(appliedLayoutFormData.metrics) : metrics,
-    [appliedLayoutFormData.metrics, isUserControlled, metrics],
-  );
-  const layoutGroupbyRows = useMemo(
-    () =>
-      isUserControlled
-        ? ensureIsArray(appliedLayoutFormData.groupbyRows)
-        : groupbyRows,
-    [appliedLayoutFormData.groupbyRows, groupbyRows, isUserControlled],
-  );
-  const layoutGroupbyColumns = useMemo(
-    () =>
-      isUserControlled
-        ? ensureIsArray(appliedLayoutFormData.groupbyColumns)
-        : groupbyColumns,
-    [appliedLayoutFormData.groupbyColumns, groupbyColumns, isUserControlled],
+      appliedFormData,
+      committedRuntimeLayout,
+      formData,
+      groupbyColumns,
+      groupbyRows,
+      isUserControlled,
+      metrics,
+      metricsLayout,
+      runtimeLayout,
+    ],
   );
   const rowAxisLabels = useMemo(
     () =>
@@ -672,10 +621,6 @@ function PivotTableChart(props: PivotTableProps) {
       }),
     [layoutGroupbyRows, resolvedVerboseMap],
   );
-  const layoutMetricsLayout = isUserControlled
-    ? (appliedLayoutFormData.metricsLayout ?? metricsLayout)
-    : metricsLayout;
-
   const committedSelectionFilters = useMemo(
     () =>
       buildSelectionFilterClauses({

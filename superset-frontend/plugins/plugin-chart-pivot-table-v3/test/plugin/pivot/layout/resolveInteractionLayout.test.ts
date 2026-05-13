@@ -22,6 +22,7 @@ import {
 } from '../../../../src/pivot/measureLeaves';
 import {
   normalizeRuntimeLayout,
+  resolveAppliedInteractionLayout,
   resolveInteractionFormData,
 } from '../../../../src/pivot/layout/resolveInteractionLayout';
 import {
@@ -30,6 +31,7 @@ import {
   getStableColumnKey,
 } from '../../../../src/utils';
 import {
+  MetricsLayoutEnum,
   PivotRuntimeLayout,
   PivotTableQueryFormData,
 } from '../../../../src/types';
@@ -148,5 +150,91 @@ describe('resolveInteractionFormData', () => {
     expect(resolved.measureLeavesByMetric).toEqual({});
     expect(resolved.groupbyRows).toEqual(['country']);
     expect(resolved.groupbyColumns).toEqual([]);
+  });
+});
+
+describe('resolveAppliedInteractionLayout', () => {
+  it('keeps prop-driven layout inputs unchanged outside user-controlled mode', () => {
+    const formData: PivotTableQueryFormData = buildFormData({
+      interactionMode: 'standard',
+      metrics: ['sum__sales'],
+      groupbyRows: ['country'],
+      groupbyColumns: ['state'],
+    });
+    const runtimeLayout = normalizeRuntimeLayout(undefined, [], ['sum__sales']);
+
+    const resolved = resolveAppliedInteractionLayout({
+      isUserControlled: false,
+      appliedFormData: formData,
+      formData,
+      metrics: ['sum__sales'],
+      groupbyRows: ['country'],
+      groupbyColumns: ['state'],
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      runtimeLayout,
+      committedRuntimeLayout: {
+        ...runtimeLayout,
+        rows: ['state'],
+      },
+      appliedDimensionKeys: ['country', 'state'],
+    });
+
+    expect(resolved.appliedLayoutFormData).toBe(formData);
+    expect(resolved.layoutMetrics).toEqual(['sum__sales']);
+    expect(resolved.layoutGroupbyRows).toEqual(['country']);
+    expect(resolved.layoutGroupbyColumns).toEqual(['state']);
+    expect(resolved.layoutMetricsLayout).toBe(MetricsLayoutEnum.COLUMNS);
+  });
+
+  it('preserves committed runtime metrics that are available in the source form', () => {
+    const formData: PivotTableQueryFormData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: ['country', 'state'],
+      groupbyRows: [],
+      groupbyColumns: [],
+      metrics: ['sum__sales', 'sum__profit'],
+      measureLeavesByMetric: {
+        sum__sales: [buildValueLeaf()],
+        sum__profit: [buildValueLeaf()],
+      },
+    });
+    const appliedFormData = formData;
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows: [getStableColumnKey('country')],
+      cols: [getStableColumnKey('state')],
+      metrics: ['sum__sales'],
+      leafSelection: { value: true },
+      valuePlacement: { axis: 'row', index: 1 },
+    };
+    const committedRuntimeLayout: PivotRuntimeLayout = {
+      ...runtimeLayout,
+      metrics: ['sum__profit'],
+    };
+
+    const resolved = resolveAppliedInteractionLayout({
+      isUserControlled: true,
+      appliedFormData,
+      formData,
+      metrics: ['sum__sales'],
+      groupbyRows: [],
+      groupbyColumns: [],
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      runtimeLayout,
+      committedRuntimeLayout,
+      appliedDimensionKeys: [
+        getStableColumnKey('country'),
+        getStableColumnKey('state'),
+      ],
+    });
+
+    expect(resolved.appliedRuntimeLayout.metrics).toEqual(['sum__profit']);
+    expect(getMetricKeys(resolved.layoutMetrics)).toEqual(['sum__profit']);
+    expect(resolved.layoutGroupbyRows).toEqual([
+      'country',
+      METRICS_PLACEHOLDER,
+    ]);
+    expect(resolved.layoutGroupbyColumns).toEqual(['state']);
+    expect(resolved.layoutMetricsLayout).toBe(MetricsLayoutEnum.ROWS);
   });
 });
