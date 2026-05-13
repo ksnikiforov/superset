@@ -349,6 +349,82 @@ export const mergeSameAxisExpansionTree = ({
   return mergeTrees(currentTree, preservedTree);
 };
 
+export type HydrationDeltaTarget = {
+  axis: PivotAxis;
+  pathKey: string;
+};
+
+export type HydrationDeltaEntry = HydrationDeltaTarget & {
+  tree: PivotTreeData;
+};
+
+export type HydrationDeltaMap = Map<string, HydrationDeltaEntry>;
+
+const getHydrationDeltaKey = ({ axis, pathKey }: HydrationDeltaTarget) =>
+  JSON.stringify([axis, pathKey]);
+
+const getOrderedHydrationDeltas = (deltas: HydrationDeltaMap) =>
+  Array.from(deltas.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, entry]) => entry);
+
+export const stageHydrationFetchDeltas = ({
+  deltas,
+  results,
+}: {
+  deltas: HydrationDeltaMap;
+  results: Array<{
+    targets: HydrationDeltaTarget[];
+    data: PivotTreeData;
+  }>;
+}) => {
+  results.forEach(({ targets, data }) => {
+    targets.forEach(target => {
+      deltas.set(getHydrationDeltaKey(target), {
+        ...target,
+        tree: data,
+      });
+    });
+  });
+};
+
+export const buildHydrationStagedTree = ({
+  baseTree,
+  deltas,
+}: {
+  baseTree: PivotTreeData;
+  deltas: HydrationDeltaMap;
+}) =>
+  getOrderedHydrationDeltas(deltas).reduce(
+    (merged, delta) => mergeTrees(merged, delta.tree),
+    baseTree,
+  );
+
+export const finalizeHydrationTree = ({
+  baseTree,
+  deltas,
+  pruneMergedTree,
+}: {
+  baseTree: PivotTreeData;
+  deltas: HydrationDeltaMap;
+  pruneMergedTree: PruneMergedTree;
+}) => {
+  let mergedTree = buildHydrationStagedTree({ baseTree, deltas });
+  getOrderedHydrationDeltas(deltas).forEach(delta => {
+    const parent =
+      delta.axis === 'row'
+        ? mergedTree.rows[delta.pathKey]
+        : mergedTree.cols[delta.pathKey];
+    mergedTree = pruneMergedTree({
+      axis: delta.axis,
+      tree: mergedTree,
+      parent,
+      branch: delta.tree,
+    });
+  });
+  return mergedTree;
+};
+
 export const hasNestedPendingKeys = (keys: Set<string>) => {
   if (keys.size < 2) {
     return false;

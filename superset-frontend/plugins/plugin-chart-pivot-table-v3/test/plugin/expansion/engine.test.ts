@@ -19,11 +19,15 @@
 
 import {
   applyExpansionFetchDelta,
+  buildHydrationStagedTree,
   buildHydrationPrefetchAction,
+  finalizeHydrationTree,
   mergeSameAxisExpansionTree,
   planInitialHydrationPrefetch,
   planHydrationIteration,
+  stageHydrationFetchDeltas,
   shouldPlanHydrationPrefetchAxis,
+  type HydrationDeltaMap,
   type ExpansionVisibilityConfig,
 } from '../../../src/pivot/expansion/engine';
 import { createFetchedFactCoverageState } from '../../../src/pivot/expansion/fetchedRequests';
@@ -212,6 +216,101 @@ describe('pivot/expansion/engine', () => {
     expect(new Set(Object.keys(result.cols))).toEqual(
       new Set([aKey, freshKey, metricKey]),
     );
+  });
+
+  it('stages hydration deltas by axis and path then builds deterministic staged trees', () => {
+    const aKey = serializePath(['A']);
+    const bKey = serializePath(['B']);
+    const aChildKey = serializePath(['A', '1']);
+    const bChildKey = serializePath(['B', '1']);
+    const baseTree: PivotTreeData = {
+      rows: {
+        [aKey]: makeNode('row', ['A'], true),
+        [bKey]: makeNode('row', ['B'], true),
+      },
+      cols: {},
+      cells: {},
+    };
+    const aDelta: PivotTreeData = {
+      rows: {
+        [aChildKey]: makeNode('row', ['A', '1'], false),
+      },
+      cols: {},
+      cells: {},
+    };
+    const bDelta: PivotTreeData = {
+      rows: {
+        [bChildKey]: makeNode('row', ['B', '1'], false),
+      },
+      cols: {},
+      cells: {},
+    };
+    const deltas: HydrationDeltaMap = new Map();
+
+    stageHydrationFetchDeltas({
+      deltas,
+      results: [
+        { targets: [{ axis: 'row', pathKey: bKey }], data: bDelta },
+        { targets: [{ axis: 'row', pathKey: aKey }], data: aDelta },
+      ],
+    });
+
+    const stagedTree = buildHydrationStagedTree({ baseTree, deltas });
+    expect(new Set(Object.keys(stagedTree.rows))).toEqual(
+      new Set([aKey, bKey, aChildKey, bChildKey]),
+    );
+  });
+
+  it('finalizes hydration trees through the supplied pruning policy', () => {
+    const aKey = serializePath(['A']);
+    const staleKey = serializePath(['A', 'old']);
+    const freshKey = serializePath(['A', 'new']);
+    const baseTree: PivotTreeData = {
+      rows: {
+        [aKey]: makeNode('row', ['A'], true),
+        [staleKey]: makeNode('row', ['A', 'old'], false),
+      },
+      cols: {},
+      cells: {},
+    };
+    const deltaTree: PivotTreeData = {
+      rows: {
+        [freshKey]: makeNode('row', ['A', 'new'], false),
+      },
+      cols: {},
+      cells: {},
+    };
+    const deltas: HydrationDeltaMap = new Map();
+    stageHydrationFetchDeltas({
+      deltas,
+      results: [{ targets: [{ axis: 'row', pathKey: aKey }], data: deltaTree }],
+    });
+    const pruneMergedTree = jest.fn(({ tree: nextTree }) => {
+      const rows = { ...nextTree.rows };
+      delete rows[staleKey];
+      return { ...nextTree, rows };
+    });
+
+    const result = finalizeHydrationTree({
+      baseTree,
+      deltas,
+      pruneMergedTree,
+    });
+
+    expect(new Set(Object.keys(result.rows))).toEqual(
+      new Set([aKey, freshKey]),
+    );
+    expect(pruneMergedTree).toHaveBeenCalledWith({
+      axis: 'row',
+      tree: expect.objectContaining({
+        rows: expect.objectContaining({
+          [staleKey]: baseTree.rows[staleKey],
+          [freshKey]: deltaTree.rows[freshKey],
+        }),
+      }),
+      parent: baseTree.rows[aKey],
+      branch: deltaTree,
+    });
   });
 
   it('plans fetch targets for expanded nodes', () => {

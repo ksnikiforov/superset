@@ -36,7 +36,7 @@ import {
   type PivotTreeData,
   type PivotTreeNode,
 } from '../../types';
-import { parsePath, mergeTrees } from '../../utils';
+import { parsePath } from '../../utils';
 import {
   buildDesiredExpandedKeys,
   type PivotExpansionStateKeys,
@@ -77,15 +77,19 @@ import {
 import {
   addAncestors,
   applyExpansionFetchDelta,
+  buildHydrationStagedTree,
   computeVisibleDepths as computeVisibleDepthsBase,
   dropDescendants,
+  finalizeHydrationTree,
   getVisibleExpansionKeys as getVisibleExpansionKeysBase,
   mergeSameAxisExpansionTree,
   planInitialHydrationPrefetch,
   planHydrationIteration,
   resolveReinitializedExpansionState,
   resolveExpandedForMetrics as resolveExpandedForMetricsBase,
+  stageHydrationFetchDeltas,
   type ExpansionVisibilityConfig,
+  type HydrationDeltaMap,
 } from './engine';
 import {
   createFetchedFactCoverageState,
@@ -1192,19 +1196,7 @@ export const useExpansionEngine = ({
 
       try {
         const stagingBaseTree = treeRef.current;
-        const stagedDeltas = new Map<string, PivotTreeData>();
-        const buildHydrationTree = () => {
-          let merged = stagingBaseTree;
-          Array.from(stagedDeltas.keys())
-            .sort()
-            .forEach(key => {
-              const delta = stagedDeltas.get(key);
-              if (delta) {
-                merged = mergeTrees(merged, delta);
-              }
-            });
-          return merged;
-        };
+        const stagedDeltas: HydrationDeltaMap = new Map();
         const fetchRuntime: ExpansionFetchRuntime = {
           requestScope,
           fetchFormData,
@@ -1222,7 +1214,10 @@ export const useExpansionEngine = ({
           if (!requestScope.isCurrent()) {
             return;
           }
-          const stagedTree = buildHydrationTree();
+          const stagedTree = buildHydrationStagedTree({
+            baseTree: stagingBaseTree,
+            deltas: stagedDeltas,
+          });
           const desiredRows = buildDesiredExpanded('row', stagedTree);
           const desiredCols = buildDesiredExpanded('col', stagedTree);
           const hydrationPlan = planHydrationIteration({
@@ -1241,25 +1236,11 @@ export const useExpansionEngine = ({
           const { visibleRowDepth, visibleColDepth } = hydrationPlan;
 
           if (hydrationPlan.kind === 'complete') {
-            let mergedTree = buildHydrationTree();
-            const orderedDeltas = Array.from(stagedDeltas.entries()).sort(
-              ([a], [b]) => a.localeCompare(b),
-            );
-            for (const [key, delta] of orderedDeltas) {
-              const parsed = JSON.parse(key) as [PivotAxis, string];
-              const axis = parsed[0];
-              const targetKey = parsed[1];
-              const parent =
-                axis === 'row'
-                  ? mergedTree.rows[targetKey]
-                  : mergedTree.cols[targetKey];
-              mergedTree = pruneMergedTree({
-                axis,
-                tree: mergedTree,
-                parent,
-                branch: delta,
-              });
-            }
+            const mergedTree = finalizeHydrationTree({
+              baseTree: stagingBaseTree,
+              deltas: stagedDeltas,
+              pruneMergedTree,
+            });
             const resolvedRows = resolveExpandedForMetrics(
               'row',
               desiredRows,
@@ -1304,15 +1285,10 @@ export const useExpansionEngine = ({
             seedLoadedMetricNodeCoverage:
               seedFetchedCoverageFromLoadedMetricNodes,
           });
-          for (const {
-            targets: deltaTargets,
-            data: deltaTree,
-          } of resultDeltas) {
-            for (const target of deltaTargets) {
-              const deltaKey = JSON.stringify([target.axis, target.pathKey]);
-              stagedDeltas.set(deltaKey, deltaTree);
-            }
-          }
+          stageHydrationFetchDeltas({
+            deltas: stagedDeltas,
+            results: resultDeltas,
+          });
         }
       } finally {
         if (shouldShowLoader) {
