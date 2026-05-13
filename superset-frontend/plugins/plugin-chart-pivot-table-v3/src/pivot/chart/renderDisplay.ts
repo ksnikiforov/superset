@@ -18,14 +18,19 @@
  */
 import { type DataRecordValue } from '@superset-ui/core';
 import {
+  type DateFormatter,
   MetricsLayoutEnum,
   type MeasureHierarchy,
+  type PivotAxis,
+  type PivotTreeData,
   type PivotTreeNode,
 } from '../../types';
 import {
+  coerceEpochMsStringToNumber,
   decodeMeasureLeafId,
   decodeMetricKey,
   formatPivotLabelValue,
+  isSubtotalToken,
   SUBTOTAL_TOKEN,
 } from '../../utils';
 
@@ -180,4 +185,113 @@ export const expandMetricNodesForRender = ({
     }
   });
   return next;
+};
+
+const normalizeDateFormatterInput = (value: DataRecordValue) => {
+  const normalizedValue = coerceEpochMsStringToNumber(value);
+  if (typeof normalizedValue === 'number') {
+    return normalizedValue;
+  }
+  if (normalizedValue instanceof Date) {
+    return normalizedValue.getTime();
+  }
+  if (typeof normalizedValue === 'string') {
+    const parsed = Date.parse(normalizedValue);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+  return undefined;
+};
+
+const formatAxisDateLabels = ({
+  axis,
+  nodes,
+  dateFormatters,
+  getDimensionKeyForNode,
+  getNonMetricPathParts,
+}: {
+  axis: PivotAxis;
+  nodes: Record<string, PivotTreeNode>;
+  dateFormatters: Record<string, DateFormatter | undefined>;
+  getDimensionKeyForNode: (
+    node: PivotTreeNode,
+    axis: PivotAxis,
+  ) => string | undefined;
+  getNonMetricPathParts: (path: PivotTreeNode['path']) => PivotTreeNode['path'];
+}) => {
+  if (Object.keys(dateFormatters).length === 0) {
+    return nodes;
+  }
+  let hasChanges = false;
+  const nextNodes: Record<string, PivotTreeNode> = { ...nodes };
+  Object.values(nodes).forEach(node => {
+    if (node.path.length === 0 || node.path.some(isSubtotalToken)) {
+      return;
+    }
+    const tail = node.path[node.path.length - 1];
+    if (decodeMetricKey(tail) || decodeMeasureLeafId(tail)) {
+      return;
+    }
+    const dimensionKey = getDimensionKeyForNode(node, axis);
+    if (!dimensionKey) {
+      return;
+    }
+    const formatter = dateFormatters[dimensionKey];
+    if (!formatter) {
+      return;
+    }
+    const nonSubtotalParts = getNonMetricPathParts(node.path).filter(
+      part => !isSubtotalToken(part),
+    );
+    const rawValue = nonSubtotalParts[nonSubtotalParts.length - 1];
+    if (rawValue === null || rawValue === undefined) {
+      return;
+    }
+    const formatterInput = normalizeDateFormatterInput(rawValue);
+    if (formatterInput === undefined) {
+      return;
+    }
+    const formatted = formatter(formatterInput);
+    if (formatted !== node.formattedLabel) {
+      nextNodes[node.key] = { ...node, formattedLabel: formatted };
+      hasChanges = true;
+    }
+  });
+  return hasChanges ? nextNodes : nodes;
+};
+
+export const formatRenderTreeDateLabels = ({
+  tree,
+  dateFormatters,
+  getDimensionKeyForNode,
+  getNonMetricPathParts,
+}: {
+  tree: PivotTreeData;
+  dateFormatters?: Record<string, DateFormatter | undefined>;
+  getDimensionKeyForNode: (
+    node: PivotTreeNode,
+    axis: PivotAxis,
+  ) => string | undefined;
+  getNonMetricPathParts: (path: PivotTreeNode['path']) => PivotTreeNode['path'];
+}) => {
+  if (!dateFormatters || Object.keys(dateFormatters).length === 0) {
+    return tree;
+  }
+  const nextRows = formatAxisDateLabels({
+    axis: 'row',
+    nodes: tree.rows,
+    dateFormatters,
+    getDimensionKeyForNode,
+    getNonMetricPathParts,
+  });
+  const nextCols = formatAxisDateLabels({
+    axis: 'col',
+    nodes: tree.cols,
+    dateFormatters,
+    getDimensionKeyForNode,
+    getNonMetricPathParts,
+  });
+  if (nextRows === tree.rows && nextCols === tree.cols) {
+    return tree;
+  }
+  return { ...tree, rows: nextRows, cols: nextCols };
 };

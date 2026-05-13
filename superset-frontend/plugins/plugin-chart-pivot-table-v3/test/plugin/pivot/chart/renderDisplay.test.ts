@@ -19,11 +19,14 @@
 import {
   MetricsLayoutEnum,
   type MeasureHierarchy,
+  type PivotAxis,
+  type PivotTreeData,
   type PivotTreeNode,
 } from '../../../../src/types';
 import {
   buildColumnDisplayPath,
   expandMetricNodesForRender,
+  formatRenderTreeDateLabels,
   resolveColumnHeaderLabel,
 } from '../../../../src/pivot/chart/renderDisplay';
 import {
@@ -42,6 +45,18 @@ const node = (path: PivotTreeNode['path'], overrides = {}): PivotTreeNode => ({
   level: path.length,
   hasChildren: false,
   ...overrides,
+});
+
+const treeFromNodes = ({
+  rows = [],
+  cols = [],
+}: {
+  rows?: PivotTreeNode[];
+  cols?: PivotTreeNode[];
+}): PivotTreeData => ({
+  rows: Object.fromEntries(rows.map(row => [row.key, row])),
+  cols: Object.fromEntries(cols.map(col => [col.key, col])),
+  cells: {},
 });
 
 const baseDisplayConfig = {
@@ -149,4 +164,82 @@ test('adds metric nodes to expanded render state only when the leaf tier is visi
         typeof value === 'string' && value.startsWith('__metric__'),
     }).has(metricNode.key),
   ).toBe(true);
+});
+
+test('formats render tree date labels for row and column dimensions', () => {
+  const rowDate = node(['1704067200000'], { axis: 'row' });
+  const colDate = node(['2024-02-01']);
+  const tree = treeFromNodes({ rows: [rowDate], cols: [colDate] });
+
+  const formattedTree = formatRenderTreeDateLabels({
+    tree,
+    dateFormatters: {
+      order_date: value => `date:${new Date(Number(value)).getUTCMonth() + 1}`,
+    },
+    getDimensionKeyForNode: () => 'order_date',
+    getNonMetricPathParts: path => path,
+  });
+
+  expect(formattedTree).not.toBe(tree);
+  expect(formattedTree.rows[rowDate.key]).toEqual({
+    ...rowDate,
+    formattedLabel: 'date:1',
+  });
+  expect(formattedTree.cols[colDate.key]).toEqual({
+    ...colDate,
+    formattedLabel: 'date:2',
+  });
+  expect(formattedTree.cells).toBe(tree.cells);
+});
+
+test('preserves render tree references when date formatting makes no changes', () => {
+  const rowDate = node(['2024-01-01'], {
+    axis: 'row',
+    formattedLabel: 'same',
+  });
+  const tree = treeFromNodes({ rows: [rowDate] });
+
+  expect(
+    formatRenderTreeDateLabels({
+      tree,
+      dateFormatters: {
+        order_date: () => 'same',
+      },
+      getDimensionKeyForNode: () => 'order_date',
+      getNonMetricPathParts: path => path,
+    }),
+  ).toBe(tree);
+});
+
+test('skips root, subtotal, metric, measure leaf, and non-date render labels', () => {
+  const root = node([], { axis: 'row' });
+  const subtotal = node(['2024-01-01', SUBTOTAL_TOKEN], { axis: 'row' });
+  const metric = node(['2024-01-01', encodeMetricKey('sales')], {
+    axis: 'row',
+  });
+  const measureLeaf = node(['2024-01-01', encodeMeasureLeafKey('value')], {
+    axis: 'row',
+  });
+  const nonDate = node(['not-a-date'], { axis: 'row' });
+  const tree = treeFromNodes({
+    rows: [root, subtotal, metric, measureLeaf, nonDate],
+  });
+
+  expect(
+    formatRenderTreeDateLabels({
+      tree,
+      dateFormatters: {
+        order_date: () => 'formatted',
+      },
+      getDimensionKeyForNode: (candidate: PivotTreeNode, axis: PivotAxis) =>
+        axis === 'row' && candidate.path.length > 0 ? 'order_date' : undefined,
+      getNonMetricPathParts: path =>
+        path.filter(
+          value =>
+            value !== SUBTOTAL_TOKEN &&
+            value !== encodeMetricKey('sales') &&
+            value !== encodeMeasureLeafKey('value'),
+        ),
+    }),
+  ).toBe(tree);
 });

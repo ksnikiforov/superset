@@ -33,12 +33,9 @@ import {
 import { buildFormattingValueMaps } from '../cellUtils';
 import {
   normalizeDimensionSortingMapWithKeys,
-  coerceEpochMsStringToNumber,
   getFormattingMetricKey,
   serializeCellKey,
   serializePath,
-  decodeMetricKey,
-  decodeMeasureLeafId,
   isSubtotalToken,
 } from '../../utils';
 import { buildRenderModel } from '../render/renderModel';
@@ -57,6 +54,7 @@ import { type PivotColumnSortState } from './columnSort';
 import {
   buildColumnDisplayPath,
   expandMetricNodesForRender,
+  formatRenderTreeDateLabels,
   resolveColumnHeaderLabel,
 } from './renderDisplay';
 
@@ -180,70 +178,21 @@ export const usePivotRenderModel = ({
   const hasRowSorting = Object.keys(rowSortingKeyMap).length > 0;
 
   const { dateFormatters } = formData;
-  const renderTree = useMemo(() => {
-    const formatAxisNodes = (
-      nodes: Record<string, PivotTreeNode>,
-      axis: 'row' | 'col',
-    ) => {
-      if (!dateFormatters || Object.keys(dateFormatters).length === 0) {
-        return nodes;
-      }
-      let hasChanges = false;
-      const nextNodes: Record<string, PivotTreeNode> = { ...nodes };
-      Object.values(nodes).forEach(node => {
-        if (node.path.length === 0 || node.path.some(isSubtotalToken)) {
-          return;
-        }
-        const tail = node.path[node.path.length - 1];
-        if (decodeMetricKey(tail) || decodeMeasureLeafId(tail)) {
-          return;
-        }
-        const dimensionKey = layout.getDimensionKeyForNode(node, axis);
-        if (!dimensionKey) {
-          return;
-        }
-        const formatter = dateFormatters[dimensionKey];
-        if (!formatter) {
-          return;
-        }
-        const nonSubtotalParts = layout
-          .getNonMetricPathParts(node.path)
-          .filter(part => !isSubtotalToken(part));
-        const rawValue = nonSubtotalParts[nonSubtotalParts.length - 1];
-        if (rawValue === null || rawValue === undefined) {
-          return;
-        }
-        const normalizedRawValue = coerceEpochMsStringToNumber(rawValue);
-        let formatterInput: number;
-        if (typeof normalizedRawValue === 'number') {
-          formatterInput = normalizedRawValue;
-        } else if (normalizedRawValue instanceof Date) {
-          formatterInput = normalizedRawValue.getTime();
-        } else if (typeof normalizedRawValue === 'string') {
-          const parsed = Date.parse(normalizedRawValue);
-          if (!Number.isFinite(parsed)) {
-            return;
-          }
-          formatterInput = parsed;
-        } else {
-          return;
-        }
-        const formatted = formatter(formatterInput);
-        if (formatted !== node.formattedLabel) {
-          nextNodes[node.key] = { ...node, formattedLabel: formatted };
-          hasChanges = true;
-        }
-      });
-      return hasChanges ? nextNodes : nodes;
-    };
-
-    const nextRows = formatAxisNodes(tree.rows, 'row');
-    const nextColsFormatted = formatAxisNodes(tree.cols, 'col');
-    if (nextRows === tree.rows && nextColsFormatted === tree.cols) {
-      return tree;
-    }
-    return { ...tree, rows: nextRows, cols: nextColsFormatted };
-  }, [dateFormatters, layout, tree]);
+  const renderTree = useMemo(
+    () =>
+      formatRenderTreeDateLabels({
+        tree,
+        dateFormatters,
+        getDimensionKeyForNode: layout.getDimensionKeyForNode,
+        getNonMetricPathParts: layout.getNonMetricPathParts,
+      }),
+    [
+      dateFormatters,
+      layout.getDimensionKeyForNode,
+      layout.getNonMetricPathParts,
+      tree,
+    ],
+  );
 
   const getProjectedPathParts = useCallback(
     (axis: 'row' | 'col', path: PivotTreeNode['path']) =>
