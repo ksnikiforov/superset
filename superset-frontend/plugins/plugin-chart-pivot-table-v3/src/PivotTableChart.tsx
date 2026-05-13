@@ -63,10 +63,7 @@ import { useStickyHeaders } from './pivot/chart/useStickyHeaders';
 import { usePivotFormatting } from './pivot/chart/usePivotFormatting';
 import { usePivotInteractions } from './pivot/chart/usePivotInteractions';
 import { PivotInteractionPanel } from './pivot/chart/PivotInteractionPanel';
-import {
-  isSameRuntimeLayout,
-  shouldFetchRuntimeLayout,
-} from './pivot/runtime/coverage';
+import { isSameRuntimeLayout } from './pivot/runtime/coverage';
 import {
   normalizeRuntimeLayout,
   resolveInteractionFormData,
@@ -108,8 +105,9 @@ import {
   buildSeamlessRuntimeSyncSnapshot,
   buildSeamlessRuntimeUpstreamSignature,
   fetchAndMaterializeSeamlessRuntimeUpdate,
-  shouldApplyPersistedFilterSeamlessUpdate,
   hasPersistedRuntimeLayoutSyncSettled,
+  prepareSeamlessRuntimeLayoutChange,
+  shouldApplyPersistedFilterSeamlessUpdate,
   shouldRecoverStaleDashboardRuntimeCoverage,
   shouldSyncCommittedRuntimeLayoutFromProps,
   shouldSyncCommittedRuntimeFromProps,
@@ -1450,32 +1448,25 @@ function PivotTableChart(props: PivotTableProps) {
   );
   const handleRuntimeLayoutChange = useCallback(
     (nextLayout: PivotRuntimeLayout) => {
-      const normalized = normalizeRuntimeLayout(
+      const action = prepareSeamlessRuntimeLayoutChange({
         nextLayout,
         dimensionKeys,
         metricKeys,
-      );
-      const fetchBaselineLayout =
-        pendingSeamlessLayoutRef.current ?? committedRuntimeLayout;
-      if (
-        shouldFetchRuntimeLayout({
-          factBatches: committedFactBatches,
-          previousLayout: fetchBaselineLayout,
-          nextLayout: normalized,
-        })
-      ) {
-        pendingSeamlessLayoutRef.current = normalized;
-        updateUiRuntimeLayout(normalized);
-        applySeamlessUpdate(normalized, uiSelectedFilters);
-        return;
-      }
-      updateUiRuntimeLayout(normalized);
-      persistRuntimeState(normalized, uiSelectedFilters);
-      lastSeamlessSyncRef.current = buildSeamlessRuntimeSyncSnapshot({
-        runtimeLayout: normalized,
+        factBatches: committedFactBatches,
+        pendingSeamlessLayout: pendingSeamlessLayoutRef.current,
+        committedRuntimeLayout,
         selection: uiSelectedFilters,
         upstreamSignature: upstreamSeamlessSignature,
       });
+      if (action.kind === 'fetch') {
+        pendingSeamlessLayoutRef.current = action.runtimeLayout;
+        updateUiRuntimeLayout(action.runtimeLayout);
+        applySeamlessUpdate(action.runtimeLayout, uiSelectedFilters);
+        return;
+      }
+      updateUiRuntimeLayout(action.runtimeLayout);
+      persistRuntimeState(action.runtimeLayout, uiSelectedFilters);
+      lastSeamlessSyncRef.current = action.syncSnapshot;
     },
     [
       applySeamlessUpdate,

@@ -25,6 +25,7 @@ import {
   buildSeamlessRuntimeUpstreamSignature,
   hasPersistedRuntimeLayoutSyncSettled,
   matchesSeamlessRuntimeSyncSnapshot,
+  prepareSeamlessRuntimeLayoutChange,
   shouldApplyPersistedFilterSeamlessUpdate,
   shouldRecoverStaleDashboardRuntimeCoverage,
   shouldSyncCommittedRuntimeLayoutFromProps,
@@ -388,4 +389,69 @@ test('detects settled persisted runtime layout sync', () => {
       lastPersistedRuntimeLayout: runtimeLayout,
     }),
   ).toBe(false);
+});
+
+test('prepares fetch actions for runtime layout changes with missing coverage', () => {
+  const factBatch: PivotFactStoreBatch = {
+    coverage: buildFactCoverage({
+      reason: 'initial',
+      rowDimensions: ['country'],
+      columnDimensions: ['month'],
+      rowDepth: 1,
+      columnDepth: 0,
+    }),
+    facts: [],
+    scope: { kind: 'bootstrap' },
+  };
+
+  expect(
+    prepareSeamlessRuntimeLayoutChange({
+      nextLayout: runtimeLayout,
+      dimensionKeys: ['country', 'month'],
+      metricKeys: ['sales'],
+      factBatches: [factBatch],
+      pendingSeamlessLayout: null,
+      committedRuntimeLayout: { ...runtimeLayout, cols: [] },
+      selection: {},
+      upstreamSignature: 'query-a',
+    }),
+  ).toEqual({
+    kind: 'fetch',
+    runtimeLayout,
+  });
+});
+
+test('prepares local commit actions for covered runtime layout changes', () => {
+  const nextLayout: PivotRuntimeLayout = {
+    ...runtimeLayout,
+    rows: ['country', 'state'],
+    metrics: ['sales', 'missing'],
+  };
+
+  expect(
+    prepareSeamlessRuntimeLayoutChange({
+      nextLayout,
+      dimensionKeys: ['country', 'state', 'month'],
+      metricKeys: ['sales'],
+      factBatches: [],
+      pendingSeamlessLayout: null,
+      committedRuntimeLayout: runtimeLayout,
+      selection: { country: ['France'] },
+      upstreamSignature: 'query-a',
+    }),
+  ).toEqual({
+    kind: 'commit-local',
+    runtimeLayout: {
+      ...runtimeLayout,
+      rows: ['country', 'state'],
+    },
+    syncSnapshot: buildSeamlessRuntimeSyncSnapshot({
+      runtimeLayout: {
+        ...runtimeLayout,
+        rows: ['country', 'state'],
+      },
+      selection: { country: ['France'] },
+      upstreamSignature: 'query-a',
+    }),
+  });
 });

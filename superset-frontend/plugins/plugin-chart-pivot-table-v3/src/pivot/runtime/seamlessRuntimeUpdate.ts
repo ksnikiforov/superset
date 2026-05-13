@@ -33,12 +33,17 @@ import {
 import { type PlannedQuerySpec } from '../query/specs';
 import { normalizeFormDataExtraFilters } from '../query/normalizeExtraFormData';
 import { buildInitialPivotUpdatePlan } from '../update/initialUpdatePlan';
+import { normalizeRuntimeLayout } from '../layout/resolveInteractionLayout';
 import {
   buildInitialRuntimeFromSpecResultsAsync,
   type PivotFactStoreBatch,
 } from './ingestQueryResults';
 import { insertValuesPlaceholder } from './compilePivotProgram';
-import { factBatchesCoverRuntimeLayout, isSameRuntimeLayout } from './coverage';
+import {
+  factBatchesCoverRuntimeLayout,
+  isSameRuntimeLayout,
+  shouldFetchRuntimeLayout,
+} from './coverage';
 import {
   executeLatestRequest,
   executeScheduledLatestRequest,
@@ -255,6 +260,65 @@ export const shouldSyncUiRuntimeLayoutFromProps = ({
     isDashboardContext &&
     pendingPersistedRuntimeLayoutSync
   ) && !hasPendingSeamlessLayout;
+
+export type SeamlessRuntimeLayoutChangeAction =
+  | {
+      kind: 'fetch';
+      runtimeLayout: PivotRuntimeLayout;
+    }
+  | {
+      kind: 'commit-local';
+      runtimeLayout: PivotRuntimeLayout;
+      syncSnapshot: SeamlessRuntimeSyncSnapshot;
+    };
+
+export const prepareSeamlessRuntimeLayoutChange = ({
+  nextLayout,
+  dimensionKeys,
+  metricKeys,
+  factBatches,
+  pendingSeamlessLayout,
+  committedRuntimeLayout,
+  selection,
+  upstreamSignature,
+}: {
+  nextLayout: PivotRuntimeLayout;
+  dimensionKeys: string[];
+  metricKeys: string[];
+  factBatches: PivotFactStoreBatch[];
+  pendingSeamlessLayout: PivotRuntimeLayout | null;
+  committedRuntimeLayout: PivotRuntimeLayout;
+  selection: RuntimeSelection;
+  upstreamSignature: string;
+}): SeamlessRuntimeLayoutChangeAction => {
+  const runtimeLayout = normalizeRuntimeLayout(
+    nextLayout,
+    dimensionKeys,
+    metricKeys,
+  );
+  const previousLayout = pendingSeamlessLayout ?? committedRuntimeLayout;
+  if (
+    shouldFetchRuntimeLayout({
+      factBatches,
+      previousLayout,
+      nextLayout: runtimeLayout,
+    })
+  ) {
+    return {
+      kind: 'fetch',
+      runtimeLayout,
+    };
+  }
+  return {
+    kind: 'commit-local',
+    runtimeLayout,
+    syncSnapshot: buildSeamlessRuntimeSyncSnapshot({
+      runtimeLayout,
+      selection,
+      upstreamSignature,
+    }),
+  };
+};
 
 export type SeamlessRuntimeUpdateResult =
   | {
