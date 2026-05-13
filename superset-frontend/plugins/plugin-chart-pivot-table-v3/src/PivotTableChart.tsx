@@ -107,9 +107,8 @@ import {
   isSeamlessDisplaySnapshotSettled,
   prepareRuntimeLayoutPropSync,
   prepareRuntimeStatePersistence,
+  prepareSeamlessRuntimeUpdateEffect,
   prepareSeamlessRuntimeLayoutChange,
-  prepareStaleDashboardRuntimeUpdate,
-  shouldApplyPersistedFilterSeamlessUpdate,
   shouldRecoverStaleDashboardRuntimeCoverage,
   shouldSyncCommittedRuntimeFromProps,
   shouldSyncPersistedSelectedFilters,
@@ -912,34 +911,24 @@ function PivotTableChart(props: PivotTableProps) {
     });
 
   useEffect(() => {
-    const {
-      nextUpstreamState,
-      shouldApplySeamlessUpdate: shouldApplyStaleUpdate,
-    } = prepareStaleDashboardRuntimeUpdate({
-      upstreamSignature: upstreamDashboardQueryContextSignature,
+    const updatePlan = prepareSeamlessRuntimeUpdateEffect({
+      upstreamDashboardQueryContextSignature,
       previousUpstreamState: lastUpstreamQueryContextRef.current,
       data,
       shouldRecoverStaleCoverage:
         shouldRecoverStaleDashboardRuntimeCoverageValue,
+      isUserControlled,
+      persistedInteractionFilters,
+      committedFilters,
+      uiSelectedFilters,
+      lastSync: lastSeamlessSyncRef.current,
+      uiRuntimeLayout,
+      upstreamSeamlessSignature,
     });
-    lastUpstreamQueryContextRef.current = nextUpstreamState;
-    if (shouldApplyStaleUpdate) {
-      applySeamlessUpdate(uiRuntimeLayout, uiSelectedFilters);
-    }
-    if (
-      !shouldApplyPersistedFilterSeamlessUpdate({
-        isUserControlled,
-        persistedInteractionFilters,
-        committedFilters,
-        uiSelectedFilters,
-        lastSync: lastSeamlessSyncRef.current,
-        uiRuntimeLayout,
-        upstreamSignature: upstreamSeamlessSignature,
-      })
-    ) {
-      return;
-    }
-    applySeamlessUpdate(uiRuntimeLayout, persistedInteractionFilters);
+    lastUpstreamQueryContextRef.current = updatePlan.nextUpstreamState;
+    updatePlan.updates.forEach(({ runtimeLayout: nextLayout, selection }) => {
+      applySeamlessUpdate(nextLayout, selection);
+    });
   }, [
     applySeamlessUpdate,
     committedFilters,

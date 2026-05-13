@@ -153,69 +153,83 @@ export const shouldRecoverStaleDashboardRuntimeCoverage = ({
   !hasSelectedFilters(persistedInteractionFilters) &&
   !factBatchesCoverRuntimeLayout(committedFactBatches, committedRuntimeLayout);
 
-export const prepareStaleDashboardRuntimeUpdate = ({
-  upstreamSignature,
+export type SeamlessRuntimeUpdateEffectPlan = {
+  nextUpstreamState: SeamlessRuntimeUpstreamState;
+  updates: {
+    runtimeLayout: PivotRuntimeLayout;
+    selection: RuntimeSelection;
+  }[];
+};
+
+export const prepareSeamlessRuntimeUpdateEffect = ({
+  upstreamDashboardQueryContextSignature,
   previousUpstreamState,
   data,
   shouldRecoverStaleCoverage,
-}: {
-  upstreamSignature: string | null;
-  previousUpstreamState: SeamlessRuntimeUpstreamState;
-  data: PivotTreeData;
-  shouldRecoverStaleCoverage: boolean;
-}): {
-  nextUpstreamState: SeamlessRuntimeUpstreamState;
-  shouldApplySeamlessUpdate: boolean;
-} => {
-  if (!upstreamSignature) {
-    return {
-      nextUpstreamState: null,
-      shouldApplySeamlessUpdate: false,
-    };
-  }
-  const nextUpstreamState = {
-    data,
-    signature: upstreamSignature,
-  };
-  return {
-    nextUpstreamState,
-    shouldApplySeamlessUpdate:
-      shouldRecoverStaleCoverage ||
-      (previousUpstreamState !== null &&
-        previousUpstreamState.signature !== upstreamSignature &&
-        previousUpstreamState.data === data),
-  };
-};
-
-export const shouldApplyPersistedFilterSeamlessUpdate = ({
   isUserControlled,
   persistedInteractionFilters,
   committedFilters,
   uiSelectedFilters,
   lastSync,
   uiRuntimeLayout,
-  upstreamSignature,
+  upstreamSeamlessSignature,
 }: {
+  upstreamDashboardQueryContextSignature: string | null;
+  previousUpstreamState: SeamlessRuntimeUpstreamState;
+  data: PivotTreeData;
+  shouldRecoverStaleCoverage: boolean;
   isUserControlled: boolean;
   persistedInteractionFilters: RuntimeSelection;
   committedFilters: RuntimeSelection;
   uiSelectedFilters: RuntimeSelection;
   lastSync: SeamlessRuntimeSyncSnapshot | null;
   uiRuntimeLayout: PivotRuntimeLayout;
-  upstreamSignature: string;
-}) =>
-  isUserControlled &&
-  hasSelectedFilters(persistedInteractionFilters) &&
-  isEqual(committedFilters, persistedInteractionFilters) &&
-  isEqual(uiSelectedFilters, persistedInteractionFilters) &&
-  !matchesSeamlessRuntimeSyncSnapshot(
-    lastSync,
-    buildSeamlessRuntimeSyncSnapshot({
+  upstreamSeamlessSignature: string;
+}): SeamlessRuntimeUpdateEffectPlan => {
+  const nextUpstreamState = upstreamDashboardQueryContextSignature
+    ? {
+        data,
+        signature: upstreamDashboardQueryContextSignature,
+      }
+    : null;
+  const shouldApplyStaleUpdate =
+    upstreamDashboardQueryContextSignature !== null &&
+    (shouldRecoverStaleCoverage ||
+      (previousUpstreamState !== null &&
+        previousUpstreamState.signature !==
+          upstreamDashboardQueryContextSignature &&
+        previousUpstreamState.data === data));
+  const shouldApplyPersistedFilterUpdate =
+    isUserControlled &&
+    hasSelectedFilters(persistedInteractionFilters) &&
+    isEqual(committedFilters, persistedInteractionFilters) &&
+    isEqual(uiSelectedFilters, persistedInteractionFilters) &&
+    !matchesSeamlessRuntimeSyncSnapshot(
+      lastSync,
+      buildSeamlessRuntimeSyncSnapshot({
+        runtimeLayout: uiRuntimeLayout,
+        selection: persistedInteractionFilters,
+        upstreamSignature: upstreamSeamlessSignature,
+      }),
+    );
+  const updates: SeamlessRuntimeUpdateEffectPlan['updates'] = [];
+  if (shouldApplyStaleUpdate) {
+    updates.push({
+      runtimeLayout: uiRuntimeLayout,
+      selection: uiSelectedFilters,
+    });
+  }
+  if (shouldApplyPersistedFilterUpdate) {
+    updates.push({
       runtimeLayout: uiRuntimeLayout,
       selection: persistedInteractionFilters,
-      upstreamSignature,
-    }),
-  );
+    });
+  }
+  return {
+    nextUpstreamState,
+    updates,
+  };
+};
 
 export const shouldSyncPersistedSelectedFilters = ({
   isUserControlled,

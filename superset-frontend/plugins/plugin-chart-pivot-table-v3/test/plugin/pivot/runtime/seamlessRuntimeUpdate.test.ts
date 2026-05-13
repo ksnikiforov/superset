@@ -31,8 +31,7 @@ import {
   prepareRuntimeLayoutPropSync,
   prepareRuntimeStatePersistence,
   prepareSeamlessRuntimeLayoutChange,
-  prepareStaleDashboardRuntimeUpdate,
-  shouldApplyPersistedFilterSeamlessUpdate,
+  prepareSeamlessRuntimeUpdateEffect,
   shouldRecoverStaleDashboardRuntimeCoverage,
   shouldSyncCommittedRuntimeFromProps,
   shouldSyncPersistedSelectedFilters,
@@ -216,81 +215,8 @@ test('decides when dashboard runtime coverage needs stale recovery', () => {
   ).toBe(false);
 });
 
-test('prepares stale dashboard runtime updates from upstream query state', () => {
+test('prepares seamless runtime effect updates in chart application order', () => {
   const currentData: PivotTreeData = { rows: {}, cols: {}, cells: {} };
-  const previousData: PivotTreeData = { rows: {}, cols: {}, cells: {} };
-
-  expect(
-    prepareStaleDashboardRuntimeUpdate({
-      upstreamSignature: null,
-      previousUpstreamState: {
-        data: previousData,
-        signature: 'query-a',
-      },
-      data: currentData,
-      shouldRecoverStaleCoverage: true,
-    }),
-  ).toEqual({
-    nextUpstreamState: null,
-    shouldApplySeamlessUpdate: false,
-  });
-
-  expect(
-    prepareStaleDashboardRuntimeUpdate({
-      upstreamSignature: 'query-a',
-      previousUpstreamState: null,
-      data: currentData,
-      shouldRecoverStaleCoverage: false,
-    }),
-  ).toEqual({
-    nextUpstreamState: {
-      data: currentData,
-      signature: 'query-a',
-    },
-    shouldApplySeamlessUpdate: false,
-  });
-
-  expect(
-    prepareStaleDashboardRuntimeUpdate({
-      upstreamSignature: 'query-b',
-      previousUpstreamState: {
-        data: currentData,
-        signature: 'query-a',
-      },
-      data: currentData,
-      shouldRecoverStaleCoverage: false,
-    }),
-  ).toEqual({
-    nextUpstreamState: {
-      data: currentData,
-      signature: 'query-b',
-    },
-    shouldApplySeamlessUpdate: true,
-  });
-
-  expect(
-    prepareStaleDashboardRuntimeUpdate({
-      upstreamSignature: 'query-b',
-      previousUpstreamState: {
-        data: previousData,
-        signature: 'query-a',
-      },
-      data: currentData,
-      shouldRecoverStaleCoverage: false,
-    }).shouldApplySeamlessUpdate,
-  ).toBe(false);
-
-  expect(
-    prepareStaleDashboardRuntimeUpdate({
-      upstreamSignature: 'query-a',
-      previousUpstreamState: null,
-      data: currentData,
-      shouldRecoverStaleCoverage: true,
-    }).shouldApplySeamlessUpdate,
-  ).toBe(true);
-});
-
-test('decides when persisted filters need a seamless update', () => {
   const persistedFilters = { country: ['France'] };
   const lastSync = buildSeamlessRuntimeSyncSnapshot({
     runtimeLayout,
@@ -299,40 +225,89 @@ test('decides when persisted filters need a seamless update', () => {
   });
 
   expect(
-    shouldApplyPersistedFilterSeamlessUpdate({
+    prepareSeamlessRuntimeUpdateEffect({
+      upstreamDashboardQueryContextSignature: 'query-b',
+      previousUpstreamState: {
+        data: currentData,
+        signature: 'query-a',
+      },
+      data: currentData,
+      shouldRecoverStaleCoverage: false,
       isUserControlled: true,
       persistedInteractionFilters: persistedFilters,
       committedFilters: persistedFilters,
       uiSelectedFilters: persistedFilters,
       lastSync,
       uiRuntimeLayout: runtimeLayout,
-      upstreamSignature: 'query-a',
+      upstreamSeamlessSignature: 'query-b',
     }),
-  ).toBe(false);
+  ).toEqual({
+    nextUpstreamState: {
+      data: currentData,
+      signature: 'query-b',
+    },
+    updates: [
+      {
+        runtimeLayout,
+        selection: persistedFilters,
+      },
+      {
+        runtimeLayout,
+        selection: persistedFilters,
+      },
+    ],
+  });
+});
 
+test('skips seamless runtime effect updates for unrelated upstream state', () => {
+  const currentData: PivotTreeData = { rows: {}, cols: {}, cells: {} };
+  const previousData: PivotTreeData = { rows: {}, cols: {}, cells: {} };
   expect(
-    shouldApplyPersistedFilterSeamlessUpdate({
+    prepareSeamlessRuntimeUpdateEffect({
+      upstreamDashboardQueryContextSignature: 'query-b',
+      previousUpstreamState: {
+        data: previousData,
+        signature: 'query-a',
+      },
+      data: currentData,
+      shouldRecoverStaleCoverage: false,
       isUserControlled: true,
-      persistedInteractionFilters: persistedFilters,
-      committedFilters: persistedFilters,
-      uiSelectedFilters: persistedFilters,
-      lastSync,
-      uiRuntimeLayout: runtimeLayout,
-      upstreamSignature: 'query-b',
-    }),
-  ).toBe(true);
-
-  expect(
-    shouldApplyPersistedFilterSeamlessUpdate({
-      isUserControlled: true,
-      persistedInteractionFilters: persistedFilters,
+      persistedInteractionFilters: { country: ['France'] },
       committedFilters: {},
-      uiSelectedFilters: persistedFilters,
+      uiSelectedFilters: { country: ['France'] },
       lastSync: null,
       uiRuntimeLayout: runtimeLayout,
-      upstreamSignature: 'query-a',
+      upstreamSeamlessSignature: 'query-b',
     }),
-  ).toBe(false);
+  ).toEqual({
+    nextUpstreamState: {
+      data: currentData,
+      signature: 'query-b',
+    },
+    updates: [],
+  });
+
+  expect(
+    prepareSeamlessRuntimeUpdateEffect({
+      upstreamDashboardQueryContextSignature: null,
+      previousUpstreamState: {
+        data: previousData,
+        signature: 'query-a',
+      },
+      data: currentData,
+      shouldRecoverStaleCoverage: true,
+      isUserControlled: false,
+      persistedInteractionFilters: {},
+      committedFilters: {},
+      uiSelectedFilters: {},
+      lastSync: null,
+      uiRuntimeLayout: runtimeLayout,
+      upstreamSeamlessSignature: '',
+    }),
+  ).toEqual({
+    nextUpstreamState: null,
+    updates: [],
+  });
 });
 
 test('decides when persisted selected filters should sync into local state', () => {
