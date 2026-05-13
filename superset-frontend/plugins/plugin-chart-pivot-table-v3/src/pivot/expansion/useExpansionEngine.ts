@@ -56,7 +56,6 @@ import {
 } from '../query/fetchPlanOptimizer';
 import { stableStringify } from '../shared/stableStringify';
 import { fetchPivotBranchesBatch } from '../query/fetchPivotBranchesBatch';
-import { rootKey } from '../viewModel';
 import { planGroupedExpansionTargets } from './planner';
 import { createExpansionStateStore, type ExpansionStateStore } from './store';
 import {
@@ -77,11 +76,11 @@ import {
 import {
   addAncestors,
   applyExpansionFetchDelta,
+  buildVisiblePersistedExpansionState,
   buildHydrationStagedTree,
   computeVisibleDepths as computeVisibleDepthsBase,
   dropDescendants,
   finalizeHydrationTree,
-  getVisibleExpansionKeys as getVisibleExpansionKeysBase,
   mergeSameAxisExpansionTree,
   planInitialHydrationPrefetch,
   planHydrationIteration,
@@ -807,49 +806,25 @@ export const useExpansionEngine = ({
 
   const persistExpansionState = useCallback(
     (nextRows: Set<string>, nextCols: Set<string>) => {
-      const visibleKeys = getVisibleExpansionKeysBase({
+      const visible = buildVisiblePersistedExpansionState({
         tree: treeRef.current,
         expandedRows: nextRows,
         expandedCols: nextCols,
         config: visibilityConfig,
+        explicitExpandedRows: explicitExpandedRowsRef.current,
+        explicitExpandedCols: explicitExpandedColsRef.current,
+        explicitCollapsedRows: explicitCollapsedRowsRef.current,
+        explicitCollapsedCols: explicitCollapsedColsRef.current,
+        resolvedExpandRowsLevel,
+        resolvedExpandColumnsLevel,
+        groupbyRowKeys,
+        groupbyColumnKeys,
       });
-      const filterVisible = (
-        keys: Set<string>,
-        visible: Set<string>,
-      ): string[] =>
-        Array.from(keys).filter(key => key !== rootKey && visible.has(key));
-      const visibleRows = filterVisible(
-        explicitExpandedRowsRef.current,
-        visibleKeys.rows,
-      );
-      const visibleCols = filterVisible(
-        explicitExpandedColsRef.current,
-        visibleKeys.cols,
-      );
-      const visibleCollapsedRows = filterVisible(
-        resolvedExpandRowsLevel > 0
-          ? explicitCollapsedRowsRef.current
-          : new Set<string>(),
-        visibleKeys.rows,
-      );
-      const visibleCollapsedCols = filterVisible(
-        resolvedExpandColumnsLevel > 0
-          ? explicitCollapsedColsRef.current
-          : new Set<string>(),
-        visibleKeys.cols,
-      );
-      explicitExpandedRowsRef.current = new Set(visibleRows);
-      explicitExpandedColsRef.current = new Set(visibleCols);
-      explicitCollapsedRowsRef.current = new Set(visibleCollapsedRows);
-      explicitCollapsedColsRef.current = new Set(visibleCollapsedCols);
-      persistExpansionStateToStore({
-        rowKeys: groupbyRowKeys,
-        colKeys: groupbyColumnKeys,
-        rows: visibleRows,
-        cols: visibleCols,
-        collapsedRows: visibleCollapsedRows,
-        collapsedCols: visibleCollapsedCols,
-      });
+      explicitExpandedRowsRef.current = visible.visibleExpandedRows;
+      explicitExpandedColsRef.current = visible.visibleExpandedCols;
+      explicitCollapsedRowsRef.current = visible.visibleCollapsedRows;
+      explicitCollapsedColsRef.current = visible.visibleCollapsedCols;
+      persistExpansionStateToStore(visible.persistedState);
     },
     [
       groupbyColumnKeys,

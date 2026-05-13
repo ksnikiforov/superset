@@ -21,6 +21,7 @@ import {
   applyExpansionFetchDelta,
   buildHydrationStagedTree,
   buildHydrationPrefetchAction,
+  buildVisiblePersistedExpansionState,
   finalizeHydrationTree,
   mergeSameAxisExpansionTree,
   planInitialHydrationPrefetch,
@@ -416,6 +417,40 @@ describe('pivot/expansion/engine', () => {
         hasNewData: true,
       }).shouldReinitialize,
     ).toBe(true);
+  });
+
+  it('persists only visible explicit expansion state', () => {
+    const { tree, aKey, xKey } = buildTree({ includeIntersectionCell: true });
+    const hiddenRowKey = serializePath(['hidden']);
+    const hiddenColKey = serializePath(['hidden-col']);
+
+    const result = buildVisiblePersistedExpansionState({
+      tree,
+      expandedRows: new Set([rootKey, aKey]),
+      expandedCols: new Set([rootKey, xKey]),
+      config,
+      explicitExpandedRows: new Set([rootKey, aKey, hiddenRowKey]),
+      explicitExpandedCols: new Set([rootKey, xKey, hiddenColKey]),
+      explicitCollapsedRows: new Set([aKey, hiddenRowKey]),
+      explicitCollapsedCols: new Set([xKey, hiddenColKey]),
+      resolvedExpandRowsLevel: 1,
+      resolvedExpandColumnsLevel: 0,
+      groupbyRowKeys: ['country'],
+      groupbyColumnKeys: ['month'],
+    });
+
+    expect(result.persistedState).toEqual({
+      rowKeys: ['country'],
+      colKeys: ['month'],
+      rows: [aKey],
+      cols: [xKey],
+      collapsedRows: [aKey],
+      collapsedCols: [],
+    });
+    expect(result.visibleExpandedRows).toEqual(new Set([aKey]));
+    expect(result.visibleExpandedCols).toEqual(new Set([xKey]));
+    expect(result.visibleCollapsedRows).toEqual(new Set([aKey]));
+    expect(result.visibleCollapsedCols).toEqual(new Set());
   });
 
   it('plans fetch targets for expanded nodes', () => {

@@ -1209,3 +1209,77 @@ export const getVisibleExpansionKeys = ({
   });
   return collectVisibleExpansionKeys(renderModel);
 };
+
+const filterVisibleExpansionKeys = (keys: Set<string>, visible: Set<string>) =>
+  Array.from(keys).filter(key => key !== rootKey && visible.has(key));
+
+export const buildVisiblePersistedExpansionState = ({
+  tree,
+  expandedRows,
+  expandedCols,
+  config,
+  explicitExpandedRows,
+  explicitExpandedCols,
+  explicitCollapsedRows,
+  explicitCollapsedCols,
+  resolvedExpandRowsLevel,
+  resolvedExpandColumnsLevel,
+  groupbyRowKeys,
+  groupbyColumnKeys,
+}: {
+  tree: PivotTreeData;
+  expandedRows: Set<string>;
+  expandedCols: Set<string>;
+  config: ExpansionVisibilityConfig;
+  explicitExpandedRows: Set<string>;
+  explicitExpandedCols: Set<string>;
+  explicitCollapsedRows: Set<string>;
+  explicitCollapsedCols: Set<string>;
+  resolvedExpandRowsLevel: number;
+  resolvedExpandColumnsLevel: number;
+  groupbyRowKeys: string[];
+  groupbyColumnKeys: string[];
+}): {
+  persistedState: PivotExpansionStateKeys;
+  visibleExpandedRows: Set<string>;
+  visibleExpandedCols: Set<string>;
+  visibleCollapsedRows: Set<string>;
+  visibleCollapsedCols: Set<string>;
+} => {
+  const visibleKeys = getVisibleExpansionKeys({
+    tree,
+    expandedRows,
+    expandedCols,
+    config,
+  });
+  const visibleRows = filterVisibleExpansionKeys(
+    explicitExpandedRows,
+    visibleKeys.rows,
+  );
+  const visibleCols = filterVisibleExpansionKeys(
+    explicitExpandedCols,
+    visibleKeys.cols,
+  );
+  const visibleCollapsedRows = filterVisibleExpansionKeys(
+    resolvedExpandRowsLevel > 0 ? explicitCollapsedRows : new Set<string>(),
+    visibleKeys.rows,
+  );
+  const visibleCollapsedCols = filterVisibleExpansionKeys(
+    resolvedExpandColumnsLevel > 0 ? explicitCollapsedCols : new Set<string>(),
+    visibleKeys.cols,
+  );
+  return {
+    visibleExpandedRows: new Set(visibleRows),
+    visibleExpandedCols: new Set(visibleCols),
+    visibleCollapsedRows: new Set(visibleCollapsedRows),
+    visibleCollapsedCols: new Set(visibleCollapsedCols),
+    persistedState: {
+      rowKeys: groupbyRowKeys,
+      colKeys: groupbyColumnKeys,
+      rows: visibleRows,
+      cols: visibleCols,
+      collapsedRows: visibleCollapsedRows,
+      collapsedCols: visibleCollapsedCols,
+    },
+  };
+};
