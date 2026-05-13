@@ -265,27 +265,22 @@ export const usePivotLayout = ({
     [layout.groupbyColumns],
   );
 
-  const expandedStateSignature = useMemo(
-    () =>
-      JSON.stringify({
-        rows: groupbyRowKeys,
-        cols: groupbyColumnKeys,
-        metrics: metrics.map(getMetricKey),
-        metricsLayout: resolvedMetricsLayout,
-        metricPosition: metrics.length > 0 ? metricInsertIndex : -1,
-        rowSubtotalLevels: normalizedRowSubtotalLevels,
-        colSubtotalLevels: normalizedColSubtotalLevels,
-        rowTotals,
-        colTotals,
-        rowSubTotals,
-        expandRowsLevel: resolvedExpandRowsLevel,
-        expandColumnsLevel: resolvedExpandColumnsLevel,
-        measureHierarchy: layout.measureHierarchy,
-      }),
+  const expansionStateSharedSignatureData = useMemo(
+    () => ({
+      metrics: metrics.map(getMetricKey),
+      metricsLayout: resolvedMetricsLayout,
+      metricPosition: metrics.length > 0 ? metricInsertIndex : -1,
+      rowSubtotalLevels: normalizedRowSubtotalLevels,
+      colSubtotalLevels: normalizedColSubtotalLevels,
+      rowTotals,
+      colTotals,
+      rowSubTotals,
+      expandRowsLevel: resolvedExpandRowsLevel,
+      expandColumnsLevel: resolvedExpandColumnsLevel,
+      measureHierarchy: layout.measureHierarchy,
+    }),
     [
       colTotals,
-      groupbyColumnKeys,
-      groupbyRowKeys,
       layout.measureHierarchy,
       metricInsertIndex,
       metrics,
@@ -298,34 +293,18 @@ export const usePivotLayout = ({
       rowTotals,
     ],
   );
-  const expandedStateSharedSignature = useMemo(
+  const expandedStateSignature = useMemo(
     () =>
       JSON.stringify({
-        metrics: metrics.map(getMetricKey),
-        metricsLayout: resolvedMetricsLayout,
-        metricPosition: metrics.length > 0 ? metricInsertIndex : -1,
-        rowSubtotalLevels: normalizedRowSubtotalLevels,
-        colSubtotalLevels: normalizedColSubtotalLevels,
-        rowTotals,
-        colTotals,
-        rowSubTotals,
-        expandRowsLevel: resolvedExpandRowsLevel,
-        expandColumnsLevel: resolvedExpandColumnsLevel,
-        measureHierarchy: layout.measureHierarchy,
+        rows: groupbyRowKeys,
+        cols: groupbyColumnKeys,
+        ...expansionStateSharedSignatureData,
       }),
-    [
-      colTotals,
-      layout.measureHierarchy,
-      metricInsertIndex,
-      metrics,
-      normalizedColSubtotalLevels,
-      normalizedRowSubtotalLevels,
-      resolvedMetricsLayout,
-      resolvedExpandColumnsLevel,
-      resolvedExpandRowsLevel,
-      rowSubTotals,
-      rowTotals,
-    ],
+    [expansionStateSharedSignatureData, groupbyColumnKeys, groupbyRowKeys],
+  );
+  const expandedStateSharedSignature = useMemo(
+    () => JSON.stringify(expansionStateSharedSignatureData),
+    [expansionStateSharedSignatureData],
   );
 
   const resolvedRowTotalPosition = layout.rowTotalPosition;
