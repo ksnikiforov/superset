@@ -21,13 +21,6 @@ import { type PivotResultCell, type PivotTreeNode } from '../types';
 import { serializeCellKey } from '../utils';
 import { type HeaderCellInfo } from '../pivot/viewModel';
 
-const ROW_DEPTH_COUNT_ATTR = 'data-pivot-row-depth-count';
-const ROW_EXPORT_VALUES_ATTR = 'data-pivot-row-export-values';
-const ROW_AXIS_LABELS_ATTR = 'data-pivot-row-axis-labels';
-const EXPORT_CELL_TYPE_ATTR = 'data-pivot-export-type';
-const EXPORT_CELL_VALUE_ATTR = 'data-pivot-export-value';
-const EXPORT_SUBTOTAL_ROW_ATTR = 'data-pivot-export-subtotal-row';
-
 const getText = (value: string | null | undefined) =>
   (value ?? '').replace(/\s+/g, ' ').trim();
 
@@ -151,69 +144,6 @@ export const buildPivotV3RowExportModel = ({
       }),
     ),
   };
-};
-
-const parseRowAxisLabels = (table: HTMLTableElement): string[] => {
-  const raw = table.getAttribute(ROW_AXIS_LABELS_ATTR);
-  if (!raw) {
-    return [];
-  }
-  try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-    return parsed
-      .map(value => getText(typeof value === 'string' ? value : String(value)))
-      .filter(Boolean);
-  } catch {
-    return [];
-  }
-};
-
-const resolveDepthCount = (
-  table: HTMLTableElement,
-  axisLabels: string[],
-): number => {
-  if (axisLabels.length === 0) {
-    return 0;
-  }
-  const parsed = Number.parseInt(
-    table.getAttribute(ROW_DEPTH_COUNT_ATTR) ?? '',
-    10,
-  );
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return axisLabels.length;
-  }
-  return Math.min(axisLabels.length, parsed);
-};
-
-const toHeaderLabels = (depthCount: number, axisLabels: string[]): string[] =>
-  axisLabels.slice(0, depthCount);
-
-const parseRowExportValues = (
-  row: HTMLTableRowElement,
-  depthCount: number,
-): string[] | null => {
-  const raw = row.getAttribute(ROW_EXPORT_VALUES_ATTR);
-  if (!raw) {
-    return null;
-  }
-  try {
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) {
-      return null;
-    }
-    return Array.from({ length: depthCount }, (_, index) =>
-      getText(
-        typeof parsed[index] === 'string'
-          ? parsed[index]
-          : String(parsed[index] ?? ''),
-      ),
-    );
-  } catch {
-    return null;
-  }
 };
 
 export type PivotV3ExportSheetCell =
@@ -391,107 +321,7 @@ export const unregisterPivotV3ExportSheetData = (table: HTMLTableElement) => {
   pivotV3ExportSheetDataRegistry.delete(table);
 };
 
-const appendExpandedTextCell = (
-  target: PivotV3ExportSheetCell[],
-  cell: HTMLTableCellElement,
-  isHeader: boolean,
-) => {
-  const span = Math.max(cell.colSpan || 1, 1);
-  target.push(textCell(getText(cell.textContent), isHeader));
-  for (let index = 1; index < span; index += 1) {
-    target.push(textCell('', isHeader));
-  }
-};
-
-const buildHeaderRows = (
-  table: HTMLTableElement,
-  headerLabels: string[],
-): PivotV3ExportSheetCell[][] => {
-  const depthCount = headerLabels.length;
-  return (table.tHead ? Array.from(table.tHead.rows) : []).map(
-    (row, rowIndex) => {
-      const cells: PivotV3ExportSheetCell[] = [];
-      if (depthCount > 0) {
-        if (rowIndex === 0) {
-          headerLabels.forEach(label => cells.push(textCell(label, true)));
-        } else {
-          headerLabels.forEach(() => cells.push(textCell('', true)));
-        }
-      }
-      Array.from(row.cells).forEach((cell, cellIndex) => {
-        if (depthCount > 0 && rowIndex === 0 && cellIndex === 0) {
-          return;
-        }
-        appendExpandedTextCell(cells, cell, true);
-      });
-      return cells;
-    },
-  );
-};
-
-const parseValueCell = (
-  cell: HTMLTableCellElement,
-  isHeader: boolean,
-): PivotV3ExportSheetCell => {
-  const rawValue = cell.getAttribute(EXPORT_CELL_VALUE_ATTR)?.trim();
-  if (
-    cell.getAttribute(EXPORT_CELL_TYPE_ATTR) === 'number' &&
-    rawValue !== undefined &&
-    rawValue.length > 0
-  ) {
-    const parsed = Number(rawValue);
-    if (Number.isFinite(parsed)) {
-      return numericCell(parsed, isHeader);
-    }
-  }
-  return textCell(getText(cell.textContent), isHeader);
-};
-
-const buildBodyRows = (
-  table: HTMLTableElement,
-  depthCount: number,
-): PivotV3ExportSheetCell[][] =>
-  Array.from(table.querySelectorAll<HTMLTableRowElement>('tbody tr')).map(
-    row => {
-      const rowValues = parseRowExportValues(row, depthCount);
-      const isGrandTotalRow = row.classList.contains('pivot-grand-total-row');
-      const isSubtotalRow =
-        row.getAttribute(EXPORT_SUBTOTAL_ROW_ATTR) === 'true';
-      const cells: PivotV3ExportSheetCell[] = [];
-
-      if (rowValues) {
-        rowValues.forEach(value => cells.push(textCell(value, true)));
-      }
-
-      Array.from(row.cells).forEach((cell, cellIndex) => {
-        if (rowValues && cellIndex === 0 && cell.tagName === 'TH') {
-          return;
-        }
-        const span = Math.max(cell.colSpan || 1, 1);
-        const isHeader =
-          cell.tagName === 'TH' || isGrandTotalRow || isSubtotalRow;
-        cells.push(parseValueCell(cell, isHeader));
-        for (let index = 1; index < span; index += 1) {
-          cells.push(textCell('', isHeader));
-        }
-      });
-
-      return cells;
-    },
-  );
-
 export const buildPivotV3ExportSheetData = (
   table: HTMLTableElement,
-): PivotV3ExportSheetCell[][] => {
-  const registered = pivotV3ExportSheetDataRegistry.get(table);
-  if (registered) {
-    return registered;
-  }
-  const axisLabels = parseRowAxisLabels(table);
-  const depthCount = resolveDepthCount(table, axisLabels);
-  const headerRows = buildHeaderRows(
-    table,
-    toHeaderLabels(depthCount, axisLabels),
-  );
-  return [...headerRows, ...buildBodyRows(table, depthCount)];
-};
+): PivotV3ExportSheetCell[][] | undefined =>
+  pivotV3ExportSheetDataRegistry.get(table);

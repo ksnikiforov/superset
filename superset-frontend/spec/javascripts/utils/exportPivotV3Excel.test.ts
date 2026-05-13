@@ -37,7 +37,7 @@ describe('exportPivotV3Excel', () => {
 
   it('builds the workbook from the pivot v3 worksheet model', () => {
     document.body.innerHTML = `
-      <table class="pivot-v3-table" data-pivot-row-axis-labels='["Region"]' data-pivot-row-depth-count="1">
+      <table class="pivot-v3-table">
         <thead>
           <tr>
             <th>Rows</th>
@@ -45,13 +45,27 @@ describe('exportPivotV3Excel', () => {
           </tr>
         </thead>
         <tbody>
-          <tr data-pivot-row-export-values='["West"]'>
+          <tr>
             <th>West</th>
-            <td data-pivot-export-type="number" data-pivot-export-value="42.5">42.50</td>
+            <td>42.50</td>
           </tr>
         </tbody>
       </table>
     `;
+    const table = document.querySelector<HTMLTableElement>('.pivot-v3-table');
+    if (!table) {
+      throw new Error('Expected pivot table');
+    }
+    registerPivotV3ExportSheetData(table, [
+      [
+        { value: 'Region', type: 'string', isHeader: true },
+        { value: 'Revenue', type: 'string', isHeader: true },
+      ],
+      [
+        { value: 'West', type: 'string', isHeader: true },
+        { value: 42.5, type: 'number', isHeader: false },
+      ],
+    ]);
 
     exportPivotV3Excel('.pivot-v3-table', 'pivot-export');
 
@@ -65,6 +79,15 @@ describe('exportPivotV3Excel', () => {
       { workbook: true },
       'pivot-export.xlsx',
     );
+  });
+
+  it('does not export an unregistered pivot table', () => {
+    document.body.innerHTML = '<table class="pivot-v3-table" />';
+
+    exportPivotV3Excel('.pivot-v3-table', 'missing-model');
+
+    expect(utils.aoa_to_sheet).not.toHaveBeenCalled();
+    expect(writeFile).not.toHaveBeenCalled();
   });
 
   it('uses registered worksheet data instead of reading rendered table metadata', () => {

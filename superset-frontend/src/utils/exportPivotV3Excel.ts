@@ -43,8 +43,12 @@ export default function exportPivotV3Excel(
   if (!table) {
     return;
   }
+  const sheetData = buildPivotV3ExportSheetData(table);
+  if (!sheetData) {
+    return;
+  }
   const worksheet = utils.aoa_to_sheet(
-    buildPivotV3ExportSheetData(table).map(row => row.map(toSheetCell)),
+    sheetData.map(row => row.map(toSheetCell)),
   );
   const workbook = utils.book_new(worksheet, 'Sheet1');
   writeFile(workbook, `${fileName}.xlsx`);

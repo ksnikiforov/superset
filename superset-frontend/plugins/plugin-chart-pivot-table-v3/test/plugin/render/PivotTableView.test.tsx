@@ -395,7 +395,7 @@ describe('PivotTableView', () => {
     );
 
     const table = container.querySelector('table') as HTMLTableElement;
-    const exportRows = buildPivotV3ExportSheetData(table).map(row =>
+    const exportRows = buildPivotV3ExportSheetData(table)?.map(row =>
       row.map(cell => cell.value),
     );
     expect(exportRows).toEqual([
