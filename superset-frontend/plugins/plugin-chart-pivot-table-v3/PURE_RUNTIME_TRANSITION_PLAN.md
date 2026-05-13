@@ -58,7 +58,7 @@ cells are projections of DB facts, not canonical data.
 ## Current Status
 
 As of May 13, 2026, after
-`d1b985b012 refactor(pivot-table-v3): centralize stale dashboard runtime actions`:
+`524d54a0fd refactor(pivot-table-v3): plan initial hydration prefetch in engine`:
 
 - Overall transition estimate: **86%**.
 - Goal-weighted completion estimate: **86%**.
@@ -70,8 +70,8 @@ As of May 13, 2026, after
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `8632` insertions, `9610` deletions, net `-978`.
-- Current production `src` TypeScript/TSX total: `32532` lines.
+- Production `src`: `8767` insertions, `9632` deletions, net `-865`.
+- Current production `src` TypeScript/TSX total: `32645` lines.
 - Implied baseline `src` total: about `33510` lines.
 
 The readout is mixed but improving: the new runtime files still account for
@@ -86,7 +86,7 @@ the plugin net-negative overall.
 | Gate 2: query planning from coverage      |        91% | Initial/root/branch/batch query paths use explicit coverage metadata. Bootstrap/root fact batches now seed fetched root expansion coverage. Branch and grouped-batch fetch params no longer expose tree shape. Remaining work is mostly support/totals coverage composition.                                                                                                                                                                                                                                                                                                                  |
 | Gate 3: central fact ingestion/store      |        92% | Fetch paths return fact batches, cache/fact-store hits use typed coverage, and ingestion is isolated. Compatible root/bootstrap coverage can now materialize branch specs without matching the original request scope while exact branch coverage remains authoritative. Remaining coupling is mostly tree-shaped chart/test boundaries.                                                                                                                                                                                                                                                      |
 | Gate 4: one tree materializer             |        88% | `materializePivotTree.ts` owns fact-to-tree materialization, Values/metric/measure axes, subtotal leaf injection, and measure-leaf value application. Export no longer repairs row depth semantics, but still needs a cleaner model boundary.                                                                                                                                                                                                                                                                                                                                                 |
-| Gate 5: expansion reducer/runtime effects |        81% | Expansion no longer derives fetched state from rendered tree shape. It uses explicit fact coverage, semantic fetchability, shared fetch execution, and request lifecycles. Loaded terminal metric nodes and metric subtotal nodes now seed coverage through the fetched-coverage utility, and fetched-result delta collection now seeds both fact batches and loaded metric-node coverage for same-axis and hydration paths. The hook still owns hydration iteration, cancellation, and React commits.                                                                                        |
+| Gate 5: expansion reducer/runtime effects |        83% | Expansion no longer derives fetched state from rendered tree shape. It uses explicit fact coverage, semantic fetchability, shared fetch execution, and request lifecycles. Loaded terminal metric nodes and metric subtotal nodes now seed coverage through the fetched-coverage utility, and fetched-result delta collection now seeds both fact batches and loaded metric-node coverage for same-axis and hydration paths. Initial hydration prefetch planning and prefetch action selection are now pure engine decisions. The hook still owns hydration iteration, cancellation, and React commits. |
 | Gate 6: pure render model                 |        85% | Projection drives toggle eligibility, collapsed Values, column display, visible-axis construction, and semantic export row depth. Remaining risk is deeper row subtotal policy and some metric-index compatibility behavior.                                                                                                                                                                                                                                                                                                                                                                  |
 | Gate 7: chart component cleanup           |        64% | The chart delegates runtime fetch decisions and no longer vetoes metric-order-only commits or treats rendered tree signatures as seamless refetch identity. Seamless sync snapshots, upstream dashboard query-context signatures, committed-props sync predicates, stale coverage recovery predicates, persisted-filter seamless reload policy, persisted-selection local sync policy, runtime-layout prop sync policy, runtime-layout change actions, and stale dashboard runtime actions now live in the runtime update module. Selected-filter update policy, persisted filter normalization, and tree-derived filter value collection now live with the filter helpers. The chart still owns committed tree/fact state, dimension filter fetch state, interaction wiring, and several controller-like effects. |
 
@@ -114,6 +114,9 @@ the plugin net-negative overall.
   real fetches.
 - Fetched-result delta collection now seeds loaded metric-node coverage in one
   path shared by same-axis expansion and atomic hydration.
+- Initial hydration prefetch participation, root-only skip handling, and loader
+  visibility are planned in the expansion engine instead of in
+  `useExpansionEngine.ts`.
 - Branch-cache entries store fact batches, not rendered trees.
 - Measure-leaf value application is inside `materializePivotTree`.
 - The chart no longer contains separate runtime-layout fetch predicates, stale
@@ -160,7 +163,7 @@ the plugin net-negative overall.
 Largest relevant production files:
 
 - `PivotTableChart.tsx`: `2371` lines.
-- `useExpansionEngine.ts`: `1718` lines.
+- `useExpansionEngine.ts`: `1707` lines.
 - `usePivotFormatting.tsx`: `1632` lines.
 - `PivotDndMetricSelect.tsx`: `1566` lines.
 - `utils.ts`: `1464` lines.
@@ -334,6 +337,15 @@ Recent validation:
 - `d1b985b012`: centralized stale dashboard runtime actions in the seamless
   runtime module; touched-file ESLint, Prettier, `git diff --check`, and the
   chart-sync/runtime guardrail (`87` tests) passed.
+- After the runtime-action checkpoint, the full pivot-table-v3 plugin Jest suite
+  passed (`89` suites, `715` tests).
+- `50392546d7`: centralized hydration prefetch action decisions in the expansion
+  engine; touched-file ESLint, Prettier, `git diff --check`, and focused
+  expansion/prefetch guardrails (`53` tests) passed.
+- `524d54a0fd`: moved initial hydration prefetch planning into the expansion
+  engine, leaving the hook to execute the returned action; touched-file ESLint,
+  Prettier, `git diff --check`, and focused expansion/prefetch guardrails
+  (`54` tests) passed.
 
 Minimum test coverage for future slices:
 
