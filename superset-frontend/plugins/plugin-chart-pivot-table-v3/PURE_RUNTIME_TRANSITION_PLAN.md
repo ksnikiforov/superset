@@ -58,7 +58,7 @@ cells are projections of DB facts, not canonical data.
 ## Current Status
 
 As of May 13, 2026, after
-`6d6362443b refactor(pivot-table-v3): fold stale coverage trigger into runtime plan`:
+`9a192f0e25 refactor(pivot-table-v3): dedupe expansion in-flight tracking`:
 
 - Gate-weighted architecture estimate: **96%**.
 - Delivery remaining estimate: **15-25%**, mostly final cleanup, validation,
@@ -71,8 +71,8 @@ As of May 13, 2026, after
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `12351` insertions, `11844` deletions, net `+507`.
-- Current production `src` TypeScript/TSX total: `34017` lines.
+- Production `src`: `12351` insertions, `11849` deletions, net `+502`.
+- Current production `src` TypeScript/TSX total: `34012` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - Full plugin Jest pass after the column-sort extraction: `91` suites and
   `729` tests.
@@ -189,6 +189,10 @@ Source-only diff from pre-refactor baseline
   seamless update plan: `4` suites and `23` tests.
 - Full plugin plus export utility Jest pass after folding stale coverage
   recovery into the seamless update plan: `95` suites and `769` tests.
+- Focused expansion-concurrency pass after removing duplicate same-axis
+  in-flight counters: `4` suites and `61` tests.
+- Full plugin plus export utility Jest pass after removing duplicate same-axis
+  in-flight counters: `95` suites and `769` tests.
 
 The readout remains mixed: the plugin is still modestly above the baseline line
 count, but the chart/layout hooks keep losing inline policy and the remaining
@@ -261,6 +265,9 @@ orchestration.
 - Same-axis fetch, cross-axis hydration, collapse, and reinitialization now use
   one batched commit path for tree, expanded keys, and pending keys instead of
   separate React updates.
+- Same-axis expansion no longer keeps separate in-flight counters beside the
+  in-flight expanded-key maps; cross-axis hydration now checks the existing
+  in-flight map state directly.
 - Branch-cache entries store fact batches, not rendered trees.
 - Measure-leaf value application is inside `materializePivotTree`.
 - The chart no longer contains separate runtime-layout fetch predicates, stale
@@ -383,7 +390,7 @@ Largest relevant production files:
 - `PivotTableChart.tsx`: `1401` lines.
 - `materializePivotTree.ts`: `1329` lines.
 - `usePivotFormatting.tsx`: `1325` lines.
-- `useExpansionEngine.ts`: `1321` lines.
+- `useExpansionEngine.ts`: `1316` lines.
 - `PivotInteractionPanel.tsx`: `1186` lines.
 - `PivotDndColumnSelect.tsx`: `1109` lines.
 - `controlPanel.tsx`: `1038` lines.
