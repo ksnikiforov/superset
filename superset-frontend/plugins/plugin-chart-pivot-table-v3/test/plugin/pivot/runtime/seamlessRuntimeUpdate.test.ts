@@ -17,7 +17,10 @@
  * under the License.
  */
 
-import { type PivotRuntimeLayout } from '../../../../src/types';
+import {
+  type PivotRuntimeLayout,
+  type PivotTreeData,
+} from '../../../../src/types';
 import { buildFactCoverage } from '../../../../src/pivot/runtime/coverage';
 import { type PivotFactStoreBatch } from '../../../../src/pivot/runtime/factStore';
 import {
@@ -26,6 +29,7 @@ import {
   hasPersistedRuntimeLayoutSyncSettled,
   matchesSeamlessRuntimeSyncSnapshot,
   prepareSeamlessRuntimeLayoutChange,
+  prepareStaleDashboardRuntimeUpdate,
   shouldApplyPersistedFilterSeamlessUpdate,
   shouldRecoverStaleDashboardRuntimeCoverage,
   shouldSyncCommittedRuntimeLayoutFromProps,
@@ -210,6 +214,80 @@ test('decides when dashboard runtime coverage needs stale recovery', () => {
       committedRuntimeLayout: runtimeLayout,
     }),
   ).toBe(false);
+});
+
+test('prepares stale dashboard runtime updates from upstream query state', () => {
+  const currentData: PivotTreeData = { rows: {}, cols: {}, cells: {} };
+  const previousData: PivotTreeData = { rows: {}, cols: {}, cells: {} };
+
+  expect(
+    prepareStaleDashboardRuntimeUpdate({
+      upstreamSignature: null,
+      previousUpstreamState: {
+        data: previousData,
+        signature: 'query-a',
+      },
+      data: currentData,
+      shouldRecoverStaleCoverage: true,
+    }),
+  ).toEqual({
+    nextUpstreamState: null,
+    shouldApplySeamlessUpdate: false,
+  });
+
+  expect(
+    prepareStaleDashboardRuntimeUpdate({
+      upstreamSignature: 'query-a',
+      previousUpstreamState: null,
+      data: currentData,
+      shouldRecoverStaleCoverage: false,
+    }),
+  ).toEqual({
+    nextUpstreamState: {
+      data: currentData,
+      signature: 'query-a',
+    },
+    shouldApplySeamlessUpdate: false,
+  });
+
+  expect(
+    prepareStaleDashboardRuntimeUpdate({
+      upstreamSignature: 'query-b',
+      previousUpstreamState: {
+        data: currentData,
+        signature: 'query-a',
+      },
+      data: currentData,
+      shouldRecoverStaleCoverage: false,
+    }),
+  ).toEqual({
+    nextUpstreamState: {
+      data: currentData,
+      signature: 'query-b',
+    },
+    shouldApplySeamlessUpdate: true,
+  });
+
+  expect(
+    prepareStaleDashboardRuntimeUpdate({
+      upstreamSignature: 'query-b',
+      previousUpstreamState: {
+        data: previousData,
+        signature: 'query-a',
+      },
+      data: currentData,
+      shouldRecoverStaleCoverage: false,
+    }).shouldApplySeamlessUpdate,
+  ).toBe(false);
+
+  expect(
+    prepareStaleDashboardRuntimeUpdate({
+      upstreamSignature: 'query-a',
+      previousUpstreamState: null,
+      data: currentData,
+      shouldRecoverStaleCoverage: true,
+    }).shouldApplySeamlessUpdate,
+  ).toBe(true);
 });
 
 test('decides when persisted filters need a seamless update', () => {

@@ -65,6 +65,11 @@ export type SeamlessRuntimeSyncSnapshot = {
   upstreamSignature: string;
 };
 
+export type SeamlessRuntimeUpstreamState = {
+  data: PivotTreeData;
+  signature: string;
+} | null;
+
 export const buildSeamlessRuntimeSyncSnapshot = ({
   runtimeLayout,
   selection,
@@ -147,6 +152,40 @@ export const shouldRecoverStaleDashboardRuntimeCoverage = ({
   isDashboardRuntimeSync &&
   !hasSelectedFilters(persistedInteractionFilters) &&
   !factBatchesCoverRuntimeLayout(committedFactBatches, committedRuntimeLayout);
+
+export const prepareStaleDashboardRuntimeUpdate = ({
+  upstreamSignature,
+  previousUpstreamState,
+  data,
+  shouldRecoverStaleCoverage,
+}: {
+  upstreamSignature: string | null;
+  previousUpstreamState: SeamlessRuntimeUpstreamState;
+  data: PivotTreeData;
+  shouldRecoverStaleCoverage: boolean;
+}): {
+  nextUpstreamState: SeamlessRuntimeUpstreamState;
+  shouldApplySeamlessUpdate: boolean;
+} => {
+  if (!upstreamSignature) {
+    return {
+      nextUpstreamState: null,
+      shouldApplySeamlessUpdate: false,
+    };
+  }
+  const nextUpstreamState = {
+    data,
+    signature: upstreamSignature,
+  };
+  return {
+    nextUpstreamState,
+    shouldApplySeamlessUpdate:
+      shouldRecoverStaleCoverage ||
+      (previousUpstreamState !== null &&
+        previousUpstreamState.signature !== upstreamSignature &&
+        previousUpstreamState.data === data),
+  };
+};
 
 export const shouldApplyPersistedFilterSeamlessUpdate = ({
   isUserControlled,

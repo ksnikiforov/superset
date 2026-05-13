@@ -107,6 +107,7 @@ import {
   fetchAndMaterializeSeamlessRuntimeUpdate,
   hasPersistedRuntimeLayoutSyncSettled,
   prepareSeamlessRuntimeLayoutChange,
+  prepareStaleDashboardRuntimeUpdate,
   shouldApplyPersistedFilterSeamlessUpdate,
   shouldRecoverStaleDashboardRuntimeCoverage,
   shouldSyncCommittedRuntimeLayoutFromProps,
@@ -114,6 +115,7 @@ import {
   shouldSyncPersistedSelectedFilters,
   shouldSyncUiRuntimeLayoutFromProps,
   type SeamlessRuntimeSyncSnapshot,
+  type SeamlessRuntimeUpstreamState,
 } from './pivot/runtime/seamlessRuntimeUpdate';
 
 const PANEL_WIDTH = 230;
@@ -834,10 +836,8 @@ function PivotTableChart(props: PivotTableProps) {
   const [pendingDisplaySnapshot, setPendingDisplaySnapshot] =
     useState<PivotDisplaySnapshot | null>(null);
   const pendingSeamlessLayoutRef = useRef<PivotRuntimeLayout | null>(null);
-  const lastUpstreamQueryContextRef = useRef<{
-    data: PivotTreeData;
-    signature: string;
-  } | null>(null);
+  const lastUpstreamQueryContextRef =
+    useRef<SeamlessRuntimeUpstreamState>(null);
   const expandedRowsForSeamlessRef = useRef<Set<string>>(new Set());
   const expandedColsForSeamlessRef = useRef<Set<string>>(new Set());
   const pendingRowsForSeamlessRef = useRef<Set<string>>(new Set());
@@ -1491,29 +1491,18 @@ function PivotTableChart(props: PivotTableProps) {
     });
 
   useEffect(() => {
-    if (!upstreamDashboardQueryContextSignature) {
-      lastUpstreamQueryContextRef.current = null;
-      return;
-    }
-    const previous = lastUpstreamQueryContextRef.current;
-    lastUpstreamQueryContextRef.current = {
-      data,
-      signature: upstreamDashboardQueryContextSignature,
-    };
-    if (shouldRecoverStaleDashboardRuntimeCoverageValue) {
+    const { nextUpstreamState, shouldApplySeamlessUpdate } =
+      prepareStaleDashboardRuntimeUpdate({
+        upstreamSignature: upstreamDashboardQueryContextSignature,
+        previousUpstreamState: lastUpstreamQueryContextRef.current,
+        data,
+        shouldRecoverStaleCoverage:
+          shouldRecoverStaleDashboardRuntimeCoverageValue,
+      });
+    lastUpstreamQueryContextRef.current = nextUpstreamState;
+    if (shouldApplySeamlessUpdate) {
       applySeamlessUpdate(uiRuntimeLayout, uiSelectedFilters);
-      return;
     }
-    if (!previous) {
-      return;
-    }
-    if (previous.signature === upstreamDashboardQueryContextSignature) {
-      return;
-    }
-    if (previous.data !== data) {
-      return;
-    }
-    applySeamlessUpdate(uiRuntimeLayout, uiSelectedFilters);
   }, [
     applySeamlessUpdate,
     data,
