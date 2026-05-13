@@ -20,6 +20,7 @@ import { type QueryFormColumn } from '@superset-ui/core';
 import { MetricsLayoutEnum, type PivotTreeNode } from '../../../../src/types';
 import {
   resolveAxisChildrenBeforeSubtotalPolicy,
+  resolveCollapsedValuesNodesForAxis,
   resolveMetricAxisLayoutPolicy,
 } from '../../../../src/pivot/chart/layoutRuntime';
 import { type PivotProgram } from '../../../../src/pivot/runtime/types';
@@ -72,6 +73,25 @@ const baseProgram: PivotProgram = {
   metricsLayoutResolved: MetricsLayoutEnum.ROWS,
   valueAxis: 'row',
   metricInsertIndex: 0,
+};
+
+const valuesProgram: PivotProgram = {
+  rows: [
+    { kind: 'dimension', column: 'country' },
+    {
+      kind: 'values',
+      metrics: [{ key: 'sales', metric: 'sales', index: 0 }],
+    },
+    { kind: 'dimension', column: 'quarter' },
+  ],
+  columns: [],
+  rowDimensions: ['country', 'quarter'],
+  columnDimensions: [],
+  metrics: [{ key: 'sales', metric: 'sales', index: 0 }],
+  metricKeys: ['sales'],
+  metricsLayoutResolved: MetricsLayoutEnum.ROWS,
+  valueAxis: 'row',
+  metricInsertIndex: 1,
 };
 
 describe('pivot/chart/layoutRuntime', () => {
@@ -204,5 +224,90 @@ describe('pivot/chart/layoutRuntime', () => {
         keepValuesChild: () => true,
       }),
     ).toEqual([dimensionChild]);
+  });
+
+  it('projects collapsed Values metric nodes from deeper source metric paths', () => {
+    const parent = node('row', ['West']);
+    const metricNode = node('row', ['West', 'Q1', encodeMetricKey('sales')]);
+    const nodes = {
+      [parent.key]: parent,
+      [metricNode.key]: metricNode,
+    };
+
+    const collapsed = resolveCollapsedValuesNodesForAxis({
+      program: valuesProgram,
+      resolvedMetricsLayout: MetricsLayoutEnum.ROWS,
+      metricLabelSet: baseParams.metricLabelSet,
+      axis: 'row',
+      parent,
+      expandedSet: new Set<string>(),
+      nodes,
+      exposeCollapsedMetricTier: true,
+      metricsAtEnd: false,
+      suppressSubtotalParent: true,
+      normalizeSubtotalExisting: false,
+      isMetricTokenValue: baseParams.isMetricTokenValue,
+      isExplicitSubtotalNode: () => false,
+      isMetricSubtotalNode: () => false,
+    });
+
+    expect(collapsed).toEqual([
+      expect.objectContaining({
+        key: serializePath(['West', encodeMetricKey('sales')]),
+        path: ['West', encodeMetricKey('sales')],
+        label: 'sales',
+        formattedLabel: 'sales',
+        hasChildren: true,
+      }),
+    ]);
+  });
+
+  it('normalizes existing subtotal metric nodes for collapsed column leaves', () => {
+    const parent = node('col', ['West']);
+    const metricNode = {
+      ...node('col', ['West', encodeMetricKey('sales')]),
+      label: 'Subtotal',
+      formattedLabel: 'Subtotal',
+      isSubtotal: true,
+    };
+    const nodes = {
+      [parent.key]: parent,
+      [metricNode.key]: metricNode,
+    };
+
+    const collapsed = resolveCollapsedValuesNodesForAxis({
+      program: {
+        ...valuesProgram,
+        rows: [],
+        columns: valuesProgram.rows,
+        rowDimensions: [],
+        columnDimensions: valuesProgram.rowDimensions,
+        metricsLayoutResolved: MetricsLayoutEnum.COLUMNS,
+        valueAxis: 'col',
+      },
+      resolvedMetricsLayout: MetricsLayoutEnum.COLUMNS,
+      metricLabelSet: baseParams.metricLabelSet,
+      axis: 'col',
+      parent,
+      expandedSet: new Set<string>(),
+      nodes,
+      exposeCollapsedMetricTier: true,
+      metricsAtEnd: true,
+      suppressSubtotalParent: false,
+      normalizeSubtotalExisting: true,
+      isMetricTokenValue: baseParams.isMetricTokenValue,
+      isExplicitSubtotalNode: () => false,
+      isMetricSubtotalNode: child => child?.isSubtotal === true,
+    });
+
+    expect(collapsed).toEqual([
+      expect.objectContaining({
+        key: metricNode.key,
+        label: 'sales',
+        formattedLabel: 'sales',
+        isSubtotal: false,
+        hasChildren: false,
+      }),
+    ]);
   });
 });

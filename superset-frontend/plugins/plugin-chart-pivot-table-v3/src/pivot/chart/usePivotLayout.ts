@@ -32,24 +32,20 @@ import {
   getMetricKey,
   getStableColumnKey,
   isSubtotalToken,
-  serializePath,
 } from '../../utils';
-import { findChildren } from '../viewModel';
 import { buildLayoutContext } from '../layout/LayoutContext';
 import {
   countDimDepth as countDimDepthBase,
-  getMetricDepthForParent as getMetricDepthForParentBase,
   getMetricLabelFromPath as getMetricLabelFromPathBase,
-  getMetricTierNodes as getMetricTierNodesBase,
   getNonMetricPathParts as getNonMetricPathPartsBase,
   isExplicitSubtotalNode,
   isMetricGrandTotalNode as isMetricGrandTotalNodeBase,
   isMetricSubtotalNode as isMetricSubtotalNodeBase,
 } from '../metricsTotals';
-import { resolveCollapsedValuesProjection } from '../runtime/projection';
 import { pruneStaleCollapsedAxis } from './pruneCollapsedAxis';
 import {
   resolveAxisChildrenBeforeSubtotalPolicy,
+  resolveCollapsedValuesNodesForAxis,
   resolveMetricAxisLayoutPolicy,
 } from './layoutRuntime';
 
@@ -551,16 +547,7 @@ export const usePivotLayout = ({
   );
 
   const getCollapsedValuesNodesForAxis = useCallback(
-    ({
-      axis,
-      parent,
-      expandedSet,
-      nodes,
-      exposeCollapsedMetricTier,
-      metricsAtEnd,
-      suppressSubtotalParent,
-      normalizeSubtotalExisting,
-    }: {
+    (params: {
       axis: 'row' | 'col';
       parent: PivotTreeNode;
       expandedSet: Set<string>;
@@ -569,79 +556,16 @@ export const usePivotLayout = ({
       metricsAtEnd: boolean;
       suppressSubtotalParent: boolean;
       normalizeSubtotalExisting: boolean;
-    }) => {
-      const expectedMetricsLayout =
-        axis === 'row' ? MetricsLayoutEnum.ROWS : MetricsLayoutEnum.COLUMNS;
-      if (
-        !exposeCollapsedMetricTier ||
-        resolvedMetricsLayout !== expectedMetricsLayout ||
-        expandedSet.has(parent.key)
-      ) {
-        return [] as PivotTreeNode[];
-      }
-      if (
-        (suppressSubtotalParent &&
-          (isExplicitSubtotalNode(parent) || isMetricSubtotalNode(parent))) ||
-        parent.path.some(val => isMetricTokenValue(val))
-      ) {
-        return [] as PivotTreeNode[];
-      }
-      const metricDepth = getMetricDepthForParentBase(
-        nodes,
-        parent,
-        metricLabelSet,
-      );
-      if (metricDepth === undefined || parent.path.length > metricDepth) {
-        return [] as PivotTreeNode[];
-      }
-      const metricNodes = getMetricTierNodesBase(
-        nodes,
-        parent,
-        metricDepth,
-        metricLabelSet,
-      );
-      if (metricNodes.length === 0) {
-        return [] as PivotTreeNode[];
-      }
-      const collapsedMetrics = resolveCollapsedValuesProjection({
+    }) =>
+      resolveCollapsedValuesNodesForAxis({
+        ...params,
         program: layout.pivotProgram,
-        axis,
-        parentPath: parent.path,
-        sourceMetricPaths: metricNodes.map(node => node.path),
-      });
-      return collapsedMetrics.map(metric => {
-        const collapsedKey = serializePath(metric.metricPath);
-        const existing = nodes[collapsedKey];
-        const sourceNode = nodes[serializePath(metric.sourceMetricPath)];
-        const hasChildren = metricsAtEnd
-          ? false
-          : findChildren(
-              nodes,
-              existing || { ...parent, path: metric.metricPath },
-            ).length > 0 || metric.hasProjectedChildren;
-        if (existing) {
-          if (normalizeSubtotalExisting && isMetricSubtotalNode(existing)) {
-            return {
-              ...existing,
-              label: metric.metricKey,
-              formattedLabel: metric.metricKey,
-              isSubtotal: false,
-              hasChildren,
-            };
-          }
-          return { ...existing, hasChildren };
-        }
-        return {
-          ...(sourceNode || metricNodes[0]),
-          key: collapsedKey,
-          path: metric.metricPath,
-          label: metric.metricKey,
-          formattedLabel: metric.metricKey,
-          level: metric.metricPath.length,
-          hasChildren,
-        };
-      });
-    },
+        resolvedMetricsLayout,
+        metricLabelSet,
+        isMetricTokenValue,
+        isExplicitSubtotalNode,
+        isMetricSubtotalNode,
+      }),
     [
       isMetricSubtotalNode,
       isMetricTokenValue,
