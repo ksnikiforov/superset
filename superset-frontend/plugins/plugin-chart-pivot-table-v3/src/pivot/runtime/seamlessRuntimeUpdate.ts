@@ -175,6 +175,45 @@ export const shouldApplyPersistedFilterSeamlessUpdate = ({
     }),
   );
 
+export const shouldSyncPersistedSelectedFilters = ({
+  isUserControlled,
+  pendingPersistedSelectionSync,
+  persistedSelectedFilters,
+  committedFilters,
+  uiSelectedFilters,
+  suppressStalePersistedFilterRestore,
+}: {
+  isUserControlled: boolean;
+  pendingPersistedSelectionSync: boolean;
+  persistedSelectedFilters: RuntimeSelection;
+  committedFilters: RuntimeSelection;
+  uiSelectedFilters: RuntimeSelection;
+  suppressStalePersistedFilterRestore: boolean;
+}) => {
+  if (isUserControlled && pendingPersistedSelectionSync) {
+    return false;
+  }
+  const shouldSyncFilters =
+    !isEqual(persistedSelectedFilters, committedFilters) ||
+    !isEqual(persistedSelectedFilters, uiSelectedFilters);
+  if (!shouldSyncFilters) {
+    return false;
+  }
+  if (!isUserControlled) {
+    return true;
+  }
+  const hasLocalFilters =
+    hasSelectedFilters(uiSelectedFilters) ||
+    hasSelectedFilters(committedFilters);
+  if (hasLocalFilters) {
+    return false;
+  }
+  return !(
+    suppressStalePersistedFilterRestore &&
+    hasSelectedFilters(persistedSelectedFilters)
+  );
+};
+
 export type SeamlessRuntimeUpdateResult =
   | {
       status: 'success';

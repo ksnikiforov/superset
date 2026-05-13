@@ -105,6 +105,7 @@ import {
   shouldApplyPersistedFilterSeamlessUpdate,
   shouldRecoverStaleDashboardRuntimeCoverage,
   shouldSyncCommittedRuntimeFromProps,
+  shouldSyncPersistedSelectedFilters,
   type SeamlessRuntimeSyncSnapshot,
 } from './pivot/runtime/seamlessRuntimeUpdate';
 
@@ -1328,30 +1329,17 @@ function PivotTableChart(props: PivotTableProps) {
   }, [isUserControlled, persistedSelectedFilters]);
 
   useEffect(() => {
-    if (isUserControlled && pendingPersistedSelectionSyncRef.current) {
-      return;
-    }
-    const shouldSyncFilters =
-      !isEqual(persistedSelectedFilters, committedFilters) ||
-      !isEqual(persistedSelectedFilters, uiSelectedFilters);
-    if (!shouldSyncFilters) {
-      return;
-    }
-    if (!isUserControlled) {
-      setCommittedFilters(persistedSelectedFilters);
-      setUiSelectedFilters(persistedSelectedFilters);
-      return;
-    }
-    const hasLocalFilters =
-      hasSelectedFilters(uiSelectedFilters) ||
-      hasSelectedFilters(committedFilters);
-    if (!hasLocalFilters) {
-      if (
-        suppressStalePersistedFilterRestoreRef.current &&
-        hasSelectedFilters(persistedSelectedFilters)
-      ) {
-        return;
-      }
+    if (
+      shouldSyncPersistedSelectedFilters({
+        isUserControlled,
+        pendingPersistedSelectionSync: pendingPersistedSelectionSyncRef.current,
+        persistedSelectedFilters,
+        committedFilters,
+        uiSelectedFilters,
+        suppressStalePersistedFilterRestore:
+          suppressStalePersistedFilterRestoreRef.current,
+      })
+    ) {
       setCommittedFilters(persistedSelectedFilters);
       setUiSelectedFilters(persistedSelectedFilters);
     }

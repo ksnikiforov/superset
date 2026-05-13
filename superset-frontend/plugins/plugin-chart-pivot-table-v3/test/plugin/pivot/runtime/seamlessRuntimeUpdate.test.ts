@@ -27,6 +27,7 @@ import {
   shouldApplyPersistedFilterSeamlessUpdate,
   shouldRecoverStaleDashboardRuntimeCoverage,
   shouldSyncCommittedRuntimeFromProps,
+  shouldSyncPersistedSelectedFilters,
 } from '../../../../src/pivot/runtime/seamlessRuntimeUpdate';
 
 const runtimeLayout: PivotRuntimeLayout = {
@@ -248,6 +249,64 @@ test('decides when persisted filters need a seamless update', () => {
       lastSync: null,
       uiRuntimeLayout: runtimeLayout,
       upstreamSignature: 'query-a',
+    }),
+  ).toBe(false);
+});
+
+test('decides when persisted selected filters should sync into local state', () => {
+  const persistedFilters = { country: ['France'] };
+  expect(
+    shouldSyncPersistedSelectedFilters({
+      isUserControlled: false,
+      pendingPersistedSelectionSync: false,
+      persistedSelectedFilters: persistedFilters,
+      committedFilters: {},
+      uiSelectedFilters: {},
+      suppressStalePersistedFilterRestore: true,
+    }),
+  ).toBe(true);
+
+  expect(
+    shouldSyncPersistedSelectedFilters({
+      isUserControlled: true,
+      pendingPersistedSelectionSync: true,
+      persistedSelectedFilters: persistedFilters,
+      committedFilters: {},
+      uiSelectedFilters: {},
+      suppressStalePersistedFilterRestore: false,
+    }),
+  ).toBe(false);
+
+  expect(
+    shouldSyncPersistedSelectedFilters({
+      isUserControlled: true,
+      pendingPersistedSelectionSync: false,
+      persistedSelectedFilters: persistedFilters,
+      committedFilters: {},
+      uiSelectedFilters: {},
+      suppressStalePersistedFilterRestore: true,
+    }),
+  ).toBe(false);
+
+  expect(
+    shouldSyncPersistedSelectedFilters({
+      isUserControlled: true,
+      pendingPersistedSelectionSync: false,
+      persistedSelectedFilters: persistedFilters,
+      committedFilters: {},
+      uiSelectedFilters: {},
+      suppressStalePersistedFilterRestore: false,
+    }),
+  ).toBe(true);
+
+  expect(
+    shouldSyncPersistedSelectedFilters({
+      isUserControlled: true,
+      pendingPersistedSelectionSync: false,
+      persistedSelectedFilters: persistedFilters,
+      committedFilters: { country: ['Germany'] },
+      uiSelectedFilters: {},
+      suppressStalePersistedFilterRestore: false,
     }),
   ).toBe(false);
 });
