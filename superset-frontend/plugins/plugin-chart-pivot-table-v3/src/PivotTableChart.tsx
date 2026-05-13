@@ -1255,15 +1255,8 @@ function PivotTableChart(props: PivotTableProps) {
   const persistedInteractionFiltersSignature = selectedFiltersSignature(
     persistedInteractionFilters,
   );
-  const upstreamSeamlessSignature = useMemo(
-    () =>
-      stableStringify({
-        dashboardQueryContext:
-          upstreamDashboardQueryContextSignature ?? EMPTY_SELECTED_FILTERS,
-        treeDataSignature: formData.treeDataSignature ?? null,
-      }),
-    [formData.treeDataSignature, upstreamDashboardQueryContextSignature],
-  );
+  const upstreamSeamlessSignature =
+    upstreamDashboardQueryContextSignature ?? '';
   const hasLocalSyncForCurrentDashboardQueryContext =
     isDashboardContext &&
     upstreamDashboardQueryContextSignature !== null &&

@@ -206,8 +206,19 @@ export const createPivotFactStore = (): PivotFactStore => {
       .filter(([, candidate]) => isCompatibleSelector(candidate, selector))
       .map(([key, candidate]) => ({ key, selector: candidate }));
 
+  const getCompatibleRequestSelectorsForRead = (
+    selector: PivotFactSelector,
+  ) => {
+    const exactKey = buildPivotFactRequestKey(selector);
+    const exactSelector = selectorByRequest.get(exactKey);
+    if (exactSelector) {
+      return [{ key: exactKey, selector: exactSelector }];
+    }
+    return getCompatibleRequestSelectors(selector);
+  };
+
   const getCompatibleFacts = (selector: PivotFactSelector) =>
-    getCompatibleRequestSelectors(selector).flatMap(candidate => {
+    getCompatibleRequestSelectorsForRead(selector).flatMap(candidate => {
       const facts = Array.from(factKeysByRequest.get(candidate.key) ?? [])
         .map(key => factsByKey.get(key))
         .filter((fact): fact is PivotFact => fact !== undefined);

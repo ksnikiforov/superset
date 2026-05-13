@@ -209,6 +209,50 @@ test('does not reuse root coverage for values-token branch scopes', () => {
   expect(store.getCompatibleFacts(selectorWithMetricPath)).toEqual([]);
 });
 
+test('prefers exact branch facts over broader compatible root coverage', () => {
+  const store = createPivotFactStore();
+  const branchCoverage: PivotFactCoverage = {
+    reason: 'expand',
+    rowDepth: 2,
+    columnDepth: 1,
+    rowDimensions: ['country', 'city'],
+    columnDimensions: ['month'],
+  };
+  const selector = {
+    coverage: branchCoverage,
+    scope: {
+      kind: 'branch',
+      axis: 'row',
+      path: ['France'],
+    } as PivotFactStoreBatchScope,
+  };
+  const rootFact = buildFact({
+    rowPath: ['France', 'Paris'],
+    columnPath: ['2026-01'],
+    value: 1,
+  });
+  const branchFact = buildFact({
+    rowPath: ['France', 'Paris'],
+    columnPath: ['2026-01'],
+    value: 2,
+  });
+
+  store.upsertBatch({
+    coverage: { ...branchCoverage, reason: 'initial' },
+    scope: { kind: 'root' },
+    facts: [rootFact],
+  });
+  store.upsertBatch({
+    ...selector,
+    facts: [branchFact],
+  });
+
+  expect(store.hasCompatibleCoverage(selector)).toBe(true);
+  expect(store.getCompatibleFacts(selector).map(fact => fact.value)).toEqual([
+    2,
+  ]);
+});
+
 test('tracks loaded coverage even when the query returns no facts', () => {
   const store = createPivotFactStore();
 
