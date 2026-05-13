@@ -17,7 +17,11 @@
  * under the License.
  */
 
-import { buildPivotV3ExportTable } from '../../../src/export/buildPivotV3ExportTable';
+import {
+  buildPivotV3ExportTable,
+  buildPivotV3RowExportModel,
+} from '../../../src/export/buildPivotV3ExportTable';
+import { type PivotTreeNode } from '../../../src/types';
 
 describe('buildPivotV3ExportTable', () => {
   beforeEach(() => {
@@ -32,7 +36,7 @@ describe('buildPivotV3ExportTable', () => {
     );
     const rows = Array.from(
       document.querySelectorAll<HTMLTableRowElement>('tbody tr'),
-    ).map(row => {
+    ).map((row, index) => {
       const depthNode = row.querySelector<HTMLElement>(
         '[data-pivot-row-depth]',
       );
@@ -40,62 +44,65 @@ describe('buildPivotV3ExportTable', () => {
         depthNode?.getAttribute('data-pivot-row-depth') ?? '',
         10,
       );
+      const depth =
+        Number.isFinite(parsedDepth) && parsedDepth >= 0 ? parsedDepth : 0;
+      const label =
+        row
+          .querySelector<HTMLElement>('[data-pivot-row-label]')
+          ?.textContent?.trim() ?? '';
+      const isGrandTotal = row.classList.contains('pivot-grand-total-row');
+      const isSubtotal =
+        !isGrandTotal && row.cells[0]?.classList.contains('subtotal-cell');
+      const node: PivotTreeNode = {
+        axis: 'row',
+        key: `row-${index}`,
+        path: Array.from({ length: depth + 1 }, (_, pathIndex) =>
+          pathIndex === depth ? label : `level-${pathIndex}`,
+        ),
+        label,
+        formattedLabel: label,
+        level: depth + 1,
+        hasChildren: false,
+        isSubtotal,
+      };
       return {
         row,
-        depth:
-          Number.isFinite(parsedDepth) && parsedDepth >= 0 ? parsedDepth : 0,
-        label:
-          row
-            .querySelector<HTMLElement>('[data-pivot-row-label]')
-            ?.textContent?.trim() ?? '',
-        isGrandTotal: row.classList.contains('pivot-grand-total-row'),
-        isSubtotal:
-          !row.classList.contains('pivot-grand-total-row') &&
-          row.cells[0]?.classList.contains('subtotal-cell'),
+        node,
+        isGrandTotal,
+        isSubtotal,
       };
     });
-    const rowHasVisibleChildren = (rowIndex: number) => {
-      const current = rows[rowIndex];
-      if (!current?.isSubtotal) {
-        return false;
+
+    const grandTotalKeys = new Set(
+      rows.filter(entry => entry.isGrandTotal).map(entry => entry.node.key),
+    );
+    const subtotalKeys = new Set(
+      rows.filter(entry => entry.isSubtotal).map(entry => entry.node.key),
+    );
+    const { rowExportRows } = buildPivotV3RowExportModel({
+      visibleRows: rows.map(entry => entry.node),
+      rowAxisLabels: Array.from({ length: depthCount }, (_, index) =>
+        String(index),
+      ),
+      rowTotalLabel:
+        table?.getAttribute('data-pivot-row-total-label') ?? 'Total',
+      getNodeDimDepth: node => node.level,
+      formatLabel: node => node.formattedLabel,
+      isGrandTotalLikeRow: node => grandTotalKeys.has(node.key),
+      isRowAggregateBold: node => subtotalKeys.has(node?.key ?? ''),
+    });
+
+    rows.forEach(entry => {
+      const rowExport = rowExportRows.get(entry.node.key);
+      if (!rowExport) {
+        return;
       }
-      for (let index = rowIndex + 1; index < rows.length; index += 1) {
-        const next = rows[index];
-        if (next.isGrandTotal) {
-          continue;
-        }
-        if (next.depth <= current.depth) {
-          return false;
-        }
-        return true;
-      }
-      return false;
-    };
-    const activePath: string[] = [];
-    rows.forEach((entry, index) => {
-      if (entry.isGrandTotal) {
-        activePath.length = 0;
-      } else {
-        activePath.length = entry.depth;
-        activePath[entry.depth] = entry.label;
-      }
-      const values = Array.from({ length: depthCount }, (_, depth) => {
-        if (entry.isGrandTotal) {
-          return depth === 0 ? entry.label : '';
-        }
-        return depth <= entry.depth ? (activePath[depth] ?? '') : '';
-      });
-      if (
-        entry.isSubtotal &&
-        rowHasVisibleChildren(index) &&
-        entry.depth + 1 < depthCount
-      ) {
-        values[entry.depth + 1] = 'Total';
+      if (rowExport.isSubtotal) {
         entry.row.setAttribute('data-pivot-export-subtotal-row', 'true');
       }
       entry.row.setAttribute(
         'data-pivot-row-export-values',
-        JSON.stringify(values),
+        JSON.stringify(rowExport.values),
       );
     });
   };

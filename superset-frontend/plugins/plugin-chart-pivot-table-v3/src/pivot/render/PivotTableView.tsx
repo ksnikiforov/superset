@@ -42,6 +42,7 @@ import {
   type TotalPosition,
 } from '../../types';
 import { serializeCellKey } from '../../utils';
+import { buildPivotV3RowExportModel } from '../../export/buildPivotV3ExportTable';
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import { rootKey } from '../viewModel';
 import { type RenderModel } from '../shared/types';
@@ -441,95 +442,28 @@ export const PivotTableView = ({
   const cornerHeaderStyle = themeColor
     ? { backgroundColor: themeColor, fontWeight: 600 }
     : { fontWeight: 600 };
-  const rowExportDepthCount = useMemo(() => {
-    if (rowAxisLabels.length === 0) {
-      return 0;
-    }
-    const depths = visibleRows
-      .filter(row => !isGrandTotalLikeRow(row))
-      .map(row => Math.max(getNodeDimDepth(row) - 1, 0));
-    const effectiveDepths =
-      depths.length > 0
-        ? depths
-        : visibleRows.map(row => Math.max(getNodeDimDepth(row) - 1, 0));
-    const maxDepth = effectiveDepths.reduce(
-      (max, depth) => (depth > max ? depth : max),
-      -1,
-    );
-    return Math.min(rowAxisLabels.length, maxDepth + 1);
-  }, [getNodeDimDepth, isGrandTotalLikeRow, rowAxisLabels.length, visibleRows]);
   const rowTotalLabel = t('Total');
-  const rowExportRows = useMemo(() => {
-    if (rowExportDepthCount <= 0) {
-      return new Map<string, { values: string[]; isSubtotal: boolean }>();
-    }
-    const rows = visibleRows.map(row => {
-      const depth = Math.max(
-        0,
-        Math.min(
-          (isGrandTotalLikeRow(row) ? 1 : getNodeDimDepth(row)) - 1,
-          rowExportDepthCount - 1,
-        ),
-      );
-      return {
-        row,
-        depth,
-        label: formatLabel(row, 'row'),
-        isGrandTotal: isGrandTotalLikeRow(row),
-        isSubtotal: !isGrandTotalLikeRow(row) && isRowAggregateBold(row),
-      };
-    });
-    const rowHasVisibleChildren = (rowIndex: number) => {
-      const current = rows[rowIndex];
-      if (!current?.isSubtotal) {
-        return false;
-      }
-      for (let index = rowIndex + 1; index < rows.length; index += 1) {
-        const next = rows[index];
-        if (next.isGrandTotal) {
-          continue;
-        }
-        if (next.depth <= current.depth) {
-          return false;
-        }
-        return true;
-      }
-      return false;
-    };
-    const activePath: string[] = [];
-    return new Map(
-      rows.map((entry, index) => {
-        if (entry.isGrandTotal) {
-          activePath.length = 0;
-        } else {
-          activePath.length = entry.depth;
-          activePath[entry.depth] = entry.label;
-        }
-        const values = Array.from({ length: rowExportDepthCount }, (_, idx) => {
-          if (entry.isGrandTotal) {
-            return idx === 0 ? entry.label : '';
-          }
-          return idx <= entry.depth ? (activePath[idx] ?? '') : '';
-        });
-        const isSubtotal =
-          entry.isSubtotal &&
-          rowHasVisibleChildren(index) &&
-          entry.depth + 1 < rowExportDepthCount;
-        if (isSubtotal) {
-          values[entry.depth + 1] = rowTotalLabel;
-        }
-        return [entry.row.key, { values, isSubtotal }];
+  const { rowExportDepthCount, rowExportRows } = useMemo(
+    () =>
+      buildPivotV3RowExportModel({
+        visibleRows,
+        rowAxisLabels,
+        rowTotalLabel,
+        getNodeDimDepth,
+        formatLabel,
+        isGrandTotalLikeRow,
+        isRowAggregateBold,
       }),
-    );
-  }, [
-    formatLabel,
-    getNodeDimDepth,
-    isGrandTotalLikeRow,
-    isRowAggregateBold,
-    rowExportDepthCount,
-    rowTotalLabel,
-    visibleRows,
-  ]);
+    [
+      visibleRows,
+      rowAxisLabels,
+      rowTotalLabel,
+      getNodeDimDepth,
+      formatLabel,
+      isGrandTotalLikeRow,
+      isRowAggregateBold,
+    ],
+  );
   const renderCornerHeader = (rowSpan?: number) => (
     <th
       rowSpan={rowSpan}

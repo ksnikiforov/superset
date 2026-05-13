@@ -17,6 +17,8 @@
  * under the License.
  */
 
+import { type PivotTreeNode } from '../types';
+
 const ROW_DEPTH_COUNT_ATTR = 'data-pivot-row-depth-count';
 const ROW_EXPORT_VALUES_ATTR = 'data-pivot-row-export-values';
 const ROW_AXIS_LABELS_ATTR = 'data-pivot-row-axis-labels';
@@ -27,6 +29,128 @@ const EXPORT_SUBTOTAL_ROW_ATTR = 'data-pivot-export-subtotal-row';
 
 const getText = (value: string | null | undefined) =>
   (value ?? '').replace(/\s+/g, ' ').trim();
+
+export type PivotV3RowExportEntry = {
+  values: string[];
+  isSubtotal: boolean;
+};
+
+export type PivotV3RowExportModel = {
+  rowExportDepthCount: number;
+  rowExportRows: Map<string, PivotV3RowExportEntry>;
+};
+
+type BuildPivotV3RowExportModelParams = {
+  visibleRows: PivotTreeNode[];
+  rowAxisLabels: readonly string[];
+  rowTotalLabel: string;
+  getNodeDimDepth: (node: PivotTreeNode) => number;
+  formatLabel: (node: PivotTreeNode, axis: 'row') => string;
+  isGrandTotalLikeRow: (node: PivotTreeNode) => boolean;
+  isRowAggregateBold: (node?: PivotTreeNode) => boolean;
+};
+
+export const buildPivotV3RowExportModel = ({
+  visibleRows,
+  rowAxisLabels,
+  rowTotalLabel,
+  getNodeDimDepth,
+  formatLabel,
+  isGrandTotalLikeRow,
+  isRowAggregateBold,
+}: BuildPivotV3RowExportModelParams): PivotV3RowExportModel => {
+  if (rowAxisLabels.length === 0) {
+    return {
+      rowExportDepthCount: 0,
+      rowExportRows: new Map(),
+    };
+  }
+
+  const depths = visibleRows
+    .filter(row => !isGrandTotalLikeRow(row))
+    .map(row => Math.max(getNodeDimDepth(row) - 1, 0));
+  const effectiveDepths =
+    depths.length > 0
+      ? depths
+      : visibleRows.map(row => Math.max(getNodeDimDepth(row) - 1, 0));
+  const maxDepth = effectiveDepths.reduce(
+    (max, depth) => (depth > max ? depth : max),
+    -1,
+  );
+  const rowExportDepthCount = Math.min(rowAxisLabels.length, maxDepth + 1);
+
+  if (rowExportDepthCount <= 0) {
+    return {
+      rowExportDepthCount,
+      rowExportRows: new Map(),
+    };
+  }
+
+  const rows = visibleRows.map(row => {
+    const isGrandTotal = isGrandTotalLikeRow(row);
+    const depth = Math.max(
+      0,
+      Math.min(
+        (isGrandTotal ? 1 : getNodeDimDepth(row)) - 1,
+        rowExportDepthCount - 1,
+      ),
+    );
+    return {
+      row,
+      depth,
+      label: formatLabel(row, 'row'),
+      isGrandTotal,
+      isSubtotal: !isGrandTotal && isRowAggregateBold(row),
+    };
+  });
+
+  const rowHasVisibleChildren = (rowIndex: number) => {
+    const current = rows[rowIndex];
+    if (!current?.isSubtotal) {
+      return false;
+    }
+    for (let index = rowIndex + 1; index < rows.length; index += 1) {
+      const next = rows[index];
+      if (next.isGrandTotal) {
+        continue;
+      }
+      if (next.depth <= current.depth) {
+        return false;
+      }
+      return true;
+    }
+    return false;
+  };
+
+  const activePath: string[] = [];
+  return {
+    rowExportDepthCount,
+    rowExportRows: new Map(
+      rows.map((entry, index) => {
+        if (entry.isGrandTotal) {
+          activePath.length = 0;
+        } else {
+          activePath.length = entry.depth;
+          activePath[entry.depth] = entry.label;
+        }
+        const values = Array.from({ length: rowExportDepthCount }, (_, idx) => {
+          if (entry.isGrandTotal) {
+            return idx === 0 ? entry.label : '';
+          }
+          return idx <= entry.depth ? (activePath[idx] ?? '') : '';
+        });
+        const isSubtotal =
+          entry.isSubtotal &&
+          rowHasVisibleChildren(index) &&
+          entry.depth + 1 < rowExportDepthCount;
+        if (isSubtotal) {
+          values[entry.depth + 1] = rowTotalLabel;
+        }
+        return [entry.row.key, { values, isSubtotal }];
+      }),
+    ),
+  };
+};
 
 const parseRowAxisLabels = (table: HTMLTableElement): string[] => {
   const raw = table.getAttribute(ROW_AXIS_LABELS_ATTR);
