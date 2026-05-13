@@ -64,6 +64,7 @@ import { usePivotFormatting } from './pivot/chart/usePivotFormatting';
 import { usePivotInteractions } from './pivot/chart/usePivotInteractions';
 import { PivotInteractionPanel } from './pivot/chart/PivotInteractionPanel';
 import {
+  factBatchesCoverRuntimeLayout,
   isSameRuntimeLayout,
   shouldFetchRuntimeLayout,
 } from './pivot/runtime/coverage';
@@ -1497,8 +1498,6 @@ function PivotTableChart(props: PivotTableProps) {
       updateUiRuntimeLayout,
     ],
   );
-  const staleCoverageRecoverySignatureRef = useRef<string | null>(null);
-
   const handleRuntimeLayoutChange = useCallback(
     (nextLayout: PivotRuntimeLayout) => {
       const normalized = normalizeRuntimeLayout(
@@ -1541,6 +1540,15 @@ function PivotTableChart(props: PivotTableProps) {
     ],
   );
 
+  const shouldRecoverStaleDashboardRuntimeCoverage =
+    isUserControlled &&
+    isDashboardRuntimeSync &&
+    !hasSelectedFilters(persistedInteractionFilters) &&
+    !factBatchesCoverRuntimeLayout(
+      committedFactBatches,
+      committedRuntimeLayout,
+    );
+
   useEffect(() => {
     if (!upstreamDashboardQueryContextSignature) {
       lastUpstreamQueryContextRef.current = null;
@@ -1551,6 +1559,10 @@ function PivotTableChart(props: PivotTableProps) {
       data,
       signature: upstreamDashboardQueryContextSignature,
     };
+    if (shouldRecoverStaleDashboardRuntimeCoverage) {
+      applySeamlessUpdate(uiRuntimeLayout, uiSelectedFilters);
+      return;
+    }
     if (!previous) {
       return;
     }
@@ -1566,6 +1578,7 @@ function PivotTableChart(props: PivotTableProps) {
     data,
     uiRuntimeLayout,
     uiSelectedFilters,
+    shouldRecoverStaleDashboardRuntimeCoverage,
     upstreamDashboardQueryContextSignature,
   ]);
 
@@ -1595,48 +1608,6 @@ function PivotTableChart(props: PivotTableProps) {
     isUserControlled,
     persistedInteractionFilters,
     persistedInteractionFiltersSignature,
-    uiRuntimeLayout,
-    uiSelectedFilters,
-    upstreamSeamlessSignature,
-  ]);
-
-  useEffect(() => {
-    if (
-      !isUserControlled ||
-      !shouldFetchRuntimeLayout({
-        factBatches: committedFactBatches,
-        previousLayout: committedRuntimeLayout,
-        nextLayout: committedRuntimeLayout,
-      })
-    ) {
-      staleCoverageRecoverySignatureRef.current = null;
-      return;
-    }
-    if (
-      !isDashboardRuntimeSync ||
-      hasSelectedFilters(persistedInteractionFilters) ||
-      seamlessLoading
-    ) {
-      return;
-    }
-    const recoverySignature = stableStringify({
-      layout: uiRuntimeLayout,
-      filters: uiSelectedFilters,
-      upstreamSignature: upstreamSeamlessSignature,
-    });
-    if (staleCoverageRecoverySignatureRef.current === recoverySignature) {
-      return;
-    }
-    staleCoverageRecoverySignatureRef.current = recoverySignature;
-    applySeamlessUpdate(uiRuntimeLayout, uiSelectedFilters);
-  }, [
-    applySeamlessUpdate,
-    committedFactBatches,
-    committedRuntimeLayout,
-    isDashboardRuntimeSync,
-    isUserControlled,
-    persistedInteractionFilters,
-    seamlessLoading,
     uiRuntimeLayout,
     uiSelectedFilters,
     upstreamSeamlessSignature,
