@@ -218,8 +218,6 @@ export const useExpansionEngine = ({
   const explicitExpandedColsRef = useRef<Set<string>>(new Set());
   const explicitCollapsedRowsRef = useRef<Set<string>>(new Set());
   const explicitCollapsedColsRef = useRef<Set<string>>(new Set());
-  const inFlightRowsRef = useRef(0);
-  const inFlightColsRef = useRef(0);
   const inFlightExpandedRowsRef = useRef<Map<number, Set<string>>>(new Map());
   const inFlightExpandedColsRef = useRef<Map<number, Set<string>>>(new Map());
   const inFlightExpansionIdRef = useRef(0);
@@ -624,8 +622,6 @@ export const useExpansionEngine = ({
 
   const expandSameAxis = useCallback(
     async (axis: PivotAxis, node: PivotTreeNode) => {
-      const inFlightRef = axis === 'row' ? inFlightRowsRef : inFlightColsRef;
-      inFlightRef.current += 1;
       const requestScope = expansionRequestLifecycle.currentScope();
       const requestId = requestScope.id;
       const expanded =
@@ -794,7 +790,6 @@ export const useExpansionEngine = ({
         );
       } finally {
         inFlightMap.delete(inFlightId);
-        inFlightRef.current = Math.max(0, inFlightRef.current - 1);
       }
     },
     [
@@ -990,8 +985,8 @@ export const useExpansionEngine = ({
         axis === 'row' ? pendingColsRef.current : pendingRowsRef.current;
       const otherInFlight =
         axis === 'row'
-          ? inFlightColsRef.current > 0
-          : inFlightRowsRef.current > 0;
+          ? inFlightExpandedColsRef.current.size > 0
+          : inFlightExpandedRowsRef.current.size > 0;
       const manualExpandedRef =
         axis === 'row' ? explicitExpandedRowsRef : explicitExpandedColsRef;
       const manualCollapsedRef =
