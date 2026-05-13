@@ -300,6 +300,48 @@ export const shouldSyncUiRuntimeLayoutFromProps = ({
     pendingPersistedRuntimeLayoutSync
   ) && !hasPendingSeamlessLayout;
 
+export type RuntimeLayoutPropSyncPlan = {
+  shouldSyncCommittedRuntimeLayout: boolean;
+  shouldSyncUiRuntimeLayout: boolean;
+  hasPersistedRuntimeLayoutSyncSettled: boolean;
+};
+
+export const prepareRuntimeLayoutPropSync = ({
+  isUserControlled,
+  isDashboardContext,
+  isDashboardRuntimeSync,
+  pendingPersistedRuntimeLayoutSync,
+  hasPendingSeamlessLayout,
+  runtimeLayout,
+  lastPersistedRuntimeLayout,
+}: {
+  isUserControlled: boolean;
+  isDashboardContext: boolean;
+  isDashboardRuntimeSync: boolean;
+  pendingPersistedRuntimeLayoutSync: boolean;
+  hasPendingSeamlessLayout: boolean;
+  runtimeLayout: PivotRuntimeLayout;
+  lastPersistedRuntimeLayout: PivotRuntimeLayout;
+}): RuntimeLayoutPropSyncPlan => ({
+  shouldSyncCommittedRuntimeLayout: shouldSyncCommittedRuntimeLayoutFromProps({
+    isDashboardRuntimeSync,
+    pendingPersistedRuntimeLayoutSync,
+    hasPendingSeamlessLayout,
+  }),
+  shouldSyncUiRuntimeLayout: shouldSyncUiRuntimeLayoutFromProps({
+    isUserControlled,
+    isDashboardContext,
+    pendingPersistedRuntimeLayoutSync,
+    hasPendingSeamlessLayout,
+  }),
+  hasPersistedRuntimeLayoutSyncSettled: hasPersistedRuntimeLayoutSyncSettled({
+    isDashboardRuntimeSync,
+    pendingPersistedRuntimeLayoutSync,
+    runtimeLayout,
+    lastPersistedRuntimeLayout,
+  }),
+});
+
 export type RuntimeStatePersistencePlan = {
   ownStatePatch: JsonObject;
   persistedRuntimeLayout?: PivotRuntimeLayout;

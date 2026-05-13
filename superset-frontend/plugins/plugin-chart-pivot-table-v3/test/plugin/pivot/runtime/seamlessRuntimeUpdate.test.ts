@@ -29,6 +29,7 @@ import {
   hasPersistedRuntimeLayoutSyncSettled,
   isSeamlessDisplaySnapshotSettled,
   matchesSeamlessRuntimeSyncSnapshot,
+  prepareRuntimeLayoutPropSync,
   prepareRuntimeStatePersistence,
   prepareSeamlessRuntimeLayoutChange,
   prepareStaleDashboardRuntimeUpdate,
@@ -469,6 +470,56 @@ test('detects settled persisted runtime layout sync', () => {
       lastPersistedRuntimeLayout: runtimeLayout,
     }),
   ).toBe(false);
+});
+
+test('prepares runtime layout prop sync decisions in one plan', () => {
+  expect(
+    prepareRuntimeLayoutPropSync({
+      isUserControlled: true,
+      isDashboardContext: true,
+      isDashboardRuntimeSync: true,
+      pendingPersistedRuntimeLayoutSync: true,
+      hasPendingSeamlessLayout: false,
+      runtimeLayout,
+      lastPersistedRuntimeLayout: runtimeLayout,
+    }),
+  ).toEqual({
+    shouldSyncCommittedRuntimeLayout: false,
+    shouldSyncUiRuntimeLayout: false,
+    hasPersistedRuntimeLayoutSyncSettled: true,
+  });
+
+  expect(
+    prepareRuntimeLayoutPropSync({
+      isUserControlled: true,
+      isDashboardContext: false,
+      isDashboardRuntimeSync: false,
+      pendingPersistedRuntimeLayoutSync: true,
+      hasPendingSeamlessLayout: false,
+      runtimeLayout,
+      lastPersistedRuntimeLayout: { ...runtimeLayout, rows: ['state'] },
+    }),
+  ).toEqual({
+    shouldSyncCommittedRuntimeLayout: true,
+    shouldSyncUiRuntimeLayout: true,
+    hasPersistedRuntimeLayoutSyncSettled: false,
+  });
+
+  expect(
+    prepareRuntimeLayoutPropSync({
+      isUserControlled: false,
+      isDashboardContext: false,
+      isDashboardRuntimeSync: false,
+      pendingPersistedRuntimeLayoutSync: false,
+      hasPendingSeamlessLayout: true,
+      runtimeLayout,
+      lastPersistedRuntimeLayout: runtimeLayout,
+    }),
+  ).toEqual({
+    shouldSyncCommittedRuntimeLayout: false,
+    shouldSyncUiRuntimeLayout: false,
+    hasPersistedRuntimeLayoutSyncSettled: false,
+  });
 });
 
 test('prepares runtime state persistence side-effect plan', () => {

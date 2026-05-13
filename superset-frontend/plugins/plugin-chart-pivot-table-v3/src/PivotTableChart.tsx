@@ -104,17 +104,15 @@ import {
   buildSeamlessRuntimeSyncSnapshot,
   buildSeamlessRuntimeUpstreamSignature,
   fetchAndMaterializeSeamlessRuntimeUpdate,
-  hasPersistedRuntimeLayoutSyncSettled,
   isSeamlessDisplaySnapshotSettled,
+  prepareRuntimeLayoutPropSync,
   prepareRuntimeStatePersistence,
   prepareSeamlessRuntimeLayoutChange,
   prepareStaleDashboardRuntimeUpdate,
   shouldApplyPersistedFilterSeamlessUpdate,
   shouldRecoverStaleDashboardRuntimeCoverage,
-  shouldSyncCommittedRuntimeLayoutFromProps,
   shouldSyncCommittedRuntimeFromProps,
   shouldSyncPersistedSelectedFilters,
-  shouldSyncUiRuntimeLayoutFromProps,
   type SeamlessRuntimeSyncSnapshot,
   type SeamlessRuntimeUpstreamState,
 } from './pivot/runtime/seamlessRuntimeUpdate';
@@ -548,33 +546,34 @@ function PivotTableChart(props: PivotTableProps) {
   );
 
   useEffect(() => {
-    if (
-      !shouldSyncCommittedRuntimeLayoutFromProps({
-        isDashboardRuntimeSync,
-        pendingPersistedRuntimeLayoutSync:
-          pendingPersistedRuntimeLayoutSyncRef.current,
-        hasPendingSeamlessLayout: pendingSeamlessLayoutRef.current !== null,
-      })
-    ) {
-      return;
+    const propSync = prepareRuntimeLayoutPropSync({
+      isUserControlled,
+      isDashboardContext,
+      isDashboardRuntimeSync,
+      pendingPersistedRuntimeLayoutSync:
+        pendingPersistedRuntimeLayoutSyncRef.current,
+      hasPendingSeamlessLayout: pendingSeamlessLayoutRef.current !== null,
+      runtimeLayout,
+      lastPersistedRuntimeLayout: lastPersistedRuntimeLayoutRef.current,
+    });
+    if (propSync.shouldSyncCommittedRuntimeLayout) {
+      setCommittedRuntimeLayout(current =>
+        isSameRuntimeLayout(current, runtimeLayout) ? current : runtimeLayout,
+      );
     }
-    setCommittedRuntimeLayout(current =>
-      isSameRuntimeLayout(current, runtimeLayout) ? current : runtimeLayout,
-    );
-  }, [isDashboardRuntimeSync, runtimeLayout]);
-  useEffect(() => {
-    if (
-      hasPersistedRuntimeLayoutSyncSettled({
-        isDashboardRuntimeSync,
-        pendingPersistedRuntimeLayoutSync:
-          pendingPersistedRuntimeLayoutSyncRef.current,
-        runtimeLayout,
-        lastPersistedRuntimeLayout: lastPersistedRuntimeLayoutRef.current,
-      })
-    ) {
+    if (propSync.hasPersistedRuntimeLayoutSyncSettled) {
       pendingPersistedRuntimeLayoutSyncRef.current = false;
     }
-  }, [isDashboardRuntimeSync, runtimeLayout]);
+    if (propSync.shouldSyncUiRuntimeLayout) {
+      updateUiRuntimeLayout(runtimeLayout);
+    }
+  }, [
+    isDashboardContext,
+    isDashboardRuntimeSync,
+    isUserControlled,
+    runtimeLayout,
+    updateUiRuntimeLayout,
+  ]);
   const {
     appliedLayoutFormData,
     layoutMetrics,
@@ -691,26 +690,6 @@ function PivotTableChart(props: PivotTableProps) {
     factBatches,
     seamlessMaterializationLifecycle,
     shouldSyncCommittedTreeFromProps,
-  ]);
-
-  useEffect(() => {
-    if (
-      !shouldSyncUiRuntimeLayoutFromProps({
-        isUserControlled,
-        isDashboardContext,
-        pendingPersistedRuntimeLayoutSync:
-          pendingPersistedRuntimeLayoutSyncRef.current,
-        hasPendingSeamlessLayout: pendingSeamlessLayoutRef.current !== null,
-      })
-    ) {
-      return;
-    }
-    updateUiRuntimeLayout(runtimeLayout);
-  }, [
-    isDashboardContext,
-    isUserControlled,
-    runtimeLayout,
-    updateUiRuntimeLayout,
   ]);
 
   const persistedSelectedFilters = useMemo(() => {
