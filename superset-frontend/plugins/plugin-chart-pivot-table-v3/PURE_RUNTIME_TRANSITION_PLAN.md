@@ -137,8 +137,8 @@ Source-only diff from pre-refactor baseline
   `3` suites and `24` tests.
 - Full plugin Jest pass after centralizing runtime-layout prop sync planning:
   `94` suites and `777` tests.
-- Focused chart-sync/runtime pass after narrowing the runtime-layout sync API:
-  `4` suites and `53` tests.
+- Full plugin Jest pass after narrowing the runtime-layout sync API: `94`
+  suites and `775` tests.
 
 The readout remains mixed: the plugin is still modestly above the baseline line
 count, but the chart/layout hooks keep losing inline policy and the remaining
@@ -430,7 +430,8 @@ Recent validation:
 - `d8fac22ff6`: narrowed the runtime-layout sync API to the combined plan and
   deleted the now-redundant exported predicate/test surface; touched-file
   ESLint, Prettier, `git diff --check`, and focused chart-sync/runtime Jest
-  (`53` tests) passed.
+  (`53` tests) passed. The full pivot-table-v3 plugin Jest suite also passed
+  (`94` suites, `775` tests).
 - `7e724e895b`: centralized runtime-layout prop sync planning in the seamless
   runtime module; touched-file ESLint, Prettier, `git diff --check`, focused
   chart-sync/runtime Jest (`55` tests), and the full pivot-table-v3 plugin Jest
