@@ -80,6 +80,49 @@ const removeDimension = (
   };
 };
 
+export const removeDimensionFromLayout = (
+  layout: PivotRuntimeLayout,
+  dimensionKey: string,
+): PivotRuntimeLayout => removeDimension(layout, dimensionKey).layout;
+
+export type InteractionChipItem = {
+  id: string;
+  label: string;
+  kind: 'dimension' | 'value';
+};
+
+export const buildInteractionChips = ({
+  axis,
+  layout,
+  dimensionLabelMap,
+  hasMetrics,
+  valueLabel,
+}: {
+  axis: PivotAxis;
+  layout: PivotRuntimeLayout;
+  dimensionLabelMap: Map<string, string>;
+  hasMetrics: boolean;
+  valueLabel: string;
+}): InteractionChipItem[] => {
+  const keys = axis === 'row' ? layout.rows : layout.cols;
+  const labels: InteractionChipItem[] = keys.map(key => ({
+    id: key,
+    label: dimensionLabelMap.get(key) ?? key,
+    kind: 'dimension',
+  }));
+  if (!hasMetrics || layout.valuePlacement.axis !== axis) {
+    return labels;
+  }
+  const valueIndex = clampIndex(layout.valuePlacement.index, 0, labels.length);
+  const next = [...labels];
+  next.splice(valueIndex, 0, {
+    id: 'value',
+    label: valueLabel,
+    kind: 'value',
+  });
+  return next;
+};
+
 const chipIndexToDimensionIndex = (chipIndex: number, valueIndex?: number) => {
   if (valueIndex === undefined) {
     return chipIndex;

@@ -84,8 +84,11 @@ import { type ChartDataWarning } from './pivot/data/ChartDataClient';
 import {
   applyDimensionDrag,
   applyValueDrag,
+  buildInteractionChips,
   INTERACTION_DIMENSION_DND_TYPE,
   INTERACTION_VALUE_DND_TYPE,
+  removeDimensionFromLayout,
+  type InteractionChipItem,
 } from './pivot/layout/interactionDrag';
 import {
   findMeasureLeafIdInPath,
@@ -302,7 +305,7 @@ const TableArea = styled.div<{ $height: number; $width: number }>`
 
 type InteractionChipProps = {
   axis: PivotAxis;
-  chip: ChipItem;
+  chip: InteractionChipItem;
   chipIndex: number;
   vertical?: boolean;
   onRegisterRef?: (node: HTMLDivElement | null) => void;
@@ -555,12 +558,6 @@ const PivotDragLayer = memo(() => {
     </DragPreviewWrap>
   );
 });
-
-type ChipItem = {
-  id: string;
-  label: string;
-  kind: 'dimension' | 'value';
-};
 
 type DimensionDragItem = {
   type: string;
@@ -1510,35 +1507,6 @@ function PivotTableChart(props: PivotTableProps) {
     return map;
   }, [dimensionList, resolvedVerboseMap]);
 
-  const chipItems = useCallback(
-    (axis: 'row' | 'col') => {
-      const keys = axis === 'row' ? uiRuntimeLayout.rows : uiRuntimeLayout.cols;
-      const labels: ChipItem[] = keys.map(key => ({
-        id: key,
-        label: dimensionLabelMap.get(key) ?? key,
-        kind: 'dimension' as const,
-      }));
-      if (
-        metricKeys.length === 0 ||
-        uiRuntimeLayout.valuePlacement.axis !== axis
-      ) {
-        return labels;
-      }
-      const valueIndex = Math.max(
-        0,
-        Math.min(uiRuntimeLayout.valuePlacement.index, labels.length),
-      );
-      const next = [...labels];
-      next.splice(valueIndex, 0, {
-        id: 'value',
-        label: t('Value'),
-        kind: 'value' as const,
-      });
-      return next;
-    },
-    [dimensionLabelMap, metricKeys.length, uiRuntimeLayout],
-  );
-
   const layoutResult = usePivotLayout({
     data: dataForRender,
     formData: appliedLayoutFormData,
@@ -1961,8 +1929,29 @@ function PivotTableChart(props: PivotTableProps) {
     handleCellContextMenu: interactions.handleCellContextMenu,
     rowAxisLabels,
   };
-  const rowChips = chipItems('row');
-  const colChips = chipItems('col');
+  const hasMetrics = metricKeys.length > 0;
+  const rowChips = useMemo(
+    () =>
+      buildInteractionChips({
+        axis: 'row',
+        layout: uiRuntimeLayout,
+        dimensionLabelMap,
+        hasMetrics,
+        valueLabel: t('Value'),
+      }),
+    [dimensionLabelMap, hasMetrics, uiRuntimeLayout],
+  );
+  const colChips = useMemo(
+    () =>
+      buildInteractionChips({
+        axis: 'col',
+        layout: uiRuntimeLayout,
+        dimensionLabelMap,
+        hasMetrics,
+        valueLabel: t('Value'),
+      }),
+    [dimensionLabelMap, hasMetrics, uiRuntimeLayout],
+  );
   const rowChipRefs = useRef<Array<HTMLDivElement | null>>([]);
   const colChipRefs = useRef<Array<HTMLDivElement | null>>([]);
 
@@ -1993,42 +1982,14 @@ function PivotTableChart(props: PivotTableProps) {
     [colChips, rowChips],
   );
 
-  const removeDimensionFromLayout = useCallback((dimensionKey: string) => {
-    const currentLayout = uiRuntimeLayoutRef.current;
-    const rowIndex = currentLayout.rows.indexOf(dimensionKey);
-    const colIndex = currentLayout.cols.indexOf(dimensionKey);
-    if (rowIndex < 0 && colIndex < 0) {
-      return currentLayout;
-    }
-    const nextRows = currentLayout.rows.filter(key => key !== dimensionKey);
-    const nextCols = currentLayout.cols.filter(key => key !== dimensionKey);
-    const nextValuePlacement = { ...currentLayout.valuePlacement };
-    if (rowIndex >= 0 && nextValuePlacement.axis === 'row') {
-      if (rowIndex < nextValuePlacement.index) {
-        nextValuePlacement.index = Math.max(0, nextValuePlacement.index - 1);
-      }
-    }
-    if (colIndex >= 0 && nextValuePlacement.axis === 'col') {
-      if (colIndex < nextValuePlacement.index) {
-        nextValuePlacement.index = Math.max(0, nextValuePlacement.index - 1);
-      }
-    }
-    return {
-      ...currentLayout,
-      rows: nextRows,
-      cols: nextCols,
-      valuePlacement: nextValuePlacement,
-    };
-  }, []);
-
   const handleChipRemove = useCallback(
     (dimensionKey: string) => {
-      handleRuntimeLayoutChange(removeDimensionFromLayout(dimensionKey));
+      handleRuntimeLayoutChange(
+        removeDimensionFromLayout(uiRuntimeLayoutRef.current, dimensionKey),
+      );
     },
-    [handleRuntimeLayoutChange, removeDimensionFromLayout],
+    [handleRuntimeLayoutChange],
   );
-
-  const metricsAvailable = metricKeys.length > 0;
 
   const handleDimensionDrop = useCallback(
     (
@@ -2046,11 +2007,11 @@ function PivotTableChart(props: PivotTableProps) {
         insertBeforeValue,
         sourceAxis,
         sourceChipIndex,
-        metricsAvailable,
+        metricsAvailable: hasMetrics,
       });
       handleRuntimeLayoutChange(nextLayout);
     },
-    [handleRuntimeLayoutChange, metricsAvailable],
+    [handleRuntimeLayoutChange, hasMetrics],
   );
 
   const handleValueDrop = useCallback(
@@ -2065,11 +2026,11 @@ function PivotTableChart(props: PivotTableProps) {
         targetChipIndex,
         sourceAxis,
         sourceChipIndex,
-        metricsAvailable,
+        metricsAvailable: hasMetrics,
       });
       handleRuntimeLayoutChange(nextLayout);
     },
-    [handleRuntimeLayoutChange, metricsAvailable],
+    [handleRuntimeLayoutChange, hasMetrics],
   );
 
   const dropOnRowStrip = useStripDropTarget(

@@ -20,6 +20,8 @@ import { PivotRuntimeLayout } from '../../../../src/types';
 import {
   applyDimensionDrag,
   applyValueDrag,
+  buildInteractionChips,
+  removeDimensionFromLayout,
 } from '../../../../src/pivot/layout/interactionDrag';
 
 const baseLayout = (overrides: Partial<PivotRuntimeLayout> = {}) =>
@@ -140,5 +142,53 @@ describe('interaction drag layout helpers', () => {
       metricsAvailable: true,
     });
     expect(next.valuePlacement).toEqual({ axis: 'row', index: 0 });
+  });
+
+  it('builds interaction chips with value placement inserted on the active axis', () => {
+    const layout = baseLayout({
+      rows: ['country', 'city'],
+      cols: ['month'],
+      valuePlacement: { axis: 'row', index: 1 },
+    });
+    expect(
+      buildInteractionChips({
+        axis: 'row',
+        layout,
+        dimensionLabelMap: new Map([
+          ['country', 'Country'],
+          ['city', 'City'],
+        ]),
+        hasMetrics: true,
+        valueLabel: 'Value',
+      }),
+    ).toEqual([
+      { id: 'country', label: 'Country', kind: 'dimension' },
+      { id: 'value', label: 'Value', kind: 'value' },
+      { id: 'city', label: 'City', kind: 'dimension' },
+    ]);
+
+    expect(
+      buildInteractionChips({
+        axis: 'col',
+        layout,
+        dimensionLabelMap: new Map([['month', 'Month']]),
+        hasMetrics: true,
+        valueLabel: 'Value',
+      }),
+    ).toEqual([{ id: 'month', label: 'Month', kind: 'dimension' }]);
+  });
+
+  it('removes dimensions from layout and keeps value placement aligned', () => {
+    const layout = baseLayout({
+      rows: ['country', 'city'],
+      cols: ['month'],
+      valuePlacement: { axis: 'row', index: 2 },
+    });
+    expect(removeDimensionFromLayout(layout, 'country')).toEqual({
+      ...layout,
+      rows: ['city'],
+      cols: ['month'],
+      valuePlacement: { axis: 'row', index: 1 },
+    });
   });
 });
