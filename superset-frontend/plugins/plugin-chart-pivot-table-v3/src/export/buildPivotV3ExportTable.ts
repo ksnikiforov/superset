@@ -233,15 +233,13 @@ export const buildPivotV3ExportTable = (
   const cloned = table.cloneNode(true) as HTMLTableElement;
 
   const axisLabels = parseRowAxisLabels(cloned);
-  const rowTotalLabel = parseRowTotalLabel(cloned);
   const depthCount = resolveDepthCount(cloned, axisLabels);
-  if (depthCount <= 0) {
-    return cloned;
+  if (depthCount > 0) {
+    const rowTotalLabel = parseRowTotalLabel(cloned);
+    replaceCornerWithAxisLabels(cloned, toHeaderLabels(depthCount, axisLabels));
+    splitRowHeadersIntoColumns(cloned, depthCount);
+    promoteTotalRowsForExcel(cloned, rowTotalLabel);
   }
-
-  replaceCornerWithAxisLabels(cloned, toHeaderLabels(depthCount, axisLabels));
-  splitRowHeadersIntoColumns(cloned, depthCount);
-  promoteTotalRowsForExcel(cloned, rowTotalLabel);
   coerceNumericCellsForExcel(cloned);
 
   return cloned;

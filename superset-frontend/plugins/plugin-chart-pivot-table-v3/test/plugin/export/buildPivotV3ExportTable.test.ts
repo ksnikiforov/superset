@@ -632,6 +632,31 @@ describe('buildPivotV3ExportTable', () => {
     expect(numericCell.dataset.v).toBe('1234.567890123456');
   });
 
+  it('exports numeric-marked cells when row hierarchy metadata is absent', () => {
+    document.body.innerHTML = `
+      <table class="pivot-v3-table">
+        <thead>
+          <tr>
+            <th>Revenue</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td data-pivot-export-type="number" data-pivot-export-value="42.5">42.50</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+
+    const original = document.querySelector('table') as HTMLTableElement;
+    const exported = buildPivotV3ExportTable(original);
+    const numericCell = exported.tBodies[0].rows[0].cells[0];
+
+    expect(numericCell.textContent?.trim()).toBe('42.5');
+    expect(numericCell.dataset.t).toBe('n');
+    expect(numericCell.dataset.v).toBe('42.5');
+  });
+
   it('exports only visible row levels and adds Total label for subtotal rows', () => {
     document.body.innerHTML = `
       <table class="pivot-v3-table" data-pivot-row-axis-labels='["resellerName","productModel","productName"]' data-pivot-row-depth-count="2">
