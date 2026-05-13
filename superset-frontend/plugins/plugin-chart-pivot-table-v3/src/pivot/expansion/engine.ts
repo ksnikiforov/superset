@@ -23,7 +23,7 @@ import {
   type PivotTreeData,
   type PivotTreeNode,
 } from '../../types';
-import { parsePath, serializePath } from '../../utils';
+import { mergeTrees, parsePath, serializePath } from '../../utils';
 import {
   planExpansionForAxis,
   type PivotExpansionNodeFetchPredicate,
@@ -280,6 +280,73 @@ export const pruneTreeByPrefixes = (
     nextCells[key] = cell;
   });
   return { ...tree, rows: nextRows, cols: nextCols, cells: nextCells };
+};
+
+export type PruneMergedTree = ({
+  axis,
+  tree,
+  parent,
+  branch,
+}: {
+  axis: PivotAxis;
+  tree: PivotTreeData;
+  parent?: PivotTreeNode;
+  branch: PivotTreeData;
+}) => PivotTreeData;
+
+export const applyExpansionFetchDelta = ({
+  tree,
+  axis,
+  keys,
+  branch,
+  pruneMergedTree,
+}: {
+  tree: PivotTreeData;
+  axis: PivotAxis;
+  keys: string[];
+  branch?: PivotTreeData;
+  pruneMergedTree: PruneMergedTree;
+}) => {
+  if (!branch) {
+    return tree;
+  }
+  let nextTree = mergeTrees(tree, branch);
+  keys.forEach(key => {
+    const parent = axis === 'row' ? nextTree.rows[key] : nextTree.cols[key];
+    nextTree = pruneMergedTree({
+      axis,
+      tree: nextTree,
+      parent,
+      branch,
+    });
+  });
+  return nextTree;
+};
+
+export const mergeSameAxisExpansionTree = ({
+  currentTree,
+  previousTree,
+  axis,
+  touchedKeys,
+  preserveMetricChildren,
+  isMetricTokenValue,
+}: {
+  currentTree: PivotTreeData;
+  previousTree: PivotTreeData;
+  axis: PivotAxis;
+  touchedKeys: string[];
+  preserveMetricChildren?: boolean;
+  isMetricTokenValue: (value: unknown) => boolean;
+}) => {
+  const touchedPrefixes = touchedKeys.map(key => parsePath(key));
+  const preservedTree =
+    touchedPrefixes.length > 0
+      ? pruneTreeByPrefixes(previousTree, axis, touchedPrefixes, {
+          preserveMetricChildren,
+          isMetricTokenValue,
+        })
+      : previousTree;
+  return mergeTrees(currentTree, preservedTree);
 };
 
 export const hasNestedPendingKeys = (keys: Set<string>) => {

@@ -18,7 +18,9 @@
  */
 
 import {
+  applyExpansionFetchDelta,
   buildHydrationPrefetchAction,
+  mergeSameAxisExpansionTree,
   planInitialHydrationPrefetch,
   planHydrationIteration,
   shouldPlanHydrationPrefetchAxis,
@@ -102,6 +104,115 @@ describe('pivot/expansion/engine', () => {
     };
     return { tree, aKey, xKey };
   };
+
+  it('applies expansion fetch deltas through the supplied pruning policy', () => {
+    const aKey = serializePath(['A']);
+    const childKey = serializePath(['A', 'A1']);
+    const tree: PivotTreeData = {
+      rows: {
+        [aKey]: makeNode('row', ['A'], true),
+      },
+      cols: {},
+      cells: {},
+    };
+    const branch: PivotTreeData = {
+      rows: {
+        [childKey]: makeNode('row', ['A', 'A1'], false),
+      },
+      cols: {},
+      cells: {},
+    };
+    const pruneMergedTree = jest.fn(({ tree: nextTree }) => nextTree);
+
+    const result = applyExpansionFetchDelta({
+      tree,
+      axis: 'row',
+      keys: [aKey],
+      branch,
+      pruneMergedTree,
+    });
+
+    expect(result.rows[childKey]).toBe(branch.rows[childKey]);
+    expect(pruneMergedTree).toHaveBeenCalledWith({
+      axis: 'row',
+      tree: result,
+      parent: tree.rows[aKey],
+      branch,
+    });
+  });
+
+  it('merges same-axis expansion trees while removing stale touched descendants', () => {
+    const aKey = serializePath(['A']);
+    const staleKey = serializePath(['A', 'old']);
+    const freshKey = serializePath(['A', 'new']);
+    const bKey = serializePath(['B']);
+    const previousTree: PivotTreeData = {
+      rows: {
+        [aKey]: makeNode('row', ['A'], true),
+        [staleKey]: makeNode('row', ['A', 'old'], false),
+        [bKey]: makeNode('row', ['B'], false),
+      },
+      cols: {},
+      cells: {},
+    };
+    const currentTree: PivotTreeData = {
+      rows: {
+        [aKey]: makeNode('row', ['A'], true),
+        [freshKey]: makeNode('row', ['A', 'new'], false),
+      },
+      cols: {},
+      cells: {},
+    };
+
+    const result = mergeSameAxisExpansionTree({
+      currentTree,
+      previousTree,
+      axis: 'row',
+      touchedKeys: [aKey],
+      isMetricTokenValue: () => false,
+    });
+
+    expect(new Set(Object.keys(result.rows))).toEqual(
+      new Set([aKey, bKey, freshKey]),
+    );
+  });
+
+  it('can preserve metric children when merging same-axis column expansions', () => {
+    const aKey = serializePath(['A']);
+    const staleKey = serializePath(['A', 'old']);
+    const metricKey = serializePath(['A', METRICS_PLACEHOLDER]);
+    const freshKey = serializePath(['A', 'new']);
+    const previousTree: PivotTreeData = {
+      rows: {},
+      cols: {
+        [aKey]: makeNode('col', ['A'], true),
+        [staleKey]: makeNode('col', ['A', 'old'], false),
+        [metricKey]: makeNode('col', ['A', METRICS_PLACEHOLDER], false),
+      },
+      cells: {},
+    };
+    const currentTree: PivotTreeData = {
+      rows: {},
+      cols: {
+        [aKey]: makeNode('col', ['A'], true),
+        [freshKey]: makeNode('col', ['A', 'new'], false),
+      },
+      cells: {},
+    };
+
+    const result = mergeSameAxisExpansionTree({
+      currentTree,
+      previousTree,
+      axis: 'col',
+      touchedKeys: [aKey],
+      preserveMetricChildren: true,
+      isMetricTokenValue: value => value === METRICS_PLACEHOLDER,
+    });
+
+    expect(new Set(Object.keys(result.cols))).toEqual(
+      new Set([aKey, freshKey, metricKey]),
+    );
+  });
 
   it('plans fetch targets for expanded nodes', () => {
     const { tree, aKey, xKey } = buildTree({ includeIntersectionCell: true });

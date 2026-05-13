@@ -76,12 +76,13 @@ import {
 } from '../runtime/requestLifecycle';
 import {
   addAncestors,
+  applyExpansionFetchDelta,
   computeVisibleDepths as computeVisibleDepthsBase,
   dropDescendants,
   getVisibleExpansionKeys as getVisibleExpansionKeysBase,
+  mergeSameAxisExpansionTree,
   planInitialHydrationPrefetch,
   planHydrationIteration,
-  pruneTreeByPrefixes,
   resolveReinitializedExpansionState,
   resolveExpandedForMetrics as resolveExpandedForMetricsBase,
   type ExpansionVisibilityConfig,
@@ -915,31 +916,6 @@ export const useExpansionEngine = ({
     [visibilityConfig],
   );
 
-  const applyFetchDelta = useCallback(
-    (
-      currentTree: PivotTreeData,
-      axis: PivotAxis,
-      keys: string[],
-      branch?: PivotTreeData,
-    ) => {
-      if (!branch) {
-        return currentTree;
-      }
-      let nextTree = mergeTrees(currentTree, branch);
-      keys.forEach(key => {
-        const parent = axis === 'row' ? nextTree.rows[key] : nextTree.cols[key];
-        nextTree = pruneMergedTree({
-          axis,
-          tree: nextTree,
-          parent,
-          branch,
-        });
-      });
-      return nextTree;
-    },
-    [pruneMergedTree],
-  );
-
   const expandSameAxis = useCallback(
     async (axis: PivotAxis, node: PivotTreeNode) => {
       const inFlightRef = axis === 'row' ? inFlightRowsRef : inFlightColsRef;
@@ -1058,12 +1034,13 @@ export const useExpansionEngine = ({
             for (const target of deltaTargets) {
               touchedKeys.add(target.pathKey);
             }
-            currentTree = applyFetchDelta(
-              currentTree,
+            currentTree = applyExpansionFetchDelta({
+              tree: currentTree,
               axis,
-              deltaTargets.map(target => target.pathKey),
-              deltaTree,
-            );
+              keys: deltaTargets.map(target => target.pathKey),
+              branch: deltaTree,
+              pruneMergedTree,
+            });
           }
           if (resultDeltas.length === 0) {
             break;
@@ -1083,21 +1060,18 @@ export const useExpansionEngine = ({
           axis === 'row' ? expandedRowsRef.current : expandedColsRef.current;
         const combinedExpanded = new Set(committedExpanded);
         manualExpandedRef.current.forEach(key => combinedExpanded.add(key));
-        const touchedPrefixes = Array.from(touchedKeys).map(key =>
-          parsePath(key),
-        );
         const preserveMetricChildren =
           axis === 'col' &&
           metricIndexForCols !== undefined &&
           metricIndexForCols >= groupbyColumnsLength;
-        const preservedTree =
-          touchedPrefixes.length > 0
-            ? pruneTreeByPrefixes(treeRef.current, axis, touchedPrefixes, {
-                preserveMetricChildren,
-                isMetricTokenValue,
-              })
-            : treeRef.current;
-        const mergedTree = mergeTrees(currentTree, preservedTree);
+        const mergedTree = mergeSameAxisExpansionTree({
+          currentTree,
+          previousTree: treeRef.current,
+          axis,
+          touchedKeys: Array.from(touchedKeys),
+          preserveMetricChildren,
+          isMetricTokenValue,
+        });
         const finalExpanded = resolveExpandedForMetrics(
           axis,
           combinedExpanded,
@@ -1117,7 +1091,6 @@ export const useExpansionEngine = ({
     },
     [
       addWarnings,
-      applyFetchDelta,
       buildRequestGroupId,
       computeVisibleDepths,
       expansionRequestLifecycle,
@@ -1127,6 +1100,7 @@ export const useExpansionEngine = ({
       isMetricTokenValue,
       metricIndexForCols,
       persistExpansionState,
+      pruneMergedTree,
       resolveExpandedForMetrics,
       seedFetchedCoverageFromFactBatches,
       seedFetchedCoverageFromLoadedMetricNodes,
