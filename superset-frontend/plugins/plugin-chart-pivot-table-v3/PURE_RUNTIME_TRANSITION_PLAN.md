@@ -58,7 +58,7 @@ cells are projections of DB facts, not canonical data.
 ## Current Status
 
 As of May 13, 2026, after
-`4ccf30a73d refactor(pivot-table-v3): tighten hydration plan allocation`:
+`e4f05c9107 refactor(pivot-table-v3): centralize chart ref syncing`:
 
 - Overall transition estimate: **94%**.
 - Goal-weighted completion estimate: **94%**.
@@ -70,8 +70,8 @@ As of May 13, 2026, after
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `11892` insertions, `11416` deletions, net `+476`.
-- Current production `src` TypeScript/TSX total: `33986` lines.
+- Production `src`: `11903` insertions, `11430` deletions, net `+473`.
+- Current production `src` TypeScript/TSX total: `33983` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - Full plugin Jest pass after the column-sort extraction: `91` suites and
   `729` tests.
@@ -123,6 +123,8 @@ Source-only diff from pre-refactor baseline
   and `776` tests.
 - Full plugin Jest pass after tightening hydration plan allocation: `94`
   suites and `776` tests.
+- Full plugin Jest pass after centralizing chart ref syncing and table-width
+  reuse: `94` suites and `776` tests.
 
 The readout remains mixed: the new runtime files now put the plugin modestly
 above the baseline line count, but the chart/layout hooks keep losing inline
@@ -212,6 +214,9 @@ React orchestration.
 - Seamless runtime persistence side-effect planning and pending display snapshot
   settlement policy are now in the seamless runtime module, so the chart applies
   persistence/display outcomes instead of deciding them inline.
+- The chart now uses one local state-ref synchronization hook for own state,
+  render tree state, and seamless expansion state, and it computes table width
+  once for sticky headers and render sizing.
 - Selected-filter update helpers, persisted filter normalization, and
   tree-derived dimension filter value collection are centralized in
   `pivot/filters.ts`, so the chart no longer owns those filter policies.
@@ -293,7 +298,7 @@ Largest relevant production files:
 - `PivotDndMetricSelect.tsx`: `1566` lines.
 - `engine.ts`: `1496` lines.
 - `utils.ts`: `1464` lines.
-- `PivotTableChart.tsx`: `1450` lines.
+- `PivotTableChart.tsx`: `1447` lines.
 - `PivotMetricDefinitionValue.tsx`: `1448` lines.
 - `materializePivotTree.ts`: `1329` lines.
 - `usePivotFormatting.tsx`: `1325` lines.
