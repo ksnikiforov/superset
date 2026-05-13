@@ -23,6 +23,7 @@ import {
   useRef,
   useState,
   type ComponentProps,
+  type MutableRefObject,
 } from 'react';
 import { unstable_batchedUpdates } from 'react-dom';
 import { isEqual } from 'lodash';
@@ -181,6 +182,13 @@ const buildDateFormattersFromColumns = (
     },
     {},
   );
+
+const useSyncRef = <Value,>(ref: MutableRefObject<Value>, value: Value) => {
+  useEffect(() => {
+    const targetRef = ref;
+    targetRef.current = value;
+  }, [ref, value]);
+};
 
 function PivotTableChart(props: PivotTableProps) {
   const {
@@ -368,10 +376,7 @@ function PivotTableChart(props: PivotTableProps) {
 
   const treeRef = useRef<PivotTableProps['data']>(dataForRender);
   const ownStateRef = useRef<JsonObject>(ownState ?? {});
-
-  useEffect(() => {
-    ownStateRef.current = ownState ?? {};
-  }, [ownState]);
+  useSyncRef(ownStateRef, ownState ?? {});
 
   const mergeOwnState = useCallback((partial: JsonObject) => {
     const next = { ...ownStateRef.current, ...partial };
@@ -1055,12 +1060,10 @@ function PivotTableChart(props: PivotTableProps) {
     pruneMergedTree: layoutResult.pruneMergedTree,
   });
 
-  useEffect(() => {
-    expandedRowsForSeamlessRef.current = expandedRows;
-    expandedColsForSeamlessRef.current = expandedCols;
-    pendingRowsForSeamlessRef.current = pendingRows;
-    pendingColsForSeamlessRef.current = pendingCols;
-  }, [expandedCols, expandedRows, pendingCols, pendingRows]);
+  useSyncRef(expandedRowsForSeamlessRef, expandedRows);
+  useSyncRef(expandedColsForSeamlessRef, expandedCols);
+  useSyncRef(pendingRowsForSeamlessRef, pendingRows);
+  useSyncRef(pendingColsForSeamlessRef, pendingCols);
 
   useEffect(() => {
     if (
@@ -1084,9 +1087,7 @@ function PivotTableChart(props: PivotTableProps) {
     seamlessLoading,
   ]);
 
-  useEffect(() => {
-    treeRef.current = tree;
-  }, [tree]);
+  useSyncRef(treeRef, tree);
 
   const renderModelResult = usePivotRenderModel({
     tree,
@@ -1203,15 +1204,17 @@ function PivotTableChart(props: PivotTableProps) {
     applySeamlessUpdate(uiRuntimeLayout, nextSelected);
   }, [applySeamlessUpdate, uiRuntimeLayout, uiSelectedFilters]);
 
+  const tableWidth = isUserControlled
+    ? Math.max(
+        0,
+        width - INTERACTION_PANEL_WIDTH - INTERACTION_SIDE_CHIPS_WIDTH,
+      )
+    : width;
+
   const { headerOffset, headerRowOffsets, headerRef } = useStickyHeaders({
     enabled: resolvedStickyHeaders,
     columnHeaderRows: renderModelResult.renderModel.columnHeaderRows,
-    width: isUserControlled
-      ? Math.max(
-          0,
-          width - INTERACTION_PANEL_WIDTH - INTERACTION_SIDE_CHIPS_WIDTH,
-        )
-      : width,
+    width: tableWidth,
   });
 
   const formatting = usePivotFormatting({
@@ -1260,12 +1263,6 @@ function PivotTableChart(props: PivotTableProps) {
   const cornerLoaderVisible = isUserControlled
     ? seamlessLoading || isHydrating
     : isHydrating;
-  const tableWidth = isUserControlled
-    ? Math.max(
-        0,
-        width - INTERACTION_PANEL_WIDTH - INTERACTION_SIDE_CHIPS_WIDTH,
-      )
-    : width;
   const tableHeight = isUserControlled
     ? Math.max(0, height - INTERACTION_TOP_CHIPS_HEIGHT)
     : height;
