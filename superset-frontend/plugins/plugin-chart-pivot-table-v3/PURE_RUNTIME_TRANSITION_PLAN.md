@@ -323,6 +323,8 @@ Recent validation:
 - `7b1548eb6c`: centralized tree-derived dimension filter value collection in
   `pivot/filters.ts`; touched-file ESLint, Prettier, `git diff --check`, and
   focused filter helper plus chart filter-seamless tests (`13` tests) passed.
+- After the filter cleanup checkpoint, the full pivot-table-v3 plugin Jest suite
+  passed (`89` suites, `712` tests).
 
 Minimum test coverage for future slices:
 
