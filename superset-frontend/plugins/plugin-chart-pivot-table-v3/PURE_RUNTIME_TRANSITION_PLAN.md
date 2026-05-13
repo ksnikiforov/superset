@@ -58,7 +58,7 @@ cells are projections of DB facts, not canonical data.
 ## Current Status
 
 As of May 13, 2026, after
-`87bbd05e52 refactor(pivot-table-v3): centralize dimension setting remaps`:
+`163c56c3b2 refactor(pivot-table-v3): centralize expansion signatures`:
 
 - Overall transition estimate: **94%**.
 - Goal-weighted completion estimate: **94%**.
@@ -70,8 +70,8 @@ As of May 13, 2026, after
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `11927` insertions, `11489` deletions, net `+438`.
-- Current production `src` TypeScript/TSX total: `33948` lines.
+- Production `src`: `11949` insertions, `11532` deletions, net `+417`.
+- Current production `src` TypeScript/TSX total: `33927` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - Full plugin Jest pass after the column-sort extraction: `91` suites and
   `729` tests.
@@ -127,6 +127,8 @@ Source-only diff from pre-refactor baseline
   reuse: `94` suites and `776` tests.
 - Full plugin Jest pass after centralizing dimension formatting/sorting key
   remaps: `94` suites and `776` tests.
+- Full plugin Jest pass after centralizing expansion-state signature payloads:
+  `94` suites and `776` tests.
 
 The readout remains mixed: the new runtime files now put the plugin modestly
 above the baseline line count, but the chart/layout hooks keep losing inline
@@ -253,6 +255,8 @@ React orchestration.
 - Row subtotal child filtering and end-position subtotal descendant insertion
   are centralized in `layoutRuntime.ts`, so `usePivotLayout.ts` no longer owns
   that row presentation policy inline.
+- Expansion-state signature payload construction is shared between the full
+  layout signature and the cross-layout shared signature.
 - Column display path construction, column header label resolution, and
   metric-node render expansion are centralized in `renderDisplay.ts`, so
   `usePivotRenderModel.ts` no longer owns that display shaping inline.
@@ -310,7 +314,7 @@ Largest relevant production files:
 - `PivotInteractionPanel.tsx`: `1186` lines.
 - `PivotDndColumnSelect.tsx`: `1109` lines.
 - `controlPanel.tsx`: `1038` lines.
-- `usePivotLayout.ts`: `825` lines.
+- `usePivotLayout.ts`: `804` lines.
 - `PivotTableView.tsx`: `826` lines.
 - `usePivotRenderModel.ts`: `542` lines.
 
