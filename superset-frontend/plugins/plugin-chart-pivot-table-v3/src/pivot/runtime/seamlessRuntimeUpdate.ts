@@ -29,6 +29,7 @@ import {
   type ChartDataWarning,
 } from '../data/ChartDataClient';
 import { type PlannedQuerySpec } from '../query/specs';
+import { normalizeFormDataExtraFilters } from '../query/normalizeExtraFormData';
 import { buildInitialPivotUpdatePlan } from '../update/initialUpdatePlan';
 import {
   buildInitialRuntimeFromSpecResultsAsync,
@@ -76,6 +77,24 @@ export const matchesSeamlessRuntimeSyncSnapshot = (
   current?.filtersSignature === next.filtersSignature &&
   current.layoutSignature === next.layoutSignature &&
   current.upstreamSignature === next.upstreamSignature;
+
+export const buildSeamlessRuntimeUpstreamSignature = (
+  queryFormData?: PivotTableQueryFormData | null,
+) => {
+  if (!queryFormData) {
+    return null;
+  }
+  const normalizedQueryFormData = normalizeFormDataExtraFilters(queryFormData);
+  return stableStringify({
+    adhoc_filters: normalizedQueryFormData.adhoc_filters ?? [],
+    extra_form_data: normalizedQueryFormData.extra_form_data ?? null,
+    extras: normalizedQueryFormData.extras ?? null,
+    granularity_sqla: normalizedQueryFormData.granularity_sqla ?? null,
+    time_grain_sqla: normalizedQueryFormData.time_grain_sqla ?? null,
+    time_offsets: normalizedQueryFormData.time_offsets ?? [],
+    time_range: normalizedQueryFormData.time_range ?? null,
+  });
+};
 
 export type SeamlessRuntimeUpdateResult =
   | {

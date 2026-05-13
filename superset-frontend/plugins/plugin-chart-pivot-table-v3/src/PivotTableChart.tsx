@@ -101,11 +101,11 @@ import { type PivotFactStoreBatch } from './pivot/runtime/ingestQueryResults';
 import { createLatestRequestLifecycle } from './pivot/runtime/requestLifecycle';
 import {
   buildSeamlessRuntimeSyncSnapshot,
+  buildSeamlessRuntimeUpstreamSignature,
   fetchAndMaterializeSeamlessRuntimeUpdate,
   matchesSeamlessRuntimeSyncSnapshot,
   type SeamlessRuntimeSyncSnapshot,
 } from './pivot/runtime/seamlessRuntimeUpdate';
-import { stableStringify } from './pivot/shared/stableStringify';
 
 const PANEL_WIDTH = 230;
 const TOP_CHIPS_HEIGHT = 36;
@@ -1218,20 +1218,10 @@ function PivotTableChart(props: PivotTableProps) {
   }, [appliedLayoutFormData, committedSelectionFilters, isUserControlled]);
 
   const upstreamDashboardQueryContextSignature = useMemo(() => {
-    if (!isDashboardRuntimeSync || !queryFormData) {
+    if (!isDashboardRuntimeSync) {
       return null;
     }
-    const normalizedQueryFormData =
-      normalizeFormDataExtraFilters(queryFormData);
-    return stableStringify({
-      adhoc_filters: normalizedQueryFormData.adhoc_filters ?? [],
-      extra_form_data: normalizedQueryFormData.extra_form_data ?? null,
-      extras: normalizedQueryFormData.extras ?? null,
-      granularity_sqla: normalizedQueryFormData.granularity_sqla ?? null,
-      time_grain_sqla: normalizedQueryFormData.time_grain_sqla ?? null,
-      time_offsets: normalizedQueryFormData.time_offsets ?? [],
-      time_range: normalizedQueryFormData.time_range ?? null,
-    });
+    return buildSeamlessRuntimeUpstreamSignature(queryFormData);
   }, [isDashboardRuntimeSync, queryFormData]);
 
   const persistedInteractionFilters = useMemo(() => {

@@ -20,6 +20,7 @@
 import { type PivotRuntimeLayout } from '../../../../src/types';
 import {
   buildSeamlessRuntimeSyncSnapshot,
+  buildSeamlessRuntimeUpstreamSignature,
   matchesSeamlessRuntimeSyncSnapshot,
 } from '../../../../src/pivot/runtime/seamlessRuntimeUpdate';
 
@@ -94,4 +95,24 @@ test('matches seamless runtime sync snapshots by filters, layout, and upstream q
       }),
     ),
   ).toBe(false);
+});
+
+test('builds stable upstream dashboard query-context signatures', () => {
+  expect(buildSeamlessRuntimeUpstreamSignature()).toBeNull();
+  expect(
+    buildSeamlessRuntimeUpstreamSignature({
+      adhoc_filters: [{ col: 'country', op: '==', val: 'France' }],
+      extra_form_data: {
+        filters: [{ col: 'region', op: 'IN', val: ['EU'] }],
+      },
+      extras: { time_grain_sqla: 'P1D' },
+      granularity_sqla: 'ds',
+      metrics: ['sales'],
+      time_offsets: ['1 year ago'],
+      time_range: 'No filter',
+      viz_type: 'pivot_table_v3',
+    }),
+  ).toBe(
+    '{"adhoc_filters":[{"col":"country","op":"==","val":"France"}],"extra_form_data":{"filters":[{"col":"region","op":"IN","val":["EU"]}]},"extras":{"time_grain_sqla":"P1D"},"granularity_sqla":"ds","time_grain_sqla":null,"time_offsets":["1 year ago"],"time_range":"No filter"}',
+  );
 });
