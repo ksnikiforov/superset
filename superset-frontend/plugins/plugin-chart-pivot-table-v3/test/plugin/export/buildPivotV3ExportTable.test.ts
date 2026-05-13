@@ -18,8 +18,8 @@
  */
 
 import {
-  buildPivotV3ExportTable,
   buildPivotV3RowExportModel,
+  buildPivotV3ExportSheetData,
 } from '../../../src/export/buildPivotV3ExportTable';
 import { type PivotTreeNode } from '../../../src/types';
 
@@ -105,6 +105,42 @@ describe('buildPivotV3ExportTable', () => {
         JSON.stringify(rowExport.values),
       );
     });
+  };
+
+  const buildPivotV3ExportTable = (
+    table: HTMLTableElement,
+  ): HTMLTableElement => {
+    const exportRows = buildPivotV3ExportSheetData(table);
+    const exported = table.ownerDocument.createElement('table');
+    const headerRowCount = table.tHead?.rows.length ?? 0;
+    const head = table.ownerDocument.createElement('thead');
+    const body = table.ownerDocument.createElement('tbody');
+
+    exportRows.forEach((row, rowIndex) => {
+      const targetSection = rowIndex < headerRowCount ? head : body;
+      const outputRow = table.ownerDocument.createElement('tr');
+      row.forEach(cell => {
+        const outputCell = table.ownerDocument.createElement(
+          cell.isHeader ? 'th' : 'td',
+        );
+        outputCell.textContent = String(cell.value);
+        if (cell.type === 'number') {
+          outputCell.setAttribute('data-t', 'n');
+          outputCell.setAttribute('data-v', String(cell.value));
+        }
+        outputRow.appendChild(outputCell);
+      });
+      targetSection.appendChild(outputRow);
+    });
+
+    if (head.rows.length > 0) {
+      exported.appendChild(head);
+    }
+    if (body.rows.length > 0) {
+      exported.appendChild(body);
+    }
+
+    return exported;
   };
 
   it('splits row hierarchy into columns using row axis labels', () => {
