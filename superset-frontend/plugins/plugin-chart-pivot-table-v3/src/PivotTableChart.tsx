@@ -108,6 +108,8 @@ import {
   buildSeamlessRuntimeUpstreamSignature,
   fetchAndMaterializeSeamlessRuntimeUpdate,
   hasPersistedRuntimeLayoutSyncSettled,
+  isSeamlessDisplaySnapshotSettled,
+  prepareRuntimeStatePersistence,
   prepareSeamlessRuntimeLayoutChange,
   prepareStaleDashboardRuntimeUpdate,
   shouldApplyPersistedFilterSeamlessUpdate,
@@ -839,33 +841,36 @@ function PivotTableChart(props: PivotTableProps) {
       layout: PivotRuntimeLayout,
       filters: Record<string, DataRecordValue[]>,
     ) => {
-      if (
-        isDashboardRuntimeSync &&
-        !isSameRuntimeLayout(lastPersistedRuntimeLayoutRef.current, layout)
-      ) {
-        lastPersistedRuntimeLayoutRef.current = layout;
+      const persistencePlan = prepareRuntimeStatePersistence({
+        layout,
+        selection: filters,
+        isDashboardRuntimeSync,
+        lastPersistedRuntimeLayout: lastPersistedRuntimeLayoutRef.current,
+        lastPersistedSelection: lastPersistedSelectionRef.current,
+        upstreamDashboardQueryContextSignature,
+      });
+      if (persistencePlan.persistedRuntimeLayout) {
+        lastPersistedRuntimeLayoutRef.current =
+          persistencePlan.persistedRuntimeLayout;
         pendingPersistedRuntimeLayoutSyncRef.current = true;
       }
-      if (isDashboardRuntimeSync) {
+      if (persistencePlan.localSyncDashboardQueryContext !== undefined) {
         lastLocalSyncDashboardQueryContextRef.current =
-          upstreamDashboardQueryContextSignature;
+          persistencePlan.localSyncDashboardQueryContext;
       }
-      if (!isEqual(lastPersistedSelectionRef.current, filters)) {
-        lastPersistedSelectionRef.current = filters;
+      if (persistencePlan.persistedSelection) {
+        lastPersistedSelectionRef.current = persistencePlan.persistedSelection;
         pendingPersistedSelectionSyncRef.current = true;
       }
       setCommittedRuntimeLayout(current =>
         isSameRuntimeLayout(current, layout) ? current : layout,
       );
-      const nextOwnState = mergeOwnState({
-        pivotRuntimeLayout: layout,
-        pivotSelectedFilters: filters,
-      });
       if (setControlValue) {
         setControlValue('pivotRuntimeLayout', layout);
         setControlValue('pivotSelectedFilters', filters);
       }
       if (shouldPersistOwnState) {
+        const nextOwnState = mergeOwnState(persistencePlan.ownStatePatch);
         setDataMask({ ownState: { ...nextOwnState } });
       }
     },
@@ -1130,16 +1135,16 @@ function PivotTableChart(props: PivotTableProps) {
   }, [expandedCols, expandedRows, pendingCols, pendingRows]);
 
   useEffect(() => {
-    if (!pendingDisplaySnapshot) {
-      return;
-    }
-    const settled =
-      !seamlessLoading &&
-      !isHydrating &&
-      loadingKeys.size === 0 &&
-      pendingRows.size === 0 &&
-      pendingCols.size === 0;
-    if (settled) {
+    if (
+      pendingDisplaySnapshot &&
+      isSeamlessDisplaySnapshotSettled({
+        seamlessLoading,
+        isHydrating,
+        loadingKeys,
+        pendingRows,
+        pendingCols,
+      })
+    ) {
       setPendingDisplaySnapshot(null);
     }
   }, [

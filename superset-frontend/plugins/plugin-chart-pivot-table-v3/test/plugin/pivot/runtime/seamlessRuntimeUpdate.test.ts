@@ -27,7 +27,9 @@ import {
   buildSeamlessRuntimeSyncSnapshot,
   buildSeamlessRuntimeUpstreamSignature,
   hasPersistedRuntimeLayoutSyncSettled,
+  isSeamlessDisplaySnapshotSettled,
   matchesSeamlessRuntimeSyncSnapshot,
+  prepareRuntimeStatePersistence,
   prepareSeamlessRuntimeLayoutChange,
   prepareStaleDashboardRuntimeUpdate,
   shouldApplyPersistedFilterSeamlessUpdate,
@@ -465,6 +467,90 @@ test('detects settled persisted runtime layout sync', () => {
       pendingPersistedRuntimeLayoutSync: true,
       runtimeLayout,
       lastPersistedRuntimeLayout: runtimeLayout,
+    }),
+  ).toBe(false);
+});
+
+test('prepares runtime state persistence side-effect plan', () => {
+  const filters = { country: ['France'] };
+
+  expect(
+    prepareRuntimeStatePersistence({
+      layout: runtimeLayout,
+      selection: filters,
+      isDashboardRuntimeSync: true,
+      lastPersistedRuntimeLayout: { ...runtimeLayout, rows: ['state'] },
+      lastPersistedSelection: {},
+      upstreamDashboardQueryContextSignature: 'query-a',
+    }),
+  ).toEqual({
+    ownStatePatch: {
+      pivotRuntimeLayout: runtimeLayout,
+      pivotSelectedFilters: filters,
+    },
+    persistedRuntimeLayout: runtimeLayout,
+    localSyncDashboardQueryContext: 'query-a',
+    persistedSelection: filters,
+  });
+
+  expect(
+    prepareRuntimeStatePersistence({
+      layout: runtimeLayout,
+      selection: filters,
+      isDashboardRuntimeSync: false,
+      lastPersistedRuntimeLayout: { ...runtimeLayout, rows: ['state'] },
+      lastPersistedSelection: filters,
+      upstreamDashboardQueryContextSignature: null,
+    }),
+  ).toEqual({
+    ownStatePatch: {
+      pivotRuntimeLayout: runtimeLayout,
+      pivotSelectedFilters: filters,
+    },
+    persistedRuntimeLayout: undefined,
+    localSyncDashboardQueryContext: undefined,
+    persistedSelection: undefined,
+  });
+});
+
+test('detects when seamless display snapshots can clear', () => {
+  const baseState = {
+    seamlessLoading: false,
+    isHydrating: false,
+    loadingKeys: new Set<string>(),
+    pendingRows: new Set<string>(),
+    pendingCols: new Set<string>(),
+  };
+
+  expect(isSeamlessDisplaySnapshotSettled(baseState)).toBe(true);
+  expect(
+    isSeamlessDisplaySnapshotSettled({
+      ...baseState,
+      seamlessLoading: true,
+    }),
+  ).toBe(false);
+  expect(
+    isSeamlessDisplaySnapshotSettled({
+      ...baseState,
+      isHydrating: true,
+    }),
+  ).toBe(false);
+  expect(
+    isSeamlessDisplaySnapshotSettled({
+      ...baseState,
+      loadingKeys: new Set(['row']),
+    }),
+  ).toBe(false);
+  expect(
+    isSeamlessDisplaySnapshotSettled({
+      ...baseState,
+      pendingRows: new Set(['row']),
+    }),
+  ).toBe(false);
+  expect(
+    isSeamlessDisplaySnapshotSettled({
+      ...baseState,
+      pendingCols: new Set(['col']),
     }),
   ).toBe(false);
 });

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { type DataRecordValue } from '@superset-ui/core';
+import { type DataRecordValue, type JsonObject } from '@superset-ui/core';
 import { isEqual } from 'lodash';
 import {
   type PivotRuntimeLayout,
@@ -299,6 +299,71 @@ export const shouldSyncUiRuntimeLayoutFromProps = ({
     isDashboardContext &&
     pendingPersistedRuntimeLayoutSync
   ) && !hasPendingSeamlessLayout;
+
+export type RuntimeStatePersistencePlan = {
+  ownStatePatch: JsonObject;
+  persistedRuntimeLayout?: PivotRuntimeLayout;
+  localSyncDashboardQueryContext?: string | null;
+  persistedSelection?: RuntimeSelection;
+};
+
+export const prepareRuntimeStatePersistence = ({
+  layout,
+  selection,
+  isDashboardRuntimeSync,
+  lastPersistedRuntimeLayout,
+  lastPersistedSelection,
+  upstreamDashboardQueryContextSignature,
+}: {
+  layout: PivotRuntimeLayout;
+  selection: RuntimeSelection;
+  isDashboardRuntimeSync: boolean;
+  lastPersistedRuntimeLayout: PivotRuntimeLayout;
+  lastPersistedSelection: RuntimeSelection;
+  upstreamDashboardQueryContextSignature: string | null;
+}): RuntimeStatePersistencePlan => {
+  const shouldMarkPersistedRuntimeLayoutSyncPending =
+    isDashboardRuntimeSync &&
+    !isSameRuntimeLayout(lastPersistedRuntimeLayout, layout);
+  const shouldMarkPersistedSelectionSyncPending = !isEqual(
+    lastPersistedSelection,
+    selection,
+  );
+  return {
+    ownStatePatch: {
+      pivotRuntimeLayout: layout,
+      pivotSelectedFilters: selection,
+    },
+    persistedRuntimeLayout: shouldMarkPersistedRuntimeLayoutSyncPending
+      ? layout
+      : undefined,
+    localSyncDashboardQueryContext: isDashboardRuntimeSync
+      ? upstreamDashboardQueryContextSignature
+      : undefined,
+    persistedSelection: shouldMarkPersistedSelectionSyncPending
+      ? selection
+      : undefined,
+  };
+};
+
+export const isSeamlessDisplaySnapshotSettled = ({
+  seamlessLoading,
+  isHydrating,
+  loadingKeys,
+  pendingRows,
+  pendingCols,
+}: {
+  seamlessLoading: boolean;
+  isHydrating: boolean;
+  loadingKeys: Set<string>;
+  pendingRows: Set<string>;
+  pendingCols: Set<string>;
+}) =>
+  !seamlessLoading &&
+  !isHydrating &&
+  loadingKeys.size === 0 &&
+  pendingRows.size === 0 &&
+  pendingCols.size === 0;
 
 export type SeamlessRuntimeLayoutChangeAction =
   | {
