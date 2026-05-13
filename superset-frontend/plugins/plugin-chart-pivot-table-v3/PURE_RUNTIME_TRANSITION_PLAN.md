@@ -58,7 +58,7 @@ cells are projections of DB facts, not canonical data.
 ## Current Status
 
 As of May 13, 2026, after
-`bf7c3478d5 refactor(pivot-table-v3): extract dimension filter value fetching`:
+`1cd6e74a8a refactor(pivot-table-v3): centralize interaction chip layout`:
 
 - Overall transition estimate: **86%**.
 - Goal-weighted completion estimate: **86%**.
@@ -70,8 +70,8 @@ As of May 13, 2026, after
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `9019` insertions, `9815` deletions, net `-796`.
-- Current production `src` TypeScript/TSX total: `32714` lines.
+- Production `src`: `9071` insertions, `9863` deletions, net `-792`.
+- Current production `src` TypeScript/TSX total: `32718` lines.
 - Implied baseline `src` total: about `33510` lines.
 
 The readout is mixed but improving: the new runtime files still account for
@@ -88,7 +88,7 @@ the plugin net-negative overall.
 | Gate 4: one tree materializer             |        88% | `materializePivotTree.ts` owns fact-to-tree materialization, Values/metric/measure axes, subtotal leaf injection, and measure-leaf value application. Export no longer repairs row depth semantics, but still needs a cleaner model boundary.                                                                                                                                                                                                                                                                                                                                                 |
 | Gate 5: expansion reducer/runtime effects |        83% | Expansion no longer derives fetched state from rendered tree shape. It uses explicit fact coverage, semantic fetchability, shared fetch execution, and request lifecycles. Loaded terminal metric nodes and metric subtotal nodes now seed coverage through the fetched-coverage utility, and fetched-result delta collection now seeds both fact batches and loaded metric-node coverage for same-axis and hydration paths. Initial hydration prefetch planning and prefetch action selection are now pure engine decisions. The hook still owns hydration iteration, cancellation, and React commits. |
 | Gate 6: pure render model                 |        85% | Projection drives toggle eligibility, collapsed Values, column display, visible-axis construction, and semantic export row depth. Remaining risk is deeper row subtotal policy and some metric-index compatibility behavior.                                                                                                                                                                                                                                                                                                                                                                  |
-| Gate 7: chart component cleanup           |        66% | The chart delegates runtime fetch decisions and no longer vetoes metric-order-only commits or treats rendered tree signatures as seamless refetch identity. Seamless sync snapshots, upstream dashboard query-context signatures, committed-props sync predicates, stale coverage recovery predicates, persisted-filter seamless reload policy, persisted-selection local sync policy, runtime-layout prop sync policy, runtime-layout change actions, and stale dashboard runtime actions now live in the runtime update module. Selected-filter update policy, persisted filter normalization, and tree-derived filter value collection now live with the filter helpers. Dimension filter search/value fetch state now lives in a dedicated chart hook. The chart still owns committed tree/fact state, interaction wiring, and several controller-like effects. |
+| Gate 7: chart component cleanup           |        67% | The chart delegates runtime fetch decisions and no longer vetoes metric-order-only commits or treats rendered tree signatures as seamless refetch identity. Seamless sync snapshots, upstream dashboard query-context signatures, committed-props sync predicates, stale coverage recovery predicates, persisted-filter seamless reload policy, persisted-selection local sync policy, runtime-layout prop sync policy, runtime-layout change actions, and stale dashboard runtime actions now live in the runtime update module. Selected-filter update policy, persisted filter normalization, and tree-derived filter value collection now live with the filter helpers. Dimension filter search/value fetch state now lives in a dedicated chart hook. Interaction chip construction and remove-dimension layout policy live with the drag layout helpers. The chart still owns committed tree/fact state, interaction wiring, and several controller-like effects. |
 
 ## What Is Now Solid
 
@@ -136,6 +136,8 @@ the plugin net-negative overall.
 - Dimension filter search/value request state and query construction are now
   isolated in `useDimensionFilterValues`, so the chart no longer owns the
   request versioning and loading bookkeeping for filter value menus.
+- Interaction chip construction and dimension-removal layout updates are
+  centralized in `interactionDrag.ts`, beside the other drag layout policies.
 - Pending seamless layout refresh keeps a display snapshot instead of freezing
   the whole view prop bundle.
 - `PivotTableView` emits semantic zero-based row depth for export, so the export
@@ -164,7 +166,7 @@ the plugin net-negative overall.
 
 Largest relevant production files:
 
-- `PivotTableChart.tsx`: `2195` lines.
+- `PivotTableChart.tsx`: `2156` lines.
 - `useExpansionEngine.ts`: `1707` lines.
 - `usePivotFormatting.tsx`: `1632` lines.
 - `PivotDndMetricSelect.tsx`: `1566` lines.
@@ -353,6 +355,9 @@ Recent validation:
   focused hook/filter-search tests (`9` tests) passed.
 - After the dimension filter checkpoint, the full pivot-table-v3 plugin Jest
   suite passed (`90` suites, `721` tests).
+- `1cd6e74a8a`: centralized interaction chip construction and dimension-removal
+  layout policy in `interactionDrag.ts`; touched-file ESLint, Prettier,
+  `git diff --check`, and focused interaction layout tests (`32` tests) passed.
 
 Minimum test coverage for future slices:
 
