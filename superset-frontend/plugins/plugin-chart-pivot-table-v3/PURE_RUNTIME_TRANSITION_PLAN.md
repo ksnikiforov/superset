@@ -58,7 +58,7 @@ cells are projections of DB facts, not canonical data.
 ## Current Status
 
 As of May 13, 2026, after
-`e4f05c9107 refactor(pivot-table-v3): centralize chart ref syncing`:
+`87bbd05e52 refactor(pivot-table-v3): centralize dimension setting remaps`:
 
 - Overall transition estimate: **94%**.
 - Goal-weighted completion estimate: **94%**.
@@ -70,8 +70,8 @@ As of May 13, 2026, after
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `11903` insertions, `11430` deletions, net `+473`.
-- Current production `src` TypeScript/TSX total: `33983` lines.
+- Production `src`: `11927` insertions, `11489` deletions, net `+438`.
+- Current production `src` TypeScript/TSX total: `33948` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - Full plugin Jest pass after the column-sort extraction: `91` suites and
   `729` tests.
@@ -125,6 +125,8 @@ Source-only diff from pre-refactor baseline
   suites and `776` tests.
 - Full plugin Jest pass after centralizing chart ref syncing and table-width
   reuse: `94` suites and `776` tests.
+- Full plugin Jest pass after centralizing dimension formatting/sorting key
+  remaps: `94` suites and `776` tests.
 
 The readout remains mixed: the new runtime files now put the plugin modestly
 above the baseline line count, but the chart/layout hooks keep losing inline
@@ -225,6 +227,8 @@ React orchestration.
   request versioning and loading bookkeeping for filter value menus.
 - Interaction chip construction and dimension-removal layout updates are
   centralized in `interactionDrag.ts`, beside the other drag layout policies.
+- Dimension formatting/sorting key remapping now uses one helper shared by
+  query normalization and cross-axis setting transfer.
 - The interaction drag strips, drag preview, chip shell, and panel/table
   scaffolding live in `PivotInteractionLayout.tsx`, leaving the chart to pass
   callbacks and runtime chip state.
@@ -297,7 +301,7 @@ Largest relevant production files:
 
 - `PivotDndMetricSelect.tsx`: `1566` lines.
 - `engine.ts`: `1496` lines.
-- `utils.ts`: `1464` lines.
+- `utils.ts`: `1429` lines.
 - `PivotTableChart.tsx`: `1447` lines.
 - `PivotMetricDefinitionValue.tsx`: `1448` lines.
 - `materializePivotTree.ts`: `1329` lines.
