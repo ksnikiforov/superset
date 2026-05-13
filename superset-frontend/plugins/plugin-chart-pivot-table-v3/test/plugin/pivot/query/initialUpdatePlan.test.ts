@@ -21,6 +21,7 @@ import { formatQueryName } from '../../../../src/pivot/query/queryName';
 import buildQuery from '../../../../src/buildQuery';
 import {
   buildInitialPivotUpdatePlan,
+  buildSelectionFilteredFormData,
   buildSelectionFilterClauses,
 } from '../../../../src/pivot/update/initialUpdatePlan';
 import { MetricsLayoutEnum, PivotRuntimeLayout } from '../../../../src/types';
@@ -45,6 +46,28 @@ describe('buildInitialPivotUpdatePlan', () => {
     expect(filters).toEqual([
       { col: 'country', op: 'IN', val: ['US'] },
       { col: 'state', op: 'IN', val: ['CA'] },
+    ]);
+  });
+
+  it('builds normalized form data with selection filters', () => {
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: ['country', 'state'],
+      extra_form_data: {
+        filters: [{ col: 'segment', op: 'IN', val: ['Consumer'] }],
+      },
+    });
+
+    const filteredFormData = buildSelectionFilteredFormData({
+      formData,
+      selection: {
+        country: ['US'],
+      },
+    });
+
+    expect(filteredFormData.extra_form_data?.filters).toEqual([
+      { col: 'segment', op: 'IN', val: ['Consumer'] },
+      { col: 'country', op: 'IN', val: ['US'] },
     ]);
   });
 

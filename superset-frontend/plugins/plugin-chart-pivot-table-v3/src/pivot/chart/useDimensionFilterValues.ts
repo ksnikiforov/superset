@@ -28,12 +28,8 @@ import { isEqual } from 'lodash';
 import { type PivotTableQueryFormData } from '../../types';
 import { getStableColumnKey } from '../../utils';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
-import { normalizeFormDataExtraFilters } from '../query/normalizeExtraFormData';
 import { type QuerySpec } from '../query/types';
-import {
-  buildSelectionFilterClauses,
-  mergeExtraFilters as mergeSelectionExtraFilters,
-} from '../update/initialUpdatePlan';
+import { buildSelectionFilteredFormData } from '../update/initialUpdatePlan';
 import { type PivotSelectedFilters } from '../filters';
 
 const DIMENSION_VALUES_REQUEST_GROUP = 'pivot-v3-dimension-values';
@@ -162,22 +158,10 @@ export const useDimensionFilterValues = ({
       try {
         const selection = { ...selectedFilters };
         delete selection[dimensionKey];
-        const filters = buildSelectionFilterClauses({
+        const normalizedFormData = buildSelectionFilteredFormData({
           formData,
           selection,
         });
-        const pendingFormData =
-          filters.length > 0
-            ? {
-                ...formData,
-                extra_form_data: mergeSelectionExtraFilters(
-                  formData.extra_form_data,
-                  filters,
-                ),
-              }
-            : formData;
-        const normalizedFormData =
-          normalizeFormDataExtraFilters(pendingFormData);
         const spec: QuerySpec = {
           queryName: buildDimensionValuesQueryName(dimensionKey),
           columns: [dimension],

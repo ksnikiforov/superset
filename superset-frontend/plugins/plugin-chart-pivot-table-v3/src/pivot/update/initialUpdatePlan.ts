@@ -94,6 +94,27 @@ export const mergeExtraFilters = (
   };
 };
 
+export const buildSelectionFilteredFormData = ({
+  formData,
+  selection,
+}: BuildSelectionFilterClausesParams): PivotTableQueryFormData => {
+  const selectionFilters = buildSelectionFilterClauses({
+    formData,
+    selection,
+  });
+  return normalizeFormDataExtraFilters(
+    selectionFilters.length > 0
+      ? {
+          ...formData,
+          extra_form_data: mergeExtraFilters(
+            formData.extra_form_data,
+            selectionFilters,
+          ),
+        }
+      : formData,
+  );
+};
+
 const withMetricOverrides = ({
   formData,
   metricsOverride,
@@ -149,17 +170,10 @@ export const buildInitialPivotUpdatePlan = ({
     selection: resolvedSelection,
   });
 
-  const normalizedFormData = normalizeFormDataExtraFilters(
-    selectionFilters.length > 0
-      ? {
-          ...formData,
-          extra_form_data: mergeExtraFilters(
-            formData.extra_form_data,
-            selectionFilters,
-          ),
-        }
-      : formData,
-  );
+  const normalizedFormData = buildSelectionFilteredFormData({
+    formData,
+    selection: resolvedSelection,
+  });
 
   const formDataWithOverrides = withMetricOverrides({
     formData: normalizedFormData,

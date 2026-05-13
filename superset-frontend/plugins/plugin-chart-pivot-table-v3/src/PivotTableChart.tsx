@@ -68,10 +68,7 @@ import {
   normalizeRuntimeLayout,
   resolveAppliedInteractionLayout,
 } from './pivot/layout/resolveInteractionLayout';
-import {
-  buildSelectionFilterClauses,
-  mergeExtraFilters as mergeSelectionExtraFilters,
-} from './pivot/update/initialUpdatePlan';
+import { buildSelectionFilteredFormData } from './pivot/update/initialUpdatePlan';
 import {
   applyDimensionFilterSelectionChange,
   buildClearSelectedFiltersUpdate,
@@ -81,7 +78,6 @@ import {
 } from './pivot/filters';
 import { useDimensionFilterValues } from './pivot/chart/useDimensionFilterValues';
 import { supersetChartDataClient } from './pivot/data/SupersetChartDataClient';
-import { normalizeFormDataExtraFilters } from './pivot/query/normalizeExtraFormData';
 import { type ChartDataWarning } from './pivot/data/ChartDataClient';
 import {
   applyDimensionDrag,
@@ -621,28 +617,15 @@ function PivotTableChart(props: PivotTableProps) {
       }),
     [layoutGroupbyRows, resolvedVerboseMap],
   );
-  const committedSelectionFilters = useMemo(
-    () =>
-      buildSelectionFilterClauses({
-        formData: fetchFormDataBaseWithFormatters,
-        selection: committedFilters,
-      }),
-    [committedFilters, fetchFormDataBaseWithFormatters],
-  );
-
   const fetchFormData = useMemo(() => {
-    if (!isUserControlled || committedSelectionFilters.length === 0) {
+    if (!isUserControlled) {
       return appliedLayoutFormData;
     }
-    const merged = {
-      ...appliedLayoutFormData,
-      extra_form_data: mergeSelectionExtraFilters(
-        appliedLayoutFormData.extra_form_data,
-        committedSelectionFilters,
-      ),
-    };
-    return normalizeFormDataExtraFilters(merged);
-  }, [appliedLayoutFormData, committedSelectionFilters, isUserControlled]);
+    return buildSelectionFilteredFormData({
+      formData: appliedLayoutFormData,
+      selection: committedFilters,
+    });
+  }, [appliedLayoutFormData, committedFilters, isUserControlled]);
 
   const upstreamDashboardQueryContextSignature = useMemo(() => {
     if (!isDashboardRuntimeSync) {
