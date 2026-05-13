@@ -256,50 +256,6 @@ export const shouldSyncPersistedSelectedFilters = ({
   );
 };
 
-export const shouldSyncCommittedRuntimeLayoutFromProps = ({
-  isDashboardRuntimeSync,
-  pendingPersistedRuntimeLayoutSync,
-  hasPendingSeamlessLayout,
-}: {
-  isDashboardRuntimeSync: boolean;
-  pendingPersistedRuntimeLayoutSync: boolean;
-  hasPendingSeamlessLayout: boolean;
-}) =>
-  !(isDashboardRuntimeSync && pendingPersistedRuntimeLayoutSync) &&
-  !hasPendingSeamlessLayout;
-
-export const hasPersistedRuntimeLayoutSyncSettled = ({
-  isDashboardRuntimeSync,
-  pendingPersistedRuntimeLayoutSync,
-  runtimeLayout,
-  lastPersistedRuntimeLayout,
-}: {
-  isDashboardRuntimeSync: boolean;
-  pendingPersistedRuntimeLayoutSync: boolean;
-  runtimeLayout: PivotRuntimeLayout;
-  lastPersistedRuntimeLayout: PivotRuntimeLayout;
-}) =>
-  isDashboardRuntimeSync &&
-  pendingPersistedRuntimeLayoutSync &&
-  isSameRuntimeLayout(runtimeLayout, lastPersistedRuntimeLayout);
-
-export const shouldSyncUiRuntimeLayoutFromProps = ({
-  isUserControlled,
-  isDashboardContext,
-  pendingPersistedRuntimeLayoutSync,
-  hasPendingSeamlessLayout,
-}: {
-  isUserControlled: boolean;
-  isDashboardContext: boolean;
-  pendingPersistedRuntimeLayoutSync: boolean;
-  hasPendingSeamlessLayout: boolean;
-}) =>
-  !(
-    isUserControlled &&
-    isDashboardContext &&
-    pendingPersistedRuntimeLayoutSync
-  ) && !hasPendingSeamlessLayout;
-
 export type RuntimeLayoutPropSyncPlan = {
   shouldSyncCommittedRuntimeLayout: boolean;
   shouldSyncUiRuntimeLayout: boolean;
@@ -323,23 +279,19 @@ export const prepareRuntimeLayoutPropSync = ({
   runtimeLayout: PivotRuntimeLayout;
   lastPersistedRuntimeLayout: PivotRuntimeLayout;
 }): RuntimeLayoutPropSyncPlan => ({
-  shouldSyncCommittedRuntimeLayout: shouldSyncCommittedRuntimeLayoutFromProps({
-    isDashboardRuntimeSync,
-    pendingPersistedRuntimeLayoutSync,
-    hasPendingSeamlessLayout,
-  }),
-  shouldSyncUiRuntimeLayout: shouldSyncUiRuntimeLayoutFromProps({
-    isUserControlled,
-    isDashboardContext,
-    pendingPersistedRuntimeLayoutSync,
-    hasPendingSeamlessLayout,
-  }),
-  hasPersistedRuntimeLayoutSyncSettled: hasPersistedRuntimeLayoutSyncSettled({
-    isDashboardRuntimeSync,
-    pendingPersistedRuntimeLayoutSync,
-    runtimeLayout,
-    lastPersistedRuntimeLayout,
-  }),
+  shouldSyncCommittedRuntimeLayout:
+    !(isDashboardRuntimeSync && pendingPersistedRuntimeLayoutSync) &&
+    !hasPendingSeamlessLayout,
+  shouldSyncUiRuntimeLayout:
+    !(
+      isUserControlled &&
+      isDashboardContext &&
+      pendingPersistedRuntimeLayoutSync
+    ) && !hasPendingSeamlessLayout,
+  hasPersistedRuntimeLayoutSyncSettled:
+    isDashboardRuntimeSync &&
+    pendingPersistedRuntimeLayoutSync &&
+    isSameRuntimeLayout(runtimeLayout, lastPersistedRuntimeLayout),
 });
 
 export type RuntimeStatePersistencePlan = {
