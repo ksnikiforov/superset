@@ -764,29 +764,39 @@ const buildDimensionKeyMap = (columns: QueryFormColumn[]) => {
   return keyMap;
 };
 
+const remapDimensionSettingKeys = <Value extends object>(
+  settings: Record<string, Value>,
+  columns: QueryFormColumn[],
+  preserveUnmapped: boolean,
+): Record<string, Value> => {
+  if (columns.length === 0) {
+    return settings;
+  }
+  const keyMap = buildDimensionKeyMap(columns);
+  return Object.entries(settings).reduce<Record<string, Value>>(
+    (acc, [dimensionKey, setting]) => {
+      const resolvedKey =
+        keyMap.get(dimensionKey) ??
+        (preserveUnmapped ? dimensionKey : undefined);
+      if (!resolvedKey) {
+        return acc;
+      }
+      acc[resolvedKey] = {
+        ...(acc[resolvedKey] ?? {}),
+        ...setting,
+      } as Value;
+      return acc;
+    },
+    {},
+  );
+};
+
 export const normalizeDimensionFormattingMapWithKeys = (
   formatting: PivotDimensionFormattingMap | undefined,
   columns: QueryFormColumn[],
 ): PivotDimensionFormattingMap => {
   const normalized = normalizeDimensionFormattingMap(formatting);
-  if (columns.length === 0) {
-    return normalized;
-  }
-  const keyMap = buildDimensionKeyMap(columns);
-  return Object.entries(normalized).reduce<PivotDimensionFormattingMap>(
-    (acc, [dimensionKey, dimensionFormatting]) => {
-      const resolvedKey = keyMap.get(dimensionKey);
-      if (!resolvedKey) {
-        return acc;
-      }
-      acc[resolvedKey] = {
-        ...(acc[resolvedKey] || {}),
-        ...dimensionFormatting,
-      };
-      return acc;
-    },
-    {},
-  );
+  return remapDimensionSettingKeys(normalized, columns, false);
 };
 
 const DEFAULT_DIMENSION_SORT_ORDER: PivotSortOrder = 'asc';
@@ -857,24 +867,7 @@ export const normalizeDimensionSortingMapWithKeys = (
   columns: QueryFormColumn[],
 ): PivotDimensionSortingMap => {
   const normalized = normalizeDimensionSortingMap(sorting);
-  if (columns.length === 0) {
-    return normalized;
-  }
-  const keyMap = buildDimensionKeyMap(columns);
-  return Object.entries(normalized).reduce<PivotDimensionSortingMap>(
-    (acc, [dimensionKey, dimensionSorting]) => {
-      const resolvedKey = keyMap.get(dimensionKey);
-      if (!resolvedKey) {
-        return acc;
-      }
-      acc[resolvedKey] = {
-        ...(acc[resolvedKey] || {}),
-        ...dimensionSorting,
-      };
-      return acc;
-    },
-    {},
-  );
+  return remapDimensionSettingKeys(normalized, columns, false);
 };
 
 export const hasTotalSorting = (
@@ -892,21 +885,7 @@ const normalizeDimensionFormattingMapForAxis = (
   columns: QueryFormColumn[],
 ): PivotDimensionFormattingMap => {
   const normalized = normalizeDimensionFormattingMap(formatting);
-  if (columns.length === 0) {
-    return normalized;
-  }
-  const keyMap = buildDimensionKeyMap(columns);
-  return Object.entries(normalized).reduce<PivotDimensionFormattingMap>(
-    (acc, [dimensionKey, dimensionFormatting]) => {
-      const resolvedKey = keyMap.get(dimensionKey) ?? dimensionKey;
-      acc[resolvedKey] = {
-        ...(acc[resolvedKey] || {}),
-        ...dimensionFormatting,
-      };
-      return acc;
-    },
-    {},
-  );
+  return remapDimensionSettingKeys(normalized, columns, true);
 };
 
 const normalizeDimensionSortingMapForAxis = (
@@ -914,21 +893,7 @@ const normalizeDimensionSortingMapForAxis = (
   columns: QueryFormColumn[],
 ): PivotDimensionSortingMap => {
   const normalized = normalizeDimensionSortingMap(sorting);
-  if (columns.length === 0) {
-    return normalized;
-  }
-  const keyMap = buildDimensionKeyMap(columns);
-  return Object.entries(normalized).reduce<PivotDimensionSortingMap>(
-    (acc, [dimensionKey, dimensionSorting]) => {
-      const resolvedKey = keyMap.get(dimensionKey) ?? dimensionKey;
-      acc[resolvedKey] = {
-        ...(acc[resolvedKey] || {}),
-        ...dimensionSorting,
-      };
-      return acc;
-    },
-    {},
-  );
+  return remapDimensionSettingKeys(normalized, columns, true);
 };
 
 const getDimensionKeyFromColumn = (
