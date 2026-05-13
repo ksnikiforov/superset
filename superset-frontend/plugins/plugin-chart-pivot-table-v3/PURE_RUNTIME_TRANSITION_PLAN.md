@@ -84,6 +84,8 @@ Source-only diff from pre-refactor baseline
   `4` suites and `18` tests.
 - Focused reinitialization pass after centralizing expansion reinit decisions:
   `3` suites and `68` tests.
+- Full plugin Jest pass after the expansion-engine cleanup series: `91` suites
+  and `737` tests.
 
 The readout is mixed but improving: the new runtime files still account for
 substantial added lines, while old production files have shrunk enough to leave
