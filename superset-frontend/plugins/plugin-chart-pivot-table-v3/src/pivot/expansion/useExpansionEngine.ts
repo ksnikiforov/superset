@@ -85,6 +85,7 @@ import {
   mergeSameAxisExpansionTree,
   planInitialHydrationPrefetch,
   planHydrationIteration,
+  resolveExpansionReinitializationDecision,
   resolveReinitializedExpansionState,
   resolveExpandedForMetrics as resolveExpandedForMetricsBase,
   stageHydrationFetchDeltas,
@@ -1385,31 +1386,33 @@ export const useExpansionEngine = ({
 
   useEffect(() => {
     const previousSignature = expandedStateSignatureRef.current;
-    const shouldResetExpandedState =
-      previousSignature !== expandedStateSignature;
-    const isInitialMount = previousSignature === null;
     expandedStateSignatureRef.current = expandedStateSignature;
     const previousSharedSignature = expandedStateSharedSignatureRef.current;
-    const sharedSignatureChanged =
-      previousSharedSignature !== expandedStateSharedSignature;
     expandedStateSharedSignatureRef.current = expandedStateSharedSignature;
     const prevExpandRowsLevelRaw = prevExpandRowsLevelRawRef.current;
     const prevExpandColsLevelRaw = prevExpandColsLevelRawRef.current;
-    const expandRowsLevelChanged =
-      prevExpandRowsLevelRaw !== expandRowsLevelRaw;
-    const expandColsLevelChanged =
-      prevExpandColsLevelRaw !== expandColumnsLevelRaw;
-    const isRowsLevelCleared =
-      expandRowsLevelRaw === undefined && prevExpandRowsLevelRaw !== undefined;
-    const isColsLevelCleared =
-      expandColumnsLevelRaw === undefined &&
-      prevExpandColsLevelRaw !== undefined;
-    const effectiveExpandRowsLevel = isRowsLevelCleared
-      ? 0
-      : resolvedExpandRowsLevel;
-    const effectiveExpandColsLevel = isColsLevelCleared
-      ? 0
-      : resolvedExpandColumnsLevel;
+    const hasNewData = previousDataRef.current !== data;
+    const reinitializationDecision = resolveExpansionReinitializationDecision({
+      previousSignature,
+      expandedStateSignature,
+      previousSharedSignature,
+      expandedStateSharedSignature,
+      prevExpandRowsLevelRaw,
+      prevExpandColsLevelRaw,
+      expandRowsLevelRaw,
+      expandColumnsLevelRaw,
+      resolvedExpandRowsLevel,
+      resolvedExpandColumnsLevel,
+      hasNewData,
+    });
+    const {
+      shouldResetExpandedState,
+      isInitialMount,
+      sharedSignatureChanged,
+      effectiveExpandRowsLevel,
+      effectiveExpandColsLevel,
+      shouldReinitialize,
+    } = reinitializationDecision;
     const sessionExpansionState =
       expansionStateStoreRef.current?.init({
         persistedState: persistedExpansionStateRef.current,
@@ -1429,14 +1432,6 @@ export const useExpansionEngine = ({
       cols: groupbyColumnKeys,
     };
     const previousLayout = previousLayoutRef.current;
-    const hasNewData = previousDataRef.current !== data;
-    const shouldReinitialize =
-      isInitialMount ||
-      shouldResetExpandedState ||
-      sharedSignatureChanged ||
-      hasNewData ||
-      expandRowsLevelChanged ||
-      expandColsLevelChanged;
     if (!shouldReinitialize) {
       return;
     }

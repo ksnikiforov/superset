@@ -425,6 +425,73 @@ export const finalizeHydrationTree = ({
   return mergedTree;
 };
 
+export type ExpansionReinitializationDecision = {
+  shouldResetExpandedState: boolean;
+  isInitialMount: boolean;
+  sharedSignatureChanged: boolean;
+  expandRowsLevelChanged: boolean;
+  expandColsLevelChanged: boolean;
+  effectiveExpandRowsLevel: number;
+  effectiveExpandColsLevel: number;
+  shouldReinitialize: boolean;
+};
+
+export const resolveExpansionReinitializationDecision = ({
+  previousSignature,
+  expandedStateSignature,
+  previousSharedSignature,
+  expandedStateSharedSignature,
+  prevExpandRowsLevelRaw,
+  prevExpandColsLevelRaw,
+  expandRowsLevelRaw,
+  expandColumnsLevelRaw,
+  resolvedExpandRowsLevel,
+  resolvedExpandColumnsLevel,
+  hasNewData,
+}: {
+  previousSignature: string | null;
+  expandedStateSignature: string;
+  previousSharedSignature: string | null;
+  expandedStateSharedSignature: string;
+  prevExpandRowsLevelRaw?: number;
+  prevExpandColsLevelRaw?: number;
+  expandRowsLevelRaw?: number;
+  expandColumnsLevelRaw?: number;
+  resolvedExpandRowsLevel: number;
+  resolvedExpandColumnsLevel: number;
+  hasNewData: boolean;
+}): ExpansionReinitializationDecision => {
+  const shouldResetExpandedState = previousSignature !== expandedStateSignature;
+  const isInitialMount = previousSignature === null;
+  const sharedSignatureChanged =
+    previousSharedSignature !== expandedStateSharedSignature;
+  const expandRowsLevelChanged = prevExpandRowsLevelRaw !== expandRowsLevelRaw;
+  const expandColsLevelChanged =
+    prevExpandColsLevelRaw !== expandColumnsLevelRaw;
+  const isRowsLevelCleared =
+    expandRowsLevelRaw === undefined && prevExpandRowsLevelRaw !== undefined;
+  const isColsLevelCleared =
+    expandColumnsLevelRaw === undefined && prevExpandColsLevelRaw !== undefined;
+  return {
+    shouldResetExpandedState,
+    isInitialMount,
+    sharedSignatureChanged,
+    expandRowsLevelChanged,
+    expandColsLevelChanged,
+    effectiveExpandRowsLevel: isRowsLevelCleared ? 0 : resolvedExpandRowsLevel,
+    effectiveExpandColsLevel: isColsLevelCleared
+      ? 0
+      : resolvedExpandColumnsLevel,
+    shouldReinitialize:
+      isInitialMount ||
+      shouldResetExpandedState ||
+      sharedSignatureChanged ||
+      hasNewData ||
+      expandRowsLevelChanged ||
+      expandColsLevelChanged,
+  };
+};
+
 export const hasNestedPendingKeys = (keys: Set<string>) => {
   if (keys.size < 2) {
     return false;

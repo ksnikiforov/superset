@@ -25,6 +25,7 @@ import {
   mergeSameAxisExpansionTree,
   planInitialHydrationPrefetch,
   planHydrationIteration,
+  resolveExpansionReinitializationDecision,
   stageHydrationFetchDeltas,
   shouldPlanHydrationPrefetchAxis,
   type HydrationDeltaMap,
@@ -311,6 +312,110 @@ describe('pivot/expansion/engine', () => {
       parent: baseTree.rows[aKey],
       branch: deltaTree,
     });
+  });
+
+  it('plans expansion reinitialization for first mount and signature changes', () => {
+    expect(
+      resolveExpansionReinitializationDecision({
+        previousSignature: null,
+        expandedStateSignature: 'layout-a',
+        previousSharedSignature: null,
+        expandedStateSharedSignature: 'shared-a',
+        prevExpandRowsLevelRaw: undefined,
+        prevExpandColsLevelRaw: undefined,
+        expandRowsLevelRaw: undefined,
+        expandColumnsLevelRaw: undefined,
+        resolvedExpandRowsLevel: 1,
+        resolvedExpandColumnsLevel: 2,
+        hasNewData: false,
+      }),
+    ).toMatchObject({
+      isInitialMount: true,
+      shouldResetExpandedState: true,
+      sharedSignatureChanged: true,
+      shouldReinitialize: true,
+      effectiveExpandRowsLevel: 1,
+      effectiveExpandColsLevel: 2,
+    });
+
+    expect(
+      resolveExpansionReinitializationDecision({
+        previousSignature: 'layout-a',
+        expandedStateSignature: 'layout-a',
+        previousSharedSignature: 'shared-a',
+        expandedStateSharedSignature: 'shared-b',
+        prevExpandRowsLevelRaw: 1,
+        prevExpandColsLevelRaw: 2,
+        expandRowsLevelRaw: 1,
+        expandColumnsLevelRaw: 2,
+        resolvedExpandRowsLevel: 1,
+        resolvedExpandColumnsLevel: 2,
+        hasNewData: false,
+      }),
+    ).toMatchObject({
+      isInitialMount: false,
+      shouldResetExpandedState: false,
+      sharedSignatureChanged: true,
+      shouldReinitialize: true,
+    });
+  });
+
+  it('treats cleared expand levels as zero during reinitialization', () => {
+    const decision = resolveExpansionReinitializationDecision({
+      previousSignature: 'layout-a',
+      expandedStateSignature: 'layout-a',
+      previousSharedSignature: 'shared-a',
+      expandedStateSharedSignature: 'shared-a',
+      prevExpandRowsLevelRaw: 3,
+      prevExpandColsLevelRaw: 2,
+      expandRowsLevelRaw: undefined,
+      expandColumnsLevelRaw: undefined,
+      resolvedExpandRowsLevel: 3,
+      resolvedExpandColumnsLevel: 2,
+      hasNewData: false,
+    });
+
+    expect(decision).toMatchObject({
+      expandRowsLevelChanged: true,
+      expandColsLevelChanged: true,
+      effectiveExpandRowsLevel: 0,
+      effectiveExpandColsLevel: 0,
+      shouldReinitialize: true,
+    });
+  });
+
+  it('skips expansion reinitialization when signatures, data, and levels are stable', () => {
+    expect(
+      resolveExpansionReinitializationDecision({
+        previousSignature: 'layout-a',
+        expandedStateSignature: 'layout-a',
+        previousSharedSignature: 'shared-a',
+        expandedStateSharedSignature: 'shared-a',
+        prevExpandRowsLevelRaw: 1,
+        prevExpandColsLevelRaw: undefined,
+        expandRowsLevelRaw: 1,
+        expandColumnsLevelRaw: undefined,
+        resolvedExpandRowsLevel: 1,
+        resolvedExpandColumnsLevel: 0,
+        hasNewData: false,
+      }).shouldReinitialize,
+    ).toBe(false);
+
+    expect(
+      resolveExpansionReinitializationDecision({
+        previousSignature: 'layout-a',
+        expandedStateSignature: 'layout-a',
+        previousSharedSignature: 'shared-a',
+        expandedStateSharedSignature: 'shared-a',
+        prevExpandRowsLevelRaw: 1,
+        prevExpandColsLevelRaw: undefined,
+        expandRowsLevelRaw: 1,
+        expandColumnsLevelRaw: undefined,
+        resolvedExpandRowsLevel: 1,
+        resolvedExpandColumnsLevel: 0,
+        hasNewData: true,
+      }).shouldReinitialize,
+    ).toBe(true);
   });
 
   it('plans fetch targets for expanded nodes', () => {
