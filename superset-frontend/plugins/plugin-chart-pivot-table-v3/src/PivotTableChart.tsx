@@ -912,28 +912,20 @@ function PivotTableChart(props: PivotTableProps) {
     });
 
   useEffect(() => {
-    const { nextUpstreamState, shouldApplySeamlessUpdate } =
-      prepareStaleDashboardRuntimeUpdate({
-        upstreamSignature: upstreamDashboardQueryContextSignature,
-        previousUpstreamState: lastUpstreamQueryContextRef.current,
-        data,
-        shouldRecoverStaleCoverage:
-          shouldRecoverStaleDashboardRuntimeCoverageValue,
-      });
+    const {
+      nextUpstreamState,
+      shouldApplySeamlessUpdate: shouldApplyStaleUpdate,
+    } = prepareStaleDashboardRuntimeUpdate({
+      upstreamSignature: upstreamDashboardQueryContextSignature,
+      previousUpstreamState: lastUpstreamQueryContextRef.current,
+      data,
+      shouldRecoverStaleCoverage:
+        shouldRecoverStaleDashboardRuntimeCoverageValue,
+    });
     lastUpstreamQueryContextRef.current = nextUpstreamState;
-    if (shouldApplySeamlessUpdate) {
+    if (shouldApplyStaleUpdate) {
       applySeamlessUpdate(uiRuntimeLayout, uiSelectedFilters);
     }
-  }, [
-    applySeamlessUpdate,
-    data,
-    uiRuntimeLayout,
-    uiSelectedFilters,
-    shouldRecoverStaleDashboardRuntimeCoverageValue,
-    upstreamDashboardQueryContextSignature,
-  ]);
-
-  useEffect(() => {
     if (
       !shouldApplyPersistedFilterSeamlessUpdate({
         isUserControlled,
@@ -951,10 +943,13 @@ function PivotTableChart(props: PivotTableProps) {
   }, [
     applySeamlessUpdate,
     committedFilters,
+    data,
     isUserControlled,
     persistedInteractionFilters,
     uiRuntimeLayout,
     uiSelectedFilters,
+    shouldRecoverStaleDashboardRuntimeCoverageValue,
+    upstreamDashboardQueryContextSignature,
     upstreamSeamlessSignature,
   ]);
 
