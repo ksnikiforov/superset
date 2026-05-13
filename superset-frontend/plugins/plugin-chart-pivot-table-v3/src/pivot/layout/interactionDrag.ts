@@ -41,8 +41,6 @@ const resolveValueIndex = (
 
 type RemoveResult = {
   layout: PivotRuntimeLayout;
-  removedAxis?: PivotAxis;
-  removedIndex?: number;
 };
 
 const removeDimension = (
@@ -64,10 +62,6 @@ const removeDimension = (
       nextValuePlacement.index = Math.max(0, nextValuePlacement.index - 1);
     }
   }
-  const removedAxis: PivotAxis | undefined =
-    rowIndex >= 0 ? 'row' : colIndex >= 0 ? 'col' : undefined;
-  const removedIndex =
-    removedAxis === 'row' ? rowIndex : removedAxis === 'col' ? colIndex : -1;
   return {
     layout: {
       ...layout,
@@ -75,8 +69,6 @@ const removeDimension = (
       cols: nextCols,
       valuePlacement: nextValuePlacement,
     },
-    removedAxis,
-    removedIndex,
   };
 };
 
