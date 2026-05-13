@@ -58,10 +58,10 @@ cells are projections of DB facts, not canonical data.
 ## Current Status
 
 As of May 13, 2026, after
-`19b7fe3a7a refactor(pivot-table-v3): centralize persisted expansion visibility`:
+`73f92498ef refactor(pivot-table-v3): centralize databar runtime model`:
 
-- Overall transition estimate: **86%**.
-- Goal-weighted completion estimate: **86%**.
+- Overall transition estimate: **87%**.
+- Goal-weighted completion estimate: **87%**.
 - The runtime architecture exists and is used by the main paths.
 - The project is past line-count break-even, but not done.
 - The remaining work is mostly deletion of old chart, expansion, and render
@@ -70,8 +70,8 @@ As of May 13, 2026, after
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `10173` insertions, `10576` deletions, net `-403`.
-- Current production `src` TypeScript/TSX total: `33107` lines.
+- Production `src`: `10583` insertions, `10865` deletions, net `-282`.
+- Current production `src` TypeScript/TSX total: `33228` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - Full plugin Jest pass after the column-sort extraction: `91` suites and
   `729` tests.
@@ -87,6 +87,8 @@ Source-only diff from pre-refactor baseline
 - Full plugin Jest pass after the expansion-engine cleanup series: `91` suites
   and `737` tests.
 - Focused persisted-expansion visibility pass: `2` suites and `65` tests.
+- Full plugin Jest pass after extracting the databar runtime model: `92` suites
+  and `742` tests.
 
 The readout is mixed but improving: the new runtime files still account for
 substantial added lines, while old production files have shrunk enough to leave
@@ -101,7 +103,7 @@ the plugin net-negative overall.
 | Gate 3: central fact ingestion/store      |        92% | Fetch paths return fact batches, cache/fact-store hits use typed coverage, and ingestion is isolated. Compatible root/bootstrap coverage can now materialize branch specs without matching the original request scope while exact branch coverage remains authoritative. Remaining coupling is mostly tree-shaped chart/test boundaries.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | Gate 4: one tree materializer             |        88% | `materializePivotTree.ts` owns fact-to-tree materialization, Values/metric/measure axes, subtotal leaf injection, and measure-leaf value application. Export no longer repairs row depth semantics, but still needs a cleaner model boundary.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
 | Gate 5: expansion reducer/runtime effects |        87% | Expansion no longer derives fetched state from rendered tree shape. It uses explicit fact coverage, semantic fetchability, shared fetch execution, and request lifecycles. Loaded terminal metric nodes and metric subtotal nodes now seed coverage through the fetched-coverage utility, fetched-result delta collection now seeds both fact batches and loaded metric-node coverage for same-axis and hydration paths, same-axis delta merge/stale-subtree preservation policy lives in the expansion engine, hydration delta staging/finalization policy lives in the expansion engine, expansion reinitialization trigger/effective-level policy lives in the expansion engine, and persisted expansion visibility normalization also lives in the expansion engine. Initial hydration prefetch planning and prefetch action selection are now pure engine decisions. The hook still owns hydration iteration, cancellation, and React commits.                      |
-| Gate 6: pure render model                 |        86% | Projection drives toggle eligibility, collapsed Values, column display, visible-axis construction, semantic export row depth, and chart column-sort decisions. Remaining risk is deeper row subtotal policy and some metric-index compatibility behavior.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| Gate 6: pure render model                 |        88% | Projection drives toggle eligibility, collapsed Values, column display, visible-axis construction, semantic export row depth, and chart column-sort decisions. Databar scale grouping, waterfall offsets, bridge connectors, label-space sizing, and databar column min-width policy now live in a pure chart helper. Remaining risk is deeper row subtotal policy and some metric-index compatibility behavior.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | Gate 7: chart component cleanup           |        72% | The chart delegates runtime fetch decisions and no longer vetoes metric-order-only commits or treats rendered tree signatures as seamless refetch identity. Seamless sync snapshots, upstream dashboard query-context signatures, committed-props sync predicates, stale coverage recovery predicates, persisted-filter seamless reload policy, persisted-selection local sync policy, runtime-layout prop sync policy, runtime-layout change actions, and stale dashboard runtime actions now live in the runtime update module. Selected-filter update policy, persisted filter normalization, tree-derived filter value collection, dimension filter search/value fetch state, interaction chip construction, interaction DnD shell rendering, remove-dimension layout policy, and column-sort resolution/reconciliation are now outside the chart. The chart still owns committed tree/fact state, interaction callback wiring, and several controller-like effects. |
 
 ## What Is Now Solid
@@ -167,6 +169,10 @@ the plugin net-negative overall.
 - Column-sort metric/data-key resolution, click-state cycling, and active-sort
   reconciliation are centralized in `columnSort.ts`, so the chart no longer
   owns measure-leaf sort policy.
+- Databar scale grouping, waterfall offset/cumulative policy, waterfall bridge
+  connector anchors, label-space sizing, and databar column min-width policy are
+  centralized in `databarRuntime.ts`, so `usePivotFormatting.tsx` no longer
+  owns the pure databar runtime model.
 - Pending seamless layout refresh keeps a display snapshot instead of freezing
   the whole view prop bundle.
 - `PivotTableView` emits semantic zero-based row depth for export, so the export
@@ -196,24 +202,26 @@ the plugin net-negative overall.
 
 Largest relevant production files:
 
-- `usePivotFormatting.tsx`: `1632` lines.
 - `useExpansionEngine.ts`: `1627` lines.
 - `PivotDndMetricSelect.tsx`: `1566` lines.
 - `PivotTableChart.tsx`: `1517` lines.
 - `utils.ts`: `1464` lines.
 - `PivotMetricDefinitionValue.tsx`: `1448` lines.
 - `materializePivotTree.ts`: `1329` lines.
+- `usePivotFormatting.tsx`: `1325` lines.
+- `engine.ts`: `1285` lines.
 - `PivotInteractionPanel.tsx`: `1186` lines.
 - `PivotDndColumnSelect.tsx`: `1109` lines.
 - `usePivotLayout.ts`: `1071` lines.
-- `engine.ts`: `1285` lines.
 - `PivotTableView.tsx`: `808` lines.
 - `usePivotRenderModel.ts`: `795` lines.
 
 Not all large files are equal for this refactor. The next high-impact files are
-`PivotTableChart.tsx`, `useExpansionEngine.ts`, `usePivotLayout.ts`, and
-`usePivotRenderModel.ts`. Control components are large but less central to the
-pure runtime boundary unless they delete runtime-layout translation code.
+`useExpansionEngine.ts`, `PivotTableChart.tsx`, `usePivotLayout.ts`, and
+`usePivotRenderModel.ts`. `usePivotFormatting.tsx` still has formatting policy
+worth isolating, but the high-risk databar runtime model has moved out. Control
+components are large but less central to the pure runtime boundary unless they
+delete runtime-layout translation code.
 
 ## Next Work, Highest Impact First
 
