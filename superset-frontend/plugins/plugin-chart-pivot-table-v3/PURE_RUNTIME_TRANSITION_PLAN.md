@@ -58,7 +58,7 @@ cells are projections of DB facts, not canonical data.
 ## Current Status
 
 As of May 13, 2026, after
-`c58ca7561a refactor(pivot-table-v3): unify metric expansion cleanup`:
+`8047d8a893 refactor(pivot-table-v3): centralize expansion ref syncing`:
 
 - Overall transition estimate: **94%**.
 - Goal-weighted completion estimate: **94%**.
@@ -70,8 +70,8 @@ As of May 13, 2026, after
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `11847` insertions, `11357` deletions, net `+490`.
-- Current production `src` TypeScript/TSX total: `34000` lines.
+- Production `src`: `11857` insertions, `11375` deletions, net `+482`.
+- Current production `src` TypeScript/TSX total: `33992` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - Full plugin Jest pass after the column-sort extraction: `91` suites and
   `729` tests.
@@ -119,6 +119,8 @@ Source-only diff from pre-refactor baseline
   suites and `774` tests.
 - Full plugin Jest pass after unifying metric expansion stale-key cleanup: `94`
   suites and `776` tests.
+- Full plugin Jest pass after centralizing expansion ref syncing: `94` suites
+  and `776` tests.
 
 The readout remains mixed: the new runtime files now put the plugin modestly
 above the baseline line count, but the chart/layout hooks keep losing inline
@@ -184,6 +186,8 @@ React orchestration.
   `useExpansionEngine.ts`.
 - Metric expansion stale-key cleanup now has one path for collapsed and
   non-collapsed states.
+- Expansion state/ref synchronization now uses one local hook instead of six
+  repeated effects in `useExpansionEngine.ts`.
 - Branch-cache entries store fact batches, not rendered trees.
 - Measure-leaf value application is inside `materializePivotTree`.
 - The chart no longer contains separate runtime-layout fetch predicates, stale
@@ -265,8 +269,8 @@ React orchestration.
   sync, local runtime layout state, dashboard persistence, interaction callback
   wiring, and stale recovery.
 - `useExpansionEngine.ts` still owns request kickoff and React commit
-  sequencing. More helper extraction is useful only if it deletes more hook code
-  than it adds.
+  sequencing. Repeated state-ref synchronization is centralized, but more
+  helper extraction is useful only if it deletes more hook code than it adds.
 - `usePivotLayout.ts` is now mostly a composition hook around pure layout
   helpers. `usePivotRenderModel.ts` still carries formatting value maps,
   sorting, and render-model assembly.
@@ -289,7 +293,7 @@ Largest relevant production files:
 - `PivotMetricDefinitionValue.tsx`: `1448` lines.
 - `materializePivotTree.ts`: `1329` lines.
 - `usePivotFormatting.tsx`: `1325` lines.
-- `useExpansionEngine.ts`: `1274` lines.
+- `useExpansionEngine.ts`: `1266` lines.
 - `PivotInteractionPanel.tsx`: `1186` lines.
 - `PivotDndColumnSelect.tsx`: `1109` lines.
 - `controlPanel.tsx`: `1038` lines.
