@@ -720,23 +720,6 @@ export const resolveExpandedForMetrics = ({
     metricIndex,
     isMetricTokenValue,
   });
-  if (collapsed.size === 0) {
-    if (metricIndex === undefined) {
-      return resolved;
-    }
-    const next = new Set(resolved);
-    resolved.forEach(key => {
-      if (key === rootKey || nodes[key]) {
-        return;
-      }
-      const path = parsePath(key);
-      const keyMetricIndex = findMetricIndex(path, isMetricTokenValue);
-      if (keyMetricIndex >= 0 && keyMetricIndex < metricIndex) {
-        next.delete(key);
-      }
-    });
-    return next;
-  }
   const next = new Set(resolved);
   collapsed.forEach(key => next.delete(key));
   if (metricIndex === undefined) {

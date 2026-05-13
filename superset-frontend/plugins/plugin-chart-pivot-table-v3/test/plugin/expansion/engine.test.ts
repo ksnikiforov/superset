@@ -27,6 +27,7 @@ import {
   planInitialHydrationPrefetch,
   planHydrationIteration,
   resolveCollapsedExpansionState,
+  resolveExpandedForMetrics,
   resolveExpansionReinitializationDecision,
   resolveExpansionToggleDecision,
   runHydrationLoop,
@@ -321,6 +322,58 @@ describe('pivot/expansion/engine', () => {
     expect(new Set(Object.keys(result.cols))).toEqual(
       new Set([aKey, freshKey, metricKey]),
     );
+  });
+
+  it('drops stale metric-pattern expansion keys after metric depth changes', () => {
+    const staleMetricFirstKey = serializePath([METRICS_PLACEHOLDER, 'A']);
+    const aKey = serializePath(['A']);
+    const aMetricKey = serializePath(['A', METRICS_PLACEHOLDER]);
+    const tree: PivotTreeData = {
+      rows: {
+        [rootKey]: makeNode('row', [], true),
+        [aKey]: makeNode('row', ['A'], true),
+        [aMetricKey]: makeNode('row', ['A', METRICS_PLACEHOLDER], false),
+      },
+      cols: {},
+      cells: {},
+    };
+
+    const result = resolveExpandedForMetrics({
+      axis: 'row',
+      expanded: new Set([rootKey, aKey, staleMetricFirstKey]),
+      tree,
+      collapsed: new Set(),
+      fallbackMetricIndex: undefined,
+      isMetricTokenValue: value => value === METRICS_PLACEHOLDER,
+    });
+
+    expect(result).toEqual(new Set([rootKey, aKey]));
+  });
+
+  it('applies collapsed metric keys and stale metric-pattern cleanup together', () => {
+    const staleMetricFirstKey = serializePath([METRICS_PLACEHOLDER, 'A']);
+    const aKey = serializePath(['A']);
+    const aMetricKey = serializePath(['A', METRICS_PLACEHOLDER]);
+    const tree: PivotTreeData = {
+      rows: {
+        [rootKey]: makeNode('row', [], true),
+        [aKey]: makeNode('row', ['A'], true),
+        [aMetricKey]: makeNode('row', ['A', METRICS_PLACEHOLDER], false),
+      },
+      cols: {},
+      cells: {},
+    };
+
+    const result = resolveExpandedForMetrics({
+      axis: 'row',
+      expanded: new Set([rootKey, aKey, aMetricKey, staleMetricFirstKey]),
+      tree,
+      collapsed: new Set([aMetricKey]),
+      fallbackMetricIndex: undefined,
+      isMetricTokenValue: value => value === METRICS_PLACEHOLDER,
+    });
+
+    expect(result).toEqual(new Set([rootKey, aKey]));
   });
 
   it('stages hydration deltas by axis and path then builds deterministic staged trees', () => {
