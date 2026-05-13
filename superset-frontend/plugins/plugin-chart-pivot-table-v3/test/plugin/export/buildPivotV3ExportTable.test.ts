@@ -24,6 +24,82 @@ describe('buildPivotV3ExportTable', () => {
     document.body.innerHTML = '';
   });
 
+  const setRowExportValues = () => {
+    const table = document.querySelector('table');
+    const depthCount = Number.parseInt(
+      table?.getAttribute('data-pivot-row-depth-count') ?? '',
+      10,
+    );
+    const rows = Array.from(
+      document.querySelectorAll<HTMLTableRowElement>('tbody tr'),
+    ).map(row => {
+      const depthNode = row.querySelector<HTMLElement>(
+        '[data-pivot-row-depth]',
+      );
+      const parsedDepth = Number.parseInt(
+        depthNode?.getAttribute('data-pivot-row-depth') ?? '',
+        10,
+      );
+      return {
+        row,
+        depth:
+          Number.isFinite(parsedDepth) && parsedDepth >= 0 ? parsedDepth : 0,
+        label:
+          row
+            .querySelector<HTMLElement>('[data-pivot-row-label]')
+            ?.textContent?.trim() ?? '',
+        isGrandTotal: row.classList.contains('pivot-grand-total-row'),
+        isSubtotal:
+          !row.classList.contains('pivot-grand-total-row') &&
+          row.cells[0]?.classList.contains('subtotal-cell'),
+      };
+    });
+    const rowHasVisibleChildren = (rowIndex: number) => {
+      const current = rows[rowIndex];
+      if (!current?.isSubtotal) {
+        return false;
+      }
+      for (let index = rowIndex + 1; index < rows.length; index += 1) {
+        const next = rows[index];
+        if (next.isGrandTotal) {
+          continue;
+        }
+        if (next.depth <= current.depth) {
+          return false;
+        }
+        return true;
+      }
+      return false;
+    };
+    const activePath: string[] = [];
+    rows.forEach((entry, index) => {
+      if (entry.isGrandTotal) {
+        activePath.length = 0;
+      } else {
+        activePath.length = entry.depth;
+        activePath[entry.depth] = entry.label;
+      }
+      const values = Array.from({ length: depthCount }, (_, depth) => {
+        if (entry.isGrandTotal) {
+          return depth === 0 ? entry.label : '';
+        }
+        return depth <= entry.depth ? (activePath[depth] ?? '') : '';
+      });
+      if (
+        entry.isSubtotal &&
+        rowHasVisibleChildren(index) &&
+        entry.depth + 1 < depthCount
+      ) {
+        values[entry.depth + 1] = 'Total';
+        entry.row.setAttribute('data-pivot-export-subtotal-row', 'true');
+      }
+      entry.row.setAttribute(
+        'data-pivot-row-export-values',
+        JSON.stringify(values),
+      );
+    });
+  };
+
   it('splits row hierarchy into columns using row axis labels', () => {
     document.body.innerHTML = `
       <table class="pivot-v3-table" data-pivot-row-axis-labels='["Region","City"]' data-pivot-row-depth-count="2">
@@ -53,6 +129,7 @@ describe('buildPivotV3ExportTable', () => {
         </tbody>
       </table>
     `;
+    setRowExportValues();
 
     const original = document.querySelector('table') as HTMLTableElement;
     const exported = buildPivotV3ExportTable(original);
@@ -103,6 +180,7 @@ describe('buildPivotV3ExportTable', () => {
         </tbody>
       </table>
     `;
+    setRowExportValues();
 
     const original = document.querySelector('table') as HTMLTableElement;
     const exported = buildPivotV3ExportTable(original);
@@ -134,6 +212,7 @@ describe('buildPivotV3ExportTable', () => {
         </tbody>
       </table>
     `;
+    setRowExportValues();
 
     const original = document.querySelector('table') as HTMLTableElement;
     const exported = buildPivotV3ExportTable(original);
@@ -186,6 +265,7 @@ describe('buildPivotV3ExportTable', () => {
         </tbody>
       </table>
     `;
+    setRowExportValues();
 
     const original = document.querySelector('table') as HTMLTableElement;
     const exported = buildPivotV3ExportTable(original);
@@ -244,6 +324,7 @@ describe('buildPivotV3ExportTable', () => {
         </tbody>
       </table>
     `;
+    setRowExportValues();
 
     const original = document.querySelector('table') as HTMLTableElement;
     const exported = buildPivotV3ExportTable(original);
@@ -295,6 +376,7 @@ describe('buildPivotV3ExportTable', () => {
         </tbody>
       </table>
     `;
+    setRowExportValues();
 
     const original = document.querySelector('table') as HTMLTableElement;
     const exported = buildPivotV3ExportTable(original);
@@ -369,6 +451,7 @@ describe('buildPivotV3ExportTable', () => {
         </tbody>
       </table>
     `;
+    setRowExportValues();
 
     const original = document.querySelector('table') as HTMLTableElement;
     const exported = buildPivotV3ExportTable(original);
@@ -422,6 +505,7 @@ describe('buildPivotV3ExportTable', () => {
         </tbody>
       </table>
     `;
+    setRowExportValues();
 
     const original = document.querySelector('table') as HTMLTableElement;
     const exported = buildPivotV3ExportTable(original);
@@ -488,6 +572,7 @@ describe('buildPivotV3ExportTable', () => {
         </tbody>
       </table>
     `;
+    setRowExportValues();
 
     const original = document.querySelector('table') as HTMLTableElement;
     const exported = buildPivotV3ExportTable(original);
@@ -536,6 +621,7 @@ describe('buildPivotV3ExportTable', () => {
         </tbody>
       </table>
     `;
+    setRowExportValues();
 
     const original = document.querySelector('table') as HTMLTableElement;
     const exported = buildPivotV3ExportTable(original);
@@ -605,6 +691,7 @@ describe('buildPivotV3ExportTable', () => {
         </tbody>
       </table>
     `;
+    setRowExportValues();
 
     const original = document.querySelector('table') as HTMLTableElement;
     const exported = buildPivotV3ExportTable(original);
@@ -685,6 +772,7 @@ describe('buildPivotV3ExportTable', () => {
         </tbody>
       </table>
     `;
+    setRowExportValues();
 
     const original = document.querySelector('table') as HTMLTableElement;
     const exported = buildPivotV3ExportTable(original);

@@ -458,6 +458,78 @@ export const PivotTableView = ({
     );
     return Math.min(rowAxisLabels.length, maxDepth + 1);
   }, [getNodeDimDepth, isGrandTotalLikeRow, rowAxisLabels.length, visibleRows]);
+  const rowTotalLabel = t('Total');
+  const rowExportRows = useMemo(() => {
+    if (rowExportDepthCount <= 0) {
+      return new Map<string, { values: string[]; isSubtotal: boolean }>();
+    }
+    const rows = visibleRows.map(row => {
+      const depth = Math.max(
+        0,
+        Math.min(
+          (isGrandTotalLikeRow(row) ? 1 : getNodeDimDepth(row)) - 1,
+          rowExportDepthCount - 1,
+        ),
+      );
+      return {
+        row,
+        depth,
+        label: formatLabel(row, 'row'),
+        isGrandTotal: isGrandTotalLikeRow(row),
+        isSubtotal: !isGrandTotalLikeRow(row) && isRowAggregateBold(row),
+      };
+    });
+    const rowHasVisibleChildren = (rowIndex: number) => {
+      const current = rows[rowIndex];
+      if (!current?.isSubtotal) {
+        return false;
+      }
+      for (let index = rowIndex + 1; index < rows.length; index += 1) {
+        const next = rows[index];
+        if (next.isGrandTotal) {
+          continue;
+        }
+        if (next.depth <= current.depth) {
+          return false;
+        }
+        return true;
+      }
+      return false;
+    };
+    const activePath: string[] = [];
+    return new Map(
+      rows.map((entry, index) => {
+        if (entry.isGrandTotal) {
+          activePath.length = 0;
+        } else {
+          activePath.length = entry.depth;
+          activePath[entry.depth] = entry.label;
+        }
+        const values = Array.from({ length: rowExportDepthCount }, (_, idx) => {
+          if (entry.isGrandTotal) {
+            return idx === 0 ? entry.label : '';
+          }
+          return idx <= entry.depth ? (activePath[idx] ?? '') : '';
+        });
+        const isSubtotal =
+          entry.isSubtotal &&
+          rowHasVisibleChildren(index) &&
+          entry.depth + 1 < rowExportDepthCount;
+        if (isSubtotal) {
+          values[entry.depth + 1] = rowTotalLabel;
+        }
+        return [entry.row.key, { values, isSubtotal }];
+      }),
+    );
+  }, [
+    formatLabel,
+    getNodeDimDepth,
+    isGrandTotalLikeRow,
+    isRowAggregateBold,
+    rowExportDepthCount,
+    rowTotalLabel,
+    visibleRows,
+  ]);
   const renderCornerHeader = (rowSpan?: number) => (
     <th
       rowSpan={rowSpan}
@@ -638,6 +710,7 @@ export const PivotTableView = ({
               const rowDepthForExport = isGrandTotalLike
                 ? 0
                 : Math.max(rowDisplayDepth - 1, 0);
+              const rowExport = rowExportRows.get(row.key);
               const rowIndent = rowDisplayDepth * ROW_INDENT_PX;
               const isRowLoading = showSpinner(row.key);
               return (
@@ -645,6 +718,12 @@ export const PivotTableView = ({
                   key={row.key}
                   className={rowClassName}
                   style={rowStyle}
+                  data-pivot-row-export-values={
+                    rowExport ? JSON.stringify(rowExport.values) : undefined
+                  }
+                  data-pivot-export-subtotal-row={
+                    rowExport?.isSubtotal ? 'true' : undefined
+                  }
                   ref={
                     isGrandTotalLike
                       ? rowElement => {

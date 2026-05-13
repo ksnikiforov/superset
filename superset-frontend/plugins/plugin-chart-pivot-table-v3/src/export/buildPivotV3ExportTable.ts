@@ -17,9 +17,8 @@
  * under the License.
  */
 
-const ROW_DEPTH_ATTR = 'data-pivot-row-depth';
 const ROW_DEPTH_COUNT_ATTR = 'data-pivot-row-depth-count';
-const ROW_LABEL_ATTR = 'data-pivot-row-label';
+const ROW_EXPORT_VALUES_ATTR = 'data-pivot-row-export-values';
 const ROW_AXIS_LABELS_ATTR = 'data-pivot-row-axis-labels';
 const ROW_TOTAL_LABEL_ATTR = 'data-pivot-row-total-label';
 const EXPORT_CELL_TYPE_ATTR = 'data-pivot-export-type';
@@ -28,18 +27,6 @@ const EXPORT_SUBTOTAL_ROW_ATTR = 'data-pivot-export-subtotal-row';
 
 const getText = (value: string | null | undefined) =>
   (value ?? '').replace(/\s+/g, ' ').trim();
-
-const parseDepth = (row: HTMLTableRowElement) => {
-  const depthNode = row.querySelector<HTMLElement>(`[${ROW_DEPTH_ATTR}]`);
-  if (!depthNode) {
-    return undefined;
-  }
-  const parsed = Number.parseInt(
-    depthNode.getAttribute(ROW_DEPTH_ATTR) ?? '',
-    10,
-  );
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
-};
 
 const parseRowAxisLabels = (table: HTMLTableElement): string[] => {
   const raw = table.getAttribute(ROW_AXIS_LABELS_ATTR);
@@ -85,6 +72,31 @@ const resolveDepthCount = (
 const toHeaderLabels = (depthCount: number, axisLabels: string[]): string[] =>
   axisLabels.slice(0, depthCount);
 
+const parseRowExportValues = (
+  row: HTMLTableRowElement,
+  depthCount: number,
+): string[] | null => {
+  const raw = row.getAttribute(ROW_EXPORT_VALUES_ATTR);
+  if (!raw) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) {
+      return null;
+    }
+    return Array.from({ length: depthCount }, (_, index) =>
+      getText(
+        typeof parsed[index] === 'string'
+          ? parsed[index]
+          : String(parsed[index] ?? ''),
+      ),
+    );
+  } catch {
+    return null;
+  }
+};
+
 const replaceCornerWithAxisLabels = (
   table: HTMLTableElement,
   headerLabels: string[],
@@ -117,95 +129,18 @@ const replaceCornerWithAxisLabels = (
 const splitRowHeadersIntoColumns = (
   table: HTMLTableElement,
   depthCount: number,
-  rowTotalLabel: string,
 ) => {
   const bodyRows = Array.from(
     table.querySelectorAll<HTMLTableRowElement>('tbody tr'),
   );
-  const activePath: string[] = [];
 
-  const rowsForExport = bodyRows.map(row => {
+  bodyRows.forEach(row => {
     const firstCell = row.cells[0];
     const sourceHeader =
       firstCell?.tagName === 'TH' ? (firstCell as HTMLTableCellElement) : null;
-    const isGrandTotalRow = row.classList.contains('pivot-grand-total-row');
-    const isSubtotalRow =
-      !isGrandTotalRow && sourceHeader?.classList.contains('subtotal-cell');
-    const parsedDepth = parseDepth(row);
-    const clampedDepth =
-      typeof parsedDepth === 'number'
-        ? Math.max(0, Math.min(parsedDepth, depthCount - 1))
-        : null;
-    const rowLabelNode = row.querySelector<HTMLElement>(`[${ROW_LABEL_ATTR}]`);
-    const rowLabel = getText(
-      rowLabelNode?.textContent ?? sourceHeader?.textContent,
-    );
-    return {
-      row,
-      sourceHeader,
-      isGrandTotalRow,
-      isSubtotalRow,
-      clampedDepth,
-      rowLabel,
-    };
-  });
-
-  const rowHasVisibleChildren = (rowIndex: number) => {
-    const current = rowsForExport[rowIndex];
-    if (
-      !current ||
-      !current.isSubtotalRow ||
-      typeof current.clampedDepth !== 'number'
-    ) {
-      return false;
-    }
-    for (let index = rowIndex + 1; index < rowsForExport.length; index += 1) {
-      const next = rowsForExport[index];
-      if (next.isGrandTotalRow || typeof next.clampedDepth !== 'number') {
-        continue;
-      }
-      if (next.clampedDepth <= current.clampedDepth) {
-        return false;
-      }
-      return true;
-    }
-    return false;
-  };
-
-  rowsForExport.forEach((exportRow, rowIndex) => {
-    const {
-      row,
-      sourceHeader,
-      isGrandTotalRow,
-      isSubtotalRow,
-      clampedDepth,
-      rowLabel,
-    } = exportRow;
-
-    if (!sourceHeader || typeof clampedDepth !== 'number') {
+    const rowValues = parseRowExportValues(row, depthCount);
+    if (!sourceHeader || !rowValues) {
       return;
-    }
-
-    if (isGrandTotalRow) {
-      activePath.length = 0;
-    } else {
-      activePath.length = clampedDepth;
-      activePath[clampedDepth] = rowLabel;
-    }
-
-    const rowValues = Array.from({ length: depthCount }, (_, index) => {
-      if (isGrandTotalRow) {
-        return index === 0 ? rowLabel : '';
-      }
-      return index <= clampedDepth ? (activePath[index] ?? '') : '';
-    });
-    if (
-      isSubtotalRow &&
-      rowHasVisibleChildren(rowIndex) &&
-      clampedDepth + 1 < depthCount
-    ) {
-      rowValues[clampedDepth + 1] = rowTotalLabel;
-      row.setAttribute(EXPORT_SUBTOTAL_ROW_ATTR, 'true');
     }
 
     sourceHeader?.remove();
@@ -305,7 +240,7 @@ export const buildPivotV3ExportTable = (
   }
 
   replaceCornerWithAxisLabels(cloned, toHeaderLabels(depthCount, axisLabels));
-  splitRowHeadersIntoColumns(cloned, depthCount, rowTotalLabel);
+  splitRowHeadersIntoColumns(cloned, depthCount);
   promoteTotalRowsForExcel(cloned, rowTotalLabel);
   coerceNumericCellsForExcel(cloned);
 

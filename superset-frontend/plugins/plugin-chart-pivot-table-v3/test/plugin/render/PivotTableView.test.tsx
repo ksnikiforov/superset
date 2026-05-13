@@ -397,5 +397,13 @@ describe('PivotTableView', () => {
       'data-pivot-row-depth-count',
       '2',
     );
+    const bodyRows = Array.from(container.querySelectorAll('tbody tr'));
+    expect(
+      bodyRows.map(row => row.getAttribute('data-pivot-row-export-values')),
+    ).toEqual([
+      JSON.stringify(['Grand total', '']),
+      JSON.stringify(['West', '']),
+      JSON.stringify(['West', 'SF']),
+    ]);
   });
 });
