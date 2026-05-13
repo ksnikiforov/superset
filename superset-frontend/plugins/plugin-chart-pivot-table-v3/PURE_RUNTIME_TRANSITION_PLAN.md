@@ -58,7 +58,7 @@ cells are projections of DB facts, not canonical data.
 ## Current Status
 
 As of May 13, 2026, after
-`83b84e9cf2 refactor(pivot-table-v3): centralize selected filter updates`:
+`7b1548eb6c refactor(pivot-table-v3): centralize tree filter values`:
 
 - Overall transition estimate: **85%**.
 - Goal-weighted completion estimate: **85%**.
@@ -70,8 +70,8 @@ As of May 13, 2026, after
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `8374` insertions, `9481` deletions, net `-1107`.
-- Current production `src` TypeScript/TSX total: `32403` lines.
+- Production `src`: `8523` insertions, `9584` deletions, net `-1061`.
+- Current production `src` TypeScript/TSX total: `32449` lines.
 - Implied baseline `src` total: about `33510` lines.
 
 The readout is mixed but improving: the new runtime files still account for
@@ -88,7 +88,7 @@ the plugin net-negative overall.
 | Gate 4: one tree materializer             |        88% | `materializePivotTree.ts` owns fact-to-tree materialization, Values/metric/measure axes, subtotal leaf injection, and measure-leaf value application. Export no longer repairs row depth semantics, but still needs a cleaner model boundary.                                                                                                                                                                                                                                                                                                                                                 |
 | Gate 5: expansion reducer/runtime effects |        81% | Expansion no longer derives fetched state from rendered tree shape. It uses explicit fact coverage, semantic fetchability, shared fetch execution, and request lifecycles. Loaded terminal metric nodes and metric subtotal nodes now seed coverage through the fetched-coverage utility, and fetched-result delta collection now seeds both fact batches and loaded metric-node coverage for same-axis and hydration paths. The hook still owns hydration iteration, cancellation, and React commits.                                                                                        |
 | Gate 6: pure render model                 |        85% | Projection drives toggle eligibility, collapsed Values, column display, visible-axis construction, and semantic export row depth. Remaining risk is deeper row subtotal policy and some metric-index compatibility behavior.                                                                                                                                                                                                                                                                                                                                                                  |
-| Gate 7: chart component cleanup           |        60% | The chart delegates runtime fetch decisions and no longer vetoes metric-order-only commits or treats rendered tree signatures as seamless refetch identity. Seamless sync snapshots, upstream dashboard query-context signatures, committed-props sync predicates, stale coverage recovery predicates, persisted-filter seamless reload policy, persisted-selection local sync policy, and runtime-layout prop sync policy now live in the runtime update module. Selected-filter update policy now lives with the filter helpers. The chart still owns committed tree/fact state, dimension filter UI wiring, interaction wiring, and several controller-like effects. |
+| Gate 7: chart component cleanup           |        62% | The chart delegates runtime fetch decisions and no longer vetoes metric-order-only commits or treats rendered tree signatures as seamless refetch identity. Seamless sync snapshots, upstream dashboard query-context signatures, committed-props sync predicates, stale coverage recovery predicates, persisted-filter seamless reload policy, persisted-selection local sync policy, and runtime-layout prop sync policy now live in the runtime update module. Selected-filter update policy, persisted filter normalization, and tree-derived filter value collection now live with the filter helpers. The chart still owns committed tree/fact state, dimension filter fetch state, interaction wiring, and several controller-like effects. |
 
 ## What Is Now Solid
 
@@ -124,8 +124,9 @@ the plugin net-negative overall.
   policy are built in the seamless runtime module instead of in
   `PivotTableChart.tsx`. Persisted selected-filter local sync policy is also
   centralized there, along with runtime-layout prop sync policy.
-- Selected-filter update helpers are centralized in `pivot/filters.ts`, so the
-  chart no longer owns the clear-all and per-dimension stale-restore policy.
+- Selected-filter update helpers, persisted filter normalization, and
+  tree-derived dimension filter value collection are centralized in
+  `pivot/filters.ts`, so the chart no longer owns those filter policies.
 - Pending seamless layout refresh keeps a display snapshot instead of freezing
   the whole view prop bundle.
 - `PivotTableView` emits semantic zero-based row depth for export, so the export
@@ -136,7 +137,7 @@ the plugin net-negative overall.
 
 - `PivotTableChart.tsx` is still the largest chart-owned orchestration surface.
   It handles committed tree/fact sync, local runtime layout state, dashboard
-  persistence, dimension filter UI wiring, interaction panel wiring, and stale
+  persistence, dimension filter fetch state, interaction panel wiring, and stale
   recovery.
 - `useExpansionEngine.ts` still owns hydration loops, cancellation boundaries,
   and React commit sequencing. More helper extraction is useful only if it
@@ -155,7 +156,7 @@ the plugin net-negative overall.
 
 Largest relevant production files:
 
-- `PivotTableChart.tsx`: `2467` lines.
+- `PivotTableChart.tsx`: `2391` lines.
 - `useExpansionEngine.ts`: `1718` lines.
 - `usePivotFormatting.tsx`: `1632` lines.
 - `PivotDndMetricSelect.tsx`: `1566` lines.
@@ -315,6 +316,13 @@ Recent validation:
   and reused the shared selected-filter predicate from the seamless runtime
   module; touched-file ESLint, Prettier, `git diff --check`, and focused
   seamless runtime/filter/layout tests (`43` tests) passed.
+- `349ea1ed61`: centralized persisted selected-filter normalization in
+  `pivot/filters.ts` and removed the chart-only dimension map; touched-file
+  ESLint, Prettier, `git diff --check`, and focused seamless runtime/filter
+  tests (`21` tests) passed.
+- `7b1548eb6c`: centralized tree-derived dimension filter value collection in
+  `pivot/filters.ts`; touched-file ESLint, Prettier, `git diff --check`, and
+  focused filter helper plus chart filter-seamless tests (`13` tests) passed.
 
 Minimum test coverage for future slices:
 
