@@ -22,7 +22,6 @@ import { type PivotTreeNode } from '../types';
 const ROW_DEPTH_COUNT_ATTR = 'data-pivot-row-depth-count';
 const ROW_EXPORT_VALUES_ATTR = 'data-pivot-row-export-values';
 const ROW_AXIS_LABELS_ATTR = 'data-pivot-row-axis-labels';
-const ROW_TOTAL_LABEL_ATTR = 'data-pivot-row-total-label';
 const EXPORT_CELL_TYPE_ATTR = 'data-pivot-export-type';
 const EXPORT_CELL_VALUE_ATTR = 'data-pivot-export-value';
 const EXPORT_SUBTOTAL_ROW_ATTR = 'data-pivot-export-subtotal-row';
@@ -170,12 +169,6 @@ const parseRowAxisLabels = (table: HTMLTableElement): string[] => {
   }
 };
 
-const parseRowTotalLabel = (table: HTMLTableElement): string => {
-  const raw = table.getAttribute(ROW_TOTAL_LABEL_ATTR);
-  const parsed = getText(raw);
-  return parsed || 'Total';
-};
-
 const resolveDepthCount = (
   table: HTMLTableElement,
   axisLabels: string[],
@@ -221,150 +214,169 @@ const parseRowExportValues = (
   }
 };
 
-const replaceCornerWithAxisLabels = (
+export type PivotV3ExportSheetCell =
+  | {
+      value: string;
+      type: 'string';
+      isHeader: boolean;
+    }
+  | {
+      value: number;
+      type: 'number';
+      isHeader: boolean;
+    };
+
+const textCell = (
+  value: string,
+  isHeader: boolean,
+): PivotV3ExportSheetCell => ({
+  value,
+  type: 'string',
+  isHeader,
+});
+
+const numericCell = (
+  value: number,
+  isHeader: boolean,
+): PivotV3ExportSheetCell => ({
+  value,
+  type: 'number',
+  isHeader,
+});
+
+const appendExpandedTextCell = (
+  target: PivotV3ExportSheetCell[],
+  cell: HTMLTableCellElement,
+  isHeader: boolean,
+) => {
+  const span = Math.max(cell.colSpan || 1, 1);
+  target.push(textCell(getText(cell.textContent), isHeader));
+  for (let index = 1; index < span; index += 1) {
+    target.push(textCell('', isHeader));
+  }
+};
+
+const buildHeaderRows = (
   table: HTMLTableElement,
   headerLabels: string[],
-) => {
-  const headerRows = table.tHead ? Array.from(table.tHead.rows) : [];
-  if (headerRows.length === 0) {
-    return;
-  }
-
-  const firstRow = headerRows[0];
-  const cornerCell = firstRow.cells[0];
-  if (!cornerCell) {
-    return;
-  }
-
-  const insertBefore = firstRow.cells[1] ?? null;
-  cornerCell.remove();
-
-  const fragment = table.ownerDocument.createDocumentFragment();
-  headerLabels.forEach(label => {
-    const cell = table.ownerDocument.createElement('th');
-    cell.rowSpan = headerRows.length;
-    cell.textContent = label;
-    fragment.appendChild(cell);
-  });
-
-  firstRow.insertBefore(fragment, insertBefore);
+): PivotV3ExportSheetCell[][] => {
+  const depthCount = headerLabels.length;
+  return (table.tHead ? Array.from(table.tHead.rows) : []).map(
+    (row, rowIndex) => {
+      const cells: PivotV3ExportSheetCell[] = [];
+      if (depthCount > 0) {
+        if (rowIndex === 0) {
+          headerLabels.forEach(label => cells.push(textCell(label, true)));
+        } else {
+          headerLabels.forEach(() => cells.push(textCell('', true)));
+        }
+      }
+      Array.from(row.cells).forEach((cell, cellIndex) => {
+        if (depthCount > 0 && rowIndex === 0 && cellIndex === 0) {
+          return;
+        }
+        appendExpandedTextCell(cells, cell, true);
+      });
+      return cells;
+    },
+  );
 };
 
-const splitRowHeadersIntoColumns = (
+const parseValueCell = (
+  cell: HTMLTableCellElement,
+  isHeader: boolean,
+): PivotV3ExportSheetCell => {
+  const rawValue = cell.getAttribute(EXPORT_CELL_VALUE_ATTR)?.trim();
+  if (
+    cell.getAttribute(EXPORT_CELL_TYPE_ATTR) === 'number' &&
+    rawValue !== undefined &&
+    rawValue.length > 0
+  ) {
+    const parsed = Number(rawValue);
+    if (Number.isFinite(parsed)) {
+      return numericCell(parsed, isHeader);
+    }
+  }
+  return textCell(getText(cell.textContent), isHeader);
+};
+
+const buildBodyRows = (
   table: HTMLTableElement,
   depthCount: number,
-) => {
-  const bodyRows = Array.from(
-    table.querySelectorAll<HTMLTableRowElement>('tbody tr'),
-  );
+): PivotV3ExportSheetCell[][] =>
+  Array.from(table.querySelectorAll<HTMLTableRowElement>('tbody tr')).map(
+    row => {
+      const rowValues = parseRowExportValues(row, depthCount);
+      const isGrandTotalRow = row.classList.contains('pivot-grand-total-row');
+      const isSubtotalRow =
+        row.getAttribute(EXPORT_SUBTOTAL_ROW_ATTR) === 'true';
+      const cells: PivotV3ExportSheetCell[] = [];
 
-  bodyRows.forEach(row => {
-    const firstCell = row.cells[0];
-    const sourceHeader =
-      firstCell?.tagName === 'TH' ? (firstCell as HTMLTableCellElement) : null;
-    const rowValues = parseRowExportValues(row, depthCount);
-    if (!sourceHeader || !rowValues) {
-      return;
-    }
-
-    sourceHeader?.remove();
-
-    rowValues.forEach((value, index) => {
-      const replacement = table.ownerDocument.createElement('th');
-      replacement.textContent = value;
-      row.insertBefore(replacement, row.cells[index] ?? null);
-    });
-  });
-};
-
-const promoteTotalRowsForExcel = (
-  table: HTMLTableElement,
-  rowTotalLabel: string,
-) => {
-  const bodyRows = Array.from(
-    table.querySelectorAll<HTMLTableRowElement>('tbody tr'),
-  );
-
-  const findFirstNonEmptyCellIndex = (row: HTMLTableRowElement) =>
-    Array.from(row.cells).findIndex(
-      cell => getText(cell.textContent).length > 0,
-    );
-
-  bodyRows.forEach(row => {
-    const isGrandTotalRow = row.classList.contains('pivot-grand-total-row');
-    const isSubtotalRow = row.getAttribute(EXPORT_SUBTOTAL_ROW_ATTR) === 'true';
-    if (!isGrandTotalRow && !isSubtotalRow) {
-      return;
-    }
-
-    let startIndex = findFirstNonEmptyCellIndex(row);
-    if (isSubtotalRow) {
-      const totalCellIndex = Array.from(row.cells).findIndex(
-        cell => getText(cell.textContent) === rowTotalLabel,
-      );
-      if (totalCellIndex >= 0) {
-        startIndex = totalCellIndex;
+      if (rowValues) {
+        rowValues.forEach(value => cells.push(textCell(value, true)));
       }
-    }
-    if (startIndex < 0) {
-      return;
-    }
 
-    for (let index = startIndex; index < row.cells.length; index += 1) {
-      const cell = row.cells[index];
-      if (cell.tagName === 'TH') {
-        cell.classList.add('subtotal-cell');
-        continue;
-      }
-      const replacement = table.ownerDocument.createElement('th');
-      Array.from(cell.attributes).forEach(attribute => {
-        replacement.setAttribute(attribute.name, attribute.value);
+      Array.from(row.cells).forEach((cell, cellIndex) => {
+        if (rowValues && cellIndex === 0 && cell.tagName === 'TH') {
+          return;
+        }
+        const span = Math.max(cell.colSpan || 1, 1);
+        const isHeader =
+          cell.tagName === 'TH' || isGrandTotalRow || isSubtotalRow;
+        cells.push(parseValueCell(cell, isHeader));
+        for (let index = 1; index < span; index += 1) {
+          cells.push(textCell('', isHeader));
+        }
       });
-      replacement.className = cell.className;
-      replacement.classList.add('subtotal-cell');
-      replacement.innerHTML = cell.innerHTML;
-      row.replaceChild(replacement, cell);
-    }
-  });
-};
 
-const coerceNumericCellsForExcel = (table: HTMLTableElement) => {
-  const numericCells = Array.from(
-    table.querySelectorAll<HTMLTableCellElement>(
-      `[${EXPORT_CELL_TYPE_ATTR}="number"][${EXPORT_CELL_VALUE_ATTR}]`,
-    ),
+      return cells;
+    },
   );
 
-  numericCells.forEach(numericCell => {
-    const cell = numericCell;
-    const rawValue = cell.getAttribute(EXPORT_CELL_VALUE_ATTR)?.trim();
-    if (!rawValue) {
-      return;
-    }
-    const parsed = Number(rawValue);
-    if (!Number.isFinite(parsed)) {
-      return;
-    }
-    cell.textContent = rawValue;
-    cell.setAttribute('data-t', 'n');
-    cell.setAttribute('data-v', rawValue);
-  });
+export const buildPivotV3ExportSheetData = (
+  table: HTMLTableElement,
+): PivotV3ExportSheetCell[][] => {
+  const axisLabels = parseRowAxisLabels(table);
+  const depthCount = resolveDepthCount(table, axisLabels);
+  const headerRows = buildHeaderRows(
+    table,
+    toHeaderLabels(depthCount, axisLabels),
+  );
+  return [...headerRows, ...buildBodyRows(table, depthCount)];
 };
 
 export const buildPivotV3ExportTable = (
   table: HTMLTableElement,
 ): HTMLTableElement => {
-  const cloned = table.cloneNode(true) as HTMLTableElement;
+  const exportRows = buildPivotV3ExportSheetData(table);
+  const exported = table.ownerDocument.createElement('table');
+  const headerRowCount = table.tHead?.rows.length ?? 0;
+  const head = table.ownerDocument.createElement('thead');
+  const body = table.ownerDocument.createElement('tbody');
 
-  const axisLabels = parseRowAxisLabels(cloned);
-  const depthCount = resolveDepthCount(cloned, axisLabels);
-  if (depthCount > 0) {
-    const rowTotalLabel = parseRowTotalLabel(cloned);
-    replaceCornerWithAxisLabels(cloned, toHeaderLabels(depthCount, axisLabels));
-    splitRowHeadersIntoColumns(cloned, depthCount);
-    promoteTotalRowsForExcel(cloned, rowTotalLabel);
+  exportRows.forEach((row, rowIndex) => {
+    const targetSection = rowIndex < headerRowCount ? head : body;
+    const outputRow = table.ownerDocument.createElement('tr');
+    row.forEach(cell => {
+      const outputCell = table.ownerDocument.createElement(
+        cell.isHeader ? 'th' : 'td',
+      );
+      outputCell.textContent = String(cell.value);
+      if (cell.type === 'number') {
+        outputCell.setAttribute('data-t', 'n');
+        outputCell.setAttribute('data-v', String(cell.value));
+      }
+      outputRow.appendChild(outputCell);
+    });
+    targetSection.appendChild(outputRow);
+  });
+
+  if (head.rows.length > 0) {
+    exported.appendChild(head);
   }
-  coerceNumericCellsForExcel(cloned);
+  if (body.rows.length > 0) {
+    exported.appendChild(body);
+  }
 
-  return cloned;
+  return exported;
 };

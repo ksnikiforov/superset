@@ -591,7 +591,14 @@ describe('buildPivotV3ExportTable', () => {
       Array.from(row.cells).map(cell => cell.textContent?.trim() ?? ''),
     );
 
-    expect(topHeaderCells).toEqual(['Region', 'City', '2025', 'Grand Total']);
+    expect(topHeaderCells).toEqual([
+      'Region',
+      'City',
+      '2025',
+      '',
+      'Grand Total',
+      '',
+    ]);
     expect(bodyRows[0]).toEqual(['West', '', '10', '1', '20', '2']);
     expect(bodyRows[1]).toEqual([
       'West',

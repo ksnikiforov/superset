@@ -17,8 +17,23 @@
  * under the License.
  */
 
-import { utils, writeFile } from 'xlsx';
-import { buildPivotV3ExportTable } from '../../plugins/plugin-chart-pivot-table-v3/src/export/buildPivotV3ExportTable';
+import { utils, writeFile, type CellObject } from 'xlsx';
+import {
+  buildPivotV3ExportSheetData,
+  type PivotV3ExportSheetCell,
+} from '../../plugins/plugin-chart-pivot-table-v3/src/export/buildPivotV3ExportTable';
+
+const toSheetCell = (
+  cell: PivotV3ExportSheetCell,
+): string | number | CellObject => {
+  if (cell.type === 'number') {
+    return {
+      t: 'n',
+      v: cell.value,
+    };
+  }
+  return cell.value;
+};
 
 export default function exportPivotV3Excel(
   tableSelector: string,
@@ -28,6 +43,9 @@ export default function exportPivotV3Excel(
   if (!table) {
     return;
   }
-  const workbook = utils.table_to_book(buildPivotV3ExportTable(table));
+  const worksheet = utils.aoa_to_sheet(
+    buildPivotV3ExportSheetData(table).map(row => row.map(toSheetCell)),
+  );
+  const workbook = utils.book_new(worksheet, 'Sheet1');
   writeFile(workbook, `${fileName}.xlsx`);
 }
