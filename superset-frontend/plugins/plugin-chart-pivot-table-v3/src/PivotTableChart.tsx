@@ -31,7 +31,6 @@ import {
   AppSection,
   DataRecordValue,
   ensureIsArray,
-  GenericDataType,
   getColumnLabel,
   getTimeFormatter,
   SMART_DATE_ID,
@@ -39,7 +38,6 @@ import {
   supersetTheme,
   TimeFormats,
   type JsonObject,
-  type QueryObjectFilterClause,
   styled,
   t,
 } from '@superset-ui/core';
@@ -79,9 +77,9 @@ import {
   firstSelectedFilters,
   normalizePivotSelectedFilters,
 } from './pivot/filters';
+import { useDimensionFilterValues } from './pivot/chart/useDimensionFilterValues';
 import { supersetChartDataClient } from './pivot/data/SupersetChartDataClient';
 import { normalizeFormDataExtraFilters } from './pivot/query/normalizeExtraFormData';
-import { type QuerySpec } from './pivot/query/types';
 import { type ChartDataWarning } from './pivot/data/ChartDataClient';
 import {
   applyDimensionDrag,
@@ -121,49 +119,10 @@ import {
 const PANEL_WIDTH = 230;
 const TOP_CHIPS_HEIGHT = 36;
 const SIDE_CHIPS_WIDTH = 24;
-const DIMENSION_VALUES_REQUEST_GROUP = 'pivot-v3-dimension-values';
-const DIMENSION_VALUES_QUERY_PREFIX = 'pivot_v3|dimension-values';
-const EMPTY_FILTER_VALUES: DataRecordValue[] = [];
 const EMPTY_SELECTED_FILTERS: Record<string, DataRecordValue[]> = {};
 const EMPTY_FACT_BATCHES: PivotFactStoreBatch[] = [];
 
 const { DATABASE_DATETIME } = TimeFormats;
-
-const buildDimensionValuesQueryName = (dimensionKey: string) =>
-  `${DIMENSION_VALUES_QUERY_PREFIX}|${dimensionKey}`;
-
-const buildDimensionValueSearchFilters = ({
-  dimension,
-  dimensionKey,
-  colTypeMap,
-  search,
-}: {
-  dimension: PivotTableProps['groupbyRows'][number];
-  dimensionKey: string;
-  colTypeMap?: Record<string, GenericDataType>;
-  search: string;
-}): QueryObjectFilterClause[] => {
-  const normalizedSearch = search.trim();
-  if (!normalizedSearch) {
-    return [];
-  }
-  const label = getColumnLabel(dimension);
-  const dimensionType = colTypeMap?.[label] ?? colTypeMap?.[dimensionKey];
-  if (
-    dimensionType === GenericDataType.String ||
-    (dimensionType === GenericDataType.Numeric &&
-      !Number.isNaN(Number(normalizedSearch)))
-  ) {
-    return [
-      {
-        col: dimension,
-        op: 'ILIKE',
-        val: `%${normalizedSearch}%`,
-      },
-    ];
-  }
-  return [];
-};
 
 const InteractionLayout = styled.div`
   display: flex;
@@ -1857,152 +1816,17 @@ function PivotTableChart(props: PivotTableProps) {
       resolvedVerboseMap,
     ],
   );
-  const [fetchedDimensionFilterValues, setFetchedDimensionFilterValues] =
-    useState<Record<string, DataRecordValue[]>>({});
-  const [dimensionFilterSearchText, setDimensionFilterSearchText] = useState<
-    Record<string, string>
-  >({});
-  const [dimensionFilterLoading, setDimensionFilterLoading] = useState<
-    Record<string, boolean>
-  >({});
-  const dimensionFilterValues = useMemo(
-    () =>
-      Object.fromEntries(
-        dimensionList.map(dimension => {
-          const dimensionKey = getStableColumnKey(dimension);
-          const search = dimensionFilterSearchText[dimensionKey]?.trim() ?? '';
-          const fetchedValues =
-            fetchedDimensionFilterValues[dimensionKey] ?? EMPTY_FILTER_VALUES;
-          if (search.length > 0) {
-            return [dimensionKey, fetchedValues];
-          }
-          const treeValues =
-            treeDimensionFilterValues[dimensionKey] ?? EMPTY_FILTER_VALUES;
-          return [
-            dimensionKey,
-            Array.from(new Set([...treeValues, ...fetchedValues])),
-          ];
-        }),
-      ),
-    [
-      dimensionFilterSearchText,
-      dimensionList,
-      fetchedDimensionFilterValues,
-      treeDimensionFilterValues,
-    ],
-  );
-  const dimensionFilterValuesVersion = useRef(0);
-  const dimensionFilterRequestVersion = useRef<Record<string, number>>({});
-  const dimensionFilterValuesRef = useRef(treeDimensionFilterValues);
-
-  useEffect(() => {
-    if (isEqual(dimensionFilterValuesRef.current, treeDimensionFilterValues)) {
-      return;
-    }
-    dimensionFilterValuesRef.current = treeDimensionFilterValues;
-    dimensionFilterValuesVersion.current += 1;
-    setFetchedDimensionFilterValues({});
-    setDimensionFilterSearchText({});
-  }, [treeDimensionFilterValues]);
-
-  const handleFetchDimensionValues = useCallback(
-    async (dimension: PivotTableProps['groupbyRows'][number], search = '') => {
-      const dimensionKey = getStableColumnKey(dimension);
-      const normalizedSearch = search.trim();
-      setDimensionFilterSearchText(current =>
-        current[dimensionKey] === normalizedSearch
-          ? current
-          : { ...current, [dimensionKey]: normalizedSearch },
-      );
-      setDimensionFilterLoading(current => ({
-        ...current,
-        [dimensionKey]: true,
-      }));
-      const requestVersion = dimensionFilterValuesVersion.current;
-      const nextRequestVersion =
-        (dimensionFilterRequestVersion.current[dimensionKey] ?? 0) + 1;
-      dimensionFilterRequestVersion.current[dimensionKey] = nextRequestVersion;
-      try {
-        const selection = { ...uiSelectedFilters };
-        delete selection[dimensionKey];
-        const filters = buildSelectionFilterClauses({
-          formData: fetchFormDataBaseWithFormatters,
-          selection,
-        });
-        const pendingFormData =
-          filters.length > 0
-            ? {
-                ...fetchFormDataBaseWithFormatters,
-                extra_form_data: mergeSelectionExtraFilters(
-                  fetchFormDataBaseWithFormatters.extra_form_data,
-                  filters,
-                ),
-              }
-            : fetchFormDataBaseWithFormatters;
-        const normalizedFormData =
-          normalizeFormDataExtraFilters(pendingFormData);
-        const spec: QuerySpec = {
-          queryName: buildDimensionValuesQueryName(dimensionKey),
-          columns: [dimension],
-          metrics: [],
-          filters: buildDimensionValueSearchFilters({
-            dimension,
-            dimensionKey,
-            colTypeMap,
-            search: normalizedSearch,
-          }),
-        };
-        const results = await supersetChartDataClient.fetch({
-          formData: normalizedFormData,
-          specs: [spec],
-          requestGroupId: `${DIMENSION_VALUES_REQUEST_GROUP}-${dimensionKey}`,
-        });
-        if (
-          dimensionFilterValuesVersion.current !== requestVersion ||
-          dimensionFilterRequestVersion.current[dimensionKey] !==
-            nextRequestVersion
-        ) {
-          return;
-        }
-        const result = results[0];
-        const label = getColumnLabel(dimension);
-        const values = new Set<DataRecordValue>();
-        (result?.data ?? []).forEach(row => {
-          if (row && typeof row === 'object' && label in row) {
-            values.add((row as Record<string, DataRecordValue>)[label]);
-          }
-        });
-        setFetchedDimensionFilterValues(current => ({
-          ...current,
-          [dimensionKey]: Array.from(values.values()),
-        }));
-      } catch (error) {
-        if (
-          typeof DOMException !== 'undefined' &&
-          error instanceof DOMException &&
-          error.name === 'AbortError'
-        ) {
-          return;
-        }
-        // Ignore errors for dimension value lookups; filtering still works.
-      } finally {
-        if (
-          dimensionFilterRequestVersion.current[dimensionKey] ===
-          nextRequestVersion
-        ) {
-          setDimensionFilterLoading(current => {
-            if (!current[dimensionKey]) {
-              return current;
-            }
-            const next = { ...current };
-            delete next[dimensionKey];
-            return next;
-          });
-        }
-      }
-    },
-    [colTypeMap, fetchFormDataBaseWithFormatters, uiSelectedFilters],
-  );
+  const {
+    values: dimensionFilterValues,
+    loading: dimensionFilterLoading,
+    fetchValues: handleFetchDimensionValues,
+  } = useDimensionFilterValues({
+    dimensions: dimensionList,
+    treeValues: treeDimensionFilterValues,
+    formData: fetchFormDataBaseWithFormatters,
+    selectedFilters: uiSelectedFilters,
+    colTypeMap,
+  });
 
   const handleDimensionFilterChange = useCallback(
     (
