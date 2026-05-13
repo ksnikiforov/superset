@@ -58,7 +58,7 @@ cells are projections of DB facts, not canonical data.
 ## Current Status
 
 As of May 13, 2026, after
-`d8fac22ff6 refactor(pivot-table-v3): narrow runtime layout sync API`:
+`2a29b350a0 refactor(pivot-table-v3): remove unused drag removal metadata`:
 
 - Overall transition estimate: **95%**.
 - Goal-weighted completion estimate: **95%**.
@@ -70,8 +70,8 @@ As of May 13, 2026, after
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `12104` insertions, `11651` deletions, net `+453`.
-- Current production `src` TypeScript/TSX total: `33963` lines.
+- Production `src`: `12104` insertions, `11659` deletions, net `+445`.
+- Current production `src` TypeScript/TSX total: `33955` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - Full plugin Jest pass after the column-sort extraction: `91` suites and
   `729` tests.
@@ -139,6 +139,8 @@ Source-only diff from pre-refactor baseline
   `94` suites and `777` tests.
 - Full plugin Jest pass after narrowing the runtime-layout sync API: `94`
   suites and `775` tests.
+- Focused interaction drag/layout pass after removing unused drag-removal
+  metadata: `2` suites and `32` tests.
 
 The readout remains mixed: the plugin is still modestly above the baseline line
 count, but the chart/layout hooks keep losing inline policy and the remaining
@@ -427,6 +429,9 @@ git diff --check
 
 Recent validation:
 
+- `2a29b350a0`: removed unused drag-removal axis/index metadata from the
+  interaction layout helper; touched-file ESLint, Prettier, `git diff --check`,
+  and focused interaction drag/layout Jest (`32` tests) passed.
 - `d8fac22ff6`: narrowed the runtime-layout sync API to the combined plan and
   deleted the now-redundant exported predicate/test surface; touched-file
   ESLint, Prettier, `git diff --check`, and focused chart-sync/runtime Jest
