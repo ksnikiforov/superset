@@ -846,6 +846,74 @@ export const planHydrationIteration = ({
   };
 };
 
+export const shouldPlanHydrationPrefetchAxis = ({
+  effectiveExpandLevel,
+  expandedCount,
+  collapsedCount,
+}: {
+  effectiveExpandLevel: number;
+  expandedCount: number;
+  collapsedCount: number;
+}) => effectiveExpandLevel > 0 || expandedCount > 0 || collapsedCount > 0;
+
+export type HydrationPrefetchAction =
+  | {
+      kind: 'idle';
+    }
+  | {
+      kind: 'skip-root';
+    }
+  | {
+      kind: 'hydrate';
+      showLoader: boolean;
+    };
+
+export const buildHydrationPrefetchAction = ({
+  resolvedRows,
+  resolvedCols,
+  persistedState,
+  autoExpandRowsLevelForDesired,
+  autoExpandColsLevelForDesired,
+  tree,
+  rowPlan,
+  colPlan,
+}: {
+  resolvedRows: Set<string>;
+  resolvedCols: Set<string>;
+  persistedState: PivotExpansionStateKeys;
+  autoExpandRowsLevelForDesired: number;
+  autoExpandColsLevelForDesired: number;
+  tree: PivotTreeData;
+  rowPlan: PivotExpansionPlan;
+  colPlan: PivotExpansionPlan;
+}): HydrationPrefetchAction => {
+  if (rowPlan.pendingKeys.size + colPlan.pendingKeys.size === 0) {
+    return { kind: 'idle' };
+  }
+  const shouldSkipRootPrefetch =
+    resolvedRows.size === 1 &&
+    resolvedRows.has(rootKey) &&
+    resolvedCols.size === 1 &&
+    resolvedCols.has(rootKey) &&
+    persistedState.rows.length === 0 &&
+    persistedState.cols.length === 0 &&
+    persistedState.collapsedRows.length === 0 &&
+    persistedState.collapsedCols.length === 0 &&
+    autoExpandRowsLevelForDesired <= 0 &&
+    autoExpandColsLevelForDesired <= 0 &&
+    !Object.keys(tree.rows).some(key => key !== rootKey) &&
+    !Object.keys(tree.cols).some(key => key !== rootKey);
+  if (shouldSkipRootPrefetch) {
+    return { kind: 'skip-root' };
+  }
+  return {
+    kind: 'hydrate',
+    showLoader:
+      hasNestedPendingKeys(rowPlan.pendingKeys) ||
+      hasNestedPendingKeys(colPlan.pendingKeys),
+  };
+};
+
 export const getVisibleExpansionKeys = ({
   tree,
   expandedRows,

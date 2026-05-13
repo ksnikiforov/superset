@@ -76,14 +76,15 @@ import {
 } from '../runtime/requestLifecycle';
 import {
   addAncestors,
+  buildHydrationPrefetchAction,
   computeVisibleDepths as computeVisibleDepthsBase,
   dropDescendants,
   getVisibleExpansionKeys as getVisibleExpansionKeysBase,
-  hasNestedPendingKeys,
   planHydrationIteration,
   pruneTreeByPrefixes,
   resolveReinitializedExpansionState,
   resolveExpandedForMetrics as resolveExpandedForMetricsBase,
+  shouldPlanHydrationPrefetchAxis,
   type ExpansionVisibilityConfig,
 } from './engine';
 import {
@@ -1609,14 +1610,16 @@ export const useExpansionEngine = ({
     prevExpandRowsLevelRawRef.current = expandRowsLevelRaw;
     prevExpandColsLevelRawRef.current = expandColumnsLevelRaw;
 
-    const shouldPlanRows =
-      effectiveExpandRowsLevel > 0 ||
-      persistedState.rows.length > 0 ||
-      persistedState.collapsedRows.length > 0;
-    const shouldPlanCols =
-      effectiveExpandColsLevel > 0 ||
-      persistedState.cols.length > 0 ||
-      persistedState.collapsedCols.length > 0;
+    const shouldPlanRows = shouldPlanHydrationPrefetchAxis({
+      effectiveExpandLevel: effectiveExpandRowsLevel,
+      expandedCount: persistedState.rows.length,
+      collapsedCount: persistedState.collapsedRows.length,
+    });
+    const shouldPlanCols = shouldPlanHydrationPrefetchAxis({
+      effectiveExpandLevel: effectiveExpandColsLevel,
+      expandedCount: persistedState.cols.length,
+      collapsedCount: persistedState.collapsedCols.length,
+    });
     if (factBatches.length > 0 && (hasNewData || !layoutChanged)) {
       seedFetchedCoverageFromFactBatches(factBatches);
     }
@@ -1633,32 +1636,26 @@ export const useExpansionEngine = ({
         planRows: shouldPlanRows,
         planCols: shouldPlanCols,
       });
-    const shouldSkipRootPrefetch =
-      resolvedRows.size === 1 &&
-      resolvedRows.has(rootKey) &&
-      resolvedCols.size === 1 &&
-      resolvedCols.has(rootKey) &&
-      persistedState.rows.length === 0 &&
-      persistedState.cols.length === 0 &&
-      persistedState.collapsedRows.length === 0 &&
-      persistedState.collapsedCols.length === 0 &&
-      autoExpandRowsLevelForDesired <= 0 &&
-      autoExpandColsLevelForDesired <= 0 &&
-      !Object.keys(normalizedTree.rows).some(key => key !== rootKey) &&
-      !Object.keys(normalizedTree.cols).some(key => key !== rootKey);
-    const shouldShowPrefetchLoader =
-      hasNestedPendingKeys(nextRowPlan.pendingKeys) ||
-      hasNestedPendingKeys(nextColPlan.pendingKeys);
-    if (nextRowPlan.pendingKeys.size + nextColPlan.pendingKeys.size > 0) {
-      if (shouldSkipRootPrefetch) {
+    const prefetchAction = buildHydrationPrefetchAction({
+      resolvedRows,
+      resolvedCols,
+      persistedState,
+      autoExpandRowsLevelForDesired,
+      autoExpandColsLevelForDesired,
+      tree: normalizedTree,
+      rowPlan: nextRowPlan,
+      colPlan: nextColPlan,
+    });
+    if (prefetchAction.kind !== 'idle') {
+      if (prefetchAction.kind === 'skip-root') {
         setHydratingState(false);
         return;
       }
-      if (!shouldShowPrefetchLoader) {
+      if (!prefetchAction.showLoader) {
         setHydratingState(false);
       }
       hydrateAtomic('prefetch', {
-        showLoader: shouldShowPrefetchLoader,
+        showLoader: prefetchAction.showLoader,
         planRows: shouldPlanRows,
         planCols: shouldPlanCols,
       }).catch(error => {
