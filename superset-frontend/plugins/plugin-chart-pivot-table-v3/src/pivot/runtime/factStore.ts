@@ -23,6 +23,7 @@ import {
   type PivotPathValue,
 } from '../../types';
 import { serializePath } from '../core/path';
+import { decodeMetricKey, isMeasureLeafToken } from '../core/tokens';
 import { stableStringify } from '../shared/stableStringify';
 import { type PivotFactCoverage } from './types';
 
@@ -65,7 +66,9 @@ export type PivotFactStore = {
   upsertBatch: (batch: PivotFactStoreBatch) => void;
   upsertBatches: (batches: PivotFactStoreBatch[]) => void;
   getFacts: (selector: PivotFactSelector) => PivotFact[];
+  getCompatibleFacts: (selector: PivotFactSelector) => PivotFact[];
   hasCoverage: (selector: PivotFactSelector) => boolean;
+  hasCompatibleCoverage: (selector: PivotFactSelector) => boolean;
   getAll: () => PivotFact[];
   size: () => number;
 };
@@ -74,6 +77,14 @@ export const buildPivotFactRequestKey = ({
   coverage,
   scope,
 }: PivotFactSelector) => stableStringify([coverage, scope]);
+
+const buildCoverageShapeKey = ({
+  rowDepth,
+  columnDepth,
+  rowDimensions,
+  columnDimensions,
+}: PivotFactCoverage) =>
+  stableStringify([rowDepth, columnDepth, rowDimensions, columnDimensions]);
 
 export const buildPivotFactKey = (
   selector: PivotFactSelector,
@@ -90,6 +101,7 @@ export const buildPivotFactKey = (
 export const createPivotFactStore = (): PivotFactStore => {
   const factsByKey = new Map<string, PivotFact>();
   const factKeysByRequest = new Map<string, Set<string>>();
+  const selectorByRequest = new Map<string, PivotFactSelector>();
 
   const upsertBatch = (batch: PivotFactStoreBatch) => {
     const { facts } = batch;
@@ -99,6 +111,7 @@ export const createPivotFactStore = (): PivotFactStore => {
     };
     const key = buildPivotFactRequestKey(selector);
     const requestFactKeys = factKeysByRequest.get(key) ?? new Set<string>();
+    selectorByRequest.set(key, selector);
     facts.forEach(fact => {
       const factKey = buildPivotFactKey(selector, fact);
       factsByKey.set(factKey, fact);
@@ -112,12 +125,110 @@ export const createPivotFactStore = (): PivotFactStore => {
       .map(key => factsByKey.get(key))
       .filter((fact): fact is PivotFact => fact !== undefined);
 
+  const sameCoverageShape = (
+    left: PivotFactCoverage,
+    right: PivotFactCoverage,
+  ) => buildCoverageShapeKey(left) === buildCoverageShapeKey(right);
+
+  const startsWithPath = (path: PivotPath, prefix: PivotPath) =>
+    prefix.every((value, index) => path[index] === value);
+
+  const factMatchesScope = (
+    fact: PivotFact,
+    scope: PivotFactStoreBatchScope,
+  ) => {
+    switch (scope.kind) {
+      case 'bootstrap':
+      case 'root':
+        return true;
+      case 'branch':
+        return startsWithPath(
+          scope.axis === 'row' ? fact.rowPath : fact.columnPath,
+          scope.path,
+        );
+      case 'batch':
+        return scope.siblingValues.some(value =>
+          startsWithPath(
+            scope.axis === 'row' ? fact.rowPath : fact.columnPath,
+            [...scope.parentPath, value],
+          ),
+        );
+      default:
+        return false;
+    }
+  };
+
+  const pathContainsValuesToken = (path: PivotPath) =>
+    path.some(value => decodeMetricKey(value) || isMeasureLeafToken(value));
+
+  const scopeContainsValuesToken = (scope: PivotFactStoreBatchScope) => {
+    switch (scope.kind) {
+      case 'branch':
+        return pathContainsValuesToken(scope.path);
+      case 'batch':
+        return scope.siblingValues.some(value =>
+          pathContainsValuesToken([...scope.parentPath, value]),
+        );
+      default:
+        return false;
+    }
+  };
+
+  const isCompatibleSelector = (
+    candidate: PivotFactSelector,
+    requested: PivotFactSelector,
+  ) => {
+    if (!sameCoverageShape(candidate.coverage, requested.coverage)) {
+      return false;
+    }
+    if (
+      requested.scope.kind === 'bootstrap' ||
+      requested.scope.kind === 'root'
+    ) {
+      return (
+        candidate.scope.kind === 'bootstrap' || candidate.scope.kind === 'root'
+      );
+    }
+    if (
+      candidate.scope.kind === 'bootstrap' ||
+      candidate.scope.kind === 'root'
+    ) {
+      return !scopeContainsValuesToken(requested.scope);
+    }
+    return (
+      buildPivotFactRequestKey(candidate) ===
+      buildPivotFactRequestKey(requested)
+    );
+  };
+
+  const getCompatibleRequestSelectors = (selector: PivotFactSelector) =>
+    Array.from(selectorByRequest.entries())
+      .filter(([, candidate]) => isCompatibleSelector(candidate, selector))
+      .map(([key, candidate]) => ({ key, selector: candidate }));
+
+  const getCompatibleFacts = (selector: PivotFactSelector) =>
+    getCompatibleRequestSelectors(selector).flatMap(candidate => {
+      const facts = Array.from(factKeysByRequest.get(candidate.key) ?? [])
+        .map(key => factsByKey.get(key))
+        .filter((fact): fact is PivotFact => fact !== undefined);
+      if (
+        buildPivotFactRequestKey(candidate.selector) ===
+        buildPivotFactRequestKey(selector)
+      ) {
+        return facts;
+      }
+      return facts.filter(fact => factMatchesScope(fact, selector.scope));
+    });
+
   return {
     upsertBatch,
     upsertBatches: batches => batches.forEach(upsertBatch),
     getFacts,
+    getCompatibleFacts,
     hasCoverage: selector =>
       factKeysByRequest.has(buildPivotFactRequestKey(selector)),
+    hasCompatibleCoverage: selector =>
+      getCompatibleRequestSelectors(selector).length > 0,
     getAll: () => Array.from(factsByKey.values()),
     size: () => factsByKey.size,
   };

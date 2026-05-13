@@ -23,6 +23,7 @@ import {
   type PivotFactStoreBatchScope,
 } from '../../../../src/pivot/runtime/factStore';
 import { type PivotFactCoverage } from '../../../../src/pivot/runtime/types';
+import { encodeMetricKey } from '../../../../src/utils';
 
 const coverage: PivotFactCoverage = {
   reason: 'initial',
@@ -132,6 +133,80 @@ test('does not satisfy sibling branch scopes with identical coverage', () => {
   expect(store.getFacts({ coverage: branchCoverage, scope: usaScope })).toEqual(
     [],
   );
+});
+
+test('materialization can reuse compatible root coverage for branch facts', () => {
+  const store = createPivotFactStore();
+  const branchCoverage: PivotFactCoverage = {
+    reason: 'expand',
+    rowDepth: 2,
+    columnDepth: 1,
+    rowDimensions: ['country', 'city'],
+    columnDimensions: ['month'],
+  };
+  const rootCoverage: PivotFactCoverage = {
+    ...branchCoverage,
+    reason: 'initial',
+  };
+  const franceFact = buildFact({
+    rowPath: ['France', 'Paris'],
+    columnPath: ['2026-01'],
+    value: 1,
+  });
+  const usaFact = buildFact({
+    rowPath: ['USA', 'Seattle'],
+    columnPath: ['2026-01'],
+    value: 2,
+  });
+  const franceBranchSelector = {
+    coverage: branchCoverage,
+    scope: {
+      kind: 'branch',
+      axis: 'row',
+      path: ['France'],
+    } as PivotFactStoreBatchScope,
+  };
+
+  store.upsertBatch({
+    coverage: rootCoverage,
+    scope: { kind: 'root' },
+    facts: [franceFact, usaFact],
+  });
+
+  expect(store.hasCoverage(franceBranchSelector)).toBe(false);
+  expect(store.hasCompatibleCoverage(franceBranchSelector)).toBe(true);
+  expect(store.getFacts(franceBranchSelector)).toEqual([]);
+  expect(
+    store.getCompatibleFacts(franceBranchSelector).map(fact => fact.rowPath),
+  ).toEqual([['France', 'Paris']]);
+});
+
+test('does not reuse root coverage for values-token branch scopes', () => {
+  const store = createPivotFactStore();
+  const branchCoverage: PivotFactCoverage = {
+    reason: 'expand',
+    rowDepth: 1,
+    columnDepth: 1,
+    rowDimensions: ['country'],
+    columnDimensions: ['band'],
+  };
+  const selectorWithMetricPath = {
+    coverage: branchCoverage,
+    scope: {
+      kind: 'branch',
+      axis: 'col',
+      path: [encodeMetricKey('sales')],
+    } as PivotFactStoreBatchScope,
+  };
+
+  store.upsertBatch({
+    coverage: { ...branchCoverage, reason: 'initial' },
+    scope: { kind: 'root' },
+    facts: [buildFact({ columnPath: ['REV-A'] })],
+  });
+
+  expect(store.hasCompatibleCoverage(selectorWithMetricPath)).toBe(false);
+  expect(store.getCompatibleFacts(selectorWithMetricPath)).toEqual([]);
 });
 
 test('tracks loaded coverage even when the query returns no facts', () => {

@@ -109,6 +109,34 @@ describe('pivot/expansion/planner', () => {
     ]);
   });
 
+  it('projects root coverage to fetched root expansion coverage on covered axes', () => {
+    expect(
+      projectFactRequestToFetchedCoverage({
+        coverage: {
+          reason: 'initial',
+          rowDepth: 1,
+          columnDepth: 2,
+          rowDimensions: ['country'],
+          columnDimensions: ['year', 'quarter'],
+        },
+        scope: {
+          kind: 'root',
+        },
+      }),
+    ).toEqual([
+      {
+        axis: 'row',
+        pathKey: rootKey,
+        requiredOppositeDepth: 2,
+      },
+      {
+        axis: 'col',
+        pathKey: rootKey,
+        requiredOppositeDepth: 1,
+      },
+    ]);
+  });
+
   it('seeds fetched coverage lookup from typed fact batches', () => {
     const fetchedCoverage = createFetchedFactCoverageState({
       row: new Map([[`row:${serializePath(['France'])}`, 0]]),

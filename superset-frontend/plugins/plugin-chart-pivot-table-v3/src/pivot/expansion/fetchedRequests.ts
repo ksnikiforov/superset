@@ -22,6 +22,7 @@ import {
   type PivotFactSelector,
   type PivotFactStoreBatch,
 } from '../runtime/factStore';
+import { rootKey } from '../viewModel';
 
 export type FetchedFactCoverageState = {
   depthByAxis: Record<PivotAxis, Map<string, number>>;
@@ -60,8 +61,24 @@ export const projectFactRequestToFetchedCoverage = ({
 }: PivotFactSelector): FetchedFactRequestProjection[] => {
   switch (scope.kind) {
     case 'bootstrap':
-    case 'root':
-      return [];
+    case 'root': {
+      const projections: FetchedFactRequestProjection[] = [];
+      if (coverage.rowDepth > 0) {
+        projections.push({
+          axis: 'row',
+          pathKey: rootKey,
+          requiredOppositeDepth: coverage.columnDepth,
+        });
+      }
+      if (coverage.columnDepth > 0) {
+        projections.push({
+          axis: 'col',
+          pathKey: rootKey,
+          requiredOppositeDepth: coverage.rowDepth,
+        });
+      }
+      return projections;
+    }
     case 'branch': {
       const requiredOppositeDepth =
         scope.axis === 'row' ? coverage.columnDepth : coverage.rowDepth;

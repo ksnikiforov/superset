@@ -87,8 +87,8 @@ plugin net-negative overall.
 | Gate                                      | Completion | Current readout                                                                                                                                                                                                                                      |
 | ----------------------------------------- | ---------: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Gate 1: compiled layout model             |        72% | `PivotProgram` exists and drives many paths. `usePivotLayout` and interaction layout still translate raw form/runtime layout into compatibility fields.                                                                                              |
-| Gate 2: query planning from coverage      |        90% | Initial/root/branch/batch query paths use explicit coverage metadata. Branch and grouped-batch fetch params no longer expose tree shape. Remaining work is mostly support/totals coverage composition.                                               |
-| Gate 3: central fact ingestion/store      |        91% | Fetch paths return fact batches, cache/fact-store hits use exact coverage, and ingestion is isolated. Remaining coupling is mostly tree-shaped chart/test boundaries.                                                                                |
+| Gate 2: query planning from coverage      |        91% | Initial/root/branch/batch query paths use explicit coverage metadata. Bootstrap/root fact batches now seed fetched root expansion coverage. Branch and grouped-batch fetch params no longer expose tree shape. Remaining work is mostly support/totals coverage composition. |
+| Gate 3: central fact ingestion/store      |        92% | Fetch paths return fact batches, cache/fact-store hits use typed coverage, and ingestion is isolated. Compatible root/bootstrap coverage can now materialize branch specs without matching the original request scope. Remaining coupling is mostly tree-shaped chart/test boundaries. |
 | Gate 4: one tree materializer             |        88% | `materializePivotTree.ts` owns fact-to-tree materialization, Values/metric/measure axes, subtotal leaf injection, and measure-leaf value application. Export no longer repairs row depth semantics, but still needs a cleaner model boundary.        |
 | Gate 5: expansion reducer/runtime effects |        79% | Expansion no longer derives fetched state from rendered tree shape. It uses explicit fact coverage, semantic fetchability, shared fetch execution, and request lifecycles. The hook still owns hydration iteration, cancellation, and React commits. |
 | Gate 6: pure render model                 |        85% | Projection drives toggle eligibility, collapsed Values, column display, visible-axis construction, and semantic export row depth. Remaining risk is deeper row subtotal policy and some metric-index compatibility behavior.                         |
@@ -107,6 +107,10 @@ plugin net-negative overall.
 - Expansion fetch execution carries coverage depths, not a staged tree snapshot,
   and hydration loader cleanup now uses one finalization path.
 - No-dimension layouts require explicit root coverage before materialization.
+- Bootstrap/root fact batches seed fetched root expansion coverage for the axes
+  they actually cover.
+- Fact-store materialization can reuse compatible root/bootstrap coverage for
+  branch requests without weakening exact scoped fact lookups.
 - Branch-cache entries store fact batches, not rendered trees.
 - Measure-leaf value application is inside `materializePivotTree`.
 - The chart no longer contains separate runtime-layout fetch predicates, stale

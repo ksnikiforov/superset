@@ -116,7 +116,7 @@ export const buildFactStoreBatchesFromSpecs = ({
 }): PivotFactStoreBatch[] =>
   specs.map(spec => ({
     ...factStoreSelectorFromSpec(spec),
-    facts: store.getFacts(factStoreSelectorFromSpec(spec)),
+    facts: store.getCompatibleFacts(factStoreSelectorFromSpec(spec)),
   }));
 
 const factBatchFromStore = ({
@@ -126,7 +126,7 @@ const factBatchFromStore = ({
   store: PivotFactStore;
   spec: PlannedQuerySpec;
 }): MaterializationFactBatch => ({
-  facts: store.getFacts(factStoreSelectorFromSpec(spec)),
+  facts: store.getCompatibleFacts(factStoreSelectorFromSpec(spec)),
   coverage: spec.meta.coverage,
 });
 
@@ -1219,7 +1219,10 @@ export const canMaterializeSpecsFromFactStore = ({
 }: {
   specs: PlannedQuerySpec[];
   store: PivotFactStore;
-}) => specs.every(spec => store.hasCoverage(factStoreSelectorFromSpec(spec)));
+}) =>
+  specs.every(spec =>
+    store.hasCompatibleCoverage(factStoreSelectorFromSpec(spec)),
+  );
 
 export const buildBranchTreeFromFactStore = ({
   specs,
