@@ -26,7 +26,12 @@ import {
   getColumnLabel,
 } from '@superset-ui/core';
 import { DateFormatter, MetricsLayoutEnum, PivotTreeNode } from '../types';
-import { decodeMetricKey, getMetricKeys, isSubtotalToken } from '../utils';
+import {
+  decodeMetricKey,
+  getMetricKeys,
+  getStableColumnKey,
+  isSubtotalToken,
+} from '../utils';
 
 export type PivotSelectedFilters = Record<string, DataRecordValue[]>;
 
@@ -36,6 +41,39 @@ export const hasSelectedFilters = (filters: PivotSelectedFilters): boolean =>
 export const firstSelectedFilters = (
   ...sources: PivotSelectedFilters[]
 ): PivotSelectedFilters => sources.find(hasSelectedFilters) ?? {};
+
+export const normalizePivotSelectedFilters = ({
+  filters,
+  dimensions,
+}: {
+  filters?: PivotSelectedFilters;
+  dimensions: QueryFormColumn[];
+}): PivotSelectedFilters => {
+  if (!filters) {
+    return {};
+  }
+  const dimensionKeys = new Set(
+    dimensions.map(dimension => getStableColumnKey(dimension)),
+  );
+  const dimensionLabels = new Map(
+    dimensions.map(dimension => [
+      getColumnLabel(dimension),
+      getStableColumnKey(dimension),
+    ]),
+  );
+  const normalized: PivotSelectedFilters = {};
+  Object.entries(filters).forEach(([key, values]) => {
+    if (dimensionKeys.has(key)) {
+      normalized[key] = values;
+      return;
+    }
+    const stableKey = dimensionLabels.get(key);
+    if (stableKey) {
+      normalized[stableKey] = values;
+    }
+  });
+  return normalized;
+};
 
 export const applyDimensionFilterSelectionChange = ({
   selection,

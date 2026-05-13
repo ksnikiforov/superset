@@ -79,6 +79,7 @@ import {
   applyDimensionFilterSelectionChange,
   buildClearSelectedFiltersUpdate,
   firstSelectedFilters,
+  normalizePivotSelectedFilters,
 } from './pivot/filters';
 import { supersetChartDataClient } from './pivot/data/SupersetChartDataClient';
 import { normalizeFormDataExtraFilters } from './pivot/query/normalizeExtraFormData';
@@ -891,13 +892,6 @@ function PivotTableChart(props: PivotTableProps) {
       ),
     [appliedFormData.dimensions],
   );
-  const dimensionMap = useMemo(() => {
-    const map = new Map<string, PivotTableProps['groupbyRows'][number]>();
-    dimensionList.forEach(dimension => {
-      map.set(getStableColumnKey(dimension), dimension);
-    });
-    return map;
-  }, [dimensionList]);
   const datasourceId = useMemo(() => {
     const datasource = formData.datasource || '';
     const [idPart] = datasource.split('__');
@@ -1176,29 +1170,6 @@ function PivotTableChart(props: PivotTableProps) {
     ? (appliedLayoutFormData.metricsLayout ?? metricsLayout)
     : metricsLayout;
 
-  const normalizeSelectedFilters = useCallback(
-    (filters?: Record<string, DataRecordValue[]>) => {
-      if (!filters) {
-        return {};
-      }
-      const normalized: Record<string, DataRecordValue[]> = {};
-      Object.entries(filters).forEach(([key, values]) => {
-        if (dimensionMap.has(key)) {
-          normalized[key] = values;
-          return;
-        }
-        const match = dimensionList.find(
-          dimension => getColumnLabel(dimension) === key,
-        );
-        if (match) {
-          normalized[getStableColumnKey(match)] = values;
-        }
-      });
-      return normalized;
-    },
-    [dimensionList, dimensionMap],
-  );
-
   const committedSelectionFilters = useMemo(
     () =>
       buildSelectionFilterClauses({
@@ -1233,15 +1204,16 @@ function PivotTableChart(props: PivotTableProps) {
     if (!isUserControlled) {
       return EMPTY_SELECTED_FILTERS;
     }
-    return normalizeSelectedFilters(
-      firstSelectedFilters(
+    return normalizePivotSelectedFilters({
+      filters: firstSelectedFilters(
         selectedFiltersFromFormData,
         selectedFiltersFromOwnState,
       ),
-    );
+      dimensions: dimensionList,
+    });
   }, [
+    dimensionList,
     isUserControlled,
-    normalizeSelectedFilters,
     selectedFiltersFromFormData,
     selectedFiltersFromOwnState,
   ]);
@@ -1304,20 +1276,24 @@ function PivotTableChart(props: PivotTableProps) {
 
   const persistedSelectedFilters = useMemo(() => {
     if (!isUserControlled) {
-      return normalizeSelectedFilters(selectedFiltersFromProps);
+      return normalizePivotSelectedFilters({
+        filters: selectedFiltersFromProps,
+        dimensions: dimensionList,
+      });
     }
-    return normalizeSelectedFilters(
-      firstSelectedFilters(
+    return normalizePivotSelectedFilters({
+      filters: firstSelectedFilters(
         selectedFiltersFromFormData,
         selectedFiltersFromOwnState,
         committedFilters,
         selectedFiltersFromProps,
       ),
-    );
+      dimensions: dimensionList,
+    });
   }, [
     committedFilters,
+    dimensionList,
     isUserControlled,
-    normalizeSelectedFilters,
     selectedFiltersFromFormData,
     selectedFiltersFromOwnState,
     selectedFiltersFromProps,

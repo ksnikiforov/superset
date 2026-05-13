@@ -22,6 +22,7 @@ import {
   buildClearSelectedFiltersUpdate,
   firstSelectedFilters,
   hasSelectedFilters,
+  normalizePivotSelectedFilters,
 } from '../../../src/pivot/filters';
 import { MetricsLayoutEnum, PivotTreeNode } from '../../../src/types';
 import { encodeMetricKey, SUBTOTAL_TOKEN } from '../../../src/utils';
@@ -110,6 +111,27 @@ describe('selected filter state helpers', () => {
       selected,
     );
     expect(firstSelectedFilters({}, {})).toEqual({});
+  });
+
+  it('normalizes persisted filters to stable dimension keys', () => {
+    expect(
+      normalizePivotSelectedFilters({
+        filters: {
+          Country: ['France'],
+          region: ['EU'],
+          Unknown: ['ignored'],
+        },
+        dimensions: ['Country', { label: 'Region', sqlExpression: 'region' }],
+      }),
+    ).toEqual({
+      Country: ['France'],
+      region: ['EU'],
+    });
+    expect(
+      normalizePivotSelectedFilters({
+        dimensions: ['Country'],
+      }),
+    ).toEqual({});
   });
 
   it('updates dimension filter selections and stale restore suppression', () => {
