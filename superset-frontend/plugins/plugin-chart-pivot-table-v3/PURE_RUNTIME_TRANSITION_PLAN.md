@@ -58,7 +58,7 @@ cells are projections of DB facts, not canonical data.
 ## Current Status
 
 As of May 13, 2026, after
-`421b9f943f refactor(pivot-table-v3): drop row depth export marker`:
+`7e724e895b refactor(pivot-table-v3): centralize runtime layout prop sync`:
 
 - Overall transition estimate: **95%**.
 - Goal-weighted completion estimate: **95%**.
@@ -70,8 +70,8 @@ As of May 13, 2026, after
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `12123` insertions, `11643` deletions, net `+480`.
-- Current production `src` TypeScript/TSX total: `33990` lines.
+- Production `src`: `12152` insertions, `11651` deletions, net `+501`.
+- Current production `src` TypeScript/TSX total: `34011` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - Full plugin Jest pass after the column-sort extraction: `91` suites and
   `729` tests.
@@ -135,6 +135,8 @@ Source-only diff from pre-refactor baseline
   commits: `94` suites and `776` tests.
 - Focused render/export pass after dropping the per-row depth export marker:
   `3` suites and `24` tests.
+- Full plugin Jest pass after centralizing runtime-layout prop sync planning:
+  `94` suites and `777` tests.
 
 The readout remains mixed: the new runtime files now put the plugin modestly
 above the baseline line count, but the chart/layout hooks keep losing inline
@@ -151,7 +153,7 @@ React orchestration.
 | Gate 4: one tree materializer             |        90% | `materializePivotTree.ts` owns fact-to-tree materialization, Values/metric/measure axes, subtotal leaf injection, and measure-leaf value application. Export no longer repairs row depth semantics, infers visible row hierarchy depth from cloned DOM rows, reads per-row depth markers, or reconstructs visible row paths by scanning sibling DOM rows, but still needs a cleaner workbook model boundary.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 | Gate 5: expansion reducer/runtime effects |        91% | Expansion no longer derives fetched state from rendered tree shape. It uses explicit fact coverage, semantic fetchability, shared fetch execution, and request lifecycles. Loaded terminal metric nodes and metric subtotal nodes now seed coverage through the fetched-coverage utility, fetched-result delta collection now seeds both fact batches and loaded metric-node coverage for same-axis and hydration paths, same-axis delta merge/stale-subtree preservation policy lives in the expansion engine, hydration delta staging/finalization policy lives in the expansion engine, expansion reinitialization trigger/effective-level policy lives in the expansion engine, persisted expansion visibility normalization lives in the expansion engine, expansion toggle/collapse pruning decisions live in the expansion engine, metric expansion stale-key cleanup uses one path, hydration iteration/cancellation policy lives in the expansion engine, and branch/batch fetch execution now lives in a dedicated expansion fetch executor. Initial hydration prefetch planning and prefetch action selection are also pure engine decisions. Same-axis fetch, cross-axis hydration, collapse, and reinitialization now use one batched tree/expanded/pending commit path. The hook still owns request kickoff and sequencing. |
 | Gate 6: pure render model                 |        95% | Projection drives toggle eligibility, collapsed Values, column display, visible-axis construction, semantic export row depth count, semantic export row values, and chart column-sort decisions. Databar scale grouping, waterfall offsets, bridge connectors, label-space sizing, databar column min-width policy, metric-axis layout compatibility policy, pre-subtotal child filtering, collapsed Values node projection, row subtotal child policy, column display path construction, header label resolution, metric-leaf render expansion, render date-label formatting, toggle visibility, row/column aggregate emphasis, and render node depth now live in pure chart helpers. Remaining risk is mostly sorting/display-map policy and export workbook-model parity.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| Gate 7: chart component cleanup           |        76% | The chart delegates runtime fetch decisions and no longer vetoes metric-order-only commits or treats rendered tree signatures as seamless refetch identity. Seamless sync snapshots, upstream dashboard query-context signatures, committed-props sync predicates, stale coverage recovery predicates, persisted-filter seamless reload policy, persisted-selection local sync policy, runtime-layout prop sync policy, runtime-layout change actions, stale dashboard runtime actions, seamless persistence side-effect planning, pending display snapshot settlement policy, and applied runtime layout/formData projection now live outside the chart. Selected-filter update policy, persisted filter normalization, tree-derived dimension filter value collection, selection-filtered fetch form-data construction, dimension filter search/value fetch state, interaction chip construction, interaction DnD shell rendering, remove-dimension layout policy, and column-sort resolution/reconciliation are now outside the chart. The chart still owns committed tree/fact state, interaction callback wiring, and several controller-like effects.                                                                                                                                                                               |
+| Gate 7: chart component cleanup           |        77% | The chart delegates runtime fetch decisions and no longer vetoes metric-order-only commits or treats rendered tree signatures as seamless refetch identity. Seamless sync snapshots, upstream dashboard query-context signatures, committed-props sync predicates, stale coverage recovery predicates, persisted-filter seamless reload policy, persisted-selection local sync policy, runtime-layout prop sync policy and prop-sync planning, runtime-layout change actions, stale dashboard runtime actions, seamless persistence side-effect planning, pending display snapshot settlement policy, and applied runtime layout/formData projection now live outside the chart. Selected-filter update policy, persisted filter normalization, tree-derived dimension filter value collection, selection-filtered fetch form-data construction, dimension filter search/value fetch state, interaction chip construction, interaction DnD shell rendering, remove-dimension layout policy, and column-sort resolution/reconciliation are now outside the chart. The chart still owns committed tree/fact state, interaction callback wiring, and several controller-like effects.                                                                                                                                                                               |
 
 ## What Is Now Solid
 
@@ -216,7 +218,8 @@ React orchestration.
   stale coverage recovery predicates, and persisted-filter seamless reload
   policy are built in the seamless runtime module instead of in
   `PivotTableChart.tsx`. Persisted selected-filter local sync policy is also
-  centralized there, along with runtime-layout prop sync policy.
+  centralized there, along with runtime-layout prop sync policy and the combined
+  prop-sync plan that the chart applies.
 - Runtime-layout change actions and stale dashboard runtime actions are now
   prepared in the seamless runtime module, so the chart no longer owns those
   fetch/local-commit and upstream-query-state decisions.
@@ -292,7 +295,7 @@ React orchestration.
 
 ## Remaining Risk
 
-- `PivotTableChart.tsx` is no longer the largest file, but it is still the
+- `PivotTableChart.tsx` is no longer the largest file, but it remains the
   largest chart-owned orchestration surface. It handles committed tree/fact
   sync, local runtime layout state, dashboard persistence, interaction callback
   wiring, and stale recovery.
@@ -318,9 +321,9 @@ Largest relevant production files:
 
 - `PivotDndMetricSelect.tsx`: `1566` lines.
 - `engine.ts`: `1496` lines.
-- `utils.ts`: `1429` lines.
-- `PivotTableChart.tsx`: `1447` lines.
 - `PivotMetricDefinitionValue.tsx`: `1448` lines.
+- `utils.ts`: `1429` lines.
+- `PivotTableChart.tsx`: `1426` lines.
 - `materializePivotTree.ts`: `1329` lines.
 - `usePivotFormatting.tsx`: `1325` lines.
 - `useExpansionEngine.ts`: `1321` lines.
@@ -422,6 +425,10 @@ git diff --check
 
 Recent validation:
 
+- `7e724e895b`: centralized runtime-layout prop sync planning in the seamless
+  runtime module; touched-file ESLint, Prettier, `git diff --check`, focused
+  chart-sync/runtime Jest (`55` tests), and the full pivot-table-v3 plugin Jest
+  suite (`94` suites, `777` tests) passed.
 - `c2c37db817`: emitted semantic visible row-depth count from
   `PivotTableView` and consumed it in export; touched-file ESLint, Prettier,
   `git diff --check`, focused export/render/chart Jest (`24` tests), and the
