@@ -16,7 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { buildCellFilters } from '../../../src/pivot/filters';
+import {
+  applyDimensionFilterSelectionChange,
+  buildCellFilters,
+  buildClearSelectedFiltersUpdate,
+  firstSelectedFilters,
+  hasSelectedFilters,
+} from '../../../src/pivot/filters';
 import { MetricsLayoutEnum, PivotTreeNode } from '../../../src/types';
 import { encodeMetricKey, SUBTOTAL_TOKEN } from '../../../src/utils';
 
@@ -91,5 +97,61 @@ describe('buildCellFilters', () => {
       { col: 'country', op: '==', val: 'US' },
       { col: 'year', op: '==', val: '2022' },
     ]);
+  });
+});
+
+describe('selected filter state helpers', () => {
+  it('detects and selects the first populated filter source', () => {
+    const selected = { country: ['France'] };
+
+    expect(hasSelectedFilters({})).toBe(false);
+    expect(hasSelectedFilters(selected)).toBe(true);
+    expect(firstSelectedFilters({}, selected, { country: ['Germany'] })).toBe(
+      selected,
+    );
+    expect(firstSelectedFilters({}, {})).toEqual({});
+  });
+
+  it('updates dimension filter selections and stale restore suppression', () => {
+    expect(
+      applyDimensionFilterSelectionChange({
+        selection: {},
+        dimensionKey: 'country',
+        values: ['France'],
+      }),
+    ).toEqual({
+      selection: { country: ['France'] },
+      suppressStalePersistedFilterRestore: false,
+    });
+
+    expect(
+      applyDimensionFilterSelectionChange({
+        selection: { country: ['France'], region: ['EU'] },
+        dimensionKey: 'country',
+        values: [],
+      }),
+    ).toEqual({
+      selection: { region: ['EU'] },
+      suppressStalePersistedFilterRestore: false,
+    });
+
+    expect(
+      applyDimensionFilterSelectionChange({
+        selection: { country: ['France'] },
+        dimensionKey: 'country',
+        values: [],
+      }),
+    ).toEqual({
+      selection: {},
+      suppressStalePersistedFilterRestore: true,
+    });
+  });
+
+  it('builds clear-all filter updates only when filters exist', () => {
+    expect(buildClearSelectedFiltersUpdate({})).toBeNull();
+    expect(buildClearSelectedFiltersUpdate({ country: ['France'] })).toEqual({
+      selection: {},
+      suppressStalePersistedFilterRestore: true,
+    });
   });
 });

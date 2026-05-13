@@ -75,6 +75,11 @@ import {
   buildSelectionFilterClauses,
   mergeExtraFilters as mergeSelectionExtraFilters,
 } from './pivot/update/initialUpdatePlan';
+import {
+  applyDimensionFilterSelectionChange,
+  buildClearSelectedFiltersUpdate,
+  firstSelectedFilters,
+} from './pivot/filters';
 import { supersetChartDataClient } from './pivot/data/SupersetChartDataClient';
 import { normalizeFormDataExtraFilters } from './pivot/query/normalizeExtraFormData';
 import { type QuerySpec } from './pivot/query/types';
@@ -120,12 +125,6 @@ const DIMENSION_VALUES_QUERY_PREFIX = 'pivot_v3|dimension-values';
 const EMPTY_FILTER_VALUES: DataRecordValue[] = [];
 const EMPTY_SELECTED_FILTERS: Record<string, DataRecordValue[]> = {};
 const EMPTY_FACT_BATCHES: PivotFactStoreBatch[] = [];
-const hasSelectedFilters = (
-  filters: Record<string, DataRecordValue[]>,
-): boolean => Object.keys(filters).length > 0;
-const firstSelectedFilters = (
-  ...sources: Array<Record<string, DataRecordValue[]>>
-) => sources.find(hasSelectedFilters) ?? EMPTY_SELECTED_FILTERS;
 
 const { DATABASE_DATETIME } = TimeFormats;
 
@@ -2107,19 +2106,14 @@ function PivotTableChart(props: PivotTableProps) {
       values: DataRecordValue[],
     ) => {
       const dimensionKey = getStableColumnKey(dimension);
-      const nextSelected = { ...uiSelectedFilters };
-      if (values.length > 0) {
-        suppressStalePersistedFilterRestoreRef.current = false;
-        nextSelected[dimensionKey] = values;
-      } else {
-        delete nextSelected[dimensionKey];
-        if (
-          hasSelectedFilters(uiSelectedFilters) &&
-          !hasSelectedFilters(nextSelected)
-        ) {
-          suppressStalePersistedFilterRestoreRef.current = true;
-        }
-      }
+      const { selection: nextSelected, suppressStalePersistedFilterRestore } =
+        applyDimensionFilterSelectionChange({
+          selection: uiSelectedFilters,
+          dimensionKey,
+          values,
+        });
+      suppressStalePersistedFilterRestoreRef.current =
+        suppressStalePersistedFilterRestore;
       setUiSelectedFilters(nextSelected);
       applySeamlessUpdate(uiRuntimeLayout, nextSelected);
     },
@@ -2127,11 +2121,13 @@ function PivotTableChart(props: PivotTableProps) {
   );
 
   const handleClearAllFilters = useCallback(() => {
-    if (!hasSelectedFilters(uiSelectedFilters)) {
+    const update = buildClearSelectedFiltersUpdate(uiSelectedFilters);
+    if (!update) {
       return;
     }
-    suppressStalePersistedFilterRestoreRef.current = true;
-    const nextSelected: Record<string, DataRecordValue[]> = {};
+    suppressStalePersistedFilterRestoreRef.current =
+      update.suppressStalePersistedFilterRestore;
+    const nextSelected = update.selection;
     setUiSelectedFilters(nextSelected);
     applySeamlessUpdate(uiRuntimeLayout, nextSelected);
   }, [applySeamlessUpdate, uiRuntimeLayout, uiSelectedFilters]);

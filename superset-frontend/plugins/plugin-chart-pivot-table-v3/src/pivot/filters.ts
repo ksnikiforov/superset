@@ -28,6 +28,50 @@ import {
 import { DateFormatter, MetricsLayoutEnum, PivotTreeNode } from '../types';
 import { decodeMetricKey, getMetricKeys, isSubtotalToken } from '../utils';
 
+export type PivotSelectedFilters = Record<string, DataRecordValue[]>;
+
+export const hasSelectedFilters = (filters: PivotSelectedFilters): boolean =>
+  Object.keys(filters).length > 0;
+
+export const firstSelectedFilters = (
+  ...sources: PivotSelectedFilters[]
+): PivotSelectedFilters => sources.find(hasSelectedFilters) ?? {};
+
+export const applyDimensionFilterSelectionChange = ({
+  selection,
+  dimensionKey,
+  values,
+}: {
+  selection: PivotSelectedFilters;
+  dimensionKey: string;
+  values: DataRecordValue[];
+}) => {
+  const nextSelection = { ...selection };
+  if (values.length > 0) {
+    nextSelection[dimensionKey] = values;
+    return {
+      selection: nextSelection,
+      suppressStalePersistedFilterRestore: false,
+    };
+  }
+  delete nextSelection[dimensionKey];
+  return {
+    selection: nextSelection,
+    suppressStalePersistedFilterRestore:
+      hasSelectedFilters(selection) && !hasSelectedFilters(nextSelection),
+  };
+};
+
+export const buildClearSelectedFiltersUpdate = (
+  selection: PivotSelectedFilters,
+) =>
+  hasSelectedFilters(selection)
+    ? {
+        selection: {},
+        suppressStalePersistedFilterRestore: true,
+      }
+    : null;
+
 const stripMetricPath = (
   path: PivotTreeNode['path'],
   axis: 'row' | 'col',

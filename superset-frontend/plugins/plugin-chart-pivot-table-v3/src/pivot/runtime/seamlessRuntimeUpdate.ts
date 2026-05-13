@@ -24,6 +24,7 @@ import {
   type PivotTreeData,
 } from '../../types';
 import { METRICS_PLACEHOLDER, parsePath } from '../../utils';
+import { hasSelectedFilters } from '../filters';
 import { stableStringify } from '../shared/stableStringify';
 import {
   type ChartDataQueryResult,
@@ -52,9 +53,6 @@ type RuntimeSelection = Record<string, DataRecordValue[]>;
 
 const collectWarnings = (results: ChartDataQueryResult[]): ChartDataWarning[] =>
   results.flatMap(result => result.warnings ?? []);
-
-const hasSelectedFilters = (filters: RuntimeSelection): boolean =>
-  Object.keys(filters).length > 0;
 
 export type SeamlessRuntimeSyncSnapshot = {
   filtersSignature: string | null;
