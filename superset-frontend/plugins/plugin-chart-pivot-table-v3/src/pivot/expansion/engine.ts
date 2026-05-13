@@ -96,6 +96,12 @@ export type HydrationIterationPlan =
 
 const depthSorter = () => 0;
 
+const createEmptyExpansionPlan = (): PivotExpansionPlan => ({
+  fetchKeys: new Set<string>(),
+  pendingKeys: new Set<string>(),
+  hasMissingNodes: false,
+});
+
 const findMetricIndex = (
   path: PivotTreeNode['path'],
   isMetricTokenValue: (value: unknown) => boolean,
@@ -959,16 +965,6 @@ export const applyCrossAxisRootFetch = ({
   groupbyColumnsLength: number;
   countDimDepth: (path: PivotTreeNode['path']) => number;
 }): { rowPlan: PivotExpansionPlan; colPlan: PivotExpansionPlan } => {
-  const nextRowPlan = {
-    ...rowPlan,
-    fetchKeys: new Set(rowPlan.fetchKeys),
-    pendingKeys: new Set(rowPlan.pendingKeys),
-  };
-  const nextColPlan = {
-    ...colPlan,
-    fetchKeys: new Set(colPlan.fetchKeys),
-    pendingKeys: new Set(colPlan.pendingKeys),
-  };
   const hasRowNodes = Object.keys(tree.rows).some(key => key !== rootKey);
   const hasColNodes = Object.keys(tree.cols).some(key => key !== rootKey);
   const hasIntersectionCells = Object.values(tree.cells).some(cell => {
@@ -986,19 +982,33 @@ export const applyCrossAxisRootFetch = ({
     visibleColDepth > 0 &&
     !hasIntersectionCells;
   if (
-    shouldForceRootFetch &&
-    !nextRowPlan.fetchKeys.has(rootKey) &&
-    !nextColPlan.fetchKeys.has(rootKey)
+    !shouldForceRootFetch ||
+    rowPlan.fetchKeys.has(rootKey) ||
+    colPlan.fetchKeys.has(rootKey)
   ) {
-    if (groupbyRowsLength > 0) {
-      nextRowPlan.fetchKeys.add(rootKey);
-      nextRowPlan.pendingKeys.add(rootKey);
-    } else if (groupbyColumnsLength > 0) {
-      nextColPlan.fetchKeys.add(rootKey);
-      nextColPlan.pendingKeys.add(rootKey);
-    }
+    return { rowPlan, colPlan };
   }
-  return { rowPlan: nextRowPlan, colPlan: nextColPlan };
+  if (groupbyRowsLength > 0) {
+    return {
+      rowPlan: {
+        ...rowPlan,
+        fetchKeys: new Set([...rowPlan.fetchKeys, rootKey]),
+        pendingKeys: new Set([...rowPlan.pendingKeys, rootKey]),
+      },
+      colPlan,
+    };
+  }
+  if (groupbyColumnsLength > 0) {
+    return {
+      rowPlan,
+      colPlan: {
+        ...colPlan,
+        fetchKeys: new Set([...colPlan.fetchKeys, rootKey]),
+        pendingKeys: new Set([...colPlan.pendingKeys, rootKey]),
+      },
+    };
+  }
+  return { rowPlan, colPlan };
 };
 
 export const planHydrationIteration = ({
@@ -1046,11 +1056,7 @@ export const planHydrationIteration = ({
         fetchedCoverageLookup,
         shouldFetchChildren: config.shouldFetchChildren,
       })
-    : {
-        fetchKeys: new Set<string>(),
-        pendingKeys: new Set<string>(),
-        hasMissingNodes: false,
-      };
+    : createEmptyExpansionPlan();
   const colPlan = planCols
     ? planExpansionForAxis({
         axis: 'col',
@@ -1060,11 +1066,7 @@ export const planHydrationIteration = ({
         fetchedCoverageLookup,
         shouldFetchChildren: config.shouldFetchChildren,
       })
-    : {
-        fetchKeys: new Set<string>(),
-        pendingKeys: new Set<string>(),
-        hasMissingNodes: false,
-      };
+    : createEmptyExpansionPlan();
 
   let effectiveRowPlan: PivotExpansionPlan = rowPlan;
   let effectiveColPlan: PivotExpansionPlan = colPlan;
@@ -1075,11 +1077,7 @@ export const planHydrationIteration = ({
     !rowPlan.hasMissingNodes &&
     pendingRows.size === 0
   ) {
-    effectiveRowPlan = {
-      ...rowPlan,
-      fetchKeys: new Set<string>(),
-      pendingKeys: new Set<string>(),
-    };
+    effectiveRowPlan = { ...rowPlan, ...createEmptyExpansionPlan() };
   }
   if (
     activeAxis === 'row' &&
@@ -1087,11 +1085,7 @@ export const planHydrationIteration = ({
     !colPlan.hasMissingNodes &&
     pendingCols.size === 0
   ) {
-    effectiveColPlan = {
-      ...colPlan,
-      fetchKeys: new Set<string>(),
-      pendingKeys: new Set<string>(),
-    };
+    effectiveColPlan = { ...colPlan, ...createEmptyExpansionPlan() };
   }
 
   ({ rowPlan: effectiveRowPlan, colPlan: effectiveColPlan } =
