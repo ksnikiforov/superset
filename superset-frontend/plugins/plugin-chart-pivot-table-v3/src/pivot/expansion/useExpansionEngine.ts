@@ -23,6 +23,7 @@ import {
   useReducer,
   useRef,
   useState,
+  type MutableRefObject,
 } from 'react';
 import { nanoid } from 'nanoid';
 import {
@@ -94,6 +95,14 @@ import {
 
 const MAX_HYDRATION_ITERATIONS = 12;
 const EMPTY_FACT_BATCHES: PivotFactStoreBatch[] = [];
+
+const useSyncRef = <Value>(ref: MutableRefObject<Value>, value: Value) => {
+  useEffect(() => {
+    const targetRef = ref;
+    targetRef.current = value;
+  }, [ref, value]);
+};
+
 export type ExpansionEngineResult = {
   tree: PivotTreeData;
   expandedRows: Set<string>;
@@ -258,29 +267,12 @@ export const useExpansionEngine = ({
     shouldPersistExpansionState,
   ]);
 
-  useEffect(() => {
-    persistedExpansionStateRef.current = persistedExpansionState;
-  }, [persistedExpansionState]);
-
-  useEffect(() => {
-    treeRef.current = tree;
-  }, [tree]);
-
-  useEffect(() => {
-    expandedRowsRef.current = expandedRows;
-  }, [expandedRows]);
-
-  useEffect(() => {
-    expandedColsRef.current = expandedCols;
-  }, [expandedCols]);
-
-  useEffect(() => {
-    pendingRowsRef.current = pendingRows;
-  }, [pendingRows]);
-
-  useEffect(() => {
-    pendingColsRef.current = pendingCols;
-  }, [pendingCols]);
+  useSyncRef(persistedExpansionStateRef, persistedExpansionState);
+  useSyncRef(treeRef, tree);
+  useSyncRef(expandedRowsRef, expandedRows);
+  useSyncRef(expandedColsRef, expandedCols);
+  useSyncRef(pendingRowsRef, pendingRows);
+  useSyncRef(pendingColsRef, pendingCols);
 
   const updateLoadingKey = useCallback((key: string, delta: number) => {
     dispatchRuntimeState({ type: 'updateLoadingKey', key, delta });
