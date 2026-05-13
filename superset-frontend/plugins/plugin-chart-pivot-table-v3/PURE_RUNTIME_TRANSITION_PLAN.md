@@ -351,6 +351,8 @@ Recent validation:
 - `bf7c3478d5`: extracted dimension filter search/value fetching into
   `useDimensionFilterValues`; touched-file ESLint, Prettier, `git diff --check`,
   focused hook/filter-search tests (`9` tests) passed.
+- After the dimension filter checkpoint, the full pivot-table-v3 plugin Jest
+  suite passed (`90` suites, `721` tests).
 
 Minimum test coverage for future slices:
 
