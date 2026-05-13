@@ -64,7 +64,6 @@ import { usePivotFormatting } from './pivot/chart/usePivotFormatting';
 import { usePivotInteractions } from './pivot/chart/usePivotInteractions';
 import { PivotInteractionPanel } from './pivot/chart/PivotInteractionPanel';
 import {
-  factBatchesCoverRuntimeLayout,
   isSameRuntimeLayout,
   shouldFetchRuntimeLayout,
 } from './pivot/runtime/coverage';
@@ -104,6 +103,8 @@ import {
   buildSeamlessRuntimeUpstreamSignature,
   fetchAndMaterializeSeamlessRuntimeUpdate,
   matchesSeamlessRuntimeSyncSnapshot,
+  shouldRecoverStaleDashboardRuntimeCoverage,
+  shouldSyncCommittedRuntimeFromProps,
   type SeamlessRuntimeSyncSnapshot,
 } from './pivot/runtime/seamlessRuntimeUpdate';
 
@@ -1247,12 +1248,15 @@ function PivotTableChart(props: PivotTableProps) {
     upstreamDashboardQueryContextSignature !== null &&
     lastLocalSyncDashboardQueryContextRef.current ===
       upstreamDashboardQueryContextSignature;
-  const shouldSyncCommittedTreeFromProps =
-    !isUserControlled ||
-    (!hasLocalSyncForCurrentDashboardQueryContext &&
-      !hasSelectedFilters(persistedInteractionFilters) &&
-      isSameRuntimeLayout(runtimeLayout, committedRuntimeLayout) &&
-      isEqual(selectedFiltersForTreeSync, committedFilters));
+  const shouldSyncCommittedTreeFromProps = shouldSyncCommittedRuntimeFromProps({
+    isUserControlled,
+    hasLocalSyncForCurrentDashboardQueryContext,
+    persistedInteractionFilters,
+    runtimeLayout,
+    committedRuntimeLayout,
+    selectedFiltersForTreeSync,
+    committedFilters,
+  });
   useEffect(() => {
     // Ignore stale upstream updates while a local interaction update is still
     // pending.
@@ -1518,14 +1522,14 @@ function PivotTableChart(props: PivotTableProps) {
     ],
   );
 
-  const shouldRecoverStaleDashboardRuntimeCoverage =
-    isUserControlled &&
-    isDashboardRuntimeSync &&
-    !hasSelectedFilters(persistedInteractionFilters) &&
-    !factBatchesCoverRuntimeLayout(
+  const shouldRecoverStaleDashboardRuntimeCoverageValue =
+    shouldRecoverStaleDashboardRuntimeCoverage({
+      isUserControlled,
+      isDashboardRuntimeSync,
+      persistedInteractionFilters,
       committedFactBatches,
       committedRuntimeLayout,
-    );
+    });
 
   useEffect(() => {
     if (!upstreamDashboardQueryContextSignature) {
@@ -1537,7 +1541,7 @@ function PivotTableChart(props: PivotTableProps) {
       data,
       signature: upstreamDashboardQueryContextSignature,
     };
-    if (shouldRecoverStaleDashboardRuntimeCoverage) {
+    if (shouldRecoverStaleDashboardRuntimeCoverageValue) {
       applySeamlessUpdate(uiRuntimeLayout, uiSelectedFilters);
       return;
     }
@@ -1556,7 +1560,7 @@ function PivotTableChart(props: PivotTableProps) {
     data,
     uiRuntimeLayout,
     uiSelectedFilters,
-    shouldRecoverStaleDashboardRuntimeCoverage,
+    shouldRecoverStaleDashboardRuntimeCoverageValue,
     upstreamDashboardQueryContextSignature,
   ]);
 

@@ -18,10 +18,14 @@
  */
 
 import { type PivotRuntimeLayout } from '../../../../src/types';
+import { buildFactCoverage } from '../../../../src/pivot/runtime/coverage';
+import { type PivotFactStoreBatch } from '../../../../src/pivot/runtime/factStore';
 import {
   buildSeamlessRuntimeSyncSnapshot,
   buildSeamlessRuntimeUpstreamSignature,
   matchesSeamlessRuntimeSyncSnapshot,
+  shouldRecoverStaleDashboardRuntimeCoverage,
+  shouldSyncCommittedRuntimeFromProps,
 } from '../../../../src/pivot/runtime/seamlessRuntimeUpdate';
 
 const runtimeLayout: PivotRuntimeLayout = {
@@ -115,4 +119,89 @@ test('builds stable upstream dashboard query-context signatures', () => {
   ).toBe(
     '{"adhoc_filters":[{"col":"country","op":"==","val":"France"}],"extra_form_data":{"filters":[{"col":"region","op":"IN","val":["EU"]}]},"extras":{"time_grain_sqla":"P1D"},"granularity_sqla":"ds","time_grain_sqla":null,"time_offsets":["1 year ago"],"time_range":"No filter"}',
   );
+});
+
+test('decides when committed runtime should sync from upstream props', () => {
+  expect(
+    shouldSyncCommittedRuntimeFromProps({
+      isUserControlled: false,
+      hasLocalSyncForCurrentDashboardQueryContext: true,
+      persistedInteractionFilters: { country: ['France'] },
+      runtimeLayout: { ...runtimeLayout, rows: ['state'] },
+      committedRuntimeLayout: runtimeLayout,
+      selectedFiltersForTreeSync: { country: ['Germany'] },
+      committedFilters: { country: ['France'] },
+    }),
+  ).toBe(true);
+
+  expect(
+    shouldSyncCommittedRuntimeFromProps({
+      isUserControlled: true,
+      hasLocalSyncForCurrentDashboardQueryContext: false,
+      persistedInteractionFilters: {},
+      runtimeLayout,
+      committedRuntimeLayout: runtimeLayout,
+      selectedFiltersForTreeSync: { country: ['France'] },
+      committedFilters: { country: ['France'] },
+    }),
+  ).toBe(true);
+
+  expect(
+    shouldSyncCommittedRuntimeFromProps({
+      isUserControlled: true,
+      hasLocalSyncForCurrentDashboardQueryContext: true,
+      persistedInteractionFilters: {},
+      runtimeLayout,
+      committedRuntimeLayout: runtimeLayout,
+      selectedFiltersForTreeSync: {},
+      committedFilters: {},
+    }),
+  ).toBe(false);
+});
+
+test('decides when dashboard runtime coverage needs stale recovery', () => {
+  const factBatch = (
+    rowDepth: number,
+    columnDepth: number,
+  ): PivotFactStoreBatch => ({
+    coverage: buildFactCoverage({
+      reason: 'initial',
+      rowDimensions: ['country'].slice(0, rowDepth),
+      columnDimensions: ['month'].slice(0, columnDepth),
+      rowDepth,
+      columnDepth,
+    }),
+    facts: [],
+    scope: { kind: 'bootstrap' },
+  });
+
+  expect(
+    shouldRecoverStaleDashboardRuntimeCoverage({
+      isUserControlled: true,
+      isDashboardRuntimeSync: true,
+      persistedInteractionFilters: {},
+      committedFactBatches: [factBatch(1, 0)],
+      committedRuntimeLayout: runtimeLayout,
+    }),
+  ).toBe(true);
+
+  expect(
+    shouldRecoverStaleDashboardRuntimeCoverage({
+      isUserControlled: true,
+      isDashboardRuntimeSync: true,
+      persistedInteractionFilters: {},
+      committedFactBatches: [factBatch(1, 1)],
+      committedRuntimeLayout: runtimeLayout,
+    }),
+  ).toBe(false);
+
+  expect(
+    shouldRecoverStaleDashboardRuntimeCoverage({
+      isUserControlled: true,
+      isDashboardRuntimeSync: true,
+      persistedInteractionFilters: { country: ['France'] },
+      committedFactBatches: [factBatch(1, 0)],
+      committedRuntimeLayout: runtimeLayout,
+    }),
+  ).toBe(false);
 });

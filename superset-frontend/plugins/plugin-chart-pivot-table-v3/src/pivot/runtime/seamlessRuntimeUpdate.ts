@@ -17,6 +17,7 @@
  * under the License.
  */
 import { type DataRecordValue } from '@superset-ui/core';
+import { isEqual } from 'lodash';
 import {
   type PivotRuntimeLayout,
   type PivotTableQueryFormData,
@@ -36,6 +37,7 @@ import {
   type PivotFactStoreBatch,
 } from './ingestQueryResults';
 import { insertValuesPlaceholder } from './compilePivotProgram';
+import { factBatchesCoverRuntimeLayout, isSameRuntimeLayout } from './coverage';
 import {
   executeLatestRequest,
   executeScheduledLatestRequest,
@@ -46,8 +48,13 @@ import {
 export const SEAMLESS_REQUEST_GROUP = 'pivot-v3-seamless';
 export const SEAMLESS_MATERIALIZATION_GROUP = 'pivot-v3-seamless-materialize';
 
+type RuntimeSelection = Record<string, DataRecordValue[]>;
+
 const collectWarnings = (results: ChartDataQueryResult[]): ChartDataWarning[] =>
   results.flatMap(result => result.warnings ?? []);
+
+const hasSelectedFilters = (filters: RuntimeSelection): boolean =>
+  Object.keys(filters).length > 0;
 
 export type SeamlessRuntimeSyncSnapshot = {
   filtersSignature: string | null;
@@ -61,11 +68,12 @@ export const buildSeamlessRuntimeSyncSnapshot = ({
   upstreamSignature,
 }: {
   runtimeLayout: PivotRuntimeLayout;
-  selection: Record<string, DataRecordValue[]>;
+  selection: RuntimeSelection;
   upstreamSignature: string;
 }): SeamlessRuntimeSyncSnapshot => ({
-  filtersSignature:
-    Object.keys(selection).length > 0 ? stableStringify(selection) : null,
+  filtersSignature: hasSelectedFilters(selection)
+    ? stableStringify(selection)
+    : null,
   layoutSignature: stableStringify(runtimeLayout),
   upstreamSignature,
 });
@@ -96,6 +104,47 @@ export const buildSeamlessRuntimeUpstreamSignature = (
   });
 };
 
+export const shouldSyncCommittedRuntimeFromProps = ({
+  isUserControlled,
+  hasLocalSyncForCurrentDashboardQueryContext,
+  persistedInteractionFilters,
+  runtimeLayout,
+  committedRuntimeLayout,
+  selectedFiltersForTreeSync,
+  committedFilters,
+}: {
+  isUserControlled: boolean;
+  hasLocalSyncForCurrentDashboardQueryContext: boolean;
+  persistedInteractionFilters: RuntimeSelection;
+  runtimeLayout: PivotRuntimeLayout;
+  committedRuntimeLayout: PivotRuntimeLayout;
+  selectedFiltersForTreeSync: RuntimeSelection;
+  committedFilters: RuntimeSelection;
+}) =>
+  !isUserControlled ||
+  (!hasLocalSyncForCurrentDashboardQueryContext &&
+    !hasSelectedFilters(persistedInteractionFilters) &&
+    isSameRuntimeLayout(runtimeLayout, committedRuntimeLayout) &&
+    isEqual(selectedFiltersForTreeSync, committedFilters));
+
+export const shouldRecoverStaleDashboardRuntimeCoverage = ({
+  isUserControlled,
+  isDashboardRuntimeSync,
+  persistedInteractionFilters,
+  committedFactBatches,
+  committedRuntimeLayout,
+}: {
+  isUserControlled: boolean;
+  isDashboardRuntimeSync: boolean;
+  persistedInteractionFilters: RuntimeSelection;
+  committedFactBatches: PivotFactStoreBatch[];
+  committedRuntimeLayout: PivotRuntimeLayout;
+}) =>
+  isUserControlled &&
+  isDashboardRuntimeSync &&
+  !hasSelectedFilters(persistedInteractionFilters) &&
+  !factBatchesCoverRuntimeLayout(committedFactBatches, committedRuntimeLayout);
+
 export type SeamlessRuntimeUpdateResult =
   | {
       status: 'success';
@@ -115,7 +164,7 @@ type SeamlessRuntimeUpdatePlanConfig = {
   baseFormData: PivotTableQueryFormData;
   sourceFormData: PivotTableQueryFormData;
   runtimeLayout: PivotRuntimeLayout;
-  selection: Record<string, DataRecordValue[]>;
+  selection: RuntimeSelection;
   expandedRows?: Set<string>;
   expandedCols?: Set<string>;
   pendingRows?: Set<string>;
