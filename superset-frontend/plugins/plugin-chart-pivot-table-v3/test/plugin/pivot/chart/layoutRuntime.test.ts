@@ -18,7 +18,11 @@
  */
 import { type QueryFormColumn } from '@superset-ui/core';
 import { MetricsLayoutEnum, type PivotTreeNode } from '../../../../src/types';
-import { resolveMetricAxisLayoutPolicy } from '../../../../src/pivot/chart/layoutRuntime';
+import {
+  resolveAxisChildrenBeforeSubtotalPolicy,
+  resolveMetricAxisLayoutPolicy,
+} from '../../../../src/pivot/chart/layoutRuntime';
+import { type PivotProgram } from '../../../../src/pivot/runtime/types';
 import {
   encodeMetricKey,
   METRICS_PLACEHOLDER,
@@ -56,6 +60,18 @@ const baseParams = {
   rowSubTotals: false,
   resolvedRowSubtotalPosition: 'start' as const,
   resolvedColSubtotalPosition: 'start' as const,
+};
+
+const baseProgram: PivotProgram = {
+  rows: [],
+  columns: [],
+  rowDimensions: [],
+  columnDimensions: [],
+  metrics: [],
+  metricKeys: ['sales'],
+  metricsLayoutResolved: MetricsLayoutEnum.ROWS,
+  valueAxis: 'row',
+  metricInsertIndex: 0,
 };
 
 describe('pivot/chart/layoutRuntime', () => {
@@ -131,5 +147,62 @@ describe('pivot/chart/layoutRuntime', () => {
 
     expect(withoutLeafTier.hideMetricHeaderOnRows).toBe(true);
     expect(withLeafTier.hideMetricHeaderOnRows).toBe(false);
+  });
+
+  it('filters hidden metric-header children before subtotal placement', () => {
+    const parent = node('row', ['West']);
+    const dimensionChild = node('row', ['West', 'CA']);
+    const metricChild = node('row', ['West', encodeMetricKey('sales')]);
+    const nodes = {
+      [parent.key]: parent,
+      [dimensionChild.key]: dimensionChild,
+      [metricChild.key]: metricChild,
+    };
+
+    expect(
+      resolveAxisChildrenBeforeSubtotalPolicy({
+        program: baseProgram,
+        resolvedMetricsLayout: MetricsLayoutEnum.ROWS,
+        axis: 'row',
+        parent,
+        nodes,
+        groupbyLength: 1,
+        hideMetricHeader: true,
+        metricsFirst: false,
+        isMetricTokenValue: baseParams.isMetricTokenValue,
+        isMetricGrandTotalNode: () => false,
+        keepValuesChild: () => true,
+      }),
+    ).toEqual([dimensionChild]);
+  });
+
+  it('removes metric grand totals from metric-first child lists', () => {
+    const parent = node('row', []);
+    const dimensionChild = node('row', ['West']);
+    const metricTotal = {
+      ...node('row', [encodeMetricKey('sales')]),
+      isSubtotal: true,
+    };
+    const nodes = {
+      [parent.key]: parent,
+      [dimensionChild.key]: dimensionChild,
+      [metricTotal.key]: metricTotal,
+    };
+
+    expect(
+      resolveAxisChildrenBeforeSubtotalPolicy({
+        program: baseProgram,
+        resolvedMetricsLayout: MetricsLayoutEnum.ROWS,
+        axis: 'row',
+        parent,
+        nodes,
+        groupbyLength: 0,
+        hideMetricHeader: false,
+        metricsFirst: true,
+        isMetricTokenValue: baseParams.isMetricTokenValue,
+        isMetricGrandTotalNode: child => child?.isSubtotal === true,
+        keepValuesChild: () => true,
+      }),
+    ).toEqual([dimensionChild]);
   });
 });

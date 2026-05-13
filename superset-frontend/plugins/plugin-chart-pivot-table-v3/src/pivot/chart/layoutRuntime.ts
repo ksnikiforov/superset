@@ -18,15 +18,23 @@
  */
 import {
   MetricsLayoutEnum,
+  type PivotAxis,
   type PivotTableProps,
   type PivotTreeData,
+  type PivotTreeNode,
   type TotalPosition,
 } from '../../types';
-import { isMetricsPlaceholder } from '../../utils';
+import { isMetricsPlaceholder, isSubtotalToken } from '../../utils';
 import {
   getMetricIndexFromNodes,
   getNonMetricPathParts,
 } from '../metricsTotals';
+import {
+  resolveAxisChildProjection,
+  resolveAxisProjection,
+} from '../runtime/projection';
+import { type PivotProgram } from '../runtime/types';
+import { findChildren } from '../viewModel';
 
 type ResolveMetricAxisLayoutParams = {
   rows: PivotTreeData['rows'];
@@ -231,4 +239,97 @@ export const resolveMetricAxisLayoutPolicy = ({
     hideMetricHeaderOnRows,
     hideMetricHeaderOnCols,
   };
+};
+
+type ResolveAxisChildrenBeforeSubtotalPolicyParams = {
+  program: PivotProgram;
+  resolvedMetricsLayout: MetricsLayoutEnum;
+  axis: PivotAxis;
+  parent: PivotTreeNode;
+  nodes: Record<string, PivotTreeNode>;
+  metricIndex?: number;
+  metricLayoutIndex?: number;
+  groupbyLength: number;
+  hideMetricHeader: boolean;
+  metricsFirst: boolean;
+  isMetricTokenValue: (value: unknown) => boolean;
+  isMetricGrandTotalNode: (node?: PivotTreeNode) => boolean;
+  keepValuesChild: (
+    child: PivotTreeNode,
+    hasNonValuesChildren: boolean,
+  ) => boolean;
+};
+
+export const resolveAxisChildrenBeforeSubtotalPolicy = ({
+  program,
+  resolvedMetricsLayout,
+  axis,
+  parent,
+  nodes,
+  metricIndex,
+  metricLayoutIndex,
+  groupbyLength,
+  hideMetricHeader,
+  metricsFirst,
+  isMetricTokenValue,
+  isMetricGrandTotalNode,
+  keepValuesChild,
+}: ResolveAxisChildrenBeforeSubtotalPolicyParams): PivotTreeNode[] => {
+  const children = findChildren(nodes, parent);
+  const getChildProjection = (child: PivotTreeNode) =>
+    resolveAxisChildProjection({
+      program,
+      axis,
+      parentPath: parent.path,
+      childPath: child.path,
+    });
+  const { valuesLevelSeen } = resolveAxisProjection({
+    program,
+    axis,
+    path: parent.path.filter(val => !isSubtotalToken(val)),
+  });
+  let filtered =
+    valuesLevelSeen || metricIndex === undefined
+      ? children
+      : children.filter(
+          child =>
+            child.path.length <= metricIndex ||
+            getChildProjection(child).rawValuesTokenIndex === metricIndex,
+        );
+  const expectedMetricsLayout =
+    axis === 'row' ? MetricsLayoutEnum.ROWS : MetricsLayoutEnum.COLUMNS;
+  if (
+    resolvedMetricsLayout === expectedMetricsLayout &&
+    parent.axis === axis &&
+    parent.level < groupbyLength &&
+    (metricLayoutIndex === undefined || metricLayoutIndex > parent.level)
+  ) {
+    const projected = children.map(child => ({
+      child,
+      introducesValues: getChildProjection(child).introducesValues,
+    }));
+    const hasNonValuesChildren = projected.some(
+      child => !child.introducesValues,
+    );
+    const withoutMetrics = projected
+      .filter(
+        ({ child, introducesValues }) =>
+          !introducesValues || keepValuesChild(child, hasNonValuesChildren),
+      )
+      .map(({ child }) => child);
+    filtered = withoutMetrics.length > 0 ? withoutMetrics : children;
+  }
+  if (
+    hideMetricHeader &&
+    parent.axis === axis &&
+    parent.level >= groupbyLength
+  ) {
+    filtered = filtered.filter(
+      child => !isMetricTokenValue(child.path[parent.level]),
+    );
+  }
+  if (metricsFirst) {
+    filtered = filtered.filter(child => !isMetricGrandTotalNode(child));
+  }
+  return filtered;
 };

@@ -46,13 +46,12 @@ import {
   isMetricGrandTotalNode as isMetricGrandTotalNodeBase,
   isMetricSubtotalNode as isMetricSubtotalNodeBase,
 } from '../metricsTotals';
-import {
-  resolveAxisChildProjection,
-  resolveAxisProjection,
-  resolveCollapsedValuesProjection,
-} from '../runtime/projection';
+import { resolveCollapsedValuesProjection } from '../runtime/projection';
 import { pruneStaleCollapsedAxis } from './pruneCollapsedAxis';
-import { resolveMetricAxisLayoutPolicy } from './layoutRuntime';
+import {
+  resolveAxisChildrenBeforeSubtotalPolicy,
+  resolveMetricAxisLayoutPolicy,
+} from './layoutRuntime';
 
 export type PivotLayoutResult = {
   layout: ReturnType<typeof buildLayoutContext>;
@@ -509,17 +508,7 @@ export const usePivotLayout = ({
   );
 
   const getAxisChildrenBeforeSubtotalPolicy = useCallback(
-    ({
-      axis,
-      parent,
-      nodes,
-      metricIndex,
-      metricLayoutIndex,
-      groupbyLength,
-      hideMetricHeader,
-      metricsFirst,
-      keepValuesChild,
-    }: {
+    (params: {
       axis: 'row' | 'col';
       parent: PivotTreeNode;
       nodes: Record<string, PivotTreeNode>;
@@ -532,65 +521,14 @@ export const usePivotLayout = ({
         child: PivotTreeNode,
         hasNonValuesChildren: boolean,
       ) => boolean;
-    }) => {
-      const children = findChildren(nodes, parent);
-      const getChildProjection = (child: PivotTreeNode) =>
-        resolveAxisChildProjection({
-          program: layout.pivotProgram,
-          axis,
-          parentPath: parent.path,
-          childPath: child.path,
-        });
-      const { valuesLevelSeen } = resolveAxisProjection({
+    }) =>
+      resolveAxisChildrenBeforeSubtotalPolicy({
+        ...params,
         program: layout.pivotProgram,
-        axis,
-        path: parent.path.filter(val => !isSubtotalToken(val)),
-      });
-      let filtered =
-        valuesLevelSeen || metricIndex === undefined
-          ? children
-          : children.filter(
-              child =>
-                child.path.length <= metricIndex ||
-                getChildProjection(child).rawValuesTokenIndex === metricIndex,
-            );
-      const expectedMetricsLayout =
-        axis === 'row' ? MetricsLayoutEnum.ROWS : MetricsLayoutEnum.COLUMNS;
-      if (
-        resolvedMetricsLayout === expectedMetricsLayout &&
-        parent.axis === axis &&
-        parent.level < groupbyLength &&
-        (metricLayoutIndex === undefined || metricLayoutIndex > parent.level)
-      ) {
-        const projected = children.map(child => ({
-          child,
-          introducesValues: getChildProjection(child).introducesValues,
-        }));
-        const hasNonValuesChildren = projected.some(
-          child => !child.introducesValues,
-        );
-        const withoutMetrics = projected
-          .filter(
-            ({ child, introducesValues }) =>
-              !introducesValues || keepValuesChild(child, hasNonValuesChildren),
-          )
-          .map(({ child }) => child);
-        filtered = withoutMetrics.length > 0 ? withoutMetrics : children;
-      }
-      if (
-        hideMetricHeader &&
-        parent.axis === axis &&
-        parent.level >= groupbyLength
-      ) {
-        filtered = filtered.filter(
-          child => !isMetricTokenValue(child.path[parent.level]),
-        );
-      }
-      if (metricsFirst) {
-        filtered = filtered.filter(child => !isMetricGrandTotalNode(child));
-      }
-      return filtered;
-    },
+        resolvedMetricsLayout,
+        isMetricTokenValue,
+        isMetricGrandTotalNode,
+      }),
     [
       isMetricGrandTotalNode,
       isMetricTokenValue,
