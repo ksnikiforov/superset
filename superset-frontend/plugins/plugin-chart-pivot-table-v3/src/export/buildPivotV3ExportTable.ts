@@ -309,6 +309,10 @@ const pivotV3ExportSheetDataRegistry = new WeakMap<
   HTMLTableElement,
   PivotV3ExportSheetCell[][]
 >();
+const pivotV3ExportSheetDataByChartId = new Map<
+  string | number,
+  PivotV3ExportSheetCell[][]
+>();
 
 export const registerPivotV3ExportSheetData = (
   table: HTMLTableElement,
@@ -325,3 +329,21 @@ export const buildPivotV3ExportSheetData = (
   table: HTMLTableElement,
 ): PivotV3ExportSheetCell[][] | undefined =>
   pivotV3ExportSheetDataRegistry.get(table);
+
+export const registerPivotV3ExportSheetDataForChart = (
+  chartId: string | number,
+  sheetData: PivotV3ExportSheetCell[][],
+) => {
+  pivotV3ExportSheetDataByChartId.set(chartId, sheetData);
+};
+
+export const unregisterPivotV3ExportSheetDataForChart = (
+  chartId: string | number,
+) => {
+  pivotV3ExportSheetDataByChartId.delete(chartId);
+};
+
+export const getPivotV3ExportSheetDataForChart = (
+  chartId: string | number,
+): PivotV3ExportSheetCell[][] | undefined =>
+  pivotV3ExportSheetDataByChartId.get(chartId);

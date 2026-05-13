@@ -21,18 +21,22 @@ import { render, screen, userEvent } from 'spec/helpers/testing-library';
 import { FeatureFlag, VizType } from '@superset-ui/core';
 import mockState from 'spec/fixtures/mockState';
 import { cachedSupersetGet } from 'src/utils/cachedSupersetGet';
-import exportPivotV3Excel from 'src/utils/exportPivotV3Excel';
+import { exportPivotV3ExcelForChart } from 'src/utils/exportPivotV3Excel';
 import SliceHeaderControls, { SliceHeaderControlsProps } from '.';
 
 jest.mock('src/utils/cachedSupersetGet');
-jest.mock('src/utils/exportPivotV3Excel', () => jest.fn());
+jest.mock('src/utils/exportPivotV3Excel', () => ({
+  __esModule: true,
+  exportPivotV3ExcelForChart: jest.fn(),
+}));
 
 const mockCachedSupersetGet = cachedSupersetGet as jest.MockedFunction<
   typeof cachedSupersetGet
 >;
-const mockExportPivotV3Excel = exportPivotV3Excel as jest.MockedFunction<
-  typeof exportPivotV3Excel
->;
+const mockExportPivotV3ExcelForChart =
+  exportPivotV3ExcelForChart as jest.MockedFunction<
+    typeof exportPivotV3ExcelForChart
+  >;
 const SLICE_ID = 371;
 
 const createProps = (viz_type = VizType.Sunburst) =>
@@ -129,7 +133,7 @@ const openMenu = () => {
 
 beforeEach(() => {
   mockCachedSupersetGet.mockClear();
-  mockExportPivotV3Excel.mockClear();
+  mockExportPivotV3ExcelForChart.mockClear();
   mockCachedSupersetGet.mockResolvedValue({
     response: {} as Response,
     json: {
@@ -310,9 +314,9 @@ test('Pivot Table v3 keeps CSV option and exports as-is Excel', async () => {
 
   userEvent.click(screen.getByText('Export to Excel'));
   expect(props.exportPivotExcel).toHaveBeenCalledTimes(0);
-  expect(mockExportPivotV3Excel).toHaveBeenCalledTimes(1);
-  expect(mockExportPivotV3Excel).toHaveBeenCalledWith(
-    '#chart-id-371 .pivot-v3-table',
+  expect(mockExportPivotV3ExcelForChart).toHaveBeenCalledTimes(1);
+  expect(mockExportPivotV3ExcelForChart).toHaveBeenCalledWith(
+    371,
     props.slice.slice_name,
   );
   expect(props.exportXLSX).toHaveBeenCalledTimes(0);

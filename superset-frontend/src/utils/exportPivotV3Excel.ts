@@ -20,6 +20,7 @@
 import { utils, writeFile, type CellObject } from 'xlsx';
 import {
   buildPivotV3ExportSheetData,
+  getPivotV3ExportSheetDataForChart,
   type PivotV3ExportSheetCell,
 } from '../../plugins/plugin-chart-pivot-table-v3/src/export/buildPivotV3ExportTable';
 
@@ -44,6 +45,17 @@ export function exportPivotV3ExcelFromSheetData(
   );
   const workbook = utils.book_new(worksheet, 'Sheet1');
   writeFile(workbook, `${fileName}.xlsx`);
+}
+
+export function exportPivotV3ExcelForChart(
+  chartId: string | number,
+  fileName: string,
+) {
+  const sheetData = getPivotV3ExportSheetDataForChart(chartId);
+  if (!sheetData) {
+    return;
+  }
+  exportPivotV3ExcelFromSheetData(sheetData, fileName);
 }
 
 export default function exportPivotV3Excel(

@@ -1228,6 +1228,11 @@ function PivotTableChart(props: PivotTableProps) {
   };
   displaySnapshotRef.current = liveDisplaySnapshot;
   const activeDisplaySnapshot = pendingDisplaySnapshot ?? liveDisplaySnapshot;
+  const exportChartId =
+    typeof formData.slice_id === 'number' ||
+    typeof formData.slice_id === 'string'
+      ? formData.slice_id
+      : undefined;
   const sharedPivotViewProps: Omit<PivotViewProps, 'height' | 'width'> = {
     renderModel: activeDisplaySnapshot.renderModel,
     tree: activeDisplaySnapshot.tree,
@@ -1260,6 +1265,7 @@ function PivotTableChart(props: PivotTableProps) {
     handleCellKeyDown: interactions.handleCellKeyDown,
     handleCellContextMenu: interactions.handleCellContextMenu,
     rowAxisLabels,
+    exportChartId,
   };
   const hasMetrics = metricKeys.length > 0;
   const rowChips = useMemo(

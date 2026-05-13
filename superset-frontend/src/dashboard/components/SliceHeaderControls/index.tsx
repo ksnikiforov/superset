@@ -61,7 +61,7 @@ import DrillDetailModal from 'src/components/Chart/DrillDetail/DrillDetailModal'
 import { usePermissions } from 'src/hooks/usePermissions';
 import { useDatasetDrillInfo } from 'src/hooks/apiResources/datasets';
 import { ResourceStatus } from 'src/hooks/apiResources/apiResources';
-import exportPivotV3Excel from 'src/utils/exportPivotV3Excel';
+import { exportPivotV3ExcelForChart } from 'src/utils/exportPivotV3Excel';
 import { useCrossFiltersScopingModal } from '../nativeFilters/FilterBar/CrossFilters/ScopingModal/useCrossFiltersScopingModal';
 import { ViewResultsModalTrigger } from './ViewResultsModalTrigger';
 
@@ -275,8 +275,8 @@ const SliceHeaderControls = (
       case MenuKeys.ExportPivotXlsx: {
         const sliceSelector = `#chart-id-${props.slice.slice_id}`;
         if (props.slice.viz_type === VizType.PivotTableV3) {
-          exportPivotV3Excel(
-            `${sliceSelector} .pivot-v3-table`,
+          exportPivotV3ExcelForChart(
+            props.slice.slice_id,
             props.slice.slice_name,
           );
         } else {

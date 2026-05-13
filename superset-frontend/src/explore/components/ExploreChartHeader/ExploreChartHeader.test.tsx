@@ -517,7 +517,10 @@ describe('Additional actions tests', () => {
       spyDownloadAsImage = sinon.spy(downloadAsImage, 'default');
       spyExportChart = sinon.spy(exploreUtils, 'exportChart');
       spyExportPivotExcel = sinon.spy(downloadAsPivotExcel, 'default');
-      spyExportPivotV3Excel = sinon.spy(exportPivotV3Excel, 'default');
+      spyExportPivotV3Excel = sinon.spy(
+        exportPivotV3Excel,
+        'exportPivotV3ExcelForChart',
+      );
 
       (useUnsavedChangesPrompt as jest.Mock).mockReturnValue({
         showModal: false,
@@ -676,7 +679,7 @@ describe('Additional actions tests', () => {
       expect(spyExportChart.callCount).toBe(1);
     });
 
-    test('Pivot Table v3 keeps CSV option and exports as-is Excel from DOM', async () => {
+    test('Pivot Table v3 keeps CSV option and exports as-is Excel by chart id', async () => {
       const props = createProps();
       props.canDownload = true;
       props.chart.latestQueryFormData.viz_type = VizType.PivotTableV3;
@@ -700,7 +703,7 @@ describe('Additional actions tests', () => {
       expect(spyExportPivotExcel.callCount).toBe(0);
       expect(spyExportPivotV3Excel.callCount).toBe(1);
       expect(spyExportPivotV3Excel.firstCall.args).toEqual([
-        '#chart-id-318 .pivot-v3-table',
+        318,
         'Age distribution of respondents',
       ]);
       expect(spyExportChart.callCount).toBe(0);

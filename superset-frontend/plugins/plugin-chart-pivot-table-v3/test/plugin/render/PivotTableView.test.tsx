@@ -24,7 +24,10 @@ import { type RenderModel } from '../../../src/pivot/shared/types';
 import { type PivotTreeData, type PivotTreeNode } from '../../../src/types';
 import { serializePath } from '../../../src/utils';
 import { type PivotFormattingResult } from '../../../src/pivot/chart/usePivotFormatting';
-import { buildPivotV3ExportSheetData } from '../../../src/export/buildPivotV3ExportTable';
+import {
+  buildPivotV3ExportSheetData,
+  getPivotV3ExportSheetDataForChart,
+} from '../../../src/export/buildPivotV3ExportTable';
 
 const baseRenderModel: RenderModel = {
   visibleRows: [],
@@ -90,6 +93,42 @@ describe('PivotTableView', () => {
     const { container } = renderView(false);
     const table = container.querySelector('table');
     expect(table).toHaveClass('pivot-v3-table');
+  });
+
+  it('registers worksheet export data for the chart id', () => {
+    render(
+      <PivotTableView
+        height={300}
+        width={400}
+        renderModel={baseRenderModel}
+        tree={baseTree}
+        expandedRows={new Set()}
+        expandedCols={new Set()}
+        showGlobalLoader={false}
+        onRetry={jest.fn()}
+        stickyHeaders={false}
+        headerOffset={0}
+        headerRowOffsets={[]}
+        headerRef={createRef()}
+        colTotalPosition="start"
+        formatting={baseFormatting}
+        onToggleNode={jest.fn()}
+        shouldShowToggle={() => false}
+        showSpinner={() => false}
+        isRowAggregateBold={() => false}
+        isColAggregateBold={() => false}
+        getNodeDimDepth={() => 0}
+        isMetricGrandTotalNode={() => false}
+        handleCellClick={jest.fn()}
+        handleCellKeyDown={jest.fn()}
+        handleCellContextMenu={jest.fn()}
+        exportChartId={371}
+      />,
+    );
+
+    expect(getPivotV3ExportSheetDataForChart(371)).toEqual([
+      [{ value: 'Rows', type: 'string', isHeader: true }],
+    ]);
   });
 
   it('renders the rows header when not loading', () => {

@@ -18,9 +18,13 @@
  */
 import { utils, writeFile } from 'xlsx';
 import exportPivotV3Excel, {
+  exportPivotV3ExcelForChart,
   exportPivotV3ExcelFromSheetData,
 } from 'src/utils/exportPivotV3Excel';
-import { registerPivotV3ExportSheetData } from '../../../plugins/plugin-chart-pivot-table-v3/src/export/buildPivotV3ExportTable';
+import {
+  registerPivotV3ExportSheetData,
+  registerPivotV3ExportSheetDataForChart,
+} from '../../../plugins/plugin-chart-pivot-table-v3/src/export/buildPivotV3ExportTable';
 
 jest.mock('xlsx', () => ({
   utils: {
@@ -100,6 +104,25 @@ describe('exportPivotV3Excel', () => {
     expect(writeFile).toHaveBeenCalledWith(
       { workbook: true },
       'direct-export.xlsx',
+    );
+  });
+
+  it('exports worksheet data registered for a chart without reading the DOM', () => {
+    registerPivotV3ExportSheetDataForChart(371, [
+      [{ value: 'Revenue', type: 'string', isHeader: true }],
+      [{ value: 84, type: 'number', isHeader: false }],
+    ]);
+
+    exportPivotV3ExcelForChart(371, 'chart-export');
+
+    expect(utils.table_to_book).not.toHaveBeenCalled();
+    expect(utils.aoa_to_sheet).toHaveBeenCalledWith([
+      ['Revenue'],
+      [{ t: 'n', v: 84 }],
+    ]);
+    expect(writeFile).toHaveBeenCalledWith(
+      { workbook: true },
+      'chart-export.xlsx',
     );
   });
 

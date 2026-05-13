@@ -50,7 +50,9 @@ import {
   LOG_ACTIONS_CHART_DOWNLOAD_AS_XLS,
 } from 'src/logger/LogUtils';
 import exportPivotExcel from 'src/utils/downloadAsPivotExcel';
-import exportPivotV3Excel from 'src/utils/exportPivotV3Excel';
+import exportPivotV3Excel, {
+  exportPivotV3ExcelForChart,
+} from 'src/utils/exportPivotV3Excel';
 import ViewQueryModal from '../controls/ViewQueryModal';
 import EmbedCodeContent from '../EmbedCodeContent';
 import { useDashboardsMenuItems } from './DashboardsSubMenu';
@@ -380,13 +382,12 @@ export const useExploreAdditionalActionsMenu = (
           icon: <Icons.FileOutlined />,
           disabled: !canDownloadCSV,
           onClick: () => {
-            const tableSelector = slice?.slice_id
-              ? `#chart-id-${slice.slice_id} .pivot-v3-table`
-              : '.pivot-v3-table';
-            exportPivotV3Excel(
-              tableSelector,
-              slice?.slice_name ?? t('pivoted_xlsx'),
-            );
+            const fileName = slice?.slice_name ?? t('pivoted_xlsx');
+            if (slice?.slice_id) {
+              exportPivotV3ExcelForChart(slice.slice_id, fileName);
+            } else {
+              exportPivotV3Excel('.pivot-v3-table', fileName);
+            }
             setIsDropdownVisible(false);
             dispatch(
               logEvent(LOG_ACTIONS_CHART_DOWNLOAD_AS_XLS, {

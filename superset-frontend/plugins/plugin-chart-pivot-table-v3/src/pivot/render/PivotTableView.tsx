@@ -46,7 +46,9 @@ import {
   buildPivotV3ExportSheetModel,
   buildPivotV3RowExportModel,
   registerPivotV3ExportSheetData,
+  registerPivotV3ExportSheetDataForChart,
   unregisterPivotV3ExportSheetData,
+  unregisterPivotV3ExportSheetDataForChart,
 } from '../../export/buildPivotV3ExportTable';
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import { rootKey } from '../viewModel';
@@ -323,6 +325,7 @@ type PivotTableViewProps = {
     colNode: PivotTreeNode,
   ) => void;
   rowAxisLabels?: string[];
+  exportChartId?: string | number;
 };
 
 export const PivotTableView = ({
@@ -357,6 +360,7 @@ export const PivotTableView = ({
   handleCellKeyDown,
   handleCellContextMenu,
   rowAxisLabels = [],
+  exportChartId,
 }: PivotTableViewProps) => {
   const { visibleRows, visibleCols, columnHeaderRows, showRowRoot } =
     renderModel;
@@ -545,8 +549,16 @@ export const PivotTableView = ({
       return undefined;
     }
     registerPivotV3ExportSheetData(table, exportSheetData);
-    return () => unregisterPivotV3ExportSheetData(table);
-  }, [exportSheetData]);
+    if (exportChartId !== undefined) {
+      registerPivotV3ExportSheetDataForChart(exportChartId, exportSheetData);
+    }
+    return () => {
+      unregisterPivotV3ExportSheetData(table);
+      if (exportChartId !== undefined) {
+        unregisterPivotV3ExportSheetDataForChart(exportChartId);
+      }
+    };
+  }, [exportChartId, exportSheetData]);
   const renderCornerHeader = (rowSpan?: number) => (
     <th
       rowSpan={rowSpan}
