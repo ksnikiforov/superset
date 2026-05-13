@@ -145,6 +145,36 @@ export const shouldRecoverStaleDashboardRuntimeCoverage = ({
   !hasSelectedFilters(persistedInteractionFilters) &&
   !factBatchesCoverRuntimeLayout(committedFactBatches, committedRuntimeLayout);
 
+export const shouldApplyPersistedFilterSeamlessUpdate = ({
+  isUserControlled,
+  persistedInteractionFilters,
+  committedFilters,
+  uiSelectedFilters,
+  lastSync,
+  uiRuntimeLayout,
+  upstreamSignature,
+}: {
+  isUserControlled: boolean;
+  persistedInteractionFilters: RuntimeSelection;
+  committedFilters: RuntimeSelection;
+  uiSelectedFilters: RuntimeSelection;
+  lastSync: SeamlessRuntimeSyncSnapshot | null;
+  uiRuntimeLayout: PivotRuntimeLayout;
+  upstreamSignature: string;
+}) =>
+  isUserControlled &&
+  hasSelectedFilters(persistedInteractionFilters) &&
+  isEqual(committedFilters, persistedInteractionFilters) &&
+  isEqual(uiSelectedFilters, persistedInteractionFilters) &&
+  !matchesSeamlessRuntimeSyncSnapshot(
+    lastSync,
+    buildSeamlessRuntimeSyncSnapshot({
+      runtimeLayout: uiRuntimeLayout,
+      selection: persistedInteractionFilters,
+      upstreamSignature,
+    }),
+  );
+
 export type SeamlessRuntimeUpdateResult =
   | {
       status: 'success';

@@ -102,7 +102,7 @@ import {
   buildSeamlessRuntimeSyncSnapshot,
   buildSeamlessRuntimeUpstreamSignature,
   fetchAndMaterializeSeamlessRuntimeUpdate,
-  matchesSeamlessRuntimeSyncSnapshot,
+  shouldApplyPersistedFilterSeamlessUpdate,
   shouldRecoverStaleDashboardRuntimeCoverage,
   shouldSyncCommittedRuntimeFromProps,
   type SeamlessRuntimeSyncSnapshot,
@@ -1565,24 +1565,16 @@ function PivotTableChart(props: PivotTableProps) {
   ]);
 
   useEffect(() => {
-    if (!isUserControlled || !hasSelectedFilters(persistedInteractionFilters)) {
-      return;
-    }
     if (
-      !isEqual(committedFilters, persistedInteractionFilters) ||
-      !isEqual(uiSelectedFilters, persistedInteractionFilters)
-    ) {
-      return;
-    }
-    if (
-      matchesSeamlessRuntimeSyncSnapshot(
-        lastSeamlessSyncRef.current,
-        buildSeamlessRuntimeSyncSnapshot({
-          runtimeLayout: uiRuntimeLayout,
-          selection: persistedInteractionFilters,
-          upstreamSignature: upstreamSeamlessSignature,
-        }),
-      )
+      !shouldApplyPersistedFilterSeamlessUpdate({
+        isUserControlled,
+        persistedInteractionFilters,
+        committedFilters,
+        uiSelectedFilters,
+        lastSync: lastSeamlessSyncRef.current,
+        uiRuntimeLayout,
+        upstreamSignature: upstreamSeamlessSignature,
+      })
     ) {
       return;
     }

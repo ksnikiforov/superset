@@ -24,6 +24,7 @@ import {
   buildSeamlessRuntimeSyncSnapshot,
   buildSeamlessRuntimeUpstreamSignature,
   matchesSeamlessRuntimeSyncSnapshot,
+  shouldApplyPersistedFilterSeamlessUpdate,
   shouldRecoverStaleDashboardRuntimeCoverage,
   shouldSyncCommittedRuntimeFromProps,
 } from '../../../../src/pivot/runtime/seamlessRuntimeUpdate';
@@ -202,6 +203,51 @@ test('decides when dashboard runtime coverage needs stale recovery', () => {
       persistedInteractionFilters: { country: ['France'] },
       committedFactBatches: [factBatch(1, 0)],
       committedRuntimeLayout: runtimeLayout,
+    }),
+  ).toBe(false);
+});
+
+test('decides when persisted filters need a seamless update', () => {
+  const persistedFilters = { country: ['France'] };
+  const lastSync = buildSeamlessRuntimeSyncSnapshot({
+    runtimeLayout,
+    selection: persistedFilters,
+    upstreamSignature: 'query-a',
+  });
+
+  expect(
+    shouldApplyPersistedFilterSeamlessUpdate({
+      isUserControlled: true,
+      persistedInteractionFilters: persistedFilters,
+      committedFilters: persistedFilters,
+      uiSelectedFilters: persistedFilters,
+      lastSync,
+      uiRuntimeLayout: runtimeLayout,
+      upstreamSignature: 'query-a',
+    }),
+  ).toBe(false);
+
+  expect(
+    shouldApplyPersistedFilterSeamlessUpdate({
+      isUserControlled: true,
+      persistedInteractionFilters: persistedFilters,
+      committedFilters: persistedFilters,
+      uiSelectedFilters: persistedFilters,
+      lastSync,
+      uiRuntimeLayout: runtimeLayout,
+      upstreamSignature: 'query-b',
+    }),
+  ).toBe(true);
+
+  expect(
+    shouldApplyPersistedFilterSeamlessUpdate({
+      isUserControlled: true,
+      persistedInteractionFilters: persistedFilters,
+      committedFilters: {},
+      uiSelectedFilters: persistedFilters,
+      lastSync: null,
+      uiRuntimeLayout: runtimeLayout,
+      upstreamSignature: 'query-a',
     }),
   ).toBe(false);
 });
