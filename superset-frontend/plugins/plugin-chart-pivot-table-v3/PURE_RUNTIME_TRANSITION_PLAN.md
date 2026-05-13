@@ -58,7 +58,7 @@ cells are projections of DB facts, not canonical data.
 ## Current Status
 
 As of May 13, 2026, after
-`11c9593425 refactor(pivot-table-v3): simplify drag dimension removal`:
+`bd8b29c520 refactor(pivot-table-v3): merge persisted selection sync effect`:
 
 - Overall transition estimate: **95%**.
 - Goal-weighted completion estimate: **95%**.
@@ -70,8 +70,8 @@ As of May 13, 2026, after
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `12110` insertions, `11672` deletions, net `+438`.
-- Current production `src` TypeScript/TSX total: `33948` lines.
+- Production `src`: `12115` insertions, `11679` deletions, net `+436`.
+- Current production `src` TypeScript/TSX total: `33946` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - Full plugin Jest pass after the column-sort extraction: `91` suites and
   `729` tests.
@@ -143,6 +143,8 @@ Source-only diff from pre-refactor baseline
   metadata: `2` suites and `32` tests.
 - Focused interaction drag/layout pass after simplifying dimension removal:
   `2` suites and `32` tests.
+- Focused chart-sync/runtime pass after merging persisted selection sync into
+  one effect: `5` suites and `76` tests.
 
 The readout remains mixed: the plugin is still modestly above the baseline line
 count, but the chart/layout hooks keep losing inline policy and the remaining
@@ -329,7 +331,7 @@ Largest relevant production files:
 - `engine.ts`: `1496` lines.
 - `PivotMetricDefinitionValue.tsx`: `1448` lines.
 - `utils.ts`: `1429` lines.
-- `PivotTableChart.tsx`: `1426` lines.
+- `PivotTableChart.tsx`: `1424` lines.
 - `materializePivotTree.ts`: `1329` lines.
 - `usePivotFormatting.tsx`: `1325` lines.
 - `useExpansionEngine.ts`: `1321` lines.
@@ -431,6 +433,10 @@ git diff --check
 
 Recent validation:
 
+- `bd8b29c520`: merged persisted selected-filter pending-settlement and state
+  sync into one chart effect; touched-file ESLint, Prettier,
+  `git diff --check`, focused filter/runtime Jest (`18` tests), and focused
+  chart-sync/runtime Jest (`76` tests) passed.
 - `11c9593425`: simplified dimension removal in the interaction layout helper
   to return the runtime layout directly; touched-file ESLint, Prettier,
   `git diff --check`, and focused interaction drag/layout Jest (`32` tests)
