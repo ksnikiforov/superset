@@ -58,7 +58,7 @@ cells are projections of DB facts, not canonical data.
 ## Current Status
 
 As of May 13, 2026, after
-`bd8b29c520 refactor(pivot-table-v3): merge persisted selection sync effect`:
+`de63dbe030 fix(pivot-table-v3): preserve numeric export typing without row axes`:
 
 - Overall transition estimate: **95%**.
 - Goal-weighted completion estimate: **95%**.
@@ -70,8 +70,8 @@ As of May 13, 2026, after
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `12115` insertions, `11679` deletions, net `+436`.
-- Current production `src` TypeScript/TSX total: `33946` lines.
+- Production `src`: `12119` insertions, `11685` deletions, net `+434`.
+- Current production `src` TypeScript/TSX total: `33944` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - Full plugin Jest pass after the column-sort extraction: `91` suites and
   `729` tests.
@@ -147,6 +147,8 @@ Source-only diff from pre-refactor baseline
   one effect: `5` suites and `76` tests.
 - Full plugin Jest pass after merging persisted selection sync into one effect:
   `94` suites and `775` tests.
+- Focused export/render/chart pass after preserving numeric export typing
+  without row-axis metadata: `3` suites and `25` tests.
 
 The readout remains mixed: the plugin is still modestly above the baseline line
 count, but the chart/layout hooks keep losing inline policy and the remaining
@@ -435,6 +437,9 @@ git diff --check
 
 Recent validation:
 
+- `de63dbe030`: preserved Excel numeric export typing when a table has no
+  row-axis export metadata; touched-file ESLint, Prettier, `git diff --check`,
+  and focused export/render/chart Jest (`25` tests) passed.
 - `bd8b29c520`: merged persisted selected-filter pending-settlement and state
   sync into one chart effect; touched-file ESLint, Prettier,
   `git diff --check`, focused filter/runtime Jest (`18` tests), and focused
