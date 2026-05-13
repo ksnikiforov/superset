@@ -707,9 +707,6 @@ export const PivotTableView = ({
               const rowDisplayDepth = isMetricGrandTotalRow
                 ? 0
                 : getNodeDimDepth(row);
-              const rowDepthForExport = isGrandTotalLike
-                ? 0
-                : Math.max(rowDisplayDepth - 1, 0);
               const rowExport = rowExportRows.get(row.key);
               const rowIndent = rowDisplayDepth * ROW_INDENT_PX;
               const isRowLoading = showSpinner(row.key);
@@ -736,10 +733,7 @@ export const PivotTableView = ({
                     className={isSubtotalHeader ? 'subtotal-cell' : undefined}
                     style={rowHeaderStyleResolved}
                   >
-                    <RowHeaderCell
-                      style={{ paddingLeft: rowIndent }}
-                      data-pivot-row-depth={rowDepthForExport}
-                    >
+                    <RowHeaderCell style={{ paddingLeft: rowIndent }}>
                       <RowToggleSlot className="pivot-row-toggle-slot">
                         {showToggle ? (
                           <ToggleButton
