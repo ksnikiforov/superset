@@ -47,6 +47,7 @@ import {
   resolveAxisChildrenBeforeSubtotalPolicy,
   resolveCollapsedValuesNodesForAxis,
   resolveMetricAxisLayoutPolicy,
+  resolveRowSubtotalChildrenPolicy,
 } from './layoutRuntime';
 
 export type PivotLayoutResult = {
@@ -638,7 +639,7 @@ export const usePivotLayout = ({
       metricIndexOverride?: number,
     ) => {
       const rowSubtotalPositionForParent = getRowSubtotalPosition(parent);
-      let filtered = getAxisChildrenBeforeSubtotalPolicy({
+      const filtered = getAxisChildrenBeforeSubtotalPolicy({
         axis: 'row',
         parent,
         nodes,
@@ -660,74 +661,21 @@ export const usePivotLayout = ({
           );
         },
       });
-      if (resolvedMetricsLayout === MetricsLayoutEnum.ROWS && !isMultiMetric) {
-        filtered = filtered.filter(child => !isMetricGrandTotalNode(child));
-      }
-      if (!rowSubTotals || rowSubtotalPositionForParent === 'start') {
-        filtered = filtered.filter(
-          child =>
-            child.path.length === 0 ||
-            !isExplicitSubtotalNode(child) ||
-            isMetricGrandTotalNode(child),
-        );
-      }
-      if (rowSubTotals && rowSubtotalPositionForParent === 'end') {
-        const requireMetricLabel =
-          resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
-          isMultiMetric &&
-          metricLayoutIndexOnRows !== undefined &&
-          countDimDepth(parent.path) > metricLayoutIndexOnRows;
-        const subtotalDescendants = Object.values(nodes).filter(node => {
-          if (
-            node.path.length <= parent.path.length ||
-            !parent.path.every((val, idx) => val === node.path[idx])
-          ) {
-            return false;
-          }
-          if (
-            (resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
-              !isMultiMetric &&
-              isMetricGrandTotalNode(node)) ||
-            !isSubtotalToken(node.path[parent.path.length])
-          ) {
-            return false;
-          }
-          const hasMetricToken = node.path.some(val => isMetricTokenValue(val));
-          return hideMetricHeaderOnRows
-            ? !hasMetricToken
-            : !requireMetricLabel || hasMetricToken;
-        });
-        const seen = new Set(filtered.map(child => child.key));
-        subtotalDescendants.forEach(node => {
-          const subtotalIndex = node.path.findIndex(val =>
-            isSubtotalToken(val),
-          );
-          if (
-            !(
-              resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
-              isMultiMetric &&
-              subtotalIndex > 0 &&
-              isMetricTokenValue(node.path[subtotalIndex - 1])
-            ) &&
-            !seen.has(node.key)
-          ) {
-            filtered.push(node);
-          }
-        });
-      }
-      if (
-        rowSubTotals &&
-        resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
-        isMultiMetric
-      ) {
-        filtered = filtered.filter(
-          child =>
-            !isExplicitSubtotalNode(child) ||
-            isMetricGrandTotalNode(child) ||
-            child.path.some(val => isMetricTokenValue(val)),
-        );
-      }
-      return filtered;
+      return resolveRowSubtotalChildrenPolicy({
+        children: filtered,
+        parent,
+        nodes,
+        rowSubTotals,
+        rowSubtotalPositionForParent,
+        resolvedMetricsLayout,
+        isMultiMetric,
+        metricLayoutIndexOnRows,
+        hideMetricHeaderOnRows,
+        countDimDepth,
+        isMetricTokenValue,
+        isMetricGrandTotalNode,
+        isExplicitSubtotalNode,
+      });
     },
     [
       colTotals,

@@ -22,12 +22,14 @@ import {
   resolveAxisChildrenBeforeSubtotalPolicy,
   resolveCollapsedValuesNodesForAxis,
   resolveMetricAxisLayoutPolicy,
+  resolveRowSubtotalChildrenPolicy,
 } from '../../../../src/pivot/chart/layoutRuntime';
 import { type PivotProgram } from '../../../../src/pivot/runtime/types';
 import {
   encodeMetricKey,
   METRICS_PLACEHOLDER,
   serializePath,
+  SUBTOTAL_TOKEN,
 } from '../../../../src/utils';
 
 const node = (axis: 'row' | 'col', path: PivotTreeNode['path']) => ({
@@ -309,5 +311,74 @@ describe('pivot/chart/layoutRuntime', () => {
         hasChildren: false,
       }),
     ]);
+  });
+
+  it('filters explicit row subtotals when row subtotal position is start', () => {
+    const parent = node('row', ['West']);
+    const dimensionChild = node('row', ['West', 'CA']);
+    const subtotalChild = {
+      ...node('row', ['West', SUBTOTAL_TOKEN]),
+      isSubtotal: true,
+    };
+    const grandTotalChild = {
+      ...node('row', [encodeMetricKey('sales')]),
+      isSubtotal: true,
+    };
+
+    expect(
+      resolveRowSubtotalChildrenPolicy({
+        children: [dimensionChild, subtotalChild, grandTotalChild],
+        parent,
+        nodes: {},
+        rowSubTotals: true,
+        rowSubtotalPositionForParent: 'start',
+        resolvedMetricsLayout: MetricsLayoutEnum.COLUMNS,
+        isMultiMetric: false,
+        hideMetricHeaderOnRows: false,
+        countDimDepth: path => path.length,
+        isMetricTokenValue: baseParams.isMetricTokenValue,
+        isMetricGrandTotalNode: child => child === grandTotalChild,
+        isExplicitSubtotalNode: child =>
+          child?.path.some(value => value === SUBTOTAL_TOKEN) === true,
+      }),
+    ).toEqual([dimensionChild, grandTotalChild]);
+  });
+
+  it('appends eligible end-position row subtotal descendants once', () => {
+    const parent = node('row', ['West', 'CA']);
+    const dimensionChild = node('row', ['West', 'CA', 'Los Angeles']);
+    const subtotalDescendant = {
+      ...node('row', ['West', 'CA', SUBTOTAL_TOKEN, encodeMetricKey('sales')]),
+      isSubtotal: true,
+    };
+    const metricSubtotalDescendant = {
+      ...node('row', ['West', 'CA', encodeMetricKey('sales'), SUBTOTAL_TOKEN]),
+      isSubtotal: true,
+    };
+    const nodes = {
+      [parent.key]: parent,
+      [dimensionChild.key]: dimensionChild,
+      [subtotalDescendant.key]: subtotalDescendant,
+      [metricSubtotalDescendant.key]: metricSubtotalDescendant,
+    };
+
+    expect(
+      resolveRowSubtotalChildrenPolicy({
+        children: [dimensionChild],
+        parent,
+        nodes,
+        rowSubTotals: true,
+        rowSubtotalPositionForParent: 'end',
+        resolvedMetricsLayout: MetricsLayoutEnum.ROWS,
+        isMultiMetric: true,
+        metricLayoutIndexOnRows: 1,
+        hideMetricHeaderOnRows: false,
+        countDimDepth: path => path.length,
+        isMetricTokenValue: baseParams.isMetricTokenValue,
+        isMetricGrandTotalNode: () => false,
+        isExplicitSubtotalNode: child =>
+          child?.path.some(value => value === SUBTOTAL_TOKEN) === true,
+      }),
+    ).toEqual([dimensionChild, subtotalDescendant]);
   });
 });
