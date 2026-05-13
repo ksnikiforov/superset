@@ -68,6 +68,10 @@ const resolveDepthCount = (
   rows: HTMLTableRowElement[],
   axisLabels: string[],
 ): number => {
+  if (axisLabels.length === 0) {
+    return 0;
+  }
+
   const depthInfo = rows
     .map(row => ({ row, depth: parseDepth(row) }))
     .filter(
@@ -91,21 +95,14 @@ const resolveDepthCount = (
   );
   const observedDepthCount = maxDepth + 1;
 
-  if (axisLabels.length > 0) {
-    if (observedDepthCount <= 0) {
-      return axisLabels.length;
-    }
-    return Math.min(axisLabels.length, observedDepthCount);
+  if (observedDepthCount <= 0) {
+    return axisLabels.length;
   }
-
-  return observedDepthCount;
+  return Math.min(axisLabels.length, observedDepthCount);
 };
 
 const toHeaderLabels = (depthCount: number, axisLabels: string[]): string[] =>
-  Array.from({ length: depthCount }, (_, index) => {
-    const explicit = axisLabels[index];
-    return explicit && explicit.length > 0 ? explicit : `Row ${index + 1}`;
-  });
+  axisLabels.slice(0, depthCount);
 
 const replaceCornerWithAxisLabels = (
   table: HTMLTableElement,

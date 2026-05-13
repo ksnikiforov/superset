@@ -60,9 +60,15 @@ const emptyGroupbyRows: PivotTableProps['groupbyRows'] = [];
 const emptyGroupbyColumns: PivotTableProps['groupbyColumns'] = [];
 const emptyQueriesData: PivotTableProps['queriesData'] = [];
 
+const isDimensionalChildValue = (value: PivotPath[number]) =>
+  !isMetricToken(value) && !isSubtotalToken(value);
+
+const countDimensionalPathDepth = (path: PivotPath) =>
+  path.filter(isDimensionalChildValue).length;
+
 const maxPathDepth = (nodes: PivotTreeData['rows']) =>
   Object.values(nodes).reduce(
-    (depth, node) => Math.max(depth, node.path.length),
+    (depth, node) => Math.max(depth, countDimensionalPathDepth(node.path)),
     0,
   );
 
@@ -76,8 +82,7 @@ const isDirectChildPath = (childPath: PivotPath, parentPath: PivotPath) =>
   childPath.length === parentPath.length + 1 &&
   pathStartsWith(childPath, parentPath);
 
-const isDimensionalChildValue = (value: PivotPath[number]) =>
-  !isMetricToken(value) && !isSubtotalToken(value);
+const pathHasMetricToken = (path: PivotPath) => path.some(isMetricToken);
 
 const collectLoadedBranchPaths = ({
   axis,
@@ -90,7 +95,19 @@ const collectLoadedBranchPaths = ({
 }): PivotPath[] => {
   const pathsByKey = new Map<string, PivotPath>();
   const nodes = axis === 'row' ? tree.rows : tree.cols;
-  const hasLoadedDimensionalChild = (path: PivotPath) =>
+  const hasLoadedDimensionalChild = (path: PivotPath) => {
+    const parentDimDepth = countDimensionalPathDepth(path);
+    return Object.values(nodes).some(node => {
+      if (
+        !isSameOrDescendantPath(node.path, path) ||
+        node.path.length === path.length
+      ) {
+        return false;
+      }
+      return countDimensionalPathDepth(node.path) === parentDimDepth + 1;
+    });
+  };
+  const hasLoadedRawDimensionalChild = (path: PivotPath) =>
     Object.values(nodes).some(node => {
       if (!isDirectChildPath(node.path, path)) {
         return false;
@@ -100,12 +117,24 @@ const collectLoadedBranchPaths = ({
 
   Object.values(nodes).forEach(node => {
     if (
-      !node.hasChildren ||
       !basePaths.some(basePath => isSameOrDescendantPath(node.path, basePath))
     ) {
       return;
     }
-    if (hasLoadedDimensionalChild(node.path)) {
+    if (
+      pathHasMetricToken(node.path) &&
+      (!node.hasChildren || node.path.some(isSubtotalToken))
+    ) {
+      pathsByKey.set(serializePath(node.path), node.path);
+      return;
+    }
+    if (!node.hasChildren) {
+      return;
+    }
+    if (
+      hasLoadedRawDimensionalChild(node.path) ||
+      hasLoadedDimensionalChild(node.path)
+    ) {
       pathsByKey.set(serializePath(node.path), node.path);
     }
   });

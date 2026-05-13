@@ -613,6 +613,60 @@ export const useExpansionEngine = ({
     [getCoverageKey],
   );
 
+  const seedFetchedCoverageFromLoadedMetricNodes = useCallback(
+    (
+      loadedTree: PivotTreeData,
+      visibleRowDepth: number,
+      visibleColDepth: number,
+    ) => {
+      const coverage = {
+        reason: 'expand' as const,
+        rowDepth: visibleRowDepth,
+        columnDepth: visibleColDepth,
+        rowDimensions: pivotProgram.rowDimensions.slice(0, visibleRowDepth),
+        columnDimensions: pivotProgram.columnDimensions.slice(
+          0,
+          visibleColDepth,
+        ),
+      };
+      const batches: PivotFactStoreBatch[] = [];
+      (
+        [
+          ['row', loadedTree.rows],
+          ['col', loadedTree.cols],
+        ] as const
+      ).forEach(([axis, nodes]) => {
+        Object.values(nodes).forEach(node => {
+          const hasMetricToken = node.path.some(isMetricTokenValue);
+          if (
+            !hasMetricToken ||
+            (node.hasChildren && !node.path.some(isSubtotalToken))
+          ) {
+            return;
+          }
+          batches.push({
+            coverage,
+            facts: [],
+            scope: {
+              kind: 'branch',
+              axis,
+              path: node.path,
+            },
+          });
+        });
+      });
+      if (batches.length > 0) {
+        seedFetchedCoverageFromFactBatches(batches);
+      }
+    },
+    [
+      isMetricTokenValue,
+      pivotProgram.columnDimensions,
+      pivotProgram.rowDimensions,
+      seedFetchedCoverageFromFactBatches,
+    ],
+  );
+
   const collectInFlightExpanded = useCallback((axis: PivotAxis) => {
     const merged = new Set<string>();
     (axis === 'row'
@@ -1020,6 +1074,11 @@ export const useExpansionEngine = ({
             targets: deltaTargets,
             data: deltaTree,
           } of resultDeltas) {
+            seedFetchedCoverageFromLoadedMetricNodes(
+              deltaTree,
+              visibleRowDepth,
+              visibleColDepth,
+            );
             for (const target of deltaTargets) {
               touchedKeys.add(target.pathKey);
             }
@@ -1094,6 +1153,7 @@ export const useExpansionEngine = ({
       persistExpansionState,
       resolveExpandedForMetrics,
       seedFetchedCoverageFromFactBatches,
+      seedFetchedCoverageFromLoadedMetricNodes,
       setExpandedState,
       shouldFetchChildren,
       trackRequestInScope,
@@ -1295,6 +1355,11 @@ export const useExpansionEngine = ({
             targets: deltaTargets,
             data: deltaTree,
           } of resultDeltas) {
+            seedFetchedCoverageFromLoadedMetricNodes(
+              deltaTree,
+              visibleRowDepth,
+              visibleColDepth,
+            );
             for (const target of deltaTargets) {
               const deltaKey = JSON.stringify([target.axis, target.pathKey]);
               stagedDeltas.set(deltaKey, deltaTree);
@@ -1319,6 +1384,7 @@ export const useExpansionEngine = ({
       pruneMergedTree,
       resolveExpandedForMetrics,
       seedFetchedCoverageFromFactBatches,
+      seedFetchedCoverageFromLoadedMetricNodes,
       setExpandedState,
       setHydratingState,
       setPendingState,

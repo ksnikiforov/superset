@@ -74,7 +74,7 @@ describe('buildPivotV3ExportTable', () => {
     expect(originalHeaderCells).toEqual(['Rows', 'Metric']);
   });
 
-  it('falls back to generated row labels when axis labels are missing', () => {
+  it('does not infer row hierarchy columns when axis labels are missing', () => {
     document.body.innerHTML = `
       <table class="pivot-v3-table">
         <thead>
@@ -110,7 +110,7 @@ describe('buildPivotV3ExportTable', () => {
     const headerCells = Array.from(exported.tHead?.rows[0].cells ?? []).map(
       cell => cell.textContent?.trim(),
     );
-    expect(headerCells).toEqual(['Row 1', 'Row 2', 'Metric']);
+    expect(headerCells).toEqual(['Rows', 'Metric']);
   });
 
   it('does not create extra row header columns for a single row level', () => {
