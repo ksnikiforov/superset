@@ -17,7 +17,9 @@
  * under the License.
  */
 
-import { type PivotTreeNode } from '../types';
+import { type PivotResultCell, type PivotTreeNode } from '../types';
+import { serializeCellKey } from '../utils';
+import { type HeaderCellInfo } from '../pivot/viewModel';
 
 const ROW_DEPTH_COUNT_ATTR = 'data-pivot-row-depth-count';
 const ROW_EXPORT_VALUES_ATTR = 'data-pivot-row-export-values';
@@ -244,6 +246,151 @@ const numericCell = (
   isHeader,
 });
 
+const toExportSheetCell = (
+  value: string | number | null | undefined,
+  isHeader: boolean,
+): PivotV3ExportSheetCell => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return numericCell(value, isHeader);
+  }
+  return textCell(
+    getText(value === undefined || value === null ? '' : String(value)),
+    isHeader,
+  );
+};
+
+const appendExpandedLabelCell = (
+  target: PivotV3ExportSheetCell[],
+  label: string,
+  span: number,
+  isHeader: boolean,
+) => {
+  target.push(textCell(label, isHeader));
+  for (let index = 1; index < Math.max(span, 1); index += 1) {
+    target.push(textCell('', isHeader));
+  }
+};
+
+type BuildPivotV3ExportSheetModelParams = {
+  rowAxisLabels: readonly string[];
+  rowCornerLabel: string;
+  rowExportDepthCount: number;
+  rowExportRows: Map<string, PivotV3RowExportEntry>;
+  columnHeaderRows: HeaderCellInfo[][];
+  visibleRows: PivotTreeNode[];
+  visibleCols: PivotTreeNode[];
+  cells: Record<string, PivotResultCell>;
+  formatLabel: (node: PivotTreeNode, axis: 'row' | 'col') => string;
+  deriveMetricKey: (rowNode: PivotTreeNode, colNode: PivotTreeNode) => string;
+  formatBodyCell: (
+    rowNode: PivotTreeNode,
+    colNode: PivotTreeNode,
+    cell: PivotResultCell | undefined,
+    metricKey: string,
+  ) => string | number | null | undefined;
+  isGrandTotalLikeRow: (node: PivotTreeNode) => boolean;
+};
+
+const buildModelHeaderRows = ({
+  rowAxisLabels,
+  rowCornerLabel,
+  rowExportDepthCount,
+  columnHeaderRows,
+  formatLabel,
+}: Pick<
+  BuildPivotV3ExportSheetModelParams,
+  | 'rowAxisLabels'
+  | 'rowCornerLabel'
+  | 'rowExportDepthCount'
+  | 'columnHeaderRows'
+  | 'formatLabel'
+>): PivotV3ExportSheetCell[][] => {
+  if (columnHeaderRows.length === 0) {
+    return [
+      rowExportDepthCount > 0
+        ? rowAxisLabels
+            .slice(0, rowExportDepthCount)
+            .map(label => textCell(label, true))
+        : [textCell(rowCornerLabel, true)],
+    ];
+  }
+
+  return columnHeaderRows.map((rowCells, rowIndex) => {
+    const cells: PivotV3ExportSheetCell[] =
+      rowExportDepthCount > 0
+        ? Array.from({ length: rowExportDepthCount }, (_, index) =>
+            textCell(rowIndex === 0 ? (rowAxisLabels[index] ?? '') : '', true),
+          )
+        : rowIndex === 0
+          ? [textCell(rowCornerLabel, true)]
+          : [];
+    rowCells.forEach(cell => {
+      appendExpandedLabelCell(
+        cells,
+        formatLabel(cell.node, 'col'),
+        cell.colSpan,
+        true,
+      );
+    });
+    return cells;
+  });
+};
+
+export const buildPivotV3ExportSheetModel = ({
+  rowAxisLabels,
+  rowCornerLabel,
+  rowExportDepthCount,
+  rowExportRows,
+  columnHeaderRows,
+  visibleRows,
+  visibleCols,
+  cells,
+  formatLabel,
+  deriveMetricKey,
+  formatBodyCell,
+  isGrandTotalLikeRow,
+}: BuildPivotV3ExportSheetModelParams): PivotV3ExportSheetCell[][] => {
+  const headerRows = buildModelHeaderRows({
+    rowAxisLabels,
+    rowCornerLabel,
+    rowExportDepthCount,
+    columnHeaderRows,
+    formatLabel,
+  });
+  const bodyRows = visibleRows.map(row => {
+    const rowExport = rowExportRows.get(row.key);
+    const isHeader = isGrandTotalLikeRow(row) || rowExport?.isSubtotal === true;
+    const rowCells = (rowExport?.values ?? []).map(value =>
+      textCell(value, true),
+    );
+    visibleCols.forEach(col => {
+      const cell = cells[serializeCellKey(row.key, col.key)];
+      const metricKey = deriveMetricKey(row, col);
+      rowCells.push(
+        toExportSheetCell(formatBodyCell(row, col, cell, metricKey), isHeader),
+      );
+    });
+    return rowCells;
+  });
+  return [...headerRows, ...bodyRows];
+};
+
+const pivotV3ExportSheetDataRegistry = new WeakMap<
+  HTMLTableElement,
+  PivotV3ExportSheetCell[][]
+>();
+
+export const registerPivotV3ExportSheetData = (
+  table: HTMLTableElement,
+  sheetData: PivotV3ExportSheetCell[][],
+) => {
+  pivotV3ExportSheetDataRegistry.set(table, sheetData);
+};
+
+export const unregisterPivotV3ExportSheetData = (table: HTMLTableElement) => {
+  pivotV3ExportSheetDataRegistry.delete(table);
+};
+
 const appendExpandedTextCell = (
   target: PivotV3ExportSheetCell[],
   cell: HTMLTableCellElement,
@@ -336,6 +483,10 @@ const buildBodyRows = (
 export const buildPivotV3ExportSheetData = (
   table: HTMLTableElement,
 ): PivotV3ExportSheetCell[][] => {
+  const registered = pivotV3ExportSheetDataRegistry.get(table);
+  if (registered) {
+    return registered;
+  }
   const axisLabels = parseRowAxisLabels(table);
   const depthCount = resolveDepthCount(table, axisLabels);
   const headerRows = buildHeaderRows(

@@ -18,6 +18,7 @@
  */
 import { utils, writeFile } from 'xlsx';
 import exportPivotV3Excel from 'src/utils/exportPivotV3Excel';
+import { registerPivotV3ExportSheetData } from '../../../plugins/plugin-chart-pivot-table-v3/src/export/buildPivotV3ExportTable';
 
 jest.mock('xlsx', () => ({
   utils: {
@@ -63,6 +64,42 @@ describe('exportPivotV3Excel', () => {
     expect(writeFile).toHaveBeenCalledWith(
       { workbook: true },
       'pivot-export.xlsx',
+    );
+  });
+
+  it('uses registered worksheet data instead of reading rendered table metadata', () => {
+    document.body.innerHTML = `
+      <table class="pivot-v3-table">
+        <thead>
+          <tr>
+            <th>Stale DOM</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Ignored</td>
+          </tr>
+        </tbody>
+      </table>
+    `;
+    const table = document.querySelector<HTMLTableElement>('.pivot-v3-table');
+    if (!table) {
+      throw new Error('Expected pivot table');
+    }
+    registerPivotV3ExportSheetData(table, [
+      [{ value: 'Registered', type: 'string', isHeader: true }],
+      [{ value: 7, type: 'number', isHeader: false }],
+    ]);
+
+    exportPivotV3Excel('.pivot-v3-table', 'registered-export');
+
+    expect(utils.aoa_to_sheet).toHaveBeenCalledWith([
+      ['Registered'],
+      [{ t: 'n', v: 7 }],
+    ]);
+    expect(writeFile).toHaveBeenCalledWith(
+      { workbook: true },
+      'registered-export.xlsx',
     );
   });
 });

@@ -42,7 +42,12 @@ import {
   type TotalPosition,
 } from '../../types';
 import { serializeCellKey } from '../../utils';
-import { buildPivotV3RowExportModel } from '../../export/buildPivotV3ExportTable';
+import {
+  buildPivotV3ExportSheetModel,
+  buildPivotV3RowExportModel,
+  registerPivotV3ExportSheetData,
+  unregisterPivotV3ExportSheetData,
+} from '../../export/buildPivotV3ExportTable';
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import { rootKey } from '../viewModel';
 import { type RenderModel } from '../shared/types';
@@ -367,6 +372,7 @@ export const PivotTableView = ({
     renderCellContent,
     renderDatabarContent,
   } = formatting;
+  const tableRef = useRef<HTMLTableElement | null>(null);
   const stickyRowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
   const [stickyTotalRowOffsets, setStickyTotalRowOffsets] = useState<
     Record<string, number>
@@ -443,6 +449,7 @@ export const PivotTableView = ({
     ? { backgroundColor: themeColor, fontWeight: 600 }
     : { fontWeight: 600 };
   const rowTotalLabel = t('Total');
+  const rowCornerLabel = t('Rows');
   const { rowExportDepthCount, rowExportRows } = useMemo(
     () =>
       buildPivotV3RowExportModel({
@@ -464,6 +471,82 @@ export const PivotTableView = ({
       isRowAggregateBold,
     ],
   );
+  const exportSheetData = useMemo(
+    () =>
+      buildPivotV3ExportSheetModel({
+        rowAxisLabels,
+        rowCornerLabel,
+        rowExportDepthCount,
+        rowExportRows,
+        columnHeaderRows,
+        visibleRows,
+        visibleCols,
+        cells: tree.cells,
+        formatLabel,
+        deriveMetricKey,
+        isGrandTotalLikeRow,
+        formatBodyCell: (row, col, cell, metricKey) => {
+          if (!cell) {
+            return '';
+          }
+          const currentValue = cell.values[metricKey];
+          if (
+            typeof currentValue === 'number' &&
+            Number.isFinite(currentValue)
+          ) {
+            return currentValue;
+          }
+          const isSubtotalCell =
+            isRowAggregateBold(row) || isColAggregateBold(col);
+          const isGrandTotalCell =
+            row.path.length === 0 ||
+            col.path.length === 0 ||
+            isMetricGrandTotalNode(row) ||
+            isMetricGrandTotalNode(col);
+          const metricCellFormatting = resolveMetricCellFormatting(
+            metricKey,
+            cell,
+            isSubtotalCell,
+            isGrandTotalCell,
+          );
+          const content = renderCellContent(
+            row,
+            col,
+            metricKey,
+            metricCellFormatting?.d3FormatOverride,
+          );
+          return typeof content === 'string' || typeof content === 'number'
+            ? content
+            : '';
+        },
+      }),
+    [
+      rowAxisLabels,
+      rowCornerLabel,
+      rowExportDepthCount,
+      rowExportRows,
+      columnHeaderRows,
+      visibleRows,
+      visibleCols,
+      tree.cells,
+      formatLabel,
+      deriveMetricKey,
+      isGrandTotalLikeRow,
+      isRowAggregateBold,
+      isColAggregateBold,
+      isMetricGrandTotalNode,
+      resolveMetricCellFormatting,
+      renderCellContent,
+    ],
+  );
+  useLayoutEffect(() => {
+    const table = tableRef.current;
+    if (!table) {
+      return undefined;
+    }
+    registerPivotV3ExportSheetData(table, exportSheetData);
+    return () => unregisterPivotV3ExportSheetData(table);
+  }, [exportSheetData]);
   const renderCornerHeader = (rowSpan?: number) => (
     <th
       rowSpan={rowSpan}
@@ -494,6 +577,7 @@ export const PivotTableView = ({
         <Loading />
       ) : (
         <StyledTable
+          ref={tableRef}
           className="pivot-v3-table pvtTable"
           $stickyHeaders={stickyHeaders}
           data-sticky-headers={stickyHeaders}
