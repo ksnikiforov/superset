@@ -57,11 +57,11 @@ cells are projections of DB facts, not canonical data.
 
 ## Current Status
 
-As of May 10, 2026, after
-`18f5a03252 refactor(pivot-table-v3): simplify expansion hydration context`:
+As of May 13, 2026, after
+`3862895b84 refactor(pivot-table-v3): centralize loaded metric coverage`:
 
-- Overall transition estimate: **82%**.
-- Goal-weighted completion estimate: **82%**.
+- Overall transition estimate: **83%**.
+- Goal-weighted completion estimate: **83%**.
 - The runtime architecture exists and is used by the main paths.
 - The project is past line-count break-even, but not done.
 - The remaining work is mostly deletion of old chart, expansion, and render
@@ -70,29 +70,25 @@ As of May 10, 2026, after
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `7786` insertions, `9338` deletions, net `-1552`.
-- Current production `src` TypeScript/TSX total: `31958` lines.
+- Production `src`: `8013` insertions, `9386` deletions, net `-1373`.
+- Current production `src` TypeScript/TSX total: `32137` lines.
 - Implied baseline `src` total: about `33510` lines.
-- Added files: `+4228 / -0` across `15` files.
-- Deleted files: `+0 / -1419` across `8` files.
-- Modified files: `+3558 / -7919`, net `-4361`.
-- Pre-existing production files are net `-5780`.
 
 The readout is mixed but improving: the new runtime files still account for
-`4228` added lines, while old production files have shrunk enough to leave the
-plugin net-negative overall.
+substantial added lines, while old production files have shrunk enough to leave
+the plugin net-negative overall.
 
 ## Gate Status
 
-| Gate                                      | Completion | Current readout                                                                                                                                                                                                                                      |
-| ----------------------------------------- | ---------: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Gate 1: compiled layout model             |        72% | `PivotProgram` exists and drives many paths. `usePivotLayout` and interaction layout still translate raw form/runtime layout into compatibility fields.                                                                                              |
-| Gate 2: query planning from coverage      |        91% | Initial/root/branch/batch query paths use explicit coverage metadata. Bootstrap/root fact batches now seed fetched root expansion coverage. Branch and grouped-batch fetch params no longer expose tree shape. Remaining work is mostly support/totals coverage composition. |
-| Gate 3: central fact ingestion/store      |        92% | Fetch paths return fact batches, cache/fact-store hits use typed coverage, and ingestion is isolated. Compatible root/bootstrap coverage can now materialize branch specs without matching the original request scope while exact branch coverage remains authoritative. Remaining coupling is mostly tree-shaped chart/test boundaries. |
-| Gate 4: one tree materializer             |        88% | `materializePivotTree.ts` owns fact-to-tree materialization, Values/metric/measure axes, subtotal leaf injection, and measure-leaf value application. Export no longer repairs row depth semantics, but still needs a cleaner model boundary.        |
-| Gate 5: expansion reducer/runtime effects |        79% | Expansion no longer derives fetched state from rendered tree shape. It uses explicit fact coverage, semantic fetchability, shared fetch execution, and request lifecycles. The hook still owns hydration iteration, cancellation, and React commits. |
-| Gate 6: pure render model                 |        85% | Projection drives toggle eligibility, collapsed Values, column display, visible-axis construction, and semantic export row depth. Remaining risk is deeper row subtotal policy and some metric-index compatibility behavior.                         |
-| Gate 7: chart component cleanup           |        53% | The chart delegates runtime fetch decisions and no longer vetoes metric-order-only commits or treats rendered tree signatures as seamless refetch identity. It still owns committed-tree sync, dimension filters, interaction wiring, and several controller-like effects. |
+| Gate                                      | Completion | Current readout                                                                                                                                                                                                                                                                                                                                                                                            |
+| ----------------------------------------- | ---------: | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Gate 1: compiled layout model             |        72% | `PivotProgram` exists and drives many paths. `usePivotLayout` and interaction layout still translate raw form/runtime layout into compatibility fields.                                                                                                                                                                                                                                                    |
+| Gate 2: query planning from coverage      |        91% | Initial/root/branch/batch query paths use explicit coverage metadata. Bootstrap/root fact batches now seed fetched root expansion coverage. Branch and grouped-batch fetch params no longer expose tree shape. Remaining work is mostly support/totals coverage composition.                                                                                                                               |
+| Gate 3: central fact ingestion/store      |        92% | Fetch paths return fact batches, cache/fact-store hits use typed coverage, and ingestion is isolated. Compatible root/bootstrap coverage can now materialize branch specs without matching the original request scope while exact branch coverage remains authoritative. Remaining coupling is mostly tree-shaped chart/test boundaries.                                                                   |
+| Gate 4: one tree materializer             |        88% | `materializePivotTree.ts` owns fact-to-tree materialization, Values/metric/measure axes, subtotal leaf injection, and measure-leaf value application. Export no longer repairs row depth semantics, but still needs a cleaner model boundary.                                                                                                                                                              |
+| Gate 5: expansion reducer/runtime effects |        80% | Expansion no longer derives fetched state from rendered tree shape. It uses explicit fact coverage, semantic fetchability, shared fetch execution, and request lifecycles. Loaded terminal metric nodes and metric subtotal nodes now seed coverage through the fetched-coverage utility instead of hook-local branch synthesis. The hook still owns hydration iteration, cancellation, and React commits. |
+| Gate 6: pure render model                 |        85% | Projection drives toggle eligibility, collapsed Values, column display, visible-axis construction, and semantic export row depth. Remaining risk is deeper row subtotal policy and some metric-index compatibility behavior.                                                                                                                                                                               |
+| Gate 7: chart component cleanup           |        53% | The chart delegates runtime fetch decisions and no longer vetoes metric-order-only commits or treats rendered tree signatures as seamless refetch identity. It still owns committed-tree sync, dimension filters, interaction wiring, and several controller-like effects.                                                                                                                                 |
 
 ## What Is Now Solid
 
@@ -113,6 +109,9 @@ plugin net-negative overall.
   branch requests without weakening exact scoped fact lookups.
 - Exact branch coverage wins over broader compatible root/bootstrap coverage
   during fact-store materialization reads.
+- Loaded metric subtotal nodes and terminal metric nodes seed fetched expansion
+  coverage centrally, while expandable non-subtotal metric nodes still require
+  real fetches.
 - Branch-cache entries store fact batches, not rendered trees.
 - Measure-leaf value application is inside `materializePivotTree`.
 - The chart no longer contains separate runtime-layout fetch predicates, stale
@@ -146,13 +145,13 @@ plugin net-negative overall.
 
 Largest relevant production files:
 
-- `PivotTableChart.tsx`: `2531` lines.
-- `useExpansionEngine.ts`: `1687` lines.
+- `PivotTableChart.tsx`: `2495` lines.
+- `useExpansionEngine.ts`: `1718` lines.
 - `usePivotFormatting.tsx`: `1632` lines.
 - `PivotDndMetricSelect.tsx`: `1566` lines.
 - `utils.ts`: `1464` lines.
 - `PivotMetricDefinitionValue.tsx`: `1448` lines.
-- `materializePivotTree.ts`: `1326` lines.
+- `materializePivotTree.ts`: `1329` lines.
 - `PivotInteractionPanel.tsx`: `1186` lines.
 - `PivotDndColumnSelect.tsx`: `1109` lines.
 - `usePivotLayout.ts`: `1071` lines.
@@ -268,6 +267,14 @@ Recent validation:
 - `61f63d7876`: focused expansion/prefetch/layout batches passed (`167`
   selected tests), and dashboard 12 expansion was verified in the browser after
   the tree-shape fetched-coverage cleanup.
+- `b732814384`: touched-file ESLint passed, `git diff --check` passed, and
+  focused Jest passed for totals columns, metrics-between regressions, export,
+  chart smoke/layout/filter-seamless, fact store, branch fetch, and batch fetch
+  guardrails (`113` tests).
+- `3862895b84`: touched-file ESLint passed, `git diff --check` passed, and
+  focused Jest passed for fetched coverage, metrics-between regressions, totals
+  columns, chart smoke/layout/filter-seamless, fact store, branch fetch, and
+  batch fetch guardrails (`105` tests).
 
 Minimum test coverage for future slices:
 
