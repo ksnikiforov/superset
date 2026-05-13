@@ -145,6 +145,8 @@ Source-only diff from pre-refactor baseline
   `2` suites and `32` tests.
 - Focused chart-sync/runtime pass after merging persisted selection sync into
   one effect: `5` suites and `76` tests.
+- Full plugin Jest pass after merging persisted selection sync into one effect:
+  `94` suites and `775` tests.
 
 The readout remains mixed: the plugin is still modestly above the baseline line
 count, but the chart/layout hooks keep losing inline policy and the remaining
@@ -436,7 +438,8 @@ Recent validation:
 - `bd8b29c520`: merged persisted selected-filter pending-settlement and state
   sync into one chart effect; touched-file ESLint, Prettier,
   `git diff --check`, focused filter/runtime Jest (`18` tests), and focused
-  chart-sync/runtime Jest (`76` tests) passed.
+  chart-sync/runtime Jest (`76` tests) passed. The full pivot-table-v3 plugin
+  Jest suite also passed (`94` suites, `775` tests).
 - `11c9593425`: simplified dimension removal in the interaction layout helper
   to return the runtime layout directly; touched-file ESLint, Prettier,
   `git diff --check`, and focused interaction drag/layout Jest (`32` tests)
