@@ -31,7 +31,6 @@ import {
   findMeasureLeafIdInPath,
   getMetricKey,
   getStableColumnKey,
-  isMetricsPlaceholder,
   isSubtotalToken,
   serializePath,
 } from '../../utils';
@@ -40,7 +39,6 @@ import { buildLayoutContext } from '../layout/LayoutContext';
 import {
   countDimDepth as countDimDepthBase,
   getMetricDepthForParent as getMetricDepthForParentBase,
-  getMetricIndexFromNodes,
   getMetricLabelFromPath as getMetricLabelFromPathBase,
   getMetricTierNodes as getMetricTierNodesBase,
   getNonMetricPathParts as getNonMetricPathPartsBase,
@@ -54,6 +52,7 @@ import {
   resolveCollapsedValuesProjection,
 } from '../runtime/projection';
 import { pruneStaleCollapsedAxis } from './pruneCollapsedAxis';
+import { resolveMetricAxisLayoutPolicy } from './layoutRuntime';
 
 export type PivotLayoutResult = {
   layout: ReturnType<typeof buildLayoutContext>;
@@ -244,7 +243,6 @@ export const usePivotLayout = ({
     () => new Map(metricLabels.map((label, idx) => [label, idx])),
     [metricLabels],
   );
-  const isSingleMetric = metricLabels.length === 1;
   const isMultiMetric = metricLabels.length > 1;
   const hasMultipleMeasures =
     isMultiMetric ||
@@ -261,38 +259,6 @@ export const usePivotLayout = ({
 
   const rowDimCount = layout.groupbyRows.length;
   const colDimCount = layout.groupbyColumns.length;
-
-  const metricInsertIndexOnRows =
-    resolvedMetricsLayout === MetricsLayoutEnum.ROWS && metrics.length > 0
-      ? Math.min(layout.metricInsertIndex, rowDimCount)
-      : undefined;
-  const metricInsertIndexOnCols =
-    resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS && metrics.length > 0
-      ? Math.min(layout.metricInsertIndex, colDimCount)
-      : undefined;
-  const singleMetricBetweenRows =
-    isSingleMetric &&
-    resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
-    metricInsertIndexOnRows !== undefined &&
-    metricInsertIndexOnRows > 0 &&
-    metricInsertIndexOnRows < rowDimCount;
-  const singleMetricBetweenCols =
-    isSingleMetric &&
-    resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS &&
-    metricInsertIndexOnCols !== undefined &&
-    metricInsertIndexOnCols > 0 &&
-    metricInsertIndexOnCols < colDimCount;
-
-  const shouldExpandMetricRows =
-    resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
-    metrics.length > 0 &&
-    layout.metricInsertIndex === 0 &&
-    resolvedExpandRowsLevel > 0;
-  const shouldExpandMetricCols =
-    resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS &&
-    metrics.length > 0 &&
-    layout.metricInsertIndex === 0 &&
-    resolvedExpandColumnsLevel > 0;
 
   const groupbyRowKeys = useMemo(
     () => layout.groupbyRows.map(getStableColumnKey),
@@ -366,98 +332,76 @@ export const usePivotLayout = ({
     ],
   );
 
-  const maxColDimDepth = useMemo(
-    () =>
-      Object.values(data.cols).reduce(
-        (max, node) =>
-          Math.max(
-            max,
-            getNonMetricPathPartsBase(node.path, metricLabelSet).length,
-          ),
-        0,
-      ),
-    [data.cols, metricLabelSet],
-  );
-
-  const metricIndexOnRows = useMemo(
-    () =>
-      getMetricIndexFromNodes({
-        nodes: data.rows,
-        isMetricTokenValue,
-      }) ?? metricInsertIndexOnRows,
-    [data.rows, isMetricTokenValue, metricInsertIndexOnRows],
-  );
-  const metricIndexOnCols = useMemo(
-    () =>
-      getMetricIndexFromNodes({
-        nodes: data.cols,
-        isMetricTokenValue,
-      }) ?? metricInsertIndexOnCols,
-    [data.cols, isMetricTokenValue, metricInsertIndexOnCols],
-  );
-  const metricIntentIndexOnRows = metricInsertIndexOnRows ?? metricIndexOnRows;
-  const metricIntentIndexOnCols = metricInsertIndexOnCols ?? metricIndexOnCols;
-
-  const formRowsHasPlaceholder =
-    Array.isArray(formData.groupbyRows) &&
-    formData.groupbyRows.some(isMetricsPlaceholder);
-  const formColsHasPlaceholder =
-    Array.isArray(formData.groupbyColumns) &&
-    formData.groupbyColumns.some(isMetricsPlaceholder);
-  const metricLayoutIndexOnRows = formRowsHasPlaceholder
-    ? (metricInsertIndexOnRows ?? metricIndexOnRows)
-    : metricIndexOnRows;
-  const metricLayoutIndexOnCols = formColsHasPlaceholder
-    ? (metricInsertIndexOnCols ?? metricIndexOnCols)
-    : metricIndexOnCols !== undefined && maxColDimDepth < groupbyColumns.length
-      ? groupbyColumns.length
-      : metricIndexOnCols;
-
-  const metricsAtRowEnd =
-    resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
-    metricInsertIndexOnRows !== undefined &&
-    metricInsertIndexOnRows >= rowDimCount;
-  const metricsAtColEnd =
-    resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS &&
-    metricInsertIndexOnCols !== undefined &&
-    metricInsertIndexOnCols >= colDimCount;
-  const metricsFirstOnRows =
-    resolvedMetricsLayout === MetricsLayoutEnum.ROWS && metricIndexOnRows === 0;
-  const metricsFirstOnCols =
-    resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS &&
-    metricIndexOnCols === 0;
-
   const resolvedRowTotalPosition = layout.rowTotalPosition;
   const resolvedRowSubtotalPosition = layout.rowSubtotalPosition;
   const resolvedColTotalPosition = layout.colTotalPosition;
   const resolvedColSubtotalPosition = layout.colSubtotalPosition;
 
-  const forceRowSubtotalEnd =
-    rowSubTotals &&
-    isMultiMetric &&
-    resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
-    !metricsFirstOnRows;
-  const effectiveRowSubtotalPosition = forceRowSubtotalEnd
-    ? 'end'
-    : resolvedRowSubtotalPosition;
-  const forceColSubtotalEnd =
-    isMultiMetric && resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS;
-  const effectiveColSubtotalPosition = forceColSubtotalEnd
-    ? 'end'
-    : resolvedColSubtotalPosition;
-
-  const hideMetricHeaderOnRows =
-    resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
-    !isLeafTierVisible &&
-    isSingleMetric &&
-    metricIndexOnRows === rowDimCount &&
-    rowDimCount > 0;
-  const hideMetricHeaderOnCols =
-    resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS &&
-    !isLeafTierVisible &&
-    isSingleMetric &&
-    metricIndexOnCols === colDimCount &&
-    colDimCount > 0;
+  const {
+    singleMetricBetweenRows,
+    singleMetricBetweenCols,
+    shouldExpandMetricRows,
+    shouldExpandMetricCols,
+    metricIndexOnRows,
+    metricIndexOnCols,
+    metricIntentIndexOnRows,
+    metricIntentIndexOnCols,
+    metricLayoutIndexOnRows,
+    metricLayoutIndexOnCols,
+    metricsAtRowEnd,
+    metricsAtColEnd,
+    metricsFirstOnRows,
+    metricsFirstOnCols,
+    forceRowSubtotalEnd,
+    effectiveRowSubtotalPosition,
+    effectiveColSubtotalPosition,
+    hideMetricHeaderOnRows,
+    hideMetricHeaderOnCols,
+  } = useMemo(
+    () =>
+      resolveMetricAxisLayoutPolicy({
+        rows: data.rows,
+        cols: data.cols,
+        formGroupbyRows: formData.groupbyRows,
+        formGroupbyColumns: formData.groupbyColumns,
+        groupbyColumnsLength: groupbyColumns.length,
+        metricsCount: metrics.length,
+        metricLabelCount: metricLabels.length,
+        rowDimCount,
+        colDimCount,
+        metricInsertIndex: layout.metricInsertIndex,
+        resolvedMetricsLayout,
+        resolvedExpandRowsLevel,
+        resolvedExpandColumnsLevel,
+        metricLabelSet,
+        isMetricTokenValue,
+        isLeafTierVisible,
+        rowSubTotals,
+        resolvedRowSubtotalPosition,
+        resolvedColSubtotalPosition,
+      }),
+    [
+      colDimCount,
+      data.cols,
+      data.rows,
+      formData.groupbyColumns,
+      formData.groupbyRows,
+      groupbyColumns.length,
+      isLeafTierVisible,
+      isMetricTokenValue,
+      layout.metricInsertIndex,
+      metricLabelSet,
+      metricLabels.length,
+      metrics.length,
+      resolvedColSubtotalPosition,
+      resolvedExpandColumnsLevel,
+      resolvedExpandRowsLevel,
+      resolvedMetricsLayout,
+      resolvedRowSubtotalPosition,
+      rowDimCount,
+      rowSubTotals,
+    ],
+  );
 
   const getMetricLabelFromPath = useCallback(
     (path: PivotTreeNode['path']) =>
