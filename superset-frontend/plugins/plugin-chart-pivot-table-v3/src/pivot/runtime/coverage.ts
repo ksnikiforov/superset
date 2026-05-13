@@ -22,6 +22,7 @@ import {
   type PivotPath,
   type PivotRuntimeLayout,
 } from '../../types';
+import { isMetricToken } from '../core/tokens';
 import { stableStringify } from '../shared/stableStringify';
 import { getNextAxisLevelForPath } from './paths';
 import type { PivotAxisProjection } from './projection';
@@ -103,6 +104,18 @@ const columnRefsMatchKeys = (
 ) =>
   columns.length === keys.length &&
   columns.every((column, index) => columnRefKey(column) === keys[index]);
+
+const isRuntimeLayoutCoverageScope = (
+  scope: PivotFactStoreBatch['scope'],
+): boolean => {
+  if (scope.kind === 'bootstrap' || scope.kind === 'root') {
+    return true;
+  }
+  if (scope.kind !== 'branch') {
+    return false;
+  }
+  return scope.path.every(isMetricToken);
+};
 
 const selectionSignature = (selection: PivotRuntimeLayout['leafSelection']) =>
   stableStringify(selection ?? {});
@@ -309,7 +322,7 @@ export const factBatchesCoverRuntimeLayout = (
     runtimeLayout.metrics.length === 0 ||
     factBatches.some(
       ({ coverage, scope }) =>
-        (scope.kind === 'bootstrap' || scope.kind === 'root') &&
+        isRuntimeLayoutCoverageScope(scope) &&
         coverage.rowDepth === requiredRowDepth &&
         coverage.columnDepth === requiredColumnDepth &&
         columnRefsMatchKeys(coverage.rowDimensions, requiredRows) &&
@@ -317,6 +330,11 @@ export const factBatchesCoverRuntimeLayout = (
     )
   );
 };
+
+const runtimeLayoutRequiredRootDepth = (runtimeLayout: PivotRuntimeLayout) => ({
+  rowDepth: runtimeLayout.rows.length > 0 ? 1 : 0,
+  columnDepth: runtimeLayout.cols.length > 0 ? 1 : 0,
+});
 
 export const shouldFetchRuntimeLayout = ({
   factBatches,
@@ -326,9 +344,23 @@ export const shouldFetchRuntimeLayout = ({
   factBatches: PivotFactStoreBatch[];
   previousLayout: PivotRuntimeLayout;
   nextLayout: PivotRuntimeLayout;
-}) =>
-  shouldFetchForLayoutChange(previousLayout, nextLayout) ||
-  !factBatchesCoverRuntimeLayout(factBatches, nextLayout);
+}) => {
+  if (shouldFetchForLayoutChange(previousLayout, nextLayout)) {
+    return true;
+  }
+  const previousRootDepth = runtimeLayoutRequiredRootDepth(previousLayout);
+  const nextRootDepth = runtimeLayoutRequiredRootDepth(nextLayout);
+  const rootDepthChanged =
+    previousRootDepth.rowDepth !== nextRootDepth.rowDepth ||
+    previousRootDepth.columnDepth !== nextRootDepth.columnDepth;
+  const dimensionsRemoved =
+    nextLayout.rows.length < previousLayout.rows.length ||
+    nextLayout.cols.length < previousLayout.cols.length;
+  return (
+    (rootDepthChanged || dimensionsRemoved) &&
+    !factBatchesCoverRuntimeLayout(factBatches, nextLayout)
+  );
+};
 
 export const buildBranchFactCoverages = ({
   program,

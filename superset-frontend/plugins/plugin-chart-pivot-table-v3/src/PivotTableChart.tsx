@@ -99,7 +99,12 @@ import {
 } from './pivot/measureLeaves';
 import { type PivotFactStoreBatch } from './pivot/runtime/ingestQueryResults';
 import { createLatestRequestLifecycle } from './pivot/runtime/requestLifecycle';
-import { fetchAndMaterializeSeamlessRuntimeUpdate } from './pivot/runtime/seamlessRuntimeUpdate';
+import {
+  buildSeamlessRuntimeSyncSnapshot,
+  fetchAndMaterializeSeamlessRuntimeUpdate,
+  matchesSeamlessRuntimeSyncSnapshot,
+  type SeamlessRuntimeSyncSnapshot,
+} from './pivot/runtime/seamlessRuntimeUpdate';
 import { stableStringify } from './pivot/shared/stableStringify';
 
 const PANEL_WIDTH = 230;
@@ -113,9 +118,6 @@ const EMPTY_FACT_BATCHES: PivotFactStoreBatch[] = [];
 const hasSelectedFilters = (
   filters: Record<string, DataRecordValue[]>,
 ): boolean => Object.keys(filters).length > 0;
-const selectedFiltersSignature = (
-  filters: Record<string, DataRecordValue[]>,
-) => (hasSelectedFilters(filters) ? stableStringify(filters) : null);
 const firstSelectedFilters = (
   ...sources: Array<Record<string, DataRecordValue[]>>
 ) => sources.find(hasSelectedFilters) ?? EMPTY_SELECTED_FILTERS;
@@ -838,11 +840,7 @@ function PivotTableChart(props: PivotTableProps) {
   const pendingRowsForSeamlessRef = useRef<Set<string>>(new Set());
   const pendingColsForSeamlessRef = useRef<Set<string>>(new Set());
   const displaySnapshotRef = useRef<PivotDisplaySnapshot | null>(null);
-  const lastSeamlessSyncRef = useRef<{
-    filtersSignature: string | null;
-    layoutSignature: string;
-    upstreamSignature: string;
-  } | null>(null);
+  const lastSeamlessSyncRef = useRef<SeamlessRuntimeSyncSnapshot | null>(null);
   const lastLocalSyncDashboardQueryContextRef = useRef<string | null>(null);
   const dataForRender = isUserControlled ? committedTree : data;
   const factBatchesForRender = isUserControlled
@@ -1252,9 +1250,6 @@ function PivotTableChart(props: PivotTableProps) {
     selectedFiltersFromFormData,
     selectedFiltersFromOwnState,
   ]);
-  const persistedInteractionFiltersSignature = selectedFiltersSignature(
-    persistedInteractionFilters,
-  );
   const upstreamSeamlessSignature =
     upstreamDashboardQueryContextSignature ?? '';
   const hasLocalSyncForCurrentDashboardQueryContext =
@@ -1471,11 +1466,11 @@ function PivotTableChart(props: PivotTableProps) {
         setSeamlessWarnings(updateResult.warnings);
         persistRuntimeState(normalized, nextFilters);
       });
-      lastSeamlessSyncRef.current = {
-        filtersSignature: selectedFiltersSignature(nextFilters),
-        layoutSignature: stableStringify(normalized),
+      lastSeamlessSyncRef.current = buildSeamlessRuntimeSyncSnapshot({
+        runtimeLayout: normalized,
+        selection: nextFilters,
         upstreamSignature: upstreamSeamlessSignature,
-      };
+      });
       pendingSeamlessLayoutRef.current = null;
       setSeamlessLoading(false);
     },
@@ -1514,11 +1509,11 @@ function PivotTableChart(props: PivotTableProps) {
       }
       updateUiRuntimeLayout(normalized);
       persistRuntimeState(normalized, uiSelectedFilters);
-      lastSeamlessSyncRef.current = {
-        filtersSignature: selectedFiltersSignature(uiSelectedFilters),
-        layoutSignature: stableStringify(normalized),
+      lastSeamlessSyncRef.current = buildSeamlessRuntimeSyncSnapshot({
+        runtimeLayout: normalized,
+        selection: uiSelectedFilters,
         upstreamSignature: upstreamSeamlessSignature,
-      };
+      });
     },
     [
       applySeamlessUpdate,
@@ -1585,12 +1580,15 @@ function PivotTableChart(props: PivotTableProps) {
     ) {
       return;
     }
-    const layoutSignature = stableStringify(uiRuntimeLayout);
-    const currentSync = lastSeamlessSyncRef.current;
     if (
-      currentSync?.filtersSignature === persistedInteractionFiltersSignature &&
-      currentSync.layoutSignature === layoutSignature &&
-      currentSync.upstreamSignature === upstreamSeamlessSignature
+      matchesSeamlessRuntimeSyncSnapshot(
+        lastSeamlessSyncRef.current,
+        buildSeamlessRuntimeSyncSnapshot({
+          runtimeLayout: uiRuntimeLayout,
+          selection: persistedInteractionFilters,
+          upstreamSignature: upstreamSeamlessSignature,
+        }),
+      )
     ) {
       return;
     }
@@ -1600,7 +1598,6 @@ function PivotTableChart(props: PivotTableProps) {
     committedFilters,
     isUserControlled,
     persistedInteractionFilters,
-    persistedInteractionFiltersSignature,
     uiRuntimeLayout,
     uiSelectedFilters,
     upstreamSeamlessSignature,

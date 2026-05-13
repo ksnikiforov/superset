@@ -23,6 +23,7 @@ import {
   type PivotTreeData,
 } from '../../types';
 import { METRICS_PLACEHOLDER, parsePath } from '../../utils';
+import { stableStringify } from '../shared/stableStringify';
 import {
   type ChartDataQueryResult,
   type ChartDataWarning,
@@ -46,6 +47,35 @@ export const SEAMLESS_MATERIALIZATION_GROUP = 'pivot-v3-seamless-materialize';
 
 const collectWarnings = (results: ChartDataQueryResult[]): ChartDataWarning[] =>
   results.flatMap(result => result.warnings ?? []);
+
+export type SeamlessRuntimeSyncSnapshot = {
+  filtersSignature: string | null;
+  layoutSignature: string;
+  upstreamSignature: string;
+};
+
+export const buildSeamlessRuntimeSyncSnapshot = ({
+  runtimeLayout,
+  selection,
+  upstreamSignature,
+}: {
+  runtimeLayout: PivotRuntimeLayout;
+  selection: Record<string, DataRecordValue[]>;
+  upstreamSignature: string;
+}): SeamlessRuntimeSyncSnapshot => ({
+  filtersSignature:
+    Object.keys(selection).length > 0 ? stableStringify(selection) : null,
+  layoutSignature: stableStringify(runtimeLayout),
+  upstreamSignature,
+});
+
+export const matchesSeamlessRuntimeSyncSnapshot = (
+  current: SeamlessRuntimeSyncSnapshot | null,
+  next: SeamlessRuntimeSyncSnapshot,
+) =>
+  current?.filtersSignature === next.filtersSignature &&
+  current.layoutSignature === next.layoutSignature &&
+  current.upstreamSignature === next.upstreamSignature;
 
 export type SeamlessRuntimeUpdateResult =
   | {

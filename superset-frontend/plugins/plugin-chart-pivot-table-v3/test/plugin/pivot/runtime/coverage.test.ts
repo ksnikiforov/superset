@@ -27,6 +27,7 @@ import {
   buildFactCoverage,
   buildVisibleFactCoverage,
   factBatchesCoverRuntimeLayout,
+  shouldFetchRuntimeLayout,
 } from '../../../../src/pivot/runtime/coverage';
 import { type PivotFactStoreBatch } from '../../../../src/pivot/runtime/factStore';
 import { resolveAxisProjection } from '../../../../src/pivot/runtime/projection';
@@ -198,6 +199,64 @@ describe('runtime layout fact coverage', () => {
         runtimeLayout,
       ),
     ).toBe(false);
+  });
+
+  it('accepts metric-root branch coverage for the active runtime layout', () => {
+    expect(
+      factBatchesCoverRuntimeLayout(
+        [
+          factBatch(1, 1, {
+            kind: 'branch',
+            axis: 'col',
+            path: [encodeMetricKey('m1')],
+          }),
+        ],
+        runtimeLayout,
+      ),
+    ).toBe(true);
+  });
+
+  it('does not fetch for same-root-depth layout changes with stale committed coverage', () => {
+    expect(
+      shouldFetchRuntimeLayout({
+        factBatches: [factBatch(1, 0)],
+        previousLayout: runtimeLayout,
+        nextLayout: {
+          ...runtimeLayout,
+          rows: ['row1', 'row2'],
+        },
+      }),
+    ).toBe(false);
+  });
+
+  it('fetches when a root-depth change requires missing committed coverage', () => {
+    expect(
+      shouldFetchRuntimeLayout({
+        factBatches: [factBatch(1, 0)],
+        previousLayout: {
+          ...runtimeLayout,
+          cols: [],
+        },
+        nextLayout: {
+          ...runtimeLayout,
+          rows: [],
+          cols: [],
+        },
+      }),
+    ).toBe(true);
+  });
+
+  it('fetches when trimming dimensions requires missing exact coverage', () => {
+    expect(
+      shouldFetchRuntimeLayout({
+        factBatches: [factBatch(1, 2)],
+        previousLayout: {
+          ...runtimeLayout,
+          cols: ['col1', 'col2'],
+        },
+        nextLayout: runtimeLayout,
+      }),
+    ).toBe(true);
   });
 });
 
