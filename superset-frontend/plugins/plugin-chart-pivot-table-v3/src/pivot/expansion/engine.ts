@@ -1164,6 +1164,132 @@ export const planHydrationIteration = ({
   };
 };
 
+export type HydrationFetchTarget = {
+  axis: PivotAxis;
+  pathKey: string;
+  childDepth: number;
+  requiredOppositeDepth: number;
+};
+
+export type HydrationLoopFetchContext = {
+  visibleRowDepth: number;
+  visibleColDepth: number;
+};
+
+export type HydrationLoopResult =
+  | {
+      status: 'complete';
+      tree: PivotTreeData;
+      desiredRows: Set<string>;
+      desiredCols: Set<string>;
+    }
+  | {
+      status: 'stale' | 'exhausted';
+    };
+
+export const runHydrationLoop = async <FetchResult>({
+  baseTree,
+  maxIterations,
+  isCurrent,
+  buildDesiredExpanded,
+  fetchedCoverage,
+  config,
+  getCoverageKey,
+  activeAxis,
+  pendingRows,
+  pendingCols,
+  planRows = true,
+  planCols = true,
+  pruneMergedTree,
+  fetchResults,
+  collectDeltas,
+}: {
+  baseTree: PivotTreeData;
+  maxIterations: number;
+  isCurrent: () => boolean;
+  buildDesiredExpanded: (axis: PivotAxis, tree: PivotTreeData) => Set<string>;
+  fetchedCoverage: FetchedFactCoverageState;
+  config: ExpansionVisibilityConfig;
+  getCoverageKey: (axis: PivotAxis, key: string) => string;
+  activeAxis?: PivotAxis;
+  pendingRows: Set<string>;
+  pendingCols: Set<string>;
+  planRows?: boolean;
+  planCols?: boolean;
+  pruneMergedTree: PruneMergedTree;
+  fetchResults: ({
+    targets,
+    context,
+  }: {
+    targets: HydrationFetchTarget[];
+    context: HydrationLoopFetchContext;
+  }) => Promise<FetchResult[]>;
+  collectDeltas: ({
+    results,
+    context,
+  }: {
+    results: FetchResult[];
+    context: HydrationLoopFetchContext;
+  }) => Array<{ targets: HydrationDeltaTarget[]; data: PivotTreeData }>;
+}): Promise<HydrationLoopResult> => {
+  const deltas: HydrationDeltaMap = new Map();
+  for (let iteration = 0; iteration < maxIterations; iteration += 1) {
+    if (!isCurrent()) {
+      return { status: 'stale' };
+    }
+    const stagedTree = buildHydrationStagedTree({
+      baseTree,
+      deltas,
+    });
+    const desiredRows = buildDesiredExpanded('row', stagedTree);
+    const desiredCols = buildDesiredExpanded('col', stagedTree);
+    const hydrationPlan = planHydrationIteration({
+      tree: stagedTree,
+      desiredRows,
+      desiredCols,
+      fetchedCoverage,
+      config,
+      getCoverageKey,
+      activeAxis,
+      pendingRows,
+      pendingCols,
+      planRows,
+      planCols,
+    });
+    const { visibleRowDepth, visibleColDepth } = hydrationPlan;
+
+    if (hydrationPlan.kind === 'complete') {
+      return {
+        status: 'complete',
+        tree: finalizeHydrationTree({
+          baseTree,
+          deltas,
+          pruneMergedTree,
+        }),
+        desiredRows,
+        desiredCols,
+      };
+    }
+
+    // eslint-disable-next-line no-await-in-loop
+    const results = await fetchResults({
+      targets: hydrationPlan.targets,
+      context: { visibleRowDepth, visibleColDepth },
+    });
+    if (!isCurrent()) {
+      return { status: 'stale' };
+    }
+    stageHydrationFetchDeltas({
+      deltas,
+      results: collectDeltas({
+        results,
+        context: { visibleRowDepth, visibleColDepth },
+      }),
+    });
+  }
+  return { status: 'exhausted' };
+};
+
 export const shouldPlanHydrationPrefetchAxis = ({
   effectiveExpandLevel,
   expandedCount,

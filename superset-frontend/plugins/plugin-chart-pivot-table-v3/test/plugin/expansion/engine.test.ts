@@ -29,6 +29,7 @@ import {
   resolveCollapsedExpansionState,
   resolveExpansionReinitializationDecision,
   resolveExpansionToggleDecision,
+  runHydrationLoop,
   stageHydrationFetchDeltas,
   shouldPlanHydrationPrefetchAxis,
   type HydrationDeltaMap,
@@ -415,6 +416,118 @@ describe('pivot/expansion/engine', () => {
       parent: baseTree.rows[aKey],
       branch: deltaTree,
     });
+  });
+
+  it('runs hydration loops to completion without fetching when coverage is satisfied', async () => {
+    const { tree, aKey, xKey } = buildTree({ includeIntersectionCell: true });
+    const fetchedCoverage = createFetchedFactCoverageState({
+      row: new Map([[aKey, 1]]),
+    });
+    const result = await runHydrationLoop({
+      baseTree: tree,
+      maxIterations: 3,
+      isCurrent: () => true,
+      buildDesiredExpanded: axis =>
+        axis === 'row' ? new Set([aKey]) : new Set([xKey]),
+      fetchedCoverage,
+      config,
+      getCoverageKey,
+      pendingRows: new Set(),
+      pendingCols: new Set(),
+      planCols: false,
+      pruneMergedTree: ({ tree: nextTree }) => nextTree,
+      fetchResults: jest.fn(),
+      collectDeltas: jest.fn(),
+    });
+
+    expect(result).toEqual({
+      status: 'complete',
+      tree,
+      desiredRows: new Set([aKey]),
+      desiredCols: new Set([xKey]),
+    });
+  });
+
+  it('runs hydration loops by fetching and staging missing deltas', async () => {
+    const { tree, aKey, xKey } = buildTree({ includeIntersectionCell: true });
+    const childKey = serializePath(['A', 'B']);
+    const branch: PivotTreeData = {
+      rows: {
+        [childKey]: makeNode('row', ['A', 'B'], false),
+      },
+      cols: {},
+      cells: {},
+    };
+    const fetchedCoverage = emptyFetchedCoverage();
+    const fetchResults = jest.fn(async ({ targets }) => [
+      { targets, data: branch },
+    ]);
+    const collectDeltas = jest.fn(({ results }) => {
+      results.forEach(({ targets }) => {
+        targets.forEach(target => {
+          fetchedCoverage.depthByAxis[target.axis].set(
+            target.pathKey,
+            target.requiredOppositeDepth,
+          );
+        });
+      });
+      return results;
+    });
+    const result = await runHydrationLoop({
+      baseTree: tree,
+      maxIterations: 3,
+      isCurrent: () => true,
+      buildDesiredExpanded: axis =>
+        axis === 'row' ? new Set([aKey]) : new Set([xKey]),
+      fetchedCoverage,
+      config,
+      getCoverageKey,
+      pendingRows: new Set(),
+      pendingCols: new Set(),
+      planCols: false,
+      pruneMergedTree: ({ tree: nextTree }) => nextTree,
+      fetchResults,
+      collectDeltas,
+    });
+
+    expect(fetchResults).toHaveBeenCalledTimes(1);
+    expect(collectDeltas).toHaveBeenCalledTimes(1);
+    expect(fetchResults.mock.calls[0][0].targets).toMatchObject([
+      {
+        axis: 'row',
+        pathKey: aKey,
+        childDepth: 2,
+        requiredOppositeDepth: 1,
+      },
+    ]);
+    expect(result.status).toBe('complete');
+    if (result.status !== 'complete') {
+      return;
+    }
+    expect(result.tree.rows[childKey]).toEqual(branch.rows[childKey]);
+  });
+
+  it('stops hydration loops when the request becomes stale', async () => {
+    const { tree, aKey, xKey } = buildTree({ includeIntersectionCell: true });
+    const fetchResults = jest.fn();
+    const result = await runHydrationLoop({
+      baseTree: tree,
+      maxIterations: 3,
+      isCurrent: () => false,
+      buildDesiredExpanded: axis =>
+        axis === 'row' ? new Set([aKey]) : new Set([xKey]),
+      fetchedCoverage: emptyFetchedCoverage(),
+      config,
+      getCoverageKey,
+      pendingRows: new Set(),
+      pendingCols: new Set(),
+      pruneMergedTree: ({ tree: nextTree }) => nextTree,
+      fetchResults,
+      collectDeltas: jest.fn(),
+    });
+
+    expect(result).toEqual({ status: 'stale' });
+    expect(fetchResults).not.toHaveBeenCalled();
   });
 
   it('plans expansion reinitialization for first mount and signature changes', () => {

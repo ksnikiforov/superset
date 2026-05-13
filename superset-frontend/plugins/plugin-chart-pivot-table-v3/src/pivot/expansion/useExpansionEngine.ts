@@ -77,20 +77,16 @@ import {
   addAncestors,
   applyExpansionFetchDelta,
   buildVisiblePersistedExpansionState,
-  buildHydrationStagedTree,
   computeVisibleDepths as computeVisibleDepthsBase,
-  finalizeHydrationTree,
   mergeSameAxisExpansionTree,
   planInitialHydrationPrefetch,
-  planHydrationIteration,
   resolveCollapsedExpansionState,
   resolveExpansionToggleDecision,
   resolveExpansionReinitializationDecision,
   resolveReinitializedExpansionState,
   resolveExpandedForMetrics as resolveExpandedForMetricsBase,
-  stageHydrationFetchDeltas,
+  runHydrationLoop,
   type ExpansionVisibilityConfig,
-  type HydrationDeltaMap,
 } from './engine';
 import {
   createFetchedFactCoverageState,
@@ -1165,7 +1161,6 @@ export const useExpansionEngine = ({
 
       try {
         const stagingBaseTree = treeRef.current;
-        const stagedDeltas: HydrationDeltaMap = new Map();
         const fetchRuntime: ExpansionFetchRuntime = {
           requestScope,
           fetchFormData,
@@ -1174,90 +1169,58 @@ export const useExpansionEngine = ({
           addWarnings,
           updateLoadingKey,
         };
-
-        for (
-          let iteration = 0;
-          iteration < MAX_HYDRATION_ITERATIONS;
-          iteration += 1
-        ) {
-          if (!requestScope.isCurrent()) {
-            return;
+        const result = await runHydrationLoop({
+          baseTree: stagingBaseTree,
+          maxIterations: MAX_HYDRATION_ITERATIONS,
+          isCurrent: requestScope.isCurrent,
+          buildDesiredExpanded,
+          fetchedCoverage: fetchedCoverageRef.current,
+          config: visibilityConfig,
+          getCoverageKey,
+          activeAxis: options?.activeAxis,
+          pendingRows: pendingRowsRef.current,
+          pendingCols: pendingColsRef.current,
+          planRows: shouldPlanRows,
+          planCols: shouldPlanCols,
+          pruneMergedTree,
+          fetchResults: ({ targets, context }) =>
+            fetchExpansionTargets({
+              targets,
+              context,
+              runtime: fetchRuntime,
+              singleRequestKind: `hydrate:${reason}`,
+              transactionId,
+              buildRequestGroupId,
+            }),
+          collectDeltas: ({ results, context }) =>
+            collectFetchResultDeltas({
+              results,
+              context,
+              seedFetchedCoverage: seedFetchedCoverageFromFactBatches,
+              seedLoadedMetricNodeCoverage:
+                seedFetchedCoverageFromLoadedMetricNodes,
+            }),
+        });
+        if (result.status === 'complete') {
+          const resolvedRows = resolveExpandedForMetrics(
+            'row',
+            result.desiredRows,
+            result.tree,
+          );
+          const resolvedCols = resolveExpandedForMetrics(
+            'col',
+            result.desiredCols,
+            result.tree,
+          );
+          treeRef.current = result.tree;
+          setTree(result.tree);
+          setExpandedState('row', resolvedRows);
+          setExpandedState('col', resolvedCols);
+          setPendingState('row', new Set());
+          setPendingState('col', new Set());
+          if (reason === 'cross-axis') {
+            persistExpansionState(resolvedRows, resolvedCols);
           }
-          const stagedTree = buildHydrationStagedTree({
-            baseTree: stagingBaseTree,
-            deltas: stagedDeltas,
-          });
-          const desiredRows = buildDesiredExpanded('row', stagedTree);
-          const desiredCols = buildDesiredExpanded('col', stagedTree);
-          const hydrationPlan = planHydrationIteration({
-            tree: stagedTree,
-            desiredRows,
-            desiredCols,
-            fetchedCoverage: fetchedCoverageRef.current,
-            config: visibilityConfig,
-            getCoverageKey,
-            activeAxis: options?.activeAxis,
-            pendingRows: pendingRowsRef.current,
-            pendingCols: pendingColsRef.current,
-            planRows: shouldPlanRows,
-            planCols: shouldPlanCols,
-          });
-          const { visibleRowDepth, visibleColDepth } = hydrationPlan;
-
-          if (hydrationPlan.kind === 'complete') {
-            const mergedTree = finalizeHydrationTree({
-              baseTree: stagingBaseTree,
-              deltas: stagedDeltas,
-              pruneMergedTree,
-            });
-            const resolvedRows = resolveExpandedForMetrics(
-              'row',
-              desiredRows,
-              mergedTree,
-            );
-            const resolvedCols = resolveExpandedForMetrics(
-              'col',
-              desiredCols,
-              mergedTree,
-            );
-            treeRef.current = mergedTree;
-            setTree(mergedTree);
-            setExpandedState('row', resolvedRows);
-            setExpandedState('col', resolvedCols);
-            setPendingState('row', new Set());
-            setPendingState('col', new Set());
-            if (reason === 'cross-axis') {
-              persistExpansionState(resolvedRows, resolvedCols);
-            }
-            return;
-          }
-          const { targets } = hydrationPlan;
-
-          // eslint-disable-next-line no-await-in-loop
-          const results = await fetchExpansionTargets({
-            targets,
-            context: { visibleRowDepth, visibleColDepth },
-            runtime: fetchRuntime,
-            singleRequestKind: `hydrate:${reason}`,
-            transactionId,
-            buildRequestGroupId,
-          });
-
-          if (!requestScope.isCurrent()) {
-            return;
-          }
-
-          const resultDeltas = collectFetchResultDeltas({
-            results,
-            context: { visibleRowDepth, visibleColDepth },
-            seedFetchedCoverage: seedFetchedCoverageFromFactBatches,
-            seedLoadedMetricNodeCoverage:
-              seedFetchedCoverageFromLoadedMetricNodes,
-          });
-          stageHydrationFetchDeltas({
-            deltas: stagedDeltas,
-            results: resultDeltas,
-          });
         }
       } finally {
         if (shouldShowLoader) {
