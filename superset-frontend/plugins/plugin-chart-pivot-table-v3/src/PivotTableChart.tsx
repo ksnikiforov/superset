@@ -718,15 +718,13 @@ function PivotTableChart(props: PivotTableProps) {
   ]);
 
   useEffect(() => {
-    if (!isUserControlled || !pendingPersistedSelectionSyncRef.current) {
-      return;
-    }
-    if (isEqual(persistedSelectedFilters, lastPersistedSelectionRef.current)) {
+    if (
+      isUserControlled &&
+      pendingPersistedSelectionSyncRef.current &&
+      isEqual(persistedSelectedFilters, lastPersistedSelectionRef.current)
+    ) {
       pendingPersistedSelectionSyncRef.current = false;
     }
-  }, [isUserControlled, persistedSelectedFilters]);
-
-  useEffect(() => {
     if (
       shouldSyncPersistedSelectedFilters({
         isUserControlled,
