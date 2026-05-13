@@ -73,6 +73,8 @@ Source-only diff from pre-refactor baseline
 - Production `src`: `9279` insertions, `9975` deletions, net `-696`.
 - Current production `src` TypeScript/TSX total: `32814` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
+- Full plugin Jest pass after the column-sort extraction: `91` suites and
+  `729` tests.
 
 The readout is mixed but improving: the new runtime files still account for
 substantial added lines, while old production files have shrunk enough to leave
