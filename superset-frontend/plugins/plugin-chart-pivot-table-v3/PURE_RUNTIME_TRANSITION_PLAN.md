@@ -58,7 +58,7 @@ cells are projections of DB facts, not canonical data.
 ## Current Status
 
 As of May 13, 2026, after
-`7f1f21097b refactor(pivot-table-v3): centralize render node display policy`:
+`1e34d0a919 refactor(pivot-table-v3): tighten render node display helper`:
 
 - Overall transition estimate: **94%**.
 - Goal-weighted completion estimate: **94%**.
@@ -70,8 +70,8 @@ As of May 13, 2026, after
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `11833` insertions, `11283` deletions, net `+550`.
-- Current production `src` TypeScript/TSX total: `34060` lines.
+- Production `src`: `11819` insertions, `11289` deletions, net `+530`.
+- Current production `src` TypeScript/TSX total: `34040` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - Full plugin Jest pass after the column-sort extraction: `91` suites and
   `729` tests.
@@ -280,7 +280,7 @@ Largest relevant production files:
 - `controlPanel.tsx`: `1038` lines.
 - `usePivotLayout.ts`: `825` lines.
 - `PivotTableView.tsx`: `808` lines.
-- `usePivotRenderModel.ts`: `556` lines.
+- `usePivotRenderModel.ts`: `542` lines.
 
 Not all large files are equal for this refactor. The next high-impact files are
 `PivotTableChart.tsx`, `usePivotLayout.ts`, `usePivotRenderModel.ts`, and the
@@ -373,6 +373,11 @@ git diff --check
 
 Recent validation:
 
+- `1e34d0a919`: tightened the render node display helper to reuse the typed
+  layout result and reduce production source after the extraction; touched-file
+  ESLint, Prettier, `git diff --check`, focused render/display Jest (`20`
+  tests), and the full pivot-table-v3 plugin Jest suite (`94` suites, `772`
+  tests) passed.
 - `7f1f21097b`: centralized render node display policy in
   `renderDisplay.ts`; touched-file ESLint, Prettier, `git diff --check`,
   focused render/display Jest (`20` tests), and the full pivot-table-v3 plugin
