@@ -25,10 +25,12 @@ import {
 } from '../../../../src/types';
 import {
   buildColumnDisplayPath,
+  buildRenderNodeDisplayState,
   expandMetricNodesForRender,
   formatRenderTreeDateLabels,
   resolveColumnHeaderLabel,
 } from '../../../../src/pivot/chart/renderDisplay';
+import { type PivotProgram } from '../../../../src/pivot/runtime/types';
 import {
   encodeMeasureLeafKey,
   encodeMetricKey,
@@ -86,6 +88,34 @@ const baseDisplayConfig = {
   isMetricGrandTotalNode: () => false,
   isMetricSubtotalNode: (candidate: PivotTreeNode) =>
     candidate.isSubtotal === true,
+};
+
+const pivotProgram: PivotProgram = {
+  rows: [
+    { kind: 'dimension', column: 'country' },
+    { kind: 'dimension', column: 'state' },
+  ],
+  columns: [{ kind: 'dimension', column: 'month' }],
+  rowDimensions: ['country', 'state'],
+  columnDimensions: ['month'],
+  metrics: [{ key: 'sales', metric: 'sales', index: 0 }],
+  metricKeys: ['sales'],
+  metricsLayoutResolved: MetricsLayoutEnum.COLUMNS,
+  metricInsertIndex: 2,
+};
+
+const metricFirstProgram: PivotProgram = {
+  ...pivotProgram,
+  rows: [
+    {
+      kind: 'values',
+      metrics: [{ key: 'sales', metric: 'sales', index: 0 }],
+    },
+    { kind: 'dimension', column: 'country' },
+  ],
+  valueAxis: 'row',
+  metricsLayoutResolved: MetricsLayoutEnum.ROWS,
+  metricInsertIndex: 0,
 };
 
 test('pads expanded metric-first column headers to the render depth', () => {
@@ -242,4 +272,82 @@ test('skips root, subtotal, metric, measure leaf, and non-date render labels', (
         ),
     }),
   ).toBe(tree);
+});
+
+test('builds render node display state for toggles and aggregate emphasis', () => {
+  const country = node(['US'], {
+    axis: 'row',
+    hasChildren: true,
+  });
+  const subtotal = node(['US', SUBTOTAL_TOKEN], {
+    axis: 'row',
+    isSubtotal: true,
+    hasChildren: true,
+  });
+  const metricSubtotal = node(['US', encodeMetricKey('sales')], {
+    isSubtotal: true,
+  });
+  const rows = { [country.key]: country, [subtotal.key]: subtotal };
+  const state = buildRenderNodeDisplayState({
+    rowNodes: rows,
+    expandedRows: new Set([country.key]),
+    resolvedExpandRowsLevel: 0,
+    metricLabelSet: new Set(['sales']),
+    shouldExpandMetricRows: false,
+    metricsFirstOnRows: false,
+    metricsFirstOnCols: false,
+    metricLabels: ['Sales'],
+    metricsLayout: MetricsLayoutEnum.COLUMNS,
+    hideMetricHeaderOnRows: false,
+    isMetricTokenValue: value => value === encodeMetricKey('sales'),
+    isExplicitSubtotalNode: candidate =>
+      candidate?.path.some(value => value === SUBTOTAL_TOKEN) ?? false,
+    isMetricGrandTotalNode: () => false,
+    isMetricSubtotalNode: candidate => candidate === metricSubtotal,
+    countDimDepth: path =>
+      path.filter(value => value !== SUBTOTAL_TOKEN).length,
+    pivotProgram,
+    isLeafTierVisible: false,
+    groupbyRowsLength: 2,
+    groupbyColumnsLength: 1,
+  });
+
+  expect(state.shouldShowToggle('row', country)).toBe(true);
+  expect(state.shouldShowToggle('row', node([], { axis: 'row' }))).toBe(false);
+  expect(state.shouldShowToggle('row', subtotal)).toBe(false);
+  expect(state.isRowAggregateBold(country)).toBe(true);
+  expect(state.isColAggregateBold(metricSubtotal)).toBe(true);
+  expect(state.getNodeDimDepth(country)).toBe(1);
+});
+
+test('hides metric toggles when measure leaves are visible', () => {
+  const metricNode = node([encodeMetricKey('sales')], {
+    axis: 'row',
+    hasChildren: true,
+  });
+  const state = buildRenderNodeDisplayState({
+    rowNodes: { [metricNode.key]: metricNode },
+    expandedRows: new Set<string>(),
+    resolvedExpandRowsLevel: 0,
+    metricLabelSet: new Set(['sales']),
+    shouldExpandMetricRows: false,
+    metricsFirstOnRows: true,
+    metricsFirstOnCols: false,
+    metricLabels: ['Sales'],
+    metricsLayout: MetricsLayoutEnum.ROWS,
+    hideMetricHeaderOnRows: false,
+    metricLayoutIndexOnRows: 0,
+    isMetricTokenValue: value => value === encodeMetricKey('sales'),
+    isExplicitSubtotalNode: () => false,
+    isMetricGrandTotalNode: () => false,
+    isMetricSubtotalNode: () => false,
+    countDimDepth: path =>
+      path.filter(value => value !== encodeMetricKey('sales')).length,
+    pivotProgram: metricFirstProgram,
+    isLeafTierVisible: true,
+    groupbyRowsLength: 1,
+    groupbyColumnsLength: 0,
+  });
+
+  expect(state.shouldShowToggle('row', metricNode)).toBe(false);
 });

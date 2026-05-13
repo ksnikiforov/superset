@@ -33,6 +33,13 @@ import {
   isSubtotalToken,
   SUBTOTAL_TOKEN,
 } from '../../utils';
+import { seedExpandedByLevel } from '../engine/expansionStateModel';
+import {
+  getNodeDimDepth as getNodeDimDepthBase,
+  isExplicitTotalNode as isExplicitTotalNodeBase,
+} from '../metricsTotals';
+import { resolveAxisProjection } from '../runtime/projection';
+import { type PivotProgram } from '../runtime/types';
 
 export type ColumnDisplayConfig = {
   metricsLayout: MetricsLayoutEnum;
@@ -294,4 +301,138 @@ export const formatRenderTreeDateLabels = ({
     return tree;
   }
   return { ...tree, rows: nextRows, cols: nextCols };
+};
+
+export type RenderNodeDisplayState = {
+  shouldShowToggle: (axis: PivotAxis, node?: PivotTreeNode) => boolean;
+  isRowAggregateBold: (node?: PivotTreeNode) => boolean;
+  isColAggregateBold: (node?: PivotTreeNode) => boolean;
+  getNodeDimDepth: (node: PivotTreeNode) => number;
+};
+
+export const buildRenderNodeDisplayState = ({
+  rowNodes,
+  expandedRows,
+  resolvedExpandRowsLevel,
+  metricLabelSet,
+  shouldExpandMetricRows,
+  metricsFirstOnRows,
+  metricsFirstOnCols,
+  metricLabels,
+  metricsLayout,
+  hideMetricHeaderOnRows,
+  metricLayoutIndexOnRows,
+  isMetricTokenValue,
+  isExplicitSubtotalNode,
+  isMetricGrandTotalNode,
+  isMetricSubtotalNode,
+  countDimDepth,
+  pivotProgram,
+  isLeafTierVisible,
+  groupbyRowsLength,
+  groupbyColumnsLength,
+}: {
+  rowNodes: Record<string, PivotTreeNode>;
+  expandedRows: Set<string>;
+  resolvedExpandRowsLevel: number;
+  metricLabelSet: Set<string>;
+  shouldExpandMetricRows: boolean;
+  metricsFirstOnRows: boolean;
+  metricsFirstOnCols: boolean;
+  metricLabels: string[];
+  metricsLayout: MetricsLayoutEnum;
+  hideMetricHeaderOnRows: boolean;
+  metricLayoutIndexOnRows?: number;
+  isMetricTokenValue: (value: unknown) => boolean;
+  isExplicitSubtotalNode: (node?: PivotTreeNode) => boolean;
+  isMetricGrandTotalNode: (node?: PivotTreeNode) => boolean;
+  isMetricSubtotalNode: (node?: PivotTreeNode) => boolean;
+  countDimDepth: (path: PivotTreeNode['path']) => number;
+  pivotProgram: PivotProgram;
+  isLeafTierVisible: boolean;
+  groupbyRowsLength: number;
+  groupbyColumnsLength: number;
+}): RenderNodeDisplayState => {
+  const autoExpandedRows = seedExpandedByLevel(
+    rowNodes,
+    resolvedExpandRowsLevel,
+    metricLabelSet,
+    { includeMetricDepthZero: shouldExpandMetricRows },
+  );
+  const manualExpandedRowDepths = new Set<number>();
+  expandedRows.forEach(key => {
+    const node = rowNodes[key];
+    if (autoExpandedRows.has(key) || !node?.hasChildren) {
+      return;
+    }
+    manualExpandedRowDepths.add(countDimDepth(node.path));
+  });
+
+  const isExplicitTotalNode = (node: PivotTreeNode) =>
+    isExplicitTotalNodeBase(node, {
+      metricLabelSet,
+      metricsFirstOnRows,
+      metricsFirstOnCols,
+    });
+
+  const getNodeDimDepth = (node: PivotTreeNode) =>
+    getNodeDimDepthBase(node, {
+      metricLabelSet,
+      metricsLayout,
+      hideMetricHeaderOnRows,
+      metricLayoutIndexOnRows,
+    });
+
+  const shouldShowToggle = (axis: PivotAxis, node?: PivotTreeNode) => {
+    if (!node || node.path.length === 0) {
+      return false;
+    }
+    if (
+      (node.path.length === 1 &&
+        typeof node.path[0] === 'string' &&
+        metricLabels.some(label => node.path[0] === `Total ${label}`)) ||
+      isExplicitSubtotalNode(node) ||
+      isMetricGrandTotalNode(node)
+    ) {
+      return false;
+    }
+    const projection = resolveAxisProjection({
+      program: pivotProgram,
+      axis,
+      path: node.path.filter(value => !isSubtotalToken(value)),
+    });
+    if (
+      !projection.nextLevel ||
+      (projection.nextLevel.kind === 'values' && !projection.valuesLevelSeen)
+    ) {
+      return false;
+    }
+    return (
+      !isLeafTierVisible || !isMetricTokenValue(node.path[node.path.length - 1])
+    );
+  };
+
+  const isRowAggregateBold = (row?: PivotTreeNode) => {
+    if (!row || (row.path.length === 0 && groupbyRowsLength === 0)) {
+      return false;
+    }
+    return (
+      isExplicitTotalNode(row) ||
+      (manualExpandedRowDepths.has(countDimDepth(row.path)) && row.hasChildren)
+    );
+  };
+
+  const isColAggregateBold = (col?: PivotTreeNode) => {
+    if (!col || (col.path.length === 0 && !groupbyColumnsLength)) {
+      return false;
+    }
+    return isExplicitTotalNode(col) || isMetricSubtotalNode(col);
+  };
+
+  return {
+    shouldShowToggle,
+    isRowAggregateBold,
+    isColAggregateBold,
+    getNodeDimDepth,
+  };
 };
