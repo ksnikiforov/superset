@@ -58,7 +58,7 @@ cells are projections of DB facts, not canonical data.
 ## Current Status
 
 As of May 13, 2026, after
-`f8d002d395 refactor(pivot-table-v3): expose worksheet excel writer`:
+`e6ad0d2f1f refactor(pivot-table-v3): export worksheet data by chart id`:
 
 - Gate-weighted architecture estimate: **96%**.
 - Delivery remaining estimate: **15-25%**, mostly final cleanup, validation,
@@ -71,8 +71,8 @@ As of May 13, 2026, after
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `12351` insertions, `11849` deletions, net `+502`.
-- Current production `src` TypeScript/TSX total: `34012` lines.
+- Production `src`: `12389` insertions, `11847` deletions, net `+542`.
+- Current production `src` TypeScript/TSX total: `34052` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - Full plugin Jest pass after the column-sort extraction: `91` suites and
   `729` tests.
@@ -197,6 +197,10 @@ Source-only diff from pre-refactor baseline
   worksheet Excel writer: `4` suites and `19` tests.
 - Full plugin plus export utility Jest pass after exposing the direct worksheet
   Excel writer: `95` suites and `770` tests.
+- Focused export provider/menu pass after routing saved chart exports through
+  chart-id worksheet data: `6` suites and `79` tests.
+- Full plugin plus export utility Jest pass after routing saved chart exports
+  through chart-id worksheet data: `95` suites and `772` tests.
 
 The readout remains mixed: the plugin is still modestly above the baseline line
 count, but the chart/layout hooks keep losing inline policy and the remaining
@@ -212,7 +216,7 @@ orchestration.
 | Gate 3: central fact ingestion/store      |        92% | Fetch paths return fact batches, cache/fact-store hits use typed coverage, and ingestion is isolated. Compatible root/bootstrap coverage can now materialize branch specs without matching the original request scope while exact branch coverage remains authoritative. Remaining coupling is mostly tree-shaped chart/test boundaries.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | Gate 4: one tree materializer             |        96% | `materializePivotTree.ts` owns fact-to-tree materialization, Values/metric/measure axes, subtotal leaf injection, and measure-leaf value application. Export no longer repairs row depth semantics, infers visible row hierarchy depth from cloned DOM rows, reads per-row depth markers, reconstructs visible row paths by scanning sibling DOM rows, clones/reshapes the rendered table, routes v3 workbook generation through `table_to_book`, exposes a production HTML-table export builder, emits export metadata attributes into the rendered table, parses rendered DOM metadata, or exports unregistered rendered tables. Row export values are produced by a pure export row model, the rendered view registers explicit worksheet cells, and the v3 export path writes that registered worksheet model.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | Gate 5: expansion reducer/runtime effects |        91% | Expansion no longer derives fetched state from rendered tree shape. It uses explicit fact coverage, semantic fetchability, shared fetch execution, and request lifecycles. Loaded terminal metric nodes and metric subtotal nodes now seed coverage through the fetched-coverage utility, fetched-result delta collection now seeds both fact batches and loaded metric-node coverage for same-axis and hydration paths, same-axis delta merge/stale-subtree preservation policy lives in the expansion engine, hydration delta staging/finalization policy lives in the expansion engine, expansion reinitialization trigger/effective-level policy lives in the expansion engine, persisted expansion visibility normalization lives in the expansion engine, expansion toggle/collapse pruning decisions live in the expansion engine, metric expansion stale-key cleanup uses one path, hydration iteration/cancellation policy lives in the expansion engine, and branch/batch fetch execution now lives in a dedicated expansion fetch executor. Initial hydration prefetch planning and prefetch action selection are also pure engine decisions. Same-axis fetch, cross-axis hydration, collapse, and reinitialization now use one batched tree/expanded/pending commit path. The hook still owns request kickoff and sequencing.        |
-| Gate 6: pure render model                 |        98% | Projection drives toggle eligibility, collapsed Values, column display, visible-axis construction, semantic export row depth count, semantic export row values, and chart column-sort decisions. Databar scale grouping, waterfall offsets, bridge connectors, label-space sizing, databar column min-width policy, metric-axis layout compatibility policy, pre-subtotal child filtering, collapsed Values node projection, row subtotal child policy, column display path construction, header label resolution, metric-leaf render expansion, render date-label formatting, toggle visibility, row/column aggregate emphasis, render node depth, export row hierarchy projection, worksheet-cell export typing, registered worksheet export data, and the direct worksheet-to-XLSX writer now live in pure helpers. Remaining risk is mostly sorting/display-map policy and formalizing how menu/header entrypoints receive the non-DOM export model.                                                                                                                                                                                                                                                                                                                                                                                         |
+| Gate 6: pure render model                 |        99% | Projection drives toggle eligibility, collapsed Values, column display, visible-axis construction, semantic export row depth count, semantic export row values, and chart column-sort decisions. Databar scale grouping, waterfall offsets, bridge connectors, label-space sizing, databar column min-width policy, metric-axis layout compatibility policy, pre-subtotal child filtering, collapsed Values node projection, row subtotal child policy, column display path construction, header label resolution, metric-leaf render expansion, render date-label formatting, toggle visibility, row/column aggregate emphasis, render node depth, export row hierarchy projection, worksheet-cell export typing, registered worksheet export data, the direct worksheet-to-XLSX writer, and saved chart-id export lookup now live in pure helpers. Remaining risk is mostly sorting/display-map policy plus the fallback selector adapter for unsaved or legacy export entrypoints.                                                                                                                                                                                                                                                                                                                                                            |
 | Gate 7: chart component cleanup           |        79% | The chart delegates runtime fetch decisions and no longer vetoes metric-order-only commits or treats rendered tree signatures as seamless refetch identity. Seamless sync snapshots, upstream dashboard query-context signatures, committed-props sync predicates, stale coverage recovery predicates, persisted-filter seamless reload policy, persisted-selection local sync policy, runtime-layout prop sync policy and prop-sync planning, runtime-layout change actions, stale dashboard runtime actions, seamless update-trigger planning, seamless persistence side-effect planning, pending display snapshot settlement policy, and applied runtime layout/formData projection now live outside the chart. Selected-filter update policy, persisted filter normalization, tree-derived dimension filter value collection, selection-filtered fetch form-data construction, dimension filter search/value fetch state, interaction chip construction, interaction DnD shell rendering, remove-dimension layout policy, and column-sort resolution/reconciliation are now outside the chart. Stale-dashboard recovery, stale coverage recovery, and persisted-filter replay now share one runtime-planned update effect. The chart still owns committed tree/fact state, interaction callback wiring, and several controller-like effects. |
 
 ## What Is Now Solid
@@ -354,6 +358,8 @@ orchestration.
   columns, subtotal rows, or raw cell values.
 - The XLSX writer can consume worksheet data directly; the selector-based
   export function is now an adapter that retrieves registered worksheet data.
+- Saved dashboard and Explore Pivot Table v3 exports now call the chart-id
+  worksheet provider instead of constructing a rendered table selector.
 - Pending seamless layout refresh keeps a display snapshot instead of freezing
   the whole view prop bundle.
 - Row-export values, subtotal worksheet emphasis, and numeric cell typing now
@@ -382,9 +388,10 @@ orchestration.
   repair, missing-depth fallback, DOM-row depth-count inference, sibling-row
   hierarchy reconstruction, render-owned row-export hierarchy projection, the
   production HTML-table export builder, and the DOM parser fallback are gone.
-  A direct worksheet-to-XLSX writer exists. The remaining export risk is API
-  shape: menu entrypoints still discover the worksheet model through the
-  rendered table registry rather than receiving it through chart/header props.
+  A direct worksheet-to-XLSX writer exists, and saved dashboard/Explore
+  entrypoints now export by chart id. The remaining export risk is API shape:
+  unsaved or legacy entrypoints still use the selector adapter, and the
+  chart-id provider is a registry rather than an injected export-data prop.
 
 ## Current Hotspots
 
@@ -394,14 +401,14 @@ Largest relevant production files:
 - `engine.ts`: `1496` lines.
 - `PivotMetricDefinitionValue.tsx`: `1448` lines.
 - `utils.ts`: `1429` lines.
-- `PivotTableChart.tsx`: `1401` lines.
+- `PivotTableChart.tsx`: `1407` lines.
 - `materializePivotTree.ts`: `1329` lines.
 - `usePivotFormatting.tsx`: `1325` lines.
 - `useExpansionEngine.ts`: `1316` lines.
 - `PivotInteractionPanel.tsx`: `1186` lines.
 - `PivotDndColumnSelect.tsx`: `1109` lines.
 - `controlPanel.tsx`: `1038` lines.
-- `PivotTableView.tsx`: `890` lines.
+- `PivotTableView.tsx`: `902` lines.
 - `usePivotLayout.ts`: `804` lines.
 - `seamlessRuntimeUpdate.ts`: `594` lines.
 - `usePivotRenderModel.ts`: `542` lines.
@@ -442,10 +449,10 @@ pure runtime boundary unless they delete runtime-layout translation code.
    V3 export now writes an XLSX worksheet model directly instead of passing a
    cloned table to `table_to_book`, and it consumes render-emitted row export
    values instead of reconstructing row hierarchy from DOM siblings. The XLSX
-   writer accepts worksheet data directly, while the menu/header adapter still
-   discovers that model through the rendered table registry. The next export
-   slice should route menu/header entrypoints to a formal sheet-data provider or
-   rename the remaining module/API around worksheet data.
+   writer accepts worksheet data directly, and saved dashboard/Explore
+   entrypoints now retrieve the registered worksheet model by chart id. The next
+   export slice should either remove the remaining selector fallback for unsaved
+   cases or rename the remaining module/API around worksheet data.
 
 5. Keep every runtime helper under a deletion obligation.
 
@@ -499,6 +506,11 @@ git diff --check
 
 Recent validation:
 
+- `e6ad0d2f1f`: registered worksheet export data by chart id and routed saved
+  dashboard/Explore Pivot Table v3 Excel exports through that provider instead
+  of table selectors; touched-file ESLint, Prettier, `git diff --check`,
+  focused export provider/menu Jest (`79` tests), and the full pivot-table-v3
+  plugin plus export utility Jest suite (`95` suites, `772` tests) passed.
 - `f8d002d395`: exposed a direct worksheet-to-XLSX writer so workbook
   generation has a non-DOM entrypoint; touched-file ESLint, Prettier,
   `git diff --check`, focused export utility/model/render/chart Jest (`19`
