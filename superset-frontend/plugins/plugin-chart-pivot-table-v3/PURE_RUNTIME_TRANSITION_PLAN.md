@@ -75,8 +75,9 @@ Source-only diff from pre-refactor baseline
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - Full plugin Jest pass after the column-sort extraction: `91` suites and
   `729` tests.
-- Focused interaction pass after extracting the interaction layout shell: `5`
-  suites and `69` tests.
+- Full plugin Jest pass after extracting the interaction layout shell: `91`
+  suites and `729` tests. Focused interaction coverage also passed: `5` suites
+  and `69` tests.
 
 The readout is mixed but improving: the new runtime files still account for
 substantial added lines, while old production files have shrunk enough to leave
