@@ -58,7 +58,7 @@ cells are projections of DB facts, not canonical data.
 ## Current Status
 
 As of May 13, 2026, after
-`9913794db3 refactor(pivot-table-v3): require registered worksheet export data`:
+`a74a3345e9 refactor(pivot-table-v3): centralize seamless update triggers`:
 
 - Gate-weighted architecture estimate: **96%**.
 - Delivery remaining estimate: **15-25%**, mostly final cleanup, validation,
@@ -71,8 +71,8 @@ As of May 13, 2026, after
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `12339` insertions, `11838` deletions, net `+501`.
-- Current production `src` TypeScript/TSX total: `34011` lines.
+- Production `src`: `12348` insertions, `11844` deletions, net `+504`.
+- Current production `src` TypeScript/TSX total: `34014` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - Full plugin Jest pass after the column-sort extraction: `91` suites and
   `729` tests.
@@ -181,6 +181,10 @@ Source-only diff from pre-refactor baseline
   suites and `18` tests.
 - Full plugin plus export utility Jest pass after requiring registered worksheet
   export data: `95` suites and `769` tests.
+- Focused chart/runtime pass after centralizing seamless update triggers: `4`
+  suites and `23` tests.
+- Full plugin plus export utility Jest pass after centralizing seamless update
+  triggers: `95` suites and `769` tests.
 
 The readout remains mixed: the plugin is still modestly above the baseline line
 count, but the chart/layout hooks keep losing inline policy and the remaining
@@ -197,7 +201,7 @@ orchestration.
 | Gate 4: one tree materializer             |        96% | `materializePivotTree.ts` owns fact-to-tree materialization, Values/metric/measure axes, subtotal leaf injection, and measure-leaf value application. Export no longer repairs row depth semantics, infers visible row hierarchy depth from cloned DOM rows, reads per-row depth markers, reconstructs visible row paths by scanning sibling DOM rows, clones/reshapes the rendered table, routes v3 workbook generation through `table_to_book`, exposes a production HTML-table export builder, emits export metadata attributes into the rendered table, parses rendered DOM metadata, or exports unregistered rendered tables. Row export values are produced by a pure export row model, the rendered view registers explicit worksheet cells, and the v3 export path writes that registered worksheet model.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | Gate 5: expansion reducer/runtime effects |        91% | Expansion no longer derives fetched state from rendered tree shape. It uses explicit fact coverage, semantic fetchability, shared fetch execution, and request lifecycles. Loaded terminal metric nodes and metric subtotal nodes now seed coverage through the fetched-coverage utility, fetched-result delta collection now seeds both fact batches and loaded metric-node coverage for same-axis and hydration paths, same-axis delta merge/stale-subtree preservation policy lives in the expansion engine, hydration delta staging/finalization policy lives in the expansion engine, expansion reinitialization trigger/effective-level policy lives in the expansion engine, persisted expansion visibility normalization lives in the expansion engine, expansion toggle/collapse pruning decisions live in the expansion engine, metric expansion stale-key cleanup uses one path, hydration iteration/cancellation policy lives in the expansion engine, and branch/batch fetch execution now lives in a dedicated expansion fetch executor. Initial hydration prefetch planning and prefetch action selection are also pure engine decisions. Same-axis fetch, cross-axis hydration, collapse, and reinitialization now use one batched tree/expanded/pending commit path. The hook still owns request kickoff and sequencing. |
 | Gate 6: pure render model                 |        98% | Projection drives toggle eligibility, collapsed Values, column display, visible-axis construction, semantic export row depth count, semantic export row values, and chart column-sort decisions. Databar scale grouping, waterfall offsets, bridge connectors, label-space sizing, databar column min-width policy, metric-axis layout compatibility policy, pre-subtotal child filtering, collapsed Values node projection, row subtotal child policy, column display path construction, header label resolution, metric-leaf render expansion, render date-label formatting, toggle visibility, row/column aggregate emphasis, render node depth, export row hierarchy projection, worksheet-cell export typing, and registered worksheet export data now live in pure helpers. Remaining risk is mostly sorting/display-map policy and formalizing the non-DOM export model boundary.                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| Gate 7: chart component cleanup           |        77% | The chart delegates runtime fetch decisions and no longer vetoes metric-order-only commits or treats rendered tree signatures as seamless refetch identity. Seamless sync snapshots, upstream dashboard query-context signatures, committed-props sync predicates, stale coverage recovery predicates, persisted-filter seamless reload policy, persisted-selection local sync policy, runtime-layout prop sync policy and prop-sync planning, runtime-layout change actions, stale dashboard runtime actions, seamless persistence side-effect planning, pending display snapshot settlement policy, and applied runtime layout/formData projection now live outside the chart. Selected-filter update policy, persisted filter normalization, tree-derived dimension filter value collection, selection-filtered fetch form-data construction, dimension filter search/value fetch state, interaction chip construction, interaction DnD shell rendering, remove-dimension layout policy, and column-sort resolution/reconciliation are now outside the chart. Stale-dashboard recovery and persisted-filter replay now share one seamless runtime update effect. The chart still owns committed tree/fact state, interaction callback wiring, and several controller-like effects.                                                     |
+| Gate 7: chart component cleanup           |        78% | The chart delegates runtime fetch decisions and no longer vetoes metric-order-only commits or treats rendered tree signatures as seamless refetch identity. Seamless sync snapshots, upstream dashboard query-context signatures, committed-props sync predicates, stale coverage recovery predicates, persisted-filter seamless reload policy, persisted-selection local sync policy, runtime-layout prop sync policy and prop-sync planning, runtime-layout change actions, stale dashboard runtime actions, seamless update-trigger planning, seamless persistence side-effect planning, pending display snapshot settlement policy, and applied runtime layout/formData projection now live outside the chart. Selected-filter update policy, persisted filter normalization, tree-derived dimension filter value collection, selection-filtered fetch form-data construction, dimension filter search/value fetch state, interaction chip construction, interaction DnD shell rendering, remove-dimension layout policy, and column-sort resolution/reconciliation are now outside the chart. Stale-dashboard recovery and persisted-filter replay now share one runtime-planned update effect. The chart still owns committed tree/fact state, interaction callback wiring, and several controller-like effects.                    |
 
 ## What Is Now Solid
 
@@ -263,7 +267,9 @@ orchestration.
   policy are built in the seamless runtime module instead of in
   `PivotTableChart.tsx`. Persisted selected-filter local sync policy is also
   centralized there, along with runtime-layout prop sync policy and the combined
-  prop-sync plan that the chart applies.
+  prop-sync plan that the chart applies. Stale-dashboard recovery and
+  persisted-filter replay are now one runtime-planned update-trigger decision,
+  so the chart no longer branches across those two seamless update paths inline.
 - Runtime-layout change actions and stale dashboard runtime actions are now
   prepared in the seamless runtime module, so the chart no longer owns those
   fetch/local-commit and upstream-query-state decisions.
@@ -368,7 +374,7 @@ Largest relevant production files:
 - `engine.ts`: `1496` lines.
 - `PivotMetricDefinitionValue.tsx`: `1448` lines.
 - `utils.ts`: `1429` lines.
-- `PivotTableChart.tsx`: `1419` lines.
+- `PivotTableChart.tsx`: `1408` lines.
 - `materializePivotTree.ts`: `1329` lines.
 - `usePivotFormatting.tsx`: `1325` lines.
 - `useExpansionEngine.ts`: `1321` lines.
@@ -377,6 +383,7 @@ Largest relevant production files:
 - `controlPanel.tsx`: `1038` lines.
 - `PivotTableView.tsx`: `890` lines.
 - `usePivotLayout.ts`: `804` lines.
+- `seamlessRuntimeUpdate.ts`: `584` lines.
 - `usePivotRenderModel.ts`: `542` lines.
 
 Not all large files are equal for this refactor. The next high-impact files are
@@ -472,6 +479,11 @@ git diff --check
 
 Recent validation:
 
+- `a74a3345e9`: centralized stale-dashboard recovery and persisted-filter
+  replay trigger planning in the seamless runtime helper; touched-file ESLint,
+  Prettier, `git diff --check`, focused chart/runtime Jest (`23` tests), and
+  the full pivot-table-v3 plugin plus export utility Jest suite (`95` suites,
+  `769` tests) passed.
 - `9913794db3`: deleted the production DOM export fallback and made v3 Excel
   export require registered worksheet data; touched-file ESLint, Prettier,
   `git diff --check`, focused export utility/model/render/chart Jest (`18`
