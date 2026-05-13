@@ -581,9 +581,6 @@ export const PivotTableView = ({
           className="pivot-v3-table pvtTable"
           $stickyHeaders={stickyHeaders}
           data-sticky-headers={stickyHeaders}
-          data-pivot-row-axis-labels={JSON.stringify(rowAxisLabels)}
-          data-pivot-row-depth-count={rowExportDepthCount}
-          data-pivot-row-total-label={t('Total')}
         >
           <thead ref={headerRef}>
             {columnHeaderRows.length === 0 ? (
@@ -725,7 +722,6 @@ export const PivotTableView = ({
               const rowDisplayDepth = isMetricGrandTotalRow
                 ? 0
                 : getNodeDimDepth(row);
-              const rowExport = rowExportRows.get(row.key);
               const rowIndent = rowDisplayDepth * ROW_INDENT_PX;
               const isRowLoading = showSpinner(row.key);
               return (
@@ -733,12 +729,6 @@ export const PivotTableView = ({
                   key={row.key}
                   className={rowClassName}
                   style={rowStyle}
-                  data-pivot-row-export-values={
-                    rowExport ? JSON.stringify(rowExport.values) : undefined
-                  }
-                  data-pivot-export-subtotal-row={
-                    rowExport?.isSubtotal ? 'true' : undefined
-                  }
                   ref={
                     isGrandTotalLike
                       ? rowElement => {
@@ -798,13 +788,6 @@ export const PivotTableView = ({
                     const colCellFormatting = !isGrandTotalCell
                       ? resolveDimensionStyle('col', col, 'cell')
                       : undefined;
-                    const currentValue =
-                      cell && metricKey ? cell.values[metricKey] : undefined;
-                    const exportNumericValue =
-                      typeof currentValue === 'number' &&
-                      Number.isFinite(currentValue)
-                        ? currentValue
-                        : undefined;
                     const metricCellFormatting =
                       cell && metricKey
                         ? resolveMetricCellFormatting(
@@ -887,16 +870,6 @@ export const PivotTableView = ({
                         key={cellKey}
                         className={cellClassName}
                         style={style}
-                        data-pivot-export-type={
-                          exportNumericValue !== undefined
-                            ? 'number'
-                            : undefined
-                        }
-                        data-pivot-export-value={
-                          exportNumericValue !== undefined
-                            ? String(exportNumericValue)
-                            : undefined
-                        }
                         {...cellInteractionProps}
                         onContextMenu={event =>
                           handleCellContextMenu(event, row, col)

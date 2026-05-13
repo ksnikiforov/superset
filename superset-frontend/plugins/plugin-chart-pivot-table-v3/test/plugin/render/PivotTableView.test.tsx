@@ -24,6 +24,7 @@ import { type RenderModel } from '../../../src/pivot/shared/types';
 import { type PivotTreeData, type PivotTreeNode } from '../../../src/types';
 import { serializePath } from '../../../src/utils';
 import { type PivotFormattingResult } from '../../../src/pivot/chart/usePivotFormatting';
+import { buildPivotV3ExportSheetData } from '../../../src/export/buildPivotV3ExportTable';
 
 const baseRenderModel: RenderModel = {
   visibleRows: [],
@@ -393,17 +394,15 @@ describe('PivotTableView', () => {
       />,
     );
 
-    expect(container.querySelector('table')).toHaveAttribute(
-      'data-pivot-row-depth-count',
-      '2',
+    const table = container.querySelector('table') as HTMLTableElement;
+    const exportRows = buildPivotV3ExportSheetData(table).map(row =>
+      row.map(cell => cell.value),
     );
-    const bodyRows = Array.from(container.querySelectorAll('tbody tr'));
-    expect(
-      bodyRows.map(row => row.getAttribute('data-pivot-row-export-values')),
-    ).toEqual([
-      JSON.stringify(['Grand total', '']),
-      JSON.stringify(['West', '']),
-      JSON.stringify(['West', 'SF']),
+    expect(exportRows).toEqual([
+      ['Region', 'City'],
+      ['Grand total', ''],
+      ['West', ''],
+      ['West', 'SF'],
     ]);
   });
 });

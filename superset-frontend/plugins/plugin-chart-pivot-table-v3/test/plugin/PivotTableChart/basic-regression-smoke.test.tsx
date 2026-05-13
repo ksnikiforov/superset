@@ -25,6 +25,7 @@ import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { supersetChartDataClient } from '../../../src/pivot/data/SupersetChartDataClient';
 import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
 import { applyMetricAxis } from '../fixtures/metricAxis';
+import { buildPivotV3ExportSheetData } from '../../../src/export/buildPivotV3ExportTable';
 
 jest.mock('../../../src/pivot/data/SupersetChartDataClient', () => {
   const actual = jest.requireActual(
@@ -185,14 +186,12 @@ describe('PivotTableChart basic regression smoke guardrails', () => {
     fireEvent.click(expandToggle);
 
     await waitFor(() => expect(screen.getByText('X')).toBeInTheDocument());
-    expect(rowA).toHaveAttribute(
-      'data-pivot-row-export-values',
-      JSON.stringify(['A', '']),
+    const table = screen.getByRole('table') as HTMLTableElement;
+    const exportRows = buildPivotV3ExportSheetData(table).map(row =>
+      row.map(cell => cell.value),
     );
-    expect(screen.getByText('X').closest('tr')).toHaveAttribute(
-      'data-pivot-row-export-values',
-      JSON.stringify(['A', 'X']),
-    );
+    expect(exportRows.some(row => row[0] === 'A' && row[1] === '')).toBe(true);
+    expect(exportRows.some(row => row[0] === 'A' && row[1] === 'X')).toBe(true);
   });
 
   it('keeps visible column headers after adding first column dimension in Values-only layout', async () => {
