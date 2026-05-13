@@ -23,7 +23,6 @@ import {
   getColumnLabel,
 } from '@superset-ui/core';
 import {
-  MetricsLayoutEnum,
   type PivotSortMode,
   type PivotSortOrder,
   type PivotTableProps,
@@ -39,10 +38,8 @@ import {
   serializeCellKey,
   serializePath,
   decodeMetricKey,
-  formatPivotLabelValue,
   decodeMeasureLeafId,
   isSubtotalToken,
-  SUBTOTAL_TOKEN,
 } from '../../utils';
 import { buildRenderModel } from '../render/renderModel';
 import { resolveAxisProjection } from '../runtime/projection';
@@ -57,6 +54,11 @@ import {
 } from '../metricsTotals';
 import { type PivotLayoutResult } from './usePivotLayout';
 import { type PivotColumnSortState } from './columnSort';
+import {
+  buildColumnDisplayPath,
+  expandMetricNodesForRender,
+  resolveColumnHeaderLabel,
+} from './renderDisplay';
 
 type DimensionSortingKeys = {
   metricKey?: string;
@@ -64,112 +66,7 @@ type DimensionSortingKeys = {
   mode: PivotSortMode;
 };
 
-type ColumnDisplayConfig = {
-  metricsLayout: MetricsLayoutEnum;
-  metricsFirstOnCols: boolean;
-  metricsAtColEnd: boolean;
-  allowMetricSubtotalLabels: boolean;
-  metricLabels: string[];
-  isExplicitSubtotalNode: (node: PivotTreeNode) => boolean;
-  getMetricKeyFromPath: (path: PivotTreeNode['path']) => string | undefined;
-  getMetricDisplayLabelForKey: (metricKey: string) => string;
-  getNonMetricPathParts: (path: PivotTreeNode['path']) => PivotTreeNode['path'];
-  isMetricGrandTotalNode: (node: PivotTreeNode) => boolean;
-  isMetricSubtotalNode: (node: PivotTreeNode) => boolean;
-  isExpanded?: (node: PivotTreeNode) => boolean;
-};
-
 const DEFAULT_DIMENSION_SORT_ORDER: PivotSortOrder = 'asc';
-
-const buildColumnDisplayPath = (
-  col: PivotTreeNode,
-  maxDepth: number,
-  config: ColumnDisplayConfig,
-) => {
-  const {
-    metricsLayout,
-    metricsFirstOnCols,
-    metricsAtColEnd,
-    allowMetricSubtotalLabels,
-    metricLabels,
-    isExplicitSubtotalNode,
-    getMetricKeyFromPath,
-    getMetricDisplayLabelForKey,
-    getNonMetricPathParts,
-    isMetricGrandTotalNode,
-    isMetricSubtotalNode,
-    isExpanded,
-  } = config;
-  const metricKey = getMetricKeyFromPath(col.path);
-  const metricLabel = metricKey
-    ? getMetricDisplayLabelForKey(metricKey)
-    : undefined;
-  if (
-    metricsLayout === MetricsLayoutEnum.COLUMNS &&
-    metricsFirstOnCols &&
-    isExpanded?.(col) &&
-    metricLabel &&
-    col.path.length < maxDepth
-  ) {
-    const nonMetricParts = getNonMetricPathParts(col.path);
-    if (nonMetricParts.length === 0) {
-      return [...col.path, SUBTOTAL_TOKEN];
-    }
-    return [
-      ...col.path,
-      ...Array(Math.max(maxDepth - col.path.length, 0)).fill(metricLabel),
-    ];
-  }
-  if (metricsLayout !== MetricsLayoutEnum.COLUMNS || metricsFirstOnCols) {
-    return col.path;
-  }
-  const padToDepth = (path: PivotTreeNode['path']) => {
-    if (!isExplicitSubtotalNode(col) || path.length >= maxDepth) {
-      return path;
-    }
-    const decoded = decodeMetricKey(path[path.length - 1]);
-    const lastLabel = decoded
-      ? getMetricDisplayLabelForKey(decoded)
-      : String(path[path.length - 1] ?? '');
-    return [
-      ...path,
-      ...Array(Math.max(maxDepth - path.length, 0)).fill(lastLabel),
-    ];
-  };
-  if (!metricKey || !metricLabel) {
-    return padToDepth(col.path);
-  }
-  const nonMetricParts = getNonMetricPathParts(col.path);
-  const buildMetricSubtotalPathAtEnd = () => {
-    if (nonMetricParts.length === 0) {
-      return [metricLabel];
-    }
-    const displayParts = [...nonMetricParts];
-    const lastIndex = displayParts.length - 1;
-    displayParts[lastIndex] = `${displayParts[lastIndex]} ${metricLabel}`;
-    return displayParts;
-  };
-  if (isMetricGrandTotalNode(col)) {
-    const leafPath = col.path.filter(val => decodeMeasureLeafId(val));
-    const totalLabel =
-      metricLabels.length === 1 ? 'Grand total' : `Total ${metricLabel}`;
-    return leafPath.length > 0 ? [totalLabel, ...leafPath] : [totalLabel];
-  }
-  const metricIsLeaf =
-    (decodeMetricKey(col.path[col.path.length - 1]) ??
-      String(col.path[col.path.length - 1] ?? '')) === metricKey;
-  if (
-    metricIsLeaf &&
-    nonMetricParts.length > 0 &&
-    metricsAtColEnd &&
-    allowMetricSubtotalLabels &&
-    isMetricSubtotalNode(col) &&
-    (col.hasChildren || nonMetricParts.length > 1)
-  ) {
-    return buildMetricSubtotalPathAtEnd();
-  }
-  return padToDepth(col.path);
-};
 
 const compareSortValues = (
   aValue: DataRecordValue | undefined,
@@ -535,50 +432,47 @@ export const usePivotRenderModel = ({
   );
 
   const getColumnHeaderLabel = useCallback(
-    (rawValue: DataRecordValue) => {
-      const decoded = decodeMetricKey(rawValue);
-      if (decoded) {
-        return layout.getMetricDisplayLabelForKey(decoded);
-      }
-      const leafId = decodeMeasureLeafId(rawValue);
-      if (leafId && layout.measureHierarchy.kind === 'measureStackV1') {
-        return (
-          layout.measureHierarchy.groups
-            .flatMap(group => group.leaves)
-            .find(leaf => leaf.id === leafId)?.label ||
-          formatPivotLabelValue(rawValue, '')
-        );
-      }
-      return formatPivotLabelValue(rawValue, '');
-    },
+    (rawValue: DataRecordValue) =>
+      resolveColumnHeaderLabel({
+        rawValue,
+        measureHierarchy: layout.measureHierarchy,
+        getMetricDisplayLabelForKey: layout.getMetricDisplayLabelForKey,
+      }),
     [layout],
   );
 
   const isLeafTierVisible =
     layout.measureHierarchy.kind === 'measureStackV1' &&
     layout.measureHierarchy.leafTierVisibility === 'visible';
-  const expandMetricNodesForRender = useCallback(
-    (expanded: Set<string>, nodes: Record<string, PivotTreeNode>) => {
-      if (!isLeafTierVisible) {
-        return expanded;
-      }
-      const next = new Set(expanded);
-      Object.values(nodes).forEach(node => {
-        if (layout.isMetricTokenValue(node.path[node.path.length - 1])) {
-          next.add(node.key);
-        }
-      });
-      return next;
-    },
-    [isLeafTierVisible, layout],
-  );
   const expandedRowsForRender = useMemo(
-    () => expandMetricNodesForRender(expandedRows, renderTree.rows),
-    [expandMetricNodesForRender, expandedRows, renderTree.rows],
+    () =>
+      expandMetricNodesForRender({
+        expanded: expandedRows,
+        nodes: renderTree.rows,
+        isLeafTierVisible,
+        isMetricTokenValue: layout.isMetricTokenValue,
+      }),
+    [
+      expandedRows,
+      isLeafTierVisible,
+      layout.isMetricTokenValue,
+      renderTree.rows,
+    ],
   );
   const expandedColsForRender = useMemo(
-    () => expandMetricNodesForRender(expandedCols, renderTree.cols),
-    [expandMetricNodesForRender, expandedCols, renderTree.cols],
+    () =>
+      expandMetricNodesForRender({
+        expanded: expandedCols,
+        nodes: renderTree.cols,
+        isLeafTierVisible,
+        isMetricTokenValue: layout.isMetricTokenValue,
+      }),
+    [
+      expandedCols,
+      isLeafTierVisible,
+      layout.isMetricTokenValue,
+      renderTree.cols,
+    ],
   );
 
   const renderModel = useMemo(() => {
