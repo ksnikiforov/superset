@@ -25,7 +25,6 @@ import {
   useState,
 } from 'react';
 import { unstable_batchedUpdates } from 'react-dom';
-import { nanoid } from 'nanoid';
 import {
   type HandlerFunction,
   type JsonObject,
@@ -42,7 +41,6 @@ import {
   type PivotExpansionStateKeys,
 } from '../engine/expansionStateModel';
 import { type ChartDataWarning } from '../data/ChartDataClient';
-import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import { stableStringify } from '../shared/stableStringify';
 import { createExpansionStateStore, type ExpansionStateStore } from './store';
 import {
@@ -56,7 +54,6 @@ import {
   type PivotFactStore,
   type PivotFactStoreBatch,
 } from '../runtime/factStore';
-import { createLatestRequestLifecycle } from '../runtime/requestLifecycle';
 import {
   addAncestors,
   buildVisiblePersistedExpansionState,
@@ -83,11 +80,11 @@ import {
 } from './runtimeState';
 import { useSyncRef } from '../shared/useSyncRef';
 import {
-  createExpansionRequestHelpers,
   runHydrationExpansionFetchLoop,
   runSameAxisExpansionFetchLoop,
   type ExpansionFetchRuntime,
 } from './fetchExecution';
+import { useExpansionRequestRuntime } from './useExpansionRequestRuntime';
 
 const MAX_HYDRATION_ITERATIONS = 12;
 const EMPTY_FACT_BATCHES: PivotFactStoreBatch[] = [];
@@ -209,7 +206,6 @@ export const useExpansionEngine = ({
     metrics: fetchFormData.metrics,
     metricsLayout: fetchFormData.metricsLayout,
   });
-  const fetchCoverageSignatureRef = useRef(fetchCoverageSignature);
   const explicitExpandedRowsRef = useRef<Set<string>>(new Set());
   const explicitExpandedColsRef = useRef<Set<string>>(new Set());
   const explicitCollapsedRowsRef = useRef<Set<string>>(new Set());
@@ -229,28 +225,13 @@ export const useExpansionEngine = ({
   const expandedStateSignatureRef = useRef<string | null>(null);
   const expandedStateSharedSignatureRef = useRef<string | null>(null);
   const fetchedCoverageRef = useRef(createFetchedFactCoverageState());
-  const requestGroupPrefixRef = useRef(nanoid());
-  const expansionRequestLifecycle = useMemo(
-    () =>
-      createLatestRequestLifecycle({
-        cancel: requestGroupId =>
-          supersetChartDataClient.cancel(requestGroupId),
-      }),
-    [],
-  );
-  if (fetchCoverageSignatureRef.current !== fetchCoverageSignature) {
-    expansionRequestLifecycle.invalidate();
-    fetchedCoverageRef.current = createFetchedFactCoverageState();
-    fetchCoverageSignatureRef.current = fetchCoverageSignature;
-  }
-  const expansionRequestHelpers = useMemo(
-    () =>
-      createExpansionRequestHelpers({
-        lifecycle: expansionRequestLifecycle,
-        instanceId: requestGroupPrefixRef.current,
-      }),
-    [expansionRequestLifecycle],
-  );
+  const { expansionRequestLifecycle, expansionRequestHelpers } =
+    useExpansionRequestRuntime({
+      fetchCoverageSignature,
+      resetFetchedCoverage: () => {
+        fetchedCoverageRef.current = createFetchedFactCoverageState();
+      },
+    });
   const expansionStateStoreRef = useRef<ExpansionStateStore>();
   const persistedExpansionStateRef = useRef<unknown>(persistedExpansionState);
   const dataEpochRef = useRef(0);
@@ -436,13 +417,6 @@ export const useExpansionEngine = ({
       setWarnings(Array.from(map.values()));
     },
     [setWarnings],
-  );
-
-  useEffect(
-    () => () => {
-      expansionRequestLifecycle.invalidate();
-    },
-    [expansionRequestLifecycle],
   );
 
   const shouldFetchChildren = useCallback(
