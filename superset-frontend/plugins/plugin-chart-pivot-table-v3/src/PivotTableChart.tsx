@@ -52,6 +52,7 @@ import { useStickyHeaders } from './pivot/chart/useStickyHeaders';
 import { usePivotFormatting } from './pivot/chart/usePivotFormatting';
 import { usePivotInteractions } from './pivot/chart/usePivotInteractions';
 import { usePivotDatasetMeta } from './pivot/chart/usePivotDatasetMeta';
+import { usePivotRuntimeLayoutState } from './pivot/chart/usePivotRuntimeLayoutState';
 import { PivotInteractionPanel } from './pivot/chart/PivotInteractionPanel';
 import {
   INTERACTION_PANEL_WIDTH,
@@ -59,7 +60,6 @@ import {
   INTERACTION_TOP_CHIPS_HEIGHT,
   PivotInteractionLayout,
 } from './pivot/chart/PivotInteractionLayout';
-import { isSameRuntimeLayout } from './pivot/runtime/coverage';
 import {
   normalizeRuntimeLayout,
   resolveAppliedInteractionLayout,
@@ -91,7 +91,6 @@ import { useSyncRef } from './pivot/shared/useSyncRef';
 import {
   buildSeamlessRuntimeUpstreamSignature,
   isSeamlessDisplaySnapshotSettled,
-  prepareRuntimeLayoutPropSync,
   prepareRuntimeStatePersistence,
   prepareSeamlessRuntimeUpdateEffect,
   prepareSeamlessRuntimeLayoutChange,
@@ -263,22 +262,27 @@ function PivotTableChart(props: PivotTableProps) {
       formData.pivotRuntimeLayout;
     return normalizeRuntimeLayout(persisted, dimensionKeys, metricKeys);
   }, [dimensionKeys, formData.pivotRuntimeLayout, metricKeys, ownState]);
-  const [committedRuntimeLayout, setCommittedRuntimeLayout] =
-    useState<PivotRuntimeLayout>(runtimeLayout);
-  const committedRuntimeLayoutRef = useRef(committedRuntimeLayout);
-  useSyncRef(committedRuntimeLayoutRef, committedRuntimeLayout);
-  const [uiRuntimeLayout, setUiRuntimeLayout] =
-    useState<PivotRuntimeLayout>(runtimeLayout);
-  const uiRuntimeLayoutRef = useRef(runtimeLayout);
-  const updateUiRuntimeLayout = useCallback((layout: PivotRuntimeLayout) => {
-    uiRuntimeLayoutRef.current = layout;
-    setUiRuntimeLayout(layout);
-  }, []);
+  const lastPersistedRuntimeLayoutRef = useRef(runtimeLayout);
+  const pendingPersistedRuntimeLayoutSyncRef = useRef(false);
+  const {
+    committedRuntimeLayout,
+    committedRuntimeLayoutRef,
+    uiRuntimeLayout,
+    uiRuntimeLayoutRef,
+    updateUiRuntimeLayout,
+    commitRuntimeLayout,
+  } = usePivotRuntimeLayoutState({
+    isUserControlled,
+    isDashboardContext,
+    isDashboardRuntimeSync,
+    runtimeLayout,
+    pendingPersistedRuntimeLayoutSyncRef,
+    pendingSeamlessLayoutRef,
+    lastPersistedRuntimeLayoutRef,
+  });
   const [uiSelectedFilters, setUiSelectedFilters] = useState<
     Record<string, DataRecordValue[]>
   >(selectedFilters ?? EMPTY_SELECTED_FILTERS);
-  const lastPersistedRuntimeLayoutRef = useRef(runtimeLayout);
-  const pendingPersistedRuntimeLayoutSyncRef = useRef(false);
   const selectedFiltersFromProps = selectedFilters ?? EMPTY_SELECTED_FILTERS;
   const lastPersistedSelectionRef = useRef(selectedFiltersFromProps);
   const pendingPersistedSelectionSyncRef = useRef(false);
@@ -313,36 +317,6 @@ function PivotTableChart(props: PivotTableProps) {
     ],
   );
 
-  useEffect(() => {
-    const propSync = prepareRuntimeLayoutPropSync({
-      isUserControlled,
-      isDashboardContext,
-      isDashboardRuntimeSync,
-      pendingPersistedRuntimeLayoutSync:
-        pendingPersistedRuntimeLayoutSyncRef.current,
-      hasPendingSeamlessLayout: pendingSeamlessLayoutRef.current !== null,
-      runtimeLayout,
-      lastPersistedRuntimeLayout: lastPersistedRuntimeLayoutRef.current,
-    });
-    if (propSync.shouldSyncCommittedRuntimeLayout) {
-      committedRuntimeLayoutRef.current = runtimeLayout;
-      setCommittedRuntimeLayout(current =>
-        isSameRuntimeLayout(current, runtimeLayout) ? current : runtimeLayout,
-      );
-    }
-    if (propSync.hasPersistedRuntimeLayoutSyncSettled) {
-      pendingPersistedRuntimeLayoutSyncRef.current = false;
-    }
-    if (propSync.shouldSyncUiRuntimeLayout) {
-      updateUiRuntimeLayout(runtimeLayout);
-    }
-  }, [
-    isDashboardContext,
-    isDashboardRuntimeSync,
-    isUserControlled,
-    runtimeLayout,
-    updateUiRuntimeLayout,
-  ]);
   const { appliedLayoutFormData, appliedPivotProgram } =
     resolveAppliedInteractionLayout({
       isUserControlled,
@@ -440,10 +414,7 @@ function PivotTableChart(props: PivotTableProps) {
         lastPersistedSelectionRef.current = persistencePlan.persistedSelection;
         pendingPersistedSelectionSyncRef.current = true;
       }
-      committedRuntimeLayoutRef.current = layout;
-      setCommittedRuntimeLayout(current =>
-        isSameRuntimeLayout(current, layout) ? current : layout,
-      );
+      commitRuntimeLayout(layout);
       if (setControlValue) {
         setControlValue('pivotRuntimeLayout', layout);
         setControlValue('pivotSelectedFilters', filters);
@@ -455,6 +426,7 @@ function PivotTableChart(props: PivotTableProps) {
     },
     [
       isDashboardRuntimeSync,
+      commitRuntimeLayout,
       mergeOwnState,
       setControlValue,
       setDataMask,
@@ -532,6 +504,7 @@ function PivotTableChart(props: PivotTableProps) {
     [
       applySeamlessUpdate,
       committedFactBatches,
+      committedRuntimeLayoutRef,
       dimensionKeys,
       metricKeys,
       persistRuntimeState,
@@ -943,7 +916,7 @@ function PivotTableChart(props: PivotTableProps) {
         removeDimensionFromLayout(uiRuntimeLayoutRef.current, dimensionKey),
       );
     },
-    [handleRuntimeLayoutChange],
+    [handleRuntimeLayoutChange, uiRuntimeLayoutRef],
   );
 
   const handleDimensionDrop = useCallback(
@@ -966,7 +939,7 @@ function PivotTableChart(props: PivotTableProps) {
       });
       handleRuntimeLayoutChange(nextLayout);
     },
-    [handleRuntimeLayoutChange, hasMetrics],
+    [handleRuntimeLayoutChange, hasMetrics, uiRuntimeLayoutRef],
   );
 
   const handleValueDrop = useCallback(
@@ -985,7 +958,7 @@ function PivotTableChart(props: PivotTableProps) {
       });
       handleRuntimeLayoutChange(nextLayout);
     },
-    [handleRuntimeLayoutChange, hasMetrics],
+    [handleRuntimeLayoutChange, hasMetrics, uiRuntimeLayoutRef],
   );
 
   const shouldDelayRender =
