@@ -30,6 +30,7 @@ import {
   type JsonObject,
   type SetDataMaskHook,
 } from '@superset-ui/core';
+import { nanoid } from 'nanoid';
 import {
   type PivotAxis,
   type PivotExpansionState,
@@ -78,15 +79,16 @@ import {
 } from './fetchedRequests';
 import { useSyncRef } from '../shared/useSyncRef';
 import {
+  createExpansionRequestHelpers,
   runSameAxisExpansionFetchLoop,
   type ExpansionFetchRuntime,
 } from './fetchExecution';
-import { useExpansionRequestRuntime } from './useExpansionRequestRuntime';
-import { useExpansionInFlight } from './useExpansionInFlight';
 import {
   scheduleInitialHydrationPrefetch,
   useExpansionHydrationRuntime,
 } from './useExpansionHydrationRuntime';
+import { createLatestRequestLifecycle } from '../runtime/requestLifecycle';
+import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 
 const MAX_HYDRATION_ITERATIONS = 12;
 const EMPTY_FACT_BATCHES: PivotFactStoreBatch[] = [];
@@ -383,7 +385,9 @@ export const useExpansionEngine = ({
   const explicitExpandedColsRef = useRef<Set<string>>(new Set());
   const explicitCollapsedRowsRef = useRef<Set<string>>(new Set());
   const explicitCollapsedColsRef = useRef<Set<string>>(new Set());
-  const inFlightExpansion = useExpansionInFlight();
+  const inFlightExpandedRowsRef = useRef<Map<number, Set<string>>>(new Map());
+  const inFlightExpandedColsRef = useRef<Map<number, Set<string>>>(new Map());
+  const inFlightExpansionIdRef = useRef(0);
   const [errorMessage, setErrorMessage] = useState<string>();
   const [warnings, setWarnings] = useState<ChartDataWarning[]>([]);
   const warningsRef = useRef<Map<string, ChartDataWarning>>(new Map());
@@ -396,13 +400,31 @@ export const useExpansionEngine = ({
   const expandedStateSignatureRef = useRef<string | null>(null);
   const expandedStateSharedSignatureRef = useRef<string | null>(null);
   const fetchedCoverageRef = useRef(createFetchedFactCoverageState());
-  const { expansionRequestLifecycle, expansionRequestHelpers } =
-    useExpansionRequestRuntime({
-      fetchCoverageSignature,
-      resetFetchedCoverage: () => {
-        fetchedCoverageRef.current = createFetchedFactCoverageState();
-      },
-    });
+  const requestGroupPrefixRef = useRef(nanoid());
+  const fetchCoverageSignatureRef = useRef(fetchCoverageSignature);
+  const expansionRequestLifecycle = useMemo(
+    () =>
+      createLatestRequestLifecycle({
+        cancel: requestGroupId =>
+          supersetChartDataClient.cancel(requestGroupId),
+      }),
+    [],
+  );
+
+  if (fetchCoverageSignatureRef.current !== fetchCoverageSignature) {
+    expansionRequestLifecycle.invalidate();
+    fetchedCoverageRef.current = createFetchedFactCoverageState();
+    fetchCoverageSignatureRef.current = fetchCoverageSignature;
+  }
+
+  const expansionRequestHelpers = useMemo(
+    () =>
+      createExpansionRequestHelpers({
+        lifecycle: expansionRequestLifecycle,
+        instanceId: requestGroupPrefixRef.current,
+      }),
+    [expansionRequestLifecycle],
+  );
   const expansionStateStoreRef = useRef<ExpansionStateStore>();
   const persistedExpansionStateRef = useRef<unknown>(persistedExpansionState);
   const dataEpochRef = useRef(0);
@@ -435,6 +457,13 @@ export const useExpansionEngine = ({
     shouldPersistExpansionState,
   ]);
 
+  useEffect(
+    () => () => {
+      expansionRequestLifecycle.invalidate();
+    },
+    [expansionRequestLifecycle],
+  );
+
   useSyncRef(persistedExpansionStateRef, persistedExpansionState);
   useSyncRef(treeRef, tree);
   useSyncRef(expandedRowsRef, expandedRows);
@@ -453,6 +482,53 @@ export const useExpansionEngine = ({
 
   const setHydratingState = useCallback((value: boolean) => {
     dispatchRuntimeState({ type: 'setHydrating', value });
+  }, []);
+
+  const collectInFlightExpansion = useCallback((axis: PivotAxis) => {
+    const merged = new Set<string>();
+    (axis === 'row'
+      ? inFlightExpandedRowsRef.current
+      : inFlightExpandedColsRef.current
+    ).forEach(keys => keys.forEach(key => merged.add(key)));
+    return merged;
+  }, []);
+
+  const hasOtherAxisInFlight = useCallback((axis: PivotAxis) => {
+    const otherMap =
+      axis === 'row'
+        ? inFlightExpandedColsRef.current
+        : inFlightExpandedRowsRef.current;
+    return otherMap.size > 0;
+  }, []);
+
+  const trackInFlightExpansion = useCallback(
+    (
+      axis: PivotAxis,
+      resolvedExpanded: Set<string>,
+      committedExpanded: Set<string>,
+    ) => {
+      const inFlightId = inFlightExpansionIdRef.current + 1;
+      inFlightExpansionIdRef.current = inFlightId;
+      const inFlightMap =
+        axis === 'row'
+          ? inFlightExpandedRowsRef.current
+          : inFlightExpandedColsRef.current;
+      const inFlightKeys = new Set(resolvedExpanded);
+      committedExpanded.forEach(key => inFlightKeys.delete(key));
+      if (inFlightKeys.size > 0) {
+        inFlightMap.set(inFlightId, inFlightKeys);
+      }
+      return {
+        clear: () => inFlightMap.delete(inFlightId),
+      };
+    },
+    [],
+  );
+
+  const clearInFlightExpansions = useCallback(() => {
+    inFlightExpandedRowsRef.current.clear();
+    inFlightExpandedColsRef.current.clear();
+    inFlightExpansionIdRef.current = 0;
   }, []);
 
   const getCoverageKey = useCallback(
@@ -704,10 +780,10 @@ export const useExpansionEngine = ({
             : explicitCollapsedColsRef.current,
         pendingKeys:
           axis === 'row' ? pendingRowsRef.current : pendingColsRef.current,
-        inFlightKeys: inFlightExpansion.collect(axis),
+        inFlightKeys: collectInFlightExpansion(axis),
       }),
     [
-      inFlightExpansion,
+      collectInFlightExpansion,
       metricLabelSet,
       shouldExpandMetricCols,
       shouldExpandMetricRows,
@@ -753,11 +829,7 @@ export const useExpansionEngine = ({
         baseExpanded,
         initialTree,
       );
-      const inFlight = inFlightExpansion.track(
-        axis,
-        resolvedExpanded,
-        expanded,
-      );
+      const inFlight = trackInFlightExpansion(axis, resolvedExpanded, expanded);
 
       const fetchRuntime: ExpansionFetchRuntime = {
         requestScope,
@@ -839,7 +911,6 @@ export const useExpansionEngine = ({
       expansionRequestLifecycle,
       getCoverageKey,
       groupbyColumnsLength,
-      inFlightExpansion,
       isMetricTokenValue,
       metricIndexForCols,
       persistExpansionState,
@@ -847,6 +918,7 @@ export const useExpansionEngine = ({
       resolveExpandedForMetrics,
       seedFetchedCoverageFromFactBatches,
       seedFetchedCoverageFromLoadedMetricNodes,
+      trackInFlightExpansion,
       shouldFetchChildren,
       updateLoadingKey,
     ],
@@ -934,7 +1006,7 @@ export const useExpansionEngine = ({
         axis === 'row' ? pendingRowsRef.current : pendingColsRef.current;
       const otherPending =
         axis === 'row' ? pendingColsRef.current : pendingRowsRef.current;
-      const otherInFlight = inFlightExpansion.hasOtherAxisInFlight(axis);
+      const otherInFlight = hasOtherAxisInFlight(axis);
       const manualExpandedRef =
         axis === 'row' ? explicitExpandedRowsRef : explicitExpandedColsRef;
       const manualCollapsedRef =
@@ -985,8 +1057,8 @@ export const useExpansionEngine = ({
       computeVisibleDepths,
       expansionRequestLifecycle,
       expandSameAxis,
+      hasOtherAxisInFlight,
       hydrateAtomic,
-      inFlightExpansion,
       reportAsyncError,
       clearLoadingState,
       setHydratingState,
@@ -1093,7 +1165,7 @@ export const useExpansionEngine = ({
     setErrorMessage(undefined);
     fetchedCoverageRef.current = nextFetchedCoverage;
     clearLoadingState();
-    inFlightExpansion.clearAll();
+    clearInFlightExpansions();
 
     const reinitializedExpansion = resolveReinitializedExpansionState({
       tree: normalizedTree,
@@ -1221,7 +1293,7 @@ export const useExpansionEngine = ({
     shouldExpandMetricCols,
     shouldExpandMetricRows,
     hydrateAtomic,
-    inFlightExpansion,
+    clearInFlightExpansions,
     expansionRequestLifecycle,
     resolveExpandedForMetrics,
     reportAsyncError,
