@@ -57,7 +57,7 @@ cells are projections of DB facts, not canonical data.
 
 ## Current Status
 
-As of May 14, 2026, after the expansion transition API cleanup checkpoint:
+As of May 14, 2026, after the expansion prefetch cleanup checkpoint:
 
 - Gate-weighted architecture estimate: **99%**.
 - Delivery remaining estimate: **less than 1%**, mostly completion audit and
@@ -72,11 +72,11 @@ As of May 14, 2026, after the expansion transition API cleanup checkpoint:
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `14454` insertions, `13557` deletions, net `+897`.
-- Current production `src` TypeScript/TSX total: `34407` lines.
+- Production `src`: `14389` insertions, `13557` deletions, net `+832`.
+- Current production `src` TypeScript/TSX total: `34342` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
-- `PivotTableChart.tsx` is now `705` lines and `useExpansionEngine.ts` is now
-  `1439` lines; those single-file reductions should not be counted as plugin
+- `PivotTableChart.tsx` is now `691` lines and `useExpansionEngine.ts` is now
+  `1405` lines; those single-file reductions should not be counted as plugin
   source reduction because the plugin-wide total increased.
 - Query/render boundary cleanup deleted the one-type `pivot/query/types.ts`
   file and the mixed `pivot/shared/types.ts` bucket. `QuerySpec` now lives with
@@ -120,6 +120,16 @@ Source-only diff from pre-refactor baseline
   and `65` tests.
 - Full plugin plus export entrypoint Jest pass after the cleanup: `99` suites
   and `839` tests.
+- Expansion prefetch cleanup folded one-consumer hydration scheduling into the
+  owning engine effect and inlined private prefetch/visible-key helpers inside
+  their owning transition functions. The source slice was deletion-positive:
+  `29` insertions, `94` deletions, net `-65`; source plus tests was `29`
+  insertions, `126` deletions, net `-97`.
+- Touched-file ESLint passed after the expansion prefetch cleanup.
+- Focused expansion/seamless validation after the cleanup passed: `4` suites
+  and `64` tests.
+- Full plugin plus export entrypoint Jest pass after the cleanup: `99` suites
+  and `838` tests.
 - Metric source-catalog cleanup removed `metricsBase` and
   `measureLeavesByMetricBase` from the chart `formData` shape. The original
   metric catalog now travels as explicit chart props instead of compatibility
@@ -604,12 +614,12 @@ deletion-positive structure cleanup; it is still not a net source reduction.
 Largest relevant production files:
 
 - `PivotDndMetricSelect.tsx`: `1564` lines.
-- `stateTransitions.ts`: `1492` lines.
+- `stateTransitions.ts`: `1461` lines.
 - `PivotMetricDefinitionValue.tsx`: `1448` lines.
 - `utils.ts`: `1399` lines.
 - `materializePivotTree.ts`: `1329` lines.
 - `usePivotFormatting.tsx`: `1320` lines.
-- `useExpansionEngine.ts`: `1439` lines.
+- `useExpansionEngine.ts`: `1405` lines.
 - `PivotInteractionPanel.tsx`: `1171` lines.
 - `PivotDndColumnSelect.tsx`: `1071` lines.
 - `controlPanel.tsx`: `1024` lines.
