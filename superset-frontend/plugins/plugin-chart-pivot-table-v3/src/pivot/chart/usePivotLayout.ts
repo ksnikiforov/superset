@@ -28,7 +28,6 @@ import {
 } from '../../types';
 import {
   resolveMetricDisplayLabel,
-  findMeasureLeafIdInPath,
   getMetricKey,
   getStableColumnKey,
   isSubtotalToken,
@@ -44,6 +43,7 @@ import {
 } from '../metricsTotals';
 import { pruneStaleCollapsedAxis } from './pruneCollapsedAxis';
 import {
+  buildMetricOrderComparator,
   resolveAxisChildrenBeforeSubtotalPolicy,
   resolveCollapsedValuesNodesForAxis,
   resolveMetricAxisLayoutPolicy,
@@ -235,10 +235,6 @@ export const usePivotLayout = ({
     | Record<string, string>
     | undefined;
 
-  const metricOrderMap = useMemo(
-    () => new Map(metricLabels.map((label, idx) => [label, idx])),
-    [metricLabels],
-  );
   const isMultiMetric = metricLabels.length > 1;
   const hasMultipleMeasures =
     isMultiMetric ||
@@ -393,46 +389,14 @@ export const usePivotLayout = ({
     [metricLabelMap, metricVerboseMap, metrics],
   );
 
-  const measureLeafOrderMap = useMemo(() => {
-    const next = new Map<string, Map<string, number>>();
-    if (layout.measureHierarchy.kind !== 'measureStackV1') {
-      return next;
-    }
-    layout.measureHierarchy.groups.forEach(group => {
-      const order = new Map<string, number>();
-      group.leaves.forEach((leaf, index) => {
-        order.set(leaf.id, index);
-      });
-      next.set(group.metricKey, order);
-    });
-    return next;
-  }, [layout.measureHierarchy]);
-
-  const compareMetricOrder = useCallback(
-    (a: PivotTreeNode, b: PivotTreeNode) => {
-      const aMetric = getMetricLabelFromPath(a.path);
-      const bMetric = getMetricLabelFromPath(b.path);
-      if (!aMetric || !bMetric) {
-        return 0;
-      }
-      if (aMetric === bMetric) {
-        const leafOrder = measureLeafOrderMap.get(aMetric);
-        const aLeaf = findMeasureLeafIdInPath(a.path);
-        const bLeaf = findMeasureLeafIdInPath(b.path);
-        if (!leafOrder || !aLeaf || !bLeaf || aLeaf === bLeaf) {
-          return 0;
-        }
-        const aIndex = leafOrder.get(aLeaf);
-        const bIndex = leafOrder.get(bLeaf);
-        return aIndex !== undefined && bIndex !== undefined
-          ? aIndex - bIndex
-          : 0;
-      }
-      const aIndex = metricOrderMap.get(aMetric);
-      const bIndex = metricOrderMap.get(bMetric);
-      return aIndex !== undefined && bIndex !== undefined ? aIndex - bIndex : 0;
-    },
-    [getMetricLabelFromPath, measureLeafOrderMap, metricOrderMap],
+  const compareMetricOrder = useMemo(
+    () =>
+      buildMetricOrderComparator({
+        metricKeys: metricLabels,
+        measureHierarchy: layout.measureHierarchy,
+        getMetricLabelFromPath,
+      }),
+    [getMetricLabelFromPath, layout.measureHierarchy, metricLabels],
   );
 
   const getNonMetricPathParts = useCallback(

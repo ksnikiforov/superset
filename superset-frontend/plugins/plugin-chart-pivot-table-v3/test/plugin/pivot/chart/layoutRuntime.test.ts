@@ -19,6 +19,7 @@
 import { type QueryFormColumn } from '@superset-ui/core';
 import { MetricsLayoutEnum, type PivotTreeNode } from '../../../../src/types';
 import {
+  buildMetricOrderComparator,
   resolveAxisChildrenBeforeSubtotalPolicy,
   resolveCollapsedValuesNodesForAxis,
   resolveMetricAxisLayoutPolicy,
@@ -26,6 +27,7 @@ import {
 } from '../../../../src/pivot/chart/layoutRuntime';
 import { type PivotProgram } from '../../../../src/pivot/runtime/types';
 import {
+  encodeMeasureLeafKey,
   encodeMetricKey,
   METRICS_PLACEHOLDER,
   serializePath,
@@ -97,6 +99,59 @@ const valuesProgram: PivotProgram = {
 };
 
 describe('pivot/chart/layoutRuntime', () => {
+  it('orders metric nodes by compiled metric order', () => {
+    const comparator = buildMetricOrderComparator({
+      metricKeys: ['sales', 'profit'],
+      measureHierarchy: {
+        kind: 'flatMetrics',
+        metricKeys: ['sales', 'profit'],
+      },
+      getMetricLabelFromPath: path =>
+        path.includes(encodeMetricKey('sales'))
+          ? 'sales'
+          : path.includes(encodeMetricKey('profit'))
+            ? 'profit'
+            : undefined,
+    });
+
+    expect(
+      comparator(
+        node('row', [encodeMetricKey('profit')]),
+        node('row', [encodeMetricKey('sales')]),
+      ),
+    ).toBeGreaterThan(0);
+  });
+
+  it('orders measure leaves within the same metric', () => {
+    const comparator = buildMetricOrderComparator({
+      metricKeys: ['sales'],
+      measureHierarchy: {
+        kind: 'measureStackV1',
+        leafTierVisibility: 'visible',
+        groups: [
+          {
+            metricKey: 'sales',
+            leaves: [
+              { kind: 'builtIn', id: 'current', operator: 'value', label: '' },
+              { kind: 'builtIn', id: 'delta', operator: 'delta', label: '' },
+            ],
+          },
+        ],
+      },
+      getMetricLabelFromPath: () => 'sales',
+    });
+
+    expect(
+      comparator(
+        node('row', [encodeMetricKey('sales'), encodeMeasureLeafKey('delta')]),
+        node('row', [
+          encodeMetricKey('sales'),
+          encodeMeasureLeafKey('current'),
+        ]),
+      ),
+    ).toBeGreaterThan(0);
+  });
+
   it('uses explicit row metric placeholder position before inferred nodes exist', () => {
     const policy = resolveMetricAxisLayoutPolicy({
       ...baseParams,

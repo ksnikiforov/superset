@@ -18,6 +18,7 @@
  */
 import {
   MetricsLayoutEnum,
+  type MeasureHierarchy,
   type PivotAxis,
   type PivotTableProps,
   type PivotTreeData,
@@ -25,6 +26,7 @@ import {
   type TotalPosition,
 } from '../../types';
 import {
+  findMeasureLeafIdInPath,
   isMetricsPlaceholder,
   isSubtotalToken,
   serializePath,
@@ -89,6 +91,50 @@ export type MetricAxisLayoutPolicy = {
   effectiveColSubtotalPosition: TotalPosition;
   hideMetricHeaderOnRows: boolean;
   hideMetricHeaderOnCols: boolean;
+};
+
+export const buildMetricOrderComparator = ({
+  metricKeys,
+  measureHierarchy,
+  getMetricLabelFromPath,
+}: {
+  metricKeys: string[];
+  measureHierarchy: MeasureHierarchy;
+  getMetricLabelFromPath: (path: PivotTreeNode['path']) => string | undefined;
+}) => {
+  const metricOrderMap = new Map(metricKeys.map((label, idx) => [label, idx]));
+  const measureLeafOrderMap = new Map<string, Map<string, number>>();
+  if (measureHierarchy.kind === 'measureStackV1') {
+    measureHierarchy.groups.forEach(group => {
+      const order = new Map<string, number>();
+      group.leaves.forEach((leaf, index) => {
+        order.set(leaf.id, index);
+      });
+      measureLeafOrderMap.set(group.metricKey, order);
+    });
+  }
+
+  return (a: PivotTreeNode, b: PivotTreeNode) => {
+    const aMetric = getMetricLabelFromPath(a.path);
+    const bMetric = getMetricLabelFromPath(b.path);
+    if (!aMetric || !bMetric) {
+      return 0;
+    }
+    if (aMetric === bMetric) {
+      const leafOrder = measureLeafOrderMap.get(aMetric);
+      const aLeaf = findMeasureLeafIdInPath(a.path);
+      const bLeaf = findMeasureLeafIdInPath(b.path);
+      if (!leafOrder || !aLeaf || !bLeaf || aLeaf === bLeaf) {
+        return 0;
+      }
+      const aIndex = leafOrder.get(aLeaf);
+      const bIndex = leafOrder.get(bLeaf);
+      return aIndex !== undefined && bIndex !== undefined ? aIndex - bIndex : 0;
+    }
+    const aIndex = metricOrderMap.get(aMetric);
+    const bIndex = metricOrderMap.get(bMetric);
+    return aIndex !== undefined && bIndex !== undefined ? aIndex - bIndex : 0;
+  };
 };
 
 export const resolveMetricAxisLayoutPolicy = ({
