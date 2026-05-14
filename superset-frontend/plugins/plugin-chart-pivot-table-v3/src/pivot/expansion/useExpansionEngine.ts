@@ -68,7 +68,6 @@ import {
   resolveExpansionReinitializationDecision,
   resolveReinitializedExpansionState,
   resolveExpandedForMetrics as resolveExpandedForMetricsBase,
-  runHydrationLoop,
   type ExpansionVisibilityConfig,
 } from './engine';
 import {
@@ -85,7 +84,7 @@ import {
 import { useSyncRef } from '../shared/useSyncRef';
 import {
   createExpansionRequestHelpers,
-  fetchExpansionTargetDeltas,
+  runHydrationExpansionFetchLoop,
   runSameAxisExpansionFetchLoop,
   type ExpansionFetchRuntime,
 } from './fetchExecution';
@@ -802,7 +801,8 @@ export const useExpansionEngine = ({
           addWarnings,
           updateLoadingKey,
         };
-        const result = await runHydrationLoop({
+        const result = await runHydrationExpansionFetchLoop({
+          reason,
           baseTree: stagingBaseTree,
           maxIterations: MAX_HYDRATION_ITERATIONS,
           isCurrent: requestScope.isCurrent,
@@ -816,18 +816,12 @@ export const useExpansionEngine = ({
           planRows: shouldPlanRows,
           planCols: shouldPlanCols,
           pruneMergedTree,
-          fetchDeltas: ({ targets, context }) =>
-            fetchExpansionTargetDeltas({
-              targets,
-              context,
-              runtime: fetchRuntime,
-              singleRequestKind: `hydrate:${reason}`,
-              transactionId,
-              buildRequestGroupId: expansionRequestHelpers.buildRequestGroupId,
-              seedFetchedCoverage: seedFetchedCoverageFromFactBatches,
-              seedLoadedMetricNodeCoverage:
-                seedFetchedCoverageFromLoadedMetricNodes,
-            }),
+          fetchRuntime,
+          transactionId,
+          buildRequestGroupId: expansionRequestHelpers.buildRequestGroupId,
+          seedFetchedCoverage: seedFetchedCoverageFromFactBatches,
+          seedLoadedMetricNodeCoverage:
+            seedFetchedCoverageFromLoadedMetricNodes,
         });
         if (result.status === 'complete') {
           const resolvedRows = resolveExpandedForMetrics(

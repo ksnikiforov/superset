@@ -46,7 +46,7 @@ import {
   type LatestRequestScope,
 } from '../runtime/requestLifecycle';
 import { stableStringify } from '../shared/stableStringify';
-import { applyExpansionFetchDelta } from './engine';
+import { applyExpansionFetchDelta, runHydrationLoop } from './engine';
 import { type FetchedFactCoverageState } from './fetchedRequests';
 import { planGroupedExpansionTargets } from './planner';
 
@@ -414,6 +414,43 @@ export const fetchExpansionTargetDeltas = async ({
   });
   return deltas;
 };
+
+type HydrationLoopParams = Parameters<typeof runHydrationLoop>[0];
+
+export const runHydrationExpansionFetchLoop = ({
+  reason,
+  fetchRuntime,
+  transactionId,
+  buildRequestGroupId,
+  seedFetchedCoverage,
+  seedLoadedMetricNodeCoverage,
+  ...hydrationLoopParams
+}: Omit<HydrationLoopParams, 'fetchDeltas'> & {
+  reason: 'prefetch' | 'cross-axis';
+  fetchRuntime: ExpansionFetchRuntime;
+  transactionId: number;
+  buildRequestGroupId: BuildExpansionRequestGroupId;
+  seedFetchedCoverage: (factBatches: PivotFactStoreBatch[]) => void;
+  seedLoadedMetricNodeCoverage: (
+    loadedTree: PivotTreeData,
+    visibleRowDepth: number,
+    visibleColDepth: number,
+  ) => void;
+}) =>
+  runHydrationLoop({
+    ...hydrationLoopParams,
+    fetchDeltas: ({ targets, context }) =>
+      fetchExpansionTargetDeltas({
+        targets,
+        context,
+        runtime: fetchRuntime,
+        singleRequestKind: `hydrate:${reason}`,
+        transactionId,
+        buildRequestGroupId,
+        seedFetchedCoverage,
+        seedLoadedMetricNodeCoverage,
+      }),
+  });
 
 export type SameAxisExpansionFetchLoopResult =
   | {
