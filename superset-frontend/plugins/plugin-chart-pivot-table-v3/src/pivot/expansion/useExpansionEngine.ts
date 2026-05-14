@@ -80,12 +80,12 @@ import {
 } from './runtimeState';
 import { useSyncRef } from '../shared/useSyncRef';
 import {
-  runHydrationExpansionFetchLoop,
   runSameAxisExpansionFetchLoop,
   type ExpansionFetchRuntime,
 } from './fetchExecution';
 import { useExpansionRequestRuntime } from './useExpansionRequestRuntime';
 import { useExpansionInFlight } from './useExpansionInFlight';
+import { useExpansionHydrationRuntime } from './useExpansionHydrationRuntime';
 
 const MAX_HYDRATION_ITERATIONS = 12;
 const EMPTY_FACT_BATCHES: PivotFactStoreBatch[] = [];
@@ -730,104 +730,29 @@ export const useExpansionEngine = ({
     [commitExpansionState, persistExpansionState, resolveExpandedForMetrics],
   );
 
-  const hydrateAtomic = useCallback(
-    async (
-      reason: 'prefetch' | 'cross-axis',
-      options?: {
-        showLoader?: boolean;
-        activeAxis?: PivotAxis;
-        planRows?: boolean;
-        planCols?: boolean;
-      },
-    ) => {
-      const shouldShowLoader = options?.showLoader ?? false;
-      const shouldPlanRows = options?.planRows ?? true;
-      const shouldPlanCols = options?.planCols ?? true;
-      const requestScope = expansionRequestLifecycle.beginScope();
-      const transactionId = requestScope.id;
-      clearLoadingState();
-      if (shouldShowLoader) {
-        setHydratingState(true);
-      }
-
-      try {
-        const stagingBaseTree = treeRef.current;
-        const fetchRuntime: ExpansionFetchRuntime = {
-          requestScope,
-          fetchFormData: fetchFormDataRef.current,
-          factStore: factStoreRef.current,
-          trackRequestInScope: expansionRequestHelpers.trackRequestInScope,
-          addWarnings,
-          updateLoadingKey,
-        };
-        const result = await runHydrationExpansionFetchLoop({
-          reason,
-          baseTree: stagingBaseTree,
-          maxIterations: MAX_HYDRATION_ITERATIONS,
-          isCurrent: requestScope.isCurrent,
-          buildDesiredExpanded,
-          fetchedCoverage: fetchedCoverageRef.current,
-          config: visibilityConfig,
-          getCoverageKey,
-          activeAxis: options?.activeAxis,
-          pendingRows: pendingRowsRef.current,
-          pendingCols: pendingColsRef.current,
-          planRows: shouldPlanRows,
-          planCols: shouldPlanCols,
-          pruneMergedTree,
-          fetchRuntime,
-          transactionId,
-          buildRequestGroupId: expansionRequestHelpers.buildRequestGroupId,
-          seedFetchedCoverage: seedFetchedCoverageFromFactBatches,
-          seedLoadedMetricNodeCoverage:
-            seedFetchedCoverageFromLoadedMetricNodes,
-        });
-        if (result.status === 'complete') {
-          const resolvedRows = resolveExpandedForMetrics(
-            'row',
-            result.desiredRows,
-            result.tree,
-          );
-          const resolvedCols = resolveExpandedForMetrics(
-            'col',
-            result.desiredCols,
-            result.tree,
-          );
-          commitExpansionState({
-            tree: result.tree,
-            expandedRows: resolvedRows,
-            expandedCols: resolvedCols,
-            pendingRows: new Set(),
-            pendingCols: new Set(),
-          });
-          if (reason === 'cross-axis') {
-            persistExpansionState(resolvedRows, resolvedCols);
-          }
-        }
-      } finally {
-        if (shouldShowLoader) {
-          setHydratingState(false);
-        }
-      }
-    },
-    [
-      addWarnings,
-      buildDesiredExpanded,
-      clearLoadingState,
-      commitExpansionState,
-      expansionRequestHelpers,
-      expansionRequestLifecycle,
-      getCoverageKey,
-      persistExpansionState,
-      pruneMergedTree,
-      resolveExpandedForMetrics,
-      seedFetchedCoverageFromFactBatches,
-      seedFetchedCoverageFromLoadedMetricNodes,
-      setHydratingState,
-      updateLoadingKey,
-      visibilityConfig,
-    ],
-  );
+  const hydrateAtomic = useExpansionHydrationRuntime({
+    expansionRequestLifecycle,
+    expansionRequestHelpers,
+    treeRef,
+    fetchFormDataRef,
+    factStoreRef,
+    fetchedCoverageRef,
+    pendingRowsRef,
+    pendingColsRef,
+    clearLoadingState,
+    setHydratingState,
+    addWarnings,
+    updateLoadingKey,
+    buildDesiredExpanded,
+    visibilityConfig,
+    getCoverageKey,
+    pruneMergedTree,
+    seedFetchedCoverageFromFactBatches,
+    seedFetchedCoverageFromLoadedMetricNodes,
+    resolveExpandedForMetrics,
+    commitExpansionState,
+    persistExpansionState,
+  });
 
   const handleToggle = useCallback(
     (axis: PivotAxis, node: PivotTreeNode) => {
