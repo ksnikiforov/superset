@@ -50,13 +50,11 @@ type AppliedInteractionLayoutParams = {
   formData: PivotTableQueryFormData;
   sourceMetrics?: PivotTableQueryFormData['metrics'];
   sourceMeasureLeavesByMetric?: PivotTableQueryFormData['measureLeavesByMetric'];
-  runtimeLayout: PivotRuntimeLayout;
   committedRuntimeLayout: PivotRuntimeLayout;
   appliedDimensionKeys: string[];
 };
 
 export type AppliedInteractionLayout = {
-  appliedRuntimeLayout: PivotRuntimeLayout;
   appliedLayoutFormData: PivotTableQueryFormData;
   appliedPivotProgram?: PivotProgram;
 };
@@ -246,13 +244,11 @@ export const resolveAppliedInteractionLayout = ({
   formData,
   sourceMetrics,
   sourceMeasureLeavesByMetric,
-  runtimeLayout,
   committedRuntimeLayout,
   appliedDimensionKeys,
 }: AppliedInteractionLayoutParams): AppliedInteractionLayout => {
   if (!isUserControlled) {
     return {
-      appliedRuntimeLayout: runtimeLayout,
       appliedLayoutFormData: appliedFormData,
     };
   }
@@ -310,7 +306,6 @@ export const resolveAppliedInteractionLayout = ({
   });
 
   return {
-    appliedRuntimeLayout,
     appliedLayoutFormData,
     appliedPivotProgram,
   };

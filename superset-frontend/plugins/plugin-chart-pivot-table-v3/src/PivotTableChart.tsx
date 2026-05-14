@@ -266,7 +266,6 @@ function PivotTableChart(props: PivotTableProps) {
       formData,
       sourceMetrics,
       sourceMeasureLeavesByMetric,
-      runtimeLayout,
       committedRuntimeLayout: committedRuntimeLayoutRef.current,
       appliedDimensionKeys,
     });

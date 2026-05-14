@@ -167,7 +167,6 @@ describe('resolveAppliedInteractionLayout', () => {
       isUserControlled: false,
       appliedFormData: formData,
       formData,
-      runtimeLayout,
       committedRuntimeLayout: {
         ...runtimeLayout,
         rows: ['state'],
@@ -176,7 +175,6 @@ describe('resolveAppliedInteractionLayout', () => {
     });
 
     expect(resolved.appliedLayoutFormData).toBe(formData);
-    expect(resolved.appliedRuntimeLayout).toBe(runtimeLayout);
   });
 
   it('preserves committed runtime metrics that are available in the source form', () => {
@@ -209,7 +207,6 @@ describe('resolveAppliedInteractionLayout', () => {
       isUserControlled: true,
       appliedFormData,
       formData,
-      runtimeLayout,
       committedRuntimeLayout,
       appliedDimensionKeys: [
         getStableColumnKey('country'),
@@ -217,7 +214,6 @@ describe('resolveAppliedInteractionLayout', () => {
       ],
     });
 
-    expect(resolved.appliedRuntimeLayout.metrics).toEqual(['sum__profit']);
     expect(getMetricKeys(resolved.appliedLayoutFormData.metrics)).toEqual([
       'sum__profit',
     ]);
