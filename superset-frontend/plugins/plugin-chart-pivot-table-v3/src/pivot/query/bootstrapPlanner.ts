@@ -39,6 +39,10 @@ export type BootstrapPlan = {
   targets: BootstrapTarget[];
 };
 
+type BootstrapPlanOptions = {
+  prefetchRoot?: boolean;
+};
+
 type BuildIntentInput = {
   kind: BootstrapTargetKind;
   targetRowDepth: number;
@@ -123,6 +127,7 @@ const buildCoverageTarget = ({
 export function buildBootstrapPlanFromLayout(
   layout: LayoutContext,
   formData: PivotTableQueryFormData,
+  options: BootstrapPlanOptions = {},
 ): BootstrapPlan {
   const { groupbyRows: rowGroupby, groupbyColumns: colGroupby } = layout;
   const { rowSubtotalLevels, colSubtotalLevelsForQuery: colSubtotalLevels } =
@@ -238,6 +243,6 @@ export function buildBootstrapPlanFromLayout(
   }
 
   return {
-    targets,
+    targets: options.prefetchRoot ? targets.slice(0, 1) : targets,
   };
 }

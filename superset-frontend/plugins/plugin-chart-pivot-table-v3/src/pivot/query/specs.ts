@@ -549,15 +549,13 @@ export const buildInitialQuerySpecs = (
   const colTargets = uniqueTargets(cols, layout, 'col', colCollapsedSet);
 
   const shouldPrefetchRoot = baseRowDepth > 1 || baseColDepth > 1;
-  const bootstrapPlan = buildBootstrapPlanFromLayout(layout, formData);
-
-  const bootstrapTargets = shouldPrefetchRoot
-    ? bootstrapPlan.targets.slice(0, 1)
-    : bootstrapPlan.targets;
+  const bootstrapPlan = buildBootstrapPlanFromLayout(layout, formData, {
+    prefetchRoot: shouldPrefetchRoot,
+  });
 
   const specs: PlannedQuerySpec[] = [];
 
-  bootstrapTargets.forEach(target => {
+  bootstrapPlan.targets.forEach(target => {
     const queryShape = buildQueryShape({
       intent: target.intent,
       rowGroupby,
