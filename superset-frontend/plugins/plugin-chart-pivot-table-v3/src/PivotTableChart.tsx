@@ -21,7 +21,6 @@ import {
   useEffect,
   useMemo,
   useRef,
-  useState,
   type ComponentProps,
 } from 'react';
 import {
@@ -40,7 +39,6 @@ import {
   MetricsLayoutEnum,
   type PivotAxis,
   PivotRuntimeLayout,
-  type PivotTreeNode,
 } from './types';
 import { PivotTableView } from './pivot/render/PivotTableView';
 import { useExpansionEngine } from './pivot/expansion/useExpansionEngine';
@@ -76,13 +74,6 @@ import {
   removeDimensionFromLayout,
 } from './pivot/layout/interactionDrag';
 import { getMetricKeys, getStableColumnKey } from './utils';
-import {
-  buildPivotColumnSortStateForClick,
-  getPivotColumnSortOrder,
-  reconcilePivotColumnSortState,
-  resolvePivotColumnSortMetric,
-  type PivotColumnSortState,
-} from './pivot/chart/columnSort';
 import { useSyncRef } from './pivot/shared/useSyncRef';
 import {
   buildSeamlessRuntimeUpstreamSignature,
@@ -202,8 +193,6 @@ function PivotTableChart(props: PivotTableProps) {
   const persistExpansionState = persistExpansionStateProp ?? true;
   const resolvedStickyHeaders = formData.stickyHeaders ?? stickyHeaders;
 
-  const [activeColumnSort, setActiveColumnSort] =
-    useState<PivotColumnSortState | null>(null);
   const pendingSeamlessLayoutRef = useRef<PivotRuntimeLayout | null>(null);
   const expandedRowsForSeamlessRef = useRef<Set<string>>(new Set());
   const expandedColsForSeamlessRef = useRef<Set<string>>(new Set());
@@ -525,47 +514,8 @@ function PivotTableChart(props: PivotTableProps) {
     colTotals,
     rowSubTotals,
     layout: layoutResult,
-    uiColumnSort: activeColumnSort,
   });
   const { renderTree } = renderModelResult;
-
-  const isColumnSortable = useCallback(
-    (node: PivotTreeNode) =>
-      Boolean(resolvePivotColumnSortMetric({ node, layout: layoutResult })),
-    [layoutResult],
-  );
-
-  const getColumnSortOrder = useCallback(
-    (node: PivotTreeNode) =>
-      getPivotColumnSortOrder({ current: activeColumnSort, node }),
-    [activeColumnSort],
-  );
-
-  const handleColumnSort = useCallback(
-    (node: PivotTreeNode) => {
-      setActiveColumnSort(current => {
-        const next = buildPivotColumnSortStateForClick({
-          current,
-          node,
-          layout: layoutResult,
-          columnNodes: renderTree.cols,
-        });
-        return next === undefined ? current : next;
-      });
-    },
-    [layoutResult, renderTree.cols],
-  );
-
-  useEffect(() => {
-    setActiveColumnSort(current => {
-      const next = reconcilePivotColumnSortState({
-        current,
-        layout: layoutResult,
-        columnNodes: renderTree.cols,
-      });
-      return next === current ? current : next;
-    });
-  }, [layoutResult, renderTree.cols]);
 
   const treeDimensionFilterValues = useMemo(
     () =>
@@ -724,9 +674,9 @@ function PivotTableChart(props: PivotTableProps) {
     colTotalPosition: layoutResult.resolvedColTotalPosition,
     formatting,
     onToggleNode: handleToggle,
-    onSortColumn: handleColumnSort,
-    isColumnSortable,
-    getColumnSortOrder,
+    onSortColumn: renderModelResult.handleColumnSort,
+    isColumnSortable: renderModelResult.isColumnSortable,
+    getColumnSortOrder: renderModelResult.getColumnSortOrder,
     shouldShowToggle: renderModelResult.shouldShowToggle,
     showSpinner: key =>
       !pendingDisplaySnapshot && !seamlessLoading && loadingKeys.has(key),

@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   DataRecordValue,
   GenericDataType,
@@ -45,7 +45,13 @@ import { compareValues, rootKey, sortByOrder } from '../viewModel';
 import { type RenderModel } from '../shared/types';
 import { getMetricIndexFromNodes } from '../metricsTotals';
 import { type PivotLayoutResult } from './usePivotLayout';
-import { type PivotColumnSortState } from './columnSort';
+import {
+  buildPivotColumnSortStateForClick,
+  getPivotColumnSortOrder,
+  reconcilePivotColumnSortState,
+  resolvePivotColumnSortMetric,
+  type PivotColumnSortState,
+} from './columnSort';
 import {
   buildColumnDisplayPath,
   buildRenderNodeDisplayState,
@@ -91,6 +97,9 @@ export type PivotRenderModelResult = {
   colValuesMap: Map<string, Record<string, DataRecordValue>>;
   expandedRowsForRender: Set<string>;
   expandedColsForRender: Set<string>;
+  handleColumnSort: (node: PivotTreeNode) => void;
+  isColumnSortable: (node: PivotTreeNode) => boolean;
+  getColumnSortOrder: (node: PivotTreeNode) => PivotSortOrder | undefined;
 };
 
 const buildDimensionSortingKeyMap = (
@@ -129,7 +138,6 @@ export const usePivotRenderModel = ({
   colTotals,
   rowSubTotals,
   layout,
-  uiColumnSort,
 }: {
   tree: PivotTreeData;
   expandedRows: Set<string>;
@@ -142,8 +150,9 @@ export const usePivotRenderModel = ({
   colTotals: boolean;
   rowSubTotals: boolean;
   layout: PivotLayoutResult;
-  uiColumnSort?: PivotColumnSortState | null;
 }): PivotRenderModelResult => {
+  const [activeColumnSort, setActiveColumnSort] =
+    useState<PivotColumnSortState | null>(null);
   const resolvedGroupbyRows = layout.layout.groupbyRows;
   const resolvedGroupbyColumns = layout.layout.groupbyColumns;
   const resolvedGroupbyRowsLength = resolvedGroupbyRows.length;
@@ -272,7 +281,7 @@ export const usePivotRenderModel = ({
       !pushMetricTotalsToEnd &&
       !pullMetricTotalsToStart &&
       !hasRowSorting &&
-      !uiColumnSort
+      !activeColumnSort
     ) {
       return baseSorter;
     }
@@ -301,17 +310,17 @@ export const usePivotRenderModel = ({
       if (metricOrder !== 0) {
         return metricOrder;
       }
-      if (uiColumnSort) {
+      if (activeColumnSort) {
         const aValue =
-          renderTree.cells[serializeCellKey(a.key, uiColumnSort.colKey)]
-            ?.values[uiColumnSort.metricKey];
+          renderTree.cells[serializeCellKey(a.key, activeColumnSort.colKey)]
+            ?.values[activeColumnSort.metricKey];
         const bValue =
-          renderTree.cells[serializeCellKey(b.key, uiColumnSort.colKey)]
-            ?.values[uiColumnSort.metricKey];
+          renderTree.cells[serializeCellKey(b.key, activeColumnSort.colKey)]
+            ?.values[activeColumnSort.metricKey];
         const uiColumnSortCmp = compareSortValues(
           aValue,
           bValue,
-          uiColumnSort.order,
+          activeColumnSort.order,
         );
         if (uiColumnSortCmp !== 0) {
           return uiColumnSortCmp;
@@ -333,7 +342,7 @@ export const usePivotRenderModel = ({
     renderTree.cells,
     rowOrder,
     rowSubTotals,
-    uiColumnSort,
+    activeColumnSort,
   ]);
 
   const colSorter = useMemo(() => {
@@ -527,6 +536,44 @@ export const usePivotRenderModel = ({
     ],
   );
 
+  const isColumnSortable = useCallback(
+    (node: PivotTreeNode) =>
+      Boolean(resolvePivotColumnSortMetric({ node, layout })),
+    [layout],
+  );
+
+  const getColumnSortOrder = useCallback(
+    (node: PivotTreeNode) =>
+      getPivotColumnSortOrder({ current: activeColumnSort, node }),
+    [activeColumnSort],
+  );
+
+  const handleColumnSort = useCallback(
+    (node: PivotTreeNode) => {
+      setActiveColumnSort(current => {
+        const next = buildPivotColumnSortStateForClick({
+          current,
+          node,
+          layout,
+          columnNodes: renderTree.cols,
+        });
+        return next === undefined ? current : next;
+      });
+    },
+    [layout, renderTree.cols],
+  );
+
+  useEffect(() => {
+    setActiveColumnSort(current => {
+      const next = reconcilePivotColumnSortState({
+        current,
+        layout,
+        columnNodes: renderTree.cols,
+      });
+      return next === current ? current : next;
+    });
+  }, [layout, renderTree.cols]);
+
   return {
     renderTree,
     renderModel,
@@ -536,6 +583,9 @@ export const usePivotRenderModel = ({
     isRowAggregateBold: renderNodeDisplayState.isRowAggregateBold,
     isColAggregateBold: renderNodeDisplayState.isColAggregateBold,
     getNodeDimDepth: renderNodeDisplayState.getNodeDimDepth,
+    handleColumnSort,
+    isColumnSortable,
+    getColumnSortOrder,
     rowValuesMap,
     colValuesMap,
   };
