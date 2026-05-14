@@ -75,6 +75,55 @@ export const normalizePivotSelectedFilters = ({
   return normalized;
 };
 
+export const buildRuntimeSelectionSyncState = ({
+  isUserControlled,
+  dimensions,
+  selectedFiltersFromFormData,
+  selectedFiltersFromOwnState,
+  selectedFiltersFromProps,
+  committedFilters,
+}: {
+  isUserControlled: boolean;
+  dimensions: QueryFormColumn[];
+  selectedFiltersFromFormData: PivotSelectedFilters;
+  selectedFiltersFromOwnState: PivotSelectedFilters;
+  selectedFiltersFromProps: PivotSelectedFilters;
+  committedFilters: PivotSelectedFilters;
+}) => {
+  const selectedFiltersForTreeSync = isUserControlled
+    ? firstSelectedFilters(
+        selectedFiltersFromFormData,
+        selectedFiltersFromOwnState,
+        selectedFiltersFromProps,
+      )
+    : selectedFiltersFromProps;
+  const persistedInteractionFilters = isUserControlled
+    ? normalizePivotSelectedFilters({
+        filters: firstSelectedFilters(
+          selectedFiltersFromFormData,
+          selectedFiltersFromOwnState,
+        ),
+        dimensions,
+      })
+    : {};
+  const persistedSelectedFilters = normalizePivotSelectedFilters({
+    filters: isUserControlled
+      ? firstSelectedFilters(
+          selectedFiltersFromFormData,
+          selectedFiltersFromOwnState,
+          committedFilters,
+          selectedFiltersFromProps,
+        )
+      : selectedFiltersFromProps,
+    dimensions,
+  });
+  return {
+    selectedFiltersForTreeSync,
+    persistedInteractionFilters,
+    persistedSelectedFilters,
+  };
+};
+
 type TreeDimensionFilterLayout = {
   getDimensionKeyForNode: (
     node: PivotTreeNode,

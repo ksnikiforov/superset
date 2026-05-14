@@ -73,9 +73,8 @@ import { buildSelectionFilteredFormData } from './pivot/update/initialUpdatePlan
 import {
   applyDimensionFilterSelectionChange,
   buildClearSelectedFiltersUpdate,
+  buildRuntimeSelectionSyncState,
   buildTreeDimensionFilterValues,
-  firstSelectedFilters,
-  normalizePivotSelectedFilters,
 } from './pivot/filters';
 import { useDimensionFilterValues } from './pivot/chart/useDimensionFilterValues';
 import { supersetChartDataClient } from './pivot/data/SupersetChartDataClient';
@@ -526,16 +525,23 @@ function PivotTableChart(props: PivotTableProps) {
     (ownState?.pivotSelectedFilters as
       | Record<string, DataRecordValue[]>
       | undefined) ?? EMPTY_SELECTED_FILTERS;
-  const selectedFiltersForTreeSync = useMemo(
+  const {
+    selectedFiltersForTreeSync,
+    persistedInteractionFilters,
+    persistedSelectedFilters,
+  } = useMemo(
     () =>
-      isUserControlled
-        ? firstSelectedFilters(
-            selectedFiltersFromFormData,
-            selectedFiltersFromOwnState,
-            selectedFiltersFromProps,
-          )
-        : selectedFiltersFromProps,
+      buildRuntimeSelectionSyncState({
+        isUserControlled,
+        dimensions: dimensionList,
+        selectedFiltersFromFormData,
+        selectedFiltersFromOwnState,
+        selectedFiltersFromProps,
+        committedFilters,
+      }),
     [
+      committedFilters,
+      dimensionList,
       isUserControlled,
       selectedFiltersFromFormData,
       selectedFiltersFromOwnState,
@@ -636,23 +642,6 @@ function PivotTableChart(props: PivotTableProps) {
     return buildSeamlessRuntimeUpstreamSignature(queryFormData);
   }, [isDashboardRuntimeSync, queryFormData]);
 
-  const persistedInteractionFilters = useMemo(() => {
-    if (!isUserControlled) {
-      return EMPTY_SELECTED_FILTERS;
-    }
-    return normalizePivotSelectedFilters({
-      filters: firstSelectedFilters(
-        selectedFiltersFromFormData,
-        selectedFiltersFromOwnState,
-      ),
-      dimensions: dimensionList,
-    });
-  }, [
-    dimensionList,
-    isUserControlled,
-    selectedFiltersFromFormData,
-    selectedFiltersFromOwnState,
-  ]);
   const upstreamSeamlessSignature =
     upstreamDashboardQueryContextSignature ?? '';
   const hasLocalSyncForCurrentDashboardQueryContext =
@@ -688,31 +677,6 @@ function PivotTableChart(props: PivotTableProps) {
     factBatches,
     seamlessMaterializationLifecycle,
     shouldSyncCommittedTreeFromProps,
-  ]);
-
-  const persistedSelectedFilters = useMemo(() => {
-    if (!isUserControlled) {
-      return normalizePivotSelectedFilters({
-        filters: selectedFiltersFromProps,
-        dimensions: dimensionList,
-      });
-    }
-    return normalizePivotSelectedFilters({
-      filters: firstSelectedFilters(
-        selectedFiltersFromFormData,
-        selectedFiltersFromOwnState,
-        committedFilters,
-        selectedFiltersFromProps,
-      ),
-      dimensions: dimensionList,
-    });
-  }, [
-    committedFilters,
-    dimensionList,
-    isUserControlled,
-    selectedFiltersFromFormData,
-    selectedFiltersFromOwnState,
-    selectedFiltersFromProps,
   ]);
 
   useEffect(() => {

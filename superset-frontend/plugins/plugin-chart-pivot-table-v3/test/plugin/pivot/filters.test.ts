@@ -20,6 +20,7 @@ import {
   applyDimensionFilterSelectionChange,
   buildCellFilters,
   buildClearSelectedFiltersUpdate,
+  buildRuntimeSelectionSyncState,
   buildTreeDimensionFilterValues,
   firstSelectedFilters,
   hasSelectedFilters,
@@ -133,6 +134,57 @@ describe('selected filter state helpers', () => {
         dimensions: ['Country'],
       }),
     ).toEqual({});
+  });
+
+  it('resolves runtime selection sync precedence for user-controlled charts', () => {
+    expect(
+      buildRuntimeSelectionSyncState({
+        isUserControlled: true,
+        dimensions: ['Country', { label: 'Region', sqlExpression: 'region' }],
+        selectedFiltersFromFormData: { Country: ['France'] },
+        selectedFiltersFromOwnState: { region: ['EU'] },
+        selectedFiltersFromProps: { Country: ['Germany'] },
+        committedFilters: { Country: ['Spain'] },
+      }),
+    ).toEqual({
+      selectedFiltersForTreeSync: { Country: ['France'] },
+      persistedInteractionFilters: { Country: ['France'] },
+      persistedSelectedFilters: { Country: ['France'] },
+    });
+  });
+
+  it('uses committed filters before prop filters when persisted filters are empty', () => {
+    expect(
+      buildRuntimeSelectionSyncState({
+        isUserControlled: true,
+        dimensions: ['Country'],
+        selectedFiltersFromFormData: {},
+        selectedFiltersFromOwnState: {},
+        selectedFiltersFromProps: { Country: ['Germany'] },
+        committedFilters: { Country: ['Spain'] },
+      }),
+    ).toEqual({
+      selectedFiltersForTreeSync: { Country: ['Germany'] },
+      persistedInteractionFilters: {},
+      persistedSelectedFilters: { Country: ['Spain'] },
+    });
+  });
+
+  it('uses prop filters directly when charts are not user-controlled', () => {
+    expect(
+      buildRuntimeSelectionSyncState({
+        isUserControlled: false,
+        dimensions: ['Country'],
+        selectedFiltersFromFormData: { Country: ['France'] },
+        selectedFiltersFromOwnState: { Country: ['Italy'] },
+        selectedFiltersFromProps: { Country: ['Germany'] },
+        committedFilters: { Country: ['Spain'] },
+      }),
+    ).toEqual({
+      selectedFiltersForTreeSync: { Country: ['Germany'] },
+      persistedInteractionFilters: {},
+      persistedSelectedFilters: { Country: ['Germany'] },
+    });
   });
 
   it('collects tree filter values by stable and verbose dimension aliases', () => {
