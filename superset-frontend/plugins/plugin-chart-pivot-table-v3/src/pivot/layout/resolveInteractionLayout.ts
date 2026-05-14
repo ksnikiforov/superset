@@ -44,10 +44,6 @@ type AppliedInteractionLayoutParams = {
   isUserControlled: boolean;
   appliedFormData: PivotTableQueryFormData;
   formData: PivotTableQueryFormData;
-  metrics: QueryFormMetric[];
-  groupbyRows: QueryFormColumn[];
-  groupbyColumns: QueryFormColumn[];
-  metricsLayout: MetricsLayoutEnum;
   runtimeLayout: PivotRuntimeLayout;
   committedRuntimeLayout: PivotRuntimeLayout;
   appliedDimensionKeys: string[];
@@ -56,10 +52,6 @@ type AppliedInteractionLayoutParams = {
 export type AppliedInteractionLayout = {
   appliedRuntimeLayout: PivotRuntimeLayout;
   appliedLayoutFormData: PivotTableQueryFormData;
-  layoutMetrics: QueryFormMetric[];
-  layoutGroupbyRows: QueryFormColumn[];
-  layoutGroupbyColumns: QueryFormColumn[];
-  layoutMetricsLayout: MetricsLayoutEnum;
 };
 
 const resolveDimensionMap = (dimensions: QueryFormColumn[]) => {
@@ -237,10 +229,6 @@ export const resolveAppliedInteractionLayout = ({
   isUserControlled,
   appliedFormData,
   formData,
-  metrics,
-  groupbyRows,
-  groupbyColumns,
-  metricsLayout,
   runtimeLayout,
   committedRuntimeLayout,
   appliedDimensionKeys,
@@ -249,16 +237,14 @@ export const resolveAppliedInteractionLayout = ({
     return {
       appliedRuntimeLayout: runtimeLayout,
       appliedLayoutFormData: appliedFormData,
-      layoutMetrics: metrics,
-      layoutGroupbyRows: groupbyRows,
-      layoutGroupbyColumns: groupbyColumns,
-      layoutMetricsLayout: metricsLayout,
     };
   }
 
   const appliedMetricKeysBase = getMetricKeys(
     ensureIsArray(
-      appliedFormData.metricsBase ?? appliedFormData.metrics ?? metrics,
+      appliedFormData.metricsBase ??
+        appliedFormData.metrics ??
+        formData.metrics,
     ),
   );
   const committedMetrics = committedRuntimeLayout.metrics ?? [];
@@ -299,9 +285,5 @@ export const resolveAppliedInteractionLayout = ({
   return {
     appliedRuntimeLayout,
     appliedLayoutFormData,
-    layoutMetrics: ensureIsArray(appliedLayoutFormData.metrics),
-    layoutGroupbyRows: ensureIsArray(appliedLayoutFormData.groupbyRows),
-    layoutGroupbyColumns: ensureIsArray(appliedLayoutFormData.groupbyColumns),
-    layoutMetricsLayout: appliedLayoutFormData.metricsLayout ?? metricsLayout,
   };
 };

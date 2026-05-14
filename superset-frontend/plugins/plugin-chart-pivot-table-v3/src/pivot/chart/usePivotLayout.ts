@@ -130,7 +130,6 @@ export type PivotLayoutResult = {
 export const usePivotLayout = ({
   data,
   formData,
-  metrics,
   metricsLayout,
   startCollapsed,
   initialDepth,
@@ -148,7 +147,6 @@ export const usePivotLayout = ({
 }: {
   data: PivotTableProps['data'];
   formData: PivotTableProps['formData'];
-  metrics: PivotTableProps['metrics'];
   metricsLayout: MetricsLayoutEnum;
   startCollapsed: boolean;
   initialDepth: number;
@@ -173,7 +171,7 @@ export const usePivotLayout = ({
       buildLayoutContext({
         groupbyRows: formData.groupbyRows,
         groupbyColumns: formData.groupbyColumns,
-        metrics,
+        metrics: formData.metrics,
         measureLeavesByMetric: formData.measureLeavesByMetric,
         verboseMap: formData.verboseMap,
         metricsLayout:
@@ -203,7 +201,6 @@ export const usePivotLayout = ({
       expandRowsLevelRaw,
       formData,
       initialDepth,
-      metrics,
       metricsLayout,
       rowSubtotalLevels,
       rowSubtotalPosition,
@@ -226,6 +223,7 @@ export const usePivotLayout = ({
     metricLabelSet,
     metricLabelMap,
     isMetricTokenValue,
+    metrics,
   } = layout;
   const metricVerboseMap = formData.verboseMap as
     | Record<string, string>

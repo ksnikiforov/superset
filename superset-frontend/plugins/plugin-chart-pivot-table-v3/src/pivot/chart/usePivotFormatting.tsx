@@ -475,9 +475,6 @@ export const usePivotFormatting = ({
   renderModel,
   expandedRows,
   formData,
-  groupbyRows,
-  groupbyColumns,
-  metrics,
   layout,
   rowValuesMap,
   colValuesMap,
@@ -495,9 +492,6 @@ export const usePivotFormatting = ({
   renderModel: RenderModel;
   expandedRows: Set<string>;
   formData: PivotTableProps['formData'];
-  groupbyRows: PivotTableProps['groupbyRows'];
-  groupbyColumns: PivotTableProps['groupbyColumns'];
-  metrics: PivotTableProps['metrics'];
   layout: PivotLayoutResult;
   rowValuesMap: Map<string, Record<string, DataRecordValue>>;
   colValuesMap: Map<string, Record<string, DataRecordValue>>;
@@ -514,6 +508,7 @@ export const usePivotFormatting = ({
   const metricFormattingScope =
     (formData.metricFormattingScope as MetricFormattingScope) ||
     'values_totals';
+  const { groupbyRows, groupbyColumns, metrics } = layout.layout;
 
   const metricFormatting = useMemo(
     () =>

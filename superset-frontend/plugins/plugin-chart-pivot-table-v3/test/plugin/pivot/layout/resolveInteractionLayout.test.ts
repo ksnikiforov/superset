@@ -167,10 +167,6 @@ describe('resolveAppliedInteractionLayout', () => {
       isUserControlled: false,
       appliedFormData: formData,
       formData,
-      metrics: ['sum__sales'],
-      groupbyRows: ['country'],
-      groupbyColumns: ['state'],
-      metricsLayout: MetricsLayoutEnum.COLUMNS,
       runtimeLayout,
       committedRuntimeLayout: {
         ...runtimeLayout,
@@ -180,10 +176,7 @@ describe('resolveAppliedInteractionLayout', () => {
     });
 
     expect(resolved.appliedLayoutFormData).toBe(formData);
-    expect(resolved.layoutMetrics).toEqual(['sum__sales']);
-    expect(resolved.layoutGroupbyRows).toEqual(['country']);
-    expect(resolved.layoutGroupbyColumns).toEqual(['state']);
-    expect(resolved.layoutMetricsLayout).toBe(MetricsLayoutEnum.COLUMNS);
+    expect(resolved.appliedRuntimeLayout).toBe(runtimeLayout);
   });
 
   it('preserves committed runtime metrics that are available in the source form', () => {
@@ -216,10 +209,6 @@ describe('resolveAppliedInteractionLayout', () => {
       isUserControlled: true,
       appliedFormData,
       formData,
-      metrics: ['sum__sales'],
-      groupbyRows: [],
-      groupbyColumns: [],
-      metricsLayout: MetricsLayoutEnum.COLUMNS,
       runtimeLayout,
       committedRuntimeLayout,
       appliedDimensionKeys: [
@@ -229,12 +218,16 @@ describe('resolveAppliedInteractionLayout', () => {
     });
 
     expect(resolved.appliedRuntimeLayout.metrics).toEqual(['sum__profit']);
-    expect(getMetricKeys(resolved.layoutMetrics)).toEqual(['sum__profit']);
-    expect(resolved.layoutGroupbyRows).toEqual([
+    expect(getMetricKeys(resolved.appliedLayoutFormData.metrics)).toEqual([
+      'sum__profit',
+    ]);
+    expect(resolved.appliedLayoutFormData.groupbyRows).toEqual([
       'country',
       METRICS_PLACEHOLDER,
     ]);
-    expect(resolved.layoutGroupbyColumns).toEqual(['state']);
-    expect(resolved.layoutMetricsLayout).toBe(MetricsLayoutEnum.ROWS);
+    expect(resolved.appliedLayoutFormData.groupbyColumns).toEqual(['state']);
+    expect(resolved.appliedLayoutFormData.metricsLayout).toBe(
+      MetricsLayoutEnum.ROWS,
+    );
   });
 });

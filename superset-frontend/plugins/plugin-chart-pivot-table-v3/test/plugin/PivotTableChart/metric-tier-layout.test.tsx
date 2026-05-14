@@ -173,7 +173,6 @@ describe('PivotTableChart metric tier indentation and toggles', () => {
       const layout = usePivotLayout({
         data: tree,
         formData,
-        metrics,
         metricsLayout: MetricsLayoutEnum.COLUMNS,
         startCollapsed: false,
         initialDepth: 1,
@@ -250,7 +249,6 @@ describe('PivotTableChart metric tier indentation and toggles', () => {
       const layout = usePivotLayout({
         data: tree,
         formData,
-        metrics,
         metricsLayout: MetricsLayoutEnum.COLUMNS,
         startCollapsed: false,
         initialDepth: 1,
@@ -343,7 +341,6 @@ describe('PivotTableChart metric tier indentation and toggles', () => {
       const layout = usePivotLayout({
         data: tree,
         formData,
-        metrics: [metricKey],
         metricsLayout: MetricsLayoutEnum.ROWS,
         startCollapsed: false,
         initialDepth: 1,

@@ -127,8 +127,6 @@ function PivotTableChart(props: PivotTableProps) {
     width,
     height,
     metrics,
-    groupbyRows,
-    groupbyColumns,
     startCollapsed = true,
     initialDepth = 1,
     expandRowsLevel,
@@ -342,22 +340,12 @@ function PivotTableChart(props: PivotTableProps) {
     runtimeLayout,
     updateUiRuntimeLayout,
   ]);
-  const {
-    appliedLayoutFormData,
-    layoutMetrics,
-    layoutGroupbyRows,
-    layoutGroupbyColumns,
-    layoutMetricsLayout,
-  } = useMemo(
+  const { appliedLayoutFormData } = useMemo(
     () =>
       resolveAppliedInteractionLayout({
         isUserControlled,
         appliedFormData,
         formData,
-        metrics,
-        groupbyRows,
-        groupbyColumns,
-        metricsLayout,
         runtimeLayout,
         committedRuntimeLayout,
         appliedDimensionKeys,
@@ -367,27 +355,9 @@ function PivotTableChart(props: PivotTableProps) {
       appliedFormData,
       committedRuntimeLayout,
       formData,
-      groupbyColumns,
-      groupbyRows,
       isUserControlled,
-      metrics,
-      metricsLayout,
       runtimeLayout,
     ],
-  );
-  const rowAxisLabels = useMemo(
-    () =>
-      layoutGroupbyRows.map(dimension => {
-        const baseLabel = getColumnLabel(dimension);
-        const stableKey = getStableColumnKey(dimension);
-        return (
-          resolvedVerboseMap[stableKey] ??
-          (typeof dimension === 'string'
-            ? (resolvedVerboseMap[dimension] ?? baseLabel)
-            : baseLabel)
-        );
-      }),
-    [layoutGroupbyRows, resolvedVerboseMap],
   );
   const fetchFormData = useMemo(() => {
     if (!isUserControlled) {
@@ -630,8 +600,7 @@ function PivotTableChart(props: PivotTableProps) {
   const layoutResult = usePivotLayout({
     data: dataForRender,
     formData: appliedLayoutFormData,
-    metrics: layoutMetrics,
-    metricsLayout: layoutMetricsLayout,
+    metricsLayout,
     startCollapsed,
     initialDepth,
     expandRowsLevel,
@@ -646,6 +615,23 @@ function PivotTableChart(props: PivotTableProps) {
     colTotalPosition,
     colSubtotalPosition,
   });
+  const layoutMetrics = layoutResult.layout.metrics;
+  const layoutGroupbyRows = layoutResult.layout.groupbyRows;
+  const layoutGroupbyColumns = layoutResult.layout.groupbyColumns;
+  const rowAxisLabels = useMemo(
+    () =>
+      layoutGroupbyRows.map(dimension => {
+        const baseLabel = getColumnLabel(dimension);
+        const stableKey = getStableColumnKey(dimension);
+        return (
+          resolvedVerboseMap[stableKey] ??
+          (typeof dimension === 'string'
+            ? (resolvedVerboseMap[dimension] ?? baseLabel)
+            : baseLabel)
+        );
+      }),
+    [layoutGroupbyRows, resolvedVerboseMap],
+  );
   const {
     tree,
     expandedRows,
@@ -851,9 +837,6 @@ function PivotTableChart(props: PivotTableProps) {
     renderModel: renderModelResult.renderModel,
     expandedRows: renderModelResult.expandedRowsForRender,
     formData: appliedLayoutFormData,
-    groupbyRows: layoutGroupbyRows,
-    groupbyColumns: layoutGroupbyColumns,
-    metrics: layoutMetrics,
     layout: layoutResult,
     rowValuesMap: renderModelResult.rowValuesMap,
     colValuesMap: renderModelResult.colValuesMap,
