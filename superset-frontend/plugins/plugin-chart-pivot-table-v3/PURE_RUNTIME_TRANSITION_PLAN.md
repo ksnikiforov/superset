@@ -57,7 +57,7 @@ cells are projections of DB facts, not canonical data.
 
 ## Current Status
 
-As of May 14, 2026, after the chart helper cleanup checkpoint:
+As of May 14, 2026, after the expansion runtime-hook cleanup checkpoint:
 
 - Gate-weighted architecture estimate: **98%**.
 - Delivery remaining estimate: **1-2%**, mostly final cleanup, validation,
@@ -72,12 +72,19 @@ As of May 14, 2026, after the chart helper cleanup checkpoint:
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `14724` insertions, `13416` deletions, net `+1308`.
-- Current production `src` TypeScript/TSX total: `34818` lines.
+- Production `src`: `14636` insertions, `13408` deletions, net `+1228`.
+- Current production `src` TypeScript/TSX total: `34738` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - `PivotTableChart.tsx` is now `698` lines and `useExpansionEngine.ts` is now
-  `1255` lines; those single-file reductions should not be counted as plugin
+  `1327` lines; those single-file reductions should not be counted as plugin
   source reduction because the plugin-wide total increased.
+- Expansion runtime-hook cleanup deleted the one-consumer
+  `useExpansionInFlight.ts` and `useExpansionRequestRuntime.ts` files and kept
+  their state local to `useExpansionEngine.ts`; the source slice was
+  deletion-positive: `94` insertions, `174` deletions, net `-80`.
+- Focused expansion request/concurrency validation after deleting those hooks
+  passed: `5` suites and `54` tests.
+- Touched expansion files passed ESLint, Prettier, and `git diff --check`.
 - Chart view-prop helper cleanup deleted the one-consumer `pivotViewProps.ts`
   helper and built the display snapshot plus `PivotTableView` props directly at
   the render site; the source slice was deletion-positive: `34` insertions,
@@ -309,7 +316,7 @@ Source-only diff from pre-refactor baseline
   compiled layout context: `2` suites and `28` tests.
 
 The readout is mixed and should be treated plainly: plugin-wide source lines
-increased by `1308`. The meaningful progress is architectural ownership moving
+increased by `1228`. The meaningful progress is architectural ownership moving
 out of overloaded React/chart files into tested runtime helpers plus
 deletion-positive structure cleanup; it is still not a net source reduction.
 
@@ -503,8 +510,8 @@ deletion-positive structure cleanup; it is still not a net source reduction.
   high-level view composition.
 - `useExpansionEngine.ts` still owns request kickoff and sequencing. Repeated
   state-ref synchronization and tree/expanded/pending commits are centralized,
-  but more helper extraction is useful only if it deletes more hook code than it
-  adds.
+  but further work should delete obsolete state or move functions to real owning
+  domains, not create more one-consumer hooks/helpers.
 - `usePivotLayout.ts` is now mostly a composition hook around pure layout
   helpers. `usePivotRenderModel.ts` still carries formatting value maps,
   sorting, and render-model assembly.
@@ -532,7 +539,7 @@ Largest relevant production files:
 - `utils.ts`: `1429` lines.
 - `materializePivotTree.ts`: `1329` lines.
 - `usePivotFormatting.tsx`: `1320` lines.
-- `useExpansionEngine.ts`: `1255` lines.
+- `useExpansionEngine.ts`: `1327` lines.
 - `PivotInteractionPanel.tsx`: `1171` lines.
 - `PivotDndColumnSelect.tsx`: `1071` lines.
 - `controlPanel.tsx`: `1024` lines.
@@ -636,6 +643,10 @@ git diff --check
 
 Recent validation:
 
+- `dec50a1e4a`: deleted the one-consumer `useExpansionInFlight.ts` and
+  `useExpansionRequestRuntime.ts` files and kept their state local to
+  `useExpansionEngine.ts`; Prettier, focused ESLint, `git diff --check`, and
+  focused expansion concurrency/request Jest (`54` tests) passed.
 - Latest broad checkpoint after structure/helper cleanup: full plugin source
   ESLint passed, and the full pivot-table-v3 plugin plus export utility Jest
   suite passed (`96` suites, `781` tests).
@@ -981,12 +992,19 @@ changes from the highest-impact areas.
 Current evidence:
 
 - Source-only baseline comparison from
-  `7088db374448845ef6e71cf74817aa53efbc5fc1`: `14724` insertions, `13416`
-  deletions, net `+1308`; current production `src` TypeScript/TSX total is
-  `34818` lines, up from an implied `33510` line baseline.
+  `7088db374448845ef6e71cf74817aa53efbc5fc1`: `14636` insertions, `13408`
+  deletions, net `+1228`; current production `src` TypeScript/TSX total is
+  `34738` lines, up from an implied `33510` line baseline.
 - The honest line-count result is not a plugin reduction. `PivotTableChart.tsx`
-  is down to `698` lines and `useExpansionEngine.ts` is down to `1255` lines,
+  is down to `698` lines and `useExpansionEngine.ts` is down to `1327` lines,
   but those are local file reductions offset by extracted runtime/helper code.
+- Latest expansion runtime-hook cleanup deleted the one-consumer
+  `useExpansionInFlight.ts` and `useExpansionRequestRuntime.ts` files and kept
+  their state local to `useExpansionEngine.ts`; the source slice was
+  deletion-positive: `94` insertions, `174` deletions, net `-80`.
+- Latest expansion runtime-hook validation passed focused Jest validation: `5`
+  suites and `54` tests; touched expansion files passed Prettier, focused
+  ESLint, and `git diff --check`.
 - Latest chart view-prop helper cleanup deleted the one-consumer
   `pivotViewProps.ts` file and built the display snapshot plus
   `PivotTableView` props directly in `PivotTableChart.tsx`; the source slice
