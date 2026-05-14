@@ -23,31 +23,55 @@ import {
   useState,
   type MutableRefObject,
 } from 'react';
+import {
+  type DataRecordValue,
+  type HandlerFunction,
+  type JsonObject,
+  type SetDataMaskHook,
+} from '@superset-ui/core';
 import { type PivotRuntimeLayout } from '../../types';
 import { isSameRuntimeLayout } from '../runtime/coverage';
-import { prepareRuntimeLayoutPropSync } from '../runtime/seamlessRuntimeUpdate';
+import {
+  prepareRuntimeLayoutPropSync,
+  prepareRuntimeStatePersistence,
+} from '../runtime/seamlessRuntimeUpdate';
 import { useSyncRef } from '../shared/useSyncRef';
+
+type RuntimeSelection = Record<string, DataRecordValue[]>;
 
 type UsePivotRuntimeLayoutStateConfig = {
   isUserControlled: boolean;
   isDashboardContext: boolean;
   isDashboardRuntimeSync: boolean;
+  shouldPersistOwnState: boolean;
   runtimeLayout: PivotRuntimeLayout;
-  pendingPersistedRuntimeLayoutSyncRef: MutableRefObject<boolean>;
+  selectedFiltersFromProps: RuntimeSelection;
+  upstreamDashboardQueryContextSignature: string | null;
   pendingSeamlessLayoutRef: MutableRefObject<PivotRuntimeLayout | null>;
-  lastPersistedRuntimeLayoutRef: MutableRefObject<PivotRuntimeLayout>;
+  mergeOwnState: (partial: JsonObject) => JsonObject;
+  setControlValue?: HandlerFunction;
+  setDataMask: SetDataMaskHook;
 };
 
 export const usePivotRuntimeLayoutState = ({
   isUserControlled,
   isDashboardContext,
   isDashboardRuntimeSync,
+  shouldPersistOwnState,
   runtimeLayout,
-  pendingPersistedRuntimeLayoutSyncRef,
+  selectedFiltersFromProps,
+  upstreamDashboardQueryContextSignature,
   pendingSeamlessLayoutRef,
-  lastPersistedRuntimeLayoutRef,
+  mergeOwnState,
+  setControlValue,
+  setDataMask,
 }: UsePivotRuntimeLayoutStateConfig) => {
-  const persistedRuntimeLayoutSyncRef = pendingPersistedRuntimeLayoutSyncRef;
+  const lastPersistedRuntimeLayoutRef = useRef(runtimeLayout);
+  const persistedRuntimeLayoutSyncRef = useRef(false);
+  const lastPersistedSelectionRef = useRef(selectedFiltersFromProps);
+  const pendingPersistedSelectionSyncRef = useRef(false);
+  const lastLocalSyncDashboardQueryContextRef = useRef<string | null>(null);
+
   const [committedRuntimeLayout, setCommittedRuntimeLayout] =
     useState<PivotRuntimeLayout>(runtimeLayout);
   const committedRuntimeLayoutRef = useRef(committedRuntimeLayout);
@@ -67,6 +91,50 @@ export const usePivotRuntimeLayoutState = ({
       isSameRuntimeLayout(current, layout) ? current : layout,
     );
   }, []);
+
+  const persistRuntimeState = useCallback(
+    (layout: PivotRuntimeLayout, filters: RuntimeSelection) => {
+      const persistencePlan = prepareRuntimeStatePersistence({
+        layout,
+        selection: filters,
+        isDashboardRuntimeSync,
+        lastPersistedRuntimeLayout: lastPersistedRuntimeLayoutRef.current,
+        lastPersistedSelection: lastPersistedSelectionRef.current,
+        upstreamDashboardQueryContextSignature,
+      });
+      if (persistencePlan.persistedRuntimeLayout) {
+        lastPersistedRuntimeLayoutRef.current =
+          persistencePlan.persistedRuntimeLayout;
+        persistedRuntimeLayoutSyncRef.current = true;
+      }
+      if (persistencePlan.localSyncDashboardQueryContext !== undefined) {
+        lastLocalSyncDashboardQueryContextRef.current =
+          persistencePlan.localSyncDashboardQueryContext;
+      }
+      if (persistencePlan.persistedSelection) {
+        lastPersistedSelectionRef.current = persistencePlan.persistedSelection;
+        pendingPersistedSelectionSyncRef.current = true;
+      }
+      commitRuntimeLayout(layout);
+      if (setControlValue) {
+        setControlValue('pivotRuntimeLayout', layout);
+        setControlValue('pivotSelectedFilters', filters);
+      }
+      if (shouldPersistOwnState) {
+        const nextOwnState = mergeOwnState(persistencePlan.ownStatePatch);
+        setDataMask({ ownState: { ...nextOwnState } });
+      }
+    },
+    [
+      commitRuntimeLayout,
+      isDashboardRuntimeSync,
+      mergeOwnState,
+      setControlValue,
+      setDataMask,
+      shouldPersistOwnState,
+      upstreamDashboardQueryContextSignature,
+    ],
+  );
 
   useEffect(() => {
     const propSync = prepareRuntimeLayoutPropSync({
@@ -106,5 +174,9 @@ export const usePivotRuntimeLayoutState = ({
     uiRuntimeLayoutRef,
     updateUiRuntimeLayout,
     commitRuntimeLayout,
+    lastPersistedSelectionRef,
+    pendingPersistedSelectionSyncRef,
+    lastLocalSyncDashboardQueryContextRef,
+    persistRuntimeState,
   };
 };

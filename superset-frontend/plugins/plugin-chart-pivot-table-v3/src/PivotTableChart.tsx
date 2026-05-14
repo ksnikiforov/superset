@@ -91,7 +91,6 @@ import { useSyncRef } from './pivot/shared/useSyncRef';
 import {
   buildSeamlessRuntimeUpstreamSignature,
   isSeamlessDisplaySnapshotSettled,
-  prepareRuntimeStatePersistence,
   prepareSeamlessRuntimeUpdateEffect,
   prepareSeamlessRuntimeLayoutChange,
   shouldSyncCommittedRuntimeFromProps,
@@ -229,7 +228,6 @@ function PivotTableChart(props: PivotTableProps) {
   const pendingColsForSeamlessRef = useRef<Set<string>>(new Set());
   const displaySnapshotRef = useRef<PivotDisplaySnapshot | null>(null);
   const lastSeamlessSyncRef = useRef<SeamlessRuntimeSyncSnapshot | null>(null);
-  const lastLocalSyncDashboardQueryContextRef = useRef<string | null>(null);
   const dataForRender = isUserControlled ? committedTree : data;
   const factBatchesForRender = isUserControlled
     ? committedFactBatches
@@ -262,30 +260,39 @@ function PivotTableChart(props: PivotTableProps) {
       formData.pivotRuntimeLayout;
     return normalizeRuntimeLayout(persisted, dimensionKeys, metricKeys);
   }, [dimensionKeys, formData.pivotRuntimeLayout, metricKeys, ownState]);
-  const lastPersistedRuntimeLayoutRef = useRef(runtimeLayout);
-  const pendingPersistedRuntimeLayoutSyncRef = useRef(false);
+  const selectedFiltersFromProps = selectedFilters ?? EMPTY_SELECTED_FILTERS;
+  const upstreamDashboardQueryContextSignature = useMemo(() => {
+    if (!isDashboardRuntimeSync) {
+      return null;
+    }
+    return buildSeamlessRuntimeUpstreamSignature(queryFormData);
+  }, [isDashboardRuntimeSync, queryFormData]);
   const {
     committedRuntimeLayout,
     committedRuntimeLayoutRef,
     uiRuntimeLayout,
     uiRuntimeLayoutRef,
     updateUiRuntimeLayout,
-    commitRuntimeLayout,
+    lastPersistedSelectionRef,
+    pendingPersistedSelectionSyncRef,
+    lastLocalSyncDashboardQueryContextRef,
+    persistRuntimeState,
   } = usePivotRuntimeLayoutState({
     isUserControlled,
     isDashboardContext,
     isDashboardRuntimeSync,
+    shouldPersistOwnState,
     runtimeLayout,
-    pendingPersistedRuntimeLayoutSyncRef,
+    selectedFiltersFromProps,
+    upstreamDashboardQueryContextSignature,
     pendingSeamlessLayoutRef,
-    lastPersistedRuntimeLayoutRef,
+    mergeOwnState,
+    setControlValue,
+    setDataMask,
   });
   const [uiSelectedFilters, setUiSelectedFilters] = useState<
     Record<string, DataRecordValue[]>
   >(selectedFilters ?? EMPTY_SELECTED_FILTERS);
-  const selectedFiltersFromProps = selectedFilters ?? EMPTY_SELECTED_FILTERS;
-  const lastPersistedSelectionRef = useRef(selectedFiltersFromProps);
-  const pendingPersistedSelectionSyncRef = useRef(false);
   const suppressStalePersistedFilterRestoreRef = useRef(false);
   const selectedFiltersFromFormData =
     formData.pivotSelectedFilters ?? EMPTY_SELECTED_FILTERS;
@@ -336,13 +343,6 @@ function PivotTableChart(props: PivotTableProps) {
     });
   }, [appliedLayoutFormData, committedFilters, isUserControlled]);
 
-  const upstreamDashboardQueryContextSignature = useMemo(() => {
-    if (!isDashboardRuntimeSync) {
-      return null;
-    }
-    return buildSeamlessRuntimeUpstreamSignature(queryFormData);
-  }, [isDashboardRuntimeSync, queryFormData]);
-
   const upstreamSeamlessSignature =
     upstreamDashboardQueryContextSignature ?? '';
   const hasLocalSyncForCurrentDashboardQueryContext =
@@ -384,56 +384,11 @@ function PivotTableChart(props: PivotTableProps) {
   }, [
     committedFilters,
     isUserControlled,
+    lastPersistedSelectionRef,
+    pendingPersistedSelectionSyncRef,
     persistedSelectedFilters,
     uiSelectedFilters,
   ]);
-
-  const persistRuntimeState = useCallback(
-    (
-      layout: PivotRuntimeLayout,
-      filters: Record<string, DataRecordValue[]>,
-    ) => {
-      const persistencePlan = prepareRuntimeStatePersistence({
-        layout,
-        selection: filters,
-        isDashboardRuntimeSync,
-        lastPersistedRuntimeLayout: lastPersistedRuntimeLayoutRef.current,
-        lastPersistedSelection: lastPersistedSelectionRef.current,
-        upstreamDashboardQueryContextSignature,
-      });
-      if (persistencePlan.persistedRuntimeLayout) {
-        lastPersistedRuntimeLayoutRef.current =
-          persistencePlan.persistedRuntimeLayout;
-        pendingPersistedRuntimeLayoutSyncRef.current = true;
-      }
-      if (persistencePlan.localSyncDashboardQueryContext !== undefined) {
-        lastLocalSyncDashboardQueryContextRef.current =
-          persistencePlan.localSyncDashboardQueryContext;
-      }
-      if (persistencePlan.persistedSelection) {
-        lastPersistedSelectionRef.current = persistencePlan.persistedSelection;
-        pendingPersistedSelectionSyncRef.current = true;
-      }
-      commitRuntimeLayout(layout);
-      if (setControlValue) {
-        setControlValue('pivotRuntimeLayout', layout);
-        setControlValue('pivotSelectedFilters', filters);
-      }
-      if (shouldPersistOwnState) {
-        const nextOwnState = mergeOwnState(persistencePlan.ownStatePatch);
-        setDataMask({ ownState: { ...nextOwnState } });
-      }
-    },
-    [
-      isDashboardRuntimeSync,
-      commitRuntimeLayout,
-      mergeOwnState,
-      setControlValue,
-      setDataMask,
-      shouldPersistOwnState,
-      upstreamDashboardQueryContextSignature,
-    ],
-  );
 
   const {
     seamlessLoading,
