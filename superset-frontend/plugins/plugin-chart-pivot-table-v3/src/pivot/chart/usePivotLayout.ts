@@ -33,6 +33,7 @@ import {
   isSubtotalToken,
 } from '../../utils';
 import { buildLayoutContext } from '../layout/LayoutContext';
+import type { PivotProgram } from '../runtime/types';
 import {
   countDimDepth as countDimDepthBase,
   getMetricLabelFromPath as getMetricLabelFromPathBase,
@@ -144,6 +145,7 @@ export const usePivotLayout = ({
   rowSubtotalPosition,
   colTotalPosition,
   colSubtotalPosition,
+  pivotProgram,
 }: {
   data: PivotTableProps['data'];
   formData: PivotTableProps['formData'];
@@ -161,6 +163,7 @@ export const usePivotLayout = ({
   rowSubtotalPosition: TotalPosition;
   colTotalPosition: TotalPosition;
   colSubtotalPosition: TotalPosition;
+  pivotProgram?: PivotProgram;
 }): PivotLayoutResult => {
   const expandRowsLevelRaw = expandRowsLevel ?? formData.expandRowsLevel;
   const expandColumnsLevelRaw =
@@ -191,6 +194,7 @@ export const usePivotLayout = ({
         initialDepth,
         expandRowsLevel: expandRowsLevelRaw,
         expandColumnsLevel: expandColumnsLevelRaw,
+        pivotProgram,
       }),
     [
       colSubtotalLevels,
@@ -202,6 +206,7 @@ export const usePivotLayout = ({
       formData,
       initialDepth,
       metricsLayout,
+      pivotProgram,
       rowSubtotalLevels,
       rowSubtotalPosition,
       rowTotalPosition,
@@ -328,8 +333,8 @@ export const usePivotLayout = ({
       resolveMetricAxisLayoutPolicy({
         rows: data.rows,
         cols: data.cols,
-        formGroupbyRows: formData.groupbyRows,
-        formGroupbyColumns: formData.groupbyColumns,
+        groupbyRowsRaw: layout.groupbyRowsRaw,
+        groupbyColumnsRaw: layout.groupbyColumnsRaw,
         groupbyColumnsLength: layout.groupbyColumnsRaw.length,
         metricsCount: metrics.length,
         metricLabelCount: metricLabels.length,
@@ -350,9 +355,8 @@ export const usePivotLayout = ({
       colDimCount,
       data.cols,
       data.rows,
-      formData.groupbyColumns,
-      formData.groupbyRows,
-      layout.groupbyColumnsRaw.length,
+      layout.groupbyColumnsRaw,
+      layout.groupbyRowsRaw,
       isLeafTierVisible,
       isMetricTokenValue,
       layout.metricInsertIndex,

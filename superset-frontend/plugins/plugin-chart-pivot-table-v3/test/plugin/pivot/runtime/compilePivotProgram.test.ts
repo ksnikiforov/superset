@@ -19,6 +19,7 @@
 import { METRICS_PLACEHOLDER } from '../../../../src/pivot/core/tokens';
 import {
   compilePivotProgram,
+  compilePivotProgramFromPlacement,
   resolvePivotProgramPlacement,
 } from '../../../../src/pivot/runtime/compilePivotProgram';
 import type { PivotAxisProgram } from '../../../../src/pivot/runtime/types';
@@ -159,5 +160,35 @@ describe('compilePivotProgram', () => {
     expect(resolved.cols).toEqual(['segment', METRICS_PLACEHOLDER]);
     expect(resolved.layout).toEqual(MetricsLayoutEnum.COLUMNS);
     expect(resolved.metricPosition).toBe(1);
+  });
+
+  it('compiles runtime placement without legacy Values placeholders', () => {
+    const program = compilePivotProgramFromPlacement({
+      rowDimensions: ['country'],
+      columnDimensions: ['segment', 'state'],
+      metrics: ['m1'],
+      valuePlacement: { axis: 'col', index: 1 },
+    });
+
+    expect(describeAxis(program.rows)).toEqual(['dimension:country']);
+    expect(describeAxis(program.columns)).toEqual([
+      'dimension:segment',
+      'values',
+      'dimension:state',
+    ]);
+    expect(program.columnDimensions).toEqual(['segment', 'state']);
+    expect(program.metricInsertIndex).toBe(1);
+    expect(program.metricsLayoutResolved).toBe(MetricsLayoutEnum.COLUMNS);
+  });
+
+  it('clamps runtime placement to the available dimension depth', () => {
+    const program = compilePivotProgramFromPlacement({
+      rowDimensions: ['country'],
+      metrics: ['m1'],
+      valuePlacement: { axis: 'row', index: 99 },
+    });
+
+    expect(describeAxis(program.rows)).toEqual(['dimension:country', 'values']);
+    expect(program.metricInsertIndex).toBe(1);
   });
 });

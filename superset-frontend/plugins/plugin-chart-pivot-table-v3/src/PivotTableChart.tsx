@@ -343,14 +343,15 @@ function PivotTableChart(props: PivotTableProps) {
     runtimeLayout,
     updateUiRuntimeLayout,
   ]);
-  const { appliedLayoutFormData } = resolveAppliedInteractionLayout({
-    isUserControlled,
-    appliedFormData,
-    formData,
-    runtimeLayout,
-    committedRuntimeLayout: committedRuntimeLayoutRef.current,
-    appliedDimensionKeys,
-  });
+  const { appliedLayoutFormData, appliedPivotProgram } =
+    resolveAppliedInteractionLayout({
+      isUserControlled,
+      appliedFormData,
+      formData,
+      runtimeLayout,
+      committedRuntimeLayout: committedRuntimeLayoutRef.current,
+      appliedDimensionKeys,
+    });
   const fetchFormData = useMemo(() => {
     if (!isUserControlled) {
       return appliedLayoutFormData;
@@ -606,6 +607,7 @@ function PivotTableChart(props: PivotTableProps) {
     rowSubtotalPosition,
     colTotalPosition,
     colSubtotalPosition,
+    pivotProgram: appliedPivotProgram,
   });
   const layoutGroupbyRows = layoutResult.layout.groupbyRows;
   const rowAxisLabels = useMemo(

@@ -48,8 +48,8 @@ import { findChildren } from '../viewModel';
 type ResolveMetricAxisLayoutParams = {
   rows: PivotTreeData['rows'];
   cols: PivotTreeData['cols'];
-  formGroupbyRows: PivotTableProps['formData']['groupbyRows'];
-  formGroupbyColumns: PivotTableProps['formData']['groupbyColumns'];
+  groupbyRowsRaw: PivotTableProps['formData']['groupbyRows'];
+  groupbyColumnsRaw: PivotTableProps['formData']['groupbyColumns'];
   groupbyColumnsLength: number;
   metricsCount: number;
   metricLabelCount: number;
@@ -140,8 +140,8 @@ export const buildMetricOrderComparator = ({
 export const resolveMetricAxisLayoutPolicy = ({
   rows,
   cols,
-  formGroupbyRows,
-  formGroupbyColumns,
+  groupbyRowsRaw,
+  groupbyColumnsRaw,
   groupbyColumnsLength,
   metricsCount,
   metricLabelCount,
@@ -211,16 +211,15 @@ export const resolveMetricAxisLayoutPolicy = ({
   const metricIntentIndexOnRows = metricInsertIndexOnRows ?? metricIndexOnRows;
   const metricIntentIndexOnCols = metricInsertIndexOnCols ?? metricIndexOnCols;
 
-  const formRowsHasPlaceholder =
-    Array.isArray(formGroupbyRows) &&
-    formGroupbyRows.some(isMetricsPlaceholder);
-  const formColsHasPlaceholder =
-    Array.isArray(formGroupbyColumns) &&
-    formGroupbyColumns.some(isMetricsPlaceholder);
-  const metricLayoutIndexOnRows = formRowsHasPlaceholder
+  const rowsHavePlacement =
+    Array.isArray(groupbyRowsRaw) && groupbyRowsRaw.some(isMetricsPlaceholder);
+  const columnsHavePlacement =
+    Array.isArray(groupbyColumnsRaw) &&
+    groupbyColumnsRaw.some(isMetricsPlaceholder);
+  const metricLayoutIndexOnRows = rowsHavePlacement
     ? (metricInsertIndexOnRows ?? metricIndexOnRows)
     : metricIndexOnRows;
-  const metricLayoutIndexOnCols = formColsHasPlaceholder
+  const metricLayoutIndexOnCols = columnsHavePlacement
     ? (metricInsertIndexOnCols ?? metricIndexOnCols)
     : metricIndexOnCols !== undefined && maxColDimDepth < groupbyColumnsLength
       ? groupbyColumnsLength

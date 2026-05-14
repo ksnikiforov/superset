@@ -229,5 +229,8 @@ describe('resolveAppliedInteractionLayout', () => {
     expect(resolved.appliedLayoutFormData.metricsLayout).toBe(
       MetricsLayoutEnum.ROWS,
     );
+    expect(resolved.appliedPivotProgram?.valueAxis).toBe('row');
+    expect(resolved.appliedPivotProgram?.metricInsertIndex).toBe(1);
+    expect(resolved.appliedPivotProgram?.rowDimensions).toEqual(['country']);
   });
 });

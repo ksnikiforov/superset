@@ -21,7 +21,11 @@ import {
   type QueryFormColumn,
   type QueryFormMetric,
 } from '@superset-ui/core';
-import { MetricsLayoutEnum, type PivotAxis } from '../../types';
+import {
+  MetricsLayoutEnum,
+  type PivotAxis,
+  type PivotRuntimeLayout,
+} from '../../types';
 import {
   getMetricKey,
   isMetricsPlaceholder,
@@ -41,6 +45,14 @@ export type CompilePivotProgramInput = {
   metrics?: QueryFormMetric[] | QueryFormMetric;
   metricsLayout?: MetricsLayoutEnum;
   lastMoved?: PivotAxis;
+};
+
+export type CompilePivotProgramPlacementInput = {
+  rowDimensions?: QueryFormColumn[] | QueryFormColumn;
+  columnDimensions?: QueryFormColumn[] | QueryFormColumn;
+  metrics?: QueryFormMetric[] | QueryFormMetric;
+  metricsLayout?: MetricsLayoutEnum;
+  valuePlacement?: PivotRuntimeLayout['valuePlacement'];
 };
 
 export type PivotProgramPlacement = {
@@ -177,6 +189,49 @@ export const compilePivotProgram = ({
     valueAxis,
     metricInsertIndex,
   };
+};
+
+export const compilePivotProgramFromPlacement = ({
+  rowDimensions,
+  columnDimensions,
+  metrics: rawMetrics,
+  metricsLayout,
+  valuePlacement,
+}: CompilePivotProgramPlacementInput): PivotProgram => {
+  const rows = toColumns(rowDimensions).filter(
+    col => !isMetricsPlaceholder(col),
+  );
+  const columns = toColumns(columnDimensions).filter(
+    col => !isMetricsPlaceholder(col),
+  );
+  const metrics = toMetrics(rawMetrics);
+  const valueAxis: PivotAxis =
+    valuePlacement?.axis ??
+    (metricsLayout === MetricsLayoutEnum.ROWS ? 'row' : 'col');
+  const dimensionAxis = valueAxis === 'row' ? rows : columns;
+  const rawMetricInsertIndex = valuePlacement?.index ?? dimensionAxis.length;
+  const metricInsertIndex = Math.max(
+    0,
+    Math.min(rawMetricInsertIndex, dimensionAxis.length),
+  );
+  const placed =
+    metrics.length > 0
+      ? insertValuesPlaceholder(
+          rows,
+          columns,
+          { axis: valueAxis, index: metricInsertIndex },
+          METRICS_PLACEHOLDER,
+        )
+      : { rows, cols: columns };
+
+  return compilePivotProgram({
+    groupbyRows: placed.rows,
+    groupbyColumns: placed.cols,
+    metrics,
+    metricsLayout:
+      valueAxis === 'row' ? MetricsLayoutEnum.ROWS : MetricsLayoutEnum.COLUMNS,
+    lastMoved: valueAxis,
+  });
 };
 
 export const pivotProgramToPlacement = (

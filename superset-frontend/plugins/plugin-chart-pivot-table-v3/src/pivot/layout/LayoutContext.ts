@@ -39,7 +39,10 @@ import {
   coerceMeasureLeavesByMetric,
   collectRequiredTimeOffsets,
 } from '../measureLeaves';
-import { compilePivotProgram } from '../runtime/compilePivotProgram';
+import {
+  compilePivotProgram,
+  pivotProgramToPlacement,
+} from '../runtime/compilePivotProgram';
 import type { PivotProgram } from '../runtime/types';
 
 export type PivotLayoutSpec = Pick<
@@ -66,6 +69,7 @@ export type PivotLayoutSpec = Pick<
   | 'expandColumnsLevel'
 > & {
   lastMoved?: 'row' | 'col';
+  pivotProgram?: PivotProgram;
 };
 
 export type LayoutContext = {
@@ -112,8 +116,10 @@ const normalizeTotalPosition = (value: unknown): TotalPosition => {
 export const buildLayoutContext = (
   layoutSpec: PivotLayoutSpec,
 ): LayoutContext => {
-  const groupbyRowsRaw = ensureIsArray<QueryFormColumn>(layoutSpec.groupbyRows);
-  const groupbyColumnsRaw = ensureIsArray<QueryFormColumn>(
+  const inputGroupbyRowsRaw = ensureIsArray<QueryFormColumn>(
+    layoutSpec.groupbyRows,
+  );
+  const inputGroupbyColumnsRaw = ensureIsArray<QueryFormColumn>(
     layoutSpec.groupbyColumns,
   );
   const metrics = ensureIsArray<QueryFormMetric>(layoutSpec.metrics);
@@ -146,13 +152,20 @@ export const buildLayoutContext = (
   };
   const requiredTimeOffsets = collectRequiredTimeOffsets(measureHierarchy);
 
-  const pivotProgram = compilePivotProgram({
-    groupbyRows: groupbyRowsRaw,
-    groupbyColumns: groupbyColumnsRaw,
-    metrics,
-    metricsLayout: layoutSpec.metricsLayout as MetricsLayoutEnum,
-    lastMoved: layoutSpec.lastMoved,
-  });
+  const pivotProgram =
+    layoutSpec.pivotProgram ??
+    compilePivotProgram({
+      groupbyRows: inputGroupbyRowsRaw,
+      groupbyColumns: inputGroupbyColumnsRaw,
+      metrics,
+      metricsLayout: layoutSpec.metricsLayout as MetricsLayoutEnum,
+      lastMoved: layoutSpec.lastMoved,
+    });
+  const rawGroupbyPlacement = layoutSpec.pivotProgram
+    ? pivotProgramToPlacement(pivotProgram)
+    : undefined;
+  const groupbyRowsRaw = rawGroupbyPlacement?.rows ?? inputGroupbyRowsRaw;
+  const groupbyColumnsRaw = rawGroupbyPlacement?.cols ?? inputGroupbyColumnsRaw;
 
   const groupbyRows = pivotProgram.rowDimensions;
   const groupbyColumns = pivotProgram.columnDimensions;

@@ -33,7 +33,11 @@ import {
   getStableColumnKey,
 } from '../../utils';
 import { coerceMeasureLeavesByMetric } from '../measureLeaves';
-import { insertValuesPlaceholder } from '../runtime/compilePivotProgram';
+import {
+  compilePivotProgramFromPlacement,
+  insertValuesPlaceholder,
+} from '../runtime/compilePivotProgram';
+import type { PivotProgram } from '../runtime/types';
 
 type ResolvedLayoutParams = {
   formData: PivotTableQueryFormData;
@@ -52,7 +56,16 @@ type AppliedInteractionLayoutParams = {
 export type AppliedInteractionLayout = {
   appliedRuntimeLayout: PivotRuntimeLayout;
   appliedLayoutFormData: PivotTableQueryFormData;
+  appliedPivotProgram?: PivotProgram;
 };
+
+const mapLayoutDimensions = (
+  dimensionMap: Map<string, QueryFormColumn>,
+  keys: string[],
+): QueryFormColumn[] =>
+  keys
+    .map(key => dimensionMap.get(key))
+    .filter((dimension): dimension is QueryFormColumn => Boolean(dimension));
 
 const resolveDimensionMap = (dimensions: QueryFormColumn[]) => {
   const map = new Map<string, QueryFormColumn>();
@@ -281,9 +294,28 @@ export const resolveAppliedInteractionLayout = ({
     },
     runtimeLayout: appliedRuntimeLayout,
   });
+  const appliedDimensionMap = resolveDimensionMap(
+    ensureIsArray(appliedFormData.dimensions ?? formData.dimensions),
+  );
+  const rowDimensions = mapLayoutDimensions(
+    appliedDimensionMap,
+    appliedRuntimeLayout.rows,
+  );
+  const columnDimensions = mapLayoutDimensions(
+    appliedDimensionMap,
+    appliedRuntimeLayout.cols,
+  );
+  const appliedPivotProgram = compilePivotProgramFromPlacement({
+    rowDimensions,
+    columnDimensions,
+    metrics: appliedLayoutFormData.metrics,
+    metricsLayout: appliedLayoutFormData.metricsLayout as MetricsLayoutEnum,
+    valuePlacement: appliedRuntimeLayout.valuePlacement,
+  });
 
   return {
     appliedRuntimeLayout,
     appliedLayoutFormData,
+    appliedPivotProgram,
   };
 };
