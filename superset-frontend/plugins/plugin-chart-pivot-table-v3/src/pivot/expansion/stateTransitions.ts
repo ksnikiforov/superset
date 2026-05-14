@@ -25,10 +25,11 @@ import {
 import { mergeTrees } from '../core/tree';
 import { parsePath, serializePath } from '../core/path';
 import {
+  buildGroupedFetchTargets,
   planExpansionForAxis,
   type PivotExpansionNodeFetchPredicate,
   type PivotExpansionPlan,
-} from './coveragePlanner';
+} from './planner';
 import {
   buildDesiredExpandedKeys,
   collectVisibleExpansionKeys,
@@ -42,7 +43,6 @@ import {
   type RenderModelConfig,
 } from '../render/renderModel';
 import { rootKey } from '../viewModel';
-import { buildGroupedFetchTargets } from './planner';
 import {
   createFetchedFactCoverageLookup,
   type FetchedFactCoverageState,

@@ -18,7 +18,7 @@
  */
 
 import { PivotAxis, PivotTreeNode } from '../../../src/types';
-import { planExpansionForAxis } from '../../../src/pivot/expansion/coveragePlanner';
+import { planExpansionForAxis } from '../../../src/pivot/expansion/planner';
 import { type FetchedFactCoverageLookup } from '../../../src/pivot/expansion/fetchedRequests';
 import { serializePath } from '../../../src/pivot/core/path';
 import { rootKey } from '../../../src/pivot/viewModel';
