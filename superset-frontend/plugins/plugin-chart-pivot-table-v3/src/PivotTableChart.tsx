@@ -184,7 +184,9 @@ function PivotTableChart(props: PivotTableProps) {
   const displaySnapshotRef = useRef<PivotDisplaySnapshot | null>(null);
   const lastSeamlessSyncRef = useRef<SeamlessRuntimeSyncSnapshot | null>(null);
   const ownStateRef = useRef<JsonObject>(ownState ?? {});
-  useSyncRef(ownStateRef, ownState ?? {});
+  useEffect(() => {
+    ownStateRef.current = { ...ownStateRef.current, ...(ownState ?? {}) };
+  }, [ownState]);
 
   const mergeOwnState = useCallback((partial: JsonObject) => {
     const next = { ...ownStateRef.current, ...partial };
