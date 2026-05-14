@@ -57,7 +57,8 @@ cells are projections of DB facts, not canonical data.
 
 ## Current Status
 
-As of May 14, 2026, after the query-result fallback mode removal checkpoint:
+As of May 14, 2026, after the expansion-engine fact-batch requirement
+checkpoint:
 
 - Gate-weighted architecture estimate: **99%**.
 - Delivery remaining estimate: **less than 1%**, mostly completion audit and
@@ -72,8 +73,8 @@ As of May 14, 2026, after the query-result fallback mode removal checkpoint:
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `14212` insertions, `13756` deletions, net `+456`.
-- Current production `src` TypeScript/TSX total: `33966` lines.
+- Production `src`: `14210` insertions, `13755` deletions, net `+455`.
+- Current production `src` TypeScript/TSX total: `33965` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - `PivotTableChart.tsx` is now `688` lines and `useExpansionEngine.ts` is now
   `1405` lines; those single-file reductions should not be counted as plugin
@@ -111,6 +112,12 @@ Source-only diff from pre-refactor baseline
 - Touched-file ESLint passed after the query-result fallback mode removal.
 - Focused query/fetch validation after the fallback removal passed: `4` suites
   / `35` tests.
+- Expansion-engine fact-batch requirement removed the hook-local empty batch
+  fallback and made `factBatches` required at the engine boundary. The source
+  slice was deletion-positive: `2` insertions, `3` deletions, net `-1`.
+- Touched-file ESLint passed after the expansion-engine fact-batch requirement.
+- Focused expansion/chart validation after the requirement passed: `4` suites /
+  `83` tests.
 - Chart runtime-sync cleanup moved the committed-tree sync decision out of
   `PivotTableChart.tsx` and into the seamless runtime hook, then deleted the
   now one-consumer runtime predicate export/test surface. The source slice was
