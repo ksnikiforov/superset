@@ -28,10 +28,7 @@ import {
 } from '../layout/LayoutContext';
 import { stableStringify } from '../shared/stableStringify';
 import { formatQueryName } from './queryName';
-import {
-  buildFetchContextFactCoverages,
-  resolveFetchContext,
-} from './resolveFetchContext';
+import { resolveFetchContext } from './resolveFetchContext';
 import { toChartDataQueries } from './toChartDataQueries';
 import { type QuerySpec } from './specs';
 
@@ -72,13 +69,7 @@ export const buildBatchSignature = ({
     timeOffsets.length > 0
       ? { ...queryFormData, time_offsets: timeOffsets }
       : queryFormData;
-  const coverages = buildFetchContextFactCoverages({
-    layout: resolvedLayout,
-    axis,
-    ctx,
-  });
-
-  const specs: QuerySpec[] = coverages.map(coverage => ({
+  const specs: QuerySpec[] = ctx.coverages.map(coverage => ({
     queryName: formatQueryName(coverage.rowDepth, coverage.columnDepth),
     columns: [...coverage.rowDimensions, ...coverage.columnDimensions],
     metrics: ctx.metricsForQuery,

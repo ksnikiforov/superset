@@ -39,7 +39,7 @@ import {
   resolveAxisProjection,
 } from '../runtime/projection';
 import { buildBranchFactCoverages } from '../runtime/coverage';
-import { type PivotCoverageReason } from '../runtime/types';
+import { type PivotFactCoverage } from '../runtime/types';
 import { buildQueryShape } from './queryShape';
 import { type QueryIntent } from './queryIntent';
 
@@ -52,6 +52,7 @@ export type ResolveFetchContextParams = {
   visibleColDepth?: number;
   targetRowDepth?: number;
   targetColDepth?: number;
+  coverageReason?: PivotFactCoverage['reason'];
 };
 
 export type ResolvedFetchContext = {
@@ -71,6 +72,7 @@ export type ResolvedFetchContext = {
   hasColFormatting: boolean;
   hasRowTotalSorting: boolean;
   hasColTotalSorting: boolean;
+  coverages: PivotFactCoverage[];
 };
 
 const filterMetricsByScope = (
@@ -129,6 +131,7 @@ export const resolveFetchContext = ({
   visibleColDepth = 0,
   targetRowDepth,
   targetColDepth,
+  coverageReason = 'expand',
 }: ResolveFetchContextParams): ResolvedFetchContext => {
   const layout = layoutParam ?? buildLayoutContext(formData);
   const { metrics } = layout;
@@ -249,6 +252,22 @@ export const resolveFetchContext = ({
   const rowGroupbyForQuery = queryShape.rowGroupby;
   const colGroupbyForQuery = queryShape.colGroupby;
   const metricsForQuery = queryShape.metrics;
+  const coverages = buildBranchFactCoverages({
+    program: layout.pivotProgram,
+    axis,
+    projection,
+    rowDepth,
+    columnDepth: colDepth,
+    rowSubtotalLevels,
+    columnSubtotalLevels: colSubtotalLevels,
+    rowTotals: layout.rowTotals,
+    columnTotals: layout.colTotals,
+    includeRowTotalForColumnFormatting:
+      axis === 'col' && (hasColFormatting || hasColTotalSorting),
+    includeColumnTotalForRowFormatting:
+      axis === 'row' && (hasRowFormatting || hasRowTotalSorting),
+    reason: coverageReason,
+  });
 
   return {
     projection,
@@ -267,33 +286,6 @@ export const resolveFetchContext = ({
     hasColFormatting,
     hasRowTotalSorting,
     hasColTotalSorting,
+    coverages,
   };
 };
-
-export const buildFetchContextFactCoverages = ({
-  layout,
-  axis,
-  ctx,
-  reason = 'expand',
-}: {
-  layout: LayoutContext;
-  axis: PivotAxis;
-  ctx: ResolvedFetchContext;
-  reason?: PivotCoverageReason;
-}) =>
-  buildBranchFactCoverages({
-    program: layout.pivotProgram,
-    axis,
-    projection: ctx.projection,
-    rowDepth: ctx.rowDepth,
-    columnDepth: ctx.colDepth,
-    rowSubtotalLevels: ctx.rowSubtotalLevels,
-    columnSubtotalLevels: ctx.colSubtotalLevels,
-    rowTotals: layout.rowTotals,
-    columnTotals: layout.colTotals,
-    includeRowTotalForColumnFormatting:
-      axis === 'col' && (ctx.hasColFormatting || ctx.hasColTotalSorting),
-    includeColumnTotalForRowFormatting:
-      axis === 'row' && (ctx.hasRowFormatting || ctx.hasRowTotalSorting),
-    reason,
-  });

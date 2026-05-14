@@ -51,7 +51,6 @@ import { formatQueryName } from './queryName';
 import { buildPathFilters, coerceValueForColumn } from './pathFilters';
 import { coerceExpansionState } from './persistedExpansionState';
 import {
-  buildFetchContextFactCoverages,
   type ResolvedFetchContext,
   resolveFetchContext,
 } from './resolveFetchContext';
@@ -310,13 +309,6 @@ const buildBranchSpecs = ({
     visibleRowDepth,
     visibleColDepth,
   });
-  const coverages = buildFetchContextFactCoverages({
-    layout,
-    axis,
-    ctx,
-    reason: 'expand',
-  });
-
   const axisGroupby =
     axis === 'row' ? ctx.rowGroupbyForQuery : ctx.colGroupbyForQuery;
   const pathFilters = buildPathFilters(
@@ -327,7 +319,7 @@ const buildBranchSpecs = ({
   const suffix = `|branch:${axis}:${serializePath(path)}`;
 
   return buildSpecsForCoverages({
-    coverages,
+    coverages: ctx.coverages,
     ctx,
     layout,
     filters: pathFilters,
@@ -433,12 +425,6 @@ const buildBatchSpecs = ({
     visibleRowDepth,
     visibleColDepth,
   });
-  const coverages = buildFetchContextFactCoverages({
-    layout,
-    axis,
-    ctx,
-    reason: 'expand',
-  });
   const axisGroupby =
     axis === 'row' ? ctx.rowGroupbyForQuery : ctx.colGroupbyForQuery;
   const filters = buildBatchFilterClauses({
@@ -450,7 +436,7 @@ const buildBatchSpecs = ({
   const suffix = `|batch:${axis}:${parentPathKey}|chunk:${chunkIndex}`;
 
   return buildSpecsForCoverages({
-    coverages,
+    coverages: ctx.coverages,
     ctx,
     layout,
     filters,
@@ -608,22 +594,36 @@ export const buildInitialQuerySpecs = (
       visibleColDepth: baseColDepth,
       targetRowDepth: baseRowDepth,
       targetColDepth: baseColDepth,
+      coverageReason: 'initial',
     });
-    const rowCoverages = buildFetchContextFactCoverages({
+    const rowRootContext = resolveFetchContext({
+      formData,
       layout,
       axis: 'row',
-      ctx: rootContext,
-      reason: 'initial',
+      path: [],
+      visibleRowDepth: baseRowDepth,
+      visibleColDepth: baseColDepth,
+      targetRowDepth: baseRowDepth,
+      targetColDepth: baseColDepth,
+      coverageReason: 'initial',
     });
-    const colCoverages = buildFetchContextFactCoverages({
+    const colRootContext = resolveFetchContext({
+      formData,
       layout,
       axis: 'col',
-      ctx: rootContext,
-      reason: 'initial',
+      path: [],
+      visibleRowDepth: baseRowDepth,
+      visibleColDepth: baseColDepth,
+      targetRowDepth: baseRowDepth,
+      targetColDepth: baseColDepth,
+      coverageReason: 'initial',
     });
     specs.push(
       ...buildSpecsForCoverages({
-        coverages: dedupeCoverages([...rowCoverages, ...colCoverages]),
+        coverages: dedupeCoverages([
+          ...rowRootContext.coverages,
+          ...colRootContext.coverages,
+        ]),
         ctx: rootContext,
         layout,
         filters: [],
