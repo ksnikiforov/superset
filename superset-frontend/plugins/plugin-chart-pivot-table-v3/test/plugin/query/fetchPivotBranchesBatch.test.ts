@@ -309,7 +309,6 @@ describe('fetchPivotBranchesBatch', () => {
     const rowKey = serializePath(['US', 'CA', 'SF']);
     const metricColKey = serializePath([encodeMetricKey('m1')]);
 
-    expect(result.factStoreHit).toBe(true);
     expect(result.factBatches).toEqual([
       expect.objectContaining({
         scope: {

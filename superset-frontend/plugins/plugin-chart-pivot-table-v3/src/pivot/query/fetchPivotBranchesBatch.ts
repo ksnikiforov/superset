@@ -47,7 +47,6 @@ export type FetchPivotBranchesBatchParams = {
 
 export type FetchPivotBranchesBatchResult = {
   data?: PivotTreeData;
-  factStoreHit?: boolean;
   factBatches: PivotFactStoreBatch[];
   warnings?: ChartDataWarning[];
   error?: Error;
@@ -127,7 +126,6 @@ export const fetchPivotBranchesBatch = async ({
     });
     return {
       data,
-      factStoreHit: true,
       factBatches,
     };
   }

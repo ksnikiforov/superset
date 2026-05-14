@@ -48,7 +48,6 @@ import {
 
 export interface FetchPivotBranchResult {
   data?: PivotTreeData;
-  factStoreHit?: boolean;
   factBatches: PivotFactStoreBatch[];
   warnings?: ChartDataWarning[];
   error?: Error;
@@ -151,7 +150,6 @@ const resolvePivotBranchLocalResultFromPlan = (
     });
     return {
       data,
-      factStoreHit: true,
       factBatches,
     };
   }

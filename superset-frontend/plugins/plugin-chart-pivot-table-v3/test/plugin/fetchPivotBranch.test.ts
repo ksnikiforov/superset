@@ -831,7 +831,6 @@ describe('resolveFetchContext', () => {
     expect(firstResult.factBatches).toHaveLength(queries.length);
     const secondResult = await fetchPivotBranch(fetchParams);
 
-    expect(secondResult.factStoreHit).toBe(true);
     expect(secondResult.factBatches).toHaveLength(queries.length);
     expect(postMock).toHaveBeenCalledTimes(1);
     expect(
@@ -1619,7 +1618,6 @@ describe('fetchPivotBranch delta-only contract', () => {
     const rowKey = serializePath(['A', 'B']);
     const metricColKey = serializePath([encodeMetricKey('m1')]);
 
-    expect(result.factStoreHit).toBe(true);
     expect(postMock).not.toHaveBeenCalled();
     expect(result.data?.rows[rowKey]).toBeDefined();
     expect(
