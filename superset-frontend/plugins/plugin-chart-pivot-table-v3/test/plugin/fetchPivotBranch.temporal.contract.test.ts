@@ -26,7 +26,7 @@ import {
   PivotTreeData,
   PivotTreeNode,
 } from '../../src/types';
-import { serializePath } from '../../src/utils';
+import { serializePath } from '../../src/pivot/core/path';
 import { buildFormData } from './fixtures/pivotFormData';
 
 jest.mock('@superset-ui/core', () => {

@@ -25,14 +25,14 @@ import {
   type PivotTreeData,
   type PivotTreeNode,
 } from '../../types';
+import { coerceEpochMsStringToNumber } from '../../utils';
 import {
-  coerceEpochMsStringToNumber,
   decodeMeasureLeafId,
   decodeMetricKey,
-  formatPivotLabelValue,
   isSubtotalToken,
   SUBTOTAL_TOKEN,
-} from '../../utils';
+} from '../core/tokens';
+import { formatPivotLabelValue } from '../core/tree';
 import { seedExpandedByLevel } from '../expansion/stateModel';
 import {
   getNodeDimDepth as getNodeDimDepthBase,

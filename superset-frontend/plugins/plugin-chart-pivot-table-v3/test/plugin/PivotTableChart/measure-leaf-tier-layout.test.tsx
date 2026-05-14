@@ -27,7 +27,7 @@ import {
   type PivotTableQueryFormData,
 } from '../../../src/types';
 import { buildFormData } from '../fixtures/pivotFormData';
-import { METRICS_PLACEHOLDER } from '../../../src/utils';
+import { METRICS_PLACEHOLDER } from '../../../src/pivot/core/tokens';
 import {
   buildBuiltInLeaf,
   buildValueLeaf,

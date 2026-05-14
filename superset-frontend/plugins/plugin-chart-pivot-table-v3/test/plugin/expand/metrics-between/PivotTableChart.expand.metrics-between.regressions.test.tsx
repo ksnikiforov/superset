@@ -20,7 +20,10 @@
 import { render, fireEvent, waitFor, within } from '../../../testUtils';
 import PivotTableChart from '../../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum, type PivotTreeData } from '../../../../src/types';
-import { decodeMetricKey, METRICS_PLACEHOLDER } from '../../../../src/utils';
+import {
+  decodeMetricKey,
+  METRICS_PLACEHOLDER,
+} from '../../../../src/pivot/core/tokens';
 import {
   fetchPivotBranch,
   type FetchPivotBranchParams,

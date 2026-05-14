@@ -24,13 +24,15 @@ import { MetricsLayoutEnum, PivotTreeData } from '../../../../src/types';
 import { baseFormData, buildFormData } from '../../fixtures/pivotFormData';
 import {
   METRICS_PLACEHOLDER,
-  mergeTrees,
+  SUBTOTAL_TOKEN,
+} from '../../../../src/pivot/core/tokens';
+import {
   parseCellKey,
   parsePath,
   serializeCellKey,
   serializePath,
-  SUBTOTAL_TOKEN,
-} from '../../../../src/utils';
+} from '../../../../src/pivot/core/path';
+import { mergeTrees } from '../../../../src/pivot/core/tree';
 import {
   fetchPivotBranch,
   peekPivotBranchCache,

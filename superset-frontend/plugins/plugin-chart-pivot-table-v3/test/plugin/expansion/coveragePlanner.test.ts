@@ -22,7 +22,7 @@ import {
   planExpansionForAxis,
   type PivotExpansionFetchedCoverageLookup,
 } from '../../../src/pivot/expansion/coveragePlanner';
-import { serializePath } from '../../../src/utils';
+import { serializePath } from '../../../src/pivot/core/path';
 import { rootKey } from '../../../src/pivot/viewModel';
 
 const makeNode = ({

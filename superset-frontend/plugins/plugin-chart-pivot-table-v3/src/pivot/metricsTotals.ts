@@ -21,7 +21,7 @@ import {
   decodeMetricKey,
   decodeMeasureLeafId,
   isSubtotalToken,
-} from '../utils';
+} from './core/tokens';
 
 type MetricTotalsConfig = {
   metricLabelSet: Set<string>;

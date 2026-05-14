@@ -18,7 +18,7 @@
  */
 import { buildInitialQuerySpecs } from '../../../src/pivot/query/specs';
 import { buildFormData } from '../fixtures/pivotFormData';
-import { serializePath } from '../../../src/utils';
+import { serializePath } from '../../../src/pivot/core/path';
 
 describe('buildInitialQuerySpecs (contracts)', () => {
   it('emits branch targets in deterministic order and drops collapsed/duplicate paths', () => {

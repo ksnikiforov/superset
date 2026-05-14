@@ -58,36 +58,6 @@ import {
   isMetricsPlaceholder,
 } from './pivot/core/tokens';
 
-export {
-  CELL_KEY_DIVIDER,
-  parseCellKey,
-  parsePath,
-  PATH_DIVIDER,
-  serializeCellKey,
-  serializePath,
-} from './pivot/core/path';
-export {
-  decodeMetricKey,
-  encodeMetricKey,
-  encodeMeasureLeafKey,
-  decodeMeasureLeafId,
-  findMeasureLeafIdInPath,
-  getFormattingMetricKey,
-  getMetricKey,
-  getMetricKeys,
-  isMetricToken,
-  isMeasureLeafToken,
-  isMetricsPlaceholder,
-  isSubtotalToken,
-  METRICS_PLACEHOLDER,
-  METRICS_PLACEHOLDER_LABEL,
-  METRIC_TOKEN_PREFIX,
-  normalizePlaceholder,
-  stripMetricsPlaceholder,
-  SUBTOTAL_LABEL,
-  SUBTOTAL_TOKEN,
-} from './pivot/core/tokens';
-export { formatPivotLabelValue, mergeTrees } from './pivot/core/tree';
 export const PIVOT_THEME_PRESETS: Record<string, string> = {
   blue: supersetTheme.colorPrimaryBg,
   peach: supersetTheme.colorWarningBg,

@@ -80,12 +80,11 @@ import {
   collectMetricFormattingMetrics,
   collectMetricDatabarMetrics,
   buildMetricLabelMap,
-  getFormattingMetricKey,
-  getMetricKey,
   resolveMetricDisplayLabel,
   normalizeMetricDatabarMapWithKeys,
   normalizeMetricFormattingMapWithKeys,
 } from '../../utils';
+import { getFormattingMetricKey, getMetricKey } from '../../pivot/core/tokens';
 import {
   buildBuiltInLeaf,
   buildCustomLeaf,

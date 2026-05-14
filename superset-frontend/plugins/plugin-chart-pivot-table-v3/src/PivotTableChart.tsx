@@ -56,7 +56,8 @@ import { buildSelectionFilteredFormData } from './pivot/update/initialUpdatePlan
 import { buildTreeDimensionFilterValues } from './pivot/filters';
 import { useDimensionFilterValues } from './pivot/chart/useDimensionFilterValues';
 import { buildInteractionChips } from './pivot/layout/interactionDrag';
-import { getMetricKeys, getStableColumnKey } from './utils';
+import { getStableColumnKey } from './utils';
+import { getMetricKeys } from './pivot/core/tokens';
 import { useSyncRef } from './pivot/shared/useSyncRef';
 import {
   buildSeamlessRuntimeUpstreamSignature,

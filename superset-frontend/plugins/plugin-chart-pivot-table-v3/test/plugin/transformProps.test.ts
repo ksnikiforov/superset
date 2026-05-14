@@ -20,11 +20,8 @@
 import { ChartProps, GenericDataType, supersetTheme } from '@superset-ui/core';
 import transformProps from '../../src/transformProps';
 import { MetricsLayoutEnum, PivotTableQueryFormData } from '../../src/types';
-import {
-  encodeMetricKey,
-  serializeCellKey,
-  serializePath,
-} from '../../src/utils';
+import { encodeMetricKey } from '../../src/pivot/core/tokens';
+import { serializeCellKey, serializePath } from '../../src/pivot/core/path';
 import { buildInitialQuerySpecs } from '../../src/pivot/query/specs';
 
 const baseFormData: Partial<PivotTableQueryFormData> = {

@@ -23,7 +23,8 @@ import {
   type PivotTreeData,
   type PivotTreeNode,
 } from '../../types';
-import { mergeTrees, parsePath, serializePath } from '../../utils';
+import { mergeTrees } from '../core/tree';
+import { parsePath, serializePath } from '../core/path';
 import {
   planExpansionForAxis,
   type PivotExpansionNodeFetchPredicate,

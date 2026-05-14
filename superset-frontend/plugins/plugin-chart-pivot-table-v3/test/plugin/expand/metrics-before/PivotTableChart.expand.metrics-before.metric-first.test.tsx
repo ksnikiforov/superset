@@ -26,9 +26,11 @@ import { baseFormData, buildFormData } from '../../fixtures/pivotFormData';
 import {
   encodeMetricKey,
   METRICS_PLACEHOLDER,
+} from '../../../../src/pivot/core/tokens';
+import {
   serializeCellKey,
   serializePath,
-} from '../../../../src/utils';
+} from '../../../../src/pivot/core/path';
 import {
   fetchPivotBranch,
   type FetchPivotBranchParams,

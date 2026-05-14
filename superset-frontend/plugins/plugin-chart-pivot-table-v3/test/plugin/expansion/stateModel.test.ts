@@ -27,9 +27,9 @@ import {
 } from '../../../src/pivot/expansion/stateModel';
 import {
   encodeMetricKey,
-  serializePath,
   SUBTOTAL_TOKEN,
-} from '../../../src/utils';
+} from '../../../src/pivot/core/tokens';
+import { serializePath } from '../../../src/pivot/core/path';
 import { rootKey } from '../../../src/pivot/viewModel';
 
 const makeNode = ({

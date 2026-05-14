@@ -31,8 +31,6 @@ import { getColorFormatters } from '@superset-ui/chart-controls';
 import { PivotTableProps, PivotTableQueryFormData } from './types';
 import {
   buildResolvedMetricLabelMap,
-  getMetricKeys,
-  getMetricKey,
   getStableColumnKey,
   mergeMetrics,
   normalizeDimensionSortingMapWithKeys,
@@ -40,6 +38,7 @@ import {
   normalizeMetricDatabarMapWithKeys,
   coerceEpochMsStringToNumber,
 } from './utils';
+import { getMetricKeys, getMetricKey } from './pivot/core/tokens';
 import { buildLayoutContext } from './pivot/layout/LayoutContext';
 import { resolveInteractionFormData } from './pivot/layout/resolveInteractionLayout';
 import { normalizeFormDataExtraFilters } from './pivot/query/normalizeExtraFormData';

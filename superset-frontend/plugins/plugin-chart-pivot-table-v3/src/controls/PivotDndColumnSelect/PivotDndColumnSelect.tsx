@@ -58,13 +58,13 @@ import {
   setControlValueAction,
 } from '../../exploreImports';
 import {
-  METRICS_PLACEHOLDER,
   buildMetricLabelMap,
   mergeMetrics,
   normalizeDimensionFormattingMapWithKeys,
   normalizeDimensionSortingMapWithKeys,
   transferDimensionSettingsAcrossAxes,
 } from '../../utils';
+import { METRICS_PLACEHOLDER } from '../../pivot/core/tokens';
 import {
   DimensionFormattingField,
   DimensionFormattingScope,

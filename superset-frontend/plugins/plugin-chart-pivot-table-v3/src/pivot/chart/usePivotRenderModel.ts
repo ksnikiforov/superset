@@ -31,13 +31,9 @@ import {
   type PivotDimensionSortingMap,
 } from '../../types';
 import { buildFormattingValueMaps } from '../cellUtils';
-import {
-  normalizeDimensionSortingMapWithKeys,
-  getFormattingMetricKey,
-  serializeCellKey,
-  serializePath,
-  isSubtotalToken,
-} from '../../utils';
+import { normalizeDimensionSortingMapWithKeys } from '../../utils';
+import { serializeCellKey, serializePath } from '../core/path';
+import { getFormattingMetricKey, isSubtotalToken } from '../core/tokens';
 import { buildRenderModel } from '../render/renderModel';
 import { resolveAxisProjection } from '../runtime/projection';
 import { resolveMeasureSortMetricKey } from '../measureLeaves';

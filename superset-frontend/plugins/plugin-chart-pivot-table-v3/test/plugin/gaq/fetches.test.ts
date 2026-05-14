@@ -24,7 +24,7 @@ import {
   clearPivotBranchCache,
 } from '../../../src/fetchPivotBranch';
 import { fetchPivotBranchesBatch } from '../../../src/pivot/query/fetchPivotBranchesBatch';
-import { serializePath } from '../../../src/utils';
+import { serializePath } from '../../../src/pivot/core/path';
 import { type PivotTreeData, type PivotTreeNode } from '../../../src/types';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { type BatchGroup } from '../../../src/pivot/query/fetchPlanOptimizer';

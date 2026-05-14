@@ -33,10 +33,12 @@ import {
 import {
   encodeMetricKey,
   METRICS_PLACEHOLDER,
+  SUBTOTAL_TOKEN,
+} from '../../../../src/pivot/core/tokens';
+import {
   serializeCellKey,
   serializePath,
-  SUBTOTAL_TOKEN,
-} from '../../../../src/utils';
+} from '../../../../src/pivot/core/path';
 import { buildFormData } from '../../fixtures/pivotFormData';
 
 const buildSpec = ({

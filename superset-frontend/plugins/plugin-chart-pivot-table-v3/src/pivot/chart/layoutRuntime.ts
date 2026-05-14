@@ -29,8 +29,8 @@ import {
   findMeasureLeafIdInPath,
   isMetricsPlaceholder,
   isSubtotalToken,
-  serializePath,
-} from '../../utils';
+} from '../core/tokens';
+import { serializePath } from '../core/path';
 import {
   getMetricDepthForParent,
   getMetricIndexFromNodes,

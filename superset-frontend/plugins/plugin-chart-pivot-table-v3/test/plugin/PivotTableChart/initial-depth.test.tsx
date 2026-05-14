@@ -27,11 +27,8 @@ import {
   PivotTreeNode,
 } from '../../../src/types';
 import { buildFormData } from '../fixtures/pivotFormData';
-import {
-  serializeCellKey,
-  serializePath,
-  SUBTOTAL_TOKEN,
-} from '../../../src/utils';
+import { serializeCellKey, serializePath } from '../../../src/pivot/core/path';
+import { SUBTOTAL_TOKEN } from '../../../src/pivot/core/tokens';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';
 

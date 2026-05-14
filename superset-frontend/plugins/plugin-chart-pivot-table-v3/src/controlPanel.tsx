@@ -45,13 +45,15 @@ import {
   type PivotTableQueryFormData,
 } from './types';
 import {
-  METRICS_PLACEHOLDER,
-  METRICS_PLACEHOLDER_LABEL,
   parseThemeColors,
   PIVOT_THEME_PRESETS,
-  stripMetricsPlaceholder,
   normalizeSubtotalLevels,
 } from './utils';
+import {
+  METRICS_PLACEHOLDER,
+  METRICS_PLACEHOLDER_LABEL,
+  stripMetricsPlaceholder,
+} from './pivot/core/tokens';
 import PivotDndColumnSelect from './controls/PivotDndColumnSelect/PivotDndColumnSelect';
 import PivotDndMetricSelect from './controls/PivotDndMetricSelect/PivotDndMetricSelect';
 import { resolveInteractionFormData } from './pivot/layout/resolveInteractionLayout';

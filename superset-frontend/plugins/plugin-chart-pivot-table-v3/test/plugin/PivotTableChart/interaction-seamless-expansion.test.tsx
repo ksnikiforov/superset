@@ -29,12 +29,10 @@ import {
   PivotRuntimeLayout,
   PivotTreeData,
 } from '../../../src/types';
-import {
-  METRICS_PLACEHOLDER,
-  getStableColumnKey,
-  mergeTrees,
-  serializePath,
-} from '../../../src/utils';
+import { getStableColumnKey } from '../../../src/utils';
+import { METRICS_PLACEHOLDER } from '../../../src/pivot/core/tokens';
+import { serializePath } from '../../../src/pivot/core/path';
+import { mergeTrees } from '../../../src/pivot/core/tree';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { supersetChartDataClient } from '../../../src/pivot/data/SupersetChartDataClient';
 import {

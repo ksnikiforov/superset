@@ -41,7 +41,7 @@ import {
   type PivotTreeNode,
   type TotalPosition,
 } from '../../types';
-import { serializeCellKey } from '../../utils';
+import { serializeCellKey } from '../core/path';
 import {
   buildPivotV3ExportSheetModel,
   buildPivotV3RowExportModel,

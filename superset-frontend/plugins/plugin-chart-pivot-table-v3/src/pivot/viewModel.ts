@@ -24,12 +24,9 @@ import {
   getNumberFormatter,
 } from '@superset-ui/core';
 import { PivotTreeNode } from '../types';
-import {
-  decodeMetricKey,
-  formatPivotLabelValue,
-  isSubtotalToken,
-  serializePath,
-} from '../utils';
+import { decodeMetricKey, isSubtotalToken } from './core/tokens';
+import { serializePath } from './core/path';
+import { formatPivotLabelValue } from './core/tree';
 
 export const rootKey = serializePath([]);
 

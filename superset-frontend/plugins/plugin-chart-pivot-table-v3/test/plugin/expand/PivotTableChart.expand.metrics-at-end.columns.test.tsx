@@ -21,11 +21,9 @@ import { render, fireEvent, waitFor, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum } from '../../../src/types';
 import { buildFormData } from '../fixtures/pivotFormData';
-import {
-  mergeTrees,
-  METRICS_PLACEHOLDER,
-  serializePath,
-} from '../../../src/utils';
+import { mergeTrees } from '../../../src/pivot/core/tree';
+import { serializePath } from '../../../src/pivot/core/path';
+import { METRICS_PLACEHOLDER } from '../../../src/pivot/core/tokens';
 import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';

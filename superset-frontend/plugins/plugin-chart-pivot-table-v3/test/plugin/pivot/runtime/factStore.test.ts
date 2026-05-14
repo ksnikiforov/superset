@@ -23,7 +23,7 @@ import {
   type PivotFactStoreBatchScope,
 } from '../../../../src/pivot/runtime/factStore';
 import { type PivotFactCoverage } from '../../../../src/pivot/runtime/types';
-import { encodeMetricKey } from '../../../../src/utils';
+import { encodeMetricKey } from '../../../../src/pivot/core/tokens';
 
 const coverage: PivotFactCoverage = {
   reason: 'initial',

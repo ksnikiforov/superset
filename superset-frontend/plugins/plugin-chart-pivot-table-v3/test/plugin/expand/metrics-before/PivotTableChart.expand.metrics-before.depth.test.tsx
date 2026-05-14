@@ -24,7 +24,7 @@ import PivotTableChart, {
 import { PivotTreeData } from '../../../../src/types';
 import { baseFormData, buildFormData } from '../../fixtures/pivotFormData';
 import { resolveMockBranchFetchResult } from '../../fixtures/factBatches';
-import { serializePath } from '../../../../src/utils';
+import { serializePath } from '../../../../src/pivot/core/path';
 import { fetchPivotBranch } from '../../../../src/fetchPivotBranch';
 
 jest.mock('../../../../src/fetchPivotBranch', () => {

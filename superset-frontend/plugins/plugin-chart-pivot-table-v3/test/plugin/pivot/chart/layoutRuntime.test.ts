@@ -30,9 +30,9 @@ import {
   encodeMeasureLeafKey,
   encodeMetricKey,
   METRICS_PLACEHOLDER,
-  serializePath,
   SUBTOTAL_TOKEN,
-} from '../../../../src/utils';
+} from '../../../../src/pivot/core/tokens';
+import { serializePath } from '../../../../src/pivot/core/path';
 
 const node = (axis: 'row' | 'col', path: PivotTreeNode['path']) => ({
   axis,

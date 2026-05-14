@@ -41,9 +41,8 @@ import { rootKey } from '../../../src/pivot/viewModel';
 import {
   METRICS_PLACEHOLDER,
   SUBTOTAL_TOKEN,
-  serializeCellKey,
-  serializePath,
-} from '../../../src/utils';
+} from '../../../src/pivot/core/tokens';
+import { serializeCellKey, serializePath } from '../../../src/pivot/core/path';
 import {
   MetricsLayoutEnum,
   type PivotTreeData,

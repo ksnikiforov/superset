@@ -23,7 +23,8 @@ import {
   type PivotTableQueryFormData,
   type PivotTreeData,
 } from '../../types';
-import { METRICS_PLACEHOLDER, parsePath } from '../../utils';
+import { METRICS_PLACEHOLDER } from '../core/tokens';
+import { parsePath } from '../core/path';
 import { hasSelectedFilters } from '../filters';
 import { stableStringify } from '../shared/stableStringify';
 import {

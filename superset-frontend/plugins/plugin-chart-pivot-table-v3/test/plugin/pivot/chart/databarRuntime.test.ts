@@ -28,7 +28,7 @@ import {
   type PivotResultCell,
   type PivotTreeNode,
 } from '../../../../src/types';
-import { serializeCellKey } from '../../../../src/utils';
+import { serializeCellKey } from '../../../../src/pivot/core/path';
 
 const node = (
   key: string,

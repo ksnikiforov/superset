@@ -26,8 +26,8 @@ import { baseFormData, buildFormData } from '../../fixtures/pivotFormData';
 import {
   decodeMetricKey,
   METRICS_PLACEHOLDER,
-  mergeTrees,
-} from '../../../../src/utils';
+} from '../../../../src/pivot/core/tokens';
+import { mergeTrees } from '../../../../src/pivot/core/tree';
 import { fetchPivotBranch } from '../../../../src/fetchPivotBranch';
 import {
   buildMockBranchFetchResult,

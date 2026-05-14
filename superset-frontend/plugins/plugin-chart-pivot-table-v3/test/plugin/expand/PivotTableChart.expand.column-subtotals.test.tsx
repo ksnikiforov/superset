@@ -21,14 +21,13 @@ import { fireEvent, render, waitFor, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
 import { baseFormData, buildFormData } from '../fixtures/pivotFormData';
+import { mergeTrees } from '../../../src/pivot/core/tree';
+import { serializeCellKey, serializePath } from '../../../src/pivot/core/path';
 import {
-  mergeTrees,
   METRICS_PLACEHOLDER,
-  serializeCellKey,
-  serializePath,
   SUBTOTAL_LABEL,
   SUBTOTAL_TOKEN,
-} from '../../../src/utils';
+} from '../../../src/pivot/core/tokens';
 import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
 import { resolveMockBranchFetchResult } from '../fixtures/factBatches';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';

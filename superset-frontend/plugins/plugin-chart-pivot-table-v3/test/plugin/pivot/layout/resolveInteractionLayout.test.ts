@@ -25,11 +25,11 @@ import {
   resolveAppliedInteractionLayout,
   resolveInteractionFormData,
 } from '../../../../src/pivot/layout/resolveInteractionLayout';
+import { getStableColumnKey } from '../../../../src/utils';
 import {
   getMetricKeys,
   METRICS_PLACEHOLDER,
-  getStableColumnKey,
-} from '../../../../src/utils';
+} from '../../../../src/pivot/core/tokens';
 import {
   MetricsLayoutEnum,
   PivotRuntimeLayout,

@@ -22,7 +22,7 @@ import { render, screen } from '../../testUtils';
 import { PivotTableView } from '../../../src/pivot/render/PivotTableView';
 import { type RenderModel } from '../../../src/pivot/shared/types';
 import { type PivotTreeData, type PivotTreeNode } from '../../../src/types';
-import { serializePath } from '../../../src/utils';
+import { serializePath } from '../../../src/pivot/core/path';
 import { type PivotFormattingResult } from '../../../src/pivot/chart/usePivotFormatting';
 import { getPivotV3ExportSheetDataForChart } from '../../../src/export/buildPivotV3ExportTable';
 

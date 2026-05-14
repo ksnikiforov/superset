@@ -23,7 +23,8 @@ import { render, screen, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum, PivotTableQueryFormData } from '../../../src/types';
 import { buildFormData } from '../fixtures/pivotFormData';
-import { METRICS_PLACEHOLDER, serializePath } from '../../../src/utils';
+import { METRICS_PLACEHOLDER } from '../../../src/pivot/core/tokens';
+import { serializePath } from '../../../src/pivot/core/path';
 import {
   buildBuiltInLeaf,
   buildValueLeaf,

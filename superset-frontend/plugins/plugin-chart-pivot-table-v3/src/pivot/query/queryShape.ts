@@ -31,9 +31,9 @@ import {
   collectMeasureLeafMetricsForQuery,
   collectMetricDatabarMetricsForQuery,
   collectMetricFormattingMetricsForQuery,
-  getMetricKey,
   mergeMetrics,
 } from '../../utils';
+import { getMetricKey } from '../core/tokens';
 import {
   type QueryIntent,
   shouldIncludeDatabars,

@@ -32,7 +32,10 @@ import {
   resolvePivotColumnSortMetric,
   type PivotColumnSortLayout,
 } from '../../../../src/pivot/chart/columnSort';
-import { encodeMeasureLeafKey, encodeMetricKey } from '../../../../src/utils';
+import {
+  encodeMeasureLeafKey,
+  encodeMetricKey,
+} from '../../../../src/pivot/core/tokens';
 
 const valueLeaf = buildValueLeaf();
 const deltaLeaf = buildBuiltInLeaf('delta');

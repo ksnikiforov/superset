@@ -28,9 +28,8 @@ import {
   decodeMetricKey,
   findMeasureLeafIdInPath,
   getMetricKey,
-  serializeCellKey,
-  serializePath,
-} from '../utils';
+} from './core/tokens';
+import { serializeCellKey, serializePath } from './core/path';
 import { buildMeasureLeafOutputKey } from './measureLeaves';
 
 type DeriveMetricKeyParams = {

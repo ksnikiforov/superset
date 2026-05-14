@@ -22,7 +22,7 @@ import {
   buildPivotV3RowExportModel,
 } from '../../../src/export/buildPivotV3ExportTable';
 import { type PivotResultCell, type PivotTreeNode } from '../../../src/types';
-import { serializeCellKey, serializePath } from '../../../src/utils';
+import { serializeCellKey, serializePath } from '../../../src/pivot/core/path';
 
 const rowNode = (
   path: string[],

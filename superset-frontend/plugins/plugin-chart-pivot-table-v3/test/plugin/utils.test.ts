@@ -25,19 +25,19 @@ import {
 } from '../../src/types';
 import { buildColumnHeaderRows } from '../../src/pivot/viewModel';
 import {
-  decodeMetricKey,
-  encodeMetricKey,
-  mergeTrees,
   normalizeSubtotalLevels,
   parseThemeColors,
   resolveExpandLevel,
   normalizeExpandLevel,
-  serializeCellKey,
-  serializePath,
-  SUBTOTAL_TOKEN,
   transferDimensionSettingsAcrossAxes,
-  formatPivotLabelValue,
 } from '../../src/utils';
+import {
+  decodeMetricKey,
+  encodeMetricKey,
+  SUBTOTAL_TOKEN,
+} from '../../src/pivot/core/tokens';
+import { serializeCellKey, serializePath } from '../../src/pivot/core/path';
+import { mergeTrees, formatPivotLabelValue } from '../../src/pivot/core/tree';
 import { buildTreeFromRecords } from './fixtures/buildTreeFromRecords';
 import { labelRowSubtotalLeaves, applyMetricAxis } from './fixtures/metricAxis';
 

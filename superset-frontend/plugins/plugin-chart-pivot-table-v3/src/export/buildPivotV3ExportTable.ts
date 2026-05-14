@@ -18,7 +18,7 @@
  */
 
 import { type PivotResultCell, type PivotTreeNode } from '../types';
-import { serializeCellKey } from '../utils';
+import { serializeCellKey } from '../pivot/core/path';
 import { type HeaderCellInfo } from '../pivot/viewModel';
 
 const getText = (value: string | null | undefined) =>

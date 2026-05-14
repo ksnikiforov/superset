@@ -18,7 +18,8 @@
  */
 
 import { type PivotAxis, type PivotTreeData, PivotTreeNode } from '../../types';
-import { decodeMetricKey, parsePath, serializePath } from '../../utils';
+import { decodeMetricKey } from '../core/tokens';
+import { parsePath, serializePath } from '../core/path';
 import { countDimDepth } from '../metricsTotals';
 import { rootKey } from '../viewModel';
 

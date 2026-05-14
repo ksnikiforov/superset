@@ -34,9 +34,9 @@ import { type PivotProgram } from '../../../../src/pivot/runtime/types';
 import {
   encodeMeasureLeafKey,
   encodeMetricKey,
-  serializePath,
   SUBTOTAL_TOKEN,
-} from '../../../../src/utils';
+} from '../../../../src/pivot/core/tokens';
+import { serializePath } from '../../../../src/pivot/core/path';
 
 const node = (path: PivotTreeNode['path'], overrides = {}): PivotTreeNode => ({
   axis: 'col',

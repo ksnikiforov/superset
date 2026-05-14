@@ -41,9 +41,8 @@ import { ColumnMeta } from '@superset-ui/chart-controls';
 import {
   DEFAULT_DATABAR_NEGATIVE_COLOR,
   DEFAULT_DATABAR_POSITIVE_COLOR,
-  getFormattingMetricKey,
-  getMetricKey,
 } from '../../utils';
+import { getFormattingMetricKey, getMetricKey } from '../../pivot/core/tokens';
 import {
   MeasureLeafSpec,
   MetricFormattingField,

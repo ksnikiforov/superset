@@ -21,7 +21,7 @@ import {
   decodeMeasureLeafId,
   decodeMetricKey,
   isSubtotalToken,
-} from '../utils';
+} from './core/tokens';
 import { buildVisibleList, rootKey } from './viewModel';
 
 type ColLeavesParams = {

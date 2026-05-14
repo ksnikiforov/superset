@@ -20,7 +20,7 @@
 import buildQuery from '../../src/buildQuery';
 import { formatQueryName } from '../../src/pivot/query/queryName';
 import { buildFormData } from './fixtures/pivotFormData';
-import { serializePath } from '../../src/utils';
+import { serializePath } from '../../src/pivot/core/path';
 
 const baseFormData = buildFormData({
   groupbyRows: ['row1', 'row2'],

@@ -24,11 +24,13 @@ import { baseFormData, buildFormData } from '../../fixtures/pivotFormData';
 import {
   encodeMetricKey,
   METRICS_PLACEHOLDER,
-  serializeCellKey,
-  serializePath,
   SUBTOTAL_LABEL,
   SUBTOTAL_TOKEN,
-} from '../../../../src/utils';
+} from '../../../../src/pivot/core/tokens';
+import {
+  serializeCellKey,
+  serializePath,
+} from '../../../../src/pivot/core/path';
 import {
   fetchPivotBranch,
   type FetchPivotBranchParams,

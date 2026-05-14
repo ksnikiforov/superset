@@ -43,7 +43,7 @@ import {
   type PivotExpansionStateKeys,
   coerceExpansionState,
 } from './stateModel';
-import { parsePath } from '../../utils';
+import { parsePath } from '../core/path';
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import { stableStringify } from '../shared/stableStringify';
 import {

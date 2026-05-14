@@ -26,12 +26,12 @@ import {
   PivotRuntimeLayout,
   PivotTableQueryFormData,
 } from '../../types';
+import { getStableColumnKey } from '../../utils';
 import {
   METRICS_PLACEHOLDER,
   getMetricKey,
   getMetricKeys,
-  getStableColumnKey,
-} from '../../utils';
+} from '../core/tokens';
 import { coerceMeasureLeavesByMetric } from '../measureLeaves';
 import {
   compilePivotProgramFromPlacement,

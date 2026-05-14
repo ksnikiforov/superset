@@ -20,7 +20,7 @@
 import { render, fireEvent, waitFor, within } from '../../../testUtils';
 import PivotTableChart from '../../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum } from '../../../../src/types';
-import { METRICS_PLACEHOLDER } from '../../../../src/utils';
+import { METRICS_PLACEHOLDER } from '../../../../src/pivot/core/tokens';
 import { fetchPivotBranch } from '../../../../src/fetchPivotBranch';
 import { buildFormData } from '../../fixtures/pivotFormData';
 import { resolveMockBranchFetchResult } from '../../fixtures/factBatches';

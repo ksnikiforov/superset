@@ -24,7 +24,7 @@ import {
   type PivotTreeData,
   type PivotTreeNode,
 } from '../../../src/types';
-import { serializePath } from '../../../src/utils';
+import { serializePath } from '../../../src/pivot/core/path';
 
 const makeNode = ({
   axis,

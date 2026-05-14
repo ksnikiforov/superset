@@ -72,10 +72,9 @@ import {
   DEFAULT_DATABAR_NEGATIVE_COLOR,
   DEFAULT_DATABAR_POSITIVE_COLOR,
   buildMetricLabelMap,
-  getFormattingMetricKey,
-  getMetricKey,
   resolveMetricDisplayLabel,
 } from '../../utils';
+import { getFormattingMetricKey, getMetricKey } from '../../pivot/core/tokens';
 import {
   isPivotExcelFormula,
   normalizePivotExcelFormula,

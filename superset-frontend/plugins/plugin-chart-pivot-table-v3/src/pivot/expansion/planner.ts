@@ -18,7 +18,7 @@
  */
 
 import { type PivotAxis, type PivotTreeNode } from '../../types';
-import { parsePath } from '../../utils';
+import { parsePath } from '../core/path';
 import {
   planExpansionForAxis,
   type PivotExpansionNodeFetchPredicate,

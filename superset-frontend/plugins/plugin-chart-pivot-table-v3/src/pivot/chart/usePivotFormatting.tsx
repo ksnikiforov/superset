@@ -49,17 +49,12 @@ import {
   type PivotTreeNode,
 } from '../../types';
 import {
-  SUBTOTAL_LABEL,
   collectDimensionFormattingMetricsForQuery,
   collectDimensionSortingMetricsForQuery,
   collectMetricDatabarMetricsForQuery,
   collectMetricFormattingMetricsForQuery,
   DEFAULT_DATABAR_NEGATIVE_COLOR,
   DEFAULT_DATABAR_POSITIVE_COLOR,
-  getFormattingMetricKey,
-  getMetricKey,
-  getMetricKeys,
-  isSubtotalToken,
   mergeMetrics,
   normalizeDimensionFormattingMapWithKeys,
   normalizeDimensionSortingMapWithKeys,
@@ -67,9 +62,15 @@ import {
   normalizeMetricFormattingMapWithKeys,
   parseThemeColors,
   PIVOT_THEME_PRESETS,
-  serializeCellKey,
-  serializePath,
 } from '../../utils';
+import {
+  SUBTOTAL_LABEL,
+  getFormattingMetricKey,
+  getMetricKey,
+  getMetricKeys,
+  isSubtotalToken,
+} from '../core/tokens';
+import { serializeCellKey, serializePath } from '../core/path';
 import { formatMetricValue, rootKey } from '../viewModel';
 import { buildMeasureLeafOutputKey, isValueLeaf } from '../measureLeaves';
 import {

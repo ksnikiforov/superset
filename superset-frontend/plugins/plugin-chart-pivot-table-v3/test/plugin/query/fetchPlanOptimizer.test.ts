@@ -21,7 +21,7 @@ import {
   MAX_BATCH_SIBLINGS,
   type FetchTarget,
 } from '../../../src/pivot/query/fetchPlanOptimizer';
-import { parsePath, serializePath } from '../../../src/utils';
+import { parsePath, serializePath } from '../../../src/pivot/core/path';
 import { type PivotPathValue } from '../../../src/types';
 
 const makeTarget = (

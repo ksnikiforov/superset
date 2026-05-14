@@ -30,9 +30,8 @@ import {
 import {
   encodeMeasureLeafKey,
   encodeMetricKey,
-  serializeCellKey,
-  serializePath,
-} from '../../../src/utils';
+} from '../../../src/pivot/core/tokens';
+import { serializeCellKey, serializePath } from '../../../src/pivot/core/path';
 import {
   buildBuiltInLeaf,
   buildMeasureLeafOutputKey,

@@ -21,7 +21,7 @@ import { render, fireEvent, waitFor, within } from '../../../testUtils';
 import PivotTableChart from '../../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum } from '../../../../src/types';
 import { baseFormData, buildFormData } from '../../fixtures/pivotFormData';
-import { METRICS_PLACEHOLDER } from '../../../../src/utils';
+import { METRICS_PLACEHOLDER } from '../../../../src/pivot/core/tokens';
 import {
   buildBuiltInLeaf,
   buildValueLeaf,

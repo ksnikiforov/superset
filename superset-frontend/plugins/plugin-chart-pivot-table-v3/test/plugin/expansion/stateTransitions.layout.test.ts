@@ -24,7 +24,7 @@ import {
 } from '../../../src/types';
 import { resolveLayoutTransition } from '../../../src/pivot/expansion/stateTransitions';
 import { rootKey } from '../../../src/pivot/viewModel';
-import { serializeCellKey, serializePath } from '../../../src/utils';
+import { serializeCellKey, serializePath } from '../../../src/pivot/core/path';
 
 const makeNode = ({
   axis,

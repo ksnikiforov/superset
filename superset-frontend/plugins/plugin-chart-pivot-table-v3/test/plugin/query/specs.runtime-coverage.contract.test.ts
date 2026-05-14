@@ -26,7 +26,7 @@ import {
   METRICS_PLACEHOLDER,
 } from '../../../src/pivot/core/tokens';
 import { MetricsLayoutEnum } from '../../../src/types';
-import { serializePath } from '../../../src/utils';
+import { serializePath } from '../../../src/pivot/core/path';
 import { type BatchGroup } from '../../../src/pivot/query/fetchPlanOptimizer';
 import { buildFormData } from '../fixtures/pivotFormData';
 

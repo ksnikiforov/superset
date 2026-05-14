@@ -24,7 +24,7 @@ import {
   buildBranchQuerySpecs,
 } from '../../../src/pivot/query/specs';
 import { formatQueryName } from '../../../src/pivot/query/queryName';
-import { serializePath } from '../../../src/utils';
+import { serializePath } from '../../../src/pivot/core/path';
 import { type BatchGroup } from '../../../src/pivot/query/fetchPlanOptimizer';
 import { buildFormData } from '../fixtures/pivotFormData';
 

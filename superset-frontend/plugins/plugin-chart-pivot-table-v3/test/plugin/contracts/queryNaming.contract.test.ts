@@ -17,7 +17,7 @@
  * under the License.
  */
 import buildQuery from '../../../src/buildQuery';
-import { PATH_DIVIDER, serializePath } from '../../../src/utils';
+import { PATH_DIVIDER, serializePath } from '../../../src/pivot/core/path';
 import { buildFormData } from '../fixtures/pivotFormData';
 
 describe('query naming (contracts)', () => {

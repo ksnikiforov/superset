@@ -26,9 +26,9 @@ import {
 import {
   collectDimensionFormattingMetricsForQuery,
   collectDimensionSortingMetricsForQuery,
-  getMetricKey,
   hasTotalSorting,
 } from '../../utils';
+import { getMetricKey } from '../core/tokens';
 import {
   buildLayoutContext,
   type LayoutContext,

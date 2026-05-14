@@ -30,11 +30,10 @@ import {
 } from '../../types';
 import {
   buildResolvedMetricLabelMap,
-  decodeMetricKey,
-  getMetricKeys,
   normalizeSubtotalLevels,
   resolveExpandLevel,
 } from '../../utils';
+import { decodeMetricKey, getMetricKeys } from '../core/tokens';
 import {
   coerceMeasureLeavesByMetric,
   collectRequiredTimeOffsets,

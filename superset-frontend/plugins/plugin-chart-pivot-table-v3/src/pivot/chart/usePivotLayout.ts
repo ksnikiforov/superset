@@ -26,12 +26,8 @@ import {
   type PivotTreeNode,
   type TotalPosition,
 } from '../../types';
-import {
-  resolveMetricDisplayLabel,
-  getMetricKey,
-  getStableColumnKey,
-  isSubtotalToken,
-} from '../../utils';
+import { resolveMetricDisplayLabel, getStableColumnKey } from '../../utils';
+import { getMetricKey, isSubtotalToken } from '../core/tokens';
 import { buildLayoutContext } from '../layout/LayoutContext';
 import type { PivotProgram } from '../runtime/types';
 import {

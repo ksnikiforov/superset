@@ -25,7 +25,7 @@ import {
   buildSelectionFilterClauses,
 } from '../../../../src/pivot/update/initialUpdatePlan';
 import { MetricsLayoutEnum, PivotRuntimeLayout } from '../../../../src/types';
-import { METRICS_PLACEHOLDER } from '../../../../src/utils';
+import { METRICS_PLACEHOLDER } from '../../../../src/pivot/core/tokens';
 import { buildFormData } from '../../fixtures/pivotFormData';
 
 describe('buildInitialPivotUpdatePlan', () => {

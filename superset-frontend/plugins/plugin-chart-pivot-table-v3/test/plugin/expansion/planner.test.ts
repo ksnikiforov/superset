@@ -25,7 +25,8 @@ import {
   seedFetchedCoverageFromFactBatches,
 } from '../../../src/pivot/expansion/fetchedRequests';
 import { rootKey } from '../../../src/pivot/viewModel';
-import { encodeMetricKey, serializePath } from '../../../src/utils';
+import { encodeMetricKey } from '../../../src/pivot/core/tokens';
+import { serializePath } from '../../../src/pivot/core/path';
 import { type PivotTreeNode } from '../../../src/types';
 
 const makeNode = ({

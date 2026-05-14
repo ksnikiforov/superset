@@ -55,11 +55,8 @@ import {
   MeasureLeavesByMetricKey,
   PivotRuntimeLayout,
 } from '../../types';
-import {
-  getMetricKey,
-  getStableColumnKey,
-  resolveMetricDisplayLabel,
-} from '../../utils';
+import { getStableColumnKey, resolveMetricDisplayLabel } from '../../utils';
+import { getMetricKey } from '../core/tokens';
 import { isValueLeaf } from '../measureLeaves';
 import { INTERACTION_DIMENSION_DND_TYPE } from '../layout/interactionDrag';
 import { normalizeRuntimeLayout } from '../layout/resolveInteractionLayout';

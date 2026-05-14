@@ -21,7 +21,7 @@ import {
   type PivotSortOrder,
   type PivotTreeNode,
 } from '../../types';
-import { findMeasureLeafIdInPath } from '../../utils';
+import { findMeasureLeafIdInPath } from '../core/tokens';
 import {
   buildMeasureLeafOutputKey,
   resolveMeasureSortMetricKey,

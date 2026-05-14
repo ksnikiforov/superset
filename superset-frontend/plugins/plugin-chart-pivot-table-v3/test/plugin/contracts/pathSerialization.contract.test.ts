@@ -16,7 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { parsePath, PATH_DIVIDER, serializePath } from '../../../src/utils';
+import {
+  parsePath,
+  PATH_DIVIDER,
+  serializePath,
+} from '../../../src/pivot/core/path';
 
 describe('path serialization (contracts)', () => {
   it('round-trips divider-containing strings', () => {

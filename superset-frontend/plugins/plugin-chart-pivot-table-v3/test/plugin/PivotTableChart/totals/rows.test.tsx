@@ -33,12 +33,14 @@ import {
 import { buildFormData } from '../../fixtures/pivotFormData';
 import {
   encodeMetricKey,
-  mergeTrees,
   METRICS_PLACEHOLDER,
+  SUBTOTAL_TOKEN,
+} from '../../../../src/pivot/core/tokens';
+import {
   serializeCellKey,
   serializePath,
-  SUBTOTAL_TOKEN,
-} from '../../../../src/utils';
+} from '../../../../src/pivot/core/path';
+import { mergeTrees } from '../../../../src/pivot/core/tree';
 import {
   buildBuiltInLeaf,
   buildValueLeaf,

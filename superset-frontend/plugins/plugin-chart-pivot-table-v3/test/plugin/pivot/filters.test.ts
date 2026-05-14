@@ -27,7 +27,10 @@ import {
   normalizePivotSelectedFilters,
 } from '../../../src/pivot/filters';
 import { MetricsLayoutEnum, PivotTreeNode } from '../../../src/types';
-import { encodeMetricKey, SUBTOTAL_TOKEN } from '../../../src/utils';
+import {
+  encodeMetricKey,
+  SUBTOTAL_TOKEN,
+} from '../../../src/pivot/core/tokens';
 
 describe('buildCellFilters', () => {
   it('builds filters for all row/col levels excluding metric tokens on columns', () => {

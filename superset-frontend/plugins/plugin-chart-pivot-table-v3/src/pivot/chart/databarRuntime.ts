@@ -23,7 +23,8 @@ import {
   type PivotTreeData,
   type PivotTreeNode,
 } from '../../types';
-import { getFormattingMetricKey, serializeCellKey } from '../../utils';
+import { getFormattingMetricKey } from '../core/tokens';
+import { serializeCellKey } from '../core/path';
 import { type VisibleCellEntry } from '../cellUtils';
 
 export type DatabarScaleBounds = {

@@ -30,13 +30,12 @@ import {
   PivotTableQueryFormData,
   PivotTreeData,
 } from '../../../src/types';
+import { mergeTrees } from '../../../src/pivot/core/tree';
+import { PATH_DIVIDER, parsePath } from '../../../src/pivot/core/path';
 import {
-  mergeTrees,
   METRIC_TOKEN_PREFIX,
-  PATH_DIVIDER,
-  parsePath,
   SUBTOTAL_TOKEN,
-} from '../../../src/utils';
+} from '../../../src/pivot/core/tokens';
 import {
   fetchPivotBranch,
   peekPivotBranchCache,

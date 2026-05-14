@@ -26,12 +26,8 @@ import {
   getColumnLabel,
 } from '@superset-ui/core';
 import { DateFormatter, MetricsLayoutEnum, PivotTreeNode } from '../types';
-import {
-  decodeMetricKey,
-  getMetricKeys,
-  getStableColumnKey,
-  isSubtotalToken,
-} from '../utils';
+import { getStableColumnKey } from '../utils';
+import { decodeMetricKey, getMetricKeys, isSubtotalToken } from './core/tokens';
 
 export type PivotSelectedFilters = Record<string, DataRecordValue[]>;
 

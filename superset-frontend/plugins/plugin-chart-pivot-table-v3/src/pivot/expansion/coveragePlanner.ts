@@ -18,7 +18,7 @@
  */
 
 import { PivotAxis, PivotTreeNode } from '../../types';
-import { parsePath, serializePath } from '../../utils';
+import { parsePath, serializePath } from '../core/path';
 import { rootKey } from '../viewModel';
 
 export type PivotExpansionPlan = {
