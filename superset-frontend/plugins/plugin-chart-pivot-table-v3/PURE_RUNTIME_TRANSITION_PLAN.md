@@ -58,7 +58,7 @@ cells are projections of DB facts, not canonical data.
 ## Current Status
 
 As of May 14, 2026, after
-`6bb826e7d6 refactor(pivot-table-v3): extract seamless runtime update hook`:
+`b66975cfaf refactor(pivot-table-v3): remove column dnd debug logging`:
 
 - Gate-weighted architecture estimate: **97%**.
 - Delivery remaining estimate: **11-19%**, mostly final cleanup, validation,
@@ -72,8 +72,8 @@ As of May 14, 2026, after
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `12991` insertions, `12186` deletions, net `+805`.
-- Current production `src` TypeScript/TSX total: `34315` lines.
+- Production `src`: `12992` insertions, `12225` deletions, net `+767`.
+- Current production `src` TypeScript/TSX total: `34277` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - Full plugin Jest pass after the column-sort extraction: `91` suites and
   `729` tests.
@@ -233,6 +233,8 @@ Source-only diff from pre-refactor baseline
   `6` suites and `74` tests.
 - Full plugin plus export utility Jest pass after extracting the seamless
   runtime update hook: `97` suites and `782` tests.
+- Focused column DnD pass after removing production debug logging: `2` suites
+  and `21` tests.
 
 The readout remains mixed: the plugin is still modestly above the baseline line
 count, but the chart/layout hooks keep losing inline policy and the remaining
@@ -459,7 +461,7 @@ Largest relevant production files:
 - `useExpansionEngine.ts`: `1267` lines.
 - `PivotInteractionPanel.tsx`: `1186` lines.
 - `PivotTableChart.tsx`: `1087` lines.
-- `PivotDndColumnSelect.tsx`: `1109` lines.
+- `PivotDndColumnSelect.tsx`: `1071` lines.
 - `controlPanel.tsx`: `1038` lines.
 - `PivotTableView.tsx`: `891` lines.
 - `usePivotLayout.ts`: `768` lines.
@@ -559,6 +561,9 @@ git diff --check
 
 Recent validation:
 
+- `b66975cfaf`: removed production Pivot Table v3 column DnD debug logging and
+  the now-unused debug flag type/dependency; touched-file ESLint, Prettier,
+  `git diff --check`, and focused column DnD Jest (`21` tests) passed.
 - `6bb826e7d6`: extracted seamless runtime request lifecycle, loading/error
   state, pending display snapshots, async result branching, and success commits
   from `PivotTableChart.tsx` into `usePivotSeamlessRuntimeUpdate`; touched-file
