@@ -903,8 +903,8 @@ Current evidence:
 - Latest focused expansion Jest run passed: `5` suites and `48` tests.
 - Touched expansion files passed ESLint.
 - Latest full pivot-table-v3 plus export utility Jest run passed: `97` suites
-  and `782` tests after the expansion stale-delta fix.
-- Full plugin source ESLint passed after the expansion stale-delta fix.
+  and `784` tests after the Gate 1/2/7 checkpoints.
+- Full plugin source ESLint passed after the Gate 1/2/7 checkpoints.
 - Latest Gate 1 runtime-placement validation passed: `5` focused suites and
   `60` tests covering interaction layout, compiled program placement,
   layout-runtime policy, and metric-tier layout.
