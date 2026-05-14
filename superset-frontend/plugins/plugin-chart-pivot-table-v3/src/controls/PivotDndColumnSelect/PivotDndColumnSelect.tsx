@@ -145,8 +145,6 @@ const DimensionSortingButtonWrap = styled.div`
   padding-right: ${({ theme }) => theme.sizeUnit}px;
 `;
 
-type WindowWithPivotDebug = Window & { PIVOT_V3_DEBUG_PLACEMENT?: boolean };
-
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
@@ -342,9 +340,6 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
 
   const applyChange = useCallback(
     (nextValue: QueryFormColumn[] | QueryFormColumn | null | undefined) => {
-      const debugOn = Boolean(
-        (window as WindowWithPivotDebug).PIVOT_V3_DEBUG_PLACEMENT,
-      );
       if (
         pivotPlacement?.resolve &&
         pivotPlacement.controlNames?.rows &&
@@ -372,15 +367,6 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
           metricsLayout: pivotPlacement.preferredAxis,
           lastMoved: pivotPlacement.axis === 'rows' ? 'row' : 'col',
         });
-        if (debugOn) {
-          // eslint-disable-next-line no-console
-          console.log('[pivot-v3] DnD applyChange', {
-            axis: pivotPlacement.axis,
-            rowsNext,
-            colsNext,
-            resolved,
-          });
-        }
         const setControl = (
           controlName: string,
           val: QueryFormColumn[],
@@ -456,14 +442,6 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
         });
         resetHover();
         return;
-      }
-      if (debugOn) {
-        // eslint-disable-next-line no-console
-        console.log('[pivot-v3] DnD fallback applyChange', {
-          axis: pivotPlacement?.axis,
-          pivotPlacementPresent: !!pivotPlacement,
-          nextValue,
-        });
       }
       onChange(nextValue);
       resetHover();
@@ -543,15 +521,6 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
         return;
       }
       const insertAt = computeInsertIndex(monitor);
-      if ((window as WindowWithPivotDebug).PIVOT_V3_DEBUG_PLACEMENT) {
-        // eslint-disable-next-line no-console
-        console.log('[pivot-v3] DnD drop details', {
-          listId: currentListId,
-          lastHover: lastHoverRef.current,
-          insertAt,
-          values: optionSelector.getValues(),
-        });
-      }
       if (!optionSelector.has(columnValue)) {
         const baseValues = toArray(optionSelector.getValues());
         const clampedIndex = Math.max(0, Math.min(insertAt, baseValues.length));
@@ -562,14 +531,7 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
       }
       resetHover();
     },
-    [
-      applyChange,
-      computeInsertIndex,
-      currentListId,
-      optionSelector,
-      resetHover,
-      toArray,
-    ],
+    [applyChange, computeInsertIndex, optionSelector, resetHover, toArray],
   );
 
   const canDrop = useCallback(
