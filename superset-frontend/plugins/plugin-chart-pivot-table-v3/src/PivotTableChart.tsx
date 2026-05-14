@@ -265,6 +265,8 @@ function PivotTableChart(props: PivotTableProps) {
   }, [dimensionKeys, formData.pivotRuntimeLayout, metricKeys, ownState]);
   const [committedRuntimeLayout, setCommittedRuntimeLayout] =
     useState<PivotRuntimeLayout>(runtimeLayout);
+  const committedRuntimeLayoutRef = useRef(committedRuntimeLayout);
+  useSyncRef(committedRuntimeLayoutRef, committedRuntimeLayout);
   const [uiRuntimeLayout, setUiRuntimeLayout] =
     useState<PivotRuntimeLayout>(runtimeLayout);
   const uiRuntimeLayoutRef = useRef(runtimeLayout);
@@ -323,6 +325,7 @@ function PivotTableChart(props: PivotTableProps) {
       lastPersistedRuntimeLayout: lastPersistedRuntimeLayoutRef.current,
     });
     if (propSync.shouldSyncCommittedRuntimeLayout) {
+      committedRuntimeLayoutRef.current = runtimeLayout;
       setCommittedRuntimeLayout(current =>
         isSameRuntimeLayout(current, runtimeLayout) ? current : runtimeLayout,
       );
@@ -340,25 +343,14 @@ function PivotTableChart(props: PivotTableProps) {
     runtimeLayout,
     updateUiRuntimeLayout,
   ]);
-  const { appliedLayoutFormData } = useMemo(
-    () =>
-      resolveAppliedInteractionLayout({
-        isUserControlled,
-        appliedFormData,
-        formData,
-        runtimeLayout,
-        committedRuntimeLayout,
-        appliedDimensionKeys,
-      }),
-    [
-      appliedDimensionKeys,
-      appliedFormData,
-      committedRuntimeLayout,
-      formData,
-      isUserControlled,
-      runtimeLayout,
-    ],
-  );
+  const { appliedLayoutFormData } = resolveAppliedInteractionLayout({
+    isUserControlled,
+    appliedFormData,
+    formData,
+    runtimeLayout,
+    committedRuntimeLayout: committedRuntimeLayoutRef.current,
+    appliedDimensionKeys,
+  });
   const fetchFormData = useMemo(() => {
     if (!isUserControlled) {
       return appliedLayoutFormData;
@@ -447,6 +439,7 @@ function PivotTableChart(props: PivotTableProps) {
         lastPersistedSelectionRef.current = persistencePlan.persistedSelection;
         pendingPersistedSelectionSyncRef.current = true;
       }
+      committedRuntimeLayoutRef.current = layout;
       setCommittedRuntimeLayout(current =>
         isSameRuntimeLayout(current, layout) ? current : layout,
       );
@@ -521,7 +514,7 @@ function PivotTableChart(props: PivotTableProps) {
         metricKeys,
         factBatches: committedFactBatches,
         pendingSeamlessLayout: pendingSeamlessLayoutRef.current,
-        committedRuntimeLayout,
+        committedRuntimeLayout: committedRuntimeLayoutRef.current,
         selection: uiSelectedFilters,
         upstreamSignature: upstreamSeamlessSignature,
       });
@@ -538,7 +531,6 @@ function PivotTableChart(props: PivotTableProps) {
     [
       applySeamlessUpdate,
       committedFactBatches,
-      committedRuntimeLayout,
       dimensionKeys,
       metricKeys,
       persistRuntimeState,

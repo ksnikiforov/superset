@@ -204,6 +204,14 @@ export const useExpansionEngine = ({
   );
   const pendingRowsRef = useRef(pendingRows);
   const pendingColsRef = useRef(pendingCols);
+  const fetchFormDataRef = useRef(fetchFormData);
+  const fetchCoverageSignature = stableStringify({
+    groupbyRows: fetchFormData.groupbyRows,
+    groupbyColumns: fetchFormData.groupbyColumns,
+    metrics: fetchFormData.metrics,
+    metricsLayout: fetchFormData.metricsLayout,
+  });
+  const fetchCoverageSignatureRef = useRef(fetchCoverageSignature);
   const explicitExpandedRowsRef = useRef<Set<string>>(new Set());
   const explicitExpandedColsRef = useRef<Set<string>>(new Set());
   const explicitCollapsedRowsRef = useRef<Set<string>>(new Set());
@@ -232,6 +240,11 @@ export const useExpansionEngine = ({
       }),
     [],
   );
+  if (fetchCoverageSignatureRef.current !== fetchCoverageSignature) {
+    expansionRequestLifecycle.invalidate();
+    fetchedCoverageRef.current = createFetchedFactCoverageState();
+    fetchCoverageSignatureRef.current = fetchCoverageSignature;
+  }
   const expansionRequestHelpers = useMemo(
     () =>
       createExpansionRequestHelpers({
@@ -278,6 +291,7 @@ export const useExpansionEngine = ({
   useSyncRef(expandedColsRef, expandedCols);
   useSyncRef(pendingRowsRef, pendingRows);
   useSyncRef(pendingColsRef, pendingCols);
+  useSyncRef(fetchFormDataRef, fetchFormData);
 
   const updateLoadingKey = useCallback((key: string, delta: number) => {
     dispatchRuntimeState({ type: 'updateLoadingKey', key, delta });
@@ -619,7 +633,7 @@ export const useExpansionEngine = ({
 
       const fetchRuntime: ExpansionFetchRuntime = {
         requestScope,
-        fetchFormData,
+        fetchFormData: fetchFormDataRef.current,
         factStore: factStoreRef.current,
         trackRequestInScope: expansionRequestHelpers.trackRequestInScope,
         addWarnings,
@@ -751,7 +765,6 @@ export const useExpansionEngine = ({
       commitExpansionState,
       expansionRequestHelpers,
       expansionRequestLifecycle,
-      fetchFormData,
       getCoverageKey,
       groupbyColumnsLength,
       isMetricTokenValue,
@@ -840,7 +853,7 @@ export const useExpansionEngine = ({
         const stagingBaseTree = treeRef.current;
         const fetchRuntime: ExpansionFetchRuntime = {
           requestScope,
-          fetchFormData,
+          fetchFormData: fetchFormDataRef.current,
           factStore: factStoreRef.current,
           trackRequestInScope: expansionRequestHelpers.trackRequestInScope,
           addWarnings,
@@ -908,7 +921,6 @@ export const useExpansionEngine = ({
       commitExpansionState,
       expansionRequestHelpers,
       expansionRequestLifecycle,
-      fetchFormData,
       getCoverageKey,
       persistExpansionState,
       pruneMergedTree,
@@ -954,7 +966,6 @@ export const useExpansionEngine = ({
         manualExpanded: manualExpandedRef.current,
         manualCollapsed: manualCollapsedRef.current,
       });
-
       if (toggleDecision.kind === 'collapse') {
         expansionRequestLifecycle.invalidate();
         clearLoadingState();

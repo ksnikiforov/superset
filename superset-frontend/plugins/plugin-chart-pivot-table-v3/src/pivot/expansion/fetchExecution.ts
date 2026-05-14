@@ -384,6 +384,9 @@ export const fetchExpansionTargetDeltas = async ({
     transactionId,
     buildRequestGroupId,
   });
+  if (!runtime.requestScope.isCurrent()) {
+    return [];
+  }
   const deltas: FetchResultDelta[] = [];
   results.forEach(result => {
     seedFetchedCoverage(result.factBatches);
