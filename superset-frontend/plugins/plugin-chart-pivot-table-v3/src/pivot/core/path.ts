@@ -74,16 +74,3 @@ export const parsePath = (key: string): PivotPath => {
 
 export const serializeCellKey = (rowKey: string, colKey: string) =>
   `${rowKey}${CELL_KEY_DIVIDER}${colKey}`;
-
-export type ParsedCellKey = { rowKey: string; colKey: string };
-
-export const parseCellKey = (key: string): ParsedCellKey => {
-  const dividerIndex = key.indexOf(CELL_KEY_DIVIDER);
-  if (dividerIndex < 0) {
-    return { rowKey: key, colKey: '' };
-  }
-  return {
-    rowKey: key.slice(0, dividerIndex),
-    colKey: key.slice(dividerIndex + CELL_KEY_DIVIDER.length),
-  };
-};

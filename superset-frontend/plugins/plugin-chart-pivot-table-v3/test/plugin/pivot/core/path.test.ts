@@ -17,8 +17,8 @@
  * under the License.
  */
 import {
-  parseCellKey,
   parsePath,
+  CELL_KEY_DIVIDER,
   PATH_DIVIDER,
   serializeCellKey,
   serializePath,
@@ -37,8 +37,9 @@ describe('pivot/core/path', () => {
     expect(parsePath(serializePath([undefined]))).toEqual([undefined]);
   });
 
-  it('serializes and parses cell keys', () => {
-    const key = serializeCellKey('rowKey', 'colKey');
-    expect(parseCellKey(key)).toEqual({ rowKey: 'rowKey', colKey: 'colKey' });
+  it('serializes cell keys', () => {
+    expect(serializeCellKey('rowKey', 'colKey')).toBe(
+      `rowKey${CELL_KEY_DIVIDER}colKey`,
+    );
   });
 });

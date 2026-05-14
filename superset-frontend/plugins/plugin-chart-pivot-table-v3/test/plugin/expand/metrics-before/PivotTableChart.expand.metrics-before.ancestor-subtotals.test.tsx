@@ -27,7 +27,7 @@ import {
   SUBTOTAL_TOKEN,
 } from '../../../../src/pivot/core/tokens';
 import {
-  parseCellKey,
+  CELL_KEY_DIVIDER,
   parsePath,
   serializeCellKey,
   serializePath,
@@ -1395,7 +1395,10 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
       groupbyColumns.length,
     );
     const subtotalKey = serializePath(['F', SUBTOTAL_TOKEN]);
-    const { colKey: firstColKey } = parseCellKey(Object.keys(tree.cells)[0]);
+    const firstCellKey = Object.keys(tree.cells)[0];
+    const firstColKey = firstCellKey.slice(
+      firstCellKey.indexOf(CELL_KEY_DIVIDER) + CELL_KEY_DIVIDER.length,
+    );
     tree.rows[subtotalKey] = {
       axis: 'row',
       key: subtotalKey,
