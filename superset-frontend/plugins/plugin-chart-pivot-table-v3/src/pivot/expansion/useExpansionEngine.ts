@@ -1002,10 +1002,7 @@ export const useExpansionEngine = ({
         hydrateAtomic('cross-axis', {
           activeAxis: axis,
           showLoader: false,
-        }).catch(error => {
-          reportAsyncError(error);
-          setHydratingState(false);
-        });
+        }).catch(reportAsyncError);
         return;
       }
       expandSameAxis(axis, node).catch(reportAsyncError);
@@ -1226,10 +1223,7 @@ export const useExpansionEngine = ({
         showLoader: prefetchAction.showLoader,
         planRows: shouldPlanRows,
         planCols: shouldPlanCols,
-      }).catch(error => {
-        reportAsyncError(error);
-        setHydratingState(false);
-      });
+      }).catch(reportAsyncError);
       return;
     }
     setHydratingState(false);
