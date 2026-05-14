@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { type QueryFormColumn } from '@superset-ui/core';
 import { MetricsLayoutEnum, type PivotTreeNode } from '../../../../src/types';
 import {
   buildMetricOrderComparator,
@@ -29,7 +28,6 @@ import { type PivotProgram } from '../../../../src/pivot/runtime/types';
 import {
   encodeMeasureLeafKey,
   encodeMetricKey,
-  METRICS_PLACEHOLDER,
   SUBTOTAL_TOKEN,
 } from '../../../../src/pivot/core/tokens';
 import { serializePath } from '../../../../src/pivot/core/path';
@@ -45,11 +43,6 @@ const node = (axis: 'row' | 'col', path: PivotTreeNode['path']) => ({
 });
 
 const baseParams = {
-  rows: {},
-  cols: {},
-  formGroupbyRows: [] as QueryFormColumn[],
-  formGroupbyColumns: [] as QueryFormColumn[],
-  groupbyColumnsLength: 0,
   metricsCount: 1,
   metricLabelCount: 1,
   rowDimCount: 0,
@@ -152,45 +145,33 @@ describe('pivot/chart/layoutRuntime', () => {
     ).toBeGreaterThan(0);
   });
 
-  it('uses explicit row metric placeholder position before inferred nodes exist', () => {
+  it('uses the compiled row metric position before rendered nodes exist', () => {
     const policy = resolveMetricAxisLayoutPolicy({
       ...baseParams,
-      formGroupbyRows: ['country', METRICS_PLACEHOLDER, 'state'],
       rowDimCount: 3,
       metricInsertIndex: 1,
     });
 
-    expect(policy.metricLayoutIndexOnRows).toBe(1);
-    expect(policy.metricIntentIndexOnRows).toBe(1);
+    expect(policy.metricIndexOnRows).toBe(1);
     expect(policy.singleMetricBetweenRows).toBe(true);
     expect(policy.shouldExpandMetricRows).toBe(false);
   });
 
-  it('keeps column layout at the configured dimension depth when fetched data is shallow', () => {
+  it('uses the compiled column metric position without inspecting shallow rendered data', () => {
     const policy = resolveMetricAxisLayoutPolicy({
       ...baseParams,
-      cols: {
-        westSales: node('col', ['West', encodeMetricKey('sales')]),
-      },
-      formGroupbyColumns: ['region', 'quarter'],
-      groupbyColumnsLength: 2,
       colDimCount: 2,
       metricInsertIndex: 2,
       resolvedMetricsLayout: MetricsLayoutEnum.COLUMNS,
     });
 
-    expect(policy.maxColDimDepth).toBe(1);
-    expect(policy.metricIndexOnCols).toBe(1);
-    expect(policy.metricLayoutIndexOnCols).toBe(2);
+    expect(policy.metricIndexOnCols).toBe(2);
     expect(policy.metricsAtColEnd).toBe(true);
   });
 
   it('forces row subtotals to the end for multi-metric row layouts after dimensions', () => {
     const policy = resolveMetricAxisLayoutPolicy({
       ...baseParams,
-      rows: {
-        westSales: node('row', ['West', encodeMetricKey('sales')]),
-      },
       metricLabelCount: 2,
       rowDimCount: 1,
       metricInsertIndex: 1,
@@ -206,17 +187,11 @@ describe('pivot/chart/layoutRuntime', () => {
   it('hides a redundant single row metric header only when the leaf tier is absent', () => {
     const withoutLeafTier = resolveMetricAxisLayoutPolicy({
       ...baseParams,
-      rows: {
-        westSales: node('row', ['West', encodeMetricKey('sales')]),
-      },
       rowDimCount: 1,
       metricInsertIndex: 1,
     });
     const withLeafTier = resolveMetricAxisLayoutPolicy({
       ...baseParams,
-      rows: {
-        westSales: node('row', ['West', encodeMetricKey('sales')]),
-      },
       rowDimCount: 1,
       metricInsertIndex: 1,
       isLeafTierVisible: true,
@@ -426,7 +401,7 @@ describe('pivot/chart/layoutRuntime', () => {
         rowSubtotalPositionForParent: 'end',
         resolvedMetricsLayout: MetricsLayoutEnum.ROWS,
         isMultiMetric: true,
-        metricLayoutIndexOnRows: 1,
+        metricIndexOnRows: 1,
         hideMetricHeaderOnRows: false,
         countDimDepth: path => path.length,
         isMetricTokenValue: baseParams.isMetricTokenValue,

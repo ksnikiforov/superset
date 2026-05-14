@@ -33,7 +33,7 @@ type NodeDepthConfig = {
   metricLabelSet: Set<string>;
   metricsLayout: MetricsLayoutEnum;
   hideMetricHeaderOnRows: boolean;
-  metricLayoutIndexOnRows?: number;
+  metricIndexOnRows?: number;
 };
 
 export const getMetricLabelFromPath = (
@@ -184,29 +184,6 @@ export const getMetricTierNodes = (
       })(),
   );
 
-export const getMetricIndexFromNodes = ({
-  nodes,
-  isMetricTokenValue,
-}: {
-  nodes: Record<string, PivotTreeNode>;
-  isMetricTokenValue: (value: unknown) => boolean;
-}): number | undefined => {
-  let found: number | undefined;
-  let foundFromSubtotal: number | undefined;
-  Object.values(nodes).forEach(node => {
-    const idx = node.path.findIndex(val => isMetricTokenValue(val));
-    if (idx < 0) {
-      return;
-    }
-    if (node.path.some(val => isSubtotalToken(val))) {
-      foundFromSubtotal = Math.max(foundFromSubtotal ?? idx, idx);
-      return;
-    }
-    found = Math.max(found ?? idx, idx);
-  });
-  return found ?? foundFromSubtotal;
-};
-
 export const countDimDepth = (
   path: PivotTreeNode['path'],
   metricLabelSet: Set<string>,
@@ -241,7 +218,7 @@ export const getNodeDimDepth = (
     metricLabelSet,
     metricsLayout,
     hideMetricHeaderOnRows,
-    metricLayoutIndexOnRows,
+    metricIndexOnRows,
   }: NodeDepthConfig,
 ) => {
   const dimDepth = countDimDepth(node.path, metricLabelSet);
@@ -255,8 +232,8 @@ export const getNodeDimDepth = (
   });
   const boundarySubtotal =
     metricsLayout === MetricsLayoutEnum.ROWS &&
-    metricLayoutIndexOnRows === 1 &&
-    subtotalIndex === metricLayoutIndexOnRows &&
+    metricIndexOnRows === 1 &&
+    subtotalIndex === metricIndexOnRows &&
     metricIndex > subtotalIndex;
   const adjustedDimDepth = boundarySubtotal
     ? dimDepth
@@ -284,8 +261,8 @@ export const getNodeDimDepth = (
     subtotalIndex >= 0 && (metricIndex < 0 || metricIndex > subtotalIndex);
   const skipOffsetAtBoundary =
     metricsLayout === MetricsLayoutEnum.ROWS &&
-    metricLayoutIndexOnRows === 1 &&
-    subtotalIndex === metricLayoutIndexOnRows &&
+    metricIndexOnRows === 1 &&
+    subtotalIndex === metricIndexOnRows &&
     metricIndex > subtotalIndex;
   return shouldOffsetSubtotal && !skipOffsetAtBoundary
     ? Math.max(depth - 1, 0)

@@ -18,7 +18,6 @@
  */
 
 import {
-  MetricsLayoutEnum,
   type PivotAxis,
   type PivotTreeData,
   type PivotTreeNode,
@@ -42,12 +41,7 @@ import {
   buildRenderModel,
   type RenderModelConfig,
 } from '../render/renderModel';
-import { findChildren, rootKey } from '../viewModel';
-import {
-  getMetricIndexFromNodes,
-  isMetricGrandTotalNode as isMetricGrandTotalNodeBase,
-  isMetricSubtotalNode as isMetricSubtotalNodeBase,
-} from '../metricsTotals';
+import { rootKey } from '../viewModel';
 import { buildGroupedFetchTargets } from './planner';
 import {
   createFetchedFactCoverageLookup,
@@ -57,19 +51,16 @@ import {
 export type ExpansionVisibilityConfig = {
   groupbyRowsLength: number;
   groupbyColumnsLength: number;
-  rowTotals: boolean;
-  colTotals: boolean;
-  metricsLayout?: MetricsLayoutEnum;
   metricLabelSet: Set<string>;
-  hasMultipleMeasures?: boolean;
-  metricIndexForRows?: number;
-  metricIndexForCols?: number;
   isMetricTokenValue: (value: unknown) => boolean;
   countDimDepth: (path: PivotTreeNode['path']) => number;
   shouldFetchChildren: PivotExpansionNodeFetchPredicate;
+  buildRenderModelConfig: (params: {
+    tree: PivotTreeData;
+    expandedRows: Set<string>;
+    expandedCols: Set<string>;
+  }) => RenderModelConfig;
 };
-
-const depthSorter = () => 0;
 
 const createEmptyExpansionPlan = (): PivotExpansionPlan => ({
   fetchKeys: new Set<string>(),
@@ -644,54 +635,6 @@ export const hasNestedPendingKeys = (keys: Set<string>) => {
   );
 };
 
-export const buildExpansionRenderModelConfig = (
-  tree: PivotTreeData,
-  config: ExpansionVisibilityConfig,
-): RenderModelConfig => {
-  const resolvedMetricsLayout =
-    config.metricsLayout === MetricsLayoutEnum.ROWS
-      ? MetricsLayoutEnum.ROWS
-      : MetricsLayoutEnum.COLUMNS;
-  const metricsFirstOnRows =
-    resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
-    config.metricIndexForRows === 0;
-  const metricsFirstOnCols =
-    resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS &&
-    config.metricIndexForCols === 0;
-  const isMultiMetric = config.metricLabelSet.size > 1;
-  const hasMultipleMeasures = config.hasMultipleMeasures ?? isMultiMetric;
-  return {
-    groupbyRowsLength: config.groupbyRowsLength,
-    groupbyColumnsLength: config.groupbyColumnsLength,
-    normalizedRowSubtotalLevels: [],
-    normalizedColSubtotalLevels: [],
-    rowTotals: config.rowTotals,
-    colTotals: config.colTotals,
-    rowTotalPosition: 'start',
-    colTotalPosition: 'start',
-    resolvedColSubtotalPosition: 'start',
-    resolvedMetricsLayout,
-    hasMultipleMeasures,
-    metricsFirstOnCols,
-    rowSorter: depthSorter,
-    colSorter: depthSorter,
-    getRowChildren: parent => findChildren(tree.rows, parent),
-    getCollapsedRowChildren: () => [] as PivotTreeNode[],
-    getColChildren: parent => findChildren(tree.cols, parent),
-    getCollapsedColLeaves: () => [] as PivotTreeNode[],
-    countDimDepth: config.countDimDepth,
-    isMetricGrandTotalNode: node =>
-      isMetricGrandTotalNodeBase(node, {
-        metricLabelSet: config.metricLabelSet,
-        metricsFirstOnRows,
-        metricsFirstOnCols,
-      }),
-    isMetricSubtotalNode: node =>
-      isMetricSubtotalNodeBase(node, config.metricLabelSet),
-    isMetricTokenValue: config.isMetricTokenValue,
-  };
-};
-
 export const computeVisibleDepths = ({
   tree,
   expandedRows,
@@ -707,7 +650,7 @@ export const computeVisibleDepths = ({
     tree,
     expandedRows,
     expandedCols,
-    config: buildExpansionRenderModelConfig(tree, config),
+    config: config.buildRenderModelConfig({ tree, expandedRows, expandedCols }),
   });
   return {
     visibleRowDepth: Math.max(
@@ -726,20 +669,17 @@ export const resolveExpandedForMetrics = ({
   expanded,
   tree,
   collapsed,
-  fallbackMetricIndex,
+  metricIndex,
   isMetricTokenValue,
 }: {
   axis: PivotAxis;
   expanded: Set<string>;
   tree: PivotTreeData;
   collapsed: Set<string>;
-  fallbackMetricIndex: number | undefined;
+  metricIndex: number | undefined;
   isMetricTokenValue: (value: unknown) => boolean;
 }) => {
   const nodes = axis === 'row' ? tree.rows : tree.cols;
-  const metricIndex =
-    getMetricIndexFromNodes({ nodes, isMetricTokenValue }) ??
-    fallbackMetricIndex;
   const resolved = expandMetricPatternExpansions({
     expanded,
     nodes,
@@ -1425,7 +1365,11 @@ export const buildVisiblePersistedExpansionState = ({
       tree,
       expandedRows,
       expandedCols,
-      config: buildExpansionRenderModelConfig(tree, config),
+      config: config.buildRenderModelConfig({
+        tree,
+        expandedRows,
+        expandedCols,
+      }),
     }),
   );
   const visibleRows = filterVisibleExpansionKeys(

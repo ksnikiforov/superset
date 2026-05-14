@@ -346,7 +346,6 @@ function PivotTableChart(props: PivotTableProps) {
   }, [dimensionList, resolvedVerboseMap]);
 
   const layoutResult = usePivotLayout({
-    data: dataForRender,
     formData: appliedLayoutFormData,
     metricsLayout,
     startCollapsed,
@@ -406,11 +405,12 @@ function PivotTableChart(props: PivotTableProps) {
     shouldExpandMetricRows: layoutResult.shouldExpandMetricRows,
     shouldExpandMetricCols: layoutResult.shouldExpandMetricCols,
     metricLabelSet: layoutResult.metricLabelSet,
-    metricIndexForRows: layoutResult.metricIntentIndexOnRows,
-    metricIndexForCols: layoutResult.metricIntentIndexOnCols,
+    metricIndexForRows: layoutResult.metricIndexOnRows,
+    metricIndexForCols: layoutResult.metricIndexOnCols,
     isMetricTokenValue: layoutResult.isMetricTokenValue,
     pivotProgram: layoutResult.layout.pivotProgram,
     countDimDepth: layoutResult.countEngineDimDepth,
+    buildRenderModelConfig: layoutResult.buildRenderModelConfig,
     expandRowsLevelRaw: layoutResult.expandRowsLevelRaw,
     expandColumnsLevelRaw: layoutResult.expandColumnsLevelRaw,
     setControlValue,

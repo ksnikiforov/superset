@@ -339,7 +339,7 @@ test('hides metric toggles when measure leaves are visible', () => {
       metricLabels: ['Sales'],
       resolvedMetricsLayout: MetricsLayoutEnum.ROWS,
       hideMetricHeaderOnRows: false,
-      metricLayoutIndexOnRows: 0,
+      metricIndexOnRows: 0,
       isMetricTokenValue: value => value === encodeMetricKey('sales'),
       isExplicitSubtotalNode: () => false,
       isMetricGrandTotalNode: () => false,

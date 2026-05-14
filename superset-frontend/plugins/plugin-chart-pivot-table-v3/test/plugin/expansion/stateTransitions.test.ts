@@ -36,12 +36,16 @@ import {
   type ExpansionVisibilityConfig,
 } from '../../../src/pivot/expansion/stateTransitions';
 import { createFetchedFactCoverageState } from '../../../src/pivot/expansion/fetchedRequests';
-import { rootKey } from '../../../src/pivot/viewModel';
+import { findChildren, rootKey } from '../../../src/pivot/viewModel';
 import {
   METRICS_PLACEHOLDER,
   SUBTOTAL_TOKEN,
 } from '../../../src/pivot/core/tokens';
 import { serializeCellKey, serializePath } from '../../../src/pivot/core/path';
+import {
+  isMetricGrandTotalNode,
+  isMetricSubtotalNode,
+} from '../../../src/pivot/metricsTotals';
 import {
   MetricsLayoutEnum,
   type PivotTreeData,
@@ -49,18 +53,78 @@ import {
 } from '../../../src/types';
 
 describe('pivot/expansion/stateTransitions', () => {
+  const depthSorter = () => 0;
+  const buildTestRenderModelConfig =
+    ({
+      groupbyRowsLength = 2,
+      groupbyColumnsLength = 2,
+      rowTotals = false,
+      colTotals = false,
+      metricsLayout = MetricsLayoutEnum.COLUMNS,
+      metricLabelSet = new Set<string>(),
+      metricIndexForRows,
+      metricIndexForCols,
+      isMetricTokenValue = () => false,
+      countDimDepth = (path: PivotTreeNode['path']) => path.length,
+    }: {
+      groupbyRowsLength?: number;
+      groupbyColumnsLength?: number;
+      rowTotals?: boolean;
+      colTotals?: boolean;
+      metricsLayout?: MetricsLayoutEnum;
+      metricLabelSet?: Set<string>;
+      metricIndexForRows?: number;
+      metricIndexForCols?: number;
+      isMetricTokenValue?: (value: unknown) => boolean;
+      countDimDepth?: (path: PivotTreeNode['path']) => number;
+    } = {}) =>
+    ({ tree }: { tree: PivotTreeData }) => {
+      const metricsFirstOnRows =
+        metricsLayout === MetricsLayoutEnum.ROWS && metricIndexForRows === 0;
+      const metricsFirstOnCols =
+        metricsLayout === MetricsLayoutEnum.COLUMNS && metricIndexForCols === 0;
+      return {
+        groupbyRowsLength,
+        groupbyColumnsLength,
+        normalizedRowSubtotalLevels: [],
+        normalizedColSubtotalLevels: [],
+        rowTotals,
+        colTotals,
+        rowTotalPosition: 'start' as const,
+        colTotalPosition: 'start' as const,
+        resolvedColSubtotalPosition: 'start' as const,
+        resolvedMetricsLayout: metricsLayout,
+        hasMultipleMeasures: metricLabelSet.size > 1,
+        metricsFirstOnCols,
+        rowSorter: depthSorter,
+        colSorter: depthSorter,
+        getRowChildren: (parent: PivotTreeNode) =>
+          findChildren(tree.rows, parent),
+        getCollapsedRowChildren: () => [] as PivotTreeNode[],
+        getColChildren: (parent: PivotTreeNode) =>
+          findChildren(tree.cols, parent),
+        getCollapsedColLeaves: () => [] as PivotTreeNode[],
+        countDimDepth,
+        isMetricGrandTotalNode: (node?: PivotTreeNode) =>
+          isMetricGrandTotalNode(node, {
+            metricLabelSet,
+            metricsFirstOnRows,
+            metricsFirstOnCols,
+          }),
+        isMetricSubtotalNode: (node?: PivotTreeNode) =>
+          isMetricSubtotalNode(node, metricLabelSet),
+        isMetricTokenValue,
+      };
+    };
+
   const config: ExpansionVisibilityConfig = {
     groupbyRowsLength: 2,
     groupbyColumnsLength: 2,
-    rowTotals: false,
-    colTotals: false,
-    metricsLayout: undefined,
     metricLabelSet: new Set<string>(),
-    metricIndexForRows: undefined,
-    metricIndexForCols: undefined,
     isMetricTokenValue: () => false,
     countDimDepth: path => path.length,
     shouldFetchChildren: ({ node }) => node.hasChildren,
+    buildRenderModelConfig: buildTestRenderModelConfig(),
   };
 
   const getCoverageKey = (_axis: 'row' | 'col', key: string) => key;
@@ -341,7 +405,7 @@ describe('pivot/expansion/stateTransitions', () => {
       expanded: new Set([rootKey, aKey, staleMetricFirstKey]),
       tree,
       collapsed: new Set(),
-      fallbackMetricIndex: undefined,
+      metricIndex: 1,
       isMetricTokenValue: value => value === METRICS_PLACEHOLDER,
     });
 
@@ -367,7 +431,7 @@ describe('pivot/expansion/stateTransitions', () => {
       expanded: new Set([rootKey, aKey, aMetricKey, staleMetricFirstKey]),
       tree,
       collapsed: new Set([aMetricKey]),
-      fallbackMetricIndex: undefined,
+      metricIndex: 1,
       isMetricTokenValue: value => value === METRICS_PLACEHOLDER,
     });
 
@@ -851,11 +915,16 @@ describe('pivot/expansion/stateTransitions', () => {
     };
     const metricConfig: ExpansionVisibilityConfig = {
       ...config,
-      metricsLayout: MetricsLayoutEnum.ROWS,
-      metricIndexForRows: 1,
       isMetricTokenValue: value => value === METRICS_PLACEHOLDER,
       countDimDepth: path =>
         path.filter(value => value !== METRICS_PLACEHOLDER).length,
+      buildRenderModelConfig: buildTestRenderModelConfig({
+        metricsLayout: MetricsLayoutEnum.ROWS,
+        metricIndexForRows: 1,
+        isMetricTokenValue: value => value === METRICS_PLACEHOLDER,
+        countDimDepth: path =>
+          path.filter(value => value !== METRICS_PLACEHOLDER).length,
+      }),
     };
 
     const plan = planHydrationIteration({
@@ -905,12 +974,20 @@ describe('pivot/expansion/stateTransitions', () => {
     const metricConfig: ExpansionVisibilityConfig = {
       ...config,
       groupbyRowsLength: 3,
-      metricsLayout: MetricsLayoutEnum.ROWS,
-      metricIndexForRows: 2,
       isMetricTokenValue: value => value === metricToken,
       countDimDepth: path =>
         path.filter(value => value !== metricToken && value !== SUBTOTAL_TOKEN)
           .length,
+      buildRenderModelConfig: buildTestRenderModelConfig({
+        groupbyRowsLength: 3,
+        metricsLayout: MetricsLayoutEnum.ROWS,
+        metricIndexForRows: 2,
+        isMetricTokenValue: value => value === metricToken,
+        countDimDepth: path =>
+          path.filter(
+            value => value !== metricToken && value !== SUBTOTAL_TOKEN,
+          ).length,
+      }),
     };
 
     const plan = planHydrationIteration({

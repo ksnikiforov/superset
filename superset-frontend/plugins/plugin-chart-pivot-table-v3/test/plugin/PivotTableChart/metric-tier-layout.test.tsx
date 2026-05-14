@@ -172,7 +172,6 @@ describe('PivotTableChart metric tier indentation and toggles', () => {
 
     const { result } = renderHook(() => {
       const layout = usePivotLayout({
-        data: tree,
         formData,
         metricsLayout: MetricsLayoutEnum.COLUMNS,
         startCollapsed: false,
@@ -248,7 +247,6 @@ describe('PivotTableChart metric tier indentation and toggles', () => {
 
     const { result } = renderHook(() => {
       const layout = usePivotLayout({
-        data: tree,
         formData,
         metricsLayout: MetricsLayoutEnum.COLUMNS,
         startCollapsed: false,
@@ -340,7 +338,6 @@ describe('PivotTableChart metric tier indentation and toggles', () => {
 
     const { result } = renderHook(() => {
       const layout = usePivotLayout({
-        data: tree,
         formData,
         metricsLayout: MetricsLayoutEnum.ROWS,
         startCollapsed: false,

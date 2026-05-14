@@ -70,7 +70,7 @@ export const pruneStaleCollapsedAxis = ({
   parent,
   branch,
   resolvedMetricsLayout,
-  metricLayoutIndex,
+  metricIndex,
   preserveMetricAtParentLevel = false,
   isMetricTokenValue,
   isExplicitSubtotalNode,
@@ -82,7 +82,7 @@ export const pruneStaleCollapsedAxis = ({
   parent: PivotTreeNode;
   branch?: PivotTreeData;
   resolvedMetricsLayout: MetricsLayoutEnum;
-  metricLayoutIndex?: number;
+  metricIndex?: number;
   preserveMetricAtParentLevel?: boolean;
   isMetricTokenValue: (value: unknown) => boolean;
   isExplicitSubtotalNode: (node: PivotTreeNode) => boolean;
@@ -95,10 +95,10 @@ export const pruneStaleCollapsedAxis = ({
   if (resolvedMetricsLayout !== expectedMetricsLayoutForAxis(axis)) {
     return currentTree;
   }
-  if (metricLayoutIndex === undefined) {
+  if (metricIndex === undefined) {
     return currentTree;
   }
-  if (metricLayoutIndex <= parent.level) {
+  if (metricIndex <= parent.level) {
     return currentTree;
   }
   if (parent.path.some(val => isMetricTokenValue(val))) {

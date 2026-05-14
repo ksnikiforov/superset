@@ -38,7 +38,6 @@ import { buildRenderModel, type RenderModel } from '../render/renderModel';
 import { resolveAxisProjection } from '../runtime/projection';
 import { resolveMeasureSortMetricKey } from '../measureLeaves';
 import { compareValues, rootKey, sortByOrder } from '../viewModel';
-import { getMetricIndexFromNodes } from '../metricsTotals';
 import { type PivotLayoutResult } from './usePivotLayout';
 import {
   buildPivotColumnSortStateForClick,
@@ -424,92 +423,37 @@ export const usePivotRenderModel = ({
     ],
   );
 
-  const renderModel = useMemo(() => {
-    const resolveMetricIndex = (...candidates: Array<number | undefined>) => {
-      const index = Math.max(...candidates.map(value => value ?? -1));
-      return index >= 0 ? index : undefined;
-    };
-    const metricIndexForRowsResolved = resolveMetricIndex(
-      layout.metricLayoutIndexOnRows,
-      getMetricIndexFromNodes({
-        nodes: renderTree.rows,
-        isMetricTokenValue: layout.isMetricTokenValue,
+  const renderModel = useMemo(
+    () =>
+      buildRenderModel({
+        tree: renderTree,
+        expandedRows: expandedRowsForRender,
+        expandedCols: expandedColsForRender,
+        config: layout.buildRenderModelConfig({
+          tree: renderTree,
+          expandedRows: expandedRowsForRender,
+          expandedCols: expandedColsForRender,
+          rowTotals,
+          colTotals,
+          rowSorter,
+          colSorter,
+          getColumnDisplayPath,
+          getColumnHeaderLabel,
+        }),
       }),
-      layout.metricIndexOnRows,
-    );
-    const metricIndexForColsResolved = resolveMetricIndex(
-      layout.metricLayoutIndexOnCols,
-      getMetricIndexFromNodes({
-        nodes: renderTree.cols,
-        isMetricTokenValue: layout.isMetricTokenValue,
-      }),
-      layout.metricIndexOnCols,
-    );
-    return buildRenderModel({
-      tree: renderTree,
-      expandedRows: expandedRowsForRender,
-      expandedCols: expandedColsForRender,
-      config: {
-        groupbyRowsLength: resolvedGroupbyRowsLength,
-        groupbyColumnsLength: resolvedGroupbyColumnsLength,
-        normalizedRowSubtotalLevels: layout.normalizedRowSubtotalLevels,
-        normalizedColSubtotalLevels: layout.normalizedColSubtotalLevels,
-        rowTotals,
-        colTotals,
-        rowTotalPosition: layout.resolvedRowTotalPosition,
-        colTotalPosition: layout.resolvedColTotalPosition,
-        resolvedColSubtotalPosition: layout.effectiveColSubtotalPosition,
-        resolvedMetricsLayout: layout.resolvedMetricsLayout,
-        hasMultipleMeasures: layout.hasMultipleMeasures,
-        metricsFirstOnCols: layout.metricsFirstOnCols,
-        rowSorter,
-        colSorter,
-        getRowChildren: parent =>
-          layout.getRowChildrenForNodes(
-            parent,
-            renderTree.rows,
-            metricIndexForRowsResolved,
-          ),
-        getCollapsedRowChildren: parent =>
-          layout.getCollapsedRowChildrenForNodes(
-            parent,
-            expandedRowsForRender,
-            renderTree.rows,
-          ),
-        getColChildren: parent =>
-          layout.getColChildrenForNodes(
-            parent,
-            renderTree.cols,
-            metricIndexForColsResolved,
-          ),
-        getCollapsedColLeaves: parent =>
-          layout.getCollapsedColLeavesForNodes(
-            parent,
-            expandedColsForRender,
-            renderTree.cols,
-          ),
-        countDimDepth: layout.countDimDepth,
-        isMetricGrandTotalNode: layout.isMetricGrandTotalNode,
-        isMetricSubtotalNode: layout.isMetricSubtotalNode,
-        isMetricTokenValue: layout.isMetricTokenValue,
-        getColumnDisplayPath,
-        getColumnHeaderLabel,
-      },
-    });
-  }, [
-    colSorter,
-    colTotals,
-    expandedColsForRender,
-    expandedRowsForRender,
-    getColumnDisplayPath,
-    getColumnHeaderLabel,
-    layout,
-    renderTree,
-    resolvedGroupbyColumnsLength,
-    resolvedGroupbyRowsLength,
-    rowSorter,
-    rowTotals,
-  ]);
+    [
+      colSorter,
+      colTotals,
+      expandedColsForRender,
+      expandedRowsForRender,
+      getColumnDisplayPath,
+      getColumnHeaderLabel,
+      layout,
+      renderTree,
+      rowSorter,
+      rowTotals,
+    ],
+  );
 
   const renderNodeDisplayState = useMemo(
     () =>

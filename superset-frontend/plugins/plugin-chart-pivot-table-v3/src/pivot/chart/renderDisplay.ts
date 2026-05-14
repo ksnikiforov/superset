@@ -320,7 +320,7 @@ type RenderNodeDisplayLayout = Pick<
   | 'metricLabels'
   | 'resolvedMetricsLayout'
   | 'hideMetricHeaderOnRows'
-  | 'metricLayoutIndexOnRows'
+  | 'metricIndexOnRows'
   | 'isMetricTokenValue'
   | 'isExplicitSubtotalNode'
   | 'isMetricGrandTotalNode'
@@ -372,7 +372,7 @@ export const buildRenderNodeDisplayState = ({
       metricLabelSet: layout.metricLabelSet,
       metricsLayout: layout.resolvedMetricsLayout,
       hideMetricHeaderOnRows: layout.hideMetricHeaderOnRows,
-      metricLayoutIndexOnRows: layout.metricLayoutIndexOnRows,
+      metricIndexOnRows: layout.metricIndexOnRows,
     });
 
   const shouldShowToggle = (axis: PivotAxis, node?: PivotTreeNode) => {

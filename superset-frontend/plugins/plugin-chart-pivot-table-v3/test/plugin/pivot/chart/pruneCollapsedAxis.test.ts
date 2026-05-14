@@ -111,7 +111,7 @@ describe('pivot/chart/pruneCollapsedAxis', () => {
       parent,
       branch,
       resolvedMetricsLayout: MetricsLayoutEnum.ROWS,
-      metricLayoutIndex: 2,
+      metricIndex: 2,
     });
 
     expect(nextTree.rows[valid.key]).toBeDefined();
@@ -157,7 +157,7 @@ describe('pivot/chart/pruneCollapsedAxis', () => {
       parent,
       branch,
       resolvedMetricsLayout: MetricsLayoutEnum.COLUMNS,
-      metricLayoutIndex: 2,
+      metricIndex: 2,
       preserveMetricAtParentLevel: true,
     });
 

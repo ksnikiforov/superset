@@ -30,6 +30,7 @@ import { resolveMetricDisplayLabel, getStableColumnKey } from '../../utils';
 import { getMetricKey, isSubtotalToken } from '../core/tokens';
 import { buildLayoutContext } from '../layout/LayoutContext';
 import type { PivotProgram } from '../runtime/types';
+import type { RenderModelConfig } from '../render/renderModel';
 import {
   countDimDepth as countDimDepthBase,
   getMetricLabelFromPath as getMetricLabelFromPathBase,
@@ -46,6 +47,8 @@ import {
   resolveMetricAxisLayoutPolicy,
   resolveRowSubtotalChildrenPolicy,
 } from './layoutRuntime';
+
+const defaultPivotNodeSorter = () => 0;
 
 export type PivotLayoutResult = {
   layout: ReturnType<typeof buildLayoutContext>;
@@ -74,10 +77,6 @@ export type PivotLayoutResult = {
   metricsFirstOnCols: boolean;
   metricIndexOnRows?: number;
   metricIndexOnCols?: number;
-  metricLayoutIndexOnRows?: number;
-  metricLayoutIndexOnCols?: number;
-  metricIntentIndexOnRows?: number;
-  metricIntentIndexOnCols?: number;
   hideMetricHeaderOnRows: boolean;
   metricsAtColEnd: boolean;
   shouldExpandMetricRows: boolean;
@@ -109,13 +108,25 @@ export type PivotLayoutResult = {
   getRowChildrenForNodes: (
     parent: PivotTreeNode,
     nodes: Record<string, PivotTreeNode>,
-    metricIndexOverride?: number,
   ) => PivotTreeNode[];
   getColChildrenForNodes: (
     parent: PivotTreeNode,
     nodes: Record<string, PivotTreeNode>,
-    metricIndexOverride?: number,
   ) => PivotTreeNode[];
+  buildRenderModelConfig: (params: {
+    tree: PivotTreeData;
+    expandedRows: Set<string>;
+    expandedCols: Set<string>;
+    rowTotals: boolean;
+    colTotals: boolean;
+    rowSorter?: (a: PivotTreeNode, b: PivotTreeNode) => number;
+    colSorter?: (a: PivotTreeNode, b: PivotTreeNode) => number;
+    getColumnDisplayPath?: (
+      col: PivotTreeNode,
+      maxDepth: number,
+    ) => PivotTreeNode['path'];
+    getColumnHeaderLabel?: (value: unknown) => string;
+  }) => RenderModelConfig;
   pruneMergedTree: (params: {
     axis: 'row' | 'col';
     tree: PivotTreeData;
@@ -125,7 +136,6 @@ export type PivotLayoutResult = {
 };
 
 export const usePivotLayout = ({
-  data,
   formData,
   metricsLayout,
   startCollapsed,
@@ -143,7 +153,6 @@ export const usePivotLayout = ({
   colSubtotalPosition,
   pivotProgram,
 }: {
-  data: PivotTableProps['data'];
   formData: PivotTableProps['formData'];
   metricsLayout: MetricsLayoutEnum;
   startCollapsed: boolean;
@@ -311,10 +320,6 @@ export const usePivotLayout = ({
     shouldExpandMetricCols,
     metricIndexOnRows,
     metricIndexOnCols,
-    metricIntentIndexOnRows,
-    metricIntentIndexOnCols,
-    metricLayoutIndexOnRows,
-    metricLayoutIndexOnCols,
     metricsAtRowEnd,
     metricsAtColEnd,
     metricsFirstOnRows,
@@ -327,11 +332,6 @@ export const usePivotLayout = ({
   } = useMemo(
     () =>
       resolveMetricAxisLayoutPolicy({
-        rows: data.rows,
-        cols: data.cols,
-        groupbyRowsRaw: layout.groupbyRowsRaw,
-        groupbyColumnsRaw: layout.groupbyColumnsRaw,
-        groupbyColumnsLength: layout.groupbyColumnsRaw.length,
         metricsCount: metrics.length,
         metricLabelCount: metricLabels.length,
         rowDimCount,
@@ -340,8 +340,6 @@ export const usePivotLayout = ({
         resolvedMetricsLayout,
         resolvedExpandRowsLevel,
         resolvedExpandColumnsLevel,
-        metricLabelSet,
-        isMetricTokenValue,
         isLeafTierVisible,
         rowSubTotals,
         resolvedRowSubtotalPosition,
@@ -349,14 +347,8 @@ export const usePivotLayout = ({
       }),
     [
       colDimCount,
-      data.cols,
-      data.rows,
-      layout.groupbyColumnsRaw,
-      layout.groupbyRowsRaw,
       isLeafTierVisible,
-      isMetricTokenValue,
       layout.metricInsertIndex,
-      metricLabelSet,
       metricLabels.length,
       metrics.length,
       resolvedColSubtotalPosition,
@@ -448,7 +440,6 @@ export const usePivotLayout = ({
       parent: PivotTreeNode;
       nodes: Record<string, PivotTreeNode>;
       metricIndex?: number;
-      metricLayoutIndex?: number;
       groupbyLength: number;
       hideMetricHeader: boolean;
       metricsFirst: boolean;
@@ -571,18 +562,13 @@ export const usePivotLayout = ({
   );
 
   const getRowChildrenForNodes = useCallback(
-    (
-      parent: PivotTreeNode,
-      nodes: Record<string, PivotTreeNode>,
-      metricIndexOverride?: number,
-    ) => {
+    (parent: PivotTreeNode, nodes: Record<string, PivotTreeNode>) => {
       const rowSubtotalPositionForParent = getRowSubtotalPosition(parent);
       const filtered = getAxisChildrenBeforeSubtotalPolicy({
         axis: 'row',
         parent,
         nodes,
-        metricIndex: metricIndexOverride ?? metricIndexOnRows,
-        metricLayoutIndex: metricLayoutIndexOnRows,
+        metricIndex: metricIndexOnRows,
         groupbyLength: layout.groupbyRowsRaw.length,
         hideMetricHeader: hideMetricHeaderOnRows,
         metricsFirst: metricsFirstOnRows,
@@ -593,8 +579,8 @@ export const usePivotLayout = ({
           return (
             isMetricGrandTotalNode(child) &&
             (colTotals ||
-              metricLayoutIndexOnRows === undefined ||
-              parent.level >= metricLayoutIndexOnRows ||
+              metricIndexOnRows === undefined ||
+              parent.level >= metricIndexOnRows ||
               metricIndexOnRows !== 0)
           );
         },
@@ -607,7 +593,7 @@ export const usePivotLayout = ({
         rowSubtotalPositionForParent,
         resolvedMetricsLayout,
         isMultiMetric,
-        metricLayoutIndexOnRows,
+        metricIndexOnRows,
         hideMetricHeaderOnRows,
         countDimDepth,
         isMetricTokenValue,
@@ -627,7 +613,6 @@ export const usePivotLayout = ({
       layout.groupbyRowsRaw.length,
       isMultiMetric,
       metricIndexOnRows,
-      metricLayoutIndexOnRows,
       metricsFirstOnRows,
       resolvedMetricsLayout,
       rowSubTotals,
@@ -635,17 +620,12 @@ export const usePivotLayout = ({
   );
 
   const getColChildrenForNodes = useCallback(
-    (
-      parent: PivotTreeNode,
-      nodes: Record<string, PivotTreeNode>,
-      metricIndexOverride?: number,
-    ) =>
+    (parent: PivotTreeNode, nodes: Record<string, PivotTreeNode>) =>
       getAxisChildrenBeforeSubtotalPolicy({
         axis: 'col',
         parent,
         nodes,
-        metricIndex: metricIndexOverride ?? metricIndexOnCols,
-        metricLayoutIndex: metricLayoutIndexOnCols,
+        metricIndex: metricIndexOnCols,
         groupbyLength: layout.groupbyColumnsRaw.length,
         hideMetricHeader: hideMetricHeaderOnCols,
         metricsFirst: metricsFirstOnCols,
@@ -661,7 +641,6 @@ export const usePivotLayout = ({
       isMetricSubtotalNode,
       layout.groupbyColumnsRaw.length,
       metricIndexOnCols,
-      metricLayoutIndexOnCols,
       metricsFirstOnCols,
       normalizedColSubtotalLevels.length,
     ],
@@ -688,8 +667,7 @@ export const usePivotLayout = ({
         parent,
         branch,
         resolvedMetricsLayout,
-        metricLayoutIndex:
-          axis === 'row' ? metricLayoutIndexOnRows : metricLayoutIndexOnCols,
+        metricIndex: axis === 'row' ? metricIndexOnRows : metricIndexOnCols,
         preserveMetricAtParentLevel: axis === 'col' && metricsAtColEnd,
         isMetricTokenValue,
         isExplicitSubtotalNode,
@@ -701,10 +679,71 @@ export const usePivotLayout = ({
       isMetricGrandTotalNode,
       isMetricSubtotalNode,
       isMetricTokenValue,
-      metricLayoutIndexOnCols,
-      metricLayoutIndexOnRows,
+      metricIndexOnCols,
+      metricIndexOnRows,
       metricsAtColEnd,
       resolvedMetricsLayout,
+    ],
+  );
+
+  const buildRenderModelConfig = useCallback(
+    ({
+      tree,
+      expandedRows,
+      expandedCols,
+      rowTotals: rowTotalsForModel,
+      colTotals: colTotalsForModel,
+      rowSorter = defaultPivotNodeSorter,
+      colSorter = defaultPivotNodeSorter,
+      getColumnDisplayPath,
+      getColumnHeaderLabel,
+    }: Parameters<PivotLayoutResult['buildRenderModelConfig']>[0]) => ({
+      groupbyRowsLength: layout.groupbyRows.length,
+      groupbyColumnsLength: layout.groupbyColumns.length,
+      normalizedRowSubtotalLevels,
+      normalizedColSubtotalLevels,
+      rowTotals: rowTotalsForModel,
+      colTotals: colTotalsForModel,
+      rowTotalPosition: resolvedRowTotalPosition,
+      colTotalPosition: resolvedColTotalPosition,
+      resolvedColSubtotalPosition: effectiveColSubtotalPosition,
+      resolvedMetricsLayout,
+      hasMultipleMeasures,
+      metricsFirstOnCols,
+      rowSorter,
+      colSorter,
+      getRowChildren: parent => getRowChildrenForNodes(parent, tree.rows),
+      getCollapsedRowChildren: parent =>
+        getCollapsedRowChildrenForNodes(parent, expandedRows, tree.rows),
+      getColChildren: parent => getColChildrenForNodes(parent, tree.cols),
+      getCollapsedColLeaves: parent =>
+        getCollapsedColLeavesForNodes(parent, expandedCols, tree.cols),
+      countDimDepth,
+      isMetricGrandTotalNode,
+      isMetricSubtotalNode,
+      isMetricTokenValue,
+      getColumnDisplayPath,
+      getColumnHeaderLabel,
+    }),
+    [
+      countDimDepth,
+      effectiveColSubtotalPosition,
+      getColChildrenForNodes,
+      getCollapsedColLeavesForNodes,
+      getCollapsedRowChildrenForNodes,
+      getRowChildrenForNodes,
+      hasMultipleMeasures,
+      isMetricGrandTotalNode,
+      isMetricSubtotalNode,
+      isMetricTokenValue,
+      layout.groupbyColumns.length,
+      layout.groupbyRows.length,
+      metricsFirstOnCols,
+      normalizedColSubtotalLevels,
+      normalizedRowSubtotalLevels,
+      resolvedColTotalPosition,
+      resolvedMetricsLayout,
+      resolvedRowTotalPosition,
     ],
   );
 
@@ -735,10 +774,6 @@ export const usePivotLayout = ({
     metricsFirstOnCols,
     metricIndexOnRows,
     metricIndexOnCols,
-    metricLayoutIndexOnRows,
-    metricLayoutIndexOnCols,
-    metricIntentIndexOnRows,
-    metricIntentIndexOnCols,
     hideMetricHeaderOnRows,
     metricsAtColEnd,
     shouldExpandMetricRows,
@@ -758,6 +793,7 @@ export const usePivotLayout = ({
     getCollapsedColLeavesForNodes,
     getRowChildrenForNodes,
     getColChildrenForNodes,
+    buildRenderModelConfig,
     pruneMergedTree,
   };
 };

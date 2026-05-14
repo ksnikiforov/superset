@@ -833,7 +833,7 @@ describe('PivotTableChart measure leaf tier indentation', () => {
     expect(ixToggle).toBeInTheDocument();
   });
 
-  it('does not show toggles on total-only column branches', () => {
+  it('does not project total-only leaf columns ahead of required column coverage', () => {
     const grossMetric = 'grossRevenue';
     const avgMetric = 'averageOrderValue';
     const valueLeaf = buildValueLeaf();
@@ -911,17 +911,7 @@ describe('PivotTableChart measure leaf tier indentation', () => {
     const valueHeaders = Array.from(thead.querySelectorAll('th')).filter(
       th => th.textContent?.trim() === 'Value',
     );
-    if (valueHeaders.length === 0) {
-      throw new Error('Expected Value header not found');
-    }
-    valueHeaders.forEach(header => {
-      expect(
-        within(header).queryByLabelText('plus-square'),
-      ).not.toBeInTheDocument();
-      expect(
-        within(header).queryByLabelText('minus-square'),
-      ).not.toBeInTheDocument();
-    });
+    expect(valueHeaders).toHaveLength(0);
   });
 
   it('does not treat leaf-tier visibility as subtotal expansion', () => {

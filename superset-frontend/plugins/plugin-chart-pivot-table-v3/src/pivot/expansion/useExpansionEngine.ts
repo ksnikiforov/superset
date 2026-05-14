@@ -86,9 +86,9 @@ import {
 } from './fetchExecution';
 import { createLatestRequestLifecycle } from '../runtime/requestLifecycle';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
+import type { RenderModelConfig } from '../render/renderModel';
 
 const MAX_HYDRATION_ITERATIONS = 12;
-
 type ExpansionStateCommit = {
   tree?: PivotTreeData;
   expandedRows?: Set<string>;
@@ -311,6 +311,13 @@ export type ExpansionEngineConfig = {
   isMetricTokenValue: (value: unknown) => boolean;
   pivotProgram: PivotProgram;
   countDimDepth: (path: PivotTreeNode['path']) => number;
+  buildRenderModelConfig: (params: {
+    tree: PivotTreeData;
+    expandedRows: Set<string>;
+    expandedCols: Set<string>;
+    rowTotals: boolean;
+    colTotals: boolean;
+  }) => RenderModelConfig;
   expandRowsLevelRaw?: number;
   expandColumnsLevelRaw?: number;
   setControlValue?: HandlerFunction;
@@ -346,6 +353,7 @@ export const useExpansionEngine = ({
   isMetricTokenValue,
   pivotProgram,
   countDimDepth,
+  buildRenderModelConfig,
   expandRowsLevelRaw,
   expandColumnsLevelRaw,
   setControlValue,
@@ -684,32 +692,25 @@ export const useExpansionEngine = ({
     () => ({
       groupbyRowsLength,
       groupbyColumnsLength,
-      rowTotals: fetchFormData.rowTotals ?? false,
-      colTotals: fetchFormData.colTotals ?? false,
-      metricsLayout: fetchFormData.metricsLayout,
       metricLabelSet,
-      hasMultipleMeasures:
-        metricLabelSet.size > 1 ||
-        Object.values(fetchFormData.measureLeavesByMetric ?? {}).some(
-          leaves => leaves.length > 1,
-        ),
-      metricIndexForRows,
-      metricIndexForCols,
       isMetricTokenValue,
       countDimDepth,
       shouldFetchChildren,
+      buildRenderModelConfig: params =>
+        buildRenderModelConfig({
+          ...params,
+          rowTotals: fetchFormData.rowTotals ?? false,
+          colTotals: fetchFormData.colTotals ?? false,
+        }),
     }),
     [
+      buildRenderModelConfig,
       countDimDepth,
       fetchFormData.colTotals,
-      fetchFormData.metricsLayout,
-      fetchFormData.measureLeavesByMetric,
       fetchFormData.rowTotals,
       groupbyColumnsLength,
       groupbyRowsLength,
       isMetricTokenValue,
-      metricIndexForCols,
-      metricIndexForRows,
       metricLabelSet,
       shouldFetchChildren,
     ],
@@ -756,8 +757,7 @@ export const useExpansionEngine = ({
           axis === 'row'
             ? explicitCollapsedRowsRef.current
             : explicitCollapsedColsRef.current,
-        fallbackMetricIndex:
-          axis === 'row' ? metricIndexForRows : metricIndexForCols,
+        metricIndex: axis === 'row' ? metricIndexForRows : metricIndexForCols,
         isMetricTokenValue,
       }),
     [isMetricTokenValue, metricIndexForCols, metricIndexForRows],
