@@ -28,7 +28,7 @@ import {
   planExpansionForAxis,
   type PivotExpansionNodeFetchPredicate,
   type PivotExpansionPlan,
-} from '../engine/expansionPlanner';
+} from './coveragePlanner';
 import {
   buildDesiredExpandedKeys,
   collectVisibleExpansionKeys,
@@ -36,7 +36,7 @@ import {
   pruneExpandedToStablePrefix,
   stripAutoSeededExpansions,
   type PivotExpansionStateKeys,
-} from '../engine/expansionStateModel';
+} from './stateModel';
 import {
   buildRenderModel,
   type RenderModelConfig,
@@ -190,6 +190,83 @@ export const isSameLayout = (left?: string[], right?: string[]) => {
     return false;
   }
   return left.every((value, idx) => value === right[idx]);
+};
+
+export type PivotLayoutKeyState = {
+  rows: string[];
+  cols: string[];
+};
+
+type ResolveLayoutTransitionInput = {
+  data: PivotTreeData;
+  currentTree: PivotTreeData;
+  previousLayout: PivotLayoutKeyState;
+  currentLayout: PivotLayoutKeyState;
+  sessionLayout?: Partial<PivotLayoutKeyState>;
+  hasNewData: boolean;
+  effectiveExpandRowsLevel: number;
+  effectiveExpandColsLevel: number;
+};
+
+export const isPrefix = (prefix: string[], target: string[]) =>
+  prefix.length <= target.length &&
+  prefix.every((value, idx) => value === target[idx]);
+
+export const resolveLayoutTransition = ({
+  data,
+  currentTree,
+  previousLayout,
+  currentLayout,
+  sessionLayout,
+  hasNewData,
+  effectiveExpandRowsLevel,
+  effectiveExpandColsLevel,
+}: ResolveLayoutTransitionInput) => {
+  const rowsChanged = !isSameLayout(previousLayout.rows, currentLayout.rows);
+  const colsChanged = !isSameLayout(previousLayout.cols, currentLayout.cols);
+  const shouldExpandRows =
+    currentLayout.rows.length > previousLayout.rows.length &&
+    isPrefix(previousLayout.rows, currentLayout.rows);
+  const shouldExpandCols =
+    currentLayout.cols.length > previousLayout.cols.length &&
+    isPrefix(previousLayout.cols, currentLayout.cols);
+  const layoutChanged = rowsChanged || colsChanged;
+  const sourceTree = hasNewData || !layoutChanged ? data : currentTree;
+  const layoutChangedWithoutNewData = layoutChanged && !hasNewData;
+  const layoutRowsForPrune = rowsChanged
+    ? previousLayout.rows
+    : (sessionLayout?.rows ?? previousLayout.rows);
+  const layoutColsForPrune = colsChanged
+    ? previousLayout.cols
+    : (sessionLayout?.cols ?? previousLayout.cols);
+  const rowStablePrefix = getStablePrefixLength(
+    layoutRowsForPrune,
+    currentLayout.rows,
+  );
+  const colStablePrefix = getStablePrefixLength(
+    layoutColsForPrune,
+    currentLayout.cols,
+  );
+  const autoExpandRowsLevelForDesired =
+    layoutChangedWithoutNewData && rowsChanged && rowStablePrefix > 0
+      ? Math.min(effectiveExpandRowsLevel, Math.max(rowStablePrefix - 1, 0))
+      : effectiveExpandRowsLevel;
+  const autoExpandColsLevelForDesired =
+    layoutChangedWithoutNewData && colsChanged && colStablePrefix > 0
+      ? Math.min(effectiveExpandColsLevel, Math.max(colStablePrefix - 1, 0))
+      : effectiveExpandColsLevel;
+  return {
+    rowsChanged,
+    colsChanged,
+    shouldExpandRows,
+    shouldExpandCols,
+    layoutChanged,
+    normalizedTree: sourceTree,
+    rowStablePrefix,
+    colStablePrefix,
+    autoExpandRowsLevelForDesired,
+    autoExpandColsLevelForDesired,
+  };
 };
 
 export const addAncestors = (

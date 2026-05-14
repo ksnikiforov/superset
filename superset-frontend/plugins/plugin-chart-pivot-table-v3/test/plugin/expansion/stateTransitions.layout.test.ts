@@ -22,7 +22,7 @@ import {
   type PivotTreeData,
   type PivotTreeNode,
 } from '../../../src/types';
-import { resolveLayoutTransition } from '../../../src/pivot/expansion/layoutTransition';
+import { resolveLayoutTransition } from '../../../src/pivot/expansion/stateTransitions';
 import { rootKey } from '../../../src/pivot/viewModel';
 import { serializeCellKey, serializePath } from '../../../src/utils';
 
@@ -68,7 +68,7 @@ const baseTransitionConfig = {
   groupbyColumnsLength: 0,
 };
 
-describe('pivot/expansion/layoutTransition', () => {
+describe('pivot/expansion/stateTransitions layout changes', () => {
   it('keeps the current tree as a display snapshot for layout changes without fresh data', () => {
     const usKey = serializePath(['US']);
     const usCaKey = serializePath(['US', 'CA']);

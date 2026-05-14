@@ -23,7 +23,7 @@ import {
   planExpansionForAxis,
   type PivotExpansionNodeFetchPredicate,
   type PivotExpansionPlan,
-} from '../engine/expansionPlanner';
+} from './coveragePlanner';
 import { type FetchTarget } from '../query/fetchPlanOptimizer';
 import {
   createFetchedFactCoverageLookup,

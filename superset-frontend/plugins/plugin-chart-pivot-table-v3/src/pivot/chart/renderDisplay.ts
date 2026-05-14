@@ -33,7 +33,7 @@ import {
   isSubtotalToken,
   SUBTOTAL_TOKEN,
 } from '../../utils';
-import { seedExpandedByLevel } from '../engine/expansionStateModel';
+import { seedExpandedByLevel } from '../expansion/stateModel';
 import {
   getNodeDimDepth as getNodeDimDepthBase,
   isExplicitTotalNode as isExplicitTotalNodeBase,

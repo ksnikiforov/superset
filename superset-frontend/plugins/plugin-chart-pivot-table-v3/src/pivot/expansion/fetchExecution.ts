@@ -36,7 +36,7 @@ import {
   type BatchGroup,
   type FetchTarget,
 } from '../query/fetchPlanOptimizer';
-import { type PivotExpansionNodeFetchPredicate } from '../engine/expansionPlanner';
+import { type PivotExpansionNodeFetchPredicate } from './coveragePlanner';
 import {
   type PivotFactStore,
   type PivotFactStoreBatch,
@@ -46,7 +46,7 @@ import {
   type LatestRequestScope,
 } from '../runtime/requestLifecycle';
 import { stableStringify } from '../shared/stableStringify';
-import { applyExpansionFetchDelta, runHydrationLoop } from './engine';
+import { applyExpansionFetchDelta, runHydrationLoop } from './stateTransitions';
 import { type FetchedFactCoverageState } from './fetchedRequests';
 import { planGroupedExpansionTargets } from './planner';
 

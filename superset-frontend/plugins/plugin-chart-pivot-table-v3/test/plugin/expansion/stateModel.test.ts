@@ -24,7 +24,7 @@ import {
   pruneExpandedToStablePrefix,
   seedExpandedByLevel,
   stripAutoSeededExpansions,
-} from '../../../src/pivot/engine/expansionStateModel';
+} from '../../../src/pivot/expansion/stateModel';
 import {
   encodeMetricKey,
   serializePath,

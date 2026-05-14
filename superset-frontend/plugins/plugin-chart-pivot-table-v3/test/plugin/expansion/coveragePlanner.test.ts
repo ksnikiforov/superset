@@ -21,7 +21,7 @@ import { PivotAxis, PivotTreeNode } from '../../../src/types';
 import {
   planExpansionForAxis,
   type PivotExpansionFetchedCoverageLookup,
-} from '../../../src/pivot/engine/expansionPlanner';
+} from '../../../src/pivot/expansion/coveragePlanner';
 import { serializePath } from '../../../src/utils';
 import { rootKey } from '../../../src/pivot/viewModel';
 

@@ -32,6 +32,7 @@ import {
 } from '@superset-ui/core';
 import {
   type PivotAxis,
+  type PivotExpansionState,
   type PivotTableQueryFormData,
   type PivotTreeData,
   type PivotTreeNode,
@@ -39,10 +40,11 @@ import {
 import {
   buildDesiredExpandedKeys,
   type PivotExpansionStateKeys,
-} from '../engine/expansionStateModel';
+  coerceExpansionState,
+} from './stateModel';
+import { parsePath } from '../../utils';
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import { stableStringify } from '../shared/stableStringify';
-import { createExpansionStateStore, type ExpansionStateStore } from './store';
 import {
   buildAxisCoverageKeyFromPathKey,
   getNextAxisLevelForPath,
@@ -65,19 +67,15 @@ import {
   resolveExpansionReinitializationDecision,
   resolveReinitializedExpansionState,
   resolveExpandedForMetrics as resolveExpandedForMetricsBase,
+  resolveLayoutTransition,
   type ExpansionVisibilityConfig,
-} from './engine';
+} from './stateTransitions';
 import {
   createFetchedFactCoverageState,
   pruneFetchedCoverageForCollapsedNode,
   seedFetchedCoverageFromFactBatches as seedFetchedCoverageStateFromFactBatches,
   seedFetchedCoverageFromLoadedMetricNodes as seedFetchedLoadedMetricNodeCoverage,
 } from './fetchedRequests';
-import { resolveLayoutTransition } from './layoutTransition';
-import {
-  createExpansionRuntimeState,
-  expansionRuntimeReducer,
-} from './runtimeState';
 import { useSyncRef } from '../shared/useSyncRef';
 import {
   runSameAxisExpansionFetchLoop,
@@ -99,6 +97,177 @@ type ExpansionStateCommit = {
   expandedCols?: Set<string>;
   pendingRows?: Set<string>;
   pendingCols?: Set<string>;
+};
+
+type ExpansionRuntimeState = {
+  pendingRows: Set<string>;
+  pendingCols: Set<string>;
+  loadingCounts: Map<string, number>;
+  isHydrating: boolean;
+};
+
+type ExpansionRuntimeAction =
+  | {
+      type: 'setPending';
+      axis: PivotAxis;
+      keys: Set<string>;
+    }
+  | {
+      type: 'updateLoadingKey';
+      key: string;
+      delta: number;
+    }
+  | {
+      type: 'clearLoading';
+    }
+  | {
+      type: 'setHydrating';
+      value: boolean;
+    };
+
+const createExpansionRuntimeState = (): ExpansionRuntimeState => ({
+  pendingRows: new Set(),
+  pendingCols: new Set(),
+  loadingCounts: new Map(),
+  isHydrating: false,
+});
+
+const updateLoadingCounts = ({
+  loadingCounts,
+  key,
+  delta,
+}: {
+  loadingCounts: Map<string, number>;
+  key: string;
+  delta: number;
+}) => {
+  const counts = new Map(loadingCounts);
+  const nextCount = (counts.get(key) ?? 0) + delta;
+  if (nextCount <= 0) {
+    counts.delete(key);
+  } else {
+    counts.set(key, nextCount);
+  }
+  return counts;
+};
+
+const expansionRuntimeReducer = (
+  state: ExpansionRuntimeState,
+  action: ExpansionRuntimeAction,
+): ExpansionRuntimeState => {
+  switch (action.type) {
+    case 'setPending':
+      return action.axis === 'row'
+        ? { ...state, pendingRows: new Set(action.keys) }
+        : { ...state, pendingCols: new Set(action.keys) };
+    case 'updateLoadingKey':
+      return {
+        ...state,
+        loadingCounts: updateLoadingCounts({
+          loadingCounts: state.loadingCounts,
+          key: action.key,
+          delta: action.delta,
+        }),
+      };
+    case 'clearLoading':
+      return {
+        ...state,
+        loadingCounts: new Map(),
+      };
+    case 'setHydrating':
+      return {
+        ...state,
+        isHydrating: action.value,
+      };
+    default:
+      return state;
+  }
+};
+
+type ExpansionStateStore = {
+  init: (params: {
+    persistedState: unknown;
+    defaultRowKeys: string[];
+    defaultColKeys: string[];
+  }) => PivotExpansionStateKeys;
+  updateDeps: (deps: ExpansionStateStoreDeps) => void;
+  write: (
+    nextState: PivotExpansionStateKeys,
+    options?: { persist?: boolean },
+  ) => void;
+};
+
+type ExpansionStateStoreDeps = {
+  shouldPersist: boolean;
+  setControlValue?: HandlerFunction;
+  setDataMask?: SetDataMaskHook;
+  mergeOwnState?: (partial: JsonObject) => JsonObject;
+};
+
+const toPersistedPayload = (
+  state: PivotExpansionStateKeys,
+): PivotExpansionState => {
+  const toPathArray = (keys: string[]) => keys.map(key => parsePath(key));
+  return {
+    rowKeys: state.rowKeys,
+    colKeys: state.colKeys,
+    rows: toPathArray(state.rows),
+    cols: toPathArray(state.cols),
+    collapsedRows: toPathArray(state.collapsedRows ?? []),
+    collapsedCols: toPathArray(state.collapsedCols ?? []),
+  };
+};
+
+const createExpansionStateStore = (
+  initialDeps: ExpansionStateStoreDeps,
+): ExpansionStateStore => {
+  let deps = initialDeps;
+  let memory: PivotExpansionStateKeys | undefined;
+
+  const persist = (state: PivotExpansionStateKeys) => {
+    if (!deps.shouldPersist) {
+      return;
+    }
+    const payload = toPersistedPayload(state);
+    if (deps.setControlValue) {
+      deps.setControlValue('pivotExpansionState', payload);
+      return;
+    }
+    if (deps.setDataMask && deps.mergeOwnState) {
+      const nextOwnState = deps.mergeOwnState({ pivotExpansionState: payload });
+      deps.setDataMask({ ownState: { ...nextOwnState } });
+    }
+  };
+
+  return {
+    init: ({ persistedState, defaultRowKeys, defaultColKeys }) => {
+      if (memory) {
+        return memory;
+      }
+      const seed = coerceExpansionState(persistedState);
+      memory =
+        seed ??
+        ({
+          rowKeys: defaultRowKeys,
+          colKeys: defaultColKeys,
+          rows: [],
+          cols: [],
+          collapsedRows: [],
+          collapsedCols: [],
+        } satisfies PivotExpansionStateKeys);
+      return memory;
+    },
+    updateDeps: nextDeps => {
+      deps = nextDeps;
+    },
+    write: (nextState, options) => {
+      memory = nextState;
+      if (options?.persist === false) {
+        return;
+      }
+      persist(nextState);
+    },
+  };
 };
 
 export type ExpansionEngineResult = {

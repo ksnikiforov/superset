@@ -26,7 +26,7 @@ import {
   type ExpansionVisibilityConfig,
   type HydrationPrefetchAction,
   type PruneMergedTree,
-} from './engine';
+} from './stateTransitions';
 import {
   type ExpansionFetchRuntime,
   type ExpansionRequestHelpers,

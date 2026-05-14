@@ -35,7 +35,7 @@ import {
   shouldPlanHydrationPrefetchAxis,
   type HydrationDeltaMap,
   type ExpansionVisibilityConfig,
-} from '../../../src/pivot/expansion/engine';
+} from '../../../src/pivot/expansion/stateTransitions';
 import { createFetchedFactCoverageState } from '../../../src/pivot/expansion/fetchedRequests';
 import { rootKey } from '../../../src/pivot/viewModel';
 import {
@@ -50,7 +50,7 @@ import {
   type PivotTreeNode,
 } from '../../../src/types';
 
-describe('pivot/expansion/engine', () => {
+describe('pivot/expansion/stateTransitions', () => {
   const config: ExpansionVisibilityConfig = {
     groupbyRowsLength: 2,
     groupbyColumnsLength: 2,
