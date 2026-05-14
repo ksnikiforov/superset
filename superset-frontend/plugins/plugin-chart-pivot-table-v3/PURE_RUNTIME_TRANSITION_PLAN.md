@@ -58,7 +58,7 @@ cells are projections of DB facts, not canonical data.
 ## Current Status
 
 As of May 14, 2026, after
-`f19e33f0fb refactor(pivot-table-v3): pass interaction tree directly`:
+`18597bcfe1 refactor(pivot-table-v3): remove control panel debug logging`:
 
 - Gate-weighted architecture estimate: **97%**.
 - Delivery remaining estimate: **11-19%**, mostly final cleanup, validation,
@@ -72,8 +72,8 @@ As of May 14, 2026, after
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `12996` insertions, `12232` deletions, net `+764`.
-- Current production `src` TypeScript/TSX total: `34274` lines.
+- Production `src`: `12996` insertions, `12246` deletions, net `+750`.
+- Current production `src` TypeScript/TSX total: `34260` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - Full plugin Jest pass after the column-sort extraction: `91` suites and
   `729` tests.
@@ -237,6 +237,8 @@ Source-only diff from pre-refactor baseline
   and `21` tests.
 - Focused chart interaction pass after passing the interaction tree directly:
   `3` suites and `32` tests.
+- Focused control panel pass after removing remaining production debug logging:
+  `2` suites and `8` tests.
 
 The readout remains mixed: the plugin is still modestly above the baseline line
 count, but the chart/layout hooks keep losing inline policy and the remaining
@@ -464,7 +466,7 @@ Largest relevant production files:
 - `PivotInteractionPanel.tsx`: `1186` lines.
 - `PivotTableChart.tsx`: `1084` lines.
 - `PivotDndColumnSelect.tsx`: `1071` lines.
-- `controlPanel.tsx`: `1038` lines.
+- `controlPanel.tsx`: `1024` lines.
 - `PivotTableView.tsx`: `891` lines.
 - `usePivotLayout.ts`: `768` lines.
 - `seamlessRuntimeUpdate.ts`: `594` lines.
@@ -563,6 +565,10 @@ git diff --check
 
 Recent validation:
 
+- `18597bcfe1`: removed the remaining production Pivot Table v3 placement debug
+  flag and `console.log` path from `controlPanel.tsx`; touched-file ESLint,
+  Prettier, `git diff --check`, focused control panel/layout Jest (`8` tests),
+  and a production-source debug logging scan passed.
 - `f19e33f0fb`: removed the chart-owned `treeRef`/sync indirection and passed
   the current tree directly to interaction handlers; touched-file ESLint,
   Prettier, `git diff --check`, and focused chart interaction Jest (`32`
