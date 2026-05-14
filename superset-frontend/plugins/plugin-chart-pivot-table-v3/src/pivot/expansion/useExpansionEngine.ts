@@ -70,6 +70,7 @@ import {
   resolveExpandedForMetrics as resolveExpandedForMetricsBase,
   resolveLayoutTransition,
   type ExpansionVisibilityConfig,
+  type HydrationPrefetchAction,
 } from './stateTransitions';
 import {
   createFetchedFactCoverageState,
@@ -80,13 +81,10 @@ import {
 import { useSyncRef } from '../shared/useSyncRef';
 import {
   createExpansionRequestHelpers,
+  runHydrationExpansionFetchLoop,
   runSameAxisExpansionFetchLoop,
   type ExpansionFetchRuntime,
 } from './fetchExecution';
-import {
-  scheduleInitialHydrationPrefetch,
-  useExpansionHydrationRuntime,
-} from './useExpansionHydrationRuntime';
 import { createLatestRequestLifecycle } from '../runtime/requestLifecycle';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 
@@ -99,6 +97,51 @@ type ExpansionStateCommit = {
   expandedCols?: Set<string>;
   pendingRows?: Set<string>;
   pendingCols?: Set<string>;
+};
+
+type HydrateExpansionOptions = {
+  showLoader?: boolean;
+  activeAxis?: PivotAxis;
+  planRows?: boolean;
+  planCols?: boolean;
+};
+
+type HydrateExpansionReason = 'prefetch' | 'cross-axis';
+
+const scheduleInitialHydrationPrefetch = ({
+  action,
+  shouldPlanRows,
+  shouldPlanCols,
+  setHydratingState,
+  hydrate,
+  reportAsyncError,
+}: {
+  action: HydrationPrefetchAction;
+  shouldPlanRows: boolean;
+  shouldPlanCols: boolean;
+  setHydratingState: (value: boolean) => void;
+  hydrate: (
+    reason: HydrateExpansionReason,
+    options?: HydrateExpansionOptions,
+  ) => Promise<void>;
+  reportAsyncError: (error: unknown) => void;
+}) => {
+  if (action.kind === 'idle') {
+    return false;
+  }
+  if (action.kind === 'skip-root') {
+    setHydratingState(false);
+    return true;
+  }
+  if (!action.showLoader) {
+    setHydratingState(false);
+  }
+  hydrate('prefetch', {
+    showLoader: action.showLoader,
+    planRows: shouldPlanRows,
+    planCols: shouldPlanCols,
+  }).catch(reportAsyncError);
+  return true;
 };
 
 type ExpansionRuntimeState = {
@@ -974,29 +1017,98 @@ export const useExpansionEngine = ({
     [commitExpansionState, persistExpansionState, resolveExpandedForMetrics],
   );
 
-  const hydrateAtomic = useExpansionHydrationRuntime({
-    expansionRequestLifecycle,
-    expansionRequestHelpers,
-    treeRef,
-    fetchFormDataRef,
-    factStoreRef,
-    fetchedCoverageRef,
-    pendingRowsRef,
-    pendingColsRef,
-    clearLoadingState,
-    setHydratingState,
-    addWarnings,
-    updateLoadingKey,
-    buildDesiredExpanded,
-    visibilityConfig,
-    getCoverageKey,
-    pruneMergedTree,
-    seedFetchedCoverageFromFactBatches,
-    seedFetchedCoverageFromLoadedMetricNodes,
-    resolveExpandedForMetrics,
-    commitExpansionState,
-    persistExpansionState,
-  });
+  const hydrateAtomic = useCallback(
+    async (
+      reason: HydrateExpansionReason,
+      options?: HydrateExpansionOptions,
+    ) => {
+      const shouldShowLoader = options?.showLoader ?? false;
+      const shouldPlanRows = options?.planRows ?? true;
+      const shouldPlanCols = options?.planCols ?? true;
+      const requestScope = expansionRequestLifecycle.beginScope();
+      const transactionId = requestScope.id;
+      clearLoadingState();
+      if (shouldShowLoader) {
+        setHydratingState(true);
+      }
+
+      try {
+        const fetchRuntime: ExpansionFetchRuntime = {
+          requestScope,
+          fetchFormData: fetchFormDataRef.current,
+          factStore: factStoreRef.current,
+          trackRequestInScope: expansionRequestHelpers.trackRequestInScope,
+          addWarnings,
+          updateLoadingKey,
+        };
+        const result = await runHydrationExpansionFetchLoop({
+          reason,
+          baseTree: treeRef.current,
+          maxIterations: MAX_HYDRATION_ITERATIONS,
+          isCurrent: requestScope.isCurrent,
+          buildDesiredExpanded,
+          fetchedCoverage: fetchedCoverageRef.current,
+          config: visibilityConfig,
+          getCoverageKey,
+          activeAxis: options?.activeAxis,
+          pendingRows: pendingRowsRef.current,
+          pendingCols: pendingColsRef.current,
+          planRows: shouldPlanRows,
+          planCols: shouldPlanCols,
+          pruneMergedTree,
+          fetchRuntime,
+          transactionId,
+          buildRequestGroupId: expansionRequestHelpers.buildRequestGroupId,
+          seedFetchedCoverage: seedFetchedCoverageFromFactBatches,
+          seedLoadedMetricNodeCoverage:
+            seedFetchedCoverageFromLoadedMetricNodes,
+        });
+        if (result.status === 'complete') {
+          const resolvedRows = resolveExpandedForMetrics(
+            'row',
+            result.desiredRows,
+            result.tree,
+          );
+          const resolvedCols = resolveExpandedForMetrics(
+            'col',
+            result.desiredCols,
+            result.tree,
+          );
+          commitExpansionState({
+            tree: result.tree,
+            expandedRows: resolvedRows,
+            expandedCols: resolvedCols,
+            pendingRows: new Set(),
+            pendingCols: new Set(),
+          });
+          if (reason === 'cross-axis') {
+            persistExpansionState(resolvedRows, resolvedCols);
+          }
+        }
+      } finally {
+        if (shouldShowLoader) {
+          setHydratingState(false);
+        }
+      }
+    },
+    [
+      addWarnings,
+      buildDesiredExpanded,
+      clearLoadingState,
+      commitExpansionState,
+      expansionRequestHelpers,
+      expansionRequestLifecycle,
+      getCoverageKey,
+      persistExpansionState,
+      pruneMergedTree,
+      resolveExpandedForMetrics,
+      seedFetchedCoverageFromFactBatches,
+      seedFetchedCoverageFromLoadedMetricNodes,
+      setHydratingState,
+      updateLoadingKey,
+      visibilityConfig,
+    ],
+  );
 
   const handleToggle = useCallback(
     (axis: PivotAxis, node: PivotTreeNode) => {
