@@ -18,6 +18,7 @@
  */
 import {
   useCallback,
+  useEffect,
   useMemo,
   useState,
   type ComponentProps,
@@ -52,6 +53,10 @@ export type PivotDisplaySnapshot = Pick<
 type UsePivotSeamlessRuntimeUpdateConfig = {
   dimensionKeys: string[];
   metricKeys: string[];
+  data: PivotTreeData;
+  factBatches: PivotFactStoreBatch[];
+  isUserControlled: boolean;
+  shouldSyncCommittedTreeFromProps: boolean;
   baseFormData: PivotTableQueryFormData;
   sourceFormData: PivotTableQueryFormData;
   upstreamSignature: string;
@@ -62,8 +67,6 @@ type UsePivotSeamlessRuntimeUpdateConfig = {
   expandedColsRef: MutableRefObject<Set<string>>;
   pendingRowsRef: MutableRefObject<Set<string>>;
   pendingColsRef: MutableRefObject<Set<string>>;
-  commitTree: (tree: PivotTreeData) => void;
-  commitFactBatches: (batches: PivotFactStoreBatch[]) => void;
   commitFilters: (filters: RuntimeSelection) => void;
   commitUiRuntimeLayout: (layout: PivotRuntimeLayout) => void;
   persistRuntimeState: (
@@ -78,6 +81,10 @@ export const usePivotSeamlessRuntimeUpdate = (
   const {
     dimensionKeys,
     metricKeys,
+    data,
+    factBatches,
+    isUserControlled,
+    shouldSyncCommittedTreeFromProps,
     baseFormData,
     sourceFormData,
     upstreamSignature,
@@ -88,8 +95,6 @@ export const usePivotSeamlessRuntimeUpdate = (
     expandedColsRef,
     pendingRowsRef,
     pendingColsRef,
-    commitTree,
-    commitFactBatches,
     commitFilters,
     commitUiRuntimeLayout,
     persistRuntimeState,
@@ -99,6 +104,9 @@ export const usePivotSeamlessRuntimeUpdate = (
   const [error, setError] = useState<string | undefined>(undefined);
   const [pendingDisplaySnapshot, setPendingDisplaySnapshot] =
     useState<PivotDisplaySnapshot | null>(null);
+  const [committedTree, setCommittedTree] = useState<PivotTreeData>(data);
+  const [committedFactBatches, setCommittedFactBatches] =
+    useState<PivotFactStoreBatch[]>(factBatches);
   const requestLifecycle = useMemo(
     () =>
       createLatestRequestLifecycle({
@@ -124,6 +132,22 @@ export const usePivotSeamlessRuntimeUpdate = (
   const clearPendingDisplaySnapshot = useCallback(() => {
     setPendingDisplaySnapshot(null);
   }, []);
+
+  useEffect(() => {
+    // Ignore stale upstream updates while a local interaction update is still
+    // pending.
+    if (!shouldSyncCommittedTreeFromProps) {
+      return;
+    }
+    setCommittedTree(data);
+    setCommittedFactBatches(factBatches);
+    resetSeamlessRuntimeState();
+  }, [
+    data,
+    factBatches,
+    resetSeamlessRuntimeState,
+    shouldSyncCommittedTreeFromProps,
+  ]);
 
   const applySeamlessUpdate = useCallback(
     async (nextLayout: PivotRuntimeLayout, nextFilters: RuntimeSelection) => {
@@ -170,8 +194,8 @@ export const usePivotSeamlessRuntimeUpdate = (
       }
 
       unstable_batchedUpdates(() => {
-        commitTree(updateResult.tree);
-        commitFactBatches(updateResult.factBatches);
+        setCommittedTree(updateResult.tree);
+        setCommittedFactBatches(updateResult.factBatches);
         commitUiRuntimeLayout(normalized);
         commitFilters(nextFilters);
         setWarnings(updateResult.warnings);
@@ -187,9 +211,7 @@ export const usePivotSeamlessRuntimeUpdate = (
     },
     [
       baseFormData,
-      commitFactBatches,
       commitFilters,
-      commitTree,
       commitUiRuntimeLayout,
       dimensionKeys,
       displaySnapshotRef,
@@ -209,12 +231,15 @@ export const usePivotSeamlessRuntimeUpdate = (
   );
 
   return {
+    committedTree,
+    committedFactBatches,
+    dataForRender: isUserControlled ? committedTree : data,
+    factBatchesForRender: isUserControlled ? committedFactBatches : factBatches,
     seamlessLoading: loading,
     seamlessWarnings: warnings,
     seamlessError: error,
     pendingDisplaySnapshot,
     applySeamlessUpdate,
     clearPendingDisplaySnapshot,
-    resetSeamlessRuntimeState,
   };
 };
