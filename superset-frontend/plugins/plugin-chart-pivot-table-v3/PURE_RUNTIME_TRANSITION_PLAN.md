@@ -58,7 +58,7 @@ cells are projections of DB facts, not canonical data.
 ## Current Status
 
 As of May 14, 2026, after
-`9add9b1625 refactor(pivot-table-v3): dedupe expansion error cleanup`:
+`80e4405426 refactor(pivot-table-v3): share sync ref hook`:
 
 - Gate-weighted architecture estimate: **96%**.
 - Delivery remaining estimate: **14-22%**, mostly final cleanup, validation,
@@ -71,8 +71,8 @@ As of May 14, 2026, after
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `12826` insertions, `12140` deletions, net `+686`.
-- Current production `src` TypeScript/TSX total: `34202` lines.
+- Production `src`: `12824` insertions, `12134` deletions, net `+690`.
+- Current production `src` TypeScript/TSX total: `34200` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - Full plugin Jest pass after the column-sort extraction: `91` suites and
   `729` tests.
@@ -219,6 +219,8 @@ Source-only diff from pre-refactor baseline
   resolution from the chart: `97` suites and `783` tests.
 - Focused expansion concurrency/error pass after deduplicating async expansion
   error cleanup: `4` suites and `6` tests.
+- Focused chart/expansion pass after sharing the local sync-ref hook and
+  removing expansion wrapper callbacks: `5` suites and `29` tests.
 
 The readout remains mixed: the plugin is still modestly above the baseline line
 count, but the chart/layout hooks keep losing inline policy and the remaining
@@ -290,6 +292,8 @@ orchestration.
   root-fetch planning only clones the axis plan it mutates.
 - Expansion state/ref synchronization now uses one local hook instead of six
   repeated effects in `useExpansionEngine.ts`.
+- Chart and expansion state/ref synchronization now share `useSyncRef` instead
+  of keeping duplicate local hook implementations.
 - Same-axis fetch, cross-axis hydration, collapse, and reinitialization now use
   one batched commit path for tree, expanded keys, and pending keys instead of
   separate React updates.
@@ -435,9 +439,9 @@ Largest relevant production files:
 - `utils.ts`: `1429` lines.
 - `materializePivotTree.ts`: `1329` lines.
 - `usePivotFormatting.tsx`: `1325` lines.
-- `useExpansionEngine.ts`: `1291` lines.
+- `useExpansionEngine.ts`: `1267` lines.
 - `PivotInteractionPanel.tsx`: `1186` lines.
-- `PivotTableChart.tsx`: `1170` lines.
+- `PivotTableChart.tsx`: `1163` lines.
 - `PivotDndColumnSelect.tsx`: `1109` lines.
 - `controlPanel.tsx`: `1038` lines.
 - `PivotTableView.tsx`: `902` lines.
@@ -538,6 +542,10 @@ git diff --check
 
 Recent validation:
 
+- `80e4405426`: shared the local sync-ref hook between `PivotTableChart.tsx`
+  and `useExpansionEngine.ts`, and removed expansion invalidation/persistence
+  wrapper callbacks that only forwarded to refs; touched-file ESLint, Prettier,
+  `git diff --check`, and focused chart/expansion Jest (`29` tests) passed.
 - `9add9b1625`: deduplicated expansion async error cleanup so cross-axis
   hydration and initial prefetch failures rely on `reportAsyncError` for
   loading/hydrating cleanup; touched-file ESLint, Prettier, `git diff --check`,
