@@ -57,8 +57,7 @@ cells are projections of DB facts, not canonical data.
 
 ## Current Status
 
-As of May 14, 2026, after the interaction own-state tree payload cleanup
-checkpoint:
+As of May 14, 2026, after the query fetch ownership cleanup checkpoint:
 
 - Gate-weighted architecture estimate: **99%**.
 - Delivery remaining estimate: **less than 1%**, mostly completion audit and
@@ -73,8 +72,8 @@ checkpoint:
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `14204` insertions, `13761` deletions, net `+443`.
-- Current production `src` TypeScript/TSX total: `33953` lines.
+- Production `src`: `14357` insertions, `13930` deletions, net `+427`.
+- Current production `src` TypeScript/TSX total: `33937` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - `PivotTableChart.tsx` is now `688` lines and `useExpansionEngine.ts` is now
   `1405` lines; those single-file reductions should not be counted as plugin
@@ -127,6 +126,18 @@ Source-only diff from pre-refactor baseline
   cleanup.
 - Focused interaction/expansion validation after the cleanup passed: `4` suites
   / `76` tests.
+- Query fetch ownership cleanup moved single-branch fetch execution from the
+  plugin root into `pivot/query`, removed the root import path, consolidated the
+  shared branch/batch spec fetch plus fact-store materialization path, and made
+  chart-level `factBatches` required instead of defaulting to an empty
+  compatibility value. The source slice was deletion-positive: `155`
+  insertions, `171` deletions, net `-16`; source plus tests was `275`
+  insertions, `283` deletions, net `-8`.
+- Touched-file ESLint passed after the query fetch ownership cleanup.
+- Focused fetch/chart validation after the cleanup passed: `6` suites and `81`
+  tests.
+- Full plugin plus export entrypoint Jest pass after the cleanup: `99` suites
+  and `832` tests.
 - Chart runtime-sync cleanup moved the committed-tree sync decision out of
   `PivotTableChart.tsx` and into the seamless runtime hook, then deleted the
   now one-consumer runtime predicate export/test surface. The source slice was

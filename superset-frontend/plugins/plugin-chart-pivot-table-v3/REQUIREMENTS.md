@@ -61,7 +61,8 @@ This document summarizes the functional requirements gathered from user feedback
 
 ### Key file references
 - Query construction: [`src/buildQuery.ts`](src/buildQuery.ts)
-- Branch fetching: [`src/fetchPivotBranch.ts`](src/fetchPivotBranch.ts)
+- Branch fetching:
+  [`src/pivot/query/fetchPivotBranch.ts`](src/pivot/query/fetchPivotBranch.ts)
 - Data shaping & type map: [`src/transformProps.ts`](src/transformProps.ts)
 - Tree building & metric axis projection: [`src/utils.ts`](src/utils.ts)
 - Rendering, expansion, sorting, cell metrics: [`src/PivotTableChart.tsx`](src/PivotTableChart.tsx)
