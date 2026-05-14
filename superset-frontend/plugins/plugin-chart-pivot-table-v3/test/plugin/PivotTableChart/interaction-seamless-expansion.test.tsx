@@ -38,7 +38,7 @@ import { supersetChartDataClient } from '../../../src/pivot/data/SupersetChartDa
 import {
   fetchPivotBranch,
   type FetchPivotBranchParams,
-} from '../../../src/fetchPivotBranch';
+} from '../../../src/pivot/query/fetchPivotBranch';
 import { type PivotFactStoreBatch } from '../../../src/pivot/runtime/factStore';
 import { buildMockBranchFetchResult } from '../fixtures/factBatches';
 import { applyMetricAxis } from '../fixtures/metricAxis';
@@ -56,8 +56,8 @@ jest.mock('../../../src/pivot/data/SupersetChartDataClient', () => {
   };
 });
 
-jest.mock('../../../src/fetchPivotBranch', () => {
-  const actual = jest.requireActual('../../../src/fetchPivotBranch');
+jest.mock('../../../src/pivot/query/fetchPivotBranch', () => {
+  const actual = jest.requireActual('../../../src/pivot/query/fetchPivotBranch');
   return {
     ...actual,
     fetchPivotBranch: jest

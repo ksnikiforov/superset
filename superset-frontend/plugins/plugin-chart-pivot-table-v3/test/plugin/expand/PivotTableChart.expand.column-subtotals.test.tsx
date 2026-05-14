@@ -28,13 +28,13 @@ import {
   SUBTOTAL_LABEL,
   SUBTOTAL_TOKEN,
 } from '../../../src/pivot/core/tokens';
-import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
+import { fetchPivotBranch } from '../../../src/pivot/query/fetchPivotBranch';
 import { resolveMockBranchFetchResult } from '../fixtures/factBatches';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';
 
-jest.mock('../../../src/fetchPivotBranch', () => {
-  const actual = jest.requireActual('../../../src/fetchPivotBranch');
+jest.mock('../../../src/pivot/query/fetchPivotBranch', () => {
+  const actual = jest.requireActual('../../../src/pivot/query/fetchPivotBranch');
   return {
     ...actual,
     fetchPivotBranch: jest

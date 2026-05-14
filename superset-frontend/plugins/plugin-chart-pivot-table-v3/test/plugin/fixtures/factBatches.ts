@@ -19,7 +19,7 @@
 import {
   type FetchPivotBranchParams,
   type FetchPivotBranchResult,
-} from '../../../src/fetchPivotBranch';
+} from '../../../src/pivot/query/fetchPivotBranch';
 import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
 import {
   type FetchPivotBranchesBatchParams,

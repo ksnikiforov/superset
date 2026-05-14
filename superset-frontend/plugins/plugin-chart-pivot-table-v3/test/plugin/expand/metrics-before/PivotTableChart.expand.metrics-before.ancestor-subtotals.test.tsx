@@ -33,7 +33,7 @@ import {
   serializePath,
 } from '../../../../src/pivot/core/path';
 import { mergeTrees } from '../../../../src/pivot/core/tree';
-import { fetchPivotBranch } from '../../../../src/fetchPivotBranch';
+import { fetchPivotBranch } from '../../../../src/pivot/query/fetchPivotBranch';
 import {
   fetchPivotBranchesBatch,
   type FetchPivotBranchesBatchParams,
@@ -43,8 +43,8 @@ import { formatQueryName } from '../../../../src/pivot/query/queryName';
 import { buildTreeFromRecords } from '../../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../../fixtures/metricAxis';
 
-jest.mock('../../../../src/fetchPivotBranch', () => {
-  const actual = jest.requireActual('../../../../src/fetchPivotBranch');
+jest.mock('../../../../src/pivot/query/fetchPivotBranch', () => {
+  const actual = jest.requireActual('../../../../src/pivot/query/fetchPivotBranch');
   return {
     ...actual,
     fetchPivotBranch: jest
@@ -1145,7 +1145,7 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
 
   it('fills ancestor column values for all visible rows when expanding another column after deep row expansion', async () => {
     const actualFetchModule = jest.requireActual(
-      '../../../../src/fetchPivotBranch',
+      '../../../../src/pivot/query/fetchPivotBranch',
     );
     fetchPivotBranchMock.mockImplementation(args =>
       actualFetchModule.fetchPivotBranch(args),

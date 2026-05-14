@@ -17,7 +17,7 @@
  * under the License.
  */
 import { GenericDataType, SupersetClient } from '@superset-ui/core';
-import { fetchPivotBranch } from '../../src/fetchPivotBranch';
+import { fetchPivotBranch } from '../../src/pivot/query/fetchPivotBranch';
 import {
   MetricsLayoutEnum,
   PivotTreeData,

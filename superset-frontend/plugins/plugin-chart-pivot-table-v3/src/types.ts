@@ -301,7 +301,7 @@ export interface PivotTableProps
   extends BaseChartProps<PivotTableQueryFormData>,
     PivotTableStylesProps {
   data: PivotTreeData;
-  factBatches?: PivotFactStoreBatch[];
+  factBatches: PivotFactStoreBatch[];
   formData: PivotTableQueryFormData;
   queryFormData?: PivotTableQueryFormData;
   persistExpansionState?: boolean;

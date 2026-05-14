@@ -25,14 +25,14 @@ import { mergeTrees } from '../../../../src/pivot/core/tree';
 import {
   fetchPivotBranch,
   type FetchPivotBranchParams,
-} from '../../../../src/fetchPivotBranch';
+} from '../../../../src/pivot/query/fetchPivotBranch';
 import { buildFormData } from '../../fixtures/pivotFormData';
 import { buildMockBranchFetchResult } from '../../fixtures/factBatches';
 import { buildTreeFromRecords } from '../../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../../fixtures/metricAxis';
 
-jest.mock('../../../../src/fetchPivotBranch', () => {
-  const actual = jest.requireActual('../../../../src/fetchPivotBranch');
+jest.mock('../../../../src/pivot/query/fetchPivotBranch', () => {
+  const actual = jest.requireActual('../../../../src/pivot/query/fetchPivotBranch');
   return {
     ...actual,
     fetchPivotBranch: jest

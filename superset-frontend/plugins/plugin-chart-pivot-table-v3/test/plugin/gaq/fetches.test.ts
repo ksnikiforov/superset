@@ -19,7 +19,7 @@
 import { FeatureFlag, SupersetClient } from '@superset-ui/core';
 // eslint-disable-next-line import/no-extraneous-dependencies -- Test-only GAQ mock relies on Superset core asyncEvent entrypoint.
 import { waitForAsyncData } from 'src/middleware/asyncEvent';
-import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
+import { fetchPivotBranch } from '../../../src/pivot/query/fetchPivotBranch';
 import { fetchPivotBranchesBatch } from '../../../src/pivot/query/fetchPivotBranchesBatch';
 import { serializePath } from '../../../src/pivot/core/path';
 import { type PivotTreeData, type PivotTreeNode } from '../../../src/types';

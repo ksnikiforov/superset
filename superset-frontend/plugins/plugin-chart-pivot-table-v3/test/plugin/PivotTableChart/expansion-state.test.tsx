@@ -36,11 +36,11 @@ import {
   METRIC_TOKEN_PREFIX,
   SUBTOTAL_TOKEN,
 } from '../../../src/pivot/core/tokens';
-import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
+import { fetchPivotBranch } from '../../../src/pivot/query/fetchPivotBranch';
 import type {
   FetchPivotBranchParams,
   FetchPivotBranchResult,
-} from '../../../src/fetchPivotBranch';
+} from '../../../src/pivot/query/fetchPivotBranch';
 import { type PivotFactStoreBatch } from '../../../src/pivot/runtime/factStore';
 import {
   fetchPivotBranchesBatch,
@@ -58,8 +58,10 @@ import {
   applyMetricAxis,
 } from '../fixtures/metricAxis';
 
-jest.mock('../../../src/fetchPivotBranch', () => {
-  const actual = jest.requireActual('../../../src/fetchPivotBranch');
+jest.mock('../../../src/pivot/query/fetchPivotBranch', () => {
+  const actual = jest.requireActual(
+    '../../../src/pivot/query/fetchPivotBranch',
+  );
   return {
     ...actual,
     fetchPivotBranch: jest
@@ -277,7 +279,13 @@ describe('PivotTableChart expansion state persistence', () => {
         setDataMask={setDataMask || jest.fn()}
         setControlValue={setControlValue}
         emitCrossFilters={emitCrossFilters}
-        factBatches={factBatches}
+        factBatches={
+          factBatches ??
+          buildPreloadedTreeFactBatches(data, {
+            groupbyRows: groupbyRowsValue,
+            groupbyColumns: groupbyColumnsValue,
+          })
+        }
       />
     );
   };

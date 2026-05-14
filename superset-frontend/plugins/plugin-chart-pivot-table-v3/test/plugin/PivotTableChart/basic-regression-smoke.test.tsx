@@ -24,7 +24,7 @@ import { getStableColumnKey } from '../../../src/utils';
 import { METRICS_PLACEHOLDER } from '../../../src/pivot/core/tokens';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { supersetChartDataClient } from '../../../src/pivot/data/SupersetChartDataClient';
-import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
+import { fetchPivotBranch } from '../../../src/pivot/query/fetchPivotBranch';
 import { applyMetricAxis } from '../fixtures/metricAxis';
 import { getPivotV3ExportSheetDataForChart } from '../../../src/export/buildPivotV3ExportTable';
 
@@ -41,8 +41,8 @@ jest.mock('../../../src/pivot/data/SupersetChartDataClient', () => {
   };
 });
 
-jest.mock('../../../src/fetchPivotBranch', () => {
-  const actual = jest.requireActual('../../../src/fetchPivotBranch');
+jest.mock('../../../src/pivot/query/fetchPivotBranch', () => {
+  const actual = jest.requireActual('../../../src/pivot/query/fetchPivotBranch');
   return {
     ...actual,
     fetchPivotBranch: jest

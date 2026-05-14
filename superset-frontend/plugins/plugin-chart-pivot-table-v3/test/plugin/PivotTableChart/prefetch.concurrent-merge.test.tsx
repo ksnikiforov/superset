@@ -22,8 +22,8 @@ import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
 import { mergeTrees } from '../../../src/pivot/core/tree';
 import { parsePath } from '../../../src/pivot/core/path';
-import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
-import type { FetchPivotBranchResult } from '../../../src/fetchPivotBranch';
+import { fetchPivotBranch } from '../../../src/pivot/query/fetchPivotBranch';
+import type { FetchPivotBranchResult } from '../../../src/pivot/query/fetchPivotBranch';
 import {
   fetchPivotBranchesBatch,
   type FetchPivotBranchesBatchParams,
@@ -34,8 +34,8 @@ import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';
 import { buildMockBranchFetchResult } from '../fixtures/factBatches';
 
-jest.mock('../../../src/fetchPivotBranch', () => {
-  const actual = jest.requireActual('../../../src/fetchPivotBranch');
+jest.mock('../../../src/pivot/query/fetchPivotBranch', () => {
+  const actual = jest.requireActual('../../../src/pivot/query/fetchPivotBranch');
   return {
     ...actual,
     fetchPivotBranch: jest.fn(),

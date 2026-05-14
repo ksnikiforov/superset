@@ -25,7 +25,7 @@ import {
 import {
   fetchPivotBranch,
   resolvePivotBranchLocalResult,
-} from '../../fetchPivotBranch';
+} from '../query/fetchPivotBranch';
 import { parsePath } from '../core/path';
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import { buildBatchSignature } from '../query/batchSignature';

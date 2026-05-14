@@ -24,13 +24,13 @@ import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
 import {
   fetchPivotBranch,
   type FetchPivotBranchResult,
-} from '../../../src/fetchPivotBranch';
+} from '../../../src/pivot/query/fetchPivotBranch';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';
 
-jest.mock('../../../src/fetchPivotBranch', () => {
-  const actual = jest.requireActual('../../../src/fetchPivotBranch');
+jest.mock('../../../src/pivot/query/fetchPivotBranch', () => {
+  const actual = jest.requireActual('../../../src/pivot/query/fetchPivotBranch');
   return {
     ...actual,
     fetchPivotBranch: jest.fn(),

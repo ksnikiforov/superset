@@ -24,7 +24,7 @@ import {
   PivotTreeData,
 } from '../../../src/types';
 
-import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
+import { fetchPivotBranch } from '../../../src/pivot/query/fetchPivotBranch';
 import { fetchPivotBranchesBatch } from '../../../src/pivot/query/fetchPivotBranchesBatch';
 import type {
   FetchPivotBranchesBatchParams,
@@ -38,8 +38,8 @@ import {
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';
 
-jest.mock('../../../src/fetchPivotBranch', () => {
-  const actual = jest.requireActual('../../../src/fetchPivotBranch');
+jest.mock('../../../src/pivot/query/fetchPivotBranch', () => {
+  const actual = jest.requireActual('../../../src/pivot/query/fetchPivotBranch');
   return {
     ...actual,
     fetchPivotBranch: jest.fn(),

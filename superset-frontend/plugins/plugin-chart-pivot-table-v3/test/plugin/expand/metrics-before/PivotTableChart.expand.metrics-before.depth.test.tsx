@@ -25,10 +25,10 @@ import { PivotTreeData } from '../../../../src/types';
 import { baseFormData, buildFormData } from '../../fixtures/pivotFormData';
 import { resolveMockBranchFetchResult } from '../../fixtures/factBatches';
 import { serializePath } from '../../../../src/pivot/core/path';
-import { fetchPivotBranch } from '../../../../src/fetchPivotBranch';
+import { fetchPivotBranch } from '../../../../src/pivot/query/fetchPivotBranch';
 
-jest.mock('../../../../src/fetchPivotBranch', () => {
-  const actual = jest.requireActual('../../../../src/fetchPivotBranch');
+jest.mock('../../../../src/pivot/query/fetchPivotBranch', () => {
+  const actual = jest.requireActual('../../../../src/pivot/query/fetchPivotBranch');
   return {
     ...actual,
     fetchPivotBranch: jest

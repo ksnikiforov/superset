@@ -26,7 +26,7 @@ import {
 import {
   fetchPivotBranch,
   resolveBranchFetchContext,
-} from '../../src/fetchPivotBranch';
+} from '../../src/pivot/query/fetchPivotBranch';
 import {
   buildBuiltInLeaf,
   buildMeasureLeafOutputKey,

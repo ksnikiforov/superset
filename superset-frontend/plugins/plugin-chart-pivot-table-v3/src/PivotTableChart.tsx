@@ -81,7 +81,7 @@ const MetaLoadingWrap = styled.div`
 function PivotTableChart(props: PivotTableProps) {
   const {
     data,
-    factBatches = [],
+    factBatches,
     formData,
     queryFormData,
     width,
