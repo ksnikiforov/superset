@@ -57,7 +57,7 @@ cells are projections of DB facts, not canonical data.
 
 ## Current Status
 
-As of May 14, 2026, after the path export cleanup checkpoint:
+As of May 14, 2026, after the branch fact-cache cleanup checkpoint:
 
 - Gate-weighted architecture estimate: **99%**.
 - Delivery remaining estimate: **less than 1%**, mostly completion audit and
@@ -72,8 +72,8 @@ As of May 14, 2026, after the path export cleanup checkpoint:
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `14288` insertions, `13567` deletions, net `+721`.
-- Current production `src` TypeScript/TSX total: `34231` lines.
+- Production `src`: `14246` insertions, `13727` deletions, net `+519`.
+- Current production `src` TypeScript/TSX total: `34029` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - `PivotTableChart.tsx` is now `688` lines and `useExpansionEngine.ts` is now
   `1405` lines; those single-file reductions should not be counted as plugin
@@ -176,6 +176,17 @@ Source-only diff from pre-refactor baseline
   suites and `10` tests.
 - Full plugin plus export entrypoint Jest pass after the cleanup: `99` suites
   and `836` tests.
+- Branch fact-cache cleanup deleted the module-level branch fact cache and its
+  cache-key/filter-signature machinery. Branch fetch now relies on explicit
+  fact-store coverage for local hits, and the cache reset export plus
+  cache-behavior tests were removed. The source slice was deletion-positive:
+  `3` insertions, `205` deletions, net `-202`; source plus tests was `3`
+  insertions, `386` deletions, net `-383`.
+- Touched-file ESLint passed after the branch fact-cache cleanup.
+- Focused branch-fetch/cache-adjacent validation after the cleanup passed: `5`
+  suites and `38` tests.
+- Full plugin plus export entrypoint Jest pass after the cleanup: `99` suites
+  and `833` tests.
 - Metric source-catalog cleanup removed `metricsBase` and
   `measureLeavesByMetricBase` from the chart `formData` shape. The original
   metric catalog now travels as explicit chart props instead of compatibility
