@@ -410,13 +410,13 @@ export default function transformProps(
       metricsLayout,
       treeDataSignature,
       metricLabelMap,
-      metricsBase: rawFormData.metrics ?? baseFormData.metrics,
-      measureLeavesByMetricBase:
-        rawFormData.measureLeavesByMetric ?? baseFormData.measureLeavesByMetric,
       extra_form_data: normalizedQueryFormData.extra_form_data,
       dateFormatters,
       colTypeMap: colTypeMapWithAliases,
     },
+    sourceMetrics: rawFormData.metrics ?? baseFormData.metrics,
+    sourceMeasureLeavesByMetric:
+      rawFormData.measureLeavesByMetric ?? baseFormData.measureLeavesByMetric,
     rawFormData,
     hooks,
     ownState,

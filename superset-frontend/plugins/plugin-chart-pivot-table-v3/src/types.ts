@@ -235,12 +235,10 @@ export interface PivotTableCustomizeProps {
   groupbyRows: QueryFormColumn[];
   groupbyColumns: QueryFormColumn[];
   metrics: QueryFormMetric[];
-  metricsBase?: QueryFormMetric[];
   metricLabelMap?: Record<string, string>;
   pivotRuntimeLayout?: PivotRuntimeLayout;
   pivotSelectedFilters?: Record<string, DataRecordValue[]>;
   measureLeavesByMetric?: MeasureLeavesByMetricKey;
-  measureLeavesByMetricBase?: MeasureLeavesByMetricKey;
   metricFormatting?: PivotMetricFormattingMap;
   metricDatabars?: PivotMetricDatabarMap;
   metricFormattingScope?: MetricFormattingScope;
@@ -309,6 +307,8 @@ export interface PivotTableProps
   queryFormData?: PivotTableQueryFormData;
   persistExpansionState?: boolean;
   metrics: QueryFormMetric[];
+  sourceMetrics?: QueryFormMetric[];
+  sourceMeasureLeavesByMetric?: MeasureLeavesByMetricKey;
   groupbyRows: QueryFormColumn[];
   groupbyColumns: QueryFormColumn[];
   metricFormatting?: PivotMetricFormattingMap;

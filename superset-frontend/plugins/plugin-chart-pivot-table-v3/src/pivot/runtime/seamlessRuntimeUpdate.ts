@@ -461,6 +461,8 @@ export type SeamlessRuntimeUpdateResult =
 type SeamlessRuntimeUpdatePlanConfig = {
   baseFormData: PivotTableQueryFormData;
   sourceFormData: PivotTableQueryFormData;
+  sourceMetrics?: PivotTableQueryFormData['metrics'];
+  sourceMeasureLeavesByMetric?: PivotTableQueryFormData['measureLeavesByMetric'];
   runtimeLayout: PivotRuntimeLayout;
   selection: RuntimeSelection;
   expandedRows?: Set<string>;
@@ -490,6 +492,8 @@ const toExpansionPaths = (
 const buildSeamlessRuntimeUpdatePlan = ({
   baseFormData,
   sourceFormData,
+  sourceMetrics,
+  sourceMeasureLeavesByMetric,
   runtimeLayout,
   selection,
   expandedRows,
@@ -519,11 +523,9 @@ const buildSeamlessRuntimeUpdatePlan = ({
     runtimeLayout,
     selection,
     metricsOverride:
-      sourceFormData.metricsBase ??
-      sourceFormData.metrics ??
-      baseFormData.metrics,
+      sourceMetrics ?? sourceFormData.metrics ?? baseFormData.metrics,
     measureLeavesByMetricOverride:
-      sourceFormData.measureLeavesByMetricBase ??
+      sourceMeasureLeavesByMetric ??
       sourceFormData.measureLeavesByMetric ??
       baseFormData.measureLeavesByMetric,
   });

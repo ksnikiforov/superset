@@ -105,6 +105,8 @@ function PivotTableChart(props: PivotTableProps) {
     setControlValue,
     emitCrossFilters,
     selectedFilters,
+    sourceMetrics,
+    sourceMeasureLeavesByMetric,
     persistExpansionState: persistExpansionStateProp,
     onContextMenu,
     timeGrainSqla,
@@ -201,8 +203,8 @@ function PivotTableChart(props: PivotTableProps) {
     [appliedFormData.dimensions],
   );
   const metricsForUi = useMemo(
-    () => formData.metricsBase ?? formData.metrics ?? metrics,
-    [formData.metrics, formData.metricsBase, metrics],
+    () => sourceMetrics ?? formData.metrics ?? metrics,
+    [formData.metrics, metrics, sourceMetrics],
   );
   const metricKeys = useMemo(() => getMetricKeys(metricsForUi), [metricsForUi]);
   const hasMetrics = metricKeys.length > 0;
@@ -263,6 +265,8 @@ function PivotTableChart(props: PivotTableProps) {
       isUserControlled,
       appliedFormData,
       formData,
+      sourceMetrics,
+      sourceMeasureLeavesByMetric,
       runtimeLayout,
       committedRuntimeLayout: committedRuntimeLayoutRef.current,
       appliedDimensionKeys,
@@ -325,6 +329,8 @@ function PivotTableChart(props: PivotTableProps) {
     uiRuntimeLayoutRef,
     baseFormData: fetchFormDataBaseWithFormatters,
     sourceFormData: formData,
+    sourceMetrics,
+    sourceMeasureLeavesByMetric,
     upstreamSignature: upstreamSeamlessSignature,
     displaySnapshotRef,
     pendingSeamlessLayoutRef,
@@ -670,7 +676,7 @@ function PivotTableChart(props: PivotTableProps) {
           dimensions={dimensionList}
           metrics={metricsForUi}
           measureLeavesByMetric={
-            formData.measureLeavesByMetricBase ?? formData.measureLeavesByMetric
+            sourceMeasureLeavesByMetric ?? formData.measureLeavesByMetric
           }
           metricLabelMap={formData.metricLabelMap}
           dimensionLabelMap={resolvedVerboseMap}

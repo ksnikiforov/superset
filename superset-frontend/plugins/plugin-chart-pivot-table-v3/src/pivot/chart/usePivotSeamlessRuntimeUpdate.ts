@@ -87,6 +87,8 @@ type UsePivotSeamlessRuntimeUpdateConfig = {
   uiRuntimeLayoutRef: MutableRefObject<PivotRuntimeLayout>;
   baseFormData: PivotTableQueryFormData;
   sourceFormData: PivotTableQueryFormData;
+  sourceMetrics?: PivotTableQueryFormData['metrics'];
+  sourceMeasureLeavesByMetric?: PivotTableQueryFormData['measureLeavesByMetric'];
   upstreamSignature: string;
   displaySnapshotRef: MutableRefObject<PivotDisplaySnapshot | null>;
   pendingSeamlessLayoutRef: MutableRefObject<PivotRuntimeLayout | null>;
@@ -126,6 +128,8 @@ export const usePivotSeamlessRuntimeUpdate = (
     uiRuntimeLayoutRef,
     baseFormData,
     sourceFormData,
+    sourceMetrics,
+    sourceMeasureLeavesByMetric,
     upstreamSignature,
     displaySnapshotRef,
     pendingSeamlessLayoutRef,
@@ -208,6 +212,8 @@ export const usePivotSeamlessRuntimeUpdate = (
         materializationLifecycle,
         baseFormData,
         sourceFormData,
+        sourceMetrics,
+        sourceMeasureLeavesByMetric,
         runtimeLayout: normalized,
         selection: nextFilters,
         expandedRows: expandedRowsRef.current,
@@ -269,6 +275,8 @@ export const usePivotSeamlessRuntimeUpdate = (
       requestLifecycle,
       seamlessSyncRef,
       sourceFormData,
+      sourceMeasureLeavesByMetric,
+      sourceMetrics,
       upstreamSignature,
     ],
   );

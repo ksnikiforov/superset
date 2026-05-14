@@ -48,6 +48,8 @@ type AppliedInteractionLayoutParams = {
   isUserControlled: boolean;
   appliedFormData: PivotTableQueryFormData;
   formData: PivotTableQueryFormData;
+  sourceMetrics?: PivotTableQueryFormData['metrics'];
+  sourceMeasureLeavesByMetric?: PivotTableQueryFormData['measureLeavesByMetric'];
   runtimeLayout: PivotRuntimeLayout;
   committedRuntimeLayout: PivotRuntimeLayout;
   appliedDimensionKeys: string[];
@@ -242,6 +244,8 @@ export const resolveAppliedInteractionLayout = ({
   isUserControlled,
   appliedFormData,
   formData,
+  sourceMetrics,
+  sourceMeasureLeavesByMetric,
   runtimeLayout,
   committedRuntimeLayout,
   appliedDimensionKeys,
@@ -254,11 +258,7 @@ export const resolveAppliedInteractionLayout = ({
   }
 
   const appliedMetricKeysBase = getMetricKeys(
-    ensureIsArray(
-      appliedFormData.metricsBase ??
-        appliedFormData.metrics ??
-        formData.metrics,
-    ),
+    ensureIsArray(sourceMetrics ?? appliedFormData.metrics ?? formData.metrics),
   );
   const committedMetrics = committedRuntimeLayout.metrics ?? [];
   const appliedMetricKeys =
@@ -276,13 +276,9 @@ export const resolveAppliedInteractionLayout = ({
     appliedMetricKeys,
   );
   const metricsForLayout =
-    appliedFormData.metricsBase ??
-    formData.metricsBase ??
-    appliedFormData.metrics ??
-    formData.metrics;
+    sourceMetrics ?? appliedFormData.metrics ?? formData.metrics;
   const leavesForLayout =
-    appliedFormData.measureLeavesByMetricBase ??
-    formData.measureLeavesByMetricBase ??
+    sourceMeasureLeavesByMetric ??
     appliedFormData.measureLeavesByMetric ??
     formData.measureLeavesByMetric;
   const appliedLayoutFormData = resolveInteractionFormData({
