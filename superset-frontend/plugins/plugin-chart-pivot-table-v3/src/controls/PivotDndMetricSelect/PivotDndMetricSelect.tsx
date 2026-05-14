@@ -1204,8 +1204,6 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       openMeasureSelector,
       props.columns,
       props.datasource,
-      props.label,
-      props.name,
       savedMetrics,
     ],
   );

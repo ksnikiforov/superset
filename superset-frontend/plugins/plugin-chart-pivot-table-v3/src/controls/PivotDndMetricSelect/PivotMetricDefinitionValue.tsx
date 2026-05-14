@@ -492,7 +492,7 @@ export const MetricFormatSelector = (props: MetricFormatSelectorProps) => {
       }
       props.onChange(next);
     },
-    [props],
+    [allowExcel, excelOnly, props],
   );
 
   const options = useMemo(() => {
@@ -570,7 +570,7 @@ export const MetricFormatSelector = (props: MetricFormatSelectorProps) => {
       }
     }
     return undefined;
-  }, [enableExcel, savedMetrics, value]);
+  }, [savedMetrics, value]);
   const savedMetricOptions = useMemo(
     () =>
       savedMetricsForPopover
