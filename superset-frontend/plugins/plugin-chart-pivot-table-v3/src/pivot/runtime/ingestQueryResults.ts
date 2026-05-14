@@ -54,7 +54,7 @@ export type {
   PivotFactStoreBatch,
 } from './factStore';
 
-export type QueryResultWithData = {
+type QueryResultWithData = {
   data?: DataRecord[] | Record<string, unknown>[];
   query?:
     | string
@@ -64,7 +64,7 @@ export type QueryResultWithData = {
   query_name?: unknown;
 };
 
-export type IngestedQueryResult<T extends QueryResultWithData> = {
+type IngestedQueryResult<T extends QueryResultWithData> = {
   spec: PlannedQuerySpec;
   result: T;
   facts: PivotFact[];
@@ -72,7 +72,7 @@ export type IngestedQueryResult<T extends QueryResultWithData> = {
 
 type QueryResultFallback = 'index' | 'empty';
 
-export const getQueryResultName = (
+const getQueryResultName = (
   result: QueryResultWithData,
 ): string | undefined => {
   if (
@@ -88,7 +88,7 @@ export const getQueryResultName = (
   return undefined;
 };
 
-export const orderQueryResultsForSpecs = <T extends QueryResultWithData>({
+const orderQueryResultsForSpecs = <T extends QueryResultWithData>({
   specs,
   results,
   fallback = 'index',
@@ -218,7 +218,7 @@ const factsFromRecordsAsync = async ({
   return facts;
 };
 
-export const ingestQueryResultFacts = ({
+const ingestQueryResultFacts = ({
   spec,
   result,
 }: {
@@ -230,22 +230,6 @@ export const ingestQueryResultFacts = ({
     metrics: spec.metrics,
     coverage: spec.meta.coverage,
     materializedMetrics: spec.meta.materializedMetrics,
-  });
-
-export const ingestQueryResultFactsAsync = ({
-  spec,
-  result,
-  ...options
-}: {
-  spec: PlannedQuerySpec;
-  result: QueryResultWithData;
-} & ChunkedWorkOptions): Promise<PivotFact[]> =>
-  factsFromRecordsAsync({
-    result,
-    metrics: spec.metrics,
-    coverage: spec.meta.coverage,
-    materializedMetrics: spec.meta.materializedMetrics,
-    ...options,
   });
 
 export const ingestQueryResults = <T extends QueryResultWithData>({
@@ -272,7 +256,7 @@ export const ingestQueryResults = <T extends QueryResultWithData>({
   });
 };
 
-export const ingestQueryResultsAsync = async <T extends QueryResultWithData>({
+const ingestQueryResultsAsync = async <T extends QueryResultWithData>({
   specs,
   results,
   fallback,
@@ -299,9 +283,11 @@ export const ingestQueryResultsAsync = async <T extends QueryResultWithData>({
       spec,
       result,
       // eslint-disable-next-line no-await-in-loop
-      facts: await ingestQueryResultFactsAsync({
-        spec,
+      facts: await factsFromRecordsAsync({
         result,
+        metrics: spec.metrics,
+        coverage: spec.meta.coverage,
+        materializedMetrics: spec.meta.materializedMetrics,
         chunkSize,
         shouldContinue,
         yieldToMain,
@@ -329,7 +315,7 @@ const factStoreBatchFromIngested = ({
   facts,
 });
 
-export const upsertIngestedFactsIntoStore = ({
+const upsertIngestedFactsIntoStore = ({
   store,
   ingested,
 }: {
