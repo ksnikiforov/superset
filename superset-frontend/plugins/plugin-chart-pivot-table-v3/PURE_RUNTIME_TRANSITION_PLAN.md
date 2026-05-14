@@ -43,6 +43,68 @@ form data + runtime UI state
 Only fetches and persistence should have side effects. Tree nodes, rendered
 cells, and worksheet cells are projections of DB facts, not canonical data.
 
+## Architectural Reassessment: Draft vs Loaded Runtime
+
+This is a continuation of the pure runtime transition, not a separate refactor.
+The main remaining ambiguity is that "runtime layout" still sometimes means two
+different things:
+
+- the layout the user is currently editing;
+- the query-backed layout that produced the loaded fact coverage and
+  materialized tree.
+
+That ambiguity is the source of several remaining complexity pockets:
+
+- recovery fetches that compensate for layout/tree mismatch;
+- metric-index fallback resolution;
+- render-time semantic repair;
+- tree-shape-as-loaded-state checks;
+- expansion planning that can drift from the real renderer;
+- chart-level second guessing of runtime ownership.
+
+The better target model is:
+
+- **Draft layout:** user-controlled interaction state. Drag/drop, measure
+  selection, row/column edits, and expand/collapse intent update this
+  immediately so the plugin stays interactive.
+- **Loaded runtime snapshot:** the last query-backed `PivotProgram`, subtotal
+  policy, expansion coverage, measure hierarchy, and fact batches that are
+  actually loaded.
+- **Fact store:** owns loaded batches only and answers exact coverage questions.
+  It must not pretend that draft layout changes are loaded.
+- **Planner:** compares draft layout with the loaded snapshot and chooses local
+  cosmetic update, targeted expansion fetch, targeted semantic layout fetch, or
+  no fetch for hidden/not-expanded layers.
+- **Materializer:** materializes only from loaded snapshot plus fact store.
+- **Renderer:** renders materialized structure only. It does not infer metric
+  placement, loaded state, or missing semantic nodes from tree shape.
+
+Assessment: this is the right architectural direction because it turns the
+current safety/recovery logic into an explicit transition decision. The
+important constraint is to implement it by deleting duplicate authority, not by
+adding a second runtime framework beside the existing one.
+
+Two other architectural options can pursue the same simplification goal:
+
+1. **Runtime reducer plus effect commands.** Put layout edits, expansion,
+   fetch lifecycle, materialization, and stale-result handling behind one
+   reducer that emits commands such as `fetchCoverage`, `materializeSnapshot`,
+   or `commitDraft`. This would make state transitions explicit and could
+   delete hook-local request bookkeeping, but it is only a win if it replaces
+   existing chart/expansion/seamless branches rather than wrapping them.
+
+2. **Coverage manifest as the central artifact.** Compile the draft layout into
+   a declarative visible-coverage manifest, diff that manifest against the fact
+   store, and make both expansion and semantic layout changes use the same
+   manifest diff. This directly supports the no-hidden-layer-fetch rule and can
+   delete duplicate expansion/query planning, but it still needs a loaded
+   snapshot so materialization and rendering do not consume the newest draft as
+   if it were already loaded.
+
+Recommendation: use the draft-vs-loaded split as the primary model, implement
+coverage manifests as the planner artifact inside that model, and use a reducer
+only where it deletes existing hook/chart state machines.
+
 ## Hard Guardrails
 
 - No render-time semantic repair.
