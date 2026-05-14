@@ -34,7 +34,7 @@ import {
 } from '../core/tokens';
 import { coerceMeasureLeavesByMetric } from '../measureLeaves';
 import {
-  compilePivotProgramFromPlacement,
+  compilePivotProgram,
   insertValuesPlaceholder,
 } from '../runtime/compilePivotProgram';
 import type { PivotProgram } from '../runtime/types';
@@ -58,14 +58,6 @@ export type AppliedInteractionLayout = {
   appliedLayoutFormData: PivotTableQueryFormData;
   appliedPivotProgram?: PivotProgram;
 };
-
-const mapLayoutDimensions = (
-  dimensionMap: Map<string, QueryFormColumn>,
-  keys: string[],
-): QueryFormColumn[] =>
-  keys
-    .map(key => dimensionMap.get(key))
-    .filter((dimension): dimension is QueryFormColumn => Boolean(dimension));
 
 const resolveDimensionMap = (dimensions: QueryFormColumn[]) => {
   const map = new Map<string, QueryFormColumn>();
@@ -286,23 +278,12 @@ export const resolveAppliedInteractionLayout = ({
     },
     runtimeLayout: appliedRuntimeLayout,
   });
-  const appliedDimensionMap = resolveDimensionMap(
-    ensureIsArray(appliedFormData.dimensions ?? formData.dimensions),
-  );
-  const rowDimensions = mapLayoutDimensions(
-    appliedDimensionMap,
-    appliedRuntimeLayout.rows,
-  );
-  const columnDimensions = mapLayoutDimensions(
-    appliedDimensionMap,
-    appliedRuntimeLayout.cols,
-  );
-  const appliedPivotProgram = compilePivotProgramFromPlacement({
-    rowDimensions,
-    columnDimensions,
+  const appliedPivotProgram = compilePivotProgram({
+    groupbyRows: appliedLayoutFormData.groupbyRows,
+    groupbyColumns: appliedLayoutFormData.groupbyColumns,
     metrics: appliedLayoutFormData.metrics,
     metricsLayout: appliedLayoutFormData.metricsLayout as MetricsLayoutEnum,
-    valuePlacement: appliedRuntimeLayout.valuePlacement,
+    lastMoved: appliedRuntimeLayout.valuePlacement.axis,
   });
 
   return {
