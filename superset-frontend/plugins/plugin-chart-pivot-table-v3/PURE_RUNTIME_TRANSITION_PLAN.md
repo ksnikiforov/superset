@@ -84,6 +84,8 @@ Source-only diff from pre-refactor baseline
   `139` insertions, `275` deletions, net `-136`.
 - Focused hydration/prefetch validation after deleting that hook passed: `7`
   suites and `55` tests.
+- Full plugin plus export utility Jest pass after deleting that hook: `96`
+  suites and `781` tests.
 - Touched expansion files passed ESLint, Prettier, and `git diff --check`.
 - Expansion runtime-hook cleanup deleted the one-consumer
   `useExpansionInFlight.ts` and `useExpansionRequestRuntime.ts` files and kept
@@ -655,7 +657,9 @@ Recent validation:
 - `95f71db57a`: deleted the one-consumer `useExpansionHydrationRuntime.ts`
   file and kept hydration/prefetch scheduling local to
   `useExpansionEngine.ts`; Prettier, focused ESLint, `git diff --check`, and
-  focused hydration/prefetch Jest (`55` tests) passed.
+  focused hydration/prefetch Jest (`55` tests) passed. The full
+  pivot-table-v3 plugin plus export utility Jest suite also passed afterward
+  (`96` suites, `781` tests).
 - `dec50a1e4a`: deleted the one-consumer `useExpansionInFlight.ts` and
   `useExpansionRequestRuntime.ts` files and kept their state local to
   `useExpansionEngine.ts`; Prettier, focused ESLint, `git diff --check`, and
@@ -1020,6 +1024,8 @@ Current evidence:
 - Latest hydration runtime-hook validation passed focused Jest validation: `7`
   suites and `55` tests; touched expansion files passed Prettier, focused
   ESLint, and `git diff --check`.
+- Latest full pivot-table-v3 plugin plus export utility Jest run after the
+  hydration runtime-hook cleanup passed: `96` suites and `781` tests.
 - Latest expansion runtime-hook cleanup deleted the one-consumer
   `useExpansionInFlight.ts` and `useExpansionRequestRuntime.ts` files and kept
   their state local to `useExpansionEngine.ts`; the source slice was
