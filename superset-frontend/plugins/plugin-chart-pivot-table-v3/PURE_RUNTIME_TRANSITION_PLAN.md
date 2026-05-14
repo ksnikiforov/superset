@@ -221,6 +221,8 @@ Source-only diff from pre-refactor baseline
   error cleanup: `4` suites and `6` tests.
 - Focused chart/expansion pass after sharing the local sync-ref hook and
   removing expansion wrapper callbacks: `5` suites and `29` tests.
+- Full plugin plus export utility Jest pass after sharing the sync-ref hook:
+  `97` suites and `783` tests.
 
 The readout remains mixed: the plugin is still modestly above the baseline line
 count, but the chart/layout hooks keep losing inline policy and the remaining
@@ -545,7 +547,9 @@ Recent validation:
 - `80e4405426`: shared the local sync-ref hook between `PivotTableChart.tsx`
   and `useExpansionEngine.ts`, and removed expansion invalidation/persistence
   wrapper callbacks that only forwarded to refs; touched-file ESLint, Prettier,
-  `git diff --check`, and focused chart/expansion Jest (`29` tests) passed.
+  `git diff --check`, focused chart/expansion Jest (`29` tests), and the full
+  pivot-table-v3 plugin plus export utility Jest suite (`97` suites, `783`
+  tests) passed.
 - `9add9b1625`: deduplicated expansion async error cleanup so cross-axis
   hydration and initial prefetch failures rely on `reportAsyncError` for
   loading/hydrating cleanup; touched-file ESLint, Prettier, `git diff --check`,
