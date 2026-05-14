@@ -120,31 +120,18 @@ const isRuntimeLayoutCoverageScope = (
 const selectionSignature = (selection: PivotRuntimeLayout['leafSelection']) =>
   stableStringify(selection ?? {});
 
-const valuePlacementSignature = (
-  placement: PivotRuntimeLayout['valuePlacement'],
-) => stableStringify(placement ?? {});
-
-const leafOrderSignature = (order?: PivotRuntimeLayout['leafOrder']) =>
-  stableStringify(order ?? []);
-
-const hasSameRuntimeLayoutState = (
-  prev: PivotRuntimeLayout,
-  next: PivotRuntimeLayout,
-  metricsMatch: (left: string[], right: string[]) => boolean,
-) =>
-  arraysEqual(prev.rows, next.rows) &&
-  arraysEqual(prev.cols, next.cols) &&
-  metricsMatch(prev.metrics, next.metrics) &&
-  selectionSignature(prev.leafSelection) ===
-    selectionSignature(next.leafSelection) &&
-  leafOrderSignature(prev.leafOrder) === leafOrderSignature(next.leafOrder) &&
-  valuePlacementSignature(prev.valuePlacement) ===
-    valuePlacementSignature(next.valuePlacement);
-
 export const isSameRuntimeLayout = (
   prev: PivotRuntimeLayout,
   next: PivotRuntimeLayout,
-) => hasSameRuntimeLayoutState(prev, next, arraysEqual);
+) =>
+  arraysEqual(prev.rows, next.rows) &&
+  arraysEqual(prev.cols, next.cols) &&
+  arraysEqual(prev.metrics, next.metrics) &&
+  arraysEqual(prev.leafOrder ?? [], next.leafOrder ?? []) &&
+  selectionSignature(prev.leafSelection) ===
+    selectionSignature(next.leafSelection) &&
+  prev.valuePlacement.axis === next.valuePlacement.axis &&
+  prev.valuePlacement.index === next.valuePlacement.index;
 
 const shouldFetchForLeadingKeyChange = (
   prevAxisKeys: string[],
@@ -247,8 +234,8 @@ export const shouldFetchForLayoutChange = (
     return true;
   }
   if (
-    valuePlacementSignature(prev.valuePlacement) !==
-    valuePlacementSignature(next.valuePlacement)
+    prev.valuePlacement.axis !== next.valuePlacement.axis ||
+    prev.valuePlacement.index !== next.valuePlacement.index
   ) {
     const prevValueAxis =
       prev.valuePlacement.axis === 'row' ? prev.rows : prev.cols;
