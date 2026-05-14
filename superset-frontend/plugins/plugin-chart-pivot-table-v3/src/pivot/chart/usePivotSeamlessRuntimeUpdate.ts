@@ -20,6 +20,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ComponentProps,
   type MutableRefObject,
@@ -37,7 +38,9 @@ import { createLatestRequestLifecycle } from '../runtime/requestLifecycle';
 import {
   buildSeamlessRuntimeSyncSnapshot,
   fetchAndMaterializeSeamlessRuntimeUpdate,
+  prepareSeamlessRuntimeUpdateEffect,
   type SeamlessRuntimeSyncSnapshot,
+  type SeamlessRuntimeUpstreamState,
 } from '../runtime/seamlessRuntimeUpdate';
 import { type PivotFactStoreBatch } from '../runtime/ingestQueryResults';
 import { normalizeRuntimeLayout } from '../layout/resolveInteractionLayout';
@@ -56,7 +59,14 @@ type UsePivotSeamlessRuntimeUpdateConfig = {
   data: PivotTreeData;
   factBatches: PivotFactStoreBatch[];
   isUserControlled: boolean;
+  isDashboardRuntimeSync: boolean;
   shouldSyncCommittedTreeFromProps: boolean;
+  upstreamDashboardQueryContextSignature: string | null;
+  persistedInteractionFilters: RuntimeSelection;
+  committedRuntimeLayout: PivotRuntimeLayout;
+  committedFilters: RuntimeSelection;
+  uiSelectedFilters: RuntimeSelection;
+  uiRuntimeLayout: PivotRuntimeLayout;
   baseFormData: PivotTableQueryFormData;
   sourceFormData: PivotTableQueryFormData;
   upstreamSignature: string;
@@ -84,7 +94,14 @@ export const usePivotSeamlessRuntimeUpdate = (
     data,
     factBatches,
     isUserControlled,
+    isDashboardRuntimeSync,
     shouldSyncCommittedTreeFromProps,
+    upstreamDashboardQueryContextSignature,
+    persistedInteractionFilters,
+    committedRuntimeLayout,
+    committedFilters,
+    uiSelectedFilters,
+    uiRuntimeLayout,
     baseFormData,
     sourceFormData,
     upstreamSignature,
@@ -107,6 +124,8 @@ export const usePivotSeamlessRuntimeUpdate = (
   const [committedTree, setCommittedTree] = useState<PivotTreeData>(data);
   const [committedFactBatches, setCommittedFactBatches] =
     useState<PivotFactStoreBatch[]>(factBatches);
+  const lastUpstreamQueryContextRef =
+    useRef<SeamlessRuntimeUpstreamState>(null);
   const requestLifecycle = useMemo(
     () =>
       createLatestRequestLifecycle({
@@ -229,6 +248,42 @@ export const usePivotSeamlessRuntimeUpdate = (
       upstreamSignature,
     ],
   );
+
+  useEffect(() => {
+    const updatePlan = prepareSeamlessRuntimeUpdateEffect({
+      upstreamDashboardQueryContextSignature,
+      previousUpstreamState: lastUpstreamQueryContextRef.current,
+      data,
+      isUserControlled,
+      isDashboardRuntimeSync,
+      persistedInteractionFilters,
+      committedFactBatches,
+      committedRuntimeLayout,
+      committedFilters,
+      uiSelectedFilters,
+      lastSync: seamlessSyncRef.current,
+      uiRuntimeLayout,
+      upstreamSeamlessSignature: upstreamSignature,
+    });
+    lastUpstreamQueryContextRef.current = updatePlan.nextUpstreamState;
+    updatePlan.updates.forEach(({ runtimeLayout: nextLayout, selection }) => {
+      applySeamlessUpdate(nextLayout, selection);
+    });
+  }, [
+    applySeamlessUpdate,
+    committedFactBatches,
+    committedFilters,
+    committedRuntimeLayout,
+    data,
+    isDashboardRuntimeSync,
+    isUserControlled,
+    persistedInteractionFilters,
+    seamlessSyncRef,
+    uiRuntimeLayout,
+    uiSelectedFilters,
+    upstreamDashboardQueryContextSignature,
+    upstreamSignature,
+  ]);
 
   return {
     committedTree,

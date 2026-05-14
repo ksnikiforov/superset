@@ -87,11 +87,9 @@ import { useSyncRef } from './pivot/shared/useSyncRef';
 import {
   buildSeamlessRuntimeUpstreamSignature,
   isSeamlessDisplaySnapshotSettled,
-  prepareSeamlessRuntimeUpdateEffect,
   prepareSeamlessRuntimeLayoutChange,
   shouldSyncCommittedRuntimeFromProps,
   type SeamlessRuntimeSyncSnapshot,
-  type SeamlessRuntimeUpstreamState,
 } from './pivot/runtime/seamlessRuntimeUpdate';
 import {
   type PivotDisplaySnapshot,
@@ -207,8 +205,6 @@ function PivotTableChart(props: PivotTableProps) {
   const [activeColumnSort, setActiveColumnSort] =
     useState<PivotColumnSortState | null>(null);
   const pendingSeamlessLayoutRef = useRef<PivotRuntimeLayout | null>(null);
-  const lastUpstreamQueryContextRef =
-    useRef<SeamlessRuntimeUpstreamState>(null);
   const expandedRowsForSeamlessRef = useRef<Set<string>>(new Set());
   const expandedColsForSeamlessRef = useRef<Set<string>>(new Set());
   const pendingRowsForSeamlessRef = useRef<Set<string>>(new Set());
@@ -339,7 +335,14 @@ function PivotTableChart(props: PivotTableProps) {
     data,
     factBatches,
     isUserControlled,
+    isDashboardRuntimeSync,
     shouldSyncCommittedTreeFromProps,
+    upstreamDashboardQueryContextSignature,
+    persistedInteractionFilters,
+    committedRuntimeLayout,
+    committedFilters,
+    uiSelectedFilters,
+    uiRuntimeLayout,
     baseFormData: fetchFormDataBaseWithFormatters,
     sourceFormData: formData,
     upstreamSignature: upstreamSeamlessSignature,
@@ -389,41 +392,6 @@ function PivotTableChart(props: PivotTableProps) {
       upstreamSeamlessSignature,
     ],
   );
-
-  useEffect(() => {
-    const updatePlan = prepareSeamlessRuntimeUpdateEffect({
-      upstreamDashboardQueryContextSignature,
-      previousUpstreamState: lastUpstreamQueryContextRef.current,
-      data,
-      isUserControlled,
-      isDashboardRuntimeSync,
-      persistedInteractionFilters,
-      committedFactBatches,
-      committedRuntimeLayout,
-      committedFilters,
-      uiSelectedFilters,
-      lastSync: lastSeamlessSyncRef.current,
-      uiRuntimeLayout,
-      upstreamSeamlessSignature,
-    });
-    lastUpstreamQueryContextRef.current = updatePlan.nextUpstreamState;
-    updatePlan.updates.forEach(({ runtimeLayout: nextLayout, selection }) => {
-      applySeamlessUpdate(nextLayout, selection);
-    });
-  }, [
-    applySeamlessUpdate,
-    committedFactBatches,
-    committedFilters,
-    committedRuntimeLayout,
-    data,
-    isDashboardRuntimeSync,
-    isUserControlled,
-    persistedInteractionFilters,
-    uiRuntimeLayout,
-    uiSelectedFilters,
-    upstreamDashboardQueryContextSignature,
-    upstreamSeamlessSignature,
-  ]);
 
   const dimensionLabelMap = useMemo(() => {
     const map = new Map<string, string>();
