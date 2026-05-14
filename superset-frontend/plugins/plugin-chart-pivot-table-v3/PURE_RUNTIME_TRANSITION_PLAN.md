@@ -58,7 +58,7 @@ cells are projections of DB facts, not canonical data.
 ## Current Status
 
 As of May 14, 2026, after
-`1daf9b57ce refactor(pivot-table-v3): extract dataset metadata hook`:
+`9add9b1625 refactor(pivot-table-v3): dedupe expansion error cleanup`:
 
 - Gate-weighted architecture estimate: **96%**.
 - Delivery remaining estimate: **14-22%**, mostly final cleanup, validation,
@@ -71,7 +71,7 @@ As of May 14, 2026, after
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `12826` insertions, `12134` deletions, net `+692`.
+- Production `src`: `12826` insertions, `12140` deletions, net `+686`.
 - Current production `src` TypeScript/TSX total: `34202` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - Full plugin Jest pass after the column-sort extraction: `91` suites and
@@ -217,6 +217,8 @@ Source-only diff from pre-refactor baseline
   resolution from the chart: `2` suites and `26` tests.
 - Full plugin plus export utility Jest pass after extracting dataset metadata
   resolution from the chart: `97` suites and `783` tests.
+- Focused expansion concurrency/error pass after deduplicating async expansion
+  error cleanup: `4` suites and `6` tests.
 
 The readout remains mixed: the plugin is still modestly above the baseline line
 count, but the chart/layout hooks keep losing inline policy and the remaining
@@ -294,6 +296,9 @@ orchestration.
 - Same-axis expansion no longer keeps separate in-flight counters beside the
   in-flight expanded-key maps; cross-axis hydration now checks the existing
   in-flight map state directly.
+- Cross-axis hydration and initial prefetch async failures now use
+  `reportAsyncError` as the single cleanup authority instead of clearing
+  hydrating state both inside and outside the error reporter.
 - Branch-cache entries store fact batches, not rendered trees.
 - Measure-leaf value application is inside `materializePivotTree`.
 - The chart no longer contains separate runtime-layout fetch predicates, stale
@@ -533,6 +538,10 @@ git diff --check
 
 Recent validation:
 
+- `9add9b1625`: deduplicated expansion async error cleanup so cross-axis
+  hydration and initial prefetch failures rely on `reportAsyncError` for
+  loading/hydrating cleanup; touched-file ESLint, Prettier, `git diff --check`,
+  and focused expansion concurrency/error Jest (`6` tests) passed.
 - `1daf9b57ce`: extracted dataset metadata lookup, dataset date-formatter
   lookup, temporal fallback construction, metadata fetch/cache state, and
   delayed-render predicates into `usePivotDatasetMeta`; touched-file ESLint,
