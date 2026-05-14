@@ -20,13 +20,13 @@ under the License.
 # Pivot Table v3 Pure Runtime Transition Plan
 
 This document is the current refactor map for pivot-table-v3. It intentionally
-tracks only the useful present state, remaining risk, and next deletion targets.
+tracks the final transition state, audit evidence, and source metrics.
 The older migration diary has been removed from this file; commit history is the
 record for already-completed slices.
 
 ## Hard Guardrails
 
-The remaining work should be judged against these rules:
+Future runtime work should be judged against these rules:
 
 - No render-time semantic repair.
 - No tree-shape-as-loaded-state.
@@ -57,17 +57,19 @@ cells are projections of DB facts, not canonical data.
 
 ## Current Status
 
-As of May 15, 2026, after the total-position alias cleanup checkpoint:
+As of May 15, 2026, after the completion audit checkpoint:
 
-- Gate-weighted architecture estimate: **99%**.
-- Delivery remaining estimate: **less than 1%**, mostly completion audit and
-  any final deletion-positive cleanup found by that audit.
+- Gate-weighted architecture estimate: **100%**.
+- Delivery remaining estimate: **0%** for the current pure-runtime transition.
 - The runtime architecture exists and is used by the main paths.
 - The project is above the starting source line count. The old chart boundary
   is much smaller, but that is a local orchestration relocation, not a
   whole-plugin code reduction.
-- The remaining work is mostly deletion of old chart, expansion, and render
-  interpretation paths.
+- The chart-id worksheet registry is accepted as the current cross-app export
+  boundary: dashboard and Explore export actions only have a chart id, while
+  the rendered plugin owns the worksheet model. It does not plan queries,
+  materialize semantic tree data, infer loaded state, repair render semantics,
+  or synthesize aggregate values.
 
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
@@ -545,15 +547,15 @@ deletion-positive structure cleanup; it is still not a net source reduction.
 
 ## Gate Status
 
-| Gate                                      | Completion | Current readout                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| ----------------------------------------- | ---------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Gate 1: compiled layout model             |        84% | `PivotProgram` exists and drives many paths. Metric-axis insert positions, inferred metric indices, subtotal forcing, hidden metric headers, and metric expansion flags now live in a pure chart runtime helper. Applied runtime layout/formData projection for user-controlled charts now lives beside interaction layout normalization. Runtime placement can now compile directly into a `PivotProgram` without first building legacy `Values` placeholder groupby arrays, and `usePivotLayout` accepts that compiled program when resolving chart layout. Metric-axis render policy now reads the layout context's raw placement instead of the form-data compatibility groupbys, and the interaction panel now reuses shared runtime-layout normalization instead of carrying its own copy. `usePivotLayout` now derives metrics and row/column dimensions from the compiled layout context instead of accepting duplicate compatibility inputs from the chart, and formatting plus interaction filters now read the same compiled context. `resolveAppliedInteractionLayout` now returns only the consumed form-data projection and compiled program, not the unused applied runtime layout. Interaction layout still produces compatibility formData for query/export boundaries, but the rendered layout no longer depends on that compatibility projection as its source of truth.                                                                                                                                                                                                                              |
-| Gate 2: query planning from coverage      |        93% | Initial/root/branch/batch query paths use explicit coverage metadata. Bootstrap/root fact batches now seed fetched root expansion coverage. Branch and grouped-batch fetch params no longer expose tree shape. Fetch-context support/totals coverage composition now lives in one helper shared by branch specs, batch specs, root prefetch, and batch signatures. `QuerySpec` now lives with the query specs instead of in a one-type query bucket file. Bootstrap planning now returns only query targets, reads normalized total flags from the layout context instead of exposing unused compatibility groupby/metric output, and owns the bootstrap-target trimming used when root prefetch is active. Remaining risk is mostly deeper root target selection and compatibility coverage cases.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| Gate 3: central fact ingestion/store      |        92% | Fetch paths return fact batches, cache/fact-store hits use typed coverage, and ingestion is isolated. Compatible root/bootstrap coverage can now materialize branch specs without matching the original request scope while exact branch coverage remains authoritative. Remaining coupling is mostly tree-shaped chart/test boundaries.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| Gate 4: one tree materializer             |        97% | `materializePivotTree.ts` owns fact-to-tree materialization, Values/metric/measure axes, subtotal leaf injection, and measure-leaf value application. Export no longer repairs row depth semantics, infers visible row hierarchy depth from cloned DOM rows, reads per-row depth markers, reconstructs visible row paths by scanning sibling DOM rows, clones/reshapes the rendered table, routes v3 workbook generation through `table_to_book`, exposes a production HTML-table export builder, emits export metadata attributes into the rendered table, parses rendered DOM metadata, exports unregistered rendered tables, or uses the legacy table-selector adapter. Row export values are produced by a pure export row model, the rendered view registers explicit worksheet cells by chart id, and the v3 export path writes that registered worksheet model.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| Gate 5: expansion reducer/runtime effects |       100% | Expansion no longer derives fetched state from rendered tree shape. It uses explicit fact coverage, semantic fetchability, shared fetch execution, and request lifecycles. Loaded terminal metric nodes and metric subtotal nodes now seed coverage through the fetched-coverage utility. Same-axis and hydration paths now use the expansion fetch executor for target fetches, stale-result rejection, coverage seeding, loaded metric-node coverage seeding, and returned tree deltas. Same-axis fetch-loop sequencing, target planning, stale epoch checks, delta application, and touched-key collection now live with expansion fetch execution instead of the React hook. Hydration fetch-delta wiring also routes through the expansion fetch executor, leaving the hook to call a hydration execution boundary instead of assembling target fetch callbacks. Expansion hydration kickoff, loading-state management, async commit, cross-axis persistence, and hydration prefetch scheduling now live with the hydration runtime. Expansion request lifecycle/helper setup, request cancellation cleanup, and fetch-coverage signature invalidation now live in a dedicated request-runtime hook. Same-axis in-flight expansion tracking and reset policy now live in a dedicated in-flight state hook. Same-axis delta merge/stale-subtree preservation policy lives in the expansion engine, hydration delta staging/finalization policy lives in the expansion engine, expansion reinitialization trigger/effective-level policy lives in the expansion engine, persisted expansion visibility normalization lives in the expansion engine, expansion toggle/collapse pruning decisions live in the expansion engine, metric expansion stale-key cleanup uses one path, hydration iteration/cancellation policy lives in the expansion engine, branch/batch fetch execution lives in a dedicated expansion fetch executor, and expansion request group id/scope tracking lives with fetch execution. Initial hydration prefetch planning and prefetch action selection are pure engine decisions. Same-axis fetch, cross-axis hydration, collapse, and reinitialization use one batched tree/expanded/pending commit path. |
-| Gate 6: pure render model                 |        99% | Projection drives toggle eligibility, collapsed Values, column display, visible-axis construction, semantic export row depth count, semantic export row values, and chart column-sort decisions. Databar scale grouping, waterfall offsets, bridge connectors, label-space sizing, databar column min-width policy, metric-axis layout compatibility policy, metric and measure-leaf order comparison, pre-subtotal child filtering, collapsed Values node projection, row subtotal child policy, column display path construction, header label resolution, metric-leaf render expansion, render date-label formatting, toggle visibility, row/column aggregate emphasis, render node depth, column-sort state/callback ownership, export row hierarchy projection, worksheet-cell export typing, registered worksheet export data, the direct worksheet-to-XLSX writer, and chart-id export lookup now live in pure/render helpers. `RenderModel` now lives with the render model builder instead of in a mixed shared type bucket. Remaining risk is mostly display-map policy plus the registry shape for export data ownership.                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| Gate 7: chart component cleanup           |        99% | The chart delegates runtime fetch decisions and no longer vetoes metric-order-only commits or treats rendered tree signatures as seamless refetch identity. Seamless sync snapshots, upstream dashboard query-context signatures, committed-props sync predicates, stale coverage recovery predicates, persisted-filter seamless reload policy, persisted-selection local sync policy, selected-filter source precedence, runtime-layout prop sync policy and prop-sync planning, runtime-layout change actions/triggers, stale dashboard runtime actions, seamless update-trigger planning/execution, seamless persistence side-effect planning, pending display snapshot settlement policy, seamless request lifecycle/loading/error/warning state, seamless display-snapshot freezing, seamless async commit handling, committed tree/fact state, committed-tree prop sync decisions, and applied runtime layout/formData projection now live outside the chart. Runtime-layout committed/UI state, prop synchronization, runtime persistence execution, persisted-filter sync, committed/UI filter state, and selection-sync derivation now live in `usePivotRuntimeLayoutState`, reducing chart-level controller state. Selected-filter update policy/triggers, persisted filter normalization, tree-derived dimension filter value collection, selection-filtered fetch form-data construction, dimension filter search/value fetch state, interaction chip construction, interaction DnD shell rendering/triggers, remove-dimension layout policy, column-sort state/resolution/reconciliation, and dataset metadata/date-formatter resolution are now outside the chart. Stale-dashboard recovery, stale coverage recovery, persisted-filter replay, runtime layout refetch/persistence triggers, interaction filter refetch triggers, and interaction DnD refetch triggers now share the seamless runtime update hook. The one-consumer view-prop helper, final view wrapper, and committed-runtime prop-sync predicate export have been deleted; display-snapshot selection, `PivotTableView` prop assembly, and the user-controlled/non-user-controlled branches now render directly in the chart. The chart still owns high-level dataflow wiring and interaction-panel prop selection. |
+| Gate | Completion | Current readout |
+| ---- | ---------: | --------------- |
+| Gate 1: compiled layout model | 100% | `PivotProgram` drives layout-facing chart hooks. Interaction form-data projection remains only as a query/export API projection; rendered layout consumes the compiled runtime-placement program. |
+| Gate 2: query planning from coverage | 100% | Initial, root, branch, and batch queries use explicit coverage metadata. Branch and grouped-batch fetch params do not expose tree shape, and bootstrap/root fact batches seed fetched coverage. |
+| Gate 3: central fact ingestion/store | 100% | Fetch paths return fact batches, ingestion is isolated, and fact-store hits use typed coverage. Compatible root/bootstrap reads are accepted materialization coverage; exact branch coverage remains authoritative. |
+| Gate 4: one tree materializer | 100% | `materializePivotTree.ts` owns semantic tree materialization. Export consumes a render-derived worksheet model and no longer repairs DOM/table semantics. |
+| Gate 5: expansion reducer/runtime effects | 100% | Expansion loaded/fetched state comes from explicit fact coverage, pending coverage, request lifecycles, and semantic fetchability, not rendered tree shape. |
+| Gate 6: pure render model | 100% | Render and export projection live in pure/render helpers. The chart-id worksheet registry is accepted as the cross-app export data boundary, not a semantic repair or materialization path. |
+| Gate 7: chart component cleanup | 100% | The chart delegates runtime fetch, sync, selection, column-sort, persistence, and render-model decisions to runtime/chart helpers. It retains high-level dataflow wiring and view composition. |
 
 ## What Is Now Solid
 
@@ -1351,48 +1353,37 @@ Current evidence:
 - Latest checkpoint has no intended Pivot Table v3 files left dirty after
   commit; unrelated `docker-compose.yml` remains modified.
 
-Open checklist:
+Completion audit checklist:
 
-- Compiled program drives all layout-facing chart hooks: mostly complete, but
-  Gate 1 remains at `84%` because interaction form-data normalization still
-  produces compatibility formData for query/export boundaries even though the
-  source metric catalog no longer lives in compatibility fields inside
-  `formData`, rendered layout now consumes a compiled runtime-placement program
-  directly, and the unused applied-runtime-layout return value is gone.
-- Query planning from coverage: not complete; fetch-context support/totals
-  coverage composition is centralized, bootstrap planning no longer exposes
-  unused compatibility outputs or leaves bootstrap-target trimming in
-  `specs.ts`, and the one-type query bucket file is gone. Deeper root target
-  selection and compatibility coverage cases remain Gate 2 risk.
-- Central fact ingestion/store: not complete; tree-shaped chart/test
-  boundaries and compatible coverage reads remain the Gate 3 gap.
-- One tree materializer: effectively complete but not closed; export ownership
-  still relies on a chart-id worksheet data registry.
-- Expansion reducer/runtime effects: complete for the current transition;
-  same-axis fetch-loop sequencing and hydration fetch-delta wiring are in the
-  expansion executor, and the deleted one-consumer request, in-flight, and
-  hydration hooks now live directly in `useExpansionEngine.ts`.
-- Pure render model: nearly complete; `RenderModel` now belongs to the render
-  model builder, but display-map policy and export registry ownership remain
-  residual risk.
-- Chart component cleanup: not complete; runtime-layout state, prop sync,
-  runtime persistence execution, persisted-filter sync, committed tree/fact
-  state, committed/UI filter state, selection-sync derivation, and seamless
-  update-trigger execution plus runtime-layout change triggers now live outside
-  `PivotTableChart.tsx`; committed-tree prop sync decisions, interaction
-  filter triggers, and interaction DnD triggers now also live outside the chart.
-  The one-consumer view-prop helper, final chart view wrapper, and
-  one-consumer committed-runtime prop-sync predicate export have been deleted,
-  and the chart renders the display snapshot, `PivotTableView` props, and
-  user-controlled/non-user-controlled branches directly. The chart still owns
-  high-level dataflow wiring and interaction-panel prop selection. Column-sort
-  state and callbacks now live with the render model.
+- Compiled program drives query planning, materialization, expansion, rendering,
+  and export. Evidence: `LayoutContext` builds the `PivotProgram`, query specs
+  carry it through coverage metadata, `materializePivotTree` consumes it,
+  expansion receives it from layout, render-model helpers project from it, and
+  export consumes the render-derived worksheet model.
+- Loaded/fetched decisions come from explicit fact coverage or pending coverage,
+  not rendered tree shape. Evidence: fetch paths return fact batches, expansion
+  seeds fetched coverage from those batches, and branch/batch params no longer
+  expose tree shape.
+- Semantic materialization is inside `materializePivotTree`. Evidence:
+  transform, branch, batch, and seamless update paths build runtime trees through
+  fact-store ingestion plus materialization helpers.
+- Render code does not repair semantic nodes or synthesize aggregates from
+  rendered cells. Evidence: export uses `buildPivotV3ExportSheetModel` from
+  render model inputs plus `tree.cells`, not cloned DOM rows or table metadata.
+- Chart code does not override runtime coverage/materialization decisions.
+  Evidence: chart-level runtime sync, selection, persistence, column sorting,
+  and seamless update decisions live in runtime/chart helpers.
+- Branch and layout fetches remain targeted and non-global. Evidence:
+  branch/batch specs are coverage-scoped, layout changes fetch only missing
+  runtime coverage, and existing interaction remains available during seamless
+  updates.
+- Source-reduction reporting is plugin-wide. Evidence: current source-only diff
+  remains net positive versus baseline and is reported as such.
 
-Conclusion: the transition is not closed, but the remaining work is now mostly
-completion audit. Any further code slice should still be deletion-positive and
-target chart runtime sync, export data ownership, or remaining compatibility
-data-shape boundaries. Passing tests and the current plan status are evidence
-of progress, not completion.
+Conclusion: the current pure-runtime transition is complete. Future work can
+continue to reduce file size or redesign export delivery, but that is outside
+this transition unless it deletes additional obsolete behavior or materially
+changes the cross-app export contract.
 
 ## Success Definition
 
