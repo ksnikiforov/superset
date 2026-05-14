@@ -75,7 +75,7 @@ Source-only diff from pre-refactor baseline
 - Current production `src` TypeScript/TSX total: `34470` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - Full pivot-table-v3 plugin plus export utility Jest pass after the
-  runtime-layout trigger extraction: `96` suites and `781` tests.
+  interaction DnD trigger extraction: `96` suites and `781` tests.
 - Full plugin Jest pass after the column-sort extraction: `91` suites and
   `729` tests.
 - Full plugin Jest pass after extracting the interaction layout shell: `91`
@@ -931,6 +931,8 @@ Current evidence:
 - Latest interaction DnD trigger extraction passed focused interaction/seamless
   Jest coverage: `5` suites and `81` tests; touched chart/seamless hook files
   passed ESLint.
+- Latest full pivot-table-v3 plugin plus export utility Jest run after the
+  interaction DnD trigger extraction passed: `96` suites and `781` tests.
 - Latest Gate 1 runtime-placement validation passed: `5` focused suites and
   `60` tests covering interaction layout, compiled program placement,
   layout-runtime policy, and metric-tier layout.
