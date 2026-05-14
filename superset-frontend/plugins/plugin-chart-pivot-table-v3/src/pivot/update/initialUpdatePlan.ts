@@ -18,7 +18,6 @@
  */
 import {
   type DataRecordValue,
-  ensureIsArray,
   type QueryFormColumn,
   type QueryObjectFilterClause,
 } from '@superset-ui/core';
@@ -42,16 +41,8 @@ type BuildSelectionFilterClausesParams = {
 const buildSelectionDimensionMap = (
   formData: PivotTableQueryFormData,
 ): Map<string, QueryFormColumn> => {
-  const dimensionList = ensureIsArray(formData.dimensions);
-  const fallbackList =
-    dimensionList.length > 0
-      ? dimensionList
-      : [
-          ...ensureIsArray(formData.groupbyRows),
-          ...ensureIsArray(formData.groupbyColumns),
-        ];
   const dimensionMap = new Map<string, QueryFormColumn>();
-  fallbackList.forEach(dimension => {
+  formData.dimensions.forEach(dimension => {
     dimensionMap.set(getStableColumnKey(dimension), dimension);
   });
   return dimensionMap;
