@@ -23,7 +23,6 @@ import {
   useRef,
   useState,
   type ComponentProps,
-  type MutableRefObject,
 } from 'react';
 import { unstable_batchedUpdates } from 'react-dom';
 import { isEqual } from 'lodash';
@@ -91,6 +90,7 @@ import {
   type PivotColumnSortState,
 } from './pivot/chart/columnSort';
 import { type PivotFactStoreBatch } from './pivot/runtime/ingestQueryResults';
+import { useSyncRef } from './pivot/shared/useSyncRef';
 import { createLatestRequestLifecycle } from './pivot/runtime/requestLifecycle';
 import {
   buildSeamlessRuntimeSyncSnapshot,
@@ -123,13 +123,6 @@ type PivotDisplaySnapshot = Pick<
   PivotViewProps,
   'renderModel' | 'tree' | 'expandedRows' | 'expandedCols'
 >;
-
-const useSyncRef = <Value,>(ref: MutableRefObject<Value>, value: Value) => {
-  useEffect(() => {
-    const targetRef = ref;
-    targetRef.current = value;
-  }, [ref, value]);
-};
 
 function PivotTableChart(props: PivotTableProps) {
   const {

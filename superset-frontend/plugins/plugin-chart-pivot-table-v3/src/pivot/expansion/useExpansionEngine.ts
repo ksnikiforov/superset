@@ -23,7 +23,6 @@ import {
   useReducer,
   useRef,
   useState,
-  type MutableRefObject,
 } from 'react';
 import { unstable_batchedUpdates } from 'react-dom';
 import { nanoid } from 'nanoid';
@@ -85,6 +84,7 @@ import {
   createExpansionRuntimeState,
   expansionRuntimeReducer,
 } from './runtimeState';
+import { useSyncRef } from '../shared/useSyncRef';
 import {
   collectFetchResultDeltas,
   createExpansionRequestHelpers,
@@ -101,13 +101,6 @@ type ExpansionStateCommit = {
   expandedCols?: Set<string>;
   pendingRows?: Set<string>;
   pendingCols?: Set<string>;
-};
-
-const useSyncRef = <Value>(ref: MutableRefObject<Value>, value: Value) => {
-  useEffect(() => {
-    const targetRef = ref;
-    targetRef.current = value;
-  }, [ref, value]);
 };
 
 export type ExpansionEngineResult = {
@@ -434,15 +427,11 @@ export const useExpansionEngine = ({
     [setWarnings],
   );
 
-  const invalidateInFlightRequests = useCallback(() => {
-    expansionRequestLifecycle.invalidate();
-  }, [expansionRequestLifecycle]);
-
   useEffect(
     () => () => {
-      invalidateInFlightRequests();
+      expansionRequestLifecycle.invalidate();
     },
-    [invalidateInFlightRequests],
+    [expansionRequestLifecycle],
   );
 
   const shouldFetchChildren = useCallback(
@@ -498,13 +487,6 @@ export const useExpansionEngine = ({
     ],
   );
 
-  const persistExpansionStateToStore = useCallback(
-    (nextState: PivotExpansionStateKeys, options?: { persist?: boolean }) => {
-      expansionStateStoreRef.current?.write(nextState, options);
-    },
-    [],
-  );
-
   const persistExpansionState = useCallback(
     (nextRows: Set<string>, nextCols: Set<string>) => {
       const visible = buildVisiblePersistedExpansionState({
@@ -525,12 +507,11 @@ export const useExpansionEngine = ({
       explicitExpandedColsRef.current = visible.visibleExpandedCols;
       explicitCollapsedRowsRef.current = visible.visibleCollapsedRows;
       explicitCollapsedColsRef.current = visible.visibleCollapsedCols;
-      persistExpansionStateToStore(visible.persistedState);
+      expansionStateStoreRef.current?.write(visible.persistedState);
     },
     [
       groupbyColumnKeys,
       groupbyRowKeys,
-      persistExpansionStateToStore,
       resolvedExpandColumnsLevel,
       resolvedExpandRowsLevel,
       visibilityConfig,
@@ -985,7 +966,7 @@ export const useExpansionEngine = ({
       });
 
       if (toggleDecision.kind === 'collapse') {
-        invalidateInFlightRequests();
+        expansionRequestLifecycle.invalidate();
         clearLoadingState();
         setHydratingState(false);
         collapseNode(axis, node);
@@ -1011,9 +992,9 @@ export const useExpansionEngine = ({
       collapseNode,
       commitExpansionState,
       computeVisibleDepths,
+      expansionRequestLifecycle,
       expandSameAxis,
       hydrateAtomic,
-      invalidateInFlightRequests,
       reportAsyncError,
       clearLoadingState,
       setHydratingState,
@@ -1110,7 +1091,7 @@ export const useExpansionEngine = ({
     const nextFetchedCoverage = createFetchedFactCoverageState();
 
     dataEpochRef.current += 1;
-    invalidateInFlightRequests();
+    expansionRequestLifecycle.invalidate();
     const nextFactStore = createPivotFactStore();
     nextFactStore.upsertBatches(factBatches);
     factStoreRef.current = nextFactStore;
@@ -1154,14 +1135,16 @@ export const useExpansionEngine = ({
       isMetricTokenValue,
     });
     if (reinitializedExpansion.clearedState) {
-      persistExpansionStateToStore(reinitializedExpansion.clearedState);
+      expansionStateStoreRef.current?.write(
+        reinitializedExpansion.clearedState,
+      );
     }
     const { persistedState } = reinitializedExpansion;
     explicitExpandedRowsRef.current = new Set(persistedState.rows);
     explicitExpandedColsRef.current = new Set(persistedState.cols);
     explicitCollapsedRowsRef.current = new Set(persistedState.collapsedRows);
     explicitCollapsedColsRef.current = new Set(persistedState.collapsedCols);
-    persistExpansionStateToStore(persistedState, {
+    expansionStateStoreRef.current?.write(persistedState, {
       persist:
         reinitializedExpansion.shouldResetPersistedLayout ||
         (!isInitialMount && shouldResetExpanded),
@@ -1245,14 +1228,13 @@ export const useExpansionEngine = ({
     metricLabelSet,
     metricIndexForCols,
     metricIndexForRows,
-    persistExpansionStateToStore,
     shouldPersistExpansionState,
     resolvedExpandColumnsLevel,
     resolvedExpandRowsLevel,
     shouldExpandMetricCols,
     shouldExpandMetricRows,
     hydrateAtomic,
-    invalidateInFlightRequests,
+    expansionRequestLifecycle,
     resolveExpandedForMetrics,
     reportAsyncError,
     getCoverageKey,
