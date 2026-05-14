@@ -85,6 +85,7 @@ import {
   type ExpansionFetchRuntime,
 } from './fetchExecution';
 import { useExpansionRequestRuntime } from './useExpansionRequestRuntime';
+import { useExpansionInFlight } from './useExpansionInFlight';
 
 const MAX_HYDRATION_ITERATIONS = 12;
 const EMPTY_FACT_BATCHES: PivotFactStoreBatch[] = [];
@@ -210,9 +211,7 @@ export const useExpansionEngine = ({
   const explicitExpandedColsRef = useRef<Set<string>>(new Set());
   const explicitCollapsedRowsRef = useRef<Set<string>>(new Set());
   const explicitCollapsedColsRef = useRef<Set<string>>(new Set());
-  const inFlightExpandedRowsRef = useRef<Map<number, Set<string>>>(new Map());
-  const inFlightExpandedColsRef = useRef<Map<number, Set<string>>>(new Map());
-  const inFlightExpansionIdRef = useRef(0);
+  const inFlightExpansion = useExpansionInFlight();
   const [errorMessage, setErrorMessage] = useState<string>();
   const [warnings, setWarnings] = useState<ChartDataWarning[]>([]);
   const warningsRef = useRef<Map<string, ChartDataWarning>>(new Map());
@@ -322,15 +321,6 @@ export const useExpansionEngine = ({
     },
     [getCoverageKey, isMetricTokenValue],
   );
-
-  const collectInFlightExpanded = useCallback((axis: PivotAxis) => {
-    const merged = new Set<string>();
-    (axis === 'row'
-      ? inFlightExpandedRowsRef.current
-      : inFlightExpandedColsRef.current
-    ).forEach(keys => keys.forEach(key => merged.add(key)));
-    return merged;
-  }, []);
 
   const commitExpansionState = useCallback(
     ({
@@ -542,10 +532,10 @@ export const useExpansionEngine = ({
             : explicitCollapsedColsRef.current,
         pendingKeys:
           axis === 'row' ? pendingRowsRef.current : pendingColsRef.current,
-        inFlightKeys: collectInFlightExpanded(axis),
+        inFlightKeys: inFlightExpansion.collect(axis),
       }),
     [
-      collectInFlightExpanded,
+      inFlightExpansion,
       metricLabelSet,
       shouldExpandMetricCols,
       shouldExpandMetricRows,
@@ -591,17 +581,11 @@ export const useExpansionEngine = ({
         baseExpanded,
         initialTree,
       );
-      const inFlightId = inFlightExpansionIdRef.current + 1;
-      inFlightExpansionIdRef.current = inFlightId;
-      const inFlightMap =
-        axis === 'row'
-          ? inFlightExpandedRowsRef.current
-          : inFlightExpandedColsRef.current;
-      const inFlightKeys = new Set(resolvedExpanded);
-      expanded.forEach(key => inFlightKeys.delete(key));
-      if (inFlightKeys.size > 0) {
-        inFlightMap.set(inFlightId, inFlightKeys);
-      }
+      const inFlight = inFlightExpansion.track(
+        axis,
+        resolvedExpanded,
+        expanded,
+      );
 
       const fetchRuntime: ExpansionFetchRuntime = {
         requestScope,
@@ -672,7 +656,7 @@ export const useExpansionEngine = ({
           axis === 'col' ? finalExpanded : expandedColsRef.current,
         );
       } finally {
-        inFlightMap.delete(inFlightId);
+        inFlight.clear();
       }
     },
     [
@@ -683,6 +667,7 @@ export const useExpansionEngine = ({
       expansionRequestLifecycle,
       getCoverageKey,
       groupbyColumnsLength,
+      inFlightExpansion,
       isMetricTokenValue,
       metricIndexForCols,
       persistExpansionState,
@@ -852,10 +837,7 @@ export const useExpansionEngine = ({
         axis === 'row' ? pendingRowsRef.current : pendingColsRef.current;
       const otherPending =
         axis === 'row' ? pendingColsRef.current : pendingRowsRef.current;
-      const otherInFlight =
-        axis === 'row'
-          ? inFlightExpandedColsRef.current.size > 0
-          : inFlightExpandedRowsRef.current.size > 0;
+      const otherInFlight = inFlightExpansion.hasOtherAxisInFlight(axis);
       const manualExpandedRef =
         axis === 'row' ? explicitExpandedRowsRef : explicitExpandedColsRef;
       const manualCollapsedRef =
@@ -907,6 +889,7 @@ export const useExpansionEngine = ({
       expansionRequestLifecycle,
       expandSameAxis,
       hydrateAtomic,
+      inFlightExpansion,
       reportAsyncError,
       clearLoadingState,
       setHydratingState,
@@ -1013,9 +996,7 @@ export const useExpansionEngine = ({
     setErrorMessage(undefined);
     fetchedCoverageRef.current = nextFetchedCoverage;
     clearLoadingState();
-    inFlightExpandedRowsRef.current.clear();
-    inFlightExpandedColsRef.current.clear();
-    inFlightExpansionIdRef.current = 0;
+    inFlightExpansion.clearAll();
 
     const reinitializedExpansion = resolveReinitializedExpansionState({
       tree: normalizedTree,
@@ -1146,6 +1127,7 @@ export const useExpansionEngine = ({
     shouldExpandMetricCols,
     shouldExpandMetricRows,
     hydrateAtomic,
+    inFlightExpansion,
     expansionRequestLifecycle,
     resolveExpandedForMetrics,
     reportAsyncError,
