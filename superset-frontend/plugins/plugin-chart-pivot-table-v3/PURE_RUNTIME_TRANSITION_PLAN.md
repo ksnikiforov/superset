@@ -57,7 +57,7 @@ cells are projections of DB facts, not canonical data.
 
 ## Current Status
 
-As of May 14, 2026, after the selection-filter catalog cleanup checkpoint:
+As of May 15, 2026, after the total-position alias cleanup checkpoint:
 
 - Gate-weighted architecture estimate: **99%**.
 - Delivery remaining estimate: **less than 1%**, mostly completion audit and
@@ -72,8 +72,8 @@ As of May 14, 2026, after the selection-filter catalog cleanup checkpoint:
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `14358` insertions, `13940` deletions, net `+418`.
-- Current production `src` TypeScript/TSX total: `33928` lines.
+- Production `src`: `14359` insertions, `13944` deletions, net `+415`.
+- Current production `src` TypeScript/TSX total: `33925` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - `PivotTableChart.tsx` is now `688` lines and `useExpansionEngine.ts` is now
   `1405` lines; those single-file reductions should not be counted as plugin
@@ -147,6 +147,15 @@ Source-only diff from pre-refactor baseline
 - Touched-file ESLint passed after the selection-filter catalog cleanup.
 - Focused interaction/query validation after the cleanup passed: `3` suites and
   `32` tests.
+- Full plugin plus export entrypoint Jest pass after the cleanup: `99` suites
+  and `832` tests.
+- Total-position alias cleanup removed legacy `top`/`bottom` normalization from
+  layout context. Runtime total positions now use the typed `start`/`end`
+  values directly. The source/test slice was deletion-positive: `4`
+  insertions, `7` deletions, net `-3`.
+- Touched-file ESLint passed after the total-position alias cleanup.
+- Focused layout/query/transform validation after the cleanup passed: `4`
+  suites and `29` tests.
 - Full plugin plus export entrypoint Jest pass after the cleanup: `99` suites
   and `832` tests.
 - Chart runtime-sync cleanup moved the committed-tree sync decision out of
