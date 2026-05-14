@@ -57,23 +57,32 @@ cells are projections of DB facts, not canonical data.
 
 ## Current Status
 
-As of May 14, 2026, after the Gate 5 hydration-prefetch checkpoint:
+As of May 14, 2026, after the full plugin validation checkpoint:
 
 - Gate-weighted architecture estimate: **98%**.
 - Delivery remaining estimate: **1-2%**, mostly final cleanup, validation,
   and completion audit rather than another large migration.
 - The runtime architecture exists and is used by the main paths.
-- The project is above the starting source line count, but the old chart
-  boundary continues to shrink.
+- The project is above the starting source line count. The old chart boundary
+  is much smaller, but that is a local orchestration relocation, not a
+  whole-plugin code reduction.
 - The remaining work is mostly deletion of old chart, expansion, and render
   interpretation paths.
 
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `14293` insertions, `12727` deletions, net `+1566`.
-- Current production `src` TypeScript/TSX total: `35076` lines.
+- Production `src`: `14331` insertions, `12763` deletions, net `+1568`.
+- Current production `src` TypeScript/TSX total: `35078` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
+- `PivotTableChart.tsx` is now `672` lines and `useExpansionEngine.ts` is now
+  `1086` lines; those single-file reductions should not be counted as plugin
+  source reduction because the plugin-wide total increased.
+- Full plugin plus export utility Jest pass after preserving local `ownState`
+  merges: `96` suites and `781` tests.
+- Full plugin source ESLint passed after preserving local `ownState` merges.
+- Focused expansion-state pass after preserving local `ownState` merges: `1`
+  suite and `47` tests.
 - Focused prefetch/hydration pass after moving hydration prefetch scheduling:
   `5` suites and `31` tests.
 - Touched expansion files passed ESLint and `git diff --check`.
@@ -271,10 +280,10 @@ Source-only diff from pre-refactor baseline
 - Focused interaction pass after deriving interaction filter layout from the
   compiled layout context: `2` suites and `28` tests.
 
-The readout remains mixed: the plugin is still modestly above the baseline line
-count, but the chart/layout hooks keep losing inline policy and the remaining
-added lines are isolated, tested runtime helpers rather than more React
-orchestration.
+The readout is mixed and should be treated plainly: plugin-wide source lines
+increased by `1568`. The meaningful progress is architectural ownership moving
+out of overloaded React/chart files into tested runtime helpers; it is not a
+net source reduction yet.
 
 ## Gate Status
 
@@ -598,6 +607,11 @@ git diff --check
 
 Recent validation:
 
+- `9e8a1dd8c5`: preserved local `ownState` merges so expansion persistence is
+  not lost when the parent has not replayed `setDataMask` state into props;
+  focused expansion-state Jest (`47` tests), the full pivot-table-v3 plugin
+  plus export utility Jest suite (`96` suites, `781` tests), and full plugin
+  source ESLint passed.
 - `a0334d6977`: removed chart-passed interaction metrics/groupbys and made
   `usePivotInteractions` read them from the compiled layout result; touched-file
   ESLint, Prettier, `git diff --check`, and focused interaction Jest (`28`
@@ -920,9 +934,17 @@ changes from the highest-impact areas.
 Current evidence:
 
 - Source-only baseline comparison from
-  `7088db374448845ef6e71cf74817aa53efbc5fc1`: `14293` insertions, `12727`
-  deletions, net `+1566`; current production `src` TypeScript/TSX total is
-  `35076` lines.
+  `7088db374448845ef6e71cf74817aa53efbc5fc1`: `14331` insertions, `12763`
+  deletions, net `+1568`; current production `src` TypeScript/TSX total is
+  `35078` lines, up from an implied `33510` line baseline.
+- The honest line-count result is not a plugin reduction. `PivotTableChart.tsx`
+  is down to `672` lines and `useExpansionEngine.ts` is down to `1086` lines,
+  but those are local file reductions offset by extracted runtime/helper code.
+- Latest full pivot-table-v3 plugin plus export utility Jest run after
+  preserving local `ownState` merges passed: `96` suites and `781` tests.
+- Full plugin source ESLint passed after preserving local `ownState` merges.
+- Latest expansion-state fix passed focused Jest validation: `1` suite and `47`
+  tests.
 - Latest hydration prefetch scheduling extraction passed focused
   prefetch/hydration Jest validation: `5` suites and `31` tests; touched
   expansion files passed ESLint and `git diff --check`.
@@ -1050,5 +1072,6 @@ The refactor is complete when:
 - branch and layout fetches remain targeted and do not globally block table
   interaction;
 - aggregate values are never synthesized from rendered cells; and
-- the largest old production files keep shrinking rather than being offset by
-  new runtime surface.
+- any remaining single-file shrink is backed by deletion of obsolete behavior
+  or clearer runtime ownership, not counted as whole-plugin source reduction
+  unless the plugin-wide `src` total actually falls.
