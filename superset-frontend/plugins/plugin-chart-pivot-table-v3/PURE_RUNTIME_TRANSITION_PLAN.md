@@ -58,7 +58,7 @@ cells are projections of DB facts, not canonical data.
 ## Current Status
 
 As of May 14, 2026, after
-`b66975cfaf refactor(pivot-table-v3): remove column dnd debug logging`:
+`f19e33f0fb refactor(pivot-table-v3): pass interaction tree directly`:
 
 - Gate-weighted architecture estimate: **97%**.
 - Delivery remaining estimate: **11-19%**, mostly final cleanup, validation,
@@ -72,8 +72,8 @@ As of May 14, 2026, after
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `12992` insertions, `12225` deletions, net `+767`.
-- Current production `src` TypeScript/TSX total: `34277` lines.
+- Production `src`: `12996` insertions, `12232` deletions, net `+764`.
+- Current production `src` TypeScript/TSX total: `34274` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - Full plugin Jest pass after the column-sort extraction: `91` suites and
   `729` tests.
@@ -235,6 +235,8 @@ Source-only diff from pre-refactor baseline
   runtime update hook: `97` suites and `782` tests.
 - Focused column DnD pass after removing production debug logging: `2` suites
   and `21` tests.
+- Focused chart interaction pass after passing the interaction tree directly:
+  `3` suites and `32` tests.
 
 The readout remains mixed: the plugin is still modestly above the baseline line
 count, but the chart/layout hooks keep losing inline policy and the remaining
@@ -460,7 +462,7 @@ Largest relevant production files:
 - `usePivotFormatting.tsx`: `1325` lines.
 - `useExpansionEngine.ts`: `1267` lines.
 - `PivotInteractionPanel.tsx`: `1186` lines.
-- `PivotTableChart.tsx`: `1087` lines.
+- `PivotTableChart.tsx`: `1084` lines.
 - `PivotDndColumnSelect.tsx`: `1071` lines.
 - `controlPanel.tsx`: `1038` lines.
 - `PivotTableView.tsx`: `891` lines.
@@ -561,6 +563,10 @@ git diff --check
 
 Recent validation:
 
+- `f19e33f0fb`: removed the chart-owned `treeRef`/sync indirection and passed
+  the current tree directly to interaction handlers; touched-file ESLint,
+  Prettier, `git diff --check`, and focused chart interaction Jest (`32`
+  tests) passed.
 - `b66975cfaf`: removed production Pivot Table v3 column DnD debug logging and
   the now-unused debug flag type/dependency; touched-file ESLint, Prettier,
   `git diff --check`, and focused column DnD Jest (`21` tests) passed.
