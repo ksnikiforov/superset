@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { type DataRecordValue, type JsonObject } from '@superset-ui/core';
+import { type DataRecordValue } from '@superset-ui/core';
 import { isEqual } from 'lodash';
 import {
   type PivotRuntimeLayout,
@@ -27,10 +27,7 @@ import { METRICS_PLACEHOLDER } from '../core/tokens';
 import { parsePath } from '../core/path';
 import { hasSelectedFilters } from '../filters';
 import { stableStringify } from '../shared/stableStringify';
-import {
-  type ChartDataQueryResult,
-  type ChartDataWarning,
-} from '../data/ChartDataClient';
+import { type ChartDataQueryResult } from '../data/ChartDataClient';
 import { type PlannedQuerySpec } from '../query/specs';
 import { normalizeFormDataExtraFilters } from '../query/normalizeExtraFormData';
 import { buildInitialPivotUpdatePlan } from '../update/initialUpdatePlan';
@@ -52,8 +49,8 @@ import {
   yieldToMainThread,
 } from './requestLifecycle';
 
-export const SEAMLESS_REQUEST_GROUP = 'pivot-v3-seamless';
-export const SEAMLESS_MATERIALIZATION_GROUP = 'pivot-v3-seamless-materialize';
+const SEAMLESS_REQUEST_GROUP = 'pivot-v3-seamless';
+const SEAMLESS_MATERIALIZATION_GROUP = 'pivot-v3-seamless-materialize';
 
 type RuntimeSelection = Record<string, DataRecordValue[]>;
 
@@ -66,7 +63,7 @@ export type SeamlessRuntimeSyncSnapshot = {
   upstreamSignature: string;
 };
 
-export type SeamlessRuntimeUpstreamState = {
+type SeamlessRuntimeUpstreamState = {
   data: PivotTreeData;
   signature: string;
 } | null;
@@ -123,14 +120,6 @@ const shouldRecoverStaleDashboardRuntimeCoverage = ({
   !hasSelectedFilters(persistedInteractionFilters) &&
   !factBatchesCoverRuntimeLayout(committedFactBatches, committedRuntimeLayout);
 
-export type SeamlessRuntimeUpdateEffectPlan = {
-  nextUpstreamState: SeamlessRuntimeUpstreamState;
-  updates: {
-    runtimeLayout: PivotRuntimeLayout;
-    selection: RuntimeSelection;
-  }[];
-};
-
 export const prepareSeamlessRuntimeUpdateEffect = ({
   upstreamDashboardQueryContextSignature,
   previousUpstreamState,
@@ -159,7 +148,7 @@ export const prepareSeamlessRuntimeUpdateEffect = ({
   lastSync: SeamlessRuntimeSyncSnapshot | null;
   uiRuntimeLayout: PivotRuntimeLayout;
   upstreamSeamlessSignature: string;
-}): SeamlessRuntimeUpdateEffectPlan => {
+}) => {
   const nextUpstreamState = upstreamDashboardQueryContextSignature
     ? {
         data,
@@ -194,7 +183,10 @@ export const prepareSeamlessRuntimeUpdateEffect = ({
     isEqual(committedFilters, persistedInteractionFilters) &&
     isEqual(uiSelectedFilters, persistedInteractionFilters) &&
     !hasMatchingPersistedFilterSync;
-  const updates: SeamlessRuntimeUpdateEffectPlan['updates'] = [];
+  const updates: Array<{
+    runtimeLayout: PivotRuntimeLayout;
+    selection: RuntimeSelection;
+  }> = [];
   if (shouldApplyStaleUpdate) {
     updates.push({
       runtimeLayout: uiRuntimeLayout,
@@ -252,12 +244,6 @@ export const shouldSyncPersistedSelectedFilters = ({
   );
 };
 
-export type RuntimeLayoutPropSyncPlan = {
-  shouldSyncCommittedRuntimeLayout: boolean;
-  shouldSyncUiRuntimeLayout: boolean;
-  hasPersistedRuntimeLayoutSyncSettled: boolean;
-};
-
 export const prepareRuntimeLayoutPropSync = ({
   isUserControlled,
   isDashboardContext,
@@ -274,7 +260,7 @@ export const prepareRuntimeLayoutPropSync = ({
   hasPendingSeamlessLayout: boolean;
   runtimeLayout: PivotRuntimeLayout;
   lastPersistedRuntimeLayout: PivotRuntimeLayout;
-}): RuntimeLayoutPropSyncPlan => ({
+}) => ({
   shouldSyncCommittedRuntimeLayout:
     !(isDashboardRuntimeSync && pendingPersistedRuntimeLayoutSync) &&
     !hasPendingSeamlessLayout,
@@ -290,13 +276,6 @@ export const prepareRuntimeLayoutPropSync = ({
     isSameRuntimeLayout(runtimeLayout, lastPersistedRuntimeLayout),
 });
 
-export type RuntimeStatePersistencePlan = {
-  ownStatePatch: JsonObject;
-  persistedRuntimeLayout?: PivotRuntimeLayout;
-  localSyncDashboardQueryContext?: string | null;
-  persistedSelection?: RuntimeSelection;
-};
-
 export const prepareRuntimeStatePersistence = ({
   layout,
   selection,
@@ -311,7 +290,7 @@ export const prepareRuntimeStatePersistence = ({
   lastPersistedRuntimeLayout: PivotRuntimeLayout;
   lastPersistedSelection: RuntimeSelection;
   upstreamDashboardQueryContextSignature: string | null;
-}): RuntimeStatePersistencePlan => {
+}) => {
   const shouldMarkPersistedRuntimeLayoutSyncPending =
     isDashboardRuntimeSync &&
     !isSameRuntimeLayout(lastPersistedRuntimeLayout, layout);
@@ -336,17 +315,6 @@ export const prepareRuntimeStatePersistence = ({
   };
 };
 
-export type SeamlessRuntimeLayoutChangeAction =
-  | {
-      kind: 'fetch';
-      runtimeLayout: PivotRuntimeLayout;
-    }
-  | {
-      kind: 'commit-local';
-      runtimeLayout: PivotRuntimeLayout;
-      syncSnapshot: SeamlessRuntimeSyncSnapshot;
-    };
-
 export const prepareSeamlessRuntimeLayoutChange = ({
   nextLayout,
   dimensionKeys,
@@ -365,7 +333,7 @@ export const prepareSeamlessRuntimeLayoutChange = ({
   committedRuntimeLayout: PivotRuntimeLayout;
   selection: RuntimeSelection;
   upstreamSignature: string;
-}): SeamlessRuntimeLayoutChangeAction => {
+}) => {
   const runtimeLayout = normalizeRuntimeLayout(
     nextLayout,
     dimensionKeys,
@@ -394,21 +362,6 @@ export const prepareSeamlessRuntimeLayoutChange = ({
     }),
   };
 };
-
-export type SeamlessRuntimeUpdateResult =
-  | {
-      status: 'success';
-      tree: PivotTreeData;
-      factBatches: PivotFactStoreBatch[];
-      warnings: ChartDataWarning[];
-    }
-  | {
-      status: 'stale';
-    }
-  | {
-      status: 'aborted' | 'error';
-      error: unknown;
-    };
 
 type SeamlessRuntimeUpdatePlanConfig = {
   baseFormData: PivotTableQueryFormData;
@@ -490,7 +443,7 @@ export const fetchAndMaterializeSeamlessRuntimeUpdate = async ({
   onFetchStart,
   onError,
   ...planConfig
-}: SeamlessRuntimeUpdateConfig): Promise<SeamlessRuntimeUpdateResult> => {
+}: SeamlessRuntimeUpdateConfig) => {
   const { formData, layout, specs } =
     buildSeamlessRuntimeUpdatePlan(planConfig);
   const fetchResult = await executeLatestRequest({

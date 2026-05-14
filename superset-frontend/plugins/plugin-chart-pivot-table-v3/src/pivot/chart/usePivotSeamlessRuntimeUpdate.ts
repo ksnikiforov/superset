@@ -47,7 +47,6 @@ import {
   prepareSeamlessRuntimeUpdateEffect,
   prepareSeamlessRuntimeLayoutChange,
   type SeamlessRuntimeSyncSnapshot,
-  type SeamlessRuntimeUpstreamState,
 } from '../runtime/seamlessRuntimeUpdate';
 import { type PivotFactStoreBatch } from '../runtime/ingestQueryResults';
 import { normalizeRuntimeLayout } from '../layout/resolveInteractionLayout';
@@ -159,8 +158,10 @@ export const usePivotSeamlessRuntimeUpdate = (
   const [committedTree, setCommittedTree] = useState<PivotTreeData>(data);
   const [committedFactBatches, setCommittedFactBatches] =
     useState<PivotFactStoreBatch[]>(factBatches);
-  const lastUpstreamQueryContextRef =
-    useRef<SeamlessRuntimeUpstreamState>(null);
+  const lastUpstreamQueryContextRef = useRef<{
+    data: PivotTreeData;
+    signature: string;
+  } | null>(null);
   const requestLifecycle = useMemo(
     () =>
       createLatestRequestLifecycle({
