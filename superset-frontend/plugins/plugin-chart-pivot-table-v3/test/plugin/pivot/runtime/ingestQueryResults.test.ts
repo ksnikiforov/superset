@@ -158,7 +158,7 @@ test('ingests named query results into ordered fact batches', () => {
   ]);
 });
 
-test('can avoid index fallback for partially named branch results', () => {
+test('does not positionally match partially named branch results', () => {
   const specs = [
     buildSpec({ queryName: 'pivot_v3|1|0', rowDepth: 1, colDepth: 0 }),
     buildSpec({ queryName: 'pivot_v3|1|1', rowDepth: 1, colDepth: 1 }),
@@ -174,7 +174,6 @@ test('can avoid index fallback for partially named branch results', () => {
         data: [{ country: 'France', month: '2026-01', sales: 999 }],
       },
     ],
-    fallback: 'empty',
   });
 
   expect(ingested[0].facts).toHaveLength(1);
@@ -250,7 +249,6 @@ test('keeps support and offset facts without materializing support metric branch
   const [ingested] = ingestQueryResults({
     specs: [spec],
     results: [result],
-    fallback: 'empty',
   });
 
   expect(ingested.facts.map(fact => fact.valueKey)).toEqual([
@@ -264,7 +262,6 @@ test('keeps support and offset facts without materializing support metric branch
     store,
     specs: [spec],
     results: [result],
-    fallback: 'empty',
   });
   const tree = buildBranchTreeFromFactStore({
     specs: [spec],
@@ -313,7 +310,6 @@ test('materializes column subtotal leaves from planned coverage specs', () => {
         data: [{ country: 'France', category: 'Furniture', sales: 12 }],
       },
     ],
-    fallback: 'empty',
   });
   const tree = buildBranchTreeFromFactStore({
     specs: [spec],

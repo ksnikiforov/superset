@@ -70,8 +70,6 @@ type IngestedQueryResult<T extends QueryResultWithData> = {
   facts: PivotFact[];
 };
 
-type QueryResultFallback = 'index' | 'empty';
-
 const getQueryResultName = (
   result: QueryResultWithData,
 ): string | undefined => {
@@ -91,11 +89,9 @@ const getQueryResultName = (
 const orderQueryResultsForSpecs = <T extends QueryResultWithData>({
   specs,
   results,
-  fallback = 'index',
 }: {
   specs: PlannedQuerySpec[];
   results: T[];
-  fallback?: QueryResultFallback;
 }): QueryResultWithData[] => {
   const resultsByName = new Map<string, T>();
   results.forEach(result => {
@@ -107,12 +103,7 @@ const orderQueryResultsForSpecs = <T extends QueryResultWithData>({
   if (resultsByName.size === 0) {
     return results;
   }
-  return specs.map(
-    (spec, idx) =>
-      resultsByName.get(spec.queryName) ??
-      (fallback === 'index' ? results[idx] : undefined) ??
-      {},
-  );
+  return specs.map(spec => resultsByName.get(spec.queryName) ?? {});
 };
 
 const getMetricValueKeysFromRecord = (
@@ -235,16 +226,13 @@ const ingestQueryResultFacts = ({
 export const ingestQueryResults = <T extends QueryResultWithData>({
   specs,
   results,
-  fallback,
 }: {
   specs: PlannedQuerySpec[];
   results: T[];
-  fallback?: QueryResultFallback;
 }): IngestedQueryResult<QueryResultWithData>[] => {
   const orderedResults = orderQueryResultsForSpecs({
     specs,
     results,
-    fallback,
   });
   return specs.map((spec, idx) => {
     const result = orderedResults[idx] ?? {};
@@ -259,21 +247,18 @@ export const ingestQueryResults = <T extends QueryResultWithData>({
 const ingestQueryResultsAsync = async <T extends QueryResultWithData>({
   specs,
   results,
-  fallback,
   chunkSize,
   shouldContinue,
   yieldToMain,
 }: {
   specs: PlannedQuerySpec[];
   results: T[];
-  fallback?: QueryResultFallback;
 } & ChunkedWorkOptions): Promise<
   IngestedQueryResult<QueryResultWithData>[]
 > => {
   const orderedResults = orderQueryResultsForSpecs({
     specs,
     results,
-    fallback,
   });
   const ingested: IngestedQueryResult<QueryResultWithData>[] = [];
   for (let idx = 0; idx < specs.length; idx += 1) {
@@ -331,17 +316,14 @@ export const upsertQueryResultsIntoFactStore = <T extends QueryResultWithData>({
   store,
   specs,
   results,
-  fallback,
 }: {
   store: PivotFactStore;
   specs: PlannedQuerySpec[];
   results: T[];
-  fallback?: QueryResultFallback;
 }): PivotFactStoreBatch[] => {
   const ingested = ingestQueryResults({
     specs,
     results,
-    fallback,
   });
   return upsertIngestedFactsIntoStore({ store, ingested });
 };

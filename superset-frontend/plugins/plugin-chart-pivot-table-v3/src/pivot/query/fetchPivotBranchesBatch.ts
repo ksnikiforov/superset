@@ -142,7 +142,6 @@ export const fetchPivotBranchesBatch = async ({
       store,
       specs,
       results,
-      fallback: 'empty',
     });
     const tree = buildBranchTreeFromFactStore({
       specs,
