@@ -45,9 +45,7 @@ import { serializeCellKey } from '../../utils';
 import {
   buildPivotV3ExportSheetModel,
   buildPivotV3RowExportModel,
-  registerPivotV3ExportSheetData,
   registerPivotV3ExportSheetDataForChart,
-  unregisterPivotV3ExportSheetData,
   unregisterPivotV3ExportSheetDataForChart,
 } from '../../export/buildPivotV3ExportTable';
 import { type ChartDataWarning } from '../data/ChartDataClient';
@@ -376,7 +374,6 @@ export const PivotTableView = ({
     renderCellContent,
     renderDatabarContent,
   } = formatting;
-  const tableRef = useRef<HTMLTableElement | null>(null);
   const stickyRowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
   const [stickyTotalRowOffsets, setStickyTotalRowOffsets] = useState<
     Record<string, number>
@@ -544,19 +541,12 @@ export const PivotTableView = ({
     ],
   );
   useLayoutEffect(() => {
-    const table = tableRef.current;
-    if (!table) {
+    if (exportChartId === undefined) {
       return undefined;
     }
-    registerPivotV3ExportSheetData(table, exportSheetData);
-    if (exportChartId !== undefined) {
-      registerPivotV3ExportSheetDataForChart(exportChartId, exportSheetData);
-    }
+    registerPivotV3ExportSheetDataForChart(exportChartId, exportSheetData);
     return () => {
-      unregisterPivotV3ExportSheetData(table);
-      if (exportChartId !== undefined) {
-        unregisterPivotV3ExportSheetDataForChart(exportChartId);
-      }
+      unregisterPivotV3ExportSheetDataForChart(exportChartId);
     };
   }, [exportChartId, exportSheetData]);
   const renderCornerHeader = (rowSpan?: number) => (
@@ -589,7 +579,6 @@ export const PivotTableView = ({
         <Loading />
       ) : (
         <StyledTable
-          ref={tableRef}
           className="pivot-v3-table pvtTable"
           $stickyHeaders={stickyHeaders}
           data-sticky-headers={stickyHeaders}

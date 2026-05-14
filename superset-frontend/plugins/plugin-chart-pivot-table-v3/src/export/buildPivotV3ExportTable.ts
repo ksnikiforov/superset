@@ -305,30 +305,10 @@ export const buildPivotV3ExportSheetModel = ({
   return [...headerRows, ...bodyRows];
 };
 
-const pivotV3ExportSheetDataRegistry = new WeakMap<
-  HTMLTableElement,
-  PivotV3ExportSheetCell[][]
->();
 const pivotV3ExportSheetDataByChartId = new Map<
   string | number,
   PivotV3ExportSheetCell[][]
 >();
-
-export const registerPivotV3ExportSheetData = (
-  table: HTMLTableElement,
-  sheetData: PivotV3ExportSheetCell[][],
-) => {
-  pivotV3ExportSheetDataRegistry.set(table, sheetData);
-};
-
-export const unregisterPivotV3ExportSheetData = (table: HTMLTableElement) => {
-  pivotV3ExportSheetDataRegistry.delete(table);
-};
-
-export const buildPivotV3ExportSheetData = (
-  table: HTMLTableElement,
-): PivotV3ExportSheetCell[][] | undefined =>
-  pivotV3ExportSheetDataRegistry.get(table);
 
 export const registerPivotV3ExportSheetDataForChart = (
   chartId: string | number,

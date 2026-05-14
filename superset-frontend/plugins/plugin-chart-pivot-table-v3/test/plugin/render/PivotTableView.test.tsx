@@ -24,10 +24,7 @@ import { type RenderModel } from '../../../src/pivot/shared/types';
 import { type PivotTreeData, type PivotTreeNode } from '../../../src/types';
 import { serializePath } from '../../../src/utils';
 import { type PivotFormattingResult } from '../../../src/pivot/chart/usePivotFormatting';
-import {
-  buildPivotV3ExportSheetData,
-  getPivotV3ExportSheetDataForChart,
-} from '../../../src/export/buildPivotV3ExportTable';
+import { getPivotV3ExportSheetDataForChart } from '../../../src/export/buildPivotV3ExportTable';
 
 const baseRenderModel: RenderModel = {
   visibleRows: [],
@@ -430,11 +427,12 @@ describe('PivotTableView', () => {
         handleCellKeyDown={jest.fn()}
         handleCellContextMenu={jest.fn()}
         rowAxisLabels={['Region', 'City', 'Store']}
+        exportChartId={18}
       />,
     );
 
-    const table = container.querySelector('table') as HTMLTableElement;
-    const exportRows = buildPivotV3ExportSheetData(table)?.map(row =>
+    expect(container.querySelector('table')).toBeInTheDocument();
+    const exportRows = getPivotV3ExportSheetDataForChart(18)?.map(row =>
       row.map(cell => cell.value),
     );
     expect(exportRows).toEqual([

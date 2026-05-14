@@ -364,6 +364,7 @@ class ChartRenderer extends Component {
             id={`chart-id-${chartId}`}
             className={chartClassName}
             chartType={vizType}
+            chartId={chartId}
             width={width}
             height={height}
             annotationData={annotationData}

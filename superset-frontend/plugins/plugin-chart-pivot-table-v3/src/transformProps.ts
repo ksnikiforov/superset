@@ -74,6 +74,7 @@ export default function transformProps(
     filterState,
     datasource,
     rawDatasource,
+    chartId,
     initialValues,
     legendState,
     legendIndex,
@@ -406,6 +407,7 @@ export default function transformProps(
     factBatches,
     formData: {
       ...formDataWithMetricLabels,
+      slice_id: formDataWithMetricLabels.slice_id ?? chartId,
       metricsLayout,
       treeDataSignature,
       metricLabelMap,
