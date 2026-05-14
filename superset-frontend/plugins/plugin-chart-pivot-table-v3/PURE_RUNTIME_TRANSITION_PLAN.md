@@ -96,9 +96,9 @@ Rules:
 - A later layer can also be fully expanded under that scoped middle layer. The
   manifest must represent this as explicit ancestor-scoped sets, not as a
   requirement for full expansion of all previous layers.
-- Consecutive full-expansion layers are also scoped. For example, `[USA] ->
-all states -> all cities -> store` still means only the explicit subtree
-  under `USA`, not all states and cities globally.
+- Consecutive full-expansion layers are also scoped. For example,
+  `[USA] -> [full states] -> [full cities] -> [store]` still means only the
+  explicit subtree under `USA`, not all states and cities globally.
 - Many small expands may be transport-batched, but they must not be promoted
   into an unbounded full-level query.
 - No full-level expansion query is allowed unless the user action explicitly
