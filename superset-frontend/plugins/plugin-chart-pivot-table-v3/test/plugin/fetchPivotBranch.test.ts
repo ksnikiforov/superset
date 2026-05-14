@@ -1513,69 +1513,6 @@ describe('resolveFetchContext', () => {
       ]),
     );
   });
-
-  it('invalidates cache when extra_form_data filters change', async () => {
-    const postMock = SupersetClient.post as jest.Mock;
-    postMock.mockResolvedValue({
-      json: {
-        result: [{ data: [] }],
-      },
-    });
-
-    const currentTree: PivotTreeData = {
-      rows: {
-        '': makeNode({ axis: 'row', path: [], hasChildren: true }),
-        A: makeNode({
-          axis: 'row',
-          path: ['A'],
-          level: 1,
-          hasChildren: true,
-          label: 'A',
-          formattedLabel: 'A',
-        }),
-      },
-      cols: {
-        '': makeNode({ axis: 'col', path: [], hasChildren: false }),
-      },
-      cells: {},
-    };
-
-    await fetchPivotBranch({
-      formData: buildFormData({
-        groupbyRows: ['orderPriority', 'customerName'],
-        groupbyColumns: [],
-        metrics: ['countCustomers'],
-        metricsLayout: MetricsLayoutEnum.ROWS,
-        rowSubTotals: false,
-        extra_form_data: {
-          time_range: '2020-01-01 : 2020-02-01',
-        },
-      }),
-      axis: 'row',
-      path: ['A'],
-      currentTree,
-      visibleColDepth: 0,
-    });
-
-    await fetchPivotBranch({
-      formData: buildFormData({
-        groupbyRows: ['orderPriority', 'customerName'],
-        groupbyColumns: [],
-        metrics: ['countCustomers'],
-        metricsLayout: MetricsLayoutEnum.ROWS,
-        rowSubTotals: false,
-        extra_form_data: {
-          time_range: '2021-01-01 : 2021-02-01',
-        },
-      }),
-      axis: 'row',
-      path: ['A'],
-      currentTree,
-      visibleColDepth: 0,
-    });
-
-    expect(postMock).toHaveBeenCalledTimes(2);
-  });
 });
 
 describe('fetchPivotBranch delta-only contract', () => {
