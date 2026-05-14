@@ -57,7 +57,7 @@ cells are projections of DB facts, not canonical data.
 
 ## Current Status
 
-As of May 14, 2026, after the hydration runtime-hook cleanup checkpoint:
+As of May 14, 2026, after the core-import facade cleanup checkpoint:
 
 - Gate-weighted architecture estimate: **98%**.
 - Delivery remaining estimate: **1-2%**, mostly final cleanup, validation,
@@ -72,12 +72,19 @@ As of May 14, 2026, after the hydration runtime-hook cleanup checkpoint:
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `14455` insertions, `13363` deletions, net `+1092`.
-- Current production `src` TypeScript/TSX total: `34602` lines.
+- Production `src`: `14493` insertions, `13447` deletions, net `+1046`.
+- Current production `src` TypeScript/TSX total: `34556` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
-- `PivotTableChart.tsx` is now `698` lines and `useExpansionEngine.ts` is now
+- `PivotTableChart.tsx` is now `699` lines and `useExpansionEngine.ts` is now
   `1439` lines; those single-file reductions should not be counted as plugin
   source reduction because the plugin-wide total increased.
+- Core-import facade cleanup removed the historical path/token/tree re-exports
+  from `utils.ts` and moved production plus test imports to
+  `pivot/core/path`, `pivot/core/tokens`, and `pivot/core/tree`. The source
+  slice was deletion-positive: `61` insertions, `107` deletions, net `-46`.
+- Full plugin source/test ESLint passed after removing the facade.
+- Full plugin plus export utility Jest pass after removing the facade: `96`
+  suites and `781` tests.
 - Hydration runtime-hook cleanup deleted the one-consumer
   `useExpansionHydrationRuntime.ts` file and kept hydration/prefetch scheduling
   local to `useExpansionEngine.ts`; the source slice was deletion-positive:
@@ -545,9 +552,9 @@ deletion-positive structure cleanup; it is still not a net source reduction.
 Largest relevant production files:
 
 - `PivotDndMetricSelect.tsx`: `1564` lines.
-- `stateTransitions.ts`: `1564` lines.
+- `stateTransitions.ts`: `1565` lines.
 - `PivotMetricDefinitionValue.tsx`: `1448` lines.
-- `utils.ts`: `1429` lines.
+- `utils.ts`: `1399` lines.
 - `materializePivotTree.ts`: `1329` lines.
 - `usePivotFormatting.tsx`: `1320` lines.
 - `useExpansionEngine.ts`: `1439` lines.
@@ -1156,10 +1163,8 @@ Open checklist:
   still relies on a chart-id worksheet data registry.
 - Expansion reducer/runtime effects: complete for the current transition;
   same-axis fetch-loop sequencing and hydration fetch-delta wiring are in the
-  expansion executor, request lifecycle/helper ownership lives in a request
-  runtime hook, same-axis in-flight bookkeeping lives in its own hook, and
-  hydration kickoff plus reinitialization-triggered prefetch scheduling live
-  with the hydration runtime.
+  expansion executor, and the deleted one-consumer request, in-flight, and
+  hydration hooks now live directly in `useExpansionEngine.ts`.
 - Pure render model: nearly complete; display-map policy and export registry
   ownership remain residual risk.
 - Chart component cleanup: not complete; runtime-layout state, prop sync,
@@ -1175,9 +1180,9 @@ Open checklist:
   state and callbacks now live with the render model.
 
 Conclusion: the transition is not complete. The next code slices should target
-only deletion-positive changes in chart runtime sync, expansion request
-sequencing, or export data ownership. Passing tests and the current plan status
-are evidence of progress, not completion.
+only deletion-positive changes in chart runtime sync, export data ownership, or
+remaining compatibility data-shape boundaries. Passing tests and the current
+plan status are evidence of progress, not completion.
 
 ## Success Definition
 
