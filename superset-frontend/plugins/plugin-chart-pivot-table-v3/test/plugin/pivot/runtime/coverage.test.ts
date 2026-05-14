@@ -25,8 +25,11 @@ import { compilePivotProgram } from '../../../../src/pivot/runtime/compilePivotP
 import {
   buildBranchFactCoverages,
   buildFactCoverage,
+  buildRuntimeLayoutCoverageManifest,
   buildVisibleFactCoverage,
+  diffCoverageManifest,
   factBatchesCoverRuntimeLayout,
+  type PivotCoverageNeed,
   shouldFetchRuntimeLayout,
 } from '../../../../src/pivot/runtime/coverage';
 import { type PivotFactStoreBatch } from '../../../../src/pivot/runtime/factStore';
@@ -257,6 +260,114 @@ describe('runtime layout fact coverage', () => {
         nextLayout: runtimeLayout,
       }),
     ).toBe(true);
+  });
+});
+
+describe('coverage manifest diff', () => {
+  const need = (
+    rowScope: PivotCoverageNeed['rowScope'],
+    columnScope: PivotCoverageNeed['columnScope'],
+  ): PivotCoverageNeed => ({
+    reason: 'intersection',
+    rowDepth: 2,
+    columnDepth: 2,
+    rowDimensions: ['country', 'city'],
+    columnDimensions: ['year', 'quarter'],
+    rowScope,
+    columnScope,
+  });
+
+  const batch = (
+    scope: PivotFactStoreBatch['scope'],
+    rowDepth = 2,
+    columnDepth = 2,
+  ): PivotFactStoreBatch => ({
+    coverage: buildFactCoverage({
+      reason: 'expand',
+      rowDimensions: ['country', 'city'],
+      columnDimensions: ['year', 'quarter'],
+      rowDepth,
+      columnDepth,
+    }),
+    scope,
+    facts: [],
+  });
+
+  it('builds root runtime coverage without hidden deeper dimensions', () => {
+    expect(
+      buildRuntimeLayoutCoverageManifest({
+        version: 1,
+        rows: ['country', 'city'],
+        cols: ['year', 'quarter'],
+        metrics: ['sales'],
+        leafSelection: {},
+        valuePlacement: { axis: 'col', index: 2 },
+      }),
+    ).toEqual([
+      {
+        reason: 'root',
+        rowDepth: 1,
+        columnDepth: 1,
+        rowDimensions: ['country'],
+        columnDimensions: ['year'],
+        rowScope: { kind: 'root' },
+        columnScope: { kind: 'root' },
+      },
+    ]);
+  });
+
+  it('does not require coverage when no metrics are selected', () => {
+    expect(
+      buildRuntimeLayoutCoverageManifest({
+        version: 1,
+        rows: ['country'],
+        cols: ['year'],
+        metrics: [],
+        leafSelection: {},
+        valuePlacement: { axis: 'col', index: 1 },
+      }),
+    ).toEqual([]);
+  });
+
+  it('treats explicit path sets as bounded coverage needs', () => {
+    const required = [
+      need(
+        { kind: 'paths', paths: [['Germany'], ['France']] },
+        { kind: 'paths', paths: [[2024], [2025]] },
+      ),
+    ];
+
+    expect(
+      diffCoverageManifest({
+        required,
+        factBatches: [
+          batch({
+            kind: 'batch',
+            axis: 'row',
+            parentPath: [],
+            siblingValues: ['Germany', 'France'],
+          }),
+        ],
+      }),
+    ).toEqual([]);
+  });
+
+  it('does not treat one explicit branch as covering a sibling path set', () => {
+    const required = [
+      need(
+        { kind: 'paths', paths: [['Germany'], ['France']] },
+        { kind: 'paths', paths: [[2024], [2025]] },
+      ),
+    ];
+
+    expect(
+      diffCoverageManifest({
+        required,
+        factBatches: [
+          batch({ kind: 'branch', axis: 'row', path: ['Germany'] }),
+        ],
+      }),
+    ).toEqual(required);
   });
 });
 

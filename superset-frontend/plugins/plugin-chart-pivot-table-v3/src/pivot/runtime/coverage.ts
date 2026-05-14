@@ -69,6 +69,27 @@ export type BranchFactCoverageInput = {
   reason?: PivotCoverageReason;
 };
 
+export type AxisPathScope =
+  | { kind: 'root' }
+  | { kind: 'paths'; paths: PivotPath[] };
+
+export type PivotCoverageNeedReason =
+  | 'root'
+  | 'expand'
+  | 'intersection'
+  | 'subtotal'
+  | 'sort';
+
+export type PivotCoverageNeed = {
+  rowDepth: number;
+  columnDepth: number;
+  rowDimensions: PivotProgram['rowDimensions'];
+  columnDimensions: PivotProgram['columnDimensions'];
+  rowScope: AxisPathScope;
+  columnScope: AxisPathScope;
+  reason: PivotCoverageNeedReason;
+};
+
 type DepthPair = { rowDepth: number; columnDepth: number };
 
 const clampDepth = (depth: number, maxDepth: number) => {
@@ -98,12 +119,23 @@ const columnRefKey = (column: PivotProgram['rowDimensions'][number]) =>
     ? column
     : column.sqlExpression || column.label || '';
 
-const columnRefsMatchKeys = (
-  columns: PivotProgram['rowDimensions'],
-  keys: string[],
+const columnRefsMatch = (
+  left: PivotProgram['rowDimensions'],
+  right: PivotProgram['rowDimensions'],
 ) =>
-  columns.length === keys.length &&
-  columns.every((column, index) => columnRefKey(column) === keys[index]);
+  left.length === right.length &&
+  left.every(
+    (column, index) => columnRefKey(column) === columnRefKey(right[index]),
+  );
+
+const pathStartsWith = (path: PivotPath, prefix: PivotPath) =>
+  prefix.every((value, index) => path[index] === value);
+
+const batchScopePaths = ({
+  parentPath,
+  siblingValues,
+}: Extract<PivotFactStoreBatch['scope'], { kind: 'batch' }>) =>
+  siblingValues.map(value => [...parentPath, value]);
 
 const isRuntimeLayoutCoverageScope = (
   scope: PivotFactStoreBatch['scope'],
@@ -115,6 +147,29 @@ const isRuntimeLayoutCoverageScope = (
     return false;
   }
   return scope.path.every(isMetricToken);
+};
+
+const scopeCoversAxisPaths = (
+  scope: PivotFactStoreBatch['scope'],
+  axis: PivotAxis,
+  needScope: AxisPathScope,
+) => {
+  if (needScope.kind === 'root') {
+    return scope.kind === 'bootstrap' || scope.kind === 'root';
+  }
+  if (scope.kind === 'bootstrap' || scope.kind === 'root') {
+    return true;
+  }
+  if (scope.axis !== axis) {
+    return true;
+  }
+  const candidatePaths =
+    scope.kind === 'branch' ? [scope.path] : batchScopePaths(scope);
+  return needScope.paths.every(needPath =>
+    candidatePaths.some(candidatePath =>
+      pathStartsWith(needPath, candidatePath),
+    ),
+  );
 };
 
 const selectionSignature = (selection: PivotRuntimeLayout['leafSelection']) =>
@@ -297,25 +352,57 @@ export const buildVisibleFactCoverage = ({
   ];
 };
 
+export const buildRuntimeLayoutCoverageManifest = (
+  runtimeLayout: PivotRuntimeLayout,
+): PivotCoverageNeed[] => {
+  if (runtimeLayout.metrics.length === 0) {
+    return [];
+  }
+  const rowDepth = runtimeLayout.rows.length > 0 ? 1 : 0;
+  const columnDepth = runtimeLayout.cols.length > 0 ? 1 : 0;
+  return [
+    {
+      reason: 'root',
+      rowDepth,
+      columnDepth,
+      rowDimensions: runtimeLayout.rows.slice(0, rowDepth),
+      columnDimensions: runtimeLayout.cols.slice(0, columnDepth),
+      rowScope: { kind: 'root' },
+      columnScope: { kind: 'root' },
+    },
+  ];
+};
+
+const factBatchCoversNeed = (
+  { coverage, scope }: PivotFactStoreBatch,
+  need: PivotCoverageNeed,
+) =>
+  coverage.rowDepth === need.rowDepth &&
+  coverage.columnDepth === need.columnDepth &&
+  columnRefsMatch(coverage.rowDimensions, need.rowDimensions) &&
+  columnRefsMatch(coverage.columnDimensions, need.columnDimensions) &&
+  (need.rowScope.kind === 'root' && need.columnScope.kind === 'root'
+    ? isRuntimeLayoutCoverageScope(scope)
+    : scopeCoversAxisPaths(scope, 'row', need.rowScope) &&
+      scopeCoversAxisPaths(scope, 'col', need.columnScope));
+
+export const diffCoverageManifest = ({
+  required,
+  factBatches,
+}: {
+  required: PivotCoverageNeed[];
+  factBatches: PivotFactStoreBatch[];
+}) =>
+  required.filter(
+    need => !factBatches.some(batch => factBatchCoversNeed(batch, need)),
+  );
+
 export const factBatchesCoverRuntimeLayout = (
   factBatches: PivotFactStoreBatch[],
   runtimeLayout: PivotRuntimeLayout,
 ) => {
-  const requiredRowDepth = runtimeLayout.rows.length > 0 ? 1 : 0;
-  const requiredColumnDepth = runtimeLayout.cols.length > 0 ? 1 : 0;
-  const requiredRows = runtimeLayout.rows.slice(0, requiredRowDepth);
-  const requiredColumns = runtimeLayout.cols.slice(0, requiredColumnDepth);
-  return (
-    runtimeLayout.metrics.length === 0 ||
-    factBatches.some(
-      ({ coverage, scope }) =>
-        isRuntimeLayoutCoverageScope(scope) &&
-        coverage.rowDepth === requiredRowDepth &&
-        coverage.columnDepth === requiredColumnDepth &&
-        columnRefsMatchKeys(coverage.rowDimensions, requiredRows) &&
-        columnRefsMatchKeys(coverage.columnDimensions, requiredColumns),
-    )
-  );
+  const required = buildRuntimeLayoutCoverageManifest(runtimeLayout);
+  return diffCoverageManifest({ required, factBatches }).length === 0;
 };
 
 const runtimeLayoutRequiredRootDepth = (runtimeLayout: PivotRuntimeLayout) => ({

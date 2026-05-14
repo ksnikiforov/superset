@@ -352,6 +352,8 @@ Success criteria:
   dimension filter values, and export registration to helper modules.
 - Applied interaction layout now compiles through `compilePivotProgram`; the
   placement-only compiler bridge has been removed.
+- Set-oriented coverage manifest primitives now exist for root runtime-layout
+  coverage and explicit path-set coverage diffing.
 
 ## Current Risks
 
