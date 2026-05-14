@@ -85,6 +85,9 @@ Source-only diff from pre-refactor baseline
 - Focused chart validation after deleting the view-prop helper passed: `3`
   suites and `74` tests.
 - Touched chart file passed ESLint, Prettier, and `git diff --check`.
+- Full plugin plus export utility Jest pass after the structure/helper cleanup:
+  `96` suites and `781` tests.
+- Full plugin source ESLint passed after the structure/helper cleanup.
 - Chart wrapper cleanup deleted the one-consumer `PivotChartView.tsx` wrapper
   and rendered its two branches directly in `PivotTableChart.tsx`; the source
   slice was deletion-positive: `49` insertions, `110` deletions, net `-61`.
@@ -633,6 +636,9 @@ git diff --check
 
 Recent validation:
 
+- Latest broad checkpoint after structure/helper cleanup: full plugin source
+  ESLint passed, and the full pivot-table-v3 plugin plus export utility Jest
+  suite passed (`96` suites, `781` tests).
 - `9953f66b02`: deleted the one-consumer `pivotViewProps.ts` helper and built
   the display snapshot plus `PivotTableView` props directly in
   `PivotTableChart.tsx`; Prettier, file-level ESLint, `git diff --check`, and
@@ -988,6 +994,9 @@ Current evidence:
 - Latest view-prop helper validation passed focused Jest validation: `3`
   suites and `74` tests; touched chart file passed Prettier, file-level ESLint,
   and `git diff --check`.
+- Latest full validation after the structure/helper cleanup passed: full plugin
+  source ESLint and the full pivot-table-v3 plugin plus export utility Jest
+  suite (`96` suites and `781` tests).
 - Latest chart wrapper cleanup deleted the one-consumer `PivotChartView.tsx`
   file and rendered its branches directly in `PivotTableChart.tsx`; the source
   slice was deletion-positive: `49` insertions, `110` deletions, net `-61`.
