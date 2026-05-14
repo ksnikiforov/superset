@@ -131,8 +131,6 @@ export const usePivotLayout = ({
   data,
   formData,
   metrics,
-  groupbyRows,
-  groupbyColumns,
   metricsLayout,
   startCollapsed,
   initialDepth,
@@ -151,8 +149,6 @@ export const usePivotLayout = ({
   data: PivotTableProps['data'];
   formData: PivotTableProps['formData'];
   metrics: PivotTableProps['metrics'];
-  groupbyRows: PivotTableProps['groupbyRows'];
-  groupbyColumns: PivotTableProps['groupbyColumns'];
   metricsLayout: MetricsLayoutEnum;
   startCollapsed: boolean;
   initialDepth: number;
@@ -249,16 +245,17 @@ export const usePivotLayout = ({
     return layout.colSubtotalLevels;
   }, [layout.colSubtotalLevels, rowTotals]);
 
-  const rowDimCount = layout.groupbyRows.length;
-  const colDimCount = layout.groupbyColumns.length;
+  const { groupbyRows, groupbyColumns } = layout;
+  const rowDimCount = groupbyRows.length;
+  const colDimCount = groupbyColumns.length;
 
   const groupbyRowKeys = useMemo(
-    () => layout.groupbyRows.map(getStableColumnKey),
-    [layout.groupbyRows],
+    () => groupbyRows.map(getStableColumnKey),
+    [groupbyRows],
   );
   const groupbyColumnKeys = useMemo(
-    () => layout.groupbyColumns.map(getStableColumnKey),
-    [layout.groupbyColumns],
+    () => groupbyColumns.map(getStableColumnKey),
+    [groupbyColumns],
   );
 
   const expansionStateSharedSignatureData = useMemo(

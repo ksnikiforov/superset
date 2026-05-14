@@ -631,8 +631,6 @@ function PivotTableChart(props: PivotTableProps) {
     data: dataForRender,
     formData: appliedLayoutFormData,
     metrics: layoutMetrics,
-    groupbyRows: layoutGroupbyRows,
-    groupbyColumns: layoutGroupbyColumns,
     metricsLayout: layoutMetricsLayout,
     startCollapsed,
     initialDepth,
