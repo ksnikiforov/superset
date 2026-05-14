@@ -24,7 +24,6 @@ import {
   useState,
   type ComponentProps,
 } from 'react';
-import { unstable_batchedUpdates } from 'react-dom';
 import { isEqual } from 'lodash';
 import {
   AppSection,
@@ -73,8 +72,6 @@ import {
   buildTreeDimensionFilterValues,
 } from './pivot/filters';
 import { useDimensionFilterValues } from './pivot/chart/useDimensionFilterValues';
-import { supersetChartDataClient } from './pivot/data/SupersetChartDataClient';
-import { type ChartDataWarning } from './pivot/data/ChartDataClient';
 import {
   applyDimensionDrag,
   applyValueDrag,
@@ -91,11 +88,8 @@ import {
 } from './pivot/chart/columnSort';
 import { type PivotFactStoreBatch } from './pivot/runtime/ingestQueryResults';
 import { useSyncRef } from './pivot/shared/useSyncRef';
-import { createLatestRequestLifecycle } from './pivot/runtime/requestLifecycle';
 import {
-  buildSeamlessRuntimeSyncSnapshot,
   buildSeamlessRuntimeUpstreamSignature,
-  fetchAndMaterializeSeamlessRuntimeUpdate,
   isSeamlessDisplaySnapshotSettled,
   prepareRuntimeLayoutPropSync,
   prepareRuntimeStatePersistence,
@@ -106,6 +100,10 @@ import {
   type SeamlessRuntimeSyncSnapshot,
   type SeamlessRuntimeUpstreamState,
 } from './pivot/runtime/seamlessRuntimeUpdate';
+import {
+  type PivotDisplaySnapshot,
+  usePivotSeamlessRuntimeUpdate,
+} from './pivot/chart/usePivotSeamlessRuntimeUpdate';
 
 const EMPTY_SELECTED_FILTERS: Record<string, DataRecordValue[]> = {};
 const EMPTY_FACT_BATCHES: PivotFactStoreBatch[] = [];
@@ -119,10 +117,6 @@ const MetaLoadingWrap = styled.div`
 `;
 
 type PivotViewProps = ComponentProps<typeof PivotTableView>;
-type PivotDisplaySnapshot = Pick<
-  PivotViewProps,
-  'renderModel' | 'tree' | 'expandedRows' | 'expandedCols'
->;
 
 function PivotTableChart(props: PivotTableProps) {
   const {
@@ -227,17 +221,8 @@ function PivotTableChart(props: PivotTableProps) {
   const [committedFilters, setCommittedFilters] = useState<
     Record<string, DataRecordValue[]>
   >(selectedFilters ?? EMPTY_SELECTED_FILTERS);
-  const [seamlessLoading, setSeamlessLoading] = useState(false);
-  const [seamlessWarnings, setSeamlessWarnings] = useState<ChartDataWarning[]>(
-    [],
-  );
-  const [seamlessError, setSeamlessError] = useState<string | undefined>(
-    undefined,
-  );
   const [activeColumnSort, setActiveColumnSort] =
     useState<PivotColumnSortState | null>(null);
-  const [pendingDisplaySnapshot, setPendingDisplaySnapshot] =
-    useState<PivotDisplaySnapshot | null>(null);
   const pendingSeamlessLayoutRef = useRef<PivotRuntimeLayout | null>(null);
   const lastUpstreamQueryContextRef =
     useRef<SeamlessRuntimeUpstreamState>(null);
@@ -252,18 +237,6 @@ function PivotTableChart(props: PivotTableProps) {
   const factBatchesForRender = isUserControlled
     ? committedFactBatches
     : factBatches;
-  const seamlessRequestLifecycle = useMemo(
-    () =>
-      createLatestRequestLifecycle({
-        cancel: requestGroupId =>
-          supersetChartDataClient.cancel(requestGroupId),
-      }),
-    [],
-  );
-  const seamlessMaterializationLifecycle = useMemo(
-    () => createLatestRequestLifecycle(),
-    [],
-  );
 
   const treeRef = useRef<PivotTableProps['data']>(dataForRender);
   const ownStateRef = useRef<JsonObject>(ownState ?? {});
@@ -451,27 +424,6 @@ function PivotTableChart(props: PivotTableProps) {
     committedFilters,
   });
   useEffect(() => {
-    // Ignore stale upstream updates while a local interaction update is still
-    // pending.
-    if (!shouldSyncCommittedTreeFromProps) {
-      return;
-    }
-    seamlessMaterializationLifecycle.invalidate();
-    setCommittedTree(data);
-    setCommittedFactBatches(factBatches);
-    setSeamlessWarnings([]);
-    setSeamlessError(undefined);
-    setSeamlessLoading(false);
-    setPendingDisplaySnapshot(null);
-    pendingSeamlessLayoutRef.current = null;
-  }, [
-    data,
-    factBatches,
-    seamlessMaterializationLifecycle,
-    shouldSyncCommittedTreeFromProps,
-  ]);
-
-  useEffect(() => {
     if (
       isUserControlled &&
       pendingPersistedSelectionSyncRef.current &&
@@ -548,79 +500,50 @@ function PivotTableChart(props: PivotTableProps) {
     ],
   );
 
-  const applySeamlessUpdate = useCallback(
-    async (
-      nextLayout: PivotRuntimeLayout,
-      nextFilters: Record<string, DataRecordValue[]>,
-    ) => {
-      const normalized = normalizeRuntimeLayout(
-        nextLayout,
-        dimensionKeys,
-        metricKeys,
-      );
-      const displaySnapshot = displaySnapshotRef.current;
-      if (displaySnapshot) {
-        setPendingDisplaySnapshot(displaySnapshot);
-      }
-      const updateResult = await fetchAndMaterializeSeamlessRuntimeUpdate({
-        requestLifecycle: seamlessRequestLifecycle,
-        materializationLifecycle: seamlessMaterializationLifecycle,
-        baseFormData: fetchFormDataBaseWithFormatters,
-        sourceFormData: formData,
-        runtimeLayout: normalized,
-        selection: nextFilters,
-        expandedRows: expandedRowsForSeamlessRef.current,
-        expandedCols: expandedColsForSeamlessRef.current,
-        pendingRows: pendingRowsForSeamlessRef.current,
-        pendingCols: pendingColsForSeamlessRef.current,
-        fetchData: params => supersetChartDataClient.fetch(params),
-        onFetchStart: () => {
-          setSeamlessLoading(true);
-          setSeamlessError(undefined);
-        },
-        onError: error => {
-          setSeamlessError(
-            error instanceof Error ? error.message : t('Failed to update data'),
-          );
-        },
-      });
-      if (updateResult.status === 'stale') {
-        return;
-      }
-      if (updateResult.status !== 'success') {
-        pendingSeamlessLayoutRef.current = null;
-        setSeamlessLoading(false);
-        return;
-      }
+  const {
+    seamlessLoading,
+    seamlessWarnings,
+    seamlessError,
+    pendingDisplaySnapshot,
+    applySeamlessUpdate,
+    clearPendingDisplaySnapshot,
+    resetSeamlessRuntimeState,
+  } = usePivotSeamlessRuntimeUpdate({
+    dimensionKeys,
+    metricKeys,
+    baseFormData: fetchFormDataBaseWithFormatters,
+    sourceFormData: formData,
+    upstreamSignature: upstreamSeamlessSignature,
+    displaySnapshotRef,
+    pendingSeamlessLayoutRef,
+    seamlessSyncRef: lastSeamlessSyncRef,
+    expandedRowsRef: expandedRowsForSeamlessRef,
+    expandedColsRef: expandedColsForSeamlessRef,
+    pendingRowsRef: pendingRowsForSeamlessRef,
+    pendingColsRef: pendingColsForSeamlessRef,
+    commitTree: setCommittedTree,
+    commitFactBatches: setCommittedFactBatches,
+    commitFilters: setCommittedFilters,
+    commitUiRuntimeLayout: updateUiRuntimeLayout,
+    persistRuntimeState,
+  });
 
-      unstable_batchedUpdates(() => {
-        setCommittedTree(updateResult.tree);
-        setCommittedFactBatches(updateResult.factBatches);
-        updateUiRuntimeLayout(normalized);
-        setCommittedFilters(nextFilters);
-        setSeamlessWarnings(updateResult.warnings);
-        persistRuntimeState(normalized, nextFilters);
-      });
-      lastSeamlessSyncRef.current = buildSeamlessRuntimeSyncSnapshot({
-        runtimeLayout: normalized,
-        selection: nextFilters,
-        upstreamSignature: upstreamSeamlessSignature,
-      });
-      pendingSeamlessLayoutRef.current = null;
-      setSeamlessLoading(false);
-    },
-    [
-      dimensionKeys,
-      fetchFormDataBaseWithFormatters,
-      formData,
-      metricKeys,
-      persistRuntimeState,
-      seamlessMaterializationLifecycle,
-      seamlessRequestLifecycle,
-      upstreamSeamlessSignature,
-      updateUiRuntimeLayout,
-    ],
-  );
+  useEffect(() => {
+    // Ignore stale upstream updates while a local interaction update is still
+    // pending.
+    if (!shouldSyncCommittedTreeFromProps) {
+      return;
+    }
+    setCommittedTree(data);
+    setCommittedFactBatches(factBatches);
+    resetSeamlessRuntimeState();
+  }, [
+    data,
+    factBatches,
+    resetSeamlessRuntimeState,
+    shouldSyncCommittedTreeFromProps,
+  ]);
+
   const handleRuntimeLayoutChange = useCallback(
     (nextLayout: PivotRuntimeLayout) => {
       const action = prepareSeamlessRuntimeLayoutChange({
@@ -786,9 +709,10 @@ function PivotTableChart(props: PivotTableProps) {
         pendingCols,
       })
     ) {
-      setPendingDisplaySnapshot(null);
+      clearPendingDisplaySnapshot();
     }
   }, [
+    clearPendingDisplaySnapshot,
     isHydrating,
     loadingKeys,
     pendingCols,
