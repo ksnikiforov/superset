@@ -57,7 +57,7 @@ cells are projections of DB facts, not canonical data.
 
 ## Current Status
 
-As of May 14, 2026, after the seamless export surface cleanup checkpoint:
+As of May 14, 2026, after the ingestion helper surface cleanup checkpoint:
 
 - Gate-weighted architecture estimate: **99%**.
 - Delivery remaining estimate: **less than 1%**, mostly completion audit and
@@ -72,8 +72,8 @@ As of May 14, 2026, after the seamless export surface cleanup checkpoint:
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `14309` insertions, `13553` deletions, net `+756`.
-- Current production `src` TypeScript/TSX total: `34266` lines.
+- Production `src`: `14295` insertions, `13553` deletions, net `+742`.
+- Current production `src` TypeScript/TSX total: `34252` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - `PivotTableChart.tsx` is now `688` lines and `useExpansionEngine.ts` is now
   `1405` lines; those single-file reductions should not be counted as plugin
@@ -148,6 +148,15 @@ Source-only diff from pre-refactor baseline
 - Touched-file ESLint passed after the seamless export surface cleanup.
 - Focused chart/runtime validation after the cleanup passed: `3` suites and
   `46` tests.
+- Full plugin plus export entrypoint Jest pass after the cleanup: `99` suites
+  and `836` tests.
+- Ingestion helper surface cleanup made query-result ordering, low-level fact
+  ingestion, async ingestion, and fact-store upsert helpers private, then folded
+  the one-consumer async fact wrapper into the async ingestion loop. The source
+  slice was deletion-positive: `11` insertions, `25` deletions, net `-14`.
+- Touched-file ESLint passed after the ingestion helper surface cleanup.
+- Focused ingestion/fetch/runtime validation after the cleanup passed: `4`
+  suites and `47` tests.
 - Full plugin plus export entrypoint Jest pass after the cleanup: `99` suites
   and `836` tests.
 - Metric source-catalog cleanup removed `metricsBase` and
