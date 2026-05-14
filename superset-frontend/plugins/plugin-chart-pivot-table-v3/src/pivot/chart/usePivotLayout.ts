@@ -95,24 +95,6 @@ export type PivotLayoutResult = {
   countDimDepth: (path: PivotTreeNode['path']) => number;
   countEngineDimDepth: (path: PivotTreeNode['path']) => number;
   getRowSubtotalPosition: (node: PivotTreeNode) => TotalPosition;
-  getCollapsedRowChildrenForNodes: (
-    parent: PivotTreeNode,
-    expandedSet: Set<string>,
-    nodes: Record<string, PivotTreeNode>,
-  ) => PivotTreeNode[];
-  getCollapsedColLeavesForNodes: (
-    parent: PivotTreeNode,
-    expandedSet: Set<string>,
-    nodes: Record<string, PivotTreeNode>,
-  ) => PivotTreeNode[];
-  getRowChildrenForNodes: (
-    parent: PivotTreeNode,
-    nodes: Record<string, PivotTreeNode>,
-  ) => PivotTreeNode[];
-  getColChildrenForNodes: (
-    parent: PivotTreeNode,
-    nodes: Record<string, PivotTreeNode>,
-  ) => PivotTreeNode[];
   buildRenderModelConfig: (params: {
     tree: PivotTreeData;
     expandedRows: Set<string>;
@@ -789,10 +771,6 @@ export const usePivotLayout = ({
     countDimDepth,
     countEngineDimDepth,
     getRowSubtotalPosition,
-    getCollapsedRowChildrenForNodes,
-    getCollapsedColLeavesForNodes,
-    getRowChildrenForNodes,
-    getColChildrenForNodes,
     buildRenderModelConfig,
     pruneMergedTree,
   };

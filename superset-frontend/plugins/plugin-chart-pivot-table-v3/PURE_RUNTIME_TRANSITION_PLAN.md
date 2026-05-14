@@ -230,6 +230,11 @@ Problem:
 - Runtime interaction layout uses `valuePlacement`.
 - Both models are necessary today, but the boundary must be explicit to avoid
   duplicate Values-placement behavior.
+- Interaction mode currently has two valid layout authorities: the layout that
+  produced the loaded query/fact coverage, and the local layout the user is
+  editing. Attempts to delete the placement compiler before modeling this split
+  regressed metric order changes, ownState layout preference, stale dashboard
+  rerenders, and targeted fetch counts.
 
 Target:
 
@@ -237,6 +242,10 @@ Target:
 - `METRICS_PLACEHOLDER` exists only as a control/form-data serialization adapter.
 - Drag/drop and control-panel behavior route through the same placement
   compiler.
+- Model the boundary explicitly as `loadedProgram`, `interactiveProgram`, and a
+  transition decision that chooses reuse, targeted fetch, or seamless recovery.
+  After that exists, delete placement-specific compile glue instead of keeping
+  it as an implicit bridge.
 
 Primary files:
 
@@ -252,6 +261,8 @@ Success criteria:
 - Tests cover converting placeholder form data to runtime placement and back.
 - Runtime query/materialization/render paths do not treat the placeholder as
   semantic truth except through the compiler/adapter.
+- Applied/query layout and committed local UI layout are separate typed states,
+  not inferred from whichever formData snapshot is newest.
 
 ## Current Solid Ground
 
@@ -301,7 +312,9 @@ Bring these back before implementing the behavior change:
   behavior, get UX approval first.
 - **Values placeholder boundary.** Removing placeholder tolerance from saved
   form data would be a compatibility break; runtime-only cleanup is fine, but
-  persisted control behavior needs approval.
+  persisted control behavior needs approval. Deleting
+  `compilePivotProgramFromPlacement` also needs the explicit loaded-vs-local
+  program boundary first; otherwise it changes interaction-state UX.
 - **Large-result interactivity.** Worker/off-thread/chunked commit changes can
   alter loader timing and must be planned as an interactivity change.
 

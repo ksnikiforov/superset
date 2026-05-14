@@ -330,26 +330,19 @@ describe('PivotTableChart interaction layout', () => {
       ...appliedFormData,
       pivotRuntimeLayout: uiRuntimeLayout,
     };
-    const baseTree = buildTreeFromRecords(
-      [{ col1: 'A', m1: 10, m2: 20 }],
-      ['m1', 'm2'],
-      [],
-      ['col1'],
-      0,
-      1,
-    );
-    const tree = applyMetricAxis(
-      baseTree,
-      ['m1', 'm2'],
-      MetricsLayoutEnum.COLUMNS,
-      [],
-      ['col1'],
-      1,
-    );
+    const initialRuntime = buildInitialBootstrapRuntime({
+      formData: appliedFormData,
+      runtimeLayout: appliedRuntimeLayout,
+      resultsByDepth: {
+        '0|0': [{ m1: 10, m2: 20 }],
+        '0|1': [{ col1: 'A', m1: 10, m2: 20 }],
+      },
+    });
 
     const { container } = render(
       <PivotTableChart
-        data={tree}
+        data={initialRuntime.tree}
+        factBatches={initialRuntime.factBatches}
         formData={uiFormData}
         rawFormData={uiFormData}
         queryFormData={appliedFormData}
