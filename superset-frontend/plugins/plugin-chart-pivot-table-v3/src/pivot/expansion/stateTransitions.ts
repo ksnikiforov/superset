@@ -69,32 +69,6 @@ export type ExpansionVisibilityConfig = {
   shouldFetchChildren: PivotExpansionNodeFetchPredicate;
 };
 
-export type HydrationIterationPlan =
-  | {
-      kind: 'complete';
-      desiredRows: Set<string>;
-      desiredCols: Set<string>;
-      visibleRowDepth: number;
-      visibleColDepth: number;
-      rowPlan: PivotExpansionPlan;
-      colPlan: PivotExpansionPlan;
-    }
-  | {
-      kind: 'fetch';
-      desiredRows: Set<string>;
-      desiredCols: Set<string>;
-      visibleRowDepth: number;
-      visibleColDepth: number;
-      rowPlan: PivotExpansionPlan;
-      colPlan: PivotExpansionPlan;
-      targets: Array<{
-        axis: PivotAxis;
-        pathKey: string;
-        childDepth: number;
-        requiredOppositeDepth: number;
-      }>;
-    };
-
 const depthSorter = () => 0;
 
 const createEmptyExpansionPlan = (): PivotExpansionPlan => ({
@@ -301,20 +275,6 @@ export const dropDescendants = (
   return next;
 };
 
-export type ExpansionToggleDecision =
-  | {
-      kind: 'collapse';
-    }
-  | {
-      kind: 'same-axis';
-    }
-  | {
-      kind: 'cross-axis-hydration';
-      nextPending: Set<string>;
-      nextManualExpanded: Set<string>;
-      nextManualCollapsed: Set<string>;
-    };
-
 export const resolveExpansionToggleDecision = ({
   axis,
   node,
@@ -337,7 +297,7 @@ export const resolveExpansionToggleDecision = ({
   visibleColDepth: number;
   manualExpanded: Set<string>;
   manualCollapsed: Set<string>;
-}): ExpansionToggleDecision => {
+}) => {
   const isOpen = expanded.has(node.key) || pending.has(node.key);
   if (isOpen) {
     return { kind: 'collapse' };
@@ -365,13 +325,6 @@ export const resolveExpansionToggleDecision = ({
   };
 };
 
-export type CollapsedExpansionState = {
-  nextExpanded: Set<string>;
-  nextPending: Set<string>;
-  nextManualExpanded: Set<string>;
-  nextManualCollapsed: Set<string>;
-};
-
 export const resolveCollapsedExpansionState = ({
   node,
   expanded,
@@ -386,7 +339,7 @@ export const resolveCollapsedExpansionState = ({
   manualExpanded: Set<string>;
   manualCollapsed: Set<string>;
   nodes: Record<string, PivotTreeNode>;
-}): CollapsedExpansionState => {
+}) => {
   const nextManualExpanded = dropDescendants(node.path, manualExpanded, nodes);
   const nextManualCollapsed = dropDescendants(
     node.path,
@@ -617,17 +570,6 @@ export const finalizeHydrationTree = ({
   return mergedTree;
 };
 
-export type ExpansionReinitializationDecision = {
-  shouldResetExpandedState: boolean;
-  isInitialMount: boolean;
-  sharedSignatureChanged: boolean;
-  expandRowsLevelChanged: boolean;
-  expandColsLevelChanged: boolean;
-  effectiveExpandRowsLevel: number;
-  effectiveExpandColsLevel: number;
-  shouldReinitialize: boolean;
-};
-
 export const resolveExpansionReinitializationDecision = ({
   previousSignature,
   expandedStateSignature,
@@ -652,7 +594,7 @@ export const resolveExpansionReinitializationDecision = ({
   resolvedExpandRowsLevel: number;
   resolvedExpandColumnsLevel: number;
   hasNewData: boolean;
-}): ExpansionReinitializationDecision => {
+}) => {
   const shouldResetExpandedState = previousSignature !== expandedStateSignature;
   const isInitialMount = previousSignature === null;
   const sharedSignatureChanged =
@@ -1113,7 +1055,7 @@ export const planHydrationIteration = ({
   pendingCols: Set<string>;
   planRows?: boolean;
   planCols?: boolean;
-}): HydrationIterationPlan => {
+}) => {
   const { visibleRowDepth, visibleColDepth } = computeVisibleDepths({
     tree,
     expandedRows: desiredRows,
@@ -1219,29 +1161,6 @@ export const planHydrationIteration = ({
   };
 };
 
-export type HydrationFetchTarget = {
-  axis: PivotAxis;
-  pathKey: string;
-  childDepth: number;
-  requiredOppositeDepth: number;
-};
-
-export type HydrationLoopFetchContext = {
-  visibleRowDepth: number;
-  visibleColDepth: number;
-};
-
-export type HydrationLoopResult =
-  | {
-      status: 'complete';
-      tree: PivotTreeData;
-      desiredRows: Set<string>;
-      desiredCols: Set<string>;
-    }
-  | {
-      status: 'stale' | 'exhausted';
-    };
-
 export const runHydrationLoop = async ({
   baseTree,
   maxIterations,
@@ -1275,12 +1194,20 @@ export const runHydrationLoop = async ({
     targets,
     context,
   }: {
-    targets: HydrationFetchTarget[];
-    context: HydrationLoopFetchContext;
+    targets: Array<{
+      axis: PivotAxis;
+      pathKey: string;
+      childDepth: number;
+      requiredOppositeDepth: number;
+    }>;
+    context: {
+      visibleRowDepth: number;
+      visibleColDepth: number;
+    };
   }) => Promise<
     Array<{ targets: HydrationDeltaTarget[]; data: PivotTreeData }>
   >;
-}): Promise<HydrationLoopResult> => {
+}) => {
   const deltas: HydrationDeltaMap = new Map();
   for (let iteration = 0; iteration < maxIterations; iteration += 1) {
     if (!isCurrent()) {
