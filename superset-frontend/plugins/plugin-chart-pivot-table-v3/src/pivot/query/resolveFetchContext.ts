@@ -38,6 +38,8 @@ import {
   type PivotAxisProjection,
   resolveAxisProjection,
 } from '../runtime/projection';
+import { buildBranchFactCoverages } from '../runtime/coverage';
+import { type PivotCoverageReason } from '../runtime/types';
 import { buildQueryShape } from './queryShape';
 import { type QueryIntent } from './queryIntent';
 
@@ -267,3 +269,31 @@ export const resolveFetchContext = ({
     hasColTotalSorting,
   };
 };
+
+export const buildFetchContextFactCoverages = ({
+  layout,
+  axis,
+  ctx,
+  reason = 'expand',
+}: {
+  layout: LayoutContext;
+  axis: PivotAxis;
+  ctx: ResolvedFetchContext;
+  reason?: PivotCoverageReason;
+}) =>
+  buildBranchFactCoverages({
+    program: layout.pivotProgram,
+    axis,
+    projection: ctx.projection,
+    rowDepth: ctx.rowDepth,
+    columnDepth: ctx.colDepth,
+    rowSubtotalLevels: ctx.rowSubtotalLevels,
+    columnSubtotalLevels: ctx.colSubtotalLevels,
+    rowTotals: layout.rowTotals,
+    columnTotals: layout.colTotals,
+    includeRowTotalForColumnFormatting:
+      axis === 'col' && (ctx.hasColFormatting || ctx.hasColTotalSorting),
+    includeColumnTotalForRowFormatting:
+      axis === 'row' && (ctx.hasRowFormatting || ctx.hasRowTotalSorting),
+    reason,
+  });

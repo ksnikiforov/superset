@@ -51,24 +51,18 @@ import { formatQueryName } from './queryName';
 import { buildPathFilters, coerceValueForColumn } from './pathFilters';
 import { coerceExpansionState } from './persistedExpansionState';
 import {
+  buildFetchContextFactCoverages,
   type ResolvedFetchContext,
   resolveFetchContext,
 } from './resolveFetchContext';
 import { buildQueryShape } from './queryShape';
 import { type QuerySpec } from './types';
-import {
-  buildBranchFactCoverages,
-  expansionRevealsValuesLevel,
-} from '../runtime/coverage';
+import { expansionRevealsValuesLevel } from '../runtime/coverage';
 import {
   buildAxisCoverageKey,
   projectAxisPathToDimensions,
 } from '../runtime/paths';
-import {
-  type PivotCoverageReason,
-  type PivotFactCoverage,
-  type PivotProgram,
-} from '../runtime/types';
+import { type PivotFactCoverage, type PivotProgram } from '../runtime/types';
 
 export type QuerySpecMeta = {
   kind: 'bootstrap' | 'root' | 'branch' | 'batch';
@@ -277,36 +271,6 @@ const buildSpecsForCoverages = ({
     },
   }));
 
-const buildCoveragesForContext = ({
-  formData,
-  layout,
-  axis,
-  ctx,
-  reason,
-}: {
-  formData: PivotTableQueryFormData;
-  layout: LayoutContext;
-  axis: PivotAxis;
-  ctx: ResolvedFetchContext;
-  reason: PivotCoverageReason;
-}) =>
-  buildBranchFactCoverages({
-    program: layout.pivotProgram,
-    axis,
-    projection: ctx.projection,
-    rowDepth: ctx.rowDepth,
-    columnDepth: ctx.colDepth,
-    rowSubtotalLevels: ctx.rowSubtotalLevels,
-    columnSubtotalLevels: ctx.colSubtotalLevels,
-    rowTotals: formData.rowTotals,
-    columnTotals: formData.colTotals,
-    includeRowTotalForColumnFormatting:
-      axis === 'col' && (ctx.hasColFormatting || ctx.hasColTotalSorting),
-    includeColumnTotalForRowFormatting:
-      axis === 'row' && (ctx.hasRowFormatting || ctx.hasRowTotalSorting),
-    reason,
-  });
-
 const buildBranchSpecs = ({
   formData,
   layout,
@@ -340,8 +304,7 @@ const buildBranchSpecs = ({
     visibleRowDepth,
     visibleColDepth,
   });
-  const coverages = buildCoveragesForContext({
-    formData,
+  const coverages = buildFetchContextFactCoverages({
     layout,
     axis,
     ctx,
@@ -464,8 +427,7 @@ const buildBatchSpecs = ({
     visibleRowDepth,
     visibleColDepth,
   });
-  const coverages = buildCoveragesForContext({
-    formData,
+  const coverages = buildFetchContextFactCoverages({
     layout,
     axis,
     ctx,
@@ -643,15 +605,13 @@ export const buildInitialQuerySpecs = (
       targetRowDepth: baseRowDepth,
       targetColDepth: baseColDepth,
     });
-    const rowCoverages = buildCoveragesForContext({
-      formData,
+    const rowCoverages = buildFetchContextFactCoverages({
       layout,
       axis: 'row',
       ctx: rootContext,
       reason: 'initial',
     });
-    const colCoverages = buildCoveragesForContext({
-      formData,
+    const colCoverages = buildFetchContextFactCoverages({
       layout,
       axis: 'col',
       ctx: rootContext,

@@ -26,10 +26,12 @@ import {
   buildLayoutContext,
   type LayoutContext,
 } from '../layout/LayoutContext';
-import { buildBranchFactCoverages } from '../runtime/coverage';
 import { stableStringify } from '../shared/stableStringify';
 import { formatQueryName } from './queryName';
-import { resolveFetchContext } from './resolveFetchContext';
+import {
+  buildFetchContextFactCoverages,
+  resolveFetchContext,
+} from './resolveFetchContext';
 import { toChartDataQueries } from './toChartDataQueries';
 import { type QuerySpec } from './types';
 
@@ -70,20 +72,10 @@ export const buildBatchSignature = ({
     timeOffsets.length > 0
       ? { ...queryFormData, time_offsets: timeOffsets }
       : queryFormData;
-  const coverages = buildBranchFactCoverages({
-    program: resolvedLayout.pivotProgram,
+  const coverages = buildFetchContextFactCoverages({
+    layout: resolvedLayout,
     axis,
-    projection: ctx.projection,
-    rowDepth: ctx.rowDepth,
-    columnDepth: ctx.colDepth,
-    rowSubtotalLevels: ctx.rowSubtotalLevels,
-    columnSubtotalLevels: ctx.colSubtotalLevels,
-    rowTotals: formData.rowTotals,
-    columnTotals: formData.colTotals,
-    includeRowTotalForColumnFormatting:
-      axis === 'col' && (ctx.hasColFormatting || ctx.hasColTotalSorting),
-    includeColumnTotalForRowFormatting:
-      axis === 'row' && (ctx.hasRowFormatting || ctx.hasRowTotalSorting),
+    ctx,
   });
 
   const specs: QuerySpec[] = coverages.map(coverage => ({
