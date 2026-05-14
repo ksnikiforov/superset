@@ -57,7 +57,7 @@ cells are projections of DB facts, not canonical data.
 
 ## Current Status
 
-As of May 14, 2026, after the chart wrapper cleanup checkpoint:
+As of May 14, 2026, after the chart helper cleanup checkpoint:
 
 - Gate-weighted architecture estimate: **98%**.
 - Delivery remaining estimate: **1-2%**, mostly final cleanup, validation,
@@ -72,12 +72,19 @@ As of May 14, 2026, after the chart wrapper cleanup checkpoint:
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `14873` insertions, `13437` deletions, net `+1436`.
-- Current production `src` TypeScript/TSX total: `34946` lines.
+- Production `src`: `14724` insertions, `13416` deletions, net `+1308`.
+- Current production `src` TypeScript/TSX total: `34818` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
-- `PivotTableChart.tsx` is now `689` lines and `useExpansionEngine.ts` is now
+- `PivotTableChart.tsx` is now `698` lines and `useExpansionEngine.ts` is now
   `1255` lines; those single-file reductions should not be counted as plugin
   source reduction because the plugin-wide total increased.
+- Chart view-prop helper cleanup deleted the one-consumer `pivotViewProps.ts`
+  helper and built the display snapshot plus `PivotTableView` props directly at
+  the render site; the source slice was deletion-positive: `34` insertions,
+  `162` deletions, net `-128`.
+- Focused chart validation after deleting the view-prop helper passed: `3`
+  suites and `74` tests.
+- Touched chart file passed ESLint, Prettier, and `git diff --check`.
 - Chart wrapper cleanup deleted the one-consumer `PivotChartView.tsx` wrapper
   and rendered its two branches directly in `PivotTableChart.tsx`; the source
   slice was deletion-positive: `49` insertions, `110` deletions, net `-61`.
@@ -299,7 +306,7 @@ Source-only diff from pre-refactor baseline
   compiled layout context: `2` suites and `28` tests.
 
 The readout is mixed and should be treated plainly: plugin-wide source lines
-increased by `1436`. The meaningful progress is architectural ownership moving
+increased by `1308`. The meaningful progress is architectural ownership moving
 out of overloaded React/chart files into tested runtime helpers plus
 deletion-positive structure cleanup; it is still not a net source reduction.
 
@@ -313,7 +320,7 @@ deletion-positive structure cleanup; it is still not a net source reduction.
 | Gate 4: one tree materializer             |        97% | `materializePivotTree.ts` owns fact-to-tree materialization, Values/metric/measure axes, subtotal leaf injection, and measure-leaf value application. Export no longer repairs row depth semantics, infers visible row hierarchy depth from cloned DOM rows, reads per-row depth markers, reconstructs visible row paths by scanning sibling DOM rows, clones/reshapes the rendered table, routes v3 workbook generation through `table_to_book`, exposes a production HTML-table export builder, emits export metadata attributes into the rendered table, parses rendered DOM metadata, exports unregistered rendered tables, or uses the legacy table-selector adapter. Row export values are produced by a pure export row model, the rendered view registers explicit worksheet cells by chart id, and the v3 export path writes that registered worksheet model.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
 | Gate 5: expansion reducer/runtime effects |       100% | Expansion no longer derives fetched state from rendered tree shape. It uses explicit fact coverage, semantic fetchability, shared fetch execution, and request lifecycles. Loaded terminal metric nodes and metric subtotal nodes now seed coverage through the fetched-coverage utility. Same-axis and hydration paths now use the expansion fetch executor for target fetches, stale-result rejection, coverage seeding, loaded metric-node coverage seeding, and returned tree deltas. Same-axis fetch-loop sequencing, target planning, stale epoch checks, delta application, and touched-key collection now live with expansion fetch execution instead of the React hook. Hydration fetch-delta wiring also routes through the expansion fetch executor, leaving the hook to call a hydration execution boundary instead of assembling target fetch callbacks. Expansion hydration kickoff, loading-state management, async commit, cross-axis persistence, and hydration prefetch scheduling now live with the hydration runtime. Expansion request lifecycle/helper setup, request cancellation cleanup, and fetch-coverage signature invalidation now live in a dedicated request-runtime hook. Same-axis in-flight expansion tracking and reset policy now live in a dedicated in-flight state hook. Same-axis delta merge/stale-subtree preservation policy lives in the expansion engine, hydration delta staging/finalization policy lives in the expansion engine, expansion reinitialization trigger/effective-level policy lives in the expansion engine, persisted expansion visibility normalization lives in the expansion engine, expansion toggle/collapse pruning decisions live in the expansion engine, metric expansion stale-key cleanup uses one path, hydration iteration/cancellation policy lives in the expansion engine, branch/batch fetch execution lives in a dedicated expansion fetch executor, and expansion request group id/scope tracking lives with fetch execution. Initial hydration prefetch planning and prefetch action selection are pure engine decisions. Same-axis fetch, cross-axis hydration, collapse, and reinitialization use one batched tree/expanded/pending commit path. |
 | Gate 6: pure render model                 |        99% | Projection drives toggle eligibility, collapsed Values, column display, visible-axis construction, semantic export row depth count, semantic export row values, and chart column-sort decisions. Databar scale grouping, waterfall offsets, bridge connectors, label-space sizing, databar column min-width policy, metric-axis layout compatibility policy, metric and measure-leaf order comparison, pre-subtotal child filtering, collapsed Values node projection, row subtotal child policy, column display path construction, header label resolution, metric-leaf render expansion, render date-label formatting, toggle visibility, row/column aggregate emphasis, render node depth, column-sort state/callback ownership, export row hierarchy projection, worksheet-cell export typing, registered worksheet export data, the direct worksheet-to-XLSX writer, and chart-id export lookup now live in pure/render helpers. Remaining risk is mostly display-map policy plus the registry shape for export data ownership.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
-| Gate 7: chart component cleanup           |        98% | The chart delegates runtime fetch decisions and no longer vetoes metric-order-only commits or treats rendered tree signatures as seamless refetch identity. Seamless sync snapshots, upstream dashboard query-context signatures, committed-props sync predicates, stale coverage recovery predicates, persisted-filter seamless reload policy, persisted-selection local sync policy, selected-filter source precedence, runtime-layout prop sync policy and prop-sync planning, runtime-layout change actions/triggers, stale dashboard runtime actions, seamless update-trigger planning/execution, seamless persistence side-effect planning, pending display snapshot settlement policy, seamless request lifecycle/loading/error/warning state, seamless display-snapshot freezing, seamless async commit handling, committed tree/fact state, and applied runtime layout/formData projection now live outside the chart. Runtime-layout committed/UI state, prop synchronization, runtime persistence execution, persisted-filter sync, committed/UI filter state, and selection-sync derivation now live in `usePivotRuntimeLayoutState`, reducing chart-level controller state. Selected-filter update policy/triggers, persisted filter normalization, tree-derived dimension filter value collection, selection-filtered fetch form-data construction, dimension filter search/value fetch state, interaction chip construction, interaction DnD shell rendering/triggers, remove-dimension layout policy, column-sort state/resolution/reconciliation, and dataset metadata/date-formatter resolution are now outside the chart. Stale-dashboard recovery, stale coverage recovery, persisted-filter replay, runtime layout refetch/persistence triggers, interaction filter refetch triggers, and interaction DnD refetch/persistence triggers now share the seamless runtime update hook. Shared active-display-snapshot resolution and `PivotTableView` prop assembly live in chart helpers, while the one-consumer final view wrapper has been deleted and its branches render directly in the chart. The chart still owns high-level dataflow wiring and interaction-panel prop selection. |
+| Gate 7: chart component cleanup           |        98% | The chart delegates runtime fetch decisions and no longer vetoes metric-order-only commits or treats rendered tree signatures as seamless refetch identity. Seamless sync snapshots, upstream dashboard query-context signatures, committed-props sync predicates, stale coverage recovery predicates, persisted-filter seamless reload policy, persisted-selection local sync policy, selected-filter source precedence, runtime-layout prop sync policy and prop-sync planning, runtime-layout change actions/triggers, stale dashboard runtime actions, seamless update-trigger planning/execution, seamless persistence side-effect planning, pending display snapshot settlement policy, seamless request lifecycle/loading/error/warning state, seamless display-snapshot freezing, seamless async commit handling, committed tree/fact state, and applied runtime layout/formData projection now live outside the chart. Runtime-layout committed/UI state, prop synchronization, runtime persistence execution, persisted-filter sync, committed/UI filter state, and selection-sync derivation now live in `usePivotRuntimeLayoutState`, reducing chart-level controller state. Selected-filter update policy/triggers, persisted filter normalization, tree-derived dimension filter value collection, selection-filtered fetch form-data construction, dimension filter search/value fetch state, interaction chip construction, interaction DnD shell rendering/triggers, remove-dimension layout policy, column-sort state/resolution/reconciliation, and dataset metadata/date-formatter resolution are now outside the chart. Stale-dashboard recovery, stale coverage recovery, persisted-filter replay, runtime layout refetch/persistence triggers, interaction filter refetch triggers, and interaction DnD refetch/persistence triggers now share the seamless runtime update hook. The one-consumer view-prop helper and final view wrapper have been deleted; display-snapshot selection, `PivotTableView` prop assembly, and the user-controlled/non-user-controlled branches now render directly in the chart. The chart still owns high-level dataflow wiring and interaction-panel prop selection. |
 
 ## What Is Now Solid
 
@@ -489,8 +496,8 @@ deletion-positive structure cleanup; it is still not a net source reduction.
   largest chart-owned orchestration surface. Committed tree/fact state now
   lives in the seamless runtime update hook, and committed/UI filter state now
   lives in the runtime layout state hook, but the chart still handles dashboard
-  persistence side-effect execution, stale recovery predicate inputs, and view
-  prop assembly.
+  persistence side-effect execution, stale recovery predicate inputs, and
+  high-level view composition.
 - `useExpansionEngine.ts` still owns request kickoff and sequencing. Repeated
   state-ref synchronization and tree/expanded/pending commits are centralized,
   but more helper extraction is useful only if it deletes more hook code than it
@@ -528,7 +535,7 @@ Largest relevant production files:
 - `controlPanel.tsx`: `1024` lines.
 - `PivotTableView.tsx`: `891` lines.
 - `usePivotLayout.ts`: `767` lines.
-- `PivotTableChart.tsx`: `689` lines.
+- `PivotTableChart.tsx`: `698` lines.
 - `seamlessRuntimeUpdate.ts`: `594` lines.
 - `usePivotRenderModel.ts`: `592` lines.
 
@@ -626,6 +633,10 @@ git diff --check
 
 Recent validation:
 
+- `9953f66b02`: deleted the one-consumer `pivotViewProps.ts` helper and built
+  the display snapshot plus `PivotTableView` props directly in
+  `PivotTableChart.tsx`; Prettier, file-level ESLint, `git diff --check`, and
+  focused chart Jest (`74` tests) passed.
 - `4e3c0cccef`: deleted the one-consumer `PivotChartView.tsx` wrapper and
   rendered the user-controlled/non-user-controlled chart branches directly in
   `PivotTableChart.tsx`; Prettier, file-level ESLint, `git diff --check`, and
@@ -964,12 +975,19 @@ changes from the highest-impact areas.
 Current evidence:
 
 - Source-only baseline comparison from
-  `7088db374448845ef6e71cf74817aa53efbc5fc1`: `14873` insertions, `13437`
-  deletions, net `+1436`; current production `src` TypeScript/TSX total is
-  `34946` lines, up from an implied `33510` line baseline.
+  `7088db374448845ef6e71cf74817aa53efbc5fc1`: `14724` insertions, `13416`
+  deletions, net `+1308`; current production `src` TypeScript/TSX total is
+  `34818` lines, up from an implied `33510` line baseline.
 - The honest line-count result is not a plugin reduction. `PivotTableChart.tsx`
-  is down to `689` lines and `useExpansionEngine.ts` is down to `1255` lines,
+  is down to `698` lines and `useExpansionEngine.ts` is down to `1255` lines,
   but those are local file reductions offset by extracted runtime/helper code.
+- Latest chart view-prop helper cleanup deleted the one-consumer
+  `pivotViewProps.ts` file and built the display snapshot plus
+  `PivotTableView` props directly in `PivotTableChart.tsx`; the source slice
+  was deletion-positive: `34` insertions, `162` deletions, net `-128`.
+- Latest view-prop helper validation passed focused Jest validation: `3`
+  suites and `74` tests; touched chart file passed Prettier, file-level ESLint,
+  and `git diff --check`.
 - Latest chart wrapper cleanup deleted the one-consumer `PivotChartView.tsx`
   file and rendered its branches directly in `PivotTableChart.tsx`; the source
   slice was deletion-positive: `49` insertions, `110` deletions, net `-61`.
@@ -1092,13 +1110,12 @@ Open checklist:
   state, committed/UI filter state, selection-sync derivation, and seamless
   update-trigger execution plus runtime-layout change triggers now live outside
   `PivotTableChart.tsx`; interaction filter triggers now also live outside the
-  chart. Interaction DnD triggers now also live outside the chart. Shared
-  active-display-snapshot resolution and `PivotTableView` prop assembly now
-  live outside the chart. The one-consumer final chart view wrapper has been
-  deleted, and the chart renders the user-controlled/non-user-controlled
-  branches directly. The chart still owns high-level dataflow wiring and
-  interaction-panel prop selection. Column-sort state and callbacks now live
-  with the render model.
+  chart. Interaction DnD triggers now also live outside the chart. The
+  one-consumer view-prop helper and final chart view wrapper have been deleted,
+  and the chart renders the display snapshot, `PivotTableView` props, and
+  user-controlled/non-user-controlled branches directly. The chart still owns
+  high-level dataflow wiring and interaction-panel prop selection. Column-sort
+  state and callbacks now live with the render model.
 
 Conclusion: the transition is not complete. The next code slices should target
 only deletion-positive changes in chart runtime sync, expansion request
