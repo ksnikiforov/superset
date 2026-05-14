@@ -61,11 +61,7 @@ import {
   resolveAppliedInteractionLayout,
 } from './pivot/layout/resolveInteractionLayout';
 import { buildSelectionFilteredFormData } from './pivot/update/initialUpdatePlan';
-import {
-  applyDimensionFilterSelectionChange,
-  buildClearSelectedFiltersUpdate,
-  buildTreeDimensionFilterValues,
-} from './pivot/filters';
+import { buildTreeDimensionFilterValues } from './pivot/filters';
 import { useDimensionFilterValues } from './pivot/chart/useDimensionFilterValues';
 import {
   applyDimensionDrag,
@@ -314,8 +310,9 @@ function PivotTableChart(props: PivotTableProps) {
     seamlessWarnings,
     seamlessError,
     pendingDisplaySnapshot,
-    applySeamlessUpdate,
     applyRuntimeLayoutChange,
+    applyDimensionFilterChange,
+    clearAllFilters,
     clearPendingDisplaySnapshot,
   } = usePivotSeamlessRuntimeUpdate({
     dimensionKeys,
@@ -342,6 +339,8 @@ function PivotTableChart(props: PivotTableProps) {
     pendingRowsRef: pendingRowsForSeamlessRef,
     pendingColsRef: pendingColsForSeamlessRef,
     commitFilters,
+    updateUiSelectedFilters,
+    suppressStalePersistedFilterRestoreRef,
     commitUiRuntimeLayout: updateUiRuntimeLayout,
     persistRuntimeState,
   });
@@ -509,48 +508,6 @@ function PivotTableChart(props: PivotTableProps) {
     selectedFilters: uiSelectedFilters,
     colTypeMap,
   });
-
-  const handleDimensionFilterChange = useCallback(
-    (
-      dimension: PivotTableProps['groupbyRows'][number],
-      values: DataRecordValue[],
-    ) => {
-      const dimensionKey = getStableColumnKey(dimension);
-      const { selection: nextSelected, suppressStalePersistedFilterRestore } =
-        applyDimensionFilterSelectionChange({
-          selection: uiSelectedFilters,
-          dimensionKey,
-          values,
-        });
-      suppressStalePersistedFilterRestoreRef.current =
-        suppressStalePersistedFilterRestore;
-      updateUiSelectedFilters(nextSelected);
-      applySeamlessUpdate(uiRuntimeLayout, nextSelected);
-    },
-    [
-      applySeamlessUpdate,
-      uiRuntimeLayout,
-      uiSelectedFilters,
-      updateUiSelectedFilters,
-    ],
-  );
-
-  const handleClearAllFilters = useCallback(() => {
-    const update = buildClearSelectedFiltersUpdate(uiSelectedFilters);
-    if (!update) {
-      return;
-    }
-    suppressStalePersistedFilterRestoreRef.current =
-      update.suppressStalePersistedFilterRestore;
-    const nextSelected = update.selection;
-    updateUiSelectedFilters(nextSelected);
-    applySeamlessUpdate(uiRuntimeLayout, nextSelected);
-  }, [
-    applySeamlessUpdate,
-    uiRuntimeLayout,
-    uiSelectedFilters,
-    updateUiSelectedFilters,
-  ]);
 
   const tableWidth = isUserControlled
     ? Math.max(
@@ -766,8 +723,8 @@ function PivotTableChart(props: PivotTableProps) {
           dimensionFilterValues={dimensionFilterValues}
           dimensionFilterLoading={dimensionFilterLoading}
           selectedFilters={uiSelectedFilters}
-          onFilterChange={handleDimensionFilterChange}
-          onClearFilters={handleClearAllFilters}
+          onFilterChange={applyDimensionFilterChange}
+          onClearFilters={clearAllFilters}
           onFilterValuesOpen={handleFetchDimensionValues}
           onFilterValuesSearch={handleFetchDimensionValues}
           runtimeLayout={uiRuntimeLayout}

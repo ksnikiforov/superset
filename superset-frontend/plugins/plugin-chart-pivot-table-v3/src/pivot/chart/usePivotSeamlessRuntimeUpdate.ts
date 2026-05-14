@@ -26,7 +26,11 @@ import {
   type MutableRefObject,
 } from 'react';
 import { unstable_batchedUpdates } from 'react-dom';
-import { t, type DataRecordValue } from '@superset-ui/core';
+import {
+  t,
+  type DataRecordValue,
+  type QueryFormColumn,
+} from '@superset-ui/core';
 import {
   type PivotRuntimeLayout,
   type PivotTableQueryFormData,
@@ -46,6 +50,11 @@ import {
 import { type PivotFactStoreBatch } from '../runtime/ingestQueryResults';
 import { normalizeRuntimeLayout } from '../layout/resolveInteractionLayout';
 import { PivotTableView } from '../render/PivotTableView';
+import {
+  applyDimensionFilterSelectionChange,
+  buildClearSelectedFiltersUpdate,
+} from '../filters';
+import { getStableColumnKey } from '../../utils';
 
 type RuntimeSelection = Record<string, DataRecordValue[]>;
 type PivotViewProps = ComponentProps<typeof PivotTableView>;
@@ -79,6 +88,8 @@ type UsePivotSeamlessRuntimeUpdateConfig = {
   pendingRowsRef: MutableRefObject<Set<string>>;
   pendingColsRef: MutableRefObject<Set<string>>;
   commitFilters: (filters: RuntimeSelection) => void;
+  updateUiSelectedFilters: (filters: RuntimeSelection) => void;
+  suppressStalePersistedFilterRestoreRef: MutableRefObject<boolean>;
   commitUiRuntimeLayout: (layout: PivotRuntimeLayout) => void;
   persistRuntimeState: (
     layout: PivotRuntimeLayout,
@@ -114,6 +125,8 @@ export const usePivotSeamlessRuntimeUpdate = (
     pendingRowsRef,
     pendingColsRef,
     commitFilters,
+    updateUiSelectedFilters,
+    suppressStalePersistedFilterRestoreRef,
     commitUiRuntimeLayout,
     persistRuntimeState,
   } = config;
@@ -287,6 +300,47 @@ export const usePivotSeamlessRuntimeUpdate = (
     ],
   );
 
+  const applyDimensionFilterChange = useCallback(
+    (dimension: QueryFormColumn, values: DataRecordValue[]) => {
+      const dimensionKey = getStableColumnKey(dimension);
+      const { selection: nextSelected, suppressStalePersistedFilterRestore } =
+        applyDimensionFilterSelectionChange({
+          selection: uiSelectedFilters,
+          dimensionKey,
+          values,
+        });
+      suppressStalePersistedFilterRestoreRef.current =
+        suppressStalePersistedFilterRestore;
+      updateUiSelectedFilters(nextSelected);
+      applySeamlessUpdate(uiRuntimeLayout, nextSelected);
+    },
+    [
+      applySeamlessUpdate,
+      suppressStalePersistedFilterRestoreRef,
+      uiRuntimeLayout,
+      uiSelectedFilters,
+      updateUiSelectedFilters,
+    ],
+  );
+
+  const clearAllFilters = useCallback(() => {
+    const update = buildClearSelectedFiltersUpdate(uiSelectedFilters);
+    if (!update) {
+      return;
+    }
+    suppressStalePersistedFilterRestoreRef.current =
+      update.suppressStalePersistedFilterRestore;
+    const nextSelected = update.selection;
+    updateUiSelectedFilters(nextSelected);
+    applySeamlessUpdate(uiRuntimeLayout, nextSelected);
+  }, [
+    applySeamlessUpdate,
+    suppressStalePersistedFilterRestoreRef,
+    uiRuntimeLayout,
+    uiSelectedFilters,
+    updateUiSelectedFilters,
+  ]);
+
   useEffect(() => {
     const updatePlan = prepareSeamlessRuntimeUpdateEffect({
       upstreamDashboardQueryContextSignature,
@@ -334,6 +388,8 @@ export const usePivotSeamlessRuntimeUpdate = (
     pendingDisplaySnapshot,
     applySeamlessUpdate,
     applyRuntimeLayoutChange,
+    applyDimensionFilterChange,
+    clearAllFilters,
     clearPendingDisplaySnapshot,
   };
 };
