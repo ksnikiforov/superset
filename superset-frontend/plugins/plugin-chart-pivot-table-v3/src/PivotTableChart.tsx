@@ -68,10 +68,6 @@ import {
   type PivotDisplaySnapshot,
   usePivotSeamlessRuntimeUpdate,
 } from './pivot/chart/usePivotSeamlessRuntimeUpdate';
-import {
-  buildSharedPivotViewProps,
-  resolveActivePivotDisplaySnapshot,
-} from './pivot/chart/pivotViewProps';
 import { PivotTableView } from './pivot/render/PivotTableView';
 
 const EMPTY_SELECTED_FILTERS: Record<string, DataRecordValue[]> = {};
@@ -563,40 +559,53 @@ function PivotTableChart(props: PivotTableProps) {
   const tableHeight = isUserControlled
     ? Math.max(0, height - INTERACTION_TOP_CHIPS_HEIGHT)
     : height;
-  const { activeDisplaySnapshot, liveDisplaySnapshot } =
-    resolveActivePivotDisplaySnapshot({
-      renderModelResult,
-      renderTree,
-      pendingDisplaySnapshot,
-    });
+  const liveDisplaySnapshot: PivotDisplaySnapshot = {
+    renderModel: renderModelResult.renderModel,
+    tree: renderTree,
+    expandedRows: renderModelResult.expandedRowsForRender,
+    expandedCols: renderModelResult.expandedColsForRender,
+  };
+  const activeDisplaySnapshot = pendingDisplaySnapshot ?? liveDisplaySnapshot;
   displaySnapshotRef.current = liveDisplaySnapshot;
   const exportChartId =
     typeof formData.slice_id === 'number' ||
     typeof formData.slice_id === 'string'
       ? formData.slice_id
       : undefined;
-  const sharedPivotViewProps = buildSharedPivotViewProps({
-    activeDisplaySnapshot,
-    activeErrorMessage,
-    handleRetry,
-    combinedWarnings,
-    cornerLoaderVisible,
-    resolvedStickyHeaders,
+  const sharedPivotViewProps = {
+    renderModel: activeDisplaySnapshot.renderModel,
+    tree: activeDisplaySnapshot.tree,
+    expandedRows: activeDisplaySnapshot.expandedRows,
+    expandedCols: activeDisplaySnapshot.expandedCols,
+    errorMessage: activeErrorMessage,
+    onRetry: handleRetry,
+    warnings: combinedWarnings,
+    showGlobalLoader: false,
+    showCornerLoader: cornerLoaderVisible,
+    stickyHeaders: resolvedStickyHeaders,
     headerOffset,
     headerRowOffsets,
     headerRef,
-    layoutResult,
+    colTotalPosition: layoutResult.resolvedColTotalPosition,
     formatting,
-    handleToggle,
-    renderModelResult,
-    pendingDisplaySnapshot,
-    seamlessLoading,
-    loadingKeys,
+    onToggleNode: handleToggle,
+    onSortColumn: renderModelResult.handleColumnSort,
+    isColumnSortable: renderModelResult.isColumnSortable,
+    getColumnSortOrder: renderModelResult.getColumnSortOrder,
+    shouldShowToggle: renderModelResult.shouldShowToggle,
+    showSpinner: (key: string) =>
+      !pendingDisplaySnapshot && !seamlessLoading && loadingKeys.has(key),
+    isRowAggregateBold: renderModelResult.isRowAggregateBold,
+    isColAggregateBold: renderModelResult.isColAggregateBold,
+    getNodeDimDepth: renderModelResult.getNodeDimDepth,
+    isMetricGrandTotalNode: layoutResult.isMetricGrandTotalNode,
     emitCrossFilters,
-    interactions,
+    handleCellClick: interactions.handleCellClick,
+    handleCellKeyDown: interactions.handleCellKeyDown,
+    handleCellContextMenu: interactions.handleCellContextMenu,
     rowAxisLabels,
     exportChartId,
-  });
+  };
   const rowChips = useMemo(
     () =>
       buildInteractionChips({
