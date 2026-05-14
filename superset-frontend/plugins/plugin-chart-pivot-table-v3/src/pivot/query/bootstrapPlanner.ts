@@ -16,7 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { type QueryFormColumn, type QueryFormMetric } from '@superset-ui/core';
+import { type QueryFormColumn } from '@superset-ui/core';
 import { type PivotTableQueryFormData } from '../../types';
 import { hasTotalSorting } from '../../utils';
 import { type LayoutContext } from '../layout/LayoutContext';
@@ -37,9 +37,6 @@ export type BootstrapTarget = {
 
 export type BootstrapPlan = {
   targets: BootstrapTarget[];
-  rowGroupby: QueryFormColumn[];
-  colGroupby: QueryFormColumn[];
-  metrics: QueryFormMetric[];
 };
 
 type BuildIntentInput = {
@@ -127,16 +124,12 @@ export function buildBootstrapPlanFromLayout(
   layout: LayoutContext,
   formData: PivotTableQueryFormData,
 ): BootstrapPlan {
-  const {
-    groupbyRows: rowGroupby,
-    groupbyColumns: colGroupby,
-    metrics,
-  } = layout;
+  const { groupbyRows: rowGroupby, groupbyColumns: colGroupby } = layout;
   const { rowSubtotalLevels, colSubtotalLevelsForQuery: colSubtotalLevels } =
     layout;
   const needsTotals =
-    !!formData.rowTotals ||
-    !!formData.colTotals ||
+    layout.rowTotals ||
+    layout.colTotals ||
     rowSubtotalLevels.length > 0 ||
     colSubtotalLevels.length > 0;
   const needsMetricFormatting =
@@ -150,12 +143,12 @@ export function buildBootstrapPlanFromLayout(
     Object.keys(formData.colFormatting || {}).length > 0;
   const needsRowTotals =
     rowGroupby.length > 0 &&
-    (!!formData.rowTotals ||
+    (layout.rowTotals ||
       rowSubtotalLevels.length > 0 ||
       hasTotalSorting(formData.rowSorting, rowGroupby));
   const needsColTotals =
     colGroupby.length > 0 &&
-    (!!formData.colTotals ||
+    (layout.colTotals ||
       colSubtotalLevels.length > 0 ||
       hasTotalSorting(formData.colSorting, colGroupby));
   const firstRowDepth = firstVisibleDepth(rowGroupby);
@@ -246,8 +239,5 @@ export function buildBootstrapPlanFromLayout(
 
   return {
     targets,
-    rowGroupby,
-    colGroupby,
-    metrics,
   };
 }
