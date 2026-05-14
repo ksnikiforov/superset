@@ -88,7 +88,6 @@ import { createLatestRequestLifecycle } from '../runtime/requestLifecycle';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 
 const MAX_HYDRATION_ITERATIONS = 12;
-const EMPTY_FACT_BATCHES: PivotFactStoreBatch[] = [];
 
 type ExpansionStateCommit = {
   tree?: PivotTreeData;
@@ -294,7 +293,7 @@ export type ExpansionEngineResult = {
 
 export type ExpansionEngineConfig = {
   data: PivotTreeData;
-  factBatches?: PivotFactStoreBatch[];
+  factBatches: PivotFactStoreBatch[];
   expandedStateSignature: string;
   expandedStateSharedSignature: string;
   fetchFormData: PivotTableQueryFormData;
@@ -329,7 +328,7 @@ export type ExpansionEngineConfig = {
 
 export const useExpansionEngine = ({
   data,
-  factBatches = EMPTY_FACT_BATCHES,
+  factBatches,
   expandedStateSignature,
   expandedStateSharedSignature,
   fetchFormData,
