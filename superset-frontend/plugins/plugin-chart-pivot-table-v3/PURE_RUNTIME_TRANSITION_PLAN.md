@@ -58,7 +58,7 @@ cells are projections of DB facts, not canonical data.
 ## Current Status
 
 As of May 14, 2026, after
-`25905610bf refactor(pivot-table-v3): read formatting layout from program`:
+`129011563d fix(pivot-table-v3): preserve raw layout levels`:
 
 - Gate-weighted architecture estimate: **97%**.
 - Delivery remaining estimate: **10-18%**, mostly final cleanup, validation,
@@ -72,7 +72,7 @@ As of May 14, 2026, after
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `12986` insertions, `12285` deletions, net `+701`.
+- Production `src`: `12988` insertions, `12287` deletions, net `+701`.
 - Current production `src` TypeScript/TSX total: `34211` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - Full plugin Jest pass after the column-sort extraction: `91` suites and
@@ -244,6 +244,8 @@ Source-only diff from pre-refactor baseline
 - Focused metric-tier and interaction-layout pass after deriving
   `usePivotLayout`, formatting, and interaction form-data inputs from the
   compiled layout context: `2` suites and `14` tests.
+- Full plugin plus export utility Jest pass after preserving raw compiled
+  layout levels for Values placeholder policy: `97` suites and `782` tests.
 
 The readout remains mixed: the plugin is still modestly above the baseline line
 count, but the chart/layout hooks keep losing inline policy and the remaining
@@ -570,6 +572,11 @@ git diff --check
 
 Recent validation:
 
+- `129011563d`: kept raw compiled layout row/column levels for Values
+  placeholder child policy after removing chart-owned groupby compatibility
+  props; touched-file ESLint, focused sorting Jest, and the full
+  pivot-table-v3 plus export utility Jest suite (`97` suites, `782` tests)
+  passed.
 - `25905610bf`: removed the duplicate layout metrics/groupbys returned from
   `resolveAppliedInteractionLayout`, made `usePivotLayout` derive metrics from
   form data, and made formatting read metrics/groupbys from the compiled layout
