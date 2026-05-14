@@ -24,7 +24,6 @@ import {
   useState,
   type ComponentProps,
 } from 'react';
-import { isEqual } from 'lodash';
 import {
   AppSection,
   DataRecordValue,
@@ -94,7 +93,6 @@ import {
   prepareSeamlessRuntimeUpdateEffect,
   prepareSeamlessRuntimeLayoutChange,
   shouldSyncCommittedRuntimeFromProps,
-  shouldSyncPersistedSelectedFilters,
   type SeamlessRuntimeSyncSnapshot,
   type SeamlessRuntimeUpstreamState,
 } from './pivot/runtime/seamlessRuntimeUpdate';
@@ -261,35 +259,6 @@ function PivotTableChart(props: PivotTableProps) {
     return normalizeRuntimeLayout(persisted, dimensionKeys, metricKeys);
   }, [dimensionKeys, formData.pivotRuntimeLayout, metricKeys, ownState]);
   const selectedFiltersFromProps = selectedFilters ?? EMPTY_SELECTED_FILTERS;
-  const upstreamDashboardQueryContextSignature = useMemo(() => {
-    if (!isDashboardRuntimeSync) {
-      return null;
-    }
-    return buildSeamlessRuntimeUpstreamSignature(queryFormData);
-  }, [isDashboardRuntimeSync, queryFormData]);
-  const {
-    committedRuntimeLayout,
-    committedRuntimeLayoutRef,
-    uiRuntimeLayout,
-    uiRuntimeLayoutRef,
-    updateUiRuntimeLayout,
-    lastPersistedSelectionRef,
-    pendingPersistedSelectionSyncRef,
-    lastLocalSyncDashboardQueryContextRef,
-    persistRuntimeState,
-  } = usePivotRuntimeLayoutState({
-    isUserControlled,
-    isDashboardContext,
-    isDashboardRuntimeSync,
-    shouldPersistOwnState,
-    runtimeLayout,
-    selectedFiltersFromProps,
-    upstreamDashboardQueryContextSignature,
-    pendingSeamlessLayoutRef,
-    mergeOwnState,
-    setControlValue,
-    setDataMask,
-  });
   const [uiSelectedFilters, setUiSelectedFilters] = useState<
     Record<string, DataRecordValue[]>
   >(selectedFilters ?? EMPTY_SELECTED_FILTERS);
@@ -323,6 +292,39 @@ function PivotTableChart(props: PivotTableProps) {
       selectedFiltersFromProps,
     ],
   );
+  const upstreamDashboardQueryContextSignature = useMemo(() => {
+    if (!isDashboardRuntimeSync) {
+      return null;
+    }
+    return buildSeamlessRuntimeUpstreamSignature(queryFormData);
+  }, [isDashboardRuntimeSync, queryFormData]);
+  const {
+    committedRuntimeLayout,
+    committedRuntimeLayoutRef,
+    uiRuntimeLayout,
+    uiRuntimeLayoutRef,
+    updateUiRuntimeLayout,
+    lastLocalSyncDashboardQueryContextRef,
+    persistRuntimeState,
+  } = usePivotRuntimeLayoutState({
+    isUserControlled,
+    isDashboardContext,
+    isDashboardRuntimeSync,
+    shouldPersistOwnState,
+    runtimeLayout,
+    selectedFiltersFromProps,
+    persistedSelectedFilters,
+    committedFilters,
+    uiSelectedFilters,
+    upstreamDashboardQueryContextSignature,
+    pendingSeamlessLayoutRef,
+    suppressStalePersistedFilterRestoreRef,
+    commitFilters: setCommittedFilters,
+    setUiSelectedFilters,
+    mergeOwnState,
+    setControlValue,
+    setDataMask,
+  });
 
   const { appliedLayoutFormData, appliedPivotProgram } =
     resolveAppliedInteractionLayout({
@@ -359,37 +361,6 @@ function PivotTableChart(props: PivotTableProps) {
     selectedFiltersForTreeSync,
     committedFilters,
   });
-  useEffect(() => {
-    if (
-      isUserControlled &&
-      pendingPersistedSelectionSyncRef.current &&
-      isEqual(persistedSelectedFilters, lastPersistedSelectionRef.current)
-    ) {
-      pendingPersistedSelectionSyncRef.current = false;
-    }
-    if (
-      shouldSyncPersistedSelectedFilters({
-        isUserControlled,
-        pendingPersistedSelectionSync: pendingPersistedSelectionSyncRef.current,
-        persistedSelectedFilters,
-        committedFilters,
-        uiSelectedFilters,
-        suppressStalePersistedFilterRestore:
-          suppressStalePersistedFilterRestoreRef.current,
-      })
-    ) {
-      setCommittedFilters(persistedSelectedFilters);
-      setUiSelectedFilters(persistedSelectedFilters);
-    }
-  }, [
-    committedFilters,
-    isUserControlled,
-    lastPersistedSelectionRef,
-    pendingPersistedSelectionSyncRef,
-    persistedSelectedFilters,
-    uiSelectedFilters,
-  ]);
-
   const {
     seamlessLoading,
     seamlessWarnings,
