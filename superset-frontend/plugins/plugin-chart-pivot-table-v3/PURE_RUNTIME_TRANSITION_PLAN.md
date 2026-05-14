@@ -57,7 +57,7 @@ cells are projections of DB facts, not canonical data.
 
 ## Current Status
 
-As of May 14, 2026, after the fact-store result flag cleanup checkpoint:
+As of May 14, 2026, after the branch/batch abort-helper cleanup checkpoint:
 
 - Gate-weighted architecture estimate: **99%**.
 - Delivery remaining estimate: **less than 1%**, mostly completion audit and
@@ -72,8 +72,8 @@ As of May 14, 2026, after the fact-store result flag cleanup checkpoint:
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `14242` insertions, `13727` deletions, net `+515`.
-- Current production `src` TypeScript/TSX total: `34025` lines.
+- Production `src`: `14241` insertions, `13756` deletions, net `+485`.
+- Current production `src` TypeScript/TSX total: `33995` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - `PivotTableChart.tsx` is now `688` lines and `useExpansionEngine.ts` is now
   `1405` lines; those single-file reductions should not be counted as plugin
@@ -195,6 +195,15 @@ Source-only diff from pre-refactor baseline
 - Touched-file ESLint passed after the fact-store result flag cleanup.
 - Focused branch/batch fetch validation after the cleanup passed: `2` suites
   and `26` tests.
+- Full plugin plus export entrypoint Jest pass after the cleanup: `99` suites
+  and `832` tests.
+- Branch/batch abort-helper cleanup removed duplicate local abort-error
+  predicates from the branch and batch fetch paths and reused the existing
+  runtime request-lifecycle helper. The source slice was deletion-positive:
+  `2` insertions, `32` deletions, net `-30`.
+- Touched-file ESLint passed after the abort-helper cleanup.
+- Focused branch/batch/request-lifecycle validation after the cleanup passed:
+  `3` suites and `34` tests.
 - Full plugin plus export entrypoint Jest pass after the cleanup: `99` suites
   and `832` tests.
 - Metric source-catalog cleanup removed `metricsBase` and
