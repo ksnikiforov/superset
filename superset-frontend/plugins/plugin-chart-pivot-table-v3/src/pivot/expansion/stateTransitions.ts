@@ -1097,7 +1097,7 @@ export const planHydrationIteration = ({
     visibleColDepth,
     rowPlan: effectiveRowPlan,
     colPlan: effectiveColPlan,
-    targets: [...rowGroups.targets, ...colGroups.targets],
+    targets: [...rowGroups, ...colGroups],
   };
 };
 

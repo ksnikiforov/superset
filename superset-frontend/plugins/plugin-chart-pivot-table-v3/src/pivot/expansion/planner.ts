@@ -200,9 +200,7 @@ export function buildGroupedFetchTargets({
   nodes: Record<string, PivotTreeNode>;
   requiredOppositeDepth: number;
   getCoverageKey: (axis: PivotAxis, key: string) => string;
-}): {
-  targets: PlannedFetchTarget[];
-} {
+}): PlannedFetchTarget[] {
   const groups = new Map<string, string[]>();
   fetchKeys.forEach(key => {
     const groupKey = getCoverageKey(axis, key);
@@ -237,7 +235,7 @@ export function buildGroupedFetchTargets({
     });
   }
 
-  return { targets };
+  return targets;
 }
 
 export const planGroupedExpansionTargets = ({
@@ -273,7 +271,7 @@ export const planGroupedExpansionTargets = ({
     shouldFetchChildren,
   });
 
-  const grouped = buildGroupedFetchTargets({
+  const targets = buildGroupedFetchTargets({
     axis,
     fetchKeys: plan.fetchKeys,
     nodes,
@@ -281,5 +279,5 @@ export const planGroupedExpansionTargets = ({
     getCoverageKey,
   });
 
-  return { plan, targets: grouped.targets };
+  return { plan, targets };
 };

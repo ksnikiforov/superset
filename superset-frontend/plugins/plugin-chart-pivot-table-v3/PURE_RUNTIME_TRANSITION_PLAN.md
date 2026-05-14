@@ -71,9 +71,7 @@ logical need can describe multiple explicit row branches crossed with multiple
 explicit column branches:
 
 ```ts
-type AxisPathScope =
-  | { kind: 'root' }
-  | { kind: 'paths'; paths: PivotPath[] };
+type AxisPathScope = { kind: 'root' } | { kind: 'paths'; paths: PivotPath[] };
 
 type CoverageNeed = {
   rowDepth: number;
@@ -92,6 +90,15 @@ Rules:
 - Expanding a node creates a path-scoped need for the newly visible layer.
 - Row x column expansion creates intersection needs for explicit visible row
   path sets crossed with explicit visible column path sets.
+- Full expansion is path-scoped, not level-global. A middle layer can be fully
+  expanded under an explicit ancestor such as `[USA] -> all states -> city`
+  without implying that the same layer is fully expanded for every country.
+- A later layer can also be fully expanded under that scoped middle layer. The
+  manifest must represent this as explicit ancestor-scoped sets, not as a
+  requirement for full expansion of all previous layers.
+- Consecutive full-expansion layers are also scoped. For example, `[USA] ->
+all states -> all cities -> store` still means only the explicit subtree
+  under `USA`, not all states and cities globally.
 - Many small expands may be transport-batched, but they must not be promoted
   into an unbounded full-level query.
 - No full-level expansion query is allowed unless the user action explicitly
