@@ -57,7 +57,7 @@ cells are projections of DB facts, not canonical data.
 
 ## Current Status
 
-As of May 14, 2026, after the seamless helper surface cleanup checkpoint:
+As of May 14, 2026, after the seamless export surface cleanup checkpoint:
 
 - Gate-weighted architecture estimate: **99%**.
 - Delivery remaining estimate: **less than 1%**, mostly completion audit and
@@ -72,8 +72,8 @@ As of May 14, 2026, after the seamless helper surface cleanup checkpoint:
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `14355` insertions, `13553` deletions, net `+802`.
-- Current production `src` TypeScript/TSX total: `34312` lines.
+- Production `src`: `14309` insertions, `13553` deletions, net `+756`.
+- Current production `src` TypeScript/TSX total: `34266` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - `PivotTableChart.tsx` is now `688` lines and `useExpansionEngine.ts` is now
   `1405` lines; those single-file reductions should not be counted as plugin
@@ -139,6 +139,15 @@ Source-only diff from pre-refactor baseline
 - Touched-file ESLint passed after the seamless helper surface cleanup.
 - Focused chart/runtime validation after the cleanup passed: `4` suites and
   `52` tests.
+- Full plugin plus export entrypoint Jest pass after the cleanup: `99` suites
+  and `836` tests.
+- Seamless export surface cleanup made internal request-group constants and
+  runtime plan/result types private or inferred, removing names that were not a
+  real module contract. The source slice was deletion-positive: `18`
+  insertions, `64` deletions, net `-46`.
+- Touched-file ESLint passed after the seamless export surface cleanup.
+- Focused chart/runtime validation after the cleanup passed: `3` suites and
+  `46` tests.
 - Full plugin plus export entrypoint Jest pass after the cleanup: `99` suites
   and `836` tests.
 - Metric source-catalog cleanup removed `metricsBase` and
@@ -637,7 +646,7 @@ Largest relevant production files:
 - `PivotTableView.tsx`: `891` lines.
 - `usePivotLayout.ts`: `767` lines.
 - `PivotTableChart.tsx`: `688` lines.
-- `seamlessRuntimeUpdate.ts`: `549` lines.
+- `seamlessRuntimeUpdate.ts`: `502` lines.
 - `usePivotRenderModel.ts`: `592` lines.
 
 Not all large files are equal for this refactor. The next high-impact files are
