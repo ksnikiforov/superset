@@ -249,6 +249,44 @@ describe('runtime layout fact coverage', () => {
     ).toBe(true);
   });
 
+  it('fetches when the root coverage dimensions change and coverage is missing', () => {
+    expect(
+      shouldFetchRuntimeLayout({
+        factBatches: [factBatch(1, 1)],
+        previousLayout: runtimeLayout,
+        nextLayout: {
+          ...runtimeLayout,
+          rows: ['row2', 'row1'],
+        },
+      }),
+    ).toBe(true);
+  });
+
+  it('does not fetch when changed root coverage is already loaded', () => {
+    expect(
+      shouldFetchRuntimeLayout({
+        factBatches: [
+          {
+            coverage: buildFactCoverage({
+              reason: 'initial',
+              rowDimensions: ['row2'],
+              columnDimensions: ['col1'],
+              rowDepth: 1,
+              columnDepth: 1,
+            }),
+            scope: { kind: 'bootstrap' },
+            facts: [],
+          },
+        ],
+        previousLayout: runtimeLayout,
+        nextLayout: {
+          ...runtimeLayout,
+          rows: ['row2', 'row1'],
+        },
+      }),
+    ).toBe(false);
+  });
+
   it('fetches when trimming dimensions requires missing exact coverage', () => {
     expect(
       shouldFetchRuntimeLayout({

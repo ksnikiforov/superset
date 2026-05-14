@@ -188,97 +188,10 @@ export const isSameRuntimeLayout = (
   prev.valuePlacement.axis === next.valuePlacement.axis &&
   prev.valuePlacement.index === next.valuePlacement.index;
 
-const shouldFetchForLeadingKeyChange = (
-  prevAxisKeys: string[],
-  nextAxisKeys: string[],
-) => {
-  const prevLeading = prevAxisKeys[0];
-  const nextLeading = nextAxisKeys[0];
-  if (prevLeading === nextLeading) {
-    return false;
-  }
-  // Collapsing an axis to totals-only reuses existing aggregate rows/cols.
-  if (prevLeading !== undefined && nextLeading === undefined) {
-    return false;
-  }
-  return true;
-};
-
-const movedLeadingKeyAcrossAxes = ({
-  prevSource,
-  nextSource,
-  nextTarget,
-}: {
-  prevSource: string[];
-  nextSource: string[];
-  nextTarget: string[];
-}) => {
-  const leading = prevSource[0];
-  if (!leading) {
-    return false;
-  }
-  if (nextSource.includes(leading)) {
-    return false;
-  }
-  return nextTarget.includes(leading);
-};
-
-const shouldFetchForDimensionAxisChange = ({
-  prevRows,
-  prevCols,
-  nextRows,
-  nextCols,
-}: {
-  prevRows: string[];
-  prevCols: string[];
-  nextRows: string[];
-  nextCols: string[];
-}) => {
-  if (shouldFetchForLeadingKeyChange(prevRows, nextRows)) {
-    return true;
-  }
-  if (shouldFetchForLeadingKeyChange(prevCols, nextCols)) {
-    return true;
-  }
-  if (
-    movedLeadingKeyAcrossAxes({
-      prevSource: prevRows,
-      nextSource: nextRows,
-      nextTarget: nextCols,
-    })
-  ) {
-    return true;
-  }
-  if (
-    movedLeadingKeyAcrossAxes({
-      prevSource: prevCols,
-      nextSource: nextCols,
-      nextTarget: nextRows,
-    })
-  ) {
-    return true;
-  }
-  return false;
-};
-
-export const shouldFetchForLayoutChange = (
+const shouldFetchForSemanticLayoutChange = (
   prev: PivotRuntimeLayout,
   next: PivotRuntimeLayout,
 ): boolean => {
-  if (prev.valuePlacement.axis !== next.valuePlacement.axis) {
-    return true;
-  }
-  if (
-    !arraysEqual(prev.rows, next.rows) ||
-    !arraysEqual(prev.cols, next.cols)
-  ) {
-    return shouldFetchForDimensionAxisChange({
-      prevRows: prev.rows,
-      prevCols: prev.cols,
-      nextRows: next.rows,
-      nextCols: next.cols,
-    });
-  }
   if (!hasSameSet(prev.metrics, next.metrics)) {
     return true;
   }
@@ -405,10 +318,8 @@ export const factBatchesCoverRuntimeLayout = (
   return diffCoverageManifest({ required, factBatches }).length === 0;
 };
 
-const runtimeLayoutRequiredRootDepth = (runtimeLayout: PivotRuntimeLayout) => ({
-  rowDepth: runtimeLayout.rows.length > 0 ? 1 : 0,
-  columnDepth: runtimeLayout.cols.length > 0 ? 1 : 0,
-});
+const coverageManifestSignature = (runtimeLayout: PivotRuntimeLayout) =>
+  stableStringify(buildRuntimeLayoutCoverageManifest(runtimeLayout));
 
 export const shouldFetchRuntimeLayout = ({
   factBatches,
@@ -419,19 +330,17 @@ export const shouldFetchRuntimeLayout = ({
   previousLayout: PivotRuntimeLayout;
   nextLayout: PivotRuntimeLayout;
 }) => {
-  if (shouldFetchForLayoutChange(previousLayout, nextLayout)) {
+  if (shouldFetchForSemanticLayoutChange(previousLayout, nextLayout)) {
     return true;
   }
-  const previousRootDepth = runtimeLayoutRequiredRootDepth(previousLayout);
-  const nextRootDepth = runtimeLayoutRequiredRootDepth(nextLayout);
-  const rootDepthChanged =
-    previousRootDepth.rowDepth !== nextRootDepth.rowDepth ||
-    previousRootDepth.columnDepth !== nextRootDepth.columnDepth;
+  const coverageNeedChanged =
+    coverageManifestSignature(previousLayout) !==
+    coverageManifestSignature(nextLayout);
   const dimensionsRemoved =
     nextLayout.rows.length < previousLayout.rows.length ||
     nextLayout.cols.length < previousLayout.cols.length;
   return (
-    (rootDepthChanged || dimensionsRemoved) &&
+    (coverageNeedChanged || dimensionsRemoved) &&
     !factBatchesCoverRuntimeLayout(factBatches, nextLayout)
   );
 };
