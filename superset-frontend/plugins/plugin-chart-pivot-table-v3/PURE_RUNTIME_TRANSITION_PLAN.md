@@ -101,9 +101,30 @@ Two other architectural options can pursue the same simplification goal:
    snapshot so materialization and rendering do not consume the newest draft as
    if it were already loaded.
 
-Recommendation: use the draft-vs-loaded split as the primary model, implement
-coverage manifests as the planner artifact inside that model, and use a reducer
-only where it deletes existing hook/chart state machines.
+Decision criteria for the next architecture cut:
+
+1. **Elegant:** one rule should explain query/loading behavior across layout
+   changes, expansion, and recovery.
+2. **Low code:** the change must replace existing planner/coverage branches,
+   not introduce a parallel framework.
+3. **Fast:** the runtime should diff loaded coverage before querying, avoid
+   hidden/not-expanded layers, and keep interaction state responsive while data
+   loads.
+
+Assessment of the options against those criteria:
+
+| Direction | Elegant | Low code | Fast | Assessment |
+| --- | --- | --- | --- | --- |
+| Coverage Manifest First | High: one visible-coverage diff governs fetch decisions | High: can replace `shouldFetchRuntimeLayout`, expansion coverage drift, and duplicate query coverage planning | High: naturally fetches only missing visible coverage | **Selected direction** |
+| Runtime Reducer / State Machine | Medium/high: lifecycle becomes explicit | Medium/low initially: high risk of adding a framework before deleting hooks | Medium: helps stale request handling, but not coverage by itself | Defer unless it deletes existing hook state immediately |
+| Query-Backed View Plan Compiler | High long-term: full compiler model | Low initially: likely adds a broad plan object before deletion | Medium/high: depends on coverage diff inside the plan | Too large as the next cut |
+| Draft vs Loaded Snapshot Only | Medium: clarifies ownership | Low by itself: mostly naming/types until paired with coverage | Medium: still needs a fetch diff artifact | Useful concept, not enough as the implementation target |
+
+Recommendation: implement **Coverage Manifest First** as the next concrete
+architecture move. Draft-vs-loaded remains the ownership model, but the
+manifest is the deletion engine: build required visible coverage, diff it
+against loaded fact batches, fetch only the missing coverage, and delete the
+older boolean/fallback decision branches as each caller migrates.
 
 ## Hard Guardrails
 
