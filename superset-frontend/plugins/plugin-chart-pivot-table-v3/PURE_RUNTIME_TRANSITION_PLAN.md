@@ -933,6 +933,7 @@ Current evidence:
   passed ESLint.
 - Latest full pivot-table-v3 plugin plus export utility Jest run after the
   interaction DnD trigger extraction passed: `96` suites and `781` tests.
+- Full plugin source ESLint passed after the interaction DnD trigger extraction.
 - Latest Gate 1 runtime-placement validation passed: `5` focused suites and
   `60` tests covering interaction layout, compiled program placement,
   layout-runtime policy, and metric-tier layout.
