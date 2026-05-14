@@ -84,6 +84,8 @@ Source-only diff from pre-refactor baseline
   deletion-positive: `94` insertions, `174` deletions, net `-80`.
 - Focused expansion request/concurrency validation after deleting those hooks
   passed: `5` suites and `54` tests.
+- Full plugin plus export utility Jest pass after deleting those hooks: `96`
+  suites and `781` tests.
 - Touched expansion files passed ESLint, Prettier, and `git diff --check`.
 - Chart view-prop helper cleanup deleted the one-consumer `pivotViewProps.ts`
   helper and built the display snapshot plus `PivotTableView` props directly at
@@ -646,7 +648,9 @@ Recent validation:
 - `dec50a1e4a`: deleted the one-consumer `useExpansionInFlight.ts` and
   `useExpansionRequestRuntime.ts` files and kept their state local to
   `useExpansionEngine.ts`; Prettier, focused ESLint, `git diff --check`, and
-  focused expansion concurrency/request Jest (`54` tests) passed.
+  focused expansion concurrency/request Jest (`54` tests) passed. The full
+  pivot-table-v3 plugin plus export utility Jest suite also passed afterward
+  (`96` suites, `781` tests).
 - Latest broad checkpoint after structure/helper cleanup: full plugin source
   ESLint passed, and the full pivot-table-v3 plugin plus export utility Jest
   suite passed (`96` suites, `781` tests).
@@ -1005,6 +1009,8 @@ Current evidence:
 - Latest expansion runtime-hook validation passed focused Jest validation: `5`
   suites and `54` tests; touched expansion files passed Prettier, focused
   ESLint, and `git diff --check`.
+- Latest full pivot-table-v3 plugin plus export utility Jest run after the
+  expansion runtime-hook cleanup passed: `96` suites and `781` tests.
 - Latest chart view-prop helper cleanup deleted the one-consumer
   `pivotViewProps.ts` file and built the display snapshot plus
   `PivotTableView` props directly in `PivotTableChart.tsx`; the source slice
