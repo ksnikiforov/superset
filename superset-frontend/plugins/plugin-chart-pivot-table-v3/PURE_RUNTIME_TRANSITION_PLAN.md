@@ -57,7 +57,7 @@ cells are projections of DB facts, not canonical data.
 
 ## Current Status
 
-As of May 14, 2026, after the full plugin validation checkpoint:
+As of May 14, 2026, after the expansion structure cleanup checkpoint:
 
 - Gate-weighted architecture estimate: **98%**.
 - Delivery remaining estimate: **1-2%**, mostly final cleanup, validation,
@@ -72,12 +72,24 @@ As of May 14, 2026, after the full plugin validation checkpoint:
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `14331` insertions, `12763` deletions, net `+1568`.
-- Current production `src` TypeScript/TSX total: `35078` lines.
+- Production `src`: `14943` insertions, `13446` deletions, net `+1497`.
+- Current production `src` TypeScript/TSX total: `35007` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - `PivotTableChart.tsx` is now `672` lines and `useExpansionEngine.ts` is now
-  `1086` lines; those single-file reductions should not be counted as plugin
+  `1255` lines; those single-file reductions should not be counted as plugin
   source reduction because the plugin-wide total increased.
+- Expansion structure cleanup removed the false `pivot/engine` namespace, moved
+  expansion-only planning/state modules under `pivot/expansion`, renamed the
+  expansion transition module away from generic `engine.ts`, folded
+  single-consumer runtime/store/layout helper files into their owning modules,
+  and moved the misplaced initial-query contract test under query tests. The
+  source/test slice was deletion-positive: `267` insertions, `338` deletions,
+  net `-71`.
+- Focused expansion/query validation after the structure cleanup passed: `8`
+  suites and `66` tests.
+- Focused render-display plus expansion-state validation after the structure
+  cleanup passed: `2` suites and `56` tests.
+- Touched expansion/chart files passed ESLint, Prettier, and `git diff --check`.
 - Full plugin plus export utility Jest pass after preserving local `ownState`
   merges: `96` suites and `781` tests.
 - Full plugin source ESLint passed after preserving local `ownState` merges.
@@ -281,9 +293,9 @@ Source-only diff from pre-refactor baseline
   compiled layout context: `2` suites and `28` tests.
 
 The readout is mixed and should be treated plainly: plugin-wide source lines
-increased by `1568`. The meaningful progress is architectural ownership moving
-out of overloaded React/chart files into tested runtime helpers; it is not a
-net source reduction yet.
+increased by `1497`. The meaningful progress is architectural ownership moving
+out of overloaded React/chart files into tested runtime helpers plus the first
+deletion-positive structure cleanup; it is still not a net source reduction.
 
 ## Gate Status
 
@@ -499,27 +511,28 @@ net source reduction yet.
 Largest relevant production files:
 
 - `PivotDndMetricSelect.tsx`: `1564` lines.
-- `engine.ts`: `1496` lines.
+- `stateTransitions.ts`: `1564` lines.
 - `PivotMetricDefinitionValue.tsx`: `1448` lines.
 - `utils.ts`: `1429` lines.
 - `materializePivotTree.ts`: `1329` lines.
-- `usePivotFormatting.tsx`: `1325` lines.
-- `useExpansionEngine.ts`: `1267` lines.
-- `PivotInteractionPanel.tsx`: `1186` lines.
+- `usePivotFormatting.tsx`: `1320` lines.
+- `useExpansionEngine.ts`: `1255` lines.
+- `PivotInteractionPanel.tsx`: `1171` lines.
 - `PivotDndColumnSelect.tsx`: `1071` lines.
 - `controlPanel.tsx`: `1024` lines.
-- `PivotTableChart.tsx`: `700` lines.
 - `PivotTableView.tsx`: `891` lines.
-- `usePivotLayout.ts`: `768` lines.
+- `usePivotLayout.ts`: `767` lines.
+- `PivotTableChart.tsx`: `672` lines.
 - `seamlessRuntimeUpdate.ts`: `594` lines.
-- `usePivotRenderModel.ts`: `542` lines.
+- `usePivotRenderModel.ts`: `592` lines.
 
 Not all large files are equal for this refactor. The next high-impact files are
-`engine.ts`, `PivotTableChart.tsx`, `usePivotLayout.ts`,
-`usePivotRenderModel.ts`, and the export/materialization boundary.
-`useExpansionEngine.ts` is no longer the top hotspot, but it still has React
-commit sequencing risk. Control components are large but less central to the
-pure runtime boundary unless they delete runtime-layout translation code.
+`stateTransitions.ts`, `useExpansionEngine.ts`, `PivotTableChart.tsx`,
+`usePivotLayout.ts`, `usePivotRenderModel.ts`, and the export/materialization
+boundary. `stateTransitions.ts` is now honestly named and located, but it is
+still too large and should be split only by real ownership, not by wrapper
+modules. Control components are large but less central to the pure runtime
+boundary unless they delete runtime-layout translation code.
 
 ## Next Work, Highest Impact First
 
@@ -607,6 +620,13 @@ git diff --check
 
 Recent validation:
 
+- `418d3c471e`: collapsed the expansion module structure by removing the false
+  `pivot/engine` namespace, renaming the generic expansion `engine.ts` to
+  `stateTransitions.ts`, folding single-consumer `layoutTransition.ts`,
+  `runtimeState.ts`, and `store.ts` into owning modules, and moving the
+  misplaced initial-query contract test under query tests; Prettier, focused
+  ESLint, `git diff --check`, focused expansion/query Jest (`66` tests), and
+  focused render-display plus expansion-state Jest (`56` tests) passed.
 - `9e8a1dd8c5`: preserved local `ownState` merges so expansion persistence is
   not lost when the parent has not replayed `setDataMask` state into props;
   focused expansion-state Jest (`47` tests), the full pivot-table-v3 plugin
@@ -934,12 +954,22 @@ changes from the highest-impact areas.
 Current evidence:
 
 - Source-only baseline comparison from
-  `7088db374448845ef6e71cf74817aa53efbc5fc1`: `14331` insertions, `12763`
-  deletions, net `+1568`; current production `src` TypeScript/TSX total is
-  `35078` lines, up from an implied `33510` line baseline.
+  `7088db374448845ef6e71cf74817aa53efbc5fc1`: `14943` insertions, `13446`
+  deletions, net `+1497`; current production `src` TypeScript/TSX total is
+  `35007` lines, up from an implied `33510` line baseline.
 - The honest line-count result is not a plugin reduction. `PivotTableChart.tsx`
-  is down to `672` lines and `useExpansionEngine.ts` is down to `1086` lines,
+  is down to `672` lines and `useExpansionEngine.ts` is down to `1255` lines,
   but those are local file reductions offset by extracted runtime/helper code.
+- Latest expansion structure cleanup removed `3` source files, removed the
+  false `pivot/engine` namespace, moved expansion-only modules under
+  `pivot/expansion`, moved the misplaced initial-query contract test under
+  query tests, and was deletion-positive across source/tests: `267`
+  insertions, `338` deletions, net `-71`.
+- Latest expansion/query structure validation passed focused Jest validation:
+  `8` suites and `66` tests; focused render-display plus expansion-state Jest
+  validation passed: `2` suites and `56` tests.
+- Touched expansion/chart files passed Prettier, focused ESLint, and
+  `git diff --check`.
 - Latest full pivot-table-v3 plugin plus export utility Jest run after
   preserving local `ownState` merges passed: `96` suites and `781` tests.
 - Full plugin source ESLint passed after preserving local `ownState` merges.
