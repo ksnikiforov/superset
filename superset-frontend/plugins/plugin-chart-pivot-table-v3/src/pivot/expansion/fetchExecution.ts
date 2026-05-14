@@ -35,7 +35,11 @@ import {
   type PivotFactStore,
   type PivotFactStoreBatch,
 } from '../runtime/factStore';
-import { type LatestRequestScope } from '../runtime/requestLifecycle';
+import {
+  type LatestRequestLifecycle,
+  type LatestRequestScope,
+} from '../runtime/requestLifecycle';
+import { stableStringify } from '../shared/stableStringify';
 
 const EMPTY_FACT_BATCHES: PivotFactStoreBatch[] = [];
 
@@ -55,6 +59,42 @@ export type BuildExpansionRequestGroupId = (
   payload: Record<string, unknown>,
   transactionId?: number,
 ) => string;
+
+export type ExpansionRequestHelpers = {
+  buildRequestGroupId: BuildExpansionRequestGroupId;
+  trackRequestInScope: TrackExpansionRequest;
+};
+
+export const createExpansionRequestHelpers = ({
+  lifecycle,
+  instanceId,
+}: {
+  lifecycle: LatestRequestLifecycle;
+  instanceId: string;
+}): ExpansionRequestHelpers => ({
+  buildRequestGroupId(
+    payload: Record<string, unknown>,
+    transactionId: number = lifecycle.currentId(),
+  ) {
+    return stableStringify({
+      instanceId,
+      transactionId,
+      ...payload,
+    });
+  },
+  async trackRequestInScope<T>(
+    requestScope: LatestRequestScope,
+    requestGroupId: string,
+    fetcher: () => Promise<T>,
+  ): Promise<T> {
+    const token = requestScope.beginRequest(requestGroupId);
+    try {
+      return await fetcher();
+    } finally {
+      lifecycle.finish(token);
+    }
+  },
+});
 
 export type ExpansionFetchRuntime = {
   requestScope: LatestRequestScope;

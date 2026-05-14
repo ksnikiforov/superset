@@ -58,10 +58,7 @@ import {
   type PivotFactStore,
   type PivotFactStoreBatch,
 } from '../runtime/factStore';
-import {
-  createLatestRequestLifecycle,
-  type LatestRequestScope,
-} from '../runtime/requestLifecycle';
+import { createLatestRequestLifecycle } from '../runtime/requestLifecycle';
 import {
   addAncestors,
   applyExpansionFetchDelta,
@@ -90,6 +87,7 @@ import {
 } from './runtimeState';
 import {
   collectFetchResultDeltas,
+  createExpansionRequestHelpers,
   fetchExpansionTargets,
   type ExpansionFetchRuntime,
 } from './fetchExecution';
@@ -241,6 +239,14 @@ export const useExpansionEngine = ({
           supersetChartDataClient.cancel(requestGroupId),
       }),
     [],
+  );
+  const expansionRequestHelpers = useMemo(
+    () =>
+      createExpansionRequestHelpers({
+        lifecycle: expansionRequestLifecycle,
+        instanceId: requestGroupPrefixRef.current,
+      }),
+    [expansionRequestLifecycle],
   );
   const expansionStateStoreRef = useRef<ExpansionStateStore>();
   const persistedExpansionStateRef = useRef<unknown>(persistedExpansionState);
@@ -431,35 +437,6 @@ export const useExpansionEngine = ({
   const invalidateInFlightRequests = useCallback(() => {
     expansionRequestLifecycle.invalidate();
   }, [expansionRequestLifecycle]);
-
-  const buildRequestGroupId = useCallback(
-    (
-      payload: Record<string, unknown>,
-      transactionId: number = expansionRequestLifecycle.currentId(),
-    ) =>
-      stableStringify({
-        instanceId: requestGroupPrefixRef.current,
-        transactionId,
-        ...payload,
-      }),
-    [expansionRequestLifecycle],
-  );
-
-  const trackRequestInScope = useCallback(
-    async <T>(
-      requestScope: LatestRequestScope,
-      requestGroupId: string,
-      fetcher: () => Promise<T>,
-    ): Promise<T> => {
-      const token = requestScope.beginRequest(requestGroupId);
-      try {
-        return await fetcher();
-      } finally {
-        expansionRequestLifecycle.finish(token);
-      }
-    },
-    [expansionRequestLifecycle],
-  );
 
   useEffect(
     () => () => {
@@ -664,7 +641,7 @@ export const useExpansionEngine = ({
         requestScope,
         fetchFormData,
         factStore: factStoreRef.current,
-        trackRequestInScope,
+        trackRequestInScope: expansionRequestHelpers.trackRequestInScope,
         addWarnings,
         updateLoadingKey,
       };
@@ -714,7 +691,7 @@ export const useExpansionEngine = ({
             singleRequestKind: 'branch',
             batchRequestKind: 'batch',
             transactionId: requestId,
-            buildRequestGroupId,
+            buildRequestGroupId: expansionRequestHelpers.buildRequestGroupId,
           });
           if (
             dataEpochRef.current !== requestEpoch ||
@@ -794,9 +771,9 @@ export const useExpansionEngine = ({
     },
     [
       addWarnings,
-      buildRequestGroupId,
       computeVisibleDepths,
       commitExpansionState,
+      expansionRequestHelpers,
       expansionRequestLifecycle,
       fetchFormData,
       getCoverageKey,
@@ -809,7 +786,6 @@ export const useExpansionEngine = ({
       seedFetchedCoverageFromFactBatches,
       seedFetchedCoverageFromLoadedMetricNodes,
       shouldFetchChildren,
-      trackRequestInScope,
       updateLoadingKey,
     ],
   );
@@ -890,7 +866,7 @@ export const useExpansionEngine = ({
           requestScope,
           fetchFormData,
           factStore: factStoreRef.current,
-          trackRequestInScope,
+          trackRequestInScope: expansionRequestHelpers.trackRequestInScope,
           addWarnings,
           updateLoadingKey,
         };
@@ -915,7 +891,7 @@ export const useExpansionEngine = ({
               runtime: fetchRuntime,
               singleRequestKind: `hydrate:${reason}`,
               transactionId,
-              buildRequestGroupId,
+              buildRequestGroupId: expansionRequestHelpers.buildRequestGroupId,
             }),
           collectDeltas: ({ results, context }) =>
             collectFetchResultDeltas({
@@ -957,9 +933,9 @@ export const useExpansionEngine = ({
     [
       addWarnings,
       buildDesiredExpanded,
-      buildRequestGroupId,
       clearLoadingState,
       commitExpansionState,
+      expansionRequestHelpers,
       expansionRequestLifecycle,
       fetchFormData,
       getCoverageKey,
@@ -969,7 +945,6 @@ export const useExpansionEngine = ({
       seedFetchedCoverageFromFactBatches,
       seedFetchedCoverageFromLoadedMetricNodes,
       setHydratingState,
-      trackRequestInScope,
       updateLoadingKey,
       visibilityConfig,
     ],
