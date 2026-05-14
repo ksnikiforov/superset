@@ -113,29 +113,6 @@ export const buildSeamlessRuntimeUpstreamSignature = (
   });
 };
 
-export const shouldSyncCommittedRuntimeFromProps = ({
-  isUserControlled,
-  hasLocalSyncForCurrentDashboardQueryContext,
-  persistedInteractionFilters,
-  runtimeLayout,
-  committedRuntimeLayout,
-  selectedFiltersForTreeSync,
-  committedFilters,
-}: {
-  isUserControlled: boolean;
-  hasLocalSyncForCurrentDashboardQueryContext: boolean;
-  persistedInteractionFilters: RuntimeSelection;
-  runtimeLayout: PivotRuntimeLayout;
-  committedRuntimeLayout: PivotRuntimeLayout;
-  selectedFiltersForTreeSync: RuntimeSelection;
-  committedFilters: RuntimeSelection;
-}) =>
-  !isUserControlled ||
-  (!hasLocalSyncForCurrentDashboardQueryContext &&
-    !hasSelectedFilters(persistedInteractionFilters) &&
-    isSameRuntimeLayout(runtimeLayout, committedRuntimeLayout) &&
-    isEqual(selectedFiltersForTreeSync, committedFilters));
-
 const shouldRecoverStaleDashboardRuntimeCoverage = ({
   isUserControlled,
   isDashboardRuntimeSync,

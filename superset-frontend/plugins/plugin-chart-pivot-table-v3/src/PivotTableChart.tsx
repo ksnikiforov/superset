@@ -62,7 +62,6 @@ import { useSyncRef } from './pivot/shared/useSyncRef';
 import {
   buildSeamlessRuntimeUpstreamSignature,
   isSeamlessDisplaySnapshotSettled,
-  shouldSyncCommittedRuntimeFromProps,
   type SeamlessRuntimeSyncSnapshot,
 } from './pivot/runtime/seamlessRuntimeUpdate';
 import {
@@ -233,8 +232,8 @@ function PivotTableChart(props: PivotTableProps) {
     uiSelectedFilters,
     updateUiSelectedFilters,
     commitFilters,
-    selectedFiltersForTreeSync,
     persistedInteractionFilters,
+    selectedFiltersForTreeSync,
     committedRuntimeLayout,
     committedRuntimeLayoutRef,
     uiRuntimeLayout,
@@ -283,20 +282,6 @@ function PivotTableChart(props: PivotTableProps) {
 
   const upstreamSeamlessSignature =
     upstreamDashboardQueryContextSignature ?? '';
-  const hasLocalSyncForCurrentDashboardQueryContext =
-    isDashboardContext &&
-    upstreamDashboardQueryContextSignature !== null &&
-    lastLocalSyncDashboardQueryContextRef.current ===
-      upstreamDashboardQueryContextSignature;
-  const shouldSyncCommittedTreeFromProps = shouldSyncCommittedRuntimeFromProps({
-    isUserControlled,
-    hasLocalSyncForCurrentDashboardQueryContext,
-    persistedInteractionFilters,
-    runtimeLayout,
-    committedRuntimeLayout,
-    selectedFiltersForTreeSync,
-    committedFilters,
-  });
   const {
     dataForRender,
     factBatchesForRender,
@@ -319,9 +304,10 @@ function PivotTableChart(props: PivotTableProps) {
     isUserControlled,
     isDashboardRuntimeSync,
     hasMetrics,
-    shouldSyncCommittedTreeFromProps,
     upstreamDashboardQueryContextSignature,
     persistedInteractionFilters,
+    selectedFiltersForTreeSync,
+    runtimeLayout,
     committedRuntimeLayout,
     committedFilters,
     uiSelectedFilters,
@@ -341,6 +327,7 @@ function PivotTableChart(props: PivotTableProps) {
     pendingColsRef: pendingColsForSeamlessRef,
     commitFilters,
     updateUiSelectedFilters,
+    lastLocalSyncDashboardQueryContextRef,
     suppressStalePersistedFilterRestoreRef,
     commitUiRuntimeLayout: updateUiRuntimeLayout,
     persistRuntimeState,

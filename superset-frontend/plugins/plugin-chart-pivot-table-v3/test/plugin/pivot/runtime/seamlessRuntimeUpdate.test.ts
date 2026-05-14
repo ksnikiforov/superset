@@ -32,7 +32,6 @@ import {
   prepareRuntimeStatePersistence,
   prepareSeamlessRuntimeLayoutChange,
   prepareSeamlessRuntimeUpdateEffect,
-  shouldSyncCommittedRuntimeFromProps,
   shouldSyncPersistedSelectedFilters,
 } from '../../../../src/pivot/runtime/seamlessRuntimeUpdate';
 
@@ -142,44 +141,6 @@ test('builds stable upstream dashboard query-context signatures', () => {
   ).toBe(
     '{"adhoc_filters":[{"col":"country","op":"==","val":"France"}],"extra_form_data":{"filters":[{"col":"region","op":"IN","val":["EU"]}]},"extras":{"time_grain_sqla":"P1D"},"granularity_sqla":"ds","time_grain_sqla":null,"time_offsets":["1 year ago"],"time_range":"No filter"}',
   );
-});
-
-test('decides when committed runtime should sync from upstream props', () => {
-  expect(
-    shouldSyncCommittedRuntimeFromProps({
-      isUserControlled: false,
-      hasLocalSyncForCurrentDashboardQueryContext: true,
-      persistedInteractionFilters: { country: ['France'] },
-      runtimeLayout: { ...runtimeLayout, rows: ['state'] },
-      committedRuntimeLayout: runtimeLayout,
-      selectedFiltersForTreeSync: { country: ['Germany'] },
-      committedFilters: { country: ['France'] },
-    }),
-  ).toBe(true);
-
-  expect(
-    shouldSyncCommittedRuntimeFromProps({
-      isUserControlled: true,
-      hasLocalSyncForCurrentDashboardQueryContext: false,
-      persistedInteractionFilters: {},
-      runtimeLayout,
-      committedRuntimeLayout: runtimeLayout,
-      selectedFiltersForTreeSync: { country: ['France'] },
-      committedFilters: { country: ['France'] },
-    }),
-  ).toBe(true);
-
-  expect(
-    shouldSyncCommittedRuntimeFromProps({
-      isUserControlled: true,
-      hasLocalSyncForCurrentDashboardQueryContext: true,
-      persistedInteractionFilters: {},
-      runtimeLayout,
-      committedRuntimeLayout: runtimeLayout,
-      selectedFiltersForTreeSync: {},
-      committedFilters: {},
-    }),
-  ).toBe(false);
 });
 
 test('prepares seamless runtime effect updates in chart application order', () => {

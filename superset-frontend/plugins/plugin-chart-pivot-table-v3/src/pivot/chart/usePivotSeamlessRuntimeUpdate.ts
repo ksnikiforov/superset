@@ -26,6 +26,7 @@ import {
   type MutableRefObject,
 } from 'react';
 import { unstable_batchedUpdates } from 'react-dom';
+import { isEqual } from 'lodash';
 import {
   t,
   type DataRecordValue,
@@ -54,6 +55,7 @@ import { PivotTableView } from '../render/PivotTableView';
 import {
   applyDimensionFilterSelectionChange,
   buildClearSelectedFiltersUpdate,
+  hasSelectedFilters,
 } from '../filters';
 import {
   applyDimensionDrag,
@@ -61,6 +63,7 @@ import {
   removeDimensionFromLayout,
 } from '../layout/interactionDrag';
 import { getStableColumnKey } from '../../utils';
+import { isSameRuntimeLayout } from '../runtime/coverage';
 
 type RuntimeSelection = Record<string, DataRecordValue[]>;
 type PivotViewProps = ComponentProps<typeof PivotTableView>;
@@ -77,9 +80,10 @@ type UsePivotSeamlessRuntimeUpdateConfig = {
   isUserControlled: boolean;
   isDashboardRuntimeSync: boolean;
   hasMetrics: boolean;
-  shouldSyncCommittedTreeFromProps: boolean;
   upstreamDashboardQueryContextSignature: string | null;
   persistedInteractionFilters: RuntimeSelection;
+  selectedFiltersForTreeSync: RuntimeSelection;
+  runtimeLayout: PivotRuntimeLayout;
   committedRuntimeLayout: PivotRuntimeLayout;
   committedFilters: RuntimeSelection;
   uiSelectedFilters: RuntimeSelection;
@@ -99,6 +103,7 @@ type UsePivotSeamlessRuntimeUpdateConfig = {
   pendingColsRef: MutableRefObject<Set<string>>;
   commitFilters: (filters: RuntimeSelection) => void;
   updateUiSelectedFilters: (filters: RuntimeSelection) => void;
+  lastLocalSyncDashboardQueryContextRef: MutableRefObject<string | null>;
   suppressStalePersistedFilterRestoreRef: MutableRefObject<boolean>;
   commitUiRuntimeLayout: (layout: PivotRuntimeLayout) => void;
   persistRuntimeState: (
@@ -118,9 +123,10 @@ export const usePivotSeamlessRuntimeUpdate = (
     isUserControlled,
     isDashboardRuntimeSync,
     hasMetrics,
-    shouldSyncCommittedTreeFromProps,
     upstreamDashboardQueryContextSignature,
     persistedInteractionFilters,
+    selectedFiltersForTreeSync,
+    runtimeLayout,
     committedRuntimeLayout,
     committedFilters,
     uiSelectedFilters,
@@ -140,6 +146,7 @@ export const usePivotSeamlessRuntimeUpdate = (
     pendingColsRef,
     commitFilters,
     updateUiSelectedFilters,
+    lastLocalSyncDashboardQueryContextRef,
     suppressStalePersistedFilterRestoreRef,
     commitUiRuntimeLayout,
     persistRuntimeState,
@@ -183,6 +190,17 @@ export const usePivotSeamlessRuntimeUpdate = (
   useEffect(() => {
     // Ignore stale upstream updates while a local interaction update is still
     // pending.
+    const hasLocalSyncForCurrentDashboardQueryContext =
+      isDashboardRuntimeSync &&
+      upstreamDashboardQueryContextSignature !== null &&
+      lastLocalSyncDashboardQueryContextRef.current ===
+        upstreamDashboardQueryContextSignature;
+    const shouldSyncCommittedTreeFromProps =
+      !isUserControlled ||
+      (!hasLocalSyncForCurrentDashboardQueryContext &&
+        !hasSelectedFilters(persistedInteractionFilters) &&
+        isSameRuntimeLayout(runtimeLayout, committedRuntimeLayout) &&
+        isEqual(selectedFiltersForTreeSync, committedFilters));
     if (!shouldSyncCommittedTreeFromProps) {
       return;
     }
@@ -192,8 +210,16 @@ export const usePivotSeamlessRuntimeUpdate = (
   }, [
     data,
     factBatches,
+    committedFilters,
+    committedRuntimeLayout,
+    isDashboardRuntimeSync,
+    isUserControlled,
+    lastLocalSyncDashboardQueryContextRef,
+    persistedInteractionFilters,
     resetSeamlessRuntimeState,
-    shouldSyncCommittedTreeFromProps,
+    runtimeLayout,
+    selectedFiltersForTreeSync,
+    upstreamDashboardQueryContextSignature,
   ]);
 
   const applySeamlessUpdate = useCallback(
