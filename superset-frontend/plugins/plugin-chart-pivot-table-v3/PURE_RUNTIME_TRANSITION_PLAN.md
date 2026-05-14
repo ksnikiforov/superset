@@ -57,7 +57,7 @@ cells are projections of DB facts, not canonical data.
 
 ## Current Status
 
-As of May 14, 2026, after the expansion-engine fact-batch requirement
+As of May 14, 2026, after the interaction own-state tree payload cleanup
 checkpoint:
 
 - Gate-weighted architecture estimate: **99%**.
@@ -73,8 +73,8 @@ checkpoint:
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `14210` insertions, `13755` deletions, net `+455`.
-- Current production `src` TypeScript/TSX total: `33965` lines.
+- Production `src`: `14204` insertions, `13761` deletions, net `+443`.
+- Current production `src` TypeScript/TSX total: `33953` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - `PivotTableChart.tsx` is now `688` lines and `useExpansionEngine.ts` is now
   `1405` lines; those single-file reductions should not be counted as plugin
@@ -118,6 +118,15 @@ Source-only diff from pre-refactor baseline
 - Touched-file ESLint passed after the expansion-engine fact-batch requirement.
 - Focused expansion/chart validation after the requirement passed: `4` suites /
   `83` tests.
+- Interaction own-state tree payload cleanup removed the stale `treeData`
+  payload from data-mask/context-menu ownState and deleted the corresponding
+  form-data field. `treeDataSignature` remains the only persisted tree-shape
+  marker. The source slice was deletion-positive: `1` insertion, `13`
+  deletions, net `-12`.
+- Touched-file ESLint passed after the interaction own-state tree payload
+  cleanup.
+- Focused interaction/expansion validation after the cleanup passed: `4` suites
+  / `76` tests.
 - Chart runtime-sync cleanup moved the committed-tree sync decision out of
   `PivotTableChart.tsx` and into the seamless runtime hook, then deleted the
   now one-consumer runtime predicate export/test surface. The source slice was
