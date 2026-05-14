@@ -108,7 +108,7 @@ This is the selected path because it centralizes the right complexity:
 
 Expected deletion targets:
 
-- `shouldFetchRuntimeLayout` and root-depth fetch heuristics;
+- remaining non-manifest coverage planning in expansion and query batching;
 - duplicate expansion/query coverage planning;
 - tree-shape-as-loaded-state checks;
 - seamless recovery branches that exist only because coverage ownership is
@@ -354,6 +354,12 @@ Success criteria:
   placement-only compiler bridge has been removed.
 - Set-oriented coverage manifest primitives now exist for root runtime-layout
   coverage and explicit path-set coverage diffing.
+- Runtime layout fetches now route through manifest diff instead of the old
+  root-depth/leading-dimension heuristic.
+- Resolved query fetch context owns its fact coverages, so branch, batch, and
+  signature callers no longer rebuild the same coverage list separately.
+- Expansion planner and fetched-request code now share the same fetched coverage
+  projection types.
 
 ## Current Risks
 
