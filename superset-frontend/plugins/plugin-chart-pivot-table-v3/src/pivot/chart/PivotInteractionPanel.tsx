@@ -62,6 +62,7 @@ import {
 } from '../../utils';
 import { isValueLeaf } from '../measureLeaves';
 import { INTERACTION_DIMENSION_DND_TYPE } from '../layout/interactionDrag';
+import { normalizeRuntimeLayout } from '../layout/resolveInteractionLayout';
 
 const PanelSection = styled.div`
   display: flex;
@@ -407,22 +408,6 @@ const hasComparisonLeaves = (
   return Object.values(measureLeavesByMetric).some(leaves =>
     leaves.some(leaf => !isValueLeaf(leaf)),
   );
-};
-
-const normalizeLayout = (
-  runtimeLayout: PivotRuntimeLayout,
-  dimensionKeys: string[],
-  metricKeys: string[],
-): PivotRuntimeLayout => {
-  const rows = runtimeLayout.rows.filter(key => dimensionKeys.includes(key));
-  const cols = runtimeLayout.cols.filter(key => dimensionKeys.includes(key));
-  const metrics = runtimeLayout.metrics.filter(key => metricKeys.includes(key));
-  return {
-    ...runtimeLayout,
-    rows,
-    cols,
-    metrics: metrics.length > 0 ? metrics : metricKeys,
-  };
 };
 
 const encodeFilterValue = (value: DataRecordValue): string => {
@@ -858,7 +843,7 @@ export const PivotInteractionPanel = ({
   );
 
   const resolvedLayout = useMemo(
-    () => normalizeLayout(runtimeLayout, dimensionKeys, metricKeys),
+    () => normalizeRuntimeLayout(runtimeLayout, dimensionKeys, metricKeys),
     [dimensionKeys, metricKeys, runtimeLayout],
   );
   const baseLeafOrder = useMemo(
