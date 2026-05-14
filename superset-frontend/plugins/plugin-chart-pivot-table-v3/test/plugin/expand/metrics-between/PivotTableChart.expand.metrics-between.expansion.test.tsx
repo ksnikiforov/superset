@@ -28,7 +28,6 @@ import {
   fetchPivotBranch,
   type FetchPivotBranchParams,
 } from '../../../../src/fetchPivotBranch';
-import { clearPivotBranchCache } from '../../../../src/pivot/data/cache';
 import { buildFormData } from '../../fixtures/pivotFormData';
 import {
   buildMockBranchFetchResult,
@@ -52,7 +51,6 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
   beforeEach(() => {
     fetchPivotBranchMock.mockReset();
     fetchPivotBranchMock.mockImplementation(resolveMockBranchFetchResult());
-    clearPivotBranchCache();
   });
 
   const metrics = ['averageOrderValue', 'weightedDiscount'];

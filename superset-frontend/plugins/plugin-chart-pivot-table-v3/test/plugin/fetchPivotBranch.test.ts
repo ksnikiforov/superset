@@ -26,9 +26,7 @@ import {
 import {
   fetchPivotBranch,
   resolveBranchFetchContext,
-  resolvePivotBranchLocalResult,
 } from '../../src/fetchPivotBranch';
-import { clearPivotBranchCache } from '../../src/pivot/data/cache';
 import {
   buildBuiltInLeaf,
   buildMeasureLeafOutputKey,
@@ -82,7 +80,6 @@ type QueryPayload = {
 describe('resolveFetchContext', () => {
   beforeEach(() => {
     (SupersetClient.post as jest.Mock).mockReset();
-    clearPivotBranchCache();
   });
 
   it('keeps column depth aligned to visible dimensions when metrics are on columns', () => {
@@ -281,78 +278,6 @@ describe('resolveFetchContext', () => {
 
     expect(ctx.rowDepth).toBe(0);
     expect(ctx.colDepth).toBe(2);
-  });
-
-  it('changes branch cache key when measure leaf selection changes', () => {
-    const deltaLeaf = buildBuiltInLeaf('delta', {
-      n: 1,
-      unit: 'year',
-      direction: 'past',
-    });
-    const valueLeaf = buildValueLeaf();
-    const currentTree: PivotTreeData = {
-      rows: {
-        '': makeNode({ axis: 'row', path: [], hasChildren: true }),
-        A: makeNode({
-          axis: 'row',
-          path: ['A'],
-          level: 1,
-          hasChildren: true,
-          label: 'A',
-          formattedLabel: 'A',
-        }),
-      },
-      cols: {
-        '': makeNode({ axis: 'col', path: [], hasChildren: true }),
-        [serializePath([encodeMetricKey('m1')])]: makeNode({
-          axis: 'col',
-          path: [encodeMetricKey('m1')],
-          level: 1,
-          hasChildren: true,
-          label: 'm1',
-          formattedLabel: 'm1',
-        }),
-      },
-      cells: {},
-    };
-
-    const deltaOnly = buildFormData({
-      groupbyRows: ['r1', 'r2'],
-      groupbyColumns: [METRICS_PLACEHOLDER, 'c1'],
-      metrics: ['m1'],
-      metricsLayout: MetricsLayoutEnum.COLUMNS,
-      rowSubTotals: false,
-      measureLeavesByMetric: {
-        m1: [deltaLeaf],
-      },
-    });
-
-    const valueAndDelta = {
-      ...deltaOnly,
-      measureLeavesByMetric: {
-        m1: [deltaLeaf, valueLeaf],
-      },
-    };
-
-    const deltaOnlyContext = resolveBranchFetchContext({
-      formData: deltaOnly,
-      axis: 'row',
-      path: ['A'],
-      currentTree,
-    });
-    const valueAndDeltaContext = resolveBranchFetchContext({
-      formData: valueAndDelta,
-      axis: 'row',
-      path: ['A'],
-      currentTree,
-    });
-
-    expect(deltaOnlyContext.layout.requiredTimeOffsets).toEqual(
-      valueAndDeltaContext.layout.requiredTimeOffsets,
-    );
-    expect(deltaOnlyContext.cacheKey).not.toEqual(
-      valueAndDeltaContext.cacheKey,
-    );
   });
 
   it('fetches metric-front column expansion with root metrics populated', async () => {
@@ -904,8 +829,6 @@ describe('resolveFetchContext', () => {
       expect(query.metrics).toEqual(['measure1', 'sortMetric']);
     });
     expect(firstResult.factBatches).toHaveLength(queries.length);
-
-    clearPivotBranchCache();
     const secondResult = await fetchPivotBranch(fetchParams);
 
     expect(secondResult.factStoreHit).toBe(true);
@@ -1658,7 +1581,6 @@ describe('resolveFetchContext', () => {
 describe('fetchPivotBranch delta-only contract', () => {
   beforeEach(() => {
     (SupersetClient.post as jest.Mock).mockReset();
-    clearPivotBranchCache();
   });
 
   const buildMetricFirstColumnTree = (
@@ -1766,101 +1688,6 @@ describe('fetchPivotBranch delta-only contract', () => {
     expect(
       result.data?.cells[serializeCellKey(rowKey, metricColKey)]?.values.m1,
     ).toBe(42);
-  });
-
-  it('cache hits are independent of the caller currentTree', async () => {
-    const postMock = SupersetClient.post as jest.Mock;
-    postMock.mockResolvedValueOnce({
-      json: {
-        result: [
-          {
-            data: [{ r1: 'A', m1: 1 }],
-          },
-        ],
-      },
-    });
-
-    const formData = buildFormData({
-      groupbyRows: ['r1'],
-      groupbyColumns: [],
-      metrics: ['m1'],
-      metricsLayout: MetricsLayoutEnum.COLUMNS,
-      rowSubTotals: false,
-      datasource: '1__table',
-      viz_type: 'pivot_table_v3',
-    });
-
-    const firstResult = await fetchPivotBranch({
-      formData,
-      axis: 'row',
-      path: ['A'],
-      currentTree: buildMetricFirstColumnTree([{ r1: 'Z', m1: 999 }]),
-    });
-    expect(firstResult.cached).not.toBe(true);
-
-    postMock.mockClear();
-
-    const secondResult = await fetchPivotBranch({
-      formData,
-      axis: 'row',
-      path: ['A'],
-      currentTree: buildMetricFirstColumnTree([{ r1: 'Y', m1: 888 }]),
-    });
-
-    expect(secondResult.cached).toBe(true);
-    expect(postMock).not.toHaveBeenCalled();
-
-    const rowKeys = Object.keys(secondResult.data?.rows ?? {});
-    expect(rowKeys).not.toContain(serializePath(['Z']));
-    expect(rowKeys).not.toContain(serializePath(['Y']));
-  });
-
-  it('resolves branch cache hits through the local result path without network', async () => {
-    const postMock = SupersetClient.post as jest.Mock;
-    postMock.mockResolvedValueOnce({
-      json: {
-        result: [
-          {
-            data: [{ r1: 'A', m1: 7 }],
-          },
-        ],
-      },
-    });
-
-    const formData = buildFormData({
-      groupbyRows: ['r1'],
-      groupbyColumns: [],
-      metrics: ['m1'],
-      metricsLayout: MetricsLayoutEnum.COLUMNS,
-      rowSubTotals: false,
-      datasource: '1__table',
-      viz_type: 'pivot_table_v3',
-    });
-
-    await fetchPivotBranch({
-      formData,
-      axis: 'row',
-      path: ['A'],
-      currentTree: buildMetricFirstColumnTree([{ r1: 'A', m1: 7 }]),
-    });
-    postMock.mockClear();
-
-    const result = resolvePivotBranchLocalResult({
-      formData,
-      axis: 'row',
-      path: ['A'],
-      currentTree: buildMetricFirstColumnTree([{ r1: 'ignored', m1: 999 }]),
-    });
-
-    const rowKey = serializePath(['A']);
-    const metricColKey = serializePath([encodeMetricKey('m1')]);
-
-    expect(result?.cached).toBe(true);
-    expect(result?.factBatches).toHaveLength(1);
-    expect(postMock).not.toHaveBeenCalled();
-    expect(
-      result?.data?.cells[serializeCellKey(rowKey, metricColKey)]?.values.m1,
-    ).toBe(7);
   });
 
   it('returns a fetched coverage marker when expansion only reveals Values', async () => {

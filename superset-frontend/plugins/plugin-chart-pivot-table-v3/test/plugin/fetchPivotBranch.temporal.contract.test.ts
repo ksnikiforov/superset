@@ -18,7 +18,6 @@
  */
 import { GenericDataType, SupersetClient } from '@superset-ui/core';
 import { fetchPivotBranch } from '../../src/fetchPivotBranch';
-import { clearPivotBranchCache } from '../../src/pivot/data/cache';
 import {
   MetricsLayoutEnum,
   PivotTreeData,
@@ -95,7 +94,6 @@ describe('fetchPivotBranch temporal payload contract', () => {
 
   beforeEach(() => {
     postMock.mockReset();
-    clearPivotBranchCache();
     postMock.mockResolvedValue({
       response: { status: 200 } as Response,
       json: {

@@ -20,7 +20,6 @@ import { GenericDataType, SupersetClient } from '@superset-ui/core';
 import { fireEvent, render, screen, waitFor } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 
-import { clearPivotBranchCache } from '../../../src/pivot/data/cache';
 import { MetricsLayoutEnum } from '../../../src/types';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
@@ -171,7 +170,6 @@ describe('PivotTableChart temporal expansion outcome', () => {
         },
       },
     } as Awaited<ReturnType<typeof SupersetClient.get>>);
-    clearPivotBranchCache();
   });
 
   it('expanding temporal parent does not show chart error and reveals child values', async () => {

@@ -22,12 +22,6 @@ import {
   PivotTableQueryFormData,
   PivotTreeData,
 } from './types';
-import {
-  buildFilterSignature,
-  buildPivotBranchCacheKey,
-  readPivotBranchFactCache,
-  writePivotBranchFactCache,
-} from './pivot/data/cache';
 import { type ChartDataWarning } from './pivot/data/ChartDataClient';
 import { supersetChartDataClient } from './pivot/data/SupersetChartDataClient';
 import {
@@ -54,7 +48,6 @@ import {
 
 export interface FetchPivotBranchResult {
   data?: PivotTreeData;
-  cached?: boolean;
   factStoreHit?: boolean;
   factBatches: PivotFactStoreBatch[];
   warnings?: ChartDataWarning[];
@@ -72,7 +65,6 @@ export interface FetchPivotBranchParams {
 }
 
 export type ResolvedFetchContext = ResolvedQueryFetchContext & {
-  cacheKey: string;
   layout: LayoutContext;
 };
 
@@ -82,22 +74,6 @@ type ResolvedBranchPlan = {
 };
 
 const EMPTY_FACT_BATCHES: PivotFactStoreBatch[] = [];
-
-const buildMeasureLeafSelectionSignature = (
-  measureHierarchy: LayoutContext['measureHierarchy'],
-): string => {
-  if (measureHierarchy.kind !== 'measureStackV1') {
-    return '';
-  }
-  return measureHierarchy.groups
-    .map(group => ({
-      metricKey: group.metricKey,
-      leafIds: group.leaves.map(leaf => leaf.id).sort(),
-    }))
-    .sort((left, right) => left.metricKey.localeCompare(right.metricKey))
-    .map(group => `${group.metricKey}:${group.leafIds.join(',')}`)
-    .join('|');
-};
 
 export const resolveBranchFetchContext = ({
   formData,
@@ -115,38 +91,7 @@ export const resolveBranchFetchContext = ({
     visibleRowDepth,
     visibleColDepth,
   });
-  const filterSignature = buildFilterSignature(formData);
-  const cacheKey = buildPivotBranchCacheKey({
-    axis,
-    path,
-    rowDepth: queryCtx.rowDepth,
-    colDepth: queryCtx.colDepth,
-    rowGroupby: queryCtx.rowGroupbyForQuery,
-    colGroupby: queryCtx.colGroupbyForQuery,
-    metrics:
-      queryCtx.metricsForQuery.length > 0
-        ? queryCtx.metricsForQuery
-        : queryCtx.materializedMetrics,
-    aggregateFunction: formData.aggregateFunction,
-    filterSignature,
-    cacheMeta: {
-      datasource: formData.datasource,
-      granularity: formData.granularity,
-      granularity_sqla: formData.granularity_sqla,
-      rowTotals: formData.rowTotals ?? false,
-      colTotals: formData.colTotals ?? false,
-      rowSubTotals: formData.rowSubTotals ?? true,
-      rowSubtotalLevels: queryCtx.rowSubtotalLevels,
-      colSubtotalLevels: queryCtx.colSubtotalLevels,
-      metricsLayoutResolved: layout.metricsLayoutResolved,
-      metricInsertIndex: layout.metricInsertIndex,
-      timeOffsets: queryCtx.requiredTimeOffsets,
-      measureLeafSelection: buildMeasureLeafSelectionSignature(
-        queryCtx.materializedMeasureHierarchy,
-      ),
-    },
-  });
-  return { ...queryCtx, cacheKey, layout };
+  return { ...queryCtx, layout };
 };
 
 const resolveBranchPlan = (
@@ -210,23 +155,7 @@ const resolvePivotBranchLocalResultFromPlan = (
       factBatches,
     };
   }
-  const cachedFactBatches = readPivotBranchFactCache(ctx.cacheKey);
-  if (!cachedFactBatches) {
-    return undefined;
-  }
-  const store = params.factStore ?? createPivotFactStore();
-  store.upsertBatches(cachedFactBatches);
-  const data = buildBranchTreeFromFactStore({
-    specs,
-    store,
-    formData: params.formData,
-    measureHierarchy: ctx.layout.measureHierarchy,
-  });
-  return {
-    data,
-    cached: true,
-    factBatches: cachedFactBatches,
-  };
+  return undefined;
 };
 
 export const resolvePivotBranchLocalResult = (
@@ -267,7 +196,7 @@ export async function fetchPivotBranch({
     visibleColDepth,
   });
   const { ctx, specs } = plan;
-  const { metricsForQuery, requiredTimeOffsets, cacheKey, layout } = ctx;
+  const { metricsForQuery, requiredTimeOffsets, layout } = ctx;
   const timeOffsets = Array.from(
     new Set([...(formData.time_offsets ?? []), ...requiredTimeOffsets]),
   );
@@ -318,7 +247,6 @@ export async function fetchPivotBranch({
       formData,
       measureHierarchy: layout.measureHierarchy,
     });
-    writePivotBranchFactCache(cacheKey, factBatches);
     return {
       data: labeledBranch,
       factBatches,
