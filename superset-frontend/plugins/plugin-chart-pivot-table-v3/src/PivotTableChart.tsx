@@ -238,7 +238,6 @@ function PivotTableChart(props: PivotTableProps) {
     ? committedFactBatches
     : factBatches;
 
-  const treeRef = useRef<PivotTableProps['data']>(dataForRender);
   const ownStateRef = useRef<JsonObject>(ownState ?? {});
   useSyncRef(ownStateRef, ownState ?? {});
 
@@ -721,8 +720,6 @@ function PivotTableChart(props: PivotTableProps) {
     seamlessLoading,
   ]);
 
-  useSyncRef(treeRef, tree);
-
   const renderModelResult = usePivotRenderModel({
     tree,
     expandedRows,
@@ -877,7 +874,7 @@ function PivotTableChart(props: PivotTableProps) {
     emitCrossFilters,
     setDataMask,
     mergeOwnState,
-    treeRef,
+    tree,
     treeDataSignature: formatting.treeDataSignature,
     groupbyRows: layoutGroupbyRows,
     groupbyColumns: layoutGroupbyColumns,

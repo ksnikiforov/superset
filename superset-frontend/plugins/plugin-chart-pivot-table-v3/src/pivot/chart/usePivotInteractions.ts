@@ -66,7 +66,7 @@ export const usePivotInteractions = ({
   emitCrossFilters,
   setDataMask,
   mergeOwnState,
-  treeRef,
+  tree,
   treeDataSignature,
   groupbyRows,
   groupbyColumns,
@@ -80,7 +80,7 @@ export const usePivotInteractions = ({
   emitCrossFilters?: PivotTableProps['emitCrossFilters'];
   setDataMask: PivotTableProps['setDataMask'];
   mergeOwnState: (partial: JsonObject) => JsonObject;
-  treeRef: { current: PivotTreeData };
+  tree: PivotTreeData;
   treeDataSignature: string;
   groupbyRows: PivotTableProps['groupbyRows'];
   groupbyColumns: PivotTableProps['groupbyColumns'];
@@ -114,7 +114,7 @@ export const usePivotInteractions = ({
         },
         ownState: {
           ...mergeOwnState({
-            treeData: treeRef.current,
+            treeData: tree,
             treeDataSignature,
           }),
         },
@@ -128,8 +128,8 @@ export const usePivotInteractions = ({
       metrics,
       resolvedMetricsLayout,
       setDataMask,
+      tree,
       treeDataSignature,
-      treeRef,
     ],
   );
 
@@ -187,7 +187,7 @@ export const usePivotInteractions = ({
                 },
                 ownState: {
                   ...(ownState ?? {}),
-                  treeData: treeRef.current,
+                  treeData: tree,
                   treeDataSignature,
                 },
               },
@@ -207,8 +207,8 @@ export const usePivotInteractions = ({
       onContextMenu,
       ownState,
       resolvedMetricsLayout,
+      tree,
       treeDataSignature,
-      treeRef,
       timeGrainSqla,
     ],
   );
