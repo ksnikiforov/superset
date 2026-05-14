@@ -294,7 +294,6 @@ export type PivotTableQueryFormData = QueryFormData &
     timeGrainSqla?: TimeGranularity;
     time_grain_sqla?: TimeGranularity;
     granularity_sqla?: string;
-    treeData?: PivotTreeData;
     treeDataSignature?: string;
   };
 

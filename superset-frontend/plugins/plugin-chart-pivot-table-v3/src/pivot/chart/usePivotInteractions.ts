@@ -24,11 +24,7 @@ import {
   type QueryObjectFilterClause,
   getColumnLabel,
 } from '@superset-ui/core';
-import {
-  type PivotTableProps,
-  type PivotTreeData,
-  type PivotTreeNode,
-} from '../../types';
+import { type PivotTableProps, type PivotTreeNode } from '../../types';
 import { buildCellFilters, buildContextMenuFilters } from '../filters';
 import { type PivotLayoutResult } from './usePivotLayout';
 
@@ -66,7 +62,6 @@ export const usePivotInteractions = ({
   emitCrossFilters,
   setDataMask,
   mergeOwnState,
-  tree,
   treeDataSignature,
   layout,
   onContextMenu,
@@ -77,7 +72,6 @@ export const usePivotInteractions = ({
   emitCrossFilters?: PivotTableProps['emitCrossFilters'];
   setDataMask: PivotTableProps['setDataMask'];
   mergeOwnState: (partial: JsonObject) => JsonObject;
-  tree: PivotTreeData;
   treeDataSignature: string;
   layout: PivotLayoutResult;
   onContextMenu?: PivotTableProps['onContextMenu'];
@@ -113,7 +107,6 @@ export const usePivotInteractions = ({
         },
         ownState: {
           ...mergeOwnState({
-            treeData: tree,
             treeDataSignature,
           }),
         },
@@ -127,7 +120,6 @@ export const usePivotInteractions = ({
       metrics,
       resolvedMetricsLayout,
       setDataMask,
-      tree,
       treeDataSignature,
     ],
   );
@@ -186,7 +178,6 @@ export const usePivotInteractions = ({
                 },
                 ownState: {
                   ...(ownState ?? {}),
-                  treeData: tree,
                   treeDataSignature,
                 },
               },
@@ -206,7 +197,6 @@ export const usePivotInteractions = ({
       onContextMenu,
       ownState,
       resolvedMetricsLayout,
-      tree,
       treeDataSignature,
       timeGrainSqla,
     ],
