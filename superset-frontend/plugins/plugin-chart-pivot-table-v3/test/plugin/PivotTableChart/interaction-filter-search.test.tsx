@@ -66,7 +66,9 @@ jest.mock('../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../src/fetchPivotBranch');
   return {
     ...actual,
-    fetchPivotBranch: jest.fn().mockResolvedValue({ data: undefined }),
+    fetchPivotBranch: jest
+      .fn()
+      .mockResolvedValue({ data: undefined, factBatches: [] }),
   };
 });
 
@@ -77,7 +79,10 @@ describe('PivotTableChart interaction filter search', () => {
   beforeEach(() => {
     fetchMock.mockReset();
     fetchPivotBranchMock.mockReset();
-    fetchPivotBranchMock.mockResolvedValue({ data: undefined });
+    fetchPivotBranchMock.mockResolvedValue({
+      data: undefined,
+      factBatches: [],
+    });
   });
 
   it('uses a dynamic search query for dimension filter values', async () => {

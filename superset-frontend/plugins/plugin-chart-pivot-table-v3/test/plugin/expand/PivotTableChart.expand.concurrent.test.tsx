@@ -21,7 +21,10 @@ import { fireEvent, render, waitFor, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
 
-import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
+import {
+  fetchPivotBranch,
+  type FetchPivotBranchResult,
+} from '../../../src/fetchPivotBranch';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';
@@ -126,6 +129,10 @@ describe('PivotTableChart concurrent expands', () => {
 
   beforeEach(() => {
     fetchPivotBranchMock.mockReset();
+    fetchPivotBranchMock.mockResolvedValue({
+      data: undefined,
+      factBatches: [],
+    });
   });
 
   it('merges branches from overlapping row expansions', async () => {
@@ -139,8 +146,8 @@ describe('PivotTableChart concurrent expands', () => {
       2,
     );
 
-    const deferredA = createDeferred<{ data?: PivotTreeData }>();
-    const deferredB = createDeferred<{ data?: PivotTreeData }>();
+    const deferredA = createDeferred<FetchPivotBranchResult>();
+    const deferredB = createDeferred<FetchPivotBranchResult>();
     fetchPivotBranchMock
       .mockImplementationOnce(() => deferredA.promise)
       .mockImplementationOnce(() => deferredB.promise);
@@ -183,8 +190,8 @@ describe('PivotTableChart concurrent expands', () => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
     });
 
-    deferredB.resolve({ data: branchB });
-    deferredA.resolve({ data: branchA });
+    deferredB.resolve({ data: branchB, factBatches: [] });
+    deferredA.resolve({ data: branchA, factBatches: [] });
 
     await waitFor(() => {
       const latest = getPivotTable(container);
@@ -208,8 +215,8 @@ describe('PivotTableChart concurrent expands', () => {
       2,
     );
 
-    const deferredA = createDeferred<{ data?: PivotTreeData }>();
-    const deferredB = createDeferred<{ data?: PivotTreeData }>();
+    const deferredA = createDeferred<FetchPivotBranchResult>();
+    const deferredB = createDeferred<FetchPivotBranchResult>();
     fetchPivotBranchMock
       .mockImplementationOnce(() => deferredA.promise)
       .mockImplementationOnce(() => deferredB.promise);
@@ -251,7 +258,7 @@ describe('PivotTableChart concurrent expands', () => {
       expect(fetchPivotBranchMock.mock.calls.length).toBeGreaterThanOrEqual(2);
     });
 
-    deferredA.resolve({ data: branchA });
+    deferredA.resolve({ data: branchA, factBatches: [] });
 
     await waitFor(() => {
       const latest = getPivotTable(container);
@@ -263,7 +270,7 @@ describe('PivotTableChart concurrent expands', () => {
       expect(scoped.queryByText('Z')).not.toBeInTheDocument();
     });
 
-    deferredB.resolve({ data: branchB });
+    deferredB.resolve({ data: branchB, factBatches: [] });
 
     await waitFor(() => {
       const latest = getPivotTable(container);

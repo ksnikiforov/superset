@@ -217,8 +217,8 @@ describe('PivotTableChart cross-axis expands (no blanks)', () => {
       expect(fetchPivotBranchMock.mock.calls.length).toBeGreaterThanOrEqual(2),
     );
 
-    deferredCol.resolve({ data: colBranch });
-    deferredRow.resolve({ data: rowBranch });
+    deferredCol.resolve({ data: colBranch, factBatches: [] });
+    deferredRow.resolve({ data: rowBranch, factBatches: [] });
 
     await Promise.all(
       fetchPivotBranchMock.mock.results.slice(0, 2).map(result => result.value),

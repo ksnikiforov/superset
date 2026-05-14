@@ -34,7 +34,9 @@ jest.mock('../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../src/fetchPivotBranch');
   return {
     ...actual,
-    fetchPivotBranch: jest.fn().mockResolvedValue({ data: undefined }),
+    fetchPivotBranch: jest
+      .fn()
+      .mockResolvedValue({ data: undefined, factBatches: [] }),
   };
 });
 

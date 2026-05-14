@@ -76,7 +76,10 @@ describe('PivotTableChart initial depth prefetch', () => {
     const colTree = buildTree([{ r1: 'A', c1: 'B', m1: 20 }], 0, 1);
     const baseTree = mergeTrees(mergeTrees(totalsTree, rowTree), colTree);
     const branchTree = buildTree([{ r1: 'A', c1: 'B', m1: 100 }], 1, 1);
-    fetchPivotBranchMock.mockResolvedValue({ data: branchTree });
+    fetchPivotBranchMock.mockResolvedValue({
+      data: branchTree,
+      factBatches: [],
+    });
 
     const { container } = render(
       <PivotTableChart

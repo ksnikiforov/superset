@@ -50,8 +50,6 @@ import { applyExpansionFetchDelta, runHydrationLoop } from './stateTransitions';
 import { type FetchedFactCoverageState } from './fetchedRequests';
 import { planGroupedExpansionTargets } from './planner';
 
-const EMPTY_FACT_BATCHES: PivotFactStoreBatch[] = [];
-
 export type ExpansionFetchResult = {
   targets: FetchTarget[];
   data?: PivotTreeData;
@@ -157,7 +155,7 @@ const resolveExpansionFetchPlan = ({
       localResults.push({
         targets: [target],
         data: localResult.data,
-        factBatches: localResult.factBatches ?? EMPTY_FACT_BATCHES,
+        factBatches: localResult.factBatches,
       });
       continue;
     }
@@ -211,13 +209,6 @@ const fetchExpansionSingleTarget = async ({
         factStore,
       }),
     );
-    if (!result) {
-      return {
-        targets: [target],
-        data: undefined,
-        factBatches: EMPTY_FACT_BATCHES,
-      };
-    }
     if (requestScope.isCurrent()) {
       addWarnings(result.warnings);
       if (result.error) {
@@ -227,7 +218,7 @@ const fetchExpansionSingleTarget = async ({
     return {
       targets: [target],
       data: result.data,
-      factBatches: result.factBatches ?? EMPTY_FACT_BATCHES,
+      factBatches: result.factBatches,
     };
   } finally {
     if (requestScope.isCurrent()) {
@@ -278,7 +269,7 @@ const fetchExpansionBatchTarget = async ({
     return {
       targets: batch.targets,
       data: result.data,
-      factBatches: result.factBatches ?? EMPTY_FACT_BATCHES,
+      factBatches: result.factBatches,
     };
   } finally {
     if (requestScope.isCurrent()) {

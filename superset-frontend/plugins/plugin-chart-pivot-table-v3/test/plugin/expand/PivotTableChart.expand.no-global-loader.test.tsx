@@ -30,7 +30,9 @@ jest.mock('../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../src/fetchPivotBranch');
   return {
     ...actual,
-    fetchPivotBranch: jest.fn().mockResolvedValue({ data: undefined }),
+    fetchPivotBranch: jest
+      .fn()
+      .mockResolvedValue({ data: undefined, factBatches: [] }),
   };
 });
 
@@ -64,7 +66,10 @@ describe('PivotTableChart expand without global loader for same-axis actions', (
       [],
     );
 
-    fetchPivotBranchMock.mockResolvedValueOnce({ data: expandedTree });
+    fetchPivotBranchMock.mockResolvedValueOnce({
+      data: expandedTree,
+      factBatches: [],
+    });
 
     const { container, findByText } = render(
       <PivotTableChart

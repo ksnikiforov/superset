@@ -60,7 +60,9 @@ jest.mock('../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../src/fetchPivotBranch');
   return {
     ...actual,
-    fetchPivotBranch: jest.fn().mockResolvedValue({ data: undefined }),
+    fetchPivotBranch: jest
+      .fn()
+      .mockResolvedValue({ data: undefined, factBatches: [] }),
   };
 });
 
@@ -3007,7 +3009,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
         if (axis === 'row') {
           return branchPromise;
         }
-        return { data: undefined };
+        return { data: undefined, factBatches: [] };
       },
     );
 
@@ -3080,7 +3082,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     expect(disabledColumnToggles).toHaveLength(0);
 
     if (resolveBranch) {
-      resolveBranch({ data: undefined });
+      resolveBranch({ data: undefined, factBatches: [] });
     }
   });
 

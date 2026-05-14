@@ -45,7 +45,9 @@ jest.mock('../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../src/fetchPivotBranch');
   return {
     ...actual,
-    fetchPivotBranch: jest.fn().mockResolvedValue({ data: undefined }),
+    fetchPivotBranch: jest
+      .fn()
+      .mockResolvedValue({ data: undefined, factBatches: [] }),
   };
 });
 
@@ -56,7 +58,10 @@ describe('PivotTableChart basic regression smoke guardrails', () => {
   beforeEach(() => {
     fetchMock.mockReset();
     fetchPivotBranchMock.mockReset();
-    fetchPivotBranchMock.mockResolvedValue({ data: undefined });
+    fetchPivotBranchMock.mockResolvedValue({
+      data: undefined,
+      factBatches: [],
+    });
   });
 
   it('renders totals when rowTotals and colTotals are enabled', async () => {
@@ -144,7 +149,10 @@ describe('PivotTableChart basic regression smoke guardrails', () => {
       rows,
       [],
     );
-    fetchPivotBranchMock.mockResolvedValue({ data: expandedTree });
+    fetchPivotBranchMock.mockResolvedValue({
+      data: expandedTree,
+      factBatches: [],
+    });
 
     const formData = buildFormData({
       groupbyRows: rows,

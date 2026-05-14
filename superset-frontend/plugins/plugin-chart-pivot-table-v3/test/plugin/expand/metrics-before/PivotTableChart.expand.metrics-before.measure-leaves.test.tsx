@@ -35,7 +35,9 @@ jest.mock('../../../../src/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../../src/fetchPivotBranch');
   return {
     ...actual,
-    fetchPivotBranch: jest.fn().mockResolvedValue({ data: undefined }),
+    fetchPivotBranch: jest
+      .fn()
+      .mockResolvedValue({ data: undefined, factBatches: [] }),
   };
 });
 
@@ -135,7 +137,10 @@ describe('PivotTableChart expansion with measure leaves before dimensions', () =
       record,
     });
 
-    fetchPivotBranchMock.mockResolvedValueOnce({ data: branchTree });
+    fetchPivotBranchMock.mockResolvedValueOnce({
+      data: branchTree,
+      factBatches: [],
+    });
 
     const { container } = render(
       <PivotTableChart
@@ -226,7 +231,10 @@ describe('PivotTableChart expansion with measure leaves before dimensions', () =
       record,
     });
 
-    fetchPivotBranchMock.mockResolvedValueOnce({ data: branchTree });
+    fetchPivotBranchMock.mockResolvedValueOnce({
+      data: branchTree,
+      factBatches: [],
+    });
 
     const { container } = render(
       <PivotTableChart
