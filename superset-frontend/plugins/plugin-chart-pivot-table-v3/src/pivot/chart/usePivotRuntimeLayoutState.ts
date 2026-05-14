@@ -19,6 +19,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type MutableRefObject,
@@ -28,9 +29,11 @@ import {
   type DataRecordValue,
   type HandlerFunction,
   type JsonObject,
+  type QueryFormColumn,
   type SetDataMaskHook,
 } from '@superset-ui/core';
 import { type PivotRuntimeLayout } from '../../types';
+import { buildRuntimeSelectionSyncState } from '../filters';
 import { isSameRuntimeLayout } from '../runtime/coverage';
 import {
   prepareRuntimeLayoutPropSync,
@@ -47,15 +50,13 @@ type UsePivotRuntimeLayoutStateConfig = {
   isDashboardRuntimeSync: boolean;
   shouldPersistOwnState: boolean;
   runtimeLayout: PivotRuntimeLayout;
+  dimensions: QueryFormColumn[];
+  selectedFiltersFromFormData: RuntimeSelection;
+  selectedFiltersFromOwnState: RuntimeSelection;
   selectedFiltersFromProps: RuntimeSelection;
-  persistedSelectedFilters: RuntimeSelection;
-  committedFilters: RuntimeSelection;
-  uiSelectedFilters: RuntimeSelection;
   upstreamDashboardQueryContextSignature: string | null;
   pendingSeamlessLayoutRef: MutableRefObject<PivotRuntimeLayout | null>;
   suppressStalePersistedFilterRestoreRef: MutableRefObject<boolean>;
-  commitFilters: (filters: RuntimeSelection) => void;
-  setUiSelectedFilters: (filters: RuntimeSelection) => void;
   mergeOwnState: (partial: JsonObject) => JsonObject;
   setControlValue?: HandlerFunction;
   setDataMask: SetDataMaskHook;
@@ -67,15 +68,13 @@ export const usePivotRuntimeLayoutState = ({
   isDashboardRuntimeSync,
   shouldPersistOwnState,
   runtimeLayout,
+  dimensions,
+  selectedFiltersFromFormData,
+  selectedFiltersFromOwnState,
   selectedFiltersFromProps,
-  persistedSelectedFilters,
-  committedFilters,
-  uiSelectedFilters,
   upstreamDashboardQueryContextSignature,
   pendingSeamlessLayoutRef,
   suppressStalePersistedFilterRestoreRef,
-  commitFilters,
-  setUiSelectedFilters,
   mergeOwnState,
   setControlValue,
   setDataMask,
@@ -85,6 +84,36 @@ export const usePivotRuntimeLayoutState = ({
   const lastPersistedSelectionRef = useRef(selectedFiltersFromProps);
   const pendingPersistedSelectionSyncRef = useRef(false);
   const lastLocalSyncDashboardQueryContextRef = useRef<string | null>(null);
+  const [committedFilters, setCommittedFilters] = useState<RuntimeSelection>(
+    selectedFiltersFromProps,
+  );
+  const [uiSelectedFilters, setUiSelectedFilters] = useState<RuntimeSelection>(
+    selectedFiltersFromProps,
+  );
+
+  const {
+    selectedFiltersForTreeSync,
+    persistedInteractionFilters,
+    persistedSelectedFilters,
+  } = useMemo(
+    () =>
+      buildRuntimeSelectionSyncState({
+        isUserControlled,
+        dimensions,
+        selectedFiltersFromFormData,
+        selectedFiltersFromOwnState,
+        selectedFiltersFromProps,
+        committedFilters,
+      }),
+    [
+      committedFilters,
+      dimensions,
+      isUserControlled,
+      selectedFiltersFromFormData,
+      selectedFiltersFromOwnState,
+      selectedFiltersFromProps,
+    ],
+  );
 
   const [committedRuntimeLayout, setCommittedRuntimeLayout] =
     useState<PivotRuntimeLayout>(runtimeLayout);
@@ -200,20 +229,24 @@ export const usePivotRuntimeLayoutState = ({
           suppressStalePersistedFilterRestoreRef.current,
       })
     ) {
-      commitFilters(persistedSelectedFilters);
+      setCommittedFilters(persistedSelectedFilters);
       setUiSelectedFilters(persistedSelectedFilters);
     }
   }, [
-    commitFilters,
     committedFilters,
     isUserControlled,
     persistedSelectedFilters,
-    setUiSelectedFilters,
     suppressStalePersistedFilterRestoreRef,
     uiSelectedFilters,
   ]);
 
   return {
+    committedFilters,
+    uiSelectedFilters,
+    updateUiSelectedFilters: setUiSelectedFilters,
+    commitFilters: setCommittedFilters,
+    selectedFiltersForTreeSync,
+    persistedInteractionFilters,
     committedRuntimeLayout,
     committedRuntimeLayoutRef,
     uiRuntimeLayout,

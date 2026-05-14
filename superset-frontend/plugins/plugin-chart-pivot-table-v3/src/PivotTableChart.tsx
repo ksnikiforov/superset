@@ -66,7 +66,6 @@ import { buildSelectionFilteredFormData } from './pivot/update/initialUpdatePlan
 import {
   applyDimensionFilterSelectionChange,
   buildClearSelectedFiltersUpdate,
-  buildRuntimeSelectionSyncState,
   buildTreeDimensionFilterValues,
 } from './pivot/filters';
 import { useDimensionFilterValues } from './pivot/chart/useDimensionFilterValues';
@@ -205,9 +204,6 @@ function PivotTableChart(props: PivotTableProps) {
   const persistExpansionState = persistExpansionStateProp ?? true;
   const resolvedStickyHeaders = formData.stickyHeaders ?? stickyHeaders;
 
-  const [committedFilters, setCommittedFilters] = useState<
-    Record<string, DataRecordValue[]>
-  >(selectedFilters ?? EMPTY_SELECTED_FILTERS);
   const [activeColumnSort, setActiveColumnSort] =
     useState<PivotColumnSortState | null>(null);
   const pendingSeamlessLayoutRef = useRef<PivotRuntimeLayout | null>(null);
@@ -247,9 +243,6 @@ function PivotTableChart(props: PivotTableProps) {
     return normalizeRuntimeLayout(persisted, dimensionKeys, metricKeys);
   }, [dimensionKeys, formData.pivotRuntimeLayout, metricKeys, ownState]);
   const selectedFiltersFromProps = selectedFilters ?? EMPTY_SELECTED_FILTERS;
-  const [uiSelectedFilters, setUiSelectedFilters] = useState<
-    Record<string, DataRecordValue[]>
-  >(selectedFilters ?? EMPTY_SELECTED_FILTERS);
   const suppressStalePersistedFilterRestoreRef = useRef(false);
   const selectedFiltersFromFormData =
     formData.pivotSelectedFilters ?? EMPTY_SELECTED_FILTERS;
@@ -257,29 +250,6 @@ function PivotTableChart(props: PivotTableProps) {
     (ownState?.pivotSelectedFilters as
       | Record<string, DataRecordValue[]>
       | undefined) ?? EMPTY_SELECTED_FILTERS;
-  const {
-    selectedFiltersForTreeSync,
-    persistedInteractionFilters,
-    persistedSelectedFilters,
-  } = useMemo(
-    () =>
-      buildRuntimeSelectionSyncState({
-        isUserControlled,
-        dimensions: dimensionList,
-        selectedFiltersFromFormData,
-        selectedFiltersFromOwnState,
-        selectedFiltersFromProps,
-        committedFilters,
-      }),
-    [
-      committedFilters,
-      dimensionList,
-      isUserControlled,
-      selectedFiltersFromFormData,
-      selectedFiltersFromOwnState,
-      selectedFiltersFromProps,
-    ],
-  );
   const upstreamDashboardQueryContextSignature = useMemo(() => {
     if (!isDashboardRuntimeSync) {
       return null;
@@ -287,6 +257,12 @@ function PivotTableChart(props: PivotTableProps) {
     return buildSeamlessRuntimeUpstreamSignature(queryFormData);
   }, [isDashboardRuntimeSync, queryFormData]);
   const {
+    committedFilters,
+    uiSelectedFilters,
+    updateUiSelectedFilters,
+    commitFilters,
+    selectedFiltersForTreeSync,
+    persistedInteractionFilters,
     committedRuntimeLayout,
     committedRuntimeLayoutRef,
     uiRuntimeLayout,
@@ -300,15 +276,13 @@ function PivotTableChart(props: PivotTableProps) {
     isDashboardRuntimeSync,
     shouldPersistOwnState,
     runtimeLayout,
+    dimensions: dimensionList,
+    selectedFiltersFromFormData,
+    selectedFiltersFromOwnState,
     selectedFiltersFromProps,
-    persistedSelectedFilters,
-    committedFilters,
-    uiSelectedFilters,
     upstreamDashboardQueryContextSignature,
     pendingSeamlessLayoutRef,
     suppressStalePersistedFilterRestoreRef,
-    commitFilters: setCommittedFilters,
-    setUiSelectedFilters,
     mergeOwnState,
     setControlValue,
     setDataMask,
@@ -376,7 +350,7 @@ function PivotTableChart(props: PivotTableProps) {
     expandedColsRef: expandedColsForSeamlessRef,
     pendingRowsRef: pendingRowsForSeamlessRef,
     pendingColsRef: pendingColsForSeamlessRef,
-    commitFilters: setCommittedFilters,
+    commitFilters,
     commitUiRuntimeLayout: updateUiRuntimeLayout,
     persistRuntimeState,
   });
@@ -668,10 +642,15 @@ function PivotTableChart(props: PivotTableProps) {
         });
       suppressStalePersistedFilterRestoreRef.current =
         suppressStalePersistedFilterRestore;
-      setUiSelectedFilters(nextSelected);
+      updateUiSelectedFilters(nextSelected);
       applySeamlessUpdate(uiRuntimeLayout, nextSelected);
     },
-    [applySeamlessUpdate, uiRuntimeLayout, uiSelectedFilters],
+    [
+      applySeamlessUpdate,
+      uiRuntimeLayout,
+      uiSelectedFilters,
+      updateUiSelectedFilters,
+    ],
   );
 
   const handleClearAllFilters = useCallback(() => {
@@ -682,9 +661,14 @@ function PivotTableChart(props: PivotTableProps) {
     suppressStalePersistedFilterRestoreRef.current =
       update.suppressStalePersistedFilterRestore;
     const nextSelected = update.selection;
-    setUiSelectedFilters(nextSelected);
+    updateUiSelectedFilters(nextSelected);
     applySeamlessUpdate(uiRuntimeLayout, nextSelected);
-  }, [applySeamlessUpdate, uiRuntimeLayout, uiSelectedFilters]);
+  }, [
+    applySeamlessUpdate,
+    uiRuntimeLayout,
+    uiSelectedFilters,
+    updateUiSelectedFilters,
+  ]);
 
   const tableWidth = isUserControlled
     ? Math.max(
