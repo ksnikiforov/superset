@@ -40,6 +40,7 @@ import {
   type PivotFactStoreBatch,
 } from './pivot/runtime/factStore';
 import { upsertQueryResultsIntoFactStore } from './pivot/runtime/ingestQueryResults';
+import { isAbortError } from './pivot/runtime/requestLifecycle';
 import {
   buildBranchTreeFromFactStore,
   buildFactStoreBatchesFromSpecs,
@@ -160,22 +161,6 @@ export const resolvePivotBranchLocalResult = (
   params: FetchPivotBranchParams,
 ): FetchPivotBranchResult | undefined =>
   resolvePivotBranchLocalResultFromPlan(params, resolveBranchPlan(params));
-
-const isAbortError = (error: unknown): boolean => {
-  if (
-    typeof DOMException !== 'undefined' &&
-    error instanceof DOMException &&
-    error.name === 'AbortError'
-  ) {
-    return true;
-  }
-  return (
-    typeof error === 'object' &&
-    error !== null &&
-    'name' in error &&
-    (error as { name?: unknown }).name === 'AbortError'
-  );
-};
 
 export async function fetchPivotBranch({
   formData,
