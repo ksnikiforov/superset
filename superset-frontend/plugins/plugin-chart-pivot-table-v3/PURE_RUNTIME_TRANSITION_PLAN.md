@@ -57,7 +57,7 @@ cells are projections of DB facts, not canonical data.
 
 ## Current Status
 
-As of May 14, 2026, after the branch cache peek cleanup checkpoint:
+As of May 14, 2026, after the path export cleanup checkpoint:
 
 - Gate-weighted architecture estimate: **99%**.
 - Delivery remaining estimate: **less than 1%**, mostly completion audit and
@@ -72,8 +72,8 @@ As of May 14, 2026, after the branch cache peek cleanup checkpoint:
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `14288` insertions, `13554` deletions, net `+734`.
-- Current production `src` TypeScript/TSX total: `34244` lines.
+- Production `src`: `14288` insertions, `13567` deletions, net `+721`.
+- Current production `src` TypeScript/TSX total: `34231` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - `PivotTableChart.tsx` is now `688` lines and `useExpansionEngine.ts` is now
   `1405` lines; those single-file reductions should not be counted as plugin
@@ -165,6 +165,15 @@ Source-only diff from pre-refactor baseline
   source slice was deletion-positive: `8` deletions, net `-8`; source plus
   tests was `11` insertions, `182` deletions, net `-171`.
 - Touched-file ESLint passed after the branch cache peek cleanup.
+- Full plugin plus export entrypoint Jest pass after the cleanup: `99` suites
+  and `836` tests.
+- Path export cleanup deleted the production `parseCellKey` export after audit
+  found no production caller, leaving tests to assert the serialized cell-key
+  shape directly. The source slice was deletion-positive: `13` deletions, net
+  `-13`; source plus tests was `10` insertions, `19` deletions, net `-9`.
+- Touched-file ESLint passed after the path export cleanup.
+- Focused path/ancestor-subtotal validation after the cleanup passed: `2`
+  suites and `10` tests.
 - Full plugin plus export entrypoint Jest pass after the cleanup: `99` suites
   and `836` tests.
 - Metric source-catalog cleanup removed `metricsBase` and
