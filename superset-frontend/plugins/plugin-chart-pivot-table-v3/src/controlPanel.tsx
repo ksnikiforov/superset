@@ -57,8 +57,6 @@ import PivotDndMetricSelect from './controls/PivotDndMetricSelect/PivotDndMetric
 import { resolveInteractionFormData } from './pivot/layout/resolveInteractionLayout';
 import { resolvePivotProgramPlacement } from './pivot/runtime/compilePivotProgram';
 
-type WindowWithPivotDebug = Window & { PIVOT_V3_DEBUG_PLACEMENT?: boolean };
-
 const THEME_BLUE = 'blue';
 const THEME_PEACH = 'peach';
 const THEME_GREY = 'grey';
@@ -213,18 +211,6 @@ const withMetricsPlaceholder =
         metrics: hasMetrics ? metricsValue : [],
         metricsLayout: preferredLayout,
       });
-      if ((window as WindowWithPivotDebug).PIVOT_V3_DEBUG_PLACEMENT) {
-        // eslint-disable-next-line no-console
-        console.log('[pivot-v3] placement', {
-          axis,
-          rowsRaw,
-          colsRaw,
-          resolvedRows: resolved.rows,
-          resolvedCols: resolved.cols,
-          preferredLayout,
-          hasMetrics,
-        });
-      }
       const value = axis === 'row' ? resolved.rows : resolved.cols;
       return {
         ...base,
