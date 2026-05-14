@@ -57,7 +57,7 @@ cells are projections of DB facts, not canonical data.
 
 ## Current Status
 
-As of May 14, 2026, after the branch fact-cache cleanup checkpoint:
+As of May 14, 2026, after the fact-store result flag cleanup checkpoint:
 
 - Gate-weighted architecture estimate: **99%**.
 - Delivery remaining estimate: **less than 1%**, mostly completion audit and
@@ -72,8 +72,8 @@ As of May 14, 2026, after the branch fact-cache cleanup checkpoint:
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `14246` insertions, `13727` deletions, net `+519`.
-- Current production `src` TypeScript/TSX total: `34029` lines.
+- Production `src`: `14242` insertions, `13727` deletions, net `+515`.
+- Current production `src` TypeScript/TSX total: `34025` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - `PivotTableChart.tsx` is now `688` lines and `useExpansionEngine.ts` is now
   `1405` lines; those single-file reductions should not be counted as plugin
@@ -187,6 +187,16 @@ Source-only diff from pre-refactor baseline
   suites and `38` tests.
 - Full plugin plus export entrypoint Jest pass after the cleanup: `99` suites
   and `833` tests.
+- Fact-store result flag cleanup removed the branch/batch fetch `factStoreHit`
+  diagnostic return field, which had no production consumer after the cache
+  cleanup. Existing tests now assert observable behavior through fact batches
+  and network-call absence. The source/test slice was deletion-only: `7`
+  deletions, with `4` production source deletions.
+- Touched-file ESLint passed after the fact-store result flag cleanup.
+- Focused branch/batch fetch validation after the cleanup passed: `2` suites
+  and `26` tests.
+- Full plugin plus export entrypoint Jest pass after the cleanup: `99` suites
+  and `832` tests.
 - Metric source-catalog cleanup removed `metricsBase` and
   `measureLeavesByMetricBase` from the chart `formData` shape. The original
   metric catalog now travels as explicit chart props instead of compatibility
