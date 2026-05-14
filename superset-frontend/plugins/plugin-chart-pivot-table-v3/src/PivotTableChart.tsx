@@ -615,9 +615,7 @@ function PivotTableChart(props: PivotTableProps) {
     colTotalPosition,
     colSubtotalPosition,
   });
-  const layoutMetrics = layoutResult.layout.metrics;
   const layoutGroupbyRows = layoutResult.layout.groupbyRows;
-  const layoutGroupbyColumns = layoutResult.layout.groupbyColumns;
   const rowAxisLabels = useMemo(
     () =>
       layoutGroupbyRows.map(dimension => {
@@ -857,10 +855,7 @@ function PivotTableChart(props: PivotTableProps) {
     mergeOwnState,
     tree,
     treeDataSignature: formatting.treeDataSignature,
-    groupbyRows: layoutGroupbyRows,
-    groupbyColumns: layoutGroupbyColumns,
-    metrics: layoutMetrics,
-    resolvedMetricsLayout: layoutResult.resolvedMetricsLayout,
+    layout: layoutResult,
     onContextMenu,
     ownState,
     dateFormatters: resolvedDateFormatters,

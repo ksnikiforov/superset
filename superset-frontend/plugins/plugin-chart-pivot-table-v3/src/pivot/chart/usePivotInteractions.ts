@@ -27,10 +27,10 @@ import {
 import {
   type PivotTableProps,
   type PivotTreeData,
-  MetricsLayoutEnum,
   type PivotTreeNode,
 } from '../../types';
 import { buildCellFilters, buildContextMenuFilters } from '../filters';
+import { type PivotLayoutResult } from './usePivotLayout';
 
 export type PivotInteractionsResult = {
   handleCellClick: (rowNode: PivotTreeNode, colNode: PivotTreeNode) => void;
@@ -68,10 +68,7 @@ export const usePivotInteractions = ({
   mergeOwnState,
   tree,
   treeDataSignature,
-  groupbyRows,
-  groupbyColumns,
-  metrics,
-  resolvedMetricsLayout,
+  layout,
   onContextMenu,
   ownState,
   dateFormatters,
@@ -82,15 +79,17 @@ export const usePivotInteractions = ({
   mergeOwnState: (partial: JsonObject) => JsonObject;
   tree: PivotTreeData;
   treeDataSignature: string;
-  groupbyRows: PivotTableProps['groupbyRows'];
-  groupbyColumns: PivotTableProps['groupbyColumns'];
-  metrics: PivotTableProps['metrics'];
-  resolvedMetricsLayout: MetricsLayoutEnum;
+  layout: PivotLayoutResult;
   onContextMenu?: PivotTableProps['onContextMenu'];
   ownState?: PivotTableProps['ownState'];
   dateFormatters: PivotTableProps['dateFormatters'];
   timeGrainSqla?: PivotTableProps['timeGrainSqla'];
 }): PivotInteractionsResult => {
+  const {
+    layout: { groupbyRows, groupbyColumns, metrics },
+    resolvedMetricsLayout,
+  } = layout;
+
   const handleCellClick = useCallback(
     (rowNode: PivotTreeNode, colNode: PivotTreeNode) => {
       if (!emitCrossFilters) {
