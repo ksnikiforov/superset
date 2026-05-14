@@ -1263,16 +1263,6 @@ export const runHydrationLoop = async ({
   return { status: 'exhausted' };
 };
 
-export const shouldPlanHydrationPrefetchAxis = ({
-  effectiveExpandLevel,
-  expandedCount,
-  collapsedCount,
-}: {
-  effectiveExpandLevel: number;
-  expandedCount: number;
-  collapsedCount: number;
-}) => effectiveExpandLevel > 0 || expandedCount > 0 || collapsedCount > 0;
-
 export type HydrationPrefetchAction =
   | {
       kind: 'idle';
@@ -1356,16 +1346,14 @@ export const planInitialHydrationPrefetch = ({
   config: ExpansionVisibilityConfig;
   getCoverageKey: (axis: PivotAxis, key: string) => string;
 }) => {
-  const shouldPlanRows = shouldPlanHydrationPrefetchAxis({
-    effectiveExpandLevel: effectiveExpandRowsLevel,
-    expandedCount: persistedState.rows.length,
-    collapsedCount: persistedState.collapsedRows.length,
-  });
-  const shouldPlanCols = shouldPlanHydrationPrefetchAxis({
-    effectiveExpandLevel: effectiveExpandColsLevel,
-    expandedCount: persistedState.cols.length,
-    collapsedCount: persistedState.collapsedCols.length,
-  });
+  const shouldPlanRows =
+    effectiveExpandRowsLevel > 0 ||
+    persistedState.rows.length > 0 ||
+    persistedState.collapsedRows.length > 0;
+  const shouldPlanCols =
+    effectiveExpandColsLevel > 0 ||
+    persistedState.cols.length > 0 ||
+    persistedState.collapsedCols.length > 0;
   const { rowPlan, colPlan } = planHydrationIteration({
     tree,
     desiredRows: resolvedRows,
@@ -1394,27 +1382,6 @@ export const planInitialHydrationPrefetch = ({
       colPlan,
     }),
   };
-};
-
-export const getVisibleExpansionKeys = ({
-  tree,
-  expandedRows,
-  expandedCols,
-  config,
-}: {
-  tree: PivotTreeData;
-  expandedRows: Set<string>;
-  expandedCols: Set<string>;
-  config: ExpansionVisibilityConfig;
-}) => {
-  const resolvedConfig = buildExpansionRenderModelConfig(tree, config);
-  const renderModel = buildRenderModel({
-    tree,
-    expandedRows,
-    expandedCols,
-    config: resolvedConfig,
-  });
-  return collectVisibleExpansionKeys(renderModel);
 };
 
 const filterVisibleExpansionKeys = (keys: Set<string>, visible: Set<string>) =>
@@ -1453,12 +1420,14 @@ export const buildVisiblePersistedExpansionState = ({
   visibleCollapsedRows: Set<string>;
   visibleCollapsedCols: Set<string>;
 } => {
-  const visibleKeys = getVisibleExpansionKeys({
-    tree,
-    expandedRows,
-    expandedCols,
-    config,
-  });
+  const visibleKeys = collectVisibleExpansionKeys(
+    buildRenderModel({
+      tree,
+      expandedRows,
+      expandedCols,
+      config: buildExpansionRenderModelConfig(tree, config),
+    }),
+  );
   const visibleRows = filterVisibleExpansionKeys(
     explicitExpandedRows,
     visibleKeys.rows,

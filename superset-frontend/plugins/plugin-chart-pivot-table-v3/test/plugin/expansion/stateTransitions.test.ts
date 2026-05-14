@@ -32,7 +32,6 @@ import {
   resolveExpansionToggleDecision,
   runHydrationLoop,
   stageHydrationFetchDeltas,
-  shouldPlanHydrationPrefetchAxis,
   type HydrationDeltaMap,
   type ExpansionVisibilityConfig,
 } from '../../../src/pivot/expansion/stateTransitions';
@@ -927,37 +926,6 @@ describe('pivot/expansion/stateTransitions', () => {
 
     expect(plan.rowPlan.fetchKeys.has(aKey)).toBe(true);
     expect(plan.kind).toBe('fetch');
-  });
-
-  it('decides which axes should participate in hydration prefetch', () => {
-    expect(
-      shouldPlanHydrationPrefetchAxis({
-        effectiveExpandLevel: 0,
-        expandedCount: 0,
-        collapsedCount: 0,
-      }),
-    ).toBe(false);
-    expect(
-      shouldPlanHydrationPrefetchAxis({
-        effectiveExpandLevel: 1,
-        expandedCount: 0,
-        collapsedCount: 0,
-      }),
-    ).toBe(true);
-    expect(
-      shouldPlanHydrationPrefetchAxis({
-        effectiveExpandLevel: 0,
-        expandedCount: 1,
-        collapsedCount: 0,
-      }),
-    ).toBe(true);
-    expect(
-      shouldPlanHydrationPrefetchAxis({
-        effectiveExpandLevel: 0,
-        expandedCount: 0,
-        collapsedCount: 1,
-      }),
-    ).toBe(true);
   });
 
   it('builds hydration prefetch actions from pending plans', () => {
