@@ -340,7 +340,7 @@ const areDataRecordValueArraysEqual = (
   (previous.length === next.length &&
     previous.every((value, index) => value === next[index]));
 
-type PivotInteractionPanelProps = {
+export type PivotInteractionPanelProps = {
   dimensions: QueryFormColumn[];
   metrics: QueryFormMetric[];
   measureLeavesByMetric?: MeasureLeavesByMetricKey;

@@ -30,7 +30,10 @@ import { type PivotInteractionsResult } from './usePivotInteractions';
 import { type PivotLayoutResult } from './usePivotLayout';
 import { type PivotRenderModelResult } from './usePivotRenderModel';
 
-type SharedPivotViewProps = Omit<PivotTableViewProps, 'height' | 'width'>;
+export type SharedPivotViewProps = Omit<
+  PivotTableViewProps,
+  'height' | 'width'
+>;
 
 export const resolveActivePivotDisplaySnapshot = ({
   renderModelResult,

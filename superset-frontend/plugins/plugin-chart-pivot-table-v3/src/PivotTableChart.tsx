@@ -33,7 +33,6 @@ import {
   MetricsLayoutEnum,
   PivotRuntimeLayout,
 } from './types';
-import { PivotTableView } from './pivot/render/PivotTableView';
 import { useExpansionEngine } from './pivot/expansion/useExpansionEngine';
 import { usePivotLayout } from './pivot/chart/usePivotLayout';
 import { usePivotRenderModel } from './pivot/chart/usePivotRenderModel';
@@ -42,13 +41,12 @@ import { usePivotFormatting } from './pivot/chart/usePivotFormatting';
 import { usePivotInteractions } from './pivot/chart/usePivotInteractions';
 import { usePivotDatasetMeta } from './pivot/chart/usePivotDatasetMeta';
 import { usePivotRuntimeLayoutState } from './pivot/chart/usePivotRuntimeLayoutState';
-import { PivotInteractionPanel } from './pivot/chart/PivotInteractionPanel';
 import {
   INTERACTION_PANEL_WIDTH,
   INTERACTION_SIDE_CHIPS_WIDTH,
   INTERACTION_TOP_CHIPS_HEIGHT,
-  PivotInteractionLayout,
 } from './pivot/chart/PivotInteractionLayout';
+import { PivotChartView } from './pivot/chart/PivotChartView';
 import {
   normalizeRuntimeLayout,
   resolveAppliedInteractionLayout,
@@ -631,51 +629,40 @@ function PivotTableChart(props: PivotTableProps) {
     );
   }
 
-  return isUserControlled ? (
-    <PivotInteractionLayout
-      height={height}
-      tableHeight={tableHeight}
-      tableWidth={tableWidth}
-      rowChips={rowChips}
-      colChips={colChips}
-      onDropDimension={dropRuntimeDimension}
-      onDropValue={dropRuntimeValue}
-      onRemoveDimension={removeRuntimeDimension}
-      panel={
-        <PivotInteractionPanel
-          dimensions={dimensionList}
-          metrics={metricsForUi}
-          measureLeavesByMetric={
-            formData.measureLeavesByMetricBase ?? formData.measureLeavesByMetric
-          }
-          metricLabelMap={formData.metricLabelMap}
-          dimensionLabelMap={resolvedVerboseMap}
-          dateFormatters={resolvedDateFormatters}
-          dimensionFilterValues={dimensionFilterValues}
-          dimensionFilterLoading={dimensionFilterLoading}
-          selectedFilters={uiSelectedFilters}
-          onFilterChange={applyDimensionFilterChange}
-          onClearFilters={clearAllFilters}
-          onFilterValuesOpen={handleFetchDimensionValues}
-          onFilterValuesSearch={handleFetchDimensionValues}
-          runtimeLayout={uiRuntimeLayout}
-          onChange={applyRuntimeLayoutChange}
-        />
-      }
-    >
-      <PivotTableView
-        {...sharedPivotViewProps}
-        height={tableHeight}
-        width={tableWidth}
-      />
-    </PivotInteractionLayout>
-  ) : (
-    <PivotTableView
-      {...sharedPivotViewProps}
+  return (
+    <PivotChartView
+      isUserControlled={isUserControlled}
       height={height}
       width={width}
-      showGlobalLoader={isHydrating}
-      showCornerLoader={isHydrating}
+      tableHeight={tableHeight}
+      tableWidth={tableWidth}
+      isHydrating={isHydrating}
+      sharedPivotViewProps={sharedPivotViewProps}
+      interactionLayoutProps={{
+        rowChips,
+        colChips,
+        onDropDimension: dropRuntimeDimension,
+        onDropValue: dropRuntimeValue,
+        onRemoveDimension: removeRuntimeDimension,
+      }}
+      interactionPanelProps={{
+        dimensions: dimensionList,
+        metrics: metricsForUi,
+        measureLeavesByMetric:
+          formData.measureLeavesByMetricBase ?? formData.measureLeavesByMetric,
+        metricLabelMap: formData.metricLabelMap,
+        dimensionLabelMap: resolvedVerboseMap,
+        dateFormatters: resolvedDateFormatters,
+        dimensionFilterValues,
+        dimensionFilterLoading,
+        selectedFilters: uiSelectedFilters,
+        onFilterChange: applyDimensionFilterChange,
+        onClearFilters: clearAllFilters,
+        onFilterValuesOpen: handleFetchDimensionValues,
+        onFilterValuesSearch: handleFetchDimensionValues,
+        runtimeLayout: uiRuntimeLayout,
+        onChange: applyRuntimeLayoutChange,
+      }}
     />
   );
 }
