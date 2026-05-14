@@ -888,6 +888,47 @@ Minimum test coverage for future slices:
 - Chart sync changes: interaction layout, interaction seamless expansion,
   interaction filter seamless, and runtime coverage.
 
+## Completion Audit, May 14, 2026
+
+Objective: complete the pure runtime transition with impactful, deletion-first
+changes from the highest-impact areas.
+
+Current evidence:
+
+- Source-only baseline comparison from
+  `7088db374448845ef6e71cf74817aa53efbc5fc1`: `13000` insertions, `12305`
+  deletions, net `+695`; current production `src` TypeScript/TSX total is
+  `34205` lines.
+- Latest full pivot-table-v3 plus export utility Jest run passed: `97` suites
+  and `782` tests.
+- Full plugin source ESLint passed after the compiled-layout cleanup.
+- Working tree has no Pivot Table v3 changes pending; only unrelated
+  `docker-compose.yml` is modified.
+
+Open checklist:
+
+- Compiled program drives all layout-facing chart hooks: mostly complete, but
+  Gate 1 remains at `79%` because interaction form-data normalization still
+  translates raw runtime/form layout into compatibility fields.
+- Query planning from coverage: not complete; support/totals coverage
+  composition remains the explicit Gate 2 gap.
+- Central fact ingestion/store: not complete; tree-shaped chart/test
+  boundaries and compatible coverage reads remain the Gate 3 gap.
+- One tree materializer: effectively complete but not closed; export ownership
+  still relies on a chart-id worksheet data registry.
+- Expansion reducer/runtime effects: not complete; `useExpansionEngine.ts`
+  still owns request kickoff and sequencing.
+- Pure render model: nearly complete; sorting/display-map policy and export
+  registry ownership remain residual risk.
+- Chart component cleanup: not complete; `PivotTableChart.tsx` still owns
+  committed tree/fact state, runtime persistence side-effect execution, and
+  several controller-like effects.
+
+Conclusion: the transition is not complete. The next code slices should target
+only deletion-positive changes in chart runtime sync, expansion request
+sequencing, or export data ownership. Passing tests and the current plan status
+are evidence of progress, not completion.
+
 ## Success Definition
 
 The refactor is complete when:
