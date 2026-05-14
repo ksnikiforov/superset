@@ -57,7 +57,7 @@ cells are projections of DB facts, not canonical data.
 
 ## Current Status
 
-As of May 14, 2026, after the core-import facade cleanup checkpoint:
+As of May 14, 2026, after the metric source-catalog cleanup checkpoint:
 
 - Gate-weighted architecture estimate: **98%**.
 - Delivery remaining estimate: **1-2%**, mostly final cleanup, validation,
@@ -72,12 +72,22 @@ As of May 14, 2026, after the core-import facade cleanup checkpoint:
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `14493` insertions, `13447` deletions, net `+1046`.
-- Current production `src` TypeScript/TSX total: `34556` lines.
+- Production `src`: `14512` insertions, `13454` deletions, net `+1058`.
+- Current production `src` TypeScript/TSX total: `34568` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
-- `PivotTableChart.tsx` is now `699` lines and `useExpansionEngine.ts` is now
+- `PivotTableChart.tsx` is now `705` lines and `useExpansionEngine.ts` is now
   `1439` lines; those single-file reductions should not be counted as plugin
   source reduction because the plugin-wide total increased.
+- Metric source-catalog cleanup removed `metricsBase` and
+  `measureLeavesByMetricBase` from the chart `formData` shape. The original
+  metric catalog now travels as explicit chart props instead of compatibility
+  fields inside query/form data. The source slice was not deletion-positive:
+  `35` insertions, `23` deletions, net `+12`, but it removes a compatibility
+  data-shape boundary.
+- Focused validation after removing those compatibility fields passed: `5`
+  suites and `84` tests.
+- Full plugin plus export utility Jest pass after removing those compatibility
+  fields: `96` suites and `781` tests.
 - Core-import facade cleanup removed the historical path/token/tree re-exports
   from `utils.ts` and moved production plus test imports to
   `pivot/core/path`, `pivot/core/tokens`, and `pivot/core/tree`. The source
@@ -563,7 +573,7 @@ Largest relevant production files:
 - `controlPanel.tsx`: `1024` lines.
 - `PivotTableView.tsx`: `891` lines.
 - `usePivotLayout.ts`: `767` lines.
-- `PivotTableChart.tsx`: `698` lines.
+- `PivotTableChart.tsx`: `705` lines.
 - `seamlessRuntimeUpdate.ts`: `594` lines.
 - `usePivotRenderModel.ts`: `592` lines.
 
@@ -1149,9 +1159,11 @@ Current evidence:
 Open checklist:
 
 - Compiled program drives all layout-facing chart hooks: mostly complete, but
-  Gate 1 remains at `81%` because interaction form-data normalization still
-  produces compatibility formData for query/export boundaries even though
-  rendered layout now consumes a compiled runtime-placement program directly.
+  Gate 1 remains at `83%` because interaction form-data normalization still
+  produces compatibility formData for query/export boundaries even though the
+  source metric catalog no longer lives in compatibility fields inside
+  `formData` and rendered layout now consumes a compiled runtime-placement
+  program directly.
 - Query planning from coverage: not complete; fetch-context support/totals
   coverage composition is centralized and bootstrap planning no longer exposes
   unused compatibility outputs or leaves bootstrap-target trimming in
