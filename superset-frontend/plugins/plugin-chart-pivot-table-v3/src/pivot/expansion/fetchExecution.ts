@@ -16,7 +16,12 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { type PivotTableQueryFormData, type PivotTreeData } from '../../types';
+import {
+  type PivotAxis,
+  type PivotTableQueryFormData,
+  type PivotTreeData,
+  type PivotTreeNode,
+} from '../../types';
 import {
   fetchPivotBranch,
   resolvePivotBranchLocalResult,
@@ -31,6 +36,7 @@ import {
   type BatchGroup,
   type FetchTarget,
 } from '../query/fetchPlanOptimizer';
+import { type PivotExpansionNodeFetchPredicate } from '../engine/expansionPlanner';
 import {
   type PivotFactStore,
   type PivotFactStoreBatch,
@@ -40,6 +46,9 @@ import {
   type LatestRequestScope,
 } from '../runtime/requestLifecycle';
 import { stableStringify } from '../shared/stableStringify';
+import { applyExpansionFetchDelta } from './engine';
+import { type FetchedFactCoverageState } from './fetchedRequests';
+import { planGroupedExpansionTargets } from './planner';
 
 const EMPTY_FACT_BATCHES: PivotFactStoreBatch[] = [];
 
@@ -404,4 +413,161 @@ export const fetchExpansionTargetDeltas = async ({
     });
   });
   return deltas;
+};
+
+export type SameAxisExpansionFetchLoopResult =
+  | {
+      status: 'complete';
+      tree: PivotTreeData;
+      touchedKeys: string[];
+    }
+  | {
+      status: 'stale';
+    };
+
+type SameAxisVisibleDepths = {
+  visibleRowDepth: number;
+  visibleColDepth: number;
+};
+
+export const runSameAxisExpansionFetchLoop = async ({
+  axis,
+  baseExpanded,
+  initialResolvedExpanded,
+  initialTree,
+  maxIterations,
+  requestScope,
+  requestEpoch,
+  getDataEpoch,
+  getExpandedRows,
+  getExpandedCols,
+  computeVisibleDepths,
+  fetchedCoverage,
+  getCoverageKey,
+  shouldFetchChildren,
+  fetchRuntime,
+  transactionId,
+  buildRequestGroupId,
+  seedFetchedCoverage,
+  seedLoadedMetricNodeCoverage,
+  resolveExpandedForMetrics,
+  pruneMergedTree,
+}: {
+  axis: PivotAxis;
+  baseExpanded: Set<string>;
+  initialResolvedExpanded: Set<string>;
+  initialTree: PivotTreeData;
+  maxIterations: number;
+  requestScope: LatestRequestScope;
+  requestEpoch: number;
+  getDataEpoch: () => number;
+  getExpandedRows: () => Set<string>;
+  getExpandedCols: () => Set<string>;
+  computeVisibleDepths: (
+    expandedRows: Set<string>,
+    expandedCols: Set<string>,
+    tree: PivotTreeData,
+  ) => SameAxisVisibleDepths;
+  fetchedCoverage: FetchedFactCoverageState;
+  getCoverageKey: (axis: PivotAxis, key: string) => string;
+  shouldFetchChildren: PivotExpansionNodeFetchPredicate;
+  fetchRuntime: ExpansionFetchRuntime;
+  transactionId: number;
+  buildRequestGroupId: BuildExpansionRequestGroupId;
+  seedFetchedCoverage: (factBatches: PivotFactStoreBatch[]) => void;
+  seedLoadedMetricNodeCoverage: (
+    loadedTree: PivotTreeData,
+    visibleRowDepth: number,
+    visibleColDepth: number,
+  ) => void;
+  resolveExpandedForMetrics: (
+    axis: PivotAxis,
+    nextExpanded: Set<string>,
+    nextTree: PivotTreeData,
+  ) => Set<string>;
+  pruneMergedTree: (params: {
+    axis: PivotAxis;
+    tree: PivotTreeData;
+    parent?: PivotTreeNode;
+    branch?: PivotTreeData;
+  }) => PivotTreeData;
+}): Promise<SameAxisExpansionFetchLoopResult> => {
+  let currentTree = initialTree;
+  let resolvedExpanded = initialResolvedExpanded;
+  const touchedKeys = new Set<string>();
+
+  for (let iteration = 0; iteration < maxIterations; iteration += 1) {
+    if (getDataEpoch() !== requestEpoch || !requestScope.isCurrent()) {
+      return { status: 'stale' };
+    }
+    const expandedRowsForDepth =
+      axis === 'row' ? resolvedExpanded : getExpandedRows();
+    const expandedColsForDepth =
+      axis === 'col' ? resolvedExpanded : getExpandedCols();
+    const { visibleRowDepth, visibleColDepth } = computeVisibleDepths(
+      expandedRowsForDepth,
+      expandedColsForDepth,
+      currentTree,
+    );
+    const requiredDepth = axis === 'row' ? visibleColDepth : visibleRowDepth;
+    const nodes = axis === 'row' ? currentTree.rows : currentTree.cols;
+    const { plan, targets } = planGroupedExpansionTargets({
+      axis,
+      expandedKeys: resolvedExpanded,
+      nodes,
+      requiredOppositeDepth: requiredDepth,
+      fetchedCoverage,
+      getCoverageKey,
+      shouldFetchChildren,
+    });
+    if (plan.fetchKeys.size === 0) {
+      break;
+    }
+
+    // eslint-disable-next-line no-await-in-loop
+    const resultDeltas = await fetchExpansionTargetDeltas({
+      targets,
+      context: { visibleRowDepth, visibleColDepth },
+      runtime: fetchRuntime,
+      singleRequestKind: 'branch',
+      batchRequestKind: 'batch',
+      transactionId,
+      buildRequestGroupId,
+      seedFetchedCoverage,
+      seedLoadedMetricNodeCoverage,
+    });
+    if (getDataEpoch() !== requestEpoch || !requestScope.isCurrent()) {
+      return { status: 'stale' };
+    }
+    for (const { targets: deltaTargets, data: deltaTree } of resultDeltas) {
+      deltaTargets.forEach(target => {
+        touchedKeys.add(target.pathKey);
+      });
+      currentTree = applyExpansionFetchDelta({
+        tree: currentTree,
+        axis,
+        keys: deltaTargets.map(target => target.pathKey),
+        branch: deltaTree,
+        pruneMergedTree,
+      });
+    }
+    if (resultDeltas.length === 0) {
+      break;
+    }
+    resolvedExpanded = resolveExpandedForMetrics(
+      axis,
+      baseExpanded,
+      currentTree,
+    );
+  }
+
+  if (!requestScope.isCurrent()) {
+    return { status: 'stale' };
+  }
+
+  return {
+    status: 'complete',
+    tree: currentTree,
+    touchedKeys: Array.from(touchedKeys),
+  };
 };

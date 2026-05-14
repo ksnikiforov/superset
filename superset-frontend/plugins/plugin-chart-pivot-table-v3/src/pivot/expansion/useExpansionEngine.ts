@@ -44,7 +44,6 @@ import {
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import { stableStringify } from '../shared/stableStringify';
-import { planGroupedExpansionTargets } from './planner';
 import { createExpansionStateStore, type ExpansionStateStore } from './store';
 import {
   buildAxisCoverageKeyFromPathKey,
@@ -60,7 +59,6 @@ import {
 import { createLatestRequestLifecycle } from '../runtime/requestLifecycle';
 import {
   addAncestors,
-  applyExpansionFetchDelta,
   buildVisiblePersistedExpansionState,
   computeVisibleDepths as computeVisibleDepthsBase,
   mergeSameAxisExpansionTree,
@@ -88,6 +86,7 @@ import { useSyncRef } from '../shared/useSyncRef';
 import {
   createExpansionRequestHelpers,
   fetchExpansionTargetDeltas,
+  runSameAxisExpansionFetchLoop,
   type ExpansionFetchRuntime,
 } from './fetchExecution';
 
@@ -613,11 +612,11 @@ export const useExpansionEngine = ({
       addAncestors(node.path, baseExpanded, expanded);
 
       const requestEpoch = dataEpochRef.current;
-      let currentTree = treeRef.current;
-      let resolvedExpanded = resolveExpandedForMetrics(
+      const initialTree = treeRef.current;
+      const resolvedExpanded = resolveExpandedForMetrics(
         axis,
         baseExpanded,
-        currentTree,
+        initialTree,
       );
       const inFlightId = inFlightExpansionIdRef.current + 1;
       inFlightExpansionIdRef.current = inFlightId;
@@ -640,89 +639,33 @@ export const useExpansionEngine = ({
         updateLoadingKey,
       };
 
-      const touchedKeys = new Set<string>();
       try {
-        for (
-          let iteration = 0;
-          iteration < MAX_HYDRATION_ITERATIONS;
-          iteration += 1
-        ) {
-          if (
-            dataEpochRef.current !== requestEpoch ||
-            !requestScope.isCurrent()
-          ) {
-            return;
-          }
-          const expandedRowsForDepth =
-            axis === 'row' ? resolvedExpanded : expandedRowsRef.current;
-          const expandedColsForDepth =
-            axis === 'col' ? resolvedExpanded : expandedColsRef.current;
-          const { visibleRowDepth, visibleColDepth } = computeVisibleDepths(
-            expandedRowsForDepth,
-            expandedColsForDepth,
-            currentTree,
-          );
-          const requiredDepth =
-            axis === 'row' ? visibleColDepth : visibleRowDepth;
-          const nodes = axis === 'row' ? currentTree.rows : currentTree.cols;
-          const { plan, targets } = planGroupedExpansionTargets({
-            axis,
-            expandedKeys: resolvedExpanded,
-            nodes,
-            requiredOppositeDepth: requiredDepth,
-            fetchedCoverage: fetchedCoverageRef.current,
-            getCoverageKey,
-            shouldFetchChildren,
-          });
-          if (plan.fetchKeys.size === 0) {
-            break;
-          }
-          // eslint-disable-next-line no-await-in-loop
-          const resultDeltas = await fetchExpansionTargetDeltas({
-            targets,
-            context: { visibleRowDepth, visibleColDepth },
-            runtime: fetchRuntime,
-            singleRequestKind: 'branch',
-            batchRequestKind: 'batch',
-            transactionId: requestId,
-            buildRequestGroupId: expansionRequestHelpers.buildRequestGroupId,
-            seedFetchedCoverage: seedFetchedCoverageFromFactBatches,
-            seedLoadedMetricNodeCoverage:
-              seedFetchedCoverageFromLoadedMetricNodes,
-          });
-          if (
-            dataEpochRef.current !== requestEpoch ||
-            !requestScope.isCurrent()
-          ) {
-            return;
-          }
-          for (const {
-            targets: deltaTargets,
-            data: deltaTree,
-          } of resultDeltas) {
-            for (const target of deltaTargets) {
-              touchedKeys.add(target.pathKey);
-            }
-            currentTree = applyExpansionFetchDelta({
-              tree: currentTree,
-              axis,
-              keys: deltaTargets.map(target => target.pathKey),
-              branch: deltaTree,
-              pruneMergedTree,
-            });
-          }
-          if (resultDeltas.length === 0) {
-            break;
-          }
-          const nextResolvedExpanded = resolveExpandedForMetrics(
-            axis,
-            baseExpanded,
-            currentTree,
-          );
-          resolvedExpanded = nextResolvedExpanded;
-        }
+        const fetchLoop = await runSameAxisExpansionFetchLoop({
+          axis,
+          baseExpanded,
+          initialResolvedExpanded: resolvedExpanded,
+          initialTree,
+          maxIterations: MAX_HYDRATION_ITERATIONS,
+          requestScope,
+          requestEpoch,
+          getDataEpoch: () => dataEpochRef.current,
+          getExpandedRows: () => expandedRowsRef.current,
+          getExpandedCols: () => expandedColsRef.current,
+          computeVisibleDepths,
+          fetchedCoverage: fetchedCoverageRef.current,
+          getCoverageKey,
+          shouldFetchChildren,
+          fetchRuntime,
+          transactionId: requestId,
+          buildRequestGroupId: expansionRequestHelpers.buildRequestGroupId,
+          seedFetchedCoverage: seedFetchedCoverageFromFactBatches,
+          seedLoadedMetricNodeCoverage:
+            seedFetchedCoverageFromLoadedMetricNodes,
+          resolveExpandedForMetrics,
+          pruneMergedTree,
+        });
 
-        if (!requestScope.isCurrent()) {
+        if (fetchLoop.status === 'stale' || !requestScope.isCurrent()) {
           return;
         }
         const committedExpanded =
@@ -734,10 +677,10 @@ export const useExpansionEngine = ({
           metricIndexForCols !== undefined &&
           metricIndexForCols >= groupbyColumnsLength;
         const mergedTree = mergeSameAxisExpansionTree({
-          currentTree,
+          currentTree: fetchLoop.tree,
           previousTree: treeRef.current,
           axis,
-          touchedKeys: Array.from(touchedKeys),
+          touchedKeys: fetchLoop.touchedKeys,
           preserveMetricChildren,
           isMetricTokenValue,
         });
