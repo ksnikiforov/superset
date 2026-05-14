@@ -43,88 +43,77 @@ form data + runtime UI state
 Only fetches and persistence should have side effects. Tree nodes, rendered
 cells, and worksheet cells are projections of DB facts, not canonical data.
 
-## Architectural Reassessment: Draft vs Loaded Runtime
+## Selected Architecture: Set-Oriented Coverage Manifest
 
-This is a continuation of the pure runtime transition, not a separate refactor.
-The main remaining ambiguity is that "runtime layout" still sometimes means two
-different things:
+This is the next concrete architecture cut. It replaces scattered
+fetch/layout/expansion heuristics with one rule:
 
-- the layout the user is currently editing;
-- the query-backed layout that produced the loaded fact coverage and
-  materialized tree.
+```text
+build required visible coverage
+  -> diff against loaded fact coverage
+  -> fetch only missing explicit coverage
+  -> materialize from loaded facts
+  -> render
+```
 
-That ambiguity is the source of several remaining complexity pockets:
+The decision criteria are:
 
-- recovery fetches that compensate for layout/tree mismatch;
-- metric-index fallback resolution;
-- render-time semantic repair;
-- tree-shape-as-loaded-state checks;
-- expansion planning that can drift from the real renderer;
-- chart-level second guessing of runtime ownership.
-
-The better target model is:
-
-- **Draft layout:** user-controlled interaction state. Drag/drop, measure
-  selection, row/column edits, and expand/collapse intent update this
-  immediately so the plugin stays interactive.
-- **Loaded runtime snapshot:** the last query-backed `PivotProgram`, subtotal
-  policy, expansion coverage, measure hierarchy, and fact batches that are
-  actually loaded.
-- **Fact store:** owns loaded batches only and answers exact coverage questions.
-  It must not pretend that draft layout changes are loaded.
-- **Planner:** compares draft layout with the loaded snapshot and chooses local
-  cosmetic update, targeted expansion fetch, targeted semantic layout fetch, or
-  no fetch for hidden/not-expanded layers.
-- **Materializer:** materializes only from loaded snapshot plus fact store.
-- **Renderer:** renders materialized structure only. It does not infer metric
-  placement, loaded state, or missing semantic nodes from tree shape.
-
-Assessment: this is the right architectural direction because it turns the
-current safety/recovery logic into an explicit transition decision. The
-important constraint is to implement it by deleting duplicate authority, not by
-adding a second runtime framework beside the existing one.
-
-Two other architectural options can pursue the same simplification goal:
-
-1. **Runtime reducer plus effect commands.** Put layout edits, expansion,
-   fetch lifecycle, materialization, and stale-result handling behind one
-   reducer that emits commands such as `fetchCoverage`, `materializeSnapshot`,
-   or `commitDraft`. This would make state transitions explicit and could
-   delete hook-local request bookkeeping, but it is only a win if it replaces
-   existing chart/expansion/seamless branches rather than wrapping them.
-
-2. **Coverage manifest as the central artifact.** Compile the draft layout into
-   a declarative visible-coverage manifest, diff that manifest against the fact
-   store, and make both expansion and semantic layout changes use the same
-   manifest diff. This directly supports the no-hidden-layer-fetch rule and can
-   delete duplicate expansion/query planning, but it still needs a loaded
-   snapshot so materialization and rendering do not consume the newest draft as
-   if it were already loaded.
-
-Decision criteria for the next architecture cut:
-
-1. **Elegant:** one rule should explain query/loading behavior across layout
-   changes, expansion, and recovery.
-2. **Low code:** the change must replace existing planner/coverage branches,
-   not introduce a parallel framework.
-3. **Fast:** the runtime should diff loaded coverage before querying, avoid
-   hidden/not-expanded layers, and keep interaction state responsive while data
+1. **Elegant:** one rule explains query/loading behavior across layout changes,
+   expansion, and recovery.
+2. **Low code:** the change replaces existing planner/coverage branches instead
+   of adding a parallel runtime framework.
+3. **Fast:** the runtime avoids hidden/not-expanded layers, diffs loaded
+   coverage before querying, and keeps interaction state responsive while data
    loads.
 
-Assessment of the options against those criteria:
+The manifest is **set-oriented**, not cell/intersection-entry oriented. A single
+logical need can describe multiple explicit row branches crossed with multiple
+explicit column branches:
 
-| Direction | Elegant | Low code | Fast | Assessment |
-| --- | --- | --- | --- | --- |
-| Coverage Manifest First | High: one visible-coverage diff governs fetch decisions | High: can replace `shouldFetchRuntimeLayout`, expansion coverage drift, and duplicate query coverage planning | High: naturally fetches only missing visible coverage | **Selected direction** |
-| Runtime Reducer / State Machine | Medium/high: lifecycle becomes explicit | Medium/low initially: high risk of adding a framework before deleting hooks | Medium: helps stale request handling, but not coverage by itself | Defer unless it deletes existing hook state immediately |
-| Query-Backed View Plan Compiler | High long-term: full compiler model | Low initially: likely adds a broad plan object before deletion | Medium/high: depends on coverage diff inside the plan | Too large as the next cut |
-| Draft vs Loaded Snapshot Only | Medium: clarifies ownership | Low by itself: mostly naming/types until paired with coverage | Medium: still needs a fetch diff artifact | Useful concept, not enough as the implementation target |
+```ts
+type AxisPathScope =
+  | { kind: 'root' }
+  | { kind: 'paths'; paths: PivotPath[] };
 
-Recommendation: implement **Coverage Manifest First** as the next concrete
-architecture move. Draft-vs-loaded remains the ownership model, but the
-manifest is the deletion engine: build required visible coverage, diff it
-against loaded fact batches, fetch only the missing coverage, and delete the
-older boolean/fallback decision branches as each caller migrates.
+type CoverageNeed = {
+  rowDepth: number;
+  columnDepth: number;
+  rowScope: AxisPathScope;
+  columnScope: AxisPathScope;
+  reason: 'root' | 'expand' | 'intersection' | 'subtotal' | 'sort';
+};
+```
+
+Rules:
+
+- `root` means root/no branch filter. It never means "all possible paths".
+- `paths` means only the listed explicit visible/expanded branches.
+- Adding a dimension to the layout does not create a query need by itself.
+- Expanding a node creates a path-scoped need for the newly visible layer.
+- Row x column expansion creates intersection needs for explicit visible row
+  path sets crossed with explicit visible column path sets.
+- Many small expands may be transport-batched, but they must not be promoted
+  into an unbounded full-level query.
+- No full-level expansion query is allowed unless the user action explicitly
+  requests a bounded broad scope.
+- Loaded broader coverage can satisfy narrower explicit needs only through a
+  conservative, tested dominance check.
+
+This is the selected path because it centralizes the right complexity:
+
+- manifest construction owns "what visible data is required";
+- fact coverage diff owns "what is already loaded";
+- query planning owns "how to batch explicit missing needs";
+- materialization and rendering stop repairing or inferring loaded state.
+
+Expected deletion targets:
+
+- `shouldFetchRuntimeLayout` and root-depth fetch heuristics;
+- duplicate expansion/query coverage planning;
+- tree-shape-as-loaded-state checks;
+- seamless recovery branches that exist only because coverage ownership is
+  implicit;
+- render/chart fallbacks that re-decide whether semantic data is loaded.
 
 ## Hard Guardrails
 
