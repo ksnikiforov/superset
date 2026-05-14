@@ -50,7 +50,7 @@ import {
 } from '../../export/buildPivotV3ExportTable';
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import { rootKey } from '../viewModel';
-import { type RenderModel } from '../shared/types';
+import { type RenderModel } from './renderModel';
 import { type PivotFormattingResult } from '../chart/usePivotFormatting';
 
 const ROW_INDENT_PX = 14;

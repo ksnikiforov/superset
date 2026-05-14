@@ -78,7 +78,7 @@ import {
   formatNodeLabel as formatNodeLabelBase,
   shouldHideRowValues as shouldHideRowValuesBase,
 } from '../cellUtils';
-import { type FormattingKeys, type RenderModel } from '../shared/types';
+import { type RenderModel } from '../render/renderModel';
 import { type PivotLayoutResult } from './usePivotLayout';
 import {
   compileExcelFormula,
@@ -94,6 +94,12 @@ import {
 } from './databarRuntime';
 
 const { PERCENT, INTEGER } = NumberFormats;
+
+type FormattingKeys = {
+  backgroundColor?: string;
+  textColor?: string;
+  d3Format?: string;
+};
 
 const DatabarContent = styled.div`
   position: absolute;

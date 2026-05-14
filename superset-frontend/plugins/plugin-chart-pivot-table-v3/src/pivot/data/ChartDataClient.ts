@@ -18,7 +18,7 @@
  */
 import { type DataRecord } from '@superset-ui/core';
 import { type PivotTableQueryFormData } from '../../types';
-import { type QuerySpec } from '../query/types';
+import { type QuerySpec } from '../query/specs';
 
 export type TruncationWarning = {
   type: 'truncation';

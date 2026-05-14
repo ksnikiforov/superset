@@ -34,11 +34,10 @@ import { buildFormattingValueMaps } from '../cellUtils';
 import { normalizeDimensionSortingMapWithKeys } from '../../utils';
 import { serializeCellKey, serializePath } from '../core/path';
 import { getFormattingMetricKey, isSubtotalToken } from '../core/tokens';
-import { buildRenderModel } from '../render/renderModel';
+import { buildRenderModel, type RenderModel } from '../render/renderModel';
 import { resolveAxisProjection } from '../runtime/projection';
 import { resolveMeasureSortMetricKey } from '../measureLeaves';
 import { compareValues, rootKey, sortByOrder } from '../viewModel';
-import { type RenderModel } from '../shared/types';
 import { getMetricIndexFromNodes } from '../metricsTotals';
 import { type PivotLayoutResult } from './usePivotLayout';
 import {

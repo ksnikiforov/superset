@@ -45,7 +45,6 @@ import {
   PivotDimensionFormattingValue,
   MeasureHierarchy,
 } from './types';
-import { formatQueryName } from './pivot/query/queryName';
 import {
   extractMetricReferencesFromExcelFormula,
   isPivotExcelFormula,
@@ -1336,8 +1335,8 @@ export const mergeMetrics = (
 export const normalizeSubtotalLevels = (
   levels: number[] | undefined,
   maxDepth: number,
-  legacyTotal?: boolean,
-  legacySubtotals?: boolean,
+  includeRootTotal?: boolean,
+  includeAllSubtotals?: boolean,
 ) => {
   const base = Array.isArray(levels)
     ? levels
@@ -1345,29 +1344,15 @@ export const normalizeSubtotalLevels = (
         .filter(l => Number.isFinite(l) && l <= maxDepth && l >= 0)
     : [];
   const next = new Set(base);
-  if (legacyTotal) {
+  if (includeRootTotal) {
     next.add(0);
   }
-  if (legacySubtotals) {
-    // legacy boolean meant all levels; here we add every level greater than 0
+  if (includeAllSubtotals) {
     for (let i = 1; i <= maxDepth; i += 1) {
       next.add(i);
     }
   }
   return Array.from(next).sort((a, b) => a - b);
-};
-
-export const parseDepth = (queryName?: string) => {
-  if (
-    !queryName ||
-    !queryName.startsWith(formatQueryName(0, 0).split('|')[0])
-  ) {
-    return { rowDepth: 0, colDepth: 0 };
-  }
-  const [, rowLabel = '', colLabel = ''] = queryName.split('|');
-  const rowDepth = Number(rowLabel.replace('row', '')) || 0;
-  const colDepth = Number(colLabel.replace('col', '')) || 0;
-  return { rowDepth, colDepth };
 };
 
 export const normalizeExpandLevel = (rawLevel: number | undefined) => {

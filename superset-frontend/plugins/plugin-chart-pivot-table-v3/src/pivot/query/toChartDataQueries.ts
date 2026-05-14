@@ -21,7 +21,7 @@ import {
   type QueryObject,
   type QueryObjectFilterClause,
 } from '@superset-ui/core';
-import { type QuerySpec } from './types';
+import { type QuerySpec } from './specs';
 
 export const toChartDataQueries = ({
   specs,

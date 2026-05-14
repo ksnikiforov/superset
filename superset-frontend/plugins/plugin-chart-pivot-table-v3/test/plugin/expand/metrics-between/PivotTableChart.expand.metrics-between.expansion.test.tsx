@@ -25,10 +25,10 @@ import {
   METRICS_PLACEHOLDER,
 } from '../../../../src/pivot/core/tokens';
 import {
-  clearPivotBranchCache,
   fetchPivotBranch,
   type FetchPivotBranchParams,
 } from '../../../../src/fetchPivotBranch';
+import { clearPivotBranchCache } from '../../../../src/pivot/data/cache';
 import { buildFormData } from '../../fixtures/pivotFormData';
 import {
   buildMockBranchFetchResult,

@@ -20,7 +20,7 @@
 import { createRef } from 'react';
 import { render, screen } from '../../testUtils';
 import { PivotTableView } from '../../../src/pivot/render/PivotTableView';
-import { type RenderModel } from '../../../src/pivot/shared/types';
+import { type RenderModel } from '../../../src/pivot/render/renderModel';
 import { type PivotTreeData, type PivotTreeNode } from '../../../src/types';
 import { serializePath } from '../../../src/pivot/core/path';
 import { type PivotFormattingResult } from '../../../src/pivot/chart/usePivotFormatting';

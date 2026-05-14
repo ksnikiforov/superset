@@ -28,7 +28,7 @@ import {
 import { waitForAsyncData } from 'src/middleware/asyncEvent';
 import { type PivotTableQueryFormData } from '../../types';
 import { toChartDataQueries } from '../query/toChartDataQueries';
-import { type QuerySpec } from '../query/types';
+import { type QuerySpec } from '../query/specs';
 import {
   type ChartDataClient,
   type ChartDataFetchParams,

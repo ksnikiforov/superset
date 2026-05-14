@@ -24,11 +24,11 @@ import {
   PivotTreeNode,
 } from '../../src/types';
 import {
-  clearPivotBranchCache,
   fetchPivotBranch,
-  resolveFetchContextForTest,
+  resolveBranchFetchContext,
   resolvePivotBranchLocalResult,
 } from '../../src/fetchPivotBranch';
+import { clearPivotBranchCache } from '../../src/pivot/data/cache';
 import {
   buildBuiltInLeaf,
   buildMeasureLeafOutputKey,
@@ -111,7 +111,7 @@ describe('resolveFetchContext', () => {
       cells: {},
     };
 
-    const ctx = resolveFetchContextForTest({
+    const ctx = resolveBranchFetchContext({
       formData: {
         groupbyRows: ['r1', 'r2'],
         groupbyColumns: [METRICS_PLACEHOLDER, 'c1'],
@@ -163,7 +163,7 @@ describe('resolveFetchContext', () => {
       cells: {},
     };
 
-    const ctx = resolveFetchContextForTest({
+    const ctx = resolveBranchFetchContext({
       formData: {
         groupbyRows: ['r1', 'r2'],
         groupbyColumns: [METRICS_PLACEHOLDER, 'c1'],
@@ -215,7 +215,7 @@ describe('resolveFetchContext', () => {
       cells: {},
     };
 
-    const ctx = resolveFetchContextForTest({
+    const ctx = resolveBranchFetchContext({
       formData: {
         groupbyRows: ['r1', 'r2'],
         groupbyColumns: [METRICS_PLACEHOLDER, 'c1'],
@@ -267,7 +267,7 @@ describe('resolveFetchContext', () => {
       cells: {},
     };
 
-    const ctx = resolveFetchContextForTest({
+    const ctx = resolveBranchFetchContext({
       formData: {
         groupbyRows: ['r1', 'r2'],
         groupbyColumns: ['c1', 'c2'],
@@ -334,13 +334,13 @@ describe('resolveFetchContext', () => {
       },
     };
 
-    const deltaOnlyContext = resolveFetchContextForTest({
+    const deltaOnlyContext = resolveBranchFetchContext({
       formData: deltaOnly,
       axis: 'row',
       path: ['A'],
       currentTree,
     });
-    const valueAndDeltaContext = resolveFetchContextForTest({
+    const valueAndDeltaContext = resolveBranchFetchContext({
       formData: valueAndDelta,
       axis: 'row',
       path: ['A'],

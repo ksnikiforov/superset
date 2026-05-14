@@ -28,7 +28,7 @@ import { isEqual } from 'lodash';
 import { type PivotTableQueryFormData } from '../../types';
 import { getStableColumnKey } from '../../utils';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
-import { type QuerySpec } from '../query/types';
+import { type QuerySpec } from '../query/specs';
 import { buildSelectionFilteredFormData } from '../update/initialUpdatePlan';
 import { type PivotSelectedFilters } from '../filters';
 

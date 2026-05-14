@@ -33,7 +33,7 @@ import {
   resolveFetchContext,
 } from './resolveFetchContext';
 import { toChartDataQueries } from './toChartDataQueries';
-import { type QuerySpec } from './types';
+import { type QuerySpec } from './specs';
 
 export type BatchSignatureParams = {
   formData: PivotTableQueryFormData;

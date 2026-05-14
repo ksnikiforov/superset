@@ -17,7 +17,7 @@
  * under the License.
  */
 import { type RefObject, useLayoutEffect, useRef, useState } from 'react';
-import { type RenderModel } from '../shared/types';
+import { type RenderModel } from '../render/renderModel';
 
 export type StickyHeaderState = {
   headerOffset: number;

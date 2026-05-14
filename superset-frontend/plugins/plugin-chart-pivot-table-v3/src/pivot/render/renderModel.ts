@@ -23,10 +23,17 @@ import {
   type PivotTreeNode,
   type TotalPosition,
 } from '../../types';
-import { buildColumnHeaderRows } from '../viewModel';
-import { buildVisibleCellEntries } from '../cellUtils';
+import { buildColumnHeaderRows, type HeaderCellInfo } from '../viewModel';
+import { buildVisibleCellEntries, type VisibleCellEntry } from '../cellUtils';
 import { buildVisiblePivotAxes } from '../visibility';
-import { type RenderModel } from '../shared/types';
+
+export type RenderModel = {
+  visibleRows: PivotTreeNode[];
+  visibleCols: PivotTreeNode[];
+  columnHeaderRows: HeaderCellInfo[][];
+  visibleCellEntries: VisibleCellEntry[];
+  showRowRoot: boolean;
+};
 
 export type RenderModelConfig = {
   groupbyRowsLength: number;

@@ -25,7 +25,6 @@ import {
 import {
   buildFilterSignature,
   buildPivotBranchCacheKey,
-  clearPivotBranchCache as clearPivotBranchCacheBase,
   readPivotBranchFactCache,
   writePivotBranchFactCache,
 } from './pivot/data/cache';
@@ -40,7 +39,6 @@ import {
   type ResolvedFetchContext as ResolvedQueryFetchContext,
 } from './pivot/query/resolveFetchContext';
 import { buildBranchQuerySpecs } from './pivot/query/specs';
-import { stableStringify as stableStringifyBase } from './pivot/shared/stableStringify';
 import { buildFactCoverage } from './pivot/runtime/coverage';
 import {
   createPivotFactStore,
@@ -73,10 +71,6 @@ export interface FetchPivotBranchParams {
   factStore?: PivotFactStore;
 }
 
-export const stableStringify = stableStringifyBase;
-
-export const clearPivotBranchCache = () => clearPivotBranchCacheBase();
-
 export type ResolvedFetchContext = ResolvedQueryFetchContext & {
   cacheKey: string;
   layout: LayoutContext;
@@ -105,7 +99,7 @@ const buildMeasureLeafSelectionSignature = (
     .join('|');
 };
 
-const resolveFetchContext = ({
+export const resolveBranchFetchContext = ({
   formData,
   axis,
   path,
@@ -158,7 +152,7 @@ const resolveFetchContext = ({
 const resolveBranchPlan = (
   params: FetchPivotBranchParams,
 ): ResolvedBranchPlan => {
-  const ctx = resolveFetchContext(params);
+  const ctx = resolveBranchFetchContext(params);
   const specs = buildBranchQuerySpecs({
     formData: params.formData,
     layout: ctx.layout,
@@ -247,9 +241,6 @@ export const peekPivotBranchCache = (params: FetchPivotBranchParams) => {
   });
   return result?.cached ? result.data : undefined;
 };
-
-// Exported for tests
-export const resolveFetchContextForTest = resolveFetchContext;
 
 const isAbortError = (error: unknown): boolean => {
   if (

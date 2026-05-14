@@ -56,13 +56,19 @@ import {
   resolveFetchContext,
 } from './resolveFetchContext';
 import { buildQueryShape } from './queryShape';
-import { type QuerySpec } from './types';
 import { expansionRevealsValuesLevel } from '../runtime/coverage';
 import {
   buildAxisCoverageKey,
   projectAxisPathToDimensions,
 } from '../runtime/paths';
 import { type PivotFactCoverage, type PivotProgram } from '../runtime/types';
+
+export type QuerySpec = {
+  queryName: string;
+  columns: QueryFormColumn[];
+  metrics: QueryFormMetric[];
+  filters: QueryObjectFilterClause[];
+};
 
 export type QuerySpecMeta = {
   kind: 'bootstrap' | 'root' | 'branch' | 'batch';
