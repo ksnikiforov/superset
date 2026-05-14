@@ -57,7 +57,7 @@ cells are projections of DB facts, not canonical data.
 
 ## Current Status
 
-As of May 14, 2026, after the ingestion helper surface cleanup checkpoint:
+As of May 14, 2026, after the branch cache peek cleanup checkpoint:
 
 - Gate-weighted architecture estimate: **99%**.
 - Delivery remaining estimate: **less than 1%**, mostly completion audit and
@@ -72,8 +72,8 @@ As of May 14, 2026, after the ingestion helper surface cleanup checkpoint:
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `14295` insertions, `13553` deletions, net `+742`.
-- Current production `src` TypeScript/TSX total: `34252` lines.
+- Production `src`: `14288` insertions, `13554` deletions, net `+734`.
+- Current production `src` TypeScript/TSX total: `34244` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - `PivotTableChart.tsx` is now `688` lines and `useExpansionEngine.ts` is now
   `1405` lines; those single-file reductions should not be counted as plugin
@@ -157,6 +157,14 @@ Source-only diff from pre-refactor baseline
 - Touched-file ESLint passed after the ingestion helper surface cleanup.
 - Focused ingestion/fetch/runtime validation after the cleanup passed: `4`
   suites and `47` tests.
+- Full plugin plus export entrypoint Jest pass after the cleanup: `99` suites
+  and `836` tests.
+- Branch cache peek cleanup deleted the production `peekPivotBranchCache`
+  export and removed the test-only mocks/imports plus obsolete `currentTree`
+  branch-fetch fixture params that kept that historical API surface alive. The
+  source slice was deletion-positive: `8` deletions, net `-8`; source plus
+  tests was `11` insertions, `182` deletions, net `-171`.
+- Touched-file ESLint passed after the branch cache peek cleanup.
 - Full plugin plus export entrypoint Jest pass after the cleanup: `99` suites
   and `836` tests.
 - Metric source-catalog cleanup removed `metricsBase` and
