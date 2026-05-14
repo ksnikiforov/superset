@@ -252,7 +252,6 @@ export const usePivotRuntimeLayoutState = ({
     uiRuntimeLayout,
     uiRuntimeLayoutRef,
     updateUiRuntimeLayout,
-    commitRuntimeLayout,
     lastLocalSyncDashboardQueryContextRef,
     persistRuntimeState,
   };

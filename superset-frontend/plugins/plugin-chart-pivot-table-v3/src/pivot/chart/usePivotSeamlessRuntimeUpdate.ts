@@ -481,7 +481,6 @@ export const usePivotSeamlessRuntimeUpdate = (
     seamlessWarnings: warnings,
     seamlessError: error,
     pendingDisplaySnapshot,
-    applySeamlessUpdate,
     applyRuntimeLayoutChange,
     applyDimensionFilterChange,
     clearAllFilters,

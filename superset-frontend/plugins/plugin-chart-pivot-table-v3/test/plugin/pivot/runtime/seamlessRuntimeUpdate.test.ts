@@ -26,8 +26,6 @@ import { type PivotFactStoreBatch } from '../../../../src/pivot/runtime/factStor
 import {
   buildSeamlessRuntimeSyncSnapshot,
   buildSeamlessRuntimeUpstreamSignature,
-  isSeamlessDisplaySnapshotSettled,
-  matchesSeamlessRuntimeSyncSnapshot,
   prepareRuntimeLayoutPropSync,
   prepareRuntimeStatePersistence,
   prepareSeamlessRuntimeLayoutChange,
@@ -72,55 +70,6 @@ test('builds stable seamless runtime sync snapshots', () => {
       '{"cols":["month"],"leafSelection":{},"metrics":["sales"],"rows":["country"],"valuePlacement":{"axis":"col","index":1},"version":1}',
     upstreamSignature: 'query-a',
   });
-});
-
-test('matches seamless runtime sync snapshots by filters, layout, and upstream query', () => {
-  const current = buildSeamlessRuntimeSyncSnapshot({
-    runtimeLayout,
-    selection: { country: ['France'] },
-    upstreamSignature: 'query-a',
-  });
-
-  expect(
-    matchesSeamlessRuntimeSyncSnapshot(
-      current,
-      buildSeamlessRuntimeSyncSnapshot({
-        runtimeLayout,
-        selection: { country: ['France'] },
-        upstreamSignature: 'query-a',
-      }),
-    ),
-  ).toBe(true);
-  expect(
-    matchesSeamlessRuntimeSyncSnapshot(
-      current,
-      buildSeamlessRuntimeSyncSnapshot({
-        runtimeLayout,
-        selection: { country: ['Germany'] },
-        upstreamSignature: 'query-a',
-      }),
-    ),
-  ).toBe(false);
-  expect(
-    matchesSeamlessRuntimeSyncSnapshot(
-      current,
-      buildSeamlessRuntimeSyncSnapshot({
-        runtimeLayout: { ...runtimeLayout, cols: [] },
-        selection: { country: ['France'] },
-        upstreamSignature: 'query-a',
-      }),
-    ),
-  ).toBe(false);
-  expect(
-    matchesSeamlessRuntimeSyncSnapshot(
-      current,
-      buildSeamlessRuntimeSyncSnapshot({
-        runtimeLayout,
-        selection: { country: ['France'] },
-        upstreamSignature: 'query-b',
-      }),
-    ),
-  ).toBe(false);
 });
 
 test('builds stable upstream dashboard query-context signatures', () => {
@@ -437,48 +386,6 @@ test('prepares runtime state persistence side-effect plan', () => {
     localSyncDashboardQueryContext: undefined,
     persistedSelection: undefined,
   });
-});
-
-test('detects when seamless display snapshots can clear', () => {
-  const baseState = {
-    seamlessLoading: false,
-    isHydrating: false,
-    loadingKeys: new Set<string>(),
-    pendingRows: new Set<string>(),
-    pendingCols: new Set<string>(),
-  };
-
-  expect(isSeamlessDisplaySnapshotSettled(baseState)).toBe(true);
-  expect(
-    isSeamlessDisplaySnapshotSettled({
-      ...baseState,
-      seamlessLoading: true,
-    }),
-  ).toBe(false);
-  expect(
-    isSeamlessDisplaySnapshotSettled({
-      ...baseState,
-      isHydrating: true,
-    }),
-  ).toBe(false);
-  expect(
-    isSeamlessDisplaySnapshotSettled({
-      ...baseState,
-      loadingKeys: new Set(['row']),
-    }),
-  ).toBe(false);
-  expect(
-    isSeamlessDisplaySnapshotSettled({
-      ...baseState,
-      pendingRows: new Set(['row']),
-    }),
-  ).toBe(false);
-  expect(
-    isSeamlessDisplaySnapshotSettled({
-      ...baseState,
-      pendingCols: new Set(['col']),
-    }),
-  ).toBe(false);
 });
 
 test('prepares fetch actions for runtime layout changes with missing coverage', () => {

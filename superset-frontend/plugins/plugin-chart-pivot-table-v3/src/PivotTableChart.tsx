@@ -61,7 +61,6 @@ import { getMetricKeys } from './pivot/core/tokens';
 import { useSyncRef } from './pivot/shared/useSyncRef';
 import {
   buildSeamlessRuntimeUpstreamSignature,
-  isSeamlessDisplaySnapshotSettled,
   type SeamlessRuntimeSyncSnapshot,
 } from './pivot/runtime/seamlessRuntimeUpdate';
 import {
@@ -432,13 +431,11 @@ function PivotTableChart(props: PivotTableProps) {
   useEffect(() => {
     if (
       pendingDisplaySnapshot &&
-      isSeamlessDisplaySnapshotSettled({
-        seamlessLoading,
-        isHydrating,
-        loadingKeys,
-        pendingRows,
-        pendingCols,
-      })
+      !seamlessLoading &&
+      !isHydrating &&
+      loadingKeys.size === 0 &&
+      pendingRows.size === 0 &&
+      pendingCols.size === 0
     ) {
       clearPendingDisplaySnapshot();
     }

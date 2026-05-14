@@ -87,14 +87,6 @@ export const buildSeamlessRuntimeSyncSnapshot = ({
   upstreamSignature,
 });
 
-export const matchesSeamlessRuntimeSyncSnapshot = (
-  current: SeamlessRuntimeSyncSnapshot | null,
-  next: SeamlessRuntimeSyncSnapshot,
-) =>
-  current?.filtersSignature === next.filtersSignature &&
-  current.layoutSignature === next.layoutSignature &&
-  current.upstreamSignature === next.upstreamSignature;
-
 export const buildSeamlessRuntimeUpstreamSignature = (
   queryFormData?: PivotTableQueryFormData | null,
 ) => {
@@ -187,19 +179,21 @@ export const prepareSeamlessRuntimeUpdateEffect = ({
         previousUpstreamState.signature !==
           upstreamDashboardQueryContextSignature &&
         previousUpstreamState.data === data));
+  const nextPersistedFilterSync = buildSeamlessRuntimeSyncSnapshot({
+    runtimeLayout: uiRuntimeLayout,
+    selection: persistedInteractionFilters,
+    upstreamSignature: upstreamSeamlessSignature,
+  });
+  const hasMatchingPersistedFilterSync =
+    lastSync?.filtersSignature === nextPersistedFilterSync.filtersSignature &&
+    lastSync.layoutSignature === nextPersistedFilterSync.layoutSignature &&
+    lastSync.upstreamSignature === nextPersistedFilterSync.upstreamSignature;
   const shouldApplyPersistedFilterUpdate =
     isUserControlled &&
     hasSelectedFilters(persistedInteractionFilters) &&
     isEqual(committedFilters, persistedInteractionFilters) &&
     isEqual(uiSelectedFilters, persistedInteractionFilters) &&
-    !matchesSeamlessRuntimeSyncSnapshot(
-      lastSync,
-      buildSeamlessRuntimeSyncSnapshot({
-        runtimeLayout: uiRuntimeLayout,
-        selection: persistedInteractionFilters,
-        upstreamSignature: upstreamSeamlessSignature,
-      }),
-    );
+    !hasMatchingPersistedFilterSync;
   const updates: SeamlessRuntimeUpdateEffectPlan['updates'] = [];
   if (shouldApplyStaleUpdate) {
     updates.push({
@@ -341,25 +335,6 @@ export const prepareRuntimeStatePersistence = ({
       : undefined,
   };
 };
-
-export const isSeamlessDisplaySnapshotSettled = ({
-  seamlessLoading,
-  isHydrating,
-  loadingKeys,
-  pendingRows,
-  pendingCols,
-}: {
-  seamlessLoading: boolean;
-  isHydrating: boolean;
-  loadingKeys: Set<string>;
-  pendingRows: Set<string>;
-  pendingCols: Set<string>;
-}) =>
-  !seamlessLoading &&
-  !isHydrating &&
-  loadingKeys.size === 0 &&
-  pendingRows.size === 0 &&
-  pendingCols.size === 0;
 
 export type SeamlessRuntimeLayoutChangeAction =
   | {
