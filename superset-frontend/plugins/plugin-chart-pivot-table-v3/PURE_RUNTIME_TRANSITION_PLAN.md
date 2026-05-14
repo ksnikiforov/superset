@@ -57,7 +57,7 @@ cells are projections of DB facts, not canonical data.
 
 ## Current Status
 
-As of May 14, 2026, after the query/render boundary cleanup checkpoint:
+As of May 14, 2026, after the expansion transition API cleanup checkpoint:
 
 - Gate-weighted architecture estimate: **99%**.
 - Delivery remaining estimate: **less than 1%**, mostly completion audit and
@@ -72,8 +72,8 @@ As of May 14, 2026, after the query/render boundary cleanup checkpoint:
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `14527` insertions, `13557` deletions, net `+970`.
-- Current production `src` TypeScript/TSX total: `34480` lines.
+- Production `src`: `14454` insertions, `13557` deletions, net `+897`.
+- Current production `src` TypeScript/TSX total: `34407` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - `PivotTableChart.tsx` is now `705` lines and `useExpansionEngine.ts` is now
   `1439` lines; those single-file reductions should not be counted as plugin
@@ -109,6 +109,15 @@ Source-only diff from pre-refactor baseline
 - Touched-file ESLint passed after the interaction-layout boundary cleanup.
 - Focused interaction-layout validation after the cleanup passed: `2` suites
   and `29` tests.
+- Full plugin plus export entrypoint Jest pass after the cleanup: `99` suites
+  and `839` tests.
+- Expansion transition API cleanup removed internal-only exported result and
+  return types from `stateTransitions.ts`, leaving those shapes owned by the
+  implementation instead of the module boundary. The source slice was
+  deletion-positive: `15` insertions, `88` deletions, net `-73`.
+- Touched-file ESLint passed after the expansion transition API cleanup.
+- Focused expansion/seamless validation after the cleanup passed: `4` suites
+  and `65` tests.
 - Full plugin plus export entrypoint Jest pass after the cleanup: `99` suites
   and `839` tests.
 - Metric source-catalog cleanup removed `metricsBase` and
@@ -595,7 +604,7 @@ deletion-positive structure cleanup; it is still not a net source reduction.
 Largest relevant production files:
 
 - `PivotDndMetricSelect.tsx`: `1564` lines.
-- `stateTransitions.ts`: `1565` lines.
+- `stateTransitions.ts`: `1492` lines.
 - `PivotMetricDefinitionValue.tsx`: `1448` lines.
 - `utils.ts`: `1399` lines.
 - `materializePivotTree.ts`: `1329` lines.
