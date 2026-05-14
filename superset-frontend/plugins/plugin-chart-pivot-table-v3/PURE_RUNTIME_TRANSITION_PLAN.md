@@ -360,6 +360,8 @@ Success criteria:
   signature callers no longer rebuild the same coverage list separately.
 - Expansion planner and fetched-request code now share the same fetched coverage
   projection types.
+- The old standalone expansion coverage planner module has been collapsed into
+  the grouped expansion planner boundary.
 
 ## Current Risks
 
