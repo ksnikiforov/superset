@@ -489,8 +489,7 @@ describe('pivot/expansion/engine', () => {
       pendingCols: new Set(),
       planCols: false,
       pruneMergedTree: ({ tree: nextTree }) => nextTree,
-      fetchResults: jest.fn(),
-      collectDeltas: jest.fn(),
+      fetchDeltas: jest.fn(),
     });
 
     expect(result).toEqual({
@@ -512,19 +511,14 @@ describe('pivot/expansion/engine', () => {
       cells: {},
     };
     const fetchedCoverage = emptyFetchedCoverage();
-    const fetchResults = jest.fn(async ({ targets }) => [
-      { targets, data: branch },
-    ]);
-    const collectDeltas = jest.fn(({ results }) => {
-      results.forEach(({ targets }) => {
-        targets.forEach(target => {
-          fetchedCoverage.depthByAxis[target.axis].set(
-            target.pathKey,
-            target.requiredOppositeDepth,
-          );
-        });
+    const fetchDeltas = jest.fn(async ({ targets }) => {
+      targets.forEach(target => {
+        fetchedCoverage.depthByAxis[target.axis].set(
+          target.pathKey,
+          target.requiredOppositeDepth,
+        );
       });
-      return results;
+      return [{ targets, data: branch }];
     });
     const result = await runHydrationLoop({
       baseTree: tree,
@@ -539,13 +533,11 @@ describe('pivot/expansion/engine', () => {
       pendingCols: new Set(),
       planCols: false,
       pruneMergedTree: ({ tree: nextTree }) => nextTree,
-      fetchResults,
-      collectDeltas,
+      fetchDeltas,
     });
 
-    expect(fetchResults).toHaveBeenCalledTimes(1);
-    expect(collectDeltas).toHaveBeenCalledTimes(1);
-    expect(fetchResults.mock.calls[0][0].targets).toMatchObject([
+    expect(fetchDeltas).toHaveBeenCalledTimes(1);
+    expect(fetchDeltas.mock.calls[0][0].targets).toMatchObject([
       {
         axis: 'row',
         pathKey: aKey,
@@ -562,7 +554,7 @@ describe('pivot/expansion/engine', () => {
 
   it('stops hydration loops when the request becomes stale', async () => {
     const { tree, aKey, xKey } = buildTree({ includeIntersectionCell: true });
-    const fetchResults = jest.fn();
+    const fetchDeltas = jest.fn();
     const result = await runHydrationLoop({
       baseTree: tree,
       maxIterations: 3,
@@ -575,12 +567,11 @@ describe('pivot/expansion/engine', () => {
       pendingRows: new Set(),
       pendingCols: new Set(),
       pruneMergedTree: ({ tree: nextTree }) => nextTree,
-      fetchResults,
-      collectDeltas: jest.fn(),
+      fetchDeltas,
     });
 
     expect(result).toEqual({ status: 'stale' });
-    expect(fetchResults).not.toHaveBeenCalled();
+    expect(fetchDeltas).not.toHaveBeenCalled();
   });
 
   it('plans expansion reinitialization for first mount and signature changes', () => {

@@ -86,9 +86,8 @@ import {
 } from './runtimeState';
 import { useSyncRef } from '../shared/useSyncRef';
 import {
-  collectFetchResultDeltas,
   createExpansionRequestHelpers,
-  fetchExpansionTargets,
+  fetchExpansionTargetDeltas,
   type ExpansionFetchRuntime,
 } from './fetchExecution';
 
@@ -665,7 +664,7 @@ export const useExpansionEngine = ({
             break;
           }
           // eslint-disable-next-line no-await-in-loop
-          const results = await fetchExpansionTargets({
+          const resultDeltas = await fetchExpansionTargetDeltas({
             targets,
             context: { visibleRowDepth, visibleColDepth },
             runtime: fetchRuntime,
@@ -673,6 +672,9 @@ export const useExpansionEngine = ({
             batchRequestKind: 'batch',
             transactionId: requestId,
             buildRequestGroupId: expansionRequestHelpers.buildRequestGroupId,
+            seedFetchedCoverage: seedFetchedCoverageFromFactBatches,
+            seedLoadedMetricNodeCoverage:
+              seedFetchedCoverageFromLoadedMetricNodes,
           });
           if (
             dataEpochRef.current !== requestEpoch ||
@@ -680,13 +682,6 @@ export const useExpansionEngine = ({
           ) {
             return;
           }
-          const resultDeltas = collectFetchResultDeltas({
-            results,
-            context: { visibleRowDepth, visibleColDepth },
-            seedFetchedCoverage: seedFetchedCoverageFromFactBatches,
-            seedLoadedMetricNodeCoverage:
-              seedFetchedCoverageFromLoadedMetricNodes,
-          });
           for (const {
             targets: deltaTargets,
             data: deltaTree,
@@ -865,19 +860,14 @@ export const useExpansionEngine = ({
           planRows: shouldPlanRows,
           planCols: shouldPlanCols,
           pruneMergedTree,
-          fetchResults: ({ targets, context }) =>
-            fetchExpansionTargets({
+          fetchDeltas: ({ targets, context }) =>
+            fetchExpansionTargetDeltas({
               targets,
               context,
               runtime: fetchRuntime,
               singleRequestKind: `hydrate:${reason}`,
               transactionId,
               buildRequestGroupId: expansionRequestHelpers.buildRequestGroupId,
-            }),
-          collectDeltas: ({ results, context }) =>
-            collectFetchResultDeltas({
-              results,
-              context,
               seedFetchedCoverage: seedFetchedCoverageFromFactBatches,
               seedLoadedMetricNodeCoverage:
                 seedFetchedCoverageFromLoadedMetricNodes,

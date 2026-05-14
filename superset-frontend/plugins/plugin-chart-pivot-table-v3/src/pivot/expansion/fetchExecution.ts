@@ -350,21 +350,40 @@ export const fetchExpansionTargets = async ({
   return [...localResults, ...fetchedResults];
 };
 
-export const collectFetchResultDeltas = ({
-  results,
+export const fetchExpansionTargetDeltas = async ({
+  targets,
   context,
+  runtime,
+  singleRequestKind,
+  batchRequestKind,
+  transactionId,
+  buildRequestGroupId,
   seedFetchedCoverage,
   seedLoadedMetricNodeCoverage,
 }: {
-  results: ExpansionFetchResult[];
+  targets: FetchTarget[];
   context: ExpansionFetchContext;
+  runtime: ExpansionFetchRuntime;
+  singleRequestKind: string;
+  batchRequestKind?: string;
+  transactionId: number;
+  buildRequestGroupId: BuildExpansionRequestGroupId;
   seedFetchedCoverage: (factBatches: PivotFactStoreBatch[]) => void;
   seedLoadedMetricNodeCoverage: (
     loadedTree: PivotTreeData,
     visibleRowDepth: number,
     visibleColDepth: number,
   ) => void;
-}) => {
+}): Promise<FetchResultDelta[]> => {
+  const results = await fetchExpansionTargets({
+    targets,
+    context,
+    runtime,
+    singleRequestKind,
+    batchRequestKind,
+    transactionId,
+    buildRequestGroupId,
+  });
   const deltas: FetchResultDelta[] = [];
   results.forEach(result => {
     seedFetchedCoverage(result.factBatches);

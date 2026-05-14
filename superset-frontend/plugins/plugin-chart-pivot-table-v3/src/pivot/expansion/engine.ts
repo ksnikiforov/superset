@@ -1164,7 +1164,7 @@ export type HydrationLoopResult =
       status: 'stale' | 'exhausted';
     };
 
-export const runHydrationLoop = async <FetchResult>({
+export const runHydrationLoop = async ({
   baseTree,
   maxIterations,
   isCurrent,
@@ -1178,8 +1178,7 @@ export const runHydrationLoop = async <FetchResult>({
   planRows = true,
   planCols = true,
   pruneMergedTree,
-  fetchResults,
-  collectDeltas,
+  fetchDeltas,
 }: {
   baseTree: PivotTreeData;
   maxIterations: number;
@@ -1194,20 +1193,15 @@ export const runHydrationLoop = async <FetchResult>({
   planRows?: boolean;
   planCols?: boolean;
   pruneMergedTree: PruneMergedTree;
-  fetchResults: ({
+  fetchDeltas: ({
     targets,
     context,
   }: {
     targets: HydrationFetchTarget[];
     context: HydrationLoopFetchContext;
-  }) => Promise<FetchResult[]>;
-  collectDeltas: ({
-    results,
-    context,
-  }: {
-    results: FetchResult[];
-    context: HydrationLoopFetchContext;
-  }) => Array<{ targets: HydrationDeltaTarget[]; data: PivotTreeData }>;
+  }) => Promise<
+    Array<{ targets: HydrationDeltaTarget[]; data: PivotTreeData }>
+  >;
 }): Promise<HydrationLoopResult> => {
   const deltas: HydrationDeltaMap = new Map();
   for (let iteration = 0; iteration < maxIterations; iteration += 1) {
@@ -1249,7 +1243,7 @@ export const runHydrationLoop = async <FetchResult>({
     }
 
     // eslint-disable-next-line no-await-in-loop
-    const results = await fetchResults({
+    const results = await fetchDeltas({
       targets: hydrationPlan.targets,
       context: { visibleRowDepth, visibleColDepth },
     });
@@ -1258,10 +1252,7 @@ export const runHydrationLoop = async <FetchResult>({
     }
     stageHydrationFetchDeltas({
       deltas,
-      results: collectDeltas({
-        results,
-        context: { visibleRowDepth, visibleColDepth },
-      }),
+      results,
     });
   }
   return { status: 'exhausted' };
