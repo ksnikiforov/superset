@@ -78,7 +78,6 @@ import { useSyncRef } from './pivot/shared/useSyncRef';
 import {
   buildSeamlessRuntimeUpstreamSignature,
   isSeamlessDisplaySnapshotSettled,
-  prepareSeamlessRuntimeLayoutChange,
   shouldSyncCommittedRuntimeFromProps,
   type SeamlessRuntimeSyncSnapshot,
 } from './pivot/runtime/seamlessRuntimeUpdate';
@@ -309,7 +308,6 @@ function PivotTableChart(props: PivotTableProps) {
     committedFilters,
   });
   const {
-    committedFactBatches,
     dataForRender,
     factBatchesForRender,
     seamlessLoading,
@@ -317,6 +315,7 @@ function PivotTableChart(props: PivotTableProps) {
     seamlessError,
     pendingDisplaySnapshot,
     applySeamlessUpdate,
+    applyRuntimeLayoutChange,
     clearPendingDisplaySnapshot,
   } = usePivotSeamlessRuntimeUpdate({
     dimensionKeys,
@@ -346,41 +345,6 @@ function PivotTableChart(props: PivotTableProps) {
     commitUiRuntimeLayout: updateUiRuntimeLayout,
     persistRuntimeState,
   });
-
-  const handleRuntimeLayoutChange = useCallback(
-    (nextLayout: PivotRuntimeLayout) => {
-      const action = prepareSeamlessRuntimeLayoutChange({
-        nextLayout,
-        dimensionKeys,
-        metricKeys,
-        factBatches: committedFactBatches,
-        pendingSeamlessLayout: pendingSeamlessLayoutRef.current,
-        committedRuntimeLayout: committedRuntimeLayoutRef.current,
-        selection: uiSelectedFilters,
-        upstreamSignature: upstreamSeamlessSignature,
-      });
-      if (action.kind === 'fetch') {
-        pendingSeamlessLayoutRef.current = action.runtimeLayout;
-        updateUiRuntimeLayout(action.runtimeLayout);
-        applySeamlessUpdate(action.runtimeLayout, uiSelectedFilters);
-        return;
-      }
-      updateUiRuntimeLayout(action.runtimeLayout);
-      persistRuntimeState(action.runtimeLayout, uiSelectedFilters);
-      lastSeamlessSyncRef.current = action.syncSnapshot;
-    },
-    [
-      applySeamlessUpdate,
-      committedFactBatches,
-      committedRuntimeLayoutRef,
-      dimensionKeys,
-      metricKeys,
-      persistRuntimeState,
-      uiSelectedFilters,
-      updateUiRuntimeLayout,
-      upstreamSeamlessSignature,
-    ],
-  );
 
   const dimensionLabelMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -716,11 +680,11 @@ function PivotTableChart(props: PivotTableProps) {
   );
   const handleChipRemove = useCallback(
     (dimensionKey: string) => {
-      handleRuntimeLayoutChange(
+      applyRuntimeLayoutChange(
         removeDimensionFromLayout(uiRuntimeLayoutRef.current, dimensionKey),
       );
     },
-    [handleRuntimeLayoutChange, uiRuntimeLayoutRef],
+    [applyRuntimeLayoutChange, uiRuntimeLayoutRef],
   );
 
   const handleDimensionDrop = useCallback(
@@ -741,9 +705,9 @@ function PivotTableChart(props: PivotTableProps) {
         sourceChipIndex,
         metricsAvailable: hasMetrics,
       });
-      handleRuntimeLayoutChange(nextLayout);
+      applyRuntimeLayoutChange(nextLayout);
     },
-    [handleRuntimeLayoutChange, hasMetrics, uiRuntimeLayoutRef],
+    [applyRuntimeLayoutChange, hasMetrics, uiRuntimeLayoutRef],
   );
 
   const handleValueDrop = useCallback(
@@ -760,9 +724,9 @@ function PivotTableChart(props: PivotTableProps) {
         sourceChipIndex,
         metricsAvailable: hasMetrics,
       });
-      handleRuntimeLayoutChange(nextLayout);
+      applyRuntimeLayoutChange(nextLayout);
     },
-    [handleRuntimeLayoutChange, hasMetrics, uiRuntimeLayoutRef],
+    [applyRuntimeLayoutChange, hasMetrics, uiRuntimeLayoutRef],
   );
 
   const shouldDelayRender =
@@ -807,7 +771,7 @@ function PivotTableChart(props: PivotTableProps) {
           onFilterValuesOpen={handleFetchDimensionValues}
           onFilterValuesSearch={handleFetchDimensionValues}
           runtimeLayout={uiRuntimeLayout}
-          onChange={handleRuntimeLayoutChange}
+          onChange={applyRuntimeLayoutChange}
         />
       }
     >

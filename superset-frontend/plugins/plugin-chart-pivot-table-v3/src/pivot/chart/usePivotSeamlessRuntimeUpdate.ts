@@ -39,6 +39,7 @@ import {
   buildSeamlessRuntimeSyncSnapshot,
   fetchAndMaterializeSeamlessRuntimeUpdate,
   prepareSeamlessRuntimeUpdateEffect,
+  prepareSeamlessRuntimeLayoutChange,
   type SeamlessRuntimeSyncSnapshot,
   type SeamlessRuntimeUpstreamState,
 } from '../runtime/seamlessRuntimeUpdate';
@@ -249,6 +250,43 @@ export const usePivotSeamlessRuntimeUpdate = (
     ],
   );
 
+  const applyRuntimeLayoutChange = useCallback(
+    (nextLayout: PivotRuntimeLayout) => {
+      const action = prepareSeamlessRuntimeLayoutChange({
+        nextLayout,
+        dimensionKeys,
+        metricKeys,
+        factBatches: committedFactBatches,
+        pendingSeamlessLayout: pendingSeamlessLayoutRef.current,
+        committedRuntimeLayout,
+        selection: uiSelectedFilters,
+        upstreamSignature,
+      });
+      if (action.kind === 'fetch') {
+        pendingSeamlessLayoutRef.current = action.runtimeLayout;
+        commitUiRuntimeLayout(action.runtimeLayout);
+        applySeamlessUpdate(action.runtimeLayout, uiSelectedFilters);
+        return;
+      }
+      commitUiRuntimeLayout(action.runtimeLayout);
+      persistRuntimeState(action.runtimeLayout, uiSelectedFilters);
+      seamlessSyncRef.current = action.syncSnapshot;
+    },
+    [
+      applySeamlessUpdate,
+      commitUiRuntimeLayout,
+      committedFactBatches,
+      committedRuntimeLayout,
+      dimensionKeys,
+      metricKeys,
+      pendingSeamlessLayoutRef,
+      persistRuntimeState,
+      seamlessSyncRef,
+      uiSelectedFilters,
+      upstreamSignature,
+    ],
+  );
+
   useEffect(() => {
     const updatePlan = prepareSeamlessRuntimeUpdateEffect({
       upstreamDashboardQueryContextSignature,
@@ -295,6 +333,7 @@ export const usePivotSeamlessRuntimeUpdate = (
     seamlessError: error,
     pendingDisplaySnapshot,
     applySeamlessUpdate,
+    applyRuntimeLayoutChange,
     clearPendingDisplaySnapshot,
   };
 };
