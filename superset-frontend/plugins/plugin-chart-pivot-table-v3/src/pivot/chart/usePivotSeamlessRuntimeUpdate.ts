@@ -32,6 +32,7 @@ import {
   type QueryFormColumn,
 } from '@superset-ui/core';
 import {
+  type PivotAxis,
   type PivotRuntimeLayout,
   type PivotTableQueryFormData,
   type PivotTreeData,
@@ -54,6 +55,11 @@ import {
   applyDimensionFilterSelectionChange,
   buildClearSelectedFiltersUpdate,
 } from '../filters';
+import {
+  applyDimensionDrag,
+  applyValueDrag,
+  removeDimensionFromLayout,
+} from '../layout/interactionDrag';
 import { getStableColumnKey } from '../../utils';
 
 type RuntimeSelection = Record<string, DataRecordValue[]>;
@@ -70,6 +76,7 @@ type UsePivotSeamlessRuntimeUpdateConfig = {
   factBatches: PivotFactStoreBatch[];
   isUserControlled: boolean;
   isDashboardRuntimeSync: boolean;
+  hasMetrics: boolean;
   shouldSyncCommittedTreeFromProps: boolean;
   upstreamDashboardQueryContextSignature: string | null;
   persistedInteractionFilters: RuntimeSelection;
@@ -77,6 +84,7 @@ type UsePivotSeamlessRuntimeUpdateConfig = {
   committedFilters: RuntimeSelection;
   uiSelectedFilters: RuntimeSelection;
   uiRuntimeLayout: PivotRuntimeLayout;
+  uiRuntimeLayoutRef: MutableRefObject<PivotRuntimeLayout>;
   baseFormData: PivotTableQueryFormData;
   sourceFormData: PivotTableQueryFormData;
   upstreamSignature: string;
@@ -107,6 +115,7 @@ export const usePivotSeamlessRuntimeUpdate = (
     factBatches,
     isUserControlled,
     isDashboardRuntimeSync,
+    hasMetrics,
     shouldSyncCommittedTreeFromProps,
     upstreamDashboardQueryContextSignature,
     persistedInteractionFilters,
@@ -114,6 +123,7 @@ export const usePivotSeamlessRuntimeUpdate = (
     committedFilters,
     uiSelectedFilters,
     uiRuntimeLayout,
+    uiRuntimeLayoutRef,
     baseFormData,
     sourceFormData,
     upstreamSignature,
@@ -341,6 +351,57 @@ export const usePivotSeamlessRuntimeUpdate = (
     updateUiSelectedFilters,
   ]);
 
+  const removeRuntimeDimension = useCallback(
+    (dimensionKey: string) => {
+      applyRuntimeLayoutChange(
+        removeDimensionFromLayout(uiRuntimeLayoutRef.current, dimensionKey),
+      );
+    },
+    [applyRuntimeLayoutChange, uiRuntimeLayoutRef],
+  );
+
+  const dropRuntimeDimension = useCallback(
+    (
+      dimensionKey: string,
+      targetAxis: PivotAxis,
+      targetChipIndex: number | undefined,
+      insertBeforeValue: boolean,
+      sourceAxis?: PivotAxis,
+      sourceChipIndex?: number,
+    ) => {
+      const nextLayout = applyDimensionDrag(uiRuntimeLayoutRef.current, {
+        dimensionKey,
+        targetAxis,
+        targetChipIndex,
+        insertBeforeValue,
+        sourceAxis,
+        sourceChipIndex,
+        metricsAvailable: hasMetrics,
+      });
+      applyRuntimeLayoutChange(nextLayout);
+    },
+    [applyRuntimeLayoutChange, hasMetrics, uiRuntimeLayoutRef],
+  );
+
+  const dropRuntimeValue = useCallback(
+    (
+      targetAxis: PivotAxis,
+      targetChipIndex: number | undefined,
+      sourceAxis: PivotAxis,
+      sourceChipIndex?: number,
+    ) => {
+      const nextLayout = applyValueDrag(uiRuntimeLayoutRef.current, {
+        targetAxis,
+        targetChipIndex,
+        sourceAxis,
+        sourceChipIndex,
+        metricsAvailable: hasMetrics,
+      });
+      applyRuntimeLayoutChange(nextLayout);
+    },
+    [applyRuntimeLayoutChange, hasMetrics, uiRuntimeLayoutRef],
+  );
+
   useEffect(() => {
     const updatePlan = prepareSeamlessRuntimeUpdateEffect({
       upstreamDashboardQueryContextSignature,
@@ -390,6 +451,9 @@ export const usePivotSeamlessRuntimeUpdate = (
     applyRuntimeLayoutChange,
     applyDimensionFilterChange,
     clearAllFilters,
+    removeRuntimeDimension,
+    dropRuntimeDimension,
+    dropRuntimeValue,
     clearPendingDisplaySnapshot,
   };
 };

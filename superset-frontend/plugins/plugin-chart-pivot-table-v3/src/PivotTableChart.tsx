@@ -37,7 +37,6 @@ import { Loading } from '@superset-ui/core/components';
 import {
   type PivotTableProps,
   MetricsLayoutEnum,
-  type PivotAxis,
   PivotRuntimeLayout,
 } from './types';
 import { PivotTableView } from './pivot/render/PivotTableView';
@@ -63,12 +62,7 @@ import {
 import { buildSelectionFilteredFormData } from './pivot/update/initialUpdatePlan';
 import { buildTreeDimensionFilterValues } from './pivot/filters';
 import { useDimensionFilterValues } from './pivot/chart/useDimensionFilterValues';
-import {
-  applyDimensionDrag,
-  applyValueDrag,
-  buildInteractionChips,
-  removeDimensionFromLayout,
-} from './pivot/layout/interactionDrag';
+import { buildInteractionChips } from './pivot/layout/interactionDrag';
 import { getMetricKeys, getStableColumnKey } from './utils';
 import { useSyncRef } from './pivot/shared/useSyncRef';
 import {
@@ -216,6 +210,7 @@ function PivotTableChart(props: PivotTableProps) {
     [formData.metrics, formData.metricsBase, metrics],
   );
   const metricKeys = useMemo(() => getMetricKeys(metricsForUi), [metricsForUi]);
+  const hasMetrics = metricKeys.length > 0;
   const runtimeLayout = useMemo(() => {
     const persisted =
       (ownState?.pivotRuntimeLayout as PivotRuntimeLayout | undefined) ??
@@ -313,6 +308,9 @@ function PivotTableChart(props: PivotTableProps) {
     applyRuntimeLayoutChange,
     applyDimensionFilterChange,
     clearAllFilters,
+    removeRuntimeDimension,
+    dropRuntimeDimension,
+    dropRuntimeValue,
     clearPendingDisplaySnapshot,
   } = usePivotSeamlessRuntimeUpdate({
     dimensionKeys,
@@ -321,6 +319,7 @@ function PivotTableChart(props: PivotTableProps) {
     factBatches,
     isUserControlled,
     isDashboardRuntimeSync,
+    hasMetrics,
     shouldSyncCommittedTreeFromProps,
     upstreamDashboardQueryContextSignature,
     persistedInteractionFilters,
@@ -328,6 +327,7 @@ function PivotTableChart(props: PivotTableProps) {
     committedFilters,
     uiSelectedFilters,
     uiRuntimeLayout,
+    uiRuntimeLayoutRef,
     baseFormData: fetchFormDataBaseWithFormatters,
     sourceFormData: formData,
     upstreamSignature: upstreamSeamlessSignature,
@@ -612,7 +612,6 @@ function PivotTableChart(props: PivotTableProps) {
     rowAxisLabels,
     exportChartId,
   };
-  const hasMetrics = metricKeys.length > 0;
   const rowChips = useMemo(
     () =>
       buildInteractionChips({
@@ -635,57 +634,6 @@ function PivotTableChart(props: PivotTableProps) {
       }),
     [dimensionLabelMap, hasMetrics, uiRuntimeLayout],
   );
-  const handleChipRemove = useCallback(
-    (dimensionKey: string) => {
-      applyRuntimeLayoutChange(
-        removeDimensionFromLayout(uiRuntimeLayoutRef.current, dimensionKey),
-      );
-    },
-    [applyRuntimeLayoutChange, uiRuntimeLayoutRef],
-  );
-
-  const handleDimensionDrop = useCallback(
-    (
-      dimensionKey: string,
-      targetAxis: PivotAxis,
-      targetChipIndex: number | undefined,
-      insertBeforeValue: boolean,
-      sourceAxis?: PivotAxis,
-      sourceChipIndex?: number,
-    ) => {
-      const nextLayout = applyDimensionDrag(uiRuntimeLayoutRef.current, {
-        dimensionKey,
-        targetAxis,
-        targetChipIndex,
-        insertBeforeValue,
-        sourceAxis,
-        sourceChipIndex,
-        metricsAvailable: hasMetrics,
-      });
-      applyRuntimeLayoutChange(nextLayout);
-    },
-    [applyRuntimeLayoutChange, hasMetrics, uiRuntimeLayoutRef],
-  );
-
-  const handleValueDrop = useCallback(
-    (
-      targetAxis: PivotAxis,
-      targetChipIndex: number | undefined,
-      sourceAxis: PivotAxis,
-      sourceChipIndex?: number,
-    ) => {
-      const nextLayout = applyValueDrag(uiRuntimeLayoutRef.current, {
-        targetAxis,
-        targetChipIndex,
-        sourceAxis,
-        sourceChipIndex,
-        metricsAvailable: hasMetrics,
-      });
-      applyRuntimeLayoutChange(nextLayout);
-    },
-    [applyRuntimeLayoutChange, hasMetrics, uiRuntimeLayoutRef],
-  );
-
   const shouldDelayRender =
     !isUserControlled &&
     datasourceId !== null &&
@@ -707,9 +655,9 @@ function PivotTableChart(props: PivotTableProps) {
       tableWidth={tableWidth}
       rowChips={rowChips}
       colChips={colChips}
-      onDropDimension={handleDimensionDrop}
-      onDropValue={handleValueDrop}
-      onRemoveDimension={handleChipRemove}
+      onDropDimension={dropRuntimeDimension}
+      onDropValue={dropRuntimeValue}
+      onRemoveDimension={removeRuntimeDimension}
       panel={
         <PivotInteractionPanel
           dimensions={dimensionList}
