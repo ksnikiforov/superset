@@ -50,7 +50,6 @@ export type PivotRuntimeLayout = {
   leafSelection: Record<string, boolean>;
   leafOrder?: string[];
   valuePlacement: { axis: PivotAxis; index: number };
-  lastMoved?: PivotAxis;
 };
 
 export interface PivotTableStylesProps {

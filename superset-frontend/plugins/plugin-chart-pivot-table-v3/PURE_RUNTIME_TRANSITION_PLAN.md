@@ -232,9 +232,7 @@ Problem:
   duplicate Values-placement behavior.
 - Interaction mode currently has two valid layout authorities: the layout that
   produced the loaded query/fact coverage, and the local layout the user is
-  editing. Attempts to delete the placement compiler before modeling this split
-  regressed metric order changes, ownState layout preference, stale dashboard
-  rerenders, and targeted fetch counts.
+  editing.
 
 Target:
 
@@ -244,8 +242,6 @@ Target:
   compiler.
 - Model the boundary explicitly as `loadedProgram`, `interactiveProgram`, and a
   transition decision that chooses reuse, targeted fetch, or seamless recovery.
-  After that exists, delete placement-specific compile glue instead of keeping
-  it as an implicit bridge.
 
 Primary files:
 
@@ -282,6 +278,8 @@ Success criteria:
 - Export uses a worksheet model rather than DOM reconstruction.
 - The chart delegates seamless update, runtime layout state, dataset metadata,
   dimension filter values, and export registration to helper modules.
+- Applied interaction layout now compiles through `compilePivotProgram`; the
+  placement-only compiler bridge has been removed.
 
 ## Current Risks
 
@@ -312,9 +310,7 @@ Bring these back before implementing the behavior change:
   behavior, get UX approval first.
 - **Values placeholder boundary.** Removing placeholder tolerance from saved
   form data would be a compatibility break; runtime-only cleanup is fine, but
-  persisted control behavior needs approval. Deleting
-  `compilePivotProgramFromPlacement` also needs the explicit loaded-vs-local
-  program boundary first; otherwise it changes interaction-state UX.
+  persisted control behavior needs approval.
 - **Large-result interactivity.** Worker/off-thread/chunked commit changes can
   alter loader timing and must be planned as an interactivity change.
 

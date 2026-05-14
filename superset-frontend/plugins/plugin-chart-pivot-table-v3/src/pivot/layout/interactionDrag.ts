@@ -203,7 +203,6 @@ export const applyDimensionDrag = (
     ...cleaned,
     [axisKey]: list,
     valuePlacement: nextValuePlacement,
-    lastMoved: targetAxis,
   };
 };
 
@@ -241,6 +240,5 @@ export const applyValueDrag = (
   return {
     ...layout,
     valuePlacement: { axis: targetAxis, index: insertIndex },
-    lastMoved: targetAxis,
   };
 };
