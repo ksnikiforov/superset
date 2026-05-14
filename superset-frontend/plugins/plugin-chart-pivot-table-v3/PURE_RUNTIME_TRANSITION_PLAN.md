@@ -58,7 +58,7 @@ cells are projections of DB facts, not canonical data.
 ## Current Status
 
 As of May 14, 2026, after
-`18597bcfe1 refactor(pivot-table-v3): remove control panel debug logging`:
+`2c48cf5e08 refactor(pivot-table-v3): clean metric control hook deps`:
 
 - Gate-weighted architecture estimate: **97%**.
 - Delivery remaining estimate: **11-19%**, mostly final cleanup, validation,
@@ -72,8 +72,8 @@ As of May 14, 2026, after
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `12996` insertions, `12246` deletions, net `+750`.
-- Current production `src` TypeScript/TSX total: `34260` lines.
+- Production `src`: `12998` insertions, `12250` deletions, net `+748`.
+- Current production `src` TypeScript/TSX total: `34258` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - Full plugin Jest pass after the column-sort extraction: `91` suites and
   `729` tests.
@@ -239,6 +239,8 @@ Source-only diff from pre-refactor baseline
   `3` suites and `32` tests.
 - Focused control panel pass after removing remaining production debug logging:
   `2` suites and `8` tests.
+- Focused metric-control pass after cleaning hook dependency arrays: `1` suite
+  and `15` tests.
 
 The readout remains mixed: the plugin is still modestly above the baseline line
 count, but the chart/layout hooks keep losing inline policy and the remaining
@@ -456,7 +458,7 @@ orchestration.
 
 Largest relevant production files:
 
-- `PivotDndMetricSelect.tsx`: `1566` lines.
+- `PivotDndMetricSelect.tsx`: `1564` lines.
 - `engine.ts`: `1496` lines.
 - `PivotMetricDefinitionValue.tsx`: `1448` lines.
 - `utils.ts`: `1429` lines.
@@ -565,6 +567,10 @@ git diff --check
 
 Recent validation:
 
+- `2c48cf5e08`: cleaned stale/missing hook dependencies in the Pivot Table v3
+  metric controls; touched-file ESLint, Prettier, `git diff --check`, focused
+  metric-control Jest (`15` tests), and full pivot-table-v3 source ESLint
+  passed with no warnings.
 - `18597bcfe1`: removed the remaining production Pivot Table v3 placement debug
   flag and `console.log` path from `controlPanel.tsx`; touched-file ESLint,
   Prettier, `git diff --check`, focused control panel/layout Jest (`8` tests),
