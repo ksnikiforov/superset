@@ -57,8 +57,7 @@ cells are projections of DB facts, not canonical data.
 
 ## Current Status
 
-As of May 14, 2026, after the strict expansion fetch-result contract cleanup
-checkpoint:
+As of May 14, 2026, after the query-result fallback mode removal checkpoint:
 
 - Gate-weighted architecture estimate: **99%**.
 - Delivery remaining estimate: **less than 1%**, mostly completion audit and
@@ -73,8 +72,8 @@ checkpoint:
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `14232` insertions, `13756` deletions, net `+476`.
-- Current production `src` TypeScript/TSX total: `33986` lines.
+- Production `src`: `14212` insertions, `13756` deletions, net `+456`.
+- Current production `src` TypeScript/TSX total: `33966` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - `PivotTableChart.tsx` is now `688` lines and `useExpansionEngine.ts` is now
   `1405` lines; those single-file reductions should not be counted as plugin
@@ -103,6 +102,15 @@ Source-only diff from pre-refactor baseline
   cleanup.
 - Full plugin/export validation after the cleanup passed: `99` suites / `832`
   tests.
+- Query-result fallback mode removal deleted the configurable `index`/`empty`
+  ingestion fallback path. Ingestion now has one rule: all-unnamed initial
+  results remain positional, but once query names are present, specs match by
+  query name and missing specs ingest as empty. The source slice was
+  deletion-positive: `1` insertion, `21` deletions, net `-20`; source plus
+  tests was `2` insertions, `26` deletions, net `-24`.
+- Touched-file ESLint passed after the query-result fallback mode removal.
+- Focused query/fetch validation after the fallback removal passed: `4` suites
+  / `35` tests.
 - Chart runtime-sync cleanup moved the committed-tree sync decision out of
   `PivotTableChart.tsx` and into the seamless runtime hook, then deleted the
   now one-consumer runtime predicate export/test surface. The source slice was
