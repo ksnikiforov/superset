@@ -16,13 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  type ComponentProps,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   AppSection,
   DataRecordValue,
@@ -75,6 +69,10 @@ import {
   type PivotDisplaySnapshot,
   usePivotSeamlessRuntimeUpdate,
 } from './pivot/chart/usePivotSeamlessRuntimeUpdate';
+import {
+  buildSharedPivotViewProps,
+  resolveActivePivotDisplaySnapshot,
+} from './pivot/chart/pivotViewProps';
 
 const EMPTY_SELECTED_FILTERS: Record<string, DataRecordValue[]> = {};
 const MetaLoadingWrap = styled.div`
@@ -84,8 +82,6 @@ const MetaLoadingWrap = styled.div`
   height: 100%;
   width: 100%;
 `;
-
-type PivotViewProps = ComponentProps<typeof PivotTableView>;
 
 function PivotTableChart(props: PivotTableProps) {
   const {
@@ -565,53 +561,40 @@ function PivotTableChart(props: PivotTableProps) {
   const tableHeight = isUserControlled
     ? Math.max(0, height - INTERACTION_TOP_CHIPS_HEIGHT)
     : height;
-  const liveDisplaySnapshot: PivotDisplaySnapshot = {
-    renderModel: renderModelResult.renderModel,
-    tree: renderTree,
-    expandedRows: renderModelResult.expandedRowsForRender,
-    expandedCols: renderModelResult.expandedColsForRender,
-  };
+  const { activeDisplaySnapshot, liveDisplaySnapshot } =
+    resolveActivePivotDisplaySnapshot({
+      renderModelResult,
+      renderTree,
+      pendingDisplaySnapshot,
+    });
   displaySnapshotRef.current = liveDisplaySnapshot;
-  const activeDisplaySnapshot = pendingDisplaySnapshot ?? liveDisplaySnapshot;
   const exportChartId =
     typeof formData.slice_id === 'number' ||
     typeof formData.slice_id === 'string'
       ? formData.slice_id
       : undefined;
-  const sharedPivotViewProps: Omit<PivotViewProps, 'height' | 'width'> = {
-    renderModel: activeDisplaySnapshot.renderModel,
-    tree: activeDisplaySnapshot.tree,
-    expandedRows: activeDisplaySnapshot.expandedRows,
-    expandedCols: activeDisplaySnapshot.expandedCols,
-    errorMessage: activeErrorMessage,
-    onRetry: handleRetry,
-    warnings: combinedWarnings,
-    showGlobalLoader: false,
-    showCornerLoader: cornerLoaderVisible,
-    stickyHeaders: resolvedStickyHeaders,
+  const sharedPivotViewProps = buildSharedPivotViewProps({
+    activeDisplaySnapshot,
+    activeErrorMessage,
+    handleRetry,
+    combinedWarnings,
+    cornerLoaderVisible,
+    resolvedStickyHeaders,
     headerOffset,
     headerRowOffsets,
     headerRef,
-    colTotalPosition: layoutResult.resolvedColTotalPosition,
+    layoutResult,
     formatting,
-    onToggleNode: handleToggle,
-    onSortColumn: renderModelResult.handleColumnSort,
-    isColumnSortable: renderModelResult.isColumnSortable,
-    getColumnSortOrder: renderModelResult.getColumnSortOrder,
-    shouldShowToggle: renderModelResult.shouldShowToggle,
-    showSpinner: key =>
-      !pendingDisplaySnapshot && !seamlessLoading && loadingKeys.has(key),
-    isRowAggregateBold: renderModelResult.isRowAggregateBold,
-    isColAggregateBold: renderModelResult.isColAggregateBold,
-    getNodeDimDepth: renderModelResult.getNodeDimDepth,
-    isMetricGrandTotalNode: layoutResult.isMetricGrandTotalNode,
+    handleToggle,
+    renderModelResult,
+    pendingDisplaySnapshot,
+    seamlessLoading,
+    loadingKeys,
     emitCrossFilters,
-    handleCellClick: interactions.handleCellClick,
-    handleCellKeyDown: interactions.handleCellKeyDown,
-    handleCellContextMenu: interactions.handleCellContextMenu,
+    interactions,
     rowAxisLabels,
     exportChartId,
-  };
+  });
   const rowChips = useMemo(
     () =>
       buildInteractionChips({

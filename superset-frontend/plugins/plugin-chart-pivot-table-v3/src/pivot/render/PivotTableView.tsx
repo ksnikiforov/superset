@@ -282,7 +282,7 @@ const isNullLabelValue = (node: PivotTreeNode) => {
   return last === null;
 };
 
-type PivotTableViewProps = {
+export type PivotTableViewProps = {
   height: number;
   width: number;
   renderModel: RenderModel;
