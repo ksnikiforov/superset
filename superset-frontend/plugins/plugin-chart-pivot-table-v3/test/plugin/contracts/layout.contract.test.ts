@@ -115,11 +115,11 @@ describe('layout resolution (contracts)', () => {
     });
   });
 
-  it('normalizes legacy total position values', () => {
+  it('uses only runtime total position values', () => {
     const formData = buildFormData({
       colTotals: true,
-      colTotalPosition: 'bottom' as PivotTableQueryFormData['colTotalPosition'],
-      rowTotalPosition: 'top' as PivotTableQueryFormData['rowTotalPosition'],
+      colTotalPosition: 'end',
+      rowTotalPosition: 'start',
     });
 
     const layout = buildLayoutContext(formData);

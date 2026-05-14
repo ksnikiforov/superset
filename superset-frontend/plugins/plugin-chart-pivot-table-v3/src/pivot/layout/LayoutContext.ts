@@ -103,11 +103,8 @@ export type LayoutContext = {
 };
 
 const normalizeTotalPosition = (value: unknown): TotalPosition => {
-  if (value === 'end' || value === 'bottom') {
+  if (value === 'end') {
     return 'end';
-  }
-  if (value === 'start' || value === 'top') {
-    return 'start';
   }
   return 'start';
 };
