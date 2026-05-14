@@ -46,7 +46,6 @@ jest.mock('../../../src/fetchPivotBranch', () => {
   return {
     ...actual,
     fetchPivotBranch: jest.fn().mockResolvedValue({ data: undefined }),
-    peekPivotBranchCache: jest.fn(),
   };
 });
 

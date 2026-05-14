@@ -21,10 +21,7 @@ import { fireEvent, render, screen, waitFor, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
 
-import {
-  fetchPivotBranch,
-  peekPivotBranchCache,
-} from '../../../src/fetchPivotBranch';
+import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
 import type {
   FetchPivotBranchParams,
   FetchPivotBranchResult,
@@ -39,7 +36,6 @@ jest.mock('../../../src/fetchPivotBranch', () => {
   return {
     ...actual,
     fetchPivotBranch: jest.fn(),
-    peekPivotBranchCache: jest.fn(),
   };
 });
 
@@ -139,14 +135,9 @@ describe('PivotTableChart cross-axis concurrent expands', () => {
   const fetchPivotBranchMock = fetchPivotBranch as jest.MockedFunction<
     typeof fetchPivotBranch
   >;
-  const peekPivotBranchCacheMock = peekPivotBranchCache as jest.MockedFunction<
-    typeof peekPivotBranchCache
-  >;
 
   beforeEach(() => {
     fetchPivotBranchMock.mockReset();
-    peekPivotBranchCacheMock.mockReset();
-    peekPivotBranchCacheMock.mockReturnValue(undefined);
   });
 
   it('hydrates intersection values when row+col expansion results resolve out of order', async () => {

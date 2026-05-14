@@ -21,10 +21,7 @@ import { fireEvent, render, waitFor, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
 
-import {
-  fetchPivotBranch,
-  peekPivotBranchCache,
-} from '../../../src/fetchPivotBranch';
+import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';
@@ -34,7 +31,6 @@ jest.mock('../../../src/fetchPivotBranch', () => {
   return {
     ...actual,
     fetchPivotBranch: jest.fn(),
-    peekPivotBranchCache: jest.fn(),
   };
 });
 
@@ -127,12 +123,9 @@ const getPivotTable = (container: HTMLElement) =>
 
 describe('PivotTableChart concurrent expands', () => {
   const fetchPivotBranchMock = fetchPivotBranch as jest.Mock;
-  const peekPivotBranchCacheMock = peekPivotBranchCache as jest.Mock;
 
   beforeEach(() => {
     fetchPivotBranchMock.mockReset();
-    peekPivotBranchCacheMock.mockReset();
-    peekPivotBranchCacheMock.mockReturnValue(undefined);
   });
 
   it('merges branches from overlapping row expansions', async () => {

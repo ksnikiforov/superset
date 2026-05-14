@@ -36,10 +36,7 @@ import {
   METRIC_TOKEN_PREFIX,
   SUBTOTAL_TOKEN,
 } from '../../../src/pivot/core/tokens';
-import {
-  fetchPivotBranch,
-  peekPivotBranchCache,
-} from '../../../src/fetchPivotBranch';
+import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
 import type {
   FetchPivotBranchParams,
   FetchPivotBranchResult,
@@ -66,7 +63,6 @@ jest.mock('../../../src/fetchPivotBranch', () => {
   return {
     ...actual,
     fetchPivotBranch: jest.fn().mockResolvedValue({ data: undefined }),
-    peekPivotBranchCache: jest.fn(),
   };
 });
 
@@ -76,7 +72,6 @@ jest.mock('../../../src/pivot/query/fetchPivotBranchesBatch', () => ({
 
 describe('PivotTableChart expansion state persistence', () => {
   const fetchPivotBranchMock = fetchPivotBranch as jest.Mock;
-  const peekPivotBranchCacheMock = peekPivotBranchCache as jest.Mock;
   const fetchPivotBranchesBatchMock =
     fetchPivotBranchesBatch as jest.MockedFunction<
       typeof fetchPivotBranchesBatch
@@ -85,7 +80,6 @@ describe('PivotTableChart expansion state persistence', () => {
   const resolveBatchWithSingles = async ({
     batch,
     formData,
-    currentTree,
     visibleRowDepth,
     visibleColDepth,
   }: FetchPivotBranchesBatchParams): Promise<FetchPivotBranchesBatchResult> => {
@@ -97,7 +91,6 @@ describe('PivotTableChart expansion state persistence', () => {
             formData,
             axis: batch.axis,
             path,
-            currentTree,
             visibleRowDepth,
             visibleColDepth,
           }),
@@ -290,9 +283,7 @@ describe('PivotTableChart expansion state persistence', () => {
   beforeEach(() => {
     fetchPivotBranchMock.mockClear();
     fetchPivotBranchMock.mockImplementation(resolveMockBranchFetchResult());
-    peekPivotBranchCacheMock.mockClear();
     fetchPivotBranchesBatchMock.mockReset();
-    peekPivotBranchCacheMock.mockReturnValue(undefined);
     fetchPivotBranchesBatchMock.mockImplementation(resolveBatchWithSingles);
   });
 

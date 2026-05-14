@@ -24,10 +24,7 @@ import {
   PivotTreeData,
 } from '../../../src/types';
 
-import {
-  fetchPivotBranch,
-  peekPivotBranchCache,
-} from '../../../src/fetchPivotBranch';
+import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
 import { fetchPivotBranchesBatch } from '../../../src/pivot/query/fetchPivotBranchesBatch';
 import type {
   FetchPivotBranchesBatchParams,
@@ -46,7 +43,6 @@ jest.mock('../../../src/fetchPivotBranch', () => {
   return {
     ...actual,
     fetchPivotBranch: jest.fn(),
-    peekPivotBranchCache: jest.fn(),
   };
 });
 
@@ -123,9 +119,6 @@ describe('PivotTableChart batching on persisted restore', () => {
   const fetchPivotBranchMock = fetchPivotBranch as jest.MockedFunction<
     typeof fetchPivotBranch
   >;
-  const peekPivotBranchCacheMock = peekPivotBranchCache as jest.MockedFunction<
-    typeof peekPivotBranchCache
-  >;
   const fetchPivotBranchesBatchMock =
     fetchPivotBranchesBatch as jest.MockedFunction<
       typeof fetchPivotBranchesBatch
@@ -133,9 +126,7 @@ describe('PivotTableChart batching on persisted restore', () => {
 
   beforeEach(() => {
     fetchPivotBranchMock.mockReset();
-    peekPivotBranchCacheMock.mockReset();
     fetchPivotBranchesBatchMock.mockReset();
-    peekPivotBranchCacheMock.mockReturnValue(undefined);
   });
 
   it('batches sibling expansions into one request', async () => {

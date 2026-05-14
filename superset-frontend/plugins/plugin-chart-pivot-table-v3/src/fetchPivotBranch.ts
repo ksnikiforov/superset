@@ -234,14 +234,6 @@ export const resolvePivotBranchLocalResult = (
 ): FetchPivotBranchResult | undefined =>
   resolvePivotBranchLocalResultFromPlan(params, resolveBranchPlan(params));
 
-export const peekPivotBranchCache = (params: FetchPivotBranchParams) => {
-  const result = resolvePivotBranchLocalResult({
-    ...params,
-    factStore: undefined,
-  });
-  return result?.cached ? result.data : undefined;
-};
-
 const isAbortError = (error: unknown): boolean => {
   if (
     typeof DOMException !== 'undefined' &&

@@ -21,10 +21,7 @@ import { fireEvent, render, screen, waitFor, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
 
-import {
-  fetchPivotBranch,
-  peekPivotBranchCache,
-} from '../../../src/fetchPivotBranch';
+import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
 import type { FetchPivotBranchResult } from '../../../src/fetchPivotBranch';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
@@ -35,7 +32,6 @@ jest.mock('../../../src/fetchPivotBranch', () => {
   return {
     ...actual,
     fetchPivotBranch: jest.fn(),
-    peekPivotBranchCache: jest.fn(),
   };
 });
 
@@ -137,14 +133,9 @@ describe('PivotTableChart cross-axis expands (no blanks)', () => {
   const fetchPivotBranchMock = fetchPivotBranch as jest.MockedFunction<
     typeof fetchPivotBranch
   >;
-  const peekPivotBranchCacheMock = peekPivotBranchCache as jest.MockedFunction<
-    typeof peekPivotBranchCache
-  >;
 
   beforeEach(() => {
     fetchPivotBranchMock.mockReset();
-    peekPivotBranchCacheMock.mockReset();
-    peekPivotBranchCacheMock.mockReturnValue(undefined);
   });
 
   it('does not expose deep row+col intersections until required intersection values are available', async () => {

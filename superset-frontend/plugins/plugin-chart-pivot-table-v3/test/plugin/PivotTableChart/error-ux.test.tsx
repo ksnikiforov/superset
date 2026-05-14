@@ -22,10 +22,7 @@ import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
 import { mergeTrees } from '../../../src/pivot/core/tree';
 import { parsePath } from '../../../src/pivot/core/path';
-import {
-  fetchPivotBranch,
-  peekPivotBranchCache,
-} from '../../../src/fetchPivotBranch';
+import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
 import {
   fetchPivotBranchesBatch,
   type FetchPivotBranchesBatchParams,
@@ -41,7 +38,6 @@ jest.mock('../../../src/fetchPivotBranch', () => {
   return {
     ...actual,
     fetchPivotBranch: jest.fn(),
-    peekPivotBranchCache: jest.fn(),
   };
 });
 
@@ -79,9 +75,6 @@ describe('PivotTableChart error UX (Phase 4.5)', () => {
   const fetchPivotBranchMock = fetchPivotBranch as jest.MockedFunction<
     typeof fetchPivotBranch
   >;
-  const peekPivotBranchCacheMock = peekPivotBranchCache as jest.MockedFunction<
-    typeof peekPivotBranchCache
-  >;
   const fetchPivotBranchesBatchMock =
     fetchPivotBranchesBatch as jest.MockedFunction<
       typeof fetchPivotBranchesBatch
@@ -90,7 +83,6 @@ describe('PivotTableChart error UX (Phase 4.5)', () => {
   const resolveBatchWithSingles = async ({
     batch,
     formData,
-    currentTree,
     visibleRowDepth,
     visibleColDepth,
   }: FetchPivotBranchesBatchParams): Promise<FetchPivotBranchesBatchResult> => {
@@ -102,7 +94,6 @@ describe('PivotTableChart error UX (Phase 4.5)', () => {
             formData,
             axis: batch.axis,
             path,
-            currentTree,
             visibleRowDepth,
             visibleColDepth,
           }),
@@ -125,10 +116,8 @@ describe('PivotTableChart error UX (Phase 4.5)', () => {
 
   beforeEach(() => {
     fetchPivotBranchMock.mockReset();
-    peekPivotBranchCacheMock.mockReset();
     fetchPivotBranchesBatchMock.mockReset();
 
-    peekPivotBranchCacheMock.mockReturnValue(undefined);
     fetchPivotBranchesBatchMock.mockImplementation(resolveBatchWithSingles);
   });
 

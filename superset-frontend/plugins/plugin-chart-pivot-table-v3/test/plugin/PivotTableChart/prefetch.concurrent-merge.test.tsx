@@ -22,10 +22,7 @@ import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
 import { mergeTrees } from '../../../src/pivot/core/tree';
 import { parsePath } from '../../../src/pivot/core/path';
-import {
-  fetchPivotBranch,
-  peekPivotBranchCache,
-} from '../../../src/fetchPivotBranch';
+import { fetchPivotBranch } from '../../../src/fetchPivotBranch';
 import type { FetchPivotBranchResult } from '../../../src/fetchPivotBranch';
 import {
   fetchPivotBranchesBatch,
@@ -42,7 +39,6 @@ jest.mock('../../../src/fetchPivotBranch', () => {
   return {
     ...actual,
     fetchPivotBranch: jest.fn(),
-    peekPivotBranchCache: jest.fn(),
   };
 });
 
@@ -93,9 +89,6 @@ describe('PivotTableChart persisted prefetch merges concurrent results', () => {
   const fetchPivotBranchMock = fetchPivotBranch as jest.MockedFunction<
     typeof fetchPivotBranch
   >;
-  const peekPivotBranchCacheMock = peekPivotBranchCache as jest.MockedFunction<
-    typeof peekPivotBranchCache
-  >;
   const fetchPivotBranchesBatchMock =
     fetchPivotBranchesBatch as jest.MockedFunction<
       typeof fetchPivotBranchesBatch
@@ -104,7 +97,6 @@ describe('PivotTableChart persisted prefetch merges concurrent results', () => {
   const resolveBatchWithSingles = async ({
     batch,
     formData,
-    currentTree,
     visibleRowDepth,
     visibleColDepth,
   }: FetchPivotBranchesBatchParams): Promise<FetchPivotBranchesBatchResult> => {
@@ -116,7 +108,6 @@ describe('PivotTableChart persisted prefetch merges concurrent results', () => {
             formData,
             axis: batch.axis,
             path,
-            currentTree,
             visibleRowDepth,
             visibleColDepth,
           }),
@@ -135,9 +126,7 @@ describe('PivotTableChart persisted prefetch merges concurrent results', () => {
 
   beforeEach(() => {
     fetchPivotBranchMock.mockReset();
-    peekPivotBranchCacheMock.mockReset();
     fetchPivotBranchesBatchMock.mockReset();
-    peekPivotBranchCacheMock.mockReturnValue(undefined);
     fetchPivotBranchesBatchMock.mockImplementation(resolveBatchWithSingles);
   });
 

@@ -23,7 +23,6 @@ import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
 
 import {
   fetchPivotBranch,
-  peekPivotBranchCache,
   type FetchPivotBranchParams,
 } from '../../../src/fetchPivotBranch';
 import { buildFormData } from '../fixtures/pivotFormData';
@@ -36,13 +35,11 @@ jest.mock('../../../src/fetchPivotBranch', () => {
   return {
     ...actual,
     fetchPivotBranch: jest.fn().mockResolvedValue({ data: undefined }),
-    peekPivotBranchCache: jest.fn(),
   };
 });
 
 describe('PivotTableChart expand/collapse count stability', () => {
   const fetchPivotBranchMock = fetchPivotBranch as jest.Mock;
-  const peekPivotBranchCacheMock = peekPivotBranchCache as jest.Mock;
 
   const records = [
     {
@@ -281,8 +278,6 @@ describe('PivotTableChart expand/collapse count stability', () => {
 
   beforeEach(() => {
     fetchPivotBranchMock.mockReset();
-    peekPivotBranchCacheMock.mockReset();
-    peekPivotBranchCacheMock.mockReturnValue(undefined);
   });
 
   test.each(scenarios)(

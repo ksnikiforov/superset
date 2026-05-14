@@ -37,7 +37,6 @@ import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { supersetChartDataClient } from '../../../src/pivot/data/SupersetChartDataClient';
 import {
   fetchPivotBranch,
-  peekPivotBranchCache,
   type FetchPivotBranchParams,
 } from '../../../src/fetchPivotBranch';
 import { type PivotFactStoreBatch } from '../../../src/pivot/runtime/factStore';
@@ -62,14 +61,12 @@ jest.mock('../../../src/fetchPivotBranch', () => {
   return {
     ...actual,
     fetchPivotBranch: jest.fn().mockResolvedValue({ data: undefined }),
-    peekPivotBranchCache: jest.fn(),
   };
 });
 
 describe('PivotTableChart seamless expansion uses committed layout', () => {
   const fetchMock = supersetChartDataClient.fetch as jest.Mock;
   const fetchPivotBranchMock = fetchPivotBranch as jest.Mock;
-  const peekPivotBranchCacheMock = peekPivotBranchCache as jest.Mock;
   const resolveBranchData =
     (data?: PivotTreeData) => (params: FetchPivotBranchParams) =>
       Promise.resolve(buildMockBranchFetchResult(params, { data }));
@@ -78,8 +75,6 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     fetchMock.mockReset();
     fetchPivotBranchMock.mockReset();
     fetchPivotBranchMock.mockImplementation(resolveBranchData());
-    peekPivotBranchCacheMock.mockReset();
-    peekPivotBranchCacheMock.mockReturnValue(undefined);
   });
 
   const hasColumnKey = (
@@ -629,41 +624,6 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       startCollapsed: true,
       initialDepth: 2,
     });
-    peekPivotBranchCacheMock.mockImplementation(
-      ({
-        path,
-        formData: branchFormData,
-      }: {
-        path: Array<string | number>;
-        formData: {
-          groupbyRows?: Array<string | QueryFormColumn>;
-        };
-      }) => {
-        const groupbyRows = (branchFormData.groupbyRows ?? []).map(
-          getStableColumnKey,
-        );
-        if (groupbyRows.length === 0) {
-          return undefined;
-        }
-        const filtered = records.filter(record =>
-          path.every(
-            (value, index) =>
-              String(
-                (record as Record<string, unknown>)[groupbyRows[index]],
-              ) === String(value),
-          ),
-        );
-        const rowDepth = Math.min(path.length + 1, groupbyRows.length);
-        return applyMetricAxis(
-          buildTreeFromRecords(filtered, metrics, groupbyRows, [], rowDepth, 0),
-          metrics,
-          MetricsLayoutEnum.COLUMNS,
-          groupbyRows,
-          [],
-          0,
-        );
-      },
-    );
 
     render(
       <PivotTableChart
@@ -689,7 +649,6 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
 
     fetchMock.mockClear();
     fetchPivotBranchMock.mockClear();
-    peekPivotBranchCacheMock.mockClear();
     fetchMock.mockImplementation(() => new Promise(() => undefined));
 
     const findDimensionRow = (label: string) => {
@@ -711,7 +670,6 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     expect(fetchPivotBranchMock).not.toHaveBeenCalled();
-    expect(peekPivotBranchCacheMock).not.toHaveBeenCalled();
     expect(screen.queryByText('X')).not.toBeInTheDocument();
     expect(screen.queryByText('Y')).not.toBeInTheDocument();
     expect(screen.getByText('A1')).toBeInTheDocument();

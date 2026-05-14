@@ -33,10 +33,7 @@ import {
   serializePath,
 } from '../../../../src/pivot/core/path';
 import { mergeTrees } from '../../../../src/pivot/core/tree';
-import {
-  fetchPivotBranch,
-  peekPivotBranchCache,
-} from '../../../../src/fetchPivotBranch';
+import { fetchPivotBranch } from '../../../../src/fetchPivotBranch';
 import {
   fetchPivotBranchesBatch,
   type FetchPivotBranchesBatchParams,
@@ -51,7 +48,6 @@ jest.mock('../../../../src/fetchPivotBranch', () => {
   return {
     ...actual,
     fetchPivotBranch: jest.fn().mockResolvedValue({ data: undefined }),
-    peekPivotBranchCache: jest.fn(),
   };
 });
 
@@ -61,7 +57,6 @@ jest.mock('../../../../src/pivot/query/fetchPivotBranchesBatch', () => ({
 
 describe('PivotTableChart expansion with metrics before dimensions (ancestor-subtotals)', () => {
   const fetchPivotBranchMock = fetchPivotBranch as jest.Mock;
-  const peekPivotBranchCacheMock = peekPivotBranchCache as jest.Mock;
   const fetchPivotBranchesBatchMock =
     fetchPivotBranchesBatch as jest.MockedFunction<
       typeof fetchPivotBranchesBatch
@@ -70,7 +65,6 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
   const resolveBatchWithSingles = async ({
     batch,
     formData,
-    currentTree,
     visibleRowDepth,
     visibleColDepth,
   }: FetchPivotBranchesBatchParams): Promise<FetchPivotBranchesBatchResult> => {
@@ -82,7 +76,6 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
             formData,
             axis: batch.axis,
             path,
-            currentTree,
             visibleRowDepth,
             visibleColDepth,
           }),
@@ -1149,9 +1142,6 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
     fetchPivotBranchMock.mockImplementation(args =>
       actualFetchModule.fetchPivotBranch(args),
     );
-    peekPivotBranchCacheMock.mockImplementation(
-      actualFetchModule.peekPivotBranchCache,
-    );
     const postSpy = jest.spyOn(SupersetClient, 'post');
     postSpy.mockImplementation(({ jsonPayload }) => {
       const payload =
@@ -1372,7 +1362,6 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
       postSpy.mockRestore();
       fetchPivotBranchMock.mockReset();
       fetchPivotBranchMock.mockResolvedValue({ data: undefined });
-      peekPivotBranchCacheMock.mockReset();
     }
   });
 
