@@ -22,7 +22,11 @@ import {
   type PivotTableQueryFormData,
   type PivotTreeData,
 } from '../../types';
-import { type ExpansionVisibilityConfig, type PruneMergedTree } from './engine';
+import {
+  type ExpansionVisibilityConfig,
+  type HydrationPrefetchAction,
+  type PruneMergedTree,
+} from './engine';
 import {
   type ExpansionFetchRuntime,
   type ExpansionRequestHelpers,
@@ -54,6 +58,42 @@ export type HydrateExpansionOptions = {
 };
 
 export type HydrateExpansionReason = 'prefetch' | 'cross-axis';
+
+export const scheduleInitialHydrationPrefetch = ({
+  action,
+  shouldPlanRows,
+  shouldPlanCols,
+  setHydratingState,
+  hydrate,
+  reportAsyncError,
+}: {
+  action: HydrationPrefetchAction;
+  shouldPlanRows: boolean;
+  shouldPlanCols: boolean;
+  setHydratingState: (value: boolean) => void;
+  hydrate: (
+    reason: HydrateExpansionReason,
+    options?: HydrateExpansionOptions,
+  ) => Promise<void>;
+  reportAsyncError: (error: unknown) => void;
+}) => {
+  if (action.kind === 'idle') {
+    return false;
+  }
+  if (action.kind === 'skip-root') {
+    setHydratingState(false);
+    return true;
+  }
+  if (!action.showLoader) {
+    setHydratingState(false);
+  }
+  hydrate('prefetch', {
+    showLoader: action.showLoader,
+    planRows: shouldPlanRows,
+    planCols: shouldPlanCols,
+  }).catch(reportAsyncError);
+  return true;
+};
 
 export const useExpansionHydrationRuntime = ({
   expansionRequestLifecycle,

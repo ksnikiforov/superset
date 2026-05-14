@@ -85,7 +85,10 @@ import {
 } from './fetchExecution';
 import { useExpansionRequestRuntime } from './useExpansionRequestRuntime';
 import { useExpansionInFlight } from './useExpansionInFlight';
-import { useExpansionHydrationRuntime } from './useExpansionHydrationRuntime';
+import {
+  scheduleInitialHydrationPrefetch,
+  useExpansionHydrationRuntime,
+} from './useExpansionHydrationRuntime';
 
 const MAX_HYDRATION_ITERATIONS = 12;
 const EMPTY_FACT_BATCHES: PivotFactStoreBatch[] = [];
@@ -1012,19 +1015,16 @@ export const useExpansionEngine = ({
       config: visibilityConfig,
       getCoverageKey,
     });
-    if (prefetchAction.kind !== 'idle') {
-      if (prefetchAction.kind === 'skip-root') {
-        setHydratingState(false);
-        return;
-      }
-      if (!prefetchAction.showLoader) {
-        setHydratingState(false);
-      }
-      hydrateAtomic('prefetch', {
-        showLoader: prefetchAction.showLoader,
-        planRows: shouldPlanRows,
-        planCols: shouldPlanCols,
-      }).catch(reportAsyncError);
+    if (
+      scheduleInitialHydrationPrefetch({
+        action: prefetchAction,
+        shouldPlanRows,
+        shouldPlanCols,
+        setHydratingState,
+        hydrate: hydrateAtomic,
+        reportAsyncError,
+      })
+    ) {
       return;
     }
     setHydratingState(false);
