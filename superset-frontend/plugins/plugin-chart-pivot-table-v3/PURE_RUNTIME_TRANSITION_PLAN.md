@@ -57,7 +57,7 @@ cells are projections of DB facts, not canonical data.
 
 ## Current Status
 
-As of May 14, 2026, after the query fetch ownership cleanup checkpoint:
+As of May 14, 2026, after the selection-filter catalog cleanup checkpoint:
 
 - Gate-weighted architecture estimate: **99%**.
 - Delivery remaining estimate: **less than 1%**, mostly completion audit and
@@ -72,8 +72,8 @@ As of May 14, 2026, after the query fetch ownership cleanup checkpoint:
 Source-only diff from pre-refactor baseline
 `7088db374448845ef6e71cf74817aa53efbc5fc1`:
 
-- Production `src`: `14357` insertions, `13930` deletions, net `+427`.
-- Current production `src` TypeScript/TSX total: `33937` lines.
+- Production `src`: `14358` insertions, `13940` deletions, net `+418`.
+- Current production `src` TypeScript/TSX total: `33928` lines.
 - Implied baseline `src` TypeScript/TSX total: about `33510` lines.
 - `PivotTableChart.tsx` is now `688` lines and `useExpansionEngine.ts` is now
   `1405` lines; those single-file reductions should not be counted as plugin
@@ -136,6 +136,17 @@ Source-only diff from pre-refactor baseline
 - Touched-file ESLint passed after the query fetch ownership cleanup.
 - Focused fetch/chart validation after the cleanup passed: `6` suites and `81`
   tests.
+- Full plugin plus export entrypoint Jest pass after the cleanup: `99` suites
+  and `832` tests.
+- Selection-filter catalog cleanup removed the compatibility fallback that built
+  interaction filter columns from legacy `groupbyRows`/`groupbyColumns` when
+  the runtime dimension catalog was empty. User-controlled selection filters now
+  resolve from `dimensions`, matching the interaction panel's source catalog.
+  The source slice was deletion-positive: `1` insertion, `10` deletions, net
+  `-9`.
+- Touched-file ESLint passed after the selection-filter catalog cleanup.
+- Focused interaction/query validation after the cleanup passed: `3` suites and
+  `32` tests.
 - Full plugin plus export entrypoint Jest pass after the cleanup: `99` suites
   and `832` tests.
 - Chart runtime-sync cleanup moved the committed-tree sync decision out of
