@@ -20,27 +20,12 @@
 import { PivotAxis, PivotTreeNode } from '../../types';
 import { parsePath, serializePath } from '../core/path';
 import { rootKey } from '../viewModel';
+import { type FetchedFactCoverageLookup } from './fetchedRequests';
 
 export type PivotExpansionPlan = {
   fetchKeys: Set<string>;
   pendingKeys: Set<string>;
   hasMissingNodes: boolean;
-};
-
-export type PivotExpansionCoverageProjection = {
-  axis: PivotAxis;
-  pathKey: string;
-  requiredOppositeDepth: number;
-};
-
-export type PivotExpansionFetchedCoverageLookup = {
-  getFetchedDepth: (
-    projection: PivotExpansionCoverageProjection,
-  ) => number | undefined;
-  isSameFetchedCoverage: (
-    left: PivotExpansionCoverageProjection,
-    right: PivotExpansionCoverageProjection,
-  ) => boolean;
 };
 
 export type PivotExpansionNodeFetchPredicate = (input: {
@@ -54,7 +39,7 @@ const buildCoverageProjection = (
   axis: PivotAxis,
   pathKey: string,
   requiredOppositeDepth: number,
-): PivotExpansionCoverageProjection => ({
+) => ({
   axis,
   pathKey,
   requiredOppositeDepth,
@@ -72,7 +57,7 @@ const isSatisfiedNode = ({
   key: string;
   node: PivotTreeNode;
   requiredDepth: number;
-  fetchedCoverageLookup: PivotExpansionFetchedCoverageLookup;
+  fetchedCoverageLookup: FetchedFactCoverageLookup;
   shouldFetchChildren: PivotExpansionNodeFetchPredicate;
 }) => {
   if (!shouldFetchChildren({ axis, key, node, requiredDepth })) {
@@ -116,7 +101,7 @@ export const planExpansionForAxis = ({
   expandedKeys: Set<string>;
   nodes: Record<string, PivotTreeNode>;
   requiredDepth: number;
-  fetchedCoverageLookup: PivotExpansionFetchedCoverageLookup;
+  fetchedCoverageLookup: FetchedFactCoverageLookup;
   shouldFetchChildren: PivotExpansionNodeFetchPredicate;
 }): PivotExpansionPlan => {
   const fetchKeys = new Set<string>();

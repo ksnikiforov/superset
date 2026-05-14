@@ -18,10 +18,8 @@
  */
 
 import { PivotAxis, PivotTreeNode } from '../../../src/types';
-import {
-  planExpansionForAxis,
-  type PivotExpansionFetchedCoverageLookup,
-} from '../../../src/pivot/expansion/coveragePlanner';
+import { planExpansionForAxis } from '../../../src/pivot/expansion/coveragePlanner';
+import { type FetchedFactCoverageLookup } from '../../../src/pivot/expansion/fetchedRequests';
 import { serializePath } from '../../../src/pivot/core/path';
 import { rootKey } from '../../../src/pivot/viewModel';
 
@@ -50,7 +48,7 @@ const sortKeys = (keys: Set<string>) => Array.from(keys).sort();
 
 const fetchedCoverageLookupFromDepths = (
   depthByPathKey: Map<string, number>,
-): PivotExpansionFetchedCoverageLookup => ({
+): FetchedFactCoverageLookup => ({
   getFetchedDepth: ({ pathKey }) => depthByPathKey.get(pathKey),
   isSameFetchedCoverage: (left, right) =>
     left.axis === right.axis && left.pathKey === right.pathKey,
