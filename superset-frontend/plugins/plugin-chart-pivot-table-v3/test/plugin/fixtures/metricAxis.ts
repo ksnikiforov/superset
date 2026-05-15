@@ -30,15 +30,11 @@ import { applyMeasureHierarchyAxis as applyMeasureHierarchyAxisRuntime } from '.
 export {
   buildBranchTreeFromFactStore,
   buildFactStoreBatchesFromSpecs,
-  canMaterializeSpecsFromFactStore,
-  factStoreBatchScopeFromSpec,
   factStoreSelectorFromSpec,
   injectRowSubtotalLeaves,
   labelRowSubtotalLeaves,
   materializeInitialPivotTreeFromFactStore,
   materializeInitialPivotTreeFromFactStoreAsync,
-  materializePivotTree,
-  materializePivotTreeAsync,
 } from '../../../src/pivot/runtime/materializePivotTree';
 
 const compileMetricAxisProgram = ({

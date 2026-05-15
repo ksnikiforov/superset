@@ -72,7 +72,7 @@ type MaterializationFactBatch = {
   coverage: PivotFactCoverage;
 };
 
-export const factStoreBatchScopeFromSpec = (
+const factStoreBatchScopeFromSpec = (
   spec: PlannedQuerySpec,
 ): PivotFactStoreBatch['scope'] => {
   if (spec.meta.kind === 'branch') {
@@ -1096,7 +1096,7 @@ const buildTreeFromFactBatchAsync = async ({
   return tree;
 };
 
-export const materializePivotTree = ({
+const materializePivotTree = ({
   batches,
   metricsForQuery,
   formData,
@@ -1152,7 +1152,7 @@ export const materializePivotTree = ({
   );
 };
 
-export const materializePivotTreeAsync = async ({
+const materializePivotTreeAsync = async ({
   batches,
   metricsForQuery,
   formData,
@@ -1217,17 +1217,6 @@ export const materializePivotTreeAsync = async ({
     formData.metricLabelMap as Record<string, string> | undefined,
   );
 };
-
-export const canMaterializeSpecsFromFactStore = ({
-  specs,
-  store,
-}: {
-  specs: PlannedQuerySpec[];
-  store: PivotFactStore;
-}) =>
-  specs.every(spec =>
-    store.hasCompatibleCoverage(factStoreSelectorFromSpec(spec)),
-  );
 
 export const buildBranchTreeFromFactStore = ({
   specs,
