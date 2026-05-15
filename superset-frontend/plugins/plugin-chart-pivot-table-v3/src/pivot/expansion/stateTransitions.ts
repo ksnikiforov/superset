@@ -915,40 +915,37 @@ export const resolveReinitializedExpansionState = (params: {
 };
 
 export const applyCrossAxisRootFetch = ({
-  tree,
   rowPlan,
   colPlan,
   visibleRowDepth,
   visibleColDepth,
   groupbyRowsLength,
   groupbyColumnsLength,
-  countDimDepth,
+  getMissingExpansionCoverage,
 }: {
-  tree: PivotTreeData;
   rowPlan: PivotExpansionPlan;
   colPlan: PivotExpansionPlan;
   visibleRowDepth: number;
   visibleColDepth: number;
   groupbyRowsLength: number;
   groupbyColumnsLength: number;
-  countDimDepth: (path: PivotTreeNode['path']) => number;
+  getMissingExpansionCoverage: PivotExpansionCoverageDiff;
 }): { rowPlan: PivotExpansionPlan; colPlan: PivotExpansionPlan } => {
-  const hasRowNodes = Object.keys(tree.rows).some(key => key !== rootKey);
-  const hasColNodes = Object.keys(tree.cols).some(key => key !== rootKey);
-  const hasIntersectionCells = Object.values(tree.cells).some(cell => {
-    const rowNode = tree.rows[cell.rowKey];
-    const colNode = tree.cols[cell.colKey];
-    if (!rowNode || !colNode) {
-      return false;
-    }
-    return countDimDepth(rowNode.path) > 0 && countDimDepth(colNode.path) > 0;
-  });
+  const hasCrossAxisFetch =
+    rowPlan.fetchKeys.size > 0 && colPlan.fetchKeys.size > 0;
+  const axis = groupbyRowsLength > 0 ? 'row' : 'col';
   const shouldForceRootFetch =
-    hasRowNodes &&
-    hasColNodes &&
+    hasCrossAxisFetch &&
     visibleRowDepth > 0 &&
     visibleColDepth > 0 &&
-    !hasIntersectionCells;
+    getMissingExpansionCoverage([
+      {
+        axis,
+        pathKey: rootKey,
+        rowDepth: visibleRowDepth,
+        columnDepth: visibleColDepth,
+      },
+    ]).length > 0;
   if (
     !shouldForceRootFetch ||
     rowPlan.fetchKeys.has(rootKey) ||
@@ -1055,14 +1052,13 @@ export const planHydrationIteration = ({
 
   ({ rowPlan: effectiveRowPlan, colPlan: effectiveColPlan } =
     applyCrossAxisRootFetch({
-      tree,
       rowPlan: effectiveRowPlan,
       colPlan: effectiveColPlan,
       visibleRowDepth,
       visibleColDepth,
       groupbyRowsLength: config.groupbyRowsLength,
       groupbyColumnsLength: config.groupbyColumnsLength,
-      countDimDepth: config.countDimDepth,
+      getMissingExpansionCoverage,
     }));
 
   if (

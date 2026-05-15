@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13997` insertions, `14260` deletions, net `-263`.
-- Current production TypeScript/TSX total: `33247` lines.
+- Production `src`: `13993` insertions, `14260` deletions, net `-267`.
+- Current production TypeScript/TSX total: `33243` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -423,6 +423,9 @@ Success criteria:
   coverage requests instead of a single-key loaded predicate. Hydration and
   branch fetch loops can now reason from the same "which coverage is missing"
   shape used by runtime layout fetch decisions.
+- Cross-axis root recovery no longer scans rendered intersection cells to infer
+  whether root data is loaded. It asks the expansion coverage manifest for the
+  missing root request and only applies during an actual cross-axis fetch.
 - The materializer no longer exports a dead fact-store compatibility wrapper or
   test-fixture-only materialization entrypoints. Production callers now go
   through the explicit branch/initial materialization APIs.

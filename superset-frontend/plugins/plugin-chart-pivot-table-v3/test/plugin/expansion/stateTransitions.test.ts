@@ -998,11 +998,29 @@ describe('pivot/expansion/stateTransitions', () => {
 
   it('plans fetch targets for expanded nodes', () => {
     const { tree, aKey, xKey } = buildTree({ includeIntersectionCell: true });
+    const loadedRootCoverage: PivotFactStoreBatch = {
+      coverage: {
+        reason: 'expand',
+        rowDepth: 1,
+        columnDepth: 1,
+        rowDimensions: ['country'],
+        columnDimensions: ['month'],
+      },
+      scope: {
+        kind: 'branch',
+        axis: 'row',
+        path: [],
+      },
+      valueKeys: ['sales'],
+      facts: [],
+    };
     const plan = planHydrationIteration({
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
-      getMissingExpansionCoverage: expansionCoverageLoadedFromBatches(),
+      getMissingExpansionCoverage: expansionCoverageLoadedFromBatches([
+        loadedRootCoverage,
+      ]),
       config,
       getCoverageKey,
       pendingRows: new Set(),
@@ -1053,7 +1071,7 @@ describe('pivot/expansion/stateTransitions', () => {
     ]);
   });
 
-  it('forces a root fetch when expanded axes have no intersection cells', () => {
+  it('forces a root fetch when cross-axis root coverage is missing', () => {
     const { tree, aKey, xKey } = buildTree({ includeIntersectionCell: false });
     const plan = planHydrationIteration({
       tree,
