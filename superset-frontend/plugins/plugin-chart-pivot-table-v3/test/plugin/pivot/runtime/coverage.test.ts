@@ -407,6 +407,72 @@ describe('coverage manifest diff', () => {
       }),
     ).toEqual(required);
   });
+
+  it('treats scoped full expansion as bounded to the concrete ancestor path', () => {
+    const required = [
+      need({ kind: 'scopedFull', ancestorPaths: [['USA']] }, { kind: 'root' }),
+    ];
+
+    expect(
+      diffCoverageManifest({
+        required,
+        factBatches: [batch({ kind: 'branch', axis: 'row', path: ['USA'] })],
+      }),
+    ).toEqual([]);
+    expect(
+      diffCoverageManifest({
+        required,
+        factBatches: [batch({ kind: 'branch', axis: 'row', path: ['Canada'] })],
+      }),
+    ).toEqual(required);
+  });
+
+  it('does not let a narrower descendant branch satisfy scoped full ancestor coverage', () => {
+    const required = [
+      need({ kind: 'scopedFull', ancestorPaths: [['USA']] }, { kind: 'root' }),
+    ];
+
+    expect(
+      diffCoverageManifest({
+        required,
+        factBatches: [
+          batch({ kind: 'branch', axis: 'row', path: ['USA', 'California'] }),
+        ],
+      }),
+    ).toEqual(required);
+  });
+
+  it('supports consecutive scoped full expansion through the same ancestor scope', () => {
+    const required = [
+      {
+        ...need(
+          { kind: 'scopedFull', ancestorPaths: [['USA']] },
+          { kind: 'root' },
+        ),
+        rowDepth: 4,
+        rowDimensions: ['country', 'state', 'city', 'store'],
+      },
+    ];
+
+    expect(
+      diffCoverageManifest({
+        required,
+        factBatches: [
+          {
+            coverage: buildFactCoverage({
+              reason: 'expand',
+              rowDimensions: ['country', 'state', 'city', 'store'],
+              columnDimensions: ['year', 'quarter'],
+              rowDepth: 4,
+              columnDepth: 2,
+            }),
+            scope: { kind: 'branch', axis: 'row', path: ['USA'] },
+            facts: [],
+          },
+        ],
+      }),
+    ).toEqual([]);
+  });
 });
 
 describe('branch fact coverage', () => {

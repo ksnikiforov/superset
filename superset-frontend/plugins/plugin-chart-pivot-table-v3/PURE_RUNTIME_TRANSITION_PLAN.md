@@ -71,7 +71,10 @@ logical need can describe multiple explicit row branches crossed with multiple
 explicit column branches:
 
 ```ts
-type AxisPathScope = { kind: 'root' } | { kind: 'paths'; paths: PivotPath[] };
+type AxisPathScope =
+  | { kind: 'root' }
+  | { kind: 'paths'; paths: PivotPath[] }
+  | { kind: 'scopedFull'; ancestorPaths: PivotPath[] };
 
 type CoverageNeed = {
   rowDepth: number;
