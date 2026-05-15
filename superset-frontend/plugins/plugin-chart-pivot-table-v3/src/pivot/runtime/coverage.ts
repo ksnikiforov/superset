@@ -205,6 +205,50 @@ export const isSameRuntimeLayout = (
   prev.valuePlacement.axis === next.valuePlacement.axis &&
   prev.valuePlacement.index === next.valuePlacement.index;
 
+const placementBeforeSharedDimensions = (
+  axisDimensions: string[],
+  index: number,
+  sharedDimensions: Set<string>,
+) => axisDimensions.slice(0, index).filter(item => sharedDimensions.has(item));
+
+const shouldFetchForValuePlacementChange = ({
+  prev,
+  next,
+}: {
+  prev: PivotRuntimeLayout;
+  next: PivotRuntimeLayout;
+}) => {
+  if (prev.valuePlacement.axis !== next.valuePlacement.axis) {
+    const prevValueAxis =
+      prev.valuePlacement.axis === 'row' ? prev.rows : prev.cols;
+    const nextValueAxis =
+      next.valuePlacement.axis === 'row' ? next.rows : next.cols;
+    return prevValueAxis.length > 0 || nextValueAxis.length > 0;
+  }
+  const prevValueAxis =
+    prev.valuePlacement.axis === 'row' ? prev.rows : prev.cols;
+  const nextValueAxis =
+    next.valuePlacement.axis === 'row' ? next.rows : next.cols;
+  if (prevValueAxis.length === 0 && nextValueAxis.length === 0) {
+    return false;
+  }
+  const sharedDimensions = new Set(
+    prevValueAxis.filter(dimension => nextValueAxis.includes(dimension)),
+  );
+  return !arraysEqual(
+    placementBeforeSharedDimensions(
+      prevValueAxis,
+      prev.valuePlacement.index,
+      sharedDimensions,
+    ),
+    placementBeforeSharedDimensions(
+      nextValueAxis,
+      next.valuePlacement.index,
+      sharedDimensions,
+    ),
+  );
+};
+
 const shouldFetchForSemanticLayoutChange = (
   prev: PivotRuntimeLayout,
   next: PivotRuntimeLayout,
@@ -222,15 +266,11 @@ const shouldFetchForSemanticLayoutChange = (
     prev.valuePlacement.axis !== next.valuePlacement.axis ||
     prev.valuePlacement.index !== next.valuePlacement.index
   ) {
-    const prevValueAxis =
-      prev.valuePlacement.axis === 'row' ? prev.rows : prev.cols;
-    const nextValueAxis =
-      next.valuePlacement.axis === 'row' ? next.rows : next.cols;
-    const indexChanged =
-      prev.valuePlacement.index !== next.valuePlacement.index;
     if (
-      indexChanged &&
-      (prevValueAxis.length > 0 || nextValueAxis.length > 0)
+      shouldFetchForValuePlacementChange({
+        prev,
+        next,
+      })
     ) {
       return true;
     }
@@ -353,11 +393,8 @@ export const shouldFetchRuntimeLayout = ({
   const coverageNeedChanged =
     coverageManifestSignature(previousLayout) !==
     coverageManifestSignature(nextLayout);
-  const dimensionsRemoved =
-    nextLayout.rows.length < previousLayout.rows.length ||
-    nextLayout.cols.length < previousLayout.cols.length;
   return (
-    (coverageNeedChanged || dimensionsRemoved) &&
+    coverageNeedChanged &&
     !factBatchesCoverRuntimeLayout(factBatches, nextLayout)
   );
 };

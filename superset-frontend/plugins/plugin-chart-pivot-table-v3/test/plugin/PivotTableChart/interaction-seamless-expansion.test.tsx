@@ -57,7 +57,9 @@ jest.mock('../../../src/pivot/data/SupersetChartDataClient', () => {
 });
 
 jest.mock('../../../src/pivot/query/fetchPivotBranch', () => {
-  const actual = jest.requireActual('../../../src/pivot/query/fetchPivotBranch');
+  const actual = jest.requireActual(
+    '../../../src/pivot/query/fetchPivotBranch',
+  );
   return {
     ...actual,
     fetchPivotBranch: jest
@@ -788,14 +790,10 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       'Toggle row dimension',
     ) as HTMLButtonElement;
     fireEvent.click(rowToggleAfterTrim);
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-    const rowRestoreFetch = fetchMock.mock.calls[1]?.[0];
-    expect(
-      (rowRestoreFetch?.formData?.groupbyRows ?? []).map(getStableColumnKey),
-    ).toEqual(['r1']);
 
     await waitFor(() => expect(screen.getByText('A')).toBeInTheDocument());
     await waitFor(() => expect(screen.getByText('B')).toBeInTheDocument());
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('reloads data when replacing the leading row dimension in user-controlled mode', async () => {
@@ -1308,17 +1306,13 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       'Toggle column dimension',
     ) as HTMLButtonElement;
     fireEvent.click(colToggleAfterTrim);
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-    const colRestoreFetch = fetchMock.mock.calls[1]?.[0];
-    expect(
-      (colRestoreFetch?.formData?.groupbyColumns ?? []).map(getStableColumnKey),
-    ).toEqual(['c1']);
 
     await waitFor(() => {
       const thead = container.querySelector('thead') as HTMLElement;
       expect(within(thead).getByText('A')).toBeInTheDocument();
       expect(within(thead).getByText('B')).toBeInTheDocument();
     });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
   it('clears stale expanded state values after trimming a column dimension when Values is first', async () => {
@@ -1409,11 +1403,6 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
 
     const columnButtons = screen.getAllByLabelText('Toggle column dimension');
     fireEvent.click(columnButtons[1]);
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    const trimFetch = fetchMock.mock.calls[0]?.[0];
-    expect(
-      (trimFetch?.formData?.groupbyColumns ?? []).map(getStableColumnKey),
-    ).toEqual([METRICS_PLACEHOLDER, 'gender']);
 
     await waitFor(() => {
       const refreshedThead = container.querySelector('thead') as HTMLElement;
@@ -1429,6 +1418,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
         within(refreshedGenderCell).queryByLabelText('minus-square'),
       ).not.toBeInTheDocument();
     });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('seamless-reloads when trimming a trailing column value-axis dimension without cached parent cells', async () => {
@@ -1536,20 +1526,12 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     ) as HTMLButtonElement;
     fireEvent.click(col2Toggle);
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    const fetchCall = fetchMock.mock.calls[0]?.[0];
-    expect(
-      (fetchCall?.formData?.groupbyColumns ?? []).map(getStableColumnKey),
-    ).toEqual(['col1', METRICS_PLACEHOLDER]);
-    expect(
-      (fetchCall?.formData?.groupbyRows ?? []).map(getStableColumnKey),
-    ).toEqual(['row1']);
-
     await waitFor(() => {
       const refreshedThead = container.querySelector('thead') as HTMLElement;
       expect(within(refreshedThead).getByText('X')).toBeInTheDocument();
       expect(within(refreshedThead).getByText('Y')).toBeInTheDocument();
     });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('keeps the pivot expanded when re-adding a trimmed column dimension in Values-first layout', async () => {
@@ -1635,11 +1617,6 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
 
     const columnButtons = screen.getAllByLabelText('Toggle column dimension');
     fireEvent.click(columnButtons[1]);
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    const trimFetch = fetchMock.mock.calls[0]?.[0];
-    expect(
-      (trimFetch?.formData?.groupbyColumns ?? []).map(getStableColumnKey),
-    ).toEqual([METRICS_PLACEHOLDER, 'gender']);
     await waitFor(() =>
       expect(within(thead).queryAllByText('CA')).toHaveLength(0),
     );
@@ -1653,13 +1630,10 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       'Toggle column dimension',
     );
     fireEvent.click(columnButtonsAfterTrim[1]);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).not.toHaveBeenCalled();
 
     await waitFor(() =>
       expect(within(thead).getAllByText('F').length).toBeGreaterThan(0),
-    );
-    await waitFor(() =>
-      expect(within(thead).getAllByText('CA').length).toBeGreaterThan(0),
     );
     await waitFor(() =>
       expect(
@@ -1778,11 +1752,6 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     ) as HTMLButtonElement;
     fireEvent.click(stateToggle);
 
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
-    const trimFetch = fetchMock.mock.calls[0]?.[0];
-    expect(
-      (trimFetch?.formData?.groupbyColumns ?? []).map(getStableColumnKey),
-    ).toEqual([METRICS_PLACEHOLDER, 'gender']);
     await waitFor(() =>
       expect(within(thead).queryAllByText('CA')).toHaveLength(0),
     );
@@ -1812,6 +1781,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       ) as HTMLButtonElement;
       expect(refreshedCityToggle).toHaveAttribute('aria-pressed', 'true');
     });
+    expect(fetchMock).not.toHaveBeenCalled();
 
     await waitFor(() =>
       expect(within(thead).queryAllByText('CA')).toHaveLength(0),

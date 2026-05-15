@@ -287,7 +287,7 @@ describe('runtime layout fact coverage', () => {
     ).toBe(false);
   });
 
-  it('fetches when trimming dimensions requires missing exact coverage', () => {
+  it('does not fetch when trimming hidden dimensions leaves visible coverage unchanged', () => {
     expect(
       shouldFetchRuntimeLayout({
         factBatches: [factBatch(1, 2)],
@@ -296,6 +296,46 @@ describe('runtime layout fact coverage', () => {
           cols: ['col1', 'col2'],
         },
         nextLayout: runtimeLayout,
+      }),
+    ).toBe(false);
+  });
+
+  it('does not fetch when adding a hidden dimension only shifts Values after the same prefix', () => {
+    expect(
+      shouldFetchRuntimeLayout({
+        factBatches: [factBatch(0, 1)],
+        previousLayout: {
+          ...runtimeLayout,
+          rows: [],
+          cols: ['col1'],
+          valuePlacement: { axis: 'col', index: 1 },
+        },
+        nextLayout: {
+          ...runtimeLayout,
+          rows: [],
+          cols: ['col1', 'col2'],
+          valuePlacement: { axis: 'col', index: 2 },
+        },
+      }),
+    ).toBe(false);
+  });
+
+  it('fetches when Values moves across an already shared dimension', () => {
+    expect(
+      shouldFetchRuntimeLayout({
+        factBatches: [factBatch(0, 1)],
+        previousLayout: {
+          ...runtimeLayout,
+          rows: [],
+          cols: ['col1', 'col2'],
+          valuePlacement: { axis: 'col', index: 2 },
+        },
+        nextLayout: {
+          ...runtimeLayout,
+          rows: [],
+          cols: ['col1', 'col2'],
+          valuePlacement: { axis: 'col', index: 1 },
+        },
       }),
     ).toBe(true);
   });
