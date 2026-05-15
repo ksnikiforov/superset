@@ -434,6 +434,9 @@ Success criteria:
 - The materializer no longer exports a dead fact-store compatibility wrapper or
   test-fixture-only materialization entrypoints. Production callers now go
   through the explicit branch/initial materialization APIs.
+- Materializer entrypoints now share one spec-to-materialization input path, so
+  branch, initial sync, and initial async materialization no longer rebuild the
+  same spec metadata object separately.
 - Measure-axis materialization now uses one axis-neutral cell projection loop
   for row and column Values placement. Row-only subtotal placement and
   column-only single-metric base-cell propagation remain explicit visible
