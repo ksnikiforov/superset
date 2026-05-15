@@ -96,8 +96,6 @@ describe('fetchPivotBranchesBatch', () => {
     });
     const batch: BatchGroup = {
       axis: 'row',
-      childDepth: 2,
-      requiredOppositeDepth: 0,
       signature: 'sig',
       parentPathKey: serializePath(['US']),
       siblingValues: ['CA', 'NY'],
@@ -105,15 +103,11 @@ describe('fetchPivotBranchesBatch', () => {
         {
           axis: 'row',
           pathKey: serializePath(['US', 'CA']),
-          childDepth: 2,
-          requiredOppositeDepth: 0,
           batchSignature: 'sig',
         },
         {
           axis: 'row',
           pathKey: serializePath(['US', 'NY']),
-          childDepth: 2,
-          requiredOppositeDepth: 0,
           batchSignature: 'sig',
         },
       ],
@@ -157,8 +151,6 @@ describe('fetchPivotBranchesBatch', () => {
     });
     const batch: BatchGroup = {
       axis: 'row',
-      childDepth: 2,
-      requiredOppositeDepth: 0,
       signature: 'sig',
       parentPathKey: serializePath(['US']),
       siblingValues: [null],
@@ -166,8 +158,6 @@ describe('fetchPivotBranchesBatch', () => {
         {
           axis: 'row',
           pathKey: serializePath(['US', null]),
-          childDepth: 2,
-          requiredOppositeDepth: 0,
           batchSignature: 'sig',
         },
       ],
@@ -208,8 +198,6 @@ describe('fetchPivotBranchesBatch', () => {
     });
     const batch: BatchGroup = {
       axis: 'row',
-      childDepth: 1,
-      requiredOppositeDepth: 0,
       signature: 'sig',
       parentPathKey: serializePath([]),
       siblingValues: ['US'],
@@ -217,8 +205,6 @@ describe('fetchPivotBranchesBatch', () => {
         {
           axis: 'row',
           pathKey: serializePath(['US']),
-          childDepth: 1,
-          requiredOppositeDepth: 0,
           batchSignature: 'sig',
         },
       ],
@@ -245,8 +231,6 @@ describe('fetchPivotBranchesBatch', () => {
     });
     const batch: BatchGroup = {
       axis: 'row',
-      childDepth: 2,
-      requiredOppositeDepth: 0,
       signature: 'sig',
       parentPathKey: serializePath(['US']),
       siblingValues: ['CA', 'NY'],
@@ -254,15 +238,11 @@ describe('fetchPivotBranchesBatch', () => {
         {
           axis: 'row',
           pathKey: serializePath(['US', 'CA']),
-          childDepth: 2,
-          requiredOppositeDepth: 0,
           batchSignature: 'sig',
         },
         {
           axis: 'row',
           pathKey: serializePath(['US', 'NY']),
-          childDepth: 2,
-          requiredOppositeDepth: 0,
           batchSignature: 'sig',
         },
       ],
@@ -338,8 +318,6 @@ describe('fetchPivotBranchesBatch', () => {
     });
     const batch: BatchGroup = {
       axis: 'row',
-      childDepth: 2,
-      requiredOppositeDepth: 0,
       signature: 'values-only',
       parentPathKey: '',
       siblingValues: ['US', 'CA'],
@@ -347,15 +325,11 @@ describe('fetchPivotBranchesBatch', () => {
         {
           axis: 'row',
           pathKey: serializePath(['US']),
-          childDepth: 2,
-          requiredOppositeDepth: 0,
           batchSignature: 'values-only',
         },
         {
           axis: 'row',
           pathKey: serializePath(['CA']),
-          childDepth: 2,
-          requiredOppositeDepth: 0,
           batchSignature: 'values-only',
         },
       ],

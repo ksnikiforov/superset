@@ -181,13 +181,11 @@ export function buildGroupedFetchTargets({
   axis,
   fetchKeys,
   nodes,
-  requiredOppositeDepth,
   getCoverageKey,
 }: {
   axis: PivotAxis;
   fetchKeys: Set<string>;
   nodes: Record<string, PivotTreeNode>;
-  requiredOppositeDepth: number;
   getCoverageKey: (axis: PivotAxis, key: string) => string;
 }): FetchTarget[] {
   const groups = new Map<string, string[]>();
@@ -209,12 +207,9 @@ export function buildGroupedFetchTargets({
       keys.find(key => nodes[key]) ??
       keys[0];
 
-    const childDepth = parsePath(representative).length + 1;
     targets.push({
       axis,
       pathKey: representative,
-      childDepth,
-      requiredOppositeDepth,
     });
   }
 
@@ -255,7 +250,6 @@ export const planGroupedExpansionTargets = ({
     axis,
     fetchKeys: plan.fetchKeys,
     nodes,
-    requiredOppositeDepth,
     getCoverageKey,
   });
 

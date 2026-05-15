@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14132` insertions, `14196` deletions, net `-64`.
-- Current production TypeScript/TSX total: `33446` lines.
+- Production `src`: `14122` insertions, `14236` deletions, net `-114`.
+- Current production TypeScript/TSX total: `33396` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -393,6 +393,9 @@ Success criteria:
   projection types.
 - The old standalone expansion coverage planner module has been collapsed into
   the grouped expansion planner boundary.
+- Expansion/query transport targets no longer carry duplicate
+  `childDepth`/`requiredOppositeDepth` metadata. Depth remains planner/signature
+  input, while fetch targets only identify the branch to fetch.
 
 ## Current Risks
 

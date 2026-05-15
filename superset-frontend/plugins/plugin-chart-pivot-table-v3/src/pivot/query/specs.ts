@@ -651,14 +651,6 @@ export const buildInitialQuerySpecs = (
 
     const candidates: BatchCandidate[] = [];
     representativeByKey.forEach((path, pathKey) => {
-      const ctx = resolveFetchContext({
-        formData,
-        layout,
-        axis,
-        path,
-        visibleRowDepth,
-        visibleColDepth,
-      });
       const batchSignature = buildBatchSignature({
         formData,
         layout,
@@ -670,8 +662,6 @@ export const buildInitialQuerySpecs = (
       candidates.push({
         axis,
         pathKey,
-        childDepth: axis === 'row' ? ctx.rowDepth : ctx.colDepth,
-        requiredOppositeDepth: axis === 'row' ? ctx.colDepth : ctx.rowDepth,
         batchSignature,
       });
     });
@@ -679,18 +669,8 @@ export const buildInitialQuerySpecs = (
     const { batches, singles } = optimizeFetchPlan({ targets: candidates });
 
     const sortedBatches = [...batches].sort((a, b) =>
-      JSON.stringify([
-        a.parentPathKey,
-        a.signature,
-        a.childDepth,
-        a.requiredOppositeDepth,
-      ]).localeCompare(
-        JSON.stringify([
-          b.parentPathKey,
-          b.signature,
-          b.childDepth,
-          b.requiredOppositeDepth,
-        ]),
+      JSON.stringify([a.parentPathKey, a.signature]).localeCompare(
+        JSON.stringify([b.parentPathKey, b.signature]),
       ),
     );
 
@@ -700,8 +680,6 @@ export const buildInitialQuerySpecs = (
         batch.axis,
         batch.parentPathKey,
         batch.signature,
-        batch.childDepth,
-        batch.requiredOppositeDepth,
       ]);
       const index = chunkIndexByGroup.get(groupKey) ?? 0;
       const rep = representativeByKey.get(batch.targets[0].pathKey);

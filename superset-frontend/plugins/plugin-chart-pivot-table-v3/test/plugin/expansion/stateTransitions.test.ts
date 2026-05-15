@@ -600,16 +600,16 @@ describe('pivot/expansion/stateTransitions', () => {
       cells: {},
     };
     const factBatches: PivotFactStoreBatch[] = [];
-    const fetchDeltas = jest.fn(async ({ targets }) => {
+    const fetchDeltas = jest.fn(async ({ targets, context }) => {
       targets.forEach(target => {
+        const targetDepth = parsePath(target.pathKey).length + 1;
         factBatches.push({
           coverage: {
             reason: 'expand',
-            rowDepth: target.axis === 'row' ? target.childDepth : 1,
+            rowDepth:
+              target.axis === 'row' ? targetDepth : context.visibleRowDepth,
             columnDepth:
-              target.axis === 'col'
-                ? target.childDepth
-                : target.requiredOppositeDepth,
+              target.axis === 'col' ? targetDepth : context.visibleColDepth,
             rowDimensions: ['country', 'city'],
             columnDimensions: ['month'],
           },
@@ -646,8 +646,6 @@ describe('pivot/expansion/stateTransitions', () => {
       {
         axis: 'row',
         pathKey: aKey,
-        childDepth: 2,
-        requiredOppositeDepth: 1,
       },
     ]);
     expect(result.status).toBe('complete');
@@ -838,14 +836,10 @@ describe('pivot/expansion/stateTransitions', () => {
       {
         axis: 'row',
         pathKey: aKey,
-        childDepth: 2,
-        requiredOppositeDepth: 1,
       },
       {
         axis: 'col',
         pathKey: xKey,
-        childDepth: 2,
-        requiredOppositeDepth: 1,
       },
     ]);
   });
@@ -874,8 +868,6 @@ describe('pivot/expansion/stateTransitions', () => {
       {
         axis: 'col',
         pathKey: xKey,
-        childDepth: 2,
-        requiredOppositeDepth: 1,
       },
     ]);
   });

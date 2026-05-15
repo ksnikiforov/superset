@@ -22,8 +22,6 @@ import { parsePath, serializePath } from '../core/path';
 export type FetchTarget = {
   axis: PivotAxis;
   pathKey: string;
-  childDepth: number;
-  requiredOppositeDepth: number;
 };
 
 export type BatchCandidate = FetchTarget & {
@@ -32,8 +30,6 @@ export type BatchCandidate = FetchTarget & {
 
 export type BatchGroup = {
   axis: PivotAxis;
-  childDepth: number;
-  requiredOppositeDepth: number;
   signature: string;
   parentPathKey: string;
   siblingValues: PivotPathValue[];
@@ -54,8 +50,6 @@ type CandidateWithPath = BatchCandidate & {
 
 type BatchGroupSeed = {
   axis: PivotAxis;
-  childDepth: number;
-  requiredOppositeDepth: number;
   signature: string;
   parentPathKey: string;
   nonNullTargets: CandidateWithPath[];
@@ -86,8 +80,6 @@ const buildBatchGroups = (
 ): BatchGroup[] =>
   chunkTargets(targets, maxBatchSize).map(chunk => ({
     axis: seed.axis,
-    childDepth: seed.childDepth,
-    requiredOppositeDepth: seed.requiredOppositeDepth,
     signature: seed.signature,
     parentPathKey: seed.parentPathKey,
     siblingValues: chunk.map(target => target.siblingValue),
@@ -115,15 +107,11 @@ export const optimizeFetchPlan = ({
     const siblingValue = path[path.length - 1];
     const groupKey = JSON.stringify([
       target.axis,
-      target.childDepth,
-      target.requiredOppositeDepth,
       target.batchSignature,
       parentPathKey,
     ]);
     const seed = groups.get(groupKey) ?? {
       axis: target.axis,
-      childDepth: target.childDepth,
-      requiredOppositeDepth: target.requiredOppositeDepth,
       signature: target.batchSignature,
       parentPathKey,
       nonNullTargets: [],

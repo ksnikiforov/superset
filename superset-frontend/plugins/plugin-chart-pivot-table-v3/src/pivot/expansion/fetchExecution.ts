@@ -321,8 +321,6 @@ export const fetchExpansionTargets = async ({
         kind: batchRequestKind,
         axis: batch.axis,
         parentPathKey: batch.parentPathKey,
-        childDepth: batch.childDepth,
-        requiredOppositeDepth: batch.requiredOppositeDepth,
         signature: batch.signature,
         targetKeys: [...batch.targets.map(target => target.pathKey)].sort(),
         visibleRowDepth,

@@ -117,8 +117,6 @@ describe('Global Async Queries (HTTP 202) support', () => {
 
     const batch: BatchGroup = {
       axis: 'row',
-      childDepth: 2,
-      requiredOppositeDepth: 0,
       signature: 'sig',
       parentPathKey: serializePath(['US']),
       siblingValues: ['CA', 'NY'],
@@ -126,15 +124,11 @@ describe('Global Async Queries (HTTP 202) support', () => {
         {
           axis: 'row',
           pathKey: serializePath(['US', 'CA']),
-          childDepth: 2,
-          requiredOppositeDepth: 0,
           batchSignature: 'sig',
         },
         {
           axis: 'row',
           pathKey: serializePath(['US', 'NY']),
-          childDepth: 2,
-          requiredOppositeDepth: 0,
           batchSignature: 'sig',
         },
       ],

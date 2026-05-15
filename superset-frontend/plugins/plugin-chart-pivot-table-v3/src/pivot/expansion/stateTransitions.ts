@@ -1073,14 +1073,12 @@ export const planHydrationIteration = ({
     axis: 'row',
     fetchKeys: effectiveRowPlan.fetchKeys,
     nodes: tree.rows,
-    requiredOppositeDepth: visibleColDepth,
     getCoverageKey,
   });
   const colGroups = buildGroupedFetchTargets({
     axis: 'col',
     fetchKeys: effectiveColPlan.fetchKeys,
     nodes: tree.cols,
-    requiredOppositeDepth: visibleRowDepth,
     getCoverageKey,
   });
   return {
@@ -1131,8 +1129,6 @@ export const runHydrationLoop = async ({
     targets: Array<{
       axis: PivotAxis;
       pathKey: string;
-      childDepth: number;
-      requiredOppositeDepth: number;
     }>;
     context: {
       visibleRowDepth: number;

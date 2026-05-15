@@ -229,8 +229,6 @@ describe('pivot/expansion/planner', () => {
       {
         axis: 'row',
         pathKey: aKey,
-        childDepth: 2,
-        requiredOppositeDepth: 1,
       },
     ]);
   });
@@ -259,8 +257,6 @@ describe('pivot/expansion/planner', () => {
       {
         axis: 'row',
         pathKey: aKey,
-        childDepth: 2,
-        requiredOppositeDepth: 0,
       },
     ]);
   });

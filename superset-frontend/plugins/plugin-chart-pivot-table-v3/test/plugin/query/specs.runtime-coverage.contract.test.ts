@@ -129,8 +129,6 @@ describe('runtime coverage query specs contract', () => {
     const layout = buildLayoutContext(formData);
     const batch: BatchGroup = {
       axis: 'row',
-      childDepth: 2,
-      requiredOppositeDepth: 0,
       signature: 'values-only',
       parentPathKey: '',
       siblingValues: ['US', 'CA'],
@@ -138,15 +136,11 @@ describe('runtime coverage query specs contract', () => {
         {
           axis: 'row',
           pathKey: serializePath(['US']),
-          childDepth: 2,
-          requiredOppositeDepth: 0,
           batchSignature: 'values-only',
         },
         {
           axis: 'row',
           pathKey: serializePath(['CA']),
-          childDepth: 2,
-          requiredOppositeDepth: 0,
           batchSignature: 'values-only',
         },
       ],

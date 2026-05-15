@@ -30,8 +30,6 @@ const makeTarget = (
 ): FetchTarget & { batchSignature: string } => ({
   axis: 'row',
   pathKey: serializePath(path),
-  childDepth: path.length + 1,
-  requiredOppositeDepth: 1,
   batchSignature: signature,
 });
 
