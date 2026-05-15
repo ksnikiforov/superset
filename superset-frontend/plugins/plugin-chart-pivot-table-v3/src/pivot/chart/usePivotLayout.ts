@@ -485,59 +485,40 @@ export const usePivotLayout = ({
     ],
   );
 
-  const getCollapsedRowChildrenForNodes = useCallback(
+  const getCollapsedChildrenForAxis = useCallback(
     (
+      axis: 'row' | 'col',
       parent: PivotTreeNode,
       expandedSet: Set<string>,
       nodes: Record<string, PivotTreeNode>,
-    ) =>
-      getCollapsedValuesNodesForAxis({
-        axis: 'row',
+    ) => {
+      const isRow = axis === 'row';
+      const metricsAtEnd = isRow ? metricsAtRowEnd : metricsAtColEnd;
+      const singleMetricBetween = isRow
+        ? singleMetricBetweenRows
+        : singleMetricBetweenCols;
+      return getCollapsedValuesNodesForAxis({
+        axis,
         parent,
         expandedSet,
         nodes,
         exposeCollapsedMetricTier:
           isMultiMetric ||
-          singleMetricBetweenRows ||
-          (isLeafTierVisible && metricsAtRowEnd),
-        metricsAtEnd: metricsAtRowEnd,
-        suppressSubtotalParent: true,
-        normalizeSubtotalExisting: false,
-      }),
-    [
-      getCollapsedValuesNodesForAxis,
-      isLeafTierVisible,
-      isMultiMetric,
-      metricsAtRowEnd,
-      singleMetricBetweenRows,
-    ],
-  );
-
-  const getCollapsedColLeavesForNodes = useCallback(
-    (
-      parent: PivotTreeNode,
-      expandedSet: Set<string>,
-      nodes: Record<string, PivotTreeNode>,
-    ) =>
-      getCollapsedValuesNodesForAxis({
-        axis: 'col',
-        parent,
-        expandedSet,
-        nodes,
-        exposeCollapsedMetricTier:
-          isMultiMetric ||
-          singleMetricBetweenCols ||
-          (isLeafTierVisible && metricsAtColEnd),
-        metricsAtEnd: metricsAtColEnd,
-        suppressSubtotalParent: false,
-        normalizeSubtotalExisting: true,
-      }),
+          singleMetricBetween ||
+          (isLeafTierVisible && metricsAtEnd),
+        metricsAtEnd,
+        suppressSubtotalParent: isRow,
+        normalizeSubtotalExisting: !isRow,
+      });
+    },
     [
       getCollapsedValuesNodesForAxis,
       isLeafTierVisible,
       isMultiMetric,
       metricsAtColEnd,
+      metricsAtRowEnd,
       singleMetricBetweenCols,
+      singleMetricBetweenRows,
     ],
   );
 
@@ -694,10 +675,10 @@ export const usePivotLayout = ({
       colSorter,
       getRowChildren: parent => getRowChildrenForNodes(parent, tree.rows),
       getCollapsedRowChildren: parent =>
-        getCollapsedRowChildrenForNodes(parent, expandedRows, tree.rows),
+        getCollapsedChildrenForAxis('row', parent, expandedRows, tree.rows),
       getColChildren: parent => getColChildrenForNodes(parent, tree.cols),
       getCollapsedColLeaves: parent =>
-        getCollapsedColLeavesForNodes(parent, expandedCols, tree.cols),
+        getCollapsedChildrenForAxis('col', parent, expandedCols, tree.cols),
       countDimDepth,
       isMetricGrandTotalNode,
       isMetricSubtotalNode,
@@ -709,8 +690,7 @@ export const usePivotLayout = ({
       countDimDepth,
       effectiveColSubtotalPosition,
       getColChildrenForNodes,
-      getCollapsedColLeavesForNodes,
-      getCollapsedRowChildrenForNodes,
+      getCollapsedChildrenForAxis,
       getRowChildrenForNodes,
       hasMultipleMeasures,
       isMetricGrandTotalNode,

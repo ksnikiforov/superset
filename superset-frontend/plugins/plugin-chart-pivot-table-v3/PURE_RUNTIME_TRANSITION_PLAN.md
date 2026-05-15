@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13990` insertions, `14261` deletions, net `-271`.
-- Current production TypeScript/TSX total: `33239` lines.
+- Production `src`: `13973` insertions, `14264` deletions, net `-291`.
+- Current production TypeScript/TSX total: `33219` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -449,6 +449,9 @@ Success criteria:
 - Same-axis expansion and cross-axis hydration now share one local
   `ExpansionFetchRuntime` builder inside `useExpansionEngine`, removing
   duplicate hook-owned fetch runtime wiring.
+- Collapsed row and column Values-tier projection now share one
+  axis-neutral hook path in `usePivotLayout`, with row/column differences
+  passed as policy parameters instead of separate callbacks.
 
 ## Current Risks
 
