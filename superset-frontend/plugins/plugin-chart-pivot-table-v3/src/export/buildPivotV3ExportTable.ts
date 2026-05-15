@@ -167,21 +167,12 @@ const textCell = (
   isHeader,
 });
 
-const numericCell = (
-  value: number,
-  isHeader: boolean,
-): PivotV3ExportSheetCell => ({
-  value,
-  type: 'number',
-  isHeader,
-});
-
 const toExportSheetCell = (
   value: string | number | null | undefined,
   isHeader: boolean,
 ): PivotV3ExportSheetCell => {
   if (typeof value === 'number' && Number.isFinite(value)) {
-    return numericCell(value, isHeader);
+    return { value, type: 'number', isHeader };
   }
   return textCell(
     getText(value === undefined || value === null ? '' : String(value)),
