@@ -18,7 +18,6 @@
  */
 
 import {
-  MetricsLayoutEnum,
   type PivotTreeData,
   type PivotTreeNode,
   type TotalPosition,
@@ -26,6 +25,7 @@ import {
 import { buildColumnHeaderRows, type HeaderCellInfo } from '../viewModel';
 import { buildVisibleCellEntries, type VisibleCellEntry } from '../cellUtils';
 import { buildVisiblePivotAxes } from '../visibility';
+import type { PivotProgram } from '../runtime/types';
 
 export type RenderModel = {
   visibleRows: PivotTreeNode[];
@@ -45,9 +45,8 @@ export type RenderModelConfig = {
   rowTotalPosition: TotalPosition;
   colTotalPosition: TotalPosition;
   resolvedColSubtotalPosition: TotalPosition;
-  resolvedMetricsLayout: MetricsLayoutEnum;
+  pivotProgram: PivotProgram;
   hasMultipleMeasures: boolean;
-  metricsFirstOnCols: boolean;
   rowSorter: (a: PivotTreeNode, b: PivotTreeNode) => number;
   colSorter: (a: PivotTreeNode, b: PivotTreeNode) => number;
   getRowChildren: (parent: PivotTreeNode) => PivotTreeNode[];
@@ -83,8 +82,7 @@ export const buildRenderModel = ({
     (config.normalizedRowSubtotalLevels.includes(0) || config.colTotals);
   const suppressRowRootForMultiMeasure =
     config.hasMultipleMeasures &&
-    (config.resolvedMetricsLayout === MetricsLayoutEnum.ROWS ||
-      config.rowTotals);
+    (config.pivotProgram.valueAxis === 'row' || config.rowTotals);
   const showRowRoot = showRowRootBase && !suppressRowRootForMultiMeasure;
   const showColRoot =
     config.groupbyColumnsLength > 0 &&
@@ -101,8 +99,9 @@ export const buildRenderModel = ({
     : config.rowTotalPosition;
   const shouldHideMetricGrandTotalsOnCols = !showColRoot;
   const shouldSuppressColRoot =
-    config.resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS &&
-    config.metricsFirstOnCols;
+    config.pivotProgram.valueAxis === 'col' &&
+    config.pivotProgram.metricKeys.length > 0 &&
+    config.pivotProgram.metricInsertIndex === 0;
   const { visibleRows, visibleCols } = buildVisiblePivotAxes({
     rows: tree.rows,
     cols: tree.cols,

@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13987` insertions, `14459` deletions, net `-472`.
-- Current production TypeScript/TSX total: `33038` lines.
+- Production `src`: `13989` insertions, `14464` deletions, net `-475`.
+- Current production TypeScript/TSX total: `33035` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -378,6 +378,8 @@ Success criteria:
 - Metric-key derivation and node-label formatting now consume `PivotProgram`
   directly instead of receiving separate `metricsLayout` / row metric-index
   inputs from formatting.
+- Render-model root suppression now consumes `PivotProgram`; render config no
+  longer carries separate metric-layout and metrics-first flags.
 - Applied interaction layout now compiles through `compilePivotProgram`; the
   placement-only compiler bridge has been removed.
 - Set-oriented coverage manifest primitives now exist for root runtime-layout

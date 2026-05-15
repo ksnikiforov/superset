@@ -121,12 +121,8 @@ describe('pivot/expansion/stateTransitions', () => {
         rowTotalPosition: 'start' as const,
         colTotalPosition: 'start' as const,
         resolvedColSubtotalPosition: 'start' as const,
-        resolvedMetricsLayout: metricsLayout,
+        pivotProgram: program,
         hasMultipleMeasures: metricLabelSet.size > 1,
-        metricsFirstOnCols:
-          program.valueAxis === 'col' &&
-          program.metricKeys.length > 0 &&
-          program.metricInsertIndex === 0,
         rowSorter: depthSorter,
         colSorter: depthSorter,
         getRowChildren: (parent: PivotTreeNode) =>

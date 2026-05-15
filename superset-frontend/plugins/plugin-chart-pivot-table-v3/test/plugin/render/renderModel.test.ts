@@ -25,6 +25,7 @@ import {
   type PivotTreeNode,
 } from '../../../src/types';
 import { serializePath } from '../../../src/pivot/core/path';
+import { compilePivotProgram } from '../../../src/pivot/runtime/compilePivotProgram';
 
 const makeNode = ({
   axis,
@@ -147,9 +148,8 @@ describe('buildRenderModel', () => {
         rowTotalPosition: 'start',
         colTotalPosition: 'start',
         resolvedColSubtotalPosition: 'start',
-        resolvedMetricsLayout: MetricsLayoutEnum.COLUMNS,
+        pivotProgram: compilePivotProgram({}),
         hasMultipleMeasures: false,
-        metricsFirstOnCols: false,
         rowSorter: (a, b) => a.label.localeCompare(b.label),
         colSorter: (a, b) => a.label.localeCompare(b.label),
         getRowChildren: parent => findChildren(tree.rows, parent),
@@ -219,9 +219,11 @@ describe('buildRenderModel', () => {
         rowTotalPosition: 'start',
         colTotalPosition: 'start',
         resolvedColSubtotalPosition: 'start',
-        resolvedMetricsLayout: MetricsLayoutEnum.COLUMNS,
+        pivotProgram: compilePivotProgram({
+          metrics: ['m1', 'm2'],
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+        }),
         hasMultipleMeasures: true,
-        metricsFirstOnCols: false,
         rowSorter: (a, b) => a.label.localeCompare(b.label),
         colSorter: (a, b) => a.label.localeCompare(b.label),
         getRowChildren: parent => findChildren(tree.rows, parent),
