@@ -1037,7 +1037,7 @@ export const planHydrationIteration = ({
     !rowPlan.hasMissingNodes &&
     pendingRows.size === 0
   ) {
-    effectiveRowPlan = { ...rowPlan, ...createEmptyExpansionPlan() };
+    effectiveRowPlan = createEmptyExpansionPlan();
   }
   if (
     activeAxis === 'row' &&
@@ -1045,7 +1045,7 @@ export const planHydrationIteration = ({
     !colPlan.hasMissingNodes &&
     pendingCols.size === 0
   ) {
-    effectiveColPlan = { ...colPlan, ...createEmptyExpansionPlan() };
+    effectiveColPlan = createEmptyExpansionPlan();
   }
 
   ({ rowPlan: effectiveRowPlan, colPlan: effectiveColPlan } =

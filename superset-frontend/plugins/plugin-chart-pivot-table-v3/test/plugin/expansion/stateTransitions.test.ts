@@ -793,14 +793,12 @@ describe('pivot/expansion/stateTransitions', () => {
     }
     expect(plan.targets).toEqual([
       {
-        id: JSON.stringify(['row', aKey, 2, 1]),
         axis: 'row',
         pathKey: aKey,
         childDepth: 2,
         requiredOppositeDepth: 1,
       },
       {
-        id: JSON.stringify(['col', xKey, 2, 1]),
         axis: 'col',
         pathKey: xKey,
         childDepth: 2,
@@ -831,7 +829,6 @@ describe('pivot/expansion/stateTransitions', () => {
     expect(Array.from(plan.colPlan.fetchKeys)).toEqual([xKey]);
     expect(plan.targets).toEqual([
       {
-        id: JSON.stringify(['col', xKey, 2, 1]),
         axis: 'col',
         pathKey: xKey,
         childDepth: 2,
