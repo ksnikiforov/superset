@@ -414,6 +414,12 @@ Success criteria:
   multiple runtime state machines.
 - `useExpansionEngine.ts` and `stateTransitions.ts` remain large. Split only by
   real ownership, not by wrapper files.
+- Directly replacing expansion's coverage predicate with manifest diff is not
+  safe yet: chart-level persisted hydration currently relies on a distinction
+  between visible tree depth and required branch fetch depth. A direct manifest
+  diff made persisted expansion targets look satisfied too early. The next
+  attempt must first model "branch depth required by the expansion intent" as
+  explicit coverage, not infer it from the currently materialized tree.
 - Large result sets still pay main-thread JSON parsing and React commit costs.
 
 ## Approval Checkpoints
