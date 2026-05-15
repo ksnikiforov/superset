@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14100` insertions, `14242` deletions, net `-142`.
-- Current production TypeScript/TSX total: `33368` lines.
+- Production `src`: `14016` insertions, `14260` deletions, net `-244`.
+- Current production TypeScript/TSX total: `33266` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -413,9 +413,15 @@ Success criteria:
   missing from the fact store, then materialize from the full requested spec
   set. This avoids refetching already-loaded support coverage while preserving a
   single transport batch for the truly missing specs.
+- Branch and batch execution no longer run a separate all-local preflight before
+  entering the spec fetch path. The spec fetch path owns both all-local
+  materialization and partial missing-spec fetches.
 - Fact-store compatibility keeps root/no-branch coverage separate from explicit
   branch coverage. Root is not a wildcard for arbitrary expanded paths under
   the set-oriented manifest.
+- The materializer no longer exports a dead fact-store compatibility wrapper or
+  test-fixture-only materialization entrypoints. Production callers now go
+  through the explicit branch/initial materialization APIs.
 - Hydration finalization now applies parent deltas before descendant deltas, so
   persisted nested expansion results survive branch pruning.
 - Seamless layout updates no longer freeze the table behind a separate pending
