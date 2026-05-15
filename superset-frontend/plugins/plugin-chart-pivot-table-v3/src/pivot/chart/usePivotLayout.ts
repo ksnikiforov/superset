@@ -431,16 +431,10 @@ export const usePivotLayout = ({
       resolveAxisChildrenBeforeSubtotalPolicy({
         ...params,
         program: layout.pivotProgram,
-        resolvedMetricsLayout,
         isMetricTokenValue,
         isMetricGrandTotalNode,
       }),
-    [
-      isMetricGrandTotalNode,
-      isMetricTokenValue,
-      layout.pivotProgram,
-      resolvedMetricsLayout,
-    ],
+    [isMetricGrandTotalNode, isMetricTokenValue, layout.pivotProgram],
   );
 
   const getRowSubtotalPosition = useCallback(
@@ -470,7 +464,6 @@ export const usePivotLayout = ({
       resolveCollapsedValuesNodesForAxis({
         ...params,
         program: layout.pivotProgram,
-        resolvedMetricsLayout,
         metricLabelSet,
         isMetricTokenValue,
         isExplicitSubtotalNode,
@@ -481,7 +474,6 @@ export const usePivotLayout = ({
       isMetricTokenValue,
       layout.pivotProgram,
       metricLabelSet,
-      resolvedMetricsLayout,
     ],
   );
 

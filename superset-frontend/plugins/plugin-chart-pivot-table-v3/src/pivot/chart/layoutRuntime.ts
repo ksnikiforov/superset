@@ -219,7 +219,6 @@ export const resolveMetricAxisLayoutPolicy = ({
 
 type ResolveAxisChildrenBeforeSubtotalPolicyParams = {
   program: PivotProgram;
-  resolvedMetricsLayout: MetricsLayoutEnum;
   axis: PivotAxis;
   parent: PivotTreeNode;
   nodes: Record<string, PivotTreeNode>;
@@ -237,7 +236,6 @@ type ResolveAxisChildrenBeforeSubtotalPolicyParams = {
 
 export const resolveAxisChildrenBeforeSubtotalPolicy = ({
   program,
-  resolvedMetricsLayout,
   axis,
   parent,
   nodes,
@@ -273,7 +271,7 @@ export const resolveAxisChildrenBeforeSubtotalPolicy = ({
   const expectedMetricsLayout =
     axis === 'row' ? MetricsLayoutEnum.ROWS : MetricsLayoutEnum.COLUMNS;
   if (
-    resolvedMetricsLayout === expectedMetricsLayout &&
+    program.metricsLayoutResolved === expectedMetricsLayout &&
     parent.axis === axis &&
     parent.level < groupbyLength &&
     (metricIndex === undefined || metricIndex > parent.level)
@@ -310,7 +308,6 @@ export const resolveAxisChildrenBeforeSubtotalPolicy = ({
 
 type ResolveCollapsedValuesNodesForAxisParams = {
   program: PivotProgram;
-  resolvedMetricsLayout: MetricsLayoutEnum;
   metricLabelSet: Set<string>;
   axis: PivotAxis;
   parent: PivotTreeNode;
@@ -327,7 +324,6 @@ type ResolveCollapsedValuesNodesForAxisParams = {
 
 export const resolveCollapsedValuesNodesForAxis = ({
   program,
-  resolvedMetricsLayout,
   metricLabelSet,
   axis,
   parent,
@@ -345,7 +341,7 @@ export const resolveCollapsedValuesNodesForAxis = ({
     axis === 'row' ? MetricsLayoutEnum.ROWS : MetricsLayoutEnum.COLUMNS;
   if (
     !exposeCollapsedMetricTier ||
-    resolvedMetricsLayout !== expectedMetricsLayout ||
+    program.metricsLayoutResolved !== expectedMetricsLayout ||
     expandedSet.has(parent.key)
   ) {
     return [];
