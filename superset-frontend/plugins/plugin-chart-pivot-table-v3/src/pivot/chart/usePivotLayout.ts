@@ -60,8 +60,6 @@ export type PivotLayoutResult = {
   expandColumnsLevelRaw?: number;
   resolvedExpandRowsLevel: number;
   resolvedExpandColumnsLevel: number;
-  resolvedMetricsLayout: MetricsLayoutEnum;
-  metricInsertIndex: number;
   metricLabels: string[];
   metricLabelSet: Set<string>;
   isMetricTokenValue: (value: unknown) => boolean;
@@ -73,12 +71,9 @@ export type PivotLayoutResult = {
   resolvedColTotalPosition: TotalPosition;
   effectiveRowSubtotalPosition: TotalPosition;
   effectiveColSubtotalPosition: TotalPosition;
-  metricsFirstOnRows: boolean;
-  metricsFirstOnCols: boolean;
   metricIndexOnRows?: number;
   metricIndexOnCols?: number;
   hideMetricHeaderOnRows: boolean;
-  metricsAtColEnd: boolean;
   shouldExpandMetricRows: boolean;
   shouldExpandMetricCols: boolean;
   compareMetricOrder: (a: PivotTreeNode, b: PivotTreeNode) => number;
@@ -688,8 +683,6 @@ export const usePivotLayout = ({
     expandColumnsLevelRaw,
     resolvedExpandRowsLevel,
     resolvedExpandColumnsLevel,
-    resolvedMetricsLayout,
-    metricInsertIndex,
     metricLabels,
     metricLabelSet,
     isMetricTokenValue,
@@ -701,12 +694,9 @@ export const usePivotLayout = ({
     resolvedColTotalPosition,
     effectiveRowSubtotalPosition,
     effectiveColSubtotalPosition,
-    metricsFirstOnRows,
-    metricsFirstOnCols,
     metricIndexOnRows,
     metricIndexOnCols,
     hideMetricHeaderOnRows,
-    metricsAtColEnd,
     shouldExpandMetricRows,
     shouldExpandMetricCols,
     compareMetricOrder,

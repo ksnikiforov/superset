@@ -19,7 +19,6 @@
 import { type DataRecordValue } from '@superset-ui/core';
 import {
   type DateFormatter,
-  MetricsLayoutEnum,
   type MeasureHierarchy,
   type PivotAxis,
   type PivotTreeData,
@@ -39,12 +38,11 @@ import {
   isExplicitTotalNode as isExplicitTotalNodeBase,
 } from '../metricsTotals';
 import { resolveAxisProjection } from '../runtime/projection';
+import type { PivotProgram } from '../runtime/types';
 import { type PivotLayoutResult } from './usePivotLayout';
 
 export type ColumnDisplayConfig = {
-  metricsLayout: MetricsLayoutEnum;
-  metricsFirstOnCols: boolean;
-  metricsAtColEnd: boolean;
+  program: PivotProgram;
   allowMetricSubtotalLabels: boolean;
   metricLabels: string[];
   isExplicitSubtotalNode: (node: PivotTreeNode) => boolean;
@@ -62,9 +60,7 @@ export const buildColumnDisplayPath = (
   config: ColumnDisplayConfig,
 ) => {
   const {
-    metricsLayout,
-    metricsFirstOnCols,
-    metricsAtColEnd,
+    program,
     allowMetricSubtotalLabels,
     metricLabels,
     isExplicitSubtotalNode,
@@ -75,12 +71,20 @@ export const buildColumnDisplayPath = (
     isMetricSubtotalNode,
     isExpanded,
   } = config;
+  const metricsFirstOnCols =
+    program.valueAxis === 'col' &&
+    program.metricKeys.length > 0 &&
+    program.metricInsertIndex === 0;
+  const metricsAtColEnd =
+    program.valueAxis === 'col' &&
+    program.metricKeys.length > 0 &&
+    program.metricInsertIndex >= program.columnDimensions.length;
   const metricKey = getMetricKeyFromPath(col.path);
   const metricLabel = metricKey
     ? getMetricDisplayLabelForKey(metricKey)
     : undefined;
   if (
-    metricsLayout === MetricsLayoutEnum.COLUMNS &&
+    program.valueAxis === 'col' &&
     metricsFirstOnCols &&
     isExpanded?.(col) &&
     metricLabel &&
@@ -95,7 +99,7 @@ export const buildColumnDisplayPath = (
       ...Array(Math.max(maxDepth - col.path.length, 0)).fill(metricLabel),
     ];
   }
-  if (metricsLayout !== MetricsLayoutEnum.COLUMNS || metricsFirstOnCols) {
+  if (program.valueAxis !== 'col' || metricsFirstOnCols) {
     return col.path;
   }
   const padToDepth = (path: PivotTreeNode['path']) => {

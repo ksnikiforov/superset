@@ -361,9 +361,7 @@ export const usePivotRenderModel = ({
   const getColumnDisplayPath = useCallback(
     (col: PivotTreeNode, maxDepth: number) =>
       buildColumnDisplayPath(col, maxDepth, {
-        metricsLayout: layout.resolvedMetricsLayout,
-        metricsFirstOnCols: layout.metricsFirstOnCols,
-        metricsAtColEnd: layout.metricsAtColEnd,
+        program: layout.layout.pivotProgram,
         allowMetricSubtotalLabels: layout.normalizedColSubtotalLevels.some(
           level => level > 0,
         ),

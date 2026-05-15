@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14044` insertions, `14563` deletions, net `-519`.
-- Current production TypeScript/TSX total: `32991` lines.
+- Production `src`: `14049` insertions, `14576` deletions, net `-527`.
+- Current production TypeScript/TSX total: `32983` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -380,6 +380,9 @@ Success criteria:
   inputs from formatting.
 - Render-model root suppression now consumes `PivotProgram`; render config no
   longer carries separate metric-layout and metrics-first flags.
+- Column display path policy now consumes `PivotProgram`; render no longer
+  passes separate column metric-layout, metric-first, or metric-at-end flags into
+  the display helper.
 - Cross-filter and context-menu filter construction now consume `PivotProgram`
   directly. Interaction code no longer passes separate groupby, metric, or
   metric-layout inputs into filter helpers.

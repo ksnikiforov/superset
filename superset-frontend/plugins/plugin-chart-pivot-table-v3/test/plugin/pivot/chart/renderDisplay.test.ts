@@ -62,9 +62,6 @@ const treeFromNodes = ({
 });
 
 const baseDisplayConfig = {
-  metricsLayout: MetricsLayoutEnum.COLUMNS,
-  metricsFirstOnCols: false,
-  metricsAtColEnd: true,
   allowMetricSubtotalLabels: true,
   metricLabels: ['sales', 'profit'],
   isExplicitSubtotalNode: (candidate: PivotTreeNode) =>
@@ -101,10 +98,25 @@ const pivotProgram: PivotProgram = {
   metrics: [{ key: 'sales', metric: 'sales', index: 0 }],
   metricKeys: ['sales'],
   metricsLayoutResolved: MetricsLayoutEnum.COLUMNS,
-  metricInsertIndex: 2,
+  valueAxis: 'col',
+  metricInsertIndex: 1,
 };
 
-const metricFirstProgram: PivotProgram = {
+const columnMetricFirstProgram: PivotProgram = {
+  ...pivotProgram,
+  columns: [
+    {
+      kind: 'values',
+      metrics: [{ key: 'sales', metric: 'sales', index: 0 }],
+    },
+    { kind: 'dimension', column: 'month' },
+  ],
+  valueAxis: 'col',
+  metricsLayoutResolved: MetricsLayoutEnum.COLUMNS,
+  metricInsertIndex: 0,
+};
+
+const rowMetricFirstProgram: PivotProgram = {
   ...pivotProgram,
   rows: [
     {
@@ -124,7 +136,7 @@ test('pads expanded metric-first column headers to the render depth', () => {
   expect(
     buildColumnDisplayPath(col, 3, {
       ...baseDisplayConfig,
-      metricsFirstOnCols: true,
+      program: columnMetricFirstProgram,
       isExpanded: () => true,
     }),
   ).toEqual([encodeMetricKey('sales'), SUBTOTAL_TOKEN]);
@@ -136,9 +148,12 @@ test('labels metric subtotal headers at the end of column dimensions', () => {
     hasChildren: true,
   });
 
-  expect(buildColumnDisplayPath(col, 2, baseDisplayConfig)).toEqual([
-    'West Sales',
-  ]);
+  expect(
+    buildColumnDisplayPath(col, 2, {
+      ...baseDisplayConfig,
+      program: pivotProgram,
+    }),
+  ).toEqual(['West Sales']);
 });
 
 test('resolves metric and measure-leaf column header labels', () => {
@@ -346,7 +361,7 @@ test('hides metric toggles when measure leaves are visible', () => {
       isMetricSubtotalNode: () => false,
       countDimDepth: path =>
         path.filter(value => value !== encodeMetricKey('sales')).length,
-      layout: { pivotProgram: metricFirstProgram },
+      layout: { pivotProgram: rowMetricFirstProgram },
     },
     isLeafTierVisible: true,
     groupbyRowsLength: 1,
