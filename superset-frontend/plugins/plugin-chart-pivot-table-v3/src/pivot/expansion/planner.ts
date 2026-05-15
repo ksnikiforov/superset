@@ -21,7 +21,7 @@ import { type PivotAxis, type PivotTreeNode } from '../../types';
 import { parsePath, serializePath } from '../core/path';
 import { type FetchTarget } from '../query/fetchPlanOptimizer';
 import {
-  type PivotExpansionCoveragePredicate,
+  type PivotExpansionCoverageDiff,
   type PivotExpansionCoverageRequest,
 } from '../runtime/coverage';
 import { rootKey } from '../viewModel';
@@ -48,24 +48,23 @@ const isSatisfiedNode = ({
   key,
   path,
   coverage,
-  isExpansionCoverageLoaded,
+  getMissingExpansionCoverage,
   shouldFetchChildren,
 }: {
   axis: PivotAxis;
   key: string;
   path: PivotTreeNode['path'];
   coverage: PivotExpansionCoverageDepths;
-  isExpansionCoverageLoaded: PivotExpansionCoveragePredicate;
+  getMissingExpansionCoverage: PivotExpansionCoverageDiff;
   shouldFetchChildren: PivotExpansionNodeFetchPredicate;
 }) => {
   if (!shouldFetchChildren({ axis, key, path })) {
     return true;
   }
-  return isExpansionCoverageLoaded({
-    axis,
-    pathKey: key,
-    ...coverage,
-  });
+  return (
+    getMissingExpansionCoverage([{ axis, pathKey: key, ...coverage }])
+      .length === 0
+  );
 };
 
 const resolveNearestPresentAncestorKey = (
@@ -90,7 +89,7 @@ export const planExpansionForAxis = ({
   expandedKeys,
   nodes,
   coverage,
-  isExpansionCoverageLoaded,
+  getMissingExpansionCoverage,
   getCoverageKey,
   shouldFetchChildren,
 }: {
@@ -98,7 +97,7 @@ export const planExpansionForAxis = ({
   expandedKeys: Set<string>;
   nodes: Record<string, PivotTreeNode>;
   coverage: PivotExpansionCoverageDepths;
-  isExpansionCoverageLoaded: PivotExpansionCoveragePredicate;
+  getMissingExpansionCoverage: PivotExpansionCoverageDiff;
   getCoverageKey: (axis: PivotAxis, key: string) => string;
   shouldFetchChildren: PivotExpansionNodeFetchPredicate;
 }): PivotExpansionPlan => {
@@ -121,7 +120,7 @@ export const planExpansionForAxis = ({
           key,
           path: node.path,
           coverage,
-          isExpansionCoverageLoaded,
+          getMissingExpansionCoverage,
           shouldFetchChildren,
         })
       ) {
@@ -133,11 +132,8 @@ export const planExpansionForAxis = ({
     }
 
     if (
-      isExpansionCoverageLoaded({
-        axis,
-        pathKey: key,
-        ...coverage,
-      })
+      getMissingExpansionCoverage([{ axis, pathKey: key, ...coverage }])
+        .length === 0
     ) {
       return;
     }
@@ -153,7 +149,7 @@ export const planExpansionForAxis = ({
         key: ancestorKey,
         path: ancestor.path,
         coverage,
-        isExpansionCoverageLoaded,
+        getMissingExpansionCoverage,
         shouldFetchChildren,
       })
     ) {
@@ -220,7 +216,7 @@ export const planGroupedExpansionTargets = ({
   expandedKeys,
   nodes,
   coverage,
-  isExpansionCoverageLoaded,
+  getMissingExpansionCoverage,
   getCoverageKey,
   shouldFetchChildren,
 }: {
@@ -228,7 +224,7 @@ export const planGroupedExpansionTargets = ({
   expandedKeys: Set<string>;
   nodes: Record<string, PivotTreeNode>;
   coverage: PivotExpansionCoverageDepths;
-  isExpansionCoverageLoaded: PivotExpansionCoveragePredicate;
+  getMissingExpansionCoverage: PivotExpansionCoverageDiff;
   getCoverageKey: (axis: PivotAxis, key: string) => string;
   shouldFetchChildren: PivotExpansionNodeFetchPredicate;
 }): {
@@ -240,7 +236,7 @@ export const planGroupedExpansionTargets = ({
     expandedKeys,
     nodes,
     coverage,
-    isExpansionCoverageLoaded,
+    getMissingExpansionCoverage,
     getCoverageKey,
     shouldFetchChildren,
   });

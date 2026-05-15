@@ -59,8 +59,8 @@ import {
   type PivotFactStoreBatch,
 } from '../runtime/factStore';
 import {
-  createExpansionCoveragePredicate,
-  type PivotExpansionCoveragePredicate,
+  createExpansionCoverageDiff,
+  type PivotExpansionCoverageDiff,
 } from '../runtime/coverage';
 import {
   addAncestors,
@@ -553,9 +553,9 @@ export const useExpansionEngine = ({
     [pivotProgram],
   );
 
-  const getExpansionCoveragePredicate = useCallback(
-    (): PivotExpansionCoveragePredicate =>
-      createExpansionCoveragePredicate({
+  const getMissingExpansionCoverage = useCallback(
+    (): PivotExpansionCoverageDiff =>
+      createExpansionCoverageDiff({
         factBatches: factStoreRef.current?.getCoverageBatches() ?? [],
         program: pivotProgram,
         valueKeys: buildFactValueKeys({
@@ -832,7 +832,7 @@ export const useExpansionEngine = ({
           getExpandedRows: () => expandedRowsRef.current,
           getExpandedCols: () => expandedColsRef.current,
           computeVisibleDepths,
-          getExpansionCoveragePredicate,
+          getMissingExpansionCoverage,
           getCoverageKey,
           shouldFetchChildren,
           fetchRuntime,
@@ -886,7 +886,7 @@ export const useExpansionEngine = ({
       expansionRequestHelpers,
       expansionRequestLifecycle,
       getCoverageKey,
-      getExpansionCoveragePredicate,
+      getMissingExpansionCoverage,
       groupbyColumnsLength,
       isMetricTokenValue,
       metricIndexForCols,
@@ -971,7 +971,7 @@ export const useExpansionEngine = ({
           maxIterations: MAX_HYDRATION_ITERATIONS,
           isCurrent: requestScope.isCurrent,
           buildDesiredExpanded,
-          getExpansionCoveragePredicate,
+          getMissingExpansionCoverage,
           config: visibilityConfig,
           getCoverageKey,
           activeAxis: options?.activeAxis,
@@ -1020,7 +1020,7 @@ export const useExpansionEngine = ({
       expansionRequestHelpers,
       expansionRequestLifecycle,
       getCoverageKey,
-      getExpansionCoveragePredicate,
+      getMissingExpansionCoverage,
       persistExpansionState,
       pruneMergedTree,
       resolveExpandedForMetrics,
@@ -1278,7 +1278,7 @@ export const useExpansionEngine = ({
       effectiveExpandColsLevel,
       autoExpandRowsLevelForDesired,
       autoExpandColsLevelForDesired,
-      isExpansionCoverageLoaded: getExpansionCoveragePredicate(),
+      getMissingExpansionCoverage: getMissingExpansionCoverage(),
       config: visibilityConfig,
       getCoverageKey,
     });
@@ -1327,7 +1327,7 @@ export const useExpansionEngine = ({
     resolveExpandedForMetrics,
     reportAsyncError,
     getCoverageKey,
-    getExpansionCoveragePredicate,
+    getMissingExpansionCoverage,
     setHydratingState,
     visibilityConfig,
   ]);

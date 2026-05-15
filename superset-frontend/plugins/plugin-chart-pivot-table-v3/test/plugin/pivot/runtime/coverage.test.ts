@@ -25,7 +25,7 @@ import { serializePath } from '../../../../src/pivot/core/path';
 import { compilePivotProgram } from '../../../../src/pivot/runtime/compilePivotProgram';
 import {
   buildBranchFactCoverages,
-  createExpansionCoveragePredicate,
+  createExpansionCoverageDiff,
   buildFactCoverage,
   buildRuntimeLayoutCoverageManifest,
   buildVisibleFactCoverage,
@@ -106,7 +106,7 @@ describe('expansion fact coverage', () => {
       groupbyColumns: ['year', 'quarter', 'month', 'day'],
       metrics: ['sales'],
     });
-    const isExpansionCoverageLoaded = createExpansionCoveragePredicate({
+    const getMissingExpansionCoverage = createExpansionCoverageDiff({
       factBatches: [
         {
           coverage: {
@@ -146,29 +146,49 @@ describe('expansion fact coverage', () => {
     });
 
     expect(
-      isExpansionCoverageLoaded({
-        axis: 'row',
-        pathKey: serializePath(['France']),
-        rowDepth: 2,
-        columnDepth: 1,
-      }),
-    ).toBe(true);
+      getMissingExpansionCoverage([
+        {
+          axis: 'row',
+          pathKey: serializePath(['France']),
+          rowDepth: 2,
+          columnDepth: 1,
+        },
+      ]),
+    ).toEqual([]);
     expect(
-      isExpansionCoverageLoaded({
+      getMissingExpansionCoverage([
+        {
+          axis: 'row',
+          pathKey: serializePath(['France']),
+          rowDepth: 2,
+          columnDepth: 4,
+        },
+      ]),
+    ).toEqual([
+      {
         axis: 'row',
         pathKey: serializePath(['France']),
         rowDepth: 2,
         columnDepth: 4,
-      }),
-    ).toBe(false);
+      },
+    ]);
     expect(
-      isExpansionCoverageLoaded({
+      getMissingExpansionCoverage([
+        {
+          axis: 'col',
+          pathKey: serializePath(['France']),
+          rowDepth: 1,
+          columnDepth: 1,
+        },
+      ]),
+    ).toEqual([
+      {
         axis: 'col',
         pathKey: serializePath(['France']),
         rowDepth: 1,
         columnDepth: 1,
-      }),
-    ).toBe(false);
+      },
+    ]);
   });
 });
 

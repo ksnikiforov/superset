@@ -19,8 +19,8 @@
 
 import { planGroupedExpansionTargets } from '../../../src/pivot/expansion/planner';
 import {
-  createExpansionCoveragePredicate,
-  type PivotExpansionCoveragePredicate,
+  createExpansionCoverageDiff,
+  type PivotExpansionCoverageDiff,
 } from '../../../src/pivot/runtime/coverage';
 import { rootKey } from '../../../src/pivot/viewModel';
 import { encodeMetricKey } from '../../../src/pivot/core/tokens';
@@ -62,10 +62,10 @@ const shouldFetchDimensionChildren = ({
   path: PivotTreeNode['path'];
 }) => path.length < testProgram.rowDimensions.length;
 
-const coverageLoadedFromBatches = (
+const getMissingCoverageFromBatches = (
   factBatches: PivotFactStoreBatch[] = [],
-): PivotExpansionCoveragePredicate =>
-  createExpansionCoveragePredicate({
+): PivotExpansionCoverageDiff =>
+  createExpansionCoverageDiff({
     factBatches,
     program: testProgram,
     valueKeys: ['sales', 'profit'],
@@ -100,7 +100,7 @@ describe('pivot/expansion/planner', () => {
       expandedKeys: new Set([rootKey, aKey]),
       nodes,
       coverage: { rowDepth: 1, columnDepth: 1 },
-      isExpansionCoverageLoaded: coverageLoadedFromBatches(),
+      getMissingExpansionCoverage: getMissingCoverageFromBatches(),
       getCoverageKey: (_axis, key) => key,
       shouldFetchChildren: shouldFetchDimensionChildren,
     });
@@ -128,7 +128,7 @@ describe('pivot/expansion/planner', () => {
         }),
       },
       coverage: { rowDepth: 1, columnDepth: 0 },
-      isExpansionCoverageLoaded: coverageLoadedFromBatches(),
+      getMissingExpansionCoverage: getMissingCoverageFromBatches(),
       getCoverageKey: (_axis, key) => key,
       shouldFetchChildren: ({ key }) => key === aKey,
     });
@@ -145,7 +145,7 @@ describe('pivot/expansion/planner', () => {
   it('uses typed branch coverage to skip only the covered expanded path', () => {
     const aKey = serializePath(['A']);
     const bKey = serializePath(['B']);
-    const isExpansionCoverageLoaded = coverageLoadedFromBatches([
+    const getMissingExpansionCoverage = getMissingCoverageFromBatches([
       {
         coverage: {
           reason: 'expand',
@@ -173,7 +173,7 @@ describe('pivot/expansion/planner', () => {
         [bKey]: makeNode({ axis: 'row', path: ['B'] }),
       },
       coverage: { rowDepth: 1, columnDepth: 1 },
-      isExpansionCoverageLoaded,
+      getMissingExpansionCoverage,
       getCoverageKey: (_axis, key) => key,
       shouldFetchChildren: shouldFetchDimensionChildren,
     });
@@ -186,7 +186,7 @@ describe('pivot/expansion/planner', () => {
     const caKey = serializePath(['US', 'CA']);
     const nyKey = serializePath(['US', 'NY']);
     const txKey = serializePath(['US', 'TX']);
-    const isExpansionCoverageLoaded = coverageLoadedFromBatches([
+    const getMissingExpansionCoverage = getMissingCoverageFromBatches([
       {
         coverage: {
           reason: 'expand',
@@ -215,7 +215,7 @@ describe('pivot/expansion/planner', () => {
         [txKey]: makeNode({ axis: 'row', path: ['US', 'TX'] }),
       },
       coverage: { rowDepth: 1, columnDepth: 0 },
-      isExpansionCoverageLoaded,
+      getMissingExpansionCoverage,
       getCoverageKey: (_axis, key) => key,
       shouldFetchChildren: shouldFetchDimensionChildren,
     });
@@ -227,7 +227,7 @@ describe('pivot/expansion/planner', () => {
   it('does not let typed metric branch coverage satisfy sibling metrics', () => {
     const salesKey = serializePath(['A', encodeMetricKey('sales')]);
     const profitKey = serializePath(['A', encodeMetricKey('profit')]);
-    const isExpansionCoverageLoaded = coverageLoadedFromBatches([
+    const getMissingExpansionCoverage = getMissingCoverageFromBatches([
       {
         coverage: {
           reason: 'expand',
@@ -260,7 +260,7 @@ describe('pivot/expansion/planner', () => {
         }),
       },
       coverage: { rowDepth: 1, columnDepth: 1 },
-      isExpansionCoverageLoaded,
+      getMissingExpansionCoverage,
       getCoverageKey: (_axis, key) => key,
       shouldFetchChildren: shouldFetchDimensionChildren,
     });
@@ -307,7 +307,7 @@ describe('pivot/expansion/planner', () => {
       expandedKeys: new Set([metricAKey, metricBKey]),
       nodes,
       coverage: { rowDepth: 1, columnDepth: 1 },
-      isExpansionCoverageLoaded: coverageLoadedFromBatches(),
+      getMissingExpansionCoverage: getMissingCoverageFromBatches(),
       getCoverageKey: (_axis, key) => key,
       shouldFetchChildren: shouldFetchDimensionChildren,
     });

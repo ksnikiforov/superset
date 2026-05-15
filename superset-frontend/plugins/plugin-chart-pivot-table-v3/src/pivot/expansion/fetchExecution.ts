@@ -44,7 +44,7 @@ import {
   type LatestRequestLifecycle,
   type LatestRequestScope,
 } from '../runtime/requestLifecycle';
-import { type PivotExpansionCoveragePredicate } from '../runtime/coverage';
+import { type PivotExpansionCoverageDiff } from '../runtime/coverage';
 import { stableStringify } from '../shared/stableStringify';
 import { applyExpansionFetchDelta, runHydrationLoop } from './stateTransitions';
 import {
@@ -447,7 +447,7 @@ export const runSameAxisExpansionFetchLoop = async ({
   getExpandedRows,
   getExpandedCols,
   computeVisibleDepths,
-  getExpansionCoveragePredicate,
+  getMissingExpansionCoverage,
   getCoverageKey,
   shouldFetchChildren,
   fetchRuntime,
@@ -471,7 +471,7 @@ export const runSameAxisExpansionFetchLoop = async ({
     expandedCols: Set<string>,
     tree: PivotTreeData,
   ) => SameAxisVisibleDepths;
-  getExpansionCoveragePredicate: () => PivotExpansionCoveragePredicate;
+  getMissingExpansionCoverage: () => PivotExpansionCoverageDiff;
   getCoverageKey: (axis: PivotAxis, key: string) => string;
   shouldFetchChildren: PivotExpansionNodeFetchPredicate;
   fetchRuntime: ExpansionFetchRuntime;
@@ -512,7 +512,7 @@ export const runSameAxisExpansionFetchLoop = async ({
       expandedKeys: resolvedExpanded,
       nodes,
       coverage: { rowDepth: visibleRowDepth, columnDepth: visibleColDepth },
-      isExpansionCoverageLoaded: getExpansionCoveragePredicate(),
+      getMissingExpansionCoverage: getMissingExpansionCoverage(),
       getCoverageKey,
       shouldFetchChildren,
     });

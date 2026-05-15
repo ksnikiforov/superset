@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14000` insertions, `14260` deletions, net `-260`.
-- Current production TypeScript/TSX total: `33250` lines.
+- Production `src`: `13997` insertions, `14260` deletions, net `-263`.
+- Current production TypeScript/TSX total: `33247` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -419,6 +419,10 @@ Success criteria:
 - Fact-store compatibility keeps root/no-branch coverage separate from explicit
   branch coverage. Root is not a wildcard for arbitrary expanded paths under
   the set-oriented manifest.
+- Expansion coverage checks now use a manifest-diff API that returns missing
+  coverage requests instead of a single-key loaded predicate. Hydration and
+  branch fetch loops can now reason from the same "which coverage is missing"
+  shape used by runtime layout fetch decisions.
 - The materializer no longer exports a dead fact-store compatibility wrapper or
   test-fixture-only materialization entrypoints. Production callers now go
   through the explicit branch/initial materialization APIs.
@@ -451,10 +455,10 @@ Success criteria:
   runtime state machines.
 - `useExpansionEngine.ts` and `stateTransitions.ts` remain large. Split only by
   real ownership, not by wrapper files.
-- Expansion now has the right manifest predicate, but the grouped planner still
-  builds fetch targets separately from manifest construction. The next deletion
-  opportunity is to make the planner produce coverage needs first, then derive
-  transport batches from missing needs.
+- Expansion now has the right manifest-diff API, but the grouped planner still
+  builds fetch targets from keys after identifying missing coverage. The next
+  deletion opportunity is to make the planner produce missing coverage requests
+  first, then derive transport batches directly from those requests.
 - Large result sets still pay main-thread JSON parsing and React commit costs.
 
 ## Approval Checkpoints

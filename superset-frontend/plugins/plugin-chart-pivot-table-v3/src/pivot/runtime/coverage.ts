@@ -86,9 +86,9 @@ export type PivotExpansionCoverageRequest = {
   columnDepth: number;
 };
 
-export type PivotExpansionCoveragePredicate = (
-  request: PivotExpansionCoverageRequest,
-) => boolean;
+export type PivotExpansionCoverageDiff = (
+  requests: PivotExpansionCoverageRequest[],
+) => PivotExpansionCoverageRequest[];
 
 export type PivotCoverageNeedReason =
   | 'root'
@@ -482,7 +482,7 @@ export const diffCoverageManifest = ({
     need => !factBatches.some(batch => factBatchCoversNeed(batch, need)),
   );
 
-export const createExpansionCoveragePredicate = ({
+export const createExpansionCoverageDiff = ({
   factBatches,
   program,
   valueKeys,
@@ -490,15 +490,15 @@ export const createExpansionCoveragePredicate = ({
   factBatches: PivotFactStoreBatch[];
   program: PivotProgram;
   valueKeys: string[];
-}): PivotExpansionCoveragePredicate => {
+}): PivotExpansionCoverageDiff => {
   const cache = new Map<string, boolean>();
-  return request => {
+  const isLoaded = (request: PivotExpansionCoverageRequest) => {
     const key = stableStringify(request);
     const cached = cache.get(key);
     if (cached !== undefined) {
       return cached;
     }
-    const isLoaded =
+    const loaded =
       diffCoverageManifest({
         required: [
           buildExpansionCoverageNeed({
@@ -509,9 +509,10 @@ export const createExpansionCoveragePredicate = ({
         ],
         factBatches,
       }).length === 0;
-    cache.set(key, isLoaded);
-    return isLoaded;
+    cache.set(key, loaded);
+    return loaded;
   };
+  return requests => requests.filter(request => !isLoaded(request));
 };
 
 export const buildCoverageNeedFromFactSelector = ({

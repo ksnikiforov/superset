@@ -19,7 +19,7 @@
 
 import { PivotAxis, PivotTreeNode } from '../../../src/types';
 import { planExpansionForAxis } from '../../../src/pivot/expansion/planner';
-import { type PivotExpansionCoveragePredicate } from '../../../src/pivot/runtime/coverage';
+import { type PivotExpansionCoverageDiff } from '../../../src/pivot/runtime/coverage';
 import { serializePath } from '../../../src/pivot/core/path';
 import { rootKey } from '../../../src/pivot/viewModel';
 
@@ -46,13 +46,14 @@ const makeNode = ({
 
 const sortKeys = (keys: Set<string>) => Array.from(keys).sort();
 
-const expansionCoverageLoadedFromDepths =
-  (depthByPathKey: Map<string, number>): PivotExpansionCoveragePredicate =>
-  ({ axis, pathKey, rowDepth, columnDepth }) => {
-    const fetchedDepth = depthByPathKey.get(pathKey);
-    const requiredDepth = axis === 'row' ? columnDepth : rowDepth;
-    return fetchedDepth !== undefined && fetchedDepth >= requiredDepth;
-  };
+const getMissingCoverageFromDepths =
+  (depthByPathKey: Map<string, number>): PivotExpansionCoverageDiff =>
+  requests =>
+    requests.filter(({ axis, pathKey, rowDepth, columnDepth }) => {
+      const fetchedDepth = depthByPathKey.get(pathKey);
+      const requiredDepth = axis === 'row' ? columnDepth : rowDepth;
+      return !(fetchedDepth !== undefined && fetchedDepth >= requiredDepth);
+    });
 
 const shouldFetchDimensionChildren = ({
   path,
@@ -73,7 +74,7 @@ describe('expansionPlanner', () => {
       expandedKeys: new Set([rootKey, keyA]),
       nodes,
       coverage: { rowDepth: 1, columnDepth: 1 },
-      isExpansionCoverageLoaded: expansionCoverageLoadedFromDepths(
+      getMissingExpansionCoverage: getMissingCoverageFromDepths(
         new Map([[keyA, 1]]),
       ),
       getCoverageKey: (_axis, key) => key,
@@ -97,7 +98,7 @@ describe('expansionPlanner', () => {
       expandedKeys: new Set([rootKey, keyA]),
       nodes,
       coverage: { rowDepth: 1, columnDepth: 1 },
-      isExpansionCoverageLoaded: expansionCoverageLoadedFromDepths(
+      getMissingExpansionCoverage: getMissingCoverageFromDepths(
         new Map([[keyA, 2]]),
       ),
       getCoverageKey: (_axis, key) => key,
@@ -120,7 +121,7 @@ describe('expansionPlanner', () => {
       expandedKeys: new Set([rootKey, keyA]),
       nodes,
       coverage: { rowDepth: 1, columnDepth: 2 },
-      isExpansionCoverageLoaded: expansionCoverageLoadedFromDepths(
+      getMissingExpansionCoverage: getMissingCoverageFromDepths(
         new Map([[keyA, 1]]),
       ),
       getCoverageKey: (_axis, key) => key,
@@ -143,7 +144,7 @@ describe('expansionPlanner', () => {
       expandedKeys: new Set([rootKey, keyA]),
       nodes,
       coverage: { rowDepth: 1, columnDepth: 0 },
-      isExpansionCoverageLoaded: expansionCoverageLoadedFromDepths(new Map()),
+      getMissingExpansionCoverage: getMissingCoverageFromDepths(new Map()),
       getCoverageKey: (_axis, key) => key,
       shouldFetchChildren: shouldFetchDimensionChildren,
     });
@@ -165,7 +166,7 @@ describe('expansionPlanner', () => {
       expandedKeys: new Set([rootKey, keyA, keyAB]),
       nodes,
       coverage: { rowDepth: 1, columnDepth: 1 },
-      isExpansionCoverageLoaded: expansionCoverageLoadedFromDepths(
+      getMissingExpansionCoverage: getMissingCoverageFromDepths(
         new Map([[keyA, 1]]),
       ),
       getCoverageKey: (_axis, key) => key,
@@ -190,7 +191,7 @@ describe('expansionPlanner', () => {
       expandedKeys: new Set([rootKey, keyA, keyAB]),
       nodes,
       coverage: { rowDepth: 1, columnDepth: 2 },
-      isExpansionCoverageLoaded: expansionCoverageLoadedFromDepths(
+      getMissingExpansionCoverage: getMissingCoverageFromDepths(
         new Map([[keyA, 1]]),
       ),
       getCoverageKey: (_axis, key) => key,
@@ -214,7 +215,7 @@ describe('expansionPlanner', () => {
       expandedKeys: new Set([rootKey, keyA]),
       nodes: baseNodes,
       coverage: { rowDepth: 1, columnDepth: 1 },
-      isExpansionCoverageLoaded: expansionCoverageLoadedFromDepths(new Map()),
+      getMissingExpansionCoverage: getMissingCoverageFromDepths(new Map()),
       getCoverageKey: (_axis, key) => key,
       shouldFetchChildren: shouldFetchDimensionChildren,
     });
@@ -226,8 +227,7 @@ describe('expansionPlanner', () => {
       expandedKeys: new Set([rootKey, keyA]),
       nodes: baseNodes,
       coverage: { rowDepth: 1, columnDepth: 1 },
-      isExpansionCoverageLoaded:
-        expansionCoverageLoadedFromDepths(fetchedDepth),
+      getMissingExpansionCoverage: getMissingCoverageFromDepths(fetchedDepth),
       getCoverageKey: (_axis, key) => key,
       shouldFetchChildren: shouldFetchDimensionChildren,
     });
@@ -238,8 +238,7 @@ describe('expansionPlanner', () => {
       expandedKeys: new Set([rootKey, keyA, keyAB]),
       nodes: baseNodes,
       coverage: { rowDepth: 1, columnDepth: 1 },
-      isExpansionCoverageLoaded:
-        expansionCoverageLoadedFromDepths(fetchedDepth),
+      getMissingExpansionCoverage: getMissingCoverageFromDepths(fetchedDepth),
       getCoverageKey: (_axis, key) => key,
       shouldFetchChildren: shouldFetchDimensionChildren,
     });
@@ -250,8 +249,7 @@ describe('expansionPlanner', () => {
       expandedKeys: new Set([rootKey, keyA, keyAB]),
       nodes: baseNodes,
       coverage: { rowDepth: 1, columnDepth: 2 },
-      isExpansionCoverageLoaded:
-        expansionCoverageLoadedFromDepths(fetchedDepth),
+      getMissingExpansionCoverage: getMissingCoverageFromDepths(fetchedDepth),
       getCoverageKey: (_axis, key) => key,
       shouldFetchChildren: shouldFetchDimensionChildren,
     });
@@ -267,7 +265,7 @@ describe('expansionPlanner', () => {
       expandedKeys: new Set([rootKey, keyA, keyAB]),
       nodes: nodesWithChild,
       coverage: { rowDepth: 1, columnDepth: 2 },
-      isExpansionCoverageLoaded: expansionCoverageLoadedFromDepths(
+      getMissingExpansionCoverage: getMissingCoverageFromDepths(
         new Map([[keyA, 2]]),
       ),
       getCoverageKey: (_axis, key) => key,
