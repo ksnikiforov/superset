@@ -89,9 +89,6 @@ export const buildBatchSignature = ({
   });
 
   return stableStringify({
-    axis,
-    childDepth: axis === 'row' ? ctx.rowDepth : ctx.colDepth,
-    requiredOppositeDepth: axis === 'row' ? ctx.colDepth : ctx.rowDepth,
     datasource: queryContext.datasource,
     queries,
   });

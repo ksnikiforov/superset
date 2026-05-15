@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14122` insertions, `14236` deletions, net `-114`.
-- Current production TypeScript/TSX total: `33396` lines.
+- Production `src`: `14106` insertions, `14241` deletions, net `-135`.
+- Current production TypeScript/TSX total: `33375` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -396,6 +396,9 @@ Success criteria:
 - Expansion/query transport targets no longer carry duplicate
   `childDepth`/`requiredOppositeDepth` metadata. Depth remains planner/signature
   input, while fetch targets only identify the branch to fetch.
+- Expansion coverage lookup now reads from the fact store directly. The hook no
+  longer mirrors loaded fact batches or wires a separate `recordFactBatches`
+  callback through fetch loops.
 
 ## Current Risks
 

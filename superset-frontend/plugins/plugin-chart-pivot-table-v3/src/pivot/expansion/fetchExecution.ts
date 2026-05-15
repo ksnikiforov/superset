@@ -358,7 +358,6 @@ export const fetchExpansionTargetDeltas = async ({
   batchRequestKind,
   transactionId,
   buildRequestGroupId,
-  recordFactBatches,
 }: {
   targets: FetchTarget[];
   context: ExpansionFetchContext;
@@ -367,7 +366,6 @@ export const fetchExpansionTargetDeltas = async ({
   batchRequestKind?: string;
   transactionId: number;
   buildRequestGroupId: BuildExpansionRequestGroupId;
-  recordFactBatches: (factBatches: PivotFactStoreBatch[]) => void;
 }): Promise<FetchResultDelta[]> => {
   const results = await fetchExpansionTargets({
     targets,
@@ -383,7 +381,7 @@ export const fetchExpansionTargetDeltas = async ({
   }
   const deltas: FetchResultDelta[] = [];
   results.forEach(result => {
-    recordFactBatches(result.factBatches);
+    runtime.factStore?.upsertBatches(result.factBatches);
     if (!result.data) {
       return;
     }
@@ -402,14 +400,12 @@ export const runHydrationExpansionFetchLoop = ({
   fetchRuntime,
   transactionId,
   buildRequestGroupId,
-  recordFactBatches,
   ...hydrationLoopParams
 }: Omit<HydrationLoopParams, 'fetchDeltas'> & {
   reason: 'prefetch' | 'cross-axis';
   fetchRuntime: ExpansionFetchRuntime;
   transactionId: number;
   buildRequestGroupId: BuildExpansionRequestGroupId;
-  recordFactBatches: (factBatches: PivotFactStoreBatch[]) => void;
 }) =>
   runHydrationLoop({
     ...hydrationLoopParams,
@@ -421,7 +417,6 @@ export const runHydrationExpansionFetchLoop = ({
         singleRequestKind: `hydrate:${reason}`,
         transactionId,
         buildRequestGroupId,
-        recordFactBatches,
       }),
   });
 
@@ -458,7 +453,6 @@ export const runSameAxisExpansionFetchLoop = async ({
   fetchRuntime,
   transactionId,
   buildRequestGroupId,
-  recordFactBatches,
   resolveExpandedForMetrics,
   pruneMergedTree,
 }: {
@@ -483,7 +477,6 @@ export const runSameAxisExpansionFetchLoop = async ({
   fetchRuntime: ExpansionFetchRuntime;
   transactionId: number;
   buildRequestGroupId: BuildExpansionRequestGroupId;
-  recordFactBatches: (factBatches: PivotFactStoreBatch[]) => void;
   resolveExpandedForMetrics: (
     axis: PivotAxis,
     nextExpanded: Set<string>,
@@ -537,7 +530,6 @@ export const runSameAxisExpansionFetchLoop = async ({
       batchRequestKind: 'batch',
       transactionId,
       buildRequestGroupId,
-      recordFactBatches,
     });
     if (getDataEpoch() !== requestEpoch || !requestScope.isCurrent()) {
       return { status: 'stale' };

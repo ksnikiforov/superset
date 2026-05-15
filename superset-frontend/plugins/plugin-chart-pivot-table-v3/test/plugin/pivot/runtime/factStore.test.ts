@@ -113,6 +113,22 @@ test('does not share facts across different request scopes with the same coverag
   ).toEqual([2]);
 });
 
+test('exposes loaded coverage batches without duplicating fact payloads', () => {
+  const store = createPivotFactStore();
+
+  store.upsertBatch({
+    ...selector,
+    facts: [buildFact({ value: 10 })],
+  });
+
+  expect(store.getCoverageBatches()).toEqual([
+    {
+      ...selector,
+      facts: [],
+    },
+  ]);
+});
+
 test('does not satisfy sibling branch scopes with identical coverage', () => {
   const store = createPivotFactStore();
   const branchCoverage: PivotFactCoverage = {

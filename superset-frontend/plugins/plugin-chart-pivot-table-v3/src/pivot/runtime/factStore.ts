@@ -72,6 +72,7 @@ export type PivotFactStore = {
   upsertBatches: (batches: PivotFactStoreBatch[]) => void;
   getFacts: (selector: PivotFactSelector) => PivotFact[];
   getCompatibleFacts: (selector: PivotFactSelector) => PivotFact[];
+  getCoverageBatches: () => PivotFactStoreBatch[];
   hasCoverage: (selector: PivotFactSelector) => boolean;
   hasCompatibleCoverage: (selector: PivotFactSelector) => boolean;
   getAll: () => PivotFact[];
@@ -230,6 +231,11 @@ export const createPivotFactStore = (): PivotFactStore => {
     upsertBatches: batches => batches.forEach(upsertBatch),
     getFacts,
     getCompatibleFacts,
+    getCoverageBatches: () =>
+      Array.from(selectorByRequest.values()).map(selector => ({
+        ...selector,
+        facts: [],
+      })),
     hasCoverage: selector =>
       factKeysByRequest.has(buildPivotFactRequestKey(selector)),
     hasCompatibleCoverage: selector =>

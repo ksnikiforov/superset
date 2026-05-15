@@ -407,7 +407,6 @@ export const useExpansionEngine = ({
   const autoExpandColsLevelRef = useRef<number>(resolvedExpandColumnsLevel);
   const expandedStateSignatureRef = useRef<string | null>(null);
   const expandedStateSharedSignatureRef = useRef<string | null>(null);
-  const loadedFactBatchesRef = useRef<PivotFactStoreBatch[]>(factBatches);
   const requestGroupPrefixRef = useRef(nanoid());
   const fetchCoverageSignatureRef = useRef(fetchCoverageSignature);
   const expansionRequestLifecycle = useMemo(
@@ -421,7 +420,7 @@ export const useExpansionEngine = ({
 
   if (fetchCoverageSignatureRef.current !== fetchCoverageSignature) {
     expansionRequestLifecycle.invalidate();
-    loadedFactBatchesRef.current = [];
+    factStoreRef.current = createPivotFactStore();
     fetchCoverageSignatureRef.current = fetchCoverageSignature;
   }
 
@@ -552,21 +551,11 @@ export const useExpansionEngine = ({
   const getFetchedCoverageLookup = useCallback(
     () =>
       createFetchedFactCoverageLookup({
-        factBatches: loadedFactBatchesRef.current,
+        factBatches: factStoreRef.current?.getCoverageBatches() ?? [],
         getCoverageKey,
       }),
     [getCoverageKey],
   );
-
-  const recordFactBatches = useCallback((batches: PivotFactStoreBatch[]) => {
-    if (batches.length === 0) {
-      return;
-    }
-    loadedFactBatchesRef.current = [
-      ...loadedFactBatchesRef.current,
-      ...batches,
-    ];
-  }, []);
 
   const commitExpansionState = useCallback(
     ({
@@ -849,7 +838,6 @@ export const useExpansionEngine = ({
           fetchRuntime,
           transactionId: requestId,
           buildRequestGroupId: expansionRequestHelpers.buildRequestGroupId,
-          recordFactBatches,
           resolveExpandedForMetrics,
           pruneMergedTree,
         });
@@ -905,7 +893,6 @@ export const useExpansionEngine = ({
       persistExpansionState,
       pruneMergedTree,
       resolveExpandedForMetrics,
-      recordFactBatches,
       trackInFlightExpansion,
       shouldFetchChildren,
       updateLoadingKey,
@@ -996,7 +983,6 @@ export const useExpansionEngine = ({
           fetchRuntime,
           transactionId,
           buildRequestGroupId: expansionRequestHelpers.buildRequestGroupId,
-          recordFactBatches,
         });
         if (result.status === 'complete') {
           const resolvedRows = resolveExpandedForMetrics(
@@ -1037,7 +1023,6 @@ export const useExpansionEngine = ({
       getFetchedCoverageLookup,
       persistExpansionState,
       pruneMergedTree,
-      recordFactBatches,
       resolveExpandedForMetrics,
       setHydratingState,
       updateLoadingKey,
@@ -1204,7 +1189,6 @@ export const useExpansionEngine = ({
     const nextFactStore = createPivotFactStore();
     nextFactStore.upsertBatches(factBatches);
     factStoreRef.current = nextFactStore;
-    loadedFactBatchesRef.current = factBatches;
     setHydratingState(false);
     warningsRef.current = new Map();
     setWarnings([]);
