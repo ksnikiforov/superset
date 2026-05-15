@@ -142,8 +142,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14253` insertions, `14011` deletions, net `+242`.
-- Current production TypeScript/TSX total: `33752` lines.
+- Production `src`: `14299` insertions, `14193` deletions, net `+106`.
+- Current production TypeScript/TSX total: `33616` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -366,6 +366,11 @@ Success criteria:
   coverage and explicit path-set coverage diffing.
 - Runtime layout fetches now route through manifest diff instead of the old
   root-depth/leading-dimension heuristic.
+- Hidden-dimension layout edits no longer force a fetch when the visible
+  coverage manifest is unchanged.
+- Values index shifts caused only by hidden dimensions no longer count as
+  semantic placement changes; moving Values across an already shared visible
+  dimension still fetches.
 - Resolved query fetch context owns its fact coverages, so branch, batch, and
   signature callers no longer rebuild the same coverage list separately.
 - Expansion planner and fetched-request code now share the same fetched coverage
