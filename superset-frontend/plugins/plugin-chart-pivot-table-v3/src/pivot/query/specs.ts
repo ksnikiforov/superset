@@ -115,16 +115,6 @@ type BuildIntentInput = {
   needsColDimensionFormatting: boolean;
 };
 
-type CoverageTargetInput = Omit<
-  BuildIntentInput,
-  'kind' | 'targetRowDepth' | 'targetColDepth'
-> & {
-  layout: LayoutContext;
-  kind: Exclude<BootstrapTargetKind, 'totals'>;
-  rowDepth: number;
-  colDepth: number;
-};
-
 const buildIntent = ({
   kind,
   targetRowDepth,
@@ -152,36 +142,6 @@ const buildIntent = ({
 
 const firstVisibleDepth = (groupby: QueryFormColumn[]) =>
   groupby.length > 0 ? 1 : 0;
-
-const buildCoverageTarget = ({
-  layout,
-  kind,
-  rowDepth,
-  colDepth,
-  ...intentFlags
-}: CoverageTargetInput): BootstrapTarget | undefined => {
-  if (layout.pivotProgram.metricKeys.length === 0) {
-    return undefined;
-  }
-  const coverage = buildFactCoverage({
-    reason: 'initial',
-    rowDimensions: layout.pivotProgram.rowDimensions,
-    columnDimensions: layout.pivotProgram.columnDimensions,
-    rowDepth,
-    columnDepth: colDepth,
-  });
-
-  return {
-    kind,
-    coverage,
-    intent: buildIntent({
-      kind,
-      targetRowDepth: coverage.rowDepth,
-      targetColDepth: coverage.columnDepth,
-      ...intentFlags,
-    }),
-  };
-};
 
 const buildBootstrapPlanFromLayout = (
   layout: LayoutContext,
@@ -218,6 +178,12 @@ const buildBootstrapPlanFromLayout = (
   const firstRowDepth = firstVisibleDepth(rowGroupby);
   const firstColDepth = firstVisibleDepth(colGroupby);
   const needsGrid = firstRowDepth > 0 && firstColDepth > 0;
+  const intentFlags = {
+    needsMetricFormatting,
+    needsDatabars,
+    needsRowDimensionFormatting,
+    needsColDimensionFormatting,
+  };
 
   const targets: BootstrapTarget[] = [
     {
@@ -244,61 +210,89 @@ const buildBootstrapPlanFromLayout = (
     },
   ];
 
+  const addCoverageTarget = ({
+    kind,
+    rowDepth,
+    colDepth,
+    needsTotals: targetNeedsTotals,
+    needsRowOrdering: targetNeedsRowOrdering,
+    needsColOrdering: targetNeedsColOrdering,
+    needsRowDimensionFormatting: targetNeedsRowDimensionFormatting,
+    needsColDimensionFormatting: targetNeedsColDimensionFormatting,
+  }: {
+    kind: Exclude<BootstrapTargetKind, 'totals'>;
+    rowDepth: number;
+    colDepth: number;
+    needsTotals: boolean;
+    needsRowOrdering: boolean;
+    needsColOrdering: boolean;
+    needsRowDimensionFormatting: boolean;
+    needsColDimensionFormatting: boolean;
+  }) => {
+    if (layout.pivotProgram.metricKeys.length === 0) {
+      return;
+    }
+    const coverage = buildFactCoverage({
+      reason: 'initial',
+      rowDimensions: layout.pivotProgram.rowDimensions,
+      columnDimensions: layout.pivotProgram.columnDimensions,
+      rowDepth,
+      columnDepth: colDepth,
+    });
+    targets.push({
+      kind,
+      coverage,
+      intent: buildIntent({
+        kind,
+        targetRowDepth: coverage.rowDepth,
+        targetColDepth: coverage.columnDepth,
+        ...intentFlags,
+        needsTotals: targetNeedsTotals,
+        needsRowOrdering: targetNeedsRowOrdering,
+        needsColOrdering: targetNeedsColOrdering,
+        needsRowDimensionFormatting: targetNeedsRowDimensionFormatting,
+        needsColDimensionFormatting: targetNeedsColDimensionFormatting,
+      }),
+    });
+  };
+
   if (needsGrid) {
-    const target = buildCoverageTarget({
-      layout,
+    addCoverageTarget({
       kind: 'grid',
       rowDepth: firstRowDepth,
       colDepth: firstColDepth,
       needsTotals: false,
-      needsMetricFormatting,
-      needsDatabars,
       needsRowOrdering,
       needsColOrdering,
       needsRowDimensionFormatting,
       needsColDimensionFormatting,
     });
-    if (target) {
-      targets.push(target);
-    }
   }
 
   if (rowGroupby.length > 0 && (!needsGrid || needsRowTotals)) {
-    const target = buildCoverageTarget({
-      layout,
+    addCoverageTarget({
       kind: 'rows',
       rowDepth: firstRowDepth,
       colDepth: 0,
       needsTotals,
-      needsMetricFormatting,
-      needsDatabars,
       needsRowOrdering,
       needsColOrdering: false,
       needsRowDimensionFormatting,
       needsColDimensionFormatting: false,
     });
-    if (target) {
-      targets.push(target);
-    }
   }
 
   if (colGroupby.length > 0 && (!needsGrid || needsColTotals)) {
-    const target = buildCoverageTarget({
-      layout,
+    addCoverageTarget({
       kind: 'cols',
       rowDepth: 0,
       colDepth: firstColDepth,
       needsTotals,
-      needsMetricFormatting,
-      needsDatabars,
       needsRowOrdering: false,
       needsColOrdering,
       needsRowDimensionFormatting: false,
       needsColDimensionFormatting,
     });
-    if (target) {
-      targets.push(target);
-    }
   }
 
   return options.prefetchRoot ? targets.slice(0, 1) : targets;
