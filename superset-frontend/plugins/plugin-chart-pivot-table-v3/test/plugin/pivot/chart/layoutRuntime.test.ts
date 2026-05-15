@@ -360,13 +360,15 @@ describe('pivot/chart/layoutRuntime', () => {
 
     expect(
       resolveRowSubtotalChildrenPolicy({
+        program: policyProgram({
+          metricsLayoutResolved: MetricsLayoutEnum.COLUMNS,
+          valueAxis: 'col',
+        }),
         children: [dimensionChild, subtotalChild, grandTotalChild],
         parent,
         nodes: {},
         rowSubTotals: true,
         rowSubtotalPositionForParent: 'start',
-        resolvedMetricsLayout: MetricsLayoutEnum.COLUMNS,
-        isMultiMetric: false,
         hideMetricHeaderOnRows: false,
         countDimDepth: path => path.length,
         isMetricTokenValue: baseParams.isMetricTokenValue,
@@ -397,14 +399,16 @@ describe('pivot/chart/layoutRuntime', () => {
 
     expect(
       resolveRowSubtotalChildrenPolicy({
+        program: policyProgram({
+          rowDimensions: ['r1', 'r2'],
+          metricKeys: ['sales', 'profit'],
+          metricInsertIndex: 1,
+        }),
         children: [dimensionChild],
         parent,
         nodes,
         rowSubTotals: true,
         rowSubtotalPositionForParent: 'end',
-        resolvedMetricsLayout: MetricsLayoutEnum.ROWS,
-        isMultiMetric: true,
-        metricIndexOnRows: 1,
         hideMetricHeaderOnRows: false,
         countDimDepth: path => path.length,
         isMetricTokenValue: baseParams.isMetricTokenValue,

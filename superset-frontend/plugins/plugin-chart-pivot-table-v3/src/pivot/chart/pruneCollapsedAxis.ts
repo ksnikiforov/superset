@@ -17,15 +17,12 @@
  * under the License.
  */
 import {
-  MetricsLayoutEnum,
   type PivotAxis,
   type PivotTreeData,
   type PivotTreeNode,
 } from '../../types';
+import type { PivotProgram } from '../runtime/types';
 import { findChildren } from '../viewModel';
-
-const expectedMetricsLayoutForAxis = (axis: PivotAxis) =>
-  axis === 'row' ? MetricsLayoutEnum.ROWS : MetricsLayoutEnum.COLUMNS;
 
 const getAxisNodes = (tree: PivotTreeData, axis: PivotAxis) =>
   axis === 'row' ? tree.rows : tree.cols;
@@ -69,9 +66,7 @@ export const pruneStaleCollapsedAxis = ({
   axis,
   parent,
   branch,
-  resolvedMetricsLayout,
-  metricIndex,
-  preserveMetricAtParentLevel = false,
+  program,
   isMetricTokenValue,
   isExplicitSubtotalNode,
   isMetricGrandTotalNode,
@@ -81,9 +76,7 @@ export const pruneStaleCollapsedAxis = ({
   axis: PivotAxis;
   parent: PivotTreeNode;
   branch?: PivotTreeData;
-  resolvedMetricsLayout: MetricsLayoutEnum;
-  metricIndex?: number;
-  preserveMetricAtParentLevel?: boolean;
+  program: PivotProgram;
   isMetricTokenValue: (value: unknown) => boolean;
   isExplicitSubtotalNode: (node: PivotTreeNode) => boolean;
   isMetricGrandTotalNode: (node: PivotTreeNode) => boolean;
@@ -92,9 +85,16 @@ export const pruneStaleCollapsedAxis = ({
   if (!branch) {
     return currentTree;
   }
-  if (resolvedMetricsLayout !== expectedMetricsLayoutForAxis(axis)) {
-    return currentTree;
-  }
+  const axisDimensions =
+    axis === 'row' ? program.rowDimensions : program.columnDimensions;
+  const metricIndex =
+    program.valueAxis === axis && program.metricKeys.length > 0
+      ? Math.min(program.metricInsertIndex, axisDimensions.length)
+      : undefined;
+  const preserveMetricAtParentLevel =
+    axis === 'col' &&
+    metricIndex !== undefined &&
+    metricIndex >= axisDimensions.length;
   if (metricIndex === undefined) {
     return currentTree;
   }

@@ -407,14 +407,12 @@ export const resolveCollapsedValuesNodesForAxis = ({
 };
 
 type ResolveRowSubtotalChildrenPolicyParams = {
+  program: PivotProgram;
   children: PivotTreeNode[];
   parent: PivotTreeNode;
   nodes: Record<string, PivotTreeNode>;
   rowSubTotals: boolean;
   rowSubtotalPositionForParent: TotalPosition;
-  resolvedMetricsLayout: MetricsLayoutEnum;
-  isMultiMetric: boolean;
-  metricIndexOnRows?: number;
   hideMetricHeaderOnRows: boolean;
   countDimDepth: (path: PivotTreeNode['path']) => number;
   isMetricTokenValue: (value: unknown) => boolean;
@@ -423,20 +421,25 @@ type ResolveRowSubtotalChildrenPolicyParams = {
 };
 
 export const resolveRowSubtotalChildrenPolicy = ({
+  program,
   children,
   parent,
   nodes,
   rowSubTotals,
   rowSubtotalPositionForParent,
-  resolvedMetricsLayout,
-  isMultiMetric,
-  metricIndexOnRows,
   hideMetricHeaderOnRows,
   countDimDepth,
   isMetricTokenValue,
   isMetricGrandTotalNode,
   isExplicitSubtotalNode,
 }: ResolveRowSubtotalChildrenPolicyParams): PivotTreeNode[] => {
+  const resolvedMetricsLayout = program.metricsLayoutResolved;
+  const isMultiMetric = program.metricKeys.length > 1;
+  const metricIndexOnRows =
+    resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
+    program.metricKeys.length
+      ? Math.min(program.metricInsertIndex, program.rowDimensions.length)
+      : undefined;
   let filtered = children;
   if (resolvedMetricsLayout === MetricsLayoutEnum.ROWS && !isMultiMetric) {
     filtered = filtered.filter(child => !isMetricGrandTotalNode(child));
