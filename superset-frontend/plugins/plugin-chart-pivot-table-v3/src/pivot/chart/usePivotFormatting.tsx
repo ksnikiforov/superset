@@ -792,17 +792,11 @@ export const usePivotFormatting = ({
       deriveMetricKeyBase({
         rowNode,
         colNode,
-        metrics,
-        metricsLayout: layout.resolvedMetricsLayout,
+        program: layout.layout.pivotProgram,
         cells: tree.cells,
         measureHierarchy: layout.measureHierarchy,
       }),
-    [
-      layout.measureHierarchy,
-      layout.resolvedMetricsLayout,
-      metrics,
-      tree.cells,
-    ],
+    [layout.layout.pivotProgram, layout.measureHierarchy, tree.cells],
   );
 
   const themeColor = useMemo(() => {
@@ -1208,8 +1202,7 @@ export const usePivotFormatting = ({
       formatNodeLabelBase({
         node,
         axis,
-        metricsLayout: layout.resolvedMetricsLayout,
-        metricIndexOnRows: layout.metricIndexOnRows,
+        program: layout.layout.pivotProgram,
         isMetricGrandTotalNode: layout.isMetricGrandTotalNode,
         getMetricKeyFromPath: layout.getMetricLabelFromPath,
         getMetricDisplayLabelForKey: layout.getMetricDisplayLabelForKey,

@@ -28,6 +28,7 @@ import {
   deriveMetricKey,
 } from '../../../src/pivot/cellUtils';
 import {
+  METRICS_PLACEHOLDER,
   encodeMeasureLeafKey,
   encodeMetricKey,
 } from '../../../src/pivot/core/tokens';
@@ -37,6 +38,7 @@ import {
   buildMeasureLeafOutputKey,
   buildValueLeaf,
 } from '../../../src/pivot/measureLeaves';
+import { compilePivotProgram } from '../../../src/pivot/runtime/compilePivotProgram';
 
 const rootKey = serializePath([]);
 
@@ -175,8 +177,11 @@ describe('cellUtils helpers', () => {
     const result = deriveMetricKey({
       rowNode,
       colNode,
-      metrics: [metricKey],
-      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      program: compilePivotProgram({
+        groupbyColumns: [METRICS_PLACEHOLDER],
+        metrics: [metricKey],
+        metricsLayout: MetricsLayoutEnum.COLUMNS,
+      }),
       cells,
       measureHierarchy: {
         kind: 'measureStackV1',
@@ -212,8 +217,11 @@ describe('cellUtils helpers', () => {
     const result = deriveMetricKey({
       rowNode,
       colNode,
-      metrics: [metricKey],
-      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      program: compilePivotProgram({
+        groupbyColumns: [METRICS_PLACEHOLDER],
+        metrics: [metricKey],
+        metricsLayout: MetricsLayoutEnum.COLUMNS,
+      }),
       cells,
       measureHierarchy: {
         kind: 'measureStackV1',

@@ -16,27 +16,26 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { DataRecordValue, QueryFormMetric } from '@superset-ui/core';
-import {
-  MeasureHierarchy,
-  MetricsLayoutEnum,
-  PivotResultCell,
-  PivotTreeNode,
-} from '../types';
+import { DataRecordValue } from '@superset-ui/core';
+import { MeasureHierarchy, PivotResultCell, PivotTreeNode } from '../types';
 import {
   decodeMeasureLeafId,
   decodeMetricKey,
   findMeasureLeafIdInPath,
-  getMetricKey,
 } from './core/tokens';
 import { serializeCellKey, serializePath } from './core/path';
 import { buildMeasureLeafOutputKey } from './measureLeaves';
+import type { PivotProgram } from './runtime/types';
+
+const metricIndexOnRows = (program: PivotProgram) =>
+  program.valueAxis === 'row' && program.metricKeys.length > 0
+    ? Math.min(program.metricInsertIndex, program.rowDimensions.length)
+    : undefined;
 
 type DeriveMetricKeyParams = {
   rowNode: PivotTreeNode;
   colNode: PivotTreeNode;
-  metrics: QueryFormMetric[];
-  metricsLayout: MetricsLayoutEnum;
+  program: PivotProgram;
   cells: Record<string, PivotResultCell>;
   measureHierarchy?: MeasureHierarchy;
 };
@@ -44,20 +43,16 @@ type DeriveMetricKeyParams = {
 export const deriveMetricKey = ({
   rowNode,
   colNode,
-  metrics,
-  metricsLayout,
+  program,
   cells,
   measureHierarchy,
 }: DeriveMetricKeyParams) => {
   const cellValues =
     cells[serializeCellKey(rowNode.key, colNode.key)]?.values || {};
-  const metricLabels = metrics
-    .map(getMetricKey)
-    .filter(label => label.length > 0);
-  const primaryPath =
-    metricsLayout === MetricsLayoutEnum.ROWS ? rowNode.path : colNode.path;
+  const metricLabels = program.metricKeys;
+  const primaryPath = program.valueAxis === 'row' ? rowNode.path : colNode.path;
   const secondaryPath =
-    metricsLayout === MetricsLayoutEnum.ROWS ? colNode.path : rowNode.path;
+    program.valueAxis === 'row' ? colNode.path : rowNode.path;
   const findMetricToken = (path: PivotTreeNode['path']) =>
     [...path].reverse().find(val => {
       const decoded = decodeMetricKey(val);
@@ -147,8 +142,7 @@ export const shouldHideRowValues = ({
 type FormatLabelParams = {
   node: PivotTreeNode;
   axis: 'row' | 'col';
-  metricsLayout: MetricsLayoutEnum;
-  metricIndexOnRows?: number;
+  program: PivotProgram;
   isMetricGrandTotalNode: (node: PivotTreeNode) => boolean;
   getMetricKeyFromPath: (path: PivotTreeNode['path']) => string | undefined;
   getMetricDisplayLabelForKey: (metricKey: string) => string;
@@ -160,8 +154,7 @@ type FormatLabelParams = {
 export const formatNodeLabel = ({
   node,
   axis,
-  metricsLayout,
-  metricIndexOnRows,
+  program,
   isMetricGrandTotalNode,
   getMetricKeyFromPath,
   getMetricDisplayLabelForKey,
@@ -209,7 +202,7 @@ export const formatNodeLabel = ({
   });
   if (
     axis === 'col' &&
-    metricsLayout === MetricsLayoutEnum.COLUMNS &&
+    program.valueAxis === 'col' &&
     isMetricGrandTotalNode(node) &&
     !hasNonMetricParts
   ) {
@@ -217,9 +210,7 @@ export const formatNodeLabel = ({
   }
   if (
     axis === 'row' &&
-    metricsLayout === MetricsLayoutEnum.ROWS &&
-    metricIndexOnRows !== undefined &&
-    metricIndexOnRows > 0 &&
+    (metricIndexOnRows(program) ?? 0) > 0 &&
     isMetricGrandTotalNode(node)
   ) {
     if (metricDisplayLabel) {
