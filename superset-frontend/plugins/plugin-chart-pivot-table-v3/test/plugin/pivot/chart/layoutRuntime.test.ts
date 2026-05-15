@@ -43,7 +43,6 @@ const node = (axis: 'row' | 'col', path: PivotTreeNode['path']) => ({
 });
 
 const baseParams = {
-  metricsCount: 1,
   metricLabelCount: 1,
   rowDimCount: 0,
   colDimCount: 0,

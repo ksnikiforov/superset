@@ -314,7 +314,6 @@ export const usePivotLayout = ({
   } = useMemo(
     () =>
       resolveMetricAxisLayoutPolicy({
-        metricsCount: metrics.length,
         metricLabelCount: metricLabels.length,
         rowDimCount,
         colDimCount,
@@ -332,7 +331,6 @@ export const usePivotLayout = ({
       isLeafTierVisible,
       layout.metricInsertIndex,
       metricLabels.length,
-      metrics.length,
       resolvedColSubtotalPosition,
       resolvedExpandColumnsLevel,
       resolvedExpandRowsLevel,

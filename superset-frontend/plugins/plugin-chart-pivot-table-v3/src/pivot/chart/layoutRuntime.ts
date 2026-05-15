@@ -35,7 +35,6 @@ import { type PivotProgram } from '../runtime/types';
 import { findChildren } from '../viewModel';
 
 type ResolveMetricAxisLayoutParams = {
-  metricsCount: number;
   metricLabelCount: number;
   rowDimCount: number;
   colDimCount: number;
@@ -62,7 +61,6 @@ export type MetricAxisLayoutPolicy = {
   metricsFirstOnCols: boolean;
   forceRowSubtotalEnd: boolean;
   effectiveRowSubtotalPosition: TotalPosition;
-  forceColSubtotalEnd: boolean;
   effectiveColSubtotalPosition: TotalPosition;
   hideMetricHeaderOnRows: boolean;
   hideMetricHeaderOnCols: boolean;
@@ -113,7 +111,6 @@ export const buildMetricOrderComparator = ({
 };
 
 export const resolveMetricAxisLayoutPolicy = ({
-  metricsCount,
   metricLabelCount,
   rowDimCount,
   colDimCount,
@@ -126,14 +123,15 @@ export const resolveMetricAxisLayoutPolicy = ({
   resolvedRowSubtotalPosition,
   resolvedColSubtotalPosition,
 }: ResolveMetricAxisLayoutParams): MetricAxisLayoutPolicy => {
+  const hasMetrics = metricLabelCount > 0;
   const isSingleMetric = metricLabelCount === 1;
   const isMultiMetric = metricLabelCount > 1;
   const metricIndexOnRows =
-    resolvedMetricsLayout === MetricsLayoutEnum.ROWS && metricsCount > 0
+    resolvedMetricsLayout === MetricsLayoutEnum.ROWS && hasMetrics
       ? Math.min(metricInsertIndex, rowDimCount)
       : undefined;
   const metricIndexOnCols =
-    resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS && metricsCount > 0
+    resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS && hasMetrics
       ? Math.min(metricInsertIndex, colDimCount)
       : undefined;
   const singleMetricBetweenRows =
@@ -151,12 +149,12 @@ export const resolveMetricAxisLayoutPolicy = ({
 
   const shouldExpandMetricRows =
     resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
-    metricsCount > 0 &&
+    hasMetrics &&
     metricInsertIndex === 0 &&
     resolvedExpandRowsLevel > 0;
   const shouldExpandMetricCols =
     resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS &&
-    metricsCount > 0 &&
+    hasMetrics &&
     metricInsertIndex === 0 &&
     resolvedExpandColumnsLevel > 0;
 
@@ -182,11 +180,10 @@ export const resolveMetricAxisLayoutPolicy = ({
   const effectiveRowSubtotalPosition = forceRowSubtotalEnd
     ? 'end'
     : resolvedRowSubtotalPosition;
-  const forceColSubtotalEnd =
-    isMultiMetric && resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS;
-  const effectiveColSubtotalPosition = forceColSubtotalEnd
-    ? 'end'
-    : resolvedColSubtotalPosition;
+  const effectiveColSubtotalPosition =
+    isMultiMetric && resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS
+      ? 'end'
+      : resolvedColSubtotalPosition;
 
   const hideMetricHeaderOnRows =
     resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
@@ -214,7 +211,6 @@ export const resolveMetricAxisLayoutPolicy = ({
     metricsFirstOnCols,
     forceRowSubtotalEnd,
     effectiveRowSubtotalPosition,
-    forceColSubtotalEnd,
     effectiveColSubtotalPosition,
     hideMetricHeaderOnRows,
     hideMetricHeaderOnCols,
