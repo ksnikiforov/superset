@@ -163,6 +163,7 @@ describe('pivot/expansion/planner', () => {
             path: ['France'],
           },
           facts: [],
+          valueKeys: ['sales'],
         },
       ],
     });
@@ -284,6 +285,7 @@ describe('pivot/expansion/planner', () => {
             path: ['A'],
           },
           facts: [],
+          valueKeys: ['sales'],
         },
       ],
     });
@@ -331,6 +333,7 @@ describe('pivot/expansion/planner', () => {
             siblingValues: ['CA', 'NY'],
           },
           facts: [],
+          valueKeys: ['sales'],
         },
       ],
     });
@@ -376,6 +379,7 @@ describe('pivot/expansion/planner', () => {
             path: ['A', encodeMetricKey('sales')],
           },
           facts: [],
+          valueKeys: ['sales'],
         },
       ],
     });

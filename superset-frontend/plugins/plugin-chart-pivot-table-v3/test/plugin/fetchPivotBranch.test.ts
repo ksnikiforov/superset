@@ -1597,6 +1597,7 @@ describe('fetchPivotBranch delta-only contract', () => {
     store.upsertBatch({
       coverage: spec.meta.coverage,
       scope: { kind: 'branch', axis: 'row', path: ['A'] },
+      valueKeys: ['m1'],
       facts: [
         {
           rowPath: ['A', 'B'],
@@ -1659,6 +1660,7 @@ describe('fetchPivotBranch delta-only contract', () => {
           path: ['Furniture'],
         },
         facts: [],
+        valueKeys: ['profit', 'sales'],
       }),
     ]);
   });

@@ -287,6 +287,7 @@ describe('fetchPivotBranchesBatch', () => {
         parentPath: ['US'],
         siblingValues: ['CA', 'NY'],
       },
+      valueKeys: ['m1'],
       facts: [
         {
           rowPath: ['US', 'CA', 'SF'],
@@ -383,6 +384,7 @@ describe('fetchPivotBranchesBatch', () => {
           siblingValues: ['US', 'CA'],
         },
         facts: [],
+        valueKeys: ['profit', 'sales'],
       }),
     ]);
   });

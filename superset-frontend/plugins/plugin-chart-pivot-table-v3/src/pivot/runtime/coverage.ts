@@ -350,17 +350,14 @@ export const buildRuntimeLayoutCoverageManifest = (
 };
 
 const factBatchCoversNeed = (
-  { coverage, scope, facts, valueKeys }: PivotFactStoreBatch,
+  { coverage, scope, valueKeys }: PivotFactStoreBatch,
   need: PivotCoverageNeed,
 ) =>
   coverage.rowDepth === need.rowDepth &&
   coverage.columnDepth === need.columnDepth &&
   columnRefsMatch(coverage.rowDimensions, need.rowDimensions) &&
   columnRefsMatch(coverage.columnDimensions, need.columnDimensions) &&
-  valueKeysCover(
-    valueKeys ?? facts.map(fact => fact.valueKey),
-    need.valueKeys,
-  ) &&
+  valueKeysCover(valueKeys, need.valueKeys) &&
   (need.rowScope.kind === 'root' && need.columnScope.kind === 'root'
     ? isRuntimeLayoutCoverageScope(scope)
     : scopeCoversAxisPaths(scope, 'row', need.rowScope) &&

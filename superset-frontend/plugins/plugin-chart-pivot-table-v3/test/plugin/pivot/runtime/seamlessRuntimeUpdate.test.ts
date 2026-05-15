@@ -399,6 +399,7 @@ test('prepares fetch actions for runtime layout changes with missing coverage', 
       columnDepth: 0,
     }),
     facts: [],
+    valueKeys: ['sales'],
     scope: { kind: 'bootstrap' },
   };
 

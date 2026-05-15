@@ -40,7 +40,7 @@ export type PivotFact = {
 export type PivotFactSelector = {
   coverage: PivotFactCoverage;
   scope: PivotFactStoreBatchScope;
-  valueKeys?: string[];
+  valueKeys: string[];
 };
 
 export type PivotFactStoreBatch = PivotFactSelector & {
@@ -128,9 +128,7 @@ export const createPivotFactStore = (): PivotFactStore => {
     const selector = {
       coverage: batch.coverage,
       scope: batch.scope,
-      valueKeys: normalizeFactValueKeys(
-        batch.valueKeys ?? facts.map(fact => fact.valueKey),
-      ),
+      valueKeys: normalizeFactValueKeys(batch.valueKeys),
     };
     const key = buildPivotFactRequestKey(selector);
     const requestFactKeys = factKeysByRequest.get(key) ?? new Set<string>();

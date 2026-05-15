@@ -1466,6 +1466,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
           columnDimensions: initialCols,
         },
         facts: [],
+        valueKeys: ['m1', 'm2'],
         scope: {
           kind: 'batch',
           axis: 'col',
