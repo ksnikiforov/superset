@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13973` insertions, `14264` deletions, net `-291`.
-- Current production TypeScript/TSX total: `33219` lines.
+- Production `src`: `13977` insertions, `14293` deletions, net `-316`.
+- Current production TypeScript/TSX total: `33194` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -427,8 +427,10 @@ Success criteria:
   whether root data is loaded. It asks the expansion coverage manifest for the
   missing root request and only applies during an actual cross-axis fetch.
 - Expansion planning now builds the candidate coverage request set before
-  deciding fetch keys, then diffs that set once through the manifest-diff API.
-  This removes repeated per-key loaded checks from the planner boundary.
+  deciding fetch requests, then diffs that set once through the manifest-diff
+  API. Grouped expansion transport now derives from those explicit fetch
+  requests instead of from a separate fetch-key plan, and the old grouped
+  planner wrapper has been deleted.
 - The materializer no longer exports a dead fact-store compatibility wrapper or
   test-fixture-only materialization entrypoints. Production callers now go
   through the explicit branch/initial materialization APIs.
@@ -467,9 +469,6 @@ Success criteria:
   runtime state machines.
 - `useExpansionEngine.ts` and `stateTransitions.ts` remain large. Split only by
   real ownership, not by wrapper files.
-- Expansion now builds missing coverage requests first, but grouped transport
-  still derives from fetch keys. The next deletion opportunity is to derive
-  transport batches directly from missing coverage requests.
 - Large result sets still pay main-thread JSON parsing and React commit costs.
 
 ## Approval Checkpoints

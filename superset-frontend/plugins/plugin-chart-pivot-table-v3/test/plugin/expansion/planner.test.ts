@@ -17,7 +17,10 @@
  * under the License.
  */
 
-import { planGroupedExpansionTargets } from '../../../src/pivot/expansion/planner';
+import {
+  buildGroupedFetchTargets,
+  planExpansionForAxis,
+} from '../../../src/pivot/expansion/planner';
 import {
   createExpansionCoverageDiff,
   type PivotExpansionCoverageDiff,
@@ -71,6 +74,24 @@ const getMissingCoverageFromBatches = (
     valueKeys: ['sales', 'profit'],
   });
 
+const fetchPathKeys = (plan: ReturnType<typeof planExpansionForAxis>) =>
+  plan.fetchRequests.map(request => request.pathKey);
+
+const planGroupedExpansionTargets = (
+  input: Parameters<typeof planExpansionForAxis>[0],
+) => {
+  const plan = planExpansionForAxis(input);
+  return {
+    plan,
+    targets: buildGroupedFetchTargets({
+      axis: input.axis,
+      requests: plan.fetchRequests,
+      nodes: input.nodes,
+      getCoverageKey: input.getCoverageKey,
+    }),
+  };
+};
+
 describe('pivot/expansion/planner', () => {
   it('plans grouped fetch targets for an expanded node', () => {
     const aKey = serializePath(['A']);
@@ -105,7 +126,7 @@ describe('pivot/expansion/planner', () => {
       shouldFetchChildren: shouldFetchDimensionChildren,
     });
 
-    expect(Array.from(plan.fetchKeys)).toEqual([aKey]);
+    expect(fetchPathKeys(plan)).toEqual([aKey]);
     expect(targets).toEqual([
       {
         axis: 'row',
@@ -133,7 +154,7 @@ describe('pivot/expansion/planner', () => {
       shouldFetchChildren: ({ key }) => key === aKey,
     });
 
-    expect(Array.from(plan.fetchKeys)).toEqual([aKey]);
+    expect(fetchPathKeys(plan)).toEqual([aKey]);
     expect(targets).toEqual([
       {
         axis: 'row',
@@ -178,7 +199,7 @@ describe('pivot/expansion/planner', () => {
       shouldFetchChildren: shouldFetchDimensionChildren,
     });
 
-    expect(Array.from(plan.fetchKeys)).toEqual([bKey]);
+    expect(fetchPathKeys(plan)).toEqual([bKey]);
     expect(targets.map(target => target.pathKey)).toEqual([bKey]);
   });
 
@@ -249,7 +270,7 @@ describe('pivot/expansion/planner', () => {
       shouldFetchChildren: shouldFetchDimensionChildren,
     });
 
-    expect(Array.from(plan.fetchKeys)).toEqual([txKey]);
+    expect(fetchPathKeys(plan)).toEqual([txKey]);
     expect(targets.map(target => target.pathKey)).toEqual([txKey]);
   });
 
@@ -294,7 +315,7 @@ describe('pivot/expansion/planner', () => {
       shouldFetchChildren: shouldFetchDimensionChildren,
     });
 
-    expect(Array.from(plan.fetchKeys)).toEqual([profitKey]);
+    expect(fetchPathKeys(plan)).toEqual([profitKey]);
     expect(targets.map(target => target.pathKey)).toEqual([profitKey]);
   });
 

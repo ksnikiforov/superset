@@ -27,7 +27,7 @@ import {
 import { rootKey } from '../viewModel';
 
 export type PivotExpansionPlan = {
-  fetchKeys: Set<string>;
+  fetchRequests: PivotExpansionCoverageRequest[];
   pendingKeys: Set<string>;
   hasMissingNodes: boolean;
 };
@@ -85,7 +85,7 @@ export const planExpansionForAxis = ({
   getCoverageKey: (axis: PivotAxis, key: string) => string;
   shouldFetchChildren: PivotExpansionNodeFetchPredicate;
 }): PivotExpansionPlan => {
-  const fetchKeys = new Set<string>();
+  const fetchRequests = new Map<string, PivotExpansionCoverageRequest>();
   const pendingKeys = new Set<string>();
   let hasMissingNodes = false;
   const hasNonRootExpanded =
@@ -104,6 +104,10 @@ export const planExpansionForAxis = ({
   const addRequest = (key: string) => {
     const request = buildRequest(key);
     candidateRequests.set(requestKey(request), request);
+  };
+  const addFetchRequest = (key: string) => {
+    const request = buildRequest(key);
+    fetchRequests.set(requestKey(request), request);
   };
   candidates.forEach(({ key, node }) => {
     if (node) {
@@ -134,7 +138,7 @@ export const planExpansionForAxis = ({
       if (!missingRequestKeys.has(requestKey(buildRequest(key)))) {
         return;
       }
-      fetchKeys.add(key);
+      addFetchRequest(key);
       pendingKeys.add(key);
       return;
     }
@@ -156,41 +160,46 @@ export const planExpansionForAxis = ({
       if (getCoverageKey(axis, key) === getCoverageKey(axis, ancestorKey)) {
         return;
       }
-      fetchKeys.add(key);
+      addFetchRequest(key);
       pendingKeys.add(key);
       return;
     }
-    fetchKeys.add(ancestorKey);
+    addFetchRequest(ancestorKey);
     pendingKeys.add(key);
   });
 
-  if (fetchKeys.size > 1 && fetchKeys.has(rootKey)) {
-    fetchKeys.delete(rootKey);
+  const rootRequest = buildRequest(rootKey);
+  if (fetchRequests.size > 1 && fetchRequests.has(requestKey(rootRequest))) {
+    fetchRequests.delete(requestKey(rootRequest));
     pendingKeys.delete(rootKey);
   }
 
-  return { fetchKeys, pendingKeys, hasMissingNodes };
+  return {
+    fetchRequests: Array.from(fetchRequests.values()),
+    pendingKeys,
+    hasMissingNodes,
+  };
 };
 
 export function buildGroupedFetchTargets({
   axis,
-  fetchKeys,
+  requests,
   nodes,
   getCoverageKey,
 }: {
   axis: PivotAxis;
-  fetchKeys: Set<string>;
+  requests: PivotExpansionCoverageRequest[];
   nodes: Record<string, PivotTreeNode>;
   getCoverageKey: (axis: PivotAxis, key: string) => string;
 }): FetchTarget[] {
   const groups = new Map<string, string[]>();
-  fetchKeys.forEach(key => {
-    const groupKey = getCoverageKey(axis, key);
+  requests.forEach(({ pathKey }) => {
+    const groupKey = getCoverageKey(axis, pathKey);
     const existing = groups.get(groupKey);
     if (existing) {
-      existing.push(key);
+      existing.push(pathKey);
     } else {
-      groups.set(groupKey, [key]);
+      groups.set(groupKey, [pathKey]);
     }
   });
 
@@ -210,43 +219,3 @@ export function buildGroupedFetchTargets({
 
   return targets;
 }
-
-export const planGroupedExpansionTargets = ({
-  axis,
-  expandedKeys,
-  nodes,
-  coverage,
-  getMissingExpansionCoverage,
-  getCoverageKey,
-  shouldFetchChildren,
-}: {
-  axis: PivotAxis;
-  expandedKeys: Set<string>;
-  nodes: Record<string, PivotTreeNode>;
-  coverage: PivotExpansionCoverageDepths;
-  getMissingExpansionCoverage: PivotExpansionCoverageDiff;
-  getCoverageKey: (axis: PivotAxis, key: string) => string;
-  shouldFetchChildren: PivotExpansionNodeFetchPredicate;
-}): {
-  plan: PivotExpansionPlan;
-  targets: FetchTarget[];
-} => {
-  const plan = planExpansionForAxis({
-    axis,
-    expandedKeys,
-    nodes,
-    coverage,
-    getMissingExpansionCoverage,
-    getCoverageKey,
-    shouldFetchChildren,
-  });
-
-  const targets = buildGroupedFetchTargets({
-    axis,
-    fetchKeys: plan.fetchKeys,
-    nodes,
-    getCoverageKey,
-  });
-
-  return { plan, targets };
-};

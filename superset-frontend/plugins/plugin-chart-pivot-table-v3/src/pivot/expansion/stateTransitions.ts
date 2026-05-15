@@ -60,7 +60,7 @@ export type ExpansionVisibilityConfig = {
 };
 
 const createEmptyExpansionPlan = (): PivotExpansionPlan => ({
-  fetchKeys: new Set<string>(),
+  fetchRequests: [],
   pendingKeys: new Set<string>(),
   hasMissingNodes: false,
 });
@@ -932,24 +932,23 @@ export const applyCrossAxisRootFetch = ({
   getMissingExpansionCoverage: PivotExpansionCoverageDiff;
 }): { rowPlan: PivotExpansionPlan; colPlan: PivotExpansionPlan } => {
   const hasCrossAxisFetch =
-    rowPlan.fetchKeys.size > 0 && colPlan.fetchKeys.size > 0;
+    rowPlan.fetchRequests.length > 0 && colPlan.fetchRequests.length > 0;
   const axis = groupbyRowsLength > 0 ? 'row' : 'col';
+  const rootRequest = {
+    axis,
+    pathKey: rootKey,
+    rowDepth: visibleRowDepth,
+    columnDepth: visibleColDepth,
+  };
   const shouldForceRootFetch =
     hasCrossAxisFetch &&
     visibleRowDepth > 0 &&
     visibleColDepth > 0 &&
-    getMissingExpansionCoverage([
-      {
-        axis,
-        pathKey: rootKey,
-        rowDepth: visibleRowDepth,
-        columnDepth: visibleColDepth,
-      },
-    ]).length > 0;
+    getMissingExpansionCoverage([rootRequest]).length > 0;
   if (
     !shouldForceRootFetch ||
-    rowPlan.fetchKeys.has(rootKey) ||
-    colPlan.fetchKeys.has(rootKey)
+    rowPlan.fetchRequests.some(request => request.pathKey === rootKey) ||
+    colPlan.fetchRequests.some(request => request.pathKey === rootKey)
   ) {
     return { rowPlan, colPlan };
   }
@@ -957,7 +956,7 @@ export const applyCrossAxisRootFetch = ({
     return {
       rowPlan: {
         ...rowPlan,
-        fetchKeys: new Set([...rowPlan.fetchKeys, rootKey]),
+        fetchRequests: [...rowPlan.fetchRequests, rootRequest],
         pendingKeys: new Set([...rowPlan.pendingKeys, rootKey]),
       },
       colPlan,
@@ -968,7 +967,7 @@ export const applyCrossAxisRootFetch = ({
       rowPlan,
       colPlan: {
         ...colPlan,
-        fetchKeys: new Set([...colPlan.fetchKeys, rootKey]),
+        fetchRequests: [...colPlan.fetchRequests, rootRequest],
         pendingKeys: new Set([...colPlan.pendingKeys, rootKey]),
       },
     };
@@ -1035,7 +1034,7 @@ export const planHydrationIteration = ({
 
   if (
     activeAxis === 'col' &&
-    colPlan.fetchKeys.size > 0 &&
+    colPlan.fetchRequests.length > 0 &&
     !rowPlan.hasMissingNodes &&
     pendingRows.size === 0
   ) {
@@ -1043,7 +1042,7 @@ export const planHydrationIteration = ({
   }
   if (
     activeAxis === 'row' &&
-    rowPlan.fetchKeys.size > 0 &&
+    rowPlan.fetchRequests.length > 0 &&
     !colPlan.hasMissingNodes &&
     pendingCols.size === 0
   ) {
@@ -1078,13 +1077,13 @@ export const planHydrationIteration = ({
 
   const rowGroups = buildGroupedFetchTargets({
     axis: 'row',
-    fetchKeys: effectiveRowPlan.fetchKeys,
+    requests: effectiveRowPlan.fetchRequests,
     nodes: tree.rows,
     getCoverageKey,
   });
   const colGroups = buildGroupedFetchTargets({
     axis: 'col',
-    fetchKeys: effectiveColPlan.fetchKeys,
+    requests: effectiveColPlan.fetchRequests,
     nodes: tree.cols,
     getCoverageKey,
   });

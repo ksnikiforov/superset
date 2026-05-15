@@ -147,6 +147,8 @@ describe('pivot/expansion/stateTransitions', () => {
       program: testProgram,
       valueKeys: ['sales'],
     });
+  const fetchPathKeys = (plan: { fetchRequests: Array<{ pathKey: string }> }) =>
+    plan.fetchRequests.map(request => request.pathKey);
 
   const makeNode = (
     axis: 'row' | 'col',
@@ -1061,8 +1063,8 @@ describe('pivot/expansion/stateTransitions', () => {
     if (plan.kind !== 'fetch') {
       throw new Error('Expected a fetch plan');
     }
-    expect(Array.from(plan.rowPlan.fetchKeys)).toEqual([]);
-    expect(Array.from(plan.colPlan.fetchKeys)).toEqual([xKey]);
+    expect(fetchPathKeys(plan.rowPlan)).toEqual([]);
+    expect(fetchPathKeys(plan.colPlan)).toEqual([xKey]);
     expect(plan.targets).toEqual([
       {
         axis: 'col',
@@ -1085,7 +1087,7 @@ describe('pivot/expansion/stateTransitions', () => {
     });
 
     expect(plan.kind).toBe('fetch');
-    expect(plan.rowPlan.fetchKeys.has(rootKey)).toBe(true);
+    expect(fetchPathKeys(plan.rowPlan)).toContain(rootKey);
     if (plan.kind !== 'fetch') {
       throw new Error('Expected a fetch plan');
     }
@@ -1114,8 +1116,8 @@ describe('pivot/expansion/stateTransitions', () => {
     });
 
     expect(plan.kind).toBe('fetch');
-    expect(plan.rowPlan.fetchKeys.size).toBe(0);
-    expect(plan.colPlan.fetchKeys.size).toBe(1);
+    expect(plan.rowPlan.fetchRequests).toHaveLength(0);
+    expect(plan.colPlan.fetchRequests).toHaveLength(1);
     if (plan.kind !== 'fetch') {
       throw new Error('Expected a fetch plan');
     }
@@ -1169,7 +1171,7 @@ describe('pivot/expansion/stateTransitions', () => {
       pendingCols: new Set(),
     });
 
-    expect(plan.rowPlan.fetchKeys.has(aKey)).toBe(true);
+    expect(fetchPathKeys(plan.rowPlan)).toContain(aKey);
     expect(plan.kind).toBe('fetch');
   });
 
@@ -1232,7 +1234,7 @@ describe('pivot/expansion/stateTransitions', () => {
       pendingCols: new Set(),
     });
 
-    expect(plan.rowPlan.fetchKeys.has(aKey)).toBe(true);
+    expect(fetchPathKeys(plan.rowPlan)).toContain(aKey);
     expect(plan.kind).toBe('fetch');
   });
 
@@ -1264,12 +1266,12 @@ describe('pivot/expansion/stateTransitions', () => {
         autoExpandColsLevelForDesired: 0,
         tree: rootOnlyTree,
         rowPlan: {
-          fetchKeys: new Set(),
+          fetchRequests: [],
           pendingKeys: new Set(),
           hasMissingNodes: false,
         },
         colPlan: {
-          fetchKeys: new Set(),
+          fetchRequests: [],
           pendingKeys: new Set(),
           hasMissingNodes: false,
         },
@@ -1285,12 +1287,19 @@ describe('pivot/expansion/stateTransitions', () => {
         autoExpandColsLevelForDesired: 0,
         tree: rootOnlyTree,
         rowPlan: {
-          fetchKeys: new Set([rootKey]),
+          fetchRequests: [
+            {
+              axis: 'row',
+              pathKey: rootKey,
+              rowDepth: 1,
+              columnDepth: 0,
+            },
+          ],
           pendingKeys: new Set([rootKey]),
           hasMissingNodes: false,
         },
         colPlan: {
-          fetchKeys: new Set(),
+          fetchRequests: [],
           pendingKeys: new Set(),
           hasMissingNodes: false,
         },
@@ -1308,12 +1317,25 @@ describe('pivot/expansion/stateTransitions', () => {
         autoExpandColsLevelForDesired: 0,
         tree,
         rowPlan: {
-          fetchKeys: new Set([aKey, childKey]),
+          fetchRequests: [
+            {
+              axis: 'row',
+              pathKey: aKey,
+              rowDepth: 1,
+              columnDepth: 0,
+            },
+            {
+              axis: 'row',
+              pathKey: childKey,
+              rowDepth: 1,
+              columnDepth: 0,
+            },
+          ],
           pendingKeys: new Set([aKey, childKey]),
           hasMissingNodes: false,
         },
         colPlan: {
-          fetchKeys: new Set(),
+          fetchRequests: [],
           pendingKeys: new Set(),
           hasMissingNodes: false,
         },
@@ -1346,8 +1368,8 @@ describe('pivot/expansion/stateTransitions', () => {
 
     expect(prefetch.shouldPlanRows).toBe(true);
     expect(prefetch.shouldPlanCols).toBe(false);
-    expect(prefetch.rowPlan.fetchKeys.has(aKey)).toBe(true);
-    expect(prefetch.colPlan.fetchKeys.size).toBe(0);
+    expect(fetchPathKeys(prefetch.rowPlan)).toContain(aKey);
+    expect(prefetch.colPlan.fetchRequests).toHaveLength(0);
     expect(prefetch.action).toEqual({
       kind: 'hydrate',
       showLoader: false,

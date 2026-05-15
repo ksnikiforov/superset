@@ -45,6 +45,8 @@ const makeNode = ({
 });
 
 const sortKeys = (keys: Set<string>) => Array.from(keys).sort();
+const sortFetchPathKeys = (plan: ReturnType<typeof planExpansionForAxis>) =>
+  plan.fetchRequests.map(request => request.pathKey).sort();
 
 const getMissingCoverageFromDepths =
   (depthByPathKey: Map<string, number>): PivotExpansionCoverageDiff =>
@@ -81,7 +83,7 @@ describe('expansionPlanner', () => {
       shouldFetchChildren: shouldFetchDimensionChildren,
     });
 
-    expect(sortKeys(plan.fetchKeys)).toEqual([]);
+    expect(sortFetchPathKeys(plan)).toEqual([]);
     expect(sortKeys(plan.pendingKeys)).toEqual([]);
     expect(plan.hasMissingNodes).toBe(false);
   });
@@ -105,7 +107,7 @@ describe('expansionPlanner', () => {
       shouldFetchChildren: shouldFetchDimensionChildren,
     });
 
-    expect(sortKeys(plan.fetchKeys)).toEqual([]);
+    expect(sortFetchPathKeys(plan)).toEqual([]);
     expect(sortKeys(plan.pendingKeys)).toEqual([]);
   });
 
@@ -128,7 +130,7 @@ describe('expansionPlanner', () => {
       shouldFetchChildren: shouldFetchDimensionChildren,
     });
 
-    expect(sortKeys(plan.fetchKeys)).toEqual([keyA]);
+    expect(sortFetchPathKeys(plan)).toEqual([keyA]);
     expect(sortKeys(plan.pendingKeys)).toEqual([keyA]);
   });
 
@@ -149,7 +151,7 @@ describe('expansionPlanner', () => {
       shouldFetchChildren: shouldFetchDimensionChildren,
     });
 
-    expect(sortKeys(plan.fetchKeys)).toEqual([keyA]);
+    expect(sortFetchPathKeys(plan)).toEqual([keyA]);
     expect(sortKeys(plan.pendingKeys)).toEqual([keyA]);
   });
 
@@ -173,7 +175,7 @@ describe('expansionPlanner', () => {
       shouldFetchChildren: shouldFetchDimensionChildren,
     });
 
-    expect(sortKeys(plan.fetchKeys)).toEqual([keyAB]);
+    expect(sortFetchPathKeys(plan)).toEqual([keyAB]);
     expect(sortKeys(plan.pendingKeys)).toEqual([keyAB]);
     expect(plan.hasMissingNodes).toBe(true);
   });
@@ -198,7 +200,7 @@ describe('expansionPlanner', () => {
       shouldFetchChildren: shouldFetchDimensionChildren,
     });
 
-    expect(sortKeys(plan.fetchKeys)).toEqual([keyA]);
+    expect(sortFetchPathKeys(plan)).toEqual([keyA]);
     expect(sortKeys(plan.pendingKeys)).toEqual([keyA, keyAB]);
     expect(plan.hasMissingNodes).toBe(true);
   });
@@ -219,7 +221,7 @@ describe('expansionPlanner', () => {
       getCoverageKey: (_axis, key) => key,
       shouldFetchChildren: shouldFetchDimensionChildren,
     });
-    expect(sortKeys(plan1.fetchKeys)).toEqual([keyA]);
+    expect(sortFetchPathKeys(plan1)).toEqual([keyA]);
 
     const fetchedDepth = new Map([[keyA, 1]]);
     const plan2 = planExpansionForAxis({
@@ -231,7 +233,7 @@ describe('expansionPlanner', () => {
       getCoverageKey: (_axis, key) => key,
       shouldFetchChildren: shouldFetchDimensionChildren,
     });
-    expect(sortKeys(plan2.fetchKeys)).toEqual([]);
+    expect(sortFetchPathKeys(plan2)).toEqual([]);
 
     const plan3 = planExpansionForAxis({
       axis: 'row',
@@ -242,7 +244,7 @@ describe('expansionPlanner', () => {
       getCoverageKey: (_axis, key) => key,
       shouldFetchChildren: shouldFetchDimensionChildren,
     });
-    expect(sortKeys(plan3.fetchKeys)).toEqual([keyAB]);
+    expect(sortFetchPathKeys(plan3)).toEqual([keyAB]);
 
     const plan4 = planExpansionForAxis({
       axis: 'row',
@@ -253,7 +255,7 @@ describe('expansionPlanner', () => {
       getCoverageKey: (_axis, key) => key,
       shouldFetchChildren: shouldFetchDimensionChildren,
     });
-    expect(sortKeys(plan4.fetchKeys)).toEqual([keyA]);
+    expect(sortFetchPathKeys(plan4)).toEqual([keyA]);
     expect(sortKeys(plan4.pendingKeys)).toEqual([keyA, keyAB]);
 
     const nodesWithChild: Record<string, PivotTreeNode> = {
@@ -271,6 +273,6 @@ describe('expansionPlanner', () => {
       getCoverageKey: (_axis, key) => key,
       shouldFetchChildren: shouldFetchDimensionChildren,
     });
-    expect(sortKeys(plan5.fetchKeys)).toEqual([]);
+    expect(sortFetchPathKeys(plan5)).toEqual([]);
   });
 });

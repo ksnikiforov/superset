@@ -48,7 +48,8 @@ import { type PivotExpansionCoverageDiff } from '../runtime/coverage';
 import { stableStringify } from '../shared/stableStringify';
 import { applyExpansionFetchDelta, runHydrationLoop } from './stateTransitions';
 import {
-  planGroupedExpansionTargets,
+  buildGroupedFetchTargets,
+  planExpansionForAxis,
   type PivotExpansionNodeFetchPredicate,
 } from './planner';
 
@@ -507,7 +508,7 @@ export const runSameAxisExpansionFetchLoop = async ({
       currentTree,
     );
     const nodes = axis === 'row' ? currentTree.rows : currentTree.cols;
-    const { plan, targets } = planGroupedExpansionTargets({
+    const plan = planExpansionForAxis({
       axis,
       expandedKeys: resolvedExpanded,
       nodes,
@@ -516,9 +517,15 @@ export const runSameAxisExpansionFetchLoop = async ({
       getCoverageKey,
       shouldFetchChildren,
     });
-    if (plan.fetchKeys.size === 0) {
+    if (plan.fetchRequests.length === 0) {
       break;
     }
+    const targets = buildGroupedFetchTargets({
+      axis,
+      requests: plan.fetchRequests,
+      nodes,
+      getCoverageKey,
+    });
 
     // eslint-disable-next-line no-await-in-loop
     const resultDeltas = await fetchExpansionTargetDeltas({
