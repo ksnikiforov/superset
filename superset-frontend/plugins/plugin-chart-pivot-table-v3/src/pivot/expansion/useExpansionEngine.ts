@@ -75,7 +75,6 @@ import {
   createFetchedFactCoverageState,
   pruneFetchedCoverageForCollapsedNode,
   seedFetchedCoverageFromFactBatches as seedFetchedCoverageStateFromFactBatches,
-  seedFetchedCoverageFromLoadedMetricNodes as seedFetchedLoadedMetricNodeCoverage,
 } from './fetchedRequests';
 import { useSyncRef } from '../shared/useSyncRef';
 import {
@@ -565,24 +564,6 @@ export const useExpansionEngine = ({
     [getCoverageKey],
   );
 
-  const seedFetchedCoverageFromLoadedMetricNodes = useCallback(
-    (
-      loadedTree: PivotTreeData,
-      visibleRowDepth: number,
-      visibleColDepth: number,
-    ) => {
-      seedFetchedLoadedMetricNodeCoverage({
-        fetchedCoverage: fetchedCoverageRef.current,
-        getCoverageKey,
-        tree: loadedTree,
-        visibleRowDepth,
-        visibleColDepth,
-        isMetricTokenValue,
-      });
-    },
-    [getCoverageKey, isMetricTokenValue],
-  );
-
   const commitExpansionState = useCallback(
     ({
       tree: nextTree,
@@ -865,8 +846,6 @@ export const useExpansionEngine = ({
           transactionId: requestId,
           buildRequestGroupId: expansionRequestHelpers.buildRequestGroupId,
           seedFetchedCoverage: seedFetchedCoverageFromFactBatches,
-          seedLoadedMetricNodeCoverage:
-            seedFetchedCoverageFromLoadedMetricNodes,
           resolveExpandedForMetrics,
           pruneMergedTree,
         });
@@ -922,7 +901,6 @@ export const useExpansionEngine = ({
       pruneMergedTree,
       resolveExpandedForMetrics,
       seedFetchedCoverageFromFactBatches,
-      seedFetchedCoverageFromLoadedMetricNodes,
       trackInFlightExpansion,
       shouldFetchChildren,
       updateLoadingKey,
@@ -1022,8 +1000,6 @@ export const useExpansionEngine = ({
           transactionId,
           buildRequestGroupId: expansionRequestHelpers.buildRequestGroupId,
           seedFetchedCoverage: seedFetchedCoverageFromFactBatches,
-          seedLoadedMetricNodeCoverage:
-            seedFetchedCoverageFromLoadedMetricNodes,
         });
         if (result.status === 'complete') {
           const resolvedRows = resolveExpandedForMetrics(
@@ -1065,7 +1041,6 @@ export const useExpansionEngine = ({
       pruneMergedTree,
       resolveExpandedForMetrics,
       seedFetchedCoverageFromFactBatches,
-      seedFetchedCoverageFromLoadedMetricNodes,
       setHydratingState,
       updateLoadingKey,
       visibilityConfig,

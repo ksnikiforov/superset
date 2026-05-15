@@ -361,7 +361,6 @@ export const fetchExpansionTargetDeltas = async ({
   transactionId,
   buildRequestGroupId,
   seedFetchedCoverage,
-  seedLoadedMetricNodeCoverage,
 }: {
   targets: FetchTarget[];
   context: ExpansionFetchContext;
@@ -371,11 +370,6 @@ export const fetchExpansionTargetDeltas = async ({
   transactionId: number;
   buildRequestGroupId: BuildExpansionRequestGroupId;
   seedFetchedCoverage: (factBatches: PivotFactStoreBatch[]) => void;
-  seedLoadedMetricNodeCoverage: (
-    loadedTree: PivotTreeData,
-    visibleRowDepth: number,
-    visibleColDepth: number,
-  ) => void;
 }): Promise<FetchResultDelta[]> => {
   const results = await fetchExpansionTargets({
     targets,
@@ -395,11 +389,6 @@ export const fetchExpansionTargetDeltas = async ({
     if (!result.data) {
       return;
     }
-    seedLoadedMetricNodeCoverage(
-      result.data,
-      context.visibleRowDepth,
-      context.visibleColDepth,
-    );
     deltas.push({
       targets: result.targets,
       data: result.data,
@@ -416,7 +405,6 @@ export const runHydrationExpansionFetchLoop = ({
   transactionId,
   buildRequestGroupId,
   seedFetchedCoverage,
-  seedLoadedMetricNodeCoverage,
   ...hydrationLoopParams
 }: Omit<HydrationLoopParams, 'fetchDeltas'> & {
   reason: 'prefetch' | 'cross-axis';
@@ -424,11 +412,6 @@ export const runHydrationExpansionFetchLoop = ({
   transactionId: number;
   buildRequestGroupId: BuildExpansionRequestGroupId;
   seedFetchedCoverage: (factBatches: PivotFactStoreBatch[]) => void;
-  seedLoadedMetricNodeCoverage: (
-    loadedTree: PivotTreeData,
-    visibleRowDepth: number,
-    visibleColDepth: number,
-  ) => void;
 }) =>
   runHydrationLoop({
     ...hydrationLoopParams,
@@ -441,7 +424,6 @@ export const runHydrationExpansionFetchLoop = ({
         transactionId,
         buildRequestGroupId,
         seedFetchedCoverage,
-        seedLoadedMetricNodeCoverage,
       }),
   });
 
@@ -479,7 +461,6 @@ export const runSameAxisExpansionFetchLoop = async ({
   transactionId,
   buildRequestGroupId,
   seedFetchedCoverage,
-  seedLoadedMetricNodeCoverage,
   resolveExpandedForMetrics,
   pruneMergedTree,
 }: {
@@ -505,11 +486,6 @@ export const runSameAxisExpansionFetchLoop = async ({
   transactionId: number;
   buildRequestGroupId: BuildExpansionRequestGroupId;
   seedFetchedCoverage: (factBatches: PivotFactStoreBatch[]) => void;
-  seedLoadedMetricNodeCoverage: (
-    loadedTree: PivotTreeData,
-    visibleRowDepth: number,
-    visibleColDepth: number,
-  ) => void;
   resolveExpandedForMetrics: (
     axis: PivotAxis,
     nextExpanded: Set<string>,
@@ -564,7 +540,6 @@ export const runSameAxisExpansionFetchLoop = async ({
       transactionId,
       buildRequestGroupId,
       seedFetchedCoverage,
-      seedLoadedMetricNodeCoverage,
     });
     if (getDataEpoch() !== requestEpoch || !requestScope.isCurrent()) {
       return { status: 'stale' };

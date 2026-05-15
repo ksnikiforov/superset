@@ -142,8 +142,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14369` insertions, `14193` deletions, net `+176`.
-- Current production TypeScript/TSX total: `33686` lines.
+- Production `src`: `14278` insertions, `14193` deletions, net `+85`.
+- Current production TypeScript/TSX total: `33595` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -377,6 +377,8 @@ Success criteria:
 - Broader metric batches can satisfy narrower metric requests, while missing
   metric payloads no longer count as loaded coverage even when row/column depth
   matches.
+- Expansion fetched state no longer infers loaded metric coverage from returned
+  tree shape. Fetched state is seeded from explicit fact batches only.
 - Resolved query fetch context owns its fact coverages, so branch, batch, and
   signature callers no longer rebuild the same coverage list separately.
 - Expansion planner and fetched-request code now share the same fetched coverage
@@ -389,7 +391,8 @@ Success criteria:
 - Metric placement authority is now program-owned, but there are still
   display-policy branches that may be removable after UX review.
 - Expansion and rendering share the layout-owned render-model config builder;
-  remaining risk is smaller visibility-only logic inside expansion planning.
+  remaining risk is smaller visibility-only logic inside expansion planning,
+  not fetched-state inference from metric tree nodes.
 - `materializePivotTree.ts` is too large and combines several internal
   responsibilities.
 - `PivotTableChart.tsx` is smaller, but it is still the rendezvous point for
