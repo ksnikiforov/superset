@@ -40,8 +40,6 @@ export type PivotExpansionNodeFetchPredicate = (input: {
   requiredDepth: number;
 }) => boolean;
 
-export type PlannedFetchTarget = FetchTarget;
-
 const buildCoverageProjection = (
   axis: PivotAxis,
   pathKey: string,
@@ -198,7 +196,7 @@ export function buildGroupedFetchTargets({
   nodes: Record<string, PivotTreeNode>;
   requiredOppositeDepth: number;
   getCoverageKey: (axis: PivotAxis, key: string) => string;
-}): PlannedFetchTarget[] {
+}): FetchTarget[] {
   const groups = new Map<string, string[]>();
   fetchKeys.forEach(key => {
     const groupKey = getCoverageKey(axis, key);
@@ -210,7 +208,7 @@ export function buildGroupedFetchTargets({
     }
   });
 
-  const targets: PlannedFetchTarget[] = [];
+  const targets: FetchTarget[] = [];
 
   for (const keys of groups.values()) {
     const representative =
@@ -248,7 +246,7 @@ export const planGroupedExpansionTargets = ({
   shouldFetchChildren: PivotExpansionNodeFetchPredicate;
 }): {
   plan: PivotExpansionPlan;
-  targets: PlannedFetchTarget[];
+  targets: FetchTarget[];
 } => {
   const fetchedCoverageLookup = createFetchedFactCoverageLookup({
     fetchedCoverage,
