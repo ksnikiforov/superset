@@ -36,18 +36,12 @@ export type PivotExpansionNodeFetchPredicate = (input: {
   axis: PivotAxis;
   key: string;
   node: PivotTreeNode;
-  requiredDepth: number;
 }) => boolean;
 
 type PivotExpansionCoverageDepths = Pick<
   PivotExpansionCoverageRequest,
   'rowDepth' | 'columnDepth'
 >;
-
-const requiredDepthForAxis = (
-  axis: PivotAxis,
-  coverage: PivotExpansionCoverageDepths,
-) => (axis === 'row' ? coverage.columnDepth : coverage.rowDepth);
 
 const isSatisfiedNode = ({
   axis,
@@ -64,8 +58,7 @@ const isSatisfiedNode = ({
   isExpansionCoverageLoaded: PivotExpansionCoveragePredicate;
   shouldFetchChildren: PivotExpansionNodeFetchPredicate;
 }) => {
-  const requiredDepth = requiredDepthForAxis(axis, coverage);
-  if (!shouldFetchChildren({ axis, key, node, requiredDepth })) {
+  if (!shouldFetchChildren({ axis, key, node })) {
     return true;
   }
   return isExpansionCoverageLoaded({

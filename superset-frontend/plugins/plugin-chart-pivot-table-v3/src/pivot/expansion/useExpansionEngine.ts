@@ -652,15 +652,7 @@ export const useExpansionEngine = ({
   );
 
   const shouldFetchChildren = useCallback(
-    ({
-      axis,
-      node,
-    }: {
-      axis: PivotAxis;
-      key: string;
-      node: PivotTreeNode;
-      requiredDepth: number;
-    }) =>
+    ({ axis, node }: { axis: PivotAxis; key: string; node: PivotTreeNode }) =>
       getNextAxisLevelForPath({
         program: pivotProgram,
         axis,
