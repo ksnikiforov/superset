@@ -35,11 +35,7 @@ import { type PivotProgram } from '../runtime/types';
 import { findChildren } from '../viewModel';
 
 type ResolveMetricAxisLayoutParams = {
-  metricLabelCount: number;
-  rowDimCount: number;
-  colDimCount: number;
-  metricInsertIndex: number;
-  resolvedMetricsLayout: MetricsLayoutEnum;
+  program: PivotProgram;
   resolvedExpandRowsLevel: number;
   resolvedExpandColumnsLevel: number;
   isLeafTierVisible: boolean;
@@ -111,11 +107,7 @@ export const buildMetricOrderComparator = ({
 };
 
 export const resolveMetricAxisLayoutPolicy = ({
-  metricLabelCount,
-  rowDimCount,
-  colDimCount,
-  metricInsertIndex,
-  resolvedMetricsLayout,
+  program,
   resolvedExpandRowsLevel,
   resolvedExpandColumnsLevel,
   isLeafTierVisible,
@@ -123,6 +115,16 @@ export const resolveMetricAxisLayoutPolicy = ({
   resolvedRowSubtotalPosition,
   resolvedColSubtotalPosition,
 }: ResolveMetricAxisLayoutParams): MetricAxisLayoutPolicy => {
+  const {
+    metricInsertIndex,
+    metricsLayoutResolved: resolvedMetricsLayout,
+    rowDimensions,
+    columnDimensions,
+    metricKeys,
+  } = program;
+  const metricLabelCount = metricKeys.length;
+  const rowDimCount = rowDimensions.length;
+  const colDimCount = columnDimensions.length;
   const hasMetrics = metricLabelCount > 0;
   const isSingleMetric = metricLabelCount === 1;
   const isMultiMetric = metricLabelCount > 1;

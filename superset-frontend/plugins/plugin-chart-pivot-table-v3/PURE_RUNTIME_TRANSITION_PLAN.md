@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13957` insertions, `14385` deletions, net `-428`.
-- Current production TypeScript/TSX total: `33082` lines.
+- Production `src`: `13952` insertions, `14388` deletions, net `-436`.
+- Current production TypeScript/TSX total: `33074` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -366,9 +366,9 @@ Success criteria:
 - Formatting no longer rebuilds query-support metric lists or tree-data
   signatures. Those belong to transform/query planning, and the chart consumes
   the supplied signature.
-- Axis child and collapsed Values projection helpers now read metric placement
-  from the compiled `PivotProgram` instead of accepting a second
-  `resolvedMetricsLayout` argument from chart layout.
+- Metric-axis layout policy, axis child projection, and collapsed Values
+  projection now read metric placement from the compiled `PivotProgram`
+  instead of accepting duplicated chart-owned placement inputs.
 - Applied interaction layout now compiles through `compilePivotProgram`; the
   placement-only compiler bridge has been removed.
 - Set-oriented coverage manifest primitives now exist for root runtime-layout

@@ -43,11 +43,6 @@ const node = (axis: 'row' | 'col', path: PivotTreeNode['path']) => ({
 });
 
 const baseParams = {
-  metricLabelCount: 1,
-  rowDimCount: 0,
-  colDimCount: 0,
-  metricInsertIndex: 0,
-  resolvedMetricsLayout: MetricsLayoutEnum.ROWS,
   resolvedExpandRowsLevel: 0,
   resolvedExpandColumnsLevel: 0,
   metricLabelSet: new Set(['sales']),
@@ -70,6 +65,11 @@ const baseProgram: PivotProgram = {
   valueAxis: 'row',
   metricInsertIndex: 0,
 };
+
+const policyProgram = (overrides: Partial<PivotProgram>): PivotProgram => ({
+  ...baseProgram,
+  ...overrides,
+});
 
 const valuesProgram: PivotProgram = {
   rows: [
@@ -147,8 +147,10 @@ describe('pivot/chart/layoutRuntime', () => {
   it('uses the compiled row metric position before rendered nodes exist', () => {
     const policy = resolveMetricAxisLayoutPolicy({
       ...baseParams,
-      rowDimCount: 3,
-      metricInsertIndex: 1,
+      program: policyProgram({
+        rowDimensions: ['r1', 'r2', 'r3'],
+        metricInsertIndex: 1,
+      }),
     });
 
     expect(policy.metricIndexOnRows).toBe(1);
@@ -159,9 +161,11 @@ describe('pivot/chart/layoutRuntime', () => {
   it('uses the compiled column metric position without inspecting shallow rendered data', () => {
     const policy = resolveMetricAxisLayoutPolicy({
       ...baseParams,
-      colDimCount: 2,
-      metricInsertIndex: 2,
-      resolvedMetricsLayout: MetricsLayoutEnum.COLUMNS,
+      program: policyProgram({
+        columnDimensions: ['c1', 'c2'],
+        metricInsertIndex: 2,
+        metricsLayoutResolved: MetricsLayoutEnum.COLUMNS,
+      }),
     });
 
     expect(policy.metricIndexOnCols).toBe(2);
@@ -171,9 +175,11 @@ describe('pivot/chart/layoutRuntime', () => {
   it('forces row subtotals to the end for multi-metric row layouts after dimensions', () => {
     const policy = resolveMetricAxisLayoutPolicy({
       ...baseParams,
-      metricLabelCount: 2,
-      rowDimCount: 1,
-      metricInsertIndex: 1,
+      program: policyProgram({
+        rowDimensions: ['r1'],
+        metricKeys: ['sales', 'profit'],
+        metricInsertIndex: 1,
+      }),
       rowSubTotals: true,
       resolvedRowSubtotalPosition: 'start',
     });
@@ -184,15 +190,17 @@ describe('pivot/chart/layoutRuntime', () => {
   });
 
   it('hides a redundant single row metric header only when the leaf tier is absent', () => {
+    const program = policyProgram({
+      rowDimensions: ['r1'],
+      metricInsertIndex: 1,
+    });
     const withoutLeafTier = resolveMetricAxisLayoutPolicy({
       ...baseParams,
-      rowDimCount: 1,
-      metricInsertIndex: 1,
+      program,
     });
     const withLeafTier = resolveMetricAxisLayoutPolicy({
       ...baseParams,
-      rowDimCount: 1,
-      metricInsertIndex: 1,
+      program,
       isLeafTierVisible: true,
     });
 
@@ -213,7 +221,6 @@ describe('pivot/chart/layoutRuntime', () => {
     expect(
       resolveAxisChildrenBeforeSubtotalPolicy({
         program: baseProgram,
-        resolvedMetricsLayout: MetricsLayoutEnum.ROWS,
         axis: 'row',
         parent,
         nodes,
@@ -243,7 +250,6 @@ describe('pivot/chart/layoutRuntime', () => {
     expect(
       resolveAxisChildrenBeforeSubtotalPolicy({
         program: baseProgram,
-        resolvedMetricsLayout: MetricsLayoutEnum.ROWS,
         axis: 'row',
         parent,
         nodes,
@@ -267,7 +273,6 @@ describe('pivot/chart/layoutRuntime', () => {
 
     const collapsed = resolveCollapsedValuesNodesForAxis({
       program: valuesProgram,
-      resolvedMetricsLayout: MetricsLayoutEnum.ROWS,
       metricLabelSet: baseParams.metricLabelSet,
       axis: 'row',
       parent,
@@ -316,7 +321,6 @@ describe('pivot/chart/layoutRuntime', () => {
         metricsLayoutResolved: MetricsLayoutEnum.COLUMNS,
         valueAxis: 'col',
       },
-      resolvedMetricsLayout: MetricsLayoutEnum.COLUMNS,
       metricLabelSet: baseParams.metricLabelSet,
       axis: 'col',
       parent,

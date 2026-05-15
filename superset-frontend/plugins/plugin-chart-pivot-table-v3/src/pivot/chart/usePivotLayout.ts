@@ -236,8 +236,6 @@ export const usePivotLayout = ({
   }, [layout.colSubtotalLevels, rowTotals]);
 
   const { groupbyRows, groupbyColumns } = layout;
-  const rowDimCount = groupbyRows.length;
-  const colDimCount = groupbyColumns.length;
 
   const groupbyRowKeys = useMemo(
     () => groupbyRows.map(getStableColumnKey),
@@ -314,11 +312,7 @@ export const usePivotLayout = ({
   } = useMemo(
     () =>
       resolveMetricAxisLayoutPolicy({
-        metricLabelCount: metricLabels.length,
-        rowDimCount,
-        colDimCount,
-        metricInsertIndex: layout.metricInsertIndex,
-        resolvedMetricsLayout,
+        program: layout.pivotProgram,
         resolvedExpandRowsLevel,
         resolvedExpandColumnsLevel,
         isLeafTierVisible,
@@ -327,16 +321,12 @@ export const usePivotLayout = ({
         resolvedColSubtotalPosition,
       }),
     [
-      colDimCount,
       isLeafTierVisible,
-      layout.metricInsertIndex,
-      metricLabels.length,
+      layout.pivotProgram,
       resolvedColSubtotalPosition,
       resolvedExpandColumnsLevel,
       resolvedExpandRowsLevel,
-      resolvedMetricsLayout,
       resolvedRowSubtotalPosition,
-      rowDimCount,
       rowSubTotals,
     ],
   );
