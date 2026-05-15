@@ -38,13 +38,6 @@ import type {
   PivotProgram,
 } from './types';
 
-export type VisibleFactCoverageInput = {
-  program: PivotProgram;
-  rowDepth: number;
-  columnDepth: number;
-  reason?: PivotCoverageReason;
-};
-
 export type FactCoverageInput = {
   rowDimensions: PivotProgram['rowDimensions'];
   columnDimensions: PivotProgram['columnDimensions'];
@@ -400,27 +393,6 @@ export const buildFactCoverage = ({
     rowDimensions: rowDimensions.slice(0, visibleRowDepth),
     columnDimensions: columnDimensions.slice(0, visibleColumnDepth),
   };
-};
-
-export const buildVisibleFactCoverage = ({
-  program,
-  rowDepth,
-  columnDepth,
-  reason = 'initial',
-}: VisibleFactCoverageInput): PivotFactCoverage[] => {
-  if (program.metricKeys.length === 0) {
-    return [];
-  }
-
-  return [
-    buildFactCoverage({
-      reason,
-      rowDimensions: program.rowDimensions,
-      columnDimensions: program.columnDimensions,
-      rowDepth,
-      columnDepth,
-    }),
-  ];
 };
 
 export const buildRuntimeLayoutCoverageManifest = (

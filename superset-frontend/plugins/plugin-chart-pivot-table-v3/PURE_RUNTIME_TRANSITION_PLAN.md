@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14234` insertions, `14847` deletions, net `-613`.
-- Current production TypeScript/TSX total: `32897` lines.
+- Production `src`: `14205` insertions, `14847` deletions, net `-642`.
+- Current production TypeScript/TSX total: `32868` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -394,6 +394,9 @@ Success criteria:
   the misplaced query-owned expansion-state module has been removed.
 - Initial bootstrap query planning is folded into the query spec builder; the
   old standalone bootstrap planner wrapper has been removed.
+- The old visible-fact coverage wrapper has been removed. Initial query
+  planning now builds explicit fact coverage directly, while layout visibility
+  requirements are represented by the runtime coverage manifest.
 - Set-oriented coverage manifest primitives now exist for root runtime-layout
   coverage and explicit path-set coverage diffing.
 - Runtime layout fetches now route through manifest diff instead of the old

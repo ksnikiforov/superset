@@ -28,7 +28,6 @@ import {
   createExpansionCoverageDiff,
   buildFactCoverage,
   buildRuntimeLayoutCoverageManifest,
-  buildVisibleFactCoverage,
   diffCoverageManifest,
   factBatchesCoverRuntimeLayout,
   type PivotCoverageNeed,
@@ -37,67 +36,6 @@ import {
 import { type PivotFactStoreBatch } from '../../../../src/pivot/runtime/factStore';
 import { resolveAxisProjection } from '../../../../src/pivot/runtime/projection';
 import { MetricsLayoutEnum, PivotRuntimeLayout } from '../../../../src/types';
-
-describe('visible fact coverage', () => {
-  it('does not request coverage for a non-only hidden row layer', () => {
-    const program = compilePivotProgram({
-      groupbyRows: ['country', 'state'],
-      metrics: ['sales'],
-      metricsLayout: MetricsLayoutEnum.ROWS,
-    });
-
-    const coverage = buildVisibleFactCoverage({
-      program,
-      rowDepth: 1,
-      columnDepth: 0,
-      reason: 'layout',
-    });
-
-    expect(coverage).toEqual([
-      {
-        reason: 'layout',
-        rowDepth: 1,
-        columnDepth: 0,
-        rowDimensions: ['country'],
-        columnDimensions: [],
-      },
-    ]);
-  });
-
-  it('does not request coverage for a non-only hidden column layer', () => {
-    const program = compilePivotProgram({
-      groupbyColumns: ['category', 'subcategory'],
-      metrics: ['sales'],
-      metricsLayout: MetricsLayoutEnum.COLUMNS,
-    });
-
-    const coverage = buildVisibleFactCoverage({
-      program,
-      rowDepth: 0,
-      columnDepth: 1,
-      reason: 'layout',
-    });
-
-    expect(coverage[0].columnDimensions).toEqual(['category']);
-    expect(coverage[0].columnDepth).toBe(1);
-  });
-
-  it('may request coverage for the first and only visible row layer', () => {
-    const program = compilePivotProgram({
-      groupbyRows: ['country'],
-      metrics: ['sales'],
-      metricsLayout: MetricsLayoutEnum.ROWS,
-    });
-
-    const coverage = buildVisibleFactCoverage({
-      program,
-      rowDepth: 1,
-      columnDepth: 0,
-    });
-
-    expect(coverage[0].rowDimensions).toEqual(['country']);
-  });
-});
 
 describe('expansion fact coverage', () => {
   it('derives loaded expansion coverage from typed fact batches', () => {

@@ -56,7 +56,6 @@ import {
 import { buildQueryShape, type QueryIntent } from './queryShape';
 import {
   buildFactCoverage,
-  buildVisibleFactCoverage,
   expansionRevealsValuesLevel,
 } from '../runtime/coverage';
 import {
@@ -161,16 +160,16 @@ const buildCoverageTarget = ({
   colDepth,
   ...intentFlags
 }: CoverageTargetInput): BootstrapTarget | undefined => {
-  const [coverage] = buildVisibleFactCoverage({
-    program: layout.pivotProgram,
-    rowDepth,
-    columnDepth: colDepth,
-    reason: 'initial',
-  });
-
-  if (!coverage) {
+  if (layout.pivotProgram.metricKeys.length === 0) {
     return undefined;
   }
+  const coverage = buildFactCoverage({
+    reason: 'initial',
+    rowDimensions: layout.pivotProgram.rowDimensions,
+    columnDimensions: layout.pivotProgram.columnDimensions,
+    rowDepth,
+    columnDepth: colDepth,
+  });
 
   return {
     kind,
