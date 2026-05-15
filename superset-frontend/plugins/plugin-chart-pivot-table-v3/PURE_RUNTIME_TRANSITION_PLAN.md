@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14199` insertions, `14847` deletions, net `-648`.
-- Current production TypeScript/TSX total: `32862` lines.
+- Production `src`: `14224` insertions, `14902` deletions, net `-678`.
+- Current production TypeScript/TSX total: `32832` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -489,6 +489,9 @@ Success criteria:
 - Collapsed row and column Values-tier projection now share one
   axis-neutral hook path in `usePivotLayout`, with row/column differences
   passed as policy parameters instead of separate callbacks.
+- Grouped branch batch execution now lives in the branch fetch boundary. The
+  standalone batch fetch module has been removed, and branch/batch fetches now
+  share one query-spec-to-fact-store materialization path.
 
 ## Current Risks
 
@@ -504,6 +507,11 @@ Success criteria:
   runtime state machines.
 - `useExpansionEngine.ts` and `stateTransitions.ts` remain large. Split only by
   real ownership, not by wrapper files.
+- Cross-axis hydration can still force a root-depth recovery fetch when row and
+  column expansions are both missing combined-depth coverage. That preserves the
+  current no-blank UX, but it is a fallback that conflicts with the selected
+  set-oriented manifest model. The target replacement is explicit row-path-set x
+  column-path-set coverage, not a root full-level fetch.
 - Large result sets still pay main-thread JSON parsing and React commit costs.
 
 ## Approval Checkpoints

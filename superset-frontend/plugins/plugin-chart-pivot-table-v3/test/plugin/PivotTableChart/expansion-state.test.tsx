@@ -36,17 +36,17 @@ import {
   METRIC_TOKEN_PREFIX,
   SUBTOTAL_TOKEN,
 } from '../../../src/pivot/core/tokens';
-import { fetchPivotBranch } from '../../../src/pivot/query/fetchPivotBranch';
+import {
+  fetchPivotBranch,
+  fetchPivotBranchesBatch,
+} from '../../../src/pivot/query/fetchPivotBranch';
 import type {
   FetchPivotBranchParams,
   FetchPivotBranchResult,
+  FetchPivotBranchesBatchParams,
+  FetchPivotBranchesBatchResult,
 } from '../../../src/pivot/query/fetchPivotBranch';
 import { type PivotFactStoreBatch } from '../../../src/pivot/runtime/factStore';
-import {
-  fetchPivotBranchesBatch,
-  type FetchPivotBranchesBatchParams,
-  type FetchPivotBranchesBatchResult,
-} from '../../../src/pivot/query/fetchPivotBranchesBatch';
 import { buildFormData } from '../fixtures/pivotFormData';
 import {
   buildMockBranchFetchResult,
@@ -67,12 +67,9 @@ jest.mock('../../../src/pivot/query/fetchPivotBranch', () => {
     fetchPivotBranch: jest
       .fn()
       .mockResolvedValue({ data: undefined, factBatches: [] }),
+    fetchPivotBranchesBatch: jest.fn(),
   };
 });
-
-jest.mock('../../../src/pivot/query/fetchPivotBranchesBatch', () => ({
-  fetchPivotBranchesBatch: jest.fn(),
-}));
 
 describe('PivotTableChart expansion state persistence', () => {
   const fetchPivotBranchMock = fetchPivotBranch as jest.Mock;

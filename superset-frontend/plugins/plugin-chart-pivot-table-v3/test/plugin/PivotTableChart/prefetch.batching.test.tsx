@@ -24,12 +24,14 @@ import {
   PivotTreeData,
 } from '../../../src/types';
 
-import { fetchPivotBranch } from '../../../src/pivot/query/fetchPivotBranch';
-import { fetchPivotBranchesBatch } from '../../../src/pivot/query/fetchPivotBranchesBatch';
+import {
+  fetchPivotBranch,
+  fetchPivotBranchesBatch,
+} from '../../../src/pivot/query/fetchPivotBranch';
 import type {
   FetchPivotBranchesBatchParams,
   FetchPivotBranchesBatchResult,
-} from '../../../src/pivot/query/fetchPivotBranchesBatch';
+} from '../../../src/pivot/query/fetchPivotBranch';
 import { buildFormData } from '../fixtures/pivotFormData';
 import {
   buildMockBatchFetchResult,
@@ -39,16 +41,15 @@ import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';
 
 jest.mock('../../../src/pivot/query/fetchPivotBranch', () => {
-  const actual = jest.requireActual('../../../src/pivot/query/fetchPivotBranch');
+  const actual = jest.requireActual(
+    '../../../src/pivot/query/fetchPivotBranch',
+  );
   return {
     ...actual,
     fetchPivotBranch: jest.fn(),
+    fetchPivotBranchesBatch: jest.fn(),
   };
 });
-
-jest.mock('../../../src/pivot/query/fetchPivotBranchesBatch', () => ({
-  fetchPivotBranchesBatch: jest.fn(),
-}));
 
 const createDeferredBatchFetch = () => {
   const resolvers: Array<
@@ -237,6 +238,14 @@ describe('PivotTableChart batching on persisted restore', () => {
       rowDepth: 1,
       colDepth: 2,
     });
+    const intersectionBranch = buildTree({
+      records,
+      rowGroupby,
+      colGroupby,
+      metrics,
+      rowDepth: 2,
+      colDepth: 2,
+    });
 
     const deferredRow = createDeferredBatchFetch();
     const deferredCol = createDeferredBatchFetch();
@@ -247,6 +256,11 @@ describe('PivotTableChart batching on persisted restore', () => {
       }
       return deferredCol.implementation(params);
     });
+    fetchPivotBranchMock.mockImplementation(params =>
+      Promise.resolve(
+        buildMockBranchFetchResult(params, { data: intersectionBranch }),
+      ),
+    );
 
     const pivotExpansionState: PivotExpansionState = {
       rowKeys: rowGroupby,

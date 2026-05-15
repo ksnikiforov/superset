@@ -38,24 +38,23 @@ import {
   fetchPivotBranchesBatch,
   type FetchPivotBranchesBatchParams,
   type FetchPivotBranchesBatchResult,
-} from '../../../../src/pivot/query/fetchPivotBranchesBatch';
+} from '../../../../src/pivot/query/fetchPivotBranch';
 import { formatQueryName } from '../../../../src/pivot/query/queryName';
 import { buildTreeFromRecords } from '../../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../../fixtures/metricAxis';
 
 jest.mock('../../../../src/pivot/query/fetchPivotBranch', () => {
-  const actual = jest.requireActual('../../../../src/pivot/query/fetchPivotBranch');
+  const actual = jest.requireActual(
+    '../../../../src/pivot/query/fetchPivotBranch',
+  );
   return {
     ...actual,
     fetchPivotBranch: jest
       .fn()
       .mockResolvedValue({ data: undefined, factBatches: [] }),
+    fetchPivotBranchesBatch: jest.fn(),
   };
 });
-
-jest.mock('../../../../src/pivot/query/fetchPivotBranchesBatch', () => ({
-  fetchPivotBranchesBatch: jest.fn(),
-}));
 
 describe('PivotTableChart expansion with metrics before dimensions (ancestor-subtotals)', () => {
   const fetchPivotBranchMock = fetchPivotBranch as jest.Mock;

@@ -22,13 +22,15 @@ import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
 import { mergeTrees } from '../../../src/pivot/core/tree';
 import { parsePath } from '../../../src/pivot/core/path';
-import { fetchPivotBranch } from '../../../src/pivot/query/fetchPivotBranch';
-import type { FetchPivotBranchResult } from '../../../src/pivot/query/fetchPivotBranch';
 import {
+  fetchPivotBranch,
   fetchPivotBranchesBatch,
-  type FetchPivotBranchesBatchParams,
-  type FetchPivotBranchesBatchResult,
-} from '../../../src/pivot/query/fetchPivotBranchesBatch';
+} from '../../../src/pivot/query/fetchPivotBranch';
+import type {
+  FetchPivotBranchResult,
+  FetchPivotBranchesBatchParams,
+  FetchPivotBranchesBatchResult,
+} from '../../../src/pivot/query/fetchPivotBranch';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';
@@ -41,12 +43,9 @@ jest.mock('../../../src/pivot/query/fetchPivotBranch', () => {
   return {
     ...actual,
     fetchPivotBranch: jest.fn(),
+    fetchPivotBranchesBatch: jest.fn(),
   };
 });
-
-jest.mock('../../../src/pivot/query/fetchPivotBranchesBatch', () => ({
-  fetchPivotBranchesBatch: jest.fn(),
-}));
 
 type Deferred<T> = {
   promise: Promise<T>;

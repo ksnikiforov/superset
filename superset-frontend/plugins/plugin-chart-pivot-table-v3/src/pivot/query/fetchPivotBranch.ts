@@ -25,6 +25,7 @@ import {
 } from '../../types';
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import { getMetricKeys } from '../core/tokens';
+import { parsePath } from '../core/path';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import {
   buildLayoutContext,
@@ -34,7 +35,11 @@ import {
   resolveFetchContext as resolveFetchContextBase,
   type ResolvedFetchContext as ResolvedQueryFetchContext,
 } from './resolveFetchContext';
-import { buildBranchQuerySpecs, type PlannedQuerySpec } from './specs';
+import {
+  buildBatchQuerySpecs,
+  buildBranchQuerySpecs,
+  type PlannedQuerySpec,
+} from './specs';
 import { buildFactCoverage } from '../runtime/coverage';
 import {
   buildFactValueKeys,
@@ -49,6 +54,7 @@ import {
   buildFactStoreBatchesFromSpecs,
   factStoreSelectorFromSpec,
 } from '../runtime/materializePivotTree';
+import { type BatchGroup } from './fetchPlanOptimizer';
 
 export interface FetchPivotBranchResult {
   data?: PivotTreeData;
@@ -66,6 +72,17 @@ export interface FetchPivotBranchParams {
   requestGroupId?: string;
   factStore?: PivotFactStore;
 }
+
+export type FetchPivotBranchesBatchParams = {
+  formData: PivotTableQueryFormData;
+  batch: BatchGroup;
+  visibleRowDepth: number;
+  visibleColDepth: number;
+  requestGroupId?: string;
+  factStore?: PivotFactStore;
+};
+
+export type FetchPivotBranchesBatchResult = FetchPivotBranchResult;
 
 export type ResolvedFetchContext = ResolvedQueryFetchContext & {
   layout: LayoutContext;
@@ -269,3 +286,52 @@ export async function fetchPivotBranch({
     measureHierarchy: ctx.layout.measureHierarchy,
   });
 }
+
+export const fetchPivotBranchesBatch = async ({
+  formData,
+  batch,
+  visibleRowDepth,
+  visibleColDepth,
+  requestGroupId,
+  factStore,
+}: FetchPivotBranchesBatchParams): Promise<FetchPivotBranchesBatchResult> => {
+  const layout = buildLayoutContext(formData);
+  const specs = buildBatchQuerySpecs({
+    formData,
+    layout,
+    batch,
+    visibleRowDepth,
+    visibleColDepth,
+    chunkIndex: 0,
+  });
+  if (specs.length === 0) {
+    const batchMarker: PivotFactStoreBatch = {
+      coverage: buildFactCoverage({
+        reason: 'expand',
+        rowDimensions: layout.pivotProgram.rowDimensions,
+        columnDimensions: layout.pivotProgram.columnDimensions,
+        rowDepth: visibleRowDepth,
+        columnDepth: visibleColDepth,
+      }),
+      scope: {
+        kind: 'batch',
+        axis: batch.axis,
+        parentPath: parsePath(batch.parentPathKey),
+        siblingValues: batch.siblingValues,
+      },
+      valueKeys: buildFactValueKeys({
+        metricKeys: layout.pivotProgram.metricKeys,
+      }),
+      facts: [],
+    };
+    factStore?.upsertBatch(batchMarker);
+    return { data: undefined, factBatches: [batchMarker] };
+  }
+  return fetchPivotQuerySpecsIntoBranchTree({
+    formData,
+    specs,
+    requestGroupId,
+    factStore,
+    measureHierarchy: layout.measureHierarchy,
+  });
+};

@@ -17,14 +17,12 @@
  * under the License.
  */
 import {
+  type FetchPivotBranchesBatchParams,
+  type FetchPivotBranchesBatchResult,
   type FetchPivotBranchParams,
   type FetchPivotBranchResult,
 } from '../../../src/pivot/query/fetchPivotBranch';
 import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
-import {
-  type FetchPivotBranchesBatchParams,
-  type FetchPivotBranchesBatchResult,
-} from '../../../src/pivot/query/fetchPivotBranchesBatch';
 import { resolveFetchContext } from '../../../src/pivot/query/resolveFetchContext';
 import {
   buildFactValueKeys,

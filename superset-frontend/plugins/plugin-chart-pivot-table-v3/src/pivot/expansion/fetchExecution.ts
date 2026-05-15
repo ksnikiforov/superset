@@ -24,12 +24,12 @@ import {
 } from '../../types';
 import {
   fetchPivotBranch,
+  fetchPivotBranchesBatch,
   resolvePivotBranchLocalResult,
 } from '../query/fetchPivotBranch';
 import { parsePath } from '../core/path';
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import { buildBatchSignature } from '../query/batchSignature';
-import { fetchPivotBranchesBatch } from '../query/fetchPivotBranchesBatch';
 import {
   optimizeFetchPlan,
   type BatchCandidate,

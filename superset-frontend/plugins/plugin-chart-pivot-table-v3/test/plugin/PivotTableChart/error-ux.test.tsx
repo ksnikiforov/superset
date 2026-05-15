@@ -27,23 +27,22 @@ import {
   fetchPivotBranchesBatch,
   type FetchPivotBranchesBatchParams,
   type FetchPivotBranchesBatchResult,
-} from '../../../src/pivot/query/fetchPivotBranchesBatch';
+} from '../../../src/pivot/query/fetchPivotBranch';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';
 import { buildMockBranchFetchResult } from '../fixtures/factBatches';
 
 jest.mock('../../../src/pivot/query/fetchPivotBranch', () => {
-  const actual = jest.requireActual('../../../src/pivot/query/fetchPivotBranch');
+  const actual = jest.requireActual(
+    '../../../src/pivot/query/fetchPivotBranch',
+  );
   return {
     ...actual,
     fetchPivotBranch: jest.fn(),
+    fetchPivotBranchesBatch: jest.fn(),
   };
 });
-
-jest.mock('../../../src/pivot/query/fetchPivotBranchesBatch', () => ({
-  fetchPivotBranchesBatch: jest.fn(),
-}));
 
 const rowGroupby = ['r1', 'r2'];
 const colGroupby: string[] = [];
