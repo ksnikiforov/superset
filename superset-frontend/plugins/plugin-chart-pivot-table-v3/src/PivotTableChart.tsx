@@ -63,10 +63,7 @@ import {
   buildSeamlessRuntimeUpstreamSignature,
   type SeamlessRuntimeSyncSnapshot,
 } from './pivot/runtime/seamlessRuntimeUpdate';
-import {
-  type PivotDisplaySnapshot,
-  usePivotSeamlessRuntimeUpdate,
-} from './pivot/chart/usePivotSeamlessRuntimeUpdate';
+import { usePivotSeamlessRuntimeUpdate } from './pivot/chart/usePivotSeamlessRuntimeUpdate';
 import { PivotTableView } from './pivot/render/PivotTableView';
 
 const EMPTY_SELECTED_FILTERS: Record<string, DataRecordValue[]> = {};
@@ -180,7 +177,6 @@ function PivotTableChart(props: PivotTableProps) {
   const expandedColsForSeamlessRef = useRef<Set<string>>(new Set());
   const pendingRowsForSeamlessRef = useRef<Set<string>>(new Set());
   const pendingColsForSeamlessRef = useRef<Set<string>>(new Set());
-  const displaySnapshotRef = useRef<PivotDisplaySnapshot | null>(null);
   const lastSeamlessSyncRef = useRef<SeamlessRuntimeSyncSnapshot | null>(null);
   const ownStateRef = useRef<JsonObject>(ownState ?? {});
   useEffect(() => {
@@ -286,14 +282,12 @@ function PivotTableChart(props: PivotTableProps) {
     seamlessLoading,
     seamlessWarnings,
     seamlessError,
-    pendingDisplaySnapshot,
     applyRuntimeLayoutChange,
     applyDimensionFilterChange,
     clearAllFilters,
     removeRuntimeDimension,
     dropRuntimeDimension,
     dropRuntimeValue,
-    clearPendingDisplaySnapshot,
   } = usePivotSeamlessRuntimeUpdate({
     dimensionKeys,
     metricKeys,
@@ -316,7 +310,6 @@ function PivotTableChart(props: PivotTableProps) {
     sourceMetrics,
     sourceMeasureLeavesByMetric,
     upstreamSignature: upstreamSeamlessSignature,
-    displaySnapshotRef,
     pendingSeamlessLayoutRef,
     seamlessSyncRef: lastSeamlessSyncRef,
     expandedRowsRef: expandedRowsForSeamlessRef,
@@ -428,27 +421,6 @@ function PivotTableChart(props: PivotTableProps) {
   useSyncRef(pendingRowsForSeamlessRef, pendingRows);
   useSyncRef(pendingColsForSeamlessRef, pendingCols);
 
-  useEffect(() => {
-    if (
-      pendingDisplaySnapshot &&
-      !seamlessLoading &&
-      !isHydrating &&
-      loadingKeys.size === 0 &&
-      pendingRows.size === 0 &&
-      pendingCols.size === 0
-    ) {
-      clearPendingDisplaySnapshot();
-    }
-  }, [
-    clearPendingDisplaySnapshot,
-    isHydrating,
-    loadingKeys,
-    pendingCols,
-    pendingDisplaySnapshot,
-    pendingRows,
-    seamlessLoading,
-  ]);
-
   const renderModelResult = usePivotRenderModel({
     tree,
     expandedRows,
@@ -548,24 +520,16 @@ function PivotTableChart(props: PivotTableProps) {
   const tableHeight = isUserControlled
     ? Math.max(0, height - INTERACTION_TOP_CHIPS_HEIGHT)
     : height;
-  const liveDisplaySnapshot: PivotDisplaySnapshot = {
-    renderModel: renderModelResult.renderModel,
-    tree: renderTree,
-    expandedRows: renderModelResult.expandedRowsForRender,
-    expandedCols: renderModelResult.expandedColsForRender,
-  };
-  const activeDisplaySnapshot = pendingDisplaySnapshot ?? liveDisplaySnapshot;
-  displaySnapshotRef.current = liveDisplaySnapshot;
   const exportChartId =
     typeof formData.slice_id === 'number' ||
     typeof formData.slice_id === 'string'
       ? formData.slice_id
       : undefined;
   const sharedPivotViewProps = {
-    renderModel: activeDisplaySnapshot.renderModel,
-    tree: activeDisplaySnapshot.tree,
-    expandedRows: activeDisplaySnapshot.expandedRows,
-    expandedCols: activeDisplaySnapshot.expandedCols,
+    renderModel: renderModelResult.renderModel,
+    tree: renderTree,
+    expandedRows: renderModelResult.expandedRowsForRender,
+    expandedCols: renderModelResult.expandedColsForRender,
     errorMessage: activeErrorMessage,
     onRetry: handleRetry,
     warnings: combinedWarnings,
@@ -582,8 +546,7 @@ function PivotTableChart(props: PivotTableProps) {
     isColumnSortable: renderModelResult.isColumnSortable,
     getColumnSortOrder: renderModelResult.getColumnSortOrder,
     shouldShowToggle: renderModelResult.shouldShowToggle,
-    showSpinner: (key: string) =>
-      !pendingDisplaySnapshot && !seamlessLoading && loadingKeys.has(key),
+    showSpinner: (key: string) => !seamlessLoading && loadingKeys.has(key),
     isRowAggregateBold: renderModelResult.isRowAggregateBold,
     isColAggregateBold: renderModelResult.isColAggregateBold,
     getNodeDimDepth: renderModelResult.getNodeDimDepth,

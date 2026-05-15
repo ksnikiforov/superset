@@ -407,6 +407,10 @@ Success criteria:
   repeated broad `[A]` depth-3 fetches.
 - Hydration finalization now applies parent deltas before descendant deltas, so
   persisted nested expansion results survive branch pruning.
+- Seamless layout updates no longer freeze the table behind a separate pending
+  display snapshot. The chart renders the committed runtime tree directly while
+  fetch/materialization is pending, so expansion/loading feedback remains live
+  instead of being hidden by chart-owned snapshot state.
 
 ## Current Risks
 
@@ -417,8 +421,9 @@ Success criteria:
   not fetched-state inference from metric tree nodes.
 - `materializePivotTree.ts` is too large and combines several internal
   responsibilities.
-- `PivotTableChart.tsx` is smaller, but it is still the rendezvous point for
-  multiple runtime state machines.
+- `PivotTableChart.tsx` is smaller and no longer owns a pending display
+  snapshot, but it is still the rendezvous point for multiple runtime state
+  machines.
 - `useExpansionEngine.ts` and `stateTransitions.ts` remain large. Split only by
   real ownership, not by wrapper files.
 - Expansion now has the right manifest predicate, but the grouped planner still

@@ -22,7 +22,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type ComponentProps,
   type MutableRefObject,
 } from 'react';
 import { unstable_batchedUpdates } from 'react-dom';
@@ -50,7 +49,6 @@ import {
 } from '../runtime/seamlessRuntimeUpdate';
 import { type PivotFactStoreBatch } from '../runtime/ingestQueryResults';
 import { normalizeRuntimeLayout } from '../layout/resolveInteractionLayout';
-import { PivotTableView } from '../render/PivotTableView';
 import {
   applyDimensionFilterSelectionChange,
   buildClearSelectedFiltersUpdate,
@@ -65,11 +63,6 @@ import { getStableColumnKey } from '../../utils';
 import { isSameRuntimeLayout } from '../runtime/coverage';
 
 type RuntimeSelection = Record<string, DataRecordValue[]>;
-type PivotViewProps = ComponentProps<typeof PivotTableView>;
-export type PivotDisplaySnapshot = Pick<
-  PivotViewProps,
-  'renderModel' | 'tree' | 'expandedRows' | 'expandedCols'
->;
 
 type UsePivotSeamlessRuntimeUpdateConfig = {
   dimensionKeys: string[];
@@ -93,7 +86,6 @@ type UsePivotSeamlessRuntimeUpdateConfig = {
   sourceMetrics?: PivotTableQueryFormData['metrics'];
   sourceMeasureLeavesByMetric?: PivotTableQueryFormData['measureLeavesByMetric'];
   upstreamSignature: string;
-  displaySnapshotRef: MutableRefObject<PivotDisplaySnapshot | null>;
   pendingSeamlessLayoutRef: MutableRefObject<PivotRuntimeLayout | null>;
   seamlessSyncRef: MutableRefObject<SeamlessRuntimeSyncSnapshot | null>;
   expandedRowsRef: MutableRefObject<Set<string>>;
@@ -136,7 +128,6 @@ export const usePivotSeamlessRuntimeUpdate = (
     sourceMetrics,
     sourceMeasureLeavesByMetric,
     upstreamSignature,
-    displaySnapshotRef,
     pendingSeamlessLayoutRef,
     seamlessSyncRef,
     expandedRowsRef,
@@ -153,8 +144,6 @@ export const usePivotSeamlessRuntimeUpdate = (
   const [loading, setLoading] = useState(false);
   const [warnings, setWarnings] = useState<ChartDataWarning[]>([]);
   const [error, setError] = useState<string | undefined>(undefined);
-  const [pendingDisplaySnapshot, setPendingDisplaySnapshot] =
-    useState<PivotDisplaySnapshot | null>(null);
   const [committedTree, setCommittedTree] = useState<PivotTreeData>(data);
   const [committedFactBatches, setCommittedFactBatches] =
     useState<PivotFactStoreBatch[]>(factBatches);
@@ -180,13 +169,8 @@ export const usePivotSeamlessRuntimeUpdate = (
     setWarnings([]);
     setError(undefined);
     setLoading(false);
-    setPendingDisplaySnapshot(null);
     pendingSeamlessLayoutRef.current = null;
   }, [materializationLifecycle, pendingSeamlessLayoutRef]);
-
-  const clearPendingDisplaySnapshot = useCallback(() => {
-    setPendingDisplaySnapshot(null);
-  }, []);
 
   useEffect(() => {
     // Ignore stale upstream updates while a local interaction update is still
@@ -230,10 +214,6 @@ export const usePivotSeamlessRuntimeUpdate = (
         dimensionKeys,
         metricKeys,
       );
-      const displaySnapshot = displaySnapshotRef.current;
-      if (displaySnapshot) {
-        setPendingDisplaySnapshot(displaySnapshot);
-      }
       const updateResult = await fetchAndMaterializeSeamlessRuntimeUpdate({
         requestLifecycle,
         materializationLifecycle,
@@ -290,7 +270,6 @@ export const usePivotSeamlessRuntimeUpdate = (
       commitFilters,
       commitUiRuntimeLayout,
       dimensionKeys,
-      displaySnapshotRef,
       expandedColsRef,
       expandedRowsRef,
       materializationLifecycle,
@@ -481,13 +460,11 @@ export const usePivotSeamlessRuntimeUpdate = (
     seamlessLoading: loading,
     seamlessWarnings: warnings,
     seamlessError: error,
-    pendingDisplaySnapshot,
     applyRuntimeLayoutChange,
     applyDimensionFilterChange,
     clearAllFilters,
     removeRuntimeDimension,
     dropRuntimeDimension,
     dropRuntimeValue,
-    clearPendingDisplaySnapshot,
   };
 };
