@@ -31,6 +31,25 @@ import {
   encodeMetricKey,
   SUBTOTAL_TOKEN,
 } from '../../../src/pivot/core/tokens';
+import { compilePivotProgram } from '../../../src/pivot/runtime/compilePivotProgram';
+
+const testProgram = ({
+  groupbyRows,
+  groupbyColumns,
+  metrics,
+  metricsLayout,
+}: {
+  groupbyRows: string[];
+  groupbyColumns: string[];
+  metrics: string[];
+  metricsLayout: MetricsLayoutEnum;
+}) =>
+  compilePivotProgram({
+    groupbyRows,
+    groupbyColumns,
+    metrics,
+    metricsLayout,
+  });
 
 describe('buildCellFilters', () => {
   it('builds filters for all row/col levels excluding metric tokens on columns', () => {
@@ -44,10 +63,12 @@ describe('buildCellFilters', () => {
     const filters = buildCellFilters({
       rowNode,
       colNode,
-      groupbyRows: ['country', 'state'],
-      groupbyColumns: ['year', 'quarter'],
-      metrics: ['metric1', 'metric2'],
-      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      program: testProgram({
+        groupbyRows: ['country', 'state'],
+        groupbyColumns: ['year', 'quarter'],
+        metrics: ['metric1', 'metric2'],
+        metricsLayout: MetricsLayoutEnum.COLUMNS,
+      }),
     });
 
     expect(filters).toEqual([
@@ -69,10 +90,12 @@ describe('buildCellFilters', () => {
     const filters = buildCellFilters({
       rowNode,
       colNode,
-      groupbyRows: ['country', 'state'],
-      groupbyColumns: ['year'],
-      metrics: ['metric1', 'metric2'],
-      metricsLayout: MetricsLayoutEnum.ROWS,
+      program: testProgram({
+        groupbyRows: ['country', 'state'],
+        groupbyColumns: ['year'],
+        metrics: ['metric1', 'metric2'],
+        metricsLayout: MetricsLayoutEnum.ROWS,
+      }),
     });
 
     expect(filters).toEqual([
@@ -93,10 +116,12 @@ describe('buildCellFilters', () => {
     const filters = buildCellFilters({
       rowNode,
       colNode,
-      groupbyRows: ['country', 'state'],
-      groupbyColumns: ['year'],
-      metrics: ['metric1'],
-      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      program: testProgram({
+        groupbyRows: ['country', 'state'],
+        groupbyColumns: ['year'],
+        metrics: ['metric1'],
+        metricsLayout: MetricsLayoutEnum.COLUMNS,
+      }),
     });
 
     expect(filters).toEqual([

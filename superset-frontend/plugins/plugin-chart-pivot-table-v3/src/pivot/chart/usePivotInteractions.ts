@@ -79,10 +79,7 @@ export const usePivotInteractions = ({
   dateFormatters: PivotTableProps['dateFormatters'];
   timeGrainSqla?: PivotTableProps['timeGrainSqla'];
 }): PivotInteractionsResult => {
-  const {
-    layout: { groupbyRows, groupbyColumns, metrics },
-    resolvedMetricsLayout,
-  } = layout;
+  const { pivotProgram } = layout.layout;
 
   const handleCellClick = useCallback(
     (rowNode: PivotTreeNode, colNode: PivotTreeNode) => {
@@ -92,10 +89,7 @@ export const usePivotInteractions = ({
       const filters = buildCellFilters({
         rowNode,
         colNode,
-        groupbyRows,
-        groupbyColumns,
-        metrics,
-        metricsLayout: resolvedMetricsLayout,
+        program: pivotProgram,
       });
       setDataMask({
         extraFormData: {
@@ -114,11 +108,8 @@ export const usePivotInteractions = ({
     },
     [
       emitCrossFilters,
-      groupbyColumns,
-      groupbyRows,
       mergeOwnState,
-      metrics,
-      resolvedMetricsLayout,
+      pivotProgram,
       setDataMask,
       treeDataSignature,
     ],
@@ -152,10 +143,7 @@ export const usePivotInteractions = ({
       const contextFilters = buildContextMenuFilters({
         rowNode,
         colNode,
-        groupbyRows,
-        groupbyColumns,
-        metrics,
-        metricsLayout: resolvedMetricsLayout,
+        program: pivotProgram,
         dateFormatters,
         timeGrainSqla,
       });
@@ -191,12 +179,9 @@ export const usePivotInteractions = ({
     [
       dateFormatters,
       emitCrossFilters,
-      groupbyColumns,
-      groupbyRows,
-      metrics,
       onContextMenu,
       ownState,
-      resolvedMetricsLayout,
+      pivotProgram,
       treeDataSignature,
       timeGrainSqla,
     ],

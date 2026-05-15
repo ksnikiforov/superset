@@ -20,14 +20,14 @@ import {
   BinaryQueryObjectFilterClause,
   DataRecordValue,
   QueryFormColumn,
-  QueryFormMetric,
   QueryObjectFilterClause,
   UnaryQueryObjectFilterClause,
   getColumnLabel,
 } from '@superset-ui/core';
-import { DateFormatter, MetricsLayoutEnum, PivotTreeNode } from '../types';
+import { DateFormatter, PivotTreeNode } from '../types';
 import { getStableColumnKey } from '../utils';
-import { decodeMetricKey, getMetricKeys, isSubtotalToken } from './core/tokens';
+import { decodeMetricKey, isSubtotalToken } from './core/tokens';
+import type { PivotProgram } from './runtime/types';
 
 export type PivotSelectedFilters = Record<string, DataRecordValue[]>;
 
@@ -242,12 +242,10 @@ export const buildClearSelectedFiltersUpdate = (
 const stripMetricPath = (
   path: PivotTreeNode['path'],
   axis: 'row' | 'col',
-  metricsLayout: MetricsLayoutEnum,
-  metricLabels: Set<string>,
+  program: PivotProgram,
 ) => {
-  const shouldStripMetric =
-    (axis === 'row' && metricsLayout === MetricsLayoutEnum.ROWS) ||
-    (axis === 'col' && metricsLayout === MetricsLayoutEnum.COLUMNS);
+  const shouldStripMetric = axis === program.valueAxis;
+  const metricLabels = new Set(program.metricKeys);
   return path.filter(val => {
     if (isSubtotalToken(val)) {
       return false;
@@ -260,33 +258,16 @@ const stripMetricPath = (
 type CellFiltersParams = {
   rowNode: PivotTreeNode;
   colNode: PivotTreeNode;
-  groupbyRows: QueryFormColumn[];
-  groupbyColumns: QueryFormColumn[];
-  metrics: QueryFormMetric[];
-  metricsLayout: MetricsLayoutEnum;
+  program: PivotProgram;
 };
 
 export const buildCellFilters = ({
   rowNode,
   colNode,
-  groupbyRows,
-  groupbyColumns,
-  metrics,
-  metricsLayout,
+  program,
 }: CellFiltersParams): QueryObjectFilterClause[] => {
-  const metricLabelSet = new Set(getMetricKeys(metrics));
-  const normalizedRowPath = stripMetricPath(
-    rowNode.path,
-    'row',
-    metricsLayout,
-    metricLabelSet,
-  );
-  const normalizedColPath = stripMetricPath(
-    colNode.path,
-    'col',
-    metricsLayout,
-    metricLabelSet,
-  );
+  const normalizedRowPath = stripMetricPath(rowNode.path, 'row', program);
+  const normalizedColPath = stripMetricPath(colNode.path, 'col', program);
   const toFilter = (
     col: QueryFormColumn,
     val: PivotTreeNode['path'][number],
@@ -299,18 +280,19 @@ export const buildCellFilters = ({
     return clause;
   };
   return [
-    ...normalizedRowPath.map((val, i) => toFilter(groupbyRows[i], val)),
-    ...normalizedColPath.map((val, i) => toFilter(groupbyColumns[i], val)),
+    ...normalizedRowPath.map((val, i) =>
+      toFilter(program.rowDimensions[i], val),
+    ),
+    ...normalizedColPath.map((val, i) =>
+      toFilter(program.columnDimensions[i], val),
+    ),
   ];
 };
 
 type ContextFiltersParams = {
   rowNode: PivotTreeNode;
   colNode: PivotTreeNode;
-  groupbyRows: QueryFormColumn[];
-  groupbyColumns: QueryFormColumn[];
-  metrics: QueryFormMetric[];
-  metricsLayout: MetricsLayoutEnum;
+  program: PivotProgram;
   dateFormatters: Record<string, DateFormatter | undefined>;
   timeGrainSqla?: string;
 };
@@ -319,61 +301,50 @@ const buildAxisContextFilters = (
   node: PivotTreeNode,
   columns: QueryFormColumn[],
   axis: 'row' | 'col',
-  metricsLayout: MetricsLayoutEnum,
-  metricLabels: Set<string>,
+  program: PivotProgram,
   dateFormatters: Record<string, DateFormatter | undefined>,
   timeGrainSqla?: string,
 ) =>
-  stripMetricPath(node.path, axis, metricsLayout, metricLabels).map(
-    (val, idx) => {
-      const col = columns[idx];
-      const colLabel = getColumnLabel(col);
-      const formatter = dateFormatters[colLabel];
-      const normalizedVal = val === undefined ? null : val;
-      return {
-        col,
-        op: '==',
-        val: normalizedVal,
-        formattedVal:
-          typeof formatter === 'function'
-            ? (formatter as unknown as (value: DataRecordValue) => string)(
-                normalizedVal,
-              )
-            : String(normalizedVal),
-        grain: formatter && axis === 'row' ? timeGrainSqla : undefined,
-      } as BinaryQueryObjectFilterClause;
-    },
-  );
+  stripMetricPath(node.path, axis, program).map((val, idx) => {
+    const col = columns[idx];
+    const colLabel = getColumnLabel(col);
+    const formatter = dateFormatters[colLabel];
+    const normalizedVal = val === undefined ? null : val;
+    return {
+      col,
+      op: '==',
+      val: normalizedVal,
+      formattedVal:
+        typeof formatter === 'function'
+          ? (formatter as unknown as (value: DataRecordValue) => string)(
+              normalizedVal,
+            )
+          : String(normalizedVal),
+      grain: formatter && axis === 'row' ? timeGrainSqla : undefined,
+    } as BinaryQueryObjectFilterClause;
+  });
 
 export const buildContextMenuFilters = ({
   rowNode,
   colNode,
-  groupbyRows,
-  groupbyColumns,
-  metrics,
-  metricsLayout,
+  program,
   dateFormatters,
   timeGrainSqla,
-}: ContextFiltersParams): BinaryQueryObjectFilterClause[] => {
-  const metricLabelSet = new Set(getMetricKeys(metrics));
-  return [
-    ...buildAxisContextFilters(
-      rowNode,
-      groupbyRows,
-      'row',
-      metricsLayout,
-      metricLabelSet,
-      dateFormatters,
-      timeGrainSqla,
-    ),
-    ...buildAxisContextFilters(
-      colNode,
-      groupbyColumns,
-      'col',
-      metricsLayout,
-      metricLabelSet,
-      dateFormatters,
-      timeGrainSqla,
-    ),
-  ];
-};
+}: ContextFiltersParams): BinaryQueryObjectFilterClause[] => [
+  ...buildAxisContextFilters(
+    rowNode,
+    program.rowDimensions,
+    'row',
+    program,
+    dateFormatters,
+    timeGrainSqla,
+  ),
+  ...buildAxisContextFilters(
+    colNode,
+    program.columnDimensions,
+    'col',
+    program,
+    dateFormatters,
+    timeGrainSqla,
+  ),
+];
