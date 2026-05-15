@@ -35,7 +35,7 @@ export type PivotExpansionPlan = {
 export type PivotExpansionNodeFetchPredicate = (input: {
   axis: PivotAxis;
   key: string;
-  node: PivotTreeNode;
+  path: PivotTreeNode['path'];
 }) => boolean;
 
 type PivotExpansionCoverageDepths = Pick<
@@ -46,19 +46,19 @@ type PivotExpansionCoverageDepths = Pick<
 const isSatisfiedNode = ({
   axis,
   key,
-  node,
+  path,
   coverage,
   isExpansionCoverageLoaded,
   shouldFetchChildren,
 }: {
   axis: PivotAxis;
   key: string;
-  node: PivotTreeNode;
+  path: PivotTreeNode['path'];
   coverage: PivotExpansionCoverageDepths;
   isExpansionCoverageLoaded: PivotExpansionCoveragePredicate;
   shouldFetchChildren: PivotExpansionNodeFetchPredicate;
 }) => {
-  if (!shouldFetchChildren({ axis, key, node })) {
+  if (!shouldFetchChildren({ axis, key, path })) {
     return true;
   }
   return isExpansionCoverageLoaded({
@@ -119,7 +119,7 @@ export const planExpansionForAxis = ({
         isSatisfiedNode({
           axis,
           key,
-          node,
+          path: node.path,
           coverage,
           isExpansionCoverageLoaded,
           shouldFetchChildren,
@@ -151,7 +151,7 @@ export const planExpansionForAxis = ({
       isSatisfiedNode({
         axis,
         key: ancestorKey,
-        node: ancestor,
+        path: ancestor.path,
         coverage,
         isExpansionCoverageLoaded,
         shouldFetchChildren,

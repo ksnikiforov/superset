@@ -83,6 +83,7 @@ import {
   runSameAxisExpansionFetchLoop,
   type ExpansionFetchRuntime,
 } from './fetchExecution';
+import { type PivotExpansionNodeFetchPredicate } from './planner';
 import { createLatestRequestLifecycle } from '../runtime/requestLifecycle';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import type { RenderModelConfig } from '../render/renderModel';
@@ -651,12 +652,12 @@ export const useExpansionEngine = ({
     [setWarnings],
   );
 
-  const shouldFetchChildren = useCallback(
-    ({ axis, node }: { axis: PivotAxis; key: string; node: PivotTreeNode }) =>
+  const shouldFetchChildren = useCallback<PivotExpansionNodeFetchPredicate>(
+    ({ axis, path }) =>
       getNextAxisLevelForPath({
         program: pivotProgram,
         axis,
-        path: node.path.filter(value => !isSubtotalToken(value)),
+        path: path.filter(value => !isSubtotalToken(value)),
       })?.kind === 'dimension',
     [pivotProgram],
   );

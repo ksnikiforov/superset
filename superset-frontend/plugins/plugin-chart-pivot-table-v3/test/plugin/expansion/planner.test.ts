@@ -56,8 +56,11 @@ const makeNode = ({
   };
 };
 
-const shouldFetchTreeChildren = ({ node }: { node: PivotTreeNode }) =>
-  node.hasChildren;
+const shouldFetchDimensionChildren = ({
+  path,
+}: {
+  path: PivotTreeNode['path'];
+}) => path.length < testProgram.rowDimensions.length;
 
 const coverageLoadedFromBatches = (
   factBatches: PivotFactStoreBatch[] = [],
@@ -99,7 +102,7 @@ describe('pivot/expansion/planner', () => {
       coverage: { rowDepth: 1, columnDepth: 1 },
       isExpansionCoverageLoaded: coverageLoadedFromBatches(),
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: shouldFetchTreeChildren,
+      shouldFetchChildren: shouldFetchDimensionChildren,
     });
 
     expect(Array.from(plan.fetchKeys)).toEqual([aKey]);
@@ -172,7 +175,7 @@ describe('pivot/expansion/planner', () => {
       coverage: { rowDepth: 1, columnDepth: 1 },
       isExpansionCoverageLoaded,
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: shouldFetchTreeChildren,
+      shouldFetchChildren: shouldFetchDimensionChildren,
     });
 
     expect(Array.from(plan.fetchKeys)).toEqual([bKey]);
@@ -214,7 +217,7 @@ describe('pivot/expansion/planner', () => {
       coverage: { rowDepth: 1, columnDepth: 0 },
       isExpansionCoverageLoaded,
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: shouldFetchTreeChildren,
+      shouldFetchChildren: shouldFetchDimensionChildren,
     });
 
     expect(Array.from(plan.fetchKeys)).toEqual([txKey]);
@@ -259,7 +262,7 @@ describe('pivot/expansion/planner', () => {
       coverage: { rowDepth: 1, columnDepth: 1 },
       isExpansionCoverageLoaded,
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: shouldFetchTreeChildren,
+      shouldFetchChildren: shouldFetchDimensionChildren,
     });
 
     expect(Array.from(plan.fetchKeys)).toEqual([profitKey]);
@@ -306,7 +309,7 @@ describe('pivot/expansion/planner', () => {
       coverage: { rowDepth: 1, columnDepth: 1 },
       isExpansionCoverageLoaded: coverageLoadedFromBatches(),
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: shouldFetchTreeChildren,
+      shouldFetchChildren: shouldFetchDimensionChildren,
     });
 
     expect(targets).toHaveLength(2);

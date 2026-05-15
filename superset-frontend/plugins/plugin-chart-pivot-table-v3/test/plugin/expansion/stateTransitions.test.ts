@@ -129,7 +129,7 @@ describe('pivot/expansion/stateTransitions', () => {
     metricLabelSet: new Set<string>(),
     isMetricTokenValue: () => false,
     countDimDepth: path => path.length,
-    shouldFetchChildren: ({ node }) => node.hasChildren,
+    shouldFetchChildren: ({ path }) => path.length < 2,
     buildRenderModelConfig: buildTestRenderModelConfig(),
   };
 
@@ -813,6 +813,7 @@ describe('pivot/expansion/stateTransitions', () => {
         ...config,
         groupbyRowsLength: 3,
         groupbyColumnsLength: 0,
+        shouldFetchChildren: ({ path }) => path.length < 3,
         buildRenderModelConfig: buildTestRenderModelConfig({
           groupbyRowsLength: 3,
           groupbyColumnsLength: 0,

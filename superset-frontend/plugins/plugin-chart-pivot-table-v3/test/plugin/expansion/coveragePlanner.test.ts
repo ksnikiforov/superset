@@ -54,8 +54,11 @@ const expansionCoverageLoadedFromDepths =
     return fetchedDepth !== undefined && fetchedDepth >= requiredDepth;
   };
 
-const shouldFetchTreeChildren = ({ node }: { node: PivotTreeNode }) =>
-  node.hasChildren;
+const shouldFetchDimensionChildren = ({
+  path,
+}: {
+  path: PivotTreeNode['path'];
+}) => path.length < 2;
 
 describe('expansionPlanner', () => {
   it('treats nodes as satisfied when fetched depth meets the requirement', () => {
@@ -74,7 +77,7 @@ describe('expansionPlanner', () => {
         new Map([[keyA, 1]]),
       ),
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: shouldFetchTreeChildren,
+      shouldFetchChildren: shouldFetchDimensionChildren,
     });
 
     expect(sortKeys(plan.fetchKeys)).toEqual([]);
@@ -98,7 +101,7 @@ describe('expansionPlanner', () => {
         new Map([[keyA, 2]]),
       ),
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: shouldFetchTreeChildren,
+      shouldFetchChildren: shouldFetchDimensionChildren,
     });
 
     expect(sortKeys(plan.fetchKeys)).toEqual([]);
@@ -121,7 +124,7 @@ describe('expansionPlanner', () => {
         new Map([[keyA, 1]]),
       ),
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: shouldFetchTreeChildren,
+      shouldFetchChildren: shouldFetchDimensionChildren,
     });
 
     expect(sortKeys(plan.fetchKeys)).toEqual([keyA]);
@@ -142,7 +145,7 @@ describe('expansionPlanner', () => {
       coverage: { rowDepth: 1, columnDepth: 0 },
       isExpansionCoverageLoaded: expansionCoverageLoadedFromDepths(new Map()),
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: shouldFetchTreeChildren,
+      shouldFetchChildren: shouldFetchDimensionChildren,
     });
 
     expect(sortKeys(plan.fetchKeys)).toEqual([keyA]);
@@ -166,7 +169,7 @@ describe('expansionPlanner', () => {
         new Map([[keyA, 1]]),
       ),
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: shouldFetchTreeChildren,
+      shouldFetchChildren: shouldFetchDimensionChildren,
     });
 
     expect(sortKeys(plan.fetchKeys)).toEqual([keyAB]);
@@ -191,7 +194,7 @@ describe('expansionPlanner', () => {
         new Map([[keyA, 1]]),
       ),
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: shouldFetchTreeChildren,
+      shouldFetchChildren: shouldFetchDimensionChildren,
     });
 
     expect(sortKeys(plan.fetchKeys)).toEqual([keyA]);
@@ -213,7 +216,7 @@ describe('expansionPlanner', () => {
       coverage: { rowDepth: 1, columnDepth: 1 },
       isExpansionCoverageLoaded: expansionCoverageLoadedFromDepths(new Map()),
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: shouldFetchTreeChildren,
+      shouldFetchChildren: shouldFetchDimensionChildren,
     });
     expect(sortKeys(plan1.fetchKeys)).toEqual([keyA]);
 
@@ -226,7 +229,7 @@ describe('expansionPlanner', () => {
       isExpansionCoverageLoaded:
         expansionCoverageLoadedFromDepths(fetchedDepth),
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: shouldFetchTreeChildren,
+      shouldFetchChildren: shouldFetchDimensionChildren,
     });
     expect(sortKeys(plan2.fetchKeys)).toEqual([]);
 
@@ -238,7 +241,7 @@ describe('expansionPlanner', () => {
       isExpansionCoverageLoaded:
         expansionCoverageLoadedFromDepths(fetchedDepth),
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: shouldFetchTreeChildren,
+      shouldFetchChildren: shouldFetchDimensionChildren,
     });
     expect(sortKeys(plan3.fetchKeys)).toEqual([keyAB]);
 
@@ -250,7 +253,7 @@ describe('expansionPlanner', () => {
       isExpansionCoverageLoaded:
         expansionCoverageLoadedFromDepths(fetchedDepth),
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: shouldFetchTreeChildren,
+      shouldFetchChildren: shouldFetchDimensionChildren,
     });
     expect(sortKeys(plan4.fetchKeys)).toEqual([keyA]);
     expect(sortKeys(plan4.pendingKeys)).toEqual([keyA, keyAB]);
@@ -268,7 +271,7 @@ describe('expansionPlanner', () => {
         new Map([[keyA, 2]]),
       ),
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: shouldFetchTreeChildren,
+      shouldFetchChildren: shouldFetchDimensionChildren,
     });
     expect(sortKeys(plan5.fetchKeys)).toEqual([]);
   });

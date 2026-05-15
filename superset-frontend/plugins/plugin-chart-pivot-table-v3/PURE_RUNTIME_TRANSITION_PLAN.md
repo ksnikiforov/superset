@@ -405,6 +405,10 @@ Success criteria:
   (`path + next dimension`) and keep only the opposite-axis visible context.
   This avoids promoting nested persisted paths such as `[A]` and `[A, X]` into
   repeated broad `[A]` depth-3 fetches.
+- Expansion fetchability is now expressed as an axis/path policy instead of a
+  tree-node policy. The planner still consumes tree nodes to find present or
+  missing ancestors, but it no longer asks node shape whether semantic children
+  should be fetched.
 - Hydration finalization now applies parent deltas before descendant deltas, so
   persisted nested expansion results survive branch pruning.
 - Seamless layout updates no longer freeze the table behind a separate pending
