@@ -413,10 +413,7 @@ export const usePivotSeamlessRuntimeUpdate = (
       previousUpstreamState: lastUpstreamQueryContextRef.current,
       data,
       isUserControlled,
-      isDashboardRuntimeSync,
       persistedInteractionFilters,
-      committedFactBatches,
-      committedRuntimeLayout,
       committedFilters,
       uiSelectedFilters,
       lastSync: seamlessSyncRef.current,
@@ -429,11 +426,8 @@ export const usePivotSeamlessRuntimeUpdate = (
     });
   }, [
     applySeamlessUpdate,
-    committedFactBatches,
     committedFilters,
-    committedRuntimeLayout,
     data,
-    isDashboardRuntimeSync,
     isUserControlled,
     persistedInteractionFilters,
     seamlessSyncRef,

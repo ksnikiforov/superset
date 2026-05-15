@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14532` insertions, `14903` deletions, net `-371`.
-- Current production TypeScript/TSX total: `33139` lines.
+- Production `src`: `14491` insertions, `14903` deletions, net `-412`.
+- Current production TypeScript/TSX total: `33098` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -499,6 +499,10 @@ Success criteria:
   result as intersection-scoped coverage.
 - Initial hydration prefetch no longer has a separate `skip-root` action. The
   root-only no-fetch case is represented as ordinary idle state.
+- Seamless dashboard sync no longer performs stale committed-layout coverage
+  recovery. If committed runtime layout needs facts that are not loaded, that is
+  now treated as a query/bootstrap coverage responsibility instead of a
+  chart-owned repair path.
 
 ## Current Risks
 
@@ -514,10 +518,10 @@ Success criteria:
   runtime state machines.
 - `useExpansionEngine.ts` and `stateTransitions.ts` remain large. Split only by
   real ownership, not by wrapper files.
-- The explicit intersection target added production code. The next cleanup must
-  harvest that investment by deleting older recovery/planning branches that are
-  now redundant, otherwise the refactor drifts away from the code-reduction
-  goal.
+- The explicit intersection target added production code. Follow-up cleanup has
+  started by deleting the separate root-prefetch action and seamless stale
+  coverage recovery, but more older recovery/planning branches should still be
+  removed where coverage ownership now makes them redundant.
 - Missing visible bootstrap cells are no longer repaired by expansion prefetch.
   Initial visible grid coverage must come from bootstrap/query planning, not a
   chart-owned recovery path.

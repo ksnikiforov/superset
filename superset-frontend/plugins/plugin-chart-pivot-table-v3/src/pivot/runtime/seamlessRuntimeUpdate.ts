@@ -37,11 +37,7 @@ import {
   type PivotFactStoreBatch,
 } from './ingestQueryResults';
 import { insertValuesPlaceholder } from './compilePivotProgram';
-import {
-  factBatchesCoverRuntimeLayout,
-  isSameRuntimeLayout,
-  shouldFetchRuntimeLayout,
-} from './coverage';
+import { isSameRuntimeLayout, shouldFetchRuntimeLayout } from './coverage';
 import {
   executeLatestRequest,
   executeScheduledLatestRequest,
@@ -102,33 +98,12 @@ export const buildSeamlessRuntimeUpstreamSignature = (
   });
 };
 
-const shouldRecoverStaleDashboardRuntimeCoverage = ({
-  isUserControlled,
-  isDashboardRuntimeSync,
-  persistedInteractionFilters,
-  committedFactBatches,
-  committedRuntimeLayout,
-}: {
-  isUserControlled: boolean;
-  isDashboardRuntimeSync: boolean;
-  persistedInteractionFilters: RuntimeSelection;
-  committedFactBatches: PivotFactStoreBatch[];
-  committedRuntimeLayout: PivotRuntimeLayout;
-}) =>
-  isUserControlled &&
-  isDashboardRuntimeSync &&
-  !hasSelectedFilters(persistedInteractionFilters) &&
-  !factBatchesCoverRuntimeLayout(committedFactBatches, committedRuntimeLayout);
-
 export const prepareSeamlessRuntimeUpdateEffect = ({
   upstreamDashboardQueryContextSignature,
   previousUpstreamState,
   data,
   isUserControlled,
-  isDashboardRuntimeSync,
   persistedInteractionFilters,
-  committedFactBatches,
-  committedRuntimeLayout,
   committedFilters,
   uiSelectedFilters,
   lastSync,
@@ -139,10 +114,7 @@ export const prepareSeamlessRuntimeUpdateEffect = ({
   previousUpstreamState: SeamlessRuntimeUpstreamState;
   data: PivotTreeData;
   isUserControlled: boolean;
-  isDashboardRuntimeSync: boolean;
   persistedInteractionFilters: RuntimeSelection;
-  committedFactBatches: PivotFactStoreBatch[];
-  committedRuntimeLayout: PivotRuntimeLayout;
   committedFilters: RuntimeSelection;
   uiSelectedFilters: RuntimeSelection;
   lastSync: SeamlessRuntimeSyncSnapshot | null;
@@ -157,17 +129,10 @@ export const prepareSeamlessRuntimeUpdateEffect = ({
     : null;
   const shouldApplyStaleUpdate =
     upstreamDashboardQueryContextSignature !== null &&
-    (shouldRecoverStaleDashboardRuntimeCoverage({
-      isUserControlled,
-      isDashboardRuntimeSync,
-      persistedInteractionFilters,
-      committedFactBatches,
-      committedRuntimeLayout,
-    }) ||
-      (previousUpstreamState !== null &&
-        previousUpstreamState.signature !==
-          upstreamDashboardQueryContextSignature &&
-        previousUpstreamState.data === data));
+    previousUpstreamState !== null &&
+    previousUpstreamState.signature !==
+      upstreamDashboardQueryContextSignature &&
+    previousUpstreamState.data === data;
   const nextPersistedFilterSync = buildSeamlessRuntimeSyncSnapshot({
     runtimeLayout: uiRuntimeLayout,
     selection: persistedInteractionFilters,

@@ -42,22 +42,6 @@ const runtimeLayout: PivotRuntimeLayout = {
   valuePlacement: { axis: 'col', index: 1 },
 };
 
-const factBatch = (
-  rowDepth: number,
-  columnDepth: number,
-): PivotFactStoreBatch => ({
-  coverage: buildFactCoverage({
-    reason: 'initial',
-    rowDimensions: ['country'].slice(0, rowDepth),
-    columnDimensions: ['month'].slice(0, columnDepth),
-    rowDepth,
-    columnDepth,
-  }),
-  facts: [],
-  valueKeys: ['sales'],
-  scope: { kind: 'bootstrap' },
-});
-
 test('builds stable seamless runtime sync snapshots', () => {
   expect(
     buildSeamlessRuntimeSyncSnapshot({
@@ -111,10 +95,7 @@ test('prepares seamless runtime effect updates in chart application order', () =
       },
       data: currentData,
       isUserControlled: true,
-      isDashboardRuntimeSync: true,
       persistedInteractionFilters: persistedFilters,
-      committedFactBatches: [factBatch(1, 0)],
-      committedRuntimeLayout: runtimeLayout,
       committedFilters: persistedFilters,
       uiSelectedFilters: persistedFilters,
       lastSync,
@@ -139,51 +120,6 @@ test('prepares seamless runtime effect updates in chart application order', () =
   });
 });
 
-test('prepares stale coverage recovery updates from committed facts', () => {
-  const currentData: PivotTreeData = { rows: {}, cols: {}, cells: {} };
-
-  expect(
-    prepareSeamlessRuntimeUpdateEffect({
-      upstreamDashboardQueryContextSignature: 'query-a',
-      previousUpstreamState: null,
-      data: currentData,
-      isUserControlled: true,
-      isDashboardRuntimeSync: true,
-      persistedInteractionFilters: {},
-      committedFactBatches: [factBatch(1, 0)],
-      committedRuntimeLayout: runtimeLayout,
-      committedFilters: {},
-      uiSelectedFilters: {},
-      lastSync: null,
-      uiRuntimeLayout: runtimeLayout,
-      upstreamSeamlessSignature: 'query-a',
-    }).updates,
-  ).toEqual([
-    {
-      runtimeLayout,
-      selection: {},
-    },
-  ]);
-
-  expect(
-    prepareSeamlessRuntimeUpdateEffect({
-      upstreamDashboardQueryContextSignature: 'query-a',
-      previousUpstreamState: null,
-      data: currentData,
-      isUserControlled: true,
-      isDashboardRuntimeSync: true,
-      persistedInteractionFilters: {},
-      committedFactBatches: [factBatch(1, 1)],
-      committedRuntimeLayout: runtimeLayout,
-      committedFilters: {},
-      uiSelectedFilters: {},
-      lastSync: null,
-      uiRuntimeLayout: runtimeLayout,
-      upstreamSeamlessSignature: 'query-a',
-    }).updates,
-  ).toEqual([]);
-});
-
 test('skips seamless runtime effect updates for unrelated upstream state', () => {
   const currentData: PivotTreeData = { rows: {}, cols: {}, cells: {} };
   const previousData: PivotTreeData = { rows: {}, cols: {}, cells: {} };
@@ -196,10 +132,7 @@ test('skips seamless runtime effect updates for unrelated upstream state', () =>
       },
       data: currentData,
       isUserControlled: true,
-      isDashboardRuntimeSync: true,
       persistedInteractionFilters: { country: ['France'] },
-      committedFactBatches: [factBatch(1, 0)],
-      committedRuntimeLayout: runtimeLayout,
       committedFilters: {},
       uiSelectedFilters: { country: ['France'] },
       lastSync: null,
@@ -223,10 +156,7 @@ test('skips seamless runtime effect updates for unrelated upstream state', () =>
       },
       data: currentData,
       isUserControlled: false,
-      isDashboardRuntimeSync: false,
       persistedInteractionFilters: {},
-      committedFactBatches: [],
-      committedRuntimeLayout: runtimeLayout,
       committedFilters: {},
       uiSelectedFilters: {},
       lastSync: null,
