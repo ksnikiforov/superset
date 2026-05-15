@@ -19,6 +19,7 @@
 import { type QueryFormColumn, type QueryFormMetric } from '@superset-ui/core';
 import {
   type MetricFormattingScope,
+  type PivotAxis,
   type PivotDimensionFormattingMap,
   type PivotDimensionSortingMap,
   type PivotMetricDatabarMap,
@@ -34,19 +35,41 @@ import {
   mergeMetrics,
 } from '../../utils';
 import { getMetricKey } from '../core/tokens';
-import {
-  type QueryIntent,
-  shouldIncludeDatabars,
-  shouldIncludeMetricFormatting,
-} from './queryIntent';
 
-export type QueryShape = {
+export type QueryIntent = {
+  kind: 'branch' | 'wholeLevel' | 'totalsOnly';
+  axis?: PivotAxis;
+  targetRowDepth: number;
+  targetColDepth: number;
+  needsValueCells: boolean;
+  needsTotals: boolean;
+  needsMetricFormatting: boolean;
+  needsDatabars: boolean;
+  needsRowOrdering: boolean;
+  needsColOrdering: boolean;
+  needsRowDimensionFormatting: boolean;
+  needsColDimensionFormatting: boolean;
+};
+
+const shouldIncludeMetricFormatting = (
+  scope: MetricFormattingScope | undefined,
+  intent: QueryIntent,
+): boolean =>
+  intent.needsMetricFormatting &&
+  (scope === 'values'
+    ? intent.needsValueCells
+    : intent.needsValueCells || intent.needsTotals);
+
+const shouldIncludeDatabars = (intent: QueryIntent): boolean =>
+  intent.needsDatabars && intent.needsValueCells;
+
+type QueryShape = {
   rowGroupby: QueryFormColumn[];
   colGroupby: QueryFormColumn[];
   metrics: QueryFormMetric[];
 };
 
-export type QueryShapeInput = {
+type QueryShapeInput = {
   intent: QueryIntent;
   rowGroupby: QueryFormColumn[];
   colGroupby: QueryFormColumn[];

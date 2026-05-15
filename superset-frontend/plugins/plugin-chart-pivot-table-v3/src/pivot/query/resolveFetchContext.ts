@@ -40,8 +40,7 @@ import {
 } from '../runtime/projection';
 import { buildBranchFactCoverages } from '../runtime/coverage';
 import { type PivotFactCoverage } from '../runtime/types';
-import { buildQueryShape } from './queryShape';
-import { type QueryIntent } from './queryIntent';
+import { buildQueryShape, type QueryIntent } from './queryShape';
 
 export type ResolveFetchContextParams = {
   formData: PivotTableQueryFormData;

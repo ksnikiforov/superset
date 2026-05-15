@@ -20,7 +20,7 @@ import { type QueryFormColumn } from '@superset-ui/core';
 import { type PivotTableQueryFormData } from '../../types';
 import { hasTotalSorting } from '../../utils';
 import { type LayoutContext } from '../layout/LayoutContext';
-import { type QueryIntent } from './queryIntent';
+import { type QueryIntent } from './queryShape';
 import {
   buildFactCoverage,
   buildVisibleFactCoverage,

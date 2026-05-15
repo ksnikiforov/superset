@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14049` insertions, `14576` deletions, net `-527`.
-- Current production TypeScript/TSX total: `32983` lines.
+- Production `src`: `14080` insertions, `14641` deletions, net `-561`.
+- Current production TypeScript/TSX total: `32949` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -356,6 +356,8 @@ Success criteria:
   the chart render path instead of constructing its own simplified renderer.
 - Main query planning uses explicit fact coverage rather than full possible
   layout depth.
+- Query shape now owns query-intent support-metric decisions directly; the
+  separate `queryIntent.ts` helper layer has been removed.
 - Branch and batch fetch params no longer expose tree shape.
 - Fetch results describe loaded coverage through fact batches.
 - Expansion loaded/fetched state is fact-coverage based.
