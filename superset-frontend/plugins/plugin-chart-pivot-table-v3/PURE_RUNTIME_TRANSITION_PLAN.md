@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14016` insertions, `14260` deletions, net `-244`.
-- Current production TypeScript/TSX total: `33266` lines.
+- Production `src`: `14000` insertions, `14260` deletions, net `-260`.
+- Current production TypeScript/TSX total: `33250` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -422,6 +422,10 @@ Success criteria:
 - The materializer no longer exports a dead fact-store compatibility wrapper or
   test-fixture-only materialization entrypoints. Production callers now go
   through the explicit branch/initial materialization APIs.
+- Measure-axis materialization now uses one axis-neutral cell projection loop
+  for row and column Values placement. Row-only subtotal placement and
+  column-only single-metric base-cell propagation remain explicit visible
+  behavior instead of duplicated axis branches.
 - Hydration finalization now applies parent deltas before descendant deltas, so
   persisted nested expansion results survive branch pruning.
 - Seamless layout updates no longer freeze the table behind a separate pending

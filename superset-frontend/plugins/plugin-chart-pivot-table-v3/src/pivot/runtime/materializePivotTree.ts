@@ -663,6 +663,10 @@ const applyMeasureAxis = ({
   });
 
   const result: PivotTreeData = { rows: {}, cols: {}, cells: {} };
+  const oppositeAxis = valueAxis === 'row' ? 'col' : 'row';
+  const valueDepthWithMeasures = valueAxisDepth + (leafTierVisible ? 2 : 1);
+  const oppositeAxisDepth =
+    oppositeAxis === 'row' ? rowGroupby.length : colGroupby.length;
 
   const ensureNode = (
     axis: 'row' | 'col',
@@ -755,219 +759,199 @@ const applyMeasureAxis = ({
     return node;
   };
 
-  if (valueAxis === 'row') {
-    const rowDepthWithMeasures = rowGroupby.length + (leafTierVisible ? 2 : 1);
-
-    if (preserveValueAxisSourceNodes) {
-      Object.values(tree.rows).forEach(rowNode =>
-        ensureNode(
-          'row',
-          rowNode.path,
-          rowGroupby.length,
-          rowNode.isSubtotal || undefined,
-        ),
-      );
+  const addCell = ({
+    rowPath,
+    colPath,
+    values,
+    isSubtotal,
+    overwrite = false,
+  }: {
+    rowPath: PivotPath;
+    colPath: PivotPath;
+    values: Record<string, DataRecordValue>;
+    isSubtotal?: boolean;
+    overwrite?: boolean;
+  }) => {
+    const rowKey = serializePath(rowPath);
+    const colKey = serializePath(colPath);
+    const cellKey = serializeCellKey(rowKey, colKey);
+    if (!overwrite && result.cells[cellKey]) {
+      return;
     }
+    result.cells[cellKey] = {
+      rowKey,
+      colKey,
+      values,
+      isSubtotal,
+    };
+  };
 
-    Object.values(tree.cols).forEach(colNode => {
-      ensureNode(
-        'col',
-        colNode.path,
-        colGroupby.length,
-        colNode.isSubtotal || undefined,
-      );
-    });
-
-    Object.values(tree.cells).forEach(cell => {
-      const baseRow = tree.rows[cell.rowKey];
-      const baseCol = tree.cols[cell.colKey];
-      const rowPath = baseRow?.path || [];
-      const colPath = baseCol?.path || [];
-      const rowPrefix = rowPath.slice(0, insertIndex);
-      const rowSuffix = rowPath.slice(insertIndex);
-
-      const rowKey = serializePath(rowPath);
-      const colKey = serializePath(colPath);
-      const isTotalRow = rowPath.length === 0 || rowPath.some(isSubtotalToken);
-      if (valuesAtEnd && rowPath.length < rowGroupby.length && !isTotalRow) {
-        ensureNode(
-          'row',
-          rowPath,
-          rowGroupby.length,
-          baseRow?.isSubtotal || undefined,
-        );
-        ensureNode(
-          'col',
-          colPath,
-          colGroupby.length,
-          baseCol?.isSubtotal || undefined,
-        );
-        const cellKey = serializeCellKey(rowKey, colKey);
-        result.cells[cellKey] = result.cells[cellKey] || {
-          rowKey,
-          colKey,
-          values: cell.values,
-          isSubtotal: cell.isSubtotal,
-        };
-        return;
-      }
-
-      groups.forEach(group => {
-        const metric = group.metricKey;
-        const mergedValues = {
-          [metric]: cell.values[metric],
-          ...cell.values,
-        };
-        const metricToken = encodeMetricKey(metric);
-        const hasSubtotalAtInsert =
-          rowSuffix.length > 0 && isSubtotalToken(rowSuffix[0]);
-        const metricAxisPath = hasSubtotalAtInsert
-          ? [...rowPrefix, rowSuffix[0], metricToken]
-          : [...rowPrefix, metricToken];
-        const rowTail = hasSubtotalAtInsert ? rowSuffix.slice(1) : rowSuffix;
-
-        const leafTargets = leafTierVisible ? group.leaves : [group.leaves[0]];
-        leafTargets.forEach(leaf => {
-          const newRowPath = leafTierVisible
-            ? [...metricAxisPath, encodeMeasureLeafKey(leaf.id), ...rowTail]
-            : [...metricAxisPath, ...rowTail];
-          for (let depth = 0; depth <= newRowPath.length; depth += 1) {
-            const subPath = newRowPath.slice(0, depth);
-            ensureNode(
-              'row',
-              subPath,
-              rowDepthWithMeasures,
-              baseRow?.isSubtotal || undefined,
-            );
-          }
-          const newRowKey = serializePath(newRowPath);
-
-          ensureNode(
-            'col',
-            colPath,
-            colGroupby.length,
-            baseCol?.isSubtotal || undefined,
-          );
-
-          result.cells[serializeCellKey(newRowKey, colKey)] = {
-            rowKey: newRowKey,
-            colKey,
-            values: mergedValues,
-            isSubtotal: cell.isSubtotal,
-          };
-          if (metricKeys.length === 1) {
-            const cellKey = serializeCellKey(rowKey, colKey);
-            result.cells[cellKey] = result.cells[cellKey] || {
-              rowKey,
-              colKey,
-              values: mergedValues,
-              isSubtotal: cell.isSubtotal,
-            };
-          }
-        });
+  const addSingleMetricBaseCells = ({
+    valuePath,
+    oppositePath,
+    colPrefix,
+    values,
+    isSubtotal,
+  }: {
+    valuePath: PivotPath;
+    oppositePath: PivotPath;
+    colPrefix?: PivotPath;
+    values: Record<string, DataRecordValue>;
+    isSubtotal?: boolean;
+  }) => {
+    if (metricKeys.length !== 1) {
+      return;
+    }
+    if (valueAxis === 'row') {
+      addCell({
+        rowPath: valuePath,
+        colPath: oppositePath,
+        values,
+        isSubtotal,
       });
-    });
-  } else {
-    const colDepthWithMeasures = colGroupby.length + (leafTierVisible ? 2 : 1);
-
-    if (preserveValueAxisSourceNodes) {
-      Object.values(tree.cols).forEach(colNode =>
-        ensureNode(
-          'col',
-          colNode.path,
-          colGroupby.length,
-          colNode.isSubtotal || undefined,
-        ),
-      );
+      return;
     }
+    if (insertIndex === 0) {
+      addCell({
+        rowPath: oppositePath,
+        colPath: colPrefix ?? [],
+        values,
+        isSubtotal,
+      });
+    }
+    if (
+      insertIndex >= colGroupby.length ||
+      insertIndex === 0 ||
+      (insertIndex > 0 &&
+        insertIndex < colGroupby.length &&
+        valuePath.length <= insertIndex)
+    ) {
+      addCell({
+        rowPath: oppositePath,
+        colPath: valuePath,
+        values,
+        isSubtotal,
+      });
+    }
+  };
 
-    Object.values(tree.rows).forEach(rowNode =>
+  const sourceNodesForAxis = (axis: 'row' | 'col') =>
+    axis === 'row' ? tree.rows : tree.cols;
+
+  if (preserveValueAxisSourceNodes) {
+    Object.values(sourceNodesForAxis(valueAxis)).forEach(node =>
       ensureNode(
-        'row',
-        rowNode.path,
-        rowGroupby.length,
-        rowNode.isSubtotal || undefined,
+        valueAxis,
+        node.path,
+        valueAxisDepth,
+        node.isSubtotal || undefined,
       ),
     );
+  }
 
-    Object.values(tree.cells).forEach(cell => {
-      const baseRow = tree.rows[cell.rowKey];
-      const baseCol = tree.cols[cell.colKey];
-      const rowPath = baseRow?.path || [];
-      const colPath = baseCol?.path || [];
-      const colPrefix = colPath.slice(0, insertIndex);
-      const colSuffix = colPath.slice(insertIndex);
+  Object.values(sourceNodesForAxis(oppositeAxis)).forEach(node =>
+    ensureNode(
+      oppositeAxis,
+      node.path,
+      oppositeAxisDepth,
+      node.isSubtotal || undefined,
+    ),
+  );
 
-      groups.forEach(group => {
-        const metric = group.metricKey;
-        const mergedValues = {
-          [metric]: cell.values[metric],
-          ...cell.values,
-        };
-        const metricToken = encodeMetricKey(metric);
-        const baseMetricPath = [...colPrefix, metricToken];
-        const colTail = colSuffix;
-        const leafTargets = leafTierVisible ? group.leaves : [group.leaves[0]];
-        leafTargets.forEach(leaf => {
-          const newColPath = leafTierVisible
-            ? [...baseMetricPath, encodeMeasureLeafKey(leaf.id), ...colTail]
-            : [...baseMetricPath, ...colTail];
-          for (let depth = 0; depth <= newColPath.length; depth += 1) {
-            const subPath = newColPath.slice(0, depth);
-            ensureNode(
-              'col',
-              subPath,
-              colDepthWithMeasures,
-              baseCol?.isSubtotal || undefined,
-            );
-          }
-          const newColKey = serializePath(newColPath);
+  Object.values(tree.cells).forEach(cell => {
+    const baseRow = tree.rows[cell.rowKey];
+    const baseCol = tree.cols[cell.colKey];
+    const valueNode = valueAxis === 'row' ? baseRow : baseCol;
+    const oppositeNode = valueAxis === 'row' ? baseCol : baseRow;
+    const valuePath = valueNode?.path || [];
+    const oppositePath = oppositeNode?.path || [];
+    const valuePrefix = valuePath.slice(0, insertIndex);
+    const valueSuffix = valuePath.slice(insertIndex);
 
-          const rowKey = serializePath(rowPath);
+    const isTotalValuePath =
+      valuePath.length === 0 || valuePath.some(isSubtotalToken);
+    if (
+      valueAxis === 'row' &&
+      valuesAtEnd &&
+      valuePath.length < rowGroupby.length &&
+      !isTotalValuePath
+    ) {
+      ensureNode(
+        valueAxis,
+        valuePath,
+        valueAxisDepth,
+        valueNode?.isSubtotal || undefined,
+      );
+      ensureNode(
+        oppositeAxis,
+        oppositePath,
+        oppositeAxisDepth,
+        oppositeNode?.isSubtotal || undefined,
+      );
+      addCell({
+        rowPath: valuePath,
+        colPath: oppositePath,
+        values: cell.values,
+        isSubtotal: cell.isSubtotal,
+      });
+      return;
+    }
+
+    groups.forEach(group => {
+      const metric = group.metricKey;
+      const mergedValues = {
+        [metric]: cell.values[metric],
+        ...cell.values,
+      };
+      const metricToken = encodeMetricKey(metric);
+      const hasSubtotalAtInsert =
+        valueAxis === 'row' &&
+        valueSuffix.length > 0 &&
+        isSubtotalToken(valueSuffix[0]);
+      const metricAxisPath = hasSubtotalAtInsert
+        ? [...valuePrefix, valueSuffix[0], metricToken]
+        : [...valuePrefix, metricToken];
+      const valueTail = hasSubtotalAtInsert
+        ? valueSuffix.slice(1)
+        : valueSuffix;
+      const leafTargets = leafTierVisible ? group.leaves : [group.leaves[0]];
+
+      leafTargets.forEach(leaf => {
+        const projectedValuePath = leafTierVisible
+          ? [...metricAxisPath, encodeMeasureLeafKey(leaf.id), ...valueTail]
+          : [...metricAxisPath, ...valueTail];
+        for (let depth = 0; depth <= projectedValuePath.length; depth += 1) {
           ensureNode(
-            'row',
-            rowPath,
-            rowGroupby.length,
-            baseRow?.isSubtotal || undefined,
+            valueAxis,
+            projectedValuePath.slice(0, depth),
+            valueDepthWithMeasures,
+            valueNode?.isSubtotal || undefined,
           );
+        }
+        ensureNode(
+          oppositeAxis,
+          oppositePath,
+          oppositeAxisDepth,
+          oppositeNode?.isSubtotal || undefined,
+        );
 
-          result.cells[serializeCellKey(rowKey, newColKey)] = {
-            rowKey,
-            colKey: newColKey,
-            values: mergedValues,
-            isSubtotal: cell.isSubtotal,
-          };
-          if (metricKeys.length === 1 && insertIndex === 0) {
-            const rootColKey = serializePath(colPrefix);
-            const cellKey = serializeCellKey(rowKey, rootColKey);
-            result.cells[cellKey] = result.cells[cellKey] || {
-              rowKey,
-              colKey: rootColKey,
-              values: mergedValues,
-              isSubtotal: cell.isSubtotal,
-            };
-          }
-          if (
-            metricKeys.length === 1 &&
-            (insertIndex >= colGroupby.length ||
-              insertIndex === 0 ||
-              (insertIndex > 0 &&
-                insertIndex < colGroupby.length &&
-                colPath.length <= insertIndex))
-          ) {
-            const baseColKey = serializePath(colPath);
-            const cellKey = serializeCellKey(rowKey, baseColKey);
-            result.cells[cellKey] = result.cells[cellKey] || {
-              rowKey,
-              colKey: baseColKey,
-              values: mergedValues,
-              isSubtotal: cell.isSubtotal,
-            };
-          }
+        addCell({
+          rowPath: valueAxis === 'row' ? projectedValuePath : oppositePath,
+          colPath: valueAxis === 'col' ? projectedValuePath : oppositePath,
+          values: mergedValues,
+          isSubtotal: cell.isSubtotal,
+          overwrite: true,
+        });
+        addSingleMetricBaseCells({
+          valuePath,
+          oppositePath,
+          colPrefix: valuePrefix,
+          values: mergedValues,
+          isSubtotal: cell.isSubtotal,
         });
       });
     });
-  }
+  });
 
   return result;
 };

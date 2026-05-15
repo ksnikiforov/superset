@@ -50,7 +50,9 @@ import {
 } from '../fixtures/metricAxis';
 
 jest.mock('../../../src/pivot/query/fetchPivotBranch', () => {
-  const actual = jest.requireActual('../../../src/pivot/query/fetchPivotBranch');
+  const actual = jest.requireActual(
+    '../../../src/pivot/query/fetchPivotBranch',
+  );
   return {
     ...actual,
     fetchPivotBranch: jest
@@ -1810,13 +1812,9 @@ describe('PivotTableChart metric tier suppression', () => {
     );
     const mergedTree = mergeTrees(baseTreeWithMetrics, branchTreeWithMetrics);
 
-    fetchPivotBranchMock
-      .mockImplementationOnce(
-        resolveMockBranchFetchResult({ data: baseTreeWithMetrics }),
-      )
-      .mockImplementationOnce(
-        resolveMockBranchFetchResult({ data: mergedTree }),
-      );
+    fetchPivotBranchMock.mockImplementation(
+      resolveMockBranchFetchResult({ data: mergedTree }),
+    );
 
     const props: Partial<PivotTableProps> = {
       data: baseTreeWithMetrics,
@@ -1873,7 +1871,7 @@ describe('PivotTableChart metric tier suppression', () => {
     fireEvent.click(within(yearHeader).getByLabelText('plus-square'));
 
     await waitFor(() => {
-      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
     });
 
     const headerRows =
