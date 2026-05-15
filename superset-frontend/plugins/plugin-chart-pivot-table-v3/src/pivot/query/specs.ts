@@ -49,7 +49,7 @@ import {
 } from './fetchPlanOptimizer';
 import { formatQueryName } from './queryName';
 import { buildPathFilters, coerceValueForColumn } from './pathFilters';
-import { coerceExpansionState } from './persistedExpansionState';
+import { coerceExpansionState } from '../expansion/stateModel';
 import {
   type ResolvedFetchContext,
   resolveFetchContext,

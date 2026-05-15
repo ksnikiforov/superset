@@ -17,16 +17,77 @@
  * under the License.
  */
 
-import { type PivotAxis, type PivotTreeData, PivotTreeNode } from '../../types';
-import { decodeMetricKey } from '../core/tokens';
+import {
+  type PivotAxis,
+  type PivotPath,
+  type PivotTreeData,
+  PivotTreeNode,
+} from '../../types';
+import { decodeMetricKey, isSubtotalToken } from '../core/tokens';
 import { parsePath, serializePath } from '../core/path';
 import { countDimDepth } from '../metricsTotals';
 import { rootKey } from '../viewModel';
 
-export {
-  coerceExpansionState,
-  type PivotExpansionStateKeys,
-} from '../query/persistedExpansionState';
+export type PivotExpansionStateKeys = {
+  rowKeys: string[];
+  colKeys: string[];
+  rows: string[];
+  cols: string[];
+  collapsedRows: string[];
+  collapsedCols: string[];
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const coerceAxisKeys = (value: unknown): string[] | undefined => {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const keys = value.filter((item): item is string => typeof item === 'string');
+  return keys.length === value.length ? keys : undefined;
+};
+
+const coerceExpansionAxis = (value: unknown): string[] | undefined => {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const resolved: string[] = [];
+  value.forEach(item => {
+    if (Array.isArray(item)) {
+      if ((item as unknown[]).some(isSubtotalToken)) {
+        return;
+      }
+      resolved.push(serializePath(item as PivotPath));
+    }
+  });
+  return resolved;
+};
+
+export const coerceExpansionState = (
+  value: unknown,
+): PivotExpansionStateKeys | undefined => {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  const rowKeys = coerceAxisKeys(value.rowKeys);
+  const colKeys = coerceAxisKeys(value.colKeys);
+  const rows = coerceExpansionAxis(value.rows);
+  const cols = coerceExpansionAxis(value.cols);
+  const collapsedRows = coerceExpansionAxis(value.collapsedRows);
+  const collapsedCols = coerceExpansionAxis(value.collapsedCols);
+  if (!rowKeys || !colKeys || !rows || !cols) {
+    return undefined;
+  }
+  return {
+    rowKeys,
+    colKeys,
+    rows,
+    cols,
+    collapsedRows: collapsedRows || [],
+    collapsedCols: collapsedCols || [],
+  };
+};
 
 type SeedExpandedOptions = {
   includeMetricDepthZero?: boolean;

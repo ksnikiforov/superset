@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14080` insertions, `14641` deletions, net `-561`.
-- Current production TypeScript/TSX total: `32949` lines.
+- Production `src`: `14145` insertions, `14727` deletions, net `-582`.
+- Current production TypeScript/TSX total: `32928` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -390,6 +390,8 @@ Success criteria:
   metric-layout inputs into filter helpers.
 - Applied interaction layout now compiles through `compilePivotProgram`; the
   placement-only compiler bridge has been removed.
+- Persisted expansion-state coercion now lives under `expansion/stateModel`;
+  the misplaced query-owned expansion-state module has been removed.
 - Set-oriented coverage manifest primitives now exist for root runtime-layout
   coverage and explicit path-set coverage diffing.
 - Runtime layout fetches now route through manifest diff instead of the old
