@@ -426,6 +426,9 @@ Success criteria:
 - Cross-axis root recovery no longer scans rendered intersection cells to infer
   whether root data is loaded. It asks the expansion coverage manifest for the
   missing root request and only applies during an actual cross-axis fetch.
+- Expansion planning now builds the candidate coverage request set before
+  deciding fetch keys, then diffs that set once through the manifest-diff API.
+  This removes repeated per-key loaded checks from the planner boundary.
 - The materializer no longer exports a dead fact-store compatibility wrapper or
   test-fixture-only materialization entrypoints. Production callers now go
   through the explicit branch/initial materialization APIs.
@@ -458,10 +461,9 @@ Success criteria:
   runtime state machines.
 - `useExpansionEngine.ts` and `stateTransitions.ts` remain large. Split only by
   real ownership, not by wrapper files.
-- Expansion now has the right manifest-diff API, but the grouped planner still
-  builds fetch targets from keys after identifying missing coverage. The next
-  deletion opportunity is to make the planner produce missing coverage requests
-  first, then derive transport batches directly from those requests.
+- Expansion now builds missing coverage requests first, but grouped transport
+  still derives from fetch keys. The next deletion opportunity is to derive
+  transport batches directly from missing coverage requests.
 - Large result sets still pay main-thread JSON parsing and React commit costs.
 
 ## Approval Checkpoints

@@ -43,30 +43,6 @@ type PivotExpansionCoverageDepths = Pick<
   'rowDepth' | 'columnDepth'
 >;
 
-const isSatisfiedNode = ({
-  axis,
-  key,
-  path,
-  coverage,
-  getMissingExpansionCoverage,
-  shouldFetchChildren,
-}: {
-  axis: PivotAxis;
-  key: string;
-  path: PivotTreeNode['path'];
-  coverage: PivotExpansionCoverageDepths;
-  getMissingExpansionCoverage: PivotExpansionCoverageDiff;
-  shouldFetchChildren: PivotExpansionNodeFetchPredicate;
-}) => {
-  if (!shouldFetchChildren({ axis, key, path })) {
-    return true;
-  }
-  return (
-    getMissingExpansionCoverage([{ axis, pathKey: key, ...coverage }])
-      .length === 0
-  );
-};
-
 const resolveNearestPresentAncestorKey = (
   nodes: Record<string, PivotTreeNode>,
   key: string,
@@ -83,6 +59,14 @@ const resolveNearestPresentAncestorKey = (
   }
   return rootKey;
 };
+
+const requestKey = ({
+  axis,
+  pathKey,
+  rowDepth,
+  columnDepth,
+}: PivotExpansionCoverageRequest) =>
+  `${axis}|${pathKey}|${rowDepth}|${columnDepth}`;
 
 export const planExpansionForAxis = ({
   axis,
@@ -108,22 +92,46 @@ export const planExpansionForAxis = ({
     expandedKeys.size > 1 ||
     (expandedKeys.size === 1 && !expandedKeys.has(rootKey));
 
-  Array.from(expandedKeys).forEach(key => {
-    if (key === rootKey && hasNonRootExpanded) {
+  const candidates = Array.from(expandedKeys)
+    .filter(key => key !== rootKey || !hasNonRootExpanded)
+    .map(key => ({ key, node: nodes[key] }));
+  const buildRequest = (key: string): PivotExpansionCoverageRequest => ({
+    axis,
+    pathKey: key,
+    ...coverage,
+  });
+  const candidateRequests = new Map<string, PivotExpansionCoverageRequest>();
+  const addRequest = (key: string) => {
+    const request = buildRequest(key);
+    candidateRequests.set(requestKey(request), request);
+  };
+  candidates.forEach(({ key, node }) => {
+    if (node) {
+      if (shouldFetchChildren({ axis, key, path: node.path })) {
+        addRequest(key);
+      }
       return;
     }
-    const node = nodes[key];
+    addRequest(key);
+    const ancestorKey = resolveNearestPresentAncestorKey(nodes, key);
+    const ancestor = nodes[ancestorKey];
+    if (
+      ancestor &&
+      getCoverageKey(axis, key) !== getCoverageKey(axis, ancestorKey) &&
+      shouldFetchChildren({ axis, key: ancestorKey, path: ancestor.path })
+    ) {
+      addRequest(ancestorKey);
+    }
+  });
+  const missingRequestKeys = new Set(
+    getMissingExpansionCoverage(Array.from(candidateRequests.values())).map(
+      requestKey,
+    ),
+  );
+
+  candidates.forEach(({ key, node }) => {
     if (node) {
-      if (
-        isSatisfiedNode({
-          axis,
-          key,
-          path: node.path,
-          coverage,
-          getMissingExpansionCoverage,
-          shouldFetchChildren,
-        })
-      ) {
+      if (!missingRequestKeys.has(requestKey(buildRequest(key)))) {
         return;
       }
       fetchKeys.add(key);
@@ -131,10 +139,7 @@ export const planExpansionForAxis = ({
       return;
     }
 
-    if (
-      getMissingExpansionCoverage([{ axis, pathKey: key, ...coverage }])
-        .length === 0
-    ) {
+    if (!missingRequestKeys.has(requestKey(buildRequest(key)))) {
       return;
     }
     hasMissingNodes = true;
@@ -143,15 +148,10 @@ export const planExpansionForAxis = ({
     if (!ancestor) {
       return;
     }
+    const ancestorRequest = buildRequest(ancestorKey);
     if (
-      isSatisfiedNode({
-        axis,
-        key: ancestorKey,
-        path: ancestor.path,
-        coverage,
-        getMissingExpansionCoverage,
-        shouldFetchChildren,
-      })
+      !shouldFetchChildren({ axis, key: ancestorKey, path: ancestor.path }) ||
+      !missingRequestKeys.has(requestKey(ancestorRequest))
     ) {
       if (getCoverageKey(axis, key) === getCoverageKey(axis, ancestorKey)) {
         return;

@@ -182,6 +182,35 @@ describe('pivot/expansion/planner', () => {
     expect(targets.map(target => target.pathKey)).toEqual([bKey]);
   });
 
+  it('diffs expansion coverage requests as one set', () => {
+    const aKey = serializePath(['A']);
+    const bKey = serializePath(['B']);
+    const getMissingExpansionCoverage = jest.fn(
+      (requests: Parameters<PivotExpansionCoverageDiff>[0]) => requests,
+    );
+
+    planGroupedExpansionTargets({
+      axis: 'row',
+      expandedKeys: new Set([rootKey, aKey, bKey]),
+      nodes: {
+        [rootKey]: makeNode({ axis: 'row', path: [] }),
+        [aKey]: makeNode({ axis: 'row', path: ['A'] }),
+        [bKey]: makeNode({ axis: 'row', path: ['B'] }),
+      },
+      coverage: { rowDepth: 1, columnDepth: 1 },
+      getMissingExpansionCoverage,
+      getCoverageKey: (_axis, key) => key,
+      shouldFetchChildren: shouldFetchDimensionChildren,
+    });
+
+    expect(getMissingExpansionCoverage).toHaveBeenCalledTimes(1);
+    expect(
+      getMissingExpansionCoverage.mock.calls[0][0].map(
+        request => request.pathKey,
+      ),
+    ).toEqual([aKey, bKey]);
+  });
+
   it('uses typed batch coverage to skip only covered sibling paths', () => {
     const caKey = serializePath(['US', 'CA']);
     const nyKey = serializePath(['US', 'NY']);
