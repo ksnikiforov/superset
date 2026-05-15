@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13968` insertions, `14293` deletions, net `-325`.
-- Current production TypeScript/TSX total: `33185` lines.
+- Production `src`: `13968` insertions, `14384` deletions, net `-416`.
+- Current production TypeScript/TSX total: `33094` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -363,6 +363,9 @@ Success criteria:
 - Export uses a worksheet model rather than DOM reconstruction.
 - The chart delegates seamless update, runtime layout state, dataset metadata,
   dimension filter values, and export registration to helper modules.
+- Formatting no longer rebuilds query-support metric lists or tree-data
+  signatures. Those belong to transform/query planning, and the chart consumes
+  the supplied signature.
 - Applied interaction layout now compiles through `compilePivotProgram`; the
   placement-only compiler bridge has been removed.
 - Set-oriented coverage manifest primitives now exist for root runtime-layout

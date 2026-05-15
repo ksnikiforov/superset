@@ -49,15 +49,9 @@ import {
   type PivotTreeNode,
 } from '../../types';
 import {
-  collectDimensionFormattingMetricsForQuery,
-  collectDimensionSortingMetricsForQuery,
-  collectMetricDatabarMetricsForQuery,
-  collectMetricFormattingMetricsForQuery,
   DEFAULT_DATABAR_NEGATIVE_COLOR,
   DEFAULT_DATABAR_POSITIVE_COLOR,
-  mergeMetrics,
   normalizeDimensionFormattingMapWithKeys,
-  normalizeDimensionSortingMapWithKeys,
   normalizeMetricDatabarMapWithKeys,
   normalizeMetricFormattingMapWithKeys,
   parseThemeColors,
@@ -67,7 +61,6 @@ import {
   SUBTOTAL_LABEL,
   getFormattingMetricKey,
   getMetricKey,
-  getMetricKeys,
   isSubtotalToken,
 } from '../core/tokens';
 import { serializeCellKey, serializePath } from '../core/path';
@@ -542,17 +535,6 @@ export const usePivotFormatting = ({
       ),
     [formData.colFormatting, groupbyColumns],
   );
-  const rowSorting = useMemo(
-    () =>
-      normalizeDimensionSortingMapWithKeys(formData.rowSorting, groupbyRows),
-    [formData.rowSorting, groupbyRows],
-  );
-  const colSorting = useMemo(
-    () =>
-      normalizeDimensionSortingMapWithKeys(formData.colSorting, groupbyColumns),
-    [formData.colSorting, groupbyColumns],
-  );
-
   const derivedFormatOverrides = useMemo(() => {
     if (layout.measureHierarchy.kind !== 'measureStackV1') {
       return { columnOverrides: {}, currencyOverrides: {} };
@@ -712,80 +694,7 @@ export const usePivotFormatting = ({
     [colFormatting],
   );
 
-  const metricsForQueryWithFormatting = useMemo(() => {
-    const formattingMetrics = collectMetricFormattingMetricsForQuery(
-      metricFormatting,
-      metrics,
-    );
-    const databarMetrics = collectMetricDatabarMetricsForQuery(
-      metricDatabars,
-      metrics,
-    );
-    const rowFormattingMetrics = collectDimensionFormattingMetricsForQuery(
-      rowFormatting,
-      groupbyRows,
-      metrics,
-    );
-    const colFormattingMetrics = collectDimensionFormattingMetricsForQuery(
-      colFormatting,
-      groupbyColumns,
-      metrics,
-    );
-    const rowSortingMetrics = collectDimensionSortingMetricsForQuery(
-      rowSorting,
-      groupbyRows,
-      metrics,
-    );
-    const colSortingMetrics = collectDimensionSortingMetricsForQuery(
-      colSorting,
-      groupbyColumns,
-      metrics,
-    );
-    const metricsForQuery = mergeMetrics(metrics, formattingMetrics);
-    return mergeMetrics(metricsForQuery, [
-      ...databarMetrics,
-      ...rowFormattingMetrics,
-      ...colFormattingMetrics,
-      ...rowSortingMetrics,
-      ...colSortingMetrics,
-    ]);
-  }, [
-    colFormatting,
-    colSorting,
-    groupbyColumns,
-    groupbyRows,
-    metricDatabars,
-    metricFormatting,
-    metrics,
-    rowFormatting,
-    rowSorting,
-  ]);
-
-  const treeDataSignature = useMemo(() => {
-    if (formData.treeDataSignature) {
-      return formData.treeDataSignature;
-    }
-    return JSON.stringify({
-      rows: layout.groupbyRowKeys,
-      cols: layout.groupbyColumnKeys,
-      metrics: getMetricKeys(metricsForQueryWithFormatting),
-      metricsLayout: layout.resolvedMetricsLayout,
-      metricInsertIndex: layout.metricInsertIndex,
-      rowSubtotalLevels: layout.normalizedRowSubtotalLevels,
-      colSubtotalLevels: layout.layout.colSubtotalLevelsForQuery,
-      measureHierarchy: layout.measureHierarchy,
-    });
-  }, [
-    formData.treeDataSignature,
-    layout.groupbyColumnKeys,
-    layout.groupbyRowKeys,
-    layout.layout.colSubtotalLevelsForQuery,
-    layout.measureHierarchy,
-    layout.metricInsertIndex,
-    layout.normalizedRowSubtotalLevels,
-    layout.resolvedMetricsLayout,
-    metricsForQueryWithFormatting,
-  ]);
+  const treeDataSignature = formData.treeDataSignature ?? '';
 
   const resolveDimensionStyle = useCallback(
     (axis: 'row' | 'col', node: PivotTreeNode, target: 'label' | 'cell') => {
