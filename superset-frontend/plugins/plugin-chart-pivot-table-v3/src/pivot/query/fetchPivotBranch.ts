@@ -24,6 +24,7 @@ import {
   type PivotTreeData,
 } from '../../types';
 import { type ChartDataWarning } from '../data/ChartDataClient';
+import { getMetricKeys } from '../core/tokens';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import {
   buildLayoutContext,
@@ -36,6 +37,7 @@ import {
 import { buildBranchQuerySpecs, type PlannedQuerySpec } from './specs';
 import { buildFactCoverage } from '../runtime/coverage';
 import {
+  buildFactValueKeys,
   createPivotFactStore,
   type PivotFactStore,
   type PivotFactStoreBatch,
@@ -231,6 +233,10 @@ const resolvePivotBranchLocalResultFromPlan = (
         axis: params.axis,
         path: params.path,
       },
+      valueKeys: buildFactValueKeys({
+        metricKeys: getMetricKeys(ctx.metricsForQuery),
+        requiredTimeOffsets: ctx.requiredTimeOffsets,
+      }),
       facts: [],
     };
     params.factStore?.upsertBatch(batch);

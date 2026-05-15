@@ -120,6 +120,7 @@ describe('runtime layout fact coverage', () => {
       columnDepth,
     }),
     scope,
+    valueKeys: ['m1'],
     facts: [],
   });
 
@@ -162,6 +163,7 @@ describe('runtime layout fact coverage', () => {
         columnDepth: 1,
       }),
       scope: { kind: 'bootstrap' },
+      valueKeys: ['m1'],
       facts: [],
     };
 
@@ -183,6 +185,7 @@ describe('runtime layout fact coverage', () => {
         columnDepth: 1,
       }),
       scope: { kind: 'bootstrap' },
+      valueKeys: ['m1'],
       facts: [],
     };
 
@@ -249,6 +252,71 @@ describe('runtime layout fact coverage', () => {
     ).toBe(true);
   });
 
+  it('does not fetch when removing a metric from already loaded root coverage', () => {
+    expect(
+      shouldFetchRuntimeLayout({
+        factBatches: [
+          {
+            ...factBatch(1, 1),
+            valueKeys: ['m1', 'm2'],
+          },
+        ],
+        previousLayout: {
+          ...runtimeLayout,
+          metrics: ['m1', 'm2'],
+        },
+        nextLayout: runtimeLayout,
+      }),
+    ).toBe(false);
+  });
+
+  it('does not fetch when adding a metric already present as support coverage', () => {
+    expect(
+      shouldFetchRuntimeLayout({
+        factBatches: [
+          {
+            ...factBatch(1, 1),
+            valueKeys: ['m1', 'm2'],
+            facts: [
+              {
+                rowPath: ['A'],
+                columnPath: ['X'],
+                valueKey: 'm1',
+                value: 1,
+                role: 'visible',
+              },
+              {
+                rowPath: ['A'],
+                columnPath: ['X'],
+                valueKey: 'm2',
+                value: 2,
+                role: 'support',
+              },
+            ],
+          },
+        ],
+        previousLayout: runtimeLayout,
+        nextLayout: {
+          ...runtimeLayout,
+          metrics: ['m1', 'm2'],
+        },
+      }),
+    ).toBe(false);
+  });
+
+  it('fetches when adding a metric missing from loaded root coverage', () => {
+    expect(
+      shouldFetchRuntimeLayout({
+        factBatches: [factBatch(1, 1)],
+        previousLayout: runtimeLayout,
+        nextLayout: {
+          ...runtimeLayout,
+          metrics: ['m1', 'm2'],
+        },
+      }),
+    ).toBe(true);
+  });
+
   it('fetches when the root coverage dimensions change and coverage is missing', () => {
     expect(
       shouldFetchRuntimeLayout({
@@ -275,6 +343,7 @@ describe('runtime layout fact coverage', () => {
               columnDepth: 1,
             }),
             scope: { kind: 'bootstrap' },
+            valueKeys: ['m1'],
             facts: [],
           },
         ],
@@ -351,6 +420,7 @@ describe('coverage manifest diff', () => {
     columnDepth: 2,
     rowDimensions: ['country', 'city'],
     columnDimensions: ['year', 'quarter'],
+    valueKeys: ['sales'],
     rowScope,
     columnScope,
   });
@@ -368,6 +438,7 @@ describe('coverage manifest diff', () => {
       columnDepth,
     }),
     scope,
+    valueKeys: ['sales'],
     facts: [],
   });
 
@@ -388,6 +459,7 @@ describe('coverage manifest diff', () => {
         columnDepth: 1,
         rowDimensions: ['country'],
         columnDimensions: ['year'],
+        valueKeys: ['sales'],
         rowScope: { kind: 'root' },
         columnScope: { kind: 'root' },
       },
@@ -507,6 +579,7 @@ describe('coverage manifest diff', () => {
               columnDepth: 2,
             }),
             scope: { kind: 'branch', axis: 'row', path: ['USA'] },
+            valueKeys: ['sales'],
             facts: [],
           },
         ],

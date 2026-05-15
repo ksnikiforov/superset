@@ -54,6 +54,7 @@ import { type LayoutContext } from '../layout/LayoutContext';
 import { type PlannedQuerySpec } from '../query/specs';
 import { type PivotFactCoverage, type PivotProgram } from './types';
 import {
+  buildFactValueKeys,
   type PivotFact,
   type PivotFactSelector,
   type PivotFactStore,
@@ -105,6 +106,10 @@ export const factStoreSelectorFromSpec = (
 ): PivotFactSelector => ({
   coverage: spec.meta.coverage,
   scope: factStoreBatchScopeFromSpec(spec),
+  valueKeys: buildFactValueKeys({
+    metricKeys: getMetricKeys(spec.metrics),
+    requiredTimeOffsets: spec.meta.requiredTimeOffsets,
+  }),
 });
 
 export const buildFactStoreBatchesFromSpecs = ({

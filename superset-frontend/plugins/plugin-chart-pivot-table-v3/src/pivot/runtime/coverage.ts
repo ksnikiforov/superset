@@ -26,7 +26,7 @@ import { isMetricToken } from '../core/tokens';
 import { stableStringify } from '../shared/stableStringify';
 import { getNextAxisLevelForPath } from './paths';
 import type { PivotAxisProjection } from './projection';
-import { type PivotFactStoreBatch } from './factStore';
+import { normalizeFactValueKeys, type PivotFactStoreBatch } from './factStore';
 import type {
   PivotCoverageReason,
   PivotFactCoverage,
@@ -86,6 +86,7 @@ export type PivotCoverageNeed = {
   columnDepth: number;
   rowDimensions: PivotProgram['rowDimensions'];
   columnDimensions: PivotProgram['columnDimensions'];
+  valueKeys: string[];
   rowScope: AxisPathScope;
   columnScope: AxisPathScope;
   reason: PivotCoverageNeedReason;
@@ -110,10 +111,17 @@ const arraysEqual = (left: string[], right: string[]) =>
   left.length === right.length &&
   left.every((value, index) => value === right[index]);
 
-const sortedUnique = (keys: string[]) => Array.from(new Set(keys)).sort();
-
-const hasSameSet = (left: string[], right: string[]) =>
-  arraysEqual(sortedUnique(left), sortedUnique(right));
+const valueKeysCover = (
+  available: string[] | undefined,
+  required: string[],
+) => {
+  const requiredValueKeys = normalizeFactValueKeys(required);
+  if (requiredValueKeys.length === 0) {
+    return true;
+  }
+  const availableValueKeys = new Set(normalizeFactValueKeys(available));
+  return requiredValueKeys.every(valueKey => availableValueKeys.has(valueKey));
+};
 
 const columnRefKey = (column: PivotProgram['rowDimensions'][number]) =>
   typeof column === 'string'
@@ -253,9 +261,6 @@ const shouldFetchForSemanticLayoutChange = (
   prev: PivotRuntimeLayout,
   next: PivotRuntimeLayout,
 ): boolean => {
-  if (!hasSameSet(prev.metrics, next.metrics)) {
-    return true;
-  }
   if (
     selectionSignature(prev.leafSelection) !==
     selectionSignature(next.leafSelection)
@@ -337,6 +342,7 @@ export const buildRuntimeLayoutCoverageManifest = (
       columnDepth,
       rowDimensions: runtimeLayout.rows.slice(0, rowDepth),
       columnDimensions: runtimeLayout.cols.slice(0, columnDepth),
+      valueKeys: normalizeFactValueKeys(runtimeLayout.metrics),
       rowScope: { kind: 'root' },
       columnScope: { kind: 'root' },
     },
@@ -344,13 +350,17 @@ export const buildRuntimeLayoutCoverageManifest = (
 };
 
 const factBatchCoversNeed = (
-  { coverage, scope }: PivotFactStoreBatch,
+  { coverage, scope, facts, valueKeys }: PivotFactStoreBatch,
   need: PivotCoverageNeed,
 ) =>
   coverage.rowDepth === need.rowDepth &&
   coverage.columnDepth === need.columnDepth &&
   columnRefsMatch(coverage.rowDimensions, need.rowDimensions) &&
   columnRefsMatch(coverage.columnDimensions, need.columnDimensions) &&
+  valueKeysCover(
+    valueKeys ?? facts.map(fact => fact.valueKey),
+    need.valueKeys,
+  ) &&
   (need.rowScope.kind === 'root' && need.columnScope.kind === 'root'
     ? isRuntimeLayoutCoverageScope(scope)
     : scopeCoversAxisPaths(scope, 'row', need.rowScope) &&

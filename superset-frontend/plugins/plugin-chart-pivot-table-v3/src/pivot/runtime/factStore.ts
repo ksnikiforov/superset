@@ -40,6 +40,7 @@ export type PivotFact = {
 export type PivotFactSelector = {
   coverage: PivotFactCoverage;
   scope: PivotFactStoreBatchScope;
+  valueKeys?: string[];
 };
 
 export type PivotFactStoreBatch = PivotFactSelector & {
@@ -73,10 +74,29 @@ export type PivotFactStore = {
   size: () => number;
 };
 
+export const normalizeFactValueKeys = (valueKeys: string[] = []) =>
+  Array.from(new Set(valueKeys)).sort();
+
 export const buildPivotFactRequestKey = ({
   coverage,
   scope,
-}: PivotFactSelector) => stableStringify([coverage, scope]);
+  valueKeys,
+}: PivotFactSelector) =>
+  stableStringify([coverage, scope, normalizeFactValueKeys(valueKeys)]);
+
+export const buildFactValueKeys = ({
+  metricKeys,
+  requiredTimeOffsets = [],
+}: {
+  metricKeys: string[];
+  requiredTimeOffsets?: string[];
+}) =>
+  normalizeFactValueKeys([
+    ...metricKeys,
+    ...metricKeys.flatMap(metricKey =>
+      requiredTimeOffsets.map(offset => `${metricKey}__${offset}`),
+    ),
+  ]);
 
 const buildCoverageShapeKey = ({
   rowDepth,
@@ -108,6 +128,9 @@ export const createPivotFactStore = (): PivotFactStore => {
     const selector = {
       coverage: batch.coverage,
       scope: batch.scope,
+      valueKeys: normalizeFactValueKeys(
+        batch.valueKeys ?? facts.map(fact => fact.valueKey),
+      ),
     };
     const key = buildPivotFactRequestKey(selector);
     const requestFactKeys = factKeysByRequest.get(key) ?? new Set<string>();
@@ -129,6 +152,22 @@ export const createPivotFactStore = (): PivotFactStore => {
     left: PivotFactCoverage,
     right: PivotFactCoverage,
   ) => buildCoverageShapeKey(left) === buildCoverageShapeKey(right);
+
+  const selectorValueKeysCover = (
+    candidate: PivotFactSelector,
+    requested: PivotFactSelector,
+  ) => {
+    const requestedValueKeys = normalizeFactValueKeys(requested.valueKeys);
+    if (requestedValueKeys.length === 0) {
+      return true;
+    }
+    const candidateValueKeys = new Set(
+      normalizeFactValueKeys(candidate.valueKeys),
+    );
+    return requestedValueKeys.every(valueKey =>
+      candidateValueKeys.has(valueKey),
+    );
+  };
 
   const startsWithPath = (path: PivotPath, prefix: PivotPath) =>
     prefix.every((value, index) => path[index] === value);
@@ -181,6 +220,9 @@ export const createPivotFactStore = (): PivotFactStore => {
     if (!sameCoverageShape(candidate.coverage, requested.coverage)) {
       return false;
     }
+    if (!selectorValueKeysCover(candidate, requested)) {
+      return false;
+    }
     if (
       requested.scope.kind === 'bootstrap' ||
       requested.scope.kind === 'root'
@@ -228,7 +270,15 @@ export const createPivotFactStore = (): PivotFactStore => {
       ) {
         return facts;
       }
-      return facts.filter(fact => factMatchesScope(fact, selector.scope));
+      const requestedValueKeys = new Set(
+        normalizeFactValueKeys(selector.valueKeys),
+      );
+      return facts.filter(
+        fact =>
+          factMatchesScope(fact, selector.scope) &&
+          (requestedValueKeys.size === 0 ||
+            requestedValueKeys.has(fact.valueKey)),
+      );
     });
 
   return {

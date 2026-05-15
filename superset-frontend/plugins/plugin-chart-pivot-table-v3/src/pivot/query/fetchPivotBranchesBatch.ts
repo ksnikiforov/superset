@@ -22,6 +22,7 @@ import { type ChartDataWarning } from '../data/ChartDataClient';
 import { buildLayoutContext } from '../layout/LayoutContext';
 import { buildFactCoverage } from '../runtime/coverage';
 import {
+  buildFactValueKeys,
   type PivotFactStore,
   type PivotFactStoreBatch,
 } from '../runtime/factStore';
@@ -80,6 +81,9 @@ export const fetchPivotBranchesBatch = async ({
         parentPath: parsePath(batch.parentPathKey),
         siblingValues: batch.siblingValues,
       },
+      valueKeys: buildFactValueKeys({
+        metricKeys: layout.pivotProgram.metricKeys,
+      }),
       facts: [],
     };
     factStore?.upsertBatch(batchMarker);

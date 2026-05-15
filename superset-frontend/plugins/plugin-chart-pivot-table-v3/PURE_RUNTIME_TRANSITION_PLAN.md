@@ -142,8 +142,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14299` insertions, `14193` deletions, net `+106`.
-- Current production TypeScript/TSX total: `33616` lines.
+- Production `src`: `14374` insertions, `14193` deletions, net `+181`.
+- Current production TypeScript/TSX total: `33691` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -371,6 +371,12 @@ Success criteria:
 - Values index shifts caused only by hidden dimensions no longer count as
   semantic placement changes; moving Values across an already shared visible
   dimension still fetches.
+- Runtime coverage and fact-store selectors now include metric payload
+  `valueKeys`, so metric add/remove decisions go through the same coverage
+  manifest instead of a separate semantic-layout fetch branch.
+- Broader metric batches can satisfy narrower metric requests, while missing
+  metric payloads no longer count as loaded coverage even when row/column depth
+  matches.
 - Resolved query fetch context owns its fact coverages, so branch, batch, and
   signature callers no longer rebuild the same coverage list separately.
 - Expansion planner and fetched-request code now share the same fetched coverage

@@ -36,6 +36,7 @@ const coverage: PivotFactCoverage = {
 const selector = {
   coverage,
   scope: { kind: 'root' } as PivotFactStoreBatchScope,
+  valueKeys: ['sales'],
 };
 
 const buildFact = (overrides: Partial<PivotFact> = {}): PivotFact => ({
@@ -86,15 +87,29 @@ test('does not share facts across different request scopes with the same coverag
   const secondScope: PivotFactStoreBatchScope = { kind: 'bootstrap' };
 
   store.upsertBatches([
-    { coverage, scope: firstScope, facts: [buildFact({ value: 1 })] },
-    { coverage, scope: secondScope, facts: [buildFact({ value: 2 })] },
+    {
+      coverage,
+      scope: firstScope,
+      valueKeys: ['sales'],
+      facts: [buildFact({ value: 1 })],
+    },
+    {
+      coverage,
+      scope: secondScope,
+      valueKeys: ['sales'],
+      facts: [buildFact({ value: 2 })],
+    },
   ]);
 
   expect(
-    store.getFacts({ coverage, scope: firstScope }).map(fact => fact.value),
+    store
+      .getFacts({ coverage, scope: firstScope, valueKeys: ['sales'] })
+      .map(fact => fact.value),
   ).toEqual([1]);
   expect(
-    store.getFacts({ coverage, scope: secondScope }).map(fact => fact.value),
+    store
+      .getFacts({ coverage, scope: secondScope, valueKeys: ['sales'] })
+      .map(fact => fact.value),
   ).toEqual([2]);
 });
 
@@ -121,18 +136,31 @@ test('does not satisfy sibling branch scopes with identical coverage', () => {
   store.upsertBatch({
     coverage: branchCoverage,
     scope: franceScope,
+    valueKeys: ['sales'],
     facts: [buildFact({ rowPath: ['France', 'Paris'], columnPath: [] })],
   });
 
   expect(
-    store.hasCoverage({ coverage: branchCoverage, scope: franceScope }),
+    store.hasCoverage({
+      coverage: branchCoverage,
+      scope: franceScope,
+      valueKeys: ['sales'],
+    }),
   ).toBe(true);
-  expect(store.hasCoverage({ coverage: branchCoverage, scope: usaScope })).toBe(
-    false,
-  );
-  expect(store.getFacts({ coverage: branchCoverage, scope: usaScope })).toEqual(
-    [],
-  );
+  expect(
+    store.hasCoverage({
+      coverage: branchCoverage,
+      scope: usaScope,
+      valueKeys: ['sales'],
+    }),
+  ).toBe(false);
+  expect(
+    store.getFacts({
+      coverage: branchCoverage,
+      scope: usaScope,
+      valueKeys: ['sales'],
+    }),
+  ).toEqual([]);
 });
 
 test('materialization can reuse compatible root coverage for branch facts', () => {
@@ -165,11 +193,13 @@ test('materialization can reuse compatible root coverage for branch facts', () =
       axis: 'row',
       path: ['France'],
     } as PivotFactStoreBatchScope,
+    valueKeys: ['sales'],
   };
 
   store.upsertBatch({
     coverage: rootCoverage,
     scope: { kind: 'root' },
+    valueKeys: ['sales'],
     facts: [franceFact, usaFact],
   });
 
@@ -197,11 +227,13 @@ test('does not reuse root coverage for values-token branch scopes', () => {
       axis: 'col',
       path: [encodeMetricKey('sales')],
     } as PivotFactStoreBatchScope,
+    valueKeys: ['sales'],
   };
 
   store.upsertBatch({
     coverage: { ...branchCoverage, reason: 'initial' },
     scope: { kind: 'root' },
+    valueKeys: ['sales'],
     facts: [buildFact({ columnPath: ['REV-A'] })],
   });
 
@@ -225,6 +257,7 @@ test('prefers exact branch facts over broader compatible root coverage', () => {
       axis: 'row',
       path: ['France'],
     } as PivotFactStoreBatchScope,
+    valueKeys: ['sales'],
   };
   const rootFact = buildFact({
     rowPath: ['France', 'Paris'],
@@ -240,6 +273,7 @@ test('prefers exact branch facts over broader compatible root coverage', () => {
   store.upsertBatch({
     coverage: { ...branchCoverage, reason: 'initial' },
     scope: { kind: 'root' },
+    valueKeys: ['sales'],
     facts: [rootFact],
   });
   store.upsertBatch({
@@ -253,6 +287,58 @@ test('prefers exact branch facts over broader compatible root coverage', () => {
   ]);
 });
 
+test('reuses broader metric coverage for narrower compatible requests', () => {
+  const store = createPivotFactStore();
+  const rootSelector = {
+    coverage,
+    scope: { kind: 'root' } as PivotFactStoreBatchScope,
+    valueKeys: ['profit', 'sales'],
+  };
+
+  store.upsertBatch({
+    ...rootSelector,
+    facts: [
+      buildFact({ valueKey: 'sales', value: 1 }),
+      buildFact({ valueKey: 'profit', value: 2 }),
+    ],
+  });
+
+  expect(
+    store
+      .getCompatibleFacts({
+        coverage,
+        scope: { kind: 'root' },
+        valueKeys: ['sales'],
+      })
+      .map(fact => fact.valueKey),
+  ).toEqual(['sales']);
+  expect(
+    store.hasCompatibleCoverage({
+      coverage,
+      scope: { kind: 'root' },
+      valueKeys: ['quantity'],
+    }),
+  ).toBe(false);
+});
+
+test('tracks zero-row metric coverage through explicit value keys', () => {
+  const store = createPivotFactStore();
+
+  store.upsertBatch({
+    ...selector,
+    facts: [],
+  });
+
+  expect(store.hasCoverage(selector)).toBe(true);
+  expect(
+    store.hasCompatibleCoverage({
+      coverage,
+      scope: selector.scope,
+      valueKeys: ['profit'],
+    }),
+  ).toBe(false);
+});
+
 test('tracks loaded coverage even when the query returns no facts', () => {
   const store = createPivotFactStore();
 
@@ -261,6 +347,7 @@ test('tracks loaded coverage even when the query returns no facts', () => {
   store.upsertBatch({
     coverage,
     scope: selector.scope,
+    valueKeys: ['sales'],
     facts: [],
   });
 

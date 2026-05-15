@@ -26,7 +26,10 @@ import {
   type FetchPivotBranchesBatchResult,
 } from '../../../src/pivot/query/fetchPivotBranchesBatch';
 import { buildFactCoverage } from '../../../src/pivot/runtime/coverage';
-import { type PivotFactStoreBatch } from '../../../src/pivot/runtime/factStore';
+import {
+  buildFactValueKeys,
+  type PivotFactStoreBatch,
+} from '../../../src/pivot/runtime/factStore';
 import { parsePath } from '../../../src/pivot/core/path';
 
 export const buildMockBranchFactBatches = ({
@@ -50,6 +53,9 @@ export const buildMockBranchFactBatches = ({
         columnDepth: visibleColDepth,
       }),
       facts: [],
+      valueKeys: buildFactValueKeys({
+        metricKeys: layout.pivotProgram.metricKeys,
+      }),
       scope: {
         kind: 'branch',
         axis,
@@ -93,6 +99,9 @@ export const buildMockBatchFactBatches = ({
         columnDepth: visibleColDepth,
       }),
       facts: [],
+      valueKeys: buildFactValueKeys({
+        metricKeys: layout.pivotProgram.metricKeys,
+      }),
       scope: {
         kind: 'batch',
         axis: batch.axis,

@@ -84,6 +84,19 @@ const isDirectChildPath = (childPath: PivotPath, parentPath: PivotPath) =>
 
 const pathHasMetricToken = (path: PivotPath) => path.some(isMetricToken);
 
+const collectTreeValueKeys = (tree: PivotTreeData) =>
+  Array.from(
+    new Set([
+      ...Object.values(tree.rows).flatMap(node =>
+        Object.keys(node.values ?? {}),
+      ),
+      ...Object.values(tree.cols).flatMap(node =>
+        Object.keys(node.values ?? {}),
+      ),
+      ...Object.values(tree.cells).flatMap(cell => Object.keys(cell.values)),
+    ]),
+  ).sort();
+
 const collectLoadedBranchPaths = ({
   axis,
   tree,
@@ -158,6 +171,7 @@ export const buildPreloadedBootstrapFactBatches = (
     groupby.groupbyRows.length > 0 && rowDepth > 0 ? 1 : 0;
   const bootstrapColDepth =
     groupby.groupbyColumns.length > 0 && colDepth > 0 ? 1 : 0;
+  const valueKeys = collectTreeValueKeys(tree);
   return [
     {
       coverage: {
@@ -168,6 +182,7 @@ export const buildPreloadedBootstrapFactBatches = (
         columnDimensions: groupby.groupbyColumns.slice(0, bootstrapColDepth),
       },
       facts: [],
+      valueKeys,
       scope: {
         kind: 'bootstrap',
       },
@@ -188,6 +203,7 @@ export const buildPreloadedBranchFactBatches = (
   const rowDepth = maxPathDepth(tree.rows);
   const colDepth = maxPathDepth(tree.cols);
   const batches: PivotFactStoreBatch[] = [];
+  const valueKeys = collectTreeValueKeys(tree);
   (
     [
       ['row', tree.rows],
@@ -208,6 +224,7 @@ export const buildPreloadedBranchFactBatches = (
           columnDimensions: groupby.groupbyColumns.slice(0, colDepth),
         },
         facts: [],
+        valueKeys,
         scope: {
           kind: 'branch',
           axis,
@@ -232,6 +249,7 @@ export const buildPreloadedRenderedBranchFactBatches = (
   const rowDepth = maxPathDepth(tree.rows);
   const colDepth = maxPathDepth(tree.cols);
   const batches: PivotFactStoreBatch[] = [];
+  const valueKeys = collectTreeValueKeys(tree);
   (
     [
       ['row', tree.rows],
@@ -251,6 +269,7 @@ export const buildPreloadedRenderedBranchFactBatches = (
           columnDimensions: groupby.groupbyColumns.slice(0, colDepth),
         },
         facts: [],
+        valueKeys,
         scope: {
           kind: 'branch',
           axis,

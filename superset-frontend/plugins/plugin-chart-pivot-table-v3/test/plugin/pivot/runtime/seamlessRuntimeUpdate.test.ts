@@ -54,6 +54,7 @@ const factBatch = (
     columnDepth,
   }),
   facts: [],
+  valueKeys: ['sales'],
   scope: { kind: 'bootstrap' },
 });
 
