@@ -33,6 +33,7 @@ import {
 import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
 import { buildBatchQuerySpecs } from '../../../src/pivot/query/specs';
 import { createPivotFactStore } from '../../../src/pivot/runtime/factStore';
+import { factStoreSelectorFromSpec } from '../../../src/pivot/runtime/materializePivotTree';
 
 jest.mock('@superset-ui/core', () => {
   const actual = jest.requireActual('@superset-ui/core');
@@ -305,6 +306,77 @@ describe('fetchPivotBranchesBatch', () => {
     expect(
       result.data?.cells[serializeCellKey(rowKey, metricColKey)]?.values.m1,
     ).toBe(7);
+  });
+
+  it('fetches only missing specs when batch support coverage is partially loaded', async () => {
+    mockPost.mockImplementation(({ jsonPayload }) =>
+      Promise.resolve({
+        response: new Response(),
+        json: {
+          result: jsonPayload.queries.map(() => ({ data: [] })),
+        },
+      }),
+    );
+
+    const formData = buildFormData({
+      groupbyRows: ['country', 'state', 'city'],
+      groupbyColumns: ['category'],
+      metrics: ['m1'],
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      rowTotals: false,
+      colTotals: false,
+    });
+    const batch: BatchGroup = {
+      axis: 'row',
+      signature: 'sig',
+      parentPathKey: serializePath(['US']),
+      siblingValues: ['CA'],
+      targets: [
+        {
+          axis: 'row',
+          pathKey: serializePath(['US', 'CA']),
+          batchSignature: 'sig',
+        },
+      ],
+    };
+    const layout = buildLayoutContext(formData);
+    const specs = buildBatchQuerySpecs({
+      formData,
+      layout,
+      batch,
+      visibleRowDepth: 2,
+      visibleColDepth: 1,
+    });
+    expect(specs.length).toBeGreaterThan(1);
+
+    const store = createPivotFactStore();
+    const preloadedSpec = specs[specs.length - 1];
+    store.upsertBatch({
+      coverage: preloadedSpec.meta.coverage,
+      scope: {
+        kind: 'batch',
+        axis: 'row',
+        parentPath: ['US'],
+        siblingValues: ['CA'],
+      },
+      valueKeys: ['m1'],
+      facts: [],
+    });
+    const expectedMissingSpecs = specs.filter(
+      spec => !store.hasCompatibleCoverage(factStoreSelectorFromSpec(spec)),
+    );
+
+    await fetchPivotBranchesBatch({
+      formData,
+      batch,
+      visibleRowDepth: 2,
+      visibleColDepth: 1,
+      factStore: store,
+    });
+
+    const payload = mockPost.mock.calls[0][0].jsonPayload;
+    expect(payload.queries).toHaveLength(expectedMissingSpecs.length);
+    expect(payload.queries.length).toBeLessThan(specs.length);
   });
 
   it('returns a fetched coverage marker when grouped expansion only reveals Values', async () => {

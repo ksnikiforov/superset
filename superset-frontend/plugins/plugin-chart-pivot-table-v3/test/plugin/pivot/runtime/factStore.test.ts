@@ -179,7 +179,7 @@ test('does not satisfy sibling branch scopes with identical coverage', () => {
   ).toEqual([]);
 });
 
-test('materialization can reuse compatible root coverage for branch facts', () => {
+test('does not treat unscoped root coverage as loaded branch coverage', () => {
   const store = createPivotFactStore();
   const branchCoverage: PivotFactCoverage = {
     reason: 'expand',
@@ -220,11 +220,9 @@ test('materialization can reuse compatible root coverage for branch facts', () =
   });
 
   expect(store.hasCoverage(franceBranchSelector)).toBe(false);
-  expect(store.hasCompatibleCoverage(franceBranchSelector)).toBe(true);
+  expect(store.hasCompatibleCoverage(franceBranchSelector)).toBe(false);
   expect(store.getFacts(franceBranchSelector)).toEqual([]);
-  expect(
-    store.getCompatibleFacts(franceBranchSelector).map(fact => fact.rowPath),
-  ).toEqual([['France', 'Paris']]);
+  expect(store.getCompatibleFacts(franceBranchSelector)).toEqual([]);
 });
 
 test('does not reuse root coverage for values-token branch scopes', () => {

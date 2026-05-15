@@ -48,6 +48,7 @@ import {
   buildBranchTreeFromFactStore,
   buildFactStoreBatchesFromSpecs,
   canMaterializeSpecsFromFactStore,
+  factStoreSelectorFromSpec,
 } from '../runtime/materializePivotTree';
 
 export interface FetchPivotBranchResult {
@@ -127,11 +128,17 @@ export const fetchPivotQuerySpecsIntoBranchTree = async ({
   factStore?: PivotFactStore;
   measureHierarchy: MeasureHierarchy;
 }): Promise<FetchPivotBranchResult> => {
-  const metricsForQuery = specs[0].metrics;
+  const missingSpecs = factStore
+    ? specs.filter(
+        spec =>
+          !factStore.hasCompatibleCoverage(factStoreSelectorFromSpec(spec)),
+      )
+    : specs;
+  const metricsForQuery = missingSpecs[0]?.metrics ?? specs[0].metrics;
   const timeOffsets = Array.from(
     new Set([
       ...(formData.time_offsets ?? []),
-      ...specs.flatMap(spec => spec.meta.requiredTimeOffsets),
+      ...missingSpecs.flatMap(spec => spec.meta.requiredTimeOffsets),
     ]),
   );
   const queryFormData =
@@ -149,14 +156,14 @@ export const fetchPivotQuerySpecsIntoBranchTree = async ({
   try {
     const results = await supersetChartDataClient.fetch({
       formData: queryFormData,
-      specs,
+      specs: missingSpecs,
       requestGroupId,
     });
     const warnings = results.flatMap(result => result.warnings ?? []);
     const store = factStore ?? createPivotFactStore();
     const factBatches = upsertQueryResultsIntoFactStore({
       store,
-      specs,
+      specs: missingSpecs,
       results,
     });
     const data = buildBranchTreeFromFactStore({

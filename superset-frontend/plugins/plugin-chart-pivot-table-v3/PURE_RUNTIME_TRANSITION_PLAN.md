@@ -409,6 +409,13 @@ Success criteria:
   tree-node policy. The planner still consumes tree nodes to find present or
   missing ancestors, but it no longer asks node shape whether semantic children
   should be fetched.
+- Branch and batch execution now fetch only query specs whose coverage is
+  missing from the fact store, then materialize from the full requested spec
+  set. This avoids refetching already-loaded support coverage while preserving a
+  single transport batch for the truly missing specs.
+- Fact-store compatibility keeps root/no-branch coverage separate from explicit
+  branch coverage. Root is not a wildcard for arbitrary expanded paths under
+  the set-oriented manifest.
 - Hydration finalization now applies parent deltas before descendant deltas, so
   persisted nested expansion results survive branch pruning.
 - Seamless layout updates no longer freeze the table behind a separate pending
