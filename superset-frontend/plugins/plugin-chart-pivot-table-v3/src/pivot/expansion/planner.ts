@@ -40,9 +40,7 @@ export type PivotExpansionNodeFetchPredicate = (input: {
   requiredDepth: number;
 }) => boolean;
 
-export type PlannedFetchTarget = FetchTarget & {
-  id: string;
-};
+export type PlannedFetchTarget = FetchTarget;
 
 const buildCoverageProjection = (
   axis: PivotAxis,
@@ -222,12 +220,6 @@ export function buildGroupedFetchTargets({
 
     const childDepth = parsePath(representative).length + 1;
     targets.push({
-      id: JSON.stringify([
-        axis,
-        representative,
-        childDepth,
-        requiredOppositeDepth,
-      ]),
       axis,
       pathKey: representative,
       childDepth,

@@ -223,7 +223,6 @@ describe('pivot/expansion/planner', () => {
     expect(Array.from(plan.fetchKeys)).toEqual([aKey]);
     expect(targets).toEqual([
       {
-        id: JSON.stringify(['row', aKey, 2, 1]),
         axis: 'row',
         pathKey: aKey,
         childDepth: 2,
@@ -254,7 +253,6 @@ describe('pivot/expansion/planner', () => {
     expect(Array.from(plan.fetchKeys)).toEqual([aKey]);
     expect(targets).toEqual([
       {
-        id: JSON.stringify(['row', aKey, 2, 0]),
         axis: 'row',
         pathKey: aKey,
         childDepth: 2,
