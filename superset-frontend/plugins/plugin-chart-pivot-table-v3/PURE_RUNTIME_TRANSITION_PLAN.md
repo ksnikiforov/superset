@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14539` insertions, `14903` deletions, net `-364`.
-- Current production TypeScript/TSX total: `33146` lines.
+- Production `src`: `14532` insertions, `14903` deletions, net `-371`.
+- Current production TypeScript/TSX total: `33139` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -497,6 +497,8 @@ Success criteria:
   bounded intersection target, query planning can fetch that row-path set
   crossed with that column-path set, and the fact store records the loaded
   result as intersection-scoped coverage.
+- Initial hydration prefetch no longer has a separate `skip-root` action. The
+  root-only no-fetch case is represented as ordinary idle state.
 
 ## Current Risks
 

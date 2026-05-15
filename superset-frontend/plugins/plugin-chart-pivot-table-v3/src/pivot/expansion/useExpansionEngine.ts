@@ -1278,10 +1278,6 @@ export const useExpansionEngine = ({
       config: visibilityConfig,
       getCoverageKey,
     });
-    if (prefetchAction.kind === 'skip-root') {
-      setHydratingState(false);
-      return;
-    }
     if (prefetchAction.kind === 'hydrate') {
       if (!prefetchAction.showLoader) {
         setHydratingState(false);

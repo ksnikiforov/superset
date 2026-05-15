@@ -1182,9 +1182,6 @@ export type HydrationPrefetchAction =
       kind: 'idle';
     }
   | {
-      kind: 'skip-root';
-    }
-  | {
       kind: 'hydrate';
       showLoader: boolean;
     };
@@ -1225,7 +1222,7 @@ export const buildHydrationPrefetchAction = ({
     !Object.keys(tree.rows).some(key => key !== rootKey) &&
     !Object.keys(tree.cols).some(key => key !== rootKey);
   if (shouldSkipRootPrefetch) {
-    return { kind: 'skip-root' };
+    return { kind: 'idle' };
   }
   return {
     kind: 'hydrate',

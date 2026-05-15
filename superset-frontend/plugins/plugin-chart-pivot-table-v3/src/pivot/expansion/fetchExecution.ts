@@ -136,7 +136,7 @@ const resolveExpansionFetchPlan = ({
   visibleColDepth,
   factStore,
 }: {
-  targets: FetchTarget[];
+  targets: ExpansionFetchTarget[];
   formData: PivotTableQueryFormData;
   visibleRowDepth: number;
   visibleColDepth: number;
@@ -365,7 +365,7 @@ export const fetchExpansionTargets = async ({
   transactionId,
   buildRequestGroupId,
 }: {
-  targets: FetchTarget[];
+  targets: ExpansionFetchTarget[];
   context: ExpansionFetchContext;
   runtime: ExpansionFetchRuntime;
   singleRequestKind: string;

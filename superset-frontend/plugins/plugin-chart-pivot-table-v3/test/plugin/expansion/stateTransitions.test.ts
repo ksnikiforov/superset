@@ -1328,7 +1328,7 @@ describe('pivot/expansion/stateTransitions', () => {
           hasMissingNodes: false,
         },
       }),
-    ).toEqual({ kind: 'skip-root' });
+    ).toEqual({ kind: 'idle' });
 
     const { tree, aKey } = buildTree({ includeIntersectionCell: true });
     const childKey = serializePath(['A', 'B']);
