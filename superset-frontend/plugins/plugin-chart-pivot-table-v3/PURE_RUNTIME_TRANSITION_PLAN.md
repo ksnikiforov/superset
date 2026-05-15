@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13949` insertions, `14390` deletions, net `-441`.
-- Current production TypeScript/TSX total: `33069` lines.
+- Production `src`: `13967` insertions, `14423` deletions, net `-456`.
+- Current production TypeScript/TSX total: `33054` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -372,6 +372,9 @@ Success criteria:
 - Row subtotal filtering and stale collapsed-branch pruning also read metric
   axis/index semantics from `PivotProgram`; chart layout no longer passes those
   placement facts into those policy helpers separately.
+- Metric total and node-depth classification now derive metrics-first and row
+  metric-index semantics from `PivotProgram`, removing another render-time
+  placement flag path.
 - Applied interaction layout now compiles through `compilePivotProgram`; the
   placement-only compiler bridge has been removed.
 - Set-oriented coverage manifest primitives now exist for root runtime-layout

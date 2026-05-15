@@ -380,10 +380,9 @@ export const usePivotLayout = ({
     (node?: PivotTreeNode) =>
       isMetricGrandTotalNodeBase(node, {
         metricLabelSet,
-        metricsFirstOnRows,
-        metricsFirstOnCols,
+        program: layout.pivotProgram,
       }),
-    [metricLabelSet, metricsFirstOnCols, metricsFirstOnRows],
+    [layout.pivotProgram, metricLabelSet],
   );
 
   const isMetricSubtotalNode = useCallback(

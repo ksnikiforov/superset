@@ -16,25 +16,34 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { MetricsLayoutEnum, PivotTreeNode } from '../types';
+import { type PivotAxis, PivotTreeNode } from '../types';
 import {
   decodeMetricKey,
   decodeMeasureLeafId,
   isSubtotalToken,
 } from './core/tokens';
+import type { PivotProgram } from './runtime/types';
 
 type MetricTotalsConfig = {
   metricLabelSet: Set<string>;
-  metricsFirstOnRows: boolean;
-  metricsFirstOnCols: boolean;
+  program: PivotProgram;
 };
 
 type NodeDepthConfig = {
   metricLabelSet: Set<string>;
-  metricsLayout: MetricsLayoutEnum;
+  program: PivotProgram;
   hideMetricHeaderOnRows: boolean;
-  metricIndexOnRows?: number;
 };
+
+const metricsFirstOnAxis = (program: PivotProgram, axis: PivotAxis) =>
+  program.valueAxis === axis &&
+  program.metricKeys.length > 0 &&
+  program.metricInsertIndex === 0;
+
+const metricIndexOnRows = (program: PivotProgram) =>
+  program.valueAxis === 'row' && program.metricKeys.length > 0
+    ? Math.min(program.metricInsertIndex, program.rowDimensions.length)
+    : undefined;
 
 export const getMetricLabelFromPath = (
   path: PivotTreeNode['path'],
@@ -71,20 +80,14 @@ export const getNonMetricPathParts = (
 
 export const isMetricGrandTotalNode = (
   node: PivotTreeNode | undefined,
-  {
-    metricLabelSet,
-    metricsFirstOnRows,
-    metricsFirstOnCols,
-  }: MetricTotalsConfig,
+  { metricLabelSet, program }: MetricTotalsConfig,
 ) => {
   if (!node || !node.isSubtotal) {
     return false;
   }
   const hasExplicitTotalToken = node.path.some(isSubtotalToken);
-  if (node.axis === 'row' && metricsFirstOnRows && !hasExplicitTotalToken) {
-    return false;
-  }
-  if (node.axis === 'col' && metricsFirstOnCols && !hasExplicitTotalToken) {
+  const metricsFirst = metricsFirstOnAxis(program, node.axis);
+  if (metricsFirst && !hasExplicitTotalToken) {
     return false;
   }
   const metricLabel = getMetricLabelFromPath(node.path, metricLabelSet);
@@ -105,10 +108,7 @@ export const isMetricGrandTotalNode = (
   }
   const firstMetric = metricTokens[0];
   const lastMetric = metricTokens[metricTokens.length - 1];
-  if (node.axis === 'row' && metricsFirstOnRows) {
-    return firstMetric === metricLabel;
-  }
-  if (node.axis === 'col' && metricsFirstOnCols) {
+  if (metricsFirst) {
     return firstMetric === metricLabel;
   }
   return lastMetric === metricLabel;
@@ -214,13 +214,9 @@ export const isExplicitTotalNode = (
 
 export const getNodeDimDepth = (
   node: PivotTreeNode,
-  {
-    metricLabelSet,
-    metricsLayout,
-    hideMetricHeaderOnRows,
-    metricIndexOnRows,
-  }: NodeDepthConfig,
+  { metricLabelSet, program, hideMetricHeaderOnRows }: NodeDepthConfig,
 ) => {
+  const rowMetricIndex = metricIndexOnRows(program);
   const dimDepth = countDimDepth(node.path, metricLabelSet);
   const subtotalTokenCount = node.path.filter(val =>
     isSubtotalToken(val),
@@ -231,9 +227,9 @@ export const getNodeDimDepth = (
     return decoded !== undefined && metricLabelSet.has(decoded);
   });
   const boundarySubtotal =
-    metricsLayout === MetricsLayoutEnum.ROWS &&
-    metricIndexOnRows === 1 &&
-    subtotalIndex === metricIndexOnRows &&
+    program.valueAxis === 'row' &&
+    rowMetricIndex === 1 &&
+    subtotalIndex === rowMetricIndex &&
     metricIndex > subtotalIndex;
   const adjustedDimDepth = boundarySubtotal
     ? dimDepth
@@ -243,13 +239,9 @@ export const getNodeDimDepth = (
     return decoded !== undefined && metricLabelSet.has(decoded);
   });
   const metricDepth =
-    metricsLayout === MetricsLayoutEnum.ROWS &&
-    !hideMetricHeaderOnRows &&
-    hasMetric
-      ? 1
-      : 0;
+    program.valueAxis === 'row' && !hideMetricHeaderOnRows && hasMetric ? 1 : 0;
   const leafDepth =
-    metricsLayout === MetricsLayoutEnum.ROWS &&
+    program.valueAxis === 'row' &&
     node.path.some(val => decodeMeasureLeafId(val))
       ? 1
       : 0;
@@ -260,9 +252,9 @@ export const getNodeDimDepth = (
   const shouldOffsetSubtotal =
     subtotalIndex >= 0 && (metricIndex < 0 || metricIndex > subtotalIndex);
   const skipOffsetAtBoundary =
-    metricsLayout === MetricsLayoutEnum.ROWS &&
-    metricIndexOnRows === 1 &&
-    subtotalIndex === metricIndexOnRows &&
+    program.valueAxis === 'row' &&
+    rowMetricIndex === 1 &&
+    subtotalIndex === rowMetricIndex &&
     metricIndex > subtotalIndex;
   return shouldOffsetSubtotal && !skipOffsetAtBoundary
     ? Math.max(depth - 1, 0)

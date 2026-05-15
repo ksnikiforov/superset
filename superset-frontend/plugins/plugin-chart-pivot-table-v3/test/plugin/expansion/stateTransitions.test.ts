@@ -85,10 +85,32 @@ describe('pivot/expansion/stateTransitions', () => {
       countDimDepth?: (path: PivotTreeNode['path']) => number;
     } = {}) =>
     ({ tree }: { tree: PivotTreeData }) => {
-      const metricsFirstOnRows =
-        metricsLayout === MetricsLayoutEnum.ROWS && metricIndexForRows === 0;
-      const metricsFirstOnCols =
-        metricsLayout === MetricsLayoutEnum.COLUMNS && metricIndexForCols === 0;
+      const metricKeys = Array.from(metricLabelSet);
+      const rowDims = Array.from(
+        { length: groupbyRowsLength },
+        (_, idx) => `r${idx}`,
+      );
+      const colDims = Array.from(
+        { length: groupbyColumnsLength },
+        (_, idx) => `c${idx}`,
+      );
+      const withPlaceholder = (dims: string[], index?: number) => [
+        ...dims.slice(0, index ?? dims.length),
+        METRICS_PLACEHOLDER,
+        ...dims.slice(index ?? dims.length),
+      ];
+      const program = compilePivotProgram({
+        groupbyRows:
+          metricsLayout === MetricsLayoutEnum.ROWS && metricKeys.length > 0
+            ? withPlaceholder(rowDims, metricIndexForRows)
+            : rowDims,
+        groupbyColumns:
+          metricsLayout === MetricsLayoutEnum.COLUMNS && metricKeys.length > 0
+            ? withPlaceholder(colDims, metricIndexForCols)
+            : colDims,
+        metrics: metricKeys,
+        metricsLayout,
+      });
       return {
         groupbyRowsLength,
         groupbyColumnsLength,
@@ -101,7 +123,10 @@ describe('pivot/expansion/stateTransitions', () => {
         resolvedColSubtotalPosition: 'start' as const,
         resolvedMetricsLayout: metricsLayout,
         hasMultipleMeasures: metricLabelSet.size > 1,
-        metricsFirstOnCols,
+        metricsFirstOnCols:
+          program.valueAxis === 'col' &&
+          program.metricKeys.length > 0 &&
+          program.metricInsertIndex === 0,
         rowSorter: depthSorter,
         colSorter: depthSorter,
         getRowChildren: (parent: PivotTreeNode) =>
@@ -114,8 +139,7 @@ describe('pivot/expansion/stateTransitions', () => {
         isMetricGrandTotalNode: (node?: PivotTreeNode) =>
           isMetricGrandTotalNode(node, {
             metricLabelSet,
-            metricsFirstOnRows,
-            metricsFirstOnCols,
+            program,
           }),
         isMetricSubtotalNode: (node?: PivotTreeNode) =>
           isMetricSubtotalNode(node, metricLabelSet),

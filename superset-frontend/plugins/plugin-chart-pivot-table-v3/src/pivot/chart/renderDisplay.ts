@@ -315,12 +315,8 @@ type RenderNodeDisplayLayout = Pick<
   | 'resolvedExpandRowsLevel'
   | 'metricLabelSet'
   | 'shouldExpandMetricRows'
-  | 'metricsFirstOnRows'
-  | 'metricsFirstOnCols'
   | 'metricLabels'
-  | 'resolvedMetricsLayout'
   | 'hideMetricHeaderOnRows'
-  | 'metricIndexOnRows'
   | 'isMetricTokenValue'
   | 'isExplicitSubtotalNode'
   | 'isMetricGrandTotalNode'
@@ -363,16 +359,14 @@ export const buildRenderNodeDisplayState = ({
   const isExplicitTotalNode = (node: PivotTreeNode) =>
     isExplicitTotalNodeBase(node, {
       metricLabelSet: layout.metricLabelSet,
-      metricsFirstOnRows: layout.metricsFirstOnRows,
-      metricsFirstOnCols: layout.metricsFirstOnCols,
+      program: layout.layout.pivotProgram,
     });
 
   const getNodeDimDepth = (node: PivotTreeNode) =>
     getNodeDimDepthBase(node, {
       metricLabelSet: layout.metricLabelSet,
-      metricsLayout: layout.resolvedMetricsLayout,
+      program: layout.layout.pivotProgram,
       hideMetricHeaderOnRows: layout.hideMetricHeaderOnRows,
-      metricIndexOnRows: layout.metricIndexOnRows,
     });
 
   const shouldShowToggle = (axis: PivotAxis, node?: PivotTreeNode) => {
