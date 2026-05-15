@@ -17,61 +17,65 @@
  * under the License.
  */
 
-import { type PivotAxis, type PivotTreeNode } from '../../../src/types';
-import {
-  createFetchedFactCoverageState,
-  getFetchedAxisDepthMap,
-  pruneFetchedCoverageForCollapsedNode,
-} from '../../../src/pivot/expansion/fetchedRequests';
-import { rootKey } from '../../../src/pivot/viewModel';
+import { createFetchedFactCoverageLookup } from '../../../src/pivot/expansion/fetchedRequests';
+import { type PivotFactStoreBatch } from '../../../src/pivot/runtime/factStore';
 import { serializePath } from '../../../src/pivot/core/path';
 
-const makeNode = ({
-  axis,
-  path,
-  hasChildren = true,
-}: {
-  axis: PivotAxis;
-  path: PivotTreeNode['path'];
-  hasChildren?: boolean;
-}): PivotTreeNode => ({
-  axis,
-  key: path.length === 0 ? rootKey : serializePath(path),
-  path,
-  label: path.length === 0 ? 'Total' : String(path[path.length - 1]),
-  formattedLabel: path.length === 0 ? 'Total' : String(path[path.length - 1]),
-  level: path.length,
-  hasChildren,
-});
-
 describe('pivot/expansion/fetchedRequests', () => {
-  it('prunes collapsed fetched coverage through the coverage helper', () => {
-    const aKey = serializePath(['A']);
-    const abKey = serializePath(['A', 'B']);
-    const cKey = serializePath(['C']);
-    const fetchedCoverage = createFetchedFactCoverageState({
-      row: new Map([
-        [aKey, 1],
-        [abKey, 2],
-        [cKey, 1],
-      ]),
-    });
-
-    pruneFetchedCoverageForCollapsedNode({
-      fetchedCoverage,
-      axis: 'row',
-      parentPath: ['A'],
-      parentKey: aKey,
-      nodes: {
-        [rootKey]: makeNode({ axis: 'row', path: [] }),
-        [aKey]: makeNode({ axis: 'row', path: ['A'] }),
-        [abKey]: makeNode({ axis: 'row', path: ['A', 'B'] }),
-        [cKey]: makeNode({ axis: 'row', path: ['C'] }),
+  it('derives fetched depth from loaded fact batches', () => {
+    const factBatches: PivotFactStoreBatch[] = [
+      {
+        coverage: {
+          reason: 'expand',
+          rowDepth: 2,
+          columnDepth: 1,
+          rowDimensions: ['country', 'city'],
+          columnDimensions: ['month'],
+        },
+        scope: {
+          kind: 'branch',
+          axis: 'row',
+          path: ['France'],
+        },
+        valueKeys: ['sales'],
+        facts: [],
       },
+      {
+        coverage: {
+          reason: 'expand',
+          rowDepth: 2,
+          columnDepth: 3,
+          rowDimensions: ['country', 'city'],
+          columnDimensions: ['year', 'quarter', 'month'],
+        },
+        scope: {
+          kind: 'branch',
+          axis: 'row',
+          path: ['France'],
+        },
+        valueKeys: ['sales'],
+        facts: [],
+      },
+    ];
+
+    const lookup = createFetchedFactCoverageLookup({
+      factBatches,
+      getCoverageKey: (_axis, key) => key,
     });
 
-    expect(Array.from(getFetchedAxisDepthMap(fetchedCoverage, 'row'))).toEqual([
-      [cKey, 1],
-    ]);
+    expect(
+      lookup.getFetchedDepth({
+        axis: 'row',
+        pathKey: serializePath(['France']),
+        requiredOppositeDepth: 1,
+      }),
+    ).toBe(3);
+    expect(
+      lookup.getFetchedDepth({
+        axis: 'col',
+        pathKey: serializePath(['France']),
+        requiredOppositeDepth: 1,
+      }),
+    ).toBeUndefined();
   });
 });

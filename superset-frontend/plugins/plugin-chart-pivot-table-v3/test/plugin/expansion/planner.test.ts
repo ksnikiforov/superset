@@ -20,14 +20,13 @@
 import { planGroupedExpansionTargets } from '../../../src/pivot/expansion/planner';
 import {
   createFetchedFactCoverageLookup,
-  createFetchedFactCoverageState,
   projectFactRequestToFetchedCoverage,
-  seedFetchedCoverageFromFactBatches,
 } from '../../../src/pivot/expansion/fetchedRequests';
 import { rootKey } from '../../../src/pivot/viewModel';
 import { encodeMetricKey } from '../../../src/pivot/core/tokens';
 import { serializePath } from '../../../src/pivot/core/path';
 import { type PivotTreeNode } from '../../../src/types';
+import { type PivotFactStoreBatch } from '../../../src/pivot/runtime/factStore';
 
 const makeNode = ({
   axis,
@@ -53,6 +52,16 @@ const makeNode = ({
 const shouldFetchTreeChildren = ({ node }: { node: PivotTreeNode }) =>
   node.hasChildren;
 
+const lookupFromBatches = (
+  factBatches: PivotFactStoreBatch[] = [],
+  getCoverageKey: (axis: 'row' | 'col', key: string) => string = (_axis, key) =>
+    key,
+) =>
+  createFetchedFactCoverageLookup({
+    factBatches,
+    getCoverageKey,
+  });
+
 describe('pivot/expansion/planner', () => {
   it('projects a typed branch request scope to fetched coverage', () => {
     expect(
@@ -69,6 +78,7 @@ describe('pivot/expansion/planner', () => {
           axis: 'row',
           path: ['France'],
         },
+        valueKeys: ['sales'],
       }),
     ).toEqual([
       {
@@ -95,6 +105,7 @@ describe('pivot/expansion/planner', () => {
           parentPath: ['US'],
           siblingValues: ['CA', 'NY'],
         },
+        valueKeys: ['sales'],
       }),
     ).toEqual([
       {
@@ -123,6 +134,7 @@ describe('pivot/expansion/planner', () => {
         scope: {
           kind: 'root',
         },
+        valueKeys: ['sales'],
       }),
     ).toEqual([
       {
@@ -139,16 +151,11 @@ describe('pivot/expansion/planner', () => {
   });
 
   it('seeds fetched coverage lookup from typed fact batches', () => {
-    const fetchedCoverage = createFetchedFactCoverageState({
-      row: new Map([[`row:${serializePath(['France'])}`, 0]]),
-    });
     const getCoverageKey = (axis: 'row' | 'col', pathKey: string) =>
       `${axis}:${pathKey}`;
-
-    seedFetchedCoverageFromFactBatches({
-      fetchedCoverage,
+    const lookup = createFetchedFactCoverageLookup({
       getCoverageKey,
-      batches: [
+      factBatches: [
         {
           coverage: {
             reason: 'expand',
@@ -168,10 +175,6 @@ describe('pivot/expansion/planner', () => {
       ],
     });
 
-    const lookup = createFetchedFactCoverageLookup({
-      fetchedCoverage,
-      getCoverageKey,
-    });
     expect(
       lookup.getFetchedDepth({
         axis: 'row',
@@ -216,7 +219,7 @@ describe('pivot/expansion/planner', () => {
       expandedKeys: new Set([rootKey, aKey]),
       nodes,
       requiredOppositeDepth: 1,
-      fetchedCoverage: createFetchedFactCoverageState(),
+      fetchedCoverageLookup: lookupFromBatches(),
       getCoverageKey: (_axis, key) => key,
       shouldFetchChildren: shouldFetchTreeChildren,
     });
@@ -246,7 +249,7 @@ describe('pivot/expansion/planner', () => {
         }),
       },
       requiredOppositeDepth: 0,
-      fetchedCoverage: createFetchedFactCoverageState(),
+      fetchedCoverageLookup: lookupFromBatches(),
       getCoverageKey: (_axis, key) => key,
       shouldFetchChildren: ({ key }) => key === aKey,
     });
@@ -265,30 +268,24 @@ describe('pivot/expansion/planner', () => {
   it('uses typed branch coverage to skip only the covered expanded path', () => {
     const aKey = serializePath(['A']);
     const bKey = serializePath(['B']);
-    const fetchedCoverage = createFetchedFactCoverageState();
-
-    seedFetchedCoverageFromFactBatches({
-      fetchedCoverage,
-      getCoverageKey: (_axis, key) => key,
-      batches: [
-        {
-          coverage: {
-            reason: 'expand',
-            rowDepth: 2,
-            columnDepth: 1,
-            rowDimensions: ['category', 'subcategory'],
-            columnDimensions: ['month'],
-          },
-          scope: {
-            kind: 'branch',
-            axis: 'row',
-            path: ['A'],
-          },
-          facts: [],
-          valueKeys: ['sales'],
+    const fetchedCoverageLookup = lookupFromBatches([
+      {
+        coverage: {
+          reason: 'expand',
+          rowDepth: 2,
+          columnDepth: 1,
+          rowDimensions: ['category', 'subcategory'],
+          columnDimensions: ['month'],
         },
-      ],
-    });
+        scope: {
+          kind: 'branch',
+          axis: 'row',
+          path: ['A'],
+        },
+        facts: [],
+        valueKeys: ['sales'],
+      },
+    ]);
 
     const { plan, targets } = planGroupedExpansionTargets({
       axis: 'row',
@@ -299,7 +296,7 @@ describe('pivot/expansion/planner', () => {
         [bKey]: makeNode({ axis: 'row', path: ['B'] }),
       },
       requiredOppositeDepth: 1,
-      fetchedCoverage,
+      fetchedCoverageLookup,
       getCoverageKey: (_axis, key) => key,
       shouldFetchChildren: shouldFetchTreeChildren,
     });
@@ -312,31 +309,25 @@ describe('pivot/expansion/planner', () => {
     const caKey = serializePath(['US', 'CA']);
     const nyKey = serializePath(['US', 'NY']);
     const txKey = serializePath(['US', 'TX']);
-    const fetchedCoverage = createFetchedFactCoverageState();
-
-    seedFetchedCoverageFromFactBatches({
-      fetchedCoverage,
-      getCoverageKey: (_axis, key) => key,
-      batches: [
-        {
-          coverage: {
-            reason: 'expand',
-            rowDepth: 3,
-            columnDepth: 0,
-            rowDimensions: ['country', 'state', 'city'],
-            columnDimensions: [],
-          },
-          scope: {
-            kind: 'batch',
-            axis: 'row',
-            parentPath: ['US'],
-            siblingValues: ['CA', 'NY'],
-          },
-          facts: [],
-          valueKeys: ['sales'],
+    const fetchedCoverageLookup = lookupFromBatches([
+      {
+        coverage: {
+          reason: 'expand',
+          rowDepth: 3,
+          columnDepth: 0,
+          rowDimensions: ['country', 'state', 'city'],
+          columnDimensions: [],
         },
-      ],
-    });
+        scope: {
+          kind: 'batch',
+          axis: 'row',
+          parentPath: ['US'],
+          siblingValues: ['CA', 'NY'],
+        },
+        facts: [],
+        valueKeys: ['sales'],
+      },
+    ]);
 
     const { plan, targets } = planGroupedExpansionTargets({
       axis: 'row',
@@ -347,7 +338,7 @@ describe('pivot/expansion/planner', () => {
         [txKey]: makeNode({ axis: 'row', path: ['US', 'TX'] }),
       },
       requiredOppositeDepth: 0,
-      fetchedCoverage,
+      fetchedCoverageLookup,
       getCoverageKey: (_axis, key) => key,
       shouldFetchChildren: shouldFetchTreeChildren,
     });
@@ -359,30 +350,24 @@ describe('pivot/expansion/planner', () => {
   it('does not let typed metric branch coverage satisfy sibling metrics', () => {
     const salesKey = serializePath(['A', encodeMetricKey('sales')]);
     const profitKey = serializePath(['A', encodeMetricKey('profit')]);
-    const fetchedCoverage = createFetchedFactCoverageState();
-
-    seedFetchedCoverageFromFactBatches({
-      fetchedCoverage,
-      getCoverageKey: (_axis, key) => key,
-      batches: [
-        {
-          coverage: {
-            reason: 'expand',
-            rowDepth: 2,
-            columnDepth: 1,
-            rowDimensions: ['category'],
-            columnDimensions: ['month'],
-          },
-          scope: {
-            kind: 'branch',
-            axis: 'row',
-            path: ['A', encodeMetricKey('sales')],
-          },
-          facts: [],
-          valueKeys: ['sales'],
+    const fetchedCoverageLookup = lookupFromBatches([
+      {
+        coverage: {
+          reason: 'expand',
+          rowDepth: 2,
+          columnDepth: 1,
+          rowDimensions: ['category'],
+          columnDimensions: ['month'],
         },
-      ],
-    });
+        scope: {
+          kind: 'branch',
+          axis: 'row',
+          path: ['A', encodeMetricKey('sales')],
+        },
+        facts: [],
+        valueKeys: ['sales'],
+      },
+    ]);
 
     const { plan, targets } = planGroupedExpansionTargets({
       axis: 'row',
@@ -398,7 +383,7 @@ describe('pivot/expansion/planner', () => {
         }),
       },
       requiredOppositeDepth: 1,
-      fetchedCoverage,
+      fetchedCoverageLookup,
       getCoverageKey: (_axis, key) => key,
       shouldFetchChildren: shouldFetchTreeChildren,
     });
@@ -445,7 +430,7 @@ describe('pivot/expansion/planner', () => {
       expandedKeys: new Set([metricAKey, metricBKey]),
       nodes,
       requiredOppositeDepth: 1,
-      fetchedCoverage: createFetchedFactCoverageState(),
+      fetchedCoverageLookup: lookupFromBatches(),
       getCoverageKey: (_axis, key) => key,
       shouldFetchChildren: shouldFetchTreeChildren,
     });

@@ -71,11 +71,7 @@ import {
   resolveLayoutTransition,
   type ExpansionVisibilityConfig,
 } from './stateTransitions';
-import {
-  createFetchedFactCoverageState,
-  pruneFetchedCoverageForCollapsedNode,
-  seedFetchedCoverageFromFactBatches as seedFetchedCoverageStateFromFactBatches,
-} from './fetchedRequests';
+import { createFetchedFactCoverageLookup } from './fetchedRequests';
 import { useSyncRef } from '../shared/useSyncRef';
 import {
   createExpansionRequestHelpers,
@@ -411,7 +407,7 @@ export const useExpansionEngine = ({
   const autoExpandColsLevelRef = useRef<number>(resolvedExpandColumnsLevel);
   const expandedStateSignatureRef = useRef<string | null>(null);
   const expandedStateSharedSignatureRef = useRef<string | null>(null);
-  const fetchedCoverageRef = useRef(createFetchedFactCoverageState());
+  const loadedFactBatchesRef = useRef<PivotFactStoreBatch[]>(factBatches);
   const requestGroupPrefixRef = useRef(nanoid());
   const fetchCoverageSignatureRef = useRef(fetchCoverageSignature);
   const expansionRequestLifecycle = useMemo(
@@ -425,7 +421,7 @@ export const useExpansionEngine = ({
 
   if (fetchCoverageSignatureRef.current !== fetchCoverageSignature) {
     expansionRequestLifecycle.invalidate();
-    fetchedCoverageRef.current = createFetchedFactCoverageState();
+    loadedFactBatchesRef.current = [];
     fetchCoverageSignatureRef.current = fetchCoverageSignature;
   }
 
@@ -553,16 +549,24 @@ export const useExpansionEngine = ({
     [pivotProgram],
   );
 
-  const seedFetchedCoverageFromFactBatches = useCallback(
-    (batches: PivotFactStoreBatch[]) => {
-      seedFetchedCoverageStateFromFactBatches({
-        fetchedCoverage: fetchedCoverageRef.current,
+  const getFetchedCoverageLookup = useCallback(
+    () =>
+      createFetchedFactCoverageLookup({
+        factBatches: loadedFactBatchesRef.current,
         getCoverageKey,
-        batches,
-      });
-    },
+      }),
     [getCoverageKey],
   );
+
+  const recordFactBatches = useCallback((batches: PivotFactStoreBatch[]) => {
+    if (batches.length === 0) {
+      return;
+    }
+    loadedFactBatchesRef.current = [
+      ...loadedFactBatchesRef.current,
+      ...batches,
+    ];
+  }, []);
 
   const commitExpansionState = useCallback(
     ({
@@ -839,13 +843,13 @@ export const useExpansionEngine = ({
           getExpandedRows: () => expandedRowsRef.current,
           getExpandedCols: () => expandedColsRef.current,
           computeVisibleDepths,
-          fetchedCoverage: fetchedCoverageRef.current,
+          getFetchedCoverageLookup,
           getCoverageKey,
           shouldFetchChildren,
           fetchRuntime,
           transactionId: requestId,
           buildRequestGroupId: expansionRequestHelpers.buildRequestGroupId,
-          seedFetchedCoverage: seedFetchedCoverageFromFactBatches,
+          recordFactBatches,
           resolveExpandedForMetrics,
           pruneMergedTree,
         });
@@ -894,13 +898,14 @@ export const useExpansionEngine = ({
       expansionRequestHelpers,
       expansionRequestLifecycle,
       getCoverageKey,
+      getFetchedCoverageLookup,
       groupbyColumnsLength,
       isMetricTokenValue,
       metricIndexForCols,
       persistExpansionState,
       pruneMergedTree,
       resolveExpandedForMetrics,
-      seedFetchedCoverageFromFactBatches,
+      recordFactBatches,
       trackInFlightExpansion,
       shouldFetchChildren,
       updateLoadingKey,
@@ -929,14 +934,6 @@ export const useExpansionEngine = ({
       });
       manualExpandedRef.current = collapsedState.nextManualExpanded;
       manualCollapsedRef.current = collapsedState.nextManualCollapsed;
-
-      pruneFetchedCoverageForCollapsedNode({
-        fetchedCoverage: fetchedCoverageRef.current,
-        axis,
-        parentPath: node.path,
-        nodes,
-        parentKey: node.key,
-      });
 
       const resolvedExpanded = resolveExpandedForMetrics(
         axis,
@@ -987,7 +984,7 @@ export const useExpansionEngine = ({
           maxIterations: MAX_HYDRATION_ITERATIONS,
           isCurrent: requestScope.isCurrent,
           buildDesiredExpanded,
-          fetchedCoverage: fetchedCoverageRef.current,
+          getFetchedCoverageLookup,
           config: visibilityConfig,
           getCoverageKey,
           activeAxis: options?.activeAxis,
@@ -999,7 +996,7 @@ export const useExpansionEngine = ({
           fetchRuntime,
           transactionId,
           buildRequestGroupId: expansionRequestHelpers.buildRequestGroupId,
-          seedFetchedCoverage: seedFetchedCoverageFromFactBatches,
+          recordFactBatches,
         });
         if (result.status === 'complete') {
           const resolvedRows = resolveExpandedForMetrics(
@@ -1037,10 +1034,11 @@ export const useExpansionEngine = ({
       expansionRequestHelpers,
       expansionRequestLifecycle,
       getCoverageKey,
+      getFetchedCoverageLookup,
       persistExpansionState,
       pruneMergedTree,
+      recordFactBatches,
       resolveExpandedForMetrics,
-      seedFetchedCoverageFromFactBatches,
       setHydratingState,
       updateLoadingKey,
       visibilityConfig,
@@ -1172,7 +1170,6 @@ export const useExpansionEngine = ({
       colsChanged,
       shouldExpandRows,
       shouldExpandCols,
-      layoutChanged,
       normalizedTree,
       rowStablePrefix,
       colStablePrefix,
@@ -1201,18 +1198,17 @@ export const useExpansionEngine = ({
       shouldResetExpandedRows || shouldResetExpandedCols;
     autoExpandRowsLevelRef.current = autoExpandRowsLevelForDesired;
     autoExpandColsLevelRef.current = autoExpandColsLevelForDesired;
-    const nextFetchedCoverage = createFetchedFactCoverageState();
 
     dataEpochRef.current += 1;
     expansionRequestLifecycle.invalidate();
     const nextFactStore = createPivotFactStore();
     nextFactStore.upsertBatches(factBatches);
     factStoreRef.current = nextFactStore;
+    loadedFactBatchesRef.current = factBatches;
     setHydratingState(false);
     warningsRef.current = new Map();
     setWarnings([]);
     setErrorMessage(undefined);
-    fetchedCoverageRef.current = nextFetchedCoverage;
     clearLoadingState();
     clearInFlightExpansions();
 
@@ -1285,9 +1281,6 @@ export const useExpansionEngine = ({
     prevExpandRowsLevelRawRef.current = expandRowsLevelRaw;
     prevExpandColsLevelRawRef.current = expandColumnsLevelRaw;
 
-    if (factBatches.length > 0 && (hasNewData || !layoutChanged)) {
-      seedFetchedCoverageFromFactBatches(factBatches);
-    }
     const {
       shouldPlanRows,
       shouldPlanCols,
@@ -1301,7 +1294,7 @@ export const useExpansionEngine = ({
       effectiveExpandColsLevel,
       autoExpandRowsLevelForDesired,
       autoExpandColsLevelForDesired,
-      fetchedCoverage: fetchedCoverageRef.current,
+      fetchedCoverageLookup: getFetchedCoverageLookup(),
       config: visibilityConfig,
       getCoverageKey,
     });
@@ -1350,7 +1343,7 @@ export const useExpansionEngine = ({
     resolveExpandedForMetrics,
     reportAsyncError,
     getCoverageKey,
-    seedFetchedCoverageFromFactBatches,
+    getFetchedCoverageLookup,
     setHydratingState,
     visibilityConfig,
   ]);

@@ -16,17 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { type PivotAxis, type PivotTreeNode } from '../../types';
-import { parsePath, serializePath } from '../core/path';
+import { type PivotAxis } from '../../types';
+import { serializePath } from '../core/path';
 import {
   type PivotFactSelector,
   type PivotFactStoreBatch,
 } from '../runtime/factStore';
 import { rootKey } from '../viewModel';
-
-export type FetchedFactCoverageState = {
-  depthByAxis: Record<PivotAxis, Map<string, number>>;
-};
 
 export type FetchedFactRequestProjection = {
   axis: PivotAxis;
@@ -39,17 +35,6 @@ export type FetchedFactCoverageLookup = {
     projection: FetchedFactRequestProjection,
   ) => number | undefined;
 };
-
-type CreateFetchedFactCoverageStateConfig = Partial<
-  Record<PivotAxis, Map<string, number>>
->;
-
-export const createFetchedFactCoverageState = ({
-  row = new Map<string, number>(),
-  col = new Map<string, number>(),
-}: CreateFetchedFactCoverageStateConfig = {}): FetchedFactCoverageState => ({
-  depthByAxis: { row, col },
-});
 
 export const projectFactRequestToFetchedCoverage = ({
   coverage,
@@ -104,128 +89,35 @@ export const projectFactRequestToFetchedCoverage = ({
   }
 };
 
-export const getFetchedAxisDepthMap = (
-  fetchedCoverage: FetchedFactCoverageState,
-  axis: PivotAxis,
-) => fetchedCoverage.depthByAxis[axis];
-
 export const createFetchedFactCoverageLookup = ({
-  fetchedCoverage,
+  factBatches,
   getCoverageKey,
 }: {
-  fetchedCoverage: FetchedFactCoverageState;
+  factBatches: PivotFactStoreBatch[];
   getCoverageKey: (axis: PivotAxis, pathKey: string) => string;
-}): FetchedFactCoverageLookup => ({
-  getFetchedDepth: ({ axis, pathKey }) =>
-    getFetchedAxisDepthMap(fetchedCoverage, axis).get(
-      getCoverageKey(axis, pathKey),
-    ),
-});
-
-const markFetchedAxisCoverage = ({
-  fetchedCoverage,
-  getCoverageKey,
-  axis,
-  pathKey,
-  requiredOppositeDepth,
-}: {
-  fetchedCoverage: FetchedFactCoverageState;
-  getCoverageKey: (axis: PivotAxis, pathKey: string) => string;
-  axis: PivotAxis;
-  pathKey: string;
-  requiredOppositeDepth: number;
-}) => {
-  const depthByKey = getFetchedAxisDepthMap(fetchedCoverage, axis);
-  const coverageKey = getCoverageKey(axis, pathKey);
-  const existingDepth = depthByKey.get(coverageKey);
-  depthByKey.set(
-    coverageKey,
-    existingDepth === undefined
-      ? requiredOppositeDepth
-      : Math.max(existingDepth, requiredOppositeDepth),
-  );
-};
-
-export const markFetchedFactRequestCoverage = ({
-  fetchedCoverage,
-  getCoverageKey,
-  selector,
-}: {
-  fetchedCoverage: FetchedFactCoverageState;
-  getCoverageKey: (axis: PivotAxis, pathKey: string) => string;
-  selector: PivotFactSelector;
-}) => {
-  projectFactRequestToFetchedCoverage(selector).forEach(
-    ({ axis, pathKey, requiredOppositeDepth }) => {
-      markFetchedAxisCoverage({
-        fetchedCoverage,
-        getCoverageKey,
-        axis,
-        pathKey,
-        requiredOppositeDepth,
-      });
-    },
-  );
-};
-
-export const seedFetchedCoverageFromFactBatches = ({
-  fetchedCoverage,
-  getCoverageKey,
-  batches,
-}: {
-  fetchedCoverage: FetchedFactCoverageState;
-  getCoverageKey: (axis: PivotAxis, pathKey: string) => string;
-  batches: PivotFactStoreBatch[];
-}) => {
-  batches.forEach(batch => {
-    markFetchedFactRequestCoverage({
-      fetchedCoverage,
-      getCoverageKey,
-      selector: {
-        coverage: batch.coverage,
-        scope: batch.scope,
-        valueKeys: batch.valueKeys,
-      },
+}): FetchedFactCoverageLookup => {
+  const depthByAxis: Record<PivotAxis, Map<string, number>> = {
+    row: new Map<string, number>(),
+    col: new Map<string, number>(),
+  };
+  factBatches.forEach(batch => {
+    projectFactRequestToFetchedCoverage({
+      coverage: batch.coverage,
+      scope: batch.scope,
+      valueKeys: batch.valueKeys,
+    }).forEach(({ axis, pathKey, requiredOppositeDepth }) => {
+      const coverageKey = getCoverageKey(axis, pathKey);
+      const existingDepth = depthByAxis[axis].get(coverageKey);
+      depthByAxis[axis].set(
+        coverageKey,
+        existingDepth === undefined
+          ? requiredOppositeDepth
+          : Math.max(existingDepth, requiredOppositeDepth),
+      );
     });
   });
-};
-
-const isDescendantPath = (
-  parentPath: PivotTreeNode['path'],
-  candidatePath: PivotTreeNode['path'],
-) => parentPath.every((value, idx) => value === candidatePath[idx]);
-
-export const pruneFetchedCoverageForCollapsedNode = ({
-  fetchedCoverage,
-  axis,
-  parentPath,
-  nodes,
-  parentKey,
-}: {
-  fetchedCoverage: FetchedFactCoverageState;
-  axis: PivotAxis;
-  parentPath: PivotTreeNode['path'];
-  nodes: Record<string, PivotTreeNode>;
-  parentKey: string;
-}) => {
-  const fetchedDepths = getFetchedAxisDepthMap(fetchedCoverage, axis);
-  if (fetchedDepths.size === 0) {
-    return;
-  }
-  const next = new Map<string, number>();
-  fetchedDepths.forEach((depth, key) => {
-    if (key === parentKey) {
-      return;
-    }
-    const node = nodes[key];
-    const path = node ? node.path : parsePath(key);
-    if (isDescendantPath(parentPath, path)) {
-      return;
-    }
-    next.set(key, depth);
-  });
-  fetchedDepths.clear();
-  next.forEach((depth, key) => {
-    fetchedDepths.set(key, depth);
-  });
+  return {
+    getFetchedDepth: ({ axis, pathKey }) =>
+      depthByAxis[axis].get(getCoverageKey(axis, pathKey)),
+  };
 };

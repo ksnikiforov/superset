@@ -46,7 +46,7 @@ import {
 } from '../runtime/requestLifecycle';
 import { stableStringify } from '../shared/stableStringify';
 import { applyExpansionFetchDelta, runHydrationLoop } from './stateTransitions';
-import { type FetchedFactCoverageState } from './fetchedRequests';
+import { type FetchedFactCoverageLookup } from './fetchedRequests';
 import {
   planGroupedExpansionTargets,
   type PivotExpansionNodeFetchPredicate,
@@ -360,7 +360,7 @@ export const fetchExpansionTargetDeltas = async ({
   batchRequestKind,
   transactionId,
   buildRequestGroupId,
-  seedFetchedCoverage,
+  recordFactBatches,
 }: {
   targets: FetchTarget[];
   context: ExpansionFetchContext;
@@ -369,7 +369,7 @@ export const fetchExpansionTargetDeltas = async ({
   batchRequestKind?: string;
   transactionId: number;
   buildRequestGroupId: BuildExpansionRequestGroupId;
-  seedFetchedCoverage: (factBatches: PivotFactStoreBatch[]) => void;
+  recordFactBatches: (factBatches: PivotFactStoreBatch[]) => void;
 }): Promise<FetchResultDelta[]> => {
   const results = await fetchExpansionTargets({
     targets,
@@ -385,7 +385,7 @@ export const fetchExpansionTargetDeltas = async ({
   }
   const deltas: FetchResultDelta[] = [];
   results.forEach(result => {
-    seedFetchedCoverage(result.factBatches);
+    recordFactBatches(result.factBatches);
     if (!result.data) {
       return;
     }
@@ -404,14 +404,14 @@ export const runHydrationExpansionFetchLoop = ({
   fetchRuntime,
   transactionId,
   buildRequestGroupId,
-  seedFetchedCoverage,
+  recordFactBatches,
   ...hydrationLoopParams
 }: Omit<HydrationLoopParams, 'fetchDeltas'> & {
   reason: 'prefetch' | 'cross-axis';
   fetchRuntime: ExpansionFetchRuntime;
   transactionId: number;
   buildRequestGroupId: BuildExpansionRequestGroupId;
-  seedFetchedCoverage: (factBatches: PivotFactStoreBatch[]) => void;
+  recordFactBatches: (factBatches: PivotFactStoreBatch[]) => void;
 }) =>
   runHydrationLoop({
     ...hydrationLoopParams,
@@ -423,7 +423,7 @@ export const runHydrationExpansionFetchLoop = ({
         singleRequestKind: `hydrate:${reason}`,
         transactionId,
         buildRequestGroupId,
-        seedFetchedCoverage,
+        recordFactBatches,
       }),
   });
 
@@ -454,13 +454,13 @@ export const runSameAxisExpansionFetchLoop = async ({
   getExpandedRows,
   getExpandedCols,
   computeVisibleDepths,
-  fetchedCoverage,
+  getFetchedCoverageLookup,
   getCoverageKey,
   shouldFetchChildren,
   fetchRuntime,
   transactionId,
   buildRequestGroupId,
-  seedFetchedCoverage,
+  recordFactBatches,
   resolveExpandedForMetrics,
   pruneMergedTree,
 }: {
@@ -479,13 +479,13 @@ export const runSameAxisExpansionFetchLoop = async ({
     expandedCols: Set<string>,
     tree: PivotTreeData,
   ) => SameAxisVisibleDepths;
-  fetchedCoverage: FetchedFactCoverageState;
+  getFetchedCoverageLookup: () => FetchedFactCoverageLookup;
   getCoverageKey: (axis: PivotAxis, key: string) => string;
   shouldFetchChildren: PivotExpansionNodeFetchPredicate;
   fetchRuntime: ExpansionFetchRuntime;
   transactionId: number;
   buildRequestGroupId: BuildExpansionRequestGroupId;
-  seedFetchedCoverage: (factBatches: PivotFactStoreBatch[]) => void;
+  recordFactBatches: (factBatches: PivotFactStoreBatch[]) => void;
   resolveExpandedForMetrics: (
     axis: PivotAxis,
     nextExpanded: Set<string>,
@@ -522,7 +522,7 @@ export const runSameAxisExpansionFetchLoop = async ({
       expandedKeys: resolvedExpanded,
       nodes,
       requiredOppositeDepth: requiredDepth,
-      fetchedCoverage,
+      fetchedCoverageLookup: getFetchedCoverageLookup(),
       getCoverageKey,
       shouldFetchChildren,
     });
@@ -539,7 +539,7 @@ export const runSameAxisExpansionFetchLoop = async ({
       batchRequestKind: 'batch',
       transactionId,
       buildRequestGroupId,
-      seedFetchedCoverage,
+      recordFactBatches,
     });
     if (getDataEpoch() !== requestEpoch || !requestScope.isCurrent()) {
       return { status: 'stale' };

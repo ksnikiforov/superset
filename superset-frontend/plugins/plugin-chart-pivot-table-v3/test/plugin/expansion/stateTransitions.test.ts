@@ -35,13 +35,17 @@ import {
   type HydrationDeltaMap,
   type ExpansionVisibilityConfig,
 } from '../../../src/pivot/expansion/stateTransitions';
-import { createFetchedFactCoverageState } from '../../../src/pivot/expansion/fetchedRequests';
+import { createFetchedFactCoverageLookup } from '../../../src/pivot/expansion/fetchedRequests';
 import { findChildren, rootKey } from '../../../src/pivot/viewModel';
 import {
   METRICS_PLACEHOLDER,
   SUBTOTAL_TOKEN,
 } from '../../../src/pivot/core/tokens';
-import { serializeCellKey, serializePath } from '../../../src/pivot/core/path';
+import {
+  parsePath,
+  serializeCellKey,
+  serializePath,
+} from '../../../src/pivot/core/path';
 import {
   isMetricGrandTotalNode,
   isMetricSubtotalNode,
@@ -51,6 +55,7 @@ import {
   type PivotTreeData,
   type PivotTreeNode,
 } from '../../../src/types';
+import { type PivotFactStoreBatch } from '../../../src/pivot/runtime/factStore';
 
 describe('pivot/expansion/stateTransitions', () => {
   const depthSorter = () => 0;
@@ -128,7 +133,13 @@ describe('pivot/expansion/stateTransitions', () => {
   };
 
   const getCoverageKey = (_axis: 'row' | 'col', key: string) => key;
-  const emptyFetchedCoverage = () => createFetchedFactCoverageState();
+  const fetchedCoverageLookupFromBatches = (
+    factBatches: PivotFactStoreBatch[] = [],
+  ) =>
+    createFetchedFactCoverageLookup({
+      factBatches,
+      getCoverageKey,
+    });
 
   const makeNode = (
     axis: 'row' | 'col',
@@ -535,16 +546,32 @@ describe('pivot/expansion/stateTransitions', () => {
 
   it('runs hydration loops to completion without fetching when coverage is satisfied', async () => {
     const { tree, aKey, xKey } = buildTree({ includeIntersectionCell: true });
-    const fetchedCoverage = createFetchedFactCoverageState({
-      row: new Map([[aKey, 1]]),
-    });
+    const factBatches: PivotFactStoreBatch[] = [
+      {
+        coverage: {
+          reason: 'expand',
+          rowDepth: 2,
+          columnDepth: 1,
+          rowDimensions: ['country', 'city'],
+          columnDimensions: ['month'],
+        },
+        scope: {
+          kind: 'branch',
+          axis: 'row',
+          path: ['A'],
+        },
+        valueKeys: ['sales'],
+        facts: [],
+      },
+    ];
     const result = await runHydrationLoop({
       baseTree: tree,
       maxIterations: 3,
       isCurrent: () => true,
       buildDesiredExpanded: axis =>
         axis === 'row' ? new Set([aKey]) : new Set([xKey]),
-      fetchedCoverage,
+      getFetchedCoverageLookup: () =>
+        fetchedCoverageLookupFromBatches(factBatches),
       config,
       getCoverageKey,
       pendingRows: new Set(),
@@ -572,13 +599,28 @@ describe('pivot/expansion/stateTransitions', () => {
       cols: {},
       cells: {},
     };
-    const fetchedCoverage = emptyFetchedCoverage();
+    const factBatches: PivotFactStoreBatch[] = [];
     const fetchDeltas = jest.fn(async ({ targets }) => {
       targets.forEach(target => {
-        fetchedCoverage.depthByAxis[target.axis].set(
-          target.pathKey,
-          target.requiredOppositeDepth,
-        );
+        factBatches.push({
+          coverage: {
+            reason: 'expand',
+            rowDepth: target.axis === 'row' ? target.childDepth : 1,
+            columnDepth:
+              target.axis === 'col'
+                ? target.childDepth
+                : target.requiredOppositeDepth,
+            rowDimensions: ['country', 'city'],
+            columnDimensions: ['month'],
+          },
+          scope: {
+            kind: 'branch',
+            axis: target.axis,
+            path: parsePath(target.pathKey),
+          },
+          valueKeys: ['sales'],
+          facts: [],
+        });
       });
       return [{ targets, data: branch }];
     });
@@ -588,7 +630,8 @@ describe('pivot/expansion/stateTransitions', () => {
       isCurrent: () => true,
       buildDesiredExpanded: axis =>
         axis === 'row' ? new Set([aKey]) : new Set([xKey]),
-      fetchedCoverage,
+      getFetchedCoverageLookup: () =>
+        fetchedCoverageLookupFromBatches(factBatches),
       config,
       getCoverageKey,
       pendingRows: new Set(),
@@ -623,7 +666,7 @@ describe('pivot/expansion/stateTransitions', () => {
       isCurrent: () => false,
       buildDesiredExpanded: axis =>
         axis === 'row' ? new Set([aKey]) : new Set([xKey]),
-      fetchedCoverage: emptyFetchedCoverage(),
+      getFetchedCoverageLookup: () => fetchedCoverageLookupFromBatches(),
       config,
       getCoverageKey,
       pendingRows: new Set(),
@@ -780,7 +823,7 @@ describe('pivot/expansion/stateTransitions', () => {
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
-      fetchedCoverage: emptyFetchedCoverage(),
+      fetchedCoverageLookup: fetchedCoverageLookupFromBatches(),
       config,
       getCoverageKey,
       pendingRows: new Set(),
@@ -813,7 +856,7 @@ describe('pivot/expansion/stateTransitions', () => {
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
-      fetchedCoverage: emptyFetchedCoverage(),
+      fetchedCoverageLookup: fetchedCoverageLookupFromBatches(),
       config,
       getCoverageKey,
       activeAxis: 'col',
@@ -843,7 +886,7 @@ describe('pivot/expansion/stateTransitions', () => {
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
-      fetchedCoverage: emptyFetchedCoverage(),
+      fetchedCoverageLookup: fetchedCoverageLookupFromBatches(),
       config,
       getCoverageKey,
       pendingRows: new Set(),
@@ -870,7 +913,7 @@ describe('pivot/expansion/stateTransitions', () => {
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
-      fetchedCoverage: emptyFetchedCoverage(),
+      fetchedCoverageLookup: fetchedCoverageLookupFromBatches(),
       config,
       getCoverageKey,
       pendingRows: new Set(),
@@ -928,7 +971,7 @@ describe('pivot/expansion/stateTransitions', () => {
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
-      fetchedCoverage: emptyFetchedCoverage(),
+      fetchedCoverageLookup: fetchedCoverageLookupFromBatches(),
       config: metricConfig,
       getCoverageKey,
       pendingRows: new Set(),
@@ -991,7 +1034,7 @@ describe('pivot/expansion/stateTransitions', () => {
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
-      fetchedCoverage: emptyFetchedCoverage(),
+      fetchedCoverageLookup: fetchedCoverageLookupFromBatches(),
       config: metricConfig,
       getCoverageKey,
       pendingRows: new Set(),
@@ -1105,7 +1148,7 @@ describe('pivot/expansion/stateTransitions', () => {
       effectiveExpandColsLevel: 0,
       autoExpandRowsLevelForDesired: 0,
       autoExpandColsLevelForDesired: 0,
-      fetchedCoverage: emptyFetchedCoverage(),
+      fetchedCoverageLookup: fetchedCoverageLookupFromBatches(),
       config,
       getCoverageKey,
     });

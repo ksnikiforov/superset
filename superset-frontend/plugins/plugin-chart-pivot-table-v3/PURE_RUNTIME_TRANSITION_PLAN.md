@@ -142,13 +142,13 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14260` insertions, `14193` deletions, net `+67`.
-- Current production TypeScript/TSX total: `33577` lines.
+- Production `src`: `14132` insertions, `14196` deletions, net `-64`.
+- Current production TypeScript/TSX total: `33446` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
-hotspots, but plugin-wide source is still slightly above the starting point.
-Future work should be deletion-first and should avoid creating helper layers
+hotspots, and plugin-wide source is now slightly below the starting point.
+Future work should remain deletion-first and should avoid creating helper layers
 that only move complexity.
 
 ## Active Refactor Points
@@ -380,8 +380,10 @@ Success criteria:
 - Fact-store compatibility now uses the coverage manifest dominance rule for
   branch and batch reuse, so a batched explicit path set can satisfy a narrower
   branch without a duplicate fetch.
-- Expansion fetched state no longer infers loaded metric coverage from returned
-  tree shape. Fetched state is seeded from explicit fact batches only.
+- Expansion fetched coverage is derived from loaded fact batches; the hook no
+  longer maintains or prunes a separate fetched-depth map. Removing a hidden
+  trailing dimension after expansion can now reuse exact loaded coverage without
+  a seamless recovery fetch.
 - Resolved query fetch context owns its fact coverages, so branch, batch, and
   signature callers no longer rebuild the same coverage list separately.
 - Expansion planner and fetched-request code now share the same fetched coverage

@@ -43,10 +43,7 @@ import {
   type RenderModelConfig,
 } from '../render/renderModel';
 import { rootKey } from '../viewModel';
-import {
-  createFetchedFactCoverageLookup,
-  type FetchedFactCoverageState,
-} from './fetchedRequests';
+import { type FetchedFactCoverageLookup } from './fetchedRequests';
 
 export type ExpansionVisibilityConfig = {
   groupbyRowsLength: number;
@@ -975,7 +972,7 @@ export const planHydrationIteration = ({
   tree,
   desiredRows,
   desiredCols,
-  fetchedCoverage,
+  fetchedCoverageLookup,
   config,
   getCoverageKey,
   activeAxis,
@@ -987,7 +984,7 @@ export const planHydrationIteration = ({
   tree: PivotTreeData;
   desiredRows: Set<string>;
   desiredCols: Set<string>;
-  fetchedCoverage: FetchedFactCoverageState;
+  fetchedCoverageLookup: FetchedFactCoverageLookup;
   config: ExpansionVisibilityConfig;
   getCoverageKey: (axis: PivotAxis, key: string) => string;
   activeAxis?: PivotAxis;
@@ -1002,11 +999,6 @@ export const planHydrationIteration = ({
     expandedCols: desiredCols,
     config,
   });
-  const fetchedCoverageLookup = createFetchedFactCoverageLookup({
-    fetchedCoverage,
-    getCoverageKey,
-  });
-
   const rowPlan = planRows
     ? planExpansionForAxis({
         axis: 'row',
@@ -1108,7 +1100,7 @@ export const runHydrationLoop = async ({
   maxIterations,
   isCurrent,
   buildDesiredExpanded,
-  fetchedCoverage,
+  getFetchedCoverageLookup,
   config,
   getCoverageKey,
   activeAxis,
@@ -1123,7 +1115,7 @@ export const runHydrationLoop = async ({
   maxIterations: number;
   isCurrent: () => boolean;
   buildDesiredExpanded: (axis: PivotAxis, tree: PivotTreeData) => Set<string>;
-  fetchedCoverage: FetchedFactCoverageState;
+  getFetchedCoverageLookup: () => FetchedFactCoverageLookup;
   config: ExpansionVisibilityConfig;
   getCoverageKey: (axis: PivotAxis, key: string) => string;
   activeAxis?: PivotAxis;
@@ -1165,7 +1157,7 @@ export const runHydrationLoop = async ({
       tree: stagedTree,
       desiredRows,
       desiredCols,
-      fetchedCoverage,
+      fetchedCoverageLookup: getFetchedCoverageLookup(),
       config,
       getCoverageKey,
       activeAxis,
@@ -1272,7 +1264,7 @@ export const planInitialHydrationPrefetch = ({
   effectiveExpandColsLevel,
   autoExpandRowsLevelForDesired,
   autoExpandColsLevelForDesired,
-  fetchedCoverage,
+  fetchedCoverageLookup,
   config,
   getCoverageKey,
 }: {
@@ -1284,7 +1276,7 @@ export const planInitialHydrationPrefetch = ({
   effectiveExpandColsLevel: number;
   autoExpandRowsLevelForDesired: number;
   autoExpandColsLevelForDesired: number;
-  fetchedCoverage: FetchedFactCoverageState;
+  fetchedCoverageLookup: FetchedFactCoverageLookup;
   config: ExpansionVisibilityConfig;
   getCoverageKey: (axis: PivotAxis, key: string) => string;
 }) => {
@@ -1300,7 +1292,7 @@ export const planInitialHydrationPrefetch = ({
     tree,
     desiredRows: resolvedRows,
     desiredCols: resolvedCols,
-    fetchedCoverage,
+    fetchedCoverageLookup,
     config,
     getCoverageKey,
     pendingRows: new Set(),

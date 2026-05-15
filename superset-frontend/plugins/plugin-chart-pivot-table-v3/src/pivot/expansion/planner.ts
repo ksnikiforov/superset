@@ -21,11 +21,7 @@ import { type PivotAxis, type PivotTreeNode } from '../../types';
 import { parsePath, serializePath } from '../core/path';
 import { type FetchTarget } from '../query/fetchPlanOptimizer';
 import { rootKey } from '../viewModel';
-import {
-  createFetchedFactCoverageLookup,
-  type FetchedFactCoverageLookup,
-  type FetchedFactCoverageState,
-} from './fetchedRequests';
+import { type FetchedFactCoverageLookup } from './fetchedRequests';
 
 export type PivotExpansionPlan = {
   fetchKeys: Set<string>;
@@ -230,7 +226,7 @@ export const planGroupedExpansionTargets = ({
   expandedKeys,
   nodes,
   requiredOppositeDepth,
-  fetchedCoverage,
+  fetchedCoverageLookup,
   getCoverageKey,
   shouldFetchChildren,
 }: {
@@ -238,17 +234,13 @@ export const planGroupedExpansionTargets = ({
   expandedKeys: Set<string>;
   nodes: Record<string, PivotTreeNode>;
   requiredOppositeDepth: number;
-  fetchedCoverage: FetchedFactCoverageState;
+  fetchedCoverageLookup: FetchedFactCoverageLookup;
   getCoverageKey: (axis: PivotAxis, key: string) => string;
   shouldFetchChildren: PivotExpansionNodeFetchPredicate;
 }): {
   plan: PivotExpansionPlan;
   targets: FetchTarget[];
 } => {
-  const fetchedCoverageLookup = createFetchedFactCoverageLookup({
-    fetchedCoverage,
-    getCoverageKey,
-  });
   const plan = planExpansionForAxis({
     axis,
     expandedKeys,
