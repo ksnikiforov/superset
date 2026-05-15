@@ -172,7 +172,6 @@ function PivotTableChart(props: PivotTableProps) {
   const persistExpansionState = persistExpansionStateProp ?? true;
   const resolvedStickyHeaders = formData.stickyHeaders ?? stickyHeaders;
 
-  const pendingSeamlessLayoutRef = useRef<PivotRuntimeLayout | null>(null);
   const expandedRowsForSeamlessRef = useRef<Set<string>>(new Set());
   const expandedColsForSeamlessRef = useRef<Set<string>>(new Set());
   const pendingRowsForSeamlessRef = useRef<Set<string>>(new Set());
@@ -247,7 +246,6 @@ function PivotTableChart(props: PivotTableProps) {
     selectedFiltersFromOwnState,
     selectedFiltersFromProps,
     upstreamDashboardQueryContextSignature,
-    pendingSeamlessLayoutRef,
     suppressStalePersistedFilterRestoreRef,
     mergeOwnState,
     setControlValue,
@@ -310,7 +308,6 @@ function PivotTableChart(props: PivotTableProps) {
     sourceMetrics,
     sourceMeasureLeavesByMetric,
     upstreamSignature: upstreamSeamlessSignature,
-    pendingSeamlessLayoutRef,
     seamlessSyncRef: lastSeamlessSyncRef,
     expandedRowsRef: expandedRowsForSeamlessRef,
     expandedColsRef: expandedColsForSeamlessRef,

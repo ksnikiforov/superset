@@ -86,7 +86,6 @@ type UsePivotSeamlessRuntimeUpdateConfig = {
   sourceMetrics?: PivotTableQueryFormData['metrics'];
   sourceMeasureLeavesByMetric?: PivotTableQueryFormData['measureLeavesByMetric'];
   upstreamSignature: string;
-  pendingSeamlessLayoutRef: MutableRefObject<PivotRuntimeLayout | null>;
   seamlessSyncRef: MutableRefObject<SeamlessRuntimeSyncSnapshot | null>;
   expandedRowsRef: MutableRefObject<Set<string>>;
   expandedColsRef: MutableRefObject<Set<string>>;
@@ -128,7 +127,6 @@ export const usePivotSeamlessRuntimeUpdate = (
     sourceMetrics,
     sourceMeasureLeavesByMetric,
     upstreamSignature,
-    pendingSeamlessLayoutRef,
     seamlessSyncRef,
     expandedRowsRef,
     expandedColsRef,
@@ -169,8 +167,7 @@ export const usePivotSeamlessRuntimeUpdate = (
     setWarnings([]);
     setError(undefined);
     setLoading(false);
-    pendingSeamlessLayoutRef.current = null;
-  }, [materializationLifecycle, pendingSeamlessLayoutRef]);
+  }, [materializationLifecycle]);
 
   useEffect(() => {
     // Ignore stale upstream updates while a local interaction update is still
@@ -244,7 +241,6 @@ export const usePivotSeamlessRuntimeUpdate = (
         return;
       }
       if (updateResult.status !== 'success') {
-        pendingSeamlessLayoutRef.current = null;
         setLoading(false);
         return;
       }
@@ -262,7 +258,6 @@ export const usePivotSeamlessRuntimeUpdate = (
         selection: nextFilters,
         upstreamSignature,
       });
-      pendingSeamlessLayoutRef.current = null;
       setLoading(false);
     },
     [
@@ -276,7 +271,6 @@ export const usePivotSeamlessRuntimeUpdate = (
       metricKeys,
       pendingColsRef,
       pendingRowsRef,
-      pendingSeamlessLayoutRef,
       persistRuntimeState,
       requestLifecycle,
       seamlessSyncRef,
@@ -294,13 +288,11 @@ export const usePivotSeamlessRuntimeUpdate = (
         dimensionKeys,
         metricKeys,
         factBatches: committedFactBatches,
-        pendingSeamlessLayout: pendingSeamlessLayoutRef.current,
-        committedRuntimeLayout,
+        previousRuntimeLayout: uiRuntimeLayoutRef.current,
         selection: uiSelectedFilters,
         upstreamSignature,
       });
       if (action.kind === 'fetch') {
-        pendingSeamlessLayoutRef.current = action.runtimeLayout;
         commitUiRuntimeLayout(action.runtimeLayout);
         applySeamlessUpdate(action.runtimeLayout, uiSelectedFilters);
         return;
@@ -313,13 +305,12 @@ export const usePivotSeamlessRuntimeUpdate = (
       applySeamlessUpdate,
       commitUiRuntimeLayout,
       committedFactBatches,
-      committedRuntimeLayout,
       dimensionKeys,
       metricKeys,
-      pendingSeamlessLayoutRef,
       persistRuntimeState,
       seamlessSyncRef,
       uiSelectedFilters,
+      uiRuntimeLayoutRef,
       upstreamSignature,
     ],
   );

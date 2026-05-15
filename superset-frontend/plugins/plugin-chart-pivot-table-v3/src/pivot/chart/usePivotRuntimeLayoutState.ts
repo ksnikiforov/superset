@@ -55,7 +55,6 @@ type UsePivotRuntimeLayoutStateConfig = {
   selectedFiltersFromOwnState: RuntimeSelection;
   selectedFiltersFromProps: RuntimeSelection;
   upstreamDashboardQueryContextSignature: string | null;
-  pendingSeamlessLayoutRef: MutableRefObject<PivotRuntimeLayout | null>;
   suppressStalePersistedFilterRestoreRef: MutableRefObject<boolean>;
   mergeOwnState: (partial: JsonObject) => JsonObject;
   setControlValue?: HandlerFunction;
@@ -73,7 +72,6 @@ export const usePivotRuntimeLayoutState = ({
   selectedFiltersFromOwnState,
   selectedFiltersFromProps,
   upstreamDashboardQueryContextSignature,
-  pendingSeamlessLayoutRef,
   suppressStalePersistedFilterRestoreRef,
   mergeOwnState,
   setControlValue,
@@ -185,7 +183,10 @@ export const usePivotRuntimeLayoutState = ({
       isDashboardContext,
       isDashboardRuntimeSync,
       pendingPersistedRuntimeLayoutSync: persistedRuntimeLayoutSyncRef.current,
-      hasPendingSeamlessLayout: pendingSeamlessLayoutRef.current !== null,
+      hasPendingRuntimeLayout: !isSameRuntimeLayout(
+        uiRuntimeLayoutRef.current,
+        committedRuntimeLayoutRef.current,
+      ),
       runtimeLayout,
       lastPersistedRuntimeLayout: lastPersistedRuntimeLayoutRef.current,
     });
@@ -204,7 +205,6 @@ export const usePivotRuntimeLayoutState = ({
     isDashboardRuntimeSync,
     isUserControlled,
     lastPersistedRuntimeLayoutRef,
-    pendingSeamlessLayoutRef,
     persistedRuntimeLayoutSyncRef,
     runtimeLayout,
     updateUiRuntimeLayout,

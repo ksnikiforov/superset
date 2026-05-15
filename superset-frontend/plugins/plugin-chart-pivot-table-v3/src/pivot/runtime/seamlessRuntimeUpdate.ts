@@ -249,7 +249,7 @@ export const prepareRuntimeLayoutPropSync = ({
   isDashboardContext,
   isDashboardRuntimeSync,
   pendingPersistedRuntimeLayoutSync,
-  hasPendingSeamlessLayout,
+  hasPendingRuntimeLayout,
   runtimeLayout,
   lastPersistedRuntimeLayout,
 }: {
@@ -257,19 +257,19 @@ export const prepareRuntimeLayoutPropSync = ({
   isDashboardContext: boolean;
   isDashboardRuntimeSync: boolean;
   pendingPersistedRuntimeLayoutSync: boolean;
-  hasPendingSeamlessLayout: boolean;
+  hasPendingRuntimeLayout: boolean;
   runtimeLayout: PivotRuntimeLayout;
   lastPersistedRuntimeLayout: PivotRuntimeLayout;
 }) => ({
   shouldSyncCommittedRuntimeLayout:
     !(isDashboardRuntimeSync && pendingPersistedRuntimeLayoutSync) &&
-    !hasPendingSeamlessLayout,
+    !hasPendingRuntimeLayout,
   shouldSyncUiRuntimeLayout:
     !(
       isUserControlled &&
       isDashboardContext &&
       pendingPersistedRuntimeLayoutSync
-    ) && !hasPendingSeamlessLayout,
+    ) && !hasPendingRuntimeLayout,
   hasPersistedRuntimeLayoutSyncSettled:
     isDashboardRuntimeSync &&
     pendingPersistedRuntimeLayoutSync &&
@@ -320,8 +320,7 @@ export const prepareSeamlessRuntimeLayoutChange = ({
   dimensionKeys,
   metricKeys,
   factBatches,
-  pendingSeamlessLayout,
-  committedRuntimeLayout,
+  previousRuntimeLayout,
   selection,
   upstreamSignature,
 }: {
@@ -329,8 +328,7 @@ export const prepareSeamlessRuntimeLayoutChange = ({
   dimensionKeys: string[];
   metricKeys: string[];
   factBatches: PivotFactStoreBatch[];
-  pendingSeamlessLayout: PivotRuntimeLayout | null;
-  committedRuntimeLayout: PivotRuntimeLayout;
+  previousRuntimeLayout: PivotRuntimeLayout;
   selection: RuntimeSelection;
   upstreamSignature: string;
 }) => {
@@ -339,11 +337,10 @@ export const prepareSeamlessRuntimeLayoutChange = ({
     dimensionKeys,
     metricKeys,
   );
-  const previousLayout = pendingSeamlessLayout ?? committedRuntimeLayout;
   if (
     shouldFetchRuntimeLayout({
       factBatches,
-      previousLayout,
+      previousLayout: previousRuntimeLayout,
       nextLayout: runtimeLayout,
     })
   ) {

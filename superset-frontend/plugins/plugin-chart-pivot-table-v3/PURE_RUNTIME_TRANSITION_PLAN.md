@@ -411,6 +411,10 @@ Success criteria:
   display snapshot. The chart renders the committed runtime tree directly while
   fetch/materialization is pending, so expansion/loading feedback remains live
   instead of being hidden by chart-owned snapshot state.
+- Seamless runtime no longer owns a duplicate pending-layout object ref. Pending
+  local layout intent is derived from the existing UI-layout and committed-layout
+  refs at the prop-sync boundary, which keeps local edits from being overwritten
+  by stale props without adding a second layout authority.
 
 ## Current Risks
 
@@ -421,9 +425,9 @@ Success criteria:
   not fetched-state inference from metric tree nodes.
 - `materializePivotTree.ts` is too large and combines several internal
   responsibilities.
-- `PivotTableChart.tsx` is smaller and no longer owns a pending display
-  snapshot, but it is still the rendezvous point for multiple runtime state
-  machines.
+- `PivotTableChart.tsx` is smaller and no longer owns pending display or
+  pending layout snapshots, but it is still the rendezvous point for multiple
+  runtime state machines.
 - `useExpansionEngine.ts` and `stateTransitions.ts` remain large. Split only by
   real ownership, not by wrapper files.
 - Expansion now has the right manifest predicate, but the grouped planner still
