@@ -47,7 +47,6 @@ import { isAbortError } from '../runtime/requestLifecycle';
 import {
   buildBranchTreeFromFactStore,
   buildFactStoreBatchesFromSpecs,
-  canMaterializeSpecsFromFactStore,
   factStoreSelectorFromSpec,
 } from '../runtime/materializePivotTree';
 
@@ -79,42 +78,6 @@ type ResolvedBranchPlan = {
 
 const EMPTY_FACT_BATCHES: PivotFactStoreBatch[] = [];
 
-export const resolvePivotQueryLocalResultFromFactStore = ({
-  specs,
-  store,
-  formData,
-  measureHierarchy,
-}: {
-  specs: PlannedQuerySpec[];
-  store?: PivotFactStore;
-  formData: PivotTableQueryFormData;
-  measureHierarchy: MeasureHierarchy;
-}): FetchPivotBranchResult | undefined => {
-  if (
-    !store ||
-    !canMaterializeSpecsFromFactStore({
-      specs,
-      store,
-    })
-  ) {
-    return undefined;
-  }
-  const factBatches = buildFactStoreBatchesFromSpecs({
-    specs,
-    store,
-  });
-  const data = buildBranchTreeFromFactStore({
-    specs,
-    store,
-    formData,
-    measureHierarchy,
-  });
-  return {
-    data,
-    factBatches,
-  };
-};
-
 export const fetchPivotQuerySpecsIntoBranchTree = async ({
   formData,
   specs,
@@ -128,12 +91,21 @@ export const fetchPivotQuerySpecsIntoBranchTree = async ({
   factStore?: PivotFactStore;
   measureHierarchy: MeasureHierarchy;
 }): Promise<FetchPivotBranchResult> => {
-  const missingSpecs = factStore
-    ? specs.filter(
-        spec =>
-          !factStore.hasCompatibleCoverage(factStoreSelectorFromSpec(spec)),
-      )
-    : specs;
+  const store = factStore ?? createPivotFactStore();
+  const missingSpecs = specs.filter(
+    spec => !store.hasCompatibleCoverage(factStoreSelectorFromSpec(spec)),
+  );
+  if (missingSpecs.length === 0) {
+    return {
+      data: buildBranchTreeFromFactStore({
+        specs,
+        store,
+        formData,
+        measureHierarchy,
+      }),
+      factBatches: buildFactStoreBatchesFromSpecs({ specs, store }),
+    };
+  }
   const metricsForQuery = missingSpecs[0]?.metrics ?? specs[0].metrics;
   const timeOffsets = Array.from(
     new Set([
@@ -160,7 +132,6 @@ export const fetchPivotQuerySpecsIntoBranchTree = async ({
       requestGroupId,
     });
     const warnings = results.flatMap(result => result.warnings ?? []);
-    const store = factStore ?? createPivotFactStore();
     const factBatches = upsertQueryResultsIntoFactStore({
       store,
       specs: missingSpecs,
@@ -249,12 +220,7 @@ const resolvePivotBranchLocalResultFromPlan = (
     params.factStore?.upsertBatch(batch);
     return { data: undefined, factBatches: [batch] };
   }
-  return resolvePivotQueryLocalResultFromFactStore({
-    specs,
-    store: params.factStore,
-    formData: params.formData,
-    measureHierarchy: ctx.layout.measureHierarchy,
-  });
+  return undefined;
 };
 
 export const resolvePivotBranchLocalResult = (

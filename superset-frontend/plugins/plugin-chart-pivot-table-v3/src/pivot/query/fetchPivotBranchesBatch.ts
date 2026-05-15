@@ -27,10 +27,7 @@ import {
   type PivotFactStoreBatch,
 } from '../runtime/factStore';
 import { type BatchGroup } from './fetchPlanOptimizer';
-import {
-  fetchPivotQuerySpecsIntoBranchTree,
-  resolvePivotQueryLocalResultFromFactStore,
-} from './fetchPivotBranch';
+import { fetchPivotQuerySpecsIntoBranchTree } from './fetchPivotBranch';
 import { buildBatchQuerySpecs } from './specs';
 
 export type FetchPivotBranchesBatchParams = {
@@ -88,15 +85,6 @@ export const fetchPivotBranchesBatch = async ({
     };
     factStore?.upsertBatch(batchMarker);
     return { data: undefined, factBatches: [batchMarker] };
-  }
-  const localResult = resolvePivotQueryLocalResultFromFactStore({
-    specs,
-    store: factStore,
-    formData,
-    measureHierarchy: layout.measureHierarchy,
-  });
-  if (localResult) {
-    return localResult;
   }
   return fetchPivotQuerySpecsIntoBranchTree({
     formData,
