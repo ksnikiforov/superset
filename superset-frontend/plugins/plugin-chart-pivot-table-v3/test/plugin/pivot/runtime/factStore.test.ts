@@ -225,6 +225,59 @@ test('does not treat unscoped root coverage as loaded branch coverage', () => {
   expect(store.getCompatibleFacts(franceBranchSelector)).toEqual([]);
 });
 
+test('uses intersection scope for bounded cross-axis coverage', () => {
+  const store = createPivotFactStore();
+  const intersectionCoverage: PivotFactCoverage = {
+    reason: 'expand',
+    rowDepth: 2,
+    columnDepth: 2,
+    rowDimensions: ['country', 'city'],
+    columnDimensions: ['quarter', 'month'],
+  };
+  const intersectionSelector = {
+    coverage: intersectionCoverage,
+    scope: {
+      kind: 'intersection',
+      rowPaths: [['USA'], ['France']],
+      columnPaths: [['Q1']],
+    } as PivotFactStoreBatchScope,
+    valueKeys: ['sales'],
+  };
+  const inScopeFact = buildFact({
+    rowPath: ['USA', 'Seattle'],
+    columnPath: ['Q1', 'Jan'],
+    value: 1,
+  });
+  const offRowScopeFact = buildFact({
+    rowPath: ['Canada', 'Toronto'],
+    columnPath: ['Q1', 'Jan'],
+    value: 2,
+  });
+  const offColumnScopeFact = buildFact({
+    rowPath: ['USA', 'Seattle'],
+    columnPath: ['Q2', 'Apr'],
+    value: 3,
+  });
+
+  store.upsertBatch({
+    ...intersectionSelector,
+    facts: [inScopeFact, offRowScopeFact, offColumnScopeFact],
+  });
+
+  expect(store.hasCompatibleCoverage(intersectionSelector)).toBe(true);
+  expect(store.getCompatibleFacts(intersectionSelector)).toEqual([inScopeFact]);
+  expect(
+    store.hasCompatibleCoverage({
+      ...intersectionSelector,
+      scope: {
+        kind: 'intersection',
+        rowPaths: [['Canada']],
+        columnPaths: [['Q1']],
+      },
+    }),
+  ).toBe(false);
+});
+
 test('does not reuse root coverage for values-token branch scopes', () => {
   const store = createPivotFactStore();
   const branchCoverage: PivotFactCoverage = {

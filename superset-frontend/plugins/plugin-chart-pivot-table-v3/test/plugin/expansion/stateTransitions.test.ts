@@ -1093,7 +1093,7 @@ describe('pivot/expansion/stateTransitions', () => {
     ]);
   });
 
-  it('forces a root fetch when cross-axis root coverage is missing', () => {
+  it('plans bounded intersection fetch when cross-axis coverage is missing', () => {
     const { tree, aKey, xKey } = buildTree({ includeIntersectionCell: false });
     const plan = planHydrationIteration({
       tree,
@@ -1107,15 +1107,19 @@ describe('pivot/expansion/stateTransitions', () => {
     });
 
     expect(plan.kind).toBe('fetch');
-    expect(fetchPathKeys(plan.rowPlan)).toContain(rootKey);
     if (plan.kind !== 'fetch') {
       throw new Error('Expected a fetch plan');
     }
+    expect(fetchPathKeys(plan.rowPlan)).not.toContain(rootKey);
     expect(plan.targets).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ axis: 'row', pathKey: rootKey }),
         expect.objectContaining({ axis: 'row', pathKey: aKey }),
         expect.objectContaining({ axis: 'col', pathKey: xKey }),
+        {
+          kind: 'intersection',
+          rowPathKeys: [aKey],
+          columnPathKeys: [xKey],
+        },
       ]),
     );
   });

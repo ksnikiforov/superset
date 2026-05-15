@@ -27,7 +27,9 @@ import {
 import {
   fetchPivotBranch,
   fetchPivotBranchesBatch,
+  fetchPivotIntersection,
 } from '../../../src/pivot/query/fetchPivotBranch';
+import { serializePath } from '../../../src/pivot/core/path';
 import type {
   FetchPivotBranchesBatchParams,
   FetchPivotBranchesBatchResult,
@@ -36,6 +38,7 @@ import { buildFormData } from '../fixtures/pivotFormData';
 import {
   buildMockBatchFetchResult,
   buildMockBranchFetchResult,
+  buildMockIntersectionFetchResult,
 } from '../fixtures/factBatches';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';
@@ -48,6 +51,7 @@ jest.mock('../../../src/pivot/query/fetchPivotBranch', () => {
     ...actual,
     fetchPivotBranch: jest.fn(),
     fetchPivotBranchesBatch: jest.fn(),
+    fetchPivotIntersection: jest.fn(),
   };
 });
 
@@ -124,10 +128,15 @@ describe('PivotTableChart batching on persisted restore', () => {
     fetchPivotBranchesBatch as jest.MockedFunction<
       typeof fetchPivotBranchesBatch
     >;
+  const fetchPivotIntersectionMock =
+    fetchPivotIntersection as jest.MockedFunction<
+      typeof fetchPivotIntersection
+    >;
 
   beforeEach(() => {
     fetchPivotBranchMock.mockReset();
     fetchPivotBranchesBatchMock.mockReset();
+    fetchPivotIntersectionMock.mockReset();
   });
 
   it('batches sibling expansions into one request', async () => {
@@ -163,6 +172,10 @@ describe('PivotTableChart batching on persisted restore', () => {
     fetchPivotBranchMock.mockImplementation(params =>
       Promise.resolve(buildMockBranchFetchResult(params, { data: branchTree })),
     );
+    fetchPivotIntersectionMock.mockResolvedValue({
+      data: branchTree,
+      factBatches: [],
+    });
 
     const pivotExpansionState: PivotExpansionState = {
       rowKeys: rowGroupby,
@@ -256,10 +269,13 @@ describe('PivotTableChart batching on persisted restore', () => {
       }
       return deferredCol.implementation(params);
     });
-    fetchPivotBranchMock.mockImplementation(params =>
+    fetchPivotIntersectionMock.mockImplementation(params =>
       Promise.resolve(
-        buildMockBranchFetchResult(params, { data: intersectionBranch }),
+        buildMockIntersectionFetchResult(params, { data: intersectionBranch }),
       ),
+    );
+    fetchPivotBranchMock.mockImplementation(params =>
+      Promise.resolve(buildMockBranchFetchResult(params)),
     );
 
     const pivotExpansionState: PivotExpansionState = {
@@ -308,5 +324,15 @@ describe('PivotTableChart batching on persisted restore', () => {
       expect(screen.getByText('X')).toBeInTheDocument();
       expect(screen.getByText('P')).toBeInTheDocument();
     });
+    expect(fetchPivotBranchMock).not.toHaveBeenCalled();
+    expect(fetchPivotIntersectionMock).toHaveBeenCalledTimes(1);
+    expect(fetchPivotIntersectionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        rowPathKeys: [serializePath(['A']), serializePath(['B'])],
+        columnPathKeys: [serializePath(['CA']), serializePath(['NY'])],
+        visibleRowDepth: 2,
+        visibleColDepth: 2,
+      }),
+    );
   });
 });

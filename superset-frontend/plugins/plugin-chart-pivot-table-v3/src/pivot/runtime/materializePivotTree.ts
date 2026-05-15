@@ -108,6 +108,13 @@ const factStoreBatchScopeFromSpec = (
       siblingValues: spec.meta.siblingValues ?? [],
     };
   }
+  if (spec.meta.kind === 'intersection') {
+    return {
+      kind: 'intersection',
+      rowPaths: spec.meta.rowPaths ?? [],
+      columnPaths: spec.meta.columnPaths ?? [],
+    };
+  }
   return {
     kind: spec.meta.kind,
   };

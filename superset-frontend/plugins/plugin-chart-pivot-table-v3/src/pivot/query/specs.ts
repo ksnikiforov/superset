@@ -63,6 +63,7 @@ import {
   projectAxisPathToDimensions,
 } from '../runtime/paths';
 import { type PivotFactCoverage, type PivotProgram } from '../runtime/types';
+import { stableStringify } from '../shared/stableStringify';
 
 export type QuerySpec = {
   queryName: string;
@@ -72,11 +73,13 @@ export type QuerySpec = {
 };
 
 export type QuerySpecMeta = {
-  kind: 'bootstrap' | 'root' | 'branch' | 'batch';
+  kind: 'bootstrap' | 'root' | 'branch' | 'batch' | 'intersection';
   axis?: PivotAxis;
   path?: PivotPath;
   parentPath?: PivotPath;
   siblingValues?: PivotPathValue[];
+  rowPaths?: PivotPath[];
+  columnPaths?: PivotPath[];
   rowSubtotalLevels: number[];
   colSubtotalLevels: number[];
   materializedMetrics: QueryFormMetric[];
@@ -452,6 +455,11 @@ type CoverageQueryMeta =
       axis: PivotAxis;
       parentPath: PivotPath;
       siblingValues: PivotPathValue[];
+    }
+  | {
+      kind: 'intersection';
+      rowPaths: PivotPath[];
+      columnPaths: PivotPath[];
     };
 
 const buildSpecsForCoverages = ({
@@ -590,6 +598,51 @@ const buildBatchFilterClauses = ({
   return [...prefixFilters, siblingClause];
 };
 
+const buildPathSetFilterClauses = ({
+  axisGroupby,
+  paths,
+  colTypeMap,
+}: {
+  axisGroupby: QueryFormColumn[];
+  paths: PivotPath[];
+  colTypeMap?: Record<string, GenericDataType>;
+}): QueryObjectFilterClause[] => {
+  const maxDepth = Math.max(0, ...paths.map(path => path.length));
+  const filters: QueryObjectFilterClause[] = [];
+  for (let index = 0; index < maxDepth; index += 1) {
+    const column = axisGroupby[index];
+    if (!column) {
+      continue;
+    }
+    const values = Array.from(new Set(paths.map(path => path[index])));
+    const nonNullValues = values.filter(value => !isNullish(value));
+    if (nonNullValues.length === 0) {
+      filters.push({
+        col: getColumnLabel(column),
+        op: 'IS NULL',
+      } as UnaryQueryObjectFilterClause);
+      continue;
+    }
+    const coercedValues = nonNullValues.map(value =>
+      coerceValueForColumn(value, column, colTypeMap),
+    ) as DataRecordValue[];
+    if (coercedValues.length === 1 && nonNullValues.length === values.length) {
+      filters.push({
+        col: getColumnLabel(column),
+        op: '==',
+        val: coercedValues[0],
+      } as QueryObjectFilterClause);
+      continue;
+    }
+    filters.push({
+      col: getColumnLabel(column),
+      op: 'IN',
+      val: coercedValues,
+    } as SetQueryObjectFilterClause);
+  }
+  return filters;
+};
+
 const buildBatchSpecs = ({
   formData,
   layout,
@@ -685,6 +738,68 @@ export const buildBatchQuerySpecs = ({
     representative,
     visibleRowDepth,
     visibleColDepth,
+  });
+};
+
+export const buildIntersectionQuerySpecs = ({
+  formData,
+  layout,
+  rowPathKeys,
+  columnPathKeys,
+  visibleRowDepth,
+  visibleColDepth,
+}: {
+  formData: PivotTableQueryFormData;
+  layout: LayoutContext;
+  rowPathKeys: string[];
+  columnPathKeys: string[];
+  visibleRowDepth: number;
+  visibleColDepth: number;
+}): PlannedQuerySpec[] => {
+  const rowPaths = rowPathKeys.map(parsePath);
+  const columnPaths = columnPathKeys.map(parsePath);
+  const ctx = resolveFetchContext({
+    formData,
+    layout,
+    axis: 'row',
+    path: rowPaths[0] ?? [],
+    visibleRowDepth,
+    visibleColDepth,
+  });
+  const rowFilters = buildPathSetFilterClauses({
+    axisGroupby: ctx.rowGroupbyForQuery,
+    paths: rowPaths.map(path =>
+      projectAxisPathToDimensions({
+        program: layout.pivotProgram,
+        axis: 'row',
+        path,
+      }),
+    ),
+    colTypeMap: formData.colTypeMap,
+  });
+  const columnFilters = buildPathSetFilterClauses({
+    axisGroupby: ctx.colGroupbyForQuery,
+    paths: columnPaths.map(path =>
+      projectAxisPathToDimensions({
+        program: layout.pivotProgram,
+        axis: 'col',
+        path,
+      }),
+    ),
+    colTypeMap: formData.colTypeMap,
+  });
+  const suffix = `|intersection:${stableStringify([
+    rowPathKeys,
+    columnPathKeys,
+  ])}`;
+
+  return buildSpecsForCoverages({
+    coverages: ctx.coverages,
+    ctx,
+    layout,
+    filters: [...rowFilters, ...columnFilters],
+    suffix,
+    meta: { kind: 'intersection', rowPaths, columnPaths },
   });
 };
 

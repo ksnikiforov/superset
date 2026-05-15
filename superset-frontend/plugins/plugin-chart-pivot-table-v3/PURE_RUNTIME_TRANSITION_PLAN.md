@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14224` insertions, `14902` deletions, net `-678`.
-- Current production TypeScript/TSX total: `32832` lines.
+- Production `src`: `14539` insertions, `14903` deletions, net `-364`.
+- Current production TypeScript/TSX total: `33146` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -492,6 +492,11 @@ Success criteria:
 - Grouped branch batch execution now lives in the branch fetch boundary. The
   standalone batch fetch module has been removed, and branch/batch fetches now
   share one query-spec-to-fact-store materialization path.
+- Cross-axis hydration no longer repairs missing row x column coverage by
+  forcing a broad root-depth fetch. Expansion planning can now emit an explicit
+  bounded intersection target, query planning can fetch that row-path set
+  crossed with that column-path set, and the fact store records the loaded
+  result as intersection-scoped coverage.
 
 ## Current Risks
 
@@ -507,11 +512,13 @@ Success criteria:
   runtime state machines.
 - `useExpansionEngine.ts` and `stateTransitions.ts` remain large. Split only by
   real ownership, not by wrapper files.
-- Cross-axis hydration can still force a root-depth recovery fetch when row and
-  column expansions are both missing combined-depth coverage. That preserves the
-  current no-blank UX, but it is a fallback that conflicts with the selected
-  set-oriented manifest model. The target replacement is explicit row-path-set x
-  column-path-set coverage, not a root full-level fetch.
+- The explicit intersection target added production code. The next cleanup must
+  harvest that investment by deleting older recovery/planning branches that are
+  now redundant, otherwise the refactor drifts away from the code-reduction
+  goal.
+- Missing visible bootstrap cells are no longer repaired by expansion prefetch.
+  Initial visible grid coverage must come from bootstrap/query planning, not a
+  chart-owned recovery path.
 - Large result sets still pay main-thread JSON parsing and React commit costs.
 
 ## Approval Checkpoints

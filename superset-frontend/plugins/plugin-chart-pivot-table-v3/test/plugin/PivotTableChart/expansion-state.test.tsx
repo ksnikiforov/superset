@@ -39,17 +39,20 @@ import {
 import {
   fetchPivotBranch,
   fetchPivotBranchesBatch,
+  fetchPivotIntersection,
 } from '../../../src/pivot/query/fetchPivotBranch';
 import type {
   FetchPivotBranchParams,
   FetchPivotBranchResult,
   FetchPivotBranchesBatchParams,
   FetchPivotBranchesBatchResult,
+  FetchPivotIntersectionParams,
 } from '../../../src/pivot/query/fetchPivotBranch';
 import { type PivotFactStoreBatch } from '../../../src/pivot/runtime/factStore';
 import { buildFormData } from '../fixtures/pivotFormData';
 import {
   buildMockBranchFetchResult,
+  buildMockIntersectionFetchResult,
   resolveMockBranchFetchResult,
 } from '../fixtures/factBatches';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
@@ -68,6 +71,7 @@ jest.mock('../../../src/pivot/query/fetchPivotBranch', () => {
       .fn()
       .mockResolvedValue({ data: undefined, factBatches: [] }),
     fetchPivotBranchesBatch: jest.fn(),
+    fetchPivotIntersection: jest.fn(),
   };
 });
 
@@ -76,6 +80,10 @@ describe('PivotTableChart expansion state persistence', () => {
   const fetchPivotBranchesBatchMock =
     fetchPivotBranchesBatch as jest.MockedFunction<
       typeof fetchPivotBranchesBatch
+    >;
+  const fetchPivotIntersectionMock =
+    fetchPivotIntersection as jest.MockedFunction<
+      typeof fetchPivotIntersection
     >;
 
   const resolveBatchWithSingles = async ({
@@ -292,6 +300,11 @@ describe('PivotTableChart expansion state persistence', () => {
     fetchPivotBranchMock.mockImplementation(resolveMockBranchFetchResult());
     fetchPivotBranchesBatchMock.mockReset();
     fetchPivotBranchesBatchMock.mockImplementation(resolveBatchWithSingles);
+    fetchPivotIntersectionMock.mockReset();
+    fetchPivotIntersectionMock.mockResolvedValue({
+      data: undefined,
+      factBatches: [],
+    });
   });
 
   it('stores expansion state via setControlValue when toggled', async () => {
@@ -2092,6 +2105,7 @@ describe('PivotTableChart expansion state persistence', () => {
     const baseTree = buildBootstrapTree(rowGroupby, colGroupby, metrics);
     const rowBranch = buildTreeWithCols(2, 1);
     const colBranch = buildTreeWithCols(1, 2);
+    const intersectionBranch = buildTreeWithCols(2, 2);
 
     const deferredRow = createDeferredBranchFetch();
     const deferredCol = createDeferredBranchFetch();
@@ -2099,6 +2113,14 @@ describe('PivotTableChart expansion state persistence', () => {
       params.axis === 'row'
         ? deferredRow.implementation(params)
         : deferredCol.implementation(params),
+    );
+    fetchPivotIntersectionMock.mockImplementation(
+      (params: FetchPivotIntersectionParams) =>
+        Promise.resolve(
+          buildMockIntersectionFetchResult(params, {
+            data: intersectionBranch,
+          }),
+        ),
     );
 
     render(
@@ -2135,6 +2157,7 @@ describe('PivotTableChart expansion state persistence', () => {
       expect(screen.getByText('X')).toBeInTheDocument();
       expect(screen.getByText('U')).toBeInTheDocument();
     });
+    expect(fetchPivotIntersectionMock).toHaveBeenCalledTimes(1);
   });
 
   it('ignores persisted column expansions when auto-expand columns is set', async () => {

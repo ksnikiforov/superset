@@ -38,6 +38,7 @@ import {
 import {
   buildBatchQuerySpecs,
   buildBranchQuerySpecs,
+  buildIntersectionQuerySpecs,
   type PlannedQuerySpec,
 } from './specs';
 import { buildFactCoverage } from '../runtime/coverage';
@@ -84,6 +85,18 @@ export type FetchPivotBranchesBatchParams = {
 
 export type FetchPivotBranchesBatchResult = FetchPivotBranchResult;
 
+export type FetchPivotIntersectionParams = {
+  formData: PivotTableQueryFormData;
+  rowPathKeys: string[];
+  columnPathKeys: string[];
+  visibleRowDepth: number;
+  visibleColDepth: number;
+  requestGroupId?: string;
+  factStore?: PivotFactStore;
+};
+
+export type FetchPivotIntersectionResult = FetchPivotBranchResult;
+
 export type ResolvedFetchContext = ResolvedQueryFetchContext & {
   layout: LayoutContext;
 };
@@ -109,6 +122,9 @@ export const fetchPivotQuerySpecsIntoBranchTree = async ({
   measureHierarchy: MeasureHierarchy;
 }): Promise<FetchPivotBranchResult> => {
   const store = factStore ?? createPivotFactStore();
+  if (specs.length === 0) {
+    return { factBatches: EMPTY_FACT_BATCHES };
+  }
   const missingSpecs = specs.filter(
     spec => !store.hasCompatibleCoverage(factStoreSelectorFromSpec(spec)),
   );
@@ -327,6 +343,33 @@ export const fetchPivotBranchesBatch = async ({
     factStore?.upsertBatch(batchMarker);
     return { data: undefined, factBatches: [batchMarker] };
   }
+  return fetchPivotQuerySpecsIntoBranchTree({
+    formData,
+    specs,
+    requestGroupId,
+    factStore,
+    measureHierarchy: layout.measureHierarchy,
+  });
+};
+
+export const fetchPivotIntersection = async ({
+  formData,
+  rowPathKeys,
+  columnPathKeys,
+  visibleRowDepth,
+  visibleColDepth,
+  requestGroupId,
+  factStore,
+}: FetchPivotIntersectionParams): Promise<FetchPivotIntersectionResult> => {
+  const layout = buildLayoutContext(formData);
+  const specs = buildIntersectionQuerySpecs({
+    formData,
+    layout,
+    rowPathKeys,
+    columnPathKeys,
+    visibleRowDepth,
+    visibleColDepth,
+  });
   return fetchPivotQuerySpecsIntoBranchTree({
     formData,
     specs,

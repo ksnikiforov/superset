@@ -26,6 +26,7 @@ import { mergeTrees } from '../core/tree';
 import { parsePath, serializePath } from '../core/path';
 import {
   buildGroupedFetchTargets,
+  type ExpansionFetchTarget,
   planExpansionForAxis,
   type PivotExpansionNodeFetchPredicate,
   type PivotExpansionPlan,
@@ -914,65 +915,47 @@ export const resolveReinitializedExpansionState = (params: {
   };
 };
 
-export const applyCrossAxisRootFetch = ({
+export const buildCrossAxisIntersectionTargets = ({
   rowPlan,
   colPlan,
   visibleRowDepth,
   visibleColDepth,
-  groupbyRowsLength,
-  groupbyColumnsLength,
   getMissingExpansionCoverage,
 }: {
   rowPlan: PivotExpansionPlan;
   colPlan: PivotExpansionPlan;
   visibleRowDepth: number;
   visibleColDepth: number;
-  groupbyRowsLength: number;
-  groupbyColumnsLength: number;
   getMissingExpansionCoverage: PivotExpansionCoverageDiff;
-}): { rowPlan: PivotExpansionPlan; colPlan: PivotExpansionPlan } => {
+}): ExpansionFetchTarget[] => {
   const hasCrossAxisFetch =
     rowPlan.fetchRequests.length > 0 && colPlan.fetchRequests.length > 0;
-  const axis = groupbyRowsLength > 0 ? 'row' : 'col';
-  const rootRequest = {
-    axis,
+  const rowPathKeys = rowPlan.fetchRequests
+    .map(request => request.pathKey)
+    .filter(key => key !== rootKey);
+  const columnPathKeys = colPlan.fetchRequests
+    .map(request => request.pathKey)
+    .filter(key => key !== rootKey);
+  if (
+    !hasCrossAxisFetch ||
+    visibleRowDepth === 0 ||
+    visibleColDepth === 0 ||
+    rowPathKeys.length === 0 ||
+    columnPathKeys.length === 0
+  ) {
+    return [];
+  }
+  const intersectionRequest = {
+    axis: 'row' as const,
     pathKey: rootKey,
     rowDepth: visibleRowDepth,
     columnDepth: visibleColDepth,
+    rowPathKeys,
+    columnPathKeys,
   };
-  const shouldForceRootFetch =
-    hasCrossAxisFetch &&
-    visibleRowDepth > 0 &&
-    visibleColDepth > 0 &&
-    getMissingExpansionCoverage([rootRequest]).length > 0;
-  if (
-    !shouldForceRootFetch ||
-    rowPlan.fetchRequests.some(request => request.pathKey === rootKey) ||
-    colPlan.fetchRequests.some(request => request.pathKey === rootKey)
-  ) {
-    return { rowPlan, colPlan };
-  }
-  if (groupbyRowsLength > 0) {
-    return {
-      rowPlan: {
-        ...rowPlan,
-        fetchRequests: [...rowPlan.fetchRequests, rootRequest],
-        pendingKeys: new Set([...rowPlan.pendingKeys, rootKey]),
-      },
-      colPlan,
-    };
-  }
-  if (groupbyColumnsLength > 0) {
-    return {
-      rowPlan,
-      colPlan: {
-        ...colPlan,
-        fetchRequests: [...colPlan.fetchRequests, rootRequest],
-        pendingKeys: new Set([...colPlan.pendingKeys, rootKey]),
-      },
-    };
-  }
-  return { rowPlan, colPlan };
+  return getMissingExpansionCoverage([intersectionRequest]).length > 0
+    ? [{ kind: 'intersection', rowPathKeys, columnPathKeys }]
+    : [];
 };
 
 export const planHydrationIteration = ({
@@ -1049,20 +1032,18 @@ export const planHydrationIteration = ({
     effectiveColPlan = createEmptyExpansionPlan();
   }
 
-  ({ rowPlan: effectiveRowPlan, colPlan: effectiveColPlan } =
-    applyCrossAxisRootFetch({
-      rowPlan: effectiveRowPlan,
-      colPlan: effectiveColPlan,
-      visibleRowDepth,
-      visibleColDepth,
-      groupbyRowsLength: config.groupbyRowsLength,
-      groupbyColumnsLength: config.groupbyColumnsLength,
-      getMissingExpansionCoverage,
-    }));
+  const intersectionTargets = buildCrossAxisIntersectionTargets({
+    rowPlan: effectiveRowPlan,
+    colPlan: effectiveColPlan,
+    visibleRowDepth,
+    visibleColDepth,
+    getMissingExpansionCoverage,
+  });
 
   if (
     effectiveRowPlan.pendingKeys.size === 0 &&
-    effectiveColPlan.pendingKeys.size === 0
+    effectiveColPlan.pendingKeys.size === 0 &&
+    intersectionTargets.length === 0
   ) {
     return {
       kind: 'complete',
@@ -1095,7 +1076,7 @@ export const planHydrationIteration = ({
     visibleColDepth,
     rowPlan: effectiveRowPlan,
     colPlan: effectiveColPlan,
-    targets: [...rowGroups, ...colGroups],
+    targets: [...rowGroups, ...colGroups, ...intersectionTargets],
   };
 };
 
@@ -1132,10 +1113,7 @@ export const runHydrationLoop = async ({
     targets,
     context,
   }: {
-    targets: Array<{
-      axis: PivotAxis;
-      pathKey: string;
-    }>;
+    targets: ExpansionFetchTarget[];
     context: {
       visibleRowDepth: number;
       visibleColDepth: number;

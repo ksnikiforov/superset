@@ -65,6 +65,11 @@ export type PivotFactStoreBatchScope =
       axis: PivotAxis;
       parentPath: PivotPath;
       siblingValues: PivotPathValue[];
+    }
+  | {
+      kind: 'intersection';
+      rowPaths: PivotPath[];
+      columnPaths: PivotPath[];
     };
 
 export type PivotFactStore = {
@@ -112,6 +117,36 @@ export const buildPivotFactKey = (
     fact.role,
   ]);
 
+const startsWithPath = (path: PivotPath, prefix: PivotPath) =>
+  prefix.every((value, index) => path[index] === value);
+
+const factMatchesScope = (fact: PivotFact, scope: PivotFactStoreBatchScope) => {
+  switch (scope.kind) {
+    case 'bootstrap':
+    case 'root':
+      return true;
+    case 'branch':
+      return startsWithPath(
+        scope.axis === 'row' ? fact.rowPath : fact.columnPath,
+        scope.path,
+      );
+    case 'batch':
+      return scope.siblingValues.some(value =>
+        startsWithPath(scope.axis === 'row' ? fact.rowPath : fact.columnPath, [
+          ...scope.parentPath,
+          value,
+        ]),
+      );
+    case 'intersection':
+      return (
+        scope.rowPaths.some(path => startsWithPath(fact.rowPath, path)) &&
+        scope.columnPaths.some(path => startsWithPath(fact.columnPath, path))
+      );
+    default:
+      return false;
+  }
+};
+
 export const createPivotFactStore = (): PivotFactStore => {
   const factsByKey = new Map<string, PivotFact>();
   const factKeysByRequest = new Map<string, Set<string>>();
@@ -127,11 +162,17 @@ export const createPivotFactStore = (): PivotFactStore => {
     const key = buildPivotFactRequestKey(selector);
     const requestFactKeys = factKeysByRequest.get(key) ?? new Set<string>();
     selectorByRequest.set(key, selector);
-    facts.forEach(fact => {
-      const factKey = buildPivotFactKey(selector, fact);
-      factsByKey.set(factKey, fact);
-      requestFactKeys.add(factKey);
-    });
+    facts
+      .filter(
+        fact =>
+          selector.scope.kind !== 'intersection' ||
+          factMatchesScope(fact, selector.scope),
+      )
+      .forEach(fact => {
+        const factKey = buildPivotFactKey(selector, fact);
+        factsByKey.set(factKey, fact);
+        requestFactKeys.add(factKey);
+      });
     factKeysByRequest.set(key, requestFactKeys);
   };
 
@@ -139,34 +180,6 @@ export const createPivotFactStore = (): PivotFactStore => {
     Array.from(factKeysByRequest.get(buildPivotFactRequestKey(selector)) ?? [])
       .map(key => factsByKey.get(key))
       .filter((fact): fact is PivotFact => fact !== undefined);
-
-  const startsWithPath = (path: PivotPath, prefix: PivotPath) =>
-    prefix.every((value, index) => path[index] === value);
-
-  const factMatchesScope = (
-    fact: PivotFact,
-    scope: PivotFactStoreBatchScope,
-  ) => {
-    switch (scope.kind) {
-      case 'bootstrap':
-      case 'root':
-        return true;
-      case 'branch':
-        return startsWithPath(
-          scope.axis === 'row' ? fact.rowPath : fact.columnPath,
-          scope.path,
-        );
-      case 'batch':
-        return scope.siblingValues.some(value =>
-          startsWithPath(
-            scope.axis === 'row' ? fact.rowPath : fact.columnPath,
-            [...scope.parentPath, value],
-          ),
-        );
-      default:
-        return false;
-    }
-  };
 
   const isCompatibleSelector = (
     candidate: PivotFactSelector,

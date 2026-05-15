@@ -26,6 +26,20 @@ import {
 } from '../runtime/coverage';
 import { rootKey } from '../viewModel';
 
+export type AxisFetchTarget = FetchTarget;
+
+export type IntersectionFetchTarget = {
+  kind: 'intersection';
+  rowPathKeys: string[];
+  columnPathKeys: string[];
+};
+
+export type ExpansionFetchTarget = AxisFetchTarget | IntersectionFetchTarget;
+
+export const isIntersectionFetchTarget = (
+  target: ExpansionFetchTarget,
+): target is IntersectionFetchTarget => 'kind' in target;
+
 export type PivotExpansionPlan = {
   fetchRequests: PivotExpansionCoverageRequest[];
   pendingKeys: Set<string>;

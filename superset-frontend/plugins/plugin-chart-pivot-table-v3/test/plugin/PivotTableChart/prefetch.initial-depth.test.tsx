@@ -21,16 +21,22 @@ import { render, waitFor, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
 import { mergeTrees } from '../../../src/pivot/core/tree';
-import { fetchPivotBranch } from '../../../src/pivot/query/fetchPivotBranch';
+import {
+  fetchPivotBranch,
+  fetchPivotIntersection,
+} from '../../../src/pivot/query/fetchPivotBranch';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';
 
 jest.mock('../../../src/pivot/query/fetchPivotBranch', () => {
-  const actual = jest.requireActual('../../../src/pivot/query/fetchPivotBranch');
+  const actual = jest.requireActual(
+    '../../../src/pivot/query/fetchPivotBranch',
+  );
   return {
     ...actual,
     fetchPivotBranch: jest.fn(),
+    fetchPivotIntersection: jest.fn(),
   };
 });
 
@@ -65,25 +71,26 @@ describe('PivotTableChart initial depth prefetch', () => {
   const fetchPivotBranchMock = fetchPivotBranch as jest.MockedFunction<
     typeof fetchPivotBranch
   >;
+  const fetchPivotIntersectionMock =
+    fetchPivotIntersection as jest.MockedFunction<
+      typeof fetchPivotIntersection
+    >;
 
   beforeEach(() => {
     fetchPivotBranchMock.mockReset();
+    fetchPivotIntersectionMock.mockReset();
   });
 
-  it('prefetches cross-axis intersections when bootstrap lacks cells', async () => {
+  it('does not repair missing bootstrap cells through expansion prefetch', async () => {
     const totalsTree = buildTree([{ r1: 'A', c1: 'B', m1: 30 }], 0, 0);
     const rowTree = buildTree([{ r1: 'A', c1: 'B', m1: 10 }], 1, 0);
     const colTree = buildTree([{ r1: 'A', c1: 'B', m1: 20 }], 0, 1);
     const baseTree = mergeTrees(mergeTrees(totalsTree, rowTree), colTree);
-    const branchTree = buildTree([{ r1: 'A', c1: 'B', m1: 100 }], 1, 1);
-    fetchPivotBranchMock.mockResolvedValue({
-      data: branchTree,
-      factBatches: [],
-    });
 
     const { container } = render(
       <PivotTableChart
         data={baseTree}
+        factBatches={[]}
         formData={buildFormData({
           groupbyRows: rowGroupby,
           groupbyColumns: colGroupby,
@@ -121,13 +128,13 @@ describe('PivotTableChart initial depth prefetch', () => {
       />,
     );
 
-    await waitFor(() => expect(fetchPivotBranchMock).toHaveBeenCalled());
-
     const table = container.querySelector('table');
     expect(table).not.toBeNull();
     const tableScope = within(table as HTMLTableElement);
     await waitFor(() => expect(tableScope.getByText('A')).toBeInTheDocument());
     expect(tableScope.getByText('B')).toBeInTheDocument();
-    expect(tableScope.getByText('100')).toBeInTheDocument();
+    expect(fetchPivotBranchMock).not.toHaveBeenCalled();
+    expect(fetchPivotIntersectionMock).not.toHaveBeenCalled();
+    expect(tableScope.queryByText('100')).not.toBeInTheDocument();
   });
 });

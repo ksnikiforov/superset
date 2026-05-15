@@ -21,9 +21,12 @@ import {
   type FetchPivotBranchesBatchResult,
   type FetchPivotBranchParams,
   type FetchPivotBranchResult,
+  type FetchPivotIntersectionParams,
+  type FetchPivotIntersectionResult,
 } from '../../../src/pivot/query/fetchPivotBranch';
 import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
 import { resolveFetchContext } from '../../../src/pivot/query/resolveFetchContext';
+import { buildFactCoverage } from '../../../src/pivot/runtime/coverage';
 import {
   buildFactValueKeys,
   type PivotFactStoreBatch,
@@ -125,3 +128,48 @@ export const resolveMockBatchFetchResult =
   (result: Partial<FetchPivotBranchesBatchResult> = {}) =>
   (params: FetchPivotBranchesBatchParams) =>
     Promise.resolve(buildMockBatchFetchResult(params, result));
+
+export const buildMockIntersectionFactBatches = ({
+  formData,
+  rowPathKeys,
+  columnPathKeys,
+  visibleRowDepth,
+  visibleColDepth,
+}: Pick<
+  FetchPivotIntersectionParams,
+  | 'columnPathKeys'
+  | 'formData'
+  | 'rowPathKeys'
+  | 'visibleColDepth'
+  | 'visibleRowDepth'
+>): PivotFactStoreBatch[] => {
+  const layout = buildLayoutContext(formData);
+  return [
+    {
+      coverage: buildFactCoverage({
+        reason: 'expand',
+        rowDimensions: layout.pivotProgram.rowDimensions,
+        columnDimensions: layout.pivotProgram.columnDimensions,
+        rowDepth: visibleRowDepth,
+        columnDepth: visibleColDepth,
+      }),
+      facts: [],
+      valueKeys: buildFactValueKeys({
+        metricKeys: layout.pivotProgram.metricKeys,
+      }),
+      scope: {
+        kind: 'intersection',
+        rowPaths: rowPathKeys.map(parsePath),
+        columnPaths: columnPathKeys.map(parsePath),
+      },
+    },
+  ];
+};
+
+export const buildMockIntersectionFetchResult = (
+  params: FetchPivotIntersectionParams,
+  result: Partial<FetchPivotIntersectionResult> = {},
+): FetchPivotIntersectionResult => ({
+  ...result,
+  factBatches: result.factBatches ?? buildMockIntersectionFactBatches(params),
+});

@@ -77,6 +77,8 @@ export type PivotExpansionCoverageRequest = {
   pathKey: string;
   rowDepth: number;
   columnDepth: number;
+  rowPathKeys?: string[];
+  columnPathKeys?: string[];
 };
 
 export type PivotExpansionCoverageDiff = (
@@ -178,6 +180,11 @@ const batchScopePaths = ({
 }: Extract<PivotFactStoreBatch['scope'], { kind: 'batch' }>) =>
   siblingValues.map(value => [...parentPath, value]);
 
+const intersectionScopePaths = (
+  scope: Extract<PivotFactStoreBatch['scope'], { kind: 'intersection' }>,
+  axis: PivotAxis,
+) => (axis === 'row' ? scope.rowPaths : scope.columnPaths);
+
 const axisPathScopeFromPath = (path: PivotPath): AxisPathScope => ({
   kind: 'paths',
   paths: [path],
@@ -204,6 +211,20 @@ const buildExpansionCoverageNeed = ({
   program: PivotProgram;
   valueKeys: string[];
 }): PivotCoverageNeed => {
+  if (request.rowPathKeys && request.columnPathKeys) {
+    const rowPaths = request.rowPathKeys.map(parsePath);
+    const columnPaths = request.columnPathKeys.map(parsePath);
+    return {
+      reason: 'intersection',
+      rowDepth: request.rowDepth,
+      columnDepth: request.columnDepth,
+      rowDimensions: program.rowDimensions.slice(0, request.rowDepth),
+      columnDimensions: program.columnDimensions.slice(0, request.columnDepth),
+      valueKeys,
+      rowScope: { kind: 'paths', paths: rowPaths },
+      columnScope: { kind: 'paths', paths: columnPaths },
+    };
+  }
   const path = parsePath(request.pathKey);
   const branchDimensionDepth = Math.min(
     request.axis === 'row'
@@ -246,6 +267,14 @@ const isRuntimeLayoutCoverageScope = (
   return scope.path.every(isMetricToken);
 };
 
+const scopeRestrictsAxis = (
+  scope: PivotFactStoreBatch['scope'],
+  axis: PivotAxis,
+) =>
+  (scope.kind === 'branch' || scope.kind === 'batch') && scope.axis === axis
+    ? true
+    : scope.kind === 'intersection';
+
 const scopeCoversAxisPaths = (
   scope: PivotFactStoreBatch['scope'],
   axis: PivotAxis,
@@ -255,8 +284,7 @@ const scopeCoversAxisPaths = (
     return (
       scope.kind === 'bootstrap' ||
       scope.kind === 'root' ||
-      (scope.kind !== 'branch' && scope.kind !== 'batch') ||
-      scope.axis !== axis
+      !scopeRestrictsAxis(scope, axis)
     );
   }
   if (scope.kind === 'bootstrap' || scope.kind === 'root') {
@@ -267,11 +295,20 @@ const scopeCoversAxisPaths = (
       needScope.kind === 'paths' ? needScope.paths : needScope.ancestorPaths;
     return paths.every(path => path.length === 0);
   }
-  if (scope.axis !== axis) {
+  if (
+    (scope.kind === 'branch' || scope.kind === 'batch') &&
+    scope.axis !== axis
+  ) {
     return true;
   }
   const candidatePaths =
-    scope.kind === 'branch' ? [scope.path] : batchScopePaths(scope);
+    scope.kind === 'branch'
+      ? [scope.path]
+      : scope.kind === 'batch'
+        ? batchScopePaths(scope)
+        : scope.kind === 'intersection'
+          ? intersectionScopePaths(scope, axis)
+          : [];
   if (needScope.kind === 'scopedFull') {
     return needScope.ancestorPaths.every(ancestorPath =>
       candidatePaths.some(candidatePath =>
@@ -492,6 +529,18 @@ export const buildCoverageNeedFromFactSelector = ({
   scope,
   valueKeys,
 }: PivotFactSelector): PivotCoverageNeed => {
+  if (scope.kind === 'intersection') {
+    return {
+      reason: 'intersection',
+      rowDepth: coverage.rowDepth,
+      columnDepth: coverage.columnDepth,
+      rowDimensions: coverage.rowDimensions,
+      columnDimensions: coverage.columnDimensions,
+      valueKeys,
+      rowScope: { kind: 'paths', paths: scope.rowPaths },
+      columnScope: { kind: 'paths', paths: scope.columnPaths },
+    };
+  }
   const scopedAxis =
     scope.kind === 'branch' || scope.kind === 'batch' ? scope.axis : undefined;
   const scopedPaths =
