@@ -1014,6 +1014,7 @@ export const planHydrationIteration = ({
         nodes: tree.rows,
         requiredDepth: visibleColDepth,
         fetchedCoverageLookup,
+        getCoverageKey,
         shouldFetchChildren: config.shouldFetchChildren,
       })
     : createEmptyExpansionPlan();
@@ -1024,6 +1025,7 @@ export const planHydrationIteration = ({
         nodes: tree.cols,
         requiredDepth: visibleRowDepth,
         fetchedCoverageLookup,
+        getCoverageKey,
         shouldFetchChildren: config.shouldFetchChildren,
       })
     : createEmptyExpansionPlan();

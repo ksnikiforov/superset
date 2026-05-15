@@ -100,6 +100,7 @@ export const planExpansionForAxis = ({
   nodes,
   requiredDepth,
   fetchedCoverageLookup,
+  getCoverageKey,
   shouldFetchChildren,
 }: {
   axis: PivotAxis;
@@ -107,6 +108,7 @@ export const planExpansionForAxis = ({
   nodes: Record<string, PivotTreeNode>;
   requiredDepth: number;
   fetchedCoverageLookup: FetchedFactCoverageLookup;
+  getCoverageKey: (axis: PivotAxis, key: string) => string;
   shouldFetchChildren: PivotExpansionNodeFetchPredicate;
 }): PivotExpansionPlan => {
   const fetchKeys = new Set<string>();
@@ -160,12 +162,7 @@ export const planExpansionForAxis = ({
         shouldFetchChildren,
       })
     ) {
-      if (
-        fetchedCoverageLookup.isSameFetchedCoverage(
-          missingCoverage,
-          buildCoverageProjection(axis, ancestorKey, requiredDepth),
-        )
-      ) {
+      if (getCoverageKey(axis, key) === getCoverageKey(axis, ancestorKey)) {
         return;
       }
       fetchKeys.add(key);
@@ -258,6 +255,7 @@ export const planGroupedExpansionTargets = ({
     nodes,
     requiredDepth: requiredOppositeDepth,
     fetchedCoverageLookup,
+    getCoverageKey,
     shouldFetchChildren,
   });
 

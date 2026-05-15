@@ -50,8 +50,6 @@ const fetchedCoverageLookupFromDepths = (
   depthByPathKey: Map<string, number>,
 ): FetchedFactCoverageLookup => ({
   getFetchedDepth: ({ pathKey }) => depthByPathKey.get(pathKey),
-  isSameFetchedCoverage: (left, right) =>
-    left.axis === right.axis && left.pathKey === right.pathKey,
 });
 
 const shouldFetchTreeChildren = ({ node }: { node: PivotTreeNode }) =>
@@ -73,6 +71,7 @@ describe('expansionPlanner', () => {
       fetchedCoverageLookup: fetchedCoverageLookupFromDepths(
         new Map([[keyA, 1]]),
       ),
+      getCoverageKey: (_axis, key) => key,
       shouldFetchChildren: shouldFetchTreeChildren,
     });
 
@@ -96,6 +95,7 @@ describe('expansionPlanner', () => {
       fetchedCoverageLookup: fetchedCoverageLookupFromDepths(
         new Map([[keyA, 2]]),
       ),
+      getCoverageKey: (_axis, key) => key,
       shouldFetchChildren: shouldFetchTreeChildren,
     });
 
@@ -118,6 +118,7 @@ describe('expansionPlanner', () => {
       fetchedCoverageLookup: fetchedCoverageLookupFromDepths(
         new Map([[keyA, 1]]),
       ),
+      getCoverageKey: (_axis, key) => key,
       shouldFetchChildren: shouldFetchTreeChildren,
     });
 
@@ -138,6 +139,7 @@ describe('expansionPlanner', () => {
       nodes,
       requiredDepth: 0,
       fetchedCoverageLookup: fetchedCoverageLookupFromDepths(new Map()),
+      getCoverageKey: (_axis, key) => key,
       shouldFetchChildren: shouldFetchTreeChildren,
     });
 
@@ -161,6 +163,7 @@ describe('expansionPlanner', () => {
       fetchedCoverageLookup: fetchedCoverageLookupFromDepths(
         new Map([[keyA, 1]]),
       ),
+      getCoverageKey: (_axis, key) => key,
       shouldFetchChildren: shouldFetchTreeChildren,
     });
 
@@ -185,6 +188,7 @@ describe('expansionPlanner', () => {
       fetchedCoverageLookup: fetchedCoverageLookupFromDepths(
         new Map([[keyA, 1]]),
       ),
+      getCoverageKey: (_axis, key) => key,
       shouldFetchChildren: shouldFetchTreeChildren,
     });
 
@@ -206,6 +210,7 @@ describe('expansionPlanner', () => {
       nodes: baseNodes,
       requiredDepth: 1,
       fetchedCoverageLookup: fetchedCoverageLookupFromDepths(new Map()),
+      getCoverageKey: (_axis, key) => key,
       shouldFetchChildren: shouldFetchTreeChildren,
     });
     expect(sortKeys(plan1.fetchKeys)).toEqual([keyA]);
@@ -217,6 +222,7 @@ describe('expansionPlanner', () => {
       nodes: baseNodes,
       requiredDepth: 1,
       fetchedCoverageLookup: fetchedCoverageLookupFromDepths(fetchedDepth),
+      getCoverageKey: (_axis, key) => key,
       shouldFetchChildren: shouldFetchTreeChildren,
     });
     expect(sortKeys(plan2.fetchKeys)).toEqual([]);
@@ -227,6 +233,7 @@ describe('expansionPlanner', () => {
       nodes: baseNodes,
       requiredDepth: 1,
       fetchedCoverageLookup: fetchedCoverageLookupFromDepths(fetchedDepth),
+      getCoverageKey: (_axis, key) => key,
       shouldFetchChildren: shouldFetchTreeChildren,
     });
     expect(sortKeys(plan3.fetchKeys)).toEqual([keyAB]);
@@ -237,6 +244,7 @@ describe('expansionPlanner', () => {
       nodes: baseNodes,
       requiredDepth: 2,
       fetchedCoverageLookup: fetchedCoverageLookupFromDepths(fetchedDepth),
+      getCoverageKey: (_axis, key) => key,
       shouldFetchChildren: shouldFetchTreeChildren,
     });
     expect(sortKeys(plan4.fetchKeys)).toEqual([keyA]);
@@ -254,6 +262,7 @@ describe('expansionPlanner', () => {
       fetchedCoverageLookup: fetchedCoverageLookupFromDepths(
         new Map([[keyA, 2]]),
       ),
+      getCoverageKey: (_axis, key) => key,
       shouldFetchChildren: shouldFetchTreeChildren,
     });
     expect(sortKeys(plan5.fetchKeys)).toEqual([]);
