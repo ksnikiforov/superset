@@ -58,6 +58,10 @@ import {
   type PivotFactStoreBatch,
 } from '../runtime/factStore';
 import {
+  createExpansionCoveragePredicate,
+  type PivotExpansionCoveragePredicate,
+} from '../runtime/coverage';
+import {
   addAncestors,
   buildVisiblePersistedExpansionState,
   computeVisibleDepths as computeVisibleDepthsBase,
@@ -71,7 +75,6 @@ import {
   resolveLayoutTransition,
   type ExpansionVisibilityConfig,
 } from './stateTransitions';
-import { createFetchedFactCoverageLookup } from './fetchedRequests';
 import { useSyncRef } from '../shared/useSyncRef';
 import {
   createExpansionRequestHelpers,
@@ -548,9 +551,9 @@ export const useExpansionEngine = ({
     [pivotProgram],
   );
 
-  const getFetchedCoverageLookup = useCallback(
-    () =>
-      createFetchedFactCoverageLookup({
+  const getExpansionCoveragePredicate = useCallback(
+    (): PivotExpansionCoveragePredicate =>
+      createExpansionCoveragePredicate({
         factBatches: factStoreRef.current?.getCoverageBatches() ?? [],
         getCoverageKey,
       }),
@@ -832,7 +835,7 @@ export const useExpansionEngine = ({
           getExpandedRows: () => expandedRowsRef.current,
           getExpandedCols: () => expandedColsRef.current,
           computeVisibleDepths,
-          getFetchedCoverageLookup,
+          getExpansionCoveragePredicate,
           getCoverageKey,
           shouldFetchChildren,
           fetchRuntime,
@@ -886,7 +889,7 @@ export const useExpansionEngine = ({
       expansionRequestHelpers,
       expansionRequestLifecycle,
       getCoverageKey,
-      getFetchedCoverageLookup,
+      getExpansionCoveragePredicate,
       groupbyColumnsLength,
       isMetricTokenValue,
       metricIndexForCols,
@@ -971,7 +974,7 @@ export const useExpansionEngine = ({
           maxIterations: MAX_HYDRATION_ITERATIONS,
           isCurrent: requestScope.isCurrent,
           buildDesiredExpanded,
-          getFetchedCoverageLookup,
+          getExpansionCoveragePredicate,
           config: visibilityConfig,
           getCoverageKey,
           activeAxis: options?.activeAxis,
@@ -1020,7 +1023,7 @@ export const useExpansionEngine = ({
       expansionRequestHelpers,
       expansionRequestLifecycle,
       getCoverageKey,
-      getFetchedCoverageLookup,
+      getExpansionCoveragePredicate,
       persistExpansionState,
       pruneMergedTree,
       resolveExpandedForMetrics,
@@ -1278,7 +1281,7 @@ export const useExpansionEngine = ({
       effectiveExpandColsLevel,
       autoExpandRowsLevelForDesired,
       autoExpandColsLevelForDesired,
-      fetchedCoverageLookup: getFetchedCoverageLookup(),
+      isExpansionCoverageLoaded: getExpansionCoveragePredicate(),
       config: visibilityConfig,
       getCoverageKey,
     });
@@ -1327,7 +1330,7 @@ export const useExpansionEngine = ({
     resolveExpandedForMetrics,
     reportAsyncError,
     getCoverageKey,
-    getFetchedCoverageLookup,
+    getExpansionCoveragePredicate,
     setHydratingState,
     visibilityConfig,
   ]);

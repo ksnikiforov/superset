@@ -44,9 +44,9 @@ import {
   type LatestRequestLifecycle,
   type LatestRequestScope,
 } from '../runtime/requestLifecycle';
+import { type PivotExpansionCoveragePredicate } from '../runtime/coverage';
 import { stableStringify } from '../shared/stableStringify';
 import { applyExpansionFetchDelta, runHydrationLoop } from './stateTransitions';
-import { type FetchedFactCoverageLookup } from './fetchedRequests';
 import {
   planGroupedExpansionTargets,
   type PivotExpansionNodeFetchPredicate,
@@ -447,7 +447,7 @@ export const runSameAxisExpansionFetchLoop = async ({
   getExpandedRows,
   getExpandedCols,
   computeVisibleDepths,
-  getFetchedCoverageLookup,
+  getExpansionCoveragePredicate,
   getCoverageKey,
   shouldFetchChildren,
   fetchRuntime,
@@ -471,7 +471,7 @@ export const runSameAxisExpansionFetchLoop = async ({
     expandedCols: Set<string>,
     tree: PivotTreeData,
   ) => SameAxisVisibleDepths;
-  getFetchedCoverageLookup: () => FetchedFactCoverageLookup;
+  getExpansionCoveragePredicate: () => PivotExpansionCoveragePredicate;
   getCoverageKey: (axis: PivotAxis, key: string) => string;
   shouldFetchChildren: PivotExpansionNodeFetchPredicate;
   fetchRuntime: ExpansionFetchRuntime;
@@ -506,14 +506,13 @@ export const runSameAxisExpansionFetchLoop = async ({
       expandedColsForDepth,
       currentTree,
     );
-    const requiredDepth = axis === 'row' ? visibleColDepth : visibleRowDepth;
     const nodes = axis === 'row' ? currentTree.rows : currentTree.cols;
     const { plan, targets } = planGroupedExpansionTargets({
       axis,
       expandedKeys: resolvedExpanded,
       nodes,
-      requiredOppositeDepth: requiredDepth,
-      fetchedCoverageLookup: getFetchedCoverageLookup(),
+      coverage: { rowDepth: visibleRowDepth, columnDepth: visibleColDepth },
+      isExpansionCoverageLoaded: getExpansionCoveragePredicate(),
       getCoverageKey,
       shouldFetchChildren,
     });

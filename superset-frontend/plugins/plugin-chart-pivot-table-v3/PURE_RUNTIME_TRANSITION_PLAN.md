@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14106` insertions, `14241` deletions, net `-135`.
-- Current production TypeScript/TSX total: `33375` lines.
+- Production `src`: `14100` insertions, `14242` deletions, net `-142`.
+- Current production TypeScript/TSX total: `33368` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -389,8 +389,9 @@ Success criteria:
   a seamless recovery fetch.
 - Resolved query fetch context owns its fact coverages, so branch, batch, and
   signature callers no longer rebuild the same coverage list separately.
-- Expansion planner and fetched-request code now share the same fetched coverage
-  projection types.
+- Expansion planner no longer owns a fetched-depth lookup. It asks a runtime
+  coverage predicate whether an axis path is loaded, and the old
+  `fetchedRequests.ts` module has been deleted.
 - The old standalone expansion coverage planner module has been collapsed into
   the grouped expansion planner boundary.
 - Expansion/query transport targets no longer carry duplicate

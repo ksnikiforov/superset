@@ -35,7 +35,7 @@ import {
   type HydrationDeltaMap,
   type ExpansionVisibilityConfig,
 } from '../../../src/pivot/expansion/stateTransitions';
-import { createFetchedFactCoverageLookup } from '../../../src/pivot/expansion/fetchedRequests';
+import { createExpansionCoveragePredicate } from '../../../src/pivot/runtime/coverage';
 import { findChildren, rootKey } from '../../../src/pivot/viewModel';
 import {
   METRICS_PLACEHOLDER,
@@ -133,10 +133,10 @@ describe('pivot/expansion/stateTransitions', () => {
   };
 
   const getCoverageKey = (_axis: 'row' | 'col', key: string) => key;
-  const fetchedCoverageLookupFromBatches = (
+  const expansionCoverageLoadedFromBatches = (
     factBatches: PivotFactStoreBatch[] = [],
   ) =>
-    createFetchedFactCoverageLookup({
+    createExpansionCoveragePredicate({
       factBatches,
       getCoverageKey,
     });
@@ -570,8 +570,8 @@ describe('pivot/expansion/stateTransitions', () => {
       isCurrent: () => true,
       buildDesiredExpanded: axis =>
         axis === 'row' ? new Set([aKey]) : new Set([xKey]),
-      getFetchedCoverageLookup: () =>
-        fetchedCoverageLookupFromBatches(factBatches),
+      getExpansionCoveragePredicate: () => request =>
+        expansionCoverageLoadedFromBatches(factBatches)(request),
       config,
       getCoverageKey,
       pendingRows: new Set(),
@@ -630,8 +630,8 @@ describe('pivot/expansion/stateTransitions', () => {
       isCurrent: () => true,
       buildDesiredExpanded: axis =>
         axis === 'row' ? new Set([aKey]) : new Set([xKey]),
-      getFetchedCoverageLookup: () =>
-        fetchedCoverageLookupFromBatches(factBatches),
+      getExpansionCoveragePredicate: () => request =>
+        expansionCoverageLoadedFromBatches(factBatches)(request),
       config,
       getCoverageKey,
       pendingRows: new Set(),
@@ -664,7 +664,7 @@ describe('pivot/expansion/stateTransitions', () => {
       isCurrent: () => false,
       buildDesiredExpanded: axis =>
         axis === 'row' ? new Set([aKey]) : new Set([xKey]),
-      getFetchedCoverageLookup: () => fetchedCoverageLookupFromBatches(),
+      getExpansionCoveragePredicate: () => expansionCoverageLoadedFromBatches(),
       config,
       getCoverageKey,
       pendingRows: new Set(),
@@ -821,7 +821,7 @@ describe('pivot/expansion/stateTransitions', () => {
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
-      fetchedCoverageLookup: fetchedCoverageLookupFromBatches(),
+      isExpansionCoverageLoaded: expansionCoverageLoadedFromBatches(),
       config,
       getCoverageKey,
       pendingRows: new Set(),
@@ -850,7 +850,7 @@ describe('pivot/expansion/stateTransitions', () => {
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
-      fetchedCoverageLookup: fetchedCoverageLookupFromBatches(),
+      isExpansionCoverageLoaded: expansionCoverageLoadedFromBatches(),
       config,
       getCoverageKey,
       activeAxis: 'col',
@@ -878,7 +878,7 @@ describe('pivot/expansion/stateTransitions', () => {
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
-      fetchedCoverageLookup: fetchedCoverageLookupFromBatches(),
+      isExpansionCoverageLoaded: expansionCoverageLoadedFromBatches(),
       config,
       getCoverageKey,
       pendingRows: new Set(),
@@ -905,7 +905,7 @@ describe('pivot/expansion/stateTransitions', () => {
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
-      fetchedCoverageLookup: fetchedCoverageLookupFromBatches(),
+      isExpansionCoverageLoaded: expansionCoverageLoadedFromBatches(),
       config,
       getCoverageKey,
       pendingRows: new Set(),
@@ -963,7 +963,7 @@ describe('pivot/expansion/stateTransitions', () => {
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
-      fetchedCoverageLookup: fetchedCoverageLookupFromBatches(),
+      isExpansionCoverageLoaded: expansionCoverageLoadedFromBatches(),
       config: metricConfig,
       getCoverageKey,
       pendingRows: new Set(),
@@ -1026,7 +1026,7 @@ describe('pivot/expansion/stateTransitions', () => {
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
-      fetchedCoverageLookup: fetchedCoverageLookupFromBatches(),
+      isExpansionCoverageLoaded: expansionCoverageLoadedFromBatches(),
       config: metricConfig,
       getCoverageKey,
       pendingRows: new Set(),
@@ -1140,7 +1140,7 @@ describe('pivot/expansion/stateTransitions', () => {
       effectiveExpandColsLevel: 0,
       autoExpandRowsLevelForDesired: 0,
       autoExpandColsLevelForDesired: 0,
-      fetchedCoverageLookup: fetchedCoverageLookupFromBatches(),
+      isExpansionCoverageLoaded: expansionCoverageLoadedFromBatches(),
       config,
       getCoverageKey,
     });

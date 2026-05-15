@@ -22,6 +22,7 @@ import {
   type PivotPath,
   type PivotRuntimeLayout,
 } from '../../types';
+import { serializePath } from '../core/path';
 import { isMeasureLeafToken, isMetricToken } from '../core/tokens';
 import { stableStringify } from '../shared/stableStringify';
 import { getNextAxisLevelForPath } from './paths';
@@ -73,6 +74,17 @@ export type AxisPathScope =
   | { kind: 'root' }
   | { kind: 'paths'; paths: PivotPath[] }
   | { kind: 'scopedFull'; ancestorPaths: PivotPath[] };
+
+export type PivotExpansionCoverageRequest = {
+  axis: PivotAxis;
+  pathKey: string;
+  rowDepth: number;
+  columnDepth: number;
+};
+
+export type PivotExpansionCoveragePredicate = (
+  request: PivotExpansionCoverageRequest,
+) => boolean;
 
 export type PivotCoverageNeedReason =
   | 'root'
@@ -159,6 +171,102 @@ const batchScopePaths = ({
   siblingValues,
 }: Extract<PivotFactStoreBatch['scope'], { kind: 'batch' }>) =>
   siblingValues.map(value => [...parentPath, value]);
+
+const expansionCoverageProjections = ({
+  coverage,
+  scope,
+}: PivotFactSelector): PivotExpansionCoverageRequest[] => {
+  switch (scope.kind) {
+    case 'bootstrap':
+    case 'root': {
+      const projections: PivotExpansionCoverageRequest[] = [];
+      if (coverage.rowDepth > 0) {
+        projections.push({
+          axis: 'row',
+          pathKey: serializePath([]),
+          rowDepth: coverage.rowDepth,
+          columnDepth: coverage.columnDepth,
+        });
+      }
+      if (coverage.columnDepth > 0) {
+        projections.push({
+          axis: 'col',
+          pathKey: serializePath([]),
+          rowDepth: coverage.rowDepth,
+          columnDepth: coverage.columnDepth,
+        });
+      }
+      return projections;
+    }
+    case 'branch':
+      return [
+        {
+          axis: scope.axis,
+          pathKey: serializePath(scope.path),
+          rowDepth: coverage.rowDepth,
+          columnDepth: coverage.columnDepth,
+        },
+      ];
+    case 'batch': {
+      const paths =
+        scope.siblingValues.length > 0
+          ? scope.siblingValues.map(value => [...scope.parentPath, value])
+          : [scope.parentPath];
+      return paths.map(path => ({
+        axis: scope.axis,
+        pathKey: serializePath(path),
+        rowDepth: coverage.rowDepth,
+        columnDepth: coverage.columnDepth,
+      }));
+    }
+    default:
+      return [];
+  }
+};
+
+const requiredOppositeDepth = ({
+  axis,
+  rowDepth,
+  columnDepth,
+}: PivotExpansionCoverageRequest) => (axis === 'row' ? columnDepth : rowDepth);
+
+export const createExpansionCoveragePredicate = ({
+  factBatches,
+  getCoverageKey,
+}: {
+  factBatches: PivotFactStoreBatch[];
+  getCoverageKey: (axis: PivotAxis, pathKey: string) => string;
+}): PivotExpansionCoveragePredicate => {
+  const depthByAxis: Record<PivotAxis, Map<string, number>> = {
+    row: new Map<string, number>(),
+    col: new Map<string, number>(),
+  };
+  factBatches.forEach(batch => {
+    expansionCoverageProjections({
+      coverage: batch.coverage,
+      scope: batch.scope,
+      valueKeys: batch.valueKeys,
+    }).forEach(projection => {
+      const coverageKey = getCoverageKey(projection.axis, projection.pathKey);
+      const existingDepth = depthByAxis[projection.axis].get(coverageKey);
+      const depth = requiredOppositeDepth(projection);
+      depthByAxis[projection.axis].set(
+        coverageKey,
+        existingDepth === undefined ? depth : Math.max(existingDepth, depth),
+      );
+    });
+  });
+
+  return request => {
+    const fetchedDepth = depthByAxis[request.axis].get(
+      getCoverageKey(request.axis, request.pathKey),
+    );
+    return (
+      fetchedDepth !== undefined &&
+      fetchedDepth >= requiredOppositeDepth(request)
+    );
+  };
+};
 
 const isRuntimeLayoutCoverageScope = (
   scope: PivotFactStoreBatch['scope'],

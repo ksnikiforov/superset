@@ -43,7 +43,7 @@ import {
   type RenderModelConfig,
 } from '../render/renderModel';
 import { rootKey } from '../viewModel';
-import { type FetchedFactCoverageLookup } from './fetchedRequests';
+import { type PivotExpansionCoveragePredicate } from '../runtime/coverage';
 
 export type ExpansionVisibilityConfig = {
   groupbyRowsLength: number;
@@ -972,7 +972,7 @@ export const planHydrationIteration = ({
   tree,
   desiredRows,
   desiredCols,
-  fetchedCoverageLookup,
+  isExpansionCoverageLoaded,
   config,
   getCoverageKey,
   activeAxis,
@@ -984,7 +984,7 @@ export const planHydrationIteration = ({
   tree: PivotTreeData;
   desiredRows: Set<string>;
   desiredCols: Set<string>;
-  fetchedCoverageLookup: FetchedFactCoverageLookup;
+  isExpansionCoverageLoaded: PivotExpansionCoveragePredicate;
   config: ExpansionVisibilityConfig;
   getCoverageKey: (axis: PivotAxis, key: string) => string;
   activeAxis?: PivotAxis;
@@ -1004,8 +1004,8 @@ export const planHydrationIteration = ({
         axis: 'row',
         expandedKeys: desiredRows,
         nodes: tree.rows,
-        requiredDepth: visibleColDepth,
-        fetchedCoverageLookup,
+        coverage: { rowDepth: visibleRowDepth, columnDepth: visibleColDepth },
+        isExpansionCoverageLoaded,
         getCoverageKey,
         shouldFetchChildren: config.shouldFetchChildren,
       })
@@ -1015,8 +1015,8 @@ export const planHydrationIteration = ({
         axis: 'col',
         expandedKeys: desiredCols,
         nodes: tree.cols,
-        requiredDepth: visibleRowDepth,
-        fetchedCoverageLookup,
+        coverage: { rowDepth: visibleRowDepth, columnDepth: visibleColDepth },
+        isExpansionCoverageLoaded,
         getCoverageKey,
         shouldFetchChildren: config.shouldFetchChildren,
       })
@@ -1098,7 +1098,7 @@ export const runHydrationLoop = async ({
   maxIterations,
   isCurrent,
   buildDesiredExpanded,
-  getFetchedCoverageLookup,
+  getExpansionCoveragePredicate,
   config,
   getCoverageKey,
   activeAxis,
@@ -1113,7 +1113,7 @@ export const runHydrationLoop = async ({
   maxIterations: number;
   isCurrent: () => boolean;
   buildDesiredExpanded: (axis: PivotAxis, tree: PivotTreeData) => Set<string>;
-  getFetchedCoverageLookup: () => FetchedFactCoverageLookup;
+  getExpansionCoveragePredicate: () => PivotExpansionCoveragePredicate;
   config: ExpansionVisibilityConfig;
   getCoverageKey: (axis: PivotAxis, key: string) => string;
   activeAxis?: PivotAxis;
@@ -1153,7 +1153,7 @@ export const runHydrationLoop = async ({
       tree: stagedTree,
       desiredRows,
       desiredCols,
-      fetchedCoverageLookup: getFetchedCoverageLookup(),
+      isExpansionCoverageLoaded: getExpansionCoveragePredicate(),
       config,
       getCoverageKey,
       activeAxis,
@@ -1260,7 +1260,7 @@ export const planInitialHydrationPrefetch = ({
   effectiveExpandColsLevel,
   autoExpandRowsLevelForDesired,
   autoExpandColsLevelForDesired,
-  fetchedCoverageLookup,
+  isExpansionCoverageLoaded,
   config,
   getCoverageKey,
 }: {
@@ -1272,7 +1272,7 @@ export const planInitialHydrationPrefetch = ({
   effectiveExpandColsLevel: number;
   autoExpandRowsLevelForDesired: number;
   autoExpandColsLevelForDesired: number;
-  fetchedCoverageLookup: FetchedFactCoverageLookup;
+  isExpansionCoverageLoaded: PivotExpansionCoveragePredicate;
   config: ExpansionVisibilityConfig;
   getCoverageKey: (axis: PivotAxis, key: string) => string;
 }) => {
@@ -1288,7 +1288,7 @@ export const planInitialHydrationPrefetch = ({
     tree,
     desiredRows: resolvedRows,
     desiredCols: resolvedCols,
-    fetchedCoverageLookup,
+    isExpansionCoverageLoaded,
     config,
     getCoverageKey,
     pendingRows: new Set(),

@@ -20,8 +20,11 @@
 import { type PivotAxis, type PivotTreeNode } from '../../types';
 import { parsePath, serializePath } from '../core/path';
 import { type FetchTarget } from '../query/fetchPlanOptimizer';
+import {
+  type PivotExpansionCoveragePredicate,
+  type PivotExpansionCoverageRequest,
+} from '../runtime/coverage';
 import { rootKey } from '../viewModel';
-import { type FetchedFactCoverageLookup } from './fetchedRequests';
 
 export type PivotExpansionPlan = {
   fetchKeys: Set<string>;
@@ -36,41 +39,40 @@ export type PivotExpansionNodeFetchPredicate = (input: {
   requiredDepth: number;
 }) => boolean;
 
-const buildCoverageProjection = (
+type PivotExpansionCoverageDepths = Pick<
+  PivotExpansionCoverageRequest,
+  'rowDepth' | 'columnDepth'
+>;
+
+const requiredDepthForAxis = (
   axis: PivotAxis,
-  pathKey: string,
-  requiredOppositeDepth: number,
-) => ({
-  axis,
-  pathKey,
-  requiredOppositeDepth,
-});
+  coverage: PivotExpansionCoverageDepths,
+) => (axis === 'row' ? coverage.columnDepth : coverage.rowDepth);
 
 const isSatisfiedNode = ({
   axis,
   key,
   node,
-  requiredDepth,
-  fetchedCoverageLookup,
+  coverage,
+  isExpansionCoverageLoaded,
   shouldFetchChildren,
 }: {
   axis: PivotAxis;
   key: string;
   node: PivotTreeNode;
-  requiredDepth: number;
-  fetchedCoverageLookup: FetchedFactCoverageLookup;
+  coverage: PivotExpansionCoverageDepths;
+  isExpansionCoverageLoaded: PivotExpansionCoveragePredicate;
   shouldFetchChildren: PivotExpansionNodeFetchPredicate;
 }) => {
+  const requiredDepth = requiredDepthForAxis(axis, coverage);
   if (!shouldFetchChildren({ axis, key, node, requiredDepth })) {
     return true;
   }
-  const fetchedDepth = fetchedCoverageLookup.getFetchedDepth(
-    buildCoverageProjection(axis, key, requiredDepth),
-  );
-  if (fetchedDepth !== undefined && fetchedDepth >= requiredDepth) {
-    return true;
-  }
-  return false;
+  return isExpansionCoverageLoaded({
+    axis,
+    pathKey: key,
+    ...coverage,
+  });
 };
 
 const resolveNearestPresentAncestorKey = (
@@ -94,16 +96,16 @@ export const planExpansionForAxis = ({
   axis,
   expandedKeys,
   nodes,
-  requiredDepth,
-  fetchedCoverageLookup,
+  coverage,
+  isExpansionCoverageLoaded,
   getCoverageKey,
   shouldFetchChildren,
 }: {
   axis: PivotAxis;
   expandedKeys: Set<string>;
   nodes: Record<string, PivotTreeNode>;
-  requiredDepth: number;
-  fetchedCoverageLookup: FetchedFactCoverageLookup;
+  coverage: PivotExpansionCoverageDepths;
+  isExpansionCoverageLoaded: PivotExpansionCoveragePredicate;
   getCoverageKey: (axis: PivotAxis, key: string) => string;
   shouldFetchChildren: PivotExpansionNodeFetchPredicate;
 }): PivotExpansionPlan => {
@@ -125,8 +127,8 @@ export const planExpansionForAxis = ({
           axis,
           key,
           node,
-          requiredDepth,
-          fetchedCoverageLookup,
+          coverage,
+          isExpansionCoverageLoaded,
           shouldFetchChildren,
         })
       ) {
@@ -137,9 +139,13 @@ export const planExpansionForAxis = ({
       return;
     }
 
-    const missingCoverage = buildCoverageProjection(axis, key, requiredDepth);
-    const fetchedDepth = fetchedCoverageLookup.getFetchedDepth(missingCoverage);
-    if (fetchedDepth !== undefined && fetchedDepth >= requiredDepth) {
+    if (
+      isExpansionCoverageLoaded({
+        axis,
+        pathKey: key,
+        ...coverage,
+      })
+    ) {
       return;
     }
     hasMissingNodes = true;
@@ -153,8 +159,8 @@ export const planExpansionForAxis = ({
         axis,
         key: ancestorKey,
         node: ancestor,
-        requiredDepth,
-        fetchedCoverageLookup,
+        coverage,
+        isExpansionCoverageLoaded,
         shouldFetchChildren,
       })
     ) {
@@ -220,16 +226,16 @@ export const planGroupedExpansionTargets = ({
   axis,
   expandedKeys,
   nodes,
-  requiredOppositeDepth,
-  fetchedCoverageLookup,
+  coverage,
+  isExpansionCoverageLoaded,
   getCoverageKey,
   shouldFetchChildren,
 }: {
   axis: PivotAxis;
   expandedKeys: Set<string>;
   nodes: Record<string, PivotTreeNode>;
-  requiredOppositeDepth: number;
-  fetchedCoverageLookup: FetchedFactCoverageLookup;
+  coverage: PivotExpansionCoverageDepths;
+  isExpansionCoverageLoaded: PivotExpansionCoveragePredicate;
   getCoverageKey: (axis: PivotAxis, key: string) => string;
   shouldFetchChildren: PivotExpansionNodeFetchPredicate;
 }): {
@@ -240,8 +246,8 @@ export const planGroupedExpansionTargets = ({
     axis,
     expandedKeys,
     nodes,
-    requiredDepth: requiredOppositeDepth,
-    fetchedCoverageLookup,
+    coverage,
+    isExpansionCoverageLoaded,
     getCoverageKey,
     shouldFetchChildren,
   });

@@ -21,9 +21,11 @@ import {
   encodeMetricKey,
   METRICS_PLACEHOLDER,
 } from '../../../../src/pivot/core/tokens';
+import { serializePath } from '../../../../src/pivot/core/path';
 import { compilePivotProgram } from '../../../../src/pivot/runtime/compilePivotProgram';
 import {
   buildBranchFactCoverages,
+  createExpansionCoveragePredicate,
   buildFactCoverage,
   buildRuntimeLayoutCoverageManifest,
   buildVisibleFactCoverage,
@@ -94,6 +96,73 @@ describe('visible fact coverage', () => {
     });
 
     expect(coverage[0].rowDimensions).toEqual(['country']);
+  });
+});
+
+describe('expansion fact coverage', () => {
+  it('derives loaded expansion coverage from typed fact batches', () => {
+    const isExpansionCoverageLoaded = createExpansionCoveragePredicate({
+      factBatches: [
+        {
+          coverage: {
+            reason: 'expand',
+            rowDepth: 2,
+            columnDepth: 1,
+            rowDimensions: ['country', 'city'],
+            columnDimensions: ['month'],
+          },
+          scope: {
+            kind: 'branch',
+            axis: 'row',
+            path: ['France'],
+          },
+          valueKeys: ['sales'],
+          facts: [],
+        },
+        {
+          coverage: {
+            reason: 'expand',
+            rowDepth: 2,
+            columnDepth: 3,
+            rowDimensions: ['country', 'city'],
+            columnDimensions: ['year', 'quarter', 'month'],
+          },
+          scope: {
+            kind: 'branch',
+            axis: 'row',
+            path: ['France'],
+          },
+          valueKeys: ['sales'],
+          facts: [],
+        },
+      ],
+      getCoverageKey: (_axis, key) => key,
+    });
+
+    expect(
+      isExpansionCoverageLoaded({
+        axis: 'row',
+        pathKey: serializePath(['France']),
+        rowDepth: 2,
+        columnDepth: 1,
+      }),
+    ).toBe(true);
+    expect(
+      isExpansionCoverageLoaded({
+        axis: 'row',
+        pathKey: serializePath(['France']),
+        rowDepth: 2,
+        columnDepth: 4,
+      }),
+    ).toBe(false);
+    expect(
+      isExpansionCoverageLoaded({
+        axis: 'col',
+        pathKey: serializePath(['France']),
+        rowDepth: 1,
+        columnDepth: 1,
+      }),
+    ).toBe(false);
   });
 });
 
