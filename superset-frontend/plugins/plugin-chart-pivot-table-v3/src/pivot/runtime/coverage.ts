@@ -143,10 +143,6 @@ const columnRefsMatch = (
 const pathStartsWith = (path: PivotPath, prefix: PivotPath) =>
   prefix.every((value, index) => path[index] === value);
 
-const pathEquals = (left: PivotPath, right: PivotPath) =>
-  left.length === right.length &&
-  left.every((value, index) => value === right[index]);
-
 const pathContainsValuesToken = (path: PivotPath) =>
   path.some(value => isMetricToken(value) || isMeasureLeafToken(value));
 
@@ -200,7 +196,7 @@ const scopeCoversAxisPaths = (
   if (needScope.kind === 'scopedFull') {
     return needScope.ancestorPaths.every(ancestorPath =>
       candidatePaths.some(candidatePath =>
-        pathEquals(candidatePath, ancestorPath),
+        pathStartsWith(ancestorPath, candidatePath),
       ),
     );
   }

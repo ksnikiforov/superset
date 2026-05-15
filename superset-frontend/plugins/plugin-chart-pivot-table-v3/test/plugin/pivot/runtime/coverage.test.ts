@@ -554,6 +554,51 @@ describe('coverage manifest diff', () => {
     ).toEqual(required);
   });
 
+  it('lets broader scoped coverage satisfy a narrower scoped full descendant', () => {
+    const required = [
+      need(
+        { kind: 'scopedFull', ancestorPaths: [['USA', 'California']] },
+        { kind: 'root' },
+      ),
+    ];
+
+    expect(
+      diffCoverageManifest({
+        required,
+        factBatches: [batch({ kind: 'branch', axis: 'row', path: ['USA'] })],
+      }),
+    ).toEqual([]);
+  });
+
+  it('lets a batched scoped parent satisfy narrower scoped full descendants', () => {
+    const required = [
+      need(
+        {
+          kind: 'scopedFull',
+          ancestorPaths: [
+            ['USA', 'California'],
+            ['Canada', 'Ontario'],
+          ],
+        },
+        { kind: 'root' },
+      ),
+    ];
+
+    expect(
+      diffCoverageManifest({
+        required,
+        factBatches: [
+          batch({
+            kind: 'batch',
+            axis: 'row',
+            parentPath: [],
+            siblingValues: ['USA', 'Canada'],
+          }),
+        ],
+      }),
+    ).toEqual([]);
+  });
+
   it('supports consecutive scoped full expansion through the same ancestor scope', () => {
     const required = [
       {

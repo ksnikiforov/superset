@@ -102,6 +102,9 @@ Rules:
 - Consecutive full-expansion layers are also scoped. For example,
   `[USA] -> [full states] -> [full cities] -> [store]` still means only the
   explicit subtree under `USA`, not all states and cities globally.
+- Broader loaded scoped coverage can satisfy narrower scoped-full descendant
+  needs. For example, loaded coverage for `[USA]` at the requested depth covers
+  `[USA, California]`; the reverse is not true.
 - Many small expands may be transport-batched, but they must not be promoted
   into an unbounded full-level query.
 - No full-level expansion query is allowed unless the user action explicitly
