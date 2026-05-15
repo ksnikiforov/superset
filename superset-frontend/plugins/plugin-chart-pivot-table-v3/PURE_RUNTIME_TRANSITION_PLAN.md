@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13993` insertions, `14260` deletions, net `-267`.
-- Current production TypeScript/TSX total: `33243` lines.
+- Production `src`: `13990` insertions, `14261` deletions, net `-271`.
+- Current production TypeScript/TSX total: `33239` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -446,6 +446,9 @@ Success criteria:
   local layout intent is derived from the existing UI-layout and committed-layout
   refs at the prop-sync boundary, which keeps local edits from being overwritten
   by stale props without adding a second layout authority.
+- Same-axis expansion and cross-axis hydration now share one local
+  `ExpansionFetchRuntime` builder inside `useExpansionEngine`, removing
+  duplicate hook-owned fetch runtime wiring.
 
 ## Current Risks
 

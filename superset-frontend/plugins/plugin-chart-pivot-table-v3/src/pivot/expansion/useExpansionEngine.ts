@@ -84,7 +84,10 @@ import {
   type ExpansionFetchRuntime,
 } from './fetchExecution';
 import { type PivotExpansionNodeFetchPredicate } from './planner';
-import { createLatestRequestLifecycle } from '../runtime/requestLifecycle';
+import {
+  createLatestRequestLifecycle,
+  type LatestRequestScope,
+} from '../runtime/requestLifecycle';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import type { RenderModelConfig } from '../render/renderModel';
 
@@ -780,6 +783,18 @@ export const useExpansionEngine = ({
     [visibilityConfig],
   );
 
+  const buildFetchRuntime = useCallback(
+    (requestScope: LatestRequestScope): ExpansionFetchRuntime => ({
+      requestScope,
+      fetchFormData: fetchFormDataRef.current,
+      factStore: factStoreRef.current,
+      trackRequestInScope: expansionRequestHelpers.trackRequestInScope,
+      addWarnings,
+      updateLoadingKey,
+    }),
+    [addWarnings, expansionRequestHelpers, updateLoadingKey],
+  );
+
   const expandSameAxis = useCallback(
     async (axis: PivotAxis, node: PivotTreeNode) => {
       const requestScope = expansionRequestLifecycle.currentScope();
@@ -810,15 +825,6 @@ export const useExpansionEngine = ({
       );
       const inFlight = trackInFlightExpansion(axis, resolvedExpanded, expanded);
 
-      const fetchRuntime: ExpansionFetchRuntime = {
-        requestScope,
-        fetchFormData: fetchFormDataRef.current,
-        factStore: factStoreRef.current,
-        trackRequestInScope: expansionRequestHelpers.trackRequestInScope,
-        addWarnings,
-        updateLoadingKey,
-      };
-
       try {
         const fetchLoop = await runSameAxisExpansionFetchLoop({
           axis,
@@ -835,7 +841,7 @@ export const useExpansionEngine = ({
           getMissingExpansionCoverage,
           getCoverageKey,
           shouldFetchChildren,
-          fetchRuntime,
+          fetchRuntime: buildFetchRuntime(requestScope),
           transactionId: requestId,
           buildRequestGroupId: expansionRequestHelpers.buildRequestGroupId,
           resolveExpandedForMetrics,
@@ -880,10 +886,10 @@ export const useExpansionEngine = ({
       }
     },
     [
-      addWarnings,
+      buildFetchRuntime,
       computeVisibleDepths,
       commitExpansionState,
-      expansionRequestHelpers,
+      expansionRequestHelpers.buildRequestGroupId,
       expansionRequestLifecycle,
       getCoverageKey,
       getMissingExpansionCoverage,
@@ -895,7 +901,6 @@ export const useExpansionEngine = ({
       resolveExpandedForMetrics,
       trackInFlightExpansion,
       shouldFetchChildren,
-      updateLoadingKey,
     ],
   );
 
@@ -957,14 +962,6 @@ export const useExpansionEngine = ({
       }
 
       try {
-        const fetchRuntime: ExpansionFetchRuntime = {
-          requestScope,
-          fetchFormData: fetchFormDataRef.current,
-          factStore: factStoreRef.current,
-          trackRequestInScope: expansionRequestHelpers.trackRequestInScope,
-          addWarnings,
-          updateLoadingKey,
-        };
         const result = await runHydrationExpansionFetchLoop({
           reason,
           baseTree: treeRef.current,
@@ -980,7 +977,7 @@ export const useExpansionEngine = ({
           planRows: shouldPlanRows,
           planCols: shouldPlanCols,
           pruneMergedTree,
-          fetchRuntime,
+          fetchRuntime: buildFetchRuntime(requestScope),
           transactionId,
           buildRequestGroupId: expansionRequestHelpers.buildRequestGroupId,
         });
@@ -1013,8 +1010,8 @@ export const useExpansionEngine = ({
       }
     },
     [
-      addWarnings,
       buildDesiredExpanded,
+      buildFetchRuntime,
       clearLoadingState,
       commitExpansionState,
       expansionRequestHelpers,
@@ -1025,7 +1022,6 @@ export const useExpansionEngine = ({
       pruneMergedTree,
       resolveExpandedForMetrics,
       setHydratingState,
-      updateLoadingKey,
       visibilityConfig,
     ],
   );
