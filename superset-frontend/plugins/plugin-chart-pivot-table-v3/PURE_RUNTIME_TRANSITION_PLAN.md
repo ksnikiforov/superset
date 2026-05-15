@@ -142,8 +142,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14278` insertions, `14193` deletions, net `+85`.
-- Current production TypeScript/TSX total: `33595` lines.
+- Production `src`: `14260` insertions, `14193` deletions, net `+67`.
+- Current production TypeScript/TSX total: `33577` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -377,6 +377,9 @@ Success criteria:
 - Broader metric batches can satisfy narrower metric requests, while missing
   metric payloads no longer count as loaded coverage even when row/column depth
   matches.
+- Fact-store compatibility now uses the coverage manifest dominance rule for
+  branch and batch reuse, so a batched explicit path set can satisfy a narrower
+  branch without a duplicate fetch.
 - Expansion fetched state no longer infers loaded metric coverage from returned
   tree shape. Fetched state is seeded from explicit fact batches only.
 - Resolved query fetch context owns its fact coverages, so branch, batch, and

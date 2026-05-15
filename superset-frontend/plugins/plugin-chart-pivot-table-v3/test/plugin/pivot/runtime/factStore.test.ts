@@ -241,6 +241,29 @@ test('does not reuse root coverage for values-token branch scopes', () => {
   expect(store.getCompatibleFacts(selectorWithMetricPath)).toEqual([]);
 });
 
+test('does not reuse values-token branch coverage for root materialization', () => {
+  const store = createPivotFactStore();
+  const rootSelector = {
+    coverage,
+    scope: { kind: 'root' } as PivotFactStoreBatchScope,
+    valueKeys: ['sales'],
+  };
+
+  store.upsertBatch({
+    coverage,
+    scope: {
+      kind: 'branch',
+      axis: 'col',
+      path: [encodeMetricKey('sales')],
+    },
+    valueKeys: ['sales'],
+    facts: [buildFact({ columnPath: [encodeMetricKey('sales'), 'REV-A'] })],
+  });
+
+  expect(store.hasCompatibleCoverage(rootSelector)).toBe(false);
+  expect(store.getCompatibleFacts(rootSelector)).toEqual([]);
+});
+
 test('prefers exact branch facts over broader compatible root coverage', () => {
   const store = createPivotFactStore();
   const branchCoverage: PivotFactCoverage = {
@@ -285,6 +308,64 @@ test('prefers exact branch facts over broader compatible root coverage', () => {
   expect(store.getCompatibleFacts(selector).map(fact => fact.value)).toEqual([
     2,
   ]);
+});
+
+test('materialization can reuse compatible batch coverage for branch facts', () => {
+  const store = createPivotFactStore();
+  const branchCoverage: PivotFactCoverage = {
+    reason: 'expand',
+    rowDepth: 2,
+    columnDepth: 1,
+    rowDimensions: ['country', 'city'],
+    columnDimensions: ['month'],
+  };
+  const franceSelector = {
+    coverage: branchCoverage,
+    scope: {
+      kind: 'branch',
+      axis: 'row',
+      path: ['France'],
+    } as PivotFactStoreBatchScope,
+    valueKeys: ['sales'],
+  };
+  const canadaSelector = {
+    ...franceSelector,
+    scope: {
+      kind: 'branch',
+      axis: 'row',
+      path: ['Canada'],
+    } as PivotFactStoreBatchScope,
+  };
+
+  store.upsertBatch({
+    coverage: branchCoverage,
+    scope: {
+      kind: 'batch',
+      axis: 'row',
+      parentPath: [],
+      siblingValues: ['France', 'USA'],
+    },
+    valueKeys: ['sales'],
+    facts: [
+      buildFact({
+        rowPath: ['France', 'Paris'],
+        columnPath: ['2026-01'],
+        value: 1,
+      }),
+      buildFact({
+        rowPath: ['USA', 'Seattle'],
+        columnPath: ['2026-01'],
+        value: 2,
+      }),
+    ],
+  });
+
+  expect(store.hasCoverage(franceSelector)).toBe(false);
+  expect(store.hasCompatibleCoverage(franceSelector)).toBe(true);
+  expect(
+    store.getCompatibleFacts(franceSelector).map(fact => fact.rowPath),
+  ).toEqual([['France', 'Paris']]);
+  expect(store.hasCompatibleCoverage(canadaSelector)).toBe(false);
 });
 
 test('reuses broader metric coverage for narrower compatible requests', () => {

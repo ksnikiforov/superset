@@ -22,11 +22,11 @@ import {
   type PivotPath,
   type PivotRuntimeLayout,
 } from '../../types';
-import { isMetricToken } from '../core/tokens';
+import { isMeasureLeafToken, isMetricToken } from '../core/tokens';
 import { stableStringify } from '../shared/stableStringify';
 import { getNextAxisLevelForPath } from './paths';
 import type { PivotAxisProjection } from './projection';
-import { normalizeFactValueKeys, type PivotFactStoreBatch } from './factStore';
+import type { PivotFactSelector, PivotFactStoreBatch } from './factStore';
 import type {
   PivotCoverageReason,
   PivotFactCoverage,
@@ -111,6 +111,9 @@ const arraysEqual = (left: string[], right: string[]) =>
   left.length === right.length &&
   left.every((value, index) => value === right[index]);
 
+export const normalizeFactValueKeys = (valueKeys: string[] = []) =>
+  Array.from(new Set(valueKeys)).sort();
+
 const valueKeysCover = (
   available: string[] | undefined,
   required: string[],
@@ -144,6 +147,17 @@ const pathEquals = (left: PivotPath, right: PivotPath) =>
   left.length === right.length &&
   left.every((value, index) => value === right[index]);
 
+const pathContainsValuesToken = (path: PivotPath) =>
+  path.some(value => isMetricToken(value) || isMeasureLeafToken(value));
+
+const axisScopeContainsValuesToken = (scope: AxisPathScope) => {
+  if (scope.kind === 'root') {
+    return false;
+  }
+  const paths = scope.kind === 'paths' ? scope.paths : scope.ancestorPaths;
+  return paths.some(pathContainsValuesToken);
+};
+
 const batchScopePaths = ({
   parentPath,
   siblingValues,
@@ -176,7 +190,7 @@ const scopeCoversAxisPaths = (
     );
   }
   if (scope.kind === 'bootstrap' || scope.kind === 'root') {
-    return true;
+    return !axisScopeContainsValuesToken(needScope);
   }
   if (scope.axis !== axis) {
     return true;
@@ -373,6 +387,36 @@ export const diffCoverageManifest = ({
   required.filter(
     need => !factBatches.some(batch => factBatchCoversNeed(batch, need)),
   );
+
+export const buildCoverageNeedFromFactSelector = ({
+  coverage,
+  scope,
+  valueKeys,
+}: PivotFactSelector): PivotCoverageNeed => {
+  const scopedAxis =
+    scope.kind === 'branch' || scope.kind === 'batch' ? scope.axis : undefined;
+  const scopedPaths =
+    scope.kind === 'branch'
+      ? [scope.path]
+      : scope.kind === 'batch'
+        ? batchScopePaths(scope)
+        : undefined;
+  const axisScope = scopedPaths
+    ? ({ kind: 'paths', paths: scopedPaths } as const)
+    : ({ kind: 'root' } as const);
+
+  return {
+    reason:
+      scope.kind === 'bootstrap' || scope.kind === 'root' ? 'root' : 'expand',
+    rowDepth: coverage.rowDepth,
+    columnDepth: coverage.columnDepth,
+    rowDimensions: coverage.rowDimensions,
+    columnDimensions: coverage.columnDimensions,
+    valueKeys,
+    rowScope: scopedAxis === 'row' ? axisScope : { kind: 'root' },
+    columnScope: scopedAxis === 'col' ? axisScope : { kind: 'root' },
+  };
+};
 
 export const factBatchesCoverRuntimeLayout = (
   factBatches: PivotFactStoreBatch[],
