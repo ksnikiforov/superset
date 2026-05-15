@@ -1678,7 +1678,7 @@ describe('PivotTableChart expansion state persistence', () => {
       deepGroupby,
       [],
     );
-    fetchPivotBranchMock.mockImplementationOnce(
+    fetchPivotBranchMock.mockImplementation(
       resolveMockBranchFetchResult({ data: deepTree }),
     );
 
@@ -1850,15 +1850,10 @@ describe('PivotTableChart expansion state persistence', () => {
       );
     };
     const shallowTree = buildTreeWithDepth(1);
-    const midTree = buildTreeWithDepth(2);
-    const deepTree = buildTreeWithDepth(3);
     const deepestTree = buildTreeWithDepth(4);
-    fetchPivotBranchMock
-      .mockImplementationOnce(resolveMockBranchFetchResult({ data: midTree }))
-      .mockImplementationOnce(resolveMockBranchFetchResult({ data: deepTree }))
-      .mockImplementationOnce(
-        resolveMockBranchFetchResult({ data: deepestTree }),
-      );
+    fetchPivotBranchMock.mockImplementation(
+      resolveMockBranchFetchResult({ data: deepestTree }),
+    );
 
     render(
       buildChartProps({

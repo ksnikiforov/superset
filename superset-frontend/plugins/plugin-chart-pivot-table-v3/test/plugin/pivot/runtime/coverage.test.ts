@@ -101,6 +101,11 @@ describe('visible fact coverage', () => {
 
 describe('expansion fact coverage', () => {
   it('derives loaded expansion coverage from typed fact batches', () => {
+    const program = compilePivotProgram({
+      groupbyRows: ['country', 'city'],
+      groupbyColumns: ['year', 'quarter', 'month', 'day'],
+      metrics: ['sales'],
+    });
     const isExpansionCoverageLoaded = createExpansionCoveragePredicate({
       factBatches: [
         {
@@ -136,7 +141,8 @@ describe('expansion fact coverage', () => {
           facts: [],
         },
       ],
-      getCoverageKey: (_axis, key) => key,
+      program,
+      valueKeys: ['sales'],
     });
 
     expect(

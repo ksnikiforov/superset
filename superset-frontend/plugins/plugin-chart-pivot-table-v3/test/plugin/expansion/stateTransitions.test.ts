@@ -56,6 +56,7 @@ import {
   type PivotTreeNode,
 } from '../../../src/types';
 import { type PivotFactStoreBatch } from '../../../src/pivot/runtime/factStore';
+import { compilePivotProgram } from '../../../src/pivot/runtime/compilePivotProgram';
 
 describe('pivot/expansion/stateTransitions', () => {
   const depthSorter = () => 0;
@@ -132,13 +133,19 @@ describe('pivot/expansion/stateTransitions', () => {
     buildRenderModelConfig: buildTestRenderModelConfig(),
   };
 
+  const testProgram = compilePivotProgram({
+    groupbyRows: ['country', 'city'],
+    groupbyColumns: ['month'],
+    metrics: ['sales'],
+  });
   const getCoverageKey = (_axis: 'row' | 'col', key: string) => key;
   const expansionCoverageLoadedFromBatches = (
     factBatches: PivotFactStoreBatch[] = [],
   ) =>
     createExpansionCoveragePredicate({
       factBatches,
-      getCoverageKey,
+      program: testProgram,
+      valueKeys: ['sales'],
     });
 
   const makeNode = (
@@ -544,6 +551,80 @@ describe('pivot/expansion/stateTransitions', () => {
     });
   });
 
+  it('preserves nested hydration deltas when an ancestor branch is finalized', () => {
+    const aKey = serializePath(['A']);
+    const axKey = serializePath(['A', 'X']);
+    const ayKey = serializePath(['A', 'Y']);
+    const axpKey = serializePath(['A', 'X', 'P']);
+    const staleKey = serializePath(['A', 'old']);
+    const baseTree: PivotTreeData = {
+      rows: {
+        [aKey]: makeNode('row', ['A'], true),
+        [staleKey]: makeNode('row', ['A', 'old'], false),
+      },
+      cols: {},
+      cells: {},
+    };
+    const branchA: PivotTreeData = {
+      rows: {
+        [aKey]: makeNode('row', ['A'], true),
+        [axKey]: makeNode('row', ['A', 'X'], true),
+        [ayKey]: makeNode('row', ['A', 'Y'], false),
+      },
+      cols: {},
+      cells: {},
+    };
+    const branchAX: PivotTreeData = {
+      rows: {
+        [aKey]: makeNode('row', ['A'], true),
+        [axKey]: makeNode('row', ['A', 'X'], true),
+        [axpKey]: makeNode('row', ['A', 'X', 'P'], false),
+      },
+      cols: {},
+      cells: {},
+    };
+    const deltas: HydrationDeltaMap = new Map();
+    stageHydrationFetchDeltas({
+      deltas,
+      results: [
+        { targets: [{ axis: 'row', pathKey: aKey }], data: branchA },
+        { targets: [{ axis: 'row', pathKey: axKey }], data: branchAX },
+      ],
+    });
+    const pruneMergedTree = jest.fn(({ tree: nextTree, parent, branch }) => {
+      if (!parent || !branch) {
+        return nextTree;
+      }
+      const branchChildren = Object.values(branch.rows).filter(
+        node =>
+          node.path.length === parent.path.length + 1 &&
+          parent.path.every((value, index) => value === node.path[index]),
+      );
+      const validChildKeys = new Set(branchChildren.map(node => node.key));
+      const rows = { ...nextTree.rows };
+      Object.values(nextTree.rows).forEach(node => {
+        if (
+          node.path.length === parent.path.length + 1 &&
+          parent.path.every((value, index) => value === node.path[index]) &&
+          !validChildKeys.has(node.key)
+        ) {
+          delete rows[node.key];
+        }
+      });
+      return { ...nextTree, rows };
+    });
+
+    const result = finalizeHydrationTree({
+      baseTree,
+      deltas,
+      pruneMergedTree,
+    });
+
+    expect(new Set(Object.keys(result.rows))).toEqual(
+      new Set([aKey, axKey, ayKey, axpKey]),
+    );
+  });
+
   it('runs hydration loops to completion without fetching when coverage is satisfied', async () => {
     const { tree, aKey, xKey } = buildTree({ includeIntersectionCell: true });
     const factBatches: PivotFactStoreBatch[] = [
@@ -653,6 +734,105 @@ describe('pivot/expansion/stateTransitions', () => {
       return;
     }
     expect(result.tree.rows[childKey]).toEqual(branch.rows[childKey]);
+  });
+
+  it('runs hydration loops through nested persisted row targets', async () => {
+    const aKey = serializePath(['A']);
+    const axKey = serializePath(['A', 'X']);
+    const axpKey = serializePath(['A', 'X', 'P']);
+    const baseTree: PivotTreeData = {
+      rows: {
+        [aKey]: makeNode('row', ['A'], true),
+      },
+      cols: {
+        [rootKey]: makeNode('col', [], false),
+      },
+      cells: {},
+    };
+    const branchA: PivotTreeData = {
+      rows: {
+        [aKey]: makeNode('row', ['A'], true),
+        [axKey]: makeNode('row', ['A', 'X'], true),
+      },
+      cols: {},
+      cells: {},
+    };
+    const branchAX: PivotTreeData = {
+      rows: {
+        [aKey]: makeNode('row', ['A'], true),
+        [axKey]: makeNode('row', ['A', 'X'], true),
+        [axpKey]: makeNode('row', ['A', 'X', 'P'], false),
+      },
+      cols: {},
+      cells: {},
+    };
+    const factBatches: PivotFactStoreBatch[] = [];
+    const nestedProgram = compilePivotProgram({
+      groupbyRows: ['country', 'city', 'store'],
+      groupbyColumns: [],
+      metrics: ['sales'],
+    });
+    const fetchDeltas = jest.fn(async ({ targets }) => {
+      const data = targets.some(target => target.pathKey === axKey)
+        ? branchAX
+        : branchA;
+      targets.forEach(target => {
+        const path = parsePath(target.pathKey);
+        factBatches.push({
+          coverage: {
+            reason: 'expand',
+            rowDepth: path.length + 1,
+            columnDepth: 0,
+            rowDimensions: ['country', 'city', 'store'],
+            columnDimensions: [],
+          },
+          scope: {
+            kind: 'branch',
+            axis: 'row',
+            path,
+          },
+          valueKeys: ['sales'],
+          facts: [],
+        });
+      });
+      return [{ targets, data }];
+    });
+    const result = await runHydrationLoop({
+      baseTree,
+      maxIterations: 3,
+      isCurrent: () => true,
+      buildDesiredExpanded: axis =>
+        axis === 'row' ? new Set([aKey, axKey]) : new Set(),
+      getExpansionCoveragePredicate: () => request =>
+        createExpansionCoveragePredicate({
+          factBatches,
+          program: nestedProgram,
+          valueKeys: ['sales'],
+        })(request),
+      config: {
+        ...config,
+        groupbyRowsLength: 3,
+        groupbyColumnsLength: 0,
+        buildRenderModelConfig: buildTestRenderModelConfig({
+          groupbyRowsLength: 3,
+          groupbyColumnsLength: 0,
+        }),
+      },
+      getCoverageKey,
+      pendingRows: new Set(),
+      pendingCols: new Set(),
+      planCols: false,
+      pruneMergedTree: ({ tree: nextTree }) => nextTree,
+      fetchDeltas,
+    });
+
+    expect(fetchDeltas).toHaveBeenCalledTimes(2);
+    expect(result.status).toBe('complete');
+    if (result.status !== 'complete') {
+      return;
+    }
+    expect(result.tree.rows[axKey]).toEqual(branchAX.rows[axKey]);
+    expect(result.tree.rows[axpKey]).toEqual(branchAX.rows[axpKey]);
   });
 
   it('stops hydration loops when the request becomes stale', async () => {

@@ -25,7 +25,7 @@ import {
   type FetchPivotBranchesBatchParams,
   type FetchPivotBranchesBatchResult,
 } from '../../../src/pivot/query/fetchPivotBranchesBatch';
-import { buildFactCoverage } from '../../../src/pivot/runtime/coverage';
+import { resolveFetchContext } from '../../../src/pivot/query/resolveFetchContext';
 import {
   buildFactValueKeys,
   type PivotFactStoreBatch,
@@ -43,26 +43,26 @@ export const buildMockBranchFactBatches = ({
   'axis' | 'formData' | 'path' | 'visibleColDepth' | 'visibleRowDepth'
 >): PivotFactStoreBatch[] => {
   const layout = buildLayoutContext(formData);
-  return [
-    {
-      coverage: buildFactCoverage({
-        reason: 'expand',
-        rowDimensions: layout.pivotProgram.rowDimensions,
-        columnDimensions: layout.pivotProgram.columnDimensions,
-        rowDepth: visibleRowDepth,
-        columnDepth: visibleColDepth,
-      }),
-      facts: [],
-      valueKeys: buildFactValueKeys({
-        metricKeys: layout.pivotProgram.metricKeys,
-      }),
-      scope: {
-        kind: 'branch',
-        axis,
-        path,
-      },
+  const context = resolveFetchContext({
+    formData,
+    layout,
+    axis,
+    path,
+    visibleRowDepth,
+    visibleColDepth,
+  });
+  return context.coverages.map(coverage => ({
+    coverage,
+    facts: [],
+    valueKeys: buildFactValueKeys({
+      metricKeys: layout.pivotProgram.metricKeys,
+    }),
+    scope: {
+      kind: 'branch',
+      axis,
+      path,
     },
-  ];
+  }));
 };
 
 export const buildMockBranchFetchResult = (
@@ -89,27 +89,30 @@ export const buildMockBatchFactBatches = ({
 >): PivotFactStoreBatch[] => {
   const layout = buildLayoutContext(formData);
   const parentPath = parsePath(batch.parentPathKey);
-  return [
-    {
-      coverage: buildFactCoverage({
-        reason: 'expand',
-        rowDimensions: layout.pivotProgram.rowDimensions,
-        columnDimensions: layout.pivotProgram.columnDimensions,
-        rowDepth: visibleRowDepth,
-        columnDepth: visibleColDepth,
-      }),
-      facts: [],
-      valueKeys: buildFactValueKeys({
-        metricKeys: layout.pivotProgram.metricKeys,
-      }),
-      scope: {
-        kind: 'batch',
-        axis: batch.axis,
-        parentPath,
-        siblingValues: batch.siblingValues,
-      },
+  const representative = [...parentPath, batch.siblingValues[0]].filter(
+    value => value !== undefined,
+  );
+  const context = resolveFetchContext({
+    formData,
+    layout,
+    axis: batch.axis,
+    path: representative,
+    visibleRowDepth,
+    visibleColDepth,
+  });
+  return context.coverages.map(coverage => ({
+    coverage,
+    facts: [],
+    valueKeys: buildFactValueKeys({
+      metricKeys: layout.pivotProgram.metricKeys,
+    }),
+    scope: {
+      kind: 'batch',
+      axis: batch.axis,
+      parentPath,
+      siblingValues: batch.siblingValues,
     },
-  ];
+  }));
 };
 
 export const buildMockBatchFetchResult = (

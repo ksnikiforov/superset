@@ -53,6 +53,7 @@ import {
 import { isSubtotalToken } from '../core/tokens';
 import type { PivotProgram } from '../runtime/types';
 import {
+  buildFactValueKeys,
   createPivotFactStore,
   type PivotFactStore,
   type PivotFactStoreBatch,
@@ -555,9 +556,12 @@ export const useExpansionEngine = ({
     (): PivotExpansionCoveragePredicate =>
       createExpansionCoveragePredicate({
         factBatches: factStoreRef.current?.getCoverageBatches() ?? [],
-        getCoverageKey,
+        program: pivotProgram,
+        valueKeys: buildFactValueKeys({
+          metricKeys: pivotProgram.metricKeys,
+        }),
       }),
-    [getCoverageKey],
+    [pivotProgram],
   );
 
   const commitExpansionState = useCallback(

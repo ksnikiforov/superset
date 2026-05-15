@@ -32,13 +32,12 @@ import {
 import { buildFormData } from '../fixtures/pivotFormData';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';
-import {
-  buildMockBranchFactBatches,
-  buildMockBranchFetchResult,
-} from '../fixtures/factBatches';
+import { buildMockBranchFetchResult } from '../fixtures/factBatches';
 
 jest.mock('../../../src/pivot/query/fetchPivotBranch', () => {
-  const actual = jest.requireActual('../../../src/pivot/query/fetchPivotBranch');
+  const actual = jest.requireActual(
+    '../../../src/pivot/query/fetchPivotBranch',
+  );
   return {
     ...actual,
     fetchPivotBranch: jest.fn(),
@@ -153,11 +152,15 @@ describe('PivotTableChart persisted prefetch hydrates until targets satisfied', 
 
     const deferredA = createDeferred<FetchPivotBranchResult>();
     const deferredAX = createDeferred<FetchPivotBranchResult>();
-    const mergedBranch = buildTree(records, 3);
-
-    fetchPivotBranchMock
-      .mockReturnValueOnce(deferredA.promise)
-      .mockReturnValueOnce(deferredAX.promise);
+    fetchPivotBranchMock.mockImplementation(params => {
+      if (JSON.stringify(params.path) === JSON.stringify(['A'])) {
+        return deferredA.promise;
+      }
+      if (JSON.stringify(params.path) === JSON.stringify(['A', 'X'])) {
+        return deferredAX.promise;
+      }
+      return Promise.resolve(buildMockBranchFetchResult(params));
+    });
 
     const { container } = render(
       <PivotTableChart
@@ -210,39 +213,42 @@ describe('PivotTableChart persisted prefetch hydrates until targets satisfied', 
     await waitFor(() => expect(fetchPivotBranchMock).toHaveBeenCalled());
     expect(container.querySelector('table')).toBeNull();
 
-    const callCount = fetchPivotBranchMock.mock.calls.length;
-    if (callCount <= 1) {
-      const firstParams = fetchPivotBranchMock.mock.calls[0][0];
-      deferredA.resolve(
-        buildMockBranchFetchResult(firstParams, {
-          data: mergedBranch,
-          factBatches: [
-            ...buildMockBranchFactBatches(firstParams),
-            ...buildMockBranchFactBatches({
-              ...firstParams,
-              path: ['A', 'X'],
-            }),
-          ],
-        }),
-      );
-      await fetchPivotBranchMock.mock.results[0]?.value;
-    } else {
-      deferredA.resolve(
-        buildMockBranchFetchResult(fetchPivotBranchMock.mock.calls[0][0], {
-          data: branchA,
-        }),
-      );
-      deferredAX.resolve(
-        buildMockBranchFetchResult(fetchPivotBranchMock.mock.calls[1][0], {
-          data: branchAX,
-        }),
-      );
-      await Promise.all([
-        fetchPivotBranchMock.mock.results[0]?.value,
-        fetchPivotBranchMock.mock.results[1]?.value,
-      ]);
-    }
+    await waitFor(() =>
+      expect(
+        fetchPivotBranchMock.mock.calls.some(
+          ([params]) => JSON.stringify(params.path) === JSON.stringify(['A']),
+        ),
+      ).toBe(true),
+    );
+    const branchAParams = fetchPivotBranchMock.mock.calls.find(
+      ([params]) => JSON.stringify(params.path) === JSON.stringify(['A']),
+    )?.[0];
+    expect(branchAParams).toBeDefined();
+    deferredA.resolve(
+      buildMockBranchFetchResult(branchAParams!, {
+        data: branchA,
+      }),
+    );
+    await deferredA.promise;
 
+    await waitFor(() =>
+      expect(
+        fetchPivotBranchMock.mock.calls.some(
+          ([params]) =>
+            JSON.stringify(params.path) === JSON.stringify(['A', 'X']),
+        ),
+      ).toBe(true),
+    );
+    const branchAXParams = fetchPivotBranchMock.mock.calls.find(
+      ([params]) => JSON.stringify(params.path) === JSON.stringify(['A', 'X']),
+    )?.[0];
+    expect(branchAXParams).toBeDefined();
+    deferredAX.resolve(
+      buildMockBranchFetchResult(branchAXParams!, {
+        data: branchAX,
+      }),
+    );
+    await deferredAX.promise;
     await waitFor(() => {
       expect(container.querySelector('table')).not.toBeNull();
       expect(screen.getByText('P')).toBeInTheDocument();

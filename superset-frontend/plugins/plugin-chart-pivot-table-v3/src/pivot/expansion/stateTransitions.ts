@@ -498,7 +498,18 @@ const getHydrationDeltaKey = ({ axis, pathKey }: HydrationDeltaTarget) =>
 
 const getOrderedHydrationDeltas = (deltas: HydrationDeltaMap) =>
   Array.from(deltas.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
+    .sort(([, left], [, right]) => {
+      const axisCompare = left.axis.localeCompare(right.axis);
+      if (axisCompare !== 0) {
+        return axisCompare;
+      }
+      const depthCompare =
+        parsePath(left.pathKey).length - parsePath(right.pathKey).length;
+      if (depthCompare !== 0) {
+        return depthCompare;
+      }
+      return left.pathKey.localeCompare(right.pathKey);
+    })
     .map(([, entry]) => entry);
 
 export const stageHydrationFetchDeltas = ({

@@ -400,6 +400,13 @@ Success criteria:
 - Expansion coverage lookup now reads from the fact store directly. The hook no
   longer mirrors loaded fact batches or wires a separate `recordFactBatches`
   callback through fetch loops.
+- Expansion coverage now uses the same set-oriented manifest diff as runtime
+  layout coverage. Expansion needs are path-local on the expanded axis
+  (`path + next dimension`) and keep only the opposite-axis visible context.
+  This avoids promoting nested persisted paths such as `[A]` and `[A, X]` into
+  repeated broad `[A]` depth-3 fetches.
+- Hydration finalization now applies parent deltas before descendant deltas, so
+  persisted nested expansion results survive branch pruning.
 
 ## Current Risks
 
@@ -414,12 +421,10 @@ Success criteria:
   multiple runtime state machines.
 - `useExpansionEngine.ts` and `stateTransitions.ts` remain large. Split only by
   real ownership, not by wrapper files.
-- Directly replacing expansion's coverage predicate with manifest diff is not
-  safe yet: chart-level persisted hydration currently relies on a distinction
-  between visible tree depth and required branch fetch depth. A direct manifest
-  diff made persisted expansion targets look satisfied too early. The next
-  attempt must first model "branch depth required by the expansion intent" as
-  explicit coverage, not infer it from the currently materialized tree.
+- Expansion now has the right manifest predicate, but the grouped planner still
+  builds fetch targets separately from manifest construction. The next deletion
+  opportunity is to make the planner produce coverage needs first, then derive
+  transport batches from missing needs.
 - Large result sets still pay main-thread JSON parsing and React commit costs.
 
 ## Approval Checkpoints

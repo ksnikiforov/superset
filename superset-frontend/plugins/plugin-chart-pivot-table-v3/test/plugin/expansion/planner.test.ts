@@ -27,6 +27,13 @@ import { encodeMetricKey } from '../../../src/pivot/core/tokens';
 import { serializePath } from '../../../src/pivot/core/path';
 import { type PivotTreeNode } from '../../../src/types';
 import { type PivotFactStoreBatch } from '../../../src/pivot/runtime/factStore';
+import { compilePivotProgram } from '../../../src/pivot/runtime/compilePivotProgram';
+
+const testProgram = compilePivotProgram({
+  groupbyRows: ['category', 'subcategory', 'city'],
+  groupbyColumns: ['month', 'quarter', 'day'],
+  metrics: ['sales', 'profit'],
+});
 
 const makeNode = ({
   axis,
@@ -54,12 +61,11 @@ const shouldFetchTreeChildren = ({ node }: { node: PivotTreeNode }) =>
 
 const coverageLoadedFromBatches = (
   factBatches: PivotFactStoreBatch[] = [],
-  getCoverageKey: (axis: 'row' | 'col', key: string) => string = (_axis, key) =>
-    key,
 ): PivotExpansionCoveragePredicate =>
   createExpansionCoveragePredicate({
     factBatches,
-    getCoverageKey,
+    program: testProgram,
+    valueKeys: ['sales', 'profit'],
   });
 
 describe('pivot/expansion/planner', () => {
@@ -151,7 +157,7 @@ describe('pivot/expansion/planner', () => {
           path: ['A'],
         },
         facts: [],
-        valueKeys: ['sales'],
+        valueKeys: ['sales', 'profit'],
       },
     ]);
 
@@ -183,7 +189,7 @@ describe('pivot/expansion/planner', () => {
           reason: 'expand',
           rowDepth: 3,
           columnDepth: 0,
-          rowDimensions: ['country', 'state', 'city'],
+          rowDimensions: ['category', 'subcategory', 'city'],
           columnDimensions: [],
         },
         scope: {
@@ -193,7 +199,7 @@ describe('pivot/expansion/planner', () => {
           siblingValues: ['CA', 'NY'],
         },
         facts: [],
-        valueKeys: ['sales'],
+        valueKeys: ['sales', 'profit'],
       },
     ]);
 
@@ -224,7 +230,7 @@ describe('pivot/expansion/planner', () => {
           reason: 'expand',
           rowDepth: 2,
           columnDepth: 1,
-          rowDimensions: ['category'],
+          rowDimensions: ['category', 'subcategory'],
           columnDimensions: ['month'],
         },
         scope: {
