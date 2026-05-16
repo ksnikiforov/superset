@@ -21,6 +21,7 @@ import {
   type PivotTreeData,
   type PivotTreeNode,
 } from '../../types';
+import { getValuesLevelIndex, isValuesAtAxisEnd } from '../runtime/projection';
 import type { PivotProgram } from '../runtime/types';
 import { findChildren } from '../viewModel';
 
@@ -85,16 +86,9 @@ export const pruneStaleCollapsedAxis = ({
   if (!branch) {
     return currentTree;
   }
-  const axisDimensions =
-    axis === 'row' ? program.rowDimensions : program.columnDimensions;
-  const metricIndex =
-    program.valueAxis === axis && program.metricKeys.length > 0
-      ? Math.min(program.metricInsertIndex, axisDimensions.length)
-      : undefined;
+  const metricIndex = getValuesLevelIndex(program, axis);
   const preserveMetricAtParentLevel =
-    axis === 'col' &&
-    metricIndex !== undefined &&
-    metricIndex >= axisDimensions.length;
+    axis === 'col' && isValuesAtAxisEnd(program, axis);
   if (metricIndex === undefined) {
     return currentTree;
   }

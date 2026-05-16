@@ -50,6 +50,7 @@ import {
   buildAxisCoverageKeyFromPathKey,
   getNextAxisLevelForPath,
   getValuesLevelIndex,
+  isValuesAtAxisEnd,
 } from '../runtime/projection';
 import { isSubtotalToken } from '../core/tokens';
 import type { PivotProgram } from '../runtime/types';
@@ -390,7 +391,6 @@ export const useExpansionEngine = ({
     metrics: fetchFormData.metrics,
     metricsLayout: fetchFormData.metricsLayout,
   });
-  const columnDimensionCount = pivotProgram.columnDimensions.length;
   const metricIndexForRows = getValuesLevelIndex(pivotProgram, 'row');
   const metricIndexForCols = getValuesLevelIndex(pivotProgram, 'col');
   const explicitExpandedRowsRef = useRef<Set<string>>(new Set());
@@ -848,9 +848,7 @@ export const useExpansionEngine = ({
         const combinedExpanded = new Set(committedExpanded);
         manualExpandedRef.current.forEach(key => combinedExpanded.add(key));
         const preserveMetricChildren =
-          axis === 'col' &&
-          metricIndexForCols !== undefined &&
-          metricIndexForCols >= columnDimensionCount;
+          axis === 'col' && isValuesAtAxisEnd(pivotProgram, 'col');
         const mergedTree = mergeSameAxisExpansionTree({
           currentTree: fetchLoop.tree,
           previousTree: treeRef.current,
@@ -885,9 +883,8 @@ export const useExpansionEngine = ({
       expansionRequestLifecycle,
       getCoverageKey,
       getMissingExpansionCoverage,
-      columnDimensionCount,
       isMetricTokenValue,
-      metricIndexForCols,
+      pivotProgram,
       persistExpansionState,
       pruneMergedTree,
       resolveExpandedForMetrics,

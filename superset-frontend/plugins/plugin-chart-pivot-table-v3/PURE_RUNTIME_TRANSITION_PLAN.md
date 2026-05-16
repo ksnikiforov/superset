@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14491` insertions, `14903` deletions, net `-412`.
-- Current production TypeScript/TSX total: `33098` lines.
+- Production `src`: `14483` insertions, `14926` deletions, net `-443`.
+- Current production TypeScript/TSX total: about `33067` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -371,6 +371,9 @@ Success criteria:
 - Metric-axis layout policy, axis child projection, and collapsed Values
   projection now read metric placement from the compiled `PivotProgram`
   instead of accepting duplicated chart-owned placement inputs.
+- Values-position helpers now live under runtime projection. Layout,
+  formatting, pruning, and expansion no longer recalculate metric-axis indexes
+  from `metricsLayoutResolved`, raw dimension counts, or hook-local flags.
 - Row subtotal filtering and stale collapsed-branch pruning also read metric
   axis/index semantics from `PivotProgram`; chart layout no longer passes those
   placement facts into those policy helpers separately.

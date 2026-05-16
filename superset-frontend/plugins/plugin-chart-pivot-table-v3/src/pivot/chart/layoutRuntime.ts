@@ -17,7 +17,6 @@
  * under the License.
  */
 import {
-  MetricsLayoutEnum,
   type MeasureHierarchy,
   type PivotAxis,
   type PivotTreeNode,
@@ -27,6 +26,10 @@ import { findMeasureLeafIdInPath, isSubtotalToken } from '../core/tokens';
 import { serializePath } from '../core/path';
 import { getMetricDepthForParent, getMetricTierNodes } from '../metricsTotals';
 import {
+  getAxisDimensionCount,
+  getValuesLevelIndex,
+  isValuesAtAxisEnd,
+  isValuesFirstOnAxis,
   resolveAxisChildProjection,
   resolveAxisProjection,
   resolveCollapsedValuesProjection,
@@ -115,86 +118,61 @@ export const resolveMetricAxisLayoutPolicy = ({
   resolvedRowSubtotalPosition,
   resolvedColSubtotalPosition,
 }: ResolveMetricAxisLayoutParams): MetricAxisLayoutPolicy => {
-  const {
-    metricInsertIndex,
-    metricsLayoutResolved: resolvedMetricsLayout,
-    rowDimensions,
-    columnDimensions,
-    metricKeys,
-  } = program;
+  const { rowDimensions, columnDimensions, metricKeys } = program;
   const metricLabelCount = metricKeys.length;
   const rowDimCount = rowDimensions.length;
   const colDimCount = columnDimensions.length;
   const hasMetrics = metricLabelCount > 0;
   const isSingleMetric = metricLabelCount === 1;
   const isMultiMetric = metricLabelCount > 1;
-  const metricIndexOnRows =
-    resolvedMetricsLayout === MetricsLayoutEnum.ROWS && hasMetrics
-      ? Math.min(metricInsertIndex, rowDimCount)
-      : undefined;
-  const metricIndexOnCols =
-    resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS && hasMetrics
-      ? Math.min(metricInsertIndex, colDimCount)
-      : undefined;
+  const metricIndexOnRows = getValuesLevelIndex(program, 'row');
+  const metricIndexOnCols = getValuesLevelIndex(program, 'col');
   const singleMetricBetweenRows =
     isSingleMetric &&
-    resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
     metricIndexOnRows !== undefined &&
     metricIndexOnRows > 0 &&
     metricIndexOnRows < rowDimCount;
   const singleMetricBetweenCols =
     isSingleMetric &&
-    resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS &&
     metricIndexOnCols !== undefined &&
     metricIndexOnCols > 0 &&
     metricIndexOnCols < colDimCount;
 
   const shouldExpandMetricRows =
-    resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
     hasMetrics &&
-    metricInsertIndex === 0 &&
+    isValuesFirstOnAxis(program, 'row') &&
     resolvedExpandRowsLevel > 0;
   const shouldExpandMetricCols =
-    resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS &&
     hasMetrics &&
-    metricInsertIndex === 0 &&
+    isValuesFirstOnAxis(program, 'col') &&
     resolvedExpandColumnsLevel > 0;
 
-  const metricsAtRowEnd =
-    resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
-    metricIndexOnRows !== undefined &&
-    metricIndexOnRows >= rowDimCount;
-  const metricsAtColEnd =
-    resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS &&
-    metricIndexOnCols !== undefined &&
-    metricIndexOnCols >= colDimCount;
-  const metricsFirstOnRows =
-    resolvedMetricsLayout === MetricsLayoutEnum.ROWS && metricIndexOnRows === 0;
-  const metricsFirstOnCols =
-    resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS &&
-    metricIndexOnCols === 0;
+  const metricsAtRowEnd = isValuesAtAxisEnd(program, 'row');
+  const metricsAtColEnd = isValuesAtAxisEnd(program, 'col');
+  const metricsFirstOnRows = isValuesFirstOnAxis(program, 'row');
+  const metricsFirstOnCols = isValuesFirstOnAxis(program, 'col');
 
   const forceRowSubtotalEnd =
     rowSubTotals &&
     isMultiMetric &&
-    resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
+    program.valueAxis === 'row' &&
     !metricsFirstOnRows;
   const effectiveRowSubtotalPosition = forceRowSubtotalEnd
     ? 'end'
     : resolvedRowSubtotalPosition;
   const effectiveColSubtotalPosition =
-    isMultiMetric && resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS
+    isMultiMetric && program.valueAxis === 'col'
       ? 'end'
       : resolvedColSubtotalPosition;
 
   const hideMetricHeaderOnRows =
-    resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
+    program.valueAxis === 'row' &&
     !isLeafTierVisible &&
     isSingleMetric &&
     metricIndexOnRows === rowDimCount &&
     rowDimCount > 0;
   const hideMetricHeaderOnCols =
-    resolvedMetricsLayout === MetricsLayoutEnum.COLUMNS &&
+    program.valueAxis === 'col' &&
     !isLeafTierVisible &&
     isSingleMetric &&
     metricIndexOnCols === colDimCount &&
@@ -224,10 +202,7 @@ type ResolveAxisChildrenBeforeSubtotalPolicyParams = {
   axis: PivotAxis;
   parent: PivotTreeNode;
   nodes: Record<string, PivotTreeNode>;
-  metricIndex?: number;
-  groupbyLength: number;
   hideMetricHeader: boolean;
-  metricsFirst: boolean;
   isMetricTokenValue: (value: unknown) => boolean;
   isMetricGrandTotalNode: (node?: PivotTreeNode) => boolean;
   keepValuesChild: (
@@ -241,15 +216,14 @@ export const resolveAxisChildrenBeforeSubtotalPolicy = ({
   axis,
   parent,
   nodes,
-  metricIndex,
-  groupbyLength,
   hideMetricHeader,
-  metricsFirst,
   isMetricTokenValue,
   isMetricGrandTotalNode,
   keepValuesChild,
 }: ResolveAxisChildrenBeforeSubtotalPolicyParams): PivotTreeNode[] => {
   const children = findChildren(nodes, parent);
+  const metricIndex = getValuesLevelIndex(program, axis);
+  const groupbyLength = getAxisDimensionCount(program, axis);
   const getChildProjection = (child: PivotTreeNode) =>
     resolveAxisChildProjection({
       program,
@@ -270,11 +244,9 @@ export const resolveAxisChildrenBeforeSubtotalPolicy = ({
             child.path.length <= metricIndex ||
             getChildProjection(child).rawValuesTokenIndex === metricIndex,
         );
-  const expectedMetricsLayout =
-    axis === 'row' ? MetricsLayoutEnum.ROWS : MetricsLayoutEnum.COLUMNS;
+  const isValueAxis = program.valueAxis === axis && parent.axis === axis;
   if (
-    program.metricsLayoutResolved === expectedMetricsLayout &&
-    parent.axis === axis &&
+    isValueAxis &&
     parent.level < groupbyLength &&
     (metricIndex === undefined || metricIndex > parent.level)
   ) {
@@ -302,7 +274,7 @@ export const resolveAxisChildrenBeforeSubtotalPolicy = ({
       child => !isMetricTokenValue(child.path[parent.level]),
     );
   }
-  if (metricsFirst) {
+  if (isValuesFirstOnAxis(program, axis)) {
     filtered = filtered.filter(child => !isMetricGrandTotalNode(child));
   }
   return filtered;
@@ -339,11 +311,9 @@ export const resolveCollapsedValuesNodesForAxis = ({
   isExplicitSubtotalNode,
   isMetricSubtotalNode,
 }: ResolveCollapsedValuesNodesForAxisParams): PivotTreeNode[] => {
-  const expectedMetricsLayout =
-    axis === 'row' ? MetricsLayoutEnum.ROWS : MetricsLayoutEnum.COLUMNS;
   if (
     !exposeCollapsedMetricTier ||
-    program.metricsLayoutResolved !== expectedMetricsLayout ||
+    program.valueAxis !== axis ||
     expandedSet.has(parent.key)
   ) {
     return [];
@@ -433,15 +403,11 @@ export const resolveRowSubtotalChildrenPolicy = ({
   isMetricGrandTotalNode,
   isExplicitSubtotalNode,
 }: ResolveRowSubtotalChildrenPolicyParams): PivotTreeNode[] => {
-  const resolvedMetricsLayout = program.metricsLayoutResolved;
   const isMultiMetric = program.metricKeys.length > 1;
-  const metricIndexOnRows =
-    resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
-    program.metricKeys.length
-      ? Math.min(program.metricInsertIndex, program.rowDimensions.length)
-      : undefined;
+  const metricIndexOnRows = getValuesLevelIndex(program, 'row');
+  const isRowMetricAxis = program.valueAxis === 'row';
   let filtered = children;
-  if (resolvedMetricsLayout === MetricsLayoutEnum.ROWS && !isMultiMetric) {
+  if (isRowMetricAxis && !isMultiMetric) {
     filtered = filtered.filter(child => !isMetricGrandTotalNode(child));
   }
   if (!rowSubTotals || rowSubtotalPositionForParent === 'start') {
@@ -454,7 +420,7 @@ export const resolveRowSubtotalChildrenPolicy = ({
   }
   if (rowSubTotals && rowSubtotalPositionForParent === 'end') {
     const requireMetricLabel =
-      resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
+      isRowMetricAxis &&
       isMultiMetric &&
       metricIndexOnRows !== undefined &&
       countDimDepth(parent.path) > metricIndexOnRows;
@@ -466,9 +432,7 @@ export const resolveRowSubtotalChildrenPolicy = ({
         return false;
       }
       if (
-        (resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
-          !isMultiMetric &&
-          isMetricGrandTotalNode(node)) ||
+        (isRowMetricAxis && !isMultiMetric && isMetricGrandTotalNode(node)) ||
         !isSubtotalToken(node.path[parent.path.length])
       ) {
         return false;
@@ -483,7 +447,7 @@ export const resolveRowSubtotalChildrenPolicy = ({
       const subtotalIndex = node.path.findIndex(val => isSubtotalToken(val));
       if (
         !(
-          resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
+          isRowMetricAxis &&
           isMultiMetric &&
           subtotalIndex > 0 &&
           isMetricTokenValue(node.path[subtotalIndex - 1])
@@ -494,11 +458,7 @@ export const resolveRowSubtotalChildrenPolicy = ({
       }
     });
   }
-  if (
-    rowSubTotals &&
-    resolvedMetricsLayout === MetricsLayoutEnum.ROWS &&
-    isMultiMetric
-  ) {
+  if (rowSubTotals && isRowMetricAxis && isMultiMetric) {
     filtered = filtered.filter(
       child =>
         !isExplicitSubtotalNode(child) ||

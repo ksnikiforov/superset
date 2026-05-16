@@ -29,6 +29,7 @@ import {
   serializeCellKey,
   serializePath,
 } from '../../../../src/pivot/core/path';
+import type { PivotProgram } from '../../../../src/pivot/runtime/types';
 
 const makeNode = ({
   axis,
@@ -68,6 +69,30 @@ const baseConfig = {
   isExplicitSubtotalNode: () => false,
   isMetricGrandTotalNode: () => false,
   isMetricSubtotalNode: () => false,
+};
+
+const programWithValuesAtEnd = (
+  axis: PivotAxis,
+  dimensions: string[],
+): PivotProgram => {
+  const metric = { key: 'sales', metric: 'sales', index: 0 };
+  const dimensionLevels = dimensions.map(column => ({
+    kind: 'dimension' as const,
+    column,
+  }));
+  const valuesLevel = { kind: 'values' as const, metrics: [metric] };
+  return {
+    rows: axis === 'row' ? [...dimensionLevels, valuesLevel] : [],
+    columns: axis === 'col' ? [...dimensionLevels, valuesLevel] : [],
+    rowDimensions: axis === 'row' ? dimensions : [],
+    columnDimensions: axis === 'col' ? dimensions : [],
+    metrics: [metric],
+    metricKeys: ['sales'],
+    metricsLayoutResolved:
+      axis === 'row' ? MetricsLayoutEnum.ROWS : MetricsLayoutEnum.COLUMNS,
+    valueAxis: axis,
+    metricInsertIndex: dimensions.length,
+  };
 };
 
 describe('pivot/chart/pruneCollapsedAxis', () => {
@@ -110,8 +135,7 @@ describe('pivot/chart/pruneCollapsedAxis', () => {
       axis: 'row',
       parent,
       branch,
-      resolvedMetricsLayout: MetricsLayoutEnum.ROWS,
-      metricIndex: 2,
+      program: programWithValuesAtEnd('row', ['country', 'state']),
     });
 
     expect(nextTree.rows[valid.key]).toBeDefined();
@@ -156,9 +180,7 @@ describe('pivot/chart/pruneCollapsedAxis', () => {
       axis: 'col',
       parent,
       branch,
-      resolvedMetricsLayout: MetricsLayoutEnum.COLUMNS,
-      metricIndex: 2,
-      preserveMetricAtParentLevel: true,
+      program: programWithValuesAtEnd('col', ['region', 'quarter']),
     });
 
     expect(nextTree.cols[metricChild.key]).toBeDefined();

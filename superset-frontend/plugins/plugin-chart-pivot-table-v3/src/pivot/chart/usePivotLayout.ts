@@ -297,8 +297,6 @@ export const usePivotLayout = ({
     metricIndexOnCols,
     metricsAtRowEnd,
     metricsAtColEnd,
-    metricsFirstOnRows,
-    metricsFirstOnCols,
     forceRowSubtotalEnd,
     effectiveRowSubtotalPosition,
     effectiveColSubtotalPosition,
@@ -403,10 +401,7 @@ export const usePivotLayout = ({
       axis: 'row' | 'col';
       parent: PivotTreeNode;
       nodes: Record<string, PivotTreeNode>;
-      metricIndex?: number;
-      groupbyLength: number;
       hideMetricHeader: boolean;
-      metricsFirst: boolean;
       keepValuesChild: (
         child: PivotTreeNode,
         hasNonValuesChildren: boolean,
@@ -505,10 +500,7 @@ export const usePivotLayout = ({
         axis: 'row',
         parent,
         nodes,
-        metricIndex: metricIndexOnRows,
-        groupbyLength: layout.groupbyRowsRaw.length,
         hideMetricHeader: hideMetricHeaderOnRows,
-        metricsFirst: metricsFirstOnRows,
         keepValuesChild: (child, hasNonMetricChildren) => {
           if (!hasNonMetricChildren) {
             return isMetricGrandTotalNode(child) || isMetricSubtotalNode(child);
@@ -545,10 +537,8 @@ export const usePivotLayout = ({
       isMetricGrandTotalNode,
       isMetricSubtotalNode,
       isMetricTokenValue,
-      layout.groupbyRowsRaw.length,
       layout.pivotProgram,
       metricIndexOnRows,
-      metricsFirstOnRows,
       rowSubTotals,
     ],
   );
@@ -559,10 +549,7 @@ export const usePivotLayout = ({
         axis: 'col',
         parent,
         nodes,
-        metricIndex: metricIndexOnCols,
-        groupbyLength: layout.groupbyColumnsRaw.length,
         hideMetricHeader: hideMetricHeaderOnCols,
-        metricsFirst: metricsFirstOnCols,
         keepValuesChild: child =>
           isMetricGrandTotalNode(child) ||
           (normalizedColSubtotalLevels.length > 0 &&
@@ -573,9 +560,6 @@ export const usePivotLayout = ({
       hideMetricHeaderOnCols,
       isMetricGrandTotalNode,
       isMetricSubtotalNode,
-      layout.groupbyColumnsRaw.length,
-      metricIndexOnCols,
-      metricsFirstOnCols,
       normalizedColSubtotalLevels.length,
     ],
   );

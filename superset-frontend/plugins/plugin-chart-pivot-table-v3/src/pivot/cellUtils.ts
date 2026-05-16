@@ -25,12 +25,8 @@ import {
 } from './core/tokens';
 import { serializeCellKey, serializePath } from './core/path';
 import { buildMeasureLeafOutputKey } from './measureLeaves';
+import { getValuesLevelIndex } from './runtime/projection';
 import type { PivotProgram } from './runtime/types';
-
-const metricIndexOnRows = (program: PivotProgram) =>
-  program.valueAxis === 'row' && program.metricKeys.length > 0
-    ? Math.min(program.metricInsertIndex, program.rowDimensions.length)
-    : undefined;
 
 type DeriveMetricKeyParams = {
   rowNode: PivotTreeNode;
@@ -210,7 +206,7 @@ export const formatNodeLabel = ({
   }
   if (
     axis === 'row' &&
-    (metricIndexOnRows(program) ?? 0) > 0 &&
+    (getValuesLevelIndex(program, 'row') ?? 0) > 0 &&
     isMetricGrandTotalNode(node)
   ) {
     if (metricDisplayLabel) {

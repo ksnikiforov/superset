@@ -109,10 +109,8 @@ export const getAxisDimensionCount = (
     ? program.rowDimensions.length
     : program.columnDimensions.length;
 
-export const isValuesFirstOnAxis = (
-  program: PivotProgram,
-  axis: PivotAxis,
-) => getValuesLevelIndex(program, axis) === 0;
+export const isValuesFirstOnAxis = (program: PivotProgram, axis: PivotAxis) =>
+  getValuesLevelIndex(program, axis) === 0;
 
 export const isValuesAtAxisEnd = (program: PivotProgram, axis: PivotAxis) =>
   getValuesLevelIndex(program, axis) === getAxisDimensionCount(program, axis);

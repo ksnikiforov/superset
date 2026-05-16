@@ -24,7 +24,12 @@ import {
   resolveMetricAxisLayoutPolicy,
   resolveRowSubtotalChildrenPolicy,
 } from '../../../../src/pivot/chart/layoutRuntime';
-import { type PivotProgram } from '../../../../src/pivot/runtime/types';
+import type {
+  PivotAxisProgram,
+  PivotColumnRef,
+  PivotMetricRef,
+  PivotProgram,
+} from '../../../../src/pivot/runtime/types';
 import {
   encodeMeasureLeafKey,
   encodeMetricKey,
@@ -55,21 +60,65 @@ const baseParams = {
 };
 
 const baseProgram: PivotProgram = {
-  rows: [],
+  rows: [
+    {
+      kind: 'values',
+      metrics: [{ key: 'sales', metric: 'sales', index: 0 }],
+    },
+  ],
   columns: [],
   rowDimensions: [],
   columnDimensions: [],
-  metrics: [],
+  metrics: [{ key: 'sales', metric: 'sales', index: 0 }],
   metricKeys: ['sales'],
   metricsLayoutResolved: MetricsLayoutEnum.ROWS,
   valueAxis: 'row',
   metricInsertIndex: 0,
 };
 
-const policyProgram = (overrides: Partial<PivotProgram>): PivotProgram => ({
-  ...baseProgram,
-  ...overrides,
-});
+const toMetricRefs = (keys: string[]): PivotMetricRef[] =>
+  keys.map((key, index) => ({ key, metric: key, index }));
+
+const toDimensionLevels = (dimensions: PivotColumnRef[]): PivotAxisProgram =>
+  dimensions.map(column => ({
+    kind: 'dimension',
+    column,
+  }));
+
+const withValuesLevel = (
+  dimensions: PivotColumnRef[],
+  metrics: PivotMetricRef[],
+  insertIndex: number,
+): PivotAxisProgram => [
+  ...toDimensionLevels(dimensions.slice(0, insertIndex)),
+  { kind: 'values', metrics },
+  ...toDimensionLevels(dimensions.slice(insertIndex)),
+];
+
+const policyProgram = (overrides: Partial<PivotProgram>): PivotProgram => {
+  const program = { ...baseProgram, ...overrides };
+  const metrics = toMetricRefs(program.metricKeys);
+  return {
+    ...program,
+    metrics,
+    rows:
+      program.valueAxis === 'row'
+        ? withValuesLevel(
+            program.rowDimensions,
+            metrics,
+            program.metricInsertIndex,
+          )
+        : toDimensionLevels(program.rowDimensions),
+    columns:
+      program.valueAxis === 'col'
+        ? withValuesLevel(
+            program.columnDimensions,
+            metrics,
+            program.metricInsertIndex,
+          )
+        : toDimensionLevels(program.columnDimensions),
+  };
+};
 
 const valuesProgram: PivotProgram = {
   rows: [
@@ -165,6 +214,7 @@ describe('pivot/chart/layoutRuntime', () => {
         columnDimensions: ['c1', 'c2'],
         metricInsertIndex: 2,
         metricsLayoutResolved: MetricsLayoutEnum.COLUMNS,
+        valueAxis: 'col',
       }),
     });
 
@@ -210,35 +260,34 @@ describe('pivot/chart/layoutRuntime', () => {
 
   it('filters hidden metric-header children before subtotal placement', () => {
     const parent = node('row', ['West']);
-    const dimensionChild = node('row', ['West', 'CA']);
     const metricChild = node('row', ['West', encodeMetricKey('sales')]);
     const nodes = {
       [parent.key]: parent,
-      [dimensionChild.key]: dimensionChild,
       [metricChild.key]: metricChild,
     };
 
     expect(
       resolveAxisChildrenBeforeSubtotalPolicy({
-        program: baseProgram,
+        program: policyProgram({
+          rowDimensions: ['country'],
+          metricInsertIndex: 1,
+        }),
         axis: 'row',
         parent,
         nodes,
-        groupbyLength: 1,
         hideMetricHeader: true,
-        metricsFirst: false,
         isMetricTokenValue: baseParams.isMetricTokenValue,
         isMetricGrandTotalNode: () => false,
         keepValuesChild: () => true,
       }),
-    ).toEqual([dimensionChild]);
+    ).toEqual([]);
   });
 
   it('removes metric grand totals from metric-first child lists', () => {
-    const parent = node('row', []);
-    const dimensionChild = node('row', ['West']);
+    const parent = node('row', [encodeMetricKey('sales')]);
+    const dimensionChild = node('row', [encodeMetricKey('sales'), 'West']);
     const metricTotal = {
-      ...node('row', [encodeMetricKey('sales')]),
+      ...node('row', [encodeMetricKey('sales'), SUBTOTAL_TOKEN]),
       isSubtotal: true,
     };
     const nodes = {
@@ -249,13 +298,14 @@ describe('pivot/chart/layoutRuntime', () => {
 
     expect(
       resolveAxisChildrenBeforeSubtotalPolicy({
-        program: baseProgram,
+        program: policyProgram({
+          rowDimensions: ['region'],
+          metricInsertIndex: 0,
+        }),
         axis: 'row',
         parent,
         nodes,
-        groupbyLength: 0,
         hideMetricHeader: false,
-        metricsFirst: true,
         isMetricTokenValue: baseParams.isMetricTokenValue,
         isMetricGrandTotalNode: child => child?.isSubtotal === true,
         keepValuesChild: () => true,

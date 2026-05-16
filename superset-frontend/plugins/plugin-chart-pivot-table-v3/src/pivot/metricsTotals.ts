@@ -16,12 +16,13 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { type PivotAxis, PivotTreeNode } from '../types';
+import { PivotTreeNode } from '../types';
 import {
   decodeMetricKey,
   decodeMeasureLeafId,
   isSubtotalToken,
 } from './core/tokens';
+import { getValuesLevelIndex, isValuesFirstOnAxis } from './runtime/projection';
 import type { PivotProgram } from './runtime/types';
 
 type MetricTotalsConfig = {
@@ -34,16 +35,6 @@ type NodeDepthConfig = {
   program: PivotProgram;
   hideMetricHeaderOnRows: boolean;
 };
-
-const metricsFirstOnAxis = (program: PivotProgram, axis: PivotAxis) =>
-  program.valueAxis === axis &&
-  program.metricKeys.length > 0 &&
-  program.metricInsertIndex === 0;
-
-const metricIndexOnRows = (program: PivotProgram) =>
-  program.valueAxis === 'row' && program.metricKeys.length > 0
-    ? Math.min(program.metricInsertIndex, program.rowDimensions.length)
-    : undefined;
 
 export const getMetricLabelFromPath = (
   path: PivotTreeNode['path'],
@@ -86,7 +77,7 @@ export const isMetricGrandTotalNode = (
     return false;
   }
   const hasExplicitTotalToken = node.path.some(isSubtotalToken);
-  const metricsFirst = metricsFirstOnAxis(program, node.axis);
+  const metricsFirst = isValuesFirstOnAxis(program, node.axis);
   if (metricsFirst && !hasExplicitTotalToken) {
     return false;
   }
@@ -216,7 +207,7 @@ export const getNodeDimDepth = (
   node: PivotTreeNode,
   { metricLabelSet, program, hideMetricHeaderOnRows }: NodeDepthConfig,
 ) => {
-  const rowMetricIndex = metricIndexOnRows(program);
+  const rowMetricIndex = getValuesLevelIndex(program, 'row');
   const dimDepth = countDimDepth(node.path, metricLabelSet);
   const subtotalTokenCount = node.path.filter(val =>
     isSubtotalToken(val),
