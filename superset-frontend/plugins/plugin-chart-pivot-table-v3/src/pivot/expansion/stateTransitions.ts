@@ -45,6 +45,7 @@ import {
 } from '../render/renderModel';
 import { rootKey } from '../viewModel';
 import { type PivotExpansionCoverageDiff } from '../runtime/coverage';
+import { getValuesLevelIndex } from '../runtime/projection';
 import type { PivotProgram } from '../runtime/types';
 
 export type ExpansionVisibilityConfig = {
@@ -824,19 +825,19 @@ export const resolveReinitializedExpansionState = (params: {
   colsChanged: boolean;
   hasNewData: boolean;
   program: PivotProgram;
-  metricIndexForRows?: number;
-  metricIndexForCols?: number;
   metricLabelSet: Set<string>;
   countDimDepth: (path: PivotTreeNode['path']) => number;
   isMetricTokenValue: (value: unknown) => boolean;
 }) => {
   const { tree, currentLayout, sessionState } = params;
+  const metricIndexForRows = getValuesLevelIndex(params.program, 'row');
+  const metricIndexForCols = getValuesLevelIndex(params.program, 'col');
   const includeMetricRowDepth =
-    params.metricIndexForRows !== undefined &&
-    params.metricIndexForRows < params.program.rowDimensions.length;
+    metricIndexForRows !== undefined &&
+    metricIndexForRows < params.program.rowDimensions.length;
   const includeMetricColDepth =
-    params.metricIndexForCols !== undefined &&
-    params.metricIndexForCols < params.program.columnDimensions.length;
+    metricIndexForCols !== undefined &&
+    metricIndexForCols < params.program.columnDimensions.length;
   const common = {
     tree,
     metricLabelSet: new Set(params.metricLabelSet),

@@ -49,6 +49,7 @@ import { stableStringify } from '../shared/stableStringify';
 import {
   buildAxisCoverageKeyFromPathKey,
   getNextAxisLevelForPath,
+  getValuesLevelIndex,
 } from '../runtime/projection';
 import { isSubtotalToken } from '../core/tokens';
 import type { PivotProgram } from '../runtime/types';
@@ -307,8 +308,6 @@ export type ExpansionEngineConfig = {
   shouldExpandMetricRows: boolean;
   shouldExpandMetricCols: boolean;
   metricLabelSet: Set<string>;
-  metricIndexForRows?: number;
-  metricIndexForCols?: number;
   isMetricTokenValue: (value: unknown) => boolean;
   pivotProgram: PivotProgram;
   countDimDepth: (path: PivotTreeNode['path']) => number;
@@ -347,8 +346,6 @@ export const useExpansionEngine = ({
   shouldExpandMetricRows,
   shouldExpandMetricCols,
   metricLabelSet,
-  metricIndexForRows,
-  metricIndexForCols,
   isMetricTokenValue,
   pivotProgram,
   countDimDepth,
@@ -394,6 +391,8 @@ export const useExpansionEngine = ({
     metricsLayout: fetchFormData.metricsLayout,
   });
   const columnDimensionCount = pivotProgram.columnDimensions.length;
+  const metricIndexForRows = getValuesLevelIndex(pivotProgram, 'row');
+  const metricIndexForCols = getValuesLevelIndex(pivotProgram, 'col');
   const explicitExpandedRowsRef = useRef<Set<string>>(new Set());
   const explicitExpandedColsRef = useRef<Set<string>>(new Set());
   const explicitCollapsedRowsRef = useRef<Set<string>>(new Set());
@@ -1207,8 +1206,6 @@ export const useExpansionEngine = ({
       colsChanged,
       hasNewData,
       program: pivotProgram,
-      metricIndexForRows,
-      metricIndexForCols,
       metricLabelSet,
       countDimDepth,
       isMetricTokenValue,

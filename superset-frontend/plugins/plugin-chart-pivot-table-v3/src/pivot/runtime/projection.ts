@@ -94,6 +94,29 @@ export type ResolveAxisChildProjectionInput = {
 const axisProgramFor = (program: PivotProgram, axis: PivotAxis) =>
   axis === 'row' ? program.rows : program.columns;
 
+export const getValuesLevelIndex = (program: PivotProgram, axis: PivotAxis) => {
+  const index = axisProgramFor(program, axis).findIndex(
+    level => level.kind === 'values',
+  );
+  return index >= 0 ? index : undefined;
+};
+
+export const getAxisDimensionCount = (
+  program: PivotProgram,
+  axis: PivotAxis,
+) =>
+  axis === 'row'
+    ? program.rowDimensions.length
+    : program.columnDimensions.length;
+
+export const isValuesFirstOnAxis = (
+  program: PivotProgram,
+  axis: PivotAxis,
+) => getValuesLevelIndex(program, axis) === 0;
+
+export const isValuesAtAxisEnd = (program: PivotProgram, axis: PivotAxis) =>
+  getValuesLevelIndex(program, axis) === getAxisDimensionCount(program, axis);
+
 export const isCanonicalValuesPathToken = (
   value: unknown,
   program: PivotProgram,

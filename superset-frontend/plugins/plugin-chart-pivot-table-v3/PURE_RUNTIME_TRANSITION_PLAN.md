@@ -528,6 +528,10 @@ Success criteria:
 - The older `runtime/paths.ts` projection helper has been deleted. Runtime
   projection, next-level checks, and coverage-key path encoding now live under
   `runtime/projection.ts`.
+- Expansion no longer receives row/column metric indexes from
+  `PivotTableChart.tsx`. The expansion boundary derives Values-level indexes
+  directly from `PivotProgram`, so the chart passes the program instead of
+  duplicating semantic placement facts.
 - The explicit intersection target added production code. Follow-up cleanup has
   started by deleting the separate root-prefetch action and seamless stale
   coverage recovery, but more older recovery/planning branches should still be
