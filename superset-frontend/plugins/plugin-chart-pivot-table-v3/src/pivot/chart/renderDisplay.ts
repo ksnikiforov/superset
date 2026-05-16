@@ -38,6 +38,8 @@ import {
   isExplicitTotalNode as isExplicitTotalNodeBase,
 } from '../metricsTotals';
 import {
+  isValuesAtAxisEnd,
+  isValuesFirstOnAxis,
   resolveAxisProjection,
   shouldAutoExpandValuesLevel,
 } from '../runtime/projection';
@@ -74,14 +76,8 @@ export const buildColumnDisplayPath = (
     isMetricSubtotalNode,
     isExpanded,
   } = config;
-  const metricsFirstOnCols =
-    program.valueAxis === 'col' &&
-    program.metricKeys.length > 0 &&
-    program.metricInsertIndex === 0;
-  const metricsAtColEnd =
-    program.valueAxis === 'col' &&
-    program.metricKeys.length > 0 &&
-    program.metricInsertIndex >= program.columnDimensions.length;
+  const metricsFirstOnCols = isValuesFirstOnAxis(program, 'col');
+  const metricsAtColEnd = isValuesAtAxisEnd(program, 'col');
   const metricKey = getMetricKeyFromPath(col.path);
   const metricLabel = metricKey
     ? getMetricDisplayLabelForKey(metricKey)

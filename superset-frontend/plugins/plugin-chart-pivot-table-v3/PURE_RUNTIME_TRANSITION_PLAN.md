@@ -377,6 +377,8 @@ Success criteria:
 - Auto-expanded Values-tier behavior is now a program-derived projection rule.
   Chart layout no longer passes `shouldExpandMetricRows` /
   `shouldExpandMetricCols` through render and expansion boundaries.
+- Runtime coverage and column display now use Values-position projection helpers
+  instead of reading `metricsLayoutResolved` / `metricInsertIndex` directly.
 - Row subtotal filtering and stale collapsed-branch pruning also read metric
   axis/index semantics from `PivotProgram`; chart layout no longer passes those
   placement facts into those policy helpers separately.

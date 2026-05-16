@@ -92,7 +92,13 @@ const pivotProgram: PivotProgram = {
     { kind: 'dimension', column: 'country' },
     { kind: 'dimension', column: 'state' },
   ],
-  columns: [{ kind: 'dimension', column: 'month' }],
+  columns: [
+    { kind: 'dimension', column: 'month' },
+    {
+      kind: 'values',
+      metrics: [{ key: 'sales', metric: 'sales', index: 0 }],
+    },
+  ],
   rowDimensions: ['country', 'state'],
   columnDimensions: ['month'],
   metrics: [{ key: 'sales', metric: 'sales', index: 0 }],
@@ -125,6 +131,7 @@ const rowMetricFirstProgram: PivotProgram = {
     },
     { kind: 'dimension', column: 'country' },
   ],
+  columns: [{ kind: 'dimension', column: 'month' }],
   valueAxis: 'row',
   metricsLayoutResolved: MetricsLayoutEnum.ROWS,
   metricInsertIndex: 0,

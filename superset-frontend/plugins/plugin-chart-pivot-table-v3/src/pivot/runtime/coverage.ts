@@ -17,7 +17,6 @@
  * under the License.
  */
 import {
-  MetricsLayoutEnum,
   type PivotAxis,
   type PivotPath,
   type PivotRuntimeLayout,
@@ -31,6 +30,7 @@ import {
 import { stableStringify } from '../shared/stableStringify';
 import {
   getNextAxisLevelForPath,
+  isValuesFirstOnAxis,
   projectionQueryDimensions,
   projectionQueryFilterPath,
   resolveAxisProjection,
@@ -649,12 +649,8 @@ export const buildBranchFactCoverages = ({
   };
   addDepthPair(rowDepth, columnDepth);
 
-  const valuesAtRowFront =
-    program.metricsLayoutResolved === MetricsLayoutEnum.ROWS &&
-    program.metricInsertIndex === 0;
-  const valuesAtColumnFront =
-    program.metricsLayoutResolved === MetricsLayoutEnum.COLUMNS &&
-    program.metricInsertIndex === 0;
+  const valuesAtRowFront = isValuesFirstOnAxis(program, 'row');
+  const valuesAtColumnFront = isValuesFirstOnAxis(program, 'col');
   const rowParentDepth = parentDepth(rowDepth);
   const columnParentDepth = parentDepth(columnDepth);
 
@@ -667,7 +663,7 @@ export const buildBranchFactCoverages = ({
         columnDepth,
         columnParentDepth,
       ]);
-    } else if (program.metricsLayoutResolved === MetricsLayoutEnum.COLUMNS) {
+    } else if (program.valueAxis === 'col') {
       addDepthPair(rowDepth, columnParentDepth);
     }
   }
@@ -682,10 +678,7 @@ export const buildBranchFactCoverages = ({
     );
   }
 
-  if (
-    program.metricsLayoutResolved === MetricsLayoutEnum.COLUMNS &&
-    columnDepth > 0
-  ) {
+  if (program.valueAxis === 'col' && columnDepth > 0) {
     addDepthGrid(rowDepth > 0 ? [rowDepth, rowParentDepth] : [rowDepth], [
       columnParentDepth,
     ]);
