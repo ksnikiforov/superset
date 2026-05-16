@@ -136,6 +136,43 @@ const collectSkippedPreValuesLevels = (
 const withoutSubtotalTokens = (path: PivotPath) =>
   path.filter(value => !isSubtotalToken(value));
 
+const dimensionLevels = (levels: PivotAxisProgram): PivotDimensionAxisLevel[] =>
+  levels.filter(
+    (level): level is PivotDimensionAxisLevel => level.kind === 'dimension',
+  );
+
+export const projectionQueryDimensions = (
+  projection: PivotAxisProjection,
+): PivotProgram['rowDimensions'] => {
+  if (!projection.valuesLevelSeen) {
+    return dimensionLevels(projection.sourceLevels)
+      .slice(0, projection.filterDimensionPath.length + 1)
+      .map(level => level.column);
+  }
+  const valuesLevelIndex = findValuesLevelIndex(projection.sourceLevels);
+  if (valuesLevelIndex < 0) {
+    return dimensionLevels(projection.sourceLevels)
+      .slice(0, projection.projectedDimensionPath.length + 1)
+      .map(level => level.column);
+  }
+  const preValuesDimensions = dimensionLevels(
+    projection.sourceLevels.slice(0, valuesLevelIndex),
+  ).slice(0, projection.filterDimensionPath.length);
+  const postValuesDimensions = dimensionLevels(
+    projection.sourceLevels.slice(valuesLevelIndex + 1),
+  ).slice(0, projection.postValuesDimensionPath.length + 1);
+  return [...preValuesDimensions, ...postValuesDimensions].map(
+    level => level.column,
+  );
+};
+
+export const projectionQueryFilterPath = (
+  projection: PivotAxisProjection,
+): PivotPath =>
+  projection.valuesLevelSeen
+    ? [...projection.filterDimensionPath, ...projection.postValuesDimensionPath]
+    : projection.filterDimensionPath;
+
 export const resolveAxisProjection = ({
   program,
   axis,

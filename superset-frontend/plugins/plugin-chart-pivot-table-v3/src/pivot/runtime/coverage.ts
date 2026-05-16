@@ -29,8 +29,13 @@ import {
   isMetricToken,
 } from '../core/tokens';
 import { stableStringify } from '../shared/stableStringify';
-import { getNextAxisLevelForPath, projectAxisPathToDimensions } from './paths';
-import type { PivotAxisProjection } from './projection';
+import { getNextAxisLevelForPath } from './paths';
+import {
+  projectionQueryDimensions,
+  projectionQueryFilterPath,
+  resolveAxisProjection,
+  type PivotAxisProjection,
+} from './projection';
 import type { PivotFactSelector, PivotFactStoreBatch } from './factStore';
 import type {
   PivotCoverageReason,
@@ -58,6 +63,8 @@ export type BranchFactCoverageInput = {
   projection: PivotAxisProjection;
   rowDepth: number;
   columnDepth: number;
+  rowDimensions?: PivotProgram['rowDimensions'];
+  columnDimensions?: PivotProgram['columnDimensions'];
   rowSubtotalLevels: number[];
   columnSubtotalLevels: number[];
   rowTotals?: boolean;
@@ -226,27 +233,33 @@ const buildExpansionCoverageNeed = ({
     };
   }
   const path = parsePath(request.pathKey);
-  const branchDimensionDepth = Math.min(
-    request.axis === 'row'
-      ? program.rowDimensions.length
-      : program.columnDimensions.length,
-    projectAxisPathToDimensions({
+  const branchDimensions = projectionQueryDimensions(
+    resolveAxisProjection({
       program,
       axis: request.axis,
       path,
-    }).length + 1,
+    }),
   );
+  const branchDimensionDepth = branchDimensions.length;
   const rowDepth =
     request.axis === 'row' ? branchDimensionDepth : request.rowDepth;
   const columnDepth =
     request.axis === 'col' ? branchDimensionDepth : request.columnDepth;
+  const rowDimensions =
+    request.axis === 'row'
+      ? branchDimensions
+      : program.rowDimensions.slice(0, rowDepth);
+  const columnDimensions =
+    request.axis === 'col'
+      ? branchDimensions
+      : program.columnDimensions.slice(0, columnDepth);
 
   return {
     reason: 'expand',
     rowDepth,
     columnDepth,
-    rowDimensions: program.rowDimensions.slice(0, rowDepth),
-    columnDimensions: program.columnDimensions.slice(0, columnDepth),
+    rowDimensions,
+    columnDimensions,
     valueKeys: valueKeysForExpansionPath(path, valueKeys),
     rowScope:
       request.axis === 'row' ? axisPathScopeFromPath(path) : { kind: 'root' },
@@ -604,6 +617,8 @@ export const buildBranchFactCoverages = ({
   projection,
   rowDepth,
   columnDepth,
+  rowDimensions = program.rowDimensions,
+  columnDimensions = program.columnDimensions,
   rowSubtotalLevels,
   columnSubtotalLevels,
   rowTotals = false,
@@ -697,7 +712,7 @@ export const buildBranchFactCoverages = ({
     [columnDepth, ...effectiveColumnLevels],
   );
 
-  const branchAnchorDepth = projection.filterDimensionPath.length;
+  const branchAnchorDepth = projectionQueryFilterPath(projection).length;
   const queryPairs =
     branchAnchorDepth === 0
       ? depthPairs
@@ -709,8 +724,7 @@ export const buildBranchFactCoverages = ({
   const hasTotalRow = columnTotals || rowSubtotalLevels.includes(0);
   const hasTotalColumn = rowTotals || columnSubtotalLevels.includes(0);
   const shouldIncludeGrandTotalPair =
-    (program.rowDimensions.length === 0 &&
-      program.columnDimensions.length === 0) ||
+    (rowDimensions.length === 0 && columnDimensions.length === 0) ||
     (hasTotalRow && hasTotalColumn) ||
     (valuesAtRowFront && hasTotalColumn) ||
     (valuesAtColumnFront && hasTotalRow);
@@ -723,8 +737,8 @@ export const buildBranchFactCoverages = ({
         )
   ).map(pair =>
     buildFactCoverage({
-      rowDimensions: program.rowDimensions,
-      columnDimensions: program.columnDimensions,
+      rowDimensions,
+      columnDimensions,
       rowDepth: pair.rowDepth,
       columnDepth: pair.columnDepth,
       reason,

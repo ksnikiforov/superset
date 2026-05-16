@@ -521,10 +521,10 @@ Success criteria:
   runtime state machines.
 - `useExpansionEngine.ts` and `stateTransitions.ts` remain large. Split only by
   real ownership, not by wrapper files.
-- The current workspace has pre-existing metrics-before/between expansion test
-  failures on clean source. Use the passing expansion state-transition tests and
-  focused lint as validation for unrelated boundary cleanup until those fixture
-  expectations are repaired or re-approved.
+- Values-in-the-middle expansion now uses the same projection query dimensions
+  for query planning and coverage diffing. This restored the metrics-before and
+  metrics-between expansion regression suite and removes one source of repeated
+  fetches for already-requested expanded paths.
 - The explicit intersection target added production code. Follow-up cleanup has
   started by deleting the separate root-prefetch action and seamless stale
   coverage recovery, but more older recovery/planning branches should still be

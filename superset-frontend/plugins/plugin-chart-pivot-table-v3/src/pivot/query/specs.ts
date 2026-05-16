@@ -58,10 +58,11 @@ import {
   buildFactCoverage,
   expansionRevealsValuesLevel,
 } from '../runtime/coverage';
+import { buildAxisCoverageKey } from '../runtime/paths';
 import {
-  buildAxisCoverageKey,
-  projectAxisPathToDimensions,
-} from '../runtime/paths';
+  projectionQueryFilterPath,
+  resolveAxisProjection,
+} from '../runtime/projection';
 import { type PivotFactCoverage, type PivotProgram } from '../runtime/types';
 import { stableStringify } from '../shared/stableStringify';
 
@@ -117,6 +118,23 @@ type BuildIntentInput = {
   needsRowDimensionFormatting: boolean;
   needsColDimensionFormatting: boolean;
 };
+
+const projectQueryFilterPath = ({
+  layout,
+  axis,
+  path,
+}: {
+  layout: LayoutContext;
+  axis: PivotAxis;
+  path: PivotPath;
+}) =>
+  projectionQueryFilterPath(
+    resolveAxisProjection({
+      program: layout.pivotProgram,
+      axis,
+      path,
+    }),
+  );
 
 const buildIntent = ({
   kind,
@@ -675,8 +693,8 @@ const buildBatchSpecs = ({
   }
 
   const parentPath = parsePath(parentPathKey);
-  const parentDimensionPath = projectAxisPathToDimensions({
-    program: layout.pivotProgram,
+  const parentDimensionPath = projectQueryFilterPath({
+    layout,
     axis,
     path: parentPath,
   });
@@ -769,8 +787,8 @@ export const buildIntersectionQuerySpecs = ({
   const rowFilters = buildPathSetFilterClauses({
     axisGroupby: ctx.rowGroupbyForQuery,
     paths: rowPaths.map(path =>
-      projectAxisPathToDimensions({
-        program: layout.pivotProgram,
+      projectQueryFilterPath({
+        layout,
         axis: 'row',
         path,
       }),
@@ -780,8 +798,8 @@ export const buildIntersectionQuerySpecs = ({
   const columnFilters = buildPathSetFilterClauses({
     axisGroupby: ctx.colGroupbyForQuery,
     paths: columnPaths.map(path =>
-      projectAxisPathToDimensions({
-        program: layout.pivotProgram,
+      projectQueryFilterPath({
+        layout,
         axis: 'col',
         path,
       }),

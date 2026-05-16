@@ -35,6 +35,8 @@ import {
 } from '../layout/LayoutContext';
 import { collectRequiredTimeOffsets } from '../measureLeaves';
 import {
+  projectionQueryDimensions,
+  projectionQueryFilterPath,
   type PivotAxisProjection,
   resolveAxisProjection,
 } from '../runtime/projection';
@@ -154,19 +156,26 @@ export const resolveFetchContext = ({
     axis,
     path,
   });
-  const sanitizedPath = projection.filterDimensionPath;
-  const depthIncrement = 1;
+  const sanitizedPath = projectionQueryFilterPath(projection);
+  const rowGroupbyForBranch =
+    axis === 'row' && targetRowDepth === undefined
+      ? projectionQueryDimensions(projection)
+      : rowGroupby;
+  const colGroupbyForBranch =
+    axis === 'col' && targetColDepth === undefined
+      ? projectionQueryDimensions(projection)
+      : colGroupby;
 
-  const currentRowDepth = Math.min(visibleRowDepth, rowGroupby.length);
-  const currentColDepth = Math.min(visibleColDepth, colGroupby.length);
+  const currentRowDepth = Math.min(visibleRowDepth, rowGroupbyForBranch.length);
+  const currentColDepth = Math.min(visibleColDepth, colGroupbyForBranch.length);
 
   let rowDepth =
     axis === 'row'
-      ? Math.min(rowGroupby.length, sanitizedPath.length + depthIncrement)
+      ? rowGroupbyForBranch.length
       : Math.min(rowGroupby.length, currentRowDepth);
   let colDepth =
     axis === 'col'
-      ? Math.min(colGroupby.length, sanitizedPath.length + depthIncrement)
+      ? colGroupbyForBranch.length
       : Math.min(colGroupby.length, currentColDepth);
   if (targetRowDepth !== undefined) {
     rowDepth = Math.min(rowGroupby.length, Math.max(targetRowDepth, 0));
@@ -235,8 +244,8 @@ export const resolveFetchContext = ({
   };
   const queryShape = buildQueryShape({
     intent,
-    rowGroupby,
-    colGroupby,
+    rowGroupby: rowGroupbyForBranch,
+    colGroupby: colGroupbyForBranch,
     metrics: materializedMetrics,
     availableMetrics: metrics,
     metricFormattingScope: formData.metricFormattingScope,
@@ -257,6 +266,8 @@ export const resolveFetchContext = ({
     projection,
     rowDepth,
     columnDepth: colDepth,
+    rowDimensions: rowGroupbyForQuery,
+    columnDimensions: colGroupbyForQuery,
     rowSubtotalLevels,
     columnSubtotalLevels: colSubtotalLevels,
     rowTotals: layout.rowTotals,
