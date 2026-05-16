@@ -91,9 +91,6 @@ export const projectAxisPath = ({
   return { dimensionPath };
 };
 
-export const projectAxisPathToDimensions = (input: AxisPathInput): PivotPath =>
-  projectAxisPath(input).dimensionPath;
-
 export const getNextAxisLevelForPath = (
   input: AxisPathInput,
 ): PivotAxisLevel | undefined => projectAxisPath(input).nextLevel;
