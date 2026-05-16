@@ -29,6 +29,7 @@ import {
 import { resolveMetricDisplayLabel, getStableColumnKey } from '../../utils';
 import { getMetricKey, isSubtotalToken } from '../core/tokens';
 import { buildLayoutContext } from '../layout/LayoutContext';
+import { getValuesLevelIndex } from '../runtime/projection';
 import type { PivotProgram } from '../runtime/types';
 import type { RenderModelConfig } from '../render/renderModel';
 import {
@@ -71,11 +72,7 @@ export type PivotLayoutResult = {
   resolvedColTotalPosition: TotalPosition;
   effectiveRowSubtotalPosition: TotalPosition;
   effectiveColSubtotalPosition: TotalPosition;
-  metricIndexOnRows?: number;
-  metricIndexOnCols?: number;
   hideMetricHeaderOnRows: boolean;
-  shouldExpandMetricRows: boolean;
-  shouldExpandMetricCols: boolean;
   compareMetricOrder: (a: PivotTreeNode, b: PivotTreeNode) => number;
   getMetricLabelFromPath: (path: PivotTreeNode['path']) => string | undefined;
   getMetricDisplayLabelForKey: (metricKey: string) => string;
@@ -291,10 +288,6 @@ export const usePivotLayout = ({
   const {
     singleMetricBetweenRows,
     singleMetricBetweenCols,
-    shouldExpandMetricRows,
-    shouldExpandMetricCols,
-    metricIndexOnRows,
-    metricIndexOnCols,
     metricsAtRowEnd,
     metricsAtColEnd,
     forceRowSubtotalEnd,
@@ -306,8 +299,6 @@ export const usePivotLayout = ({
     () =>
       resolveMetricAxisLayoutPolicy({
         program: layout.pivotProgram,
-        resolvedExpandRowsLevel,
-        resolvedExpandColumnsLevel,
         isLeafTierVisible,
         rowSubTotals,
         resolvedRowSubtotalPosition,
@@ -317,12 +308,11 @@ export const usePivotLayout = ({
       isLeafTierVisible,
       layout.pivotProgram,
       resolvedColSubtotalPosition,
-      resolvedExpandColumnsLevel,
-      resolvedExpandRowsLevel,
       resolvedRowSubtotalPosition,
       rowSubTotals,
     ],
   );
+  const metricIndexOnRows = getValuesLevelIndex(layout.pivotProgram, 'row');
 
   const getMetricLabelFromPath = useCallback(
     (path: PivotTreeNode['path']) =>
@@ -678,11 +668,7 @@ export const usePivotLayout = ({
     resolvedColTotalPosition,
     effectiveRowSubtotalPosition,
     effectiveColSubtotalPosition,
-    metricIndexOnRows,
-    metricIndexOnCols,
     hideMetricHeaderOnRows,
-    shouldExpandMetricRows,
-    shouldExpandMetricCols,
     compareMetricOrder,
     getMetricLabelFromPath,
     getMetricDisplayLabelForKey,

@@ -45,7 +45,10 @@ import {
 } from '../render/renderModel';
 import { rootKey } from '../viewModel';
 import { type PivotExpansionCoverageDiff } from '../runtime/coverage';
-import { getValuesLevelIndex } from '../runtime/projection';
+import {
+  getValuesLevelIndex,
+  shouldAutoExpandValuesLevel,
+} from '../runtime/projection';
 import type { PivotProgram } from '../runtime/types';
 
 export type ExpansionVisibilityConfig = {
@@ -817,8 +820,6 @@ export const resolveReinitializedExpansionState = (params: {
   prevAutoExpandCols: number | null;
   rowStablePrefix: number;
   colStablePrefix: number;
-  shouldExpandMetricRows: boolean;
-  shouldExpandMetricCols: boolean;
   shouldResetExpandedRows: boolean;
   shouldResetExpandedCols: boolean;
   rowsChanged: boolean;
@@ -859,7 +860,11 @@ export const resolveReinitializedExpansionState = (params: {
     collapsed: collapsedRowKeys,
     nodes: tree.rows,
     stablePrefix: params.rowStablePrefix,
-    expandMetric: params.shouldExpandMetricRows,
+    expandMetric: shouldAutoExpandValuesLevel(
+      params.program,
+      'row',
+      params.effectiveExpandRowsLevel,
+    ),
     reset: params.shouldResetExpandedRows,
     changed: params.rowsChanged,
     includeMetricDepth: includeMetricRowDepth,
@@ -874,7 +879,11 @@ export const resolveReinitializedExpansionState = (params: {
     collapsed: collapsedColKeys,
     nodes: tree.cols,
     stablePrefix: params.colStablePrefix,
-    expandMetric: params.shouldExpandMetricCols,
+    expandMetric: shouldAutoExpandValuesLevel(
+      params.program,
+      'col',
+      params.effectiveExpandColsLevel,
+    ),
     reset: params.shouldResetExpandedCols,
     changed: params.colsChanged,
     includeMetricDepth: includeMetricColDepth,

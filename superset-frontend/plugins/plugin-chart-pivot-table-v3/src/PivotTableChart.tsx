@@ -390,8 +390,6 @@ function PivotTableChart(props: PivotTableProps) {
     groupbyColumnKeys: layoutResult.groupbyColumnKeys,
     resolvedExpandRowsLevel: layoutResult.resolvedExpandRowsLevel,
     resolvedExpandColumnsLevel: layoutResult.resolvedExpandColumnsLevel,
-    shouldExpandMetricRows: layoutResult.shouldExpandMetricRows,
-    shouldExpandMetricCols: layoutResult.shouldExpandMetricCols,
     metricLabelSet: layoutResult.metricLabelSet,
     isMetricTokenValue: layoutResult.isMetricTokenValue,
     pivotProgram: layoutResult.layout.pivotProgram,

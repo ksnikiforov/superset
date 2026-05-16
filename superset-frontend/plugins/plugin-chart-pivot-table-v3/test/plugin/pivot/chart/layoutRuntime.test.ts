@@ -202,9 +202,7 @@ describe('pivot/chart/layoutRuntime', () => {
       }),
     });
 
-    expect(policy.metricIndexOnRows).toBe(1);
     expect(policy.singleMetricBetweenRows).toBe(true);
-    expect(policy.shouldExpandMetricRows).toBe(false);
   });
 
   it('uses the compiled column metric position without inspecting shallow rendered data', () => {
@@ -218,7 +216,6 @@ describe('pivot/chart/layoutRuntime', () => {
       }),
     });
 
-    expect(policy.metricIndexOnCols).toBe(2);
     expect(policy.metricsAtColEnd).toBe(true);
   });
 
@@ -234,7 +231,6 @@ describe('pivot/chart/layoutRuntime', () => {
       resolvedRowSubtotalPosition: 'start',
     });
 
-    expect(policy.metricsFirstOnRows).toBe(false);
     expect(policy.forceRowSubtotalEnd).toBe(true);
     expect(policy.effectiveRowSubtotalPosition).toBe('end');
   });

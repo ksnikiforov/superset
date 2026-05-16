@@ -39,8 +39,6 @@ import { findChildren } from '../viewModel';
 
 type ResolveMetricAxisLayoutParams = {
   program: PivotProgram;
-  resolvedExpandRowsLevel: number;
-  resolvedExpandColumnsLevel: number;
   isLeafTierVisible: boolean;
   rowSubTotals: boolean;
   resolvedRowSubtotalPosition: TotalPosition;
@@ -50,14 +48,8 @@ type ResolveMetricAxisLayoutParams = {
 export type MetricAxisLayoutPolicy = {
   singleMetricBetweenRows: boolean;
   singleMetricBetweenCols: boolean;
-  shouldExpandMetricRows: boolean;
-  shouldExpandMetricCols: boolean;
-  metricIndexOnRows?: number;
-  metricIndexOnCols?: number;
   metricsAtRowEnd: boolean;
   metricsAtColEnd: boolean;
-  metricsFirstOnRows: boolean;
-  metricsFirstOnCols: boolean;
   forceRowSubtotalEnd: boolean;
   effectiveRowSubtotalPosition: TotalPosition;
   effectiveColSubtotalPosition: TotalPosition;
@@ -111,8 +103,6 @@ export const buildMetricOrderComparator = ({
 
 export const resolveMetricAxisLayoutPolicy = ({
   program,
-  resolvedExpandRowsLevel,
-  resolvedExpandColumnsLevel,
   isLeafTierVisible,
   rowSubTotals,
   resolvedRowSubtotalPosition,
@@ -122,7 +112,6 @@ export const resolveMetricAxisLayoutPolicy = ({
   const metricLabelCount = metricKeys.length;
   const rowDimCount = rowDimensions.length;
   const colDimCount = columnDimensions.length;
-  const hasMetrics = metricLabelCount > 0;
   const isSingleMetric = metricLabelCount === 1;
   const isMultiMetric = metricLabelCount > 1;
   const metricIndexOnRows = getValuesLevelIndex(program, 'row');
@@ -138,19 +127,9 @@ export const resolveMetricAxisLayoutPolicy = ({
     metricIndexOnCols > 0 &&
     metricIndexOnCols < colDimCount;
 
-  const shouldExpandMetricRows =
-    hasMetrics &&
-    isValuesFirstOnAxis(program, 'row') &&
-    resolvedExpandRowsLevel > 0;
-  const shouldExpandMetricCols =
-    hasMetrics &&
-    isValuesFirstOnAxis(program, 'col') &&
-    resolvedExpandColumnsLevel > 0;
-
   const metricsAtRowEnd = isValuesAtAxisEnd(program, 'row');
   const metricsAtColEnd = isValuesAtAxisEnd(program, 'col');
   const metricsFirstOnRows = isValuesFirstOnAxis(program, 'row');
-  const metricsFirstOnCols = isValuesFirstOnAxis(program, 'col');
 
   const forceRowSubtotalEnd =
     rowSubTotals &&
@@ -181,14 +160,8 @@ export const resolveMetricAxisLayoutPolicy = ({
   return {
     singleMetricBetweenRows,
     singleMetricBetweenCols,
-    shouldExpandMetricRows,
-    shouldExpandMetricCols,
-    metricIndexOnRows,
-    metricIndexOnCols,
     metricsAtRowEnd,
     metricsAtColEnd,
-    metricsFirstOnRows,
-    metricsFirstOnCols,
     forceRowSubtotalEnd,
     effectiveRowSubtotalPosition,
     effectiveColSubtotalPosition,

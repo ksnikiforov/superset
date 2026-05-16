@@ -51,6 +51,7 @@ import {
   getNextAxisLevelForPath,
   getValuesLevelIndex,
   isValuesAtAxisEnd,
+  shouldAutoExpandValuesLevel,
 } from '../runtime/projection';
 import { isSubtotalToken } from '../core/tokens';
 import type { PivotProgram } from '../runtime/types';
@@ -306,8 +307,6 @@ export type ExpansionEngineConfig = {
   groupbyColumnKeys: string[];
   resolvedExpandRowsLevel: number;
   resolvedExpandColumnsLevel: number;
-  shouldExpandMetricRows: boolean;
-  shouldExpandMetricCols: boolean;
   metricLabelSet: Set<string>;
   isMetricTokenValue: (value: unknown) => boolean;
   pivotProgram: PivotProgram;
@@ -344,8 +343,6 @@ export const useExpansionEngine = ({
   groupbyColumnKeys,
   resolvedExpandRowsLevel,
   resolvedExpandColumnsLevel,
-  shouldExpandMetricRows,
-  shouldExpandMetricCols,
   metricLabelSet,
   isMetricTokenValue,
   pivotProgram,
@@ -733,17 +730,21 @@ export const useExpansionEngine = ({
   );
 
   const buildDesiredExpanded = useCallback(
-    (axis: PivotAxis, nextTree: PivotTreeData) =>
-      buildDesiredExpandedKeys({
+    (axis: PivotAxis, nextTree: PivotTreeData) => {
+      const autoExpandLevel =
+        axis === 'row'
+          ? autoExpandRowsLevelRef.current
+          : autoExpandColsLevelRef.current;
+      return buildDesiredExpandedKeys({
         axis,
         tree: nextTree,
-        autoExpandLevel:
-          axis === 'row'
-            ? autoExpandRowsLevelRef.current
-            : autoExpandColsLevelRef.current,
+        autoExpandLevel,
         metricLabelSet,
-        includeMetricDepthZero:
-          axis === 'row' ? shouldExpandMetricRows : shouldExpandMetricCols,
+        includeMetricDepthZero: shouldAutoExpandValuesLevel(
+          pivotProgram,
+          axis,
+          autoExpandLevel,
+        ),
         manualExpanded:
           axis === 'row'
             ? explicitExpandedRowsRef.current
@@ -755,13 +756,9 @@ export const useExpansionEngine = ({
         pendingKeys:
           axis === 'row' ? pendingRowsRef.current : pendingColsRef.current,
         inFlightKeys: collectInFlightExpansion(axis),
-      }),
-    [
-      collectInFlightExpansion,
-      metricLabelSet,
-      shouldExpandMetricCols,
-      shouldExpandMetricRows,
-    ],
+      });
+    },
+    [collectInFlightExpansion, metricLabelSet, pivotProgram],
   );
 
   const computeVisibleDepths = useCallback(
@@ -1195,8 +1192,6 @@ export const useExpansionEngine = ({
       prevAutoExpandCols: prevAutoExpandColsRef.current,
       rowStablePrefix,
       colStablePrefix,
-      shouldExpandMetricRows,
-      shouldExpandMetricCols,
       shouldResetExpandedRows,
       shouldResetExpandedCols,
       rowsChanged,
@@ -1296,8 +1291,6 @@ export const useExpansionEngine = ({
     shouldPersistExpansionState,
     resolvedExpandColumnsLevel,
     resolvedExpandRowsLevel,
-    shouldExpandMetricCols,
-    shouldExpandMetricRows,
     hydrateAtomic,
     clearInFlightExpansions,
     expansionRequestLifecycle,

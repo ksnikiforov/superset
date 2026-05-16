@@ -309,11 +309,7 @@ test('builds render node display state for toggles and aggregate emphasis', () =
     layout: {
       resolvedExpandRowsLevel: 0,
       metricLabelSet: new Set(['sales']),
-      shouldExpandMetricRows: false,
-      metricsFirstOnRows: false,
-      metricsFirstOnCols: false,
       metricLabels: ['Sales'],
-      resolvedMetricsLayout: MetricsLayoutEnum.COLUMNS,
       hideMetricHeaderOnRows: false,
       isMetricTokenValue: value => value === encodeMetricKey('sales'),
       isExplicitSubtotalNode: candidate =>
@@ -348,13 +344,8 @@ test('hides metric toggles when measure leaves are visible', () => {
     layout: {
       resolvedExpandRowsLevel: 0,
       metricLabelSet: new Set(['sales']),
-      shouldExpandMetricRows: false,
-      metricsFirstOnRows: true,
-      metricsFirstOnCols: false,
       metricLabels: ['Sales'],
-      resolvedMetricsLayout: MetricsLayoutEnum.ROWS,
       hideMetricHeaderOnRows: false,
-      metricIndexOnRows: 0,
       isMetricTokenValue: value => value === encodeMetricKey('sales'),
       isExplicitSubtotalNode: () => false,
       isMetricGrandTotalNode: () => false,

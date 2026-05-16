@@ -37,7 +37,10 @@ import {
   getNodeDimDepth as getNodeDimDepthBase,
   isExplicitTotalNode as isExplicitTotalNodeBase,
 } from '../metricsTotals';
-import { resolveAxisProjection } from '../runtime/projection';
+import {
+  resolveAxisProjection,
+  shouldAutoExpandValuesLevel,
+} from '../runtime/projection';
 import type { PivotProgram } from '../runtime/types';
 import { type PivotLayoutResult } from './usePivotLayout';
 
@@ -318,7 +321,6 @@ type RenderNodeDisplayLayout = Pick<
   PivotLayoutResult,
   | 'resolvedExpandRowsLevel'
   | 'metricLabelSet'
-  | 'shouldExpandMetricRows'
   | 'metricLabels'
   | 'hideMetricHeaderOnRows'
   | 'isMetricTokenValue'
@@ -349,7 +351,13 @@ export const buildRenderNodeDisplayState = ({
     rowNodes,
     layout.resolvedExpandRowsLevel,
     layout.metricLabelSet,
-    { includeMetricDepthZero: layout.shouldExpandMetricRows },
+    {
+      includeMetricDepthZero: shouldAutoExpandValuesLevel(
+        layout.layout.pivotProgram,
+        'row',
+        layout.resolvedExpandRowsLevel,
+      ),
+    },
   );
   const manualExpandedRowDepths = new Set<number>();
   expandedRows.forEach(key => {

@@ -115,6 +115,15 @@ export const isValuesFirstOnAxis = (program: PivotProgram, axis: PivotAxis) =>
 export const isValuesAtAxisEnd = (program: PivotProgram, axis: PivotAxis) =>
   getValuesLevelIndex(program, axis) === getAxisDimensionCount(program, axis);
 
+export const shouldAutoExpandValuesLevel = (
+  program: PivotProgram,
+  axis: PivotAxis,
+  expandLevel: number,
+) =>
+  program.metricKeys.length > 0 &&
+  isValuesFirstOnAxis(program, axis) &&
+  expandLevel > 0;
+
 export const isCanonicalValuesPathToken = (
   value: unknown,
   program: PivotProgram,
