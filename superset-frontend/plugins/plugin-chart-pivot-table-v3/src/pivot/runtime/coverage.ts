@@ -29,8 +29,8 @@ import {
   isMetricToken,
 } from '../core/tokens';
 import { stableStringify } from '../shared/stableStringify';
-import { getNextAxisLevelForPath } from './paths';
 import {
+  getNextAxisLevelForPath,
   projectionQueryDimensions,
   projectionQueryFilterPath,
   resolveAxisProjection,

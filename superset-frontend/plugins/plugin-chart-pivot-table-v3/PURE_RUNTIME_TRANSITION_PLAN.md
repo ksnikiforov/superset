@@ -525,6 +525,9 @@ Success criteria:
   for query planning and coverage diffing. This restored the metrics-before and
   metrics-between expansion regression suite and removes one source of repeated
   fetches for already-requested expanded paths.
+- The older `runtime/paths.ts` projection helper has been deleted. Runtime
+  projection, next-level checks, and coverage-key path encoding now live under
+  `runtime/projection.ts`.
 - The explicit intersection target added production code. Follow-up cleanup has
   started by deleting the separate root-prefetch action and seamless stale
   coverage recovery, but more older recovery/planning branches should still be

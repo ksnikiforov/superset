@@ -49,7 +49,7 @@ import { stableStringify } from '../shared/stableStringify';
 import {
   buildAxisCoverageKeyFromPathKey,
   getNextAxisLevelForPath,
-} from '../runtime/paths';
+} from '../runtime/projection';
 import { isSubtotalToken } from '../core/tokens';
 import type { PivotProgram } from '../runtime/types';
 import {

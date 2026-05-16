@@ -58,8 +58,8 @@ import {
   buildFactCoverage,
   expansionRevealsValuesLevel,
 } from '../runtime/coverage';
-import { buildAxisCoverageKey } from '../runtime/paths';
 import {
+  buildAxisCoverageKey,
   projectionQueryFilterPath,
   resolveAxisProjection,
 } from '../runtime/projection';

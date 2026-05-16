@@ -21,9 +21,11 @@ import {
   decodeMeasureLeafId,
   decodeMetricKey,
   encodeMetricKey,
+  isMeasureLeafToken,
+  METRICS_PLACEHOLDER,
   isSubtotalToken,
 } from '../core/tokens';
-import { isCanonicalValuesPathToken } from './paths';
+import { parsePath, serializePath } from '../core/path';
 import {
   type PivotAxisLevel,
   type PivotAxisProgram,
@@ -52,6 +54,10 @@ export type ResolveAxisProjectionInput = {
   program: PivotProgram;
   axis: PivotAxis;
   path: PivotPath;
+};
+
+export type AxisPathKeyInput = Omit<ResolveAxisProjectionInput, 'path'> & {
+  key: string;
 };
 
 export type CollapsedValuesMetricProjection = {
@@ -87,6 +93,17 @@ export type ResolveAxisChildProjectionInput = {
 
 const axisProgramFor = (program: PivotProgram, axis: PivotAxis) =>
   axis === 'row' ? program.rows : program.columns;
+
+export const isCanonicalValuesPathToken = (
+  value: unknown,
+  program: PivotProgram,
+) => {
+  const metricKey = decodeMetricKey(value);
+  return (
+    (metricKey !== undefined && program.metricKeys.includes(metricKey)) ||
+    isMeasureLeafToken(value)
+  );
+};
 
 const collectPathMetricKeys = (
   path: PivotPath,
@@ -172,6 +189,80 @@ export const projectionQueryFilterPath = (
   projection.valuesLevelSeen
     ? [...projection.filterDimensionPath, ...projection.postValuesDimensionPath]
     : projection.filterDimensionPath;
+
+const projectAxisPathForLevel = ({
+  program,
+  axis,
+  path,
+}: ResolveAxisProjectionInput): {
+  dimensionPath: PivotPath;
+  nextLevel?: PivotAxisLevel;
+} => {
+  const dimensionPath: PivotPath = [];
+  let pathIndex = 0;
+
+  for (const level of axisProgramFor(program, axis)) {
+    if (pathIndex >= path.length) {
+      return { dimensionPath, nextLevel: level };
+    }
+    const value = path[pathIndex];
+    if (level.kind === 'dimension') {
+      if (isCanonicalValuesPathToken(value, program)) {
+        return { dimensionPath, nextLevel: level };
+      }
+      dimensionPath.push(value);
+      pathIndex += 1;
+      continue;
+    }
+
+    let consumedValuesToken = false;
+    while (
+      pathIndex < path.length &&
+      isCanonicalValuesPathToken(path[pathIndex], program)
+    ) {
+      consumedValuesToken = true;
+      pathIndex += 1;
+    }
+    if (!consumedValuesToken) {
+      return { dimensionPath, nextLevel: level };
+    }
+  }
+  return { dimensionPath };
+};
+
+export const getNextAxisLevelForPath = (
+  input: ResolveAxisProjectionInput,
+): PivotAxisLevel | undefined => projectAxisPathForLevel(input).nextLevel;
+
+const projectAxisPathToCoverageDimensions = ({
+  program,
+  path,
+}: ResolveAxisProjectionInput): PivotPath => {
+  const coveragePath: PivotPath = [];
+  let consumedValuesTier = false;
+  path.forEach(value => {
+    if (isCanonicalValuesPathToken(value, program)) {
+      if (!consumedValuesTier) {
+        coveragePath.push(METRICS_PLACEHOLDER);
+        consumedValuesTier = true;
+      }
+      coveragePath.push(value);
+      return;
+    }
+    coveragePath.push(value);
+  });
+  return coveragePath;
+};
+
+export const buildAxisCoverageKey = (
+  input: ResolveAxisProjectionInput,
+): string => serializePath(projectAxisPathToCoverageDimensions(input));
+
+export const buildAxisCoverageKeyFromPathKey = ({
+  key,
+  ...input
+}: AxisPathKeyInput): string =>
+  buildAxisCoverageKey({ ...input, path: parsePath(key) });
 
 export const resolveAxisProjection = ({
   program,
