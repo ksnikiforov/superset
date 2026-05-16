@@ -302,8 +302,6 @@ export type ExpansionEngineConfig = {
   fetchFormData: PivotTableQueryFormData;
   groupbyRowKeys: string[];
   groupbyColumnKeys: string[];
-  groupbyRowsLength: number;
-  groupbyColumnsLength: number;
   resolvedExpandRowsLevel: number;
   resolvedExpandColumnsLevel: number;
   shouldExpandMetricRows: boolean;
@@ -344,8 +342,6 @@ export const useExpansionEngine = ({
   fetchFormData,
   groupbyRowKeys,
   groupbyColumnKeys,
-  groupbyRowsLength,
-  groupbyColumnsLength,
   resolvedExpandRowsLevel,
   resolvedExpandColumnsLevel,
   shouldExpandMetricRows,
@@ -397,6 +393,7 @@ export const useExpansionEngine = ({
     metrics: fetchFormData.metrics,
     metricsLayout: fetchFormData.metricsLayout,
   });
+  const columnDimensionCount = pivotProgram.columnDimensions.length;
   const explicitExpandedRowsRef = useRef<Set<string>>(new Set());
   const explicitExpandedColsRef = useRef<Set<string>>(new Set());
   const explicitCollapsedRowsRef = useRef<Set<string>>(new Set());
@@ -667,8 +664,6 @@ export const useExpansionEngine = ({
 
   const visibilityConfig = useMemo<ExpansionVisibilityConfig>(
     () => ({
-      groupbyRowsLength,
-      groupbyColumnsLength,
       metricLabelSet,
       isMetricTokenValue,
       countDimDepth,
@@ -685,8 +680,6 @@ export const useExpansionEngine = ({
       countDimDepth,
       fetchFormData.colTotals,
       fetchFormData.rowTotals,
-      groupbyColumnsLength,
-      groupbyRowsLength,
       isMetricTokenValue,
       metricLabelSet,
       shouldFetchChildren,
@@ -858,7 +851,7 @@ export const useExpansionEngine = ({
         const preserveMetricChildren =
           axis === 'col' &&
           metricIndexForCols !== undefined &&
-          metricIndexForCols >= groupbyColumnsLength;
+          metricIndexForCols >= columnDimensionCount;
         const mergedTree = mergeSameAxisExpansionTree({
           currentTree: fetchLoop.tree,
           previousTree: treeRef.current,
@@ -893,7 +886,7 @@ export const useExpansionEngine = ({
       expansionRequestLifecycle,
       getCoverageKey,
       getMissingExpansionCoverage,
-      groupbyColumnsLength,
+      columnDimensionCount,
       isMetricTokenValue,
       metricIndexForCols,
       persistExpansionState,
@@ -1213,10 +1206,9 @@ export const useExpansionEngine = ({
       rowsChanged,
       colsChanged,
       hasNewData,
+      program: pivotProgram,
       metricIndexForRows,
       metricIndexForCols,
-      groupbyRowsLength,
-      groupbyColumnsLength,
       metricLabelSet,
       countDimDepth,
       isMetricTokenValue,
@@ -1301,13 +1293,12 @@ export const useExpansionEngine = ({
     expandColumnsLevelRaw,
     expandRowsLevelRaw,
     groupbyColumnKeys,
-    groupbyColumnsLength,
     groupbyRowKeys,
-    groupbyRowsLength,
     isMetricTokenValue,
     metricLabelSet,
     metricIndexForCols,
     metricIndexForRows,
+    pivotProgram,
     shouldPersistExpansionState,
     resolvedExpandColumnsLevel,
     resolvedExpandRowsLevel,

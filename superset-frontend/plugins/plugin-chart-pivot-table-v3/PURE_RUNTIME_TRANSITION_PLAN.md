@@ -511,6 +511,9 @@ Success criteria:
 - Expansion and rendering share the layout-owned render-model config builder;
   remaining risk is smaller visibility-only logic inside expansion planning,
   not fetched-state inference from metric tree nodes.
+- Expansion no longer receives raw row/column dimension counts from the chart
+  just to decide metric-depth behavior. That boundary now uses `PivotProgram`
+  as the semantic owner for axis dimensions.
 - `materializePivotTree.ts` is too large and combines several internal
   responsibilities.
 - `PivotTableChart.tsx` is smaller and no longer owns pending display or
@@ -518,6 +521,10 @@ Success criteria:
   runtime state machines.
 - `useExpansionEngine.ts` and `stateTransitions.ts` remain large. Split only by
   real ownership, not by wrapper files.
+- The current workspace has pre-existing metrics-before/between expansion test
+  failures on clean source. Use the passing expansion state-transition tests and
+  focused lint as validation for unrelated boundary cleanup until those fixture
+  expectations are repaired or re-approved.
 - The explicit intersection target added production code. Follow-up cleanup has
   started by deleting the separate root-prefetch action and seamless stale
   coverage recovery, but more older recovery/planning branches should still be

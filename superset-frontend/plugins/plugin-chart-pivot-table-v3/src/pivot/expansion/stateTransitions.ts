@@ -45,10 +45,9 @@ import {
 } from '../render/renderModel';
 import { rootKey } from '../viewModel';
 import { type PivotExpansionCoverageDiff } from '../runtime/coverage';
+import type { PivotProgram } from '../runtime/types';
 
 export type ExpansionVisibilityConfig = {
-  groupbyRowsLength: number;
-  groupbyColumnsLength: number;
   metricLabelSet: Set<string>;
   isMetricTokenValue: (value: unknown) => boolean;
   countDimDepth: (path: PivotTreeNode['path']) => number;
@@ -824,10 +823,9 @@ export const resolveReinitializedExpansionState = (params: {
   rowsChanged: boolean;
   colsChanged: boolean;
   hasNewData: boolean;
+  program: PivotProgram;
   metricIndexForRows?: number;
   metricIndexForCols?: number;
-  groupbyRowsLength: number;
-  groupbyColumnsLength: number;
   metricLabelSet: Set<string>;
   countDimDepth: (path: PivotTreeNode['path']) => number;
   isMetricTokenValue: (value: unknown) => boolean;
@@ -835,10 +833,10 @@ export const resolveReinitializedExpansionState = (params: {
   const { tree, currentLayout, sessionState } = params;
   const includeMetricRowDepth =
     params.metricIndexForRows !== undefined &&
-    params.metricIndexForRows < params.groupbyRowsLength;
+    params.metricIndexForRows < params.program.rowDimensions.length;
   const includeMetricColDepth =
     params.metricIndexForCols !== undefined &&
-    params.metricIndexForCols < params.groupbyColumnsLength;
+    params.metricIndexForCols < params.program.columnDimensions.length;
   const common = {
     tree,
     metricLabelSet: new Set(params.metricLabelSet),

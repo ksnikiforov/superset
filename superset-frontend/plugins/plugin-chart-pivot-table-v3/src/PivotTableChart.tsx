@@ -388,8 +388,6 @@ function PivotTableChart(props: PivotTableProps) {
     fetchFormData,
     groupbyRowKeys: layoutResult.groupbyRowKeys,
     groupbyColumnKeys: layoutResult.groupbyColumnKeys,
-    groupbyRowsLength: layoutResult.layout.groupbyRows.length,
-    groupbyColumnsLength: layoutResult.layout.groupbyColumns.length,
     resolvedExpandRowsLevel: layoutResult.resolvedExpandRowsLevel,
     resolvedExpandColumnsLevel: layoutResult.resolvedExpandColumnsLevel,
     shouldExpandMetricRows: layoutResult.shouldExpandMetricRows,
