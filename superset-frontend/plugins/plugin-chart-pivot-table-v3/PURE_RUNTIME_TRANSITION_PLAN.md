@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14465` insertions, `14959` deletions, net `-494`.
-- Current production TypeScript/TSX total: about `33016` lines.
+- Production `src`: `14467` insertions, `14959` deletions, net `-492`.
+- Current production TypeScript/TSX total: about `33018` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -511,6 +511,10 @@ Success criteria:
   recovery. If committed runtime layout needs facts that are not loaded, that is
   now treated as a query/bootstrap coverage responsibility instead of a
   chart-owned repair path.
+- Runtime layout reuse/fetch policy now lives under `seamlessRuntimeUpdate`.
+  `coverage.ts` owns coverage manifests and fact-batch diffing, not the
+  decision to reuse the current interactive layout tree during a seamless
+  layout edit.
 
 ## Current Risks
 
@@ -555,11 +559,11 @@ Success criteria:
   loaded measure-tier coverage explicit in the manifest/materializer contract.
 - A manifest-only runtime-layout fetch decision was attempted and reverted
   after `interaction-seamless-expansion.test.tsx` exposed broad UX regressions.
-  Fact coverage alone is not yet enough to decide reuse: the decision also
-  depends on whether the committed loaded runtime snapshot can support local
-  tree reuse for layout edits such as trimming/re-adding hidden dimensions and
-  moving Values. The next version needs an explicit loaded-snapshot contract,
-  not another previous-layout heuristic.
+  Fact coverage alone is not yet enough to decide reuse. The remaining
+  seamless-runtime policy still depends on whether the current interactive
+  layout tree can be locally reused for layout edits such as trimming/re-adding
+  hidden dimensions and moving Values. The next version needs an explicit
+  loaded-snapshot contract, not another previous-layout heuristic.
 - Large result sets still pay main-thread JSON parsing and React commit costs.
 
 ## Approval Checkpoints
