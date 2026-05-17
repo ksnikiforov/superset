@@ -300,8 +300,7 @@ export interface PivotTableProps
   formData: PivotTableQueryFormData;
   queryFormData?: PivotTableQueryFormData;
   persistExpansionState?: boolean;
-  metrics: QueryFormMetric[];
-  sourceMetrics?: QueryFormMetric[];
+  sourceMetrics: QueryFormMetric[];
   sourceMeasureLeavesByMetric?: MeasureLeavesByMetricKey;
   startCollapsed: boolean;
   initialDepth?: number;

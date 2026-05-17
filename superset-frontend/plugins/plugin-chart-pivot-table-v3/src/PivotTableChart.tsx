@@ -79,7 +79,6 @@ function PivotTableChart(props: PivotTableProps) {
     queryFormData,
     width,
     height,
-    metrics,
     ownState,
     setDataMask,
     setControlValue,
@@ -164,10 +163,7 @@ function PivotTableChart(props: PivotTableProps) {
       ),
     [appliedFormData.dimensions],
   );
-  const metricsForUi = useMemo(
-    () => sourceMetrics ?? formData.metrics ?? metrics,
-    [formData.metrics, metrics, sourceMetrics],
-  );
+  const metricsForUi = useMemo(() => sourceMetrics, [sourceMetrics]);
   const metricKeys = useMemo(() => getMetricKeys(metricsForUi), [metricsForUi]);
   const hasMetrics = metricKeys.length > 0;
   const runtimeLayout = useMemo(() => {

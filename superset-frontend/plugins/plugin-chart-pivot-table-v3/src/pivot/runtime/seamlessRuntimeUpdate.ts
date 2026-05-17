@@ -438,7 +438,7 @@ export const prepareSeamlessRuntimeLayoutChange = ({
 type SeamlessRuntimeUpdatePlanConfig = {
   baseFormData: PivotTableQueryFormData;
   sourceFormData: PivotTableQueryFormData;
-  sourceMetrics?: PivotTableQueryFormData['metrics'];
+  sourceMetrics: PivotTableQueryFormData['metrics'];
   sourceMeasureLeavesByMetric?: PivotTableQueryFormData['measureLeavesByMetric'];
   runtimeLayout: PivotRuntimeLayout;
   selection: RuntimeSelection;
@@ -499,8 +499,7 @@ const buildSeamlessRuntimeUpdatePlan = ({
     },
     runtimeLayout,
     selection,
-    metricsOverride:
-      sourceMetrics ?? sourceFormData.metrics ?? baseFormData.metrics,
+    metricsOverride: sourceMetrics,
     measureLeavesByMetricOverride:
       sourceMeasureLeavesByMetric ??
       sourceFormData.measureLeavesByMetric ??

@@ -167,6 +167,7 @@ describe('resolveAppliedInteractionLayout', () => {
       isUserControlled: false,
       appliedFormData: formData,
       formData,
+      sourceMetrics: formData.metrics,
       committedRuntimeLayout: {
         ...runtimeLayout,
         rows: ['state'],
@@ -207,6 +208,7 @@ describe('resolveAppliedInteractionLayout', () => {
       isUserControlled: true,
       appliedFormData,
       formData,
+      sourceMetrics: formData.metrics,
       committedRuntimeLayout,
       appliedDimensionKeys: [
         getStableColumnKey('country'),

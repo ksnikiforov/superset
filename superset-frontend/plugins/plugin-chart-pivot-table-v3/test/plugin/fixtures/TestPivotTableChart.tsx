@@ -60,12 +60,13 @@ const baseDatasource: Datasource = {
 };
 
 const baseFormData = buildFormData({});
-const emptyMetrics: PivotTableProps['metrics'] = [];
+const emptyMetrics: PivotTableQueryFormData['metrics'] = [];
 const emptyGroupbyRows: PivotTableQueryFormData['groupbyRows'] = [];
 const emptyGroupbyColumns: PivotTableQueryFormData['groupbyColumns'] = [];
 const emptyQueriesData: PivotTableProps['queriesData'] = [];
 
 type LegacyTestPivotProps = {
+  metrics?: PivotTableQueryFormData['metrics'];
   groupbyRows: PivotTableQueryFormData['groupbyRows'];
   groupbyColumns: PivotTableQueryFormData['groupbyColumns'];
   aggregateFunction?: PivotTableQueryFormData['aggregateFunction'];
@@ -325,7 +326,7 @@ const baseProps: PivotTableProps & LegacyTestPivotProps = {
   data: emptyTree,
   formData: baseFormData,
   rawFormData: baseFormData,
-  metrics: emptyMetrics,
+  sourceMetrics: emptyMetrics,
   groupbyRows: emptyGroupbyRows,
   groupbyColumns: emptyGroupbyColumns,
   aggregateFunction: 'Sum',
@@ -369,15 +370,21 @@ export default function TestPivotTableChart(props: TestPivotTableChartProps) {
     ...props,
     formData: props.formData ?? baseProps.formData,
     rawFormData: props.rawFormData ?? props.formData ?? baseProps.rawFormData,
+    sourceMetrics:
+      props.sourceMetrics ??
+      props.metrics ??
+      props.formData?.metrics ??
+      baseProps.sourceMetrics,
     datasource: props.datasource ?? baseProps.datasource,
     rawDatasource: props.rawDatasource ?? baseProps.rawDatasource,
     hooks: { ...baseProps.hooks, ...(props.hooks ?? {}) },
   };
   const runtimeLayout = mergedProps.formData.pivotRuntimeLayout;
+  const { metrics: _legacyMetrics, ...chartProps } = mergedProps;
 
   return (
     <PivotTableChart
-      {...mergedProps}
+      {...chartProps}
       factBatches={
         props.factBatches ??
         buildPreloadedTreeFactBatches(mergedProps.data, {

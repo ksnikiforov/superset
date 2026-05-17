@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14512` insertions, `15220` deletions, net `-708`.
-- Current production TypeScript/TSX total: about `32802` lines.
+- Production `src`: `14507` insertions, `15225` deletions, net `-718`.
+- Current production TypeScript/TSX total: about `32792` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -545,6 +545,10 @@ Success criteria:
   layout `formData`; `PivotTableChart` no longer forwards that policy into
   `usePivotLayout`, and `transformProps` no longer exposes duplicate top-level
   normalized subtotal props.
+- Source metric metadata now has an explicit chart contract through
+  `sourceMetrics`. `PivotTableChart`, applied interaction layout, and seamless
+  update planning no longer fall back to duplicate top-level chart `metrics` or
+  nearby form-data snapshots to decide source metric order/labels.
 
 ## Current Risks
 
@@ -595,12 +599,10 @@ Success criteria:
   hidden dimensions and moving Values. The next version needs an explicit
   loaded-snapshot contract, not another previous-layout heuristic.
 - Large result sets still pay main-thread JSON parsing and React commit costs.
-- The top-level chart `metrics` prop still cannot be deleted safely. A direct
-  cut broke the interaction-layout case that keeps metric labels when datetime
-  columns are formatted with Values at column end, which shows that source
-  metric metadata is not yet fully represented by `sourceMetrics` /
-  `formData.metrics`. The next cleanup needs an explicit source-metrics
-  contract, not a fallback removal.
+- Direct chart tests that need source metric metadata should pass
+  `sourceMetrics` or encode the metric intent in `formData`. Reintroducing
+  top-level chart metric fallbacks would blur the source-metadata contract
+  again.
 
 ## Approval Checkpoints
 

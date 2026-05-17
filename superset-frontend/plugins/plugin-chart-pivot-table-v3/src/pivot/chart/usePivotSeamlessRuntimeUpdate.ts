@@ -81,7 +81,7 @@ type UsePivotSeamlessRuntimeUpdateConfig = {
   uiRuntimeLayoutRef: MutableRefObject<PivotRuntimeLayout>;
   baseFormData: PivotTableQueryFormData;
   sourceFormData: PivotTableQueryFormData;
-  sourceMetrics?: PivotTableQueryFormData['metrics'];
+  sourceMetrics: PivotTableQueryFormData['metrics'];
   sourceMeasureLeavesByMetric?: PivotTableQueryFormData['measureLeavesByMetric'];
   upstreamSignature: string;
   seamlessSyncRef: MutableRefObject<SeamlessRuntimeSyncSnapshot | null>;

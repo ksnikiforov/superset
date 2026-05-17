@@ -682,6 +682,7 @@ describe('PivotTableChart interaction layout', () => {
       pivotRuntimeLayout: runtimeLayout,
       startCollapsed: false,
       initialDepth: 1,
+      dateFormatters: { orderDate: orderDateFormatter },
     });
 
     const { container } = render(
@@ -693,7 +694,6 @@ describe('PivotTableChart interaction layout', () => {
         metrics={metrics}
         groupbyRows={[]}
         groupbyColumns={[]}
-        dateFormatters={{ orderDate: orderDateFormatter }}
       />,
     );
 

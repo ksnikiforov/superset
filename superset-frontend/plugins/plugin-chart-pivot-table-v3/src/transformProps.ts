@@ -389,7 +389,7 @@ export default function transformProps(
       columnFormats,
       currencyFormats,
     },
-    sourceMetrics: rawFormData.metrics ?? baseFormData.metrics,
+    sourceMetrics: rawFormData.metrics ?? baseFormData.metrics ?? [],
     sourceMeasureLeavesByMetric:
       rawFormData.measureLeavesByMetric ?? baseFormData.measureLeavesByMetric,
     rawFormData,
@@ -407,7 +407,6 @@ export default function transformProps(
     inContextMenu,
     theme,
     queryFormData: queryFormDataWithFormatters,
-    metrics,
     emitCrossFilters,
     setDataMask,
     setControlValue,
