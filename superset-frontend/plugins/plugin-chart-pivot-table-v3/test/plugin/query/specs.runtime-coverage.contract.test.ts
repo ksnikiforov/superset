@@ -24,6 +24,7 @@ import {
 import {
   encodeMetricKey,
   METRICS_PLACEHOLDER,
+  SUBTOTAL_TOKEN,
 } from '../../../src/pivot/core/tokens';
 import { MetricsLayoutEnum } from '../../../src/types';
 import { serializePath } from '../../../src/pivot/core/path';
@@ -117,6 +118,29 @@ describe('runtime coverage query specs contract', () => {
     ).toBe(true);
   });
 
+  it('does not build branch specs for synthetic subtotal display paths', () => {
+    const formData = buildFormData({
+      groupbyRows: ['country', 'state', 'city'],
+      groupbyColumns: [],
+      metrics: ['sales'],
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      rowTotals: false,
+      colTotals: false,
+    });
+    const layout = buildLayoutContext(formData);
+
+    const specs = buildBranchQuerySpecs({
+      formData,
+      layout,
+      axis: 'row',
+      path: ['US', SUBTOTAL_TOKEN],
+      visibleRowDepth: 2,
+      visibleColDepth: 0,
+    });
+
+    expect(specs).toEqual([]);
+  });
+
   it('does not build batch specs when grouped expansion only reveals Values', () => {
     const formData = buildFormData({
       groupbyRows: ['country', METRICS_PLACEHOLDER, 'state'],
@@ -151,6 +175,41 @@ describe('runtime coverage query specs contract', () => {
       layout,
       batch,
       visibleRowDepth: 1,
+      visibleColDepth: 0,
+    });
+
+    expect(specs).toEqual([]);
+  });
+
+  it('does not build batch specs for synthetic subtotal display paths', () => {
+    const formData = buildFormData({
+      groupbyRows: ['country', 'state', 'city'],
+      groupbyColumns: [],
+      metrics: ['sales'],
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      rowTotals: false,
+      colTotals: false,
+    });
+    const layout = buildLayoutContext(formData);
+    const batch: BatchGroup = {
+      axis: 'row',
+      signature: 'subtotal-display',
+      parentPathKey: serializePath(['US']),
+      siblingValues: [SUBTOTAL_TOKEN],
+      targets: [
+        {
+          axis: 'row',
+          pathKey: serializePath(['US', SUBTOTAL_TOKEN]),
+          batchSignature: 'subtotal-display',
+        },
+      ],
+    };
+
+    const specs = buildBatchQuerySpecs({
+      formData,
+      layout,
+      batch,
+      visibleRowDepth: 2,
       visibleColDepth: 0,
     });
 

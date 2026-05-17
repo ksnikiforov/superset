@@ -57,7 +57,7 @@ import { buildQueryShape, type QueryIntent } from './queryShape';
 import { buildFactCoverage } from '../runtime/coverage';
 import {
   buildAxisCoverageKey,
-  getNextAxisLevelForPath,
+  canRequestAxisExpansion,
   projectionQueryFilterPath,
   resolveAxisProjection,
 } from '../runtime/projection';
@@ -526,13 +526,7 @@ const buildBranchSpecs = ({
   visibleRowDepth?: number;
   visibleColDepth?: number;
 }): PlannedQuerySpec[] => {
-  if (
-    getNextAxisLevelForPath({
-      program: layout.pivotProgram,
-      axis,
-      path,
-    })?.kind === 'values'
-  ) {
+  if (!canRequestAxisExpansion({ program: layout.pivotProgram, axis, path })) {
     return [];
   }
 
@@ -682,11 +676,11 @@ const buildBatchSpecs = ({
   visibleColDepth: number;
 }): PlannedQuerySpec[] => {
   if (
-    getNextAxisLevelForPath({
+    !canRequestAxisExpansion({
       program: layout.pivotProgram,
       axis,
       path: representative,
-    })?.kind === 'values'
+    })
   ) {
     return [];
   }

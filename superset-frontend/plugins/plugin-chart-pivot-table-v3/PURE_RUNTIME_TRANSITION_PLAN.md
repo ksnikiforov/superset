@@ -145,7 +145,7 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14509` insertions, `15437` deletions, net `-928`.
+- Production `src`: `14502` insertions, `15437` deletions, net `-935`.
 - Current production TypeScript/TSX total: about `32582` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
@@ -284,6 +284,9 @@ Immediate policy:
 - Expansion planning now filters by the program-derived requestability rule
   before coverage diffing. The larger cleanup is to keep moving remaining
   token/path fetchability checks behind compiled runtime policy.
+- Branch and batch query-spec construction now use the same requestability
+  policy, so synthetic subtotal paths cannot bypass the planner and create
+  query loads from the query-spec boundary.
 
 Primary files:
 
