@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14483` insertions, `15119` deletions, net `-636`.
-- Current production TypeScript/TSX total: about `32874` lines.
+- Production `src`: `14485` insertions, `15131` deletions, net `-646`.
+- Current production TypeScript/TSX total: about `32864` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -530,6 +530,9 @@ Success criteria:
   `colTypeMap` props into the render model and dimension-filter boundary.
 - Metrics layout now comes from the applied layout `formData`; `PivotTableChart`
   and `transformProps` no longer expose it as a duplicate top-level chart prop.
+- Collapse and initial-depth policy now also comes from applied layout
+  `formData`; tests that need expanded headers set that intent in form data
+  instead of relying on chart-prop overrides.
 
 ## Current Risks
 
