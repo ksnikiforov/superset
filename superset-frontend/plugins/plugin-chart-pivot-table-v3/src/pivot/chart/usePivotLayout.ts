@@ -33,12 +33,10 @@ import { getValuesLevelIndex } from '../runtime/projection';
 import type { PivotProgram } from '../runtime/types';
 import type { RenderModelConfig } from '../render/renderModel';
 import {
-  countDimDepth as countDimDepthBase,
+  createMetricNodePolicy,
   getMetricLabelFromPath as getMetricLabelFromPathBase,
   getNonMetricPathParts as getNonMetricPathPartsBase,
   isExplicitSubtotalNode,
-  isMetricGrandTotalNode as isMetricGrandTotalNodeBase,
-  isMetricSubtotalNode as isMetricSubtotalNodeBase,
 } from '../metricsTotals';
 import { pruneStaleCollapsedAxis } from './pruneCollapsedAxis';
 import {
@@ -182,7 +180,16 @@ export const usePivotLayout = ({
   const { metricsLayoutResolved: resolvedMetricsLayout, metricInsertIndex } =
     layout.pivotProgram;
   const { metricKeys: metricLabels } = layout.pivotProgram;
-  const metricLabelSet = useMemo(() => new Set(metricLabels), [metricLabels]);
+  const metricNodePolicy = useMemo(
+    () => createMetricNodePolicy(layout.pivotProgram),
+    [layout.pivotProgram],
+  );
+  const {
+    metricLabelSet,
+    countDimDepth,
+    isMetricGrandTotalNode,
+    isMetricSubtotalNode,
+  } = metricNodePolicy;
   const metricVerboseMap = formData.verboseMap as
     | Record<string, string>
     | undefined;
@@ -216,7 +223,7 @@ export const usePivotLayout = ({
     () => ({
       metrics: metricLabels,
       metricsLayout: resolvedMetricsLayout,
-      metricPosition: metrics.length > 0 ? metricInsertIndex : -1,
+      metricPosition: metricLabels.length > 0 ? metricInsertIndex : -1,
       rowSubtotalLevels: normalizedRowSubtotalLevels,
       colSubtotalLevels: normalizedColSubtotalLevels,
       rowTotals,
@@ -329,24 +336,6 @@ export const usePivotLayout = ({
     [columnDimensions, getNonMetricPathParts, rowDimensions],
   );
 
-  const isMetricGrandTotalNode = useCallback(
-    (node?: PivotTreeNode) =>
-      isMetricGrandTotalNodeBase(node, {
-        metricLabelSet,
-        program: layout.pivotProgram,
-      }),
-    [layout.pivotProgram, metricLabelSet],
-  );
-
-  const isMetricSubtotalNode = useCallback(
-    (node?: PivotTreeNode) => isMetricSubtotalNodeBase(node, metricLabelSet),
-    [metricLabelSet],
-  );
-
-  const countDimDepth = useCallback(
-    (path: PivotTreeNode['path']) => countDimDepthBase(path, metricLabelSet),
-    [metricLabelSet],
-  );
   const getAxisChildrenBeforeSubtotalPolicy = useCallback(
     (params: {
       axis: 'row' | 'col';
@@ -547,21 +536,15 @@ export const usePivotLayout = ({
       getColChildren: parent => getColChildrenForNodes(parent, tree.cols),
       getCollapsedColLeaves: parent =>
         getCollapsedChildrenForAxis('col', parent, expandedCols, tree.cols),
-      countDimDepth,
-      isMetricGrandTotalNode,
-      isMetricSubtotalNode,
       getColumnDisplayPath,
       getColumnHeaderLabel,
     }),
     [
-      countDimDepth,
       effectiveColSubtotalPosition,
       getColChildrenForNodes,
       getCollapsedChildrenForAxis,
       getRowChildrenForNodes,
       hasMultipleMeasures,
-      isMetricGrandTotalNode,
-      isMetricSubtotalNode,
       layout.colTotals,
       layout.pivotProgram,
       layout.rowTotals,

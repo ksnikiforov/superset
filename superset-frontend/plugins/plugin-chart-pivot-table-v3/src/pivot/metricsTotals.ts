@@ -190,6 +190,19 @@ export const countDimDepth = (
     return true;
   }).length;
 
+export const createMetricNodePolicy = (program: PivotProgram) => {
+  const metricLabelSet = new Set(program.metricKeys);
+  return {
+    metricLabelSet,
+    countDimDepth: (path: PivotTreeNode['path']) =>
+      countDimDepth(path, metricLabelSet),
+    isMetricGrandTotalNode: (node?: PivotTreeNode) =>
+      isMetricGrandTotalNode(node, { metricLabelSet, program }),
+    isMetricSubtotalNode: (node?: PivotTreeNode) =>
+      isMetricSubtotalNode(node, metricLabelSet),
+  };
+};
+
 export const isExplicitTotalNode = (
   node: PivotTreeNode,
   config: MetricTotalsConfig,

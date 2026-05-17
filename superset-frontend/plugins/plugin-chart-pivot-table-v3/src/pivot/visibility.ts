@@ -23,6 +23,8 @@ import {
   isSubtotalToken,
 } from './core/tokens';
 import { buildVisibleList, rootKey } from './viewModel';
+import { createMetricNodePolicy } from './metricsTotals';
+import type { PivotProgram } from './runtime/types';
 
 type ColLeavesParams = {
   getColChildren: (node: PivotTreeNode) => PivotTreeNode[];
@@ -181,7 +183,11 @@ const createColLeavesBuilder = ({
   return buildColLeavesWithSubtotals;
 };
 
-type VisiblePivotAxesParams = ColLeavesParams & {
+type VisiblePivotAxesParams = Omit<
+  ColLeavesParams,
+  'countDimDepth' | 'isMetricGrandTotalNode' | 'isMetricSubtotalNode'
+> & {
+  pivotProgram: PivotProgram;
   rows: Record<string, PivotTreeNode>;
   cols: Record<string, PivotTreeNode>;
   expandedRows: Set<string>;
@@ -213,8 +219,9 @@ export const buildVisiblePivotAxes = ({
     getRowChildren,
     getCollapsedRowChildren,
     getColChildren,
-    isMetricGrandTotalNode,
+    pivotProgram,
   } = params;
+  const metricPolicy = createMetricNodePolicy(pivotProgram);
   const orderedRows = buildVisibleList(
     rows,
     expandedRows,
@@ -233,9 +240,12 @@ export const buildVisiblePivotAxes = ({
     }
   }
   const visibleRows = shouldHideMetricGrandTotalsOnRows
-    ? visibleRowsBase.filter(row => !isMetricGrandTotalNode(row))
+    ? visibleRowsBase.filter(row => !metricPolicy.isMetricGrandTotalNode(row))
     : visibleRowsBase;
-  const buildColLeavesWithSubtotals = createColLeavesBuilder(params);
+  const buildColLeavesWithSubtotals = createColLeavesBuilder({
+    ...params,
+    ...metricPolicy,
+  });
   const root = cols[rootKey];
   const startCols = !root
     ? []
@@ -245,7 +255,7 @@ export const buildVisiblePivotAxes = ({
   const colLeaves = startCols.flatMap(buildColLeavesWithSubtotals);
   const visibleColsBase = colLeaves.length === 0 && root ? [root] : colLeaves;
   const visibleCols = shouldHideMetricGrandTotalsOnCols
-    ? visibleColsBase.filter(col => !isMetricGrandTotalNode(col))
+    ? visibleColsBase.filter(col => !metricPolicy.isMetricGrandTotalNode(col))
     : visibleColsBase;
 
   return { visibleRows, visibleCols };

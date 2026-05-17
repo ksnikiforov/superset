@@ -63,7 +63,6 @@ const treeFromNodes = ({
 
 const baseDisplayConfig = {
   allowMetricSubtotalLabels: true,
-  metricLabels: ['sales', 'profit'],
   isExplicitSubtotalNode: (candidate: PivotTreeNode) =>
     candidate.path.some(value => value === SUBTOTAL_TOKEN),
   getMetricKeyFromPath: (path: PivotTreeNode['path']) =>
@@ -82,9 +81,6 @@ const baseDisplayConfig = {
         !(typeof value === 'string' && value.startsWith('__metric__')) &&
         value !== SUBTOTAL_TOKEN,
     ),
-  isMetricGrandTotalNode: () => false,
-  isMetricSubtotalNode: (candidate: PivotTreeNode) =>
-    candidate.isSubtotal === true,
 };
 
 const pivotProgram: PivotProgram = {

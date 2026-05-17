@@ -157,9 +157,6 @@ describe('buildRenderModel', () => {
         getCollapsedRowChildren: () => [],
         getColChildren: parent => findChildren(tree.cols, parent),
         getCollapsedColLeaves: () => [],
-        countDimDepth: path => path.length,
-        isMetricGrandTotalNode: () => false,
-        isMetricSubtotalNode: () => false,
       },
     });
 
@@ -228,9 +225,6 @@ describe('buildRenderModel', () => {
         getCollapsedRowChildren: () => [],
         getColChildren: parent => findChildren(tree.cols, parent),
         getCollapsedColLeaves: () => [],
-        countDimDepth: path => path.length,
-        isMetricGrandTotalNode: () => false,
-        isMetricSubtotalNode: () => false,
       },
     });
 

@@ -35,6 +35,7 @@ import {
 import { formatPivotLabelValue } from '../core/tree';
 import { seedExpandedByLevel } from '../expansion/stateModel';
 import {
+  createMetricNodePolicy,
   getNodeDimDepth as getNodeDimDepthBase,
   isExplicitTotalNode as isExplicitTotalNodeBase,
 } from '../metricsTotals';
@@ -50,13 +51,10 @@ import { type PivotLayoutResult } from './usePivotLayout';
 export type ColumnDisplayConfig = {
   program: PivotProgram;
   allowMetricSubtotalLabels: boolean;
-  metricLabels: string[];
   isExplicitSubtotalNode: (node: PivotTreeNode) => boolean;
   getMetricKeyFromPath: (path: PivotTreeNode['path']) => string | undefined;
   getMetricDisplayLabelForKey: (metricKey: string) => string;
   getNonMetricPathParts: (path: PivotTreeNode['path']) => PivotTreeNode['path'];
-  isMetricGrandTotalNode: (node: PivotTreeNode) => boolean;
-  isMetricSubtotalNode: (node: PivotTreeNode) => boolean;
   isExpanded?: (node: PivotTreeNode) => boolean;
 };
 
@@ -68,15 +66,14 @@ export const buildColumnDisplayPath = (
   const {
     program,
     allowMetricSubtotalLabels,
-    metricLabels,
     isExplicitSubtotalNode,
     getMetricKeyFromPath,
     getMetricDisplayLabelForKey,
     getNonMetricPathParts,
-    isMetricGrandTotalNode,
-    isMetricSubtotalNode,
     isExpanded,
   } = config;
+  const { isMetricGrandTotalNode, isMetricSubtotalNode } =
+    createMetricNodePolicy(program);
   const metricsFirstOnCols = isValuesFirstOnAxis(program, 'col');
   const metricsAtColEnd = isValuesAtAxisEnd(program, 'col');
   const metricKey = getMetricKeyFromPath(col.path);
@@ -131,7 +128,7 @@ export const buildColumnDisplayPath = (
   if (isMetricGrandTotalNode(col)) {
     const leafPath = col.path.filter(val => decodeMeasureLeafId(val));
     const totalLabel =
-      metricLabels.length === 1 ? 'Grand total' : `Total ${metricLabel}`;
+      program.metricKeys.length === 1 ? 'Grand total' : `Total ${metricLabel}`;
     return leafPath.length > 0 ? [totalLabel, ...leafPath] : [totalLabel];
   }
   const metricIsLeaf =

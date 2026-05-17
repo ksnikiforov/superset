@@ -26,6 +26,8 @@ import {
 import { getFormattingMetricKey } from '../metrics';
 import { serializeCellKey } from '../core/path';
 import { type VisibleCellEntry } from '../cellUtils';
+import { createMetricNodePolicy } from '../metricsTotals';
+import type { PivotProgram } from '../runtime/types';
 
 export type DatabarScaleBounds = {
   boundedMin: number;
@@ -81,11 +83,10 @@ export type BuildDatabarRuntimeModelParams = {
   databarScaleWidth: number;
   databarPaddingX: number;
   themeSizeUnit: number;
+  pivotProgram: PivotProgram;
   deriveMetricKey: (rowNode: PivotTreeNode, colNode: PivotTreeNode) => string;
   getNodeDimDepth: (node: PivotTreeNode) => number;
   isExplicitSubtotalNode: (node: PivotTreeNode) => boolean;
-  isMetricGrandTotalNode: (node: PivotTreeNode) => boolean;
-  isMetricSubtotalNode: (node: PivotTreeNode) => boolean;
   shouldHideRowValues: (rowNode: PivotTreeNode) => boolean;
   resolveMetricD3Format: (
     metricKey: string,
@@ -182,11 +183,10 @@ export const buildDatabarRuntimeModel = ({
   databarScaleWidth,
   databarPaddingX,
   themeSizeUnit,
+  pivotProgram,
   deriveMetricKey,
   getNodeDimDepth,
   isExplicitSubtotalNode,
-  isMetricGrandTotalNode,
-  isMetricSubtotalNode,
   shouldHideRowValues,
   resolveMetricD3Format,
   renderValue,
@@ -195,6 +195,8 @@ export const buildDatabarRuntimeModel = ({
     return emptyDatabarRuntimeModel();
   }
 
+  const { isMetricGrandTotalNode, isMetricSubtotalNode } =
+    createMetricNodePolicy(pivotProgram);
   const scaleMap = new Map<string, DatabarScale>();
   visibleCells.forEach(({ rowNode, colNode, cell }) => {
     const metricKey = deriveMetricKey(rowNode, colNode);

@@ -56,9 +56,6 @@ export type RenderModelConfig = {
   getCollapsedRowChildren: (parent: PivotTreeNode) => PivotTreeNode[];
   getColChildren: (parent: PivotTreeNode) => PivotTreeNode[];
   getCollapsedColLeaves: (parent: PivotTreeNode) => PivotTreeNode[];
-  countDimDepth: (path: PivotTreeNode['path']) => number;
-  isMetricGrandTotalNode: (node?: PivotTreeNode) => boolean;
-  isMetricSubtotalNode: (node?: PivotTreeNode) => boolean;
   getColumnDisplayPath?: (
     col: PivotTreeNode,
     maxDepth: number,
@@ -119,16 +116,14 @@ export const buildRenderModel = ({
     getRowChildren: config.getRowChildren,
     getCollapsedRowChildren: config.getCollapsedRowChildren,
     skipColRoot,
-    countDimDepth: config.countDimDepth,
     normalizedColSubtotalLevels: config.normalizedColSubtotalLevels,
     showColRoot,
     rowTotals: config.rowTotals,
     resolvedColTotalPosition: config.colTotalPosition,
     resolvedColSubtotalPosition: config.resolvedColSubtotalPosition,
+    pivotProgram: config.pivotProgram,
     getColChildren: config.getColChildren,
     getCollapsedColLeaves: config.getCollapsedColLeaves,
-    isMetricGrandTotalNode: config.isMetricGrandTotalNode,
-    isMetricSubtotalNode: config.isMetricSubtotalNode,
     shouldHideMetricGrandTotalsOnRows,
     shouldHideMetricGrandTotalsOnCols,
   });

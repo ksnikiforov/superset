@@ -29,6 +29,7 @@ import {
   type PivotTreeNode,
 } from '../../../../src/types';
 import { serializeCellKey } from '../../../../src/pivot/core/path';
+import { compilePivotProgram } from '../../../../src/pivot/runtime/compilePivotProgram';
 
 const node = (
   key: string,
@@ -61,10 +62,9 @@ const baseParams = {
   databarScaleWidth: 48,
   databarPaddingX: 8,
   themeSizeUnit: 4,
+  pivotProgram: compilePivotProgram({ metrics: ['m1', 'm2'] }),
   getNodeDimDepth: (rowNode: PivotTreeNode) => rowNode.path.length,
   isExplicitSubtotalNode: () => false,
-  isMetricGrandTotalNode: () => false,
-  isMetricSubtotalNode: () => false,
   shouldHideRowValues: () => false,
   resolveMetricD3Format: () => undefined,
   renderValue: (_metricKey: string, value: unknown) => String(value),
