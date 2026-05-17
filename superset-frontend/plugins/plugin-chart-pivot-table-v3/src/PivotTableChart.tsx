@@ -80,7 +80,6 @@ function PivotTableChart(props: PivotTableProps) {
     width,
     height,
     metrics,
-    verboseMap,
     ownState,
     setDataMask,
     setControlValue,
@@ -91,7 +90,6 @@ function PivotTableChart(props: PivotTableProps) {
     persistExpansionState: persistExpansionStateProp,
     onContextMenu,
     timeGrainSqla,
-    dateFormatters = {},
     rowSubtotalLevels = [],
     colSubtotalLevels = [],
     rowTotals = false,
@@ -138,8 +136,8 @@ function PivotTableChart(props: PivotTableProps) {
     dimensions: dimensionList,
     formData,
     fetchFormDataBase,
-    verboseMap,
-    dateFormatters,
+    verboseMap: formData.verboseMap,
+    dateFormatters: formData.dateFormatters ?? {},
   });
   const fetchFormDataBaseWithFormatters = useMemo(
     () => ({

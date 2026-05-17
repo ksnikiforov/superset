@@ -422,8 +422,6 @@ export default function transformProps(
     setDataMask,
     setControlValue,
     selectedFilters,
-    verboseMap,
-    dateFormatters,
     onContextMenu,
     rowTotalPosition,
     rowSubtotalPosition,

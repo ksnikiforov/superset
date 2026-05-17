@@ -314,8 +314,6 @@ export interface PivotTableProps
   setControlValue?: HandlerFunction;
   setDataMask: SetDataMaskHook;
   selectedFilters?: Record<string, DataRecordValue[]>;
-  verboseMap: JsonObject;
-  dateFormatters: Record<string, DateFormatter | undefined>;
   onContextMenu?: (
     clientX: number,
     clientY: number,
