@@ -46,7 +46,7 @@ import {
   yieldChunkedWork,
 } from './chunkedWork';
 
-export { buildPivotFactKey, createPivotFactStore } from './factStore';
+export { createPivotFactStore } from './factStore';
 export type {
   PivotFact,
   PivotFactRole,

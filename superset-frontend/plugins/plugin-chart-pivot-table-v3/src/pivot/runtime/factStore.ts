@@ -75,16 +75,12 @@ export type PivotFactStoreBatchScope =
 export type PivotFactStore = {
   upsertBatch: (batch: PivotFactStoreBatch) => void;
   upsertBatches: (batches: PivotFactStoreBatch[]) => void;
-  getFacts: (selector: PivotFactSelector) => PivotFact[];
   getCompatibleFacts: (selector: PivotFactSelector) => PivotFact[];
   getCoverageBatches: () => PivotFactStoreBatch[];
-  hasCoverage: (selector: PivotFactSelector) => boolean;
   hasCompatibleCoverage: (selector: PivotFactSelector) => boolean;
-  getAll: () => PivotFact[];
-  size: () => number;
 };
 
-export const buildPivotFactRequestKey = ({
+const buildPivotFactRequestKey = ({
   coverage,
   scope,
   valueKeys,
@@ -105,10 +101,7 @@ export const buildFactValueKeys = ({
     ),
   ]);
 
-export const buildPivotFactKey = (
-  selector: PivotFactSelector,
-  fact: PivotFact,
-) =>
+const buildPivotFactKey = (selector: PivotFactSelector, fact: PivotFact) =>
   stableStringify([
     buildPivotFactRequestKey(selector),
     serializePath(fact.rowPath),
@@ -176,11 +169,6 @@ export const createPivotFactStore = (): PivotFactStore => {
     factKeysByRequest.set(key, requestFactKeys);
   };
 
-  const getFacts = (selector: PivotFactSelector) =>
-    Array.from(factKeysByRequest.get(buildPivotFactRequestKey(selector)) ?? [])
-      .map(key => factsByKey.get(key))
-      .filter((fact): fact is PivotFact => fact !== undefined);
-
   const isCompatibleSelector = (
     candidate: PivotFactSelector,
     requested: PivotFactSelector,
@@ -242,18 +230,13 @@ export const createPivotFactStore = (): PivotFactStore => {
   return {
     upsertBatch,
     upsertBatches: batches => batches.forEach(upsertBatch),
-    getFacts,
     getCompatibleFacts,
     getCoverageBatches: () =>
       Array.from(selectorByRequest.values()).map(selector => ({
         ...selector,
         facts: [],
       })),
-    hasCoverage: selector =>
-      factKeysByRequest.has(buildPivotFactRequestKey(selector)),
     hasCompatibleCoverage: selector =>
       getCompatibleRequestSelectors(selector).length > 0,
-    getAll: () => Array.from(factsByKey.values()),
-    size: () => factsByKey.size,
   };
 };

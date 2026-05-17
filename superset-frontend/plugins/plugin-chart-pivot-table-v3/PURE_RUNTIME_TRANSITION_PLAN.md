@@ -145,7 +145,7 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14502` insertions, `15437` deletions, net `-935`.
+- Production `src`: `14485` insertions, `15437` deletions, net `-952`.
 - Current production TypeScript/TSX total: about `32582` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
@@ -515,6 +515,10 @@ Success criteria:
   missing from the fact store, then materialize from the full requested spec
   set. This avoids refetching already-loaded support coverage while preserving a
   single transport batch for the truly missing specs.
+- The fact-store runtime API no longer exposes exact-read/test convenience
+  methods. Runtime callers use compatible manifest coverage checks and
+  compatible fact reads, keeping the store aligned with batch-level coverage
+  authority.
 - Branch and batch execution no longer run a separate all-local preflight before
   entering the spec fetch path. The spec fetch path owns both all-local
   materialization and partial missing-spec fetches.
