@@ -145,7 +145,7 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14487` insertions, `15482` deletions, net `-995`.
+- Production `src`: `14487` insertions, `15483` deletions, net `-996`.
 - Current production TypeScript/TSX total: about `32582` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
@@ -428,6 +428,8 @@ Success criteria:
 - Metric total and node-depth classification now derive metrics-first and row
   metric-index semantics from `PivotProgram`, removing another render-time
   placement flag path.
+- Expansion-state signatures now derive metric identity from
+  `PivotProgram.metricKeys` instead of re-reading raw layout metrics.
 - Metric-key derivation and node-label formatting now consume `PivotProgram`
   directly instead of receiving separate `metricsLayout` / row metric-index
   inputs from formatting.

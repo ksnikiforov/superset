@@ -28,7 +28,6 @@ import {
 } from '../../types';
 import { resolveMetricDisplayLabel, getStableColumnKey } from '../../utils';
 import { isMetricTokenForKeys, isSubtotalToken } from '../core/tokens';
-import { getMetricKey } from '../metrics';
 import { buildLayoutContext } from '../layout/LayoutContext';
 import { getValuesLevelIndex } from '../runtime/projection';
 import type { PivotProgram } from '../runtime/types';
@@ -215,7 +214,7 @@ export const usePivotLayout = ({
 
   const expansionStateSharedSignatureData = useMemo(
     () => ({
-      metrics: metrics.map(getMetricKey),
+      metrics: metricLabels,
       metricsLayout: resolvedMetricsLayout,
       metricPosition: metrics.length > 0 ? metricInsertIndex : -1,
       rowSubtotalLevels: normalizedRowSubtotalLevels,
@@ -231,7 +230,7 @@ export const usePivotLayout = ({
       colTotals,
       layout.measureHierarchy,
       metricInsertIndex,
-      metrics,
+      metricLabels,
       normalizedColSubtotalLevels,
       normalizedRowSubtotalLevels,
       resolvedMetricsLayout,
