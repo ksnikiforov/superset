@@ -318,9 +318,6 @@ type RenderNodeDisplayLayout = Pick<
   | 'resolvedExpandRowsLevel'
   | 'hideMetricHeaderOnRows'
   | 'isExplicitSubtotalNode'
-  | 'isMetricGrandTotalNode'
-  | 'isMetricSubtotalNode'
-  | 'countDimDepth'
 > & {
   layout: Pick<PivotLayoutResult['layout'], 'pivotProgram'>;
 };
@@ -339,7 +336,12 @@ export const buildRenderNodeDisplayState = ({
   const groupbyRowsLength = layout.layout.pivotProgram.rowDimensions.length;
   const groupbyColumnsLength =
     layout.layout.pivotProgram.columnDimensions.length;
-  const metricLabelSet = new Set(layout.layout.pivotProgram.metricKeys);
+  const {
+    metricLabelSet,
+    countDimDepth,
+    isMetricGrandTotalNode,
+    isMetricSubtotalNode,
+  } = createMetricNodePolicy(layout.layout.pivotProgram);
   const isMetricTokenValue = (value: unknown) =>
     isMetricTokenForKeys(value, metricLabelSet);
   const autoExpandedRows = seedExpandedByLevel(
@@ -360,7 +362,7 @@ export const buildRenderNodeDisplayState = ({
     if (autoExpandedRows.has(key) || !node?.hasChildren) {
       return;
     }
-    manualExpandedRowDepths.add(layout.countDimDepth(node.path));
+    manualExpandedRowDepths.add(countDimDepth(node.path));
   });
 
   const isExplicitTotalNode = (node: PivotTreeNode) =>
@@ -380,10 +382,7 @@ export const buildRenderNodeDisplayState = ({
     if (!node || node.path.length === 0) {
       return false;
     }
-    if (
-      layout.isExplicitSubtotalNode(node) ||
-      layout.isMetricGrandTotalNode(node)
-    ) {
+    if (layout.isExplicitSubtotalNode(node) || isMetricGrandTotalNode(node)) {
       return false;
     }
     const projection = resolveAxisProjection({
@@ -408,8 +407,7 @@ export const buildRenderNodeDisplayState = ({
     }
     return (
       isExplicitTotalNode(row) ||
-      (manualExpandedRowDepths.has(layout.countDimDepth(row.path)) &&
-        row.hasChildren)
+      (manualExpandedRowDepths.has(countDimDepth(row.path)) && row.hasChildren)
     );
   };
 
@@ -417,7 +415,7 @@ export const buildRenderNodeDisplayState = ({
     if (!col || (col.path.length === 0 && !groupbyColumnsLength)) {
       return false;
     }
-    return isExplicitTotalNode(col) || layout.isMetricSubtotalNode(col);
+    return isExplicitTotalNode(col) || isMetricSubtotalNode(col);
   };
 
   return {

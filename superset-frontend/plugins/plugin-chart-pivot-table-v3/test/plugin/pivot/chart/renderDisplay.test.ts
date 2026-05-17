@@ -312,10 +312,6 @@ test('builds render node display state for toggles and aggregate emphasis', () =
       hideMetricHeaderOnRows: false,
       isExplicitSubtotalNode: candidate =>
         candidate?.path.some(value => value === SUBTOTAL_TOKEN) ?? false,
-      isMetricGrandTotalNode: () => false,
-      isMetricSubtotalNode: candidate => candidate === metricSubtotal,
-      countDimDepth: path =>
-        path.filter(value => value !== SUBTOTAL_TOKEN).length,
       layout: { pivotProgram },
     },
     isLeafTierVisible: false,
@@ -341,10 +337,6 @@ test('hides metric toggles when measure leaves are visible', () => {
       resolvedExpandRowsLevel: 0,
       hideMetricHeaderOnRows: false,
       isExplicitSubtotalNode: () => false,
-      isMetricGrandTotalNode: () => false,
-      isMetricSubtotalNode: () => false,
-      countDimDepth: path =>
-        path.filter(value => value !== encodeMetricKey('sales')).length,
       layout: { pivotProgram: rowMetricFirstProgram },
     },
     isLeafTierVisible: true,

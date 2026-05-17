@@ -1196,7 +1196,6 @@ export const usePivotFormatting = ({
         node,
         axis,
         program: layout.layout.pivotProgram,
-        isMetricGrandTotalNode: layout.isMetricGrandTotalNode,
         getMetricKeyFromPath: layout.getMetricLabelFromPath,
         getMetricDisplayLabelForKey: layout.getMetricDisplayLabelForKey,
         translate: t,

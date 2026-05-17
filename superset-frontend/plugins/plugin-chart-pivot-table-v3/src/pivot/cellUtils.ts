@@ -28,6 +28,7 @@ import { serializeCellKey, serializePath } from './core/path';
 import { buildMeasureLeafOutputKey } from './measureLeaves';
 import { getValuesLevelIndex } from './runtime/projection';
 import type { PivotProgram } from './runtime/types';
+import { createMetricNodePolicy } from './metricsTotals';
 
 type DeriveMetricKeyParams = {
   rowNode: PivotTreeNode;
@@ -142,7 +143,6 @@ type FormatLabelParams = {
   node: PivotTreeNode;
   axis: 'row' | 'col';
   program: PivotProgram;
-  isMetricGrandTotalNode: (node: PivotTreeNode) => boolean;
   getMetricKeyFromPath: (path: PivotTreeNode['path']) => string | undefined;
   getMetricDisplayLabelForKey: (metricKey: string) => string;
   translate: (label: string) => string;
@@ -154,13 +154,13 @@ export const formatNodeLabel = ({
   node,
   axis,
   program,
-  isMetricGrandTotalNode,
   getMetricKeyFromPath,
   getMetricDisplayLabelForKey,
   translate,
   subtotalLabel,
   isSubtotalToken,
 }: FormatLabelParams) => {
+  const { isMetricGrandTotalNode } = createMetricNodePolicy(program);
   const rawLabel = node.formattedLabel || node.label;
   const metricKeyFromPath = getMetricKeyFromPath(node.path);
   const metricDisplayLabel = metricKeyFromPath
