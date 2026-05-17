@@ -36,9 +36,6 @@ describe('createExpansionRequestHelpers', () => {
     ).toBe(
       '{"axis":"row","instanceId":"pivot-instance","kind":"branch","transactionId":1}',
     );
-    expect(helpers.buildRequestGroupId({ kind: 'batch' }, 42)).toBe(
-      '{"instanceId":"pivot-instance","kind":"batch","transactionId":42}',
-    );
   });
 
   it('finishes scoped requests after success', async () => {

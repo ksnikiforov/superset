@@ -726,7 +726,6 @@ export const useExpansionEngine = ({
   const expandSameAxis = useCallback(
     async (axis: PivotAxis, node: PivotTreeNode) => {
       const requestScope = expansionRequestLifecycle.currentScope();
-      const requestId = requestScope.id;
       const expanded =
         axis === 'row' ? expandedRowsRef.current : expandedColsRef.current;
       const manualExpandedRef =
@@ -760,14 +759,12 @@ export const useExpansionEngine = ({
           initialResolvedExpanded: resolvedExpanded,
           initialTree,
           maxIterations: MAX_HYDRATION_ITERATIONS,
-          requestScope,
           requestEpoch,
           getDataEpoch: () => dataEpochRef.current,
           getExpandedRows: () => expandedRowsRef.current,
           getExpandedCols: () => expandedColsRef.current,
           config: visibilityConfig,
           fetchRuntime: buildFetchRuntime(requestScope),
-          transactionId: requestId,
           buildRequestGroupId: expansionRequestHelpers.buildRequestGroupId,
           resolveExpandedForMetrics,
           pruneMergedTree,
@@ -870,7 +867,6 @@ export const useExpansionEngine = ({
       const shouldPlanRows = options?.planRows ?? true;
       const shouldPlanCols = options?.planCols ?? true;
       const requestScope = expansionRequestLifecycle.beginScope();
-      const transactionId = requestScope.id;
       clearLoadingState();
       if (shouldShowLoader) {
         setHydratingState(true);
@@ -891,7 +887,6 @@ export const useExpansionEngine = ({
           planCols: shouldPlanCols,
           pruneMergedTree,
           fetchRuntime: buildFetchRuntime(requestScope),
-          transactionId,
           buildRequestGroupId: expansionRequestHelpers.buildRequestGroupId,
         });
         if (result.status === 'complete') {

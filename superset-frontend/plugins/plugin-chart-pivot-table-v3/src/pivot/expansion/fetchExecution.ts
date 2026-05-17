@@ -76,7 +76,6 @@ export type TrackExpansionRequest = <T>(
 
 export type BuildExpansionRequestGroupId = (
   payload: Record<string, unknown>,
-  transactionId?: number,
 ) => string;
 
 export type ExpansionRequestHelpers = {
@@ -91,13 +90,10 @@ export const createExpansionRequestHelpers = ({
   lifecycle: LatestRequestLifecycle;
   instanceId: string;
 }): ExpansionRequestHelpers => ({
-  buildRequestGroupId(
-    payload: Record<string, unknown>,
-    transactionId: number = lifecycle.currentId(),
-  ) {
+  buildRequestGroupId(payload: Record<string, unknown>) {
     return stableStringify({
       instanceId,
-      transactionId,
+      transactionId: lifecycle.currentId(),
       ...payload,
     });
   },
@@ -342,7 +338,6 @@ export const fetchExpansionTargetDeltas = async ({
   runtime,
   singleRequestKind,
   batchRequestKind = singleRequestKind,
-  transactionId,
   buildRequestGroupId,
 }: {
   targets: ExpansionFetchTarget[];
@@ -350,7 +345,6 @@ export const fetchExpansionTargetDeltas = async ({
   runtime: ExpansionFetchRuntime;
   singleRequestKind: string;
   batchRequestKind?: string;
-  transactionId: number;
   buildRequestGroupId: BuildExpansionRequestGroupId;
 }): Promise<FetchResultDelta[]> => {
   const { batches, singles, intersections } = resolveExpansionFetchPlan({
@@ -361,39 +355,30 @@ export const fetchExpansionTargetDeltas = async ({
   });
   const { visibleRowDepth, visibleColDepth } = context;
   const buildSingleRequestGroupId = (target: FetchTarget) =>
-    buildRequestGroupId(
-      {
-        kind: singleRequestKind,
-        ...target,
-        visibleRowDepth,
-        visibleColDepth,
-      },
-      transactionId,
-    );
+    buildRequestGroupId({
+      kind: singleRequestKind,
+      ...target,
+      visibleRowDepth,
+      visibleColDepth,
+    });
   const buildBatchRequestGroupId = (batch: BatchGroup) =>
-    buildRequestGroupId(
-      {
-        kind: batchRequestKind,
-        axis: batch.axis,
-        parentPathKey: batch.parentPathKey,
-        signature: batch.signature,
-        targetKeys: [...batch.targets.map(target => target.pathKey)].sort(),
-        visibleRowDepth,
-        visibleColDepth,
-      },
-      transactionId,
-    );
+    buildRequestGroupId({
+      kind: batchRequestKind,
+      axis: batch.axis,
+      parentPathKey: batch.parentPathKey,
+      signature: batch.signature,
+      targetKeys: [...batch.targets.map(target => target.pathKey)].sort(),
+      visibleRowDepth,
+      visibleColDepth,
+    });
   const buildIntersectionRequestGroupId = (target: IntersectionFetchTarget) =>
-    buildRequestGroupId(
-      {
-        kind: 'hydrate:intersection',
-        rowPathKeys: [...target.rowPathKeys].sort(),
-        columnPathKeys: [...target.columnPathKeys].sort(),
-        visibleRowDepth,
-        visibleColDepth,
-      },
-      transactionId,
-    );
+    buildRequestGroupId({
+      kind: 'hydrate:intersection',
+      rowPathKeys: [...target.rowPathKeys].sort(),
+      columnPathKeys: [...target.columnPathKeys].sort(),
+      visibleRowDepth,
+      visibleColDepth,
+    });
   const fetchPromises: Array<Promise<ExpansionFetchResult>> = [
     ...singles.map(target =>
       fetchExpansionSingleTarget({
@@ -440,13 +425,11 @@ type HydrationLoopParams = Parameters<typeof runHydrationLoop>[0];
 export const runHydrationExpansionFetchLoop = ({
   reason,
   fetchRuntime,
-  transactionId,
   buildRequestGroupId,
   ...hydrationLoopParams
 }: Omit<HydrationLoopParams, 'fetchDeltas' | 'getMissingExpansionCoverage'> & {
   reason: 'prefetch' | 'cross-axis';
   fetchRuntime: ExpansionFetchRuntime;
-  transactionId: number;
   buildRequestGroupId: BuildExpansionRequestGroupId;
 }) =>
   runHydrationLoop({
@@ -462,7 +445,6 @@ export const runHydrationExpansionFetchLoop = ({
         context,
         runtime: fetchRuntime,
         singleRequestKind: `hydrate:${reason}`,
-        transactionId,
         buildRequestGroupId,
       }),
   });
@@ -483,14 +465,12 @@ export const runSameAxisExpansionFetchLoop = async ({
   initialResolvedExpanded,
   initialTree,
   maxIterations,
-  requestScope,
   requestEpoch,
   getDataEpoch,
   getExpandedRows,
   getExpandedCols,
   config,
   fetchRuntime,
-  transactionId,
   buildRequestGroupId,
   resolveExpandedForMetrics,
   pruneMergedTree,
@@ -500,14 +480,12 @@ export const runSameAxisExpansionFetchLoop = async ({
   initialResolvedExpanded: Set<string>;
   initialTree: PivotTreeData;
   maxIterations: number;
-  requestScope: LatestRequestScope;
   requestEpoch: number;
   getDataEpoch: () => number;
   getExpandedRows: () => Set<string>;
   getExpandedCols: () => Set<string>;
   config: ExpansionVisibilityConfig;
   fetchRuntime: ExpansionFetchRuntime;
-  transactionId: number;
   buildRequestGroupId: BuildExpansionRequestGroupId;
   resolveExpandedForMetrics: (
     axis: PivotAxis,
@@ -524,6 +502,7 @@ export const runSameAxisExpansionFetchLoop = async ({
   let currentTree = initialTree;
   let resolvedExpanded = initialResolvedExpanded;
   const touchedKeys = new Set<string>();
+  const { requestScope } = fetchRuntime;
 
   for (let iteration = 0; iteration < maxIterations; iteration += 1) {
     if (getDataEpoch() !== requestEpoch || !requestScope.isCurrent()) {
@@ -568,7 +547,6 @@ export const runSameAxisExpansionFetchLoop = async ({
       runtime: fetchRuntime,
       singleRequestKind: 'branch',
       batchRequestKind: 'batch',
-      transactionId,
       buildRequestGroupId,
     });
     if (getDataEpoch() !== requestEpoch || !requestScope.isCurrent()) {
