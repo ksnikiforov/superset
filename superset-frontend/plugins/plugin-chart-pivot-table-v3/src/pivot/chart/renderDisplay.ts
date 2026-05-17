@@ -364,10 +364,15 @@ export const buildRenderNodeDisplayState = ({
     });
 
   const shouldShowToggle = (axis: PivotAxis, node?: PivotTreeNode) => {
-    if (!node || node.path.length === 0) {
+    if (!node || node.path.length === 0 || !node.hasChildren) {
       return false;
     }
-    if (isExplicitSubtotalNode(node) || isMetricGrandTotalNode(node)) {
+    if (
+      isExplicitTotalNode(node) ||
+      isExplicitSubtotalNode(node) ||
+      isMetricGrandTotalNode(node) ||
+      isMetricSubtotalNode(node)
+    ) {
       return false;
     }
     const projection = resolveAxisProjection({

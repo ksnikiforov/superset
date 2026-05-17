@@ -42,7 +42,9 @@ jest.mock('../../../src/pivot/data/SupersetChartDataClient', () => {
 });
 
 jest.mock('../../../src/pivot/query/fetchPivotBranch', () => {
-  const actual = jest.requireActual('../../../src/pivot/query/fetchPivotBranch');
+  const actual = jest.requireActual(
+    '../../../src/pivot/query/fetchPivotBranch',
+  );
   return {
     ...actual,
     fetchPivotBranch: jest
@@ -199,9 +201,9 @@ describe('PivotTableChart basic regression smoke guardrails', () => {
     const chartExportRows = getPivotV3ExportSheetDataForChart(318)?.map(row =>
       row.map(cell => cell.value),
     );
-    expect(chartExportRows?.some(row => row[0] === 'A' && row[1] === '')).toBe(
-      true,
-    );
+    expect(
+      chartExportRows?.some(row => row[0] === 'A' && row[1] === 'Total'),
+    ).toBe(true);
     expect(chartExportRows?.some(row => row[0] === 'A' && row[1] === 'X')).toBe(
       true,
     );
