@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14466` insertions, `15022` deletions, net `-556`.
-- Current production TypeScript/TSX total: about `32954` lines.
+- Production `src`: `14474` insertions, `15088` deletions, net `-614`.
+- Current production TypeScript/TSX total: about `32896` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -522,6 +522,9 @@ Success criteria:
 - Formatting options are now derived inside the formatting boundary from
   `formData`; the chart no longer unpacks and forwards value format,
   per-column formats, currency formats, HTML rendering, or pivot theme props.
+- `transformProps` no longer exposes duplicate top-level chart props for
+  formatting, sorting, groupby, aggregate, and theme fields that already belong
+  to `formData` or hook-owned runtime state.
 
 ## Current Risks
 
