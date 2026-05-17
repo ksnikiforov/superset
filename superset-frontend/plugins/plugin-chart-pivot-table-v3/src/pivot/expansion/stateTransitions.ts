@@ -49,10 +49,10 @@ import {
   shouldAutoExpandValuesLevel,
 } from '../runtime/projection';
 import type { PivotProgram } from '../runtime/types';
-import { isMetricTokenForKeys } from '../core/tokens';
+import { isMetricTokenForKeys, isSubtotalToken } from '../core/tokens';
+import { createMetricNodePolicy } from '../metricsTotals';
 
 export type ExpansionVisibilityConfig = {
-  countDimDepth: (path: PivotTreeNode['path']) => number;
   program: PivotProgram;
   buildRenderModelConfig: (params: {
     tree: PivotTreeData;
@@ -66,6 +66,15 @@ const createEmptyExpansionPlan = (): PivotExpansionPlan => ({
   pendingKeys: new Set<string>(),
   hasMissingNodes: false,
 });
+
+const createExpansionMetricPolicy = (program: PivotProgram) => {
+  const metricNodePolicy = createMetricNodePolicy(program);
+  return {
+    metricLabelSet: metricNodePolicy.metricLabelSet,
+    countDimDepth: (path: PivotTreeNode['path']) =>
+      metricNodePolicy.countDimDepth(path.filter(val => !isSubtotalToken(val))),
+  };
+};
 
 const findMetricIndex = (
   path: PivotTreeNode['path'],
@@ -352,23 +361,27 @@ export const resolveCollapsedExpansionState = ({
   };
 };
 
-export const pruneTreeByPrefixes = (
-  tree: PivotTreeData,
-  axis: PivotAxis,
-  prefixes: PivotTreeNode['path'][],
-  options?: {
-    preserveMetricChildren?: boolean;
-    metricLabelSet?: ReadonlySet<string>;
-  },
-) => {
+const pruneTreeByPrefixes = ({
+  tree,
+  axis,
+  prefixes,
+  preserveMetricChildren,
+  program,
+}: {
+  tree: PivotTreeData;
+  axis: PivotAxis;
+  prefixes: PivotTreeNode['path'][];
+  preserveMetricChildren?: boolean;
+  program: PivotProgram;
+}) => {
   if (prefixes.length === 0) {
     return tree;
   }
-  const { preserveMetricChildren, metricLabelSet } = options || {};
+  const { metricLabelSet } = createExpansionMetricPolicy(program);
   const isUnderPrefix = (path: PivotTreeNode['path']) =>
     prefixes.some(prefix => prefix.every((val, idx) => val === path[idx]));
   const shouldPreserveMetricChild = (path: PivotTreeNode['path']) => {
-    if (!preserveMetricChildren || !metricLabelSet) {
+    if (!preserveMetricChildren) {
       return false;
     }
     return prefixes.some(prefix => {
@@ -464,21 +477,24 @@ export const mergeSameAxisExpansionTree = ({
   axis,
   touchedKeys,
   preserveMetricChildren,
-  metricLabelSet,
+  program,
 }: {
   currentTree: PivotTreeData;
   previousTree: PivotTreeData;
   axis: PivotAxis;
   touchedKeys: string[];
   preserveMetricChildren?: boolean;
-  metricLabelSet: ReadonlySet<string>;
+  program: PivotProgram;
 }) => {
   const touchedPrefixes = touchedKeys.map(key => parsePath(key));
   const preservedTree =
     touchedPrefixes.length > 0
-      ? pruneTreeByPrefixes(previousTree, axis, touchedPrefixes, {
+      ? pruneTreeByPrefixes({
+          tree: previousTree,
+          axis,
+          prefixes: touchedPrefixes,
           preserveMetricChildren,
-          metricLabelSet,
+          program,
         })
       : previousTree;
   return mergeTrees(currentTree, preservedTree);
@@ -662,14 +678,15 @@ export const computeVisibleDepths = ({
     expandedCols,
     config: config.buildRenderModelConfig({ tree, expandedRows, expandedCols }),
   });
+  const { countDimDepth } = createExpansionMetricPolicy(config.program);
   return {
     visibleRowDepth: Math.max(
       0,
-      ...renderModel.visibleRows.map(row => config.countDimDepth(row.path)),
+      ...renderModel.visibleRows.map(row => countDimDepth(row.path)),
     ),
     visibleColDepth: Math.max(
       0,
-      ...renderModel.visibleCols.map(col => config.countDimDepth(col.path)),
+      ...renderModel.visibleCols.map(col => countDimDepth(col.path)),
     ),
   };
 };
@@ -689,7 +706,7 @@ export const resolveExpandedForMetrics = ({
 }) => {
   const nodes = axis === 'row' ? tree.rows : tree.cols;
   const metricIndex = getValuesLevelIndex(program, axis);
-  const metricLabelSet = new Set(program.metricKeys);
+  const { metricLabelSet } = createExpansionMetricPolicy(program);
   const resolved = expandMetricPatternExpansions({
     expanded,
     nodes,
@@ -729,12 +746,13 @@ type ExpansionReinitAxis = {
   includeMetricDepth: boolean;
   tree: PivotTreeData;
   program: PivotProgram;
-  countDimDepth: (path: PivotTreeNode['path']) => number;
   hasNewData: boolean;
 };
 
 const resolveExpansionCacheAxis = (config: ExpansionReinitAxis) => {
-  const metricLabelSet = new Set(config.program.metricKeys);
+  const { metricLabelSet, countDimDepth } = createExpansionMetricPolicy(
+    config.program,
+  );
   const shouldClearCache =
     config.level > 0 &&
     (config.prevLevel === null || config.prevLevel === 0) &&
@@ -775,7 +793,7 @@ const resolveExpansionCacheAxis = (config: ExpansionReinitAxis) => {
     }
     const path = config.nodes[key]?.path ?? parsePath(key);
     const depth =
-      config.countDimDepth(path) +
+      countDimDepth(path) +
       (config.includeMetricDepth &&
       path.some(value => isMetricTokenForKeys(value, metricLabelSet))
         ? 1
@@ -825,7 +843,6 @@ export const resolveReinitializedExpansionState = (params: {
   colsChanged: boolean;
   hasNewData: boolean;
   program: PivotProgram;
-  countDimDepth: (path: PivotTreeNode['path']) => number;
 }) => {
   const { tree, currentLayout, sessionState } = params;
   const metricIndexForRows = getValuesLevelIndex(params.program, 'row');
@@ -839,7 +856,6 @@ export const resolveReinitializedExpansionState = (params: {
   const common = {
     tree,
     program: params.program,
-    countDimDepth: params.countDimDepth,
     hasNewData: params.hasNewData,
   };
   const rowKeys = sessionState.rows ?? [];

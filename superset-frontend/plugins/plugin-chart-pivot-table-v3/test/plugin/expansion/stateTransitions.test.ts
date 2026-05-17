@@ -147,9 +147,6 @@ describe('pivot/expansion/stateTransitions', () => {
     metrics: ['sales'],
   });
   const config: ExpansionVisibilityConfig = {
-    groupbyRowsLength: 2,
-    groupbyColumnsLength: 2,
-    countDimDepth: path => path.length,
     program: testProgram,
     buildRenderModelConfig: buildTestRenderModelConfig(),
   };
@@ -376,7 +373,7 @@ describe('pivot/expansion/stateTransitions', () => {
       previousTree,
       axis: 'row',
       touchedKeys: [aKey],
-      metricLabelSet: new Set(),
+      program: testProgram,
     });
 
     expect(new Set(Object.keys(result.rows))).toEqual(
@@ -414,7 +411,12 @@ describe('pivot/expansion/stateTransitions', () => {
       axis: 'col',
       touchedKeys: [aKey],
       preserveMetricChildren: true,
-      metricLabelSet: new Set(['m1']),
+      program: compilePivotProgram({
+        groupbyRows: [],
+        groupbyColumns: ['country', METRICS_PLACEHOLDER],
+        metrics: ['m1'],
+        metricsLayout: MetricsLayoutEnum.COLUMNS,
+      }),
     });
 
     expect(new Set(Object.keys(result.cols))).toEqual(
@@ -1177,7 +1179,12 @@ describe('pivot/expansion/stateTransitions', () => {
     };
     const metricConfig: ExpansionVisibilityConfig = {
       ...config,
-      countDimDepth: path => path.filter(value => value !== metricToken).length,
+      program: compilePivotProgram({
+        groupbyRows: ['country', 'city'],
+        groupbyColumns: ['month', 'day', METRICS_PLACEHOLDER],
+        metrics: ['m1'],
+        metricsLayout: MetricsLayoutEnum.COLUMNS,
+      }),
       buildRenderModelConfig: buildTestRenderModelConfig({
         metricsLayout: MetricsLayoutEnum.ROWS,
         metricLabelSet: new Set(['m1']),
@@ -1233,10 +1240,12 @@ describe('pivot/expansion/stateTransitions', () => {
     };
     const metricConfig: ExpansionVisibilityConfig = {
       ...config,
-      groupbyRowsLength: 3,
-      countDimDepth: path =>
-        path.filter(value => value !== metricToken && value !== SUBTOTAL_TOKEN)
-          .length,
+      program: compilePivotProgram({
+        groupbyRows: ['country', 'city', METRICS_PLACEHOLDER],
+        groupbyColumns: ['month', 'day'],
+        metrics: ['m1'],
+        metricsLayout: MetricsLayoutEnum.ROWS,
+      }),
       buildRenderModelConfig: buildTestRenderModelConfig({
         groupbyRowsLength: 3,
         metricsLayout: MetricsLayoutEnum.ROWS,

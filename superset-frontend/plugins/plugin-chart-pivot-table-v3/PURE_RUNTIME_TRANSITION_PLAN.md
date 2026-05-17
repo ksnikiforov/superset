@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14507` insertions, `15522` deletions, net `-1015`.
-- Current production TypeScript/TSX total: about `32563` lines.
+- Production `src`: `14508` insertions, `15526` deletions, net `-1018`.
+- Current production TypeScript/TSX total: about `32560` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -719,6 +719,10 @@ Success criteria:
   for single branch, batched branch, and intersection requests. The separate
   query builders remain, but request bookkeeping is no longer copied across
   each fetch shape.
+- Expansion visibility, same-axis merge preservation, and reinitialization no
+  longer receive caller-built metric-label sets or dimension-depth callbacks.
+  `stateTransitions` derives expansion metric policy from `PivotProgram`,
+  keeping the expansion hook out of semantic token/depth ownership.
 
 ## Current Risks
 

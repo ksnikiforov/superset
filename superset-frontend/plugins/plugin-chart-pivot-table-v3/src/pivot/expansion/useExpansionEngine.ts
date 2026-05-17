@@ -51,7 +51,6 @@ import {
   isValuesAtAxisEnd,
   shouldAutoExpandValuesLevel,
 } from '../runtime/projection';
-import { isSubtotalToken } from '../core/tokens';
 import type { PivotProgram } from '../runtime/types';
 import {
   buildFactValueKeys,
@@ -91,7 +90,6 @@ import {
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import type { RenderModelConfig } from '../render/renderModel';
 import { getStableColumnKey } from '../../utils';
-import { countDimDepth as countDimDepthBase } from '../metricsTotals';
 
 const MAX_HYDRATION_ITERATIONS = 12;
 type ExpansionStateCommit = {
@@ -430,18 +428,6 @@ export const useExpansionEngine = ({
     () => pivotProgram.columnDimensions.map(getStableColumnKey),
     [pivotProgram.columnDimensions],
   );
-  const metricLabelSet = useMemo(
-    () => new Set(pivotProgram.metricKeys),
-    [pivotProgram.metricKeys],
-  );
-  const countDimDepth = useCallback(
-    (path: PivotTreeNode['path']) =>
-      countDimDepthBase(
-        path.filter(val => !isSubtotalToken(val)),
-        metricLabelSet,
-      ),
-    [metricLabelSet],
-  );
   const previousLayoutRef = useRef({
     rows: groupbyRowKeys,
     cols: groupbyColumnKeys,
@@ -655,11 +641,10 @@ export const useExpansionEngine = ({
 
   const visibilityConfig = useMemo<ExpansionVisibilityConfig>(
     () => ({
-      countDimDepth,
       program: pivotProgram,
       buildRenderModelConfig,
     }),
-    [buildRenderModelConfig, countDimDepth, pivotProgram],
+    [buildRenderModelConfig, pivotProgram],
   );
 
   const persistExpansionState = useCallback(
@@ -831,7 +816,7 @@ export const useExpansionEngine = ({
           axis,
           touchedKeys: fetchLoop.touchedKeys,
           preserveMetricChildren,
-          metricLabelSet,
+          program: pivotProgram,
         });
         const finalExpanded = resolveExpandedForMetrics(
           axis,
@@ -859,7 +844,6 @@ export const useExpansionEngine = ({
       expansionRequestLifecycle,
       getCoverageKey,
       getMissingExpansionCoverage,
-      metricLabelSet,
       pivotProgram,
       persistExpansionState,
       pruneMergedTree,
@@ -1176,7 +1160,6 @@ export const useExpansionEngine = ({
       colsChanged,
       hasNewData,
       program: pivotProgram,
-      countDimDepth,
     });
     if (reinitializedExpansion.clearedState) {
       expansionStateStoreRef.current?.write(
@@ -1250,7 +1233,6 @@ export const useExpansionEngine = ({
   }, [
     clearLoadingState,
     commitExpansionState,
-    countDimDepth,
     data,
     expandedStateSignature,
     expandedStateSharedSignature,
@@ -1259,7 +1241,6 @@ export const useExpansionEngine = ({
     expandRowsLevelRaw,
     groupbyColumnKeys,
     groupbyRowKeys,
-    metricLabelSet,
     pivotProgram,
     shouldPersistExpansionState,
     resolvedExpandColumnsLevel,
