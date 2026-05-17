@@ -69,6 +69,17 @@ type LegacyTestPivotProps = {
   metrics?: PivotTableQueryFormData['metrics'];
   groupbyRows: PivotTableQueryFormData['groupbyRows'];
   groupbyColumns: PivotTableQueryFormData['groupbyColumns'];
+  startCollapsed?: PivotTableQueryFormData['startCollapsed'];
+  initialDepth?: PivotTableQueryFormData['initialDepth'];
+  rowTotals?: PivotTableQueryFormData['rowTotals'];
+  colTotals?: PivotTableQueryFormData['colTotals'];
+  rowSubTotals?: PivotTableQueryFormData['rowSubTotals'];
+  rowSubtotalLevels?: PivotTableQueryFormData['rowSubtotalLevels'];
+  colSubtotalLevels?: PivotTableQueryFormData['colSubtotalLevels'];
+  rowTotalPosition?: PivotTableQueryFormData['rowTotalPosition'];
+  rowSubtotalPosition?: PivotTableQueryFormData['rowSubtotalPosition'];
+  colTotalPosition?: PivotTableQueryFormData['colTotalPosition'];
+  colSubtotalPosition?: PivotTableQueryFormData['colSubtotalPosition'];
   aggregateFunction?: PivotTableQueryFormData['aggregateFunction'];
   valueFormat?: PivotTableQueryFormData['valueFormat'];
   columnFormats?: PivotTableQueryFormData['columnFormats'];
@@ -330,12 +341,6 @@ const baseProps: PivotTableProps & LegacyTestPivotProps = {
   groupbyRows: emptyGroupbyRows,
   groupbyColumns: emptyGroupbyColumns,
   aggregateFunction: 'Sum',
-  startCollapsed: false,
-  colTotals: false,
-  rowTotals: false,
-  rowSubTotals: false,
-  rowSubtotalLevels: [],
-  colSubtotalLevels: [],
   rowOrder: 'key_a_to_z',
   colOrder: 'key_a_to_z',
   width: 400,
@@ -380,7 +385,21 @@ export default function TestPivotTableChart(props: TestPivotTableChartProps) {
     hooks: { ...baseProps.hooks, ...(props.hooks ?? {}) },
   };
   const runtimeLayout = mergedProps.formData.pivotRuntimeLayout;
-  const { metrics: _legacyMetrics, ...chartProps } = mergedProps;
+  const {
+    metrics: _legacyMetrics,
+    startCollapsed: _legacyStartCollapsed,
+    initialDepth: _legacyInitialDepth,
+    rowTotals: _legacyRowTotals,
+    colTotals: _legacyColTotals,
+    rowSubTotals: _legacyRowSubTotals,
+    rowSubtotalLevels: _legacyRowSubtotalLevels,
+    colSubtotalLevels: _legacyColSubtotalLevels,
+    rowTotalPosition: _legacyRowTotalPosition,
+    rowSubtotalPosition: _legacyRowSubtotalPosition,
+    colTotalPosition: _legacyColTotalPosition,
+    colSubtotalPosition: _legacyColSubtotalPosition,
+    ...chartProps
+  } = mergedProps;
 
   return (
     <PivotTableChart

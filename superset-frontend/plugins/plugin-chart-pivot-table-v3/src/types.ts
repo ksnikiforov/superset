@@ -302,13 +302,6 @@ export interface PivotTableProps
   persistExpansionState?: boolean;
   sourceMetrics: QueryFormMetric[];
   sourceMeasureLeavesByMetric?: MeasureLeavesByMetricKey;
-  startCollapsed: boolean;
-  initialDepth?: number;
-  rowTotals: boolean;
-  colTotals: boolean;
-  rowSubTotals?: boolean;
-  rowSubtotalLevels?: number[];
-  colSubtotalLevels?: number[];
   emitCrossFilters?: boolean;
   setControlValue?: HandlerFunction;
   setDataMask: SetDataMaskHook;
@@ -321,8 +314,4 @@ export interface PivotTableProps
   extraControls?: {
     formData: PivotTableCustomizeProps;
   };
-  rowTotalPosition?: TotalPosition;
-  rowSubtotalPosition?: TotalPosition;
-  colTotalPosition?: TotalPosition;
-  colSubtotalPosition?: TotalPosition;
 }

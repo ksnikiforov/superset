@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14507` insertions, `15225` deletions, net `-718`.
-- Current production TypeScript/TSX total: about `32792` lines.
+- Production `src`: `14507` insertions, `15236` deletions, net `-729`.
+- Current production TypeScript/TSX total: about `32781` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -549,6 +549,9 @@ Success criteria:
   `sourceMetrics`. `PivotTableChart`, applied interaction layout, and seamless
   update planning no longer fall back to duplicate top-level chart `metrics` or
   nearby form-data snapshots to decide source metric order/labels.
+- `PivotTableProps` no longer advertises duplicate top-level collapse,
+  subtotal, total, or total-position props. Those policies are form-data/runtime
+  layout inputs, not chart-shell inputs.
 
 ## Current Risks
 
