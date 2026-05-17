@@ -167,7 +167,8 @@ const buildBootstrapPlanFromLayout = (
   formData: PivotTableQueryFormData,
   options: BootstrapPlanOptions = {},
 ): BootstrapTarget[] => {
-  const { groupbyRows: rowGroupby, groupbyColumns: colGroupby } = layout;
+  const rowGroupby = layout.pivotProgram.rowDimensions;
+  const colGroupby = layout.pivotProgram.columnDimensions;
   const { rowSubtotalLevels, colSubtotalLevelsForQuery: colSubtotalLevels } =
     layout;
   const needsTotals =
@@ -823,12 +824,9 @@ export const buildInitialQuerySpecs = (
   formData: PivotTableQueryFormData,
   layout: LayoutContext = buildLayoutContext(formData),
 ): PlannedQuerySpec[] => {
-  const {
-    groupbyRows: rowGroupby,
-    groupbyColumns: colGroupby,
-    metrics,
-    metricLabelSet,
-  } = layout;
+  const { metrics, metricLabelSet } = layout;
+  const rowGroupby = layout.pivotProgram.rowDimensions;
+  const colGroupby = layout.pivotProgram.columnDimensions;
   const rowKeys = rowGroupby.map(getStableColumnKey);
   const colKeys = colGroupby.map(getStableColumnKey);
   const {

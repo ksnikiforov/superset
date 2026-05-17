@@ -140,8 +140,8 @@ export const usePivotRenderModel = ({
   } = formData;
   const [activeColumnSort, setActiveColumnSort] =
     useState<PivotColumnSortState | null>(null);
-  const resolvedGroupbyRows = layout.layout.groupbyRows;
-  const resolvedGroupbyColumns = layout.layout.groupbyColumns;
+  const resolvedGroupbyRows = layout.layout.pivotProgram.rowDimensions;
+  const resolvedGroupbyColumns = layout.layout.pivotProgram.columnDimensions;
   const { colTotals, rowSubTotals } = layout.layout;
 
   const rowSortingKeyMap = useMemo(

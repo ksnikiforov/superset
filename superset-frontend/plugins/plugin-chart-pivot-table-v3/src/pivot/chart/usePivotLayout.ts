@@ -206,15 +206,15 @@ export const usePivotLayout = ({
     return layout.colSubtotalLevels;
   }, [layout.colSubtotalLevels, rowTotals]);
 
-  const { groupbyRows, groupbyColumns } = layout;
+  const { rowDimensions, columnDimensions } = layout.pivotProgram;
 
   const groupbyRowKeys = useMemo(
-    () => groupbyRows.map(getStableColumnKey),
-    [groupbyRows],
+    () => rowDimensions.map(getStableColumnKey),
+    [rowDimensions],
   );
   const groupbyColumnKeys = useMemo(
-    () => groupbyColumns.map(getStableColumnKey),
-    [groupbyColumns],
+    () => columnDimensions.map(getStableColumnKey),
+    [columnDimensions],
   );
 
   const expansionStateSharedSignatureData = useMemo(
@@ -327,11 +327,11 @@ export const usePivotLayout = ({
       const dimensionIndex = nonSubtotalParts.length - 1;
       const dimension =
         axis === 'row'
-          ? groupbyRows[dimensionIndex]
-          : groupbyColumns[dimensionIndex];
+          ? rowDimensions[dimensionIndex]
+          : columnDimensions[dimensionIndex];
       return dimension ? getColumnLabel(dimension) : undefined;
     },
-    [getNonMetricPathParts, groupbyColumns, groupbyRows],
+    [columnDimensions, getNonMetricPathParts, rowDimensions],
   );
 
   const isMetricGrandTotalNode = useCallback(
@@ -585,8 +585,6 @@ export const usePivotLayout = ({
       isMetricSubtotalNode,
       isMetricTokenValue,
       layout.colTotals,
-      layout.groupbyColumns.length,
-      layout.groupbyRows.length,
       layout.pivotProgram,
       layout.rowTotals,
       normalizedColSubtotalLevels,

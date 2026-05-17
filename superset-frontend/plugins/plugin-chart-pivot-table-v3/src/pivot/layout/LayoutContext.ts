@@ -74,8 +74,6 @@ export type PivotLayoutSpec = Pick<
 export type LayoutContext = {
   groupbyRowsRaw: QueryFormColumn[];
   groupbyColumnsRaw: QueryFormColumn[];
-  groupbyRows: QueryFormColumn[];
-  groupbyColumns: QueryFormColumn[];
   metrics: QueryFormMetric[];
   metricKeys: string[];
   metricLabelSet: Set<string>;
@@ -163,8 +161,7 @@ export const buildLayoutContext = (
   const groupbyRowsRaw = rawGroupbyPlacement?.rows ?? inputGroupbyRowsRaw;
   const groupbyColumnsRaw = rawGroupbyPlacement?.cols ?? inputGroupbyColumnsRaw;
 
-  const groupbyRows = pivotProgram.rowDimensions;
-  const groupbyColumns = pivotProgram.columnDimensions;
+  const { rowDimensions, columnDimensions } = pivotProgram;
 
   const rowTotals = layoutSpec.rowTotals ?? false;
   const colTotals = layoutSpec.colTotals ?? false;
@@ -173,14 +170,14 @@ export const buildLayoutContext = (
   const { metricInsertIndex } = pivotProgram;
 
   const rowSubTotalsEnabled = layoutSpec.rowSubTotals ?? true;
-  const maxRowSubtotalDepth = Math.max(groupbyRows.length - 1, 0);
+  const maxRowSubtotalDepth = Math.max(rowDimensions.length - 1, 0);
   const rowSubtotalLevels = normalizeSubtotalLevels(
     layoutSpec.rowSubtotalLevels,
     maxRowSubtotalDepth,
     colTotals,
     rowSubTotalsEnabled,
   );
-  const maxColSubtotalDepth = Math.max(groupbyColumns.length - 1, 0);
+  const maxColSubtotalDepth = Math.max(columnDimensions.length - 1, 0);
   const colSubtotalLevels = normalizeSubtotalLevels(
     ensureIsArray<number>(layoutSpec.colSubtotalLevels),
     maxColSubtotalDepth,
@@ -195,13 +192,13 @@ export const buildLayoutContext = (
   const initialDepth = layoutSpec.initialDepth ?? 1;
   const resolvedExpandRowsLevel = resolveExpandLevel(
     layoutSpec.expandRowsLevel ?? undefined,
-    groupbyRows.length,
+    rowDimensions.length,
     startCollapsed,
     initialDepth,
   );
   const resolvedExpandColsLevel = resolveExpandLevel(
     layoutSpec.expandColumnsLevel ?? undefined,
-    groupbyColumns.length,
+    columnDimensions.length,
     startCollapsed,
     initialDepth,
   );
@@ -214,8 +211,6 @@ export const buildLayoutContext = (
   return {
     groupbyRowsRaw,
     groupbyColumnsRaw,
-    groupbyRows,
-    groupbyColumns,
     metrics,
     metricKeys,
     metricLabelSet,

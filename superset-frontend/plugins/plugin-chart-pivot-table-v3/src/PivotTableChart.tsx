@@ -299,10 +299,10 @@ function PivotTableChart(props: PivotTableProps) {
     formData: appliedLayoutFormData,
     pivotProgram: appliedPivotProgram,
   });
-  const layoutGroupbyRows = layoutResult.layout.groupbyRows;
+  const layoutRowDimensions = layoutResult.layout.pivotProgram.rowDimensions;
   const rowAxisLabels = useMemo(
     () =>
-      layoutGroupbyRows.map(dimension => {
+      layoutRowDimensions.map(dimension => {
         const baseLabel = getColumnLabel(dimension);
         const stableKey = getStableColumnKey(dimension);
         return (
@@ -312,7 +312,7 @@ function PivotTableChart(props: PivotTableProps) {
             : baseLabel)
         );
       }),
-    [layoutGroupbyRows, resolvedVerboseMap],
+    [layoutRowDimensions, resolvedVerboseMap],
   );
   const {
     tree,

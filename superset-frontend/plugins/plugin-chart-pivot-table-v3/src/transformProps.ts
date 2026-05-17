@@ -155,13 +155,12 @@ export default function transformProps(
   const layout = buildLayoutContext(formDataWithMetricLabels);
   const {
     metrics,
-    groupbyRows,
-    groupbyColumns,
     rowSubtotalLevels,
     colSubtotalLevelsForQuery: colSubtotalLevels,
     metricsLayoutResolved: metricsLayout,
     metricInsertIndex,
   } = layout;
+  const { rowDimensions, columnDimensions } = layout.pivotProgram;
   const initialSpecs = buildInitialQuerySpecs(formDataWithMetricLabels, layout);
   const planMetrics = initialSpecs.reduce(
     (acc, spec) => mergeMetrics(acc, spec.metrics),
@@ -302,8 +301,8 @@ export default function transformProps(
   );
 
   const treeDataSignature = JSON.stringify({
-    rows: groupbyRows.map(getStableColumnKey),
-    cols: groupbyColumns.map(getStableColumnKey),
+    rows: rowDimensions.map(getStableColumnKey),
+    cols: columnDimensions.map(getStableColumnKey),
     metrics: metricKeysForQuery,
     metricsLayout,
     metricInsertIndex,

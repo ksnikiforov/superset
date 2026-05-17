@@ -136,8 +136,8 @@ export const resolveFetchContext = ({
 }: ResolveFetchContextParams): ResolvedFetchContext => {
   const layout = layoutParam ?? buildLayoutContext(formData);
   const { metrics } = layout;
-  const rowGroupby = layout.groupbyRows;
-  const colGroupby = layout.groupbyColumns;
+  const rowGroupby = layout.pivotProgram.rowDimensions;
+  const colGroupby = layout.pivotProgram.columnDimensions;
 
   const hasRowTotalSorting = hasTotalSorting(formData.rowSorting, rowGroupby);
   const hasColTotalSorting = hasTotalSorting(formData.colSorting, colGroupby);

@@ -502,7 +502,7 @@ export const usePivotFormatting = ({
   const metricFormattingScope =
     (formData.metricFormattingScope as MetricFormattingScope) ||
     'values_totals';
-  const { groupbyRows, groupbyColumns, metrics } = layout.layout;
+  const { metrics, pivotProgram } = layout.layout;
   const { rowSubTotals } = layout.layout;
 
   const metricFormatting = useMemo(
@@ -518,17 +518,17 @@ export const usePivotFormatting = ({
     () =>
       normalizeDimensionFormattingMapWithKeys(
         formData.rowFormatting,
-        groupbyRows,
+        pivotProgram.rowDimensions,
       ),
-    [formData.rowFormatting, groupbyRows],
+    [formData.rowFormatting, pivotProgram.rowDimensions],
   );
   const colFormatting = useMemo(
     () =>
       normalizeDimensionFormattingMapWithKeys(
         formData.colFormatting,
-        groupbyColumns,
+        pivotProgram.columnDimensions,
       ),
-    [formData.colFormatting, groupbyColumns],
+    [formData.colFormatting, pivotProgram.columnDimensions],
   );
   const derivedFormatOverrides = useMemo(() => {
     if (layout.measureHierarchy.kind !== 'measureStackV1') {

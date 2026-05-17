@@ -75,8 +75,8 @@ describe('layout resolution (contracts)', () => {
       colSubtotalLevels: number[];
     };
 
-    expect(signature.rows).toEqual(layout.groupbyRows);
-    expect(signature.cols).toEqual(layout.groupbyColumns);
+    expect(signature.rows).toEqual(layout.pivotProgram.rowDimensions);
+    expect(signature.cols).toEqual(layout.pivotProgram.columnDimensions);
 
     const bootstrapSpec = specs.find(spec => spec.meta.kind === 'bootstrap');
     expect(bootstrapSpec).toBeDefined();

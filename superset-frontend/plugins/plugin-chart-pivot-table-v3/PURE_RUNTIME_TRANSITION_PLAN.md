@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14478` insertions, `15291` deletions, net `-813`.
-- Current production TypeScript/TSX total: about `32697` lines.
+- Production `src`: `14488` insertions, `15311` deletions, net `-823`.
+- Current production TypeScript/TSX total: about `32687` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -393,6 +393,10 @@ Success criteria:
 - Render-model and display-state depth policy now derive row/column groupby
   depth from `PivotProgram`; render config no longer accepts duplicate groupby
   length inputs from chart layout.
+- `LayoutContext` no longer exposes duplicate semantic row/column dimension
+  arrays. Runtime planning, formatting, rendering, and transform signatures read
+  semantic dimensions from `PivotProgram`; raw groupby arrays remain only for
+  form/control serialization.
 - Column display path policy now consumes `PivotProgram`; render no longer
   passes separate column metric-layout, metric-first, or metric-at-end flags into
   the display helper.
