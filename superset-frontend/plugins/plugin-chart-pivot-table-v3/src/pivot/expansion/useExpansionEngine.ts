@@ -54,10 +54,7 @@ import {
   type PivotFactStore,
   type PivotFactStoreBatch,
 } from '../runtime/factStore';
-import {
-  createExpansionCoverageDiff,
-  type PivotExpansionCoverageDiff,
-} from '../runtime/coverage';
+import { createExpansionCoverageDiff } from '../runtime/coverage';
 import {
   addAncestors,
   buildVisiblePersistedExpansionState,
@@ -525,18 +522,6 @@ export const useExpansionEngine = ({
     inFlightExpandedColsRef.current.clear();
     inFlightExpansionIdRef.current = 0;
   }, []);
-
-  const getMissingExpansionCoverage = useCallback(
-    (): PivotExpansionCoverageDiff =>
-      createExpansionCoverageDiff({
-        factBatches: factStoreRef.current?.getCoverageBatches() ?? [],
-        program: pivotProgram,
-        valueKeys: buildFactValueKeys({
-          metricKeys: pivotProgram.metricKeys,
-        }),
-      }),
-    [pivotProgram],
-  );
 
   const commitExpansionState = useCallback(
     ({
@@ -1170,7 +1155,13 @@ export const useExpansionEngine = ({
       effectiveExpandColsLevel,
       autoExpandRowsLevelForDesired,
       autoExpandColsLevelForDesired,
-      getMissingExpansionCoverage: getMissingExpansionCoverage(),
+      getMissingExpansionCoverage: createExpansionCoverageDiff({
+        factBatches: factStoreRef.current?.getCoverageBatches() ?? [],
+        program: pivotProgram,
+        valueKeys: buildFactValueKeys({
+          metricKeys: pivotProgram.metricKeys,
+        }),
+      }),
       config: visibilityConfig,
     });
     if (prefetchAction.kind === 'hydrate') {
@@ -1205,7 +1196,6 @@ export const useExpansionEngine = ({
     expansionRequestLifecycle,
     resolveExpandedForMetrics,
     reportAsyncError,
-    getMissingExpansionCoverage,
     setHydratingState,
     visibilityConfig,
   ]);

@@ -163,7 +163,7 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14282` insertions, `15792` deletions, net `-1510`.
+- Production `src`: `14279` insertions, `15799` deletions, net `-1520`.
 - Current production TypeScript/TSX total: about `32557` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
@@ -804,6 +804,10 @@ Success criteria:
 - `PivotLayoutResult` no longer exports the explicit-subtotal predicate.
   Formatting, databar, render display, and render sorting use the canonical
   materialized subtotal-token predicate directly.
+- Initial expansion prefetch now builds its coverage diff directly at the
+  planner call site. The expansion hook no longer carries a one-off
+  `getMissingExpansionCoverage` callback just to invoke it inside the
+  reinitialization effect.
 
 ## Current Risks
 
