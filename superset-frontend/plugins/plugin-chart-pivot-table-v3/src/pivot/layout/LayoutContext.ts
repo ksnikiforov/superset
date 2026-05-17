@@ -33,7 +33,7 @@ import {
   normalizeSubtotalLevels,
   resolveExpandLevel,
 } from '../../utils';
-import { decodeMetricKey, getMetricKeys } from '../core/tokens';
+import { getMetricKeys } from '../core/tokens';
 import {
   coerceMeasureLeavesByMetric,
   collectRequiredTimeOffsets,
@@ -86,7 +86,6 @@ export type LayoutContext = {
   colSubtotalPosition: TotalPosition;
   resolvedExpandRowsLevel: number;
   resolvedExpandColsLevel: number;
-  isMetricTokenValue: (val: unknown) => boolean;
 };
 
 const normalizeTotalPosition = (value: unknown): TotalPosition => {
@@ -183,11 +182,6 @@ export const buildLayoutContext = (
     initialDepth,
   );
 
-  const isMetricTokenValue = (val: unknown) => {
-    const decoded = decodeMetricKey(val);
-    return !!decoded && metricLabelSet.has(decoded);
-  };
-
   return {
     metrics,
     metricLabelMap,
@@ -206,6 +200,5 @@ export const buildLayoutContext = (
     colSubtotalPosition: normalizeTotalPosition(layoutSpec.colSubtotalPosition),
     resolvedExpandRowsLevel,
     resolvedExpandColsLevel,
-    isMetricTokenValue,
   };
 };

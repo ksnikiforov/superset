@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14478` insertions, `15357` deletions, net `-879`.
-- Current production TypeScript/TSX total: about `32631` lines.
+- Production `src`: `14485` insertions, `15365` deletions, net `-880`.
+- Current production TypeScript/TSX total: about `32630` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -596,6 +596,9 @@ Success criteria:
 - `metricLabelSet` is no longer part of `LayoutContext`,
   `PivotLayoutResult`, or the chart-to-expansion boundary. Runtime code derives
   metric-token lookup sets locally from `PivotProgram.metricKeys`.
+- `LayoutContext` also no longer exports an `isMetricTokenValue` predicate.
+  The layout context exposes the compiled program; render/layout helpers derive
+  metric-token predicates from that program where needed.
 
 ## Current Risks
 

@@ -27,7 +27,7 @@ import {
   type TotalPosition,
 } from '../../types';
 import { resolveMetricDisplayLabel, getStableColumnKey } from '../../utils';
-import { getMetricKey, isSubtotalToken } from '../core/tokens';
+import { decodeMetricKey, getMetricKey, isSubtotalToken } from '../core/tokens';
 import { buildLayoutContext } from '../layout/LayoutContext';
 import { getValuesLevelIndex } from '../runtime/projection';
 import type { PivotProgram } from '../runtime/types';
@@ -178,13 +178,19 @@ export const usePivotLayout = ({
     resolvedExpandRowsLevel,
     resolvedExpandColsLevel: resolvedExpandColumnsLevel,
     metricLabelMap,
-    isMetricTokenValue,
     metrics,
   } = layout;
   const { metricsLayoutResolved: resolvedMetricsLayout, metricInsertIndex } =
     layout.pivotProgram;
   const { metricKeys: metricLabels } = layout.pivotProgram;
   const metricLabelSet = useMemo(() => new Set(metricLabels), [metricLabels]);
+  const isMetricTokenValue = useCallback(
+    (value: unknown) => {
+      const decoded = decodeMetricKey(value);
+      return decoded !== undefined && metricLabelSet.has(decoded);
+    },
+    [metricLabelSet],
+  );
   const metricVerboseMap = formData.verboseMap as
     | Record<string, string>
     | undefined;
