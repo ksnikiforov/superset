@@ -346,7 +346,7 @@ test('prepares runtime state persistence side-effect plan', () => {
 });
 
 describe('runtime layout reuse fetch policy', () => {
-  it('does not fetch for same-root-depth layout changes with stale committed coverage', () => {
+  it('fetches for same-root-depth layout changes when committed coverage is stale', () => {
     expect(
       shouldFetchRuntimeLayout({
         reuseSnapshot: reuseSnapshot(runtimeLayout, [factBatch(1, 0)]),
@@ -355,7 +355,7 @@ describe('runtime layout reuse fetch policy', () => {
           rows: ['country', 'state'],
         },
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('fetches when a root-depth change requires missing committed coverage', () => {
@@ -479,7 +479,7 @@ describe('runtime layout reuse fetch policy', () => {
     ).toBe(false);
   });
 
-  it('does not fetch when trimming hidden dimensions leaves visible coverage unchanged', () => {
+  it('fetches when trimming hidden dimensions leaves root coverage unsupported', () => {
     expect(
       shouldFetchRuntimeLayout({
         reuseSnapshot: reuseSnapshot(
@@ -491,7 +491,7 @@ describe('runtime layout reuse fetch policy', () => {
         ),
         nextLayout: runtimeLayout,
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('fetches when adding a hidden dimension changes Values placement', () => {
@@ -569,7 +569,7 @@ test('prepares local commit actions for covered runtime layout changes', () => {
       nextLayout,
       dimensionKeys: ['country', 'state', 'month'],
       metricKeys: ['sales'],
-      reuseSnapshot: reuseSnapshot(runtimeLayout, []),
+      reuseSnapshot: reuseSnapshot(runtimeLayout, [factBatch(1, 1)]),
       selection: { country: ['France'] },
       upstreamSignature: 'query-a',
     }),

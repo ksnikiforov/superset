@@ -133,7 +133,9 @@ Current semantic-layout contract:
 - dimension-only changes may reuse loaded facts only when the coverage manifest
   proves the next visible root coverage is already loaded;
 - seamless runtime update should not locally project around Values placement by
-  comparing shared dimension prefixes.
+  comparing shared dimension prefixes;
+- seamless runtime update should ask fact coverage directly instead of using
+  manifest-signature equality as a proxy for loaded data.
 
 Expected deletion targets:
 
@@ -161,7 +163,7 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14382` insertions, `15533` deletions, net `-1151`.
+- Production `src`: `14370` insertions, `15533` deletions, net `-1163`.
 - Current production TypeScript/TSX total: about `32557` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 

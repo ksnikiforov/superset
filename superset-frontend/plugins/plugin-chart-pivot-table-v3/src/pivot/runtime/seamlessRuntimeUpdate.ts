@@ -37,10 +37,7 @@ import {
   type PivotFactStoreBatch,
 } from './ingestQueryResults';
 import { insertValuesPlaceholder } from './compilePivotProgram';
-import {
-  buildRuntimeLayoutCoverageManifest,
-  factBatchesCoverRuntimeLayout,
-} from './coverage';
+import { factBatchesCoverRuntimeLayout } from './coverage';
 import {
   executeLatestRequest,
   executeScheduledLatestRequest,
@@ -107,9 +104,6 @@ const shouldFetchForSemanticLayoutChange = (
   return false;
 };
 
-const coverageManifestSignature = (runtimeLayout: PivotRuntimeLayout) =>
-  stableStringify(buildRuntimeLayoutCoverageManifest(runtimeLayout));
-
 export const shouldFetchRuntimeLayout = ({
   reuseSnapshot,
   nextLayout,
@@ -121,13 +115,7 @@ export const shouldFetchRuntimeLayout = ({
   if (shouldFetchForSemanticLayoutChange(reusableLayout, nextLayout)) {
     return true;
   }
-  const coverageNeedChanged =
-    coverageManifestSignature(reusableLayout) !==
-    coverageManifestSignature(nextLayout);
-  return (
-    coverageNeedChanged &&
-    !factBatchesCoverRuntimeLayout(reuseSnapshot.factBatches, nextLayout)
-  );
+  return !factBatchesCoverRuntimeLayout(reuseSnapshot.factBatches, nextLayout);
 };
 
 export const buildSeamlessRuntimeSyncSnapshot = ({
