@@ -539,6 +539,8 @@ Success criteria:
   chart no longer accepts or forwards duplicate top-level metadata props.
 - Sticky-header policy now comes from `formData`; the chart no longer accepts
   duplicate top-level sticky-header props.
+- Interaction time-grain context now comes from applied layout `formData`; the
+  chart no longer accepts a duplicate top-level time-grain prop.
 
 ## Current Risks
 
