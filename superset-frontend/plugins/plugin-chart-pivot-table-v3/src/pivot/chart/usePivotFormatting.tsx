@@ -479,12 +479,6 @@ export const usePivotFormatting = ({
   rowValuesMap,
   colValuesMap,
   getNodeDimDepth,
-  valueFormat,
-  columnFormats,
-  currencyFormats,
-  allowRenderHtml,
-  pivotTheme,
-  pivotThemeColors,
   theme,
 }: {
   tree: PivotTreeData;
@@ -495,14 +489,16 @@ export const usePivotFormatting = ({
   rowValuesMap: Map<string, Record<string, DataRecordValue>>;
   colValuesMap: Map<string, Record<string, DataRecordValue>>;
   getNodeDimDepth: (node: PivotTreeNode) => number;
-  valueFormat?: PivotTableProps['valueFormat'];
-  columnFormats: PivotTableProps['columnFormats'];
-  currencyFormats: PivotTableProps['currencyFormats'];
-  allowRenderHtml?: boolean;
-  pivotTheme: PivotTableProps['pivotTheme'];
-  pivotThemeColors: PivotTableProps['pivotThemeColors'];
   theme: PivotTableProps['theme'];
 }): PivotFormattingResult => {
+  const {
+    allowRenderHtml,
+    columnFormats,
+    currencyFormats,
+    pivotTheme,
+    pivotThemeColors,
+    valueFormat,
+  } = formData;
   const metricFormattingScope =
     (formData.metricFormattingScope as MetricFormattingScope) ||
     'values_totals';
