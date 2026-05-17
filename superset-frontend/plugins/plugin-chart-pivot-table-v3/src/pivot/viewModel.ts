@@ -174,7 +174,7 @@ export const buildColumnHeaderRows = (
             label: headerLabel,
             formattedLabel: headerLabel,
             level: headerPath.length,
-            hasChildren: false,
+            hasChildren: level < maxDepth - 1,
             isSubtotal: headerPath.some(isSubtotalToken),
           } as PivotTreeNode;
         }

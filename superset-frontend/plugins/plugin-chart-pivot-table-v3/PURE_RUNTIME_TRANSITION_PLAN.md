@@ -163,7 +163,7 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14285` insertions, `15800` deletions, net `-1515`.
+- Production `src`: `14279` insertions, `15799` deletions, net `-1520`.
 - Current production TypeScript/TSX total: about `32557` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
@@ -808,10 +808,6 @@ Success criteria:
   planner call site. The expansion hook no longer carries a one-off
   `getMissingExpansionCoverage` callback just to invoke it inside the
   reinitialization effect.
-- Render display toggles now require real materialized node expandability.
-  Synthetic column header nodes produced only from display paths are not treated
-  as expansion targets, so aggregate display headers cannot create toggle/query
-  behavior outside the compiled runtime policy.
 
 ## Current Risks
 
