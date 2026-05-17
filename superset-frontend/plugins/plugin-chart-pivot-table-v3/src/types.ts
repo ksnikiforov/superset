@@ -319,7 +319,6 @@ export interface PivotTableProps
     clientY: number,
     filters?: ContextMenuFilters,
   ) => void;
-  timeGrainSqla?: TimeGranularity;
   extraControls?: {
     formData: PivotTableCustomizeProps;
   };

@@ -77,7 +77,7 @@ export const usePivotInteractions = ({
   onContextMenu?: PivotTableProps['onContextMenu'];
   ownState?: PivotTableProps['ownState'];
   dateFormatters: PivotTableProps['formData']['dateFormatters'];
-  timeGrainSqla?: PivotTableProps['timeGrainSqla'];
+  timeGrainSqla?: PivotTableProps['formData']['timeGrainSqla'];
 }): PivotInteractionsResult => {
   const { pivotProgram } = layout.layout;
 

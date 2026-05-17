@@ -89,7 +89,6 @@ function PivotTableChart(props: PivotTableProps) {
     sourceMeasureLeavesByMetric,
     persistExpansionState: persistExpansionStateProp,
     onContextMenu,
-    timeGrainSqla,
     rowSubtotalLevels = [],
     colSubtotalLevels = [],
     rowTotals = false,
@@ -451,7 +450,9 @@ function PivotTableChart(props: PivotTableProps) {
     onContextMenu,
     ownState,
     dateFormatters: resolvedDateFormatters,
-    timeGrainSqla,
+    timeGrainSqla:
+      appliedLayoutFormData.timeGrainSqla ??
+      appliedLayoutFormData.time_grain_sqla,
   });
 
   const combinedWarnings = useMemo(
