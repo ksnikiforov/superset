@@ -220,60 +220,6 @@ export const projectionQueryFilterPath = (
     ? [...projection.filterDimensionPath, ...projection.postValuesDimensionPath]
     : projection.filterDimensionPath;
 
-const projectAxisPathForLevel = ({
-  program,
-  axis,
-  path,
-}: ResolveAxisProjectionInput): {
-  dimensionPath: PivotPath;
-  nextLevel?: PivotAxisLevel;
-} => {
-  const dimensionPath: PivotPath = [];
-  let pathIndex = 0;
-
-  for (const level of axisProgramFor(program, axis)) {
-    if (pathIndex >= path.length) {
-      return { dimensionPath, nextLevel: level };
-    }
-    const value = path[pathIndex];
-    if (level.kind === 'dimension') {
-      if (isCanonicalValuesPathToken(value, program)) {
-        return { dimensionPath, nextLevel: level };
-      }
-      dimensionPath.push(value);
-      pathIndex += 1;
-      continue;
-    }
-
-    let consumedValuesToken = false;
-    while (
-      pathIndex < path.length &&
-      isCanonicalValuesPathToken(path[pathIndex], program)
-    ) {
-      consumedValuesToken = true;
-      pathIndex += 1;
-    }
-    if (!consumedValuesToken) {
-      return { dimensionPath, nextLevel: level };
-    }
-  }
-  return { dimensionPath };
-};
-
-export const canRequestAxisExpansion = ({
-  program,
-  axis,
-  path,
-}: ResolveAxisProjectionInput): boolean => {
-  if (path.some(isSubtotalToken)) {
-    return false;
-  }
-  return (
-    projectAxisPathForLevel({ program, axis, path }).nextLevel?.kind ===
-    'dimension'
-  );
-};
-
 const projectAxisPathToCoverageDimensions = ({
   program,
   path,
@@ -413,6 +359,21 @@ export const resolveAxisProjection = ({
     measureLeafIds,
     valuesLevelSeen,
   };
+};
+
+export const canRequestAxisExpansion = ({
+  program,
+  axis,
+  path,
+}: ResolveAxisProjectionInput): boolean => {
+  if (path.some(isSubtotalToken)) {
+    return false;
+  }
+  const projection = resolveAxisProjection({ program, axis, path });
+  return (
+    projection.nextLevel?.kind === 'dimension' ||
+    projection.skippedPreValuesLevels.length > 0
+  );
 };
 
 export const resolveAxisChildProjection = ({

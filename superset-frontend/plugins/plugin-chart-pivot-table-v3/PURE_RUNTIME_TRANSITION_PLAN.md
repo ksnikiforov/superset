@@ -163,7 +163,7 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14363` insertions, `15552` deletions, net `-1189`.
+- Production `src`: `14324` insertions, `15552` deletions, net `-1228`.
 - Current production TypeScript/TSX total: about `32557` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
@@ -734,6 +734,9 @@ Success criteria:
   through hydration and same-axis fetch execution. Expansion planning now takes
   `PivotProgram` directly and calls the runtime projection rule at the planner
   boundary, so query permission is program-derived rather than callback-owned.
+- Expansion requestability no longer has a second axis-level walker. It derives
+  requestable dimension levels from the same axis projection result used by
+  query planning, including skipped pre-Values dimensions.
 - Expansion fetch execution now has one lifecycle/loading/warning/error shell
   for single branch, batched branch, and intersection requests. The separate
   query builders remain, but request bookkeeping is no longer copied across
