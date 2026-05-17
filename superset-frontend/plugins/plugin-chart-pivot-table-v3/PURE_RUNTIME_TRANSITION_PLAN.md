@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14474` insertions, `15088` deletions, net `-614`.
-- Current production TypeScript/TSX total: about `32896` lines.
+- Production `src`: `14480` insertions, `15107` deletions, net `-627`.
+- Current production TypeScript/TSX total: about `32883` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -525,6 +525,9 @@ Success criteria:
 - `transformProps` no longer exposes duplicate top-level chart props for
   formatting, sorting, groupby, aggregate, and theme fields that already belong
   to `formData` or hook-owned runtime state.
+- Render ordering and column type metadata now come from `formData`; the chart
+  no longer forwards duplicate top-level row order, column order, or
+  `colTypeMap` props into the render model and dimension-filter boundary.
 
 ## Current Risks
 
