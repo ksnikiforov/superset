@@ -345,77 +345,6 @@ export const isSameRuntimeLayout = (
   prev.valuePlacement.axis === next.valuePlacement.axis &&
   prev.valuePlacement.index === next.valuePlacement.index;
 
-const placementBeforeSharedDimensions = (
-  axisDimensions: string[],
-  index: number,
-  sharedDimensions: Set<string>,
-) => axisDimensions.slice(0, index).filter(item => sharedDimensions.has(item));
-
-const shouldFetchForValuePlacementChange = ({
-  prev,
-  next,
-}: {
-  prev: PivotRuntimeLayout;
-  next: PivotRuntimeLayout;
-}) => {
-  if (prev.valuePlacement.axis !== next.valuePlacement.axis) {
-    const prevValueAxis =
-      prev.valuePlacement.axis === 'row' ? prev.rows : prev.cols;
-    const nextValueAxis =
-      next.valuePlacement.axis === 'row' ? next.rows : next.cols;
-    return prevValueAxis.length > 0 || nextValueAxis.length > 0;
-  }
-  const prevValueAxis =
-    prev.valuePlacement.axis === 'row' ? prev.rows : prev.cols;
-  const nextValueAxis =
-    next.valuePlacement.axis === 'row' ? next.rows : next.cols;
-  if (prevValueAxis.length === 0 && nextValueAxis.length === 0) {
-    return false;
-  }
-  const sharedDimensions = new Set(
-    prevValueAxis.filter(dimension => nextValueAxis.includes(dimension)),
-  );
-  return !arraysEqual(
-    placementBeforeSharedDimensions(
-      prevValueAxis,
-      prev.valuePlacement.index,
-      sharedDimensions,
-    ),
-    placementBeforeSharedDimensions(
-      nextValueAxis,
-      next.valuePlacement.index,
-      sharedDimensions,
-    ),
-  );
-};
-
-const shouldFetchForSemanticLayoutChange = (
-  prev: PivotRuntimeLayout,
-  next: PivotRuntimeLayout,
-): boolean => {
-  if (
-    selectionSignature(prev.leafSelection) !==
-    selectionSignature(next.leafSelection)
-  ) {
-    return true;
-  }
-  if (
-    prev.valuePlacement.axis !== next.valuePlacement.axis ||
-    prev.valuePlacement.index !== next.valuePlacement.index
-  ) {
-    if (
-      shouldFetchForValuePlacementChange({
-        prev,
-        next,
-      })
-    ) {
-      return true;
-    }
-    return false;
-  }
-  return false;
-};
-
 export const buildFactCoverage = ({
   rowDimensions,
   columnDimensions,
@@ -575,30 +504,6 @@ export const factBatchesCoverRuntimeLayout = (
 ) => {
   const required = buildRuntimeLayoutCoverageManifest(runtimeLayout);
   return diffCoverageManifest({ required, factBatches }).length === 0;
-};
-
-const coverageManifestSignature = (runtimeLayout: PivotRuntimeLayout) =>
-  stableStringify(buildRuntimeLayoutCoverageManifest(runtimeLayout));
-
-export const shouldFetchRuntimeLayout = ({
-  factBatches,
-  previousLayout,
-  nextLayout,
-}: {
-  factBatches: PivotFactStoreBatch[];
-  previousLayout: PivotRuntimeLayout;
-  nextLayout: PivotRuntimeLayout;
-}) => {
-  if (shouldFetchForSemanticLayoutChange(previousLayout, nextLayout)) {
-    return true;
-  }
-  const coverageNeedChanged =
-    coverageManifestSignature(previousLayout) !==
-    coverageManifestSignature(nextLayout);
-  return (
-    coverageNeedChanged &&
-    !factBatchesCoverRuntimeLayout(factBatches, nextLayout)
-  );
 };
 
 export const buildBranchFactCoverages = ({

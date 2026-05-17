@@ -30,6 +30,7 @@ import {
   prepareRuntimeStatePersistence,
   prepareSeamlessRuntimeLayoutChange,
   prepareSeamlessRuntimeUpdateEffect,
+  shouldFetchRuntimeLayout,
   shouldSyncPersistedSelectedFilters,
 } from '../../../../src/pivot/runtime/seamlessRuntimeUpdate';
 
@@ -41,6 +42,23 @@ const runtimeLayout: PivotRuntimeLayout = {
   leafSelection: {},
   valuePlacement: { axis: 'col', index: 1 },
 };
+
+const factBatch = (
+  rowDepth: number,
+  columnDepth: number,
+  scope: PivotFactStoreBatch['scope'] = { kind: 'bootstrap' },
+): PivotFactStoreBatch => ({
+  coverage: buildFactCoverage({
+    reason: 'initial',
+    rowDimensions: ['country', 'state'].slice(0, Math.max(rowDepth, 1)),
+    columnDimensions: ['month', 'quarter'].slice(0, Math.max(columnDepth, 1)),
+    rowDepth,
+    columnDepth,
+  }),
+  scope,
+  valueKeys: ['sales'],
+  facts: [],
+});
 
 test('builds stable seamless runtime sync snapshots', () => {
   expect(
@@ -319,26 +337,202 @@ test('prepares runtime state persistence side-effect plan', () => {
   });
 });
 
-test('prepares fetch actions for runtime layout changes with missing coverage', () => {
-  const factBatch: PivotFactStoreBatch = {
-    coverage: buildFactCoverage({
-      reason: 'initial',
-      rowDimensions: ['country'],
-      columnDimensions: ['month'],
-      rowDepth: 1,
-      columnDepth: 0,
-    }),
-    facts: [],
-    valueKeys: ['sales'],
-    scope: { kind: 'bootstrap' },
-  };
+describe('runtime layout reuse fetch policy', () => {
+  it('does not fetch for same-root-depth layout changes with stale committed coverage', () => {
+    expect(
+      shouldFetchRuntimeLayout({
+        factBatches: [factBatch(1, 0)],
+        previousLayout: runtimeLayout,
+        nextLayout: {
+          ...runtimeLayout,
+          rows: ['country', 'state'],
+        },
+      }),
+    ).toBe(false);
+  });
 
+  it('fetches when a root-depth change requires missing committed coverage', () => {
+    expect(
+      shouldFetchRuntimeLayout({
+        factBatches: [factBatch(1, 0)],
+        previousLayout: {
+          ...runtimeLayout,
+          cols: [],
+        },
+        nextLayout: {
+          ...runtimeLayout,
+          rows: [],
+          cols: [],
+        },
+      }),
+    ).toBe(true);
+  });
+
+  it('does not fetch when removing a metric from already loaded root coverage', () => {
+    expect(
+      shouldFetchRuntimeLayout({
+        factBatches: [
+          {
+            ...factBatch(1, 1),
+            valueKeys: ['sales', 'profit'],
+          },
+        ],
+        previousLayout: {
+          ...runtimeLayout,
+          metrics: ['sales', 'profit'],
+        },
+        nextLayout: runtimeLayout,
+      }),
+    ).toBe(false);
+  });
+
+  it('does not fetch when adding a metric already present as support coverage', () => {
+    expect(
+      shouldFetchRuntimeLayout({
+        factBatches: [
+          {
+            ...factBatch(1, 1),
+            valueKeys: ['sales', 'profit'],
+            facts: [
+              {
+                rowPath: ['A'],
+                columnPath: ['X'],
+                valueKey: 'sales',
+                value: 1,
+                role: 'visible',
+              },
+              {
+                rowPath: ['A'],
+                columnPath: ['X'],
+                valueKey: 'profit',
+                value: 2,
+                role: 'support',
+              },
+            ],
+          },
+        ],
+        previousLayout: runtimeLayout,
+        nextLayout: {
+          ...runtimeLayout,
+          metrics: ['sales', 'profit'],
+        },
+      }),
+    ).toBe(false);
+  });
+
+  it('fetches when adding a metric missing from loaded root coverage', () => {
+    expect(
+      shouldFetchRuntimeLayout({
+        factBatches: [factBatch(1, 1)],
+        previousLayout: runtimeLayout,
+        nextLayout: {
+          ...runtimeLayout,
+          metrics: ['sales', 'profit'],
+        },
+      }),
+    ).toBe(true);
+  });
+
+  it('fetches when the root coverage dimensions change and coverage is missing', () => {
+    expect(
+      shouldFetchRuntimeLayout({
+        factBatches: [factBatch(1, 1)],
+        previousLayout: runtimeLayout,
+        nextLayout: {
+          ...runtimeLayout,
+          rows: ['state', 'country'],
+        },
+      }),
+    ).toBe(true);
+  });
+
+  it('does not fetch when changed root coverage is already loaded', () => {
+    expect(
+      shouldFetchRuntimeLayout({
+        factBatches: [
+          {
+            coverage: buildFactCoverage({
+              reason: 'initial',
+              rowDimensions: ['state'],
+              columnDimensions: ['month'],
+              rowDepth: 1,
+              columnDepth: 1,
+            }),
+            scope: { kind: 'bootstrap' },
+            valueKeys: ['sales'],
+            facts: [],
+          },
+        ],
+        previousLayout: runtimeLayout,
+        nextLayout: {
+          ...runtimeLayout,
+          rows: ['state', 'country'],
+        },
+      }),
+    ).toBe(false);
+  });
+
+  it('does not fetch when trimming hidden dimensions leaves visible coverage unchanged', () => {
+    expect(
+      shouldFetchRuntimeLayout({
+        factBatches: [factBatch(1, 2)],
+        previousLayout: {
+          ...runtimeLayout,
+          cols: ['month', 'quarter'],
+        },
+        nextLayout: runtimeLayout,
+      }),
+    ).toBe(false);
+  });
+
+  it('does not fetch when adding a hidden dimension only shifts Values after the same prefix', () => {
+    expect(
+      shouldFetchRuntimeLayout({
+        factBatches: [factBatch(0, 1)],
+        previousLayout: {
+          ...runtimeLayout,
+          rows: [],
+          cols: ['month'],
+          valuePlacement: { axis: 'col', index: 1 },
+        },
+        nextLayout: {
+          ...runtimeLayout,
+          rows: [],
+          cols: ['month', 'quarter'],
+          valuePlacement: { axis: 'col', index: 2 },
+        },
+      }),
+    ).toBe(false);
+  });
+
+  it('fetches when Values moves across an already shared dimension', () => {
+    expect(
+      shouldFetchRuntimeLayout({
+        factBatches: [factBatch(0, 1)],
+        previousLayout: {
+          ...runtimeLayout,
+          rows: [],
+          cols: ['month', 'quarter'],
+          valuePlacement: { axis: 'col', index: 2 },
+        },
+        nextLayout: {
+          ...runtimeLayout,
+          rows: [],
+          cols: ['month', 'quarter'],
+          valuePlacement: { axis: 'col', index: 1 },
+        },
+      }),
+    ).toBe(true);
+  });
+});
+
+test('prepares fetch actions for runtime layout changes with missing coverage', () => {
   expect(
     prepareSeamlessRuntimeLayoutChange({
       nextLayout: runtimeLayout,
       dimensionKeys: ['country', 'month'],
       metricKeys: ['sales'],
-      factBatches: [factBatch],
+      factBatches: [factBatch(1, 0)],
       previousRuntimeLayout: { ...runtimeLayout, cols: [] },
       selection: {},
       upstreamSignature: 'query-a',
