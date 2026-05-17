@@ -265,7 +265,6 @@ function PivotTableChart(props: PivotTableProps) {
     uiRuntimeLayout,
     uiRuntimeLayoutRef,
     baseFormData: fetchFormDataBaseWithFormatters,
-    sourceFormData: formData,
     sourceMetrics,
     sourceMeasureLeavesByMetric,
     upstreamSignature: upstreamSeamlessSignature,

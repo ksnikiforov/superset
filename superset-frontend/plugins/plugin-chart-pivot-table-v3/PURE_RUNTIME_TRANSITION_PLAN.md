@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14515` insertions, `15272` deletions, net `-757`.
-- Current production TypeScript/TSX total: about `32753` lines.
+- Production `src`: `14508` insertions, `15272` deletions, net `-764`.
+- Current production TypeScript/TSX total: about `32746` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -559,6 +559,9 @@ Success criteria:
 - Source measure-leaf metadata now follows the same explicit contract as source
   metrics. Runtime layout and seamless update planning no longer fall back to
   adjacent form-data snapshots for `measureLeavesByMetric`.
+- Seamless update planning no longer carries a separate `sourceFormData`
+  snapshot. The boundary takes query-ready `baseFormData` plus explicit source
+  metric and measure-leaf metadata.
 
 ## Current Risks
 
