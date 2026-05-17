@@ -29,7 +29,6 @@ import {
 } from '../core/tokens';
 import { stableStringify } from '../shared/stableStringify';
 import {
-  getNextAxisLevelForPath,
   isValuesFirstOnAxis,
   projectionQueryDimensions,
   projectionQueryFilterPath,
@@ -49,12 +48,6 @@ export type FactCoverageInput = {
   rowDepth: number;
   columnDepth: number;
   reason?: PivotCoverageReason;
-};
-
-export type ExpansionValuesLevelInput = {
-  program: PivotProgram;
-  axis: PivotAxis;
-  path: PivotPath;
 };
 
 export type BranchFactCoverageInput = {
@@ -422,9 +415,6 @@ const shouldFetchForSemanticLayoutChange = (
   }
   return false;
 };
-
-export const expansionRevealsValuesLevel = (input: ExpansionValuesLevelInput) =>
-  getNextAxisLevelForPath(input)?.kind === 'values';
 
 export const buildFactCoverage = ({
   rowDimensions,

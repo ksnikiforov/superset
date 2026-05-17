@@ -32,7 +32,11 @@ import {
 } from '../../../src/types';
 import { type PivotFactStoreBatch } from '../../../src/pivot/runtime/factStore';
 import { serializePath } from '../../../src/pivot/core/path';
-import { isMetricToken, isSubtotalToken } from '../../../src/pivot/core/tokens';
+import {
+  isMeasureLeafToken,
+  isMetricToken,
+  isSubtotalToken,
+} from '../../../src/pivot/core/tokens';
 import { buildFormData } from './pivotFormData';
 
 const noopSetDataMask: SetDataMaskHook = () => undefined;
@@ -61,7 +65,9 @@ const emptyGroupbyColumns: PivotTableProps['groupbyColumns'] = [];
 const emptyQueriesData: PivotTableProps['queriesData'] = [];
 
 const isDimensionalChildValue = (value: PivotPath[number]) =>
-  !isMetricToken(value) && !isSubtotalToken(value);
+  !isMetricToken(value) &&
+  !isMeasureLeafToken(value) &&
+  !isSubtotalToken(value);
 
 const countDimensionalPathDepth = (path: PivotPath) =>
   path.filter(isDimensionalChildValue).length;

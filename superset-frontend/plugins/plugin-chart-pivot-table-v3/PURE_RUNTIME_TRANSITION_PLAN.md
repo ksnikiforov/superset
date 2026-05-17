@@ -547,6 +547,12 @@ Success criteria:
 - Missing visible bootstrap cells are no longer repaired by expansion prefetch.
   Initial visible grid coverage must come from bootstrap/query planning, not a
   chart-owned recovery path.
+- A tempting render/materializer cleanup is to replace remaining
+  `metricInsertIndex` suppression and measure-axis fallback checks with pure
+  projection helpers. Measure leaves must stay non-dimensional in loaded
+  coverage, otherwise preloaded tree coverage can overclaim a deeper dimension
+  and skip a targeted expansion fetch. Do not cut this without first making
+  loaded measure-tier coverage explicit in the manifest/materializer contract.
 - Large result sets still pay main-thread JSON parsing and React commit costs.
 
 ## Approval Checkpoints

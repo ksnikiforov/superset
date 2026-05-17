@@ -54,12 +54,10 @@ import {
   resolveFetchContext,
 } from './resolveFetchContext';
 import { buildQueryShape, type QueryIntent } from './queryShape';
-import {
-  buildFactCoverage,
-  expansionRevealsValuesLevel,
-} from '../runtime/coverage';
+import { buildFactCoverage } from '../runtime/coverage';
 import {
   buildAxisCoverageKey,
+  getNextAxisLevelForPath,
   projectionQueryFilterPath,
   resolveAxisProjection,
 } from '../runtime/projection';
@@ -528,11 +526,11 @@ const buildBranchSpecs = ({
   visibleColDepth?: number;
 }): PlannedQuerySpec[] => {
   if (
-    expansionRevealsValuesLevel({
+    getNextAxisLevelForPath({
       program: layout.pivotProgram,
       axis,
       path,
-    })
+    })?.kind === 'values'
   ) {
     return [];
   }
@@ -683,11 +681,11 @@ const buildBatchSpecs = ({
   visibleColDepth: number;
 }): PlannedQuerySpec[] => {
   if (
-    expansionRevealsValuesLevel({
+    getNextAxisLevelForPath({
       program: layout.pivotProgram,
       axis,
       path: representative,
-    })
+    })?.kind === 'values'
   ) {
     return [];
   }
