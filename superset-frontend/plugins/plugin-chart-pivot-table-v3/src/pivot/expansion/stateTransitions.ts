@@ -53,7 +53,6 @@ import type { PivotProgram } from '../runtime/types';
 import { isMetricTokenForKeys } from '../core/tokens';
 
 export type ExpansionVisibilityConfig = {
-  metricLabelSet: Set<string>;
   countDimDepth: (path: PivotTreeNode['path']) => number;
   shouldFetchChildren: PivotExpansionNodeFetchPredicate;
   buildRenderModelConfig: (params: {
@@ -826,7 +825,6 @@ export const resolveReinitializedExpansionState = (params: {
   colsChanged: boolean;
   hasNewData: boolean;
   program: PivotProgram;
-  metricLabelSet: Set<string>;
   countDimDepth: (path: PivotTreeNode['path']) => number;
 }) => {
   const { tree, currentLayout, sessionState } = params;
@@ -840,7 +838,7 @@ export const resolveReinitializedExpansionState = (params: {
     metricIndexForCols < params.program.columnDimensions.length;
   const common = {
     tree,
-    metricLabelSet: new Set(params.metricLabelSet),
+    metricLabelSet: new Set(params.program.metricKeys),
     countDimDepth: params.countDimDepth,
     hasNewData: params.hasNewData,
   };

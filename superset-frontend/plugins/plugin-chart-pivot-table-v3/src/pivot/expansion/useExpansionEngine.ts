@@ -667,17 +667,11 @@ export const useExpansionEngine = ({
 
   const visibilityConfig = useMemo<ExpansionVisibilityConfig>(
     () => ({
-      metricLabelSet,
       countDimDepth,
       shouldFetchChildren,
       buildRenderModelConfig,
     }),
-    [
-      buildRenderModelConfig,
-      countDimDepth,
-      metricLabelSet,
-      shouldFetchChildren,
-    ],
+    [buildRenderModelConfig, countDimDepth, shouldFetchChildren],
   );
 
   const persistExpansionState = useCallback(
@@ -1195,7 +1189,6 @@ export const useExpansionEngine = ({
       colsChanged,
       hasNewData,
       program: pivotProgram,
-      metricLabelSet,
       countDimDepth,
     });
     if (reinitializedExpansion.clearedState) {

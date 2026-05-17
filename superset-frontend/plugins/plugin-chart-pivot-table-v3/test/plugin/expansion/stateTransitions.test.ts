@@ -144,7 +144,6 @@ describe('pivot/expansion/stateTransitions', () => {
   const config: ExpansionVisibilityConfig = {
     groupbyRowsLength: 2,
     groupbyColumnsLength: 2,
-    metricLabelSet: new Set<string>(),
     countDimDepth: path => path.length,
     shouldFetchChildren: ({ path }) => path.length < 2,
     buildRenderModelConfig: buildTestRenderModelConfig(),
@@ -1179,7 +1178,6 @@ describe('pivot/expansion/stateTransitions', () => {
     };
     const metricConfig: ExpansionVisibilityConfig = {
       ...config,
-      metricLabelSet: new Set(['m1']),
       countDimDepth: path => path.filter(value => value !== metricToken).length,
       buildRenderModelConfig: buildTestRenderModelConfig({
         metricsLayout: MetricsLayoutEnum.ROWS,
@@ -1237,7 +1235,6 @@ describe('pivot/expansion/stateTransitions', () => {
     const metricConfig: ExpansionVisibilityConfig = {
       ...config,
       groupbyRowsLength: 3,
-      metricLabelSet: new Set(['m1']),
       countDimDepth: path =>
         path.filter(value => value !== metricToken && value !== SUBTOTAL_TOKEN)
           .length,

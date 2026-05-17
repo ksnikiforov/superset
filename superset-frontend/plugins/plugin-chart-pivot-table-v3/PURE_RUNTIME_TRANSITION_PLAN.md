@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14559` insertions, `15432` deletions, net `-873`.
-- Current production TypeScript/TSX total: about `32637` lines.
+- Production `src`: `14556` insertions, `15438` deletions, net `-882`.
+- Current production TypeScript/TSX total: about `32628` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -653,6 +653,10 @@ Success criteria:
   including missing-node candidates. Subtotal nodes can remain in the rendered
   tree and expansion state, but they no longer independently trigger query
   loads because synthetic display paths are not requestable.
+- Expansion visibility and reinitialization no longer accept a duplicate
+  metric-label-set input from the hook. Visibility config owns only visible
+  depth, fetchability, and render-model policy; reinitialization derives metric
+  token authority from `PivotProgram`.
 
 ## Current Risks
 
