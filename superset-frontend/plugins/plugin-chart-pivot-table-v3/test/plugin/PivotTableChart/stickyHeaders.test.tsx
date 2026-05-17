@@ -56,7 +56,6 @@ describe('PivotTableChart sticky headers', () => {
         groupbyColumns={groupbyColumns}
         colTotals
         colTotalPosition="start"
-        stickyHeaders
       />,
     );
 
@@ -88,7 +87,6 @@ describe('PivotTableChart sticky headers', () => {
         groupbyColumns={groupbyColumns}
         colTotals
         colTotalPosition="end"
-        stickyHeaders={false}
       />,
     );
 
@@ -152,12 +150,13 @@ describe('PivotTableChart sticky headers', () => {
           groupbyRows,
           groupbyColumns: ['region', 'state', METRICS_PLACEHOLDER],
           metrics,
+          startCollapsed: false,
+          initialDepth: 2,
           stickyHeaders: true,
         })}
         metrics={metrics}
         groupbyRows={groupbyRows}
         groupbyColumns={['region', 'state']}
-        stickyHeaders
       />,
     );
 
@@ -231,16 +230,15 @@ describe('PivotTableChart sticky headers', () => {
             sum__num: 'sum__num',
             count: 'count',
           },
+          verboseMap: {
+            count: 'COUNT(*)',
+          },
         })}
         metrics={rowMetrics}
         groupbyRows={['name']}
         groupbyColumns={[]}
         colTotals
         colTotalPosition="start"
-        stickyHeaders
-        verboseMap={{
-          count: 'COUNT(*)',
-        }}
       />,
     );
 

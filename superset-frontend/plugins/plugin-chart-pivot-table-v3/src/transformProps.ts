@@ -427,6 +427,5 @@ export default function transformProps(
     rowSubtotalPosition,
     colTotalPosition,
     colSubtotalPosition,
-    stickyHeaders: formData.stickyHeaders ?? true,
   };
 }

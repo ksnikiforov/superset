@@ -99,7 +99,6 @@ function PivotTableChart(props: PivotTableProps) {
     rowSubtotalPosition = 'start',
     colTotalPosition = 'start',
     colSubtotalPosition = 'start',
-    stickyHeaders = true,
     theme = supersetTheme,
     appSection,
   } = props;
@@ -150,7 +149,7 @@ function PivotTableChart(props: PivotTableProps) {
 
   const appliedFormData = fetchFormDataBaseWithFormatters;
   const persistExpansionState = persistExpansionStateProp ?? true;
-  const resolvedStickyHeaders = formData.stickyHeaders ?? stickyHeaders;
+  const resolvedStickyHeaders = formData.stickyHeaders ?? true;
 
   const expandedRowsForSeamlessRef = useRef<Set<string>>(new Set());
   const expandedColsForSeamlessRef = useRef<Set<string>>(new Set());

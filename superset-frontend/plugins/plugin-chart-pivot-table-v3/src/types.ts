@@ -327,5 +327,4 @@ export interface PivotTableProps
   rowSubtotalPosition?: TotalPosition;
   colTotalPosition?: TotalPosition;
   colSubtotalPosition?: TotalPosition;
-  stickyHeaders?: boolean;
 }
