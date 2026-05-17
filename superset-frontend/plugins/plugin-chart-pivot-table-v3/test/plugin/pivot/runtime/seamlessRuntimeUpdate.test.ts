@@ -60,6 +60,14 @@ const factBatch = (
   facts: [],
 });
 
+const reuseSnapshot = (
+  layout: PivotRuntimeLayout,
+  factBatches: PivotFactStoreBatch[],
+) => ({
+  runtimeLayout: layout,
+  factBatches,
+});
+
 test('builds stable seamless runtime sync snapshots', () => {
   expect(
     buildSeamlessRuntimeSyncSnapshot({
@@ -341,8 +349,7 @@ describe('runtime layout reuse fetch policy', () => {
   it('does not fetch for same-root-depth layout changes with stale committed coverage', () => {
     expect(
       shouldFetchRuntimeLayout({
-        factBatches: [factBatch(1, 0)],
-        previousLayout: runtimeLayout,
+        reuseSnapshot: reuseSnapshot(runtimeLayout, [factBatch(1, 0)]),
         nextLayout: {
           ...runtimeLayout,
           rows: ['country', 'state'],
@@ -354,11 +361,13 @@ describe('runtime layout reuse fetch policy', () => {
   it('fetches when a root-depth change requires missing committed coverage', () => {
     expect(
       shouldFetchRuntimeLayout({
-        factBatches: [factBatch(1, 0)],
-        previousLayout: {
-          ...runtimeLayout,
-          cols: [],
-        },
+        reuseSnapshot: reuseSnapshot(
+          {
+            ...runtimeLayout,
+            cols: [],
+          },
+          [factBatch(1, 0)],
+        ),
         nextLayout: {
           ...runtimeLayout,
           rows: [],
@@ -371,16 +380,18 @@ describe('runtime layout reuse fetch policy', () => {
   it('does not fetch when removing a metric from already loaded root coverage', () => {
     expect(
       shouldFetchRuntimeLayout({
-        factBatches: [
+        reuseSnapshot: reuseSnapshot(
           {
-            ...factBatch(1, 1),
-            valueKeys: ['sales', 'profit'],
+            ...runtimeLayout,
+            metrics: ['sales', 'profit'],
           },
-        ],
-        previousLayout: {
-          ...runtimeLayout,
-          metrics: ['sales', 'profit'],
-        },
+          [
+            {
+              ...factBatch(1, 1),
+              valueKeys: ['sales', 'profit'],
+            },
+          ],
+        ),
         nextLayout: runtimeLayout,
       }),
     ).toBe(false);
@@ -389,7 +400,7 @@ describe('runtime layout reuse fetch policy', () => {
   it('does not fetch when adding a metric already present as support coverage', () => {
     expect(
       shouldFetchRuntimeLayout({
-        factBatches: [
+        reuseSnapshot: reuseSnapshot(runtimeLayout, [
           {
             ...factBatch(1, 1),
             valueKeys: ['sales', 'profit'],
@@ -410,8 +421,7 @@ describe('runtime layout reuse fetch policy', () => {
               },
             ],
           },
-        ],
-        previousLayout: runtimeLayout,
+        ]),
         nextLayout: {
           ...runtimeLayout,
           metrics: ['sales', 'profit'],
@@ -423,8 +433,7 @@ describe('runtime layout reuse fetch policy', () => {
   it('fetches when adding a metric missing from loaded root coverage', () => {
     expect(
       shouldFetchRuntimeLayout({
-        factBatches: [factBatch(1, 1)],
-        previousLayout: runtimeLayout,
+        reuseSnapshot: reuseSnapshot(runtimeLayout, [factBatch(1, 1)]),
         nextLayout: {
           ...runtimeLayout,
           metrics: ['sales', 'profit'],
@@ -436,8 +445,7 @@ describe('runtime layout reuse fetch policy', () => {
   it('fetches when the root coverage dimensions change and coverage is missing', () => {
     expect(
       shouldFetchRuntimeLayout({
-        factBatches: [factBatch(1, 1)],
-        previousLayout: runtimeLayout,
+        reuseSnapshot: reuseSnapshot(runtimeLayout, [factBatch(1, 1)]),
         nextLayout: {
           ...runtimeLayout,
           rows: ['state', 'country'],
@@ -449,7 +457,7 @@ describe('runtime layout reuse fetch policy', () => {
   it('does not fetch when changed root coverage is already loaded', () => {
     expect(
       shouldFetchRuntimeLayout({
-        factBatches: [
+        reuseSnapshot: reuseSnapshot(runtimeLayout, [
           {
             coverage: buildFactCoverage({
               reason: 'initial',
@@ -462,8 +470,7 @@ describe('runtime layout reuse fetch policy', () => {
             valueKeys: ['sales'],
             facts: [],
           },
-        ],
-        previousLayout: runtimeLayout,
+        ]),
         nextLayout: {
           ...runtimeLayout,
           rows: ['state', 'country'],
@@ -475,11 +482,13 @@ describe('runtime layout reuse fetch policy', () => {
   it('does not fetch when trimming hidden dimensions leaves visible coverage unchanged', () => {
     expect(
       shouldFetchRuntimeLayout({
-        factBatches: [factBatch(1, 2)],
-        previousLayout: {
-          ...runtimeLayout,
-          cols: ['month', 'quarter'],
-        },
+        reuseSnapshot: reuseSnapshot(
+          {
+            ...runtimeLayout,
+            cols: ['month', 'quarter'],
+          },
+          [factBatch(1, 2)],
+        ),
         nextLayout: runtimeLayout,
       }),
     ).toBe(false);
@@ -488,13 +497,15 @@ describe('runtime layout reuse fetch policy', () => {
   it('does not fetch when adding a hidden dimension only shifts Values after the same prefix', () => {
     expect(
       shouldFetchRuntimeLayout({
-        factBatches: [factBatch(0, 1)],
-        previousLayout: {
-          ...runtimeLayout,
-          rows: [],
-          cols: ['month'],
-          valuePlacement: { axis: 'col', index: 1 },
-        },
+        reuseSnapshot: reuseSnapshot(
+          {
+            ...runtimeLayout,
+            rows: [],
+            cols: ['month'],
+            valuePlacement: { axis: 'col', index: 1 },
+          },
+          [factBatch(0, 1)],
+        ),
         nextLayout: {
           ...runtimeLayout,
           rows: [],
@@ -508,13 +519,15 @@ describe('runtime layout reuse fetch policy', () => {
   it('fetches when Values moves across an already shared dimension', () => {
     expect(
       shouldFetchRuntimeLayout({
-        factBatches: [factBatch(0, 1)],
-        previousLayout: {
-          ...runtimeLayout,
-          rows: [],
-          cols: ['month', 'quarter'],
-          valuePlacement: { axis: 'col', index: 2 },
-        },
+        reuseSnapshot: reuseSnapshot(
+          {
+            ...runtimeLayout,
+            rows: [],
+            cols: ['month', 'quarter'],
+            valuePlacement: { axis: 'col', index: 2 },
+          },
+          [factBatch(0, 1)],
+        ),
         nextLayout: {
           ...runtimeLayout,
           rows: [],
@@ -532,8 +545,9 @@ test('prepares fetch actions for runtime layout changes with missing coverage', 
       nextLayout: runtimeLayout,
       dimensionKeys: ['country', 'month'],
       metricKeys: ['sales'],
-      factBatches: [factBatch(1, 0)],
-      previousRuntimeLayout: { ...runtimeLayout, cols: [] },
+      reuseSnapshot: reuseSnapshot({ ...runtimeLayout, cols: [] }, [
+        factBatch(1, 0),
+      ]),
       selection: {},
       upstreamSignature: 'query-a',
     }),
@@ -555,8 +569,7 @@ test('prepares local commit actions for covered runtime layout changes', () => {
       nextLayout,
       dimensionKeys: ['country', 'state', 'month'],
       metricKeys: ['sales'],
-      factBatches: [],
-      previousRuntimeLayout: runtimeLayout,
+      reuseSnapshot: reuseSnapshot(runtimeLayout, []),
       selection: { country: ['France'] },
       upstreamSignature: 'query-a',
     }),

@@ -118,9 +118,6 @@ const rangeFromOne = (depth: number): number[] =>
   Array.from({ length: depth }, (_, idx) => idx + 1);
 
 const uniqueDepths = (depths: number[]) => Array.from(new Set(depths));
-const arraysEqual = (left: string[], right: string[]) =>
-  left.length === right.length &&
-  left.every((value, index) => value === right[index]);
 
 export const normalizeFactValueKeys = (valueKeys: string[] = []) =>
   Array.from(new Set(valueKeys)).sort();
@@ -328,22 +325,6 @@ const scopeCoversAxisPaths = (
     ),
   );
 };
-
-const selectionSignature = (selection: PivotRuntimeLayout['leafSelection']) =>
-  stableStringify(selection ?? {});
-
-export const isSameRuntimeLayout = (
-  prev: PivotRuntimeLayout,
-  next: PivotRuntimeLayout,
-) =>
-  arraysEqual(prev.rows, next.rows) &&
-  arraysEqual(prev.cols, next.cols) &&
-  arraysEqual(prev.metrics, next.metrics) &&
-  arraysEqual(prev.leafOrder ?? [], next.leafOrder ?? []) &&
-  selectionSignature(prev.leafSelection) ===
-    selectionSignature(next.leafSelection) &&
-  prev.valuePlacement.axis === next.valuePlacement.axis &&
-  prev.valuePlacement.index === next.valuePlacement.index;
 
 export const buildFactCoverage = ({
   rowDimensions,

@@ -34,8 +34,8 @@ import {
 } from '@superset-ui/core';
 import { type PivotRuntimeLayout } from '../../types';
 import { buildRuntimeSelectionSyncState } from '../filters';
-import { isSameRuntimeLayout } from '../runtime/coverage';
 import {
+  isSameRuntimeLayout,
   prepareRuntimeLayoutPropSync,
   prepareRuntimeStatePersistence,
   shouldSyncPersistedSelectedFilters,

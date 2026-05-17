@@ -43,6 +43,7 @@ import { createLatestRequestLifecycle } from '../runtime/requestLifecycle';
 import {
   buildSeamlessRuntimeSyncSnapshot,
   fetchAndMaterializeSeamlessRuntimeUpdate,
+  isSameRuntimeLayout,
   prepareSeamlessRuntimeUpdateEffect,
   prepareSeamlessRuntimeLayoutChange,
   type SeamlessRuntimeSyncSnapshot,
@@ -60,7 +61,6 @@ import {
   removeDimensionFromLayout,
 } from '../layout/interactionDrag';
 import { getStableColumnKey } from '../../utils';
-import { isSameRuntimeLayout } from '../runtime/coverage';
 
 type RuntimeSelection = Record<string, DataRecordValue[]>;
 
@@ -287,8 +287,10 @@ export const usePivotSeamlessRuntimeUpdate = (
         nextLayout,
         dimensionKeys,
         metricKeys,
-        factBatches: committedFactBatches,
-        previousRuntimeLayout: uiRuntimeLayoutRef.current,
+        reuseSnapshot: {
+          runtimeLayout: uiRuntimeLayoutRef.current,
+          factBatches: committedFactBatches,
+        },
         selection: uiSelectedFilters,
         upstreamSignature,
       });

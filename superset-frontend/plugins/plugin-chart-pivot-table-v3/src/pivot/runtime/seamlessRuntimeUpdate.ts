@@ -40,7 +40,6 @@ import { insertValuesPlaceholder } from './compilePivotProgram';
 import {
   buildRuntimeLayoutCoverageManifest,
   factBatchesCoverRuntimeLayout,
-  isSameRuntimeLayout,
 } from './coverage';
 import {
   executeLatestRequest,
@@ -68,8 +67,26 @@ type SeamlessRuntimeUpstreamState = {
   signature: string;
 } | null;
 
+export type SeamlessRuntimeReuseSnapshot = {
+  runtimeLayout: PivotRuntimeLayout;
+  factBatches: PivotFactStoreBatch[];
+};
+
 const selectionSignature = (selection: PivotRuntimeLayout['leafSelection']) =>
   stableStringify(selection ?? {});
+
+export const isSameRuntimeLayout = (
+  prev: PivotRuntimeLayout,
+  next: PivotRuntimeLayout,
+) =>
+  isEqual(prev.rows, next.rows) &&
+  isEqual(prev.cols, next.cols) &&
+  isEqual(prev.metrics, next.metrics) &&
+  isEqual(prev.leafOrder ?? [], next.leafOrder ?? []) &&
+  selectionSignature(prev.leafSelection) ===
+    selectionSignature(next.leafSelection) &&
+  prev.valuePlacement.axis === next.valuePlacement.axis &&
+  prev.valuePlacement.index === next.valuePlacement.index;
 
 const placementBeforeSharedDimensions = (
   axisDimensions: string[],
@@ -141,23 +158,22 @@ const coverageManifestSignature = (runtimeLayout: PivotRuntimeLayout) =>
   stableStringify(buildRuntimeLayoutCoverageManifest(runtimeLayout));
 
 export const shouldFetchRuntimeLayout = ({
-  factBatches,
-  previousLayout,
+  reuseSnapshot,
   nextLayout,
 }: {
-  factBatches: PivotFactStoreBatch[];
-  previousLayout: PivotRuntimeLayout;
+  reuseSnapshot: SeamlessRuntimeReuseSnapshot;
   nextLayout: PivotRuntimeLayout;
 }) => {
-  if (shouldFetchForSemanticLayoutChange(previousLayout, nextLayout)) {
+  const reusableLayout = reuseSnapshot.runtimeLayout;
+  if (shouldFetchForSemanticLayoutChange(reusableLayout, nextLayout)) {
     return true;
   }
   const coverageNeedChanged =
-    coverageManifestSignature(previousLayout) !==
+    coverageManifestSignature(reusableLayout) !==
     coverageManifestSignature(nextLayout);
   return (
     coverageNeedChanged &&
-    !factBatchesCoverRuntimeLayout(factBatches, nextLayout)
+    !factBatchesCoverRuntimeLayout(reuseSnapshot.factBatches, nextLayout)
   );
 };
 
@@ -381,16 +397,14 @@ export const prepareSeamlessRuntimeLayoutChange = ({
   nextLayout,
   dimensionKeys,
   metricKeys,
-  factBatches,
-  previousRuntimeLayout,
+  reuseSnapshot,
   selection,
   upstreamSignature,
 }: {
   nextLayout: PivotRuntimeLayout;
   dimensionKeys: string[];
   metricKeys: string[];
-  factBatches: PivotFactStoreBatch[];
-  previousRuntimeLayout: PivotRuntimeLayout;
+  reuseSnapshot: SeamlessRuntimeReuseSnapshot;
   selection: RuntimeSelection;
   upstreamSignature: string;
 }) => {
@@ -401,8 +415,7 @@ export const prepareSeamlessRuntimeLayoutChange = ({
   );
   if (
     shouldFetchRuntimeLayout({
-      factBatches,
-      previousLayout: previousRuntimeLayout,
+      reuseSnapshot,
       nextLayout: runtimeLayout,
     })
   ) {
