@@ -44,7 +44,6 @@ type ResolvedLayoutParams = {
 type AppliedInteractionLayoutParams = {
   isUserControlled: boolean;
   appliedFormData: PivotTableQueryFormData;
-  formData: PivotTableQueryFormData;
   sourceMetrics: PivotTableQueryFormData['metrics'];
   sourceMeasureLeavesByMetric: PivotTableQueryFormData['measureLeavesByMetric'];
   committedRuntimeLayout: PivotRuntimeLayout;
@@ -230,7 +229,6 @@ export const resolveInteractionFormData = ({
 export const resolveAppliedInteractionLayout = ({
   isUserControlled,
   appliedFormData,
-  formData,
   sourceMetrics,
   sourceMeasureLeavesByMetric,
   committedRuntimeLayout,

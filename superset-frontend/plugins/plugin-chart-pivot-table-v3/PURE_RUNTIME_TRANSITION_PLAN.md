@@ -163,7 +163,7 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14328` insertions, `15560` deletions, net `-1232`.
+- Production `src`: `14393` insertions, `15723` deletions, net `-1330`.
 - Current production TypeScript/TSX total: about `32557` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
@@ -762,6 +762,10 @@ Success criteria:
   supplies a missing-coverage callback for fetch-loop execution; initial
   prefetch still passes a concrete coverage diff into the pure planner before
   the fetch runtime exists.
+- Render visibility policy now lives inside `render/renderModel.ts`, its only
+  production caller. The separate `pivot/visibility.ts` policy surface has been
+  deleted, so expansion and rendering share `buildRenderModelAxes` without an
+  extra visibility module sitting between them.
 
 ## Current Risks
 

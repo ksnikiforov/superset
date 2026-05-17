@@ -106,7 +106,6 @@ export const buildLayoutContext = (
   );
   const metrics = ensureIsArray<QueryFormMetric>(layoutSpec.metrics);
   const metricKeys = getMetricKeys(metrics);
-  const metricLabelSet = new Set(metricKeys);
   const labelOverrides =
     (layoutSpec.metricLabelMap as Record<string, string> | undefined) ?? {};
   const verboseMap =

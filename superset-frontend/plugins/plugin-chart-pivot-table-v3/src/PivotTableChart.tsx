@@ -219,7 +219,6 @@ function PivotTableChart(props: PivotTableProps) {
     resolveAppliedInteractionLayout({
       isUserControlled,
       appliedFormData,
-      formData,
       sourceMetrics,
       sourceMeasureLeavesByMetric,
       committedRuntimeLayout: committedRuntimeLayoutRef.current,

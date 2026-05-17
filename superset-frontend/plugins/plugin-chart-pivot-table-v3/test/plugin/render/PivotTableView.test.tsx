@@ -25,6 +25,13 @@ import { type PivotTreeData, type PivotTreeNode } from '../../../src/types';
 import { serializePath } from '../../../src/pivot/core/path';
 import { type PivotFormattingResult } from '../../../src/pivot/chart/usePivotFormatting';
 import { getPivotV3ExportSheetDataForChart } from '../../../src/export/buildPivotV3ExportTable';
+import { compilePivotProgram } from '../../../src/pivot/runtime/compilePivotProgram';
+
+const basePivotProgram = compilePivotProgram({
+  groupbyRows: [],
+  groupbyColumns: [],
+  metrics: [],
+});
 
 const baseRenderModel: RenderModel = {
   visibleRows: [],
@@ -61,6 +68,7 @@ const renderView = (showGlobalLoader: boolean) =>
       height={300}
       width={400}
       renderModel={baseRenderModel}
+      pivotProgram={basePivotProgram}
       tree={baseTree}
       expandedRows={new Set()}
       expandedCols={new Set()}
@@ -78,7 +86,6 @@ const renderView = (showGlobalLoader: boolean) =>
       isRowAggregateBold={() => false}
       isColAggregateBold={() => false}
       getNodeDimDepth={() => 0}
-      isMetricGrandTotalNode={() => false}
       handleCellClick={jest.fn()}
       handleCellKeyDown={jest.fn()}
       handleCellContextMenu={jest.fn()}
@@ -98,6 +105,7 @@ describe('PivotTableView', () => {
         height={300}
         width={400}
         renderModel={baseRenderModel}
+        pivotProgram={basePivotProgram}
         tree={baseTree}
         expandedRows={new Set()}
         expandedCols={new Set()}
@@ -115,7 +123,6 @@ describe('PivotTableView', () => {
         isRowAggregateBold={() => false}
         isColAggregateBold={() => false}
         getNodeDimDepth={() => 0}
-        isMetricGrandTotalNode={() => false}
         handleCellClick={jest.fn()}
         handleCellKeyDown={jest.fn()}
         handleCellContextMenu={jest.fn()}
@@ -159,6 +166,7 @@ describe('PivotTableView', () => {
         height={300}
         width={400}
         renderModel={renderModel}
+        pivotProgram={basePivotProgram}
         tree={baseTree}
         expandedRows={new Set()}
         expandedCols={new Set()}
@@ -176,7 +184,6 @@ describe('PivotTableView', () => {
         isRowAggregateBold={() => false}
         isColAggregateBold={() => false}
         getNodeDimDepth={() => 0}
-        isMetricGrandTotalNode={() => false}
         handleCellClick={jest.fn()}
         handleCellKeyDown={jest.fn()}
         handleCellContextMenu={jest.fn()}
@@ -217,6 +224,7 @@ describe('PivotTableView', () => {
         height={300}
         width={400}
         renderModel={renderModel}
+        pivotProgram={basePivotProgram}
         tree={baseTree}
         expandedRows={new Set()}
         expandedCols={new Set()}
@@ -234,7 +242,6 @@ describe('PivotTableView', () => {
         isRowAggregateBold={() => false}
         isColAggregateBold={() => false}
         getNodeDimDepth={() => 0}
-        isMetricGrandTotalNode={() => false}
         handleCellClick={jest.fn()}
         handleCellKeyDown={jest.fn()}
         handleCellContextMenu={jest.fn()}
@@ -278,6 +285,7 @@ describe('PivotTableView', () => {
         height={300}
         width={400}
         renderModel={renderModel}
+        pivotProgram={basePivotProgram}
         tree={baseTree}
         expandedRows={new Set()}
         expandedCols={new Set()}
@@ -295,7 +303,6 @@ describe('PivotTableView', () => {
         isRowAggregateBold={() => false}
         isColAggregateBold={() => false}
         getNodeDimDepth={() => 1}
-        isMetricGrandTotalNode={() => false}
         handleCellClick={jest.fn()}
         handleCellKeyDown={jest.fn()}
         handleCellContextMenu={jest.fn()}
@@ -338,6 +345,7 @@ describe('PivotTableView', () => {
         height={300}
         width={400}
         renderModel={renderModel}
+        pivotProgram={basePivotProgram}
         tree={baseTree}
         expandedRows={new Set()}
         expandedCols={new Set()}
@@ -355,7 +363,6 @@ describe('PivotTableView', () => {
         isRowAggregateBold={() => false}
         isColAggregateBold={() => false}
         getNodeDimDepth={() => 0}
-        isMetricGrandTotalNode={() => false}
         handleCellClick={jest.fn()}
         handleCellKeyDown={jest.fn()}
         handleCellContextMenu={jest.fn()}
@@ -405,6 +412,7 @@ describe('PivotTableView', () => {
         height={300}
         width={400}
         renderModel={renderModel}
+        pivotProgram={basePivotProgram}
         tree={baseTree}
         expandedRows={new Set()}
         expandedCols={new Set()}
@@ -422,7 +430,6 @@ describe('PivotTableView', () => {
         isRowAggregateBold={() => false}
         isColAggregateBold={() => false}
         getNodeDimDepth={node => node.path.length}
-        isMetricGrandTotalNode={node => node === grandTotal}
         handleCellClick={jest.fn()}
         handleCellKeyDown={jest.fn()}
         handleCellContextMenu={jest.fn()}
