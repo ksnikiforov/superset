@@ -22,7 +22,11 @@ import {
   type PivotTreeNode,
   type TotalPosition,
 } from '../../types';
-import { buildColumnHeaderRows, type HeaderCellInfo } from '../viewModel';
+import {
+  buildColumnHeaderRows,
+  rootKey,
+  type HeaderCellInfo,
+} from '../viewModel';
 import { buildVisibleCellEntries, type VisibleCellEntry } from '../cellUtils';
 import { buildVisiblePivotAxes } from '../visibility';
 import type { PivotProgram } from '../runtime/types';

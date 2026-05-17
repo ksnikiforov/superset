@@ -334,7 +334,6 @@ function PivotTableChart(props: PivotTableProps) {
     fetchFormData,
     resolvedExpandRowsLevel: layoutResult.resolvedExpandRowsLevel,
     resolvedExpandColumnsLevel: layoutResult.resolvedExpandColumnsLevel,
-    isMetricTokenValue: layoutResult.isMetricTokenValue,
     pivotProgram: layoutResult.layout.pivotProgram,
     buildRenderModelConfig: layoutResult.buildRenderModelConfig,
     expandRowsLevelRaw: layoutResult.expandRowsLevelRaw,

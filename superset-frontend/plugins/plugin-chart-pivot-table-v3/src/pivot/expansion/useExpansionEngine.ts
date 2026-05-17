@@ -52,7 +52,7 @@ import {
   isValuesAtAxisEnd,
   shouldAutoExpandValuesLevel,
 } from '../runtime/projection';
-import { isSubtotalToken } from '../core/tokens';
+import { decodeMetricKey, isSubtotalToken } from '../core/tokens';
 import type { PivotProgram } from '../runtime/types';
 import {
   buildFactValueKeys,
@@ -306,7 +306,6 @@ export type ExpansionEngineConfig = {
   fetchFormData: PivotTableQueryFormData;
   resolvedExpandRowsLevel: number;
   resolvedExpandColumnsLevel: number;
-  isMetricTokenValue: (value: unknown) => boolean;
   pivotProgram: PivotProgram;
   buildRenderModelConfig: (params: {
     tree: PivotTreeData;
@@ -336,7 +335,6 @@ export const useExpansionEngine = ({
   fetchFormData,
   resolvedExpandRowsLevel,
   resolvedExpandColumnsLevel,
-  isMetricTokenValue,
   pivotProgram,
   buildRenderModelConfig,
   expandRowsLevelRaw,
@@ -437,6 +435,13 @@ export const useExpansionEngine = ({
   const metricLabelSet = useMemo(
     () => new Set(pivotProgram.metricKeys),
     [pivotProgram.metricKeys],
+  );
+  const isMetricTokenValue = useCallback(
+    (value: unknown) => {
+      const decoded = decodeMetricKey(value);
+      return decoded !== undefined && metricLabelSet.has(decoded);
+    },
+    [metricLabelSet],
   );
   const countDimDepth = useCallback(
     (path: PivotTreeNode['path']) =>

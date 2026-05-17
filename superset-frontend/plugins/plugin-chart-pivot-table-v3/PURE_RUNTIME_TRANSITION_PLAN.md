@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14480` insertions, `15363` deletions, net `-883`.
-- Current production TypeScript/TSX total: about `32627` lines.
+- Production `src`: `14490` insertions, `15365` deletions, net `-875`.
+- Current production TypeScript/TSX total: about `32635` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -608,6 +608,9 @@ Success criteria:
 - Render display helpers no longer receive metric-token predicates from layout
   for metric-node auto-expansion or toggle checks. They derive those checks from
   the compiled `PivotProgram`.
+- The chart-to-expansion boundary no longer passes a metric-token predicate.
+  Expansion derives metric-token checks from `PivotProgram.metricKeys`, keeping
+  that semantic lookup local to the expansion policy that uses it.
 
 ## Current Risks
 
