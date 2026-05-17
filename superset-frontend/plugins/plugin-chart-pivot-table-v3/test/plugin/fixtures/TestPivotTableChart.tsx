@@ -28,6 +28,7 @@ import {
   PivotAxis,
   PivotPath,
   PivotTableProps,
+  PivotTableQueryFormData,
   PivotTreeData,
 } from '../../../src/types';
 import { type PivotFactStoreBatch } from '../../../src/pivot/runtime/factStore';
@@ -60,9 +61,20 @@ const baseDatasource: Datasource = {
 
 const baseFormData = buildFormData({});
 const emptyMetrics: PivotTableProps['metrics'] = [];
-const emptyGroupbyRows: PivotTableProps['groupbyRows'] = [];
-const emptyGroupbyColumns: PivotTableProps['groupbyColumns'] = [];
+const emptyGroupbyRows: PivotTableQueryFormData['groupbyRows'] = [];
+const emptyGroupbyColumns: PivotTableQueryFormData['groupbyColumns'] = [];
 const emptyQueriesData: PivotTableProps['queriesData'] = [];
+
+type LegacyTestPivotProps = {
+  groupbyRows: PivotTableQueryFormData['groupbyRows'];
+  groupbyColumns: PivotTableQueryFormData['groupbyColumns'];
+  aggregateFunction?: PivotTableQueryFormData['aggregateFunction'];
+  valueFormat?: PivotTableQueryFormData['valueFormat'];
+  columnFormats?: PivotTableQueryFormData['columnFormats'];
+  currencyFormats?: PivotTableQueryFormData['currencyFormats'];
+  allowRenderHtml?: PivotTableQueryFormData['allowRenderHtml'];
+  metricColorFormatters?: unknown[];
+};
 
 const isDimensionalChildValue = (value: PivotPath[number]) =>
   !isMetricToken(value) &&
@@ -163,7 +175,7 @@ const collectLoadedBranchPaths = ({
 
 export const buildPreloadedBootstrapFactBatches = (
   tree: PivotTreeData | undefined,
-  groupby: Pick<PivotTableProps, 'groupbyRows' | 'groupbyColumns'> = {
+  groupby: Pick<LegacyTestPivotProps, 'groupbyRows' | 'groupbyColumns'> = {
     groupbyRows: [],
     groupbyColumns: [],
   },
@@ -244,7 +256,7 @@ export const buildPreloadedBranchFactBatches = (
 
 export const buildPreloadedRenderedBranchFactBatches = (
   tree: PivotTreeData | undefined,
-  groupby: Pick<PivotTableProps, 'groupbyRows' | 'groupbyColumns'> = {
+  groupby: Pick<LegacyTestPivotProps, 'groupbyRows' | 'groupbyColumns'> = {
     groupbyRows: [],
     groupbyColumns: [],
   },
@@ -300,7 +312,7 @@ export const buildPreloadedTreeFactBatches = (
 
 export const buildPreloadedRenderedTreeFactBatches = (
   tree: PivotTreeData | undefined,
-  groupby: Pick<PivotTableProps, 'groupbyRows' | 'groupbyColumns'> = {
+  groupby: Pick<LegacyTestPivotProps, 'groupbyRows' | 'groupbyColumns'> = {
     groupbyRows: [],
     groupbyColumns: [],
   },
@@ -309,7 +321,7 @@ export const buildPreloadedRenderedTreeFactBatches = (
   ...buildPreloadedRenderedBranchFactBatches(tree, groupby),
 ];
 
-const baseProps: PivotTableProps = {
+const baseProps: PivotTableProps & LegacyTestPivotProps = {
   data: emptyTree,
   formData: baseFormData,
   rawFormData: baseFormData,
@@ -349,13 +361,24 @@ const baseProps: PivotTableProps = {
   theme: supersetTheme,
 };
 
-type TestPivotTableChartProps = Partial<PivotTableProps>;
+type TestPivotTableChartProps = Partial<PivotTableProps & LegacyTestPivotProps>;
 
 export default function TestPivotTableChart(props: TestPivotTableChartProps) {
-  const mergedProps: PivotTableProps = {
+  const sourceFormData = props.formData ?? baseProps.formData;
+  const mergedFormData: PivotTableQueryFormData = {
+    ...sourceFormData,
+    metrics: props.metrics ?? sourceFormData.metrics,
+    groupbyRows: props.groupbyRows ?? sourceFormData.groupbyRows,
+    groupbyColumns: props.groupbyColumns ?? sourceFormData.groupbyColumns,
+    valueFormat: props.valueFormat ?? sourceFormData.valueFormat,
+    columnFormats: props.columnFormats ?? sourceFormData.columnFormats,
+    currencyFormats: props.currencyFormats ?? sourceFormData.currencyFormats,
+    allowRenderHtml: props.allowRenderHtml ?? sourceFormData.allowRenderHtml,
+  };
+  const mergedProps: PivotTableProps & LegacyTestPivotProps = {
     ...baseProps,
     ...props,
-    formData: props.formData ?? baseProps.formData,
+    formData: mergedFormData,
     rawFormData: props.rawFormData ?? props.formData ?? baseProps.rawFormData,
     datasource: props.datasource ?? baseProps.datasource,
     rawDatasource: props.rawDatasource ?? baseProps.rawDatasource,

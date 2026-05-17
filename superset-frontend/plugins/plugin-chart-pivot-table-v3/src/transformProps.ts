@@ -27,15 +27,11 @@ import {
   SMART_DATE_ID,
   TimeFormats,
 } from '@superset-ui/core';
-import { getColorFormatters } from '@superset-ui/chart-controls';
 import { PivotTableProps, PivotTableQueryFormData } from './types';
 import {
   buildResolvedMetricLabelMap,
   getStableColumnKey,
   mergeMetrics,
-  normalizeDimensionSortingMapWithKeys,
-  normalizeMetricFormattingMapWithKeys,
-  normalizeMetricDatabarMapWithKeys,
   coerceEpochMsStringToNumber,
 } from './utils';
 import { getMetricKeys, getMetricKey } from './pivot/core/tokens';
@@ -180,35 +176,19 @@ export default function transformProps(
     metricsLayoutResolved: metricsLayout,
     metricInsertIndex,
   } = layout;
-  const metricFormatting = normalizeMetricFormattingMapWithKeys(
-    formData.metricFormatting,
-    metrics,
-  );
-  const metricDatabars = normalizeMetricDatabarMapWithKeys(
-    formData.metricDatabars,
-    metrics,
-  );
-  const rowSorting = normalizeDimensionSortingMapWithKeys(
-    formData.rowSorting,
-    groupbyRows,
-  );
-  const colSorting = normalizeDimensionSortingMapWithKeys(
-    formData.colSorting,
-    groupbyColumns,
-  );
   const initialSpecs = buildInitialQuerySpecs(formDataWithMetricLabels, layout);
   const planMetrics = initialSpecs.reduce(
     (acc, spec) => mergeMetrics(acc, spec.metrics),
     metrics,
   );
-  const pivotTheme = formData.pivotTheme || 'none';
-  const pivotThemeColors = formData.pivotThemeColors || '';
   const metricKeysForQuery = getMetricKeys(planMetrics);
   const queryFormData: PivotTableQueryFormData = {
     ...rawFormData,
     ...formDataWithMetricLabels,
     metricsLayout,
     metricLabelMap,
+    columnFormats,
+    currencyFormats,
   };
 
   const combinedData = queriesData.flatMap(({ data }) => data || []);
@@ -335,12 +315,6 @@ export default function transformProps(
     queryFormDataWithTypes,
   );
 
-  const metricColorFormatters = getColorFormatters(
-    formData.conditional_formatting,
-    combinedData,
-    theme,
-  );
-
   const treeDataSignature = JSON.stringify({
     rows: groupbyRows.map(getStableColumnKey),
     cols: groupbyColumns.map(getStableColumnKey),
@@ -355,6 +329,8 @@ export default function transformProps(
     ...formDataWithMetricLabels,
     dateFormatters,
     colTypeMap: colTypeMapWithAliases,
+    columnFormats,
+    currencyFormats,
   };
   const { tree: nextTreeWithLeaves, factBatches } =
     buildInitialRuntimeFromSpecResults({
@@ -392,6 +368,8 @@ export default function transformProps(
   const queryFormDataWithFormatters: PivotTableQueryFormData = {
     ...normalizedQueryFormData,
     dateFormatters,
+    columnFormats,
+    currencyFormats,
   };
 
   return {
@@ -413,6 +391,8 @@ export default function transformProps(
       extra_form_data: normalizedQueryFormData.extra_form_data,
       dateFormatters,
       colTypeMap: colTypeMapWithAliases,
+      columnFormats,
+      currencyFormats,
     },
     sourceMetrics: rawFormData.metrics ?? baseFormData.metrics,
     sourceMeasureLeavesByMetric:
@@ -433,14 +413,6 @@ export default function transformProps(
     theme,
     queryFormData: queryFormDataWithFormatters,
     metrics,
-    metricFormatting,
-    metricDatabars,
-    metricFormattingScope: formData.metricFormattingScope,
-    groupbyRows,
-    groupbyColumns,
-    aggregateFunction: formData.aggregateFunction,
-    rowSorting,
-    colSorting,
     startCollapsed: layout.startCollapsed,
     initialDepth: layout.initialDepth,
     rowTotals: formData.rowTotals,
@@ -450,19 +422,12 @@ export default function transformProps(
     colSubtotalLevels,
     rowOrder: formData.rowOrder,
     colOrder: formData.colOrder,
-    valueFormat: formData.valueFormat,
-    dateFormat: formData.dateFormat,
-    currencyFormat: formData.currencyFormat,
-    allowRenderHtml: formData.allowRenderHtml,
     metricsLayout,
     emitCrossFilters,
     setDataMask,
     setControlValue,
     selectedFilters,
     verboseMap,
-    columnFormats,
-    currencyFormats,
-    metricColorFormatters,
     dateFormatters,
     onContextMenu,
     colTypeMap: colTypeMapWithAliases,
@@ -470,8 +435,6 @@ export default function transformProps(
     rowSubtotalPosition,
     colTotalPosition,
     colSubtotalPosition,
-    pivotTheme,
-    pivotThemeColors,
     stickyHeaders: formData.stickyHeaders ?? true,
   };
 }

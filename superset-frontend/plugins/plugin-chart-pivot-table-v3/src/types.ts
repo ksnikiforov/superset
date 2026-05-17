@@ -32,7 +32,6 @@ import {
   TimeGranularity,
   GenericDataType,
 } from '@superset-ui/core';
-import { ColorFormatters } from '@superset-ui/chart-controls';
 import { type PivotFactStoreBatch } from './pivot/runtime/factStore';
 
 export type PivotAxis = 'row' | 'col';
@@ -281,7 +280,6 @@ export type PivotTableQueryFormData = QueryFormData &
     verboseMap: JsonObject;
     columnFormats: JsonObject;
     currencyFormats: Record<string, Currency>;
-    metricColorFormatters: ColorFormatters;
     dateFormatters: Record<string, DateFormatter | undefined>;
     colTypeMap?: Record<string, GenericDataType>;
     order_desc: boolean;
@@ -307,16 +305,6 @@ export interface PivotTableProps
   metrics: QueryFormMetric[];
   sourceMetrics?: QueryFormMetric[];
   sourceMeasureLeavesByMetric?: MeasureLeavesByMetricKey;
-  groupbyRows: QueryFormColumn[];
-  groupbyColumns: QueryFormColumn[];
-  metricFormatting?: PivotMetricFormattingMap;
-  metricDatabars?: PivotMetricDatabarMap;
-  metricFormattingScope?: MetricFormattingScope;
-  rowFormatting?: PivotDimensionFormattingMap;
-  colFormatting?: PivotDimensionFormattingMap;
-  rowSorting?: PivotDimensionSortingMap;
-  colSorting?: PivotDimensionSortingMap;
-  aggregateFunction?: string;
   startCollapsed: boolean;
   initialDepth?: number;
   expandRowsLevel?: number;
@@ -328,19 +316,12 @@ export interface PivotTableProps
   colSubtotalLevels?: number[];
   rowOrder: string;
   colOrder: string;
-  valueFormat?: string;
-  dateFormat?: string;
-  currencyFormat?: Currency;
-  allowRenderHtml?: boolean;
   metricsLayout?: MetricsLayoutEnum;
   emitCrossFilters?: boolean;
   setControlValue?: HandlerFunction;
   setDataMask: SetDataMaskHook;
   selectedFilters?: Record<string, DataRecordValue[]>;
   verboseMap: JsonObject;
-  columnFormats: JsonObject;
-  currencyFormats: Record<string, Currency>;
-  metricColorFormatters: ColorFormatters;
   dateFormatters: Record<string, DateFormatter | undefined>;
   colTypeMap?: Record<string, GenericDataType>;
   onContextMenu?: (
@@ -356,7 +337,5 @@ export interface PivotTableProps
   rowSubtotalPosition?: TotalPosition;
   colTotalPosition?: TotalPosition;
   colSubtotalPosition?: TotalPosition;
-  pivotTheme?: PivotTheme;
-  pivotThemeColors?: string;
   stickyHeaders?: boolean;
 }

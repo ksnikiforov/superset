@@ -67,14 +67,16 @@ describe('layout resolution (contracts)', () => {
       chartProps as ChartProps<PivotTableQueryFormData>,
     );
     const signature = JSON.parse(result.formData.treeDataSignature ?? '{}') as {
+      rows: string[];
+      cols: string[];
       metricsLayout: MetricsLayoutEnum;
       metricInsertIndex: number;
       rowSubtotalLevels: number[];
       colSubtotalLevels: number[];
     };
 
-    expect(result.groupbyRows).toEqual(layout.groupbyRows);
-    expect(result.groupbyColumns).toEqual(layout.groupbyColumns);
+    expect(signature.rows).toEqual(layout.groupbyRows);
+    expect(signature.cols).toEqual(layout.groupbyColumns);
 
     const bootstrapSpec = specs.find(spec => spec.meta.kind === 'bootstrap');
     expect(bootstrapSpec).toBeDefined();
