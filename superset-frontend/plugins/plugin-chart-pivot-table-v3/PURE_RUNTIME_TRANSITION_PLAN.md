@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14480` insertions, `15107` deletions, net `-627`.
-- Current production TypeScript/TSX total: about `32883` lines.
+- Production `src`: `14483` insertions, `15119` deletions, net `-636`.
+- Current production TypeScript/TSX total: about `32874` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -528,6 +528,8 @@ Success criteria:
 - Render ordering and column type metadata now come from `formData`; the chart
   no longer forwards duplicate top-level row order, column order, or
   `colTypeMap` props into the render model and dimension-filter boundary.
+- Metrics layout now comes from the applied layout `formData`; `PivotTableChart`
+  and `transformProps` no longer expose it as a duplicate top-level chart prop.
 
 ## Current Risks
 
