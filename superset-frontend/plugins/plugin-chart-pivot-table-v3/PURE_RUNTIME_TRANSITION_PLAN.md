@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14559` insertions, `15439` deletions, net `-880`.
-- Current production TypeScript/TSX total: about `32630` lines.
+- Production `src`: `14558` insertions, `15439` deletions, net `-881`.
+- Current production TypeScript/TSX total: about `32629` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -264,9 +264,9 @@ Immediate policy:
   rendered tree and expansion state.
 - Those paths must not become query coverage requests. They are display
   projections, not real fact-store coverage anchors.
-- The current planner-level subtotal filter is a narrow guard. The larger
-  cleanup is to replace token/path fetchability checks with the compiled
-  requestability rule above.
+- Expansion planning now filters by the program-derived requestability rule
+  before coverage diffing. The larger cleanup is to keep moving remaining
+  token/path fetchability checks behind compiled runtime policy.
 
 Primary files:
 
@@ -660,6 +660,9 @@ Success criteria:
 - Desired expansion seeding now also receives `PivotProgram` instead of a
   caller-built metric label set, keeping auto-expanded Values-tier behavior
   tied to the compiled runtime program.
+- Expansion requestability is axis/path-only. The planner no longer passes
+  serialized tree keys into the fetchability predicate, keeping request
+  eligibility independent from rendered tree identity.
 
 ## Current Risks
 

@@ -154,7 +154,7 @@ describe('pivot/expansion/planner', () => {
       coverage: { rowDepth: 1, columnDepth: 0 },
       getMissingExpansionCoverage: getMissingCoverageFromBatches(),
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: ({ key }) => key === aKey,
+      shouldFetchChildren: ({ path }) => path[0] === 'A',
     });
 
     expect(fetchPathKeys(plan)).toEqual([aKey]);

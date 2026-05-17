@@ -48,7 +48,6 @@ export type PivotExpansionPlan = {
 
 export type PivotExpansionNodeFetchPredicate = (input: {
   axis: PivotAxis;
-  key: string;
   path: PivotTreeNode['path'];
 }) => boolean;
 
@@ -113,7 +112,7 @@ export const planExpansionForAxis = ({
       const path = node?.path ?? parsePath(key);
       return { key, node, path };
     })
-    .filter(({ key, path }) => shouldFetchChildren({ axis, key, path }));
+    .filter(({ path }) => shouldFetchChildren({ axis, path }));
   const buildRequest = (key: string): PivotExpansionCoverageRequest => ({
     axis,
     pathKey: key,
@@ -139,7 +138,7 @@ export const planExpansionForAxis = ({
     if (
       ancestor &&
       getCoverageKey(axis, key) !== getCoverageKey(axis, ancestorKey) &&
-      shouldFetchChildren({ axis, key: ancestorKey, path: ancestor.path })
+      shouldFetchChildren({ axis, path: ancestor.path })
     ) {
       addRequest(ancestorKey);
     }
@@ -171,7 +170,7 @@ export const planExpansionForAxis = ({
     }
     const ancestorRequest = buildRequest(ancestorKey);
     if (
-      !shouldFetchChildren({ axis, key: ancestorKey, path: ancestor.path }) ||
+      !shouldFetchChildren({ axis, path: ancestor.path }) ||
       !missingRequestKeys.has(requestKey(ancestorRequest))
     ) {
       if (getCoverageKey(axis, key) === getCoverageKey(axis, ancestorKey)) {
