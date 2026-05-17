@@ -63,7 +63,9 @@ jest.mock('../../../src/pivot/data/SupersetChartDataClient', () => {
 });
 
 jest.mock('../../../src/pivot/query/fetchPivotBranch', () => {
-  const actual = jest.requireActual('../../../src/pivot/query/fetchPivotBranch');
+  const actual = jest.requireActual(
+    '../../../src/pivot/query/fetchPivotBranch',
+  );
   return {
     ...actual,
     fetchPivotBranch: jest
@@ -111,6 +113,7 @@ describe('PivotTableChart interaction filter search', () => {
       pivotRuntimeLayout: runtimeLayout,
       startCollapsed: false,
       initialDepth: 1,
+      colTypeMap: { row1: GenericDataType.String },
     });
     const tree = applyMetricAxis(
       buildTreeFromRecords(records, metrics, rows, [], 1, 0),
@@ -132,7 +135,6 @@ describe('PivotTableChart interaction filter search', () => {
         metrics={metrics}
         groupbyRows={[]}
         groupbyColumns={[]}
-        colTypeMap={{ row1: GenericDataType.String }}
         width={600}
         height={300}
       />,

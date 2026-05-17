@@ -314,8 +314,6 @@ export interface PivotTableProps
   rowSubTotals?: boolean;
   rowSubtotalLevels?: number[];
   colSubtotalLevels?: number[];
-  rowOrder: string;
-  colOrder: string;
   metricsLayout?: MetricsLayoutEnum;
   emitCrossFilters?: boolean;
   setControlValue?: HandlerFunction;
@@ -323,7 +321,6 @@ export interface PivotTableProps
   selectedFilters?: Record<string, DataRecordValue[]>;
   verboseMap: JsonObject;
   dateFormatters: Record<string, DateFormatter | undefined>;
-  colTypeMap?: Record<string, GenericDataType>;
   onContextMenu?: (
     clientX: number,
     clientY: number,

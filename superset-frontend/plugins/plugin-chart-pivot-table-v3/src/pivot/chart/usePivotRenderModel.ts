@@ -125,20 +125,19 @@ export const usePivotRenderModel = ({
   expandedRows,
   expandedCols,
   formData,
-  rowOrder,
-  colOrder,
-  colTypeMap,
   layout,
 }: {
   tree: PivotTreeData;
   expandedRows: Set<string>;
   expandedCols: Set<string>;
   formData: PivotTableProps['formData'];
-  rowOrder: PivotTableProps['rowOrder'];
-  colOrder: PivotTableProps['colOrder'];
-  colTypeMap: PivotTableProps['colTypeMap'];
   layout: PivotLayoutResult;
 }): PivotRenderModelResult => {
+  const {
+    colOrder = 'key_a_to_z',
+    colTypeMap,
+    rowOrder = 'key_a_to_z',
+  } = formData;
   const [activeColumnSort, setActiveColumnSort] =
     useState<PivotColumnSortState | null>(null);
   const resolvedGroupbyRows = layout.layout.groupbyRows;

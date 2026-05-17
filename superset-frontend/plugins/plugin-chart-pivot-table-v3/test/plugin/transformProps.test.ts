@@ -510,8 +510,12 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
     const result = transformProps(
       chartProps as ChartProps<PivotTableQueryFormData>,
     );
-    expect(result.colTypeMap?.row1).toBe(GenericDataType.Temporal);
-    expect(result.colTypeMap?.col1).toBe(GenericDataType.Numeric);
+    expect(result.formData.colTypeMap?.row1).toBe(GenericDataType.Temporal);
+    expect(result.formData.colTypeMap?.col1).toBe(GenericDataType.Numeric);
+    expect(result.queryFormData.colTypeMap?.row1).toBe(
+      GenericDataType.Temporal,
+    );
+    expect(result.queryFormData.colTypeMap?.col1).toBe(GenericDataType.Numeric);
   });
 
   it('normalizes row and column subtotal selections', () => {

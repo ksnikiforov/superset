@@ -88,8 +88,6 @@ function PivotTableChart(props: PivotTableProps) {
     initialDepth = 1,
     expandRowsLevel,
     expandColumnsLevel,
-    rowOrder,
-    colOrder,
     verboseMap,
     ownState,
     setDataMask,
@@ -102,7 +100,6 @@ function PivotTableChart(props: PivotTableProps) {
     onContextMenu,
     timeGrainSqla,
     dateFormatters = {},
-    colTypeMap,
     metricsLayout = MetricsLayoutEnum.COLUMNS,
     rowSubtotalLevels = [],
     colSubtotalLevels = [],
@@ -404,9 +401,6 @@ function PivotTableChart(props: PivotTableProps) {
     expandedRows,
     expandedCols,
     formData: appliedLayoutFormData,
-    rowOrder,
-    colOrder,
-    colTypeMap,
     layout: layoutResult,
   });
   const { renderTree } = renderModelResult;
@@ -437,7 +431,7 @@ function PivotTableChart(props: PivotTableProps) {
     treeValues: treeDimensionFilterValues,
     formData: fetchFormDataBaseWithFormatters,
     selectedFilters: uiSelectedFilters,
-    colTypeMap,
+    colTypeMap: fetchFormDataBaseWithFormatters.colTypeMap,
   });
 
   const tableWidth = isUserControlled
