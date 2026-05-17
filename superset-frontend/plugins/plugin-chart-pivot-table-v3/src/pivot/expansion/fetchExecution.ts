@@ -129,6 +129,13 @@ export type FetchResultDelta = {
   data: PivotTreeData;
 };
 
+type ExpansionFetcherResult = {
+  data: PivotTreeData;
+  factBatches: PivotFactStoreBatch[];
+  warnings?: ChartDataWarning[];
+  error?: unknown;
+};
+
 const resolveExpansionFetchPlan = ({
   targets,
   formData,
@@ -190,6 +197,48 @@ const resolveExpansionFetchPlan = ({
   };
 };
 
+const executeExpansionFetch = async ({
+  runtime,
+  requestGroupId,
+  loadingKeys,
+  targets,
+  fetcher,
+}: {
+  runtime: ExpansionFetchRuntime;
+  requestGroupId: string;
+  loadingKeys: string[];
+  targets: ExpansionFetchTarget[];
+  fetcher: () => Promise<ExpansionFetcherResult>;
+}): Promise<ExpansionFetchResult> => {
+  const { requestScope, trackRequestInScope, updateLoadingKey, addWarnings } =
+    runtime;
+  if (requestScope.isCurrent()) {
+    loadingKeys.forEach(key => updateLoadingKey(key, 1));
+  }
+  try {
+    const result = await trackRequestInScope(
+      requestScope,
+      requestGroupId,
+      fetcher,
+    );
+    if (requestScope.isCurrent()) {
+      addWarnings(result.warnings);
+      if (result.error) {
+        throw result.error;
+      }
+    }
+    return {
+      targets,
+      data: result.data,
+      factBatches: result.factBatches,
+    };
+  } finally {
+    if (requestScope.isCurrent()) {
+      loadingKeys.forEach(key => updateLoadingKey(key, -1));
+    }
+  }
+};
+
 const fetchExpansionSingleTarget = async ({
   target,
   context,
@@ -202,45 +251,22 @@ const fetchExpansionSingleTarget = async ({
   runtime: ExpansionFetchRuntime;
 }): Promise<ExpansionFetchResult> => {
   const path = parsePath(target.pathKey);
-  const {
-    addWarnings,
-    factStore,
-    fetchFormData,
-    requestScope,
-    trackRequestInScope,
-    updateLoadingKey,
-  } = runtime;
-  if (requestScope.isCurrent()) {
-    updateLoadingKey(target.pathKey, 1);
-  }
-  try {
-    const result = await trackRequestInScope(requestScope, requestGroupId, () =>
+  return executeExpansionFetch({
+    runtime,
+    requestGroupId,
+    loadingKeys: [target.pathKey],
+    targets: [target],
+    fetcher: () =>
       fetchPivotBranch({
         axis: target.axis,
         path,
-        formData: fetchFormData,
+        formData: runtime.fetchFormData,
         visibleRowDepth: context.visibleRowDepth,
         visibleColDepth: context.visibleColDepth,
         requestGroupId,
-        factStore,
+        factStore: runtime.factStore,
       }),
-    );
-    if (requestScope.isCurrent()) {
-      addWarnings(result.warnings);
-      if (result.error) {
-        throw result.error;
-      }
-    }
-    return {
-      targets: [target],
-      data: result.data,
-      factBatches: result.factBatches,
-    };
-  } finally {
-    if (requestScope.isCurrent()) {
-      updateLoadingKey(target.pathKey, -1);
-    }
-  }
+  });
 };
 
 const fetchExpansionBatchTarget = async ({
@@ -254,44 +280,22 @@ const fetchExpansionBatchTarget = async ({
   requestGroupId: string;
   runtime: ExpansionFetchRuntime;
 }): Promise<ExpansionFetchResult> => {
-  const {
-    addWarnings,
-    factStore,
-    fetchFormData,
-    requestScope,
-    trackRequestInScope,
-    updateLoadingKey,
-  } = runtime;
-  if (requestScope.isCurrent()) {
-    batch.targets.forEach(target => updateLoadingKey(target.pathKey, 1));
-  }
-  try {
-    const result = await trackRequestInScope(requestScope, requestGroupId, () =>
+  const loadingKeys = batch.targets.map(target => target.pathKey);
+  return executeExpansionFetch({
+    runtime,
+    requestGroupId,
+    loadingKeys,
+    targets: batch.targets,
+    fetcher: () =>
       fetchPivotBranchesBatch({
-        formData: fetchFormData,
+        formData: runtime.fetchFormData,
         batch,
         visibleRowDepth: context.visibleRowDepth,
         visibleColDepth: context.visibleColDepth,
         requestGroupId,
-        factStore,
+        factStore: runtime.factStore,
       }),
-    );
-    if (requestScope.isCurrent()) {
-      addWarnings(result.warnings);
-      if (result.error) {
-        throw result.error;
-      }
-    }
-    return {
-      targets: batch.targets,
-      data: result.data,
-      factBatches: result.factBatches,
-    };
-  } finally {
-    if (requestScope.isCurrent()) {
-      batch.targets.forEach(target => updateLoadingKey(target.pathKey, -1));
-    }
-  }
+  });
 };
 
 const fetchExpansionIntersectionTarget = async ({
@@ -305,55 +309,32 @@ const fetchExpansionIntersectionTarget = async ({
   requestGroupId: string;
   runtime: ExpansionFetchRuntime;
 }): Promise<ExpansionFetchResult> => {
-  const {
-    addWarnings,
-    factStore,
-    fetchFormData,
-    requestScope,
-    trackRequestInScope,
-    updateLoadingKey,
-  } = runtime;
   const loadingKeys = [...target.rowPathKeys, ...target.columnPathKeys];
-  if (requestScope.isCurrent()) {
-    loadingKeys.forEach(key => updateLoadingKey(key, 1));
-  }
-  try {
-    const result = await trackRequestInScope(requestScope, requestGroupId, () =>
+  return executeExpansionFetch({
+    runtime,
+    requestGroupId,
+    loadingKeys,
+    targets: [
+      ...target.rowPathKeys.map(pathKey => ({
+        axis: 'row' as const,
+        pathKey,
+      })),
+      ...target.columnPathKeys.map(pathKey => ({
+        axis: 'col' as const,
+        pathKey,
+      })),
+    ],
+    fetcher: () =>
       fetchPivotIntersection({
-        formData: fetchFormData,
+        formData: runtime.fetchFormData,
         rowPathKeys: target.rowPathKeys,
         columnPathKeys: target.columnPathKeys,
         visibleRowDepth: context.visibleRowDepth,
         visibleColDepth: context.visibleColDepth,
         requestGroupId,
-        factStore,
+        factStore: runtime.factStore,
       }),
-    );
-    if (requestScope.isCurrent()) {
-      addWarnings(result.warnings);
-      if (result.error) {
-        throw result.error;
-      }
-    }
-    return {
-      targets: [
-        ...target.rowPathKeys.map(pathKey => ({
-          axis: 'row' as const,
-          pathKey,
-        })),
-        ...target.columnPathKeys.map(pathKey => ({
-          axis: 'col' as const,
-          pathKey,
-        })),
-      ],
-      data: result.data,
-      factBatches: result.factBatches,
-    };
-  } finally {
-    if (requestScope.isCurrent()) {
-      loadingKeys.forEach(key => updateLoadingKey(key, -1));
-    }
-  }
+  });
 };
 
 export const fetchExpansionTargets = async ({

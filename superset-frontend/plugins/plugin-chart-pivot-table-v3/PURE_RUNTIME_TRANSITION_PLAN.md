@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14528` insertions, `15437` deletions, net `-909`.
-- Current production TypeScript/TSX total: about `32601` lines.
+- Production `src`: `14509` insertions, `15437` deletions, net `-928`.
+- Current production TypeScript/TSX total: about `32582` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -677,6 +677,10 @@ Success criteria:
   through hydration and same-axis fetch execution. Expansion planning now takes
   `PivotProgram` directly and calls the runtime projection rule at the planner
   boundary, so query permission is program-derived rather than callback-owned.
+- Expansion fetch execution now has one lifecycle/loading/warning/error shell
+  for single branch, batched branch, and intersection requests. The separate
+  query builders remain, but request bookkeeping is no longer copied across
+  each fetch shape.
 
 ## Current Risks
 
