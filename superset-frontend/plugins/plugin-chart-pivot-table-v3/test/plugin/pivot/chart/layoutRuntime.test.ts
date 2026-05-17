@@ -236,7 +236,6 @@ describe('pivot/chart/layoutRuntime', () => {
         parent,
         nodes,
         hideMetricHeader: true,
-        keepValuesChild: () => true,
       }),
     ).toEqual([]);
   });
@@ -264,7 +263,6 @@ describe('pivot/chart/layoutRuntime', () => {
         parent,
         nodes,
         hideMetricHeader: false,
-        keepValuesChild: () => true,
       }),
     ).toEqual([dimensionChild]);
   });
@@ -284,8 +282,6 @@ describe('pivot/chart/layoutRuntime', () => {
       expandedSet: new Set<string>(),
       nodes,
       isLeafTierVisible: false,
-      suppressSubtotalParent: true,
-      normalizeSubtotalExisting: false,
     });
 
     expect(collapsed).toEqual([
@@ -328,8 +324,6 @@ describe('pivot/chart/layoutRuntime', () => {
       expandedSet: new Set<string>(),
       nodes,
       isLeafTierVisible: true,
-      suppressSubtotalParent: false,
-      normalizeSubtotalExisting: true,
     });
 
     expect(collapsed).toEqual([

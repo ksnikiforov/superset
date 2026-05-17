@@ -163,7 +163,7 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14290` insertions, `15776` deletions, net `-1486`.
+- Production `src`: `14284` insertions, `15787` deletions, net `-1503`.
 - Current production TypeScript/TSX total: about `32557` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
@@ -794,6 +794,10 @@ Success criteria:
   and column sort now derives from `PivotProgram.metricKeys` at the owning
   helper boundary. `PivotLayoutResult` no longer exports a metric-label path
   callback for render/formatting/sort helpers.
+- Layout child policy now owns row/column Values-child retention and collapsed
+  Values subtotal normalization. `usePivotLayout` no longer threads
+  row/column-specific metric-total callbacks or collapsed Values flags into
+  those render-policy helpers.
 
 ## Current Risks
 

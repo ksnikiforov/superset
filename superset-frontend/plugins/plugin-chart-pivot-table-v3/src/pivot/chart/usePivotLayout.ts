@@ -26,15 +26,11 @@ import {
   type TotalPosition,
 } from '../../types';
 import { resolveMetricDisplayLabel, getStableColumnKey } from '../../utils';
-import { isMetricTokenForKeys } from '../core/tokens';
+import { decodeMetricKey } from '../core/tokens';
 import { buildLayoutContext } from '../layout/LayoutContext';
-import { getValuesLevelIndex } from '../runtime/projection';
 import type { PivotProgram } from '../runtime/types';
 import type { RenderModelConfig } from '../render/renderModel';
-import {
-  createMetricNodePolicy,
-  isExplicitSubtotalNode,
-} from '../metricsTotals';
+import { isExplicitSubtotalNode } from '../metricsTotals';
 import { pruneStaleCollapsedAxis } from './pruneCollapsedAxis';
 import {
   buildMetricOrderComparator,
@@ -166,13 +162,6 @@ export const usePivotLayout = ({
   const { metricsLayoutResolved: resolvedMetricsLayout, metricInsertIndex } =
     layout.pivotProgram;
   const { metricKeys: metricLabels } = layout.pivotProgram;
-  const metricNodePolicy = useMemo(
-    () => createMetricNodePolicy(layout.pivotProgram),
-    [layout.pivotProgram],
-  );
-  const { metricLabelSet, isMetricGrandTotalNode, isMetricSubtotalNode } =
-    metricNodePolicy;
-
   const isMultiMetric = metricLabels.length > 1;
   const hasMultipleMeasures =
     isMultiMetric ||
@@ -266,7 +255,6 @@ export const usePivotLayout = ({
       rowSubTotals,
     ],
   );
-  const metricIndexOnRows = getValuesLevelIndex(layout.pivotProgram, 'row');
 
   const getMetricDisplayLabelForKey = useCallback(
     (metricKey: string) =>
@@ -292,14 +280,16 @@ export const usePivotLayout = ({
       if (!forceRowSubtotalEnd) {
         return resolvedRowSubtotalPosition;
       }
-      const metricIndex = node.path.findIndex(val =>
-        isMetricTokenForKeys(val, metricLabelSet),
-      );
+      const metricKeySet = new Set(layout.pivotProgram.metricKeys);
+      const metricIndex = node.path.findIndex(val => {
+        const decoded = decodeMetricKey(val);
+        return decoded !== undefined && metricKeySet.has(decoded);
+      });
       return metricIndex >= 0 && node.path.length > metricIndex + 1
         ? resolvedRowSubtotalPosition
         : 'end';
     },
-    [forceRowSubtotalEnd, metricLabelSet, resolvedRowSubtotalPosition],
+    [forceRowSubtotalEnd, layout.pivotProgram, resolvedRowSubtotalPosition],
   );
 
   const getCollapsedChildrenForAxis = useCallback(
@@ -308,19 +298,15 @@ export const usePivotLayout = ({
       parent: PivotTreeNode,
       expandedSet: Set<string>,
       nodes: Record<string, PivotTreeNode>,
-    ) => {
-      const isRow = axis === 'row';
-      return resolveCollapsedValuesNodesForAxis({
+    ) =>
+      resolveCollapsedValuesNodesForAxis({
         program: layout.pivotProgram,
         axis,
         parent,
         expandedSet,
         nodes,
         isLeafTierVisible,
-        suppressSubtotalParent: isRow,
-        normalizeSubtotalExisting: !isRow,
-      });
-    },
+      }),
     [isLeafTierVisible, layout.pivotProgram],
   );
 
@@ -333,18 +319,7 @@ export const usePivotLayout = ({
         parent,
         nodes,
         hideMetricHeader: hideMetricHeaderOnRows,
-        keepValuesChild: (child, hasNonMetricChildren) => {
-          if (!hasNonMetricChildren) {
-            return isMetricGrandTotalNode(child) || isMetricSubtotalNode(child);
-          }
-          return (
-            isMetricGrandTotalNode(child) &&
-            (colTotals ||
-              metricIndexOnRows === undefined ||
-              parent.level >= metricIndexOnRows ||
-              metricIndexOnRows !== 0)
-          );
-        },
+        colTotals,
       });
       return resolveRowSubtotalChildrenPolicy({
         program: layout.pivotProgram,
@@ -360,10 +335,7 @@ export const usePivotLayout = ({
       colTotals,
       getRowSubtotalPosition,
       hideMetricHeaderOnRows,
-      isMetricGrandTotalNode,
-      isMetricSubtotalNode,
       layout.pivotProgram,
-      metricIndexOnRows,
       rowSubTotals,
     ],
   );
@@ -376,15 +348,10 @@ export const usePivotLayout = ({
         parent,
         nodes,
         hideMetricHeader: hideMetricHeaderOnCols,
-        keepValuesChild: child =>
-          isMetricGrandTotalNode(child) ||
-          (normalizedColSubtotalLevels.length > 0 &&
-            isMetricSubtotalNode(child)),
+        normalizedColSubtotalLevelCount: normalizedColSubtotalLevels.length,
       }),
     [
       hideMetricHeaderOnCols,
-      isMetricGrandTotalNode,
-      isMetricSubtotalNode,
       layout.pivotProgram,
       normalizedColSubtotalLevels.length,
     ],
