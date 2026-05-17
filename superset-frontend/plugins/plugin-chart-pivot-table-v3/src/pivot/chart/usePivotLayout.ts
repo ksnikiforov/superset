@@ -50,6 +50,7 @@ import {
 } from './layoutRuntime';
 
 const defaultPivotNodeSorter = () => 0;
+const EMPTY_SUBTOTAL_LEVELS: number[] = [];
 
 export type PivotLayoutResult = {
   layout: ReturnType<typeof buildLayoutContext>;
@@ -108,27 +109,9 @@ export type PivotLayoutResult = {
 
 export const usePivotLayout = ({
   formData,
-  rowTotals,
-  colTotals,
-  rowSubTotals,
-  rowSubtotalLevels,
-  colSubtotalLevels,
-  rowTotalPosition,
-  rowSubtotalPosition,
-  colTotalPosition,
-  colSubtotalPosition,
   pivotProgram,
 }: {
   formData: PivotTableProps['formData'];
-  rowTotals: boolean;
-  colTotals: boolean;
-  rowSubTotals: boolean;
-  rowSubtotalLevels: number[];
-  colSubtotalLevels: number[];
-  rowTotalPosition: TotalPosition;
-  rowSubtotalPosition: TotalPosition;
-  colTotalPosition: TotalPosition;
-  colSubtotalPosition: TotalPosition;
   pivotProgram?: PivotProgram;
 }): PivotLayoutResult => {
   const expandRowsLevelRaw = formData.expandRowsLevel;
@@ -137,6 +120,15 @@ export const usePivotLayout = ({
     (formData.metricsLayout as MetricsLayoutEnum) || MetricsLayoutEnum.COLUMNS;
   const startCollapsed = formData.startCollapsed ?? true;
   const initialDepth = formData.initialDepth ?? 1;
+  const rowTotals = formData.rowTotals ?? false;
+  const colTotals = formData.colTotals ?? true;
+  const rowSubTotals = formData.rowSubTotals ?? false;
+  const rowSubtotalLevels = formData.rowSubtotalLevels ?? EMPTY_SUBTOTAL_LEVELS;
+  const colSubtotalLevels = formData.colSubtotalLevels ?? EMPTY_SUBTOTAL_LEVELS;
+  const rowTotalPosition = formData.rowTotalPosition ?? 'start';
+  const rowSubtotalPosition = formData.rowSubtotalPosition ?? 'start';
+  const colTotalPosition = formData.colTotalPosition ?? 'start';
+  const colSubtotalPosition = formData.colSubtotalPosition ?? 'start';
 
   const layout = useMemo(
     () =>
@@ -152,12 +144,10 @@ export const usePivotLayout = ({
         rowSubTotals,
         rowSubtotalLevels,
         colSubtotalLevels,
-        rowTotalPosition: formData.rowTotalPosition || rowTotalPosition,
-        rowSubtotalPosition:
-          formData.rowSubtotalPosition || rowSubtotalPosition,
-        colTotalPosition: formData.colTotalPosition || colTotalPosition,
-        colSubtotalPosition:
-          formData.colSubtotalPosition || colSubtotalPosition,
+        rowTotalPosition,
+        rowSubtotalPosition,
+        colTotalPosition,
+        colSubtotalPosition,
         startCollapsed,
         initialDepth,
         expandRowsLevel: expandRowsLevelRaw,

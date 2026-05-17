@@ -89,15 +89,6 @@ function PivotTableChart(props: PivotTableProps) {
     sourceMeasureLeavesByMetric,
     persistExpansionState: persistExpansionStateProp,
     onContextMenu,
-    rowSubtotalLevels = [],
-    colSubtotalLevels = [],
-    rowTotals = false,
-    colTotals = true,
-    rowSubTotals = false,
-    rowTotalPosition = 'start',
-    rowSubtotalPosition = 'start',
-    colTotalPosition = 'start',
-    colSubtotalPosition = 'start',
     theme = supersetTheme,
     appSection,
   } = props;
@@ -311,15 +302,6 @@ function PivotTableChart(props: PivotTableProps) {
 
   const layoutResult = usePivotLayout({
     formData: appliedLayoutFormData,
-    rowTotals,
-    colTotals,
-    rowSubTotals,
-    rowSubtotalLevels,
-    colSubtotalLevels,
-    rowTotalPosition,
-    rowSubtotalPosition,
-    colTotalPosition,
-    colSubtotalPosition,
     pivotProgram: appliedPivotProgram,
   });
   const layoutGroupbyRows = layoutResult.layout.groupbyRows;

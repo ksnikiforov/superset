@@ -549,8 +549,9 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
     const result = transformProps(
       chartProps as ChartProps<PivotTableQueryFormData>,
     );
-    expect(result.rowSubtotalLevels).toEqual([0]);
-    expect(result.colSubtotalLevels).toEqual([]);
+    const treeDataSignature = JSON.parse(result.formData.treeDataSignature!);
+    expect(treeDataSignature.rowSubtotalLevels).toEqual([0]);
+    expect(treeDataSignature.colSubtotalLevels).toEqual([]);
   });
 
   it('merges persisted expansion branches into the initial tree', () => {
