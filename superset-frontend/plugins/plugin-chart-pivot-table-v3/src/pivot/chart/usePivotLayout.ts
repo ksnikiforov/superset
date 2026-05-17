@@ -61,7 +61,6 @@ export type PivotLayoutResult = {
   expandColumnsLevelRaw?: number;
   resolvedExpandRowsLevel: number;
   resolvedExpandColumnsLevel: number;
-  metricLabelSet: Set<string>;
   isMetricTokenValue: (value: unknown) => boolean;
   normalizedRowSubtotalLevels: number[];
   normalizedColSubtotalLevels: number[];
@@ -178,7 +177,6 @@ export const usePivotLayout = ({
   const {
     resolvedExpandRowsLevel,
     resolvedExpandColsLevel: resolvedExpandColumnsLevel,
-    metricLabelSet,
     metricLabelMap,
     isMetricTokenValue,
     metrics,
@@ -186,6 +184,7 @@ export const usePivotLayout = ({
   const { metricsLayoutResolved: resolvedMetricsLayout, metricInsertIndex } =
     layout.pivotProgram;
   const { metricKeys: metricLabels } = layout.pivotProgram;
+  const metricLabelSet = useMemo(() => new Set(metricLabels), [metricLabels]);
   const metricVerboseMap = formData.verboseMap as
     | Record<string, string>
     | undefined;
@@ -601,7 +600,6 @@ export const usePivotLayout = ({
     expandColumnsLevelRaw,
     resolvedExpandRowsLevel,
     resolvedExpandColumnsLevel,
-    metricLabelSet,
     isMetricTokenValue,
     normalizedRowSubtotalLevels,
     normalizedColSubtotalLevels,

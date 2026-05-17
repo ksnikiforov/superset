@@ -306,7 +306,6 @@ export type ExpansionEngineConfig = {
   fetchFormData: PivotTableQueryFormData;
   resolvedExpandRowsLevel: number;
   resolvedExpandColumnsLevel: number;
-  metricLabelSet: Set<string>;
   isMetricTokenValue: (value: unknown) => boolean;
   pivotProgram: PivotProgram;
   buildRenderModelConfig: (params: {
@@ -337,7 +336,6 @@ export const useExpansionEngine = ({
   fetchFormData,
   resolvedExpandRowsLevel,
   resolvedExpandColumnsLevel,
-  metricLabelSet,
   isMetricTokenValue,
   pivotProgram,
   buildRenderModelConfig,
@@ -435,6 +433,10 @@ export const useExpansionEngine = ({
   const groupbyColumnKeys = useMemo(
     () => pivotProgram.columnDimensions.map(getStableColumnKey),
     [pivotProgram.columnDimensions],
+  );
+  const metricLabelSet = useMemo(
+    () => new Set(pivotProgram.metricKeys),
+    [pivotProgram.metricKeys],
   );
   const countDimDepth = useCallback(
     (path: PivotTreeNode['path']) =>

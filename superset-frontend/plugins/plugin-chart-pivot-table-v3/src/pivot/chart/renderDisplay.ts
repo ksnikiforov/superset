@@ -316,7 +316,6 @@ export type RenderNodeDisplayState = {
 type RenderNodeDisplayLayout = Pick<
   PivotLayoutResult,
   | 'resolvedExpandRowsLevel'
-  | 'metricLabelSet'
   | 'hideMetricHeaderOnRows'
   | 'isMetricTokenValue'
   | 'isExplicitSubtotalNode'
@@ -341,10 +340,11 @@ export const buildRenderNodeDisplayState = ({
   const groupbyRowsLength = layout.layout.pivotProgram.rowDimensions.length;
   const groupbyColumnsLength =
     layout.layout.pivotProgram.columnDimensions.length;
+  const metricLabelSet = new Set(layout.layout.pivotProgram.metricKeys);
   const autoExpandedRows = seedExpandedByLevel(
     rowNodes,
     layout.resolvedExpandRowsLevel,
-    layout.metricLabelSet,
+    metricLabelSet,
     {
       includeMetricDepthZero: shouldAutoExpandValuesLevel(
         layout.layout.pivotProgram,
@@ -364,13 +364,13 @@ export const buildRenderNodeDisplayState = ({
 
   const isExplicitTotalNode = (node: PivotTreeNode) =>
     isExplicitTotalNodeBase(node, {
-      metricLabelSet: layout.metricLabelSet,
+      metricLabelSet,
       program: layout.layout.pivotProgram,
     });
 
   const getNodeDimDepth = (node: PivotTreeNode) =>
     getNodeDimDepthBase(node, {
-      metricLabelSet: layout.metricLabelSet,
+      metricLabelSet,
       program: layout.layout.pivotProgram,
       hideMetricHeaderOnRows: layout.hideMetricHeaderOnRows,
     });

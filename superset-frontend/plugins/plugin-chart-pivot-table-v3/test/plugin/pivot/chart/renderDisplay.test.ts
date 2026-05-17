@@ -315,7 +315,6 @@ test('builds render node display state for toggles and aggregate emphasis', () =
     expandedRows: new Set([country.key]),
     layout: {
       resolvedExpandRowsLevel: 0,
-      metricLabelSet: new Set(['sales']),
       hideMetricHeaderOnRows: false,
       isMetricTokenValue: value => value === encodeMetricKey('sales'),
       isExplicitSubtotalNode: candidate =>
@@ -347,7 +346,6 @@ test('hides metric toggles when measure leaves are visible', () => {
     expandedRows: new Set<string>(),
     layout: {
       resolvedExpandRowsLevel: 0,
-      metricLabelSet: new Set(['sales']),
       hideMetricHeaderOnRows: false,
       isMetricTokenValue: value => value === encodeMetricKey('sales'),
       isExplicitSubtotalNode: () => false,

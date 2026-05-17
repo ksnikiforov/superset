@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14470` insertions, `15347` deletions, net `-877`.
-- Current production TypeScript/TSX total: about `32633` lines.
+- Production `src`: `14478` insertions, `15357` deletions, net `-879`.
+- Current production TypeScript/TSX total: about `32631` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -593,6 +593,9 @@ Success criteria:
   display labels such as `Total <metric>`. Toggle behavior now depends on
   explicit subtotal/metric-total node predicates supplied by materialization and
   layout policy.
+- `metricLabelSet` is no longer part of `LayoutContext`,
+  `PivotLayoutResult`, or the chart-to-expansion boundary. Runtime code derives
+  metric-token lookup sets locally from `PivotProgram.metricKeys`.
 
 ## Current Risks
 

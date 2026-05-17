@@ -824,7 +824,8 @@ export const buildInitialQuerySpecs = (
   formData: PivotTableQueryFormData,
   layout: LayoutContext = buildLayoutContext(formData),
 ): PlannedQuerySpec[] => {
-  const { metrics, metricLabelSet } = layout;
+  const { metrics } = layout;
+  const metricLabelSet = new Set(layout.pivotProgram.metricKeys);
   const rowGroupby = layout.pivotProgram.rowDimensions;
   const colGroupby = layout.pivotProgram.columnDimensions;
   const rowKeys = rowGroupby.map(getStableColumnKey);
