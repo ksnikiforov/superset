@@ -311,8 +311,6 @@ test('builds render node display state for toggles and aggregate emphasis', () =
     layout: {
       resolvedExpandRowsLevel: 0,
       hideMetricHeaderOnRows: false,
-      isExplicitSubtotalNode: candidate =>
-        candidate?.path.some(value => value === SUBTOTAL_TOKEN) ?? false,
       layout: { pivotProgram },
     },
     isLeafTierVisible: false,
@@ -337,7 +335,6 @@ test('hides metric toggles when measure leaves are visible', () => {
     layout: {
       resolvedExpandRowsLevel: 0,
       hideMetricHeaderOnRows: false,
-      isExplicitSubtotalNode: () => false,
       layout: { pivotProgram: rowMetricFirstProgram },
     },
     isLeafTierVisible: true,

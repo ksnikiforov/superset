@@ -163,7 +163,7 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14284` insertions, `15787` deletions, net `-1503`.
+- Production `src`: `14283` insertions, `15787` deletions, net `-1504`.
 - Current production TypeScript/TSX total: about `32557` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
@@ -798,6 +798,9 @@ Success criteria:
   Values subtotal normalization. `usePivotLayout` no longer threads
   row/column-specific metric-total callbacks or collapsed Values flags into
   those render-policy helpers.
+- Render node display state now uses the materialized explicit-subtotal token
+  predicate directly instead of receiving that semantic predicate through
+  `PivotLayoutResult`.
 
 ## Current Risks
 

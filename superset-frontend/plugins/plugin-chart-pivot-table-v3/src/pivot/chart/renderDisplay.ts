@@ -38,6 +38,7 @@ import {
   createMetricNodePolicy,
   getMetricLabelFromPath,
   getNodeDimDepth as getNodeDimDepthBase,
+  isExplicitSubtotalNode,
   isExplicitTotalNode as isExplicitTotalNodeBase,
 } from '../metricsTotals';
 import {
@@ -303,9 +304,7 @@ export type RenderNodeDisplayState = {
 
 type RenderNodeDisplayLayout = Pick<
   PivotLayoutResult,
-  | 'resolvedExpandRowsLevel'
-  | 'hideMetricHeaderOnRows'
-  | 'isExplicitSubtotalNode'
+  'resolvedExpandRowsLevel' | 'hideMetricHeaderOnRows'
 > & {
   layout: Pick<PivotLayoutResult['layout'], 'pivotProgram'>;
 };
@@ -370,7 +369,7 @@ export const buildRenderNodeDisplayState = ({
     if (!node || node.path.length === 0) {
       return false;
     }
-    if (layout.isExplicitSubtotalNode(node) || isMetricGrandTotalNode(node)) {
+    if (isExplicitSubtotalNode(node) || isMetricGrandTotalNode(node)) {
       return false;
     }
     const projection = resolveAxisProjection({
