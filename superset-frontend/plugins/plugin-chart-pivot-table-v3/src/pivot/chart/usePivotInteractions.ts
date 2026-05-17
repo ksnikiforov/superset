@@ -155,14 +155,8 @@ export const usePivotInteractions = ({
               dataMask: {
                 extraFormData: { filters: contextFilters },
                 filterState: {
-                  value: contextFilters.map(filter => filter.val),
-                  selectedFilters: contextFilters.reduce(
-                    (acc, filter) => ({
-                      ...acc,
-                      [getColumnLabel(filter.col)]: [filter.val],
-                    }),
-                    {},
-                  ),
+                  value: buildFilterStateValues(contextFilters),
+                  selectedFilters: buildSelectedFilters(contextFilters),
                 },
                 ownState: {
                   ...(ownState ?? {}),
