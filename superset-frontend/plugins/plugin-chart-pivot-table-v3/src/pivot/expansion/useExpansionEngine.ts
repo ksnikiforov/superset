@@ -49,7 +49,6 @@ import { stableStringify } from '../shared/stableStringify';
 import {
   buildAxisCoverageKeyFromPathKey,
   getNextAxisLevelForPath,
-  getValuesLevelIndex,
   isValuesAtAxisEnd,
   shouldAutoExpandValuesLevel,
 } from '../runtime/projection';
@@ -388,8 +387,6 @@ export const useExpansionEngine = ({
     metrics: fetchFormData.metrics,
     metricsLayout: fetchFormData.metricsLayout,
   });
-  const metricIndexForRows = getValuesLevelIndex(pivotProgram, 'row');
-  const metricIndexForCols = getValuesLevelIndex(pivotProgram, 'col');
   const explicitExpandedRowsRef = useRef<Set<string>>(new Set());
   const explicitExpandedColsRef = useRef<Set<string>>(new Set());
   const explicitCollapsedRowsRef = useRef<Set<string>>(new Set());
@@ -723,10 +720,10 @@ export const useExpansionEngine = ({
           axis === 'row'
             ? explicitCollapsedRowsRef.current
             : explicitCollapsedColsRef.current,
-        metricIndex: axis === 'row' ? metricIndexForRows : metricIndexForCols,
+        program: pivotProgram,
         isMetricTokenValue,
       }),
-    [isMetricTokenValue, metricIndexForCols, metricIndexForRows],
+    [isMetricTokenValue, pivotProgram],
   );
 
   const buildDesiredExpanded = useCallback(
@@ -1285,8 +1282,6 @@ export const useExpansionEngine = ({
     groupbyRowKeys,
     isMetricTokenValue,
     metricLabelSet,
-    metricIndexForCols,
-    metricIndexForRows,
     pivotProgram,
     shouldPersistExpansionState,
     resolvedExpandColumnsLevel,

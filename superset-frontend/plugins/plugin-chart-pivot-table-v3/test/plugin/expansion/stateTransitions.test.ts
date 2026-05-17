@@ -445,7 +445,11 @@ describe('pivot/expansion/stateTransitions', () => {
       expanded: new Set([rootKey, aKey, staleMetricFirstKey]),
       tree,
       collapsed: new Set(),
-      metricIndex: 1,
+      program: compilePivotProgram({
+        groupbyRows: ['r0', METRICS_PLACEHOLDER],
+        metrics: ['m1'],
+        metricsLayout: MetricsLayoutEnum.ROWS,
+      }),
       isMetricTokenValue: value => value === METRICS_PLACEHOLDER,
     });
 
@@ -471,7 +475,11 @@ describe('pivot/expansion/stateTransitions', () => {
       expanded: new Set([rootKey, aKey, aMetricKey, staleMetricFirstKey]),
       tree,
       collapsed: new Set([aMetricKey]),
-      metricIndex: 1,
+      program: compilePivotProgram({
+        groupbyRows: ['r0', METRICS_PLACEHOLDER],
+        metrics: ['m1'],
+        metricsLayout: MetricsLayoutEnum.ROWS,
+      }),
       isMetricTokenValue: value => value === METRICS_PLACEHOLDER,
     });
 

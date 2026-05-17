@@ -681,17 +681,18 @@ export const resolveExpandedForMetrics = ({
   expanded,
   tree,
   collapsed,
-  metricIndex,
+  program,
   isMetricTokenValue,
 }: {
   axis: PivotAxis;
   expanded: Set<string>;
   tree: PivotTreeData;
   collapsed: Set<string>;
-  metricIndex: number | undefined;
+  program: PivotProgram;
   isMetricTokenValue: (value: unknown) => boolean;
 }) => {
   const nodes = axis === 'row' ? tree.rows : tree.cols;
+  const metricIndex = getValuesLevelIndex(program, axis);
   const resolved = expandMetricPatternExpansions({
     expanded,
     nodes,
