@@ -760,6 +760,11 @@ Bring these back before implementing the behavior change:
   fetch branch requires a loaded runtime snapshot contract. A pure fact-coverage
   diff changes visible interaction/fetch behavior and must not be repeated as a
   direct replacement.
+- **Persisted expansion replay.** Initial query planning still replays persisted
+  expanded/collapsed paths to prefetch saved branches. Removing that behavior
+  would simplify `buildInitialQuerySpecs` and reduce startup query planning, but
+  dashboards would no longer restore expanded branches after reload. Do not cut
+  it without an explicit UX decision.
 - **Large-result interactivity.** Worker/off-thread/chunked commit changes can
   alter loader timing and must be planned as an interactivity change.
 
