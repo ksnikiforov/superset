@@ -670,6 +670,7 @@ export const buildBatchQuerySpecs = ({
   visibleRowDepth,
   visibleColDepth,
   chunkIndex = 0,
+  representativePath,
 }: {
   formData: PivotTableQueryFormData;
   layout: LayoutContext;
@@ -677,12 +678,13 @@ export const buildBatchQuerySpecs = ({
   visibleRowDepth: number;
   visibleColDepth: number;
   chunkIndex?: number;
+  representativePath?: PivotPath;
 }): PlannedQuerySpec[] => {
   const representativeKey = batch.targets[0]?.pathKey;
-  if (!representativeKey) {
+  if (!representativeKey && !representativePath) {
     return [];
   }
-  const representative = parsePath(representativeKey);
+  const representative = representativePath ?? parsePath(representativeKey);
   const parentPath = parsePath(batch.parentPathKey);
   const parentDimensionPath = projectQueryFilterPath({
     layout,
@@ -972,37 +974,15 @@ export const buildInitialQuerySpecs = (
       if (!rep) {
         return;
       }
-      const parentPath = parsePath(batch.parentPathKey);
-      const parentDimensionPath = projectQueryFilterPath({
-        layout,
-        axis: batch.axis,
-        path: parentPath,
-      });
       specs.push(
-        ...buildAxisExpansionSpecs({
+        ...buildBatchQuerySpecs({
           formData,
           layout,
-          axis: batch.axis,
-          path: rep,
+          batch,
           visibleRowDepth,
           visibleColDepth,
-          filters: ctx =>
-            buildBatchFilterClauses({
-              axisGroupby:
-                batch.axis === 'row'
-                  ? ctx.rowGroupbyForQuery
-                  : ctx.colGroupbyForQuery,
-              parentPath: parentDimensionPath,
-              siblingValues: batch.siblingValues,
-              colTypeMap: formData.colTypeMap,
-            }),
-          suffix: `|batch:${batch.axis}:${batch.parentPathKey}|chunk:${index}`,
-          meta: {
-            kind: 'batch',
-            axis: batch.axis,
-            parentPath,
-            siblingValues: batch.siblingValues,
-          },
+          chunkIndex: index,
+          representativePath: rep,
         }),
       );
       chunkIndexByGroup.set(groupKey, index + 1);
