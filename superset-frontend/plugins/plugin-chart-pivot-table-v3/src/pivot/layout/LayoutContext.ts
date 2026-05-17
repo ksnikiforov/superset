@@ -70,7 +70,6 @@ export type PivotLayoutSpec = Pick<
 
 export type LayoutContext = {
   metrics: QueryFormMetric[];
-  metricKeys: string[];
   metricLabelSet: Set<string>;
   metricLabelMap: Map<string, string>;
   measureHierarchy: MeasureHierarchy;
@@ -192,7 +191,6 @@ export const buildLayoutContext = (
 
   return {
     metrics,
-    metricKeys,
     metricLabelSet,
     metricLabelMap,
     measureHierarchy,

@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14484` insertions, `15328` deletions, net `-844`.
-- Current production TypeScript/TSX total: about `32666` lines.
+- Production `src`: `14485` insertions, `15331` deletions, net `-846`.
+- Current production TypeScript/TSX total: about `32664` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -402,6 +402,8 @@ Success criteria:
 - `LayoutContext` no longer returns raw placeholder-preserving groupby arrays
   or the input-only collapse defaults. Those remain local compile inputs, not
   runtime context authority.
+- `LayoutContext` no longer duplicates metric keys; consumers read metric keys
+  from `PivotProgram`.
 - Column display path policy now consumes `PivotProgram`; render no longer
   passes separate column metric-layout, metric-first, or metric-at-end flags into
   the display helper.

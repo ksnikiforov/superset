@@ -180,7 +180,6 @@ export const usePivotLayout = ({
   const {
     resolvedExpandRowsLevel,
     resolvedExpandColsLevel: resolvedExpandColumnsLevel,
-    metricKeys: metricLabels,
     metricLabelSet,
     metricLabelMap,
     isMetricTokenValue,
@@ -188,6 +187,7 @@ export const usePivotLayout = ({
   } = layout;
   const { metricsLayoutResolved: resolvedMetricsLayout, metricInsertIndex } =
     layout.pivotProgram;
+  const { metricKeys: metricLabels } = layout.pivotProgram;
   const metricVerboseMap = formData.verboseMap as
     | Record<string, string>
     | undefined;
