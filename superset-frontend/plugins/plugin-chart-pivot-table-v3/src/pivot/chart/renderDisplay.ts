@@ -178,19 +178,21 @@ export const expandMetricNodesForRender = ({
   expanded,
   nodes,
   isLeafTierVisible,
-  isMetricTokenValue,
+  program,
 }: {
   expanded: Set<string>;
   nodes: Record<string, PivotTreeNode>;
   isLeafTierVisible: boolean;
-  isMetricTokenValue: (value: unknown) => boolean;
+  program: PivotProgram;
 }) => {
   if (!isLeafTierVisible) {
     return expanded;
   }
+  const metricKeySet = new Set(program.metricKeys);
   const next = new Set(expanded);
   Object.values(nodes).forEach(node => {
-    if (isMetricTokenValue(node.path[node.path.length - 1])) {
+    const decoded = decodeMetricKey(node.path[node.path.length - 1]);
+    if (decoded !== undefined && metricKeySet.has(decoded)) {
       next.add(node.key);
     }
   });
@@ -317,7 +319,6 @@ type RenderNodeDisplayLayout = Pick<
   PivotLayoutResult,
   | 'resolvedExpandRowsLevel'
   | 'hideMetricHeaderOnRows'
-  | 'isMetricTokenValue'
   | 'isExplicitSubtotalNode'
   | 'isMetricGrandTotalNode'
   | 'isMetricSubtotalNode'
@@ -341,6 +342,10 @@ export const buildRenderNodeDisplayState = ({
   const groupbyColumnsLength =
     layout.layout.pivotProgram.columnDimensions.length;
   const metricLabelSet = new Set(layout.layout.pivotProgram.metricKeys);
+  const isMetricTokenValue = (value: unknown) => {
+    const decoded = decodeMetricKey(value);
+    return decoded !== undefined && metricLabelSet.has(decoded);
+  };
   const autoExpandedRows = seedExpandedByLevel(
     rowNodes,
     layout.resolvedExpandRowsLevel,
@@ -397,8 +402,7 @@ export const buildRenderNodeDisplayState = ({
       return false;
     }
     return (
-      !isLeafTierVisible ||
-      !layout.isMetricTokenValue(node.path[node.path.length - 1])
+      !isLeafTierVisible || !isMetricTokenValue(node.path[node.path.length - 1])
     );
   };
 

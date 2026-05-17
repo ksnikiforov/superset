@@ -388,12 +388,12 @@ export const usePivotRenderModel = ({
         expanded: expandedRows,
         nodes: renderTree.rows,
         isLeafTierVisible,
-        isMetricTokenValue: layout.isMetricTokenValue,
+        program: layout.layout.pivotProgram,
       }),
     [
       expandedRows,
       isLeafTierVisible,
-      layout.isMetricTokenValue,
+      layout.layout.pivotProgram,
       renderTree.rows,
     ],
   );
@@ -403,12 +403,12 @@ export const usePivotRenderModel = ({
         expanded: expandedCols,
         nodes: renderTree.cols,
         isLeafTierVisible,
-        isMetricTokenValue: layout.isMetricTokenValue,
+        program: layout.layout.pivotProgram,
       }),
     [
       expandedCols,
       isLeafTierVisible,
-      layout.isMetricTokenValue,
+      layout.layout.pivotProgram,
       renderTree.cols,
     ],
   );

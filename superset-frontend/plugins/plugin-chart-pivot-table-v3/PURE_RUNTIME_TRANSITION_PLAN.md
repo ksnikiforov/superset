@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14475` insertions, `15362` deletions, net `-887`.
-- Current production TypeScript/TSX total: about `32623` lines.
+- Production `src`: `14480` insertions, `15363` deletions, net `-883`.
+- Current production TypeScript/TSX total: about `32627` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -605,6 +605,9 @@ Success criteria:
 - Collapsed Values projection no longer receives a separate metric-label set.
   It derives metric lookup from `PivotProgram.metricKeys`, keeping that layout
   helper program-owned.
+- Render display helpers no longer receive metric-token predicates from layout
+  for metric-node auto-expansion or toggle checks. They derive those checks from
+  the compiled `PivotProgram`.
 
 ## Current Risks
 

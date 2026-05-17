@@ -203,8 +203,7 @@ test('adds metric nodes to expanded render state only when the leaf tier is visi
       expanded,
       nodes,
       isLeafTierVisible: false,
-      isMetricTokenValue: value =>
-        typeof value === 'string' && value.startsWith('__metric__'),
+      program: pivotProgram,
     }),
   ).toBe(expanded);
   expect(
@@ -212,8 +211,7 @@ test('adds metric nodes to expanded render state only when the leaf tier is visi
       expanded,
       nodes,
       isLeafTierVisible: true,
-      isMetricTokenValue: value =>
-        typeof value === 'string' && value.startsWith('__metric__'),
+      program: pivotProgram,
     }).has(metricNode.key),
   ).toBe(true);
 });
@@ -316,7 +314,6 @@ test('builds render node display state for toggles and aggregate emphasis', () =
     layout: {
       resolvedExpandRowsLevel: 0,
       hideMetricHeaderOnRows: false,
-      isMetricTokenValue: value => value === encodeMetricKey('sales'),
       isExplicitSubtotalNode: candidate =>
         candidate?.path.some(value => value === SUBTOTAL_TOKEN) ?? false,
       isMetricGrandTotalNode: () => false,
@@ -347,7 +344,6 @@ test('hides metric toggles when measure leaves are visible', () => {
     layout: {
       resolvedExpandRowsLevel: 0,
       hideMetricHeaderOnRows: false,
-      isMetricTokenValue: value => value === encodeMetricKey('sales'),
       isExplicitSubtotalNode: () => false,
       isMetricGrandTotalNode: () => false,
       isMetricSubtotalNode: () => false,
