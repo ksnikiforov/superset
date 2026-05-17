@@ -160,7 +160,6 @@ describe('buildRenderModel', () => {
         countDimDepth: path => path.length,
         isMetricGrandTotalNode: () => false,
         isMetricSubtotalNode: () => false,
-        isMetricTokenValue: () => false,
       },
     });
 
@@ -232,7 +231,6 @@ describe('buildRenderModel', () => {
         countDimDepth: path => path.length,
         isMetricGrandTotalNode: () => false,
         isMetricSubtotalNode: () => false,
-        isMetricTokenValue: () => false,
       },
     });
 

@@ -26,6 +26,7 @@ import { buildColumnHeaderRows, type HeaderCellInfo } from '../viewModel';
 import { buildVisibleCellEntries, type VisibleCellEntry } from '../cellUtils';
 import { buildVisiblePivotAxes } from '../visibility';
 import type { PivotProgram } from '../runtime/types';
+import { decodeMetricKey } from '../core/tokens';
 
 export type RenderModel = {
   visibleRows: PivotTreeNode[];
@@ -54,7 +55,6 @@ export type RenderModelConfig = {
   countDimDepth: (path: PivotTreeNode['path']) => number;
   isMetricGrandTotalNode: (node?: PivotTreeNode) => boolean;
   isMetricSubtotalNode: (node?: PivotTreeNode) => boolean;
-  isMetricTokenValue: (value: unknown) => boolean;
   getColumnDisplayPath?: (
     col: PivotTreeNode,
     maxDepth: number,
@@ -102,7 +102,7 @@ export const buildRenderModel = ({
     config.pivotProgram.valueAxis === 'col' &&
     config.pivotProgram.metricKeys.length > 0 &&
     config.pivotProgram.metricInsertIndex === 0;
-  const { visibleRows, visibleCols } = buildVisiblePivotAxes({
+  const { visibleRows, visibleCols: visibleColsBase } = buildVisiblePivotAxes({
     rows: tree.rows,
     cols: tree.cols,
     expandedRows,
@@ -125,11 +125,23 @@ export const buildRenderModel = ({
     getCollapsedColLeaves: config.getCollapsedColLeaves,
     isMetricGrandTotalNode: config.isMetricGrandTotalNode,
     isMetricSubtotalNode: config.isMetricSubtotalNode,
-    isMetricTokenValue: config.isMetricTokenValue,
     shouldHideMetricGrandTotalsOnRows,
     shouldHideMetricGrandTotalsOnCols,
-    shouldSuppressColRoot,
   });
+  let visibleCols = visibleColsBase;
+  if (shouldSuppressColRoot) {
+    const metricKeySet = new Set(config.pivotProgram.metricKeys);
+    const hasMetricLeaves = visibleCols.some(col =>
+      col.path.some(value => {
+        const decoded = decodeMetricKey(value);
+        return decoded !== undefined && metricKeySet.has(decoded);
+      }),
+    );
+    if (hasMetricLeaves) {
+      const withoutRoot = visibleCols.filter(col => col.key !== rootKey);
+      visibleCols = withoutRoot.length > 0 ? withoutRoot : visibleCols;
+    }
+  }
 
   const columnHeaderRows = buildColumnHeaderRows(
     visibleCols,

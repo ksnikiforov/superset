@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14485` insertions, `15365` deletions, net `-880`.
-- Current production TypeScript/TSX total: about `32630` lines.
+- Production `src`: `14478` insertions, `15362` deletions, net `-884`.
+- Current production TypeScript/TSX total: about `32626` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -599,6 +599,9 @@ Success criteria:
 - `LayoutContext` also no longer exports an `isMetricTokenValue` predicate.
   The layout context exposes the compiled program; render/layout helpers derive
   metric-token predicates from that program where needed.
+- Render model config no longer accepts a metric-token predicate. Column-root
+  suppression derives metric leaves directly from `PivotProgram.metricKeys`, so
+  the visibility helper no longer receives metric-token authority.
 
 ## Current Risks
 

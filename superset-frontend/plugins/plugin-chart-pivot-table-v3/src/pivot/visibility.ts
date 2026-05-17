@@ -192,17 +192,13 @@ type VisiblePivotAxesParams = ColLeavesParams & {
   getRowChildren: (node: PivotTreeNode) => PivotTreeNode[];
   getCollapsedRowChildren?: (node: PivotTreeNode) => PivotTreeNode[];
   skipColRoot: boolean;
-  isMetricTokenValue: (value: unknown) => boolean;
   shouldHideMetricGrandTotalsOnRows: boolean;
   shouldHideMetricGrandTotalsOnCols: boolean;
-  shouldSuppressColRoot: boolean;
 };
 
 export const buildVisiblePivotAxes = ({
-  isMetricTokenValue,
   shouldHideMetricGrandTotalsOnRows,
   shouldHideMetricGrandTotalsOnCols,
-  shouldSuppressColRoot,
   ...params
 }: VisiblePivotAxesParams) => {
   const {
@@ -248,19 +244,9 @@ export const buildVisiblePivotAxes = ({
       : [root];
   const colLeaves = startCols.flatMap(buildColLeavesWithSubtotals);
   const visibleColsBase = colLeaves.length === 0 && root ? [root] : colLeaves;
-  let visibleCols = shouldHideMetricGrandTotalsOnCols
+  const visibleCols = shouldHideMetricGrandTotalsOnCols
     ? visibleColsBase.filter(col => !isMetricGrandTotalNode(col))
     : visibleColsBase;
-
-  if (shouldSuppressColRoot) {
-    const hasMetricLeaves = visibleCols.some(col =>
-      col.path.some(val => isMetricTokenValue(val)),
-    );
-    if (hasMetricLeaves) {
-      const withoutRoot = visibleCols.filter(col => col.key !== rootKey);
-      visibleCols = withoutRoot.length > 0 ? withoutRoot : visibleCols;
-    }
-  }
 
   return { visibleRows, visibleCols };
 };
