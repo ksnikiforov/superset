@@ -292,8 +292,6 @@ function PivotTableChart(props: PivotTableProps) {
     data,
     factBatches,
     isUserControlled,
-    isDashboardRuntimeSync,
-    hasMetrics,
     upstreamDashboardQueryContextSignature,
     persistedInteractionFilters,
     selectedFiltersForTreeSync,

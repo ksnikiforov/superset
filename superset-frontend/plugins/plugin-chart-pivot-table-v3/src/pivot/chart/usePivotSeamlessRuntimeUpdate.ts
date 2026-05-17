@@ -70,8 +70,6 @@ type UsePivotSeamlessRuntimeUpdateConfig = {
   data: PivotTreeData;
   factBatches: PivotFactStoreBatch[];
   isUserControlled: boolean;
-  isDashboardRuntimeSync: boolean;
-  hasMetrics: boolean;
   upstreamDashboardQueryContextSignature: string | null;
   persistedInteractionFilters: RuntimeSelection;
   selectedFiltersForTreeSync: RuntimeSelection;
@@ -111,8 +109,6 @@ export const usePivotSeamlessRuntimeUpdate = (
     data,
     factBatches,
     isUserControlled,
-    isDashboardRuntimeSync,
-    hasMetrics,
     upstreamDashboardQueryContextSignature,
     persistedInteractionFilters,
     selectedFiltersForTreeSync,
@@ -145,6 +141,7 @@ export const usePivotSeamlessRuntimeUpdate = (
   const [committedTree, setCommittedTree] = useState<PivotTreeData>(data);
   const [committedFactBatches, setCommittedFactBatches] =
     useState<PivotFactStoreBatch[]>(factBatches);
+  const hasMetrics = metricKeys.length > 0;
   const lastUpstreamQueryContextRef = useRef<{
     data: PivotTreeData;
     signature: string;
@@ -173,7 +170,6 @@ export const usePivotSeamlessRuntimeUpdate = (
     // Ignore stale upstream updates while a local interaction update is still
     // pending.
     const hasLocalSyncForCurrentDashboardQueryContext =
-      isDashboardRuntimeSync &&
       upstreamDashboardQueryContextSignature !== null &&
       lastLocalSyncDashboardQueryContextRef.current ===
         upstreamDashboardQueryContextSignature;
@@ -194,7 +190,6 @@ export const usePivotSeamlessRuntimeUpdate = (
     factBatches,
     committedFilters,
     committedRuntimeLayout,
-    isDashboardRuntimeSync,
     isUserControlled,
     lastLocalSyncDashboardQueryContextRef,
     persistedInteractionFilters,
