@@ -479,7 +479,6 @@ export const usePivotFormatting = ({
   rowValuesMap,
   colValuesMap,
   getNodeDimDepth,
-  rowSubTotals,
   valueFormat,
   columnFormats,
   currencyFormats,
@@ -496,7 +495,6 @@ export const usePivotFormatting = ({
   rowValuesMap: Map<string, Record<string, DataRecordValue>>;
   colValuesMap: Map<string, Record<string, DataRecordValue>>;
   getNodeDimDepth: (node: PivotTreeNode) => number;
-  rowSubTotals: boolean;
   valueFormat?: PivotTableProps['valueFormat'];
   columnFormats: PivotTableProps['columnFormats'];
   currencyFormats: PivotTableProps['currencyFormats'];
@@ -509,6 +507,7 @@ export const usePivotFormatting = ({
     (formData.metricFormattingScope as MetricFormattingScope) ||
     'values_totals';
   const { groupbyRows, groupbyColumns, metrics } = layout.layout;
+  const { rowSubTotals } = layout.layout;
 
   const metricFormatting = useMemo(
     () =>

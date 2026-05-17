@@ -418,9 +418,6 @@ function PivotTableChart(props: PivotTableProps) {
     rowOrder,
     colOrder,
     colTypeMap,
-    rowTotals,
-    colTotals,
-    rowSubTotals,
     layout: layoutResult,
   });
   const { renderTree } = renderModelResult;
@@ -476,7 +473,6 @@ function PivotTableChart(props: PivotTableProps) {
     rowValuesMap: renderModelResult.rowValuesMap,
     colValuesMap: renderModelResult.colValuesMap,
     getNodeDimDepth: renderModelResult.getNodeDimDepth,
-    rowSubTotals,
     valueFormat,
     columnFormats,
     currencyFormats,

@@ -128,9 +128,6 @@ export const usePivotRenderModel = ({
   rowOrder,
   colOrder,
   colTypeMap,
-  rowTotals,
-  colTotals,
-  rowSubTotals,
   layout,
 }: {
   tree: PivotTreeData;
@@ -140,9 +137,6 @@ export const usePivotRenderModel = ({
   rowOrder: PivotTableProps['rowOrder'];
   colOrder: PivotTableProps['colOrder'];
   colTypeMap: PivotTableProps['colTypeMap'];
-  rowTotals: boolean;
-  colTotals: boolean;
-  rowSubTotals: boolean;
   layout: PivotLayoutResult;
 }): PivotRenderModelResult => {
   const [activeColumnSort, setActiveColumnSort] =
@@ -151,6 +145,7 @@ export const usePivotRenderModel = ({
   const resolvedGroupbyColumns = layout.layout.groupbyColumns;
   const resolvedGroupbyRowsLength = resolvedGroupbyRows.length;
   const resolvedGroupbyColumnsLength = resolvedGroupbyColumns.length;
+  const { rowTotals, colTotals, rowSubTotals } = layout.layout;
 
   const rowSortingKeyMap = useMemo(
     () =>
