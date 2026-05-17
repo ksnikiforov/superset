@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14494` insertions, `15377` deletions, net `-883`.
-- Current production TypeScript/TSX total: about `32627` lines.
+- Production `src`: `14487` insertions, `15382` deletions, net `-895`.
+- Current production TypeScript/TSX total: about `32615` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -615,6 +615,10 @@ Success criteria:
   formatting, render display, render model, pruning, and expansion use the
   shared core token check against local `PivotProgram.metricKeys` sets instead
   of threading a chart/layout-owned callback through policy boundaries.
+- Expansion state transitions no longer accept a separate metric-token
+  predicate. Reinitialization, metric-pattern expansion, and same-axis merge
+  preservation all use canonical encoded metric tokens checked against
+  `metricLabelSet`.
 
 ## Current Risks
 

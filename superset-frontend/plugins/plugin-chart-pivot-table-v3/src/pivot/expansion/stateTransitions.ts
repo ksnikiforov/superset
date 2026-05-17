@@ -50,10 +50,10 @@ import {
   shouldAutoExpandValuesLevel,
 } from '../runtime/projection';
 import type { PivotProgram } from '../runtime/types';
+import { isMetricTokenForKeys } from '../core/tokens';
 
 export type ExpansionVisibilityConfig = {
   metricLabelSet: Set<string>;
-  isMetricTokenValue: (value: unknown) => boolean;
   countDimDepth: (path: PivotTreeNode['path']) => number;
   shouldFetchChildren: PivotExpansionNodeFetchPredicate;
   buildRenderModelConfig: (params: {
@@ -71,19 +71,19 @@ const createEmptyExpansionPlan = (): PivotExpansionPlan => ({
 
 const findMetricIndex = (
   path: PivotTreeNode['path'],
-  isMetricTokenValue: (value: unknown) => boolean,
-) => path.findIndex(value => isMetricTokenValue(value));
+  metricLabelSet: ReadonlySet<string>,
+) => path.findIndex(value => isMetricTokenForKeys(value, metricLabelSet));
 
 const expandMetricPatternExpansions = ({
   expanded,
   nodes,
   metricIndex,
-  isMetricTokenValue,
+  metricLabelSet,
 }: {
   expanded: Set<string>;
   nodes: Record<string, PivotTreeNode>;
   metricIndex: number | undefined;
-  isMetricTokenValue: (value: unknown) => boolean;
+  metricLabelSet: ReadonlySet<string>;
 }) => {
   if (metricIndex === undefined || metricIndex < 0) {
     return expanded;
@@ -93,7 +93,7 @@ const expandMetricPatternExpansions = ({
   expanded.forEach(key => {
     const node = nodes[key];
     const path = node ? node.path : parsePath(key);
-    const patternMetricIndex = findMetricIndex(path, isMetricTokenValue);
+    const patternMetricIndex = findMetricIndex(path, metricLabelSet);
     if (patternMetricIndex < 0 || patternMetricIndex > metricIndex) {
       return;
     }
@@ -103,7 +103,7 @@ const expandMetricPatternExpansions = ({
     candidates.forEach(candidate => {
       const candidateMetricIndex = findMetricIndex(
         candidate.path,
-        isMetricTokenValue,
+        metricLabelSet,
       );
       if (
         candidateMetricIndex < patternMetricIndex ||
@@ -360,17 +360,17 @@ export const pruneTreeByPrefixes = (
   prefixes: PivotTreeNode['path'][],
   options?: {
     preserveMetricChildren?: boolean;
-    isMetricTokenValue?: (val: unknown) => boolean;
+    metricLabelSet?: ReadonlySet<string>;
   },
 ) => {
   if (prefixes.length === 0) {
     return tree;
   }
-  const { preserveMetricChildren, isMetricTokenValue } = options || {};
+  const { preserveMetricChildren, metricLabelSet } = options || {};
   const isUnderPrefix = (path: PivotTreeNode['path']) =>
     prefixes.some(prefix => prefix.every((val, idx) => val === path[idx]));
   const shouldPreserveMetricChild = (path: PivotTreeNode['path']) => {
-    if (!preserveMetricChildren || !isMetricTokenValue) {
+    if (!preserveMetricChildren || !metricLabelSet) {
       return false;
     }
     return prefixes.some(prefix => {
@@ -380,7 +380,7 @@ export const pruneTreeByPrefixes = (
       if (path.length !== prefix.length + 1) {
         return false;
       }
-      return isMetricTokenValue(path[prefix.length]);
+      return isMetricTokenForKeys(path[prefix.length], metricLabelSet);
     });
   };
   const removedRowKeys = new Set<string>();
@@ -466,21 +466,21 @@ export const mergeSameAxisExpansionTree = ({
   axis,
   touchedKeys,
   preserveMetricChildren,
-  isMetricTokenValue,
+  metricLabelSet,
 }: {
   currentTree: PivotTreeData;
   previousTree: PivotTreeData;
   axis: PivotAxis;
   touchedKeys: string[];
   preserveMetricChildren?: boolean;
-  isMetricTokenValue: (value: unknown) => boolean;
+  metricLabelSet: ReadonlySet<string>;
 }) => {
   const touchedPrefixes = touchedKeys.map(key => parsePath(key));
   const preservedTree =
     touchedPrefixes.length > 0
       ? pruneTreeByPrefixes(previousTree, axis, touchedPrefixes, {
           preserveMetricChildren,
-          isMetricTokenValue,
+          metricLabelSet,
         })
       : previousTree;
   return mergeTrees(currentTree, preservedTree);
@@ -682,22 +682,21 @@ export const resolveExpandedForMetrics = ({
   tree,
   collapsed,
   program,
-  isMetricTokenValue,
 }: {
   axis: PivotAxis;
   expanded: Set<string>;
   tree: PivotTreeData;
   collapsed: Set<string>;
   program: PivotProgram;
-  isMetricTokenValue: (value: unknown) => boolean;
 }) => {
   const nodes = axis === 'row' ? tree.rows : tree.cols;
   const metricIndex = getValuesLevelIndex(program, axis);
+  const metricLabelSet = new Set(program.metricKeys);
   const resolved = expandMetricPatternExpansions({
     expanded,
     nodes,
     metricIndex,
-    isMetricTokenValue,
+    metricLabelSet,
   });
   const next = new Set(resolved);
   collapsed.forEach(key => next.delete(key));
@@ -709,7 +708,7 @@ export const resolveExpandedForMetrics = ({
       return;
     }
     const path = parsePath(key);
-    const keyMetricIndex = findMetricIndex(path, isMetricTokenValue);
+    const keyMetricIndex = findMetricIndex(path, metricLabelSet);
     if (keyMetricIndex >= 0 && keyMetricIndex < metricIndex) {
       next.delete(key);
     }
@@ -733,7 +732,6 @@ type ExpansionReinitAxis = {
   tree: PivotTreeData;
   metricLabelSet: Set<string>;
   countDimDepth: (path: PivotTreeNode['path']) => number;
-  isMetricTokenValue: (value: unknown) => boolean;
   hasNewData: boolean;
 };
 
@@ -779,7 +777,8 @@ const resolveExpansionCacheAxis = (config: ExpansionReinitAxis) => {
     const path = config.nodes[key]?.path ?? parsePath(key);
     const depth =
       config.countDimDepth(path) +
-      (config.includeMetricDepth && path.some(config.isMetricTokenValue)
+      (config.includeMetricDepth &&
+      path.some(value => isMetricTokenForKeys(value, config.metricLabelSet))
         ? 1
         : 0);
     return depth <= config.stablePrefix;
@@ -829,7 +828,6 @@ export const resolveReinitializedExpansionState = (params: {
   program: PivotProgram;
   metricLabelSet: Set<string>;
   countDimDepth: (path: PivotTreeNode['path']) => number;
-  isMetricTokenValue: (value: unknown) => boolean;
 }) => {
   const { tree, currentLayout, sessionState } = params;
   const metricIndexForRows = getValuesLevelIndex(params.program, 'row');
@@ -844,7 +842,6 @@ export const resolveReinitializedExpansionState = (params: {
     tree,
     metricLabelSet: new Set(params.metricLabelSet),
     countDimDepth: params.countDimDepth,
-    isMetricTokenValue: params.isMetricTokenValue,
     hasNewData: params.hasNewData,
   };
   const rowKeys = sessionState.rows ?? [];

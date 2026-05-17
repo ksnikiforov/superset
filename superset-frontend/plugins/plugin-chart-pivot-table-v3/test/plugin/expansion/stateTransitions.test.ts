@@ -38,6 +38,7 @@ import {
 import { createExpansionCoverageDiff } from '../../../src/pivot/runtime/coverage';
 import { findChildren, rootKey } from '../../../src/pivot/viewModel';
 import {
+  encodeMetricKey,
   METRICS_PLACEHOLDER,
   SUBTOTAL_TOKEN,
 } from '../../../src/pivot/core/tokens';
@@ -70,7 +71,6 @@ describe('pivot/expansion/stateTransitions', () => {
       metricLabelSet = new Set<string>(),
       metricIndexForRows,
       metricIndexForCols,
-      isMetricTokenValue = () => false,
       countDimDepth = (path: PivotTreeNode['path']) => path.length,
     }: {
       groupbyRowsLength?: number;
@@ -81,7 +81,6 @@ describe('pivot/expansion/stateTransitions', () => {
       metricLabelSet?: Set<string>;
       metricIndexForRows?: number;
       metricIndexForCols?: number;
-      isMetricTokenValue?: (value: unknown) => boolean;
       countDimDepth?: (path: PivotTreeNode['path']) => number;
     } = {}) =>
     ({ tree }: { tree: PivotTreeData }) => {
@@ -139,7 +138,6 @@ describe('pivot/expansion/stateTransitions', () => {
           }),
         isMetricSubtotalNode: (node?: PivotTreeNode) =>
           isMetricSubtotalNode(node, metricLabelSet),
-        isMetricTokenValue,
       };
     };
 
@@ -147,7 +145,6 @@ describe('pivot/expansion/stateTransitions', () => {
     groupbyRowsLength: 2,
     groupbyColumnsLength: 2,
     metricLabelSet: new Set<string>(),
-    isMetricTokenValue: () => false,
     countDimDepth: path => path.length,
     shouldFetchChildren: ({ path }) => path.length < 2,
     buildRenderModelConfig: buildTestRenderModelConfig(),
@@ -381,7 +378,7 @@ describe('pivot/expansion/stateTransitions', () => {
       previousTree,
       axis: 'row',
       touchedKeys: [aKey],
-      isMetricTokenValue: () => false,
+      metricLabelSet: new Set(),
     });
 
     expect(new Set(Object.keys(result.rows))).toEqual(
@@ -390,16 +387,17 @@ describe('pivot/expansion/stateTransitions', () => {
   });
 
   it('can preserve metric children when merging same-axis column expansions', () => {
+    const metricToken = encodeMetricKey('m1');
     const aKey = serializePath(['A']);
     const staleKey = serializePath(['A', 'old']);
-    const metricKey = serializePath(['A', METRICS_PLACEHOLDER]);
+    const metricKey = serializePath(['A', metricToken]);
     const freshKey = serializePath(['A', 'new']);
     const previousTree: PivotTreeData = {
       rows: {},
       cols: {
         [aKey]: makeNode('col', ['A'], true),
         [staleKey]: makeNode('col', ['A', 'old'], false),
-        [metricKey]: makeNode('col', ['A', METRICS_PLACEHOLDER], false),
+        [metricKey]: makeNode('col', ['A', metricToken], false),
       },
       cells: {},
     };
@@ -418,7 +416,7 @@ describe('pivot/expansion/stateTransitions', () => {
       axis: 'col',
       touchedKeys: [aKey],
       preserveMetricChildren: true,
-      isMetricTokenValue: value => value === METRICS_PLACEHOLDER,
+      metricLabelSet: new Set(['m1']),
     });
 
     expect(new Set(Object.keys(result.cols))).toEqual(
@@ -427,14 +425,15 @@ describe('pivot/expansion/stateTransitions', () => {
   });
 
   it('drops stale metric-pattern expansion keys after metric depth changes', () => {
-    const staleMetricFirstKey = serializePath([METRICS_PLACEHOLDER, 'A']);
+    const metricToken = encodeMetricKey('m1');
+    const staleMetricFirstKey = serializePath([metricToken, 'A']);
     const aKey = serializePath(['A']);
-    const aMetricKey = serializePath(['A', METRICS_PLACEHOLDER]);
+    const aMetricKey = serializePath(['A', metricToken]);
     const tree: PivotTreeData = {
       rows: {
         [rootKey]: makeNode('row', [], true),
         [aKey]: makeNode('row', ['A'], true),
-        [aMetricKey]: makeNode('row', ['A', METRICS_PLACEHOLDER], false),
+        [aMetricKey]: makeNode('row', ['A', metricToken], false),
       },
       cols: {},
       cells: {},
@@ -450,21 +449,21 @@ describe('pivot/expansion/stateTransitions', () => {
         metrics: ['m1'],
         metricsLayout: MetricsLayoutEnum.ROWS,
       }),
-      isMetricTokenValue: value => value === METRICS_PLACEHOLDER,
     });
 
     expect(result).toEqual(new Set([rootKey, aKey]));
   });
 
   it('applies collapsed metric keys and stale metric-pattern cleanup together', () => {
-    const staleMetricFirstKey = serializePath([METRICS_PLACEHOLDER, 'A']);
+    const metricToken = encodeMetricKey('m1');
+    const staleMetricFirstKey = serializePath([metricToken, 'A']);
     const aKey = serializePath(['A']);
-    const aMetricKey = serializePath(['A', METRICS_PLACEHOLDER]);
+    const aMetricKey = serializePath(['A', metricToken]);
     const tree: PivotTreeData = {
       rows: {
         [rootKey]: makeNode('row', [], true),
         [aKey]: makeNode('row', ['A'], true),
-        [aMetricKey]: makeNode('row', ['A', METRICS_PLACEHOLDER], false),
+        [aMetricKey]: makeNode('row', ['A', metricToken], false),
       },
       cols: {},
       cells: {},
@@ -480,7 +479,6 @@ describe('pivot/expansion/stateTransitions', () => {
         metrics: ['m1'],
         metricsLayout: MetricsLayoutEnum.ROWS,
       }),
-      isMetricTokenValue: value => value === METRICS_PLACEHOLDER,
     });
 
     expect(result).toEqual(new Set([rootKey, aKey]));
@@ -1157,14 +1155,15 @@ describe('pivot/expansion/stateTransitions', () => {
   });
 
   it('fetches expanded row branches when only stale metric variants exist', () => {
+    const metricToken = encodeMetricKey('m1');
     const aKey = serializePath(['A']);
-    const aMetricKey = serializePath(['A', METRICS_PLACEHOLDER]);
+    const aMetricKey = serializePath(['A', metricToken]);
     const xKey = serializePath(['X']);
     const tree: PivotTreeData = {
       rows: {
         [rootKey]: makeNode('row', [], true),
         [aKey]: makeNode('row', ['A'], true),
-        [aMetricKey]: makeNode('row', ['A', METRICS_PLACEHOLDER], false),
+        [aMetricKey]: makeNode('row', ['A', metricToken], false),
       },
       cols: {
         [rootKey]: makeNode('col', [], true),
@@ -1180,15 +1179,14 @@ describe('pivot/expansion/stateTransitions', () => {
     };
     const metricConfig: ExpansionVisibilityConfig = {
       ...config,
-      isMetricTokenValue: value => value === METRICS_PLACEHOLDER,
-      countDimDepth: path =>
-        path.filter(value => value !== METRICS_PLACEHOLDER).length,
+      metricLabelSet: new Set(['m1']),
+      countDimDepth: path => path.filter(value => value !== metricToken).length,
       buildRenderModelConfig: buildTestRenderModelConfig({
         metricsLayout: MetricsLayoutEnum.ROWS,
+        metricLabelSet: new Set(['m1']),
         metricIndexForRows: 1,
-        isMetricTokenValue: value => value === METRICS_PLACEHOLDER,
         countDimDepth: path =>
-          path.filter(value => value !== METRICS_PLACEHOLDER).length,
+          path.filter(value => value !== metricToken).length,
       }),
     };
 
@@ -1208,7 +1206,7 @@ describe('pivot/expansion/stateTransitions', () => {
   });
 
   it('fetches expanded row branches when only subtotal+metric descendants exist at same base depth', () => {
-    const metricToken = '__metric__m1';
+    const metricToken = encodeMetricKey('m1');
     const aKey = serializePath(['A']);
     const subtotalKey = serializePath(['A', SUBTOTAL_TOKEN]);
     const subtotalMetricKey = serializePath(['A', SUBTOTAL_TOKEN, metricToken]);
@@ -1239,15 +1237,15 @@ describe('pivot/expansion/stateTransitions', () => {
     const metricConfig: ExpansionVisibilityConfig = {
       ...config,
       groupbyRowsLength: 3,
-      isMetricTokenValue: value => value === metricToken,
+      metricLabelSet: new Set(['m1']),
       countDimDepth: path =>
         path.filter(value => value !== metricToken && value !== SUBTOTAL_TOKEN)
           .length,
       buildRenderModelConfig: buildTestRenderModelConfig({
         groupbyRowsLength: 3,
         metricsLayout: MetricsLayoutEnum.ROWS,
+        metricLabelSet: new Set(['m1']),
         metricIndexForRows: 2,
-        isMetricTokenValue: value => value === metricToken,
         countDimDepth: path =>
           path.filter(
             value => value !== metricToken && value !== SUBTOTAL_TOKEN,

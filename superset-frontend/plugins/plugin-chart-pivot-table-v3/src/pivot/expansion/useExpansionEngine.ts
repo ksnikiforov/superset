@@ -52,7 +52,7 @@ import {
   isValuesAtAxisEnd,
   shouldAutoExpandValuesLevel,
 } from '../runtime/projection';
-import { isMetricTokenForKeys, isSubtotalToken } from '../core/tokens';
+import { isSubtotalToken } from '../core/tokens';
 import type { PivotProgram } from '../runtime/types';
 import {
   buildFactValueKeys,
@@ -436,10 +436,6 @@ export const useExpansionEngine = ({
     () => new Set(pivotProgram.metricKeys),
     [pivotProgram.metricKeys],
   );
-  const isMetricTokenValue = useCallback(
-    (value: unknown) => isMetricTokenForKeys(value, metricLabelSet),
-    [metricLabelSet],
-  );
   const countDimDepth = useCallback(
     (path: PivotTreeNode['path']) =>
       countDimDepthBase(
@@ -672,7 +668,6 @@ export const useExpansionEngine = ({
   const visibilityConfig = useMemo<ExpansionVisibilityConfig>(
     () => ({
       metricLabelSet,
-      isMetricTokenValue,
       countDimDepth,
       shouldFetchChildren,
       buildRenderModelConfig,
@@ -680,7 +675,6 @@ export const useExpansionEngine = ({
     [
       buildRenderModelConfig,
       countDimDepth,
-      isMetricTokenValue,
       metricLabelSet,
       shouldFetchChildren,
     ],
@@ -728,9 +722,8 @@ export const useExpansionEngine = ({
             ? explicitCollapsedRowsRef.current
             : explicitCollapsedColsRef.current,
         program: pivotProgram,
-        isMetricTokenValue,
       }),
-    [isMetricTokenValue, pivotProgram],
+    [pivotProgram],
   );
 
   const buildDesiredExpanded = useCallback(
@@ -856,7 +849,7 @@ export const useExpansionEngine = ({
           axis,
           touchedKeys: fetchLoop.touchedKeys,
           preserveMetricChildren,
-          isMetricTokenValue,
+          metricLabelSet,
         });
         const finalExpanded = resolveExpandedForMetrics(
           axis,
@@ -884,7 +877,7 @@ export const useExpansionEngine = ({
       expansionRequestLifecycle,
       getCoverageKey,
       getMissingExpansionCoverage,
-      isMetricTokenValue,
+      metricLabelSet,
       pivotProgram,
       persistExpansionState,
       pruneMergedTree,
@@ -1204,7 +1197,6 @@ export const useExpansionEngine = ({
       program: pivotProgram,
       metricLabelSet,
       countDimDepth,
-      isMetricTokenValue,
     });
     if (reinitializedExpansion.clearedState) {
       expansionStateStoreRef.current?.write(
@@ -1287,7 +1279,6 @@ export const useExpansionEngine = ({
     expandRowsLevelRaw,
     groupbyColumnKeys,
     groupbyRowKeys,
-    isMetricTokenValue,
     metricLabelSet,
     pivotProgram,
     shouldPersistExpansionState,
