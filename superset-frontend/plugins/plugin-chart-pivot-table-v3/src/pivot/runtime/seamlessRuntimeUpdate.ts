@@ -88,50 +88,6 @@ export const isSameRuntimeLayout = (
   prev.valuePlacement.axis === next.valuePlacement.axis &&
   prev.valuePlacement.index === next.valuePlacement.index;
 
-const placementBeforeSharedDimensions = (
-  axisDimensions: string[],
-  index: number,
-  sharedDimensions: Set<string>,
-) => axisDimensions.slice(0, index).filter(item => sharedDimensions.has(item));
-
-const shouldFetchForValuePlacementChange = ({
-  prev,
-  next,
-}: {
-  prev: PivotRuntimeLayout;
-  next: PivotRuntimeLayout;
-}) => {
-  if (prev.valuePlacement.axis !== next.valuePlacement.axis) {
-    const prevValueAxis =
-      prev.valuePlacement.axis === 'row' ? prev.rows : prev.cols;
-    const nextValueAxis =
-      next.valuePlacement.axis === 'row' ? next.rows : next.cols;
-    return prevValueAxis.length > 0 || nextValueAxis.length > 0;
-  }
-  const prevValueAxis =
-    prev.valuePlacement.axis === 'row' ? prev.rows : prev.cols;
-  const nextValueAxis =
-    next.valuePlacement.axis === 'row' ? next.rows : next.cols;
-  if (prevValueAxis.length === 0 && nextValueAxis.length === 0) {
-    return false;
-  }
-  const sharedDimensions = new Set(
-    prevValueAxis.filter(dimension => nextValueAxis.includes(dimension)),
-  );
-  return !isEqual(
-    placementBeforeSharedDimensions(
-      prevValueAxis,
-      prev.valuePlacement.index,
-      sharedDimensions,
-    ),
-    placementBeforeSharedDimensions(
-      nextValueAxis,
-      next.valuePlacement.index,
-      sharedDimensions,
-    ),
-  );
-};
-
 const shouldFetchForSemanticLayoutChange = (
   prev: PivotRuntimeLayout,
   next: PivotRuntimeLayout,
@@ -146,10 +102,7 @@ const shouldFetchForSemanticLayoutChange = (
     prev.valuePlacement.axis !== next.valuePlacement.axis ||
     prev.valuePlacement.index !== next.valuePlacement.index
   ) {
-    return shouldFetchForValuePlacementChange({
-      prev,
-      next,
-    });
+    return true;
   }
   return false;
 };

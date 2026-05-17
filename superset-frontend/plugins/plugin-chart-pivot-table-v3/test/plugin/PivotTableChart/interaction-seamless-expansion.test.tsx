@@ -1805,7 +1805,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     });
   });
 
-  it('shows column expand toggles after inserting before trailing values without a seamless reload', async () => {
+  it('shows column expand toggles after inserting before trailing values through seamless reload', async () => {
     const metrics = ['averageOrderValue', 'weightedDiscount'];
     const initialCols = ['discountBand'];
     const initialRecords = [
@@ -1891,7 +1891,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     const colButtons = screen.getAllByLabelText('Toggle column dimension');
     fireEvent.click(colButtons[1]);
 
-    expect(fetchMock).not.toHaveBeenCalled();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
 
     await waitFor(() => {
       const refreshedThead = container.querySelector('thead') as HTMLElement;

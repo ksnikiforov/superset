@@ -494,7 +494,7 @@ describe('runtime layout reuse fetch policy', () => {
     ).toBe(false);
   });
 
-  it('does not fetch when adding a hidden dimension only shifts Values after the same prefix', () => {
+  it('fetches when adding a hidden dimension changes Values placement', () => {
     expect(
       shouldFetchRuntimeLayout({
         reuseSnapshot: reuseSnapshot(
@@ -513,7 +513,7 @@ describe('runtime layout reuse fetch policy', () => {
           valuePlacement: { axis: 'col', index: 2 },
         },
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('fetches when Values moves across an already shared dimension', () => {

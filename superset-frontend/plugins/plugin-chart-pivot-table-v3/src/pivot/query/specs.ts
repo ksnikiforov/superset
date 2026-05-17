@@ -972,17 +972,37 @@ export const buildInitialQuerySpecs = (
       if (!rep) {
         return;
       }
+      const parentPath = parsePath(batch.parentPathKey);
+      const parentDimensionPath = projectQueryFilterPath({
+        layout,
+        axis: batch.axis,
+        path: parentPath,
+      });
       specs.push(
-        ...buildBatchSpecs({
+        ...buildAxisExpansionSpecs({
           formData,
           layout,
           axis: batch.axis,
-          parentPathKey: batch.parentPathKey,
-          siblingValues: batch.siblingValues,
-          chunkIndex: index,
-          representative: rep,
+          path: rep,
           visibleRowDepth,
           visibleColDepth,
+          filters: ctx =>
+            buildBatchFilterClauses({
+              axisGroupby:
+                batch.axis === 'row'
+                  ? ctx.rowGroupbyForQuery
+                  : ctx.colGroupbyForQuery,
+              parentPath: parentDimensionPath,
+              siblingValues: batch.siblingValues,
+              colTypeMap: formData.colTypeMap,
+            }),
+          suffix: `|batch:${batch.axis}:${batch.parentPathKey}|chunk:${index}`,
+          meta: {
+            kind: 'batch',
+            axis: batch.axis,
+            parentPath,
+            siblingValues: batch.siblingValues,
+          },
         }),
       );
       chunkIndexByGroup.set(groupKey, index + 1);
@@ -997,7 +1017,7 @@ export const buildInitialQuerySpecs = (
         return;
       }
       specs.push(
-        ...buildBranchSpecs({
+        ...buildBranchQuerySpecs({
           formData,
           layout,
           axis,

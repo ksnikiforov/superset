@@ -127,6 +127,14 @@ Current fact-store contract:
 - repeated no-query behavior should be prevented by planner/requestability
   policy, not by pretending that an empty fact batch was loaded.
 
+Current semantic-layout contract:
+
+- Values placement changes are semantic layout changes and trigger fetch;
+- dimension-only changes may reuse loaded facts only when the coverage manifest
+  proves the next visible root coverage is already loaded;
+- seamless runtime update should not locally project around Values placement by
+  comparing shared dimension prefixes.
+
 Expected deletion targets:
 
 - remaining non-manifest coverage planning in expansion and query batching;
@@ -153,7 +161,7 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14403` insertions, `15527` deletions, net `-1124`.
+- Production `src`: `14382` insertions, `15533` deletions, net `-1151`.
 - Current production TypeScript/TSX total: about `32557` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
