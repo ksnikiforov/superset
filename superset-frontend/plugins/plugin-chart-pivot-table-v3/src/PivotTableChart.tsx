@@ -471,7 +471,7 @@ function PivotTableChart(props: PivotTableProps) {
     isRowAggregateBold: renderModelResult.isRowAggregateBold,
     isColAggregateBold: renderModelResult.isColAggregateBold,
     getNodeDimDepth: renderModelResult.getNodeDimDepth,
-    isMetricGrandTotalNode: layoutResult.isMetricGrandTotalNode,
+    pivotProgram: layoutResult.layout.pivotProgram,
     emitCrossFilters,
     handleCellClick: interactions.handleCellClick,
     handleCellKeyDown: interactions.handleCellKeyDown,

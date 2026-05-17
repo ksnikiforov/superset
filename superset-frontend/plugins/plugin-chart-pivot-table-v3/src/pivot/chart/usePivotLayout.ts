@@ -74,10 +74,7 @@ export type PivotLayoutResult = {
     node: PivotTreeNode,
     axis: 'row' | 'col',
   ) => string | undefined;
-  isMetricGrandTotalNode: (node?: PivotTreeNode) => boolean;
-  isMetricSubtotalNode: (node?: PivotTreeNode) => boolean;
   isExplicitSubtotalNode: (node?: PivotTreeNode) => boolean;
-  countDimDepth: (path: PivotTreeNode['path']) => number;
   getRowSubtotalPosition: (node: PivotTreeNode) => TotalPosition;
   buildRenderModelConfig: (params: {
     tree: PivotTreeData;
@@ -184,12 +181,8 @@ export const usePivotLayout = ({
     () => createMetricNodePolicy(layout.pivotProgram),
     [layout.pivotProgram],
   );
-  const {
-    metricLabelSet,
-    countDimDepth,
-    isMetricGrandTotalNode,
-    isMetricSubtotalNode,
-  } = metricNodePolicy;
+  const { metricLabelSet, isMetricGrandTotalNode, isMetricSubtotalNode } =
+    metricNodePolicy;
   const metricVerboseMap = formData.verboseMap as
     | Record<string, string>
     | undefined;
@@ -566,10 +559,7 @@ export const usePivotLayout = ({
     getMetricDisplayLabelForKey,
     getNonMetricPathParts,
     getDimensionKeyForNode,
-    isMetricGrandTotalNode,
-    isMetricSubtotalNode,
     isExplicitSubtotalNode,
-    countDimDepth,
     getRowSubtotalPosition,
     buildRenderModelConfig,
     pruneMergedTree,

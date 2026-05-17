@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14493` insertions, `15512` deletions, net `-1019`.
-- Current production TypeScript/TSX total: about `32559` lines.
+- Production `src`: `14507` insertions, `15522` deletions, net `-1015`.
+- Current production TypeScript/TSX total: about `32563` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -666,6 +666,9 @@ Success criteria:
   policy, and stale collapsed-branch pruning also derive metric-node policy
   from `PivotProgram`; the layout hook no longer passes metric total/subtotal
   predicates into those helpers.
+- `PivotLayoutResult` no longer exports metric-node predicates or dimension
+  depth counters. Render model, formatting, and the table view derive that
+  display policy from the compiled `PivotProgram` at their own boundary.
 - Collapsed Values projection no longer receives a separate metric-label set.
   It derives metric lookup from `PivotProgram.metricKeys`, keeping that layout
   helper program-owned.

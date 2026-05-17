@@ -67,6 +67,7 @@ import {
   formatNodeLabel as formatNodeLabelBase,
   shouldHideRowValues as shouldHideRowValuesBase,
 } from '../cellUtils';
+import { createMetricNodePolicy } from '../metricsTotals';
 import { type RenderModel } from '../render/renderModel';
 import { type PivotLayoutResult } from './usePivotLayout';
 import {
@@ -686,10 +687,17 @@ export const usePivotFormatting = ({
   );
 
   const treeDataSignature = formData.treeDataSignature ?? '';
+  const metricNodePolicy = useMemo(
+    () => createMetricNodePolicy(layout.layout.pivotProgram),
+    [layout.layout.pivotProgram],
+  );
 
   const resolveDimensionStyle = useCallback(
     (axis: 'row' | 'col', node: PivotTreeNode, target: 'label' | 'cell') => {
-      if (node.path.length === 0 || layout.isMetricGrandTotalNode(node)) {
+      if (
+        node.path.length === 0 ||
+        metricNodePolicy.isMetricGrandTotalNode(node)
+      ) {
         return undefined;
       }
       const dimensionKey = layout.getDimensionKeyForNode(node, axis);
@@ -756,6 +764,7 @@ export const usePivotFormatting = ({
       colFormattingRuntimeMap,
       colValuesMap,
       layout,
+      metricNodePolicy,
       rowFormattingRuntimeMap,
       rowValuesMap,
     ],
@@ -829,10 +838,6 @@ export const usePivotFormatting = ({
     layout.resolvedColTotalPosition === 'start' && renderModel.showRowRoot;
   const visibleCells = renderModel.visibleCellEntries;
   const { visibleRows, visibleCols } = renderModel;
-  const metricLabelSet = useMemo(
-    () => new Set(layout.layout.pivotProgram.metricKeys),
-    [layout.layout.pivotProgram.metricKeys],
-  );
 
   const shouldHideRowValues = useCallback(
     (rowNode: PivotTreeNode) =>
@@ -840,13 +845,13 @@ export const usePivotFormatting = ({
         rowNode,
         rowSubTotals,
         effectiveRowSubtotalPosition: layout.getRowSubtotalPosition(rowNode),
-        metricLabelSet,
+        metricLabelSet: metricNodePolicy.metricLabelSet,
         expandedRows,
-        countDimDepth: layout.countDimDepth,
+        countDimDepth: metricNodePolicy.countDimDepth,
         rowSubtotalLevels: layout.normalizedRowSubtotalLevels,
         isExplicitSubtotalNode: layout.isExplicitSubtotalNode,
       }),
-    [expandedRows, layout, metricLabelSet, rowSubTotals],
+    [expandedRows, layout, metricNodePolicy, rowSubTotals],
   );
 
   const {

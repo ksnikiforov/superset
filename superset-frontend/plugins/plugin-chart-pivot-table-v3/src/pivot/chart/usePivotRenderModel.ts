@@ -38,6 +38,7 @@ import { getFormattingMetricKey } from '../metrics';
 import { buildRenderModel, type RenderModel } from '../render/renderModel';
 import { resolveAxisProjection } from '../runtime/projection';
 import { resolveMeasureSortMetricKey } from '../measureLeaves';
+import { createMetricNodePolicy } from '../metricsTotals';
 import { compareValues, rootKey, sortByOrder } from '../viewModel';
 import { type PivotLayoutResult } from './usePivotLayout';
 import {
@@ -253,6 +254,9 @@ export const usePivotRenderModel = ({
   );
 
   const rowSorter = useMemo(() => {
+    const { isMetricGrandTotalNode } = createMetricNodePolicy(
+      layout.layout.pivotProgram,
+    );
     const baseSorter = sortByOrder(
       rowOrder,
       colTypeMap,
@@ -275,8 +279,7 @@ export const usePivotRenderModel = ({
     return (a: PivotTreeNode, b: PivotTreeNode) => {
       if (pullMetricTotalsToStart) {
         const metricTotalOrder =
-          Number(layout.isMetricGrandTotalNode(b)) -
-          Number(layout.isMetricGrandTotalNode(a));
+          Number(isMetricGrandTotalNode(b)) - Number(isMetricGrandTotalNode(a));
         if (metricTotalOrder !== 0) {
           return metricTotalOrder;
         }
@@ -284,11 +287,11 @@ export const usePivotRenderModel = ({
       const subtotalOrder =
         Number(
           layout.isExplicitSubtotalNode(a) ||
-            (pushMetricTotalsToEnd && layout.isMetricGrandTotalNode(a)),
+            (pushMetricTotalsToEnd && isMetricGrandTotalNode(a)),
         ) -
         Number(
           layout.isExplicitSubtotalNode(b) ||
-            (pushMetricTotalsToEnd && layout.isMetricGrandTotalNode(b)),
+            (pushMetricTotalsToEnd && isMetricGrandTotalNode(b)),
         );
       if (subtotalOrder !== 0) {
         return subtotalOrder;

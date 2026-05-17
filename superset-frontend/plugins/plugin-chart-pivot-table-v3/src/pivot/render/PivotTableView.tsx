@@ -41,6 +41,7 @@ import {
   type PivotTreeNode,
   type TotalPosition,
 } from '../../types';
+import type { PivotProgram } from '../runtime/types';
 import { serializeCellKey } from '../core/path';
 import {
   buildPivotV3ExportSheetModel,
@@ -50,6 +51,7 @@ import {
 } from '../../export/buildPivotV3ExportTable';
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import { rootKey } from '../viewModel';
+import { createMetricNodePolicy } from '../metricsTotals';
 import { type RenderModel } from './renderModel';
 import { type PivotFormattingResult } from '../chart/usePivotFormatting';
 
@@ -309,7 +311,7 @@ export type PivotTableViewProps = {
   isRowAggregateBold: (node?: PivotTreeNode) => boolean;
   isColAggregateBold: (node?: PivotTreeNode) => boolean;
   getNodeDimDepth: (node: PivotTreeNode) => number;
-  isMetricGrandTotalNode: (node: PivotTreeNode) => boolean;
+  pivotProgram: PivotProgram;
   emitCrossFilters?: boolean;
   handleCellClick: (rowNode: PivotTreeNode, colNode: PivotTreeNode) => void;
   handleCellKeyDown: (
@@ -352,7 +354,7 @@ export const PivotTableView = ({
   isRowAggregateBold,
   isColAggregateBold,
   getNodeDimDepth,
-  isMetricGrandTotalNode,
+  pivotProgram,
   emitCrossFilters,
   handleCellClick,
   handleCellKeyDown,
@@ -378,6 +380,10 @@ export const PivotTableView = ({
   const [stickyTotalRowOffsets, setStickyTotalRowOffsets] = useState<
     Record<string, number>
   >({});
+  const { isMetricGrandTotalNode } = useMemo(
+    () => createMetricNodePolicy(pivotProgram),
+    [pivotProgram],
+  );
 
   const isGrandTotalLikeRow = useMemo(
     () => (row: PivotTreeNode) =>
