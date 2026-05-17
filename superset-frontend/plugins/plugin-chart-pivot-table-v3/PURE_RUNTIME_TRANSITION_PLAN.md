@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14476` insertions, `15336` deletions, net `-860`.
-- Current production TypeScript/TSX total: about `32650` lines.
+- Production `src`: `14473` insertions, `15344` deletions, net `-871`.
+- Current production TypeScript/TSX total: about `32639` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -586,6 +586,9 @@ Success criteria:
 - Collapsed Values-tier exposure now derives directly from `PivotProgram`
   inside the collapsed-values projection helper. `usePivotLayout` no longer
   carries separate row/column single-metric-between or metrics-at-end flags.
+- Resolved query fetch context no longer exposes internal projection and
+  support-policy booleans to callers. The query boundary now exposes only query
+  shape, materialization metadata, depth, and fact coverage.
 
 ## Current Risks
 

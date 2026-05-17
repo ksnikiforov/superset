@@ -97,7 +97,7 @@ export type FetchPivotIntersectionParams = {
 
 export type FetchPivotIntersectionResult = FetchPivotBranchResult;
 
-export type ResolvedFetchContext = ResolvedQueryFetchContext & {
+type ResolvedFetchContext = ResolvedQueryFetchContext & {
   layout: LayoutContext;
 };
 

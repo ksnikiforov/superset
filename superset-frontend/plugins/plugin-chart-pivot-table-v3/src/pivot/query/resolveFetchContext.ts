@@ -37,7 +37,6 @@ import { collectRequiredTimeOffsets } from '../measureLeaves';
 import {
   projectionQueryDimensions,
   projectionQueryFilterPath,
-  type PivotAxisProjection,
   resolveAxisProjection,
 } from '../runtime/projection';
 import { buildBranchFactCoverages } from '../runtime/coverage';
@@ -57,7 +56,6 @@ export type ResolveFetchContextParams = {
 };
 
 export type ResolvedFetchContext = {
-  projection: PivotAxisProjection;
   rowGroupbyForQuery: QueryFormColumn[];
   colGroupbyForQuery: QueryFormColumn[];
   materializedMetrics: QueryFormMetric[];
@@ -69,10 +67,6 @@ export type ResolvedFetchContext = {
   colDepth: number;
   rowSubtotalLevels: number[];
   colSubtotalLevels: number[];
-  hasRowFormatting: boolean;
-  hasColFormatting: boolean;
-  hasRowTotalSorting: boolean;
-  hasColTotalSorting: boolean;
   coverages: PivotFactCoverage[];
 };
 
@@ -280,7 +274,6 @@ export const resolveFetchContext = ({
   });
 
   return {
-    projection,
     rowGroupbyForQuery,
     colGroupbyForQuery,
     materializedMetrics,
@@ -292,10 +285,6 @@ export const resolveFetchContext = ({
     colDepth,
     rowSubtotalLevels,
     colSubtotalLevels,
-    hasRowFormatting,
-    hasColFormatting,
-    hasRowTotalSorting,
-    hasColTotalSorting,
     coverages,
   };
 };
