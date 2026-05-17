@@ -85,25 +85,6 @@ export const isSameRuntimeLayout = (
   prev.valuePlacement.axis === next.valuePlacement.axis &&
   prev.valuePlacement.index === next.valuePlacement.index;
 
-const shouldFetchForSemanticLayoutChange = (
-  prev: PivotRuntimeLayout,
-  next: PivotRuntimeLayout,
-): boolean => {
-  if (
-    selectionSignature(prev.leafSelection) !==
-    selectionSignature(next.leafSelection)
-  ) {
-    return true;
-  }
-  if (
-    prev.valuePlacement.axis !== next.valuePlacement.axis ||
-    prev.valuePlacement.index !== next.valuePlacement.index
-  ) {
-    return true;
-  }
-  return false;
-};
-
 export const shouldFetchRuntimeLayout = ({
   reuseSnapshot,
   nextLayout,
@@ -112,7 +93,12 @@ export const shouldFetchRuntimeLayout = ({
   nextLayout: PivotRuntimeLayout;
 }) => {
   const reusableLayout = reuseSnapshot.runtimeLayout;
-  if (shouldFetchForSemanticLayoutChange(reusableLayout, nextLayout)) {
+  if (
+    selectionSignature(reusableLayout.leafSelection) !==
+      selectionSignature(nextLayout.leafSelection) ||
+    reusableLayout.valuePlacement.axis !== nextLayout.valuePlacement.axis ||
+    reusableLayout.valuePlacement.index !== nextLayout.valuePlacement.index
+  ) {
     return true;
   }
   return !factBatchesCoverRuntimeLayout(reuseSnapshot.factBatches, nextLayout);
