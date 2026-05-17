@@ -19,6 +19,7 @@
 
 import { type PivotAxis, type PivotTreeNode } from '../../types';
 import { parsePath, serializePath } from '../core/path';
+import { isSubtotalToken } from '../core/tokens';
 import { type FetchTarget } from '../query/fetchPlanOptimizer';
 import {
   type PivotExpansionCoverageDiff,
@@ -82,6 +83,9 @@ const requestKey = ({
 }: PivotExpansionCoverageRequest) =>
   `${axis}|${pathKey}|${rowDepth}|${columnDepth}`;
 
+const isSubtotalPath = (path: PivotTreeNode['path']) =>
+  path.some(isSubtotalToken);
+
 export const planExpansionForAxis = ({
   axis,
   expandedKeys,
@@ -108,7 +112,8 @@ export const planExpansionForAxis = ({
 
   const candidates = Array.from(expandedKeys)
     .filter(key => key !== rootKey || !hasNonRootExpanded)
-    .map(key => ({ key, node: nodes[key] }));
+    .map(key => ({ key, node: nodes[key] }))
+    .filter(({ key, node }) => !isSubtotalPath(node?.path ?? parsePath(key)));
   const buildRequest = (key: string): PivotExpansionCoverageRequest => ({
     axis,
     pathKey: key,

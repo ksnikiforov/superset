@@ -26,7 +26,10 @@ import {
   type PivotExpansionCoverageDiff,
 } from '../../../src/pivot/runtime/coverage';
 import { rootKey } from '../../../src/pivot/viewModel';
-import { encodeMetricKey } from '../../../src/pivot/core/tokens';
+import {
+  encodeMetricKey,
+  SUBTOTAL_TOKEN,
+} from '../../../src/pivot/core/tokens';
 import { serializePath } from '../../../src/pivot/core/path';
 import { type PivotTreeNode } from '../../../src/types';
 import { type PivotFactStoreBatch } from '../../../src/pivot/runtime/factStore';
@@ -230,6 +233,45 @@ describe('pivot/expansion/planner', () => {
         request => request.pathKey,
       ),
     ).toEqual([aKey, bKey]);
+  });
+
+  it('does not turn subtotal display paths into fetch coverage requests', () => {
+    const metricKey = serializePath(['A', encodeMetricKey('sales')]);
+    const subtotalMetricKey = serializePath([
+      'A',
+      SUBTOTAL_TOKEN,
+      encodeMetricKey('sales'),
+    ]);
+    const getMissingExpansionCoverage = jest.fn(
+      (requests: Parameters<PivotExpansionCoverageDiff>[0]) => requests,
+    );
+
+    const { plan, targets } = planGroupedExpansionTargets({
+      axis: 'row',
+      expandedKeys: new Set([metricKey, subtotalMetricKey]),
+      nodes: {
+        [metricKey]: makeNode({
+          axis: 'row',
+          path: ['A', encodeMetricKey('sales')],
+        }),
+        [subtotalMetricKey]: makeNode({
+          axis: 'row',
+          path: ['A', SUBTOTAL_TOKEN, encodeMetricKey('sales')],
+        }),
+      },
+      coverage: { rowDepth: 1, columnDepth: 1 },
+      getMissingExpansionCoverage,
+      getCoverageKey: (_axis, key) => key,
+      shouldFetchChildren: () => true,
+    });
+
+    expect(
+      getMissingExpansionCoverage.mock.calls[0][0].map(
+        request => request.pathKey,
+      ),
+    ).toEqual([metricKey]);
+    expect(fetchPathKeys(plan)).toEqual([metricKey]);
+    expect(targets.map(target => target.pathKey)).toEqual([metricKey]);
   });
 
   it('uses typed batch coverage to skip only covered sibling paths', () => {

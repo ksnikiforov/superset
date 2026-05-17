@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14546` insertions, `15433` deletions, net `-887`.
-- Current production TypeScript/TSX total: about `32623` lines.
+- Production `src`: `14551` insertions, `15433` deletions, net `-882`.
+- Current production TypeScript/TSX total: about `32628` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -253,10 +253,27 @@ Target:
   real render model.
 - No hard-coded expansion-only subtotal, total-position, or child-policy
   defaults unless they are documented as intentionally different.
+- Expansion requestability should become a compiled runtime rule, for example
+  `program.canRequestExpansion(axis, semanticPath)`, or an equivalent policy
+  derived directly from `PivotProgram`. Rendered tree nodes may identify present
+  paths and ancestors, but they should not decide whether a query is allowed.
+
+Immediate policy:
+
+- Synthetic display paths, including subtotal-token paths, may exist in the
+  rendered tree and expansion state.
+- Those paths must not become query coverage requests. They are display
+  projections, not real fact-store coverage anchors.
+- The current planner-level subtotal filter is a narrow guard. The larger
+  cleanup is to replace token/path fetchability checks with the compiled
+  requestability rule above.
 
 Primary files:
 
 - `src/pivot/expansion/stateTransitions.ts`
+- `src/pivot/expansion/planner.ts`
+- `src/pivot/runtime/compilePivotProgram.ts`
+- `src/pivot/runtime/projection.ts`
 - `src/pivot/chart/usePivotRenderModel.ts`
 - `src/pivot/render/renderModel.ts`
 - `src/pivot/chart/layoutRuntime.ts`
@@ -266,6 +283,12 @@ Success criteria:
 
 - One config builder or one shared policy object feeds both expansion
   visibility planning and visible rendering.
+- Expansion fetch planning asks the compiled program/policy whether a semantic
+  path can request children; it does not infer query eligibility from rendered
+  node shape or synthetic display tokens.
+- Subtotal, metric, and measure display nodes cannot independently generate
+  query loads unless the compiled policy explicitly maps them to a real
+  semantic dimension request.
 - Expansion tests cover subtotal positions, metric-first/metric-last layouts,
   and collapsed Values tiers using the shared policy.
 - Removing or changing a render visibility rule cannot silently leave expansion
@@ -623,6 +646,9 @@ Success criteria:
   (`getMetricKey`, `getMetricKeys`, `getFormattingMetricKey`) now live in
   `pivot/metrics.ts`, so placeholder/runtime token ownership is not mixed with
   source metric metadata extraction.
+- Expansion planning drops subtotal-token display paths before building fetch
+  coverage requests. Subtotal nodes can remain in the rendered tree and
+  expansion state, but they no longer independently trigger query loads.
 
 ## Current Risks
 
@@ -677,6 +703,10 @@ Success criteria:
   `sourceMetrics` or encode the metric intent in `formData`. Reintroducing
   top-level chart metric fallbacks would blur the source-metadata contract
   again.
+- Expansion requestability is still partly path-token based. The next larger
+  simplification is to move that decision behind a compiled program policy so
+  subtotal, metric, and measure display nodes are interpreted once as semantic
+  paths instead of checked ad hoc at each boundary.
 
 ## Approval Checkpoints
 

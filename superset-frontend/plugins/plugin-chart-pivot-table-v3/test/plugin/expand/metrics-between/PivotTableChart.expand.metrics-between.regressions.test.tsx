@@ -41,7 +41,9 @@ import {
 } from '../../fixtures/metricAxis';
 
 jest.mock('../../../../src/pivot/query/fetchPivotBranch', () => {
-  const actual = jest.requireActual('../../../../src/pivot/query/fetchPivotBranch');
+  const actual = jest.requireActual(
+    '../../../../src/pivot/query/fetchPivotBranch',
+  );
   return {
     ...actual,
     fetchPivotBranch: jest
