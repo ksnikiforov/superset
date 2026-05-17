@@ -145,7 +145,7 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14485` insertions, `15437` deletions, net `-952`.
+- Production `src`: `14478` insertions, `15437` deletions, net `-959`.
 - Current production TypeScript/TSX total: about `32582` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
@@ -581,6 +581,9 @@ Success criteria:
   `coverage.ts` owns coverage manifests and fact-batch diffing, not the
   decision to reuse the current interactive layout tree during a seamless
   layout edit.
+- Coverage manifest types now expose only implemented need reasons. Future
+  subtotal or sort-specific needs must be added with real planner behavior,
+  not kept as unused manifest variants.
 - Seamless runtime reuse now has an explicit snapshot that pairs the reusable
   runtime layout with the fact batches it is allowed to reuse. Runtime-layout
   equality also moved out of `coverage.ts`, keeping coverage focused on fact

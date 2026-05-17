@@ -42,7 +42,7 @@ import type {
   PivotProgram,
 } from './types';
 
-export type FactCoverageInput = {
+type FactCoverageInput = {
   rowDimensions: PivotProgram['rowDimensions'];
   columnDimensions: PivotProgram['columnDimensions'];
   rowDepth: number;
@@ -50,7 +50,7 @@ export type FactCoverageInput = {
   reason?: PivotCoverageReason;
 };
 
-export type BranchFactCoverageInput = {
+type BranchFactCoverageInput = {
   program: PivotProgram;
   axis: PivotAxis;
   projection: PivotAxisProjection;
@@ -67,7 +67,7 @@ export type BranchFactCoverageInput = {
   reason?: PivotCoverageReason;
 };
 
-export type AxisPathScope =
+type AxisPathScope =
   | { kind: 'root' }
   | { kind: 'paths'; paths: PivotPath[] }
   | { kind: 'scopedFull'; ancestorPaths: PivotPath[] };
@@ -85,13 +85,6 @@ export type PivotExpansionCoverageDiff = (
   requests: PivotExpansionCoverageRequest[],
 ) => PivotExpansionCoverageRequest[];
 
-export type PivotCoverageNeedReason =
-  | 'root'
-  | 'expand'
-  | 'intersection'
-  | 'subtotal'
-  | 'sort';
-
 export type PivotCoverageNeed = {
   rowDepth: number;
   columnDepth: number;
@@ -100,7 +93,7 @@ export type PivotCoverageNeed = {
   valueKeys: string[];
   rowScope: AxisPathScope;
   columnScope: AxisPathScope;
-  reason: PivotCoverageNeedReason;
+  reason: 'root' | 'expand' | 'intersection';
 };
 
 type DepthPair = { rowDepth: number; columnDepth: number };
