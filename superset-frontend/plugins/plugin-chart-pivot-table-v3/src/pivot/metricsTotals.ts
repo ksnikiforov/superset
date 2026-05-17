@@ -16,6 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
+import { getColumnLabel } from '@superset-ui/core';
 import { PivotTreeNode } from '../types';
 import {
   decodeMetricKey,
@@ -68,6 +69,21 @@ export const getNonMetricPathParts = (
     }
     return true;
   });
+
+export const getDimensionKeyForNode = (
+  program: PivotProgram,
+  node: PivotTreeNode,
+  axis: 'row' | 'col',
+  metricLabelSet: Set<string>,
+) => {
+  const dimensionIndex =
+    getNonMetricPathParts(node.path, metricLabelSet).length - 1;
+  const dimension =
+    axis === 'row'
+      ? program.rowDimensions[dimensionIndex]
+      : program.columnDimensions[dimensionIndex];
+  return dimension ? getColumnLabel(dimension) : undefined;
+};
 
 export const isMetricGrandTotalNode = (
   node: PivotTreeNode | undefined,
@@ -196,6 +212,10 @@ export const createMetricNodePolicy = (program: PivotProgram) => {
     metricLabelSet,
     countDimDepth: (path: PivotTreeNode['path']) =>
       countDimDepth(path, metricLabelSet),
+    getDimensionKeyForNode: (node: PivotTreeNode, axis: 'row' | 'col') =>
+      getDimensionKeyForNode(program, node, axis, metricLabelSet),
+    getNonMetricPathParts: (path: PivotTreeNode['path']) =>
+      getNonMetricPathParts(path, metricLabelSet),
     isMetricGrandTotalNode: (node?: PivotTreeNode) =>
       isMetricGrandTotalNode(node, { metricLabelSet, program }),
     isMetricSubtotalNode: (node?: PivotTreeNode) =>

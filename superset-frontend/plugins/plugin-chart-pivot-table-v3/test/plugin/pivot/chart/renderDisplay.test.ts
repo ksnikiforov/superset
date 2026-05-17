@@ -19,7 +19,6 @@
 import {
   MetricsLayoutEnum,
   type MeasureHierarchy,
-  type PivotAxis,
   type PivotTreeData,
   type PivotTreeNode,
 } from '../../../../src/types';
@@ -102,6 +101,18 @@ const pivotProgram: PivotProgram = {
   metricsLayoutResolved: MetricsLayoutEnum.COLUMNS,
   valueAxis: 'col',
   metricInsertIndex: 1,
+};
+
+const dateProgram: PivotProgram = {
+  ...pivotProgram,
+  rows: [{ kind: 'dimension', column: 'order_date' }],
+  columns: [{ kind: 'dimension', column: 'order_date' }],
+  rowDimensions: ['order_date'],
+  columnDimensions: ['order_date'],
+  metrics: [],
+  metricKeys: [],
+  valueAxis: undefined,
+  metricInsertIndex: -1,
 };
 
 const columnMetricFirstProgram: PivotProgram = {
@@ -222,8 +233,7 @@ test('formats render tree date labels for row and column dimensions', () => {
     dateFormatters: {
       order_date: value => `date:${new Date(Number(value)).getUTCMonth() + 1}`,
     },
-    getDimensionKeyForNode: () => 'order_date',
-    getNonMetricPathParts: path => path,
+    program: dateProgram,
   });
 
   expect(formattedTree).not.toBe(tree);
@@ -251,8 +261,7 @@ test('preserves render tree references when date formatting makes no changes', (
       dateFormatters: {
         order_date: () => 'same',
       },
-      getDimensionKeyForNode: () => 'order_date',
-      getNonMetricPathParts: path => path,
+      program: dateProgram,
     }),
   ).toBe(tree);
 });
@@ -277,15 +286,7 @@ test('skips root, subtotal, metric, measure leaf, and non-date render labels', (
       dateFormatters: {
         order_date: () => 'formatted',
       },
-      getDimensionKeyForNode: (candidate: PivotTreeNode, axis: PivotAxis) =>
-        axis === 'row' && candidate.path.length > 0 ? 'order_date' : undefined,
-      getNonMetricPathParts: path =>
-        path.filter(
-          value =>
-            value !== SUBTOTAL_TOKEN &&
-            value !== encodeMetricKey('sales') &&
-            value !== encodeMeasureLeafKey('value'),
-        ),
+      program: dateProgram,
     }),
   ).toBe(tree);
 });

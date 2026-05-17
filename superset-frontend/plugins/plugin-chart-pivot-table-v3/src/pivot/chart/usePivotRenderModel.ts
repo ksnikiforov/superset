@@ -145,6 +145,10 @@ export const usePivotRenderModel = ({
   const resolvedGroupbyRows = layout.layout.pivotProgram.rowDimensions;
   const resolvedGroupbyColumns = layout.layout.pivotProgram.columnDimensions;
   const { colTotals, rowSubTotals } = layout.layout;
+  const metricNodePolicy = useMemo(
+    () => createMetricNodePolicy(layout.layout.pivotProgram),
+    [layout.layout.pivotProgram],
+  );
 
   const rowSortingKeyMap = useMemo(
     () =>
@@ -176,15 +180,9 @@ export const usePivotRenderModel = ({
       formatRenderTreeDateLabels({
         tree,
         dateFormatters,
-        getDimensionKeyForNode: layout.getDimensionKeyForNode,
-        getNonMetricPathParts: layout.getNonMetricPathParts,
+        program: layout.layout.pivotProgram,
       }),
-    [
-      dateFormatters,
-      layout.getDimensionKeyForNode,
-      layout.getNonMetricPathParts,
-      tree,
-    ],
+    [dateFormatters, layout.layout.pivotProgram, tree],
   );
 
   const getProjectedPathParts = useCallback(
@@ -213,8 +211,8 @@ export const usePivotRenderModel = ({
   const compareMetricSort = useCallback(
     (axis: 'row' | 'col', a: PivotTreeNode, b: PivotTreeNode) => {
       const dimensionKey =
-        layout.getDimensionKeyForNode(a, axis) ||
-        layout.getDimensionKeyForNode(b, axis);
+        metricNodePolicy.getDimensionKeyForNode(a, axis) ||
+        metricNodePolicy.getDimensionKeyForNode(b, axis);
       if (!dimensionKey) {
         return 0;
       }
@@ -247,16 +245,14 @@ export const usePivotRenderModel = ({
       colTypeMap,
       colValuesMap,
       getProjectedPathParts,
-      layout,
+      metricNodePolicy,
       rowSortingKeyMap,
       rowValuesMap,
     ],
   );
 
   const rowSorter = useMemo(() => {
-    const { isMetricGrandTotalNode } = createMetricNodePolicy(
-      layout.layout.pivotProgram,
-    );
+    const { isMetricGrandTotalNode } = metricNodePolicy;
     const baseSorter = sortByOrder(
       rowOrder,
       colTypeMap,
@@ -333,6 +329,7 @@ export const usePivotRenderModel = ({
     rowOrder,
     rowSubTotals,
     activeColumnSort,
+    metricNodePolicy,
   ]);
 
   const colSorter = useMemo(() => {

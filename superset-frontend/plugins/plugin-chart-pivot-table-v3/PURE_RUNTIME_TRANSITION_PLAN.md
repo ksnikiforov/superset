@@ -163,7 +163,7 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14393` insertions, `15723` deletions, net `-1330`.
+- Production `src`: `14389` insertions, `15762` deletions, net `-1373`.
 - Current production TypeScript/TSX total: about `32557` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
@@ -766,6 +766,11 @@ Success criteria:
   production caller. The separate `pivot/visibility.ts` policy surface has been
   deleted, so expansion and rendering share `buildRenderModelAxes` without an
   extra visibility module sitting between them.
+- Dimension-key and non-metric-path projection now derive from
+  `PivotProgram` through metric-node policy at the consumer boundary. The
+  layout hook no longer exports those callbacks through `PivotLayoutResult` for
+  render date labels, dimension formatting, sorting, or filter-value
+  collection.
 
 ## Current Risks
 

@@ -27,6 +27,7 @@ import {
 import { DateFormatter, PivotTreeNode } from '../types';
 import { getStableColumnKey } from '../utils';
 import { decodeMetricKey, isSubtotalToken } from './core/tokens';
+import { createMetricNodePolicy } from './metricsTotals';
 import type { PivotProgram } from './runtime/types';
 
 export type PivotSelectedFilters = Record<string, DataRecordValue[]>;
@@ -120,27 +121,20 @@ export const buildRuntimeSelectionSyncState = ({
   };
 };
 
-type TreeDimensionFilterLayout = {
-  getDimensionKeyForNode: (
-    node: PivotTreeNode,
-    axis: 'row' | 'col',
-  ) => string | undefined;
-  getNonMetricPathParts: (path: PivotTreeNode['path']) => PivotTreeNode['path'];
-};
-
 export const buildTreeDimensionFilterValues = ({
   dimensions,
   rows,
   cols,
-  layout,
+  program,
   verboseMap = {},
 }: {
   dimensions: QueryFormColumn[];
   rows: Record<string, PivotTreeNode>;
   cols: Record<string, PivotTreeNode>;
-  layout: TreeDimensionFilterLayout;
+  program: PivotProgram;
   verboseMap?: Record<string, string | undefined>;
 }): PivotSelectedFilters => {
+  const metricNodePolicy = createMetricNodePolicy(program);
   const valuesMap = new Map<string, Set<DataRecordValue>>();
   const aliasMap = new Map<string, Set<string>>();
   const addAlias = (from?: string, to?: string) => {
@@ -178,13 +172,11 @@ export const buildTreeDimensionFilterValues = ({
       if (node.isSubtotal) {
         return;
       }
-      const dimensionKey = layout.getDimensionKeyForNode(node, axis);
+      const dimensionKey = metricNodePolicy.getDimensionKeyForNode(node, axis);
       if (!dimensionKey) {
         return;
       }
-      const parts = layout
-        .getNonMetricPathParts(node.path)
-        .filter(part => !isSubtotalToken(part));
+      const parts = metricNodePolicy.getNonMetricPathParts(node.path);
       if (parts.length === 0) {
         return;
       }

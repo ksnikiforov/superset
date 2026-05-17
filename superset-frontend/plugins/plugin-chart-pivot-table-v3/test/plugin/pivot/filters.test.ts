@@ -243,12 +243,12 @@ describe('selected filter state helpers', () => {
           country: 'Country',
           region: 'Region',
         },
-        layout: {
-          getDimensionKeyForNode: (_node, axis) =>
-            axis === 'row' ? 'country' : 'region',
-          getNonMetricPathParts: path =>
-            path.filter(part => part !== encodeMetricKey('metric1')),
-        },
+        program: testProgram({
+          groupbyRows: ['country'],
+          groupbyColumns: ['region'],
+          metrics: ['metric1'],
+          metricsLayout: MetricsLayoutEnum.COLUMNS,
+        }),
       }),
     ).toEqual({
       country: ['France'],

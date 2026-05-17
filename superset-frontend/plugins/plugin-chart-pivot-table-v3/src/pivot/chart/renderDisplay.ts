@@ -216,21 +216,17 @@ const formatAxisDateLabels = ({
   axis,
   nodes,
   dateFormatters,
-  getDimensionKeyForNode,
-  getNonMetricPathParts,
+  program,
 }: {
   axis: PivotAxis;
   nodes: Record<string, PivotTreeNode>;
   dateFormatters: Record<string, DateFormatter | undefined>;
-  getDimensionKeyForNode: (
-    node: PivotTreeNode,
-    axis: PivotAxis,
-  ) => string | undefined;
-  getNonMetricPathParts: (path: PivotTreeNode['path']) => PivotTreeNode['path'];
+  program: PivotLayoutResult['layout']['pivotProgram'];
 }) => {
   if (Object.keys(dateFormatters).length === 0) {
     return nodes;
   }
+  const metricNodePolicy = createMetricNodePolicy(program);
   let hasChanges = false;
   const nextNodes: Record<string, PivotTreeNode> = { ...nodes };
   Object.values(nodes).forEach(node => {
@@ -241,7 +237,7 @@ const formatAxisDateLabels = ({
     if (decodeMetricKey(tail) || decodeMeasureLeafId(tail)) {
       return;
     }
-    const dimensionKey = getDimensionKeyForNode(node, axis);
+    const dimensionKey = metricNodePolicy.getDimensionKeyForNode(node, axis);
     if (!dimensionKey) {
       return;
     }
@@ -249,9 +245,7 @@ const formatAxisDateLabels = ({
     if (!formatter) {
       return;
     }
-    const nonSubtotalParts = getNonMetricPathParts(node.path).filter(
-      part => !isSubtotalToken(part),
-    );
+    const nonSubtotalParts = metricNodePolicy.getNonMetricPathParts(node.path);
     const rawValue = nonSubtotalParts[nonSubtotalParts.length - 1];
     if (rawValue === null || rawValue === undefined) {
       return;
@@ -272,16 +266,11 @@ const formatAxisDateLabels = ({
 export const formatRenderTreeDateLabels = ({
   tree,
   dateFormatters,
-  getDimensionKeyForNode,
-  getNonMetricPathParts,
+  program,
 }: {
   tree: PivotTreeData;
   dateFormatters?: Record<string, DateFormatter | undefined>;
-  getDimensionKeyForNode: (
-    node: PivotTreeNode,
-    axis: PivotAxis,
-  ) => string | undefined;
-  getNonMetricPathParts: (path: PivotTreeNode['path']) => PivotTreeNode['path'];
+  program: PivotLayoutResult['layout']['pivotProgram'];
 }) => {
   if (!dateFormatters || Object.keys(dateFormatters).length === 0) {
     return tree;
@@ -290,15 +279,13 @@ export const formatRenderTreeDateLabels = ({
     axis: 'row',
     nodes: tree.rows,
     dateFormatters,
-    getDimensionKeyForNode,
-    getNonMetricPathParts,
+    program,
   });
   const nextCols = formatAxisDateLabels({
     axis: 'col',
     nodes: tree.cols,
     dateFormatters,
-    getDimensionKeyForNode,
-    getNonMetricPathParts,
+    program,
   });
   if (nextRows === tree.rows && nextCols === tree.cols) {
     return tree;

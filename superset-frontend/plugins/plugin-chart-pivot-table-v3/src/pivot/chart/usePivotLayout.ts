@@ -17,7 +17,6 @@
  * under the License.
  */
 import { useCallback, useMemo } from 'react';
-import { getColumnLabel } from '@superset-ui/core';
 import {
   MetricsLayoutEnum,
   MeasureHierarchy,
@@ -27,7 +26,7 @@ import {
   type TotalPosition,
 } from '../../types';
 import { resolveMetricDisplayLabel, getStableColumnKey } from '../../utils';
-import { isMetricTokenForKeys, isSubtotalToken } from '../core/tokens';
+import { isMetricTokenForKeys } from '../core/tokens';
 import { buildLayoutContext } from '../layout/LayoutContext';
 import { getValuesLevelIndex } from '../runtime/projection';
 import type { PivotProgram } from '../runtime/types';
@@ -35,7 +34,6 @@ import type { RenderModelConfig } from '../render/renderModel';
 import {
   createMetricNodePolicy,
   getMetricLabelFromPath as getMetricLabelFromPathBase,
-  getNonMetricPathParts as getNonMetricPathPartsBase,
   isExplicitSubtotalNode,
 } from '../metricsTotals';
 import { pruneStaleCollapsedAxis } from './pruneCollapsedAxis';
@@ -61,19 +59,12 @@ export type PivotLayoutResult = {
   resolvedExpandColumnsLevel: number;
   normalizedRowSubtotalLevels: number[];
   normalizedColSubtotalLevels: number[];
-  resolvedRowTotalPosition: TotalPosition;
   resolvedColTotalPosition: TotalPosition;
   effectiveRowSubtotalPosition: TotalPosition;
-  effectiveColSubtotalPosition: TotalPosition;
   hideMetricHeaderOnRows: boolean;
   compareMetricOrder: (a: PivotTreeNode, b: PivotTreeNode) => number;
   getMetricLabelFromPath: (path: PivotTreeNode['path']) => string | undefined;
   getMetricDisplayLabelForKey: (metricKey: string) => string;
-  getNonMetricPathParts: (path: PivotTreeNode['path']) => PivotTreeNode['path'];
-  getDimensionKeyForNode: (
-    node: PivotTreeNode,
-    axis: 'row' | 'col',
-  ) => string | undefined;
   isExplicitSubtotalNode: (node?: PivotTreeNode) => boolean;
   getRowSubtotalPosition: (node: PivotTreeNode) => TotalPosition;
   buildRenderModelConfig: (params: {
@@ -201,15 +192,13 @@ export const usePivotLayout = ({
     return layout.colSubtotalLevels;
   }, [layout.colSubtotalLevels, rowTotals]);
 
-  const { rowDimensions, columnDimensions } = layout.pivotProgram;
-
   const groupbyRowKeys = useMemo(
-    () => rowDimensions.map(getStableColumnKey),
-    [rowDimensions],
+    () => layout.pivotProgram.rowDimensions.map(getStableColumnKey),
+    [layout.pivotProgram.rowDimensions],
   );
   const groupbyColumnKeys = useMemo(
-    () => columnDimensions.map(getStableColumnKey),
-    [columnDimensions],
+    () => layout.pivotProgram.columnDimensions.map(getStableColumnKey),
+    [layout.pivotProgram.columnDimensions],
   );
 
   const expansionStateSharedSignatureData = useMemo(
@@ -307,26 +296,6 @@ export const usePivotLayout = ({
         getMetricLabelFromPath,
       }),
     [getMetricLabelFromPath, layout.measureHierarchy, metricLabels],
-  );
-
-  const getNonMetricPathParts = useCallback(
-    (path: PivotTreeNode['path']) =>
-      getNonMetricPathPartsBase(path, metricLabelSet),
-    [metricLabelSet],
-  );
-  const getDimensionKeyForNode = useCallback(
-    (node: PivotTreeNode, axis: 'row' | 'col') => {
-      const nonSubtotalParts = getNonMetricPathParts(node.path).filter(
-        part => !isSubtotalToken(part),
-      );
-      const dimensionIndex = nonSubtotalParts.length - 1;
-      const dimension =
-        axis === 'row'
-          ? rowDimensions[dimensionIndex]
-          : columnDimensions[dimensionIndex];
-      return dimension ? getColumnLabel(dimension) : undefined;
-    },
-    [columnDimensions, getNonMetricPathParts, rowDimensions],
   );
 
   const getAxisChildrenBeforeSubtotalPolicy = useCallback(
@@ -549,16 +518,12 @@ export const usePivotLayout = ({
     resolvedExpandColumnsLevel,
     normalizedRowSubtotalLevels,
     normalizedColSubtotalLevels,
-    resolvedRowTotalPosition,
     resolvedColTotalPosition,
     effectiveRowSubtotalPosition,
-    effectiveColSubtotalPosition,
     hideMetricHeaderOnRows,
     compareMetricOrder,
     getMetricLabelFromPath,
     getMetricDisplayLabelForKey,
-    getNonMetricPathParts,
-    getDimensionKeyForNode,
     isExplicitSubtotalNode,
     getRowSubtotalPosition,
     buildRenderModelConfig,

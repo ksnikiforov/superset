@@ -700,7 +700,7 @@ export const usePivotFormatting = ({
       ) {
         return undefined;
       }
-      const dimensionKey = layout.getDimensionKeyForNode(node, axis);
+      const dimensionKey = metricNodePolicy.getDimensionKeyForNode(node, axis);
       const formattingMaps =
         axis === 'row' ? rowFormattingRuntimeMap : colFormattingRuntimeMap;
       const formatting = dimensionKey
@@ -716,14 +716,11 @@ export const usePivotFormatting = ({
       if (target === 'cell' && applyTo !== 'all') {
         return undefined;
       }
-      const nonMetricParts = layout.getNonMetricPathParts(node.path);
-      const nonSubtotalParts = nonMetricParts.filter(
-        part => !isSubtotalToken(part),
-      );
+      const nonMetricParts = metricNodePolicy.getNonMetricPathParts(node.path);
       const nonMetricKey = serializePath(nonMetricParts);
       const dimensionValue =
-        nonSubtotalParts.length > 0
-          ? nonSubtotalParts[nonSubtotalParts.length - 1]
+        nonMetricParts.length > 0
+          ? nonMetricParts[nonMetricParts.length - 1]
           : (node.path[node.path.length - 1] ?? node.label ?? undefined);
       const values =
         axis === 'row'
@@ -763,7 +760,6 @@ export const usePivotFormatting = ({
     [
       colFormattingRuntimeMap,
       colValuesMap,
-      layout,
       metricNodePolicy,
       rowFormattingRuntimeMap,
       rowValuesMap,
