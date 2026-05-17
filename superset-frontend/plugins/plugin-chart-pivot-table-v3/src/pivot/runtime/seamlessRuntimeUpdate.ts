@@ -31,18 +31,13 @@ import { type ChartDataQueryResult } from '../data/ChartDataClient';
 import { type PlannedQuerySpec } from '../query/specs';
 import { normalizeFormDataExtraFilters } from '../query/normalizeExtraFormData';
 import { buildInitialPivotUpdatePlan } from '../update/initialUpdatePlan';
-import { buildLayoutContext } from '../layout/LayoutContext';
-import {
-  normalizeRuntimeLayout,
-  resolveInteractionFormData,
-} from '../layout/resolveInteractionLayout';
+import { normalizeRuntimeLayout } from '../layout/resolveInteractionLayout';
 import {
   buildInitialRuntimeFromSpecResultsAsync,
   type PivotFactStoreBatch,
 } from './ingestQueryResults';
 import { insertValuesPlaceholder } from './compilePivotProgram';
 import { isSameRuntimeLayout, shouldFetchRuntimeLayout } from './coverage';
-import { buildFactValueKeys } from './factStore';
 import {
   executeLatestRequest,
   executeScheduledLatestRequest,
@@ -290,10 +285,7 @@ export const prepareSeamlessRuntimeLayoutChange = ({
   dimensionKeys,
   metricKeys,
   factBatches,
-  baseFormData,
-  sourceFormData,
-  sourceMetrics,
-  sourceMeasureLeavesByMetric,
+  previousRuntimeLayout,
   selection,
   upstreamSignature,
 }: {
@@ -301,10 +293,7 @@ export const prepareSeamlessRuntimeLayoutChange = ({
   dimensionKeys: string[];
   metricKeys: string[];
   factBatches: PivotFactStoreBatch[];
-  baseFormData: PivotTableQueryFormData;
-  sourceFormData: PivotTableQueryFormData;
-  sourceMetrics?: PivotTableQueryFormData['metrics'];
-  sourceMeasureLeavesByMetric?: PivotTableQueryFormData['measureLeavesByMetric'];
+  previousRuntimeLayout: PivotRuntimeLayout;
   selection: RuntimeSelection;
   upstreamSignature: string;
 }) => {
@@ -313,28 +302,11 @@ export const prepareSeamlessRuntimeLayoutChange = ({
     dimensionKeys,
     metricKeys,
   );
-  const valueKeyLayout = buildLayoutContext(
-    resolveInteractionFormData({
-      formData: {
-        ...baseFormData,
-        metrics:
-          sourceMetrics ?? sourceFormData.metrics ?? baseFormData.metrics,
-        measureLeavesByMetric:
-          sourceMeasureLeavesByMetric ??
-          sourceFormData.measureLeavesByMetric ??
-          baseFormData.measureLeavesByMetric,
-      },
-      runtimeLayout,
-    }),
-  );
   if (
     shouldFetchRuntimeLayout({
       factBatches,
+      previousLayout: previousRuntimeLayout,
       nextLayout: runtimeLayout,
-      valueKeys: buildFactValueKeys({
-        metricKeys: valueKeyLayout.metricKeys,
-        requiredTimeOffsets: valueKeyLayout.requiredTimeOffsets,
-      }),
     })
   ) {
     return {

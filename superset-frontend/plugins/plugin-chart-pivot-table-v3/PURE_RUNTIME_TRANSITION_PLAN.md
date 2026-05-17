@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14416` insertions, `14959` deletions, net `-543`.
-- Current production TypeScript/TSX total: about `32967` lines.
+- Production `src`: `14465` insertions, `14959` deletions, net `-494`.
+- Current production TypeScript/TSX total: about `33016` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -511,11 +511,6 @@ Success criteria:
   recovery. If committed runtime layout needs facts that are not loaded, that is
   now treated as a query/bootstrap coverage responsibility instead of a
   chart-owned repair path.
-- Runtime layout fetch decisions now diff only the next coverage manifest
-  against loaded fact batches. The old previous-layout semantic fetch branch has
-  been deleted; selected measure leaves are represented through required
-  `valueKeys`, and Values placement changes fetch only when the resulting
-  visible coverage is missing.
 
 ## Current Risks
 

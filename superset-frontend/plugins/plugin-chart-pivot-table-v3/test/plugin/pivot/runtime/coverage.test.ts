@@ -255,22 +255,27 @@ describe('runtime layout fact coverage', () => {
     ).toBe(true);
   });
 
-  it('fetches when next root visible coverage is missing', () => {
+  it('does not fetch for same-root-depth layout changes with stale committed coverage', () => {
     expect(
       shouldFetchRuntimeLayout({
         factBatches: [factBatch(1, 0)],
+        previousLayout: runtimeLayout,
         nextLayout: {
           ...runtimeLayout,
           rows: ['row1', 'row2'],
         },
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('fetches when a root-depth change requires missing committed coverage', () => {
     expect(
       shouldFetchRuntimeLayout({
         factBatches: [factBatch(1, 0)],
+        previousLayout: {
+          ...runtimeLayout,
+          cols: [],
+        },
         nextLayout: {
           ...runtimeLayout,
           rows: [],
@@ -289,6 +294,10 @@ describe('runtime layout fact coverage', () => {
             valueKeys: ['m1', 'm2'],
           },
         ],
+        previousLayout: {
+          ...runtimeLayout,
+          metrics: ['m1', 'm2'],
+        },
         nextLayout: runtimeLayout,
       }),
     ).toBe(false);
@@ -319,6 +328,7 @@ describe('runtime layout fact coverage', () => {
             ],
           },
         ],
+        previousLayout: runtimeLayout,
         nextLayout: {
           ...runtimeLayout,
           metrics: ['m1', 'm2'],
@@ -331,6 +341,7 @@ describe('runtime layout fact coverage', () => {
     expect(
       shouldFetchRuntimeLayout({
         factBatches: [factBatch(1, 1)],
+        previousLayout: runtimeLayout,
         nextLayout: {
           ...runtimeLayout,
           metrics: ['m1', 'm2'],
@@ -343,6 +354,7 @@ describe('runtime layout fact coverage', () => {
     expect(
       shouldFetchRuntimeLayout({
         factBatches: [factBatch(1, 1)],
+        previousLayout: runtimeLayout,
         nextLayout: {
           ...runtimeLayout,
           rows: ['row2', 'row1'],
@@ -368,6 +380,7 @@ describe('runtime layout fact coverage', () => {
             facts: [],
           },
         ],
+        previousLayout: runtimeLayout,
         nextLayout: {
           ...runtimeLayout,
           rows: ['row2', 'row1'],
@@ -376,19 +389,29 @@ describe('runtime layout fact coverage', () => {
     ).toBe(false);
   });
 
-  it('fetches when trimming hidden dimensions leaves exact root coverage missing', () => {
+  it('does not fetch when trimming hidden dimensions leaves visible coverage unchanged', () => {
     expect(
       shouldFetchRuntimeLayout({
         factBatches: [factBatch(1, 2)],
+        previousLayout: {
+          ...runtimeLayout,
+          cols: ['col1', 'col2'],
+        },
         nextLayout: runtimeLayout,
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('does not fetch when adding a hidden dimension only shifts Values after the same prefix', () => {
     expect(
       shouldFetchRuntimeLayout({
         factBatches: [factBatch(0, 1)],
+        previousLayout: {
+          ...runtimeLayout,
+          rows: [],
+          cols: ['col1'],
+          valuePlacement: { axis: 'col', index: 1 },
+        },
         nextLayout: {
           ...runtimeLayout,
           rows: [],
@@ -399,26 +422,22 @@ describe('runtime layout fact coverage', () => {
     ).toBe(false);
   });
 
-  it('does not fetch when Values moves but exact visible coverage is loaded', () => {
+  it('fetches when Values moves across an already shared dimension', () => {
     expect(
       shouldFetchRuntimeLayout({
         factBatches: [factBatch(0, 1)],
+        previousLayout: {
+          ...runtimeLayout,
+          rows: [],
+          cols: ['col1', 'col2'],
+          valuePlacement: { axis: 'col', index: 2 },
+        },
         nextLayout: {
           ...runtimeLayout,
           rows: [],
           cols: ['col1', 'col2'],
           valuePlacement: { axis: 'col', index: 1 },
         },
-      }),
-    ).toBe(false);
-  });
-
-  it('fetches when selected measure leaves require missing value payload', () => {
-    expect(
-      shouldFetchRuntimeLayout({
-        factBatches: [factBatch(1, 1)],
-        nextLayout: runtimeLayout,
-        valueKeys: ['m1', 'm1__1 year ago'],
       }),
     ).toBe(true);
   });
