@@ -262,7 +262,7 @@ describe('pivot/expansion/planner', () => {
       coverage: { rowDepth: 1, columnDepth: 1 },
       getMissingExpansionCoverage,
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: () => true,
+      shouldFetchChildren: ({ path }) => !path.includes(SUBTOTAL_TOKEN),
     });
 
     expect(
