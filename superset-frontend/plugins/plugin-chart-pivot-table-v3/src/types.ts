@@ -305,8 +305,6 @@ export interface PivotTableProps
   sourceMeasureLeavesByMetric?: MeasureLeavesByMetricKey;
   startCollapsed: boolean;
   initialDepth?: number;
-  expandRowsLevel?: number;
-  expandColumnsLevel?: number;
   rowTotals: boolean;
   colTotals: boolean;
   rowSubTotals?: boolean;

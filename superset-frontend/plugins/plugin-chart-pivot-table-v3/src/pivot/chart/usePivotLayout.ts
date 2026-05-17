@@ -108,8 +108,6 @@ export type PivotLayoutResult = {
 
 export const usePivotLayout = ({
   formData,
-  expandRowsLevel,
-  expandColumnsLevel,
   rowTotals,
   colTotals,
   rowSubTotals,
@@ -122,8 +120,6 @@ export const usePivotLayout = ({
   pivotProgram,
 }: {
   formData: PivotTableProps['formData'];
-  expandRowsLevel?: number;
-  expandColumnsLevel?: number;
   rowTotals: boolean;
   colTotals: boolean;
   rowSubTotals: boolean;
@@ -135,9 +131,8 @@ export const usePivotLayout = ({
   colSubtotalPosition: TotalPosition;
   pivotProgram?: PivotProgram;
 }): PivotLayoutResult => {
-  const expandRowsLevelRaw = expandRowsLevel ?? formData.expandRowsLevel;
-  const expandColumnsLevelRaw =
-    expandColumnsLevel ?? formData.expandColumnsLevel;
+  const expandRowsLevelRaw = formData.expandRowsLevel;
+  const expandColumnsLevelRaw = formData.expandColumnsLevel;
   const metricsLayout =
     (formData.metricsLayout as MetricsLayoutEnum) || MetricsLayoutEnum.COLUMNS;
   const startCollapsed = formData.startCollapsed ?? true;

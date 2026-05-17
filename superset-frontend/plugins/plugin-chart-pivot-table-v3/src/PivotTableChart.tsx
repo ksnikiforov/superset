@@ -80,8 +80,6 @@ function PivotTableChart(props: PivotTableProps) {
     width,
     height,
     metrics,
-    expandRowsLevel,
-    expandColumnsLevel,
     verboseMap,
     ownState,
     setDataMask,
@@ -317,8 +315,6 @@ function PivotTableChart(props: PivotTableProps) {
 
   const layoutResult = usePivotLayout({
     formData: appliedLayoutFormData,
-    expandRowsLevel,
-    expandColumnsLevel,
     rowTotals,
     colTotals,
     rowSubTotals,
