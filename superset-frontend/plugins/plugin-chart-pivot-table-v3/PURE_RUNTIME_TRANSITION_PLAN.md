@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14507` insertions, `15236` deletions, net `-729`.
-- Current production TypeScript/TSX total: about `32781` lines.
+- Production `src`: `14515` insertions, `15265` deletions, net `-750`.
+- Current production TypeScript/TSX total: about `32760` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -552,6 +552,10 @@ Success criteria:
 - `PivotTableProps` no longer advertises duplicate top-level collapse,
   subtotal, total, or total-position props. Those policies are form-data/runtime
   layout inputs, not chart-shell inputs.
+- `PivotTableProps` no longer extends the full Superset `ChartProps` shell.
+  `transformProps` now returns only the fields the pivot chart actually
+  consumes instead of forwarding raw datasource, annotations, legend state,
+  behaviors, raw form data, or input refs through the runtime path.
 
 ## Current Risks
 

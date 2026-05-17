@@ -17,6 +17,7 @@
  * under the License.
  */
 import {
+  AppSection,
   ContextMenuFilters,
   Currency,
   DataRecordValue,
@@ -25,9 +26,9 @@ import {
   QueryFormColumn,
   QueryFormData,
   QueryFormMetric,
-  ChartProps as BaseChartProps,
   SetDataMaskHook,
   HandlerFunction,
+  SupersetTheme,
   TimeFormatter,
   TimeGranularity,
   GenericDataType,
@@ -292,9 +293,9 @@ export type PivotTableQueryFormData = QueryFormData &
     treeDataSignature?: string;
   };
 
-export interface PivotTableProps
-  extends BaseChartProps<PivotTableQueryFormData>,
-    PivotTableStylesProps {
+export interface PivotTableProps {
+  width: number;
+  height: number;
   data: PivotTreeData;
   factBatches: PivotFactStoreBatch[];
   formData: PivotTableQueryFormData;
@@ -305,6 +306,9 @@ export interface PivotTableProps
   emitCrossFilters?: boolean;
   setControlValue?: HandlerFunction;
   setDataMask: SetDataMaskHook;
+  ownState?: JsonObject;
+  theme?: SupersetTheme;
+  appSection?: AppSection;
   selectedFilters?: Record<string, DataRecordValue[]>;
   onContextMenu?: (
     clientX: number,

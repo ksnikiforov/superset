@@ -17,12 +17,7 @@
  * under the License.
  */
 
-import {
-  Datasource,
-  DatasourceType,
-  SetDataMaskHook,
-  supersetTheme,
-} from '@superset-ui/core';
+import { SetDataMaskHook } from '@superset-ui/core';
 import PivotTableChart from '../../../src/PivotTableChart';
 import {
   PivotAxis,
@@ -48,22 +43,10 @@ const emptyTree: PivotTreeData = {
   cells: {},
 };
 
-const baseDatasource: Datasource = {
-  id: 1,
-  name: 'pivot-table-test',
-  type: DatasourceType.Table,
-  columns: [],
-  metrics: [],
-  columnFormats: {},
-  currencyFormats: {},
-  verboseMap: {},
-};
-
 const baseFormData = buildFormData({});
 const emptyMetrics: PivotTableQueryFormData['metrics'] = [];
 const emptyGroupbyRows: PivotTableQueryFormData['groupbyRows'] = [];
 const emptyGroupbyColumns: PivotTableQueryFormData['groupbyColumns'] = [];
-const emptyQueriesData: PivotTableProps['queriesData'] = [];
 
 type LegacyTestPivotProps = {
   metrics?: PivotTableQueryFormData['metrics'];
@@ -86,6 +69,7 @@ type LegacyTestPivotProps = {
   currencyFormats?: PivotTableQueryFormData['currencyFormats'];
   allowRenderHtml?: PivotTableQueryFormData['allowRenderHtml'];
   metricColorFormatters?: unknown[];
+  rawFormData?: PivotTableQueryFormData;
 };
 
 const isDimensionalChildValue = (value: PivotPath[number]) =>
@@ -355,16 +339,7 @@ const baseProps: PivotTableProps & LegacyTestPivotProps = {
   metricColorFormatters: [],
   dateFormatters: {},
   verboseMap: {},
-  annotationData: {},
-  datasource: baseDatasource,
-  rawDatasource: baseDatasource,
-  initialValues: {},
-  hooks: { setDataMask: noopSetDataMask },
   ownState: {},
-  filterState: {},
-  queriesData: emptyQueriesData,
-  behaviors: [],
-  theme: supersetTheme,
 };
 
 type TestPivotTableChartProps = Partial<PivotTableProps & LegacyTestPivotProps>;
@@ -380,9 +355,6 @@ export default function TestPivotTableChart(props: TestPivotTableChartProps) {
       props.metrics ??
       props.formData?.metrics ??
       baseProps.sourceMetrics,
-    datasource: props.datasource ?? baseProps.datasource,
-    rawDatasource: props.rawDatasource ?? baseProps.rawDatasource,
-    hooks: { ...baseProps.hooks, ...(props.hooks ?? {}) },
   };
   const runtimeLayout = mergedProps.formData.pivotRuntimeLayout;
   const {

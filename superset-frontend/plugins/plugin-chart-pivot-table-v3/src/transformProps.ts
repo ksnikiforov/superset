@@ -59,7 +59,6 @@ export default function transformProps(
   chartProps: ChartProps,
 ): PivotTableProps {
   const {
-    annotationData,
     width,
     height,
     queriesData,
@@ -70,15 +69,7 @@ export default function transformProps(
     datasource,
     rawDatasource,
     chartId,
-    initialValues,
-    legendState,
-    legendIndex,
-    behaviors,
-    displaySettings,
     appSection,
-    isRefreshing,
-    inputRef,
-    inContextMenu,
     emitCrossFilters,
     theme,
     ownState,
@@ -368,13 +359,8 @@ export default function transformProps(
   };
 
   return {
-    annotationData,
     width,
     height,
-    datasource,
-    rawDatasource,
-    initialValues,
-    margin: formData.margin ?? 0,
     data: nextTreeWithLeaves,
     factBatches,
     formData: {
@@ -392,19 +378,8 @@ export default function transformProps(
     sourceMetrics: rawFormData.metrics ?? baseFormData.metrics ?? [],
     sourceMeasureLeavesByMetric:
       rawFormData.measureLeavesByMetric ?? baseFormData.measureLeavesByMetric,
-    rawFormData,
-    hooks,
     ownState,
-    filterState,
-    legendState,
-    legendIndex,
-    queriesData,
-    behaviors,
-    displaySettings,
     appSection,
-    isRefreshing,
-    inputRef,
-    inContextMenu,
     theme,
     queryFormData: queryFormDataWithFormatters,
     emitCrossFilters,
