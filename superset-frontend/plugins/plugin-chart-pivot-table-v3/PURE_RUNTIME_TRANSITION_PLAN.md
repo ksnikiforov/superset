@@ -163,7 +163,7 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14367` insertions, `15784` deletions, net `-1417`.
+- Production `src`: `14335` insertions, `15784` deletions, net `-1449`.
 - Current production TypeScript/TSX total: about `32557` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
@@ -749,6 +749,9 @@ Success criteria:
   for single branch, batched branch, and intersection requests. The separate
   query builders remain, but request bookkeeping is no longer copied across
   each fetch shape.
+- Expansion fetch execution now returns fact-store deltas directly from the
+  single caller path. The old exported `fetchExpansionTargets` wrapper and
+  optional no-data branch have been removed.
 - Expansion visibility, same-axis merge preservation, and reinitialization no
   longer receive caller-built metric-label sets or dimension-depth callbacks.
   `stateTransitions` derives expansion metric policy from `PivotProgram`,

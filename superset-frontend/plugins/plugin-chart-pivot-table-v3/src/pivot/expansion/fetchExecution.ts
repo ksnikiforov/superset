@@ -62,9 +62,9 @@ import {
 } from './planner';
 import type { PivotProgram } from '../runtime/types';
 
-export type ExpansionFetchResult = {
+type ExpansionFetchResult = {
   targets: ExpansionFetchTarget[];
-  data?: PivotTreeData;
+  data: PivotTreeData;
   factBatches: PivotFactStoreBatch[];
 };
 
@@ -336,7 +336,7 @@ const fetchExpansionIntersectionTarget = async ({
   });
 };
 
-export const fetchExpansionTargets = async ({
+export const fetchExpansionTargetDeltas = async ({
   targets,
   context,
   runtime,
@@ -352,7 +352,7 @@ export const fetchExpansionTargets = async ({
   batchRequestKind?: string;
   transactionId: number;
   buildRequestGroupId: BuildExpansionRequestGroupId;
-}): Promise<ExpansionFetchResult[]> => {
+}): Promise<FetchResultDelta[]> => {
   const { batches, singles, intersections } = resolveExpansionFetchPlan({
     targets,
     formData: runtime.fetchFormData,
@@ -420,45 +420,13 @@ export const fetchExpansionTargets = async ({
       }),
     ),
   ];
-  const fetchedResults = await Promise.all(fetchPromises);
-  return fetchedResults;
-};
-
-export const fetchExpansionTargetDeltas = async ({
-  targets,
-  context,
-  runtime,
-  singleRequestKind,
-  batchRequestKind,
-  transactionId,
-  buildRequestGroupId,
-}: {
-  targets: ExpansionFetchTarget[];
-  context: ExpansionFetchContext;
-  runtime: ExpansionFetchRuntime;
-  singleRequestKind: string;
-  batchRequestKind?: string;
-  transactionId: number;
-  buildRequestGroupId: BuildExpansionRequestGroupId;
-}): Promise<FetchResultDelta[]> => {
-  const results = await fetchExpansionTargets({
-    targets,
-    context,
-    runtime,
-    singleRequestKind,
-    batchRequestKind,
-    transactionId,
-    buildRequestGroupId,
-  });
+  const results = await Promise.all(fetchPromises);
   if (!runtime.requestScope.isCurrent()) {
     return [];
   }
   const deltas: FetchResultDelta[] = [];
   results.forEach(result => {
     runtime.factStore?.upsertBatches(result.factBatches);
-    if (!result.data) {
-      return;
-    }
     deltas.push({
       targets: result.targets,
       data: result.data,
