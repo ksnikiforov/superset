@@ -30,6 +30,7 @@ import {
   serializePath,
 } from '../../../../src/pivot/core/path';
 import type { PivotProgram } from '../../../../src/pivot/runtime/types';
+import { encodeMetricKey } from '../../../../src/pivot/core/tokens';
 
 const makeNode = ({
   axis,
@@ -62,14 +63,6 @@ const makeTree = ({
   cols: Object.fromEntries(cols.map(node => [node.key, node])),
   cells,
 });
-
-const baseConfig = {
-  isMetricTokenValue: (value: unknown) =>
-    typeof value === 'string' && value.startsWith('metric:'),
-  isExplicitSubtotalNode: () => false,
-  isMetricGrandTotalNode: () => false,
-  isMetricSubtotalNode: () => false,
-};
 
 const programWithValuesAtEnd = (
   axis: PivotAxis,
@@ -130,7 +123,6 @@ describe('pivot/chart/pruneCollapsedAxis', () => {
     });
 
     const nextTree = pruneStaleCollapsedAxis({
-      ...baseConfig,
       currentTree,
       axis: 'row',
       parent,
@@ -151,7 +143,7 @@ describe('pivot/chart/pruneCollapsedAxis', () => {
     const parent = makeNode({ axis: 'col', path: ['West'], hasChildren: true });
     const metricChild = makeNode({
       axis: 'col',
-      path: ['West', 'metric:Sales'],
+      path: ['West', encodeMetricKey('sales')],
     });
     const stale = makeNode({ axis: 'col', path: ['West', 'Old'] });
     const valid = makeNode({ axis: 'col', path: ['West', 'Q1'] });
@@ -175,7 +167,6 @@ describe('pivot/chart/pruneCollapsedAxis', () => {
     });
 
     const nextTree = pruneStaleCollapsedAxis({
-      ...baseConfig,
       currentTree,
       axis: 'col',
       parent,

@@ -50,9 +50,6 @@ const node = (axis: 'row' | 'col', path: PivotTreeNode['path']) => ({
 const baseParams = {
   resolvedExpandRowsLevel: 0,
   resolvedExpandColumnsLevel: 0,
-  metricLabelSet: new Set(['sales']),
-  isMetricTokenValue: (value: unknown) =>
-    typeof value === 'string' && value.startsWith('__metric__'),
   isLeafTierVisible: false,
   rowSubTotals: false,
   resolvedRowSubtotalPosition: 'start' as const,
@@ -246,8 +243,6 @@ describe('pivot/chart/layoutRuntime', () => {
         parent,
         nodes,
         hideMetricHeader: true,
-        isMetricTokenValue: baseParams.isMetricTokenValue,
-        isMetricGrandTotalNode: () => false,
         keepValuesChild: () => true,
       }),
     ).toEqual([]);
@@ -276,8 +271,6 @@ describe('pivot/chart/layoutRuntime', () => {
         parent,
         nodes,
         hideMetricHeader: false,
-        isMetricTokenValue: baseParams.isMetricTokenValue,
-        isMetricGrandTotalNode: child => child?.isSubtotal === true,
         keepValuesChild: () => true,
       }),
     ).toEqual([dimensionChild]);
@@ -300,9 +293,6 @@ describe('pivot/chart/layoutRuntime', () => {
       isLeafTierVisible: false,
       suppressSubtotalParent: true,
       normalizeSubtotalExisting: false,
-      isMetricTokenValue: baseParams.isMetricTokenValue,
-      isExplicitSubtotalNode: () => false,
-      isMetricSubtotalNode: () => false,
     });
 
     expect(collapsed).toEqual([
@@ -347,9 +337,6 @@ describe('pivot/chart/layoutRuntime', () => {
       isLeafTierVisible: true,
       suppressSubtotalParent: false,
       normalizeSubtotalExisting: true,
-      isMetricTokenValue: baseParams.isMetricTokenValue,
-      isExplicitSubtotalNode: () => false,
-      isMetricSubtotalNode: child => child?.isSubtotal === true,
     });
 
     expect(collapsed).toEqual([
@@ -387,11 +374,6 @@ describe('pivot/chart/layoutRuntime', () => {
         rowSubTotals: true,
         rowSubtotalPositionForParent: 'start',
         hideMetricHeaderOnRows: false,
-        countDimDepth: path => path.length,
-        isMetricTokenValue: baseParams.isMetricTokenValue,
-        isMetricGrandTotalNode: child => child === grandTotalChild,
-        isExplicitSubtotalNode: child =>
-          child?.path.some(value => value === SUBTOTAL_TOKEN) === true,
       }),
     ).toEqual([dimensionChild, grandTotalChild]);
   });
@@ -427,11 +409,6 @@ describe('pivot/chart/layoutRuntime', () => {
         rowSubTotals: true,
         rowSubtotalPositionForParent: 'end',
         hideMetricHeaderOnRows: false,
-        countDimDepth: path => path.length,
-        isMetricTokenValue: baseParams.isMetricTokenValue,
-        isMetricGrandTotalNode: () => false,
-        isExplicitSubtotalNode: child =>
-          child?.path.some(value => value === SUBTOTAL_TOKEN) === true,
       }),
     ).toEqual([dimensionChild, subtotalDescendant]);
   });

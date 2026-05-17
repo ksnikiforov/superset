@@ -350,9 +350,8 @@ export const usePivotLayout = ({
       resolveAxisChildrenBeforeSubtotalPolicy({
         ...params,
         program: layout.pivotProgram,
-        isMetricGrandTotalNode,
       }),
-    [isMetricGrandTotalNode, layout.pivotProgram],
+    [layout.pivotProgram],
   );
 
   const getRowSubtotalPosition = useCallback(
@@ -383,10 +382,8 @@ export const usePivotLayout = ({
         ...params,
         program: layout.pivotProgram,
         isLeafTierVisible,
-        isExplicitSubtotalNode,
-        isMetricSubtotalNode,
       }),
-    [isMetricSubtotalNode, isLeafTierVisible, layout.pivotProgram],
+    [isLeafTierVisible, layout.pivotProgram],
   );
 
   const getCollapsedChildrenForAxis = useCallback(
@@ -438,14 +435,10 @@ export const usePivotLayout = ({
         rowSubTotals,
         rowSubtotalPositionForParent,
         hideMetricHeaderOnRows,
-        countDimDepth,
-        isMetricGrandTotalNode,
-        isExplicitSubtotalNode,
       });
     },
     [
       colTotals,
-      countDimDepth,
       getAxisChildrenBeforeSubtotalPolicy,
       getRowSubtotalPosition,
       hideMetricHeaderOnRows,
@@ -499,12 +492,9 @@ export const usePivotLayout = ({
         parent,
         branch,
         program: layout.pivotProgram,
-        isExplicitSubtotalNode,
-        isMetricGrandTotalNode,
-        isMetricSubtotalNode,
       });
     },
-    [isMetricGrandTotalNode, isMetricSubtotalNode, layout.pivotProgram],
+    [layout.pivotProgram],
   );
 
   const buildRenderModelConfig = useCallback(
