@@ -24,6 +24,7 @@ import {
 } from '../../../../src/pivot/core/tokens';
 import { compilePivotProgram } from '../../../../src/pivot/runtime/compilePivotProgram';
 import {
+  canRequestAxisExpansion,
   resolveAxisProjection,
   resolveAxisChildProjection,
   resolveCollapsedValuesProjection,
@@ -309,5 +310,42 @@ describe('resolveAxisProjection', () => {
       rawValuesTokenIndex: 2,
       introducesValues: true,
     });
+  });
+
+  it('keeps expansion requestability program-owned and rejects synthetic subtotal paths', () => {
+    const program = compilePivotProgram({
+      groupbyRows: [
+        'orderPriority',
+        METRICS_PLACEHOLDER,
+        'returnFlag',
+        'shipMode',
+      ],
+      metrics: ['revenue'],
+      metricsLayout: MetricsLayoutEnum.ROWS,
+    });
+
+    expect(
+      canRequestAxisExpansion({
+        program,
+        axis: 'row',
+        path: ['1-URGENT', encodeMetricKey('revenue')],
+      }),
+    ).toBe(true);
+
+    expect(
+      canRequestAxisExpansion({
+        program,
+        axis: 'row',
+        path: ['1-URGENT', SUBTOTAL_TOKEN, encodeMetricKey('revenue')],
+      }),
+    ).toBe(false);
+
+    expect(
+      canRequestAxisExpansion({
+        program,
+        axis: 'row',
+        path: ['1-URGENT', encodeMetricKey('revenue'), 'Returned', 'AIR'],
+      }),
+    ).toBe(false);
   });
 });

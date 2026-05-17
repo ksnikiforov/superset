@@ -48,7 +48,7 @@ import { type ChartDataWarning } from '../data/ChartDataClient';
 import { stableStringify } from '../shared/stableStringify';
 import {
   buildAxisCoverageKeyFromPathKey,
-  getNextAxisLevelForPath,
+  canRequestAxisExpansion,
   isValuesAtAxisEnd,
   shouldAutoExpandValuesLevel,
 } from '../runtime/projection';
@@ -657,11 +657,11 @@ export const useExpansionEngine = ({
 
   const shouldFetchChildren = useCallback<PivotExpansionNodeFetchPredicate>(
     ({ axis, path }) =>
-      getNextAxisLevelForPath({
+      canRequestAxisExpansion({
         program: pivotProgram,
         axis,
-        path: path.filter(value => !isSubtotalToken(value)),
-      })?.kind === 'dimension',
+        path,
+      }),
     [pivotProgram],
   );
 

@@ -264,6 +264,17 @@ export const getNextAxisLevelForPath = (
   input: ResolveAxisProjectionInput,
 ): PivotAxisLevel | undefined => projectAxisPathForLevel(input).nextLevel;
 
+export const canRequestAxisExpansion = ({
+  program,
+  axis,
+  path,
+}: ResolveAxisProjectionInput): boolean => {
+  if (path.some(isSubtotalToken)) {
+    return false;
+  }
+  return getNextAxisLevelForPath({ program, axis, path })?.kind === 'dimension';
+};
+
 const projectAxisPathToCoverageDimensions = ({
   program,
   path,
