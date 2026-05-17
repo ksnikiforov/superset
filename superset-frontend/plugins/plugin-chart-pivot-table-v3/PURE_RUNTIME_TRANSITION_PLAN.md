@@ -553,6 +553,13 @@ Success criteria:
   coverage, otherwise preloaded tree coverage can overclaim a deeper dimension
   and skip a targeted expansion fetch. Do not cut this without first making
   loaded measure-tier coverage explicit in the manifest/materializer contract.
+- A manifest-only runtime-layout fetch decision was attempted and reverted
+  after `interaction-seamless-expansion.test.tsx` exposed broad UX regressions.
+  Fact coverage alone is not yet enough to decide reuse: the decision also
+  depends on whether the committed loaded runtime snapshot can support local
+  tree reuse for layout edits such as trimming/re-adding hidden dimensions and
+  moving Values. The next version needs an explicit loaded-snapshot contract,
+  not another previous-layout heuristic.
 - Large result sets still pay main-thread JSON parsing and React commit costs.
 
 ## Approval Checkpoints
@@ -571,6 +578,10 @@ Bring these back before implementing the behavior change:
 - **Values placeholder boundary.** Removing placeholder tolerance from saved
   form data would be a compatibility break; runtime-only cleanup is fine, but
   persisted control behavior needs approval.
+- **Runtime layout fetch authority.** Deleting the previous-layout semantic
+  fetch branch requires a loaded runtime snapshot contract. A pure fact-coverage
+  diff changes visible interaction/fetch behavior and must not be repeated as a
+  direct replacement.
 - **Large-result interactivity.** Worker/off-thread/chunked commit changes can
   alter loader timing and must be planned as an interactivity change.
 
