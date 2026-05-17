@@ -1626,7 +1626,7 @@ describe('fetchPivotBranch delta-only contract', () => {
     ).toBe(42);
   });
 
-  it('returns a fetched coverage marker when expansion only reveals Values', async () => {
+  it('does not fetch or mark coverage when expansion only reveals Values', async () => {
     const postMock = SupersetClient.post as jest.Mock;
     const formData = buildFormData({
       groupbyRows: [],
@@ -1648,20 +1648,6 @@ describe('fetchPivotBranch delta-only contract', () => {
 
     expect(postMock).not.toHaveBeenCalled();
     expect(result.data).toBeUndefined();
-    expect(result.factBatches).toEqual([
-      expect.objectContaining({
-        coverage: expect.objectContaining({
-          rowDepth: 0,
-          columnDepth: 1,
-        }),
-        scope: {
-          kind: 'branch',
-          axis: 'col',
-          path: ['Furniture'],
-        },
-        facts: [],
-        valueKeys: ['profit', 'sales'],
-      }),
-    ]);
+    expect(result.factBatches).toEqual([]);
   });
 });

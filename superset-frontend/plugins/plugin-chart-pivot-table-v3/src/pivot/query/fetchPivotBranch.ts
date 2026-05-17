@@ -24,8 +24,6 @@ import {
   type PivotTreeData,
 } from '../../types';
 import { type ChartDataWarning } from '../data/ChartDataClient';
-import { getMetricKeys } from '../metrics';
-import { parsePath } from '../core/path';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import {
   buildLayoutContext,
@@ -41,9 +39,7 @@ import {
   buildIntersectionQuerySpecs,
   type PlannedQuerySpec,
 } from './specs';
-import { buildFactCoverage } from '../runtime/coverage';
 import {
-  buildFactValueKeys,
   createPivotFactStore,
   type PivotFactStore,
   type PivotFactStoreBatch,
@@ -99,11 +95,6 @@ export type FetchPivotIntersectionResult = FetchPivotBranchResult;
 
 type ResolvedFetchContext = ResolvedQueryFetchContext & {
   layout: LayoutContext;
-};
-
-type ResolvedBranchPlan = {
-  ctx: ResolvedFetchContext;
-  specs: PlannedQuerySpec[];
 };
 
 const EMPTY_FACT_BATCHES: PivotFactStoreBatch[] = [];
@@ -213,7 +204,10 @@ export const resolveBranchFetchContext = ({
 
 const resolveBranchPlan = (
   params: FetchPivotBranchParams,
-): ResolvedBranchPlan => {
+): {
+  ctx: ResolvedFetchContext;
+  specs: PlannedQuerySpec[];
+} => {
   const ctx = resolveBranchFetchContext(params);
   const specs = buildBranchQuerySpecs({
     formData: params.formData,
@@ -225,41 +219,6 @@ const resolveBranchPlan = (
   });
   return { ctx, specs };
 };
-
-const resolvePivotBranchLocalResultFromPlan = (
-  params: FetchPivotBranchParams,
-  { ctx, specs }: ResolvedBranchPlan,
-): FetchPivotBranchResult | undefined => {
-  if (specs.length === 0) {
-    const batch: PivotFactStoreBatch = {
-      coverage: buildFactCoverage({
-        reason: 'expand',
-        rowDimensions: ctx.layout.pivotProgram.rowDimensions,
-        columnDimensions: ctx.layout.pivotProgram.columnDimensions,
-        rowDepth: params.visibleRowDepth ?? ctx.rowDepth,
-        columnDepth: params.visibleColDepth ?? ctx.colDepth,
-      }),
-      scope: {
-        kind: 'branch',
-        axis: params.axis,
-        path: params.path,
-      },
-      valueKeys: buildFactValueKeys({
-        metricKeys: getMetricKeys(ctx.metricsForQuery),
-        requiredTimeOffsets: ctx.requiredTimeOffsets,
-      }),
-      facts: [],
-    };
-    params.factStore?.upsertBatch(batch);
-    return { data: undefined, factBatches: [batch] };
-  }
-  return undefined;
-};
-
-export const resolvePivotBranchLocalResult = (
-  params: FetchPivotBranchParams,
-): FetchPivotBranchResult | undefined =>
-  resolvePivotBranchLocalResultFromPlan(params, resolveBranchPlan(params));
 
 export async function fetchPivotBranch({
   formData,
@@ -278,21 +237,6 @@ export async function fetchPivotBranch({
     visibleColDepth,
   });
   const { ctx, specs } = plan;
-
-  const localResult = resolvePivotBranchLocalResultFromPlan(
-    {
-      formData,
-      axis,
-      path,
-      visibleRowDepth,
-      visibleColDepth,
-      factStore,
-    },
-    plan,
-  );
-  if (localResult) {
-    return localResult;
-  }
 
   return fetchPivotQuerySpecsIntoBranchTree({
     formData,
@@ -320,29 +264,6 @@ export const fetchPivotBranchesBatch = async ({
     visibleColDepth,
     chunkIndex: 0,
   });
-  if (specs.length === 0) {
-    const batchMarker: PivotFactStoreBatch = {
-      coverage: buildFactCoverage({
-        reason: 'expand',
-        rowDimensions: layout.pivotProgram.rowDimensions,
-        columnDimensions: layout.pivotProgram.columnDimensions,
-        rowDepth: visibleRowDepth,
-        columnDepth: visibleColDepth,
-      }),
-      scope: {
-        kind: 'batch',
-        axis: batch.axis,
-        parentPath: parsePath(batch.parentPathKey),
-        siblingValues: batch.siblingValues,
-      },
-      valueKeys: buildFactValueKeys({
-        metricKeys: layout.pivotProgram.metricKeys,
-      }),
-      facts: [],
-    };
-    factStore?.upsertBatch(batchMarker);
-    return { data: undefined, factBatches: [batchMarker] };
-  }
   return fetchPivotQuerySpecsIntoBranchTree({
     formData,
     specs,

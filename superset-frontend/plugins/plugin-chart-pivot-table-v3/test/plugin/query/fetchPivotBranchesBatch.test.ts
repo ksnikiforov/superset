@@ -379,7 +379,7 @@ describe('fetchPivotBranchesBatch', () => {
     expect(payload.queries.length).toBeLessThan(specs.length);
   });
 
-  it('returns a fetched coverage marker when grouped expansion only reveals Values', async () => {
+  it('does not fetch or mark coverage when grouped expansion only reveals Values', async () => {
     const formData = buildFormData({
       groupbyRows: ['country', METRICS_PLACEHOLDER, 'state'],
       groupbyColumns: [],
@@ -417,21 +417,6 @@ describe('fetchPivotBranchesBatch', () => {
 
     expect(mockPost).not.toHaveBeenCalled();
     expect(result.data).toBeUndefined();
-    expect(result.factBatches).toEqual([
-      expect.objectContaining({
-        coverage: expect.objectContaining({
-          rowDepth: 1,
-          columnDepth: 0,
-        }),
-        scope: {
-          kind: 'batch',
-          axis: 'row',
-          parentPath: [],
-          siblingValues: ['US', 'CA'],
-        },
-        facts: [],
-        valueKeys: ['profit', 'sales'],
-      }),
-    ]);
+    expect(result.factBatches).toEqual([]);
   });
 });

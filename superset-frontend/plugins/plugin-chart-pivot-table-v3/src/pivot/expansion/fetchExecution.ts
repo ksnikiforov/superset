@@ -26,7 +26,6 @@ import {
   fetchPivotBranch,
   fetchPivotBranchesBatch,
   fetchPivotIntersection,
-  resolvePivotBranchLocalResult,
 } from '../query/fetchPivotBranch';
 import { parsePath } from '../core/path';
 import { type ChartDataWarning } from '../data/ChartDataClient';
@@ -141,42 +140,22 @@ const resolveExpansionFetchPlan = ({
   formData,
   visibleRowDepth,
   visibleColDepth,
-  factStore,
 }: {
   targets: ExpansionFetchTarget[];
   formData: PivotTableQueryFormData;
   visibleRowDepth: number;
   visibleColDepth: number;
-  factStore?: PivotFactStore;
 }): {
-  localResults: ExpansionFetchResult[];
   singles: FetchTarget[];
   batches: BatchGroup[];
   intersections: IntersectionFetchTarget[];
 } => {
-  const localResults: ExpansionFetchResult[] = [];
   const batchCandidates: BatchCandidate[] = [];
   for (const target of targets) {
     if (isIntersectionFetchTarget(target)) {
       continue;
     }
     const path = parsePath(target.pathKey);
-    const localResult = resolvePivotBranchLocalResult({
-      axis: target.axis,
-      path,
-      formData,
-      visibleRowDepth,
-      visibleColDepth,
-      factStore,
-    });
-    if (localResult) {
-      localResults.push({
-        targets: [target],
-        data: localResult.data,
-        factBatches: localResult.factBatches,
-      });
-      continue;
-    }
     const batchSignature = buildBatchSignature({
       formData,
       axis: target.axis,
@@ -190,7 +169,6 @@ const resolveExpansionFetchPlan = ({
     targets: batchCandidates,
   });
   return {
-    localResults,
     singles,
     batches,
     intersections: targets.filter(isIntersectionFetchTarget),
@@ -354,14 +332,12 @@ export const fetchExpansionTargets = async ({
   transactionId: number;
   buildRequestGroupId: BuildExpansionRequestGroupId;
 }): Promise<ExpansionFetchResult[]> => {
-  const { localResults, batches, singles, intersections } =
-    resolveExpansionFetchPlan({
-      targets,
-      formData: runtime.fetchFormData,
-      visibleRowDepth: context.visibleRowDepth,
-      visibleColDepth: context.visibleColDepth,
-      factStore: runtime.factStore,
-    });
+  const { batches, singles, intersections } = resolveExpansionFetchPlan({
+    targets,
+    formData: runtime.fetchFormData,
+    visibleRowDepth: context.visibleRowDepth,
+    visibleColDepth: context.visibleColDepth,
+  });
   const { visibleRowDepth, visibleColDepth } = context;
   const buildSingleRequestGroupId = (target: FetchTarget) =>
     buildRequestGroupId(
@@ -424,7 +400,7 @@ export const fetchExpansionTargets = async ({
     ),
   ];
   const fetchedResults = await Promise.all(fetchPromises);
-  return [...localResults, ...fetchedResults];
+  return fetchedResults;
 };
 
 export const fetchExpansionTargetDeltas = async ({

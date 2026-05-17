@@ -119,6 +119,14 @@ This is the selected path because it centralizes the right complexity:
 - query planning owns "how to batch explicit missing needs";
 - materialization and rendering stop repairing or inferring loaded state.
 
+Current fact-store contract:
+
+- fact batches represent loaded query coverage only;
+- non-requestable paths, such as expansions that only reveal Values tiers, do
+  not create empty coverage marker batches;
+- repeated no-query behavior should be prevented by planner/requestability
+  policy, not by pretending that an empty fact batch was loaded.
+
 Expected deletion targets:
 
 - remaining non-manifest coverage planning in expansion and query batching;
@@ -145,7 +153,7 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14506` insertions, `15527` deletions, net `-1021`.
+- Production `src`: `14403` insertions, `15527` deletions, net `-1124`.
 - Current production TypeScript/TSX total: about `32557` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
