@@ -313,8 +313,6 @@ export type ExpansionEngineConfig = {
     tree: PivotTreeData;
     expandedRows: Set<string>;
     expandedCols: Set<string>;
-    rowTotals: boolean;
-    colTotals: boolean;
   }) => RenderModelConfig;
   expandRowsLevelRaw?: number;
   expandColumnsLevelRaw?: number;
@@ -673,18 +671,11 @@ export const useExpansionEngine = ({
       isMetricTokenValue,
       countDimDepth,
       shouldFetchChildren,
-      buildRenderModelConfig: params =>
-        buildRenderModelConfig({
-          ...params,
-          rowTotals: fetchFormData.rowTotals ?? false,
-          colTotals: fetchFormData.colTotals ?? false,
-        }),
+      buildRenderModelConfig,
     }),
     [
       buildRenderModelConfig,
       countDimDepth,
-      fetchFormData.colTotals,
-      fetchFormData.rowTotals,
       isMetricTokenValue,
       metricLabelSet,
       shouldFetchChildren,

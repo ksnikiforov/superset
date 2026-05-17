@@ -88,8 +88,8 @@ export type PivotLayoutResult = {
     tree: PivotTreeData;
     expandedRows: Set<string>;
     expandedCols: Set<string>;
-    rowTotals: boolean;
-    colTotals: boolean;
+    rowTotals?: boolean;
+    colTotals?: boolean;
     rowSorter?: (a: PivotTreeNode, b: PivotTreeNode) => number;
     colSorter?: (a: PivotTreeNode, b: PivotTreeNode) => number;
     getColumnDisplayPath?: (
@@ -582,8 +582,8 @@ export const usePivotLayout = ({
       tree,
       expandedRows,
       expandedCols,
-      rowTotals: rowTotalsForModel,
-      colTotals: colTotalsForModel,
+      rowTotals: rowTotalsForModel = layout.rowTotals,
+      colTotals: colTotalsForModel = layout.colTotals,
       rowSorter = defaultPivotNodeSorter,
       colSorter = defaultPivotNodeSorter,
       getColumnDisplayPath,
@@ -625,9 +625,11 @@ export const usePivotLayout = ({
       isMetricGrandTotalNode,
       isMetricSubtotalNode,
       isMetricTokenValue,
+      layout.colTotals,
       layout.groupbyColumns.length,
       layout.groupbyRows.length,
       layout.pivotProgram,
+      layout.rowTotals,
       normalizedColSubtotalLevels,
       normalizedRowSubtotalLevels,
       resolvedColTotalPosition,

@@ -145,7 +145,7 @@ export const usePivotRenderModel = ({
   const resolvedGroupbyColumns = layout.layout.groupbyColumns;
   const resolvedGroupbyRowsLength = resolvedGroupbyRows.length;
   const resolvedGroupbyColumnsLength = resolvedGroupbyColumns.length;
-  const { rowTotals, colTotals, rowSubTotals } = layout.layout;
+  const { colTotals, rowSubTotals } = layout.layout;
 
   const rowSortingKeyMap = useMemo(
     () =>
@@ -426,8 +426,6 @@ export const usePivotRenderModel = ({
           tree: renderTree,
           expandedRows: expandedRowsForRender,
           expandedCols: expandedColsForRender,
-          rowTotals,
-          colTotals,
           rowSorter,
           colSorter,
           getColumnDisplayPath,
@@ -436,7 +434,6 @@ export const usePivotRenderModel = ({
       }),
     [
       colSorter,
-      colTotals,
       expandedColsForRender,
       expandedRowsForRender,
       getColumnDisplayPath,
@@ -444,7 +441,6 @@ export const usePivotRenderModel = ({
       layout,
       renderTree,
       rowSorter,
-      rowTotals,
     ],
   );
 
