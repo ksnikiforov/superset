@@ -83,7 +83,6 @@ export type PivotLayoutResult = {
   isMetricSubtotalNode: (node?: PivotTreeNode) => boolean;
   isExplicitSubtotalNode: (node?: PivotTreeNode) => boolean;
   countDimDepth: (path: PivotTreeNode['path']) => number;
-  countEngineDimDepth: (path: PivotTreeNode['path']) => number;
   getRowSubtotalPosition: (node: PivotTreeNode) => TotalPosition;
   buildRenderModelConfig: (params: {
     tree: PivotTreeData;
@@ -375,15 +374,6 @@ export const usePivotLayout = ({
     (path: PivotTreeNode['path']) => countDimDepthBase(path, metricLabelSet),
     [metricLabelSet],
   );
-  const countEngineDimDepth = useCallback(
-    (path: PivotTreeNode['path']) =>
-      countDimDepthBase(
-        path.filter(val => !isSubtotalToken(val)),
-        metricLabelSet,
-      ),
-    [metricLabelSet],
-  );
-
   const getAxisChildrenBeforeSubtotalPolicy = useCallback(
     (params: {
       axis: 'row' | 'col';
@@ -674,7 +664,6 @@ export const usePivotLayout = ({
     isMetricSubtotalNode,
     isExplicitSubtotalNode,
     countDimDepth,
-    countEngineDimDepth,
     getRowSubtotalPosition,
     buildRenderModelConfig,
     pruneMergedTree,

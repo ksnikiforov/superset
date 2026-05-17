@@ -387,7 +387,6 @@ function PivotTableChart(props: PivotTableProps) {
     metricLabelSet: layoutResult.metricLabelSet,
     isMetricTokenValue: layoutResult.isMetricTokenValue,
     pivotProgram: layoutResult.layout.pivotProgram,
-    countDimDepth: layoutResult.countEngineDimDepth,
     buildRenderModelConfig: layoutResult.buildRenderModelConfig,
     expandRowsLevelRaw: layoutResult.expandRowsLevelRaw,
     expandColumnsLevelRaw: layoutResult.expandColumnsLevelRaw,

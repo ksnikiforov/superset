@@ -93,6 +93,7 @@ import {
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import type { RenderModelConfig } from '../render/renderModel';
 import { getStableColumnKey } from '../../utils';
+import { countDimDepth as countDimDepthBase } from '../metricsTotals';
 
 const MAX_HYDRATION_ITERATIONS = 12;
 type ExpansionStateCommit = {
@@ -308,7 +309,6 @@ export type ExpansionEngineConfig = {
   metricLabelSet: Set<string>;
   isMetricTokenValue: (value: unknown) => boolean;
   pivotProgram: PivotProgram;
-  countDimDepth: (path: PivotTreeNode['path']) => number;
   buildRenderModelConfig: (params: {
     tree: PivotTreeData;
     expandedRows: Set<string>;
@@ -342,7 +342,6 @@ export const useExpansionEngine = ({
   metricLabelSet,
   isMetricTokenValue,
   pivotProgram,
-  countDimDepth,
   buildRenderModelConfig,
   expandRowsLevelRaw,
   expandColumnsLevelRaw,
@@ -438,6 +437,14 @@ export const useExpansionEngine = ({
   const groupbyColumnKeys = useMemo(
     () => pivotProgram.columnDimensions.map(getStableColumnKey),
     [pivotProgram.columnDimensions],
+  );
+  const countDimDepth = useCallback(
+    (path: PivotTreeNode['path']) =>
+      countDimDepthBase(
+        path.filter(val => !isSubtotalToken(val)),
+        metricLabelSet,
+      ),
+    [metricLabelSet],
   );
   const previousLayoutRef = useRef({
     rows: groupbyRowKeys,
