@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14467` insertions, `14959` deletions, net `-492`.
-- Current production TypeScript/TSX total: about `33018` lines.
+- Production `src`: `14463` insertions, `14959` deletions, net `-496`.
+- Current production TypeScript/TSX total: about `33014` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -515,6 +515,10 @@ Success criteria:
   `coverage.ts` owns coverage manifests and fact-batch diffing, not the
   decision to reuse the current interactive layout tree during a seamless
   layout edit.
+- Seamless runtime reuse now has an explicit snapshot that pairs the reusable
+  runtime layout with the fact batches it is allowed to reuse. Runtime-layout
+  equality also moved out of `coverage.ts`, keeping coverage focused on fact
+  availability rather than UI/runtime state comparison.
 
 ## Current Risks
 
