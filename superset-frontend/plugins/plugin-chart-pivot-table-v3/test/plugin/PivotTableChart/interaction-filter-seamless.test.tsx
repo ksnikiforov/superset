@@ -59,7 +59,9 @@ jest.mock('../../../src/pivot/data/SupersetChartDataClient', () => {
 });
 
 jest.mock('../../../src/pivot/query/fetchPivotBranch', () => {
-  const actual = jest.requireActual('../../../src/pivot/query/fetchPivotBranch');
+  const actual = jest.requireActual(
+    '../../../src/pivot/query/fetchPivotBranch',
+  );
   return {
     ...actual,
     fetchPivotBranch: jest
@@ -604,12 +606,11 @@ describe('PivotTableChart interaction filter seamless updates', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('recovers stale dashboard remount tree when runtime layout requires a missing column dimension', async () => {
+  it('does not run chart-owned recovery when dashboard remount tree misses bootstrap coverage', async () => {
     const metrics = ['m1'];
     const rows = ['row1'];
     const cols = ['col1'];
     const staleRecords = [{ row1: 'A', m1: 10 }];
-    const recoveredRecords = [{ row1: 'A', col1: 'ColorA', m1: 10 }];
     const runtimeLayout: PivotRuntimeLayout = {
       version: 1,
       rows,
@@ -648,7 +649,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
         specs: unknown[];
       }) =>
         requestGroupId === 'pivot-v3-seamless'
-          ? specs.map(() => ({ data: recoveredRecords }))
+          ? specs.map(() => ({ data: [] }))
           : specs.map(() => ({ data: staleRecords })),
     );
 
@@ -667,14 +668,12 @@ describe('PivotTableChart interaction filter seamless updates', () => {
       />,
     );
 
-    await waitFor(() =>
-      expect(fetchMock).toHaveBeenCalledWith(
-        expect.objectContaining({
-          requestGroupId: 'pivot-v3-seamless',
-        }),
-      ),
+    await waitFor(() => expect(screen.getByText('A')).toBeInTheDocument());
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        requestGroupId: 'pivot-v3-seamless',
+      }),
     );
-
-    await waitFor(() => expect(screen.getByText('ColorA')).toBeInTheDocument());
+    expect(screen.queryByText('ColorA')).not.toBeInTheDocument();
   });
 });
