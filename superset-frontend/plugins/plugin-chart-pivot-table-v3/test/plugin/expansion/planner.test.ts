@@ -62,12 +62,6 @@ const makeNode = ({
   };
 };
 
-const shouldFetchDimensionChildren = ({
-  path,
-}: {
-  path: PivotTreeNode['path'];
-}) => path.length < testProgram.rowDimensions.length;
-
 const getMissingCoverageFromBatches = (
   factBatches: PivotFactStoreBatch[] = [],
 ): PivotExpansionCoverageDiff =>
@@ -126,7 +120,7 @@ describe('pivot/expansion/planner', () => {
       coverage: { rowDepth: 1, columnDepth: 1 },
       getMissingExpansionCoverage: getMissingCoverageFromBatches(),
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: shouldFetchDimensionChildren,
+      program: testProgram,
     });
 
     expect(fetchPathKeys(plan)).toEqual([aKey]);
@@ -154,7 +148,7 @@ describe('pivot/expansion/planner', () => {
       coverage: { rowDepth: 1, columnDepth: 0 },
       getMissingExpansionCoverage: getMissingCoverageFromBatches(),
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: ({ path }) => path[0] === 'A',
+      program: testProgram,
     });
 
     expect(fetchPathKeys(plan)).toEqual([aKey]);
@@ -199,7 +193,7 @@ describe('pivot/expansion/planner', () => {
       coverage: { rowDepth: 1, columnDepth: 1 },
       getMissingExpansionCoverage,
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: shouldFetchDimensionChildren,
+      program: testProgram,
     });
 
     expect(fetchPathKeys(plan)).toEqual([bKey]);
@@ -224,7 +218,7 @@ describe('pivot/expansion/planner', () => {
       coverage: { rowDepth: 1, columnDepth: 1 },
       getMissingExpansionCoverage,
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: shouldFetchDimensionChildren,
+      program: testProgram,
     });
 
     expect(getMissingExpansionCoverage).toHaveBeenCalledTimes(1);
@@ -262,7 +256,7 @@ describe('pivot/expansion/planner', () => {
       coverage: { rowDepth: 1, columnDepth: 1 },
       getMissingExpansionCoverage,
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: ({ path }) => !path.includes(SUBTOTAL_TOKEN),
+      program: testProgram,
     });
 
     expect(
@@ -309,7 +303,7 @@ describe('pivot/expansion/planner', () => {
       coverage: { rowDepth: 1, columnDepth: 0 },
       getMissingExpansionCoverage,
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: shouldFetchDimensionChildren,
+      program: testProgram,
     });
 
     expect(fetchPathKeys(plan)).toEqual([txKey]);
@@ -354,7 +348,7 @@ describe('pivot/expansion/planner', () => {
       coverage: { rowDepth: 1, columnDepth: 1 },
       getMissingExpansionCoverage,
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: shouldFetchDimensionChildren,
+      program: testProgram,
     });
 
     expect(fetchPathKeys(plan)).toEqual([profitKey]);
@@ -401,7 +395,7 @@ describe('pivot/expansion/planner', () => {
       coverage: { rowDepth: 1, columnDepth: 1 },
       getMissingExpansionCoverage: getMissingCoverageFromBatches(),
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: shouldFetchDimensionChildren,
+      program: testProgram,
     });
 
     expect(targets).toHaveLength(2);

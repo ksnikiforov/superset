@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14547` insertions, `15439` deletions, net `-892`.
-- Current production TypeScript/TSX total: about `32618` lines.
+- Production `src`: `14528` insertions, `15437` deletions, net `-909`.
+- Current production TypeScript/TSX total: about `32601` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -673,6 +673,10 @@ Success criteria:
   spec-backed fact-store reads. Branch and initial materialization both reuse
   `buildFactStoreBatchesFromSpecs`, keeping batch construction under one
   selector path.
+- Expansion requestability is no longer a hook-supplied predicate threaded
+  through hydration and same-axis fetch execution. Expansion planning now takes
+  `PivotProgram` directly and calls the runtime projection rule at the planner
+  boundary, so query permission is program-derived rather than callback-owned.
 
 ## Current Risks
 
@@ -727,10 +731,10 @@ Success criteria:
   `sourceMetrics` or encode the metric intent in `formData`. Reintroducing
   top-level chart metric fallbacks would blur the source-metadata contract
   again.
-- Expansion requestability is still partly path-token based. The next larger
-  simplification is to move that decision behind a compiled program policy so
-  subtotal, metric, and measure display nodes are interpreted once as semantic
-  paths instead of checked ad hoc at each boundary.
+- Expansion requestability is centralized in the runtime projection rule, but
+  the final API shape is still a standalone function rather than an explicit
+  program policy object. Only move it again if that deletes call-site plumbing
+  or combines more layout/coverage policy.
 
 ## Approval Checkpoints
 

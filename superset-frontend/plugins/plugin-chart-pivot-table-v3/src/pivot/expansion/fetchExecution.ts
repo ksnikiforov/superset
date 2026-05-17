@@ -54,8 +54,8 @@ import {
   type IntersectionFetchTarget,
   isIntersectionFetchTarget,
   planExpansionForAxis,
-  type PivotExpansionNodeFetchPredicate,
 } from './planner';
+import type { PivotProgram } from '../runtime/types';
 
 export type ExpansionFetchResult = {
   targets: ExpansionFetchTarget[];
@@ -545,7 +545,7 @@ export const runSameAxisExpansionFetchLoop = async ({
   computeVisibleDepths,
   getMissingExpansionCoverage,
   getCoverageKey,
-  shouldFetchChildren,
+  program,
   fetchRuntime,
   transactionId,
   buildRequestGroupId,
@@ -569,7 +569,7 @@ export const runSameAxisExpansionFetchLoop = async ({
   ) => SameAxisVisibleDepths;
   getMissingExpansionCoverage: () => PivotExpansionCoverageDiff;
   getCoverageKey: (axis: PivotAxis, key: string) => string;
-  shouldFetchChildren: PivotExpansionNodeFetchPredicate;
+  program: PivotProgram;
   fetchRuntime: ExpansionFetchRuntime;
   transactionId: number;
   buildRequestGroupId: BuildExpansionRequestGroupId;
@@ -605,12 +605,12 @@ export const runSameAxisExpansionFetchLoop = async ({
     const nodes = axis === 'row' ? currentTree.rows : currentTree.cols;
     const plan = planExpansionForAxis({
       axis,
+      program,
       expandedKeys: resolvedExpanded,
       nodes,
       coverage: { rowDepth: visibleRowDepth, columnDepth: visibleColDepth },
       getMissingExpansionCoverage: getMissingExpansionCoverage(),
       getCoverageKey,
-      shouldFetchChildren,
     });
     if (plan.fetchRequests.length === 0) {
       break;

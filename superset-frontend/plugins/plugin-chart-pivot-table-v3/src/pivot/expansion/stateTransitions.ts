@@ -28,7 +28,6 @@ import {
   buildGroupedFetchTargets,
   type ExpansionFetchTarget,
   planExpansionForAxis,
-  type PivotExpansionNodeFetchPredicate,
   type PivotExpansionPlan,
 } from './planner';
 import {
@@ -54,7 +53,7 @@ import { isMetricTokenForKeys } from '../core/tokens';
 
 export type ExpansionVisibilityConfig = {
   countDimDepth: (path: PivotTreeNode['path']) => number;
-  shouldFetchChildren: PivotExpansionNodeFetchPredicate;
+  program: PivotProgram;
   buildRenderModelConfig: (params: {
     tree: PivotTreeData;
     expandedRows: Set<string>;
@@ -997,23 +996,23 @@ export const planHydrationIteration = ({
   const rowPlan = planRows
     ? planExpansionForAxis({
         axis: 'row',
+        program: config.program,
         expandedKeys: desiredRows,
         nodes: tree.rows,
         coverage: { rowDepth: visibleRowDepth, columnDepth: visibleColDepth },
         getMissingExpansionCoverage,
         getCoverageKey,
-        shouldFetchChildren: config.shouldFetchChildren,
       })
     : createEmptyExpansionPlan();
   const colPlan = planCols
     ? planExpansionForAxis({
         axis: 'col',
+        program: config.program,
         expandedKeys: desiredCols,
         nodes: tree.cols,
         coverage: { rowDepth: visibleRowDepth, columnDepth: visibleColDepth },
         getMissingExpansionCoverage,
         getCoverageKey,
-        shouldFetchChildren: config.shouldFetchChildren,
       })
     : createEmptyExpansionPlan();
 

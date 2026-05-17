@@ -22,6 +22,13 @@ import { planExpansionForAxis } from '../../../src/pivot/expansion/planner';
 import { type PivotExpansionCoverageDiff } from '../../../src/pivot/runtime/coverage';
 import { serializePath } from '../../../src/pivot/core/path';
 import { rootKey } from '../../../src/pivot/viewModel';
+import { compilePivotProgram } from '../../../src/pivot/runtime/compilePivotProgram';
+
+const testProgram = compilePivotProgram({
+  groupbyRows: ['country', 'state', 'city'],
+  groupbyColumns: ['month', 'day'],
+  metrics: ['sales'],
+});
 
 const makeNode = ({
   axis,
@@ -57,12 +64,6 @@ const getMissingCoverageFromDepths =
       return !(fetchedDepth !== undefined && fetchedDepth >= requiredDepth);
     });
 
-const shouldFetchDimensionChildren = ({
-  path,
-}: {
-  path: PivotTreeNode['path'];
-}) => path.length < 2;
-
 describe('expansionPlanner', () => {
   it('treats nodes as satisfied when fetched depth meets the requirement', () => {
     const keyA = serializePath(['A']);
@@ -80,7 +81,7 @@ describe('expansionPlanner', () => {
         new Map([[keyA, 1]]),
       ),
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: shouldFetchDimensionChildren,
+      program: testProgram,
     });
 
     expect(sortFetchPathKeys(plan)).toEqual([]);
@@ -104,7 +105,7 @@ describe('expansionPlanner', () => {
         new Map([[keyA, 2]]),
       ),
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: shouldFetchDimensionChildren,
+      program: testProgram,
     });
 
     expect(sortFetchPathKeys(plan)).toEqual([]);
@@ -127,7 +128,7 @@ describe('expansionPlanner', () => {
         new Map([[keyA, 1]]),
       ),
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: shouldFetchDimensionChildren,
+      program: testProgram,
     });
 
     expect(sortFetchPathKeys(plan)).toEqual([keyA]);
@@ -148,7 +149,7 @@ describe('expansionPlanner', () => {
       coverage: { rowDepth: 1, columnDepth: 0 },
       getMissingExpansionCoverage: getMissingCoverageFromDepths(new Map()),
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: shouldFetchDimensionChildren,
+      program: testProgram,
     });
 
     expect(sortFetchPathKeys(plan)).toEqual([keyA]);
@@ -172,7 +173,7 @@ describe('expansionPlanner', () => {
         new Map([[keyA, 1]]),
       ),
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: shouldFetchDimensionChildren,
+      program: testProgram,
     });
 
     expect(sortFetchPathKeys(plan)).toEqual([keyAB]);
@@ -197,7 +198,7 @@ describe('expansionPlanner', () => {
         new Map([[keyA, 1]]),
       ),
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: shouldFetchDimensionChildren,
+      program: testProgram,
     });
 
     expect(sortFetchPathKeys(plan)).toEqual([keyA]);
@@ -219,7 +220,7 @@ describe('expansionPlanner', () => {
       coverage: { rowDepth: 1, columnDepth: 1 },
       getMissingExpansionCoverage: getMissingCoverageFromDepths(new Map()),
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: shouldFetchDimensionChildren,
+      program: testProgram,
     });
     expect(sortFetchPathKeys(plan1)).toEqual([keyA]);
 
@@ -231,7 +232,7 @@ describe('expansionPlanner', () => {
       coverage: { rowDepth: 1, columnDepth: 1 },
       getMissingExpansionCoverage: getMissingCoverageFromDepths(fetchedDepth),
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: shouldFetchDimensionChildren,
+      program: testProgram,
     });
     expect(sortFetchPathKeys(plan2)).toEqual([]);
 
@@ -242,7 +243,7 @@ describe('expansionPlanner', () => {
       coverage: { rowDepth: 1, columnDepth: 1 },
       getMissingExpansionCoverage: getMissingCoverageFromDepths(fetchedDepth),
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: shouldFetchDimensionChildren,
+      program: testProgram,
     });
     expect(sortFetchPathKeys(plan3)).toEqual([keyAB]);
 
@@ -253,7 +254,7 @@ describe('expansionPlanner', () => {
       coverage: { rowDepth: 1, columnDepth: 2 },
       getMissingExpansionCoverage: getMissingCoverageFromDepths(fetchedDepth),
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: shouldFetchDimensionChildren,
+      program: testProgram,
     });
     expect(sortFetchPathKeys(plan4)).toEqual([keyA]);
     expect(sortKeys(plan4.pendingKeys)).toEqual([keyA, keyAB]);
@@ -271,8 +272,8 @@ describe('expansionPlanner', () => {
         new Map([[keyA, 2]]),
       ),
       getCoverageKey: (_axis, key) => key,
-      shouldFetchChildren: shouldFetchDimensionChildren,
+      program: testProgram,
     });
-    expect(sortFetchPathKeys(plan5)).toEqual([]);
+    expect(sortFetchPathKeys(plan5)).toEqual([keyAB]);
   });
 });

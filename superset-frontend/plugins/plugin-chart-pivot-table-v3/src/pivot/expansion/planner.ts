@@ -24,6 +24,8 @@ import {
   type PivotExpansionCoverageDiff,
   type PivotExpansionCoverageRequest,
 } from '../runtime/coverage';
+import { canRequestAxisExpansion } from '../runtime/projection';
+import type { PivotProgram } from '../runtime/types';
 import { rootKey } from '../viewModel';
 
 export type AxisFetchTarget = FetchTarget;
@@ -45,11 +47,6 @@ export type PivotExpansionPlan = {
   pendingKeys: Set<string>;
   hasMissingNodes: boolean;
 };
-
-export type PivotExpansionNodeFetchPredicate = (input: {
-  axis: PivotAxis;
-  path: PivotTreeNode['path'];
-}) => boolean;
 
 type PivotExpansionCoverageDepths = Pick<
   PivotExpansionCoverageRequest,
@@ -83,20 +80,20 @@ const requestKey = ({
 
 export const planExpansionForAxis = ({
   axis,
+  program,
   expandedKeys,
   nodes,
   coverage,
   getMissingExpansionCoverage,
   getCoverageKey,
-  shouldFetchChildren,
 }: {
   axis: PivotAxis;
+  program: PivotProgram;
   expandedKeys: Set<string>;
   nodes: Record<string, PivotTreeNode>;
   coverage: PivotExpansionCoverageDepths;
   getMissingExpansionCoverage: PivotExpansionCoverageDiff;
   getCoverageKey: (axis: PivotAxis, key: string) => string;
-  shouldFetchChildren: PivotExpansionNodeFetchPredicate;
 }): PivotExpansionPlan => {
   const fetchRequests = new Map<string, PivotExpansionCoverageRequest>();
   const pendingKeys = new Set<string>();
@@ -112,7 +109,7 @@ export const planExpansionForAxis = ({
       const path = node?.path ?? parsePath(key);
       return { key, node, path };
     })
-    .filter(({ path }) => shouldFetchChildren({ axis, path }));
+    .filter(({ path }) => canRequestAxisExpansion({ program, axis, path }));
   const buildRequest = (key: string): PivotExpansionCoverageRequest => ({
     axis,
     pathKey: key,
@@ -138,7 +135,7 @@ export const planExpansionForAxis = ({
     if (
       ancestor &&
       getCoverageKey(axis, key) !== getCoverageKey(axis, ancestorKey) &&
-      shouldFetchChildren({ axis, path: ancestor.path })
+      canRequestAxisExpansion({ program, axis, path: ancestor.path })
     ) {
       addRequest(ancestorKey);
     }
@@ -170,7 +167,7 @@ export const planExpansionForAxis = ({
     }
     const ancestorRequest = buildRequest(ancestorKey);
     if (
-      !shouldFetchChildren({ axis, path: ancestor.path }) ||
+      !canRequestAxisExpansion({ program, axis, path: ancestor.path }) ||
       !missingRequestKeys.has(requestKey(ancestorRequest))
     ) {
       if (getCoverageKey(axis, key) === getCoverageKey(axis, ancestorKey)) {

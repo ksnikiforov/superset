@@ -141,19 +141,18 @@ describe('pivot/expansion/stateTransitions', () => {
       };
     };
 
+  const testProgram = compilePivotProgram({
+    groupbyRows: ['country', 'city'],
+    groupbyColumns: ['month', 'day'],
+    metrics: ['sales'],
+  });
   const config: ExpansionVisibilityConfig = {
     groupbyRowsLength: 2,
     groupbyColumnsLength: 2,
     countDimDepth: path => path.length,
-    shouldFetchChildren: ({ path }) => path.length < 2,
+    program: testProgram,
     buildRenderModelConfig: buildTestRenderModelConfig(),
   };
-
-  const testProgram = compilePivotProgram({
-    groupbyRows: ['country', 'city'],
-    groupbyColumns: ['month'],
-    metrics: ['sales'],
-  });
   const getCoverageKey = (_axis: 'row' | 'col', key: string) => key;
   const expansionCoverageLoadedFromBatches = (
     factBatches: PivotFactStoreBatch[] = [],
@@ -840,7 +839,7 @@ describe('pivot/expansion/stateTransitions', () => {
         ...config,
         groupbyRowsLength: 3,
         groupbyColumnsLength: 0,
-        shouldFetchChildren: ({ path }) => path.length < 3,
+        program: nestedProgram,
         buildRenderModelConfig: buildTestRenderModelConfig({
           groupbyRowsLength: 3,
           groupbyColumnsLength: 0,

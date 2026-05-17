@@ -48,7 +48,6 @@ import { type ChartDataWarning } from '../data/ChartDataClient';
 import { stableStringify } from '../shared/stableStringify';
 import {
   buildAxisCoverageKeyFromPathKey,
-  canRequestAxisExpansion,
   isValuesAtAxisEnd,
   shouldAutoExpandValuesLevel,
 } from '../runtime/projection';
@@ -85,7 +84,6 @@ import {
   runSameAxisExpansionFetchLoop,
   type ExpansionFetchRuntime,
 } from './fetchExecution';
-import { type PivotExpansionNodeFetchPredicate } from './planner';
 import {
   createLatestRequestLifecycle,
   type LatestRequestScope,
@@ -655,23 +653,13 @@ export const useExpansionEngine = ({
     [setWarnings],
   );
 
-  const shouldFetchChildren = useCallback<PivotExpansionNodeFetchPredicate>(
-    ({ axis, path }) =>
-      canRequestAxisExpansion({
-        program: pivotProgram,
-        axis,
-        path,
-      }),
-    [pivotProgram],
-  );
-
   const visibilityConfig = useMemo<ExpansionVisibilityConfig>(
     () => ({
       countDimDepth,
-      shouldFetchChildren,
+      program: pivotProgram,
       buildRenderModelConfig,
     }),
-    [buildRenderModelConfig, countDimDepth, shouldFetchChildren],
+    [buildRenderModelConfig, countDimDepth, pivotProgram],
   );
 
   const persistExpansionState = useCallback(
@@ -820,7 +808,7 @@ export const useExpansionEngine = ({
           computeVisibleDepths,
           getMissingExpansionCoverage,
           getCoverageKey,
-          shouldFetchChildren,
+          program: pivotProgram,
           fetchRuntime: buildFetchRuntime(requestScope),
           transactionId: requestId,
           buildRequestGroupId: expansionRequestHelpers.buildRequestGroupId,
@@ -877,7 +865,6 @@ export const useExpansionEngine = ({
       pruneMergedTree,
       resolveExpandedForMetrics,
       trackInFlightExpansion,
-      shouldFetchChildren,
     ],
   );
 
