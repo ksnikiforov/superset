@@ -142,8 +142,6 @@ export const usePivotRenderModel = ({
     useState<PivotColumnSortState | null>(null);
   const resolvedGroupbyRows = layout.layout.groupbyRows;
   const resolvedGroupbyColumns = layout.layout.groupbyColumns;
-  const resolvedGroupbyRowsLength = resolvedGroupbyRows.length;
-  const resolvedGroupbyColumnsLength = resolvedGroupbyColumns.length;
   const { colTotals, rowSubTotals } = layout.layout;
 
   const rowSortingKeyMap = useMemo(
@@ -450,17 +448,8 @@ export const usePivotRenderModel = ({
         expandedRows,
         layout,
         isLeafTierVisible,
-        groupbyRowsLength: resolvedGroupbyRowsLength,
-        groupbyColumnsLength: resolvedGroupbyColumnsLength,
       }),
-    [
-      expandedRows,
-      isLeafTierVisible,
-      layout,
-      renderTree.rows,
-      resolvedGroupbyColumnsLength,
-      resolvedGroupbyRowsLength,
-    ],
+    [expandedRows, isLeafTierVisible, layout, renderTree.rows],
   );
 
   const isColumnSortable = useCallback(

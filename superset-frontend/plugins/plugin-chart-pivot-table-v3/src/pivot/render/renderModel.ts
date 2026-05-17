@@ -36,8 +36,6 @@ export type RenderModel = {
 };
 
 export type RenderModelConfig = {
-  groupbyRowsLength: number;
-  groupbyColumnsLength: number;
   normalizedRowSubtotalLevels: number[];
   normalizedColSubtotalLevels: number[];
   rowTotals: boolean;
@@ -77,21 +75,23 @@ export const buildRenderModel = ({
   expandedCols,
   config,
 }: RenderModelInput): RenderModel => {
+  const groupbyRowsLength = config.pivotProgram.rowDimensions.length;
+  const groupbyColumnsLength = config.pivotProgram.columnDimensions.length;
   const showRowRootBase =
-    config.groupbyRowsLength > 0 &&
+    groupbyRowsLength > 0 &&
     (config.normalizedRowSubtotalLevels.includes(0) || config.colTotals);
   const suppressRowRootForMultiMeasure =
     config.hasMultipleMeasures &&
     (config.pivotProgram.valueAxis === 'row' || config.rowTotals);
   const showRowRoot = showRowRootBase && !suppressRowRootForMultiMeasure;
   const showColRoot =
-    config.groupbyColumnsLength > 0 &&
+    groupbyColumnsLength > 0 &&
     (config.normalizedColSubtotalLevels.includes(0) || config.rowTotals);
 
   const skipRowRoot =
-    (config.groupbyRowsLength > 0 && !showRowRoot) ||
-    (config.groupbyRowsLength === 0 && config.hasMultipleMeasures);
-  const skipColRoot = config.groupbyColumnsLength === 0 || !showColRoot;
+    (groupbyRowsLength > 0 && !showRowRoot) ||
+    (groupbyRowsLength === 0 && config.hasMultipleMeasures);
+  const skipColRoot = groupbyColumnsLength === 0 || !showColRoot;
 
   const shouldHideMetricGrandTotalsOnRows = !showRowRootBase;
   const totalRowPosition = config.colTotals

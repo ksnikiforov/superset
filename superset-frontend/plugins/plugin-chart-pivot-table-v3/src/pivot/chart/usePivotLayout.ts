@@ -550,8 +550,6 @@ export const usePivotLayout = ({
       getColumnDisplayPath,
       getColumnHeaderLabel,
     }: Parameters<PivotLayoutResult['buildRenderModelConfig']>[0]) => ({
-      groupbyRowsLength: layout.groupbyRows.length,
-      groupbyColumnsLength: layout.groupbyColumns.length,
       normalizedRowSubtotalLevels,
       normalizedColSubtotalLevels,
       rowTotals: rowTotalsForModel,

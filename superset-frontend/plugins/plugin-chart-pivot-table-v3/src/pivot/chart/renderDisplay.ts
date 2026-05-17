@@ -333,16 +333,15 @@ export const buildRenderNodeDisplayState = ({
   expandedRows,
   layout,
   isLeafTierVisible,
-  groupbyRowsLength,
-  groupbyColumnsLength,
 }: {
   rowNodes: Record<string, PivotTreeNode>;
   expandedRows: Set<string>;
   layout: RenderNodeDisplayLayout;
   isLeafTierVisible: boolean;
-  groupbyRowsLength: number;
-  groupbyColumnsLength: number;
 }): RenderNodeDisplayState => {
+  const groupbyRowsLength = layout.layout.pivotProgram.rowDimensions.length;
+  const groupbyColumnsLength =
+    layout.layout.pivotProgram.columnDimensions.length;
   const autoExpandedRows = seedExpandedByLevel(
     rowNodes,
     layout.resolvedExpandRowsLevel,

@@ -139,8 +139,6 @@ describe('buildRenderModel', () => {
       expandedRows: new Set([rootKey, rowKey]),
       expandedCols: new Set([rootKey, colKey]),
       config: {
-        groupbyRowsLength: 1,
-        groupbyColumnsLength: 1,
         normalizedRowSubtotalLevels: [0],
         normalizedColSubtotalLevels: [0],
         rowTotals: true,
@@ -148,7 +146,10 @@ describe('buildRenderModel', () => {
         rowTotalPosition: 'start',
         colTotalPosition: 'start',
         resolvedColSubtotalPosition: 'start',
-        pivotProgram: compilePivotProgram({}),
+        pivotProgram: compilePivotProgram({
+          groupbyRows: ['row'],
+          groupbyColumns: ['col'],
+        }),
         hasMultipleMeasures: false,
         rowSorter: (a, b) => a.label.localeCompare(b.label),
         colSorter: (a, b) => a.label.localeCompare(b.label),
@@ -210,8 +211,6 @@ describe('buildRenderModel', () => {
       expandedRows: new Set([rootKey]),
       expandedCols: new Set([rootKey, metricColKey]),
       config: {
-        groupbyRowsLength: 0,
-        groupbyColumnsLength: 0,
         normalizedRowSubtotalLevels: [],
         normalizedColSubtotalLevels: [],
         rowTotals: false,

@@ -328,8 +328,6 @@ test('builds render node display state for toggles and aggregate emphasis', () =
       layout: { pivotProgram },
     },
     isLeafTierVisible: false,
-    groupbyRowsLength: 2,
-    groupbyColumnsLength: 1,
   });
 
   expect(state.shouldShowToggle('row', country)).toBe(true);
@@ -362,8 +360,6 @@ test('hides metric toggles when measure leaves are visible', () => {
       layout: { pivotProgram: rowMetricFirstProgram },
     },
     isLeafTierVisible: true,
-    groupbyRowsLength: 1,
-    groupbyColumnsLength: 0,
   });
 
   expect(state.shouldShowToggle('row', metricNode)).toBe(false);
