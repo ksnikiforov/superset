@@ -81,8 +81,6 @@ export type LayoutContext = {
   measureHierarchy: MeasureHierarchy;
   requiredTimeOffsets: string[];
   pivotProgram: PivotProgram;
-  metricsLayoutResolved: MetricsLayoutEnum;
-  metricInsertIndex: number;
   rowSubtotalLevels: number[];
   colSubtotalLevels: number[];
   colSubtotalLevelsForQuery: number[];
@@ -166,9 +164,6 @@ export const buildLayoutContext = (
   const rowTotals = layoutSpec.rowTotals ?? false;
   const colTotals = layoutSpec.colTotals ?? false;
 
-  const { metricsLayoutResolved } = pivotProgram;
-  const { metricInsertIndex } = pivotProgram;
-
   const rowSubTotalsEnabled = layoutSpec.rowSubTotals ?? true;
   const maxRowSubtotalDepth = Math.max(rowDimensions.length - 1, 0);
   const rowSubtotalLevels = normalizeSubtotalLevels(
@@ -218,8 +213,6 @@ export const buildLayoutContext = (
     measureHierarchy,
     requiredTimeOffsets,
     pivotProgram,
-    metricsLayoutResolved,
-    metricInsertIndex,
     rowSubtotalLevels,
     colSubtotalLevels,
     colSubtotalLevelsForQuery,

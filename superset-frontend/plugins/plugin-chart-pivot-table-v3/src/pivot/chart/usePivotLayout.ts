@@ -180,14 +180,14 @@ export const usePivotLayout = ({
   const {
     resolvedExpandRowsLevel,
     resolvedExpandColsLevel: resolvedExpandColumnsLevel,
-    metricsLayoutResolved: resolvedMetricsLayout,
-    metricInsertIndex,
     metricKeys: metricLabels,
     metricLabelSet,
     metricLabelMap,
     isMetricTokenValue,
     metrics,
   } = layout;
+  const { metricsLayoutResolved: resolvedMetricsLayout, metricInsertIndex } =
+    layout.pivotProgram;
   const metricVerboseMap = formData.verboseMap as
     | Record<string, string>
     | undefined;

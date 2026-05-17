@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14488` insertions, `15311` deletions, net `-823`.
-- Current production TypeScript/TSX total: about `32687` lines.
+- Production `src`: `14492` insertions, `15319` deletions, net `-827`.
+- Current production TypeScript/TSX total: about `32683` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -397,6 +397,8 @@ Success criteria:
   arrays. Runtime planning, formatting, rendering, and transform signatures read
   semantic dimensions from `PivotProgram`; raw groupby arrays remain only for
   form/control serialization.
+- `LayoutContext` also no longer re-exposes metric layout or metric insertion
+  position. Consumers read those placement facts from `PivotProgram`.
 - Column display path policy now consumes `PivotProgram`; render no longer
   passes separate column metric-layout, metric-first, or metric-at-end flags into
   the display helper.

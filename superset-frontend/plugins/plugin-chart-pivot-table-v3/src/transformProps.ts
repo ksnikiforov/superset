@@ -157,10 +157,13 @@ export default function transformProps(
     metrics,
     rowSubtotalLevels,
     colSubtotalLevelsForQuery: colSubtotalLevels,
+  } = layout;
+  const {
+    rowDimensions,
+    columnDimensions,
     metricsLayoutResolved: metricsLayout,
     metricInsertIndex,
-  } = layout;
-  const { rowDimensions, columnDimensions } = layout.pivotProgram;
+  } = layout.pivotProgram;
   const initialSpecs = buildInitialQuerySpecs(formDataWithMetricLabels, layout);
   const planMetrics = initialSpecs.reduce(
     (acc, spec) => mergeMetrics(acc, spec.metrics),
