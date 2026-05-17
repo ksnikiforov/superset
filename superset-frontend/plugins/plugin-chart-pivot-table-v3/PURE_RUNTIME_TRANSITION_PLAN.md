@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14508` insertions, `15272` deletions, net `-764`.
-- Current production TypeScript/TSX total: about `32746` lines.
+- Production `src`: `14508` insertions, `15275` deletions, net `-767`.
+- Current production TypeScript/TSX total: about `32743` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -562,6 +562,8 @@ Success criteria:
 - Seamless update planning no longer carries a separate `sourceFormData`
   snapshot. The boundary takes query-ready `baseFormData` plus explicit source
   metric and measure-leaf metadata.
+- The dead `extraControls` chart prop has been removed from the runtime prop
+  contract.
 
 ## Current Risks
 

@@ -315,7 +315,4 @@ export interface PivotTableProps {
     clientY: number,
     filters?: ContextMenuFilters,
   ) => void;
-  extraControls?: {
-    formData: PivotTableCustomizeProps;
-  };
 }
