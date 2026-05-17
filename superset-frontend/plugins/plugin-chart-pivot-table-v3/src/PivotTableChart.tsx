@@ -238,8 +238,6 @@ function PivotTableChart(props: PivotTableProps) {
   } = usePivotRuntimeLayoutState({
     isUserControlled,
     isDashboardContext,
-    isDashboardRuntimeSync,
-    shouldPersistOwnState,
     runtimeLayout,
     dimensions: dimensionList,
     selectedFiltersFromFormData,

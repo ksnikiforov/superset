@@ -47,8 +47,6 @@ type RuntimeSelection = Record<string, DataRecordValue[]>;
 type UsePivotRuntimeLayoutStateConfig = {
   isUserControlled: boolean;
   isDashboardContext: boolean;
-  isDashboardRuntimeSync: boolean;
-  shouldPersistOwnState: boolean;
   runtimeLayout: PivotRuntimeLayout;
   dimensions: QueryFormColumn[];
   selectedFiltersFromFormData: RuntimeSelection;
@@ -64,8 +62,6 @@ type UsePivotRuntimeLayoutStateConfig = {
 export const usePivotRuntimeLayoutState = ({
   isUserControlled,
   isDashboardContext,
-  isDashboardRuntimeSync,
-  shouldPersistOwnState,
   runtimeLayout,
   dimensions,
   selectedFiltersFromFormData,
@@ -77,6 +73,8 @@ export const usePivotRuntimeLayoutState = ({
   setControlValue,
   setDataMask,
 }: UsePivotRuntimeLayoutStateConfig) => {
+  const isDashboardRuntimeSync = isUserControlled && isDashboardContext;
+  const shouldPersistOwnState = !isDashboardRuntimeSync;
   const lastPersistedRuntimeLayoutRef = useRef(runtimeLayout);
   const persistedRuntimeLayoutSyncRef = useRef(false);
   const lastPersistedSelectionRef = useRef(selectedFiltersFromProps);
