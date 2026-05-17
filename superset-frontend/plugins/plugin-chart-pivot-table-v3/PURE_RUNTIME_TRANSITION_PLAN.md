@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14458` insertions, `14998` deletions, net `-540`.
-- Current production TypeScript/TSX total: about `32970` lines.
+- Production `src`: `14466` insertions, `15022` deletions, net `-556`.
+- Current production TypeScript/TSX total: about `32954` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -519,6 +519,9 @@ Success criteria:
   runtime layout with the fact batches it is allowed to reuse. Runtime-layout
   equality also moved out of `coverage.ts`, keeping coverage focused on fact
   availability rather than UI/runtime state comparison.
+- Formatting options are now derived inside the formatting boundary from
+  `formData`; the chart no longer unpacks and forwards value format,
+  per-column formats, currency formats, HTML rendering, or pivot theme props.
 
 ## Current Risks
 
