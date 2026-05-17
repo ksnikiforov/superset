@@ -179,7 +179,7 @@ export const compilePivotProgram = ({
   };
 };
 
-export const pivotProgramToPlacement = (
+const pivotProgramToPlacement = (
   program: PivotProgram,
 ): PivotProgramPlacement => {
   const fallbackAxis =

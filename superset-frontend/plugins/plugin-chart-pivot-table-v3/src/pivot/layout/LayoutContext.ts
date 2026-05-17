@@ -38,10 +38,7 @@ import {
   coerceMeasureLeavesByMetric,
   collectRequiredTimeOffsets,
 } from '../measureLeaves';
-import {
-  compilePivotProgram,
-  pivotProgramToPlacement,
-} from '../runtime/compilePivotProgram';
+import { compilePivotProgram } from '../runtime/compilePivotProgram';
 import type { PivotProgram } from '../runtime/types';
 
 export type PivotLayoutSpec = Pick<
@@ -72,8 +69,6 @@ export type PivotLayoutSpec = Pick<
 };
 
 export type LayoutContext = {
-  groupbyRowsRaw: QueryFormColumn[];
-  groupbyColumnsRaw: QueryFormColumn[];
   metrics: QueryFormMetric[];
   metricKeys: string[];
   metricLabelSet: Set<string>;
@@ -91,8 +86,6 @@ export type LayoutContext = {
   colTotalPosition: TotalPosition;
   rowSubtotalPosition: TotalPosition;
   colSubtotalPosition: TotalPosition;
-  startCollapsed: boolean;
-  initialDepth: number;
   resolvedExpandRowsLevel: number;
   resolvedExpandColsLevel: number;
   isMetricTokenValue: (val: unknown) => boolean;
@@ -153,12 +146,6 @@ export const buildLayoutContext = (
       metricsLayout: layoutSpec.metricsLayout as MetricsLayoutEnum,
       lastMoved: layoutSpec.lastMoved,
     });
-  const rawGroupbyPlacement = layoutSpec.pivotProgram
-    ? pivotProgramToPlacement(pivotProgram)
-    : undefined;
-  const groupbyRowsRaw = rawGroupbyPlacement?.rows ?? inputGroupbyRowsRaw;
-  const groupbyColumnsRaw = rawGroupbyPlacement?.cols ?? inputGroupbyColumnsRaw;
-
   const { rowDimensions, columnDimensions } = pivotProgram;
 
   const rowTotals = layoutSpec.rowTotals ?? false;
@@ -204,8 +191,6 @@ export const buildLayoutContext = (
   };
 
   return {
-    groupbyRowsRaw,
-    groupbyColumnsRaw,
     metrics,
     metricKeys,
     metricLabelSet,
@@ -223,8 +208,6 @@ export const buildLayoutContext = (
     colTotalPosition: normalizeTotalPosition(layoutSpec.colTotalPosition),
     rowSubtotalPosition: normalizeTotalPosition(layoutSpec.rowSubtotalPosition),
     colSubtotalPosition: normalizeTotalPosition(layoutSpec.colSubtotalPosition),
-    startCollapsed,
-    initialDepth,
     resolvedExpandRowsLevel,
     resolvedExpandColsLevel,
     isMetricTokenValue,
