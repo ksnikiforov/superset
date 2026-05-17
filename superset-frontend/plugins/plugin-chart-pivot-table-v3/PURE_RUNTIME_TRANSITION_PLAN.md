@@ -264,12 +264,23 @@ Immediate policy:
   rendered tree and expansion state.
 - Those paths must not become query coverage requests. They are display
   projections, not real fact-store coverage anchors.
+- Expansion requestability authority is the compiled runtime policy:
+
+  ```ts
+  program.canRequestExpansion(axis, semanticPath)
+  ```
+
+  or an equivalent `PivotProgram`-derived function. This is the selected model.
 - Query requestability belongs at the compiled runtime-policy level, not at the
   rendered-node level. The preferred shape is
   `program.canRequestExpansion(axis, semanticPath)` or an equivalent
   `PivotProgram`-derived function. A node may expose `kind` or `fetchable` as a
   cached projection of that policy, but planner/query code should not use node
   shape as the authority for whether a request is allowed.
+- The rejected model is making fetchability depend directly on rendered tree
+  shape, for example `node.kind === 'dimension' && node.fetchable === true`.
+  That is lower effort short term, but it keeps query authority in the display
+  tree and preserves the current tree-shape-as-loaded-state problem.
 - Expansion planning now filters by the program-derived requestability rule
   before coverage diffing. The larger cleanup is to keep moving remaining
   token/path fetchability checks behind compiled runtime policy.
