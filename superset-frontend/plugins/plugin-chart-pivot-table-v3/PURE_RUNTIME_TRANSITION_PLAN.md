@@ -163,7 +163,7 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14389` insertions, `15762` deletions, net `-1373`.
+- Production `src`: `14379` insertions, `15762` deletions, net `-1383`.
 - Current production TypeScript/TSX total: about `32557` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
@@ -569,6 +569,10 @@ Success criteria:
 - Materializer entrypoints now share one spec-to-materialization input path, so
   branch, initial sync, and initial async materialization no longer rebuild the
   same spec metadata object separately.
+- Initial sync and async materialization now share the same spec-list
+  fact-batch materialization path as branch materialization. Initial trees no
+  longer materialize each query spec independently and then run a second
+  measure-leaf pass during finalization.
 - Measure-axis materialization now uses one axis-neutral cell projection loop
   for row and column Values placement. Row-only subtotal placement and
   column-only single-metric base-cell propagation remain explicit visible

@@ -84,6 +84,8 @@ type MaterializePivotTreeInput = {
   pivotProgram: PivotProgram;
 };
 
+const emptyPivotTree = (): PivotTreeData => ({ rows: {}, cols: {}, cells: {} });
+
 const factStoreBatchScopeFromSpec = (
   spec: PlannedQuerySpec,
 ): PivotFactStoreBatch['scope'] => {
@@ -143,29 +145,33 @@ export const buildFactStoreBatchesFromSpecs = ({
     facts: store.getCompatibleFacts(factStoreSelectorFromSpec(spec)),
   }));
 
-const materializationInputFromSpec = ({
+const materializationInputFromSpecs = ({
   store,
-  spec,
+  specs,
   formData,
   measureHierarchy,
-  batches,
 }: {
   store: PivotFactStore;
-  spec: PlannedQuerySpec;
+  specs: PlannedQuerySpec[];
   formData: PivotTableQueryFormData;
   measureHierarchy: MeasureHierarchy;
-  batches?: MaterializationFactBatch[];
-}): MaterializePivotTreeInput => ({
-  batches: batches ?? buildFactStoreBatchesFromSpecs({ store, specs: [spec] }),
-  metricsForQuery: spec.metrics,
-  formData,
-  measureHierarchy,
-  materializedMetrics: spec.meta.materializedMetrics,
-  materializedMeasureHierarchy: spec.meta.materializedMeasureHierarchy,
-  rowSubtotalLevels: spec.meta.rowSubtotalLevels,
-  colSubtotalLevels: spec.meta.colSubtotalLevels,
-  pivotProgram: spec.meta.pivotProgram,
-});
+}): MaterializePivotTreeInput | undefined => {
+  const firstSpec = specs[0];
+  if (!firstSpec) {
+    return undefined;
+  }
+  return {
+    batches: buildFactStoreBatchesFromSpecs({ store, specs }),
+    metricsForQuery: firstSpec.metrics,
+    formData,
+    measureHierarchy,
+    materializedMetrics: firstSpec.meta.materializedMetrics,
+    materializedMeasureHierarchy: firstSpec.meta.materializedMeasureHierarchy,
+    rowSubtotalLevels: firstSpec.meta.rowSubtotalLevels,
+    colSubtotalLevels: firstSpec.meta.colSubtotalLevels,
+    pivotProgram: firstSpec.meta.pivotProgram,
+  };
+};
 
 export function applyMeasureLeafValuesToTree({
   tree,
@@ -231,13 +237,7 @@ export function applyMeasureLeafValuesToTree({
   return { rows: nextRows, cols: nextCols, cells: nextCells };
 }
 
-const finalizeInitialPivotTree = ({
-  tree,
-  measureHierarchy,
-}: {
-  tree: PivotTreeData;
-  measureHierarchy: MeasureHierarchy;
-}) => {
+const finalizeInitialPivotTree = ({ tree }: { tree: PivotTreeData }) => {
   const rootKey = serializePath([]);
   const finalizedTree = tree;
   (['rows', 'cols'] as const).forEach(axis => {
@@ -250,10 +250,7 @@ const finalizeInitialPivotTree = ({
       };
     }
   });
-  return applyMeasureLeafValuesToTree({
-    tree: finalizedTree,
-    measureHierarchy,
-  });
+  return finalizedTree;
 };
 
 type FactTreeBuilderInput = {
@@ -1225,19 +1222,16 @@ export const buildBranchTreeFromFactStore = ({
   formData: PivotTableQueryFormData;
   measureHierarchy: MeasureHierarchy;
 }): PivotTreeData => {
-  const firstSpec = specs[0];
-  if (!firstSpec) {
-    return { rows: {}, cols: {}, cells: {} };
+  const input = materializationInputFromSpecs({
+    store,
+    specs,
+    formData,
+    measureHierarchy,
+  });
+  if (!input) {
+    return emptyPivotTree();
   }
-  return materializePivotTree(
-    materializationInputFromSpec({
-      store,
-      spec: firstSpec,
-      formData,
-      measureHierarchy,
-      batches: buildFactStoreBatchesFromSpecs({ store, specs }),
-    }),
-  );
+  return materializePivotTree(input);
 };
 
 export const materializeInitialPivotTreeFromFactStore = ({
@@ -1252,15 +1246,15 @@ export const materializeInitialPivotTreeFromFactStore = ({
   formData: PivotTableQueryFormData;
 }): PivotTreeData => {
   const { measureHierarchy } = layout;
-  const materializeSpec = (spec: PlannedQuerySpec) =>
-    materializationInputFromSpec({ store, spec, formData, measureHierarchy });
-  const mergedTree = specs.reduce((acc, spec) => {
-    const nextTree = materializePivotTree(materializeSpec(spec));
-    return mergeTrees(acc, nextTree);
-  }, {} as PivotTreeData);
+  const input = materializationInputFromSpecs({
+    store,
+    specs,
+    formData,
+    measureHierarchy,
+  });
+  const mergedTree = input ? materializePivotTree(input) : emptyPivotTree();
   return finalizeInitialPivotTree({
     tree: mergedTree,
-    measureHierarchy,
   });
 };
 
@@ -1279,25 +1273,21 @@ export const materializeInitialPivotTreeFromFactStoreAsync = async ({
   formData: PivotTableQueryFormData;
 } & ChunkedWorkOptions): Promise<PivotTreeData> => {
   const { measureHierarchy } = layout;
-  const materializeSpec = (spec: PlannedQuerySpec) =>
-    materializationInputFromSpec({ store, spec, formData, measureHierarchy });
-  let mergedTree = {} as PivotTreeData;
-  for (let idx = 0; idx < specs.length; idx += 1) {
-    const spec = specs[idx];
-    // eslint-disable-next-line no-await-in-loop
-    const nextTree = await materializePivotTreeAsync({
-      ...materializeSpec(spec),
-      chunkSize,
-      shouldContinue,
-      yieldToMain,
-    });
-    // eslint-disable-next-line no-await-in-loop
-    await yieldChunkedWork({ shouldContinue, yieldToMain });
-    mergedTree = mergeTrees(mergedTree, nextTree);
-  }
-  await yieldChunkedWork({ shouldContinue, yieldToMain });
+  const input = materializationInputFromSpecs({
+    store,
+    specs,
+    formData,
+    measureHierarchy,
+  });
+  const mergedTree = input
+    ? await materializePivotTreeAsync({
+        ...input,
+        chunkSize,
+        shouldContinue,
+        yieldToMain,
+      })
+    : emptyPivotTree();
   return finalizeInitialPivotTree({
     tree: mergedTree,
-    measureHierarchy,
   });
 };
