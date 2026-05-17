@@ -145,7 +145,7 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14478` insertions, `15437` deletions, net `-959`.
+- Production `src`: `14487` insertions, `15482` deletions, net `-995`.
 - Current production TypeScript/TSX total: about `32582` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
@@ -491,6 +491,10 @@ Success criteria:
   a seamless recovery fetch.
 - Resolved query fetch context owns its fact coverages, so branch, batch, and
   signature callers no longer rebuild the same coverage list separately.
+- Branch and batch query-spec construction now share one axis-expansion spec
+  builder. Branch and batch still own their different filters/scopes, but
+  requestability, fetch context, coverage mapping, and spec assembly are no
+  longer duplicated.
 - Expansion planner no longer owns a fetched-depth lookup. It asks a runtime
   coverage predicate whether an axis path is loaded, and the old
   `fetchedRequests.ts` module has been deleted.
