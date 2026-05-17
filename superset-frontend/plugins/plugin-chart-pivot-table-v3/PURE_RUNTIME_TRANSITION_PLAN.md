@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14494` insertions, `15160` deletions, net `-666`.
-- Current production TypeScript/TSX total: about `32844` lines.
+- Production `src`: `14512` insertions, `15220` deletions, net `-708`.
+- Current production TypeScript/TSX total: about `32802` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -541,6 +541,10 @@ Success criteria:
   duplicate top-level sticky-header props.
 - Interaction time-grain context now comes from applied layout `formData`; the
   chart no longer accepts a duplicate top-level time-grain prop.
+- Totals, subtotal levels, and subtotal/total positions now come from applied
+  layout `formData`; `PivotTableChart` no longer forwards that policy into
+  `usePivotLayout`, and `transformProps` no longer exposes duplicate top-level
+  normalized subtotal props.
 
 ## Current Risks
 
