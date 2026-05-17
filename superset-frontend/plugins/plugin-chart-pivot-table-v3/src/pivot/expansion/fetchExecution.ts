@@ -574,7 +574,7 @@ export const runSameAxisExpansionFetchLoop = async ({
     const nodes = axis === 'row' ? currentTree.rows : currentTree.cols;
     const plan = planExpansionForAxis({
       axis,
-      program,
+      program: config.program,
       expandedKeys: resolvedExpanded,
       nodes,
       coverage: { rowDepth: visibleRowDepth, columnDepth: visibleColDepth },

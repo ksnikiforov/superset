@@ -163,7 +163,7 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14379` insertions, `15762` deletions, net `-1383`.
+- Production `src`: `14351` insertions, `15766` deletions, net `-1415`.
 - Current production TypeScript/TSX total: about `32557` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
@@ -593,6 +593,9 @@ Success criteria:
 - Collapsed row and column Values-tier projection now share one
   axis-neutral hook path in `usePivotLayout`, with row/column differences
   passed as policy parameters instead of separate callbacks.
+- `usePivotLayout` no longer wraps render child policy helpers just to re-pass
+  the compiled program. Row/column child assembly now calls the shared policy
+  boundary directly, reducing hook-owned runtime plumbing.
 - Grouped branch batch execution now lives in the branch fetch boundary. The
   standalone batch fetch module has been removed, and branch/batch fetches now
   share one query-spec-to-fact-store materialization path.
@@ -758,6 +761,9 @@ Success criteria:
   or visible cell entries during expansion planning.
 - Same-axis expansion fetch loops now receive the shared visibility config
   directly instead of a hook-owned visible-depth callback.
+- Same-axis expansion planning now consistently uses `config.program`, fixing
+  a runtime path where grouped same-axis expansion could reference an undefined
+  local `program` instead of the compiled runtime program.
 - Expansion coverage-key grouping is now planner-owned and program-derived.
   The hook, hydration loop, and same-axis fetch loop no longer thread a
   `getCoverageKey` callback through expansion boundaries.

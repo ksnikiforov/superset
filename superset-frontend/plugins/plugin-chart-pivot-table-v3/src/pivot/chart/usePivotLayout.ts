@@ -298,24 +298,6 @@ export const usePivotLayout = ({
     [getMetricLabelFromPath, layout.measureHierarchy, metricLabels],
   );
 
-  const getAxisChildrenBeforeSubtotalPolicy = useCallback(
-    (params: {
-      axis: 'row' | 'col';
-      parent: PivotTreeNode;
-      nodes: Record<string, PivotTreeNode>;
-      hideMetricHeader: boolean;
-      keepValuesChild: (
-        child: PivotTreeNode,
-        hasNonValuesChildren: boolean,
-      ) => boolean;
-    }) =>
-      resolveAxisChildrenBeforeSubtotalPolicy({
-        ...params,
-        program: layout.pivotProgram,
-      }),
-    [layout.pivotProgram],
-  );
-
   const getRowSubtotalPosition = useCallback(
     (node: PivotTreeNode) => {
       if (!forceRowSubtotalEnd) {
@@ -331,23 +313,6 @@ export const usePivotLayout = ({
     [forceRowSubtotalEnd, metricLabelSet, resolvedRowSubtotalPosition],
   );
 
-  const getCollapsedValuesNodesForAxis = useCallback(
-    (params: {
-      axis: 'row' | 'col';
-      parent: PivotTreeNode;
-      expandedSet: Set<string>;
-      nodes: Record<string, PivotTreeNode>;
-      suppressSubtotalParent: boolean;
-      normalizeSubtotalExisting: boolean;
-    }) =>
-      resolveCollapsedValuesNodesForAxis({
-        ...params,
-        program: layout.pivotProgram,
-        isLeafTierVisible,
-      }),
-    [isLeafTierVisible, layout.pivotProgram],
-  );
-
   const getCollapsedChildrenForAxis = useCallback(
     (
       axis: 'row' | 'col',
@@ -356,22 +321,25 @@ export const usePivotLayout = ({
       nodes: Record<string, PivotTreeNode>,
     ) => {
       const isRow = axis === 'row';
-      return getCollapsedValuesNodesForAxis({
+      return resolveCollapsedValuesNodesForAxis({
+        program: layout.pivotProgram,
         axis,
         parent,
         expandedSet,
         nodes,
+        isLeafTierVisible,
         suppressSubtotalParent: isRow,
         normalizeSubtotalExisting: !isRow,
       });
     },
-    [getCollapsedValuesNodesForAxis],
+    [isLeafTierVisible, layout.pivotProgram],
   );
 
   const getRowChildrenForNodes = useCallback(
     (parent: PivotTreeNode, nodes: Record<string, PivotTreeNode>) => {
       const rowSubtotalPositionForParent = getRowSubtotalPosition(parent);
-      const filtered = getAxisChildrenBeforeSubtotalPolicy({
+      const filtered = resolveAxisChildrenBeforeSubtotalPolicy({
+        program: layout.pivotProgram,
         axis: 'row',
         parent,
         nodes,
@@ -401,7 +369,6 @@ export const usePivotLayout = ({
     },
     [
       colTotals,
-      getAxisChildrenBeforeSubtotalPolicy,
       getRowSubtotalPosition,
       hideMetricHeaderOnRows,
       isMetricGrandTotalNode,
@@ -414,7 +381,8 @@ export const usePivotLayout = ({
 
   const getColChildrenForNodes = useCallback(
     (parent: PivotTreeNode, nodes: Record<string, PivotTreeNode>) =>
-      getAxisChildrenBeforeSubtotalPolicy({
+      resolveAxisChildrenBeforeSubtotalPolicy({
+        program: layout.pivotProgram,
         axis: 'col',
         parent,
         nodes,
@@ -425,10 +393,10 @@ export const usePivotLayout = ({
             isMetricSubtotalNode(child)),
       }),
     [
-      getAxisChildrenBeforeSubtotalPolicy,
       hideMetricHeaderOnCols,
       isMetricGrandTotalNode,
       isMetricSubtotalNode,
+      layout.pivotProgram,
       normalizedColSubtotalLevels.length,
     ],
   );
