@@ -26,7 +26,10 @@ import {
 import { getFormattingMetricKey } from '../metrics';
 import { serializeCellKey } from '../core/path';
 import { type VisibleCellEntry } from '../cellUtils';
-import { createMetricNodePolicy } from '../metricsTotals';
+import {
+  createMetricNodePolicy,
+  isExplicitSubtotalNode,
+} from '../metricsTotals';
 import type { PivotProgram } from '../runtime/types';
 
 export type DatabarScaleBounds = {
@@ -86,7 +89,6 @@ export type BuildDatabarRuntimeModelParams = {
   pivotProgram: PivotProgram;
   deriveMetricKey: (rowNode: PivotTreeNode, colNode: PivotTreeNode) => string;
   getNodeDimDepth: (node: PivotTreeNode) => number;
-  isExplicitSubtotalNode: (node: PivotTreeNode) => boolean;
   shouldHideRowValues: (rowNode: PivotTreeNode) => boolean;
   resolveMetricD3Format: (
     metricKey: string,
@@ -186,7 +188,6 @@ export const buildDatabarRuntimeModel = ({
   pivotProgram,
   deriveMetricKey,
   getNodeDimDepth,
-  isExplicitSubtotalNode,
   shouldHideRowValues,
   resolveMetricD3Format,
   renderValue,

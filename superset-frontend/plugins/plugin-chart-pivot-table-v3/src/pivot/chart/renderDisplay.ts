@@ -53,7 +53,6 @@ import { type PivotLayoutResult } from './usePivotLayout';
 export type ColumnDisplayConfig = {
   program: PivotProgram;
   allowMetricSubtotalLabels: boolean;
-  isExplicitSubtotalNode: (node: PivotTreeNode) => boolean;
   getMetricDisplayLabelForKey: (metricKey: string) => string;
   isExpanded?: (node: PivotTreeNode) => boolean;
 };
@@ -66,7 +65,6 @@ export const buildColumnDisplayPath = (
   const {
     program,
     allowMetricSubtotalLabels,
-    isExplicitSubtotalNode,
     getMetricDisplayLabelForKey,
     isExpanded,
   } = config;

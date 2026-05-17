@@ -30,7 +30,6 @@ import { decodeMetricKey } from '../core/tokens';
 import { buildLayoutContext } from '../layout/LayoutContext';
 import type { PivotProgram } from '../runtime/types';
 import type { RenderModelConfig } from '../render/renderModel';
-import { isExplicitSubtotalNode } from '../metricsTotals';
 import { pruneStaleCollapsedAxis } from './pruneCollapsedAxis';
 import {
   buildMetricOrderComparator,
@@ -59,7 +58,6 @@ export type PivotLayoutResult = {
   hideMetricHeaderOnRows: boolean;
   compareMetricOrder: (a: PivotTreeNode, b: PivotTreeNode) => number;
   getMetricDisplayLabelForKey: (metricKey: string) => string;
-  isExplicitSubtotalNode: (node?: PivotTreeNode) => boolean;
   getRowSubtotalPosition: (node: PivotTreeNode) => TotalPosition;
   buildRenderModelConfig: (params: {
     tree: PivotTreeData;
@@ -447,7 +445,6 @@ export const usePivotLayout = ({
     hideMetricHeaderOnRows,
     compareMetricOrder,
     getMetricDisplayLabelForKey,
-    isExplicitSubtotalNode,
     getRowSubtotalPosition,
     buildRenderModelConfig,
     pruneMergedTree,

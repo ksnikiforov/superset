@@ -31,6 +31,7 @@ import type { PivotProgram } from './runtime/types';
 import {
   createMetricNodePolicy,
   getMetricLabelFromPath,
+  isExplicitSubtotalNode,
 } from './metricsTotals';
 
 type DeriveMetricKeyParams = {
@@ -107,7 +108,6 @@ type ShouldHideRowValuesParams = {
   expandedRows: Set<string>;
   countDimDepth: (path: PivotTreeNode['path']) => number;
   rowSubtotalLevels: number[];
-  isExplicitSubtotalNode: (node?: PivotTreeNode) => boolean;
 };
 
 export const shouldHideRowValues = ({
@@ -118,7 +118,6 @@ export const shouldHideRowValues = ({
   expandedRows,
   countDimDepth,
   rowSubtotalLevels,
-  isExplicitSubtotalNode,
 }: ShouldHideRowValuesParams) => {
   if (!rowSubTotals || effectiveRowSubtotalPosition !== 'end') {
     return false;

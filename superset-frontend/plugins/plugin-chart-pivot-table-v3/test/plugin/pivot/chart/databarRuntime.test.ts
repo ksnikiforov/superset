@@ -64,7 +64,6 @@ const baseParams = {
   themeSizeUnit: 4,
   pivotProgram: compilePivotProgram({ metrics: ['m1', 'm2'] }),
   getNodeDimDepth: (rowNode: PivotTreeNode) => rowNode.path.length,
-  isExplicitSubtotalNode: () => false,
   shouldHideRowValues: () => false,
   resolveMetricD3Format: () => undefined,
   renderValue: (_metricKey: string, value: unknown) => String(value),

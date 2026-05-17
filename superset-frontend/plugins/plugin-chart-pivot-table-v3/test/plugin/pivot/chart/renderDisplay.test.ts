@@ -62,8 +62,6 @@ const treeFromNodes = ({
 
 const baseDisplayConfig = {
   allowMetricSubtotalLabels: true,
-  isExplicitSubtotalNode: (candidate: PivotTreeNode) =>
-    candidate.path.some(value => value === SUBTOTAL_TOKEN),
   getMetricKeyFromPath: (path: PivotTreeNode['path']) =>
     path
       .map(value =>

@@ -38,7 +38,10 @@ import { getFormattingMetricKey } from '../metrics';
 import { buildRenderModel, type RenderModel } from '../render/renderModel';
 import { resolveAxisProjection } from '../runtime/projection';
 import { resolveMeasureSortMetricKey } from '../measureLeaves';
-import { createMetricNodePolicy } from '../metricsTotals';
+import {
+  createMetricNodePolicy,
+  isExplicitSubtotalNode,
+} from '../metricsTotals';
 import { compareValues, rootKey, sortByOrder } from '../viewModel';
 import { type PivotLayoutResult } from './usePivotLayout';
 import {
@@ -282,11 +285,11 @@ export const usePivotRenderModel = ({
       }
       const subtotalOrder =
         Number(
-          layout.isExplicitSubtotalNode(a) ||
+          isExplicitSubtotalNode(a) ||
             (pushMetricTotalsToEnd && isMetricGrandTotalNode(a)),
         ) -
         Number(
-          layout.isExplicitSubtotalNode(b) ||
+          isExplicitSubtotalNode(b) ||
             (pushMetricTotalsToEnd && isMetricGrandTotalNode(b)),
         );
       if (subtotalOrder !== 0) {
@@ -358,7 +361,6 @@ export const usePivotRenderModel = ({
         allowMetricSubtotalLabels: layout.normalizedColSubtotalLevels.some(
           level => level > 0,
         ),
-        isExplicitSubtotalNode: layout.isExplicitSubtotalNode,
         getMetricDisplayLabelForKey: layout.getMetricDisplayLabelForKey,
         isExpanded: node => expandedCols.has(node.key),
       }),

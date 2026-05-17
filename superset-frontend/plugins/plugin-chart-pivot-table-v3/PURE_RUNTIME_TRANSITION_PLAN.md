@@ -163,7 +163,7 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14283` insertions, `15787` deletions, net `-1504`.
+- Production `src`: `14282` insertions, `15792` deletions, net `-1510`.
 - Current production TypeScript/TSX total: about `32557` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
@@ -801,6 +801,9 @@ Success criteria:
 - Render node display state now uses the materialized explicit-subtotal token
   predicate directly instead of receiving that semantic predicate through
   `PivotLayoutResult`.
+- `PivotLayoutResult` no longer exports the explicit-subtotal predicate.
+  Formatting, databar, render display, and render sorting use the canonical
+  materialized subtotal-token predicate directly.
 
 ## Current Risks
 

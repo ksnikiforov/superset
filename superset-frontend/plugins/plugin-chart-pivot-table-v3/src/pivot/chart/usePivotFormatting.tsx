@@ -845,7 +845,6 @@ export const usePivotFormatting = ({
         expandedRows,
         countDimDepth: metricNodePolicy.countDimDepth,
         rowSubtotalLevels: layout.normalizedRowSubtotalLevels,
-        isExplicitSubtotalNode: layout.isExplicitSubtotalNode,
       }),
     [expandedRows, layout, metricNodePolicy, rowSubTotals],
   );
@@ -874,7 +873,6 @@ export const usePivotFormatting = ({
         pivotProgram: layout.layout.pivotProgram,
         deriveMetricKey,
         getNodeDimDepth,
-        isExplicitSubtotalNode: layout.isExplicitSubtotalNode,
         shouldHideRowValues,
         resolveMetricD3Format,
         renderValue,
@@ -886,7 +884,6 @@ export const usePivotFormatting = ({
       expandedRows,
       getNodeDimDepth,
       isRowTotalAtStart,
-      layout.isExplicitSubtotalNode,
       layout.layout.pivotProgram,
       metricDatabars,
       metricsForScale,
