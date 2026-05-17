@@ -26,10 +26,8 @@ import {
   resolveInteractionFormData,
 } from '../../../../src/pivot/layout/resolveInteractionLayout';
 import { getStableColumnKey } from '../../../../src/utils';
-import {
-  getMetricKeys,
-  METRICS_PLACEHOLDER,
-} from '../../../../src/pivot/core/tokens';
+import { METRICS_PLACEHOLDER } from '../../../../src/pivot/core/tokens';
+import { getMetricKeys } from '../../../../src/pivot/metrics';
 import {
   MetricsLayoutEnum,
   PivotRuntimeLayout,

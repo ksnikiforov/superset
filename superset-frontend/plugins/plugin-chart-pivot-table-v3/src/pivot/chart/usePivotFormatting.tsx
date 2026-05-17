@@ -57,12 +57,8 @@ import {
   parseThemeColors,
   PIVOT_THEME_PRESETS,
 } from '../../utils';
-import {
-  SUBTOTAL_LABEL,
-  getFormattingMetricKey,
-  getMetricKey,
-  isSubtotalToken,
-} from '../core/tokens';
+import { SUBTOTAL_LABEL, isSubtotalToken } from '../core/tokens';
+import { getFormattingMetricKey, getMetricKey } from '../metrics';
 import { serializeCellKey, serializePath } from '../core/path';
 import { formatMetricValue, rootKey } from '../viewModel';
 import { buildMeasureLeafOutputKey, isValueLeaf } from '../measureLeaves';

@@ -27,11 +27,8 @@ import {
   type TotalPosition,
 } from '../../types';
 import { resolveMetricDisplayLabel, getStableColumnKey } from '../../utils';
-import {
-  getMetricKey,
-  isMetricTokenForKeys,
-  isSubtotalToken,
-} from '../core/tokens';
+import { isMetricTokenForKeys, isSubtotalToken } from '../core/tokens';
+import { getMetricKey } from '../metrics';
 import { buildLayoutContext } from '../layout/LayoutContext';
 import { getValuesLevelIndex } from '../runtime/projection';
 import type { PivotProgram } from '../runtime/types';

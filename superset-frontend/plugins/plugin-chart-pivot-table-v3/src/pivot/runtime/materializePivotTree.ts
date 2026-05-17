@@ -39,11 +39,11 @@ import {
   decodeMetricKey,
   encodeMeasureLeafKey,
   encodeMetricKey,
-  getMetricKeys,
   isSubtotalToken,
   SUBTOTAL_LABEL,
   SUBTOTAL_TOKEN,
 } from '../core/tokens';
+import { getMetricKeys } from '../metrics';
 import {
   buildMeasureLeafOutputKey,
   buildValueLeaf,

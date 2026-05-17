@@ -84,7 +84,7 @@ import {
   normalizeMetricDatabarMapWithKeys,
   normalizeMetricFormattingMapWithKeys,
 } from '../../utils';
-import { getFormattingMetricKey, getMetricKey } from '../../pivot/core/tokens';
+import { getFormattingMetricKey, getMetricKey } from '../../pivot/metrics';
 import {
   buildBuiltInLeaf,
   buildCustomLeaf,

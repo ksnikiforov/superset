@@ -27,11 +27,8 @@ import {
   PivotTableQueryFormData,
 } from '../../types';
 import { getStableColumnKey } from '../../utils';
-import {
-  METRICS_PLACEHOLDER,
-  getMetricKey,
-  getMetricKeys,
-} from '../core/tokens';
+import { METRICS_PLACEHOLDER } from '../core/tokens';
+import { getMetricKey, getMetricKeys } from '../metrics';
 import { coerceMeasureLeavesByMetric } from '../measureLeaves';
 import {
   compilePivotProgram,

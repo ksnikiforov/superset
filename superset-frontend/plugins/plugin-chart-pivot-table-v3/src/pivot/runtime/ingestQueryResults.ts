@@ -23,7 +23,7 @@ import {
   type QueryFormMetric,
 } from '@superset-ui/core';
 import { type PivotTableQueryFormData, type PivotTreeData } from '../../types';
-import { getMetricKeys } from '../core/tokens';
+import { getMetricKeys } from '../metrics';
 import { type LayoutContext } from '../layout/LayoutContext';
 import { type PlannedQuerySpec } from '../query/specs';
 import { type PivotFactCoverage } from './types';

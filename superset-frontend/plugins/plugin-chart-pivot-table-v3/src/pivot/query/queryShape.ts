@@ -34,7 +34,7 @@ import {
   collectMetricFormattingMetricsForQuery,
   mergeMetrics,
 } from '../../utils';
-import { getMetricKey } from '../core/tokens';
+import { getMetricKey } from '../metrics';
 
 export type QueryIntent = {
   kind: 'branch' | 'wholeLevel' | 'totalsOnly';

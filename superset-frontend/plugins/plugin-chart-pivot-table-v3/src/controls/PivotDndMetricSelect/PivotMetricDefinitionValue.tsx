@@ -74,7 +74,7 @@ import {
   buildMetricLabelMap,
   resolveMetricDisplayLabel,
 } from '../../utils';
-import { getFormattingMetricKey, getMetricKey } from '../../pivot/core/tokens';
+import { getFormattingMetricKey, getMetricKey } from '../../pivot/metrics';
 import {
   isPivotExcelFormula,
   normalizePivotExcelFormula,

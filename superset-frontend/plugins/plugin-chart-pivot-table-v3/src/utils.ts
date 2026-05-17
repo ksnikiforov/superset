@@ -50,12 +50,12 @@ import {
   isPivotExcelFormula,
   normalizePivotExcelFormula,
 } from './pivot/formatting/excelFormulaReferences';
+import { isMetricsPlaceholder } from './pivot/core/tokens';
 import {
   getFormattingMetricKey,
   getMetricKey,
   getMetricKeys,
-  isMetricsPlaceholder,
-} from './pivot/core/tokens';
+} from './pivot/metrics';
 
 export const PIVOT_THEME_PRESETS: Record<string, string> = {
   blue: supersetTheme.colorPrimaryBg,

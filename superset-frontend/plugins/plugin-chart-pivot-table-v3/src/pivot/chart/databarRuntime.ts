@@ -23,7 +23,7 @@ import {
   type PivotTreeData,
   type PivotTreeNode,
 } from '../../types';
-import { getFormattingMetricKey } from '../core/tokens';
+import { getFormattingMetricKey } from '../metrics';
 import { serializeCellKey } from '../core/path';
 import { type VisibleCellEntry } from '../cellUtils';
 

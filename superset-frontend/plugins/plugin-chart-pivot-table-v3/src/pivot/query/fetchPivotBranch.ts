@@ -24,7 +24,7 @@ import {
   type PivotTreeData,
 } from '../../types';
 import { type ChartDataWarning } from '../data/ChartDataClient';
-import { getMetricKeys } from '../core/tokens';
+import { getMetricKeys } from '../metrics';
 import { parsePath } from '../core/path';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import {

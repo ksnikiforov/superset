@@ -33,7 +33,7 @@ import {
   normalizeSubtotalLevels,
   resolveExpandLevel,
 } from '../../utils';
-import { getMetricKeys } from '../core/tokens';
+import { getMetricKeys } from '../metrics';
 import {
   coerceMeasureLeavesByMetric,
   collectRequiredTimeOffsets,

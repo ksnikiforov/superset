@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14487` insertions, `15382` deletions, net `-895`.
-- Current production TypeScript/TSX total: about `32615` lines.
+- Production `src`: `14546` insertions, `15433` deletions, net `-887`.
+- Current production TypeScript/TSX total: about `32623` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -619,6 +619,10 @@ Success criteria:
   predicate. Reinitialization, metric-pattern expansion, and same-axis merge
   preservation all use canonical encoded metric tokens checked against
   `metricLabelSet`.
+- `pivot/core/tokens.ts` is token-only again. Metric identity helpers
+  (`getMetricKey`, `getMetricKeys`, `getFormattingMetricKey`) now live in
+  `pivot/metrics.ts`, so placeholder/runtime token ownership is not mixed with
+  source metric metadata extraction.
 
 ## Current Risks
 

@@ -24,7 +24,7 @@ import {
   MeasureLeavesByMetricKey,
   MeasureHierarchy,
 } from '../types';
-import { getMetricKey } from './core/tokens';
+import { getMetricKey } from './metrics';
 
 export const MEASURE_CALC_PREFIX = '__calc__';
 

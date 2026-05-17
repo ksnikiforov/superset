@@ -34,7 +34,7 @@ import {
   mergeMetrics,
   coerceEpochMsStringToNumber,
 } from './utils';
-import { getMetricKeys, getMetricKey } from './pivot/core/tokens';
+import { getMetricKeys, getMetricKey } from './pivot/metrics';
 import { buildLayoutContext } from './pivot/layout/LayoutContext';
 import { resolveInteractionFormData } from './pivot/layout/resolveInteractionLayout';
 import { normalizeFormDataExtraFilters } from './pivot/query/normalizeExtraFormData';

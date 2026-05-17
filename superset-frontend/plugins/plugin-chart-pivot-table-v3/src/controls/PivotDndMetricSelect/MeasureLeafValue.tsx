@@ -42,7 +42,7 @@ import {
   DEFAULT_DATABAR_NEGATIVE_COLOR,
   DEFAULT_DATABAR_POSITIVE_COLOR,
 } from '../../utils';
-import { getFormattingMetricKey, getMetricKey } from '../../pivot/core/tokens';
+import { getFormattingMetricKey, getMetricKey } from '../../pivot/metrics';
 import {
   MeasureLeafSpec,
   MetricFormattingField,

@@ -56,7 +56,7 @@ import {
   PivotRuntimeLayout,
 } from '../../types';
 import { getStableColumnKey, resolveMetricDisplayLabel } from '../../utils';
-import { getMetricKey } from '../core/tokens';
+import { getMetricKey } from '../metrics';
 import { isValueLeaf } from '../measureLeaves';
 import { INTERACTION_DIMENSION_DND_TYPE } from '../layout/interactionDrag';
 import { normalizeRuntimeLayout } from '../layout/resolveInteractionLayout';

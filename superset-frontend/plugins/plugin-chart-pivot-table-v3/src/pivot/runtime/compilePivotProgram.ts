@@ -23,11 +23,11 @@ import {
 } from '@superset-ui/core';
 import { MetricsLayoutEnum, type PivotAxis } from '../../types';
 import {
-  getMetricKey,
   isMetricsPlaceholder,
   METRICS_PLACEHOLDER,
   normalizePlaceholder,
 } from '../core/tokens';
+import { getMetricKey } from '../metrics';
 import type {
   PivotAxisProgram,
   PivotColumnRef,

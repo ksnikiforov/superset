@@ -53,7 +53,7 @@ import { buildTreeDimensionFilterValues } from './pivot/filters';
 import { useDimensionFilterValues } from './pivot/chart/useDimensionFilterValues';
 import { buildInteractionChips } from './pivot/layout/interactionDrag';
 import { getStableColumnKey } from './utils';
-import { getMetricKeys } from './pivot/core/tokens';
+import { getMetricKeys } from './pivot/metrics';
 import { useSyncRef } from './pivot/shared/useSyncRef';
 import {
   buildSeamlessRuntimeUpstreamSignature,

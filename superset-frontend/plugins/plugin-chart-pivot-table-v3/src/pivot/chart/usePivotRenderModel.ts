@@ -33,7 +33,8 @@ import {
 import { buildFormattingValueMaps } from '../cellUtils';
 import { normalizeDimensionSortingMapWithKeys } from '../../utils';
 import { serializeCellKey, serializePath } from '../core/path';
-import { getFormattingMetricKey, isSubtotalToken } from '../core/tokens';
+import { isSubtotalToken } from '../core/tokens';
+import { getFormattingMetricKey } from '../metrics';
 import { buildRenderModel, type RenderModel } from '../render/renderModel';
 import { resolveAxisProjection } from '../runtime/projection';
 import { resolveMeasureSortMetricKey } from '../measureLeaves';
