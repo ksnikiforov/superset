@@ -729,12 +729,13 @@ type ExpansionReinitAxis = {
   changed: boolean;
   includeMetricDepth: boolean;
   tree: PivotTreeData;
-  metricLabelSet: Set<string>;
+  program: PivotProgram;
   countDimDepth: (path: PivotTreeNode['path']) => number;
   hasNewData: boolean;
 };
 
 const resolveExpansionCacheAxis = (config: ExpansionReinitAxis) => {
+  const metricLabelSet = new Set(config.program.metricKeys);
   const shouldClearCache =
     config.level > 0 &&
     (config.prevLevel === null || config.prevLevel === 0) &&
@@ -748,7 +749,7 @@ const resolveExpansionCacheAxis = (config: ExpansionReinitAxis) => {
           keys: manualKeys,
           collapsedKeys,
           nodes: config.nodes,
-          metricLabelSet: config.metricLabelSet,
+          metricLabelSet,
           includeMetricDepthZero: config.expandMetric,
         })
       : { keys: manualKeys, collapsedKeys };
@@ -758,7 +759,7 @@ const resolveExpansionCacheAxis = (config: ExpansionReinitAxis) => {
       expanded,
       nodes: config.nodes,
       stablePrefix: config.stablePrefix,
-      metricLabelSet: config.metricLabelSet,
+      metricLabelSet,
       includeMetricDepth: config.includeMetricDepth,
     });
   const prunedManualKeys = shouldPrune
@@ -777,7 +778,7 @@ const resolveExpansionCacheAxis = (config: ExpansionReinitAxis) => {
     const depth =
       config.countDimDepth(path) +
       (config.includeMetricDepth &&
-      path.some(value => isMetricTokenForKeys(value, config.metricLabelSet))
+      path.some(value => isMetricTokenForKeys(value, metricLabelSet))
         ? 1
         : 0);
     return depth <= config.stablePrefix;
@@ -786,7 +787,7 @@ const resolveExpansionCacheAxis = (config: ExpansionReinitAxis) => {
     axis: config.axis,
     tree: config.tree,
     autoExpandLevel: config.desiredLevel,
-    metricLabelSet: config.metricLabelSet,
+    program: config.program,
     includeMetricDepthZero: config.expandMetric,
     manualExpanded: new Set(prunedManualKeys),
     manualCollapsed: new Set(prunedCollapsedKeys),
@@ -838,7 +839,7 @@ export const resolveReinitializedExpansionState = (params: {
     metricIndexForCols < params.program.columnDimensions.length;
   const common = {
     tree,
-    metricLabelSet: new Set(params.program.metricKeys),
+    program: params.program,
     countDimDepth: params.countDimDepth,
     hasNewData: params.hasNewData,
   };

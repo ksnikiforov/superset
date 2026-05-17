@@ -730,7 +730,7 @@ export const useExpansionEngine = ({
         axis,
         tree: nextTree,
         autoExpandLevel,
-        metricLabelSet,
+        program: pivotProgram,
         includeMetricDepthZero: shouldAutoExpandValuesLevel(
           pivotProgram,
           axis,
@@ -749,7 +749,7 @@ export const useExpansionEngine = ({
         inFlightKeys: collectInFlightExpansion(axis),
       });
     },
-    [collectInFlightExpansion, metricLabelSet, pivotProgram],
+    [collectInFlightExpansion, pivotProgram],
   );
 
   const computeVisibleDepths = useCallback(

@@ -27,6 +27,7 @@ import { decodeMetricKey, isSubtotalToken } from '../core/tokens';
 import { parsePath, serializePath } from '../core/path';
 import { countDimDepth } from '../metricsTotals';
 import { rootKey } from '../viewModel';
+import type { PivotProgram } from '../runtime/types';
 
 export type PivotExpansionStateKeys = {
   rowKeys: string[];
@@ -125,7 +126,7 @@ export const buildDesiredExpandedKeys = ({
   axis,
   tree,
   autoExpandLevel,
-  metricLabelSet,
+  program,
   includeMetricDepthZero,
   manualExpanded,
   manualCollapsed,
@@ -135,7 +136,7 @@ export const buildDesiredExpandedKeys = ({
   axis: PivotAxis;
   tree: PivotTreeData;
   autoExpandLevel: number;
-  metricLabelSet: Set<string>;
+  program: PivotProgram;
   includeMetricDepthZero: boolean;
   manualExpanded: Set<string>;
   manualCollapsed: Set<string>;
@@ -146,7 +147,7 @@ export const buildDesiredExpandedKeys = ({
   const autoSeeded = seedExpandedByLevel(
     nodes,
     autoExpandLevel,
-    metricLabelSet,
+    new Set(program.metricKeys),
     { includeMetricDepthZero },
   );
   const next = new Set<string>([

@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14556` insertions, `15438` deletions, net `-882`.
-- Current production TypeScript/TSX total: about `32628` lines.
+- Production `src`: `14559` insertions, `15439` deletions, net `-880`.
+- Current production TypeScript/TSX total: about `32630` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -657,6 +657,9 @@ Success criteria:
   metric-label-set input from the hook. Visibility config owns only visible
   depth, fetchability, and render-model policy; reinitialization derives metric
   token authority from `PivotProgram`.
+- Desired expansion seeding now also receives `PivotProgram` instead of a
+  caller-built metric label set, keeping auto-expanded Values-tier behavior
+  tied to the compiled runtime program.
 
 ## Current Risks
 
