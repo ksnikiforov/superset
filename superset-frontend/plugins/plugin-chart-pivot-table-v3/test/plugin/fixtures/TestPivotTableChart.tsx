@@ -364,21 +364,10 @@ const baseProps: PivotTableProps & LegacyTestPivotProps = {
 type TestPivotTableChartProps = Partial<PivotTableProps & LegacyTestPivotProps>;
 
 export default function TestPivotTableChart(props: TestPivotTableChartProps) {
-  const sourceFormData = props.formData ?? baseProps.formData;
-  const mergedFormData: PivotTableQueryFormData = {
-    ...sourceFormData,
-    metrics: props.metrics ?? sourceFormData.metrics,
-    groupbyRows: props.groupbyRows ?? sourceFormData.groupbyRows,
-    groupbyColumns: props.groupbyColumns ?? sourceFormData.groupbyColumns,
-    valueFormat: props.valueFormat ?? sourceFormData.valueFormat,
-    columnFormats: props.columnFormats ?? sourceFormData.columnFormats,
-    currencyFormats: props.currencyFormats ?? sourceFormData.currencyFormats,
-    allowRenderHtml: props.allowRenderHtml ?? sourceFormData.allowRenderHtml,
-  };
   const mergedProps: PivotTableProps & LegacyTestPivotProps = {
     ...baseProps,
     ...props,
-    formData: mergedFormData,
+    formData: props.formData ?? baseProps.formData,
     rawFormData: props.rawFormData ?? props.formData ?? baseProps.rawFormData,
     datasource: props.datasource ?? baseProps.datasource,
     rawDatasource: props.rawDatasource ?? baseProps.rawDatasource,

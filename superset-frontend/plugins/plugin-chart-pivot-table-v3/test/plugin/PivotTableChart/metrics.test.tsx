@@ -1369,6 +1369,12 @@ describe('PivotTableChart metric tier suppression', () => {
           height: 300,
           width: 400,
           margin: 0,
+          columnFormats: {
+            [metricKey]: '.2f',
+            [secondaryMetric]: ',d',
+            [customMetricKey]: '.0%',
+          },
+          currencyFormats: {},
         })}
         metrics={[metricKey, secondaryMetric]}
         groupbyRows={[]}
