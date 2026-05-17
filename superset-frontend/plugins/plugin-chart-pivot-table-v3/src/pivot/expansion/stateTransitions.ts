@@ -39,7 +39,7 @@ import {
   type PivotExpansionStateKeys,
 } from './stateModel';
 import {
-  buildRenderModel,
+  buildRenderModelAxes,
   type RenderModelConfig,
 } from '../render/renderModel';
 import { rootKey } from '../viewModel';
@@ -673,7 +673,7 @@ export const computeVisibleDepths = ({
   expandedCols: Set<string>;
   config: ExpansionVisibilityConfig;
 }): { visibleRowDepth: number; visibleColDepth: number } => {
-  const renderModel = buildRenderModel({
+  const { visibleRows, visibleCols } = buildRenderModelAxes({
     tree,
     expandedRows,
     expandedCols,
@@ -683,11 +683,11 @@ export const computeVisibleDepths = ({
   return {
     visibleRowDepth: Math.max(
       0,
-      ...renderModel.visibleRows.map(row => countDimDepth(row.path)),
+      ...visibleRows.map(row => countDimDepth(row.path)),
     ),
     visibleColDepth: Math.max(
       0,
-      ...renderModel.visibleCols.map(col => countDimDepth(col.path)),
+      ...visibleCols.map(col => countDimDepth(col.path)),
     ),
   };
 };
@@ -1353,7 +1353,7 @@ export const buildVisiblePersistedExpansionState = ({
   visibleCollapsedCols: Set<string>;
 } => {
   const visibleKeys = collectVisibleExpansionKeys(
-    buildRenderModel({
+    buildRenderModelAxes({
       tree,
       expandedRows,
       expandedCols,

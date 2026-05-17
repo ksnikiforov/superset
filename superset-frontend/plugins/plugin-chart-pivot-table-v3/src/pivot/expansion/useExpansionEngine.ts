@@ -64,7 +64,7 @@ import {
 import {
   addAncestors,
   buildVisiblePersistedExpansionState,
-  computeVisibleDepths as computeVisibleDepthsBase,
+  computeVisibleDepths,
   mergeSameAxisExpansionTree,
   planInitialHydrationPrefetch,
   resolveCollapsedExpansionState,
@@ -724,17 +724,6 @@ export const useExpansionEngine = ({
     [collectInFlightExpansion, pivotProgram],
   );
 
-  const computeVisibleDepths = useCallback(
-    (nextRows: Set<string>, nextCols: Set<string>, nextTree: PivotTreeData) =>
-      computeVisibleDepthsBase({
-        tree: nextTree,
-        expandedRows: nextRows,
-        expandedCols: nextCols,
-        config: visibilityConfig,
-      }),
-    [visibilityConfig],
-  );
-
   const buildFetchRuntime = useCallback(
     (requestScope: LatestRequestScope): ExpansionFetchRuntime => ({
       requestScope,
@@ -789,8 +778,8 @@ export const useExpansionEngine = ({
           getDataEpoch: () => dataEpochRef.current,
           getExpandedRows: () => expandedRowsRef.current,
           getExpandedCols: () => expandedColsRef.current,
-          computeVisibleDepths,
           getMissingExpansionCoverage,
+          config: visibilityConfig,
           getCoverageKey,
           program: pivotProgram,
           fetchRuntime: buildFetchRuntime(requestScope),
@@ -834,7 +823,6 @@ export const useExpansionEngine = ({
     },
     [
       buildFetchRuntime,
-      computeVisibleDepths,
       commitExpansionState,
       expansionRequestHelpers.buildRequestGroupId,
       expansionRequestLifecycle,
@@ -845,6 +833,7 @@ export const useExpansionEngine = ({
       pruneMergedTree,
       resolveExpandedForMetrics,
       trackInFlightExpansion,
+      visibilityConfig,
     ],
   );
 
@@ -983,11 +972,12 @@ export const useExpansionEngine = ({
         axis === 'row' ? explicitExpandedRowsRef : explicitExpandedColsRef;
       const manualCollapsedRef =
         axis === 'row' ? explicitCollapsedRowsRef : explicitCollapsedColsRef;
-      const { visibleRowDepth, visibleColDepth } = computeVisibleDepths(
-        expandedRowsRef.current,
-        expandedColsRef.current,
-        treeRef.current,
-      );
+      const { visibleRowDepth, visibleColDepth } = computeVisibleDepths({
+        tree: treeRef.current,
+        expandedRows: expandedRowsRef.current,
+        expandedCols: expandedColsRef.current,
+        config: visibilityConfig,
+      });
       const toggleDecision = resolveExpansionToggleDecision({
         axis,
         node,
@@ -1026,7 +1016,6 @@ export const useExpansionEngine = ({
     [
       collapseNode,
       commitExpansionState,
-      computeVisibleDepths,
       expansionRequestLifecycle,
       expandSameAxis,
       hasOtherAxisInFlight,
@@ -1034,6 +1023,7 @@ export const useExpansionEngine = ({
       reportAsyncError,
       clearLoadingState,
       setHydratingState,
+      visibilityConfig,
     ],
   );
 

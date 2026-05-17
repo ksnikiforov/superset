@@ -40,6 +40,11 @@ export type RenderModel = {
   showRowRoot: boolean;
 };
 
+export type RenderModelAxes = Pick<
+  RenderModel,
+  'visibleRows' | 'visibleCols' | 'showRowRoot'
+>;
+
 export type RenderModelConfig = {
   normalizedRowSubtotalLevels: number[];
   normalizedColSubtotalLevels: number[];
@@ -70,12 +75,12 @@ export type RenderModelInput = {
   config: RenderModelConfig;
 };
 
-export const buildRenderModel = ({
+export const buildRenderModelAxes = ({
   tree,
   expandedRows,
   expandedCols,
   config,
-}: RenderModelInput): RenderModel => {
+}: RenderModelInput): RenderModelAxes => {
   const groupbyRowsLength = config.pivotProgram.rowDimensions.length;
   const groupbyColumnsLength = config.pivotProgram.columnDimensions.length;
   const showRowRootBase =
@@ -138,6 +143,22 @@ export const buildRenderModel = ({
       visibleCols = withoutRoot.length > 0 ? withoutRoot : visibleCols;
     }
   }
+
+  return { visibleRows, visibleCols, showRowRoot };
+};
+
+export const buildRenderModel = ({
+  tree,
+  expandedRows,
+  expandedCols,
+  config,
+}: RenderModelInput): RenderModel => {
+  const { visibleRows, visibleCols, showRowRoot } = buildRenderModelAxes({
+    tree,
+    expandedRows,
+    expandedCols,
+    config,
+  });
 
   const columnHeaderRows = buildColumnHeaderRows(
     visibleCols,

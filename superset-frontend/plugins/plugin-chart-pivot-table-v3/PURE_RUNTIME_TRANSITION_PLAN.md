@@ -163,7 +163,7 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14337` insertions, `15534` deletions, net `-1197`.
+- Production `src`: `14363` insertions, `15552` deletions, net `-1189`.
 - Current production TypeScript/TSX total: about `32557` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
@@ -285,10 +285,11 @@ Immediate policy:
 - Expansion requestability authority is the compiled runtime policy:
 
   ```ts
-  program.canRequestExpansion(axis, semanticPath)
+  program.canRequestExpansion(axis, semanticPath);
   ```
 
   or an equivalent `PivotProgram`-derived function. This is the selected model.
+
 - Query requestability belongs at the compiled runtime-policy level, not at the
   rendered-node level. The preferred shape is
   `program.canRequestExpansion(axis, semanticPath)` or an equivalent
@@ -744,6 +745,11 @@ Success criteria:
 - Same-axis expansion merge preservation also derives Values-at-end behavior
   from `PivotProgram`; the hook no longer decides metric-child preservation
   from layout placement.
+- Expansion visibility planning now consumes `buildRenderModelAxes`, the same
+  visible-axis policy used by the render model, without building column headers
+  or visible cell entries during expansion planning.
+- Same-axis expansion fetch loops now receive the shared visibility config
+  directly instead of a hook-owned visible-depth callback.
 
 ## Current Risks
 

@@ -46,7 +46,12 @@ import {
 } from '../runtime/requestLifecycle';
 import { type PivotExpansionCoverageDiff } from '../runtime/coverage';
 import { stableStringify } from '../shared/stableStringify';
-import { applyExpansionFetchDelta, runHydrationLoop } from './stateTransitions';
+import {
+  applyExpansionFetchDelta,
+  computeVisibleDepths,
+  runHydrationLoop,
+  type ExpansionVisibilityConfig,
+} from './stateTransitions';
 import {
   buildGroupedFetchTargets,
   type ExpansionFetchTarget,
@@ -483,11 +488,6 @@ export type SameAxisExpansionFetchLoopResult =
       status: 'stale';
     };
 
-type SameAxisVisibleDepths = {
-  visibleRowDepth: number;
-  visibleColDepth: number;
-};
-
 export const runSameAxisExpansionFetchLoop = async ({
   axis,
   baseExpanded,
@@ -499,8 +499,8 @@ export const runSameAxisExpansionFetchLoop = async ({
   getDataEpoch,
   getExpandedRows,
   getExpandedCols,
-  computeVisibleDepths,
   getMissingExpansionCoverage,
+  config,
   getCoverageKey,
   program,
   fetchRuntime,
@@ -519,12 +519,8 @@ export const runSameAxisExpansionFetchLoop = async ({
   getDataEpoch: () => number;
   getExpandedRows: () => Set<string>;
   getExpandedCols: () => Set<string>;
-  computeVisibleDepths: (
-    expandedRows: Set<string>,
-    expandedCols: Set<string>,
-    tree: PivotTreeData,
-  ) => SameAxisVisibleDepths;
   getMissingExpansionCoverage: () => PivotExpansionCoverageDiff;
+  config: ExpansionVisibilityConfig;
   getCoverageKey: (axis: PivotAxis, key: string) => string;
   program: PivotProgram;
   fetchRuntime: ExpansionFetchRuntime;
@@ -554,11 +550,12 @@ export const runSameAxisExpansionFetchLoop = async ({
       axis === 'row' ? resolvedExpanded : getExpandedRows();
     const expandedColsForDepth =
       axis === 'col' ? resolvedExpanded : getExpandedCols();
-    const { visibleRowDepth, visibleColDepth } = computeVisibleDepths(
-      expandedRowsForDepth,
-      expandedColsForDepth,
-      currentTree,
-    );
+    const { visibleRowDepth, visibleColDepth } = computeVisibleDepths({
+      tree: currentTree,
+      expandedRows: expandedRowsForDepth,
+      expandedCols: expandedColsForDepth,
+      config,
+    });
     const nodes = axis === 'row' ? currentTree.rows : currentTree.cols;
     const plan = planExpansionForAxis({
       axis,
