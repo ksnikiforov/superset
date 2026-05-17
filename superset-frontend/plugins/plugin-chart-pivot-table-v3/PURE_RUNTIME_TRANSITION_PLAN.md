@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14558` insertions, `15439` deletions, net `-881`.
-- Current production TypeScript/TSX total: about `32629` lines.
+- Production `src`: `14547` insertions, `15439` deletions, net `-892`.
+- Current production TypeScript/TSX total: about `32618` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -663,6 +663,10 @@ Success criteria:
 - Expansion requestability is axis/path-only. The planner no longer passes
   serialized tree keys into the fetchability predicate, keeping request
   eligibility independent from rendered tree identity.
+- Materialization no longer has a second reduced fact-batch adapter for
+  spec-backed fact-store reads. Branch and initial materialization both reuse
+  `buildFactStoreBatchesFromSpecs`, keeping batch construction under one
+  selector path.
 
 ## Current Risks
 

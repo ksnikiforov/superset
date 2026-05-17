@@ -143,17 +143,6 @@ export const buildFactStoreBatchesFromSpecs = ({
     facts: store.getCompatibleFacts(factStoreSelectorFromSpec(spec)),
   }));
 
-const factBatchFromStore = ({
-  store,
-  spec,
-}: {
-  store: PivotFactStore;
-  spec: PlannedQuerySpec;
-}): MaterializationFactBatch => ({
-  facts: store.getCompatibleFacts(factStoreSelectorFromSpec(spec)),
-  coverage: spec.meta.coverage,
-});
-
 const materializationInputFromSpec = ({
   store,
   spec,
@@ -167,7 +156,7 @@ const materializationInputFromSpec = ({
   measureHierarchy: MeasureHierarchy;
   batches?: MaterializationFactBatch[];
 }): MaterializePivotTreeInput => ({
-  batches: batches ?? [factBatchFromStore({ store, spec })],
+  batches: batches ?? buildFactStoreBatchesFromSpecs({ store, specs: [spec] }),
   metricsForQuery: spec.metrics,
   formData,
   measureHierarchy,
@@ -1246,7 +1235,7 @@ export const buildBranchTreeFromFactStore = ({
       spec: firstSpec,
       formData,
       measureHierarchy,
-      batches: specs.map(spec => factBatchFromStore({ store, spec })),
+      batches: buildFactStoreBatchesFromSpecs({ store, specs }),
     }),
   );
 };
