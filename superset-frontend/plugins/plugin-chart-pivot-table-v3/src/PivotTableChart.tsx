@@ -80,8 +80,6 @@ function PivotTableChart(props: PivotTableProps) {
     width,
     height,
     metrics,
-    startCollapsed = true,
-    initialDepth = 1,
     expandRowsLevel,
     expandColumnsLevel,
     verboseMap,
@@ -319,8 +317,6 @@ function PivotTableChart(props: PivotTableProps) {
 
   const layoutResult = usePivotLayout({
     formData: appliedLayoutFormData,
-    startCollapsed,
-    initialDepth,
     expandRowsLevel,
     expandColumnsLevel,
     rowTotals,

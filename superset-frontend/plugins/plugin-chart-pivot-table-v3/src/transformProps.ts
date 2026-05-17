@@ -413,8 +413,6 @@ export default function transformProps(
     theme,
     queryFormData: queryFormDataWithFormatters,
     metrics,
-    startCollapsed: layout.startCollapsed,
-    initialDepth: layout.initialDepth,
     rowTotals: formData.rowTotals,
     colTotals: formData.colTotals,
     rowSubTotals: rowSubTotalsEnabled,

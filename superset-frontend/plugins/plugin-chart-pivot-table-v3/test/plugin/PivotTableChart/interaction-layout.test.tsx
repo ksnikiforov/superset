@@ -257,6 +257,7 @@ describe('PivotTableChart interaction layout', () => {
       groupbyColumns: [],
       metrics: ['m1', 'm2'],
       metricsLayout: MetricsLayoutEnum.COLUMNS,
+      startCollapsed: false,
       pivotRuntimeLayout: runtimeLayout,
     });
     const baseTree = buildTreeFromRecords(

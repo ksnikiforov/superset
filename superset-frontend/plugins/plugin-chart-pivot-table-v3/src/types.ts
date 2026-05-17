@@ -245,8 +245,6 @@ export interface PivotTableCustomizeProps {
   rowSorting?: PivotDimensionSortingMap;
   colSorting?: PivotDimensionSortingMap;
   aggregateFunction?: string;
-  startCollapsed: boolean;
-  initialDepth?: number;
   expandRowsLevel?: number;
   expandColumnsLevel?: number;
   pivotExpansionState?: PivotExpansionState;
