@@ -234,7 +234,6 @@ export const resolveAxisChildrenBeforeSubtotalPolicy = ({
 
 type ResolveCollapsedValuesNodesForAxisParams = {
   program: PivotProgram;
-  metricLabelSet: Set<string>;
   axis: PivotAxis;
   parent: PivotTreeNode;
   expandedSet: Set<string>;
@@ -249,7 +248,6 @@ type ResolveCollapsedValuesNodesForAxisParams = {
 
 export const resolveCollapsedValuesNodesForAxis = ({
   program,
-  metricLabelSet,
   axis,
   parent,
   expandedSet,
@@ -261,6 +259,7 @@ export const resolveCollapsedValuesNodesForAxis = ({
   isExplicitSubtotalNode,
   isMetricSubtotalNode,
 }: ResolveCollapsedValuesNodesForAxisParams): PivotTreeNode[] => {
+  const metricLabelSet = new Set(program.metricKeys);
   const metricIndex = getValuesLevelIndex(program, axis);
   const axisDimensionCount = getAxisDimensionCount(program, axis);
   const isSingleMetricBetween =

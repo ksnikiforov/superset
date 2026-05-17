@@ -400,7 +400,6 @@ export const usePivotLayout = ({
       resolveCollapsedValuesNodesForAxis({
         ...params,
         program: layout.pivotProgram,
-        metricLabelSet,
         isLeafTierVisible,
         isMetricTokenValue,
         isExplicitSubtotalNode,
@@ -411,7 +410,6 @@ export const usePivotLayout = ({
       isMetricTokenValue,
       isLeafTierVisible,
       layout.pivotProgram,
-      metricLabelSet,
     ],
   );
 

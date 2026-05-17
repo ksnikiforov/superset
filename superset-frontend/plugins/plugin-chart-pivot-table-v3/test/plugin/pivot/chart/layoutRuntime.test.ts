@@ -293,7 +293,6 @@ describe('pivot/chart/layoutRuntime', () => {
 
     const collapsed = resolveCollapsedValuesNodesForAxis({
       program: valuesProgram,
-      metricLabelSet: baseParams.metricLabelSet,
       axis: 'row',
       parent,
       expandedSet: new Set<string>(),
@@ -341,7 +340,6 @@ describe('pivot/chart/layoutRuntime', () => {
         metricsLayoutResolved: MetricsLayoutEnum.COLUMNS,
         valueAxis: 'col',
       },
-      metricLabelSet: baseParams.metricLabelSet,
       axis: 'col',
       parent,
       expandedSet: new Set<string>(),

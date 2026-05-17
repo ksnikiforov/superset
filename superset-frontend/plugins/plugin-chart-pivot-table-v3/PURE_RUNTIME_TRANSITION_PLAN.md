@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14478` insertions, `15362` deletions, net `-884`.
-- Current production TypeScript/TSX total: about `32626` lines.
+- Production `src`: `14475` insertions, `15362` deletions, net `-887`.
+- Current production TypeScript/TSX total: about `32623` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -602,6 +602,9 @@ Success criteria:
 - Render model config no longer accepts a metric-token predicate. Column-root
   suppression derives metric leaves directly from `PivotProgram.metricKeys`, so
   the visibility helper no longer receives metric-token authority.
+- Collapsed Values projection no longer receives a separate metric-label set.
+  It derives metric lookup from `PivotProgram.metricKeys`, keeping that layout
+  helper program-owned.
 
 ## Current Risks
 
