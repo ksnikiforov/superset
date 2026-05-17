@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14508` insertions, `15526` deletions, net `-1018`.
-- Current production TypeScript/TSX total: about `32560` lines.
+- Production `src`: `14506` insertions, `15527` deletions, net `-1021`.
+- Current production TypeScript/TSX total: about `32557` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -723,6 +723,9 @@ Success criteria:
   longer receive caller-built metric-label sets or dimension-depth callbacks.
   `stateTransitions` derives expansion metric policy from `PivotProgram`,
   keeping the expansion hook out of semantic token/depth ownership.
+- Same-axis expansion merge preservation also derives Values-at-end behavior
+  from `PivotProgram`; the hook no longer decides metric-child preservation
+  from layout placement.
 
 ## Current Risks
 

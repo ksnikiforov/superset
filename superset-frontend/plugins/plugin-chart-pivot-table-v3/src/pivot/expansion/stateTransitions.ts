@@ -46,6 +46,7 @@ import { rootKey } from '../viewModel';
 import { type PivotExpansionCoverageDiff } from '../runtime/coverage';
 import {
   getValuesLevelIndex,
+  isValuesAtAxisEnd,
   shouldAutoExpandValuesLevel,
 } from '../runtime/projection';
 import type { PivotProgram } from '../runtime/types';
@@ -476,17 +477,17 @@ export const mergeSameAxisExpansionTree = ({
   previousTree,
   axis,
   touchedKeys,
-  preserveMetricChildren,
   program,
 }: {
   currentTree: PivotTreeData;
   previousTree: PivotTreeData;
   axis: PivotAxis;
   touchedKeys: string[];
-  preserveMetricChildren?: boolean;
   program: PivotProgram;
 }) => {
   const touchedPrefixes = touchedKeys.map(key => parsePath(key));
+  const preserveMetricChildren =
+    axis === 'col' && isValuesAtAxisEnd(program, 'col');
   const preservedTree =
     touchedPrefixes.length > 0
       ? pruneTreeByPrefixes({

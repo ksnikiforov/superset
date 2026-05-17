@@ -410,7 +410,6 @@ describe('pivot/expansion/stateTransitions', () => {
       previousTree,
       axis: 'col',
       touchedKeys: [aKey],
-      preserveMetricChildren: true,
       program: compilePivotProgram({
         groupbyRows: [],
         groupbyColumns: ['country', METRICS_PLACEHOLDER],

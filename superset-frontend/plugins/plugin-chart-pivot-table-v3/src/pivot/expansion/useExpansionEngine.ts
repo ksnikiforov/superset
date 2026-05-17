@@ -48,7 +48,6 @@ import { type ChartDataWarning } from '../data/ChartDataClient';
 import { stableStringify } from '../shared/stableStringify';
 import {
   buildAxisCoverageKeyFromPathKey,
-  isValuesAtAxisEnd,
   shouldAutoExpandValuesLevel,
 } from '../runtime/projection';
 import type { PivotProgram } from '../runtime/types';
@@ -808,14 +807,11 @@ export const useExpansionEngine = ({
           axis === 'row' ? expandedRowsRef.current : expandedColsRef.current;
         const combinedExpanded = new Set(committedExpanded);
         manualExpandedRef.current.forEach(key => combinedExpanded.add(key));
-        const preserveMetricChildren =
-          axis === 'col' && isValuesAtAxisEnd(pivotProgram, 'col');
         const mergedTree = mergeSameAxisExpansionTree({
           currentTree: fetchLoop.tree,
           previousTree: treeRef.current,
           axis,
           touchedKeys: fetchLoop.touchedKeys,
-          preserveMetricChildren,
           program: pivotProgram,
         });
         const finalExpanded = resolveExpandedForMetrics(
