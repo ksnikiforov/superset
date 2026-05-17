@@ -595,6 +595,12 @@ Success criteria:
   hidden dimensions and moving Values. The next version needs an explicit
   loaded-snapshot contract, not another previous-layout heuristic.
 - Large result sets still pay main-thread JSON parsing and React commit costs.
+- The top-level chart `metrics` prop still cannot be deleted safely. A direct
+  cut broke the interaction-layout case that keeps metric labels when datetime
+  columns are formatted with Values at column end, which shows that source
+  metric metadata is not yet fully represented by `sourceMetrics` /
+  `formData.metrics`. The next cleanup needs an explicit source-metrics
+  contract, not a fallback removal.
 
 ## Approval Checkpoints
 
