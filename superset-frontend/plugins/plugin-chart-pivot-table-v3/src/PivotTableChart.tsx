@@ -382,8 +382,6 @@ function PivotTableChart(props: PivotTableProps) {
     expandedStateSignature: layoutResult.expandedStateSignature,
     expandedStateSharedSignature: layoutResult.expandedStateSharedSignature,
     fetchFormData,
-    groupbyRowKeys: layoutResult.groupbyRowKeys,
-    groupbyColumnKeys: layoutResult.groupbyColumnKeys,
     resolvedExpandRowsLevel: layoutResult.resolvedExpandRowsLevel,
     resolvedExpandColumnsLevel: layoutResult.resolvedExpandColumnsLevel,
     metricLabelSet: layoutResult.metricLabelSet,

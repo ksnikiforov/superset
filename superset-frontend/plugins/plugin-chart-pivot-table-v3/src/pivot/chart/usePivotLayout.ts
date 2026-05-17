@@ -64,8 +64,6 @@ export type PivotLayoutResult = {
   metricLabels: string[];
   metricLabelSet: Set<string>;
   isMetricTokenValue: (value: unknown) => boolean;
-  groupbyRowKeys: string[];
-  groupbyColumnKeys: string[];
   normalizedRowSubtotalLevels: number[];
   normalizedColSubtotalLevels: number[];
   resolvedRowTotalPosition: TotalPosition;
@@ -660,8 +658,6 @@ export const usePivotLayout = ({
     metricLabels,
     metricLabelSet,
     isMetricTokenValue,
-    groupbyRowKeys,
-    groupbyColumnKeys,
     normalizedRowSubtotalLevels,
     normalizedColSubtotalLevels,
     resolvedRowTotalPosition,

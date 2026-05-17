@@ -92,6 +92,7 @@ import {
 } from '../runtime/requestLifecycle';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import type { RenderModelConfig } from '../render/renderModel';
+import { getStableColumnKey } from '../../utils';
 
 const MAX_HYDRATION_ITERATIONS = 12;
 type ExpansionStateCommit = {
@@ -302,8 +303,6 @@ export type ExpansionEngineConfig = {
   expandedStateSignature: string;
   expandedStateSharedSignature: string;
   fetchFormData: PivotTableQueryFormData;
-  groupbyRowKeys: string[];
-  groupbyColumnKeys: string[];
   resolvedExpandRowsLevel: number;
   resolvedExpandColumnsLevel: number;
   metricLabelSet: Set<string>;
@@ -338,8 +337,6 @@ export const useExpansionEngine = ({
   expandedStateSignature,
   expandedStateSharedSignature,
   fetchFormData,
-  groupbyRowKeys,
-  groupbyColumnKeys,
   resolvedExpandRowsLevel,
   resolvedExpandColumnsLevel,
   metricLabelSet,
@@ -434,6 +431,14 @@ export const useExpansionEngine = ({
   const persistedExpansionStateRef = useRef<unknown>(persistedExpansionState);
   const dataEpochRef = useRef(0);
   const previousDataRef = useRef<PivotTreeData | null>(null);
+  const groupbyRowKeys = useMemo(
+    () => pivotProgram.rowDimensions.map(getStableColumnKey),
+    [pivotProgram.rowDimensions],
+  );
+  const groupbyColumnKeys = useMemo(
+    () => pivotProgram.columnDimensions.map(getStableColumnKey),
+    [pivotProgram.columnDimensions],
+  );
   const previousLayoutRef = useRef({
     rows: groupbyRowKeys,
     cols: groupbyColumnKeys,
