@@ -44,6 +44,14 @@ export const isMetricToken = (val: unknown): val is string =>
 export const decodeMetricKey = (val: unknown): string | undefined =>
   isMetricToken(val) ? val.slice(METRIC_TOKEN_PREFIX.length) : undefined;
 
+export const isMetricTokenForKeys = (
+  val: unknown,
+  metricKeys: ReadonlySet<string>,
+) => {
+  const decoded = decodeMetricKey(val);
+  return decoded !== undefined && metricKeys.has(decoded);
+};
+
 export const encodeMeasureLeafKey = (leafId: string) =>
   `${MEASURE_LEAF_TOKEN_PREFIX}${leafId}`;
 

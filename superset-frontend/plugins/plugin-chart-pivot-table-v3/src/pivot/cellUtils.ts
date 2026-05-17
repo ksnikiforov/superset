@@ -22,6 +22,7 @@ import {
   decodeMeasureLeafId,
   decodeMetricKey,
   findMeasureLeafIdInPath,
+  isMetricTokenForKeys,
 } from './core/tokens';
 import { serializeCellKey, serializePath } from './core/path';
 import { buildMeasureLeafOutputKey } from './measureLeaves';
@@ -98,7 +99,7 @@ type ShouldHideRowValuesParams = {
   rowNode: PivotTreeNode;
   rowSubTotals: boolean;
   effectiveRowSubtotalPosition: 'start' | 'end';
-  isMetricTokenValue: (val: unknown) => boolean;
+  metricLabelSet: ReadonlySet<string>;
   expandedRows: Set<string>;
   countDimDepth: (path: PivotTreeNode['path']) => number;
   rowSubtotalLevels: number[];
@@ -109,7 +110,7 @@ export const shouldHideRowValues = ({
   rowNode,
   rowSubTotals,
   effectiveRowSubtotalPosition,
-  isMetricTokenValue,
+  metricLabelSet,
   expandedRows,
   countDimDepth,
   rowSubtotalLevels,
@@ -121,7 +122,9 @@ export const shouldHideRowValues = ({
   if (rowNode.path.length === 0 || isExplicitSubtotalNode(rowNode)) {
     return false;
   }
-  const metricIndex = rowNode.path.findIndex(val => isMetricTokenValue(val));
+  const metricIndex = rowNode.path.findIndex(val =>
+    isMetricTokenForKeys(val, metricLabelSet),
+  );
   if (metricIndex === rowNode.path.length - 1) {
     return false;
   }

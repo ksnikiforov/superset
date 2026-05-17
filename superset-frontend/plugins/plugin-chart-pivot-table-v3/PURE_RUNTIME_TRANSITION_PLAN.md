@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14490` insertions, `15365` deletions, net `-875`.
-- Current production TypeScript/TSX total: about `32635` lines.
+- Production `src`: `14494` insertions, `15377` deletions, net `-883`.
+- Current production TypeScript/TSX total: about `32627` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -611,6 +611,10 @@ Success criteria:
 - The chart-to-expansion boundary no longer passes a metric-token predicate.
   Expansion derives metric-token checks from `PivotProgram.metricKeys`, keeping
   that semantic lookup local to the expansion policy that uses it.
+- `PivotLayoutResult` no longer exports a metric-token predicate. Layout,
+  formatting, render display, render model, pruning, and expansion use the
+  shared core token check against local `PivotProgram.metricKeys` sets instead
+  of threading a chart/layout-owned callback through policy boundaries.
 
 ## Current Risks
 

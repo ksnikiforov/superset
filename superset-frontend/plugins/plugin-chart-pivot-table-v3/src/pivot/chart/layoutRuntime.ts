@@ -22,7 +22,11 @@ import {
   type PivotTreeNode,
   type TotalPosition,
 } from '../../types';
-import { findMeasureLeafIdInPath, isSubtotalToken } from '../core/tokens';
+import {
+  findMeasureLeafIdInPath,
+  isMetricTokenForKeys,
+  isSubtotalToken,
+} from '../core/tokens';
 import { serializePath } from '../core/path';
 import { getMetricDepthForParent, getMetricTierNodes } from '../metricsTotals';
 import {
@@ -155,7 +159,6 @@ type ResolveAxisChildrenBeforeSubtotalPolicyParams = {
   parent: PivotTreeNode;
   nodes: Record<string, PivotTreeNode>;
   hideMetricHeader: boolean;
-  isMetricTokenValue: (value: unknown) => boolean;
   isMetricGrandTotalNode: (node?: PivotTreeNode) => boolean;
   keepValuesChild: (
     child: PivotTreeNode,
@@ -169,11 +172,11 @@ export const resolveAxisChildrenBeforeSubtotalPolicy = ({
   parent,
   nodes,
   hideMetricHeader,
-  isMetricTokenValue,
   isMetricGrandTotalNode,
   keepValuesChild,
 }: ResolveAxisChildrenBeforeSubtotalPolicyParams): PivotTreeNode[] => {
   const children = findChildren(nodes, parent);
+  const metricLabelSet = new Set(program.metricKeys);
   const metricIndex = getValuesLevelIndex(program, axis);
   const groupbyLength = getAxisDimensionCount(program, axis);
   const getChildProjection = (child: PivotTreeNode) =>
@@ -223,7 +226,7 @@ export const resolveAxisChildrenBeforeSubtotalPolicy = ({
     parent.level >= groupbyLength
   ) {
     filtered = filtered.filter(
-      child => !isMetricTokenValue(child.path[parent.level]),
+      child => !isMetricTokenForKeys(child.path[parent.level], metricLabelSet),
     );
   }
   if (isValuesFirstOnAxis(program, axis)) {
@@ -241,7 +244,6 @@ type ResolveCollapsedValuesNodesForAxisParams = {
   isLeafTierVisible: boolean;
   suppressSubtotalParent: boolean;
   normalizeSubtotalExisting: boolean;
-  isMetricTokenValue: (value: unknown) => boolean;
   isExplicitSubtotalNode: (node?: PivotTreeNode) => boolean;
   isMetricSubtotalNode: (node?: PivotTreeNode) => boolean;
 };
@@ -255,7 +257,6 @@ export const resolveCollapsedValuesNodesForAxis = ({
   isLeafTierVisible,
   suppressSubtotalParent,
   normalizeSubtotalExisting,
-  isMetricTokenValue,
   isExplicitSubtotalNode,
   isMetricSubtotalNode,
 }: ResolveCollapsedValuesNodesForAxisParams): PivotTreeNode[] => {
@@ -282,7 +283,7 @@ export const resolveCollapsedValuesNodesForAxis = ({
   if (
     (suppressSubtotalParent &&
       (isExplicitSubtotalNode(parent) || isMetricSubtotalNode(parent))) ||
-    parent.path.some(val => isMetricTokenValue(val))
+    parent.path.some(val => isMetricTokenForKeys(val, metricLabelSet))
   ) {
     return [];
   }
@@ -346,7 +347,6 @@ type ResolveRowSubtotalChildrenPolicyParams = {
   rowSubtotalPositionForParent: TotalPosition;
   hideMetricHeaderOnRows: boolean;
   countDimDepth: (path: PivotTreeNode['path']) => number;
-  isMetricTokenValue: (value: unknown) => boolean;
   isMetricGrandTotalNode: (node?: PivotTreeNode) => boolean;
   isExplicitSubtotalNode: (node?: PivotTreeNode) => boolean;
 };
@@ -360,11 +360,11 @@ export const resolveRowSubtotalChildrenPolicy = ({
   rowSubtotalPositionForParent,
   hideMetricHeaderOnRows,
   countDimDepth,
-  isMetricTokenValue,
   isMetricGrandTotalNode,
   isExplicitSubtotalNode,
 }: ResolveRowSubtotalChildrenPolicyParams): PivotTreeNode[] => {
   const isMultiMetric = program.metricKeys.length > 1;
+  const metricLabelSet = new Set(program.metricKeys);
   const metricIndexOnRows = getValuesLevelIndex(program, 'row');
   const isRowMetricAxis = program.valueAxis === 'row';
   let filtered = children;
@@ -398,7 +398,9 @@ export const resolveRowSubtotalChildrenPolicy = ({
       ) {
         return false;
       }
-      const hasMetricToken = node.path.some(val => isMetricTokenValue(val));
+      const hasMetricToken = node.path.some(val =>
+        isMetricTokenForKeys(val, metricLabelSet),
+      );
       return hideMetricHeaderOnRows
         ? !hasMetricToken
         : !requireMetricLabel || hasMetricToken;
@@ -411,7 +413,7 @@ export const resolveRowSubtotalChildrenPolicy = ({
           isRowMetricAxis &&
           isMultiMetric &&
           subtotalIndex > 0 &&
-          isMetricTokenValue(node.path[subtotalIndex - 1])
+          isMetricTokenForKeys(node.path[subtotalIndex - 1], metricLabelSet)
         ) &&
         !seen.has(node.key)
       ) {
@@ -424,7 +426,7 @@ export const resolveRowSubtotalChildrenPolicy = ({
       child =>
         !isExplicitSubtotalNode(child) ||
         isMetricGrandTotalNode(child) ||
-        child.path.some(val => isMetricTokenValue(val)),
+        child.path.some(val => isMetricTokenForKeys(val, metricLabelSet)),
     );
   }
   return filtered;

@@ -28,6 +28,7 @@ import { coerceEpochMsStringToNumber } from '../../utils';
 import {
   decodeMeasureLeafId,
   decodeMetricKey,
+  isMetricTokenForKeys,
   isSubtotalToken,
   SUBTOTAL_TOKEN,
 } from '../core/tokens';
@@ -342,10 +343,8 @@ export const buildRenderNodeDisplayState = ({
   const groupbyColumnsLength =
     layout.layout.pivotProgram.columnDimensions.length;
   const metricLabelSet = new Set(layout.layout.pivotProgram.metricKeys);
-  const isMetricTokenValue = (value: unknown) => {
-    const decoded = decodeMetricKey(value);
-    return decoded !== undefined && metricLabelSet.has(decoded);
-  };
+  const isMetricTokenValue = (value: unknown) =>
+    isMetricTokenForKeys(value, metricLabelSet);
   const autoExpandedRows = seedExpandedByLevel(
     rowNodes,
     layout.resolvedExpandRowsLevel,

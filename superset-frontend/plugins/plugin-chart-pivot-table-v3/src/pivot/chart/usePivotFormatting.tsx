@@ -833,6 +833,10 @@ export const usePivotFormatting = ({
     layout.resolvedColTotalPosition === 'start' && renderModel.showRowRoot;
   const visibleCells = renderModel.visibleCellEntries;
   const { visibleRows, visibleCols } = renderModel;
+  const metricLabelSet = useMemo(
+    () => new Set(layout.layout.pivotProgram.metricKeys),
+    [layout.layout.pivotProgram.metricKeys],
+  );
 
   const shouldHideRowValues = useCallback(
     (rowNode: PivotTreeNode) =>
@@ -840,13 +844,13 @@ export const usePivotFormatting = ({
         rowNode,
         rowSubTotals,
         effectiveRowSubtotalPosition: layout.getRowSubtotalPosition(rowNode),
-        isMetricTokenValue: layout.isMetricTokenValue,
+        metricLabelSet,
         expandedRows,
         countDimDepth: layout.countDimDepth,
         rowSubtotalLevels: layout.normalizedRowSubtotalLevels,
         isExplicitSubtotalNode: layout.isExplicitSubtotalNode,
       }),
-    [expandedRows, layout, rowSubTotals],
+    [expandedRows, layout, metricLabelSet, rowSubTotals],
   );
 
   const {

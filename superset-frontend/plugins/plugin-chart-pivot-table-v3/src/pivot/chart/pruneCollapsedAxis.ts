@@ -21,6 +21,7 @@ import {
   type PivotTreeData,
   type PivotTreeNode,
 } from '../../types';
+import { isMetricTokenForKeys } from '../core/tokens';
 import { getValuesLevelIndex, isValuesAtAxisEnd } from '../runtime/projection';
 import type { PivotProgram } from '../runtime/types';
 import { findChildren } from '../viewModel';
@@ -68,7 +69,6 @@ export const pruneStaleCollapsedAxis = ({
   parent,
   branch,
   program,
-  isMetricTokenValue,
   isExplicitSubtotalNode,
   isMetricGrandTotalNode,
   isMetricSubtotalNode,
@@ -78,7 +78,6 @@ export const pruneStaleCollapsedAxis = ({
   parent: PivotTreeNode;
   branch?: PivotTreeData;
   program: PivotProgram;
-  isMetricTokenValue: (value: unknown) => boolean;
   isExplicitSubtotalNode: (node: PivotTreeNode) => boolean;
   isMetricGrandTotalNode: (node: PivotTreeNode) => boolean;
   isMetricSubtotalNode: (node: PivotTreeNode) => boolean;
@@ -95,7 +94,8 @@ export const pruneStaleCollapsedAxis = ({
   if (metricIndex <= parent.level) {
     return currentTree;
   }
-  if (parent.path.some(val => isMetricTokenValue(val))) {
+  const metricLabelSet = new Set(program.metricKeys);
+  if (parent.path.some(val => isMetricTokenForKeys(val, metricLabelSet))) {
     return currentTree;
   }
   const branchParent = getAxisNodes(branch, axis)[parent.key];
@@ -120,7 +120,7 @@ export const pruneStaleCollapsedAxis = ({
     }
     if (
       preserveMetricAtParentLevel &&
-      isMetricTokenValue(node.path[parent.level])
+      isMetricTokenForKeys(node.path[parent.level], metricLabelSet)
     ) {
       return;
     }

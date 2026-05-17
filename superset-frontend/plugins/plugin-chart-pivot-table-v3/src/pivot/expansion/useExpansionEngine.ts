@@ -52,7 +52,7 @@ import {
   isValuesAtAxisEnd,
   shouldAutoExpandValuesLevel,
 } from '../runtime/projection';
-import { decodeMetricKey, isSubtotalToken } from '../core/tokens';
+import { isMetricTokenForKeys, isSubtotalToken } from '../core/tokens';
 import type { PivotProgram } from '../runtime/types';
 import {
   buildFactValueKeys,
@@ -437,10 +437,7 @@ export const useExpansionEngine = ({
     [pivotProgram.metricKeys],
   );
   const isMetricTokenValue = useCallback(
-    (value: unknown) => {
-      const decoded = decodeMetricKey(value);
-      return decoded !== undefined && metricLabelSet.has(decoded);
-    },
+    (value: unknown) => isMetricTokenForKeys(value, metricLabelSet),
     [metricLabelSet],
   );
   const countDimDepth = useCallback(

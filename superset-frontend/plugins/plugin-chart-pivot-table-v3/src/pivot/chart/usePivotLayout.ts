@@ -27,7 +27,11 @@ import {
   type TotalPosition,
 } from '../../types';
 import { resolveMetricDisplayLabel, getStableColumnKey } from '../../utils';
-import { decodeMetricKey, getMetricKey, isSubtotalToken } from '../core/tokens';
+import {
+  getMetricKey,
+  isMetricTokenForKeys,
+  isSubtotalToken,
+} from '../core/tokens';
 import { buildLayoutContext } from '../layout/LayoutContext';
 import { getValuesLevelIndex } from '../runtime/projection';
 import type { PivotProgram } from '../runtime/types';
@@ -61,7 +65,6 @@ export type PivotLayoutResult = {
   expandColumnsLevelRaw?: number;
   resolvedExpandRowsLevel: number;
   resolvedExpandColumnsLevel: number;
-  isMetricTokenValue: (value: unknown) => boolean;
   normalizedRowSubtotalLevels: number[];
   normalizedColSubtotalLevels: number[];
   resolvedRowTotalPosition: TotalPosition;
@@ -184,13 +187,6 @@ export const usePivotLayout = ({
     layout.pivotProgram;
   const { metricKeys: metricLabels } = layout.pivotProgram;
   const metricLabelSet = useMemo(() => new Set(metricLabels), [metricLabels]);
-  const isMetricTokenValue = useCallback(
-    (value: unknown) => {
-      const decoded = decodeMetricKey(value);
-      return decoded !== undefined && metricLabelSet.has(decoded);
-    },
-    [metricLabelSet],
-  );
   const metricVerboseMap = formData.verboseMap as
     | Record<string, string>
     | undefined;
@@ -369,10 +365,9 @@ export const usePivotLayout = ({
       resolveAxisChildrenBeforeSubtotalPolicy({
         ...params,
         program: layout.pivotProgram,
-        isMetricTokenValue,
         isMetricGrandTotalNode,
       }),
-    [isMetricGrandTotalNode, isMetricTokenValue, layout.pivotProgram],
+    [isMetricGrandTotalNode, layout.pivotProgram],
   );
 
   const getRowSubtotalPosition = useCallback(
@@ -380,12 +375,14 @@ export const usePivotLayout = ({
       if (!forceRowSubtotalEnd) {
         return resolvedRowSubtotalPosition;
       }
-      const metricIndex = node.path.findIndex(val => isMetricTokenValue(val));
+      const metricIndex = node.path.findIndex(val =>
+        isMetricTokenForKeys(val, metricLabelSet),
+      );
       return metricIndex >= 0 && node.path.length > metricIndex + 1
         ? resolvedRowSubtotalPosition
         : 'end';
     },
-    [forceRowSubtotalEnd, isMetricTokenValue, resolvedRowSubtotalPosition],
+    [forceRowSubtotalEnd, metricLabelSet, resolvedRowSubtotalPosition],
   );
 
   const getCollapsedValuesNodesForAxis = useCallback(
@@ -401,16 +398,10 @@ export const usePivotLayout = ({
         ...params,
         program: layout.pivotProgram,
         isLeafTierVisible,
-        isMetricTokenValue,
         isExplicitSubtotalNode,
         isMetricSubtotalNode,
       }),
-    [
-      isMetricSubtotalNode,
-      isMetricTokenValue,
-      isLeafTierVisible,
-      layout.pivotProgram,
-    ],
+    [isMetricSubtotalNode, isLeafTierVisible, layout.pivotProgram],
   );
 
   const getCollapsedChildrenForAxis = useCallback(
@@ -463,7 +454,6 @@ export const usePivotLayout = ({
         rowSubtotalPositionForParent,
         hideMetricHeaderOnRows,
         countDimDepth,
-        isMetricTokenValue,
         isMetricGrandTotalNode,
         isExplicitSubtotalNode,
       });
@@ -476,7 +466,6 @@ export const usePivotLayout = ({
       hideMetricHeaderOnRows,
       isMetricGrandTotalNode,
       isMetricSubtotalNode,
-      isMetricTokenValue,
       layout.pivotProgram,
       metricIndexOnRows,
       rowSubTotals,
@@ -525,18 +514,12 @@ export const usePivotLayout = ({
         parent,
         branch,
         program: layout.pivotProgram,
-        isMetricTokenValue,
         isExplicitSubtotalNode,
         isMetricGrandTotalNode,
         isMetricSubtotalNode,
       });
     },
-    [
-      isMetricGrandTotalNode,
-      isMetricSubtotalNode,
-      isMetricTokenValue,
-      layout.pivotProgram,
-    ],
+    [isMetricGrandTotalNode, isMetricSubtotalNode, layout.pivotProgram],
   );
 
   const buildRenderModelConfig = useCallback(
@@ -602,7 +585,6 @@ export const usePivotLayout = ({
     expandColumnsLevelRaw,
     resolvedExpandRowsLevel,
     resolvedExpandColumnsLevel,
-    isMetricTokenValue,
     normalizedRowSubtotalLevels,
     normalizedColSubtotalLevels,
     resolvedRowTotalPosition,

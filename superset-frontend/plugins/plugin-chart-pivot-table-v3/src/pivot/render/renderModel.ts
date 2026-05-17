@@ -30,7 +30,7 @@ import {
 import { buildVisibleCellEntries, type VisibleCellEntry } from '../cellUtils';
 import { buildVisiblePivotAxes } from '../visibility';
 import type { PivotProgram } from '../runtime/types';
-import { decodeMetricKey } from '../core/tokens';
+import { isMetricTokenForKeys } from '../core/tokens';
 
 export type RenderModel = {
   visibleRows: PivotTreeNode[];
@@ -136,10 +136,7 @@ export const buildRenderModel = ({
   if (shouldSuppressColRoot) {
     const metricKeySet = new Set(config.pivotProgram.metricKeys);
     const hasMetricLeaves = visibleCols.some(col =>
-      col.path.some(value => {
-        const decoded = decodeMetricKey(value);
-        return decoded !== undefined && metricKeySet.has(decoded);
-      }),
+      col.path.some(value => isMetricTokenForKeys(value, metricKeySet)),
     );
     if (hasMetricLeaves) {
       const withoutRoot = visibleCols.filter(col => col.key !== rootKey);
