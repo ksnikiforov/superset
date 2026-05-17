@@ -46,10 +46,7 @@ import {
 import { parsePath } from '../core/path';
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import { stableStringify } from '../shared/stableStringify';
-import {
-  buildAxisCoverageKeyFromPathKey,
-  shouldAutoExpandValuesLevel,
-} from '../runtime/projection';
+import { shouldAutoExpandValuesLevel } from '../runtime/projection';
 import type { PivotProgram } from '../runtime/types';
 import {
   buildFactValueKeys,
@@ -529,16 +526,6 @@ export const useExpansionEngine = ({
     inFlightExpansionIdRef.current = 0;
   }, []);
 
-  const getCoverageKey = useCallback(
-    (axis: PivotAxis, key: string) =>
-      buildAxisCoverageKeyFromPathKey({
-        program: pivotProgram,
-        axis,
-        key,
-      }),
-    [pivotProgram],
-  );
-
   const getMissingExpansionCoverage = useCallback(
     (): PivotExpansionCoverageDiff =>
       createExpansionCoverageDiff({
@@ -780,7 +767,6 @@ export const useExpansionEngine = ({
           getExpandedCols: () => expandedColsRef.current,
           getMissingExpansionCoverage,
           config: visibilityConfig,
-          getCoverageKey,
           program: pivotProgram,
           fetchRuntime: buildFetchRuntime(requestScope),
           transactionId: requestId,
@@ -826,7 +812,6 @@ export const useExpansionEngine = ({
       commitExpansionState,
       expansionRequestHelpers.buildRequestGroupId,
       expansionRequestLifecycle,
-      getCoverageKey,
       getMissingExpansionCoverage,
       pivotProgram,
       persistExpansionState,
@@ -903,7 +888,6 @@ export const useExpansionEngine = ({
           buildDesiredExpanded,
           getMissingExpansionCoverage,
           config: visibilityConfig,
-          getCoverageKey,
           activeAxis: options?.activeAxis,
           pendingRows: pendingRowsRef.current,
           pendingCols: pendingColsRef.current,
@@ -949,7 +933,6 @@ export const useExpansionEngine = ({
       commitExpansionState,
       expansionRequestHelpers,
       expansionRequestLifecycle,
-      getCoverageKey,
       getMissingExpansionCoverage,
       persistExpansionState,
       pruneMergedTree,
@@ -1202,7 +1185,6 @@ export const useExpansionEngine = ({
       autoExpandColsLevelForDesired,
       getMissingExpansionCoverage: getMissingExpansionCoverage(),
       config: visibilityConfig,
-      getCoverageKey,
     });
     if (prefetchAction.kind === 'hydrate') {
       if (!prefetchAction.showLoader) {
@@ -1236,7 +1218,6 @@ export const useExpansionEngine = ({
     expansionRequestLifecycle,
     resolveExpandedForMetrics,
     reportAsyncError,
-    getCoverageKey,
     getMissingExpansionCoverage,
     setHydratingState,
     visibilityConfig,

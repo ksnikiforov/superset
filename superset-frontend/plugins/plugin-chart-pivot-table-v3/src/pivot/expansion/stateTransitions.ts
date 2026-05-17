@@ -985,7 +985,6 @@ export const planHydrationIteration = ({
   desiredCols,
   getMissingExpansionCoverage,
   config,
-  getCoverageKey,
   activeAxis,
   pendingRows,
   pendingCols,
@@ -997,7 +996,6 @@ export const planHydrationIteration = ({
   desiredCols: Set<string>;
   getMissingExpansionCoverage: PivotExpansionCoverageDiff;
   config: ExpansionVisibilityConfig;
-  getCoverageKey: (axis: PivotAxis, key: string) => string;
   activeAxis?: PivotAxis;
   pendingRows: Set<string>;
   pendingCols: Set<string>;
@@ -1018,7 +1016,6 @@ export const planHydrationIteration = ({
         nodes: tree.rows,
         coverage: { rowDepth: visibleRowDepth, columnDepth: visibleColDepth },
         getMissingExpansionCoverage,
-        getCoverageKey,
       })
     : createEmptyExpansionPlan();
   const colPlan = planCols
@@ -1029,7 +1026,6 @@ export const planHydrationIteration = ({
         nodes: tree.cols,
         coverage: { rowDepth: visibleRowDepth, columnDepth: visibleColDepth },
         getMissingExpansionCoverage,
-        getCoverageKey,
       })
     : createEmptyExpansionPlan();
 
@@ -1079,15 +1075,15 @@ export const planHydrationIteration = ({
 
   const rowGroups = buildGroupedFetchTargets({
     axis: 'row',
+    program: config.program,
     requests: effectiveRowPlan.fetchRequests,
     nodes: tree.rows,
-    getCoverageKey,
   });
   const colGroups = buildGroupedFetchTargets({
     axis: 'col',
+    program: config.program,
     requests: effectiveColPlan.fetchRequests,
     nodes: tree.cols,
-    getCoverageKey,
   });
   return {
     kind: 'fetch',
@@ -1108,7 +1104,6 @@ export const runHydrationLoop = async ({
   buildDesiredExpanded,
   getMissingExpansionCoverage,
   config,
-  getCoverageKey,
   activeAxis,
   pendingRows,
   pendingCols,
@@ -1123,7 +1118,6 @@ export const runHydrationLoop = async ({
   buildDesiredExpanded: (axis: PivotAxis, tree: PivotTreeData) => Set<string>;
   getMissingExpansionCoverage: () => PivotExpansionCoverageDiff;
   config: ExpansionVisibilityConfig;
-  getCoverageKey: (axis: PivotAxis, key: string) => string;
   activeAxis?: PivotAxis;
   pendingRows: Set<string>;
   pendingCols: Set<string>;
@@ -1160,7 +1154,6 @@ export const runHydrationLoop = async ({
       desiredCols,
       getMissingExpansionCoverage: getMissingExpansionCoverage(),
       config,
-      getCoverageKey,
       activeAxis,
       pendingRows,
       pendingCols,
@@ -1264,7 +1257,6 @@ export const planInitialHydrationPrefetch = ({
   autoExpandColsLevelForDesired,
   getMissingExpansionCoverage,
   config,
-  getCoverageKey,
 }: {
   tree: PivotTreeData;
   resolvedRows: Set<string>;
@@ -1276,7 +1268,6 @@ export const planInitialHydrationPrefetch = ({
   autoExpandColsLevelForDesired: number;
   getMissingExpansionCoverage: PivotExpansionCoverageDiff;
   config: ExpansionVisibilityConfig;
-  getCoverageKey: (axis: PivotAxis, key: string) => string;
 }) => {
   const shouldPlanRows =
     effectiveExpandRowsLevel > 0 ||
@@ -1292,7 +1283,6 @@ export const planInitialHydrationPrefetch = ({
     desiredCols: resolvedCols,
     getMissingExpansionCoverage,
     config,
-    getCoverageKey,
     pendingRows: new Set(),
     pendingCols: new Set(),
     planRows: shouldPlanRows,

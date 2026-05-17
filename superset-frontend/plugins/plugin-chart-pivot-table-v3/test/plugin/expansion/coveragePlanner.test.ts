@@ -80,7 +80,6 @@ describe('expansionPlanner', () => {
       getMissingExpansionCoverage: getMissingCoverageFromDepths(
         new Map([[keyA, 1]]),
       ),
-      getCoverageKey: (_axis, key) => key,
       program: testProgram,
     });
 
@@ -104,7 +103,6 @@ describe('expansionPlanner', () => {
       getMissingExpansionCoverage: getMissingCoverageFromDepths(
         new Map([[keyA, 2]]),
       ),
-      getCoverageKey: (_axis, key) => key,
       program: testProgram,
     });
 
@@ -127,7 +125,6 @@ describe('expansionPlanner', () => {
       getMissingExpansionCoverage: getMissingCoverageFromDepths(
         new Map([[keyA, 1]]),
       ),
-      getCoverageKey: (_axis, key) => key,
       program: testProgram,
     });
 
@@ -148,7 +145,6 @@ describe('expansionPlanner', () => {
       nodes,
       coverage: { rowDepth: 1, columnDepth: 0 },
       getMissingExpansionCoverage: getMissingCoverageFromDepths(new Map()),
-      getCoverageKey: (_axis, key) => key,
       program: testProgram,
     });
 
@@ -172,7 +168,6 @@ describe('expansionPlanner', () => {
       getMissingExpansionCoverage: getMissingCoverageFromDepths(
         new Map([[keyA, 1]]),
       ),
-      getCoverageKey: (_axis, key) => key,
       program: testProgram,
     });
 
@@ -197,7 +192,6 @@ describe('expansionPlanner', () => {
       getMissingExpansionCoverage: getMissingCoverageFromDepths(
         new Map([[keyA, 1]]),
       ),
-      getCoverageKey: (_axis, key) => key,
       program: testProgram,
     });
 
@@ -219,7 +213,6 @@ describe('expansionPlanner', () => {
       nodes: baseNodes,
       coverage: { rowDepth: 1, columnDepth: 1 },
       getMissingExpansionCoverage: getMissingCoverageFromDepths(new Map()),
-      getCoverageKey: (_axis, key) => key,
       program: testProgram,
     });
     expect(sortFetchPathKeys(plan1)).toEqual([keyA]);
@@ -231,7 +224,6 @@ describe('expansionPlanner', () => {
       nodes: baseNodes,
       coverage: { rowDepth: 1, columnDepth: 1 },
       getMissingExpansionCoverage: getMissingCoverageFromDepths(fetchedDepth),
-      getCoverageKey: (_axis, key) => key,
       program: testProgram,
     });
     expect(sortFetchPathKeys(plan2)).toEqual([]);
@@ -242,7 +234,6 @@ describe('expansionPlanner', () => {
       nodes: baseNodes,
       coverage: { rowDepth: 1, columnDepth: 1 },
       getMissingExpansionCoverage: getMissingCoverageFromDepths(fetchedDepth),
-      getCoverageKey: (_axis, key) => key,
       program: testProgram,
     });
     expect(sortFetchPathKeys(plan3)).toEqual([keyAB]);
@@ -253,7 +244,6 @@ describe('expansionPlanner', () => {
       nodes: baseNodes,
       coverage: { rowDepth: 1, columnDepth: 2 },
       getMissingExpansionCoverage: getMissingCoverageFromDepths(fetchedDepth),
-      getCoverageKey: (_axis, key) => key,
       program: testProgram,
     });
     expect(sortFetchPathKeys(plan4)).toEqual([keyA]);
@@ -271,7 +261,6 @@ describe('expansionPlanner', () => {
       getMissingExpansionCoverage: getMissingCoverageFromDepths(
         new Map([[keyA, 2]]),
       ),
-      getCoverageKey: (_axis, key) => key,
       program: testProgram,
     });
     expect(sortFetchPathKeys(plan5)).toEqual([keyAB]);

@@ -501,7 +501,6 @@ export const runSameAxisExpansionFetchLoop = async ({
   getExpandedCols,
   getMissingExpansionCoverage,
   config,
-  getCoverageKey,
   program,
   fetchRuntime,
   transactionId,
@@ -521,7 +520,6 @@ export const runSameAxisExpansionFetchLoop = async ({
   getExpandedCols: () => Set<string>;
   getMissingExpansionCoverage: () => PivotExpansionCoverageDiff;
   config: ExpansionVisibilityConfig;
-  getCoverageKey: (axis: PivotAxis, key: string) => string;
   program: PivotProgram;
   fetchRuntime: ExpansionFetchRuntime;
   transactionId: number;
@@ -564,16 +562,15 @@ export const runSameAxisExpansionFetchLoop = async ({
       nodes,
       coverage: { rowDepth: visibleRowDepth, columnDepth: visibleColDepth },
       getMissingExpansionCoverage: getMissingExpansionCoverage(),
-      getCoverageKey,
     });
     if (plan.fetchRequests.length === 0) {
       break;
     }
     const targets = buildGroupedFetchTargets({
       axis,
+      program,
       requests: plan.fetchRequests,
       nodes,
-      getCoverageKey,
     });
 
     // eslint-disable-next-line no-await-in-loop

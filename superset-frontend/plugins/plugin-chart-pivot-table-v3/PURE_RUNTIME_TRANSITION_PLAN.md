@@ -163,7 +163,7 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14324` insertions, `15552` deletions, net `-1228`.
+- Production `src`: `14313` insertions, `15560` deletions, net `-1247`.
 - Current production TypeScript/TSX total: about `32557` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
@@ -753,6 +753,9 @@ Success criteria:
   or visible cell entries during expansion planning.
 - Same-axis expansion fetch loops now receive the shared visibility config
   directly instead of a hook-owned visible-depth callback.
+- Expansion coverage-key grouping is now planner-owned and program-derived.
+  The hook, hydration loop, and same-axis fetch loop no longer thread a
+  `getCoverageKey` callback through expansion boundaries.
 
 ## Current Risks
 

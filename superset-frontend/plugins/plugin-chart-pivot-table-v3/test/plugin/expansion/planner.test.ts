@@ -82,9 +82,9 @@ const planGroupedExpansionTargets = (
     plan,
     targets: buildGroupedFetchTargets({
       axis: input.axis,
+      program: input.program,
       requests: plan.fetchRequests,
       nodes: input.nodes,
-      getCoverageKey: input.getCoverageKey,
     }),
   };
 };
@@ -119,7 +119,6 @@ describe('pivot/expansion/planner', () => {
       nodes,
       coverage: { rowDepth: 1, columnDepth: 1 },
       getMissingExpansionCoverage: getMissingCoverageFromBatches(),
-      getCoverageKey: (_axis, key) => key,
       program: testProgram,
     });
 
@@ -147,7 +146,6 @@ describe('pivot/expansion/planner', () => {
       },
       coverage: { rowDepth: 1, columnDepth: 0 },
       getMissingExpansionCoverage: getMissingCoverageFromBatches(),
-      getCoverageKey: (_axis, key) => key,
       program: testProgram,
     });
 
@@ -192,7 +190,6 @@ describe('pivot/expansion/planner', () => {
       },
       coverage: { rowDepth: 1, columnDepth: 1 },
       getMissingExpansionCoverage,
-      getCoverageKey: (_axis, key) => key,
       program: testProgram,
     });
 
@@ -217,7 +214,6 @@ describe('pivot/expansion/planner', () => {
       },
       coverage: { rowDepth: 1, columnDepth: 1 },
       getMissingExpansionCoverage,
-      getCoverageKey: (_axis, key) => key,
       program: testProgram,
     });
 
@@ -255,7 +251,6 @@ describe('pivot/expansion/planner', () => {
       },
       coverage: { rowDepth: 1, columnDepth: 1 },
       getMissingExpansionCoverage,
-      getCoverageKey: (_axis, key) => key,
       program: testProgram,
     });
 
@@ -302,7 +297,6 @@ describe('pivot/expansion/planner', () => {
       },
       coverage: { rowDepth: 1, columnDepth: 0 },
       getMissingExpansionCoverage,
-      getCoverageKey: (_axis, key) => key,
       program: testProgram,
     });
 
@@ -347,7 +341,6 @@ describe('pivot/expansion/planner', () => {
       },
       coverage: { rowDepth: 1, columnDepth: 1 },
       getMissingExpansionCoverage,
-      getCoverageKey: (_axis, key) => key,
       program: testProgram,
     });
 
@@ -394,7 +387,6 @@ describe('pivot/expansion/planner', () => {
       nodes,
       coverage: { rowDepth: 1, columnDepth: 1 },
       getMissingExpansionCoverage: getMissingCoverageFromBatches(),
-      getCoverageKey: (_axis, key) => key,
       program: testProgram,
     });
 

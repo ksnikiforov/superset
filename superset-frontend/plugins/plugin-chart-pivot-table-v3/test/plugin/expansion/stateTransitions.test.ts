@@ -150,7 +150,6 @@ describe('pivot/expansion/stateTransitions', () => {
     program: testProgram,
     buildRenderModelConfig: buildTestRenderModelConfig(),
   };
-  const getCoverageKey = (_axis: 'row' | 'col', key: string) => key;
   const expansionCoverageLoadedFromBatches = (
     factBatches: PivotFactStoreBatch[] = [],
   ) =>
@@ -681,7 +680,6 @@ describe('pivot/expansion/stateTransitions', () => {
       getMissingExpansionCoverage: () =>
         expansionCoverageLoadedFromBatches(factBatches),
       config,
-      getCoverageKey,
       pendingRows: new Set(),
       pendingCols: new Set(),
       planCols: false,
@@ -741,7 +739,6 @@ describe('pivot/expansion/stateTransitions', () => {
       getMissingExpansionCoverage: () =>
         expansionCoverageLoadedFromBatches(factBatches),
       config,
-      getCoverageKey,
       pendingRows: new Set(),
       pendingCols: new Set(),
       planCols: false,
@@ -846,7 +843,6 @@ describe('pivot/expansion/stateTransitions', () => {
           groupbyColumnsLength: 0,
         }),
       },
-      getCoverageKey,
       pendingRows: new Set(),
       pendingCols: new Set(),
       planCols: false,
@@ -874,7 +870,6 @@ describe('pivot/expansion/stateTransitions', () => {
         axis === 'row' ? new Set([aKey]) : new Set([xKey]),
       getMissingExpansionCoverage: () => expansionCoverageLoadedFromBatches(),
       config,
-      getCoverageKey,
       pendingRows: new Set(),
       pendingCols: new Set(),
       pruneMergedTree: ({ tree: nextTree }) => nextTree,
@@ -1049,7 +1044,6 @@ describe('pivot/expansion/stateTransitions', () => {
         loadedRootCoverage,
       ]),
       config,
-      getCoverageKey,
       pendingRows: new Set(),
       pendingCols: new Set(),
     });
@@ -1078,7 +1072,6 @@ describe('pivot/expansion/stateTransitions', () => {
       desiredCols: new Set([rootKey, xKey]),
       getMissingExpansionCoverage: expansionCoverageLoadedFromBatches(),
       config,
-      getCoverageKey,
       activeAxis: 'col',
       pendingRows: new Set(),
       pendingCols: new Set(),
@@ -1106,7 +1099,6 @@ describe('pivot/expansion/stateTransitions', () => {
       desiredCols: new Set([rootKey, xKey]),
       getMissingExpansionCoverage: expansionCoverageLoadedFromBatches(),
       config,
-      getCoverageKey,
       pendingRows: new Set(),
       pendingCols: new Set(),
     });
@@ -1137,7 +1129,6 @@ describe('pivot/expansion/stateTransitions', () => {
       desiredCols: new Set([rootKey, xKey]),
       getMissingExpansionCoverage: expansionCoverageLoadedFromBatches(),
       config,
-      getCoverageKey,
       pendingRows: new Set(),
       pendingCols: new Set(),
       planRows: false,
@@ -1199,7 +1190,6 @@ describe('pivot/expansion/stateTransitions', () => {
       desiredCols: new Set([rootKey, xKey]),
       getMissingExpansionCoverage: expansionCoverageLoadedFromBatches(),
       config: metricConfig,
-      getCoverageKey,
       pendingRows: new Set(),
       pendingCols: new Set(),
     });
@@ -1263,7 +1253,6 @@ describe('pivot/expansion/stateTransitions', () => {
       desiredCols: new Set([rootKey, xKey]),
       getMissingExpansionCoverage: expansionCoverageLoadedFromBatches(),
       config: metricConfig,
-      getCoverageKey,
       pendingRows: new Set(),
       pendingCols: new Set(),
     });
@@ -1397,7 +1386,6 @@ describe('pivot/expansion/stateTransitions', () => {
       autoExpandColsLevelForDesired: 0,
       getMissingExpansionCoverage: expansionCoverageLoadedFromBatches(),
       config,
-      getCoverageKey,
     });
 
     expect(prefetch.shouldPlanRows).toBe(true);

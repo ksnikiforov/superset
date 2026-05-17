@@ -24,7 +24,10 @@ import {
   type PivotExpansionCoverageDiff,
   type PivotExpansionCoverageRequest,
 } from '../runtime/coverage';
-import { canRequestAxisExpansion } from '../runtime/projection';
+import {
+  buildAxisCoverageKeyFromPathKey,
+  canRequestAxisExpansion,
+} from '../runtime/projection';
 import type { PivotProgram } from '../runtime/types';
 import { rootKey } from '../viewModel';
 
@@ -78,6 +81,12 @@ const requestKey = ({
 }: PivotExpansionCoverageRequest) =>
   `${axis}|${pathKey}|${rowDepth}|${columnDepth}`;
 
+const coverageKeyForPathKey = (
+  program: PivotProgram,
+  axis: PivotAxis,
+  key: string,
+) => buildAxisCoverageKeyFromPathKey({ program, axis, key });
+
 export const planExpansionForAxis = ({
   axis,
   program,
@@ -85,7 +94,6 @@ export const planExpansionForAxis = ({
   nodes,
   coverage,
   getMissingExpansionCoverage,
-  getCoverageKey,
 }: {
   axis: PivotAxis;
   program: PivotProgram;
@@ -93,7 +101,6 @@ export const planExpansionForAxis = ({
   nodes: Record<string, PivotTreeNode>;
   coverage: PivotExpansionCoverageDepths;
   getMissingExpansionCoverage: PivotExpansionCoverageDiff;
-  getCoverageKey: (axis: PivotAxis, key: string) => string;
 }): PivotExpansionPlan => {
   const fetchRequests = new Map<string, PivotExpansionCoverageRequest>();
   const pendingKeys = new Set<string>();
@@ -134,7 +141,8 @@ export const planExpansionForAxis = ({
     const ancestor = nodes[ancestorKey];
     if (
       ancestor &&
-      getCoverageKey(axis, key) !== getCoverageKey(axis, ancestorKey) &&
+      coverageKeyForPathKey(program, axis, key) !==
+        coverageKeyForPathKey(program, axis, ancestorKey) &&
       canRequestAxisExpansion({ program, axis, path: ancestor.path })
     ) {
       addRequest(ancestorKey);
@@ -170,7 +178,10 @@ export const planExpansionForAxis = ({
       !canRequestAxisExpansion({ program, axis, path: ancestor.path }) ||
       !missingRequestKeys.has(requestKey(ancestorRequest))
     ) {
-      if (getCoverageKey(axis, key) === getCoverageKey(axis, ancestorKey)) {
+      if (
+        coverageKeyForPathKey(program, axis, key) ===
+        coverageKeyForPathKey(program, axis, ancestorKey)
+      ) {
         return;
       }
       addFetchRequest(key);
@@ -196,18 +207,18 @@ export const planExpansionForAxis = ({
 
 export function buildGroupedFetchTargets({
   axis,
+  program,
   requests,
   nodes,
-  getCoverageKey,
 }: {
   axis: PivotAxis;
+  program: PivotProgram;
   requests: PivotExpansionCoverageRequest[];
   nodes: Record<string, PivotTreeNode>;
-  getCoverageKey: (axis: PivotAxis, key: string) => string;
 }): FetchTarget[] {
   const groups = new Map<string, string[]>();
   requests.forEach(({ pathKey }) => {
-    const groupKey = getCoverageKey(axis, pathKey);
+    const groupKey = coverageKeyForPathKey(program, axis, pathKey);
     const existing = groups.get(groupKey);
     if (existing) {
       existing.push(pathKey);
@@ -220,7 +231,9 @@ export function buildGroupedFetchTargets({
 
   for (const keys of groups.values()) {
     const representative =
-      keys.find(key => getCoverageKey(axis, key) === key && nodes[key]) ??
+      keys.find(
+        key => coverageKeyForPathKey(program, axis, key) === key && nodes[key],
+      ) ??
       keys.find(key => nodes[key]) ??
       keys[0];
 
