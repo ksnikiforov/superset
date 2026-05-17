@@ -314,7 +314,6 @@ export interface PivotTableProps
   rowSubTotals?: boolean;
   rowSubtotalLevels?: number[];
   colSubtotalLevels?: number[];
-  metricsLayout?: MetricsLayoutEnum;
   emitCrossFilters?: boolean;
   setControlValue?: HandlerFunction;
   setDataMask: SetDataMaskHook;

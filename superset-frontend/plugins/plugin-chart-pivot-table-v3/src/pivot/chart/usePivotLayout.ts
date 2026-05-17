@@ -108,7 +108,6 @@ export type PivotLayoutResult = {
 
 export const usePivotLayout = ({
   formData,
-  metricsLayout,
   startCollapsed,
   initialDepth,
   expandRowsLevel,
@@ -125,7 +124,6 @@ export const usePivotLayout = ({
   pivotProgram,
 }: {
   formData: PivotTableProps['formData'];
-  metricsLayout: MetricsLayoutEnum;
   startCollapsed: boolean;
   initialDepth: number;
   expandRowsLevel?: number;
@@ -144,6 +142,8 @@ export const usePivotLayout = ({
   const expandRowsLevelRaw = expandRowsLevel ?? formData.expandRowsLevel;
   const expandColumnsLevelRaw =
     expandColumnsLevel ?? formData.expandColumnsLevel;
+  const metricsLayout =
+    (formData.metricsLayout as MetricsLayoutEnum) || MetricsLayoutEnum.COLUMNS;
 
   const layout = useMemo(
     () =>
@@ -153,8 +153,7 @@ export const usePivotLayout = ({
         metrics: formData.metrics,
         measureLeavesByMetric: formData.measureLeavesByMetric,
         verboseMap: formData.verboseMap,
-        metricsLayout:
-          (formData.metricsLayout as MetricsLayoutEnum) || metricsLayout,
+        metricsLayout,
         rowTotals,
         colTotals,
         rowSubTotals,

@@ -420,7 +420,6 @@ export default function transformProps(
     rowSubTotals: rowSubTotalsEnabled,
     rowSubtotalLevels,
     colSubtotalLevels,
-    metricsLayout,
     emitCrossFilters,
     setDataMask,
     setControlValue,

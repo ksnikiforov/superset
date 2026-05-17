@@ -28,11 +28,7 @@ import {
   t,
 } from '@superset-ui/core';
 import { Loading } from '@superset-ui/core/components';
-import {
-  type PivotTableProps,
-  MetricsLayoutEnum,
-  PivotRuntimeLayout,
-} from './types';
+import { type PivotTableProps, PivotRuntimeLayout } from './types';
 import { useExpansionEngine } from './pivot/expansion/useExpansionEngine';
 import { usePivotLayout } from './pivot/chart/usePivotLayout';
 import { usePivotRenderModel } from './pivot/chart/usePivotRenderModel';
@@ -100,7 +96,6 @@ function PivotTableChart(props: PivotTableProps) {
     onContextMenu,
     timeGrainSqla,
     dateFormatters = {},
-    metricsLayout = MetricsLayoutEnum.COLUMNS,
     rowSubtotalLevels = [],
     colSubtotalLevels = [],
     rowTotals = false,
@@ -324,7 +319,6 @@ function PivotTableChart(props: PivotTableProps) {
 
   const layoutResult = usePivotLayout({
     formData: appliedLayoutFormData,
-    metricsLayout,
     startCollapsed,
     initialDepth,
     expandRowsLevel,
