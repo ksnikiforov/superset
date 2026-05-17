@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14485` insertions, `15131` deletions, net `-646`.
-- Current production TypeScript/TSX total: about `32864` lines.
+- Production `src`: `14487` insertions, `15144` deletions, net `-657`.
+- Current production TypeScript/TSX total: about `32853` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -533,6 +533,8 @@ Success criteria:
 - Collapse and initial-depth policy now also comes from applied layout
   `formData`; tests that need expanded headers set that intent in form data
   instead of relying on chart-prop overrides.
+- Expansion-level policy now comes from applied layout `formData`; the chart
+  and layout hook no longer accept duplicate top-level expand-level props.
 
 ## Current Risks
 
