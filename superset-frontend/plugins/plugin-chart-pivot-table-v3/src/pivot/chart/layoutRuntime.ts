@@ -31,6 +31,7 @@ import { serializePath } from '../core/path';
 import {
   createMetricNodePolicy,
   getMetricDepthForParent,
+  getMetricLabelFromPath,
   getMetricTierNodes,
   isExplicitSubtotalNode,
 } from '../metricsTotals';
@@ -63,15 +64,16 @@ export type MetricAxisLayoutPolicy = {
 };
 
 export const buildMetricOrderComparator = ({
-  metricKeys,
+  program,
   measureHierarchy,
-  getMetricLabelFromPath,
 }: {
-  metricKeys: string[];
+  program: PivotProgram;
   measureHierarchy: MeasureHierarchy;
-  getMetricLabelFromPath: (path: PivotTreeNode['path']) => string | undefined;
 }) => {
-  const metricOrderMap = new Map(metricKeys.map((label, idx) => [label, idx]));
+  const metricLabelSet = new Set(program.metricKeys);
+  const metricOrderMap = new Map(
+    program.metricKeys.map((label, idx) => [label, idx]),
+  );
   const measureLeafOrderMap = new Map<string, Map<string, number>>();
   if (measureHierarchy.kind === 'measureStackV1') {
     measureHierarchy.groups.forEach(group => {
@@ -84,8 +86,8 @@ export const buildMetricOrderComparator = ({
   }
 
   return (a: PivotTreeNode, b: PivotTreeNode) => {
-    const aMetric = getMetricLabelFromPath(a.path);
-    const bMetric = getMetricLabelFromPath(b.path);
+    const aMetric = getMetricLabelFromPath(a.path, metricLabelSet);
+    const bMetric = getMetricLabelFromPath(b.path, metricLabelSet);
     if (!aMetric || !bMetric) {
       return 0;
     }

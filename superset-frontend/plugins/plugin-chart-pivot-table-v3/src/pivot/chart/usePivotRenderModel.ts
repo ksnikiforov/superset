@@ -359,12 +359,10 @@ export const usePivotRenderModel = ({
           level => level > 0,
         ),
         isExplicitSubtotalNode: layout.isExplicitSubtotalNode,
-        getMetricKeyFromPath: layout.getMetricLabelFromPath,
         getMetricDisplayLabelForKey: layout.getMetricDisplayLabelForKey,
-        getNonMetricPathParts: path => getProjectedPathParts('col', path),
         isExpanded: node => expandedCols.has(node.key),
       }),
-    [expandedCols, getProjectedPathParts, layout],
+    [expandedCols, layout],
   );
 
   const getColumnHeaderLabel = useCallback(

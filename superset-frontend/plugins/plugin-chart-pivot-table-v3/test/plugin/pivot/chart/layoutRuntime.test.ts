@@ -139,17 +139,11 @@ const valuesProgram: PivotProgram = {
 describe('pivot/chart/layoutRuntime', () => {
   it('orders metric nodes by compiled metric order', () => {
     const comparator = buildMetricOrderComparator({
-      metricKeys: ['sales', 'profit'],
+      program: policyProgram({ metricKeys: ['sales', 'profit'] }),
       measureHierarchy: {
         kind: 'flatMetrics',
         metricKeys: ['sales', 'profit'],
       },
-      getMetricLabelFromPath: path =>
-        path.includes(encodeMetricKey('sales'))
-          ? 'sales'
-          : path.includes(encodeMetricKey('profit'))
-            ? 'profit'
-            : undefined,
     });
 
     expect(
@@ -162,7 +156,7 @@ describe('pivot/chart/layoutRuntime', () => {
 
   it('orders measure leaves within the same metric', () => {
     const comparator = buildMetricOrderComparator({
-      metricKeys: ['sales'],
+      program: valuesProgram,
       measureHierarchy: {
         kind: 'measureStackV1',
         leafTierVisibility: 'visible',
@@ -176,7 +170,6 @@ describe('pivot/chart/layoutRuntime', () => {
           },
         ],
       },
-      getMetricLabelFromPath: () => 'sales',
     });
 
     expect(

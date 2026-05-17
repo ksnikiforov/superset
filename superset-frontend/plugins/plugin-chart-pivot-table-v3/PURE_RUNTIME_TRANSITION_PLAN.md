@@ -163,7 +163,7 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14351` insertions, `15766` deletions, net `-1415`.
+- Production `src`: `14367` insertions, `15784` deletions, net `-1417`.
 - Current production TypeScript/TSX total: about `32557` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
@@ -781,6 +781,10 @@ Success criteria:
   layout hook no longer exports those callbacks through `PivotLayoutResult` for
   render date labels, dimension formatting, sorting, or filter-value
   collection.
+- Metric-path lookup for render labels, column header display, metric ordering,
+  and column sort now derives from `PivotProgram.metricKeys` at the owning
+  helper boundary. `PivotLayoutResult` no longer exports a metric-label path
+  callback for render/formatting/sort helpers.
 
 ## Current Risks
 

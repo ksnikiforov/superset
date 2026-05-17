@@ -22,10 +22,12 @@ import {
   type PivotTreeNode,
 } from '../../types';
 import { findMeasureLeafIdInPath } from '../core/tokens';
+import { getMetricLabelFromPath } from '../metricsTotals';
 import {
   buildMeasureLeafOutputKey,
   resolveMeasureSortMetricKey,
 } from '../measureLeaves';
+import type { PivotProgram } from '../runtime/types';
 
 export type PivotColumnSortState = {
   colKey: string;
@@ -36,7 +38,7 @@ export type PivotColumnSortState = {
 
 export type PivotColumnSortLayout = {
   measureHierarchy: MeasureHierarchy;
-  getMetricLabelFromPath: (path: PivotTreeNode['path']) => string | undefined;
+  layout: { pivotProgram: PivotProgram };
 };
 
 export const resolvePivotColumnSortMetric = ({
@@ -46,7 +48,10 @@ export const resolvePivotColumnSortMetric = ({
   node: PivotTreeNode;
   layout: PivotColumnSortLayout;
 }) => {
-  const metricKey = layout.getMetricLabelFromPath(node.path);
+  const metricKey = getMetricLabelFromPath(
+    node.path,
+    new Set(layout.layout.pivotProgram.metricKeys),
+  );
   if (!metricKey) {
     return undefined;
   }
@@ -78,7 +83,10 @@ export const resolvePivotColumnSortDataKey = ({
   layout: PivotColumnSortLayout;
   columnNodes: Record<string, PivotTreeNode>;
 }) => {
-  const baseMetricKey = layout.getMetricLabelFromPath(node.path);
+  const baseMetricKey = getMetricLabelFromPath(
+    node.path,
+    new Set(layout.layout.pivotProgram.metricKeys),
+  );
   if (!baseMetricKey) {
     return node.key;
   }

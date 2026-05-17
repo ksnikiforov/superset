@@ -36,6 +36,7 @@ import { formatPivotLabelValue } from '../core/tree';
 import { seedExpandedByLevel } from '../expansion/stateModel';
 import {
   createMetricNodePolicy,
+  getMetricLabelFromPath,
   getNodeDimDepth as getNodeDimDepthBase,
   isExplicitTotalNode as isExplicitTotalNodeBase,
 } from '../metricsTotals';
@@ -52,9 +53,7 @@ export type ColumnDisplayConfig = {
   program: PivotProgram;
   allowMetricSubtotalLabels: boolean;
   isExplicitSubtotalNode: (node: PivotTreeNode) => boolean;
-  getMetricKeyFromPath: (path: PivotTreeNode['path']) => string | undefined;
   getMetricDisplayLabelForKey: (metricKey: string) => string;
-  getNonMetricPathParts: (path: PivotTreeNode['path']) => PivotTreeNode['path'];
   isExpanded?: (node: PivotTreeNode) => boolean;
 };
 
@@ -67,16 +66,18 @@ export const buildColumnDisplayPath = (
     program,
     allowMetricSubtotalLabels,
     isExplicitSubtotalNode,
-    getMetricKeyFromPath,
     getMetricDisplayLabelForKey,
-    getNonMetricPathParts,
     isExpanded,
   } = config;
-  const { isMetricGrandTotalNode, isMetricSubtotalNode } =
-    createMetricNodePolicy(program);
+  const {
+    metricLabelSet,
+    getNonMetricPathParts,
+    isMetricGrandTotalNode,
+    isMetricSubtotalNode,
+  } = createMetricNodePolicy(program);
   const metricsFirstOnCols = isValuesFirstOnAxis(program, 'col');
   const metricsAtColEnd = isValuesAtAxisEnd(program, 'col');
-  const metricKey = getMetricKeyFromPath(col.path);
+  const metricKey = getMetricLabelFromPath(col.path, metricLabelSet);
   const metricLabel = metricKey
     ? getMetricDisplayLabelForKey(metricKey)
     : undefined;

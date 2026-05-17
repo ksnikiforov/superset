@@ -33,7 +33,6 @@ import type { PivotProgram } from '../runtime/types';
 import type { RenderModelConfig } from '../render/renderModel';
 import {
   createMetricNodePolicy,
-  getMetricLabelFromPath as getMetricLabelFromPathBase,
   isExplicitSubtotalNode,
 } from '../metricsTotals';
 import { pruneStaleCollapsedAxis } from './pruneCollapsedAxis';
@@ -63,7 +62,6 @@ export type PivotLayoutResult = {
   effectiveRowSubtotalPosition: TotalPosition;
   hideMetricHeaderOnRows: boolean;
   compareMetricOrder: (a: PivotTreeNode, b: PivotTreeNode) => number;
-  getMetricLabelFromPath: (path: PivotTreeNode['path']) => string | undefined;
   getMetricDisplayLabelForKey: (metricKey: string) => string;
   isExplicitSubtotalNode: (node?: PivotTreeNode) => boolean;
   getRowSubtotalPosition: (node: PivotTreeNode) => TotalPosition;
@@ -174,9 +172,6 @@ export const usePivotLayout = ({
   );
   const { metricLabelSet, isMetricGrandTotalNode, isMetricSubtotalNode } =
     metricNodePolicy;
-  const metricVerboseMap = formData.verboseMap as
-    | Record<string, string>
-    | undefined;
 
   const isMultiMetric = metricLabels.length > 1;
   const hasMultipleMeasures =
@@ -273,29 +268,23 @@ export const usePivotLayout = ({
   );
   const metricIndexOnRows = getValuesLevelIndex(layout.pivotProgram, 'row');
 
-  const getMetricLabelFromPath = useCallback(
-    (path: PivotTreeNode['path']) =>
-      getMetricLabelFromPathBase(path, metricLabelSet),
-    [metricLabelSet],
-  );
   const getMetricDisplayLabelForKey = useCallback(
     (metricKey: string) =>
       resolveMetricDisplayLabel(metricKey, {
         metricLabelMap,
-        verboseMap: metricVerboseMap,
+        verboseMap: formData.verboseMap as Record<string, string> | undefined,
         metrics,
       }),
-    [metricLabelMap, metricVerboseMap, metrics],
+    [formData.verboseMap, metricLabelMap, metrics],
   );
 
   const compareMetricOrder = useMemo(
     () =>
       buildMetricOrderComparator({
-        metricKeys: metricLabels,
+        program: layout.pivotProgram,
         measureHierarchy: layout.measureHierarchy,
-        getMetricLabelFromPath,
       }),
-    [getMetricLabelFromPath, layout.measureHierarchy, metricLabels],
+    [layout.measureHierarchy, layout.pivotProgram],
   );
 
   const getRowSubtotalPosition = useCallback(
@@ -490,7 +479,6 @@ export const usePivotLayout = ({
     effectiveRowSubtotalPosition,
     hideMetricHeaderOnRows,
     compareMetricOrder,
-    getMetricLabelFromPath,
     getMetricDisplayLabelForKey,
     isExplicitSubtotalNode,
     getRowSubtotalPosition,

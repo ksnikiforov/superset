@@ -17,9 +17,11 @@
  * under the License.
  */
 import {
+  MetricsLayoutEnum,
   type MeasureHierarchy,
   type PivotTreeNode,
 } from '../../../../src/types';
+import type { PivotProgram } from '../../../../src/pivot/runtime/types';
 import {
   buildBuiltInLeaf,
   buildMeasureLeafOutputKey,
@@ -65,10 +67,27 @@ const measureHierarchy: MeasureHierarchy = {
   leafTierVisibility: 'visible',
 };
 
+const pivotProgram: PivotProgram = {
+  rows: [],
+  columns: [
+    { kind: 'dimension', column: 'year' },
+    {
+      kind: 'values',
+      metrics: [{ key: 'sales', metric: 'sales', index: 0 }],
+    },
+  ],
+  rowDimensions: [],
+  columnDimensions: ['year'],
+  metrics: [{ key: 'sales', metric: 'sales', index: 0 }],
+  metricKeys: ['sales'],
+  metricsLayoutResolved: MetricsLayoutEnum.COLUMNS,
+  valueAxis: 'col',
+  metricInsertIndex: 1,
+};
+
 const layout: PivotColumnSortLayout = {
   measureHierarchy,
-  getMetricLabelFromPath: path =>
-    path.includes(metricToken) ? 'sales' : undefined,
+  layout: { pivotProgram },
 };
 
 describe('column sort helpers', () => {
