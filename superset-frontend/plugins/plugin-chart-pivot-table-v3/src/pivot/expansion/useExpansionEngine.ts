@@ -716,6 +716,7 @@ export const useExpansionEngine = ({
       requestScope,
       fetchFormData: fetchFormDataRef.current,
       factStore: factStoreRef.current,
+      buildRequestGroupId: expansionRequestHelpers.buildRequestGroupId,
       trackRequestInScope: expansionRequestHelpers.trackRequestInScope,
       addWarnings,
       updateLoadingKey,
@@ -765,7 +766,6 @@ export const useExpansionEngine = ({
           getExpandedCols: () => expandedColsRef.current,
           config: visibilityConfig,
           fetchRuntime: buildFetchRuntime(requestScope),
-          buildRequestGroupId: expansionRequestHelpers.buildRequestGroupId,
           resolveExpandedForMetrics,
           pruneMergedTree,
         });
@@ -805,7 +805,6 @@ export const useExpansionEngine = ({
     [
       buildFetchRuntime,
       commitExpansionState,
-      expansionRequestHelpers.buildRequestGroupId,
       expansionRequestLifecycle,
       pivotProgram,
       persistExpansionState,
@@ -887,7 +886,6 @@ export const useExpansionEngine = ({
           planCols: shouldPlanCols,
           pruneMergedTree,
           fetchRuntime: buildFetchRuntime(requestScope),
-          buildRequestGroupId: expansionRequestHelpers.buildRequestGroupId,
         });
         if (result.status === 'complete') {
           const resolvedRows = resolveExpandedForMetrics(
@@ -922,7 +920,6 @@ export const useExpansionEngine = ({
       buildFetchRuntime,
       clearLoadingState,
       commitExpansionState,
-      expansionRequestHelpers,
       expansionRequestLifecycle,
       persistExpansionState,
       pruneMergedTree,

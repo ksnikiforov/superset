@@ -163,7 +163,7 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14300` insertions, `15776` deletions, net `-1476`.
+- Production `src`: `14290` insertions, `15776` deletions, net `-1486`.
 - Current production TypeScript/TSX total: about `32557` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
@@ -755,6 +755,9 @@ Success criteria:
 - Expansion fetch loop request identity now comes from the runtime request
   scope. Hydration, same-axis expansion, and grouped fetch execution no longer
   thread a separate transaction id through the hook boundary.
+- Expansion fetch runtime now owns request group id construction as well as
+  request scope, loading, warnings, and fact-store access. Hydration and
+  same-axis fetch loops no longer receive a separate request-id helper.
 - Expansion visibility, same-axis merge preservation, and reinitialization no
   longer receive caller-built metric-label sets or dimension-depth callbacks.
   `stateTransitions` derives expansion metric policy from `PivotProgram`,
