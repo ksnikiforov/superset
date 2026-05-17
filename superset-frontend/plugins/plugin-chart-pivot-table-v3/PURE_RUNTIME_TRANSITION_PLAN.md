@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14485` insertions, `15333` deletions, net `-848`.
-- Current production TypeScript/TSX total: about `32662` lines.
+- Production `src`: `14476` insertions, `15336` deletions, net `-860`.
+- Current production TypeScript/TSX total: about `32650` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -418,6 +418,9 @@ Success criteria:
   the misplaced query-owned expansion-state module has been removed.
 - Initial bootstrap query planning is folded into the query spec builder; the
   old standalone bootstrap planner wrapper has been removed.
+- Initial root prefetch planning no longer builds a third redundant root fetch
+  context. It reuses the row-root context for root-prefetch metadata while
+  keeping row and column root coverage generation separate.
 - The old visible-fact coverage wrapper has been removed. Initial query
   planning now builds explicit fact coverage directly, while layout visibility
   requirements are represented by the runtime coverage manifest.

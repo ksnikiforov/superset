@@ -923,18 +923,6 @@ export const buildInitialQuerySpecs = (
   });
 
   if (shouldPrefetchRoot) {
-    const axis: PivotAxis = rowGroupby.length > 0 ? 'row' : 'col';
-    const rootContext = resolveFetchContext({
-      formData,
-      layout,
-      axis,
-      path: [],
-      visibleRowDepth: baseRowDepth,
-      visibleColDepth: baseColDepth,
-      targetRowDepth: baseRowDepth,
-      targetColDepth: baseColDepth,
-      coverageReason: 'initial',
-    });
     const rowRootContext = resolveFetchContext({
       formData,
       layout,
@@ -963,7 +951,7 @@ export const buildInitialQuerySpecs = (
           ...rowRootContext.coverages,
           ...colRootContext.coverages,
         ]),
-        ctx: rootContext,
+        ctx: rowRootContext,
         layout,
         filters: [],
         suffix: '|root',
