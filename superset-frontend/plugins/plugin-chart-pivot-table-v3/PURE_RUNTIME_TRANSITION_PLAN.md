@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14473` insertions, `15344` deletions, net `-871`.
-- Current production TypeScript/TSX total: about `32639` lines.
+- Production `src`: `14470` insertions, `15347` deletions, net `-877`.
+- Current production TypeScript/TSX total: about `32633` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -589,6 +589,10 @@ Success criteria:
 - Resolved query fetch context no longer exposes internal projection and
   support-policy booleans to callers. The query boundary now exposes only query
   shape, materialization metadata, depth, and fact coverage.
+- Render toggle policy no longer hides metric-total nodes by matching raw
+  display labels such as `Total <metric>`. Toggle behavior now depends on
+  explicit subtotal/metric-total node predicates supplied by materialization and
+  layout policy.
 
 ## Current Risks
 

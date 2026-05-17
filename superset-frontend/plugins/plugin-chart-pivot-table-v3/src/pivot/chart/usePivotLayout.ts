@@ -61,7 +61,6 @@ export type PivotLayoutResult = {
   expandColumnsLevelRaw?: number;
   resolvedExpandRowsLevel: number;
   resolvedExpandColumnsLevel: number;
-  metricLabels: string[];
   metricLabelSet: Set<string>;
   isMetricTokenValue: (value: unknown) => boolean;
   normalizedRowSubtotalLevels: number[];
@@ -602,7 +601,6 @@ export const usePivotLayout = ({
     expandColumnsLevelRaw,
     resolvedExpandRowsLevel,
     resolvedExpandColumnsLevel,
-    metricLabels,
     metricLabelSet,
     isMetricTokenValue,
     normalizedRowSubtotalLevels,

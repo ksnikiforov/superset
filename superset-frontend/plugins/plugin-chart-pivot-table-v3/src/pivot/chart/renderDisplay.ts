@@ -317,7 +317,6 @@ type RenderNodeDisplayLayout = Pick<
   PivotLayoutResult,
   | 'resolvedExpandRowsLevel'
   | 'metricLabelSet'
-  | 'metricLabels'
   | 'hideMetricHeaderOnRows'
   | 'isMetricTokenValue'
   | 'isExplicitSubtotalNode'
@@ -381,9 +380,6 @@ export const buildRenderNodeDisplayState = ({
       return false;
     }
     if (
-      (node.path.length === 1 &&
-        typeof node.path[0] === 'string' &&
-        layout.metricLabels.some(label => node.path[0] === `Total ${label}`)) ||
       layout.isExplicitSubtotalNode(node) ||
       layout.isMetricGrandTotalNode(node)
     ) {

@@ -357,7 +357,7 @@ export const usePivotRenderModel = ({
         allowMetricSubtotalLabels: layout.normalizedColSubtotalLevels.some(
           level => level > 0,
         ),
-        metricLabels: layout.metricLabels,
+        metricLabels: layout.layout.pivotProgram.metricKeys,
         isExplicitSubtotalNode: layout.isExplicitSubtotalNode,
         getMetricKeyFromPath: layout.getMetricLabelFromPath,
         getMetricDisplayLabelForKey: layout.getMetricDisplayLabelForKey,
