@@ -345,77 +345,6 @@ export const isSameRuntimeLayout = (
   prev.valuePlacement.axis === next.valuePlacement.axis &&
   prev.valuePlacement.index === next.valuePlacement.index;
 
-const placementBeforeSharedDimensions = (
-  axisDimensions: string[],
-  index: number,
-  sharedDimensions: Set<string>,
-) => axisDimensions.slice(0, index).filter(item => sharedDimensions.has(item));
-
-const shouldFetchForValuePlacementChange = ({
-  prev,
-  next,
-}: {
-  prev: PivotRuntimeLayout;
-  next: PivotRuntimeLayout;
-}) => {
-  if (prev.valuePlacement.axis !== next.valuePlacement.axis) {
-    const prevValueAxis =
-      prev.valuePlacement.axis === 'row' ? prev.rows : prev.cols;
-    const nextValueAxis =
-      next.valuePlacement.axis === 'row' ? next.rows : next.cols;
-    return prevValueAxis.length > 0 || nextValueAxis.length > 0;
-  }
-  const prevValueAxis =
-    prev.valuePlacement.axis === 'row' ? prev.rows : prev.cols;
-  const nextValueAxis =
-    next.valuePlacement.axis === 'row' ? next.rows : next.cols;
-  if (prevValueAxis.length === 0 && nextValueAxis.length === 0) {
-    return false;
-  }
-  const sharedDimensions = new Set(
-    prevValueAxis.filter(dimension => nextValueAxis.includes(dimension)),
-  );
-  return !arraysEqual(
-    placementBeforeSharedDimensions(
-      prevValueAxis,
-      prev.valuePlacement.index,
-      sharedDimensions,
-    ),
-    placementBeforeSharedDimensions(
-      nextValueAxis,
-      next.valuePlacement.index,
-      sharedDimensions,
-    ),
-  );
-};
-
-const shouldFetchForSemanticLayoutChange = (
-  prev: PivotRuntimeLayout,
-  next: PivotRuntimeLayout,
-): boolean => {
-  if (
-    selectionSignature(prev.leafSelection) !==
-    selectionSignature(next.leafSelection)
-  ) {
-    return true;
-  }
-  if (
-    prev.valuePlacement.axis !== next.valuePlacement.axis ||
-    prev.valuePlacement.index !== next.valuePlacement.index
-  ) {
-    if (
-      shouldFetchForValuePlacementChange({
-        prev,
-        next,
-      })
-    ) {
-      return true;
-    }
-    return false;
-  }
-  return false;
-};
-
 export const buildFactCoverage = ({
   rowDimensions,
   columnDimensions,
@@ -437,6 +366,7 @@ export const buildFactCoverage = ({
 
 export const buildRuntimeLayoutCoverageManifest = (
   runtimeLayout: PivotRuntimeLayout,
+  valueKeys: string[] = runtimeLayout.metrics,
 ): PivotCoverageNeed[] => {
   if (runtimeLayout.metrics.length === 0) {
     return [];
@@ -450,7 +380,7 @@ export const buildRuntimeLayoutCoverageManifest = (
       columnDepth,
       rowDimensions: runtimeLayout.rows.slice(0, rowDepth),
       columnDimensions: runtimeLayout.cols.slice(0, columnDepth),
-      valueKeys: normalizeFactValueKeys(runtimeLayout.metrics),
+      valueKeys: normalizeFactValueKeys(valueKeys),
       rowScope: { kind: 'root' },
       columnScope: { kind: 'root' },
     },
@@ -572,34 +502,21 @@ export const buildCoverageNeedFromFactSelector = ({
 export const factBatchesCoverRuntimeLayout = (
   factBatches: PivotFactStoreBatch[],
   runtimeLayout: PivotRuntimeLayout,
+  valueKeys?: string[],
 ) => {
-  const required = buildRuntimeLayoutCoverageManifest(runtimeLayout);
+  const required = buildRuntimeLayoutCoverageManifest(runtimeLayout, valueKeys);
   return diffCoverageManifest({ required, factBatches }).length === 0;
 };
 
-const coverageManifestSignature = (runtimeLayout: PivotRuntimeLayout) =>
-  stableStringify(buildRuntimeLayoutCoverageManifest(runtimeLayout));
-
 export const shouldFetchRuntimeLayout = ({
   factBatches,
-  previousLayout,
   nextLayout,
+  valueKeys,
 }: {
   factBatches: PivotFactStoreBatch[];
-  previousLayout: PivotRuntimeLayout;
   nextLayout: PivotRuntimeLayout;
-}) => {
-  if (shouldFetchForSemanticLayoutChange(previousLayout, nextLayout)) {
-    return true;
-  }
-  const coverageNeedChanged =
-    coverageManifestSignature(previousLayout) !==
-    coverageManifestSignature(nextLayout);
-  return (
-    coverageNeedChanged &&
-    !factBatchesCoverRuntimeLayout(factBatches, nextLayout)
-  );
-};
+  valueKeys?: string[];
+}) => !factBatchesCoverRuntimeLayout(factBatches, nextLayout, valueKeys);
 
 export const buildBranchFactCoverages = ({
   program,

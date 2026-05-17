@@ -32,6 +32,11 @@ import {
   prepareSeamlessRuntimeUpdateEffect,
   shouldSyncPersistedSelectedFilters,
 } from '../../../../src/pivot/runtime/seamlessRuntimeUpdate';
+import {
+  buildBuiltInLeaf,
+  buildValueLeaf,
+} from '../../../../src/pivot/measureLeaves';
+import { buildFormData } from '../../fixtures/pivotFormData';
 
 const runtimeLayout: PivotRuntimeLayout = {
   version: 1,
@@ -41,6 +46,11 @@ const runtimeLayout: PivotRuntimeLayout = {
   leafSelection: {},
   valuePlacement: { axis: 'col', index: 1 },
 };
+const formData = buildFormData({
+  groupbyRows: ['country'],
+  groupbyColumns: ['month'],
+  metrics: ['sales'],
+});
 
 test('builds stable seamless runtime sync snapshots', () => {
   expect(
@@ -339,7 +349,8 @@ test('prepares fetch actions for runtime layout changes with missing coverage', 
       dimensionKeys: ['country', 'month'],
       metricKeys: ['sales'],
       factBatches: [factBatch],
-      previousRuntimeLayout: { ...runtimeLayout, cols: [] },
+      baseFormData: formData,
+      sourceFormData: formData,
       selection: {},
       upstreamSignature: 'query-a',
     }),
@@ -361,8 +372,22 @@ test('prepares local commit actions for covered runtime layout changes', () => {
       nextLayout,
       dimensionKeys: ['country', 'state', 'month'],
       metricKeys: ['sales'],
-      factBatches: [],
-      previousRuntimeLayout: runtimeLayout,
+      factBatches: [
+        {
+          coverage: buildFactCoverage({
+            reason: 'initial',
+            rowDimensions: ['country'],
+            columnDimensions: ['month'],
+            rowDepth: 1,
+            columnDepth: 1,
+          }),
+          facts: [],
+          valueKeys: ['sales'],
+          scope: { kind: 'bootstrap' },
+        },
+      ],
+      baseFormData: formData,
+      sourceFormData: formData,
       selection: { country: ['France'] },
       upstreamSignature: 'query-a',
     }),
@@ -380,5 +405,52 @@ test('prepares local commit actions for covered runtime layout changes', () => {
       selection: { country: ['France'] },
       upstreamSignature: 'query-a',
     }),
+  });
+});
+
+test('prepares fetch actions when selected measure leaves need missing value keys', () => {
+  expect(
+    prepareSeamlessRuntimeLayoutChange({
+      nextLayout: {
+        ...runtimeLayout,
+        leafSelection: { value: true, 'ix:1:year:past': true },
+      },
+      dimensionKeys: ['country', 'month'],
+      metricKeys: ['sales'],
+      factBatches: [
+        {
+          coverage: buildFactCoverage({
+            reason: 'initial',
+            rowDimensions: ['country'],
+            columnDimensions: ['month'],
+            rowDepth: 1,
+            columnDepth: 1,
+          }),
+          facts: [],
+          valueKeys: ['sales'],
+          scope: { kind: 'bootstrap' },
+        },
+      ],
+      baseFormData: formData,
+      sourceFormData: formData,
+      sourceMeasureLeavesByMetric: {
+        sales: [
+          buildValueLeaf(),
+          buildBuiltInLeaf('ix', {
+            n: 1,
+            unit: 'year',
+            direction: 'past',
+          }),
+        ],
+      },
+      selection: {},
+      upstreamSignature: 'query-a',
+    }),
+  ).toEqual({
+    kind: 'fetch',
+    runtimeLayout: {
+      ...runtimeLayout,
+      leafSelection: { value: true, 'ix:1:year:past': true },
+    },
   });
 });
