@@ -544,9 +544,7 @@ function PivotTableChart(props: PivotTableProps) {
         <PivotInteractionPanel
           dimensions={dimensionList}
           metrics={metricsForUi}
-          measureLeavesByMetric={
-            sourceMeasureLeavesByMetric ?? formData.measureLeavesByMetric
-          }
+          measureLeavesByMetric={sourceMeasureLeavesByMetric}
           metricLabelMap={formData.metricLabelMap}
           dimensionLabelMap={resolvedVerboseMap}
           dateFormatters={resolvedDateFormatters}

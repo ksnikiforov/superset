@@ -377,7 +377,9 @@ export default function transformProps(
     },
     sourceMetrics: rawFormData.metrics ?? baseFormData.metrics ?? [],
     sourceMeasureLeavesByMetric:
-      rawFormData.measureLeavesByMetric ?? baseFormData.measureLeavesByMetric,
+      rawFormData.measureLeavesByMetric ??
+      baseFormData.measureLeavesByMetric ??
+      {},
     ownState,
     appSection,
     theme,

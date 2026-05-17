@@ -49,7 +49,7 @@ type AppliedInteractionLayoutParams = {
   appliedFormData: PivotTableQueryFormData;
   formData: PivotTableQueryFormData;
   sourceMetrics: PivotTableQueryFormData['metrics'];
-  sourceMeasureLeavesByMetric?: PivotTableQueryFormData['measureLeavesByMetric'];
+  sourceMeasureLeavesByMetric: PivotTableQueryFormData['measureLeavesByMetric'];
   committedRuntimeLayout: PivotRuntimeLayout;
   appliedDimensionKeys: string[];
 };
@@ -262,16 +262,12 @@ export const resolveAppliedInteractionLayout = ({
     appliedMetricKeys,
   );
   const metricsForLayout = sourceMetrics;
-  const leavesForLayout =
-    sourceMeasureLeavesByMetric ??
-    appliedFormData.measureLeavesByMetric ??
-    formData.measureLeavesByMetric;
+  const leavesForLayout = sourceMeasureLeavesByMetric;
   const appliedLayoutFormData = resolveInteractionFormData({
     formData: {
       ...appliedFormData,
       metrics: metricsForLayout,
-      measureLeavesByMetric:
-        leavesForLayout ?? appliedFormData.measureLeavesByMetric,
+      measureLeavesByMetric: leavesForLayout,
     },
     runtimeLayout: appliedRuntimeLayout,
   });

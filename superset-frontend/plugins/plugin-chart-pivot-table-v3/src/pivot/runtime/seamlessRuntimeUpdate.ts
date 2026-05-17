@@ -439,7 +439,7 @@ type SeamlessRuntimeUpdatePlanConfig = {
   baseFormData: PivotTableQueryFormData;
   sourceFormData: PivotTableQueryFormData;
   sourceMetrics: PivotTableQueryFormData['metrics'];
-  sourceMeasureLeavesByMetric?: PivotTableQueryFormData['measureLeavesByMetric'];
+  sourceMeasureLeavesByMetric: PivotTableQueryFormData['measureLeavesByMetric'];
   runtimeLayout: PivotRuntimeLayout;
   selection: RuntimeSelection;
   expandedRows?: Set<string>;
@@ -500,10 +500,7 @@ const buildSeamlessRuntimeUpdatePlan = ({
     runtimeLayout,
     selection,
     metricsOverride: sourceMetrics,
-    measureLeavesByMetricOverride:
-      sourceMeasureLeavesByMetric ??
-      sourceFormData.measureLeavesByMetric ??
-      baseFormData.measureLeavesByMetric,
+    measureLeavesByMetricOverride: sourceMeasureLeavesByMetric,
   });
 };
 

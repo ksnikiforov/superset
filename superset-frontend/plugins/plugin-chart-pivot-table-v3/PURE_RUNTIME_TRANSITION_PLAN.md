@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14515` insertions, `15265` deletions, net `-750`.
-- Current production TypeScript/TSX total: about `32760` lines.
+- Production `src`: `14515` insertions, `15272` deletions, net `-757`.
+- Current production TypeScript/TSX total: about `32753` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -556,6 +556,9 @@ Success criteria:
   `transformProps` now returns only the fields the pivot chart actually
   consumes instead of forwarding raw datasource, annotations, legend state,
   behaviors, raw form data, or input refs through the runtime path.
+- Source measure-leaf metadata now follows the same explicit contract as source
+  metrics. Runtime layout and seamless update planning no longer fall back to
+  adjacent form-data snapshots for `measureLeavesByMetric`.
 
 ## Current Risks
 

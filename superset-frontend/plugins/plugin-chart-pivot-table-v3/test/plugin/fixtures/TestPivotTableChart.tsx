@@ -206,7 +206,7 @@ export const buildPreloadedBootstrapFactBatches = (
 
 export const buildPreloadedBranchFactBatches = (
   tree: PivotTreeData | undefined,
-  groupby: Pick<PivotTableProps, 'groupbyRows' | 'groupbyColumns'> = {
+  groupby: Pick<LegacyTestPivotProps, 'groupbyRows' | 'groupbyColumns'> = {
     groupbyRows: [],
     groupbyColumns: [],
   },
@@ -297,7 +297,7 @@ export const buildPreloadedRenderedBranchFactBatches = (
 
 export const buildPreloadedTreeFactBatches = (
   tree: PivotTreeData | undefined,
-  groupby: Pick<PivotTableProps, 'groupbyRows' | 'groupbyColumns'> = {
+  groupby: Pick<LegacyTestPivotProps, 'groupbyRows' | 'groupbyColumns'> = {
     groupbyRows: [],
     groupbyColumns: [],
   },
@@ -322,6 +322,7 @@ const baseProps: PivotTableProps & LegacyTestPivotProps = {
   formData: baseFormData,
   rawFormData: baseFormData,
   sourceMetrics: emptyMetrics,
+  sourceMeasureLeavesByMetric: {},
   groupbyRows: emptyGroupbyRows,
   groupbyColumns: emptyGroupbyColumns,
   aggregateFunction: 'Sum',
@@ -355,6 +356,10 @@ export default function TestPivotTableChart(props: TestPivotTableChartProps) {
       props.metrics ??
       props.formData?.metrics ??
       baseProps.sourceMetrics,
+    sourceMeasureLeavesByMetric:
+      props.sourceMeasureLeavesByMetric ??
+      props.formData?.measureLeavesByMetric ??
+      baseProps.sourceMeasureLeavesByMetric,
   };
   const runtimeLayout = mergedProps.formData.pivotRuntimeLayout;
   const {

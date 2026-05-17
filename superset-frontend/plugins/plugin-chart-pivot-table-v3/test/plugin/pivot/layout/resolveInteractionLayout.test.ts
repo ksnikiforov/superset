@@ -168,6 +168,7 @@ describe('resolveAppliedInteractionLayout', () => {
       appliedFormData: formData,
       formData,
       sourceMetrics: formData.metrics,
+      sourceMeasureLeavesByMetric: formData.measureLeavesByMetric,
       committedRuntimeLayout: {
         ...runtimeLayout,
         rows: ['state'],
@@ -209,6 +210,7 @@ describe('resolveAppliedInteractionLayout', () => {
       appliedFormData,
       formData,
       sourceMetrics: formData.metrics,
+      sourceMeasureLeavesByMetric: formData.measureLeavesByMetric,
       committedRuntimeLayout,
       appliedDimensionKeys: [
         getStableColumnKey('country'),
