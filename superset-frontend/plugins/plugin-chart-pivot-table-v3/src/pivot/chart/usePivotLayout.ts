@@ -265,10 +265,6 @@ export const usePivotLayout = ({
   const resolvedColSubtotalPosition = layout.colSubtotalPosition;
 
   const {
-    singleMetricBetweenRows,
-    singleMetricBetweenCols,
-    metricsAtRowEnd,
-    metricsAtColEnd,
     forceRowSubtotalEnd,
     effectiveRowSubtotalPosition,
     effectiveColSubtotalPosition,
@@ -395,8 +391,6 @@ export const usePivotLayout = ({
       parent: PivotTreeNode;
       expandedSet: Set<string>;
       nodes: Record<string, PivotTreeNode>;
-      exposeCollapsedMetricTier: boolean;
-      metricsAtEnd: boolean;
       suppressSubtotalParent: boolean;
       normalizeSubtotalExisting: boolean;
     }) =>
@@ -404,6 +398,7 @@ export const usePivotLayout = ({
         ...params,
         program: layout.pivotProgram,
         metricLabelSet,
+        isLeafTierVisible,
         isMetricTokenValue,
         isExplicitSubtotalNode,
         isMetricSubtotalNode,
@@ -411,6 +406,7 @@ export const usePivotLayout = ({
     [
       isMetricSubtotalNode,
       isMetricTokenValue,
+      isLeafTierVisible,
       layout.pivotProgram,
       metricLabelSet,
     ],
@@ -424,33 +420,16 @@ export const usePivotLayout = ({
       nodes: Record<string, PivotTreeNode>,
     ) => {
       const isRow = axis === 'row';
-      const metricsAtEnd = isRow ? metricsAtRowEnd : metricsAtColEnd;
-      const singleMetricBetween = isRow
-        ? singleMetricBetweenRows
-        : singleMetricBetweenCols;
       return getCollapsedValuesNodesForAxis({
         axis,
         parent,
         expandedSet,
         nodes,
-        exposeCollapsedMetricTier:
-          isMultiMetric ||
-          singleMetricBetween ||
-          (isLeafTierVisible && metricsAtEnd),
-        metricsAtEnd,
         suppressSubtotalParent: isRow,
         normalizeSubtotalExisting: !isRow,
       });
     },
-    [
-      getCollapsedValuesNodesForAxis,
-      isLeafTierVisible,
-      isMultiMetric,
-      metricsAtColEnd,
-      metricsAtRowEnd,
-      singleMetricBetweenCols,
-      singleMetricBetweenRows,
-    ],
+    [getCollapsedValuesNodesForAxis],
   );
 
   const getRowChildrenForNodes = useCallback(

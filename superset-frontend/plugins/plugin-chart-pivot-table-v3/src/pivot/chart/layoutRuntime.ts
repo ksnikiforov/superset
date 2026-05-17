@@ -46,10 +46,6 @@ type ResolveMetricAxisLayoutParams = {
 };
 
 export type MetricAxisLayoutPolicy = {
-  singleMetricBetweenRows: boolean;
-  singleMetricBetweenCols: boolean;
-  metricsAtRowEnd: boolean;
-  metricsAtColEnd: boolean;
   forceRowSubtotalEnd: boolean;
   effectiveRowSubtotalPosition: TotalPosition;
   effectiveColSubtotalPosition: TotalPosition;
@@ -116,19 +112,6 @@ export const resolveMetricAxisLayoutPolicy = ({
   const isMultiMetric = metricLabelCount > 1;
   const metricIndexOnRows = getValuesLevelIndex(program, 'row');
   const metricIndexOnCols = getValuesLevelIndex(program, 'col');
-  const singleMetricBetweenRows =
-    isSingleMetric &&
-    metricIndexOnRows !== undefined &&
-    metricIndexOnRows > 0 &&
-    metricIndexOnRows < rowDimCount;
-  const singleMetricBetweenCols =
-    isSingleMetric &&
-    metricIndexOnCols !== undefined &&
-    metricIndexOnCols > 0 &&
-    metricIndexOnCols < colDimCount;
-
-  const metricsAtRowEnd = isValuesAtAxisEnd(program, 'row');
-  const metricsAtColEnd = isValuesAtAxisEnd(program, 'col');
   const metricsFirstOnRows = isValuesFirstOnAxis(program, 'row');
 
   const forceRowSubtotalEnd =
@@ -158,10 +141,6 @@ export const resolveMetricAxisLayoutPolicy = ({
     colDimCount > 0;
 
   return {
-    singleMetricBetweenRows,
-    singleMetricBetweenCols,
-    metricsAtRowEnd,
-    metricsAtColEnd,
     forceRowSubtotalEnd,
     effectiveRowSubtotalPosition,
     effectiveColSubtotalPosition,
@@ -260,8 +239,7 @@ type ResolveCollapsedValuesNodesForAxisParams = {
   parent: PivotTreeNode;
   expandedSet: Set<string>;
   nodes: Record<string, PivotTreeNode>;
-  exposeCollapsedMetricTier: boolean;
-  metricsAtEnd: boolean;
+  isLeafTierVisible: boolean;
   suppressSubtotalParent: boolean;
   normalizeSubtotalExisting: boolean;
   isMetricTokenValue: (value: unknown) => boolean;
@@ -276,14 +254,25 @@ export const resolveCollapsedValuesNodesForAxis = ({
   parent,
   expandedSet,
   nodes,
-  exposeCollapsedMetricTier,
-  metricsAtEnd,
+  isLeafTierVisible,
   suppressSubtotalParent,
   normalizeSubtotalExisting,
   isMetricTokenValue,
   isExplicitSubtotalNode,
   isMetricSubtotalNode,
 }: ResolveCollapsedValuesNodesForAxisParams): PivotTreeNode[] => {
+  const metricIndex = getValuesLevelIndex(program, axis);
+  const axisDimensionCount = getAxisDimensionCount(program, axis);
+  const isSingleMetricBetween =
+    program.metricKeys.length === 1 &&
+    metricIndex !== undefined &&
+    metricIndex > 0 &&
+    metricIndex < axisDimensionCount;
+  const metricsAtEnd = isValuesAtAxisEnd(program, axis);
+  const exposeCollapsedMetricTier =
+    program.metricKeys.length > 1 ||
+    isSingleMetricBetween ||
+    (isLeafTierVisible && metricsAtEnd);
   if (
     !exposeCollapsedMetricTier ||
     program.valueAxis !== axis ||

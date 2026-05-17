@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14508` insertions, `15275` deletions, net `-767`.
-- Current production TypeScript/TSX total: about `32743` lines.
+- Production `src`: `14480` insertions, `15279` deletions, net `-799`.
+- Current production TypeScript/TSX total: about `32711` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -564,6 +564,9 @@ Success criteria:
   metric and measure-leaf metadata.
 - The dead `extraControls` chart prop has been removed from the runtime prop
   contract.
+- Collapsed Values-tier exposure now derives directly from `PivotProgram`
+  inside the collapsed-values projection helper. `usePivotLayout` no longer
+  carries separate row/column single-metric-between or metrics-at-end flags.
 
 ## Current Risks
 

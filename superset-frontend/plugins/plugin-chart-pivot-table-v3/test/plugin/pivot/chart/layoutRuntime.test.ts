@@ -193,32 +193,6 @@ describe('pivot/chart/layoutRuntime', () => {
     ).toBeGreaterThan(0);
   });
 
-  it('uses the compiled row metric position before rendered nodes exist', () => {
-    const policy = resolveMetricAxisLayoutPolicy({
-      ...baseParams,
-      program: policyProgram({
-        rowDimensions: ['r1', 'r2', 'r3'],
-        metricInsertIndex: 1,
-      }),
-    });
-
-    expect(policy.singleMetricBetweenRows).toBe(true);
-  });
-
-  it('uses the compiled column metric position without inspecting shallow rendered data', () => {
-    const policy = resolveMetricAxisLayoutPolicy({
-      ...baseParams,
-      program: policyProgram({
-        columnDimensions: ['c1', 'c2'],
-        metricInsertIndex: 2,
-        metricsLayoutResolved: MetricsLayoutEnum.COLUMNS,
-        valueAxis: 'col',
-      }),
-    });
-
-    expect(policy.metricsAtColEnd).toBe(true);
-  });
-
   it('forces row subtotals to the end for multi-metric row layouts after dimensions', () => {
     const policy = resolveMetricAxisLayoutPolicy({
       ...baseParams,
@@ -324,8 +298,7 @@ describe('pivot/chart/layoutRuntime', () => {
       parent,
       expandedSet: new Set<string>(),
       nodes,
-      exposeCollapsedMetricTier: true,
-      metricsAtEnd: false,
+      isLeafTierVisible: false,
       suppressSubtotalParent: true,
       normalizeSubtotalExisting: false,
       isMetricTokenValue: baseParams.isMetricTokenValue,
@@ -359,11 +332,12 @@ describe('pivot/chart/layoutRuntime', () => {
 
     const collapsed = resolveCollapsedValuesNodesForAxis({
       program: {
-        ...valuesProgram,
-        rows: [],
-        columns: valuesProgram.rows,
-        rowDimensions: [],
-        columnDimensions: valuesProgram.rowDimensions,
+        ...policyProgram({
+          columnDimensions: ['country'],
+          metricInsertIndex: 1,
+          metricsLayoutResolved: MetricsLayoutEnum.COLUMNS,
+          valueAxis: 'col',
+        }),
         metricsLayoutResolved: MetricsLayoutEnum.COLUMNS,
         valueAxis: 'col',
       },
@@ -372,8 +346,7 @@ describe('pivot/chart/layoutRuntime', () => {
       parent,
       expandedSet: new Set<string>(),
       nodes,
-      exposeCollapsedMetricTier: true,
-      metricsAtEnd: true,
+      isLeafTierVisible: true,
       suppressSubtotalParent: false,
       normalizeSubtotalExisting: true,
       isMetricTokenValue: baseParams.isMetricTokenValue,
