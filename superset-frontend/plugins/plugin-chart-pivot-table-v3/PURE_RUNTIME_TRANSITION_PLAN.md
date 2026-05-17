@@ -145,8 +145,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14487` insertions, `15144` deletions, net `-657`.
-- Current production TypeScript/TSX total: about `32853` lines.
+- Production `src`: `14488` insertions, `15151` deletions, net `-663`.
+- Current production TypeScript/TSX total: about `32847` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -535,6 +535,8 @@ Success criteria:
   instead of relying on chart-prop overrides.
 - Expansion-level policy now comes from applied layout `formData`; the chart
   and layout hook no longer accept duplicate top-level expand-level props.
+- Dataset verbose labels and date formatters now come from `formData`; the
+  chart no longer accepts or forwards duplicate top-level metadata props.
 
 ## Current Risks
 
