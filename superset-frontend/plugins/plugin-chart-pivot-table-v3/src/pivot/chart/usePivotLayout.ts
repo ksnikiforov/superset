@@ -55,7 +55,6 @@ const EMPTY_SUBTOTAL_LEVELS: number[] = [];
 export type PivotLayoutResult = {
   layout: ReturnType<typeof buildLayoutContext>;
   measureHierarchy: MeasureHierarchy;
-  hasMultipleMeasures: boolean;
   expandedStateSignature: string;
   expandedStateSharedSignature: string;
   expandRowsLevelRaw?: number;
@@ -597,7 +596,6 @@ export const usePivotLayout = ({
   return {
     layout,
     measureHierarchy: layout.measureHierarchy,
-    hasMultipleMeasures,
     expandedStateSignature,
     expandedStateSharedSignature,
     expandRowsLevelRaw,
