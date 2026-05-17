@@ -37,6 +37,7 @@ import {
   type FetchTarget,
 } from '../query/fetchPlanOptimizer';
 import {
+  buildFactValueKeys,
   type PivotFactStore,
   type PivotFactStoreBatch,
 } from '../runtime/factStore';
@@ -44,7 +45,7 @@ import {
   type LatestRequestLifecycle,
   type LatestRequestScope,
 } from '../runtime/requestLifecycle';
-import { type PivotExpansionCoverageDiff } from '../runtime/coverage';
+import { createExpansionCoverageDiff } from '../runtime/coverage';
 import { stableStringify } from '../shared/stableStringify';
 import {
   applyExpansionFetchDelta,
@@ -139,6 +140,21 @@ type ExpansionFetcherResult = {
   warnings?: ChartDataWarning[];
   error?: unknown;
 };
+
+const createRuntimeExpansionCoverageDiff = ({
+  runtime,
+  program,
+}: {
+  runtime: ExpansionFetchRuntime;
+  program: PivotProgram;
+}) =>
+  createExpansionCoverageDiff({
+    factBatches: runtime.factStore?.getCoverageBatches() ?? [],
+    program,
+    valueKeys: buildFactValueKeys({
+      metricKeys: program.metricKeys,
+    }),
+  });
 
 const resolveExpansionFetchPlan = ({
   targets,
@@ -459,7 +475,7 @@ export const runHydrationExpansionFetchLoop = ({
   transactionId,
   buildRequestGroupId,
   ...hydrationLoopParams
-}: Omit<HydrationLoopParams, 'fetchDeltas'> & {
+}: Omit<HydrationLoopParams, 'fetchDeltas' | 'getMissingExpansionCoverage'> & {
   reason: 'prefetch' | 'cross-axis';
   fetchRuntime: ExpansionFetchRuntime;
   transactionId: number;
@@ -467,6 +483,11 @@ export const runHydrationExpansionFetchLoop = ({
 }) =>
   runHydrationLoop({
     ...hydrationLoopParams,
+    getMissingExpansionCoverage: () =>
+      createRuntimeExpansionCoverageDiff({
+        runtime: fetchRuntime,
+        program: hydrationLoopParams.config.program,
+      }),
     fetchDeltas: ({ targets, context }) =>
       fetchExpansionTargetDeltas({
         targets,
@@ -499,9 +520,7 @@ export const runSameAxisExpansionFetchLoop = async ({
   getDataEpoch,
   getExpandedRows,
   getExpandedCols,
-  getMissingExpansionCoverage,
   config,
-  program,
   fetchRuntime,
   transactionId,
   buildRequestGroupId,
@@ -518,9 +537,7 @@ export const runSameAxisExpansionFetchLoop = async ({
   getDataEpoch: () => number;
   getExpandedRows: () => Set<string>;
   getExpandedCols: () => Set<string>;
-  getMissingExpansionCoverage: () => PivotExpansionCoverageDiff;
   config: ExpansionVisibilityConfig;
-  program: PivotProgram;
   fetchRuntime: ExpansionFetchRuntime;
   transactionId: number;
   buildRequestGroupId: BuildExpansionRequestGroupId;
@@ -561,14 +578,17 @@ export const runSameAxisExpansionFetchLoop = async ({
       expandedKeys: resolvedExpanded,
       nodes,
       coverage: { rowDepth: visibleRowDepth, columnDepth: visibleColDepth },
-      getMissingExpansionCoverage: getMissingExpansionCoverage(),
+      getMissingExpansionCoverage: createRuntimeExpansionCoverageDiff({
+        runtime: fetchRuntime,
+        program: config.program,
+      }),
     });
     if (plan.fetchRequests.length === 0) {
       break;
     }
     const targets = buildGroupedFetchTargets({
       axis,
-      program,
+      program: config.program,
       requests: plan.fetchRequests,
       nodes,
     });

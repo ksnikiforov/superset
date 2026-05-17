@@ -163,14 +163,15 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14313` insertions, `15560` deletions, net `-1247`.
+- Production `src`: `14328` insertions, `15560` deletions, net `-1232`.
 - Current production TypeScript/TSX total: about `32557` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.
-Future work should remain deletion-first and should avoid creating helper layers
-that only move complexity.
+Future work should remain high-impact-first while still deleting code where the
+new runtime authority makes old branches redundant. Avoid helper layers that
+only move complexity.
 
 ## Active Refactor Points
 
@@ -756,6 +757,11 @@ Success criteria:
 - Expansion coverage-key grouping is now planner-owned and program-derived.
   The hook, hydration loop, and same-axis fetch loop no longer thread a
   `getCoverageKey` callback through expansion boundaries.
+- Hydration and same-axis expansion fetch loops now derive missing coverage
+  from the runtime fact store and compiled `PivotProgram`. The hook no longer
+  supplies a missing-coverage callback for fetch-loop execution; initial
+  prefetch still passes a concrete coverage diff into the pure planner before
+  the fetch runtime exists.
 
 ## Current Risks
 
