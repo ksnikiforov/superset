@@ -62,10 +62,6 @@ const baseTransitionConfig = {
   currentLayout: { rows: ['country'], cols: [] },
   previousLayout: { rows: ['country'], cols: [] },
   hasNewData: false,
-  effectiveExpandRowsLevel: 0,
-  effectiveExpandColsLevel: 0,
-  groupbyRowsLength: 1,
-  groupbyColumnsLength: 0,
 };
 
 describe('pivot/expansion/stateTransitions layout changes', () => {
@@ -130,11 +126,9 @@ describe('pivot/expansion/stateTransitions layout changes', () => {
       currentTree,
       previousLayout: { rows: ['country', 'state'], cols: [] },
       currentLayout: { rows: ['country'], cols: [] },
-      effectiveExpandRowsLevel: 2,
     });
 
     expect(transition.rowStablePrefix).toBe(1);
-    expect(transition.autoExpandRowsLevelForDesired).toBe(0);
     expect(
       transition.normalizedTree.cells[serializeCellKey(usKey, rootKey)],
     ).toMatchObject({
@@ -169,18 +163,15 @@ describe('pivot/expansion/stateTransitions layout changes', () => {
       currentTree,
       previousLayout: { rows: ['country'], cols: [] },
       currentLayout: { rows: ['country', 'state'], cols: [] },
-      effectiveExpandRowsLevel: 2,
-      groupbyRowsLength: 2,
     });
 
     expect(transition.rowStablePrefix).toBe(1);
-    expect(transition.autoExpandRowsLevelForDesired).toBe(0);
     expect(transition.normalizedTree.rows[usKey]).toMatchObject({
       hasChildren: false,
     });
   });
 
-  it('caps auto-expansion to the last stable expandable level on trailing trims', () => {
+  it('reports the stable prefix on trailing trims', () => {
     const data = makeTree({
       rows: [makeNode({ axis: 'row', path: [] })],
     });
@@ -198,11 +189,8 @@ describe('pivot/expansion/stateTransitions layout changes', () => {
       currentTree,
       previousLayout: { rows: ['country', 'state', 'city'], cols: [] },
       currentLayout: { rows: ['country', 'state'], cols: [] },
-      effectiveExpandRowsLevel: 2,
-      groupbyRowsLength: 2,
     });
 
     expect(transition.rowStablePrefix).toBe(2);
-    expect(transition.autoExpandRowsLevelForDesired).toBe(1);
   });
 });

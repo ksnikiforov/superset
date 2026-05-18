@@ -370,6 +370,41 @@ export const hasNestedPendingKeys = (keys: Set<string>) => {
   );
 };
 
+const buildChildrenByParent = (nodes: Record<string, PivotTreeNode>) => {
+  const childrenByParent = new Map<string, PivotTreeNode[]>();
+  Object.values(nodes).forEach(node => {
+    if (node.key === rootKey || node.path.length === 0) {
+      return;
+    }
+    const parentKey = serializePath(node.path.slice(0, -1));
+    childrenByParent.set(parentKey, [
+      ...(childrenByParent.get(parentKey) ?? []),
+      node,
+    ]);
+  });
+  return childrenByParent;
+};
+
+const collectVisibleAxisKeys = (
+  nodes: Record<string, PivotTreeNode>,
+  expanded: Set<string>,
+) => {
+  const visible = new Set<string>([rootKey]);
+  const childrenByParent = buildChildrenByParent(nodes);
+  const visit = (node: PivotTreeNode) => {
+    visible.add(node.key);
+    if (node.key !== rootKey && !expanded.has(node.key)) {
+      return;
+    }
+    (childrenByParent.get(node.key) ?? []).forEach(visit);
+  };
+  const root = nodes[rootKey];
+  if (root) {
+    visit(root);
+  }
+  return visible;
+};
+
 export const computeVisibleDepths = ({
   tree,
   expandedRows,
@@ -395,19 +430,7 @@ export const computeVisibleDepths = ({
     if (!root) {
       return 0;
     }
-    const childrenByParent = new Map<string, PivotTreeNode[]>();
-    Object.values(nodes).forEach(node => {
-      if (node.key === rootKey || node.path.length === 0) {
-        return;
-      }
-      const parentKey = serializePath(node.path.slice(0, -1));
-      const children = childrenByParent.get(parentKey);
-      if (children) {
-        children.push(node);
-      } else {
-        childrenByParent.set(parentKey, [node]);
-      }
-    });
+    const childrenByParent = buildChildrenByParent(nodes);
     let maxDepth = 0;
     const visit = (node: PivotTreeNode) => {
       maxDepth = Math.max(maxDepth, countDimDepth(node.path));
@@ -982,38 +1005,6 @@ export const planInitialHydrationPrefetch = ({
 const filterVisibleExpansionKeys = (keys: Set<string>, visible: Set<string>) =>
   Array.from(keys).filter(key => key !== rootKey && visible.has(key));
 
-const collectVisibleAxisExpansionKeys = (
-  nodes: Record<string, PivotTreeNode>,
-  expanded: Set<string>,
-) => {
-  const visible = new Set<string>([rootKey]);
-  const childrenByParent = new Map<string, PivotTreeNode[]>();
-  Object.values(nodes).forEach(node => {
-    if (node.key === rootKey || node.path.length === 0) {
-      return;
-    }
-    const parentKey = serializePath(node.path.slice(0, -1));
-    const children = childrenByParent.get(parentKey);
-    if (children) {
-      children.push(node);
-    } else {
-      childrenByParent.set(parentKey, [node]);
-    }
-  });
-  const visit = (node: PivotTreeNode) => {
-    visible.add(node.key);
-    if (node.key !== rootKey && !expanded.has(node.key)) {
-      return;
-    }
-    (childrenByParent.get(node.key) ?? []).forEach(visit);
-  };
-  const root = nodes[rootKey];
-  if (root) {
-    visit(root);
-  }
-  return visible;
-};
-
 export const buildVisiblePersistedExpansionState = ({
   tree,
   expandedRows,
@@ -1042,8 +1033,8 @@ export const buildVisiblePersistedExpansionState = ({
   visibleCollapsedCols: Set<string>;
 } => {
   const visibleKeys = {
-    rows: collectVisibleAxisExpansionKeys(tree.rows, expandedRows),
-    cols: collectVisibleAxisExpansionKeys(tree.cols, expandedCols),
+    rows: collectVisibleAxisKeys(tree.rows, expandedRows),
+    cols: collectVisibleAxisKeys(tree.cols, expandedCols),
   };
   const visibleRows = filterVisibleExpansionKeys(
     explicitExpandedRows,
