@@ -157,6 +157,8 @@ Current semantic-layout contract:
   fetches bootstrap coverage for the currently visible root layers only;
   persisted expanded/collapsed intent is restored by the expansion hydration
   path through the coverage manifest.
+- Async initial runtime materialization now uses the loaded fact-store
+  materializer; there is no separate spec-backed initial materialization path.
 
 Expected deletion targets:
 
@@ -186,8 +188,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13988` insertions, `16039` deletions, net `-2051`.
-- Current production TypeScript/TSX total: about `31459` lines.
+- Production `src`: `13975` insertions, `16039` deletions, net `-2064`.
+- Current production TypeScript/TSX total: about `31446` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion

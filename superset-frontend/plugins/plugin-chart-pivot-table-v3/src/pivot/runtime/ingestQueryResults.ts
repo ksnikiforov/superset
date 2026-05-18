@@ -37,7 +37,7 @@ import {
 import {
   factStoreSelectorFromSpec,
   materializeLoadedPivotTreeFromFactStore,
-  materializeInitialPivotTreeFromFactStoreAsync,
+  materializeLoadedPivotTreeFromFactStoreAsync,
 } from './materializePivotTree';
 import {
   assertChunkedWorkCurrent,
@@ -442,8 +442,7 @@ export const buildInitialRuntimeFromSpecResultsAsync = async ({
   });
   await yieldChunkedWork({ shouldContinue, yieldToMain });
   return {
-    tree: await materializeInitialPivotTreeFromFactStoreAsync({
-      specs,
+    tree: await materializeLoadedPivotTreeFromFactStoreAsync({
       store,
       layout,
       formData,

@@ -32,7 +32,7 @@ export {
   injectRowSubtotalLeaves,
   labelRowSubtotalLeaves,
   materializeLoadedPivotTreeFromFactStore,
-  materializeInitialPivotTreeFromFactStoreAsync,
+  materializeLoadedPivotTreeFromFactStoreAsync,
 } from '../../../src/pivot/runtime/materializePivotTree';
 
 const compileMetricAxisProgram = ({

@@ -236,37 +236,6 @@ export const factStoreSelectorFromSpec = (
   }),
 });
 
-const materializationInputFromSpecs = ({
-  store,
-  specs,
-  formData,
-  measureHierarchy,
-}: {
-  store: PivotFactStore;
-  specs: PlannedQuerySpec[];
-  formData: PivotTableQueryFormData;
-  measureHierarchy: MeasureHierarchy;
-}): MaterializePivotTreeInput | undefined => {
-  const firstSpec = specs[0];
-  if (!firstSpec) {
-    return undefined;
-  }
-  return {
-    batches: specs.map(spec => ({
-      ...factStoreSelectorFromSpec(spec),
-      facts: store.getCompatibleFacts(factStoreSelectorFromSpec(spec)),
-    })),
-    metricsForQuery: firstSpec.metrics,
-    formData,
-    measureHierarchy,
-    materializedMetrics: firstSpec.meta.materializedMetrics,
-    materializedMeasureHierarchy: firstSpec.meta.materializedMeasureHierarchy,
-    rowSubtotalLevels: firstSpec.meta.rowSubtotalLevels,
-    colSubtotalLevels: firstSpec.meta.colSubtotalLevels,
-    pivotProgram: firstSpec.meta.pivotProgram,
-  };
-};
-
 export function applyMeasureLeafValuesToTree({
   tree,
   measureHierarchy,
@@ -1305,15 +1274,13 @@ const materializePivotTreeAsync = async ({
   );
 };
 
-const materializeFactStoreBatches = ({
+const groupFactStoreBatchesByMaterializationPlan = ({
   batches,
   layout,
-  formData,
 }: {
   batches: PivotFactStoreBatch[];
   layout: LayoutContext;
-  formData: PivotTableQueryFormData;
-}): PivotTreeData => {
+}) => {
   const batchesByPlan = new Map<
     string,
     {
@@ -1331,7 +1298,22 @@ const materializeFactStoreBatches = ({
     });
     batchesByPlan.set(key, entry);
   });
-  return Array.from(batchesByPlan.values()).reduce<PivotTreeData>(
+  return Array.from(batchesByPlan.values());
+};
+
+const materializeFactStoreBatches = ({
+  batches,
+  layout,
+  formData,
+}: {
+  batches: PivotFactStoreBatch[];
+  layout: LayoutContext;
+  formData: PivotTableQueryFormData;
+}): PivotTreeData =>
+  groupFactStoreBatchesByMaterializationPlan({
+    batches,
+    layout,
+  }).reduce<PivotTreeData>(
     (tree, { plan, batches: planBatches }) =>
       mergeTrees(
         tree,
@@ -1349,7 +1331,6 @@ const materializeFactStoreBatches = ({
       ),
     emptyPivotTree(),
   );
-};
 
 export const materializeLoadedPivotTreeFromFactStore = ({
   store,
@@ -1368,8 +1349,7 @@ export const materializeLoadedPivotTreeFromFactStore = ({
     }),
   });
 
-export const materializeInitialPivotTreeFromFactStoreAsync = async ({
-  specs,
+export const materializeLoadedPivotTreeFromFactStoreAsync = async ({
   store,
   layout,
   formData,
@@ -1377,26 +1357,34 @@ export const materializeInitialPivotTreeFromFactStoreAsync = async ({
   shouldContinue,
   yieldToMain,
 }: {
-  specs: PlannedQuerySpec[];
   store: PivotFactStore;
   layout: LayoutContext;
   formData: PivotTableQueryFormData;
 } & ChunkedWorkOptions): Promise<PivotTreeData> => {
-  const { measureHierarchy } = layout;
-  const input = materializationInputFromSpecs({
-    store,
-    specs,
-    formData,
-    measureHierarchy,
+  let mergedTree = emptyPivotTree();
+  const groups = groupFactStoreBatchesByMaterializationPlan({
+    batches: store.getFactBatches(),
+    layout,
   });
-  const mergedTree = input
-    ? await materializePivotTreeAsync({
-        ...input,
-        chunkSize,
-        shouldContinue,
-        yieldToMain,
-      })
-    : emptyPivotTree();
+  for (let idx = 0; idx < groups.length; idx += 1) {
+    const { plan, batches } = groups[idx];
+    // eslint-disable-next-line no-await-in-loop
+    const nextTree = await materializePivotTreeAsync({
+      batches,
+      metricsForQuery: plan.metricsForQuery,
+      formData,
+      measureHierarchy: layout.measureHierarchy,
+      materializedMetrics: plan.materializedMetrics,
+      materializedMeasureHierarchy: plan.materializedMeasureHierarchy,
+      rowSubtotalLevels: plan.rowSubtotalLevels,
+      colSubtotalLevels: plan.colSubtotalLevels,
+      pivotProgram: plan.pivotProgram,
+      chunkSize,
+      shouldContinue,
+      yieldToMain,
+    });
+    mergedTree = mergeTrees(mergedTree, nextTree);
+  }
   return finalizeInitialPivotTree({
     tree: mergedTree,
   });
