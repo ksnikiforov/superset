@@ -18,7 +18,6 @@
  */
 import {
   type DataRecordValue,
-  ensureIsArray,
   getColumnLabel,
   type QueryFormColumn,
   type QueryFormMetric,
@@ -71,11 +70,9 @@ type MaterializationFactBatch = {
 
 type MaterializePivotTreeInput = {
   batches: MaterializationFactBatch[];
-  metricsForQuery: QueryFormMetric[];
+  metrics: QueryFormMetric[];
   formData: PivotTableQueryFormData;
   measureHierarchy: MeasureHierarchy;
-  materializedMetrics?: QueryFormMetric[];
-  materializedMeasureHierarchy?: MeasureHierarchy;
   rowSubtotalLevels: number[];
   colSubtotalLevels: number[];
   pivotProgram: PivotProgram;
@@ -151,9 +148,8 @@ const deriveBatchMaterializationPlan = ({
   };
 
   return {
-    metricsForQuery: loadedMetrics,
-    materializedMetrics: loadedMetrics,
-    materializedMeasureHierarchy,
+    metrics: loadedMetrics,
+    measureHierarchy: materializedMeasureHierarchy,
     rowSubtotalLevels: layout.rowSubtotalLevels,
     colSubtotalLevels: layout.colSubtotalLevelsForQuery,
     pivotProgram: layout.pivotProgram,
@@ -1081,20 +1077,13 @@ const buildTreeFromFactBatchAsync = async ({
 
 const materializePivotTree = ({
   batches,
-  metricsForQuery,
+  metrics,
   formData,
   measureHierarchy,
-  materializedMetrics,
-  materializedMeasureHierarchy,
   rowSubtotalLevels,
   colSubtotalLevels,
   pivotProgram,
 }: MaterializePivotTreeInput): PivotTreeData => {
-  const queryMetrics =
-    metricsForQuery.length > 0 ? metricsForQuery : formData.metrics;
-  const visibleMetrics = materializedMetrics ?? queryMetrics;
-  const visibleMeasureHierarchy =
-    materializedMeasureHierarchy ?? measureHierarchy;
   const branchTree = batches.reduce<PivotTreeData>(
     (acc, batch) =>
       mergeTrees(
@@ -1112,26 +1101,24 @@ const materializePivotTree = ({
   const branchWithMeasures = applyMeasureHierarchyAxis(
     applyMeasureLeafValuesToTree({
       tree: branchTree,
-      measureHierarchy: visibleMeasureHierarchy,
+      measureHierarchy,
     }),
-    visibleMeasureHierarchy,
+    measureHierarchy,
     pivotProgram,
     formData.metricLabelMap as Record<string, string> | undefined,
   );
   return labelRowSubtotalLeaves(
     branchWithMeasures,
-    ensureIsArray(visibleMetrics),
+    metrics,
     formData.metricLabelMap as Record<string, string> | undefined,
   );
 };
 
 const materializePivotTreeAsync = async ({
   batches,
-  metricsForQuery,
+  metrics,
   formData,
   measureHierarchy,
-  materializedMetrics,
-  materializedMeasureHierarchy,
   rowSubtotalLevels,
   colSubtotalLevels,
   pivotProgram,
@@ -1139,11 +1126,6 @@ const materializePivotTreeAsync = async ({
   shouldContinue,
   yieldToMain,
 }: MaterializePivotTreeInput & ChunkedWorkOptions): Promise<PivotTreeData> => {
-  const queryMetrics =
-    metricsForQuery.length > 0 ? metricsForQuery : formData.metrics;
-  const visibleMetrics = materializedMetrics ?? queryMetrics;
-  const visibleMeasureHierarchy =
-    materializedMeasureHierarchy ?? measureHierarchy;
   let branchTree = {} as PivotTreeData;
   for (let idx = 0; idx < batches.length; idx += 1) {
     // eslint-disable-next-line no-await-in-loop
@@ -1164,19 +1146,19 @@ const materializePivotTreeAsync = async ({
   await yieldChunkedWork({ shouldContinue, yieldToMain });
   const treeWithLeafValues = applyMeasureLeafValuesToTree({
     tree: branchTree,
-    measureHierarchy: visibleMeasureHierarchy,
+    measureHierarchy,
   });
   await yieldChunkedWork({ shouldContinue, yieldToMain });
   const branchWithMeasures = applyMeasureHierarchyAxis(
     treeWithLeafValues,
-    visibleMeasureHierarchy,
+    measureHierarchy,
     pivotProgram,
     formData.metricLabelMap as Record<string, string> | undefined,
   );
   await yieldChunkedWork({ shouldContinue, yieldToMain });
   return labelRowSubtotalLeaves(
     branchWithMeasures,
-    ensureIsArray(visibleMetrics),
+    metrics,
     formData.metricLabelMap as Record<string, string> | undefined,
   );
 };
@@ -1226,11 +1208,9 @@ const materializeFactStoreBatches = ({
         tree,
         materializePivotTree({
           batches: planBatches,
-          metricsForQuery: plan.metricsForQuery,
+          metrics: plan.metrics,
           formData,
-          measureHierarchy: layout.measureHierarchy,
-          materializedMetrics: plan.materializedMetrics,
-          materializedMeasureHierarchy: plan.materializedMeasureHierarchy,
+          measureHierarchy: plan.measureHierarchy,
           rowSubtotalLevels: plan.rowSubtotalLevels,
           colSubtotalLevels: plan.colSubtotalLevels,
           pivotProgram: plan.pivotProgram,
@@ -1278,11 +1258,9 @@ export const materializeLoadedPivotTreeFromFactStoreAsync = async ({
     // eslint-disable-next-line no-await-in-loop
     const nextTree = await materializePivotTreeAsync({
       batches,
-      metricsForQuery: plan.metricsForQuery,
+      metrics: plan.metrics,
       formData,
-      measureHierarchy: layout.measureHierarchy,
-      materializedMetrics: plan.materializedMetrics,
-      materializedMeasureHierarchy: plan.materializedMeasureHierarchy,
+      measureHierarchy: plan.measureHierarchy,
       rowSubtotalLevels: plan.rowSubtotalLevels,
       colSubtotalLevels: plan.colSubtotalLevels,
       pivotProgram: plan.pivotProgram,

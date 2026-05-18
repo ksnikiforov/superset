@@ -255,8 +255,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13577` insertions, `16906` deletions, net `-3329`.
-- Current production TypeScript/TSX total: about `30181` lines.
+- Production `src`: `13555` insertions, `16906` deletions, net `-3351`.
+- Current production TypeScript/TSX total: about `30159` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -268,16 +268,16 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `30181` | `-3329` | `< 28000` |
-| Strict core pipeline | `11337` | `12627` | `+1290` | `8000` |
+| Full production `src` | `33510` | `30159` | `-3351` | `< 28000` |
+| Strict core pipeline | `11337` | `12605` | `+1268` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5076` | `+393` | `3000-4000` |
-| Broad core pipeline | `16020` | `17703` | `+1683` | `11000-13000` |
+| Broad core pipeline | `16020` | `17681` | `+1661` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `4081` |
+| `pivot/runtime/*` | `4059` |
 | `pivot/expansion/*` | `2930` |
 | `pivot/query/*` | `1786` |
 | `pivot/layout/*` | `744` |
@@ -319,6 +319,11 @@ Latest query-meta cleanup: planned query specs no longer carry materialization
 metadata such as subtotal levels, materialized metrics, or materialized measure
 hierarchy. Query specs own fetch metadata only; loaded materialization is driven
 by the fact store and current `LayoutContext`.
+
+Latest materializer cleanup: batch materialization plans now carry one loaded
+metric set and one loaded measure hierarchy. The materializer no longer accepts
+separate `metricsForQuery`, `materializedMetrics`, or optional materialized
+hierarchy aliases for the same runtime state.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.
