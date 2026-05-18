@@ -55,7 +55,10 @@ const getControlNames = () =>
 describe('pivot table v3 control panel', () => {
   it('does not expose time grain control in pivot v3', () => {
     expect(getControlNames()).not.toContain('time_grain_sqla');
-    expect(getControlNames()).not.toContain('interactionMode');
+    const interactionModeControl = getControl('interactionMode');
+    expect(interactionModeControl.config.rerender).not.toContain(
+      'time_grain_sqla',
+    );
   });
 
   it('exposes auto-expand level controls with blank defaults', () => {
@@ -80,6 +83,7 @@ describe('pivot table v3 control panel', () => {
     }
     const state = {
       controls: {
+        interactionMode: { value: 'user_controlled' },
         dimensions: { value: ['row1', 'col1', 'col2', 'col3'] },
         metrics: { value: ['metric1'] },
         colSubtotalLevels: { value: [1, 3, 5, 0] },
@@ -115,6 +119,7 @@ describe('pivot table v3 control panel', () => {
     }
     const state = {
       controls: {
+        interactionMode: { value: 'user_controlled' },
         dimensions: { value: ['row1'] },
         metrics: { value: ['metric1'] },
         colSubtotalLevels: { value: [1, 2] },
@@ -150,6 +155,7 @@ describe('pivot table v3 control panel', () => {
     }
     const state = {
       controls: {
+        interactionMode: { value: 'user_controlled' },
         dimensions: { value: ['col1', 'col2', 'col3'] },
         colSubtotalLevels: { value: [] },
       },

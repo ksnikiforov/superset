@@ -74,6 +74,69 @@ const buildInitialBootstrapRuntime = ({
 };
 
 describe('PivotTableChart interaction layout', () => {
+  it('shows the side panel only in user controlled mode', () => {
+    const metrics = ['m1'];
+    const rows = ['row1'];
+    const tree = applyMetricAxis(
+      buildTreeFromRecords([{ row1: 'A', m1: 10 }], metrics, rows, [], 1, 0),
+      metrics,
+      MetricsLayoutEnum.COLUMNS,
+      rows,
+      [],
+    );
+    const fixedFormData = buildFormData({
+      interactionMode: 'fixed',
+      dimensions: rows,
+      groupbyRows: rows,
+      groupbyColumns: [],
+      metrics,
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+    });
+    const { rerender } = render(
+      <PivotTableChart
+        data={tree}
+        formData={fixedFormData}
+        rawFormData={fixedFormData}
+        queryFormData={fixedFormData}
+        metrics={metrics}
+        groupbyRows={rows}
+        groupbyColumns={[]}
+      />,
+    );
+
+    expect(screen.queryByText('Dimensions')).not.toBeInTheDocument();
+
+    const runtimeLayout: PivotRuntimeLayout = {
+      version: 1,
+      rows,
+      cols: [],
+      metrics,
+      leafSelection: {},
+      valuePlacement: { axis: 'col', index: 0 },
+    };
+    const userFormData = buildFormData({
+      ...fixedFormData,
+      interactionMode: 'user_controlled',
+      groupbyRows: [],
+      dimensions: rows,
+      pivotRuntimeLayout: runtimeLayout,
+    });
+
+    rerender(
+      <PivotTableChart
+        data={tree}
+        formData={userFormData}
+        rawFormData={userFormData}
+        queryFormData={userFormData}
+        metrics={metrics}
+        groupbyRows={[]}
+        groupbyColumns={[]}
+      />,
+    );
+
+    expect(screen.getByText('Dimensions')).toBeInTheDocument();
+  });
+
   it('persists runtime layout via setControlValue with query context in user controlled mode', async () => {
     const runtimeLayout: PivotRuntimeLayout = {
       version: 1,

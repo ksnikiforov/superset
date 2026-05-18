@@ -87,6 +87,7 @@ function PivotTableChart(props: PivotTableProps) {
 
   const isDashboardContext =
     appSection === AppSection.Dashboard || formData.dashboardId !== undefined;
+  const isUserControlledMode = formData.interactionMode === 'user_controlled';
   const isDashboardRuntimeSync = isDashboardContext;
   const shouldPersistOwnState = !isDashboardRuntimeSync;
   const fetchFormDataBase = queryFormData || formData;
@@ -385,7 +386,9 @@ function PivotTableChart(props: PivotTableProps) {
 
   const tableWidth = Math.max(
     0,
-    width - INTERACTION_PANEL_WIDTH - INTERACTION_SIDE_CHIPS_WIDTH,
+    isUserControlledMode
+      ? width - INTERACTION_PANEL_WIDTH - INTERACTION_SIDE_CHIPS_WIDTH
+      : width,
   );
 
   const { headerOffset, headerRowOffsets, headerRef } = useStickyHeaders({
@@ -426,7 +429,10 @@ function PivotTableChart(props: PivotTableProps) {
   );
   const activeErrorMessage = seamlessError ?? errorMessage;
   const cornerLoaderVisible = seamlessLoading || isHydrating;
-  const tableHeight = Math.max(0, height - INTERACTION_TOP_CHIPS_HEIGHT);
+  const tableHeight = Math.max(
+    0,
+    isUserControlledMode ? height - INTERACTION_TOP_CHIPS_HEIGHT : height,
+  );
   const exportChartId =
     typeof formData.slice_id === 'number' ||
     typeof formData.slice_id === 'string'
@@ -487,6 +493,16 @@ function PivotTableChart(props: PivotTableProps) {
       }),
     [dimensionLabelMap, hasMetrics, uiRuntimeLayout],
   );
+  if (!isUserControlledMode) {
+    return (
+      <PivotTableView
+        {...sharedPivotViewProps}
+        height={tableHeight}
+        width={tableWidth}
+      />
+    );
+  }
+
   return (
     <PivotInteractionLayout
       height={height}

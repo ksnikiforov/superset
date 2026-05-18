@@ -290,8 +290,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13054` insertions, `17400` deletions, net `-4346`.
-- Current production TypeScript/TSX total: about `29164` lines.
+- Production `src`: `13104` insertions, `17211` deletions, net `-4107`.
+- Current production TypeScript/TSX total: about `29403` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -303,7 +303,7 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `29164` | `-4346` | `< 28000` |
+| Full production `src` | `33510` | `29403` | `-4107` | `< 28000` |
 | Strict core pipeline | `11337` | `11956` | `+619` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5067` | `+384` | `3000-4000` |
 | Broad core pipeline | `16020` | `17023` | `+1003` | `11000-13000` |
@@ -454,25 +454,16 @@ execution. Expansion request lifecycle ownership also moved into
 tracking helpers into the fetch executor.
 
 Latest fixed/runtime unification cleanup: fixed form-data row/column layout now
-compiles into the same `PivotRuntimeLayout` shape as interactive layout.
-`PivotTableChart` always renders through the runtime layout shell, and the
-runtime-state/seamless-update path no longer carries an `isUserControlled`
-branch. Fixed and interactive behavior should now differ only by where the
-initial runtime layout is sourced, not by expansion, sorting, formatting,
-coloring, loading, or materialization semantics. During this cut, expansion
-planning also stopped issuing an opposite-axis root fetch when a one-axis branch
+compiles into the same `PivotRuntimeLayout` shape as user-controlled layout.
+Fixed and user-controlled behavior should differ by UI surface only: fixed mode
+uses Explore row/column controls and renders the table without the in-chart side
+panel, while user-controlled mode uses the in-chart side panel/chips. Expansion,
+sorting, formatting/coloring, loading, query planning, and materialization all
+continue through the same runtime pipeline. During this cut, expansion planning
+also stopped issuing an opposite-axis root fetch when a one-axis branch
 expansion already defines the visible scoped coverage. For example, expanding
 column `[1992]` at row depth `1` no longer also requests the row-root branch at
 the deeper column depth.
-
-Latest authoring-layout cleanup: Explore no longer exposes a fixed-vs-user
-interaction-mode control or separate row/column layout DnD controls. Form data
-normalization always compiles through `PivotRuntimeLayout` and then resolves
-the query-facing row/column/metric fields from that layout. Existing
-row/column form-data fields are still accepted as an initial layout source when
-no runtime layout exists, but they are not a separate live behavior path. The
-remaining `interactionMode` type/form-data field is inert legacy payload
-surface, not runtime authority.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.
@@ -491,7 +482,7 @@ authority boundaries:
 
 | Target | Current source surface | Why it is a large simplification target | UX/product risk | Expected deletion shape |
 | --- | ---: | --- | --- | --- |
-| Make user-controlled runtime the only layout mode | The live `interactionMode` branch is removed from chart runtime, seamless/update planning, and Explore authoring controls. Existing row/column form-data fields are accepted only as an initial layout source when no `pivotRuntimeLayout` exists. The remaining type field is inert persisted payload surface. | The code used to support two pivots: fixed Explore controls and interactive chart runtime. The chart/runtime path and Explore authoring path now both compile through `PivotRuntimeLayout`. | Visible but intentional. Fixed and interactive layouts should now differ only by initial layout source, not by expansion, sorting, formatting/coloring, loading, or materialization behavior. | Next deletion is mechanical cleanup: remove inert `interactionMode`/`PivotInteractionMode` type/test payloads, then decide whether remaining metric/dimension source-pool controls should be reduced further or moved fully behind the in-chart editor. |
+| Keep UI modes, unify runtime behavior | `interactionMode` remains as a UI/authoring switch. Fixed mode exposes Explore row/column controls and no in-chart side panel. User-controlled mode exposes dimensions plus the in-chart side panel/chips. Both modes normalize through `PivotRuntimeLayout` before query planning/rendering. | The old problem was not the UI mode itself; it was letting UI mode imply different runtime semantics. The runtime path is shared, while the UI presentation remains selectable. | Low to medium. The user-facing mode choice is preserved. The requirement is that expansion, sorting, formatting/coloring, loading, and materialization stay identical below the UI surface. | Do not delete the UI mode. Delete only behavior branches below normalization. Remaining high-impact deletion should target duplicated query/coverage/executor paths, not the fixed-vs-user authoring distinction. |
 | Represent level expansion as manifest-shaped coverage need | `expandRowsLevel`, `expandColumnsLevel`, `initialDepth`, `useExpansionEngine.ts`, `stateTransitions.ts`, and root-prefetch planning in `query/specs.ts` | Pre-expand depth is a real saved visibility feature. The complexity problem is not that it exists; the problem is that level expansion, path expansion, persisted restore, root prefetch, and hydration are still separate mechanisms. | Low if visible behavior is preserved. A dashboard configured to pre-expand level `N` must still load and show level `N` on fresh load. | Pre-expand compiles directly to `PivotAxisCoverageNeed` with `scope: { kind: 'scopedFull', ancestorPaths: [[]] }`. Manual branch expansion uses the same type with `scope: { kind: 'paths', paths }`. Delete separate expansion-local vocabulary and then collapse duplicate hydration branches around coverage diff/execution. |
 | Replace expansion hydration scheduler with a manifest executor | `useExpansionEngine.ts` about `867` lines, `stateTransitions.ts` about `878` lines, `fetchExecution.ts` about `328` lines | Expansion still has same-axis toggle flow, cross-axis hydration, initial prefetch, persisted restore, in-flight expansion maps, loading-key counts, and branch/batch/intersection execution as separate mechanisms. The selected manifest model should make this one diff/execute/rematerialize loop. | Low to medium if explicit expansion behavior is preserved. Higher if combined with removing auto-expand levels or exact persisted restore. | Build required visible coverage, diff fact store, execute missing needs, rematerialize. Delete same-axis/cross-axis/prefetch loop splits and request-group/loading bookkeeping that only exists because flows are separate. |
 | Merge initial, seamless, and expansion query planning | `query/specs.ts`, `runtime/coverage.ts`, `runtime/seamlessRuntimeUpdate.ts`, `update/initialUpdatePlan.ts`, `expansion/fetchExecution.ts`; query/expansion/runtime totals remain large | Initial load, semantic layout change, and expansion still enter through different request/spec paths. The fact selector is unified, but root/branch/batch/intersection are still first-class query paths instead of outputs of one coverage manifest. | Low if fetch counts are locked by tests. Main risk is underfetch/overfetch around sorting support metrics, measure leaves, and row x column intersections. | One manifest-to-query-spec executor handles root, layout, expansion, batch, and intersection needs. Delete root target planning, `buildBranchFactCoverages`, expansion request-kind query branches, and duplicated coverage/spec conversion. |
