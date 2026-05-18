@@ -223,8 +223,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13853` insertions, `16374` deletions, net `-2521`.
-- Current production TypeScript/TSX total: about `30989` lines.
+- Production `src`: `13853` insertions, `16381` deletions, net `-2528`.
+- Current production TypeScript/TSX total: about `30982` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
