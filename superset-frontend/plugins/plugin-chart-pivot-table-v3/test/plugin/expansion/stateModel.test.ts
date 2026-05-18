@@ -20,7 +20,6 @@
 import { PivotTreeNode } from '../../../src/types';
 import {
   coerceExpansionState,
-  collectVisibleExpansionKeys,
   pruneExpandedToStablePrefix,
   seedExpandedByLevel,
   stripAutoSeededExpansions,
@@ -167,40 +166,5 @@ describe('expansionStateModel', () => {
       metricLabelSet: new Set(),
     });
     expect(pruned).toEqual(new Set([rootKey, serializePath(['A'])]));
-  });
-
-  it('filters visible expansion keys to rendered rows and columns', () => {
-    const rows = {
-      [rootKey]: makeNode({ axis: 'row', path: [], hasChildren: true }),
-      A: makeNode({ axis: 'row', path: ['A'], hasChildren: true }),
-      [serializePath(['A', 'X'])]: makeNode({
-        axis: 'row',
-        path: ['A', 'X'],
-      }),
-    };
-    const cols = {
-      [rootKey]: makeNode({ axis: 'col', path: [], hasChildren: true }),
-      C: makeNode({ axis: 'col', path: ['C'] }),
-    };
-    const { rows: visibleRows, cols: visibleCols } =
-      collectVisibleExpansionKeys({
-        visibleRows: [rows[rootKey], rows.A],
-        visibleCols: [cols.C],
-      });
-
-    expect(visibleRows.has(serializePath(['A', 'X']))).toBe(false);
-    expect(visibleRows.has(serializePath(['A']))).toBe(true);
-    expect(visibleCols.has(serializePath(['C']))).toBe(true);
-  });
-
-  it('keeps visible column keys that are not present in the node map', () => {
-    const virtualCol = makeNode({ axis: 'col', path: ['virtual'] });
-
-    const { cols: visibleCols } = collectVisibleExpansionKeys({
-      visibleRows: [],
-      visibleCols: [virtualCol],
-    });
-
-    expect(visibleCols.has(serializePath(['virtual']))).toBe(true);
   });
 });

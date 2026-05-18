@@ -180,6 +180,10 @@ Current semantic-layout contract:
   of a dedicated branch loop. Expansion prefetch, cross-axis hydration, and
   direct row/column expansion all follow the same plan/fetch/rematerialize
   iteration boundary.
+- Expansion-state persistence no longer calls the render model to decide which
+  expansion keys are visible. It filters persisted keys from loaded tree
+  structure plus expansion intent, keeping render policy out of expansion
+  ownership.
 
 Expected deletion targets:
 

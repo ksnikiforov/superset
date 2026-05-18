@@ -346,7 +346,6 @@ function PivotTableChart(props: PivotTableProps) {
     resolvedExpandRowsLevel: layoutResult.resolvedExpandRowsLevel,
     resolvedExpandColumnsLevel: layoutResult.resolvedExpandColumnsLevel,
     pivotProgram: layoutResult.layout.pivotProgram,
-    buildRenderModelConfig: layoutResult.buildRenderModelConfig,
     expandRowsLevelRaw: layoutResult.expandRowsLevelRaw,
     expandColumnsLevelRaw: layoutResult.expandColumnsLevelRaw,
     setControlValue,

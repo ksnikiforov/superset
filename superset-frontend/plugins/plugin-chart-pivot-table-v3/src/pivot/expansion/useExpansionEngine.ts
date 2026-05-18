@@ -67,7 +67,6 @@ import {
   resolveExpandedForMetrics as resolveExpandedForMetricsBase,
   resolveLayoutTransition,
   type ExpansionPlanningConfig,
-  type ExpansionVisibilityConfig,
 } from './stateTransitions';
 import { useSyncRef } from '../shared/useSyncRef';
 import {
@@ -82,7 +81,6 @@ import {
 import { buildLayoutContext } from '../layout/LayoutContext';
 import { materializeLoadedPivotTreeFromFactStore } from '../runtime/materializePivotTree';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
-import type { RenderModelConfig } from '../render/renderModel';
 import { getStableColumnKey } from '../../utils';
 
 const MAX_HYDRATION_ITERATIONS = 12;
@@ -297,11 +295,6 @@ export type ExpansionEngineConfig = {
   resolvedExpandRowsLevel: number;
   resolvedExpandColumnsLevel: number;
   pivotProgram: PivotProgram;
-  buildRenderModelConfig: (params: {
-    tree: PivotTreeData;
-    expandedRows: Set<string>;
-    expandedCols: Set<string>;
-  }) => RenderModelConfig;
   expandRowsLevelRaw?: number;
   expandColumnsLevelRaw?: number;
   setControlValue?: HandlerFunction;
@@ -320,7 +313,6 @@ export const useExpansionEngine = ({
   resolvedExpandRowsLevel,
   resolvedExpandColumnsLevel,
   pivotProgram,
-  buildRenderModelConfig,
   expandRowsLevelRaw,
   expandColumnsLevelRaw,
   setControlValue,
@@ -591,13 +583,6 @@ export const useExpansionEngine = ({
     [setWarnings],
   );
 
-  const visibilityConfig = useMemo<ExpansionVisibilityConfig>(
-    () => ({
-      program: pivotProgram,
-      buildRenderModelConfig,
-    }),
-    [buildRenderModelConfig, pivotProgram],
-  );
   const planningConfig = useMemo<ExpansionPlanningConfig>(
     () => ({
       program: pivotProgram,
@@ -611,7 +596,6 @@ export const useExpansionEngine = ({
         tree: treeRef.current,
         expandedRows: nextRows,
         expandedCols: nextCols,
-        config: visibilityConfig,
         explicitExpandedRows: explicitExpandedRowsRef.current,
         explicitExpandedCols: explicitExpandedColsRef.current,
         explicitCollapsedRows: explicitCollapsedRowsRef.current,
@@ -632,7 +616,6 @@ export const useExpansionEngine = ({
       groupbyRowKeys,
       resolvedExpandColumnsLevel,
       resolvedExpandRowsLevel,
-      visibilityConfig,
     ],
   );
 

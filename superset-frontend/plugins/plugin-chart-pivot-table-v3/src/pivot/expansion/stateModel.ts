@@ -230,24 +230,3 @@ export const pruneExpandedToStablePrefix = ({
   });
   return next;
 };
-
-export const collectVisibleExpansionKeys = ({
-  visibleRows,
-  visibleCols,
-}: {
-  visibleRows: PivotTreeNode[];
-  visibleCols: PivotTreeNode[];
-}): { rows: Set<string>; cols: Set<string> } => {
-  const visibleColKeys = new Set<string>();
-  visibleCols.forEach(col => {
-    for (let idx = 0; idx <= col.path.length; idx += 1) {
-      const key = serializePath(col.path.slice(0, idx));
-      visibleColKeys.add(key);
-    }
-  });
-
-  return {
-    rows: new Set(visibleRows.map(row => row.key)),
-    cols: visibleColKeys,
-  };
-};

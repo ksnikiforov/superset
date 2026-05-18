@@ -31,16 +31,11 @@ import {
 } from './planner';
 import {
   buildDesiredExpandedKeys,
-  collectVisibleExpansionKeys,
   coerceExpansionState,
   pruneExpandedToStablePrefix,
   stripAutoSeededExpansions,
   type PivotExpansionStateKeys,
 } from './stateModel';
-import {
-  buildRenderModelAxes,
-  type RenderModelConfig,
-} from '../render/renderModel';
 import { rootKey } from '../viewModel';
 import { type PivotExpansionCoverageDiff } from '../runtime/coverage';
 import {
@@ -50,15 +45,6 @@ import {
 import type { PivotProgram } from '../runtime/types';
 import { isMetricTokenForKeys, isSubtotalToken } from '../core/tokens';
 import { createMetricNodePolicy } from '../metricsTotals';
-
-export type ExpansionVisibilityConfig = {
-  program: PivotProgram;
-  buildRenderModelConfig: (params: {
-    tree: PivotTreeData;
-    expandedRows: Set<string>;
-    expandedCols: Set<string>;
-  }) => RenderModelConfig;
-};
 
 export type ExpansionPlanningConfig = {
   program: PivotProgram;
@@ -1124,11 +1110,42 @@ export const planInitialHydrationPrefetch = ({
 const filterVisibleExpansionKeys = (keys: Set<string>, visible: Set<string>) =>
   Array.from(keys).filter(key => key !== rootKey && visible.has(key));
 
+const collectVisibleAxisExpansionKeys = (
+  nodes: Record<string, PivotTreeNode>,
+  expanded: Set<string>,
+) => {
+  const visible = new Set<string>([rootKey]);
+  const childrenByParent = new Map<string, PivotTreeNode[]>();
+  Object.values(nodes).forEach(node => {
+    if (node.key === rootKey || node.path.length === 0) {
+      return;
+    }
+    const parentKey = serializePath(node.path.slice(0, -1));
+    const children = childrenByParent.get(parentKey);
+    if (children) {
+      children.push(node);
+    } else {
+      childrenByParent.set(parentKey, [node]);
+    }
+  });
+  const visit = (node: PivotTreeNode) => {
+    visible.add(node.key);
+    if (node.key !== rootKey && !expanded.has(node.key)) {
+      return;
+    }
+    (childrenByParent.get(node.key) ?? []).forEach(visit);
+  };
+  const root = nodes[rootKey];
+  if (root) {
+    visit(root);
+  }
+  return visible;
+};
+
 export const buildVisiblePersistedExpansionState = ({
   tree,
   expandedRows,
   expandedCols,
-  config,
   explicitExpandedRows,
   explicitExpandedCols,
   explicitCollapsedRows,
@@ -1141,7 +1158,6 @@ export const buildVisiblePersistedExpansionState = ({
   tree: PivotTreeData;
   expandedRows: Set<string>;
   expandedCols: Set<string>;
-  config: ExpansionVisibilityConfig;
   explicitExpandedRows: Set<string>;
   explicitExpandedCols: Set<string>;
   explicitCollapsedRows: Set<string>;
@@ -1157,18 +1173,10 @@ export const buildVisiblePersistedExpansionState = ({
   visibleCollapsedRows: Set<string>;
   visibleCollapsedCols: Set<string>;
 } => {
-  const visibleKeys = collectVisibleExpansionKeys(
-    buildRenderModelAxes({
-      tree,
-      expandedRows,
-      expandedCols,
-      config: config.buildRenderModelConfig({
-        tree,
-        expandedRows,
-        expandedCols,
-      }),
-    }),
-  );
+  const visibleKeys = {
+    rows: collectVisibleAxisExpansionKeys(tree.rows, expandedRows),
+    cols: collectVisibleAxisExpansionKeys(tree.cols, expandedCols),
+  };
   const visibleRows = filterVisibleExpansionKeys(
     explicitExpandedRows,
     visibleKeys.rows,
