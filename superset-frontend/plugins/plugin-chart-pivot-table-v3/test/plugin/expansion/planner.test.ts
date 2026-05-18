@@ -17,10 +17,7 @@
  * under the License.
  */
 
-import {
-  buildGroupedFetchTargets,
-  planExpansionForAxis,
-} from '../../../src/pivot/expansion/planner';
+import { planExpansionForAxis } from '../../../src/pivot/expansion/planner';
 import {
   createExpansionCoverageDiff,
   type PivotExpansionCoverageDiff,
@@ -72,22 +69,7 @@ const getMissingCoverageFromSelectors = (
   });
 
 const fetchPathKeys = (plan: ReturnType<typeof planExpansionForAxis>) =>
-  plan.fetchRequests.map(request => request.pathKey);
-
-const planGroupedExpansionTargets = (
-  input: Parameters<typeof planExpansionForAxis>[0],
-) => {
-  const plan = planExpansionForAxis(input);
-  return {
-    plan,
-    targets: buildGroupedFetchTargets({
-      axis: input.axis,
-      program: input.program,
-      requests: plan.fetchRequests,
-      nodes: input.nodes,
-    }),
-  };
-};
+  plan.targets.map(target => target.pathKey);
 
 describe('pivot/expansion/planner', () => {
   it('plans grouped fetch targets for an expanded node', () => {
@@ -113,7 +95,7 @@ describe('pivot/expansion/planner', () => {
       },
     };
 
-    const { plan, targets } = planGroupedExpansionTargets({
+    const plan = planExpansionForAxis({
       axis: 'row',
       expandedKeys: new Set([rootKey, aKey]),
       nodes,
@@ -123,7 +105,7 @@ describe('pivot/expansion/planner', () => {
     });
 
     expect(fetchPathKeys(plan)).toEqual([aKey]);
-    expect(targets).toEqual([
+    expect(plan.targets).toEqual([
       {
         axis: 'row',
         pathKey: aKey,
@@ -133,7 +115,7 @@ describe('pivot/expansion/planner', () => {
 
   it('plans fetches from semantic expandability instead of tree child shape', () => {
     const aKey = serializePath(['A']);
-    const { plan, targets } = planGroupedExpansionTargets({
+    const plan = planExpansionForAxis({
       axis: 'row',
       expandedKeys: new Set([rootKey, aKey]),
       nodes: {
@@ -150,7 +132,7 @@ describe('pivot/expansion/planner', () => {
     });
 
     expect(fetchPathKeys(plan)).toEqual([aKey]);
-    expect(targets).toEqual([
+    expect(plan.targets).toEqual([
       {
         axis: 'row',
         pathKey: aKey,
@@ -178,7 +160,7 @@ describe('pivot/expansion/planner', () => {
       },
     ]);
 
-    const { plan, targets } = planGroupedExpansionTargets({
+    const plan = planExpansionForAxis({
       axis: 'row',
       expandedKeys: new Set([rootKey, aKey, bKey]),
       nodes: {
@@ -192,7 +174,7 @@ describe('pivot/expansion/planner', () => {
     });
 
     expect(fetchPathKeys(plan)).toEqual([bKey]);
-    expect(targets.map(target => target.pathKey)).toEqual([bKey]);
+    expect(plan.targets.map(target => target.pathKey)).toEqual([bKey]);
   });
 
   it('diffs expansion coverage requests as one set', () => {
@@ -202,7 +184,7 @@ describe('pivot/expansion/planner', () => {
       (requests: Parameters<PivotExpansionCoverageDiff>[0]) => requests,
     );
 
-    planGroupedExpansionTargets({
+    planExpansionForAxis({
       axis: 'row',
       expandedKeys: new Set([rootKey, aKey, bKey]),
       nodes: {
@@ -234,7 +216,7 @@ describe('pivot/expansion/planner', () => {
       (requests: Parameters<PivotExpansionCoverageDiff>[0]) => requests,
     );
 
-    const { plan, targets } = planGroupedExpansionTargets({
+    const plan = planExpansionForAxis({
       axis: 'row',
       expandedKeys: new Set([metricKey, subtotalMetricKey]),
       nodes: {
@@ -258,7 +240,7 @@ describe('pivot/expansion/planner', () => {
       ),
     ).toEqual([metricKey]);
     expect(fetchPathKeys(plan)).toEqual([metricKey]);
-    expect(targets.map(target => target.pathKey)).toEqual([metricKey]);
+    expect(plan.targets.map(target => target.pathKey)).toEqual([metricKey]);
   });
 
   it('uses typed batch coverage to skip only covered sibling paths', () => {
@@ -283,7 +265,7 @@ describe('pivot/expansion/planner', () => {
       },
     ]);
 
-    const { plan, targets } = planGroupedExpansionTargets({
+    const plan = planExpansionForAxis({
       axis: 'row',
       expandedKeys: new Set([caKey, nyKey, txKey]),
       nodes: {
@@ -297,7 +279,7 @@ describe('pivot/expansion/planner', () => {
     });
 
     expect(fetchPathKeys(plan)).toEqual([txKey]);
-    expect(targets.map(target => target.pathKey)).toEqual([txKey]);
+    expect(plan.targets.map(target => target.pathKey)).toEqual([txKey]);
   });
 
   it('does not let typed metric branch coverage satisfy sibling metrics', () => {
@@ -320,7 +302,7 @@ describe('pivot/expansion/planner', () => {
       },
     ]);
 
-    const { plan, targets } = planGroupedExpansionTargets({
+    const plan = planExpansionForAxis({
       axis: 'row',
       expandedKeys: new Set([salesKey, profitKey]),
       nodes: {
@@ -339,7 +321,7 @@ describe('pivot/expansion/planner', () => {
     });
 
     expect(fetchPathKeys(plan)).toEqual([profitKey]);
-    expect(targets.map(target => target.pathKey)).toEqual([profitKey]);
+    expect(plan.targets.map(target => target.pathKey)).toEqual([profitKey]);
   });
 
   it('keeps rendered metric siblings as separate fetch targets when coverage keys differ', () => {
@@ -375,7 +357,7 @@ describe('pivot/expansion/planner', () => {
       },
     };
 
-    const { targets } = planGroupedExpansionTargets({
+    const plan = planExpansionForAxis({
       axis: 'row',
       expandedKeys: new Set([metricAKey, metricBKey]),
       nodes,
@@ -384,8 +366,8 @@ describe('pivot/expansion/planner', () => {
       program: testProgram,
     });
 
-    expect(targets).toHaveLength(2);
-    expect(new Set(targets.map(target => target.pathKey))).toEqual(
+    expect(plan.targets).toHaveLength(2);
+    expect(new Set(plan.targets.map(target => target.pathKey))).toEqual(
       new Set([metricAKey, metricBKey]),
     );
   });

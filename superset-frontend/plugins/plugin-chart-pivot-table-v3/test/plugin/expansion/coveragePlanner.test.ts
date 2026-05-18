@@ -51,9 +51,8 @@ const makeNode = ({
   isSubtotal: false,
 });
 
-const sortKeys = (keys: Set<string>) => Array.from(keys).sort();
 const sortFetchPathKeys = (plan: ReturnType<typeof planExpansionForAxis>) =>
-  plan.fetchRequests.map(request => request.pathKey).sort();
+  plan.targets.map(target => target.pathKey).sort();
 
 const getMissingCoverageFromDepths =
   (depthByPathKey: Map<string, number>): PivotExpansionCoverageDiff =>
@@ -84,7 +83,6 @@ describe('expansionPlanner', () => {
     });
 
     expect(sortFetchPathKeys(plan)).toEqual([]);
-    expect(sortKeys(plan.pendingKeys)).toEqual([]);
     expect(plan.hasMissingNodes).toBe(false);
   });
 
@@ -107,7 +105,6 @@ describe('expansionPlanner', () => {
     });
 
     expect(sortFetchPathKeys(plan)).toEqual([]);
-    expect(sortKeys(plan.pendingKeys)).toEqual([]);
   });
 
   it('requires a fetch when the required depth increases', () => {
@@ -129,7 +126,6 @@ describe('expansionPlanner', () => {
     });
 
     expect(sortFetchPathKeys(plan)).toEqual([keyA]);
-    expect(sortKeys(plan.pendingKeys)).toEqual([keyA]);
   });
 
   it('treats nodes as pending when children are not loaded at depth zero', () => {
@@ -149,7 +145,6 @@ describe('expansionPlanner', () => {
     });
 
     expect(sortFetchPathKeys(plan)).toEqual([keyA]);
-    expect(sortKeys(plan.pendingKeys)).toEqual([keyA]);
   });
 
   it('fetches missing keys when the nearest ancestor is satisfied', () => {
@@ -172,7 +167,6 @@ describe('expansionPlanner', () => {
     });
 
     expect(sortFetchPathKeys(plan)).toEqual([keyAB]);
-    expect(sortKeys(plan.pendingKeys)).toEqual([keyAB]);
     expect(plan.hasMissingNodes).toBe(true);
   });
 
@@ -196,7 +190,6 @@ describe('expansionPlanner', () => {
     });
 
     expect(sortFetchPathKeys(plan)).toEqual([keyA]);
-    expect(sortKeys(plan.pendingKeys)).toEqual([keyA, keyAB]);
     expect(plan.hasMissingNodes).toBe(true);
   });
 
@@ -247,7 +240,6 @@ describe('expansionPlanner', () => {
       program: testProgram,
     });
     expect(sortFetchPathKeys(plan4)).toEqual([keyA]);
-    expect(sortKeys(plan4.pendingKeys)).toEqual([keyA, keyAB]);
 
     const nodesWithChild: Record<string, PivotTreeNode> = {
       ...baseNodes,

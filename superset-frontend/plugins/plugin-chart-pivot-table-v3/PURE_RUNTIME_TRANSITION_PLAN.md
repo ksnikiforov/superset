@@ -290,8 +290,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13043` insertions, `17161` deletions, net `-4118`.
-- Current production TypeScript/TSX total: about `29392` lines.
+- Production `src`: `13010` insertions, `17150` deletions, net `-4140`.
+- Current production TypeScript/TSX total: about `29370` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -303,20 +303,20 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `29392` | `-4118` | `< 28000` |
-| Strict core pipeline | `11337` | `11923` | `+586` | `8000` |
+| Full production `src` | `33510` | `29370` | `-4140` | `< 28000` |
+| Strict core pipeline | `11337` | `11901` | `+564` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5084` | `+401` | `3000-4000` |
-| Broad core pipeline | `16020` | `17007` | `+987` | `11000-13000` |
+| Broad core pipeline | `16020` | `16985` | `+965` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `3917` |
-| `pivot/expansion/*` | `2634` |
+| `pivot/runtime/*` | `3921` |
+| `pivot/expansion/*` | `2608` |
 | `pivot/query/*` | `1554` |
 | `pivot/layout/*` | `732` |
-| core/shared/domain helpers | `1752` |
+| core/shared/domain helpers | `1873` |
 | formatting/data/render-model/update support | `1213` |
 
 Interpretation: plugin-wide source has shrunk, but core pipeline source has
@@ -445,6 +445,14 @@ hydration state remain render state. The seamless reuse policy also accepts the
 reusable runtime layout directly instead of wrapping it in a one-field reuse
 snapshot.
 
+Latest expansion-planner cleanup: `planExpansionForAxis` no longer exposes
+coverage request objects or pending-key sets to hydration. It emits executable
+axis fetch targets directly, keeps ancestor/descendant request pruning inside
+the planner, and leaves hydration with only visible depths plus target
+execution. Expansion request lifecycle ownership also moved into
+`LatestRequestScope.finish`, so `useExpansionEngine` no longer injects request
+tracking helpers into the fetch executor.
+
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.
 Future work should remain high-impact-first while still deleting code where the
@@ -464,12 +472,12 @@ authority boundaries:
 | --- | ---: | --- | --- | --- |
 | Make user-controlled runtime the only layout mode | `interactionMode` branches in `controlPanel.tsx`, `PivotTableChart.tsx`, `usePivotRuntimeLayoutState.ts`, `usePivotSeamlessRuntimeUpdate.ts`, `runtime/seamlessRuntimeUpdate.ts`, plus duplicate fixed-mode row/column controls | The code currently supports two pivots: fixed Explore controls and interactive chart runtime. That forces layout conversion, committed-vs-draft branching, different filter persistence, different loader behavior, and two Values placement surfaces. | Visible. The chart would always show the interactive layout shell/editor. Explore row/column controls could be reduced or removed; dimensions/metrics controls would remain as source-pool controls unless replaced. | Remove `fixed` mode as a runtime branch. Keep a single `PivotRuntimeLayout` authority. Delete fixed/user conditionals, fixed-only render path, and duplicated row/column Explore layout controls after replacing them with source-pool serialization. |
 | Represent level expansion as manifest-shaped coverage need | `expandRowsLevel`, `expandColumnsLevel`, `initialDepth`, `useExpansionEngine.ts`, `stateTransitions.ts`, and root-prefetch planning in `query/specs.ts` | Pre-expand depth is a real saved visibility feature. The complexity problem is not that it exists; the problem is that level expansion, path expansion, persisted restore, root prefetch, and hydration are still separate mechanisms. | Low if visible behavior is preserved. A dashboard configured to pre-expand level `N` must still load and show level `N` on fresh load. | Pre-expand compiles directly to `PivotAxisCoverageNeed` with `scope: { kind: 'scopedFull', ancestorPaths: [[]] }`. Manual branch expansion uses the same type with `scope: { kind: 'paths', paths }`. Delete separate expansion-local vocabulary and then collapse duplicate hydration branches around coverage diff/execution. |
-| Replace expansion hydration scheduler with a manifest executor | `useExpansionEngine.ts` about `1199` lines, `stateTransitions.ts` about `1210` lines, `fetchExecution.ts` about `412` lines | Expansion still has same-axis toggle flow, cross-axis hydration, initial prefetch, persisted restore, in-flight expansion maps, loading-key counts, and branch/batch/intersection execution as separate mechanisms. The selected manifest model should make this one diff/execute/rematerialize loop. | Low to medium if explicit expansion behavior is preserved. Higher if combined with removing auto-expand levels or exact persisted restore. | Build required visible coverage, diff fact store, execute missing needs, rematerialize. Delete same-axis/cross-axis/prefetch loop splits and request-group/loading bookkeeping that only exists because flows are separate. |
+| Replace expansion hydration scheduler with a manifest executor | `useExpansionEngine.ts` about `867` lines, `stateTransitions.ts` about `878` lines, `fetchExecution.ts` about `328` lines | Expansion still has same-axis toggle flow, cross-axis hydration, initial prefetch, persisted restore, in-flight expansion maps, loading-key counts, and branch/batch/intersection execution as separate mechanisms. The selected manifest model should make this one diff/execute/rematerialize loop. | Low to medium if explicit expansion behavior is preserved. Higher if combined with removing auto-expand levels or exact persisted restore. | Build required visible coverage, diff fact store, execute missing needs, rematerialize. Delete same-axis/cross-axis/prefetch loop splits and request-group/loading bookkeeping that only exists because flows are separate. |
 | Merge initial, seamless, and expansion query planning | `query/specs.ts`, `runtime/coverage.ts`, `runtime/seamlessRuntimeUpdate.ts`, `update/initialUpdatePlan.ts`, `expansion/fetchExecution.ts`; query/expansion/runtime totals remain large | Initial load, semantic layout change, and expansion still enter through different request/spec paths. The fact selector is unified, but root/branch/batch/intersection are still first-class query paths instead of outputs of one coverage manifest. | Low if fetch counts are locked by tests. Main risk is underfetch/overfetch around sorting support metrics, measure leaves, and row x column intersections. | One manifest-to-query-spec executor handles root, layout, expansion, batch, and intersection needs. Delete root target planning, `buildBranchFactCoverages`, expansion request-kind query branches, and duplicated coverage/spec conversion. |
-| Reduce Explore DnD controls to source-pool controls | `controls/PivotDndMetricSelect/*` about `3870` lines, `controls/PivotDndColumnSelect/*` about `1745` lines, in-chart panel/layout about `1784` lines | Metric/dimension controls and the in-chart panel both edit formatting, metric order, measure leaves, dimension formatting/sorting, and Values placement. The metric control alone is larger than most runtime modules. | High. This changes where users configure formatting, measure leaves, and layout. It should follow the decision on making interactive runtime the only mode. | Keep minimal Explore controls for selecting available dimensions/metrics. Move formatting/measure-leaf editing to one surface or simplify those features. Delete duplicated DnD/formatting transfer logic. |
-| Standardize or cut formatting/databar formula features | `utils.ts` about `1328` lines, `usePivotFormatting.tsx` about `1215` lines, `databarRuntime.ts` about `432` lines, Excel formula helpers, metric controls | Formatting support drives many support metrics, key normalization paths, render wrappers, databar runtime models, Excel formula parsing, and control-state repair. Some complexity is core value; some is feature breadth. | High if features are removed. Medium if only legacy aliases/normalizers are deleted. | First remove compatibility aliasing and duplicate key remapping. Larger deletion requires a feature checkpoint: e.g. keep basic formatting but remove formula-driven formatting or waterfall databars. |
+| Reduce Explore DnD controls to source-pool controls | `controls/PivotDndMetricSelect/*` about `3995` lines, `controls/PivotDndColumnSelect/*` about `1745` lines, in-chart panel/layout about `1784` lines | Metric/dimension controls and the in-chart panel both edit formatting, metric order, measure leaves, dimension formatting/sorting, and Values placement. The metric control alone is larger than most runtime modules. | High. This changes where users configure formatting, measure leaves, and layout. It should follow the decision on making interactive runtime the only mode. | Keep minimal Explore controls for selecting available dimensions/metrics. Move formatting/measure-leaf editing to one surface or simplify those features. Delete duplicated DnD/formatting transfer logic. |
+| Standardize or cut formatting/databar formula features | `utils.ts` about `1169` lines, `usePivotFormatting.tsx` about `1212` lines, `databarRuntime.ts` about `432` lines, Excel formula helpers, metric controls | Formatting support drives many support metrics, key normalization paths, render wrappers, databar runtime models, Excel formula parsing, and control-state repair. Some complexity is core value; some is feature breadth. | High if features are removed. Medium if only legacy aliases/normalizers are deleted. | First remove compatibility aliasing and duplicate key remapping. Larger deletion requires a feature checkpoint: e.g. keep basic formatting but remove formula-driven formatting or waterfall databars. |
 | Canonicalize metric identity | `metrics.ts`, `utils.ts`, metric controls, query support metrics, measure leaves, formatting/databars, expansion path labels | Metric identity is still partly display-label based for adhoc and saved metrics. That forces separate formatting keys, label maps, rename repair, and support-metric fallback logic. | High. Existing dashboards that identify adhoc metrics by label/verbose name may stop restoring formatting, databars, sorting support metrics, or expansion labels exactly. | Define one durable metric id, likely saved `metric_name` and adhoc `optionName`, and treat display labels as labels only. Delete label fallback resolution, rename repair branches, and duplicate key/label normalization paths. |
-| Replace materialized tree as render contract with a typed grid model | `materializePivotTree.ts` about `1298` lines, `renderModel.ts`, `renderDisplay.ts`, `PivotTableView.tsx`, export model | The materializer builds a semantic tree, render projects/hides/relabels it, and export builds a worksheet model from render output. The tree still carries both semantic and display responsibilities. | Medium to high. It touches render and export heavily, but can preserve visible behavior if done after query/executor unification. | Materializer emits typed axes/headers/cells from facts and program. Render/export consume the same grid model. Delete display repair and duplicate export/header assembly. |
+| Replace materialized tree as render contract with a typed grid model | `materializePivotTree.ts` about `1276` lines, `renderModel.ts`, `renderDisplay.ts`, `PivotTableView.tsx`, export model | The materializer builds a semantic tree, render projects/hides/relabels it, and export builds a worksheet model from render output. The tree still carries both semantic and display responsibilities. | Medium to high. It touches render and export heavily, but can preserve visible behavior if done after query/executor unification. | Materializer emits typed axes/headers/cells from facts and program. Render/export consume the same grid model. Delete display repair and duplicate export/header assembly. |
 
 Near-term priority should be:
 

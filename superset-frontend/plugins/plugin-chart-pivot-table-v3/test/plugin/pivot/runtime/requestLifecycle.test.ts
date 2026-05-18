@@ -61,6 +61,18 @@ describe('requestLifecycle', () => {
     expect(cancel).toHaveBeenCalledWith('batch:b');
   });
 
+  it('finishes scoped requests without cancelling completed groups later', () => {
+    const cancel = jest.fn();
+    const lifecycle = createLatestRequestLifecycle({ cancel });
+    const scope = lifecycle.beginScope();
+    const token = scope.beginRequest('branch:a');
+
+    scope.finish(token);
+    scope.beginRequest('branch:a');
+
+    expect(cancel).not.toHaveBeenCalled();
+  });
+
   it('commits only the latest successful request', async () => {
     const lifecycle = createLatestRequestLifecycle();
     const onSuccess = jest.fn();

@@ -26,10 +26,7 @@ import {
   type FetchTarget,
 } from '../query/fetchPlanOptimizer';
 import { buildFactValueKeys, type PivotFactStore } from '../runtime/factStore';
-import {
-  type LatestRequestLifecycle,
-  type LatestRequestScope,
-} from '../runtime/requestLifecycle';
+import { type LatestRequestScope } from '../runtime/requestLifecycle';
 import { createExpansionCoverageDiff } from '../runtime/coverage';
 import { stableStringify } from '../shared/stableStringify';
 import { runHydrationLoop } from './stateTransitions';
@@ -45,57 +42,13 @@ import {
   type FetchPivotExpansionRequest,
 } from './fetchPivotExpansion';
 
-export type TrackExpansionRequest = <T>(
-  requestScope: LatestRequestScope,
-  requestGroupId: string,
-  fetcher: () => Promise<T>,
-) => Promise<T>;
-
-type BuildExpansionRequestGroupId = (
-  payload: Record<string, unknown>,
-) => string;
-
-export type ExpansionRequestHelpers = {
-  buildRequestGroupId: BuildExpansionRequestGroupId;
-  trackRequestInScope: TrackExpansionRequest;
-};
-
-export const createExpansionRequestHelpers = ({
-  lifecycle,
-  instanceId,
-}: {
-  lifecycle: LatestRequestLifecycle;
-  instanceId: string;
-}): ExpansionRequestHelpers => ({
-  buildRequestGroupId(payload: Record<string, unknown>) {
-    return stableStringify({
-      instanceId,
-      transactionId: lifecycle.currentId(),
-      ...payload,
-    });
-  },
-  async trackRequestInScope<T>(
-    requestScope: LatestRequestScope,
-    requestGroupId: string,
-    fetcher: () => Promise<T>,
-  ): Promise<T> {
-    const token = requestScope.beginRequest(requestGroupId);
-    try {
-      return await fetcher();
-    } finally {
-      lifecycle.finish(token);
-    }
-  },
-});
-
 export type ExpansionFetchRuntime = {
   requestScope: LatestRequestScope;
+  instanceId: string;
   fetchFormData: PivotTableQueryFormData;
   program: PivotProgram;
   factStore?: PivotFactStore;
   materializeLoadedTree: () => PivotTreeData;
-  buildRequestGroupId: BuildExpansionRequestGroupId;
-  trackRequestInScope: TrackExpansionRequest;
   addWarnings: (nextWarnings?: ChartDataWarning[]) => void;
   updateLoadingKey: (key: string, delta: number) => void;
 };
@@ -109,6 +62,19 @@ type ExpansionQueryRequest = Omit<
   FetchPivotExpansionRequest,
   'formData' | 'requestGroupId' | 'factStore'
 >;
+
+const buildExpansionRequestGroupId = ({
+  runtime,
+  payload,
+}: {
+  runtime: ExpansionFetchRuntime;
+  payload: Record<string, unknown>;
+}) =>
+  stableStringify({
+    instanceId: runtime.instanceId,
+    transactionId: runtime.requestScope.id,
+    ...payload,
+  });
 
 const createRuntimeExpansionCoverageDiff = ({
   runtime,
@@ -167,24 +133,23 @@ const executeExpansionQueryRequest = async ({
   runtime: ExpansionFetchRuntime;
   loadingKeys: string[];
 }): Promise<void> => {
-  const { requestScope, trackRequestInScope, updateLoadingKey, addWarnings } =
-    runtime;
+  const { requestScope, updateLoadingKey, addWarnings } = runtime;
   if (requestScope.isCurrent()) {
     loadingKeys.forEach(key => updateLoadingKey(key, 1));
   }
+  const token = requestScope.beginRequest(requestGroupId);
   try {
-    const result = await trackRequestInScope(requestScope, requestGroupId, () =>
-      fetchPivotExpansion({
-        ...request,
-        requestGroupId,
-        formData: runtime.fetchFormData,
-        factStore: runtime.factStore,
-      }),
-    );
+    const result = await fetchPivotExpansion({
+      ...request,
+      requestGroupId,
+      formData: runtime.fetchFormData,
+      factStore: runtime.factStore,
+    });
     if (requestScope.isCurrent()) {
       addWarnings(result.warnings);
     }
   } finally {
+    requestScope.finish(token);
     if (requestScope.isCurrent()) {
       loadingKeys.forEach(key => updateLoadingKey(key, -1));
     }
@@ -244,29 +209,38 @@ export const fetchExpansionTargetDeltas = async ({
   });
   const { visibleRowDepth, visibleColDepth } = context;
   const buildSingleRequestGroupId = (target: FetchTarget) =>
-    runtime.buildRequestGroupId({
-      kind: 'branch',
-      ...target,
-      visibleRowDepth,
-      visibleColDepth,
+    buildExpansionRequestGroupId({
+      runtime,
+      payload: {
+        kind: 'branch',
+        ...target,
+        visibleRowDepth,
+        visibleColDepth,
+      },
     });
   const buildBatchRequestGroupId = (batch: BatchGroup) =>
-    runtime.buildRequestGroupId({
-      kind: 'batch',
-      axis: batch.axis,
-      parentPathKey: batch.parentPathKey,
-      signature: batch.signature,
-      targetKeys: [...batch.targets.map(target => target.pathKey)].sort(),
-      visibleRowDepth,
-      visibleColDepth,
+    buildExpansionRequestGroupId({
+      runtime,
+      payload: {
+        kind: 'batch',
+        axis: batch.axis,
+        parentPathKey: batch.parentPathKey,
+        signature: batch.signature,
+        targetKeys: [...batch.targets.map(target => target.pathKey)].sort(),
+        visibleRowDepth,
+        visibleColDepth,
+      },
     });
   const buildIntersectionRequestGroupId = (target: IntersectionFetchTarget) =>
-    runtime.buildRequestGroupId({
-      kind: 'hydrate:intersection',
-      rowPathKeys: [...target.rowPathKeys].sort(),
-      columnPathKeys: [...target.columnPathKeys].sort(),
-      visibleRowDepth,
-      visibleColDepth,
+    buildExpansionRequestGroupId({
+      runtime,
+      payload: {
+        kind: 'hydrate:intersection',
+        rowPathKeys: [...target.rowPathKeys].sort(),
+        columnPathKeys: [...target.columnPathKeys].sort(),
+        visibleRowDepth,
+        visibleColDepth,
+      },
     });
   const branchFetchPromises: Array<Promise<void>> = [
     ...singles.map(target =>

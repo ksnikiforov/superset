@@ -26,6 +26,7 @@ export type LatestRequestToken = {
 export type LatestRequestScope = {
   id: number;
   beginRequest: (requestGroupId: string) => LatestRequestToken;
+  finish: (token: LatestRequestToken) => void;
   isCurrent: () => boolean;
 };
 
@@ -86,6 +87,17 @@ export const createLatestRequestLifecycle = ({
     activeRequestGroupIds.set(requestGroupId, ids);
   };
 
+  const finishToken = (token: LatestRequestToken) => {
+    const activeIds = activeRequestGroupIds.get(token.requestGroupId);
+    if (!activeIds) {
+      return;
+    }
+    activeIds.delete(token.id);
+    if (activeIds.size === 0) {
+      activeRequestGroupIds.delete(token.requestGroupId);
+    }
+  };
+
   const createScope = (requestId: number): LatestRequestScope => ({
     id: requestId,
     beginRequest(requestGroupId: string) {
@@ -100,6 +112,7 @@ export const createLatestRequestLifecycle = ({
         isCurrent: () => requestId === currentRequestId,
       };
     },
+    finish: finishToken,
     isCurrent: () => requestId === currentRequestId,
   });
 
@@ -120,16 +133,7 @@ export const createLatestRequestLifecycle = ({
     currentScope() {
       return createScope(currentRequestId);
     },
-    finish(token: LatestRequestToken) {
-      const activeIds = activeRequestGroupIds.get(token.requestGroupId);
-      if (!activeIds) {
-        return;
-      }
-      activeIds.delete(token.id);
-      if (activeIds.size === 0) {
-        activeRequestGroupIds.delete(token.requestGroupId);
-      }
-    },
+    finish: finishToken,
     invalidate() {
       currentRequestId += 1;
       cancelActiveRequestGroups();

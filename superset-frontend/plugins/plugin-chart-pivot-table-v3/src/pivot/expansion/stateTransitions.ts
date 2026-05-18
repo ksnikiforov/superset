@@ -24,7 +24,6 @@ import {
 } from '../../types';
 import { parsePath, serializePath } from '../core/path';
 import {
-  buildGroupedFetchTargets,
   type ExpansionFetchTarget,
   planExpansionForAxis,
   type PivotExpansionPlan,
@@ -50,8 +49,7 @@ export type ExpansionPlanningConfig = {
 };
 
 const createEmptyExpansionPlan = (): PivotExpansionPlan => ({
-  fetchRequests: [],
-  pendingKeys: new Set<string>(),
+  targets: [],
   hasMissingNodes: false,
 });
 
@@ -720,8 +718,8 @@ export const planHydrationIteration = ({
     : colPlan;
 
   if (
-    rowPlanForTransport.pendingKeys.size === 0 &&
-    colPlanForTransport.pendingKeys.size === 0 &&
+    rowPlanForTransport.targets.length === 0 &&
+    colPlanForTransport.targets.length === 0 &&
     intersectionTargets.length === 0
   ) {
     return {
@@ -730,32 +728,20 @@ export const planHydrationIteration = ({
       desiredCols,
       visibleRowDepth,
       visibleColDepth,
-      rowPlan,
-      colPlan,
     };
   }
 
-  const rowGroups = buildGroupedFetchTargets({
-    axis: 'row',
-    program: config.program,
-    requests: rowPlanForTransport.fetchRequests,
-    nodes: tree.rows,
-  });
-  const colGroups = buildGroupedFetchTargets({
-    axis: 'col',
-    program: config.program,
-    requests: colPlanForTransport.fetchRequests,
-    nodes: tree.cols,
-  });
   return {
     kind: 'fetch',
     desiredRows,
     desiredCols,
     visibleRowDepth,
     visibleColDepth,
-    rowPlan,
-    colPlan,
-    targets: [...rowGroups, ...colGroups, ...intersectionTargets],
+    targets: [
+      ...rowPlanForTransport.targets,
+      ...colPlanForTransport.targets,
+      ...intersectionTargets,
+    ],
   };
 };
 

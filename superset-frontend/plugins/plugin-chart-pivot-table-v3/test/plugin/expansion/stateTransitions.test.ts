@@ -152,8 +152,8 @@ describe('pivot/expansion/stateTransitions', () => {
       program: testProgram,
       valueKeys: ['sales'],
     });
-  const fetchPathKeys = (plan: { fetchRequests: Array<{ pathKey: string }> }) =>
-    plan.fetchRequests.map(request => request.pathKey);
+  const fetchPathKeys = (targets: Array<{ pathKey: string }>) =>
+    targets.map(target => target.pathKey);
   const makeNode = (
     axis: 'row' | 'col',
     path: string[],
@@ -760,8 +760,7 @@ describe('pivot/expansion/stateTransitions', () => {
     if (plan.kind !== 'fetch') {
       throw new Error('Expected a fetch plan');
     }
-    expect(fetchPathKeys(plan.rowPlan)).toEqual([aKey]);
-    expect(fetchPathKeys(plan.colPlan)).toEqual([xKey]);
+    expect(fetchPathKeys(plan.targets)).toEqual([aKey, xKey]);
     expect(plan.targets).toEqual([
       {
         axis: 'row',
@@ -788,7 +787,7 @@ describe('pivot/expansion/stateTransitions', () => {
     if (plan.kind !== 'fetch') {
       throw new Error('Expected a fetch plan');
     }
-    expect(fetchPathKeys(plan.rowPlan)).not.toContain(rootKey);
+    expect(fetchPathKeys(plan.targets)).not.toContain(rootKey);
     expect(plan.targets).toEqual([
       expect.objectContaining({ axis: 'row', pathKey: aKey }),
       expect.objectContaining({ axis: 'col', pathKey: xKey }),
@@ -811,7 +810,7 @@ describe('pivot/expansion/stateTransitions', () => {
     if (plan.kind !== 'fetch') {
       throw new Error('Expected a fetch plan');
     }
-    expect(plan.rowPlan.hasMissingNodes).toBe(true);
+    expect(fetchPathKeys(plan.targets)).toContain(aKey);
     expect(plan.targets).not.toEqual(
       expect.arrayContaining([
         expect.objectContaining({ kind: 'intersection' }),
@@ -867,7 +866,7 @@ describe('pivot/expansion/stateTransitions', () => {
       config: metricConfig,
     });
 
-    expect(fetchPathKeys(plan.rowPlan)).toContain(aKey);
+    expect(fetchPathKeys(plan.targets)).toContain(aKey);
     expect(plan.kind).toBe('fetch');
   });
 
@@ -928,7 +927,7 @@ describe('pivot/expansion/stateTransitions', () => {
       config: metricConfig,
     });
 
-    expect(fetchPathKeys(plan.rowPlan)).toContain(aKey);
+    expect(fetchPathKeys(plan.targets)).toContain(aKey);
     expect(plan.kind).toBe('fetch');
   });
 });

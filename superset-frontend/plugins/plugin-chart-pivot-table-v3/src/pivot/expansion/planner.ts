@@ -46,8 +46,7 @@ export const isIntersectionFetchTarget = (
 ): target is IntersectionFetchTarget => 'kind' in target;
 
 export type PivotExpansionPlan = {
-  fetchRequests: PivotExpansionCoverageRequest[];
-  pendingKeys: Set<string>;
+  targets: FetchTarget[];
   hasMissingNodes: boolean;
 };
 
@@ -70,6 +69,54 @@ const coverageKeyForPathKey = (
   key: string,
 ) => buildAxisCoverageKeyFromPathKey({ program, axis, key });
 
+const pathStartsWith = (
+  path: PivotTreeNode['path'],
+  prefix: PivotTreeNode['path'],
+) =>
+  prefix.length <= path.length &&
+  prefix.every((value, index) => path[index] === value);
+
+const buildGroupedFetchTargets = ({
+  axis,
+  program,
+  requests,
+  nodes,
+}: {
+  axis: PivotAxis;
+  program: PivotProgram;
+  requests: PivotExpansionCoverageRequest[];
+  nodes: Record<string, PivotTreeNode>;
+}): FetchTarget[] => {
+  const groups = new Map<string, string[]>();
+  requests.forEach(({ pathKey }) => {
+    const groupKey = coverageKeyForPathKey(program, axis, pathKey);
+    const existing = groups.get(groupKey);
+    if (existing) {
+      existing.push(pathKey);
+    } else {
+      groups.set(groupKey, [pathKey]);
+    }
+  });
+
+  const targets: FetchTarget[] = [];
+
+  for (const keys of groups.values()) {
+    const representative =
+      keys.find(
+        key => coverageKeyForPathKey(program, axis, key) === key && nodes[key],
+      ) ??
+      keys.find(key => nodes[key]) ??
+      keys[0];
+
+    targets.push({
+      axis,
+      pathKey: representative,
+    });
+  }
+
+  return targets;
+};
+
 export const planExpansionForAxis = ({
   axis,
   program,
@@ -86,7 +133,6 @@ export const planExpansionForAxis = ({
   getMissingExpansionCoverage: PivotExpansionCoverageDiff;
 }): PivotExpansionPlan => {
   const fetchRequests = new Map<string, PivotExpansionCoverageRequest>();
-  const pendingKeys = new Set<string>();
   let hasMissingNodes = false;
   const hasNonRootExpanded =
     expandedKeys.size > 1 ||
@@ -118,59 +164,38 @@ export const planExpansionForAxis = ({
     }
     hasMissingNodes ||= !node;
     fetchRequests.set(keyForRequest, request);
-    pendingKeys.add(key);
   });
 
   const rootRequest = buildRequest(rootKey);
   if (fetchRequests.size > 1 && fetchRequests.has(requestKey(rootRequest))) {
     fetchRequests.delete(requestKey(rootRequest));
-    pendingKeys.delete(rootKey);
   }
-
-  return {
-    fetchRequests: Array.from(fetchRequests.values()),
-    pendingKeys,
-    hasMissingNodes,
-  };
-};
-
-export function buildGroupedFetchTargets({
-  axis,
-  program,
-  requests,
-  nodes,
-}: {
-  axis: PivotAxis;
-  program: PivotProgram;
-  requests: PivotExpansionCoverageRequest[];
-  nodes: Record<string, PivotTreeNode>;
-}): FetchTarget[] {
-  const groups = new Map<string, string[]>();
-  requests.forEach(({ pathKey }) => {
-    const groupKey = coverageKeyForPathKey(program, axis, pathKey);
-    const existing = groups.get(groupKey);
-    if (existing) {
-      existing.push(pathKey);
-    } else {
-      groups.set(groupKey, [pathKey]);
+  const pendingRequests = Array.from(fetchRequests.values()).map(request => ({
+    request,
+    path: parsePath(request.pathKey),
+  }));
+  pendingRequests.forEach(({ request, path }) => {
+    const axisDepth =
+      request.axis === 'row' ? request.rowDepth : request.columnDepth;
+    const hasAncestorRequest = pendingRequests.some(
+      ({ request: ancestorRequest, path: ancestorPath }) =>
+        ancestorRequest.pathKey !== request.pathKey &&
+        ancestorPath.length > 0 &&
+        ancestorPath.length < path.length &&
+        pathStartsWith(path, ancestorPath),
+    );
+    if (hasAncestorRequest && path.length > axisDepth) {
+      fetchRequests.delete(requestKey(request));
     }
   });
 
-  const targets: FetchTarget[] = [];
-
-  for (const keys of groups.values()) {
-    const representative =
-      keys.find(
-        key => coverageKeyForPathKey(program, axis, key) === key && nodes[key],
-      ) ??
-      keys.find(key => nodes[key]) ??
-      keys[0];
-
-    targets.push({
+  return {
+    targets: buildGroupedFetchTargets({
       axis,
-      pathKey: representative,
-    });
-  }
-
-  return targets;
-}
+      program,
+      requests: Array.from(fetchRequests.values()),
+      nodes,
+    }),
+    hasMissingNodes,
+  };
+};

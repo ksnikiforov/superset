@@ -66,7 +66,6 @@ import {
 } from './stateTransitions';
 import { useSyncRef } from '../shared/useSyncRef';
 import {
-  createExpansionRequestHelpers,
   runHydrationExpansionFetchLoop,
   type ExpansionFetchRuntime,
 } from './fetchExecution';
@@ -344,14 +343,6 @@ export const useExpansionEngine = ({
     [],
   );
 
-  const expansionRequestHelpers = useMemo(
-    () =>
-      createExpansionRequestHelpers({
-        lifecycle: expansionRequestLifecycle,
-        instanceId: requestGroupPrefixRef.current,
-      }),
-    [expansionRequestLifecycle],
-  );
   const expansionStateStoreRef = useRef<ExpansionStateStore>();
   const persistedExpansionStateRef = useRef<unknown>(persistedExpansionState);
   const previousDataRef = useRef<PivotTreeData | null>(null);
@@ -543,6 +534,7 @@ export const useExpansionEngine = ({
   const buildFetchRuntime = useCallback(
     (requestScope: LatestRequestScope): ExpansionFetchRuntime => ({
       requestScope,
+      instanceId: requestGroupPrefixRef.current,
       fetchFormData: fetchFormDataRef.current,
       program: pivotProgram,
       factStore: factStoreRef.current,
@@ -554,12 +546,10 @@ export const useExpansionEngine = ({
               formData: fetchFormDataRef.current,
             })
           : treeRef.current,
-      buildRequestGroupId: expansionRequestHelpers.buildRequestGroupId,
-      trackRequestInScope: expansionRequestHelpers.trackRequestInScope,
       addWarnings,
       updateLoadingKey,
     }),
-    [addWarnings, expansionRequestHelpers, pivotProgram, updateLoadingKey],
+    [addWarnings, pivotProgram, updateLoadingKey],
   );
 
   const collapseNode = useCallback(
@@ -834,7 +824,6 @@ export const useExpansionEngine = ({
       hydrateAtomic({
         showLoader: false,
       }).catch(reportAsyncError);
-      return;
     }
   }, [
     clearLoadingState,
