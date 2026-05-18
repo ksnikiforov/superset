@@ -16,65 +16,35 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import {
-  type PivotAxis,
-  type PivotPath,
-  type PivotTableQueryFormData,
-} from '../../types';
+import { type PivotTableQueryFormData } from '../../types';
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import { buildLayoutContext } from '../layout/LayoutContext';
-import { buildExpansionQuerySpecs, type PlannedQuerySpec } from './specs';
+import {
+  buildExpansionQuerySpecs,
+  type ExpansionQuerySpecRequest,
+  type PlannedQuerySpec,
+} from './specs';
 import { type PivotFactStore } from '../runtime/factStore';
 import { upsertQueryResultsIntoFactStore } from '../runtime/ingestQueryResults';
 import { isAbortError } from '../runtime/requestLifecycle';
 import { factStoreSelectorFromSpec } from '../runtime/materializePivotTree';
-import { type BatchGroup } from './fetchPlanOptimizer';
 
 export interface FetchPivotExpansionResult {
   warnings?: ChartDataWarning[];
   error?: Error;
 }
 
-type BranchExpansionRequest = {
-  formData: PivotTableQueryFormData;
-  axis: PivotAxis;
-  path: PivotPath;
-  visibleRowDepth?: number;
-  visibleColDepth?: number;
+type ExpansionQueryRequest = ExpansionQuerySpecRequest extends infer Request
+  ? Request extends unknown
+    ? Omit<Request, 'layout'>
+    : never
+  : never;
+
+export type FetchPivotExpansionRequest = ExpansionQueryRequest & {
   requestGroupId?: string;
   factStore?: PivotFactStore;
 };
-
-type BatchExpansionRequest = {
-  formData: PivotTableQueryFormData;
-  batch: BatchGroup;
-  visibleRowDepth: number;
-  visibleColDepth: number;
-  requestGroupId?: string;
-  factStore?: PivotFactStore;
-};
-
-type IntersectionExpansionRequest = {
-  formData: PivotTableQueryFormData;
-  rowPathKeys: string[];
-  columnPathKeys: string[];
-  visibleRowDepth: number;
-  visibleColDepth: number;
-  requestGroupId?: string;
-  factStore?: PivotFactStore;
-};
-
-export type FetchPivotExpansionRequest =
-  | ({
-      kind: 'branch';
-    } & BranchExpansionRequest)
-  | ({
-      kind: 'batch';
-    } & BatchExpansionRequest)
-  | ({
-      kind: 'intersection';
-    } & IntersectionExpansionRequest);
 
 const fetchPivotQuerySpecsIntoFactStore = async ({
   formData,

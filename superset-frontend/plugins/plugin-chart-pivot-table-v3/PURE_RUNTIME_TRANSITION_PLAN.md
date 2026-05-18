@@ -171,6 +171,10 @@ Current semantic-layout contract:
   through one request-shaped API, `buildExpansionQuerySpecs({ kind })`. The
   separate production `buildBranchQuerySpecs`, `buildBatchQuerySpecs`, and
   `buildIntersectionQuerySpecs` exports have been removed.
+- Expansion fetch request typing now derives from the same
+  `ExpansionQuerySpecRequest` union used by query-spec construction. The fetch
+  layer no longer maintains a duplicate branch/batch/intersection request
+  union.
 - Expansion fetch execution no longer carries separate same-axis/hydration
   request-kind overrides. Branch, batch, and intersection identity now comes
   from the typed expansion request itself.
@@ -234,8 +238,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13833` insertions, `16414` deletions, net `-2581`.
-- Current production TypeScript/TSX total: about `30929` lines.
+- Production `src`: `13803` insertions, `16414` deletions, net `-2611`.
+- Current production TypeScript/TSX total: about `30899` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
