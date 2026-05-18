@@ -165,11 +165,7 @@ const expansionRuntimeReducer = (
 };
 
 type ExpansionStateStore = {
-  init: (params: {
-    persistedState: unknown;
-    defaultRowKeys: string[];
-    defaultColKeys: string[];
-  }) => PivotExpansionStateKeys;
+  init: (persistedState: unknown) => PivotExpansionStateKeys;
   updateDeps: (deps: ExpansionStateStoreDeps) => void;
   write: (
     nextState: PivotExpansionStateKeys,
@@ -189,8 +185,6 @@ const toPersistedPayload = (
 ): PivotExpansionState => {
   const toPathArray = (keys: string[]) => keys.map(key => parsePath(key));
   return {
-    rowKeys: state.rowKeys,
-    colKeys: state.colKeys,
     rows: toPathArray(state.rows),
     cols: toPathArray(state.cols),
     collapsedRows: toPathArray(state.collapsedRows ?? []),
@@ -220,7 +214,7 @@ const createExpansionStateStore = (
   };
 
   return {
-    init: ({ persistedState, defaultRowKeys, defaultColKeys }) => {
+    init: persistedState => {
       if (memory) {
         return memory;
       }
@@ -228,8 +222,6 @@ const createExpansionStateStore = (
       memory =
         seed ??
         ({
-          rowKeys: defaultRowKeys,
-          colKeys: defaultColKeys,
           rows: [],
           cols: [],
           collapsedRows: [],
@@ -493,8 +485,6 @@ export const useExpansionEngine = ({
         explicitExpandedCols: explicitExpandedRefs.col.current,
         explicitCollapsedRows: explicitCollapsedRefs.row.current,
         explicitCollapsedCols: explicitCollapsedRefs.col.current,
-        groupbyRowKeys,
-        groupbyColumnKeys,
       });
       explicitExpandedRefs.row.current = visible.visibleExpandedRows;
       explicitExpandedRefs.col.current = visible.visibleExpandedCols;
@@ -502,7 +492,7 @@ export const useExpansionEngine = ({
       explicitCollapsedRefs.col.current = visible.visibleCollapsedCols;
       expansionStateStoreRef.current?.write(visible.persistedState);
     },
-    [groupbyColumnKeys, groupbyRowKeys],
+    [],
   );
 
   const resolveExpandedForMetrics = useCallback(
@@ -710,14 +700,10 @@ export const useExpansionEngine = ({
       shouldReinitialize,
     } = reinitializationDecision;
     const sessionExpansionState =
-      expansionStateStoreRef.current?.init({
-        persistedState: persistedExpansionStateRef.current,
-        defaultRowKeys: groupbyRowKeys,
-        defaultColKeys: groupbyColumnKeys,
-      }) ??
+      expansionStateStoreRef.current?.init(
+        persistedExpansionStateRef.current,
+      ) ??
       ({
-        rowKeys: groupbyRowKeys,
-        colKeys: groupbyColumnKeys,
         rows: [],
         cols: [],
         collapsedRows: [],
@@ -746,10 +732,6 @@ export const useExpansionEngine = ({
       currentTree: treeRef.current,
       previousLayout,
       currentLayout,
-      sessionLayout: {
-        rows: sessionExpansionState.rowKeys,
-        cols: sessionExpansionState.colKeys,
-      },
       hasNewData,
     });
     const shouldResetExpandedRows =
@@ -772,10 +754,7 @@ export const useExpansionEngine = ({
     clearLoadingState();
     const reinitializedExpansion = resolveReinitializedExpansionState({
       tree: normalizedTree,
-      currentLayout,
       sessionState: sessionExpansionState,
-      persistedExpansionState: persistedExpansionStateRef.current,
-      shouldPersistExpansionState,
       axisCoverageNeeds,
       rowStablePrefix,
       colStablePrefix,
@@ -792,9 +771,7 @@ export const useExpansionEngine = ({
     explicitCollapsedRefs.row.current = new Set(persistedState.collapsedRows);
     explicitCollapsedRefs.col.current = new Set(persistedState.collapsedCols);
     expansionStateStoreRef.current?.write(persistedState, {
-      persist:
-        reinitializedExpansion.shouldResetPersistedLayout ||
-        (!isInitialMount && shouldResetExpanded),
+      persist: !isInitialMount && shouldResetExpanded,
     });
 
     const resolvedRows = resolveExpandedForMetrics(

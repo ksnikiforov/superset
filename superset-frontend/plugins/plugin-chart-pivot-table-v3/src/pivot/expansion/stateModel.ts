@@ -32,8 +32,6 @@ import type { AxisPathScope, PivotAxisCoverageNeed } from '../runtime/coverage';
 import type { PivotProgram } from '../runtime/types';
 
 export type PivotExpansionStateKeys = {
-  rowKeys: string[];
-  colKeys: string[];
   rows: string[];
   cols: string[];
   collapsedRows: string[];
@@ -42,14 +40,6 @@ export type PivotExpansionStateKeys = {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
-
-const coerceAxisKeys = (value: unknown): string[] | undefined => {
-  if (!Array.isArray(value)) {
-    return undefined;
-  }
-  const keys = value.filter((item): item is string => typeof item === 'string');
-  return keys.length === value.length ? keys : undefined;
-};
 
 const coerceExpansionAxis = (value: unknown): string[] | undefined => {
   if (!Array.isArray(value)) {
@@ -73,18 +63,14 @@ export const coerceExpansionState = (
   if (!isRecord(value)) {
     return undefined;
   }
-  const rowKeys = coerceAxisKeys(value.rowKeys);
-  const colKeys = coerceAxisKeys(value.colKeys);
   const rows = coerceExpansionAxis(value.rows);
   const cols = coerceExpansionAxis(value.cols);
   const collapsedRows = coerceExpansionAxis(value.collapsedRows);
   const collapsedCols = coerceExpansionAxis(value.collapsedCols);
-  if (!rowKeys || !colKeys || !rows || !cols) {
+  if (!rows || !cols) {
     return undefined;
   }
   return {
-    rowKeys,
-    colKeys,
     rows,
     cols,
     collapsedRows: collapsedRows || [],

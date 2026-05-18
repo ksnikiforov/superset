@@ -676,8 +676,6 @@ describe('pivot/expansion/stateTransitions', () => {
     });
 
     expect(result.persistedState).toEqual({
-      rowKeys: ['country'],
-      colKeys: ['month'],
       rows: [aKey],
       cols: [xKey],
       collapsedRows: [bKey],

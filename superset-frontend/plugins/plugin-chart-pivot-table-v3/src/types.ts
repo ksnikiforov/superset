@@ -209,8 +209,6 @@ export type PivotAxisValueRef = {
 };
 
 export type PivotExpansionState = {
-  rowKeys: string[];
-  colKeys: string[];
   rows: PivotPath[];
   cols: PivotPath[];
   collapsedRows?: PivotPath[];

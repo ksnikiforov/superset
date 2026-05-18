@@ -290,8 +290,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13104` insertions, `17211` deletions, net `-4107`.
-- Current production TypeScript/TSX total: about `29403` lines.
+- Production `src`: `13045` insertions, `17222` deletions, net `-4177`.
+- Current production TypeScript/TSX total: about `29333` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -303,17 +303,17 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `29403` | `-4107` | `< 28000` |
-| Strict core pipeline | `11337` | `11956` | `+619` | `8000` |
+| Full production `src` | `33510` | `29333` | `-4177` | `< 28000` |
+| Strict core pipeline | `11337` | `11890` | `+553` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5067` | `+384` | `3000-4000` |
-| Broad core pipeline | `16020` | `17023` | `+1003` | `11000-13000` |
+| Broad core pipeline | `16020` | `16957` | `+937` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
 | `pivot/runtime/*` | `3906` |
-| `pivot/expansion/*` | `2650` |
+| `pivot/expansion/*` | `2584` |
 | `pivot/query/*` | `1554` |
 | `pivot/layout/*` | `770` |
 | core/shared/domain helpers | `1865` |
@@ -464,6 +464,13 @@ also stopped issuing an opposite-axis root fetch when a one-axis branch
 expansion already defines the visible scoped coverage. For example, expanding
 column `[1992]` at row depth `1` no longer also requests the row-root branch at
 the deeper column depth.
+
+Latest expansion-persistence cleanup: persisted expansion state no longer stores
+`rowKeys`/`colKeys`. Layout identity belongs to the runtime layout signature and
+stable-prefix pruning. Persisted expansion state is now only row/column
+expanded intent plus explicit collapsed intent:
+`rows`, `cols`, `collapsedRows`, and `collapsedCols`. This removes the second
+layout-signature system from the expansion boundary.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.

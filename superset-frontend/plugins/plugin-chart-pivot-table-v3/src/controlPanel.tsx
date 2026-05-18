@@ -594,8 +594,6 @@ const config: ControlPanelConfig = {
             config: {
               type: 'HiddenControl',
               default: {
-                rowKeys: [],
-                colKeys: [],
                 rows: [],
                 cols: [],
                 collapsedRows: [],

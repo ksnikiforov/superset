@@ -30,7 +30,6 @@ import {
 } from './planner';
 import {
   buildDesiredExpandedKeys,
-  coerceExpansionState,
   pruneExpandedToStablePrefix,
   type PivotExpansionStateKeys,
 } from './stateModel';
@@ -160,7 +159,6 @@ type ResolveLayoutTransitionInput = {
   currentTree: PivotTreeData;
   previousLayout: PivotLayoutKeyState;
   currentLayout: PivotLayoutKeyState;
-  sessionLayout?: Partial<PivotLayoutKeyState>;
   hasNewData: boolean;
 };
 
@@ -173,7 +171,6 @@ export const resolveLayoutTransition = ({
   currentTree,
   previousLayout,
   currentLayout,
-  sessionLayout,
   hasNewData,
 }: ResolveLayoutTransitionInput) => {
   const rowsChanged = !isSameLayout(previousLayout.rows, currentLayout.rows);
@@ -186,18 +183,12 @@ export const resolveLayoutTransition = ({
     isPrefix(previousLayout.cols, currentLayout.cols);
   const layoutChanged = rowsChanged || colsChanged;
   const sourceTree = hasNewData || !layoutChanged ? data : currentTree;
-  const layoutRowsForPrune = rowsChanged
-    ? previousLayout.rows
-    : (sessionLayout?.rows ?? previousLayout.rows);
-  const layoutColsForPrune = colsChanged
-    ? previousLayout.cols
-    : (sessionLayout?.cols ?? previousLayout.cols);
   const rowStablePrefix = getStablePrefixLength(
-    layoutRowsForPrune,
+    previousLayout.rows,
     currentLayout.rows,
   );
   const colStablePrefix = getStablePrefixLength(
-    layoutColsForPrune,
+    previousLayout.cols,
     currentLayout.cols,
   );
   return {
@@ -537,10 +528,7 @@ const resolveExpansionCacheAxis = (config: ExpansionReinitAxis) => {
 
 export const resolveReinitializedExpansionState = (params: {
   tree: PivotTreeData;
-  currentLayout: { rows: string[]; cols: string[] };
   sessionState: PivotExpansionStateKeys;
-  persistedExpansionState: unknown;
-  shouldPersistExpansionState: boolean;
   axisCoverageNeeds: PivotAxisCoverageNeed[];
   rowStablePrefix: number;
   colStablePrefix: number;
@@ -551,7 +539,7 @@ export const resolveReinitializedExpansionState = (params: {
   hasNewData: boolean;
   program: PivotProgram;
 }) => {
-  const { tree, currentLayout, sessionState } = params;
+  const { tree, sessionState } = params;
   const includeMetricDepth = (axis: PivotAxis) => {
     const metricIndex = getValuesLevelIndex(params.program, axis);
     const dimensionCount =
@@ -591,19 +579,8 @@ export const resolveReinitializedExpansionState = (params: {
       includeMetricDepth: includeMetricDepth('col'),
     }),
   };
-  const persistedSeed = coerceExpansionState(params.persistedExpansionState);
-  const shouldResetPersistedLayout =
-    params.shouldPersistExpansionState &&
-    params.persistedExpansionState !== undefined &&
-    params.persistedExpansionState !== null &&
-    (!persistedSeed ||
-      !isSameLayout(persistedSeed.rowKeys, currentLayout.rows) ||
-      !isSameLayout(persistedSeed.colKeys, currentLayout.cols));
   return {
-    shouldResetPersistedLayout,
     persistedState: {
-      rowKeys: currentLayout.rows,
-      colKeys: currentLayout.cols,
       rows: axisState.row.prunedManualKeys,
       cols: axisState.col.prunedManualKeys,
       collapsedRows: axisState.row.prunedCollapsedKeys,
@@ -864,8 +841,6 @@ export const buildVisiblePersistedExpansionState = ({
   explicitExpandedCols,
   explicitCollapsedRows,
   explicitCollapsedCols,
-  groupbyRowKeys,
-  groupbyColumnKeys,
 }: {
   tree: PivotTreeData;
   expandedRows: Set<string>;
@@ -874,8 +849,6 @@ export const buildVisiblePersistedExpansionState = ({
   explicitExpandedCols: Set<string>;
   explicitCollapsedRows: Set<string>;
   explicitCollapsedCols: Set<string>;
-  groupbyRowKeys: string[];
-  groupbyColumnKeys: string[];
 }): {
   persistedState: PivotExpansionStateKeys;
   visibleExpandedRows: Set<string>;
@@ -909,8 +882,6 @@ export const buildVisiblePersistedExpansionState = ({
     visibleCollapsedRows: new Set(visibleCollapsedRows),
     visibleCollapsedCols: new Set(visibleCollapsedCols),
     persistedState: {
-      rowKeys: groupbyRowKeys,
-      colKeys: groupbyColumnKeys,
       rows: visibleRows,
       cols: visibleCols,
       collapsedRows: visibleCollapsedRows,

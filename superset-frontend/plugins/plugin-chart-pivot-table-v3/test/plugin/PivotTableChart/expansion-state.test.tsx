@@ -391,8 +391,6 @@ describe('PivotTableChart expansion state persistence', () => {
     const lastCall = setControlValue.mock.calls.slice(-1)[0];
     expect(lastCall?.[0]).toBe('pivotExpansionState');
     expect(lastCall?.[1]).toMatchObject({
-      rowKeys: rowGroupby,
-      colKeys: [],
       rows: [['A']],
       cols: [],
     });
@@ -451,8 +449,6 @@ describe('PivotTableChart expansion state persistence', () => {
     expect(setDataMask).not.toHaveBeenCalled();
     const lastCall = setControlValue.mock.calls.slice(-1)[0];
     expect(lastCall?.[1]).toMatchObject({
-      rowKeys: rowGroupby,
-      colKeys: colGroupby,
       cols: [['C']],
     });
   });
@@ -587,7 +583,6 @@ describe('PivotTableChart expansion state persistence', () => {
         data: buildTree(1),
         setDataMask,
         persistExpansionState: true,
-        formDataOverrides: { dashboardId: 1 },
       }),
     );
 
@@ -604,8 +599,6 @@ describe('PivotTableChart expansion state persistence', () => {
     const ownState = lastCall?.[0]?.ownState as Record<string, unknown>;
     const persisted = ownState?.pivotExpansionState as PivotExpansionState;
     expect(persisted).toMatchObject({
-      rowKeys: rowGroupby,
-      colKeys: [],
       rows: [['A']],
       cols: [],
     });
@@ -656,8 +649,6 @@ describe('PivotTableChart expansion state persistence', () => {
     expect(setDataMask).not.toHaveBeenCalled();
     const persisted = getLastExpansionState(setControlValue);
     expect(persisted).toMatchObject({
-      rowKeys: rowGroupby,
-      colKeys: [],
       rows: [['A']],
       cols: [],
     });
@@ -883,8 +874,6 @@ describe('PivotTableChart expansion state persistence', () => {
 
   it('restores expansion state by fetching expanded branches', async () => {
     const pivotExpansionState = {
-      rowKeys: rowGroupby,
-      colKeys: [],
       rows: [['A']],
       cols: [],
       collapsedRows: [],
@@ -918,8 +907,6 @@ describe('PivotTableChart expansion state persistence', () => {
         setControlValue: jest.fn(),
         formDataOverrides: {
           pivotExpansionState: {
-            rowKeys: rowGroupby,
-            colKeys: [],
             rows: [['A']],
             cols: [],
             collapsedRows: [],
@@ -1553,8 +1540,6 @@ describe('PivotTableChart expansion state persistence', () => {
         groupbyRowsOverride: deepGroupby,
         formDataOverrides: {
           pivotExpansionState: {
-            rowKeys: deepGroupby,
-            colKeys: [],
             rows: [['A'], ['A', 'X']],
             cols: [],
             collapsedRows: [],
@@ -1604,8 +1589,6 @@ describe('PivotTableChart expansion state persistence', () => {
 
   it('keeps persisted expansions when auto-expand is explicitly zero', async () => {
     const cachedExpansionState = {
-      rowKeys: rowGroupby,
-      colKeys: [],
       rows: [['A'], ['B']],
       cols: [],
       collapsedRows: [],
@@ -1642,8 +1625,6 @@ describe('PivotTableChart expansion state persistence', () => {
 
   it('keeps persisted expansions when auto-expand is cleared to default', async () => {
     const cachedExpansionState = {
-      rowKeys: rowGroupby,
-      colKeys: [],
       rows: [['A'], ['B']],
       cols: [],
       collapsedRows: [],
@@ -1800,8 +1781,6 @@ describe('PivotTableChart expansion state persistence', () => {
         groupbyRowsOverride: deepGroupby,
         formDataOverrides: {
           pivotExpansionState: {
-            rowKeys: deepGroupby,
-            colKeys: [],
             rows: [['A'], ['A', 'X']],
             cols: [],
             collapsedRows: [],
@@ -1822,8 +1801,6 @@ describe('PivotTableChart expansion state persistence', () => {
 
   it('keeps persisted row expansions when auto-expand rows is changed', async () => {
     const persistedState = {
-      rowKeys: rowGroupby,
-      colKeys: [],
       rows: [['A'], ['A', 'X']],
       cols: [],
       collapsedRows: [],
@@ -2021,8 +1998,6 @@ describe('PivotTableChart expansion state persistence', () => {
 
   it('does not refetch when persisted expansions are already in the tree', async () => {
     const pivotExpansionState = {
-      rowKeys: rowGroupby,
-      colKeys: [],
       rows: [['A']],
       cols: [],
       collapsedRows: [],
@@ -2050,8 +2025,6 @@ describe('PivotTableChart expansion state persistence', () => {
     branchExpansionMock.mockImplementation(deferred.implementation);
 
     const pivotExpansionState = {
-      rowKeys: rowGroupby,
-      colKeys: [],
       rows: [['A'], ['B']],
       cols: [],
       collapsedRows: [],
@@ -2163,8 +2136,6 @@ describe('PivotTableChart expansion state persistence', () => {
         formDataGroupbyColumnsOverride: colGroupby,
         formDataOverrides: {
           pivotExpansionState: {
-            rowKeys: rowGroupby,
-            colKeys: colGroupby,
             rows: [['A']],
             cols: [['C']],
             collapsedRows: [],
@@ -2228,8 +2199,6 @@ describe('PivotTableChart expansion state persistence', () => {
         formDataGroupbyColumnsOverride: deepColGroupby,
         formDataOverrides: {
           pivotExpansionState: {
-            rowKeys: deepRowGroupby,
-            colKeys: deepColGroupby,
             rows: [['A'], ['A', 'X']],
             cols: [['C'], ['C', 'U']],
             collapsedRows: [],
@@ -2342,8 +2311,6 @@ describe('PivotTableChart expansion state persistence', () => {
       resolveMockBranchFetchResult({ data: buildTree(2) }),
     );
     const pivotExpansionState = {
-      rowKeys: rowGroupby,
-      colKeys: [],
       rows: [['A'], ['A', 'X']],
       cols: [],
       collapsedRows: [],
@@ -2368,8 +2335,6 @@ describe('PivotTableChart expansion state persistence', () => {
 
   it('does not fetch persisted subtotal expansions', async () => {
     const pivotExpansionState = {
-      rowKeys: rowGroupby,
-      colKeys: [],
       rows: [['A', SUBTOTAL_TOKEN]],
       cols: [],
       collapsedRows: [],
@@ -2388,8 +2353,6 @@ describe('PivotTableChart expansion state persistence', () => {
 
   it('decodes null values when prefetching persisted expansions', async () => {
     const pivotExpansionState = {
-      rowKeys: rowGroupby,
-      colKeys: [],
       rows: [[null]],
       cols: [],
       collapsedRows: [],
@@ -2411,8 +2374,6 @@ describe('PivotTableChart expansion state persistence', () => {
   it('decodes undefined values when prefetching persisted expansions', async () => {
     const undefinedPath = [undefined] as unknown as PivotPath;
     const pivotExpansionState = {
-      rowKeys: rowGroupby,
-      colKeys: [],
       rows: [undefinedPath],
       cols: [],
       collapsedRows: [],
@@ -2434,8 +2395,6 @@ describe('PivotTableChart expansion state persistence', () => {
   it('handles PATH_DIVIDER values when prefetching persisted expansions', async () => {
     const dividerValue = `A${PATH_DIVIDER}B`;
     const pivotExpansionState = {
-      rowKeys: rowGroupby,
-      colKeys: [],
       rows: [[dividerValue]],
       cols: [],
       collapsedRows: [],
@@ -2468,8 +2427,6 @@ describe('PivotTableChart expansion state persistence', () => {
       [],
     );
     const pivotExpansionState = {
-      rowKeys: rowGroupby,
-      colKeys: [],
       rows: [[metricLikeValue]],
       cols: [],
       collapsedRows: [],
