@@ -245,7 +245,7 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13797` insertions, `16593` deletions, net `-2796`.
+- Production `src`: `13798` insertions, `16597` deletions, net `-2799`.
 - Current production TypeScript/TSX total: about `30720` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
