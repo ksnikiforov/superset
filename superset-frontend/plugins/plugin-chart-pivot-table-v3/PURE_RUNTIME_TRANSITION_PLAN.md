@@ -245,8 +245,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13798` insertions, `16600` deletions, net `-2802`.
-- Current production TypeScript/TSX total: about `30720` lines.
+- Production `src`: `13801` insertions, `16602` deletions, net `-2801`.
+- Current production TypeScript/TSX total: about `30709` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -565,6 +565,9 @@ Success criteria:
 - Formatting no longer rebuilds query-support metric lists or tree-data
   signatures. Those belong to transform/query planning, and the chart consumes
   the supplied signature.
+- Tree-data signature is now a top-level chart/runtime prop. It no longer lives
+  inside query form data, keeping runtime interaction identity out of the
+  semantic query/layout snapshot.
 - Metric-axis layout policy, axis child projection, and collapsed Values
   projection now read metric placement from the compiled `PivotProgram`
   instead of accepting duplicated chart-owned placement inputs.

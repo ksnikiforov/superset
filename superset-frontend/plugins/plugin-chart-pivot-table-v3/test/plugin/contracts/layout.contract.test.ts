@@ -66,7 +66,7 @@ describe('layout resolution (contracts)', () => {
     const result = transformProps(
       chartProps as ChartProps<PivotTableQueryFormData>,
     );
-    const signature = JSON.parse(result.formData.treeDataSignature ?? '{}') as {
+    const signature = JSON.parse(result.treeDataSignature ?? '{}') as {
       rows: string[];
       cols: string[];
       metricsLayout: MetricsLayoutEnum;

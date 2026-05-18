@@ -288,7 +288,6 @@ export type PivotTableQueryFormData = QueryFormData &
     timeGrainSqla?: TimeGranularity;
     time_grain_sqla?: TimeGranularity;
     granularity_sqla?: string;
-    treeDataSignature?: string;
   };
 
 export interface PivotTableProps {
@@ -297,6 +296,7 @@ export interface PivotTableProps {
   data: PivotTreeData;
   factBatches: PivotFactStoreBatch[];
   formData: PivotTableQueryFormData;
+  treeDataSignature?: string;
   queryFormData?: PivotTableQueryFormData;
   persistExpansionState?: boolean;
   sourceMetrics: QueryFormMetric[];

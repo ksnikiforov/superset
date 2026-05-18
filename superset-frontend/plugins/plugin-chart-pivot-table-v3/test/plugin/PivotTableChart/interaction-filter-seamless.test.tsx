@@ -528,7 +528,6 @@ describe('PivotTableChart interaction filter seamless updates', () => {
       pivotSelectedFilters: { row1: ['A'] },
       startCollapsed: false,
       initialDepth: 1,
-      treeDataSignature: 'signature-a',
     });
     const tree = applyMetricAxis(
       buildTreeFromRecords(allRecords, metrics, rows, [], 1, 0),
@@ -562,6 +561,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
         groupbyRows={[]}
         groupbyColumns={[]}
         selectedFilters={{}}
+        treeDataSignature="signature-a"
         width={600}
         height={300}
       />,
@@ -583,10 +583,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
     });
     fetchMock.mockClear();
 
-    const refreshedFormData = {
-      ...formData,
-      treeDataSignature: 'signature-b',
-    };
+    const refreshedFormData = { ...formData };
     rerender(
       <PivotTableChart
         data={tree}
@@ -597,6 +594,7 @@ describe('PivotTableChart interaction filter seamless updates', () => {
         groupbyRows={[]}
         groupbyColumns={[]}
         selectedFilters={{}}
+        treeDataSignature="signature-b"
         width={480}
         height={300}
       />,

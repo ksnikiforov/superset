@@ -549,7 +549,7 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
     const result = transformProps(
       chartProps as ChartProps<PivotTableQueryFormData>,
     );
-    const treeDataSignature = JSON.parse(result.formData.treeDataSignature!);
+    const treeDataSignature = JSON.parse(result.treeDataSignature!);
     expect(treeDataSignature.rowSubtotalLevels).toEqual([0]);
     expect(treeDataSignature.colSubtotalLevels).toEqual([]);
   });

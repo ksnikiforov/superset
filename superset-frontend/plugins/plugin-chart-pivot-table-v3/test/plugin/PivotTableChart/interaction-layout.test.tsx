@@ -1757,7 +1757,6 @@ describe('PivotTableChart interaction layout', () => {
       pivotRuntimeLayout: initialRuntimeLayout,
       startCollapsed: false,
       initialDepth: 1,
-      treeDataSignature: 'stable-signature',
     });
     const staleTree = applyMetricAxis(
       buildTreeFromRecords(staleRecords, metrics, rows, cols, 1, 1),
@@ -1787,6 +1786,7 @@ describe('PivotTableChart interaction layout', () => {
         metrics={metrics}
         groupbyRows={[]}
         groupbyColumns={[]}
+        treeDataSignature="stable-signature"
         width={600}
         height={300}
       />,
@@ -1813,7 +1813,6 @@ describe('PivotTableChart interaction layout', () => {
     const staleRerenderFormData = {
       ...baseFormData,
       pivotRuntimeLayout: valuesOnlyRuntimeLayout,
-      treeDataSignature: 'stable-signature',
     };
 
     rerender(
@@ -1825,6 +1824,7 @@ describe('PivotTableChart interaction layout', () => {
         metrics={metrics}
         groupbyRows={[]}
         groupbyColumns={[]}
+        treeDataSignature="stable-signature"
         width={480}
         height={300}
       />,
@@ -2101,7 +2101,6 @@ describe('PivotTableChart interaction layout', () => {
       pivotRuntimeLayout: runtimeLayout,
       startCollapsed: false,
       initialDepth: 1,
-      treeDataSignature: 'stable-signature',
     });
     const staleTree = applyMetricAxis(
       buildTreeFromRecords(staleRecords, metrics, rows, cols, 1, 1),
@@ -2131,6 +2130,7 @@ describe('PivotTableChart interaction layout', () => {
         metrics={metrics}
         groupbyRows={[]}
         groupbyColumns={[]}
+        treeDataSignature="stable-signature"
         width={600}
         height={300}
       />,
@@ -2153,7 +2153,6 @@ describe('PivotTableChart interaction layout', () => {
         ...runtimeLayout,
         cols,
       },
-      treeDataSignature: 'stable-signature',
     };
 
     rerender(
@@ -2165,6 +2164,7 @@ describe('PivotTableChart interaction layout', () => {
         metrics={metrics}
         groupbyRows={[]}
         groupbyColumns={[]}
+        treeDataSignature="stable-signature"
         width={480}
         height={300}
       />,
@@ -2204,7 +2204,6 @@ describe('PivotTableChart interaction layout', () => {
       pivotRuntimeLayout: runtimeLayout,
       startCollapsed: false,
       initialDepth: 1,
-      treeDataSignature: 'signature-a',
     });
     const staleTree = applyMetricAxis(
       buildTreeFromRecords(staleRecords, metrics, rows, cols, 1, 1),
@@ -2234,6 +2233,7 @@ describe('PivotTableChart interaction layout', () => {
         metrics={metrics}
         groupbyRows={[]}
         groupbyColumns={[]}
+        treeDataSignature="signature-a"
         width={600}
         height={300}
       />,
@@ -2256,7 +2256,6 @@ describe('PivotTableChart interaction layout', () => {
         ...runtimeLayout,
         cols,
       },
-      treeDataSignature: 'signature-b',
     };
 
     rerender(
@@ -2268,6 +2267,7 @@ describe('PivotTableChart interaction layout', () => {
         metrics={metrics}
         groupbyRows={[]}
         groupbyColumns={[]}
+        treeDataSignature="signature-b"
         width={480}
         height={300}
       />,
