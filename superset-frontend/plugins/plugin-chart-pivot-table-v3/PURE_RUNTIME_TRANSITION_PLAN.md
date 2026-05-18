@@ -828,6 +828,10 @@ Success criteria:
   while still materializing from the loaded runtime snapshot. This keeps
   interaction responsive and avoids sending requests for stale committed
   row/column layout after drag/drop edits.
+- The chart no longer owns the loaded fact-batch ref that bridges expansion and
+  seamless runtime. Expansion reports fact-store coverage changes directly to
+  the seamless runtime boundary, and the expansion hook no longer keeps a
+  duplicate loaded-batch React state just to expose coverage to the chart.
 
 ## Current Risks
 
@@ -886,10 +890,10 @@ Success criteria:
   the final API shape is still a standalone function rather than an explicit
   program policy object. Only move it again if that deletes call-site plumbing
   or combines more layout/coverage policy.
-- Expansion and seamless runtime now share loaded fact-batch coverage, but this
-  is still a bridge between two hook-owned stores. The larger target remains one
-  runtime coverage authority instead of separate expansion and seamless
-  snapshots.
+- Expansion and seamless runtime now share loaded fact-batch coverage through
+  one callback-owned snapshot, but expansion still owns a local fact store while
+  seamless owns committed tree/materialization state. A larger controller cut is
+  only worth doing if it deletes that remaining state-machine split.
 
 ## Approval Checkpoints
 

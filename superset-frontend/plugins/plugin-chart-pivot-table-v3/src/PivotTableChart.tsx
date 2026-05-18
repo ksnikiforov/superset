@@ -245,10 +245,10 @@ function PivotTableChart(props: PivotTableProps) {
 
   const upstreamSeamlessSignature =
     upstreamDashboardQueryContextSignature ?? '';
-  const loadedFactBatchesRef = useRef(factBatches);
   const {
     dataForRender,
     factBatchesForRender,
+    syncLoadedFactBatches,
     seamlessLoading,
     seamlessWarnings,
     seamlessError,
@@ -282,7 +282,6 @@ function PivotTableChart(props: PivotTableProps) {
     expandedColsRef: expandedColsForSeamlessRef,
     pendingRowsRef: pendingRowsForSeamlessRef,
     pendingColsRef: pendingColsForSeamlessRef,
-    loadedFactBatchesRef,
     commitFilters,
     updateUiSelectedFilters,
     lastLocalSyncDashboardQueryContextRef,
@@ -326,7 +325,6 @@ function PivotTableChart(props: PivotTableProps) {
   );
   const {
     tree,
-    factBatches: expansionFactBatches,
     expandedRows,
     expandedCols,
     loadingKeys,
@@ -356,10 +354,10 @@ function PivotTableChart(props: PivotTableProps) {
       appliedLayoutFormData.pivotExpansionState ??
       ownState?.pivotExpansionState,
     shouldPersistExpansionState: persistExpansionState,
+    onLoadedFactBatchesChange: syncLoadedFactBatches,
     pruneMergedTree: layoutResult.pruneMergedTree,
   });
 
-  useSyncRef(loadedFactBatchesRef, expansionFactBatches);
   useSyncRef(expandedRowsForSeamlessRef, expandedRows);
   useSyncRef(expandedColsForSeamlessRef, expandedCols);
   useSyncRef(pendingRowsForSeamlessRef, pendingRows);

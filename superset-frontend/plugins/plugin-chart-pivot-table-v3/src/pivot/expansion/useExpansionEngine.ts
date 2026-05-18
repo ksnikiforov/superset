@@ -275,7 +275,6 @@ const createExpansionStateStore = (
 
 export type ExpansionEngineResult = {
   tree: PivotTreeData;
-  factBatches: PivotFactStoreBatch[];
   expandedRows: Set<string>;
   expandedCols: Set<string>;
   loadingKeys: Set<string>;
@@ -309,6 +308,7 @@ export type ExpansionEngineConfig = {
   mergeOwnState?: (partial: JsonObject) => JsonObject;
   persistedExpansionState?: unknown;
   shouldPersistExpansionState: boolean;
+  onLoadedFactBatchesChange?: (factBatches: PivotFactStoreBatch[]) => void;
   pruneMergedTree: (params: {
     axis: PivotAxis;
     tree: PivotTreeData;
@@ -334,11 +334,10 @@ export const useExpansionEngine = ({
   mergeOwnState,
   persistedExpansionState,
   shouldPersistExpansionState,
+  onLoadedFactBatchesChange,
   pruneMergedTree,
 }: ExpansionEngineConfig): ExpansionEngineResult => {
   const [tree, setTree] = useState<PivotTreeData>(data);
-  const [loadedFactBatches, setLoadedFactBatches] =
-    useState<PivotFactStoreBatch[]>(factBatches);
   const treeRef = useRef(tree);
   const factStoreRef = useRef<PivotFactStore>();
   if (!factStoreRef.current) {
@@ -398,37 +397,11 @@ export const useExpansionEngine = ({
     [],
   );
 
-  const recordFactBatches = useCallback(
-    (nextBatches: PivotFactStoreBatch[]) => {
-      setLoadedFactBatches(previous => {
-        if (nextBatches.length === 0) {
-          return previous;
-        }
-        const merged = new Map(
-          previous.map(batch => [
-            stableStringify([
-              batch.coverage,
-              batch.scope,
-              batch.valueKeys ?? [],
-            ]),
-            batch,
-          ]),
-        );
-        nextBatches.forEach(batch => {
-          merged.set(
-            stableStringify([
-              batch.coverage,
-              batch.scope,
-              batch.valueKeys ?? [],
-            ]),
-            batch,
-          );
-        });
-        return Array.from(merged.values());
-      });
-    },
-    [],
-  );
+  const syncLoadedFactBatches = useCallback(() => {
+    onLoadedFactBatchesChange?.(
+      factStoreRef.current?.getCoverageBatches() ?? factBatches,
+    );
+  }, [factBatches, onLoadedFactBatchesChange]);
 
   if (fetchCoverageSignatureRef.current !== fetchCoverageSignature) {
     expansionRequestLifecycle.invalidate();
@@ -736,13 +709,18 @@ export const useExpansionEngine = ({
       requestScope,
       fetchFormData: fetchFormDataRef.current,
       factStore: factStoreRef.current,
-      recordFactBatches,
+      recordFactBatches: syncLoadedFactBatches,
       buildRequestGroupId: expansionRequestHelpers.buildRequestGroupId,
       trackRequestInScope: expansionRequestHelpers.trackRequestInScope,
       addWarnings,
       updateLoadingKey,
     }),
-    [addWarnings, expansionRequestHelpers, recordFactBatches, updateLoadingKey],
+    [
+      addWarnings,
+      expansionRequestHelpers,
+      syncLoadedFactBatches,
+      updateLoadingKey,
+    ],
   );
 
   const expandSameAxis = useCallback(
@@ -1110,7 +1088,7 @@ export const useExpansionEngine = ({
     const nextFactStore = createPivotFactStore();
     nextFactStore.upsertBatches(factBatches);
     factStoreRef.current = nextFactStore;
-    setLoadedFactBatches(factBatches);
+    onLoadedFactBatchesChange?.(factBatches);
     setHydratingState(false);
     warningsRef.current = new Map();
     setWarnings([]);
@@ -1227,6 +1205,7 @@ export const useExpansionEngine = ({
     groupbyColumnKeys,
     groupbyRowKeys,
     pivotProgram,
+    onLoadedFactBatchesChange,
     shouldPersistExpansionState,
     resolvedExpandColumnsLevel,
     resolvedExpandRowsLevel,
@@ -1249,7 +1228,6 @@ export const useExpansionEngine = ({
 
   return {
     tree,
-    factBatches: loadedFactBatches,
     expandedRows,
     expandedCols,
     loadingKeys,

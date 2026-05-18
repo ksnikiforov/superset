@@ -89,7 +89,6 @@ type UsePivotSeamlessRuntimeUpdateConfig = {
   expandedColsRef: MutableRefObject<Set<string>>;
   pendingRowsRef: MutableRefObject<Set<string>>;
   pendingColsRef: MutableRefObject<Set<string>>;
-  loadedFactBatchesRef: MutableRefObject<PivotFactStoreBatch[]>;
   commitFilters: (filters: RuntimeSelection) => void;
   updateUiSelectedFilters: (filters: RuntimeSelection) => void;
   lastLocalSyncDashboardQueryContextRef: MutableRefObject<string | null>;
@@ -128,7 +127,6 @@ export const usePivotSeamlessRuntimeUpdate = (
     expandedColsRef,
     pendingRowsRef,
     pendingColsRef,
-    loadedFactBatchesRef,
     commitFilters,
     updateUiSelectedFilters,
     lastLocalSyncDashboardQueryContextRef,
@@ -142,6 +140,7 @@ export const usePivotSeamlessRuntimeUpdate = (
   const [committedTree, setCommittedTree] = useState<PivotTreeData>(data);
   const [committedFactBatches, setCommittedFactBatches] =
     useState<PivotFactStoreBatch[]>(factBatches);
+  const loadedFactBatchesRef = useRef<PivotFactStoreBatch[]>(factBatches);
   const hasMetrics = metricKeys.length > 0;
   const lastUpstreamQueryContextRef = useRef<{
     data: PivotTreeData;
@@ -166,6 +165,13 @@ export const usePivotSeamlessRuntimeUpdate = (
     setError(undefined);
     setLoading(false);
   }, [materializationLifecycle]);
+
+  const syncLoadedFactBatches = useCallback(
+    (nextFactBatches: PivotFactStoreBatch[]) => {
+      loadedFactBatchesRef.current = nextFactBatches;
+    },
+    [],
+  );
 
   useEffect(() => {
     // Ignore stale upstream updates while a local interaction update is still
@@ -194,7 +200,6 @@ export const usePivotSeamlessRuntimeUpdate = (
     committedRuntimeLayout,
     isUserControlled,
     lastLocalSyncDashboardQueryContextRef,
-    loadedFactBatchesRef,
     persistedInteractionFilters,
     resetSeamlessRuntimeState,
     runtimeLayout,
@@ -265,7 +270,6 @@ export const usePivotSeamlessRuntimeUpdate = (
       dimensionKeys,
       expandedColsRef,
       expandedRowsRef,
-      loadedFactBatchesRef,
       materializationLifecycle,
       metricKeys,
       pendingColsRef,
@@ -342,7 +346,6 @@ export const usePivotSeamlessRuntimeUpdate = (
       dimensionKeys,
       expandedColsRef,
       expandedRowsRef,
-      loadedFactBatchesRef,
       materializationLifecycle,
       metricKeys,
       pendingColsRef,
@@ -394,7 +397,6 @@ export const usePivotSeamlessRuntimeUpdate = (
       applyLocalRuntimeMaterialization,
       commitUiRuntimeLayout,
       dimensionKeys,
-      loadedFactBatchesRef,
       metricKeys,
       persistRuntimeState,
       seamlessSyncRef,
@@ -531,6 +533,7 @@ export const usePivotSeamlessRuntimeUpdate = (
     committedFactBatches,
     dataForRender: isUserControlled ? committedTree : data,
     factBatchesForRender: isUserControlled ? committedFactBatches : factBatches,
+    syncLoadedFactBatches,
     seamlessLoading: loading,
     seamlessWarnings: warnings,
     seamlessError: error,
