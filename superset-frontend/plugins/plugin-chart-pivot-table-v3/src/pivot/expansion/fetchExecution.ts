@@ -18,9 +18,8 @@
  */
 import { type PivotTableQueryFormData, type PivotTreeData } from '../../types';
 import {
-  fetchPivotBranch,
-  fetchPivotBranchesBatch,
-  fetchPivotIntersection,
+  fetchPivotExpansion,
+  type FetchPivotExpansionRequest,
 } from '../query/fetchPivotBranch';
 import { parsePath } from '../core/path';
 import { type ChartDataWarning } from '../data/ChartDataClient';
@@ -119,6 +118,11 @@ type ExpansionFetcherResult = {
   error?: unknown;
 };
 
+type ExpansionQueryRequest = Omit<
+  FetchPivotExpansionRequest,
+  'formData' | 'requestGroupId' | 'factStore'
+>;
+
 const createRuntimeExpansionCoverageDiff = ({
   runtime,
   program,
@@ -205,103 +209,32 @@ const executeExpansionFetch = async ({
   }
 };
 
-const fetchExpansionSingleTarget = async ({
-  target,
-  context,
+const executeExpansionQueryRequest = async ({
+  request,
   requestGroupId,
   runtime,
+  loadingKeys,
+  targets,
 }: {
-  target: FetchTarget;
-  context: ExpansionFetchContext;
+  request: ExpansionQueryRequest;
   requestGroupId: string;
   runtime: ExpansionFetchRuntime;
-}): Promise<ExpansionFetchResult> => {
-  const path = parsePath(target.pathKey);
-  return executeExpansionFetch({
-    runtime,
-    requestGroupId,
-    loadingKeys: [target.pathKey],
-    targets: [target],
-    fetcher: () =>
-      fetchPivotBranch({
-        axis: target.axis,
-        path,
-        formData: runtime.fetchFormData,
-        visibleRowDepth: context.visibleRowDepth,
-        visibleColDepth: context.visibleColDepth,
-        requestGroupId,
-        factStore: runtime.factStore,
-      }),
-  });
-};
-
-const fetchExpansionBatchTarget = async ({
-  batch,
-  context,
-  requestGroupId,
-  runtime,
-}: {
-  batch: BatchGroup;
-  context: ExpansionFetchContext;
-  requestGroupId: string;
-  runtime: ExpansionFetchRuntime;
-}): Promise<ExpansionFetchResult> => {
-  const loadingKeys = batch.targets.map(target => target.pathKey);
-  return executeExpansionFetch({
+  loadingKeys: string[];
+  targets: ExpansionFetchTarget[];
+}): Promise<ExpansionFetchResult> =>
+  executeExpansionFetch({
     runtime,
     requestGroupId,
     loadingKeys,
-    targets: batch.targets,
+    targets,
     fetcher: () =>
-      fetchPivotBranchesBatch({
-        formData: runtime.fetchFormData,
-        batch,
-        visibleRowDepth: context.visibleRowDepth,
-        visibleColDepth: context.visibleColDepth,
+      fetchPivotExpansion({
+        ...request,
         requestGroupId,
+        formData: runtime.fetchFormData,
         factStore: runtime.factStore,
       }),
   });
-};
-
-const fetchExpansionIntersectionTarget = async ({
-  target,
-  context,
-  requestGroupId,
-  runtime,
-}: {
-  target: IntersectionFetchTarget;
-  context: ExpansionFetchContext;
-  requestGroupId: string;
-  runtime: ExpansionFetchRuntime;
-}): Promise<ExpansionFetchResult> => {
-  const loadingKeys = [...target.rowPathKeys, ...target.columnPathKeys];
-  return executeExpansionFetch({
-    runtime,
-    requestGroupId,
-    loadingKeys,
-    targets: [
-      ...target.rowPathKeys.map(pathKey => ({
-        axis: 'row' as const,
-        pathKey,
-      })),
-      ...target.columnPathKeys.map(pathKey => ({
-        axis: 'col' as const,
-        pathKey,
-      })),
-    ],
-    fetcher: () =>
-      fetchPivotIntersection({
-        formData: runtime.fetchFormData,
-        rowPathKeys: target.rowPathKeys,
-        columnPathKeys: target.columnPathKeys,
-        visibleRowDepth: context.visibleRowDepth,
-        visibleColDepth: context.visibleColDepth,
-        requestGroupId,
-        factStore: runtime.factStore,
-      }),
-  });
-};
 
 const filterMissingIntersectionTargets = ({
   intersections,
@@ -386,19 +319,32 @@ export const fetchExpansionTargetDeltas = async ({
     });
   const branchFetchPromises: Array<Promise<ExpansionFetchResult>> = [
     ...singles.map(target =>
-      fetchExpansionSingleTarget({
-        target,
-        context,
+      executeExpansionQueryRequest({
+        request: {
+          kind: 'branch',
+          axis: target.axis,
+          path: parsePath(target.pathKey),
+          visibleRowDepth,
+          visibleColDepth,
+        },
         requestGroupId: buildSingleRequestGroupId(target),
         runtime,
+        loadingKeys: [target.pathKey],
+        targets: [target],
       }),
     ),
     ...batches.map(batch =>
-      fetchExpansionBatchTarget({
-        batch,
-        context,
+      executeExpansionQueryRequest({
+        request: {
+          kind: 'batch',
+          batch,
+          visibleRowDepth,
+          visibleColDepth,
+        },
         requestGroupId: buildBatchRequestGroupId(batch),
         runtime,
+        loadingKeys: batch.targets.map(target => target.pathKey),
+        targets: batch.targets,
       }),
     ),
   ];
@@ -413,11 +359,27 @@ export const fetchExpansionTargetDeltas = async ({
   });
   const intersectionResults = await Promise.all(
     missingIntersections.map(target =>
-      fetchExpansionIntersectionTarget({
-        target,
-        context,
+      executeExpansionQueryRequest({
+        request: {
+          kind: 'intersection',
+          rowPathKeys: target.rowPathKeys,
+          columnPathKeys: target.columnPathKeys,
+          visibleRowDepth,
+          visibleColDepth,
+        },
         requestGroupId: buildIntersectionRequestGroupId(target),
         runtime,
+        loadingKeys: [...target.rowPathKeys, ...target.columnPathKeys],
+        targets: [
+          ...target.rowPathKeys.map(pathKey => ({
+            axis: 'row' as const,
+            pathKey,
+          })),
+          ...target.columnPathKeys.map(pathKey => ({
+            axis: 'col' as const,
+            pathKey,
+          })),
+        ],
       }),
     ),
   );

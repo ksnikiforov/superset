@@ -696,6 +696,10 @@ Success criteria:
 - Grouped branch batch execution now lives in the branch fetch boundary. The
   standalone batch fetch module has been removed, and branch/batch fetches now
   share one query-spec-to-fact-store materialization path.
+- Expansion fetch execution now submits branch, batch, and intersection work
+  through one query-side expansion request function. Same-axis and cross-axis
+  execution still build different request payloads, but they no longer call
+  three separate transport-specific query wrappers from the expansion runtime.
 - Cross-axis hydration no longer repairs missing row x column coverage by
   forcing a broad root-depth fetch. Expansion planning can now emit an explicit
   bounded intersection target, query planning can fetch that row-path set
