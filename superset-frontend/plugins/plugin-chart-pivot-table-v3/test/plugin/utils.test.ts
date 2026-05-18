@@ -26,6 +26,8 @@ import {
 import { buildColumnHeaderRows } from '../../src/pivot/viewModel';
 import {
   normalizeSubtotalLevels,
+  normalizeDimensionFormattingMapWithKeys,
+  normalizeDimensionSortingMapWithKeys,
   parseThemeColors,
   resolveExpandLevel,
   normalizeExpandLevel,
@@ -396,6 +398,56 @@ describe('parseThemeColors', () => {
 });
 
 describe('transferDimensionSettingsAcrossAxes', () => {
+  it('keeps only canonical dimension keys for formatting and sorting', () => {
+    const columns = [
+      {
+        label: 'canonical_dimension',
+        sqlExpression: 'UPPER(country)',
+      },
+    ];
+
+    expect(
+      normalizeDimensionFormattingMapWithKeys(
+        {
+          canonical_dimension: {
+            backgroundColor: 'metric1',
+            applyTo: 'all',
+          },
+          'UPPER(country)': {
+            textColor: 'metric2',
+            applyTo: 'label',
+          },
+          country: {
+            backgroundColor: 'metric3',
+            applyTo: 'all',
+          },
+        },
+        columns,
+      ),
+    ).toEqual({
+      canonical_dimension: {
+        backgroundColor: 'metric1',
+        applyTo: 'all',
+      },
+    });
+
+    expect(
+      normalizeDimensionSortingMapWithKeys(
+        {
+          canonical_dimension: { metric: 'metric1', order: 'desc' },
+          'UPPER(country)': { metric: 'metric2', order: 'asc' },
+        },
+        columns,
+      ),
+    ).toEqual({
+      canonical_dimension: {
+        metric: 'metric1',
+        order: 'desc',
+        mode: 'total',
+      },
+    });
+  });
+
   it('moves formatting and sorting settings when axes change', () => {
     const result = transferDimensionSettingsAcrossAxes(
       ['country'],

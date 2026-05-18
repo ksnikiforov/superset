@@ -620,52 +620,40 @@ const resolveMetricReferenceForQuery = (
   return resolved || metric;
 };
 
-const buildDimensionKeyMap = (columns: QueryFormColumn[]) => {
-  const keyMap = new Map<string, string>();
-  columns.forEach(column => {
-    const key = getColumnLabel(column);
-    if (!key) {
-      return;
-    }
-    const candidates = new Set<string>([key]);
-    if (typeof column !== 'string') {
-      if (column.label) {
-        candidates.add(column.label);
-      }
-      if (column.sqlExpression) {
-        candidates.add(column.sqlExpression);
-      }
-    }
-    candidates.forEach(candidate => {
-      if (!keyMap.has(candidate)) {
-        keyMap.set(candidate, key);
-      }
-    });
-  });
-  return keyMap;
+const getDimensionKeyFromColumn = (
+  column: QueryFormColumn,
+): string | undefined => {
+  if (isMetricsPlaceholder(column)) {
+    return undefined;
+  }
+  const key = getColumnLabel(column);
+  return key || undefined;
 };
 
-const remapDimensionSettingKeys = <Value extends object>(
+const buildDimensionKeySet = (columns: QueryFormColumn[]) => {
+  const keys = new Set<string>();
+  columns.forEach(column => {
+    const key = getDimensionKeyFromColumn(column);
+    if (key) {
+      keys.add(key);
+    }
+  });
+  return keys;
+};
+
+const filterDimensionSettingKeys = <Value extends object>(
   settings: Record<string, Value>,
   columns: QueryFormColumn[],
-  preserveUnmapped: boolean,
 ): Record<string, Value> => {
-  if (columns.length === 0) {
-    return settings;
+  const dimensionKeys = buildDimensionKeySet(columns);
+  if (dimensionKeys.size === 0) {
+    return {};
   }
-  const keyMap = buildDimensionKeyMap(columns);
   return Object.entries(settings).reduce<Record<string, Value>>(
     (acc, [dimensionKey, setting]) => {
-      const resolvedKey =
-        keyMap.get(dimensionKey) ??
-        (preserveUnmapped ? dimensionKey : undefined);
-      if (!resolvedKey) {
-        return acc;
+      if (dimensionKeys.has(dimensionKey)) {
+        acc[dimensionKey] = setting;
       }
-      acc[resolvedKey] = {
-        ...(acc[resolvedKey] ?? {}),
-        ...setting,
-      } as Value;
       return acc;
     },
     {},
@@ -677,7 +665,7 @@ export const normalizeDimensionFormattingMapWithKeys = (
   columns: QueryFormColumn[],
 ): PivotDimensionFormattingMap => {
   const normalized = normalizeDimensionFormattingMap(formatting);
-  return remapDimensionSettingKeys(normalized, columns, false);
+  return filterDimensionSettingKeys(normalized, columns);
 };
 
 const DEFAULT_DIMENSION_SORT_ORDER: PivotSortOrder = 'asc';
@@ -748,7 +736,7 @@ export const normalizeDimensionSortingMapWithKeys = (
   columns: QueryFormColumn[],
 ): PivotDimensionSortingMap => {
   const normalized = normalizeDimensionSortingMap(sorting);
-  return remapDimensionSettingKeys(normalized, columns, false);
+  return filterDimensionSettingKeys(normalized, columns);
 };
 
 export const hasTotalSorting = (
@@ -766,7 +754,7 @@ const normalizeDimensionFormattingMapForAxis = (
   columns: QueryFormColumn[],
 ): PivotDimensionFormattingMap => {
   const normalized = normalizeDimensionFormattingMap(formatting);
-  return remapDimensionSettingKeys(normalized, columns, true);
+  return filterDimensionSettingKeys(normalized, columns);
 };
 
 const normalizeDimensionSortingMapForAxis = (
@@ -774,28 +762,7 @@ const normalizeDimensionSortingMapForAxis = (
   columns: QueryFormColumn[],
 ): PivotDimensionSortingMap => {
   const normalized = normalizeDimensionSortingMap(sorting);
-  return remapDimensionSettingKeys(normalized, columns, true);
-};
-
-const getDimensionKeyFromColumn = (
-  column: QueryFormColumn,
-): string | undefined => {
-  if (isMetricsPlaceholder(column)) {
-    return undefined;
-  }
-  const key = getColumnLabel(column);
-  return key || undefined;
-};
-
-const buildDimensionKeySet = (columns: QueryFormColumn[]) => {
-  const keys = new Set<string>();
-  columns.forEach(column => {
-    const key = getDimensionKeyFromColumn(column);
-    if (key) {
-      keys.add(key);
-    }
-  });
-  return keys;
+  return filterDimensionSettingKeys(normalized, columns);
 };
 
 type DimensionSettingsTransferResult = {

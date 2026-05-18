@@ -245,8 +245,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13783` insertions, `16539` deletions, net `-2756`.
-- Current production TypeScript/TSX total: about `30775` lines.
+- Production `src`: `13796` insertions, `16585` deletions, net `-2789`.
+- Current production TypeScript/TSX total: about `30725` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -773,6 +773,10 @@ Success criteria:
   Loose legacy select wrappers, nested `{ value }`/`{ metric }` objects,
   label-only objects, numeric keys, and inferred adhoc metric types have been
   removed.
+- Dimension formatting and sorting maps now use canonical dimension keys only.
+  Label/sql-expression alias remapping and unmapped-setting preservation were
+  removed, so row/column settings cannot silently retarget themselves through a
+  non-canonical dimension identity.
 - `transformProps` no longer exposes duplicate top-level chart props for
   formatting, sorting, groupby, aggregate, and theme fields that already belong
   to `formData` or hook-owned runtime state.
