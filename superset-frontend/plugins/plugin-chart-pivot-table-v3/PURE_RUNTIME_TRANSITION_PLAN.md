@@ -167,6 +167,10 @@ Current semantic-layout contract:
   `fetchPivotExpansion({ kind })`, and the legacy `fetchPivotBranch`,
   `fetchPivotBranchesBatch`, and `fetchPivotIntersection` wrapper exports have
   been removed.
+- Branch, batch, and intersection query-spec construction now also enters
+  through one request-shaped API, `buildExpansionQuerySpecs({ kind })`. The
+  separate production `buildBranchQuerySpecs`, `buildBatchQuerySpecs`, and
+  `buildIntersectionQuerySpecs` exports have been removed.
 - Seamless runtime fetch execution no longer accepts hook-injected fetch,
   fetch-start, or error callbacks. It calls the chart-data client directly
   through its runtime boundary, leaving the chart hook responsible only for UI
@@ -227,8 +231,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13838` insertions, `16381` deletions, net `-2543`.
-- Current production TypeScript/TSX total: about `30967` lines.
+- Production `src`: `13848` insertions, `16408` deletions, net `-2560`.
+- Current production TypeScript/TSX total: about `30950` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion

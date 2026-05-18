@@ -42,7 +42,7 @@ import { serializeCellKey, serializePath } from '../../src/pivot/core/path';
 import { buildTreeFromRecords } from './fixtures/buildTreeFromRecords';
 import { formatQueryName } from '../../src/pivot/query/queryName';
 import { buildLayoutContext } from '../../src/pivot/layout/LayoutContext';
-import { buildBranchQuerySpecs } from '../../src/pivot/query/specs';
+import { buildExpansionQuerySpecs } from '../../src/pivot/query/specs';
 import { createPivotFactStore } from '../../src/pivot/runtime/factStore';
 import {
   factStoreSelectorFromSpec,
@@ -103,7 +103,7 @@ const fetchPivotBranchTree = async (
   };
 };
 
-describe('buildBranchQuerySpecs', () => {
+describe('buildExpansionQuerySpecs', () => {
   beforeEach(() => {
     (SupersetClient.post as jest.Mock).mockReset();
   });
@@ -116,7 +116,8 @@ describe('buildBranchQuerySpecs', () => {
       metricsLayout: MetricsLayoutEnum.COLUMNS,
       rowSubTotals: false,
     } as any;
-    const specs = buildBranchQuerySpecs({
+    const specs = buildExpansionQuerySpecs({
+      kind: 'branch',
       formData,
       layout: buildLayoutContext(formData),
       axis: 'row',
@@ -135,7 +136,8 @@ describe('buildBranchQuerySpecs', () => {
       metricsLayout: MetricsLayoutEnum.COLUMNS,
       rowSubTotals: false,
     } as any;
-    const specs = buildBranchQuerySpecs({
+    const specs = buildExpansionQuerySpecs({
+      kind: 'branch',
       formData,
       layout: buildLayoutContext(formData),
       axis: 'row',
@@ -154,7 +156,8 @@ describe('buildBranchQuerySpecs', () => {
       metricsLayout: MetricsLayoutEnum.COLUMNS,
       rowSubTotals: false,
     } as any;
-    const specs = buildBranchQuerySpecs({
+    const specs = buildExpansionQuerySpecs({
+      kind: 'branch',
       formData,
       layout: buildLayoutContext(formData),
       axis: 'col',
@@ -172,7 +175,8 @@ describe('buildBranchQuerySpecs', () => {
       metrics: ['m1'],
       rowSubTotals: false,
     } as any;
-    const specs = buildBranchQuerySpecs({
+    const specs = buildExpansionQuerySpecs({
+      kind: 'branch',
       formData,
       layout: buildLayoutContext(formData),
       axis: 'col',
@@ -1486,7 +1490,8 @@ describe('fetchBranch delta-only contract', () => {
       viz_type: 'pivot_table_v3',
     });
     const layout = buildLayoutContext(formData);
-    const specs = buildBranchQuerySpecs({
+    const specs = buildExpansionQuerySpecs({
+      kind: 'branch',
       formData,
       layout,
       axis: 'row',

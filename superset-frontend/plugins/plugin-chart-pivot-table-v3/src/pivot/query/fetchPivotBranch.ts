@@ -24,12 +24,7 @@ import {
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import { buildLayoutContext } from '../layout/LayoutContext';
-import {
-  buildBatchQuerySpecs,
-  buildBranchQuerySpecs,
-  buildIntersectionQuerySpecs,
-  type PlannedQuerySpec,
-} from './specs';
+import { buildExpansionQuerySpecs, type PlannedQuerySpec } from './specs';
 import { type PivotFactStore } from '../runtime/factStore';
 import { upsertQueryResultsIntoFactStore } from '../runtime/ingestQueryResults';
 import { isAbortError } from '../runtime/requestLifecycle';
@@ -151,33 +146,7 @@ export const fetchPivotExpansion = async (
   request: FetchPivotExpansionRequest,
 ): Promise<FetchPivotExpansionResult> => {
   const layout = buildLayoutContext(request.formData);
-  const specs =
-    request.kind === 'branch'
-      ? buildBranchQuerySpecs({
-          formData: request.formData,
-          layout,
-          axis: request.axis,
-          path: request.path,
-          visibleRowDepth: request.visibleRowDepth,
-          visibleColDepth: request.visibleColDepth,
-        })
-      : request.kind === 'batch'
-        ? buildBatchQuerySpecs({
-            formData: request.formData,
-            layout,
-            batch: request.batch,
-            visibleRowDepth: request.visibleRowDepth,
-            visibleColDepth: request.visibleColDepth,
-            chunkIndex: 0,
-          })
-        : buildIntersectionQuerySpecs({
-            formData: request.formData,
-            layout,
-            rowPathKeys: request.rowPathKeys,
-            columnPathKeys: request.columnPathKeys,
-            visibleRowDepth: request.visibleRowDepth,
-            visibleColDepth: request.visibleColDepth,
-          });
+  const specs = buildExpansionQuerySpecs({ ...request, layout });
 
   return fetchPivotQuerySpecsIntoFactStore({
     formData: request.formData,

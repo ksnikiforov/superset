@@ -19,10 +19,7 @@
 import { GenericDataType } from '@superset-ui/core';
 import { MetricsLayoutEnum } from '../../../src/types';
 import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
-import {
-  buildBatchQuerySpecs,
-  buildBranchQuerySpecs,
-} from '../../../src/pivot/query/specs';
+import { buildExpansionQuerySpecs } from '../../../src/pivot/query/specs';
 import { formatQueryName } from '../../../src/pivot/query/queryName';
 import { serializePath } from '../../../src/pivot/core/path';
 import { type BatchGroup } from '../../../src/pivot/query/fetchPlanOptimizer';
@@ -44,7 +41,7 @@ const assertColumnsUseRawSqlOutput = (columns: unknown[]) => {
 };
 
 describe('temporal branch query specs contract', () => {
-  it('buildBranchQuerySpecs keeps temporal equality filters backend-safe', () => {
+  it('buildExpansionQuerySpecs keeps temporal equality filters backend-safe', () => {
     const formData = buildFormData({
       groupbyRows: ['orderYear', 'orderMonth'],
       groupbyColumns: [],
@@ -66,7 +63,8 @@ describe('temporal branch query specs contract', () => {
     });
     const layout = buildLayoutContext(formData);
     const path = ['1483228800000'];
-    const specs = buildBranchQuerySpecs({
+    const specs = buildExpansionQuerySpecs({
+      kind: 'branch',
       formData,
       layout,
       axis: 'row',
@@ -93,7 +91,7 @@ describe('temporal branch query specs contract', () => {
     });
   });
 
-  it('buildBatchQuerySpecs keeps temporal sibling filters backend-safe', () => {
+  it('buildExpansionQuerySpecs keeps temporal sibling filters backend-safe', () => {
     const formData = buildFormData({
       groupbyRows: ['orderYear', 'orderMonth'],
       groupbyColumns: [],
@@ -133,7 +131,8 @@ describe('temporal branch query specs contract', () => {
       ],
     };
 
-    const specs = buildBatchQuerySpecs({
+    const specs = buildExpansionQuerySpecs({
+      kind: 'batch',
       formData,
       layout,
       batch,

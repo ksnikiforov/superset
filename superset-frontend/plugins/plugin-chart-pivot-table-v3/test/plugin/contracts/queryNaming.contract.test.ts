@@ -18,7 +18,7 @@
  */
 import { PATH_DIVIDER, serializePath } from '../../../src/pivot/core/path';
 import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
-import { buildBranchQuerySpecs } from '../../../src/pivot/query/specs';
+import { buildExpansionQuerySpecs } from '../../../src/pivot/query/specs';
 import { buildFormData } from '../fixtures/pivotFormData';
 
 describe('query naming (contracts)', () => {
@@ -29,7 +29,8 @@ describe('query naming (contracts)', () => {
       groupbyColumns: [],
       metrics: ['m1'],
     });
-    const names = buildBranchQuerySpecs({
+    const names = buildExpansionQuerySpecs({
+      kind: 'branch',
       formData,
       layout: buildLayoutContext(formData),
       axis: 'row',
@@ -49,7 +50,8 @@ describe('query naming (contracts)', () => {
       groupbyColumns: [],
       metrics: ['m1'],
     });
-    const names = buildBranchQuerySpecs({
+    const names = buildExpansionQuerySpecs({
+      kind: 'branch',
       formData,
       layout: buildLayoutContext(formData),
       axis: 'row',
@@ -67,7 +69,8 @@ describe('query naming (contracts)', () => {
       groupbyColumns: [],
       metrics: ['m1'],
     });
-    const names = buildBranchQuerySpecs({
+    const names = buildExpansionQuerySpecs({
+      kind: 'branch',
       formData,
       layout: buildLayoutContext(formData),
       axis: 'row',

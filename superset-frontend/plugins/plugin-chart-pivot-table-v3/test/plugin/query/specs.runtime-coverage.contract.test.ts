@@ -17,10 +17,7 @@
  * under the License.
  */
 import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
-import {
-  buildBatchQuerySpecs,
-  buildBranchQuerySpecs,
-} from '../../../src/pivot/query/specs';
+import { buildExpansionQuerySpecs } from '../../../src/pivot/query/specs';
 import {
   encodeMetricKey,
   METRICS_PLACEHOLDER,
@@ -44,7 +41,8 @@ describe('runtime coverage query specs contract', () => {
     });
     const layout = buildLayoutContext(formData);
 
-    const specs = buildBranchQuerySpecs({
+    const specs = buildExpansionQuerySpecs({
+      kind: 'branch',
       formData,
       layout,
       axis: 'row',
@@ -78,7 +76,8 @@ describe('runtime coverage query specs contract', () => {
     });
     const layout = buildLayoutContext(formData);
 
-    const specs = buildBranchQuerySpecs({
+    const specs = buildExpansionQuerySpecs({
+      kind: 'branch',
       formData,
       layout,
       axis: 'col',
@@ -102,7 +101,8 @@ describe('runtime coverage query specs contract', () => {
     const layout = buildLayoutContext(formData);
 
     const path = ['Furniture', encodeMetricKey('sales')];
-    const specs = buildBranchQuerySpecs({
+    const specs = buildExpansionQuerySpecs({
+      kind: 'branch',
       formData,
       layout,
       axis: 'col',
@@ -135,7 +135,8 @@ describe('runtime coverage query specs contract', () => {
     });
     const layout = buildLayoutContext(formData);
 
-    const specs = buildBranchQuerySpecs({
+    const specs = buildExpansionQuerySpecs({
+      kind: 'branch',
       formData,
       layout,
       axis: 'row',
@@ -176,7 +177,8 @@ describe('runtime coverage query specs contract', () => {
       ],
     };
 
-    const specs = buildBatchQuerySpecs({
+    const specs = buildExpansionQuerySpecs({
+      kind: 'batch',
       formData,
       layout,
       batch,
@@ -211,7 +213,8 @@ describe('runtime coverage query specs contract', () => {
       ],
     };
 
-    const specs = buildBatchQuerySpecs({
+    const specs = buildExpansionQuerySpecs({
+      kind: 'batch',
       formData,
       layout,
       batch,

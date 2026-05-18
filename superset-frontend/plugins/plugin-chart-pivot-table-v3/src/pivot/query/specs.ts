@@ -661,26 +661,6 @@ const buildAxisExpansionSpecs = ({
   });
 };
 
-export const buildBranchQuerySpecs = (params: {
-  formData: PivotTableQueryFormData;
-  layout: LayoutContext;
-  axis: PivotAxis;
-  path: PivotPath;
-  visibleRowDepth?: number;
-  visibleColDepth?: number;
-}): PlannedQuerySpec[] =>
-  buildAxisExpansionSpecs({
-    ...params,
-    filters: ctx =>
-      buildPathFilters(
-        params.axis === 'row' ? ctx.rowGroupbyForQuery : ctx.colGroupbyForQuery,
-        ctx.sanitizedPath,
-        params.formData.colTypeMap,
-      ),
-    suffix: `|branch:${params.axis}:${serializePath(params.path)}`,
-    meta: { kind: 'branch', axis: params.axis, path: params.path },
-  });
-
 const isNullish = (value: PivotPathValue) =>
   value === null || value === undefined;
 
@@ -769,76 +749,110 @@ const buildPathSetFilterClauses = ({
   return filters;
 };
 
-export const buildBatchQuerySpecs = ({
-  formData,
-  layout,
-  batch,
-  visibleRowDepth,
-  visibleColDepth,
-  chunkIndex = 0,
-  representativePath,
-}: {
-  formData: PivotTableQueryFormData;
-  layout: LayoutContext;
-  batch: BatchGroup;
-  visibleRowDepth: number;
-  visibleColDepth: number;
-  chunkIndex?: number;
-  representativePath?: PivotPath;
-}): PlannedQuerySpec[] => {
-  const representativeKey = batch.targets[0]?.pathKey;
-  if (!representativeKey && !representativePath) {
-    return [];
-  }
-  const representative = representativePath ?? parsePath(representativeKey);
-  const parentPath = parsePath(batch.parentPathKey);
-  const parentDimensionPath = projectQueryFilterPath({
-    layout,
-    axis: batch.axis,
-    path: parentPath,
-  });
-  return buildAxisExpansionSpecs({
-    formData,
-    layout,
-    axis: batch.axis,
-    path: representative,
-    visibleRowDepth,
-    visibleColDepth,
-    filters: ctx =>
-      buildBatchFilterClauses({
-        axisGroupby:
-          batch.axis === 'row'
+export type ExpansionQuerySpecRequest =
+  | {
+      kind: 'branch';
+      formData: PivotTableQueryFormData;
+      layout: LayoutContext;
+      axis: PivotAxis;
+      path: PivotPath;
+      visibleRowDepth?: number;
+      visibleColDepth?: number;
+    }
+  | {
+      kind: 'batch';
+      formData: PivotTableQueryFormData;
+      layout: LayoutContext;
+      batch: BatchGroup;
+      visibleRowDepth: number;
+      visibleColDepth: number;
+      chunkIndex?: number;
+      representativePath?: PivotPath;
+    }
+  | {
+      kind: 'intersection';
+      formData: PivotTableQueryFormData;
+      layout: LayoutContext;
+      rowPathKeys: string[];
+      columnPathKeys: string[];
+      visibleRowDepth: number;
+      visibleColDepth: number;
+    };
+
+export const buildExpansionQuerySpecs = (
+  request: ExpansionQuerySpecRequest,
+): PlannedQuerySpec[] => {
+  if (request.kind === 'branch') {
+    return buildAxisExpansionSpecs({
+      ...request,
+      filters: ctx =>
+        buildPathFilters(
+          request.axis === 'row'
             ? ctx.rowGroupbyForQuery
             : ctx.colGroupbyForQuery,
-        parentPath: parentDimensionPath,
-        siblingValues: batch.siblingValues,
-        colTypeMap: formData.colTypeMap,
-      }),
-    suffix: `|batch:${batch.axis}:${batch.parentPathKey}|chunk:${chunkIndex}`,
-    meta: {
-      kind: 'batch',
+          ctx.sanitizedPath,
+          request.formData.colTypeMap,
+        ),
+      suffix: `|branch:${request.axis}:${serializePath(request.path)}`,
+      meta: { kind: 'branch', axis: request.axis, path: request.path },
+    });
+  }
+  if (request.kind === 'batch') {
+    const {
+      formData,
+      layout,
+      batch,
+      visibleRowDepth,
+      visibleColDepth,
+      chunkIndex = 0,
+      representativePath,
+    } = request;
+    const representativeKey = batch.targets[0]?.pathKey;
+    if (!representativeKey && !representativePath) {
+      return [];
+    }
+    const representative = representativePath ?? parsePath(representativeKey);
+    const parentPath = parsePath(batch.parentPathKey);
+    const parentDimensionPath = projectQueryFilterPath({
+      layout,
       axis: batch.axis,
-      parentPath,
-      siblingValues: batch.siblingValues,
-    },
-  });
-};
+      path: parentPath,
+    });
+    return buildAxisExpansionSpecs({
+      formData,
+      layout,
+      axis: batch.axis,
+      path: representative,
+      visibleRowDepth,
+      visibleColDepth,
+      filters: ctx =>
+        buildBatchFilterClauses({
+          axisGroupby:
+            batch.axis === 'row'
+              ? ctx.rowGroupbyForQuery
+              : ctx.colGroupbyForQuery,
+          parentPath: parentDimensionPath,
+          siblingValues: batch.siblingValues,
+          colTypeMap: formData.colTypeMap,
+        }),
+      suffix: `|batch:${batch.axis}:${batch.parentPathKey}|chunk:${chunkIndex}`,
+      meta: {
+        kind: 'batch',
+        axis: batch.axis,
+        parentPath,
+        siblingValues: batch.siblingValues,
+      },
+    });
+  }
 
-export const buildIntersectionQuerySpecs = ({
-  formData,
-  layout,
-  rowPathKeys,
-  columnPathKeys,
-  visibleRowDepth,
-  visibleColDepth,
-}: {
-  formData: PivotTableQueryFormData;
-  layout: LayoutContext;
-  rowPathKeys: string[];
-  columnPathKeys: string[];
-  visibleRowDepth: number;
-  visibleColDepth: number;
-}): PlannedQuerySpec[] => {
+  const {
+    formData,
+    layout,
+    rowPathKeys,
+    columnPathKeys,
+    visibleRowDepth,
+    visibleColDepth,
+  } = request;
   const rowPaths = rowPathKeys.map(parsePath);
   const columnPaths = columnPathKeys.map(parsePath);
   return buildAxisExpansionSpecs({

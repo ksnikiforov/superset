@@ -34,7 +34,7 @@ import {
   type PivotTreeNode,
 } from '../../../src/types';
 import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
-import { buildBatchQuerySpecs } from '../../../src/pivot/query/specs';
+import { buildExpansionQuerySpecs } from '../../../src/pivot/query/specs';
 import { createPivotFactStore } from '../../../src/pivot/runtime/factStore';
 import {
   factStoreSelectorFromSpec,
@@ -262,7 +262,8 @@ describe('fetchBatch', () => {
       ],
     };
     const layout = buildLayoutContext(formData);
-    const specs = buildBatchQuerySpecs({
+    const specs = buildExpansionQuerySpecs({
+      kind: 'batch',
       formData,
       layout,
       batch,
@@ -307,9 +308,9 @@ describe('fetchBatch', () => {
     );
     expect(mockPost).not.toHaveBeenCalled();
     expect(tree.rows[rowKey]).toBeDefined();
-    expect(
-      tree.cells[serializeCellKey(rowKey, metricColKey)]?.values.m1,
-    ).toBe(7);
+    expect(tree.cells[serializeCellKey(rowKey, metricColKey)]?.values.m1).toBe(
+      7,
+    );
   });
 
   it('fetches only missing specs when batch support coverage is partially loaded', async () => {
@@ -344,7 +345,8 @@ describe('fetchBatch', () => {
       ],
     };
     const layout = buildLayoutContext(formData);
-    const specs = buildBatchQuerySpecs({
+    const specs = buildExpansionQuerySpecs({
+      kind: 'batch',
       formData,
       layout,
       batch,

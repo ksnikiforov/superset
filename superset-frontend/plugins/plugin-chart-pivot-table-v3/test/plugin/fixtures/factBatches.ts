@@ -28,13 +28,9 @@ import {
   type PivotFactStoreBatch,
 } from '../../../src/pivot/runtime/factStore';
 import { parsePath } from '../../../src/pivot/core/path';
+import { factStoreSelectorFromSpec } from '../../../src/pivot/runtime/materializePivotTree';
 import {
-  factStoreSelectorFromSpec,
-} from '../../../src/pivot/runtime/materializePivotTree';
-import {
-  buildBatchQuerySpecs,
-  buildBranchQuerySpecs,
-  buildIntersectionQuerySpecs,
+  buildExpansionQuerySpecs,
   type PlannedQuerySpec,
 } from '../../../src/pivot/query/specs';
 import { type PivotFactCoverage } from '../../../src/pivot/runtime/types';
@@ -158,7 +154,8 @@ export const buildMockBranchFactBatches = ({
   'axis' | 'formData' | 'path' | 'visibleColDepth' | 'visibleRowDepth'
 > & { data?: PivotTreeData }): PivotFactStoreBatch[] => {
   const layout = buildLayoutContext(formData);
-  const specs = buildBranchQuerySpecs({
+  const specs = buildExpansionQuerySpecs({
+    kind: 'branch',
     formData,
     layout,
     axis,
@@ -198,7 +195,8 @@ export const buildMockBatchFactBatches = ({
   'batch' | 'formData' | 'visibleColDepth' | 'visibleRowDepth'
 > & { data?: PivotTreeData }): PivotFactStoreBatch[] => {
   const layout = buildLayoutContext(formData);
-  const specs = buildBatchQuerySpecs({
+  const specs = buildExpansionQuerySpecs({
+    kind: 'batch',
     formData,
     layout,
     batch,
@@ -242,7 +240,8 @@ export const buildMockIntersectionFactBatches = ({
   | 'visibleRowDepth'
 > & { data?: PivotTreeData }): PivotFactStoreBatch[] => {
   const layout = buildLayoutContext(formData);
-  const specs = buildIntersectionQuerySpecs({
+  const specs = buildExpansionQuerySpecs({
+    kind: 'intersection',
     formData,
     layout,
     rowPathKeys,
