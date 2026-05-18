@@ -121,7 +121,6 @@ describe('Global Async Queries (HTTP 202) support', () => {
 
     expect(waitForAsyncDataMock).toHaveBeenCalledTimes(1);
     expect(result).toEqual({});
-    expect(result.error).toBeUndefined();
   });
 
   it('waits for async chart data in fetchBatch()', async () => {
@@ -164,6 +163,5 @@ describe('Global Async Queries (HTTP 202) support', () => {
 
     expect(waitForAsyncDataMock).toHaveBeenCalledTimes(1);
     expect(result).toEqual({});
-    expect(result.error).toBeUndefined();
   });
 });

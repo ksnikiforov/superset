@@ -252,6 +252,10 @@ Current semantic-layout contract:
   reinitialization transition no longer repeat row/column commit and toggle
   wiring, and expansion fetch execution no longer keeps a generic fetch wrapper
   around the single concrete expansion-query path.
+- Expansion query fetch now has one error channel: warnings are returned,
+  failures throw. The old `{ error }` result-object branch is removed from the
+  production expansion fetch path and tests now model failures as rejected
+  fetches.
 
 Expected deletion targets:
 
@@ -279,8 +283,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13065` insertions, `17161` deletions, net `-4096`.
-- Current production TypeScript/TSX total: about `29414` lines.
+- Production `src`: `13059` insertions, `17161` deletions, net `-4102`.
+- Current production TypeScript/TSX total: about `29408` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -292,17 +296,17 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `29414` | `-4096` | `< 28000` |
-| Strict core pipeline | `11337` | `11824` | `+487` | `8000` |
+| Full production `src` | `33510` | `29408` | `-4102` | `< 28000` |
+| Strict core pipeline | `11337` | `11817` | `+480` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5084` | `+401` | `3000-4000` |
-| Broad core pipeline | `16020` | `16908` | `+888` | `11000-13000` |
+| Broad core pipeline | `16020` | `16901` | `+881` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
 | `pivot/runtime/*` | `3933` |
-| `pivot/expansion/*` | `2640` |
+| `pivot/expansion/*` | `2634` |
 | `pivot/query/*` | `1554` |
 | `pivot/layout/*` | `732` |
 | core/shared/domain helpers | `1752` |
@@ -927,6 +931,9 @@ Success criteria:
   axis-shaped boundary, and the reinitialization transition returns the same
   shape. This retires duplicated row/column commit, toggle, and rehydrate
   plumbing without changing the persisted expansion UX.
+- Expansion fetch failures now reject through the request lifecycle instead of
+  being wrapped as `{ error }` payloads. This removes a second expansion error
+  protocol and keeps fetch execution aligned with the planned-query executor.
 - Same-axis expansion no longer has a separate in-flight expansion map or
   branch-specific fetch loop. Toggle expansion writes pending visible coverage
   and enters the same hydration loop used by prefetch and cross-axis hydration.

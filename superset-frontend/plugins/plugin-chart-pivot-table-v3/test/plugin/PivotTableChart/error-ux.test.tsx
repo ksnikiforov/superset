@@ -89,22 +89,16 @@ describe('PivotTableChart error UX (Phase 4.5)', () => {
     const results = await Promise.all(
       batch.targets.map(target => {
         const path = parsePath(target.pathKey);
-        return Promise.resolve(
-          fetchPivotBranchMock({
-            formData,
-            axis: batch.axis,
-            path,
-            visibleRowDepth,
-            visibleColDepth,
-            factStore,
-          }),
-        );
+        return fetchPivotBranchMock({
+          formData,
+          axis: batch.axis,
+          path,
+          visibleRowDepth,
+          visibleColDepth,
+          factStore,
+        });
       }),
     );
-    const firstError = results.find(result => result.error)?.error;
-    if (firstError) {
-      return { error: firstError };
-    }
     const merged = results.reduce<PivotTreeData | undefined>(
       (acc, result) => mergeTrees(acc, result.data),
       undefined,
@@ -131,9 +125,7 @@ describe('PivotTableChart error UX (Phase 4.5)', () => {
     );
     const error = new Error('kaboom');
     fetchPivotBranchMock
-      .mockImplementationOnce(params =>
-        Promise.resolve(buildMockBranchFetchResult(params, { error })),
-      )
+      .mockRejectedValueOnce(error)
       .mockImplementation(params =>
         Promise.resolve(buildMockBranchFetchResult(params, { data: branchA })),
       );
@@ -209,9 +201,7 @@ describe('PivotTableChart error UX (Phase 4.5)', () => {
     );
     const error = new Error('network down');
     fetchPivotBranchMock
-      .mockImplementationOnce(params =>
-        Promise.resolve(buildMockBranchFetchResult(params, { error })),
-      )
+      .mockRejectedValueOnce(error)
       .mockImplementation(params =>
         Promise.resolve(buildMockBranchFetchResult(params, { data: branchA })),
       );

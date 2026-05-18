@@ -183,9 +183,6 @@ const executeExpansionQueryRequest = async ({
     );
     if (requestScope.isCurrent()) {
       addWarnings(result.warnings);
-      if (result.error) {
-        throw result.error;
-      }
     }
   } finally {
     if (requestScope.isCurrent()) {

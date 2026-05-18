@@ -171,9 +171,7 @@ export const buildMockBranchFetchResult = (
   const factBatches =
     result.factBatches ??
     buildMockBranchFactBatches({ ...params, data: result.data });
-  if (!result.error) {
-    params.factStore?.upsertBatches(factBatches);
-  }
+  params.factStore?.upsertBatches(factBatches);
   return stripMockFactBatches(result);
 };
 
@@ -211,9 +209,7 @@ export const buildMockBatchFetchResult = (
   const factBatches =
     result.factBatches ??
     buildMockBatchFactBatches({ ...params, data: result.data });
-  if (!result.error) {
-    params.factStore?.upsertBatches(factBatches);
-  }
+  params.factStore?.upsertBatches(factBatches);
   return stripMockFactBatches(result);
 };
 
@@ -275,9 +271,7 @@ export const buildMockIntersectionFetchResult = (
   const factBatches =
     result.factBatches ??
     buildMockIntersectionFactBatches({ ...params, data: result.data });
-  if (!result.error) {
-    params.factStore?.upsertBatches(factBatches);
-  }
+  params.factStore?.upsertBatches(factBatches);
   return stripMockFactBatches(result);
 };
 

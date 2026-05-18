@@ -44,7 +44,6 @@ export type FetchPivotExpansionRequest =
 
 export interface FetchPivotExpansionResult {
   warnings?: ChartDataWarning[];
-  error?: Error;
 }
 
 export const fetchPivotExpansion = async (
@@ -68,8 +67,6 @@ export const fetchPivotExpansion = async (
     if (isAbortError(error)) {
       return {};
     }
-    return {
-      error: error instanceof Error ? error : new Error(String(error)),
-    };
+    throw error instanceof Error ? error : new Error(String(error));
   }
 };
