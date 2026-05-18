@@ -24,10 +24,8 @@ import {
   getColumnLabel,
   supersetTheme,
   type JsonObject,
-  styled,
   t,
 } from '@superset-ui/core';
-import { Loading } from '@superset-ui/core/components';
 import { type PivotTableProps, PivotRuntimeLayout } from './types';
 import { useExpansionEngine } from './pivot/expansion/useExpansionEngine';
 import { usePivotLayout } from './pivot/chart/usePivotLayout';
@@ -45,6 +43,7 @@ import {
 } from './pivot/chart/PivotInteractionLayout';
 import { PivotInteractionPanel } from './pivot/chart/PivotInteractionPanel';
 import {
+  buildRuntimeLayoutFromFormData,
   normalizeRuntimeLayout,
   resolveAppliedInteractionLayout,
 } from './pivot/layout/resolveInteractionLayout';
@@ -63,13 +62,6 @@ import { usePivotSeamlessRuntimeUpdate } from './pivot/chart/usePivotSeamlessRun
 import { PivotTableView } from './pivot/render/PivotTableView';
 
 const EMPTY_SELECTED_FILTERS: Record<string, DataRecordValue[]> = {};
-const MetaLoadingWrap = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  width: 100%;
-`;
 
 function PivotTableChart(props: PivotTableProps) {
   const {
@@ -93,11 +85,9 @@ function PivotTableChart(props: PivotTableProps) {
     appSection,
   } = props;
 
-  const { interactionMode } = formData;
-  const isUserControlled = interactionMode === 'user_controlled';
   const isDashboardContext =
     appSection === AppSection.Dashboard || formData.dashboardId !== undefined;
-  const isDashboardRuntimeSync = isUserControlled && isDashboardContext;
+  const isDashboardRuntimeSync = isDashboardContext;
   const shouldPersistOwnState = !isDashboardRuntimeSync;
   const fetchFormDataBase = queryFormData || formData;
   const dimensionList = useMemo(
@@ -114,13 +104,7 @@ function PivotTableChart(props: PivotTableProps) {
     const id = Number(idPart);
     return Number.isFinite(id) ? id : null;
   }, [formData.datasource]);
-  const {
-    resolvedVerboseMap,
-    resolvedDateFormatters,
-    metaState,
-    needsVerboseMap,
-    needsDateFormatters,
-  } = usePivotDatasetMeta({
+  const { resolvedVerboseMap, resolvedDateFormatters } = usePivotDatasetMeta({
     datasourceId,
     dimensions: dimensionList,
     formData,
@@ -166,9 +150,10 @@ function PivotTableChart(props: PivotTableProps) {
   const runtimeLayout = useMemo(() => {
     const persisted =
       (ownState?.pivotRuntimeLayout as PivotRuntimeLayout | undefined) ??
-      formData.pivotRuntimeLayout;
+      formData.pivotRuntimeLayout ??
+      buildRuntimeLayoutFromFormData(formData);
     return normalizeRuntimeLayout(persisted, dimensionKeys, metricKeys);
-  }, [dimensionKeys, formData.pivotRuntimeLayout, metricKeys, ownState]);
+  }, [dimensionKeys, formData, metricKeys, ownState]);
   const appliedRuntimeLayoutFromQuery = useMemo(
     () =>
       normalizeRuntimeLayout(
@@ -217,7 +202,6 @@ function PivotTableChart(props: PivotTableProps) {
     lastLocalSyncDashboardQueryContextRef,
     persistRuntimeState,
   } = usePivotRuntimeLayoutState({
-    isUserControlled,
     isDashboardContext,
     runtimeLayout,
     dimensions: dimensionList,
@@ -234,7 +218,6 @@ function PivotTableChart(props: PivotTableProps) {
 
   const { appliedLayoutFormData, appliedPivotProgram } =
     resolveAppliedInteractionLayout({
-      isUserControlled,
       appliedFormData,
       sourceMetrics,
       sourceMeasureLeavesByMetric,
@@ -243,22 +226,20 @@ function PivotTableChart(props: PivotTableProps) {
     });
   const { appliedLayoutFormData: draftLayoutFormData } =
     resolveAppliedInteractionLayout({
-      isUserControlled,
       appliedFormData,
       sourceMetrics,
       sourceMeasureLeavesByMetric,
       committedRuntimeLayout: uiRuntimeLayout,
       appliedDimensionKeys,
     });
-  const fetchFormData = useMemo(() => {
-    if (!isUserControlled) {
-      return draftLayoutFormData;
-    }
-    return buildSelectionFilteredFormData({
-      formData: draftLayoutFormData,
-      selection: committedFilters,
-    });
-  }, [committedFilters, draftLayoutFormData, isUserControlled]);
+  const fetchFormData = useMemo(
+    () =>
+      buildSelectionFilteredFormData({
+        formData: draftLayoutFormData,
+        selection: committedFilters,
+      }),
+    [committedFilters, draftLayoutFormData],
+  );
 
   const upstreamSeamlessSignature =
     upstreamDashboardQueryContextSignature ?? '';
@@ -279,7 +260,6 @@ function PivotTableChart(props: PivotTableProps) {
     metricKeys,
     data,
     factBatches,
-    isUserControlled,
     upstreamDashboardQueryContextSignature,
     persistedInteractionFilters,
     selectedFiltersForTreeSync,
@@ -403,12 +383,10 @@ function PivotTableChart(props: PivotTableProps) {
     colTypeMap: fetchFormDataBaseWithFormatters.colTypeMap,
   });
 
-  const tableWidth = isUserControlled
-    ? Math.max(
-        0,
-        width - INTERACTION_PANEL_WIDTH - INTERACTION_SIDE_CHIPS_WIDTH,
-      )
-    : width;
+  const tableWidth = Math.max(
+    0,
+    width - INTERACTION_PANEL_WIDTH - INTERACTION_SIDE_CHIPS_WIDTH,
+  );
 
   const { headerOffset, headerRowOffsets, headerRef } = useStickyHeaders({
     enabled: resolvedStickyHeaders,
@@ -447,12 +425,8 @@ function PivotTableChart(props: PivotTableProps) {
     [seamlessWarnings, warnings],
   );
   const activeErrorMessage = seamlessError ?? errorMessage;
-  const cornerLoaderVisible = isUserControlled
-    ? seamlessLoading || isHydrating
-    : isHydrating;
-  const tableHeight = isUserControlled
-    ? Math.max(0, height - INTERACTION_TOP_CHIPS_HEIGHT)
-    : height;
+  const cornerLoaderVisible = seamlessLoading || isHydrating;
+  const tableHeight = Math.max(0, height - INTERACTION_TOP_CHIPS_HEIGHT);
   const exportChartId =
     typeof formData.slice_id === 'number' ||
     typeof formData.slice_id === 'string'
@@ -513,32 +487,6 @@ function PivotTableChart(props: PivotTableProps) {
       }),
     [dimensionLabelMap, hasMetrics, uiRuntimeLayout],
   );
-  const shouldDelayRender =
-    !isUserControlled &&
-    datasourceId !== null &&
-    (metaState === 'loading' ||
-      (metaState === 'idle' && (needsVerboseMap || needsDateFormatters)));
-
-  if (shouldDelayRender) {
-    return (
-      <MetaLoadingWrap>
-        <Loading />
-      </MetaLoadingWrap>
-    );
-  }
-
-  if (!isUserControlled) {
-    return (
-      <PivotTableView
-        {...sharedPivotViewProps}
-        height={height}
-        width={width}
-        showGlobalLoader={isHydrating}
-        showCornerLoader={isHydrating}
-      />
-    );
-  }
-
   return (
     <PivotInteractionLayout
       height={height}

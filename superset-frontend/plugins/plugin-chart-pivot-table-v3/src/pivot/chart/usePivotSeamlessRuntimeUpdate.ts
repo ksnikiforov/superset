@@ -69,7 +69,6 @@ type UsePivotSeamlessRuntimeUpdateConfig = {
   metricKeys: string[];
   data: PivotTreeData;
   factBatches: PivotFactStoreBatch[];
-  isUserControlled: boolean;
   upstreamDashboardQueryContextSignature: string | null;
   persistedInteractionFilters: RuntimeSelection;
   selectedFiltersForTreeSync: RuntimeSelection;
@@ -104,7 +103,6 @@ export const usePivotSeamlessRuntimeUpdate = (
     metricKeys,
     data,
     factBatches,
-    isUserControlled,
     upstreamDashboardQueryContextSignature,
     persistedInteractionFilters,
     selectedFiltersForTreeSync,
@@ -165,12 +163,11 @@ export const usePivotSeamlessRuntimeUpdate = (
       lastLocalSyncDashboardQueryContextRef.current ===
         upstreamDashboardQueryContextSignature;
     const shouldSyncCommittedTreeFromProps =
-      !isUserControlled ||
-      (!loading &&
-        !hasLocalSyncForCurrentDashboardQueryContext &&
-        !hasSelectedFilters(persistedInteractionFilters) &&
-        isSameRuntimeLayout(runtimeLayout, committedRuntimeLayout) &&
-        isEqual(selectedFiltersForTreeSync, committedFilters));
+      !loading &&
+      !hasLocalSyncForCurrentDashboardQueryContext &&
+      !hasSelectedFilters(persistedInteractionFilters) &&
+      isSameRuntimeLayout(runtimeLayout, committedRuntimeLayout) &&
+      isEqual(selectedFiltersForTreeSync, committedFilters);
     if (!shouldSyncCommittedTreeFromProps) {
       return;
     }
@@ -182,7 +179,6 @@ export const usePivotSeamlessRuntimeUpdate = (
     factBatches,
     committedFilters,
     committedRuntimeLayout,
-    isUserControlled,
     lastLocalSyncDashboardQueryContextRef,
     loading,
     persistedInteractionFilters,
@@ -388,7 +384,6 @@ export const usePivotSeamlessRuntimeUpdate = (
       upstreamDashboardQueryContextSignature,
       previousUpstreamState: lastUpstreamQueryContextRef.current,
       data,
-      isUserControlled,
       persistedInteractionFilters,
       committedFilters,
       uiSelectedFilters,
@@ -404,7 +399,6 @@ export const usePivotSeamlessRuntimeUpdate = (
     applySeamlessUpdate,
     committedFilters,
     data,
-    isUserControlled,
     persistedInteractionFilters,
     seamlessSyncRef,
     uiRuntimeLayout,
@@ -416,8 +410,8 @@ export const usePivotSeamlessRuntimeUpdate = (
   return {
     committedTree,
     committedFactBatches,
-    dataForRender: isUserControlled ? committedTree : data,
-    factBatchesForRender: isUserControlled ? committedFactBatches : factBatches,
+    dataForRender: committedTree,
+    factBatchesForRender: committedFactBatches,
     seamlessLoading: loading,
     seamlessWarnings: warnings,
     seamlessError: error,

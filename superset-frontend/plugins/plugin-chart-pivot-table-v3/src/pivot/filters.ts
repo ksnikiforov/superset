@@ -73,45 +73,37 @@ export const normalizePivotSelectedFilters = ({
 };
 
 export const buildRuntimeSelectionSyncState = ({
-  isUserControlled,
   dimensions,
   selectedFiltersFromFormData,
   selectedFiltersFromOwnState,
   selectedFiltersFromProps,
   committedFilters,
 }: {
-  isUserControlled: boolean;
   dimensions: QueryFormColumn[];
   selectedFiltersFromFormData: PivotSelectedFilters;
   selectedFiltersFromOwnState: PivotSelectedFilters;
   selectedFiltersFromProps: PivotSelectedFilters;
   committedFilters: PivotSelectedFilters;
 }) => {
-  const selectedFiltersForTreeSync = isUserControlled
-    ? firstSelectedFilters(
-        selectedFiltersFromFormData,
-        selectedFiltersFromOwnState,
-        selectedFiltersFromProps,
-      )
-    : selectedFiltersFromProps;
-  const persistedInteractionFilters = isUserControlled
-    ? normalizePivotSelectedFilters({
-        filters: firstSelectedFilters(
-          selectedFiltersFromFormData,
-          selectedFiltersFromOwnState,
-        ),
-        dimensions,
-      })
-    : {};
+  const selectedFiltersForTreeSync = firstSelectedFilters(
+    selectedFiltersFromFormData,
+    selectedFiltersFromOwnState,
+    selectedFiltersFromProps,
+  );
+  const persistedInteractionFilters = normalizePivotSelectedFilters({
+    filters: firstSelectedFilters(
+      selectedFiltersFromFormData,
+      selectedFiltersFromOwnState,
+    ),
+    dimensions,
+  });
   const persistedSelectedFilters = normalizePivotSelectedFilters({
-    filters: isUserControlled
-      ? firstSelectedFilters(
-          selectedFiltersFromFormData,
-          selectedFiltersFromOwnState,
-          committedFilters,
-          selectedFiltersFromProps,
-        )
-      : selectedFiltersFromProps,
+    filters: firstSelectedFilters(
+      selectedFiltersFromFormData,
+      selectedFiltersFromOwnState,
+      committedFilters,
+      selectedFiltersFromProps,
+    ),
     dimensions,
   });
   return {

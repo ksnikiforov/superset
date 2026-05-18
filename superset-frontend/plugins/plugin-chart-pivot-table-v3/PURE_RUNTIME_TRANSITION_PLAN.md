@@ -290,8 +290,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13010` insertions, `17150` deletions, net `-4140`.
-- Current production TypeScript/TSX total: about `29370` lines.
+- Production `src`: `13166` insertions, `17314` deletions, net `-4148`.
+- Current production TypeScript/TSX total: about `29362` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -303,20 +303,20 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `29370` | `-4140` | `< 28000` |
-| Strict core pipeline | `11337` | `11901` | `+564` | `8000` |
-| Non-visual chart runtime hooks | `4683` | `5084` | `+401` | `3000-4000` |
-| Broad core pipeline | `16020` | `16985` | `+965` | `11000-13000` |
+| Full production `src` | `33510` | `29362` | `-4148` | `< 28000` |
+| Strict core pipeline | `11337` | `11958` | `+621` | `8000` |
+| Non-visual chart runtime hooks | `4683` | `5067` | `+384` | `3000-4000` |
+| Broad core pipeline | `16020` | `17025` | `+1005` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `3921` |
-| `pivot/expansion/*` | `2608` |
+| `pivot/runtime/*` | `3906` |
+| `pivot/expansion/*` | `2650` |
 | `pivot/query/*` | `1554` |
-| `pivot/layout/*` | `732` |
-| core/shared/domain helpers | `1873` |
+| `pivot/layout/*` | `770` |
+| core/shared/domain helpers | `1865` |
 | formatting/data/render-model/update support | `1213` |
 
 Interpretation: plugin-wide source has shrunk, but core pipeline source has
@@ -453,6 +453,18 @@ execution. Expansion request lifecycle ownership also moved into
 `LatestRequestScope.finish`, so `useExpansionEngine` no longer injects request
 tracking helpers into the fetch executor.
 
+Latest fixed/runtime unification cleanup: fixed form-data row/column layout now
+compiles into the same `PivotRuntimeLayout` shape as interactive layout.
+`PivotTableChart` always renders through the runtime layout shell, and the
+runtime-state/seamless-update path no longer carries an `isUserControlled`
+branch. Fixed and interactive behavior should now differ only by where the
+initial runtime layout is sourced, not by expansion, sorting, formatting,
+coloring, loading, or materialization semantics. During this cut, expansion
+planning also stopped issuing an opposite-axis root fetch when a one-axis branch
+expansion already defines the visible scoped coverage. For example, expanding
+column `[1992]` at row depth `1` no longer also requests the row-root branch at
+the deeper column depth.
+
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.
 Future work should remain high-impact-first while still deleting code where the
@@ -470,7 +482,7 @@ authority boundaries:
 
 | Target | Current source surface | Why it is a large simplification target | UX/product risk | Expected deletion shape |
 | --- | ---: | --- | --- | --- |
-| Make user-controlled runtime the only layout mode | `interactionMode` branches in `controlPanel.tsx`, `PivotTableChart.tsx`, `usePivotRuntimeLayoutState.ts`, `usePivotSeamlessRuntimeUpdate.ts`, `runtime/seamlessRuntimeUpdate.ts`, plus duplicate fixed-mode row/column controls | The code currently supports two pivots: fixed Explore controls and interactive chart runtime. That forces layout conversion, committed-vs-draft branching, different filter persistence, different loader behavior, and two Values placement surfaces. | Visible. The chart would always show the interactive layout shell/editor. Explore row/column controls could be reduced or removed; dimensions/metrics controls would remain as source-pool controls unless replaced. | Remove `fixed` mode as a runtime branch. Keep a single `PivotRuntimeLayout` authority. Delete fixed/user conditionals, fixed-only render path, and duplicated row/column Explore layout controls after replacing them with source-pool serialization. |
+| Make user-controlled runtime the only layout mode | Remaining `interactionMode` usage is mostly in `controlPanel.tsx` control visibility and duplicated Explore row/column layout controls. `PivotTableChart.tsx`, runtime layout state, seamless update, and runtime update helpers now use one runtime path. | The code used to support two pivots: fixed Explore controls and interactive chart runtime. The chart/runtime branch has been collapsed; the remaining duplication is mainly the authoring surface. | Visible. The chart now always uses the runtime layout shell/editor. Explore row/column controls still exist as legacy authoring controls until replaced or reduced. | Remove remaining fixed/user control-panel visibility branches. Keep a single `PivotRuntimeLayout` authority. Delete duplicated row/column Explore layout controls after replacing them with source-pool serialization or making the in-chart editor the single layout editor. |
 | Represent level expansion as manifest-shaped coverage need | `expandRowsLevel`, `expandColumnsLevel`, `initialDepth`, `useExpansionEngine.ts`, `stateTransitions.ts`, and root-prefetch planning in `query/specs.ts` | Pre-expand depth is a real saved visibility feature. The complexity problem is not that it exists; the problem is that level expansion, path expansion, persisted restore, root prefetch, and hydration are still separate mechanisms. | Low if visible behavior is preserved. A dashboard configured to pre-expand level `N` must still load and show level `N` on fresh load. | Pre-expand compiles directly to `PivotAxisCoverageNeed` with `scope: { kind: 'scopedFull', ancestorPaths: [[]] }`. Manual branch expansion uses the same type with `scope: { kind: 'paths', paths }`. Delete separate expansion-local vocabulary and then collapse duplicate hydration branches around coverage diff/execution. |
 | Replace expansion hydration scheduler with a manifest executor | `useExpansionEngine.ts` about `867` lines, `stateTransitions.ts` about `878` lines, `fetchExecution.ts` about `328` lines | Expansion still has same-axis toggle flow, cross-axis hydration, initial prefetch, persisted restore, in-flight expansion maps, loading-key counts, and branch/batch/intersection execution as separate mechanisms. The selected manifest model should make this one diff/execute/rematerialize loop. | Low to medium if explicit expansion behavior is preserved. Higher if combined with removing auto-expand levels or exact persisted restore. | Build required visible coverage, diff fact store, execute missing needs, rematerialize. Delete same-axis/cross-axis/prefetch loop splits and request-group/loading bookkeeping that only exists because flows are separate. |
 | Merge initial, seamless, and expansion query planning | `query/specs.ts`, `runtime/coverage.ts`, `runtime/seamlessRuntimeUpdate.ts`, `update/initialUpdatePlan.ts`, `expansion/fetchExecution.ts`; query/expansion/runtime totals remain large | Initial load, semantic layout change, and expansion still enter through different request/spec paths. The fact selector is unified, but root/branch/batch/intersection are still first-class query paths instead of outputs of one coverage manifest. | Low if fetch counts are locked by tests. Main risk is underfetch/overfetch around sorting support metrics, measure leaves, and row x column intersections. | One manifest-to-query-spec executor handles root, layout, expansion, batch, and intersection needs. Delete root target planning, `buildBranchFactCoverages`, expansion request-kind query branches, and duplicated coverage/spec conversion. |

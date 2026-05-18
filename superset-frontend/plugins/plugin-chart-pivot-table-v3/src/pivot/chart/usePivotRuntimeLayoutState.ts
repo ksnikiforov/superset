@@ -45,7 +45,6 @@ import { useSyncRef } from '../shared/useSyncRef';
 type RuntimeSelection = Record<string, DataRecordValue[]>;
 
 type UsePivotRuntimeLayoutStateConfig = {
-  isUserControlled: boolean;
   isDashboardContext: boolean;
   runtimeLayout: PivotRuntimeLayout;
   committedRuntimeLayout?: PivotRuntimeLayout;
@@ -61,7 +60,6 @@ type UsePivotRuntimeLayoutStateConfig = {
 };
 
 export const usePivotRuntimeLayoutState = ({
-  isUserControlled,
   isDashboardContext,
   runtimeLayout,
   committedRuntimeLayout: committedRuntimeLayoutProp,
@@ -75,7 +73,7 @@ export const usePivotRuntimeLayoutState = ({
   setControlValue,
   setDataMask,
 }: UsePivotRuntimeLayoutStateConfig) => {
-  const isDashboardRuntimeSync = isUserControlled && isDashboardContext;
+  const isDashboardRuntimeSync = isDashboardContext;
   const shouldPersistOwnState = !isDashboardRuntimeSync;
   const committedRuntimeLayoutInput =
     committedRuntimeLayoutProp ?? runtimeLayout;
@@ -98,7 +96,6 @@ export const usePivotRuntimeLayoutState = ({
   } = useMemo(
     () =>
       buildRuntimeSelectionSyncState({
-        isUserControlled,
         dimensions,
         selectedFiltersFromFormData,
         selectedFiltersFromOwnState,
@@ -108,7 +105,6 @@ export const usePivotRuntimeLayoutState = ({
     [
       committedFilters,
       dimensions,
-      isUserControlled,
       selectedFiltersFromFormData,
       selectedFiltersFromOwnState,
       selectedFiltersFromProps,
@@ -187,8 +183,6 @@ export const usePivotRuntimeLayoutState = ({
 
   useEffect(() => {
     const propSync = prepareRuntimeLayoutPropSync({
-      isUserControlled,
-      isDashboardContext,
       isDashboardRuntimeSync,
       pendingPersistedRuntimeLayoutSync: persistedRuntimeLayoutSyncRef.current,
       hasPendingRuntimeLayout: !isSameRuntimeLayout(
@@ -209,9 +203,7 @@ export const usePivotRuntimeLayoutState = ({
     }
   }, [
     commitRuntimeLayout,
-    isDashboardContext,
     isDashboardRuntimeSync,
-    isUserControlled,
     lastPersistedRuntimeLayoutRef,
     persistedRuntimeLayoutSyncRef,
     runtimeLayout,
@@ -220,7 +212,6 @@ export const usePivotRuntimeLayoutState = ({
 
   useEffect(() => {
     if (
-      isUserControlled &&
       pendingPersistedSelectionSyncRef.current &&
       isEqual(persistedSelectedFilters, lastPersistedSelectionRef.current)
     ) {
@@ -228,7 +219,6 @@ export const usePivotRuntimeLayoutState = ({
     }
     if (
       shouldSyncPersistedSelectedFilters({
-        isUserControlled,
         pendingPersistedSelectionSync: pendingPersistedSelectionSyncRef.current,
         persistedSelectedFilters,
         committedFilters,
@@ -242,7 +232,6 @@ export const usePivotRuntimeLayoutState = ({
     }
   }, [
     committedFilters,
-    isUserControlled,
     persistedSelectedFilters,
     suppressStalePersistedFilterRestoreRef,
     uiSelectedFilters,

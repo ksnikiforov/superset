@@ -42,7 +42,6 @@ type ResolvedLayoutParams = {
 };
 
 type AppliedInteractionLayoutParams = {
-  isUserControlled: boolean;
   appliedFormData: PivotTableQueryFormData;
   sourceMetrics: PivotTableQueryFormData['metrics'];
   sourceMeasureLeavesByMetric: PivotTableQueryFormData['measureLeavesByMetric'];
@@ -52,7 +51,7 @@ type AppliedInteractionLayoutParams = {
 
 export type AppliedInteractionLayout = {
   appliedLayoutFormData: PivotTableQueryFormData;
-  appliedPivotProgram?: PivotProgram;
+  appliedPivotProgram: PivotProgram;
 };
 
 const resolveDimensionMap = (dimensions: QueryFormColumn[]) => {
@@ -110,17 +109,63 @@ export const normalizeRuntimeLayout = (
   };
 };
 
+export const buildRuntimeLayoutFromFormData = (
+  formData: PivotTableQueryFormData,
+): PivotRuntimeLayout => {
+  const rowGroupby = ensureIsArray<QueryFormColumn>(formData.groupbyRows);
+  const colGroupby = ensureIsArray<QueryFormColumn>(formData.groupbyColumns);
+  const rowValueIndex = rowGroupby.indexOf(METRICS_PLACEHOLDER);
+  const colValueIndex = colGroupby.indexOf(METRICS_PLACEHOLDER);
+  const metrics = getMetricKeys(ensureIsArray(formData.metrics));
+  const axis =
+    rowValueIndex >= 0 ||
+    (colValueIndex < 0 && formData.metricsLayout === MetricsLayoutEnum.ROWS)
+      ? 'row'
+      : 'col';
+  const rows = rowGroupby
+    .filter(column => column !== METRICS_PLACEHOLDER)
+    .map(column => getStableColumnKey(column));
+  const cols = colGroupby
+    .filter(column => column !== METRICS_PLACEHOLDER)
+    .map(column => getStableColumnKey(column));
+
+  return {
+    version: 1,
+    rows,
+    cols,
+    metrics,
+    leafSelection: {},
+    valuePlacement: {
+      axis,
+      index:
+        axis === 'row'
+          ? rowValueIndex >= 0
+            ? rowValueIndex
+            : rows.length
+          : colValueIndex >= 0
+            ? colValueIndex
+            : cols.length,
+    },
+  };
+};
+
 export const resolveInteractionFormData = ({
   formData,
   runtimeLayout,
 }: ResolvedLayoutParams): PivotTableQueryFormData => {
-  if (formData.interactionMode !== 'user_controlled') {
-    return formData;
-  }
-
-  const dimensions = ensureIsArray<QueryFormColumn>(formData.dimensions);
+  const dimensions = [
+    ...ensureIsArray<QueryFormColumn>(formData.dimensions),
+    ...ensureIsArray<QueryFormColumn>(formData.groupbyRows).filter(
+      column => column !== METRICS_PLACEHOLDER,
+    ),
+    ...ensureIsArray<QueryFormColumn>(formData.groupbyColumns).filter(
+      column => column !== METRICS_PLACEHOLDER,
+    ),
+  ];
   const dimensionMap = resolveDimensionMap(dimensions);
-  const resolvedLayout = normalizeRuntimeLayout(runtimeLayout);
+  const resolvedLayout = normalizeRuntimeLayout(
+    runtimeLayout ?? buildRuntimeLayoutFromFormData(formData),
+  );
 
   const rows = resolvedLayout.rows.filter(key => dimensionMap.has(key));
   const cols = resolvedLayout.cols.filter(key => dimensionMap.has(key));
@@ -227,19 +272,12 @@ export const resolveInteractionFormData = ({
 };
 
 export const resolveAppliedInteractionLayout = ({
-  isUserControlled,
   appliedFormData,
   sourceMetrics,
   sourceMeasureLeavesByMetric,
   committedRuntimeLayout,
   appliedDimensionKeys,
 }: AppliedInteractionLayoutParams): AppliedInteractionLayout => {
-  if (!isUserControlled) {
-    return {
-      appliedLayoutFormData: appliedFormData,
-    };
-  }
-
   const appliedMetricKeysBase = getMetricKeys(ensureIsArray(sourceMetrics));
   const committedMetrics = committedRuntimeLayout.metrics ?? [];
   const appliedMetricKeys =

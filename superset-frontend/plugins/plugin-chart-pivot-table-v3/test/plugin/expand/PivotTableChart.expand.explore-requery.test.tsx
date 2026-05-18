@@ -25,6 +25,7 @@ import { fetchPivotExpansion as fetchPivotBranch } from '../../../src/pivot/expa
 import { baseFormData, buildFormData } from '../fixtures/pivotFormData';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';
+import { buildMockExpansionFetchResult } from '../fixtures/factBatches';
 
 jest.mock('../../../src/pivot/expansion/fetchPivotExpansion', () => {
   const actual = jest.requireActual(
@@ -68,10 +69,11 @@ describe('PivotTableChart expand resilience to explore data refresh', () => {
       [],
     );
 
-    fetchPivotBranchMock.mockResolvedValueOnce({
-      data: expandedTree,
-      factBatches: [],
-    });
+    fetchPivotBranchMock.mockImplementationOnce(params =>
+      Promise.resolve(
+        buildMockExpansionFetchResult(params, { data: expandedTree }),
+      ),
+    );
 
     const renderChart = ({
       data,

@@ -147,7 +147,6 @@ export const prepareSeamlessRuntimeUpdateEffect = ({
   upstreamDashboardQueryContextSignature,
   previousUpstreamState,
   data,
-  isUserControlled,
   persistedInteractionFilters,
   committedFilters,
   uiSelectedFilters,
@@ -158,7 +157,6 @@ export const prepareSeamlessRuntimeUpdateEffect = ({
   upstreamDashboardQueryContextSignature: string | null;
   previousUpstreamState: SeamlessRuntimeUpstreamState;
   data: PivotTreeData;
-  isUserControlled: boolean;
   persistedInteractionFilters: RuntimeSelection;
   committedFilters: RuntimeSelection;
   uiSelectedFilters: RuntimeSelection;
@@ -188,7 +186,6 @@ export const prepareSeamlessRuntimeUpdateEffect = ({
     lastSync.layoutSignature === nextPersistedFilterSync.layoutSignature &&
     lastSync.upstreamSignature === nextPersistedFilterSync.upstreamSignature;
   const shouldApplyPersistedFilterUpdate =
-    isUserControlled &&
     hasSelectedFilters(persistedInteractionFilters) &&
     isEqual(committedFilters, persistedInteractionFilters) &&
     isEqual(uiSelectedFilters, persistedInteractionFilters) &&
@@ -216,21 +213,19 @@ export const prepareSeamlessRuntimeUpdateEffect = ({
 };
 
 export const shouldSyncPersistedSelectedFilters = ({
-  isUserControlled,
   pendingPersistedSelectionSync,
   persistedSelectedFilters,
   committedFilters,
   uiSelectedFilters,
   suppressStalePersistedFilterRestore,
 }: {
-  isUserControlled: boolean;
   pendingPersistedSelectionSync: boolean;
   persistedSelectedFilters: RuntimeSelection;
   committedFilters: RuntimeSelection;
   uiSelectedFilters: RuntimeSelection;
   suppressStalePersistedFilterRestore: boolean;
 }) => {
-  if (isUserControlled && pendingPersistedSelectionSync) {
+  if (pendingPersistedSelectionSync) {
     return false;
   }
   const shouldSyncFilters =
@@ -238,9 +233,6 @@ export const shouldSyncPersistedSelectedFilters = ({
     !isEqual(persistedSelectedFilters, uiSelectedFilters);
   if (!shouldSyncFilters) {
     return false;
-  }
-  if (!isUserControlled) {
-    return true;
   }
   const hasLocalFilters =
     hasSelectedFilters(uiSelectedFilters) ||
@@ -255,16 +247,12 @@ export const shouldSyncPersistedSelectedFilters = ({
 };
 
 export const prepareRuntimeLayoutPropSync = ({
-  isUserControlled,
-  isDashboardContext,
   isDashboardRuntimeSync,
   pendingPersistedRuntimeLayoutSync,
   hasPendingRuntimeLayout,
   runtimeLayout,
   lastPersistedRuntimeLayout,
 }: {
-  isUserControlled: boolean;
-  isDashboardContext: boolean;
   isDashboardRuntimeSync: boolean;
   pendingPersistedRuntimeLayoutSync: boolean;
   hasPendingRuntimeLayout: boolean;
@@ -275,11 +263,8 @@ export const prepareRuntimeLayoutPropSync = ({
     !(isDashboardRuntimeSync && pendingPersistedRuntimeLayoutSync) &&
     !hasPendingRuntimeLayout,
   shouldSyncUiRuntimeLayout:
-    !(
-      isUserControlled &&
-      isDashboardContext &&
-      pendingPersistedRuntimeLayoutSync
-    ) && !hasPendingRuntimeLayout,
+    !(isDashboardRuntimeSync && pendingPersistedRuntimeLayoutSync) &&
+    !hasPendingRuntimeLayout,
   hasPersistedRuntimeLayoutSyncSettled:
     isDashboardRuntimeSync &&
     pendingPersistedRuntimeLayoutSync &&

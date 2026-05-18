@@ -93,7 +93,6 @@ test('prepares seamless runtime effect updates in chart application order', () =
         signature: 'query-a',
       },
       data: currentData,
-      isUserControlled: true,
       persistedInteractionFilters: persistedFilters,
       committedFilters: persistedFilters,
       uiSelectedFilters: persistedFilters,
@@ -130,7 +129,6 @@ test('skips seamless runtime effect updates for unrelated upstream state', () =>
         signature: 'query-a',
       },
       data: currentData,
-      isUserControlled: true,
       persistedInteractionFilters: { country: ['France'] },
       committedFilters: {},
       uiSelectedFilters: { country: ['France'] },
@@ -154,7 +152,6 @@ test('skips seamless runtime effect updates for unrelated upstream state', () =>
         signature: 'query-a',
       },
       data: currentData,
-      isUserControlled: false,
       persistedInteractionFilters: {},
       committedFilters: {},
       uiSelectedFilters: {},
@@ -172,18 +169,6 @@ test('decides when persisted selected filters should sync into local state', () 
   const persistedFilters = { country: ['France'] };
   expect(
     shouldSyncPersistedSelectedFilters({
-      isUserControlled: false,
-      pendingPersistedSelectionSync: false,
-      persistedSelectedFilters: persistedFilters,
-      committedFilters: {},
-      uiSelectedFilters: {},
-      suppressStalePersistedFilterRestore: true,
-    }),
-  ).toBe(true);
-
-  expect(
-    shouldSyncPersistedSelectedFilters({
-      isUserControlled: true,
       pendingPersistedSelectionSync: true,
       persistedSelectedFilters: persistedFilters,
       committedFilters: {},
@@ -194,7 +179,6 @@ test('decides when persisted selected filters should sync into local state', () 
 
   expect(
     shouldSyncPersistedSelectedFilters({
-      isUserControlled: true,
       pendingPersistedSelectionSync: false,
       persistedSelectedFilters: persistedFilters,
       committedFilters: {},
@@ -205,7 +189,6 @@ test('decides when persisted selected filters should sync into local state', () 
 
   expect(
     shouldSyncPersistedSelectedFilters({
-      isUserControlled: true,
       pendingPersistedSelectionSync: false,
       persistedSelectedFilters: persistedFilters,
       committedFilters: {},
@@ -216,7 +199,6 @@ test('decides when persisted selected filters should sync into local state', () 
 
   expect(
     shouldSyncPersistedSelectedFilters({
-      isUserControlled: true,
       pendingPersistedSelectionSync: false,
       persistedSelectedFilters: persistedFilters,
       committedFilters: { country: ['Germany'] },
@@ -229,8 +211,6 @@ test('decides when persisted selected filters should sync into local state', () 
 test('prepares runtime layout prop sync decisions in one plan', () => {
   expect(
     prepareRuntimeLayoutPropSync({
-      isUserControlled: true,
-      isDashboardContext: true,
       isDashboardRuntimeSync: true,
       pendingPersistedRuntimeLayoutSync: true,
       hasPendingRuntimeLayout: false,
@@ -245,8 +225,6 @@ test('prepares runtime layout prop sync decisions in one plan', () => {
 
   expect(
     prepareRuntimeLayoutPropSync({
-      isUserControlled: true,
-      isDashboardContext: false,
       isDashboardRuntimeSync: false,
       pendingPersistedRuntimeLayoutSync: true,
       hasPendingRuntimeLayout: false,
@@ -261,8 +239,6 @@ test('prepares runtime layout prop sync decisions in one plan', () => {
 
   expect(
     prepareRuntimeLayoutPropSync({
-      isUserControlled: false,
-      isDashboardContext: false,
       isDashboardRuntimeSync: false,
       pendingPersistedRuntimeLayoutSync: false,
       hasPendingRuntimeLayout: true,

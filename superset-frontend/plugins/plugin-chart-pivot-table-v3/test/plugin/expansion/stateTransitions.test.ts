@@ -794,6 +794,80 @@ describe('pivot/expansion/stateTransitions', () => {
     ]);
   });
 
+  it('does not fetch the opposite root branch for one-axis expansion', () => {
+    const { tree, xKey } = buildTree({ includeIntersectionCell: true });
+    const loadedBootstrapCoverage: PivotFactSelector = {
+      coverage: {
+        rowDepth: 1,
+        columnDepth: 1,
+        rowDimensions: ['country'],
+        columnDimensions: ['month'],
+      },
+      scope: { kind: 'root' },
+      valueKeys: ['sales'],
+    };
+    const plan = planHydrationIteration({
+      tree,
+      desiredRows: new Set([rootKey]),
+      desiredCols: new Set([rootKey, xKey]),
+      getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors([
+        loadedBootstrapCoverage,
+      ]),
+      config,
+    });
+
+    expect(plan.kind).toBe('fetch');
+    if (plan.kind !== 'fetch') {
+      throw new Error('Expected a fetch plan');
+    }
+    expect(plan.targets).toEqual([
+      {
+        axis: 'col',
+        pathKey: xKey,
+      },
+    ]);
+  });
+
+  it('does not fetch the opposite root branch after the expanded branch is loaded', () => {
+    const { tree, xKey } = buildTree({ includeIntersectionCell: true });
+    const loadedBootstrapCoverage: PivotFactSelector = {
+      coverage: {
+        rowDepth: 1,
+        columnDepth: 1,
+        rowDimensions: ['country'],
+        columnDimensions: ['month'],
+      },
+      scope: { kind: 'root' },
+      valueKeys: ['sales'],
+    };
+    const loadedColumnBranch: PivotFactSelector = {
+      coverage: {
+        rowDepth: 1,
+        columnDepth: 2,
+        rowDimensions: ['country'],
+        columnDimensions: ['month', 'day'],
+      },
+      scope: {
+        kind: 'branch',
+        axis: 'col',
+        path: parsePath(xKey),
+      },
+      valueKeys: ['sales'],
+    };
+    const plan = planHydrationIteration({
+      tree,
+      desiredRows: new Set([rootKey]),
+      desiredCols: new Set([rootKey, xKey]),
+      getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors([
+        loadedBootstrapCoverage,
+        loadedColumnBranch,
+      ]),
+      config,
+    });
+
+    expect(plan.kind).toBe('complete');
+  });
+
   it('does not plan intersection fetches before both axis nodes are loaded', () => {
     const { tree, aKey, xKey } = buildTree({ includeIntersectionCell: false });
     delete tree.rows[aKey];

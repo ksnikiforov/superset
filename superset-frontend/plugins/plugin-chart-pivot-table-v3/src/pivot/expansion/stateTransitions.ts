@@ -661,6 +661,41 @@ export const buildCrossAxisIntersectionTargets = ({
     : [];
 };
 
+const suppressOppositeRootFetches = ({
+  rowPlan,
+  colPlan,
+  desiredRows,
+  desiredCols,
+}: {
+  rowPlan: PivotExpansionPlan;
+  colPlan: PivotExpansionPlan;
+  desiredRows: Set<string>;
+  desiredCols: Set<string>;
+}) => {
+  const hasNonRootRows = Array.from(desiredRows).some(key => key !== rootKey);
+  const hasNonRootCols = Array.from(desiredCols).some(key => key !== rootKey);
+  return {
+    rowPlan:
+      hasNonRootCols && !hasNonRootRows
+        ? {
+            ...rowPlan,
+            targets: rowPlan.targets.filter(
+              target => target.pathKey !== rootKey,
+            ),
+          }
+        : rowPlan,
+    colPlan:
+      hasNonRootRows && !hasNonRootCols
+        ? {
+            ...colPlan,
+            targets: colPlan.targets.filter(
+              target => target.pathKey !== rootKey,
+            ),
+          }
+        : colPlan,
+  };
+};
+
 export const planHydrationIteration = ({
   tree,
   desiredRows,
@@ -710,12 +745,19 @@ export const planHydrationIteration = ({
     intersectionTargets.length > 0 &&
     !rowPlan.hasMissingNodes &&
     !colPlan.hasMissingNodes;
-  const rowPlanForTransport = shouldFetchIntersectionOnly
-    ? createEmptyExpansionPlan()
-    : rowPlan;
-  const colPlanForTransport = shouldFetchIntersectionOnly
-    ? createEmptyExpansionPlan()
-    : colPlan;
+  const axisPlansForTransport = shouldFetchIntersectionOnly
+    ? {
+        rowPlan: createEmptyExpansionPlan(),
+        colPlan: createEmptyExpansionPlan(),
+      }
+    : suppressOppositeRootFetches({
+        rowPlan,
+        colPlan,
+        desiredRows,
+        desiredCols,
+      });
+  const { rowPlan: rowPlanForTransport, colPlan: colPlanForTransport } =
+    axisPlansForTransport;
 
   if (
     rowPlanForTransport.targets.length === 0 &&

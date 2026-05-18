@@ -21,6 +21,7 @@ import {
   buildValueLeaf,
 } from '../../../../src/pivot/measureLeaves';
 import {
+  buildRuntimeLayoutFromFormData,
   normalizeRuntimeLayout,
   resolveAppliedInteractionLayout,
   resolveInteractionFormData,
@@ -152,29 +153,22 @@ describe('resolveInteractionFormData', () => {
 });
 
 describe('resolveAppliedInteractionLayout', () => {
-  it('keeps prop-driven layout inputs unchanged outside user-controlled mode', () => {
+  it('builds runtime layout from prop-driven row and column groupings', () => {
     const formData: PivotTableQueryFormData = buildFormData({
       interactionMode: 'standard',
       metrics: ['sum__sales'],
-      groupbyRows: ['country'],
+      groupbyRows: ['country', METRICS_PLACEHOLDER],
       groupbyColumns: ['state'],
     });
-    const runtimeLayout = normalizeRuntimeLayout(undefined, [], ['sum__sales']);
 
-    const resolved = resolveAppliedInteractionLayout({
-      isUserControlled: false,
-      appliedFormData: formData,
-      formData,
-      sourceMetrics: formData.metrics,
-      sourceMeasureLeavesByMetric: formData.measureLeavesByMetric,
-      committedRuntimeLayout: {
-        ...runtimeLayout,
-        rows: ['state'],
-      },
-      appliedDimensionKeys: ['country', 'state'],
+    expect(buildRuntimeLayoutFromFormData(formData)).toEqual({
+      version: 1,
+      rows: ['country'],
+      cols: ['state'],
+      metrics: ['sum__sales'],
+      leafSelection: {},
+      valuePlacement: { axis: 'row', index: 1 },
     });
-
-    expect(resolved.appliedLayoutFormData).toBe(formData);
   });
 
   it('preserves committed runtime metrics that are available in the source form', () => {
@@ -204,9 +198,7 @@ describe('resolveAppliedInteractionLayout', () => {
     };
 
     const resolved = resolveAppliedInteractionLayout({
-      isUserControlled: true,
       appliedFormData,
-      formData,
       sourceMetrics: formData.metrics,
       sourceMeasureLeavesByMetric: formData.measureLeavesByMetric,
       committedRuntimeLayout,

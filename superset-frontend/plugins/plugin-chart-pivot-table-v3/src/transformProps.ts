@@ -35,7 +35,10 @@ import {
   coerceEpochMsStringToNumber,
 } from './utils';
 import { getMetricKeys, getMetricKey } from './pivot/metrics';
-import { resolveInteractionFormData } from './pivot/layout/resolveInteractionLayout';
+import {
+  buildRuntimeLayoutFromFormData,
+  resolveInteractionFormData,
+} from './pivot/layout/resolveInteractionLayout';
 import { buildInitialPivotUpdatePlan } from './pivot/update/initialUpdatePlan';
 import { buildInitialRuntimeFromSpecResults } from './pivot/runtime/ingestQueryResults';
 
@@ -79,7 +82,8 @@ export default function transformProps(
     baseFormData.pivotRuntimeLayout ??
     (ownState?.pivotRuntimeLayout as
       | PivotTableQueryFormData['pivotRuntimeLayout']
-      | undefined);
+      | undefined) ??
+    buildRuntimeLayoutFromFormData(baseFormData);
   const formData = resolveInteractionFormData({
     formData: baseFormData,
     runtimeLayout,

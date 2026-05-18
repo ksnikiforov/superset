@@ -27,6 +27,7 @@ import { supersetChartDataClient } from '../../../src/pivot/data/SupersetChartDa
 import { fetchPivotExpansion as fetchPivotBranch } from '../../../src/pivot/expansion/fetchPivotExpansion';
 import { applyMetricAxis } from '../fixtures/metricAxis';
 import { getPivotV3ExportSheetDataForChart } from '../../../src/export/buildPivotV3ExportTable';
+import { buildMockExpansionFetchResult } from '../fixtures/factBatches';
 
 jest.mock('../../../src/pivot/data/SupersetChartDataClient', () => {
   const actual = jest.requireActual(
@@ -151,10 +152,9 @@ describe('PivotTableChart basic regression smoke guardrails', () => {
       rows,
       [],
     );
-    fetchPivotBranchMock.mockResolvedValue({
-      data: expandedTree,
-      factBatches: [],
-    });
+    fetchPivotBranchMock.mockImplementation(params =>
+      Promise.resolve(buildMockExpansionFetchResult(params, { data: expandedTree })),
+    );
 
     const formData = buildFormData({
       groupbyRows: rows,
