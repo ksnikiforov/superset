@@ -105,11 +105,6 @@ export type ExpansionFetchContext = {
   visibleColDepth: number;
 };
 
-type ExpansionFetcherResult = {
-  warnings?: ChartDataWarning[];
-  error?: unknown;
-};
-
 type ExpansionQueryRequest = Omit<
   FetchPivotExpansionRequest,
   'formData' | 'requestGroupId' | 'factStore'
@@ -161,16 +156,16 @@ const resolveExpansionFetchPlan = ({
   };
 };
 
-const executeExpansionFetch = async ({
-  runtime,
+const executeExpansionQueryRequest = async ({
+  request,
   requestGroupId,
+  runtime,
   loadingKeys,
-  fetcher,
 }: {
-  runtime: ExpansionFetchRuntime;
+  request: ExpansionQueryRequest;
   requestGroupId: string;
+  runtime: ExpansionFetchRuntime;
   loadingKeys: string[];
-  fetcher: () => Promise<ExpansionFetcherResult>;
 }): Promise<void> => {
   const { requestScope, trackRequestInScope, updateLoadingKey, addWarnings } =
     runtime;
@@ -178,10 +173,13 @@ const executeExpansionFetch = async ({
     loadingKeys.forEach(key => updateLoadingKey(key, 1));
   }
   try {
-    const result = await trackRequestInScope(
-      requestScope,
-      requestGroupId,
-      fetcher,
+    const result = await trackRequestInScope(requestScope, requestGroupId, () =>
+      fetchPivotExpansion({
+        ...request,
+        requestGroupId,
+        formData: runtime.fetchFormData,
+        factStore: runtime.factStore,
+      }),
     );
     if (requestScope.isCurrent()) {
       addWarnings(result.warnings);
@@ -195,30 +193,6 @@ const executeExpansionFetch = async ({
     }
   }
 };
-
-const executeExpansionQueryRequest = async ({
-  request,
-  requestGroupId,
-  runtime,
-  loadingKeys,
-}: {
-  request: ExpansionQueryRequest;
-  requestGroupId: string;
-  runtime: ExpansionFetchRuntime;
-  loadingKeys: string[];
-}): Promise<void> =>
-  executeExpansionFetch({
-    runtime,
-    requestGroupId,
-    loadingKeys,
-    fetcher: () =>
-      fetchPivotExpansion({
-        ...request,
-        requestGroupId,
-        formData: runtime.fetchFormData,
-        factStore: runtime.factStore,
-      }),
-  });
 
 const filterMissingIntersectionTargets = ({
   intersections,

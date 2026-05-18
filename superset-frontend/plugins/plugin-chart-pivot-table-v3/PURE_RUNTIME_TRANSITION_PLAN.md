@@ -247,6 +247,11 @@ Current semantic-layout contract:
   branch, batch, and intersection execution now share a smaller boolean result
   boundary. Persisted prefetch tests now assert the intended interactive UX:
   the table remains visible with row-level loading while hydration continues.
+- Expansion state management now uses an axis-shaped state boundary for
+  expanded, pending, manual-expanded, and manual-collapsed keys. The hook and
+  reinitialization transition no longer repeat row/column commit and toggle
+  wiring, and expansion fetch execution no longer keeps a generic fetch wrapper
+  around the single concrete expansion-query path.
 
 Expected deletion targets:
 
@@ -274,8 +279,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13079` insertions, `17125` deletions, net `-4046`.
-- Current production TypeScript/TSX total: about `29464` lines.
+- Production `src`: `13065` insertions, `17161` deletions, net `-4096`.
+- Current production TypeScript/TSX total: about `29414` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -287,17 +292,17 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `29464` | `-4046` | `< 28000` |
-| Strict core pipeline | `11337` | `11874` | `+537` | `8000` |
+| Full production `src` | `33510` | `29414` | `-4096` | `< 28000` |
+| Strict core pipeline | `11337` | `11824` | `+487` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5084` | `+401` | `3000-4000` |
-| Broad core pipeline | `16020` | `16958` | `+938` | `11000-13000` |
+| Broad core pipeline | `16020` | `16908` | `+888` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
 | `pivot/runtime/*` | `3933` |
-| `pivot/expansion/*` | `2690` |
+| `pivot/expansion/*` | `2640` |
 | `pivot/query/*` | `1554` |
 | `pivot/layout/*` | `732` |
 | core/shared/domain helpers | `1752` |
@@ -918,6 +923,10 @@ Success criteria:
 - Same-axis expansion and cross-axis hydration now share one local
   `ExpansionFetchRuntime` builder inside `useExpansionEngine`, removing
   duplicate hook-owned fetch runtime wiring.
+- Expansion hook state now stores row and column expansion refs behind one
+  axis-shaped boundary, and the reinitialization transition returns the same
+  shape. This retires duplicated row/column commit, toggle, and rehydrate
+  plumbing without changing the persisted expansion UX.
 - Same-axis expansion no longer has a separate in-flight expansion map or
   branch-specific fetch loop. Toggle expansion writes pending visible coverage
   and enters the same hydration loop used by prefetch and cross-axis hydration.

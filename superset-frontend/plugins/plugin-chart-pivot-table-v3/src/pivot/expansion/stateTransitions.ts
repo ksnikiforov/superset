@@ -554,47 +554,45 @@ export const resolveReinitializedExpansionState = (params: {
   program: PivotProgram;
 }) => {
   const { tree, currentLayout, sessionState } = params;
-  const metricIndexForRows = getValuesLevelIndex(params.program, 'row');
-  const metricIndexForCols = getValuesLevelIndex(params.program, 'col');
-  const includeMetricRowDepth =
-    metricIndexForRows !== undefined &&
-    metricIndexForRows < params.program.rowDimensions.length;
-  const includeMetricColDepth =
-    metricIndexForCols !== undefined &&
-    metricIndexForCols < params.program.columnDimensions.length;
+  const includeMetricDepth = (axis: PivotAxis) => {
+    const metricIndex = getValuesLevelIndex(params.program, axis);
+    const dimensionCount =
+      axis === 'row'
+        ? params.program.rowDimensions.length
+        : params.program.columnDimensions.length;
+    return metricIndex !== undefined && metricIndex < dimensionCount;
+  };
   const common = {
     tree,
     program: params.program,
     hasNewData: params.hasNewData,
   };
-  const rowKeys = sessionState.rows ?? [];
-  const colKeys = sessionState.cols ?? [];
-  const collapsedRowKeys = sessionState.collapsedRows ?? [];
-  const collapsedColKeys = sessionState.collapsedCols ?? [];
-  const rowState = resolveExpansionCacheAxis({
-    ...common,
-    axis: 'row',
-    axisCoverageNeeds: params.axisCoverageNeeds,
-    keys: rowKeys,
-    collapsed: collapsedRowKeys,
-    nodes: tree.rows,
-    stablePrefix: params.rowStablePrefix,
-    reset: params.shouldResetExpandedRows,
-    changed: params.rowsChanged,
-    includeMetricDepth: includeMetricRowDepth,
-  });
-  const colState = resolveExpansionCacheAxis({
-    ...common,
-    axis: 'col',
-    axisCoverageNeeds: params.axisCoverageNeeds,
-    keys: colKeys,
-    collapsed: collapsedColKeys,
-    nodes: tree.cols,
-    stablePrefix: params.colStablePrefix,
-    reset: params.shouldResetExpandedCols,
-    changed: params.colsChanged,
-    includeMetricDepth: includeMetricColDepth,
-  });
+  const axisState = {
+    row: resolveExpansionCacheAxis({
+      ...common,
+      axis: 'row',
+      axisCoverageNeeds: params.axisCoverageNeeds,
+      keys: sessionState.rows ?? [],
+      collapsed: sessionState.collapsedRows ?? [],
+      nodes: tree.rows,
+      stablePrefix: params.rowStablePrefix,
+      reset: params.shouldResetExpandedRows,
+      changed: params.rowsChanged,
+      includeMetricDepth: includeMetricDepth('row'),
+    }),
+    col: resolveExpansionCacheAxis({
+      ...common,
+      axis: 'col',
+      axisCoverageNeeds: params.axisCoverageNeeds,
+      keys: sessionState.cols ?? [],
+      collapsed: sessionState.collapsedCols ?? [],
+      nodes: tree.cols,
+      stablePrefix: params.colStablePrefix,
+      reset: params.shouldResetExpandedCols,
+      changed: params.colsChanged,
+      includeMetricDepth: includeMetricDepth('col'),
+    }),
+  };
   const persistedSeed = coerceExpansionState(params.persistedExpansionState);
   const shouldResetPersistedLayout =
     params.shouldPersistExpansionState &&
@@ -608,13 +606,15 @@ export const resolveReinitializedExpansionState = (params: {
     persistedState: {
       rowKeys: currentLayout.rows,
       colKeys: currentLayout.cols,
-      rows: rowState.prunedManualKeys,
-      cols: colState.prunedManualKeys,
-      collapsedRows: rowState.prunedCollapsedKeys,
-      collapsedCols: colState.prunedCollapsedKeys,
+      rows: axisState.row.prunedManualKeys,
+      cols: axisState.col.prunedManualKeys,
+      collapsedRows: axisState.row.prunedCollapsedKeys,
+      collapsedCols: axisState.col.prunedCollapsedKeys,
     },
-    expandedRows: rowState.expandedKeys,
-    expandedCols: colState.expandedKeys,
+    expanded: {
+      row: axisState.row.expandedKeys,
+      col: axisState.col.expandedKeys,
+    },
   };
 };
 
