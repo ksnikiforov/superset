@@ -39,6 +39,7 @@ import {
   collectRequiredTimeOffsets,
 } from '../measureLeaves';
 import { compilePivotProgram } from '../runtime/compilePivotProgram';
+import type { PivotAxisCoverageNeed } from '../runtime/coverage';
 import type { PivotProgram } from '../runtime/types';
 
 export type PivotLayoutSpec = Pick<
@@ -84,8 +85,7 @@ export type LayoutContext = {
   colTotalPosition: TotalPosition;
   rowSubtotalPosition: TotalPosition;
   colSubtotalPosition: TotalPosition;
-  resolvedExpandRowsLevel: number;
-  resolvedExpandColsLevel: number;
+  axisCoverageNeeds: PivotAxisCoverageNeed[];
 };
 
 const normalizeTotalPosition = (value: unknown): TotalPosition => {
@@ -94,6 +94,21 @@ const normalizeTotalPosition = (value: unknown): TotalPosition => {
   }
   return 'start';
 };
+
+const buildInitialAxisCoverageNeeds = (
+  rowDepth: number,
+  columnDepth: number,
+): PivotAxisCoverageNeed[] =>
+  (
+    [
+      ['row', rowDepth],
+      ['col', columnDepth],
+    ] as const
+  ).flatMap(([axis, depth]) =>
+    depth > 0
+      ? [{ axis, depth, scope: { kind: 'scopedFull', ancestorPaths: [[]] } }]
+      : [],
+  );
 
 export const buildLayoutContext = (
   layoutSpec: PivotLayoutSpec,
@@ -167,6 +182,18 @@ export const buildLayoutContext = (
   );
   const startCollapsed = layoutSpec.startCollapsed ?? true;
   const initialDepth = layoutSpec.initialDepth ?? 1;
+  const rowExpandDepth = resolveExpandLevel(
+    layoutSpec.expandRowsLevel ?? undefined,
+    rowDimensions.length,
+    startCollapsed,
+    initialDepth,
+  );
+  const colExpandDepth = resolveExpandLevel(
+    layoutSpec.expandColumnsLevel ?? undefined,
+    columnDimensions.length,
+    startCollapsed,
+    initialDepth,
+  );
 
   return {
     metrics,
@@ -184,17 +211,9 @@ export const buildLayoutContext = (
     colTotalPosition: normalizeTotalPosition(layoutSpec.colTotalPosition),
     rowSubtotalPosition: normalizeTotalPosition(layoutSpec.rowSubtotalPosition),
     colSubtotalPosition: normalizeTotalPosition(layoutSpec.colSubtotalPosition),
-    resolvedExpandRowsLevel: resolveExpandLevel(
-      layoutSpec.expandRowsLevel ?? undefined,
-      rowDimensions.length,
-      startCollapsed,
-      initialDepth,
-    ),
-    resolvedExpandColsLevel: resolveExpandLevel(
-      layoutSpec.expandColumnsLevel ?? undefined,
-      columnDimensions.length,
-      startCollapsed,
-      initialDepth,
+    axisCoverageNeeds: buildInitialAxisCoverageNeeds(
+      rowExpandDepth,
+      colExpandDepth,
     ),
   };
 };

@@ -29,7 +29,6 @@ import { resolveMetricDisplayLabel, getStableColumnKey } from '../../utils';
 import { decodeMetricKey } from '../core/tokens';
 import { buildLayoutContext } from '../layout/LayoutContext';
 import type { PivotProgram } from '../runtime/types';
-import type { PivotAxisCoverageNeed } from '../runtime/coverage';
 import type { RenderModelConfig } from '../render/renderModel';
 import {
   buildMetricOrderComparator,
@@ -47,7 +46,7 @@ export type PivotLayoutResult = {
   measureHierarchy: MeasureHierarchy;
   expandedStateSignature: string;
   expandedStateSharedSignature: string;
-  axisCoverageNeeds: PivotAxisCoverageNeed[];
+  axisCoverageNeeds: ReturnType<typeof buildLayoutContext>['axisCoverageNeeds'];
   normalizedRowSubtotalLevels: number[];
   normalizedColSubtotalLevels: number[];
   resolvedColTotalPosition: TotalPosition;
@@ -141,34 +140,10 @@ export const usePivotLayout = ({
   const isLeafTierVisible =
     layout.measureHierarchy.leafTierVisibility === 'visible';
 
-  const {
-    resolvedExpandRowsLevel,
-    resolvedExpandColsLevel: resolvedExpandColumnsLevel,
-    metricLabelMap,
-    metrics,
-  } = layout;
+  const { metricLabelMap, metrics } = layout;
   const { metricsLayoutResolved: resolvedMetricsLayout, metricInsertIndex } =
     layout.pivotProgram;
-  const axisCoverageNeeds = useMemo<PivotAxisCoverageNeed[]>(
-    () =>
-      [
-        resolvedExpandRowsLevel > 0
-          ? ({
-              axis: 'row',
-              depth: resolvedExpandRowsLevel,
-              scope: { kind: 'scopedFull', ancestorPaths: [[]] },
-            } as const)
-          : undefined,
-        resolvedExpandColumnsLevel > 0
-          ? ({
-              axis: 'col',
-              depth: resolvedExpandColumnsLevel,
-              scope: { kind: 'scopedFull', ancestorPaths: [[]] },
-            } as const)
-          : undefined,
-      ].filter((need): need is PivotAxisCoverageNeed => need !== undefined),
-    [resolvedExpandColumnsLevel, resolvedExpandRowsLevel],
-  );
+  const { axisCoverageNeeds } = layout;
   const { metricKeys: metricLabels } = layout.pivotProgram;
   const isMultiMetric = metricLabels.length > 1;
   const hasMultipleMeasures =

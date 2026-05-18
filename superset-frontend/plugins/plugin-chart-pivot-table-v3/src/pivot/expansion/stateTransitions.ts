@@ -144,15 +144,13 @@ export const getStablePrefixLength = (prev: string[], next: string[]) => {
   return prefix;
 };
 
-export const isSameLayout = (left?: string[], right?: string[]) => {
-  if (!left || !right) {
-    return false;
-  }
-  if (left.length !== right.length) {
-    return false;
-  }
-  return left.every((value, idx) => value === right[idx]);
-};
+export const isSameLayout = (left?: string[], right?: string[]) =>
+  Boolean(
+    left &&
+      right &&
+      left.length === right.length &&
+      left.every((value, idx) => value === right[idx]),
+  );
 
 export type PivotLayoutKeyState = {
   rows: string[];
@@ -362,15 +360,13 @@ export const hasNestedPendingKeys = (keys: Set<string>) => {
   }
   const paths = Array.from(keys).map(key => parsePath(key));
   return paths.some((candidate, idx) =>
-    paths.some((prefix, otherIdx) => {
-      if (idx === otherIdx) {
-        return false;
-      }
-      if (prefix.length === 0 || prefix.length >= candidate.length) {
-        return false;
-      }
-      return prefix.every((val, index) => val === candidate[index]);
-    }),
+    paths.some(
+      (prefix, otherIdx) =>
+        idx !== otherIdx &&
+        prefix.length > 0 &&
+        prefix.length < candidate.length &&
+        prefix.every((val, index) => val === candidate[index]),
+    ),
   );
 };
 

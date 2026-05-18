@@ -38,16 +38,6 @@ type BuildSelectionFilterClausesParams = {
   selection?: SelectionFilterMap;
 };
 
-const buildSelectionDimensionMap = (
-  formData: PivotTableQueryFormData,
-): Map<string, QueryFormColumn> => {
-  const dimensionMap = new Map<string, QueryFormColumn>();
-  formData.dimensions.forEach(dimension => {
-    dimensionMap.set(getStableColumnKey(dimension), dimension);
-  });
-  return dimensionMap;
-};
-
 export const buildSelectionFilterClauses = ({
   formData,
   selection,
@@ -55,7 +45,12 @@ export const buildSelectionFilterClauses = ({
   if (!selection || Object.keys(selection).length === 0) {
     return [];
   }
-  const dimensionMap = buildSelectionDimensionMap(formData);
+  const dimensionMap = new Map(
+    formData.dimensions.map(dimension => [
+      getStableColumnKey(dimension),
+      dimension,
+    ]),
+  );
   return Object.entries(selection).flatMap(([key, values]) => {
     if (!Array.isArray(values) || values.length === 0) {
       return [];
@@ -71,20 +66,6 @@ export const buildSelectionFilterClauses = ({
   });
 };
 
-export const mergeExtraFilters = (
-  baseExtra: PivotTableQueryFormData['extra_form_data'] | undefined,
-  extraFilters: QueryObjectFilterClause[],
-): PivotTableQueryFormData['extra_form_data'] | undefined => {
-  if (extraFilters.length === 0) {
-    return baseExtra;
-  }
-  const existing = baseExtra?.filters ?? [];
-  return {
-    ...(baseExtra ?? {}),
-    filters: [...existing, ...extraFilters],
-  };
-};
-
 export const buildSelectionFilteredFormData = ({
   formData,
   selection,
@@ -97,10 +78,13 @@ export const buildSelectionFilteredFormData = ({
     selectionFilters.length > 0
       ? {
           ...formData,
-          extra_form_data: mergeExtraFilters(
-            formData.extra_form_data,
-            selectionFilters,
-          ),
+          extra_form_data: {
+            ...(formData.extra_form_data ?? {}),
+            filters: [
+              ...(formData.extra_form_data?.filters ?? []),
+              ...selectionFilters,
+            ],
+          },
         }
       : formData,
   );
