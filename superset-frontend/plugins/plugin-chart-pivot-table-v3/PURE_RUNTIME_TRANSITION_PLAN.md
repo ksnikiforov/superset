@@ -167,6 +167,10 @@ Current semantic-layout contract:
   `fetchPivotExpansion({ kind })`, and the legacy `fetchPivotBranch`,
   `fetchPivotBranchesBatch`, and `fetchPivotIntersection` wrapper exports have
   been removed.
+- Seamless runtime fetch execution no longer accepts hook-injected fetch,
+  fetch-start, or error callbacks. It calls the chart-data client directly
+  through its runtime boundary, leaving the chart hook responsible only for UI
+  loading/error state.
 - Expansion coverage planning no longer depends on the render model to compute
   visible row/column depths. It derives visible coverage depth from the compiled
   `PivotProgram`, loaded tree paths, and explicit expansion intent.
@@ -223,8 +227,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13853` insertions, `16381` deletions, net `-2528`.
-- Current production TypeScript/TSX total: about `30982` lines.
+- Production `src`: `13838` insertions, `16381` deletions, net `-2543`.
+- Current production TypeScript/TSX total: about `30967` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion

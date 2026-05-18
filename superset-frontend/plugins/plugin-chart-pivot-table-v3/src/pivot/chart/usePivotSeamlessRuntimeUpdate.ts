@@ -207,6 +207,8 @@ export const usePivotSeamlessRuntimeUpdate = (
         dimensionKeys,
         metricKeys,
       );
+      setLoading(true);
+      setError(undefined);
       const updateResult = await fetchAndMaterializeSeamlessRuntimeUpdate({
         requestLifecycle,
         materializationLifecycle,
@@ -219,23 +221,16 @@ export const usePivotSeamlessRuntimeUpdate = (
         expandedCols: expandedColsRef.current,
         pendingRows: pendingRowsRef.current,
         pendingCols: pendingColsRef.current,
-        fetchData: params => supersetChartDataClient.fetch(params),
-        onFetchStart: () => {
-          setLoading(true);
-          setError(undefined);
-        },
-        onError: nextError => {
-          setError(
-            nextError instanceof Error
-              ? nextError.message
-              : t('Failed to update data'),
-          );
-        },
       });
       if (updateResult.status === 'stale') {
         return;
       }
       if (updateResult.status !== 'success') {
+        setError(
+          updateResult.error instanceof Error
+            ? updateResult.error.message
+            : t('Failed to update data'),
+        );
         setLoading(false);
         return;
       }

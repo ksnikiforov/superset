@@ -27,8 +27,11 @@ import { METRICS_PLACEHOLDER } from '../core/tokens';
 import { parsePath } from '../core/path';
 import { hasSelectedFilters } from '../filters';
 import { stableStringify } from '../shared/stableStringify';
-import { type ChartDataQueryResult } from '../data/ChartDataClient';
-import { type PlannedQuerySpec } from '../query/specs';
+import {
+  type ChartDataQueryResult,
+  type ChartDataWarning,
+} from '../data/ChartDataClient';
+import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import { normalizeFormDataExtraFilters } from '../query/normalizeExtraFormData';
 import { buildInitialPivotUpdatePlan } from '../update/initialUpdatePlan';
 import { normalizeRuntimeLayout } from '../layout/resolveInteractionLayout';
@@ -391,13 +394,6 @@ type SeamlessRuntimeUpdatePlanConfig = {
 type SeamlessRuntimeUpdateConfig = SeamlessRuntimeUpdatePlanConfig & {
   requestLifecycle: LatestRequestLifecycle;
   materializationLifecycle: LatestRequestLifecycle;
-  fetchData: (params: {
-    formData: PivotTableQueryFormData;
-    specs: PlannedQuerySpec[];
-    requestGroupId: string;
-  }) => Promise<ChartDataQueryResult[]>;
-  onFetchStart?: () => void;
-  onError?: (error: unknown) => void;
 };
 
 const toExpansionPaths = (
@@ -446,9 +442,6 @@ const buildSeamlessRuntimeUpdatePlan = ({
 export const fetchAndMaterializeSeamlessRuntimeUpdate = async ({
   requestLifecycle,
   materializationLifecycle,
-  fetchData,
-  onFetchStart,
-  onError,
   ...planConfig
 }: SeamlessRuntimeUpdateConfig) => {
   const { formData, layout, specs } =
@@ -458,15 +451,13 @@ export const fetchAndMaterializeSeamlessRuntimeUpdate = async ({
     requestGroupId: SEAMLESS_REQUEST_GROUP,
     onStart: () => {
       materializationLifecycle.invalidate();
-      onFetchStart?.();
     },
     run: () =>
-      fetchData({
+      supersetChartDataClient.fetch({
         formData,
         specs,
         requestGroupId: SEAMLESS_REQUEST_GROUP,
       }),
-    onError,
   });
   if (fetchResult.status === 'stale') {
     return { status: 'stale' };
@@ -488,7 +479,6 @@ export const fetchAndMaterializeSeamlessRuntimeUpdate = async ({
         shouldContinue: token.isCurrent,
         yieldToMain: yieldToMainThread,
       }),
-    onError,
   });
   if (materializationResult.status === 'stale') {
     return { status: 'stale' };

@@ -22,7 +22,7 @@ import { buildFormData } from '../fixtures/pivotFormData';
 import { MetricsLayoutEnum, PivotRuntimeLayout } from '../../../src/types';
 
 import { supersetChartDataClient } from '../../../src/pivot/data/SupersetChartDataClient';
-import { fetchPivotBranch } from '../../../src/pivot/query/fetchPivotBranch';
+import { fetchPivotExpansion } from '../../../src/pivot/query/fetchPivotBranch';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';
 
@@ -64,7 +64,7 @@ jest.mock('../../../src/pivot/query/fetchPivotBranch', () => {
   );
   return {
     ...actual,
-    fetchPivotBranch: jest
+    fetchPivotExpansion: jest
       .fn()
       .mockResolvedValue({ data: undefined, factBatches: [] }),
   };
@@ -72,7 +72,7 @@ jest.mock('../../../src/pivot/query/fetchPivotBranch', () => {
 
 describe('PivotTableChart interaction filter seamless updates', () => {
   const fetchMock = supersetChartDataClient.fetch as jest.Mock;
-  const fetchPivotBranchMock = fetchPivotBranch as jest.Mock;
+  const fetchPivotBranchMock = fetchPivotExpansion as jest.Mock;
 
   beforeEach(() => {
     fetchMock.mockReset();

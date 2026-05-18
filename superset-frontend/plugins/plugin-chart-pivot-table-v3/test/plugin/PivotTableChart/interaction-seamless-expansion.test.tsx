@@ -36,11 +36,15 @@ import { mergeTrees } from '../../../src/pivot/core/tree';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { supersetChartDataClient } from '../../../src/pivot/data/SupersetChartDataClient';
 import {
-  fetchPivotBranch,
-  type FetchPivotBranchParams,
+  fetchPivotExpansion,
+  type FetchPivotExpansionRequest,
 } from '../../../src/pivot/query/fetchPivotBranch';
 import { type PivotFactStoreBatch } from '../../../src/pivot/runtime/factStore';
-import { buildMockBranchFetchResult } from '../fixtures/factBatches';
+import {
+  buildMockBatchFetchResult,
+  buildMockBranchFetchResult,
+  buildMockIntersectionFetchResult,
+} from '../fixtures/factBatches';
 import { applyMetricAxis } from '../fixtures/metricAxis';
 
 jest.mock('../../../src/pivot/data/SupersetChartDataClient', () => {
@@ -62,7 +66,7 @@ jest.mock('../../../src/pivot/query/fetchPivotBranch', () => {
   );
   return {
     ...actual,
-    fetchPivotBranch: jest
+    fetchPivotExpansion: jest
       .fn()
       .mockResolvedValue({ data: undefined, factBatches: [] }),
   };
@@ -70,15 +74,27 @@ jest.mock('../../../src/pivot/query/fetchPivotBranch', () => {
 
 describe('PivotTableChart seamless expansion uses committed layout', () => {
   const fetchMock = supersetChartDataClient.fetch as jest.Mock;
-  const fetchPivotBranchMock = fetchPivotBranch as jest.Mock;
-  const resolveBranchData =
-    (data?: PivotTreeData) => (params: FetchPivotBranchParams) =>
-      Promise.resolve(buildMockBranchFetchResult(params, { data }));
+  const fetchPivotBranchMock = fetchPivotExpansion as jest.Mock;
+  const buildMockExpansionFetchResult = (
+    params: FetchPivotExpansionRequest,
+    data?: PivotTreeData,
+  ) => {
+    if (params.kind === 'branch') {
+      return buildMockBranchFetchResult(params, { data });
+    }
+    if (params.kind === 'batch') {
+      return buildMockBatchFetchResult(params, { data });
+    }
+    return buildMockIntersectionFetchResult(params, { data });
+  };
+  const resolveExpansionData =
+    (data?: PivotTreeData) => (params: FetchPivotExpansionRequest) =>
+      Promise.resolve(buildMockExpansionFetchResult(params, data));
 
   beforeEach(() => {
     fetchMock.mockReset();
     fetchPivotBranchMock.mockReset();
-    fetchPivotBranchMock.mockImplementation(resolveBranchData());
+    fetchPivotBranchMock.mockImplementation(resolveExpansionData());
   });
 
   const hasColumnKey = (
@@ -2006,6 +2022,10 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
         grossRevenue: 5,
       },
     ];
+    const updatedRecords = [
+      { shipMode: 'AIR', revenueBand: 'REV-A', grossRevenue: 22 },
+      { shipMode: 'FOB', revenueBand: 'REV-B', grossRevenue: 5 },
+    ];
     const baseTree = applyMetricAxis(
       buildTreeFromRecords(records, metrics, initialRows, [], 4, 0),
       metrics,
@@ -2038,6 +2058,22 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       startCollapsed: false,
       initialDepth: 4,
     });
+    fetchMock.mockImplementation(async ({ specs }: { specs: Array<unknown> }) =>
+      specs.map(spec => {
+        const { columns } = spec as {
+          columns?: Array<string | QueryFormColumn>;
+        };
+        if (hasColumnKey(columns, 'revenueBand')) {
+          return { data: updatedRecords };
+        }
+        return {
+          data: updatedRecords.map(({ shipMode, grossRevenue }) => ({
+            shipMode,
+            grossRevenue,
+          })),
+        };
+      }),
+    );
 
     render(
       <PivotTableChart
@@ -3032,11 +3068,12 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       },
     );
     fetchPivotBranchMock.mockImplementation(
-      async ({ axis }: { axis?: string }) => {
-        if (axis === 'row') {
-          return branchPromise;
+      async (params: FetchPivotExpansionRequest) => {
+        if (params.kind === 'branch' && params.axis === 'row') {
+          await branchPromise;
+          return buildMockExpansionFetchResult(params);
         }
-        return { data: undefined, factBatches: [] };
+        return buildMockExpansionFetchResult(params);
       },
     );
 
@@ -3154,7 +3191,9 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       colGroupby,
       2,
     );
-    fetchPivotBranchMock.mockImplementation(resolveBranchData(rowsValueTree));
+    fetchPivotBranchMock.mockImplementation(
+      resolveExpansionData(rowsValueTree),
+    );
 
     const { container } = render(
       <PivotTableChart
@@ -3614,14 +3653,16 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       colGroupby,
       0,
     );
-    fetchPivotBranchMock.mockImplementation((params: FetchPivotBranchParams) =>
-      Promise.resolve(
-        buildMockBranchFetchResult(params, {
-          data: params.formData.groupbyRows?.includes('row2')
-            ? updatedExpandedTree
-            : expandedTree,
-        }),
-      ),
+    fetchPivotBranchMock.mockImplementation(
+      (params: FetchPivotExpansionRequest) =>
+        Promise.resolve(
+          buildMockExpansionFetchResult(
+            params,
+            params.formData.groupbyRows?.includes('row2')
+              ? updatedExpandedTree
+              : expandedTree,
+          ),
+        ),
     );
 
     const runtimeLayout: PivotRuntimeLayout = {
