@@ -98,6 +98,7 @@ describe('PivotTableChart persisted prefetch hydrates until targets satisfied', 
   const resolveBatchWithSingles = async ({
     batch,
     formData,
+    factStore,
     visibleRowDepth,
     visibleColDepth,
   }: FetchPivotBranchesBatchParams): Promise<FetchPivotBranchesBatchResult> => {
@@ -111,6 +112,7 @@ describe('PivotTableChart persisted prefetch hydrates until targets satisfied', 
             path,
             visibleRowDepth,
             visibleColDepth,
+            factStore,
           }),
         );
       }),
@@ -119,10 +121,7 @@ describe('PivotTableChart persisted prefetch hydrates until targets satisfied', 
       (acc, result) => mergeTrees(acc, result.data),
       undefined,
     );
-    return {
-      data: merged,
-      factBatches: results.flatMap(result => result.factBatches),
-    };
+    return { data: merged };
   };
 
   beforeEach(() => {

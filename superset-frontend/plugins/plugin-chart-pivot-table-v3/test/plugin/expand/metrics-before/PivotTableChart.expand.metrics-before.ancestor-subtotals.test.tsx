@@ -66,6 +66,7 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
   const resolveBatchWithSingles = async ({
     batch,
     formData,
+    factStore,
     visibleRowDepth,
     visibleColDepth,
   }: FetchPivotBranchesBatchParams): Promise<FetchPivotBranchesBatchResult> => {
@@ -79,6 +80,7 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
             path,
             visibleRowDepth,
             visibleColDepth,
+            factStore,
           }),
         );
       }),
@@ -87,10 +89,7 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
       (acc, result) => mergeTrees(acc, result.data),
       undefined,
     );
-    return {
-      data: merged,
-      factBatches: results.flatMap(result => result.factBatches),
-    };
+    return { data: merged };
   };
   beforeEach(() => {
     fetchPivotBranchMock.mockClear();

@@ -42,7 +42,6 @@ import {
 import {
   createPivotFactStore,
   type PivotFactStore,
-  type PivotFactStoreBatch,
 } from '../runtime/factStore';
 import { upsertQueryResultsIntoFactStore } from '../runtime/ingestQueryResults';
 import { isAbortError } from '../runtime/requestLifecycle';
@@ -55,7 +54,6 @@ import { type BatchGroup } from './fetchPlanOptimizer';
 
 export interface FetchPivotBranchResult {
   data?: PivotTreeData;
-  factBatches: PivotFactStoreBatch[];
   warnings?: ChartDataWarning[];
   error?: Error;
 }
@@ -97,8 +95,6 @@ type ResolvedFetchContext = ResolvedQueryFetchContext & {
   layout: LayoutContext;
 };
 
-const EMPTY_FACT_BATCHES: PivotFactStoreBatch[] = [];
-
 export const fetchPivotQuerySpecsIntoBranchTree = async ({
   formData,
   specs,
@@ -114,7 +110,7 @@ export const fetchPivotQuerySpecsIntoBranchTree = async ({
 }): Promise<FetchPivotBranchResult> => {
   const store = factStore ?? createPivotFactStore();
   if (specs.length === 0) {
-    return { factBatches: EMPTY_FACT_BATCHES };
+    return {};
   }
   const missingSpecs = specs.filter(
     spec => !store.hasCompatibleCoverage(factStoreSelectorFromSpec(spec)),
@@ -129,7 +125,6 @@ export const fetchPivotQuerySpecsIntoBranchTree = async ({
         formData,
         measureHierarchy,
       }),
-      factBatches,
     };
   }
   const metricsForQuery = missingSpecs[0]?.metrics ?? specs[0].metrics;
@@ -172,15 +167,13 @@ export const fetchPivotQuerySpecsIntoBranchTree = async ({
     });
     return {
       data,
-      factBatches,
       ...(warnings.length > 0 ? { warnings } : {}),
     };
   } catch (error) {
     if (isAbortError(error)) {
-      return { factBatches: EMPTY_FACT_BATCHES };
+      return {};
     }
     return {
-      factBatches: EMPTY_FACT_BATCHES,
       error: error instanceof Error ? error : new Error(String(error)),
     };
   }

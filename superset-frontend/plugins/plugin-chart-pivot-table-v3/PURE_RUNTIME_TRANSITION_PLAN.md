@@ -130,6 +130,8 @@ Current fact-store contract:
   fact ingestion. Expansion consumes tree deltas and reads updated coverage from
   the shared fact store; it no longer re-registers returned fact batches as a
   local expansion-side responsibility.
+- Branch fetch results no longer return fact batches. Loaded coverage is
+  observable through the fact store, not through expansion result payloads.
 
 Current semantic-layout contract:
 
@@ -167,8 +169,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14585` insertions, `15797` deletions, net `-1212`.
-- Current production TypeScript/TSX total: about `32298` lines.
+- Production `src`: `14578` insertions, `15797` deletions, net `-1219`.
+- Current production TypeScript/TSX total: about `32291` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion

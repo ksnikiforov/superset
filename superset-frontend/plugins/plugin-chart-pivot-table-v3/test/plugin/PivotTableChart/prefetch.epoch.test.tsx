@@ -102,6 +102,7 @@ describe('PivotTableChart persisted prefetch ignores stale results', () => {
   const resolveBatchWithSingles = async ({
     batch,
     formData,
+    factStore,
     visibleRowDepth,
     visibleColDepth,
   }: FetchPivotBranchesBatchParams): Promise<FetchPivotBranchesBatchResult> => {
@@ -115,6 +116,7 @@ describe('PivotTableChart persisted prefetch ignores stale results', () => {
             path,
             visibleRowDepth,
             visibleColDepth,
+            factStore,
           }),
         );
       }),
@@ -123,10 +125,7 @@ describe('PivotTableChart persisted prefetch ignores stale results', () => {
       (acc, result) => mergeTrees(acc, result.data),
       undefined,
     );
-    return {
-      data: merged,
-      factBatches: results.flatMap(result => result.factBatches),
-    };
+    return { data: merged };
   };
 
   beforeEach(() => {

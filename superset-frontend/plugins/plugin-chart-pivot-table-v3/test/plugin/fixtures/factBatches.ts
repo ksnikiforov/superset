@@ -33,6 +33,16 @@ import {
 } from '../../../src/pivot/runtime/factStore';
 import { parsePath } from '../../../src/pivot/core/path';
 
+type MockFetchResult<T> = Partial<T> & {
+  factBatches?: PivotFactStoreBatch[];
+};
+
+const stripMockFactBatches = <T>(result: MockFetchResult<T>): Partial<T> => {
+  const fetchResult = { ...result };
+  delete fetchResult.factBatches;
+  return fetchResult;
+};
+
 export const buildMockBranchFactBatches = ({
   formData,
   axis,
@@ -68,18 +78,17 @@ export const buildMockBranchFactBatches = ({
 
 export const buildMockBranchFetchResult = (
   params: FetchPivotBranchParams,
-  result: Partial<FetchPivotBranchResult> = {},
+  result: MockFetchResult<FetchPivotBranchResult> = {},
 ): FetchPivotBranchResult => {
   const factBatches = result.factBatches ?? buildMockBranchFactBatches(params);
-  params.factStore?.registerCompatibleCoverageBatches(factBatches);
-  return {
-    ...result,
-    factBatches,
-  };
+  if (!result.error) {
+    params.factStore?.registerCompatibleCoverageBatches(factBatches);
+  }
+  return stripMockFactBatches(result);
 };
 
 export const resolveMockBranchFetchResult =
-  (result: Partial<FetchPivotBranchResult> = {}) =>
+  (result: MockFetchResult<FetchPivotBranchResult> = {}) =>
   (params: FetchPivotBranchParams) =>
     Promise.resolve(buildMockBranchFetchResult(params, result));
 
@@ -122,18 +131,17 @@ export const buildMockBatchFactBatches = ({
 
 export const buildMockBatchFetchResult = (
   params: FetchPivotBranchesBatchParams,
-  result: Partial<FetchPivotBranchesBatchResult> = {},
+  result: MockFetchResult<FetchPivotBranchesBatchResult> = {},
 ): FetchPivotBranchesBatchResult => {
   const factBatches = result.factBatches ?? buildMockBatchFactBatches(params);
-  params.factStore?.registerCompatibleCoverageBatches(factBatches);
-  return {
-    ...result,
-    factBatches,
-  };
+  if (!result.error) {
+    params.factStore?.registerCompatibleCoverageBatches(factBatches);
+  }
+  return stripMockFactBatches(result);
 };
 
 export const resolveMockBatchFetchResult =
-  (result: Partial<FetchPivotBranchesBatchResult> = {}) =>
+  (result: MockFetchResult<FetchPivotBranchesBatchResult> = {}) =>
   (params: FetchPivotBranchesBatchParams) =>
     Promise.resolve(buildMockBatchFetchResult(params, result));
 
@@ -176,13 +184,12 @@ export const buildMockIntersectionFactBatches = ({
 
 export const buildMockIntersectionFetchResult = (
   params: FetchPivotIntersectionParams,
-  result: Partial<FetchPivotIntersectionResult> = {},
+  result: MockFetchResult<FetchPivotIntersectionResult> = {},
 ): FetchPivotIntersectionResult => {
   const factBatches =
     result.factBatches ?? buildMockIntersectionFactBatches(params);
-  params.factStore?.registerCompatibleCoverageBatches(factBatches);
-  return {
-    ...result,
-    factBatches,
-  };
+  if (!result.error) {
+    params.factStore?.registerCompatibleCoverageBatches(factBatches);
+  }
+  return stripMockFactBatches(result);
 };

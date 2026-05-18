@@ -82,6 +82,7 @@ describe('PivotTableChart error UX (Phase 4.5)', () => {
   const resolveBatchWithSingles = async ({
     batch,
     formData,
+    factStore,
     visibleRowDepth,
     visibleColDepth,
   }: FetchPivotBranchesBatchParams): Promise<FetchPivotBranchesBatchResult> => {
@@ -95,6 +96,7 @@ describe('PivotTableChart error UX (Phase 4.5)', () => {
             path,
             visibleRowDepth,
             visibleColDepth,
+            factStore,
           }),
         );
       }),
@@ -107,10 +109,7 @@ describe('PivotTableChart error UX (Phase 4.5)', () => {
       (acc, result) => mergeTrees(acc, result.data),
       undefined,
     );
-    return {
-      data: merged,
-      factBatches: results.flatMap(result => result.factBatches),
-    };
+    return { data: merged };
   };
 
   beforeEach(() => {

@@ -816,7 +816,7 @@ describe('resolveFetchContext', () => {
       factStore,
     };
 
-    const firstResult = await fetchPivotBranch(fetchParams);
+    await fetchPivotBranch(fetchParams);
 
     const queries =
       (
@@ -828,10 +828,10 @@ describe('resolveFetchContext', () => {
     queries.forEach(query => {
       expect(query.metrics).toEqual(['measure1', 'sortMetric']);
     });
-    expect(firstResult.factBatches).toHaveLength(queries.length);
+    expect(factStore.getCoverageBatches()).toHaveLength(queries.length);
     const secondResult = await fetchPivotBranch(fetchParams);
 
-    expect(secondResult.factBatches).toHaveLength(queries.length);
+    expect(factStore.getCoverageBatches()).toHaveLength(queries.length);
     expect(postMock).toHaveBeenCalledTimes(1);
     expect(
       secondResult.data?.cols[
@@ -1648,6 +1648,5 @@ describe('fetchPivotBranch delta-only contract', () => {
 
     expect(postMock).not.toHaveBeenCalled();
     expect(result.data).toBeUndefined();
-    expect(result.factBatches).toEqual([]);
   });
 });

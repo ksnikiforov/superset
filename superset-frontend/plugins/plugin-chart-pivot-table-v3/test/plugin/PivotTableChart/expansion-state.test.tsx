@@ -89,6 +89,7 @@ describe('PivotTableChart expansion state persistence', () => {
   const resolveBatchWithSingles = async ({
     batch,
     formData,
+    factStore,
     visibleRowDepth,
     visibleColDepth,
   }: FetchPivotBranchesBatchParams): Promise<FetchPivotBranchesBatchResult> => {
@@ -102,6 +103,7 @@ describe('PivotTableChart expansion state persistence', () => {
             path,
             visibleRowDepth,
             visibleColDepth,
+            factStore,
           }),
         );
       }),
@@ -110,10 +112,7 @@ describe('PivotTableChart expansion state persistence', () => {
       (acc, result) => mergeTrees(acc, result.data),
       undefined,
     );
-    return {
-      data: merged,
-      factBatches: results.flatMap(result => result.factBatches),
-    };
+    return { data: merged };
   };
 
   const createDeferredBranchFetch = () => {
