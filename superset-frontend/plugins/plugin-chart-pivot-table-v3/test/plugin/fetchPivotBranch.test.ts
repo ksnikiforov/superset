@@ -44,6 +44,11 @@ import { formatQueryName } from '../../src/pivot/query/queryName';
 import { buildLayoutContext } from '../../src/pivot/layout/LayoutContext';
 import { buildBranchQuerySpecs } from '../../src/pivot/query/specs';
 import { createPivotFactStore } from '../../src/pivot/runtime/factStore';
+import {
+  factStoreMaterializationFromSpec,
+  factStoreSelectorFromSpec,
+  materializeLoadedPivotTreeFromFactStore,
+} from '../../src/pivot/runtime/materializePivotTree';
 import { buildFormData } from './fixtures/pivotFormData';
 import { applyMetricAxis } from './fixtures/metricAxis';
 
@@ -75,6 +80,21 @@ type QueryPayload = {
   time_offsets?: string[];
   time_range?: string;
   filters?: Array<{ col?: string; op?: string; val?: string }>;
+};
+
+const fetchPivotBranchTree = async (
+  params: Parameters<typeof fetchPivotBranch>[0],
+) => {
+  const factStore = params.factStore ?? createPivotFactStore();
+  const result = await fetchPivotBranch({ ...params, factStore });
+  return {
+    result,
+    tree: materializeLoadedPivotTreeFromFactStore({
+      store: factStore,
+      layout: buildLayoutContext(params.formData),
+      formData: params.formData,
+    }),
+  };
 };
 
 describe('resolveFetchContext', () => {
@@ -352,7 +372,7 @@ describe('resolveFetchContext', () => {
       cells: {},
     };
 
-    const result = await fetchPivotBranch({
+    const { tree } = await fetchPivotBranchTree({
       formData: {
         groupbyRows: [METRICS_PLACEHOLDER, 'nation', 'customerName'],
         groupbyColumns: ['segment', 'orderPriority'],
@@ -377,11 +397,11 @@ describe('resolveFetchContext', () => {
     ]);
     const colKey = serializePath(['BUILDING', '1-URGENT']);
     expect(
-      result.data?.cells[serializeCellKey(metricRowKey, colKey)]?.values
+      tree.cells[serializeCellKey(metricRowKey, colKey)]?.values
         .countCustomers,
     ).toBe(10);
     expect(
-      result.data?.cells[serializeCellKey(detailRowKey, colKey)]?.values
+      tree.cells[serializeCellKey(detailRowKey, colKey)]?.values
         .countCustomers,
     ).toBe(4);
   });
@@ -455,7 +475,7 @@ describe('resolveFetchContext', () => {
       cells: {},
     };
 
-    const result = await fetchPivotBranch({
+    const { tree } = await fetchPivotBranchTree({
       formData: {
         groupbyRows: ['nation', 'orderPriority'],
         groupbyColumns: [METRICS_PLACEHOLDER, 'segment'],
@@ -473,7 +493,7 @@ describe('resolveFetchContext', () => {
 
     expect(postMock).toHaveBeenCalled();
     expect(
-      result.data?.cells[
+      tree.cells[
         serializeCellKey(
           serializePath(['USA', 'HIGH']),
           serializePath([encodeMetricKey('countCustomers'), 'AUTO']),
@@ -481,7 +501,7 @@ describe('resolveFetchContext', () => {
       ]?.values.countCustomers,
     ).toBe(5);
     expect(
-      result.data?.cells[
+      tree.cells[
         serializeCellKey(serializePath(['USA', 'HIGH']), serializePath([]))
       ]?.values.countCustomers,
     ).toBe(5);
@@ -539,7 +559,7 @@ describe('resolveFetchContext', () => {
       0,
     );
 
-    const result = await fetchPivotBranch({
+    const { tree } = await fetchPivotBranchTree({
       formData: {
         groupbyRows: ['orderPriority'],
         groupbyColumns: [METRICS_PLACEHOLDER, 'revenueBand'],
@@ -569,7 +589,7 @@ describe('resolveFetchContext', () => {
       encodeMetricKey('measure1'),
       'REV-A',
     ]);
-    expect(result.data?.cols[expandedColKey]).toBeTruthy();
+    expect(tree.cols[expandedColKey]).toBeTruthy();
   });
 
   it('queries and materializes only the expanded metric branch', async () => {
@@ -621,7 +641,7 @@ describe('resolveFetchContext', () => {
       0,
     );
 
-    const result = await fetchPivotBranch({
+    const { tree } = await fetchPivotBranchTree({
       formData: buildFormData({
         groupbyRows: ['orderPriority'],
         groupbyColumns: [METRICS_PLACEHOLDER, 'revenueBand'],
@@ -646,10 +666,10 @@ describe('resolveFetchContext', () => {
       expect(query.metrics).toEqual(['measure1']);
     });
     expect(
-      result.data?.cols[serializePath([encodeMetricKey('measure1'), 'REV-A'])],
+      tree.cols[serializePath([encodeMetricKey('measure1'), 'REV-A'])],
     ).toBeTruthy();
     expect(
-      result.data?.cols[serializePath([encodeMetricKey('measure2'), 'REV-A'])],
+      tree.cols[serializePath([encodeMetricKey('measure2'), 'REV-A'])],
     ).toBeUndefined();
   });
 
@@ -704,7 +724,7 @@ describe('resolveFetchContext', () => {
       0,
     );
 
-    const result = await fetchPivotBranch({
+    const { tree } = await fetchPivotBranchTree({
       formData: buildFormData({
         groupbyRows: ['orderPriority'],
         groupbyColumns: [METRICS_PLACEHOLDER, 'revenueBand'],
@@ -732,12 +752,12 @@ describe('resolveFetchContext', () => {
       expect(query.metrics).toEqual(['measure1', 'sortMetric']);
     });
     expect(
-      result.data?.cols[
+      tree.cols[
         serializePath([encodeMetricKey('sortMetric'), 'REV-A'])
       ],
     ).toBeUndefined();
     expect(
-      result.data?.cells[
+      tree.cells[
         serializeCellKey(
           serializePath(['1-URGENT']),
           serializePath([encodeMetricKey('measure1'), 'REV-A']),
@@ -829,17 +849,20 @@ describe('resolveFetchContext', () => {
       expect(query.metrics).toEqual(['measure1', 'sortMetric']);
     });
     expect(factStore.getCoverageBatches()).toHaveLength(queries.length);
-    const secondResult = await fetchPivotBranch(fetchParams);
+    await fetchPivotBranch(fetchParams);
+    const tree = materializeLoadedPivotTreeFromFactStore({
+      store: factStore,
+      layout: buildLayoutContext(formData),
+      formData,
+    });
 
     expect(factStore.getCoverageBatches()).toHaveLength(queries.length);
     expect(postMock).toHaveBeenCalledTimes(1);
     expect(
-      secondResult.data?.cols[
-        serializePath([encodeMetricKey('sortMetric'), 'REV-A'])
-      ],
+      tree.cols[serializePath([encodeMetricKey('sortMetric'), 'REV-A'])],
     ).toBeUndefined();
     expect(
-      secondResult.data?.cells[
+      tree.cells[
         serializeCellKey(
           serializePath(['1-URGENT']),
           serializePath([encodeMetricKey('measure1'), 'REV-A']),
@@ -926,7 +949,7 @@ describe('resolveFetchContext', () => {
       0,
     );
 
-    const result = await fetchPivotBranch({
+    const { tree } = await fetchPivotBranchTree({
       formData: buildFormData({
         groupbyRows: ['orderPriority'],
         groupbyColumns: [METRICS_PLACEHOLDER, 'revenueBand'],
@@ -959,7 +982,7 @@ describe('resolveFetchContext', () => {
       expect(query.time_offsets).toEqual(['1 year ago']);
     });
     expect(
-      result.data?.cols[
+      tree.cols[
         serializePath([
           encodeMetricKey('grossRevenue'),
           encodeMeasureLeafKey(ixYearLeaf.id),
@@ -968,7 +991,7 @@ describe('resolveFetchContext', () => {
       ],
     ).toBeTruthy();
     expect(
-      result.data?.cols[
+      tree.cols[
         serializePath([
           encodeMetricKey('grossRevenue'),
           encodeMeasureLeafKey(deltaMonthLeaf.id),
@@ -977,7 +1000,7 @@ describe('resolveFetchContext', () => {
       ],
     ).toBeUndefined();
     expect(
-      result.data?.cols[
+      tree.cols[
         serializePath([
           encodeMetricKey('netRevenue'),
           encodeMeasureLeafKey(netMonthLeaf.id),
@@ -986,7 +1009,7 @@ describe('resolveFetchContext', () => {
       ],
     ).toBeUndefined();
     expect(
-      result.data?.cells[
+      tree.cells[
         serializeCellKey(
           serializePath(['1-URGENT']),
           serializePath([
@@ -1122,7 +1145,7 @@ describe('resolveFetchContext', () => {
       cells: {},
     };
 
-    const result = await fetchPivotBranch({
+    const { tree } = await fetchPivotBranchTree({
       formData: {
         groupbyRows: ['r1', 'r2'],
         groupbyColumns: ['c1', 'c2', METRICS_PLACEHOLDER],
@@ -1150,9 +1173,9 @@ describe('resolveFetchContext', () => {
     );
     const subtotalKey = serializePath(['X', SUBTOTAL_TOKEN]);
     const rowKey = serializePath(['A', 'B']);
-    expect(result.data?.cols[subtotalKey]).toBeDefined();
+    expect(tree.cols[subtotalKey]).toBeDefined();
     expect(
-      result.data?.cells[serializeCellKey(rowKey, subtotalKey)]?.values.metric1,
+      tree.cells[serializeCellKey(rowKey, subtotalKey)]?.values.metric1,
     ).toBe(42);
   });
 
@@ -1555,7 +1578,7 @@ describe('fetchPivotBranch delta-only contract', () => {
 
     const currentTree = buildMetricFirstColumnTree([{ r1: 'Z', m1: 999 }]);
 
-    const result = await fetchPivotBranch({
+    const { tree } = await fetchPivotBranchTree({
       formData,
       axis: 'row',
       path: ['A'],
@@ -1564,9 +1587,9 @@ describe('fetchPivotBranch delta-only contract', () => {
 
     const unrelatedRowKey = serializePath(['Z']);
     const metricColKey = serializePath([encodeMetricKey('m1')]);
-    expect(result.data?.rows[unrelatedRowKey]).toBeUndefined();
+    expect(tree.rows[unrelatedRowKey]).toBeUndefined();
     expect(
-      result.data?.cells[serializeCellKey(unrelatedRowKey, metricColKey)],
+      tree.cells[serializeCellKey(unrelatedRowKey, metricColKey)],
     ).toBeUndefined();
   });
 
@@ -1595,9 +1618,8 @@ describe('fetchPivotBranch delta-only contract', () => {
     const [spec] = specs;
     const store = createPivotFactStore();
     store.upsertBatch({
-      coverage: spec.meta.coverage,
-      scope: { kind: 'branch', axis: 'row', path: ['A'] },
-      valueKeys: ['m1'],
+      ...factStoreSelectorFromSpec(spec),
+      materialization: factStoreMaterializationFromSpec(spec),
       facts: [
         {
           rowPath: ['A', 'B'],
@@ -1609,7 +1631,7 @@ describe('fetchPivotBranch delta-only contract', () => {
       ],
     });
 
-    const result = await fetchPivotBranch({
+    const { tree } = await fetchPivotBranchTree({
       formData,
       axis: 'row',
       path: ['A'],
@@ -1620,9 +1642,9 @@ describe('fetchPivotBranch delta-only contract', () => {
     const metricColKey = serializePath([encodeMetricKey('m1')]);
 
     expect(postMock).not.toHaveBeenCalled();
-    expect(result.data?.rows[rowKey]).toBeDefined();
+    expect(tree.rows[rowKey]).toBeDefined();
     expect(
-      result.data?.cells[serializeCellKey(rowKey, metricColKey)]?.values.m1,
+      tree.cells[serializeCellKey(rowKey, metricColKey)]?.values.m1,
     ).toBe(42);
   });
 
@@ -1647,6 +1669,6 @@ describe('fetchPivotBranch delta-only contract', () => {
     });
 
     expect(postMock).not.toHaveBeenCalled();
-    expect(result.data).toBeUndefined();
+    expect(result).toEqual({});
   });
 });

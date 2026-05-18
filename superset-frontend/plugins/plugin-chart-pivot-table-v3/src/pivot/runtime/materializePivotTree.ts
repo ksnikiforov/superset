@@ -1315,29 +1315,6 @@ export const materializeLoadedPivotTreeFromFactStore = ({
     }),
   });
 
-export const buildBranchTreeFromFactStore = ({
-  specs,
-  store,
-  formData,
-  measureHierarchy,
-}: {
-  specs: PlannedQuerySpec[];
-  store: PivotFactStore;
-  formData: PivotTableQueryFormData;
-  measureHierarchy: MeasureHierarchy;
-}): PivotTreeData => {
-  const input = materializationInputFromSpecs({
-    store,
-    specs,
-    formData,
-    measureHierarchy,
-  });
-  if (!input) {
-    return emptyPivotTree();
-  }
-  return materializePivotTree(input);
-};
-
 export const materializeInitialPivotTreeFromFactStore = ({
   specs,
   store,

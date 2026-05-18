@@ -106,7 +106,7 @@ describe('Global Async Queries (HTTP 202) support', () => {
     });
 
     expect(waitForAsyncDataMock).toHaveBeenCalledTimes(1);
-    expect(result.data).toBeDefined();
+    expect(result).toEqual({});
     expect(result.error).toBeUndefined();
   });
 
@@ -149,7 +149,7 @@ describe('Global Async Queries (HTTP 202) support', () => {
     });
 
     expect(waitForAsyncDataMock).toHaveBeenCalledTimes(1);
-    expect(result.data).toBeDefined();
+    expect(result).toEqual({});
     expect(result.error).toBeUndefined();
   });
 });

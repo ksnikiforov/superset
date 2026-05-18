@@ -28,7 +28,6 @@ import { type PivotProgram } from '../../../src/pivot/runtime/types';
 import { applyMeasureHierarchyAxis as applyMeasureHierarchyAxisRuntime } from '../../../src/pivot/runtime/materializePivotTree';
 
 export {
-  buildBranchTreeFromFactStore,
   buildFactStoreBatchesFromSpecs,
   factStoreSelectorFromSpec,
   injectRowSubtotalLeaves,

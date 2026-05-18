@@ -33,7 +33,11 @@ import {
 import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
 import { buildBatchQuerySpecs } from '../../../src/pivot/query/specs';
 import { createPivotFactStore } from '../../../src/pivot/runtime/factStore';
-import { factStoreSelectorFromSpec } from '../../../src/pivot/runtime/materializePivotTree';
+import {
+  factStoreMaterializationFromSpec,
+  factStoreSelectorFromSpec,
+  materializeLoadedPivotTreeFromFactStore,
+} from '../../../src/pivot/runtime/materializePivotTree';
 
 jest.mock('@superset-ui/core', () => {
   const actual = jest.requireActual('@superset-ui/core');
@@ -261,14 +265,8 @@ describe('fetchPivotBranchesBatch', () => {
     const [spec] = specs;
     const store = createPivotFactStore();
     store.upsertBatch({
-      coverage: spec.meta.coverage,
-      scope: {
-        kind: 'batch',
-        axis: 'row',
-        parentPath: ['US'],
-        siblingValues: ['CA', 'NY'],
-      },
-      valueKeys: ['m1'],
+      ...factStoreSelectorFromSpec(spec),
+      materialization: factStoreMaterializationFromSpec(spec),
       facts: [
         {
           rowPath: ['US', 'CA', 'SF'],
@@ -280,12 +278,17 @@ describe('fetchPivotBranchesBatch', () => {
       ],
     });
 
-    const result = await fetchPivotBranchesBatch({
+    await fetchPivotBranchesBatch({
       formData,
       batch,
       visibleRowDepth: 2,
       visibleColDepth: 0,
       factStore: store,
+    });
+    const tree = materializeLoadedPivotTreeFromFactStore({
+      store,
+      layout,
+      formData,
     });
 
     const rowKey = serializePath(['US', 'CA', 'SF']);
@@ -295,9 +298,9 @@ describe('fetchPivotBranchesBatch', () => {
       true,
     );
     expect(mockPost).not.toHaveBeenCalled();
-    expect(result.data?.rows[rowKey]).toBeDefined();
+    expect(tree.rows[rowKey]).toBeDefined();
     expect(
-      result.data?.cells[serializeCellKey(rowKey, metricColKey)]?.values.m1,
+      tree.cells[serializeCellKey(rowKey, metricColKey)]?.values.m1,
     ).toBe(7);
   });
 
@@ -409,6 +412,6 @@ describe('fetchPivotBranchesBatch', () => {
     });
 
     expect(mockPost).not.toHaveBeenCalled();
-    expect(result.data).toBeUndefined();
+    expect(result).toEqual({});
   });
 });

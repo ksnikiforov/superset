@@ -20,7 +20,6 @@ import {
   type PivotAxis,
   type PivotPath,
   type PivotTableQueryFormData,
-  type PivotTreeData,
 } from '../../types';
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
@@ -44,14 +43,10 @@ import {
 } from '../runtime/factStore';
 import { upsertQueryResultsIntoFactStore } from '../runtime/ingestQueryResults';
 import { isAbortError } from '../runtime/requestLifecycle';
-import {
-  buildBranchTreeFromFactStore,
-  factStoreSelectorFromSpec,
-} from '../runtime/materializePivotTree';
+import { factStoreSelectorFromSpec } from '../runtime/materializePivotTree';
 import { type BatchGroup } from './fetchPlanOptimizer';
 
 export interface FetchPivotBranchResult {
-  data?: PivotTreeData;
   warnings?: ChartDataWarning[];
   error?: Error;
 }
@@ -93,16 +88,14 @@ type ResolvedFetchContext = ResolvedQueryFetchContext & {
   layout: LayoutContext;
 };
 
-const fetchPivotQuerySpecsIntoBranchTree = async ({
+const fetchPivotQuerySpecsIntoFactStore = async ({
   formData,
   specs,
-  layout,
   requestGroupId,
   factStore,
 }: {
   formData: PivotTableQueryFormData;
   specs: PlannedQuerySpec[];
-  layout: LayoutContext;
   requestGroupId?: string;
   factStore?: PivotFactStore;
 }): Promise<FetchPivotBranchResult> => {
@@ -114,14 +107,7 @@ const fetchPivotQuerySpecsIntoBranchTree = async ({
     spec => !store.hasCompatibleCoverage(factStoreSelectorFromSpec(spec)),
   );
   if (missingSpecs.length === 0) {
-    return {
-      data: buildBranchTreeFromFactStore({
-        specs,
-        store,
-        formData,
-        measureHierarchy: layout.measureHierarchy,
-      }),
-    };
+    return {};
   }
   const metricsForQuery = missingSpecs[0]?.metrics ?? specs[0].metrics;
   const timeOffsets = Array.from(
@@ -154,14 +140,7 @@ const fetchPivotQuerySpecsIntoBranchTree = async ({
       specs: missingSpecs,
       results,
     });
-    const data = buildBranchTreeFromFactStore({
-      specs,
-      store,
-      formData,
-      measureHierarchy: layout.measureHierarchy,
-    });
     return {
-      data,
       ...(warnings.length > 0 ? { warnings } : {}),
     };
   } catch (error) {
@@ -218,10 +197,9 @@ export async function fetchPivotBranch({
     visibleColDepth,
   });
 
-  return fetchPivotQuerySpecsIntoBranchTree({
+  return fetchPivotQuerySpecsIntoFactStore({
     formData,
     specs,
-    layout: ctx.layout,
     requestGroupId,
     factStore,
   });
@@ -244,10 +222,9 @@ export const fetchPivotBranchesBatch = async ({
     visibleColDepth,
     chunkIndex: 0,
   });
-  return fetchPivotQuerySpecsIntoBranchTree({
+  return fetchPivotQuerySpecsIntoFactStore({
     formData,
     specs,
-    layout,
     requestGroupId,
     factStore,
   });
@@ -271,10 +248,9 @@ export const fetchPivotIntersection = async ({
     visibleRowDepth,
     visibleColDepth,
   });
-  return fetchPivotQuerySpecsIntoBranchTree({
+  return fetchPivotQuerySpecsIntoFactStore({
     formData,
     specs,
-    layout,
     requestGroupId,
     factStore,
   });

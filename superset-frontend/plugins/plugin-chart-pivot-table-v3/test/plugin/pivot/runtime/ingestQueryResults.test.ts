@@ -24,7 +24,7 @@ import {
   ingestQueryResults,
   upsertQueryResultsIntoFactStore,
 } from '../../../../src/pivot/runtime/ingestQueryResults';
-import { buildBranchTreeFromFactStore } from '../../fixtures/metricAxis';
+import { materializeInitialPivotTreeFromFactStore } from '../../fixtures/metricAxis';
 import { buildLayoutContext } from '../../../../src/pivot/layout/LayoutContext';
 import {
   MetricsLayoutEnum,
@@ -263,14 +263,15 @@ test('keeps support and offset facts without materializing support metric branch
     specs: [spec],
     results: [result],
   });
-  const tree = buildBranchTreeFromFactStore({
+  const formData = buildFormData({
+    metrics: ['sales'],
+    metricLabelMap: { sales: 'Sales', sortMetric: 'Sort metric' },
+  });
+  const tree = materializeInitialPivotTreeFromFactStore({
     specs: [spec],
     store,
-    formData: buildFormData({
-      metrics: ['sales'],
-      metricLabelMap: { sales: 'Sales', sortMetric: 'Sort metric' },
-    }),
-    measureHierarchy: spec.meta.materializedMeasureHierarchy,
+    layout: buildLayoutContext(formData),
+    formData,
   });
   const visibleMetricRowKey = serializePath([
     'France',
@@ -311,13 +312,14 @@ test('materializes column subtotal leaves from planned coverage specs', () => {
       },
     ],
   });
-  const tree = buildBranchTreeFromFactStore({
+  const formData = buildFormData({
+    metrics: ['sales'],
+  });
+  const tree = materializeInitialPivotTreeFromFactStore({
     specs: [spec],
     store,
-    formData: buildFormData({
-      metrics: ['sales'],
-    }),
-    measureHierarchy: spec.meta.materializedMeasureHierarchy,
+    layout: buildLayoutContext(formData),
+    formData,
   });
   const metricRowKey = serializePath(['France', encodeMetricKey('sales')]);
   const subtotalColKey = serializePath(['Furniture', SUBTOTAL_TOKEN]);

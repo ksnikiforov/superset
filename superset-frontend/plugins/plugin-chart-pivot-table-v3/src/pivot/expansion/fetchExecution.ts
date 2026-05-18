@@ -59,7 +59,6 @@ import { rootKey } from '../viewModel';
 
 type ExpansionFetchResult = {
   targets: ExpansionFetchTarget[];
-  data: PivotTreeData;
 };
 
 export type TrackExpansionRequest = <T>(

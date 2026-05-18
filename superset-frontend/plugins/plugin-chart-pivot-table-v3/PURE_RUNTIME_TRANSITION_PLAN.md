@@ -186,8 +186,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14040` insertions, `16039` deletions, net `-1999`.
-- Current production TypeScript/TSX total: about `31511` lines.
+- Production `src`: `13992` insertions, `16039` deletions, net `-2047`.
+- Current production TypeScript/TSX total: about `31463` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -903,6 +903,10 @@ Success criteria:
 - Exact-depth root/bootstrap coverage can satisfy narrower explicit visible
   path needs when the aggregate shape is the same. It still does not imply
   deeper hidden/expanded coverage.
+- Branch, batch, and intersection fetch APIs no longer return materialized
+  branch trees. Their production contract is warning/error reporting plus
+  fact-store mutation; callers that need a tree rematerialize from the loaded
+  fact store through the materializer boundary.
 
 ## Current Risks
 

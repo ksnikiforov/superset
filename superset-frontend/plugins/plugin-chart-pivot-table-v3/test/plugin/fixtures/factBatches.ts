@@ -46,6 +46,7 @@ import { type PivotFactCoverage } from '../../../src/pivot/runtime/types';
 import { type PivotPath, type PivotTreeData } from '../../../src/types';
 
 type MockFetchResult<T> = Partial<T> & {
+  data?: PivotTreeData;
   factBatches?: PivotFactStoreBatch[];
 };
 
