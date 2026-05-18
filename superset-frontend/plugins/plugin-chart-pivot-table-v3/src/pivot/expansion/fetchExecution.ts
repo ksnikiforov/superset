@@ -120,14 +120,14 @@ const resolveExpansionFetchPlan = ({
   };
 };
 
-const executeExpansionQueryRequest = async ({
+const executeExpansionQueryTask = async ({
+  payload,
   request,
-  requestGroupId,
   runtime,
   loadingKeys,
 }: {
+  payload: Record<string, unknown>;
   request: ExpansionQueryRequest;
-  requestGroupId: string;
   runtime: ExpansionFetchRuntime;
   loadingKeys: string[];
 }): Promise<void> => {
@@ -135,6 +135,7 @@ const executeExpansionQueryRequest = async ({
   if (requestScope.isCurrent()) {
     loadingKeys.forEach(key => updateLoadingKey(key, 1));
   }
+  const requestGroupId = buildExpansionRequestGroupId({ runtime, payload });
   const token = requestScope.beginRequest(requestGroupId);
   try {
     const result = await fetchPivotExpansion({
@@ -206,43 +207,16 @@ export const fetchExpansionTargetDeltas = async ({
     visibleColDepth: context.visibleColDepth,
   });
   const { visibleRowDepth, visibleColDepth } = context;
-  const buildSingleRequestGroupId = (target: FetchTarget) =>
-    buildExpansionRequestGroupId({
-      runtime,
-      payload: {
-        kind: 'branch',
-        ...target,
-        visibleRowDepth,
-        visibleColDepth,
-      },
-    });
-  const buildBatchRequestGroupId = (batch: BatchGroup) =>
-    buildExpansionRequestGroupId({
-      runtime,
-      payload: {
-        kind: 'batch',
-        axis: batch.axis,
-        parentPathKey: batch.parentPathKey,
-        signature: batch.signature,
-        targetKeys: [...batch.targets.map(target => target.pathKey)].sort(),
-        visibleRowDepth,
-        visibleColDepth,
-      },
-    });
-  const buildIntersectionRequestGroupId = (target: IntersectionFetchTarget) =>
-    buildExpansionRequestGroupId({
-      runtime,
-      payload: {
-        kind: 'hydrate:intersection',
-        rowPathKeys: [...target.rowPathKeys].sort(),
-        columnPathKeys: [...target.columnPathKeys].sort(),
-        visibleRowDepth,
-        visibleColDepth,
-      },
-    });
   const branchFetchPromises: Array<Promise<void>> = [
     ...singles.map(target =>
-      executeExpansionQueryRequest({
+      executeExpansionQueryTask({
+        runtime,
+        payload: {
+          kind: 'branch',
+          ...target,
+          visibleRowDepth,
+          visibleColDepth,
+        },
         request: {
           kind: 'branch',
           axis: target.axis,
@@ -250,21 +224,27 @@ export const fetchExpansionTargetDeltas = async ({
           visibleRowDepth,
           visibleColDepth,
         },
-        requestGroupId: buildSingleRequestGroupId(target),
-        runtime,
         loadingKeys: [target.pathKey],
       }),
     ),
     ...batches.map(batch =>
-      executeExpansionQueryRequest({
+      executeExpansionQueryTask({
+        runtime,
+        payload: {
+          kind: 'batch',
+          axis: batch.axis,
+          parentPathKey: batch.parentPathKey,
+          signature: batch.signature,
+          targetKeys: [...batch.targets.map(target => target.pathKey)].sort(),
+          visibleRowDepth,
+          visibleColDepth,
+        },
         request: {
           kind: 'batch',
           batch,
           visibleRowDepth,
           visibleColDepth,
         },
-        requestGroupId: buildBatchRequestGroupId(batch),
-        runtime,
         loadingKeys: batch.targets.map(target => target.pathKey),
       }),
     ),
@@ -278,9 +258,17 @@ export const fetchExpansionTargetDeltas = async ({
     context,
     runtime,
   });
-  const intersectionResults = await Promise.all(
+  await Promise.all(
     missingIntersections.map(target =>
-      executeExpansionQueryRequest({
+      executeExpansionQueryTask({
+        runtime,
+        payload: {
+          kind: 'hydrate:intersection',
+          rowPathKeys: [...target.rowPathKeys].sort(),
+          columnPathKeys: [...target.columnPathKeys].sort(),
+          visibleRowDepth,
+          visibleColDepth,
+        },
         request: {
           kind: 'intersection',
           rowPathKeys: target.rowPathKeys,
@@ -288,8 +276,6 @@ export const fetchExpansionTargetDeltas = async ({
           visibleRowDepth,
           visibleColDepth,
         },
-        requestGroupId: buildIntersectionRequestGroupId(target),
-        runtime,
         loadingKeys: [...target.rowPathKeys, ...target.columnPathKeys],
       }),
     ),
@@ -297,7 +283,7 @@ export const fetchExpansionTargetDeltas = async ({
   if (!runtime.requestScope.isCurrent()) {
     return false;
   }
-  return branchFetchPromises.length + intersectionResults.length > 0;
+  return branchFetchPromises.length + missingIntersections.length > 0;
 };
 
 type HydrationLoopParams = Parameters<typeof runHydrationLoop>[0];

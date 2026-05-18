@@ -290,8 +290,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13256` insertions, `17219` deletions, net `-3963`.
-- Current production TypeScript/TSX total: about `29547` lines.
+- Production `src`: `13242` insertions, `17219` deletions, net `-3977`.
+- Current production TypeScript/TSX total: about `29533` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -303,17 +303,17 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `29547` | `-3963` | `< 28000` |
-| Strict core pipeline | `11337` | `12103` | `+766` | `8000` |
+| Full production `src` | `33510` | `29533` | `-3977` | `< 28000` |
+| Strict core pipeline | `11337` | `12089` | `+752` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5068` | `+385` | `3000-4000` |
-| Broad core pipeline | `16020` | `17171` | `+1151` | `11000-13000` |
+| Broad core pipeline | `16020` | `17157` | `+1137` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
 | `pivot/runtime/*` | `4048` |
-| `pivot/expansion/*` | `2583` |
+| `pivot/expansion/*` | `2569` |
 | `pivot/query/*` | `1626` |
 | `pivot/layout/*` | `770` |
 | core/shared/domain helpers | `1865` |
@@ -498,6 +498,13 @@ authority gap between coverage, query specs, and materialization for flexible
 Values placement. The next slice must spend this new authority by deleting
 duplicated query/planner/render fallback branches; otherwise the strict core
 will keep drifting away from the `8000` line target.
+
+Latest expansion execution cleanup: branch, batch, and intersection expansion
+fetches now submit through one lifecycle/loading/warning executor. Request
+group id construction moved into that executor, so target-specific code only
+builds request payloads and loading keys. This is a small deletion slice, but it
+continues the larger direction: expansion transport shapes should not own
+separate request bookkeeping.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.
