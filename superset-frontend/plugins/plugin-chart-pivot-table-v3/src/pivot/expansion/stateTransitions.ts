@@ -443,35 +443,6 @@ export type PruneMergedTree = ({
   branch: PivotTreeData;
 }) => PivotTreeData;
 
-export const applyExpansionFetchDelta = ({
-  tree,
-  axis,
-  keys,
-  branch,
-  pruneMergedTree,
-}: {
-  tree: PivotTreeData;
-  axis: PivotAxis;
-  keys: string[];
-  branch?: PivotTreeData;
-  pruneMergedTree: PruneMergedTree;
-}) => {
-  if (!branch) {
-    return tree;
-  }
-  let nextTree = mergeTrees(tree, branch);
-  keys.forEach(key => {
-    const parent = axis === 'row' ? nextTree.rows[key] : nextTree.cols[key];
-    nextTree = pruneMergedTree({
-      axis,
-      tree: nextTree,
-      parent,
-      branch,
-    });
-  });
-  return nextTree;
-};
-
 export const mergeSameAxisExpansionTree = ({
   currentTree,
   previousTree,
@@ -499,93 +470,6 @@ export const mergeSameAxisExpansionTree = ({
         })
       : previousTree;
   return mergeTrees(currentTree, preservedTree);
-};
-
-export type HydrationDeltaTarget = {
-  axis: PivotAxis;
-  pathKey: string;
-};
-
-export type HydrationDeltaEntry = HydrationDeltaTarget & {
-  tree: PivotTreeData;
-};
-
-export type HydrationDeltaMap = Map<string, HydrationDeltaEntry>;
-
-const getHydrationDeltaKey = ({ axis, pathKey }: HydrationDeltaTarget) =>
-  JSON.stringify([axis, pathKey]);
-
-const getOrderedHydrationDeltas = (deltas: HydrationDeltaMap) =>
-  Array.from(deltas.entries())
-    .sort(([, left], [, right]) => {
-      const axisCompare = left.axis.localeCompare(right.axis);
-      if (axisCompare !== 0) {
-        return axisCompare;
-      }
-      const depthCompare =
-        parsePath(left.pathKey).length - parsePath(right.pathKey).length;
-      if (depthCompare !== 0) {
-        return depthCompare;
-      }
-      return left.pathKey.localeCompare(right.pathKey);
-    })
-    .map(([, entry]) => entry);
-
-export const stageHydrationFetchDeltas = ({
-  deltas,
-  results,
-}: {
-  deltas: HydrationDeltaMap;
-  results: Array<{
-    targets: HydrationDeltaTarget[];
-    data: PivotTreeData;
-  }>;
-}) => {
-  results.forEach(({ targets, data }) => {
-    targets.forEach(target => {
-      deltas.set(getHydrationDeltaKey(target), {
-        ...target,
-        tree: data,
-      });
-    });
-  });
-};
-
-export const buildHydrationStagedTree = ({
-  baseTree,
-  deltas,
-}: {
-  baseTree: PivotTreeData;
-  deltas: HydrationDeltaMap;
-}) =>
-  getOrderedHydrationDeltas(deltas).reduce(
-    (merged, delta) => mergeTrees(merged, delta.tree),
-    baseTree,
-  );
-
-export const finalizeHydrationTree = ({
-  baseTree,
-  deltas,
-  pruneMergedTree,
-}: {
-  baseTree: PivotTreeData;
-  deltas: HydrationDeltaMap;
-  pruneMergedTree: PruneMergedTree;
-}) => {
-  let mergedTree = buildHydrationStagedTree({ baseTree, deltas });
-  getOrderedHydrationDeltas(deltas).forEach(delta => {
-    const parent =
-      delta.axis === 'row'
-        ? mergedTree.rows[delta.pathKey]
-        : mergedTree.cols[delta.pathKey];
-    mergedTree = pruneMergedTree({
-      axis: delta.axis,
-      tree: mergedTree,
-      parent,
-      branch: delta.tree,
-    });
-  });
-  return mergedTree;
 };
 
 export const resolveExpansionReinitializationDecision = ({
@@ -1115,8 +999,7 @@ export const runHydrationLoop = async ({
   pendingCols,
   planRows = true,
   planCols = true,
-  pruneMergedTree,
-  fetchDeltas,
+  fetchTree,
 }: {
   baseTree: PivotTreeData;
   maxIterations: number;
@@ -1129,33 +1012,28 @@ export const runHydrationLoop = async ({
   pendingCols: Set<string>;
   planRows?: boolean;
   planCols?: boolean;
-  pruneMergedTree: PruneMergedTree;
-  fetchDeltas: ({
+  fetchTree: ({
     targets,
     context,
+    tree,
   }: {
     targets: ExpansionFetchTarget[];
     context: {
       visibleRowDepth: number;
       visibleColDepth: number;
     };
-  }) => Promise<
-    Array<{ targets: HydrationDeltaTarget[]; data: PivotTreeData }>
-  >;
+    tree: PivotTreeData;
+  }) => Promise<PivotTreeData>;
 }) => {
-  const deltas: HydrationDeltaMap = new Map();
+  let currentTree = baseTree;
   for (let iteration = 0; iteration < maxIterations; iteration += 1) {
     if (!isCurrent()) {
       return { status: 'stale' };
     }
-    const stagedTree = buildHydrationStagedTree({
-      baseTree,
-      deltas,
-    });
-    const desiredRows = buildDesiredExpanded('row', stagedTree);
-    const desiredCols = buildDesiredExpanded('col', stagedTree);
+    const desiredRows = buildDesiredExpanded('row', currentTree);
+    const desiredCols = buildDesiredExpanded('col', currentTree);
     const hydrationPlan = planHydrationIteration({
-      tree: stagedTree,
+      tree: currentTree,
       desiredRows,
       desiredCols,
       getMissingExpansionCoverage: getMissingExpansionCoverage(),
@@ -1171,28 +1049,21 @@ export const runHydrationLoop = async ({
     if (hydrationPlan.kind === 'complete') {
       return {
         status: 'complete',
-        tree: finalizeHydrationTree({
-          baseTree,
-          deltas,
-          pruneMergedTree,
-        }),
+        tree: currentTree,
         desiredRows,
         desiredCols,
       };
     }
 
     // eslint-disable-next-line no-await-in-loop
-    const results = await fetchDeltas({
+    currentTree = await fetchTree({
       targets: hydrationPlan.targets,
       context: { visibleRowDepth, visibleColDepth },
+      tree: currentTree,
     });
     if (!isCurrent()) {
       return { status: 'stale' };
     }
-    stageHydrationFetchDeltas({
-      deltas,
-      results,
-    });
   }
   return { status: 'exhausted' };
 };

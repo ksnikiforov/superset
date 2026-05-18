@@ -27,6 +27,7 @@ import {
   fetchPivotBranchesBatch,
   fetchPivotIntersection,
 } from '../query/fetchPivotBranch';
+import { mergeTrees } from '../core/tree';
 import { parsePath } from '../core/path';
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import { buildBatchSignature } from '../query/batchSignature';
@@ -44,10 +45,10 @@ import {
 import { createExpansionCoverageDiff } from '../runtime/coverage';
 import { stableStringify } from '../shared/stableStringify';
 import {
-  applyExpansionFetchDelta,
   computeVisibleDepths,
   runHydrationLoop,
   type ExpansionVisibilityConfig,
+  type PruneMergedTree,
 } from './stateTransitions';
 import {
   buildGroupedFetchTargets,
@@ -130,6 +131,12 @@ type ExpansionFetcherResult = {
   data: PivotTreeData;
   warnings?: ChartDataWarning[];
   error?: unknown;
+};
+
+type FetchDeltaEntry = {
+  axis: PivotAxis;
+  pathKey: string;
+  data: PivotTreeData;
 };
 
 const createRuntimeExpansionCoverageDiff = ({
@@ -411,15 +418,76 @@ export const fetchExpansionTargetDeltas = async ({
   return deltas;
 };
 
+const getOrderedFetchDeltaEntries = (
+  deltas: FetchResultDelta[],
+): FetchDeltaEntry[] =>
+  deltas
+    .flatMap(({ targets, data }) =>
+      targets.flatMap(target => {
+        if (!('axis' in target)) {
+          return [];
+        }
+        return [{ axis: target.axis, pathKey: target.pathKey, data }];
+      }),
+    )
+    .sort((left, right) => {
+      const axisCompare = left.axis.localeCompare(right.axis);
+      if (axisCompare !== 0) {
+        return axisCompare;
+      }
+      const depthCompare =
+        parsePath(left.pathKey).length - parsePath(right.pathKey).length;
+      if (depthCompare !== 0) {
+        return depthCompare;
+      }
+      return left.pathKey.localeCompare(right.pathKey);
+    });
+
+const applyFetchDeltasToTree = ({
+  tree,
+  deltas,
+  pruneMergedTree,
+}: {
+  tree: PivotTreeData;
+  deltas: FetchResultDelta[];
+  pruneMergedTree: (params: {
+    axis: PivotAxis;
+    tree: PivotTreeData;
+    parent?: PivotTreeNode;
+    branch?: PivotTreeData;
+  }) => PivotTreeData;
+}) => {
+  const entries = getOrderedFetchDeltaEntries(deltas);
+  let mergedTree = entries.reduce(
+    (nextTree, entry) => mergeTrees(nextTree, entry.data),
+    tree,
+  );
+  entries.forEach(entry => {
+    const parent =
+      entry.axis === 'row'
+        ? mergedTree.rows[entry.pathKey]
+        : mergedTree.cols[entry.pathKey];
+    mergedTree = pruneMergedTree({
+      axis: entry.axis,
+      tree: mergedTree,
+      parent,
+      branch: entry.data,
+    });
+  });
+  return mergedTree;
+};
+
 type HydrationLoopParams = Parameters<typeof runHydrationLoop>[0];
 
 export const runHydrationExpansionFetchLoop = ({
   reason,
   fetchRuntime,
+  pruneMergedTree,
   ...hydrationLoopParams
-}: Omit<HydrationLoopParams, 'fetchDeltas' | 'getMissingExpansionCoverage'> & {
+}: Omit<HydrationLoopParams, 'fetchTree' | 'getMissingExpansionCoverage'> & {
   reason: 'prefetch' | 'cross-axis';
   fetchRuntime: ExpansionFetchRuntime;
+  pruneMergedTree: PruneMergedTree;
 }) =>
   runHydrationLoop({
     ...hydrationLoopParams,
@@ -428,13 +496,19 @@ export const runHydrationExpansionFetchLoop = ({
         runtime: fetchRuntime,
         program: hydrationLoopParams.config.program,
       }),
-    fetchDeltas: ({ targets, context }) =>
-      fetchExpansionTargetDeltas({
+    fetchTree: async ({ targets, context, tree }) => {
+      const deltas = await fetchExpansionTargetDeltas({
         targets,
         context,
         runtime: fetchRuntime,
         singleRequestKind: `hydrate:${reason}`,
-      }),
+      });
+      return applyFetchDeltasToTree({
+        tree,
+        deltas,
+        pruneMergedTree,
+      });
+    },
   });
 
 export type SameAxisExpansionFetchLoopResult =
@@ -537,18 +611,18 @@ export const runSameAxisExpansionFetchLoop = async ({
     if (getDataEpoch() !== requestEpoch || !requestScope.isCurrent()) {
       return { status: 'stale' };
     }
-    for (const { targets: deltaTargets, data: deltaTree } of resultDeltas) {
+    resultDeltas.forEach(({ targets: deltaTargets }) => {
       deltaTargets.forEach(target => {
-        touchedKeys.add(target.pathKey);
+        if ('axis' in target) {
+          touchedKeys.add(target.pathKey);
+        }
       });
-      currentTree = applyExpansionFetchDelta({
-        tree: currentTree,
-        axis,
-        keys: deltaTargets.map(target => target.pathKey),
-        branch: deltaTree,
-        pruneMergedTree,
-      });
-    }
+    });
+    currentTree = applyFetchDeltasToTree({
+      tree: currentTree,
+      deltas: resultDeltas,
+      pruneMergedTree,
+    });
     if (resultDeltas.length === 0) {
       break;
     }

@@ -182,8 +182,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14333` insertions, `15791` deletions, net `-1458`.
-- Current production TypeScript/TSX total: about `32052` lines.
+- Production `src`: `14278` insertions, `15791` deletions, net `-1513`.
+- Current production TypeScript/TSX total: about `31997` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -358,10 +358,8 @@ Success criteria:
 - Expansion fetches upsert fact batches into the fact store and rematerialize
   the visible runtime tree from loaded facts, rather than merging fetched branch
   trees into the current tree.
-- `stageHydrationFetchDeltas`, `buildHydrationStagedTree`,
-  `finalizeHydrationTree`, same-axis branch merge preservation, and
-  `pruneMergedTree` plumbing are deleted or demoted once the fact-store-first
-  path is active.
+- Same-axis branch merge preservation and `pruneMergedTree` plumbing are
+  deleted or demoted once the fact-store-first path is active.
 
 ### 4. Keep Shrinking Chart-Owned Orchestration
 
@@ -869,6 +867,14 @@ Success criteria:
   layout fetch. The important contract is that stale deeper leaves are removed
   and the metric branch can expand from already-loaded coverage without another
   fetch.
+- Hydration no longer exposes staged tree-delta helpers from the pure expansion
+  state module. `runHydrationLoop` now carries a current tree forward and asks
+  fetch execution for the next tree, while branch merge/prune mechanics are
+  localized under `fetchExecution.ts`.
+- The exported `applyExpansionFetchDelta` helper has been deleted from
+  `stateTransitions.ts`; same-axis and hydration fetch paths now use the same
+  fetch-execution merge/prune helper pending the full fact-store-first
+  rematerialization cut.
 
 ## Current Risks
 
