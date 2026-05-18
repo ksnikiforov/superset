@@ -35,9 +35,8 @@ import {
   type PivotFactStore,
 } from './factStore';
 import {
-  factStoreMaterializationFromSpec,
   factStoreSelectorFromSpec,
-  materializeInitialPivotTreeFromFactStore,
+  materializeLoadedPivotTreeFromFactStore,
   materializeInitialPivotTreeFromFactStoreAsync,
 } from './materializePivotTree';
 import {
@@ -298,7 +297,6 @@ const factStoreBatchFromIngested = ({
   'spec' | 'facts'
 >): PivotFactStoreBatch => ({
   ...factStoreSelectorFromSpec(spec),
-  materialization: factStoreMaterializationFromSpec(spec),
   facts,
 });
 
@@ -402,8 +400,7 @@ export const buildInitialRuntimeFromSpecResults = ({
   const store = buildFactStore(ingested);
   const factBatches = ingested.map(factStoreBatchFromIngested);
   return {
-    tree: materializeInitialPivotTreeFromFactStore({
-      specs,
+    tree: materializeLoadedPivotTreeFromFactStore({
       store,
       layout,
       formData,

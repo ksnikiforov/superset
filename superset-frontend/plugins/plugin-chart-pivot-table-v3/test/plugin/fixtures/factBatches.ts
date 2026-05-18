@@ -33,7 +33,6 @@ import {
 } from '../../../src/pivot/runtime/factStore';
 import { parsePath } from '../../../src/pivot/core/path';
 import {
-  factStoreMaterializationFromSpec,
   factStoreSelectorFromSpec,
 } from '../../../src/pivot/runtime/materializePivotTree';
 import {
@@ -132,7 +131,6 @@ const buildMockFactBatchesFromSpecs = (
 ): PivotFactStoreBatch[] =>
   specs.map(spec => ({
     ...factStoreSelectorFromSpec(spec),
-    materialization: factStoreMaterializationFromSpec(spec),
     facts: buildFactsForSpec(spec, data),
   }));
 

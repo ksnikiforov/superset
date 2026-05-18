@@ -34,7 +34,6 @@ import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
 import { buildBatchQuerySpecs } from '../../../src/pivot/query/specs';
 import { createPivotFactStore } from '../../../src/pivot/runtime/factStore';
 import {
-  factStoreMaterializationFromSpec,
   factStoreSelectorFromSpec,
   materializeLoadedPivotTreeFromFactStore,
 } from '../../../src/pivot/runtime/materializePivotTree';
@@ -266,7 +265,6 @@ describe('fetchPivotBranchesBatch', () => {
     const store = createPivotFactStore();
     store.upsertBatch({
       ...factStoreSelectorFromSpec(spec),
-      materialization: factStoreMaterializationFromSpec(spec),
       facts: [
         {
           rowPath: ['US', 'CA', 'SF'],

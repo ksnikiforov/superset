@@ -186,8 +186,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13992` insertions, `16039` deletions, net `-2047`.
-- Current production TypeScript/TSX total: about `31463` lines.
+- Production `src`: `13988` insertions, `16039` deletions, net `-2051`.
+- Current production TypeScript/TSX total: about `31459` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -907,6 +907,13 @@ Success criteria:
   branch trees. Their production contract is warning/error reporting plus
   fact-store mutation; callers that need a tree rematerialize from the loaded
   fact store through the materializer boundary.
+- Fact-store batches no longer carry per-batch materialization metadata.
+  The store owns loaded facts and coverage only; loaded-tree materialization
+  derives visible metric/measure structure from the loaded batch value keys plus
+  the current loaded layout context.
+- Sync initial materialization now uses the same loaded fact-store
+  materializer as expansion. The separate sync initial-tree wrapper and the
+  exported spec-to-fact-batch materialization helper have been removed.
 
 ## Current Risks
 

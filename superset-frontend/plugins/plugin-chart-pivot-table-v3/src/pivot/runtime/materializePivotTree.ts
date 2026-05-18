@@ -43,8 +43,9 @@ import {
   SUBTOTAL_LABEL,
   SUBTOTAL_TOKEN,
 } from '../core/tokens';
-import { getMetricKeys } from '../metrics';
+import { getMetricKey, getMetricKeys } from '../metrics';
 import {
+  buildOffsetMetricKey,
   buildMeasureLeafOutputKey,
   buildValueLeaf,
   computeMeasureLeafValue,
@@ -60,7 +61,6 @@ import {
   type PivotFactSelector,
   type PivotFactStore,
   type PivotFactStoreBatch,
-  type PivotFactStoreBatchMaterialization,
 } from './factStore';
 import {
   assertChunkedWorkCurrent,
@@ -87,6 +87,86 @@ type MaterializePivotTreeInput = {
 };
 
 const emptyPivotTree = (): PivotTreeData => ({ rows: {}, cols: {}, cells: {} });
+
+const canMaterializeMeasureLeaf = ({
+  valueKeys,
+  metricKey,
+  leaf,
+}: {
+  valueKeys: ReadonlySet<string>;
+  metricKey: string;
+  leaf: MeasureLeafSpec;
+}) => {
+  if (isValueLeaf(leaf)) {
+    return valueKeys.has(metricKey);
+  }
+  if (leaf.kind === 'custom') {
+    const customMetricKey = getMetricKey(leaf.metric);
+    if (!customMetricKey) {
+      return false;
+    }
+    return valueKeys.has(
+      leaf.offset
+        ? buildOffsetMetricKey(customMetricKey, leaf.offset)
+        : customMetricKey,
+    );
+  }
+  if (!leaf.offset) {
+    return false;
+  }
+  const offsetKey = buildOffsetMetricKey(metricKey, leaf.offset);
+  if (leaf.operator === 'offset_value') {
+    return valueKeys.has(offsetKey);
+  }
+  return valueKeys.has(metricKey) && valueKeys.has(offsetKey);
+};
+
+const deriveBatchMaterializationPlan = ({
+  batch,
+  layout,
+}: {
+  batch: PivotFactStoreBatch;
+  layout: LayoutContext;
+}) => {
+  const valueKeys = new Set(batch.valueKeys);
+  const valueKeyList = Array.from(valueKeys);
+  const loadedMetrics = layout.metrics.filter(metric => {
+    const metricKey = getMetricKey(metric);
+    return metricKey
+      ? valueKeys.has(metricKey) ||
+          valueKeyList.some(valueKey => valueKey.startsWith(`${metricKey}__`))
+      : false;
+  });
+  const loadedMetricKeys = new Set(getMetricKeys(loadedMetrics));
+  const materializedMeasureHierarchy: MeasureHierarchy =
+    layout.measureHierarchy.kind === 'measureStackV1'
+      ? {
+          ...layout.measureHierarchy,
+          groups: layout.measureHierarchy.groups
+            .filter(group => loadedMetricKeys.has(group.metricKey))
+            .map(group => ({
+              ...group,
+              leaves: group.leaves.filter(leaf =>
+                canMaterializeMeasureLeaf({
+                  valueKeys,
+                  metricKey: group.metricKey,
+                  leaf,
+                }),
+              ),
+            }))
+            .filter(group => group.leaves.length > 0),
+        }
+      : { kind: 'flatMetrics', metricKeys: Array.from(loadedMetricKeys) };
+
+  return {
+    metricsForQuery: loadedMetrics,
+    materializedMetrics: loadedMetrics,
+    materializedMeasureHierarchy,
+    rowSubtotalLevels: layout.rowSubtotalLevels,
+    colSubtotalLevels: layout.colSubtotalLevelsForQuery,
+    pivotProgram: layout.pivotProgram,
+  };
+};
 
 const projectFactStorePath = (
   spec: PlannedQuerySpec,
@@ -156,30 +236,6 @@ export const factStoreSelectorFromSpec = (
   }),
 });
 
-export const factStoreMaterializationFromSpec = (
-  spec: PlannedQuerySpec,
-): PivotFactStoreBatchMaterialization => ({
-  metricsForQuery: spec.metrics,
-  materializedMetrics: spec.meta.materializedMetrics,
-  materializedMeasureHierarchy: spec.meta.materializedMeasureHierarchy,
-  rowSubtotalLevels: spec.meta.rowSubtotalLevels,
-  colSubtotalLevels: spec.meta.colSubtotalLevels,
-  pivotProgram: spec.meta.pivotProgram,
-});
-
-export const buildFactStoreBatchesFromSpecs = ({
-  store,
-  specs,
-}: {
-  store: PivotFactStore;
-  specs: PlannedQuerySpec[];
-}): PivotFactStoreBatch[] =>
-  specs.map(spec => ({
-    ...factStoreSelectorFromSpec(spec),
-    materialization: factStoreMaterializationFromSpec(spec),
-    facts: store.getCompatibleFacts(factStoreSelectorFromSpec(spec)),
-  }));
-
 const materializationInputFromSpecs = ({
   store,
   specs,
@@ -196,7 +252,10 @@ const materializationInputFromSpecs = ({
     return undefined;
   }
   return {
-    batches: buildFactStoreBatchesFromSpecs({ store, specs }),
+    batches: specs.map(spec => ({
+      ...factStoreSelectorFromSpec(spec),
+      facts: store.getCompatibleFacts(factStoreSelectorFromSpec(spec)),
+    })),
     metricsForQuery: firstSpec.metrics,
     formData,
     measureHierarchy,
@@ -1248,50 +1307,44 @@ const materializePivotTreeAsync = async ({
 
 const materializeFactStoreBatches = ({
   batches,
+  layout,
   formData,
-  measureHierarchy,
 }: {
   batches: PivotFactStoreBatch[];
+  layout: LayoutContext;
   formData: PivotTableQueryFormData;
-  measureHierarchy: MeasureHierarchy;
 }): PivotTreeData => {
-  const batchesByMaterialization = new Map<
+  const batchesByPlan = new Map<
     string,
     {
-      materialization: PivotFactStoreBatchMaterialization;
+      plan: ReturnType<typeof deriveBatchMaterializationPlan>;
       batches: MaterializationFactBatch[];
     }
   >();
   batches.forEach(batch => {
-    if (!batch.materialization) {
-      return;
-    }
-    const key = JSON.stringify(batch.materialization);
-    const entry = batchesByMaterialization.get(key) ?? {
-      materialization: batch.materialization,
-      batches: [],
-    };
+    const plan = deriveBatchMaterializationPlan({ batch, layout });
+    const key = JSON.stringify(plan);
+    const entry = batchesByPlan.get(key) ?? { plan, batches: [] };
     entry.batches.push({
       facts: batch.facts,
       coverage: batch.coverage,
     });
-    batchesByMaterialization.set(key, entry);
+    batchesByPlan.set(key, entry);
   });
-  return Array.from(batchesByMaterialization.values()).reduce<PivotTreeData>(
-    (tree, { materialization, batches: materializationBatches }) =>
+  return Array.from(batchesByPlan.values()).reduce<PivotTreeData>(
+    (tree, { plan, batches: planBatches }) =>
       mergeTrees(
         tree,
         materializePivotTree({
-          batches: materializationBatches,
-          metricsForQuery: materialization.metricsForQuery,
+          batches: planBatches,
+          metricsForQuery: plan.metricsForQuery,
           formData,
-          measureHierarchy,
-          materializedMetrics: materialization.materializedMetrics,
-          materializedMeasureHierarchy:
-            materialization.materializedMeasureHierarchy,
-          rowSubtotalLevels: materialization.rowSubtotalLevels,
-          colSubtotalLevels: materialization.colSubtotalLevels,
-          pivotProgram: materialization.pivotProgram,
+          measureHierarchy: layout.measureHierarchy,
+          materializedMetrics: plan.materializedMetrics,
+          materializedMeasureHierarchy: plan.materializedMeasureHierarchy,
+          rowSubtotalLevels: plan.rowSubtotalLevels,
+          colSubtotalLevels: plan.colSubtotalLevels,
+          pivotProgram: plan.pivotProgram,
         }),
       ),
     emptyPivotTree(),
@@ -1310,34 +1363,10 @@ export const materializeLoadedPivotTreeFromFactStore = ({
   finalizeInitialPivotTree({
     tree: materializeFactStoreBatches({
       batches: store.getFactBatches(),
+      layout,
       formData,
-      measureHierarchy: layout.measureHierarchy,
     }),
   });
-
-export const materializeInitialPivotTreeFromFactStore = ({
-  specs,
-  store,
-  layout,
-  formData,
-}: {
-  specs: PlannedQuerySpec[];
-  store: PivotFactStore;
-  layout: LayoutContext;
-  formData: PivotTableQueryFormData;
-}): PivotTreeData => {
-  const { measureHierarchy } = layout;
-  const input = materializationInputFromSpecs({
-    store,
-    specs,
-    formData,
-    measureHierarchy,
-  });
-  const mergedTree = input ? materializePivotTree(input) : emptyPivotTree();
-  return finalizeInitialPivotTree({
-    tree: mergedTree,
-  });
-};
 
 export const materializeInitialPivotTreeFromFactStoreAsync = async ({
   specs,

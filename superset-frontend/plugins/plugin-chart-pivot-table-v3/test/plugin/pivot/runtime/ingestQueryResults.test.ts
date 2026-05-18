@@ -24,7 +24,7 @@ import {
   ingestQueryResults,
   upsertQueryResultsIntoFactStore,
 } from '../../../../src/pivot/runtime/ingestQueryResults';
-import { materializeInitialPivotTreeFromFactStore } from '../../fixtures/metricAxis';
+import { materializeLoadedPivotTreeFromFactStore } from '../../fixtures/metricAxis';
 import { buildLayoutContext } from '../../../../src/pivot/layout/LayoutContext';
 import {
   MetricsLayoutEnum,
@@ -264,11 +264,13 @@ test('keeps support and offset facts without materializing support metric branch
     results: [result],
   });
   const formData = buildFormData({
+    groupbyRows: ['country', METRICS_PLACEHOLDER],
+    groupbyColumns: ['month'],
     metrics: ['sales'],
+    metricsLayout: MetricsLayoutEnum.ROWS,
     metricLabelMap: { sales: 'Sales', sortMetric: 'Sort metric' },
   });
-  const tree = materializeInitialPivotTreeFromFactStore({
-    specs: [spec],
+  const tree = materializeLoadedPivotTreeFromFactStore({
     store,
     layout: buildLayoutContext(formData),
     formData,
@@ -313,10 +315,13 @@ test('materializes column subtotal leaves from planned coverage specs', () => {
     ],
   });
   const formData = buildFormData({
+    groupbyRows: ['country', METRICS_PLACEHOLDER],
+    groupbyColumns: ['category', 'subcategory'],
     metrics: ['sales'],
+    metricsLayout: MetricsLayoutEnum.ROWS,
+    colSubtotalLevels: [1],
   });
-  const tree = materializeInitialPivotTreeFromFactStore({
-    specs: [spec],
+  const tree = materializeLoadedPivotTreeFromFactStore({
     store,
     layout: buildLayoutContext(formData),
     formData,
