@@ -157,4 +157,29 @@ describe('queryShape', () => {
 
     expect(shape.metrics).toEqual(['m1', 'm3', 'm4']);
   });
+
+  it('resolves support metrics by canonical metric key', () => {
+    const supportMetric = {
+      expressionType: 'SQL' as const,
+      sqlExpression: 'SUM(color_metric)',
+      label: 'Color Metric',
+      optionName: 'metric_color',
+    };
+    const shape = buildQueryShape({
+      intent: {
+        ...baseIntent,
+        needsMetricFormatting: true,
+      },
+      metrics: ['m1'],
+      availableMetrics: ['m1', supportMetric],
+      rowGroupby: ['r1'],
+      colGroupby: [],
+      metricFormattingScope: 'values',
+      metricFormatting: {
+        m1: { backgroundColor: 'metric_color' },
+      },
+    });
+
+    expect(shape.metrics).toEqual(['m1', supportMetric]);
+  });
 });

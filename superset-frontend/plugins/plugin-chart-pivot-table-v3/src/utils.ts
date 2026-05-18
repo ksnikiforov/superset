@@ -595,11 +595,7 @@ const resolveMetricReferenceForQuery = (
       referenceCandidates.add(metric);
     }
   } else {
-    [
-      getFormattingMetricKey(metric),
-      getMetricKey(metric),
-      getMetricLabel(metric),
-    ]
+    [getFormattingMetricKey(metric), getMetricKey(metric)]
       .filter((key): key is string => Boolean(key))
       .forEach(key => referenceCandidates.add(key));
   }
@@ -613,7 +609,6 @@ const resolveMetricReferenceForQuery = (
     const candidateKeys = [
       getFormattingMetricKey(candidate),
       getMetricKey(candidate),
-      getMetricLabel(candidate),
     ].filter((key): key is string => Boolean(key));
     return candidateKeys.some(key => referenceCandidates.has(key));
   });
@@ -1093,11 +1088,7 @@ export const collectMeasureLeafMetricsForQuery = (
   }
   const existingMetricKeys = new Set<string>();
   metrics.forEach(metric => {
-    [
-      getFormattingMetricKey(metric),
-      getMetricKey(metric),
-      getMetricLabel(metric),
-    ]
+    [getFormattingMetricKey(metric), getMetricKey(metric)]
       .filter((key): key is string => Boolean(key))
       .forEach(key => existingMetricKeys.add(key));
   });
@@ -1109,7 +1100,6 @@ export const collectMeasureLeafMetricsForQuery = (
     const candidateKeys = [
       getFormattingMetricKey(resolved),
       getMetricKey(resolved),
-      getMetricLabel(resolved),
     ].filter((key): key is string => Boolean(key));
     if (candidateKeys.some(key => existingMetricKeys.has(key))) {
       return;
