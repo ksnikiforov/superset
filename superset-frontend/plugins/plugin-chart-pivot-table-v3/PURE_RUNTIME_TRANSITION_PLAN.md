@@ -259,8 +259,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13101` insertions, `17071` deletions, net `-3970`.
-- Current production TypeScript/TSX total: about `29540` lines.
+- Production `src`: `13093` insertions, `17110` deletions, net `-4017`.
+- Current production TypeScript/TSX total: about `29493` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -272,10 +272,10 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `29540` | `-3970` | `< 28000` |
+| Full production `src` | `33510` | `29493` | `-4017` | `< 28000` |
 | Strict core pipeline | `11337` | `11928` | `+591` | `8000` |
-| Non-visual chart runtime hooks | `4683` | `5127` | `+444` | `3000-4000` |
-| Broad core pipeline | `16020` | `17055` | `+1035` | `11000-13000` |
+| Non-visual chart runtime hooks | `4683` | `5080` | `+397` | `3000-4000` |
+| Broad core pipeline | `16020` | `17008` | `+988` | `11000-13000` |
 
 Current strict core breakdown:
 
@@ -304,6 +304,12 @@ Latest pipeline cleanup: `LayoutContext` now owns initial
 display consume the same manifest. The numeric `resolvedExpand*Level` fields are
 gone from the runtime boundary; query/update/state helper wrappers were trimmed
 to keep the strict core moving down while this ownership moved into core.
+
+Latest chart-layout cleanup: `usePivotLayout` no longer repeats most
+`LayoutContext` defaulting and normalization locally. The hook preserves the
+two UI-specific defaults at the boundary, then delegates layout compilation,
+totals, subtotals, expansion coverage, and measure hierarchy defaults to
+`buildLayoutContext`.
 
 Latest query cleanup: `QueryIntent` is gone. Bootstrap query planning now emits
 root-scoped planned specs directly, and `buildQueryShape` consumes concrete

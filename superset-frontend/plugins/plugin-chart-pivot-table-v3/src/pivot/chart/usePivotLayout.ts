@@ -39,7 +39,6 @@ import {
 } from './layoutRuntime';
 
 const defaultPivotNodeSorter = () => 0;
-const EMPTY_SUBTOTAL_LEVELS: number[] = [];
 
 export type PivotLayoutResult = {
   layout: ReturnType<typeof buildLayoutContext>;
@@ -78,64 +77,18 @@ export const usePivotLayout = ({
   formData: PivotTableProps['formData'];
   pivotProgram?: PivotProgram;
 }): PivotLayoutResult => {
-  const expandRowsLevelRaw = formData.expandRowsLevel;
-  const expandColumnsLevelRaw = formData.expandColumnsLevel;
-  const metricsLayout =
-    (formData.metricsLayout as MetricsLayoutEnum) || MetricsLayoutEnum.COLUMNS;
-  const startCollapsed = formData.startCollapsed ?? true;
-  const initialDepth = formData.initialDepth ?? 1;
-  const rowTotals = formData.rowTotals ?? false;
-  const colTotals = formData.colTotals ?? true;
-  const rowSubTotals = formData.rowSubTotals ?? false;
-  const rowSubtotalLevels = formData.rowSubtotalLevels ?? EMPTY_SUBTOTAL_LEVELS;
-  const colSubtotalLevels = formData.colSubtotalLevels ?? EMPTY_SUBTOTAL_LEVELS;
-  const rowTotalPosition = formData.rowTotalPosition ?? 'start';
-  const rowSubtotalPosition = formData.rowSubtotalPosition ?? 'start';
-  const colTotalPosition = formData.colTotalPosition ?? 'start';
-  const colSubtotalPosition = formData.colSubtotalPosition ?? 'start';
-
   const layout = useMemo(
     () =>
       buildLayoutContext({
-        groupbyRows: formData.groupbyRows,
-        groupbyColumns: formData.groupbyColumns,
-        metrics: formData.metrics,
-        measureLeavesByMetric: formData.measureLeavesByMetric,
-        verboseMap: formData.verboseMap,
-        metricsLayout,
-        rowTotals,
-        colTotals,
-        rowSubTotals,
-        rowSubtotalLevels,
-        colSubtotalLevels,
-        rowTotalPosition,
-        rowSubtotalPosition,
-        colTotalPosition,
-        colSubtotalPosition,
-        startCollapsed,
-        initialDepth,
-        expandRowsLevel: expandRowsLevelRaw,
-        expandColumnsLevel: expandColumnsLevelRaw,
+        ...formData,
+        metricsLayout:
+          (formData.metricsLayout as MetricsLayoutEnum) ||
+          MetricsLayoutEnum.COLUMNS,
+        colTotals: formData.colTotals ?? true,
+        rowSubTotals: formData.rowSubTotals ?? false,
         pivotProgram,
       }),
-    [
-      colSubtotalLevels,
-      colSubtotalPosition,
-      colTotalPosition,
-      colTotals,
-      expandColumnsLevelRaw,
-      expandRowsLevelRaw,
-      formData,
-      initialDepth,
-      metricsLayout,
-      pivotProgram,
-      rowSubtotalLevels,
-      rowSubtotalPosition,
-      rowTotalPosition,
-      rowTotals,
-      rowSubTotals,
-      startCollapsed,
-    ],
+    [formData, pivotProgram],
   );
   const isLeafTierVisible =
     layout.measureHierarchy.leafTierVisibility === 'visible';
@@ -152,11 +105,11 @@ export const usePivotLayout = ({
 
   const normalizedRowSubtotalLevels = layout.rowSubtotalLevels;
   const normalizedColSubtotalLevels = useMemo(() => {
-    if (rowTotals && !layout.colSubtotalLevels.includes(0)) {
+    if (layout.rowTotals && !layout.colSubtotalLevels.includes(0)) {
       return [0, ...layout.colSubtotalLevels];
     }
     return layout.colSubtotalLevels;
-  }, [layout.colSubtotalLevels, rowTotals]);
+  }, [layout.colSubtotalLevels, layout.rowTotals]);
 
   const groupbyRowKeys = useMemo(
     () => layout.pivotProgram.rowDimensions.map(getStableColumnKey),
@@ -174,23 +127,23 @@ export const usePivotLayout = ({
       metricPosition: metricLabels.length > 0 ? metricInsertIndex : -1,
       rowSubtotalLevels: normalizedRowSubtotalLevels,
       colSubtotalLevels: normalizedColSubtotalLevels,
-      rowTotals,
-      colTotals,
-      rowSubTotals,
+      rowTotals: layout.rowTotals,
+      colTotals: layout.colTotals,
+      rowSubTotals: layout.rowSubTotals,
       axisCoverageNeeds,
       measureHierarchy: layout.measureHierarchy,
     }),
     [
       axisCoverageNeeds,
-      colTotals,
       layout.measureHierarchy,
+      layout.colTotals,
+      layout.rowSubTotals,
+      layout.rowTotals,
       metricInsertIndex,
       metricLabels,
       normalizedColSubtotalLevels,
       normalizedRowSubtotalLevels,
       resolvedMetricsLayout,
-      rowSubTotals,
-      rowTotals,
     ],
   );
   const expandedStateSignature = useMemo(
@@ -223,16 +176,16 @@ export const usePivotLayout = ({
       resolveMetricAxisLayoutPolicy({
         program: layout.pivotProgram,
         isLeafTierVisible,
-        rowSubTotals,
+        rowSubTotals: layout.rowSubTotals,
         resolvedRowSubtotalPosition,
         resolvedColSubtotalPosition,
       }),
     [
       isLeafTierVisible,
       layout.pivotProgram,
+      layout.rowSubTotals,
       resolvedColSubtotalPosition,
       resolvedRowSubtotalPosition,
-      rowSubTotals,
     ],
   );
 
@@ -299,24 +252,24 @@ export const usePivotLayout = ({
         parent,
         nodes,
         hideMetricHeader: hideMetricHeaderOnRows,
-        colTotals,
+        colTotals: layout.colTotals,
       });
       return resolveRowSubtotalChildrenPolicy({
         program: layout.pivotProgram,
         children: filtered,
         parent,
         nodes,
-        rowSubTotals,
+        rowSubTotals: layout.rowSubTotals,
         rowSubtotalPositionForParent,
         hideMetricHeaderOnRows,
       });
     },
     [
-      colTotals,
       getRowSubtotalPosition,
       hideMetricHeaderOnRows,
+      layout.colTotals,
       layout.pivotProgram,
-      rowSubTotals,
+      layout.rowSubTotals,
     ],
   );
 
