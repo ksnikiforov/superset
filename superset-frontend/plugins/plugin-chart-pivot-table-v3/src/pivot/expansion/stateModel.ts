@@ -127,6 +127,11 @@ export const seedExpandedByLevel = (
 const pathStartsWith = (path: PivotPath, prefix: PivotPath) =>
   prefix.every((value, index) => path[index] === value);
 
+const resolveNodePath = (
+  key: string,
+  nodes: Record<string, PivotTreeNode>,
+): PivotPath => nodes[key]?.path ?? parsePath(key);
+
 const addAncestors = (path: PivotPath, expanded: Set<string>) => {
   for (let depth = 0; depth <= path.length; depth += 1) {
     expanded.add(serializePath(path.slice(0, depth)));
@@ -222,7 +227,6 @@ export const buildDesiredExpandedKeys = ({
   manualExpanded,
   manualCollapsed,
   pendingKeys,
-  inFlightKeys,
 }: {
   axis: PivotAxis;
   tree: PivotTreeData;
@@ -231,7 +235,6 @@ export const buildDesiredExpandedKeys = ({
   manualExpanded: Set<string>;
   manualCollapsed: Set<string>;
   pendingKeys: Set<string>;
-  inFlightKeys: Set<string>;
 }) => {
   const needExpanded = expandAxisCoverageNeedKeys({
     axis,
@@ -243,9 +246,17 @@ export const buildDesiredExpandedKeys = ({
     ...needExpanded,
     ...manualExpanded,
     ...pendingKeys,
-    ...inFlightKeys,
   ]);
-  manualCollapsed.forEach(key => next.delete(key));
+  const nodes = axis === 'row' ? tree.rows : tree.cols;
+  manualCollapsed.forEach(key => {
+    const collapsedPath = resolveNodePath(key, nodes);
+    Array.from(next).forEach(candidate => {
+      const candidatePath = resolveNodePath(candidate, nodes);
+      if (pathStartsWith(candidatePath, collapsedPath)) {
+        next.delete(candidate);
+      }
+    });
+  });
   return next;
 };
 

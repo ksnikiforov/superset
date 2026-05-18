@@ -58,7 +58,6 @@ import {
   type PivotAxisCoverageNeed,
 } from '../runtime/coverage';
 import {
-  addAncestors,
   buildVisiblePersistedExpansionState,
   computeVisibleDepths,
   planInitialHydrationPrefetch,
@@ -345,9 +344,6 @@ export const useExpansionEngine = ({
   const explicitExpandedColsRef = useRef<Set<string>>(new Set());
   const explicitCollapsedRowsRef = useRef<Set<string>>(new Set());
   const explicitCollapsedColsRef = useRef<Set<string>>(new Set());
-  const inFlightExpandedRowsRef = useRef<Map<number, Set<string>>>(new Map());
-  const inFlightExpandedColsRef = useRef<Map<number, Set<string>>>(new Map());
-  const inFlightExpansionIdRef = useRef(0);
   const [errorMessage, setErrorMessage] = useState<string>();
   const [warnings, setWarnings] = useState<ChartDataWarning[]>([]);
   const warningsRef = useRef<Map<string, ChartDataWarning>>(new Map());
@@ -436,53 +432,6 @@ export const useExpansionEngine = ({
 
   const setHydratingState = useCallback((value: boolean) => {
     dispatchRuntimeState({ type: 'setHydrating', value });
-  }, []);
-
-  const collectInFlightExpansion = useCallback((axis: PivotAxis) => {
-    const merged = new Set<string>();
-    (axis === 'row'
-      ? inFlightExpandedRowsRef.current
-      : inFlightExpandedColsRef.current
-    ).forEach(keys => keys.forEach(key => merged.add(key)));
-    return merged;
-  }, []);
-
-  const hasOtherAxisInFlight = useCallback((axis: PivotAxis) => {
-    const otherMap =
-      axis === 'row'
-        ? inFlightExpandedColsRef.current
-        : inFlightExpandedRowsRef.current;
-    return otherMap.size > 0;
-  }, []);
-
-  const trackInFlightExpansion = useCallback(
-    (
-      axis: PivotAxis,
-      resolvedExpanded: Set<string>,
-      committedExpanded: Set<string>,
-    ) => {
-      const inFlightId = inFlightExpansionIdRef.current + 1;
-      inFlightExpansionIdRef.current = inFlightId;
-      const inFlightMap =
-        axis === 'row'
-          ? inFlightExpandedRowsRef.current
-          : inFlightExpandedColsRef.current;
-      const inFlightKeys = new Set(resolvedExpanded);
-      committedExpanded.forEach(key => inFlightKeys.delete(key));
-      if (inFlightKeys.size > 0) {
-        inFlightMap.set(inFlightId, inFlightKeys);
-      }
-      return {
-        clear: () => inFlightMap.delete(inFlightId),
-      };
-    },
-    [],
-  );
-
-  const clearInFlightExpansions = useCallback(() => {
-    inFlightExpandedRowsRef.current.clear();
-    inFlightExpandedColsRef.current.clear();
-    inFlightExpansionIdRef.current = 0;
   }, []);
 
   const commitExpansionState = useCallback(
@@ -587,6 +536,8 @@ export const useExpansionEngine = ({
         expandedCols: nextCols,
         explicitExpandedRows: explicitExpandedRowsRef.current,
         explicitExpandedCols: explicitExpandedColsRef.current,
+        explicitCollapsedRows: explicitCollapsedRowsRef.current,
+        explicitCollapsedCols: explicitCollapsedColsRef.current,
         groupbyRowKeys,
         groupbyColumnKeys,
       });
@@ -631,9 +582,8 @@ export const useExpansionEngine = ({
             : explicitCollapsedColsRef.current,
         pendingKeys:
           axis === 'row' ? pendingRowsRef.current : pendingColsRef.current,
-        inFlightKeys: collectInFlightExpansion(axis),
       }),
-    [axisCoverageNeeds, collectInFlightExpansion, pivotProgram],
+    [axisCoverageNeeds, pivotProgram],
   );
 
   const buildFetchRuntime = useCallback(
@@ -656,96 +606,6 @@ export const useExpansionEngine = ({
       updateLoadingKey,
     }),
     [addWarnings, expansionRequestHelpers, pivotProgram, updateLoadingKey],
-  );
-
-  const expandSameAxis = useCallback(
-    async (axis: PivotAxis, node: PivotTreeNode) => {
-      const requestScope = expansionRequestLifecycle.currentScope();
-      const expanded =
-        axis === 'row' ? expandedRowsRef.current : expandedColsRef.current;
-      const manualExpandedRef =
-        axis === 'row' ? explicitExpandedRowsRef : explicitExpandedColsRef;
-      const manualCollapsedRef =
-        axis === 'row' ? explicitCollapsedRowsRef : explicitCollapsedColsRef;
-
-      const nextManualExpanded = new Set(manualExpandedRef.current);
-      addAncestors(node.path, nextManualExpanded, expanded);
-      manualExpandedRef.current = nextManualExpanded;
-      const nextManualCollapsed = new Set(manualCollapsedRef.current);
-      nextManualCollapsed.delete(node.key);
-      manualCollapsedRef.current = nextManualCollapsed;
-
-      const baseExpanded = new Set(expanded);
-      addAncestors(node.path, baseExpanded, expanded);
-
-      const requestEpoch = dataEpochRef.current;
-      const initialTree = treeRef.current;
-      const initialResolvedExpanded = resolveExpandedForMetrics(
-        axis,
-        baseExpanded,
-        initialTree,
-      );
-      const inFlight = trackInFlightExpansion(
-        axis,
-        initialResolvedExpanded,
-        expanded,
-      );
-
-      try {
-        const fetchLoop = await runHydrationExpansionFetchLoop({
-          baseTree: initialTree,
-          maxIterations: MAX_HYDRATION_ITERATIONS,
-          isCurrent: () =>
-            dataEpochRef.current === requestEpoch && requestScope.isCurrent(),
-          buildDesiredExpanded: (desiredAxis, treeForExpansion) =>
-            desiredAxis === axis
-              ? resolveExpandedForMetrics(axis, baseExpanded, treeForExpansion)
-              : desiredAxis === 'row'
-                ? expandedRowsRef.current
-                : expandedColsRef.current,
-          config: planningConfig,
-          activeAxis: axis,
-          pendingRows: pendingRowsRef.current,
-          pendingCols: pendingColsRef.current,
-          planRows: axis === 'row',
-          planCols: axis === 'col',
-          fetchRuntime: buildFetchRuntime(requestScope),
-        });
-
-        if (fetchLoop.status !== 'complete' || !requestScope.isCurrent()) {
-          return;
-        }
-        const committedExpanded =
-          axis === 'row' ? expandedRowsRef.current : expandedColsRef.current;
-        const combinedExpanded = new Set(committedExpanded);
-        manualExpandedRef.current.forEach(key => combinedExpanded.add(key));
-        const finalExpanded = resolveExpandedForMetrics(
-          axis,
-          combinedExpanded,
-          fetchLoop.tree,
-        );
-        commitExpansionState({
-          tree: fetchLoop.tree,
-          expandedRows: axis === 'row' ? finalExpanded : undefined,
-          expandedCols: axis === 'col' ? finalExpanded : undefined,
-        });
-        persistExpansionState(
-          axis === 'row' ? finalExpanded : expandedRowsRef.current,
-          axis === 'col' ? finalExpanded : expandedColsRef.current,
-        );
-      } finally {
-        inFlight.clear();
-      }
-    },
-    [
-      buildFetchRuntime,
-      commitExpansionState,
-      expansionRequestLifecycle,
-      persistExpansionState,
-      resolveExpandedForMetrics,
-      trackInFlightExpansion,
-      planningConfig,
-    ],
   );
 
   const collapseNode = useCallback(
@@ -865,7 +725,6 @@ export const useExpansionEngine = ({
         axis === 'row' ? pendingRowsRef.current : pendingColsRef.current;
       const otherPending =
         axis === 'row' ? pendingColsRef.current : pendingRowsRef.current;
-      const otherInFlight = hasOtherAxisInFlight(axis);
       const manualExpandedRef =
         axis === 'row' ? explicitExpandedRowsRef : explicitExpandedColsRef;
       const manualCollapsedRef =
@@ -882,7 +741,6 @@ export const useExpansionEngine = ({
         expanded,
         pending,
         otherPending,
-        otherInFlight,
         visibleRowDepth,
         visibleColDepth,
         manualExpanded: manualExpandedRef.current,
@@ -896,7 +754,10 @@ export const useExpansionEngine = ({
         return;
       }
 
-      if (toggleDecision.kind === 'cross-axis-hydration') {
+      if (
+        toggleDecision.kind === 'same-axis' ||
+        toggleDecision.kind === 'cross-axis-hydration'
+      ) {
         commitExpansionState({
           pendingRows: axis === 'row' ? toggleDecision.nextPending : undefined,
           pendingCols: axis === 'col' ? toggleDecision.nextPending : undefined,
@@ -906,18 +767,16 @@ export const useExpansionEngine = ({
         hydrateAtomic({
           activeAxis: axis,
           showLoader: false,
+          planRows: toggleDecision.kind === 'same-axis' ? axis === 'row' : true,
+          planCols: toggleDecision.kind === 'same-axis' ? axis === 'col' : true,
           persistOnComplete: true,
         }).catch(reportAsyncError);
-        return;
       }
-      expandSameAxis(axis, node).catch(reportAsyncError);
     },
     [
       collapseNode,
       commitExpansionState,
       expansionRequestLifecycle,
-      expandSameAxis,
-      hasOtherAxisInFlight,
       hydrateAtomic,
       reportAsyncError,
       clearLoadingState,
@@ -1007,8 +866,6 @@ export const useExpansionEngine = ({
     setWarnings([]);
     setErrorMessage(undefined);
     clearLoadingState();
-    clearInFlightExpansions();
-
     const reinitializedExpansion = resolveReinitializedExpansionState({
       tree: normalizedTree,
       currentLayout,
@@ -1099,7 +956,6 @@ export const useExpansionEngine = ({
     pivotProgram,
     shouldPersistExpansionState,
     hydrateAtomic,
-    clearInFlightExpansions,
     expansionRequestLifecycle,
     resolveExpandedForMetrics,
     reportAsyncError,

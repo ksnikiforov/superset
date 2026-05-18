@@ -17,8 +17,9 @@
  * under the License.
  */
 
-import { PivotTreeNode } from '../../../src/types';
+import { PivotTreeData, PivotTreeNode } from '../../../src/types';
 import {
+  buildDesiredExpandedKeys,
   coerceExpansionState,
   pruneExpandedToStablePrefix,
   seedExpandedByLevel,
@@ -29,6 +30,7 @@ import {
 } from '../../../src/pivot/core/tokens';
 import { serializePath } from '../../../src/pivot/core/path';
 import { rootKey } from '../../../src/pivot/viewModel';
+import { compilePivotProgram } from '../../../src/pivot/runtime/compilePivotProgram';
 
 const makeNode = ({
   axis,
@@ -129,5 +131,48 @@ describe('expansionStateModel', () => {
       metricLabelSet: new Set(),
     });
     expect(pruned).toEqual(new Set([rootKey, serializePath(['A'])]));
+  });
+
+  it('keeps collapsed branches closed when full-level coverage wants descendants', () => {
+    const tree: PivotTreeData = {
+      rows: {
+        [rootKey]: makeNode({ axis: 'row', path: [], hasChildren: true }),
+        A: makeNode({ axis: 'row', path: ['A'], hasChildren: true }),
+        [serializePath(['A', 'a1'])]: makeNode({
+          axis: 'row',
+          path: ['A', 'a1'],
+        }),
+        B: makeNode({ axis: 'row', path: ['B'], hasChildren: true }),
+        [serializePath(['B', 'b1'])]: makeNode({
+          axis: 'row',
+          path: ['B', 'b1'],
+        }),
+      },
+      cols: { [rootKey]: makeNode({ axis: 'col', path: [] }) },
+      cells: {},
+    };
+    const expanded = buildDesiredExpandedKeys({
+      axis: 'row',
+      tree,
+      axisCoverageNeeds: [
+        {
+          axis: 'row',
+          depth: 2,
+          scope: { kind: 'scopedFull', ancestorPaths: [[]] },
+        },
+      ],
+      program: compilePivotProgram({
+        groupbyRows: ['r1', 'r2'],
+        groupbyColumns: [],
+        metrics: ['m1'],
+      }),
+      manualExpanded: new Set([serializePath(['A'])]),
+      manualCollapsed: new Set([serializePath(['B'])]),
+      pendingKeys: new Set(),
+    });
+
+    expect(expanded).toEqual(
+      new Set([rootKey, serializePath(['A']), serializePath(['A', 'a1'])]),
+    );
   });
 });

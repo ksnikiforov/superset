@@ -253,7 +253,6 @@ export const resolveExpansionToggleDecision = ({
   expanded,
   pending,
   otherPending,
-  otherInFlight,
   visibleRowDepth,
   visibleColDepth,
   manualExpanded,
@@ -264,7 +263,6 @@ export const resolveExpansionToggleDecision = ({
   expanded: Set<string>;
   pending: Set<string>;
   otherPending: Set<string>;
-  otherInFlight: boolean;
   visibleRowDepth: number;
   visibleColDepth: number;
   manualExpanded: Set<string>;
@@ -277,12 +275,7 @@ export const resolveExpansionToggleDecision = ({
 
   const oppositeVisibleDepth =
     axis === 'row' ? visibleColDepth : visibleRowDepth;
-  const isAtomic =
-    oppositeVisibleDepth > 0 && (otherPending.size > 0 || otherInFlight);
-  if (!isAtomic) {
-    return { kind: 'same-axis' };
-  }
-
+  const isAtomic = oppositeVisibleDepth > 0 && otherPending.size > 0;
   const nextPending = new Set(pending);
   addAncestors(node.path, nextPending, expanded);
   const nextManualExpanded = new Set(manualExpanded);
@@ -290,7 +283,7 @@ export const resolveExpansionToggleDecision = ({
   const nextManualCollapsed = new Set(manualCollapsed);
   nextManualCollapsed.delete(node.key);
   return {
-    kind: 'cross-axis-hydration',
+    kind: isAtomic ? 'cross-axis-hydration' : 'same-axis',
     nextPending,
     nextManualExpanded,
     nextManualCollapsed,
@@ -540,7 +533,6 @@ const resolveExpansionCacheAxis = (config: ExpansionReinitAxis) => {
     manualExpanded: new Set(prunedManualKeys),
     manualCollapsed: new Set(prunedCollapsedKeys),
     pendingKeys: new Set(),
-    inFlightKeys: new Set(),
   });
   const expandedKeys =
     config.reset || (config.changed && !config.hasNewData)
@@ -1032,6 +1024,8 @@ export const buildVisiblePersistedExpansionState = ({
   expandedCols,
   explicitExpandedRows,
   explicitExpandedCols,
+  explicitCollapsedRows,
+  explicitCollapsedCols,
   groupbyRowKeys,
   groupbyColumnKeys,
 }: {
@@ -1040,6 +1034,8 @@ export const buildVisiblePersistedExpansionState = ({
   expandedCols: Set<string>;
   explicitExpandedRows: Set<string>;
   explicitExpandedCols: Set<string>;
+  explicitCollapsedRows: Set<string>;
+  explicitCollapsedCols: Set<string>;
   groupbyRowKeys: string[];
   groupbyColumnKeys: string[];
 }): {
@@ -1061,18 +1057,26 @@ export const buildVisiblePersistedExpansionState = ({
     explicitExpandedCols,
     visibleKeys.cols,
   );
+  const visibleCollapsedRows = filterVisibleExpansionKeys(
+    explicitCollapsedRows,
+    visibleKeys.rows,
+  );
+  const visibleCollapsedCols = filterVisibleExpansionKeys(
+    explicitCollapsedCols,
+    visibleKeys.cols,
+  );
   return {
     visibleExpandedRows: new Set(visibleRows),
     visibleExpandedCols: new Set(visibleCols),
-    visibleCollapsedRows: new Set<string>(),
-    visibleCollapsedCols: new Set<string>(),
+    visibleCollapsedRows: new Set(visibleCollapsedRows),
+    visibleCollapsedCols: new Set(visibleCollapsedCols),
     persistedState: {
       rowKeys: groupbyRowKeys,
       colKeys: groupbyColumnKeys,
       rows: visibleRows,
       cols: visibleCols,
-      collapsedRows: [],
-      collapsedCols: [],
+      collapsedRows: visibleCollapsedRows,
+      collapsedCols: visibleCollapsedCols,
     },
   };
 };

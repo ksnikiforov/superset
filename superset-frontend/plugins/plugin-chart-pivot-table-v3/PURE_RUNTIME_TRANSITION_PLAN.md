@@ -255,8 +255,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13850` insertions, `16784` deletions, net `-2934`.
-- Current production TypeScript/TSX total: about `30576` lines.
+- Production `src`: `13781` insertions, `16844` deletions, net `-3063`.
+- Current production TypeScript/TSX total: about `30447` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -743,6 +743,12 @@ Success criteria:
 - Same-axis expansion and cross-axis hydration now share one local
   `ExpansionFetchRuntime` builder inside `useExpansionEngine`, removing
   duplicate hook-owned fetch runtime wiring.
+- Same-axis expansion no longer has a separate in-flight expansion map or
+  branch-specific fetch loop. Toggle expansion writes pending visible coverage
+  and enters the same hydration loop used by prefetch and cross-axis hydration.
+- Manual collapsed branches now persist as first-class expansion state and
+  suppress descendant keys produced by full-level coverage needs, so pre-expand
+  intent does not reopen user-collapsed branches during hydration.
 - Collapsed row and column Values-tier projection now share one
   axis-neutral hook path in `usePivotLayout`, with row/column differences
   passed as policy parameters instead of separate callbacks.

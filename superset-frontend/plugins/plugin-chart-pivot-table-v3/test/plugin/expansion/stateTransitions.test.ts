@@ -219,7 +219,6 @@ describe('pivot/expansion/stateTransitions', () => {
       expanded: new Set([node.key]),
       pending: new Set(),
       otherPending: new Set(),
-      otherInFlight: false,
       visibleRowDepth: 1,
       visibleColDepth: 0,
       manualExpanded: new Set(),
@@ -237,14 +236,18 @@ describe('pivot/expansion/stateTransitions', () => {
       expanded: new Set(),
       pending: new Set(),
       otherPending: new Set(['other']),
-      otherInFlight: true,
       visibleRowDepth: 1,
       visibleColDepth: 0,
       manualExpanded: new Set(),
       manualCollapsed: new Set([node.key]),
     });
 
-    expect(decision).toEqual({ kind: 'same-axis' });
+    expect(decision).toEqual({
+      kind: 'same-axis',
+      nextPending: new Set([node.key]),
+      nextManualExpanded: new Set([node.key]),
+      nextManualCollapsed: new Set(),
+    });
   });
 
   it('resolves cross-axis expansion toggles with pending and manual state', () => {
@@ -259,7 +262,6 @@ describe('pivot/expansion/stateTransitions', () => {
       expanded: new Set([parentKey]),
       pending,
       otherPending: new Set(['col-pending']),
-      otherInFlight: false,
       visibleRowDepth: 1,
       visibleColDepth: 1,
       manualExpanded,
@@ -666,6 +668,10 @@ describe('pivot/expansion/stateTransitions', () => {
     const { tree, aKey, xKey } = buildTree({ includeIntersectionCell: true });
     const hiddenRowKey = serializePath(['hidden']);
     const hiddenColKey = serializePath(['hidden-col']);
+    const bKey = serializePath(['B']);
+    const yKey = serializePath(['Y']);
+    tree.rows[bKey] = makeNode('row', ['B'], true);
+    tree.cols[yKey] = makeNode('col', ['Y'], true);
 
     const result = buildVisiblePersistedExpansionState({
       tree,
@@ -673,6 +679,8 @@ describe('pivot/expansion/stateTransitions', () => {
       expandedCols: new Set([rootKey, xKey]),
       explicitExpandedRows: new Set([rootKey, aKey, hiddenRowKey]),
       explicitExpandedCols: new Set([rootKey, xKey, hiddenColKey]),
+      explicitCollapsedRows: new Set([bKey, hiddenRowKey]),
+      explicitCollapsedCols: new Set([yKey, hiddenColKey]),
       groupbyRowKeys: ['country'],
       groupbyColumnKeys: ['month'],
     });
@@ -682,13 +690,13 @@ describe('pivot/expansion/stateTransitions', () => {
       colKeys: ['month'],
       rows: [aKey],
       cols: [xKey],
-      collapsedRows: [],
-      collapsedCols: [],
+      collapsedRows: [bKey],
+      collapsedCols: [yKey],
     });
     expect(result.visibleExpandedRows).toEqual(new Set([aKey]));
     expect(result.visibleExpandedCols).toEqual(new Set([xKey]));
-    expect(result.visibleCollapsedRows).toEqual(new Set());
-    expect(result.visibleCollapsedCols).toEqual(new Set());
+    expect(result.visibleCollapsedRows).toEqual(new Set([bKey]));
+    expect(result.visibleCollapsedCols).toEqual(new Set([yKey]));
   });
 
   it('plans fetch targets for expanded nodes', () => {
