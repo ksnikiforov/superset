@@ -49,7 +49,6 @@ const factBatch = (
   scope: PivotFactStoreBatch['scope'] = { kind: 'root' },
 ): PivotFactStoreBatch => ({
   coverage: buildFactCoverage({
-    reason: 'initial',
     rowDimensions: ['country', 'state'].slice(0, Math.max(rowDepth, 1)),
     columnDimensions: ['month', 'quarter'].slice(0, Math.max(columnDepth, 1)),
     rowDepth,
@@ -458,7 +457,6 @@ describe('runtime layout reuse fetch policy', () => {
         reuseSnapshot: reuseSnapshot(runtimeLayout, [
           {
             coverage: buildFactCoverage({
-              reason: 'initial',
               rowDimensions: ['state'],
               columnDimensions: ['month'],
               rowDepth: 1,

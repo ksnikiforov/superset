@@ -32,18 +32,13 @@ import {
   type PivotAxisProjection,
 } from './projection';
 import type { PivotFactSelector, PivotFactStoreBatch } from './factStore';
-import type {
-  PivotCoverageReason,
-  PivotFactCoverage,
-  PivotProgram,
-} from './types';
+import type { PivotFactCoverage, PivotProgram } from './types';
 
 type FactCoverageInput = {
   rowDimensions: PivotProgram['rowDimensions'];
   columnDimensions: PivotProgram['columnDimensions'];
   rowDepth: number;
   columnDepth: number;
-  reason?: PivotCoverageReason;
 };
 
 type BranchFactCoverageInput = {
@@ -60,7 +55,6 @@ type BranchFactCoverageInput = {
   columnTotals?: boolean;
   includeRowTotalForColumnFormatting?: boolean;
   includeColumnTotalForRowFormatting?: boolean;
-  reason?: PivotCoverageReason;
 };
 
 export type AxisPathScope =
@@ -95,7 +89,6 @@ export type PivotCoverageNeed = {
   valueKeys: string[];
   rowScope: AxisPathScope;
   columnScope: AxisPathScope;
-  reason: 'root' | 'expand' | 'intersection';
 };
 
 type DepthPair = { rowDepth: number; columnDepth: number };
@@ -198,7 +191,6 @@ const buildExpansionCoverageNeed = ({
     const rowPaths = request.rowPathKeys.map(parsePath);
     const columnPaths = request.columnPathKeys.map(parsePath);
     return {
-      reason: 'intersection',
       rowDepth: request.rowDepth,
       columnDepth: request.columnDepth,
       rowDimensions: program.rowDimensions.slice(0, request.rowDepth),
@@ -231,7 +223,6 @@ const buildExpansionCoverageNeed = ({
       : program.columnDimensions.slice(0, columnDepth);
 
   return {
-    reason: 'expand',
     rowDepth,
     columnDepth,
     rowDimensions,
@@ -314,13 +305,11 @@ export const buildFactCoverage = ({
   columnDimensions,
   rowDepth,
   columnDepth,
-  reason = 'expand',
 }: FactCoverageInput): PivotFactCoverage => {
   const visibleRowDepth = clampDepth(rowDepth, rowDimensions.length);
   const visibleColumnDepth = clampDepth(columnDepth, columnDimensions.length);
 
   return {
-    reason,
     rowDepth: visibleRowDepth,
     columnDepth: visibleColumnDepth,
     rowDimensions: rowDimensions.slice(0, visibleRowDepth),
@@ -434,7 +423,6 @@ export const buildCoverageNeedFromFactSelector = ({
 }: PivotFactSelector): PivotCoverageNeed => {
   if (scope.kind === 'intersection') {
     return {
-      reason: 'intersection',
       rowDepth: coverage.rowDepth,
       columnDepth: coverage.columnDepth,
       rowDimensions: coverage.rowDimensions,
@@ -457,7 +445,6 @@ export const buildCoverageNeedFromFactSelector = ({
     : ({ kind: 'root' } as const);
 
   return {
-    reason: scope.kind === 'root' ? 'root' : 'expand',
     rowDepth: coverage.rowDepth,
     columnDepth: coverage.columnDepth,
     rowDimensions: coverage.rowDimensions,
@@ -482,7 +469,6 @@ export const buildBranchFactCoverages = ({
   columnTotals = false,
   includeRowTotalForColumnFormatting = false,
   includeColumnTotalForRowFormatting = false,
-  reason = 'expand',
 }: BranchFactCoverageInput): PivotFactCoverage[] => {
   const depthPairs: DepthPair[] = [];
   const addDepthPair = (rowDepthVal: number, columnDepthVal: number) => {
@@ -591,7 +577,6 @@ export const buildBranchFactCoverages = ({
       columnDimensions,
       rowDepth: pair.rowDepth,
       columnDepth: pair.columnDepth,
-      reason,
     }),
   );
 };

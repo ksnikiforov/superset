@@ -378,7 +378,6 @@ describe('pivot/expansion/stateTransitions', () => {
     const factBatches: PivotFactStoreBatch[] = [
       {
         coverage: {
-          reason: 'expand',
           rowDepth: 2,
           columnDepth: 1,
           rowDimensions: ['country', 'city'],
@@ -433,7 +432,6 @@ describe('pivot/expansion/stateTransitions', () => {
           const targetDepth = parsePath(target.pathKey).length + 1;
           factBatches.push({
             coverage: {
-              reason: 'expand',
               rowDepth:
                 target.axis === 'row' ? targetDepth : context.visibleRowDepth,
               columnDepth:
@@ -531,7 +529,6 @@ describe('pivot/expansion/stateTransitions', () => {
           const targetDepth = path.length + 1;
           factBatches.push({
             coverage: {
-              reason: 'expand',
               rowDepth:
                 target.axis === 'row' ? targetDepth : context.visibleRowDepth,
               columnDepth: context.visibleColDepth,
@@ -703,7 +700,6 @@ describe('pivot/expansion/stateTransitions', () => {
     const { tree, aKey, xKey } = buildTree({ includeIntersectionCell: true });
     const loadedRootCoverage: PivotFactStoreBatch = {
       coverage: {
-        reason: 'expand',
         rowDepth: 1,
         columnDepth: 1,
         rowDimensions: ['country'],

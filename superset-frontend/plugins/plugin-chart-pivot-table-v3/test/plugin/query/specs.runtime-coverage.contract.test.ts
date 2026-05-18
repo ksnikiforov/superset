@@ -53,7 +53,6 @@ describe('runtime coverage query specs contract', () => {
     expect(specs.length).toBeGreaterThan(0);
     specs.forEach(spec => {
       expect(spec.meta.coverage).toMatchObject({
-        reason: 'expand',
         rowDepth: spec.meta.coverage.rowDepth,
         columnDepth: spec.meta.coverage.columnDepth,
       });

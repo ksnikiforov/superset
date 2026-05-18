@@ -53,7 +53,6 @@ const buildSpec = ({
   colGroupby?: string[];
 }): PlannedQuerySpec => {
   const coverage = {
-    reason: 'initial' as const,
     rowDepth,
     columnDepth: colDepth,
     rowDimensions: rowGroupby.slice(0, rowDepth),

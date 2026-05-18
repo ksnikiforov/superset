@@ -215,7 +215,6 @@ export const buildPreloadedBootstrapFactBatches = (
     groupby.groupbyColumns.length > 0 && colDepth > 0 ? 1 : 0;
   const valueKeys = collectTreeValueKeys(tree);
   const coverage = {
-    reason: 'initial' as const,
     rowDepth: bootstrapRowDepth,
     columnDepth: bootstrapColDepth,
     rowDimensions: groupby.groupbyRows.slice(0, bootstrapRowDepth),
@@ -274,7 +273,6 @@ export const buildPreloadedBranchFactBatches = (
       rowDepths.forEach(nextRowDepth => {
         colDepths.forEach(nextColDepth => {
           const coverage = {
-            reason: 'initial' as const,
             rowDepth: nextRowDepth,
             columnDepth: nextColDepth,
             rowDimensions: groupby.groupbyRows.slice(0, nextRowDepth),
@@ -337,7 +335,6 @@ export const buildPreloadedRenderedBranchFactBatches = (
       rowDepths.forEach(nextRowDepth => {
         colDepths.forEach(nextColDepth => {
           const coverage = {
-            reason: 'initial' as const,
             rowDepth: nextRowDepth,
             columnDepth: nextColDepth,
             rowDimensions: groupby.groupbyRows.slice(0, nextRowDepth),

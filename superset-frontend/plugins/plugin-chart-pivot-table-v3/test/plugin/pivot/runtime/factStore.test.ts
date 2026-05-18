@@ -25,7 +25,6 @@ import { type PivotFactCoverage } from '../../../../src/pivot/runtime/types';
 import { encodeMetricKey } from '../../../../src/pivot/core/tokens';
 
 const coverage: PivotFactCoverage = {
-  reason: 'initial',
   rowDepth: 1,
   columnDepth: 1,
   rowDimensions: ['country'],
@@ -105,7 +104,6 @@ test('exposes loaded coverage batches without duplicating fact payloads', () => 
 test('does not mark sibling branch scopes with identical coverage as loaded', () => {
   const store = createPivotFactStore();
   const branchCoverage: PivotFactCoverage = {
-    reason: 'expand',
     rowDepth: 2,
     columnDepth: 0,
     rowDimensions: ['country', 'city'],
@@ -141,7 +139,6 @@ test('does not mark sibling branch scopes with identical coverage as loaded', ()
 test('uses exact-depth root coverage for narrower branch coverage', () => {
   const store = createPivotFactStore();
   const branchCoverage: PivotFactCoverage = {
-    reason: 'expand',
     rowDepth: 2,
     columnDepth: 1,
     rowDimensions: ['country', 'city'],
@@ -149,7 +146,6 @@ test('uses exact-depth root coverage for narrower branch coverage', () => {
   };
   const rootCoverage: PivotFactCoverage = {
     ...branchCoverage,
-    reason: 'initial',
   };
   const franceFact = buildFact({
     rowPath: ['France', 'Paris'],
@@ -184,7 +180,6 @@ test('uses exact-depth root coverage for narrower branch coverage', () => {
 test('uses intersection scope for bounded cross-axis coverage', () => {
   const store = createPivotFactStore();
   const intersectionCoverage: PivotFactCoverage = {
-    reason: 'expand',
     rowDepth: 2,
     columnDepth: 2,
     rowDimensions: ['country', 'city'],
@@ -237,7 +232,6 @@ test('uses intersection scope for bounded cross-axis coverage', () => {
 test('does not reuse root coverage for values-token branch scopes', () => {
   const store = createPivotFactStore();
   const branchCoverage: PivotFactCoverage = {
-    reason: 'expand',
     rowDepth: 1,
     columnDepth: 1,
     rowDimensions: ['country'],
@@ -254,7 +248,7 @@ test('does not reuse root coverage for values-token branch scopes', () => {
   };
 
   store.upsertBatch({
-    coverage: { ...branchCoverage, reason: 'initial' },
+    coverage: branchCoverage,
     scope: { kind: 'root' },
     valueKeys: ['sales'],
     facts: [buildFact({ columnPath: ['REV-A'] })],
@@ -288,7 +282,6 @@ test('does not reuse values-token branch coverage for root materialization', () 
 test('keeps exact branch facts alongside broader compatible root coverage', () => {
   const store = createPivotFactStore();
   const branchCoverage: PivotFactCoverage = {
-    reason: 'expand',
     rowDepth: 2,
     columnDepth: 1,
     rowDimensions: ['country', 'city'],
@@ -315,7 +308,7 @@ test('keeps exact branch facts alongside broader compatible root coverage', () =
   });
 
   store.upsertBatch({
-    coverage: { ...branchCoverage, reason: 'initial' },
+    coverage: branchCoverage,
     scope: { kind: 'root' },
     valueKeys: ['sales'],
     facts: [rootFact],
@@ -334,7 +327,6 @@ test('keeps exact branch facts alongside broader compatible root coverage', () =
 test('batch coverage can satisfy branch coverage checks', () => {
   const store = createPivotFactStore();
   const branchCoverage: PivotFactCoverage = {
-    reason: 'expand',
     rowDepth: 2,
     columnDepth: 1,
     rowDimensions: ['country', 'city'],
@@ -388,7 +380,6 @@ test('batch coverage can satisfy branch coverage checks', () => {
 test('registers compatible coverage aliases without upserting duplicate facts', () => {
   const store = createPivotFactStore();
   const branchCoverage: PivotFactCoverage = {
-    reason: 'expand',
     rowDepth: 2,
     columnDepth: 1,
     rowDimensions: ['country', 'city'],
@@ -437,7 +428,6 @@ test('registers compatible coverage aliases without upserting duplicate facts', 
 test('separate exact branches can satisfy a batched coverage request', () => {
   const store = createPivotFactStore();
   const branchCoverage: PivotFactCoverage = {
-    reason: 'expand',
     rowDepth: 2,
     columnDepth: 1,
     rowDimensions: ['country', 'city'],
@@ -495,14 +485,12 @@ test('separate exact branches can satisfy a batched coverage request', () => {
 test('does not reuse deeper aggregate facts for a shallower branch request', () => {
   const store = createPivotFactStore();
   const shallowCoverage: PivotFactCoverage = {
-    reason: 'expand',
     rowDepth: 2,
     columnDepth: 1,
     rowDimensions: ['country', 'city'],
     columnDimensions: ['month'],
   };
   const deepCoverage: PivotFactCoverage = {
-    reason: 'expand',
     rowDepth: 3,
     columnDepth: 1,
     rowDimensions: ['country', 'city', 'store'],

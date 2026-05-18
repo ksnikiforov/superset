@@ -145,7 +145,6 @@ describe('buildInitialQuerySpecs (contracts)', () => {
 
     expect(gridSpec?.columns).toEqual(['country', 'category']);
     expect(gridSpec?.meta.coverage).toMatchObject({
-      reason: 'initial',
       rowDepth: 1,
       columnDepth: 1,
       rowDimensions: ['country'],

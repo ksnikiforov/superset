@@ -1496,7 +1496,6 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     const factBatches: PivotFactStoreBatch[] = [
       {
         coverage: {
-          reason: 'initial',
           rowDepth: 1,
           columnDepth: 2,
           rowDimensions: ['row1'],

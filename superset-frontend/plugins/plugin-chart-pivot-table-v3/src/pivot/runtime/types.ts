@@ -51,10 +51,7 @@ export type PivotProgram = {
   metricInsertIndex: number;
 };
 
-export type PivotCoverageReason = 'initial' | 'layout' | 'expand';
-
 export type PivotFactCoverage = {
-  reason: PivotCoverageReason;
   rowDepth: number;
   columnDepth: number;
   rowDimensions: PivotColumnRef[];

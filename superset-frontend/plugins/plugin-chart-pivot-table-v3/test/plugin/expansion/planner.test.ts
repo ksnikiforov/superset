@@ -164,7 +164,6 @@ describe('pivot/expansion/planner', () => {
     const getMissingExpansionCoverage = getMissingCoverageFromBatches([
       {
         coverage: {
-          reason: 'expand',
           rowDepth: 2,
           columnDepth: 1,
           rowDimensions: ['category', 'subcategory'],
@@ -270,7 +269,6 @@ describe('pivot/expansion/planner', () => {
     const getMissingExpansionCoverage = getMissingCoverageFromBatches([
       {
         coverage: {
-          reason: 'expand',
           rowDepth: 3,
           columnDepth: 0,
           rowDimensions: ['category', 'subcategory', 'city'],
@@ -310,7 +308,6 @@ describe('pivot/expansion/planner', () => {
     const getMissingExpansionCoverage = getMissingCoverageFromBatches([
       {
         coverage: {
-          reason: 'expand',
           rowDepth: 2,
           columnDepth: 1,
           rowDimensions: ['category', 'subcategory'],

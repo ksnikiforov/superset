@@ -388,7 +388,6 @@ const resolveFetchContext = ({
   visibleColDepth = 0,
   targetRowDepth,
   targetColDepth,
-  coverageReason = 'expand',
 }: {
   formData: PivotTableQueryFormData;
   layout: LayoutContext;
@@ -398,7 +397,6 @@ const resolveFetchContext = ({
   visibleColDepth?: number;
   targetRowDepth?: number;
   targetColDepth?: number;
-  coverageReason?: PivotFactCoverage['reason'];
 }): ResolvedFetchContext => {
   const { metrics } = layout;
   const rowGroupby = layout.pivotProgram.rowDimensions;
@@ -530,7 +528,6 @@ const resolveFetchContext = ({
       axis === 'col' && (hasColFormatting || hasColTotalSorting),
     includeColumnTotalForRowFormatting:
       axis === 'row' && (hasRowFormatting || hasRowTotalSorting),
-    reason: coverageReason,
   });
 
   return {
@@ -864,7 +861,6 @@ const buildInitialRootSpecs = ({
 
   return intents.flatMap(intent => {
     const coverage = buildFactCoverage({
-      reason: 'initial',
       rowDimensions: layout.pivotProgram.rowDimensions,
       columnDimensions: layout.pivotProgram.columnDimensions,
       rowDepth: intent.targetRowDepth,
@@ -954,7 +950,6 @@ export const buildInitialQuerySpecs = (
       visibleColDepth: baseColDepth,
       targetRowDepth: baseRowDepth,
       targetColDepth: baseColDepth,
-      coverageReason: 'initial',
     });
     const colRootContext = resolveFetchContext({
       formData,
@@ -965,7 +960,6 @@ export const buildInitialQuerySpecs = (
       visibleColDepth: baseColDepth,
       targetRowDepth: baseRowDepth,
       targetColDepth: baseColDepth,
-      coverageReason: 'initial',
     });
     specs.push(
       ...buildSpecsForCoverages({

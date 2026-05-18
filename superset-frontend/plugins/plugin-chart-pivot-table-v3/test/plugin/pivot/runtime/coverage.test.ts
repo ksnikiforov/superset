@@ -44,7 +44,6 @@ describe('expansion fact coverage', () => {
       factBatches: [
         {
           coverage: {
-            reason: 'expand',
             rowDepth: 2,
             columnDepth: 1,
             rowDimensions: ['country', 'city'],
@@ -60,7 +59,6 @@ describe('expansion fact coverage', () => {
         },
         {
           coverage: {
-            reason: 'expand',
             rowDepth: 2,
             columnDepth: 3,
             rowDimensions: ['country', 'city'],
@@ -131,7 +129,6 @@ describe('coverage manifest diff', () => {
     rowScope: PivotCoverageNeed['rowScope'],
     columnScope: PivotCoverageNeed['columnScope'],
   ): PivotCoverageNeed => ({
-    reason: 'intersection',
     rowDepth: 2,
     columnDepth: 2,
     rowDimensions: ['country', 'city'],
@@ -147,7 +144,6 @@ describe('coverage manifest diff', () => {
     columnDepth = 2,
   ): PivotFactStoreBatch => ({
     coverage: buildFactCoverage({
-      reason: 'expand',
       rowDimensions: ['country', 'city'],
       columnDimensions: ['year', 'quarter'],
       rowDepth,
@@ -337,7 +333,6 @@ describe('coverage manifest diff', () => {
         factBatches: [
           {
             coverage: {
-              reason: 'expand',
               rowDepth: 3,
               columnDepth: 2,
               rowDimensions: ['country', 'city', 'store'],
@@ -370,7 +365,6 @@ describe('coverage manifest diff', () => {
         factBatches: [
           {
             coverage: buildFactCoverage({
-              reason: 'expand',
               rowDimensions: ['country', 'state', 'city', 'store'],
               columnDimensions: ['year', 'quarter'],
               rowDepth: 4,
@@ -432,7 +426,6 @@ describe('branch fact coverage', () => {
       expect(coverage).toEqual(
         expect.arrayContaining([
           {
-            reason: 'expand',
             rowDepth: axis === 'row' ? 2 : 0,
             columnDepth: axis === 'col' ? 2 : 0,
             rowDimensions: axis === 'row' ? ['country', 'state'] : [],
@@ -443,7 +436,6 @@ describe('branch fact coverage', () => {
       expect(coverage).not.toEqual(
         expect.arrayContaining([
           {
-            reason: 'expand',
             rowDepth: 0,
             columnDepth: 0,
             rowDimensions: [],

@@ -255,8 +255,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13549` insertions, `16910` deletions, net `-3361`.
-- Current production TypeScript/TSX total: about `30149` lines.
+- Production `src`: `13525` insertions, `16910` deletions, net `-3385`.
+- Current production TypeScript/TSX total: about `30125` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -268,18 +268,18 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `30149` | `-3361` | `< 28000` |
-| Strict core pipeline | `11337` | `12595` | `+1258` | `8000` |
+| Full production `src` | `33510` | `30125` | `-3385` | `< 28000` |
+| Strict core pipeline | `11337` | `12571` | `+1234` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5076` | `+393` | `3000-4000` |
-| Broad core pipeline | `16020` | `17671` | `+1651` | `11000-13000` |
+| Broad core pipeline | `16020` | `17647` | `+1627` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `4059` |
+| `pivot/runtime/*` | `4041` |
 | `pivot/expansion/*` | `2930` |
-| `pivot/query/*` | `1776` |
+| `pivot/query/*` | `1770` |
 | `pivot/layout/*` | `744` |
 | core/shared/domain helpers | `1873` |
 | formatting/data/render-model/update support | `1213` |
@@ -334,6 +334,10 @@ Latest query-layout cleanup: planned query specs no longer carry
 `pivotProgram`. Query planning consumes the compiled program while building
 coverage and selectors, but the emitted spec no longer re-exports layout
 authority.
+
+Latest coverage cleanup: fact coverage no longer carries a semantic `reason`.
+Coverage is now only loaded aggregate shape: row depth, column depth, and the
+row/column dimensions. Request identity remains in `factSelector.scope`.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.
