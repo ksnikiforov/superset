@@ -16,31 +16,25 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import buildQuery from '../../../src/buildQuery';
 import { PATH_DIVIDER, serializePath } from '../../../src/pivot/core/path';
+import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
+import { buildBranchQuerySpecs } from '../../../src/pivot/query/specs';
 import { buildFormData } from '../fixtures/pivotFormData';
 
 describe('query naming (contracts)', () => {
   it('uses serializePath() for branch suffixes, including divider values', () => {
     const dividerValue = `A${PATH_DIVIDER}B`;
-    const queryContext = buildQuery(
-      buildFormData({
-        groupbyRows: ['r1', 'r2'],
-        groupbyColumns: [],
-        metrics: ['m1'],
-        pivotExpansionState: {
-          rowKeys: ['r1', 'r2'],
-          colKeys: [],
-          rows: [[dividerValue]],
-          cols: [],
-          collapsedRows: [],
-          collapsedCols: [],
-        },
-      }),
-    );
-    const names = queryContext.queries.map(query =>
-      typeof query.query_name === 'string' ? query.query_name : '',
-    );
+    const formData = buildFormData({
+      groupbyRows: ['r1', 'r2'],
+      groupbyColumns: [],
+      metrics: ['m1'],
+    });
+    const names = buildBranchQuerySpecs({
+      formData,
+      layout: buildLayoutContext(formData),
+      axis: 'row',
+      path: [dividerValue],
+    }).map(spec => spec.queryName);
 
     expect(
       names.some(name =>
@@ -50,24 +44,17 @@ describe('query naming (contracts)', () => {
   });
 
   it('uses serializePath() for branch suffixes, including null values', () => {
-    const queryContext = buildQuery(
-      buildFormData({
-        groupbyRows: ['r1', 'r2'],
-        groupbyColumns: [],
-        metrics: ['m1'],
-        pivotExpansionState: {
-          rowKeys: ['r1', 'r2'],
-          colKeys: [],
-          rows: [[null]],
-          cols: [],
-          collapsedRows: [],
-          collapsedCols: [],
-        },
-      }),
-    );
-    const names = queryContext.queries.map(query =>
-      typeof query.query_name === 'string' ? query.query_name : '',
-    );
+    const formData = buildFormData({
+      groupbyRows: ['r1', 'r2'],
+      groupbyColumns: [],
+      metrics: ['m1'],
+    });
+    const names = buildBranchQuerySpecs({
+      formData,
+      layout: buildLayoutContext(formData),
+      axis: 'row',
+      path: [null],
+    }).map(spec => spec.queryName);
 
     expect(
       names.some(name => name.includes(`|branch:row:${serializePath([null])}`)),
@@ -75,24 +62,18 @@ describe('query naming (contracts)', () => {
   });
 
   it('uses serializePath() for branch suffixes, including undefined values', () => {
-    const queryContext = buildQuery(
-      buildFormData({
-        groupbyRows: ['r1', 'r2'],
-        groupbyColumns: [],
-        metrics: ['m1'],
-        pivotExpansionState: {
-          rowKeys: ['r1', 'r2'],
-          colKeys: [],
-          rows: [[undefined]],
-          cols: [],
-          collapsedRows: [],
-          collapsedCols: [],
-        },
-      }),
-    );
-    const names = queryContext.queries.map(query =>
-      typeof query.query_name === 'string' ? query.query_name : '',
-    );
+    const formData = buildFormData({
+      groupbyRows: ['r1', 'r2'],
+      groupbyColumns: [],
+      metrics: ['m1'],
+    });
+    const names = buildBranchQuerySpecs({
+      formData,
+      layout: buildLayoutContext(formData),
+      axis: 'row',
+      path: [undefined],
+    }).map(spec => spec.queryName);
+
     expect(
       names.some(name =>
         name.includes(`|branch:row:${serializePath([undefined])}`),

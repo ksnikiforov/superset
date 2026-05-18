@@ -18,10 +18,9 @@
  */
 import { buildInitialQuerySpecs } from '../../../src/pivot/query/specs';
 import { buildFormData } from '../fixtures/pivotFormData';
-import { serializePath } from '../../../src/pivot/core/path';
 
 describe('buildInitialQuerySpecs (contracts)', () => {
-  it('emits branch targets in deterministic order and drops collapsed/duplicate paths', () => {
+  it('does not replay persisted expansion branches in the initial query plan', () => {
     const formData = buildFormData({
       groupbyRows: ['r1', 'r2'],
       groupbyColumns: ['c1'],
@@ -38,69 +37,89 @@ describe('buildInitialQuerySpecs (contracts)', () => {
     });
 
     const specs = buildInitialQuerySpecs(formData);
-    const uniquePrefetch = new Map<string, unknown>();
-    specs.forEach(spec => {
-      if (spec.meta.kind === 'branch' && spec.meta.axis && spec.meta.path) {
-        uniquePrefetch.set(
-          `branch|${spec.meta.axis}|${serializePath(spec.meta.path)}`,
-          { kind: 'branch', axis: spec.meta.axis, path: spec.meta.path },
-        );
-      }
-      if (
-        spec.meta.kind === 'batch' &&
-        spec.meta.axis &&
-        spec.meta.parentPath
-      ) {
-        uniquePrefetch.set(
-          `batch|${spec.meta.axis}|${serializePath(spec.meta.parentPath)}`,
-          {
-            kind: 'batch',
-            axis: spec.meta.axis,
-            parentPath: spec.meta.parentPath,
-            siblingValues: spec.meta.siblingValues ?? [],
-          },
-        );
-      }
-    });
 
-    const targets = Array.from(uniquePrefetch.values());
-    expect(targets).toEqual(
-      expect.arrayContaining([
-        { kind: 'branch', axis: 'row', path: ['A'] },
-        {
-          kind: 'batch',
-          axis: 'col',
-          parentPath: [],
-          siblingValues: expect.arrayContaining(['X', 'Y']),
-        },
-      ]),
-    );
+    expect(
+      specs.some(
+        spec =>
+          spec.meta.kind === 'branch' ||
+          spec.meta.kind === 'batch' ||
+          spec.meta.kind === 'intersection',
+      ),
+    ).toBe(false);
   });
 
-  it('prunes persisted expansions beyond the stable prefix', () => {
+  it('keeps auto-expand root prefetch separate from persisted expansion replay', () => {
     const formData = buildFormData({
       groupbyRows: ['r1', 'r2'],
-      groupbyColumns: [],
+      groupbyColumns: ['c1'],
       metrics: ['m1'],
+      expandRowsLevel: 2,
       pivotExpansionState: {
         rowKeys: ['r1', 'old_r2'],
-        colKeys: [],
+        colKeys: ['c1'],
         rows: [['A'], ['A', 'B']],
-        cols: [],
+        cols: [['X']],
         collapsedRows: [],
         collapsedCols: [],
       },
     });
 
     const specs = buildInitialQuerySpecs(formData);
-    const branchPaths = new Set<string>();
-    specs.forEach(spec => {
-      if (spec.meta.kind === 'branch' && spec.meta.axis === 'row') {
-        branchPaths.add(serializePath(spec.meta.path || []));
-      }
+
+    expect(specs.some(spec => spec.meta.kind === 'root')).toBe(true);
+    expect(
+      specs.some(
+        spec =>
+          spec.meta.kind === 'branch' ||
+          spec.meta.kind === 'batch' ||
+          spec.meta.kind === 'intersection',
+      ),
+    ).toBe(false);
+    expect(
+      specs
+        .filter(spec => spec.meta.kind === 'root')
+        .map(spec => [
+          spec.meta.coverage.rowDepth,
+          spec.meta.coverage.columnDepth,
+        ]),
+    ).toContainEqual([2, 1]);
+  });
+
+  it('does not let persisted deep expansions increase initial visible depth', () => {
+    const formData = buildFormData({
+      groupbyRows: ['r1', 'r2'],
+      groupbyColumns: ['c1', 'c2'],
+      metrics: ['m1'],
+      expandRowsLevel: 0,
+      expandColumnsLevel: 0,
+      pivotExpansionState: {
+        rowKeys: ['r1', 'r2'],
+        colKeys: ['c1', 'c2'],
+        rows: [['A', 'B']],
+        cols: [['X', 'Y']],
+        collapsedRows: [],
+        collapsedCols: [],
+      },
     });
 
-    expect(Array.from(branchPaths)).toEqual([serializePath(['A'])]);
+    const specs = buildInitialQuerySpecs(formData);
+
+    expect(specs.some(spec => spec.meta.kind === 'root')).toBe(false);
+    expect(
+      specs.some(
+        spec =>
+          spec.meta.kind === 'branch' ||
+          spec.meta.kind === 'batch' ||
+          spec.meta.kind === 'intersection',
+      ),
+    ).toBe(false);
+    expect(
+      specs.every(
+        spec =>
+          spec.meta.coverage.rowDepth <= 1 &&
+          spec.meta.coverage.columnDepth <= 1,
+      ),
+    ).toBe(true);
   });
 
   it('records bootstrap coverage for visible layers only', () => {

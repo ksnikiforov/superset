@@ -49,13 +49,17 @@ const baseFormData = buildFormData({
 });
 
 describe('buildQuery (bootstrap)', () => {
-  test('emits minimal bootstrap queries for totals + top-level axes', () => {
+  test('emits bootstrap queries for totals, grid, and visible axis roots', () => {
     const queryContext = buildQuery(baseFormData);
-    expect(queryContext.queries).toHaveLength(2);
+    expect(queryContext.queries).toHaveLength(4);
     expect(queryContext.queries[0].query_name).toEqual(formatQueryName(0, 0));
     expect(queryContext.queries[0].columns).toEqual([]);
     expect(queryContext.queries[1].query_name).toEqual(formatQueryName(1, 1));
     expect(queryContext.queries[1].columns).toEqual(['row1', 'col1']);
+    expect(queryContext.queries[2].query_name).toEqual(formatQueryName(1, 0));
+    expect(queryContext.queries[2].columns).toEqual(['row1']);
+    expect(queryContext.queries[3].query_name).toEqual(formatQueryName(0, 1));
+    expect(queryContext.queries[3].columns).toEqual(['col1']);
   });
 
   test('includes row/column totals queries when totals are enabled', () => {
@@ -98,7 +102,7 @@ describe('buildQuery (bootstrap)', () => {
     });
   });
 
-  test('prefetches persisted expansions in the initial query plan', () => {
+  test('does not prefetch persisted expansions in the initial query plan', () => {
     const queryContext = buildQuery({
       ...baseFormData,
       pivotExpansionState: {
@@ -113,11 +117,12 @@ describe('buildQuery (bootstrap)', () => {
     const names = queryContext.queries.map(query =>
       typeof query.query_name === 'string' ? query.query_name : '',
     );
-    expect(names.some(name => name.includes('|branch:row:A'))).toBe(true);
-    expect(names.some(name => name.includes('|branch:col:B'))).toBe(true);
+    expect(names.some(name => name.includes('|branch:row:A'))).toBe(false);
+    expect(names.some(name => name.includes('|branch:col:B'))).toBe(false);
+    expect(names.some(name => name.includes('|batch:'))).toBe(false);
   });
 
-  test('uses persisted column expansions to increase branch query depth', () => {
+  test('does not use persisted column expansions to increase initial query depth', () => {
     const queryContext = buildQuery({
       ...baseFormData,
       expandColumnsLevel: 0,
@@ -136,10 +141,12 @@ describe('buildQuery (bootstrap)', () => {
         typeof query.query_name === 'string' &&
         query.query_name.includes('|branch:row:A'),
     );
-    expect(rowBranchQueries.length).toBeGreaterThan(0);
     expect(
-      rowBranchQueries.some(query => (query.columns || []).includes('col2')),
+      queryContext.queries.every(
+        query => !(query.columns || []).includes('col2'),
+      ),
     ).toBe(true);
+    expect(rowBranchQueries).toHaveLength(0);
   });
 
   test('ignores time grain from stale form data', () => {
@@ -166,7 +173,7 @@ describe('buildQuery (bootstrap)', () => {
     expect(names.some(name => name.includes('|root'))).toBe(true);
   });
 
-  test('does not prefetch root when only persisted expansions are deep (BR-4.2)', () => {
+  test('does not prefetch root or branches when only persisted expansions are deep (BR-4.2)', () => {
     const queryContext = buildQuery({
       ...baseFormData,
       expandRowsLevel: 0,
@@ -184,10 +191,10 @@ describe('buildQuery (bootstrap)', () => {
       typeof query.query_name === 'string' ? query.query_name : '',
     );
     expect(names.some(name => name.includes('|root'))).toBe(false);
-    expect(names.some(name => name.includes('|branch:row:A'))).toBe(true);
+    expect(names.some(name => name.includes('|branch:row:A'))).toBe(false);
   });
 
-  test('batches sibling persisted expansions into |batch: queries (BR-4.7)', () => {
+  test('does not batch sibling persisted expansions during initial query planning', () => {
     const queryContext = buildQuery(
       buildFormData({
         groupbyRows: ['country', 'state', 'city'],
@@ -215,7 +222,7 @@ describe('buildQuery (bootstrap)', () => {
     );
     expect(
       names.some(name => name.includes(`|batch:row:${serializePath(['US'])}`)),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       names.some(name =>
         name.includes(`|branch:row:${serializePath(['US', 'CA'])}`),

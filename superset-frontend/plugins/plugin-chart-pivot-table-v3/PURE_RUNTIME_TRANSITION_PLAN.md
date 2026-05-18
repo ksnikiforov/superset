@@ -153,6 +153,10 @@ Current semantic-layout contract:
 - Semantic layout fetches include the visible row/column bootstrap coverage in
   the same request so the chart does not immediately issue a hydration follow-up
   for the newly committed visible root layer.
+- Initial query planning does not replay persisted expansion branches. It
+  fetches bootstrap coverage for the currently visible root layers only;
+  persisted expanded/collapsed intent is restored by the expansion hydration
+  path through the coverage manifest.
 
 Expected deletion targets:
 
@@ -182,8 +186,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14278` insertions, `15791` deletions, net `-1513`.
-- Current production TypeScript/TSX total: about `31997` lines.
+- Production `src`: `14231` insertions, `16010` deletions, net `-1779`.
+- Current production TypeScript/TSX total: about `31731` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -875,6 +879,11 @@ Success criteria:
   `stateTransitions.ts`; same-axis and hydration fetch paths now use the same
   fetch-execution merge/prune helper pending the full fact-store-first
   rematerialization cut.
+- Initial query planning no longer parses or prefetches persisted expansion
+  state. Stable-prefix pruning, persisted branch depth promotion, sibling
+  batching, and branch-spec replay were removed from `buildInitialQuerySpecs`.
+  Persisted expansion restore is now expansion-hydration responsibility, which
+  keeps startup query planning bounded to visible bootstrap coverage.
 
 ## Current Risks
 
@@ -955,11 +964,11 @@ Bring these back before implementing the behavior change:
   fetch branch requires a loaded runtime snapshot contract. A pure fact-coverage
   diff changes visible interaction/fetch behavior and must not be repeated as a
   direct replacement.
-- **Persisted expansion replay.** Initial query planning still replays persisted
-  expanded/collapsed paths to prefetch saved branches. Removing that behavior
-  would simplify `buildInitialQuerySpecs` and reduce startup query planning, but
-  dashboards would no longer restore expanded branches after reload. Do not cut
-  it without an explicit UX decision.
+- **Persisted expansion hydration UX.** Initial query planning no longer
+  prefetches persisted expansion branches. Expansion state is still restored as
+  intent and hydrated through the expansion path; watch for any dashboard-load
+  UX that expects expanded descendants to be present in the initial query
+  result rather than appearing through hydration.
 - **Large-result interactivity.** Worker/off-thread/chunked commit changes can
   alter loader timing and must be planned as an interactivity change.
 

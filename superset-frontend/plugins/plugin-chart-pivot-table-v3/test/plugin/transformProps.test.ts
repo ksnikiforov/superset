@@ -554,7 +554,7 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
     expect(treeDataSignature.colSubtotalLevels).toEqual([]);
   });
 
-  it('merges persisted expansion branches into the initial tree', () => {
+  it('does not merge persisted expansion branches into the initial tree', () => {
     const expandedRowKey = serializePath(['A', 'B']);
     const formData: Partial<PivotTableQueryFormData> = {
       ...baseFormData,
@@ -651,7 +651,7 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
     const result = transformProps(
       chartProps as ChartProps<PivotTableQueryFormData>,
     );
-    expect(result.data.rows).toHaveProperty(expandedRowKey);
+    expect(result.data.rows).not.toHaveProperty(expandedRowKey);
   });
 
   it('uses the render chart id as export id when form data has no slice id', () => {
