@@ -97,21 +97,6 @@ export type PlannedQuerySpec = QuerySpec & {
   meta: QuerySpecMeta;
 };
 
-type InitialRootTargetKind = 'totals' | 'grid' | 'rows' | 'cols';
-
-type BuildIntentInput = {
-  kind: InitialRootTargetKind;
-  targetRowDepth: number;
-  targetColDepth: number;
-  needsTotals: boolean;
-  needsMetricFormatting: boolean;
-  needsDatabars: boolean;
-  needsRowOrdering: boolean;
-  needsColOrdering: boolean;
-  needsRowDimensionFormatting: boolean;
-  needsColDimensionFormatting: boolean;
-};
-
 const projectQueryFilterPath = ({
   layout,
   axis,
@@ -198,31 +183,6 @@ const buildSpecFactSelector = ({
   }),
 });
 
-const buildIntent = ({
-  kind,
-  targetRowDepth,
-  targetColDepth,
-  needsTotals,
-  needsMetricFormatting,
-  needsDatabars,
-  needsRowOrdering,
-  needsColOrdering,
-  needsRowDimensionFormatting,
-  needsColDimensionFormatting,
-}: BuildIntentInput): QueryIntent => ({
-  kind: kind === 'totals' ? 'totalsOnly' : 'wholeLevel',
-  targetRowDepth,
-  targetColDepth,
-  needsValueCells: kind !== 'totals',
-  needsTotals,
-  needsMetricFormatting,
-  needsDatabars: kind === 'totals' ? false : needsDatabars,
-  needsRowOrdering,
-  needsColOrdering,
-  needsRowDimensionFormatting,
-  needsColDimensionFormatting,
-});
-
 const buildInitialRootIntents = (
   layout: LayoutContext,
   formData: PivotTableQueryFormData,
@@ -267,22 +227,21 @@ const buildInitialRootIntents = (
   };
 
   const intents: QueryIntent[] = [
-    buildIntent({
-      kind: 'totals',
+    {
       targetRowDepth: 0,
       targetColDepth: 0,
+      needsValueCells: false,
       needsTotals,
       needsMetricFormatting,
-      needsDatabars,
+      needsDatabars: false,
       needsRowOrdering: false,
       needsColOrdering: false,
       needsRowDimensionFormatting: false,
       needsColDimensionFormatting: false,
-    }),
+    },
   ];
 
   const addCoverageTarget = ({
-    kind,
     rowDepth,
     colDepth,
     needsTotals: targetNeedsTotals,
@@ -291,7 +250,6 @@ const buildInitialRootIntents = (
     needsRowDimensionFormatting: targetNeedsRowDimensionFormatting,
     needsColDimensionFormatting: targetNeedsColDimensionFormatting,
   }: {
-    kind: Exclude<InitialRootTargetKind, 'totals'>;
     rowDepth: number;
     colDepth: number;
     needsTotals: boolean;
@@ -303,24 +261,21 @@ const buildInitialRootIntents = (
     if (layout.pivotProgram.metricKeys.length === 0) {
       return;
     }
-    intents.push(
-      buildIntent({
-        kind,
-        targetRowDepth: rowDepth,
-        targetColDepth: colDepth,
-        ...intentFlags,
-        needsTotals: targetNeedsTotals,
-        needsRowOrdering: targetNeedsRowOrdering,
-        needsColOrdering: targetNeedsColOrdering,
-        needsRowDimensionFormatting: targetNeedsRowDimensionFormatting,
-        needsColDimensionFormatting: targetNeedsColDimensionFormatting,
-      }),
-    );
+    intents.push({
+      targetRowDepth: rowDepth,
+      targetColDepth: colDepth,
+      needsValueCells: true,
+      ...intentFlags,
+      needsTotals: targetNeedsTotals,
+      needsRowOrdering: targetNeedsRowOrdering,
+      needsColOrdering: targetNeedsColOrdering,
+      needsRowDimensionFormatting: targetNeedsRowDimensionFormatting,
+      needsColDimensionFormatting: targetNeedsColDimensionFormatting,
+    });
   };
 
   if (needsGrid) {
     addCoverageTarget({
-      kind: 'grid',
       rowDepth: firstRowDepth,
       colDepth: firstColDepth,
       needsTotals: false,
@@ -336,7 +291,6 @@ const buildInitialRootIntents = (
     (!needsGrid || needsRowTotals || firstRowDepth > 0)
   ) {
     addCoverageTarget({
-      kind: 'rows',
       rowDepth: firstRowDepth,
       colDepth: 0,
       needsTotals,
@@ -352,7 +306,6 @@ const buildInitialRootIntents = (
     (!needsGrid || needsColTotals || firstColDepth > 0)
   ) {
     addCoverageTarget({
-      kind: 'cols',
       rowDepth: 0,
       colDepth: firstColDepth,
       needsTotals,
@@ -553,8 +506,6 @@ const resolveFetchContext = ({
     colSubtotalLevels.length > 0;
   const queryShape = buildQueryShape({
     intent: {
-      kind: 'branch',
-      axis,
       targetRowDepth: rowDepth,
       targetColDepth: colDepth,
       needsValueCells: true,

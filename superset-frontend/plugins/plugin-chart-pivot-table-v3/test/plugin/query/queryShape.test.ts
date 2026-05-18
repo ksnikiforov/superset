@@ -23,8 +23,6 @@ import {
 
 describe('queryShape', () => {
   const baseIntent: QueryIntent = {
-    kind: 'branch',
-    axis: 'row',
     targetRowDepth: 1,
     targetColDepth: 1,
     needsValueCells: true,

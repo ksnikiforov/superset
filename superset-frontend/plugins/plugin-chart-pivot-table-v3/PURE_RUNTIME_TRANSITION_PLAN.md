@@ -255,8 +255,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13754` insertions, `16897` deletions, net `-3143`.
-- Current production TypeScript/TSX total: about `30367` lines.
+- Production `src`: `13705` insertions, `16900` deletions, net `-3195`.
+- Current production TypeScript/TSX total: about `30315` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -268,10 +268,10 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `30367` | `-3143` | `< 28000` |
-| Strict core pipeline | `11337` | `12813` | `+1476` | `8000` |
+| Full production `src` | `33510` | `30315` | `-3195` | `< 28000` |
+| Strict core pipeline | `11337` | `12761` | `+1424` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5076` | `+393` | `3000-4000` |
-| Broad core pipeline | `16020` | `17889` | `+1869` | `11000-13000` |
+| Broad core pipeline | `16020` | `17837` | `+1817` | `11000-13000` |
 
 Current strict core breakdown:
 
@@ -279,7 +279,7 @@ Current strict core breakdown:
 | --- | ---: |
 | `pivot/runtime/*` | `4184` |
 | `pivot/expansion/*` | `2939` |
-| `pivot/query/*` | `1860` |
+| `pivot/query/*` | `1808` |
 | `pivot/layout/*` | `744` |
 | core/shared/domain helpers | `1873` |
 | formatting/data/render-model/update support | `1213` |
@@ -300,6 +300,11 @@ Latest pipeline cleanup: `LayoutContext` now owns initial
 display consume the same manifest. The numeric `resolvedExpand*Level` fields are
 gone from the runtime boundary; query/update/state helper wrappers were trimmed
 to keep the strict core moving down while this ownership moved into core.
+
+Latest query cleanup: `QueryIntent` now describes only query-shape requirements.
+Semantic labels such as `branch`, `wholeLevel`, `totalsOnly`, and expansion
+axis are no longer passed into `buildQueryShape`; `specs.ts` builds shape
+requirements directly instead of routing through a local intent wrapper.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.

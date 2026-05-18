@@ -19,7 +19,6 @@
 import { type QueryFormColumn, type QueryFormMetric } from '@superset-ui/core';
 import {
   type MetricFormattingScope,
-  type PivotAxis,
   type PivotDimensionFormattingMap,
   type PivotDimensionSortingMap,
   type PivotMetricDatabarMap,
@@ -37,8 +36,6 @@ import {
 import { getMetricKey } from '../metrics';
 
 export type QueryIntent = {
-  kind: 'branch' | 'wholeLevel' | 'totalsOnly';
-  axis?: PivotAxis;
   targetRowDepth: number;
   targetColDepth: number;
   needsValueCells: boolean;
