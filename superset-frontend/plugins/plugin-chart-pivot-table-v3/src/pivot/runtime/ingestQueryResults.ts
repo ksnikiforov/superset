@@ -26,6 +26,11 @@ import { type PivotTableQueryFormData, type PivotTreeData } from '../../types';
 import { getMetricKeys } from '../metrics';
 import { type LayoutContext } from '../layout/LayoutContext';
 import { type PlannedQuerySpec } from '../query/specs';
+import {
+  type ChartDataQueryResult,
+  type ChartDataWarning,
+} from '../data/ChartDataClient';
+import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import { type PivotFactCoverage } from './types';
 import {
   createPivotFactStore,
@@ -50,6 +55,10 @@ export type {
   PivotFactStore,
   PivotFactStoreBatch,
 } from './factStore';
+
+export const collectPlannedQueryWarnings = (
+  results: ChartDataQueryResult[],
+): ChartDataWarning[] => results.flatMap(result => result.warnings ?? []);
 
 type QueryResultWithData = {
   data?: DataRecord[] | Record<string, unknown>[];
@@ -309,6 +318,51 @@ export const upsertQueryResultsIntoFactStore = <T extends QueryResultWithData>({
     results,
   });
   return upsertIngestedFactsIntoStore({ store, ingested });
+};
+
+export const fetchPlannedQuerySpecs = async ({
+  formData,
+  specs,
+  requestGroupId,
+  factStore,
+}: {
+  formData: PivotTableQueryFormData;
+  specs: PlannedQuerySpec[];
+  requestGroupId?: string;
+  factStore?: PivotFactStore;
+}): Promise<{ results: ChartDataQueryResult[] }> => {
+  const missingSpecs = specs.filter(
+    spec => !factStore?.hasCompatibleCoverage(spec.meta.factSelector),
+  );
+  if (missingSpecs.length === 0) {
+    return { results: [] };
+  }
+  const metricsForQuery = missingSpecs[0]?.metrics;
+  const timeOffsets = Array.from(
+    new Set([
+      ...(formData.time_offsets ?? []),
+      ...missingSpecs.flatMap(spec => spec.meta.requiredTimeOffsets),
+    ]),
+  );
+  const results = await supersetChartDataClient.fetch({
+    formData: {
+      ...formData,
+      ...(metricsForQuery && metricsForQuery.length > 0
+        ? { metrics: metricsForQuery }
+        : {}),
+      ...(timeOffsets.length > 0 ? { time_offsets: timeOffsets } : {}),
+    },
+    specs: missingSpecs,
+    requestGroupId,
+  });
+  if (factStore) {
+    upsertQueryResultsIntoFactStore({
+      store: factStore,
+      specs: missingSpecs,
+      results,
+    });
+  }
+  return { results };
 };
 
 const upsertFactBatchIntoStoreAsync = async ({

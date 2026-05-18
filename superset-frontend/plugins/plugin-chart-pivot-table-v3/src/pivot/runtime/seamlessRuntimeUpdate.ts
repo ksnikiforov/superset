@@ -30,12 +30,12 @@ import { stableStringify } from '../shared/stableStringify';
 import { normalizeFormDataExtraFilters } from '../query/normalizeExtraFormData';
 import { buildInitialPivotUpdatePlan } from '../update/initialUpdatePlan';
 import { normalizeRuntimeLayout } from '../layout/resolveInteractionLayout';
-import { buildInitialRuntimeFromSpecResultsAsync } from './ingestQueryResults';
-import { insertValuesPlaceholder } from './compilePivotProgram';
 import {
+  buildInitialRuntimeFromSpecResultsAsync,
   collectPlannedQueryWarnings,
   fetchPlannedQuerySpecs,
-} from '../query/fetchPivotBranch';
+} from './ingestQueryResults';
+import { insertValuesPlaceholder } from './compilePivotProgram';
 import {
   executeLatestRequest,
   executeScheduledLatestRequest,
