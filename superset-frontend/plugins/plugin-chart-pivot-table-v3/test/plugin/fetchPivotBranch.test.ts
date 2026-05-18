@@ -23,7 +23,10 @@ import {
   PivotTreeData,
   PivotTreeNode,
 } from '../../src/types';
-import { fetchPivotBranch } from '../../src/pivot/query/fetchPivotBranch';
+import {
+  fetchPivotExpansion,
+  type FetchPivotExpansionRequest,
+} from '../../src/pivot/query/fetchPivotBranch';
 import {
   buildBuiltInLeaf,
   buildMeasureLeafOutputKey,
@@ -78,11 +81,18 @@ type QueryPayload = {
   filters?: Array<{ col?: string; op?: string; val?: string }>;
 };
 
+const fetchBranch = (
+  params: Omit<
+    Extract<FetchPivotExpansionRequest, { kind: 'branch' }>,
+    'kind'
+  > & { currentTree?: PivotTreeData },
+) => fetchPivotExpansion({ kind: 'branch', ...params });
+
 const fetchPivotBranchTree = async (
-  params: Parameters<typeof fetchPivotBranch>[0],
+  params: Parameters<typeof fetchBranch>[0],
 ) => {
   const factStore = params.factStore ?? createPivotFactStore();
-  const result = await fetchPivotBranch({ ...params, factStore });
+  const result = await fetchBranch({ ...params, factStore });
   return {
     result,
     tree: materializeLoadedPivotTreeFromFactStore({
@@ -705,7 +715,7 @@ describe('buildBranchQuerySpecs', () => {
       factStore,
     };
 
-    await fetchPivotBranch(fetchParams);
+    await fetchBranch(fetchParams);
 
     const queries =
       (
@@ -718,7 +728,7 @@ describe('buildBranchQuerySpecs', () => {
       expect(query.metrics).toEqual(['measure1', 'sortMetric']);
     });
     expect(factStore.getCoverageBatches()).toHaveLength(queries.length);
-    await fetchPivotBranch(fetchParams);
+    await fetchBranch(fetchParams);
     const tree = materializeLoadedPivotTreeFromFactStore({
       store: factStore,
       layout: buildLayoutContext(formData),
@@ -933,7 +943,7 @@ describe('buildBranchQuerySpecs', () => {
       cells: {},
     };
 
-    await fetchPivotBranch({
+    await fetchBranch({
       formData: {
         groupbyRows: ['nation', 'orderPriority', 'orderStatus'],
         groupbyColumns: ['segment', 'shipMode', METRICS_PLACEHOLDER],
@@ -1090,7 +1100,7 @@ describe('buildBranchQuerySpecs', () => {
       cells: {},
     };
 
-    await fetchPivotBranch({
+    await fetchBranch({
       formData: {
         groupbyRows: ['nation', 'orderPriority', 'orderStatus'],
         groupbyColumns: ['segment', 'shipMode', METRICS_PLACEHOLDER],
@@ -1171,7 +1181,7 @@ describe('buildBranchQuerySpecs', () => {
       cells: {},
     };
 
-    await fetchPivotBranch({
+    await fetchBranch({
       formData: {
         groupbyRows: ['nation', 'orderPriority', 'orderStatus'],
         groupbyColumns: ['segment', 'shipMode', METRICS_PLACEHOLDER],
@@ -1254,7 +1264,7 @@ describe('buildBranchQuerySpecs', () => {
       cells: {},
     };
 
-    await fetchPivotBranch({
+    await fetchBranch({
       formData: {
         groupbyRows: ['nation', 'orderPriority'],
         groupbyColumns: [
@@ -1317,7 +1327,7 @@ describe('buildBranchQuerySpecs', () => {
       cells: {},
     };
 
-    await fetchPivotBranch({
+    await fetchBranch({
       formData: {
         groupbyRows: ['r1', 'r2'],
         groupbyColumns: [],
@@ -1381,7 +1391,7 @@ describe('buildBranchQuerySpecs', () => {
       },
     });
 
-    await fetchPivotBranch({
+    await fetchBranch({
       formData,
       axis: 'row',
       path: ['4-NOT SPECIFIED'],
@@ -1406,7 +1416,7 @@ describe('buildBranchQuerySpecs', () => {
   });
 });
 
-describe('fetchPivotBranch delta-only contract', () => {
+describe('fetchBranch delta-only contract', () => {
   beforeEach(() => {
     (SupersetClient.post as jest.Mock).mockReset();
   });
@@ -1527,7 +1537,7 @@ describe('fetchPivotBranch delta-only contract', () => {
       colTotals: false,
     });
 
-    const result = await fetchPivotBranch({
+    const result = await fetchBranch({
       formData,
       axis: 'col',
       path: ['Furniture'],

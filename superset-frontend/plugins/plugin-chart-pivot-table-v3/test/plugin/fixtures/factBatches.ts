@@ -17,12 +17,8 @@
  * under the License.
  */
 import {
-  type FetchPivotBranchesBatchParams,
-  type FetchPivotBranchesBatchResult,
-  type FetchPivotBranchParams,
-  type FetchPivotBranchResult,
-  type FetchPivotIntersectionParams,
-  type FetchPivotIntersectionResult,
+  type FetchPivotExpansionRequest,
+  type FetchPivotExpansionResult,
 } from '../../../src/pivot/query/fetchPivotBranch';
 import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
 import { buildFactCoverage } from '../../../src/pivot/runtime/coverage';
@@ -48,6 +44,22 @@ type MockFetchResult<T> = Partial<T> & {
   data?: PivotTreeData;
   factBatches?: PivotFactStoreBatch[];
 };
+
+type FetchPivotBranchParams = Extract<
+  FetchPivotExpansionRequest,
+  { kind: 'branch' }
+>;
+type FetchPivotBranchesBatchParams = Extract<
+  FetchPivotExpansionRequest,
+  { kind: 'batch' }
+>;
+type FetchPivotIntersectionParams = Extract<
+  FetchPivotExpansionRequest,
+  { kind: 'intersection' }
+>;
+type FetchPivotBranchResult = FetchPivotExpansionResult;
+type FetchPivotBranchesBatchResult = FetchPivotExpansionResult;
+type FetchPivotIntersectionResult = FetchPivotExpansionResult;
 
 const stripMockFactBatches = <T>(result: MockFetchResult<T>): Partial<T> => {
   const fetchResult = { ...result };

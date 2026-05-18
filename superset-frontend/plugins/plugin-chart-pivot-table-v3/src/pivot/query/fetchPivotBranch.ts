@@ -36,12 +36,12 @@ import { isAbortError } from '../runtime/requestLifecycle';
 import { factStoreSelectorFromSpec } from '../runtime/materializePivotTree';
 import { type BatchGroup } from './fetchPlanOptimizer';
 
-export interface FetchPivotBranchResult {
+export interface FetchPivotExpansionResult {
   warnings?: ChartDataWarning[];
   error?: Error;
 }
 
-export interface FetchPivotBranchParams {
+type BranchExpansionRequest = {
   formData: PivotTableQueryFormData;
   axis: PivotAxis;
   path: PivotPath;
@@ -49,9 +49,9 @@ export interface FetchPivotBranchParams {
   visibleColDepth?: number;
   requestGroupId?: string;
   factStore?: PivotFactStore;
-}
+};
 
-export type FetchPivotBranchesBatchParams = {
+type BatchExpansionRequest = {
   formData: PivotTableQueryFormData;
   batch: BatchGroup;
   visibleRowDepth: number;
@@ -60,9 +60,7 @@ export type FetchPivotBranchesBatchParams = {
   factStore?: PivotFactStore;
 };
 
-export type FetchPivotBranchesBatchResult = FetchPivotBranchResult;
-
-export type FetchPivotIntersectionParams = {
+type IntersectionExpansionRequest = {
   formData: PivotTableQueryFormData;
   rowPathKeys: string[];
   columnPathKeys: string[];
@@ -72,18 +70,16 @@ export type FetchPivotIntersectionParams = {
   factStore?: PivotFactStore;
 };
 
-export type FetchPivotIntersectionResult = FetchPivotBranchResult;
-
 export type FetchPivotExpansionRequest =
   | ({
       kind: 'branch';
-    } & FetchPivotBranchParams)
+    } & BranchExpansionRequest)
   | ({
       kind: 'batch';
-    } & FetchPivotBranchesBatchParams)
+    } & BatchExpansionRequest)
   | ({
       kind: 'intersection';
-    } & FetchPivotIntersectionParams);
+    } & IntersectionExpansionRequest);
 
 const fetchPivotQuerySpecsIntoFactStore = async ({
   formData,
@@ -95,7 +91,7 @@ const fetchPivotQuerySpecsIntoFactStore = async ({
   specs: PlannedQuerySpec[];
   requestGroupId?: string;
   factStore?: PivotFactStore;
-}): Promise<FetchPivotBranchResult> => {
+}): Promise<FetchPivotExpansionResult> => {
   if (specs.length === 0) {
     return {};
   }
@@ -153,7 +149,7 @@ const fetchPivotQuerySpecsIntoFactStore = async ({
 
 export const fetchPivotExpansion = async (
   request: FetchPivotExpansionRequest,
-): Promise<FetchPivotBranchResult> => {
+): Promise<FetchPivotExpansionResult> => {
   const layout = buildLayoutContext(request.formData);
   const specs =
     request.kind === 'branch'
@@ -190,62 +186,3 @@ export const fetchPivotExpansion = async (
     factStore: request.factStore,
   });
 };
-
-export async function fetchPivotBranch({
-  formData,
-  axis,
-  path,
-  visibleRowDepth,
-  visibleColDepth,
-  requestGroupId,
-  factStore,
-}: FetchPivotBranchParams): Promise<FetchPivotBranchResult> {
-  return fetchPivotExpansion({
-    kind: 'branch',
-    formData,
-    axis,
-    path,
-    visibleRowDepth,
-    visibleColDepth,
-    requestGroupId,
-    factStore,
-  });
-}
-
-export const fetchPivotBranchesBatch = async ({
-  formData,
-  batch,
-  visibleRowDepth,
-  visibleColDepth,
-  requestGroupId,
-  factStore,
-}: FetchPivotBranchesBatchParams): Promise<FetchPivotBranchesBatchResult> =>
-  fetchPivotExpansion({
-    kind: 'batch',
-    formData,
-    batch,
-    visibleRowDepth,
-    visibleColDepth,
-    requestGroupId,
-    factStore,
-  });
-
-export const fetchPivotIntersection = async ({
-  formData,
-  rowPathKeys,
-  columnPathKeys,
-  visibleRowDepth,
-  visibleColDepth,
-  requestGroupId,
-  factStore,
-}: FetchPivotIntersectionParams): Promise<FetchPivotIntersectionResult> =>
-  fetchPivotExpansion({
-    kind: 'intersection',
-    formData,
-    rowPathKeys,
-    columnPathKeys,
-    visibleRowDepth,
-    visibleColDepth,
-    requestGroupId,
-    factStore,
-  });

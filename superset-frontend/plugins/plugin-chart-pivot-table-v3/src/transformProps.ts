@@ -35,10 +35,8 @@ import {
   coerceEpochMsStringToNumber,
 } from './utils';
 import { getMetricKeys, getMetricKey } from './pivot/metrics';
-import { buildLayoutContext } from './pivot/layout/LayoutContext';
 import { resolveInteractionFormData } from './pivot/layout/resolveInteractionLayout';
-import { normalizeFormDataExtraFilters } from './pivot/query/normalizeExtraFormData';
-import { buildInitialQuerySpecs } from './pivot/query/specs';
+import { buildInitialPivotUpdatePlan } from './pivot/update/initialUpdatePlan';
 import { buildInitialRuntimeFromSpecResults } from './pivot/runtime/ingestQueryResults';
 
 const { DATABASE_DATETIME } = TimeFormats;
@@ -152,7 +150,14 @@ export default function transformProps(
     }),
   );
   const formDataWithMetricLabels = { ...formData, metricLabelMap };
-  const layout = buildLayoutContext(formDataWithMetricLabels);
+  const {
+    formData: plannedFormData,
+    layout,
+    specs: initialSpecs,
+  } = buildInitialPivotUpdatePlan({
+    formData: formDataWithMetricLabels,
+    runtimeLayout,
+  });
   const {
     metrics,
     rowSubtotalLevels,
@@ -164,7 +169,6 @@ export default function transformProps(
     metricsLayoutResolved: metricsLayout,
     metricInsertIndex,
   } = layout.pivotProgram;
-  const initialSpecs = buildInitialQuerySpecs(formDataWithMetricLabels, layout);
   const planMetrics = initialSpecs.reduce(
     (acc, spec) => mergeMetrics(acc, spec.metrics),
     metrics,
@@ -172,7 +176,7 @@ export default function transformProps(
   const metricKeysForQuery = getMetricKeys(planMetrics);
   const queryFormData: PivotTableQueryFormData = {
     ...rawFormData,
-    ...formDataWithMetricLabels,
+    ...plannedFormData,
     metricsLayout,
     metricLabelMap,
     columnFormats,
@@ -299,9 +303,6 @@ export default function transformProps(
     ...queryFormData,
     colTypeMap: colTypeMapWithAliases,
   };
-  const normalizedQueryFormData = normalizeFormDataExtraFilters(
-    queryFormDataWithTypes,
-  );
 
   const treeDataSignature = JSON.stringify({
     rows: rowDimensions.map(getStableColumnKey),
@@ -314,7 +315,7 @@ export default function transformProps(
     measureHierarchy: layout.measureHierarchy,
   });
   const formDataForTree: PivotTableQueryFormData = {
-    ...formDataWithMetricLabels,
+    ...plannedFormData,
     dateFormatters,
     colTypeMap: colTypeMapWithAliases,
     columnFormats,
@@ -354,7 +355,7 @@ export default function transformProps(
   const { selectedFilters } = filterState;
 
   const queryFormDataWithFormatters: PivotTableQueryFormData = {
-    ...normalizedQueryFormData,
+    ...queryFormDataWithTypes,
     dateFormatters,
     columnFormats,
     currencyFormats,
@@ -366,12 +367,12 @@ export default function transformProps(
     data: nextTreeWithLeaves,
     factBatches,
     formData: {
-      ...formDataWithMetricLabels,
-      slice_id: formDataWithMetricLabels.slice_id ?? chartId,
+      ...plannedFormData,
+      slice_id: plannedFormData.slice_id ?? chartId,
       metricsLayout,
       treeDataSignature,
       metricLabelMap,
-      extra_form_data: normalizedQueryFormData.extra_form_data,
+      extra_form_data: queryFormDataWithTypes.extra_form_data,
       dateFormatters,
       colTypeMap: colTypeMapWithAliases,
       columnFormats,

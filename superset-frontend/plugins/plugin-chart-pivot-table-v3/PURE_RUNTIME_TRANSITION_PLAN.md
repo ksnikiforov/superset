@@ -162,6 +162,11 @@ Current semantic-layout contract:
 - Branch fetch no longer runs a separate fetch-context resolution before query
   spec planning. Intersection query specs now flow through the shared
   axis-expansion spec boundary instead of a separate local planning path.
+- Branch, batch, and intersection fetch no longer expose separate production
+  query APIs. Expansion query execution now enters through
+  `fetchPivotExpansion({ kind })`, and the legacy `fetchPivotBranch`,
+  `fetchPivotBranchesBatch`, and `fetchPivotIntersection` wrapper exports have
+  been removed.
 - Expansion coverage planning no longer depends on the render model to compute
   visible row/column depths. It derives visible coverage depth from the compiled
   `PivotProgram`, loaded tree paths, and explicit expansion intent.
@@ -218,8 +223,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13901` insertions, `16299` deletions, net `-2398`.
-- Current production TypeScript/TSX total: about `31112` lines.
+- Production `src`: `13853` insertions, `16374` deletions, net `-2521`.
+- Current production TypeScript/TSX total: about `30989` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -250,6 +255,11 @@ Near-term priority should be:
 1. Unify query planning around the set-oriented manifest executor. This is the
    highest-impact pipeline target because it removes duplicated initial,
    seamless, expansion, branch, batch, and intersection entrypoints.
+   Current status: initial query construction and result ingestion share
+   `buildInitialPivotUpdatePlan`, and expansion branch/batch/intersection fetch
+   is unified under `fetchPivotExpansion({ kind })`. Remaining work is to move
+   seamless layout fetches and initial/root query execution onto a manifest
+   executor instead of keeping separate plan/fetch/materialize wrappers.
 2. Finish the expansion scheduler cut by making same-axis, cross-axis, and
    prefetch hydration submit the same manifest request shape.
 3. Bring the dual-editor question to an explicit UX/product checkpoint. It is

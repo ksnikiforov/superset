@@ -17,7 +17,10 @@
  * under the License.
  */
 import { GenericDataType, SupersetClient } from '@superset-ui/core';
-import { fetchPivotBranch } from '../../src/pivot/query/fetchPivotBranch';
+import {
+  fetchPivotExpansion,
+  type FetchPivotExpansionRequest,
+} from '../../src/pivot/query/fetchPivotBranch';
 import {
   MetricsLayoutEnum,
   PivotTreeData,
@@ -48,6 +51,13 @@ type QueryPayload = {
     columns?: unknown[];
   }>;
 };
+
+const fetchBranch = (
+  params: Omit<
+    Extract<FetchPivotExpansionRequest, { kind: 'branch' }>,
+    'kind'
+  > & { currentTree?: PivotTreeData },
+) => fetchPivotExpansion({ kind: 'branch', ...params });
 
 const makeNode = (node: Partial<PivotTreeNode>): PivotTreeNode => ({
   axis: 'row',
@@ -87,7 +97,7 @@ const assertColumnsUseRawSqlOutput = (payload?: {
   });
 };
 
-describe('fetchPivotBranch temporal payload contract', () => {
+describe('fetchBranch temporal payload contract', () => {
   const postMock = SupersetClient.post as jest.MockedFunction<
     typeof SupersetClient.post
   >;
@@ -121,7 +131,7 @@ describe('fetchPivotBranch temporal payload contract', () => {
       cells: {},
     };
 
-    await fetchPivotBranch({
+    await fetchBranch({
       formData: buildFormData({
         groupbyRows: ['orderYear', 'orderMonth'],
         groupbyColumns: [],
@@ -172,7 +182,7 @@ describe('fetchPivotBranch temporal payload contract', () => {
       cells: {},
     };
 
-    await fetchPivotBranch({
+    await fetchBranch({
       formData: buildFormData({
         groupbyRows: [],
         groupbyColumns: ['orderYear', 'orderMonth'],

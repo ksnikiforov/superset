@@ -17,7 +17,10 @@
  * under the License.
  */
 import { SupersetClient } from '@superset-ui/core';
-import { fetchPivotBranchesBatch } from '../../../src/pivot/query/fetchPivotBranch';
+import {
+  fetchPivotExpansion,
+  type FetchPivotExpansionRequest,
+} from '../../../src/pivot/query/fetchPivotBranch';
 import { type BatchGroup } from '../../../src/pivot/query/fetchPlanOptimizer';
 import { buildFormData } from '../fixtures/pivotFormData';
 import {
@@ -79,7 +82,14 @@ const makeTree = (): PivotTreeData => ({
 
 const mockPost = SupersetClient.post as jest.Mock;
 
-describe('fetchPivotBranchesBatch', () => {
+const fetchBatch = (
+  params: Omit<
+    Extract<FetchPivotExpansionRequest, { kind: 'batch' }>,
+    'kind'
+  > & { currentTree?: PivotTreeData },
+) => fetchPivotExpansion({ kind: 'batch', ...params });
+
+describe('fetchBatch', () => {
   beforeEach(() => {
     mockPost.mockReset();
   });
@@ -117,7 +127,7 @@ describe('fetchPivotBranchesBatch', () => {
       ],
     };
 
-    await fetchPivotBranchesBatch({
+    await fetchBatch({
       formData,
       batch,
       currentTree: makeTree(),
@@ -167,7 +177,7 @@ describe('fetchPivotBranchesBatch', () => {
       ],
     };
 
-    await fetchPivotBranchesBatch({
+    await fetchBatch({
       formData,
       batch,
       currentTree: makeTree(),
@@ -214,7 +224,7 @@ describe('fetchPivotBranchesBatch', () => {
       ],
     };
 
-    await fetchPivotBranchesBatch({
+    await fetchBatch({
       formData,
       batch,
       currentTree: makeTree(),
@@ -276,7 +286,7 @@ describe('fetchPivotBranchesBatch', () => {
       ],
     });
 
-    await fetchPivotBranchesBatch({
+    await fetchBatch({
       formData,
       batch,
       visibleRowDepth: 2,
@@ -360,7 +370,7 @@ describe('fetchPivotBranchesBatch', () => {
       spec => !store.hasCompatibleCoverage(factStoreSelectorFromSpec(spec)),
     );
 
-    await fetchPivotBranchesBatch({
+    await fetchBatch({
       formData,
       batch,
       visibleRowDepth: 2,
@@ -401,7 +411,7 @@ describe('fetchPivotBranchesBatch', () => {
       ],
     };
 
-    const result = await fetchPivotBranchesBatch({
+    const result = await fetchBatch({
       formData,
       batch,
       currentTree: makeTree(),

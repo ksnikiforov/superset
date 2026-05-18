@@ -21,26 +21,27 @@ import { fireEvent, render, waitFor, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum } from '../../../src/types';
 
-import { fetchPivotBranch } from '../../../src/pivot/query/fetchPivotBranch';
+import { fetchPivotExpansion } from '../../../src/pivot/query/fetchPivotBranch';
 import { baseFormData, buildFormData } from '../fixtures/pivotFormData';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';
+import { resolveMockBranchFetchResult } from '../fixtures/factBatches';
 
 jest.mock('../../../src/pivot/query/fetchPivotBranch', () => {
   const actual = jest.requireActual('../../../src/pivot/query/fetchPivotBranch');
   return {
     ...actual,
-    fetchPivotBranch: jest
+    fetchPivotExpansion: jest
       .fn()
       .mockResolvedValue({ data: undefined, factBatches: [] }),
   };
 });
 
 describe('PivotTableChart expand without global loader for same-axis actions', () => {
-  const fetchPivotBranchMock = fetchPivotBranch as jest.Mock;
+  const fetchPivotExpansionMock = fetchPivotExpansion as jest.Mock;
 
   beforeEach(() => {
-    fetchPivotBranchMock.mockClear();
+    fetchPivotExpansionMock.mockClear();
   });
 
   it('keeps the table visible while expanding rows when columns are empty', async () => {
@@ -66,10 +67,9 @@ describe('PivotTableChart expand without global loader for same-axis actions', (
       [],
     );
 
-    fetchPivotBranchMock.mockResolvedValueOnce({
-      data: expandedTree,
-      factBatches: [],
-    });
+    fetchPivotExpansionMock.mockImplementationOnce(
+      resolveMockBranchFetchResult({ data: expandedTree }),
+    );
 
     const { container, findByText } = render(
       <PivotTableChart
@@ -112,7 +112,9 @@ describe('PivotTableChart expand without global loader for same-axis actions', (
     fireEvent.click(rowToggle);
 
     expect(container.querySelector('table')).toBeInTheDocument();
-    await waitFor(() => expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(fetchPivotExpansionMock).toHaveBeenCalledTimes(1),
+    );
     expect(container.querySelector('table')).toBeInTheDocument();
     expect(await findByText('REV-A')).toBeInTheDocument();
   });

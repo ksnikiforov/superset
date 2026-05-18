@@ -20,8 +20,8 @@ import { FeatureFlag, SupersetClient } from '@superset-ui/core';
 // eslint-disable-next-line import/no-extraneous-dependencies -- Test-only GAQ mock relies on Superset core asyncEvent entrypoint.
 import { waitForAsyncData } from 'src/middleware/asyncEvent';
 import {
-  fetchPivotBranch,
-  fetchPivotBranchesBatch,
+  fetchPivotExpansion,
+  type FetchPivotExpansionRequest,
 } from '../../../src/pivot/query/fetchPivotBranch';
 import { serializePath } from '../../../src/pivot/core/path';
 import { type PivotTreeData, type PivotTreeNode } from '../../../src/types';
@@ -45,6 +45,20 @@ jest.mock('@superset-ui/core', () => {
 const waitForAsyncDataMock = waitForAsyncData as jest.MockedFunction<
   typeof waitForAsyncData
 >;
+
+const fetchBranch = (
+  params: Omit<
+    Extract<FetchPivotExpansionRequest, { kind: 'branch' }>,
+    'kind'
+  > & { currentTree?: PivotTreeData },
+) => fetchPivotExpansion({ kind: 'branch', ...params });
+
+const fetchBatch = (
+  params: Omit<
+    Extract<FetchPivotExpansionRequest, { kind: 'batch' }>,
+    'kind'
+  > & { currentTree?: PivotTreeData },
+) => fetchPivotExpansion({ kind: 'batch', ...params });
 
 const makeNode = (node: Partial<PivotTreeNode>): PivotTreeNode => ({
   axis: 'row',
@@ -86,14 +100,14 @@ describe('Global Async Queries (HTTP 202) support', () => {
     window.featureFlags[FeatureFlag.GlobalAsyncQueries] = false;
   });
 
-  it('waits for async chart data in fetchPivotBranch()', async () => {
+  it('waits for async chart data in fetchBranch()', async () => {
     (SupersetClient.post as jest.Mock).mockResolvedValue({
       response: new Response(null, { status: 202 }),
       json: { result: { job_id: 'job-1' } },
     });
     waitForAsyncDataMock.mockResolvedValue([{ data: [] }]);
 
-    const result = await fetchPivotBranch({
+    const result = await fetchBranch({
       formData: buildFormData({
         groupbyRows: ['r1', 'r2'],
         groupbyColumns: [],
@@ -110,7 +124,7 @@ describe('Global Async Queries (HTTP 202) support', () => {
     expect(result.error).toBeUndefined();
   });
 
-  it('waits for async chart data in fetchPivotBranchesBatch()', async () => {
+  it('waits for async chart data in fetchBatch()', async () => {
     (SupersetClient.post as jest.Mock).mockResolvedValue({
       response: new Response(null, { status: 202 }),
       json: { result: { job_id: 'job-2' } },
@@ -136,7 +150,7 @@ describe('Global Async Queries (HTTP 202) support', () => {
       ],
     };
 
-    const result = await fetchPivotBranchesBatch({
+    const result = await fetchBatch({
       formData: buildFormData({
         groupbyRows: ['country', 'state', 'city'],
         groupbyColumns: [],
