@@ -248,7 +248,6 @@ function PivotTableChart(props: PivotTableProps) {
   const {
     dataForRender,
     factBatchesForRender,
-    syncLoadedFactBatches,
     seamlessLoading,
     seamlessWarnings,
     seamlessError,
@@ -289,6 +288,9 @@ function PivotTableChart(props: PivotTableProps) {
     commitUiRuntimeLayout: updateUiRuntimeLayout,
     persistRuntimeState,
   });
+  const expansionFetchFormData = seamlessLoading
+    ? appliedLayoutFormData
+    : fetchFormData;
 
   const dimensionLabelMap = useMemo(() => {
     const map = new Map<string, string>();
@@ -340,7 +342,7 @@ function PivotTableChart(props: PivotTableProps) {
     factBatches: factBatchesForRender,
     expandedStateSignature: layoutResult.expandedStateSignature,
     expandedStateSharedSignature: layoutResult.expandedStateSharedSignature,
-    fetchFormData,
+    fetchFormData: expansionFetchFormData,
     resolvedExpandRowsLevel: layoutResult.resolvedExpandRowsLevel,
     resolvedExpandColumnsLevel: layoutResult.resolvedExpandColumnsLevel,
     pivotProgram: layoutResult.layout.pivotProgram,
@@ -354,7 +356,6 @@ function PivotTableChart(props: PivotTableProps) {
       appliedLayoutFormData.pivotExpansionState ??
       ownState?.pivotExpansionState,
     shouldPersistExpansionState: persistExpansionState,
-    onLoadedFactBatchesChange: syncLoadedFactBatches,
     pruneMergedTree: layoutResult.pruneMergedTree,
   });
 

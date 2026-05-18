@@ -673,7 +673,7 @@ describe('pivot/expansion/stateTransitions', () => {
     ];
     const result = await runHydrationLoop({
       baseTree: tree,
-      maxIterations: 3,
+      maxIterations: 4,
       isCurrent: () => true,
       buildDesiredExpanded: axis =>
         axis === 'row' ? new Set([aKey]) : new Set([xKey]),
@@ -766,6 +766,7 @@ describe('pivot/expansion/stateTransitions', () => {
     const axpKey = serializePath(['A', 'X', 'P']);
     const baseTree: PivotTreeData = {
       rows: {
+        [rootKey]: makeNode('row', [], true),
         [aKey]: makeNode('row', ['A'], true),
       },
       cols: {
@@ -775,6 +776,7 @@ describe('pivot/expansion/stateTransitions', () => {
     };
     const branchA: PivotTreeData = {
       rows: {
+        [rootKey]: makeNode('row', [], true),
         [aKey]: makeNode('row', ['A'], true),
         [axKey]: makeNode('row', ['A', 'X'], true),
       },
@@ -783,6 +785,7 @@ describe('pivot/expansion/stateTransitions', () => {
     };
     const branchAX: PivotTreeData = {
       rows: {
+        [rootKey]: makeNode('row', [], true),
         [aKey]: makeNode('row', ['A'], true),
         [axKey]: makeNode('row', ['A', 'X'], true),
         [axpKey]: makeNode('row', ['A', 'X', 'P'], false),
@@ -796,7 +799,7 @@ describe('pivot/expansion/stateTransitions', () => {
       groupbyColumns: [],
       metrics: ['sales'],
     });
-    const fetchDeltas = jest.fn(async ({ targets }) => {
+    const fetchDeltas = jest.fn(async ({ targets, context }) => {
       const data = targets.some(target => target.pathKey === axKey)
         ? branchAX
         : branchA;
@@ -805,9 +808,12 @@ describe('pivot/expansion/stateTransitions', () => {
         factBatches.push({
           coverage: {
             reason: 'expand',
-            rowDepth: path.length + 1,
-            columnDepth: 0,
-            rowDimensions: ['country', 'city', 'store'],
+            rowDepth: context.visibleRowDepth,
+            columnDepth: context.visibleColDepth,
+            rowDimensions: ['country', 'city', 'store'].slice(
+              0,
+              context.visibleRowDepth,
+            ),
             columnDimensions: [],
           },
           scope: {
@@ -823,7 +829,7 @@ describe('pivot/expansion/stateTransitions', () => {
     });
     const result = await runHydrationLoop({
       baseTree,
-      maxIterations: 3,
+      maxIterations: 4,
       isCurrent: () => true,
       buildDesiredExpanded: axis =>
         axis === 'row' ? new Set([aKey, axKey]) : new Set(),
@@ -850,7 +856,7 @@ describe('pivot/expansion/stateTransitions', () => {
       fetchDeltas,
     });
 
-    expect(fetchDeltas).toHaveBeenCalledTimes(2);
+    expect(fetchDeltas).toHaveBeenCalledTimes(3);
     expect(result.status).toBe('complete');
     if (result.status !== 'complete') {
       return;

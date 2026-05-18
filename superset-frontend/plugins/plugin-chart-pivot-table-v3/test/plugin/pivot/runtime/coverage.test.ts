@@ -16,7 +16,6 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { type QueryFormColumn } from '@superset-ui/core';
 import {
   encodeMetricKey,
   METRICS_PLACEHOLDER,
@@ -27,14 +26,12 @@ import {
   buildBranchFactCoverages,
   createExpansionCoverageDiff,
   buildFactCoverage,
-  buildRuntimeLayoutCoverageManifest,
   diffCoverageManifest,
-  factBatchesCoverRuntimeLayout,
   type PivotCoverageNeed,
 } from '../../../../src/pivot/runtime/coverage';
 import { type PivotFactStoreBatch } from '../../../../src/pivot/runtime/factStore';
 import { resolveAxisProjection } from '../../../../src/pivot/runtime/projection';
-import { MetricsLayoutEnum, PivotRuntimeLayout } from '../../../../src/types';
+import { MetricsLayoutEnum } from '../../../../src/types';
 
 describe('expansion fact coverage', () => {
   it('derives loaded expansion coverage from typed fact batches', () => {
@@ -129,132 +126,6 @@ describe('expansion fact coverage', () => {
   });
 });
 
-describe('runtime layout fact coverage', () => {
-  const runtimeLayout: PivotRuntimeLayout = {
-    version: 1,
-    rows: ['row1'],
-    cols: ['col1'],
-    metrics: ['m1'],
-    leafSelection: {},
-    valuePlacement: { axis: 'col', index: 0 },
-  };
-
-  const factBatch = (
-    rowDepth: number,
-    columnDepth: number,
-    scope: PivotFactStoreBatch['scope'] = { kind: 'bootstrap' },
-  ): PivotFactStoreBatch => ({
-    coverage: buildFactCoverage({
-      reason: 'initial',
-      rowDimensions: ['row1', 'row2'].slice(0, Math.max(rowDepth, 1)),
-      columnDimensions: ['col1', 'col2'].slice(0, Math.max(columnDepth, 1)),
-      rowDepth,
-      columnDepth,
-    }),
-    scope,
-    valueKeys: ['m1'],
-    facts: [],
-  });
-
-  it('detects missing fact coverage when active runtime layout requires a column dimension', () => {
-    expect(
-      factBatchesCoverRuntimeLayout([factBatch(1, 0)], runtimeLayout),
-    ).toBe(false);
-  });
-
-  it('accepts exact bootstrap fact coverage for the active runtime layout', () => {
-    expect(
-      factBatchesCoverRuntimeLayout([factBatch(1, 1)], runtimeLayout),
-    ).toBe(true);
-  });
-
-  it('requires explicit root coverage for layouts without dimensions', () => {
-    expect(
-      factBatchesCoverRuntimeLayout([], {
-        ...runtimeLayout,
-        rows: [],
-        cols: [],
-      }),
-    ).toBe(false);
-    expect(
-      factBatchesCoverRuntimeLayout([factBatch(0, 0)], {
-        ...runtimeLayout,
-        rows: [],
-        cols: [],
-      }),
-    ).toBe(true);
-  });
-
-  it('rejects depth-matching coverage for a different leading dimension', () => {
-    const batch: PivotFactStoreBatch = {
-      coverage: buildFactCoverage({
-        reason: 'initial',
-        rowDimensions: ['otherRow'],
-        columnDimensions: ['col1'],
-        rowDepth: 1,
-        columnDepth: 1,
-      }),
-      scope: { kind: 'bootstrap' },
-      valueKeys: ['m1'],
-      facts: [],
-    };
-
-    expect(factBatchesCoverRuntimeLayout([batch], runtimeLayout)).toBe(false);
-  });
-
-  it('matches object coverage dimensions by stable runtime key', () => {
-    const rowDimension: QueryFormColumn = {
-      sqlExpression: 'row1',
-      label: 'Row',
-      expressionType: 'SQL',
-    };
-    const batch: PivotFactStoreBatch = {
-      coverage: buildFactCoverage({
-        reason: 'initial',
-        rowDimensions: [rowDimension],
-        columnDimensions: ['col1'],
-        rowDepth: 1,
-        columnDepth: 1,
-      }),
-      scope: { kind: 'bootstrap' },
-      valueKeys: ['m1'],
-      facts: [],
-    };
-
-    expect(factBatchesCoverRuntimeLayout([batch], runtimeLayout)).toBe(true);
-  });
-
-  it('does not treat deeper fact coverage as root runtime-layout coverage', () => {
-    expect(
-      factBatchesCoverRuntimeLayout([factBatch(2, 1)], runtimeLayout),
-    ).toBe(false);
-  });
-
-  it('ignores branch coverage when checking root runtime-layout coverage', () => {
-    expect(
-      factBatchesCoverRuntimeLayout(
-        [factBatch(1, 1, { kind: 'branch', axis: 'row', path: ['A'] })],
-        runtimeLayout,
-      ),
-    ).toBe(false);
-  });
-
-  it('accepts metric-root branch coverage for the active runtime layout', () => {
-    expect(
-      factBatchesCoverRuntimeLayout(
-        [
-          factBatch(1, 1, {
-            kind: 'branch',
-            axis: 'col',
-            path: [encodeMetricKey('m1')],
-          }),
-        ],
-        runtimeLayout,
-      ),
-    ).toBe(true);
-  });
-});
-
 describe('coverage manifest diff', () => {
   const need = (
     rowScope: PivotCoverageNeed['rowScope'],
@@ -285,43 +156,6 @@ describe('coverage manifest diff', () => {
     scope,
     valueKeys: ['sales'],
     facts: [],
-  });
-
-  it('builds root runtime coverage without hidden deeper dimensions', () => {
-    expect(
-      buildRuntimeLayoutCoverageManifest({
-        version: 1,
-        rows: ['country', 'city'],
-        cols: ['year', 'quarter'],
-        metrics: ['sales'],
-        leafSelection: {},
-        valuePlacement: { axis: 'col', index: 2 },
-      }),
-    ).toEqual([
-      {
-        reason: 'root',
-        rowDepth: 1,
-        columnDepth: 1,
-        rowDimensions: ['country'],
-        columnDimensions: ['year'],
-        valueKeys: ['sales'],
-        rowScope: { kind: 'root' },
-        columnScope: { kind: 'root' },
-      },
-    ]);
-  });
-
-  it('does not require coverage when no metrics are selected', () => {
-    expect(
-      buildRuntimeLayoutCoverageManifest({
-        version: 1,
-        rows: ['country'],
-        cols: ['year'],
-        metrics: [],
-        leafSelection: {},
-        valuePlacement: { axis: 'col', index: 1 },
-      }),
-    ).toEqual([]);
   });
 
   it('treats explicit path sets as bounded coverage needs', () => {

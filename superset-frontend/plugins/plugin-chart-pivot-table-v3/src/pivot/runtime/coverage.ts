@@ -16,11 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import {
-  type PivotAxis,
-  type PivotPath,
-  type PivotRuntimeLayout,
-} from '../../types';
+import { type PivotAxis, type PivotPath } from '../../types';
 import { parsePath } from '../core/path';
 import {
   decodeMetricKey,
@@ -329,28 +325,6 @@ export const buildFactCoverage = ({
   };
 };
 
-export const buildRuntimeLayoutCoverageManifest = (
-  runtimeLayout: PivotRuntimeLayout,
-): PivotCoverageNeed[] => {
-  if (runtimeLayout.metrics.length === 0) {
-    return [];
-  }
-  const rowDepth = runtimeLayout.rows.length > 0 ? 1 : 0;
-  const columnDepth = runtimeLayout.cols.length > 0 ? 1 : 0;
-  return [
-    {
-      reason: 'root',
-      rowDepth,
-      columnDepth,
-      rowDimensions: runtimeLayout.rows.slice(0, rowDepth),
-      columnDimensions: runtimeLayout.cols.slice(0, columnDepth),
-      valueKeys: normalizeFactValueKeys(runtimeLayout.metrics),
-      rowScope: { kind: 'root' },
-      columnScope: { kind: 'root' },
-    },
-  ];
-};
-
 const factBatchCoversNeed = (
   { coverage, scope, valueKeys }: PivotFactStoreBatch,
   need: PivotCoverageNeed,
@@ -485,14 +459,6 @@ export const buildCoverageNeedFromFactSelector = ({
     rowScope: scopedAxis === 'row' ? axisScope : { kind: 'root' },
     columnScope: scopedAxis === 'col' ? axisScope : { kind: 'root' },
   };
-};
-
-export const factBatchesCoverRuntimeLayout = (
-  factBatches: PivotFactStoreBatch[],
-  runtimeLayout: PivotRuntimeLayout,
-) => {
-  const required = buildRuntimeLayoutCoverageManifest(runtimeLayout);
-  return diffCoverageManifest({ required, factBatches }).length === 0;
 };
 
 export const buildBranchFactCoverages = ({

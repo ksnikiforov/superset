@@ -134,21 +134,35 @@ Current fact-store contract:
 
 Current semantic-layout contract:
 
-- Values placement changes are semantic layout changes and trigger fetch;
-- dimension-only changes may reuse loaded facts only when the coverage manifest
-  proves the next visible root coverage is already loaded;
-- seamless runtime update should not locally project around Values placement by
-  comparing shared dimension prefixes;
-- seamless runtime update should ask fact coverage directly instead of using
-  manifest-signature equality as a proxy for loaded data.
+- Values placement changes, metric add/remove, measure-leaf selection changes,
+  axis removals, axis replacements, and axis reorders are semantic layout
+  changes and trigger fetch.
+- Metric reorder is cosmetic and can commit locally when the selected metric set
+  is unchanged.
+- Adding a trailing dimension to an already non-empty axis can commit locally
+  because the added layer is hidden/not expanded and must not create a query
+  load by itself.
+- Seamless runtime no longer locally rematerializes semantic layout changes from
+  previously loaded fact batches. Query-backed materialization is the only path
+  that advances the committed loaded runtime snapshot for semantic changes.
+- User draft layout is persisted and shown immediately, but the loaded runtime
+  layout/tree/facts advance only after the matching query result materializes.
+- While a semantic layout fetch is in flight, expansion planning stays pinned to
+  the committed loaded query layout. It must not plan expansion requests against
+  a draft layout that the loaded tree/fact store does not yet support.
+- Semantic layout fetches include the visible row/column bootstrap coverage in
+  the same request so the chart does not immediately issue a hydration follow-up
+  for the newly committed visible root layer.
 
 Expected deletion targets:
 
+- expansion tree merge/prune staging once expansion fetches upsert facts and
+  rematerialize from the fact store;
+- separate bootstrap/branch/batch/intersection query builders once all query
+  requests are represented as coverage needs;
 - remaining non-manifest coverage planning in expansion and query batching;
 - duplicate expansion/query coverage planning;
 - tree-shape-as-loaded-state checks;
-- seamless recovery branches that exist only because coverage ownership is
-  implicit;
 - render/chart fallbacks that re-decide whether semantic data is loaded.
 
 ## Hard Guardrails
@@ -168,8 +182,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14556` insertions, `15797` deletions, net `-1241`.
-- Current production TypeScript/TSX total: about `32269` lines.
+- Production `src`: `14333` insertions, `15791` deletions, net `-1458`.
+- Current production TypeScript/TSX total: about `32052` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -269,6 +283,9 @@ Problem:
   planning.
 - The actual render path builds its config separately.
 - Expansion correctness depends on those two policies staying equivalent.
+- Expansion fetches still return branch trees and then merge/prune those trees
+  into the current loaded tree. That keeps tree shape involved in loaded-state
+  progression even though fact coverage is now the runtime authority.
 
 Target:
 
@@ -338,6 +355,13 @@ Success criteria:
   and collapsed Values tiers using the shared policy.
 - Removing or changing a render visibility rule cannot silently leave expansion
   with stale behavior.
+- Expansion fetches upsert fact batches into the fact store and rematerialize
+  the visible runtime tree from loaded facts, rather than merging fetched branch
+  trees into the current tree.
+- `stageHydrationFetchDeltas`, `buildHydrationStagedTree`,
+  `finalizeHydrationTree`, same-axis branch merge preservation, and
+  `pruneMergedTree` plumbing are deleted or demoted once the fact-store-first
+  path is active.
 
 ### 4. Keep Shrinking Chart-Owned Orchestration
 
@@ -828,21 +852,23 @@ Success criteria:
 - Fact-store coverage no longer records compatible alias batches. Loaded
   coverage is exact query output; compatible reads and coverage checks derive
   reuse from the manifest dominance rules.
-- Expansion now exposes its loaded fact-batch snapshot back to seamless runtime
-  layout decisions. A user can expand columns, then add a hidden/not-expanded
-  row dimension without triggering a base seamless fetch when the visible
-  coverage is already loaded.
-- Seamless layout fetches now use the current draft layout for request form data
-  while still materializing from the loaded runtime snapshot. This keeps
-  interaction responsive and avoids sending requests for stale committed
-  row/column layout after drag/drop edits.
-- The chart no longer owns the loaded fact-batch ref that bridges expansion and
-  seamless runtime. Expansion reports fact-store coverage changes directly to
-  the seamless runtime boundary, and the expansion hook no longer keeps a
-  duplicate loaded-batch React state just to expose coverage to the chart.
-- Expansion fetch execution no longer owns loaded fact-batch reporting as a
-  low-level fetch-runtime callback. The expansion hook syncs the loaded fact
-  snapshot after same-axis and hydration fetch loops complete.
+- Seamless runtime no longer owns local semantic rematerialization from prior
+  fact batches. Semantic layout changes fetch and materialize through the same
+  query-backed runtime path as initial data.
+- The user-controlled draft runtime layout can update and persist immediately,
+  while the committed loaded runtime layout remains tied to the last
+  successfully materialized query-backed tree/fact snapshot.
+- Expansion no longer resets its fact store during render when draft query shape
+  changes. During a seamless semantic fetch, expansion request form data remains
+  pinned to the committed loaded layout so hidden draft layers cannot create
+  premature expansion loads.
+- Semantic layout fetch planning now includes visible row and column bootstrap
+  coverage in the same request, avoiding the immediate follow-up hydration that
+  previously appeared after committing a newly fetched layout.
+- Values-first column metric branches may return collapsed after a semantic
+  layout fetch. The important contract is that stale deeper leaves are removed
+  and the metric branch can expand from already-loaded coverage without another
+  fetch.
 
 ## Current Risks
 
@@ -885,13 +911,10 @@ Success criteria:
   coverage, otherwise preloaded tree coverage can overclaim a deeper dimension
   and skip a targeted expansion fetch. Do not cut this without first making
   loaded measure-tier coverage explicit in the manifest/materializer contract.
-- A manifest-only runtime-layout fetch decision was attempted and reverted
-  after `interaction-seamless-expansion.test.tsx` exposed broad UX regressions.
-  Fact coverage alone is not yet enough to decide reuse. The remaining
-  seamless-runtime policy still depends on whether the current interactive
-  layout tree can be locally reused for layout edits such as trimming/re-adding
-  hidden dimensions and moving Values. The next version needs an explicit
-  loaded-snapshot contract, not another previous-layout heuristic.
+- Seamless runtime now has the start of an explicit draft-vs-loaded split, but
+  the API names still carry "seamless reuse" history. The next cleanup should
+  rename or collapse that boundary only if it deletes runtime branches rather
+  than adding another controller wrapper.
 - Large result sets still pay main-thread JSON parsing and React commit costs.
 - Direct chart tests that need source metric metadata should pass
   `sourceMetrics` or encode the metric intent in `formData`. Reintroducing
@@ -901,10 +924,10 @@ Success criteria:
   the final API shape is still a standalone function rather than an explicit
   program policy object. Only move it again if that deletes call-site plumbing
   or combines more layout/coverage policy.
-- Expansion and seamless runtime now share loaded fact-batch coverage through
-  one callback-owned snapshot, but expansion still owns a local fact store while
-  seamless owns committed tree/materialization state. A larger controller cut is
-  only worth doing if it deletes that remaining state-machine split.
+- Expansion still owns a local fact store while seamless owns committed
+  tree/materialization state. The next high-impact cut is to make expansion
+  fetches fact-store-first and rematerialize the tree, which should delete
+  branch-tree merge/prune staging instead of adding another state wrapper.
 
 ## Approval Checkpoints
 

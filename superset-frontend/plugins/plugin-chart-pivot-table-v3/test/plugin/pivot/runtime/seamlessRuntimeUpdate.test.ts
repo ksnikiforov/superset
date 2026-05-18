@@ -346,7 +346,7 @@ test('prepares runtime state persistence side-effect plan', () => {
 });
 
 describe('runtime layout reuse fetch policy', () => {
-  it('fetches for same-root-depth layout changes when committed coverage is stale', () => {
+  it('does not fetch for trailing dimension appends on an already visible axis', () => {
     expect(
       shouldFetchRuntimeLayout({
         reuseSnapshot: reuseSnapshot(runtimeLayout, [factBatch(1, 0)]),
@@ -355,7 +355,7 @@ describe('runtime layout reuse fetch policy', () => {
           rows: ['country', 'state'],
         },
       }),
-    ).toBe(true);
+    ).toBe(false);
   });
 
   it('fetches when a root-depth change requires missing committed coverage', () => {
@@ -377,7 +377,7 @@ describe('runtime layout reuse fetch policy', () => {
     ).toBe(true);
   });
 
-  it('does not fetch when removing a metric from already loaded root coverage', () => {
+  it('fetches when removing a metric instead of locally rematerializing loaded facts', () => {
     expect(
       shouldFetchRuntimeLayout({
         reuseSnapshot: reuseSnapshot(
@@ -394,10 +394,10 @@ describe('runtime layout reuse fetch policy', () => {
         ),
         nextLayout: runtimeLayout,
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
-  it('does not fetch when adding a metric already present as support coverage', () => {
+  it('fetches when adding a support-loaded metric instead of locally rematerializing loaded facts', () => {
     expect(
       shouldFetchRuntimeLayout({
         reuseSnapshot: reuseSnapshot(runtimeLayout, [
@@ -427,7 +427,7 @@ describe('runtime layout reuse fetch policy', () => {
           metrics: ['sales', 'profit'],
         },
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('fetches when adding a metric missing from loaded root coverage', () => {
@@ -454,7 +454,7 @@ describe('runtime layout reuse fetch policy', () => {
     ).toBe(true);
   });
 
-  it('does not fetch when changed root coverage is already loaded', () => {
+  it('fetches when root dimensions change even if matching coverage was loaded', () => {
     expect(
       shouldFetchRuntimeLayout({
         reuseSnapshot: reuseSnapshot(runtimeLayout, [
@@ -476,7 +476,7 @@ describe('runtime layout reuse fetch policy', () => {
           rows: ['state', 'country'],
         },
       }),
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('fetches when trimming hidden dimensions leaves root coverage unsupported', () => {

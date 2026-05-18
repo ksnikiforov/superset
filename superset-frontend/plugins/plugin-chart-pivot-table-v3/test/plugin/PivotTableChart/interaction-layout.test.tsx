@@ -1941,6 +1941,7 @@ describe('PivotTableChart interaction layout', () => {
       );
 
     expect(rowMetricValues()).toEqual(expect.arrayContaining([10, 20, 30, 40]));
+    fetchSpy.mockClear();
 
     fireEvent.click(screen.getAllByLabelText('Toggle column dimension')[1]);
 
@@ -1952,7 +1953,7 @@ describe('PivotTableChart interaction layout', () => {
             `${spec.meta.coverage.rowDepth}|${spec.meta.coverage.columnDepth}`,
         ),
       ),
-    ).toEqual(new Set(['0|0', '1|1']));
+    ).toEqual(new Set(['0|0', '1|1', '1|0', '0|1']));
     await waitFor(() => expect(screen.getByText('X')).toBeInTheDocument());
 
     fireEvent.click(screen.getAllByLabelText('Remove dimension')[0]);

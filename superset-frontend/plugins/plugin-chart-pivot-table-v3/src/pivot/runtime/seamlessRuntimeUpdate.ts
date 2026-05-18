@@ -32,13 +32,8 @@ import { type PlannedQuerySpec } from '../query/specs';
 import { normalizeFormDataExtraFilters } from '../query/normalizeExtraFormData';
 import { buildInitialPivotUpdatePlan } from '../update/initialUpdatePlan';
 import { normalizeRuntimeLayout } from '../layout/resolveInteractionLayout';
-import {
-  buildInitialRuntimeFromFactBatchesAsync,
-  buildInitialRuntimeFromSpecResultsAsync,
-  type PivotFactStoreBatch,
-} from './ingestQueryResults';
+import { buildInitialRuntimeFromSpecResultsAsync } from './ingestQueryResults';
 import { insertValuesPlaceholder } from './compilePivotProgram';
-import { factBatchesCoverRuntimeLayout } from './coverage';
 import {
   executeLatestRequest,
   executeScheduledLatestRequest,
@@ -67,11 +62,18 @@ type SeamlessRuntimeUpstreamState = {
 
 export type SeamlessRuntimeReuseSnapshot = {
   runtimeLayout: PivotRuntimeLayout;
-  factBatches: PivotFactStoreBatch[];
 };
 
 const selectionSignature = (selection: PivotRuntimeLayout['leafSelection']) =>
   stableStringify(selection ?? {});
+
+const hasMetricSelectionChanged = (left: string[], right: string[]) => {
+  if (left.length !== right.length) {
+    return true;
+  }
+  const rightSet = new Set(right);
+  return left.some(metric => !rightSet.has(metric));
+};
 
 export const isSameRuntimeLayout = (
   prev: PivotRuntimeLayout,
@@ -94,7 +96,15 @@ export const shouldFetchRuntimeLayout = ({
   nextLayout: PivotRuntimeLayout;
 }) => {
   const reusableLayout = reuseSnapshot.runtimeLayout;
+  const isTrailingHiddenAppend = (previous: string[], next: string[]) =>
+    previous.length > 0 &&
+    next.length > previous.length &&
+    previous.every((value, index) => value === next[index]);
+  const axisChangeRequiresFetch = (previous: string[], next: string[]) =>
+    !isEqual(previous, next) && !isTrailingHiddenAppend(previous, next);
+
   if (
+    hasMetricSelectionChanged(reusableLayout.metrics, nextLayout.metrics) ||
     selectionSignature(reusableLayout.leafSelection) !==
       selectionSignature(nextLayout.leafSelection) ||
     reusableLayout.valuePlacement.axis !== nextLayout.valuePlacement.axis ||
@@ -102,7 +112,10 @@ export const shouldFetchRuntimeLayout = ({
   ) {
     return true;
   }
-  return !factBatchesCoverRuntimeLayout(reuseSnapshot.factBatches, nextLayout);
+  return (
+    axisChangeRequiresFetch(reusableLayout.rows, nextLayout.rows) ||
+    axisChangeRequiresFetch(reusableLayout.cols, nextLayout.cols)
+  );
 };
 
 export const buildSeamlessRuntimeSyncSnapshot = ({
@@ -352,17 +365,6 @@ export const prepareSeamlessRuntimeLayoutChange = ({
       runtimeLayout,
     };
   }
-  if (!isSameRuntimeLayout(reuseSnapshot.runtimeLayout, runtimeLayout)) {
-    return {
-      kind: 'materialize-local',
-      runtimeLayout,
-      syncSnapshot: buildSeamlessRuntimeSyncSnapshot({
-        runtimeLayout,
-        selection,
-        upstreamSignature,
-      }),
-    };
-  }
   return {
     kind: 'commit-local',
     runtimeLayout,
@@ -395,12 +397,6 @@ type SeamlessRuntimeUpdateConfig = SeamlessRuntimeUpdatePlanConfig & {
     requestGroupId: string;
   }) => Promise<ChartDataQueryResult[]>;
   onFetchStart?: () => void;
-  onError?: (error: unknown) => void;
-};
-
-type SeamlessRuntimeReuseConfig = SeamlessRuntimeUpdatePlanConfig & {
-  reuseSnapshot: SeamlessRuntimeReuseSnapshot;
-  materializationLifecycle: LatestRequestLifecycle;
   onError?: (error: unknown) => void;
 };
 
@@ -509,45 +505,5 @@ export const fetchAndMaterializeSeamlessRuntimeUpdate = async ({
     tree: materializationResult.value.tree,
     factBatches: materializationResult.value.factBatches,
     warnings: collectWarnings(results),
-  };
-};
-
-export const materializeSeamlessRuntimeReuse = async ({
-  materializationLifecycle,
-  reuseSnapshot,
-  onError,
-  ...planConfig
-}: SeamlessRuntimeReuseConfig) => {
-  const { formData, layout, specs } =
-    buildSeamlessRuntimeUpdatePlan(planConfig);
-  const materializationResult = await executeScheduledLatestRequest({
-    lifecycle: materializationLifecycle,
-    requestGroupId: SEAMLESS_MATERIALIZATION_GROUP,
-    yieldBeforeRun: false,
-    run: token =>
-      buildInitialRuntimeFromFactBatchesAsync({
-        factBatches: reuseSnapshot.factBatches,
-        specs,
-        layout,
-        formData,
-        shouldContinue: token.isCurrent,
-        yieldToMain: yieldToMainThread,
-      }),
-    onError,
-  });
-  if (materializationResult.status === 'stale') {
-    return { status: 'stale' };
-  }
-  if (materializationResult.status !== 'success') {
-    return {
-      status: materializationResult.status,
-      error: materializationResult.error,
-    };
-  }
-  return {
-    status: 'success',
-    tree: materializationResult.value.tree,
-    factBatches: materializationResult.value.factBatches,
-    warnings: [],
   };
 };

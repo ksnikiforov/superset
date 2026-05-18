@@ -289,7 +289,10 @@ const buildBootstrapPlanFromLayout = (
     });
   }
 
-  if (rowGroupby.length > 0 && (!needsGrid || needsRowTotals)) {
+  if (
+    rowGroupby.length > 0 &&
+    (!needsGrid || needsRowTotals || firstRowDepth > 0)
+  ) {
     addCoverageTarget({
       kind: 'rows',
       rowDepth: firstRowDepth,
@@ -302,7 +305,10 @@ const buildBootstrapPlanFromLayout = (
     });
   }
 
-  if (colGroupby.length > 0 && (!needsGrid || needsColTotals)) {
+  if (
+    colGroupby.length > 0 &&
+    (!needsGrid || needsColTotals || firstColDepth > 0)
+  ) {
     addCoverageTarget({
       kind: 'cols',
       rowDepth: 0,

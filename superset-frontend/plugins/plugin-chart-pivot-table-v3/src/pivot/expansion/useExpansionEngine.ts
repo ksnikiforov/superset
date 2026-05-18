@@ -308,7 +308,6 @@ export type ExpansionEngineConfig = {
   mergeOwnState?: (partial: JsonObject) => JsonObject;
   persistedExpansionState?: unknown;
   shouldPersistExpansionState: boolean;
-  onLoadedFactBatchesChange: (factBatches: PivotFactStoreBatch[]) => void;
   pruneMergedTree: (params: {
     axis: PivotAxis;
     tree: PivotTreeData;
@@ -334,7 +333,6 @@ export const useExpansionEngine = ({
   mergeOwnState,
   persistedExpansionState,
   shouldPersistExpansionState,
-  onLoadedFactBatchesChange,
   pruneMergedTree,
 }: ExpansionEngineConfig): ExpansionEngineResult => {
   const [tree, setTree] = useState<PivotTreeData>(data);
@@ -362,12 +360,6 @@ export const useExpansionEngine = ({
   const pendingRowsRef = useRef(pendingRows);
   const pendingColsRef = useRef(pendingCols);
   const fetchFormDataRef = useRef(fetchFormData);
-  const fetchCoverageSignature = stableStringify({
-    groupbyRows: fetchFormData.groupbyRows,
-    groupbyColumns: fetchFormData.groupbyColumns,
-    metrics: fetchFormData.metrics,
-    metricsLayout: fetchFormData.metricsLayout,
-  });
   const explicitExpandedRowsRef = useRef<Set<string>>(new Set());
   const explicitExpandedColsRef = useRef<Set<string>>(new Set());
   const explicitCollapsedRowsRef = useRef<Set<string>>(new Set());
@@ -387,7 +379,6 @@ export const useExpansionEngine = ({
   const expandedStateSignatureRef = useRef<string | null>(null);
   const expandedStateSharedSignatureRef = useRef<string | null>(null);
   const requestGroupPrefixRef = useRef(nanoid());
-  const fetchCoverageSignatureRef = useRef(fetchCoverageSignature);
   const expansionRequestLifecycle = useMemo(
     () =>
       createLatestRequestLifecycle({
@@ -396,18 +387,6 @@ export const useExpansionEngine = ({
       }),
     [],
   );
-
-  const syncLoadedFactBatches = useCallback(() => {
-    onLoadedFactBatchesChange(
-      factStoreRef.current?.getCoverageBatches() ?? factBatches,
-    );
-  }, [factBatches, onLoadedFactBatchesChange]);
-
-  if (fetchCoverageSignatureRef.current !== fetchCoverageSignature) {
-    expansionRequestLifecycle.invalidate();
-    factStoreRef.current = createPivotFactStore();
-    fetchCoverageSignatureRef.current = fetchCoverageSignature;
-  }
 
   const expansionRequestHelpers = useMemo(
     () =>
@@ -766,7 +745,6 @@ export const useExpansionEngine = ({
         if (fetchLoop.status === 'stale' || !requestScope.isCurrent()) {
           return;
         }
-        syncLoadedFactBatches();
         const committedExpanded =
           axis === 'row' ? expandedRowsRef.current : expandedColsRef.current;
         const combinedExpanded = new Set(committedExpanded);
@@ -804,7 +782,6 @@ export const useExpansionEngine = ({
       persistExpansionState,
       pruneMergedTree,
       resolveExpandedForMetrics,
-      syncLoadedFactBatches,
       trackInFlightExpansion,
       visibilityConfig,
     ],
@@ -883,7 +860,6 @@ export const useExpansionEngine = ({
           fetchRuntime: buildFetchRuntime(requestScope),
         });
         if (result.status === 'complete') {
-          syncLoadedFactBatches();
           const resolvedRows = resolveExpandedForMetrics(
             'row',
             result.desiredRows,
@@ -921,7 +897,6 @@ export const useExpansionEngine = ({
       pruneMergedTree,
       resolveExpandedForMetrics,
       setHydratingState,
-      syncLoadedFactBatches,
       visibilityConfig,
     ],
   );
@@ -1086,7 +1061,6 @@ export const useExpansionEngine = ({
     const nextFactStore = createPivotFactStore();
     nextFactStore.upsertBatches(factBatches);
     factStoreRef.current = nextFactStore;
-    onLoadedFactBatchesChange(factBatches);
     setHydratingState(false);
     warningsRef.current = new Map();
     setWarnings([]);
@@ -1203,7 +1177,6 @@ export const useExpansionEngine = ({
     groupbyColumnKeys,
     groupbyRowKeys,
     pivotProgram,
-    onLoadedFactBatchesChange,
     shouldPersistExpansionState,
     resolvedExpandColumnsLevel,
     resolvedExpandRowsLevel,

@@ -132,7 +132,11 @@ export const usePivotRuntimeLayoutState = ({
   }, []);
 
   const persistRuntimeState = useCallback(
-    (layout: PivotRuntimeLayout, filters: RuntimeSelection) => {
+    (
+      layout: PivotRuntimeLayout,
+      filters: RuntimeSelection,
+      options: { commit?: boolean } = {},
+    ) => {
       const persistencePlan = prepareRuntimeStatePersistence({
         layout,
         selection: filters,
@@ -154,7 +158,9 @@ export const usePivotRuntimeLayoutState = ({
         lastPersistedSelectionRef.current = persistencePlan.persistedSelection;
         pendingPersistedSelectionSyncRef.current = true;
       }
-      commitRuntimeLayout(layout);
+      if (options.commit !== false) {
+        commitRuntimeLayout(layout);
+      }
       if (setControlValue) {
         setControlValue('pivotRuntimeLayout', layout);
         setControlValue('pivotSelectedFilters', filters);
