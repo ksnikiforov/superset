@@ -339,7 +339,6 @@ export type PivotFormattingResult = {
   metricDatabars: PivotMetricDatabarMap;
   databarColumnMinWidths: Map<string, number>;
   themeColor?: string;
-  treeDataSignature: string;
   resolveDimensionStyle: (
     axis: 'row' | 'col',
     node: PivotTreeNode,
@@ -683,7 +682,6 @@ export const usePivotFormatting = ({
     [colFormatting],
   );
 
-  const treeDataSignature = formData.treeDataSignature ?? '';
   const metricNodePolicy = useMemo(
     () => createMetricNodePolicy(layout.layout.pivotProgram),
     [layout.layout.pivotProgram],
@@ -1203,7 +1201,6 @@ export const usePivotFormatting = ({
     metricDatabars,
     databarColumnMinWidths,
     themeColor,
-    treeDataSignature,
     resolveDimensionStyle,
     resolveMetricCellFormatting,
     deriveMetricKey,

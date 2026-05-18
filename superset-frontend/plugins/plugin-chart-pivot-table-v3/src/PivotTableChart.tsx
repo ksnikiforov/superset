@@ -429,7 +429,7 @@ function PivotTableChart(props: PivotTableProps) {
     emitCrossFilters,
     setDataMask,
     mergeOwnState,
-    treeDataSignature: formatting.treeDataSignature,
+    treeDataSignature: appliedLayoutFormData.treeDataSignature ?? '',
     layout: layoutResult,
     onContextMenu,
     ownState,
