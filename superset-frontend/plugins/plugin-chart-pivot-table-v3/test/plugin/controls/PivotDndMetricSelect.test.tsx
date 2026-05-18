@@ -480,7 +480,7 @@ describe('PivotDndMetricSelect', () => {
     });
   });
 
-  it('hydrates formatting when formatting key matches the metric label', async () => {
+  it('ignores formatting keyed by metric label instead of metric key', async () => {
     const savedMetric = {
       metric_name: 'avg__order_value',
       verbose_name: 'averageOrderValue',
@@ -516,8 +516,8 @@ describe('PivotDndMetricSelect', () => {
     await waitFor(() => {
       expect(
         selectContainer?.querySelector('.ant-select-selection-item')
-          ?.textContent,
-      ).toContain('cond_format');
+          ?.textContent ?? '',
+      ).not.toContain('cond_format');
     });
   });
 

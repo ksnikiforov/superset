@@ -468,18 +468,16 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
     return normalizeMetricFormattingMapWithKeys(
       rawMetricFormatting,
       ensureIsArray(props.value),
-      savedMetrics,
     );
-  }, [props.formData, props.value, savedMetrics]);
+  }, [props.formData, props.value]);
   const metricDatabars = useMemo(() => {
     const rawMetricDatabars =
       (props.formData?.metricDatabars as PivotMetricDatabarMap) || {};
     return normalizeMetricDatabarMapWithKeys(
       rawMetricDatabars,
       ensureIsArray(props.value),
-      savedMetrics,
     );
-  }, [props.formData, props.value, savedMetrics]);
+  }, [props.formData, props.value]);
   const metricFormattingRef =
     useRef<PivotMetricFormattingMap>(metricFormatting);
   const metricDatabarsRef = useRef<PivotMetricDatabarMap>(metricDatabars);

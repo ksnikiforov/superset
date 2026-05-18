@@ -725,6 +725,10 @@ Success criteria:
 - Formatting options are now derived inside the formatting boundary from
   `formData`; the chart no longer unpacks and forwards value format,
   per-column formats, currency formats, HTML rendering, or pivot theme props.
+- Metric formatting and databar map normalization now uses canonical metric
+  keys only. Saved metric verbose-name and display-label fallback remapping has
+  been removed, so future formatting state cannot silently target a metric by a
+  non-canonical label alias.
 - `transformProps` no longer exposes duplicate top-level chart props for
   formatting, sorting, groupby, aggregate, and theme fields that already belong
   to `formData` or hook-owned runtime state.

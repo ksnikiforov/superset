@@ -1067,41 +1067,18 @@ export const collectDimensionSortingMetricsForQuery = (
 export const normalizeMetricFormattingMapWithKeys = (
   metricFormatting: PivotMetricFormattingMap | undefined,
   metrics: QueryFormMetric[],
-  savedMetrics?: Metric[],
 ): PivotMetricFormattingMap => {
   const normalized = normalizeMetricFormattingMap(metricFormatting);
   if (metrics.length === 0) {
     return normalized;
   }
   const metricKeys = new Set(getMetricKeys(metrics));
-  const verboseNameToKey = (savedMetrics || []).reduce<Map<string, string>>(
-    (acc, metric) => {
-      if (metric.verbose_name && metric.metric_name) {
-        acc.set(metric.verbose_name, metric.metric_name);
-      }
-      return acc;
-    },
-    new Map(),
-  );
-  const labelToKey = metrics.reduce<Map<string, string>>((acc, metric) => {
-    const key = getMetricKey(metric);
-    const label = getMetricLabel(metric);
-    if (key && label && key !== label && !acc.has(label)) {
-      acc.set(label, key);
-    }
-    return acc;
-  }, new Map());
   return Object.entries(normalized).reduce<PivotMetricFormattingMap>(
     (acc, [metricKey, formatting]) => {
-      const resolvedKey = metricKeys.has(metricKey)
-        ? metricKey
-        : labelToKey.get(metricKey) ||
-          verboseNameToKey.get(metricKey) ||
-          metricKey;
-      if (!resolvedKey) {
+      if (!metricKeys.has(metricKey)) {
         return acc;
       }
-      acc[resolvedKey] = { ...(acc[resolvedKey] || {}), ...formatting };
+      acc[metricKey] = { ...(acc[metricKey] || {}), ...formatting };
       return acc;
     },
     {},
@@ -1111,30 +1088,12 @@ export const normalizeMetricFormattingMapWithKeys = (
 export const normalizeMetricDatabarMapWithKeys = (
   metricDatabars: PivotMetricDatabarMap | undefined,
   metrics: QueryFormMetric[],
-  savedMetrics?: Metric[],
 ): PivotMetricDatabarMap => {
   const normalized = normalizeMetricDatabarMap(metricDatabars);
   if (metrics.length === 0) {
     return normalized;
   }
   const metricKeys = new Set(getMetricKeys(metrics));
-  const verboseNameToKey = (savedMetrics || []).reduce<Map<string, string>>(
-    (acc, metric) => {
-      if (metric.verbose_name && metric.metric_name) {
-        acc.set(metric.verbose_name, metric.metric_name);
-      }
-      return acc;
-    },
-    new Map(),
-  );
-  const labelToKey = metrics.reduce<Map<string, string>>((acc, metric) => {
-    const key = getMetricKey(metric);
-    const label = getMetricLabel(metric);
-    if (key && label && key !== label && !acc.has(label)) {
-      acc.set(label, key);
-    }
-    return acc;
-  }, new Map());
   const resolveMetricReference = (metric?: QueryFormMetric) => {
     if (!metric) {
       return undefined;
@@ -1148,27 +1107,15 @@ export const normalizeMetricDatabarMapWithKeys = (
         return candidate;
       }
     }
-    for (const candidate of candidates) {
-      const resolved =
-        labelToKey.get(candidate) || verboseNameToKey.get(candidate);
-      if (resolved) {
-        return resolved;
-      }
-    }
     return undefined;
   };
   const merged = Object.entries(normalized).reduce<PivotMetricDatabarMap>(
     (acc, [metricKey, config]) => {
-      const resolvedKey = metricKeys.has(metricKey)
-        ? metricKey
-        : labelToKey.get(metricKey) ||
-          verboseNameToKey.get(metricKey) ||
-          metricKey;
-      if (!resolvedKey) {
+      if (!metricKeys.has(metricKey)) {
         return acc;
       }
-      acc[resolvedKey] = {
-        ...(acc[resolvedKey] || {}),
+      acc[metricKey] = {
+        ...(acc[metricKey] || {}),
         ...config,
       };
       return acc;
