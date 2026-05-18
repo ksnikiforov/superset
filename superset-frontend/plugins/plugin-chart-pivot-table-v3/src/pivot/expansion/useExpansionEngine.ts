@@ -66,6 +66,7 @@ import {
   resolveReinitializedExpansionState,
   resolveExpandedForMetrics as resolveExpandedForMetricsBase,
   resolveLayoutTransition,
+  type ExpansionPlanningConfig,
   type ExpansionVisibilityConfig,
 } from './stateTransitions';
 import { useSyncRef } from '../shared/useSyncRef';
@@ -598,6 +599,12 @@ export const useExpansionEngine = ({
     }),
     [buildRenderModelConfig, pivotProgram],
   );
+  const planningConfig = useMemo<ExpansionPlanningConfig>(
+    () => ({
+      program: pivotProgram,
+    }),
+    [pivotProgram],
+  );
 
   const persistExpansionState = useCallback(
     (nextRows: Set<string>, nextCols: Set<string>) => {
@@ -739,7 +746,7 @@ export const useExpansionEngine = ({
           getDataEpoch: () => dataEpochRef.current,
           getExpandedRows: () => expandedRowsRef.current,
           getExpandedCols: () => expandedColsRef.current,
-          config: visibilityConfig,
+          config: planningConfig,
           fetchRuntime: buildFetchRuntime(requestScope),
           resolveExpandedForMetrics,
         });
@@ -776,7 +783,7 @@ export const useExpansionEngine = ({
       persistExpansionState,
       resolveExpandedForMetrics,
       trackInFlightExpansion,
-      visibilityConfig,
+      planningConfig,
     ],
   );
 
@@ -843,7 +850,7 @@ export const useExpansionEngine = ({
           maxIterations: MAX_HYDRATION_ITERATIONS,
           isCurrent: requestScope.isCurrent,
           buildDesiredExpanded,
-          config: visibilityConfig,
+          config: planningConfig,
           activeAxis: options?.activeAxis,
           pendingRows: pendingRowsRef.current,
           pendingCols: pendingColsRef.current,
@@ -888,7 +895,7 @@ export const useExpansionEngine = ({
       persistExpansionState,
       resolveExpandedForMetrics,
       setHydratingState,
-      visibilityConfig,
+      planningConfig,
     ],
   );
 
@@ -909,7 +916,7 @@ export const useExpansionEngine = ({
         tree: treeRef.current,
         expandedRows: expandedRowsRef.current,
         expandedCols: expandedColsRef.current,
-        config: visibilityConfig,
+        config: planningConfig,
       });
       const toggleDecision = resolveExpansionToggleDecision({
         axis,
@@ -956,7 +963,7 @@ export const useExpansionEngine = ({
       reportAsyncError,
       clearLoadingState,
       setHydratingState,
-      visibilityConfig,
+      planningConfig,
     ],
   );
 
@@ -1142,7 +1149,7 @@ export const useExpansionEngine = ({
           metricKeys: pivotProgram.metricKeys,
         }),
       }),
-      config: visibilityConfig,
+      config: planningConfig,
     });
     if (prefetchAction.kind === 'hydrate') {
       if (!prefetchAction.showLoader) {
@@ -1177,7 +1184,7 @@ export const useExpansionEngine = ({
     resolveExpandedForMetrics,
     reportAsyncError,
     setHydratingState,
-    visibilityConfig,
+    planningConfig,
   ]);
 
   const handleRetry = useCallback(() => {

@@ -60,6 +60,10 @@ export type ExpansionVisibilityConfig = {
   }) => RenderModelConfig;
 };
 
+export type ExpansionPlanningConfig = {
+  program: PivotProgram;
+};
+
 const createEmptyExpansionPlan = (): PivotExpansionPlan => ({
   fetchRequests: [],
   pendingKeys: new Set<string>(),
@@ -443,24 +447,56 @@ export const computeVisibleDepths = ({
   tree: PivotTreeData;
   expandedRows: Set<string>;
   expandedCols: Set<string>;
-  config: ExpansionVisibilityConfig;
+  config: ExpansionPlanningConfig;
 }): { visibleRowDepth: number; visibleColDepth: number } => {
-  const { visibleRows, visibleCols } = buildRenderModelAxes({
-    tree,
-    expandedRows,
-    expandedCols,
-    config: config.buildRenderModelConfig({ tree, expandedRows, expandedCols }),
-  });
   const { countDimDepth } = createExpansionMetricPolicy(config.program);
+  const maxVisibleDepth = (
+    axis: PivotAxis,
+    nodes: Record<string, PivotTreeNode>,
+    expanded: Set<string>,
+  ) => {
+    const root = nodes[rootKey];
+    const axisDimensionCount =
+      axis === 'row'
+        ? config.program.rowDimensions.length
+        : config.program.columnDimensions.length;
+    if (!root) {
+      return 0;
+    }
+    const childrenByParent = new Map<string, PivotTreeNode[]>();
+    Object.values(nodes).forEach(node => {
+      if (node.key === rootKey || node.path.length === 0) {
+        return;
+      }
+      const parentKey = serializePath(node.path.slice(0, -1));
+      const children = childrenByParent.get(parentKey);
+      if (children) {
+        children.push(node);
+      } else {
+        childrenByParent.set(parentKey, [node]);
+      }
+    });
+    let maxDepth = 0;
+    const visit = (node: PivotTreeNode) => {
+      maxDepth = Math.max(maxDepth, countDimDepth(node.path));
+      if (node.key !== rootKey && !expanded.has(node.key)) {
+        return;
+      }
+      (childrenByParent.get(node.key) ?? []).forEach(visit);
+    };
+    visit(root);
+    expanded.forEach(key => {
+      const path = nodes[key]?.path ?? parsePath(key);
+      maxDepth = Math.max(
+        maxDepth,
+        Math.min(axisDimensionCount, countDimDepth(path) + 1),
+      );
+    });
+    return maxDepth;
+  };
   return {
-    visibleRowDepth: Math.max(
-      0,
-      ...visibleRows.map(row => countDimDepth(row.path)),
-    ),
-    visibleColDepth: Math.max(
-      0,
-      ...visibleCols.map(col => countDimDepth(col.path)),
-    ),
+    visibleRowDepth: maxVisibleDepth('row', tree.rows, expandedRows),
+    visibleColDepth: maxVisibleDepth('col', tree.cols, expandedCols),
   };
 };
 
@@ -715,35 +751,34 @@ export const resolveReinitializedExpansionState = (params: {
 };
 
 export const buildCrossAxisIntersectionTargets = ({
-  rowPlan,
-  colPlan,
+  rowKeys,
+  colKeys,
+  rowNodes,
+  colNodes,
   visibleRowDepth,
   visibleColDepth,
   getMissingExpansionCoverage,
 }: {
-  rowPlan: PivotExpansionPlan;
-  colPlan: PivotExpansionPlan;
+  rowKeys: Set<string>;
+  colKeys: Set<string>;
+  rowNodes: Record<string, PivotTreeNode>;
+  colNodes: Record<string, PivotTreeNode>;
   visibleRowDepth: number;
   visibleColDepth: number;
   getMissingExpansionCoverage: PivotExpansionCoverageDiff;
 }): ExpansionFetchTarget[] => {
-  const hasCrossAxisFetch =
-    rowPlan.fetchRequests.length > 0 && colPlan.fetchRequests.length > 0;
-  const hasMissingAxisNodes =
-    rowPlan.hasMissingNodes || colPlan.hasMissingNodes;
-  const rowPathKeys = rowPlan.fetchRequests
-    .map(request => request.pathKey)
-    .filter(key => key !== rootKey);
-  const columnPathKeys = colPlan.fetchRequests
-    .map(request => request.pathKey)
-    .filter(key => key !== rootKey);
+  const rowPathKeys = Array.from(rowKeys).filter(
+    key => key !== rootKey && rowNodes[key],
+  );
+  const columnPathKeys = Array.from(colKeys).filter(
+    key => key !== rootKey && colNodes[key],
+  );
   if (
-    !hasCrossAxisFetch ||
-    hasMissingAxisNodes ||
     visibleRowDepth === 0 ||
     visibleColDepth === 0 ||
     rowPathKeys.length === 0 ||
-    columnPathKeys.length === 0
+    columnPathKeys.length === 0 ||
+    rowPathKeys.length * columnPathKeys.length <= 1
   ) {
     return [];
   }
@@ -776,7 +811,7 @@ export const planHydrationIteration = ({
   desiredRows: Set<string>;
   desiredCols: Set<string>;
   getMissingExpansionCoverage: PivotExpansionCoverageDiff;
-  config: ExpansionVisibilityConfig;
+  config: ExpansionPlanningConfig;
   activeAxis?: PivotAxis;
   pendingRows: Set<string>;
   pendingCols: Set<string>;
@@ -785,8 +820,8 @@ export const planHydrationIteration = ({
 }) => {
   const { visibleRowDepth, visibleColDepth } = computeVisibleDepths({
     tree,
-    expandedRows: desiredRows,
-    expandedCols: desiredCols,
+    expandedRows: planRows ? desiredRows : new Set(),
+    expandedCols: planCols ? desiredCols : new Set(),
     config,
   });
   const rowPlan = planRows
@@ -831,16 +866,28 @@ export const planHydrationIteration = ({
   }
 
   const intersectionTargets = buildCrossAxisIntersectionTargets({
-    rowPlan: effectiveRowPlan,
-    colPlan: effectiveColPlan,
+    rowKeys: desiredRows,
+    colKeys: desiredCols,
+    rowNodes: tree.rows,
+    colNodes: tree.cols,
     visibleRowDepth,
     visibleColDepth,
     getMissingExpansionCoverage,
   });
+  const shouldFetchIntersectionOnly =
+    intersectionTargets.length > 0 &&
+    !effectiveRowPlan.hasMissingNodes &&
+    !effectiveColPlan.hasMissingNodes;
+  const rowPlanForTransport = shouldFetchIntersectionOnly
+    ? createEmptyExpansionPlan()
+    : effectiveRowPlan;
+  const colPlanForTransport = shouldFetchIntersectionOnly
+    ? createEmptyExpansionPlan()
+    : effectiveColPlan;
 
   if (
-    effectiveRowPlan.pendingKeys.size === 0 &&
-    effectiveColPlan.pendingKeys.size === 0 &&
+    rowPlanForTransport.pendingKeys.size === 0 &&
+    colPlanForTransport.pendingKeys.size === 0 &&
     intersectionTargets.length === 0
   ) {
     return {
@@ -857,13 +904,13 @@ export const planHydrationIteration = ({
   const rowGroups = buildGroupedFetchTargets({
     axis: 'row',
     program: config.program,
-    requests: effectiveRowPlan.fetchRequests,
+    requests: rowPlanForTransport.fetchRequests,
     nodes: tree.rows,
   });
   const colGroups = buildGroupedFetchTargets({
     axis: 'col',
     program: config.program,
-    requests: effectiveColPlan.fetchRequests,
+    requests: colPlanForTransport.fetchRequests,
     nodes: tree.cols,
   });
   return {
@@ -897,7 +944,7 @@ export const runHydrationLoop = async ({
   isCurrent: () => boolean;
   buildDesiredExpanded: (axis: PivotAxis, tree: PivotTreeData) => Set<string>;
   getMissingExpansionCoverage: () => PivotExpansionCoverageDiff;
-  config: ExpansionVisibilityConfig;
+  config: ExpansionPlanningConfig;
   activeAxis?: PivotAxis;
   pendingRows: Set<string>;
   pendingCols: Set<string>;
@@ -1035,7 +1082,7 @@ export const planInitialHydrationPrefetch = ({
   autoExpandRowsLevelForDesired: number;
   autoExpandColsLevelForDesired: number;
   getMissingExpansionCoverage: PivotExpansionCoverageDiff;
-  config: ExpansionVisibilityConfig;
+  config: ExpansionPlanningConfig;
 }) => {
   const shouldPlanRows =
     effectiveExpandRowsLevel > 0 ||

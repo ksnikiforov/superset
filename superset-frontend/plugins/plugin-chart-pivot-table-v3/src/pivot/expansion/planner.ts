@@ -18,7 +18,7 @@
  */
 
 import { type PivotAxis, type PivotTreeNode } from '../../types';
-import { parsePath, serializePath } from '../core/path';
+import { parsePath } from '../core/path';
 import { type FetchTarget } from '../query/fetchPlanOptimizer';
 import {
   type PivotExpansionCoverageDiff,
@@ -55,23 +55,6 @@ type PivotExpansionCoverageDepths = Pick<
   PivotExpansionCoverageRequest,
   'rowDepth' | 'columnDepth'
 >;
-
-const resolveNearestPresentAncestorKey = (
-  nodes: Record<string, PivotTreeNode>,
-  key: string,
-) => {
-  const path = parsePath(key);
-  for (let prefixLength = path.length; prefixLength >= 0; prefixLength -= 1) {
-    const candidate = serializePath(path.slice(0, prefixLength));
-    if (candidate === key) {
-      continue;
-    }
-    if (nodes[candidate]) {
-      return candidate;
-    }
-  }
-  return rootKey;
-};
 
 const requestKey = ({
   axis,
@@ -137,16 +120,6 @@ export const planExpansionForAxis = ({
       return;
     }
     addRequest(key);
-    const ancestorKey = resolveNearestPresentAncestorKey(nodes, key);
-    const ancestor = nodes[ancestorKey];
-    if (
-      ancestor &&
-      coverageKeyForPathKey(program, axis, key) !==
-        coverageKeyForPathKey(program, axis, ancestorKey) &&
-      canRequestAxisExpansion({ program, axis, path: ancestor.path })
-    ) {
-      addRequest(ancestorKey);
-    }
   });
   const missingRequestKeys = new Set(
     getMissingExpansionCoverage(Array.from(candidateRequests.values())).map(
@@ -168,27 +141,7 @@ export const planExpansionForAxis = ({
       return;
     }
     hasMissingNodes = true;
-    const ancestorKey = resolveNearestPresentAncestorKey(nodes, key);
-    const ancestor = nodes[ancestorKey];
-    if (!ancestor) {
-      return;
-    }
-    const ancestorRequest = buildRequest(ancestorKey);
-    if (
-      !canRequestAxisExpansion({ program, axis, path: ancestor.path }) ||
-      !missingRequestKeys.has(requestKey(ancestorRequest))
-    ) {
-      if (
-        coverageKeyForPathKey(program, axis, key) ===
-        coverageKeyForPathKey(program, axis, ancestorKey)
-      ) {
-        return;
-      }
-      addFetchRequest(key);
-      pendingKeys.add(key);
-      return;
-    }
-    addFetchRequest(ancestorKey);
+    addFetchRequest(key);
     pendingKeys.add(key);
   });
 

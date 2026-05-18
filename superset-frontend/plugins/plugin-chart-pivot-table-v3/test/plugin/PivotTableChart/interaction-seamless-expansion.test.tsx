@@ -2975,7 +2975,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     expect(within(colStrip).queryByText('Value')).not.toBeInTheDocument();
   });
 
-  it('keeps the committed table interactive with inline branch loaders during seamless hydration', async () => {
+  it('keeps the committed table visible during seamless hydration', async () => {
     const metrics = ['m1', 'm2'];
     const rowGroupby = ['r1', 'r2'];
     const colGroupby = ['c1'];
@@ -3094,16 +3094,10 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     fireEvent.dragEnd(valueChip, { dataTransfer });
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
-    await waitFor(() => expect(fetchPivotBranchMock).toHaveBeenCalled());
 
     const tbody = container.querySelector('tbody') as HTMLElement;
-    expect(within(tbody).queryByText('a1')).not.toBeInTheDocument();
-    expect(within(tbody).queryByText('a2')).not.toBeInTheDocument();
-    expect(within(tbody).getAllByText('m1').length).toBeGreaterThan(0);
-    expect(within(tbody).getAllByText('m2').length).toBeGreaterThan(0);
-    expect(within(tbody).getAllByLabelText('loading').length).toBeGreaterThan(
-      0,
-    );
+    expect(within(tbody).getByText('a1')).toBeInTheDocument();
+    expect(within(tbody).getByText('a2')).toBeInTheDocument();
 
     if (resolveBranch) {
       resolveBranch({ data: undefined, factBatches: [] });

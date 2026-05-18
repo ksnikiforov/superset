@@ -27,6 +27,7 @@ import {
   resolveExpansionReinitializationDecision,
   resolveExpansionToggleDecision,
   runHydrationLoop,
+  type ExpansionPlanningConfig,
   type ExpansionVisibilityConfig,
 } from '../../../src/pivot/expansion/stateTransitions';
 import { createExpansionCoverageDiff } from '../../../src/pivot/runtime/coverage';
@@ -141,7 +142,7 @@ describe('pivot/expansion/stateTransitions', () => {
     groupbyColumns: ['month', 'day'],
     metrics: ['sales'],
   });
-  const config: ExpansionVisibilityConfig = {
+  const config: ExpansionVisibilityConfig & ExpansionPlanningConfig = {
     program: testProgram,
     buildRenderModelConfig: buildTestRenderModelConfig(),
   };
@@ -518,14 +519,16 @@ describe('pivot/expansion/stateTransitions', () => {
           : branchA;
         targets.forEach(target => {
           const path = parsePath(target.pathKey);
+          const targetDepth = path.length + 1;
           factBatches.push({
             coverage: {
               reason: 'expand',
-              rowDepth: context.visibleRowDepth,
+              rowDepth:
+                target.axis === 'row' ? targetDepth : context.visibleRowDepth,
               columnDepth: context.visibleColDepth,
               rowDimensions: ['country', 'city', 'store'].slice(
                 0,
-                context.visibleRowDepth,
+                target.axis === 'row' ? targetDepth : context.visibleRowDepth,
               ),
               columnDimensions: [],
             },
@@ -569,7 +572,7 @@ describe('pivot/expansion/stateTransitions', () => {
       fetchTree,
     });
 
-    expect(fetchTree).toHaveBeenCalledTimes(3);
+    expect(fetchTree).toHaveBeenCalledTimes(1);
     expect(result.status).toBe('complete');
     if (result.status !== 'complete') {
       return;
@@ -809,7 +812,7 @@ describe('pivot/expansion/stateTransitions', () => {
     ]);
   });
 
-  it('plans bounded intersection fetch when cross-axis coverage is missing', () => {
+  it('suppresses redundant singleton intersection fetches', () => {
     const { tree, aKey, xKey } = buildTree({ includeIntersectionCell: false });
     const plan = planHydrationIteration({
       tree,
@@ -826,17 +829,10 @@ describe('pivot/expansion/stateTransitions', () => {
       throw new Error('Expected a fetch plan');
     }
     expect(fetchPathKeys(plan.rowPlan)).not.toContain(rootKey);
-    expect(plan.targets).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({ axis: 'row', pathKey: aKey }),
-        expect.objectContaining({ axis: 'col', pathKey: xKey }),
-        {
-          kind: 'intersection',
-          rowPathKeys: [aKey],
-          columnPathKeys: [xKey],
-        },
-      ]),
-    );
+    expect(plan.targets).toEqual([
+      expect.objectContaining({ axis: 'row', pathKey: aKey }),
+      expect.objectContaining({ axis: 'col', pathKey: xKey }),
+    ]);
   });
 
   it('does not plan intersection fetches before both axis nodes are loaded', () => {

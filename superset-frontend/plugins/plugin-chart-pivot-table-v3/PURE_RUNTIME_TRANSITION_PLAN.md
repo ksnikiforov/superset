@@ -162,6 +162,20 @@ Current semantic-layout contract:
 - Branch fetch no longer runs a separate fetch-context resolution before query
   spec planning. Intersection query specs now flow through the shared
   axis-expansion spec boundary instead of a separate local planning path.
+- Expansion coverage planning no longer depends on the render model to compute
+  visible row/column depths. It derives visible coverage depth from the compiled
+  `PivotProgram`, loaded tree paths, and explicit expansion intent.
+- Persisted or pending expansion paths that are not present in the loaded tree
+  request their explicit semantic path directly. The old nearest-ancestor/root
+  fallback is removed; compatibility with older expansion payload shape is not a
+  goal.
+- Singleton row x column expansion intersections are not fetched as separate
+  intersection queries. If both explicit axis branches are already covered, the
+  set-oriented coverage diff decides whether a real intersection request is
+  needed.
+- During semantic layout fetches that already include visible coverage, the
+  committed table remains visible instead of switching into a partial draft tree
+  plus branch-loader follow-up.
 
 Expected deletion targets:
 

@@ -45,7 +45,7 @@ import { stableStringify } from '../shared/stableStringify';
 import {
   computeVisibleDepths,
   runHydrationLoop,
-  type ExpansionVisibilityConfig,
+  type ExpansionPlanningConfig,
 } from './stateTransitions';
 import {
   buildGroupedFetchTargets,
@@ -509,7 +509,7 @@ export const runSameAxisExpansionFetchLoop = async ({
   getDataEpoch: () => number;
   getExpandedRows: () => Set<string>;
   getExpandedCols: () => Set<string>;
-  config: ExpansionVisibilityConfig;
+  config: ExpansionPlanningConfig;
   fetchRuntime: ExpansionFetchRuntime;
   resolveExpandedForMetrics: (
     axis: PivotAxis,

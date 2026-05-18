@@ -1148,7 +1148,7 @@ describe('PivotTableChart expansion state persistence', () => {
     const fetchedPaths = fetchPivotBranchMock.mock.calls.map(call =>
       JSON.stringify(call[0].path),
     );
-    expect(fetchedPaths).toContain(JSON.stringify([]));
+    expect(fetchedPaths).toContain(JSON.stringify(['A']));
     expect(fetchedPaths).toContain(JSON.stringify(['A', 'X']));
     await waitFor(() => expect(screen.getByText('I')).toBeInTheDocument());
   });
@@ -1552,7 +1552,7 @@ describe('PivotTableChart expansion state persistence', () => {
     const fetchedPaths = fetchPivotBranchMock.mock.calls.map(call =>
       JSON.stringify(call[0].path),
     );
-    expect(fetchedPaths).toContain(JSON.stringify([]));
+    expect(fetchedPaths).toContain(JSON.stringify(['A']));
     expect(fetchedPaths).toContain(JSON.stringify(['A', 'X']));
     await waitFor(() => expect(screen.getByText('I')).toBeInTheDocument());
   });
@@ -2221,19 +2221,21 @@ describe('PivotTableChart expansion state persistence', () => {
       }),
     );
 
-    await waitFor(() => expect(fetchPivotBranchMock).toHaveBeenCalled());
-    const rowPaths = fetchPivotBranchMock.mock.calls
-      .filter(([args]) => args.axis === 'row')
-      .map(call => JSON.stringify(call[0].path));
+    await waitFor(() => {
+      const rowPaths = fetchPivotBranchMock.mock.calls
+        .filter(([args]) => args.axis === 'row')
+        .map(call => JSON.stringify(call[0].path));
+      const colPaths = fetchPivotBranchMock.mock.calls
+        .filter(([args]) => args.axis === 'col')
+        .map(call => JSON.stringify(call[0].path));
+      expect(rowPaths).toEqual(
+        expect.arrayContaining([JSON.stringify(['A', 'X'])]),
+      );
+      expect(colPaths).toContain(JSON.stringify([]));
+    });
     const colPaths = fetchPivotBranchMock.mock.calls
       .filter(([args]) => args.axis === 'col')
       .map(call => JSON.stringify(call[0].path));
-    expect(rowPaths).toEqual(
-      expect.arrayContaining([JSON.stringify(['A', 'X'])]),
-    );
-    expect(colPaths).toEqual(
-      expect.arrayContaining([JSON.stringify(['C']), JSON.stringify(['D'])]),
-    );
     expect(colPaths).not.toContain(JSON.stringify(['C', 'U']));
   });
 
