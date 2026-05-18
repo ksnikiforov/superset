@@ -48,18 +48,13 @@ import { type ChartDataWarning } from '../data/ChartDataClient';
 import { stableStringify } from '../shared/stableStringify';
 import type { PivotProgram } from '../runtime/types';
 import {
-  buildFactValueKeys,
   createPivotFactStore,
   type PivotFactStore,
   type PivotFactStoreBatch,
 } from '../runtime/factStore';
-import {
-  createExpansionCoverageDiff,
-  type PivotAxisCoverageNeed,
-} from '../runtime/coverage';
+import { type PivotAxisCoverageNeed } from '../runtime/coverage';
 import {
   buildVisiblePersistedExpansionState,
-  planInitialHydrationPrefetch,
   resolveCollapsedExpansionState,
   resolveExpansionToggleDecision,
   resolveExpansionReinitializationDecision,
@@ -882,27 +877,16 @@ export const useExpansionEngine = ({
       pendingCols: new Set(),
     });
 
-    const { action: prefetchAction } = planInitialHydrationPrefetch({
-      tree: normalizedTree,
-      resolvedRows,
-      resolvedCols,
-      persistedState,
-      axisCoverageNeeds,
-      getMissingExpansionCoverage: createExpansionCoverageDiff({
-        factSelectors: factStoreRef.current?.getCoverageSelectors() ?? [],
-        program: pivotProgram,
-        valueKeys: buildFactValueKeys({
-          metricKeys: pivotProgram.metricKeys,
-        }),
-      }),
-      config: planningConfig,
-    });
-    if (prefetchAction.kind === 'hydrate') {
-      if (!prefetchAction.showLoader) {
-        setHydratingState(false);
-      }
+    const shouldHydrateExpansionIntent =
+      axisCoverageNeeds.length > 0 ||
+      persistedState.rows.length > 0 ||
+      persistedState.cols.length > 0 ||
+      persistedState.collapsedRows.length > 0 ||
+      persistedState.collapsedCols.length > 0;
+    if (shouldHydrateExpansionIntent) {
+      setHydratingState(false);
       hydrateAtomic({
-        showLoader: prefetchAction.showLoader,
+        showLoader: false,
       }).catch(reportAsyncError);
       return;
     }

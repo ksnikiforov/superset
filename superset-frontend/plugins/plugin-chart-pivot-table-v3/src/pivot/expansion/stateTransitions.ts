@@ -343,22 +343,6 @@ export const resolveExpansionReinitializationDecision = ({
   };
 };
 
-export const hasNestedPendingKeys = (keys: Set<string>) => {
-  if (keys.size < 2) {
-    return false;
-  }
-  const paths = Array.from(keys).map(key => parsePath(key));
-  return paths.some((candidate, idx) =>
-    paths.some(
-      (prefix, otherIdx) =>
-        idx !== otherIdx &&
-        prefix.length > 0 &&
-        prefix.length < candidate.length &&
-        prefix.every((val, index) => val === candidate[index]),
-    ),
-  );
-};
-
 const buildChildrenByParent = (nodes: Record<string, PivotTreeNode>) => {
   const childrenByParent = new Map<string, PivotTreeNode[]>();
   Object.values(nodes).forEach(node => {
@@ -839,97 +823,6 @@ export const runHydrationLoop = async ({
     }
   }
   return { status: 'exhausted' };
-};
-
-export type HydrationPrefetchAction =
-  | {
-      kind: 'idle';
-    }
-  | {
-      kind: 'hydrate';
-      showLoader: boolean;
-    };
-
-export const buildHydrationPrefetchAction = ({
-  resolvedRows,
-  resolvedCols,
-  persistedState,
-  axisCoverageNeeds,
-  tree,
-  rowPlan,
-  colPlan,
-}: {
-  resolvedRows: Set<string>;
-  resolvedCols: Set<string>;
-  persistedState: PivotExpansionStateKeys;
-  axisCoverageNeeds: PivotAxisCoverageNeed[];
-  tree: PivotTreeData;
-  rowPlan: PivotExpansionPlan;
-  colPlan: PivotExpansionPlan;
-}): HydrationPrefetchAction => {
-  if (rowPlan.pendingKeys.size + colPlan.pendingKeys.size === 0) {
-    return { kind: 'idle' };
-  }
-  const shouldSkipRootPrefetch =
-    resolvedRows.size === 1 &&
-    resolvedRows.has(rootKey) &&
-    resolvedCols.size === 1 &&
-    resolvedCols.has(rootKey) &&
-    persistedState.rows.length === 0 &&
-    persistedState.cols.length === 0 &&
-    persistedState.collapsedRows.length === 0 &&
-    persistedState.collapsedCols.length === 0 &&
-    axisCoverageNeeds.length === 0 &&
-    !Object.keys(tree.rows).some(key => key !== rootKey) &&
-    !Object.keys(tree.cols).some(key => key !== rootKey);
-  if (shouldSkipRootPrefetch) {
-    return { kind: 'idle' };
-  }
-  return {
-    kind: 'hydrate',
-    showLoader:
-      hasNestedPendingKeys(rowPlan.pendingKeys) ||
-      hasNestedPendingKeys(colPlan.pendingKeys),
-  };
-};
-
-export const planInitialHydrationPrefetch = ({
-  tree,
-  resolvedRows,
-  resolvedCols,
-  persistedState,
-  axisCoverageNeeds,
-  getMissingExpansionCoverage,
-  config,
-}: {
-  tree: PivotTreeData;
-  resolvedRows: Set<string>;
-  resolvedCols: Set<string>;
-  persistedState: PivotExpansionStateKeys;
-  axisCoverageNeeds: PivotAxisCoverageNeed[];
-  getMissingExpansionCoverage: PivotExpansionCoverageDiff;
-  config: ExpansionPlanningConfig;
-}) => {
-  const { rowPlan, colPlan } = planHydrationIteration({
-    tree,
-    desiredRows: resolvedRows,
-    desiredCols: resolvedCols,
-    getMissingExpansionCoverage,
-    config,
-  });
-  return {
-    rowPlan,
-    colPlan,
-    action: buildHydrationPrefetchAction({
-      resolvedRows,
-      resolvedCols,
-      persistedState,
-      axisCoverageNeeds,
-      tree,
-      rowPlan,
-      colPlan,
-    }),
-  };
 };
 
 const filterVisibleExpansionKeys = (keys: Set<string>, visible: Set<string>) =>

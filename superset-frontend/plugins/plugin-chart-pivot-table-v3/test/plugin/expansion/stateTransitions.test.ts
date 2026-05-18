@@ -18,9 +18,7 @@
  */
 
 import {
-  buildHydrationPrefetchAction,
   buildVisiblePersistedExpansionState,
-  planInitialHydrationPrefetch,
   planHydrationIteration,
   resolveCollapsedExpansionState,
   resolveExpandedForMetrics,
@@ -54,7 +52,6 @@ import {
 } from '../../../src/types';
 import { type PivotFactSelector } from '../../../src/pivot/runtime/factStore';
 import { compilePivotProgram } from '../../../src/pivot/runtime/compilePivotProgram';
-import type { PivotAxisCoverageNeed } from '../../../src/pivot/runtime/coverage';
 
 describe('pivot/expansion/stateTransitions', () => {
   const depthSorter = () => 0;
@@ -157,13 +154,6 @@ describe('pivot/expansion/stateTransitions', () => {
     });
   const fetchPathKeys = (plan: { fetchRequests: Array<{ pathKey: string }> }) =>
     plan.fetchRequests.map(request => request.pathKey);
-  const noAxisCoverageNeeds: PivotAxisCoverageNeed[] = [];
-  const rowRootLevelNeed: PivotAxisCoverageNeed = {
-    axis: 'row',
-    depth: 1,
-    scope: { kind: 'scopedFull', ancestorPaths: [[]] },
-  };
-
   const makeNode = (
     axis: 'row' | 'col',
     path: string[],
@@ -940,198 +930,5 @@ describe('pivot/expansion/stateTransitions', () => {
 
     expect(fetchPathKeys(plan.rowPlan)).toContain(aKey);
     expect(plan.kind).toBe('fetch');
-  });
-
-  it('builds hydration prefetch actions from pending plans', () => {
-    const emptyState = {
-      rowKeys: ['country'],
-      colKeys: ['month'],
-      rows: [],
-      cols: [],
-      collapsedRows: [],
-      collapsedCols: [],
-    };
-    const rootOnlyTree: PivotTreeData = {
-      rows: {
-        [rootKey]: makeNode('row', [], true),
-      },
-      cols: {
-        [rootKey]: makeNode('col', [], true),
-      },
-      cells: {},
-    };
-
-    expect(
-      buildHydrationPrefetchAction({
-        resolvedRows: new Set([rootKey]),
-        resolvedCols: new Set([rootKey]),
-        persistedState: emptyState,
-        axisCoverageNeeds: noAxisCoverageNeeds,
-        tree: rootOnlyTree,
-        rowPlan: {
-          fetchRequests: [],
-          pendingKeys: new Set(),
-          hasMissingNodes: false,
-        },
-        colPlan: {
-          fetchRequests: [],
-          pendingKeys: new Set(),
-          hasMissingNodes: false,
-        },
-      }),
-    ).toEqual({ kind: 'idle' });
-
-    expect(
-      buildHydrationPrefetchAction({
-        resolvedRows: new Set([rootKey]),
-        resolvedCols: new Set([rootKey]),
-        persistedState: emptyState,
-        axisCoverageNeeds: noAxisCoverageNeeds,
-        tree: rootOnlyTree,
-        rowPlan: {
-          fetchRequests: [
-            {
-              axis: 'row',
-              pathKey: rootKey,
-              rowDepth: 1,
-              columnDepth: 0,
-            },
-          ],
-          pendingKeys: new Set([rootKey]),
-          hasMissingNodes: false,
-        },
-        colPlan: {
-          fetchRequests: [],
-          pendingKeys: new Set(),
-          hasMissingNodes: false,
-        },
-      }),
-    ).toEqual({ kind: 'idle' });
-
-    expect(
-      buildHydrationPrefetchAction({
-        resolvedRows: new Set([rootKey]),
-        resolvedCols: new Set([rootKey]),
-        persistedState: emptyState,
-        axisCoverageNeeds: [rowRootLevelNeed],
-        tree: rootOnlyTree,
-        rowPlan: {
-          fetchRequests: [
-            {
-              axis: 'row',
-              pathKey: rootKey,
-              rowDepth: 1,
-              columnDepth: 0,
-            },
-          ],
-          pendingKeys: new Set([rootKey]),
-          hasMissingNodes: false,
-        },
-        colPlan: {
-          fetchRequests: [],
-          pendingKeys: new Set(),
-          hasMissingNodes: false,
-        },
-      }),
-    ).toEqual({ kind: 'hydrate', showLoader: false });
-
-    const { tree, aKey } = buildTree({ includeIntersectionCell: true });
-    const childKey = serializePath(['A', 'B']);
-    expect(
-      buildHydrationPrefetchAction({
-        resolvedRows: new Set([rootKey, aKey]),
-        resolvedCols: new Set([rootKey]),
-        persistedState: { ...emptyState, rows: [aKey] },
-        axisCoverageNeeds: noAxisCoverageNeeds,
-        tree,
-        rowPlan: {
-          fetchRequests: [
-            {
-              axis: 'row',
-              pathKey: aKey,
-              rowDepth: 1,
-              columnDepth: 0,
-            },
-            {
-              axis: 'row',
-              pathKey: childKey,
-              rowDepth: 1,
-              columnDepth: 0,
-            },
-          ],
-          pendingKeys: new Set([aKey, childKey]),
-          hasMissingNodes: false,
-        },
-        colPlan: {
-          fetchRequests: [],
-          pendingKeys: new Set(),
-          hasMissingNodes: false,
-        },
-      }),
-    ).toEqual({ kind: 'hydrate', showLoader: true });
-  });
-
-  it('plans initial hydration prefetch using persisted expansion state', () => {
-    const { tree, aKey } = buildTree({ includeIntersectionCell: true });
-    const prefetch = planInitialHydrationPrefetch({
-      tree,
-      resolvedRows: new Set([rootKey, aKey]),
-      resolvedCols: new Set([rootKey]),
-      persistedState: {
-        rowKeys: ['country'],
-        colKeys: ['month'],
-        rows: [aKey],
-        cols: [],
-        collapsedRows: [],
-        collapsedCols: [],
-      },
-      axisCoverageNeeds: noAxisCoverageNeeds,
-      getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors([
-        {
-          coverage: {
-            rowDepth: 2,
-            columnDepth: 1,
-            rowDimensions: ['country', 'city'],
-            columnDimensions: ['month'],
-          },
-          scope: {
-            kind: 'branch',
-            axis: 'col',
-            path: [],
-          },
-          valueKeys: ['sales'],
-        },
-      ]),
-      config,
-    });
-
-    expect(fetchPathKeys(prefetch.rowPlan)).toContain(aKey);
-    expect(prefetch.colPlan.fetchRequests).toHaveLength(0);
-    expect(prefetch.action).toEqual({
-      kind: 'hydrate',
-      showLoader: false,
-    });
-  });
-
-  it('plans initial hydration prefetch for scoped full coverage need', () => {
-    const { tree } = buildTree({ includeIntersectionCell: true });
-    const prefetch = planInitialHydrationPrefetch({
-      tree,
-      resolvedRows: new Set([rootKey]),
-      resolvedCols: new Set([rootKey]),
-      persistedState: {
-        rowKeys: ['country'],
-        colKeys: ['month'],
-        rows: [],
-        cols: [],
-        collapsedRows: [],
-        collapsedCols: [],
-      },
-      axisCoverageNeeds: [rowRootLevelNeed],
-      getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors(),
-      config,
-    });
-
-    expect(fetchPathKeys(prefetch.rowPlan)).toContain(rootKey);
   });
 });
