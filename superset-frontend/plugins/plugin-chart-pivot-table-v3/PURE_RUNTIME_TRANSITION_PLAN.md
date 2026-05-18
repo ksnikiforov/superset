@@ -218,8 +218,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: about `13991` insertions, `16046` deletions, net `-2055`.
-- Current production TypeScript/TSX total: about `31455` lines.
+- Production `src`: `13901` insertions, `16299` deletions, net `-2398`.
+- Current production TypeScript/TSX total: about `31112` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -232,23 +232,31 @@ only move complexity.
 
 The next work should not be deletion-first in the sense of shaving local
 branches. It should be impact-first: remove whole responsibilities once the pure
-runtime boundary makes them redundant. The largest remaining source surfaces are
-now:
+runtime boundary makes them redundant. A deeper source audit after the latest
+runtime/query cuts shows that narrow render-policy cleanup is no longer the best
+top-level target. The largest remaining simplification targets are whole
+authority boundaries:
 
 | Target | Current source surface | Why it is a large simplification target | Expected deletion shape |
 | --- | ---: | --- | --- |
-| Collapse dual layout editors | `controls/*` about 5742 lines, `PivotInteractionPanel.tsx` + `PivotInteractionLayout.tsx` about 1784 lines | Explore controls and in-chart controls both edit layout, metrics, measure leaves, formatting, and Values placement. This keeps form serialization, runtime layout, ownState, and query planning coupled. | Pick one authoritative editing model. Prefer keeping the interactive chart editor for runtime UX, then reduce Explore controls to serialization/bootstrap only. This is the largest potential deletion, but it is a UX/product checkpoint. |
-| Replace expansion hydration scheduler with manifest executor | `pivot/expansion/*` about 3503 lines | Expansion still has same-axis loops, cross-axis hydration, pending-key state, grouped target planning, prefetch actions, and persisted visible filtering. The selected manifest model should make this one diff/execute loop. | Build required visible coverage, diff fact store, execute missing needs, rematerialize. Delete same-axis/cross-axis special loops and request-group bookkeeping. |
-| Merge initial, seamless, and expansion query planning | `query/specs.ts`, `update/initialUpdatePlan.ts`, `runtime/seamlessRuntimeUpdate.ts`, `expansion/fetchExecution.ts` | Initial load, semantic layout change, and expansion all build query specs through different entry points. This duplicates bootstrap/branch/intersection semantics and keeps recovery fetches normal. | One manifest-to-query-spec planner handles root, layout, expansion, and intersection needs. Seamless update becomes a caller that submits a manifest and commits the loaded snapshot. |
-| Standardize metric/formatting feature model | `utils.ts` about 1384 lines, `usePivotFormatting.tsx` about 1218 lines, `databarRuntime.ts` about 432 lines, metric control files over 3000 lines | Metric formatting, databars, Excel formula references, measure leaves, and dimension formatting create a lot of support-metric and render-time value plumbing. Some of it is real functionality, some is compatibility normalization. | First delete legacy alias/normalization paths that only preserve old saved shapes. Larger deletion requires a feature checkpoint: e.g. keep measure leaves but remove or simplify databars/formula-driven formatting. |
-| Replace materialized tree as render contract with a typed worksheet/render model | `materializePivotTree.ts` about 1391 lines, `renderModel.ts`, `renderDisplay.ts`, `PivotTableView.tsx`, export model | The materializer builds a semantic tree, render then projects/hides/relabels it, and export builds a worksheet model from render output. The tree is doing double duty as semantic structure and display carrier. | Bigger architectural move: materializer emits typed axes/cells/headers directly from facts and compiled program. Render/export consume the same model. This can delete display repair and duplicate export/header assembly, but it is the highest-risk cut. |
+| Collapse dual layout editors | `controls/*` about `5737` lines, `PivotInteractionPanel.tsx` + `PivotInteractionLayout.tsx` about `1784` lines | Explore controls and in-chart controls both edit layout, metrics, measure leaves, formatting, and Values placement. This keeps form serialization, runtime layout, ownState, and query planning coupled. | Pick one authoritative editing model. Prefer keeping the interactive chart editor for runtime UX, then reduce Explore controls to serialization/bootstrap only. This is the largest potential deletion, but it is a UX/product checkpoint. |
+| Merge initial, seamless, and expansion query planning | `query/*`, `runtime/seamlessRuntimeUpdate.ts`, `update/initialUpdatePlan.ts`, `expansion/fetchExecution.ts`; query/expansion/runtime totals about `9491` lines | Initial load, semantic layout change, and expansion still enter through different request/spec paths. Runtime expansion now has fact coverage authority, but initial/seamless/branch planning still split bootstrap, root, branch, batch, intersection, fetch, and ingest responsibilities. | One manifest-to-query-spec executor handles root, layout, expansion, batch, and intersection needs. `buildQuery`, transform bootstrap, seamless updates, and expansion submit the same manifest shape and commit loaded facts through the same path. |
+| Replace expansion hydration scheduler with a manifest executor | `useExpansionEngine.ts` about `1205` lines, `stateTransitions.ts` about `1210` lines, `fetchExecution.ts` about `462` lines | Expansion still has same-axis toggle flow, cross-axis hydration, prefetch flow, explicit/collapsed persistence, in-flight refs, loading keys, and grouped target execution as separate mechanisms. The selected set-oriented coverage manifest should make this one diff/execute/rematerialize loop. | Build required visible coverage, diff fact store, execute missing needs, rematerialize. Delete same-axis/cross-axis/prefetch loop splits and request-group/loading bookkeeping that only exists because the flows are separate. |
+| Replace materialized tree as render contract with a typed worksheet/render model | `materializePivotTree.ts` about `1391` lines, `renderModel.ts`, `renderDisplay.ts`, `PivotTableView.tsx`, export model | The materializer builds a semantic tree, render then projects/hides/relabels it, and export builds a worksheet model from render output. The tree is doing double duty as semantic structure and display carrier. | Bigger architectural move: materializer emits typed axes/cells/headers directly from facts and compiled program. Render/export consume the same model. This can delete display repair and duplicate export/header assembly, but it is high-risk and should follow query/executor unification. |
+| Standardize metric/formatting feature model | `utils.ts` about `1384` lines, `usePivotFormatting.tsx` about `1218` lines, `databarRuntime.ts` about `432` lines, metric control files over `3000` lines | Metric formatting, databars, Excel formula references, measure leaves, and dimension formatting create a lot of support-metric and render-time value plumbing. Some of it is real functionality, some is compatibility normalization. | First delete legacy alias/normalization paths that only preserve old saved shapes. Larger deletion requires a feature checkpoint: e.g. keep measure leaves but remove or simplify databars/formula-driven formatting. |
 
 Near-term priority should be:
 
-1. Finish the manifest executor cut for expansion/query planning.
-2. Unify initial, seamless, and expansion query planning behind that executor.
-3. Then attack the dual layout editor surface, because it is now the biggest
-   remaining source-size and predictability problem.
+1. Unify query planning around the set-oriented manifest executor. This is the
+   highest-impact pipeline target because it removes duplicated initial,
+   seamless, expansion, branch, batch, and intersection entrypoints.
+2. Finish the expansion scheduler cut by making same-axis, cross-axis, and
+   prefetch hydration submit the same manifest request shape.
+3. Bring the dual-editor question to an explicit UX/product checkpoint. It is
+   the largest raw deletion target, but it changes where users configure pivot
+   layout.
+4. Only continue Gate 6 render cleanup where it deletes display repair as part
+   of the worksheet/render-contract move or directly removes duplicated policy.
 
 Gate 6 render-policy cleanup remains useful, but it is no longer the largest
 available deletion target unless it is part of the materialized-render-model
