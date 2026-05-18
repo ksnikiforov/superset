@@ -37,10 +37,7 @@ import {
   buildIntersectionQuerySpecs,
   type PlannedQuerySpec,
 } from './specs';
-import {
-  createPivotFactStore,
-  type PivotFactStore,
-} from '../runtime/factStore';
+import { type PivotFactStore } from '../runtime/factStore';
 import { upsertQueryResultsIntoFactStore } from '../runtime/ingestQueryResults';
 import { isAbortError } from '../runtime/requestLifecycle';
 import { factStoreSelectorFromSpec } from '../runtime/materializePivotTree';
@@ -99,12 +96,11 @@ const fetchPivotQuerySpecsIntoFactStore = async ({
   requestGroupId?: string;
   factStore?: PivotFactStore;
 }): Promise<FetchPivotBranchResult> => {
-  const store = factStore ?? createPivotFactStore();
   if (specs.length === 0) {
     return {};
   }
   const missingSpecs = specs.filter(
-    spec => !store.hasCompatibleCoverage(factStoreSelectorFromSpec(spec)),
+    spec => !factStore?.hasCompatibleCoverage(factStoreSelectorFromSpec(spec)),
   );
   if (missingSpecs.length === 0) {
     return {};
@@ -135,11 +131,13 @@ const fetchPivotQuerySpecsIntoFactStore = async ({
       requestGroupId,
     });
     const warnings = results.flatMap(result => result.warnings ?? []);
-    upsertQueryResultsIntoFactStore({
-      store,
-      specs: missingSpecs,
-      results,
-    });
+    if (factStore) {
+      upsertQueryResultsIntoFactStore({
+        store: factStore,
+        specs: missingSpecs,
+        results,
+      });
+    }
     return {
       ...(warnings.length > 0 ? { warnings } : {}),
     };
