@@ -40,13 +40,13 @@ import {
 } from '../../types';
 import {
   buildDesiredExpandedKeys,
+  type PivotExpansionIntent,
   type PivotExpansionStateKeys,
   coerceExpansionState,
 } from './stateModel';
 import { parsePath } from '../core/path';
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import { stableStringify } from '../shared/stableStringify';
-import { shouldAutoExpandValuesLevel } from '../runtime/projection';
 import type { PivotProgram } from '../runtime/types';
 import {
   buildFactValueKeys,
@@ -291,11 +291,8 @@ export type ExpansionEngineConfig = {
   expandedStateSignature: string;
   expandedStateSharedSignature: string;
   fetchFormData: PivotTableQueryFormData;
-  resolvedExpandRowsLevel: number;
-  resolvedExpandColumnsLevel: number;
+  expansionIntents: PivotExpansionIntent[];
   pivotProgram: PivotProgram;
-  expandRowsLevelRaw?: number;
-  expandColumnsLevelRaw?: number;
   setControlValue?: HandlerFunction;
   setDataMask?: SetDataMaskHook;
   mergeOwnState?: (partial: JsonObject) => JsonObject;
@@ -309,11 +306,8 @@ export const useExpansionEngine = ({
   expandedStateSignature,
   expandedStateSharedSignature,
   fetchFormData,
-  resolvedExpandRowsLevel,
-  resolvedExpandColumnsLevel,
+  expansionIntents,
   pivotProgram,
-  expandRowsLevelRaw,
-  expandColumnsLevelRaw,
   setControlValue,
   setDataMask,
   mergeOwnState,
@@ -355,12 +349,6 @@ export const useExpansionEngine = ({
   const [errorMessage, setErrorMessage] = useState<string>();
   const [warnings, setWarnings] = useState<ChartDataWarning[]>([]);
   const warningsRef = useRef<Map<string, ChartDataWarning>>(new Map());
-  const prevAutoExpandRowsRef = useRef<number | null>(null);
-  const prevAutoExpandColsRef = useRef<number | null>(null);
-  const prevExpandRowsLevelRawRef = useRef<number | undefined>(undefined);
-  const prevExpandColsLevelRawRef = useRef<number | undefined>(undefined);
-  const autoExpandRowsLevelRef = useRef<number>(resolvedExpandRowsLevel);
-  const autoExpandColsLevelRef = useRef<number>(resolvedExpandColumnsLevel);
   const expandedStateSignatureRef = useRef<string | null>(null);
   const expandedStateSharedSignatureRef = useRef<string | null>(null);
   const requestGroupPrefixRef = useRef(nanoid());
@@ -597,10 +585,6 @@ export const useExpansionEngine = ({
         expandedCols: nextCols,
         explicitExpandedRows: explicitExpandedRowsRef.current,
         explicitExpandedCols: explicitExpandedColsRef.current,
-        explicitCollapsedRows: explicitCollapsedRowsRef.current,
-        explicitCollapsedCols: explicitCollapsedColsRef.current,
-        resolvedExpandRowsLevel,
-        resolvedExpandColumnsLevel,
         groupbyRowKeys,
         groupbyColumnKeys,
       });
@@ -610,12 +594,7 @@ export const useExpansionEngine = ({
       explicitCollapsedColsRef.current = visible.visibleCollapsedCols;
       expansionStateStoreRef.current?.write(visible.persistedState);
     },
-    [
-      groupbyColumnKeys,
-      groupbyRowKeys,
-      resolvedExpandColumnsLevel,
-      resolvedExpandRowsLevel,
-    ],
+    [groupbyColumnKeys, groupbyRowKeys],
   );
 
   const resolveExpandedForMetrics = useCallback(
@@ -634,21 +613,12 @@ export const useExpansionEngine = ({
   );
 
   const buildDesiredExpanded = useCallback(
-    (axis: PivotAxis, nextTree: PivotTreeData) => {
-      const autoExpandLevel =
-        axis === 'row'
-          ? autoExpandRowsLevelRef.current
-          : autoExpandColsLevelRef.current;
-      return buildDesiredExpandedKeys({
+    (axis: PivotAxis, nextTree: PivotTreeData) =>
+      buildDesiredExpandedKeys({
         axis,
         tree: nextTree,
-        autoExpandLevel,
+        expansionIntents,
         program: pivotProgram,
-        includeMetricDepthZero: shouldAutoExpandValuesLevel(
-          pivotProgram,
-          axis,
-          autoExpandLevel,
-        ),
         manualExpanded:
           axis === 'row'
             ? explicitExpandedRowsRef.current
@@ -660,9 +630,8 @@ export const useExpansionEngine = ({
         pendingKeys:
           axis === 'row' ? pendingRowsRef.current : pendingColsRef.current,
         inFlightKeys: collectInFlightExpansion(axis),
-      });
-    },
-    [collectInFlightExpansion, pivotProgram],
+      }),
+    [collectInFlightExpansion, expansionIntents, pivotProgram],
   );
 
   const buildFetchRuntime = useCallback(
@@ -960,28 +929,18 @@ export const useExpansionEngine = ({
     expandedStateSignatureRef.current = expandedStateSignature;
     const previousSharedSignature = expandedStateSharedSignatureRef.current;
     expandedStateSharedSignatureRef.current = expandedStateSharedSignature;
-    const prevExpandRowsLevelRaw = prevExpandRowsLevelRawRef.current;
-    const prevExpandColsLevelRaw = prevExpandColsLevelRawRef.current;
     const hasNewData = previousDataRef.current !== data;
     const reinitializationDecision = resolveExpansionReinitializationDecision({
       previousSignature,
       expandedStateSignature,
       previousSharedSignature,
       expandedStateSharedSignature,
-      prevExpandRowsLevelRaw,
-      prevExpandColsLevelRaw,
-      expandRowsLevelRaw,
-      expandColumnsLevelRaw,
-      resolvedExpandRowsLevel,
-      resolvedExpandColumnsLevel,
       hasNewData,
     });
     const {
       shouldResetExpandedState,
       isInitialMount,
       sharedSignatureChanged,
-      effectiveExpandRowsLevel,
-      effectiveExpandColsLevel,
       shouldReinitialize,
     } = reinitializationDecision;
     const sessionExpansionState =
@@ -1016,8 +975,6 @@ export const useExpansionEngine = ({
       normalizedTree,
       rowStablePrefix,
       colStablePrefix,
-      autoExpandRowsLevelForDesired,
-      autoExpandColsLevelForDesired,
     } = resolveLayoutTransition({
       data,
       currentTree: treeRef.current,
@@ -1028,8 +985,6 @@ export const useExpansionEngine = ({
         cols: sessionExpansionState.colKeys,
       },
       hasNewData,
-      effectiveExpandRowsLevel,
-      effectiveExpandColsLevel,
     });
     const shouldResetExpandedRows =
       shouldResetExpandedState &&
@@ -1039,8 +994,6 @@ export const useExpansionEngine = ({
       (sharedSignatureChanged || (colsChanged && !shouldExpandCols));
     const shouldResetExpanded =
       shouldResetExpandedRows || shouldResetExpandedCols;
-    autoExpandRowsLevelRef.current = autoExpandRowsLevelForDesired;
-    autoExpandColsLevelRef.current = autoExpandColsLevelForDesired;
 
     dataEpochRef.current += 1;
     expansionRequestLifecycle.invalidate();
@@ -1060,14 +1013,7 @@ export const useExpansionEngine = ({
       sessionState: sessionExpansionState,
       persistedExpansionState: persistedExpansionStateRef.current,
       shouldPersistExpansionState,
-      effectiveExpandRowsLevel,
-      effectiveExpandColsLevel,
-      autoExpandRowsLevelForDesired,
-      autoExpandColsLevelForDesired,
-      prevAutoExpandRows: prevAutoExpandRowsRef.current,
-      prevAutoExpandCols: prevAutoExpandColsRef.current,
-      expandRowsLevelRaw,
-      expandColumnsLevelRaw,
+      expansionIntents,
       rowStablePrefix,
       colStablePrefix,
       shouldResetExpandedRows,
@@ -1077,11 +1023,6 @@ export const useExpansionEngine = ({
       hasNewData,
       program: pivotProgram,
     });
-    if (reinitializedExpansion.clearedState) {
-      expansionStateStoreRef.current?.write(
-        reinitializedExpansion.clearedState,
-      );
-    }
     const { persistedState } = reinitializedExpansion;
     explicitExpandedRowsRef.current = new Set(persistedState.rows);
     explicitExpandedColsRef.current = new Set(persistedState.cols);
@@ -1112,11 +1053,6 @@ export const useExpansionEngine = ({
       pendingCols: new Set(),
     });
 
-    prevAutoExpandRowsRef.current = effectiveExpandRowsLevel;
-    prevAutoExpandColsRef.current = effectiveExpandColsLevel;
-    prevExpandRowsLevelRawRef.current = expandRowsLevelRaw;
-    prevExpandColsLevelRawRef.current = expandColumnsLevelRaw;
-
     const {
       shouldPlanRows,
       shouldPlanCols,
@@ -1126,10 +1062,7 @@ export const useExpansionEngine = ({
       resolvedRows,
       resolvedCols,
       persistedState,
-      effectiveExpandRowsLevel,
-      effectiveExpandColsLevel,
-      autoExpandRowsLevelForDesired,
-      autoExpandColsLevelForDesired,
+      expansionIntents,
       getMissingExpansionCoverage: createExpansionCoverageDiff({
         factBatches: factStoreRef.current?.getCoverageBatches() ?? [],
         program: pivotProgram,
@@ -1158,14 +1091,11 @@ export const useExpansionEngine = ({
     expandedStateSignature,
     expandedStateSharedSignature,
     factBatches,
-    expandColumnsLevelRaw,
-    expandRowsLevelRaw,
+    expansionIntents,
     groupbyColumnKeys,
     groupbyRowKeys,
     pivotProgram,
     shouldPersistExpansionState,
-    resolvedExpandColumnsLevel,
-    resolvedExpandRowsLevel,
     hydrateAtomic,
     clearInFlightExpansions,
     expansionRequestLifecycle,

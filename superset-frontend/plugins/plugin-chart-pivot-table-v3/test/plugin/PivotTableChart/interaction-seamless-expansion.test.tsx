@@ -1690,12 +1690,9 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
 
     await waitFor(() =>
       expect(
-        within(getMetricCell()).queryByLabelText('plus-square'),
+        within(getMetricCell()).queryByLabelText('minus-square'),
       ).toBeInTheDocument(),
     );
-    expect(within(thead).queryAllByText('F')).toHaveLength(0);
-
-    fireEvent.click(within(getMetricCell()).getByLabelText('plus-square'));
     await waitFor(() =>
       expect(within(thead).getAllByText('F').length).toBeGreaterThan(0),
     );
@@ -1859,12 +1856,9 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
 
     await waitFor(() =>
       expect(
-        within(getMetricCell()).queryByLabelText('plus-square'),
+        within(getMetricCell()).queryByLabelText('minus-square'),
       ).toBeInTheDocument(),
     );
-    expect(within(thead).queryAllByText('F')).toHaveLength(0);
-
-    fireEvent.click(within(getMetricCell()).getByLabelText('plus-square'));
     await waitFor(() =>
       expect(within(thead).getAllByText('F').length).toBeGreaterThan(0),
     );

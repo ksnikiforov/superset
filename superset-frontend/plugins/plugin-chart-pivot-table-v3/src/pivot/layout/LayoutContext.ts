@@ -165,21 +165,8 @@ export const buildLayoutContext = (
   const colSubtotalLevelsForQuery = colSubtotalLevels.filter(
     level => level > 0,
   );
-
   const startCollapsed = layoutSpec.startCollapsed ?? true;
   const initialDepth = layoutSpec.initialDepth ?? 1;
-  const resolvedExpandRowsLevel = resolveExpandLevel(
-    layoutSpec.expandRowsLevel ?? undefined,
-    rowDimensions.length,
-    startCollapsed,
-    initialDepth,
-  );
-  const resolvedExpandColsLevel = resolveExpandLevel(
-    layoutSpec.expandColumnsLevel ?? undefined,
-    columnDimensions.length,
-    startCollapsed,
-    initialDepth,
-  );
 
   return {
     metrics,
@@ -197,7 +184,17 @@ export const buildLayoutContext = (
     colTotalPosition: normalizeTotalPosition(layoutSpec.colTotalPosition),
     rowSubtotalPosition: normalizeTotalPosition(layoutSpec.rowSubtotalPosition),
     colSubtotalPosition: normalizeTotalPosition(layoutSpec.colSubtotalPosition),
-    resolvedExpandRowsLevel,
-    resolvedExpandColsLevel,
+    resolvedExpandRowsLevel: resolveExpandLevel(
+      layoutSpec.expandRowsLevel ?? undefined,
+      rowDimensions.length,
+      startCollapsed,
+      initialDepth,
+    ),
+    resolvedExpandColsLevel: resolveExpandLevel(
+      layoutSpec.expandColumnsLevel ?? undefined,
+      columnDimensions.length,
+      startCollapsed,
+      initialDepth,
+    ),
   };
 };

@@ -970,7 +970,6 @@ export const buildInitialQuerySpecs = (
     resolvedExpandRowsLevel,
     resolvedExpandColsLevel,
   } = layout;
-
   const baseRowDepth =
     rowGroupby.length === 0
       ? 0

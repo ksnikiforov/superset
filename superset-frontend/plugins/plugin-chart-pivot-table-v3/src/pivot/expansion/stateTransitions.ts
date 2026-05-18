@@ -33,15 +33,12 @@ import {
   buildDesiredExpandedKeys,
   coerceExpansionState,
   pruneExpandedToStablePrefix,
-  stripAutoSeededExpansions,
+  type PivotExpansionIntent,
   type PivotExpansionStateKeys,
 } from './stateModel';
 import { rootKey } from '../viewModel';
 import { type PivotExpansionCoverageDiff } from '../runtime/coverage';
-import {
-  getValuesLevelIndex,
-  shouldAutoExpandValuesLevel,
-} from '../runtime/projection';
+import { getValuesLevelIndex } from '../runtime/projection';
 import type { PivotProgram } from '../runtime/types';
 import { isMetricTokenForKeys, isSubtotalToken } from '../core/tokens';
 import { createMetricNodePolicy } from '../metricsTotals';
@@ -167,8 +164,6 @@ type ResolveLayoutTransitionInput = {
   currentLayout: PivotLayoutKeyState;
   sessionLayout?: Partial<PivotLayoutKeyState>;
   hasNewData: boolean;
-  effectiveExpandRowsLevel: number;
-  effectiveExpandColsLevel: number;
 };
 
 export const isPrefix = (prefix: string[], target: string[]) =>
@@ -182,8 +177,6 @@ export const resolveLayoutTransition = ({
   currentLayout,
   sessionLayout,
   hasNewData,
-  effectiveExpandRowsLevel,
-  effectiveExpandColsLevel,
 }: ResolveLayoutTransitionInput) => {
   const rowsChanged = !isSameLayout(previousLayout.rows, currentLayout.rows);
   const colsChanged = !isSameLayout(previousLayout.cols, currentLayout.cols);
@@ -195,7 +188,6 @@ export const resolveLayoutTransition = ({
     isPrefix(previousLayout.cols, currentLayout.cols);
   const layoutChanged = rowsChanged || colsChanged;
   const sourceTree = hasNewData || !layoutChanged ? data : currentTree;
-  const layoutChangedWithoutNewData = layoutChanged && !hasNewData;
   const layoutRowsForPrune = rowsChanged
     ? previousLayout.rows
     : (sessionLayout?.rows ?? previousLayout.rows);
@@ -210,14 +202,6 @@ export const resolveLayoutTransition = ({
     layoutColsForPrune,
     currentLayout.cols,
   );
-  const autoExpandRowsLevelForDesired =
-    layoutChangedWithoutNewData && rowsChanged && rowStablePrefix > 0
-      ? Math.min(effectiveExpandRowsLevel, Math.max(rowStablePrefix - 1, 0))
-      : effectiveExpandRowsLevel;
-  const autoExpandColsLevelForDesired =
-    layoutChangedWithoutNewData && colsChanged && colStablePrefix > 0
-      ? Math.min(effectiveExpandColsLevel, Math.max(colStablePrefix - 1, 0))
-      : effectiveExpandColsLevel;
   return {
     rowsChanged,
     colsChanged,
@@ -227,8 +211,6 @@ export const resolveLayoutTransition = ({
     normalizedTree: sourceTree,
     rowStablePrefix,
     colStablePrefix,
-    autoExpandRowsLevelForDesired,
-    autoExpandColsLevelForDesired,
   };
 };
 
@@ -355,54 +337,27 @@ export const resolveExpansionReinitializationDecision = ({
   expandedStateSignature,
   previousSharedSignature,
   expandedStateSharedSignature,
-  prevExpandRowsLevelRaw,
-  prevExpandColsLevelRaw,
-  expandRowsLevelRaw,
-  expandColumnsLevelRaw,
-  resolvedExpandRowsLevel,
-  resolvedExpandColumnsLevel,
   hasNewData,
 }: {
   previousSignature: string | null;
   expandedStateSignature: string;
   previousSharedSignature: string | null;
   expandedStateSharedSignature: string;
-  prevExpandRowsLevelRaw?: number;
-  prevExpandColsLevelRaw?: number;
-  expandRowsLevelRaw?: number;
-  expandColumnsLevelRaw?: number;
-  resolvedExpandRowsLevel: number;
-  resolvedExpandColumnsLevel: number;
   hasNewData: boolean;
 }) => {
   const shouldResetExpandedState = previousSignature !== expandedStateSignature;
   const isInitialMount = previousSignature === null;
   const sharedSignatureChanged =
     previousSharedSignature !== expandedStateSharedSignature;
-  const expandRowsLevelChanged = prevExpandRowsLevelRaw !== expandRowsLevelRaw;
-  const expandColsLevelChanged =
-    prevExpandColsLevelRaw !== expandColumnsLevelRaw;
-  const isRowsLevelCleared =
-    expandRowsLevelRaw === undefined && prevExpandRowsLevelRaw !== undefined;
-  const isColsLevelCleared =
-    expandColumnsLevelRaw === undefined && prevExpandColsLevelRaw !== undefined;
   return {
     shouldResetExpandedState,
     isInitialMount,
     sharedSignatureChanged,
-    expandRowsLevelChanged,
-    expandColsLevelChanged,
-    effectiveExpandRowsLevel: isRowsLevelCleared ? 0 : resolvedExpandRowsLevel,
-    effectiveExpandColsLevel: isColsLevelCleared
-      ? 0
-      : resolvedExpandColumnsLevel,
     shouldReinitialize:
       isInitialMount ||
       shouldResetExpandedState ||
       sharedSignatureChanged ||
-      hasNewData ||
-      expandRowsLevelChanged ||
-      expandColsLevelChanged,
+      hasNewData,
   };
 };
 
@@ -528,15 +483,11 @@ export const resolveExpandedForMetrics = ({
 
 type ExpansionReinitAxis = {
   axis: PivotAxis;
-  level: number;
-  desiredLevel: number;
-  prevLevel: number | null;
-  expandLevelRaw?: number;
+  expansionIntents: PivotExpansionIntent[];
   keys: string[];
   collapsed: string[];
   nodes: Record<string, PivotTreeNode>;
   stablePrefix: number;
-  expandMetric: boolean;
   reset: boolean;
   changed: boolean;
   includeMetricDepth: boolean;
@@ -549,24 +500,6 @@ const resolveExpansionCacheAxis = (config: ExpansionReinitAxis) => {
   const { metricLabelSet, countDimDepth } = createExpansionMetricPolicy(
     config.program,
   );
-  const shouldClearCache =
-    config.expandLevelRaw !== undefined &&
-    config.level > 0 &&
-    (config.prevLevel === null || config.prevLevel === 0) &&
-    config.keys.length + config.collapsed.length > 0;
-  const manualKeys = shouldClearCache ? [] : config.keys;
-  const collapsedKeys =
-    shouldClearCache || config.level <= 0 ? [] : config.collapsed;
-  const normalized =
-    config.level === 0 && !shouldClearCache && (config.prevLevel ?? 0) > 0
-      ? stripAutoSeededExpansions({
-          keys: manualKeys,
-          collapsedKeys,
-          nodes: config.nodes,
-          metricLabelSet,
-          includeMetricDepthZero: config.expandMetric,
-        })
-      : { keys: manualKeys, collapsedKeys };
   const shouldPrune = config.reset || config.changed;
   const pruneExpanded = (expanded: Set<string>) =>
     pruneExpandedToStablePrefix({
@@ -578,10 +511,10 @@ const resolveExpansionCacheAxis = (config: ExpansionReinitAxis) => {
     });
   const prunedManualKeys = shouldPrune
     ? Array.from(
-        pruneExpanded(new Set<string>([rootKey, ...normalized.keys])),
+        pruneExpanded(new Set<string>([rootKey, ...config.keys])),
       ).filter(key => key !== rootKey)
-    : normalized.keys.filter(key => key !== rootKey);
-  const prunedCollapsedKeys = normalized.collapsedKeys.filter(key => {
+    : config.keys.filter(key => key !== rootKey);
+  const prunedCollapsedKeys = config.collapsed.filter(key => {
     if (key === rootKey) {
       return false;
     }
@@ -600,9 +533,8 @@ const resolveExpansionCacheAxis = (config: ExpansionReinitAxis) => {
   const desiredExpanded = buildDesiredExpandedKeys({
     axis: config.axis,
     tree: config.tree,
-    autoExpandLevel: config.desiredLevel,
+    expansionIntents: config.expansionIntents,
     program: config.program,
-    includeMetricDepthZero: config.expandMetric,
     manualExpanded: new Set(prunedManualKeys),
     manualCollapsed: new Set(prunedCollapsedKeys),
     pendingKeys: new Set(),
@@ -613,7 +545,6 @@ const resolveExpansionCacheAxis = (config: ExpansionReinitAxis) => {
       ? pruneExpanded(desiredExpanded)
       : desiredExpanded;
   return {
-    shouldClearCache,
     prunedManualKeys,
     prunedCollapsedKeys,
     expandedKeys,
@@ -626,14 +557,7 @@ export const resolveReinitializedExpansionState = (params: {
   sessionState: PivotExpansionStateKeys;
   persistedExpansionState: unknown;
   shouldPersistExpansionState: boolean;
-  effectiveExpandRowsLevel: number;
-  effectiveExpandColsLevel: number;
-  autoExpandRowsLevelForDesired: number;
-  autoExpandColsLevelForDesired: number;
-  prevAutoExpandRows: number | null;
-  prevAutoExpandCols: number | null;
-  expandRowsLevelRaw?: number;
-  expandColumnsLevelRaw?: number;
+  expansionIntents: PivotExpansionIntent[];
   rowStablePrefix: number;
   colStablePrefix: number;
   shouldResetExpandedRows: boolean;
@@ -664,19 +588,11 @@ export const resolveReinitializedExpansionState = (params: {
   const rowState = resolveExpansionCacheAxis({
     ...common,
     axis: 'row',
-    level: params.effectiveExpandRowsLevel,
-    desiredLevel: params.autoExpandRowsLevelForDesired,
-    prevLevel: params.prevAutoExpandRows,
-    expandLevelRaw: params.expandRowsLevelRaw,
+    expansionIntents: params.expansionIntents,
     keys: rowKeys,
     collapsed: collapsedRowKeys,
     nodes: tree.rows,
     stablePrefix: params.rowStablePrefix,
-    expandMetric: shouldAutoExpandValuesLevel(
-      params.program,
-      'row',
-      params.effectiveExpandRowsLevel,
-    ),
     reset: params.shouldResetExpandedRows,
     changed: params.rowsChanged,
     includeMetricDepth: includeMetricRowDepth,
@@ -684,19 +600,11 @@ export const resolveReinitializedExpansionState = (params: {
   const colState = resolveExpansionCacheAxis({
     ...common,
     axis: 'col',
-    level: params.effectiveExpandColsLevel,
-    desiredLevel: params.autoExpandColsLevelForDesired,
-    prevLevel: params.prevAutoExpandCols,
-    expandLevelRaw: params.expandColumnsLevelRaw,
+    expansionIntents: params.expansionIntents,
     keys: colKeys,
     collapsed: collapsedColKeys,
     nodes: tree.cols,
     stablePrefix: params.colStablePrefix,
-    expandMetric: shouldAutoExpandValuesLevel(
-      params.program,
-      'col',
-      params.effectiveExpandColsLevel,
-    ),
     reset: params.shouldResetExpandedCols,
     changed: params.colsChanged,
     includeMetricDepth: includeMetricColDepth,
@@ -709,19 +617,7 @@ export const resolveReinitializedExpansionState = (params: {
     (!persistedSeed ||
       !isSameLayout(persistedSeed.rowKeys, currentLayout.rows) ||
       !isSameLayout(persistedSeed.colKeys, currentLayout.cols));
-  const clearedState =
-    rowState.shouldClearCache || colState.shouldClearCache
-      ? {
-          rowKeys: currentLayout.rows,
-          colKeys: currentLayout.cols,
-          rows: rowState.shouldClearCache ? [] : rowKeys,
-          cols: colState.shouldClearCache ? [] : colKeys,
-          collapsedRows: rowState.shouldClearCache ? [] : collapsedRowKeys,
-          collapsedCols: colState.shouldClearCache ? [] : collapsedColKeys,
-        }
-      : undefined;
   return {
-    clearedState,
     shouldResetPersistedLayout,
     persistedState: {
       rowKeys: currentLayout.rows,
@@ -1005,8 +901,7 @@ export const buildHydrationPrefetchAction = ({
   resolvedRows,
   resolvedCols,
   persistedState,
-  autoExpandRowsLevelForDesired,
-  autoExpandColsLevelForDesired,
+  expansionIntents,
   tree,
   rowPlan,
   colPlan,
@@ -1014,8 +909,7 @@ export const buildHydrationPrefetchAction = ({
   resolvedRows: Set<string>;
   resolvedCols: Set<string>;
   persistedState: PivotExpansionStateKeys;
-  autoExpandRowsLevelForDesired: number;
-  autoExpandColsLevelForDesired: number;
+  expansionIntents: PivotExpansionIntent[];
   tree: PivotTreeData;
   rowPlan: PivotExpansionPlan;
   colPlan: PivotExpansionPlan;
@@ -1032,8 +926,7 @@ export const buildHydrationPrefetchAction = ({
     persistedState.cols.length === 0 &&
     persistedState.collapsedRows.length === 0 &&
     persistedState.collapsedCols.length === 0 &&
-    autoExpandRowsLevelForDesired <= 0 &&
-    autoExpandColsLevelForDesired <= 0 &&
+    expansionIntents.length === 0 &&
     !Object.keys(tree.rows).some(key => key !== rootKey) &&
     !Object.keys(tree.cols).some(key => key !== rootKey);
   if (shouldSkipRootPrefetch) {
@@ -1052,10 +945,7 @@ export const planInitialHydrationPrefetch = ({
   resolvedRows,
   resolvedCols,
   persistedState,
-  effectiveExpandRowsLevel,
-  effectiveExpandColsLevel,
-  autoExpandRowsLevelForDesired,
-  autoExpandColsLevelForDesired,
+  expansionIntents,
   getMissingExpansionCoverage,
   config,
 }: {
@@ -1063,21 +953,14 @@ export const planInitialHydrationPrefetch = ({
   resolvedRows: Set<string>;
   resolvedCols: Set<string>;
   persistedState: PivotExpansionStateKeys;
-  effectiveExpandRowsLevel: number;
-  effectiveExpandColsLevel: number;
-  autoExpandRowsLevelForDesired: number;
-  autoExpandColsLevelForDesired: number;
+  expansionIntents: PivotExpansionIntent[];
   getMissingExpansionCoverage: PivotExpansionCoverageDiff;
   config: ExpansionPlanningConfig;
 }) => {
-  const shouldPlanRows =
-    effectiveExpandRowsLevel > 0 ||
-    persistedState.rows.length > 0 ||
-    persistedState.collapsedRows.length > 0;
-  const shouldPlanCols =
-    effectiveExpandColsLevel > 0 ||
-    persistedState.cols.length > 0 ||
-    persistedState.collapsedCols.length > 0;
+  const hasRowIntent = expansionIntents.some(intent => intent.axis === 'row');
+  const hasColIntent = expansionIntents.some(intent => intent.axis === 'col');
+  const shouldPlanRows = hasRowIntent || persistedState.rows.length > 0;
+  const shouldPlanCols = hasColIntent || persistedState.cols.length > 0;
   const { rowPlan, colPlan } = planHydrationIteration({
     tree,
     desiredRows: resolvedRows,
@@ -1098,8 +981,7 @@ export const planInitialHydrationPrefetch = ({
       resolvedRows,
       resolvedCols,
       persistedState,
-      autoExpandRowsLevelForDesired,
-      autoExpandColsLevelForDesired,
+      expansionIntents,
       tree,
       rowPlan,
       colPlan,
@@ -1148,10 +1030,6 @@ export const buildVisiblePersistedExpansionState = ({
   expandedCols,
   explicitExpandedRows,
   explicitExpandedCols,
-  explicitCollapsedRows,
-  explicitCollapsedCols,
-  resolvedExpandRowsLevel,
-  resolvedExpandColumnsLevel,
   groupbyRowKeys,
   groupbyColumnKeys,
 }: {
@@ -1160,10 +1038,6 @@ export const buildVisiblePersistedExpansionState = ({
   expandedCols: Set<string>;
   explicitExpandedRows: Set<string>;
   explicitExpandedCols: Set<string>;
-  explicitCollapsedRows: Set<string>;
-  explicitCollapsedCols: Set<string>;
-  resolvedExpandRowsLevel: number;
-  resolvedExpandColumnsLevel: number;
   groupbyRowKeys: string[];
   groupbyColumnKeys: string[];
 }): {
@@ -1185,26 +1059,18 @@ export const buildVisiblePersistedExpansionState = ({
     explicitExpandedCols,
     visibleKeys.cols,
   );
-  const visibleCollapsedRows = filterVisibleExpansionKeys(
-    resolvedExpandRowsLevel > 0 ? explicitCollapsedRows : new Set<string>(),
-    visibleKeys.rows,
-  );
-  const visibleCollapsedCols = filterVisibleExpansionKeys(
-    resolvedExpandColumnsLevel > 0 ? explicitCollapsedCols : new Set<string>(),
-    visibleKeys.cols,
-  );
   return {
     visibleExpandedRows: new Set(visibleRows),
     visibleExpandedCols: new Set(visibleCols),
-    visibleCollapsedRows: new Set(visibleCollapsedRows),
-    visibleCollapsedCols: new Set(visibleCollapsedCols),
+    visibleCollapsedRows: new Set<string>(),
+    visibleCollapsedCols: new Set<string>(),
     persistedState: {
       rowKeys: groupbyRowKeys,
       colKeys: groupbyColumnKeys,
       rows: visibleRows,
       cols: visibleCols,
-      collapsedRows: visibleCollapsedRows,
-      collapsedCols: visibleCollapsedCols,
+      collapsedRows: [],
+      collapsedCols: [],
     },
   };
 };

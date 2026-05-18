@@ -329,7 +329,7 @@ export const buildRenderNodeDisplayState = ({
   } = createMetricNodePolicy(layout.layout.pivotProgram);
   const isMetricTokenValue = (value: unknown) =>
     isMetricTokenForKeys(value, metricLabelSet);
-  const autoExpandedRows = seedExpandedByLevel(
+  const levelIntentRows = seedExpandedByLevel(
     rowNodes,
     layout.resolvedExpandRowsLevel,
     metricLabelSet,
@@ -344,7 +344,7 @@ export const buildRenderNodeDisplayState = ({
   const manualExpandedRowDepths = new Set<number>();
   expandedRows.forEach(key => {
     const node = rowNodes[key];
-    if (autoExpandedRows.has(key) || !node?.hasChildren) {
+    if (levelIntentRows.has(key) || !node?.hasChildren) {
       return;
     }
     manualExpandedRowDepths.add(countDimDepth(node.path));

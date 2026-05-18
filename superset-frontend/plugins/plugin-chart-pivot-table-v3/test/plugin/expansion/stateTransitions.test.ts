@@ -54,6 +54,7 @@ import {
 } from '../../../src/types';
 import { type PivotFactStoreBatch } from '../../../src/pivot/runtime/factStore';
 import { compilePivotProgram } from '../../../src/pivot/runtime/compilePivotProgram';
+import type { PivotExpansionIntent } from '../../../src/pivot/expansion/stateModel';
 
 describe('pivot/expansion/stateTransitions', () => {
   const depthSorter = () => 0;
@@ -156,6 +157,13 @@ describe('pivot/expansion/stateTransitions', () => {
     });
   const fetchPathKeys = (plan: { fetchRequests: Array<{ pathKey: string }> }) =>
     plan.fetchRequests.map(request => request.pathKey);
+  const noExpansionIntents: PivotExpansionIntent[] = [];
+  const rowRootLevelIntent: PivotExpansionIntent = {
+    kind: 'fullLevel',
+    axis: 'row',
+    anchor: [],
+    depth: 1,
+  };
 
   const makeNode = (
     axis: 'row' | 'col',
@@ -608,12 +616,6 @@ describe('pivot/expansion/stateTransitions', () => {
         expandedStateSignature: 'layout-a',
         previousSharedSignature: null,
         expandedStateSharedSignature: 'shared-a',
-        prevExpandRowsLevelRaw: undefined,
-        prevExpandColsLevelRaw: undefined,
-        expandRowsLevelRaw: undefined,
-        expandColumnsLevelRaw: undefined,
-        resolvedExpandRowsLevel: 1,
-        resolvedExpandColumnsLevel: 2,
         hasNewData: false,
       }),
     ).toMatchObject({
@@ -621,8 +623,6 @@ describe('pivot/expansion/stateTransitions', () => {
       shouldResetExpandedState: true,
       sharedSignatureChanged: true,
       shouldReinitialize: true,
-      effectiveExpandRowsLevel: 1,
-      effectiveExpandColsLevel: 2,
     });
 
     expect(
@@ -631,42 +631,12 @@ describe('pivot/expansion/stateTransitions', () => {
         expandedStateSignature: 'layout-a',
         previousSharedSignature: 'shared-a',
         expandedStateSharedSignature: 'shared-b',
-        prevExpandRowsLevelRaw: 1,
-        prevExpandColsLevelRaw: 2,
-        expandRowsLevelRaw: 1,
-        expandColumnsLevelRaw: 2,
-        resolvedExpandRowsLevel: 1,
-        resolvedExpandColumnsLevel: 2,
         hasNewData: false,
       }),
     ).toMatchObject({
       isInitialMount: false,
       shouldResetExpandedState: false,
       sharedSignatureChanged: true,
-      shouldReinitialize: true,
-    });
-  });
-
-  it('treats cleared expand levels as zero during reinitialization', () => {
-    const decision = resolveExpansionReinitializationDecision({
-      previousSignature: 'layout-a',
-      expandedStateSignature: 'layout-a',
-      previousSharedSignature: 'shared-a',
-      expandedStateSharedSignature: 'shared-a',
-      prevExpandRowsLevelRaw: 3,
-      prevExpandColsLevelRaw: 2,
-      expandRowsLevelRaw: undefined,
-      expandColumnsLevelRaw: undefined,
-      resolvedExpandRowsLevel: 3,
-      resolvedExpandColumnsLevel: 2,
-      hasNewData: false,
-    });
-
-    expect(decision).toMatchObject({
-      expandRowsLevelChanged: true,
-      expandColsLevelChanged: true,
-      effectiveExpandRowsLevel: 0,
-      effectiveExpandColsLevel: 0,
       shouldReinitialize: true,
     });
   });
@@ -678,12 +648,6 @@ describe('pivot/expansion/stateTransitions', () => {
         expandedStateSignature: 'layout-a',
         previousSharedSignature: 'shared-a',
         expandedStateSharedSignature: 'shared-a',
-        prevExpandRowsLevelRaw: 1,
-        prevExpandColsLevelRaw: undefined,
-        expandRowsLevelRaw: 1,
-        expandColumnsLevelRaw: undefined,
-        resolvedExpandRowsLevel: 1,
-        resolvedExpandColumnsLevel: 0,
         hasNewData: false,
       }).shouldReinitialize,
     ).toBe(false);
@@ -694,12 +658,6 @@ describe('pivot/expansion/stateTransitions', () => {
         expandedStateSignature: 'layout-a',
         previousSharedSignature: 'shared-a',
         expandedStateSharedSignature: 'shared-a',
-        prevExpandRowsLevelRaw: 1,
-        prevExpandColsLevelRaw: undefined,
-        expandRowsLevelRaw: 1,
-        expandColumnsLevelRaw: undefined,
-        resolvedExpandRowsLevel: 1,
-        resolvedExpandColumnsLevel: 0,
         hasNewData: true,
       }).shouldReinitialize,
     ).toBe(true);
@@ -714,13 +672,8 @@ describe('pivot/expansion/stateTransitions', () => {
       tree,
       expandedRows: new Set([rootKey, aKey]),
       expandedCols: new Set([rootKey, xKey]),
-      config,
       explicitExpandedRows: new Set([rootKey, aKey, hiddenRowKey]),
       explicitExpandedCols: new Set([rootKey, xKey, hiddenColKey]),
-      explicitCollapsedRows: new Set([aKey, hiddenRowKey]),
-      explicitCollapsedCols: new Set([xKey, hiddenColKey]),
-      resolvedExpandRowsLevel: 1,
-      resolvedExpandColumnsLevel: 0,
       groupbyRowKeys: ['country'],
       groupbyColumnKeys: ['month'],
     });
@@ -730,12 +683,12 @@ describe('pivot/expansion/stateTransitions', () => {
       colKeys: ['month'],
       rows: [aKey],
       cols: [xKey],
-      collapsedRows: [aKey],
+      collapsedRows: [],
       collapsedCols: [],
     });
     expect(result.visibleExpandedRows).toEqual(new Set([aKey]));
     expect(result.visibleExpandedCols).toEqual(new Set([xKey]));
-    expect(result.visibleCollapsedRows).toEqual(new Set([aKey]));
+    expect(result.visibleCollapsedRows).toEqual(new Set());
     expect(result.visibleCollapsedCols).toEqual(new Set());
   });
 
@@ -1025,8 +978,7 @@ describe('pivot/expansion/stateTransitions', () => {
         resolvedRows: new Set([rootKey]),
         resolvedCols: new Set([rootKey]),
         persistedState: emptyState,
-        autoExpandRowsLevelForDesired: 0,
-        autoExpandColsLevelForDesired: 0,
+        expansionIntents: noExpansionIntents,
         tree: rootOnlyTree,
         rowPlan: {
           fetchRequests: [],
@@ -1046,8 +998,7 @@ describe('pivot/expansion/stateTransitions', () => {
         resolvedRows: new Set([rootKey]),
         resolvedCols: new Set([rootKey]),
         persistedState: emptyState,
-        autoExpandRowsLevelForDesired: 0,
-        autoExpandColsLevelForDesired: 0,
+        expansionIntents: noExpansionIntents,
         tree: rootOnlyTree,
         rowPlan: {
           fetchRequests: [
@@ -1069,6 +1020,33 @@ describe('pivot/expansion/stateTransitions', () => {
       }),
     ).toEqual({ kind: 'idle' });
 
+    expect(
+      buildHydrationPrefetchAction({
+        resolvedRows: new Set([rootKey]),
+        resolvedCols: new Set([rootKey]),
+        persistedState: emptyState,
+        expansionIntents: [rowRootLevelIntent],
+        tree: rootOnlyTree,
+        rowPlan: {
+          fetchRequests: [
+            {
+              axis: 'row',
+              pathKey: rootKey,
+              rowDepth: 1,
+              columnDepth: 0,
+            },
+          ],
+          pendingKeys: new Set([rootKey]),
+          hasMissingNodes: false,
+        },
+        colPlan: {
+          fetchRequests: [],
+          pendingKeys: new Set(),
+          hasMissingNodes: false,
+        },
+      }),
+    ).toEqual({ kind: 'hydrate', showLoader: false });
+
     const { tree, aKey } = buildTree({ includeIntersectionCell: true });
     const childKey = serializePath(['A', 'B']);
     expect(
@@ -1076,8 +1054,7 @@ describe('pivot/expansion/stateTransitions', () => {
         resolvedRows: new Set([rootKey, aKey]),
         resolvedCols: new Set([rootKey]),
         persistedState: { ...emptyState, rows: [aKey] },
-        autoExpandRowsLevelForDesired: 0,
-        autoExpandColsLevelForDesired: 0,
+        expansionIntents: noExpansionIntents,
         tree,
         rowPlan: {
           fetchRequests: [
@@ -1120,10 +1097,7 @@ describe('pivot/expansion/stateTransitions', () => {
         collapsedRows: [],
         collapsedCols: [],
       },
-      effectiveExpandRowsLevel: 0,
-      effectiveExpandColsLevel: 0,
-      autoExpandRowsLevelForDesired: 0,
-      autoExpandColsLevelForDesired: 0,
+      expansionIntents: noExpansionIntents,
       getMissingExpansionCoverage: expansionCoverageLoadedFromBatches(),
       config,
     });
@@ -1136,5 +1110,29 @@ describe('pivot/expansion/stateTransitions', () => {
       kind: 'hydrate',
       showLoader: false,
     });
+  });
+
+  it('plans initial hydration prefetch for full-level expansion intent', () => {
+    const { tree } = buildTree({ includeIntersectionCell: true });
+    const prefetch = planInitialHydrationPrefetch({
+      tree,
+      resolvedRows: new Set([rootKey]),
+      resolvedCols: new Set([rootKey]),
+      persistedState: {
+        rowKeys: ['country'],
+        colKeys: ['month'],
+        rows: [],
+        cols: [],
+        collapsedRows: [],
+        collapsedCols: [],
+      },
+      expansionIntents: [rowRootLevelIntent],
+      getMissingExpansionCoverage: expansionCoverageLoadedFromBatches(),
+      config,
+    });
+
+    expect(prefetch.shouldPlanRows).toBe(true);
+    expect(prefetch.shouldPlanCols).toBe(false);
+    expect(fetchPathKeys(prefetch.rowPlan)).toContain(rootKey);
   });
 });

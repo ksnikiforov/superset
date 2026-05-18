@@ -22,7 +22,6 @@ import {
   coerceExpansionState,
   pruneExpandedToStablePrefix,
   seedExpandedByLevel,
-  stripAutoSeededExpansions,
 } from '../../../src/pivot/expansion/stateModel';
 import {
   encodeMetricKey,
@@ -107,42 +106,6 @@ describe('expansionStateModel', () => {
     });
     expect(metricExpanded.has(rootKey)).toBe(true);
     expect(metricExpanded.has(metricToken)).toBe(true);
-  });
-
-  it('strips auto-seeded expansions when they match the seeded set', () => {
-    const nodes: Record<string, PivotTreeNode> = {
-      [rootKey]: makeNode({ axis: 'row', path: [], hasChildren: true }),
-      A: makeNode({ axis: 'row', path: ['A'], hasChildren: true }),
-      B: makeNode({ axis: 'row', path: ['B'] }),
-    };
-    const keys = [serializePath(['A']), serializePath(['B'])];
-    const result = stripAutoSeededExpansions({
-      keys,
-      collapsedKeys: [],
-      nodes,
-      metricLabelSet: new Set(),
-      includeMetricDepthZero: false,
-    });
-    expect(result).toEqual({ keys: [], collapsedKeys: [] });
-  });
-
-  it('keeps explicit expansions when collapsed keys are present', () => {
-    const nodes: Record<string, PivotTreeNode> = {
-      [rootKey]: makeNode({ axis: 'row', path: [], hasChildren: true }),
-      A: makeNode({ axis: 'row', path: ['A'], hasChildren: true }),
-    };
-    const keys = [serializePath(['A'])];
-    const result = stripAutoSeededExpansions({
-      keys,
-      collapsedKeys: [serializePath(['A'])],
-      nodes,
-      metricLabelSet: new Set(),
-      includeMetricDepthZero: false,
-    });
-    expect(result).toEqual({
-      keys,
-      collapsedKeys: [serializePath(['A'])],
-    });
   });
 
   it('prunes expansions to the stable prefix depth', () => {

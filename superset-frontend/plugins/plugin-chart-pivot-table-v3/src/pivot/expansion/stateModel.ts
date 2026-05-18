@@ -27,6 +27,7 @@ import { decodeMetricKey, isSubtotalToken } from '../core/tokens';
 import { parsePath, serializePath } from '../core/path';
 import { countDimDepth } from '../metricsTotals';
 import { rootKey } from '../viewModel';
+import { isValuesFirstOnAxis } from '../runtime/projection';
 import type { PivotProgram } from '../runtime/types';
 
 export type PivotExpansionStateKeys = {
@@ -37,6 +38,10 @@ export type PivotExpansionStateKeys = {
   collapsedRows: string[];
   collapsedCols: string[];
 };
+
+export type PivotExpansionIntent =
+  | { kind: 'path'; axis: PivotAxis; path: PivotPath }
+  | { kind: 'fullLevel'; axis: PivotAxis; anchor: PivotPath; depth: number };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -122,12 +127,93 @@ export const seedExpandedByLevel = (
   return next;
 };
 
+const pathStartsWith = (path: PivotPath, prefix: PivotPath) =>
+  prefix.every((value, index) => path[index] === value);
+
+const addAncestors = (path: PivotPath, expanded: Set<string>) => {
+  for (let depth = 0; depth <= path.length; depth += 1) {
+    expanded.add(serializePath(path.slice(0, depth)));
+  }
+};
+
+const expandFullLevelIntent = ({
+  intent,
+  nodes,
+  program,
+  metricLabelSet,
+}: {
+  intent: Extract<PivotExpansionIntent, { kind: 'fullLevel' }>;
+  nodes: Record<string, PivotTreeNode>;
+  program: PivotProgram;
+  metricLabelSet: Set<string>;
+}) => {
+  const expanded = new Set<string>();
+  addAncestors(intent.anchor, expanded);
+  const includeMetricDepthZero =
+    program.metricKeys.length > 0 &&
+    isValuesFirstOnAxis(program, intent.axis) &&
+    intent.depth > 0;
+  Object.values(nodes).forEach(node => {
+    if (!pathStartsWith(node.path, intent.anchor)) {
+      return;
+    }
+    const lastValue = node.path[node.path.length - 1];
+    const decodedMetric = decodeMetricKey(lastValue);
+    const isMetricNode = decodedMetric
+      ? metricLabelSet.has(decodedMetric)
+      : false;
+    const depth = countDimDepth(node.path, metricLabelSet);
+    if (
+      depth > 0 &&
+      (isMetricNode ? depth < intent.depth : depth <= intent.depth)
+    ) {
+      addAncestors(node.path, expanded);
+      return;
+    }
+    if (includeMetricDepthZero && depth === 0 && isMetricNode) {
+      addAncestors(node.path, expanded);
+    }
+  });
+  return expanded;
+};
+
+const expandIntentKeys = ({
+  axis,
+  tree,
+  intents,
+  program,
+}: {
+  axis: PivotAxis;
+  tree: PivotTreeData;
+  intents: PivotExpansionIntent[];
+  program: PivotProgram;
+}) => {
+  const nodes = axis === 'row' ? tree.rows : tree.cols;
+  const metricLabelSet = new Set(program.metricKeys);
+  const expanded = new Set<string>([rootKey]);
+  intents.forEach(intent => {
+    if (intent.axis !== axis) {
+      return;
+    }
+    if (intent.kind === 'path') {
+      addAncestors(intent.path, expanded);
+      return;
+    }
+    expandFullLevelIntent({
+      intent,
+      nodes,
+      program,
+      metricLabelSet,
+    }).forEach(key => expanded.add(key));
+  });
+  return expanded;
+};
+
 export const buildDesiredExpandedKeys = ({
   axis,
   tree,
-  autoExpandLevel,
+  expansionIntents,
   program,
-  includeMetricDepthZero,
   manualExpanded,
   manualCollapsed,
   pendingKeys,
@@ -135,67 +221,27 @@ export const buildDesiredExpandedKeys = ({
 }: {
   axis: PivotAxis;
   tree: PivotTreeData;
-  autoExpandLevel: number;
+  expansionIntents: PivotExpansionIntent[];
   program: PivotProgram;
-  includeMetricDepthZero: boolean;
   manualExpanded: Set<string>;
   manualCollapsed: Set<string>;
   pendingKeys: Set<string>;
   inFlightKeys: Set<string>;
 }) => {
-  const nodes = axis === 'row' ? tree.rows : tree.cols;
-  const autoSeeded = seedExpandedByLevel(
-    nodes,
-    autoExpandLevel,
-    new Set(program.metricKeys),
-    { includeMetricDepthZero },
-  );
+  const intentExpanded = expandIntentKeys({
+    axis,
+    tree,
+    intents: expansionIntents,
+    program,
+  });
   const next = new Set<string>([
-    ...autoSeeded,
+    ...intentExpanded,
     ...manualExpanded,
     ...pendingKeys,
     ...inFlightKeys,
   ]);
   manualCollapsed.forEach(key => next.delete(key));
   return next;
-};
-
-export const stripAutoSeededExpansions = ({
-  keys,
-  collapsedKeys,
-  nodes,
-  metricLabelSet,
-  includeMetricDepthZero,
-}: {
-  keys: string[];
-  collapsedKeys: string[];
-  nodes: Record<string, PivotTreeNode>;
-  metricLabelSet: Set<string>;
-  includeMetricDepthZero: boolean;
-}): { keys: string[]; collapsedKeys: string[] } => {
-  if (keys.length === 0 || collapsedKeys.length > 0) {
-    return { keys, collapsedKeys };
-  }
-  const maxDepth = keys.reduce((max, key) => {
-    const node = nodes[key];
-    const path = node ? node.path : parsePath(key);
-    return Math.max(max, countDimDepth(path, metricLabelSet));
-  }, 0);
-  if (maxDepth <= 0) {
-    return { keys, collapsedKeys };
-  }
-  const seeded = seedExpandedByLevel(nodes, maxDepth, metricLabelSet, {
-    includeMetricDepthZero,
-  });
-  const seededSet = new Set(Array.from(seeded).filter(key => key !== rootKey));
-  if (seededSet.size !== keys.length) {
-    return { keys, collapsedKeys };
-  }
-  const isAutoSeeded = keys.every(key => seededSet.has(key));
-  if (!isAutoSeeded) {
-    return { keys, collapsedKeys };
-  }
-  return { keys: [], collapsedKeys: [] };
 };
 
 export const pruneExpandedToStablePrefix = ({
