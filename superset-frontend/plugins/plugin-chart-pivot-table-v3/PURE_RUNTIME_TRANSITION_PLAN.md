@@ -242,6 +242,11 @@ Current semantic-layout contract:
   draft layout. This prevents stale dashboard rerenders from overwriting a
   locally committed seamless layout and keeps loaded rendering pinned to the
   query-backed snapshot.
+- Expansion fetch execution no longer returns fetched target-group payloads.
+  Hydration only needs to know whether any fetch ran before rematerializing, so
+  branch, batch, and intersection execution now share a smaller boolean result
+  boundary. Persisted prefetch tests now assert the intended interactive UX:
+  the table remains visible with row-level loading while hydration continues.
 
 Expected deletion targets:
 
@@ -269,8 +274,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13108` insertions, `17125` deletions, net `-4017`.
-- Current production TypeScript/TSX total: about `29493` lines.
+- Production `src`: `13079` insertions, `17125` deletions, net `-4046`.
+- Current production TypeScript/TSX total: about `29464` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -282,17 +287,17 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `29493` | `-4017` | `< 28000` |
-| Strict core pipeline | `11337` | `11903` | `+566` | `8000` |
+| Full production `src` | `33510` | `29464` | `-4046` | `< 28000` |
+| Strict core pipeline | `11337` | `11874` | `+537` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5084` | `+401` | `3000-4000` |
-| Broad core pipeline | `16020` | `16987` | `+967` | `11000-13000` |
+| Broad core pipeline | `16020` | `16958` | `+938` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
 | `pivot/runtime/*` | `3933` |
-| `pivot/expansion/*` | `2719` |
+| `pivot/expansion/*` | `2690` |
 | `pivot/query/*` | `1554` |
 | `pivot/layout/*` | `732` |
 | core/shared/domain helpers | `1752` |

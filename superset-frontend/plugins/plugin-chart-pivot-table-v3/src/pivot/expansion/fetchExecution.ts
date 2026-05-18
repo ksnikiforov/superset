@@ -45,10 +45,6 @@ import {
   type FetchPivotExpansionRequest,
 } from './fetchPivotExpansion';
 
-type ExpansionFetchResult = {
-  targets: ExpansionFetchTarget[];
-};
-
 export type TrackExpansionRequest = <T>(
   requestScope: LatestRequestScope,
   requestGroupId: string,
@@ -107,10 +103,6 @@ export type ExpansionFetchRuntime = {
 export type ExpansionFetchContext = {
   visibleRowDepth: number;
   visibleColDepth: number;
-};
-
-export type ExpansionFetchedTargetGroup = {
-  targets: ExpansionFetchTarget[];
 };
 
 type ExpansionFetcherResult = {
@@ -173,15 +165,13 @@ const executeExpansionFetch = async ({
   runtime,
   requestGroupId,
   loadingKeys,
-  targets,
   fetcher,
 }: {
   runtime: ExpansionFetchRuntime;
   requestGroupId: string;
   loadingKeys: string[];
-  targets: ExpansionFetchTarget[];
   fetcher: () => Promise<ExpansionFetcherResult>;
-}): Promise<ExpansionFetchResult> => {
+}): Promise<void> => {
   const { requestScope, trackRequestInScope, updateLoadingKey, addWarnings } =
     runtime;
   if (requestScope.isCurrent()) {
@@ -199,9 +189,6 @@ const executeExpansionFetch = async ({
         throw result.error;
       }
     }
-    return {
-      targets,
-    };
   } finally {
     if (requestScope.isCurrent()) {
       loadingKeys.forEach(key => updateLoadingKey(key, -1));
@@ -214,19 +201,16 @@ const executeExpansionQueryRequest = async ({
   requestGroupId,
   runtime,
   loadingKeys,
-  targets,
 }: {
   request: ExpansionQueryRequest;
   requestGroupId: string;
   runtime: ExpansionFetchRuntime;
   loadingKeys: string[];
-  targets: ExpansionFetchTarget[];
-}): Promise<ExpansionFetchResult> =>
+}): Promise<void> =>
   executeExpansionFetch({
     runtime,
     requestGroupId,
     loadingKeys,
-    targets,
     fetcher: () =>
       fetchPivotExpansion({
         ...request,
@@ -281,7 +265,7 @@ export const fetchExpansionTargetDeltas = async ({
   targets: ExpansionFetchTarget[];
   context: ExpansionFetchContext;
   runtime: ExpansionFetchRuntime;
-}): Promise<ExpansionFetchedTargetGroup[]> => {
+}): Promise<boolean> => {
   const { batches, singles, intersections } = resolveExpansionFetchPlan({
     targets,
     visibleRowDepth: context.visibleRowDepth,
@@ -313,7 +297,7 @@ export const fetchExpansionTargetDeltas = async ({
       visibleRowDepth,
       visibleColDepth,
     });
-  const branchFetchPromises: Array<Promise<ExpansionFetchResult>> = [
+  const branchFetchPromises: Array<Promise<void>> = [
     ...singles.map(target =>
       executeExpansionQueryRequest({
         request: {
@@ -326,7 +310,6 @@ export const fetchExpansionTargetDeltas = async ({
         requestGroupId: buildSingleRequestGroupId(target),
         runtime,
         loadingKeys: [target.pathKey],
-        targets: [target],
       }),
     ),
     ...batches.map(batch =>
@@ -340,13 +323,12 @@ export const fetchExpansionTargetDeltas = async ({
         requestGroupId: buildBatchRequestGroupId(batch),
         runtime,
         loadingKeys: batch.targets.map(target => target.pathKey),
-        targets: batch.targets,
       }),
     ),
   ];
-  const branchResults = await Promise.all(branchFetchPromises);
+  await Promise.all(branchFetchPromises);
   if (!runtime.requestScope.isCurrent()) {
-    return [];
+    return false;
   }
   const missingIntersections = filterMissingIntersectionTargets({
     intersections,
@@ -366,24 +348,13 @@ export const fetchExpansionTargetDeltas = async ({
         requestGroupId: buildIntersectionRequestGroupId(target),
         runtime,
         loadingKeys: [...target.rowPathKeys, ...target.columnPathKeys],
-        targets: [
-          ...target.rowPathKeys.map(pathKey => ({
-            axis: 'row' as const,
-            pathKey,
-          })),
-          ...target.columnPathKeys.map(pathKey => ({
-            axis: 'col' as const,
-            pathKey,
-          })),
-        ],
       }),
     ),
   );
-  const results = [...branchResults, ...intersectionResults];
   if (!runtime.requestScope.isCurrent()) {
-    return [];
+    return false;
   }
-  return results.map(result => ({ targets: result.targets }));
+  return branchFetchPromises.length + intersectionResults.length > 0;
 };
 
 type HydrationLoopParams = Parameters<typeof runHydrationLoop>[0];
@@ -402,11 +373,11 @@ export const runHydrationExpansionFetchLoop = ({
         program: hydrationLoopParams.config.program,
       }),
     fetchTree: async ({ targets, context, tree }) => {
-      const deltas = await fetchExpansionTargetDeltas({
+      const didFetch = await fetchExpansionTargetDeltas({
         targets,
         context,
         runtime: fetchRuntime,
       });
-      return deltas.length > 0 ? fetchRuntime.materializeLoadedTree() : tree;
+      return didFetch ? fetchRuntime.materializeLoadedTree() : tree;
     },
   });

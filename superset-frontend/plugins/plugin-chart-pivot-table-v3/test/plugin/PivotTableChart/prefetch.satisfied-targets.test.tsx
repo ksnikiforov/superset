@@ -130,7 +130,7 @@ describe('PivotTableChart persisted prefetch hydrates until targets satisfied', 
     fetchPivotBranchesBatchMock.mockImplementation(resolveBatchWithSingles);
   });
 
-  it('keeps the global loader up until parent+child expansions are hydrated', async () => {
+  it('keeps the table interactive while parent+child expansions are hydrated', async () => {
     const records = [
       { r1: 'A', r2: 'X', r3: 'P', m1: 10 },
       { r1: 'A', r2: 'X', r3: 'Q', m1: 11 },
@@ -209,7 +209,9 @@ describe('PivotTableChart persisted prefetch hydrates until targets satisfied', 
     );
 
     await waitFor(() => expect(fetchPivotBranchMock).toHaveBeenCalled());
-    expect(container.querySelector('table')).toBeNull();
+    expect(container.querySelector('table')).not.toBeNull();
+    expect(screen.getByText('A')).toBeInTheDocument();
+    expect(screen.getByLabelText('loading')).toBeInTheDocument();
 
     await waitFor(() =>
       expect(
