@@ -259,8 +259,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13141` insertions, `17072` deletions, net `-3931`.
-- Current production TypeScript/TSX total: about `29579` lines.
+- Production `src`: `13101` insertions, `17071` deletions, net `-3970`.
+- Current production TypeScript/TSX total: about `29540` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -272,10 +272,10 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `29579` | `-3931` | `< 28000` |
-| Strict core pipeline | `11337` | `11967` | `+630` | `8000` |
+| Full production `src` | `33510` | `29540` | `-3970` | `< 28000` |
+| Strict core pipeline | `11337` | `11928` | `+591` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5127` | `+444` | `3000-4000` |
-| Broad core pipeline | `16020` | `17094` | `+1074` | `11000-13000` |
+| Broad core pipeline | `16020` | `17055` | `+1035` | `11000-13000` |
 
 Current strict core breakdown:
 
@@ -283,7 +283,7 @@ Current strict core breakdown:
 | --- | ---: |
 | `pivot/runtime/*` | `3894` |
 | `pivot/expansion/*` | `2743` |
-| `pivot/query/*` | `1593` |
+| `pivot/query/*` | `1554` |
 | `pivot/layout/*` | `744` |
 | core/shared/domain helpers | `1780` |
 | formatting/data/render-model/update support | `1213` |
@@ -305,10 +305,9 @@ display consume the same manifest. The numeric `resolvedExpand*Level` fields are
 gone from the runtime boundary; query/update/state helper wrappers were trimmed
 to keep the strict core moving down while this ownership moved into core.
 
-Latest query cleanup: `QueryIntent` now describes only query-shape requirements.
-Semantic labels such as `branch`, `wholeLevel`, `totalsOnly`, and expansion
-axis are no longer passed into `buildQueryShape`; `specs.ts` builds shape
-requirements directly instead of routing through a local intent wrapper.
+Latest query cleanup: `QueryIntent` is gone. Bootstrap query planning now emits
+root-scoped planned specs directly, and `buildQueryShape` consumes concrete
+coverage depths plus support-metric flags instead of a separate intent object.
 
 Latest bootstrap cleanup: hidden grand-total coverage is no longer requested
 on initial load. Query planning now emits only visible bootstrap coverage

@@ -91,39 +91,23 @@ export type PlannedQuerySpec = QuerySpec & {
   meta: QuerySpecMeta;
 };
 
-type QueryIntent = {
-  targetRowDepth: number;
-  targetColDepth: number;
-  needsValueCells: boolean;
-  needsTotals: boolean;
-  needsMetricFormatting: boolean;
-  needsDatabars: boolean;
-  needsRowOrdering: boolean;
-  needsColOrdering: boolean;
-  needsRowDimensionFormatting: boolean;
-  needsColDimensionFormatting: boolean;
-};
-
 type QueryShape = {
   rowGroupby: QueryFormColumn[];
   colGroupby: QueryFormColumn[];
   metrics: QueryFormMetric[];
 };
 
-const shouldIncludeMetricFormatting = (
-  scope: MetricFormattingScope | undefined,
-  intent: QueryIntent,
-): boolean =>
-  intent.needsMetricFormatting &&
-  (scope === 'values'
-    ? intent.needsValueCells
-    : intent.needsValueCells || intent.needsTotals);
-
-const shouldIncludeDatabars = (intent: QueryIntent): boolean =>
-  intent.needsDatabars && intent.needsValueCells;
-
 const buildQueryShape = ({
-  intent,
+  rowDepth,
+  columnDepth,
+  hasValueCells,
+  needsTotals,
+  needsMetricFormatting,
+  needsDatabars,
+  needsRowOrdering,
+  needsColOrdering,
+  needsRowDimensionFormatting,
+  needsColDimensionFormatting,
   rowGroupby,
   colGroupby,
   metrics,
@@ -137,7 +121,16 @@ const buildQueryShape = ({
   colSorting,
   measureHierarchy,
 }: {
-  intent: QueryIntent;
+  rowDepth: number;
+  columnDepth: number;
+  hasValueCells: boolean;
+  needsTotals: boolean;
+  needsMetricFormatting: boolean;
+  needsDatabars: boolean;
+  needsRowOrdering: boolean;
+  needsColOrdering: boolean;
+  needsRowDimensionFormatting: boolean;
+  needsColDimensionFormatting: boolean;
   rowGroupby: QueryFormColumn[];
   colGroupby: QueryFormColumn[];
   metrics: QueryFormMetric[];
@@ -151,8 +144,8 @@ const buildQueryShape = ({
   colSorting?: PivotDimensionSortingMap;
   measureHierarchy?: MeasureHierarchy;
 }): QueryShape => {
-  const rowGroupbyForQuery = rowGroupby.slice(0, intent.targetRowDepth);
-  const colGroupbyForQuery = colGroupby.slice(0, intent.targetColDepth);
+  const rowGroupbyForQuery = rowGroupby.slice(0, rowDepth);
+  const colGroupbyForQuery = colGroupby.slice(0, columnDepth);
   const metricKeys = new Set(
     metrics.map(getMetricKey).filter((key): key is string => Boolean(key)),
   );
@@ -168,7 +161,12 @@ const buildQueryShape = ({
   };
 
   const extraMetrics: QueryFormMetric[] = [];
-  if (shouldIncludeMetricFormatting(metricFormattingScope, intent)) {
+  if (
+    needsMetricFormatting &&
+    (metricFormattingScope === 'values'
+      ? hasValueCells
+      : hasValueCells || needsTotals)
+  ) {
     extraMetrics.push(
       ...collectMetricFormattingMetricsForQuery(
         filterMetricKeyedMap(metricFormatting),
@@ -176,7 +174,7 @@ const buildQueryShape = ({
       ),
     );
   }
-  if (shouldIncludeDatabars(intent)) {
+  if (needsDatabars && hasValueCells) {
     extraMetrics.push(
       ...collectMetricDatabarMetricsForQuery(
         filterMetricKeyedMap(metricDatabars),
@@ -184,7 +182,7 @@ const buildQueryShape = ({
       ),
     );
   }
-  if (intent.needsRowDimensionFormatting) {
+  if (needsRowDimensionFormatting) {
     extraMetrics.push(
       ...collectDimensionFormattingMetricsForQuery(
         rowFormatting,
@@ -193,7 +191,7 @@ const buildQueryShape = ({
       ),
     );
   }
-  if (intent.needsColDimensionFormatting) {
+  if (needsColDimensionFormatting) {
     extraMetrics.push(
       ...collectDimensionFormattingMetricsForQuery(
         colFormatting,
@@ -202,7 +200,7 @@ const buildQueryShape = ({
       ),
     );
   }
-  if (intent.needsRowOrdering) {
+  if (needsRowOrdering) {
     extraMetrics.push(
       ...collectDimensionSortingMetricsForQuery(
         rowSorting,
@@ -211,7 +209,7 @@ const buildQueryShape = ({
       ),
     );
   }
-  if (intent.needsColOrdering) {
+  if (needsColOrdering) {
     extraMetrics.push(
       ...collectDimensionSortingMetricsForQuery(
         colSorting,
@@ -270,120 +268,6 @@ const buildSpecFactSelector = ({
     requiredTimeOffsets,
   }),
 });
-
-const buildInitialRootIntents = (
-  layout: LayoutContext,
-  formData: PivotTableQueryFormData,
-): QueryIntent[] => {
-  const rowGroupby = layout.pivotProgram.rowDimensions;
-  const colGroupby = layout.pivotProgram.columnDimensions;
-  const { rowSubtotalLevels, colSubtotalLevelsForQuery: colSubtotalLevels } =
-    layout;
-  const needsTotals =
-    layout.rowTotals ||
-    layout.colTotals ||
-    rowSubtotalLevels.length > 0 ||
-    colSubtotalLevels.length > 0;
-  const needsMetricFormatting =
-    Object.keys(formData.metricFormatting || {}).length > 0;
-  const needsDatabars = Object.keys(formData.metricDatabars || {}).length > 0;
-  const needsRowOrdering = Object.keys(formData.rowSorting || {}).length > 0;
-  const needsColOrdering = Object.keys(formData.colSorting || {}).length > 0;
-  const needsRowDimensionFormatting =
-    Object.keys(formData.rowFormatting || {}).length > 0;
-  const needsColDimensionFormatting =
-    Object.keys(formData.colFormatting || {}).length > 0;
-  const firstRowDepth = rowGroupby.length > 0 ? 1 : 0;
-  const firstColDepth = colGroupby.length > 0 ? 1 : 0;
-  const needsGrid = firstRowDepth > 0 && firstColDepth > 0;
-  const needsRootTotals =
-    needsTotals ||
-    layout.pivotProgram.metricKeys.length === 0 ||
-    (firstRowDepth === 0 && firstColDepth === 0);
-  const intents: QueryIntent[] = [];
-  if (needsRootTotals) {
-    intents.push({
-      targetRowDepth: 0,
-      targetColDepth: 0,
-      needsValueCells: false,
-      needsTotals,
-      needsMetricFormatting,
-      needsDatabars: false,
-      needsRowOrdering: false,
-      needsColOrdering: false,
-      needsRowDimensionFormatting: false,
-      needsColDimensionFormatting: false,
-    });
-  }
-  if (layout.pivotProgram.metricKeys.length === 0) {
-    return intents;
-  }
-
-  const addValueIntent = ({
-    rowDepth,
-    colDepth,
-    includeTotals,
-    includeRowOrdering = false,
-    includeColOrdering = false,
-    includeRowFormatting = false,
-    includeColFormatting = false,
-  }: {
-    rowDepth: number;
-    colDepth: number;
-    includeTotals: boolean;
-    includeRowOrdering?: boolean;
-    includeColOrdering?: boolean;
-    includeRowFormatting?: boolean;
-    includeColFormatting?: boolean;
-  }) => {
-    intents.push({
-      targetRowDepth: rowDepth,
-      targetColDepth: colDepth,
-      needsValueCells: true,
-      needsTotals: includeTotals,
-      needsMetricFormatting,
-      needsDatabars,
-      needsRowOrdering: includeRowOrdering,
-      needsColOrdering: includeColOrdering,
-      needsRowDimensionFormatting: includeRowFormatting,
-      needsColDimensionFormatting: includeColFormatting,
-    });
-  };
-
-  if (needsGrid) {
-    addValueIntent({
-      rowDepth: firstRowDepth,
-      colDepth: firstColDepth,
-      includeTotals: false,
-      includeRowOrdering: needsRowOrdering,
-      includeColOrdering: needsColOrdering,
-      includeRowFormatting: needsRowDimensionFormatting,
-      includeColFormatting: needsColDimensionFormatting,
-    });
-  }
-
-  if (rowGroupby.length > 0) {
-    addValueIntent({
-      rowDepth: firstRowDepth,
-      colDepth: 0,
-      includeTotals: needsTotals,
-      includeRowOrdering: needsRowOrdering,
-      includeRowFormatting: needsRowDimensionFormatting,
-    });
-  }
-
-  if (colGroupby.length > 0) {
-    addValueIntent({
-      rowDepth: 0,
-      colDepth: firstColDepth,
-      includeTotals: needsTotals,
-      includeColOrdering: needsColOrdering,
-      includeColFormatting: needsColDimensionFormatting,
-    });
-  }
-
-  return intents;
-};
 
 type ResolvedFetchContext = {
   rowGroupbyForQuery: QueryFormColumn[];
@@ -673,18 +557,16 @@ const resolveFetchContext = ({
     rowSubtotalLevels.length > 0 ||
     colSubtotalLevels.length > 0;
   const queryShape = buildQueryShape({
-    intent: {
-      targetRowDepth: rowDepth,
-      targetColDepth: colDepth,
-      needsValueCells: true,
-      needsTotals,
-      needsMetricFormatting,
-      needsDatabars,
-      needsRowOrdering,
-      needsColOrdering,
-      needsRowDimensionFormatting: hasRowFormatting,
-      needsColDimensionFormatting: hasColFormatting,
-    },
+    rowDepth,
+    columnDepth: colDepth,
+    hasValueCells: true,
+    needsTotals,
+    needsMetricFormatting,
+    needsDatabars,
+    needsRowOrdering,
+    needsColOrdering,
+    needsRowDimensionFormatting: hasRowFormatting,
+    needsColDimensionFormatting: hasColFormatting,
     rowGroupby: rowGroupbyForBranch,
     colGroupby: colGroupbyForBranch,
     metrics: materializedMetrics,
@@ -1043,28 +925,69 @@ export const buildExpansionQuerySpecs = (
   });
 };
 
-const buildInitialRootSpecs = ({
-  formData,
-  layout,
-  intents,
-}: {
-  formData: PivotTableQueryFormData;
-  layout: LayoutContext;
-  intents: QueryIntent[];
-}): PlannedQuerySpec[] => {
+export const buildInitialQuerySpecs = (
+  formData: PivotTableQueryFormData,
+  layout: LayoutContext = buildLayoutContext(formData),
+): PlannedQuerySpec[] => {
   const { metrics } = layout;
   const rowGroupby = layout.pivotProgram.rowDimensions;
   const colGroupby = layout.pivotProgram.columnDimensions;
+  const { rowSubtotalLevels, colSubtotalLevelsForQuery: colSubtotalLevels } =
+    layout;
+  const needsTotals =
+    layout.rowTotals ||
+    layout.colTotals ||
+    rowSubtotalLevels.length > 0 ||
+    colSubtotalLevels.length > 0;
+  const needsMetricFormatting =
+    Object.keys(formData.metricFormatting || {}).length > 0;
+  const needsDatabars = Object.keys(formData.metricDatabars || {}).length > 0;
+  const needsRowOrdering = Object.keys(formData.rowSorting || {}).length > 0;
+  const needsColOrdering = Object.keys(formData.colSorting || {}).length > 0;
+  const needsRowDimensionFormatting =
+    Object.keys(formData.rowFormatting || {}).length > 0;
+  const needsColDimensionFormatting =
+    Object.keys(formData.colFormatting || {}).length > 0;
+  const firstRowDepth = rowGroupby.length > 0 ? 1 : 0;
+  const firstColDepth = colGroupby.length > 0 ? 1 : 0;
+  const specs: PlannedQuerySpec[] = [];
 
-  return intents.flatMap(intent => {
+  const addRootSpec = ({
+    rowDepth,
+    columnDepth,
+    hasValueCells,
+    includeTotals,
+    includeRowOrdering = false,
+    includeColOrdering = false,
+    includeRowFormatting = false,
+    includeColFormatting = false,
+  }: {
+    rowDepth: number;
+    columnDepth: number;
+    hasValueCells: boolean;
+    includeTotals: boolean;
+    includeRowOrdering?: boolean;
+    includeColOrdering?: boolean;
+    includeRowFormatting?: boolean;
+    includeColFormatting?: boolean;
+  }) => {
     const coverage = buildFactCoverage({
       rowDimensions: layout.pivotProgram.rowDimensions,
       columnDimensions: layout.pivotProgram.columnDimensions,
-      rowDepth: intent.targetRowDepth,
-      columnDepth: intent.targetColDepth,
+      rowDepth,
+      columnDepth,
     });
     const queryShape = buildQueryShape({
-      intent,
+      rowDepth,
+      columnDepth,
+      hasValueCells,
+      needsTotals: includeTotals,
+      needsMetricFormatting,
+      needsDatabars,
+      needsRowOrdering: includeRowOrdering,
+      needsColOrdering: includeColOrdering,
+      needsRowDimensionFormatting: includeRowFormatting,
+      needsColDimensionFormatting: includeColFormatting,
       rowGroupby,
       colGroupby,
       metrics,
@@ -1077,32 +1000,70 @@ const buildInitialRootSpecs = ({
       colSorting: formData.colSorting,
       measureHierarchy: layout.measureHierarchy,
     });
-    return buildSpecsForCoverages({
-      coverages: [coverage],
-      ctx: {
-        rowGroupbyForQuery: queryShape.rowGroupby,
-        colGroupbyForQuery: queryShape.colGroupby,
-        metricsForQuery: queryShape.metrics,
-        requiredTimeOffsets: layout.requiredTimeOffsets,
-        sanitizedPath: [],
+    specs.push(
+      ...buildSpecsForCoverages({
         coverages: [coverage],
-      },
-      filters: [],
-      suffix: '',
-      scope: { kind: 'root' },
+        ctx: {
+          rowGroupbyForQuery: queryShape.rowGroupby,
+          colGroupbyForQuery: queryShape.colGroupby,
+          metricsForQuery: queryShape.metrics,
+          requiredTimeOffsets: layout.requiredTimeOffsets,
+          sanitizedPath: [],
+          coverages: [coverage],
+        },
+        filters: [],
+        suffix: '',
+        scope: { kind: 'root' },
+      }),
+    );
+  };
+
+  if (
+    needsTotals ||
+    layout.pivotProgram.metricKeys.length === 0 ||
+    (firstRowDepth === 0 && firstColDepth === 0)
+  ) {
+    addRootSpec({
+      rowDepth: 0,
+      columnDepth: 0,
+      hasValueCells: false,
+      includeTotals: needsTotals,
     });
-  });
-};
-
-export const buildInitialQuerySpecs = (
-  formData: PivotTableQueryFormData,
-  layout: LayoutContext = buildLayoutContext(formData),
-): PlannedQuerySpec[] => {
-  const initialRootIntents = buildInitialRootIntents(layout, formData);
-
-  return buildInitialRootSpecs({
-    formData,
-    layout,
-    intents: initialRootIntents,
-  });
+  }
+  if (layout.pivotProgram.metricKeys.length === 0) {
+    return specs;
+  }
+  if (firstRowDepth > 0 && firstColDepth > 0) {
+    addRootSpec({
+      rowDepth: firstRowDepth,
+      columnDepth: firstColDepth,
+      hasValueCells: true,
+      includeTotals: false,
+      includeRowOrdering: needsRowOrdering,
+      includeColOrdering: needsColOrdering,
+      includeRowFormatting: needsRowDimensionFormatting,
+      includeColFormatting: needsColDimensionFormatting,
+    });
+  }
+  if (rowGroupby.length > 0) {
+    addRootSpec({
+      rowDepth: firstRowDepth,
+      columnDepth: 0,
+      hasValueCells: true,
+      includeTotals: needsTotals,
+      includeRowOrdering: needsRowOrdering,
+      includeRowFormatting: needsRowDimensionFormatting,
+    });
+  }
+  if (colGroupby.length > 0) {
+    addRootSpec({
+      rowDepth: 0,
+      columnDepth: firstColDepth,
+      hasValueCells: true,
+      includeTotals: needsTotals,
+      includeColOrdering: needsColOrdering,
+      includeColFormatting: needsColDimensionFormatting,
+    });
+  }
+  return specs;
 };
