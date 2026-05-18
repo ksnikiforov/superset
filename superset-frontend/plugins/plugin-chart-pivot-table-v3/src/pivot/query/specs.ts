@@ -76,13 +76,6 @@ export type QuerySpec = {
 };
 
 export type QuerySpecMeta = {
-  kind: 'root' | 'branch' | 'batch' | 'intersection';
-  axis?: PivotAxis;
-  path?: PivotPath;
-  parentPath?: PivotPath;
-  siblingValues?: PivotPathValue[];
-  rowPaths?: PivotPath[];
-  columnPaths?: PivotPath[];
   requiredTimeOffsets: string[];
   pivotProgram: PivotProgram;
   coverage: PivotFactCoverage;
@@ -572,7 +565,6 @@ const buildSpecsForCoverages = ({
     metrics: ctx.metricsForQuery,
     filters,
     meta: {
-      ...meta,
       requiredTimeOffsets: ctx.requiredTimeOffsets,
       pivotProgram: layout.pivotProgram,
       coverage,

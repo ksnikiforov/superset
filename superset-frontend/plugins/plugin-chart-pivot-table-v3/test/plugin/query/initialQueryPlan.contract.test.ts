@@ -19,6 +19,10 @@
 import { buildInitialQuerySpecs } from '../../../src/pivot/query/specs';
 import { buildFormData } from '../fixtures/pivotFormData';
 
+const specScopeKind = (
+  spec: ReturnType<typeof buildInitialQuerySpecs>[number],
+) => spec.meta.factSelector.scope.kind;
+
 describe('buildInitialQuerySpecs (contracts)', () => {
   it('does not replay persisted expansion branches in the initial query plan', () => {
     const formData = buildFormData({
@@ -41,9 +45,9 @@ describe('buildInitialQuerySpecs (contracts)', () => {
     expect(
       specs.some(
         spec =>
-          spec.meta.kind === 'branch' ||
-          spec.meta.kind === 'batch' ||
-          spec.meta.kind === 'intersection',
+          specScopeKind(spec) === 'branch' ||
+          specScopeKind(spec) === 'batch' ||
+          specScopeKind(spec) === 'intersection',
       ),
     ).toBe(false);
   });
@@ -66,18 +70,18 @@ describe('buildInitialQuerySpecs (contracts)', () => {
 
     const specs = buildInitialQuerySpecs(formData);
 
-    expect(specs.some(spec => spec.meta.kind === 'root')).toBe(true);
+    expect(specs.some(spec => specScopeKind(spec) === 'root')).toBe(true);
     expect(
       specs.some(
         spec =>
-          spec.meta.kind === 'branch' ||
-          spec.meta.kind === 'batch' ||
-          spec.meta.kind === 'intersection',
+          specScopeKind(spec) === 'branch' ||
+          specScopeKind(spec) === 'batch' ||
+          specScopeKind(spec) === 'intersection',
       ),
     ).toBe(false);
     expect(
       specs
-        .filter(spec => spec.meta.kind === 'root')
+        .filter(spec => specScopeKind(spec) === 'root')
         .map(spec => [
           spec.meta.coverage.rowDepth,
           spec.meta.coverage.columnDepth,
@@ -108,9 +112,9 @@ describe('buildInitialQuerySpecs (contracts)', () => {
     expect(
       specs.some(
         spec =>
-          spec.meta.kind === 'branch' ||
-          spec.meta.kind === 'batch' ||
-          spec.meta.kind === 'intersection',
+          specScopeKind(spec) === 'branch' ||
+          specScopeKind(spec) === 'batch' ||
+          specScopeKind(spec) === 'intersection',
       ),
     ).toBe(false);
     expect(
@@ -134,7 +138,7 @@ describe('buildInitialQuerySpecs (contracts)', () => {
     const specs = buildInitialQuerySpecs(formData);
     const gridSpec = specs.find(
       spec =>
-        spec.meta.kind === 'root' &&
+        specScopeKind(spec) === 'root' &&
         spec.meta.coverage.rowDepth === 1 &&
         spec.meta.coverage.columnDepth === 1,
     );

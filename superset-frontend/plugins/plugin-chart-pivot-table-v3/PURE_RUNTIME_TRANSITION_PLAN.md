@@ -255,8 +255,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13555` insertions, `16906` deletions, net `-3351`.
-- Current production TypeScript/TSX total: about `30159` lines.
+- Production `src`: `13551` insertions, `16910` deletions, net `-3359`.
+- Current production TypeScript/TSX total: about `30151` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -268,10 +268,10 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `30159` | `-3351` | `< 28000` |
-| Strict core pipeline | `11337` | `12605` | `+1268` | `8000` |
+| Full production `src` | `33510` | `30151` | `-3359` | `< 28000` |
+| Strict core pipeline | `11337` | `12597` | `+1260` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5076` | `+393` | `3000-4000` |
-| Broad core pipeline | `16020` | `17681` | `+1661` | `11000-13000` |
+| Broad core pipeline | `16020` | `17673` | `+1653` | `11000-13000` |
 
 Current strict core breakdown:
 
@@ -279,7 +279,7 @@ Current strict core breakdown:
 | --- | ---: |
 | `pivot/runtime/*` | `4059` |
 | `pivot/expansion/*` | `2930` |
-| `pivot/query/*` | `1786` |
+| `pivot/query/*` | `1778` |
 | `pivot/layout/*` | `744` |
 | core/shared/domain helpers | `1873` |
 | formatting/data/render-model/update support | `1213` |
@@ -324,6 +324,11 @@ Latest materializer cleanup: batch materialization plans now carry one loaded
 metric set and one loaded measure hierarchy. The materializer no longer accepts
 separate `metricsForQuery`, `materializedMetrics`, or optional materialized
 hierarchy aliases for the same runtime state.
+
+Latest selector cleanup: planned query metadata no longer duplicates
+branch/batch/intersection shape fields. Fetch scope identity now lives in the
+fact selector; tests that need request shape inspect `spec.meta.factSelector`
+instead of parallel `meta.kind`/`meta.axis`/`meta.path` fields.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.

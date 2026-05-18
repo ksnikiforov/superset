@@ -3313,20 +3313,33 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     const plannedSummary = plannedSpecs.map(
       (spec: {
         meta?: {
-          kind?: string;
-          axis?: string;
-          path?: PivotPath;
+          factSelector?: {
+            scope?: {
+              kind?: string;
+              axis?: string;
+              path?: PivotPath;
+              parentPath?: PivotPath;
+            };
+          };
           coverage?: {
             rowDepth?: number;
             columnDepth?: number;
           };
         };
-      }) =>
-        `${spec.meta?.kind ?? 'unknown'}:${spec.meta?.axis ?? 'none'}:${serializePath(
-          spec.meta?.path ?? [],
+      }) => {
+        const scope = spec.meta?.factSelector?.scope;
+        const path =
+          scope?.kind === 'branch'
+            ? scope.path
+            : scope?.kind === 'batch'
+              ? scope.parentPath
+              : [];
+        return `${scope?.kind ?? 'unknown'}:${scope?.axis ?? 'none'}:${serializePath(
+          path ?? [],
         )}:${spec.meta?.coverage?.rowDepth ?? 0}:${
           spec.meta?.coverage?.columnDepth ?? 0
-        }`,
+        }`;
+      },
     );
     expect(plannedSummary).not.toContain('branch:row:A:2:1');
     expect(plannedSummary).toEqual(

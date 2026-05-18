@@ -571,7 +571,8 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
     };
     const specs = buildInitialQuerySpecs(formData as PivotTableQueryFormData);
     const queriesData = specs.map(spec => {
-      if (spec.meta.kind === 'root') {
+      const scopeKind = spec.meta.factSelector.scope.kind;
+      if (scopeKind === 'root') {
         if (
           spec.meta.coverage.rowDepth === 0 &&
           spec.meta.coverage.columnDepth === 0
@@ -617,7 +618,7 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
           };
         }
       }
-      if (spec.meta.kind === 'branch' || spec.meta.kind === 'batch') {
+      if (scopeKind === 'branch' || scopeKind === 'batch') {
         return {
           query: { query_name: spec.queryName },
           data: [{ row1: 'A', row2: 'B', col1: 'C', metric1: 11 }],
