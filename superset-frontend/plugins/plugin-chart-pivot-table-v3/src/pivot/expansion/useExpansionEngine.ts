@@ -47,6 +47,7 @@ import {
 import { parsePath } from '../core/path';
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import { stableStringify } from '../shared/stableStringify';
+import { type LayoutContext } from '../layout/LayoutContext';
 import type { PivotProgram } from '../runtime/types';
 import {
   createPivotFactStore,
@@ -73,7 +74,6 @@ import {
   createLatestRequestLifecycle,
   type LatestRequestScope,
 } from '../runtime/requestLifecycle';
-import { buildLayoutContext } from '../layout/LayoutContext';
 import { materializeLoadedPivotTreeFromFactStore } from '../runtime/materializePivotTree';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import { getStableColumnKey } from '../../utils';
@@ -262,6 +262,7 @@ export type ExpansionEngineConfig = {
   fetchFormData: PivotTableQueryFormData;
   axisCoverageNeeds: PivotAxisCoverageNeed[];
   pivotProgram: PivotProgram;
+  fetchLayout: LayoutContext;
   setControlValue?: HandlerFunction;
   setDataMask?: SetDataMaskHook;
   mergeOwnState?: (partial: JsonObject) => JsonObject;
@@ -277,6 +278,7 @@ export const useExpansionEngine = ({
   fetchFormData,
   axisCoverageNeeds,
   pivotProgram,
+  fetchLayout,
   setControlValue,
   setDataMask,
   mergeOwnState,
@@ -526,20 +528,20 @@ export const useExpansionEngine = ({
       requestScope,
       instanceId: requestGroupPrefixRef.current,
       fetchFormData: fetchFormDataRef.current,
-      program: pivotProgram,
+      layout: fetchLayout,
       factStore: factStoreRef.current,
       materializeLoadedTree: () =>
         factStoreRef.current
           ? materializeLoadedPivotTreeFromFactStore({
               store: factStoreRef.current,
-              layout: buildLayoutContext(fetchFormDataRef.current),
+              layout: fetchLayout,
               formData: fetchFormDataRef.current,
             })
           : treeRef.current,
       addWarnings,
       updateLoadingKey,
     }),
-    [addWarnings, pivotProgram, updateLoadingKey],
+    [addWarnings, fetchLayout, updateLoadingKey],
   );
 
   const collapseNode = useCallback(

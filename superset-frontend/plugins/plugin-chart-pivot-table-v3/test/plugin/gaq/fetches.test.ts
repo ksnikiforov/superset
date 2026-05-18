@@ -24,6 +24,7 @@ import {
   type FetchPivotExpansionRequest,
 } from '../../../src/pivot/expansion/fetchPivotExpansion';
 import { serializePath } from '../../../src/pivot/core/path';
+import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
 import { type PivotTreeData, type PivotTreeNode } from '../../../src/types';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { type BatchGroup } from '../../../src/pivot/query/fetchPlanOptimizer';
@@ -49,16 +50,26 @@ const waitForAsyncDataMock = waitForAsyncData as jest.MockedFunction<
 const fetchBranch = (
   params: Omit<
     Extract<FetchPivotExpansionRequest, { kind: 'branch' }>,
-    'kind'
+    'kind' | 'layout'
   > & { currentTree?: PivotTreeData },
-) => fetchPivotExpansion({ kind: 'branch', ...params });
+) =>
+  fetchPivotExpansion({
+    kind: 'branch',
+    ...params,
+    layout: buildLayoutContext(params.formData),
+  });
 
 const fetchBatch = (
   params: Omit<
     Extract<FetchPivotExpansionRequest, { kind: 'batch' }>,
-    'kind'
+    'kind' | 'layout'
   > & { currentTree?: PivotTreeData },
-) => fetchPivotExpansion({ kind: 'batch', ...params });
+) =>
+  fetchPivotExpansion({
+    kind: 'batch',
+    ...params,
+    layout: buildLayoutContext(params.formData),
+  });
 
 const makeNode = (node: Partial<PivotTreeNode>): PivotTreeNode => ({
   axis: 'row',

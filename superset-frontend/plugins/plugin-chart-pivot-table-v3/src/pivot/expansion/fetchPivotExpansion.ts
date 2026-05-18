@@ -17,7 +17,7 @@
  * under the License.
  */
 import { type ChartDataWarning } from '../data/ChartDataClient';
-import { buildLayoutContext } from '../layout/LayoutContext';
+import { type LayoutContext } from '../layout/LayoutContext';
 import {
   buildExpansionQuerySpecs,
   type ExpansionQuerySpecRequest,
@@ -38,6 +38,7 @@ type ExpansionQuerySpecRequestWithoutLayout =
 
 export type FetchPivotExpansionRequest =
   ExpansionQuerySpecRequestWithoutLayout & {
+    layout: LayoutContext;
     requestGroupId?: string;
     factStore?: PivotFactStore;
   };
@@ -49,8 +50,7 @@ export interface FetchPivotExpansionResult {
 export const fetchPivotExpansion = async (
   request: FetchPivotExpansionRequest,
 ): Promise<FetchPivotExpansionResult> => {
-  const layout = buildLayoutContext(request.formData);
-  const specs = buildExpansionQuerySpecs({ ...request, layout });
+  const specs = buildExpansionQuerySpecs(request);
 
   try {
     const { results } = await fetchPlannedQuerySpecs({

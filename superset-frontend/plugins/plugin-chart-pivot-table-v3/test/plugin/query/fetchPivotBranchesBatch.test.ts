@@ -82,9 +82,14 @@ const mockPost = SupersetClient.post as jest.Mock;
 const fetchBatch = (
   params: Omit<
     Extract<FetchPivotExpansionRequest, { kind: 'batch' }>,
-    'kind'
+    'kind' | 'layout'
   > & { currentTree?: PivotTreeData },
-) => fetchPivotExpansion({ kind: 'batch', ...params });
+) =>
+  fetchPivotExpansion({
+    kind: 'batch',
+    ...params,
+    layout: buildLayoutContext(params.formData),
+  });
 
 describe('fetchBatch', () => {
   beforeEach(() => {

@@ -19,6 +19,7 @@
 import { type PivotTableQueryFormData, type PivotTreeData } from '../../types';
 import { parsePath } from '../core/path';
 import { type ChartDataWarning } from '../data/ChartDataClient';
+import { type LayoutContext } from '../layout/LayoutContext';
 import {
   optimizeFetchPlan,
   type BatchCandidate,
@@ -35,7 +36,6 @@ import {
   type IntersectionFetchTarget,
   isIntersectionFetchTarget,
 } from './planner';
-import type { PivotProgram } from '../runtime/types';
 import { rootKey } from '../viewModel';
 import {
   fetchPivotExpansion,
@@ -46,7 +46,7 @@ export type ExpansionFetchRuntime = {
   requestScope: LatestRequestScope;
   instanceId: string;
   fetchFormData: PivotTableQueryFormData;
-  program: PivotProgram;
+  layout: LayoutContext;
   factStore?: PivotFactStore;
   materializeLoadedTree: () => PivotTreeData;
   addWarnings: (nextWarnings?: ChartDataWarning[]) => void;
@@ -78,16 +78,14 @@ const buildExpansionRequestGroupId = ({
 
 const createRuntimeExpansionCoverageDiff = ({
   runtime,
-  program,
 }: {
   runtime: ExpansionFetchRuntime;
-  program: PivotProgram;
 }) =>
   createExpansionCoverageDiff({
     factSelectors: runtime.factStore?.getCoverageSelectors() ?? [],
-    program,
+    program: runtime.layout.pivotProgram,
     valueKeys: buildFactValueKeys({
-      metricKeys: program.metricKeys,
+      metricKeys: runtime.layout.pivotProgram.metricKeys,
     }),
   });
 
@@ -141,6 +139,7 @@ const executeExpansionQueryRequest = async ({
   try {
     const result = await fetchPivotExpansion({
       ...request,
+      layout: runtime.layout,
       requestGroupId,
       formData: runtime.fetchFormData,
       factStore: runtime.factStore,
@@ -167,7 +166,6 @@ const filterMissingIntersectionTargets = ({
 }) => {
   const missingRequests = createRuntimeExpansionCoverageDiff({
     runtime,
-    program: runtime.program,
   })(
     intersections.map(target => ({
       axis: 'row' as const,
@@ -315,7 +313,6 @@ export const runHydrationExpansionFetchLoop = ({
     getMissingExpansionCoverage: () =>
       createRuntimeExpansionCoverageDiff({
         runtime: fetchRuntime,
-        program: hydrationLoopParams.config.program,
       }),
     fetchTree: async ({ targets, context, tree }) => {
       const didFetch = await fetchExpansionTargetDeltas({

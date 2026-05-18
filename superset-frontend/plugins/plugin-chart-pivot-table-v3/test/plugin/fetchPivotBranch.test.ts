@@ -81,9 +81,14 @@ type QueryPayload = {
 const fetchBranch = (
   params: Omit<
     Extract<FetchPivotExpansionRequest, { kind: 'branch' }>,
-    'kind'
+    'kind' | 'layout'
   > & { currentTree?: PivotTreeData },
-) => fetchPivotExpansion({ kind: 'branch', ...params });
+) =>
+  fetchPivotExpansion({
+    kind: 'branch',
+    ...params,
+    layout: buildLayoutContext(params.formData),
+  });
 
 const fetchPivotBranchTree = async (
   params: Parameters<typeof fetchBranch>[0],

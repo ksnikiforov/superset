@@ -69,8 +69,6 @@ describe('expansionStateModel', () => {
     });
 
     expect(expansionState).toEqual({
-      rowKeys: ['r1'],
-      colKeys: ['c1'],
       rows: [serializePath(['A']), serializePath(['B'])],
       cols: [serializePath(['X']), serializePath(['Y'])],
       collapsedRows: [serializePath(['A', 'Z'])],
@@ -88,7 +86,12 @@ describe('expansionStateModel', () => {
         cols: 'nope',
       }),
     ).toBeUndefined();
-    expect(coerceExpansionState({ rows: [], cols: [] })).toBeUndefined();
+    expect(coerceExpansionState({ rows: [], cols: [] })).toEqual({
+      rows: [],
+      cols: [],
+      collapsedRows: [],
+      collapsedCols: [],
+    });
   });
 
   it('builds default expanded keys from coverage manifest needs', () => {

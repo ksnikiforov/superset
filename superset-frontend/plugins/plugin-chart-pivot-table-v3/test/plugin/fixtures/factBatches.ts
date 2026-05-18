@@ -20,7 +20,6 @@ import {
   type FetchPivotExpansionRequest,
   type FetchPivotExpansionResult,
 } from '../../../src/pivot/expansion/fetchPivotExpansion';
-import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
 import { buildFactCoverage } from '../../../src/pivot/runtime/coverage';
 import {
   type PivotFact,
@@ -28,6 +27,11 @@ import {
   type PivotFactStoreBatch,
 } from '../../../src/pivot/runtime/factStore';
 import { parsePath } from '../../../src/pivot/core/path';
+import {
+  isMeasureLeafToken,
+  isMetricToken,
+  isSubtotalToken,
+} from '../../../src/pivot/core/tokens';
 import {
   buildExpansionQuerySpecs,
   type PlannedQuerySpec,
@@ -62,6 +66,16 @@ const stripMockFactBatches = <T>(result: MockFetchResult<T>): Partial<T> => {
   return fetchResult;
 };
 
+const toFactPath = (path: PivotPath, depth: number): PivotPath =>
+  path
+    .filter(
+      value =>
+        !isMetricToken(value) &&
+        !isMeasureLeafToken(value) &&
+        !isSubtotalToken(value),
+    )
+    .slice(0, depth);
+
 const buildFactsForCoverage = (
   tree: PivotTreeData | undefined,
   coverage: PivotFactCoverage,
@@ -76,8 +90,8 @@ const buildFactsForCoverage = (
       return [];
     }
     return Object.entries(cell.values).map(([valueKey, value]) => ({
-      rowPath: row.path.slice(0, coverage.rowDepth),
-      columnPath: col.path.slice(0, coverage.columnDepth),
+      rowPath: toFactPath(row.path, coverage.rowDepth),
+      columnPath: toFactPath(col.path, coverage.columnDepth),
       valueKey,
       value,
     }));
@@ -142,6 +156,7 @@ const buildMockFactBatchesFromSpecs = (
 
 export const buildMockBranchFactBatches = ({
   formData,
+  layout,
   axis,
   path,
   visibleRowDepth = 0,
@@ -149,9 +164,13 @@ export const buildMockBranchFactBatches = ({
   data,
 }: Pick<
   FetchPivotBranchParams,
-  'axis' | 'formData' | 'path' | 'visibleColDepth' | 'visibleRowDepth'
+  | 'axis'
+  | 'formData'
+  | 'layout'
+  | 'path'
+  | 'visibleColDepth'
+  | 'visibleRowDepth'
 > & { data?: PivotTreeData }): PivotFactStoreBatch[] => {
-  const layout = buildLayoutContext(formData);
   const specs = buildExpansionQuerySpecs({
     kind: 'branch',
     formData,
@@ -182,15 +201,15 @@ export const resolveMockBranchFetchResult =
 
 export const buildMockBatchFactBatches = ({
   formData,
+  layout,
   batch,
   visibleRowDepth,
   visibleColDepth,
   data,
 }: Pick<
   FetchPivotBranchesBatchParams,
-  'batch' | 'formData' | 'visibleColDepth' | 'visibleRowDepth'
+  'batch' | 'formData' | 'layout' | 'visibleColDepth' | 'visibleRowDepth'
 > & { data?: PivotTreeData }): PivotFactStoreBatch[] => {
-  const layout = buildLayoutContext(formData);
   const specs = buildExpansionQuerySpecs({
     kind: 'batch',
     formData,
@@ -220,6 +239,7 @@ export const resolveMockBatchFetchResult =
 
 export const buildMockIntersectionFactBatches = ({
   formData,
+  layout,
   rowPathKeys,
   columnPathKeys,
   visibleRowDepth,
@@ -229,11 +249,11 @@ export const buildMockIntersectionFactBatches = ({
   FetchPivotIntersectionParams,
   | 'columnPathKeys'
   | 'formData'
+  | 'layout'
   | 'rowPathKeys'
   | 'visibleColDepth'
   | 'visibleRowDepth'
 > & { data?: PivotTreeData }): PivotFactStoreBatch[] => {
-  const layout = buildLayoutContext(formData);
   const specs = buildExpansionQuerySpecs({
     kind: 'intersection',
     formData,

@@ -337,6 +337,7 @@ function PivotTableChart(props: PivotTableProps) {
     fetchFormData: expansionFetchFormData,
     axisCoverageNeeds: layoutResult.axisCoverageNeeds,
     pivotProgram: layoutResult.layout.pivotProgram,
+    fetchLayout: layoutResult.layout,
     setControlValue,
     setDataMask: shouldPersistOwnState ? setDataMask : undefined,
     mergeOwnState: shouldPersistOwnState ? mergeOwnState : undefined,

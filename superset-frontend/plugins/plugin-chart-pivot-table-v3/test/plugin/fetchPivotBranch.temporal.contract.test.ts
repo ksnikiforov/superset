@@ -27,6 +27,7 @@ import {
   PivotTreeNode,
 } from '../../src/types';
 import { serializePath } from '../../src/pivot/core/path';
+import { buildLayoutContext } from '../../src/pivot/layout/LayoutContext';
 import { buildFormData } from './fixtures/pivotFormData';
 
 jest.mock('@superset-ui/core', () => {
@@ -55,9 +56,14 @@ type QueryPayload = {
 const fetchBranch = (
   params: Omit<
     Extract<FetchPivotExpansionRequest, { kind: 'branch' }>,
-    'kind'
+    'kind' | 'layout'
   > & { currentTree?: PivotTreeData },
-) => fetchPivotExpansion({ kind: 'branch', ...params });
+) =>
+  fetchPivotExpansion({
+    kind: 'branch',
+    ...params,
+    layout: buildLayoutContext(params.formData),
+  });
 
 const makeNode = (node: Partial<PivotTreeNode>): PivotTreeNode => ({
   axis: 'row',

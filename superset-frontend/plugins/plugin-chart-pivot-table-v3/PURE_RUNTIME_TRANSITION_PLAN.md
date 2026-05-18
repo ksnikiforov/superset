@@ -304,8 +304,8 @@ formatting, databars, and interaction logic.
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
 | Full production `src` | `33510` | `29333` | `-4177` | `< 28000` |
-| Strict core pipeline | `11337` | `11890` | `+553` | `8000` |
-| Non-visual chart runtime hooks | `4683` | `5067` | `+384` | `3000-4000` |
+| Strict core pipeline | `11337` | `11889` | `+552` | `8000` |
+| Non-visual chart runtime hooks | `4683` | `5068` | `+385` | `3000-4000` |
 | Broad core pipeline | `16020` | `16957` | `+937` | `11000-13000` |
 
 Current strict core breakdown:
@@ -313,7 +313,7 @@ Current strict core breakdown:
 | Area | Lines |
 | --- | ---: |
 | `pivot/runtime/*` | `3906` |
-| `pivot/expansion/*` | `2584` |
+| `pivot/expansion/*` | `2583` |
 | `pivot/query/*` | `1554` |
 | `pivot/layout/*` | `770` |
 | core/shared/domain helpers | `1865` |
@@ -471,6 +471,16 @@ stable-prefix pruning. Persisted expansion state is now only row/column
 expanded intent plus explicit collapsed intent:
 `rows`, `cols`, `collapsedRows`, and `collapsedCols`. This removes the second
 layout-signature system from the expansion boundary.
+
+Latest expansion-layout cleanup: expansion fetch/materialization now receives
+the already-compiled `LayoutContext` from the committed runtime snapshot. It no
+longer rebuilds layout context from `formData` inside the fetch wrapper or
+materialization callback. This keeps expansion query specs pinned to the loaded
+runtime authority instead of letting a secondary form-data compile decide
+metric placement, measure hierarchy, subtotal policy, and expansion coverage.
+Expansion remains a rendered-tree action: fixed and user-controlled UI modes
+both pass through the same loaded runtime layout, while semantic draft layout
+changes continue through the separate seamless runtime update path.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.
