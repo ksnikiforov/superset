@@ -24,7 +24,6 @@ import {
 } from '../query/fetchPivotBranch';
 import { parsePath } from '../core/path';
 import { type ChartDataWarning } from '../data/ChartDataClient';
-import { buildBatchSignature } from '../query/batchSignature';
 import {
   optimizeFetchPlan,
   type BatchCandidate,
@@ -137,12 +136,10 @@ const createRuntimeExpansionCoverageDiff = ({
 
 const resolveExpansionFetchPlan = ({
   targets,
-  formData,
   visibleRowDepth,
   visibleColDepth,
 }: {
   targets: ExpansionFetchTarget[];
-  formData: PivotTableQueryFormData;
   visibleRowDepth: number;
   visibleColDepth: number;
 }): {
@@ -155,14 +152,7 @@ const resolveExpansionFetchPlan = ({
     if (isIntersectionFetchTarget(target)) {
       continue;
     }
-    const path = parsePath(target.pathKey);
-    const batchSignature = buildBatchSignature({
-      formData,
-      axis: target.axis,
-      path,
-      visibleRowDepth,
-      visibleColDepth,
-    });
+    const batchSignature = `${target.axis}|${visibleRowDepth}|${visibleColDepth}`;
     batchCandidates.push({ ...target, batchSignature });
   }
   const { batches, singles } = optimizeFetchPlan({
@@ -365,7 +355,6 @@ export const fetchExpansionTargetDeltas = async ({
 }): Promise<ExpansionFetchedTargetGroup[]> => {
   const { batches, singles, intersections } = resolveExpansionFetchPlan({
     targets,
-    formData: runtime.fetchFormData,
     visibleRowDepth: context.visibleRowDepth,
     visibleColDepth: context.visibleColDepth,
   });

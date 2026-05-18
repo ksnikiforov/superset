@@ -184,6 +184,10 @@ Current semantic-layout contract:
   expansion keys are visible. It filters persisted keys from loaded tree
   structure plus expansion intent, keeping render policy out of expansion
   ownership.
+- Expansion batching no longer builds a Superset query context just to decide
+  whether sibling expansion paths can be transported together. Batch grouping is
+  now based on explicit manifest transport shape, and the real query specs are
+  built only at the query boundary.
 
 Expected deletion targets:
 
