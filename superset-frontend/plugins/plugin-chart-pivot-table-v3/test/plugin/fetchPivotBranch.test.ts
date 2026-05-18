@@ -25,8 +25,8 @@ import {
 } from '../../src/types';
 import {
   fetchPivotBranch,
-  resolveBranchFetchContext,
 } from '../../src/pivot/query/fetchPivotBranch';
+import { resolveFetchContext } from '../../src/pivot/query/resolveFetchContext';
 import {
   buildBuiltInLeaf,
   buildMeasureLeafOutputKey,
@@ -127,7 +127,7 @@ describe('resolveFetchContext', () => {
       cells: {},
     };
 
-    const ctx = resolveBranchFetchContext({
+    const ctx = resolveFetchContext({
       formData: {
         groupbyRows: ['r1', 'r2'],
         groupbyColumns: [METRICS_PLACEHOLDER, 'c1'],
@@ -179,7 +179,7 @@ describe('resolveFetchContext', () => {
       cells: {},
     };
 
-    const ctx = resolveBranchFetchContext({
+    const ctx = resolveFetchContext({
       formData: {
         groupbyRows: ['r1', 'r2'],
         groupbyColumns: [METRICS_PLACEHOLDER, 'c1'],
@@ -231,7 +231,7 @@ describe('resolveFetchContext', () => {
       cells: {},
     };
 
-    const ctx = resolveBranchFetchContext({
+    const ctx = resolveFetchContext({
       formData: {
         groupbyRows: ['r1', 'r2'],
         groupbyColumns: [METRICS_PLACEHOLDER, 'c1'],
@@ -283,7 +283,7 @@ describe('resolveFetchContext', () => {
       cells: {},
     };
 
-    const ctx = resolveBranchFetchContext({
+    const ctx = resolveFetchContext({
       formData: {
         groupbyRows: ['r1', 'r2'],
         groupbyColumns: ['c1', 'c2'],

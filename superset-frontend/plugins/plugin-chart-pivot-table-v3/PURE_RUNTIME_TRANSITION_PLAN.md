@@ -159,6 +159,9 @@ Current semantic-layout contract:
   path through the coverage manifest.
 - Async initial runtime materialization now uses the loaded fact-store
   materializer; there is no separate spec-backed initial materialization path.
+- Branch fetch no longer runs a separate fetch-context resolution before query
+  spec planning. Intersection query specs now flow through the shared
+  axis-expansion spec boundary instead of a separate local planning path.
 
 Expected deletion targets:
 
@@ -188,8 +191,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13975` insertions, `16039` deletions, net `-2064`.
-- Current production TypeScript/TSX total: about `31446` lines.
+- Production `src`: `13930` insertions, `16039` deletions, net `-2109`.
+- Current production TypeScript/TSX total: about `31401` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion

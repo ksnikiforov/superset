@@ -604,47 +604,38 @@ export const buildIntersectionQuerySpecs = ({
 }): PlannedQuerySpec[] => {
   const rowPaths = rowPathKeys.map(parsePath);
   const columnPaths = columnPathKeys.map(parsePath);
-  const ctx = resolveFetchContext({
+  return buildAxisExpansionSpecs({
     formData,
     layout,
     axis: 'row',
     path: rowPaths[0] ?? [],
     visibleRowDepth,
     visibleColDepth,
-  });
-  const rowFilters = buildPathSetFilterClauses({
-    axisGroupby: ctx.rowGroupbyForQuery,
-    paths: rowPaths.map(path =>
-      projectQueryFilterPath({
-        layout,
-        axis: 'row',
-        path,
+    filters: ctx => [
+      ...buildPathSetFilterClauses({
+        axisGroupby: ctx.rowGroupbyForQuery,
+        paths: rowPaths.map(path =>
+          projectQueryFilterPath({
+            layout,
+            axis: 'row',
+            path,
+          }),
+        ),
+        colTypeMap: formData.colTypeMap,
       }),
-    ),
-    colTypeMap: formData.colTypeMap,
-  });
-  const columnFilters = buildPathSetFilterClauses({
-    axisGroupby: ctx.colGroupbyForQuery,
-    paths: columnPaths.map(path =>
-      projectQueryFilterPath({
-        layout,
-        axis: 'col',
-        path,
+      ...buildPathSetFilterClauses({
+        axisGroupby: ctx.colGroupbyForQuery,
+        paths: columnPaths.map(path =>
+          projectQueryFilterPath({
+            layout,
+            axis: 'col',
+            path,
+          }),
+        ),
+        colTypeMap: formData.colTypeMap,
       }),
-    ),
-    colTypeMap: formData.colTypeMap,
-  });
-  const suffix = `|intersection:${stableStringify([
-    rowPathKeys,
-    columnPathKeys,
-  ])}`;
-
-  return buildSpecsForCoverages({
-    coverages: ctx.coverages,
-    ctx,
-    layout,
-    filters: [...rowFilters, ...columnFilters],
-    suffix,
+    ],
+    suffix: `|intersection:${stableStringify([rowPathKeys, columnPathKeys])}`,
     meta: { kind: 'intersection', rowPaths, columnPaths },
   });
 };

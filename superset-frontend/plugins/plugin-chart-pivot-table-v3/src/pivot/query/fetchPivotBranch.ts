@@ -23,14 +23,7 @@ import {
 } from '../../types';
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
-import {
-  buildLayoutContext,
-  type LayoutContext,
-} from '../layout/LayoutContext';
-import {
-  resolveFetchContext as resolveFetchContextBase,
-  type ResolvedFetchContext as ResolvedQueryFetchContext,
-} from './resolveFetchContext';
+import { buildLayoutContext } from '../layout/LayoutContext';
 import {
   buildBatchQuerySpecs,
   buildBranchQuerySpecs,
@@ -80,10 +73,6 @@ export type FetchPivotIntersectionParams = {
 };
 
 export type FetchPivotIntersectionResult = FetchPivotBranchResult;
-
-type ResolvedFetchContext = ResolvedQueryFetchContext & {
-  layout: LayoutContext;
-};
 
 const fetchPivotQuerySpecsIntoFactStore = async ({
   formData,
@@ -151,25 +140,6 @@ const fetchPivotQuerySpecsIntoFactStore = async ({
   }
 };
 
-export const resolveBranchFetchContext = ({
-  formData,
-  axis,
-  path,
-  visibleRowDepth,
-  visibleColDepth,
-}: FetchPivotBranchParams): ResolvedFetchContext => {
-  const layout = buildLayoutContext(formData);
-  const queryCtx = resolveFetchContextBase({
-    formData,
-    layout,
-    axis,
-    path,
-    visibleRowDepth,
-    visibleColDepth,
-  });
-  return { ...queryCtx, layout };
-};
-
 export async function fetchPivotBranch({
   formData,
   axis,
@@ -179,16 +149,10 @@ export async function fetchPivotBranch({
   requestGroupId,
   factStore,
 }: FetchPivotBranchParams): Promise<FetchPivotBranchResult> {
-  const ctx = resolveBranchFetchContext({
-    formData,
-    axis,
-    path,
-    visibleRowDepth,
-    visibleColDepth,
-  });
+  const layout = buildLayoutContext(formData);
   const specs = buildBranchQuerySpecs({
     formData,
-    layout: ctx.layout,
+    layout,
     axis,
     path,
     visibleRowDepth,
