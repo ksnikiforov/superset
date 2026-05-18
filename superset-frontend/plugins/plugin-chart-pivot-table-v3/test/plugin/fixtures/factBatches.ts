@@ -82,7 +82,7 @@ export const buildMockBranchFetchResult = (
 ): FetchPivotBranchResult => {
   const factBatches = result.factBatches ?? buildMockBranchFactBatches(params);
   if (!result.error) {
-    params.factStore?.registerCompatibleCoverageBatches(factBatches);
+    params.factStore?.upsertBatches(factBatches);
   }
   return stripMockFactBatches(result);
 };
@@ -135,7 +135,7 @@ export const buildMockBatchFetchResult = (
 ): FetchPivotBranchesBatchResult => {
   const factBatches = result.factBatches ?? buildMockBatchFactBatches(params);
   if (!result.error) {
-    params.factStore?.registerCompatibleCoverageBatches(factBatches);
+    params.factStore?.upsertBatches(factBatches);
   }
   return stripMockFactBatches(result);
 };
@@ -189,7 +189,7 @@ export const buildMockIntersectionFetchResult = (
   const factBatches =
     result.factBatches ?? buildMockIntersectionFactBatches(params);
   if (!result.error) {
-    params.factStore?.registerCompatibleCoverageBatches(factBatches);
+    params.factStore?.upsertBatches(factBatches);
   }
   return stripMockFactBatches(result);
 };

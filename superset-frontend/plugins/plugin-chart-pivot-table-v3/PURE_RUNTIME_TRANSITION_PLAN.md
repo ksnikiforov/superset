@@ -126,10 +126,9 @@ Current fact-store contract:
   not create empty coverage marker batches;
 - repeated no-query behavior should be prevented by planner/requestability
   policy, not by pretending that an empty fact batch was loaded.
-- Query/branch fetch owns exact compatible coverage alias registration after
-  fact ingestion. Expansion consumes tree deltas and reads updated coverage from
-  the shared fact store; it no longer re-registers returned fact batches as a
-  local expansion-side responsibility.
+- Query/branch fetch records exact loaded fact batches only. Compatible coverage
+  is derived by the set-oriented manifest/fact-store dominance checks, not by
+  registering alias batches.
 - Branch fetch results no longer return fact batches. Loaded coverage is
   observable through the fact store, not through expansion result payloads.
 
@@ -169,8 +168,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14578` insertions, `15797` deletions, net `-1219`.
-- Current production TypeScript/TSX total: about `32291` lines.
+- Production `src`: `14560` insertions, `15797` deletions, net `-1237`.
+- Current production TypeScript/TSX total: about `32273` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -826,6 +825,9 @@ Success criteria:
 - Fact-store compatible reads now ignore coverage `reason` for shape matching.
   `reason` is provenance, not aggregate identity; depth, dimensions, scope, and
   value keys remain the compatibility authority.
+- Fact-store coverage no longer records compatible alias batches. Loaded
+  coverage is exact query output; compatible reads and coverage checks derive
+  reuse from the manifest dominance rules.
 - Expansion now exposes its loaded fact-batch snapshot back to seamless runtime
   layout decisions. A user can expand columns, then add a hidden/not-expanded
   row dimension without triggering a base seamless fetch when the visible

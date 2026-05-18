@@ -75,7 +75,6 @@ export type PivotFactStoreBatchScope =
 export type PivotFactStore = {
   upsertBatch: (batch: PivotFactStoreBatch) => void;
   upsertBatches: (batches: PivotFactStoreBatch[]) => void;
-  registerCompatibleCoverageBatches: (batches: PivotFactStoreBatch[]) => void;
   getCompatibleFacts: (selector: PivotFactSelector) => PivotFact[];
   getCoverageBatches: () => PivotFactStoreBatch[];
   hasCompatibleCoverage: (selector: PivotFactSelector) => boolean;
@@ -286,22 +285,9 @@ export const createPivotFactStore = (): PivotFactStore => {
       );
     });
 
-  const registerCompatibleCoverageBatch = (batch: PivotFactStoreBatch) => {
-    const selector = normalizeSelector(batch);
-    const key = buildPivotFactRequestKey(selector);
-    if (selectorByRequest.has(key)) {
-      return;
-    }
-    const compatibleFacts = getCompatibleFacts(selector);
-    selectorByRequest.set(key, selector);
-    factsByRequest.set(key, compatibleFacts);
-  };
-
   return {
     upsertBatch,
     upsertBatches: batches => batches.forEach(upsertBatch),
-    registerCompatibleCoverageBatches: batches =>
-      batches.forEach(registerCompatibleCoverageBatch),
     getCompatibleFacts,
     getCoverageBatches: () =>
       Array.from(selectorByRequest.values()).map(selector => ({

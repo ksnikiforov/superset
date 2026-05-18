@@ -47,7 +47,6 @@ import { upsertQueryResultsIntoFactStore } from '../runtime/ingestQueryResults';
 import { isAbortError } from '../runtime/requestLifecycle';
 import {
   buildBranchTreeFromFactStore,
-  buildFactStoreBatchesFromSpecs,
   factStoreSelectorFromSpec,
 } from '../runtime/materializePivotTree';
 import { type BatchGroup } from './fetchPlanOptimizer';
@@ -116,8 +115,6 @@ export const fetchPivotQuerySpecsIntoBranchTree = async ({
     spec => !store.hasCompatibleCoverage(factStoreSelectorFromSpec(spec)),
   );
   if (missingSpecs.length === 0) {
-    const factBatches = buildFactStoreBatchesFromSpecs({ specs, store });
-    store.registerCompatibleCoverageBatches(factBatches);
     return {
       data: buildBranchTreeFromFactStore({
         specs,
@@ -153,12 +150,11 @@ export const fetchPivotQuerySpecsIntoBranchTree = async ({
       requestGroupId,
     });
     const warnings = results.flatMap(result => result.warnings ?? []);
-    const factBatches = upsertQueryResultsIntoFactStore({
+    upsertQueryResultsIntoFactStore({
       store,
       specs: missingSpecs,
       results,
     });
-    store.registerCompatibleCoverageBatches(factBatches);
     const data = buildBranchTreeFromFactStore({
       specs,
       store,

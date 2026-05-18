@@ -452,8 +452,6 @@ test('registers compatible coverage aliases without upserting duplicate facts', 
       }),
     ],
   });
-  store.registerCompatibleCoverageBatches([{ ...franceSelector, facts: [] }]);
-
   expect(store.hasCompatibleCoverage(franceSelector)).toBe(true);
   expect(
     store.getCompatibleFacts(franceSelector).map(fact => fact.rowPath),
@@ -462,7 +460,7 @@ test('registers compatible coverage aliases without upserting duplicate facts', 
     store
       .getCoverageBatches()
       .some(batch => batch.scope === franceSelector.scope),
-  ).toBe(true);
+  ).toBe(false);
 });
 
 test('materialization can read separate exact branches for a batched request', () => {
