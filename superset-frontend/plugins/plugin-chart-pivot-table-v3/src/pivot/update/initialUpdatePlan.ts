@@ -137,9 +137,7 @@ export const buildInitialPivotUpdatePlan = ({
   measureLeavesByMetricOverride,
 }: BuildInitialPivotUpdatePlanParams): InitialPivotUpdatePlan => {
   const resolvedSelection =
-    selection === undefined && formData.interactionMode === 'user_controlled'
-      ? formData.pivotSelectedFilters
-      : selection;
+    selection === undefined ? formData.pivotSelectedFilters : selection;
   const selectionFilters = buildSelectionFilterClauses({
     formData,
     selection: resolvedSelection,

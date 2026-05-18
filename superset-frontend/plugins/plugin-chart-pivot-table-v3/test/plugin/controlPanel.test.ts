@@ -55,10 +55,7 @@ const getControlNames = () =>
 describe('pivot table v3 control panel', () => {
   it('does not expose time grain control in pivot v3', () => {
     expect(getControlNames()).not.toContain('time_grain_sqla');
-    const interactionModeControl = getControl('interactionMode');
-    expect(interactionModeControl.config.rerender).not.toContain(
-      'time_grain_sqla',
-    );
+    expect(getControlNames()).not.toContain('interactionMode');
   });
 
   it('exposes auto-expand level controls with blank defaults', () => {
@@ -83,10 +80,19 @@ describe('pivot table v3 control panel', () => {
     }
     const state = {
       controls: {
-        groupbyRows: { value: ['row1'] },
-        groupbyColumns: { value: ['col1', 'col2', 'col3'] },
+        dimensions: { value: ['row1', 'col1', 'col2', 'col3'] },
         metrics: { value: ['metric1'] },
         colSubtotalLevels: { value: [1, 3, 5, 0] },
+      },
+      form_data: {
+        pivotRuntimeLayout: {
+          version: 1,
+          rows: ['row1'],
+          cols: ['col1', 'col2', 'col3'],
+          metrics: ['metric1'],
+          leafSelection: {},
+          valuePlacement: { axis: 'col', index: 3 },
+        },
       },
     } as unknown as ControlPanelState;
     const controlState = {
@@ -109,10 +115,19 @@ describe('pivot table v3 control panel', () => {
     }
     const state = {
       controls: {
-        groupbyRows: { value: ['row1'] },
-        groupbyColumns: { value: [] },
+        dimensions: { value: ['row1'] },
         metrics: { value: ['metric1'] },
         colSubtotalLevels: { value: [1, 2] },
+      },
+      form_data: {
+        pivotRuntimeLayout: {
+          version: 1,
+          rows: ['row1'],
+          cols: [],
+          metrics: ['metric1'],
+          leafSelection: {},
+          valuePlacement: { axis: 'col', index: 0 },
+        },
       },
     } as unknown as ControlPanelState;
     const controlState = {
@@ -135,8 +150,18 @@ describe('pivot table v3 control panel', () => {
     }
     const state = {
       controls: {
-        groupbyColumns: { value: ['col1', 'col2', 'col3'] },
+        dimensions: { value: ['col1', 'col2', 'col3'] },
         colSubtotalLevels: { value: [] },
+      },
+      form_data: {
+        pivotRuntimeLayout: {
+          version: 1,
+          rows: [],
+          cols: ['col1', 'col2', 'col3'],
+          metrics: [],
+          leafSelection: {},
+          valuePlacement: { axis: 'col', index: 3 },
+        },
       },
     } as unknown as ControlPanelState;
     const controlState = {
