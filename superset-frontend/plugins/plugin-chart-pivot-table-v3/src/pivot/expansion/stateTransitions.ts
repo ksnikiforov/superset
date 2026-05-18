@@ -47,6 +47,8 @@ export type ExpansionPlanningConfig = {
   program: PivotProgram;
 };
 
+const PIVOT_AXES: PivotAxis[] = ['row', 'col'];
+
 const createEmptyExpansionPlan = (): PivotExpansionPlan => ({
   targets: [],
   hasMissingNodes: false,
@@ -553,32 +555,33 @@ export const resolveReinitializedExpansionState = (params: {
     program: params.program,
     hasNewData: params.hasNewData,
   };
-  const axisState = {
-    row: resolveExpansionCacheAxis({
-      ...common,
-      axis: 'row',
-      axisCoverageNeeds: params.axisCoverageNeeds,
-      keys: sessionState.rows ?? [],
-      collapsed: sessionState.collapsedRows ?? [],
-      nodes: tree.rows,
-      stablePrefix: params.rowStablePrefix,
-      reset: params.shouldResetExpandedRows,
-      changed: params.rowsChanged,
-      includeMetricDepth: includeMetricDepth('row'),
-    }),
-    col: resolveExpansionCacheAxis({
-      ...common,
-      axis: 'col',
-      axisCoverageNeeds: params.axisCoverageNeeds,
-      keys: sessionState.cols ?? [],
-      collapsed: sessionState.collapsedCols ?? [],
-      nodes: tree.cols,
-      stablePrefix: params.colStablePrefix,
-      reset: params.shouldResetExpandedCols,
-      changed: params.colsChanged,
-      includeMetricDepth: includeMetricDepth('col'),
-    }),
-  };
+  const axisState = Object.fromEntries(
+    PIVOT_AXES.map(axis => [
+      axis,
+      resolveExpansionCacheAxis({
+        ...common,
+        axis,
+        axisCoverageNeeds: params.axisCoverageNeeds,
+        keys:
+          axis === 'row'
+            ? (sessionState.rows ?? [])
+            : (sessionState.cols ?? []),
+        collapsed:
+          axis === 'row'
+            ? (sessionState.collapsedRows ?? [])
+            : (sessionState.collapsedCols ?? []),
+        nodes: axis === 'row' ? tree.rows : tree.cols,
+        stablePrefix:
+          axis === 'row' ? params.rowStablePrefix : params.colStablePrefix,
+        reset:
+          axis === 'row'
+            ? params.shouldResetExpandedRows
+            : params.shouldResetExpandedCols,
+        changed: axis === 'row' ? params.rowsChanged : params.colsChanged,
+        includeMetricDepth: includeMetricDepth(axis),
+      }),
+    ]),
+  ) as Record<PivotAxis, ReturnType<typeof resolveExpansionCacheAxis>>;
   return {
     persistedState: {
       rows: axisState.row.prunedManualKeys,
@@ -856,36 +859,28 @@ export const buildVisiblePersistedExpansionState = ({
   visibleCollapsedRows: Set<string>;
   visibleCollapsedCols: Set<string>;
 } => {
-  const visibleKeys = {
-    rows: collectVisibleAxisKeys(tree.rows, expandedRows),
-    cols: collectVisibleAxisKeys(tree.cols, expandedCols),
+  const visibleKeys: Record<PivotAxis, Set<string>> = {
+    row: collectVisibleAxisKeys(tree.rows, expandedRows),
+    col: collectVisibleAxisKeys(tree.cols, expandedCols),
   };
-  const visibleRows = filterVisibleExpansionKeys(
-    explicitExpandedRows,
-    visibleKeys.rows,
-  );
-  const visibleCols = filterVisibleExpansionKeys(
-    explicitExpandedCols,
-    visibleKeys.cols,
-  );
-  const visibleCollapsedRows = filterVisibleExpansionKeys(
-    explicitCollapsedRows,
-    visibleKeys.rows,
-  );
-  const visibleCollapsedCols = filterVisibleExpansionKeys(
-    explicitCollapsedCols,
-    visibleKeys.cols,
-  );
+  const visibleExpanded = {
+    row: filterVisibleExpansionKeys(explicitExpandedRows, visibleKeys.row),
+    col: filterVisibleExpansionKeys(explicitExpandedCols, visibleKeys.col),
+  };
+  const visibleCollapsed = {
+    row: filterVisibleExpansionKeys(explicitCollapsedRows, visibleKeys.row),
+    col: filterVisibleExpansionKeys(explicitCollapsedCols, visibleKeys.col),
+  };
   return {
-    visibleExpandedRows: new Set(visibleRows),
-    visibleExpandedCols: new Set(visibleCols),
-    visibleCollapsedRows: new Set(visibleCollapsedRows),
-    visibleCollapsedCols: new Set(visibleCollapsedCols),
+    visibleExpandedRows: new Set(visibleExpanded.row),
+    visibleExpandedCols: new Set(visibleExpanded.col),
+    visibleCollapsedRows: new Set(visibleCollapsed.row),
+    visibleCollapsedCols: new Set(visibleCollapsed.col),
     persistedState: {
-      rows: visibleRows,
-      cols: visibleCols,
-      collapsedRows: visibleCollapsedRows,
-      collapsedCols: visibleCollapsedCols,
+      rows: visibleExpanded.row,
+      cols: visibleExpanded.col,
+      collapsedRows: visibleCollapsed.row,
+      collapsedCols: visibleCollapsed.col,
     },
   };
 };

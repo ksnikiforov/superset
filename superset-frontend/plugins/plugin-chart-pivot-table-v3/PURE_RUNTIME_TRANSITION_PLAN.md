@@ -290,8 +290,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13242` insertions, `17219` deletions, net `-3977`.
-- Current production TypeScript/TSX total: about `29533` lines.
+- Production `src`: `13240` insertions, `17256` deletions, net `-4016`.
+- Current production TypeScript/TSX total: about `29494` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -303,17 +303,17 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `29533` | `-3977` | `< 28000` |
-| Strict core pipeline | `11337` | `12089` | `+752` | `8000` |
-| Non-visual chart runtime hooks | `4683` | `5068` | `+385` | `3000-4000` |
-| Broad core pipeline | `16020` | `17157` | `+1137` | `11000-13000` |
+| Full production `src` | `33510` | `29494` | `-4016` | `< 28000` |
+| Strict core pipeline | `11337` | `12055` | `+718` | `8000` |
+| Non-visual chart runtime hooks | `4683` | `5063` | `+380` | `3000-4000` |
+| Broad core pipeline | `16020` | `17118` | `+1098` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
 | `pivot/runtime/*` | `4048` |
-| `pivot/expansion/*` | `2569` |
+| `pivot/expansion/*` | `2535` |
 | `pivot/query/*` | `1626` |
 | `pivot/layout/*` | `770` |
 | core/shared/domain helpers | `1865` |
@@ -505,6 +505,15 @@ group id construction moved into that executor, so target-specific code only
 builds request payloads and loading keys. This is a small deletion slice, but it
 continues the larger direction: expansion transport shapes should not own
 separate request bookkeeping.
+
+Latest expansion state/layout policy cleanup: `useExpansionEngine` no longer
+wraps persisted expansion intent in a hook-local store object. Expansion intent
+is now plain runtime memory plus one persistence function, and expanded row/col
+render state commits through one axis map instead of two setter branches.
+`stateTransitions.ts` also reinitializes row/column expansion from one
+axis-neutral path, and `usePivotLayout` builds row/column child policies through
+one axis-aware callback. This keeps fixed and user-controlled UI modes separate
+only at the visual shell while continuing to reduce duplicated runtime behavior.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.

@@ -116,6 +116,13 @@ const createExpansionRuntimeState = (): ExpansionRuntimeState => ({
   isHydrating: false,
 });
 
+const createEmptyExpansionState = (): PivotExpansionStateKeys => ({
+  rows: [],
+  cols: [],
+  collapsedRows: [],
+  collapsedCols: [],
+});
+
 const updateLoadingCounts = ({
   loadingCounts,
   key,
@@ -164,16 +171,7 @@ const expansionRuntimeReducer = (
   }
 };
 
-type ExpansionStateStore = {
-  init: (persistedState: unknown) => PivotExpansionStateKeys;
-  updateDeps: (deps: ExpansionStateStoreDeps) => void;
-  write: (
-    nextState: PivotExpansionStateKeys,
-    options?: { persist?: boolean },
-  ) => void;
-};
-
-type ExpansionStateStoreDeps = {
+type ExpansionPersistenceDeps = {
   shouldPersist: boolean;
   setControlValue?: HandlerFunction;
   setDataMask?: SetDataMaskHook;
@@ -192,54 +190,22 @@ const toPersistedPayload = (
   };
 };
 
-const createExpansionStateStore = (
-  initialDeps: ExpansionStateStoreDeps,
-): ExpansionStateStore => {
-  let deps = initialDeps;
-  let memory: PivotExpansionStateKeys | undefined;
-
-  const persist = (state: PivotExpansionStateKeys) => {
-    if (!deps.shouldPersist) {
-      return;
-    }
-    const payload = toPersistedPayload(state);
-    if (deps.setControlValue) {
-      deps.setControlValue('pivotExpansionState', payload);
-      return;
-    }
-    if (deps.setDataMask && deps.mergeOwnState) {
-      const nextOwnState = deps.mergeOwnState({ pivotExpansionState: payload });
-      deps.setDataMask({ ownState: { ...nextOwnState } });
-    }
-  };
-
-  return {
-    init: persistedState => {
-      if (memory) {
-        return memory;
-      }
-      const seed = coerceExpansionState(persistedState);
-      memory =
-        seed ??
-        ({
-          rows: [],
-          cols: [],
-          collapsedRows: [],
-          collapsedCols: [],
-        } satisfies PivotExpansionStateKeys);
-      return memory;
-    },
-    updateDeps: nextDeps => {
-      deps = nextDeps;
-    },
-    write: (nextState, options) => {
-      memory = nextState;
-      if (options?.persist === false) {
-        return;
-      }
-      persist(nextState);
-    },
-  };
+const persistExpansionStateKeys = (
+  state: PivotExpansionStateKeys,
+  deps: ExpansionPersistenceDeps,
+) => {
+  if (!deps.shouldPersist) {
+    return;
+  }
+  const payload = toPersistedPayload(state);
+  if (deps.setControlValue) {
+    deps.setControlValue('pivotExpansionState', payload);
+    return;
+  }
+  if (deps.setDataMask && deps.mergeOwnState) {
+    const nextOwnState = deps.mergeOwnState({ pivotExpansionState: payload });
+    deps.setDataMask({ ownState: { ...nextOwnState } });
+  }
 };
 
 export type ExpansionEngineResult = {
@@ -293,8 +259,11 @@ export const useExpansionEngine = ({
     factBatches.forEach(store.upsertBatch);
     factStoreRef.current = store;
   }
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
-  const [expandedCols, setExpandedCols] = useState<Set<string>>(new Set());
+  const [expandedByAxis, setExpandedByAxis] = useState<AxisSetMap>(() => ({
+    row: new Set(),
+    col: new Set(),
+  }));
+  const { row: expandedRows, col: expandedCols } = expandedByAxis;
   const expandedRefs: AxisSetRefs = {
     row: useRef(expandedRows),
     col: useRef(expandedCols),
@@ -337,7 +306,19 @@ export const useExpansionEngine = ({
     [],
   );
 
-  const expansionStateStoreRef = useRef<ExpansionStateStore>();
+  const expansionStateMemoryRef = useRef<PivotExpansionStateKeys>();
+  const expansionPersistenceDepsRef = useRef<ExpansionPersistenceDeps>({
+    shouldPersist: shouldPersistExpansionState,
+    setControlValue,
+    setDataMask,
+    mergeOwnState,
+  });
+  expansionPersistenceDepsRef.current = {
+    shouldPersist: shouldPersistExpansionState,
+    setControlValue,
+    setDataMask,
+    mergeOwnState,
+  };
   const persistedExpansionStateRef = useRef<unknown>(persistedExpansionState);
   const previousDataRef = useRef<PivotTreeData | null>(null);
   const groupbyRowKeys = useMemo(
@@ -352,29 +333,6 @@ export const useExpansionEngine = ({
     rows: groupbyRowKeys,
     cols: groupbyColumnKeys,
   });
-
-  if (!expansionStateStoreRef.current) {
-    expansionStateStoreRef.current = createExpansionStateStore({
-      shouldPersist: shouldPersistExpansionState,
-      setControlValue,
-      setDataMask,
-      mergeOwnState,
-    });
-  }
-
-  useEffect(() => {
-    expansionStateStoreRef.current?.updateDeps({
-      shouldPersist: shouldPersistExpansionState,
-      setControlValue,
-      setDataMask,
-      mergeOwnState,
-    });
-  }, [
-    mergeOwnState,
-    setControlValue,
-    setDataMask,
-    shouldPersistExpansionState,
-  ]);
 
   useEffect(
     () => () => {
@@ -401,6 +359,26 @@ export const useExpansionEngine = ({
     dispatchRuntimeState({ type: 'setHydrating', value });
   }, []);
 
+  const readSessionExpansionState = useCallback(() => {
+    if (!expansionStateMemoryRef.current) {
+      expansionStateMemoryRef.current =
+        coerceExpansionState(persistedExpansionStateRef.current) ??
+        createEmptyExpansionState();
+    }
+    return expansionStateMemoryRef.current;
+  }, []);
+
+  const writeSessionExpansionState = useCallback(
+    (nextState: PivotExpansionStateKeys, options?: { persist?: boolean }) => {
+      expansionStateMemoryRef.current = nextState;
+      if (options?.persist === false) {
+        return;
+      }
+      persistExpansionStateKeys(nextState, expansionPersistenceDepsRef.current);
+    },
+    [],
+  );
+
   const commitExpansionState = useCallback(
     ({
       tree: nextTree,
@@ -424,11 +402,11 @@ export const useExpansionEngine = ({
         if (nextTree) {
           setTree(nextTree);
         }
-        if (nextExpanded?.row) {
-          setExpandedRows(nextExpanded.row);
-        }
-        if (nextExpanded?.col) {
-          setExpandedCols(nextExpanded.col);
+        if (nextExpanded?.row || nextExpanded?.col) {
+          setExpandedByAxis(current => ({
+            row: nextExpanded.row ?? current.row,
+            col: nextExpanded.col ?? current.col,
+          }));
         }
       });
     },
@@ -492,9 +470,9 @@ export const useExpansionEngine = ({
       explicitExpandedRefs.col.current = visible.visibleExpandedCols;
       explicitCollapsedRefs.row.current = visible.visibleCollapsedRows;
       explicitCollapsedRefs.col.current = visible.visibleCollapsedCols;
-      expansionStateStoreRef.current?.write(visible.persistedState);
+      writeSessionExpansionState(visible.persistedState);
     },
-    [],
+    [writeSessionExpansionState],
   );
 
   const resolveExpandedForMetrics = useCallback(
@@ -701,16 +679,7 @@ export const useExpansionEngine = ({
       sharedSignatureChanged,
       shouldReinitialize,
     } = reinitializationDecision;
-    const sessionExpansionState =
-      expansionStateStoreRef.current?.init(
-        persistedExpansionStateRef.current,
-      ) ??
-      ({
-        rows: [],
-        cols: [],
-        collapsedRows: [],
-        collapsedCols: [],
-      } satisfies PivotExpansionStateKeys);
+    const sessionExpansionState = readSessionExpansionState();
     const currentLayout = {
       rows: groupbyRowKeys,
       cols: groupbyColumnKeys,
@@ -772,7 +741,7 @@ export const useExpansionEngine = ({
     explicitExpandedRefs.col.current = new Set(persistedState.cols);
     explicitCollapsedRefs.row.current = new Set(persistedState.collapsedRows);
     explicitCollapsedRefs.col.current = new Set(persistedState.collapsedCols);
-    expansionStateStoreRef.current?.write(persistedState, {
+    writeSessionExpansionState(persistedState, {
       persist: !isInitialMount && shouldResetExpanded,
     });
 
@@ -820,7 +789,9 @@ export const useExpansionEngine = ({
     expansionRequestLifecycle,
     resolveExpandedForMetrics,
     reportAsyncError,
+    readSessionExpansionState,
     setHydratingState,
+    writeSessionExpansionState,
     planningConfig,
   ]);
 

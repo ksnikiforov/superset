@@ -243,49 +243,43 @@ export const usePivotLayout = ({
     [isLeafTierVisible, layout.pivotProgram],
   );
 
-  const getRowChildrenForNodes = useCallback(
-    (parent: PivotTreeNode, nodes: Record<string, PivotTreeNode>) => {
-      const rowSubtotalPositionForParent = getRowSubtotalPosition(parent);
+  const getAxisChildrenForNodes = useCallback(
+    (
+      axis: 'row' | 'col',
+      parent: PivotTreeNode,
+      nodes: Record<string, PivotTreeNode>,
+    ) => {
       const filtered = resolveAxisChildrenBeforeSubtotalPolicy({
         program: layout.pivotProgram,
-        axis: 'row',
+        axis,
         parent,
         nodes,
-        hideMetricHeader: hideMetricHeaderOnRows,
-        colTotals: layout.colTotals,
+        hideMetricHeader:
+          axis === 'row' ? hideMetricHeaderOnRows : hideMetricHeaderOnCols,
+        colTotals: axis === 'row' ? layout.colTotals : undefined,
+        normalizedColSubtotalLevelCount:
+          axis === 'col' ? normalizedColSubtotalLevels.length : undefined,
       });
+      if (axis === 'col') {
+        return filtered;
+      }
       return resolveRowSubtotalChildrenPolicy({
         program: layout.pivotProgram,
         children: filtered,
         parent,
         nodes,
         rowSubTotals: layout.rowSubTotals,
-        rowSubtotalPositionForParent,
+        rowSubtotalPositionForParent: getRowSubtotalPosition(parent),
         hideMetricHeaderOnRows,
       });
     },
     [
       getRowSubtotalPosition,
+      hideMetricHeaderOnCols,
       hideMetricHeaderOnRows,
       layout.colTotals,
       layout.pivotProgram,
       layout.rowSubTotals,
-    ],
-  );
-
-  const getColChildrenForNodes = useCallback(
-    (parent: PivotTreeNode, nodes: Record<string, PivotTreeNode>) =>
-      resolveAxisChildrenBeforeSubtotalPolicy({
-        program: layout.pivotProgram,
-        axis: 'col',
-        parent,
-        nodes,
-        hideMetricHeader: hideMetricHeaderOnCols,
-        normalizedColSubtotalLevelCount: normalizedColSubtotalLevels.length,
-      }),
-    [
-      hideMetricHeaderOnCols,
-      layout.pivotProgram,
       normalizedColSubtotalLevels.length,
     ],
   );
@@ -313,10 +307,12 @@ export const usePivotLayout = ({
       hasMultipleMeasures,
       rowSorter,
       colSorter,
-      getRowChildren: parent => getRowChildrenForNodes(parent, tree.rows),
+      getRowChildren: parent =>
+        getAxisChildrenForNodes('row', parent, tree.rows),
       getCollapsedRowChildren: parent =>
         getCollapsedChildrenForAxis('row', parent, expandedRows, tree.rows),
-      getColChildren: parent => getColChildrenForNodes(parent, tree.cols),
+      getColChildren: parent =>
+        getAxisChildrenForNodes('col', parent, tree.cols),
       getCollapsedColLeaves: parent =>
         getCollapsedChildrenForAxis('col', parent, expandedCols, tree.cols),
       getColumnDisplayPath,
@@ -324,9 +320,8 @@ export const usePivotLayout = ({
     }),
     [
       effectiveColSubtotalPosition,
-      getColChildrenForNodes,
+      getAxisChildrenForNodes,
       getCollapsedChildrenForAxis,
-      getRowChildrenForNodes,
       hasMultipleMeasures,
       layout.colTotals,
       layout.pivotProgram,
