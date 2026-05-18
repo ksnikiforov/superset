@@ -36,10 +36,7 @@ import {
 import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
 import { buildExpansionQuerySpecs } from '../../../src/pivot/query/specs';
 import { createPivotFactStore } from '../../../src/pivot/runtime/factStore';
-import {
-  factStoreSelectorFromSpec,
-  materializeLoadedPivotTreeFromFactStore,
-} from '../../../src/pivot/runtime/materializePivotTree';
+import { materializeLoadedPivotTreeFromFactStore } from '../../../src/pivot/runtime/materializePivotTree';
 
 jest.mock('@superset-ui/core', () => {
   const actual = jest.requireActual('@superset-ui/core');
@@ -275,7 +272,7 @@ describe('fetchBatch', () => {
     const [spec] = specs;
     const store = createPivotFactStore();
     store.upsertBatch({
-      ...factStoreSelectorFromSpec(spec),
+      ...spec.meta.factSelector,
       facts: [
         {
           rowPath: ['US', 'CA', 'SF'],
@@ -303,9 +300,7 @@ describe('fetchBatch', () => {
     const rowKey = serializePath(['US', 'CA', 'SF']);
     const metricColKey = serializePath([encodeMetricKey('m1')]);
 
-    expect(store.hasCompatibleCoverage(factStoreSelectorFromSpec(spec))).toBe(
-      true,
-    );
+    expect(store.hasCompatibleCoverage(spec.meta.factSelector)).toBe(true);
     expect(mockPost).not.toHaveBeenCalled();
     expect(tree.rows[rowKey]).toBeDefined();
     expect(tree.cells[serializeCellKey(rowKey, metricColKey)]?.values.m1).toBe(
@@ -369,7 +364,7 @@ describe('fetchBatch', () => {
       facts: [],
     });
     const expectedMissingSpecs = specs.filter(
-      spec => !store.hasCompatibleCoverage(factStoreSelectorFromSpec(spec)),
+      spec => !store.hasCompatibleCoverage(spec.meta.factSelector),
     );
 
     await fetchBatch({

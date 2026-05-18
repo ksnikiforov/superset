@@ -35,7 +35,6 @@ import {
   type PivotFactStore,
 } from './factStore';
 import {
-  factStoreSelectorFromSpec,
   materializeLoadedPivotTreeFromFactStore,
   materializeLoadedPivotTreeFromFactStoreAsync,
 } from './materializePivotTree';
@@ -296,7 +295,7 @@ const factStoreBatchFromIngested = ({
   IngestedQueryResult<QueryResultWithData>,
   'spec' | 'facts'
 >): PivotFactStoreBatch => ({
-  ...factStoreSelectorFromSpec(spec),
+  ...spec.meta.factSelector,
   facts,
 });
 

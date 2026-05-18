@@ -44,10 +44,7 @@ import { formatQueryName } from '../../src/pivot/query/queryName';
 import { buildLayoutContext } from '../../src/pivot/layout/LayoutContext';
 import { buildExpansionQuerySpecs } from '../../src/pivot/query/specs';
 import { createPivotFactStore } from '../../src/pivot/runtime/factStore';
-import {
-  factStoreSelectorFromSpec,
-  materializeLoadedPivotTreeFromFactStore,
-} from '../../src/pivot/runtime/materializePivotTree';
+import { materializeLoadedPivotTreeFromFactStore } from '../../src/pivot/runtime/materializePivotTree';
 import { buildFormData } from './fixtures/pivotFormData';
 import { applyMetricAxis } from './fixtures/metricAxis';
 
@@ -1502,7 +1499,7 @@ describe('fetchBranch delta-only contract', () => {
     const [spec] = specs;
     const store = createPivotFactStore();
     store.upsertBatch({
-      ...factStoreSelectorFromSpec(spec),
+      ...spec.meta.factSelector,
       facts: [
         {
           rowPath: ['A', 'B'],

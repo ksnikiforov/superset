@@ -28,7 +28,6 @@ import {
   type PivotFactStoreBatch,
 } from '../../../src/pivot/runtime/factStore';
 import { parsePath } from '../../../src/pivot/core/path';
-import { factStoreSelectorFromSpec } from '../../../src/pivot/runtime/materializePivotTree';
 import {
   buildExpansionQuerySpecs,
   type PlannedQuerySpec,
@@ -130,7 +129,7 @@ const buildFactsForSpec = (
   data?: PivotTreeData,
 ): PivotFact[] => {
   const facts = buildFactsForCoverage(data, spec.meta.coverage);
-  return buildFactsForScope(facts, factStoreSelectorFromSpec(spec).scope);
+  return buildFactsForScope(facts, spec.meta.factSelector.scope);
 };
 
 const buildMockFactBatchesFromSpecs = (
@@ -138,7 +137,7 @@ const buildMockFactBatchesFromSpecs = (
   data?: PivotTreeData,
 ): PivotFactStoreBatch[] =>
   specs.map(spec => ({
-    ...factStoreSelectorFromSpec(spec),
+    ...spec.meta.factSelector,
     facts: buildFactsForSpec(spec, data),
   }));
 

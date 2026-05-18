@@ -182,6 +182,9 @@ Current semantic-layout contract:
   fetch-start, or error callbacks. It calls the chart-data client directly
   through its runtime boundary, leaving the chart hook responsible only for UI
   loading/error state.
+- Planned query specs now carry their exact fact-store selector. Ingestion and
+  fetch dedupe consume `spec.meta.factSelector`; materialization no longer
+  derives branch, batch, or intersection fact-store scope from query metadata.
 - Expansion coverage planning no longer depends on the render model to compute
   visible row/column depths. It derives visible coverage depth from the compiled
   `PivotProgram`, loaded tree paths, and explicit expansion intent.
@@ -238,8 +241,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13807` insertions, `16415` deletions, net `-2608`.
-- Current production TypeScript/TSX total: about `30902` lines.
+- Production `src`: `13819` insertions, `16413` deletions, net `-2594`.
+- Current production TypeScript/TSX total: about `30916` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion

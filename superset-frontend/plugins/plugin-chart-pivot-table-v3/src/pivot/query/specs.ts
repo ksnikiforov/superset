@@ -54,6 +54,11 @@ import {
   buildFactCoverage,
 } from '../runtime/coverage';
 import {
+  buildFactValueKeys,
+  type PivotFactSelector,
+  type PivotFactStoreBatchScope,
+} from '../runtime/factStore';
+import {
   canRequestAxisExpansion,
   projectionQueryDimensions,
   projectionQueryFilterPath,
@@ -85,6 +90,7 @@ export type QuerySpecMeta = {
   requiredTimeOffsets: string[];
   pivotProgram: PivotProgram;
   coverage: PivotFactCoverage;
+  factSelector: PivotFactSelector;
 };
 
 export type PlannedQuerySpec = QuerySpec & {
@@ -132,6 +138,75 @@ const projectQueryFilterPath = ({
       path,
     }),
   );
+
+const factStoreScopeForMeta = ({
+  layout,
+  meta,
+}: {
+  layout: LayoutContext;
+  meta: CoverageQueryMeta;
+}): PivotFactStoreBatchScope => {
+  if (meta.kind === 'branch') {
+    if (!meta.axis) {
+      throw new Error('Branch fact-store batch requires an axis');
+    }
+    return {
+      kind: 'branch',
+      axis: meta.axis,
+      path: projectQueryFilterPath({
+        layout,
+        axis: meta.axis,
+        path: meta.path ?? [],
+      }),
+    };
+  }
+  if (meta.kind === 'batch') {
+    if (!meta.axis) {
+      throw new Error('Batch fact-store batch requires an axis');
+    }
+    return {
+      kind: 'batch',
+      axis: meta.axis,
+      parentPath: projectQueryFilterPath({
+        layout,
+        axis: meta.axis,
+        path: meta.parentPath ?? [],
+      }),
+      siblingValues: meta.siblingValues ?? [],
+    };
+  }
+  if (meta.kind === 'intersection') {
+    return {
+      kind: 'intersection',
+      rowPaths: (meta.rowPaths ?? []).map(path =>
+        projectQueryFilterPath({ layout, axis: 'row', path }),
+      ),
+      columnPaths: (meta.columnPaths ?? []).map(path =>
+        projectQueryFilterPath({ layout, axis: 'col', path }),
+      ),
+    };
+  }
+  return { kind: meta.kind };
+};
+
+const buildSpecFactSelector = ({
+  coverage,
+  scope,
+  metrics,
+  requiredTimeOffsets,
+}: {
+  coverage: PivotFactCoverage;
+  scope: PivotFactStoreBatchScope;
+  metrics: QueryFormMetric[];
+  requiredTimeOffsets: string[];
+}): PivotFactSelector => ({
+  coverage,
+  scope,
+  valueKeys: buildFactValueKeys({
+    metricKeys: metrics.map(getMetricKey).filter(Boolean) as string[],
+    requiredTimeOffsets,
+  }),
+});
 
 const buildIntent = ({
   kind,
@@ -614,6 +689,12 @@ const buildSpecsForCoverages = ({
       requiredTimeOffsets: ctx.requiredTimeOffsets,
       pivotProgram: layout.pivotProgram,
       coverage,
+      factSelector: buildSpecFactSelector({
+        coverage,
+        scope: factStoreScopeForMeta({ layout, meta }),
+        metrics: ctx.metricsForQuery,
+        requiredTimeOffsets: ctx.requiredTimeOffsets,
+      }),
     },
   }));
 
@@ -935,6 +1016,12 @@ export const buildInitialQuerySpecs = (
       colSorting: formData.colSorting,
       measureHierarchy: layout.measureHierarchy,
     });
+    const factSelector = buildSpecFactSelector({
+      coverage: target.coverage,
+      scope: { kind: 'bootstrap' },
+      metrics: queryShape.metrics,
+      requiredTimeOffsets: layout.requiredTimeOffsets,
+    });
     specs.push({
       queryName: formatQueryName(
         target.intent.targetRowDepth,
@@ -952,6 +1039,7 @@ export const buildInitialQuerySpecs = (
         requiredTimeOffsets: layout.requiredTimeOffsets,
         pivotProgram: layout.pivotProgram,
         coverage: target.coverage,
+        factSelector,
       },
     });
   });

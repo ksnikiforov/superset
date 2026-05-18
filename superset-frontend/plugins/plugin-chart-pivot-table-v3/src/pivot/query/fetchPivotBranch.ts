@@ -28,7 +28,6 @@ import {
 import { type PivotFactStore } from '../runtime/factStore';
 import { upsertQueryResultsIntoFactStore } from '../runtime/ingestQueryResults';
 import { isAbortError } from '../runtime/requestLifecycle';
-import { factStoreSelectorFromSpec } from '../runtime/materializePivotTree';
 
 export interface FetchPivotExpansionResult {
   warnings?: ChartDataWarning[];
@@ -61,7 +60,7 @@ const fetchPivotQuerySpecsIntoFactStore = async ({
     return {};
   }
   const missingSpecs = specs.filter(
-    spec => !factStore?.hasCompatibleCoverage(factStoreSelectorFromSpec(spec)),
+    spec => !factStore?.hasCompatibleCoverage(spec.meta.factSelector),
   );
   if (missingSpecs.length === 0) {
     return {};

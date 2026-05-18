@@ -76,6 +76,25 @@ const buildSpec = ({
     METRICS_PLACEHOLDER,
     ...columns.slice(metricInsertIndex),
   ];
+  const pivotProgram = compilePivotProgram({
+    groupbyRows:
+      metricsLayoutResolved === MetricsLayoutEnum.ROWS
+        ? withValuesPlaceholder(rowGroupby)
+        : rowGroupby,
+    groupbyColumns:
+      metricsLayoutResolved === MetricsLayoutEnum.COLUMNS
+        ? withValuesPlaceholder(colGroupby)
+        : colGroupby,
+    metrics,
+    metricsLayout: metricsLayoutResolved,
+  });
+  const coverage = {
+    reason: 'initial' as const,
+    rowDepth,
+    columnDepth: colDepth,
+    rowDimensions: rowGroupby.slice(0, rowDepth),
+    columnDimensions: colGroupby.slice(0, colDepth),
+  };
   return {
     queryName,
     columns: [
@@ -91,24 +110,12 @@ const buildSpec = ({
       materializedMetrics,
       materializedMeasureHierarchy,
       requiredTimeOffsets: [],
-      pivotProgram: compilePivotProgram({
-        groupbyRows:
-          metricsLayoutResolved === MetricsLayoutEnum.ROWS
-            ? withValuesPlaceholder(rowGroupby)
-            : rowGroupby,
-        groupbyColumns:
-          metricsLayoutResolved === MetricsLayoutEnum.COLUMNS
-            ? withValuesPlaceholder(colGroupby)
-            : colGroupby,
-        metrics,
-        metricsLayout: metricsLayoutResolved,
-      }),
-      coverage: {
-        reason: 'initial',
-        rowDepth,
-        columnDepth: colDepth,
-        rowDimensions: rowGroupby.slice(0, rowDepth),
-        columnDimensions: colGroupby.slice(0, colDepth),
+      pivotProgram,
+      coverage,
+      factSelector: {
+        coverage,
+        scope: { kind: 'root' },
+        valueKeys: metrics,
       },
     },
   };
@@ -195,6 +202,14 @@ test('records exact branch scope on fact-store batches', () => {
       kind: 'branch',
       axis: 'row',
       path: ['France'],
+      factSelector: {
+        ...spec.meta.factSelector,
+        scope: {
+          kind: 'branch',
+          axis: 'row',
+          path: ['France'],
+        },
+      },
     },
   };
 

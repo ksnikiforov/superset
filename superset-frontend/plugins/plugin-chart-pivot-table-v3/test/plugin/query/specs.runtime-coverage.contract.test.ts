@@ -26,7 +26,6 @@ import {
 import { MetricsLayoutEnum } from '../../../src/types';
 import { serializePath } from '../../../src/pivot/core/path';
 import { type BatchGroup } from '../../../src/pivot/query/fetchPlanOptimizer';
-import { factStoreSelectorFromSpec } from '../../../src/pivot/runtime/materializePivotTree';
 import { buildFormData } from '../fixtures/pivotFormData';
 
 describe('runtime coverage query specs contract', () => {
@@ -117,7 +116,7 @@ describe('runtime coverage query specs contract', () => {
         spec.meta.coverage?.columnDimensions.includes('subcategory'),
       ),
     ).toBe(true);
-    expect(factStoreSelectorFromSpec(specs[0]).scope).toMatchObject({
+    expect(specs[0].meta.factSelector.scope).toMatchObject({
       kind: 'branch',
       axis: 'col',
       path: ['Furniture'],

@@ -52,13 +52,9 @@ import {
   isValueLeaf,
 } from '../measureLeaves';
 import { type LayoutContext } from '../layout/LayoutContext';
-import { type PlannedQuerySpec } from '../query/specs';
 import { type PivotFactCoverage, type PivotProgram } from './types';
-import { projectionQueryFilterPath, resolveAxisProjection } from './projection';
 import {
-  buildFactValueKeys,
   type PivotFact,
-  type PivotFactSelector,
   type PivotFactStore,
   type PivotFactStoreBatch,
 } from './factStore';
@@ -167,74 +163,6 @@ const deriveBatchMaterializationPlan = ({
     pivotProgram: layout.pivotProgram,
   };
 };
-
-const projectFactStorePath = (
-  spec: PlannedQuerySpec,
-  axis: 'row' | 'col',
-  path: PivotPath,
-) =>
-  projectionQueryFilterPath(
-    resolveAxisProjection({
-      program: spec.meta.pivotProgram,
-      axis,
-      path,
-    }),
-  );
-
-const factStoreBatchScopeFromSpec = (
-  spec: PlannedQuerySpec,
-): PivotFactStoreBatch['scope'] => {
-  if (spec.meta.kind === 'branch') {
-    if (!spec.meta.axis) {
-      throw new Error('Branch fact-store batch requires an axis');
-    }
-    return {
-      kind: 'branch',
-      axis: spec.meta.axis,
-      path: projectFactStorePath(spec, spec.meta.axis, spec.meta.path ?? []),
-    };
-  }
-  if (spec.meta.kind === 'batch') {
-    if (!spec.meta.axis) {
-      throw new Error('Batch fact-store batch requires an axis');
-    }
-    return {
-      kind: 'batch',
-      axis: spec.meta.axis,
-      parentPath: projectFactStorePath(
-        spec,
-        spec.meta.axis,
-        spec.meta.parentPath ?? [],
-      ),
-      siblingValues: spec.meta.siblingValues ?? [],
-    };
-  }
-  if (spec.meta.kind === 'intersection') {
-    return {
-      kind: 'intersection',
-      rowPaths: (spec.meta.rowPaths ?? []).map(path =>
-        projectFactStorePath(spec, 'row', path),
-      ),
-      columnPaths: (spec.meta.columnPaths ?? []).map(path =>
-        projectFactStorePath(spec, 'col', path),
-      ),
-    };
-  }
-  return {
-    kind: spec.meta.kind,
-  };
-};
-
-export const factStoreSelectorFromSpec = (
-  spec: PlannedQuerySpec,
-): PivotFactSelector => ({
-  coverage: spec.meta.coverage,
-  scope: factStoreBatchScopeFromSpec(spec),
-  valueKeys: buildFactValueKeys({
-    metricKeys: getMetricKeys(spec.metrics),
-    requiredTimeOffsets: spec.meta.requiredTimeOffsets,
-  }),
-});
 
 export function applyMeasureLeafValuesToTree({
   tree,
