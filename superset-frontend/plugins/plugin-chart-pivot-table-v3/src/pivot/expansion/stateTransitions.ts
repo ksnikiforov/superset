@@ -246,23 +246,15 @@ export const dropDescendants = (
 };
 
 export const resolveExpansionToggleDecision = ({
-  axis,
   node,
   expanded,
   pending,
-  otherPending,
-  visibleRowDepth,
-  visibleColDepth,
   manualExpanded,
   manualCollapsed,
 }: {
-  axis: PivotAxis;
   node: PivotTreeNode;
   expanded: Set<string>;
   pending: Set<string>;
-  otherPending: Set<string>;
-  visibleRowDepth: number;
-  visibleColDepth: number;
   manualExpanded: Set<string>;
   manualCollapsed: Set<string>;
 }) => {
@@ -271,9 +263,6 @@ export const resolveExpansionToggleDecision = ({
     return { kind: 'collapse' };
   }
 
-  const oppositeVisibleDepth =
-    axis === 'row' ? visibleColDepth : visibleRowDepth;
-  const isAtomic = oppositeVisibleDepth > 0 && otherPending.size > 0;
   const nextPending = new Set(pending);
   addAncestors(node.path, nextPending, expanded);
   const nextManualExpanded = new Set(manualExpanded);
@@ -281,7 +270,7 @@ export const resolveExpansionToggleDecision = ({
   const nextManualCollapsed = new Set(manualCollapsed);
   nextManualCollapsed.delete(node.key);
   return {
-    kind: isAtomic ? 'cross-axis-hydration' : 'same-axis',
+    kind: 'expand',
     nextPending,
     nextManualExpanded,
     nextManualCollapsed,
@@ -696,69 +685,35 @@ export const planHydrationIteration = ({
   desiredCols,
   getMissingExpansionCoverage,
   config,
-  activeAxis,
-  pendingRows,
-  pendingCols,
-  planRows = true,
-  planCols = true,
 }: {
   tree: PivotTreeData;
   desiredRows: Set<string>;
   desiredCols: Set<string>;
   getMissingExpansionCoverage: PivotExpansionCoverageDiff;
   config: ExpansionPlanningConfig;
-  activeAxis?: PivotAxis;
-  pendingRows: Set<string>;
-  pendingCols: Set<string>;
-  planRows?: boolean;
-  planCols?: boolean;
 }) => {
   const { visibleRowDepth, visibleColDepth } = computeVisibleDepths({
     tree,
-    expandedRows: planRows ? desiredRows : new Set(),
-    expandedCols: planCols ? desiredCols : new Set(),
+    expandedRows: desiredRows,
+    expandedCols: desiredCols,
     config,
   });
-  const rowPlan = planRows
-    ? planExpansionForAxis({
-        axis: 'row',
-        program: config.program,
-        expandedKeys: desiredRows,
-        nodes: tree.rows,
-        coverage: { rowDepth: visibleRowDepth, columnDepth: visibleColDepth },
-        getMissingExpansionCoverage,
-      })
-    : createEmptyExpansionPlan();
-  const colPlan = planCols
-    ? planExpansionForAxis({
-        axis: 'col',
-        program: config.program,
-        expandedKeys: desiredCols,
-        nodes: tree.cols,
-        coverage: { rowDepth: visibleRowDepth, columnDepth: visibleColDepth },
-        getMissingExpansionCoverage,
-      })
-    : createEmptyExpansionPlan();
-
-  let effectiveRowPlan: PivotExpansionPlan = rowPlan;
-  let effectiveColPlan: PivotExpansionPlan = colPlan;
-
-  if (
-    activeAxis === 'col' &&
-    colPlan.fetchRequests.length > 0 &&
-    !rowPlan.hasMissingNodes &&
-    pendingRows.size === 0
-  ) {
-    effectiveRowPlan = createEmptyExpansionPlan();
-  }
-  if (
-    activeAxis === 'row' &&
-    rowPlan.fetchRequests.length > 0 &&
-    !colPlan.hasMissingNodes &&
-    pendingCols.size === 0
-  ) {
-    effectiveColPlan = createEmptyExpansionPlan();
-  }
+  const rowPlan = planExpansionForAxis({
+    axis: 'row',
+    program: config.program,
+    expandedKeys: desiredRows,
+    nodes: tree.rows,
+    coverage: { rowDepth: visibleRowDepth, columnDepth: visibleColDepth },
+    getMissingExpansionCoverage,
+  });
+  const colPlan = planExpansionForAxis({
+    axis: 'col',
+    program: config.program,
+    expandedKeys: desiredCols,
+    nodes: tree.cols,
+    coverage: { rowDepth: visibleRowDepth, columnDepth: visibleColDepth },
+    getMissingExpansionCoverage,
+  });
 
   const intersectionTargets = buildCrossAxisIntersectionTargets({
     rowKeys: desiredRows,
@@ -771,14 +726,14 @@ export const planHydrationIteration = ({
   });
   const shouldFetchIntersectionOnly =
     intersectionTargets.length > 0 &&
-    !effectiveRowPlan.hasMissingNodes &&
-    !effectiveColPlan.hasMissingNodes;
+    !rowPlan.hasMissingNodes &&
+    !colPlan.hasMissingNodes;
   const rowPlanForTransport = shouldFetchIntersectionOnly
     ? createEmptyExpansionPlan()
-    : effectiveRowPlan;
+    : rowPlan;
   const colPlanForTransport = shouldFetchIntersectionOnly
     ? createEmptyExpansionPlan()
-    : effectiveColPlan;
+    : colPlan;
 
   if (
     rowPlanForTransport.pendingKeys.size === 0 &&
@@ -791,8 +746,8 @@ export const planHydrationIteration = ({
       desiredCols,
       visibleRowDepth,
       visibleColDepth,
-      rowPlan: effectiveRowPlan,
-      colPlan: effectiveColPlan,
+      rowPlan,
+      colPlan,
     };
   }
 
@@ -814,8 +769,8 @@ export const planHydrationIteration = ({
     desiredCols,
     visibleRowDepth,
     visibleColDepth,
-    rowPlan: effectiveRowPlan,
-    colPlan: effectiveColPlan,
+    rowPlan,
+    colPlan,
     targets: [...rowGroups, ...colGroups, ...intersectionTargets],
   };
 };
@@ -827,11 +782,6 @@ export const runHydrationLoop = async ({
   buildDesiredExpanded,
   getMissingExpansionCoverage,
   config,
-  activeAxis,
-  pendingRows,
-  pendingCols,
-  planRows = true,
-  planCols = true,
   fetchTree,
 }: {
   baseTree: PivotTreeData;
@@ -840,11 +790,6 @@ export const runHydrationLoop = async ({
   buildDesiredExpanded: (axis: PivotAxis, tree: PivotTreeData) => Set<string>;
   getMissingExpansionCoverage: () => PivotExpansionCoverageDiff;
   config: ExpansionPlanningConfig;
-  activeAxis?: PivotAxis;
-  pendingRows: Set<string>;
-  pendingCols: Set<string>;
-  planRows?: boolean;
-  planCols?: boolean;
   fetchTree: ({
     targets,
     context,
@@ -871,11 +816,6 @@ export const runHydrationLoop = async ({
       desiredCols,
       getMissingExpansionCoverage: getMissingExpansionCoverage(),
       config,
-      activeAxis,
-      pendingRows,
-      pendingCols,
-      planRows,
-      planCols,
     });
     const { visibleRowDepth, visibleColDepth } = hydrationPlan;
 
@@ -970,24 +910,14 @@ export const planInitialHydrationPrefetch = ({
   getMissingExpansionCoverage: PivotExpansionCoverageDiff;
   config: ExpansionPlanningConfig;
 }) => {
-  const hasRowNeed = axisCoverageNeeds.some(need => need.axis === 'row');
-  const hasColNeed = axisCoverageNeeds.some(need => need.axis === 'col');
-  const shouldPlanRows = hasRowNeed || persistedState.rows.length > 0;
-  const shouldPlanCols = hasColNeed || persistedState.cols.length > 0;
   const { rowPlan, colPlan } = planHydrationIteration({
     tree,
     desiredRows: resolvedRows,
     desiredCols: resolvedCols,
     getMissingExpansionCoverage,
     config,
-    pendingRows: new Set(),
-    pendingCols: new Set(),
-    planRows: shouldPlanRows,
-    planCols: shouldPlanCols,
   });
   return {
-    shouldPlanRows,
-    shouldPlanCols,
     rowPlan,
     colPlan,
     action: buildHydrationPrefetchAction({

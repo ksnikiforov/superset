@@ -214,13 +214,9 @@ describe('pivot/expansion/stateTransitions', () => {
   it('resolves open expansion toggles as collapse decisions', () => {
     const node = makeNode('row', ['A'], true);
     const decision = resolveExpansionToggleDecision({
-      axis: 'row',
       node,
       expanded: new Set([node.key]),
       pending: new Set(),
-      otherPending: new Set(),
-      visibleRowDepth: 1,
-      visibleColDepth: 0,
       manualExpanded: new Set(),
       manualCollapsed: new Set(),
     });
@@ -228,48 +224,40 @@ describe('pivot/expansion/stateTransitions', () => {
     expect(decision).toEqual({ kind: 'collapse' });
   });
 
-  it('resolves ordinary expansion toggles as same-axis decisions', () => {
+  it('resolves ordinary expansion toggles as manifest expansion decisions', () => {
     const node = makeNode('row', ['A'], true);
     const decision = resolveExpansionToggleDecision({
-      axis: 'row',
       node,
       expanded: new Set(),
       pending: new Set(),
-      otherPending: new Set(['other']),
-      visibleRowDepth: 1,
-      visibleColDepth: 0,
       manualExpanded: new Set(),
       manualCollapsed: new Set([node.key]),
     });
 
     expect(decision).toEqual({
-      kind: 'same-axis',
+      kind: 'expand',
       nextPending: new Set([node.key]),
       nextManualExpanded: new Set([node.key]),
       nextManualCollapsed: new Set(),
     });
   });
 
-  it('resolves cross-axis expansion toggles with pending and manual state', () => {
+  it('resolves expansion toggles with pending ancestors and manual state', () => {
     const parentKey = serializePath(['A']);
     const node = makeNode('row', ['A', 'B'], true);
     const pending = new Set<string>();
     const manualExpanded = new Set(['manual']);
     const manualCollapsed = new Set([node.key, 'other']);
     const decision = resolveExpansionToggleDecision({
-      axis: 'row',
       node,
       expanded: new Set([parentKey]),
       pending,
-      otherPending: new Set(['col-pending']),
-      visibleRowDepth: 1,
-      visibleColDepth: 1,
       manualExpanded,
       manualCollapsed,
     });
 
-    expect(decision.kind).toBe('cross-axis-hydration');
-    if (decision.kind !== 'cross-axis-hydration') {
+    expect(decision.kind).toBe('expand');
+    if (decision.kind !== 'expand') {
       return;
     }
     expect([...decision.nextPending].sort()).toEqual(
@@ -379,14 +367,28 @@ describe('pivot/expansion/stateTransitions', () => {
       {
         coverage: {
           rowDepth: 2,
-          columnDepth: 1,
+          columnDepth: 2,
           rowDimensions: ['country', 'city'],
-          columnDimensions: ['month'],
+          columnDimensions: ['month', 'day'],
         },
         scope: {
           kind: 'branch',
           axis: 'row',
           path: ['A'],
+        },
+        valueKeys: ['sales'],
+      },
+      {
+        coverage: {
+          rowDepth: 2,
+          columnDepth: 2,
+          rowDimensions: ['country', 'city'],
+          columnDimensions: ['month', 'day'],
+        },
+        scope: {
+          kind: 'branch',
+          axis: 'col',
+          path: ['X'],
         },
         valueKeys: ['sales'],
       },
@@ -400,9 +402,6 @@ describe('pivot/expansion/stateTransitions', () => {
       getMissingExpansionCoverage: () =>
         expansionCoverageLoadedFromSelectors(factSelectors),
       config,
-      pendingRows: new Set(),
-      pendingCols: new Set(),
-      planCols: false,
       fetchTree: jest.fn(),
     });
 
@@ -415,7 +414,7 @@ describe('pivot/expansion/stateTransitions', () => {
   });
 
   it('runs hydration loops by fetching the next tree for missing coverage', async () => {
-    const { tree, aKey, xKey } = buildTree({ includeIntersectionCell: true });
+    const { tree, aKey } = buildTree({ includeIntersectionCell: true });
     const childKey = serializePath(['A', 'B']);
     const branch: PivotTreeData = {
       rows: {
@@ -424,7 +423,22 @@ describe('pivot/expansion/stateTransitions', () => {
       cols: {},
       cells: {},
     };
-    const factSelectors: PivotFactSelector[] = [];
+    const factSelectors: PivotFactSelector[] = [
+      {
+        coverage: {
+          rowDepth: 2,
+          columnDepth: 1,
+          rowDimensions: ['country', 'city'],
+          columnDimensions: ['month'],
+        },
+        scope: {
+          kind: 'branch',
+          axis: 'col',
+          path: [],
+        },
+        valueKeys: ['sales'],
+      },
+    ];
     const fetchTree = jest.fn(
       async ({ targets, context, tree: currentTree }) => {
         targets.forEach(target => {
@@ -454,13 +468,10 @@ describe('pivot/expansion/stateTransitions', () => {
       maxIterations: 3,
       isCurrent: () => true,
       buildDesiredExpanded: axis =>
-        axis === 'row' ? new Set([aKey]) : new Set([xKey]),
+        axis === 'row' ? new Set([aKey]) : new Set([rootKey]),
       getMissingExpansionCoverage: () =>
         expansionCoverageLoadedFromSelectors(factSelectors),
       config,
-      pendingRows: new Set(),
-      pendingCols: new Set(),
-      planCols: false,
       fetchTree,
     });
 
@@ -569,9 +580,6 @@ describe('pivot/expansion/stateTransitions', () => {
           groupbyColumnsLength: 0,
         }),
       },
-      pendingRows: new Set(),
-      pendingCols: new Set(),
-      planCols: false,
       fetchTree,
     });
 
@@ -595,8 +603,6 @@ describe('pivot/expansion/stateTransitions', () => {
         axis === 'row' ? new Set([aKey]) : new Set([xKey]),
       getMissingExpansionCoverage: () => expansionCoverageLoadedFromSelectors(),
       config,
-      pendingRows: new Set(),
-      pendingCols: new Set(),
       fetchTree,
     });
 
@@ -717,8 +723,6 @@ describe('pivot/expansion/stateTransitions', () => {
         loadedRootCoverage,
       ]),
       config,
-      pendingRows: new Set(),
-      pendingCols: new Set(),
     });
 
     expect(plan.kind).toBe('fetch');
@@ -737,26 +741,42 @@ describe('pivot/expansion/stateTransitions', () => {
     ]);
   });
 
-  it('prioritizes the active axis when possible', () => {
+  it('plans both visible axes through manifest coverage', () => {
     const { tree, aKey, xKey } = buildTree({ includeIntersectionCell: true });
     const plan = planHydrationIteration({
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
-      getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors(),
+      getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors([
+        {
+          coverage: {
+            rowDepth: 2,
+            columnDepth: 1,
+            rowDimensions: ['country', 'city'],
+            columnDimensions: ['month'],
+          },
+          scope: {
+            kind: 'branch',
+            axis: 'col',
+            path: [],
+          },
+          valueKeys: ['sales'],
+        },
+      ]),
       config,
-      activeAxis: 'col',
-      pendingRows: new Set(),
-      pendingCols: new Set(),
     });
 
     expect(plan.kind).toBe('fetch');
     if (plan.kind !== 'fetch') {
       throw new Error('Expected a fetch plan');
     }
-    expect(fetchPathKeys(plan.rowPlan)).toEqual([]);
+    expect(fetchPathKeys(plan.rowPlan)).toEqual([aKey]);
     expect(fetchPathKeys(plan.colPlan)).toEqual([xKey]);
     expect(plan.targets).toEqual([
+      {
+        axis: 'row',
+        pathKey: aKey,
+      },
       {
         axis: 'col',
         pathKey: xKey,
@@ -772,8 +792,6 @@ describe('pivot/expansion/stateTransitions', () => {
       desiredCols: new Set([rootKey, xKey]),
       getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors(),
       config,
-      pendingRows: new Set(),
-      pendingCols: new Set(),
     });
 
     expect(plan.kind).toBe('fetch');
@@ -797,8 +815,6 @@ describe('pivot/expansion/stateTransitions', () => {
       desiredCols: new Set([rootKey, xKey]),
       getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors(),
       config,
-      pendingRows: new Set(),
-      pendingCols: new Set(),
     });
 
     expect(plan.kind).toBe('fetch');
@@ -811,29 +827,6 @@ describe('pivot/expansion/stateTransitions', () => {
         expect.objectContaining({ kind: 'intersection' }),
       ]),
     );
-  });
-
-  it('can skip planning for one axis', () => {
-    const { tree, aKey, xKey } = buildTree({ includeIntersectionCell: true });
-    const plan = planHydrationIteration({
-      tree,
-      desiredRows: new Set([rootKey, aKey]),
-      desiredCols: new Set([rootKey, xKey]),
-      getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors(),
-      config,
-      pendingRows: new Set(),
-      pendingCols: new Set(),
-      planRows: false,
-      planCols: true,
-    });
-
-    expect(plan.kind).toBe('fetch');
-    expect(plan.rowPlan.fetchRequests).toHaveLength(0);
-    expect(plan.colPlan.fetchRequests).toHaveLength(1);
-    if (plan.kind !== 'fetch') {
-      throw new Error('Expected a fetch plan');
-    }
-    expect(plan.targets.map(target => target.axis)).toEqual(['col']);
   });
 
   it('fetches expanded row branches when only stale metric variants exist', () => {
@@ -882,8 +875,6 @@ describe('pivot/expansion/stateTransitions', () => {
       desiredCols: new Set([rootKey, xKey]),
       getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors(),
       config: metricConfig,
-      pendingRows: new Set(),
-      pendingCols: new Set(),
     });
 
     expect(fetchPathKeys(plan.rowPlan)).toContain(aKey);
@@ -945,8 +936,6 @@ describe('pivot/expansion/stateTransitions', () => {
       desiredCols: new Set([rootKey, xKey]),
       getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors(),
       config: metricConfig,
-      pendingRows: new Set(),
-      pendingCols: new Set(),
     });
 
     expect(fetchPathKeys(plan.rowPlan)).toContain(aKey);
@@ -1097,12 +1086,25 @@ describe('pivot/expansion/stateTransitions', () => {
         collapsedCols: [],
       },
       axisCoverageNeeds: noAxisCoverageNeeds,
-      getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors(),
+      getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors([
+        {
+          coverage: {
+            rowDepth: 2,
+            columnDepth: 1,
+            rowDimensions: ['country', 'city'],
+            columnDimensions: ['month'],
+          },
+          scope: {
+            kind: 'branch',
+            axis: 'col',
+            path: [],
+          },
+          valueKeys: ['sales'],
+        },
+      ]),
       config,
     });
 
-    expect(prefetch.shouldPlanRows).toBe(true);
-    expect(prefetch.shouldPlanCols).toBe(false);
     expect(fetchPathKeys(prefetch.rowPlan)).toContain(aKey);
     expect(prefetch.colPlan.fetchRequests).toHaveLength(0);
     expect(prefetch.action).toEqual({
@@ -1130,8 +1132,6 @@ describe('pivot/expansion/stateTransitions', () => {
       config,
     });
 
-    expect(prefetch.shouldPlanRows).toBe(true);
-    expect(prefetch.shouldPlanCols).toBe(false);
     expect(fetchPathKeys(prefetch.rowPlan)).toContain(rootKey);
   });
 });

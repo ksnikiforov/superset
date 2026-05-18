@@ -59,7 +59,6 @@ import {
 } from '../runtime/coverage';
 import {
   buildVisiblePersistedExpansionState,
-  computeVisibleDepths,
   planInitialHydrationPrefetch,
   resolveCollapsedExpansionState,
   resolveExpansionToggleDecision,
@@ -95,9 +94,6 @@ type ExpansionStateCommit = {
 
 type HydrateExpansionOptions = {
   showLoader?: boolean;
-  activeAxis?: PivotAxis;
-  planRows?: boolean;
-  planCols?: boolean;
   persistOnComplete?: boolean;
 };
 
@@ -653,8 +649,6 @@ export const useExpansionEngine = ({
   const hydrateAtomic = useCallback(
     async (options?: HydrateExpansionOptions) => {
       const shouldShowLoader = options?.showLoader ?? false;
-      const shouldPlanRows = options?.planRows ?? true;
-      const shouldPlanCols = options?.planCols ?? true;
       const shouldPersist = options?.persistOnComplete ?? false;
       const requestScope = expansionRequestLifecycle.beginScope();
       clearLoadingState();
@@ -669,11 +663,6 @@ export const useExpansionEngine = ({
           isCurrent: requestScope.isCurrent,
           buildDesiredExpanded,
           config: planningConfig,
-          activeAxis: options?.activeAxis,
-          pendingRows: pendingRowsRef.current,
-          pendingCols: pendingColsRef.current,
-          planRows: shouldPlanRows,
-          planCols: shouldPlanCols,
           fetchRuntime: buildFetchRuntime(requestScope),
         });
         if (result.status === 'complete') {
@@ -723,26 +712,14 @@ export const useExpansionEngine = ({
         axis === 'row' ? expandedRowsRef.current : expandedColsRef.current;
       const pending =
         axis === 'row' ? pendingRowsRef.current : pendingColsRef.current;
-      const otherPending =
-        axis === 'row' ? pendingColsRef.current : pendingRowsRef.current;
       const manualExpandedRef =
         axis === 'row' ? explicitExpandedRowsRef : explicitExpandedColsRef;
       const manualCollapsedRef =
         axis === 'row' ? explicitCollapsedRowsRef : explicitCollapsedColsRef;
-      const { visibleRowDepth, visibleColDepth } = computeVisibleDepths({
-        tree: treeRef.current,
-        expandedRows: expandedRowsRef.current,
-        expandedCols: expandedColsRef.current,
-        config: planningConfig,
-      });
       const toggleDecision = resolveExpansionToggleDecision({
-        axis,
         node,
         expanded,
         pending,
-        otherPending,
-        visibleRowDepth,
-        visibleColDepth,
         manualExpanded: manualExpandedRef.current,
         manualCollapsed: manualCollapsedRef.current,
       });
@@ -754,10 +731,7 @@ export const useExpansionEngine = ({
         return;
       }
 
-      if (
-        toggleDecision.kind === 'same-axis' ||
-        toggleDecision.kind === 'cross-axis-hydration'
-      ) {
+      if (toggleDecision.kind === 'expand') {
         commitExpansionState({
           pendingRows: axis === 'row' ? toggleDecision.nextPending : undefined,
           pendingCols: axis === 'col' ? toggleDecision.nextPending : undefined,
@@ -765,10 +739,7 @@ export const useExpansionEngine = ({
         manualExpandedRef.current = toggleDecision.nextManualExpanded;
         manualCollapsedRef.current = toggleDecision.nextManualCollapsed;
         hydrateAtomic({
-          activeAxis: axis,
           showLoader: false,
-          planRows: toggleDecision.kind === 'same-axis' ? axis === 'row' : true,
-          planCols: toggleDecision.kind === 'same-axis' ? axis === 'col' : true,
           persistOnComplete: true,
         }).catch(reportAsyncError);
       }
@@ -781,7 +752,6 @@ export const useExpansionEngine = ({
       reportAsyncError,
       clearLoadingState,
       setHydratingState,
-      planningConfig,
     ],
   );
 
@@ -912,11 +882,7 @@ export const useExpansionEngine = ({
       pendingCols: new Set(),
     });
 
-    const {
-      shouldPlanRows,
-      shouldPlanCols,
-      action: prefetchAction,
-    } = planInitialHydrationPrefetch({
+    const { action: prefetchAction } = planInitialHydrationPrefetch({
       tree: normalizedTree,
       resolvedRows,
       resolvedCols,
@@ -937,8 +903,6 @@ export const useExpansionEngine = ({
       }
       hydrateAtomic({
         showLoader: prefetchAction.showLoader,
-        planRows: shouldPlanRows,
-        planCols: shouldPlanCols,
       }).catch(reportAsyncError);
       return;
     }

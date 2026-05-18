@@ -20,21 +20,12 @@
 import { render, screen, waitFor } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
-import { mergeTrees } from '../../../src/pivot/core/tree';
-import { parsePath } from '../../../src/pivot/core/path';
-import {
-  fetchPivotExpansion as fetchPivotBranch,
-  fetchPivotExpansion as fetchPivotBranchesBatch,
-} from '../../../src/pivot/expansion/fetchPivotExpansion';
-import type {
-  FetchPivotBranchResult,
-  FetchPivotBranchesBatchParams,
-  FetchPivotBranchesBatchResult,
-} from '../../../src/pivot/expansion/fetchPivotExpansion';
+import { fetchPivotExpansion } from '../../../src/pivot/expansion/fetchPivotExpansion';
+import type { FetchPivotExpansionResult } from '../../../src/pivot/expansion/fetchPivotExpansion';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';
-import { buildMockBranchFetchResult } from '../fixtures/factBatches';
+import { buildMockExpansionFetchResult } from '../fixtures/factBatches';
 
 jest.mock('../../../src/pivot/expansion/fetchPivotExpansion', () => {
   const actual = jest.requireActual(
@@ -43,7 +34,6 @@ jest.mock('../../../src/pivot/expansion/fetchPivotExpansion', () => {
   return {
     ...actual,
     fetchPivotExpansion: jest.fn(),
-    fetchPivotBranchesBatch: jest.fn(),
   };
 });
 
@@ -87,47 +77,12 @@ const buildTree = (
 };
 
 describe('PivotTableChart persisted prefetch merges concurrent results', () => {
-  const fetchPivotBranchMock = fetchPivotBranch as jest.MockedFunction<
-    typeof fetchPivotBranch
+  const fetchPivotExpansionMock = fetchPivotExpansion as jest.MockedFunction<
+    typeof fetchPivotExpansion
   >;
-  const fetchPivotBranchesBatchMock =
-    fetchPivotBranchesBatch as jest.MockedFunction<
-      typeof fetchPivotBranchesBatch
-    >;
-
-  const resolveBatchWithSingles = async ({
-    batch,
-    formData,
-    factStore,
-    visibleRowDepth,
-    visibleColDepth,
-  }: FetchPivotBranchesBatchParams): Promise<FetchPivotBranchesBatchResult> => {
-    const results = await Promise.all(
-      batch.targets.map(target => {
-        const path = parsePath(target.pathKey);
-        return Promise.resolve(
-          fetchPivotBranchMock({
-            formData,
-            axis: batch.axis,
-            path,
-            visibleRowDepth,
-            visibleColDepth,
-            factStore,
-          }),
-        );
-      }),
-    );
-    const merged = results.reduce<PivotTreeData | undefined>(
-      (acc, result) => mergeTrees(acc, result.data),
-      undefined,
-    );
-    return { data: merged };
-  };
 
   beforeEach(() => {
-    fetchPivotBranchMock.mockReset();
-    fetchPivotBranchesBatchMock.mockReset();
-    fetchPivotBranchesBatchMock.mockImplementation(resolveBatchWithSingles);
+    fetchPivotExpansionMock.mockReset();
   });
 
   it('renders both branches when prefetch fetches resolve out of order', async () => {
@@ -147,10 +102,10 @@ describe('PivotTableChart persisted prefetch merges concurrent results', () => {
     );
     const mergedBranch = buildTree(records, 2);
 
-    const deferredA = createDeferred<FetchPivotBranchResult>();
-    const deferredB = createDeferred<FetchPivotBranchResult>();
+    const deferredA = createDeferred<FetchPivotExpansionResult>();
+    const deferredB = createDeferred<FetchPivotExpansionResult>();
 
-    fetchPivotBranchMock
+    fetchPivotExpansionMock
       .mockReturnValueOnce(deferredA.promise)
       .mockReturnValueOnce(deferredB.promise);
 
@@ -202,29 +157,38 @@ describe('PivotTableChart persisted prefetch merges concurrent results', () => {
       />,
     );
 
-    await waitFor(() => expect(fetchPivotBranchMock).toHaveBeenCalled());
-    const callCount = fetchPivotBranchMock.mock.calls.length;
+    await waitFor(() => expect(fetchPivotExpansionMock).toHaveBeenCalled());
+    const callCount = fetchPivotExpansionMock.mock.calls.length;
     if (callCount <= 1) {
       deferredA.resolve(
-        buildMockBranchFetchResult(fetchPivotBranchMock.mock.calls[0][0], {
-          data: mergedBranch,
-        }),
+        buildMockExpansionFetchResult(
+          fetchPivotExpansionMock.mock.calls[0][0],
+          {
+            data: mergedBranch,
+          },
+        ),
       );
-      await fetchPivotBranchMock.mock.results[0].value;
+      await fetchPivotExpansionMock.mock.results[0].value;
     } else {
       deferredB.resolve(
-        buildMockBranchFetchResult(fetchPivotBranchMock.mock.calls[1][0], {
-          data: branchB,
-        }),
+        buildMockExpansionFetchResult(
+          fetchPivotExpansionMock.mock.calls[1][0],
+          {
+            data: branchB,
+          },
+        ),
       );
       deferredA.resolve(
-        buildMockBranchFetchResult(fetchPivotBranchMock.mock.calls[0][0], {
-          data: branchA,
-        }),
+        buildMockExpansionFetchResult(
+          fetchPivotExpansionMock.mock.calls[0][0],
+          {
+            data: branchA,
+          },
+        ),
       );
       await Promise.all([
-        fetchPivotBranchMock.mock.results[0].value,
-        fetchPivotBranchMock.mock.results[1].value,
+        fetchPivotExpansionMock.mock.results[0].value,
+        fetchPivotExpansionMock.mock.results[1].value,
       ]);
     }
 

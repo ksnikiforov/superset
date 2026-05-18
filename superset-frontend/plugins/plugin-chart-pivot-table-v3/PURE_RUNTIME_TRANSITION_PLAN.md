@@ -255,8 +255,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13485` insertions, `17047` deletions, net `-3562`.
-- Current production TypeScript/TSX total: about `29948` lines.
+- Production `src`: `13389` insertions, `17057` deletions, net `-3668`.
+- Current production TypeScript/TSX total: about `29842` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -268,17 +268,17 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `29948` | `-3562` | `< 28000` |
-| Strict core pipeline | `11337` | `12394` | `+1057` | `8000` |
+| Full production `src` | `33510` | `29842` | `-3668` | `< 28000` |
+| Strict core pipeline | `11337` | `12288` | `+951` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5076` | `+393` | `3000-4000` |
-| Broad core pipeline | `16020` | `17470` | `+1450` | `11000-13000` |
+| Broad core pipeline | `16020` | `17364` | `+1344` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
 | `pivot/runtime/*` | `3931` |
-| `pivot/expansion/*` | `3005` |
+| `pivot/expansion/*` | `2899` |
 | `pivot/query/*` | `1628` |
 | `pivot/layout/*` | `744` |
 | core/shared/domain helpers | `1873` |
@@ -372,6 +372,13 @@ the duplicated pre-expand authority from `query/specs.ts` and avoids first-load
 full-depth queries for layers that should be governed by the manifest/batching
 runtime.
 
+Latest expansion scheduler cleanup: same-axis expansion, cross-axis hydration,
+and initial prefetch no longer pass active-axis or manual `planRows`/`planCols`
+suppression flags through the hydration loop. Expansion submits desired visible
+coverage, diffs both axes through the manifest, batches the explicit missing
+requests, and rematerializes from the fact store. Fetch suppression now comes
+from loaded coverage and requestability, not from scheduler mode.
+
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.
 Future work should remain high-impact-first while still deleting code where the
@@ -412,6 +419,11 @@ Near-term priority should be:
    query-form metric/time-offset shaping, warnings, and fact-store ingestion.
 2. Finish the expansion scheduler cut by making same-axis, cross-axis, and
    prefetch hydration submit the same manifest request shape.
+   Current status: active-axis priority and manual partial-axis planning flags
+   have been removed from `stateTransitions.ts` and `useExpansionEngine.ts`.
+   Remaining scheduler work is to shrink pending/loading state and move any
+   remaining mode-specific request bookkeeping behind the unified manifest
+   executor.
 3. Bring the dual-editor question to an explicit UX/product checkpoint. It is
    the largest raw deletion target, but it changes where users configure pivot
    layout.
