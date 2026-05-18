@@ -92,38 +92,6 @@ export const coerceExpansionState = (
   };
 };
 
-type SeedExpandedOptions = {
-  includeMetricDepthZero?: boolean;
-};
-
-export const seedExpandedByLevel = (
-  nodes: Record<string, PivotTreeNode>,
-  expandLevel: number,
-  metricLabelSet: Set<string>,
-  options?: SeedExpandedOptions,
-) => {
-  const next = new Set<string>([rootKey]);
-  Object.values(nodes).forEach(node => {
-    const lastValue = node.path[node.path.length - 1];
-    const decodedMetric = decodeMetricKey(lastValue);
-    const isMetricNode = decodedMetric
-      ? metricLabelSet.has(decodedMetric)
-      : false;
-    const depth = countDimDepth(node.path, metricLabelSet);
-    if (
-      depth > 0 &&
-      (isMetricNode ? depth < expandLevel : depth <= expandLevel)
-    ) {
-      next.add(node.key);
-      return;
-    }
-    if (options?.includeMetricDepthZero && depth === 0 && isMetricNode) {
-      next.add(node.key);
-    }
-  });
-  return next;
-};
-
 const pathStartsWith = (path: PivotPath, prefix: PivotPath) =>
   prefix.every((value, index) => path[index] === value);
 

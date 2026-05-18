@@ -33,7 +33,7 @@ import {
   SUBTOTAL_TOKEN,
 } from '../core/tokens';
 import { formatPivotLabelValue } from '../core/tree';
-import { seedExpandedByLevel } from '../expansion/stateModel';
+import { buildDesiredExpandedKeys } from '../expansion/stateModel';
 import {
   createMetricNodePolicy,
   getMetricLabelFromPath,
@@ -45,7 +45,6 @@ import {
   isValuesAtAxisEnd,
   isValuesFirstOnAxis,
   resolveAxisProjection,
-  shouldAutoExpandValuesLevel,
 } from '../runtime/projection';
 import type { PivotProgram } from '../runtime/types';
 import { type PivotLayoutResult } from './usePivotLayout';
@@ -302,7 +301,7 @@ export type RenderNodeDisplayState = {
 
 type RenderNodeDisplayLayout = Pick<
   PivotLayoutResult,
-  'resolvedExpandRowsLevel' | 'hideMetricHeaderOnRows'
+  'axisCoverageNeeds' | 'hideMetricHeaderOnRows'
 > & {
   layout: Pick<PivotLayoutResult['layout'], 'pivotProgram'>;
 };
@@ -329,22 +328,19 @@ export const buildRenderNodeDisplayState = ({
   } = createMetricNodePolicy(layout.layout.pivotProgram);
   const isMetricTokenValue = (value: unknown) =>
     isMetricTokenForKeys(value, metricLabelSet);
-  const levelIntentRows = seedExpandedByLevel(
-    rowNodes,
-    layout.resolvedExpandRowsLevel,
-    metricLabelSet,
-    {
-      includeMetricDepthZero: shouldAutoExpandValuesLevel(
-        layout.layout.pivotProgram,
-        'row',
-        layout.resolvedExpandRowsLevel,
-      ),
-    },
-  );
+  const intentRows = buildDesiredExpandedKeys({
+    axis: 'row',
+    tree: { rows: rowNodes, cols: {}, cells: {} },
+    axisCoverageNeeds: layout.axisCoverageNeeds,
+    program: layout.layout.pivotProgram,
+    manualExpanded: new Set(),
+    manualCollapsed: new Set(),
+    pendingKeys: new Set(),
+  });
   const manualExpandedRowDepths = new Set<number>();
   expandedRows.forEach(key => {
     const node = rowNodes[key];
-    if (levelIntentRows.has(key) || !node?.hasChildren) {
+    if (intentRows.has(key) || !node?.hasChildren) {
       return;
     }
     manualExpandedRowDepths.add(countDimDepth(node.path));

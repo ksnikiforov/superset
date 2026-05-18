@@ -255,8 +255,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13807` insertions, `16872` deletions, net `-3065`.
-- Current production TypeScript/TSX total: about `30445` lines.
+- Production `src`: `13762` insertions, `16876` deletions, net `-3114`.
+- Current production TypeScript/TSX total: about `30396` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -268,17 +268,17 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `30445` | `-3065` | `< 28000` |
-| Strict core pipeline | `11337` | `12858` | `+1521` | `8000` |
-| Non-visual chart runtime hooks | `4683` | `5109` | `+426` | `3000-4000` |
-| Broad core pipeline | `16020` | `17967` | `+1947` | `11000-13000` |
+| Full production `src` | `33510` | `30396` | `-3114` | `< 28000` |
+| Strict core pipeline | `11337` | `12817` | `+1480` | `8000` |
+| Non-visual chart runtime hooks | `4683` | `5101` | `+418` | `3000-4000` |
+| Broad core pipeline | `16020` | `17918` | `+1898` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `4193` |
-| `pivot/expansion/*` | `2975` |
+| `pivot/runtime/*` | `4184` |
+| `pivot/expansion/*` | `2943` |
 | `pivot/query/*` | `1863` |
 | `pivot/layout/*` | `725` |
 | core/shared/domain helpers | `1873` |
@@ -288,6 +288,12 @@ Interpretation: plugin-wide source has shrunk, but core pipeline source has
 grown because runtime authority moved out of chart/control code before the old
 planner and render-repair surfaces were fully deleted. The next large cuts must
 reduce strict core, not only move lines into it.
+
+Latest core cleanup: row display intent now uses the same
+`axisCoverageNeeds` manifest as expansion/loading. The old numeric
+`seedExpandedByLevel` display path and `shouldAutoExpandValuesLevel` helper are
+deleted. This keeps pre-expanded UX encoded in coverage manifest shape instead
+of maintaining a separate row-display expansion model.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.

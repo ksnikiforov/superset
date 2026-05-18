@@ -17,15 +17,19 @@
  * under the License.
  */
 
-import { PivotTreeData, PivotTreeNode } from '../../../src/types';
+import {
+  MetricsLayoutEnum,
+  PivotTreeData,
+  PivotTreeNode,
+} from '../../../src/types';
 import {
   buildDesiredExpandedKeys,
   coerceExpansionState,
   pruneExpandedToStablePrefix,
-  seedExpandedByLevel,
 } from '../../../src/pivot/expansion/stateModel';
 import {
   encodeMetricKey,
+  METRICS_PLACEHOLDER,
   SUBTOTAL_TOKEN,
 } from '../../../src/pivot/core/tokens';
 import { serializePath } from '../../../src/pivot/core/path';
@@ -87,7 +91,7 @@ describe('expansionStateModel', () => {
     expect(coerceExpansionState({ rows: [], cols: [] })).toBeUndefined();
   });
 
-  it('seeds expansion keys by depth and supports metric depth zero', () => {
+  it('builds default expanded keys from coverage manifest needs', () => {
     const metricToken = encodeMetricKey('m1');
     const nodes: Record<string, PivotTreeNode> = {
       [rootKey]: makeNode({ axis: 'row', path: [], hasChildren: true }),
@@ -95,19 +99,32 @@ describe('expansionStateModel', () => {
       B: makeNode({ axis: 'row', path: ['B'] }),
       [metricToken]: makeNode({ axis: 'row', path: [metricToken] }),
     };
-    const metricLabels = new Set<string>(['m1']);
+    const program = compilePivotProgram({
+      groupbyRows: [METRICS_PLACEHOLDER, 'country'],
+      groupbyColumns: [],
+      metrics: ['m1'],
+      metricsLayout: MetricsLayoutEnum.ROWS,
+    });
 
-    const expanded = seedExpandedByLevel(nodes, 1, metricLabels);
+    const expanded = buildDesiredExpandedKeys({
+      axis: 'row',
+      tree: { rows: nodes, cols: {}, cells: {} },
+      axisCoverageNeeds: [
+        {
+          axis: 'row',
+          depth: 1,
+          scope: { kind: 'scopedFull', ancestorPaths: [[]] },
+        },
+      ],
+      program,
+      manualExpanded: new Set(),
+      manualCollapsed: new Set(),
+      pendingKeys: new Set(),
+    });
     expect(expanded.has(rootKey)).toBe(true);
     expect(expanded.has(serializePath(['A']))).toBe(true);
     expect(expanded.has(serializePath(['B']))).toBe(true);
-    expect(expanded.has(metricToken)).toBe(false);
-
-    const metricExpanded = seedExpandedByLevel(nodes, 0, metricLabels, {
-      includeMetricDepthZero: true,
-    });
-    expect(metricExpanded.has(rootKey)).toBe(true);
-    expect(metricExpanded.has(metricToken)).toBe(true);
+    expect(expanded.has(metricToken)).toBe(true);
   });
 
   it('prunes expansions to the stable prefix depth', () => {

@@ -48,8 +48,6 @@ export type PivotLayoutResult = {
   expandedStateSignature: string;
   expandedStateSharedSignature: string;
   axisCoverageNeeds: PivotAxisCoverageNeed[];
-  resolvedExpandRowsLevel: number;
-  resolvedExpandColumnsLevel: number;
   normalizedRowSubtotalLevels: number[];
   normalizedColSubtotalLevels: number[];
   resolvedColTotalPosition: TotalPosition;
@@ -418,8 +416,6 @@ export const usePivotLayout = ({
     expandedStateSignature,
     expandedStateSharedSignature,
     axisCoverageNeeds,
-    resolvedExpandRowsLevel,
-    resolvedExpandColumnsLevel,
     normalizedRowSubtotalLevels,
     normalizedColSubtotalLevels,
     resolvedColTotalPosition,
