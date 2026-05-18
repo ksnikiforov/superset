@@ -241,7 +241,7 @@ const buildExpansionCoverageNeed = ({
 const isRuntimeLayoutCoverageScope = (
   scope: PivotFactStoreBatch['scope'],
 ): boolean => {
-  if (scope.kind === 'bootstrap' || scope.kind === 'root') {
+  if (scope.kind === 'root') {
     return true;
   }
   if (scope.kind !== 'branch') {
@@ -265,13 +265,9 @@ const scopeCoversAxisPaths = (
   loadedDepth: number,
 ) => {
   if (needScope.kind === 'root') {
-    return (
-      scope.kind === 'bootstrap' ||
-      scope.kind === 'root' ||
-      !scopeRestrictsAxis(scope, axis)
-    );
+    return scope.kind === 'root' || !scopeRestrictsAxis(scope, axis);
   }
-  if (scope.kind === 'bootstrap' || scope.kind === 'root') {
+  if (scope.kind === 'root') {
     if (axisScopeContainsValuesToken(needScope)) {
       return false;
     }
@@ -455,8 +451,7 @@ export const buildCoverageNeedFromFactSelector = ({
     : ({ kind: 'root' } as const);
 
   return {
-    reason:
-      scope.kind === 'bootstrap' || scope.kind === 'root' ? 'root' : 'expand',
+    reason: scope.kind === 'root' ? 'root' : 'expand',
     rowDepth: coverage.rowDepth,
     columnDepth: coverage.columnDepth,
     rowDimensions: coverage.rowDimensions,

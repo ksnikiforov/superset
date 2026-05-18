@@ -3337,10 +3337,10 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     expect(plannedSummary).not.toContain('branch:row:A:2:1');
     expect(plannedSummary).toEqual(
       expect.arrayContaining([
-        'bootstrap:none::0:0',
-        'bootstrap:none::1:1',
-        'bootstrap:none::1:0',
-        'bootstrap:none::0:1',
+        'root:none::0:0',
+        'root:none::1:1',
+        'root:none::1:0',
+        'root:none::0:1',
       ]),
     );
 

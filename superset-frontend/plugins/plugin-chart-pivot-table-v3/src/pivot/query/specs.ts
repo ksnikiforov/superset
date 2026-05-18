@@ -76,7 +76,7 @@ export type QuerySpec = {
 };
 
 export type QuerySpecMeta = {
-  kind: 'bootstrap' | 'root' | 'branch' | 'batch' | 'intersection';
+  kind: 'root' | 'branch' | 'batch' | 'intersection';
   axis?: PivotAxis;
   path?: PivotPath;
   parentPath?: PivotPath;
@@ -97,20 +97,16 @@ export type PlannedQuerySpec = QuerySpec & {
   meta: QuerySpecMeta;
 };
 
-type BootstrapTargetKind = 'totals' | 'grid' | 'rows' | 'cols';
+type InitialRootTargetKind = 'totals' | 'grid' | 'rows' | 'cols';
 
-type BootstrapTarget = {
-  kind: BootstrapTargetKind;
+type InitialRootTarget = {
+  kind: InitialRootTargetKind;
   intent: QueryIntent;
   coverage: PivotFactCoverage;
 };
 
-type BootstrapPlanOptions = {
-  prefetchRoot?: boolean;
-};
-
 type BuildIntentInput = {
-  kind: BootstrapTargetKind;
+  kind: InitialRootTargetKind;
   targetRowDepth: number;
   targetColDepth: number;
   needsTotals: boolean;
@@ -236,11 +232,11 @@ const buildIntent = ({
 const firstVisibleDepth = (groupby: QueryFormColumn[]) =>
   groupby.length > 0 ? 1 : 0;
 
-const buildBootstrapPlanFromLayout = (
+const buildInitialRootTargets = (
   layout: LayoutContext,
   formData: PivotTableQueryFormData,
-  options: BootstrapPlanOptions = {},
-): BootstrapTarget[] => {
+  prefetchRoot = false,
+): InitialRootTarget[] => {
   const rowGroupby = layout.pivotProgram.rowDimensions;
   const colGroupby = layout.pivotProgram.columnDimensions;
   const { rowSubtotalLevels, colSubtotalLevelsForQuery: colSubtotalLevels } =
@@ -279,7 +275,7 @@ const buildBootstrapPlanFromLayout = (
     needsColDimensionFormatting,
   };
 
-  const targets: BootstrapTarget[] = [
+  const targets: InitialRootTarget[] = [
     {
       kind: 'totals',
       coverage: buildFactCoverage({
@@ -314,7 +310,7 @@ const buildBootstrapPlanFromLayout = (
     needsRowDimensionFormatting: targetNeedsRowDimensionFormatting,
     needsColDimensionFormatting: targetNeedsColDimensionFormatting,
   }: {
-    kind: Exclude<BootstrapTargetKind, 'totals'>;
+    kind: Exclude<InitialRootTargetKind, 'totals'>;
     rowDepth: number;
     colDepth: number;
     needsTotals: boolean;
@@ -395,7 +391,7 @@ const buildBootstrapPlanFromLayout = (
     });
   }
 
-  return options.prefetchRoot ? targets.slice(0, 1) : targets;
+  return prefetchRoot ? targets.slice(0, 1) : targets;
 };
 
 const dedupeCoverages = (coverages: PivotFactCoverage[]) => {
@@ -984,13 +980,15 @@ export const buildInitialQuerySpecs = (
       ? 0
       : Math.min(colGroupby.length, Math.max(1, resolvedExpandColsLevel));
   const shouldPrefetchRoot = baseRowDepth > 1 || baseColDepth > 1;
-  const bootstrapPlan = buildBootstrapPlanFromLayout(layout, formData, {
-    prefetchRoot: shouldPrefetchRoot,
-  });
+  const initialRootTargets = buildInitialRootTargets(
+    layout,
+    formData,
+    shouldPrefetchRoot,
+  );
 
   const specs: PlannedQuerySpec[] = [];
 
-  bootstrapPlan.forEach(target => {
+  initialRootTargets.forEach(target => {
     const queryShape = buildQueryShape({
       intent: target.intent,
       rowGroupby,
@@ -1007,7 +1005,7 @@ export const buildInitialQuerySpecs = (
     });
     const factSelector = buildSpecFactSelector({
       coverage: target.coverage,
-      scope: { kind: 'bootstrap' },
+      scope: { kind: 'root' },
       metrics: queryShape.metrics,
       requiredTimeOffsets: layout.requiredTimeOffsets,
     });
@@ -1020,7 +1018,7 @@ export const buildInitialQuerySpecs = (
       metrics: queryShape.metrics,
       filters: [],
       meta: {
-        kind: 'bootstrap',
+        kind: 'root',
         rowSubtotalLevels,
         colSubtotalLevels,
         materializedMetrics: metrics,

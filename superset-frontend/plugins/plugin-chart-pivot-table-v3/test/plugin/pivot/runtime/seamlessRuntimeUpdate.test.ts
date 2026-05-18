@@ -46,7 +46,7 @@ const runtimeLayout: PivotRuntimeLayout = {
 const factBatch = (
   rowDepth: number,
   columnDepth: number,
-  scope: PivotFactStoreBatch['scope'] = { kind: 'bootstrap' },
+  scope: PivotFactStoreBatch['scope'] = { kind: 'root' },
 ): PivotFactStoreBatch => ({
   coverage: buildFactCoverage({
     reason: 'initial',
@@ -466,7 +466,7 @@ describe('runtime layout reuse fetch policy', () => {
               rowDepth: 1,
               columnDepth: 1,
             }),
-            scope: { kind: 'bootstrap' },
+            scope: { kind: 'root' },
             valueKeys: ['sales'],
             facts: [],
           },

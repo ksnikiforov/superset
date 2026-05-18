@@ -210,7 +210,7 @@ describe('coverage manifest diff', () => {
     expect(
       diffCoverageManifest({
         required,
-        factBatches: [batch({ kind: 'bootstrap' })],
+        factBatches: [batch({ kind: 'root' })],
       }),
     ).toEqual([]);
   });
@@ -226,7 +226,7 @@ describe('coverage manifest diff', () => {
     expect(
       diffCoverageManifest({
         required,
-        factBatches: [batch({ kind: 'bootstrap' }, 1, 1)],
+        factBatches: [batch({ kind: 'root' }, 1, 1)],
       }),
     ).toEqual(required);
   });

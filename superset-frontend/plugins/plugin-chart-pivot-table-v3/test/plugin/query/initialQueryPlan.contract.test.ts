@@ -104,7 +104,7 @@ describe('buildInitialQuerySpecs (contracts)', () => {
 
     const specs = buildInitialQuerySpecs(formData);
 
-    expect(specs.some(spec => spec.meta.kind === 'root')).toBe(false);
+    expect(specs.some(spec => spec.queryName.includes('|root'))).toBe(false);
     expect(
       specs.some(
         spec =>
@@ -134,7 +134,7 @@ describe('buildInitialQuerySpecs (contracts)', () => {
     const specs = buildInitialQuerySpecs(formData);
     const gridSpec = specs.find(
       spec =>
-        spec.meta.kind === 'bootstrap' &&
+        spec.meta.kind === 'root' &&
         spec.meta.coverage.rowDepth === 1 &&
         spec.meta.coverage.columnDepth === 1,
     );

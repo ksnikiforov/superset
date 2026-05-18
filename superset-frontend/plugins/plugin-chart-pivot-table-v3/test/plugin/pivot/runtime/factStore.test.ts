@@ -73,7 +73,11 @@ test('upserts duplicate exact facts while keeping support facts separate', () =>
 test('does not share facts across different request scopes with the same coverage', () => {
   const store = createPivotFactStore();
   const firstScope: PivotFactStoreBatchScope = { kind: 'root' };
-  const secondScope: PivotFactStoreBatchScope = { kind: 'bootstrap' };
+  const secondScope: PivotFactStoreBatchScope = {
+    kind: 'branch',
+    axis: 'row',
+    path: ['USA'],
+  };
 
   store.upsertBatches([
     {
@@ -86,7 +90,7 @@ test('does not share facts across different request scopes with the same coverag
       coverage,
       scope: secondScope,
       valueKeys: ['sales'],
-      facts: [buildFact({ value: 2 })],
+      facts: [buildFact({ rowPath: ['USA'], value: 2 })],
     },
   ]);
 

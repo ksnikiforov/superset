@@ -228,7 +228,7 @@ export const buildPreloadedBootstrapFactBatches = (
       facts: buildFactsForCoverage(tree, coverage),
       valueKeys,
       scope: {
-        kind: 'bootstrap',
+        kind: 'root',
       },
     },
   ];

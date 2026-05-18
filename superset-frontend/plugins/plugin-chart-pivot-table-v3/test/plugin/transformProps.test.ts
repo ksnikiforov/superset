@@ -571,7 +571,7 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
     };
     const specs = buildInitialQuerySpecs(formData as PivotTableQueryFormData);
     const queriesData = specs.map(spec => {
-      if (spec.meta.kind === 'bootstrap') {
+      if (spec.meta.kind === 'root') {
         if (
           spec.meta.coverage.rowDepth === 0 &&
           spec.meta.coverage.columnDepth === 0

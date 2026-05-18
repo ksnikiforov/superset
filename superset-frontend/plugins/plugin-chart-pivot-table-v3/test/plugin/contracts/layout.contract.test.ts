@@ -78,7 +78,7 @@ describe('layout resolution (contracts)', () => {
     expect(signature.rows).toEqual(layout.pivotProgram.rowDimensions);
     expect(signature.cols).toEqual(layout.pivotProgram.columnDimensions);
 
-    const bootstrapSpec = specs.find(spec => spec.meta.kind === 'bootstrap');
+    const bootstrapSpec = specs.find(spec => spec.meta.kind === 'root');
     expect(bootstrapSpec).toBeDefined();
     expect(signature.metricsLayout).toBe(
       bootstrapSpec?.meta.pivotProgram.metricsLayoutResolved,

@@ -150,11 +150,11 @@ Current semantic-layout contract:
 - While a semantic layout fetch is in flight, expansion planning stays pinned to
   the committed loaded query layout. It must not plan expansion requests against
   a draft layout that the loaded tree/fact store does not yet support.
-- Semantic layout fetches include the visible row/column bootstrap coverage in
+- Semantic layout fetches include the visible row/column root coverage in
   the same request so the chart does not immediately issue a hydration follow-up
   for the newly committed visible root layer.
 - Initial query planning does not replay persisted expansion branches. It
-  fetches bootstrap coverage for the currently visible root layers only;
+  fetches root coverage for the currently visible root layers only;
   persisted expanded/collapsed intent is restored by the expansion hydration
   path through the coverage manifest.
 - Async initial runtime materialization now uses the loaded fact-store
@@ -214,10 +214,14 @@ Current semantic-layout contract:
 - Branch fetch context is no longer a separate production module. Expansion
   query context is private to `query/specs.ts`, so branch, batch, intersection,
   and root query specs share one local query-spec boundary.
+- Initial query metadata no longer has a separate `bootstrap` scope. Initial
+  visible coverage and auto-expand root prefetch use the same root-scope fact
+  selector, so fact-store and coverage dominance checks no longer special-case a
+  root alias.
 
 Expected deletion targets:
 
-- separate bootstrap/branch/batch/intersection query builders once all query
+- separate root/branch/batch/intersection query builders once all query
   requests are represented as coverage needs;
 - remaining non-manifest coverage planning in expansion and query batching;
 - duplicate expansion/query coverage planning;
@@ -241,7 +245,7 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13797` insertions, `16449` deletions, net `-2652`.
+- Production `src`: `13782` insertions, `16450` deletions, net `-2668`.
 - Current production TypeScript/TSX total: about `30865` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
@@ -265,7 +269,7 @@ authority boundaries:
 | Make user-controlled runtime the only layout mode | `interactionMode` branches in `controlPanel.tsx`, `PivotTableChart.tsx`, `usePivotRuntimeLayoutState.ts`, `usePivotSeamlessRuntimeUpdate.ts`, `runtime/seamlessRuntimeUpdate.ts`, plus duplicate fixed-mode row/column controls | The code currently supports two pivots: fixed Explore controls and interactive chart runtime. That forces layout conversion, committed-vs-draft branching, different filter persistence, different loader behavior, and two Values placement surfaces. | Visible. The chart would always show the interactive layout shell/editor. Explore row/column controls could be reduced or removed; dimensions/metrics controls would remain as source-pool controls unless replaced. | Remove `fixed` mode as a runtime branch. Keep a single `PivotRuntimeLayout` authority. Delete fixed/user conditionals, fixed-only render path, and duplicated row/column Explore layout controls after replacing them with source-pool serialization. |
 | Remove global auto-expand level controls | `expandRowsLevel`, `expandColumnsLevel`, `initialDepth`, and related expansion reinit/prefetch/hydration logic across `controlPanel.tsx`, `LayoutContext.ts`, `usePivotLayout.ts`, `useExpansionEngine.ts`, and `stateTransitions.ts` | Global level expansion conflicts with the no-unbounded-query rule. It creates auto-seeded expanded keys, collapsed-key exceptions, root-prefetch special cases, and broad hydration loops. | Visible. Users lose "open to level N" behavior. Manual/path-scoped expansion remains. This is likely acceptable only if we explicitly decide that bounded path-scoped expansion is the product model. | Delete auto-level normalization and prefetch, remove collapsed-vs-auto expansion reconciliation, keep only explicit user expansion intent and path-scoped manifest needs. This is one of the largest pure-runtime deletions. |
 | Replace expansion hydration scheduler with a manifest executor | `useExpansionEngine.ts` about `1199` lines, `stateTransitions.ts` about `1210` lines, `fetchExecution.ts` about `412` lines | Expansion still has same-axis toggle flow, cross-axis hydration, initial prefetch, persisted restore, in-flight expansion maps, loading-key counts, and branch/batch/intersection execution as separate mechanisms. The selected manifest model should make this one diff/execute/rematerialize loop. | Low to medium if explicit expansion behavior is preserved. Higher if combined with removing auto-expand levels or exact persisted restore. | Build required visible coverage, diff fact store, execute missing needs, rematerialize. Delete same-axis/cross-axis/prefetch loop splits and request-group/loading bookkeeping that only exists because flows are separate. |
-| Merge initial, seamless, and expansion query planning | `query/specs.ts`, `runtime/coverage.ts`, `runtime/seamlessRuntimeUpdate.ts`, `update/initialUpdatePlan.ts`, `expansion/fetchExecution.ts`; query/expansion/runtime totals remain large | Initial load, semantic layout change, and expansion still enter through different request/spec paths. The fact selector is unified, but `bootstrap/root/branch/batch/intersection` are still first-class query paths instead of outputs of one coverage manifest. | Low if fetch counts are locked by tests. Main risk is underfetch/overfetch around sorting support metrics, measure leaves, and row x column intersections. | One manifest-to-query-spec executor handles root, layout, expansion, batch, and intersection needs. Delete bootstrap target planning, `buildBranchFactCoverages`, expansion request-kind query branches, and duplicated coverage/spec conversion. |
+| Merge initial, seamless, and expansion query planning | `query/specs.ts`, `runtime/coverage.ts`, `runtime/seamlessRuntimeUpdate.ts`, `update/initialUpdatePlan.ts`, `expansion/fetchExecution.ts`; query/expansion/runtime totals remain large | Initial load, semantic layout change, and expansion still enter through different request/spec paths. The fact selector is unified, but root/branch/batch/intersection are still first-class query paths instead of outputs of one coverage manifest. | Low if fetch counts are locked by tests. Main risk is underfetch/overfetch around sorting support metrics, measure leaves, and row x column intersections. | One manifest-to-query-spec executor handles root, layout, expansion, batch, and intersection needs. Delete root target planning, `buildBranchFactCoverages`, expansion request-kind query branches, and duplicated coverage/spec conversion. |
 | Reduce Explore DnD controls to source-pool controls | `controls/PivotDndMetricSelect/*` about `3870` lines, `controls/PivotDndColumnSelect/*` about `1745` lines, in-chart panel/layout about `1784` lines | Metric/dimension controls and the in-chart panel both edit formatting, metric order, measure leaves, dimension formatting/sorting, and Values placement. The metric control alone is larger than most runtime modules. | High. This changes where users configure formatting, measure leaves, and layout. It should follow the decision on making interactive runtime the only mode. | Keep minimal Explore controls for selecting available dimensions/metrics. Move formatting/measure-leaf editing to one surface or simplify those features. Delete duplicated DnD/formatting transfer logic. |
 | Standardize or cut formatting/databar formula features | `utils.ts` about `1328` lines, `usePivotFormatting.tsx` about `1215` lines, `databarRuntime.ts` about `432` lines, Excel formula helpers, metric controls | Formatting support drives many support metrics, key normalization paths, render wrappers, databar runtime models, Excel formula parsing, and control-state repair. Some complexity is core value; some is feature breadth. | High if features are removed. Medium if only legacy aliases/normalizers are deleted. | First remove compatibility aliasing and duplicate key remapping. Larger deletion requires a feature checkpoint: e.g. keep basic formatting but remove formula-driven formatting or waterfall databars. |
 | Replace materialized tree as render contract with a typed grid model | `materializePivotTree.ts` about `1298` lines, `renderModel.ts`, `renderDisplay.ts`, `PivotTableView.tsx`, export model | The materializer builds a semantic tree, render projects/hides/relabels it, and export builds a worksheet model from render output. The tree still carries both semantic and display responsibilities. | Medium to high. It touches render and export heavily, but can preserve visible behavior if done after query/executor unification. | Materializer emits typed axes/headers/cells from facts and program. Render/export consume the same grid model. Delete display repair and duplicate export/header assembly. |

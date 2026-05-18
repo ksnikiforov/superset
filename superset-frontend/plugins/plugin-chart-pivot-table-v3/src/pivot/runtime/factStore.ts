@@ -53,7 +53,7 @@ export type PivotFactStoreBatch = PivotFactSelector & {
 
 export type PivotFactStoreBatchScope =
   | {
-      kind: 'bootstrap' | 'root';
+      kind: 'root';
     }
   | {
       kind: 'branch';
@@ -138,7 +138,6 @@ const startsWithPath = (path: PivotPath, prefix: PivotPath) =>
 
 const factMatchesScope = (fact: PivotFact, scope: PivotFactStoreBatchScope) => {
   switch (scope.kind) {
-    case 'bootstrap':
     case 'root':
       return true;
     case 'branch':
@@ -194,10 +193,7 @@ export const createPivotFactStore = (): PivotFactStore => {
   const hasCompatibleCoverage = (selector: PivotFactSelector) => {
     const candidateSelectors = Array.from(selectorByRequest.values()).filter(
       candidate =>
-        selector.scope.kind !== 'bootstrap' && selector.scope.kind !== 'root'
-          ? true
-          : candidate.scope.kind === 'bootstrap' ||
-            candidate.scope.kind === 'root',
+        selector.scope.kind !== 'root' ? true : candidate.scope.kind === 'root',
     );
     return (
       diffCoverageManifest({
@@ -235,13 +231,8 @@ export const createPivotFactStore = (): PivotFactStore => {
     if (!valueKeysCover(candidate.valueKeys, requested.valueKeys)) {
       return false;
     }
-    if (
-      requested.scope.kind === 'bootstrap' ||
-      requested.scope.kind === 'root'
-    ) {
-      return (
-        candidate.scope.kind === 'bootstrap' || candidate.scope.kind === 'root'
-      );
+    if (requested.scope.kind === 'root') {
+      return candidate.scope.kind === 'root';
     }
     return true;
   };
