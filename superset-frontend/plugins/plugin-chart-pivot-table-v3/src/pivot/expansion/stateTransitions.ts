@@ -33,11 +33,13 @@ import {
   buildDesiredExpandedKeys,
   coerceExpansionState,
   pruneExpandedToStablePrefix,
-  type PivotExpansionIntent,
   type PivotExpansionStateKeys,
 } from './stateModel';
 import { rootKey } from '../viewModel';
-import { type PivotExpansionCoverageDiff } from '../runtime/coverage';
+import {
+  type PivotAxisCoverageNeed,
+  type PivotExpansionCoverageDiff,
+} from '../runtime/coverage';
 import { getValuesLevelIndex } from '../runtime/projection';
 import type { PivotProgram } from '../runtime/types';
 import { isMetricTokenForKeys, isSubtotalToken } from '../core/tokens';
@@ -483,7 +485,7 @@ export const resolveExpandedForMetrics = ({
 
 type ExpansionReinitAxis = {
   axis: PivotAxis;
-  expansionIntents: PivotExpansionIntent[];
+  axisCoverageNeeds: PivotAxisCoverageNeed[];
   keys: string[];
   collapsed: string[];
   nodes: Record<string, PivotTreeNode>;
@@ -533,7 +535,7 @@ const resolveExpansionCacheAxis = (config: ExpansionReinitAxis) => {
   const desiredExpanded = buildDesiredExpandedKeys({
     axis: config.axis,
     tree: config.tree,
-    expansionIntents: config.expansionIntents,
+    axisCoverageNeeds: config.axisCoverageNeeds,
     program: config.program,
     manualExpanded: new Set(prunedManualKeys),
     manualCollapsed: new Set(prunedCollapsedKeys),
@@ -557,7 +559,7 @@ export const resolveReinitializedExpansionState = (params: {
   sessionState: PivotExpansionStateKeys;
   persistedExpansionState: unknown;
   shouldPersistExpansionState: boolean;
-  expansionIntents: PivotExpansionIntent[];
+  axisCoverageNeeds: PivotAxisCoverageNeed[];
   rowStablePrefix: number;
   colStablePrefix: number;
   shouldResetExpandedRows: boolean;
@@ -588,7 +590,7 @@ export const resolveReinitializedExpansionState = (params: {
   const rowState = resolveExpansionCacheAxis({
     ...common,
     axis: 'row',
-    expansionIntents: params.expansionIntents,
+    axisCoverageNeeds: params.axisCoverageNeeds,
     keys: rowKeys,
     collapsed: collapsedRowKeys,
     nodes: tree.rows,
@@ -600,7 +602,7 @@ export const resolveReinitializedExpansionState = (params: {
   const colState = resolveExpansionCacheAxis({
     ...common,
     axis: 'col',
-    expansionIntents: params.expansionIntents,
+    axisCoverageNeeds: params.axisCoverageNeeds,
     keys: colKeys,
     collapsed: collapsedColKeys,
     nodes: tree.cols,
@@ -901,7 +903,7 @@ export const buildHydrationPrefetchAction = ({
   resolvedRows,
   resolvedCols,
   persistedState,
-  expansionIntents,
+  axisCoverageNeeds,
   tree,
   rowPlan,
   colPlan,
@@ -909,7 +911,7 @@ export const buildHydrationPrefetchAction = ({
   resolvedRows: Set<string>;
   resolvedCols: Set<string>;
   persistedState: PivotExpansionStateKeys;
-  expansionIntents: PivotExpansionIntent[];
+  axisCoverageNeeds: PivotAxisCoverageNeed[];
   tree: PivotTreeData;
   rowPlan: PivotExpansionPlan;
   colPlan: PivotExpansionPlan;
@@ -926,7 +928,7 @@ export const buildHydrationPrefetchAction = ({
     persistedState.cols.length === 0 &&
     persistedState.collapsedRows.length === 0 &&
     persistedState.collapsedCols.length === 0 &&
-    expansionIntents.length === 0 &&
+    axisCoverageNeeds.length === 0 &&
     !Object.keys(tree.rows).some(key => key !== rootKey) &&
     !Object.keys(tree.cols).some(key => key !== rootKey);
   if (shouldSkipRootPrefetch) {
@@ -945,7 +947,7 @@ export const planInitialHydrationPrefetch = ({
   resolvedRows,
   resolvedCols,
   persistedState,
-  expansionIntents,
+  axisCoverageNeeds,
   getMissingExpansionCoverage,
   config,
 }: {
@@ -953,14 +955,14 @@ export const planInitialHydrationPrefetch = ({
   resolvedRows: Set<string>;
   resolvedCols: Set<string>;
   persistedState: PivotExpansionStateKeys;
-  expansionIntents: PivotExpansionIntent[];
+  axisCoverageNeeds: PivotAxisCoverageNeed[];
   getMissingExpansionCoverage: PivotExpansionCoverageDiff;
   config: ExpansionPlanningConfig;
 }) => {
-  const hasRowIntent = expansionIntents.some(intent => intent.axis === 'row');
-  const hasColIntent = expansionIntents.some(intent => intent.axis === 'col');
-  const shouldPlanRows = hasRowIntent || persistedState.rows.length > 0;
-  const shouldPlanCols = hasColIntent || persistedState.cols.length > 0;
+  const hasRowNeed = axisCoverageNeeds.some(need => need.axis === 'row');
+  const hasColNeed = axisCoverageNeeds.some(need => need.axis === 'col');
+  const shouldPlanRows = hasRowNeed || persistedState.rows.length > 0;
+  const shouldPlanCols = hasColNeed || persistedState.cols.length > 0;
   const { rowPlan, colPlan } = planHydrationIteration({
     tree,
     desiredRows: resolvedRows,
@@ -981,7 +983,7 @@ export const planInitialHydrationPrefetch = ({
       resolvedRows,
       resolvedCols,
       persistedState,
-      expansionIntents,
+      axisCoverageNeeds,
       tree,
       rowPlan,
       colPlan,

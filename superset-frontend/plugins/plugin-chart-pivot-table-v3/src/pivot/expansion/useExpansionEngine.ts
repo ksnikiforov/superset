@@ -40,7 +40,6 @@ import {
 } from '../../types';
 import {
   buildDesiredExpandedKeys,
-  type PivotExpansionIntent,
   type PivotExpansionStateKeys,
   coerceExpansionState,
 } from './stateModel';
@@ -54,7 +53,10 @@ import {
   type PivotFactStore,
   type PivotFactStoreBatch,
 } from '../runtime/factStore';
-import { createExpansionCoverageDiff } from '../runtime/coverage';
+import {
+  createExpansionCoverageDiff,
+  type PivotAxisCoverageNeed,
+} from '../runtime/coverage';
 import {
   addAncestors,
   buildVisiblePersistedExpansionState,
@@ -291,7 +293,7 @@ export type ExpansionEngineConfig = {
   expandedStateSignature: string;
   expandedStateSharedSignature: string;
   fetchFormData: PivotTableQueryFormData;
-  expansionIntents: PivotExpansionIntent[];
+  axisCoverageNeeds: PivotAxisCoverageNeed[];
   pivotProgram: PivotProgram;
   setControlValue?: HandlerFunction;
   setDataMask?: SetDataMaskHook;
@@ -306,7 +308,7 @@ export const useExpansionEngine = ({
   expandedStateSignature,
   expandedStateSharedSignature,
   fetchFormData,
-  expansionIntents,
+  axisCoverageNeeds,
   pivotProgram,
   setControlValue,
   setDataMask,
@@ -617,7 +619,7 @@ export const useExpansionEngine = ({
       buildDesiredExpandedKeys({
         axis,
         tree: nextTree,
-        expansionIntents,
+        axisCoverageNeeds,
         program: pivotProgram,
         manualExpanded:
           axis === 'row'
@@ -631,7 +633,7 @@ export const useExpansionEngine = ({
           axis === 'row' ? pendingRowsRef.current : pendingColsRef.current,
         inFlightKeys: collectInFlightExpansion(axis),
       }),
-    [collectInFlightExpansion, expansionIntents, pivotProgram],
+    [axisCoverageNeeds, collectInFlightExpansion, pivotProgram],
   );
 
   const buildFetchRuntime = useCallback(
@@ -1013,7 +1015,7 @@ export const useExpansionEngine = ({
       sessionState: sessionExpansionState,
       persistedExpansionState: persistedExpansionStateRef.current,
       shouldPersistExpansionState,
-      expansionIntents,
+      axisCoverageNeeds,
       rowStablePrefix,
       colStablePrefix,
       shouldResetExpandedRows,
@@ -1062,7 +1064,7 @@ export const useExpansionEngine = ({
       resolvedRows,
       resolvedCols,
       persistedState,
-      expansionIntents,
+      axisCoverageNeeds,
       getMissingExpansionCoverage: createExpansionCoverageDiff({
         factBatches: factStoreRef.current?.getCoverageBatches() ?? [],
         program: pivotProgram,
@@ -1091,7 +1093,7 @@ export const useExpansionEngine = ({
     expandedStateSignature,
     expandedStateSharedSignature,
     factBatches,
-    expansionIntents,
+    axisCoverageNeeds,
     groupbyColumnKeys,
     groupbyRowKeys,
     pivotProgram,

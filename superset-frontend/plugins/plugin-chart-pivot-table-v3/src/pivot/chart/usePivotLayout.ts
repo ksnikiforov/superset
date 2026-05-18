@@ -29,7 +29,7 @@ import { resolveMetricDisplayLabel, getStableColumnKey } from '../../utils';
 import { decodeMetricKey } from '../core/tokens';
 import { buildLayoutContext } from '../layout/LayoutContext';
 import type { PivotProgram } from '../runtime/types';
-import type { PivotExpansionIntent } from '../expansion/stateModel';
+import type { PivotAxisCoverageNeed } from '../runtime/coverage';
 import type { RenderModelConfig } from '../render/renderModel';
 import {
   buildMetricOrderComparator,
@@ -47,7 +47,7 @@ export type PivotLayoutResult = {
   measureHierarchy: MeasureHierarchy;
   expandedStateSignature: string;
   expandedStateSharedSignature: string;
-  expansionIntents: PivotExpansionIntent[];
+  axisCoverageNeeds: PivotAxisCoverageNeed[];
   resolvedExpandRowsLevel: number;
   resolvedExpandColumnsLevel: number;
   normalizedRowSubtotalLevels: number[];
@@ -151,28 +151,24 @@ export const usePivotLayout = ({
   } = layout;
   const { metricsLayoutResolved: resolvedMetricsLayout, metricInsertIndex } =
     layout.pivotProgram;
-  const expansionIntents = useMemo<PivotExpansionIntent[]>(
+  const axisCoverageNeeds = useMemo<PivotAxisCoverageNeed[]>(
     () =>
       [
         resolvedExpandRowsLevel > 0
           ? ({
-              kind: 'fullLevel',
               axis: 'row',
-              anchor: [],
               depth: resolvedExpandRowsLevel,
+              scope: { kind: 'scopedFull', ancestorPaths: [[]] },
             } as const)
           : undefined,
         resolvedExpandColumnsLevel > 0
           ? ({
-              kind: 'fullLevel',
               axis: 'col',
-              anchor: [],
               depth: resolvedExpandColumnsLevel,
+              scope: { kind: 'scopedFull', ancestorPaths: [[]] },
             } as const)
           : undefined,
-      ].filter(
-        (intent): intent is PivotExpansionIntent => intent !== undefined,
-      ),
+      ].filter((need): need is PivotAxisCoverageNeed => need !== undefined),
     [resolvedExpandColumnsLevel, resolvedExpandRowsLevel],
   );
   const { metricKeys: metricLabels } = layout.pivotProgram;
@@ -208,17 +204,17 @@ export const usePivotLayout = ({
       rowTotals,
       colTotals,
       rowSubTotals,
-      expansionIntents,
+      axisCoverageNeeds,
       measureHierarchy: layout.measureHierarchy,
     }),
     [
+      axisCoverageNeeds,
       colTotals,
       layout.measureHierarchy,
       metricInsertIndex,
       metricLabels,
       normalizedColSubtotalLevels,
       normalizedRowSubtotalLevels,
-      expansionIntents,
       resolvedMetricsLayout,
       rowSubTotals,
       rowTotals,
@@ -421,7 +417,7 @@ export const usePivotLayout = ({
     measureHierarchy: layout.measureHierarchy,
     expandedStateSignature,
     expandedStateSharedSignature,
-    expansionIntents,
+    axisCoverageNeeds,
     resolvedExpandRowsLevel,
     resolvedExpandColumnsLevel,
     normalizedRowSubtotalLevels,

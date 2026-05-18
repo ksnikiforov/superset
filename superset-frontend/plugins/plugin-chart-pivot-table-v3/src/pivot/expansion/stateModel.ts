@@ -28,6 +28,7 @@ import { parsePath, serializePath } from '../core/path';
 import { countDimDepth } from '../metricsTotals';
 import { rootKey } from '../viewModel';
 import { isValuesFirstOnAxis } from '../runtime/projection';
+import type { AxisPathScope, PivotAxisCoverageNeed } from '../runtime/coverage';
 import type { PivotProgram } from '../runtime/types';
 
 export type PivotExpansionStateKeys = {
@@ -38,10 +39,6 @@ export type PivotExpansionStateKeys = {
   collapsedRows: string[];
   collapsedCols: string[];
 };
-
-export type PivotExpansionIntent =
-  | { kind: 'path'; axis: PivotAxis; path: PivotPath }
-  | { kind: 'fullLevel'; axis: PivotAxis; anchor: PivotPath; depth: number };
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
@@ -136,71 +133,79 @@ const addAncestors = (path: PivotPath, expanded: Set<string>) => {
   }
 };
 
-const expandFullLevelIntent = ({
-  intent,
+const expandScopedFullCoverageNeed = ({
+  need,
   nodes,
   program,
   metricLabelSet,
 }: {
-  intent: Extract<PivotExpansionIntent, { kind: 'fullLevel' }>;
+  need: PivotAxisCoverageNeed & {
+    scope: Extract<AxisPathScope, { kind: 'scopedFull' }>;
+  };
   nodes: Record<string, PivotTreeNode>;
   program: PivotProgram;
   metricLabelSet: Set<string>;
 }) => {
   const expanded = new Set<string>();
-  addAncestors(intent.anchor, expanded);
   const includeMetricDepthZero =
     program.metricKeys.length > 0 &&
-    isValuesFirstOnAxis(program, intent.axis) &&
-    intent.depth > 0;
-  Object.values(nodes).forEach(node => {
-    if (!pathStartsWith(node.path, intent.anchor)) {
-      return;
-    }
-    const lastValue = node.path[node.path.length - 1];
-    const decodedMetric = decodeMetricKey(lastValue);
-    const isMetricNode = decodedMetric
-      ? metricLabelSet.has(decodedMetric)
-      : false;
-    const depth = countDimDepth(node.path, metricLabelSet);
-    if (
-      depth > 0 &&
-      (isMetricNode ? depth < intent.depth : depth <= intent.depth)
-    ) {
-      addAncestors(node.path, expanded);
-      return;
-    }
-    if (includeMetricDepthZero && depth === 0 && isMetricNode) {
-      addAncestors(node.path, expanded);
-    }
+    isValuesFirstOnAxis(program, need.axis) &&
+    need.depth > 0;
+  need.scope.ancestorPaths.forEach(anchor => {
+    addAncestors(anchor, expanded);
+    Object.values(nodes).forEach(node => {
+      if (!pathStartsWith(node.path, anchor)) {
+        return;
+      }
+      const lastValue = node.path[node.path.length - 1];
+      const decodedMetric = decodeMetricKey(lastValue);
+      const isMetricNode = decodedMetric
+        ? metricLabelSet.has(decodedMetric)
+        : false;
+      const depth = countDimDepth(node.path, metricLabelSet);
+      if (
+        depth > 0 &&
+        (isMetricNode ? depth < need.depth : depth <= need.depth)
+      ) {
+        addAncestors(node.path, expanded);
+        return;
+      }
+      if (includeMetricDepthZero && depth === 0 && isMetricNode) {
+        addAncestors(node.path, expanded);
+      }
+    });
   });
   return expanded;
 };
 
-const expandIntentKeys = ({
+const expandAxisCoverageNeedKeys = ({
   axis,
   tree,
-  intents,
+  axisCoverageNeeds,
   program,
 }: {
   axis: PivotAxis;
   tree: PivotTreeData;
-  intents: PivotExpansionIntent[];
+  axisCoverageNeeds: PivotAxisCoverageNeed[];
   program: PivotProgram;
 }) => {
   const nodes = axis === 'row' ? tree.rows : tree.cols;
   const metricLabelSet = new Set(program.metricKeys);
   const expanded = new Set<string>([rootKey]);
-  intents.forEach(intent => {
-    if (intent.axis !== axis) {
+  axisCoverageNeeds.forEach(need => {
+    if (need.axis !== axis) {
       return;
     }
-    if (intent.kind === 'path') {
-      addAncestors(intent.path, expanded);
+    if (need.scope.kind === 'root') {
+      expanded.add(rootKey);
       return;
     }
-    expandFullLevelIntent({
-      intent,
+    if (need.scope.kind === 'paths') {
+      need.scope.paths.forEach(path => addAncestors(path, expanded));
+      return;
+    }
+    expandScopedFullCoverageNeed({
+      need,
       nodes,
       program,
       metricLabelSet,
@@ -212,7 +217,7 @@ const expandIntentKeys = ({
 export const buildDesiredExpandedKeys = ({
   axis,
   tree,
-  expansionIntents,
+  axisCoverageNeeds,
   program,
   manualExpanded,
   manualCollapsed,
@@ -221,21 +226,21 @@ export const buildDesiredExpandedKeys = ({
 }: {
   axis: PivotAxis;
   tree: PivotTreeData;
-  expansionIntents: PivotExpansionIntent[];
+  axisCoverageNeeds: PivotAxisCoverageNeed[];
   program: PivotProgram;
   manualExpanded: Set<string>;
   manualCollapsed: Set<string>;
   pendingKeys: Set<string>;
   inFlightKeys: Set<string>;
 }) => {
-  const intentExpanded = expandIntentKeys({
+  const needExpanded = expandAxisCoverageNeedKeys({
     axis,
     tree,
-    intents: expansionIntents,
+    axisCoverageNeeds,
     program,
   });
   const next = new Set<string>([
-    ...intentExpanded,
+    ...needExpanded,
     ...manualExpanded,
     ...pendingKeys,
     ...inFlightKeys,

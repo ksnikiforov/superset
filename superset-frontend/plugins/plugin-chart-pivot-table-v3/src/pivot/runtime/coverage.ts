@@ -63,10 +63,16 @@ type BranchFactCoverageInput = {
   reason?: PivotCoverageReason;
 };
 
-type AxisPathScope =
+export type AxisPathScope =
   | { kind: 'root' }
   | { kind: 'paths'; paths: PivotPath[] }
   | { kind: 'scopedFull'; ancestorPaths: PivotPath[] };
+
+export type PivotAxisCoverageNeed = {
+  axis: PivotAxis;
+  depth: number;
+  scope: AxisPathScope;
+};
 
 export type PivotExpansionCoverageRequest = {
   axis: PivotAxis;

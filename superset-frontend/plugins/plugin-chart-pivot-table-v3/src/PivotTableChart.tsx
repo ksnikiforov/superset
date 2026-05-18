@@ -344,7 +344,7 @@ function PivotTableChart(props: PivotTableProps) {
     expandedStateSignature: layoutResult.expandedStateSignature,
     expandedStateSharedSignature: layoutResult.expandedStateSharedSignature,
     fetchFormData: expansionFetchFormData,
-    expansionIntents: layoutResult.expansionIntents,
+    axisCoverageNeeds: layoutResult.axisCoverageNeeds,
     pivotProgram: layoutResult.layout.pivotProgram,
     setControlValue,
     setDataMask: shouldPersistOwnState ? setDataMask : undefined,

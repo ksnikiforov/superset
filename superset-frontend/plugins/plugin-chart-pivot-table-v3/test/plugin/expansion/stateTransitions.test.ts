@@ -54,7 +54,7 @@ import {
 } from '../../../src/types';
 import { type PivotFactStoreBatch } from '../../../src/pivot/runtime/factStore';
 import { compilePivotProgram } from '../../../src/pivot/runtime/compilePivotProgram';
-import type { PivotExpansionIntent } from '../../../src/pivot/expansion/stateModel';
+import type { PivotAxisCoverageNeed } from '../../../src/pivot/runtime/coverage';
 
 describe('pivot/expansion/stateTransitions', () => {
   const depthSorter = () => 0;
@@ -157,12 +157,11 @@ describe('pivot/expansion/stateTransitions', () => {
     });
   const fetchPathKeys = (plan: { fetchRequests: Array<{ pathKey: string }> }) =>
     plan.fetchRequests.map(request => request.pathKey);
-  const noExpansionIntents: PivotExpansionIntent[] = [];
-  const rowRootLevelIntent: PivotExpansionIntent = {
-    kind: 'fullLevel',
+  const noAxisCoverageNeeds: PivotAxisCoverageNeed[] = [];
+  const rowRootLevelNeed: PivotAxisCoverageNeed = {
     axis: 'row',
-    anchor: [],
     depth: 1,
+    scope: { kind: 'scopedFull', ancestorPaths: [[]] },
   };
 
   const makeNode = (
@@ -978,7 +977,7 @@ describe('pivot/expansion/stateTransitions', () => {
         resolvedRows: new Set([rootKey]),
         resolvedCols: new Set([rootKey]),
         persistedState: emptyState,
-        expansionIntents: noExpansionIntents,
+        axisCoverageNeeds: noAxisCoverageNeeds,
         tree: rootOnlyTree,
         rowPlan: {
           fetchRequests: [],
@@ -998,7 +997,7 @@ describe('pivot/expansion/stateTransitions', () => {
         resolvedRows: new Set([rootKey]),
         resolvedCols: new Set([rootKey]),
         persistedState: emptyState,
-        expansionIntents: noExpansionIntents,
+        axisCoverageNeeds: noAxisCoverageNeeds,
         tree: rootOnlyTree,
         rowPlan: {
           fetchRequests: [
@@ -1025,7 +1024,7 @@ describe('pivot/expansion/stateTransitions', () => {
         resolvedRows: new Set([rootKey]),
         resolvedCols: new Set([rootKey]),
         persistedState: emptyState,
-        expansionIntents: [rowRootLevelIntent],
+        axisCoverageNeeds: [rowRootLevelNeed],
         tree: rootOnlyTree,
         rowPlan: {
           fetchRequests: [
@@ -1054,7 +1053,7 @@ describe('pivot/expansion/stateTransitions', () => {
         resolvedRows: new Set([rootKey, aKey]),
         resolvedCols: new Set([rootKey]),
         persistedState: { ...emptyState, rows: [aKey] },
-        expansionIntents: noExpansionIntents,
+        axisCoverageNeeds: noAxisCoverageNeeds,
         tree,
         rowPlan: {
           fetchRequests: [
@@ -1097,7 +1096,7 @@ describe('pivot/expansion/stateTransitions', () => {
         collapsedRows: [],
         collapsedCols: [],
       },
-      expansionIntents: noExpansionIntents,
+      axisCoverageNeeds: noAxisCoverageNeeds,
       getMissingExpansionCoverage: expansionCoverageLoadedFromBatches(),
       config,
     });
@@ -1112,7 +1111,7 @@ describe('pivot/expansion/stateTransitions', () => {
     });
   });
 
-  it('plans initial hydration prefetch for full-level expansion intent', () => {
+  it('plans initial hydration prefetch for scoped full coverage need', () => {
     const { tree } = buildTree({ includeIntersectionCell: true });
     const prefetch = planInitialHydrationPrefetch({
       tree,
@@ -1126,7 +1125,7 @@ describe('pivot/expansion/stateTransitions', () => {
         collapsedRows: [],
         collapsedCols: [],
       },
-      expansionIntents: [rowRootLevelIntent],
+      axisCoverageNeeds: [rowRootLevelNeed],
       getMissingExpansionCoverage: expansionCoverageLoadedFromBatches(),
       config,
     });
