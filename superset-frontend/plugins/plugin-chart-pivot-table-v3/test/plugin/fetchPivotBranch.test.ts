@@ -26,7 +26,7 @@ import {
 import {
   fetchPivotExpansion,
   type FetchPivotExpansionRequest,
-} from '../../src/pivot/query/fetchPivotBranch';
+} from '../../src/pivot/expansion/fetchPivotExpansion';
 import {
   buildBuiltInLeaf,
   buildMeasureLeafOutputKey,

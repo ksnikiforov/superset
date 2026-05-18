@@ -37,17 +37,17 @@ import {
   SUBTOTAL_TOKEN,
 } from '../../../src/pivot/core/tokens';
 import {
-  fetchPivotBranch,
-  fetchPivotBranchesBatch,
-  fetchPivotIntersection,
-} from '../../../src/pivot/query/fetchPivotBranch';
+  fetchPivotExpansion as fetchPivotBranch,
+  fetchPivotExpansion as fetchPivotBranchesBatch,
+  fetchPivotExpansion as fetchPivotIntersection,
+} from '../../../src/pivot/expansion/fetchPivotExpansion';
 import type {
   FetchPivotBranchParams,
   FetchPivotBranchResult,
   FetchPivotBranchesBatchParams,
   FetchPivotBranchesBatchResult,
   FetchPivotIntersectionParams,
-} from '../../../src/pivot/query/fetchPivotBranch';
+} from '../../../src/pivot/expansion/fetchPivotExpansion';
 import { type PivotFactStoreBatch } from '../../../src/pivot/runtime/factStore';
 import { buildFormData } from '../fixtures/pivotFormData';
 import {
@@ -61,13 +61,13 @@ import {
   applyMetricAxis,
 } from '../fixtures/metricAxis';
 
-jest.mock('../../../src/pivot/query/fetchPivotBranch', () => {
+jest.mock('../../../src/pivot/expansion/fetchPivotExpansion', () => {
   const actual = jest.requireActual(
-    '../../../src/pivot/query/fetchPivotBranch',
+    '../../../src/pivot/expansion/fetchPivotExpansion',
   );
   return {
     ...actual,
-    fetchPivotBranch: jest
+    fetchPivotExpansion: jest
       .fn()
       .mockResolvedValue({ data: undefined, factBatches: [] }),
     fetchPivotBranchesBatch: jest.fn(),

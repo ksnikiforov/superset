@@ -17,7 +17,6 @@
  * under the License.
  */
 import { type PivotTableQueryFormData, type PivotTreeData } from '../../types';
-import { buildLayoutContext } from '../layout/LayoutContext';
 import { parsePath } from '../core/path';
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import {
@@ -26,19 +25,10 @@ import {
   type BatchGroup,
   type FetchTarget,
 } from '../query/fetchPlanOptimizer';
-import {
-  buildExpansionQuerySpecs,
-  type ExpansionQuerySpecRequest,
-} from '../query/specs';
 import { buildFactValueKeys, type PivotFactStore } from '../runtime/factStore';
-import {
-  collectPlannedQueryWarnings,
-  fetchPlannedQuerySpecs,
-} from '../runtime/ingestQueryResults';
 import {
   type LatestRequestLifecycle,
   type LatestRequestScope,
-  isAbortError,
 } from '../runtime/requestLifecycle';
 import { createExpansionCoverageDiff } from '../runtime/coverage';
 import { stableStringify } from '../shared/stableStringify';
@@ -50,6 +40,10 @@ import {
 } from './planner';
 import type { PivotProgram } from '../runtime/types';
 import { rootKey } from '../viewModel';
+import {
+  fetchPivotExpansion,
+  type FetchPivotExpansionRequest,
+} from './fetchPivotExpansion';
 
 type ExpansionFetchResult = {
   targets: ExpansionFetchTarget[];
@@ -119,24 +113,6 @@ export type ExpansionFetchedTargetGroup = {
   targets: ExpansionFetchTarget[];
 };
 
-export interface FetchPivotExpansionResult {
-  warnings?: ChartDataWarning[];
-  error?: Error;
-}
-
-type ExpansionQuerySpecRequestWithoutLayout =
-  ExpansionQuerySpecRequest extends infer Request
-    ? Request extends unknown
-      ? Omit<Request, 'layout'>
-      : never
-    : never;
-
-export type FetchPivotExpansionRequest =
-  ExpansionQuerySpecRequestWithoutLayout & {
-    requestGroupId?: string;
-    factStore?: PivotFactStore;
-  };
-
 type ExpansionFetcherResult = {
   warnings?: ChartDataWarning[];
   error?: unknown;
@@ -161,33 +137,6 @@ const createRuntimeExpansionCoverageDiff = ({
       metricKeys: program.metricKeys,
     }),
   });
-
-export const fetchPivotExpansion = async (
-  request: FetchPivotExpansionRequest,
-): Promise<FetchPivotExpansionResult> => {
-  const layout = buildLayoutContext(request.formData);
-  const specs = buildExpansionQuerySpecs({ ...request, layout });
-
-  try {
-    const { results } = await fetchPlannedQuerySpecs({
-      formData: request.formData,
-      specs,
-      requestGroupId: request.requestGroupId,
-      factStore: request.factStore,
-    });
-    const warnings = collectPlannedQueryWarnings(results);
-    return {
-      ...(warnings.length > 0 ? { warnings } : {}),
-    };
-  } catch (error) {
-    if (isAbortError(error)) {
-      return {};
-    }
-    return {
-      error: error instanceof Error ? error : new Error(String(error)),
-    };
-  }
-};
 
 const resolveExpansionFetchPlan = ({
   targets,

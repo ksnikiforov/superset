@@ -49,7 +49,7 @@ Key form fields: `groupbyRows`, `groupbyColumns`, `metrics`, `aggregateFunction`
 │   ├── PivotTableChart.tsx
 │   ├── buildQuery.ts
 │   ├── controlPanel.tsx
-│   ├── fetchPivotBranch.ts
+│   ├── fetchPivotExpansion.ts
 │   ├── images/thumbnail.png
 │   ├── index.ts
 │   ├── react-pivottable/

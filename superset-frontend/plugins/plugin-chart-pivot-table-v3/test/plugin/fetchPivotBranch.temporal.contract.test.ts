@@ -20,7 +20,7 @@ import { GenericDataType, SupersetClient } from '@superset-ui/core';
 import {
   fetchPivotExpansion,
   type FetchPivotExpansionRequest,
-} from '../../src/pivot/query/fetchPivotBranch';
+} from '../../src/pivot/expansion/fetchPivotExpansion';
 import {
   MetricsLayoutEnum,
   PivotTreeData,

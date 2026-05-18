@@ -255,8 +255,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13528` insertions, `17007` deletions, net `-3479`.
-- Current production TypeScript/TSX total: about `30031` lines.
+- Production `src`: `13470` insertions, `17027` deletions, net `-3557`.
+- Current production TypeScript/TSX total: about `30028` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -268,18 +268,18 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `30031` | `-3479` | `< 28000` |
-| Strict core pipeline | `11337` | `12477` | `+1140` | `8000` |
+| Full production `src` | `33510` | `30028` | `-3557` | `< 28000` |
+| Strict core pipeline | `11337` | `12474` | `+1137` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5076` | `+393` | `3000-4000` |
-| Broad core pipeline | `16020` | `17553` | `+1533` | `11000-13000` |
+| Broad core pipeline | `16020` | `17550` | `+1530` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
 | `pivot/runtime/*` | `3931` |
-| `pivot/expansion/*` | `2981` |
-| `pivot/query/*` | `1735` |
+| `pivot/expansion/*` | `3005` |
+| `pivot/query/*` | `1708` |
 | `pivot/layout/*` | `744` |
 | core/shared/domain helpers | `1873` |
 | formatting/data/render-model/update support | `1213` |
@@ -358,10 +358,11 @@ own the conversion from expansion requests to query fact coverage. This keeps
 the runtime coverage module from becoming another query planner.
 
 Latest query-execution ownership cleanup: planned query fetch/ingest now lives
-under `runtime/ingestQueryResults.ts`, while expansion-specific fetch execution
-lives under `expansion/fetchExecution.ts`. The old
-`query/fetchPivotBranch.ts` file is now only a compatibility export; no
-production query execution logic remains behind the branch-era module name.
+under `runtime/ingestQueryResults.ts`, while expansion-specific query execution
+lives under `expansion/fetchPivotExpansion.ts` and is consumed by
+`expansion/fetchExecution.ts`. The old `query/fetchPivotBranch.ts`
+compatibility module has been deleted; no production query execution logic or
+legacy branch-fetch export remains behind the branch-era module name.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.

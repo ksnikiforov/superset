@@ -25,9 +25,9 @@ import {
   METRICS_PLACEHOLDER,
 } from '../../../../src/pivot/core/tokens';
 import {
-  fetchPivotBranch,
-  type FetchPivotBranchParams,
-} from '../../../../src/pivot/query/fetchPivotBranch';
+  fetchPivotExpansion as fetchPivotBranch,
+  type FetchPivotExpansionRequest as FetchPivotBranchParams,
+} from '../../../../src/pivot/expansion/fetchPivotExpansion';
 import { buildFormData } from '../../fixtures/pivotFormData';
 import {
   buildMockBranchFetchResult,
@@ -40,13 +40,13 @@ import {
   applyMetricAxis,
 } from '../../fixtures/metricAxis';
 
-jest.mock('../../../../src/pivot/query/fetchPivotBranch', () => {
+jest.mock('../../../../src/pivot/expansion/fetchPivotExpansion', () => {
   const actual = jest.requireActual(
-    '../../../../src/pivot/query/fetchPivotBranch',
+    '../../../../src/pivot/expansion/fetchPivotExpansion',
   );
   return {
     ...actual,
-    fetchPivotBranch: jest
+    fetchPivotExpansion: jest
       .fn()
       .mockResolvedValue({ data: undefined, factBatches: [] }),
   };

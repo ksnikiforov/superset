@@ -41,7 +41,7 @@ import {
   buildValueLeaf,
 } from '../../../src/pivot/measureLeaves';
 import { applyMeasureLeafValuesToTree } from '../../../src/pivot/runtime/materializePivotTree';
-import { fetchPivotExpansion } from '../../../src/pivot/query/fetchPivotBranch';
+import { fetchPivotExpansion } from '../../../src/pivot/expansion/fetchPivotExpansion';
 import { resolveMockExpansionFetchResult } from '../fixtures/factBatches';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import {
@@ -49,9 +49,9 @@ import {
   applyMetricAxis,
 } from '../fixtures/metricAxis';
 
-jest.mock('../../../src/pivot/query/fetchPivotBranch', () => {
+jest.mock('../../../src/pivot/expansion/fetchPivotExpansion', () => {
   const actual = jest.requireActual(
-    '../../../src/pivot/query/fetchPivotBranch',
+    '../../../src/pivot/expansion/fetchPivotExpansion',
   );
   return {
     ...actual,

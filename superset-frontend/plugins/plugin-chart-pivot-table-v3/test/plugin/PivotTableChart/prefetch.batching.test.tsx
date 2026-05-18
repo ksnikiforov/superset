@@ -24,16 +24,12 @@ import {
   PivotTreeData,
 } from '../../../src/types';
 
-import {
-  fetchPivotBranch,
-  fetchPivotBranchesBatch,
-  fetchPivotIntersection,
-} from '../../../src/pivot/query/fetchPivotBranch';
+import { fetchPivotExpansion } from '../../../src/pivot/expansion/fetchPivotExpansion';
 import { serializePath } from '../../../src/pivot/core/path';
 import type {
   FetchPivotBranchesBatchParams,
   FetchPivotBranchesBatchResult,
-} from '../../../src/pivot/query/fetchPivotBranch';
+} from '../../../src/pivot/expansion/fetchPivotExpansion';
 import { buildFormData } from '../fixtures/pivotFormData';
 import {
   buildMockBatchFetchResult,
@@ -43,15 +39,13 @@ import {
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';
 
-jest.mock('../../../src/pivot/query/fetchPivotBranch', () => {
+jest.mock('../../../src/pivot/expansion/fetchPivotExpansion', () => {
   const actual = jest.requireActual(
-    '../../../src/pivot/query/fetchPivotBranch',
+    '../../../src/pivot/expansion/fetchPivotExpansion',
   );
   return {
     ...actual,
-    fetchPivotBranch: jest.fn(),
-    fetchPivotBranchesBatch: jest.fn(),
-    fetchPivotIntersection: jest.fn(),
+    fetchPivotExpansion: jest.fn(),
   };
 });
 
@@ -121,22 +115,18 @@ const buildTree = ({
 };
 
 describe('PivotTableChart batching on persisted restore', () => {
-  const fetchPivotBranchMock = fetchPivotBranch as jest.MockedFunction<
-    typeof fetchPivotBranch
+  const fetchPivotExpansionMock = fetchPivotExpansion as jest.MockedFunction<
+    typeof fetchPivotExpansion
   >;
-  const fetchPivotBranchesBatchMock =
-    fetchPivotBranchesBatch as jest.MockedFunction<
-      typeof fetchPivotBranchesBatch
-    >;
-  const fetchPivotIntersectionMock =
-    fetchPivotIntersection as jest.MockedFunction<
-      typeof fetchPivotIntersection
-    >;
+  const expansionCalls = (
+    kind: Parameters<typeof fetchPivotExpansion>[0]['kind'],
+  ) =>
+    fetchPivotExpansionMock.mock.calls.filter(
+      ([params]) => params.kind === kind,
+    );
 
   beforeEach(() => {
-    fetchPivotBranchMock.mockReset();
-    fetchPivotBranchesBatchMock.mockReset();
-    fetchPivotIntersectionMock.mockReset();
+    fetchPivotExpansionMock.mockReset();
   });
 
   it('batches sibling expansions into one request', async () => {
@@ -166,15 +156,20 @@ describe('PivotTableChart batching on persisted restore', () => {
       colDepth: 0,
     });
 
-    fetchPivotBranchesBatchMock.mockImplementation(params =>
-      Promise.resolve(buildMockBatchFetchResult(params, { data: branchTree })),
-    );
-    fetchPivotBranchMock.mockImplementation(params =>
-      Promise.resolve(buildMockBranchFetchResult(params, { data: branchTree })),
-    );
-    fetchPivotIntersectionMock.mockResolvedValue({
-      data: branchTree,
-      factBatches: [],
+    fetchPivotExpansionMock.mockImplementation(params => {
+      if (params.kind === 'batch') {
+        return Promise.resolve(
+          buildMockBatchFetchResult(params, { data: branchTree }),
+        );
+      }
+      if (params.kind === 'intersection') {
+        return Promise.resolve(
+          buildMockIntersectionFetchResult(params, { data: branchTree }),
+        );
+      }
+      return Promise.resolve(
+        buildMockBranchFetchResult(params, { data: branchTree }),
+      );
     });
 
     const pivotExpansionState: PivotExpansionState = {
@@ -210,10 +205,8 @@ describe('PivotTableChart batching on persisted restore', () => {
       />,
     );
 
-    await waitFor(() =>
-      expect(fetchPivotBranchesBatchMock).toHaveBeenCalledTimes(1),
-    );
-    expect(fetchPivotBranchMock).not.toHaveBeenCalled();
+    await waitFor(() => expect(expansionCalls('batch')).toHaveLength(1));
+    expect(expansionCalls('branch')).toHaveLength(0);
   });
 
   it('applies out-of-order batch results correctly', async () => {
@@ -263,20 +256,22 @@ describe('PivotTableChart batching on persisted restore', () => {
     const deferredRow = createDeferredBatchFetch();
     const deferredCol = createDeferredBatchFetch();
 
-    fetchPivotBranchesBatchMock.mockImplementation(params => {
+    fetchPivotExpansionMock.mockImplementation(params => {
+      if (params.kind === 'intersection') {
+        return Promise.resolve(
+          buildMockIntersectionFetchResult(params, {
+            data: intersectionBranch,
+          }),
+        );
+      }
+      if (params.kind === 'branch') {
+        return Promise.resolve(buildMockBranchFetchResult(params));
+      }
       if (params.batch.axis === 'row') {
         return deferredRow.implementation(params);
       }
       return deferredCol.implementation(params);
     });
-    fetchPivotIntersectionMock.mockImplementation(params =>
-      Promise.resolve(
-        buildMockIntersectionFetchResult(params, { data: intersectionBranch }),
-      ),
-    );
-    fetchPivotBranchMock.mockImplementation(params =>
-      Promise.resolve(buildMockBranchFetchResult(params)),
-    );
 
     const pivotExpansionState: PivotExpansionState = {
       rowKeys: rowGroupby,
@@ -311,9 +306,7 @@ describe('PivotTableChart batching on persisted restore', () => {
       />,
     );
 
-    await waitFor(() =>
-      expect(fetchPivotBranchesBatchMock).toHaveBeenCalledTimes(2),
-    );
+    await waitFor(() => expect(expansionCalls('batch')).toHaveLength(2));
 
     expect(deferredCol.promises).toHaveLength(1);
     expect(deferredRow.promises).toHaveLength(1);
@@ -324,9 +317,9 @@ describe('PivotTableChart batching on persisted restore', () => {
       expect(screen.getByText('X')).toBeInTheDocument();
       expect(screen.getByText('P')).toBeInTheDocument();
     });
-    expect(fetchPivotBranchMock).not.toHaveBeenCalled();
-    expect(fetchPivotIntersectionMock).toHaveBeenCalledTimes(1);
-    expect(fetchPivotIntersectionMock).toHaveBeenCalledWith(
+    expect(expansionCalls('branch')).toHaveLength(0);
+    expect(expansionCalls('intersection')).toHaveLength(1);
+    expect(expansionCalls('intersection')[0][0]).toEqual(
       expect.objectContaining({
         rowPathKeys: [serializePath(['A']), serializePath(['B'])],
         columnPathKeys: [serializePath(['CA']), serializePath(['NY'])],

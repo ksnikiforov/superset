@@ -21,17 +21,19 @@ import { fireEvent, render, screen, waitFor, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
 
-import { fetchPivotBranch } from '../../../src/pivot/query/fetchPivotBranch';
-import type { FetchPivotBranchResult } from '../../../src/pivot/query/fetchPivotBranch';
+import { fetchPivotExpansion as fetchPivotBranch } from '../../../src/pivot/expansion/fetchPivotExpansion';
+import type { FetchPivotBranchResult } from '../../../src/pivot/expansion/fetchPivotExpansion';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';
 
-jest.mock('../../../src/pivot/query/fetchPivotBranch', () => {
-  const actual = jest.requireActual('../../../src/pivot/query/fetchPivotBranch');
+jest.mock('../../../src/pivot/expansion/fetchPivotExpansion', () => {
+  const actual = jest.requireActual(
+    '../../../src/pivot/expansion/fetchPivotExpansion',
+  );
   return {
     ...actual,
-    fetchPivotBranch: jest.fn(),
+    fetchPivotExpansion: jest.fn(),
   };
 });
 

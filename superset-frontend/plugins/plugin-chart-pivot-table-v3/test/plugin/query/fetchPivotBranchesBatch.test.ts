@@ -20,7 +20,7 @@ import { SupersetClient } from '@superset-ui/core';
 import {
   fetchPivotExpansion,
   type FetchPivotExpansionRequest,
-} from '../../../src/pivot/query/fetchPivotBranch';
+} from '../../../src/pivot/expansion/fetchPivotExpansion';
 import { type BatchGroup } from '../../../src/pivot/query/fetchPlanOptimizer';
 import { buildFormData } from '../fixtures/pivotFormData';
 import {

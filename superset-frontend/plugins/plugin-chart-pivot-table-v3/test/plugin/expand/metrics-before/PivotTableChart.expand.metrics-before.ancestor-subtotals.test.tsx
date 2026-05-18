@@ -33,23 +33,23 @@ import {
   serializePath,
 } from '../../../../src/pivot/core/path';
 import { mergeTrees } from '../../../../src/pivot/core/tree';
-import { fetchPivotBranch } from '../../../../src/pivot/query/fetchPivotBranch';
+import { fetchPivotExpansion as fetchPivotBranch } from '../../../../src/pivot/expansion/fetchPivotExpansion';
 import {
-  fetchPivotBranchesBatch,
+  fetchPivotExpansion as fetchPivotBranchesBatch,
   type FetchPivotBranchesBatchParams,
   type FetchPivotBranchesBatchResult,
-} from '../../../../src/pivot/query/fetchPivotBranch';
+} from '../../../../src/pivot/expansion/fetchPivotExpansion';
 import { formatQueryName } from '../../../../src/pivot/query/queryName';
 import { buildTreeFromRecords } from '../../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../../fixtures/metricAxis';
 
-jest.mock('../../../../src/pivot/query/fetchPivotBranch', () => {
+jest.mock('../../../../src/pivot/expansion/fetchPivotExpansion', () => {
   const actual = jest.requireActual(
-    '../../../../src/pivot/query/fetchPivotBranch',
+    '../../../../src/pivot/expansion/fetchPivotExpansion',
   );
   return {
     ...actual,
-    fetchPivotBranch: jest
+    fetchPivotExpansion: jest
       .fn()
       .mockResolvedValue({ data: undefined, factBatches: [] }),
     fetchPivotBranchesBatch: jest.fn(),
@@ -1143,7 +1143,7 @@ describe('PivotTableChart expansion with metrics before dimensions (ancestor-sub
 
   it('fills ancestor column values for all visible rows when expanding another column after deep row expansion', async () => {
     const actualFetchModule = jest.requireActual(
-      '../../../../src/pivot/query/fetchPivotBranch',
+      '../../../../src/pivot/expansion/fetchPivotExpansion',
     );
     fetchPivotBranchMock.mockImplementation(args =>
       actualFetchModule.fetchPivotBranch(args),

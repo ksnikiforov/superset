@@ -22,24 +22,24 @@ import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
 import { mergeTrees } from '../../../src/pivot/core/tree';
 import { parsePath } from '../../../src/pivot/core/path';
-import { fetchPivotBranch } from '../../../src/pivot/query/fetchPivotBranch';
+import { fetchPivotExpansion as fetchPivotBranch } from '../../../src/pivot/expansion/fetchPivotExpansion';
 import {
-  fetchPivotBranchesBatch,
+  fetchPivotExpansion as fetchPivotBranchesBatch,
   type FetchPivotBranchesBatchParams,
   type FetchPivotBranchesBatchResult,
-} from '../../../src/pivot/query/fetchPivotBranch';
+} from '../../../src/pivot/expansion/fetchPivotExpansion';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';
 import { buildMockBranchFetchResult } from '../fixtures/factBatches';
 
-jest.mock('../../../src/pivot/query/fetchPivotBranch', () => {
+jest.mock('../../../src/pivot/expansion/fetchPivotExpansion', () => {
   const actual = jest.requireActual(
-    '../../../src/pivot/query/fetchPivotBranch',
+    '../../../src/pivot/expansion/fetchPivotExpansion',
   );
   return {
     ...actual,
-    fetchPivotBranch: jest.fn(),
+    fetchPivotExpansion: jest.fn(),
     fetchPivotBranchesBatch: jest.fn(),
   };
 });

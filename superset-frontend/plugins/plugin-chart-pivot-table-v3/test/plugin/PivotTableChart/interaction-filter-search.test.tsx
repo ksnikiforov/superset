@@ -23,7 +23,7 @@ import { buildFormData } from '../fixtures/pivotFormData';
 import { MetricsLayoutEnum, PivotRuntimeLayout } from '../../../src/types';
 
 import { supersetChartDataClient } from '../../../src/pivot/data/SupersetChartDataClient';
-import { fetchPivotBranch } from '../../../src/pivot/query/fetchPivotBranch';
+import { fetchPivotExpansion as fetchPivotBranch } from '../../../src/pivot/expansion/fetchPivotExpansion';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';
 
@@ -62,13 +62,13 @@ jest.mock('../../../src/pivot/data/SupersetChartDataClient', () => {
   };
 });
 
-jest.mock('../../../src/pivot/query/fetchPivotBranch', () => {
+jest.mock('../../../src/pivot/expansion/fetchPivotExpansion', () => {
   const actual = jest.requireActual(
-    '../../../src/pivot/query/fetchPivotBranch',
+    '../../../src/pivot/expansion/fetchPivotExpansion',
   );
   return {
     ...actual,
-    fetchPivotBranch: jest
+    fetchPivotExpansion: jest
       .fn()
       .mockResolvedValue({ data: undefined, factBatches: [] }),
   };

@@ -19,7 +19,7 @@
 import {
   type FetchPivotExpansionRequest,
   type FetchPivotExpansionResult,
-} from '../../../src/pivot/query/fetchPivotBranch';
+} from '../../../src/pivot/expansion/fetchPivotExpansion';
 import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
 import { buildFactCoverage } from '../../../src/pivot/runtime/coverage';
 import {

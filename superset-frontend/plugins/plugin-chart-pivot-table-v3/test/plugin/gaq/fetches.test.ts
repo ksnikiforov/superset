@@ -22,7 +22,7 @@ import { waitForAsyncData } from 'src/middleware/asyncEvent';
 import {
   fetchPivotExpansion,
   type FetchPivotExpansionRequest,
-} from '../../../src/pivot/query/fetchPivotBranch';
+} from '../../../src/pivot/expansion/fetchPivotExpansion';
 import { serializePath } from '../../../src/pivot/core/path';
 import { type PivotTreeData, type PivotTreeNode } from '../../../src/types';
 import { buildFormData } from '../fixtures/pivotFormData';

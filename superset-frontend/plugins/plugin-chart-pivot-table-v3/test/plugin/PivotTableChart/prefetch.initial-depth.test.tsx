@@ -22,20 +22,20 @@ import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
 import { mergeTrees } from '../../../src/pivot/core/tree';
 import {
-  fetchPivotBranch,
-  fetchPivotIntersection,
-} from '../../../src/pivot/query/fetchPivotBranch';
+  fetchPivotExpansion as fetchPivotBranch,
+  fetchPivotExpansion as fetchPivotIntersection,
+} from '../../../src/pivot/expansion/fetchPivotExpansion';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';
 
-jest.mock('../../../src/pivot/query/fetchPivotBranch', () => {
+jest.mock('../../../src/pivot/expansion/fetchPivotExpansion', () => {
   const actual = jest.requireActual(
-    '../../../src/pivot/query/fetchPivotBranch',
+    '../../../src/pivot/expansion/fetchPivotExpansion',
   );
   return {
     ...actual,
-    fetchPivotBranch: jest.fn(),
+    fetchPivotExpansion: jest.fn(),
     fetchPivotIntersection: jest.fn(),
   };
 });
