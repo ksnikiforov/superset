@@ -16,18 +16,20 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { type PivotTableQueryFormData } from '../../types';
-import { type ChartDataWarning } from '../data/ChartDataClient';
+import {
+  type ChartDataWarning,
+  type ChartDataQueryResult,
+} from '../data/ChartDataClient';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import { buildLayoutContext } from '../layout/LayoutContext';
+import { type PivotFactStore } from '../runtime/factStore';
+import { upsertQueryResultsIntoFactStore } from '../runtime/ingestQueryResults';
+import { isAbortError } from '../runtime/requestLifecycle';
 import {
   buildExpansionQuerySpecs,
   type ExpansionQuerySpecRequest,
   type PlannedQuerySpec,
 } from './specs';
-import { type PivotFactStore } from '../runtime/factStore';
-import { upsertQueryResultsIntoFactStore } from '../runtime/ingestQueryResults';
-import { isAbortError } from '../runtime/requestLifecycle';
 
 export interface FetchPivotExpansionResult {
   warnings?: ChartDataWarning[];
@@ -45,59 +47,68 @@ export type FetchPivotExpansionRequest = ExpansionQueryRequest & {
   factStore?: PivotFactStore;
 };
 
-const fetchPivotQuerySpecsIntoFactStore = async ({
+export const collectPlannedQueryWarnings = (results: ChartDataQueryResult[]) =>
+  results.flatMap(result => result.warnings ?? []);
+
+export const fetchPlannedQuerySpecs = async ({
   formData,
   specs,
   requestGroupId,
   factStore,
 }: {
-  formData: PivotTableQueryFormData;
+  formData: FetchPivotExpansionRequest['formData'];
   specs: PlannedQuerySpec[];
   requestGroupId?: string;
   factStore?: PivotFactStore;
-}): Promise<FetchPivotExpansionResult> => {
-  if (specs.length === 0) {
-    return {};
-  }
+}): Promise<{ results: ChartDataQueryResult[] }> => {
   const missingSpecs = specs.filter(
     spec => !factStore?.hasCompatibleCoverage(spec.meta.factSelector),
   );
   if (missingSpecs.length === 0) {
-    return {};
+    return { results: [] };
   }
-  const metricsForQuery = missingSpecs[0]?.metrics ?? specs[0].metrics;
+  const metricsForQuery = missingSpecs[0]?.metrics;
   const timeOffsets = Array.from(
     new Set([
       ...(formData.time_offsets ?? []),
       ...missingSpecs.flatMap(spec => spec.meta.requiredTimeOffsets),
     ]),
   );
-  const queryFormData =
-    metricsForQuery.length > 0
-      ? {
-          ...formData,
-          metrics: metricsForQuery,
-          ...(timeOffsets.length > 0 ? { time_offsets: timeOffsets } : {}),
-        }
-      : {
-          ...formData,
-          ...(timeOffsets.length > 0 ? { time_offsets: timeOffsets } : {}),
-        };
+  const results = await supersetChartDataClient.fetch({
+    formData: {
+      ...formData,
+      ...(metricsForQuery && metricsForQuery.length > 0
+        ? { metrics: metricsForQuery }
+        : {}),
+      ...(timeOffsets.length > 0 ? { time_offsets: timeOffsets } : {}),
+    },
+    specs: missingSpecs,
+    requestGroupId,
+  });
+  if (factStore) {
+    upsertQueryResultsIntoFactStore({
+      store: factStore,
+      specs: missingSpecs,
+      results,
+    });
+  }
+  return { results };
+};
+
+export const fetchPivotExpansion = async (
+  request: FetchPivotExpansionRequest,
+): Promise<FetchPivotExpansionResult> => {
+  const layout = buildLayoutContext(request.formData);
+  const specs = buildExpansionQuerySpecs({ ...request, layout });
 
   try {
-    const results = await supersetChartDataClient.fetch({
-      formData: queryFormData,
-      specs: missingSpecs,
-      requestGroupId,
+    const { results } = await fetchPlannedQuerySpecs({
+      formData: request.formData,
+      specs,
+      requestGroupId: request.requestGroupId,
+      factStore: request.factStore,
     });
-    const warnings = results.flatMap(result => result.warnings ?? []);
-    if (factStore) {
-      upsertQueryResultsIntoFactStore({
-        store: factStore,
-        specs: missingSpecs,
-        results,
-      });
-    }
+    const warnings = collectPlannedQueryWarnings(results);
     return {
       ...(warnings.length > 0 ? { warnings } : {}),
     };
@@ -109,18 +120,4 @@ const fetchPivotQuerySpecsIntoFactStore = async ({
       error: error instanceof Error ? error : new Error(String(error)),
     };
   }
-};
-
-export const fetchPivotExpansion = async (
-  request: FetchPivotExpansionRequest,
-): Promise<FetchPivotExpansionResult> => {
-  const layout = buildLayoutContext(request.formData);
-  const specs = buildExpansionQuerySpecs({ ...request, layout });
-
-  return fetchPivotQuerySpecsIntoFactStore({
-    formData: request.formData,
-    specs,
-    requestGroupId: request.requestGroupId,
-    factStore: request.factStore,
-  });
 };

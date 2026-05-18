@@ -27,16 +27,15 @@ import { METRICS_PLACEHOLDER } from '../core/tokens';
 import { parsePath } from '../core/path';
 import { hasSelectedFilters } from '../filters';
 import { stableStringify } from '../shared/stableStringify';
-import {
-  type ChartDataQueryResult,
-  type ChartDataWarning,
-} from '../data/ChartDataClient';
-import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import { normalizeFormDataExtraFilters } from '../query/normalizeExtraFormData';
 import { buildInitialPivotUpdatePlan } from '../update/initialUpdatePlan';
 import { normalizeRuntimeLayout } from '../layout/resolveInteractionLayout';
 import { buildInitialRuntimeFromSpecResultsAsync } from './ingestQueryResults';
 import { insertValuesPlaceholder } from './compilePivotProgram';
+import {
+  collectPlannedQueryWarnings,
+  fetchPlannedQuerySpecs,
+} from '../query/fetchPivotBranch';
 import {
   executeLatestRequest,
   executeScheduledLatestRequest,
@@ -48,9 +47,6 @@ const SEAMLESS_REQUEST_GROUP = 'pivot-v3-seamless';
 const SEAMLESS_MATERIALIZATION_GROUP = 'pivot-v3-seamless-materialize';
 
 type RuntimeSelection = Record<string, DataRecordValue[]>;
-
-const collectWarnings = (results: ChartDataQueryResult[]): ChartDataWarning[] =>
-  results.flatMap(result => result.warnings ?? []);
 
 export type SeamlessRuntimeSyncSnapshot = {
   filtersSignature: string | null;
@@ -453,7 +449,7 @@ export const fetchAndMaterializeSeamlessRuntimeUpdate = async ({
       materializationLifecycle.invalidate();
     },
     run: () =>
-      supersetChartDataClient.fetch({
+      fetchPlannedQuerySpecs({
         formData,
         specs,
         requestGroupId: SEAMLESS_REQUEST_GROUP,
@@ -466,7 +462,7 @@ export const fetchAndMaterializeSeamlessRuntimeUpdate = async ({
     return { status: fetchResult.status, error: fetchResult.error };
   }
 
-  const results = fetchResult.value;
+  const { results } = fetchResult.value;
   const materializationResult = await executeScheduledLatestRequest({
     lifecycle: materializationLifecycle,
     requestGroupId: SEAMLESS_MATERIALIZATION_GROUP,
@@ -494,6 +490,6 @@ export const fetchAndMaterializeSeamlessRuntimeUpdate = async ({
     status: 'success',
     tree: materializationResult.value.tree,
     factBatches: materializationResult.value.factBatches,
-    warnings: collectWarnings(results),
+    warnings: collectPlannedQueryWarnings(results),
   };
 };
