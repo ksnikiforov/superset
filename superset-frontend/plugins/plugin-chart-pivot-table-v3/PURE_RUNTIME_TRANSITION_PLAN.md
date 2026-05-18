@@ -259,6 +259,10 @@ Current semantic-layout contract:
 - `PivotFactStore` now exposes one mutation API, `upsertBatch`. The
   `upsertBatches` convenience wrapper is removed so callers explicitly submit
   loaded fact batches through the same store boundary.
+- Query-result ingestion no longer exports the `upsertQueryResultsIntoFactStore`
+  wrapper. Planned fetch execution ingests results and upserts through the
+  private ingestion boundary, leaving runtime callers with explicit
+  `ingestQueryResults` or planned fetch execution.
 
 Expected deletion targets:
 
@@ -286,8 +290,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13057` insertions, `17161` deletions, net `-4104`.
-- Current production TypeScript/TSX total: about `29406` lines.
+- Production `src`: `13043` insertions, `17161` deletions, net `-4118`.
+- Current production TypeScript/TSX total: about `29392` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -299,16 +303,16 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `29406` | `-4104` | `< 28000` |
-| Strict core pipeline | `11337` | `11815` | `+478` | `8000` |
+| Full production `src` | `33510` | `29392` | `-4118` | `< 28000` |
+| Strict core pipeline | `11337` | `11923` | `+586` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5084` | `+401` | `3000-4000` |
-| Broad core pipeline | `16020` | `16899` | `+879` | `11000-13000` |
+| Broad core pipeline | `16020` | `17007` | `+987` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `3931` |
+| `pivot/runtime/*` | `3917` |
 | `pivot/expansion/*` | `2634` |
 | `pivot/query/*` | `1554` |
 | `pivot/layout/*` | `732` |
@@ -939,6 +943,10 @@ Success criteria:
   protocol and keeps fetch execution aligned with the planned-query executor.
 - Fact-store mutation now has one production surface, `upsertBatch`; bulk
   insertion is caller iteration rather than a second runtime-store method.
+- Query-result ingestion no longer exports a store-upsert wrapper. Query result
+  fetching owns result-to-store insertion internally, while tests and direct
+  materialization paths use `ingestQueryResults` plus the single fact-store
+  mutation API.
 - Same-axis expansion no longer has a separate in-flight expansion map or
   branch-specific fetch loop. Toggle expansion writes pending visible coverage
   and enters the same hydration loop used by prefetch and cross-axis hydration.

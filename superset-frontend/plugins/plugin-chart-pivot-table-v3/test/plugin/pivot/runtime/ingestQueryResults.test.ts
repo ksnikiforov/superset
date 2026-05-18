@@ -21,7 +21,6 @@ import {
   buildInitialRuntimeFromSpecResultsAsync,
   createPivotFactStore,
   ingestQueryResults,
-  upsertQueryResultsIntoFactStore,
 } from '../../../../src/pivot/runtime/ingestQueryResults';
 import { materializeLoadedPivotTreeFromFactStore } from '../../fixtures/metricAxis';
 import { buildLayoutContext } from '../../../../src/pivot/layout/LayoutContext';
@@ -169,8 +168,7 @@ test('records exact branch scope on fact-store batches', () => {
     },
   };
 
-  const [batch] = upsertQueryResultsIntoFactStore({
-    store,
+  const [ingested] = ingestQueryResults({
     specs: [branchSpec],
     results: [
       {
@@ -186,6 +184,11 @@ test('records exact branch scope on fact-store batches', () => {
       },
     ],
   });
+  const batch = {
+    ...ingested.spec.meta.factSelector,
+    facts: ingested.facts,
+  };
+  store.upsertBatch(batch);
 
   expect(batch.scope).toEqual({
     kind: 'branch',
@@ -228,11 +231,15 @@ test('keeps support and offset facts without materializing support metric branch
   ]);
 
   const store = createPivotFactStore();
-  upsertQueryResultsIntoFactStore({
-    store,
+  ingestQueryResults({
     specs: [spec],
     results: [result],
-  });
+  }).forEach(ingested =>
+    store.upsertBatch({
+      ...ingested.spec.meta.factSelector,
+      facts: ingested.facts,
+    }),
+  );
   const formData = buildFormData({
     groupbyRows: ['country', METRICS_PLACEHOLDER],
     groupbyColumns: ['month'],
@@ -273,8 +280,7 @@ test('materializes column subtotal leaves from planned coverage specs', () => {
     colGroupby: ['category', 'subcategory'],
   });
   const store = createPivotFactStore();
-  upsertQueryResultsIntoFactStore({
-    store,
+  ingestQueryResults({
     specs: [spec],
     results: [
       {
@@ -282,7 +288,12 @@ test('materializes column subtotal leaves from planned coverage specs', () => {
         data: [{ country: 'France', category: 'Furniture', sales: 12 }],
       },
     ],
-  });
+  }).forEach(ingested =>
+    store.upsertBatch({
+      ...ingested.spec.meta.factSelector,
+      facts: ingested.facts,
+    }),
+  );
   const formData = buildFormData({
     groupbyRows: ['country', METRICS_PLACEHOLDER],
     groupbyColumns: ['category', 'subcategory'],

@@ -304,22 +304,6 @@ const upsertIngestedFactsIntoStore = ({
   return batches;
 };
 
-export const upsertQueryResultsIntoFactStore = <T extends QueryResultWithData>({
-  store,
-  specs,
-  results,
-}: {
-  store: PivotFactStore;
-  specs: PlannedQuerySpec[];
-  results: T[];
-}): PivotFactStoreBatch[] => {
-  const ingested = ingestQueryResults({
-    specs,
-    results,
-  });
-  return upsertIngestedFactsIntoStore({ store, ingested });
-};
-
 export const fetchPlannedQuerySpecs = async ({
   formData,
   specs,
@@ -356,10 +340,12 @@ export const fetchPlannedQuerySpecs = async ({
     requestGroupId,
   });
   if (factStore) {
-    upsertQueryResultsIntoFactStore({
+    upsertIngestedFactsIntoStore({
       store: factStore,
-      specs: missingSpecs,
-      results,
+      ingested: ingestQueryResults({
+        specs: missingSpecs,
+        results,
+      }),
     });
   }
   return { results };
