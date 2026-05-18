@@ -35,7 +35,7 @@ import {
   fetchPivotExpansion as fetchPivotBranch,
   type FetchPivotExpansionRequest as FetchPivotBranchParams,
 } from '../../../../src/pivot/expansion/fetchPivotExpansion';
-import { buildMockBranchFetchResult } from '../../fixtures/factBatches';
+import { buildMockExpansionFetchResult } from '../../fixtures/factBatches';
 import { buildTreeFromRecords } from '../../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../../fixtures/metricAxis';
 
@@ -55,7 +55,7 @@ describe('PivotTableChart expansion with metrics between dimensions (column-metr
   const fetchPivotBranchMock = fetchPivotBranch as jest.Mock;
   const resolveBranchData =
     (data?: PivotTreeData) => (params: FetchPivotBranchParams) =>
-      Promise.resolve(buildMockBranchFetchResult(params, { data }));
+      Promise.resolve(buildMockExpansionFetchResult(params, { data }));
 
   beforeEach(() => {
     fetchPivotBranchMock.mockReset();

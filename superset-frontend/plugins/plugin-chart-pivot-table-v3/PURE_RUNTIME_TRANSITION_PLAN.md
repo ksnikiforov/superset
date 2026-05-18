@@ -290,8 +290,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13045` insertions, `17222` deletions, net `-4177`.
-- Current production TypeScript/TSX total: about `29333` lines.
+- Production `src`: `13256` insertions, `17219` deletions, net `-3963`.
+- Current production TypeScript/TSX total: about `29547` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -303,18 +303,18 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `29333` | `-4177` | `< 28000` |
-| Strict core pipeline | `11337` | `11889` | `+552` | `8000` |
+| Full production `src` | `33510` | `29547` | `-3963` | `< 28000` |
+| Strict core pipeline | `11337` | `12103` | `+766` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5068` | `+385` | `3000-4000` |
-| Broad core pipeline | `16020` | `16957` | `+937` | `11000-13000` |
+| Broad core pipeline | `16020` | `17171` | `+1151` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `3906` |
+| `pivot/runtime/*` | `4048` |
 | `pivot/expansion/*` | `2583` |
-| `pivot/query/*` | `1554` |
+| `pivot/query/*` | `1626` |
 | `pivot/layout/*` | `770` |
 | core/shared/domain helpers | `1865` |
 | formatting/data/render-model/update support | `1211` |
@@ -481,6 +481,23 @@ metric placement, measure hierarchy, subtotal policy, and expansion coverage.
 Expansion remains a rendered-tree action: fixed and user-controlled UI modes
 both pass through the same loaded runtime layout, while semantic draft layout
 changes continue through the separate seamless runtime update path.
+
+Latest Values-projection coverage cleanup: rendered metric/measure paths are
+projected to semantic fact paths before expansion coverage diffing, so a loaded
+branch such as `[A]` can satisfy a rendered metric-first request such as
+`[__metric__m1, A]` without a duplicate query. Fact batches now carry the
+effective Values-tier materialization placement for skipped pre-Values
+dimensions, so a column path like `[Revenue, __metric__m1]` materializes the
+loaded post-Values child as `[Revenue, __metric__m1, C2]` instead of inserting
+the metric at the original full-layout index. Intersection specs also select a
+requestable row or column anchor instead of hard-coding row expansion, keeping
+row x column hydration bounded to the visible explicit paths.
+
+This slice is intentionally core-positive because it fixes the remaining
+authority gap between coverage, query specs, and materialization for flexible
+Values placement. The next slice must spend this new authority by deleting
+duplicated query/planner/render fallback branches; otherwise the strict core
+will keep drifting away from the `8000` line target.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.

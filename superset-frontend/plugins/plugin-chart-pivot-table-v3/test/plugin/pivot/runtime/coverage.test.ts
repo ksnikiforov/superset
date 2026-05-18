@@ -443,6 +443,46 @@ describe('initial coverage manifest', () => {
 });
 
 describe('branch fact coverage', () => {
+  it('matches rendered metric-first expansion paths to semantic fact coverage', () => {
+    const program = compilePivotProgram({
+      groupbyRows: [METRICS_PLACEHOLDER, 'returnFlag', 'orderPriority'],
+      groupbyColumns: ['shipMode'],
+      metrics: ['averageOrderValue', 'weightedDiscount'],
+      metricsLayout: MetricsLayoutEnum.ROWS,
+    });
+    const getMissingExpansionCoverage = createExpansionCoverageDiff({
+      factSelectors: [
+        {
+          coverage: {
+            rowDepth: 2,
+            columnDepth: 1,
+            rowDimensions: ['returnFlag', 'orderPriority'],
+            columnDimensions: ['shipMode'],
+          },
+          scope: {
+            kind: 'branch',
+            axis: 'row',
+            path: ['A'],
+          },
+          valueKeys: ['averageOrderValue'],
+        },
+      ],
+      program,
+      valueKeys: ['averageOrderValue', 'weightedDiscount'],
+    });
+
+    expect(
+      getMissingExpansionCoverage([
+        {
+          axis: 'row',
+          pathKey: serializePath([encodeMetricKey('averageOrderValue'), 'A']),
+          rowDepth: 2,
+          columnDepth: 1,
+        },
+      ]),
+    ).toEqual([]);
+  });
+
   it.each([
     ['row', MetricsLayoutEnum.ROWS],
     ['col', MetricsLayoutEnum.COLUMNS],

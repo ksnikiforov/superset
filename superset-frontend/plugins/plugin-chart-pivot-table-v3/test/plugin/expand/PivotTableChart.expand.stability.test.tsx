@@ -26,7 +26,7 @@ import {
   type FetchPivotExpansionRequest as FetchPivotBranchParams,
 } from '../../../src/pivot/expansion/fetchPivotExpansion';
 import { buildFormData } from '../fixtures/pivotFormData';
-import { buildMockBranchFetchResult } from '../fixtures/factBatches';
+import { buildMockExpansionFetchResult } from '../fixtures/factBatches';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';
 
@@ -315,7 +315,7 @@ describe('PivotTableChart expand/collapse count stability', () => {
       fetchPivotBranchMock.mockImplementation(
         (params: FetchPivotBranchParams) =>
           Promise.resolve(
-            buildMockBranchFetchResult(params, { data: fullTree }),
+            buildMockExpansionFetchResult(params, { data: fullTree }),
           ),
       );
 

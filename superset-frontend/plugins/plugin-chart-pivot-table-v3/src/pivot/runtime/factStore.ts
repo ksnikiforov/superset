@@ -42,6 +42,7 @@ export type PivotFactSelector = {
   coverage: PivotFactCoverage;
   scope: PivotFactStoreBatchScope;
   valueKeys: string[];
+  materialization?: PivotFactMaterialization;
 };
 
 export type PivotFactStoreBatch = PivotFactSelector & {
@@ -69,6 +70,11 @@ export type PivotFactStoreBatchScope =
       columnPaths: PivotPath[];
     };
 
+export type PivotFactMaterialization = {
+  valueAxis: PivotAxis;
+  valueInsertIndex: number;
+};
+
 export type PivotFactStore = {
   upsertBatch: (batch: PivotFactStoreBatch) => void;
   getCoverageSelectors: () => PivotFactSelector[];
@@ -78,10 +84,16 @@ export type PivotFactStore = {
 
 const buildPivotFactRequestKey = ({
   coverage,
+  materialization,
   scope,
   valueKeys,
 }: PivotFactSelector) =>
-  stableStringify([coverage, scope, normalizeFactValueKeys(valueKeys)]);
+  stableStringify([
+    coverage,
+    scope,
+    materialization,
+    normalizeFactValueKeys(valueKeys),
+  ]);
 
 export const buildFactValueKeys = ({
   metricKeys,
@@ -107,10 +119,12 @@ const buildPivotFactKey = (selector: PivotFactSelector, fact: PivotFact) =>
 
 const normalizeSelector = ({
   coverage,
+  materialization,
   scope,
   valueKeys,
 }: PivotFactSelector): PivotFactSelector => ({
   coverage,
+  materialization,
   scope,
   valueKeys: normalizeFactValueKeys(valueKeys),
 });

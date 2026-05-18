@@ -50,9 +50,14 @@ import {
   isValueLeaf,
 } from '../measureLeaves';
 import { type LayoutContext } from '../layout/LayoutContext';
-import { type PivotFactCoverage, type PivotProgram } from './types';
+import {
+  type PivotAxisProgram,
+  type PivotFactCoverage,
+  type PivotProgram,
+} from './types';
 import {
   type PivotFact,
+  type PivotFactMaterialization,
   type PivotFactStore,
   type PivotFactStoreBatch,
 } from './factStore';
@@ -79,6 +84,86 @@ type MaterializePivotTreeInput = {
 };
 
 const emptyPivotTree = (): PivotTreeData => ({ rows: {}, cols: {}, cells: {} });
+
+const toDimensionLevels = (
+  columns: PivotProgram['rowDimensions'],
+): PivotAxisProgram =>
+  columns.map(column => ({
+    kind: 'dimension',
+    column,
+  }));
+
+const withValuesLevel = ({
+  columns,
+  metrics,
+  insertIndex,
+}: {
+  columns: PivotProgram['rowDimensions'];
+  metrics: PivotProgram['metrics'];
+  insertIndex: number;
+}): PivotAxisProgram => {
+  const clampedIndex = Math.max(0, Math.min(insertIndex, columns.length));
+  return [
+    ...toDimensionLevels(columns.slice(0, clampedIndex)),
+    { kind: 'values' as const, metrics },
+    ...toDimensionLevels(columns.slice(clampedIndex)),
+  ];
+};
+
+const buildBatchMaterializationProgram = ({
+  program,
+  coverage,
+  materialization,
+}: {
+  program: PivotProgram;
+  coverage: PivotFactCoverage;
+  materialization?: PivotFactMaterialization;
+}): PivotProgram => {
+  if (!materialization || materialization.valueAxis !== program.valueAxis) {
+    return program;
+  }
+
+  const rowDimensions =
+    materialization.valueAxis === 'row'
+      ? coverage.rowDimensions
+      : program.rowDimensions;
+  const columnDimensions =
+    materialization.valueAxis === 'col'
+      ? coverage.columnDimensions
+      : program.columnDimensions;
+  const metricInsertIndex = Math.max(
+    0,
+    Math.min(
+      materialization.valueInsertIndex,
+      materialization.valueAxis === 'row'
+        ? rowDimensions.length
+        : columnDimensions.length,
+    ),
+  );
+
+  return {
+    ...program,
+    rowDimensions,
+    columnDimensions,
+    metricInsertIndex,
+    rows:
+      materialization.valueAxis === 'row'
+        ? withValuesLevel({
+            columns: rowDimensions,
+            metrics: program.metrics,
+            insertIndex: metricInsertIndex,
+          })
+        : toDimensionLevels(rowDimensions),
+    columns:
+      materialization.valueAxis === 'col'
+        ? withValuesLevel({
+            columns: columnDimensions,
+            metrics: program.metrics,
+            insertIndex: metricInsertIndex,
+          })
+        : toDimensionLevels(columnDimensions),
+  };
+};
 
 const canMaterializeMeasureLeaf = ({
   valueKeys,
@@ -147,12 +232,18 @@ const deriveBatchMaterializationPlan = ({
       .filter(group => group.leaves.length > 0),
   };
 
+  const pivotProgram = buildBatchMaterializationProgram({
+    program: layout.pivotProgram,
+    coverage: batch.coverage,
+    materialization: batch.materialization,
+  });
+
   return {
     metrics: loadedMetrics,
     measureHierarchy: materializedMeasureHierarchy,
     rowSubtotalLevels: layout.rowSubtotalLevels,
     colSubtotalLevels: layout.colSubtotalLevelsForQuery,
-    pivotProgram: layout.pivotProgram,
+    pivotProgram,
   };
 };
 

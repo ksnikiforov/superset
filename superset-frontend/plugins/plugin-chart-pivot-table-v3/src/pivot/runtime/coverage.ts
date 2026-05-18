@@ -24,7 +24,11 @@ import {
   isMetricToken,
 } from '../core/tokens';
 import { stableStringify } from '../shared/stableStringify';
-import { projectionQueryDimensions, resolveAxisProjection } from './projection';
+import {
+  projectionQueryDimensions,
+  projectionQueryFilterPath,
+  resolveAxisProjection,
+} from './projection';
 import type { PivotFactSelector, PivotFactStoreBatchScope } from './factStore';
 import type { PivotFactCoverage, PivotProgram } from './types';
 
@@ -174,6 +178,23 @@ const axisPathScopeFromPath = (path: PivotPath): AxisPathScope => ({
   paths: [path],
 });
 
+const expansionFilterPath = ({
+  program,
+  axis,
+  path,
+}: {
+  program: PivotProgram;
+  axis: PivotAxis;
+  path: PivotPath;
+}) =>
+  projectionQueryFilterPath(
+    resolveAxisProjection({
+      program,
+      axis,
+      path,
+    }),
+  );
+
 const valueKeysForExpansionPath = (
   path: PivotPath,
   fallbackValueKeys: string[],
@@ -196,8 +217,20 @@ const buildExpansionCoverageNeed = ({
   valueKeys: string[];
 }): PivotCoverageNeed => {
   if (request.rowPathKeys && request.columnPathKeys) {
-    const rowPaths = request.rowPathKeys.map(parsePath);
-    const columnPaths = request.columnPathKeys.map(parsePath);
+    const rowPaths = request.rowPathKeys.map(pathKey =>
+      expansionFilterPath({
+        program,
+        axis: 'row',
+        path: parsePath(pathKey),
+      }),
+    );
+    const columnPaths = request.columnPathKeys.map(pathKey =>
+      expansionFilterPath({
+        program,
+        axis: 'col',
+        path: parsePath(pathKey),
+      }),
+    );
     return {
       rowDepth: request.rowDepth,
       columnDepth: request.columnDepth,
@@ -209,14 +242,14 @@ const buildExpansionCoverageNeed = ({
     };
   }
   const path = parsePath(request.pathKey);
-  const branchDimensions = projectionQueryDimensions(
-    resolveAxisProjection({
-      program,
-      axis: request.axis,
-      path,
-    }),
-  );
+  const branchProjection = resolveAxisProjection({
+    program,
+    axis: request.axis,
+    path,
+  });
+  const branchDimensions = projectionQueryDimensions(branchProjection);
   const branchDimensionDepth = branchDimensions.length;
+  const branchPath = projectionQueryFilterPath(branchProjection);
   const rowDepth =
     request.axis === 'row' ? branchDimensionDepth : request.rowDepth;
   const columnDepth =
@@ -237,9 +270,13 @@ const buildExpansionCoverageNeed = ({
     columnDimensions,
     valueKeys: valueKeysForExpansionPath(path, valueKeys),
     rowScope:
-      request.axis === 'row' ? axisPathScopeFromPath(path) : { kind: 'root' },
+      request.axis === 'row'
+        ? axisPathScopeFromPath(branchPath)
+        : { kind: 'root' },
     columnScope:
-      request.axis === 'col' ? axisPathScopeFromPath(path) : { kind: 'root' },
+      request.axis === 'col'
+        ? axisPathScopeFromPath(branchPath)
+        : { kind: 'root' },
   };
 };
 

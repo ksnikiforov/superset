@@ -61,6 +61,7 @@ import { buildFactCoverage } from '../runtime/coverage';
 import {
   buildFactValueKeys,
   type PivotFactSelector,
+  type PivotFactMaterialization,
   type PivotFactStoreBatchScope,
 } from '../runtime/factStore';
 import {
@@ -252,16 +253,19 @@ const projectQueryFilterPath = ({
 
 const buildSpecFactSelector = ({
   coverage,
+  materialization,
   scope,
   metrics,
   requiredTimeOffsets,
 }: {
   coverage: PivotFactCoverage;
+  materialization?: PivotFactMaterialization;
   scope: PivotFactStoreBatchScope;
   metrics: QueryFormMetric[];
   requiredTimeOffsets: string[];
 }): PivotFactSelector => ({
   coverage,
+  materialization,
   scope,
   valueKeys: buildFactValueKeys({
     metricKeys: metrics.map(getMetricKey).filter(Boolean) as string[],
@@ -275,6 +279,7 @@ type ResolvedFetchContext = {
   metricsForQuery: QueryFormMetric[];
   requiredTimeOffsets: string[];
   sanitizedPath: PivotPath;
+  materialization?: PivotFactMaterialization;
   coverages: PivotFactCoverage[];
 };
 
@@ -463,6 +468,22 @@ const filterMeasureHierarchyByScope = ({
   };
 };
 
+const resolveFactMaterialization = ({
+  layout,
+  axis,
+  projection,
+}: {
+  layout: LayoutContext;
+  axis: PivotAxis;
+  projection: PivotAxisProjection;
+}): PivotFactMaterialization | undefined =>
+  axis === layout.pivotProgram.valueAxis && projection.valuesLevelSeen
+    ? {
+        valueAxis: axis,
+        valueInsertIndex: projection.filterDimensionPath.length,
+      }
+    : undefined;
+
 const resolveFetchContext = ({
   formData,
   layout,
@@ -604,6 +625,11 @@ const resolveFetchContext = ({
     metricsForQuery: queryShape.metrics,
     requiredTimeOffsets,
     sanitizedPath,
+    materialization: resolveFactMaterialization({
+      layout,
+      axis,
+      projection,
+    }),
     coverages,
   };
 };
@@ -631,6 +657,7 @@ const buildSpecsForCoverages = ({
       coverage,
       factSelector: buildSpecFactSelector({
         coverage,
+        materialization: ctx.materialization,
         scope,
         metrics: ctx.metricsForQuery,
         requiredTimeOffsets: ctx.requiredTimeOffsets,
@@ -769,6 +796,45 @@ const buildPathSetFilterClauses = ({
   return filters;
 };
 
+const resolveIntersectionExpansionAnchor = ({
+  layout,
+  rowPaths,
+  columnPaths,
+}: {
+  layout: LayoutContext;
+  rowPaths: PivotPath[];
+  columnPaths: PivotPath[];
+}): { axis: PivotAxis; path: PivotPath } => {
+  const rowPath =
+    rowPaths.find(path =>
+      canRequestAxisExpansion({
+        program: layout.pivotProgram,
+        axis: 'row',
+        path,
+      }),
+    ) ?? rowPaths[0];
+  const columnPath =
+    columnPaths.find(path =>
+      canRequestAxisExpansion({
+        program: layout.pivotProgram,
+        axis: 'col',
+        path,
+      }),
+    ) ?? columnPaths[0];
+
+  if (
+    columnPath &&
+    canRequestAxisExpansion({
+      program: layout.pivotProgram,
+      axis: 'col',
+      path: columnPath,
+    })
+  ) {
+    return { axis: 'col', path: columnPath };
+  }
+  return { axis: 'row', path: rowPath ?? [] };
+};
+
 export type ExpansionQuerySpecRequest =
   | {
       kind: 'branch';
@@ -883,6 +949,11 @@ export const buildExpansionQuerySpecs = (
   } = request;
   const rowPaths = rowPathKeys.map(parsePath);
   const columnPaths = columnPathKeys.map(parsePath);
+  const anchor = resolveIntersectionExpansionAnchor({
+    layout,
+    rowPaths,
+    columnPaths,
+  });
   const scopedRowPaths = rowPaths.map(path =>
     projectQueryFilterPath({
       layout,
@@ -900,8 +971,8 @@ export const buildExpansionQuerySpecs = (
   return buildAxisExpansionSpecs({
     formData,
     layout,
-    axis: 'row',
-    path: rowPaths[0] ?? [],
+    axis: anchor.axis,
+    path: anchor.path,
     visibleRowDepth,
     visibleColDepth,
     filters: ctx => [
@@ -1009,6 +1080,7 @@ export const buildInitialQuerySpecs = (
           metricsForQuery: queryShape.metrics,
           requiredTimeOffsets: layout.requiredTimeOffsets,
           sanitizedPath: [],
+          materialization: undefined,
           coverages: [coverage],
         },
         filters: [],

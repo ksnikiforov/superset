@@ -35,7 +35,7 @@ import {
   fetchPivotExpansion as fetchPivotBranch,
   type FetchPivotExpansionRequest as FetchPivotBranchParams,
 } from '../../../../src/pivot/expansion/fetchPivotExpansion';
-import { buildMockBranchFetchResult } from '../../fixtures/factBatches';
+import { buildMockExpansionFetchResult } from '../../fixtures/factBatches';
 import { buildTreeFromRecords } from '../../fixtures/buildTreeFromRecords';
 import {
   injectRowSubtotalLeaves,
@@ -59,7 +59,7 @@ describe('PivotTableChart expansion with metrics before dimensions (metric-first
   const fetchPivotBranchMock = fetchPivotBranch as jest.Mock;
   const resolveBranchData =
     (data?: PivotTreeData) => (params: FetchPivotBranchParams) =>
-      Promise.resolve(buildMockBranchFetchResult(params, { data }));
+      Promise.resolve(buildMockExpansionFetchResult(params, { data }));
 
   beforeEach(() => {
     fetchPivotBranchMock.mockReset();
@@ -167,7 +167,7 @@ describe('PivotTableChart expansion with metrics before dimensions (metric-first
     });
   });
 
-  it('renders metric-first rows without duplicating base nodes and fetches from metric tier', async () => {
+  it('renders metric-first rows without duplicating base nodes and expands loaded metric tier locally', async () => {
     const metricFirstTree: PivotTreeData = {
       rows: {
         '': {
@@ -284,11 +284,13 @@ describe('PivotTableChart expansion with metrics before dimensions (metric-first
     const rowToggle = within(
       container.querySelector('tbody') as HTMLElement,
     ).getAllByLabelText('plus-square')[0];
-    // Expand the metric node to fetch the next level.
+    // Expand the metric node. The child row is already present in bootstrap
+    // facts, so no query should be needed.
     fireEvent.click(rowToggle);
     await waitFor(() => {
-      expect(fetchPivotBranchMock).toHaveBeenCalled();
+      expect(queryAllByText('A', { exact: true })).toHaveLength(1);
     });
+    expect(fetchPivotBranchMock).not.toHaveBeenCalled();
   });
 
   it('keeps metric-first return flag values after expanding a child level', async () => {
