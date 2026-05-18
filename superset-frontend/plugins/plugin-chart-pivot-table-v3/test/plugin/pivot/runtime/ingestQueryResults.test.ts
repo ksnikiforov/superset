@@ -17,7 +17,6 @@
  * under the License.
  */
 import { type PlannedQuerySpec } from '../../../../src/pivot/query/specs';
-import { compilePivotProgram } from '../../../../src/pivot/runtime/compilePivotProgram';
 import {
   buildInitialRuntimeFromSpecResultsAsync,
   createPivotFactStore,
@@ -45,8 +44,6 @@ const buildSpec = ({
   metrics = ['sales'],
   rowGroupby = ['country'],
   colGroupby = ['month'],
-  metricsLayoutResolved = MetricsLayoutEnum.ROWS,
-  metricInsertIndex = 1,
 }: {
   queryName: string;
   rowDepth: number;
@@ -54,26 +51,7 @@ const buildSpec = ({
   metrics?: string[];
   rowGroupby?: string[];
   colGroupby?: string[];
-  metricsLayoutResolved?: MetricsLayoutEnum;
-  metricInsertIndex?: number;
 }): PlannedQuerySpec => {
-  const withValuesPlaceholder = (columns: string[]) => [
-    ...columns.slice(0, metricInsertIndex),
-    METRICS_PLACEHOLDER,
-    ...columns.slice(metricInsertIndex),
-  ];
-  const pivotProgram = compilePivotProgram({
-    groupbyRows:
-      metricsLayoutResolved === MetricsLayoutEnum.ROWS
-        ? withValuesPlaceholder(rowGroupby)
-        : rowGroupby,
-    groupbyColumns:
-      metricsLayoutResolved === MetricsLayoutEnum.COLUMNS
-        ? withValuesPlaceholder(colGroupby)
-        : colGroupby,
-    metrics,
-    metricsLayout: metricsLayoutResolved,
-  });
   const coverage = {
     reason: 'initial' as const,
     rowDepth,
@@ -92,7 +70,6 @@ const buildSpec = ({
     meta: {
       kind: 'root',
       requiredTimeOffsets: [],
-      pivotProgram,
       coverage,
       factSelector: {
         coverage,

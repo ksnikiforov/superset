@@ -65,7 +65,7 @@ import {
   resolveAxisProjection,
   type PivotAxisProjection,
 } from '../runtime/projection';
-import { type PivotFactCoverage, type PivotProgram } from '../runtime/types';
+import { type PivotFactCoverage } from '../runtime/types';
 import { stableStringify } from '../shared/stableStringify';
 
 export type QuerySpec = {
@@ -77,7 +77,6 @@ export type QuerySpec = {
 
 export type QuerySpecMeta = {
   requiredTimeOffsets: string[];
-  pivotProgram: PivotProgram;
   coverage: PivotFactCoverage;
   factSelector: PivotFactSelector;
 };
@@ -566,7 +565,6 @@ const buildSpecsForCoverages = ({
     filters,
     meta: {
       requiredTimeOffsets: ctx.requiredTimeOffsets,
-      pivotProgram: layout.pivotProgram,
       coverage,
       factSelector: buildSpecFactSelector({
         coverage,

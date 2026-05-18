@@ -78,15 +78,14 @@ describe('layout resolution (contracts)', () => {
     expect(signature.rows).toEqual(layout.pivotProgram.rowDimensions);
     expect(signature.cols).toEqual(layout.pivotProgram.columnDimensions);
 
-    const bootstrapSpec = specs.find(
-      spec => spec.meta.factSelector.scope.kind === 'root',
-    );
-    expect(bootstrapSpec).toBeDefined();
+    expect(
+      specs.some(spec => spec.meta.factSelector.scope.kind === 'root'),
+    ).toBe(true);
     expect(signature.metricsLayout).toBe(
-      bootstrapSpec?.meta.pivotProgram.metricsLayoutResolved,
+      layout.pivotProgram.metricsLayoutResolved,
     );
     expect(signature.metricInsertIndex).toBe(
-      bootstrapSpec?.meta.pivotProgram.metricInsertIndex,
+      layout.pivotProgram.metricInsertIndex,
     );
     expect(signature.rowSubtotalLevels).toEqual(layout.rowSubtotalLevels);
     expect(signature.colSubtotalLevels).toEqual(
