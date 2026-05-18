@@ -259,6 +259,36 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 - Current production TypeScript/TSX total: about `30447` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
+Engine-size accounting must be updated with every plan update that changes
+source. Count production `src` TypeScript/TSX only; exclude tests and markdown.
+The strict core pipeline excludes visual components, control-panel UI, sticky
+headers, and interaction panels. The broad core pipeline adds non-visual chart
+runtime hooks/policies such as layout, render-model, seamless update,
+formatting, databars, and interaction logic.
+
+| Scope | Baseline lines | Current lines | Delta | Target |
+| --- | ---: | ---: | ---: | ---: |
+| Full production `src` | `33510` | `30447` | `-3063` | `< 28000` |
+| Strict core pipeline | `11337` | `12860` | `+1523` | `8000-9500` |
+| Non-visual chart runtime hooks | `4683` | `5109` | `+426` | `3000-4000` |
+| Broad core pipeline | `16020` | `17969` | `+1949` | `11000-13500` |
+
+Current strict core breakdown:
+
+| Area | Lines |
+| --- | ---: |
+| `pivot/runtime/*` | `4193` |
+| `pivot/expansion/*` | `2975` |
+| `pivot/query/*` | `1865` |
+| `pivot/layout/*` | `725` |
+| core/shared/domain helpers | `1873` |
+| formatting/data/render-model/update support | `1229` |
+
+Interpretation: plugin-wide source has shrunk, but core pipeline source has
+grown because runtime authority moved out of chart/control code before the old
+planner and render-repair surfaces were fully deleted. The next large cuts must
+reduce strict core, not only move lines into it.
+
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.
 Future work should remain high-impact-first while still deleting code where the
