@@ -69,10 +69,14 @@ export const buildMockBranchFactBatches = ({
 export const buildMockBranchFetchResult = (
   params: FetchPivotBranchParams,
   result: Partial<FetchPivotBranchResult> = {},
-): FetchPivotBranchResult => ({
-  ...result,
-  factBatches: result.factBatches ?? buildMockBranchFactBatches(params),
-});
+): FetchPivotBranchResult => {
+  const factBatches = result.factBatches ?? buildMockBranchFactBatches(params);
+  params.factStore?.registerCompatibleCoverageBatches(factBatches);
+  return {
+    ...result,
+    factBatches,
+  };
+};
 
 export const resolveMockBranchFetchResult =
   (result: Partial<FetchPivotBranchResult> = {}) =>
@@ -119,10 +123,14 @@ export const buildMockBatchFactBatches = ({
 export const buildMockBatchFetchResult = (
   params: FetchPivotBranchesBatchParams,
   result: Partial<FetchPivotBranchesBatchResult> = {},
-): FetchPivotBranchesBatchResult => ({
-  ...result,
-  factBatches: result.factBatches ?? buildMockBatchFactBatches(params),
-});
+): FetchPivotBranchesBatchResult => {
+  const factBatches = result.factBatches ?? buildMockBatchFactBatches(params);
+  params.factStore?.registerCompatibleCoverageBatches(factBatches);
+  return {
+    ...result,
+    factBatches,
+  };
+};
 
 export const resolveMockBatchFetchResult =
   (result: Partial<FetchPivotBranchesBatchResult> = {}) =>
@@ -169,7 +177,12 @@ export const buildMockIntersectionFactBatches = ({
 export const buildMockIntersectionFetchResult = (
   params: FetchPivotIntersectionParams,
   result: Partial<FetchPivotIntersectionResult> = {},
-): FetchPivotIntersectionResult => ({
-  ...result,
-  factBatches: result.factBatches ?? buildMockIntersectionFactBatches(params),
-});
+): FetchPivotIntersectionResult => {
+  const factBatches =
+    result.factBatches ?? buildMockIntersectionFactBatches(params);
+  params.factStore?.registerCompatibleCoverageBatches(factBatches);
+  return {
+    ...result,
+    factBatches,
+  };
+};

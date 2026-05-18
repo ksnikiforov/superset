@@ -36,11 +36,7 @@ import {
   type BatchGroup,
   type FetchTarget,
 } from '../query/fetchPlanOptimizer';
-import {
-  buildFactValueKeys,
-  type PivotFactStore,
-  type PivotFactStoreBatch,
-} from '../runtime/factStore';
+import { buildFactValueKeys, type PivotFactStore } from '../runtime/factStore';
 import {
   type LatestRequestLifecycle,
   type LatestRequestScope,
@@ -65,7 +61,6 @@ import type { PivotProgram } from '../runtime/types';
 type ExpansionFetchResult = {
   targets: ExpansionFetchTarget[];
   data: PivotTreeData;
-  factBatches: PivotFactStoreBatch[];
 };
 
 export type TrackExpansionRequest = <T>(
@@ -134,7 +129,6 @@ export type FetchResultDelta = {
 
 type ExpansionFetcherResult = {
   data: PivotTreeData;
-  factBatches: PivotFactStoreBatch[];
   warnings?: ChartDataWarning[];
   error?: unknown;
 };
@@ -227,7 +221,6 @@ const executeExpansionFetch = async ({
     return {
       targets,
       data: result.data,
-      factBatches: result.factBatches,
     };
   } finally {
     if (requestScope.isCurrent()) {
@@ -411,7 +404,6 @@ export const fetchExpansionTargetDeltas = async ({
   }
   const deltas: FetchResultDelta[] = [];
   results.forEach(result => {
-    runtime.factStore?.registerCompatibleCoverageBatches(result.factBatches);
     runtime.recordFactBatches?.();
     deltas.push({
       targets: result.targets,

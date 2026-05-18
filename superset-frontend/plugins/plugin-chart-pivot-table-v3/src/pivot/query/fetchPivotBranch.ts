@@ -120,6 +120,8 @@ export const fetchPivotQuerySpecsIntoBranchTree = async ({
     spec => !store.hasCompatibleCoverage(factStoreSelectorFromSpec(spec)),
   );
   if (missingSpecs.length === 0) {
+    const factBatches = buildFactStoreBatchesFromSpecs({ specs, store });
+    store.registerCompatibleCoverageBatches(factBatches);
     return {
       data: buildBranchTreeFromFactStore({
         specs,
@@ -127,7 +129,7 @@ export const fetchPivotQuerySpecsIntoBranchTree = async ({
         formData,
         measureHierarchy,
       }),
-      factBatches: buildFactStoreBatchesFromSpecs({ specs, store }),
+      factBatches,
     };
   }
   const metricsForQuery = missingSpecs[0]?.metrics ?? specs[0].metrics;
@@ -161,6 +163,7 @@ export const fetchPivotQuerySpecsIntoBranchTree = async ({
       specs: missingSpecs,
       results,
     });
+    store.registerCompatibleCoverageBatches(factBatches);
     const data = buildBranchTreeFromFactStore({
       specs,
       store,
