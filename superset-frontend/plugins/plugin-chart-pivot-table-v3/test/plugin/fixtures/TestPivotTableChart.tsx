@@ -26,7 +26,10 @@ import {
   PivotTableQueryFormData,
   PivotTreeData,
 } from '../../../src/types';
-import { type PivotFactStoreBatch } from '../../../src/pivot/runtime/factStore';
+import {
+  type PivotFact,
+  type PivotFactStoreBatch,
+} from '../../../src/pivot/runtime/factStore';
 import { serializePath } from '../../../src/pivot/core/path';
 import {
   isMeasureLeafToken,
@@ -86,6 +89,11 @@ const maxPathDepth = (nodes: PivotTreeData['rows']) =>
     0,
   );
 
+const depthRange = (maxDepth: number) =>
+  maxDepth > 0
+    ? Array.from({ length: maxDepth }, (_value, index) => index + 1)
+    : [0];
+
 const pathStartsWith = (path: PivotPath, basePath: PivotPath) =>
   basePath.every((value, index) => path[index] === value);
 
@@ -110,6 +118,27 @@ const collectTreeValueKeys = (tree: PivotTreeData) =>
       ...Object.values(tree.cells).flatMap(cell => Object.keys(cell.values)),
     ]),
   ).sort();
+
+const buildFactsForCoverage = (
+  tree: PivotTreeData,
+  coverage: PivotFactStoreBatch['coverage'],
+): PivotFact[] =>
+  Object.values(tree.cells).flatMap(cell => {
+    const row = tree.rows[cell.rowKey];
+    const col = tree.cols[cell.colKey];
+    if (!row || !col) {
+      return [];
+    }
+    const rowPath = row.path.slice(0, coverage.rowDepth);
+    const columnPath = col.path.slice(0, coverage.columnDepth);
+    return Object.entries(cell.values).map(([valueKey, value]) => ({
+      rowPath,
+      columnPath,
+      valueKey,
+      value,
+      role: 'visible' as const,
+    }));
+  });
 
 const collectLoadedBranchPaths = ({
   axis,
@@ -186,16 +215,17 @@ export const buildPreloadedBootstrapFactBatches = (
   const bootstrapColDepth =
     groupby.groupbyColumns.length > 0 && colDepth > 0 ? 1 : 0;
   const valueKeys = collectTreeValueKeys(tree);
+  const coverage = {
+    reason: 'initial' as const,
+    rowDepth: bootstrapRowDepth,
+    columnDepth: bootstrapColDepth,
+    rowDimensions: groupby.groupbyRows.slice(0, bootstrapRowDepth),
+    columnDimensions: groupby.groupbyColumns.slice(0, bootstrapColDepth),
+  };
   return [
     {
-      coverage: {
-        reason: 'initial',
-        rowDepth: bootstrapRowDepth,
-        columnDepth: bootstrapColDepth,
-        rowDimensions: groupby.groupbyRows.slice(0, bootstrapRowDepth),
-        columnDimensions: groupby.groupbyColumns.slice(0, bootstrapColDepth),
-      },
-      facts: [],
+      coverage,
+      facts: buildFactsForCoverage(tree, coverage),
       valueKeys,
       scope: {
         kind: 'bootstrap',
@@ -229,21 +259,39 @@ export const buildPreloadedBranchFactBatches = (
       tree,
       basePaths: [[]],
     }).forEach(path => {
-      batches.push({
-        coverage: {
-          reason: 'initial',
-          rowDepth,
-          columnDepth: colDepth,
-          rowDimensions: groupby.groupbyRows.slice(0, rowDepth),
-          columnDimensions: groupby.groupbyColumns.slice(0, colDepth),
-        },
-        facts: [],
-        valueKeys,
-        scope: {
-          kind: 'branch',
-          axis,
-          path,
-        },
+      const pathDepth = countDimensionalPathDepth(path);
+      const rowDepths =
+        axis === 'row'
+          ? [Math.min(pathDepth + 1, rowDepth)].filter(
+              nextDepth => nextDepth > pathDepth,
+            )
+          : depthRange(rowDepth);
+      const colDepths =
+        axis === 'col'
+          ? [Math.min(pathDepth + 1, colDepth)].filter(
+              nextDepth => nextDepth > pathDepth,
+            )
+          : depthRange(colDepth);
+      rowDepths.forEach(nextRowDepth => {
+        colDepths.forEach(nextColDepth => {
+          const coverage = {
+            reason: 'initial' as const,
+            rowDepth: nextRowDepth,
+            columnDepth: nextColDepth,
+            rowDimensions: groupby.groupbyRows.slice(0, nextRowDepth),
+            columnDimensions: groupby.groupbyColumns.slice(0, nextColDepth),
+          };
+          batches.push({
+            coverage,
+            facts: buildFactsForCoverage(tree, coverage),
+            valueKeys,
+            scope: {
+              kind: 'branch',
+              axis,
+              path,
+            },
+          });
+        });
       });
     });
   });
@@ -274,21 +322,39 @@ export const buildPreloadedRenderedBranchFactBatches = (
       if (!node.hasChildren) {
         return;
       }
-      batches.push({
-        coverage: {
-          reason: 'initial',
-          rowDepth,
-          columnDepth: colDepth,
-          rowDimensions: groupby.groupbyRows.slice(0, rowDepth),
-          columnDimensions: groupby.groupbyColumns.slice(0, colDepth),
-        },
-        facts: [],
-        valueKeys,
-        scope: {
-          kind: 'branch',
-          axis,
-          path: node.path,
-        },
+      const pathDepth = countDimensionalPathDepth(node.path);
+      const rowDepths =
+        axis === 'row'
+          ? [Math.min(pathDepth + 1, rowDepth)].filter(
+              nextDepth => nextDepth > pathDepth,
+            )
+          : depthRange(rowDepth);
+      const colDepths =
+        axis === 'col'
+          ? [Math.min(pathDepth + 1, colDepth)].filter(
+              nextDepth => nextDepth > pathDepth,
+            )
+          : depthRange(colDepth);
+      rowDepths.forEach(nextRowDepth => {
+        colDepths.forEach(nextColDepth => {
+          const coverage = {
+            reason: 'initial' as const,
+            rowDepth: nextRowDepth,
+            columnDepth: nextColDepth,
+            rowDimensions: groupby.groupbyRows.slice(0, nextRowDepth),
+            columnDimensions: groupby.groupbyColumns.slice(0, nextColDepth),
+          };
+          batches.push({
+            coverage,
+            facts: buildFactsForCoverage(tree, coverage),
+            valueKeys,
+            scope: {
+              kind: 'branch',
+              axis,
+              path: node.path,
+            },
+          });
+        });
       });
     });
   });
@@ -362,21 +428,19 @@ export default function TestPivotTableChart(props: TestPivotTableChartProps) {
       baseProps.sourceMeasureLeavesByMetric,
   };
   const runtimeLayout = mergedProps.formData.pivotRuntimeLayout;
-  const {
-    metrics: _legacyMetrics,
-    startCollapsed: _legacyStartCollapsed,
-    initialDepth: _legacyInitialDepth,
-    rowTotals: _legacyRowTotals,
-    colTotals: _legacyColTotals,
-    rowSubTotals: _legacyRowSubTotals,
-    rowSubtotalLevels: _legacyRowSubtotalLevels,
-    colSubtotalLevels: _legacyColSubtotalLevels,
-    rowTotalPosition: _legacyRowTotalPosition,
-    rowSubtotalPosition: _legacyRowSubtotalPosition,
-    colTotalPosition: _legacyColTotalPosition,
-    colSubtotalPosition: _legacyColSubtotalPosition,
-    ...chartProps
-  } = mergedProps;
+  const chartProps = { ...mergedProps };
+  delete chartProps.metrics;
+  delete chartProps.startCollapsed;
+  delete chartProps.initialDepth;
+  delete chartProps.rowTotals;
+  delete chartProps.colTotals;
+  delete chartProps.rowSubTotals;
+  delete chartProps.rowSubtotalLevels;
+  delete chartProps.colSubtotalLevels;
+  delete chartProps.rowTotalPosition;
+  delete chartProps.rowSubtotalPosition;
+  delete chartProps.colTotalPosition;
+  delete chartProps.colSubtotalPosition;
 
   return (
     <PivotTableChart

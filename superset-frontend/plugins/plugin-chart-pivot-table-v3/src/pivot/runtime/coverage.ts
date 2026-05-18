@@ -141,15 +141,6 @@ const columnRefsMatch = (
     (column, index) => columnRefKey(column) === columnRefKey(right[index]),
   );
 
-const columnRefsStartWith = (
-  left: PivotProgram['rowDimensions'],
-  prefix: PivotProgram['rowDimensions'],
-) =>
-  left.length >= prefix.length &&
-  prefix.every(
-    (column, index) => columnRefKey(column) === columnRefKey(left[index]),
-  );
-
 const pathStartsWith = (path: PivotPath, prefix: PivotPath) =>
   prefix.every((value, index) => path[index] === value);
 
@@ -366,15 +357,11 @@ const factBatchCoversNeed = (
 ) => {
   const isRootNeed =
     need.rowScope.kind === 'root' && need.columnScope.kind === 'root';
-  const hasCompatibleCoverage = isRootNeed
-    ? coverage.rowDepth === need.rowDepth &&
-      coverage.columnDepth === need.columnDepth &&
-      columnRefsMatch(coverage.rowDimensions, need.rowDimensions) &&
-      columnRefsMatch(coverage.columnDimensions, need.columnDimensions)
-    : coverage.rowDepth >= need.rowDepth &&
-      coverage.columnDepth >= need.columnDepth &&
-      columnRefsStartWith(coverage.rowDimensions, need.rowDimensions) &&
-      columnRefsStartWith(coverage.columnDimensions, need.columnDimensions);
+  const hasCompatibleCoverage =
+    coverage.rowDepth === need.rowDepth &&
+    coverage.columnDepth === need.columnDepth &&
+    columnRefsMatch(coverage.rowDimensions, need.rowDimensions) &&
+    columnRefsMatch(coverage.columnDimensions, need.columnDimensions);
 
   return (
     hasCompatibleCoverage &&
@@ -386,16 +373,44 @@ const factBatchCoversNeed = (
   );
 };
 
+const splitAxisScope = (scope: AxisPathScope): AxisPathScope[] => {
+  if (scope.kind === 'root') {
+    return [scope];
+  }
+  if (scope.kind === 'paths') {
+    return scope.paths.map(path => ({ kind: 'paths', paths: [path] }));
+  }
+  return scope.ancestorPaths.map(path => ({
+    kind: 'scopedFull',
+    ancestorPaths: [path],
+  }));
+};
+
+const splitCoverageNeed = (need: PivotCoverageNeed): PivotCoverageNeed[] =>
+  splitAxisScope(need.rowScope).flatMap(rowScope =>
+    splitAxisScope(need.columnScope).map(columnScope => ({
+      ...need,
+      rowScope,
+      columnScope,
+    })),
+  );
+
+const factBatchesCoverNeed = (
+  factBatches: PivotFactStoreBatch[],
+  need: PivotCoverageNeed,
+) =>
+  factBatches.some(batch => factBatchCoversNeed(batch, need)) ||
+  splitCoverageNeed(need).every(part =>
+    factBatches.some(batch => factBatchCoversNeed(batch, part)),
+  );
+
 export const diffCoverageManifest = ({
   required,
   factBatches,
 }: {
   required: PivotCoverageNeed[];
   factBatches: PivotFactStoreBatch[];
-}) =>
-  required.filter(
-    need => !factBatches.some(batch => factBatchCoversNeed(batch, need)),
-  );
+}) => required.filter(need => !factBatchesCoverNeed(factBatches, need));
 
 export const createExpansionCoverageDiff = ({
   factBatches,

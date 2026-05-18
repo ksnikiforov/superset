@@ -51,7 +51,7 @@ describe('expansion fact coverage', () => {
             rowDepth: 2,
             columnDepth: 1,
             rowDimensions: ['country', 'city'],
-            columnDimensions: ['month'],
+            columnDimensions: ['year'],
           },
           scope: {
             kind: 'branch',
@@ -442,6 +442,48 @@ describe('coverage manifest diff', () => {
         ],
       }),
     ).toEqual([]);
+  });
+
+  it('lets separate exact branch batches satisfy a path-set request', () => {
+    const required = [
+      need({ kind: 'paths', paths: [['USA'], ['Canada']] }, { kind: 'root' }),
+    ];
+
+    expect(
+      diffCoverageManifest({
+        required,
+        factBatches: [
+          batch({ kind: 'branch', axis: 'row', path: ['USA'] }),
+          batch({ kind: 'branch', axis: 'row', path: ['Canada'] }),
+        ],
+      }),
+    ).toEqual([]);
+  });
+
+  it('does not let deeper aggregate coverage satisfy a shallower scoped request', () => {
+    const required = [
+      need({ kind: 'paths', paths: [['USA']] }, { kind: 'root' }),
+    ];
+
+    expect(
+      diffCoverageManifest({
+        required,
+        factBatches: [
+          {
+            coverage: {
+              reason: 'expand',
+              rowDepth: 3,
+              columnDepth: 2,
+              rowDimensions: ['country', 'city', 'store'],
+              columnDimensions: ['year', 'quarter'],
+            },
+            scope: { kind: 'branch', axis: 'row', path: ['USA'] },
+            valueKeys: ['sales'],
+            facts: [],
+          },
+        ],
+      }),
+    ).toEqual(required);
   });
 
   it('supports consecutive scoped full expansion through the same ancestor scope', () => {

@@ -44,6 +44,7 @@ import {
   buildSeamlessRuntimeSyncSnapshot,
   fetchAndMaterializeSeamlessRuntimeUpdate,
   isSameRuntimeLayout,
+  materializeSeamlessRuntimeReuse,
   prepareSeamlessRuntimeUpdateEffect,
   prepareSeamlessRuntimeLayoutChange,
   type SeamlessRuntimeSyncSnapshot,
@@ -88,6 +89,7 @@ type UsePivotSeamlessRuntimeUpdateConfig = {
   expandedColsRef: MutableRefObject<Set<string>>;
   pendingRowsRef: MutableRefObject<Set<string>>;
   pendingColsRef: MutableRefObject<Set<string>>;
+  loadedFactBatchesRef: MutableRefObject<PivotFactStoreBatch[]>;
   commitFilters: (filters: RuntimeSelection) => void;
   updateUiSelectedFilters: (filters: RuntimeSelection) => void;
   lastLocalSyncDashboardQueryContextRef: MutableRefObject<string | null>;
@@ -126,6 +128,7 @@ export const usePivotSeamlessRuntimeUpdate = (
     expandedColsRef,
     pendingRowsRef,
     pendingColsRef,
+    loadedFactBatchesRef,
     commitFilters,
     updateUiSelectedFilters,
     lastLocalSyncDashboardQueryContextRef,
@@ -182,6 +185,7 @@ export const usePivotSeamlessRuntimeUpdate = (
     }
     setCommittedTree(data);
     setCommittedFactBatches(factBatches);
+    loadedFactBatchesRef.current = factBatches;
     resetSeamlessRuntimeState();
   }, [
     data,
@@ -190,6 +194,7 @@ export const usePivotSeamlessRuntimeUpdate = (
     committedRuntimeLayout,
     isUserControlled,
     lastLocalSyncDashboardQueryContextRef,
+    loadedFactBatchesRef,
     persistedInteractionFilters,
     resetSeamlessRuntimeState,
     runtimeLayout,
@@ -240,6 +245,7 @@ export const usePivotSeamlessRuntimeUpdate = (
       unstable_batchedUpdates(() => {
         setCommittedTree(updateResult.tree);
         setCommittedFactBatches(updateResult.factBatches);
+        loadedFactBatchesRef.current = updateResult.factBatches;
         commitUiRuntimeLayout(normalized);
         commitFilters(nextFilters);
         setWarnings(updateResult.warnings);
@@ -259,6 +265,84 @@ export const usePivotSeamlessRuntimeUpdate = (
       dimensionKeys,
       expandedColsRef,
       expandedRowsRef,
+      loadedFactBatchesRef,
+      materializationLifecycle,
+      metricKeys,
+      pendingColsRef,
+      pendingRowsRef,
+      persistRuntimeState,
+      requestLifecycle,
+      seamlessSyncRef,
+      sourceMeasureLeavesByMetric,
+      sourceMetrics,
+      upstreamSignature,
+    ],
+  );
+
+  const applyLocalRuntimeMaterialization = useCallback(
+    async (
+      nextLayout: PivotRuntimeLayout,
+      nextFilters: RuntimeSelection,
+      reuseSnapshot: {
+        runtimeLayout: PivotRuntimeLayout;
+        factBatches: PivotFactStoreBatch[];
+      },
+    ) => {
+      requestLifecycle.invalidate();
+      const normalized = normalizeRuntimeLayout(
+        nextLayout,
+        dimensionKeys,
+        metricKeys,
+      );
+      const updateResult = await materializeSeamlessRuntimeReuse({
+        materializationLifecycle,
+        reuseSnapshot,
+        baseFormData,
+        sourceMetrics,
+        sourceMeasureLeavesByMetric,
+        runtimeLayout: normalized,
+        selection: nextFilters,
+        expandedRows: expandedRowsRef.current,
+        expandedCols: expandedColsRef.current,
+        pendingRows: pendingRowsRef.current,
+        pendingCols: pendingColsRef.current,
+        onError: nextError => {
+          setError(
+            nextError instanceof Error
+              ? nextError.message
+              : t('Failed to update data'),
+          );
+        },
+      });
+      if (updateResult.status === 'stale') {
+        return;
+      }
+      if (updateResult.status !== 'success') {
+        return;
+      }
+      unstable_batchedUpdates(() => {
+        setCommittedTree(updateResult.tree);
+        setCommittedFactBatches(updateResult.factBatches);
+        loadedFactBatchesRef.current = updateResult.factBatches;
+        commitUiRuntimeLayout(normalized);
+        commitFilters(nextFilters);
+        setWarnings(updateResult.warnings);
+        persistRuntimeState(normalized, nextFilters);
+      });
+      seamlessSyncRef.current = buildSeamlessRuntimeSyncSnapshot({
+        runtimeLayout: normalized,
+        selection: nextFilters,
+        upstreamSignature,
+      });
+    },
+    [
+      baseFormData,
+      commitFilters,
+      commitUiRuntimeLayout,
+      dimensionKeys,
+      expandedColsRef,
+      expandedRowsRef,
+      loadedFactBatchesRef,
       materializationLifecycle,
       metricKeys,
       pendingColsRef,
@@ -274,14 +358,15 @@ export const usePivotSeamlessRuntimeUpdate = (
 
   const applyRuntimeLayoutChange = useCallback(
     (nextLayout: PivotRuntimeLayout) => {
+      const reuseSnapshot = {
+        runtimeLayout: uiRuntimeLayoutRef.current,
+        factBatches: loadedFactBatchesRef.current,
+      };
       const action = prepareSeamlessRuntimeLayoutChange({
         nextLayout,
         dimensionKeys,
         metricKeys,
-        reuseSnapshot: {
-          runtimeLayout: uiRuntimeLayoutRef.current,
-          factBatches: committedFactBatches,
-        },
+        reuseSnapshot,
         selection: uiSelectedFilters,
         upstreamSignature,
       });
@@ -290,15 +375,26 @@ export const usePivotSeamlessRuntimeUpdate = (
         applySeamlessUpdate(action.runtimeLayout, uiSelectedFilters);
         return;
       }
+      if (action.kind === 'materialize-local') {
+        commitUiRuntimeLayout(action.runtimeLayout);
+        persistRuntimeState(action.runtimeLayout, uiSelectedFilters);
+        applyLocalRuntimeMaterialization(
+          action.runtimeLayout,
+          uiSelectedFilters,
+          reuseSnapshot,
+        );
+        return;
+      }
       commitUiRuntimeLayout(action.runtimeLayout);
       persistRuntimeState(action.runtimeLayout, uiSelectedFilters);
       seamlessSyncRef.current = action.syncSnapshot;
     },
     [
       applySeamlessUpdate,
+      applyLocalRuntimeMaterialization,
       commitUiRuntimeLayout,
-      committedFactBatches,
       dimensionKeys,
+      loadedFactBatchesRef,
       metricKeys,
       persistRuntimeState,
       seamlessSyncRef,

@@ -455,3 +455,36 @@ export const buildInitialRuntimeFromSpecResultsAsync = async ({
     factBatches,
   };
 };
+
+export const buildInitialRuntimeFromFactBatchesAsync = async ({
+  specs,
+  factBatches,
+  layout,
+  formData,
+  chunkSize,
+  shouldContinue,
+  yieldToMain,
+}: {
+  specs: PlannedQuerySpec[];
+  factBatches: PivotFactStoreBatch[];
+  layout: LayoutContext;
+  formData: PivotTableQueryFormData;
+} & ChunkedWorkOptions): Promise<{
+  tree: PivotTreeData;
+  factBatches: PivotFactStoreBatch[];
+}> => {
+  const store = createPivotFactStore();
+  store.upsertBatches(factBatches);
+  return {
+    tree: await materializeInitialPivotTreeFromFactStoreAsync({
+      specs,
+      store,
+      layout,
+      formData,
+      chunkSize,
+      shouldContinue,
+      yieldToMain,
+    }),
+    factBatches,
+  };
+};

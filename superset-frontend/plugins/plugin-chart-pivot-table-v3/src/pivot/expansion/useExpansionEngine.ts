@@ -275,6 +275,7 @@ const createExpansionStateStore = (
 
 export type ExpansionEngineResult = {
   tree: PivotTreeData;
+  factBatches: PivotFactStoreBatch[];
   expandedRows: Set<string>;
   expandedCols: Set<string>;
   loadingKeys: Set<string>;
@@ -336,6 +337,8 @@ export const useExpansionEngine = ({
   pruneMergedTree,
 }: ExpansionEngineConfig): ExpansionEngineResult => {
   const [tree, setTree] = useState<PivotTreeData>(data);
+  const [loadedFactBatches, setLoadedFactBatches] =
+    useState<PivotFactStoreBatch[]>(factBatches);
   const treeRef = useRef(tree);
   const factStoreRef = useRef<PivotFactStore>();
   if (!factStoreRef.current) {
@@ -392,6 +395,38 @@ export const useExpansionEngine = ({
         cancel: requestGroupId =>
           supersetChartDataClient.cancel(requestGroupId),
       }),
+    [],
+  );
+
+  const recordFactBatches = useCallback(
+    (nextBatches: PivotFactStoreBatch[]) => {
+      setLoadedFactBatches(previous => {
+        if (nextBatches.length === 0) {
+          return previous;
+        }
+        const merged = new Map(
+          previous.map(batch => [
+            stableStringify([
+              batch.coverage,
+              batch.scope,
+              batch.valueKeys ?? [],
+            ]),
+            batch,
+          ]),
+        );
+        nextBatches.forEach(batch => {
+          merged.set(
+            stableStringify([
+              batch.coverage,
+              batch.scope,
+              batch.valueKeys ?? [],
+            ]),
+            batch,
+          );
+        });
+        return Array.from(merged.values());
+      });
+    },
     [],
   );
 
@@ -701,12 +736,13 @@ export const useExpansionEngine = ({
       requestScope,
       fetchFormData: fetchFormDataRef.current,
       factStore: factStoreRef.current,
+      recordFactBatches,
       buildRequestGroupId: expansionRequestHelpers.buildRequestGroupId,
       trackRequestInScope: expansionRequestHelpers.trackRequestInScope,
       addWarnings,
       updateLoadingKey,
     }),
-    [addWarnings, expansionRequestHelpers, updateLoadingKey],
+    [addWarnings, expansionRequestHelpers, recordFactBatches, updateLoadingKey],
   );
 
   const expandSameAxis = useCallback(
@@ -1074,6 +1110,7 @@ export const useExpansionEngine = ({
     const nextFactStore = createPivotFactStore();
     nextFactStore.upsertBatches(factBatches);
     factStoreRef.current = nextFactStore;
+    setLoadedFactBatches(factBatches);
     setHydratingState(false);
     warningsRef.current = new Map();
     setWarnings([]);
@@ -1093,6 +1130,8 @@ export const useExpansionEngine = ({
       autoExpandColsLevelForDesired,
       prevAutoExpandRows: prevAutoExpandRowsRef.current,
       prevAutoExpandCols: prevAutoExpandColsRef.current,
+      expandRowsLevelRaw,
+      expandColumnsLevelRaw,
       rowStablePrefix,
       colStablePrefix,
       shouldResetExpandedRows,
@@ -1210,6 +1249,7 @@ export const useExpansionEngine = ({
 
   return {
     tree,
+    factBatches: loadedFactBatches,
     expandedRows,
     expandedCols,
     loadingKeys,

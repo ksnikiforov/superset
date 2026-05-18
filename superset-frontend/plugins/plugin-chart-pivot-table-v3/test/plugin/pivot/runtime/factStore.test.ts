@@ -411,6 +411,117 @@ test('materialization can reuse compatible batch coverage for branch facts', () 
   expect(store.hasCompatibleCoverage(canadaSelector)).toBe(false);
 });
 
+test('materialization can read separate exact branches for a batched request', () => {
+  const store = createPivotFactStore();
+  const branchCoverage: PivotFactCoverage = {
+    reason: 'expand',
+    rowDepth: 2,
+    columnDepth: 1,
+    rowDimensions: ['country', 'city'],
+    columnDimensions: ['month'],
+  };
+  const batchSelector = {
+    coverage: branchCoverage,
+    scope: {
+      kind: 'batch',
+      axis: 'row',
+      parentPath: [],
+      siblingValues: ['France', 'Canada'],
+    } as PivotFactStoreBatchScope,
+    valueKeys: ['sales'],
+  };
+
+  store.upsertBatches([
+    {
+      coverage: branchCoverage,
+      scope: {
+        kind: 'branch',
+        axis: 'row',
+        path: ['France'],
+      },
+      valueKeys: ['sales'],
+      facts: [
+        buildFact({
+          rowPath: ['France', 'Paris'],
+          columnPath: ['2026-01'],
+          value: 1,
+        }),
+      ],
+    },
+    {
+      coverage: branchCoverage,
+      scope: {
+        kind: 'branch',
+        axis: 'row',
+        path: ['Canada'],
+      },
+      valueKeys: ['sales'],
+      facts: [
+        buildFact({
+          rowPath: ['Canada', 'Toronto'],
+          columnPath: ['2026-01'],
+          value: 2,
+        }),
+      ],
+    },
+  ]);
+
+  expect(store.hasCompatibleCoverage(batchSelector)).toBe(true);
+  expect(
+    store.getCompatibleFacts(batchSelector).map(fact => fact.rowPath),
+  ).toEqual([
+    ['France', 'Paris'],
+    ['Canada', 'Toronto'],
+  ]);
+});
+
+test('does not reuse deeper aggregate facts for a shallower branch request', () => {
+  const store = createPivotFactStore();
+  const shallowCoverage: PivotFactCoverage = {
+    reason: 'expand',
+    rowDepth: 2,
+    columnDepth: 1,
+    rowDimensions: ['country', 'city'],
+    columnDimensions: ['month'],
+  };
+  const deepCoverage: PivotFactCoverage = {
+    reason: 'expand',
+    rowDepth: 3,
+    columnDepth: 1,
+    rowDimensions: ['country', 'city', 'store'],
+    columnDimensions: ['month'],
+  };
+  const shallowSelector = {
+    coverage: shallowCoverage,
+    scope: {
+      kind: 'branch',
+      axis: 'row',
+      path: ['France'],
+    } as PivotFactStoreBatchScope,
+    valueKeys: ['sales'],
+  };
+
+  store.upsertBatch({
+    coverage: deepCoverage,
+    scope: {
+      kind: 'branch',
+      axis: 'row',
+      path: ['France'],
+    },
+    valueKeys: ['sales'],
+    facts: [
+      buildFact({
+        rowPath: ['France', 'Paris', 'Store A'],
+        columnPath: ['2026-01'],
+        value: 1,
+      }),
+    ],
+  });
+
+  expect(store.hasCompatibleCoverage(shallowSelector)).toBe(false);
+  expect(store.getCompatibleFacts(shallowSelector)).toEqual([]);
+});
+
 test('reuses broader metric coverage for narrower compatible requests', () => {
   const store = createPivotFactStore();
   const rootSelector = {

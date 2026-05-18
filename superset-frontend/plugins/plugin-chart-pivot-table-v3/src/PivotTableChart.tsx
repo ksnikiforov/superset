@@ -224,18 +224,28 @@ function PivotTableChart(props: PivotTableProps) {
       committedRuntimeLayout: committedRuntimeLayoutRef.current,
       appliedDimensionKeys,
     });
+  const { appliedLayoutFormData: draftLayoutFormData } =
+    resolveAppliedInteractionLayout({
+      isUserControlled,
+      appliedFormData,
+      sourceMetrics,
+      sourceMeasureLeavesByMetric,
+      committedRuntimeLayout: uiRuntimeLayout,
+      appliedDimensionKeys,
+    });
   const fetchFormData = useMemo(() => {
     if (!isUserControlled) {
-      return appliedLayoutFormData;
+      return draftLayoutFormData;
     }
     return buildSelectionFilteredFormData({
-      formData: appliedLayoutFormData,
+      formData: draftLayoutFormData,
       selection: committedFilters,
     });
-  }, [appliedLayoutFormData, committedFilters, isUserControlled]);
+  }, [committedFilters, draftLayoutFormData, isUserControlled]);
 
   const upstreamSeamlessSignature =
     upstreamDashboardQueryContextSignature ?? '';
+  const loadedFactBatchesRef = useRef(factBatches);
   const {
     dataForRender,
     factBatchesForRender,
@@ -272,6 +282,7 @@ function PivotTableChart(props: PivotTableProps) {
     expandedColsRef: expandedColsForSeamlessRef,
     pendingRowsRef: pendingRowsForSeamlessRef,
     pendingColsRef: pendingColsForSeamlessRef,
+    loadedFactBatchesRef,
     commitFilters,
     updateUiSelectedFilters,
     lastLocalSyncDashboardQueryContextRef,
@@ -315,6 +326,7 @@ function PivotTableChart(props: PivotTableProps) {
   );
   const {
     tree,
+    factBatches: expansionFactBatches,
     expandedRows,
     expandedCols,
     loadingKeys,
@@ -347,6 +359,7 @@ function PivotTableChart(props: PivotTableProps) {
     pruneMergedTree: layoutResult.pruneMergedTree,
   });
 
+  useSyncRef(loadedFactBatchesRef, expansionFactBatches);
   useSyncRef(expandedRowsForSeamlessRef, expandedRows);
   useSyncRef(expandedColsForSeamlessRef, expandedCols);
   useSyncRef(pendingRowsForSeamlessRef, pendingRows);

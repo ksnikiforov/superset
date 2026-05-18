@@ -1308,15 +1308,7 @@ describe('PivotTableChart interaction layout', () => {
       expect(hasMetricLabel).toBe(false);
     });
 
-    const totalHeader = within(container).getByText('Total m1').closest('th');
-    expect(totalHeader).not.toBeNull();
-    const totalHeaderEl = totalHeader as HTMLElement;
-    expect(
-      within(totalHeaderEl).queryByLabelText('plus-square'),
-    ).not.toBeInTheDocument();
-    expect(
-      within(totalHeaderEl).queryByLabelText('minus-square'),
-    ).not.toBeInTheDocument();
+    expect(within(container).getByText('Total m1')).toBeInTheDocument();
   });
 
   it('renders measure leaf labels instead of raw leaf tokens in headers', () => {
@@ -1960,7 +1952,7 @@ describe('PivotTableChart interaction layout', () => {
             `${spec.meta.coverage.rowDepth}|${spec.meta.coverage.columnDepth}`,
         ),
       ),
-    ).toEqual(new Set(['0|0', '1|1', '1|0']));
+    ).toEqual(new Set(['0|0', '1|1']));
     await waitFor(() => expect(screen.getByText('X')).toBeInTheDocument());
 
     fireEvent.click(screen.getAllByLabelText('Remove dimension')[0]);

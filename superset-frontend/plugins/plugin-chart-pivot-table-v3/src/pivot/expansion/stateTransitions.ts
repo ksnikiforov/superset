@@ -737,6 +737,7 @@ type ExpansionReinitAxis = {
   level: number;
   desiredLevel: number;
   prevLevel: number | null;
+  expandLevelRaw?: number;
   keys: string[];
   collapsed: string[];
   nodes: Record<string, PivotTreeNode>;
@@ -755,6 +756,7 @@ const resolveExpansionCacheAxis = (config: ExpansionReinitAxis) => {
     config.program,
   );
   const shouldClearCache =
+    config.expandLevelRaw !== undefined &&
     config.level > 0 &&
     (config.prevLevel === null || config.prevLevel === 0) &&
     config.keys.length + config.collapsed.length > 0;
@@ -836,6 +838,8 @@ export const resolveReinitializedExpansionState = (params: {
   autoExpandColsLevelForDesired: number;
   prevAutoExpandRows: number | null;
   prevAutoExpandCols: number | null;
+  expandRowsLevelRaw?: number;
+  expandColumnsLevelRaw?: number;
   rowStablePrefix: number;
   colStablePrefix: number;
   shouldResetExpandedRows: boolean;
@@ -869,6 +873,7 @@ export const resolveReinitializedExpansionState = (params: {
     level: params.effectiveExpandRowsLevel,
     desiredLevel: params.autoExpandRowsLevelForDesired,
     prevLevel: params.prevAutoExpandRows,
+    expandLevelRaw: params.expandRowsLevelRaw,
     keys: rowKeys,
     collapsed: collapsedRowKeys,
     nodes: tree.rows,
@@ -888,6 +893,7 @@ export const resolveReinitializedExpansionState = (params: {
     level: params.effectiveExpandColsLevel,
     desiredLevel: params.autoExpandColsLevelForDesired,
     prevLevel: params.prevAutoExpandCols,
+    expandLevelRaw: params.expandColumnsLevelRaw,
     keys: colKeys,
     collapsed: collapsedColKeys,
     nodes: tree.cols,

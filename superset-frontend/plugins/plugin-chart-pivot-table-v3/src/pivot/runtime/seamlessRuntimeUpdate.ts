@@ -33,6 +33,7 @@ import { normalizeFormDataExtraFilters } from '../query/normalizeExtraFormData';
 import { buildInitialPivotUpdatePlan } from '../update/initialUpdatePlan';
 import { normalizeRuntimeLayout } from '../layout/resolveInteractionLayout';
 import {
+  buildInitialRuntimeFromFactBatchesAsync,
   buildInitialRuntimeFromSpecResultsAsync,
   type PivotFactStoreBatch,
 } from './ingestQueryResults';
@@ -351,6 +352,17 @@ export const prepareSeamlessRuntimeLayoutChange = ({
       runtimeLayout,
     };
   }
+  if (!isSameRuntimeLayout(reuseSnapshot.runtimeLayout, runtimeLayout)) {
+    return {
+      kind: 'materialize-local',
+      runtimeLayout,
+      syncSnapshot: buildSeamlessRuntimeSyncSnapshot({
+        runtimeLayout,
+        selection,
+        upstreamSignature,
+      }),
+    };
+  }
   return {
     kind: 'commit-local',
     runtimeLayout,
@@ -383,6 +395,12 @@ type SeamlessRuntimeUpdateConfig = SeamlessRuntimeUpdatePlanConfig & {
     requestGroupId: string;
   }) => Promise<ChartDataQueryResult[]>;
   onFetchStart?: () => void;
+  onError?: (error: unknown) => void;
+};
+
+type SeamlessRuntimeReuseConfig = SeamlessRuntimeUpdatePlanConfig & {
+  reuseSnapshot: SeamlessRuntimeReuseSnapshot;
+  materializationLifecycle: LatestRequestLifecycle;
   onError?: (error: unknown) => void;
 };
 
@@ -491,5 +509,45 @@ export const fetchAndMaterializeSeamlessRuntimeUpdate = async ({
     tree: materializationResult.value.tree,
     factBatches: materializationResult.value.factBatches,
     warnings: collectWarnings(results),
+  };
+};
+
+export const materializeSeamlessRuntimeReuse = async ({
+  materializationLifecycle,
+  reuseSnapshot,
+  onError,
+  ...planConfig
+}: SeamlessRuntimeReuseConfig) => {
+  const { formData, layout, specs } =
+    buildSeamlessRuntimeUpdatePlan(planConfig);
+  const materializationResult = await executeScheduledLatestRequest({
+    lifecycle: materializationLifecycle,
+    requestGroupId: SEAMLESS_MATERIALIZATION_GROUP,
+    yieldBeforeRun: false,
+    run: token =>
+      buildInitialRuntimeFromFactBatchesAsync({
+        factBatches: reuseSnapshot.factBatches,
+        specs,
+        layout,
+        formData,
+        shouldContinue: token.isCurrent,
+        yieldToMain: yieldToMainThread,
+      }),
+    onError,
+  });
+  if (materializationResult.status === 'stale') {
+    return { status: 'stale' };
+  }
+  if (materializationResult.status !== 'success') {
+    return {
+      status: materializationResult.status,
+      error: materializationResult.error,
+    };
+  }
+  return {
+    status: 'success',
+    tree: materializationResult.value.tree,
+    factBatches: materializationResult.value.factBatches,
+    warnings: [],
   };
 };

@@ -110,6 +110,18 @@ const buildPivotFactKey = (selector: PivotFactSelector, fact: PivotFact) =>
     fact.role,
   ]);
 
+const valueKeysCover = (
+  available: string[] | undefined,
+  required: string[],
+) => {
+  const requiredValueKeys = normalizeFactValueKeys(required);
+  if (requiredValueKeys.length === 0) {
+    return true;
+  }
+  const availableValueKeys = new Set(normalizeFactValueKeys(available));
+  return requiredValueKeys.every(valueKey => availableValueKeys.has(valueKey));
+};
+
 const startsWithPath = (path: PivotPath, prefix: PivotPath) =>
   prefix.every((value, index) => path[index] === value);
 
@@ -169,30 +181,62 @@ export const createPivotFactStore = (): PivotFactStore => {
     factKeysByRequest.set(key, requestFactKeys);
   };
 
-  const isCompatibleSelector = (
-    candidate: PivotFactSelector,
-    requested: PivotFactSelector,
-  ) => {
-    if (
-      (requested.scope.kind === 'bootstrap' ||
-        requested.scope.kind === 'root') &&
-      candidate.scope.kind !== 'bootstrap' &&
-      candidate.scope.kind !== 'root'
-    ) {
-      return false;
-    }
+  const hasCompatibleCoverage = (selector: PivotFactSelector) => {
+    const candidateSelectors = Array.from(selectorByRequest.values()).filter(
+      candidate =>
+        selector.scope.kind !== 'bootstrap' && selector.scope.kind !== 'root'
+          ? true
+          : candidate.scope.kind === 'bootstrap' ||
+            candidate.scope.kind === 'root',
+    );
     return (
       diffCoverageManifest({
-        required: [buildCoverageNeedFromFactSelector(requested)],
-        factBatches: [{ ...candidate, facts: [] }],
+        required: [buildCoverageNeedFromFactSelector(selector)],
+        factBatches: candidateSelectors.map(candidate => ({
+          ...candidate,
+          facts: [],
+        })),
       }).length === 0
     );
   };
 
-  const getCompatibleRequestSelectors = (selector: PivotFactSelector) =>
-    Array.from(selectorByRequest.entries())
-      .filter(([, candidate]) => isCompatibleSelector(candidate, selector))
-      .map(([key, candidate]) => ({ key, selector: candidate }));
+  const coverageShapeKey = (coverage: PivotFactCoverage) =>
+    stableStringify({
+      rowDepth: coverage.rowDepth,
+      columnDepth: coverage.columnDepth,
+      rowDimensions: coverage.rowDimensions,
+      columnDimensions: coverage.columnDimensions,
+    });
+
+  const hasExactCoverageShape = (
+    candidate: PivotFactSelector,
+    requested: PivotFactSelector,
+  ) =>
+    coverageShapeKey(candidate.coverage) ===
+    coverageShapeKey(requested.coverage);
+
+  const selectorCanContributeToRead = (
+    candidate: PivotFactSelector,
+    requested: PivotFactSelector,
+  ) => {
+    if (!hasExactCoverageShape(candidate, requested)) {
+      return false;
+    }
+    if (!valueKeysCover(candidate.valueKeys, requested.valueKeys)) {
+      return false;
+    }
+    if (
+      requested.scope.kind === 'bootstrap' ||
+      requested.scope.kind === 'root'
+    ) {
+      return (
+        candidate.scope.kind === 'bootstrap' || candidate.scope.kind === 'root'
+      );
+    }
+    return (
+      candidate.scope.kind !== 'bootstrap' && candidate.scope.kind !== 'root'
+    );
+  };
 
   const getCompatibleRequestSelectorsForRead = (
     selector: PivotFactSelector,
@@ -202,7 +246,14 @@ export const createPivotFactStore = (): PivotFactStore => {
     if (exactSelector) {
       return [{ key: exactKey, selector: exactSelector }];
     }
-    return getCompatibleRequestSelectors(selector);
+    if (!hasCompatibleCoverage(selector)) {
+      return [];
+    }
+    return Array.from(selectorByRequest.entries())
+      .filter(([, candidate]) =>
+        selectorCanContributeToRead(candidate, selector),
+      )
+      .map(([key, candidate]) => ({ key, selector: candidate }));
   };
 
   const getCompatibleFacts = (selector: PivotFactSelector) =>
@@ -236,7 +287,6 @@ export const createPivotFactStore = (): PivotFactStore => {
         ...selector,
         facts: [],
       })),
-    hasCompatibleCoverage: selector =>
-      getCompatibleRequestSelectors(selector).length > 0,
+    hasCompatibleCoverage,
   };
 };

@@ -808,6 +808,26 @@ Success criteria:
   planner call site. The expansion hook no longer carries a one-off
   `getMissingExpansionCoverage` callback just to invoke it inside the
   reinitialization effect.
+- Fact coverage compatibility is now exact on aggregate depth and dimensions.
+  A deeper fact batch can no longer satisfy a shallower aggregate request,
+  because detailed facts are not generally safe substitutes for parent
+  aggregates. Broader same-depth scope reuse still works through the
+  set-oriented manifest.
+- Set-oriented coverage diff can now satisfy a path-set need from the union of
+  exact compatible batches. Separate loaded branch batches for `A` and `B` can
+  satisfy a later batched `A+B` request without refetching, while a partial set
+  still reports missing coverage.
+- Fact-store compatible reads now ignore coverage `reason` for shape matching.
+  `reason` is provenance, not aggregate identity; depth, dimensions, scope, and
+  value keys remain the compatibility authority.
+- Expansion now exposes its loaded fact-batch snapshot back to seamless runtime
+  layout decisions. A user can expand columns, then add a hidden/not-expanded
+  row dimension without triggering a base seamless fetch when the visible
+  coverage is already loaded.
+- Seamless layout fetches now use the current draft layout for request form data
+  while still materializing from the loaded runtime snapshot. This keeps
+  interaction responsive and avoids sending requests for stale committed
+  row/column layout after drag/drop edits.
 
 ## Current Risks
 
@@ -866,6 +886,10 @@ Success criteria:
   the final API shape is still a standalone function rather than an explicit
   program policy object. Only move it again if that deletes call-site plumbing
   or combines more layout/coverage policy.
+- Expansion and seamless runtime now share loaded fact-batch coverage, but this
+  is still a bridge between two hook-owned stores. The larger target remains one
+  runtime coverage authority instead of separate expansion and seamless
+  snapshots.
 
 ## Approval Checkpoints
 

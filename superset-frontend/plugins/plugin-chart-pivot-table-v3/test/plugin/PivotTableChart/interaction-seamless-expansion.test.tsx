@@ -674,9 +674,13 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(fetchPivotBranchMock).not.toHaveBeenCalled();
-    expect(screen.queryByText('X')).not.toBeInTheDocument();
-    expect(screen.queryByText('Y')).not.toBeInTheDocument();
-    expect(screen.getByText('A1')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByText('X')).not.toBeInTheDocument(),
+    );
+    await waitFor(() =>
+      expect(screen.queryByText('Y')).not.toBeInTheDocument(),
+    );
+    await waitFor(() => expect(screen.getByText('A1')).toBeInTheDocument());
   });
 
   it('shows grand total and restores row members after removing then re-adding the last row dimension', async () => {
@@ -1348,7 +1352,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       metricsLayout: MetricsLayoutEnum.COLUMNS,
       pivotRuntimeLayout: runtimeLayout,
       startCollapsed: true,
-      initialDepth: 1,
+      initialDepth: 2,
     });
 
     fetchMock.mockImplementation(async ({ specs }: { specs: Array<unknown> }) =>
@@ -1454,7 +1458,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       metricsLayout: MetricsLayoutEnum.COLUMNS,
       pivotRuntimeLayout: runtimeLayout,
       startCollapsed: true,
-      initialDepth: 1,
+      initialDepth: 2,
     });
     const factBatches: PivotFactStoreBatch[] = [
       {
@@ -1532,7 +1536,14 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       expect(within(refreshedThead).getByText('X')).toBeInTheDocument();
       expect(within(refreshedThead).getByText('Y')).toBeInTheDocument();
     });
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const fetchCall = fetchMock.mock.calls[0]?.[0];
+    expect(fetchCall?.specs).toHaveLength(2);
+    expect(
+      fetchCall?.specs.some((spec: { columns?: string[] }) =>
+        spec.columns?.includes('col2'),
+      ),
+    ).toBe(false);
   });
 
   it('keeps the pivot expanded when re-adding a trimmed column dimension in Values-first layout', async () => {
@@ -1568,7 +1579,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       metricsLayout: MetricsLayoutEnum.COLUMNS,
       pivotRuntimeLayout: runtimeLayout,
       startCollapsed: true,
-      initialDepth: 1,
+      initialDepth: 2,
     });
 
     fetchMock.mockImplementation(async ({ specs }: { specs: Array<unknown> }) =>
@@ -1685,7 +1696,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       metricsLayout: MetricsLayoutEnum.COLUMNS,
       pivotRuntimeLayout: runtimeLayout,
       startCollapsed: true,
-      initialDepth: 1,
+      initialDepth: 2,
     });
 
     fetchMock.mockImplementation(async ({ specs }: { specs: Array<unknown> }) =>
@@ -3065,7 +3076,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       { r1: 'B', r2: 'b2', c1: 'X', m1: 16, m2: 32 },
     ];
     const baseTree = applyMetricAxis(
-      buildTreeFromRecords(records, metrics, rowGroupby, colGroupby, 1, 1),
+      buildTreeFromRecords(records, metrics, rowGroupby, colGroupby, 2, 1),
       metrics,
       MetricsLayoutEnum.COLUMNS,
       rowGroupby,
@@ -3089,7 +3100,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       metricsLayout: MetricsLayoutEnum.COLUMNS,
       pivotRuntimeLayout: runtimeLayout,
       startCollapsed: true,
-      initialDepth: 1,
+      initialDepth: 2,
     });
 
     fetchMock.mockImplementation(async ({ specs }: { specs: Array<unknown> }) =>
