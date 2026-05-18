@@ -277,14 +277,10 @@ export const fetchExpansionTargetDeltas = async ({
   targets,
   context,
   runtime,
-  singleRequestKind,
-  batchRequestKind = singleRequestKind,
 }: {
   targets: ExpansionFetchTarget[];
   context: ExpansionFetchContext;
   runtime: ExpansionFetchRuntime;
-  singleRequestKind: string;
-  batchRequestKind?: string;
 }): Promise<ExpansionFetchedTargetGroup[]> => {
   const { batches, singles, intersections } = resolveExpansionFetchPlan({
     targets,
@@ -294,14 +290,14 @@ export const fetchExpansionTargetDeltas = async ({
   const { visibleRowDepth, visibleColDepth } = context;
   const buildSingleRequestGroupId = (target: FetchTarget) =>
     runtime.buildRequestGroupId({
-      kind: singleRequestKind,
+      kind: 'branch',
       ...target,
       visibleRowDepth,
       visibleColDepth,
     });
   const buildBatchRequestGroupId = (batch: BatchGroup) =>
     runtime.buildRequestGroupId({
-      kind: batchRequestKind,
+      kind: 'batch',
       axis: batch.axis,
       parentPathKey: batch.parentPathKey,
       signature: batch.signature,
@@ -393,16 +389,10 @@ export const fetchExpansionTargetDeltas = async ({
 type HydrationLoopParams = Parameters<typeof runHydrationLoop>[0];
 
 export const runHydrationExpansionFetchLoop = ({
-  reason,
   fetchRuntime,
-  singleRequestKind = `hydrate:${reason}`,
-  batchRequestKind,
   ...hydrationLoopParams
 }: Omit<HydrationLoopParams, 'fetchTree' | 'getMissingExpansionCoverage'> & {
-  reason: 'prefetch' | 'cross-axis' | 'branch';
   fetchRuntime: ExpansionFetchRuntime;
-  singleRequestKind?: string;
-  batchRequestKind?: string;
 }) =>
   runHydrationLoop({
     ...hydrationLoopParams,
@@ -416,8 +406,6 @@ export const runHydrationExpansionFetchLoop = ({
         targets,
         context,
         runtime: fetchRuntime,
-        singleRequestKind,
-        batchRequestKind,
       });
       return deltas.length > 0 ? fetchRuntime.materializeLoadedTree() : tree;
     },

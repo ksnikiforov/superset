@@ -99,8 +99,6 @@ type HydrateExpansionOptions = {
   planCols?: boolean;
 };
 
-type HydrateExpansionReason = 'prefetch' | 'cross-axis';
-
 type ExpansionRuntimeState = {
   pendingRows: Set<string>;
   pendingCols: Set<string>;
@@ -723,7 +721,6 @@ export const useExpansionEngine = ({
 
       try {
         const fetchLoop = await runHydrationExpansionFetchLoop({
-          reason: 'branch',
           baseTree: initialTree,
           maxIterations: MAX_HYDRATION_ITERATIONS,
           isCurrent: () =>
@@ -741,8 +738,6 @@ export const useExpansionEngine = ({
           planRows: axis === 'row',
           planCols: axis === 'col',
           fetchRuntime: buildFetchRuntime(requestScope),
-          singleRequestKind: 'branch',
-          batchRequestKind: 'batch',
         });
 
         if (fetchLoop.status !== 'complete' || !requestScope.isCurrent()) {
@@ -824,10 +819,7 @@ export const useExpansionEngine = ({
   );
 
   const hydrateAtomic = useCallback(
-    async (
-      reason: HydrateExpansionReason,
-      options?: HydrateExpansionOptions,
-    ) => {
+    async (options?: HydrateExpansionOptions) => {
       const shouldShowLoader = options?.showLoader ?? false;
       const shouldPlanRows = options?.planRows ?? true;
       const shouldPlanCols = options?.planCols ?? true;
@@ -839,7 +831,6 @@ export const useExpansionEngine = ({
 
       try {
         const result = await runHydrationExpansionFetchLoop({
-          reason,
           baseTree: treeRef.current,
           maxIterations: MAX_HYDRATION_ITERATIONS,
           isCurrent: requestScope.isCurrent,
@@ -939,7 +930,7 @@ export const useExpansionEngine = ({
         });
         manualExpandedRef.current = toggleDecision.nextManualExpanded;
         manualCollapsedRef.current = toggleDecision.nextManualCollapsed;
-        hydrateAtomic('cross-axis', {
+        hydrateAtomic({
           activeAxis: axis,
           showLoader: false,
         }).catch(reportAsyncError);
@@ -1149,7 +1140,7 @@ export const useExpansionEngine = ({
       if (!prefetchAction.showLoader) {
         setHydratingState(false);
       }
-      hydrateAtomic('prefetch', {
+      hydrateAtomic({
         showLoader: prefetchAction.showLoader,
         planRows: shouldPlanRows,
         planCols: shouldPlanCols,
@@ -1186,7 +1177,7 @@ export const useExpansionEngine = ({
     warningsRef.current = new Map();
     setWarnings([]);
 
-    hydrateAtomic('prefetch', { showLoader: true }).catch(reportAsyncError);
+    hydrateAtomic({ showLoader: true }).catch(reportAsyncError);
   }, [hydrateAtomic, reportAsyncError]);
 
   return {
