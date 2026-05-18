@@ -31,14 +31,11 @@ import {
 } from './coverage';
 import { type PivotFactCoverage } from './types';
 
-export type PivotFactRole = 'visible' | 'support';
-
 export type PivotFact = {
   rowPath: PivotPath;
   columnPath: PivotPath;
   valueKey: string;
   value: DataRecordValue;
-  role: PivotFactRole;
 };
 
 export type PivotFactSelector = {
@@ -75,7 +72,6 @@ export type PivotFactStoreBatchScope =
 export type PivotFactStore = {
   upsertBatch: (batch: PivotFactStoreBatch) => void;
   upsertBatches: (batches: PivotFactStoreBatch[]) => void;
-  getCompatibleFacts: (selector: PivotFactSelector) => PivotFact[];
   getCoverageBatches: () => PivotFactStoreBatch[];
   getFactBatches: () => PivotFactStoreBatch[];
   hasCompatibleCoverage: (selector: PivotFactSelector) => boolean;
@@ -108,7 +104,6 @@ const buildPivotFactKey = (selector: PivotFactSelector, fact: PivotFact) =>
     serializePath(fact.rowPath),
     serializePath(fact.columnPath),
     fact.valueKey,
-    fact.role,
   ]);
 
 const normalizeSelector = ({
@@ -120,18 +115,6 @@ const normalizeSelector = ({
   scope,
   valueKeys: normalizeFactValueKeys(valueKeys),
 });
-
-const valueKeysCover = (
-  available: string[] | undefined,
-  required: string[],
-) => {
-  const requiredValueKeys = normalizeFactValueKeys(required);
-  if (requiredValueKeys.length === 0) {
-    return true;
-  }
-  const availableValueKeys = new Set(normalizeFactValueKeys(available));
-  return requiredValueKeys.every(valueKey => availableValueKeys.has(valueKey));
-};
 
 const startsWithPath = (path: PivotPath, prefix: PivotPath) =>
   prefix.every((value, index) => path[index] === value);
@@ -206,79 +189,9 @@ export const createPivotFactStore = (): PivotFactStore => {
     );
   };
 
-  const coverageShapeKey = (coverage: PivotFactCoverage) =>
-    stableStringify({
-      rowDepth: coverage.rowDepth,
-      columnDepth: coverage.columnDepth,
-      rowDimensions: coverage.rowDimensions,
-      columnDimensions: coverage.columnDimensions,
-    });
-
-  const hasExactCoverageShape = (
-    candidate: PivotFactSelector,
-    requested: PivotFactSelector,
-  ) =>
-    coverageShapeKey(candidate.coverage) ===
-    coverageShapeKey(requested.coverage);
-
-  const selectorCanContributeToRead = (
-    candidate: PivotFactSelector,
-    requested: PivotFactSelector,
-  ) => {
-    if (!hasExactCoverageShape(candidate, requested)) {
-      return false;
-    }
-    if (!valueKeysCover(candidate.valueKeys, requested.valueKeys)) {
-      return false;
-    }
-    if (requested.scope.kind === 'root') {
-      return candidate.scope.kind === 'root';
-    }
-    return true;
-  };
-
-  const getCompatibleRequestSelectorsForRead = (
-    selector: PivotFactSelector,
-  ) => {
-    const exactKey = buildPivotFactRequestKey(selector);
-    const exactSelector = selectorByRequest.get(exactKey);
-    if (exactSelector) {
-      return [{ key: exactKey, selector: exactSelector }];
-    }
-    if (!hasCompatibleCoverage(selector)) {
-      return [];
-    }
-    return Array.from(selectorByRequest.entries())
-      .filter(([, candidate]) =>
-        selectorCanContributeToRead(candidate, selector),
-      )
-      .map(([key, candidate]) => ({ key, selector: candidate }));
-  };
-
-  const getCompatibleFacts = (selector: PivotFactSelector) =>
-    getCompatibleRequestSelectorsForRead(selector).flatMap(candidate => {
-      const facts = factsByRequest.get(candidate.key) ?? [];
-      if (
-        buildPivotFactRequestKey(candidate.selector) ===
-        buildPivotFactRequestKey(selector)
-      ) {
-        return facts;
-      }
-      const requestedValueKeys = new Set(
-        normalizeFactValueKeys(selector.valueKeys),
-      );
-      return facts.filter(
-        fact =>
-          factMatchesScope(fact, selector.scope) &&
-          (requestedValueKeys.size === 0 ||
-            requestedValueKeys.has(fact.valueKey)),
-      );
-    });
-
   return {
     upsertBatch,
     upsertBatches: batches => batches.forEach(upsertBatch),
-    getCompatibleFacts,
     getCoverageBatches: () =>
       Array.from(selectorByRequest.values()).map(selector => ({
         ...selector,

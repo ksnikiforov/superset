@@ -136,7 +136,6 @@ const buildFactsForCoverage = (
       columnPath,
       valueKey,
       value,
-      role: 'visible' as const,
     }));
   });
 

@@ -30,7 +30,6 @@ import { type PivotFactCoverage } from './types';
 import {
   createPivotFactStore,
   type PivotFact,
-  type PivotFactRole,
   type PivotFactStoreBatch,
   type PivotFactStore,
 } from './factStore';
@@ -48,7 +47,6 @@ import {
 export { createPivotFactStore } from './factStore';
 export type {
   PivotFact,
-  PivotFactRole,
   PivotFactStore,
   PivotFactStoreBatch,
 } from './factStore';
@@ -132,20 +130,15 @@ const factsFromRecords = ({
   result,
   metrics,
   coverage,
-  materializedMetrics,
 }: {
   result: QueryResultWithData;
   metrics: QueryFormMetric[];
   coverage: PivotFactCoverage;
-  materializedMetrics: QueryFormMetric[];
 }): PivotFact[] => {
   const records = (result.data ?? []) as DataRecord[];
   const valueKeys = getMetricValueKeysFromRecord(records[0], metrics);
-  const visibleValueKeys = new Set(getMetricKeys(materializedMetrics));
   const rowColumns = coverage.rowDimensions;
   const columnColumns = coverage.columnDimensions;
-  const roleForValueKey = (valueKey: string): PivotFactRole =>
-    visibleValueKeys.has(valueKey) ? 'visible' : 'support';
 
   return records.flatMap(record => {
     const rowPath = pathFromRecord(record, rowColumns);
@@ -155,7 +148,6 @@ const factsFromRecords = ({
       columnPath,
       valueKey,
       value: record[valueKey],
-      role: roleForValueKey(valueKey),
     }));
   });
 };
@@ -164,7 +156,6 @@ const factsFromRecordsAsync = async ({
   result,
   metrics,
   coverage,
-  materializedMetrics,
   chunkSize,
   shouldContinue,
   yieldToMain,
@@ -172,15 +163,11 @@ const factsFromRecordsAsync = async ({
   result: QueryResultWithData;
   metrics: QueryFormMetric[];
   coverage: PivotFactCoverage;
-  materializedMetrics: QueryFormMetric[];
 } & ChunkedWorkOptions): Promise<PivotFact[]> => {
   const records = (result.data ?? []) as DataRecord[];
   const valueKeys = getMetricValueKeysFromRecord(records[0], metrics);
-  const visibleValueKeys = new Set(getMetricKeys(materializedMetrics));
   const rowColumns = coverage.rowDimensions;
   const columnColumns = coverage.columnDimensions;
-  const roleForValueKey = (valueKey: string): PivotFactRole =>
-    visibleValueKeys.has(valueKey) ? 'visible' : 'support';
   const facts: PivotFact[] = [];
 
   for (let idx = 0; idx < records.length; idx += 1) {
@@ -193,7 +180,6 @@ const factsFromRecordsAsync = async ({
         columnPath,
         valueKey,
         value: record[valueKey],
-        role: roleForValueKey(valueKey),
       });
     });
     // eslint-disable-next-line no-await-in-loop
@@ -219,7 +205,6 @@ const ingestQueryResultFacts = ({
     result,
     metrics: spec.metrics,
     coverage: spec.meta.coverage,
-    materializedMetrics: spec.meta.materializedMetrics,
   });
 
 export const ingestQueryResults = <T extends QueryResultWithData>({
@@ -271,7 +256,6 @@ const ingestQueryResultsAsync = async <T extends QueryResultWithData>({
         result,
         metrics: spec.metrics,
         coverage: spec.meta.coverage,
-        materializedMetrics: spec.meta.materializedMetrics,
         chunkSize,
         shouldContinue,
         yieldToMain,

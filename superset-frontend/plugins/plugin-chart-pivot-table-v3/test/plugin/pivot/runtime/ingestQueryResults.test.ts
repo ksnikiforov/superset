@@ -158,14 +158,12 @@ test('ingests named query results into ordered fact batches', () => {
       columnPath: [],
       valueKey: 'sales',
       value: 30,
-      role: 'visible',
     },
     {
       rowPath: ['France'],
       columnPath: ['2026-01'],
       valueKey: 'sales',
       value: 12,
-      role: 'visible',
     },
   ]);
 });

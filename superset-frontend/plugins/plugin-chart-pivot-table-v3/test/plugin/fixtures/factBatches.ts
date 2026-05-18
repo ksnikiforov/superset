@@ -80,7 +80,6 @@ const buildFactsForCoverage = (
       columnPath: col.path.slice(0, coverage.columnDepth),
       valueKey,
       value,
-      role: 'visible' as const,
     }));
   });
 };

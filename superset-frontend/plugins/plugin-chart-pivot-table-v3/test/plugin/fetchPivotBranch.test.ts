@@ -1506,7 +1506,6 @@ describe('fetchBranch delta-only contract', () => {
           columnPath: [],
           valueKey: 'm1',
           value: 42,
-          role: 'visible',
         },
       ],
     });

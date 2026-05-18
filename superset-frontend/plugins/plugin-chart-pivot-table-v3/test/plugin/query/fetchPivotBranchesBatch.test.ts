@@ -279,7 +279,6 @@ describe('fetchBatch', () => {
           columnPath: [],
           valueKey: 'm1',
           value: 7,
-          role: 'visible',
         },
       ],
     });

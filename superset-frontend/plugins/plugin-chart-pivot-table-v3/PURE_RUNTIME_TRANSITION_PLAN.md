@@ -255,8 +255,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13696` insertions, `16900` deletions, net `-3204`.
-- Current production TypeScript/TSX total: about `30306` lines.
+- Production `src`: `13593` insertions, `16900` deletions, net `-3307`.
+- Current production TypeScript/TSX total: about `30203` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -268,16 +268,16 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `30306` | `-3204` | `< 28000` |
-| Strict core pipeline | `11337` | `12752` | `+1415` | `8000` |
+| Full production `src` | `33510` | `30203` | `-3307` | `< 28000` |
+| Strict core pipeline | `11337` | `12649` | `+1312` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5076` | `+393` | `3000-4000` |
-| Broad core pipeline | `16020` | `17828` | `+1808` | `11000-13000` |
+| Broad core pipeline | `16020` | `17725` | `+1705` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `4184` |
+| `pivot/runtime/*` | `4081` |
 | `pivot/expansion/*` | `2930` |
 | `pivot/query/*` | `1808` |
 | `pivot/layout/*` | `744` |
@@ -309,6 +309,11 @@ requirements directly instead of routing through a local intent wrapper.
 Latest expansion cleanup: duplicated child-map traversal in
 `stateTransitions.ts` was collapsed into one visible-axis traversal helper used
 by both visible-depth calculation and persisted expansion-state pruning.
+
+Latest fact-store cleanup: `PivotFactStore` no longer exposes the unused
+production `getCompatibleFacts()` read API, and loaded facts no longer carry a
+`visible`/`support` role. Query specs and fact selectors own value-key intent;
+the fact store now stores exact loaded fact batches plus coverage only.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.

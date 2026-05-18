@@ -43,34 +43,21 @@ const buildFact = (overrides: Partial<PivotFact> = {}): PivotFact => ({
   columnPath: ['2026-01'],
   valueKey: 'sales',
   value: 10,
-  role: 'visible',
   ...overrides,
 });
 
-test('upserts duplicate exact facts while keeping support facts separate', () => {
+test('upserts duplicate exact facts by request/path/value key', () => {
   const store = createPivotFactStore();
 
   store.upsertBatch({
     ...selector,
-    facts: [
-      buildFact({ value: 10 }),
-      buildFact({ value: 12 }),
-      buildFact({ role: 'support', value: 99 }),
-    ],
+    facts: [buildFact({ value: 10 }), buildFact({ value: 12 })],
   });
 
-  expect(
-    store.getCompatibleFacts(selector).map(fact => ({
-      role: fact.role,
-      value: fact.value,
-    })),
-  ).toEqual([
-    { role: 'visible', value: 12 },
-    { role: 'support', value: 99 },
-  ]);
+  expect(store.getFactBatches()[0].facts.map(fact => fact.value)).toEqual([12]);
 });
 
-test('does not share facts across different request scopes with the same coverage', () => {
+test('keeps different request scopes as separate exact fact batches', () => {
   const store = createPivotFactStore();
   const firstScope: PivotFactStoreBatchScope = { kind: 'root' };
   const secondScope: PivotFactStoreBatchScope = {
@@ -94,20 +81,9 @@ test('does not share facts across different request scopes with the same coverag
     },
   ]);
 
-  expect(
-    store
-      .getCompatibleFacts({ coverage, scope: firstScope, valueKeys: ['sales'] })
-      .map(fact => fact.value),
-  ).toEqual([1]);
-  expect(
-    store
-      .getCompatibleFacts({
-        coverage,
-        scope: secondScope,
-        valueKeys: ['sales'],
-      })
-      .map(fact => fact.value),
-  ).toEqual([2]);
+  expect(store.getFactBatches().map(batch => batch.facts[0]?.value)).toEqual([
+    1, 2,
+  ]);
 });
 
 test('exposes loaded coverage batches without duplicating fact payloads', () => {
@@ -126,7 +102,7 @@ test('exposes loaded coverage batches without duplicating fact payloads', () => 
   ]);
 });
 
-test('does not satisfy sibling branch scopes with identical coverage', () => {
+test('does not mark sibling branch scopes with identical coverage as loaded', () => {
   const store = createPivotFactStore();
   const branchCoverage: PivotFactCoverage = {
     reason: 'expand',
@@ -154,15 +130,15 @@ test('does not satisfy sibling branch scopes with identical coverage', () => {
   });
 
   expect(
-    store.getCompatibleFacts({
+    store.hasCompatibleCoverage({
       coverage: branchCoverage,
       scope: usaScope,
       valueKeys: ['sales'],
     }),
-  ).toEqual([]);
+  ).toBe(false);
 });
 
-test('uses exact-depth root coverage for narrower branch reads', () => {
+test('uses exact-depth root coverage for narrower branch coverage', () => {
   const store = createPivotFactStore();
   const branchCoverage: PivotFactCoverage = {
     reason: 'expand',
@@ -203,7 +179,6 @@ test('uses exact-depth root coverage for narrower branch reads', () => {
   });
 
   expect(store.hasCompatibleCoverage(franceBranchSelector)).toBe(true);
-  expect(store.getCompatibleFacts(franceBranchSelector)).toEqual([franceFact]);
 });
 
 test('uses intersection scope for bounded cross-axis coverage', () => {
@@ -246,7 +221,7 @@ test('uses intersection scope for bounded cross-axis coverage', () => {
   });
 
   expect(store.hasCompatibleCoverage(intersectionSelector)).toBe(true);
-  expect(store.getCompatibleFacts(intersectionSelector)).toEqual([inScopeFact]);
+  expect(store.getFactBatches()[0].facts).toEqual([inScopeFact]);
   expect(
     store.hasCompatibleCoverage({
       ...intersectionSelector,
@@ -286,7 +261,6 @@ test('does not reuse root coverage for values-token branch scopes', () => {
   });
 
   expect(store.hasCompatibleCoverage(selectorWithMetricPath)).toBe(false);
-  expect(store.getCompatibleFacts(selectorWithMetricPath)).toEqual([]);
 });
 
 test('does not reuse values-token branch coverage for root materialization', () => {
@@ -309,10 +283,9 @@ test('does not reuse values-token branch coverage for root materialization', () 
   });
 
   expect(store.hasCompatibleCoverage(rootSelector)).toBe(false);
-  expect(store.getCompatibleFacts(rootSelector)).toEqual([]);
 });
 
-test('prefers exact branch facts over broader compatible root coverage', () => {
+test('keeps exact branch facts alongside broader compatible root coverage', () => {
   const store = createPivotFactStore();
   const branchCoverage: PivotFactCoverage = {
     reason: 'expand',
@@ -353,12 +326,12 @@ test('prefers exact branch facts over broader compatible root coverage', () => {
   });
 
   expect(store.hasCompatibleCoverage(selector)).toBe(true);
-  expect(store.getCompatibleFacts(selector).map(fact => fact.value)).toEqual([
-    2,
+  expect(store.getFactBatches().map(batch => batch.facts[0]?.value)).toEqual([
+    1, 2,
   ]);
 });
 
-test('materialization can reuse compatible batch coverage for branch facts', () => {
+test('batch coverage can satisfy branch coverage checks', () => {
   const store = createPivotFactStore();
   const branchCoverage: PivotFactCoverage = {
     reason: 'expand',
@@ -409,9 +382,6 @@ test('materialization can reuse compatible batch coverage for branch facts', () 
   });
 
   expect(store.hasCompatibleCoverage(franceSelector)).toBe(true);
-  expect(
-    store.getCompatibleFacts(franceSelector).map(fact => fact.rowPath),
-  ).toEqual([['France', 'Paris']]);
   expect(store.hasCompatibleCoverage(canadaSelector)).toBe(false);
 });
 
@@ -458,16 +428,13 @@ test('registers compatible coverage aliases without upserting duplicate facts', 
   });
   expect(store.hasCompatibleCoverage(franceSelector)).toBe(true);
   expect(
-    store.getCompatibleFacts(franceSelector).map(fact => fact.rowPath),
-  ).toEqual([['France', 'Paris']]);
-  expect(
     store
       .getCoverageBatches()
       .some(batch => batch.scope === franceSelector.scope),
   ).toBe(false);
 });
 
-test('materialization can read separate exact branches for a batched request', () => {
+test('separate exact branches can satisfy a batched coverage request', () => {
   const store = createPivotFactStore();
   const branchCoverage: PivotFactCoverage = {
     reason: 'expand',
@@ -523,12 +490,6 @@ test('materialization can read separate exact branches for a batched request', (
   ]);
 
   expect(store.hasCompatibleCoverage(batchSelector)).toBe(true);
-  expect(
-    store.getCompatibleFacts(batchSelector).map(fact => fact.rowPath),
-  ).toEqual([
-    ['France', 'Paris'],
-    ['Canada', 'Toronto'],
-  ]);
 });
 
 test('does not reuse deeper aggregate facts for a shallower branch request', () => {
@@ -575,7 +536,6 @@ test('does not reuse deeper aggregate facts for a shallower branch request', () 
   });
 
   expect(store.hasCompatibleCoverage(shallowSelector)).toBe(false);
-  expect(store.getCompatibleFacts(shallowSelector)).toEqual([]);
 });
 
 test('reuses broader metric coverage for narrower compatible requests', () => {
@@ -595,14 +555,12 @@ test('reuses broader metric coverage for narrower compatible requests', () => {
   });
 
   expect(
-    store
-      .getCompatibleFacts({
-        coverage,
-        scope: { kind: 'root' },
-        valueKeys: ['sales'],
-      })
-      .map(fact => fact.valueKey),
-  ).toEqual(['sales']);
+    store.hasCompatibleCoverage({
+      coverage,
+      scope: { kind: 'root' },
+      valueKeys: ['sales'],
+    }),
+  ).toBe(true);
   expect(
     store.hasCompatibleCoverage({
       coverage,
@@ -642,5 +600,4 @@ test('tracks loaded coverage even when the query returns no facts', () => {
   });
 
   expect(store.hasCompatibleCoverage(selector)).toBe(true);
-  expect(store.getCompatibleFacts(selector)).toEqual([]);
 });
