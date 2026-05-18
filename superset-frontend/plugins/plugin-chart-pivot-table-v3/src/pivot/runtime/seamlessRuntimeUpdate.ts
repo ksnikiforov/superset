@@ -56,10 +56,6 @@ type SeamlessRuntimeUpstreamState = {
   signature: string;
 } | null;
 
-export type SeamlessRuntimeReuseSnapshot = {
-  runtimeLayout: PivotRuntimeLayout;
-};
-
 const selectionSignature = (selection: PivotRuntimeLayout['leafSelection']) =>
   stableStringify(selection ?? {});
 
@@ -85,13 +81,12 @@ export const isSameRuntimeLayout = (
   prev.valuePlacement.index === next.valuePlacement.index;
 
 export const shouldFetchRuntimeLayout = ({
-  reuseSnapshot,
+  reusableLayout,
   nextLayout,
 }: {
-  reuseSnapshot: SeamlessRuntimeReuseSnapshot;
+  reusableLayout: PivotRuntimeLayout;
   nextLayout: PivotRuntimeLayout;
 }) => {
-  const reusableLayout = reuseSnapshot.runtimeLayout;
   const isTrailingHiddenAppend = (previous: string[], next: string[]) =>
     previous.length > 0 &&
     next.length > previous.length &&
@@ -334,14 +329,14 @@ export const prepareSeamlessRuntimeLayoutChange = ({
   nextLayout,
   dimensionKeys,
   metricKeys,
-  reuseSnapshot,
+  reusableLayout,
   selection,
   upstreamSignature,
 }: {
   nextLayout: PivotRuntimeLayout;
   dimensionKeys: string[];
   metricKeys: string[];
-  reuseSnapshot: SeamlessRuntimeReuseSnapshot;
+  reusableLayout: PivotRuntimeLayout;
   selection: RuntimeSelection;
   upstreamSignature: string;
 }) => {
@@ -352,7 +347,7 @@ export const prepareSeamlessRuntimeLayoutChange = ({
   );
   if (
     shouldFetchRuntimeLayout({
-      reuseSnapshot,
+      reusableLayout,
       nextLayout: runtimeLayout,
     })
   ) {

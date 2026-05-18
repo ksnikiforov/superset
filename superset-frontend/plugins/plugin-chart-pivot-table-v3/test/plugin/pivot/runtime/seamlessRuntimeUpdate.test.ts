@@ -41,10 +41,6 @@ const runtimeLayout: PivotRuntimeLayout = {
   valuePlacement: { axis: 'col', index: 1 },
 };
 
-const reuseSnapshot = (layout: PivotRuntimeLayout) => ({
-  runtimeLayout: layout,
-});
-
 test('builds stable seamless runtime sync snapshots', () => {
   expect(
     buildSeamlessRuntimeSyncSnapshot({
@@ -326,7 +322,7 @@ describe('runtime layout reuse fetch policy', () => {
   it('does not fetch for trailing dimension appends on an already visible axis', () => {
     expect(
       shouldFetchRuntimeLayout({
-        reuseSnapshot: reuseSnapshot(runtimeLayout),
+        reusableLayout: runtimeLayout,
         nextLayout: {
           ...runtimeLayout,
           rows: ['country', 'state'],
@@ -338,10 +334,10 @@ describe('runtime layout reuse fetch policy', () => {
   it('fetches when a visible axis is removed', () => {
     expect(
       shouldFetchRuntimeLayout({
-        reuseSnapshot: reuseSnapshot({
+        reusableLayout: {
           ...runtimeLayout,
           cols: [],
-        }),
+        },
         nextLayout: {
           ...runtimeLayout,
           rows: [],
@@ -354,10 +350,10 @@ describe('runtime layout reuse fetch policy', () => {
   it('fetches when removing a metric', () => {
     expect(
       shouldFetchRuntimeLayout({
-        reuseSnapshot: reuseSnapshot({
+        reusableLayout: {
           ...runtimeLayout,
           metrics: ['sales', 'profit'],
-        }),
+        },
         nextLayout: runtimeLayout,
       }),
     ).toBe(true);
@@ -366,7 +362,7 @@ describe('runtime layout reuse fetch policy', () => {
   it('fetches when adding a metric', () => {
     expect(
       shouldFetchRuntimeLayout({
-        reuseSnapshot: reuseSnapshot(runtimeLayout),
+        reusableLayout: runtimeLayout,
         nextLayout: {
           ...runtimeLayout,
           metrics: ['sales', 'profit'],
@@ -378,7 +374,7 @@ describe('runtime layout reuse fetch policy', () => {
   it('fetches when dimension order changes', () => {
     expect(
       shouldFetchRuntimeLayout({
-        reuseSnapshot: reuseSnapshot(runtimeLayout),
+        reusableLayout: runtimeLayout,
         nextLayout: {
           ...runtimeLayout,
           rows: ['state', 'country'],
@@ -390,10 +386,10 @@ describe('runtime layout reuse fetch policy', () => {
   it('fetches when trimming a hidden dimension', () => {
     expect(
       shouldFetchRuntimeLayout({
-        reuseSnapshot: reuseSnapshot({
+        reusableLayout: {
           ...runtimeLayout,
           cols: ['month', 'quarter'],
-        }),
+        },
         nextLayout: runtimeLayout,
       }),
     ).toBe(true);
@@ -402,12 +398,12 @@ describe('runtime layout reuse fetch policy', () => {
   it('fetches when adding a hidden dimension changes Values placement', () => {
     expect(
       shouldFetchRuntimeLayout({
-        reuseSnapshot: reuseSnapshot({
+        reusableLayout: {
           ...runtimeLayout,
           rows: [],
           cols: ['month'],
           valuePlacement: { axis: 'col', index: 1 },
-        }),
+        },
         nextLayout: {
           ...runtimeLayout,
           rows: [],
@@ -421,12 +417,12 @@ describe('runtime layout reuse fetch policy', () => {
   it('fetches when Values moves across an already shared dimension', () => {
     expect(
       shouldFetchRuntimeLayout({
-        reuseSnapshot: reuseSnapshot({
+        reusableLayout: {
           ...runtimeLayout,
           rows: [],
           cols: ['month', 'quarter'],
           valuePlacement: { axis: 'col', index: 2 },
-        }),
+        },
         nextLayout: {
           ...runtimeLayout,
           rows: [],
@@ -444,7 +440,7 @@ test('prepares fetch actions for semantic runtime layout changes', () => {
       nextLayout: runtimeLayout,
       dimensionKeys: ['country', 'month'],
       metricKeys: ['sales'],
-      reuseSnapshot: reuseSnapshot({ ...runtimeLayout, cols: [] }),
+      reusableLayout: { ...runtimeLayout, cols: [] },
       selection: {},
       upstreamSignature: 'query-a',
     }),
@@ -466,7 +462,7 @@ test('prepares local commit actions for covered runtime layout changes', () => {
       nextLayout,
       dimensionKeys: ['country', 'state', 'month'],
       metricKeys: ['sales'],
-      reuseSnapshot: reuseSnapshot(runtimeLayout),
+      reusableLayout: runtimeLayout,
       selection: { country: ['France'] },
       upstreamSignature: 'query-a',
     }),

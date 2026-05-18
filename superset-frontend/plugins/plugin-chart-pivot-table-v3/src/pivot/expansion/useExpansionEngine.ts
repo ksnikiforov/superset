@@ -93,18 +93,11 @@ type HydrateExpansionOptions = {
 };
 
 type ExpansionRuntimeState = {
-  pendingRows: Set<string>;
-  pendingCols: Set<string>;
   loadingCounts: Map<string, number>;
   isHydrating: boolean;
 };
 
 type ExpansionRuntimeAction =
-  | {
-      type: 'setPending';
-      axis: PivotAxis;
-      keys: Set<string>;
-    }
   | {
       type: 'updateLoadingKey';
       key: string;
@@ -119,8 +112,6 @@ type ExpansionRuntimeAction =
     };
 
 const createExpansionRuntimeState = (): ExpansionRuntimeState => ({
-  pendingRows: new Set(),
-  pendingCols: new Set(),
   loadingCounts: new Map(),
   isHydrating: false,
 });
@@ -149,10 +140,6 @@ const expansionRuntimeReducer = (
   action: ExpansionRuntimeAction,
 ): ExpansionRuntimeState => {
   switch (action.type) {
-    case 'setPending':
-      return action.axis === 'row'
-        ? { ...state, pendingRows: new Set(action.keys) }
-        : { ...state, pendingCols: new Set(action.keys) };
     case 'updateLoadingKey':
       return {
         ...state,
@@ -268,8 +255,6 @@ export type ExpansionEngineResult = {
   expandedRows: Set<string>;
   expandedCols: Set<string>;
   loadingKeys: Set<string>;
-  pendingRows: Set<string>;
-  pendingCols: Set<string>;
   isHydrating: boolean;
   errorMessage?: string;
   warnings: ChartDataWarning[];
@@ -323,13 +308,13 @@ export const useExpansionEngine = ({
     undefined,
     createExpansionRuntimeState,
   );
-  const { loadingCounts, pendingCols, pendingRows, isHydrating } = runtimeState;
+  const { loadingCounts, isHydrating } = runtimeState;
   const loadingKeys = useMemo(
     () => new Set(loadingCounts.keys()),
     [loadingCounts],
   );
-  const pendingRowsRef = useRef(pendingRows);
-  const pendingColsRef = useRef(pendingCols);
+  const pendingRowsRef = useRef<Set<string>>(new Set());
+  const pendingColsRef = useRef<Set<string>>(new Set());
   const fetchFormDataRef = useRef(fetchFormData);
   const explicitExpandedRowsRef = useRef<Set<string>>(new Set());
   const explicitExpandedColsRef = useRef<Set<string>>(new Set());
@@ -409,8 +394,6 @@ export const useExpansionEngine = ({
   useSyncRef(treeRef, tree);
   useSyncRef(expandedRowsRef, expandedRows);
   useSyncRef(expandedColsRef, expandedCols);
-  useSyncRef(pendingRowsRef, pendingRows);
-  useSyncRef(pendingColsRef, pendingCols);
   useSyncRef(fetchFormDataRef, fetchFormData);
 
   const updateLoadingKey = useCallback((key: string, delta: number) => {
@@ -457,20 +440,6 @@ export const useExpansionEngine = ({
         }
         if (nextExpandedCols) {
           setExpandedCols(nextExpandedCols);
-        }
-        if (nextPendingRows) {
-          dispatchRuntimeState({
-            type: 'setPending',
-            axis: 'row',
-            keys: nextPendingRows,
-          });
-        }
-        if (nextPendingCols) {
-          dispatchRuntimeState({
-            type: 'setPending',
-            axis: 'col',
-            keys: nextPendingCols,
-          });
         }
       });
     },
@@ -924,8 +893,6 @@ export const useExpansionEngine = ({
     expandedRows,
     expandedCols,
     loadingKeys,
-    pendingRows,
-    pendingCols,
     isHydrating,
     errorMessage,
     warnings,

@@ -256,14 +256,11 @@ export const usePivotSeamlessRuntimeUpdate = (
 
   const applyRuntimeLayoutChange = useCallback(
     (nextLayout: PivotRuntimeLayout) => {
-      const reuseSnapshot = {
-        runtimeLayout: uiRuntimeLayoutRef.current,
-      };
       const action = prepareSeamlessRuntimeLayoutChange({
         nextLayout,
         dimensionKeys,
         metricKeys,
-        reuseSnapshot,
+        reusableLayout: uiRuntimeLayoutRef.current,
         selection: uiSelectedFilters,
         upstreamSignature,
       });

@@ -255,8 +255,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13213` insertions, `17068` deletions, net `-3855`.
-- Current production TypeScript/TSX total: about `29655` lines.
+- Production `src`: `13177` insertions, `17073` deletions, net `-3896`.
+- Current production TypeScript/TSX total: about `29614` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -268,17 +268,17 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `29655` | `-3855` | `< 28000` |
-| Strict core pipeline | `11337` | `12133` | `+796` | `8000` |
-| Non-visual chart runtime hooks | `4683` | `5060` | `+377` | `3000-4000` |
-| Broad core pipeline | `16020` | `17193` | `+1173` | `11000-13000` |
+| Full production `src` | `33510` | `29614` | `-3896` | `< 28000` |
+| Strict core pipeline | `11337` | `12095` | `+758` | `8000` |
+| Non-visual chart runtime hooks | `4683` | `5127` | `+444` | `3000-4000` |
+| Broad core pipeline | `16020` | `17222` | `+1202` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `3899` |
-| `pivot/expansion/*` | `2776` |
+| `pivot/runtime/*` | `3894` |
+| `pivot/expansion/*` | `2743` |
 | `pivot/query/*` | `1628` |
 | `pivot/layout/*` | `744` |
 | core/shared/domain helpers | `1873` |
@@ -392,6 +392,13 @@ coverage intent or persisted expansion/collapse intent, the hook enters the
 same hydration loop used by toggles; the loop diffs loaded coverage before
 fetching, so no-query cases stay local without a duplicate planner/action
 surface.
+
+Latest runtime-state cleanup: expansion pending row/column intent is no longer
+part of the hook's public result or React reducer state. Pending intent is
+internal ref state consumed by the hydration loop; only loading keys and global
+hydration state remain render state. The seamless reuse policy also accepts the
+reusable runtime layout directly instead of wrapping it in a one-field reuse
+snapshot.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.
