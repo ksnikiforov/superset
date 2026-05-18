@@ -168,8 +168,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14560` insertions, `15797` deletions, net `-1237`.
-- Current production TypeScript/TSX total: about `32273` lines.
+- Production `src`: `14556` insertions, `15797` deletions, net `-1241`.
+- Current production TypeScript/TSX total: about `32269` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -840,6 +840,9 @@ Success criteria:
   seamless runtime. Expansion reports fact-store coverage changes directly to
   the seamless runtime boundary, and the expansion hook no longer keeps a
   duplicate loaded-batch React state just to expose coverage to the chart.
+- Expansion fetch execution no longer owns loaded fact-batch reporting as a
+  low-level fetch-runtime callback. The expansion hook syncs the loaded fact
+  snapshot after same-axis and hydration fetch loops complete.
 
 ## Current Risks
 

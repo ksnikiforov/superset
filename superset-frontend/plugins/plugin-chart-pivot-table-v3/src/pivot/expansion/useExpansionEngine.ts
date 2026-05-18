@@ -308,7 +308,7 @@ export type ExpansionEngineConfig = {
   mergeOwnState?: (partial: JsonObject) => JsonObject;
   persistedExpansionState?: unknown;
   shouldPersistExpansionState: boolean;
-  onLoadedFactBatchesChange?: (factBatches: PivotFactStoreBatch[]) => void;
+  onLoadedFactBatchesChange: (factBatches: PivotFactStoreBatch[]) => void;
   pruneMergedTree: (params: {
     axis: PivotAxis;
     tree: PivotTreeData;
@@ -398,7 +398,7 @@ export const useExpansionEngine = ({
   );
 
   const syncLoadedFactBatches = useCallback(() => {
-    onLoadedFactBatchesChange?.(
+    onLoadedFactBatchesChange(
       factStoreRef.current?.getCoverageBatches() ?? factBatches,
     );
   }, [factBatches, onLoadedFactBatchesChange]);
@@ -709,18 +709,12 @@ export const useExpansionEngine = ({
       requestScope,
       fetchFormData: fetchFormDataRef.current,
       factStore: factStoreRef.current,
-      recordFactBatches: syncLoadedFactBatches,
       buildRequestGroupId: expansionRequestHelpers.buildRequestGroupId,
       trackRequestInScope: expansionRequestHelpers.trackRequestInScope,
       addWarnings,
       updateLoadingKey,
     }),
-    [
-      addWarnings,
-      expansionRequestHelpers,
-      syncLoadedFactBatches,
-      updateLoadingKey,
-    ],
+    [addWarnings, expansionRequestHelpers, updateLoadingKey],
   );
 
   const expandSameAxis = useCallback(
@@ -772,6 +766,7 @@ export const useExpansionEngine = ({
         if (fetchLoop.status === 'stale' || !requestScope.isCurrent()) {
           return;
         }
+        syncLoadedFactBatches();
         const committedExpanded =
           axis === 'row' ? expandedRowsRef.current : expandedColsRef.current;
         const combinedExpanded = new Set(committedExpanded);
@@ -809,6 +804,7 @@ export const useExpansionEngine = ({
       persistExpansionState,
       pruneMergedTree,
       resolveExpandedForMetrics,
+      syncLoadedFactBatches,
       trackInFlightExpansion,
       visibilityConfig,
     ],
@@ -887,6 +883,7 @@ export const useExpansionEngine = ({
           fetchRuntime: buildFetchRuntime(requestScope),
         });
         if (result.status === 'complete') {
+          syncLoadedFactBatches();
           const resolvedRows = resolveExpandedForMetrics(
             'row',
             result.desiredRows,
@@ -924,6 +921,7 @@ export const useExpansionEngine = ({
       pruneMergedTree,
       resolveExpandedForMetrics,
       setHydratingState,
+      syncLoadedFactBatches,
       visibilityConfig,
     ],
   );
@@ -1088,7 +1086,7 @@ export const useExpansionEngine = ({
     const nextFactStore = createPivotFactStore();
     nextFactStore.upsertBatches(factBatches);
     factStoreRef.current = nextFactStore;
-    onLoadedFactBatchesChange?.(factBatches);
+    onLoadedFactBatchesChange(factBatches);
     setHydratingState(false);
     warningsRef.current = new Map();
     setWarnings([]);

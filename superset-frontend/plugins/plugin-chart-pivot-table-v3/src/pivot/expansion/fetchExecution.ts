@@ -110,7 +110,6 @@ export type ExpansionFetchRuntime = {
   requestScope: LatestRequestScope;
   fetchFormData: PivotTableQueryFormData;
   factStore?: PivotFactStore;
-  recordFactBatches?: () => void;
   buildRequestGroupId: BuildExpansionRequestGroupId;
   trackRequestInScope: TrackExpansionRequest;
   addWarnings: (nextWarnings?: ChartDataWarning[]) => void;
@@ -404,7 +403,6 @@ export const fetchExpansionTargetDeltas = async ({
   }
   const deltas: FetchResultDelta[] = [];
   results.forEach(result => {
-    runtime.recordFactBatches?.();
     deltas.push({
       targets: result.targets,
       data: result.data,
