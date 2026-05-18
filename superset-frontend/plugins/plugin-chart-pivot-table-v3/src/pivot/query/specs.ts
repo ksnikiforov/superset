@@ -57,10 +57,7 @@ import { collectRequiredTimeOffsets } from '../measureLeaves';
 import { type BatchGroup } from './fetchPlanOptimizer';
 import { formatQueryName } from './queryName';
 import { buildPathFilters, coerceValueForColumn } from './pathFilters';
-import {
-  buildBranchFactCoverages,
-  buildFactCoverage,
-} from '../runtime/coverage';
+import { buildFactCoverage } from '../runtime/coverage';
 import {
   buildFactValueKeys,
   type PivotFactSelector,
@@ -68,6 +65,7 @@ import {
 } from '../runtime/factStore';
 import {
   canRequestAxisExpansion,
+  isValuesFirstOnAxis,
   projectionQueryDimensions,
   projectionQueryFilterPath,
   resolveAxisProjection,
@@ -428,6 +426,155 @@ type ResolvedFetchContext = {
   requiredTimeOffsets: string[];
   sanitizedPath: PivotPath;
   coverages: PivotFactCoverage[];
+};
+
+type DepthPair = { rowDepth: number; columnDepth: number };
+
+const parentDepth = (depth: number) => Math.max(depth - 1, 0);
+
+const rangeFromOne = (depth: number): number[] =>
+  Array.from({ length: depth }, (_, idx) => idx + 1);
+
+const uniqueDepths = (depths: number[]) => Array.from(new Set(depths));
+
+const buildBranchFactCoverages = ({
+  program,
+  axis,
+  projection,
+  rowDepth,
+  columnDepth,
+  rowDimensions = program.rowDimensions,
+  columnDimensions = program.columnDimensions,
+  rowSubtotalLevels,
+  columnSubtotalLevels,
+  rowTotals = false,
+  columnTotals = false,
+  includeRowTotalForColumnFormatting = false,
+  includeColumnTotalForRowFormatting = false,
+}: {
+  program: LayoutContext['pivotProgram'];
+  axis: PivotAxis;
+  projection: PivotAxisProjection;
+  rowDepth: number;
+  columnDepth: number;
+  rowDimensions?: LayoutContext['pivotProgram']['rowDimensions'];
+  columnDimensions?: LayoutContext['pivotProgram']['columnDimensions'];
+  rowSubtotalLevels: number[];
+  columnSubtotalLevels: number[];
+  rowTotals?: boolean;
+  columnTotals?: boolean;
+  includeRowTotalForColumnFormatting?: boolean;
+  includeColumnTotalForRowFormatting?: boolean;
+}): PivotFactCoverage[] => {
+  const depthPairs: DepthPair[] = [];
+  const addDepthPair = (rowDepthVal: number, columnDepthVal: number) => {
+    const key = `${rowDepthVal}|${columnDepthVal}`;
+    if (
+      depthPairs.find(pair => `${pair.rowDepth}|${pair.columnDepth}` === key)
+    ) {
+      return;
+    }
+    depthPairs.push({
+      rowDepth: rowDepthVal,
+      columnDepth: columnDepthVal,
+    });
+  };
+  const addDepthGrid = (rowDepths: number[], columnDepths: number[]) => {
+    uniqueDepths(rowDepths).forEach(rowDepthVal => {
+      uniqueDepths(columnDepths).forEach(columnDepthVal =>
+        addDepthPair(rowDepthVal, columnDepthVal),
+      );
+    });
+  };
+  addDepthPair(rowDepth, columnDepth);
+
+  const valuesAtRowFront = isValuesFirstOnAxis(program, 'row');
+  const valuesAtColumnFront = isValuesFirstOnAxis(program, 'col');
+  const rowParentDepth = parentDepth(rowDepth);
+  const columnParentDepth = parentDepth(columnDepth);
+
+  if (axis === 'col' && columnDepth > 0) {
+    if (valuesAtRowFront && rowDepth > 0) {
+      addDepthPair(0, columnDepth);
+    }
+    if (rowDepth > 0) {
+      addDepthGrid(rowDepth === 1 ? [0, 1] : rangeFromOne(rowDepth), [
+        columnDepth,
+        columnParentDepth,
+      ]);
+    } else if (program.valueAxis === 'col') {
+      addDepthPair(rowDepth, columnParentDepth);
+    }
+  }
+
+  if (axis === 'row' && columnDepth > 0) {
+    if (valuesAtColumnFront) {
+      addDepthPair(rowDepth, 0);
+    }
+    addDepthGrid(
+      rowDepth > 0 ? [rowDepth, rowParentDepth] : [rowDepth],
+      rangeFromOne(columnDepth),
+    );
+  }
+
+  if (program.valueAxis === 'col' && columnDepth > 0) {
+    addDepthGrid(rowDepth > 0 ? [rowDepth, rowParentDepth] : [rowDepth], [
+      columnParentDepth,
+    ]);
+    if (rowDepth > 0) {
+      addDepthPair(rowParentDepth, columnDepth);
+    }
+  }
+
+  const effectiveRowLevels = Array.from(
+    new Set([
+      ...rowSubtotalLevels,
+      ...(includeRowTotalForColumnFormatting ? [0] : []),
+    ]),
+  ).filter(level => level <= rowDepth);
+  const effectiveColumnLevels = Array.from(
+    new Set([
+      ...columnSubtotalLevels,
+      ...(rowTotals ? [0] : []),
+      ...(includeColumnTotalForRowFormatting ? [0] : []),
+    ]),
+  ).filter(level => level <= columnDepth);
+  addDepthGrid(
+    [rowDepth, ...effectiveRowLevels],
+    [columnDepth, ...effectiveColumnLevels],
+  );
+
+  const branchAnchorDepth = projectionQueryFilterPath(projection).length;
+  const queryPairs =
+    branchAnchorDepth === 0
+      ? depthPairs
+      : depthPairs.filter(pair =>
+          axis === 'row'
+            ? pair.rowDepth >= branchAnchorDepth
+            : pair.columnDepth >= branchAnchorDepth,
+        );
+  const hasTotalRow = columnTotals || rowSubtotalLevels.includes(0);
+  const hasTotalColumn = rowTotals || columnSubtotalLevels.includes(0);
+  const shouldIncludeGrandTotalPair =
+    (rowDimensions.length === 0 && columnDimensions.length === 0) ||
+    (hasTotalRow && hasTotalColumn) ||
+    (valuesAtRowFront && hasTotalColumn) ||
+    (valuesAtColumnFront && hasTotalRow);
+
+  return (
+    shouldIncludeGrandTotalPair
+      ? queryPairs
+      : queryPairs.filter(
+          pair => !(pair.rowDepth === 0 && pair.columnDepth === 0),
+        )
+  ).map(pair =>
+    buildFactCoverage({
+      rowDimensions,
+      columnDimensions,
+      rowDepth: pair.rowDepth,
+      columnDepth: pair.columnDepth,
+    }),
+  );
 };
 
 const filterMetricsByScope = (

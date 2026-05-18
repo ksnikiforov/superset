@@ -255,8 +255,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13549` insertions, `17027` deletions, net `-3478`.
-- Current production TypeScript/TSX total: about `30032` lines.
+- Production `src`: `13539` insertions, `17027` deletions, net `-3488`.
+- Current production TypeScript/TSX total: about `30022` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -268,18 +268,18 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `30032` | `-3478` | `< 28000` |
-| Strict core pipeline | `11337` | `12478` | `+1141` | `8000` |
+| Full production `src` | `33510` | `30022` | `-3488` | `< 28000` |
+| Strict core pipeline | `11337` | `12468` | `+1131` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5076` | `+393` | `3000-4000` |
-| Broad core pipeline | `16020` | `17554` | `+1534` | `11000-13000` |
+| Broad core pipeline | `16020` | `17544` | `+1524` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `4034` |
+| `pivot/runtime/*` | `3877` |
 | `pivot/expansion/*` | `2930` |
-| `pivot/query/*` | `1684` |
+| `pivot/query/*` | `1831` |
 | `pivot/layout/*` | `744` |
 | core/shared/domain helpers | `1873` |
 | formatting/data/render-model/update support | `1213` |
@@ -350,6 +350,12 @@ Support metric shaping for values, totals, formatting, databars, sorting, and
 measure leaves now lives inside the query-spec planner that consumes it, so the
 query pipeline has one less public core module and one less helper-specific test
 surface.
+
+Latest query/coverage ownership cleanup: branch fact coverage planning now lives
+inside the query-spec boundary instead of `runtime/coverage.ts`. Coverage owns
+manifest primitives, coverage needs, fact selectors, and diffing; query specs
+own the conversion from expansion requests to query fact coverage. This keeps
+the runtime coverage module from becoming another query planner.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.

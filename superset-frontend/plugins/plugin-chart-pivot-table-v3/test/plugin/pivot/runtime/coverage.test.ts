@@ -23,7 +23,6 @@ import {
 import { serializePath } from '../../../../src/pivot/core/path';
 import { compilePivotProgram } from '../../../../src/pivot/runtime/compilePivotProgram';
 import {
-  buildBranchFactCoverages,
   createExpansionCoverageDiff,
   buildFactCoverage,
   diffCoverageManifest,
@@ -31,7 +30,12 @@ import {
 } from '../../../../src/pivot/runtime/coverage';
 import { type PivotFactSelector } from '../../../../src/pivot/runtime/factStore';
 import { resolveAxisProjection } from '../../../../src/pivot/runtime/projection';
-import { MetricsLayoutEnum } from '../../../../src/types';
+import { buildLayoutContext } from '../../../../src/pivot/layout/LayoutContext';
+import { buildExpansionQuerySpecs } from '../../../../src/pivot/query/specs';
+import {
+  MetricsLayoutEnum,
+  type PivotTableQueryFormData,
+} from '../../../../src/types';
 
 describe('expansion fact coverage', () => {
   it('derives loaded expansion coverage from typed fact selectors', () => {
@@ -384,7 +388,7 @@ describe('branch fact coverage', () => {
   ] as const)(
     'uses the %s projection filter depth instead of the raw Values path length',
     (axis, metricsLayout) => {
-      const program = compilePivotProgram({
+      const formData = {
         [axis === 'row' ? 'groupbyRows' : 'groupbyColumns']: [
           'country',
           'state',
@@ -393,22 +397,24 @@ describe('branch fact coverage', () => {
         ],
         metrics: ['sales'],
         metricsLayout,
-      });
+      } as PivotTableQueryFormData;
+      const layout = buildLayoutContext(formData);
+      const { pivotProgram: program } = layout;
       const projection = resolveAxisProjection({
         program,
         axis,
         path: ['US', encodeMetricKey('sales'), 'Boston'],
       });
 
-      const coverage = buildBranchFactCoverages({
-        program,
+      const coverage = buildExpansionQuerySpecs({
+        kind: 'branch',
+        formData,
+        layout,
         axis,
-        projection,
-        rowDepth: axis === 'row' ? 2 : 0,
-        columnDepth: axis === 'col' ? 2 : 0,
-        rowSubtotalLevels: [],
-        columnSubtotalLevels: [],
-      });
+        path: ['US', encodeMetricKey('sales'), 'Boston'],
+        visibleRowDepth: axis === 'row' ? 2 : 0,
+        visibleColDepth: axis === 'col' ? 2 : 0,
+      }).map(spec => spec.meta.coverage);
 
       expect(projection.filterDimensionPath).toEqual(['US']);
       expect(projection.projectedDimensionPath).toEqual(['US', 'Boston']);
@@ -425,8 +431,8 @@ describe('branch fact coverage', () => {
           {
             rowDepth: axis === 'row' ? 2 : 0,
             columnDepth: axis === 'col' ? 2 : 0,
-            rowDimensions: axis === 'row' ? ['country', 'state'] : [],
-            columnDimensions: axis === 'col' ? ['country', 'state'] : [],
+            rowDimensions: axis === 'row' ? ['country', 'city'] : [],
+            columnDimensions: axis === 'col' ? ['country', 'city'] : [],
           },
         ]),
       );
