@@ -255,8 +255,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13781` insertions, `16844` deletions, net `-3063`.
-- Current production TypeScript/TSX total: about `30447` lines.
+- Production `src`: `13807` insertions, `16872` deletions, net `-3065`.
+- Current production TypeScript/TSX total: about `30445` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -268,10 +268,10 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `30447` | `-3063` | `< 28000` |
-| Strict core pipeline | `11337` | `12860` | `+1523` | `8000-9500` |
+| Full production `src` | `33510` | `30445` | `-3065` | `< 28000` |
+| Strict core pipeline | `11337` | `12858` | `+1521` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5109` | `+426` | `3000-4000` |
-| Broad core pipeline | `16020` | `17969` | `+1949` | `11000-13500` |
+| Broad core pipeline | `16020` | `17967` | `+1947` | `11000-13000` |
 
 Current strict core breakdown:
 
@@ -279,7 +279,7 @@ Current strict core breakdown:
 | --- | ---: |
 | `pivot/runtime/*` | `4193` |
 | `pivot/expansion/*` | `2975` |
-| `pivot/query/*` | `1865` |
+| `pivot/query/*` | `1863` |
 | `pivot/layout/*` | `725` |
 | core/shared/domain helpers | `1873` |
 | formatting/data/render-model/update support | `1229` |
