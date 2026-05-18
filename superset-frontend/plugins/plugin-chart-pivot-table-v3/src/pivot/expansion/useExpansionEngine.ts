@@ -97,6 +97,7 @@ type HydrateExpansionOptions = {
   activeAxis?: PivotAxis;
   planRows?: boolean;
   planCols?: boolean;
+  persistOnComplete?: boolean;
 };
 
 type ExpansionRuntimeState = {
@@ -823,6 +824,7 @@ export const useExpansionEngine = ({
       const shouldShowLoader = options?.showLoader ?? false;
       const shouldPlanRows = options?.planRows ?? true;
       const shouldPlanCols = options?.planCols ?? true;
+      const shouldPersist = options?.persistOnComplete ?? false;
       const requestScope = expansionRequestLifecycle.beginScope();
       clearLoadingState();
       if (shouldShowLoader) {
@@ -861,7 +863,7 @@ export const useExpansionEngine = ({
             pendingRows: new Set(),
             pendingCols: new Set(),
           });
-          if (reason === 'cross-axis') {
+          if (shouldPersist) {
             persistExpansionState(resolvedRows, resolvedCols);
           }
         }
@@ -933,6 +935,7 @@ export const useExpansionEngine = ({
         hydrateAtomic({
           activeAxis: axis,
           showLoader: false,
+          persistOnComplete: true,
         }).catch(reportAsyncError);
         return;
       }
