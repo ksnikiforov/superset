@@ -86,11 +86,9 @@ describe('layout resolution (contracts)', () => {
     expect(signature.metricInsertIndex).toBe(
       bootstrapSpec?.meta.pivotProgram.metricInsertIndex,
     );
-    expect(signature.rowSubtotalLevels).toEqual(
-      bootstrapSpec?.meta.rowSubtotalLevels,
-    );
+    expect(signature.rowSubtotalLevels).toEqual(layout.rowSubtotalLevels);
     expect(signature.colSubtotalLevels).toEqual(
-      bootstrapSpec?.meta.colSubtotalLevels,
+      layout.colSubtotalLevelsForQuery,
     );
   });
 

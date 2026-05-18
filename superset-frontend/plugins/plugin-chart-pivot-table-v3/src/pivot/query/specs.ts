@@ -83,10 +83,6 @@ export type QuerySpecMeta = {
   siblingValues?: PivotPathValue[];
   rowPaths?: PivotPath[];
   columnPaths?: PivotPath[];
-  rowSubtotalLevels: number[];
-  colSubtotalLevels: number[];
-  materializedMetrics: QueryFormMetric[];
-  materializedMeasureHierarchy: MeasureHierarchy;
   requiredTimeOffsets: string[];
   pivotProgram: PivotProgram;
   coverage: PivotFactCoverage;
@@ -349,13 +345,9 @@ type CoverageQueryMeta =
 type ResolvedFetchContext = {
   rowGroupbyForQuery: QueryFormColumn[];
   colGroupbyForQuery: QueryFormColumn[];
-  materializedMetrics: QueryFormMetric[];
   metricsForQuery: QueryFormMetric[];
-  materializedMeasureHierarchy: MeasureHierarchy;
   requiredTimeOffsets: string[];
   sanitizedPath: PivotPath;
-  rowSubtotalLevels: number[];
-  colSubtotalLevels: number[];
   coverages: PivotFactCoverage[];
 };
 
@@ -552,13 +544,9 @@ const resolveFetchContext = ({
   return {
     rowGroupbyForQuery: queryShape.rowGroupby,
     colGroupbyForQuery: queryShape.colGroupby,
-    materializedMetrics,
     metricsForQuery: queryShape.metrics,
-    materializedMeasureHierarchy,
     requiredTimeOffsets,
     sanitizedPath,
-    rowSubtotalLevels,
-    colSubtotalLevels,
     coverages,
   };
 };
@@ -585,10 +573,6 @@ const buildSpecsForCoverages = ({
     filters,
     meta: {
       ...meta,
-      rowSubtotalLevels: ctx.rowSubtotalLevels,
-      colSubtotalLevels: ctx.colSubtotalLevels,
-      materializedMetrics: ctx.materializedMetrics,
-      materializedMeasureHierarchy: ctx.materializedMeasureHierarchy,
       requiredTimeOffsets: ctx.requiredTimeOffsets,
       pivotProgram: layout.pivotProgram,
       coverage,
@@ -887,8 +871,6 @@ const buildInitialRootSpecs = ({
   const { metrics } = layout;
   const rowGroupby = layout.pivotProgram.rowDimensions;
   const colGroupby = layout.pivotProgram.columnDimensions;
-  const { rowSubtotalLevels, colSubtotalLevelsForQuery: colSubtotalLevels } =
-    layout;
 
   return intents.flatMap(intent => {
     const coverage = buildFactCoverage({
@@ -917,13 +899,9 @@ const buildInitialRootSpecs = ({
       ctx: {
         rowGroupbyForQuery: queryShape.rowGroupby,
         colGroupbyForQuery: queryShape.colGroupby,
-        materializedMetrics: metrics,
         metricsForQuery: queryShape.metrics,
-        materializedMeasureHierarchy: layout.measureHierarchy,
         requiredTimeOffsets: layout.requiredTimeOffsets,
         sanitizedPath: [],
-        rowSubtotalLevels,
-        colSubtotalLevels,
         coverages: [coverage],
       },
       layout,

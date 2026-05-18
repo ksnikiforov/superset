@@ -26,11 +26,7 @@ import {
 } from '../../../../src/pivot/runtime/ingestQueryResults';
 import { materializeLoadedPivotTreeFromFactStore } from '../../fixtures/metricAxis';
 import { buildLayoutContext } from '../../../../src/pivot/layout/LayoutContext';
-import {
-  MetricsLayoutEnum,
-  type MeasureHierarchy,
-} from '../../../../src/types';
-import { buildValueLeaf } from '../../../../src/pivot/measureLeaves';
+import { MetricsLayoutEnum } from '../../../../src/types';
 import {
   encodeMetricKey,
   METRICS_PLACEHOLDER,
@@ -47,34 +43,19 @@ const buildSpec = ({
   rowDepth,
   colDepth,
   metrics = ['sales'],
-  materializedMetrics = ['sales'],
   rowGroupby = ['country'],
   colGroupby = ['month'],
-  rowSubtotalLevels = [],
-  colSubtotalLevels = [],
   metricsLayoutResolved = MetricsLayoutEnum.ROWS,
   metricInsertIndex = 1,
-  materializedMeasureHierarchy = {
-    kind: 'measureStackV1',
-    groups: materializedMetrics.map(metricKey => ({
-      metricKey,
-      leaves: [buildValueLeaf()],
-    })),
-    leafTierVisibility: 'hidden',
-  },
 }: {
   queryName: string;
   rowDepth: number;
   colDepth: number;
   metrics?: string[];
-  materializedMetrics?: string[];
   rowGroupby?: string[];
   colGroupby?: string[];
-  rowSubtotalLevels?: number[];
-  colSubtotalLevels?: number[];
   metricsLayoutResolved?: MetricsLayoutEnum;
   metricInsertIndex?: number;
-  materializedMeasureHierarchy?: MeasureHierarchy;
 }): PlannedQuerySpec => {
   const withValuesPlaceholder = (columns: string[]) => [
     ...columns.slice(0, metricInsertIndex),
@@ -110,10 +91,6 @@ const buildSpec = ({
     filters: [],
     meta: {
       kind: 'root',
-      rowSubtotalLevels,
-      colSubtotalLevels,
-      materializedMetrics,
-      materializedMeasureHierarchy,
       requiredTimeOffsets: [],
       pivotProgram,
       coverage,
@@ -251,7 +228,6 @@ test('keeps support and offset facts without materializing support metric branch
     rowDepth: 1,
     colDepth: 0,
     metrics: ['sales', 'sortMetric'],
-    materializedMetrics: ['sales'],
   });
   const result = {
     query_name: spec.queryName,
@@ -319,7 +295,6 @@ test('materializes column subtotal leaves from planned coverage specs', () => {
     colDepth: 1,
     rowGroupby: ['country'],
     colGroupby: ['category', 'subcategory'],
-    colSubtotalLevels: [1],
   });
   const store = createPivotFactStore();
   upsertQueryResultsIntoFactStore({
