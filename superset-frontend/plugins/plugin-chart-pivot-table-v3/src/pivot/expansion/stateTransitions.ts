@@ -22,7 +22,6 @@ import {
   type PivotTreeData,
   type PivotTreeNode,
 } from '../../types';
-import { mergeTrees } from '../core/tree';
 import { parsePath, serializePath } from '../core/path';
 import {
   buildGroupedFetchTargets,
@@ -46,7 +45,6 @@ import { rootKey } from '../viewModel';
 import { type PivotExpansionCoverageDiff } from '../runtime/coverage';
 import {
   getValuesLevelIndex,
-  isValuesAtAxisEnd,
   shouldAutoExpandValuesLevel,
 } from '../runtime/projection';
 import type { PivotProgram } from '../runtime/types';
@@ -360,116 +358,6 @@ export const resolveCollapsedExpansionState = ({
     nextManualExpanded,
     nextManualCollapsed,
   };
-};
-
-const pruneTreeByPrefixes = ({
-  tree,
-  axis,
-  prefixes,
-  preserveMetricChildren,
-  program,
-}: {
-  tree: PivotTreeData;
-  axis: PivotAxis;
-  prefixes: PivotTreeNode['path'][];
-  preserveMetricChildren?: boolean;
-  program: PivotProgram;
-}) => {
-  if (prefixes.length === 0) {
-    return tree;
-  }
-  const { metricLabelSet } = createExpansionMetricPolicy(program);
-  const isUnderPrefix = (path: PivotTreeNode['path']) =>
-    prefixes.some(prefix => prefix.every((val, idx) => val === path[idx]));
-  const shouldPreserveMetricChild = (path: PivotTreeNode['path']) => {
-    if (!preserveMetricChildren) {
-      return false;
-    }
-    return prefixes.some(prefix => {
-      if (!prefix.every((val, idx) => val === path[idx])) {
-        return false;
-      }
-      if (path.length !== prefix.length + 1) {
-        return false;
-      }
-      return isMetricTokenForKeys(path[prefix.length], metricLabelSet);
-    });
-  };
-  const removedRowKeys = new Set<string>();
-  const removedColKeys = new Set<string>();
-  if (axis === 'row') {
-    Object.values(tree.rows).forEach(node => {
-      if (isUnderPrefix(node.path) && !shouldPreserveMetricChild(node.path)) {
-        removedRowKeys.add(node.key);
-      }
-    });
-  } else {
-    Object.values(tree.cols).forEach(node => {
-      if (isUnderPrefix(node.path) && !shouldPreserveMetricChild(node.path)) {
-        removedColKeys.add(node.key);
-      }
-    });
-  }
-  if (removedRowKeys.size === 0 && removedColKeys.size === 0) {
-    return tree;
-  }
-  const nextRows = axis === 'row' ? { ...tree.rows } : tree.rows;
-  removedRowKeys.forEach(key => {
-    delete nextRows[key];
-  });
-  const nextCols = axis === 'col' ? { ...tree.cols } : tree.cols;
-  removedColKeys.forEach(key => {
-    delete nextCols[key];
-  });
-  const nextCells: PivotTreeData['cells'] = {};
-  Object.entries(tree.cells).forEach(([key, cell]) => {
-    if (removedRowKeys.has(cell.rowKey) || removedColKeys.has(cell.colKey)) {
-      return;
-    }
-    nextCells[key] = cell;
-  });
-  return { ...tree, rows: nextRows, cols: nextCols, cells: nextCells };
-};
-
-export type PruneMergedTree = ({
-  axis,
-  tree,
-  parent,
-  branch,
-}: {
-  axis: PivotAxis;
-  tree: PivotTreeData;
-  parent?: PivotTreeNode;
-  branch: PivotTreeData;
-}) => PivotTreeData;
-
-export const mergeSameAxisExpansionTree = ({
-  currentTree,
-  previousTree,
-  axis,
-  touchedKeys,
-  program,
-}: {
-  currentTree: PivotTreeData;
-  previousTree: PivotTreeData;
-  axis: PivotAxis;
-  touchedKeys: string[];
-  program: PivotProgram;
-}) => {
-  const touchedPrefixes = touchedKeys.map(key => parsePath(key));
-  const preserveMetricChildren =
-    axis === 'col' && isValuesAtAxisEnd(program, 'col');
-  const preservedTree =
-    touchedPrefixes.length > 0
-      ? pruneTreeByPrefixes({
-          tree: previousTree,
-          axis,
-          prefixes: touchedPrefixes,
-          preserveMetricChildren,
-          program,
-        })
-      : previousTree;
-  return mergeTrees(currentTree, preservedTree);
 };
 
 export const resolveExpansionReinitializationDecision = ({
@@ -841,6 +729,8 @@ export const buildCrossAxisIntersectionTargets = ({
 }): ExpansionFetchTarget[] => {
   const hasCrossAxisFetch =
     rowPlan.fetchRequests.length > 0 && colPlan.fetchRequests.length > 0;
+  const hasMissingAxisNodes =
+    rowPlan.hasMissingNodes || colPlan.hasMissingNodes;
   const rowPathKeys = rowPlan.fetchRequests
     .map(request => request.pathKey)
     .filter(key => key !== rootKey);
@@ -849,6 +739,7 @@ export const buildCrossAxisIntersectionTargets = ({
     .filter(key => key !== rootKey);
   if (
     !hasCrossAxisFetch ||
+    hasMissingAxisNodes ||
     visibleRowDepth === 0 ||
     visibleColDepth === 0 ||
     rowPathKeys.length === 0 ||

@@ -16,8 +16,9 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { type DataRecordValue } from '@superset-ui/core';
+import { type DataRecordValue, type QueryFormMetric } from '@superset-ui/core';
 import {
+  type MeasureHierarchy,
   type PivotAxis,
   type PivotPath,
   type PivotPathValue,
@@ -29,7 +30,7 @@ import {
   diffCoverageManifest,
   normalizeFactValueKeys,
 } from './coverage';
-import { type PivotFactCoverage } from './types';
+import { type PivotFactCoverage, type PivotProgram } from './types';
 
 export type PivotFactRole = 'visible' | 'support';
 
@@ -49,6 +50,16 @@ export type PivotFactSelector = {
 
 export type PivotFactStoreBatch = PivotFactSelector & {
   facts: PivotFact[];
+  materialization?: PivotFactStoreBatchMaterialization;
+};
+
+export type PivotFactStoreBatchMaterialization = {
+  metricsForQuery: QueryFormMetric[];
+  materializedMetrics: QueryFormMetric[];
+  materializedMeasureHierarchy: MeasureHierarchy;
+  rowSubtotalLevels: number[];
+  colSubtotalLevels: number[];
+  pivotProgram: PivotProgram;
 };
 
 export type PivotFactStoreBatchScope =
@@ -77,6 +88,7 @@ export type PivotFactStore = {
   upsertBatches: (batches: PivotFactStoreBatch[]) => void;
   getCompatibleFacts: (selector: PivotFactSelector) => PivotFact[];
   getCoverageBatches: () => PivotFactStoreBatch[];
+  getFactBatches: () => PivotFactStoreBatch[];
   hasCompatibleCoverage: (selector: PivotFactSelector) => boolean;
 };
 
@@ -165,6 +177,10 @@ const factMatchesScope = (fact: PivotFact, scope: PivotFactStoreBatchScope) => {
 export const createPivotFactStore = (): PivotFactStore => {
   const factsByRequest = new Map<string, PivotFact[]>();
   const selectorByRequest = new Map<string, PivotFactSelector>();
+  const materializationByRequest = new Map<
+    string,
+    PivotFactStoreBatchMaterialization
+  >();
 
   const upsertBatch = (batch: PivotFactStoreBatch) => {
     const { facts } = batch;
@@ -177,6 +193,9 @@ export const createPivotFactStore = (): PivotFactStore => {
       ]),
     );
     selectorByRequest.set(key, selector);
+    if (batch.materialization) {
+      materializationByRequest.set(key, batch.materialization);
+    }
     facts
       .filter(
         fact =>
@@ -242,9 +261,7 @@ export const createPivotFactStore = (): PivotFactStore => {
         candidate.scope.kind === 'bootstrap' || candidate.scope.kind === 'root'
       );
     }
-    return (
-      candidate.scope.kind !== 'bootstrap' && candidate.scope.kind !== 'root'
-    );
+    return true;
   };
 
   const getCompatibleRequestSelectorsForRead = (
@@ -290,10 +307,25 @@ export const createPivotFactStore = (): PivotFactStore => {
     upsertBatches: batches => batches.forEach(upsertBatch),
     getCompatibleFacts,
     getCoverageBatches: () =>
-      Array.from(selectorByRequest.values()).map(selector => ({
-        ...selector,
-        facts: [],
-      })),
+      Array.from(selectorByRequest.values()).map(selector => {
+        const materialization = materializationByRequest.get(
+          buildPivotFactRequestKey(selector),
+        );
+        return {
+          ...selector,
+          facts: [],
+          ...(materialization ? { materialization } : {}),
+        };
+      }),
+    getFactBatches: () =>
+      Array.from(selectorByRequest.entries()).map(([key, selector]) => {
+        const materialization = materializationByRequest.get(key);
+        return {
+          ...selector,
+          facts: factsByRequest.get(key) ?? [],
+          ...(materialization ? { materialization } : {}),
+        };
+      }),
     hasCompatibleCoverage,
   };
 };

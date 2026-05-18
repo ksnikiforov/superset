@@ -59,7 +59,6 @@ import {
   addAncestors,
   buildVisiblePersistedExpansionState,
   computeVisibleDepths,
-  mergeSameAxisExpansionTree,
   planInitialHydrationPrefetch,
   resolveCollapsedExpansionState,
   resolveExpansionToggleDecision,
@@ -80,6 +79,8 @@ import {
   createLatestRequestLifecycle,
   type LatestRequestScope,
 } from '../runtime/requestLifecycle';
+import { buildLayoutContext } from '../layout/LayoutContext';
+import { materializeLoadedPivotTreeFromFactStore } from '../runtime/materializePivotTree';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import type { RenderModelConfig } from '../render/renderModel';
 import { getStableColumnKey } from '../../utils';
@@ -308,12 +309,6 @@ export type ExpansionEngineConfig = {
   mergeOwnState?: (partial: JsonObject) => JsonObject;
   persistedExpansionState?: unknown;
   shouldPersistExpansionState: boolean;
-  pruneMergedTree: (params: {
-    axis: PivotAxis;
-    tree: PivotTreeData;
-    parent?: PivotTreeNode;
-    branch?: PivotTreeData;
-  }) => PivotTreeData;
 };
 
 export const useExpansionEngine = ({
@@ -333,7 +328,6 @@ export const useExpansionEngine = ({
   mergeOwnState,
   persistedExpansionState,
   shouldPersistExpansionState,
-  pruneMergedTree,
 }: ExpansionEngineConfig): ExpansionEngineResult => {
   const [tree, setTree] = useState<PivotTreeData>(data);
   const treeRef = useRef(tree);
@@ -687,13 +681,22 @@ export const useExpansionEngine = ({
     (requestScope: LatestRequestScope): ExpansionFetchRuntime => ({
       requestScope,
       fetchFormData: fetchFormDataRef.current,
+      program: pivotProgram,
       factStore: factStoreRef.current,
+      materializeLoadedTree: () =>
+        factStoreRef.current
+          ? materializeLoadedPivotTreeFromFactStore({
+              store: factStoreRef.current,
+              layout: buildLayoutContext(fetchFormDataRef.current),
+              formData: fetchFormDataRef.current,
+            })
+          : treeRef.current,
       buildRequestGroupId: expansionRequestHelpers.buildRequestGroupId,
       trackRequestInScope: expansionRequestHelpers.trackRequestInScope,
       addWarnings,
       updateLoadingKey,
     }),
-    [addWarnings, expansionRequestHelpers, updateLoadingKey],
+    [addWarnings, expansionRequestHelpers, pivotProgram, updateLoadingKey],
   );
 
   const expandSameAxis = useCallback(
@@ -739,7 +742,6 @@ export const useExpansionEngine = ({
           config: visibilityConfig,
           fetchRuntime: buildFetchRuntime(requestScope),
           resolveExpandedForMetrics,
-          pruneMergedTree,
         });
 
         if (fetchLoop.status === 'stale' || !requestScope.isCurrent()) {
@@ -749,20 +751,13 @@ export const useExpansionEngine = ({
           axis === 'row' ? expandedRowsRef.current : expandedColsRef.current;
         const combinedExpanded = new Set(committedExpanded);
         manualExpandedRef.current.forEach(key => combinedExpanded.add(key));
-        const mergedTree = mergeSameAxisExpansionTree({
-          currentTree: fetchLoop.tree,
-          previousTree: treeRef.current,
-          axis,
-          touchedKeys: fetchLoop.touchedKeys,
-          program: pivotProgram,
-        });
         const finalExpanded = resolveExpandedForMetrics(
           axis,
           combinedExpanded,
-          mergedTree,
+          fetchLoop.tree,
         );
         commitExpansionState({
-          tree: mergedTree,
+          tree: fetchLoop.tree,
           expandedRows: axis === 'row' ? finalExpanded : undefined,
           expandedCols: axis === 'col' ? finalExpanded : undefined,
         });
@@ -778,9 +773,7 @@ export const useExpansionEngine = ({
       buildFetchRuntime,
       commitExpansionState,
       expansionRequestLifecycle,
-      pivotProgram,
       persistExpansionState,
-      pruneMergedTree,
       resolveExpandedForMetrics,
       trackInFlightExpansion,
       visibilityConfig,
@@ -856,7 +849,6 @@ export const useExpansionEngine = ({
           pendingCols: pendingColsRef.current,
           planRows: shouldPlanRows,
           planCols: shouldPlanCols,
-          pruneMergedTree,
           fetchRuntime: buildFetchRuntime(requestScope),
         });
         if (result.status === 'complete') {
@@ -894,7 +886,6 @@ export const useExpansionEngine = ({
       commitExpansionState,
       expansionRequestLifecycle,
       persistExpansionState,
-      pruneMergedTree,
       resolveExpandedForMetrics,
       setHydratingState,
       visibilityConfig,

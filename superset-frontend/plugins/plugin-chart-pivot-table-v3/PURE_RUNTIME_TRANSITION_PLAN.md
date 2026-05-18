@@ -186,8 +186,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14231` insertions, `16010` deletions, net `-1779`.
-- Current production TypeScript/TSX total: about `31731` lines.
+- Production `src`: `14040` insertions, `16039` deletions, net `-1999`.
+- Current production TypeScript/TSX total: about `31511` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -884,6 +884,25 @@ Success criteria:
   batching, and branch-spec replay were removed from `buildInitialQuerySpecs`.
   Persisted expansion restore is now expansion-hydration responsibility, which
   keeps startup query planning bounded to visible bootstrap coverage.
+- Branch, batch, and intersection fetches now share the same internal
+  query-spec-to-fact-store materialization executor. The old branch-only plan
+  wrapper has been removed, and the executor takes the compiled layout directly
+  instead of threading a separate measure hierarchy argument.
+- Expansion fetches now upsert fact batches into the fact store and
+  rematerialize the runtime tree from loaded facts. Branch-tree deltas,
+  same-axis tree merge preservation, collapsed-axis pruning, and the
+  `pruneMergedTree` chart/layout plumbing have been removed from production.
+- Same-iteration branch and batch fetches are now allowed to satisfy later
+  intersection needs before intersection transport runs. Expansion execution
+  rechecks fact-store coverage after branch/batch results arrive, which avoids
+  redundant row x column intersection requests.
+- Fact-store scopes for branch, batch, and intersection specs now use projected
+  query dimension paths instead of rendered display paths. Metric, measure, and
+  subtotal tokens can exist in UI paths, but they do not become fact-store
+  coverage anchors.
+- Exact-depth root/bootstrap coverage can satisfy narrower explicit visible
+  path needs when the aggregate shape is the same. It still does not imply
+  deeper hidden/expanded coverage.
 
 ## Current Risks
 
@@ -940,9 +959,9 @@ Success criteria:
   program policy object. Only move it again if that deletes call-site plumbing
   or combines more layout/coverage policy.
 - Expansion still owns a local fact store while seamless owns committed
-  tree/materialization state. The next high-impact cut is to make expansion
-  fetches fact-store-first and rematerialize the tree, which should delete
-  branch-tree merge/prune staging instead of adding another state wrapper.
+  tree/materialization state. The next high-impact cut is to formalize the
+  loaded runtime snapshot so fact batches do not carry per-batch materialization
+  metadata and query planning can move toward one manifest-to-spec compiler.
 
 ## Approval Checkpoints
 

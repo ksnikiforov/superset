@@ -199,6 +199,38 @@ describe('coverage manifest diff', () => {
     ).toEqual(required);
   });
 
+  it('lets exact-depth root coverage satisfy narrower explicit path needs', () => {
+    const required = [
+      need(
+        { kind: 'paths', paths: [['Germany']] },
+        { kind: 'paths', paths: [[2024]] },
+      ),
+    ];
+
+    expect(
+      diffCoverageManifest({
+        required,
+        factBatches: [batch({ kind: 'bootstrap' })],
+      }),
+    ).toEqual([]);
+  });
+
+  it('does not let shallower root coverage satisfy deeper explicit path needs', () => {
+    const required = [
+      need(
+        { kind: 'paths', paths: [['Germany']] },
+        { kind: 'paths', paths: [[2024]] },
+      ),
+    ];
+
+    expect(
+      diffCoverageManifest({
+        required,
+        factBatches: [batch({ kind: 'bootstrap' }, 1, 1)],
+      }),
+    ).toEqual(required);
+  });
+
   it('treats scoped full expansion as bounded to the concrete ancestor path', () => {
     const required = [
       need({ kind: 'scopedFull', ancestorPaths: [['USA']] }, { kind: 'root' }),

@@ -20,14 +20,12 @@ import {
   type PivotAxis,
   type PivotTableQueryFormData,
   type PivotTreeData,
-  type PivotTreeNode,
 } from '../../types';
 import {
   fetchPivotBranch,
   fetchPivotBranchesBatch,
   fetchPivotIntersection,
 } from '../query/fetchPivotBranch';
-import { mergeTrees } from '../core/tree';
 import { parsePath } from '../core/path';
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import { buildBatchSignature } from '../query/batchSignature';
@@ -48,7 +46,6 @@ import {
   computeVisibleDepths,
   runHydrationLoop,
   type ExpansionVisibilityConfig,
-  type PruneMergedTree,
 } from './stateTransitions';
 import {
   buildGroupedFetchTargets,
@@ -58,6 +55,7 @@ import {
   planExpansionForAxis,
 } from './planner';
 import type { PivotProgram } from '../runtime/types';
+import { rootKey } from '../viewModel';
 
 type ExpansionFetchResult = {
   targets: ExpansionFetchTarget[];
@@ -110,7 +108,9 @@ export const createExpansionRequestHelpers = ({
 export type ExpansionFetchRuntime = {
   requestScope: LatestRequestScope;
   fetchFormData: PivotTableQueryFormData;
+  program: PivotProgram;
   factStore?: PivotFactStore;
+  materializeLoadedTree: () => PivotTreeData;
   buildRequestGroupId: BuildExpansionRequestGroupId;
   trackRequestInScope: TrackExpansionRequest;
   addWarnings: (nextWarnings?: ChartDataWarning[]) => void;
@@ -122,21 +122,13 @@ export type ExpansionFetchContext = {
   visibleColDepth: number;
 };
 
-export type FetchResultDelta = {
+export type ExpansionFetchedTargetGroup = {
   targets: ExpansionFetchTarget[];
-  data: PivotTreeData;
 };
 
 type ExpansionFetcherResult = {
-  data: PivotTreeData;
   warnings?: ChartDataWarning[];
   error?: unknown;
-};
-
-type FetchDeltaEntry = {
-  axis: PivotAxis;
-  pathKey: string;
-  data: PivotTreeData;
 };
 
 const createRuntimeExpansionCoverageDiff = ({
@@ -226,7 +218,6 @@ const executeExpansionFetch = async ({
     }
     return {
       targets,
-      data: result.data,
     };
   } finally {
     if (requestScope.isCurrent()) {
@@ -333,6 +324,43 @@ const fetchExpansionIntersectionTarget = async ({
   });
 };
 
+const filterMissingIntersectionTargets = ({
+  intersections,
+  context,
+  runtime,
+}: {
+  intersections: IntersectionFetchTarget[];
+  context: ExpansionFetchContext;
+  runtime: ExpansionFetchRuntime;
+}) => {
+  const missingRequests = createRuntimeExpansionCoverageDiff({
+    runtime,
+    program: runtime.program,
+  })(
+    intersections.map(target => ({
+      axis: 'row' as const,
+      pathKey: rootKey,
+      rowDepth: context.visibleRowDepth,
+      columnDepth: context.visibleColDepth,
+      rowPathKeys: target.rowPathKeys,
+      columnPathKeys: target.columnPathKeys,
+    })),
+  );
+  const missingKeys = new Set(
+    missingRequests.map(request =>
+      stableStringify([
+        request.rowPathKeys ?? [],
+        request.columnPathKeys ?? [],
+      ]),
+    ),
+  );
+  return intersections.filter(target =>
+    missingKeys.has(
+      stableStringify([target.rowPathKeys, target.columnPathKeys]),
+    ),
+  );
+};
+
 export const fetchExpansionTargetDeltas = async ({
   targets,
   context,
@@ -345,7 +373,7 @@ export const fetchExpansionTargetDeltas = async ({
   runtime: ExpansionFetchRuntime;
   singleRequestKind: string;
   batchRequestKind?: string;
-}): Promise<FetchResultDelta[]> => {
+}): Promise<ExpansionFetchedTargetGroup[]> => {
   const { batches, singles, intersections } = resolveExpansionFetchPlan({
     targets,
     formData: runtime.fetchFormData,
@@ -378,7 +406,7 @@ export const fetchExpansionTargetDeltas = async ({
       visibleRowDepth,
       visibleColDepth,
     });
-  const fetchPromises: Array<Promise<ExpansionFetchResult>> = [
+  const branchFetchPromises: Array<Promise<ExpansionFetchResult>> = [
     ...singles.map(target =>
       fetchExpansionSingleTarget({
         target,
@@ -395,7 +423,18 @@ export const fetchExpansionTargetDeltas = async ({
         runtime,
       }),
     ),
-    ...intersections.map(target =>
+  ];
+  const branchResults = await Promise.all(branchFetchPromises);
+  if (!runtime.requestScope.isCurrent()) {
+    return [];
+  }
+  const missingIntersections = filterMissingIntersectionTargets({
+    intersections,
+    context,
+    runtime,
+  });
+  const intersectionResults = await Promise.all(
+    missingIntersections.map(target =>
       fetchExpansionIntersectionTarget({
         target,
         context,
@@ -403,78 +442,12 @@ export const fetchExpansionTargetDeltas = async ({
         runtime,
       }),
     ),
-  ];
-  const results = await Promise.all(fetchPromises);
+  );
+  const results = [...branchResults, ...intersectionResults];
   if (!runtime.requestScope.isCurrent()) {
     return [];
   }
-  const deltas: FetchResultDelta[] = [];
-  results.forEach(result => {
-    deltas.push({
-      targets: result.targets,
-      data: result.data,
-    });
-  });
-  return deltas;
-};
-
-const getOrderedFetchDeltaEntries = (
-  deltas: FetchResultDelta[],
-): FetchDeltaEntry[] =>
-  deltas
-    .flatMap(({ targets, data }) =>
-      targets.flatMap(target => {
-        if (!('axis' in target)) {
-          return [];
-        }
-        return [{ axis: target.axis, pathKey: target.pathKey, data }];
-      }),
-    )
-    .sort((left, right) => {
-      const axisCompare = left.axis.localeCompare(right.axis);
-      if (axisCompare !== 0) {
-        return axisCompare;
-      }
-      const depthCompare =
-        parsePath(left.pathKey).length - parsePath(right.pathKey).length;
-      if (depthCompare !== 0) {
-        return depthCompare;
-      }
-      return left.pathKey.localeCompare(right.pathKey);
-    });
-
-const applyFetchDeltasToTree = ({
-  tree,
-  deltas,
-  pruneMergedTree,
-}: {
-  tree: PivotTreeData;
-  deltas: FetchResultDelta[];
-  pruneMergedTree: (params: {
-    axis: PivotAxis;
-    tree: PivotTreeData;
-    parent?: PivotTreeNode;
-    branch?: PivotTreeData;
-  }) => PivotTreeData;
-}) => {
-  const entries = getOrderedFetchDeltaEntries(deltas);
-  let mergedTree = entries.reduce(
-    (nextTree, entry) => mergeTrees(nextTree, entry.data),
-    tree,
-  );
-  entries.forEach(entry => {
-    const parent =
-      entry.axis === 'row'
-        ? mergedTree.rows[entry.pathKey]
-        : mergedTree.cols[entry.pathKey];
-    mergedTree = pruneMergedTree({
-      axis: entry.axis,
-      tree: mergedTree,
-      parent,
-      branch: entry.data,
-    });
-  });
-  return mergedTree;
+  return results.map(result => ({ targets: result.targets }));
 };
 
 type HydrationLoopParams = Parameters<typeof runHydrationLoop>[0];
@@ -482,12 +455,10 @@ type HydrationLoopParams = Parameters<typeof runHydrationLoop>[0];
 export const runHydrationExpansionFetchLoop = ({
   reason,
   fetchRuntime,
-  pruneMergedTree,
   ...hydrationLoopParams
 }: Omit<HydrationLoopParams, 'fetchTree' | 'getMissingExpansionCoverage'> & {
   reason: 'prefetch' | 'cross-axis';
   fetchRuntime: ExpansionFetchRuntime;
-  pruneMergedTree: PruneMergedTree;
 }) =>
   runHydrationLoop({
     ...hydrationLoopParams,
@@ -503,11 +474,7 @@ export const runHydrationExpansionFetchLoop = ({
         runtime: fetchRuntime,
         singleRequestKind: `hydrate:${reason}`,
       });
-      return applyFetchDeltasToTree({
-        tree,
-        deltas,
-        pruneMergedTree,
-      });
+      return deltas.length > 0 ? fetchRuntime.materializeLoadedTree() : tree;
     },
   });
 
@@ -515,7 +482,6 @@ export type SameAxisExpansionFetchLoopResult =
   | {
       status: 'complete';
       tree: PivotTreeData;
-      touchedKeys: string[];
     }
   | {
       status: 'stale';
@@ -534,7 +500,6 @@ export const runSameAxisExpansionFetchLoop = async ({
   config,
   fetchRuntime,
   resolveExpandedForMetrics,
-  pruneMergedTree,
 }: {
   axis: PivotAxis;
   baseExpanded: Set<string>;
@@ -552,16 +517,9 @@ export const runSameAxisExpansionFetchLoop = async ({
     nextExpanded: Set<string>,
     nextTree: PivotTreeData,
   ) => Set<string>;
-  pruneMergedTree: (params: {
-    axis: PivotAxis;
-    tree: PivotTreeData;
-    parent?: PivotTreeNode;
-    branch?: PivotTreeData;
-  }) => PivotTreeData;
 }): Promise<SameAxisExpansionFetchLoopResult> => {
   let currentTree = initialTree;
   let resolvedExpanded = initialResolvedExpanded;
-  const touchedKeys = new Set<string>();
   const { requestScope } = fetchRuntime;
 
   for (let iteration = 0; iteration < maxIterations; iteration += 1) {
@@ -611,21 +569,10 @@ export const runSameAxisExpansionFetchLoop = async ({
     if (getDataEpoch() !== requestEpoch || !requestScope.isCurrent()) {
       return { status: 'stale' };
     }
-    resultDeltas.forEach(({ targets: deltaTargets }) => {
-      deltaTargets.forEach(target => {
-        if ('axis' in target) {
-          touchedKeys.add(target.pathKey);
-        }
-      });
-    });
-    currentTree = applyFetchDeltasToTree({
-      tree: currentTree,
-      deltas: resultDeltas,
-      pruneMergedTree,
-    });
     if (resultDeltas.length === 0) {
       break;
     }
+    currentTree = fetchRuntime.materializeLoadedTree();
     resolvedExpanded = resolveExpandedForMetrics(
       axis,
       baseExpanded,
@@ -640,6 +587,5 @@ export const runSameAxisExpansionFetchLoop = async ({
   return {
     status: 'complete',
     tree: currentTree,
-    touchedKeys: Array.from(touchedKeys),
   };
 };

@@ -3666,7 +3666,17 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
 
     const getMetricHeader = () => {
       const thead = container.querySelector('thead') as HTMLElement;
-      return within(thead).getByText('measure1').closest('th') as HTMLElement;
+      const headers = within(thead)
+        .getAllByText('measure1')
+        .map(node => node.closest('th') as HTMLElement)
+        .filter(Boolean);
+      return (
+        headers.find(
+          header =>
+            within(header).queryByLabelText('minus-square') ||
+            within(header).queryByLabelText('plus-square'),
+        ) ?? headers[0]
+      );
     };
     await waitFor(() => {
       const header = getMetricHeader();

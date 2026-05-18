@@ -262,6 +262,7 @@ const scopeCoversAxisPaths = (
   scope: PivotFactStoreBatch['scope'],
   axis: PivotAxis,
   needScope: AxisPathScope,
+  loadedDepth: number,
 ) => {
   if (needScope.kind === 'root') {
     return (
@@ -276,7 +277,7 @@ const scopeCoversAxisPaths = (
     }
     const paths =
       needScope.kind === 'paths' ? needScope.paths : needScope.ancestorPaths;
-    return paths.every(path => path.length === 0);
+    return paths.every(path => path.length <= loadedDepth);
   }
   if (
     (scope.kind === 'branch' || scope.kind === 'batch') &&
@@ -342,8 +343,13 @@ const factBatchCoversNeed = (
     valueKeysCover(valueKeys, need.valueKeys) &&
     (isRootNeed
       ? isRuntimeLayoutCoverageScope(scope)
-      : scopeCoversAxisPaths(scope, 'row', need.rowScope) &&
-        scopeCoversAxisPaths(scope, 'col', need.columnScope))
+      : scopeCoversAxisPaths(scope, 'row', need.rowScope, coverage.rowDepth) &&
+        scopeCoversAxisPaths(
+          scope,
+          'col',
+          need.columnScope,
+          coverage.columnDepth,
+        ))
   );
 };
 

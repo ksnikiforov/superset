@@ -17,7 +17,6 @@
  * under the License.
  */
 import {
-  type MeasureHierarchy,
   type PivotAxis,
   type PivotPath,
   type PivotTableQueryFormData,
@@ -94,18 +93,18 @@ type ResolvedFetchContext = ResolvedQueryFetchContext & {
   layout: LayoutContext;
 };
 
-export const fetchPivotQuerySpecsIntoBranchTree = async ({
+const fetchPivotQuerySpecsIntoBranchTree = async ({
   formData,
   specs,
+  layout,
   requestGroupId,
   factStore,
-  measureHierarchy,
 }: {
   formData: PivotTableQueryFormData;
   specs: PlannedQuerySpec[];
+  layout: LayoutContext;
   requestGroupId?: string;
   factStore?: PivotFactStore;
-  measureHierarchy: MeasureHierarchy;
 }): Promise<FetchPivotBranchResult> => {
   const store = factStore ?? createPivotFactStore();
   if (specs.length === 0) {
@@ -120,7 +119,7 @@ export const fetchPivotQuerySpecsIntoBranchTree = async ({
         specs,
         store,
         formData,
-        measureHierarchy,
+        measureHierarchy: layout.measureHierarchy,
       }),
     };
   }
@@ -159,7 +158,7 @@ export const fetchPivotQuerySpecsIntoBranchTree = async ({
       specs,
       store,
       formData,
-      measureHierarchy,
+      measureHierarchy: layout.measureHierarchy,
     });
     return {
       data,
@@ -194,24 +193,6 @@ export const resolveBranchFetchContext = ({
   return { ...queryCtx, layout };
 };
 
-const resolveBranchPlan = (
-  params: FetchPivotBranchParams,
-): {
-  ctx: ResolvedFetchContext;
-  specs: PlannedQuerySpec[];
-} => {
-  const ctx = resolveBranchFetchContext(params);
-  const specs = buildBranchQuerySpecs({
-    formData: params.formData,
-    layout: ctx.layout,
-    axis: params.axis,
-    path: params.path,
-    visibleRowDepth: params.visibleRowDepth,
-    visibleColDepth: params.visibleColDepth,
-  });
-  return { ctx, specs };
-};
-
 export async function fetchPivotBranch({
   formData,
   axis,
@@ -221,21 +202,28 @@ export async function fetchPivotBranch({
   requestGroupId,
   factStore,
 }: FetchPivotBranchParams): Promise<FetchPivotBranchResult> {
-  const plan = resolveBranchPlan({
+  const ctx = resolveBranchFetchContext({
     formData,
     axis,
     path,
     visibleRowDepth,
     visibleColDepth,
   });
-  const { ctx, specs } = plan;
+  const specs = buildBranchQuerySpecs({
+    formData,
+    layout: ctx.layout,
+    axis,
+    path,
+    visibleRowDepth,
+    visibleColDepth,
+  });
 
   return fetchPivotQuerySpecsIntoBranchTree({
     formData,
     specs,
+    layout: ctx.layout,
     requestGroupId,
     factStore,
-    measureHierarchy: ctx.layout.measureHierarchy,
   });
 }
 
@@ -259,9 +247,9 @@ export const fetchPivotBranchesBatch = async ({
   return fetchPivotQuerySpecsIntoBranchTree({
     formData,
     specs,
+    layout,
     requestGroupId,
     factStore,
-    measureHierarchy: layout.measureHierarchy,
   });
 };
 
@@ -286,8 +274,8 @@ export const fetchPivotIntersection = async ({
   return fetchPivotQuerySpecsIntoBranchTree({
     formData,
     specs,
+    layout,
     requestGroupId,
     factStore,
-    measureHierarchy: layout.measureHierarchy,
   });
 };

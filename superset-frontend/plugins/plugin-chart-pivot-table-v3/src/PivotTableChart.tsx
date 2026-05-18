@@ -356,7 +356,6 @@ function PivotTableChart(props: PivotTableProps) {
       appliedLayoutFormData.pivotExpansionState ??
       ownState?.pivotExpansionState,
     shouldPersistExpansionState: persistExpansionState,
-    pruneMergedTree: layoutResult.pruneMergedTree,
   });
 
   useSyncRef(expandedRowsForSeamlessRef, expandedRows);

@@ -28,6 +28,7 @@ import {
 } from '../../../src/types';
 import {
   type PivotFact,
+  type PivotFactStoreBatchMaterialization,
   type PivotFactStoreBatch,
 } from '../../../src/pivot/runtime/factStore';
 import { serializePath } from '../../../src/pivot/core/path';
@@ -37,6 +38,7 @@ import {
   isSubtotalToken,
 } from '../../../src/pivot/core/tokens';
 import { buildFormData } from './pivotFormData';
+import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
 
 const noopSetDataMask: SetDataMaskHook = () => undefined;
 
@@ -140,6 +142,26 @@ const buildFactsForCoverage = (
     }));
   });
 
+const buildTestMaterialization = (
+  groupby: Pick<LegacyTestPivotProps, 'groupbyRows' | 'groupbyColumns'>,
+  valueKeys: string[],
+): PivotFactStoreBatchMaterialization => {
+  const formData = buildFormData({
+    groupbyRows: groupby.groupbyRows,
+    groupbyColumns: groupby.groupbyColumns,
+    metrics: valueKeys,
+  });
+  const layout = buildLayoutContext(formData);
+  return {
+    metricsForQuery: valueKeys,
+    materializedMetrics: valueKeys,
+    materializedMeasureHierarchy: layout.measureHierarchy,
+    rowSubtotalLevels: layout.rowSubtotalLevels,
+    colSubtotalLevels: layout.colSubtotalLevelsForQuery,
+    pivotProgram: layout.pivotProgram,
+  };
+};
+
 const collectLoadedBranchPaths = ({
   axis,
   tree,
@@ -215,6 +237,7 @@ export const buildPreloadedBootstrapFactBatches = (
   const bootstrapColDepth =
     groupby.groupbyColumns.length > 0 && colDepth > 0 ? 1 : 0;
   const valueKeys = collectTreeValueKeys(tree);
+  const materialization = buildTestMaterialization(groupby, valueKeys);
   const coverage = {
     reason: 'initial' as const,
     rowDepth: bootstrapRowDepth,
@@ -226,6 +249,7 @@ export const buildPreloadedBootstrapFactBatches = (
     {
       coverage,
       facts: buildFactsForCoverage(tree, coverage),
+      materialization,
       valueKeys,
       scope: {
         kind: 'bootstrap',
@@ -248,6 +272,7 @@ export const buildPreloadedBranchFactBatches = (
   const colDepth = maxPathDepth(tree.cols);
   const batches: PivotFactStoreBatch[] = [];
   const valueKeys = collectTreeValueKeys(tree);
+  const materialization = buildTestMaterialization(groupby, valueKeys);
   (
     [
       ['row', tree.rows],
@@ -284,6 +309,7 @@ export const buildPreloadedBranchFactBatches = (
           batches.push({
             coverage,
             facts: buildFactsForCoverage(tree, coverage),
+            materialization,
             valueKeys,
             scope: {
               kind: 'branch',
@@ -312,6 +338,7 @@ export const buildPreloadedRenderedBranchFactBatches = (
   const colDepth = maxPathDepth(tree.cols);
   const batches: PivotFactStoreBatch[] = [];
   const valueKeys = collectTreeValueKeys(tree);
+  const materialization = buildTestMaterialization(groupby, valueKeys);
   (
     [
       ['row', tree.rows],
@@ -347,6 +374,7 @@ export const buildPreloadedRenderedBranchFactBatches = (
           batches.push({
             coverage,
             facts: buildFactsForCoverage(tree, coverage),
+            materialization,
             valueKeys,
             scope: {
               kind: 'branch',

@@ -30,7 +30,6 @@ import { decodeMetricKey } from '../core/tokens';
 import { buildLayoutContext } from '../layout/LayoutContext';
 import type { PivotProgram } from '../runtime/types';
 import type { RenderModelConfig } from '../render/renderModel';
-import { pruneStaleCollapsedAxis } from './pruneCollapsedAxis';
 import {
   buildMetricOrderComparator,
   resolveAxisChildrenBeforeSubtotalPolicy,
@@ -73,12 +72,6 @@ export type PivotLayoutResult = {
     ) => PivotTreeNode['path'];
     getColumnHeaderLabel?: (value: unknown) => string;
   }) => RenderModelConfig;
-  pruneMergedTree: (params: {
-    axis: 'row' | 'col';
-    tree: PivotTreeData;
-    parent?: PivotTreeNode;
-    branch?: PivotTreeData;
-  }) => PivotTreeData;
 };
 
 export const usePivotLayout = ({
@@ -355,32 +348,6 @@ export const usePivotLayout = ({
     ],
   );
 
-  const pruneMergedTree = useCallback(
-    ({
-      axis,
-      tree: nextTree,
-      parent,
-      branch,
-    }: {
-      axis: 'row' | 'col';
-      tree: PivotTreeData;
-      parent?: PivotTreeNode;
-      branch?: PivotTreeData;
-    }) => {
-      if (!parent || !branch) {
-        return nextTree;
-      }
-      return pruneStaleCollapsedAxis({
-        currentTree: nextTree,
-        axis,
-        parent,
-        branch,
-        program: layout.pivotProgram,
-      });
-    },
-    [layout.pivotProgram],
-  );
-
   const buildRenderModelConfig = useCallback(
     ({
       tree,
@@ -447,6 +414,5 @@ export const usePivotLayout = ({
     getMetricDisplayLabelForKey,
     getRowSubtotalPosition,
     buildRenderModelConfig,
-    pruneMergedTree,
   };
 };

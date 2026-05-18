@@ -158,7 +158,7 @@ test('does not satisfy sibling branch scopes with identical coverage', () => {
   ).toEqual([]);
 });
 
-test('does not treat unscoped root coverage as loaded branch coverage', () => {
+test('uses exact-depth root coverage for narrower branch reads', () => {
   const store = createPivotFactStore();
   const branchCoverage: PivotFactCoverage = {
     reason: 'expand',
@@ -198,8 +198,8 @@ test('does not treat unscoped root coverage as loaded branch coverage', () => {
     facts: [franceFact, usaFact],
   });
 
-  expect(store.hasCompatibleCoverage(franceBranchSelector)).toBe(false);
-  expect(store.getCompatibleFacts(franceBranchSelector)).toEqual([]);
+  expect(store.hasCompatibleCoverage(franceBranchSelector)).toBe(true);
+  expect(store.getCompatibleFacts(franceBranchSelector)).toEqual([franceFact]);
 });
 
 test('uses intersection scope for bounded cross-axis coverage', () => {

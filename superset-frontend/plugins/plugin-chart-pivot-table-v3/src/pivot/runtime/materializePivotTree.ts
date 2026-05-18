@@ -53,12 +53,14 @@ import {
 import { type LayoutContext } from '../layout/LayoutContext';
 import { type PlannedQuerySpec } from '../query/specs';
 import { type PivotFactCoverage, type PivotProgram } from './types';
+import { projectionQueryFilterPath, resolveAxisProjection } from './projection';
 import {
   buildFactValueKeys,
   type PivotFact,
   type PivotFactSelector,
   type PivotFactStore,
   type PivotFactStoreBatch,
+  type PivotFactStoreBatchMaterialization,
 } from './factStore';
 import {
   assertChunkedWorkCurrent,
@@ -86,6 +88,19 @@ type MaterializePivotTreeInput = {
 
 const emptyPivotTree = (): PivotTreeData => ({ rows: {}, cols: {}, cells: {} });
 
+const projectFactStorePath = (
+  spec: PlannedQuerySpec,
+  axis: 'row' | 'col',
+  path: PivotPath,
+) =>
+  projectionQueryFilterPath(
+    resolveAxisProjection({
+      program: spec.meta.pivotProgram,
+      axis,
+      path,
+    }),
+  );
+
 const factStoreBatchScopeFromSpec = (
   spec: PlannedQuerySpec,
 ): PivotFactStoreBatch['scope'] => {
@@ -96,7 +111,7 @@ const factStoreBatchScopeFromSpec = (
     return {
       kind: 'branch',
       axis: spec.meta.axis,
-      path: spec.meta.path ?? [],
+      path: projectFactStorePath(spec, spec.meta.axis, spec.meta.path ?? []),
     };
   }
   if (spec.meta.kind === 'batch') {
@@ -106,15 +121,23 @@ const factStoreBatchScopeFromSpec = (
     return {
       kind: 'batch',
       axis: spec.meta.axis,
-      parentPath: spec.meta.parentPath ?? [],
+      parentPath: projectFactStorePath(
+        spec,
+        spec.meta.axis,
+        spec.meta.parentPath ?? [],
+      ),
       siblingValues: spec.meta.siblingValues ?? [],
     };
   }
   if (spec.meta.kind === 'intersection') {
     return {
       kind: 'intersection',
-      rowPaths: spec.meta.rowPaths ?? [],
-      columnPaths: spec.meta.columnPaths ?? [],
+      rowPaths: (spec.meta.rowPaths ?? []).map(path =>
+        projectFactStorePath(spec, 'row', path),
+      ),
+      columnPaths: (spec.meta.columnPaths ?? []).map(path =>
+        projectFactStorePath(spec, 'col', path),
+      ),
     };
   }
   return {
@@ -133,6 +156,17 @@ export const factStoreSelectorFromSpec = (
   }),
 });
 
+export const factStoreMaterializationFromSpec = (
+  spec: PlannedQuerySpec,
+): PivotFactStoreBatchMaterialization => ({
+  metricsForQuery: spec.metrics,
+  materializedMetrics: spec.meta.materializedMetrics,
+  materializedMeasureHierarchy: spec.meta.materializedMeasureHierarchy,
+  rowSubtotalLevels: spec.meta.rowSubtotalLevels,
+  colSubtotalLevels: spec.meta.colSubtotalLevels,
+  pivotProgram: spec.meta.pivotProgram,
+});
+
 export const buildFactStoreBatchesFromSpecs = ({
   store,
   specs,
@@ -142,6 +176,7 @@ export const buildFactStoreBatchesFromSpecs = ({
 }): PivotFactStoreBatch[] =>
   specs.map(spec => ({
     ...factStoreSelectorFromSpec(spec),
+    materialization: factStoreMaterializationFromSpec(spec),
     facts: store.getCompatibleFacts(factStoreSelectorFromSpec(spec)),
   }));
 
@@ -1210,6 +1245,75 @@ const materializePivotTreeAsync = async ({
     formData.metricLabelMap as Record<string, string> | undefined,
   );
 };
+
+const materializeFactStoreBatches = ({
+  batches,
+  formData,
+  measureHierarchy,
+}: {
+  batches: PivotFactStoreBatch[];
+  formData: PivotTableQueryFormData;
+  measureHierarchy: MeasureHierarchy;
+}): PivotTreeData => {
+  const batchesByMaterialization = new Map<
+    string,
+    {
+      materialization: PivotFactStoreBatchMaterialization;
+      batches: MaterializationFactBatch[];
+    }
+  >();
+  batches.forEach(batch => {
+    if (!batch.materialization) {
+      return;
+    }
+    const key = JSON.stringify(batch.materialization);
+    const entry = batchesByMaterialization.get(key) ?? {
+      materialization: batch.materialization,
+      batches: [],
+    };
+    entry.batches.push({
+      facts: batch.facts,
+      coverage: batch.coverage,
+    });
+    batchesByMaterialization.set(key, entry);
+  });
+  return Array.from(batchesByMaterialization.values()).reduce<PivotTreeData>(
+    (tree, { materialization, batches: materializationBatches }) =>
+      mergeTrees(
+        tree,
+        materializePivotTree({
+          batches: materializationBatches,
+          metricsForQuery: materialization.metricsForQuery,
+          formData,
+          measureHierarchy,
+          materializedMetrics: materialization.materializedMetrics,
+          materializedMeasureHierarchy:
+            materialization.materializedMeasureHierarchy,
+          rowSubtotalLevels: materialization.rowSubtotalLevels,
+          colSubtotalLevels: materialization.colSubtotalLevels,
+          pivotProgram: materialization.pivotProgram,
+        }),
+      ),
+    emptyPivotTree(),
+  );
+};
+
+export const materializeLoadedPivotTreeFromFactStore = ({
+  store,
+  layout,
+  formData,
+}: {
+  store: PivotFactStore;
+  layout: LayoutContext;
+  formData: PivotTableQueryFormData;
+}): PivotTreeData =>
+  finalizeInitialPivotTree({
+    tree: materializeFactStoreBatches({
+      batches: store.getFactBatches(),
+      formData,
+      measureHierarchy: layout.measureHierarchy,
+    }),
+  });
 
 export const buildBranchTreeFromFactStore = ({
   specs,

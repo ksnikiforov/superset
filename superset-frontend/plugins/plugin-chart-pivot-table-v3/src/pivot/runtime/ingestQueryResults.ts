@@ -35,6 +35,7 @@ import {
   type PivotFactStore,
 } from './factStore';
 import {
+  factStoreMaterializationFromSpec,
   factStoreSelectorFromSpec,
   materializeInitialPivotTreeFromFactStore,
   materializeInitialPivotTreeFromFactStoreAsync,
@@ -297,6 +298,7 @@ const factStoreBatchFromIngested = ({
   'spec' | 'facts'
 >): PivotFactStoreBatch => ({
   ...factStoreSelectorFromSpec(spec),
+  materialization: factStoreMaterializationFromSpec(spec),
   facts,
 });
 

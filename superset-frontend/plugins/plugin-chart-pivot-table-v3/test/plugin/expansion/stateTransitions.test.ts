@@ -20,7 +20,6 @@
 import {
   buildHydrationPrefetchAction,
   buildVisiblePersistedExpansionState,
-  mergeSameAxisExpansionTree,
   planInitialHydrationPrefetch,
   planHydrationIteration,
   resolveCollapsedExpansionState,
@@ -301,84 +300,6 @@ describe('pivot/expansion/stateTransitions', () => {
     expect([...result.nextManualExpanded]).toEqual([sibling.key]);
     expect([...result.nextManualCollapsed].sort()).toEqual(
       [child.key, sibling.key].sort(),
-    );
-  });
-
-  it('merges same-axis expansion trees while removing stale touched descendants', () => {
-    const aKey = serializePath(['A']);
-    const staleKey = serializePath(['A', 'old']);
-    const freshKey = serializePath(['A', 'new']);
-    const bKey = serializePath(['B']);
-    const previousTree: PivotTreeData = {
-      rows: {
-        [aKey]: makeNode('row', ['A'], true),
-        [staleKey]: makeNode('row', ['A', 'old'], false),
-        [bKey]: makeNode('row', ['B'], false),
-      },
-      cols: {},
-      cells: {},
-    };
-    const currentTree: PivotTreeData = {
-      rows: {
-        [aKey]: makeNode('row', ['A'], true),
-        [freshKey]: makeNode('row', ['A', 'new'], false),
-      },
-      cols: {},
-      cells: {},
-    };
-
-    const result = mergeSameAxisExpansionTree({
-      currentTree,
-      previousTree,
-      axis: 'row',
-      touchedKeys: [aKey],
-      program: testProgram,
-    });
-
-    expect(new Set(Object.keys(result.rows))).toEqual(
-      new Set([aKey, bKey, freshKey]),
-    );
-  });
-
-  it('can preserve metric children when merging same-axis column expansions', () => {
-    const metricToken = encodeMetricKey('m1');
-    const aKey = serializePath(['A']);
-    const staleKey = serializePath(['A', 'old']);
-    const metricKey = serializePath(['A', metricToken]);
-    const freshKey = serializePath(['A', 'new']);
-    const previousTree: PivotTreeData = {
-      rows: {},
-      cols: {
-        [aKey]: makeNode('col', ['A'], true),
-        [staleKey]: makeNode('col', ['A', 'old'], false),
-        [metricKey]: makeNode('col', ['A', metricToken], false),
-      },
-      cells: {},
-    };
-    const currentTree: PivotTreeData = {
-      rows: {},
-      cols: {
-        [aKey]: makeNode('col', ['A'], true),
-        [freshKey]: makeNode('col', ['A', 'new'], false),
-      },
-      cells: {},
-    };
-
-    const result = mergeSameAxisExpansionTree({
-      currentTree,
-      previousTree,
-      axis: 'col',
-      touchedKeys: [aKey],
-      program: compilePivotProgram({
-        groupbyRows: [],
-        groupbyColumns: ['country', METRICS_PLACEHOLDER],
-        metrics: ['m1'],
-        metricsLayout: MetricsLayoutEnum.COLUMNS,
-      }),
-    });
-
-    expect(new Set(Object.keys(result.cols))).toEqual(
-      new Set([aKey, freshKey, metricKey]),
     );
   });
 
@@ -914,6 +835,32 @@ describe('pivot/expansion/stateTransitions', () => {
           rowPathKeys: [aKey],
           columnPathKeys: [xKey],
         },
+      ]),
+    );
+  });
+
+  it('does not plan intersection fetches before both axis nodes are loaded', () => {
+    const { tree, aKey, xKey } = buildTree({ includeIntersectionCell: false });
+    delete tree.rows[aKey];
+
+    const plan = planHydrationIteration({
+      tree,
+      desiredRows: new Set([rootKey, aKey]),
+      desiredCols: new Set([rootKey, xKey]),
+      getMissingExpansionCoverage: expansionCoverageLoadedFromBatches(),
+      config,
+      pendingRows: new Set(),
+      pendingCols: new Set(),
+    });
+
+    expect(plan.kind).toBe('fetch');
+    if (plan.kind !== 'fetch') {
+      throw new Error('Expected a fetch plan');
+    }
+    expect(plan.rowPlan.hasMissingNodes).toBe(true);
+    expect(plan.targets).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'intersection' }),
       ]),
     );
   });
