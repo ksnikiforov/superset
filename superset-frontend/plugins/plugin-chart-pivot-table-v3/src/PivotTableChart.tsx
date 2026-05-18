@@ -54,7 +54,6 @@ import { useDimensionFilterValues } from './pivot/chart/useDimensionFilterValues
 import { buildInteractionChips } from './pivot/layout/interactionDrag';
 import { getStableColumnKey } from './utils';
 import { getMetricKeys } from './pivot/metrics';
-import { useSyncRef } from './pivot/shared/useSyncRef';
 import {
   buildSeamlessRuntimeUpstreamSignature,
   type SeamlessRuntimeSyncSnapshot,
@@ -141,10 +140,6 @@ function PivotTableChart(props: PivotTableProps) {
   const persistExpansionState = persistExpansionStateProp ?? true;
   const resolvedStickyHeaders = formData.stickyHeaders ?? true;
 
-  const expandedRowsForSeamlessRef = useRef<Set<string>>(new Set());
-  const expandedColsForSeamlessRef = useRef<Set<string>>(new Set());
-  const pendingRowsForSeamlessRef = useRef<Set<string>>(new Set());
-  const pendingColsForSeamlessRef = useRef<Set<string>>(new Set());
   const lastSeamlessSyncRef = useRef<SeamlessRuntimeSyncSnapshot | null>(null);
   const ownStateRef = useRef<JsonObject>(ownState ?? {});
   useEffect(() => {
@@ -278,10 +273,6 @@ function PivotTableChart(props: PivotTableProps) {
     sourceMeasureLeavesByMetric,
     upstreamSignature: upstreamSeamlessSignature,
     seamlessSyncRef: lastSeamlessSyncRef,
-    expandedRowsRef: expandedRowsForSeamlessRef,
-    expandedColsRef: expandedColsForSeamlessRef,
-    pendingRowsRef: pendingRowsForSeamlessRef,
-    pendingColsRef: pendingColsForSeamlessRef,
     commitFilters,
     updateUiSelectedFilters,
     lastLocalSyncDashboardQueryContextRef,
@@ -331,8 +322,6 @@ function PivotTableChart(props: PivotTableProps) {
     expandedRows,
     expandedCols,
     loadingKeys,
-    pendingRows,
-    pendingCols,
     errorMessage,
     warnings,
     isHydrating,
@@ -354,11 +343,6 @@ function PivotTableChart(props: PivotTableProps) {
       ownState?.pivotExpansionState,
     shouldPersistExpansionState: persistExpansionState,
   });
-
-  useSyncRef(expandedRowsForSeamlessRef, expandedRows);
-  useSyncRef(expandedColsForSeamlessRef, expandedCols);
-  useSyncRef(pendingRowsForSeamlessRef, pendingRows);
-  useSyncRef(pendingColsForSeamlessRef, pendingCols);
 
   const renderModelResult = usePivotRenderModel({
     tree,

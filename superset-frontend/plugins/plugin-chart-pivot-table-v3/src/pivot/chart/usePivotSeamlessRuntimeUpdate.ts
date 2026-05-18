@@ -84,10 +84,6 @@ type UsePivotSeamlessRuntimeUpdateConfig = {
   sourceMeasureLeavesByMetric: PivotTableQueryFormData['measureLeavesByMetric'];
   upstreamSignature: string;
   seamlessSyncRef: MutableRefObject<SeamlessRuntimeSyncSnapshot | null>;
-  expandedRowsRef: MutableRefObject<Set<string>>;
-  expandedColsRef: MutableRefObject<Set<string>>;
-  pendingRowsRef: MutableRefObject<Set<string>>;
-  pendingColsRef: MutableRefObject<Set<string>>;
   commitFilters: (filters: RuntimeSelection) => void;
   updateUiSelectedFilters: (filters: RuntimeSelection) => void;
   lastLocalSyncDashboardQueryContextRef: MutableRefObject<string | null>;
@@ -123,10 +119,6 @@ export const usePivotSeamlessRuntimeUpdate = (
     sourceMeasureLeavesByMetric,
     upstreamSignature,
     seamlessSyncRef,
-    expandedRowsRef,
-    expandedColsRef,
-    pendingRowsRef,
-    pendingColsRef,
     commitFilters,
     updateUiSelectedFilters,
     lastLocalSyncDashboardQueryContextRef,
@@ -217,10 +209,6 @@ export const usePivotSeamlessRuntimeUpdate = (
         sourceMeasureLeavesByMetric,
         runtimeLayout: normalized,
         selection: nextFilters,
-        expandedRows: expandedRowsRef.current,
-        expandedCols: expandedColsRef.current,
-        pendingRows: pendingRowsRef.current,
-        pendingCols: pendingColsRef.current,
       });
       if (updateResult.status === 'stale') {
         return;
@@ -255,12 +243,8 @@ export const usePivotSeamlessRuntimeUpdate = (
       commitFilters,
       commitUiRuntimeLayout,
       dimensionKeys,
-      expandedColsRef,
-      expandedRowsRef,
       materializationLifecycle,
       metricKeys,
-      pendingColsRef,
-      pendingRowsRef,
       persistRuntimeState,
       requestLifecycle,
       seamlessSyncRef,

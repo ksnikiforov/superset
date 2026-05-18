@@ -3301,13 +3301,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     expect(
       (lastFetch?.formData?.groupbyRows ?? []).map(getStableColumnKey),
     ).toEqual(['r1', 'r2', METRICS_PLACEHOLDER]);
-    const persistedRows = (lastFetch?.formData?.pivotExpansionState?.rows ??
-      []) as unknown[];
-    expect(
-      persistedRows.map(path =>
-        Array.isArray(path) ? serializePath(path) : String(path),
-      ),
-    ).toContain('A');
+    expect(lastFetch?.formData?.pivotExpansionState).toBeUndefined();
     const plannedSpecs = lastFetch?.specs ?? [];
     const plannedSummary = plannedSpecs.map(
       (spec: {
@@ -3921,9 +3915,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     const lastFetch = fetchMock.mock.calls.at(-1)?.[0];
-    expect(
-      lastFetch?.formData?.pivotExpansionState?.rows?.length,
-    ).toBeGreaterThan(0);
+    expect(lastFetch?.formData?.pivotExpansionState).toBeUndefined();
     await waitFor(() =>
       expect(screen.getAllByText('m2').length).toBeGreaterThan(0),
     );

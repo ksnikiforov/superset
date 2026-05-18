@@ -23,8 +23,6 @@ import {
   type PivotTableQueryFormData,
   type PivotTreeData,
 } from '../../types';
-import { METRICS_PLACEHOLDER } from '../core/tokens';
-import { parsePath } from '../core/path';
 import { hasSelectedFilters } from '../filters';
 import { stableStringify } from '../shared/stableStringify';
 import { normalizeFormDataExtraFilters } from '../query/normalizeExtraFormData';
@@ -35,7 +33,6 @@ import {
   collectPlannedQueryWarnings,
   fetchPlannedQuerySpecs,
 } from './ingestQueryResults';
-import { insertValuesPlaceholder } from './compilePivotProgram';
 import {
   executeLatestRequest,
   executeScheduledLatestRequest,
@@ -381,10 +378,6 @@ type SeamlessRuntimeUpdatePlanConfig = {
   sourceMeasureLeavesByMetric: PivotTableQueryFormData['measureLeavesByMetric'];
   runtimeLayout: PivotRuntimeLayout;
   selection: RuntimeSelection;
-  expandedRows?: Set<string>;
-  expandedCols?: Set<string>;
-  pendingRows?: Set<string>;
-  pendingCols?: Set<string>;
 };
 
 type SeamlessRuntimeUpdateConfig = SeamlessRuntimeUpdatePlanConfig & {
@@ -392,42 +385,17 @@ type SeamlessRuntimeUpdateConfig = SeamlessRuntimeUpdatePlanConfig & {
   materializationLifecycle: LatestRequestLifecycle;
 };
 
-const toExpansionPaths = (
-  expanded: Set<string> | undefined,
-  pending: Set<string> | undefined,
-) =>
-  Array.from(new Set([...(expanded ?? []), ...(pending ?? [])])).map(parsePath);
-
 const buildSeamlessRuntimeUpdatePlan = ({
   baseFormData,
   sourceMetrics,
   sourceMeasureLeavesByMetric,
   runtimeLayout,
   selection,
-  expandedRows,
-  expandedCols,
-  pendingRows,
-  pendingCols,
 }: SeamlessRuntimeUpdatePlanConfig) => {
-  const { rows: rowKeys, cols: colKeys } = insertValuesPlaceholder(
-    runtimeLayout.rows,
-    runtimeLayout.cols,
-    runtimeLayout.valuePlacement,
-    METRICS_PLACEHOLDER,
-  );
-
+  const queryFormData = { ...baseFormData };
+  delete queryFormData.pivotExpansionState;
   return buildInitialPivotUpdatePlan({
-    formData: {
-      ...baseFormData,
-      pivotExpansionState: {
-        rowKeys,
-        colKeys,
-        rows: toExpansionPaths(expandedRows, pendingRows),
-        cols: toExpansionPaths(expandedCols, pendingCols),
-        collapsedRows: [],
-        collapsedCols: [],
-      },
-    },
+    formData: queryFormData,
     runtimeLayout,
     selection,
     metricsOverride: sourceMetrics,

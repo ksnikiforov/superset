@@ -255,8 +255,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13389` insertions, `17057` deletions, net `-3668`.
-- Current production TypeScript/TSX total: about `29842` lines.
+- Production `src`: `13333` insertions, `17065` deletions, net `-3732`.
+- Current production TypeScript/TSX total: about `29778` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -268,16 +268,16 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `29842` | `-3668` | `< 28000` |
-| Strict core pipeline | `11337` | `12288` | `+951` | `8000` |
-| Non-visual chart runtime hooks | `4683` | `5076` | `+393` | `3000-4000` |
-| Broad core pipeline | `16020` | `17364` | `+1344` | `11000-13000` |
+| Full production `src` | `33510` | `29778` | `-3732` | `< 28000` |
+| Strict core pipeline | `11337` | `12256` | `+919` | `8000` |
+| Non-visual chart runtime hooks | `4683` | `5060` | `+377` | `3000-4000` |
+| Broad core pipeline | `16020` | `17316` | `+1296` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `3931` |
+| `pivot/runtime/*` | `3899` |
 | `pivot/expansion/*` | `2899` |
 | `pivot/query/*` | `1628` |
 | `pivot/layout/*` | `744` |
@@ -378,6 +378,13 @@ suppression flags through the hydration loop. Expansion submits desired visible
 coverage, diffs both axes through the manifest, batches the explicit missing
 requests, and rematerializes from the fact store. Fetch suppression now comes
 from loaded coverage and requestability, not from scheduler mode.
+
+Latest seamless cleanup: semantic layout fetches no longer serialize current
+expanded/pending paths back into `pivotExpansionState`. Initial/seamless query
+planning does not replay expansion branches, so that payload was a dead query
+bridge. Expansion intent remains persisted by the expansion state store and is
+rehydrated by the expansion manifest loop after the query-backed layout
+materializes.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.
