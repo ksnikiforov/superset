@@ -65,7 +65,7 @@ test('keeps different request scopes as separate exact fact batches', () => {
     path: ['USA'],
   };
 
-  store.upsertBatches([
+  [
     {
       coverage,
       scope: firstScope,
@@ -78,7 +78,7 @@ test('keeps different request scopes as separate exact fact batches', () => {
       valueKeys: ['sales'],
       facts: [buildFact({ rowPath: ['USA'], value: 2 })],
     },
-  ]);
+  ].forEach(store.upsertBatch);
 
   expect(store.getFactBatches().map(batch => batch.facts[0]?.value)).toEqual([
     1, 2,
@@ -443,7 +443,7 @@ test('separate exact branches can satisfy a batched coverage request', () => {
     valueKeys: ['sales'],
   };
 
-  store.upsertBatches([
+  [
     {
       coverage: branchCoverage,
       scope: {
@@ -476,7 +476,7 @@ test('separate exact branches can satisfy a batched coverage request', () => {
         }),
       ],
     },
-  ]);
+  ].forEach(store.upsertBatch);
 
   expect(store.hasCompatibleCoverage(batchSelector)).toBe(true);
 });

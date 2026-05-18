@@ -256,6 +256,9 @@ Current semantic-layout contract:
   failures throw. The old `{ error }` result-object branch is removed from the
   production expansion fetch path and tests now model failures as rejected
   fetches.
+- `PivotFactStore` now exposes one mutation API, `upsertBatch`. The
+  `upsertBatches` convenience wrapper is removed so callers explicitly submit
+  loaded fact batches through the same store boundary.
 
 Expected deletion targets:
 
@@ -283,8 +286,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13059` insertions, `17161` deletions, net `-4102`.
-- Current production TypeScript/TSX total: about `29408` lines.
+- Production `src`: `13057` insertions, `17161` deletions, net `-4104`.
+- Current production TypeScript/TSX total: about `29406` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -296,16 +299,16 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `29408` | `-4102` | `< 28000` |
-| Strict core pipeline | `11337` | `11817` | `+480` | `8000` |
+| Full production `src` | `33510` | `29406` | `-4104` | `< 28000` |
+| Strict core pipeline | `11337` | `11815` | `+478` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5084` | `+401` | `3000-4000` |
-| Broad core pipeline | `16020` | `16901` | `+881` | `11000-13000` |
+| Broad core pipeline | `16020` | `16899` | `+879` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `3933` |
+| `pivot/runtime/*` | `3931` |
 | `pivot/expansion/*` | `2634` |
 | `pivot/query/*` | `1554` |
 | `pivot/layout/*` | `732` |
@@ -934,6 +937,8 @@ Success criteria:
 - Expansion fetch failures now reject through the request lifecycle instead of
   being wrapped as `{ error }` payloads. This removes a second expansion error
   protocol and keeps fetch execution aligned with the planned-query executor.
+- Fact-store mutation now has one production surface, `upsertBatch`; bulk
+  insertion is caller iteration rather than a second runtime-store method.
 - Same-axis expansion no longer has a separate in-flight expansion map or
   branch-specific fetch loop. Toggle expansion writes pending visible coverage
   and enters the same hydration loop used by prefetch and cross-axis hydration.

@@ -297,7 +297,7 @@ export const useExpansionEngine = ({
   const factStoreRef = useRef<PivotFactStore>();
   if (!factStoreRef.current) {
     const store = createPivotFactStore();
-    store.upsertBatches(factBatches);
+    factBatches.forEach(store.upsertBatch);
     factStoreRef.current = store;
   }
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -773,7 +773,7 @@ export const useExpansionEngine = ({
 
     expansionRequestLifecycle.invalidate();
     const nextFactStore = createPivotFactStore();
-    nextFactStore.upsertBatches(factBatches);
+    factBatches.forEach(nextFactStore.upsertBatch);
     factStoreRef.current = nextFactStore;
     setHydratingState(false);
     warningsRef.current = new Map();

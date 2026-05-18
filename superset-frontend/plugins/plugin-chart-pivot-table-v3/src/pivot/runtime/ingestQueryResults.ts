@@ -300,7 +300,7 @@ const upsertIngestedFactsIntoStore = ({
   ingested: Array<IngestedQueryResult<QueryResultWithData>>;
 }): PivotFactStoreBatch[] => {
   const batches = ingested.map(factStoreBatchFromIngested);
-  store.upsertBatches(batches);
+  batches.forEach(store.upsertBatch);
   return batches;
 };
 
