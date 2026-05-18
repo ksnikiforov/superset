@@ -49,17 +49,15 @@ const baseFormData = buildFormData({
 });
 
 describe('buildQuery (bootstrap)', () => {
-  test('emits bootstrap queries for totals, grid, and visible axis roots', () => {
+  test('emits bootstrap queries for visible grid and axis roots', () => {
     const queryContext = buildQuery(baseFormData);
-    expect(queryContext.queries).toHaveLength(4);
-    expect(queryContext.queries[0].query_name).toEqual(formatQueryName(0, 0));
-    expect(queryContext.queries[0].columns).toEqual([]);
-    expect(queryContext.queries[1].query_name).toEqual(formatQueryName(1, 1));
-    expect(queryContext.queries[1].columns).toEqual(['row1', 'col1']);
-    expect(queryContext.queries[2].query_name).toEqual(formatQueryName(1, 0));
-    expect(queryContext.queries[2].columns).toEqual(['row1']);
-    expect(queryContext.queries[3].query_name).toEqual(formatQueryName(0, 1));
-    expect(queryContext.queries[3].columns).toEqual(['col1']);
+    expect(queryContext.queries).toHaveLength(3);
+    expect(queryContext.queries[0].query_name).toEqual(formatQueryName(1, 1));
+    expect(queryContext.queries[0].columns).toEqual(['row1', 'col1']);
+    expect(queryContext.queries[1].query_name).toEqual(formatQueryName(1, 0));
+    expect(queryContext.queries[1].columns).toEqual(['row1']);
+    expect(queryContext.queries[2].query_name).toEqual(formatQueryName(0, 1));
+    expect(queryContext.queries[2].columns).toEqual(['col1']);
   });
 
   test('includes row/column totals queries when totals are enabled', () => {

@@ -159,4 +159,41 @@ describe('buildInitialQuerySpecs (contracts)', () => {
       columnDimensions: ['category'],
     });
   });
+
+  it('does not fetch the grand total layer when totals are hidden', () => {
+    const formData = buildFormData({
+      groupbyRows: ['country', 'state'],
+      groupbyColumns: ['category', 'subcategory'],
+      metrics: ['sales'],
+      rowTotals: false,
+      colTotals: false,
+      rowSubTotals: false,
+      rowSubtotalLevels: [],
+      colSubtotalLevels: [],
+      startCollapsed: true,
+      initialDepth: 1,
+    });
+
+    const specs = buildInitialQuerySpecs(formData);
+
+    expect(
+      specs.map(spec => [
+        spec.meta.coverage.rowDepth,
+        spec.meta.coverage.columnDepth,
+      ]),
+    ).toEqual(
+      expect.arrayContaining([
+        [1, 1],
+        [1, 0],
+        [0, 1],
+      ]),
+    );
+    expect(
+      specs.some(
+        spec =>
+          spec.meta.coverage.rowDepth === 0 &&
+          spec.meta.coverage.columnDepth === 0,
+      ),
+    ).toBe(false);
+  });
 });

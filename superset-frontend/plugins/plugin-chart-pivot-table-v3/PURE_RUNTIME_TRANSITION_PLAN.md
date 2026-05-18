@@ -228,6 +228,10 @@ Current semantic-layout contract:
   visible coverage and full-level expansion intent use the same root-scope fact
   selector, so fact-store and coverage dominance checks no longer special-case a
   root alias.
+- Initial bootstrap query planning no longer fetches the 0x0 grand-total layer
+  when row totals, column totals, and subtotals are hidden. Bootstrap root
+  coverage is now requested only when the layer is visible/semantically needed
+  or there are no row/column dimensions.
 
 Expected deletion targets:
 
@@ -255,8 +259,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13177` insertions, `17073` deletions, net `-3896`.
-- Current production TypeScript/TSX total: about `29614` lines.
+- Production `src`: `13141` insertions, `17072` deletions, net `-3931`.
+- Current production TypeScript/TSX total: about `29579` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -268,10 +272,10 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `29614` | `-3896` | `< 28000` |
-| Strict core pipeline | `11337` | `12095` | `+758` | `8000` |
+| Full production `src` | `33510` | `29579` | `-3931` | `< 28000` |
+| Strict core pipeline | `11337` | `11967` | `+630` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5127` | `+444` | `3000-4000` |
-| Broad core pipeline | `16020` | `17222` | `+1202` | `11000-13000` |
+| Broad core pipeline | `16020` | `17094` | `+1074` | `11000-13000` |
 
 Current strict core breakdown:
 
@@ -279,9 +283,9 @@ Current strict core breakdown:
 | --- | ---: |
 | `pivot/runtime/*` | `3894` |
 | `pivot/expansion/*` | `2743` |
-| `pivot/query/*` | `1628` |
+| `pivot/query/*` | `1593` |
 | `pivot/layout/*` | `744` |
-| core/shared/domain helpers | `1873` |
+| core/shared/domain helpers | `1780` |
 | formatting/data/render-model/update support | `1213` |
 
 Interpretation: plugin-wide source has shrunk, but core pipeline source has
@@ -305,6 +309,11 @@ Latest query cleanup: `QueryIntent` now describes only query-shape requirements.
 Semantic labels such as `branch`, `wholeLevel`, `totalsOnly`, and expansion
 axis are no longer passed into `buildQueryShape`; `specs.ts` builds shape
 requirements directly instead of routing through a local intent wrapper.
+
+Latest bootstrap cleanup: hidden grand-total coverage is no longer requested
+on initial load. Query planning now emits only visible bootstrap coverage
+unless the 0x0 layer is required for visible totals/subtotals, no-dimension
+tables, or empty-metric compatibility.
 
 Latest expansion cleanup: duplicated child-map traversal in
 `stateTransitions.ts` was collapsed into one visible-axis traversal helper used

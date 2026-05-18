@@ -293,28 +293,16 @@ const buildInitialRootIntents = (
     Object.keys(formData.rowFormatting || {}).length > 0;
   const needsColDimensionFormatting =
     Object.keys(formData.colFormatting || {}).length > 0;
-  const needsRowTotals =
-    rowGroupby.length > 0 &&
-    (layout.rowTotals ||
-      rowSubtotalLevels.length > 0 ||
-      hasTotalSorting(formData.rowSorting, rowGroupby));
-  const needsColTotals =
-    colGroupby.length > 0 &&
-    (layout.colTotals ||
-      colSubtotalLevels.length > 0 ||
-      hasTotalSorting(formData.colSorting, colGroupby));
   const firstRowDepth = rowGroupby.length > 0 ? 1 : 0;
   const firstColDepth = colGroupby.length > 0 ? 1 : 0;
   const needsGrid = firstRowDepth > 0 && firstColDepth > 0;
-  const intentFlags = {
-    needsMetricFormatting,
-    needsDatabars,
-    needsRowDimensionFormatting,
-    needsColDimensionFormatting,
-  };
-
-  const intents: QueryIntent[] = [
-    {
+  const needsRootTotals =
+    needsTotals ||
+    layout.pivotProgram.metricKeys.length === 0 ||
+    (firstRowDepth === 0 && firstColDepth === 0);
+  const intents: QueryIntent[] = [];
+  if (needsRootTotals) {
+    intents.push({
       targetRowDepth: 0,
       targetColDepth: 0,
       needsValueCells: false,
@@ -325,81 +313,72 @@ const buildInitialRootIntents = (
       needsColOrdering: false,
       needsRowDimensionFormatting: false,
       needsColDimensionFormatting: false,
-    },
-  ];
+    });
+  }
+  if (layout.pivotProgram.metricKeys.length === 0) {
+    return intents;
+  }
 
-  const addCoverageTarget = ({
+  const addValueIntent = ({
     rowDepth,
     colDepth,
-    needsTotals: targetNeedsTotals,
-    needsRowOrdering: targetNeedsRowOrdering,
-    needsColOrdering: targetNeedsColOrdering,
-    needsRowDimensionFormatting: targetNeedsRowDimensionFormatting,
-    needsColDimensionFormatting: targetNeedsColDimensionFormatting,
+    includeTotals,
+    includeRowOrdering = false,
+    includeColOrdering = false,
+    includeRowFormatting = false,
+    includeColFormatting = false,
   }: {
     rowDepth: number;
     colDepth: number;
-    needsTotals: boolean;
-    needsRowOrdering: boolean;
-    needsColOrdering: boolean;
-    needsRowDimensionFormatting: boolean;
-    needsColDimensionFormatting: boolean;
+    includeTotals: boolean;
+    includeRowOrdering?: boolean;
+    includeColOrdering?: boolean;
+    includeRowFormatting?: boolean;
+    includeColFormatting?: boolean;
   }) => {
-    if (layout.pivotProgram.metricKeys.length === 0) {
-      return;
-    }
     intents.push({
       targetRowDepth: rowDepth,
       targetColDepth: colDepth,
       needsValueCells: true,
-      ...intentFlags,
-      needsTotals: targetNeedsTotals,
-      needsRowOrdering: targetNeedsRowOrdering,
-      needsColOrdering: targetNeedsColOrdering,
-      needsRowDimensionFormatting: targetNeedsRowDimensionFormatting,
-      needsColDimensionFormatting: targetNeedsColDimensionFormatting,
+      needsTotals: includeTotals,
+      needsMetricFormatting,
+      needsDatabars,
+      needsRowOrdering: includeRowOrdering,
+      needsColOrdering: includeColOrdering,
+      needsRowDimensionFormatting: includeRowFormatting,
+      needsColDimensionFormatting: includeColFormatting,
     });
   };
 
   if (needsGrid) {
-    addCoverageTarget({
+    addValueIntent({
       rowDepth: firstRowDepth,
       colDepth: firstColDepth,
-      needsTotals: false,
-      needsRowOrdering,
-      needsColOrdering,
-      needsRowDimensionFormatting,
-      needsColDimensionFormatting,
+      includeTotals: false,
+      includeRowOrdering: needsRowOrdering,
+      includeColOrdering: needsColOrdering,
+      includeRowFormatting: needsRowDimensionFormatting,
+      includeColFormatting: needsColDimensionFormatting,
     });
   }
 
-  if (
-    rowGroupby.length > 0 &&
-    (!needsGrid || needsRowTotals || firstRowDepth > 0)
-  ) {
-    addCoverageTarget({
+  if (rowGroupby.length > 0) {
+    addValueIntent({
       rowDepth: firstRowDepth,
       colDepth: 0,
-      needsTotals,
-      needsRowOrdering,
-      needsColOrdering: false,
-      needsRowDimensionFormatting,
-      needsColDimensionFormatting: false,
+      includeTotals: needsTotals,
+      includeRowOrdering: needsRowOrdering,
+      includeRowFormatting: needsRowDimensionFormatting,
     });
   }
 
-  if (
-    colGroupby.length > 0 &&
-    (!needsGrid || needsColTotals || firstColDepth > 0)
-  ) {
-    addCoverageTarget({
+  if (colGroupby.length > 0) {
+    addValueIntent({
       rowDepth: 0,
       colDepth: firstColDepth,
-      needsTotals,
-      needsRowOrdering: false,
-      needsColOrdering,
-      needsRowDimensionFormatting: false,
-      needsColDimensionFormatting,
+      includeTotals: needsTotals,
+      includeColOrdering: needsColOrdering,
+      includeColFormatting: needsColDimensionFormatting,
     });
   }
 
@@ -607,8 +586,6 @@ const resolveFetchContext = ({
   path,
   visibleRowDepth = 0,
   visibleColDepth = 0,
-  targetRowDepth,
-  targetColDepth,
 }: {
   formData: PivotTableQueryFormData;
   layout: LayoutContext;
@@ -616,8 +593,6 @@ const resolveFetchContext = ({
   path: PivotPath;
   visibleRowDepth?: number;
   visibleColDepth?: number;
-  targetRowDepth?: number;
-  targetColDepth?: number;
 }): ResolvedFetchContext => {
   const { metrics } = layout;
   const rowGroupby = layout.pivotProgram.rowDimensions;
@@ -639,29 +614,19 @@ const resolveFetchContext = ({
   });
   const sanitizedPath = projectionQueryFilterPath(projection);
   const rowGroupbyForBranch =
-    axis === 'row' && targetRowDepth === undefined
-      ? projectionQueryDimensions(projection)
-      : rowGroupby;
+    axis === 'row' ? projectionQueryDimensions(projection) : rowGroupby;
   const colGroupbyForBranch =
-    axis === 'col' && targetColDepth === undefined
-      ? projectionQueryDimensions(projection)
-      : colGroupby;
+    axis === 'col' ? projectionQueryDimensions(projection) : colGroupby;
   const currentRowDepth = Math.min(visibleRowDepth, rowGroupbyForBranch.length);
   const currentColDepth = Math.min(visibleColDepth, colGroupbyForBranch.length);
-  let rowDepth =
+  const rowDepth =
     axis === 'row'
       ? rowGroupbyForBranch.length
       : Math.min(rowGroupby.length, currentRowDepth);
-  let colDepth =
+  const colDepth =
     axis === 'col'
       ? colGroupbyForBranch.length
       : Math.min(colGroupby.length, currentColDepth);
-  if (targetRowDepth !== undefined) {
-    rowDepth = Math.min(rowGroupby.length, Math.max(targetRowDepth, 0));
-  }
-  if (targetColDepth !== undefined) {
-    colDepth = Math.min(colGroupby.length, Math.max(targetColDepth, 0));
-  }
 
   const needsMetricFormatting =
     Object.keys(formData.metricFormatting || {}).length > 0;
