@@ -245,8 +245,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13782` insertions, `16450` deletions, net `-2668`.
-- Current production TypeScript/TSX total: about `30865` lines.
+- Production `src`: `13783` insertions, `16539` deletions, net `-2756`.
+- Current production TypeScript/TSX total: about `30775` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -768,6 +768,11 @@ Success criteria:
   keys only. Saved metric verbose-name and display-label fallback remapping has
   been removed, so future formatting state cannot silently target a metric by a
   non-canonical label alias.
+- Formatting metric values now accept only canonical metric keys, Excel formula
+  references, or typed `QueryFormMetric` objects with `expressionType`.
+  Loose legacy select wrappers, nested `{ value }`/`{ metric }` objects,
+  label-only objects, numeric keys, and inferred adhoc metric types have been
+  removed.
 - `transformProps` no longer exposes duplicate top-level chart props for
   formatting, sorting, groupby, aggregate, and theme fields that already belong
   to `formData` or hook-owned runtime state.

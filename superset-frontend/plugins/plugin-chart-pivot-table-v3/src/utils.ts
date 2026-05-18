@@ -391,41 +391,8 @@ export const getStableColumnKey = (column: QueryFormColumn) =>
     ? column
     : column.sqlExpression || column.label || '';
 
-type MetricSelectValue = {
-  value: string | number;
-  label?: string;
-};
-
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
-
-const isMetricSelectValue = (value: unknown): value is MetricSelectValue =>
-  isRecord(value) &&
-  'value' in value &&
-  (typeof value.value === 'string' || typeof value.value === 'number');
-
-const coerceExpressionType = (
-  value: Record<string, unknown>,
-): QueryFormMetric | undefined => {
-  const { expressionType } = value;
-  if (typeof expressionType === 'string' && expressionType.length > 0) {
-    return value as unknown as QueryFormMetric;
-  }
-  const { sqlExpression } = value;
-  if (typeof sqlExpression === 'string' && sqlExpression.trim().length > 0) {
-    return { ...value, expressionType: 'SQL' } as unknown as QueryFormMetric;
-  }
-  const { aggregate } = value;
-  const { column } = value;
-  if (
-    typeof aggregate === 'string' &&
-    aggregate.length > 0 &&
-    isRecord(column)
-  ) {
-    return { ...value, expressionType: 'SIMPLE' } as unknown as QueryFormMetric;
-  }
-  return undefined;
-};
 
 export const normalizeMetricFormattingValue = (
   value: unknown,
@@ -433,65 +400,10 @@ export const normalizeMetricFormattingValue = (
   if (typeof value === 'string') {
     return value.trim().length > 0 ? value : undefined;
   }
-  if (typeof value === 'number') {
-    return String(value);
-  }
-  if (Array.isArray(value)) {
-    for (const entry of value) {
-      const normalized = normalizeMetricFormattingValue(entry);
-      if (normalized !== undefined) {
-        return normalized;
-      }
-    }
-    return undefined;
-  }
   if (isRecord(value)) {
-    if ('value' in value) {
-      const nested = normalizeMetricFormattingValue(value.value);
-      if (nested !== undefined) {
-        return nested;
-      }
-    }
-    if ('metric' in value) {
-      const nested = normalizeMetricFormattingValue(value.metric);
-      if (nested !== undefined) {
-        return nested;
-      }
-    }
-    const inferred = coerceExpressionType(value);
-    if (inferred !== undefined) {
-      return inferred;
-    }
-    if (isMetricSelectValue(value)) {
-      const nextValue = String(value.value);
-      return nextValue.length > 0 ? nextValue : undefined;
-    }
-    const { key } = value;
-    if (typeof key === 'string' && key.trim().length > 0) {
-      return key;
-    }
-    if (typeof key === 'number') {
-      return String(key);
-    }
-    const { name } = value;
-    if (typeof name === 'string' && name.trim().length > 0) {
-      return name;
-    }
-    const metricName = value.metric_name;
-    if (typeof metricName === 'string' && metricName.trim().length > 0) {
-      return metricName;
-    }
     const { expressionType } = value;
-    if (typeof expressionType === 'string') {
+    if (typeof expressionType === 'string' && expressionType.length > 0) {
       return value as unknown as QueryFormMetric;
-    }
-    const { label } = value;
-    if (typeof label === 'string' && label.trim().length > 0) {
-      return label;
-    }
-    const { title } = value;
-    if (typeof title === 'string' && title.trim().length > 0) {
-      return title;
     }
   }
   return undefined;

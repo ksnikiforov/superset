@@ -408,7 +408,7 @@ describe('PivotDndMetricSelect', () => {
     await waitFor(() => expect(setControlValue).not.toHaveBeenCalled());
   });
 
-  it('hydrates formatting selections from persisted labeled values', async () => {
+  it('ignores loose persisted labeled formatting values', async () => {
     render(
       <PivotDndMetricSelect
         {...baseProps}
@@ -437,12 +437,12 @@ describe('PivotDndMetricSelect', () => {
     await waitFor(() => {
       expect(
         selectContainer?.querySelector('.ant-select-selection-item')
-          ?.textContent,
-      ).toContain('color_metric');
+          ?.textContent ?? '',
+      ).not.toContain('color_metric');
     });
   });
 
-  it('hydrates formatting metrics missing expressionType', async () => {
+  it('ignores formatting metrics missing expressionType', async () => {
     render(
       <PivotDndMetricSelect
         {...baseProps}
@@ -475,8 +475,8 @@ describe('PivotDndMetricSelect', () => {
     await waitFor(() => {
       expect(
         selectContainer?.querySelector('.ant-select-selection-item')
-          ?.textContent,
-      ).toContain('cond_format');
+          ?.textContent ?? '',
+      ).not.toContain('cond_format');
     });
   });
 
