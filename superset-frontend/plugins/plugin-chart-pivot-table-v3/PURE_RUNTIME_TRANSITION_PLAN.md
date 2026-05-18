@@ -188,6 +188,9 @@ Current semantic-layout contract:
   whether sibling expansion paths can be transported together. Batch grouping is
   now based on explicit manifest transport shape, and the real query specs are
   built only at the query boundary.
+- Branch fetch context is no longer a separate production module. Expansion
+  query context is private to `query/specs.ts`, so branch, batch, intersection,
+  and root query specs share one local query-spec boundary.
 
 Expected deletion targets:
 

@@ -23,10 +23,7 @@ import {
   PivotTreeData,
   PivotTreeNode,
 } from '../../src/types';
-import {
-  fetchPivotBranch,
-} from '../../src/pivot/query/fetchPivotBranch';
-import { resolveFetchContext } from '../../src/pivot/query/resolveFetchContext';
+import { fetchPivotBranch } from '../../src/pivot/query/fetchPivotBranch';
 import {
   buildBuiltInLeaf,
   buildMeasureLeafOutputKey,
@@ -96,207 +93,84 @@ const fetchPivotBranchTree = async (
   };
 };
 
-describe('resolveFetchContext', () => {
+describe('buildBranchQuerySpecs', () => {
   beforeEach(() => {
     (SupersetClient.post as jest.Mock).mockReset();
   });
 
   it('keeps column depth aligned to visible dimensions when metrics are on columns', () => {
-    const currentTree: PivotTreeData = {
-      rows: {
-        '': makeNode({ axis: 'row', path: [], hasChildren: true }),
-        A: makeNode({
-          axis: 'row',
-          path: ['A'],
-          level: 1,
-          hasChildren: true,
-          label: 'A',
-          formattedLabel: 'A',
-        }),
-      },
-      cols: {
-        '': makeNode({ axis: 'col', path: [], hasChildren: true }),
-        [serializePath([encodeMetricKey('m1')])]: makeNode({
-          axis: 'col',
-          path: [encodeMetricKey('m1')],
-          level: 1,
-          label: 'm1',
-          formattedLabel: 'm1',
-        }),
-      },
-      cells: {},
-    };
-
-    const ctx = resolveFetchContext({
-      formData: {
-        groupbyRows: ['r1', 'r2'],
-        groupbyColumns: [METRICS_PLACEHOLDER, 'c1'],
-        metrics: ['m1'],
-        metricsLayout: MetricsLayoutEnum.COLUMNS,
-        rowSubTotals: false,
-      } as any,
+    const formData = {
+      groupbyRows: ['r1', 'r2'],
+      groupbyColumns: [METRICS_PLACEHOLDER, 'c1'],
+      metrics: ['m1'],
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      rowSubTotals: false,
+    } as any;
+    const specs = buildBranchQuerySpecs({
+      formData,
+      layout: buildLayoutContext(formData),
       axis: 'row',
       path: ['A'],
-      currentTree,
     });
 
-    expect(ctx.rowDepth).toBe(2);
-    expect(ctx.colDepth).toBe(0);
+    expect(specs[0].meta.coverage.rowDepth).toBe(2);
+    expect(specs[0].meta.coverage.columnDepth).toBe(0);
   });
 
   it('uses the visible column depth for row fetches', () => {
-    const currentTree: PivotTreeData = {
-      rows: {
-        '': makeNode({ axis: 'row', path: [], hasChildren: true }),
-        A: makeNode({
-          axis: 'row',
-          path: ['A'],
-          level: 1,
-          hasChildren: true,
-          label: 'A',
-          formattedLabel: 'A',
-        }),
-      },
-      cols: {
-        '': makeNode({ axis: 'col', path: [], hasChildren: true }),
-        [serializePath([encodeMetricKey('m1')])]: makeNode({
-          axis: 'col',
-          path: [encodeMetricKey('m1')],
-          level: 1,
-          hasChildren: true,
-          label: 'm1',
-          formattedLabel: 'm1',
-        }),
-        [serializePath([encodeMetricKey('m1'), 'AUTO'])]: makeNode({
-          axis: 'col',
-          path: [encodeMetricKey('m1'), 'AUTO'],
-          level: 2,
-          hasChildren: false,
-          label: 'AUTO',
-          formattedLabel: 'AUTO',
-        }),
-      },
-      cells: {},
-    };
-
-    const ctx = resolveFetchContext({
-      formData: {
-        groupbyRows: ['r1', 'r2'],
-        groupbyColumns: [METRICS_PLACEHOLDER, 'c1'],
-        metrics: ['m1'],
-        metricsLayout: MetricsLayoutEnum.COLUMNS,
-        rowSubTotals: false,
-      } as any,
+    const formData = {
+      groupbyRows: ['r1', 'r2'],
+      groupbyColumns: [METRICS_PLACEHOLDER, 'c1'],
+      metrics: ['m1'],
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      rowSubTotals: false,
+    } as any;
+    const specs = buildBranchQuerySpecs({
+      formData,
+      layout: buildLayoutContext(formData),
       axis: 'row',
       path: ['A'],
-      currentTree,
       visibleColDepth: 0,
     });
 
-    expect(ctx.colDepth).toBe(0);
+    expect(specs[0].meta.coverage.columnDepth).toBe(0);
   });
 
   it('limits column fetch row depth to what is visible', () => {
-    const currentTree: PivotTreeData = {
-      rows: {
-        '': makeNode({ axis: 'row', path: [], hasChildren: true }),
-        A: makeNode({
-          axis: 'row',
-          path: ['A'],
-          level: 1,
-          hasChildren: true,
-          label: 'A',
-          formattedLabel: 'A',
-        }),
-        [serializePath(['A', 'B'])]: makeNode({
-          axis: 'row',
-          path: ['A', 'B'],
-          level: 2,
-          hasChildren: false,
-          label: 'B',
-          formattedLabel: 'B',
-        }),
-      },
-      cols: {
-        '': makeNode({ axis: 'col', path: [], hasChildren: true }),
-        [serializePath([encodeMetricKey('m1')])]: makeNode({
-          axis: 'col',
-          path: [encodeMetricKey('m1')],
-          level: 1,
-          hasChildren: true,
-          label: 'm1',
-          formattedLabel: 'm1',
-        }),
-      },
-      cells: {},
-    };
-
-    const ctx = resolveFetchContext({
-      formData: {
-        groupbyRows: ['r1', 'r2'],
-        groupbyColumns: [METRICS_PLACEHOLDER, 'c1'],
-        metrics: ['m1'],
-        metricsLayout: MetricsLayoutEnum.COLUMNS,
-        rowSubTotals: false,
-      } as any,
+    const formData = {
+      groupbyRows: ['r1', 'r2'],
+      groupbyColumns: [METRICS_PLACEHOLDER, 'c1'],
+      metrics: ['m1'],
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+      rowSubTotals: false,
+    } as any;
+    const specs = buildBranchQuerySpecs({
+      formData,
+      layout: buildLayoutContext(formData),
       axis: 'col',
       path: [encodeMetricKey('m1')],
-      currentTree,
       visibleRowDepth: 1,
     });
 
-    expect(ctx.rowDepth).toBe(1);
+    expect(specs[0].meta.coverage.rowDepth).toBe(1);
   });
 
   it('does not infer branch query depth from rendered tree shape', () => {
-    const currentTree: PivotTreeData = {
-      rows: {
-        '': makeNode({ axis: 'row', path: [], hasChildren: true }),
-        A: makeNode({
-          axis: 'row',
-          path: ['A'],
-          level: 1,
-          hasChildren: true,
-          label: 'A',
-          formattedLabel: 'A',
-        }),
-        [serializePath(['A', 'B'])]: makeNode({
-          axis: 'row',
-          path: ['A', 'B'],
-          level: 2,
-          hasChildren: false,
-          label: 'B',
-          formattedLabel: 'B',
-        }),
-      },
-      cols: {
-        '': makeNode({ axis: 'col', path: [], hasChildren: true }),
-        C: makeNode({
-          axis: 'col',
-          path: ['C'],
-          level: 1,
-          hasChildren: true,
-          label: 'C',
-          formattedLabel: 'C',
-        }),
-      },
-      cells: {},
-    };
-
-    const ctx = resolveFetchContext({
-      formData: {
-        groupbyRows: ['r1', 'r2'],
-        groupbyColumns: ['c1', 'c2'],
-        metrics: ['m1'],
-        rowSubTotals: false,
-      } as any,
+    const formData = {
+      groupbyRows: ['r1', 'r2'],
+      groupbyColumns: ['c1', 'c2'],
+      metrics: ['m1'],
+      rowSubTotals: false,
+    } as any;
+    const specs = buildBranchQuerySpecs({
+      formData,
+      layout: buildLayoutContext(formData),
       axis: 'col',
       path: ['C'],
-      currentTree,
     });
 
-    expect(ctx.rowDepth).toBe(0);
-    expect(ctx.colDepth).toBe(2);
+    expect(specs[0].meta.coverage.rowDepth).toBe(0);
+    expect(specs[0].meta.coverage.columnDepth).toBe(2);
   });
 
   it('fetches metric-front column expansion with root metrics populated', async () => {
@@ -396,12 +270,10 @@ describe('resolveFetchContext', () => {
     ]);
     const colKey = serializePath(['BUILDING', '1-URGENT']);
     expect(
-      tree.cells[serializeCellKey(metricRowKey, colKey)]?.values
-        .countCustomers,
+      tree.cells[serializeCellKey(metricRowKey, colKey)]?.values.countCustomers,
     ).toBe(10);
     expect(
-      tree.cells[serializeCellKey(detailRowKey, colKey)]?.values
-        .countCustomers,
+      tree.cells[serializeCellKey(detailRowKey, colKey)]?.values.countCustomers,
     ).toBe(4);
   });
 
@@ -751,9 +623,7 @@ describe('resolveFetchContext', () => {
       expect(query.metrics).toEqual(['measure1', 'sortMetric']);
     });
     expect(
-      tree.cols[
-        serializePath([encodeMetricKey('sortMetric'), 'REV-A'])
-      ],
+      tree.cols[serializePath([encodeMetricKey('sortMetric'), 'REV-A'])],
     ).toBeUndefined();
     expect(
       tree.cells[
@@ -1641,9 +1511,9 @@ describe('fetchPivotBranch delta-only contract', () => {
 
     expect(postMock).not.toHaveBeenCalled();
     expect(tree.rows[rowKey]).toBeDefined();
-    expect(
-      tree.cells[serializeCellKey(rowKey, metricColKey)]?.values.m1,
-    ).toBe(42);
+    expect(tree.cells[serializeCellKey(rowKey, metricColKey)]?.values.m1).toBe(
+      42,
+    );
   });
 
   it('does not fetch or mark coverage when expansion only reveals Values', async () => {
