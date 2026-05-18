@@ -75,6 +75,7 @@ export type PivotFactStoreBatchScope =
 export type PivotFactStore = {
   upsertBatch: (batch: PivotFactStoreBatch) => void;
   upsertBatches: (batches: PivotFactStoreBatch[]) => void;
+  registerCompatibleCoverageBatches: (batches: PivotFactStoreBatch[]) => void;
   getCompatibleFacts: (selector: PivotFactSelector) => PivotFact[];
   getCoverageBatches: () => PivotFactStoreBatch[];
   hasCompatibleCoverage: (selector: PivotFactSelector) => boolean;
@@ -109,6 +110,16 @@ const buildPivotFactKey = (selector: PivotFactSelector, fact: PivotFact) =>
     fact.valueKey,
     fact.role,
   ]);
+
+const normalizeSelector = ({
+  coverage,
+  scope,
+  valueKeys,
+}: PivotFactSelector): PivotFactSelector => ({
+  coverage,
+  scope,
+  valueKeys: normalizeFactValueKeys(valueKeys),
+});
 
 const valueKeysCover = (
   available: string[] | undefined,
@@ -153,19 +164,19 @@ const factMatchesScope = (fact: PivotFact, scope: PivotFactStoreBatchScope) => {
 };
 
 export const createPivotFactStore = (): PivotFactStore => {
-  const factsByKey = new Map<string, PivotFact>();
-  const factKeysByRequest = new Map<string, Set<string>>();
+  const factsByRequest = new Map<string, PivotFact[]>();
   const selectorByRequest = new Map<string, PivotFactSelector>();
 
   const upsertBatch = (batch: PivotFactStoreBatch) => {
     const { facts } = batch;
-    const selector = {
-      coverage: batch.coverage,
-      scope: batch.scope,
-      valueKeys: normalizeFactValueKeys(batch.valueKeys),
-    };
+    const selector = normalizeSelector(batch);
     const key = buildPivotFactRequestKey(selector);
-    const requestFactKeys = factKeysByRequest.get(key) ?? new Set<string>();
+    const factsByFactKey = new Map(
+      (factsByRequest.get(key) ?? []).map(fact => [
+        buildPivotFactKey(selector, fact),
+        fact,
+      ]),
+    );
     selectorByRequest.set(key, selector);
     facts
       .filter(
@@ -175,10 +186,9 @@ export const createPivotFactStore = (): PivotFactStore => {
       )
       .forEach(fact => {
         const factKey = buildPivotFactKey(selector, fact);
-        factsByKey.set(factKey, fact);
-        requestFactKeys.add(factKey);
+        factsByFactKey.set(factKey, fact);
       });
-    factKeysByRequest.set(key, requestFactKeys);
+    factsByRequest.set(key, Array.from(factsByFactKey.values()));
   };
 
   const hasCompatibleCoverage = (selector: PivotFactSelector) => {
@@ -258,9 +268,7 @@ export const createPivotFactStore = (): PivotFactStore => {
 
   const getCompatibleFacts = (selector: PivotFactSelector) =>
     getCompatibleRequestSelectorsForRead(selector).flatMap(candidate => {
-      const facts = Array.from(factKeysByRequest.get(candidate.key) ?? [])
-        .map(key => factsByKey.get(key))
-        .filter((fact): fact is PivotFact => fact !== undefined);
+      const facts = factsByRequest.get(candidate.key) ?? [];
       if (
         buildPivotFactRequestKey(candidate.selector) ===
         buildPivotFactRequestKey(selector)
@@ -278,9 +286,22 @@ export const createPivotFactStore = (): PivotFactStore => {
       );
     });
 
+  const registerCompatibleCoverageBatch = (batch: PivotFactStoreBatch) => {
+    const selector = normalizeSelector(batch);
+    const key = buildPivotFactRequestKey(selector);
+    if (selectorByRequest.has(key)) {
+      return;
+    }
+    const compatibleFacts = getCompatibleFacts(selector);
+    selectorByRequest.set(key, selector);
+    factsByRequest.set(key, compatibleFacts);
+  };
+
   return {
     upsertBatch,
     upsertBatches: batches => batches.forEach(upsertBatch),
+    registerCompatibleCoverageBatches: batches =>
+      batches.forEach(registerCompatibleCoverageBatch),
     getCompatibleFacts,
     getCoverageBatches: () =>
       Array.from(selectorByRequest.values()).map(selector => ({

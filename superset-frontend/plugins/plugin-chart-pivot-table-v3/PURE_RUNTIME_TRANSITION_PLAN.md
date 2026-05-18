@@ -126,6 +126,11 @@ Current fact-store contract:
   not create empty coverage marker batches;
 - repeated no-query behavior should be prevented by planner/requestability
   policy, not by pretending that an empty fact batch was loaded.
+- Expansion fetch currently re-upserts returned fact batches into the shared
+  fact store after query ingestion. This used to hide two operations under one
+  method: fact insertion and exact compatible coverage alias registration.
+  Alias registration is now an explicit fact-store operation, so expansion no
+  longer pretends that it is inserting the same facts twice.
 
 Current semantic-layout contract:
 
@@ -163,8 +168,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `14279` insertions, `15799` deletions, net `-1520`.
-- Current production TypeScript/TSX total: about `32557` lines.
+- Production `src`: `14590` insertions, `15797` deletions, net `-1207`.
+- Current production TypeScript/TSX total: about `32303` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion

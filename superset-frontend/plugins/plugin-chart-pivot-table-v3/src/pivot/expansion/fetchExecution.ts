@@ -411,7 +411,7 @@ export const fetchExpansionTargetDeltas = async ({
   }
   const deltas: FetchResultDelta[] = [];
   results.forEach(result => {
-    runtime.factStore?.upsertBatches(result.factBatches);
+    runtime.factStore?.registerCompatibleCoverageBatches(result.factBatches);
     runtime.recordFactBatches?.();
     deltas.push({
       targets: result.targets,

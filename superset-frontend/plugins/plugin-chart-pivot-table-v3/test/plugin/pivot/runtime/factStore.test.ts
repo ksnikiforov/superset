@@ -411,6 +411,60 @@ test('materialization can reuse compatible batch coverage for branch facts', () 
   expect(store.hasCompatibleCoverage(canadaSelector)).toBe(false);
 });
 
+test('registers compatible coverage aliases without upserting duplicate facts', () => {
+  const store = createPivotFactStore();
+  const branchCoverage: PivotFactCoverage = {
+    reason: 'expand',
+    rowDepth: 2,
+    columnDepth: 1,
+    rowDimensions: ['country', 'city'],
+    columnDimensions: ['month'],
+  };
+  const franceSelector = {
+    coverage: branchCoverage,
+    scope: {
+      kind: 'branch',
+      axis: 'row',
+      path: ['France'],
+    } as PivotFactStoreBatchScope,
+    valueKeys: ['sales'],
+  };
+
+  store.upsertBatch({
+    coverage: branchCoverage,
+    scope: {
+      kind: 'batch',
+      axis: 'row',
+      parentPath: [],
+      siblingValues: ['France', 'USA'],
+    },
+    valueKeys: ['sales'],
+    facts: [
+      buildFact({
+        rowPath: ['France', 'Paris'],
+        columnPath: ['2026-01'],
+        value: 1,
+      }),
+      buildFact({
+        rowPath: ['USA', 'Seattle'],
+        columnPath: ['2026-01'],
+        value: 2,
+      }),
+    ],
+  });
+  store.registerCompatibleCoverageBatches([{ ...franceSelector, facts: [] }]);
+
+  expect(store.hasCompatibleCoverage(franceSelector)).toBe(true);
+  expect(
+    store.getCompatibleFacts(franceSelector).map(fact => fact.rowPath),
+  ).toEqual([['France', 'Paris']]);
+  expect(
+    store
+      .getCoverageBatches()
+      .some(batch => batch.scope === franceSelector.scope),
+  ).toBe(true);
+});
+
 test('materialization can read separate exact branches for a batched request', () => {
   const store = createPivotFactStore();
   const branchCoverage: PivotFactCoverage = {
