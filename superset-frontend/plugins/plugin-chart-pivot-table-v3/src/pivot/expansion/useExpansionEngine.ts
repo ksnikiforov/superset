@@ -73,7 +73,6 @@ import { useSyncRef } from '../shared/useSyncRef';
 import {
   createExpansionRequestHelpers,
   runHydrationExpansionFetchLoop,
-  runSameAxisExpansionFetchLoop,
   type ExpansionFetchRuntime,
 } from './fetchExecution';
 import {
@@ -728,30 +727,42 @@ export const useExpansionEngine = ({
 
       const requestEpoch = dataEpochRef.current;
       const initialTree = treeRef.current;
-      const resolvedExpanded = resolveExpandedForMetrics(
+      const initialResolvedExpanded = resolveExpandedForMetrics(
         axis,
         baseExpanded,
         initialTree,
       );
-      const inFlight = trackInFlightExpansion(axis, resolvedExpanded, expanded);
+      const inFlight = trackInFlightExpansion(
+        axis,
+        initialResolvedExpanded,
+        expanded,
+      );
 
       try {
-        const fetchLoop = await runSameAxisExpansionFetchLoop({
-          axis,
-          baseExpanded,
-          initialResolvedExpanded: resolvedExpanded,
-          initialTree,
+        const fetchLoop = await runHydrationExpansionFetchLoop({
+          reason: 'branch',
+          baseTree: initialTree,
           maxIterations: MAX_HYDRATION_ITERATIONS,
-          requestEpoch,
-          getDataEpoch: () => dataEpochRef.current,
-          getExpandedRows: () => expandedRowsRef.current,
-          getExpandedCols: () => expandedColsRef.current,
+          isCurrent: () =>
+            dataEpochRef.current === requestEpoch && requestScope.isCurrent(),
+          buildDesiredExpanded: (desiredAxis, treeForExpansion) =>
+            desiredAxis === axis
+              ? resolveExpandedForMetrics(axis, baseExpanded, treeForExpansion)
+              : desiredAxis === 'row'
+                ? expandedRowsRef.current
+                : expandedColsRef.current,
           config: planningConfig,
+          activeAxis: axis,
+          pendingRows: pendingRowsRef.current,
+          pendingCols: pendingColsRef.current,
+          planRows: axis === 'row',
+          planCols: axis === 'col',
           fetchRuntime: buildFetchRuntime(requestScope),
-          resolveExpandedForMetrics,
+          singleRequestKind: 'branch',
+          batchRequestKind: 'batch',
         });
 
-        if (fetchLoop.status === 'stale' || !requestScope.isCurrent()) {
+        if (fetchLoop.status !== 'complete' || !requestScope.isCurrent()) {
           return;
         }
         const committedExpanded =

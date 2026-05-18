@@ -176,11 +176,13 @@ Current semantic-layout contract:
 - During semantic layout fetches that already include visible coverage, the
   committed table remains visible instead of switching into a partial draft tree
   plus branch-loader follow-up.
+- Same-axis expansion now uses the shared hydration/manifest executor instead
+  of a dedicated branch loop. Expansion prefetch, cross-axis hydration, and
+  direct row/column expansion all follow the same plan/fetch/rematerialize
+  iteration boundary.
 
 Expected deletion targets:
 
-- expansion tree merge/prune staging once expansion fetches upsert facts and
-  rematerialize from the fact store;
 - separate bootstrap/branch/batch/intersection query builders once all query
   requests are represented as coverage needs;
 - remaining non-manifest coverage planning in expansion and query batching;

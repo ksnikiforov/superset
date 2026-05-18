@@ -16,11 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import {
-  type PivotAxis,
-  type PivotTableQueryFormData,
-  type PivotTreeData,
-} from '../../types';
+import { type PivotTableQueryFormData, type PivotTreeData } from '../../types';
 import {
   fetchPivotBranch,
   fetchPivotBranchesBatch,
@@ -42,17 +38,11 @@ import {
 } from '../runtime/requestLifecycle';
 import { createExpansionCoverageDiff } from '../runtime/coverage';
 import { stableStringify } from '../shared/stableStringify';
+import { runHydrationLoop } from './stateTransitions';
 import {
-  computeVisibleDepths,
-  runHydrationLoop,
-  type ExpansionPlanningConfig,
-} from './stateTransitions';
-import {
-  buildGroupedFetchTargets,
   type ExpansionFetchTarget,
   type IntersectionFetchTarget,
   isIntersectionFetchTarget,
-  planExpansionForAxis,
 } from './planner';
 import type { PivotProgram } from '../runtime/types';
 import { rootKey } from '../viewModel';
@@ -454,10 +444,14 @@ type HydrationLoopParams = Parameters<typeof runHydrationLoop>[0];
 export const runHydrationExpansionFetchLoop = ({
   reason,
   fetchRuntime,
+  singleRequestKind = `hydrate:${reason}`,
+  batchRequestKind,
   ...hydrationLoopParams
 }: Omit<HydrationLoopParams, 'fetchTree' | 'getMissingExpansionCoverage'> & {
-  reason: 'prefetch' | 'cross-axis';
+  reason: 'prefetch' | 'cross-axis' | 'branch';
   fetchRuntime: ExpansionFetchRuntime;
+  singleRequestKind?: string;
+  batchRequestKind?: string;
 }) =>
   runHydrationLoop({
     ...hydrationLoopParams,
@@ -471,120 +465,9 @@ export const runHydrationExpansionFetchLoop = ({
         targets,
         context,
         runtime: fetchRuntime,
-        singleRequestKind: `hydrate:${reason}`,
+        singleRequestKind,
+        batchRequestKind,
       });
       return deltas.length > 0 ? fetchRuntime.materializeLoadedTree() : tree;
     },
   });
-
-export type SameAxisExpansionFetchLoopResult =
-  | {
-      status: 'complete';
-      tree: PivotTreeData;
-    }
-  | {
-      status: 'stale';
-    };
-
-export const runSameAxisExpansionFetchLoop = async ({
-  axis,
-  baseExpanded,
-  initialResolvedExpanded,
-  initialTree,
-  maxIterations,
-  requestEpoch,
-  getDataEpoch,
-  getExpandedRows,
-  getExpandedCols,
-  config,
-  fetchRuntime,
-  resolveExpandedForMetrics,
-}: {
-  axis: PivotAxis;
-  baseExpanded: Set<string>;
-  initialResolvedExpanded: Set<string>;
-  initialTree: PivotTreeData;
-  maxIterations: number;
-  requestEpoch: number;
-  getDataEpoch: () => number;
-  getExpandedRows: () => Set<string>;
-  getExpandedCols: () => Set<string>;
-  config: ExpansionPlanningConfig;
-  fetchRuntime: ExpansionFetchRuntime;
-  resolveExpandedForMetrics: (
-    axis: PivotAxis,
-    nextExpanded: Set<string>,
-    nextTree: PivotTreeData,
-  ) => Set<string>;
-}): Promise<SameAxisExpansionFetchLoopResult> => {
-  let currentTree = initialTree;
-  let resolvedExpanded = initialResolvedExpanded;
-  const { requestScope } = fetchRuntime;
-
-  for (let iteration = 0; iteration < maxIterations; iteration += 1) {
-    if (getDataEpoch() !== requestEpoch || !requestScope.isCurrent()) {
-      return { status: 'stale' };
-    }
-    const expandedRowsForDepth =
-      axis === 'row' ? resolvedExpanded : getExpandedRows();
-    const expandedColsForDepth =
-      axis === 'col' ? resolvedExpanded : getExpandedCols();
-    const { visibleRowDepth, visibleColDepth } = computeVisibleDepths({
-      tree: currentTree,
-      expandedRows: expandedRowsForDepth,
-      expandedCols: expandedColsForDepth,
-      config,
-    });
-    const nodes = axis === 'row' ? currentTree.rows : currentTree.cols;
-    const plan = planExpansionForAxis({
-      axis,
-      program: config.program,
-      expandedKeys: resolvedExpanded,
-      nodes,
-      coverage: { rowDepth: visibleRowDepth, columnDepth: visibleColDepth },
-      getMissingExpansionCoverage: createRuntimeExpansionCoverageDiff({
-        runtime: fetchRuntime,
-        program: config.program,
-      }),
-    });
-    if (plan.fetchRequests.length === 0) {
-      break;
-    }
-    const targets = buildGroupedFetchTargets({
-      axis,
-      program: config.program,
-      requests: plan.fetchRequests,
-      nodes,
-    });
-
-    // eslint-disable-next-line no-await-in-loop
-    const resultDeltas = await fetchExpansionTargetDeltas({
-      targets,
-      context: { visibleRowDepth, visibleColDepth },
-      runtime: fetchRuntime,
-      singleRequestKind: 'branch',
-      batchRequestKind: 'batch',
-    });
-    if (getDataEpoch() !== requestEpoch || !requestScope.isCurrent()) {
-      return { status: 'stale' };
-    }
-    if (resultDeltas.length === 0) {
-      break;
-    }
-    currentTree = fetchRuntime.materializeLoadedTree();
-    resolvedExpanded = resolveExpandedForMetrics(
-      axis,
-      baseExpanded,
-      currentTree,
-    );
-  }
-
-  if (!requestScope.isCurrent()) {
-    return { status: 'stale' };
-  }
-
-  return {
-    status: 'complete',
-    tree: currentTree,
-  };
-};
