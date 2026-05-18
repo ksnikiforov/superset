@@ -85,7 +85,7 @@ test('keeps different request scopes as separate exact fact batches', () => {
   ]);
 });
 
-test('exposes loaded coverage batches without duplicating fact payloads', () => {
+test('exposes loaded coverage selectors without fact payloads', () => {
   const store = createPivotFactStore();
 
   store.upsertBatch({
@@ -93,10 +93,9 @@ test('exposes loaded coverage batches without duplicating fact payloads', () => 
     facts: [buildFact({ value: 10 })],
   });
 
-  expect(store.getCoverageBatches()).toEqual([
+  expect(store.getCoverageSelectors()).toEqual([
     {
       ...selector,
-      facts: [],
     },
   ]);
 });
@@ -420,7 +419,7 @@ test('registers compatible coverage aliases without upserting duplicate facts', 
   expect(store.hasCompatibleCoverage(franceSelector)).toBe(true);
   expect(
     store
-      .getCoverageBatches()
+      .getCoverageSelectors()
       .some(batch => batch.scope === franceSelector.scope),
   ).toBe(false);
 });

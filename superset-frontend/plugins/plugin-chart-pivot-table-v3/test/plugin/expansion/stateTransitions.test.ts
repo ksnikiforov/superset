@@ -52,7 +52,7 @@ import {
   type PivotTreeData,
   type PivotTreeNode,
 } from '../../../src/types';
-import { type PivotFactStoreBatch } from '../../../src/pivot/runtime/factStore';
+import { type PivotFactSelector } from '../../../src/pivot/runtime/factStore';
 import { compilePivotProgram } from '../../../src/pivot/runtime/compilePivotProgram';
 import type { PivotAxisCoverageNeed } from '../../../src/pivot/runtime/coverage';
 
@@ -147,11 +147,11 @@ describe('pivot/expansion/stateTransitions', () => {
     program: testProgram,
     buildRenderModelConfig: buildTestRenderModelConfig(),
   };
-  const expansionCoverageLoadedFromBatches = (
-    factBatches: PivotFactStoreBatch[] = [],
+  const expansionCoverageLoadedFromSelectors = (
+    factSelectors: PivotFactSelector[] = [],
   ) =>
     createExpansionCoverageDiff({
-      factBatches,
+      factSelectors,
       program: testProgram,
       valueKeys: ['sales'],
     });
@@ -375,7 +375,7 @@ describe('pivot/expansion/stateTransitions', () => {
 
   it('runs hydration loops to completion without fetching when coverage is satisfied', async () => {
     const { tree, aKey, xKey } = buildTree({ includeIntersectionCell: true });
-    const factBatches: PivotFactStoreBatch[] = [
+    const factSelectors: PivotFactSelector[] = [
       {
         coverage: {
           rowDepth: 2,
@@ -389,7 +389,6 @@ describe('pivot/expansion/stateTransitions', () => {
           path: ['A'],
         },
         valueKeys: ['sales'],
-        facts: [],
       },
     ];
     const result = await runHydrationLoop({
@@ -399,7 +398,7 @@ describe('pivot/expansion/stateTransitions', () => {
       buildDesiredExpanded: axis =>
         axis === 'row' ? new Set([aKey]) : new Set([xKey]),
       getMissingExpansionCoverage: () =>
-        expansionCoverageLoadedFromBatches(factBatches),
+        expansionCoverageLoadedFromSelectors(factSelectors),
       config,
       pendingRows: new Set(),
       pendingCols: new Set(),
@@ -425,12 +424,12 @@ describe('pivot/expansion/stateTransitions', () => {
       cols: {},
       cells: {},
     };
-    const factBatches: PivotFactStoreBatch[] = [];
+    const factSelectors: PivotFactSelector[] = [];
     const fetchTree = jest.fn(
       async ({ targets, context, tree: currentTree }) => {
         targets.forEach(target => {
           const targetDepth = parsePath(target.pathKey).length + 1;
-          factBatches.push({
+          factSelectors.push({
             coverage: {
               rowDepth:
                 target.axis === 'row' ? targetDepth : context.visibleRowDepth,
@@ -445,7 +444,6 @@ describe('pivot/expansion/stateTransitions', () => {
               path: parsePath(target.pathKey),
             },
             valueKeys: ['sales'],
-            facts: [],
           });
         });
         return mergeTrees(currentTree, branch);
@@ -458,7 +456,7 @@ describe('pivot/expansion/stateTransitions', () => {
       buildDesiredExpanded: axis =>
         axis === 'row' ? new Set([aKey]) : new Set([xKey]),
       getMissingExpansionCoverage: () =>
-        expansionCoverageLoadedFromBatches(factBatches),
+        expansionCoverageLoadedFromSelectors(factSelectors),
       config,
       pendingRows: new Set(),
       pendingCols: new Set(),
@@ -513,7 +511,7 @@ describe('pivot/expansion/stateTransitions', () => {
       cols: {},
       cells: {},
     };
-    const factBatches: PivotFactStoreBatch[] = [];
+    const factSelectors: PivotFactSelector[] = [];
     const nestedProgram = compilePivotProgram({
       groupbyRows: ['country', 'city', 'store'],
       groupbyColumns: [],
@@ -527,7 +525,7 @@ describe('pivot/expansion/stateTransitions', () => {
         targets.forEach(target => {
           const path = parsePath(target.pathKey);
           const targetDepth = path.length + 1;
-          factBatches.push({
+          factSelectors.push({
             coverage: {
               rowDepth:
                 target.axis === 'row' ? targetDepth : context.visibleRowDepth,
@@ -544,7 +542,6 @@ describe('pivot/expansion/stateTransitions', () => {
               path,
             },
             valueKeys: ['sales'],
-            facts: [],
           });
         });
         return mergeTrees(currentTree, data);
@@ -558,7 +555,7 @@ describe('pivot/expansion/stateTransitions', () => {
         axis === 'row' ? new Set([aKey, axKey]) : new Set(),
       getMissingExpansionCoverage: () =>
         createExpansionCoverageDiff({
-          factBatches,
+          factSelectors,
           program: nestedProgram,
           valueKeys: ['sales'],
         }),
@@ -596,7 +593,7 @@ describe('pivot/expansion/stateTransitions', () => {
       isCurrent: () => false,
       buildDesiredExpanded: axis =>
         axis === 'row' ? new Set([aKey]) : new Set([xKey]),
-      getMissingExpansionCoverage: () => expansionCoverageLoadedFromBatches(),
+      getMissingExpansionCoverage: () => expansionCoverageLoadedFromSelectors(),
       config,
       pendingRows: new Set(),
       pendingCols: new Set(),
@@ -698,7 +695,7 @@ describe('pivot/expansion/stateTransitions', () => {
 
   it('plans fetch targets for expanded nodes', () => {
     const { tree, aKey, xKey } = buildTree({ includeIntersectionCell: true });
-    const loadedRootCoverage: PivotFactStoreBatch = {
+    const loadedRootCoverage: PivotFactSelector = {
       coverage: {
         rowDepth: 1,
         columnDepth: 1,
@@ -711,13 +708,12 @@ describe('pivot/expansion/stateTransitions', () => {
         path: [],
       },
       valueKeys: ['sales'],
-      facts: [],
     };
     const plan = planHydrationIteration({
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
-      getMissingExpansionCoverage: expansionCoverageLoadedFromBatches([
+      getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors([
         loadedRootCoverage,
       ]),
       config,
@@ -747,7 +743,7 @@ describe('pivot/expansion/stateTransitions', () => {
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
-      getMissingExpansionCoverage: expansionCoverageLoadedFromBatches(),
+      getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors(),
       config,
       activeAxis: 'col',
       pendingRows: new Set(),
@@ -774,7 +770,7 @@ describe('pivot/expansion/stateTransitions', () => {
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
-      getMissingExpansionCoverage: expansionCoverageLoadedFromBatches(),
+      getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors(),
       config,
       pendingRows: new Set(),
       pendingCols: new Set(),
@@ -799,7 +795,7 @@ describe('pivot/expansion/stateTransitions', () => {
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
-      getMissingExpansionCoverage: expansionCoverageLoadedFromBatches(),
+      getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors(),
       config,
       pendingRows: new Set(),
       pendingCols: new Set(),
@@ -823,7 +819,7 @@ describe('pivot/expansion/stateTransitions', () => {
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
-      getMissingExpansionCoverage: expansionCoverageLoadedFromBatches(),
+      getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors(),
       config,
       pendingRows: new Set(),
       pendingCols: new Set(),
@@ -884,7 +880,7 @@ describe('pivot/expansion/stateTransitions', () => {
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
-      getMissingExpansionCoverage: expansionCoverageLoadedFromBatches(),
+      getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors(),
       config: metricConfig,
       pendingRows: new Set(),
       pendingCols: new Set(),
@@ -947,7 +943,7 @@ describe('pivot/expansion/stateTransitions', () => {
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
-      getMissingExpansionCoverage: expansionCoverageLoadedFromBatches(),
+      getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors(),
       config: metricConfig,
       pendingRows: new Set(),
       pendingCols: new Set(),
@@ -1101,7 +1097,7 @@ describe('pivot/expansion/stateTransitions', () => {
         collapsedCols: [],
       },
       axisCoverageNeeds: noAxisCoverageNeeds,
-      getMissingExpansionCoverage: expansionCoverageLoadedFromBatches(),
+      getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors(),
       config,
     });
 
@@ -1130,7 +1126,7 @@ describe('pivot/expansion/stateTransitions', () => {
         collapsedCols: [],
       },
       axisCoverageNeeds: [rowRootLevelNeed],
-      getMissingExpansionCoverage: expansionCoverageLoadedFromBatches(),
+      getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors(),
       config,
     });
 

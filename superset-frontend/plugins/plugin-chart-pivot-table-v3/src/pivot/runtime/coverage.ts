@@ -31,7 +31,7 @@ import {
   resolveAxisProjection,
   type PivotAxisProjection,
 } from './projection';
-import type { PivotFactSelector, PivotFactStoreBatch } from './factStore';
+import type { PivotFactSelector, PivotFactStoreBatchScope } from './factStore';
 import type { PivotFactCoverage, PivotProgram } from './types';
 
 type FactCoverageInput = {
@@ -153,11 +153,11 @@ const axisScopeContainsValuesToken = (scope: AxisPathScope) => {
 const batchScopePaths = ({
   parentPath,
   siblingValues,
-}: Extract<PivotFactStoreBatch['scope'], { kind: 'batch' }>) =>
+}: Extract<PivotFactStoreBatchScope, { kind: 'batch' }>) =>
   siblingValues.map(value => [...parentPath, value]);
 
 const intersectionScopePaths = (
-  scope: Extract<PivotFactStoreBatch['scope'], { kind: 'intersection' }>,
+  scope: Extract<PivotFactStoreBatchScope, { kind: 'intersection' }>,
   axis: PivotAxis,
 ) => (axis === 'row' ? scope.rowPaths : scope.columnPaths);
 
@@ -236,7 +236,7 @@ const buildExpansionCoverageNeed = ({
 };
 
 const isRuntimeLayoutCoverageScope = (
-  scope: PivotFactStoreBatch['scope'],
+  scope: PivotFactStoreBatchScope,
 ): boolean => {
   if (scope.kind === 'root') {
     return true;
@@ -248,7 +248,7 @@ const isRuntimeLayoutCoverageScope = (
 };
 
 const scopeRestrictsAxis = (
-  scope: PivotFactStoreBatch['scope'],
+  scope: PivotFactStoreBatchScope,
   axis: PivotAxis,
 ) =>
   (scope.kind === 'branch' || scope.kind === 'batch') && scope.axis === axis
@@ -256,7 +256,7 @@ const scopeRestrictsAxis = (
     : scope.kind === 'intersection';
 
 const scopeCoversAxisPaths = (
-  scope: PivotFactStoreBatch['scope'],
+  scope: PivotFactStoreBatchScope,
   axis: PivotAxis,
   needScope: AxisPathScope,
   loadedDepth: number,
@@ -317,8 +317,8 @@ export const buildFactCoverage = ({
   };
 };
 
-const factBatchCoversNeed = (
-  { coverage, scope, valueKeys }: PivotFactStoreBatch,
+const factSelectorCoversNeed = (
+  { coverage, scope, valueKeys }: PivotFactSelector,
   need: PivotCoverageNeed,
 ) => {
   const isRootNeed =
@@ -366,29 +366,29 @@ const splitCoverageNeed = (need: PivotCoverageNeed): PivotCoverageNeed[] =>
     })),
   );
 
-const factBatchesCoverNeed = (
-  factBatches: PivotFactStoreBatch[],
+const factSelectorsCoverNeed = (
+  factSelectors: PivotFactSelector[],
   need: PivotCoverageNeed,
 ) =>
-  factBatches.some(batch => factBatchCoversNeed(batch, need)) ||
+  factSelectors.some(selector => factSelectorCoversNeed(selector, need)) ||
   splitCoverageNeed(need).every(part =>
-    factBatches.some(batch => factBatchCoversNeed(batch, part)),
+    factSelectors.some(selector => factSelectorCoversNeed(selector, part)),
   );
 
 export const diffCoverageManifest = ({
   required,
-  factBatches,
+  factSelectors,
 }: {
   required: PivotCoverageNeed[];
-  factBatches: PivotFactStoreBatch[];
-}) => required.filter(need => !factBatchesCoverNeed(factBatches, need));
+  factSelectors: PivotFactSelector[];
+}) => required.filter(need => !factSelectorsCoverNeed(factSelectors, need));
 
 export const createExpansionCoverageDiff = ({
-  factBatches,
+  factSelectors,
   program,
   valueKeys,
 }: {
-  factBatches: PivotFactStoreBatch[];
+  factSelectors: PivotFactSelector[];
   program: PivotProgram;
   valueKeys: string[];
 }): PivotExpansionCoverageDiff => {
@@ -408,7 +408,7 @@ export const createExpansionCoverageDiff = ({
             valueKeys,
           }),
         ],
-        factBatches,
+        factSelectors,
       }).length === 0;
     cache.set(key, loaded);
     return loaded;

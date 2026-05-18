@@ -131,7 +131,7 @@ const createRuntimeExpansionCoverageDiff = ({
   program: PivotProgram;
 }) =>
   createExpansionCoverageDiff({
-    factBatches: runtime.factStore?.getCoverageBatches() ?? [],
+    factSelectors: runtime.factStore?.getCoverageSelectors() ?? [],
     program,
     valueKeys: buildFactValueKeys({
       metricKeys: program.metricKeys,

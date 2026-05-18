@@ -923,7 +923,7 @@ export const useExpansionEngine = ({
       persistedState,
       axisCoverageNeeds,
       getMissingExpansionCoverage: createExpansionCoverageDiff({
-        factBatches: factStoreRef.current?.getCoverageBatches() ?? [],
+        factSelectors: factStoreRef.current?.getCoverageSelectors() ?? [],
         program: pivotProgram,
         valueKeys: buildFactValueKeys({
           metricKeys: pivotProgram.metricKeys,

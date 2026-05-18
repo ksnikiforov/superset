@@ -32,7 +32,7 @@ import {
 } from '../../../src/pivot/core/tokens';
 import { serializePath } from '../../../src/pivot/core/path';
 import { type PivotTreeNode } from '../../../src/types';
-import { type PivotFactStoreBatch } from '../../../src/pivot/runtime/factStore';
+import { type PivotFactSelector } from '../../../src/pivot/runtime/factStore';
 import { compilePivotProgram } from '../../../src/pivot/runtime/compilePivotProgram';
 
 const testProgram = compilePivotProgram({
@@ -62,11 +62,11 @@ const makeNode = ({
   };
 };
 
-const getMissingCoverageFromBatches = (
-  factBatches: PivotFactStoreBatch[] = [],
+const getMissingCoverageFromSelectors = (
+  factSelectors: PivotFactSelector[] = [],
 ): PivotExpansionCoverageDiff =>
   createExpansionCoverageDiff({
-    factBatches,
+    factSelectors,
     program: testProgram,
     valueKeys: ['sales', 'profit'],
   });
@@ -118,7 +118,7 @@ describe('pivot/expansion/planner', () => {
       expandedKeys: new Set([rootKey, aKey]),
       nodes,
       coverage: { rowDepth: 1, columnDepth: 1 },
-      getMissingExpansionCoverage: getMissingCoverageFromBatches(),
+      getMissingExpansionCoverage: getMissingCoverageFromSelectors(),
       program: testProgram,
     });
 
@@ -145,7 +145,7 @@ describe('pivot/expansion/planner', () => {
         }),
       },
       coverage: { rowDepth: 1, columnDepth: 0 },
-      getMissingExpansionCoverage: getMissingCoverageFromBatches(),
+      getMissingExpansionCoverage: getMissingCoverageFromSelectors(),
       program: testProgram,
     });
 
@@ -161,7 +161,7 @@ describe('pivot/expansion/planner', () => {
   it('uses typed branch coverage to skip only the covered expanded path', () => {
     const aKey = serializePath(['A']);
     const bKey = serializePath(['B']);
-    const getMissingExpansionCoverage = getMissingCoverageFromBatches([
+    const getMissingExpansionCoverage = getMissingCoverageFromSelectors([
       {
         coverage: {
           rowDepth: 2,
@@ -174,7 +174,6 @@ describe('pivot/expansion/planner', () => {
           axis: 'row',
           path: ['A'],
         },
-        facts: [],
         valueKeys: ['sales', 'profit'],
       },
     ]);
@@ -266,7 +265,7 @@ describe('pivot/expansion/planner', () => {
     const caKey = serializePath(['US', 'CA']);
     const nyKey = serializePath(['US', 'NY']);
     const txKey = serializePath(['US', 'TX']);
-    const getMissingExpansionCoverage = getMissingCoverageFromBatches([
+    const getMissingExpansionCoverage = getMissingCoverageFromSelectors([
       {
         coverage: {
           rowDepth: 3,
@@ -280,7 +279,6 @@ describe('pivot/expansion/planner', () => {
           parentPath: ['US'],
           siblingValues: ['CA', 'NY'],
         },
-        facts: [],
         valueKeys: ['sales', 'profit'],
       },
     ]);
@@ -305,7 +303,7 @@ describe('pivot/expansion/planner', () => {
   it('does not let typed metric branch coverage satisfy sibling metrics', () => {
     const salesKey = serializePath(['A', encodeMetricKey('sales')]);
     const profitKey = serializePath(['A', encodeMetricKey('profit')]);
-    const getMissingExpansionCoverage = getMissingCoverageFromBatches([
+    const getMissingExpansionCoverage = getMissingCoverageFromSelectors([
       {
         coverage: {
           rowDepth: 2,
@@ -318,7 +316,6 @@ describe('pivot/expansion/planner', () => {
           axis: 'row',
           path: ['A', encodeMetricKey('sales')],
         },
-        facts: [],
         valueKeys: ['sales'],
       },
     ]);
@@ -383,7 +380,7 @@ describe('pivot/expansion/planner', () => {
       expandedKeys: new Set([metricAKey, metricBKey]),
       nodes,
       coverage: { rowDepth: 1, columnDepth: 1 },
-      getMissingExpansionCoverage: getMissingCoverageFromBatches(),
+      getMissingExpansionCoverage: getMissingCoverageFromSelectors(),
       program: testProgram,
     });
 
