@@ -47,7 +47,6 @@ import { getMetricKey, getMetricKeys } from '../metrics';
 import {
   buildOffsetMetricKey,
   buildMeasureLeafOutputKey,
-  buildValueLeaf,
   computeMeasureLeafValue,
   isValueLeaf,
 } from '../measureLeaves';
@@ -134,25 +133,22 @@ const deriveBatchMaterializationPlan = ({
       : false;
   });
   const loadedMetricKeys = new Set(getMetricKeys(loadedMetrics));
-  const materializedMeasureHierarchy: MeasureHierarchy =
-    layout.measureHierarchy.kind === 'measureStackV1'
-      ? {
-          ...layout.measureHierarchy,
-          groups: layout.measureHierarchy.groups
-            .filter(group => loadedMetricKeys.has(group.metricKey))
-            .map(group => ({
-              ...group,
-              leaves: group.leaves.filter(leaf =>
-                canMaterializeMeasureLeaf({
-                  valueKeys,
-                  metricKey: group.metricKey,
-                  leaf,
-                }),
-              ),
-            }))
-            .filter(group => group.leaves.length > 0),
-        }
-      : { kind: 'flatMetrics', metricKeys: Array.from(loadedMetricKeys) };
+  const materializedMeasureHierarchy: MeasureHierarchy = {
+    ...layout.measureHierarchy,
+    groups: layout.measureHierarchy.groups
+      .filter(group => loadedMetricKeys.has(group.metricKey))
+      .map(group => ({
+        ...group,
+        leaves: group.leaves.filter(leaf =>
+          canMaterializeMeasureLeaf({
+            valueKeys,
+            metricKey: group.metricKey,
+            leaf,
+          }),
+        ),
+      }))
+      .filter(group => group.leaves.length > 0),
+  };
 
   return {
     metricsForQuery: loadedMetrics,
@@ -169,15 +165,9 @@ export function applyMeasureLeafValuesToTree({
   measureHierarchy,
 }: {
   tree: PivotTreeData;
-  measureHierarchy: {
-    kind: 'flatMetrics' | 'measureStackV1';
-    groups?: Array<{ metricKey: string; leaves: MeasureLeafSpec[] }>;
-  };
+  measureHierarchy: Pick<MeasureHierarchy, 'groups'>;
 }) {
-  if (measureHierarchy.kind !== 'measureStackV1') {
-    return tree;
-  }
-  const groups = measureHierarchy.groups ?? [];
+  const { groups } = measureHierarchy;
   if (groups.length === 0) {
     return tree;
   }
@@ -982,32 +972,21 @@ export const applyMeasureHierarchyAxis = (
   program: PivotProgram,
   metricLabelMap?: Record<string, string>,
 ): PivotTreeData => {
-  if (measureHierarchy.kind === 'flatMetrics') {
-    const insertIndex = getValuesInsertIndex(program);
-    const valueAxis = getValueAxis(program);
-    const axisDepth = getAxisDimensions(program, valueAxis).length;
-    return applyMeasureAxis({
-      tree,
-      groups: measureHierarchy.metricKeys.map(metricKey => ({
-        metricKey,
-        leaves: [buildValueLeaf()],
-      })),
-      leafTierVisible: false,
-      program,
-      metricLabelMap,
-      preserveValueAxisSourceNodes:
-        insertIndex === 0 || insertIndex >= axisDepth,
-      promoteExistingNodes: true,
-    });
-  }
+  const leafTierVisible = measureHierarchy.leafTierVisibility === 'visible';
+  const insertIndex = getValuesInsertIndex(program);
+  const valueAxis = getValueAxis(program);
+  const axisDepth = getAxisDimensions(program, valueAxis).length;
+  const hasSingleMetric = measureHierarchy.groups.length === 1;
   return applyMeasureAxis({
     tree,
     groups: measureHierarchy.groups,
-    leafTierVisible: measureHierarchy.leafTierVisibility === 'visible',
+    leafTierVisible,
     program,
     metricLabelMap,
-    preserveValueAxisSourceNodes: true,
-    promoteExistingNodes: false,
+    preserveValueAxisSourceNodes:
+      leafTierVisible ||
+      (hasSingleMetric && (insertIndex === 0 || insertIndex >= axisDepth)),
+    promoteExistingNodes: !leafTierVisible,
   });
 };
 

@@ -75,15 +75,13 @@ export const buildMetricOrderComparator = ({
     program.metricKeys.map((label, idx) => [label, idx]),
   );
   const measureLeafOrderMap = new Map<string, Map<string, number>>();
-  if (measureHierarchy.kind === 'measureStackV1') {
-    measureHierarchy.groups.forEach(group => {
-      const order = new Map<string, number>();
-      group.leaves.forEach((leaf, index) => {
-        order.set(leaf.id, index);
-      });
-      measureLeafOrderMap.set(group.metricKey, order);
+  measureHierarchy.groups.forEach(group => {
+    const order = new Map<string, number>();
+    group.leaves.forEach((leaf, index) => {
+      order.set(leaf.id, index);
     });
-  }
+    measureLeafOrderMap.set(group.metricKey, order);
+  });
 
   return (a: PivotTreeNode, b: PivotTreeNode) => {
     const aMetric = getMetricLabelFromPath(a.path, metricLabelSet);

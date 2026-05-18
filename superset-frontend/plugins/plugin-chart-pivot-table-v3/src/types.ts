@@ -145,16 +145,14 @@ export type MeasureLeafSpec =
 
 export type MeasureLeavesByMetricKey = Record<string, MeasureLeafSpec[]>;
 
-export type MeasureHierarchy =
-  | { kind: 'flatMetrics'; metricKeys: string[] }
-  | {
-      kind: 'measureStackV1';
-      groups: Array<{
-        metricKey: string;
-        leaves: MeasureLeafSpec[];
-      }>;
-      leafTierVisibility: 'hidden' | 'visible';
-    };
+export type MeasureHierarchy = {
+  kind: 'measureStackV1';
+  groups: Array<{
+    metricKey: string;
+    leaves: MeasureLeafSpec[];
+  }>;
+  leafTierVisibility: 'hidden' | 'visible';
+};
 
 export type PivotMetricDatabar = {
   type?: PivotDatabarType;

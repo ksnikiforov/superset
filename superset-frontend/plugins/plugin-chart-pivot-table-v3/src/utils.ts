@@ -1111,9 +1111,6 @@ export const normalizeMetricDatabarMapWithKeys = (
   };
   const merged = Object.entries(normalized).reduce<PivotMetricDatabarMap>(
     (acc, [metricKey, config]) => {
-      if (!metricKeys.has(metricKey)) {
-        return acc;
-      }
       acc[metricKey] = {
         ...(acc[metricKey] || {}),
         ...config,
@@ -1212,7 +1209,7 @@ export const collectMeasureLeafMetricsForQuery = (
   metrics: QueryFormMetric[] = [],
   availableMetrics: QueryFormMetric[] = metrics,
 ): QueryFormMetric[] => {
-  if (!measureHierarchy || measureHierarchy.kind !== 'measureStackV1') {
+  if (!measureHierarchy) {
     return [];
   }
   const existingMetricKeys = new Set<string>();

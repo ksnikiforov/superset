@@ -282,3 +282,24 @@ export const buildMockIntersectionFetchResult = (
   }
   return stripMockFactBatches(result);
 };
+
+export const buildMockExpansionFetchResult = (
+  params: FetchPivotExpansionRequest,
+  result: MockFetchResult<FetchPivotExpansionResult> = {},
+): FetchPivotExpansionResult => {
+  switch (params.kind) {
+    case 'branch':
+      return buildMockBranchFetchResult(params, result);
+    case 'batch':
+      return buildMockBatchFetchResult(params, result);
+    case 'intersection':
+      return buildMockIntersectionFetchResult(params, result);
+    default:
+      return stripMockFactBatches(result);
+  }
+};
+
+export const resolveMockExpansionFetchResult =
+  (result: MockFetchResult<FetchPivotExpansionResult> = {}) =>
+  (params: FetchPivotExpansionRequest) =>
+    Promise.resolve(buildMockExpansionFetchResult(params, result));

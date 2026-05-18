@@ -29,7 +29,10 @@ import {
 } from '../../../src/pivot/measureLeaves';
 import { applyMeasureLeafValuesToTree } from '../../../src/pivot/runtime/materializePivotTree';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
-import { applyMeasureHierarchyAxis } from '../fixtures/metricAxis';
+import {
+  applyMeasureHierarchyAxis,
+  buildValueMeasureHierarchy,
+} from '../fixtures/metricAxis';
 
 describe('PivotTableChart sorting', () => {
   const withMetricsOnColumns = (
@@ -40,7 +43,7 @@ describe('PivotTableChart sorting', () => {
   ) =>
     applyMeasureHierarchyAxis(
       tree,
-      { kind: 'flatMetrics', metricKeys: metrics },
+      buildValueMeasureHierarchy(metrics),
       MetricsLayoutEnum.COLUMNS,
       groupbyRows,
       groupbyColumns,
@@ -505,9 +508,9 @@ describe('PivotTableChart sorting', () => {
     const bLeftBeforeSort = getWaterfallBarLeftForRow(container, 'B');
     expect(bLeftBeforeSort).toBeGreaterThan(0);
 
-    const metricHeaderCell = getHeaderCell('metric1');
-    expect(metricHeaderCell).not.toBeNull();
-    fireEvent.click(metricHeaderCell as HTMLTableCellElement);
+    const columnLeafHeaderCell = getHeaderCell('2024');
+    expect(columnLeafHeaderCell).not.toBeNull();
+    fireEvent.click(columnLeafHeaderCell as HTMLTableCellElement);
 
     expect(getBodyRowLabels(container)).toEqual(['B', 'A']);
     const bLeftAfterSort = getWaterfallBarLeftForRow(container, 'B');

@@ -528,9 +528,6 @@ export const usePivotFormatting = ({
     [formData.colFormatting, pivotProgram.columnDimensions],
   );
   const derivedFormatOverrides = useMemo(() => {
-    if (layout.measureHierarchy.kind !== 'measureStackV1') {
-      return { columnOverrides: {}, currencyOverrides: {} };
-    }
     const columnOverrides: Record<string, string> = {};
     const currencyOverrides: Record<string, Currency> = {};
     layout.measureHierarchy.groups.forEach(group => {

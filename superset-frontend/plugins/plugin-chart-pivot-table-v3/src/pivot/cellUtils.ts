@@ -64,7 +64,7 @@ export const deriveMetricKey = ({
     findMetricToken(primaryPath) ?? findMetricToken(secondaryPath);
   const decodedCandidate = decodeMetricKey(metricCandidate);
   if (decodedCandidate && metricLabels.includes(decodedCandidate)) {
-    if (measureHierarchy?.kind === 'measureStackV1') {
+    if (measureHierarchy) {
       const leafId =
         findMeasureLeafIdInPath(primaryPath) ??
         findMeasureLeafIdInPath(secondaryPath);
@@ -80,10 +80,7 @@ export const deriveMetricKey = ({
     }
     return decodedCandidate;
   }
-  if (
-    measureHierarchy?.kind === 'measureStackV1' &&
-    metricLabels.length === 1
-  ) {
+  if (measureHierarchy && metricLabels.length === 1) {
     const metricKey = metricLabels[0];
     const group = measureHierarchy.groups.find(
       entry => entry.metricKey === metricKey,

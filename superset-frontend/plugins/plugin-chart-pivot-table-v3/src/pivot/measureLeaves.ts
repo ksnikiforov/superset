@@ -156,7 +156,7 @@ export const resolveMeasureSortMetricKey = ({
   metricKey: string;
   measureHierarchy?: MeasureHierarchy;
 }): string => {
-  if (measureHierarchy?.kind !== 'measureStackV1') {
+  if (!measureHierarchy) {
     return metricKey;
   }
   const group = measureHierarchy.groups.find(
@@ -189,17 +189,9 @@ export const getRequiredOffsetsForLeaves = (
           : [],
   );
 
-export const collectRequiredTimeOffsets = (
-  measureHierarchy:
-    | { kind: 'flatMetrics'; metricKeys: string[] }
-    | {
-        kind: 'measureStackV1';
-        groups: Array<{ metricKey: string; leaves: MeasureLeafSpec[] }>;
-      },
-): string[] => {
-  if (measureHierarchy.kind !== 'measureStackV1') {
-    return [];
-  }
+export const collectRequiredTimeOffsets = (measureHierarchy: {
+  groups: Array<{ metricKey: string; leaves: MeasureLeafSpec[] }>;
+}): string[] => {
   const offsets = new Set<string>();
   measureHierarchy.groups.forEach(group => {
     getRequiredOffsetsForLeaves(group.leaves).forEach(offset => {

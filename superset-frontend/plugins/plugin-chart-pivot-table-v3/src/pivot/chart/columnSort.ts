@@ -53,10 +53,18 @@ export const resolvePivotColumnSortMetric = ({
     new Set(layout.layout.pivotProgram.metricKeys),
   );
   if (!metricKey) {
+    const { pivotProgram } = layout.layout;
+    if (
+      pivotProgram.valueAxis === 'col' &&
+      node.axis === 'col' &&
+      pivotProgram.metricKeys.length === 1
+    ) {
+      return resolveMeasureSortMetricKey({
+        metricKey: pivotProgram.metricKeys[0],
+        measureHierarchy: layout.measureHierarchy,
+      });
+    }
     return undefined;
-  }
-  if (layout.measureHierarchy.kind !== 'measureStackV1') {
-    return metricKey;
   }
   const fallbackMetricKey = resolveMeasureSortMetricKey({
     metricKey,
@@ -88,9 +96,6 @@ export const resolvePivotColumnSortDataKey = ({
     new Set(layout.layout.pivotProgram.metricKeys),
   );
   if (!baseMetricKey) {
-    return node.key;
-  }
-  if (layout.measureHierarchy.kind !== 'measureStackV1') {
     return node.key;
   }
   const sortLeafId = layout.measureHierarchy.groups

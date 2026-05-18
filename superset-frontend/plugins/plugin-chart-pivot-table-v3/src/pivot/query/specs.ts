@@ -463,17 +463,6 @@ const filterMeasureHierarchyByScope = ({
   metricKeys: string[];
   leafIds: string[];
 }): MeasureHierarchy => {
-  if (measureHierarchy.kind === 'flatMetrics') {
-    return metricKeys.length > 0
-      ? {
-          kind: 'flatMetrics',
-          metricKeys: measureHierarchy.metricKeys.filter(metricKey =>
-            metricKeys.includes(metricKey),
-          ),
-        }
-      : measureHierarchy;
-  }
-
   const metricKeySet = metricKeys.length > 0 ? new Set(metricKeys) : undefined;
   const leafIdSet = leafIds.length > 0 ? new Set(leafIds) : undefined;
   return {

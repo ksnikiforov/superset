@@ -26,6 +26,7 @@ import { METRICS_PLACEHOLDER } from '../../../src/pivot/core/tokens';
 import { compilePivotProgram } from '../../../src/pivot/runtime/compilePivotProgram';
 import { type PivotProgram } from '../../../src/pivot/runtime/types';
 import { applyMeasureHierarchyAxis as applyMeasureHierarchyAxisRuntime } from '../../../src/pivot/runtime/materializePivotTree';
+import { buildValueLeaf } from '../../../src/pivot/measureLeaves';
 
 export {
   injectRowSubtotalLeaves,
@@ -65,6 +66,17 @@ const compileMetricAxisProgram = ({
   });
 };
 
+export const buildValueMeasureHierarchy = (
+  metricKeys: string[],
+): MeasureHierarchy => ({
+  kind: 'measureStackV1',
+  groups: metricKeys.map(metricKey => ({
+    metricKey,
+    leaves: [buildValueLeaf()],
+  })),
+  leafTierVisibility: 'hidden',
+});
+
 export const applyMetricAxis = (
   tree: PivotTreeData,
   metrics: QueryFormMetric[],
@@ -83,7 +95,7 @@ export const applyMetricAxis = (
   });
   return applyMeasureHierarchyAxisRuntime(
     tree,
-    { kind: 'flatMetrics', metricKeys: program.metricKeys },
+    buildValueMeasureHierarchy(program.metricKeys),
     program,
     metricLabelMap,
   );
@@ -121,10 +133,7 @@ export function applyMeasureHierarchyAxis(
       metricLabelMapOrRowGroupby as Record<string, string> | undefined,
     );
   }
-  const metrics =
-    measureHierarchy.kind === 'flatMetrics'
-      ? measureHierarchy.metricKeys
-      : measureHierarchy.groups.map(group => group.metricKey);
+  const metrics = measureHierarchy.groups.map(group => group.metricKey);
   return applyMeasureHierarchyAxisRuntime(
     tree,
     measureHierarchy,

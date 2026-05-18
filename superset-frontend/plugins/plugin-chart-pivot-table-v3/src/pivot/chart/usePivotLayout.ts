@@ -141,7 +141,6 @@ export const usePivotLayout = ({
     ],
   );
   const isLeafTierVisible =
-    layout.measureHierarchy.kind === 'measureStackV1' &&
     layout.measureHierarchy.leafTierVisibility === 'visible';
 
   const {
@@ -156,8 +155,7 @@ export const usePivotLayout = ({
   const isMultiMetric = metricLabels.length > 1;
   const hasMultipleMeasures =
     isMultiMetric ||
-    (layout.measureHierarchy.kind === 'measureStackV1' &&
-      layout.measureHierarchy.groups.some(group => group.leaves.length > 1));
+    layout.measureHierarchy.groups.some(group => group.leaves.length > 1);
 
   const normalizedRowSubtotalLevels = layout.rowSubtotalLevels;
   const normalizedColSubtotalLevels = useMemo(() => {

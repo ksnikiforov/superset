@@ -30,6 +30,7 @@ import {
   MetricsLayoutEnum,
   type MeasureHierarchy,
 } from '../../../../src/types';
+import { buildValueLeaf } from '../../../../src/pivot/measureLeaves';
 import {
   encodeMetricKey,
   METRICS_PLACEHOLDER,
@@ -54,8 +55,12 @@ const buildSpec = ({
   metricsLayoutResolved = MetricsLayoutEnum.ROWS,
   metricInsertIndex = 1,
   materializedMeasureHierarchy = {
-    kind: 'flatMetrics',
-    metricKeys: materializedMetrics,
+    kind: 'measureStackV1',
+    groups: materializedMetrics.map(metricKey => ({
+      metricKey,
+      leaves: [buildValueLeaf()],
+    })),
+    leafTierVisibility: 'hidden',
   },
 }: {
   queryName: string;

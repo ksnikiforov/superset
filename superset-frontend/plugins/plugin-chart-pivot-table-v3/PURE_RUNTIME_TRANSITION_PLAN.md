@@ -241,8 +241,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13819` insertions, `16413` deletions, net `-2594`.
-- Current production TypeScript/TSX total: about `30916` lines.
+- Production `src`: `13804` insertions, `16449` deletions, net `-2645`.
+- Current production TypeScript/TSX total: about `30865` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 The refactor has substantially reduced the original chart and expansion
@@ -618,6 +618,9 @@ Success criteria:
   coverage and explicit path-set coverage diffing.
 - Runtime layout fetches now route through manifest diff instead of the old
   root-depth/leading-dimension heuristic.
+- Measure hierarchy is now canonical. The old `flatMetrics` hierarchy shape has
+  been removed from production runtime types and tests; single-value metrics are
+  represented as hidden `measureStackV1` groups with one Value leaf.
 - Hidden-dimension layout edits no longer force a fetch when the visible
   coverage manifest is unchanged.
 - Values index shifts caused only by hidden dimensions no longer count as

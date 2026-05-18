@@ -141,8 +141,19 @@ describe('pivot/chart/layoutRuntime', () => {
     const comparator = buildMetricOrderComparator({
       program: policyProgram({ metricKeys: ['sales', 'profit'] }),
       measureHierarchy: {
-        kind: 'flatMetrics',
-        metricKeys: ['sales', 'profit'],
+        kind: 'measureStackV1',
+        leafTierVisibility: 'hidden',
+        groups: ['sales', 'profit'].map(metricKey => ({
+          metricKey,
+          leaves: [
+            {
+              kind: 'builtIn',
+              id: 'current',
+              operator: 'value',
+              label: '',
+            },
+          ],
+        })),
       },
     });
 

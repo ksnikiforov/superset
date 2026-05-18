@@ -161,7 +161,7 @@ export const resolveColumnHeaderLabel = ({
     return getMetricDisplayLabelForKey(decoded);
   }
   const leafId = decodeMeasureLeafId(rawValue);
-  if (leafId && measureHierarchy.kind === 'measureStackV1') {
+  if (leafId) {
     return (
       measureHierarchy.groups
         .flatMap(group => group.leaves)

@@ -378,7 +378,6 @@ export const usePivotRenderModel = ({
   );
 
   const isLeafTierVisible =
-    layout.measureHierarchy.kind === 'measureStackV1' &&
     layout.measureHierarchy.leafTierVisibility === 'visible';
   const expandedRowsForRender = useMemo(
     () =>

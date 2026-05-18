@@ -41,8 +41,8 @@ import {
   buildValueLeaf,
 } from '../../../src/pivot/measureLeaves';
 import { applyMeasureLeafValuesToTree } from '../../../src/pivot/runtime/materializePivotTree';
-import { fetchPivotBranch } from '../../../src/pivot/query/fetchPivotBranch';
-import { resolveMockBranchFetchResult } from '../fixtures/factBatches';
+import { fetchPivotExpansion } from '../../../src/pivot/query/fetchPivotBranch';
+import { resolveMockExpansionFetchResult } from '../fixtures/factBatches';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import {
   applyMeasureHierarchyAxis,
@@ -55,13 +55,11 @@ jest.mock('../../../src/pivot/query/fetchPivotBranch', () => {
   );
   return {
     ...actual,
-    fetchPivotBranch: jest
-      .fn()
-      .mockResolvedValue({ data: undefined, factBatches: [] }),
+    fetchPivotExpansion: jest.fn().mockResolvedValue({}),
   };
 });
 
-const fetchPivotBranchMock = fetchPivotBranch as jest.Mock;
+const fetchPivotExpansionMock = fetchPivotExpansion as jest.Mock;
 
 const waitForPivotReady = async () => {
   await waitFor(() =>
@@ -259,8 +257,10 @@ const injectColumnSubtotalLeaves = (
 
 describe('PivotTableChart metric tier suppression', () => {
   beforeEach(() => {
-    fetchPivotBranchMock.mockClear();
-    fetchPivotBranchMock.mockImplementation(resolveMockBranchFetchResult());
+    fetchPivotExpansionMock.mockClear();
+    fetchPivotExpansionMock.mockImplementation(
+      resolveMockExpansionFetchResult(),
+    );
   });
 
   it('hides the metric column header when there is a single metric at the last column level', async () => {
@@ -1564,8 +1564,8 @@ describe('PivotTableChart metric tier suppression', () => {
     );
     const mergedTree = mergeTrees(baseTreeWithMetrics, branchTreeWithMetrics);
 
-    fetchPivotBranchMock.mockImplementationOnce(
-      resolveMockBranchFetchResult({ data: mergedTree }),
+    fetchPivotExpansionMock.mockImplementationOnce(
+      resolveMockExpansionFetchResult({ data: mergedTree }),
     );
 
     const props: Partial<PivotTableProps> = {
@@ -1615,7 +1615,7 @@ describe('PivotTableChart metric tier suppression', () => {
     fireEvent.click(within(yearHeader).getByLabelText('plus-square'));
 
     await waitFor(() => {
-      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
+      expect(fetchPivotExpansionMock).toHaveBeenCalledTimes(1);
     });
 
     const headerRows =
@@ -1690,8 +1690,8 @@ describe('PivotTableChart metric tier suppression', () => {
     );
     const mergedTree = mergeTrees(baseTreeWithMetrics, branchTreeWithMetrics);
 
-    fetchPivotBranchMock.mockImplementationOnce(
-      resolveMockBranchFetchResult({ data: mergedTree }),
+    fetchPivotExpansionMock.mockImplementationOnce(
+      resolveMockExpansionFetchResult({ data: mergedTree }),
     );
 
     const props: Partial<PivotTableProps> = {
@@ -1741,7 +1741,7 @@ describe('PivotTableChart metric tier suppression', () => {
     fireEvent.click(within(yearHeader).getByLabelText('plus-square'));
 
     await waitFor(() => {
-      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
+      expect(fetchPivotExpansionMock).toHaveBeenCalledTimes(1);
     });
 
     const headerRows =
@@ -1818,8 +1818,8 @@ describe('PivotTableChart metric tier suppression', () => {
     );
     const mergedTree = mergeTrees(baseTreeWithMetrics, branchTreeWithMetrics);
 
-    fetchPivotBranchMock.mockImplementation(
-      resolveMockBranchFetchResult({ data: mergedTree }),
+    fetchPivotExpansionMock.mockImplementation(
+      resolveMockExpansionFetchResult({ data: mergedTree }),
     );
 
     const props: Partial<PivotTableProps> = {
@@ -1870,14 +1870,14 @@ describe('PivotTableChart metric tier suppression', () => {
     fireEvent.click(within(yearHeader).getByLabelText('plus-square'));
 
     await waitFor(() => {
-      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
+      expect(fetchPivotExpansionMock).toHaveBeenCalledTimes(1);
     });
 
     fireEvent.click(within(yearHeader).getByLabelText('minus-square'));
     fireEvent.click(within(yearHeader).getByLabelText('plus-square'));
 
     await waitFor(() => {
-      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
+      expect(fetchPivotExpansionMock).toHaveBeenCalledTimes(1);
     });
 
     const headerRows =
@@ -2039,6 +2039,8 @@ describe('PivotTableChart multi-metric visibility', () => {
             groupbyColumns: [],
             metricsLayout: MetricsLayoutEnum.ROWS,
             metrics,
+            startCollapsed: true,
+            initialDepth: 1,
           })}
           metrics={metrics}
           groupbyRows={['group', 'product']}
@@ -2140,6 +2142,8 @@ describe('PivotTableChart multi-metric visibility', () => {
             groupbyColumns: ['group', 'product', '__MEASURES__'],
             metricsLayout: MetricsLayoutEnum.COLUMNS,
             metrics,
+            startCollapsed: true,
+            initialDepth: 1,
           })}
           metrics={metrics}
           groupbyRows={[]}
