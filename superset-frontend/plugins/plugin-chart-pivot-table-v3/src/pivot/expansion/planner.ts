@@ -105,43 +105,19 @@ export const planExpansionForAxis = ({
     pathKey: key,
     ...coverage,
   });
-  const candidateRequests = new Map<string, PivotExpansionCoverageRequest>();
-  const addRequest = (key: string) => {
-    const request = buildRequest(key);
-    candidateRequests.set(requestKey(request), request);
-  };
-  const addFetchRequest = (key: string) => {
-    const request = buildRequest(key);
-    fetchRequests.set(requestKey(request), request);
-  };
-  candidates.forEach(({ key, node }) => {
-    if (node) {
-      addRequest(key);
-      return;
-    }
-    addRequest(key);
-  });
+  const candidateRequests = candidates.map(({ key }) => buildRequest(key));
   const missingRequestKeys = new Set(
-    getMissingExpansionCoverage(Array.from(candidateRequests.values())).map(
-      requestKey,
-    ),
+    getMissingExpansionCoverage(candidateRequests).map(requestKey),
   );
 
   candidates.forEach(({ key, node }) => {
-    if (node) {
-      if (!missingRequestKeys.has(requestKey(buildRequest(key)))) {
-        return;
-      }
-      addFetchRequest(key);
-      pendingKeys.add(key);
+    const request = buildRequest(key);
+    const keyForRequest = requestKey(request);
+    if (!missingRequestKeys.has(keyForRequest)) {
       return;
     }
-
-    if (!missingRequestKeys.has(requestKey(buildRequest(key)))) {
-      return;
-    }
-    hasMissingNodes = true;
-    addFetchRequest(key);
+    hasMissingNodes ||= !node;
+    fetchRequests.set(keyForRequest, request);
     pendingKeys.add(key);
   });
 

@@ -31,7 +31,6 @@ import {
 import {
   buildResolvedMetricLabelMap,
   normalizeSubtotalLevels,
-  resolveExpandLevel,
 } from '../../utils';
 import { getMetricKeys } from '../metrics';
 import {
@@ -39,7 +38,11 @@ import {
   collectRequiredTimeOffsets,
 } from '../measureLeaves';
 import { compilePivotProgram } from '../runtime/compilePivotProgram';
-import type { PivotAxisCoverageNeed } from '../runtime/coverage';
+import {
+  buildInitialAxisCoverageNeeds,
+  resolveInitialVisibleAxisDepth,
+  type PivotAxisCoverageNeed,
+} from '../runtime/coverage';
 import type { PivotProgram } from '../runtime/types';
 
 export type PivotLayoutSpec = Pick<
@@ -94,21 +97,6 @@ const normalizeTotalPosition = (value: unknown): TotalPosition => {
   }
   return 'start';
 };
-
-const buildInitialAxisCoverageNeeds = (
-  rowDepth: number,
-  columnDepth: number,
-): PivotAxisCoverageNeed[] =>
-  (
-    [
-      ['row', rowDepth],
-      ['col', columnDepth],
-    ] as const
-  ).flatMap(([axis, depth]) =>
-    depth > 0
-      ? [{ axis, depth, scope: { kind: 'scopedFull', ancestorPaths: [[]] } }]
-      : [],
-  );
 
 export const buildLayoutContext = (
   layoutSpec: PivotLayoutSpec,
@@ -182,18 +170,18 @@ export const buildLayoutContext = (
   );
   const startCollapsed = layoutSpec.startCollapsed ?? true;
   const initialDepth = layoutSpec.initialDepth ?? 1;
-  const rowExpandDepth = resolveExpandLevel(
-    layoutSpec.expandRowsLevel ?? undefined,
-    rowDimensions.length,
+  const rowExpandDepth = resolveInitialVisibleAxisDepth({
+    configuredDepth: layoutSpec.expandRowsLevel ?? undefined,
+    dimensionCount: rowDimensions.length,
     startCollapsed,
     initialDepth,
-  );
-  const colExpandDepth = resolveExpandLevel(
-    layoutSpec.expandColumnsLevel ?? undefined,
-    columnDimensions.length,
+  });
+  const colExpandDepth = resolveInitialVisibleAxisDepth({
+    configuredDepth: layoutSpec.expandColumnsLevel ?? undefined,
+    dimensionCount: columnDimensions.length,
     startCollapsed,
     initialDepth,
-  );
+  });
 
   return {
     metrics,
@@ -211,9 +199,9 @@ export const buildLayoutContext = (
     colTotalPosition: normalizeTotalPosition(layoutSpec.colTotalPosition),
     rowSubtotalPosition: normalizeTotalPosition(layoutSpec.rowSubtotalPosition),
     colSubtotalPosition: normalizeTotalPosition(layoutSpec.colSubtotalPosition),
-    axisCoverageNeeds: buildInitialAxisCoverageNeeds(
-      rowExpandDepth,
-      colExpandDepth,
-    ),
+    axisCoverageNeeds: buildInitialAxisCoverageNeeds({
+      rowDepth: rowExpandDepth,
+      columnDepth: colExpandDepth,
+    }),
   };
 };

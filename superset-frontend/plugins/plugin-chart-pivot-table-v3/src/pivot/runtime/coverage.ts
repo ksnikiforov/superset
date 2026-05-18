@@ -76,6 +76,45 @@ const clampDepth = (depth: number, maxDepth: number) => {
   return Math.min(Math.max(Math.floor(depth), 0), maxDepth);
 };
 
+export const resolveInitialVisibleAxisDepth = ({
+  configuredDepth,
+  dimensionCount,
+  startCollapsed,
+  initialDepth,
+}: {
+  configuredDepth: number | undefined;
+  dimensionCount: number;
+  startCollapsed: boolean;
+  initialDepth: number;
+}) => {
+  const parsedDepth = Number(configuredDepth);
+  if (configuredDepth !== undefined && Number.isFinite(parsedDepth)) {
+    return clampDepth(parsedDepth, dimensionCount);
+  }
+  if (!startCollapsed) {
+    return dimensionCount;
+  }
+  return clampDepth(Math.max(initialDepth || 1, 1) - 1, dimensionCount);
+};
+
+export const buildInitialAxisCoverageNeeds = ({
+  rowDepth,
+  columnDepth,
+}: {
+  rowDepth: number;
+  columnDepth: number;
+}): PivotAxisCoverageNeed[] =>
+  (
+    [
+      ['row', rowDepth],
+      ['col', columnDepth],
+    ] as const
+  ).flatMap(([axis, depth]) =>
+    depth > 0
+      ? [{ axis, depth, scope: { kind: 'scopedFull', ancestorPaths: [[]] } }]
+      : [],
+  );
+
 export const normalizeFactValueKeys = (valueKeys: string[] = []) =>
   Array.from(new Set(valueKeys)).sort();
 

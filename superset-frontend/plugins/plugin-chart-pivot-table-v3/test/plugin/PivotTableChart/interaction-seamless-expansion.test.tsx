@@ -1577,7 +1577,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
             `${spec.meta.coverage.rowDepth}|${spec.meta.coverage.columnDepth}`,
         ),
       ),
-    ).toEqual(new Set(['0|0', '1|1', '1|0', '0|1']));
+    ).toEqual(new Set(['1|1', '1|0', '0|1']));
     expect(
       fetchCall?.specs.some((spec: { columns?: string[] }) =>
         spec.columns?.includes('col2'),
@@ -3337,7 +3337,6 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     expect(plannedSummary).not.toContain('branch:row:A:2:1');
     expect(plannedSummary).toEqual(
       expect.arrayContaining([
-        'root:none::0:0',
         'root:none::1:1',
         'root:none::1:0',
         'root:none::0:1',

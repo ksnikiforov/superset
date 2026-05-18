@@ -55,6 +55,7 @@ import { buildInteractionChips } from './pivot/layout/interactionDrag';
 import { getStableColumnKey } from './utils';
 import { getMetricKeys } from './pivot/metrics';
 import {
+  isSameRuntimeLayout,
   buildSeamlessRuntimeUpstreamSignature,
   type SeamlessRuntimeSyncSnapshot,
 } from './pivot/runtime/seamlessRuntimeUpdate';
@@ -159,7 +160,7 @@ function PivotTableChart(props: PivotTableProps) {
       ),
     [appliedFormData.dimensions],
   );
-  const metricsForUi = useMemo(() => sourceMetrics, [sourceMetrics]);
+  const metricsForUi = sourceMetrics;
   const metricKeys = useMemo(() => getMetricKeys(metricsForUi), [metricsForUi]);
   const hasMetrics = metricKeys.length > 0;
   const runtimeLayout = useMemo(() => {
@@ -168,6 +169,25 @@ function PivotTableChart(props: PivotTableProps) {
       formData.pivotRuntimeLayout;
     return normalizeRuntimeLayout(persisted, dimensionKeys, metricKeys);
   }, [dimensionKeys, formData.pivotRuntimeLayout, metricKeys, ownState]);
+  const appliedRuntimeLayoutFromQuery = useMemo(
+    () =>
+      normalizeRuntimeLayout(
+        appliedFormData.pivotRuntimeLayout ?? runtimeLayout,
+        appliedDimensionKeys,
+        metricKeys,
+      ),
+    [
+      appliedDimensionKeys,
+      appliedFormData.pivotRuntimeLayout,
+      metricKeys,
+      runtimeLayout,
+    ],
+  );
+  const appliedRuntimeLayout =
+    ownState?.pivotRuntimeLayout ||
+    isSameRuntimeLayout(appliedRuntimeLayoutFromQuery, runtimeLayout)
+      ? runtimeLayout
+      : appliedRuntimeLayoutFromQuery;
   const selectedFiltersFromProps = selectedFilters ?? EMPTY_SELECTED_FILTERS;
   const suppressStalePersistedFilterRestoreRef = useRef(false);
   const selectedFiltersFromFormData =
@@ -209,6 +229,7 @@ function PivotTableChart(props: PivotTableProps) {
     mergeOwnState,
     setControlValue,
     setDataMask,
+    committedRuntimeLayout: appliedRuntimeLayout,
   });
 
   const { appliedLayoutFormData, appliedPivotProgram } =

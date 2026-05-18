@@ -232,6 +232,16 @@ Current semantic-layout contract:
   when row totals, column totals, and subtotals are hidden. Bootstrap root
   coverage is now requested only when the layer is visible/semantically needed
   or there are no row/column dimensions.
+- Initial configured pre-expansion now compiles inside the coverage manifest
+  layer. The old generic expand-level helpers are gone; configured visible
+  depth becomes scoped-full axis coverage needs, and expansion/display/query
+  code consume the same manifest shape.
+- User draft layout and loaded/applied layout now have a clearer chart boundary:
+  when `queryFormData` carries a different applied runtime layout, it seeds the
+  committed loaded layout, while `formData`/`ownState` continue to own the UI
+  draft layout. This prevents stale dashboard rerenders from overwriting a
+  locally committed seamless layout and keeps loaded rendering pinned to the
+  query-backed snapshot.
 
 Expected deletion targets:
 
@@ -259,7 +269,7 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13093` insertions, `17110` deletions, net `-4017`.
+- Production `src`: `13108` insertions, `17125` deletions, net `-4017`.
 - Current production TypeScript/TSX total: about `29493` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
@@ -273,19 +283,19 @@ formatting, databars, and interaction logic.
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
 | Full production `src` | `33510` | `29493` | `-4017` | `< 28000` |
-| Strict core pipeline | `11337` | `11928` | `+591` | `8000` |
-| Non-visual chart runtime hooks | `4683` | `5080` | `+397` | `3000-4000` |
-| Broad core pipeline | `16020` | `17008` | `+988` | `11000-13000` |
+| Strict core pipeline | `11337` | `11903` | `+566` | `8000` |
+| Non-visual chart runtime hooks | `4683` | `5084` | `+401` | `3000-4000` |
+| Broad core pipeline | `16020` | `16987` | `+967` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `3894` |
-| `pivot/expansion/*` | `2743` |
+| `pivot/runtime/*` | `3933` |
+| `pivot/expansion/*` | `2719` |
 | `pivot/query/*` | `1554` |
-| `pivot/layout/*` | `744` |
-| core/shared/domain helpers | `1780` |
+| `pivot/layout/*` | `732` |
+| core/shared/domain helpers | `1752` |
 | formatting/data/render-model/update support | `1213` |
 
 Interpretation: plugin-wide source has shrunk, but core pipeline source has

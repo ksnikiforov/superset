@@ -1167,31 +1167,3 @@ export const normalizeSubtotalLevels = (
   }
   return Array.from(next).sort((a, b) => a - b);
 };
-
-export const normalizeExpandLevel = (rawLevel: number | undefined) => {
-  if (rawLevel === undefined || rawLevel === null) {
-    return undefined;
-  }
-  const parsed = Number(rawLevel);
-  if (!Number.isFinite(parsed)) {
-    return undefined;
-  }
-  return Math.floor(parsed);
-};
-
-export const resolveExpandLevel = (
-  rawLevel: number | undefined,
-  groupbyLength: number,
-  startCollapsed: boolean,
-  initialDepth: number,
-) => {
-  const parsed = normalizeExpandLevel(rawLevel);
-  if (parsed !== undefined) {
-    return Math.min(Math.max(parsed, 0), groupbyLength);
-  }
-  if (!startCollapsed) {
-    return groupbyLength;
-  }
-  const resolvedDepth = Math.max(initialDepth || 1, 1) - 1;
-  return Math.min(Math.max(resolvedDepth, 0), groupbyLength);
-};

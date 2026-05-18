@@ -24,8 +24,10 @@ import { serializePath } from '../../../../src/pivot/core/path';
 import { compilePivotProgram } from '../../../../src/pivot/runtime/compilePivotProgram';
 import {
   createExpansionCoverageDiff,
+  buildInitialAxisCoverageNeeds,
   buildFactCoverage,
   diffCoverageManifest,
+  resolveInitialVisibleAxisDepth,
   type PivotCoverageNeed,
 } from '../../../../src/pivot/runtime/coverage';
 import { type PivotFactSelector } from '../../../../src/pivot/runtime/factStore';
@@ -378,6 +380,65 @@ describe('coverage manifest diff', () => {
         ],
       }),
     ).toEqual([]);
+  });
+});
+
+describe('initial coverage manifest', () => {
+  it('normalizes configured visible depths into scoped-full needs', () => {
+    expect(
+      resolveInitialVisibleAxisDepth({
+        configuredDepth: 2.7,
+        dimensionCount: 3,
+        startCollapsed: true,
+        initialDepth: 1,
+      }),
+    ).toBe(2);
+    expect(
+      resolveInitialVisibleAxisDepth({
+        configuredDepth: -5,
+        dimensionCount: 3,
+        startCollapsed: true,
+        initialDepth: 1,
+      }),
+    ).toBe(0);
+    expect(
+      resolveInitialVisibleAxisDepth({
+        configuredDepth: 10,
+        dimensionCount: 3,
+        startCollapsed: true,
+        initialDepth: 1,
+      }),
+    ).toBe(3);
+    expect(
+      resolveInitialVisibleAxisDepth({
+        configuredDepth: undefined,
+        dimensionCount: 4,
+        startCollapsed: false,
+        initialDepth: 1,
+      }),
+    ).toBe(4);
+    expect(
+      resolveInitialVisibleAxisDepth({
+        configuredDepth: undefined,
+        dimensionCount: 4,
+        startCollapsed: true,
+        initialDepth: 3,
+      }),
+    ).toBe(2);
+    expect(
+      buildInitialAxisCoverageNeeds({ rowDepth: 2, columnDepth: 1 }),
+    ).toEqual([
+      {
+        axis: 'row',
+        depth: 2,
+        scope: { kind: 'scopedFull', ancestorPaths: [[]] },
+      },
+      {
+        axis: 'col',
+        depth: 1,
+        scope: { kind: 'scopedFull', ancestorPaths: [[]] },
+      },
+    ]);
   });
 });
 
