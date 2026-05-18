@@ -255,8 +255,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13518` insertions, `16910` deletions, net `-3392`.
-- Current production TypeScript/TSX total: about `30118` lines.
+- Production `src`: `13549` insertions, `17027` deletions, net `-3478`.
+- Current production TypeScript/TSX total: about `30032` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -268,10 +268,10 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `30118` | `-3392` | `< 28000` |
-| Strict core pipeline | `11337` | `12564` | `+1227` | `8000` |
+| Full production `src` | `33510` | `30032` | `-3478` | `< 28000` |
+| Strict core pipeline | `11337` | `12478` | `+1141` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5076` | `+393` | `3000-4000` |
-| Broad core pipeline | `16020` | `17640` | `+1620` | `11000-13000` |
+| Broad core pipeline | `16020` | `17554` | `+1534` | `11000-13000` |
 
 Current strict core breakdown:
 
@@ -279,7 +279,7 @@ Current strict core breakdown:
 | --- | ---: |
 | `pivot/runtime/*` | `4034` |
 | `pivot/expansion/*` | `2930` |
-| `pivot/query/*` | `1770` |
+| `pivot/query/*` | `1684` |
 | `pivot/layout/*` | `744` |
 | core/shared/domain helpers | `1873` |
 | formatting/data/render-model/update support | `1213` |
@@ -339,6 +339,17 @@ Latest coverage cleanup: fact coverage no longer carries a semantic `reason`,
 and coverage diff now consumes fact selectors directly instead of fake empty
 fact batches. Coverage is only loaded aggregate shape plus exact selector scope;
 fact batches remain exact loaded facts only.
+
+Latest query-scope cleanup: query specs no longer build an intermediate
+`CoverageQueryMeta` and then translate it to fact-store scope. Root, branch,
+batch, and intersection planners now construct the exact `factSelector.scope`
+directly at the query boundary.
+
+Latest query-shape cleanup: the separate `queryShape.ts` intent helper is gone.
+Support metric shaping for values, totals, formatting, databars, sorting, and
+measure leaves now lives inside the query-spec planner that consumes it, so the
+query pipeline has one less public core module and one less helper-specific test
+surface.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.

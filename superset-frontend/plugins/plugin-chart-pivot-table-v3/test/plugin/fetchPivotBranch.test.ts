@@ -728,7 +728,7 @@ describe('buildExpansionQuerySpecs', () => {
     queries.forEach(query => {
       expect(query.metrics).toEqual(['measure1', 'sortMetric']);
     });
-    expect(factStore.getCoverageBatches()).toHaveLength(queries.length);
+    expect(factStore.getCoverageSelectors()).toHaveLength(queries.length);
     await fetchBranch(fetchParams);
     const tree = materializeLoadedPivotTreeFromFactStore({
       store: factStore,
@@ -736,7 +736,7 @@ describe('buildExpansionQuerySpecs', () => {
       formData,
     });
 
-    expect(factStore.getCoverageBatches()).toHaveLength(queries.length);
+    expect(factStore.getCoverageSelectors()).toHaveLength(queries.length);
     expect(postMock).toHaveBeenCalledTimes(1);
     expect(
       tree.cols[serializePath([encodeMetricKey('sortMetric'), 'REV-A'])],

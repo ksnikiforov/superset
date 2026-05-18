@@ -28,7 +28,12 @@ import {
 } from '@superset-ui/core';
 import {
   type MeasureHierarchy,
+  type MetricFormattingScope,
   type PivotAxis,
+  type PivotDimensionFormattingMap,
+  type PivotDimensionSortingMap,
+  type PivotMetricDatabarMap,
+  type PivotMetricFormattingMap,
   type PivotPath,
   type PivotPathValue,
   type PivotTableQueryFormData,
@@ -36,7 +41,11 @@ import {
 import {
   collectDimensionFormattingMetricsForQuery,
   collectDimensionSortingMetricsForQuery,
+  collectMeasureLeafMetricsForQuery,
+  collectMetricDatabarMetricsForQuery,
+  collectMetricFormattingMetricsForQuery,
   hasTotalSorting,
+  mergeMetrics,
 } from '../../utils';
 import { serializePath, parsePath } from '../core/path';
 import {
@@ -48,7 +57,6 @@ import { collectRequiredTimeOffsets } from '../measureLeaves';
 import { type BatchGroup } from './fetchPlanOptimizer';
 import { formatQueryName } from './queryName';
 import { buildPathFilters, coerceValueForColumn } from './pathFilters';
-import { buildQueryShape, type QueryIntent } from './queryShape';
 import {
   buildBranchFactCoverages,
   buildFactCoverage,
@@ -85,6 +93,150 @@ export type PlannedQuerySpec = QuerySpec & {
   meta: QuerySpecMeta;
 };
 
+type QueryIntent = {
+  targetRowDepth: number;
+  targetColDepth: number;
+  needsValueCells: boolean;
+  needsTotals: boolean;
+  needsMetricFormatting: boolean;
+  needsDatabars: boolean;
+  needsRowOrdering: boolean;
+  needsColOrdering: boolean;
+  needsRowDimensionFormatting: boolean;
+  needsColDimensionFormatting: boolean;
+};
+
+type QueryShape = {
+  rowGroupby: QueryFormColumn[];
+  colGroupby: QueryFormColumn[];
+  metrics: QueryFormMetric[];
+};
+
+const shouldIncludeMetricFormatting = (
+  scope: MetricFormattingScope | undefined,
+  intent: QueryIntent,
+): boolean =>
+  intent.needsMetricFormatting &&
+  (scope === 'values'
+    ? intent.needsValueCells
+    : intent.needsValueCells || intent.needsTotals);
+
+const shouldIncludeDatabars = (intent: QueryIntent): boolean =>
+  intent.needsDatabars && intent.needsValueCells;
+
+const buildQueryShape = ({
+  intent,
+  rowGroupby,
+  colGroupby,
+  metrics,
+  availableMetrics = metrics,
+  metricFormattingScope,
+  metricFormatting,
+  metricDatabars,
+  rowFormatting,
+  colFormatting,
+  rowSorting,
+  colSorting,
+  measureHierarchy,
+}: {
+  intent: QueryIntent;
+  rowGroupby: QueryFormColumn[];
+  colGroupby: QueryFormColumn[];
+  metrics: QueryFormMetric[];
+  availableMetrics?: QueryFormMetric[];
+  metricFormattingScope?: MetricFormattingScope;
+  metricFormatting?: PivotMetricFormattingMap;
+  metricDatabars?: PivotMetricDatabarMap;
+  rowFormatting?: PivotDimensionFormattingMap;
+  colFormatting?: PivotDimensionFormattingMap;
+  rowSorting?: PivotDimensionSortingMap;
+  colSorting?: PivotDimensionSortingMap;
+  measureHierarchy?: MeasureHierarchy;
+}): QueryShape => {
+  const rowGroupbyForQuery = rowGroupby.slice(0, intent.targetRowDepth);
+  const colGroupbyForQuery = colGroupby.slice(0, intent.targetColDepth);
+  const metricKeys = new Set(
+    metrics.map(getMetricKey).filter((key): key is string => Boolean(key)),
+  );
+  const filterMetricKeyedMap = <T>(
+    map: Record<string, T> | undefined,
+  ): Record<string, T> | undefined => {
+    if (!map) {
+      return undefined;
+    }
+    return Object.fromEntries(
+      Object.entries(map).filter(([metricKey]) => metricKeys.has(metricKey)),
+    );
+  };
+
+  const extraMetrics: QueryFormMetric[] = [];
+  if (shouldIncludeMetricFormatting(metricFormattingScope, intent)) {
+    extraMetrics.push(
+      ...collectMetricFormattingMetricsForQuery(
+        filterMetricKeyedMap(metricFormatting),
+        availableMetrics,
+      ),
+    );
+  }
+  if (shouldIncludeDatabars(intent)) {
+    extraMetrics.push(
+      ...collectMetricDatabarMetricsForQuery(
+        filterMetricKeyedMap(metricDatabars),
+        availableMetrics,
+      ),
+    );
+  }
+  if (intent.needsRowDimensionFormatting) {
+    extraMetrics.push(
+      ...collectDimensionFormattingMetricsForQuery(
+        rowFormatting,
+        rowGroupbyForQuery,
+        availableMetrics,
+      ),
+    );
+  }
+  if (intent.needsColDimensionFormatting) {
+    extraMetrics.push(
+      ...collectDimensionFormattingMetricsForQuery(
+        colFormatting,
+        colGroupbyForQuery,
+        availableMetrics,
+      ),
+    );
+  }
+  if (intent.needsRowOrdering) {
+    extraMetrics.push(
+      ...collectDimensionSortingMetricsForQuery(
+        rowSorting,
+        rowGroupbyForQuery,
+        availableMetrics,
+      ),
+    );
+  }
+  if (intent.needsColOrdering) {
+    extraMetrics.push(
+      ...collectDimensionSortingMetricsForQuery(
+        colSorting,
+        colGroupbyForQuery,
+        availableMetrics,
+      ),
+    );
+  }
+  extraMetrics.push(
+    ...collectMeasureLeafMetricsForQuery(
+      measureHierarchy,
+      metrics,
+      availableMetrics,
+    ),
+  );
+
+  return {
+    rowGroupby: rowGroupbyForQuery,
+    colGroupby: colGroupbyForQuery,
+    metrics: mergeMetrics(metrics, extraMetrics),
+  };
+};
+
 const projectQueryFilterPath = ({
   layout,
   axis,
@@ -101,56 +253,6 @@ const projectQueryFilterPath = ({
       path,
     }),
   );
-
-const factStoreScopeForMeta = ({
-  layout,
-  meta,
-}: {
-  layout: LayoutContext;
-  meta: CoverageQueryMeta;
-}): PivotFactStoreBatchScope => {
-  if (meta.kind === 'branch') {
-    if (!meta.axis) {
-      throw new Error('Branch fact-store batch requires an axis');
-    }
-    return {
-      kind: 'branch',
-      axis: meta.axis,
-      path: projectQueryFilterPath({
-        layout,
-        axis: meta.axis,
-        path: meta.path ?? [],
-      }),
-    };
-  }
-  if (meta.kind === 'batch') {
-    if (!meta.axis) {
-      throw new Error('Batch fact-store batch requires an axis');
-    }
-    return {
-      kind: 'batch',
-      axis: meta.axis,
-      parentPath: projectQueryFilterPath({
-        layout,
-        axis: meta.axis,
-        path: meta.parentPath ?? [],
-      }),
-      siblingValues: meta.siblingValues ?? [],
-    };
-  }
-  if (meta.kind === 'intersection') {
-    return {
-      kind: 'intersection',
-      rowPaths: (meta.rowPaths ?? []).map(path =>
-        projectQueryFilterPath({ layout, axis: 'row', path }),
-      ),
-      columnPaths: (meta.columnPaths ?? []).map(path =>
-        projectQueryFilterPath({ layout, axis: 'col', path }),
-      ),
-    };
-  }
-  return { kind: meta.kind };
-};
 
 const buildSpecFactSelector = ({
   coverage,
@@ -318,21 +420,6 @@ const dedupeCoverages = (coverages: PivotFactCoverage[]) => {
     return true;
   });
 };
-
-type CoverageQueryMeta =
-  | { kind: 'root' }
-  | { kind: 'branch'; axis: PivotAxis; path: PivotPath }
-  | {
-      kind: 'batch';
-      axis: PivotAxis;
-      parentPath: PivotPath;
-      siblingValues: PivotPathValue[];
-    }
-  | {
-      kind: 'intersection';
-      rowPaths: PivotPath[];
-      columnPaths: PivotPath[];
-    };
 
 type ResolvedFetchContext = {
   rowGroupbyForQuery: QueryFormColumn[];
@@ -543,17 +630,15 @@ const resolveFetchContext = ({
 const buildSpecsForCoverages = ({
   coverages,
   ctx,
-  layout,
   filters,
   suffix,
-  meta,
+  scope,
 }: {
   coverages: PivotFactCoverage[];
   ctx: ResolvedFetchContext;
-  layout: LayoutContext;
   filters: QueryObjectFilterClause[];
   suffix: string;
-  meta: CoverageQueryMeta;
+  scope: PivotFactStoreBatchScope;
 }): PlannedQuerySpec[] =>
   coverages.map(coverage => ({
     queryName: `${formatQueryName(coverage.rowDepth, coverage.columnDepth)}${suffix}`,
@@ -565,7 +650,7 @@ const buildSpecsForCoverages = ({
       coverage,
       factSelector: buildSpecFactSelector({
         coverage,
-        scope: factStoreScopeForMeta({ layout, meta }),
+        scope,
         metrics: ctx.metricsForQuery,
         requiredTimeOffsets: ctx.requiredTimeOffsets,
       }),
@@ -581,7 +666,7 @@ const buildAxisExpansionSpecs = ({
   visibleColDepth,
   filters,
   suffix,
-  meta,
+  scope,
 }: {
   formData: PivotTableQueryFormData;
   layout: LayoutContext;
@@ -591,7 +676,7 @@ const buildAxisExpansionSpecs = ({
   visibleColDepth?: number;
   filters: (ctx: ResolvedFetchContext) => QueryObjectFilterClause[];
   suffix: string;
-  meta: CoverageQueryMeta;
+  scope: PivotFactStoreBatchScope;
 }): PlannedQuerySpec[] => {
   if (!canRequestAxisExpansion({ program: layout.pivotProgram, axis, path })) {
     return [];
@@ -609,10 +694,9 @@ const buildAxisExpansionSpecs = ({
   return buildSpecsForCoverages({
     coverages: ctx.coverages,
     ctx,
-    layout,
     filters: filters(ctx),
     suffix,
-    meta,
+    scope,
   });
 };
 
@@ -749,7 +833,15 @@ export const buildExpansionQuerySpecs = (
           request.formData.colTypeMap,
         ),
       suffix: `|branch:${request.axis}:${serializePath(request.path)}`,
-      meta: { kind: 'branch', axis: request.axis, path: request.path },
+      scope: {
+        kind: 'branch',
+        axis: request.axis,
+        path: projectQueryFilterPath({
+          layout: request.layout,
+          axis: request.axis,
+          path: request.path,
+        }),
+      },
     });
   }
   if (request.kind === 'batch') {
@@ -791,10 +883,10 @@ export const buildExpansionQuerySpecs = (
           colTypeMap: formData.colTypeMap,
         }),
       suffix: `|batch:${batch.axis}:${batch.parentPathKey}|chunk:${chunkIndex}`,
-      meta: {
+      scope: {
         kind: 'batch',
         axis: batch.axis,
-        parentPath,
+        parentPath: parentDimensionPath,
         siblingValues: batch.siblingValues,
       },
     });
@@ -810,6 +902,20 @@ export const buildExpansionQuerySpecs = (
   } = request;
   const rowPaths = rowPathKeys.map(parsePath);
   const columnPaths = columnPathKeys.map(parsePath);
+  const scopedRowPaths = rowPaths.map(path =>
+    projectQueryFilterPath({
+      layout,
+      axis: 'row',
+      path,
+    }),
+  );
+  const scopedColumnPaths = columnPaths.map(path =>
+    projectQueryFilterPath({
+      layout,
+      axis: 'col',
+      path,
+    }),
+  );
   return buildAxisExpansionSpecs({
     formData,
     layout,
@@ -820,29 +926,21 @@ export const buildExpansionQuerySpecs = (
     filters: ctx => [
       ...buildPathSetFilterClauses({
         axisGroupby: ctx.rowGroupbyForQuery,
-        paths: rowPaths.map(path =>
-          projectQueryFilterPath({
-            layout,
-            axis: 'row',
-            path,
-          }),
-        ),
+        paths: scopedRowPaths,
         colTypeMap: formData.colTypeMap,
       }),
       ...buildPathSetFilterClauses({
         axisGroupby: ctx.colGroupbyForQuery,
-        paths: columnPaths.map(path =>
-          projectQueryFilterPath({
-            layout,
-            axis: 'col',
-            path,
-          }),
-        ),
+        paths: scopedColumnPaths,
         colTypeMap: formData.colTypeMap,
       }),
     ],
     suffix: `|intersection:${stableStringify([rowPathKeys, columnPathKeys])}`,
-    meta: { kind: 'intersection', rowPaths, columnPaths },
+    scope: {
+      kind: 'intersection',
+      rowPaths: scopedRowPaths,
+      columnPaths: scopedColumnPaths,
+    },
   });
 };
 
@@ -890,10 +988,9 @@ const buildInitialRootSpecs = ({
         sanitizedPath: [],
         coverages: [coverage],
       },
-      layout,
       filters: [],
       suffix: '',
-      meta: { kind: 'root' },
+      scope: { kind: 'root' },
     });
   });
 };
@@ -968,10 +1065,9 @@ export const buildInitialQuerySpecs = (
           ...colRootContext.coverages,
         ]),
         ctx: rowRootContext,
-        layout,
         filters: [],
         suffix: '|root',
-        meta: { kind: 'root' },
+        scope: { kind: 'root' },
       }),
     );
   }
