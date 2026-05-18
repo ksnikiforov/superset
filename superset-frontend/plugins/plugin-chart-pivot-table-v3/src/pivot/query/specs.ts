@@ -274,7 +274,6 @@ const buildSpecFactSelector = ({
 const buildInitialRootIntents = (
   layout: LayoutContext,
   formData: PivotTableQueryFormData,
-  prefetchRoot = false,
 ): QueryIntent[] => {
   const rowGroupby = layout.pivotProgram.rowDimensions;
   const colGroupby = layout.pivotProgram.columnDimensions;
@@ -404,19 +403,7 @@ const buildInitialRootIntents = (
     });
   }
 
-  return prefetchRoot ? intents.slice(0, 1) : intents;
-};
-
-const dedupeCoverages = (coverages: PivotFactCoverage[]) => {
-  const seen = new Set<string>();
-  return coverages.filter(coverage => {
-    const key = `${coverage.rowDepth}|${coverage.columnDepth}`;
-    if (seen.has(key)) {
-      return false;
-    }
-    seen.add(key);
-    return true;
-  });
+  return intents;
 };
 
 type ResolvedFetchContext = {
@@ -1142,82 +1129,15 @@ const buildInitialRootSpecs = ({
   });
 };
 
-const initialAxisCoverageDepth = (
-  layout: LayoutContext,
-  axis: PivotAxis,
-): number =>
-  layout.axisCoverageNeeds.reduce(
-    (depth, need) => (need.axis === axis ? Math.max(depth, need.depth) : depth),
-    0,
-  );
-
 export const buildInitialQuerySpecs = (
   formData: PivotTableQueryFormData,
   layout: LayoutContext = buildLayoutContext(formData),
 ): PlannedQuerySpec[] => {
-  const rowGroupby = layout.pivotProgram.rowDimensions;
-  const colGroupby = layout.pivotProgram.columnDimensions;
-  const baseRowDepth =
-    rowGroupby.length === 0
-      ? 0
-      : Math.min(
-          rowGroupby.length,
-          Math.max(1, initialAxisCoverageDepth(layout, 'row')),
-        );
-  const baseColDepth =
-    colGroupby.length === 0
-      ? 0
-      : Math.min(
-          colGroupby.length,
-          Math.max(1, initialAxisCoverageDepth(layout, 'col')),
-        );
-  const shouldPrefetchRoot = baseRowDepth > 1 || baseColDepth > 1;
-  const initialRootIntents = buildInitialRootIntents(
-    layout,
-    formData,
-    shouldPrefetchRoot,
-  );
+  const initialRootIntents = buildInitialRootIntents(layout, formData);
 
-  const specs: PlannedQuerySpec[] = buildInitialRootSpecs({
+  return buildInitialRootSpecs({
     formData,
     layout,
     intents: initialRootIntents,
   });
-
-  if (shouldPrefetchRoot) {
-    const rowRootContext = resolveFetchContext({
-      formData,
-      layout,
-      axis: 'row',
-      path: [],
-      visibleRowDepth: baseRowDepth,
-      visibleColDepth: baseColDepth,
-      targetRowDepth: baseRowDepth,
-      targetColDepth: baseColDepth,
-    });
-    const colRootContext = resolveFetchContext({
-      formData,
-      layout,
-      axis: 'col',
-      path: [],
-      visibleRowDepth: baseRowDepth,
-      visibleColDepth: baseColDepth,
-      targetRowDepth: baseRowDepth,
-      targetColDepth: baseColDepth,
-    });
-    specs.push(
-      ...buildSpecsForCoverages({
-        coverages: dedupeCoverages([
-          ...rowRootContext.coverages,
-          ...colRootContext.coverages,
-        ]),
-        ctx: rowRootContext,
-        filters: [],
-        suffix: '|root',
-        scope: { kind: 'root' },
-      }),
-    );
-  }
-
-  return specs;
 };

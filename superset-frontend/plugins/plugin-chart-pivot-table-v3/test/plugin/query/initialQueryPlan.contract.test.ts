@@ -17,6 +17,7 @@
  * under the License.
  */
 import { buildInitialQuerySpecs } from '../../../src/pivot/query/specs';
+import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
 import { buildFormData } from '../fixtures/pivotFormData';
 
 const specScopeKind = (
@@ -52,7 +53,7 @@ describe('buildInitialQuerySpecs (contracts)', () => {
     ).toBe(false);
   });
 
-  it('keeps auto-expand root prefetch separate from persisted expansion replay', () => {
+  it('keeps auto-expand intent in the manifest, not the bootstrap query plan', () => {
     const formData = buildFormData({
       groupbyRows: ['r1', 'r2'],
       groupbyColumns: ['c1'],
@@ -69,6 +70,7 @@ describe('buildInitialQuerySpecs (contracts)', () => {
     });
 
     const specs = buildInitialQuerySpecs(formData);
+    const layout = buildLayoutContext(formData);
 
     expect(specs.some(spec => specScopeKind(spec) === 'root')).toBe(true);
     expect(
@@ -86,7 +88,13 @@ describe('buildInitialQuerySpecs (contracts)', () => {
           spec.meta.coverage.rowDepth,
           spec.meta.coverage.columnDepth,
         ]),
-    ).toContainEqual([2, 1]);
+    ).not.toContainEqual([2, 1]);
+    expect(specs.every(spec => spec.meta.coverage.rowDepth <= 1)).toBe(true);
+    expect(layout.axisCoverageNeeds).toContainEqual({
+      axis: 'row',
+      depth: 2,
+      scope: { kind: 'scopedFull', ancestorPaths: [[]] },
+    });
   });
 
   it('does not let persisted deep expansions increase initial visible depth', () => {

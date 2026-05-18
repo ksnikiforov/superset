@@ -162,7 +162,7 @@ describe('buildQuery (bootstrap)', () => {
     });
   });
 
-  test('adds root prefetch queries when auto-expand goes beyond depth 1', () => {
+  test('does not add root prefetch queries when auto-expand goes beyond depth 1', () => {
     const queryContext = buildQuery({
       ...baseFormData,
       startCollapsed: false,
@@ -170,7 +170,7 @@ describe('buildQuery (bootstrap)', () => {
     const names = queryContext.queries.map(query =>
       typeof query.query_name === 'string' ? query.query_name : '',
     );
-    expect(names.some(name => name.includes('|root'))).toBe(true);
+    expect(names.some(name => name.includes('|root'))).toBe(false);
   });
 
   test('does not prefetch root or branches when only persisted expansions are deep (BR-4.2)', () => {

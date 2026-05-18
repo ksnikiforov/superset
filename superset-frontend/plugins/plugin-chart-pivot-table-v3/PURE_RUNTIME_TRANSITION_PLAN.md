@@ -255,8 +255,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13470` insertions, `17027` deletions, net `-3557`.
-- Current production TypeScript/TSX total: about `30028` lines.
+- Production `src`: `13485` insertions, `17047` deletions, net `-3562`.
+- Current production TypeScript/TSX total: about `29948` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -268,10 +268,10 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `30028` | `-3557` | `< 28000` |
-| Strict core pipeline | `11337` | `12474` | `+1137` | `8000` |
+| Full production `src` | `33510` | `29948` | `-3562` | `< 28000` |
+| Strict core pipeline | `11337` | `12394` | `+1057` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5076` | `+393` | `3000-4000` |
-| Broad core pipeline | `16020` | `17550` | `+1530` | `11000-13000` |
+| Broad core pipeline | `16020` | `17470` | `+1450` | `11000-13000` |
 
 Current strict core breakdown:
 
@@ -279,7 +279,7 @@ Current strict core breakdown:
 | --- | ---: |
 | `pivot/runtime/*` | `3931` |
 | `pivot/expansion/*` | `3005` |
-| `pivot/query/*` | `1708` |
+| `pivot/query/*` | `1628` |
 | `pivot/layout/*` | `744` |
 | core/shared/domain helpers | `1873` |
 | formatting/data/render-model/update support | `1213` |
@@ -363,6 +363,14 @@ lives under `expansion/fetchPivotExpansion.ts` and is consumed by
 `expansion/fetchExecution.ts`. The old `query/fetchPivotBranch.ts`
 compatibility module has been deleted; no production query execution logic or
 legacy branch-fetch export remains behind the branch-era module name.
+
+Latest initial-query cleanup: bootstrap query planning no longer turns
+pre-expanded depth into broad `|root` prefetch specs. Initial specs fetch only
+root-visible coverage; the requested pre-expanded layers remain in
+`axisCoverageNeeds` and are loaded by the expansion hydration loop. This removes
+the duplicated pre-expand authority from `query/specs.ts` and avoids first-load
+full-depth queries for layers that should be governed by the manifest/batching
+runtime.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.
