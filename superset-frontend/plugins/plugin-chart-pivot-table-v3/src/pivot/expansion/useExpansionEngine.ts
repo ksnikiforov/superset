@@ -16,14 +16,7 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useReducer,
-  useRef,
-  useState,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { unstable_batchedUpdates } from 'react-dom';
 import {
   type HandlerFunction,
@@ -89,30 +82,6 @@ type HydrateExpansionOptions = {
   persistOnComplete?: boolean;
 };
 
-type ExpansionRuntimeState = {
-  loadingCounts: Map<string, number>;
-  isHydrating: boolean;
-};
-
-type ExpansionRuntimeAction =
-  | {
-      type: 'updateLoadingKey';
-      key: string;
-      delta: number;
-    }
-  | {
-      type: 'clearLoading';
-    }
-  | {
-      type: 'setHydrating';
-      value: boolean;
-    };
-
-const createExpansionRuntimeState = (): ExpansionRuntimeState => ({
-  loadingCounts: new Map(),
-  isHydrating: false,
-});
-
 const createEmptyExpansionState = (): PivotExpansionStateKeys => ({
   rows: [],
   cols: [],
@@ -137,35 +106,6 @@ const updateLoadingCounts = ({
     counts.set(key, nextCount);
   }
   return counts;
-};
-
-const expansionRuntimeReducer = (
-  state: ExpansionRuntimeState,
-  action: ExpansionRuntimeAction,
-): ExpansionRuntimeState => {
-  switch (action.type) {
-    case 'updateLoadingKey':
-      return {
-        ...state,
-        loadingCounts: updateLoadingCounts({
-          loadingCounts: state.loadingCounts,
-          key: action.key,
-          delta: action.delta,
-        }),
-      };
-    case 'clearLoading':
-      return {
-        ...state,
-        loadingCounts: new Map(),
-      };
-    case 'setHydrating':
-      return {
-        ...state,
-        isHydrating: action.value,
-      };
-    default:
-      return state;
-  }
 };
 
 type ExpansionPersistenceDeps = {
@@ -260,12 +200,10 @@ export const useExpansionEngine = ({
   }));
   const { row: expandedRows, col: expandedCols } = expandedByAxis;
   const expandedRef = useRef(expandedByAxis);
-  const [runtimeState, dispatchRuntimeState] = useReducer(
-    expansionRuntimeReducer,
-    undefined,
-    createExpansionRuntimeState,
+  const [loadingCounts, setLoadingCounts] = useState<Map<string, number>>(
+    () => new Map(),
   );
-  const { loadingCounts, isHydrating } = runtimeState;
+  const [isHydrating, setIsHydrating] = useState(false);
   const loadingKeys = useMemo(
     () => new Set(loadingCounts.keys()),
     [loadingCounts],
@@ -338,16 +276,16 @@ export const useExpansionEngine = ({
   useSyncRef(expandedRef, expandedByAxis);
   useSyncRef(fetchFormDataRef, fetchFormData);
 
-  const updateLoadingKey = useCallback((key: string, delta: number) => {
-    dispatchRuntimeState({ type: 'updateLoadingKey', key, delta });
-  }, []);
+  const updateLoadingKey = useCallback(
+    (key: string, delta: number) =>
+      setLoadingCounts(current =>
+        updateLoadingCounts({ loadingCounts: current, key, delta }),
+      ),
+    [],
+  );
 
   const clearLoadingState = useCallback(() => {
-    dispatchRuntimeState({ type: 'clearLoading' });
-  }, []);
-
-  const setHydratingState = useCallback((value: boolean) => {
-    dispatchRuntimeState({ type: 'setHydrating', value });
+    setLoadingCounts(new Map());
   }, []);
 
   const readSessionExpansionState = useCallback(() => {
@@ -409,10 +347,10 @@ export const useExpansionEngine = ({
       const message = error instanceof Error ? error.message : String(error);
       expansionRequestLifecycle.invalidate();
       clearLoadingState();
-      setHydratingState(false);
+      setIsHydrating(false);
       setErrorMessage(message);
     },
-    [clearLoadingState, expansionRequestLifecycle, setHydratingState],
+    [clearLoadingState, expansionRequestLifecycle],
   );
 
   const addWarnings = useCallback(
@@ -543,7 +481,7 @@ export const useExpansionEngine = ({
       const requestScope = expansionRequestLifecycle.beginScope();
       clearLoadingState();
       if (shouldShowLoader) {
-        setHydratingState(true);
+        setIsHydrating(true);
       }
 
       try {
@@ -577,7 +515,7 @@ export const useExpansionEngine = ({
         }
       } finally {
         if (shouldShowLoader) {
-          setHydratingState(false);
+          setIsHydrating(false);
         }
       }
     },
@@ -590,7 +528,6 @@ export const useExpansionEngine = ({
       persistExpansionState,
       pivotProgram,
       resolveExpandedForMetrics,
-      setHydratingState,
     ],
   );
 
@@ -608,7 +545,7 @@ export const useExpansionEngine = ({
       if (toggleDecision.kind === 'collapse') {
         expansionRequestLifecycle.invalidate();
         clearLoadingState();
-        setHydratingState(false);
+        setIsHydrating(false);
         collapseNode(axis, node);
         return;
       }
@@ -632,7 +569,6 @@ export const useExpansionEngine = ({
       hydrateAtomic,
       reportAsyncError,
       clearLoadingState,
-      setHydratingState,
     ],
   );
 
@@ -693,7 +629,7 @@ export const useExpansionEngine = ({
 
     expansionRequestLifecycle.invalidate();
     factStoreRef.current = createPivotFactStoreFromBatches(factBatches);
-    setHydratingState(false);
+    setIsHydrating(false);
     warningsRef.current = new Map();
     setWarnings([]);
     setErrorMessage(undefined);
@@ -775,7 +711,6 @@ export const useExpansionEngine = ({
     resolveExpandedForMetrics,
     reportAsyncError,
     readSessionExpansionState,
-    setHydratingState,
     writeSessionExpansionState,
   ]);
 

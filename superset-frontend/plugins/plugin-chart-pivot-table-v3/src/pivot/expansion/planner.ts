@@ -350,14 +350,6 @@ export const planExpansionForAxis = ({
     expandedKeys.size > 1 ||
     (expandedKeys.size === 1 && !expandedKeys.has(rootKey));
 
-  const candidates = Array.from(expandedKeys)
-    .filter(key => key !== rootKey || !hasNonRootExpanded)
-    .map(key => {
-      const node = nodes[key];
-      const path = node?.path ?? parsePath(key);
-      return { key, node, path };
-    })
-    .filter(({ path }) => canRequestAxisExpansion({ program, axis, path }));
   const buildTarget = (key: string): ExpansionCoverageTarget =>
     buildAxisExpansionCoverageTarget({
       axis,
@@ -365,13 +357,22 @@ export const planExpansionForAxis = ({
       program,
       ...coverage,
     });
-  const candidateTargets = candidates.map(({ key }) => buildTarget(key));
+  const candidates = Array.from(expandedKeys)
+    .filter(key => key !== rootKey || !hasNonRootExpanded)
+    .map(key => {
+      const node = nodes[key];
+      const path = node?.path ?? parsePath(key);
+      return { key, node, path };
+    })
+    .filter(({ path }) => canRequestAxisExpansion({ program, axis, path }))
+    .map(candidate => ({ ...candidate, target: buildTarget(candidate.key) }));
   const missingTargetKeys = new Set(
-    getMissingExpansionCoverage(candidateTargets).map(targetKey),
+    getMissingExpansionCoverage(candidates.map(({ target }) => target)).map(
+      targetKey,
+    ),
   );
 
-  candidates.forEach(({ key, node }) => {
-    const target = buildTarget(key);
+  candidates.forEach(({ node, target }) => {
     const keyForTarget = targetKey(target);
     if (!missingTargetKeys.has(keyForTarget)) {
       return;

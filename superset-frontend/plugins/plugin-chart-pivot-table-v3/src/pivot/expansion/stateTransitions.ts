@@ -229,9 +229,8 @@ export const resolveLayoutTransition = ({
     previousLayout.cols,
     currentLayout.cols,
   );
-  const layoutChanged = rowsChanged || colsChanged;
   const sourceTree =
-    hasNewData || !layoutChanged
+    hasNewData || (!rowsChanged && !colsChanged)
       ? data
       : pruneTreeToStableLayout({
           tree: currentTree,
@@ -246,7 +245,6 @@ export const resolveLayoutTransition = ({
     colsChanged,
     shouldExpandRows,
     shouldExpandCols,
-    layoutChanged,
     normalizedTree: sourceTree,
     rowStablePrefix,
     colStablePrefix,

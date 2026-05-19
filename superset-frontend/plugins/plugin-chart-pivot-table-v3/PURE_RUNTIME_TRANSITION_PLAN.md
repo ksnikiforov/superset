@@ -290,8 +290,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13317` insertions, `17813` deletions, net `-4496`.
-- Current production TypeScript/TSX total: about `29014` lines.
+- Production `src`: `13254` insertions, `17816` deletions, net `-4562`.
+- Current production TypeScript/TSX total: about `28948` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -303,17 +303,17 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `29014` | `-4496` | `< 28000` |
-| Strict core pipeline | `11337` | `11737` | `+400` | `8000` |
+| Full production `src` | `33510` | `28948` | `-4562` | `< 28000` |
+| Strict core pipeline | `11337` | `11671` | `+334` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5061` | `+378` | `3000-4000` |
-| Broad core pipeline | `16020` | `16798` | `+778` | `11000-13000` |
+| Broad core pipeline | `16020` | `16732` | `+712` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
 | `pivot/runtime/*` | `3818` |
-| `pivot/expansion/*` | `2821` |
+| `pivot/expansion/*` | `2682` |
 | `pivot/query/*` | `1412` |
 | `pivot/layout/*` | `770` |
 | core/shared/domain helpers | `1779` |
@@ -661,6 +661,13 @@ complete/fetch plus desired expansion sets and compiled targets.
 Latest expansion target vocabulary cleanup: the unused `AxisFetchTarget` alias
 is gone. Expansion fetch targets are either a compiled branch `FetchTarget` or
 an explicit compiled intersection target.
+
+Latest expansion runtime-state cleanup: `useExpansionEngine` no longer keeps
+loading counts and hydration state behind a local reducer/action protocol.
+Expansion execution already owns request lifecycle and loading-key deltas, so
+the hook now stores those UI facts directly. The expansion planner also reuses
+compiled candidate coverage targets instead of rebuilding them during missing
+coverage filtering.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.
