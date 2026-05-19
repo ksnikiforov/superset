@@ -443,17 +443,12 @@ export const useExpansionEngine = ({
     (nextRows: Set<string>, nextCols: Set<string>) => {
       const visible = buildVisiblePersistedExpansionState({
         tree: treeRef.current,
-        expandedRows: nextRows,
-        expandedCols: nextCols,
-        explicitExpandedRows: explicitExpandedRef.current.row,
-        explicitExpandedCols: explicitExpandedRef.current.col,
-        explicitCollapsedRows: explicitCollapsedRef.current.row,
-        explicitCollapsedCols: explicitCollapsedRef.current.col,
+        expanded: { row: nextRows, col: nextCols },
+        explicitExpanded: explicitExpandedRef.current,
+        explicitCollapsed: explicitCollapsedRef.current,
       });
-      explicitExpandedRef.current.row = visible.visibleExpandedRows;
-      explicitExpandedRef.current.col = visible.visibleExpandedCols;
-      explicitCollapsedRef.current.row = visible.visibleCollapsedRows;
-      explicitCollapsedRef.current.col = visible.visibleCollapsedCols;
+      explicitExpandedRef.current = visible.visibleExpanded;
+      explicitCollapsedRef.current = visible.visibleCollapsed;
       writeSessionExpansionState(visible.persistedState);
     },
     [writeSessionExpansionState],

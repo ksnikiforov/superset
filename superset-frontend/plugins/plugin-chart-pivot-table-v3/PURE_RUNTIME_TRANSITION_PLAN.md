@@ -290,8 +290,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13458` insertions, `17813` deletions, net `-4355`.
-- Current production TypeScript/TSX total: about `29155` lines.
+- Production `src`: `13449` insertions, `17813` deletions, net `-4364`.
+- Current production TypeScript/TSX total: about `29146` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -303,17 +303,17 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `29155` | `-4355` | `< 28000` |
-| Strict core pipeline | `11337` | `11878` | `+541` | `8000` |
+| Full production `src` | `33510` | `29146` | `-4364` | `< 28000` |
+| Strict core pipeline | `11337` | `11869` | `+532` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5061` | `+378` | `3000-4000` |
-| Broad core pipeline | `16020` | `16939` | `+919` | `11000-13000` |
+| Broad core pipeline | `16020` | `16930` | `+910` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
 | `pivot/runtime/*` | `3876` |
-| `pivot/expansion/*` | `2830` |
+| `pivot/expansion/*` | `2821` |
 | `pivot/query/*` | `1412` |
 | `pivot/layout/*` | `770` |
 | core/shared/domain helpers | `1779` |
@@ -618,6 +618,11 @@ pending, explicit-expanded, and explicit-collapsed intent in axis-shaped refs
 instead of separate row/column ref objects. This removes duplicated hook
 dependency plumbing and keeps the expansion runtime state boundary aligned with
 the axis-neutral transition model.
+
+Latest persistence pruning cleanup: `buildVisiblePersistedExpansionState` now
+accepts and returns axis-shaped expansion sets instead of row/column-specific
+parameters and result fields. The hook no longer repacks persisted expansion
+intent across separate row and column branches.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.

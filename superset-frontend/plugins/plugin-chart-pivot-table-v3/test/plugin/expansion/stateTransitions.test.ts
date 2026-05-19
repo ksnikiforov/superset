@@ -321,14 +321,18 @@ describe('pivot/expansion/stateTransitions', () => {
 
     const result = buildVisiblePersistedExpansionState({
       tree,
-      expandedRows: new Set([rootKey, aKey]),
-      expandedCols: new Set([rootKey, xKey]),
-      explicitExpandedRows: new Set([rootKey, aKey, hiddenRowKey]),
-      explicitExpandedCols: new Set([rootKey, xKey, hiddenColKey]),
-      explicitCollapsedRows: new Set([bKey, hiddenRowKey]),
-      explicitCollapsedCols: new Set([yKey, hiddenColKey]),
-      groupbyRowKeys: ['country'],
-      groupbyColumnKeys: ['month'],
+      expanded: {
+        row: new Set([rootKey, aKey]),
+        col: new Set([rootKey, xKey]),
+      },
+      explicitExpanded: {
+        row: new Set([rootKey, aKey, hiddenRowKey]),
+        col: new Set([rootKey, xKey, hiddenColKey]),
+      },
+      explicitCollapsed: {
+        row: new Set([bKey, hiddenRowKey]),
+        col: new Set([yKey, hiddenColKey]),
+      },
     });
 
     expect(result.persistedState).toEqual({
@@ -337,10 +341,14 @@ describe('pivot/expansion/stateTransitions', () => {
       collapsedRows: [bKey],
       collapsedCols: [yKey],
     });
-    expect(result.visibleExpandedRows).toEqual(new Set([aKey]));
-    expect(result.visibleExpandedCols).toEqual(new Set([xKey]));
-    expect(result.visibleCollapsedRows).toEqual(new Set([bKey]));
-    expect(result.visibleCollapsedCols).toEqual(new Set([yKey]));
+    expect(result.visibleExpanded).toEqual({
+      row: new Set([aKey]),
+      col: new Set([xKey]),
+    });
+    expect(result.visibleCollapsed).toEqual({
+      row: new Set([bKey]),
+      col: new Set([yKey]),
+    });
   });
 
   it('plans fetch targets for expanded nodes', () => {

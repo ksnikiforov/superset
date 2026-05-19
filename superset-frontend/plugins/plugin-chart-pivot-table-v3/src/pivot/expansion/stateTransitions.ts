@@ -829,49 +829,45 @@ const filterVisibleExpansionKeys = (keys: Set<string>, visible: Set<string>) =>
 
 export const buildVisiblePersistedExpansionState = ({
   tree,
-  expandedRows,
-  expandedCols,
-  explicitExpandedRows,
-  explicitExpandedCols,
-  explicitCollapsedRows,
-  explicitCollapsedCols,
+  expanded,
+  explicitExpanded,
+  explicitCollapsed,
 }: {
   tree: PivotTreeData;
-  expandedRows: Set<string>;
-  expandedCols: Set<string>;
-  explicitExpandedRows: Set<string>;
-  explicitExpandedCols: Set<string>;
-  explicitCollapsedRows: Set<string>;
-  explicitCollapsedCols: Set<string>;
+  expanded: Record<PivotAxis, Set<string>>;
+  explicitExpanded: Record<PivotAxis, Set<string>>;
+  explicitCollapsed: Record<PivotAxis, Set<string>>;
 }): {
   persistedState: PivotExpansionStateKeys;
-  visibleExpandedRows: Set<string>;
-  visibleExpandedCols: Set<string>;
-  visibleCollapsedRows: Set<string>;
-  visibleCollapsedCols: Set<string>;
+  visibleExpanded: Record<PivotAxis, Set<string>>;
+  visibleCollapsed: Record<PivotAxis, Set<string>>;
 } => {
   const visibleKeys: Record<PivotAxis, Set<string>> = {
-    row: collectVisibleAxisKeys(tree.rows, expandedRows),
-    col: collectVisibleAxisKeys(tree.cols, expandedCols),
+    row: collectVisibleAxisKeys(tree.rows, expanded.row),
+    col: collectVisibleAxisKeys(tree.cols, expanded.col),
   };
-  const visibleExpanded = {
-    row: filterVisibleExpansionKeys(explicitExpandedRows, visibleKeys.row),
-    col: filterVisibleExpansionKeys(explicitExpandedCols, visibleKeys.col),
+  const visibleExpandedKeys = {
+    row: filterVisibleExpansionKeys(explicitExpanded.row, visibleKeys.row),
+    col: filterVisibleExpansionKeys(explicitExpanded.col, visibleKeys.col),
   };
-  const visibleCollapsed = {
-    row: filterVisibleExpansionKeys(explicitCollapsedRows, visibleKeys.row),
-    col: filterVisibleExpansionKeys(explicitCollapsedCols, visibleKeys.col),
+  const visibleCollapsedKeys = {
+    row: filterVisibleExpansionKeys(explicitCollapsed.row, visibleKeys.row),
+    col: filterVisibleExpansionKeys(explicitCollapsed.col, visibleKeys.col),
   };
   return {
-    visibleExpandedRows: new Set(visibleExpanded.row),
-    visibleExpandedCols: new Set(visibleExpanded.col),
-    visibleCollapsedRows: new Set(visibleCollapsed.row),
-    visibleCollapsedCols: new Set(visibleCollapsed.col),
+    visibleExpanded: {
+      row: new Set(visibleExpandedKeys.row),
+      col: new Set(visibleExpandedKeys.col),
+    },
+    visibleCollapsed: {
+      row: new Set(visibleCollapsedKeys.row),
+      col: new Set(visibleCollapsedKeys.col),
+    },
     persistedState: {
-      rows: visibleExpanded.row,
-      cols: visibleExpanded.col,
-      collapsedRows: visibleCollapsed.row,
-      collapsedCols: visibleCollapsed.col,
+      rows: visibleExpandedKeys.row,
+      cols: visibleExpandedKeys.col,
+      collapsedRows: visibleCollapsedKeys.row,
+      collapsedCols: visibleCollapsedKeys.col,
     },
   };
 };
