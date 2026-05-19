@@ -352,30 +352,29 @@ export const resolveCollapsedExpansionState = ({
 };
 
 export const resolveExpansionReinitializationDecision = ({
-  previousSignature,
-  expandedStateSignature,
-  previousSharedSignature,
-  expandedStateSharedSignature,
+  previousSemanticSignature,
+  expansionSemanticSignature,
+  rowsChanged,
+  colsChanged,
   hasNewData,
 }: {
-  previousSignature: string | null;
-  expandedStateSignature: string;
-  previousSharedSignature: string | null;
-  expandedStateSharedSignature: string;
+  previousSemanticSignature: string | null;
+  expansionSemanticSignature: string;
+  rowsChanged: boolean;
+  colsChanged: boolean;
   hasNewData: boolean;
 }) => {
-  const shouldResetExpandedState = previousSignature !== expandedStateSignature;
-  const isInitialMount = previousSignature === null;
-  const sharedSignatureChanged =
-    previousSharedSignature !== expandedStateSharedSignature;
+  const semanticSignatureChanged =
+    previousSemanticSignature !== expansionSemanticSignature;
+  const isInitialMount = previousSemanticSignature === null;
   return {
-    shouldResetExpandedState,
     isInitialMount,
-    sharedSignatureChanged,
+    semanticSignatureChanged,
     shouldReinitialize:
       isInitialMount ||
-      shouldResetExpandedState ||
-      sharedSignatureChanged ||
+      semanticSignatureChanged ||
+      rowsChanged ||
+      colsChanged ||
       hasNewData,
   };
 };

@@ -160,8 +160,7 @@ export type ExpansionEngineResult = {
 export type ExpansionEngineConfig = {
   data: PivotTreeData;
   factBatches: PivotFactStoreBatch[];
-  expandedStateSignature: string;
-  expandedStateSharedSignature: string;
+  expansionSemanticSignature: string;
   fetchFormData: PivotTableQueryFormData;
   axisCoverageNeeds: PivotAxisCoverageNeed[];
   pivotProgram: PivotProgram;
@@ -176,8 +175,7 @@ export type ExpansionEngineConfig = {
 export const useExpansionEngine = ({
   data,
   factBatches,
-  expandedStateSignature,
-  expandedStateSharedSignature,
+  expansionSemanticSignature,
   fetchFormData,
   axisCoverageNeeds,
   pivotProgram,
@@ -224,8 +222,7 @@ export const useExpansionEngine = ({
   const [errorMessage, setErrorMessage] = useState<string>();
   const [warnings, setWarnings] = useState<ChartDataWarning[]>([]);
   const warningsRef = useRef<Map<string, ChartDataWarning>>(new Map());
-  const expandedStateSignatureRef = useRef<string | null>(null);
-  const expandedStateSharedSignatureRef = useRef<string | null>(null);
+  const expansionSemanticSignatureRef = useRef<string | null>(null);
   const requestGroupPrefixRef = useRef(nanoid());
   const expansionRequestLifecycle = useMemo(
     () =>
@@ -573,35 +570,15 @@ export const useExpansionEngine = ({
   );
 
   useEffect(() => {
-    const previousSignature = expandedStateSignatureRef.current;
-    expandedStateSignatureRef.current = expandedStateSignature;
-    const previousSharedSignature = expandedStateSharedSignatureRef.current;
-    expandedStateSharedSignatureRef.current = expandedStateSharedSignature;
+    const previousSemanticSignature = expansionSemanticSignatureRef.current;
+    expansionSemanticSignatureRef.current = expansionSemanticSignature;
     const hasNewData = previousDataRef.current !== data;
-    const reinitializationDecision = resolveExpansionReinitializationDecision({
-      previousSignature,
-      expandedStateSignature,
-      previousSharedSignature,
-      expandedStateSharedSignature,
-      hasNewData,
-    });
-    const {
-      shouldResetExpandedState,
-      isInitialMount,
-      sharedSignatureChanged,
-      shouldReinitialize,
-    } = reinitializationDecision;
     const sessionExpansionState = readSessionExpansionState();
     const currentLayout = {
       rows: groupbyRowKeys,
       cols: groupbyColumnKeys,
     };
     const previousLayout = previousLayoutRef.current;
-    if (!shouldReinitialize) {
-      return;
-    }
-    previousLayoutRef.current = currentLayout;
-    previousDataRef.current = data;
     const {
       rowsChanged,
       colsChanged,
@@ -618,12 +595,23 @@ export const useExpansionEngine = ({
       hasNewData,
       program: pivotProgram,
     });
+    const { isInitialMount, semanticSignatureChanged, shouldReinitialize } =
+      resolveExpansionReinitializationDecision({
+        previousSemanticSignature,
+        expansionSemanticSignature,
+        rowsChanged,
+        colsChanged,
+        hasNewData,
+      });
+    if (!shouldReinitialize) {
+      return;
+    }
+    previousLayoutRef.current = currentLayout;
+    previousDataRef.current = data;
     const shouldResetExpandedRows =
-      shouldResetExpandedState &&
-      (sharedSignatureChanged || (rowsChanged && !shouldExpandRows));
+      semanticSignatureChanged || (rowsChanged && !shouldExpandRows);
     const shouldResetExpandedCols =
-      shouldResetExpandedState &&
-      (sharedSignatureChanged || (colsChanged && !shouldExpandCols));
+      semanticSignatureChanged || (colsChanged && !shouldExpandCols);
     const shouldResetExpanded =
       shouldResetExpandedRows || shouldResetExpandedCols;
 
@@ -698,8 +686,7 @@ export const useExpansionEngine = ({
     clearLoadingState,
     commitExpansionState,
     data,
-    expandedStateSignature,
-    expandedStateSharedSignature,
+    expansionSemanticSignature,
     factBatches,
     axisCoverageNeeds,
     groupbyColumnKeys,

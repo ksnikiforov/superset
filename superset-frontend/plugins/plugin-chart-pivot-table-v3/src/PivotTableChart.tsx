@@ -332,8 +332,7 @@ function PivotTableChart(props: PivotTableProps) {
   } = useExpansionEngine({
     data: dataForRender,
     factBatches: factBatchesForRender,
-    expandedStateSignature: layoutResult.expandedStateSignature,
-    expandedStateSharedSignature: layoutResult.expandedStateSharedSignature,
+    expansionSemanticSignature: layoutResult.expansionSemanticSignature,
     fetchFormData: expansionFetchFormData,
     axisCoverageNeeds: layoutResult.axisCoverageNeeds,
     pivotProgram: layoutResult.layout.pivotProgram,

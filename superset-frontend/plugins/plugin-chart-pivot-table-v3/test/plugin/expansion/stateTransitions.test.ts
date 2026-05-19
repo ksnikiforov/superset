@@ -259,31 +259,43 @@ describe('pivot/expansion/stateTransitions', () => {
   it('plans expansion reinitialization for first mount and signature changes', () => {
     expect(
       resolveExpansionReinitializationDecision({
-        previousSignature: null,
-        expandedStateSignature: 'layout-a',
-        previousSharedSignature: null,
-        expandedStateSharedSignature: 'shared-a',
+        previousSemanticSignature: null,
+        expansionSemanticSignature: 'semantic-a',
+        rowsChanged: false,
+        colsChanged: false,
         hasNewData: false,
       }),
     ).toMatchObject({
       isInitialMount: true,
-      shouldResetExpandedState: true,
-      sharedSignatureChanged: true,
+      semanticSignatureChanged: true,
       shouldReinitialize: true,
     });
 
     expect(
       resolveExpansionReinitializationDecision({
-        previousSignature: 'layout-a',
-        expandedStateSignature: 'layout-a',
-        previousSharedSignature: 'shared-a',
-        expandedStateSharedSignature: 'shared-b',
+        previousSemanticSignature: 'semantic-a',
+        expansionSemanticSignature: 'semantic-b',
+        rowsChanged: false,
+        colsChanged: false,
         hasNewData: false,
       }),
     ).toMatchObject({
       isInitialMount: false,
-      shouldResetExpandedState: false,
-      sharedSignatureChanged: true,
+      semanticSignatureChanged: true,
+      shouldReinitialize: true,
+    });
+
+    expect(
+      resolveExpansionReinitializationDecision({
+        previousSemanticSignature: 'semantic-a',
+        expansionSemanticSignature: 'semantic-a',
+        rowsChanged: true,
+        colsChanged: false,
+        hasNewData: false,
+      }),
+    ).toMatchObject({
+      isInitialMount: false,
+      semanticSignatureChanged: false,
       shouldReinitialize: true,
     });
   });
@@ -291,20 +303,20 @@ describe('pivot/expansion/stateTransitions', () => {
   it('skips expansion reinitialization when signatures, data, and levels are stable', () => {
     expect(
       resolveExpansionReinitializationDecision({
-        previousSignature: 'layout-a',
-        expandedStateSignature: 'layout-a',
-        previousSharedSignature: 'shared-a',
-        expandedStateSharedSignature: 'shared-a',
+        previousSemanticSignature: 'semantic-a',
+        expansionSemanticSignature: 'semantic-a',
+        rowsChanged: false,
+        colsChanged: false,
         hasNewData: false,
       }).shouldReinitialize,
     ).toBe(false);
 
     expect(
       resolveExpansionReinitializationDecision({
-        previousSignature: 'layout-a',
-        expandedStateSignature: 'layout-a',
-        previousSharedSignature: 'shared-a',
-        expandedStateSharedSignature: 'shared-a',
+        previousSemanticSignature: 'semantic-a',
+        expansionSemanticSignature: 'semantic-a',
+        rowsChanged: false,
+        colsChanged: false,
         hasNewData: true,
       }).shouldReinitialize,
     ).toBe(true);

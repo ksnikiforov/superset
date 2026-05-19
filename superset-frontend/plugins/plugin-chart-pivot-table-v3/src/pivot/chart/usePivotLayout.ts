@@ -25,7 +25,7 @@ import {
   type PivotTreeNode,
   type TotalPosition,
 } from '../../types';
-import { resolveMetricDisplayLabel, getStableColumnKey } from '../../utils';
+import { resolveMetricDisplayLabel } from '../../utils';
 import { decodeMetricKey } from '../core/tokens';
 import { buildLayoutContext } from '../layout/LayoutContext';
 import type { PivotProgram } from '../runtime/types';
@@ -43,8 +43,7 @@ const defaultPivotNodeSorter = () => 0;
 export type PivotLayoutResult = {
   layout: ReturnType<typeof buildLayoutContext>;
   measureHierarchy: MeasureHierarchy;
-  expandedStateSignature: string;
-  expandedStateSharedSignature: string;
+  expansionSemanticSignature: string;
   axisCoverageNeeds: ReturnType<typeof buildLayoutContext>['axisCoverageNeeds'];
   normalizedRowSubtotalLevels: number[];
   normalizedColSubtotalLevels: number[];
@@ -111,16 +110,7 @@ export const usePivotLayout = ({
     return layout.colSubtotalLevels;
   }, [layout.colSubtotalLevels, layout.rowTotals]);
 
-  const groupbyRowKeys = useMemo(
-    () => layout.pivotProgram.rowDimensions.map(getStableColumnKey),
-    [layout.pivotProgram.rowDimensions],
-  );
-  const groupbyColumnKeys = useMemo(
-    () => layout.pivotProgram.columnDimensions.map(getStableColumnKey),
-    [layout.pivotProgram.columnDimensions],
-  );
-
-  const expansionStateSharedSignatureData = useMemo(
+  const expansionSemanticSignatureData = useMemo(
     () => ({
       metrics: metricLabels,
       metricsLayout: resolvedMetricsLayout,
@@ -146,18 +136,9 @@ export const usePivotLayout = ({
       resolvedMetricsLayout,
     ],
   );
-  const expandedStateSignature = useMemo(
-    () =>
-      JSON.stringify({
-        rows: groupbyRowKeys,
-        cols: groupbyColumnKeys,
-        ...expansionStateSharedSignatureData,
-      }),
-    [expansionStateSharedSignatureData, groupbyColumnKeys, groupbyRowKeys],
-  );
-  const expandedStateSharedSignature = useMemo(
-    () => JSON.stringify(expansionStateSharedSignatureData),
-    [expansionStateSharedSignatureData],
+  const expansionSemanticSignature = useMemo(
+    () => JSON.stringify(expansionSemanticSignatureData),
+    [expansionSemanticSignatureData],
   );
 
   const resolvedRowTotalPosition = layout.rowTotalPosition;
@@ -336,8 +317,7 @@ export const usePivotLayout = ({
   return {
     layout,
     measureHierarchy: layout.measureHierarchy,
-    expandedStateSignature,
-    expandedStateSharedSignature,
+    expansionSemanticSignature,
     axisCoverageNeeds,
     normalizedRowSubtotalLevels,
     normalizedColSubtotalLevels,
