@@ -290,8 +290,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13464` insertions, `17813` deletions, net `-4349`.
-- Current production TypeScript/TSX total: about `29161` lines.
+- Production `src`: `13458` insertions, `17813` deletions, net `-4355`.
+- Current production TypeScript/TSX total: about `29155` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -303,17 +303,17 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `29161` | `-4349` | `< 28000` |
-| Strict core pipeline | `11337` | `11884` | `+547` | `8000` |
+| Full production `src` | `33510` | `29155` | `-4355` | `< 28000` |
+| Strict core pipeline | `11337` | `11878` | `+541` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5061` | `+378` | `3000-4000` |
-| Broad core pipeline | `16020` | `16945` | `+925` | `11000-13000` |
+| Broad core pipeline | `16020` | `16939` | `+919` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
 | `pivot/runtime/*` | `3876` |
-| `pivot/expansion/*` | `2836` |
+| `pivot/expansion/*` | `2830` |
 | `pivot/query/*` | `1412` |
 | `pivot/layout/*` | `770` |
 | core/shared/domain helpers | `1779` |
@@ -612,6 +612,12 @@ new layer does not issue row/column expansion loads until the user explicitly
 expands into it. Layout transitions also prune tree nodes and cells below the
 stable prefix for no-fetch layout changes, so stale cached children such as
 old state leaves cannot reappear under a newly added hidden dimension.
+
+Latest expansion state cleanup: `useExpansionEngine` now keeps expanded,
+pending, explicit-expanded, and explicit-collapsed intent in axis-shaped refs
+instead of separate row/column ref objects. This removes duplicated hook
+dependency plumbing and keeps the expansion runtime state boundary aligned with
+the axis-neutral transition model.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.
