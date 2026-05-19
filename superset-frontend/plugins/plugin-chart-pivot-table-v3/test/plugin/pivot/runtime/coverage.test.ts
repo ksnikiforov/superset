@@ -119,11 +119,11 @@ describe('expansion fact coverage', () => {
       }),
     ]);
     expect(
-      missingDeepColumn.map(({ axis, pathKey, rowDepth, columnDepth }) => ({
+      missingDeepColumn.map(({ axis, pathKey, need }) => ({
         axis,
         pathKey,
-        rowDepth,
-        columnDepth,
+        rowDepth: need.rowDepth,
+        columnDepth: need.columnDepth,
       })),
     ).toEqual([
       {
@@ -142,18 +142,18 @@ describe('expansion fact coverage', () => {
       }),
     ]);
     expect(
-      missingColumnBranch.map(({ axis, pathKey, rowDepth, columnDepth }) => ({
+      missingColumnBranch.map(({ axis, pathKey, need }) => ({
         axis,
         pathKey,
-        rowDepth,
-        columnDepth,
+        rowDepth: need.rowDepth,
+        columnDepth: need.columnDepth,
       })),
     ).toEqual([
       {
         axis: 'col',
         pathKey: serializePath(['France']),
         rowDepth: 1,
-        columnDepth: 1,
+        columnDepth: 2,
       },
     ]);
   });

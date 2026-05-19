@@ -59,9 +59,9 @@ const sortFetchPathKeys = (plan: ReturnType<typeof planExpansionForAxis>) =>
 const getMissingCoverageFromDepths =
   (depthByPathKey: Map<string, number>): PivotExpansionCoverageDiff =>
   targets =>
-    targets.filter(({ axis, pathKey, rowDepth, columnDepth }) => {
+    targets.filter(({ axis, pathKey, need }) => {
       const fetchedDepth = depthByPathKey.get(pathKey);
-      const requiredDepth = axis === 'row' ? columnDepth : rowDepth;
+      const requiredDepth = axis === 'row' ? need.columnDepth : need.rowDepth;
       return !(fetchedDepth !== undefined && fetchedDepth >= requiredDepth);
     });
 

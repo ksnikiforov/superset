@@ -210,7 +210,7 @@ const resolveExpansionFetchPlan = (
     if (isIntersectionFetchTarget(target)) {
       continue;
     }
-    const { rowDepth, columnDepth } = target.coverageTarget;
+    const { rowDepth, columnDepth } = target.coverageTarget.need;
     const batchSignature = `${target.axis}|${rowDepth}|${columnDepth}`;
     batchCandidates.push({ ...target, batchSignature });
   }

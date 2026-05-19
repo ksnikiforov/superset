@@ -53,8 +53,6 @@ type PivotExpansionCoverageDepths = {
 export type ExpansionCoverageTarget = {
   axis: PivotAxis;
   pathKey: string;
-  rowDepth: number;
-  columnDepth: number;
   need: PivotCoverageNeed;
 };
 
@@ -98,14 +96,8 @@ export type PivotExpansionPlan = {
   hasMissingNodes: boolean;
 };
 
-const targetKey = ({
-  axis,
-  pathKey,
-  rowDepth,
-  columnDepth,
-  need,
-}: ExpansionCoverageTarget) =>
-  `${axis}|${pathKey}|${rowDepth}|${columnDepth}|${stableStringify(need.valueKeys)}`;
+const targetKey = ({ axis, pathKey, need }: ExpansionCoverageTarget) =>
+  `${axis}|${pathKey}|${stableStringify(need)}`;
 
 const axisPathScopeFromPath = (path: PivotPath) => ({
   kind: 'paths' as const,
@@ -178,8 +170,6 @@ export const buildAxisExpansionCoverageTarget = ({
   return {
     axis,
     pathKey,
-    rowDepth: visibleRowDepth,
-    columnDepth: visibleColDepth,
     need: {
       rowDepth,
       columnDepth,
@@ -215,8 +205,6 @@ export const buildIntersectionCoverageTarget = ({
 }): ExpansionCoverageTarget => ({
   axis: 'row',
   pathKey: rootKey,
-  rowDepth,
-  columnDepth,
   need: {
     rowDepth,
     columnDepth,
@@ -391,7 +379,7 @@ export const planExpansionForAxis = ({
   }));
   pendingTargets.forEach(({ target, path }) => {
     const axisDepth =
-      target.axis === 'row' ? target.rowDepth : target.columnDepth;
+      target.axis === 'row' ? coverage.rowDepth : coverage.columnDepth;
     const hasAncestorRequest = pendingTargets.some(
       ({ target: ancestorTarget, path: ancestorPath }) =>
         ancestorTarget.pathKey !== target.pathKey &&

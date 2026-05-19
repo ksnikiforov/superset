@@ -266,8 +266,8 @@ export const buildMockIntersectionFactBatches = ({
           coverage: buildFactCoverage({
             rowDimensions: layout.pivotProgram.rowDimensions,
             columnDimensions: layout.pivotProgram.columnDimensions,
-            rowDepth: coverageTarget.rowDepth,
-            columnDepth: coverageTarget.columnDepth,
+            rowDepth: coverageTarget.need.rowDepth,
+            columnDepth: coverageTarget.need.columnDepth,
           }),
           facts: [],
           valueKeys: [],
