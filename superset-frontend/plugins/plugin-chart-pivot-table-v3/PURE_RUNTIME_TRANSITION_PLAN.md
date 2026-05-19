@@ -1552,6 +1552,17 @@ Bring these back before implementing the behavior change:
   result rather than appearing through hydration.
 - **Large-result interactivity.** Worker/off-thread/chunked commit changes can
   alter loader timing and must be planned as an interactivity change.
+- **Row subtotal/header behavior.** The current `totals/rows.test.tsx` suite
+  exposes visible disagreements around single-metric subtotal labels,
+  collapsed row subtotals, and top-level metric subtotal rows. Do not change
+  these by test expectation alone. Decide the visible UX first, then implement
+  the policy through materialization/render policy rather than another
+  render-time repair branch.
+- **Metric display-label precedence.** One row-total test expects `verboseMap`
+  to beat an explicit `metricLabelMap` for `Total COUNT(*)` labels, while the
+  current display resolver gives `metricLabelMap` priority. Changing that could
+  affect saved labels, formatting keys, and export labels; it needs an explicit
+  metric-identity/display-label decision.
 
 ## Testing And Validation
 
