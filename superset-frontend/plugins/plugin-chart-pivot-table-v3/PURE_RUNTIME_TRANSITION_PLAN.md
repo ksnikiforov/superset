@@ -290,8 +290,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13409` insertions, `17801` deletions, net `-4392`.
-- Current production TypeScript/TSX total: about `29118` lines.
+- Production `src`: `13414` insertions, `17813` deletions, net `-4399`.
+- Current production TypeScript/TSX total: about `29111` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -303,7 +303,7 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `29118` | `-4392` | `< 28000` |
+| Full production `src` | `33510` | `29111` | `-4399` | `< 28000` |
 | Strict core pipeline | `11337` | `11834` | `+497` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5061` | `+378` | `3000-4000` |
 | Broad core pipeline | `16020` | `16895` | `+875` | `11000-13000` |
@@ -591,6 +591,13 @@ fetch-execution boundary no longer carries a second handwritten payload with
 duplicated axis/path/depth fields just to build request ids. Visible depths
 still drive batching and intersection coverage, but request identity follows
 the same compiled target consumed by query specs.
+
+Latest chart bootstrap cleanup: `transformProps` no longer resolves the
+interaction layout before calling `buildInitialPivotUpdatePlan`. Bootstrap now
+passes the raw form data plus runtime layout to the plan boundary and lets that
+single planner compile the query-backed runtime layout. This removes a
+chart-owned pre-resolution path without changing fixed/user-controlled UI
+selection.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.

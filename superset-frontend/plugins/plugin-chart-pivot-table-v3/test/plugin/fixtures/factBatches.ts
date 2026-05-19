@@ -26,7 +26,7 @@ import {
   type PivotFactStoreBatchScope,
   type PivotFactStoreBatch,
 } from '../../../src/pivot/runtime/factStore';
-import { parsePath, serializePath } from '../../../src/pivot/core/path';
+import { parsePath } from '../../../src/pivot/core/path';
 import {
   isMeasureLeafToken,
   isMetricToken,
@@ -36,10 +36,6 @@ import {
   buildExpansionQuerySpecs,
   type PlannedQuerySpec,
 } from '../../../src/pivot/query/specs';
-import {
-  buildAxisExpansionCoverageTarget,
-  buildIntersectionCoverageTarget,
-} from '../../../src/pivot/expansion/planner';
 import { type PivotFactCoverage } from '../../../src/pivot/runtime/types';
 import { type PivotPath, type PivotTreeData } from '../../../src/types';
 
@@ -63,6 +59,30 @@ type FetchPivotIntersectionParams = Extract<
 type FetchPivotBranchResult = FetchPivotExpansionResult;
 type FetchPivotBranchesBatchResult = FetchPivotExpansionResult;
 type FetchPivotIntersectionResult = FetchPivotExpansionResult;
+
+export const getMockExpansionRequestAxis = (
+  params: FetchPivotExpansionRequest,
+) => {
+  if (params.kind === 'intersection') {
+    return 'row';
+  }
+  return params.kind === 'batch'
+    ? params.batch.axis
+    : params.coverageTarget.axis;
+};
+
+export const getMockExpansionRequestPath = (
+  params: FetchPivotExpansionRequest,
+): PivotPath => {
+  if (params.kind === 'intersection') {
+    return [];
+  }
+  return parsePath(
+    params.kind === 'batch'
+      ? (params.batch.targets[0]?.pathKey ?? '')
+      : params.coverageTarget.pathKey,
+  );
+};
 
 const stripMockFactBatches = <T>(result: MockFetchResult<T>): Partial<T> => {
   const fetchResult = { ...result };
@@ -161,35 +181,16 @@ const buildMockFactBatchesFromSpecs = (
 export const buildMockBranchFactBatches = ({
   formData,
   layout,
-  axis,
-  path,
-  visibleRowDepth = 0,
-  visibleColDepth = 0,
+  coverageTarget,
   data,
-}: Pick<
-  FetchPivotBranchParams,
-  | 'axis'
-  | 'formData'
-  | 'layout'
-  | 'path'
-  | 'visibleColDepth'
-  | 'visibleRowDepth'
-> & { data?: PivotTreeData }): PivotFactStoreBatch[] => {
+}: Pick<FetchPivotBranchParams, 'coverageTarget' | 'formData' | 'layout'> & {
+  data?: PivotTreeData;
+}): PivotFactStoreBatch[] => {
   const specs = buildExpansionQuerySpecs({
     kind: 'branch',
     formData,
     layout,
-    axis,
-    path,
-    visibleRowDepth,
-    visibleColDepth,
-    coverageTarget: buildAxisExpansionCoverageTarget({
-      program: layout.pivotProgram,
-      axis,
-      pathKey: serializePath(path),
-      rowDepth: visibleRowDepth,
-      columnDepth: visibleColDepth,
-    }),
+    coverageTarget,
   });
   return buildMockFactBatchesFromSpecs(specs, data);
 };
@@ -214,27 +215,18 @@ export const buildMockBatchFactBatches = ({
   formData,
   layout,
   batch,
-  visibleRowDepth,
-  visibleColDepth,
+  coverageTarget,
   data,
 }: Pick<
   FetchPivotBranchesBatchParams,
-  'batch' | 'formData' | 'layout' | 'visibleColDepth' | 'visibleRowDepth'
+  'batch' | 'coverageTarget' | 'formData' | 'layout'
 > & { data?: PivotTreeData }): PivotFactStoreBatch[] => {
   const specs = buildExpansionQuerySpecs({
     kind: 'batch',
     formData,
     layout,
     batch,
-    visibleRowDepth,
-    visibleColDepth,
-    coverageTarget: buildAxisExpansionCoverageTarget({
-      program: layout.pivotProgram,
-      axis: batch.axis,
-      pathKey: batch.targets[0].pathKey,
-      rowDepth: visibleRowDepth,
-      columnDepth: visibleColDepth,
-    }),
+    coverageTarget,
   });
   return buildMockFactBatchesFromSpecs(specs, data);
 };
@@ -260,17 +252,11 @@ export const buildMockIntersectionFactBatches = ({
   layout,
   rowPathKeys,
   columnPathKeys,
-  visibleRowDepth,
-  visibleColDepth,
+  coverageTarget,
   data,
 }: Pick<
   FetchPivotIntersectionParams,
-  | 'columnPathKeys'
-  | 'formData'
-  | 'layout'
-  | 'rowPathKeys'
-  | 'visibleColDepth'
-  | 'visibleRowDepth'
+  'columnPathKeys' | 'coverageTarget' | 'formData' | 'layout' | 'rowPathKeys'
 > & { data?: PivotTreeData }): PivotFactStoreBatch[] => {
   const specs = buildExpansionQuerySpecs({
     kind: 'intersection',
@@ -278,15 +264,7 @@ export const buildMockIntersectionFactBatches = ({
     layout,
     rowPathKeys,
     columnPathKeys,
-    visibleRowDepth,
-    visibleColDepth,
-    coverageTarget: buildIntersectionCoverageTarget({
-      program: layout.pivotProgram,
-      rowPathKeys,
-      columnPathKeys,
-      rowDepth: visibleRowDepth,
-      columnDepth: visibleColDepth,
-    }),
+    coverageTarget,
   });
   return specs.length > 0
     ? buildMockFactBatchesFromSpecs(specs, data)
@@ -295,8 +273,8 @@ export const buildMockIntersectionFactBatches = ({
           coverage: buildFactCoverage({
             rowDimensions: layout.pivotProgram.rowDimensions,
             columnDimensions: layout.pivotProgram.columnDimensions,
-            rowDepth: visibleRowDepth,
-            columnDepth: visibleColDepth,
+            rowDepth: coverageTarget.rowDepth,
+            columnDepth: coverageTarget.columnDepth,
           }),
           facts: [],
           valueKeys: [],

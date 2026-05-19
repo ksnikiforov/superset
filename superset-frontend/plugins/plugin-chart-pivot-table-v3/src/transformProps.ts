@@ -35,10 +35,7 @@ import {
   coerceEpochMsStringToNumber,
 } from './utils';
 import { getMetricKeys, getMetricKey } from './pivot/metrics';
-import {
-  buildRuntimeLayoutFromFormData,
-  resolveInteractionFormData,
-} from './pivot/layout/resolveInteractionLayout';
+import { buildRuntimeLayoutFromFormData } from './pivot/layout/resolveInteractionLayout';
 import { buildInitialPivotUpdatePlan } from './pivot/update/initialUpdatePlan';
 import { buildInitialRuntimeFromSpecResults } from './pivot/runtime/ingestQueryResults';
 
@@ -84,12 +81,8 @@ export default function transformProps(
       | PivotTableQueryFormData['pivotRuntimeLayout']
       | undefined) ??
     buildRuntimeLayoutFromFormData(baseFormData);
-  const formData = resolveInteractionFormData({
-    formData: baseFormData,
-    runtimeLayout,
-  });
   const metricsForLabels = ensureIsArray(
-    rawFormData.metrics ?? baseFormData.metrics ?? formData.metrics,
+    rawFormData.metrics ?? baseFormData.metrics ?? runtimeLayout.metrics,
   );
   const metricLabelMapBase = metricsForLabels.reduce<Record<string, string>>(
     (acc, metric) => {
@@ -113,7 +106,7 @@ export default function transformProps(
   );
   const baseMetricLabelOverrides = {
     ...metricLabelMapBase,
-    ...(formData.metricLabelMap ?? {}),
+    ...(baseFormData.metricLabelMap ?? {}),
   };
   const datasourceVerboseMap = datasource?.verboseMap ?? {};
   const columnFormats = datasource?.columnFormats ?? {};
@@ -144,7 +137,7 @@ export default function transformProps(
     ...columnVerboseMap,
     ...rawDatasourceVerboseMap,
     ...datasourceVerboseMap,
-    ...(formData.verboseMap ?? {}),
+    ...(baseFormData.verboseMap ?? {}),
   };
   const metricLabelMap = Object.fromEntries(
     buildResolvedMetricLabelMap({
@@ -153,7 +146,7 @@ export default function transformProps(
       verboseMap,
     }),
   );
-  const formDataWithMetricLabels = { ...formData, metricLabelMap };
+  const formDataWithMetricLabels = { ...baseFormData, metricLabelMap };
   const {
     formData: plannedFormData,
     layout,
@@ -220,7 +213,7 @@ export default function transformProps(
     }
   });
 
-  Object.entries(formData.temporal_columns_lookup ?? {}).forEach(
+  Object.entries(baseFormData.temporal_columns_lookup ?? {}).forEach(
     ([columnName, isTemporal]) => {
       if (!isTemporal) {
         return;
@@ -266,7 +259,7 @@ export default function transformProps(
       return;
     }
     let formatter: ((value: DataRecordValue) => string) | undefined;
-    if (formData.dateFormat === SMART_DATE_ID) {
+    if (baseFormData.dateFormat === SMART_DATE_ID) {
       if (
         combinedData.every(row => {
           const value = row[temporalColname];
@@ -287,8 +280,8 @@ export default function transformProps(
               | undefined,
           );
       }
-    } else if (formData.dateFormat) {
-      const base = getTimeFormatter(formData.dateFormat);
+    } else if (baseFormData.dateFormat) {
+      const base = getTimeFormatter(baseFormData.dateFormat);
       formatter = (value: DataRecordValue) =>
         base(
           coerceEpochMsStringToNumber(value) as
