@@ -24,12 +24,10 @@ import {
   resolveExpandedForMetrics,
   resolveExpansionReinitializationDecision,
   resolveExpansionToggleDecision,
-  runHydrationLoop,
   type ExpansionPlanningConfig,
-  type ExpansionVisibilityConfig,
 } from '../../../src/pivot/expansion/stateTransitions';
 import { createExpansionCoverageDiff } from '../../../src/pivot/runtime/coverage';
-import { findChildren, rootKey } from '../../../src/pivot/viewModel';
+import { rootKey } from '../../../src/pivot/viewModel';
 import {
   encodeMetricKey,
   METRICS_PLACEHOLDER,
@@ -40,11 +38,6 @@ import {
   serializeCellKey,
   serializePath,
 } from '../../../src/pivot/core/path';
-import { mergeTrees } from '../../../src/pivot/core/tree';
-import {
-  isMetricGrandTotalNode,
-  isMetricSubtotalNode,
-} from '../../../src/pivot/metricsTotals';
 import {
   MetricsLayoutEnum,
   type PivotTreeData,
@@ -54,95 +47,13 @@ import { type PivotFactSelector } from '../../../src/pivot/runtime/factStore';
 import { compilePivotProgram } from '../../../src/pivot/runtime/compilePivotProgram';
 
 describe('pivot/expansion/stateTransitions', () => {
-  const depthSorter = () => 0;
-  const buildTestRenderModelConfig =
-    ({
-      groupbyRowsLength = 2,
-      groupbyColumnsLength = 2,
-      rowTotals = false,
-      colTotals = false,
-      metricsLayout = MetricsLayoutEnum.COLUMNS,
-      metricLabelSet = new Set<string>(),
-      metricIndexForRows,
-      metricIndexForCols,
-      countDimDepth = (path: PivotTreeNode['path']) => path.length,
-    }: {
-      groupbyRowsLength?: number;
-      groupbyColumnsLength?: number;
-      rowTotals?: boolean;
-      colTotals?: boolean;
-      metricsLayout?: MetricsLayoutEnum;
-      metricLabelSet?: Set<string>;
-      metricIndexForRows?: number;
-      metricIndexForCols?: number;
-      countDimDepth?: (path: PivotTreeNode['path']) => number;
-    } = {}) =>
-    ({ tree }: { tree: PivotTreeData }) => {
-      const metricKeys = Array.from(metricLabelSet);
-      const rowDims = Array.from(
-        { length: groupbyRowsLength },
-        (_, idx) => `r${idx}`,
-      );
-      const colDims = Array.from(
-        { length: groupbyColumnsLength },
-        (_, idx) => `c${idx}`,
-      );
-      const withPlaceholder = (dims: string[], index?: number) => [
-        ...dims.slice(0, index ?? dims.length),
-        METRICS_PLACEHOLDER,
-        ...dims.slice(index ?? dims.length),
-      ];
-      const program = compilePivotProgram({
-        groupbyRows:
-          metricsLayout === MetricsLayoutEnum.ROWS && metricKeys.length > 0
-            ? withPlaceholder(rowDims, metricIndexForRows)
-            : rowDims,
-        groupbyColumns:
-          metricsLayout === MetricsLayoutEnum.COLUMNS && metricKeys.length > 0
-            ? withPlaceholder(colDims, metricIndexForCols)
-            : colDims,
-        metrics: metricKeys,
-        metricsLayout,
-      });
-      return {
-        groupbyRowsLength,
-        groupbyColumnsLength,
-        normalizedRowSubtotalLevels: [],
-        normalizedColSubtotalLevels: [],
-        rowTotals,
-        colTotals,
-        rowTotalPosition: 'start' as const,
-        colTotalPosition: 'start' as const,
-        resolvedColSubtotalPosition: 'start' as const,
-        pivotProgram: program,
-        hasMultipleMeasures: metricLabelSet.size > 1,
-        rowSorter: depthSorter,
-        colSorter: depthSorter,
-        getRowChildren: (parent: PivotTreeNode) =>
-          findChildren(tree.rows, parent),
-        getCollapsedRowChildren: () => [] as PivotTreeNode[],
-        getColChildren: (parent: PivotTreeNode) =>
-          findChildren(tree.cols, parent),
-        getCollapsedColLeaves: () => [] as PivotTreeNode[],
-        countDimDepth,
-        isMetricGrandTotalNode: (node?: PivotTreeNode) =>
-          isMetricGrandTotalNode(node, {
-            metricLabelSet,
-            program,
-          }),
-        isMetricSubtotalNode: (node?: PivotTreeNode) =>
-          isMetricSubtotalNode(node, metricLabelSet),
-      };
-    };
-
   const testProgram = compilePivotProgram({
     groupbyRows: ['country', 'city'],
     groupbyColumns: ['month', 'day'],
     metrics: ['sales'],
   });
-  const config: ExpansionVisibilityConfig & ExpansionPlanningConfig = {
+  const config: ExpansionPlanningConfig = {
     program: testProgram,
-    buildRenderModelConfig: buildTestRenderModelConfig(),
   };
   const expansionCoverageLoadedFromSelectors = (
     factSelectors: PivotFactSelector[] = [],
@@ -349,255 +260,6 @@ describe('pivot/expansion/stateTransitions', () => {
     });
 
     expect(result).toEqual(new Set([rootKey, aKey]));
-  });
-
-  it('runs hydration loops to completion without fetching when coverage is satisfied', async () => {
-    const { tree, aKey, xKey } = buildTree({ includeIntersectionCell: true });
-    const factSelectors: PivotFactSelector[] = [
-      {
-        coverage: {
-          rowDepth: 2,
-          columnDepth: 2,
-          rowDimensions: ['country', 'city'],
-          columnDimensions: ['month', 'day'],
-        },
-        scope: {
-          kind: 'branch',
-          axis: 'row',
-          path: ['A'],
-        },
-        valueKeys: ['sales'],
-      },
-      {
-        coverage: {
-          rowDepth: 2,
-          columnDepth: 2,
-          rowDimensions: ['country', 'city'],
-          columnDimensions: ['month', 'day'],
-        },
-        scope: {
-          kind: 'branch',
-          axis: 'col',
-          path: ['X'],
-        },
-        valueKeys: ['sales'],
-      },
-    ];
-    const result = await runHydrationLoop({
-      baseTree: tree,
-      maxIterations: 4,
-      isCurrent: () => true,
-      buildDesiredExpanded: axis =>
-        axis === 'row' ? new Set([aKey]) : new Set([xKey]),
-      getMissingExpansionCoverage: () =>
-        expansionCoverageLoadedFromSelectors(factSelectors),
-      config,
-      fetchTree: jest.fn(),
-    });
-
-    expect(result).toEqual({
-      status: 'complete',
-      tree,
-      desiredRows: new Set([aKey]),
-      desiredCols: new Set([xKey]),
-    });
-  });
-
-  it('runs hydration loops by fetching the next tree for missing coverage', async () => {
-    const { tree, aKey } = buildTree({ includeIntersectionCell: true });
-    const childKey = serializePath(['A', 'B']);
-    const branch: PivotTreeData = {
-      rows: {
-        [childKey]: makeNode('row', ['A', 'B'], false),
-      },
-      cols: {},
-      cells: {},
-    };
-    const factSelectors: PivotFactSelector[] = [
-      {
-        coverage: {
-          rowDepth: 2,
-          columnDepth: 1,
-          rowDimensions: ['country', 'city'],
-          columnDimensions: ['month'],
-        },
-        scope: {
-          kind: 'branch',
-          axis: 'col',
-          path: [],
-        },
-        valueKeys: ['sales'],
-      },
-    ];
-    const fetchTree = jest.fn(
-      async ({ targets, context, tree: currentTree }) => {
-        targets.forEach(target => {
-          const targetDepth = parsePath(target.pathKey).length + 1;
-          factSelectors.push({
-            coverage: {
-              rowDepth:
-                target.axis === 'row' ? targetDepth : context.visibleRowDepth,
-              columnDepth:
-                target.axis === 'col' ? targetDepth : context.visibleColDepth,
-              rowDimensions: ['country', 'city'],
-              columnDimensions: ['month'],
-            },
-            scope: {
-              kind: 'branch',
-              axis: target.axis,
-              path: parsePath(target.pathKey),
-            },
-            valueKeys: ['sales'],
-          });
-        });
-        return mergeTrees(currentTree, branch);
-      },
-    );
-    const result = await runHydrationLoop({
-      baseTree: tree,
-      maxIterations: 3,
-      isCurrent: () => true,
-      buildDesiredExpanded: axis =>
-        axis === 'row' ? new Set([aKey]) : new Set([rootKey]),
-      getMissingExpansionCoverage: () =>
-        expansionCoverageLoadedFromSelectors(factSelectors),
-      config,
-      fetchTree,
-    });
-
-    expect(fetchTree).toHaveBeenCalledTimes(1);
-    expect(fetchTree.mock.calls[0][0].targets).toMatchObject([
-      {
-        axis: 'row',
-        pathKey: aKey,
-      },
-    ]);
-    expect(result.status).toBe('complete');
-    if (result.status !== 'complete') {
-      return;
-    }
-    expect(result.tree.rows[childKey]).toEqual(branch.rows[childKey]);
-  });
-
-  it('runs hydration loops through nested persisted row targets', async () => {
-    const aKey = serializePath(['A']);
-    const axKey = serializePath(['A', 'X']);
-    const axpKey = serializePath(['A', 'X', 'P']);
-    const baseTree: PivotTreeData = {
-      rows: {
-        [rootKey]: makeNode('row', [], true),
-        [aKey]: makeNode('row', ['A'], true),
-      },
-      cols: {
-        [rootKey]: makeNode('col', [], false),
-      },
-      cells: {},
-    };
-    const branchA: PivotTreeData = {
-      rows: {
-        [rootKey]: makeNode('row', [], true),
-        [aKey]: makeNode('row', ['A'], true),
-        [axKey]: makeNode('row', ['A', 'X'], true),
-      },
-      cols: {},
-      cells: {},
-    };
-    const branchAX: PivotTreeData = {
-      rows: {
-        [rootKey]: makeNode('row', [], true),
-        [aKey]: makeNode('row', ['A'], true),
-        [axKey]: makeNode('row', ['A', 'X'], true),
-        [axpKey]: makeNode('row', ['A', 'X', 'P'], false),
-      },
-      cols: {},
-      cells: {},
-    };
-    const factSelectors: PivotFactSelector[] = [];
-    const nestedProgram = compilePivotProgram({
-      groupbyRows: ['country', 'city', 'store'],
-      groupbyColumns: [],
-      metrics: ['sales'],
-    });
-    const fetchTree = jest.fn(
-      async ({ targets, context, tree: currentTree }) => {
-        const data = targets.some(target => target.pathKey === axKey)
-          ? branchAX
-          : branchA;
-        targets.forEach(target => {
-          const path = parsePath(target.pathKey);
-          const targetDepth = path.length + 1;
-          factSelectors.push({
-            coverage: {
-              rowDepth:
-                target.axis === 'row' ? targetDepth : context.visibleRowDepth,
-              columnDepth: context.visibleColDepth,
-              rowDimensions: ['country', 'city', 'store'].slice(
-                0,
-                target.axis === 'row' ? targetDepth : context.visibleRowDepth,
-              ),
-              columnDimensions: [],
-            },
-            scope: {
-              kind: 'branch',
-              axis: 'row',
-              path,
-            },
-            valueKeys: ['sales'],
-          });
-        });
-        return mergeTrees(currentTree, data);
-      },
-    );
-    const result = await runHydrationLoop({
-      baseTree,
-      maxIterations: 4,
-      isCurrent: () => true,
-      buildDesiredExpanded: axis =>
-        axis === 'row' ? new Set([aKey, axKey]) : new Set(),
-      getMissingExpansionCoverage: () =>
-        createExpansionCoverageDiff({
-          factSelectors,
-          program: nestedProgram,
-          valueKeys: ['sales'],
-        }),
-      config: {
-        ...config,
-        groupbyRowsLength: 3,
-        groupbyColumnsLength: 0,
-        program: nestedProgram,
-        buildRenderModelConfig: buildTestRenderModelConfig({
-          groupbyRowsLength: 3,
-          groupbyColumnsLength: 0,
-        }),
-      },
-      fetchTree,
-    });
-
-    expect(fetchTree).toHaveBeenCalledTimes(1);
-    expect(result.status).toBe('complete');
-    if (result.status !== 'complete') {
-      return;
-    }
-    expect(result.tree.rows[axKey]).toEqual(branchAX.rows[axKey]);
-    expect(result.tree.rows[axpKey]).toEqual(branchAX.rows[axpKey]);
-  });
-
-  it('stops hydration loops when the request becomes stale', async () => {
-    const { tree, aKey, xKey } = buildTree({ includeIntersectionCell: true });
-    const fetchTree = jest.fn();
-    const result = await runHydrationLoop({
-      baseTree: tree,
-      maxIterations: 3,
-      isCurrent: () => false,
-      buildDesiredExpanded: axis =>
-        axis === 'row' ? new Set([aKey]) : new Set([xKey]),
-      getMissingExpansionCoverage: () => expansionCoverageLoadedFromSelectors(),
-      config,
-      fetchTree,
-    });
-
-    expect(result).toEqual({ status: 'stale' });
-    expect(fetchTree).not.toHaveBeenCalled();
   });
 
   it('plans expansion reinitialization for first mount and signature changes', () => {
@@ -913,20 +575,12 @@ describe('pivot/expansion/stateTransitions', () => {
         },
       },
     };
-    const metricConfig: ExpansionVisibilityConfig = {
-      ...config,
+    const metricConfig: ExpansionPlanningConfig = {
       program: compilePivotProgram({
         groupbyRows: ['country', 'city'],
         groupbyColumns: ['month', 'day', METRICS_PLACEHOLDER],
         metrics: ['m1'],
         metricsLayout: MetricsLayoutEnum.COLUMNS,
-      }),
-      buildRenderModelConfig: buildTestRenderModelConfig({
-        metricsLayout: MetricsLayoutEnum.ROWS,
-        metricLabelSet: new Set(['m1']),
-        metricIndexForRows: 1,
-        countDimDepth: path =>
-          path.filter(value => value !== metricToken).length,
       }),
     };
 
@@ -971,23 +625,12 @@ describe('pivot/expansion/stateTransitions', () => {
         },
       },
     };
-    const metricConfig: ExpansionVisibilityConfig = {
-      ...config,
+    const metricConfig: ExpansionPlanningConfig = {
       program: compilePivotProgram({
         groupbyRows: ['country', 'city', METRICS_PLACEHOLDER],
         groupbyColumns: ['month', 'day'],
         metrics: ['m1'],
         metricsLayout: MetricsLayoutEnum.ROWS,
-      }),
-      buildRenderModelConfig: buildTestRenderModelConfig({
-        groupbyRowsLength: 3,
-        metricsLayout: MetricsLayoutEnum.ROWS,
-        metricLabelSet: new Set(['m1']),
-        metricIndexForRows: 2,
-        countDimDepth: path =>
-          path.filter(
-            value => value !== metricToken && value !== SUBTOTAL_TOKEN,
-          ).length,
       }),
     };
 

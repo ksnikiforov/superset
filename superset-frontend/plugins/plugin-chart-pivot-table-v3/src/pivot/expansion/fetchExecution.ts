@@ -30,7 +30,10 @@ import { buildFactValueKeys, type PivotFactStore } from '../runtime/factStore';
 import { type LatestRequestScope } from '../runtime/requestLifecycle';
 import { createExpansionCoverageDiff } from '../runtime/coverage';
 import { stableStringify } from '../shared/stableStringify';
-import { runHydrationLoop } from './stateTransitions';
+import {
+  planHydrationIteration,
+  type ExpansionPlanningConfig,
+} from './stateTransitions';
 import {
   type ExpansionFetchTarget,
   type IntersectionFetchTarget,
@@ -56,6 +59,18 @@ export type ExpansionFetchRuntime = {
 export type ExpansionFetchContext = {
   visibleRowDepth: number;
   visibleColDepth: number;
+};
+
+type HydrationFetchLoopParams = {
+  baseTree: PivotTreeData;
+  maxIterations: number;
+  isCurrent: () => boolean;
+  buildDesiredExpanded: (
+    axis: 'row' | 'col',
+    tree: PivotTreeData,
+  ) => Set<string>;
+  config: ExpansionPlanningConfig;
+  fetchRuntime: ExpansionFetchRuntime;
 };
 
 type ExpansionQueryRequest = Omit<
@@ -286,26 +301,51 @@ export const fetchExpansionTargetDeltas = async ({
   return branchFetchPromises.length + missingIntersections.length > 0;
 };
 
-type HydrationLoopParams = Parameters<typeof runHydrationLoop>[0];
-
-export const runHydrationExpansionFetchLoop = ({
+export const runHydrationExpansionFetchLoop = async ({
+  baseTree,
+  maxIterations,
+  isCurrent,
+  buildDesiredExpanded,
+  config,
   fetchRuntime,
-  ...hydrationLoopParams
-}: Omit<HydrationLoopParams, 'fetchTree' | 'getMissingExpansionCoverage'> & {
-  fetchRuntime: ExpansionFetchRuntime;
-}) =>
-  runHydrationLoop({
-    ...hydrationLoopParams,
-    getMissingExpansionCoverage: () =>
-      createRuntimeExpansionCoverageDiff({
+}: HydrationFetchLoopParams) => {
+  let currentTree = baseTree;
+  for (let iteration = 0; iteration < maxIterations; iteration += 1) {
+    if (!isCurrent()) {
+      return { status: 'stale' as const };
+    }
+    const desiredRows = buildDesiredExpanded('row', currentTree);
+    const desiredCols = buildDesiredExpanded('col', currentTree);
+    const hydrationPlan = planHydrationIteration({
+      tree: currentTree,
+      desiredRows,
+      desiredCols,
+      getMissingExpansionCoverage: createRuntimeExpansionCoverageDiff({
         runtime: fetchRuntime,
       }),
-    fetchTree: async ({ targets, context, tree }) => {
-      const didFetch = await fetchExpansionTargetDeltas({
-        targets,
-        context,
-        runtime: fetchRuntime,
-      });
-      return didFetch ? fetchRuntime.materializeLoadedTree() : tree;
-    },
-  });
+      config,
+    });
+    const { visibleRowDepth, visibleColDepth } = hydrationPlan;
+
+    if (hydrationPlan.kind === 'complete') {
+      return {
+        status: 'complete' as const,
+        tree: currentTree,
+        desiredRows,
+        desiredCols,
+      };
+    }
+
+    // eslint-disable-next-line no-await-in-loop
+    const didFetch = await fetchExpansionTargetDeltas({
+      targets: hydrationPlan.targets,
+      context: { visibleRowDepth, visibleColDepth },
+      runtime: fetchRuntime,
+    });
+    currentTree = didFetch ? fetchRuntime.materializeLoadedTree() : currentTree;
+    if (!isCurrent()) {
+      return { status: 'stale' as const };
+    }
+  }
+  return { status: 'exhausted' as const };
+};

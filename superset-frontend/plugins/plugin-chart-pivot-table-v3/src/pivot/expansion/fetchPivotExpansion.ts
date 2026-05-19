@@ -29,23 +29,16 @@ import {
 } from '../runtime/ingestQueryResults';
 import { isAbortError } from '../runtime/requestLifecycle';
 
-type ExpansionQuerySpecRequestWithoutLayout =
-  ExpansionQuerySpecRequest extends infer Request
-    ? Request extends unknown
-      ? Omit<Request, 'layout'>
-      : never
-    : never;
+type ExpansionRequestWithoutLayout<Request = ExpansionQuerySpecRequest> =
+  Request extends unknown ? Omit<Request, 'layout'> : never;
 
-export type FetchPivotExpansionRequest =
-  ExpansionQuerySpecRequestWithoutLayout & {
-    layout: LayoutContext;
-    requestGroupId?: string;
-    factStore?: PivotFactStore;
-  };
+export type FetchPivotExpansionRequest = ExpansionRequestWithoutLayout & {
+  layout: LayoutContext;
+  requestGroupId?: string;
+  factStore?: PivotFactStore;
+};
 
-export interface FetchPivotExpansionResult {
-  warnings?: ChartDataWarning[];
-}
+export type FetchPivotExpansionResult = { warnings?: ChartDataWarning[] };
 
 export const fetchPivotExpansion = async (
   request: FetchPivotExpansionRequest,
