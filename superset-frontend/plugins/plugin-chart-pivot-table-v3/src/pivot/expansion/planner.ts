@@ -80,8 +80,6 @@ export type BatchGroup = {
   targets: BatchCandidate[];
 };
 
-export type AxisFetchTarget = FetchTarget;
-
 export type IntersectionFetchTarget = {
   kind: 'intersection';
   rowPathKeys: string[];
@@ -89,7 +87,7 @@ export type IntersectionFetchTarget = {
   coverageTarget: ExpansionCoverageTarget;
 };
 
-export type ExpansionFetchTarget = AxisFetchTarget | IntersectionFetchTarget;
+export type ExpansionFetchTarget = FetchTarget | IntersectionFetchTarget;
 
 export const isIntersectionFetchTarget = (
   target: ExpansionFetchTarget,
