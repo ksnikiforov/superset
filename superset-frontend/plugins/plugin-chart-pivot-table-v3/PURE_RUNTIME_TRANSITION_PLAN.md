@@ -290,8 +290,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13414` insertions, `17813` deletions, net `-4399`.
-- Current production TypeScript/TSX total: about `29111` lines.
+- Production `src`: `13404` insertions, `17813` deletions, net `-4409`.
+- Current production TypeScript/TSX total: about `29101` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -303,16 +303,16 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `29111` | `-4399` | `< 28000` |
-| Strict core pipeline | `11337` | `11834` | `+497` | `8000` |
+| Full production `src` | `33510` | `29101` | `-4409` | `< 28000` |
+| Strict core pipeline | `11337` | `11824` | `+487` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5061` | `+378` | `3000-4000` |
-| Broad core pipeline | `16020` | `16895` | `+875` | `11000-13000` |
+| Broad core pipeline | `16020` | `16885` | `+865` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `3886` |
+| `pivot/runtime/*` | `3876` |
 | `pivot/expansion/*` | `2776` |
 | `pivot/query/*` | `1412` |
 | `pivot/layout/*` | `770` |
@@ -598,6 +598,12 @@ passes the raw form data plus runtime layout to the plan boundary and lets that
 single planner compile the query-backed runtime layout. This removes a
 chart-owned pre-resolution path without changing fixed/user-controlled UI
 selection.
+
+Latest seamless planning cleanup: the local `buildSeamlessRuntimeUpdatePlan`
+wrapper is gone. Seamless semantic-layout fetches now call
+`buildInitialPivotUpdatePlan` directly after stripping expansion state from
+the query form data, so initial and seamless planning share the same planner
+without an extra seamless-only vocabulary.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.

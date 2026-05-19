@@ -352,44 +352,34 @@ export const prepareSeamlessRuntimeLayoutChange = ({
   };
 };
 
-type SeamlessRuntimeUpdatePlanConfig = {
+type SeamlessRuntimeUpdateConfig = {
   baseFormData: PivotTableQueryFormData;
   sourceMetrics: PivotTableQueryFormData['metrics'];
   sourceMeasureLeavesByMetric: PivotTableQueryFormData['measureLeavesByMetric'];
   runtimeLayout: PivotRuntimeLayout;
   selection: RuntimeSelection;
-};
-
-type SeamlessRuntimeUpdateConfig = SeamlessRuntimeUpdatePlanConfig & {
   requestLifecycle: LatestRequestLifecycle;
   materializationLifecycle: LatestRequestLifecycle;
 };
 
-const buildSeamlessRuntimeUpdatePlan = ({
+export const fetchAndMaterializeSeamlessRuntimeUpdate = async ({
+  requestLifecycle,
+  materializationLifecycle,
   baseFormData,
   sourceMetrics,
   sourceMeasureLeavesByMetric,
   runtimeLayout,
   selection,
-}: SeamlessRuntimeUpdatePlanConfig) => {
+}: SeamlessRuntimeUpdateConfig) => {
   const queryFormData = { ...baseFormData };
   delete queryFormData.pivotExpansionState;
-  return buildInitialPivotUpdatePlan({
+  const { formData, layout, specs } = buildInitialPivotUpdatePlan({
     formData: queryFormData,
     runtimeLayout,
     selection,
     metricsOverride: sourceMetrics,
     measureLeavesByMetricOverride: sourceMeasureLeavesByMetric,
   });
-};
-
-export const fetchAndMaterializeSeamlessRuntimeUpdate = async ({
-  requestLifecycle,
-  materializationLifecycle,
-  ...planConfig
-}: SeamlessRuntimeUpdateConfig) => {
-  const { formData, layout, specs } =
-    buildSeamlessRuntimeUpdatePlan(planConfig);
   const fetchResult = await executeLatestRequest({
     lifecycle: requestLifecycle,
     requestGroupId: SEAMLESS_REQUEST_GROUP,
