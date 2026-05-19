@@ -644,59 +644,6 @@ export const resolveReinitializedExpansionState = (params: {
   };
 };
 
-export const buildCrossAxisIntersectionTargets = ({
-  rowKeys,
-  colKeys,
-  rowNodes,
-  colNodes,
-  visibleRowDepth,
-  visibleColDepth,
-  getMissingExpansionCoverage,
-  program,
-}: {
-  rowKeys: Set<string>;
-  colKeys: Set<string>;
-  rowNodes: Record<string, PivotTreeNode>;
-  colNodes: Record<string, PivotTreeNode>;
-  visibleRowDepth: number;
-  visibleColDepth: number;
-  getMissingExpansionCoverage: PivotExpansionCoverageDiff;
-  program: PivotProgram;
-}): ExpansionFetchTarget[] => {
-  const rowPathKeys = Array.from(rowKeys).filter(
-    key => key !== rootKey && rowNodes[key],
-  );
-  const columnPathKeys = Array.from(colKeys).filter(
-    key => key !== rootKey && colNodes[key],
-  );
-  if (
-    visibleRowDepth === 0 ||
-    visibleColDepth === 0 ||
-    rowPathKeys.length === 0 ||
-    columnPathKeys.length === 0 ||
-    rowPathKeys.length * columnPathKeys.length <= 1
-  ) {
-    return [];
-  }
-  const intersectionTarget = buildIntersectionCoverageTarget({
-    program,
-    rowDepth: visibleRowDepth,
-    columnDepth: visibleColDepth,
-    rowPathKeys,
-    columnPathKeys,
-  });
-  return getMissingExpansionCoverage([intersectionTarget]).length > 0
-    ? [
-        {
-          kind: 'intersection',
-          rowPathKeys,
-          columnPathKeys,
-          coverageTarget: intersectionTarget,
-        },
-      ]
-    : [];
-};
-
 const suppressOppositeRootFetches = ({
   rowPlan,
   colPlan,
@@ -768,16 +715,39 @@ export const planHydrationIteration = ({
     getMissingExpansionCoverage,
   });
 
-  const intersectionTargets = buildCrossAxisIntersectionTargets({
-    rowKeys: desiredRows,
-    colKeys: desiredCols,
-    rowNodes: tree.rows,
-    colNodes: tree.cols,
-    visibleRowDepth,
-    visibleColDepth,
-    getMissingExpansionCoverage,
-    program,
-  });
+  const rowPathKeys = Array.from(desiredRows).filter(
+    key => key !== rootKey && tree.rows[key],
+  );
+  const columnPathKeys = Array.from(desiredCols).filter(
+    key => key !== rootKey && tree.cols[key],
+  );
+  const shouldCheckIntersection =
+    visibleRowDepth > 0 &&
+    visibleColDepth > 0 &&
+    rowPathKeys.length > 0 &&
+    columnPathKeys.length > 0 &&
+    rowPathKeys.length * columnPathKeys.length > 1;
+  const intersectionCoverageTarget = shouldCheckIntersection
+    ? buildIntersectionCoverageTarget({
+        program,
+        rowDepth: visibleRowDepth,
+        columnDepth: visibleColDepth,
+        rowPathKeys,
+        columnPathKeys,
+      })
+    : undefined;
+  const intersectionTargets: ExpansionFetchTarget[] =
+    intersectionCoverageTarget &&
+    getMissingExpansionCoverage([intersectionCoverageTarget]).length > 0
+      ? [
+          {
+            kind: 'intersection',
+            rowPathKeys,
+            columnPathKeys,
+            coverageTarget: intersectionCoverageTarget,
+          },
+        ]
+      : [];
   const shouldFetchIntersectionOnly =
     intersectionTargets.length > 0 &&
     !rowPlan.hasMissingNodes &&
@@ -805,8 +775,6 @@ export const planHydrationIteration = ({
       kind: 'complete',
       desiredRows,
       desiredCols,
-      visibleRowDepth,
-      visibleColDepth,
     };
   }
 
@@ -814,8 +782,6 @@ export const planHydrationIteration = ({
     kind: 'fetch',
     desiredRows,
     desiredCols,
-    visibleRowDepth,
-    visibleColDepth,
     targets: [
       ...rowPlanForTransport.targets,
       ...colPlanForTransport.targets,

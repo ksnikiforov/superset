@@ -290,8 +290,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13353` insertions, `17813` deletions, net `-4460`.
-- Current production TypeScript/TSX total: about `29050` lines.
+- Production `src`: `13319` insertions, `17813` deletions, net `-4494`.
+- Current production TypeScript/TSX total: about `29016` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -303,10 +303,10 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `29050` | `-4460` | `< 28000` |
-| Strict core pipeline | `11337` | `11773` | `+436` | `8000` |
+| Full production `src` | `33510` | `29016` | `-4494` | `< 28000` |
+| Strict core pipeline | `11337` | `11739` | `+402` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5061` | `+378` | `3000-4000` |
-| Broad core pipeline | `16020` | `16834` | `+814` | `11000-13000` |
+| Broad core pipeline | `16020` | `16800` | `+780` | `11000-13000` |
 
 Current strict core breakdown:
 
@@ -651,6 +651,12 @@ Batch grouping and intersection missing-coverage checks now use the compiled
 `coverageTarget` already attached to each planner target. This deletes the
 remaining duplicate depth/coverage authority at the executor boundary and keeps
 the executor downstream of the manifest target compiler.
+
+Latest hydration planner cleanup: `planHydrationIteration` no longer returns
+visible depth metadata to callers, and the single-use cross-axis intersection
+target helper has been folded into the hydration iteration. Visible depths are
+now internal planning input only; outward hydration state is reduced to
+complete/fetch plus desired expansion sets and compiled targets.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.
