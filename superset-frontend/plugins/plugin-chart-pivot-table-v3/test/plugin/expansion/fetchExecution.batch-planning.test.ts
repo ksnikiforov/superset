@@ -17,10 +17,10 @@
  * under the License.
  */
 import {
-  optimizeFetchPlan,
+  optimizeExpansionFetchPlan,
   MAX_BATCH_SIBLINGS,
-  type FetchTarget,
-} from '../../../src/pivot/query/fetchPlanOptimizer';
+} from '../../../src/pivot/expansion/fetchExecution';
+import { type FetchTarget } from '../../../src/pivot/expansion/planner';
 import { parsePath, serializePath } from '../../../src/pivot/core/path';
 import { type PivotPathValue } from '../../../src/types';
 
@@ -36,7 +36,7 @@ const makeTarget = (
 describe('fetchPlanOptimizer', () => {
   it('groups compatible sibling targets into a batch', () => {
     const targets = [makeTarget(['US', 'CA']), makeTarget(['US', 'NY'])];
-    const plan = optimizeFetchPlan({ targets });
+    const plan = optimizeExpansionFetchPlan({ targets });
 
     expect(plan.batches).toHaveLength(1);
     expect(plan.singles).toHaveLength(0);
@@ -49,7 +49,7 @@ describe('fetchPlanOptimizer', () => {
       makeTarget(['US', 'CA']),
       makeTarget(['US', 'NY']),
     ];
-    const plan = optimizeFetchPlan({ targets });
+    const plan = optimizeExpansionFetchPlan({ targets });
 
     const siblings = plan.batches.flatMap(batch => batch.siblingValues);
     expect(siblings).toContain('CA');
@@ -65,7 +65,7 @@ describe('fetchPlanOptimizer', () => {
     const targets = Array.from({ length: MAX_BATCH_SIBLINGS + 1 }, (_, idx) =>
       makeTarget(['US', `S${idx}`]),
     );
-    const plan = optimizeFetchPlan({ targets });
+    const plan = optimizeExpansionFetchPlan({ targets });
 
     const batchSizes = plan.batches.map(batch => batch.targets.length);
     const hasMaxBatch = batchSizes.includes(MAX_BATCH_SIBLINGS);
@@ -80,7 +80,7 @@ describe('fetchPlanOptimizer', () => {
       makeTarget(['US', 'CA'], 'sig-1'),
       makeTarget(['US', 'NY'], 'sig-2'),
     ];
-    const plan = optimizeFetchPlan({ targets });
+    const plan = optimizeExpansionFetchPlan({ targets });
 
     expect(plan.batches).toHaveLength(0);
     expect(plan.singles).toHaveLength(2);

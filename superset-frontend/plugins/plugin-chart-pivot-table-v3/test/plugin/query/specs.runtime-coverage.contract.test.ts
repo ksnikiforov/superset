@@ -25,7 +25,7 @@ import {
 } from '../../../src/pivot/core/tokens';
 import { MetricsLayoutEnum } from '../../../src/types';
 import { serializePath } from '../../../src/pivot/core/path';
-import { type BatchGroup } from '../../../src/pivot/query/fetchPlanOptimizer';
+import { type BatchGroup } from '../../../src/pivot/expansion/planner';
 import { buildFormData } from '../fixtures/pivotFormData';
 
 describe('runtime coverage query specs contract', () => {

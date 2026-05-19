@@ -21,7 +21,7 @@ import {
   fetchPivotExpansion,
   type FetchPivotExpansionRequest,
 } from '../../../src/pivot/expansion/fetchPivotExpansion';
-import { type BatchGroup } from '../../../src/pivot/query/fetchPlanOptimizer';
+import { type BatchGroup } from '../../../src/pivot/expansion/planner';
 import { buildFormData } from '../fixtures/pivotFormData';
 import {
   encodeMetricKey,

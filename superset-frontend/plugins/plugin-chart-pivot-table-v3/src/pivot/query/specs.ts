@@ -55,7 +55,7 @@ import {
 } from '../layout/LayoutContext';
 import { getMetricKey } from '../metrics';
 import { collectRequiredTimeOffsets } from '../measureLeaves';
-import { type BatchGroup } from './fetchPlanOptimizer';
+import { type BatchGroup } from '../expansion/planner';
 import { buildPathFilters, coerceValueForColumn } from './pathFilters';
 import { buildFactCoverage } from '../runtime/coverage';
 import {

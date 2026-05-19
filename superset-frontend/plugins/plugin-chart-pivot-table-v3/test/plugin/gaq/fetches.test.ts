@@ -27,7 +27,7 @@ import { serializePath } from '../../../src/pivot/core/path';
 import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
 import { type PivotTreeData, type PivotTreeNode } from '../../../src/types';
 import { buildFormData } from '../fixtures/pivotFormData';
-import { type BatchGroup } from '../../../src/pivot/query/fetchPlanOptimizer';
+import { type BatchGroup } from '../../../src/pivot/expansion/planner';
 
 jest.mock('src/middleware/asyncEvent', () => ({
   waitForAsyncData: jest.fn(),

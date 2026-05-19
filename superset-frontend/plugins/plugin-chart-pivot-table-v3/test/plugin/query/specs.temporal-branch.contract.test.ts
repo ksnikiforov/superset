@@ -24,7 +24,7 @@ import {
   formatQueryName,
 } from '../../../src/pivot/query/specs';
 import { serializePath } from '../../../src/pivot/core/path';
-import { type BatchGroup } from '../../../src/pivot/query/fetchPlanOptimizer';
+import { type BatchGroup } from '../../../src/pivot/expansion/planner';
 import { buildFormData } from '../fixtures/pivotFormData';
 
 type FilterClause = {

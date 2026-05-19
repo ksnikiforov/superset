@@ -17,15 +17,9 @@
  * under the License.
  */
 import { type PivotTableQueryFormData, type PivotTreeData } from '../../types';
-import { parsePath } from '../core/path';
+import { parsePath, serializePath } from '../core/path';
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import { type LayoutContext } from '../layout/LayoutContext';
-import {
-  optimizeFetchPlan,
-  type BatchCandidate,
-  type BatchGroup,
-  type FetchTarget,
-} from '../query/fetchPlanOptimizer';
 import { buildFactValueKeys, type PivotFactStore } from '../runtime/factStore';
 import { type LatestRequestScope } from '../runtime/requestLifecycle';
 import { createExpansionCoverageDiff } from '../runtime/coverage';
@@ -33,7 +27,10 @@ import { stableStringify } from '../shared/stableStringify';
 import { planHydrationIteration } from './stateTransitions';
 import type { PivotProgram } from '../runtime/types';
 import {
+  type BatchCandidate,
+  type BatchGroup,
   type ExpansionFetchTarget,
+  type FetchTarget,
   type IntersectionFetchTarget,
   isIntersectionFetchTarget,
 } from './planner';
@@ -75,6 +72,115 @@ type ExpansionQueryRequest = Omit<
   FetchPivotExpansionRequest,
   'formData' | 'requestGroupId' | 'factStore'
 >;
+
+export const MAX_BATCH_SIBLINGS = 50;
+
+type BatchPlan = {
+  batches: BatchGroup[];
+  singles: BatchCandidate[];
+};
+
+type CandidateWithPath = BatchCandidate & {
+  parentPathKey: string;
+  siblingValue: BatchGroup['siblingValues'][number];
+};
+
+type BatchGroupSeed = {
+  axis: BatchGroup['axis'];
+  signature: string;
+  parentPathKey: string;
+  nonNullTargets: CandidateWithPath[];
+  nullTargets: CandidateWithPath[];
+};
+
+const isNullish = (value: unknown) => value === null || value === undefined;
+
+const chunkTargets = (
+  targets: CandidateWithPath[],
+  chunkSize: number,
+): CandidateWithPath[][] => {
+  const sorted = [...targets].sort((a, b) =>
+    a.pathKey.localeCompare(b.pathKey),
+  );
+  const chunks: CandidateWithPath[][] = [];
+  for (let idx = 0; idx < sorted.length; idx += chunkSize) {
+    chunks.push(sorted.slice(idx, idx + chunkSize));
+  }
+  return chunks;
+};
+
+const buildBatchGroups = (
+  seed: BatchGroupSeed,
+  targets: CandidateWithPath[],
+  maxBatchSize: number,
+): BatchGroup[] =>
+  chunkTargets(targets, maxBatchSize).map(chunk => ({
+    axis: seed.axis,
+    signature: seed.signature,
+    parentPathKey: seed.parentPathKey,
+    siblingValues: chunk.map(target => target.siblingValue),
+    targets: chunk,
+  }));
+
+export const optimizeExpansionFetchPlan = ({
+  targets,
+  maxBatchSize = MAX_BATCH_SIBLINGS,
+}: {
+  targets: BatchCandidate[];
+  maxBatchSize?: number;
+}): BatchPlan => {
+  const singles: BatchCandidate[] = [];
+  const groups = new Map<string, BatchGroupSeed>();
+
+  targets.forEach(target => {
+    const path = parsePath(target.pathKey);
+    if (path.length === 0) {
+      singles.push(target);
+      return;
+    }
+    const parentPathKey = serializePath(path.slice(0, -1));
+    const siblingValue = path[path.length - 1];
+    const groupKey = JSON.stringify([
+      target.axis,
+      target.batchSignature,
+      parentPathKey,
+    ]);
+    const seed = groups.get(groupKey) ?? {
+      axis: target.axis,
+      signature: target.batchSignature,
+      parentPathKey,
+      nonNullTargets: [],
+      nullTargets: [],
+    };
+    const candidate = {
+      ...target,
+      parentPathKey,
+      siblingValue,
+    };
+    if (isNullish(siblingValue)) {
+      seed.nullTargets.push(candidate);
+    } else {
+      seed.nonNullTargets.push(candidate);
+    }
+    groups.set(groupKey, seed);
+  });
+
+  const batches: BatchGroup[] = [];
+  groups.forEach(seed => {
+    [
+      ...buildBatchGroups(seed, seed.nonNullTargets, maxBatchSize),
+      ...buildBatchGroups(seed, seed.nullTargets, maxBatchSize),
+    ].forEach(group => {
+      if (group.targets.length <= 1) {
+        singles.push(...group.targets);
+        return;
+      }
+      batches.push(group);
+    });
+  });
+
+  return { batches, singles };
+};
 
 const buildExpansionRequestGroupId = ({
   runtime,
@@ -123,7 +229,7 @@ const resolveExpansionFetchPlan = ({
     const batchSignature = `${target.axis}|${visibleRowDepth}|${visibleColDepth}`;
     batchCandidates.push({ ...target, batchSignature });
   }
-  const { batches, singles } = optimizeFetchPlan({
+  const { batches, singles } = optimizeExpansionFetchPlan({
     targets: batchCandidates,
   });
   return {

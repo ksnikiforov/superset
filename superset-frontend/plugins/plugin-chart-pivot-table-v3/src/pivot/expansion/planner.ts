@@ -17,9 +17,12 @@
  * under the License.
  */
 
-import { type PivotAxis, type PivotTreeNode } from '../../types';
+import {
+  type PivotAxis,
+  type PivotPathValue,
+  type PivotTreeNode,
+} from '../../types';
 import { parsePath } from '../core/path';
-import { type FetchTarget } from '../query/fetchPlanOptimizer';
 import {
   type PivotExpansionCoverageDiff,
   type PivotExpansionCoverageRequest,
@@ -30,6 +33,23 @@ import {
 } from '../runtime/projection';
 import type { PivotProgram } from '../runtime/types';
 import { rootKey } from '../viewModel';
+
+export type FetchTarget = {
+  axis: PivotAxis;
+  pathKey: string;
+};
+
+export type BatchCandidate = FetchTarget & {
+  batchSignature: string;
+};
+
+export type BatchGroup = {
+  axis: PivotAxis;
+  signature: string;
+  parentPathKey: string;
+  siblingValues: PivotPathValue[];
+  targets: BatchCandidate[];
+};
 
 export type AxisFetchTarget = FetchTarget;
 
