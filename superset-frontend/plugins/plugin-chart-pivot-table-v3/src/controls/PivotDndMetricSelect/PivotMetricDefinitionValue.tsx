@@ -74,7 +74,7 @@ import {
   buildMetricLabelMap,
   resolveMetricDisplayLabel,
 } from '../../utils';
-import { getFormattingMetricKey, getMetricKey } from '../../pivot/metrics';
+import { getMetricKey } from '../../pivot/metrics';
 import {
   isPivotExcelFormula,
   normalizePivotExcelFormula,
@@ -1090,86 +1090,8 @@ export default function PivotMetricDefinitionValue(
     const categoricalScheme = getCategoricalSchemeRegistry().get();
     return categoricalScheme?.colors.slice(0, 9) || [];
   }, []);
-  const formattingKey = useMemo(() => {
-    const candidateKeys = [metricKey, metricLabel].filter(
-      (candidate): candidate is string => !!candidate,
-    );
-    const savedMetricMatch = savedMetrics.find(metric => {
-      if (
-        metric.metric_name === metricKey ||
-        metric.metric_name === metricLabel
-      ) {
-        return true;
-      }
-      if (
-        metric.verbose_name === metricKey ||
-        metric.verbose_name === metricLabel
-      ) {
-        return true;
-      }
-      return false;
-    });
-    if (savedMetricMatch) {
-      if (savedMetricMatch.metric_name) {
-        candidateKeys.push(savedMetricMatch.metric_name);
-      }
-      if (savedMetricMatch.verbose_name) {
-        candidateKeys.push(savedMetricMatch.verbose_name);
-      }
-    }
-    if (typeof option === 'object' && option !== null) {
-      if ('metric_name' in option && typeof option.metric_name === 'string') {
-        candidateKeys.push(option.metric_name);
-      }
-      if ('label' in option && typeof option.label === 'string') {
-        candidateKeys.push(option.label);
-      }
-      if ('verbose_name' in option && typeof option.verbose_name === 'string') {
-        candidateKeys.push(option.verbose_name);
-      }
-    }
-    return candidateKeys.find(key => metricFormatting[key]) || metricKey;
-  }, [metricFormatting, metricKey, metricLabel, option, savedMetrics]);
-  const databarKey = useMemo(() => {
-    const candidateKeys = [metricKey, metricLabel].filter(
-      (candidate): candidate is string => !!candidate,
-    );
-    const savedMetricMatch = savedMetrics.find(metric => {
-      if (
-        metric.metric_name === metricKey ||
-        metric.metric_name === metricLabel
-      ) {
-        return true;
-      }
-      if (
-        metric.verbose_name === metricKey ||
-        metric.verbose_name === metricLabel
-      ) {
-        return true;
-      }
-      return false;
-    });
-    if (savedMetricMatch) {
-      if (savedMetricMatch.metric_name) {
-        candidateKeys.push(savedMetricMatch.metric_name);
-      }
-      if (savedMetricMatch.verbose_name) {
-        candidateKeys.push(savedMetricMatch.verbose_name);
-      }
-    }
-    if (typeof option === 'object' && option !== null) {
-      if ('metric_name' in option && typeof option.metric_name === 'string') {
-        candidateKeys.push(option.metric_name);
-      }
-      if ('label' in option && typeof option.label === 'string') {
-        candidateKeys.push(option.label);
-      }
-      if ('verbose_name' in option && typeof option.verbose_name === 'string') {
-        candidateKeys.push(option.verbose_name);
-      }
-    }
-    return candidateKeys.find(key => metricDatabars[key]) || metricKey;
-  }, [metricDatabars, metricKey, metricLabel, option, savedMetrics]);
+  const formattingKey = metricKey;
+  const databarKey = metricKey;
   const formatting = (formattingKey && metricFormatting[formattingKey]) || {};
   const databar = (databarKey && metricDatabars[databarKey]) || {};
   const hasFormatting = Boolean(
@@ -1232,7 +1154,7 @@ export default function PivotMetricDefinitionValue(
     const targets = new Set<string>();
     Object.entries(metricDatabars).forEach(([key, config]) => {
       const targetKey = config.scaleLike
-        ? getFormattingMetricKey(config.scaleLike as QueryFormMetric | Metric)
+        ? getMetricKey(config.scaleLike as QueryFormMetric | Metric)
         : undefined;
       if (targetKey) {
         sources.add(key);
@@ -1250,9 +1172,7 @@ export default function PivotMetricDefinitionValue(
       return props.selectedMetrics;
     }
     return props.selectedMetrics.filter(metric => {
-      const candidateKey =
-        getFormattingMetricKey(metric as QueryFormMetric | Metric) ||
-        resolveMetricKey(metric as MetricOptionValue);
+      const candidateKey = getMetricKey(metric as QueryFormMetric | Metric);
       if (!candidateKey) {
         return false;
       }

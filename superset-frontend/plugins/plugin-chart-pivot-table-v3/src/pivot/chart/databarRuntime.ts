@@ -23,7 +23,7 @@ import {
   type PivotTreeData,
   type PivotTreeNode,
 } from '../../types';
-import { getFormattingMetricKey } from '../metrics';
+import { getMetricKey } from '../metrics';
 import { serializeCellKey } from '../core/path';
 import { type VisibleCellEntry } from '../cellUtils';
 import {
@@ -152,7 +152,7 @@ export const resolveScaleGroupKey = (
     if (!config?.scaleLike) {
       break;
     }
-    const next = getFormattingMetricKey(config.scaleLike);
+    const next = getMetricKey(config.scaleLike);
     if (!next || next === current) {
       break;
     }

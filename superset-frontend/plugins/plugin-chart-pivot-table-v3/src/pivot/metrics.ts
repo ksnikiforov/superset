@@ -53,6 +53,3 @@ export const getMetricKey = (metric: QueryFormMetric | Metric) => {
 
 export const getMetricKeys = (metrics: QueryFormMetric[]) =>
   metrics.map(getMetricKey).filter((m): m is string => !!m);
-
-export const getFormattingMetricKey = (metric: QueryFormMetric | Metric) =>
-  getMetricKey(metric);

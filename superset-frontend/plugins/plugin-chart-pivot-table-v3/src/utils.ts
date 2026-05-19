@@ -51,11 +51,7 @@ import {
   normalizePivotExcelFormula,
 } from './pivot/formatting/excelFormulaReferences';
 import { isMetricsPlaceholder } from './pivot/core/tokens';
-import {
-  getFormattingMetricKey,
-  getMetricKey,
-  getMetricKeys,
-} from './pivot/metrics';
+import { getMetricKey, getMetricKeys } from './pivot/metrics';
 
 export const PIVOT_THEME_PRESETS: Record<string, string> = {
   blue: supersetTheme.colorPrimaryBg,
@@ -536,29 +532,13 @@ const resolveMetricReferenceForQuery = (
   if (metrics.length === 0) {
     return metric;
   }
-  const referenceCandidates = new Set<string>();
-  if (typeof metric === 'string') {
-    if (metric.length > 0) {
-      referenceCandidates.add(metric);
-    }
-  } else {
-    [getFormattingMetricKey(metric), getMetricKey(metric)]
-      .filter((key): key is string => Boolean(key))
-      .forEach(key => referenceCandidates.add(key));
-  }
-  if (referenceCandidates.size === 0) {
+  const metricKey = getMetricKey(metric);
+  if (!metricKey) {
     return metric;
   }
-  const resolved = metrics.find(candidate => {
-    if (typeof candidate === 'string') {
-      return referenceCandidates.has(candidate);
-    }
-    const candidateKeys = [
-      getFormattingMetricKey(candidate),
-      getMetricKey(candidate),
-    ].filter((key): key is string => Boolean(key));
-    return candidateKeys.some(key => referenceCandidates.has(key));
-  });
+  const resolved = metrics.find(
+    candidate => getMetricKey(candidate) === metricKey,
+  );
   return resolved || metric;
 };
 
@@ -919,16 +899,8 @@ export const normalizeMetricDatabarMapWithKeys = (
     if (!metric) {
       return undefined;
     }
-    const candidates = [
-      getFormattingMetricKey(metric),
-      getMetricKey(metric as QueryFormMetric | Metric),
-    ].filter((candidate): candidate is string => Boolean(candidate));
-    for (const candidate of candidates) {
-      if (metricKeys.has(candidate)) {
-        return candidate;
-      }
-    }
-    return undefined;
+    const metricKey = getMetricKey(metric);
+    return metricKey && metricKeys.has(metricKey) ? metricKey : undefined;
   };
   const merged = Object.entries(normalized).reduce<PivotMetricDatabarMap>(
     (acc, [metricKey, config]) => {
@@ -957,7 +929,7 @@ export const normalizeMetricDatabarMapWithKeys = (
   const scaleLikeTargets = Object.entries(mapped).reduce<Set<string>>(
     (targets, [metricKey, config]) => {
       const scaleLikeKey = config.scaleLike
-        ? getFormattingMetricKey(config.scaleLike)
+        ? getMetricKey(config.scaleLike)
         : undefined;
       if (scaleLikeKey && scaleLikeKey !== metricKey) {
         targets.add(scaleLikeKey);
@@ -1035,27 +1007,25 @@ export const collectMeasureLeafMetricsForQuery = (
   }
   const existingMetricKeys = new Set<string>();
   metrics.forEach(metric => {
-    [getFormattingMetricKey(metric), getMetricKey(metric)]
-      .filter((key): key is string => Boolean(key))
-      .forEach(key => existingMetricKeys.add(key));
+    const metricKey = getMetricKey(metric);
+    if (metricKey) {
+      existingMetricKeys.add(metricKey);
+    }
   });
 
   const referencedMetrics: QueryFormMetric[] = [];
   const referencedMetricKeys = new Set<string>();
   const addMetric = (metric: QueryFormMetric) => {
     const resolved = resolveMetricReferenceForQuery(metric, availableMetrics);
-    const candidateKeys = [
-      getFormattingMetricKey(resolved),
-      getMetricKey(resolved),
-    ].filter((key): key is string => Boolean(key));
-    if (candidateKeys.some(key => existingMetricKeys.has(key))) {
+    const metricKey = getMetricKey(resolved);
+    if (
+      !metricKey ||
+      existingMetricKeys.has(metricKey) ||
+      referencedMetricKeys.has(metricKey)
+    ) {
       return;
     }
-    const primaryKey = candidateKeys[0];
-    if (!primaryKey || referencedMetricKeys.has(primaryKey)) {
-      return;
-    }
-    referencedMetricKeys.add(primaryKey);
+    referencedMetricKeys.add(metricKey);
     referencedMetrics.push(
       availableMetrics.includes(resolved)
         ? resolved

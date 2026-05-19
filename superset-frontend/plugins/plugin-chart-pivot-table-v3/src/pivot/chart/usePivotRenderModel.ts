@@ -34,7 +34,7 @@ import { buildFormattingValueMaps } from '../cellUtils';
 import { normalizeDimensionSortingMapWithKeys } from '../../utils';
 import { serializeCellKey, serializePath } from '../core/path';
 import { isSubtotalToken } from '../core/tokens';
-import { getFormattingMetricKey } from '../metrics';
+import { getMetricKey } from '../metrics';
 import { buildRenderModel, type RenderModel } from '../render/renderModel';
 import { resolveAxisProjection } from '../runtime/projection';
 import { resolveMeasureSortMetricKey } from '../measureLeaves';
@@ -112,7 +112,7 @@ const buildDimensionSortingKeyMap = (
     }
     const metricKey = dimensionSorting.metric
       ? resolveMeasureSortMetricKey({
-          metricKey: getFormattingMetricKey(dimensionSorting.metric),
+          metricKey: getMetricKey(dimensionSorting.metric),
           measureHierarchy: layout.measureHierarchy,
         })
       : '';

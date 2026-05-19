@@ -290,8 +290,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13364` insertions, `17556` deletions, net `-4192`.
-- Current production TypeScript/TSX total: about `29318` lines.
+- Production `src`: `13389` insertions, `17704` deletions, net `-4315`.
+- Current production TypeScript/TSX total: about `29195` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -303,10 +303,10 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `29318` | `-4192` | `< 28000` |
-| Strict core pipeline | `11337` | `11886` | `+549` | `8000` |
-| Non-visual chart runtime hooks | `4683` | `5063` | `+380` | `3000-4000` |
-| Broad core pipeline | `16020` | `16949` | `+929` | `11000-13000` |
+| Full production `src` | `33510` | `29195` | `-4315` | `< 28000` |
+| Strict core pipeline | `11337` | `11853` | `+516` | `8000` |
+| Non-visual chart runtime hooks | `4683` | `5061` | `+378` | `3000-4000` |
+| Broad core pipeline | `16020` | `16914` | `+894` | `11000-13000` |
 
 Current strict core breakdown:
 
@@ -316,7 +316,7 @@ Current strict core breakdown:
 | `pivot/expansion/*` | `2606` |
 | `pivot/query/*` | `1432` |
 | `pivot/layout/*` | `770` |
-| core/shared/domain helpers | `1812` |
+| core/shared/domain helpers | `1779` |
 | formatting/data/render-model/update support | `1211` |
 
 Interpretation: plugin-wide source has shrunk, but core pipeline source has
@@ -547,6 +547,11 @@ verbose names, and formatting keys now use the same canonical metric key as the
 runtime. Display labels remain display-only through `metricLabelMap`/verbose
 metadata. The broad alias scan that treated metric name, verbose name, label,
 and query label as equivalent identities has been removed.
+
+Latest metric-key follow-up: the separate `getFormattingMetricKey` alias helper
+is gone. Query support metrics, databars, measure leaves, render sorting, and
+Explore metric controls now resolve references through canonical `getMetricKey`
+only; control-side fallback lookup by verbose/label keys was removed.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.

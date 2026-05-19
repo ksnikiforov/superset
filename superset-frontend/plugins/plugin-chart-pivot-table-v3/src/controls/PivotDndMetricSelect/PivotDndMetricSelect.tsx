@@ -84,7 +84,7 @@ import {
   normalizeMetricDatabarMapWithKeys,
   normalizeMetricFormattingMapWithKeys,
 } from '../../utils';
-import { getFormattingMetricKey, getMetricKey } from '../../pivot/metrics';
+import { getMetricKey } from '../../pivot/metrics';
 import {
   buildBuiltInLeaf,
   buildCustomLeaf,
@@ -224,9 +224,7 @@ const collectMetricIdentifiers = (
     }
     return identifiers;
   }
-  const formattingKey = getFormattingMetricKey(
-    metric as QueryFormMetric | Metric,
-  );
+  const formattingKey = getMetricKey(metric as QueryFormMetric | Metric);
   if (formattingKey) {
     identifiers.add(formattingKey);
   }
@@ -409,9 +407,7 @@ export const updateMetricConfigForRename = ({
 const dedupeMetrics = (metrics: ValueType[]) => {
   const seen = new Set<string>();
   return metrics.filter(metric => {
-    const key =
-      getFormattingMetricKey(metric as QueryFormMetric | Metric) ||
-      resolveMetricKey(metric);
+    const key = getMetricKey(metric as QueryFormMetric | Metric);
     if (!key || seen.has(key)) {
       return false;
     }
@@ -723,7 +719,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
           nextDatabars,
         ).reduce<PivotMetricDatabarMap>((acc, [key, config]) => {
           const scaleLikeKey = config.scaleLike
-            ? getFormattingMetricKey(config.scaleLike as QueryFormMetric)
+            ? getMetricKey(config.scaleLike as QueryFormMetric)
             : '';
           if (scaleLikeKey && !activeMetricKeys.has(scaleLikeKey)) {
             acc[key] = { ...config, scaleLike: undefined };
@@ -798,7 +794,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
         }>(
           (acc, [key, config]) => {
             const scaleLikeKey = config.scaleLike
-              ? getFormattingMetricKey(config.scaleLike as QueryFormMetric)
+              ? getMetricKey(config.scaleLike as QueryFormMetric)
               : undefined;
             if (scaleLikeKey) {
               acc.sources.add(key);
@@ -808,9 +804,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
           },
           { sources: new Set(), targets: new Set() },
         );
-        const targetKey = getFormattingMetricKey(
-          nextValue as QueryFormMetric | Metric,
-        );
+        const targetKey = getMetricKey(nextValue as QueryFormMetric | Metric);
         if (
           !targetKey ||
           targetKey === metricKey ||

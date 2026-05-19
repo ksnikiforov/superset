@@ -42,7 +42,7 @@ import {
   DEFAULT_DATABAR_NEGATIVE_COLOR,
   DEFAULT_DATABAR_POSITIVE_COLOR,
 } from '../../utils';
-import { getFormattingMetricKey, getMetricKey } from '../../pivot/metrics';
+import { getMetricKey } from '../../pivot/metrics';
 import {
   MeasureLeafSpec,
   MetricFormattingField,
@@ -251,7 +251,7 @@ export default function MeasureLeafValue({
     const targets = new Set<string>();
     Object.entries(metricDatabars).forEach(([key, config]) => {
       const targetKey = config.scaleLike
-        ? getFormattingMetricKey(config.scaleLike as QueryFormMetric | Metric)
+        ? getMetricKey(config.scaleLike as QueryFormMetric | Metric)
         : undefined;
       if (targetKey) {
         sources.add(key);
@@ -269,9 +269,7 @@ export default function MeasureLeafValue({
       return selectedMetrics;
     }
     return selectedMetrics.filter(metric => {
-      const candidateKey =
-        getFormattingMetricKey(metric as QueryFormMetric | Metric) ||
-        getMetricKey(metric as QueryFormMetric | Metric);
+      const candidateKey = getMetricKey(metric as QueryFormMetric | Metric);
       if (!candidateKey) {
         return false;
       }

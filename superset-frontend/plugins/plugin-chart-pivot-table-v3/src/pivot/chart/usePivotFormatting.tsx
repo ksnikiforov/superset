@@ -58,7 +58,7 @@ import {
   PIVOT_THEME_PRESETS,
 } from '../../utils';
 import { SUBTOTAL_LABEL, isSubtotalToken } from '../core/tokens';
-import { getFormattingMetricKey, getMetricKey } from '../metrics';
+import { getMetricKey } from '../metrics';
 import { serializeCellKey, serializePath } from '../core/path';
 import { formatMetricValue, rootKey } from '../viewModel';
 import { buildMeasureLeafOutputKey, isValueLeaf } from '../measureLeaves';
@@ -407,7 +407,7 @@ const buildMetricFormattingRuntimeMap = (
         compiled[field] = compileExcelFormula(formattingMetric.formula);
         return;
       }
-      const key = getFormattingMetricKey(formattingMetric);
+      const key = getMetricKey(formattingMetric);
       if (key) {
         formattingKeys[field] = key;
       }
@@ -445,7 +445,7 @@ const buildDimensionFormattingRuntimeMap = (
         compiled[field] = compileExcelFormula(value.formula);
         return;
       }
-      const key = getFormattingMetricKey(value);
+      const key = getMetricKey(value);
       if (key) {
         formattingKeys[field] = key;
       }
@@ -815,9 +815,7 @@ export const usePivotFormatting = ({
     const targets = new Set<string>();
     Object.entries(metricDatabars).forEach(([metricKey, config]) => {
       targets.add(metricKey);
-      const scaleKey = config.scaleLike
-        ? getFormattingMetricKey(config.scaleLike)
-        : '';
+      const scaleKey = config.scaleLike ? getMetricKey(config.scaleLike) : '';
       if (scaleKey) {
         targets.add(scaleKey);
       }
@@ -1052,7 +1050,7 @@ export const usePivotFormatting = ({
         barWidthPct = Math.max(barEnd - barStart, 0);
         const colorMetricKey =
           config.colorMode === 'byMetric' && config.colorMetric
-            ? getFormattingMetricKey(config.colorMetric)
+            ? getMetricKey(config.colorMetric)
             : undefined;
         const metricColor =
           cell && colorMetricKey
