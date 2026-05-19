@@ -290,8 +290,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13387` insertions, `17813` deletions, net `-4426`.
-- Current production TypeScript/TSX total: about `29084` lines.
+- Production `src`: `13353` insertions, `17813` deletions, net `-4460`.
+- Current production TypeScript/TSX total: about `29050` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -303,10 +303,10 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `29084` | `-4426` | `< 28000` |
-| Strict core pipeline | `11337` | `11807` | `+470` | `8000` |
+| Full production `src` | `33510` | `29050` | `-4460` | `< 28000` |
+| Strict core pipeline | `11337` | `11773` | `+436` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5061` | `+378` | `3000-4000` |
-| Broad core pipeline | `16020` | `16868` | `+848` | `11000-13000` |
+| Broad core pipeline | `16020` | `16834` | `+814` | `11000-13000` |
 
 Current strict core breakdown:
 
@@ -644,6 +644,13 @@ requests carry one compiled target object instead of parallel row/column/depth
 fields. This is a small deletion slice, but it removes a second request-shape
 authority at the expansion planner/query boundary and keeps query planning
 downstream of manifest targets.
+
+Latest expansion executor cleanup: expansion fetch execution no longer carries
+a separate visible-depth context or rebuilds intersection coverage targets.
+Batch grouping and intersection missing-coverage checks now use the compiled
+`coverageTarget` already attached to each planner target. This deletes the
+remaining duplicate depth/coverage authority at the executor boundary and keeps
+the executor downstream of the manifest target compiler.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.

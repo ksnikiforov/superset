@@ -28,7 +28,6 @@ import type { PivotProgram } from '../runtime/types';
 import {
   type BatchCandidate,
   type BatchGroup,
-  buildIntersectionCoverageTarget,
   createExpansionCoverageDiff,
   type ExpansionFetchTarget,
   type FetchTarget,
@@ -49,11 +48,6 @@ export type ExpansionFetchRuntime = {
   materializeLoadedTree: () => PivotTreeData;
   addWarnings: (nextWarnings?: ChartDataWarning[]) => void;
   updateLoadingKey: (key: string, delta: number) => void;
-};
-
-export type ExpansionFetchContext = {
-  visibleRowDepth: number;
-  visibleColDepth: number;
 };
 
 type HydrationFetchLoopParams = {
@@ -204,15 +198,9 @@ const createRuntimeExpansionCoverageDiff = ({
     factSelectors: runtime.factStore.getCoverageSelectors(),
   });
 
-const resolveExpansionFetchPlan = ({
-  targets,
-  visibleRowDepth,
-  visibleColDepth,
-}: {
-  targets: ExpansionFetchTarget[];
-  visibleRowDepth: number;
-  visibleColDepth: number;
-}): {
+const resolveExpansionFetchPlan = (
+  targets: ExpansionFetchTarget[],
+): {
   singles: FetchTarget[];
   batches: BatchGroup[];
   intersections: IntersectionFetchTarget[];
@@ -222,7 +210,8 @@ const resolveExpansionFetchPlan = ({
     if (isIntersectionFetchTarget(target)) {
       continue;
     }
-    const batchSignature = `${target.axis}|${visibleRowDepth}|${visibleColDepth}`;
+    const { rowDepth, columnDepth } = target.coverageTarget;
+    const batchSignature = `${target.axis}|${rowDepth}|${columnDepth}`;
     batchCandidates.push({ ...target, batchSignature });
   }
   const { batches, singles } = optimizeExpansionFetchPlan({
@@ -271,50 +260,31 @@ const executeExpansionQueryTask = async ({
 
 const filterMissingIntersectionTargets = ({
   intersections,
-  context,
   runtime,
 }: {
   intersections: IntersectionFetchTarget[];
-  context: ExpansionFetchContext;
   runtime: ExpansionFetchRuntime;
 }) => {
-  const coverageTargets = intersections.map(target => ({
-    target,
-    coverageTarget: buildIntersectionCoverageTarget({
-      program: runtime.layout.pivotProgram,
-      rowDepth: context.visibleRowDepth,
-      columnDepth: context.visibleColDepth,
-      rowPathKeys: target.rowPathKeys,
-      columnPathKeys: target.columnPathKeys,
-    }),
-  }));
   const missingRequests = createRuntimeExpansionCoverageDiff({
     runtime,
-  })(coverageTargets.map(({ coverageTarget }) => coverageTarget));
+  })(intersections.map(target => target.coverageTarget));
   const missingKeys = new Set(
     missingRequests.map(request => stableStringify(request.need)),
   );
-  return coverageTargets
-    .filter(({ coverageTarget }) =>
-      missingKeys.has(stableStringify(coverageTarget.need)),
-    )
-    .map(({ target }) => target);
+  return intersections.filter(target =>
+    missingKeys.has(stableStringify(target.coverageTarget.need)),
+  );
 };
 
 export const fetchExpansionTargetDeltas = async ({
   targets,
-  context,
   runtime,
 }: {
   targets: ExpansionFetchTarget[];
-  context: ExpansionFetchContext;
   runtime: ExpansionFetchRuntime;
 }): Promise<boolean> => {
-  const { batches, singles, intersections } = resolveExpansionFetchPlan({
-    targets,
-    visibleRowDepth: context.visibleRowDepth,
-    visibleColDepth: context.visibleColDepth,
-  });
+  const { batches, singles, intersections } =
+    resolveExpansionFetchPlan(targets);
   const branchFetchPromises: Array<Promise<void>> = [
     ...singles.map(target =>
       executeExpansionQueryTask({
@@ -343,7 +313,6 @@ export const fetchExpansionTargetDeltas = async ({
   }
   const missingIntersections = filterMissingIntersectionTargets({
     intersections,
-    context,
     runtime,
   });
   await Promise.all(
@@ -388,8 +357,6 @@ export const runHydrationExpansionFetchLoop = async ({
       }),
       program,
     });
-    const { visibleRowDepth, visibleColDepth } = hydrationPlan;
-
     if (hydrationPlan.kind === 'complete') {
       return {
         status: 'complete' as const,
@@ -402,7 +369,6 @@ export const runHydrationExpansionFetchLoop = async ({
     // eslint-disable-next-line no-await-in-loop
     const didFetch = await fetchExpansionTargetDeltas({
       targets: hydrationPlan.targets,
-      context: { visibleRowDepth, visibleColDepth },
       runtime: fetchRuntime,
     });
     currentTree = didFetch ? fetchRuntime.materializeLoadedTree() : currentTree;
