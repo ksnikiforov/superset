@@ -529,7 +529,7 @@ export const usePivotFormatting = ({
   const derivedFormatOverrides = useMemo(() => {
     const columnOverrides: Record<string, string> = {};
     const currencyOverrides: Record<string, Currency> = {};
-    layout.measureHierarchy.groups.forEach(group => {
+    layout.layout.measureHierarchy.groups.forEach(group => {
       group.leaves.forEach(leaf => {
         if (isValueLeaf(leaf)) {
           return;
@@ -562,7 +562,7 @@ export const usePivotFormatting = ({
       });
     });
     return { columnOverrides, currencyOverrides };
-  }, [columnFormats, currencyFormats, layout.measureHierarchy]);
+  }, [columnFormats, currencyFormats, layout.layout.measureHierarchy]);
 
   const effectiveColumnFormats = useMemo(
     () => ({ ...derivedFormatOverrides.columnOverrides, ...columnFormats }),
@@ -785,9 +785,9 @@ export const usePivotFormatting = ({
         colNode,
         program: layout.layout.pivotProgram,
         cells: tree.cells,
-        measureHierarchy: layout.measureHierarchy,
+        measureHierarchy: layout.layout.measureHierarchy,
       }),
-    [layout.layout.pivotProgram, layout.measureHierarchy, tree.cells],
+    [layout.layout.measureHierarchy, layout.layout.pivotProgram, tree.cells],
   );
 
   const themeColor = useMemo(() => {

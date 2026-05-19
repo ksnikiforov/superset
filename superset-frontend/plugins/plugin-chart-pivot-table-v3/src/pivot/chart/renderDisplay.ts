@@ -301,9 +301,12 @@ export type RenderNodeDisplayState = {
 
 type RenderNodeDisplayLayout = Pick<
   PivotLayoutResult,
-  'axisCoverageNeeds' | 'hideMetricHeaderOnRows'
+  'hideMetricHeaderOnRows'
 > & {
-  layout: Pick<PivotLayoutResult['layout'], 'pivotProgram'>;
+  layout: Pick<
+    PivotLayoutResult['layout'],
+    'axisCoverageNeeds' | 'pivotProgram'
+  >;
 };
 
 export const buildRenderNodeDisplayState = ({
@@ -331,7 +334,7 @@ export const buildRenderNodeDisplayState = ({
   const intentRows = buildDesiredExpandedKeys({
     axis: 'row',
     tree: { rows: rowNodes, cols: {}, cells: {} },
-    axisCoverageNeeds: layout.axisCoverageNeeds,
+    axisCoverageNeeds: layout.layout.axisCoverageNeeds,
     program: layout.layout.pivotProgram,
     manualExpanded: new Set(),
     manualCollapsed: new Set(),

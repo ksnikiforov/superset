@@ -113,7 +113,7 @@ const buildDimensionSortingKeyMap = (
     const metricKey = dimensionSorting.metric
       ? resolveMeasureSortMetricKey({
           metricKey: getMetricKey(dimensionSorting.metric),
-          measureHierarchy: layout.measureHierarchy,
+          measureHierarchy: layout.layout.measureHierarchy,
         })
       : '';
     next[dimensionKey] = {
@@ -174,6 +174,13 @@ export const usePivotRenderModel = ({
         layout,
       ),
     [formData.colSorting, layout, resolvedGroupbyColumns],
+  );
+  const columnSortLayout = useMemo(
+    () => ({
+      measureHierarchy: layout.layout.measureHierarchy,
+      layout: { pivotProgram: layout.layout.pivotProgram },
+    }),
+    [layout.layout.measureHierarchy, layout.layout.pivotProgram],
   );
   const hasRowSorting = Object.keys(rowSortingKeyMap).length > 0;
 
@@ -371,14 +378,14 @@ export const usePivotRenderModel = ({
     (rawValue: DataRecordValue) =>
       resolveColumnHeaderLabel({
         rawValue,
-        measureHierarchy: layout.measureHierarchy,
+        measureHierarchy: layout.layout.measureHierarchy,
         getMetricDisplayLabelForKey: layout.getMetricDisplayLabelForKey,
       }),
     [layout],
   );
 
   const isLeafTierVisible =
-    layout.measureHierarchy.leafTierVisibility === 'visible';
+    layout.layout.measureHierarchy.leafTierVisibility === 'visible';
   const expandedRowsForRender = useMemo(
     () =>
       expandMetricNodesForRender({
@@ -451,8 +458,8 @@ export const usePivotRenderModel = ({
 
   const isColumnSortable = useCallback(
     (node: PivotTreeNode) =>
-      Boolean(resolvePivotColumnSortMetric({ node, layout })),
-    [layout],
+      Boolean(resolvePivotColumnSortMetric({ node, layout: columnSortLayout })),
+    [columnSortLayout],
   );
 
   const getColumnSortOrder = useCallback(
@@ -467,25 +474,25 @@ export const usePivotRenderModel = ({
         const next = buildPivotColumnSortStateForClick({
           current,
           node,
-          layout,
+          layout: columnSortLayout,
           columnNodes: renderTree.cols,
         });
         return next === undefined ? current : next;
       });
     },
-    [layout, renderTree.cols],
+    [columnSortLayout, renderTree.cols],
   );
 
   useEffect(() => {
     setActiveColumnSort(current => {
       const next = reconcilePivotColumnSortState({
         current,
-        layout,
+        layout: columnSortLayout,
         columnNodes: renderTree.cols,
       });
       return next === current ? current : next;
     });
-  }, [layout, renderTree.cols]);
+  }, [columnSortLayout, renderTree.cols]);
 
   return {
     renderTree,

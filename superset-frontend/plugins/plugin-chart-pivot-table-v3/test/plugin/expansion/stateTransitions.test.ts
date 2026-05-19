@@ -22,7 +22,6 @@ import {
   planHydrationIteration,
   resolveCollapsedExpansionState,
   resolveExpandedForMetrics,
-  resolveExpansionReinitializationDecision,
   resolveExpansionToggleDecision,
 } from '../../../src/pivot/expansion/stateTransitions';
 import { createExpansionCoverageDiff } from '../../../src/pivot/expansion/planner';
@@ -254,72 +253,6 @@ describe('pivot/expansion/stateTransitions', () => {
     });
 
     expect(result).toEqual(new Set([rootKey, aKey]));
-  });
-
-  it('plans expansion reinitialization for first mount and signature changes', () => {
-    expect(
-      resolveExpansionReinitializationDecision({
-        previousSemanticSignature: null,
-        expansionSemanticSignature: 'semantic-a',
-        rowsChanged: false,
-        colsChanged: false,
-        hasNewData: false,
-      }),
-    ).toMatchObject({
-      isInitialMount: true,
-      semanticSignatureChanged: true,
-      shouldReinitialize: true,
-    });
-
-    expect(
-      resolveExpansionReinitializationDecision({
-        previousSemanticSignature: 'semantic-a',
-        expansionSemanticSignature: 'semantic-b',
-        rowsChanged: false,
-        colsChanged: false,
-        hasNewData: false,
-      }),
-    ).toMatchObject({
-      isInitialMount: false,
-      semanticSignatureChanged: true,
-      shouldReinitialize: true,
-    });
-
-    expect(
-      resolveExpansionReinitializationDecision({
-        previousSemanticSignature: 'semantic-a',
-        expansionSemanticSignature: 'semantic-a',
-        rowsChanged: true,
-        colsChanged: false,
-        hasNewData: false,
-      }),
-    ).toMatchObject({
-      isInitialMount: false,
-      semanticSignatureChanged: false,
-      shouldReinitialize: true,
-    });
-  });
-
-  it('skips expansion reinitialization when signatures, data, and levels are stable', () => {
-    expect(
-      resolveExpansionReinitializationDecision({
-        previousSemanticSignature: 'semantic-a',
-        expansionSemanticSignature: 'semantic-a',
-        rowsChanged: false,
-        colsChanged: false,
-        hasNewData: false,
-      }).shouldReinitialize,
-    ).toBe(false);
-
-    expect(
-      resolveExpansionReinitializationDecision({
-        previousSemanticSignature: 'semantic-a',
-        expansionSemanticSignature: 'semantic-a',
-        rowsChanged: false,
-        colsChanged: false,
-        hasNewData: true,
-      }).shouldReinitialize,
-    ).toBe(true);
   });
 
   it('persists only visible explicit expansion state', () => {

@@ -334,7 +334,7 @@ function PivotTableChart(props: PivotTableProps) {
     factBatches: factBatchesForRender,
     expansionSemanticSignature: layoutResult.expansionSemanticSignature,
     fetchFormData: expansionFetchFormData,
-    axisCoverageNeeds: layoutResult.axisCoverageNeeds,
+    axisCoverageNeeds: layoutResult.layout.axisCoverageNeeds,
     pivotProgram: layoutResult.layout.pivotProgram,
     fetchLayout: layoutResult.layout,
     setControlValue,

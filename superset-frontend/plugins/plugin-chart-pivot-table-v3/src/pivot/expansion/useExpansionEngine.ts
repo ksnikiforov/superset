@@ -51,7 +51,6 @@ import {
   buildVisiblePersistedExpansionState,
   resolveCollapsedExpansionState,
   resolveExpansionToggleDecision,
-  resolveExpansionReinitializationDecision,
   resolveReinitializedExpansionState,
   resolveExpandedForMetrics as resolveExpandedForMetricsBase,
   resolveLayoutTransition,
@@ -595,14 +594,15 @@ export const useExpansionEngine = ({
       hasNewData,
       program: pivotProgram,
     });
-    const { isInitialMount, semanticSignatureChanged, shouldReinitialize } =
-      resolveExpansionReinitializationDecision({
-        previousSemanticSignature,
-        expansionSemanticSignature,
-        rowsChanged,
-        colsChanged,
-        hasNewData,
-      });
+    const isInitialMount = previousSemanticSignature === null;
+    const semanticSignatureChanged =
+      previousSemanticSignature !== expansionSemanticSignature;
+    const shouldReinitialize =
+      isInitialMount ||
+      semanticSignatureChanged ||
+      rowsChanged ||
+      colsChanged ||
+      hasNewData;
     if (!shouldReinitialize) {
       return;
     }

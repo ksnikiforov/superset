@@ -290,8 +290,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13237` insertions, `17846` deletions, net `-4609`.
-- Current production TypeScript/TSX total: about `28901` lines.
+- Production `src`: `13207` insertions, `17843` deletions, net `-4636`.
+- Current production TypeScript/TSX total: about `28874` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -303,17 +303,17 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `28901` | `-4609` | `< 28000` |
-| Strict core pipeline | `11337` | `11659` | `+322` | `8000` |
-| Non-visual chart runtime hooks | `4683` | `4970` | `+287` | `3000-4000` |
-| Broad core pipeline | `16020` | `16629` | `+609` | `11000-13000` |
+| Full production `src` | `33510` | `28874` | `-4636` | `< 28000` |
+| Strict core pipeline | `11337` | `11631` | `+294` | `8000` |
+| Non-visual chart runtime hooks | `4683` | `4971` | `+288` | `3000-4000` |
+| Broad core pipeline | `16020` | `16602` | `+582` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
 | `pivot/runtime/*` | `3818` |
-| `pivot/expansion/*` | `2656` |
+| `pivot/expansion/*` | `2628` |
 | `pivot/query/*` | `1412` |
 | `pivot/layout/*` | `770` |
 | core/shared/domain helpers | `1800` |
@@ -680,6 +680,12 @@ semantic signature plus the row/column layout transition already owned by
 `useExpansionEngine`. `usePivotLayout` no longer emits a second full
 row/column expansion-state signature, so layout identity is not duplicated
 between layout compilation and the expansion hook.
+
+Latest layout-result authority cleanup: `PivotLayoutResult` no longer exposes
+`measureHierarchy` or `axisCoverageNeeds` aliases. Consumers read those facts
+from the compiled `layout` object, while column-sort keeps its own narrow input
+contract. The obsolete exported reinitialization-decision helper was also
+deleted; the expansion hook now owns that simple local condition directly.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.

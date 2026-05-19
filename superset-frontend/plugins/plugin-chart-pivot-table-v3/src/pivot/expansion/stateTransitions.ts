@@ -351,34 +351,6 @@ export const resolveCollapsedExpansionState = ({
   };
 };
 
-export const resolveExpansionReinitializationDecision = ({
-  previousSemanticSignature,
-  expansionSemanticSignature,
-  rowsChanged,
-  colsChanged,
-  hasNewData,
-}: {
-  previousSemanticSignature: string | null;
-  expansionSemanticSignature: string;
-  rowsChanged: boolean;
-  colsChanged: boolean;
-  hasNewData: boolean;
-}) => {
-  const semanticSignatureChanged =
-    previousSemanticSignature !== expansionSemanticSignature;
-  const isInitialMount = previousSemanticSignature === null;
-  return {
-    isInitialMount,
-    semanticSignatureChanged,
-    shouldReinitialize:
-      isInitialMount ||
-      semanticSignatureChanged ||
-      rowsChanged ||
-      colsChanged ||
-      hasNewData,
-  };
-};
-
 const buildChildrenByParent = (nodes: Record<string, PivotTreeNode>) => {
   const childrenByParent = new Map<string, PivotTreeNode[]>();
   Object.values(nodes).forEach(node => {

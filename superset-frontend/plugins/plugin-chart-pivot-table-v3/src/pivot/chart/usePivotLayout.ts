@@ -19,7 +19,6 @@
 import { useCallback, useMemo } from 'react';
 import {
   MetricsLayoutEnum,
-  MeasureHierarchy,
   type PivotTableProps,
   type PivotTreeData,
   type PivotTreeNode,
@@ -42,9 +41,7 @@ const defaultPivotNodeSorter = () => 0;
 
 export type PivotLayoutResult = {
   layout: ReturnType<typeof buildLayoutContext>;
-  measureHierarchy: MeasureHierarchy;
   expansionSemanticSignature: string;
-  axisCoverageNeeds: ReturnType<typeof buildLayoutContext>['axisCoverageNeeds'];
   normalizedRowSubtotalLevels: number[];
   normalizedColSubtotalLevels: number[];
   resolvedColTotalPosition: TotalPosition;
@@ -95,7 +92,6 @@ export const usePivotLayout = ({
   const { metricLabelMap, metrics } = layout;
   const { metricsLayoutResolved: resolvedMetricsLayout, metricInsertIndex } =
     layout.pivotProgram;
-  const { axisCoverageNeeds } = layout;
   const { metricKeys: metricLabels } = layout.pivotProgram;
   const isMultiMetric = metricLabels.length > 1;
   const hasMultipleMeasures =
@@ -110,21 +106,22 @@ export const usePivotLayout = ({
     return layout.colSubtotalLevels;
   }, [layout.colSubtotalLevels, layout.rowTotals]);
 
-  const expansionSemanticSignatureData = useMemo(
-    () => ({
-      metrics: metricLabels,
-      metricsLayout: resolvedMetricsLayout,
-      metricPosition: metricLabels.length > 0 ? metricInsertIndex : -1,
-      rowSubtotalLevels: normalizedRowSubtotalLevels,
-      colSubtotalLevels: normalizedColSubtotalLevels,
-      rowTotals: layout.rowTotals,
-      colTotals: layout.colTotals,
-      rowSubTotals: layout.rowSubTotals,
-      axisCoverageNeeds,
-      measureHierarchy: layout.measureHierarchy,
-    }),
+  const expansionSemanticSignature = useMemo(
+    () =>
+      JSON.stringify({
+        metrics: metricLabels,
+        metricsLayout: resolvedMetricsLayout,
+        metricPosition: metricLabels.length > 0 ? metricInsertIndex : -1,
+        rowSubtotalLevels: normalizedRowSubtotalLevels,
+        colSubtotalLevels: normalizedColSubtotalLevels,
+        rowTotals: layout.rowTotals,
+        colTotals: layout.colTotals,
+        rowSubTotals: layout.rowSubTotals,
+        axisCoverageNeeds: layout.axisCoverageNeeds,
+        measureHierarchy: layout.measureHierarchy,
+      }),
     [
-      axisCoverageNeeds,
+      layout.axisCoverageNeeds,
       layout.measureHierarchy,
       layout.colTotals,
       layout.rowSubTotals,
@@ -135,10 +132,6 @@ export const usePivotLayout = ({
       normalizedRowSubtotalLevels,
       resolvedMetricsLayout,
     ],
-  );
-  const expansionSemanticSignature = useMemo(
-    () => JSON.stringify(expansionSemanticSignatureData),
-    [expansionSemanticSignatureData],
   );
 
   const resolvedRowTotalPosition = layout.rowTotalPosition;
@@ -316,9 +309,7 @@ export const usePivotLayout = ({
 
   return {
     layout,
-    measureHierarchy: layout.measureHierarchy,
     expansionSemanticSignature,
-    axisCoverageNeeds,
     normalizedRowSubtotalLevels,
     normalizedColSubtotalLevels,
     resolvedColTotalPosition,
