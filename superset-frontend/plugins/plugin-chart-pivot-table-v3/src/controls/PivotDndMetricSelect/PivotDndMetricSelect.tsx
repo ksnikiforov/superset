@@ -213,50 +213,12 @@ const resolveMetricLabel = (
 const resolveMetricKey = (option: ValueType) =>
   getMetricKey(option as QueryFormMetric | Metric);
 
-const collectMetricIdentifiers = (
-  metric: ValueType,
-  metricLabelMap?: Record<string, string>,
-) => {
-  const identifiers = new Set<string>();
-  if (typeof metric === 'string') {
-    if (metric.length > 0) {
-      identifiers.add(metric);
-    }
-    return identifiers;
-  }
-  const formattingKey = getMetricKey(metric as QueryFormMetric | Metric);
-  if (formattingKey) {
-    identifiers.add(formattingKey);
-  }
-  const metricKey = getMetricKey(metric as QueryFormMetric | Metric);
-  if (metricKey) {
-    identifiers.add(metricKey);
-  }
-  const label = resolveMetricLabel(metric, metricLabelMap);
-  if (label && label !== t('Metric')) {
-    identifiers.add(label);
-  }
-  if ('metric_name' in metric && typeof metric.metric_name === 'string') {
-    identifiers.add(metric.metric_name);
-  }
-  if ('verbose_name' in metric && typeof metric.verbose_name === 'string') {
-    identifiers.add(metric.verbose_name);
-  }
-  return identifiers;
-};
-
 const resolveMetricReferenceKey = (metric?: QueryFormMetric) => {
   if (!metric) {
     return undefined;
   }
-  if (typeof metric === 'string') {
-    return metric.length > 0 ? metric : undefined;
-  }
   const metricKey = getMetricKey(metric as QueryFormMetric | Metric);
-  if (metricKey) {
-    return metricKey;
-  }
-  return undefined;
+  return metricKey || undefined;
 };
 
 const normalizeMetricReferenceValue = (metric: ValueType): QueryFormMetric => {
@@ -307,12 +269,9 @@ export const updateMetricConfigForRename = ({
   oldMetric: ValueType;
   newMetric: ValueType;
 }) => {
-  const oldIdentifiers = collectMetricIdentifiers(oldMetric);
-  const nextLabel = resolveMetricLabel(newMetric);
-  const nextKey =
-    resolveMetricReferenceKey(newMetric as QueryFormMetric) ||
-    (nextLabel !== t('Metric') ? nextLabel : undefined);
-  if (!nextKey || oldIdentifiers.size === 0) {
+  const oldKey = resolveMetricReferenceKey(oldMetric as QueryFormMetric);
+  const nextKey = resolveMetricReferenceKey(newMetric as QueryFormMetric);
+  if (!oldKey || !nextKey) {
     return { metricFormatting, metricDatabars };
   }
   const replacementMetric = normalizeMetricReferenceValue(newMetric);
@@ -323,16 +282,9 @@ export const updateMetricConfigForRename = ({
     if (!metric) {
       return metric;
     }
-    if (typeof metric === 'string') {
-      return oldIdentifiers.has(metric) ? replacementMetric : metric;
-    }
-    const identifiers = collectMetricIdentifiers(metric as ValueType);
-    for (const identifier of identifiers) {
-      if (oldIdentifiers.has(identifier)) {
-        return replacementMetric;
-      }
-    }
-    return metric;
+    return resolveMetricReferenceKey(metric) === oldKey
+      ? replacementMetric
+      : metric;
   };
 
   const replaceFormattingReference = (
@@ -350,19 +302,17 @@ export const updateMetricConfigForRename = ({
   const renameMapKey = <T extends Record<string, unknown>>(
     map: Record<string, T>,
   ) => {
-    let next = { ...map };
-    oldIdentifiers.forEach(identifier => {
-      if (identifier && identifier !== nextKey && identifier in next) {
-        const existing = next[nextKey];
-        const value = next[identifier];
-        const merged =
-          existing && typeof existing === 'object'
-            ? { ...value, ...existing }
-            : existing || value;
-        next = { ...next, [nextKey]: merged };
-        delete next[identifier];
-      }
-    });
+    if (oldKey === nextKey || !(oldKey in map)) {
+      return map;
+    }
+    const existing = map[nextKey];
+    const value = map[oldKey];
+    const merged =
+      existing && typeof existing === 'object'
+        ? { ...value, ...existing }
+        : existing || value;
+    const next = { ...map, [nextKey]: merged };
+    delete next[oldKey];
     return next;
   };
 
@@ -416,17 +366,13 @@ const dedupeMetrics = (metrics: ValueType[]) => {
   });
 };
 
-const collectActiveMetricKeys = (
-  metrics: ValueType[],
-  metricLabelMap?: Record<string, string>,
-) => {
+const collectActiveMetricKeys = (metrics: ValueType[]) => {
   const keys = new Set<string>();
   metrics.forEach(metric => {
-    collectMetricIdentifiers(metric, metricLabelMap).forEach(identifier => {
-      if (identifier) {
-        keys.add(identifier);
-      }
-    });
+    const key = getMetricKey(metric as QueryFormMetric | Metric);
+    if (key) {
+      keys.add(key);
+    }
   });
   return keys;
 };
@@ -690,7 +636,6 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       if (setControlValue) {
         const activeMetricKeys = collectActiveMetricKeys(
           optionValues as ValueType[],
-          metricLabelMap,
         );
         Object.entries(nextLeaves).forEach(([metricKey, leaves]) => {
           leaves.forEach(leaf => {
@@ -740,7 +685,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       }
       onChange(multi ? optionValues : optionValues[0]);
     },
-    [metricLabelMap, multi, onChange, setControlValue, updateMeasureLeaves],
+    [multi, onChange, setControlValue, updateMeasureLeaves],
   );
 
   const handleMetricFormattingChange = useCallback(
@@ -787,7 +732,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       }
       const baseDatabars = metricDatabarsRef.current || {};
       if (field === 'scaleLike' && nextValue) {
-        const activeMetricKeys = collectActiveMetricKeys(value, metricLabelMap);
+        const activeMetricKeys = collectActiveMetricKeys(value);
         const { sources, targets } = Object.entries(baseDatabars).reduce<{
           sources: Set<string>;
           targets: Set<string>;
@@ -840,7 +785,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       metricDatabarsRef.current = nextDatabars;
       setControlValue('metricDatabars', nextDatabars);
     },
-    [metricLabelMap, setControlValue, value],
+    [setControlValue, value],
   );
 
   const availableMetrics = useMemo(() => {
