@@ -30,10 +30,8 @@ import { buildFactValueKeys, type PivotFactStore } from '../runtime/factStore';
 import { type LatestRequestScope } from '../runtime/requestLifecycle';
 import { createExpansionCoverageDiff } from '../runtime/coverage';
 import { stableStringify } from '../shared/stableStringify';
-import {
-  planHydrationIteration,
-  type ExpansionPlanningConfig,
-} from './stateTransitions';
+import { planHydrationIteration } from './stateTransitions';
+import type { PivotProgram } from '../runtime/types';
 import {
   type ExpansionFetchTarget,
   type IntersectionFetchTarget,
@@ -50,7 +48,7 @@ export type ExpansionFetchRuntime = {
   instanceId: string;
   fetchFormData: PivotTableQueryFormData;
   layout: LayoutContext;
-  factStore?: PivotFactStore;
+  factStore: PivotFactStore;
   materializeLoadedTree: () => PivotTreeData;
   addWarnings: (nextWarnings?: ChartDataWarning[]) => void;
   updateLoadingKey: (key: string, delta: number) => void;
@@ -69,7 +67,7 @@ type HydrationFetchLoopParams = {
     axis: 'row' | 'col',
     tree: PivotTreeData,
   ) => Set<string>;
-  config: ExpansionPlanningConfig;
+  program: PivotProgram;
   fetchRuntime: ExpansionFetchRuntime;
 };
 
@@ -97,7 +95,7 @@ const createRuntimeExpansionCoverageDiff = ({
   runtime: ExpansionFetchRuntime;
 }) =>
   createExpansionCoverageDiff({
-    factSelectors: runtime.factStore?.getCoverageSelectors() ?? [],
+    factSelectors: runtime.factStore.getCoverageSelectors(),
     program: runtime.layout.pivotProgram,
     valueKeys: buildFactValueKeys({
       metricKeys: runtime.layout.pivotProgram.metricKeys,
@@ -306,7 +304,7 @@ export const runHydrationExpansionFetchLoop = async ({
   maxIterations,
   isCurrent,
   buildDesiredExpanded,
-  config,
+  program,
   fetchRuntime,
 }: HydrationFetchLoopParams) => {
   let currentTree = baseTree;
@@ -323,7 +321,7 @@ export const runHydrationExpansionFetchLoop = async ({
       getMissingExpansionCoverage: createRuntimeExpansionCoverageDiff({
         runtime: fetchRuntime,
       }),
-      config,
+      program,
     });
     const { visibleRowDepth, visibleColDepth } = hydrationPlan;
 

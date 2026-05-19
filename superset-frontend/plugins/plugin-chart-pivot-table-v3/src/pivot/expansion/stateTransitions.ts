@@ -43,10 +43,6 @@ import type { PivotProgram } from '../runtime/types';
 import { isMetricTokenForKeys, isSubtotalToken } from '../core/tokens';
 import { createMetricNodePolicy } from '../metricsTotals';
 
-export type ExpansionPlanningConfig = {
-  program: PivotProgram;
-};
-
 const PIVOT_AXES: PivotAxis[] = ['row', 'col'];
 
 const createEmptyExpansionPlan = (): PivotExpansionPlan => ({
@@ -373,14 +369,14 @@ export const computeVisibleDepths = ({
   tree,
   expandedRows,
   expandedCols,
-  config,
+  program,
 }: {
   tree: PivotTreeData;
   expandedRows: Set<string>;
   expandedCols: Set<string>;
-  config: ExpansionPlanningConfig;
+  program: PivotProgram;
 }): { visibleRowDepth: number; visibleColDepth: number } => {
-  const { countDimDepth } = createExpansionMetricPolicy(config.program);
+  const { countDimDepth } = createExpansionMetricPolicy(program);
   const maxVisibleDepth = (
     axis: PivotAxis,
     nodes: Record<string, PivotTreeNode>,
@@ -389,8 +385,8 @@ export const computeVisibleDepths = ({
     const root = nodes[rootKey];
     const axisDimensionCount =
       axis === 'row'
-        ? config.program.rowDimensions.length
-        : config.program.columnDimensions.length;
+        ? program.rowDimensions.length
+        : program.columnDimensions.length;
     if (!root) {
       return 0;
     }
@@ -681,23 +677,23 @@ export const planHydrationIteration = ({
   desiredRows,
   desiredCols,
   getMissingExpansionCoverage,
-  config,
+  program,
 }: {
   tree: PivotTreeData;
   desiredRows: Set<string>;
   desiredCols: Set<string>;
   getMissingExpansionCoverage: PivotExpansionCoverageDiff;
-  config: ExpansionPlanningConfig;
+  program: PivotProgram;
 }) => {
   const { visibleRowDepth, visibleColDepth } = computeVisibleDepths({
     tree,
     expandedRows: desiredRows,
     expandedCols: desiredCols,
-    config,
+    program,
   });
   const rowPlan = planExpansionForAxis({
     axis: 'row',
-    program: config.program,
+    program,
     expandedKeys: desiredRows,
     nodes: tree.rows,
     coverage: { rowDepth: visibleRowDepth, columnDepth: visibleColDepth },
@@ -705,7 +701,7 @@ export const planHydrationIteration = ({
   });
   const colPlan = planExpansionForAxis({
     axis: 'col',
-    program: config.program,
+    program,
     expandedKeys: desiredCols,
     nodes: tree.cols,
     coverage: { rowDepth: visibleRowDepth, columnDepth: visibleColDepth },

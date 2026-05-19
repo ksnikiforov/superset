@@ -24,7 +24,6 @@ import {
   resolveExpandedForMetrics,
   resolveExpansionReinitializationDecision,
   resolveExpansionToggleDecision,
-  type ExpansionPlanningConfig,
 } from '../../../src/pivot/expansion/stateTransitions';
 import { createExpansionCoverageDiff } from '../../../src/pivot/runtime/coverage';
 import { rootKey } from '../../../src/pivot/viewModel';
@@ -52,9 +51,6 @@ describe('pivot/expansion/stateTransitions', () => {
     groupbyColumns: ['month', 'day'],
     metrics: ['sales'],
   });
-  const config: ExpansionPlanningConfig = {
-    program: testProgram,
-  };
   const expansionCoverageLoadedFromSelectors = (
     factSelectors: PivotFactSelector[] = [],
   ) =>
@@ -372,7 +368,7 @@ describe('pivot/expansion/stateTransitions', () => {
       getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors([
         loadedRootCoverage,
       ]),
-      config,
+      program: testProgram,
     });
 
     expect(plan.kind).toBe('fetch');
@@ -413,7 +409,7 @@ describe('pivot/expansion/stateTransitions', () => {
           valueKeys: ['sales'],
         },
       ]),
-      config,
+      program: testProgram,
     });
 
     expect(plan.kind).toBe('fetch');
@@ -440,7 +436,7 @@ describe('pivot/expansion/stateTransitions', () => {
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
       getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors(),
-      config,
+      program: testProgram,
     });
 
     expect(plan.kind).toBe('fetch');
@@ -473,7 +469,7 @@ describe('pivot/expansion/stateTransitions', () => {
       getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors([
         loadedBootstrapCoverage,
       ]),
-      config,
+      program: testProgram,
     });
 
     expect(plan.kind).toBe('fetch');
@@ -522,7 +518,7 @@ describe('pivot/expansion/stateTransitions', () => {
         loadedBootstrapCoverage,
         loadedColumnBranch,
       ]),
-      config,
+      program: testProgram,
     });
 
     expect(plan.kind).toBe('complete');
@@ -537,7 +533,7 @@ describe('pivot/expansion/stateTransitions', () => {
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
       getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors(),
-      config,
+      program: testProgram,
     });
 
     expect(plan.kind).toBe('fetch');
@@ -575,21 +571,19 @@ describe('pivot/expansion/stateTransitions', () => {
         },
       },
     };
-    const metricConfig: ExpansionPlanningConfig = {
-      program: compilePivotProgram({
-        groupbyRows: ['country', 'city'],
-        groupbyColumns: ['month', 'day', METRICS_PLACEHOLDER],
-        metrics: ['m1'],
-        metricsLayout: MetricsLayoutEnum.COLUMNS,
-      }),
-    };
+    const metricProgram = compilePivotProgram({
+      groupbyRows: ['country', 'city'],
+      groupbyColumns: ['month', 'day', METRICS_PLACEHOLDER],
+      metrics: ['m1'],
+      metricsLayout: MetricsLayoutEnum.COLUMNS,
+    });
 
     const plan = planHydrationIteration({
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
       getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors(),
-      config: metricConfig,
+      program: metricProgram,
     });
 
     expect(fetchPathKeys(plan.targets)).toContain(aKey);
@@ -625,21 +619,19 @@ describe('pivot/expansion/stateTransitions', () => {
         },
       },
     };
-    const metricConfig: ExpansionPlanningConfig = {
-      program: compilePivotProgram({
-        groupbyRows: ['country', 'city', METRICS_PLACEHOLDER],
-        groupbyColumns: ['month', 'day'],
-        metrics: ['m1'],
-        metricsLayout: MetricsLayoutEnum.ROWS,
-      }),
-    };
+    const metricProgram = compilePivotProgram({
+      groupbyRows: ['country', 'city', METRICS_PLACEHOLDER],
+      groupbyColumns: ['month', 'day'],
+      metrics: ['m1'],
+      metricsLayout: MetricsLayoutEnum.ROWS,
+    });
 
     const plan = planHydrationIteration({
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
       getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors(),
-      config: metricConfig,
+      program: metricProgram,
     });
 
     expect(fetchPathKeys(plan.targets)).toContain(aKey);

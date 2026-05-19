@@ -63,7 +63,6 @@ import {
   resolveReinitializedExpansionState,
   resolveExpandedForMetrics as resolveExpandedForMetricsBase,
   resolveLayoutTransition,
-  type ExpansionPlanningConfig,
 } from './stateTransitions';
 import { useSyncRef } from '../shared/useSyncRef';
 import {
@@ -446,13 +445,6 @@ export const useExpansionEngine = ({
     [setWarnings],
   );
 
-  const planningConfig = useMemo<ExpansionPlanningConfig>(
-    () => ({
-      program: pivotProgram,
-    }),
-    [pivotProgram],
-  );
-
   const persistExpansionState = useCallback(
     (nextRows: Set<string>, nextCols: Set<string>) => {
       const visible = buildVisiblePersistedExpansionState({
@@ -500,23 +492,24 @@ export const useExpansionEngine = ({
   );
 
   const buildFetchRuntime = useCallback(
-    (requestScope: LatestRequestScope): ExpansionFetchRuntime => ({
-      requestScope,
-      instanceId: requestGroupPrefixRef.current,
-      fetchFormData: fetchFormDataRef.current,
-      layout: fetchLayout,
-      factStore: factStoreRef.current,
-      materializeLoadedTree: () =>
-        factStoreRef.current
-          ? materializeLoadedPivotTreeFromFactStore({
-              store: factStoreRef.current,
-              layout: fetchLayout,
-              formData: fetchFormDataRef.current,
-            })
-          : treeRef.current,
-      addWarnings,
-      updateLoadingKey,
-    }),
+    (requestScope: LatestRequestScope): ExpansionFetchRuntime => {
+      const factStore = factStoreRef.current as PivotFactStore;
+      return {
+        requestScope,
+        instanceId: requestGroupPrefixRef.current,
+        fetchFormData: fetchFormDataRef.current,
+        layout: fetchLayout,
+        factStore,
+        materializeLoadedTree: () =>
+          materializeLoadedPivotTreeFromFactStore({
+            store: factStore,
+            layout: fetchLayout,
+            formData: fetchFormDataRef.current,
+          }),
+        addWarnings,
+        updateLoadingKey,
+      };
+    },
     [addWarnings, fetchLayout, updateLoadingKey],
   );
 
@@ -572,7 +565,7 @@ export const useExpansionEngine = ({
           maxIterations: MAX_HYDRATION_ITERATIONS,
           isCurrent: requestScope.isCurrent,
           buildDesiredExpanded,
-          config: planningConfig,
+          program: pivotProgram,
           fetchRuntime: buildFetchRuntime(requestScope),
         });
         if (result.status === 'complete') {
@@ -608,9 +601,9 @@ export const useExpansionEngine = ({
       commitExpansionState,
       expansionRequestLifecycle,
       persistExpansionState,
+      pivotProgram,
       resolveExpandedForMetrics,
       setHydratingState,
-      planningConfig,
     ],
   );
 
@@ -788,7 +781,6 @@ export const useExpansionEngine = ({
     readSessionExpansionState,
     setHydratingState,
     writeSessionExpansionState,
-    planningConfig,
   ]);
 
   const handleRetry = useCallback(() => {
