@@ -25,7 +25,7 @@ import {
   resolveExpansionReinitializationDecision,
   resolveExpansionToggleDecision,
 } from '../../../src/pivot/expansion/stateTransitions';
-import { createExpansionCoverageDiff } from '../../../src/pivot/runtime/coverage';
+import { createExpansionCoverageDiff } from '../../../src/pivot/expansion/planner';
 import { rootKey } from '../../../src/pivot/viewModel';
 import {
   encodeMetricKey,
@@ -56,8 +56,6 @@ describe('pivot/expansion/stateTransitions', () => {
   ) =>
     createExpansionCoverageDiff({
       factSelectors,
-      program: testProgram,
-      valueKeys: ['sales'],
     });
   const fetchPathKeys = (targets: Array<{ pathKey: string }>) =>
     targets.map(target => target.pathKey);

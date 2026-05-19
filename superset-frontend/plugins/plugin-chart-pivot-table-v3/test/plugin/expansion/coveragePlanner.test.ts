@@ -18,8 +18,10 @@
  */
 
 import { PivotAxis, PivotTreeNode } from '../../../src/types';
-import { planExpansionForAxis } from '../../../src/pivot/expansion/planner';
-import { type PivotExpansionCoverageDiff } from '../../../src/pivot/runtime/coverage';
+import {
+  planExpansionForAxis,
+  type PivotExpansionCoverageDiff,
+} from '../../../src/pivot/expansion/planner';
 import { serializePath } from '../../../src/pivot/core/path';
 import { rootKey } from '../../../src/pivot/viewModel';
 import { compilePivotProgram } from '../../../src/pivot/runtime/compilePivotProgram';
@@ -56,8 +58,8 @@ const sortFetchPathKeys = (plan: ReturnType<typeof planExpansionForAxis>) =>
 
 const getMissingCoverageFromDepths =
   (depthByPathKey: Map<string, number>): PivotExpansionCoverageDiff =>
-  requests =>
-    requests.filter(({ axis, pathKey, rowDepth, columnDepth }) => {
+  targets =>
+    targets.filter(({ axis, pathKey, rowDepth, columnDepth }) => {
       const fetchedDepth = depthByPathKey.get(pathKey);
       const requiredDepth = axis === 'row' ? columnDepth : rowDepth;
       return !(fetchedDepth !== undefined && fetchedDepth >= requiredDepth);

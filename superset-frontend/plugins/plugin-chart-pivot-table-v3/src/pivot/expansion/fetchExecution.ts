@@ -20,21 +20,21 @@ import { type PivotTableQueryFormData, type PivotTreeData } from '../../types';
 import { parsePath, serializePath } from '../core/path';
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import { type LayoutContext } from '../layout/LayoutContext';
-import { buildFactValueKeys, type PivotFactStore } from '../runtime/factStore';
+import { type PivotFactStore } from '../runtime/factStore';
 import { type LatestRequestScope } from '../runtime/requestLifecycle';
-import { createExpansionCoverageDiff } from '../runtime/coverage';
 import { stableStringify } from '../shared/stableStringify';
 import { planHydrationIteration } from './stateTransitions';
 import type { PivotProgram } from '../runtime/types';
 import {
   type BatchCandidate,
   type BatchGroup,
+  buildIntersectionCoverageTarget,
+  createExpansionCoverageDiff,
   type ExpansionFetchTarget,
   type FetchTarget,
   type IntersectionFetchTarget,
   isIntersectionFetchTarget,
 } from './planner';
-import { rootKey } from '../viewModel';
 import {
   fetchPivotExpansion,
   type FetchPivotExpansionRequest,
@@ -202,10 +202,6 @@ const createRuntimeExpansionCoverageDiff = ({
 }) =>
   createExpansionCoverageDiff({
     factSelectors: runtime.factStore.getCoverageSelectors(),
-    program: runtime.layout.pivotProgram,
-    valueKeys: buildFactValueKeys({
-      metricKeys: runtime.layout.pivotProgram.metricKeys,
-    }),
   });
 
 const resolveExpansionFetchPlan = ({
@@ -284,31 +280,27 @@ const filterMissingIntersectionTargets = ({
   context: ExpansionFetchContext;
   runtime: ExpansionFetchRuntime;
 }) => {
-  const missingRequests = createRuntimeExpansionCoverageDiff({
-    runtime,
-  })(
-    intersections.map(target => ({
-      axis: 'row' as const,
-      pathKey: rootKey,
+  const coverageTargets = intersections.map(target => ({
+    target,
+    coverageTarget: buildIntersectionCoverageTarget({
+      program: runtime.layout.pivotProgram,
       rowDepth: context.visibleRowDepth,
       columnDepth: context.visibleColDepth,
       rowPathKeys: target.rowPathKeys,
       columnPathKeys: target.columnPathKeys,
-    })),
-  );
+    }),
+  }));
+  const missingRequests = createRuntimeExpansionCoverageDiff({
+    runtime,
+  })(coverageTargets.map(({ coverageTarget }) => coverageTarget));
   const missingKeys = new Set(
-    missingRequests.map(request =>
-      stableStringify([
-        request.rowPathKeys ?? [],
-        request.columnPathKeys ?? [],
-      ]),
-    ),
+    missingRequests.map(request => stableStringify(request.need)),
   );
-  return intersections.filter(target =>
-    missingKeys.has(
-      stableStringify([target.rowPathKeys, target.columnPathKeys]),
-    ),
-  );
+  return coverageTargets
+    .filter(({ coverageTarget }) =>
+      missingKeys.has(stableStringify(coverageTarget.need)),
+    )
+    .map(({ target }) => target);
 };
 
 export const fetchExpansionTargetDeltas = async ({

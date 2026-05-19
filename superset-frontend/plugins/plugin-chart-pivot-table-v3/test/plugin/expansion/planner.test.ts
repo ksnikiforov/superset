@@ -17,11 +17,11 @@
  * under the License.
  */
 
-import { planExpansionForAxis } from '../../../src/pivot/expansion/planner';
 import {
   createExpansionCoverageDiff,
+  planExpansionForAxis,
   type PivotExpansionCoverageDiff,
-} from '../../../src/pivot/runtime/coverage';
+} from '../../../src/pivot/expansion/planner';
 import { rootKey } from '../../../src/pivot/viewModel';
 import {
   encodeMetricKey,
@@ -64,8 +64,6 @@ const getMissingCoverageFromSelectors = (
 ): PivotExpansionCoverageDiff =>
   createExpansionCoverageDiff({
     factSelectors,
-    program: testProgram,
-    valueKeys: ['sales', 'profit'],
   });
 
 const fetchPathKeys = (plan: ReturnType<typeof planExpansionForAxis>) =>

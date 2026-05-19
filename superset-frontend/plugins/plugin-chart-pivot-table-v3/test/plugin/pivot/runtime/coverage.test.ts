@@ -23,13 +23,16 @@ import {
 import { serializePath } from '../../../../src/pivot/core/path';
 import { compilePivotProgram } from '../../../../src/pivot/runtime/compilePivotProgram';
 import {
-  createExpansionCoverageDiff,
   buildInitialAxisCoverageNeeds,
   buildFactCoverage,
   diffCoverageManifest,
   resolveInitialVisibleAxisDepth,
   type PivotCoverageNeed,
 } from '../../../../src/pivot/runtime/coverage';
+import {
+  buildAxisExpansionCoverageTarget,
+  createExpansionCoverageDiff,
+} from '../../../../src/pivot/expansion/planner';
 import { type PivotFactSelector } from '../../../../src/pivot/runtime/factStore';
 import { resolveAxisProjection } from '../../../../src/pivot/runtime/projection';
 import { buildLayoutContext } from '../../../../src/pivot/layout/LayoutContext';
@@ -77,29 +80,51 @@ describe('expansion fact coverage', () => {
           valueKeys: ['sales'],
         },
       ],
-      program,
-      valueKeys: ['sales'],
     });
+    const target = ({
+      axis,
+      path,
+      rowDepth,
+      columnDepth,
+    }: {
+      axis: 'row' | 'col';
+      path: string[];
+      rowDepth: number;
+      columnDepth: number;
+    }) =>
+      buildAxisExpansionCoverageTarget({
+        program,
+        axis,
+        pathKey: serializePath(path),
+        rowDepth,
+        columnDepth,
+      });
 
     expect(
       getMissingExpansionCoverage([
-        {
+        target({
           axis: 'row',
-          pathKey: serializePath(['France']),
+          path: ['France'],
           rowDepth: 2,
           columnDepth: 1,
-        },
+        }),
       ]),
     ).toEqual([]);
+    const missingDeepColumn = getMissingExpansionCoverage([
+      target({
+        axis: 'row',
+        path: ['France'],
+        rowDepth: 2,
+        columnDepth: 4,
+      }),
+    ]);
     expect(
-      getMissingExpansionCoverage([
-        {
-          axis: 'row',
-          pathKey: serializePath(['France']),
-          rowDepth: 2,
-          columnDepth: 4,
-        },
-      ]),
+      missingDeepColumn.map(({ axis, pathKey, rowDepth, columnDepth }) => ({
+        axis,
+        pathKey,
+        rowDepth,
+        columnDepth,
+      })),
     ).toEqual([
       {
         axis: 'row',
@@ -108,15 +133,21 @@ describe('expansion fact coverage', () => {
         columnDepth: 4,
       },
     ]);
+    const missingColumnBranch = getMissingExpansionCoverage([
+      target({
+        axis: 'col',
+        path: ['France'],
+        rowDepth: 1,
+        columnDepth: 1,
+      }),
+    ]);
     expect(
-      getMissingExpansionCoverage([
-        {
-          axis: 'col',
-          pathKey: serializePath(['France']),
-          rowDepth: 1,
-          columnDepth: 1,
-        },
-      ]),
+      missingColumnBranch.map(({ axis, pathKey, rowDepth, columnDepth }) => ({
+        axis,
+        pathKey,
+        rowDepth,
+        columnDepth,
+      })),
     ).toEqual([
       {
         axis: 'col',
@@ -467,18 +498,17 @@ describe('branch fact coverage', () => {
           valueKeys: ['averageOrderValue'],
         },
       ],
-      program,
-      valueKeys: ['averageOrderValue', 'weightedDiscount'],
     });
 
     expect(
       getMissingExpansionCoverage([
-        {
+        buildAxisExpansionCoverageTarget({
+          program,
           axis: 'row',
           pathKey: serializePath([encodeMetricKey('averageOrderValue'), 'A']),
           rowDepth: 2,
           columnDepth: 1,
-        },
+        }),
       ]),
     ).toEqual([]);
   });

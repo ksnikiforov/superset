@@ -17,18 +17,7 @@
  * under the License.
  */
 import { type PivotAxis, type PivotPath } from '../../types';
-import { parsePath } from '../core/path';
-import {
-  decodeMetricKey,
-  isMeasureLeafToken,
-  isMetricToken,
-} from '../core/tokens';
-import { stableStringify } from '../shared/stableStringify';
-import {
-  projectionQueryDimensions,
-  projectionQueryFilterPath,
-  resolveAxisProjection,
-} from './projection';
+import { isMeasureLeafToken, isMetricToken } from '../core/tokens';
 import type { PivotFactSelector, PivotFactStoreBatchScope } from './factStore';
 import type { PivotFactCoverage, PivotProgram } from './types';
 
@@ -49,19 +38,6 @@ export type PivotAxisCoverageNeed = {
   depth: number;
   scope: AxisPathScope;
 };
-
-export type PivotExpansionCoverageRequest = {
-  axis: PivotAxis;
-  pathKey: string;
-  rowDepth: number;
-  columnDepth: number;
-  rowPathKeys?: string[];
-  columnPathKeys?: string[];
-};
-
-export type PivotExpansionCoverageDiff = (
-  requests: PivotExpansionCoverageRequest[],
-) => PivotExpansionCoverageRequest[];
 
 export type PivotCoverageNeed = {
   rowDepth: number;
@@ -172,113 +148,6 @@ const intersectionScopePaths = (
   scope: Extract<PivotFactStoreBatchScope, { kind: 'intersection' }>,
   axis: PivotAxis,
 ) => (axis === 'row' ? scope.rowPaths : scope.columnPaths);
-
-const axisPathScopeFromPath = (path: PivotPath): AxisPathScope => ({
-  kind: 'paths',
-  paths: [path],
-});
-
-const expansionFilterPath = ({
-  program,
-  axis,
-  path,
-}: {
-  program: PivotProgram;
-  axis: PivotAxis;
-  path: PivotPath;
-}) =>
-  projectionQueryFilterPath(
-    resolveAxisProjection({
-      program,
-      axis,
-      path,
-    }),
-  );
-
-const valueKeysForExpansionPath = (
-  path: PivotPath,
-  fallbackValueKeys: string[],
-) => {
-  const metricKeys = path
-    .map(value => decodeMetricKey(value))
-    .filter((value): value is string => value !== undefined);
-  return metricKeys.length > 0
-    ? normalizeFactValueKeys(metricKeys)
-    : fallbackValueKeys;
-};
-
-const buildExpansionCoverageNeed = ({
-  request,
-  program,
-  valueKeys,
-}: {
-  request: PivotExpansionCoverageRequest;
-  program: PivotProgram;
-  valueKeys: string[];
-}): PivotCoverageNeed => {
-  if (request.rowPathKeys && request.columnPathKeys) {
-    const rowPaths = request.rowPathKeys.map(pathKey =>
-      expansionFilterPath({
-        program,
-        axis: 'row',
-        path: parsePath(pathKey),
-      }),
-    );
-    const columnPaths = request.columnPathKeys.map(pathKey =>
-      expansionFilterPath({
-        program,
-        axis: 'col',
-        path: parsePath(pathKey),
-      }),
-    );
-    return {
-      rowDepth: request.rowDepth,
-      columnDepth: request.columnDepth,
-      rowDimensions: program.rowDimensions.slice(0, request.rowDepth),
-      columnDimensions: program.columnDimensions.slice(0, request.columnDepth),
-      valueKeys,
-      rowScope: { kind: 'paths', paths: rowPaths },
-      columnScope: { kind: 'paths', paths: columnPaths },
-    };
-  }
-  const path = parsePath(request.pathKey);
-  const branchProjection = resolveAxisProjection({
-    program,
-    axis: request.axis,
-    path,
-  });
-  const branchDimensions = projectionQueryDimensions(branchProjection);
-  const branchDimensionDepth = branchDimensions.length;
-  const branchPath = projectionQueryFilterPath(branchProjection);
-  const rowDepth =
-    request.axis === 'row' ? branchDimensionDepth : request.rowDepth;
-  const columnDepth =
-    request.axis === 'col' ? branchDimensionDepth : request.columnDepth;
-  const rowDimensions =
-    request.axis === 'row'
-      ? branchDimensions
-      : program.rowDimensions.slice(0, rowDepth);
-  const columnDimensions =
-    request.axis === 'col'
-      ? branchDimensions
-      : program.columnDimensions.slice(0, columnDepth);
-
-  return {
-    rowDepth,
-    columnDepth,
-    rowDimensions,
-    columnDimensions,
-    valueKeys: valueKeysForExpansionPath(path, valueKeys),
-    rowScope:
-      request.axis === 'row'
-        ? axisPathScopeFromPath(branchPath)
-        : { kind: 'root' },
-    columnScope:
-      request.axis === 'col'
-        ? axisPathScopeFromPath(branchPath)
-        : { kind: 'root' },
-  };
-};
 
 const isRuntimeLayoutCoverageScope = (
   scope: PivotFactStoreBatchScope,
@@ -427,39 +296,6 @@ export const diffCoverageManifest = ({
   required: PivotCoverageNeed[];
   factSelectors: PivotFactSelector[];
 }) => required.filter(need => !factSelectorsCoverNeed(factSelectors, need));
-
-export const createExpansionCoverageDiff = ({
-  factSelectors,
-  program,
-  valueKeys,
-}: {
-  factSelectors: PivotFactSelector[];
-  program: PivotProgram;
-  valueKeys: string[];
-}): PivotExpansionCoverageDiff => {
-  const cache = new Map<string, boolean>();
-  const isLoaded = (request: PivotExpansionCoverageRequest) => {
-    const key = stableStringify(request);
-    const cached = cache.get(key);
-    if (cached !== undefined) {
-      return cached;
-    }
-    const loaded =
-      diffCoverageManifest({
-        required: [
-          buildExpansionCoverageNeed({
-            request,
-            program,
-            valueKeys,
-          }),
-        ],
-        factSelectors,
-      }).length === 0;
-    cache.set(key, loaded);
-    return loaded;
-  };
-  return requests => requests.filter(request => !isLoaded(request));
-};
 
 export const buildCoverageNeedFromFactSelector = ({
   coverage,

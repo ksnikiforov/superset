@@ -24,9 +24,11 @@ import {
 } from '../../types';
 import { parsePath, serializePath } from '../core/path';
 import {
+  buildIntersectionCoverageTarget,
   type ExpansionFetchTarget,
   planExpansionForAxis,
   type PivotExpansionPlan,
+  type PivotExpansionCoverageDiff,
 } from './planner';
 import {
   buildDesiredExpandedKeys,
@@ -34,10 +36,7 @@ import {
   type PivotExpansionStateKeys,
 } from './stateModel';
 import { rootKey } from '../viewModel';
-import {
-  type PivotAxisCoverageNeed,
-  type PivotExpansionCoverageDiff,
-} from '../runtime/coverage';
+import { type PivotAxisCoverageNeed } from '../runtime/coverage';
 import { getValuesLevelIndex } from '../runtime/projection';
 import type { PivotProgram } from '../runtime/types';
 import { isMetricTokenForKeys, isSubtotalToken } from '../core/tokens';
@@ -600,6 +599,7 @@ export const buildCrossAxisIntersectionTargets = ({
   visibleRowDepth,
   visibleColDepth,
   getMissingExpansionCoverage,
+  program,
 }: {
   rowKeys: Set<string>;
   colKeys: Set<string>;
@@ -608,6 +608,7 @@ export const buildCrossAxisIntersectionTargets = ({
   visibleRowDepth: number;
   visibleColDepth: number;
   getMissingExpansionCoverage: PivotExpansionCoverageDiff;
+  program: PivotProgram;
 }): ExpansionFetchTarget[] => {
   const rowPathKeys = Array.from(rowKeys).filter(
     key => key !== rootKey && rowNodes[key],
@@ -624,15 +625,14 @@ export const buildCrossAxisIntersectionTargets = ({
   ) {
     return [];
   }
-  const intersectionRequest = {
-    axis: 'row' as const,
-    pathKey: rootKey,
+  const intersectionTarget = buildIntersectionCoverageTarget({
+    program,
     rowDepth: visibleRowDepth,
     columnDepth: visibleColDepth,
     rowPathKeys,
     columnPathKeys,
-  };
-  return getMissingExpansionCoverage([intersectionRequest]).length > 0
+  });
+  return getMissingExpansionCoverage([intersectionTarget]).length > 0
     ? [{ kind: 'intersection', rowPathKeys, columnPathKeys }]
     : [];
 };
@@ -716,6 +716,7 @@ export const planHydrationIteration = ({
     visibleRowDepth,
     visibleColDepth,
     getMissingExpansionCoverage,
+    program,
   });
   const shouldFetchIntersectionOnly =
     intersectionTargets.length > 0 &&
