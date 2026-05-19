@@ -101,9 +101,6 @@ test('ingests named query results into ordered fact batches', () => {
     'pivot_v3|1|0',
     'pivot_v3|1|1',
   ]);
-  expect(ingested.map(batch => batch.result.data?.[0]?.sales)).toEqual([
-    30, 12,
-  ]);
   expect(ingested.flatMap(batch => batch.facts)).toEqual([
     {
       rowPath: ['France'],

@@ -71,9 +71,8 @@ type QueryResultWithData = {
   query_name?: unknown;
 };
 
-type IngestedQueryResult<T extends QueryResultWithData> = {
+type IngestedQueryResult = {
   spec: PlannedQuerySpec;
-  result: T;
   facts: PivotFact[];
 };
 
@@ -204,26 +203,13 @@ const factsFromRecordsAsync = async ({
   return facts;
 };
 
-const ingestQueryResultFacts = ({
-  spec,
-  result,
-}: {
-  spec: PlannedQuerySpec;
-  result: QueryResultWithData;
-}): PivotFact[] =>
-  factsFromRecords({
-    result,
-    metrics: spec.metrics,
-    coverage: spec.meta.coverage,
-  });
-
 export const ingestQueryResults = <T extends QueryResultWithData>({
   specs,
   results,
 }: {
   specs: PlannedQuerySpec[];
   results: T[];
-}): IngestedQueryResult<QueryResultWithData>[] => {
+}): IngestedQueryResult[] => {
   const orderedResults = orderQueryResultsForSpecs({
     specs,
     results,
@@ -232,8 +218,11 @@ export const ingestQueryResults = <T extends QueryResultWithData>({
     const result = orderedResults[idx] ?? {};
     return {
       spec,
-      result,
-      facts: ingestQueryResultFacts({ spec, result }),
+      facts: factsFromRecords({
+        result,
+        metrics: spec.metrics,
+        coverage: spec.meta.coverage,
+      }),
     };
   });
 };
@@ -247,20 +236,17 @@ const ingestQueryResultsAsync = async <T extends QueryResultWithData>({
 }: {
   specs: PlannedQuerySpec[];
   results: T[];
-} & ChunkedWorkOptions): Promise<
-  IngestedQueryResult<QueryResultWithData>[]
-> => {
+} & ChunkedWorkOptions): Promise<IngestedQueryResult[]> => {
   const orderedResults = orderQueryResultsForSpecs({
     specs,
     results,
   });
-  const ingested: IngestedQueryResult<QueryResultWithData>[] = [];
+  const ingested: IngestedQueryResult[] = [];
   for (let idx = 0; idx < specs.length; idx += 1) {
     const spec = specs[idx];
     const result = orderedResults[idx] ?? {};
     ingested.push({
       spec,
-      result,
       // eslint-disable-next-line no-await-in-loop
       facts: await factsFromRecordsAsync({
         result,
@@ -285,10 +271,7 @@ const ingestQueryResultsAsync = async <T extends QueryResultWithData>({
 const factStoreBatchFromIngested = ({
   spec,
   facts,
-}: Pick<
-  IngestedQueryResult<QueryResultWithData>,
-  'spec' | 'facts'
->): PivotFactStoreBatch => ({
+}: Pick<IngestedQueryResult, 'spec' | 'facts'>): PivotFactStoreBatch => ({
   ...spec.meta.factSelector,
   facts,
 });
@@ -298,7 +281,7 @@ const upsertIngestedFactsIntoStore = ({
   ingested,
 }: {
   store: PivotFactStore;
-  ingested: Array<IngestedQueryResult<QueryResultWithData>>;
+  ingested: IngestedQueryResult[];
 }) => {
   ingested.forEach(batch =>
     store.upsertBatch(factStoreBatchFromIngested(batch)),
@@ -380,19 +363,19 @@ const upsertFactBatchIntoStoreAsync = async ({
 };
 
 const buildFactStoreAsync = async ({
-  ingested,
+  factBatches,
   chunkSize,
   shouldContinue,
   yieldToMain,
 }: {
-  ingested: IngestedQueryResult<QueryResultWithData>[];
+  factBatches: PivotFactStoreBatch[];
 } & ChunkedWorkOptions) => {
   const store = createPivotFactStore();
-  for (let idx = 0; idx < ingested.length; idx += 1) {
+  for (let idx = 0; idx < factBatches.length; idx += 1) {
     // eslint-disable-next-line no-await-in-loop
     await upsertFactBatchIntoStoreAsync({
       store,
-      batch: factStoreBatchFromIngested(ingested[idx]),
+      batch: factBatches[idx],
       chunkSize,
       shouldContinue,
       yieldToMain,
@@ -452,7 +435,7 @@ export const buildInitialRuntimeFromSpecResultsAsync = async ({
   });
   const factBatches = ingested.map(factStoreBatchFromIngested);
   const store = await buildFactStoreAsync({
-    ingested,
+    factBatches,
     chunkSize,
     shouldContinue,
     yieldToMain,
