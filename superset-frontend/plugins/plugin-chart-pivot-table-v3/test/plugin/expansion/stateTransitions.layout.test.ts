@@ -18,6 +18,7 @@
  */
 
 import {
+  MetricsLayoutEnum,
   type PivotAxis,
   type PivotTreeData,
   type PivotTreeNode,
@@ -25,6 +26,7 @@ import {
 import { resolveLayoutTransition } from '../../../src/pivot/expansion/stateTransitions';
 import { rootKey } from '../../../src/pivot/viewModel';
 import { serializeCellKey, serializePath } from '../../../src/pivot/core/path';
+import { compilePivotProgram } from '../../../src/pivot/runtime/compilePivotProgram';
 
 const makeNode = ({
   axis,
@@ -62,10 +64,16 @@ const baseTransitionConfig = {
   currentLayout: { rows: ['country'], cols: [] },
   previousLayout: { rows: ['country'], cols: [] },
   hasNewData: false,
+  program: compilePivotProgram({
+    groupbyRows: ['country', 'state', 'city'],
+    groupbyColumns: [],
+    metrics: ['sales'],
+    metricsLayout: MetricsLayoutEnum.ROWS,
+  }),
 };
 
 describe('pivot/expansion/stateTransitions layout changes', () => {
-  it('keeps the current tree as a display snapshot for layout changes without fresh data', () => {
+  it('keeps only stable-prefix tree nodes for layout changes without fresh data', () => {
     const usKey = serializePath(['US']);
     const usCaKey = serializePath(['US', 'CA']);
     const data = makeTree({
@@ -90,11 +98,11 @@ describe('pivot/expansion/stateTransitions layout changes', () => {
     });
 
     expect(transition.normalizedTree.rows[usKey]).toBeDefined();
-    expect(transition.normalizedTree.rows[usCaKey]).toBeDefined();
+    expect(transition.normalizedTree.rows[usCaKey]).toBeUndefined();
     expect(transition.normalizedTree.cells).toEqual({});
   });
 
-  it('does not locally trim or roll child cells up to the stable prefix', () => {
+  it('trims child cells below the stable prefix without rolling them up', () => {
     const usKey = serializePath(['US']);
     const usCaKey = serializePath(['US', 'CA']);
     const data = makeTree({
@@ -138,11 +146,7 @@ describe('pivot/expansion/stateTransitions layout changes', () => {
     });
     expect(
       transition.normalizedTree.cells[serializeCellKey(usCaKey, rootKey)],
-    ).toMatchObject({
-      rowKey: usCaKey,
-      colKey: rootKey,
-      values: { sales: 7 },
-    });
+    ).toBeUndefined();
   });
 
   it('limits desired auto-expansion without promoting added layers locally', () => {

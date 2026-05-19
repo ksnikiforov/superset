@@ -695,6 +695,7 @@ export const useExpansionEngine = ({
       previousLayout,
       currentLayout,
       hasNewData,
+      program: pivotProgram,
     });
     const shouldResetExpandedRows =
       shouldResetExpandedState &&
@@ -751,12 +752,18 @@ export const useExpansionEngine = ({
       pending: { row: new Set(), col: new Set() },
     });
 
+    const layoutChangedOnlyByHiddenAppend =
+      !hasNewData &&
+      (rowsChanged || colsChanged) &&
+      (!rowsChanged || shouldExpandRows) &&
+      (!colsChanged || shouldExpandCols);
     const shouldHydrateExpansionIntent =
-      axisCoverageNeeds.length > 0 ||
-      persistedState.rows.length > 0 ||
-      persistedState.cols.length > 0 ||
-      persistedState.collapsedRows.length > 0 ||
-      persistedState.collapsedCols.length > 0;
+      !layoutChangedOnlyByHiddenAppend &&
+      (axisCoverageNeeds.length > 0 ||
+        persistedState.rows.length > 0 ||
+        persistedState.cols.length > 0 ||
+        persistedState.collapsedRows.length > 0 ||
+        persistedState.collapsedCols.length > 0);
     if (shouldHydrateExpansionIntent) {
       hydrateAtomic({
         showLoader: false,
