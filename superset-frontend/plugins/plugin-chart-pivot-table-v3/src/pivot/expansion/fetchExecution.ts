@@ -184,15 +184,15 @@ export const optimizeExpansionFetchPlan = ({
 
 const buildExpansionRequestGroupId = ({
   runtime,
-  payload,
+  request,
 }: {
   runtime: ExpansionFetchRuntime;
-  payload: Record<string, unknown>;
+  request: ExpansionQueryRequest;
 }) =>
   stableStringify({
     instanceId: runtime.instanceId,
     transactionId: runtime.requestScope.id,
-    ...payload,
+    request,
   });
 
 const createRuntimeExpansionCoverageDiff = ({
@@ -236,12 +236,10 @@ const resolveExpansionFetchPlan = ({
 };
 
 const executeExpansionQueryTask = async ({
-  payload,
   request,
   runtime,
   loadingKeys,
 }: {
-  payload: Record<string, unknown>;
   request: ExpansionQueryRequest;
   runtime: ExpansionFetchRuntime;
   loadingKeys: string[];
@@ -250,7 +248,7 @@ const executeExpansionQueryTask = async ({
   if (requestScope.isCurrent()) {
     loadingKeys.forEach(key => updateLoadingKey(key, 1));
   }
-  const requestGroupId = buildExpansionRequestGroupId({ runtime, payload });
+  const requestGroupId = buildExpansionRequestGroupId({ runtime, request });
   const token = requestScope.beginRequest(requestGroupId);
   try {
     const result = await fetchPivotExpansion({
@@ -317,17 +315,10 @@ export const fetchExpansionTargetDeltas = async ({
     visibleRowDepth: context.visibleRowDepth,
     visibleColDepth: context.visibleColDepth,
   });
-  const { visibleRowDepth, visibleColDepth } = context;
   const branchFetchPromises: Array<Promise<void>> = [
     ...singles.map(target =>
       executeExpansionQueryTask({
         runtime,
-        payload: {
-          kind: 'branch',
-          ...target,
-          visibleRowDepth,
-          visibleColDepth,
-        },
         request: {
           kind: 'branch',
           coverageTarget: target.coverageTarget,
@@ -338,15 +329,6 @@ export const fetchExpansionTargetDeltas = async ({
     ...batches.map(batch =>
       executeExpansionQueryTask({
         runtime,
-        payload: {
-          kind: 'batch',
-          axis: batch.axis,
-          parentPathKey: batch.parentPathKey,
-          signature: batch.signature,
-          targetKeys: [...batch.targets.map(target => target.pathKey)].sort(),
-          visibleRowDepth,
-          visibleColDepth,
-        },
         request: {
           kind: 'batch',
           batch,
@@ -369,13 +351,6 @@ export const fetchExpansionTargetDeltas = async ({
     missingIntersections.map(target =>
       executeExpansionQueryTask({
         runtime,
-        payload: {
-          kind: 'hydrate:intersection',
-          rowPathKeys: [...target.rowPathKeys].sort(),
-          columnPathKeys: [...target.columnPathKeys].sort(),
-          visibleRowDepth,
-          visibleColDepth,
-        },
         request: {
           kind: 'intersection',
           rowPathKeys: target.rowPathKeys,

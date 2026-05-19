@@ -290,8 +290,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13434` insertions, `17801` deletions, net `-4367`.
-- Current production TypeScript/TSX total: about `29143` lines.
+- Production `src`: `13409` insertions, `17801` deletions, net `-4392`.
+- Current production TypeScript/TSX total: about `29118` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -303,17 +303,17 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `29143` | `-4367` | `< 28000` |
-| Strict core pipeline | `11337` | `11859` | `+522` | `8000` |
+| Full production `src` | `33510` | `29118` | `-4392` | `< 28000` |
+| Strict core pipeline | `11337` | `11834` | `+497` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5061` | `+378` | `3000-4000` |
-| Broad core pipeline | `16020` | `16920` | `+900` | `11000-13000` |
+| Broad core pipeline | `16020` | `16895` | `+875` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
 | `pivot/runtime/*` | `3886` |
-| `pivot/expansion/*` | `2801` |
+| `pivot/expansion/*` | `2776` |
 | `pivot/query/*` | `1412` |
 | `pivot/layout/*` | `770` |
 | core/shared/domain helpers | `1779` |
@@ -584,6 +584,13 @@ accepting duplicate `axis`/`path` request fields. Production expansion
 execution also stopped sending visible row/column depths to query-spec
 requests; visible depths remain scheduler/grouping input, while query specs
 consume the compiled manifest target.
+
+Latest expansion identity cleanup: expansion request-group identity is now
+derived from the compiled branch/batch/intersection request itself. The
+fetch-execution boundary no longer carries a second handwritten payload with
+duplicated axis/path/depth fields just to build request ids. Visible depths
+still drive batching and intersection coverage, but request identity follows
+the same compiled target consumed by query specs.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.
