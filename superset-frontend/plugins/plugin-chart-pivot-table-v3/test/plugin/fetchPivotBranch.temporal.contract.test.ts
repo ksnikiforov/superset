@@ -23,6 +23,8 @@ import {
 } from '../../src/pivot/expansion/fetchPivotExpansion';
 import {
   MetricsLayoutEnum,
+  type PivotAxis,
+  type PivotPath,
   PivotTreeData,
   PivotTreeNode,
 } from '../../src/types';
@@ -55,23 +57,42 @@ type QueryPayload = {
 };
 
 const fetchBranch = (
-  params: Omit<
-    Extract<FetchPivotExpansionRequest, { kind: 'branch' }>,
-    'kind' | 'layout'
-  > & { currentTree?: PivotTreeData },
+  params: Omit<FetchPivotExpansionRequest, 'kind' | 'layout' | 'target'> & {
+    axis: PivotAxis;
+    path: PivotPath;
+    visibleRowDepth?: number;
+    visibleColDepth?: number;
+    currentTree?: PivotTreeData;
+  },
 ) => {
   const layout = buildLayoutContext(params.formData);
+  const {
+    axis,
+    path,
+    visibleRowDepth = 0,
+    visibleColDepth = 0,
+    formData,
+    factStore,
+    requestGroupId,
+  } = params;
+  const pathKey = serializePath(path);
   return fetchPivotExpansion({
     kind: 'branch',
-    ...params,
+    formData,
+    factStore,
+    requestGroupId,
     layout,
-    coverageTarget: buildAxisExpansionCoverageTarget({
-      program: layout.pivotProgram,
-      axis: params.axis,
-      pathKey: serializePath(params.path),
-      rowDepth: params.visibleRowDepth ?? 0,
-      columnDepth: params.visibleColDepth ?? 0,
-    }),
+    target: {
+      axis,
+      pathKey,
+      coverageTarget: buildAxisExpansionCoverageTarget({
+        program: layout.pivotProgram,
+        axis,
+        pathKey,
+        rowDepth: visibleRowDepth,
+        columnDepth: visibleColDepth,
+      }),
+    },
   });
 };
 

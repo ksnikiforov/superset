@@ -321,7 +321,7 @@ export const fetchExpansionTargetDeltas = async ({
         runtime,
         request: {
           kind: 'branch',
-          coverageTarget: target.coverageTarget,
+          target,
         },
         loadingKeys: [target.pathKey],
       }),
@@ -332,7 +332,6 @@ export const fetchExpansionTargetDeltas = async ({
         request: {
           kind: 'batch',
           batch,
-          coverageTarget: batch.targets[0].coverageTarget,
         },
         loadingKeys: batch.targets.map(target => target.pathKey),
       }),
@@ -353,9 +352,7 @@ export const fetchExpansionTargetDeltas = async ({
         runtime,
         request: {
           kind: 'intersection',
-          rowPathKeys: target.rowPathKeys,
-          columnPathKeys: target.columnPathKeys,
-          coverageTarget: target.coverageTarget,
+          target,
         },
         loadingKeys: [...target.rowPathKeys, ...target.columnPathKeys],
       }),

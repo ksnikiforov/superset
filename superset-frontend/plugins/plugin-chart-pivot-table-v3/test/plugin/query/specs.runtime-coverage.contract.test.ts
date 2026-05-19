@@ -31,7 +31,7 @@ import {
 } from '../../../src/pivot/expansion/planner';
 import { buildFormData } from '../fixtures/pivotFormData';
 
-const coverageTarget = ({
+const fetchTarget = ({
   layout,
   axis,
   path,
@@ -43,14 +43,20 @@ const coverageTarget = ({
   path: unknown[];
   visibleRowDepth: number;
   visibleColDepth: number;
-}) =>
-  buildAxisExpansionCoverageTarget({
-    program: layout.pivotProgram,
+}) => {
+  const pathKey = serializePath(path);
+  return {
     axis,
-    pathKey: serializePath(path),
-    rowDepth: visibleRowDepth,
-    columnDepth: visibleColDepth,
-  });
+    pathKey,
+    coverageTarget: buildAxisExpansionCoverageTarget({
+      program: layout.pivotProgram,
+      axis,
+      pathKey,
+      rowDepth: visibleRowDepth,
+      columnDepth: visibleColDepth,
+    }),
+  };
+};
 
 describe('runtime coverage query specs contract', () => {
   it('records branch fact coverage and uses it for query columns', () => {
@@ -68,11 +74,7 @@ describe('runtime coverage query specs contract', () => {
       kind: 'branch',
       formData,
       layout,
-      axis: 'row',
-      path: ['US'],
-      visibleRowDepth: 1,
-      visibleColDepth: 1,
-      coverageTarget: coverageTarget({
+      target: fetchTarget({
         layout,
         axis: 'row',
         path: ['US'],
@@ -109,11 +111,7 @@ describe('runtime coverage query specs contract', () => {
       kind: 'branch',
       formData,
       layout,
-      axis: 'col',
-      path: ['Furniture'],
-      visibleRowDepth: 0,
-      visibleColDepth: 1,
-      coverageTarget: coverageTarget({
+      target: fetchTarget({
         layout,
         axis: 'col',
         path: ['Furniture'],
@@ -141,11 +139,7 @@ describe('runtime coverage query specs contract', () => {
       kind: 'branch',
       formData,
       layout,
-      axis: 'col',
-      path,
-      visibleRowDepth: 0,
-      visibleColDepth: 1,
-      coverageTarget: coverageTarget({
+      target: fetchTarget({
         layout,
         axis: 'col',
         path,
@@ -182,11 +176,7 @@ describe('runtime coverage query specs contract', () => {
       kind: 'branch',
       formData,
       layout,
-      axis: 'row',
-      path: ['US', SUBTOTAL_TOKEN],
-      visibleRowDepth: 2,
-      visibleColDepth: 0,
-      coverageTarget: coverageTarget({
+      target: fetchTarget({
         layout,
         axis: 'row',
         path: ['US', SUBTOTAL_TOKEN],
@@ -218,11 +208,25 @@ describe('runtime coverage query specs contract', () => {
           axis: 'row',
           pathKey: serializePath(['US']),
           batchSignature: 'values-only',
+          coverageTarget: fetchTarget({
+            layout,
+            axis: 'row',
+            path: ['US'],
+            visibleRowDepth: 1,
+            visibleColDepth: 0,
+          }).coverageTarget,
         },
         {
           axis: 'row',
           pathKey: serializePath(['CA']),
           batchSignature: 'values-only',
+          coverageTarget: fetchTarget({
+            layout,
+            axis: 'row',
+            path: ['CA'],
+            visibleRowDepth: 1,
+            visibleColDepth: 0,
+          }).coverageTarget,
         },
       ],
     };
@@ -232,15 +236,6 @@ describe('runtime coverage query specs contract', () => {
       formData,
       layout,
       batch,
-      visibleRowDepth: 1,
-      visibleColDepth: 0,
-      coverageTarget: coverageTarget({
-        layout,
-        axis: 'row',
-        path: ['US'],
-        visibleRowDepth: 1,
-        visibleColDepth: 0,
-      }),
     });
 
     expect(specs).toEqual([]);
@@ -266,6 +261,13 @@ describe('runtime coverage query specs contract', () => {
           axis: 'row',
           pathKey: serializePath(['US', SUBTOTAL_TOKEN]),
           batchSignature: 'subtotal-display',
+          coverageTarget: fetchTarget({
+            layout,
+            axis: 'row',
+            path: ['US', SUBTOTAL_TOKEN],
+            visibleRowDepth: 2,
+            visibleColDepth: 0,
+          }).coverageTarget,
         },
       ],
     };
@@ -275,15 +277,6 @@ describe('runtime coverage query specs contract', () => {
       formData,
       layout,
       batch,
-      visibleRowDepth: 2,
-      visibleColDepth: 0,
-      coverageTarget: coverageTarget({
-        layout,
-        axis: 'row',
-        path: ['US', SUBTOTAL_TOKEN],
-        visibleRowDepth: 2,
-        visibleColDepth: 0,
-      }),
     });
 
     expect(specs).toEqual([]);

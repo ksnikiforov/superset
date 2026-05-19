@@ -20,6 +20,8 @@
 import { SupersetClient } from '@superset-ui/core';
 import {
   MetricsLayoutEnum,
+  PivotAxis,
+  PivotPath,
   PivotTreeData,
   PivotTreeNode,
 } from '../../src/types';
@@ -81,23 +83,64 @@ type QueryPayload = {
   filters?: Array<{ col?: string; op?: string; val?: string }>;
 };
 
-const fetchBranch = (
-  params: Omit<
-    Extract<FetchPivotExpansionRequest, { kind: 'branch' }>,
-    'kind' | 'layout'
-  > & { currentTree?: PivotTreeData },
-) => {
-  const layout = buildLayoutContext(params.formData);
-  return fetchPivotExpansion({
-    kind: 'branch',
-    ...params,
-    layout,
+const buildFetchTarget = ({
+  layout,
+  axis,
+  path,
+  visibleRowDepth,
+  visibleColDepth,
+}: {
+  layout: ReturnType<typeof buildLayoutContext>;
+  axis: PivotAxis;
+  path: PivotPath;
+  visibleRowDepth: number;
+  visibleColDepth: number;
+}) => {
+  const pathKey = serializePath(path);
+  return {
+    axis,
+    pathKey,
     coverageTarget: buildAxisExpansionCoverageTarget({
       program: layout.pivotProgram,
-      axis: params.axis,
-      pathKey: serializePath(params.path),
-      rowDepth: params.visibleRowDepth ?? 0,
-      columnDepth: params.visibleColDepth ?? 0,
+      axis,
+      pathKey,
+      rowDepth: visibleRowDepth,
+      columnDepth: visibleColDepth,
+    }),
+  };
+};
+
+const fetchBranch = (
+  params: Omit<FetchPivotExpansionRequest, 'kind' | 'layout' | 'target'> & {
+    axis: PivotAxis;
+    path: PivotPath;
+    visibleRowDepth?: number;
+    visibleColDepth?: number;
+    currentTree?: PivotTreeData;
+  },
+) => {
+  const layout = buildLayoutContext(params.formData);
+  const {
+    axis,
+    path,
+    visibleRowDepth = 0,
+    visibleColDepth = 0,
+    formData,
+    factStore,
+    requestGroupId,
+  } = params;
+  return fetchPivotExpansion({
+    kind: 'branch',
+    formData,
+    factStore,
+    requestGroupId,
+    layout,
+    target: buildFetchTarget({
+      layout,
+      axis,
+      path,
+      visibleRowDepth,
+      visibleColDepth,
     }),
   });
 };
@@ -110,8 +153,8 @@ const buildBranchSpecs = ({
   visibleColDepth = 0,
 }: {
   formData: FetchPivotExpansionRequest['formData'];
-  axis: 'row' | 'col';
-  path: FetchPivotExpansionRequest['path'];
+  axis: PivotAxis;
+  path: PivotPath;
   visibleRowDepth?: number;
   visibleColDepth?: number;
 }) => {
@@ -120,16 +163,12 @@ const buildBranchSpecs = ({
     kind: 'branch',
     formData,
     layout,
-    axis,
-    path,
-    visibleRowDepth,
-    visibleColDepth,
-    coverageTarget: buildAxisExpansionCoverageTarget({
-      program: layout.pivotProgram,
+    target: buildFetchTarget({
+      layout,
       axis,
-      pathKey: serializePath(path),
-      rowDepth: visibleRowDepth,
-      columnDepth: visibleColDepth,
+      path,
+      visibleRowDepth,
+      visibleColDepth,
     }),
   });
 };

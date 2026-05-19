@@ -45,7 +45,7 @@ const assertColumnsUseRawSqlOutput = (columns: unknown[]) => {
   });
 };
 
-const coverageTarget = ({
+const fetchTarget = ({
   layout,
   axis,
   path,
@@ -57,14 +57,20 @@ const coverageTarget = ({
   path: unknown[];
   visibleRowDepth: number;
   visibleColDepth: number;
-}) =>
-  buildAxisExpansionCoverageTarget({
-    program: layout.pivotProgram,
+}) => {
+  const pathKey = serializePath(path);
+  return {
     axis,
-    pathKey: serializePath(path),
-    rowDepth: visibleRowDepth,
-    columnDepth: visibleColDepth,
-  });
+    pathKey,
+    coverageTarget: buildAxisExpansionCoverageTarget({
+      program: layout.pivotProgram,
+      axis,
+      pathKey,
+      rowDepth: visibleRowDepth,
+      columnDepth: visibleColDepth,
+    }),
+  };
+};
 
 describe('temporal branch query specs contract', () => {
   it('buildExpansionQuerySpecs keeps temporal equality filters backend-safe', () => {
@@ -93,11 +99,7 @@ describe('temporal branch query specs contract', () => {
       kind: 'branch',
       formData,
       layout,
-      axis: 'row',
-      path,
-      visibleRowDepth: 1,
-      visibleColDepth: 0,
-      coverageTarget: coverageTarget({
+      target: fetchTarget({
         layout,
         axis: 'row',
         path,
@@ -155,11 +157,25 @@ describe('temporal branch query specs contract', () => {
           axis: 'row',
           pathKey: serializePath(['1483228800000']),
           batchSignature: 'temporal-batch',
+          coverageTarget: fetchTarget({
+            layout,
+            axis: 'row',
+            path: ['1483228800000'],
+            visibleRowDepth: 0,
+            visibleColDepth: 0,
+          }).coverageTarget,
         },
         {
           axis: 'row',
           pathKey: serializePath(['1514764800000']),
           batchSignature: 'temporal-batch',
+          coverageTarget: fetchTarget({
+            layout,
+            axis: 'row',
+            path: ['1514764800000'],
+            visibleRowDepth: 0,
+            visibleColDepth: 0,
+          }).coverageTarget,
         },
       ],
     };
@@ -169,15 +185,6 @@ describe('temporal branch query specs contract', () => {
       formData,
       layout,
       batch,
-      visibleRowDepth: 0,
-      visibleColDepth: 0,
-      coverageTarget: coverageTarget({
-        layout,
-        axis: 'row',
-        path: ['1483228800000'],
-        visibleRowDepth: 0,
-        visibleColDepth: 0,
-      }),
     });
 
     expect(specs.length).toBeGreaterThan(0);

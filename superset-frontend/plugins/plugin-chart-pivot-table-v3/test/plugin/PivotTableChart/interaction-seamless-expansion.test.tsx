@@ -44,6 +44,7 @@ import {
   buildMockBatchFetchResult,
   buildMockBranchFetchResult,
   buildMockIntersectionFetchResult,
+  getMockExpansionRequestAxis,
 } from '../fixtures/factBatches';
 import { applyMetricAxis } from '../fixtures/metricAxis';
 
@@ -3090,7 +3091,10 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     );
     fetchPivotBranchMock.mockImplementation(
       async (params: FetchPivotExpansionRequest) => {
-        if (params.kind === 'branch' && params.axis === 'row') {
+        if (
+          params.kind === 'branch' &&
+          getMockExpansionRequestAxis(params) === 'row'
+        ) {
           await branchPromise;
           return buildMockExpansionFetchResult(params);
         }

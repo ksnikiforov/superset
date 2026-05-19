@@ -82,28 +82,7 @@ const makeTree = (): PivotTreeData => ({
 
 const mockPost = SupersetClient.post as jest.Mock;
 
-const fetchBatch = (
-  params: Omit<
-    Extract<FetchPivotExpansionRequest, { kind: 'batch' }>,
-    'kind' | 'layout'
-  > & { currentTree?: PivotTreeData },
-) => {
-  const layout = buildLayoutContext(params.formData);
-  return fetchPivotExpansion({
-    kind: 'batch',
-    ...params,
-    layout,
-    coverageTarget: buildAxisExpansionCoverageTarget({
-      program: layout.pivotProgram,
-      axis: params.batch.axis,
-      pathKey: params.batch.targets[0].pathKey,
-      rowDepth: params.visibleRowDepth,
-      columnDepth: params.visibleColDepth,
-    }),
-  });
-};
-
-const batchCoverageTarget = ({
+const withBatchCoverageTargets = ({
   layout,
   batch,
   visibleRowDepth,
@@ -113,14 +92,51 @@ const batchCoverageTarget = ({
   batch: BatchGroup;
   visibleRowDepth: number;
   visibleColDepth: number;
-}) =>
-  buildAxisExpansionCoverageTarget({
-    program: layout.pivotProgram,
-    axis: batch.axis,
-    pathKey: batch.targets[0].pathKey,
-    rowDepth: visibleRowDepth,
-    columnDepth: visibleColDepth,
+}): BatchGroup => ({
+  ...batch,
+  targets: batch.targets.map(target => ({
+    ...target,
+    coverageTarget: buildAxisExpansionCoverageTarget({
+      program: layout.pivotProgram,
+      axis: target.axis,
+      pathKey: target.pathKey,
+      rowDepth: visibleRowDepth,
+      columnDepth: visibleColDepth,
+    }),
+  })),
+});
+
+const fetchBatch = (
+  params: Omit<FetchPivotExpansionRequest, 'kind' | 'layout' | 'batch'> & {
+    batch: BatchGroup;
+    visibleRowDepth: number;
+    visibleColDepth: number;
+    currentTree?: PivotTreeData;
+  },
+) => {
+  const layout = buildLayoutContext(params.formData);
+  const {
+    batch,
+    visibleRowDepth,
+    visibleColDepth,
+    formData,
+    factStore,
+    requestGroupId,
+  } = params;
+  return fetchPivotExpansion({
+    kind: 'batch',
+    formData,
+    factStore,
+    requestGroupId,
+    layout,
+    batch: withBatchCoverageTargets({
+      layout,
+      batch,
+      visibleRowDepth,
+      visibleColDepth,
+    }),
   });
+};
 
 describe('fetchBatch', () => {
   beforeEach(() => {
@@ -295,19 +311,17 @@ describe('fetchBatch', () => {
       ],
     };
     const layout = buildLayoutContext(formData);
-    const specs = buildExpansionQuerySpecs({
-      kind: 'batch',
-      formData,
+    const batchWithCoverage = withBatchCoverageTargets({
       layout,
       batch,
       visibleRowDepth: 2,
       visibleColDepth: 0,
-      coverageTarget: batchCoverageTarget({
-        layout,
-        batch,
-        visibleRowDepth: 2,
-        visibleColDepth: 0,
-      }),
+    });
+    const specs = buildExpansionQuerySpecs({
+      kind: 'batch',
+      formData,
+      layout,
+      batch: batchWithCoverage,
     });
     expect(specs).toHaveLength(1);
 
@@ -381,19 +395,17 @@ describe('fetchBatch', () => {
       ],
     };
     const layout = buildLayoutContext(formData);
-    const specs = buildExpansionQuerySpecs({
-      kind: 'batch',
-      formData,
+    const batchWithCoverage = withBatchCoverageTargets({
       layout,
       batch,
       visibleRowDepth: 2,
       visibleColDepth: 1,
-      coverageTarget: batchCoverageTarget({
-        layout,
-        batch,
-        visibleRowDepth: 2,
-        visibleColDepth: 1,
-      }),
+    });
+    const specs = buildExpansionQuerySpecs({
+      kind: 'batch',
+      formData,
+      layout,
+      batch: batchWithCoverage,
     });
     expect(specs.length).toBeGreaterThan(1);
 

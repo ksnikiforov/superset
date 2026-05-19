@@ -58,6 +58,8 @@ import { collectRequiredTimeOffsets } from '../measureLeaves';
 import {
   type BatchGroup,
   type ExpansionCoverageTarget,
+  type FetchTarget,
+  type IntersectionFetchTarget,
 } from '../expansion/planner';
 import { buildPathFilters, coerceValueForColumn } from './pathFilters';
 import { buildFactCoverage } from '../runtime/coverage';
@@ -854,14 +856,13 @@ export type ExpansionQuerySpecRequest =
       kind: 'branch';
       formData: PivotTableQueryFormData;
       layout: LayoutContext;
-      coverageTarget: ExpansionCoverageTarget;
+      target: FetchTarget;
     }
   | {
       kind: 'batch';
       formData: PivotTableQueryFormData;
       layout: LayoutContext;
       batch: BatchGroup;
-      coverageTarget: ExpansionCoverageTarget;
       chunkIndex?: number;
       representativePath?: PivotPath;
     }
@@ -869,16 +870,14 @@ export type ExpansionQuerySpecRequest =
       kind: 'intersection';
       formData: PivotTableQueryFormData;
       layout: LayoutContext;
-      rowPathKeys: string[];
-      columnPathKeys: string[];
-      coverageTarget: ExpansionCoverageTarget;
+      target: IntersectionFetchTarget;
     };
 
 export const buildExpansionQuerySpecs = (
   request: ExpansionQuerySpecRequest,
 ): PlannedQuerySpec[] => {
   if (request.kind === 'branch') {
-    const { coverageTarget } = request;
+    const { coverageTarget } = request.target;
     const { axis } = coverageTarget;
     const path = parsePath(coverageTarget.pathKey);
     return buildAxisExpansionSpecs({
@@ -909,12 +908,12 @@ export const buildExpansionQuerySpecs = (
       formData,
       layout,
       batch,
-      coverageTarget,
       chunkIndex = 0,
       representativePath,
     } = request;
+    const coverageTarget = batch.targets[0]?.coverageTarget;
     const representativeKey = batch.targets[0]?.pathKey;
-    if (!representativeKey && !representativePath) {
+    if ((!representativeKey && !representativePath) || !coverageTarget) {
       return [];
     }
     const representative = representativePath ?? parsePath(representativeKey);
@@ -950,8 +949,8 @@ export const buildExpansionQuerySpecs = (
     });
   }
 
-  const { formData, layout, rowPathKeys, columnPathKeys, coverageTarget } =
-    request;
+  const { formData, layout, target } = request;
+  const { rowPathKeys, columnPathKeys, coverageTarget } = target;
   const rowPaths = rowPathKeys.map(parsePath);
   const columnPaths = columnPathKeys.map(parsePath);
   const anchor = resolveIntersectionExpansionAnchor({

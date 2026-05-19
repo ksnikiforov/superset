@@ -25,7 +25,12 @@ import {
 } from '../../../src/pivot/expansion/fetchPivotExpansion';
 import { serializePath } from '../../../src/pivot/core/path';
 import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
-import { type PivotTreeData, type PivotTreeNode } from '../../../src/types';
+import {
+  type PivotAxis,
+  type PivotPath,
+  type PivotTreeData,
+  type PivotTreeNode,
+} from '../../../src/types';
 import { buildFormData } from '../fixtures/pivotFormData';
 import {
   buildAxisExpansionCoverageTarget,
@@ -51,44 +56,81 @@ const waitForAsyncDataMock = waitForAsyncData as jest.MockedFunction<
 >;
 
 const fetchBranch = (
-  params: Omit<
-    Extract<FetchPivotExpansionRequest, { kind: 'branch' }>,
-    'kind' | 'layout'
-  > & { currentTree?: PivotTreeData },
+  params: Omit<FetchPivotExpansionRequest, 'kind' | 'layout' | 'target'> & {
+    axis: PivotAxis;
+    path: PivotPath;
+    visibleRowDepth?: number;
+    visibleColDepth?: number;
+    currentTree?: PivotTreeData;
+  },
 ) => {
   const layout = buildLayoutContext(params.formData);
+  const {
+    axis,
+    path,
+    visibleRowDepth = 0,
+    visibleColDepth = 0,
+    formData,
+    factStore,
+    requestGroupId,
+  } = params;
+  const pathKey = serializePath(path);
   return fetchPivotExpansion({
     kind: 'branch',
-    ...params,
+    formData,
+    factStore,
+    requestGroupId,
     layout,
-    coverageTarget: buildAxisExpansionCoverageTarget({
-      program: layout.pivotProgram,
-      axis: params.axis,
-      pathKey: serializePath(params.path),
-      rowDepth: params.visibleRowDepth ?? 0,
-      columnDepth: params.visibleColDepth ?? 0,
-    }),
+    target: {
+      axis,
+      pathKey,
+      coverageTarget: buildAxisExpansionCoverageTarget({
+        program: layout.pivotProgram,
+        axis,
+        pathKey,
+        rowDepth: visibleRowDepth,
+        columnDepth: visibleColDepth,
+      }),
+    },
   });
 };
 
 const fetchBatch = (
-  params: Omit<
-    Extract<FetchPivotExpansionRequest, { kind: 'batch' }>,
-    'kind' | 'layout'
-  > & { currentTree?: PivotTreeData },
+  params: Omit<FetchPivotExpansionRequest, 'kind' | 'layout' | 'batch'> & {
+    batch: BatchGroup;
+    visibleRowDepth: number;
+    visibleColDepth: number;
+    currentTree?: PivotTreeData;
+  },
 ) => {
   const layout = buildLayoutContext(params.formData);
+  const {
+    batch,
+    visibleRowDepth,
+    visibleColDepth,
+    formData,
+    factStore,
+    requestGroupId,
+  } = params;
   return fetchPivotExpansion({
     kind: 'batch',
-    ...params,
+    formData,
+    factStore,
+    requestGroupId,
     layout,
-    coverageTarget: buildAxisExpansionCoverageTarget({
-      program: layout.pivotProgram,
-      axis: params.batch.axis,
-      pathKey: params.batch.targets[0].pathKey,
-      rowDepth: params.visibleRowDepth,
-      columnDepth: params.visibleColDepth,
-    }),
+    batch: {
+      ...batch,
+      targets: batch.targets.map(target => ({
+        ...target,
+        coverageTarget: buildAxisExpansionCoverageTarget({
+          program: layout.pivotProgram,
+          axis: target.axis,
+          pathKey: target.pathKey,
+          rowDepth: visibleRowDepth,
+          columnDepth: visibleColDepth,
+        }),
+      })),
+    },
   });
 };
 

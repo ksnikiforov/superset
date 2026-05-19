@@ -30,19 +30,22 @@ const branchQueryNames = ({
   path: unknown[];
 }) => {
   const layout = buildLayoutContext(formData);
+  const pathKey = serializePath(path);
   return buildExpansionQuerySpecs({
     kind: 'branch',
     formData,
     layout,
-    axis: 'row',
-    path,
-    coverageTarget: buildAxisExpansionCoverageTarget({
-      program: layout.pivotProgram,
+    target: {
       axis: 'row',
-      pathKey: serializePath(path),
-      rowDepth: 0,
-      columnDepth: 0,
-    }),
+      pathKey,
+      coverageTarget: buildAxisExpansionCoverageTarget({
+        program: layout.pivotProgram,
+        axis: 'row',
+        pathKey,
+        rowDepth: 0,
+        columnDepth: 0,
+      }),
+    },
   }).map(spec => spec.queryName);
 };
 

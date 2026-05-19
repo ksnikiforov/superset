@@ -31,6 +31,7 @@ import { mergeTrees } from '../../../../src/pivot/core/tree';
 import { fetchPivotExpansion as fetchPivotBranch } from '../../../../src/pivot/expansion/fetchPivotExpansion';
 import {
   buildMockBranchFetchResult,
+  getMockExpansionRequestPath,
   resolveMockBranchFetchResult,
 } from '../../fixtures/factBatches';
 import { buildTreeFromRecords } from '../../fixtures/buildTreeFromRecords';
@@ -930,7 +931,8 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
       Promise.resolve(
         buildMockBranchFetchResult(params, {
           data: buildMetricBranch(
-            decodeMetricKey(params.path?.[0]) ?? 'measure1',
+            decodeMetricKey(getMockExpansionRequestPath(params)[0]) ??
+              'measure1',
           ),
         }),
       ),
@@ -1092,7 +1094,8 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
       Promise.resolve(
         buildMockBranchFetchResult(params, {
           data: buildMetricBranch(
-            decodeMetricKey(params.path?.[0]) ?? 'measure1',
+            decodeMetricKey(getMockExpansionRequestPath(params)[0]) ??
+              'measure1',
           ),
         }),
       ),

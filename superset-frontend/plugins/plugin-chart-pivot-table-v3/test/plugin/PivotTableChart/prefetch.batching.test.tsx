@@ -321,10 +321,14 @@ describe('PivotTableChart batching on persisted restore', () => {
     expect(expansionCalls('intersection')).toHaveLength(1);
     expect(expansionCalls('intersection')[0][0]).toEqual(
       expect.objectContaining({
-        rowPathKeys: [serializePath(['A']), serializePath(['B'])],
-        columnPathKeys: [serializePath(['CA']), serializePath(['NY'])],
-        visibleRowDepth: 2,
-        visibleColDepth: 2,
+        target: expect.objectContaining({
+          rowPathKeys: [serializePath(['A']), serializePath(['B'])],
+          columnPathKeys: [serializePath(['CA']), serializePath(['NY'])],
+          coverageTarget: expect.objectContaining({
+            rowDepth: 2,
+            columnDepth: 2,
+          }),
+        }),
       }),
     );
   });

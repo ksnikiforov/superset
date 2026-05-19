@@ -68,7 +68,7 @@ export const getMockExpansionRequestAxis = (
   }
   return params.kind === 'batch'
     ? params.batch.axis
-    : params.coverageTarget.axis;
+    : params.target.coverageTarget.axis;
 };
 
 export const getMockExpansionRequestPath = (
@@ -80,7 +80,7 @@ export const getMockExpansionRequestPath = (
   return parsePath(
     params.kind === 'batch'
       ? (params.batch.targets[0]?.pathKey ?? '')
-      : params.coverageTarget.pathKey,
+      : params.target.coverageTarget.pathKey,
   );
 };
 
@@ -181,16 +181,16 @@ const buildMockFactBatchesFromSpecs = (
 export const buildMockBranchFactBatches = ({
   formData,
   layout,
-  coverageTarget,
+  target,
   data,
-}: Pick<FetchPivotBranchParams, 'coverageTarget' | 'formData' | 'layout'> & {
+}: Pick<FetchPivotBranchParams, 'formData' | 'layout' | 'target'> & {
   data?: PivotTreeData;
 }): PivotFactStoreBatch[] => {
   const specs = buildExpansionQuerySpecs({
     kind: 'branch',
     formData,
     layout,
-    coverageTarget,
+    target,
   });
   return buildMockFactBatchesFromSpecs(specs, data);
 };
@@ -215,18 +215,15 @@ export const buildMockBatchFactBatches = ({
   formData,
   layout,
   batch,
-  coverageTarget,
   data,
-}: Pick<
-  FetchPivotBranchesBatchParams,
-  'batch' | 'coverageTarget' | 'formData' | 'layout'
-> & { data?: PivotTreeData }): PivotFactStoreBatch[] => {
+}: Pick<FetchPivotBranchesBatchParams, 'batch' | 'formData' | 'layout'> & {
+  data?: PivotTreeData;
+}): PivotFactStoreBatch[] => {
   const specs = buildExpansionQuerySpecs({
     kind: 'batch',
     formData,
     layout,
     batch,
-    coverageTarget,
   });
   return buildMockFactBatchesFromSpecs(specs, data);
 };
@@ -250,21 +247,17 @@ export const resolveMockBatchFetchResult =
 export const buildMockIntersectionFactBatches = ({
   formData,
   layout,
-  rowPathKeys,
-  columnPathKeys,
-  coverageTarget,
+  target,
   data,
-}: Pick<
-  FetchPivotIntersectionParams,
-  'columnPathKeys' | 'coverageTarget' | 'formData' | 'layout' | 'rowPathKeys'
-> & { data?: PivotTreeData }): PivotFactStoreBatch[] => {
+}: Pick<FetchPivotIntersectionParams, 'formData' | 'layout' | 'target'> & {
+  data?: PivotTreeData;
+}): PivotFactStoreBatch[] => {
+  const { rowPathKeys, columnPathKeys, coverageTarget } = target;
   const specs = buildExpansionQuerySpecs({
     kind: 'intersection',
     formData,
     layout,
-    rowPathKeys,
-    columnPathKeys,
-    coverageTarget,
+    target,
   });
   return specs.length > 0
     ? buildMockFactBatchesFromSpecs(specs, data)

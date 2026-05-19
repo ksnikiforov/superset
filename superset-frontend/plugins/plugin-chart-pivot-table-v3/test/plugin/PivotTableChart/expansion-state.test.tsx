@@ -31,7 +31,7 @@ import {
   PivotTreeData,
 } from '../../../src/types';
 import { mergeTrees } from '../../../src/pivot/core/tree';
-import { PATH_DIVIDER, parsePath } from '../../../src/pivot/core/path';
+import { PATH_DIVIDER } from '../../../src/pivot/core/path';
 import {
   METRIC_TOKEN_PREFIX,
   SUBTOTAL_TOKEN,
@@ -46,6 +46,8 @@ import { buildFormData } from '../fixtures/pivotFormData';
 import {
   buildMockBranchFetchResult,
   buildMockIntersectionFetchResult,
+  getMockExpansionRequestAxis,
+  getMockExpansionRequestPath,
   resolveMockBranchFetchResult,
 } from '../fixtures/factBatches';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
@@ -93,24 +95,20 @@ describe('PivotTableChart expansion state persistence', () => {
     batch,
     formData,
     factStore,
-    visibleRowDepth,
-    visibleColDepth,
+    layout,
   }: FetchPivotBranchesBatchParams): Promise<FetchPivotBranchesBatchResult> => {
     const results = await Promise.all(
-      batch.targets.map(target => {
-        const path = parsePath(target.pathKey);
-        return Promise.resolve(
+      batch.targets.map(target =>
+        Promise.resolve(
           branchExpansionMock({
             kind: 'branch',
             formData,
-            axis: batch.axis,
-            path,
-            visibleRowDepth,
-            visibleColDepth,
+            target,
             factStore,
+            layout,
           }),
-        );
-      }),
+        ),
+      ),
     );
     const merged = results.reduce<PivotTreeData | undefined>(
       (acc, result) => mergeTrees(acc, result.data),
@@ -1086,7 +1084,10 @@ describe('PivotTableChart expansion state persistence', () => {
     branchExpansionMock.mockImplementation((params: FetchPivotBranchParams) =>
       Promise.resolve(
         buildMockBranchFetchResult(params, {
-          data: params.path.length >= 2 ? deepTree : midTree,
+          data:
+            getMockExpansionRequestPath(params).length >= 2
+              ? deepTree
+              : midTree,
         }),
       ),
     );
@@ -1133,7 +1134,10 @@ describe('PivotTableChart expansion state persistence', () => {
     branchExpansionMock.mockImplementation((params: FetchPivotBranchParams) =>
       Promise.resolve(
         buildMockBranchFetchResult(params, {
-          data: params.path.length >= 2 ? deepTree : midTree,
+          data:
+            getMockExpansionRequestPath(params).length >= 2
+              ? deepTree
+              : midTree,
         }),
       ),
     );
@@ -1150,7 +1154,7 @@ describe('PivotTableChart expansion state persistence', () => {
 
     await waitFor(() => expect(branchExpansionMock).toHaveBeenCalled());
     const fetchedPaths = branchExpansionMock.mock.calls.map(call =>
-      JSON.stringify(call[0].path),
+      JSON.stringify(getMockExpansionRequestPath(call[0])),
     );
     expect(fetchedPaths).toContain(JSON.stringify(['A']));
     expect(fetchedPaths).toContain(JSON.stringify(['A', 'X']));
@@ -1529,7 +1533,10 @@ describe('PivotTableChart expansion state persistence', () => {
     branchExpansionMock.mockImplementation((params: FetchPivotBranchParams) =>
       Promise.resolve(
         buildMockBranchFetchResult(params, {
-          data: params.path.length >= 2 ? deepTree : midTree,
+          data:
+            getMockExpansionRequestPath(params).length >= 2
+              ? deepTree
+              : midTree,
         }),
       ),
     );
@@ -1552,7 +1559,7 @@ describe('PivotTableChart expansion state persistence', () => {
 
     await waitFor(() => expect(branchExpansionMock).toHaveBeenCalled());
     const fetchedPaths = branchExpansionMock.mock.calls.map(call =>
-      JSON.stringify(call[0].path),
+      JSON.stringify(getMockExpansionRequestPath(call[0])),
     );
     expect(fetchedPaths).toContain(JSON.stringify(['A']));
     expect(fetchedPaths).toContain(JSON.stringify(['A', 'X']));
@@ -1793,8 +1800,8 @@ describe('PivotTableChart expansion state persistence', () => {
 
     await waitFor(() => expect(branchExpansionMock).toHaveBeenCalled());
     const rowPaths = branchExpansionMock.mock.calls
-      .filter(([args]) => args.axis === 'row')
-      .map(call => JSON.stringify(call[0].path));
+      .filter(([args]) => getMockExpansionRequestAxis(args) === 'row')
+      .map(call => JSON.stringify(getMockExpansionRequestPath(call[0])));
     expect(rowPaths).toContain(JSON.stringify(['A']));
     expect(rowPaths).toContain(JSON.stringify(['A', 'X']));
   });
@@ -2116,7 +2123,7 @@ describe('PivotTableChart expansion state persistence', () => {
     const deferredRow = createDeferredBranchFetch();
     const deferredCol = createDeferredBranchFetch();
     branchExpansionMock.mockImplementation(params =>
-      params.axis === 'row'
+      getMockExpansionRequestAxis(params) === 'row'
         ? deferredRow.implementation(params)
         : deferredCol.implementation(params),
     );
@@ -2212,19 +2219,19 @@ describe('PivotTableChart expansion state persistence', () => {
 
     await waitFor(() => {
       const rowPaths = branchExpansionMock.mock.calls
-        .filter(([args]) => args.axis === 'row')
-        .map(call => JSON.stringify(call[0].path));
+        .filter(([args]) => getMockExpansionRequestAxis(args) === 'row')
+        .map(call => JSON.stringify(getMockExpansionRequestPath(call[0])));
       const colPaths = branchExpansionMock.mock.calls
-        .filter(([args]) => args.axis === 'col')
-        .map(call => JSON.stringify(call[0].path));
+        .filter(([args]) => getMockExpansionRequestAxis(args) === 'col')
+        .map(call => JSON.stringify(getMockExpansionRequestPath(call[0])));
       expect(rowPaths).toEqual(
         expect.arrayContaining([JSON.stringify(['A', 'X'])]),
       );
       expect(colPaths).toContain(JSON.stringify(['C', 'U']));
     });
     const colPaths = branchExpansionMock.mock.calls
-      .filter(([args]) => args.axis === 'col')
-      .map(call => JSON.stringify(call[0].path));
+      .filter(([args]) => getMockExpansionRequestAxis(args) === 'col')
+      .map(call => JSON.stringify(getMockExpansionRequestPath(call[0])));
     expect(colPaths).not.toContain(JSON.stringify([]));
   });
 
@@ -2294,10 +2301,12 @@ describe('PivotTableChart expansion state persistence', () => {
     await waitFor(() => expect(branchExpansionMock).toHaveBeenCalled());
     await waitFor(() => expect(screen.getByText('r3-1')).toBeInTheDocument());
     const rowCalls = branchExpansionMock.mock.calls.filter(
-      ([args]) => args.axis === 'row',
+      ([args]) => getMockExpansionRequestAxis(args) === 'row',
     );
     expect(rowCalls).toHaveLength(2);
-    const rowPaths = rowCalls.map(call => JSON.stringify(call[0].path));
+    const rowPaths = rowCalls.map(call =>
+      JSON.stringify(getMockExpansionRequestPath(call[0])),
+    );
     expect(rowPaths).toEqual(
       expect.arrayContaining([
         JSON.stringify(['A', 'X']),
@@ -2328,7 +2337,7 @@ describe('PivotTableChart expansion state persistence', () => {
       expect(branchExpansionMock.mock.calls.length).toBeGreaterThanOrEqual(1),
     );
     const fetchedPaths = branchExpansionMock.mock.calls.map(call =>
-      JSON.stringify(call[0].path),
+      JSON.stringify(getMockExpansionRequestPath(call[0])),
     );
     expect(fetchedPaths).not.toContain(JSON.stringify(['A', 'X']));
   });
@@ -2368,7 +2377,7 @@ describe('PivotTableChart expansion state persistence', () => {
 
     await waitFor(() => expect(branchExpansionMock).toHaveBeenCalled());
     const firstCall = branchExpansionMock.mock.calls[0][0];
-    expect(firstCall.path).toEqual([null]);
+    expect(getMockExpansionRequestPath(firstCall)).toEqual([null]);
   });
 
   it('decodes undefined values when prefetching persisted expansions', async () => {
@@ -2389,7 +2398,7 @@ describe('PivotTableChart expansion state persistence', () => {
 
     await waitFor(() => expect(branchExpansionMock).toHaveBeenCalled());
     const firstCall = branchExpansionMock.mock.calls[0][0];
-    expect(firstCall.path).toEqual([undefined]);
+    expect(getMockExpansionRequestPath(firstCall)).toEqual([undefined]);
   });
 
   it('handles PATH_DIVIDER values when prefetching persisted expansions', async () => {
@@ -2410,7 +2419,7 @@ describe('PivotTableChart expansion state persistence', () => {
 
     await waitFor(() => expect(branchExpansionMock).toHaveBeenCalled());
     const firstCall = branchExpansionMock.mock.calls[0][0];
-    expect(firstCall.path).toEqual([dividerValue]);
+    expect(getMockExpansionRequestPath(firstCall)).toEqual([dividerValue]);
   });
 
   it('keeps metric-like dimension values intact when prefetching', async () => {
@@ -2442,6 +2451,6 @@ describe('PivotTableChart expansion state persistence', () => {
 
     await waitFor(() => expect(branchExpansionMock).toHaveBeenCalled());
     const firstCall = branchExpansionMock.mock.calls[0][0];
-    expect(firstCall.path).toEqual([metricLikeValue]);
+    expect(getMockExpansionRequestPath(firstCall)).toEqual([metricLikeValue]);
   });
 });

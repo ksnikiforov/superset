@@ -60,6 +60,11 @@ const createDeferred = <T,>(): Deferred<T> => {
   return { promise, resolve };
 };
 
+const getRequestPath = (params: Parameters<typeof fetchPivotBranch>[0]) =>
+  params.kind === 'branch'
+    ? parsePath(params.target.coverageTarget.pathKey)
+    : [];
+
 const rowGroupby = ['r1', 'r2', 'r3'];
 const colGroupby: string[] = [];
 const metrics = ['m1'];
@@ -99,23 +104,24 @@ describe('PivotTableChart persisted prefetch hydrates until targets satisfied', 
     batch,
     formData,
     factStore,
-    visibleRowDepth,
-    visibleColDepth,
+    layout,
   }: FetchPivotBranchesBatchParams): Promise<FetchPivotBranchesBatchResult> => {
     const results = await Promise.all(
-      batch.targets.map(target => {
-        const path = parsePath(target.pathKey);
-        return Promise.resolve(
+      batch.targets.map(target =>
+        Promise.resolve(
           fetchPivotBranchMock({
+            kind: 'branch',
             formData,
-            axis: batch.axis,
-            path,
-            visibleRowDepth,
-            visibleColDepth,
+            layout,
+            target: {
+              axis: batch.axis,
+              pathKey: target.pathKey,
+              coverageTarget: target.coverageTarget,
+            },
             factStore,
           }),
-        );
-      }),
+        ),
+      ),
     );
     const merged = results.reduce<PivotTreeData | undefined>(
       (acc, result) => mergeTrees(acc, result.data),
@@ -151,10 +157,12 @@ describe('PivotTableChart persisted prefetch hydrates until targets satisfied', 
     const deferredA = createDeferred<FetchPivotBranchResult>();
     const deferredAX = createDeferred<FetchPivotBranchResult>();
     fetchPivotBranchMock.mockImplementation(params => {
-      if (JSON.stringify(params.path) === JSON.stringify(['A'])) {
+      if (JSON.stringify(getRequestPath(params)) === JSON.stringify(['A'])) {
         return deferredA.promise;
       }
-      if (JSON.stringify(params.path) === JSON.stringify(['A', 'X'])) {
+      if (
+        JSON.stringify(getRequestPath(params)) === JSON.stringify(['A', 'X'])
+      ) {
         return deferredAX.promise;
       }
       return Promise.resolve(buildMockBranchFetchResult(params));
@@ -216,12 +224,14 @@ describe('PivotTableChart persisted prefetch hydrates until targets satisfied', 
     await waitFor(() =>
       expect(
         fetchPivotBranchMock.mock.calls.some(
-          ([params]) => JSON.stringify(params.path) === JSON.stringify(['A']),
+          ([params]) =>
+            JSON.stringify(getRequestPath(params)) === JSON.stringify(['A']),
         ),
       ).toBe(true),
     );
     const branchAParams = fetchPivotBranchMock.mock.calls.find(
-      ([params]) => JSON.stringify(params.path) === JSON.stringify(['A']),
+      ([params]) =>
+        JSON.stringify(getRequestPath(params)) === JSON.stringify(['A']),
     )?.[0];
     expect(branchAParams).toBeDefined();
     deferredA.resolve(
@@ -235,12 +245,14 @@ describe('PivotTableChart persisted prefetch hydrates until targets satisfied', 
       expect(
         fetchPivotBranchMock.mock.calls.some(
           ([params]) =>
-            JSON.stringify(params.path) === JSON.stringify(['A', 'X']),
+            JSON.stringify(getRequestPath(params)) ===
+            JSON.stringify(['A', 'X']),
         ),
       ).toBe(true),
     );
     const branchAXParams = fetchPivotBranchMock.mock.calls.find(
-      ([params]) => JSON.stringify(params.path) === JSON.stringify(['A', 'X']),
+      ([params]) =>
+        JSON.stringify(getRequestPath(params)) === JSON.stringify(['A', 'X']),
     )?.[0];
     expect(branchAXParams).toBeDefined();
     deferredAX.resolve(

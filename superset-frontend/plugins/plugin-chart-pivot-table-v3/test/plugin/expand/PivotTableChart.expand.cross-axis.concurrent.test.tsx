@@ -27,7 +27,10 @@ import type {
   FetchPivotBranchResult,
 } from '../../../src/pivot/expansion/fetchPivotExpansion';
 import { buildFormData } from '../fixtures/pivotFormData';
-import { buildMockBranchFetchResult } from '../fixtures/factBatches';
+import {
+  buildMockBranchFetchResult,
+  getMockExpansionRequestAxis,
+} from '../fixtures/factBatches';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';
 
@@ -180,7 +183,10 @@ describe('PivotTableChart cross-axis concurrent expands', () => {
         return deferredCol.promise;
       })
       .mockImplementation(params => {
-        const data = params.axis === 'row' ? fullRowBranch : fullColBranch;
+        const data =
+          getMockExpansionRequestAxis(params) === 'row'
+            ? fullRowBranch
+            : fullColBranch;
         return Promise.resolve(buildMockBranchFetchResult(params, { data }));
       });
 
