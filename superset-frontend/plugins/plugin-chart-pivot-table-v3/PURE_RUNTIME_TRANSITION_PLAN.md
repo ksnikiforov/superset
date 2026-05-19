@@ -290,8 +290,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13345` insertions, `17484` deletions, net `-4139`.
-- Current production TypeScript/TSX total: about `29371` lines.
+- Production `src`: `13364` insertions, `17556` deletions, net `-4192`.
+- Current production TypeScript/TSX total: about `29318` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -303,10 +303,10 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `29371` | `-4139` | `< 28000` |
-| Strict core pipeline | `11337` | `11939` | `+602` | `8000` |
+| Full production `src` | `33510` | `29318` | `-4192` | `< 28000` |
+| Strict core pipeline | `11337` | `11886` | `+549` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5063` | `+380` | `3000-4000` |
-| Broad core pipeline | `16020` | `17002` | `+982` | `11000-13000` |
+| Broad core pipeline | `16020` | `16949` | `+929` | `11000-13000` |
 
 Current strict core breakdown:
 
@@ -316,7 +316,7 @@ Current strict core breakdown:
 | `pivot/expansion/*` | `2606` |
 | `pivot/query/*` | `1432` |
 | `pivot/layout/*` | `770` |
-| core/shared/domain helpers | `1865` |
+| core/shared/domain helpers | `1812` |
 | formatting/data/render-model/update support | `1211` |
 
 Interpretation: plugin-wide source has shrunk, but core pipeline source has
@@ -541,6 +541,12 @@ Latest expansion-transport cleanup: `query/fetchPlanOptimizer.ts` is gone.
 Sibling batching is now owned by `expansion/fetchExecution.ts`, and the batch
 request shape is owned by `expansion/planner.ts`. Query planning no longer owns
 transport batching vocabulary.
+
+Latest metric-identity cleanup: metric keys no longer fall back to saved metric
+verbose names, and formatting keys now use the same canonical metric key as the
+runtime. Display labels remain display-only through `metricLabelMap`/verbose
+metadata. The broad alias scan that treated metric name, verbose name, label,
+and query label as equivalent identities has been removed.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.

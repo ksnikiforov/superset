@@ -21,29 +21,6 @@ import { getMetricLabel, Metric, QueryFormMetric } from '@superset-ui/core';
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null;
 
-export const getMetricKey = (metric: QueryFormMetric | Metric) => {
-  if (typeof metric === 'string') {
-    return metric;
-  }
-  if (isRecord(metric) && 'expressionType' in metric) {
-    return getMetricLabel(metric as unknown as QueryFormMetric) || '';
-  }
-  if (isRecord(metric) && 'metric_name' in metric) {
-    const metricName = metric.metric_name;
-    if (typeof metricName === 'string' && metricName.trim().length > 0) {
-      const verboseName = metric.verbose_name;
-      if (typeof verboseName === 'string' && verboseName.trim().length > 0) {
-        return verboseName;
-      }
-      return metricName;
-    }
-  }
-  return '';
-};
-
-export const getMetricKeys = (metrics: QueryFormMetric[]) =>
-  metrics.map(getMetricKey).filter((m): m is string => !!m);
-
 const getMetricOptionName = (metric: QueryFormMetric | Metric) => {
   if (isRecord(metric)) {
     const { optionName } = metric;
@@ -54,5 +31,28 @@ const getMetricOptionName = (metric: QueryFormMetric | Metric) => {
   return undefined;
 };
 
+export const getMetricKey = (metric: QueryFormMetric | Metric) => {
+  if (typeof metric === 'string') {
+    return metric;
+  }
+  const optionName = getMetricOptionName(metric);
+  if (optionName) {
+    return optionName;
+  }
+  if (isRecord(metric) && 'expressionType' in metric) {
+    return getMetricLabel(metric as unknown as QueryFormMetric) || '';
+  }
+  if (isRecord(metric) && 'metric_name' in metric) {
+    const metricName = metric.metric_name;
+    if (typeof metricName === 'string' && metricName.trim().length > 0) {
+      return metricName;
+    }
+  }
+  return '';
+};
+
+export const getMetricKeys = (metrics: QueryFormMetric[]) =>
+  metrics.map(getMetricKey).filter((m): m is string => !!m);
+
 export const getFormattingMetricKey = (metric: QueryFormMetric | Metric) =>
-  getMetricOptionName(metric) || getMetricKey(metric);
+  getMetricKey(metric);
