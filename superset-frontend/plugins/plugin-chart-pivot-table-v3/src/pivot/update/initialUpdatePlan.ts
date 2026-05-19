@@ -126,7 +126,6 @@ export type InitialPivotUpdatePlan = {
   formData: PivotTableQueryFormData;
   layout: ReturnType<typeof buildLayoutContext>;
   specs: PlannedQuerySpec[];
-  selectionFilters: QueryObjectFilterClause[];
 };
 
 export const buildInitialPivotUpdatePlan = ({
@@ -138,11 +137,6 @@ export const buildInitialPivotUpdatePlan = ({
 }: BuildInitialPivotUpdatePlanParams): InitialPivotUpdatePlan => {
   const resolvedSelection =
     selection === undefined ? formData.pivotSelectedFilters : selection;
-  const selectionFilters = buildSelectionFilterClauses({
-    formData,
-    selection: resolvedSelection,
-  });
-
   const normalizedFormData = buildSelectionFilteredFormData({
     formData,
     selection: resolvedSelection,
@@ -174,6 +168,5 @@ export const buildInitialPivotUpdatePlan = ({
     formData: resolvedFormDataWithOffsets,
     layout,
     specs,
-    selectionFilters,
   };
 };

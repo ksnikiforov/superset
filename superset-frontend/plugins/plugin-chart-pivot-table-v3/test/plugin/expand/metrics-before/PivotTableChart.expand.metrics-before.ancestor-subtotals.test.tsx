@@ -39,7 +39,7 @@ import {
   type FetchPivotBranchesBatchParams,
   type FetchPivotBranchesBatchResult,
 } from '../../../../src/pivot/expansion/fetchPivotExpansion';
-import { formatQueryName } from '../../../../src/pivot/query/queryName';
+import { formatQueryName } from '../../../../src/pivot/query/specs';
 import { buildTreeFromRecords } from '../../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../../fixtures/metricAxis';
 

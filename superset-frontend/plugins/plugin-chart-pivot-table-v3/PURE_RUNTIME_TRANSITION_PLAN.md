@@ -290,8 +290,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13195` insertions, `17260` deletions, net `-4065`.
-- Current production TypeScript/TSX total: about `29445` lines.
+- Production `src`: `13218` insertions, `17332` deletions, net `-4114`.
+- Current production TypeScript/TSX total: about `29396` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -303,10 +303,10 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `29445` | `-4065` | `< 28000` |
-| Strict core pipeline | `11337` | `12006` | `+669` | `8000` |
+| Full production `src` | `33510` | `29396` | `-4114` | `< 28000` |
+| Strict core pipeline | `11337` | `11964` | `+627` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5063` | `+380` | `3000-4000` |
-| Broad core pipeline | `16020` | `17069` | `+1049` | `11000-13000` |
+| Broad core pipeline | `16020` | `17027` | `+1007` | `11000-13000` |
 
 Current strict core breakdown:
 
@@ -314,7 +314,7 @@ Current strict core breakdown:
 | --- | ---: |
 | `pivot/runtime/*` | `4050` |
 | `pivot/expansion/*` | `2484` |
-| `pivot/query/*` | `1626` |
+| `pivot/query/*` | `1584` |
 | `pivot/layout/*` | `770` |
 | core/shared/domain helpers | `1865` |
 | formatting/data/render-model/update support | `1211` |
@@ -531,6 +531,11 @@ Latest expansion-planning cleanup: the one-field `ExpansionPlanningConfig`
 wrapper is gone. Hydration planning now receives the compiled `PivotProgram`
 directly, and expansion fetch execution requires a fact store instead of
 falling back to the current tree when coverage state is absent.
+
+Latest query-boundary cleanup: the tiny `queryName.ts` and
+`toChartDataQueries.ts` modules are gone. Query naming and conversion from
+planned specs to Superset `QueryObject`s now live in `query/specs.ts`, and
+`InitialPivotUpdatePlan` no longer returns an unused `selectionFilters` copy.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.

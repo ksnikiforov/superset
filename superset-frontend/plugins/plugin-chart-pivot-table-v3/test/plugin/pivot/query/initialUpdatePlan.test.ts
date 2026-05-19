@@ -17,7 +17,7 @@
  * under the License.
  */
 
-import { formatQueryName } from '../../../../src/pivot/query/queryName';
+import { formatQueryName } from '../../../../src/pivot/query/specs';
 import buildQuery from '../../../../src/buildQuery';
 import {
   buildInitialPivotUpdatePlan,

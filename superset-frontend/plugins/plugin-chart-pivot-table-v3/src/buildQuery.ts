@@ -19,7 +19,7 @@
 import { buildQueryContext, QueryFormOrderBy } from '@superset-ui/core';
 import { PivotTableQueryFormData } from './types';
 import { buildInitialPivotUpdatePlan } from './pivot/update/initialUpdatePlan';
-import { toChartDataQueries } from './pivot/query/toChartDataQueries';
+import { toChartDataQueries } from './pivot/query/specs';
 
 export default function buildQuery(formData: PivotTableQueryFormData) {
   const {

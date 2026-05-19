@@ -27,8 +27,8 @@ import {
 // eslint-disable-next-line import/no-extraneous-dependencies -- Phase 4 requires mirroring Superset core GAQ handling.
 import { waitForAsyncData } from 'src/middleware/asyncEvent';
 import { type PivotTableQueryFormData } from '../../types';
-import { toChartDataQueries } from '../query/toChartDataQueries';
 import { type QuerySpec } from '../query/specs';
+import { toChartDataQueries } from '../query/specs';
 import {
   type ChartDataClient,
   type ChartDataFetchParams,

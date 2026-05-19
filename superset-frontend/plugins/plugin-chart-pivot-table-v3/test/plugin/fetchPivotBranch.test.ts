@@ -40,9 +40,11 @@ import {
 } from '../../src/pivot/core/tokens';
 import { serializeCellKey, serializePath } from '../../src/pivot/core/path';
 import { buildTreeFromRecords } from './fixtures/buildTreeFromRecords';
-import { formatQueryName } from '../../src/pivot/query/queryName';
 import { buildLayoutContext } from '../../src/pivot/layout/LayoutContext';
-import { buildExpansionQuerySpecs } from '../../src/pivot/query/specs';
+import {
+  buildExpansionQuerySpecs,
+  formatQueryName,
+} from '../../src/pivot/query/specs';
 import { createPivotFactStore } from '../../src/pivot/runtime/factStore';
 import { materializeLoadedPivotTreeFromFactStore } from '../../src/pivot/runtime/materializePivotTree';
 import { buildFormData } from './fixtures/pivotFormData';

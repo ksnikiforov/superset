@@ -22,6 +22,7 @@ import {
   getColumnLabel,
   type QueryFormColumn,
   type QueryFormMetric,
+  type QueryObject,
   type QueryObjectFilterClause,
   type SetQueryObjectFilterClause,
   type UnaryQueryObjectFilterClause,
@@ -55,7 +56,6 @@ import {
 import { getMetricKey } from '../metrics';
 import { collectRequiredTimeOffsets } from '../measureLeaves';
 import { type BatchGroup } from './fetchPlanOptimizer';
-import { formatQueryName } from './queryName';
 import { buildPathFilters, coerceValueForColumn } from './pathFilters';
 import { buildFactCoverage } from '../runtime/coverage';
 import {
@@ -75,6 +75,10 @@ import {
 import { type PivotFactCoverage } from '../runtime/types';
 import { stableStringify } from '../shared/stableStringify';
 
+export const QUERY_NAME_PREFIX = 'pivot_v3';
+export const formatQueryName = (rowDepth: number, colDepth: number) =>
+  `${QUERY_NAME_PREFIX}|row${rowDepth}|col${colDepth}`;
+
 export type QuerySpec = {
   queryName: string;
   columns: QueryFormColumn[];
@@ -91,6 +95,27 @@ export type QuerySpecMeta = {
 export type PlannedQuerySpec = QuerySpec & {
   meta: QuerySpecMeta;
 };
+
+export const toChartDataQueries = ({
+  specs,
+  baseQueryObject,
+}: {
+  specs: QuerySpec[];
+  baseQueryObject: QueryObject;
+}): QueryObject[] =>
+  specs.map(spec => ({
+    ...baseQueryObject,
+    columns: spec.columns,
+    metrics:
+      spec.metrics.length > 0
+        ? spec.metrics
+        : ((baseQueryObject.metrics ?? []) as QueryFormMetric[]),
+    filters: [
+      ...((baseQueryObject.filters ?? []) as QueryObjectFilterClause[]),
+      ...spec.filters,
+    ],
+    query_name: spec.queryName,
+  }));
 
 type QueryShape = {
   rowGroupby: QueryFormColumn[];
