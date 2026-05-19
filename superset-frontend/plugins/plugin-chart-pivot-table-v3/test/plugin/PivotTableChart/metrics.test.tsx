@@ -40,7 +40,6 @@ import {
   buildCustomLeaf,
   buildValueLeaf,
 } from '../../../src/pivot/measureLeaves';
-import { applyMeasureLeafValuesToTree } from '../../../src/pivot/runtime/materializePivotTree';
 import { fetchPivotExpansion } from '../../../src/pivot/expansion/fetchPivotExpansion';
 import { resolveMockExpansionFetchResult } from '../fixtures/factBatches';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
@@ -1236,7 +1235,7 @@ describe('PivotTableChart metric tier suppression', () => {
       1,
     );
     const treeWithLeaves = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({ tree: baseTree, measureHierarchy }),
+      baseTree,
       measureHierarchy,
       MetricsLayoutEnum.COLUMNS,
       [],
@@ -1339,10 +1338,7 @@ describe('PivotTableChart metric tier suppression', () => {
       ),
     };
     const treeWithLeaves = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({
-        tree: treeWithCustomMetric,
-        measureHierarchy,
-      }),
+      treeWithCustomMetric,
       measureHierarchy,
       MetricsLayoutEnum.COLUMNS,
       [],
@@ -1448,10 +1444,7 @@ describe('PivotTableChart metric tier suppression', () => {
       ),
     };
     const treeWithLeaves = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({
-        tree: treeWithCustomMetric,
-        measureHierarchy,
-      }),
+      treeWithCustomMetric,
       measureHierarchy,
       MetricsLayoutEnum.COLUMNS,
       [],

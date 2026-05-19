@@ -35,7 +35,6 @@ import {
   buildMeasureLeafOutputKey,
   buildValueLeaf,
 } from '../../../src/pivot/measureLeaves';
-import { applyMeasureLeafValuesToTree } from '../../../src/pivot/runtime/materializePivotTree';
 import { supersetChartDataClient } from '../../../src/pivot/data/SupersetChartDataClient';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import {
@@ -514,10 +513,7 @@ describe('PivotTableChart interaction layout', () => {
       1,
     );
     const tree = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({
-        tree: baseTree,
-        measureHierarchy,
-      }),
+      baseTree,
       measureHierarchy,
       MetricsLayoutEnum.COLUMNS,
       [],
@@ -618,10 +614,7 @@ describe('PivotTableChart interaction layout', () => {
       2,
     );
     const tree = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({
-        tree: baseTree,
-        measureHierarchy,
-      }),
+      baseTree,
       measureHierarchy,
       MetricsLayoutEnum.COLUMNS,
       ['row1'],
@@ -869,7 +862,7 @@ describe('PivotTableChart interaction layout', () => {
     ];
     const baseTree = buildTreeFromRecords(records, metrics, ['row1'], [], 1, 0);
     const tree = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({ tree: baseTree, measureHierarchy }),
+      baseTree,
       measureHierarchy,
       MetricsLayoutEnum.COLUMNS,
       ['row1'],
@@ -1236,7 +1229,7 @@ describe('PivotTableChart interaction layout', () => {
     );
     const mergedTree = mergeTrees(baseTree, totalsTree);
     const tree = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({ tree: mergedTree, measureHierarchy }),
+      mergedTree,
       measureHierarchy,
       MetricsLayoutEnum.COLUMNS,
       rowGroupby,
@@ -1402,10 +1395,7 @@ describe('PivotTableChart interaction layout', () => {
       1,
     );
     const tree = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({
-        tree: baseTree,
-        measureHierarchy,
-      }),
+      baseTree,
       measureHierarchy,
       MetricsLayoutEnum.COLUMNS,
       [],
@@ -1505,7 +1495,7 @@ describe('PivotTableChart interaction layout', () => {
       0,
     );
     const treeWithLeafValues = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({ tree: baseTree, measureHierarchy }),
+      baseTree,
       measureHierarchy,
       MetricsLayoutEnum.COLUMNS,
       rowGroupby,
@@ -1522,10 +1512,7 @@ describe('PivotTableChart interaction layout', () => {
       0,
     );
     const refreshedTreeWithLeafValues = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({
-        tree: refreshedBaseTree,
-        measureHierarchy,
-      }),
+      refreshedBaseTree,
       measureHierarchy,
       MetricsLayoutEnum.COLUMNS,
       rowGroupby,
@@ -1616,17 +1603,14 @@ describe('PivotTableChart interaction layout', () => {
     });
 
     const treeWithLeafSources = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({
-        tree: buildTreeFromRecords(
-          [{ row1: 'A', m1: 150, [customMetricKey]: 33 }],
-          [metricKey, customMetricKey],
-          rowGroupby,
-          [],
-          1,
-          0,
-        ),
-        measureHierarchy,
-      }),
+      buildTreeFromRecords(
+        [{ row1: 'A', m1: 150, [customMetricKey]: 33 }],
+        [metricKey, customMetricKey],
+        rowGroupby,
+        [],
+        1,
+        0,
+      ),
       measureHierarchy,
       MetricsLayoutEnum.COLUMNS,
       rowGroupby,

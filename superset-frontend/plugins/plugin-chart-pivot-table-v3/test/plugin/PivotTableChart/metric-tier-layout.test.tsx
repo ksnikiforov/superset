@@ -29,7 +29,6 @@ import {
   buildBuiltInLeaf,
   buildValueLeaf,
 } from '../../../src/pivot/measureLeaves';
-import { applyMeasureLeafValuesToTree } from '../../../src/pivot/runtime/materializePivotTree';
 import { usePivotLayout } from '../../../src/pivot/chart/usePivotLayout';
 import { usePivotRenderModel } from '../../../src/pivot/chart/usePivotRenderModel';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
@@ -316,7 +315,7 @@ describe('PivotTableChart metric tier indentation and toggles', () => {
       0,
     );
     const tree = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({ tree: baseTree, measureHierarchy }),
+      baseTree,
       measureHierarchy,
       MetricsLayoutEnum.ROWS,
       rowGroupby,

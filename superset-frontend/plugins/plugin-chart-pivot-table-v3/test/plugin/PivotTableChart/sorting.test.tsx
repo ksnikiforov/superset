@@ -27,7 +27,6 @@ import {
   buildBuiltInLeaf,
   buildValueLeaf,
 } from '../../../src/pivot/measureLeaves';
-import { applyMeasureLeafValuesToTree } from '../../../src/pivot/runtime/materializePivotTree';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import {
   applyMeasureHierarchyAxis,
@@ -545,20 +544,17 @@ describe('PivotTableChart sorting', () => {
       leafTierVisibility: 'visible' as const,
     };
     const tree = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({
-        tree: buildTreeFromRecords(
-          [
-            { country: 'A', year: '2024', m1: 20, 'm1__1 year ago': 10 },
-            { country: 'B', year: '2024', m1: 10, 'm1__1 year ago': 10 },
-          ],
-          metrics,
-          groupbyRows,
-          groupbyColumns,
-          1,
-          1,
-        ),
-        measureHierarchy,
-      }),
+      buildTreeFromRecords(
+        [
+          { country: 'A', year: '2024', m1: 20, 'm1__1 year ago': 10 },
+          { country: 'B', year: '2024', m1: 10, 'm1__1 year ago': 10 },
+        ],
+        metrics,
+        groupbyRows,
+        groupbyColumns,
+        1,
+        1,
+      ),
       measureHierarchy,
       MetricsLayoutEnum.COLUMNS,
       groupbyRows,
@@ -643,32 +639,29 @@ describe('PivotTableChart sorting', () => {
       leafTierVisibility: 'visible' as const,
     };
     const tree = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({
-        tree: buildTreeFromRecords(
-          [
-            {
-              country: 'Zeta',
-              year: '2024',
-              m1: 100,
-              'm1__1 year ago': 50,
-              m2: 10,
-            },
-            {
-              country: 'Alpha',
-              year: '2024',
-              m1: 50,
-              'm1__1 year ago': 5,
-              m2: 20,
-            },
-          ],
-          metrics,
-          groupbyRows,
-          groupbyColumns,
-          1,
-          1,
-        ),
-        measureHierarchy,
-      }),
+      buildTreeFromRecords(
+        [
+          {
+            country: 'Zeta',
+            year: '2024',
+            m1: 100,
+            'm1__1 year ago': 50,
+            m2: 10,
+          },
+          {
+            country: 'Alpha',
+            year: '2024',
+            m1: 50,
+            'm1__1 year ago': 5,
+            m2: 20,
+          },
+        ],
+        metrics,
+        groupbyRows,
+        groupbyColumns,
+        1,
+        1,
+      ),
       measureHierarchy,
       MetricsLayoutEnum.COLUMNS,
       groupbyRows,
@@ -741,32 +734,29 @@ describe('PivotTableChart sorting', () => {
       leafTierVisibility: 'visible' as const,
     };
     const tree = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({
-        tree: buildTreeFromRecords(
-          [
-            {
-              country: 'Zeta',
-              year: '2024',
-              m1: 100,
-              'm1__1 year ago': 50,
-              m2: 1,
-            },
-            {
-              country: 'Alpha',
-              year: '2024',
-              m1: 50,
-              'm1__1 year ago': 5,
-              m2: 2,
-            },
-          ],
-          metrics,
-          groupbyRows,
-          groupbyColumns,
-          1,
-          1,
-        ),
-        measureHierarchy,
-      }),
+      buildTreeFromRecords(
+        [
+          {
+            country: 'Zeta',
+            year: '2024',
+            m1: 100,
+            'm1__1 year ago': 50,
+            m2: 1,
+          },
+          {
+            country: 'Alpha',
+            year: '2024',
+            m1: 50,
+            'm1__1 year ago': 5,
+            m2: 2,
+          },
+        ],
+        metrics,
+        groupbyRows,
+        groupbyColumns,
+        1,
+        1,
+      ),
       measureHierarchy,
       MetricsLayoutEnum.COLUMNS,
       groupbyRows,
@@ -850,32 +840,29 @@ describe('PivotTableChart sorting', () => {
     };
 
     const singleLeafTree = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({
-        tree: buildTreeFromRecords(
-          [
-            {
-              country: 'Zeta',
-              year: '2024',
-              m1: 100,
-              'm1__1 year ago': 5,
-              m2: 1,
-            },
-            {
-              country: 'Alpha',
-              year: '2024',
-              m1: 50,
-              'm1__1 year ago': 500,
-              m2: 2,
-            },
-          ],
-          metrics,
-          groupbyRows,
-          groupbyColumns,
-          1,
-          1,
-        ),
-        measureHierarchy: singleLeafHierarchy,
-      }),
+      buildTreeFromRecords(
+        [
+          {
+            country: 'Zeta',
+            year: '2024',
+            m1: 100,
+            'm1__1 year ago': 5,
+            m2: 1,
+          },
+          {
+            country: 'Alpha',
+            year: '2024',
+            m1: 50,
+            'm1__1 year ago': 500,
+            m2: 2,
+          },
+        ],
+        metrics,
+        groupbyRows,
+        groupbyColumns,
+        1,
+        1,
+      ),
       singleLeafHierarchy,
       MetricsLayoutEnum.COLUMNS,
       groupbyRows,
@@ -884,32 +871,29 @@ describe('PivotTableChart sorting', () => {
     );
 
     const multiLeafTree = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({
-        tree: buildTreeFromRecords(
-          [
-            {
-              country: 'Zeta',
-              year: '2024',
-              m1: 100,
-              'm1__1 year ago': 5,
-              m2: 1,
-            },
-            {
-              country: 'Alpha',
-              year: '2024',
-              m1: 50,
-              'm1__1 year ago': 500,
-              m2: 2,
-            },
-          ],
-          metrics,
-          groupbyRows,
-          groupbyColumns,
-          1,
-          1,
-        ),
-        measureHierarchy: multiLeafHierarchy,
-      }),
+      buildTreeFromRecords(
+        [
+          {
+            country: 'Zeta',
+            year: '2024',
+            m1: 100,
+            'm1__1 year ago': 5,
+            m2: 1,
+          },
+          {
+            country: 'Alpha',
+            year: '2024',
+            m1: 50,
+            'm1__1 year ago': 500,
+            m2: 2,
+          },
+        ],
+        metrics,
+        groupbyRows,
+        groupbyColumns,
+        1,
+        1,
+      ),
       multiLeafHierarchy,
       MetricsLayoutEnum.COLUMNS,
       groupbyRows,
@@ -1020,20 +1004,17 @@ describe('PivotTableChart sorting', () => {
       leafTierVisibility: 'visible' as const,
     };
     const tree = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({
-        tree: buildTreeFromRecords(
-          [
-            { country: 'Zeta', m1: 100, 'm1__1 year ago': 50 },
-            { country: 'Alpha', m1: 50, 'm1__1 year ago': 5 },
-          ],
-          metrics,
-          groupbyRows,
-          groupbyColumns,
-          1,
-          0,
-        ),
-        measureHierarchy,
-      }),
+      buildTreeFromRecords(
+        [
+          { country: 'Zeta', m1: 100, 'm1__1 year ago': 50 },
+          { country: 'Alpha', m1: 50, 'm1__1 year ago': 5 },
+        ],
+        metrics,
+        groupbyRows,
+        groupbyColumns,
+        1,
+        0,
+      ),
       measureHierarchy,
       MetricsLayoutEnum.COLUMNS,
       groupbyRows,
@@ -1099,20 +1080,17 @@ describe('PivotTableChart sorting', () => {
       leafTierVisibility: 'hidden' as const,
     };
     const tree = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({
-        tree: buildTreeFromRecords(
-          [
-            { country: 'Zeta', m1: 100, 'm1__1 year ago': 50 },
-            { country: 'Alpha', m1: 50, 'm1__1 year ago': 5 },
-          ],
-          metrics,
-          groupbyRows,
-          groupbyColumns,
-          1,
-          0,
-        ),
-        measureHierarchy,
-      }),
+      buildTreeFromRecords(
+        [
+          { country: 'Zeta', m1: 100, 'm1__1 year ago': 50 },
+          { country: 'Alpha', m1: 50, 'm1__1 year ago': 5 },
+        ],
+        metrics,
+        groupbyRows,
+        groupbyColumns,
+        1,
+        0,
+      ),
       measureHierarchy,
       MetricsLayoutEnum.COLUMNS,
       groupbyRows,

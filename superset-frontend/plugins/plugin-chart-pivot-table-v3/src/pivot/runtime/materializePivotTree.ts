@@ -247,63 +247,29 @@ const deriveBatchMaterializationPlan = ({
   };
 };
 
-export function applyMeasureLeafValuesToTree({
-  tree,
-  measureHierarchy,
-}: {
-  tree: PivotTreeData;
-  measureHierarchy: Pick<MeasureHierarchy, 'groups'>;
-}) {
-  const { groups } = measureHierarchy;
-  if (groups.length === 0) {
-    return tree;
-  }
-
-  const applyToValues = (values?: Record<string, DataRecordValue>) => {
-    if (!values) {
-      return values;
-    }
-    const next = { ...values };
-    groups.forEach(group => {
-      group.leaves.forEach(leaf => {
-        const outputKey = buildMeasureLeafOutputKey(group.metricKey, leaf);
-        if (outputKey in next) {
-          return;
-        }
-        const computed = computeMeasureLeafValue({
-          values: next,
-          metricKey: group.metricKey,
-          leaf,
-        });
-        if (computed !== undefined) {
-          next[outputKey] = computed;
-        }
+const applyMeasureLeafValues = (
+  values: Record<string, DataRecordValue>,
+  groups: MeasureAxisGroup[],
+) => {
+  const next = { ...values };
+  groups.forEach(group => {
+    group.leaves.forEach(leaf => {
+      const outputKey = buildMeasureLeafOutputKey(group.metricKey, leaf);
+      if (outputKey in next) {
+        return;
+      }
+      const computed = computeMeasureLeafValue({
+        values: next,
+        metricKey: group.metricKey,
+        leaf,
       });
+      if (computed !== undefined) {
+        next[outputKey] = computed;
+      }
     });
-    return next;
-  };
-
-  const nextCells = Object.fromEntries(
-    Object.entries(tree.cells).map(([key, cell]) => [
-      key,
-      { ...cell, values: applyToValues(cell.values) ?? cell.values },
-    ]),
-  );
-  const nextRows = Object.fromEntries(
-    Object.entries(tree.rows).map(([key, node]) => [
-      key,
-      node.values ? { ...node, values: applyToValues(node.values) } : node,
-    ]),
-  );
-  const nextCols = Object.fromEntries(
-    Object.entries(tree.cols).map(([key, node]) => [
-      key,
-      node.values ? { ...node, values: applyToValues(node.values) } : node,
-    ]),
-  );
-
-  return { rows: nextRows, cols: nextCols, cells: nextCells };
-}
+  });
+  return next;
+};
 
 const finalizeInitialPivotTree = ({ tree }: { tree: PivotTreeData }) => {
   const rootKey = serializePath([]);
@@ -964,6 +930,7 @@ const applyMeasureAxis = ({
     const oppositePath = oppositeNode?.path || [];
     const valuePrefix = valuePath.slice(0, insertIndex);
     const valueSuffix = valuePath.slice(insertIndex);
+    const cellValues = applyMeasureLeafValues(cell.values, groups);
 
     const isTotalValuePath =
       valuePath.length === 0 || valuePath.some(isSubtotalToken);
@@ -988,7 +955,7 @@ const applyMeasureAxis = ({
       addCell({
         rowPath: valuePath,
         colPath: oppositePath,
-        values: cell.values,
+        values: cellValues,
         isSubtotal: cell.isSubtotal,
       });
       return;
@@ -997,8 +964,8 @@ const applyMeasureAxis = ({
     groups.forEach(group => {
       const metric = group.metricKey;
       const mergedValues = {
-        [metric]: cell.values[metric],
-        ...cell.values,
+        [metric]: cellValues[metric],
+        ...cellValues,
       };
       const metricToken = encodeMetricKey(metric);
       const hasSubtotalAtInsert =
@@ -1190,10 +1157,7 @@ const materializePivotTree = ({
     {} as PivotTreeData,
   );
   const branchWithMeasures = applyMeasureHierarchyAxis(
-    applyMeasureLeafValuesToTree({
-      tree: branchTree,
-      measureHierarchy,
-    }),
+    branchTree,
     measureHierarchy,
     pivotProgram,
     formData.metricLabelMap as Record<string, string> | undefined,
@@ -1235,13 +1199,8 @@ const materializePivotTreeAsync = async ({
     branchTree = mergeTrees(branchTree, nextTree);
   }
   await yieldChunkedWork({ shouldContinue, yieldToMain });
-  const treeWithLeafValues = applyMeasureLeafValuesToTree({
-    tree: branchTree,
-    measureHierarchy,
-  });
-  await yieldChunkedWork({ shouldContinue, yieldToMain });
   const branchWithMeasures = applyMeasureHierarchyAxis(
-    treeWithLeafValues,
+    branchTree,
     measureHierarchy,
     pivotProgram,
     formData.metricLabelMap as Record<string, string> | undefined,

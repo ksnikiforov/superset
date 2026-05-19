@@ -290,8 +290,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13432` insertions, `17813` deletions, net `-4381`.
-- Current production TypeScript/TSX total: about `29129` lines.
+- Production `src`: `13391` insertions, `17813` deletions, net `-4422`.
+- Current production TypeScript/TSX total: about `29088` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -303,16 +303,16 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `29129` | `-4381` | `< 28000` |
-| Strict core pipeline | `11337` | `11852` | `+515` | `8000` |
+| Full production `src` | `33510` | `29088` | `-4422` | `< 28000` |
+| Strict core pipeline | `11337` | `11811` | `+474` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5061` | `+378` | `3000-4000` |
-| Broad core pipeline | `16020` | `16913` | `+893` | `11000-13000` |
+| Broad core pipeline | `16020` | `16872` | `+852` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `3859` |
+| `pivot/runtime/*` | `3818` |
 | `pivot/expansion/*` | `2821` |
 | `pivot/query/*` | `1412` |
 | `pivot/layout/*` | `770` |
@@ -629,6 +629,12 @@ metadata plus extracted facts. The original chart-data result payload is not
 kept after fact extraction, and async initial materialization builds the fact
 store from the fact batches it already produced instead of converting ingested
 results to batches twice.
+
+Latest materializer cleanup: measure-leaf value derivation is now folded into
+the measure-axis materialization pass. The separate production
+`applyMeasureLeafValuesToTree` traversal/export is gone, sync materialization
+does one less full-tree pass, and async materialization has one less scheduled
+yield stage before measure-axis projection.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.

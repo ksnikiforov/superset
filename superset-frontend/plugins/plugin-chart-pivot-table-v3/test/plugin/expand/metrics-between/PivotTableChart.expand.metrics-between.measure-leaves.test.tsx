@@ -26,10 +26,10 @@ import {
   buildBuiltInLeaf,
   buildValueLeaf,
 } from '../../../../src/pivot/measureLeaves';
-import { applyMeasureLeafValuesToTree } from '../../../../src/pivot/runtime/materializePivotTree';
 import { fetchPivotExpansion as fetchPivotBranch } from '../../../../src/pivot/expansion/fetchPivotExpansion';
 import { buildTreeFromRecords } from '../../fixtures/buildTreeFromRecords';
 import { applyMeasureHierarchyAxis } from '../../fixtures/metricAxis';
+import { resolveMockExpansionFetchResult } from '../../fixtures/factBatches';
 
 jest.mock('../../../../src/pivot/expansion/fetchPivotExpansion', () => {
   const actual = jest.requireActual(
@@ -37,9 +37,7 @@ jest.mock('../../../../src/pivot/expansion/fetchPivotExpansion', () => {
   );
   return {
     ...actual,
-    fetchPivotExpansion: jest
-      .fn()
-      .mockResolvedValue({ data: undefined, factBatches: [] }),
+    fetchPivotExpansion: jest.fn().mockResolvedValue({ data: undefined }),
   };
 });
 
@@ -88,17 +86,14 @@ describe('PivotTableChart expansion with measure leaves between dimensions', () 
     record: Record<string, string | number>;
   }) =>
     applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({
-        tree: buildTreeFromRecords(
-          [record],
-          [metricKey],
-          rowGroupby,
-          colGroupby,
-          rowDepth,
-          colDepth,
-        ),
-        measureHierarchy,
-      }),
+      buildTreeFromRecords(
+        [record],
+        [metricKey],
+        rowGroupby,
+        colGroupby,
+        rowDepth,
+        colDepth,
+      ),
       measureHierarchy,
       metricsLayout,
       rowGroupby,
@@ -134,10 +129,11 @@ describe('PivotTableChart expansion with measure leaves between dimensions', () 
       record,
     });
 
-    fetchPivotBranchMock.mockResolvedValueOnce({
-      data: branchTree,
-      factBatches: [],
-    });
+    fetchPivotBranchMock.mockImplementationOnce(
+      resolveMockExpansionFetchResult({
+        data: branchTree,
+      }),
+    );
 
     const { container } = render(
       <PivotTableChart
@@ -220,17 +216,7 @@ describe('PivotTableChart expansion with measure leaves between dimensions', () 
       'grossRevenue__1 year ago': 5,
     };
     const baseTree = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({
-        tree: buildTreeFromRecords(
-          [record],
-          [metricKey],
-          rowGroupby,
-          colGroupby,
-          0,
-          1,
-        ),
-        measureHierarchy: extendedHierarchy,
-      }),
+      buildTreeFromRecords([record], [metricKey], rowGroupby, colGroupby, 0, 1),
       extendedHierarchy,
       MetricsLayoutEnum.COLUMNS,
       rowGroupby,
@@ -238,17 +224,7 @@ describe('PivotTableChart expansion with measure leaves between dimensions', () 
       1,
     );
     const branchTree = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({
-        tree: buildTreeFromRecords(
-          [record],
-          [metricKey],
-          rowGroupby,
-          colGroupby,
-          0,
-          2,
-        ),
-        measureHierarchy: extendedHierarchy,
-      }),
+      buildTreeFromRecords([record], [metricKey], rowGroupby, colGroupby, 0, 2),
       extendedHierarchy,
       MetricsLayoutEnum.COLUMNS,
       rowGroupby,
@@ -256,10 +232,11 @@ describe('PivotTableChart expansion with measure leaves between dimensions', () 
       1,
     );
 
-    fetchPivotBranchMock.mockResolvedValueOnce({
-      data: branchTree,
-      factBatches: [],
-    });
+    fetchPivotBranchMock.mockImplementationOnce(
+      resolveMockExpansionFetchResult({
+        data: branchTree,
+      }),
+    );
 
     const { container } = render(
       <PivotTableChart
@@ -349,17 +326,7 @@ describe('PivotTableChart expansion with measure leaves between dimensions', () 
       'grossRevenue__1 year ago': 5,
     };
     const baseTree = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({
-        tree: buildTreeFromRecords(
-          [record],
-          [metricKey],
-          rowGroupby,
-          colGroupby,
-          1,
-          0,
-        ),
-        measureHierarchy: extendedHierarchy,
-      }),
+      buildTreeFromRecords([record], [metricKey], rowGroupby, colGroupby, 1, 0),
       extendedHierarchy,
       MetricsLayoutEnum.ROWS,
       rowGroupby,
@@ -367,17 +334,7 @@ describe('PivotTableChart expansion with measure leaves between dimensions', () 
       1,
     );
     const branchTree = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({
-        tree: buildTreeFromRecords(
-          [record],
-          [metricKey],
-          rowGroupby,
-          colGroupby,
-          2,
-          0,
-        ),
-        measureHierarchy: extendedHierarchy,
-      }),
+      buildTreeFromRecords([record], [metricKey], rowGroupby, colGroupby, 2, 0),
       extendedHierarchy,
       MetricsLayoutEnum.ROWS,
       rowGroupby,
@@ -385,10 +342,11 @@ describe('PivotTableChart expansion with measure leaves between dimensions', () 
       1,
     );
 
-    fetchPivotBranchMock.mockResolvedValueOnce({
-      data: branchTree,
-      factBatches: [],
-    });
+    fetchPivotBranchMock.mockImplementationOnce(
+      resolveMockExpansionFetchResult({
+        data: branchTree,
+      }),
+    );
 
     const { container } = render(
       <PivotTableChart
@@ -480,10 +438,11 @@ describe('PivotTableChart expansion with measure leaves between dimensions', () 
       record,
     });
 
-    fetchPivotBranchMock.mockResolvedValueOnce({
-      data: branchTree,
-      factBatches: [],
-    });
+    fetchPivotBranchMock.mockImplementationOnce(
+      resolveMockExpansionFetchResult({
+        data: branchTree,
+      }),
+    );
 
     const { container } = render(
       <PivotTableChart

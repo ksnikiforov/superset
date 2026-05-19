@@ -45,7 +45,6 @@ import {
   buildBuiltInLeaf,
   buildValueLeaf,
 } from '../../../../src/pivot/measureLeaves';
-import { applyMeasureLeafValuesToTree } from '../../../../src/pivot/runtime/materializePivotTree';
 import { buildTreeFromRecords } from '../../fixtures/buildTreeFromRecords';
 import {
   injectRowSubtotalLeaves,
@@ -3944,24 +3943,21 @@ describe('PivotTableChart totals & subtotals - rows', () => {
       leafTierVisibility: 'visible' as const,
     };
     const tree = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({
-        tree: buildTreeFromRecords(
-          [
-            {
-              region: 'EMEA',
-              category: 'OFFICE',
-              grossRevenue: 10,
-              'grossRevenue__1 year ago': 8,
-            },
-          ],
-          [metricKey],
-          ['region', 'category'],
-          [],
-          2,
-          0,
-        ),
-        measureHierarchy,
-      }),
+      buildTreeFromRecords(
+        [
+          {
+            region: 'EMEA',
+            category: 'OFFICE',
+            grossRevenue: 10,
+            'grossRevenue__1 year ago': 8,
+          },
+        ],
+        [metricKey],
+        ['region', 'category'],
+        [],
+        2,
+        0,
+      ),
       measureHierarchy,
       MetricsLayoutEnum.ROWS,
       ['region', 'category'],

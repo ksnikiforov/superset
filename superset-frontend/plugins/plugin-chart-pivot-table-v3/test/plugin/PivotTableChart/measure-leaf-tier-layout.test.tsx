@@ -32,7 +32,6 @@ import {
   buildBuiltInLeaf,
   buildValueLeaf,
 } from '../../../src/pivot/measureLeaves';
-import { applyMeasureLeafValuesToTree } from '../../../src/pivot/runtime/materializePivotTree';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMeasureHierarchyAxis } from '../fixtures/metricAxis';
 
@@ -93,24 +92,21 @@ describe('PivotTableChart measure leaf tier indentation', () => {
     };
 
     const tree = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({
-        tree: buildTreeFromRecords(
-          [
-            {
-              orderPriority: '1-URGENT',
-              shipMode: 'AIR',
-              grossRevenue: 10,
-              'grossRevenue__1 year ago': 5,
-            },
-          ],
-          [metricKey],
-          ['orderPriority', 'shipMode'],
-          [],
-          2,
-          0,
-        ),
-        measureHierarchy,
-      }),
+      buildTreeFromRecords(
+        [
+          {
+            orderPriority: '1-URGENT',
+            shipMode: 'AIR',
+            grossRevenue: 10,
+            'grossRevenue__1 year ago': 5,
+          },
+        ],
+        [metricKey],
+        ['orderPriority', 'shipMode'],
+        [],
+        2,
+        0,
+      ),
       measureHierarchy,
       MetricsLayoutEnum.ROWS,
       ['orderPriority', 'shipMode'],
@@ -184,26 +180,23 @@ describe('PivotTableChart measure leaf tier indentation', () => {
       leafTierVisibility: 'visible' as const,
     };
     const tree = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({
-        tree: buildTreeFromRecords(
-          [
-            {
-              col1: 'C1',
-              col2: 'C2',
-              grossRevenue: 10,
-              'grossRevenue__1 year ago': 8,
-              netRevenue: 12,
-              'netRevenue__1 year ago': 9,
-            },
-          ],
-          [metricKey, secondaryMetric],
-          [],
-          ['col1', 'col2'],
-          0,
-          2,
-        ),
-        measureHierarchy,
-      }),
+      buildTreeFromRecords(
+        [
+          {
+            col1: 'C1',
+            col2: 'C2',
+            grossRevenue: 10,
+            'grossRevenue__1 year ago': 8,
+            netRevenue: 12,
+            'netRevenue__1 year ago': 9,
+          },
+        ],
+        [metricKey, secondaryMetric],
+        [],
+        ['col1', 'col2'],
+        0,
+        2,
+      ),
       measureHierarchy,
       MetricsLayoutEnum.COLUMNS,
       [],
@@ -272,26 +265,23 @@ describe('PivotTableChart measure leaf tier indentation', () => {
       leafTierVisibility: 'visible' as const,
     };
     const tree = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({
-        tree: buildTreeFromRecords(
-          [
-            {
-              row1: 'R1',
-              row2: 'R2',
-              grossRevenue: 10,
-              'grossRevenue__1 year ago': 8,
-              netRevenue: 12,
-              'netRevenue__1 year ago': 9,
-            },
-          ],
-          [metricKey, secondaryMetric],
-          ['row1', 'row2'],
-          [],
-          2,
-          0,
-        ),
-        measureHierarchy,
-      }),
+      buildTreeFromRecords(
+        [
+          {
+            row1: 'R1',
+            row2: 'R2',
+            grossRevenue: 10,
+            'grossRevenue__1 year ago': 8,
+            netRevenue: 12,
+            'netRevenue__1 year ago': 9,
+          },
+        ],
+        [metricKey, secondaryMetric],
+        ['row1', 'row2'],
+        [],
+        2,
+        0,
+      ),
       measureHierarchy,
       MetricsLayoutEnum.ROWS,
       ['row1', 'row2'],
@@ -360,26 +350,23 @@ describe('PivotTableChart measure leaf tier indentation', () => {
       leafTierVisibility: 'visible' as const,
     };
     const tree = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({
-        tree: buildTreeFromRecords(
-          [
-            {
-              row1: 'R1',
-              col1: 'C1',
-              grossRevenue: 10,
-              'grossRevenue__1 year ago': 8,
-              netRevenue: 12,
-              'netRevenue__1 year ago': 9,
-            },
-          ],
-          [metricKey, secondaryMetric],
-          ['row1'],
-          ['col1'],
-          1,
-          1,
-        ),
-        measureHierarchy,
-      }),
+      buildTreeFromRecords(
+        [
+          {
+            row1: 'R1',
+            col1: 'C1',
+            grossRevenue: 10,
+            'grossRevenue__1 year ago': 8,
+            netRevenue: 12,
+            'netRevenue__1 year ago': 9,
+          },
+        ],
+        [metricKey, secondaryMetric],
+        ['row1'],
+        ['col1'],
+        1,
+        1,
+      ),
       measureHierarchy,
       MetricsLayoutEnum.COLUMNS,
       ['row1'],
@@ -452,26 +439,23 @@ describe('PivotTableChart measure leaf tier indentation', () => {
       leafTierVisibility: 'visible' as const,
     };
     const tree = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({
-        tree: buildTreeFromRecords(
-          [
-            {
-              row1: 'R1',
-              col1: 'C1',
-              grossRevenue: 10,
-              'grossRevenue__1 year ago': 8,
-              netRevenue: 12,
-              'netRevenue__1 year ago': 9,
-            },
-          ],
-          [metricKey, secondaryMetric],
-          ['row1'],
-          ['col1'],
-          1,
-          1,
-        ),
-        measureHierarchy,
-      }),
+      buildTreeFromRecords(
+        [
+          {
+            row1: 'R1',
+            col1: 'C1',
+            grossRevenue: 10,
+            'grossRevenue__1 year ago': 8,
+            netRevenue: 12,
+            'netRevenue__1 year ago': 9,
+          },
+        ],
+        [metricKey, secondaryMetric],
+        ['row1'],
+        ['col1'],
+        1,
+        1,
+      ),
       measureHierarchy,
       MetricsLayoutEnum.ROWS,
       ['row1'],
@@ -545,24 +529,21 @@ describe('PivotTableChart measure leaf tier indentation', () => {
       initialDepth: 2,
     };
     const tree = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({
-        tree: buildTreeFromRecords(
-          [
-            {
-              col1: 'C1',
-              col2: 'C2',
-              grossRevenue: 10,
-              'grossRevenue__1 year ago': 8,
-            },
-          ],
-          [metricKey],
-          [],
-          ['col1', 'col2'],
-          0,
-          1,
-        ),
-        measureHierarchy,
-      }),
+      buildTreeFromRecords(
+        [
+          {
+            col1: 'C1',
+            col2: 'C2',
+            grossRevenue: 10,
+            'grossRevenue__1 year ago': 8,
+          },
+        ],
+        [metricKey],
+        [],
+        ['col1', 'col2'],
+        0,
+        1,
+      ),
       measureHierarchy,
       MetricsLayoutEnum.COLUMNS,
       [],
@@ -627,23 +608,20 @@ describe('PivotTableChart measure leaf tier indentation', () => {
       initialDepth: 1,
     };
     const tree = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({
-        tree: buildTreeFromRecords(
-          [
-            {
-              col1: 'C1',
-              grossRevenue: 10,
-              'grossRevenue__1 year ago': 8,
-            },
-          ],
-          [metricKey],
-          [],
-          ['col1'],
-          0,
-          1,
-        ),
-        measureHierarchy,
-      }),
+      buildTreeFromRecords(
+        [
+          {
+            col1: 'C1',
+            grossRevenue: 10,
+            'grossRevenue__1 year ago': 8,
+          },
+        ],
+        [metricKey],
+        [],
+        ['col1'],
+        0,
+        1,
+      ),
       measureHierarchy,
       MetricsLayoutEnum.COLUMNS,
       [],
@@ -698,24 +676,21 @@ describe('PivotTableChart measure leaf tier indentation', () => {
       initialDepth: 1,
     };
     const tree = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({
-        tree: buildTreeFromRecords(
-          [
-            {
-              row1: 'R1',
-              col1: 'C1',
-              grossRevenue: 10,
-              'grossRevenue__1 year ago': 8,
-            },
-          ],
-          [metricKey],
-          ['row1'],
-          ['col1'],
-          1,
-          1,
-        ),
-        measureHierarchy,
-      }),
+      buildTreeFromRecords(
+        [
+          {
+            row1: 'R1',
+            col1: 'C1',
+            grossRevenue: 10,
+            'grossRevenue__1 year ago': 8,
+          },
+        ],
+        [metricKey],
+        ['row1'],
+        ['col1'],
+        1,
+        1,
+      ),
       measureHierarchy,
       MetricsLayoutEnum.COLUMNS,
       ['row1'],
@@ -770,24 +745,21 @@ describe('PivotTableChart measure leaf tier indentation', () => {
       initialDepth: 2,
     };
     const tree = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({
-        tree: buildTreeFromRecords(
-          [
-            {
-              row1: 'R1',
-              row2: 'R2',
-              grossRevenue: 10,
-              'grossRevenue__1 year ago': 8,
-            },
-          ],
-          [metricKey],
-          ['row1', 'row2'],
-          [],
-          1,
-          0,
-        ),
-        measureHierarchy,
-      }),
+      buildTreeFromRecords(
+        [
+          {
+            row1: 'R1',
+            row2: 'R2',
+            grossRevenue: 10,
+            'grossRevenue__1 year ago': 8,
+          },
+        ],
+        [metricKey],
+        ['row1', 'row2'],
+        [],
+        1,
+        0,
+      ),
       measureHierarchy,
       MetricsLayoutEnum.ROWS,
       ['row1', 'row2'],
@@ -856,24 +828,21 @@ describe('PivotTableChart measure leaf tier indentation', () => {
       leafTierVisibility: 'visible' as const,
     };
     const tree = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({
-        tree: buildTreeFromRecords(
-          [
-            {
-              shipMode: 'AIR',
-              grossRevenue: 10,
-              'grossRevenue__1 year ago': 8,
-              averageOrderValue: 2,
-            },
-          ],
-          [grossMetric, avgMetric],
-          ['shipMode'],
-          ['revenueBand', 'quantityBand'],
-          1,
-          0,
-        ),
-        measureHierarchy,
-      }),
+      buildTreeFromRecords(
+        [
+          {
+            shipMode: 'AIR',
+            grossRevenue: 10,
+            'grossRevenue__1 year ago': 8,
+            averageOrderValue: 2,
+          },
+        ],
+        [grossMetric, avgMetric],
+        ['shipMode'],
+        ['revenueBand', 'quantityBand'],
+        1,
+        0,
+      ),
       measureHierarchy,
       MetricsLayoutEnum.COLUMNS,
       ['shipMode'],
@@ -928,24 +897,21 @@ describe('PivotTableChart measure leaf tier indentation', () => {
       leafTierVisibility: 'visible' as const,
     };
     const tree = applyMeasureHierarchyAxis(
-      applyMeasureLeafValuesToTree({
-        tree: buildTreeFromRecords(
-          [
-            {
-              orderPriority: '1-URGENT',
-              shipMode: 'AIR',
-              grossRevenue: 10,
-              'grossRevenue__1 year ago': 8,
-            },
-          ],
-          [metricKey],
-          ['orderPriority', 'shipMode'],
-          [],
-          2,
-          0,
-        ),
-        measureHierarchy,
-      }),
+      buildTreeFromRecords(
+        [
+          {
+            orderPriority: '1-URGENT',
+            shipMode: 'AIR',
+            grossRevenue: 10,
+            'grossRevenue__1 year ago': 8,
+          },
+        ],
+        [metricKey],
+        ['orderPriority', 'shipMode'],
+        [],
+        2,
+        0,
+      ),
       measureHierarchy,
       MetricsLayoutEnum.ROWS,
       ['orderPriority', 'shipMode'],
