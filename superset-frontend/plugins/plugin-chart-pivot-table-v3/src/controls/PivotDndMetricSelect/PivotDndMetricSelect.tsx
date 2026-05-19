@@ -210,9 +210,6 @@ const resolveMetricLabel = (
   return t('Metric');
 };
 
-const resolveMetricKey = (option: ValueType) =>
-  getMetricKey(option as QueryFormMetric | Metric);
-
 const resolveMetricReferenceKey = (metric?: QueryFormMetric) => {
   if (!metric) {
     return undefined;
@@ -500,7 +497,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
   const metricKeys = useMemo(
     () =>
       value
-        .map(metric => resolveMetricKey(metric))
+        .map(metric => getMetricKey(metric as QueryFormMetric | Metric))
         .filter((key): key is string => Boolean(key)),
     [value],
   );
@@ -587,7 +584,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
       return null;
     }
     const metric = value[dragIndex];
-    return metric ? resolveMetricKey(metric) : null;
+    return metric ? getMetricKey(metric as QueryFormMetric | Metric) : null;
   }, [dragItem, dragItemType, metricRowType, value]);
 
   const updateMeasureLeaves = useCallback(
@@ -627,7 +624,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
         })
         .filter(option => option);
       const nextMetricKeys = optionValues
-        .map(option => resolveMetricKey(option as ValueType))
+        .map(option => getMetricKey(option as QueryFormMetric | Metric))
         .filter((key): key is string => Boolean(key));
       const nextLeaves = coerceMeasureLeavesByMetric(
         nextMetricKeys,
@@ -1011,8 +1008,8 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
           setControlValue('metricDatabars', nextDatabars);
         }
       }
-      const oldKey = resolveMetricKey(oldMetric as ValueType);
-      const nextKey = resolveMetricKey(changedMetric as ValueType);
+      const oldKey = getMetricKey(oldMetric as QueryFormMetric | Metric);
+      const nextKey = getMetricKey(changedMetric as QueryFormMetric | Metric);
       if (oldKey && nextKey && oldKey !== nextKey) {
         const nextLeaves = { ...measureLeavesRef.current };
         if (nextLeaves[oldKey]) {
@@ -1147,7 +1144,7 @@ export default function PivotDndMetricSelect(props: PivotDndMetricSelectProps) {
   const valuesRenderer = useCallback(
     () =>
       value.flatMap((metric, index) => {
-        const metricKey = resolveMetricKey(metric);
+        const metricKey = getMetricKey(metric as QueryFormMetric | Metric);
         const metricLabel = resolveMetricLabel(metric, metricLabelMap);
         const baseRow = valueRenderer(metric, index);
         if (!metricKey) {

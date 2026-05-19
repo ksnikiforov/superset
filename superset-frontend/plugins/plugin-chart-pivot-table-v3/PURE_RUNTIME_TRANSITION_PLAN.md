@@ -290,8 +290,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13414` insertions, `17784` deletions, net `-4370`.
-- Current production TypeScript/TSX total: about `29140` lines.
+- Production `src`: `13420` insertions, `17793` deletions, net `-4373`.
+- Current production TypeScript/TSX total: about `29137` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -303,7 +303,7 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `29140` | `-4370` | `< 28000` |
+| Full production `src` | `33510` | `29137` | `-4373` | `< 28000` |
 | Strict core pipeline | `11337` | `11853` | `+516` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5061` | `+378` | `3000-4000` |
 | Broad core pipeline | `16020` | `16914` | `+894` | `11000-13000` |
@@ -557,6 +557,10 @@ Latest control cleanup: metric rename repair now moves only the canonical
 metric key and rewrites references that resolve to that same key. The old
 control-side identifier set that treated labels, verbose names, metric names,
 and formatting aliases as interchangeable is removed.
+
+Latest control follow-up: `PivotDndMetricSelect` now calls canonical
+`getMetricKey` directly instead of carrying a local exact wrapper. This is a
+small control-only cleanup; strict core metrics are unchanged.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.
