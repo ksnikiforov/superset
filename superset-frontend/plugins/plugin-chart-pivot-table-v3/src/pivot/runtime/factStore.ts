@@ -210,3 +210,11 @@ export const createPivotFactStore = (): PivotFactStore => {
     hasCompatibleCoverage,
   };
 };
+
+export const createPivotFactStoreFromBatches = (
+  batches: PivotFactStoreBatch[],
+): PivotFactStore => {
+  const store = createPivotFactStore();
+  batches.forEach(store.upsertBatch);
+  return store;
+};

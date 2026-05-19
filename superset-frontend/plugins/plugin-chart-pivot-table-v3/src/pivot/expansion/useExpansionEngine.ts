@@ -50,7 +50,7 @@ import { stableStringify } from '../shared/stableStringify';
 import { type LayoutContext } from '../layout/LayoutContext';
 import type { PivotProgram } from '../runtime/types';
 import {
-  createPivotFactStore,
+  createPivotFactStoreFromBatches,
   type PivotFactStore,
   type PivotFactStoreBatch,
 } from '../runtime/factStore';
@@ -255,9 +255,7 @@ export const useExpansionEngine = ({
   const treeRef = useRef(tree);
   const factStoreRef = useRef<PivotFactStore>();
   if (!factStoreRef.current) {
-    const store = createPivotFactStore();
-    factBatches.forEach(store.upsertBatch);
-    factStoreRef.current = store;
+    factStoreRef.current = createPivotFactStoreFromBatches(factBatches);
   }
   const [expandedByAxis, setExpandedByAxis] = useState<AxisSetMap>(() => ({
     row: new Set(),
@@ -715,9 +713,7 @@ export const useExpansionEngine = ({
       shouldResetExpandedRows || shouldResetExpandedCols;
 
     expansionRequestLifecycle.invalidate();
-    const nextFactStore = createPivotFactStore();
-    factBatches.forEach(nextFactStore.upsertBatch);
-    factStoreRef.current = nextFactStore;
+    factStoreRef.current = createPivotFactStoreFromBatches(factBatches);
     setHydratingState(false);
     warningsRef.current = new Map();
     setWarnings([]);

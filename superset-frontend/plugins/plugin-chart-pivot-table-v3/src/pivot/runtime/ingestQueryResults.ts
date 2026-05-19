@@ -34,6 +34,7 @@ import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import { type PivotFactCoverage } from './types';
 import {
   createPivotFactStore,
+  createPivotFactStoreFromBatches,
   type PivotFact,
   type PivotFactStoreBatch,
   type PivotFactStore,
@@ -298,10 +299,10 @@ const upsertIngestedFactsIntoStore = ({
 }: {
   store: PivotFactStore;
   ingested: Array<IngestedQueryResult<QueryResultWithData>>;
-}): PivotFactStoreBatch[] => {
-  const batches = ingested.map(factStoreBatchFromIngested);
-  batches.forEach(store.upsertBatch);
-  return batches;
+}) => {
+  ingested.forEach(batch =>
+    store.upsertBatch(factStoreBatchFromIngested(batch)),
+  );
 };
 
 export const fetchPlannedQuerySpecs = async ({
@@ -378,14 +379,6 @@ const upsertFactBatchIntoStoreAsync = async ({
   }
 };
 
-const buildFactStore = (
-  batches: IngestedQueryResult<QueryResultWithData>[],
-) => {
-  const store = createPivotFactStore();
-  upsertIngestedFactsIntoStore({ store, ingested: batches });
-  return store;
-};
-
 const buildFactStoreAsync = async ({
   ingested,
   chunkSize,
@@ -419,9 +412,10 @@ export const buildInitialRuntimeFromSpecResults = ({
   layout: LayoutContext;
   formData: PivotTableQueryFormData;
 }): { tree: PivotTreeData; factBatches: PivotFactStoreBatch[] } => {
-  const ingested = ingestQueryResults({ specs, results });
-  const store = buildFactStore(ingested);
-  const factBatches = ingested.map(factStoreBatchFromIngested);
+  const factBatches = ingestQueryResults({ specs, results }).map(
+    factStoreBatchFromIngested,
+  );
+  const store = createPivotFactStoreFromBatches(factBatches);
   return {
     tree: materializeLoadedPivotTreeFromFactStore({
       store,
