@@ -290,8 +290,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13441` insertions, `17795` deletions, net `-4354`.
-- Current production TypeScript/TSX total: about `29156` lines.
+- Production `src`: `13434` insertions, `17801` deletions, net `-4367`.
+- Current production TypeScript/TSX total: about `29143` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -303,18 +303,18 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `29156` | `-4354` | `< 28000` |
-| Strict core pipeline | `11337` | `11872` | `+535` | `8000` |
+| Full production `src` | `33510` | `29143` | `-4367` | `< 28000` |
+| Strict core pipeline | `11337` | `11859` | `+522` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `5061` | `+378` | `3000-4000` |
-| Broad core pipeline | `16020` | `16933` | `+913` | `11000-13000` |
+| Broad core pipeline | `16020` | `16920` | `+900` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
 | `pivot/runtime/*` | `3886` |
-| `pivot/expansion/*` | `2793` |
-| `pivot/query/*` | `1433` |
+| `pivot/expansion/*` | `2801` |
+| `pivot/query/*` | `1412` |
 | `pivot/layout/*` | `770` |
 | core/shared/domain helpers | `1779` |
 | formatting/data/render-model/update support | `1211` |
@@ -575,9 +575,15 @@ coverage target through fetch execution into `query/specs.ts`. Query specs no
 longer recompute branch query dimensions from raw rendered paths when a
 planner target already exists, and expansion query requests now require that
 compiled target at the runtime boundary. This keeps query planning downstream
-of the manifest rather than another expansion-target compiler. Source metrics
-are unchanged from the previous line-positive ownership slice; this cut spends
-that authority without growing production `src`.
+of the manifest rather than another expansion-target compiler. That slice spent
+the previous line-positive ownership move without growing production `src`.
+
+Latest compiled-target cleanup: branch query-spec construction now derives
+axis, path, and suffix identity from the compiled `coverageTarget` instead of
+accepting duplicate `axis`/`path` request fields. Production expansion
+execution also stopped sending visible row/column depths to query-spec
+requests; visible depths remain scheduler/grouping input, while query specs
+consume the compiled manifest target.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.

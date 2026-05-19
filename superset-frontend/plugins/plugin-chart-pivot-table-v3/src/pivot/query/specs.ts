@@ -48,7 +48,7 @@ import {
   hasTotalSorting,
   mergeMetrics,
 } from '../../utils';
-import { serializePath, parsePath } from '../core/path';
+import { parsePath } from '../core/path';
 import {
   buildLayoutContext,
   type LayoutContext,
@@ -854,11 +854,7 @@ export type ExpansionQuerySpecRequest =
       kind: 'branch';
       formData: PivotTableQueryFormData;
       layout: LayoutContext;
-      axis: PivotAxis;
-      path: PivotPath;
       coverageTarget: ExpansionCoverageTarget;
-      visibleRowDepth?: number;
-      visibleColDepth?: number;
     }
   | {
       kind: 'batch';
@@ -866,8 +862,6 @@ export type ExpansionQuerySpecRequest =
       layout: LayoutContext;
       batch: BatchGroup;
       coverageTarget: ExpansionCoverageTarget;
-      visibleRowDepth: number;
-      visibleColDepth: number;
       chunkIndex?: number;
       representativePath?: PivotPath;
     }
@@ -878,33 +872,34 @@ export type ExpansionQuerySpecRequest =
       rowPathKeys: string[];
       columnPathKeys: string[];
       coverageTarget: ExpansionCoverageTarget;
-      visibleRowDepth: number;
-      visibleColDepth: number;
     };
 
 export const buildExpansionQuerySpecs = (
   request: ExpansionQuerySpecRequest,
 ): PlannedQuerySpec[] => {
   if (request.kind === 'branch') {
+    const { coverageTarget } = request;
+    const { axis } = coverageTarget;
+    const path = parsePath(coverageTarget.pathKey);
     return buildAxisExpansionSpecs({
       ...request,
-      coverageTarget: request.coverageTarget,
+      axis,
+      path,
+      coverageTarget,
       filters: ctx =>
         buildPathFilters(
-          request.axis === 'row'
-            ? ctx.rowGroupbyForQuery
-            : ctx.colGroupbyForQuery,
+          axis === 'row' ? ctx.rowGroupbyForQuery : ctx.colGroupbyForQuery,
           ctx.sanitizedPath,
           request.formData.colTypeMap,
         ),
-      suffix: `|branch:${request.axis}:${serializePath(request.path)}`,
+      suffix: `|branch:${axis}:${coverageTarget.pathKey}`,
       scope: {
         kind: 'branch',
-        axis: request.axis,
+        axis,
         path: projectQueryFilterPath({
           layout: request.layout,
-          axis: request.axis,
-          path: request.path,
+          axis,
+          path,
         }),
       },
     });
