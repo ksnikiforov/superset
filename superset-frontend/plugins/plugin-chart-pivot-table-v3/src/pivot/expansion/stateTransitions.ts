@@ -633,7 +633,14 @@ export const buildCrossAxisIntersectionTargets = ({
     columnPathKeys,
   });
   return getMissingExpansionCoverage([intersectionTarget]).length > 0
-    ? [{ kind: 'intersection', rowPathKeys, columnPathKeys }]
+    ? [
+        {
+          kind: 'intersection',
+          rowPathKeys,
+          columnPathKeys,
+          coverageTarget: intersectionTarget,
+        },
+      ]
     : [];
 };
 

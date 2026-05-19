@@ -545,6 +545,13 @@ describe('branch fact coverage', () => {
         path: ['US', encodeMetricKey('sales'), 'Boston'],
         visibleRowDepth: axis === 'row' ? 2 : 0,
         visibleColDepth: axis === 'col' ? 2 : 0,
+        coverageTarget: buildAxisExpansionCoverageTarget({
+          program,
+          axis,
+          pathKey: serializePath(['US', encodeMetricKey('sales'), 'Boston']),
+          rowDepth: axis === 'row' ? 2 : 0,
+          columnDepth: axis === 'col' ? 2 : 0,
+        }),
       }).map(spec => spec.meta.coverage);
 
       expect(projection.filterDimensionPath).toEqual(['US']);

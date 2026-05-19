@@ -24,7 +24,10 @@ import {
   formatQueryName,
 } from '../../../src/pivot/query/specs';
 import { serializePath } from '../../../src/pivot/core/path';
-import { type BatchGroup } from '../../../src/pivot/expansion/planner';
+import {
+  buildAxisExpansionCoverageTarget,
+  type BatchGroup,
+} from '../../../src/pivot/expansion/planner';
 import { buildFormData } from '../fixtures/pivotFormData';
 
 type FilterClause = {
@@ -41,6 +44,27 @@ const assertColumnsUseRawSqlOutput = (columns: unknown[]) => {
     expect(typeof column).toBe('string');
   });
 };
+
+const coverageTarget = ({
+  layout,
+  axis,
+  path,
+  visibleRowDepth,
+  visibleColDepth,
+}: {
+  layout: ReturnType<typeof buildLayoutContext>;
+  axis: 'row' | 'col';
+  path: unknown[];
+  visibleRowDepth: number;
+  visibleColDepth: number;
+}) =>
+  buildAxisExpansionCoverageTarget({
+    program: layout.pivotProgram,
+    axis,
+    pathKey: serializePath(path),
+    rowDepth: visibleRowDepth,
+    columnDepth: visibleColDepth,
+  });
 
 describe('temporal branch query specs contract', () => {
   it('buildExpansionQuerySpecs keeps temporal equality filters backend-safe', () => {
@@ -73,6 +97,13 @@ describe('temporal branch query specs contract', () => {
       path,
       visibleRowDepth: 1,
       visibleColDepth: 0,
+      coverageTarget: coverageTarget({
+        layout,
+        axis: 'row',
+        path,
+        visibleRowDepth: 1,
+        visibleColDepth: 0,
+      }),
     });
 
     expect(specs.length).toBeGreaterThan(0);
@@ -140,6 +171,13 @@ describe('temporal branch query specs contract', () => {
       batch,
       visibleRowDepth: 0,
       visibleColDepth: 0,
+      coverageTarget: coverageTarget({
+        layout,
+        axis: 'row',
+        path: ['1483228800000'],
+        visibleRowDepth: 0,
+        visibleColDepth: 0,
+      }),
     });
 
     expect(specs.length).toBeGreaterThan(0);

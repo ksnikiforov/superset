@@ -570,6 +570,15 @@ diffing. This is intentionally not a legacy wrapper, but it is line-positive
 for strict core because expansion now owns the target compiler. The next core
 slice must spend this by deleting duplicated expansion/query planning branches.
 
+Latest query-target payoff: expansion fetch targets now carry the compiled
+coverage target through fetch execution into `query/specs.ts`. Query specs no
+longer recompute branch query dimensions from raw rendered paths when a
+planner target already exists, and expansion query requests now require that
+compiled target at the runtime boundary. This keeps query planning downstream
+of the manifest rather than another expansion-target compiler. Source metrics
+are unchanged from the previous line-positive ownership slice; this cut spends
+that authority without growing production `src`.
+
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.
 Future work should remain high-impact-first while still deleting code where the

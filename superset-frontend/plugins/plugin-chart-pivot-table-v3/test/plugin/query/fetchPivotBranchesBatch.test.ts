@@ -21,7 +21,10 @@ import {
   fetchPivotExpansion,
   type FetchPivotExpansionRequest,
 } from '../../../src/pivot/expansion/fetchPivotExpansion';
-import { type BatchGroup } from '../../../src/pivot/expansion/planner';
+import {
+  buildAxisExpansionCoverageTarget,
+  type BatchGroup,
+} from '../../../src/pivot/expansion/planner';
 import { buildFormData } from '../fixtures/pivotFormData';
 import {
   encodeMetricKey,
@@ -84,11 +87,39 @@ const fetchBatch = (
     Extract<FetchPivotExpansionRequest, { kind: 'batch' }>,
     'kind' | 'layout'
   > & { currentTree?: PivotTreeData },
-) =>
-  fetchPivotExpansion({
+) => {
+  const layout = buildLayoutContext(params.formData);
+  return fetchPivotExpansion({
     kind: 'batch',
     ...params,
-    layout: buildLayoutContext(params.formData),
+    layout,
+    coverageTarget: buildAxisExpansionCoverageTarget({
+      program: layout.pivotProgram,
+      axis: params.batch.axis,
+      pathKey: params.batch.targets[0].pathKey,
+      rowDepth: params.visibleRowDepth,
+      columnDepth: params.visibleColDepth,
+    }),
+  });
+};
+
+const batchCoverageTarget = ({
+  layout,
+  batch,
+  visibleRowDepth,
+  visibleColDepth,
+}: {
+  layout: ReturnType<typeof buildLayoutContext>;
+  batch: BatchGroup;
+  visibleRowDepth: number;
+  visibleColDepth: number;
+}) =>
+  buildAxisExpansionCoverageTarget({
+    program: layout.pivotProgram,
+    axis: batch.axis,
+    pathKey: batch.targets[0].pathKey,
+    rowDepth: visibleRowDepth,
+    columnDepth: visibleColDepth,
   });
 
 describe('fetchBatch', () => {
@@ -271,6 +302,12 @@ describe('fetchBatch', () => {
       batch,
       visibleRowDepth: 2,
       visibleColDepth: 0,
+      coverageTarget: batchCoverageTarget({
+        layout,
+        batch,
+        visibleRowDepth: 2,
+        visibleColDepth: 0,
+      }),
     });
     expect(specs).toHaveLength(1);
 
@@ -351,6 +388,12 @@ describe('fetchBatch', () => {
       batch,
       visibleRowDepth: 2,
       visibleColDepth: 1,
+      coverageTarget: batchCoverageTarget({
+        layout,
+        batch,
+        visibleRowDepth: 2,
+        visibleColDepth: 1,
+      }),
     });
     expect(specs.length).toBeGreaterThan(1);
 

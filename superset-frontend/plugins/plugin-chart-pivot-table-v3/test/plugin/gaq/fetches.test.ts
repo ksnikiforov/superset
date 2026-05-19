@@ -27,7 +27,10 @@ import { serializePath } from '../../../src/pivot/core/path';
 import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
 import { type PivotTreeData, type PivotTreeNode } from '../../../src/types';
 import { buildFormData } from '../fixtures/pivotFormData';
-import { type BatchGroup } from '../../../src/pivot/expansion/planner';
+import {
+  buildAxisExpansionCoverageTarget,
+  type BatchGroup,
+} from '../../../src/pivot/expansion/planner';
 
 jest.mock('src/middleware/asyncEvent', () => ({
   waitForAsyncData: jest.fn(),
@@ -52,24 +55,42 @@ const fetchBranch = (
     Extract<FetchPivotExpansionRequest, { kind: 'branch' }>,
     'kind' | 'layout'
   > & { currentTree?: PivotTreeData },
-) =>
-  fetchPivotExpansion({
+) => {
+  const layout = buildLayoutContext(params.formData);
+  return fetchPivotExpansion({
     kind: 'branch',
     ...params,
-    layout: buildLayoutContext(params.formData),
+    layout,
+    coverageTarget: buildAxisExpansionCoverageTarget({
+      program: layout.pivotProgram,
+      axis: params.axis,
+      pathKey: serializePath(params.path),
+      rowDepth: params.visibleRowDepth ?? 0,
+      columnDepth: params.visibleColDepth ?? 0,
+    }),
   });
+};
 
 const fetchBatch = (
   params: Omit<
     Extract<FetchPivotExpansionRequest, { kind: 'batch' }>,
     'kind' | 'layout'
   > & { currentTree?: PivotTreeData },
-) =>
-  fetchPivotExpansion({
+) => {
+  const layout = buildLayoutContext(params.formData);
+  return fetchPivotExpansion({
     kind: 'batch',
     ...params,
-    layout: buildLayoutContext(params.formData),
+    layout,
+    coverageTarget: buildAxisExpansionCoverageTarget({
+      program: layout.pivotProgram,
+      axis: params.batch.axis,
+      pathKey: params.batch.targets[0].pathKey,
+      rowDepth: params.visibleRowDepth,
+      columnDepth: params.visibleColDepth,
+    }),
   });
+};
 
 const makeNode = (node: Partial<PivotTreeNode>): PivotTreeNode => ({
   axis: 'row',

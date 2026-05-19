@@ -332,6 +332,7 @@ export const fetchExpansionTargetDeltas = async ({
           kind: 'branch',
           axis: target.axis,
           path: parsePath(target.pathKey),
+          coverageTarget: target.coverageTarget,
           visibleRowDepth,
           visibleColDepth,
         },
@@ -353,6 +354,7 @@ export const fetchExpansionTargetDeltas = async ({
         request: {
           kind: 'batch',
           batch,
+          coverageTarget: batch.targets[0].coverageTarget,
           visibleRowDepth,
           visibleColDepth,
         },
@@ -384,6 +386,7 @@ export const fetchExpansionTargetDeltas = async ({
           kind: 'intersection',
           rowPathKeys: target.rowPathKeys,
           columnPathKeys: target.columnPathKeys,
+          coverageTarget: target.coverageTarget,
           visibleRowDepth,
           visibleColDepth,
         },

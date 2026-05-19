@@ -373,7 +373,12 @@ describe('pivot/expansion/stateTransitions', () => {
     if (plan.kind !== 'fetch') {
       throw new Error('Expected a fetch plan');
     }
-    expect(plan.targets).toEqual([
+    expect(
+      plan.targets.map(target => ({
+        axis: target.axis,
+        pathKey: target.pathKey,
+      })),
+    ).toEqual([
       {
         axis: 'row',
         pathKey: aKey,
@@ -415,7 +420,12 @@ describe('pivot/expansion/stateTransitions', () => {
       throw new Error('Expected a fetch plan');
     }
     expect(fetchPathKeys(plan.targets)).toEqual([aKey, xKey]);
-    expect(plan.targets).toEqual([
+    expect(
+      plan.targets.map(target => ({
+        axis: target.axis,
+        pathKey: target.pathKey,
+      })),
+    ).toEqual([
       {
         axis: 'row',
         pathKey: aKey,
@@ -474,7 +484,12 @@ describe('pivot/expansion/stateTransitions', () => {
     if (plan.kind !== 'fetch') {
       throw new Error('Expected a fetch plan');
     }
-    expect(plan.targets).toEqual([
+    expect(
+      plan.targets.map(target => ({
+        axis: target.axis,
+        pathKey: target.pathKey,
+      })),
+    ).toEqual([
       {
         axis: 'col',
         pathKey: xKey,

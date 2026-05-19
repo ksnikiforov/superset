@@ -29,6 +29,7 @@ import {
 import { serializePath } from '../../src/pivot/core/path';
 import { buildLayoutContext } from '../../src/pivot/layout/LayoutContext';
 import { buildFormData } from './fixtures/pivotFormData';
+import { buildAxisExpansionCoverageTarget } from '../../src/pivot/expansion/planner';
 
 jest.mock('@superset-ui/core', () => {
   const actual = jest.requireActual('@superset-ui/core');
@@ -58,12 +59,21 @@ const fetchBranch = (
     Extract<FetchPivotExpansionRequest, { kind: 'branch' }>,
     'kind' | 'layout'
   > & { currentTree?: PivotTreeData },
-) =>
-  fetchPivotExpansion({
+) => {
+  const layout = buildLayoutContext(params.formData);
+  return fetchPivotExpansion({
     kind: 'branch',
     ...params,
-    layout: buildLayoutContext(params.formData),
+    layout,
+    coverageTarget: buildAxisExpansionCoverageTarget({
+      program: layout.pivotProgram,
+      axis: params.axis,
+      pathKey: serializePath(params.path),
+      rowDepth: params.visibleRowDepth ?? 0,
+      columnDepth: params.visibleColDepth ?? 0,
+    }),
   });
+};
 
 const makeNode = (node: Partial<PivotTreeNode>): PivotTreeNode => ({
   axis: 'row',

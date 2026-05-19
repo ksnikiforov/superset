@@ -45,9 +45,27 @@ import type { PivotProgram } from '../runtime/types';
 import { stableStringify } from '../shared/stableStringify';
 import { rootKey } from '../viewModel';
 
+type PivotExpansionCoverageDepths = {
+  rowDepth: number;
+  columnDepth: number;
+};
+
+export type ExpansionCoverageTarget = {
+  axis: PivotAxis;
+  pathKey: string;
+  rowDepth: number;
+  columnDepth: number;
+  need: PivotCoverageNeed;
+};
+
+export type PivotExpansionCoverageDiff = (
+  targets: ExpansionCoverageTarget[],
+) => ExpansionCoverageTarget[];
+
 export type FetchTarget = {
   axis: PivotAxis;
   pathKey: string;
+  coverageTarget: ExpansionCoverageTarget;
 };
 
 export type BatchCandidate = FetchTarget & {
@@ -68,6 +86,7 @@ export type IntersectionFetchTarget = {
   kind: 'intersection';
   rowPathKeys: string[];
   columnPathKeys: string[];
+  coverageTarget: ExpansionCoverageTarget;
 };
 
 export type ExpansionFetchTarget = AxisFetchTarget | IntersectionFetchTarget;
@@ -80,23 +99,6 @@ export type PivotExpansionPlan = {
   targets: FetchTarget[];
   hasMissingNodes: boolean;
 };
-
-type PivotExpansionCoverageDepths = {
-  rowDepth: number;
-  columnDepth: number;
-};
-
-export type ExpansionCoverageTarget = {
-  axis: PivotAxis;
-  pathKey: string;
-  rowDepth: number;
-  columnDepth: number;
-  need: PivotCoverageNeed;
-};
-
-export type PivotExpansionCoverageDiff = (
-  targets: ExpansionCoverageTarget[],
-) => ExpansionCoverageTarget[];
 
 const targetKey = ({
   axis,
@@ -296,6 +298,9 @@ const buildGroupedFetchTargets = ({
   nodes: Record<string, PivotTreeNode>;
 }): FetchTarget[] => {
   const groups = new Map<string, string[]>();
+  const targetByPathKey = new Map(
+    targets.map(target => [target.pathKey, target]),
+  );
   targets.forEach(({ pathKey }) => {
     const groupKey = coverageKeyForPathKey(program, axis, pathKey);
     const existing = groups.get(groupKey);
@@ -319,6 +324,7 @@ const buildGroupedFetchTargets = ({
     fetchTargets.push({
       axis,
       pathKey: representative,
+      coverageTarget: targetByPathKey.get(representative) ?? targets[0],
     });
   }
 

@@ -26,7 +26,7 @@ import {
   type PivotFactStoreBatchScope,
   type PivotFactStoreBatch,
 } from '../../../src/pivot/runtime/factStore';
-import { parsePath } from '../../../src/pivot/core/path';
+import { parsePath, serializePath } from '../../../src/pivot/core/path';
 import {
   isMeasureLeafToken,
   isMetricToken,
@@ -36,6 +36,10 @@ import {
   buildExpansionQuerySpecs,
   type PlannedQuerySpec,
 } from '../../../src/pivot/query/specs';
+import {
+  buildAxisExpansionCoverageTarget,
+  buildIntersectionCoverageTarget,
+} from '../../../src/pivot/expansion/planner';
 import { type PivotFactCoverage } from '../../../src/pivot/runtime/types';
 import { type PivotPath, type PivotTreeData } from '../../../src/types';
 
@@ -179,6 +183,13 @@ export const buildMockBranchFactBatches = ({
     path,
     visibleRowDepth,
     visibleColDepth,
+    coverageTarget: buildAxisExpansionCoverageTarget({
+      program: layout.pivotProgram,
+      axis,
+      pathKey: serializePath(path),
+      rowDepth: visibleRowDepth,
+      columnDepth: visibleColDepth,
+    }),
   });
   return buildMockFactBatchesFromSpecs(specs, data);
 };
@@ -217,6 +228,13 @@ export const buildMockBatchFactBatches = ({
     batch,
     visibleRowDepth,
     visibleColDepth,
+    coverageTarget: buildAxisExpansionCoverageTarget({
+      program: layout.pivotProgram,
+      axis: batch.axis,
+      pathKey: batch.targets[0].pathKey,
+      rowDepth: visibleRowDepth,
+      columnDepth: visibleColDepth,
+    }),
   });
   return buildMockFactBatchesFromSpecs(specs, data);
 };
@@ -262,6 +280,13 @@ export const buildMockIntersectionFactBatches = ({
     columnPathKeys,
     visibleRowDepth,
     visibleColDepth,
+    coverageTarget: buildIntersectionCoverageTarget({
+      program: layout.pivotProgram,
+      rowPathKeys,
+      columnPathKeys,
+      rowDepth: visibleRowDepth,
+      columnDepth: visibleColDepth,
+    }),
   });
   return specs.length > 0
     ? buildMockFactBatchesFromSpecs(specs, data)

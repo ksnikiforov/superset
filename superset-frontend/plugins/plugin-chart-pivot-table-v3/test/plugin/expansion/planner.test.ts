@@ -103,12 +103,14 @@ describe('pivot/expansion/planner', () => {
     });
 
     expect(fetchPathKeys(plan)).toEqual([aKey]);
-    expect(plan.targets).toEqual([
-      {
+    expect(plan.targets[0]).toMatchObject({
+      axis: 'row',
+      pathKey: aKey,
+      coverageTarget: {
         axis: 'row',
         pathKey: aKey,
       },
-    ]);
+    });
   });
 
   it('plans fetches from semantic expandability instead of tree child shape', () => {
@@ -130,12 +132,14 @@ describe('pivot/expansion/planner', () => {
     });
 
     expect(fetchPathKeys(plan)).toEqual([aKey]);
-    expect(plan.targets).toEqual([
-      {
+    expect(plan.targets[0]).toMatchObject({
+      axis: 'row',
+      pathKey: aKey,
+      coverageTarget: {
         axis: 'row',
         pathKey: aKey,
       },
-    ]);
+    });
   });
 
   it('uses typed branch coverage to skip only the covered expanded path', () => {

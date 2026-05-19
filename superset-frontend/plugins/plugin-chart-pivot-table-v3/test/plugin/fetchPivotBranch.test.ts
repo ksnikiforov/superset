@@ -45,6 +45,7 @@ import {
   buildExpansionQuerySpecs,
   formatQueryName,
 } from '../../src/pivot/query/specs';
+import { buildAxisExpansionCoverageTarget } from '../../src/pivot/expansion/planner';
 import { createPivotFactStore } from '../../src/pivot/runtime/factStore';
 import { materializeLoadedPivotTreeFromFactStore } from '../../src/pivot/runtime/materializePivotTree';
 import { buildFormData } from './fixtures/pivotFormData';
@@ -85,12 +86,53 @@ const fetchBranch = (
     Extract<FetchPivotExpansionRequest, { kind: 'branch' }>,
     'kind' | 'layout'
   > & { currentTree?: PivotTreeData },
-) =>
-  fetchPivotExpansion({
+) => {
+  const layout = buildLayoutContext(params.formData);
+  return fetchPivotExpansion({
     kind: 'branch',
     ...params,
-    layout: buildLayoutContext(params.formData),
+    layout,
+    coverageTarget: buildAxisExpansionCoverageTarget({
+      program: layout.pivotProgram,
+      axis: params.axis,
+      pathKey: serializePath(params.path),
+      rowDepth: params.visibleRowDepth ?? 0,
+      columnDepth: params.visibleColDepth ?? 0,
+    }),
   });
+};
+
+const buildBranchSpecs = ({
+  formData,
+  axis,
+  path,
+  visibleRowDepth = 0,
+  visibleColDepth = 0,
+}: {
+  formData: FetchPivotExpansionRequest['formData'];
+  axis: 'row' | 'col';
+  path: FetchPivotExpansionRequest['path'];
+  visibleRowDepth?: number;
+  visibleColDepth?: number;
+}) => {
+  const layout = buildLayoutContext(formData);
+  return buildExpansionQuerySpecs({
+    kind: 'branch',
+    formData,
+    layout,
+    axis,
+    path,
+    visibleRowDepth,
+    visibleColDepth,
+    coverageTarget: buildAxisExpansionCoverageTarget({
+      program: layout.pivotProgram,
+      axis,
+      pathKey: serializePath(path),
+      rowDepth: visibleRowDepth,
+      columnDepth: visibleColDepth,
+    }),
+  });
+};
 
 const fetchPivotBranchTree = async (
   params: Parameters<typeof fetchBranch>[0],
@@ -120,10 +162,8 @@ describe('buildExpansionQuerySpecs', () => {
       metricsLayout: MetricsLayoutEnum.COLUMNS,
       rowSubTotals: false,
     } as any;
-    const specs = buildExpansionQuerySpecs({
-      kind: 'branch',
+    const specs = buildBranchSpecs({
       formData,
-      layout: buildLayoutContext(formData),
       axis: 'row',
       path: ['A'],
     });
@@ -140,10 +180,8 @@ describe('buildExpansionQuerySpecs', () => {
       metricsLayout: MetricsLayoutEnum.COLUMNS,
       rowSubTotals: false,
     } as any;
-    const specs = buildExpansionQuerySpecs({
-      kind: 'branch',
+    const specs = buildBranchSpecs({
       formData,
-      layout: buildLayoutContext(formData),
       axis: 'row',
       path: ['A'],
       visibleColDepth: 0,
@@ -160,10 +198,8 @@ describe('buildExpansionQuerySpecs', () => {
       metricsLayout: MetricsLayoutEnum.COLUMNS,
       rowSubTotals: false,
     } as any;
-    const specs = buildExpansionQuerySpecs({
-      kind: 'branch',
+    const specs = buildBranchSpecs({
       formData,
-      layout: buildLayoutContext(formData),
       axis: 'col',
       path: [encodeMetricKey('m1')],
       visibleRowDepth: 1,
@@ -179,10 +215,8 @@ describe('buildExpansionQuerySpecs', () => {
       metrics: ['m1'],
       rowSubTotals: false,
     } as any;
-    const specs = buildExpansionQuerySpecs({
-      kind: 'branch',
+    const specs = buildBranchSpecs({
       formData,
-      layout: buildLayoutContext(formData),
       axis: 'col',
       path: ['C'],
     });
@@ -1493,11 +1527,8 @@ describe('fetchBranch delta-only contract', () => {
       datasource: '1__table',
       viz_type: 'pivot_table_v3',
     });
-    const layout = buildLayoutContext(formData);
-    const specs = buildExpansionQuerySpecs({
-      kind: 'branch',
+    const specs = buildBranchSpecs({
       formData,
-      layout,
       axis: 'row',
       path: ['A'],
     });

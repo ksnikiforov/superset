@@ -25,8 +25,32 @@ import {
 } from '../../../src/pivot/core/tokens';
 import { MetricsLayoutEnum } from '../../../src/types';
 import { serializePath } from '../../../src/pivot/core/path';
-import { type BatchGroup } from '../../../src/pivot/expansion/planner';
+import {
+  buildAxisExpansionCoverageTarget,
+  type BatchGroup,
+} from '../../../src/pivot/expansion/planner';
 import { buildFormData } from '../fixtures/pivotFormData';
+
+const coverageTarget = ({
+  layout,
+  axis,
+  path,
+  visibleRowDepth,
+  visibleColDepth,
+}: {
+  layout: ReturnType<typeof buildLayoutContext>;
+  axis: 'row' | 'col';
+  path: unknown[];
+  visibleRowDepth: number;
+  visibleColDepth: number;
+}) =>
+  buildAxisExpansionCoverageTarget({
+    program: layout.pivotProgram,
+    axis,
+    pathKey: serializePath(path),
+    rowDepth: visibleRowDepth,
+    columnDepth: visibleColDepth,
+  });
 
 describe('runtime coverage query specs contract', () => {
   it('records branch fact coverage and uses it for query columns', () => {
@@ -48,6 +72,13 @@ describe('runtime coverage query specs contract', () => {
       path: ['US'],
       visibleRowDepth: 1,
       visibleColDepth: 1,
+      coverageTarget: coverageTarget({
+        layout,
+        axis: 'row',
+        path: ['US'],
+        visibleRowDepth: 1,
+        visibleColDepth: 1,
+      }),
     });
 
     expect(specs.length).toBeGreaterThan(0);
@@ -82,6 +113,13 @@ describe('runtime coverage query specs contract', () => {
       path: ['Furniture'],
       visibleRowDepth: 0,
       visibleColDepth: 1,
+      coverageTarget: coverageTarget({
+        layout,
+        axis: 'col',
+        path: ['Furniture'],
+        visibleRowDepth: 0,
+        visibleColDepth: 1,
+      }),
     });
 
     expect(specs).toEqual([]);
@@ -107,6 +145,13 @@ describe('runtime coverage query specs contract', () => {
       path,
       visibleRowDepth: 0,
       visibleColDepth: 1,
+      coverageTarget: coverageTarget({
+        layout,
+        axis: 'col',
+        path,
+        visibleRowDepth: 0,
+        visibleColDepth: 1,
+      }),
     });
 
     expect(specs.length).toBeGreaterThan(0);
@@ -141,6 +186,13 @@ describe('runtime coverage query specs contract', () => {
       path: ['US', SUBTOTAL_TOKEN],
       visibleRowDepth: 2,
       visibleColDepth: 0,
+      coverageTarget: coverageTarget({
+        layout,
+        axis: 'row',
+        path: ['US', SUBTOTAL_TOKEN],
+        visibleRowDepth: 2,
+        visibleColDepth: 0,
+      }),
     });
 
     expect(specs).toEqual([]);
@@ -182,6 +234,13 @@ describe('runtime coverage query specs contract', () => {
       batch,
       visibleRowDepth: 1,
       visibleColDepth: 0,
+      coverageTarget: coverageTarget({
+        layout,
+        axis: 'row',
+        path: ['US'],
+        visibleRowDepth: 1,
+        visibleColDepth: 0,
+      }),
     });
 
     expect(specs).toEqual([]);
@@ -218,6 +277,13 @@ describe('runtime coverage query specs contract', () => {
       batch,
       visibleRowDepth: 2,
       visibleColDepth: 0,
+      coverageTarget: coverageTarget({
+        layout,
+        axis: 'row',
+        path: ['US', SUBTOTAL_TOKEN],
+        visibleRowDepth: 2,
+        visibleColDepth: 0,
+      }),
     });
 
     expect(specs).toEqual([]);
