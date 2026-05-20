@@ -1052,7 +1052,7 @@ export const applyMeasureHierarchyAxis = (
   });
 };
 
-const buildTreeFromFactBatch = ({
+const buildBatchTreeProjection = ({
   batch,
   formData,
   pivotProgram,
@@ -1068,77 +1068,72 @@ const buildTreeFromFactBatch = ({
   const { coverage } = batch;
   const rowFullDepth = pivotProgram.rowDimensions.length;
   const columnFullDepth = pivotProgram.columnDimensions.length;
-  let tree = buildTreeFromFacts({
+
+  return {
     facts: batch.facts,
     rowColumns: coverage.rowDimensions,
     columnColumns: coverage.columnDimensions,
     rowFullDepth,
     columnFullDepth,
     dateFormatters: formData.dateFormatters,
-  });
-  if (colSubtotalLevels.includes(coverage.columnDepth)) {
-    tree = injectColumnSubtotalLeaves(
-      tree,
-      coverage.columnDepth,
-      columnFullDepth,
-    );
-  }
-  rowSubtotalLevels
-    .filter(level => level > 0 && level <= coverage.rowDepth)
-    .forEach(depth => {
-      tree = injectRowSubtotalLeaves(tree, depth, rowFullDepth);
-    });
-  return tree;
+    rowSubtotalDepths: rowSubtotalLevels.filter(
+      level => level > 0 && level <= coverage.rowDepth,
+    ),
+    columnSubtotalDepth: colSubtotalLevels.includes(coverage.columnDepth)
+      ? coverage.columnDepth
+      : undefined,
+  };
 };
 
-const buildTreeFromFactBatchAsync = async ({
-  batch,
-  formData,
-  pivotProgram,
-  rowSubtotalLevels,
-  colSubtotalLevels,
-  chunkSize,
-  shouldContinue,
-  yieldToMain,
-}: {
-  batch: MaterializationFactBatch;
-  formData: PivotTableQueryFormData;
-  pivotProgram: PivotProgram;
-  rowSubtotalLevels: number[];
-  colSubtotalLevels: number[];
-} & ChunkedWorkOptions) => {
-  const { coverage } = batch;
-  const rowFullDepth = pivotProgram.rowDimensions.length;
-  const columnFullDepth = pivotProgram.columnDimensions.length;
-  let tree = await buildTreeFromFactsAsync({
-    facts: batch.facts,
-    rowColumns: coverage.rowDimensions,
-    columnColumns: coverage.columnDimensions,
-    rowFullDepth,
-    columnFullDepth,
-    dateFormatters: formData.dateFormatters,
+const applyBatchSubtotalLeaves = (
+  tree: PivotTreeData,
+  projection: ReturnType<typeof buildBatchTreeProjection>,
+) => {
+  let nextTree = tree;
+  if (projection.columnSubtotalDepth !== undefined) {
+    nextTree = injectColumnSubtotalLeaves(
+      nextTree,
+      projection.columnSubtotalDepth,
+      projection.columnFullDepth,
+    );
+  }
+  projection.rowSubtotalDepths.forEach(depth => {
+    nextTree = injectRowSubtotalLeaves(
+      nextTree,
+      depth,
+      projection.rowFullDepth,
+    );
+  });
+  return nextTree;
+};
+
+const buildTreeFromFactBatch = (
+  input: Parameters<typeof buildBatchTreeProjection>[0],
+) => {
+  const projection = buildBatchTreeProjection(input);
+  return applyBatchSubtotalLeaves(buildTreeFromFacts(projection), projection);
+};
+
+const buildTreeFromFactBatchAsync = async (
+  input: Parameters<typeof buildBatchTreeProjection>[0] & ChunkedWorkOptions,
+) => {
+  const { chunkSize, shouldContinue, yieldToMain } = input;
+  const projection = buildBatchTreeProjection(input);
+  const tree = await buildTreeFromFactsAsync({
+    ...projection,
     chunkSize,
     shouldContinue,
     yieldToMain,
   });
-  if (colSubtotalLevels.includes(coverage.columnDepth)) {
-    // eslint-disable-next-line no-await-in-loop
+  if (projection.columnSubtotalDepth !== undefined) {
     await yieldChunkedWork({ shouldContinue, yieldToMain });
-    tree = injectColumnSubtotalLeaves(
-      tree,
-      coverage.columnDepth,
-      columnFullDepth,
-    );
   }
-  for (const depth of rowSubtotalLevels.filter(
-    level => level > 0 && level <= coverage.rowDepth,
-  )) {
+  for (let idx = 0; idx < projection.rowSubtotalDepths.length; idx += 1) {
     // eslint-disable-next-line no-await-in-loop
     await yieldChunkedWork({ shouldContinue, yieldToMain });
-    tree = injectRowSubtotalLeaves(tree, depth, rowFullDepth);
   }
   assertChunkedWorkCurrent(shouldContinue);
-  return tree;
+  return applyBatchSubtotalLeaves(tree, projection);
 };
 
 const finalizeMaterializedTree = (

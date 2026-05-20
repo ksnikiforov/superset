@@ -95,16 +95,16 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `27143` | `-6367` | `< 28000` |
-| Strict core pipeline | `11337` | `10908` | `-429` | `8000` |
+| Full production `src` | `33510` | `27138` | `-6372` | `< 28000` |
+| Strict core pipeline | `11337` | `10903` | `-434` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4026` | `-657` | `3000-4000` |
-| Broad core pipeline | `16020` | `14934` | `-1086` | `11000-13000` |
+| Broad core pipeline | `16020` | `14929` | `-1091` | `11000-13000` |
 
 Strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `3570` |
+| `pivot/runtime/*` | `3565` |
 | `pivot/expansion/*` | `2135` |
 | `pivot/query/*` | `1367` |
 | `pivot/layout/*` | `739` |
@@ -134,6 +134,8 @@ Completed structural cuts:
 - Expansion layout transition planning now reports layout metadata only; loaded
   tree selection stays in the expansion engine.
 - Materialization is fact-store backed for initial and incremental paths.
+- Materialization batch projection now shares the subtotal injection plan between
+  sync and async paths instead of carrying separate coverage/subtotal branches.
 - Materialization no longer has a final root relabel wrapper; root labels are
   produced by tree construction/projection.
 - The legacy production `pivot/core/tree.ts` wrapper was removed; label
