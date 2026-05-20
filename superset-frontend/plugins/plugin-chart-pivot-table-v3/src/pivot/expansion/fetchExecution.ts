@@ -26,7 +26,6 @@ import {
   type LatestRequestScope,
   yieldToMainThread,
 } from '../runtime/requestLifecycle';
-import { stableStringify } from '../shared/stableStringify';
 import { planHydrationIteration } from './stateTransitions';
 import type { PivotProgram } from '../runtime/types';
 import { type ExpansionCoverageTarget } from './planner';
@@ -55,19 +54,6 @@ type HydrationFetchLoopParams = {
   fetchRuntime: ExpansionFetchRuntime;
 };
 
-const buildExpansionRequestGroupId = ({
-  runtime,
-  targets,
-}: {
-  runtime: ExpansionFetchRuntime;
-  targets: ExpansionCoverageTarget[];
-}) =>
-  stableStringify({
-    instanceId: runtime.instanceId,
-    transactionId: runtime.requestScope.id,
-    targets,
-  });
-
 const executeExpansionQueryTask = async ({
   targets,
   runtime,
@@ -76,7 +62,7 @@ const executeExpansionQueryTask = async ({
   runtime: ExpansionFetchRuntime;
 }): Promise<boolean> => {
   const { requestScope, addWarnings } = runtime;
-  const requestGroupId = buildExpansionRequestGroupId({ runtime, targets });
+  const requestGroupId = `${runtime.instanceId}:${requestScope.id}`;
   const token = requestScope.beginRequest(requestGroupId);
   try {
     const result = await fetchPivotExpansion({
@@ -94,15 +80,6 @@ const executeExpansionQueryTask = async ({
     return Boolean(result.didFetch);
   } finally {
     requestScope.finish(token);
-  }
-};
-
-const setPhaseLoadingKeys = (
-  runtime: ExpansionFetchRuntime,
-  loadingKeys: string[],
-) => {
-  if (runtime.requestScope.isCurrent()) {
-    runtime.setLoadingKeys(new Set(loadingKeys));
   }
 };
 
@@ -128,7 +105,9 @@ export const fetchExpansionTargetDeltas = async ({
   targets: ExpansionCoverageTarget[];
   runtime: ExpansionFetchRuntime;
 }): Promise<boolean> => {
-  setPhaseLoadingKeys(runtime, targets.flatMap(loadingKeysForTarget));
+  if (runtime.requestScope.isCurrent()) {
+    runtime.setLoadingKeys(new Set(targets.flatMap(loadingKeysForTarget)));
+  }
   const didFetch = await executeExpansionQueryTask({
     targets,
     runtime,
@@ -136,7 +115,7 @@ export const fetchExpansionTargetDeltas = async ({
   if (!runtime.requestScope.isCurrent()) {
     return false;
   }
-  setPhaseLoadingKeys(runtime, []);
+  runtime.setLoadingKeys(new Set());
   return didFetch;
 };
 

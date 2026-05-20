@@ -95,17 +95,17 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `27289` | `-6221` | `< 28000` |
-| Strict core pipeline | `11337` | `11062` | `-275` | `8000` |
+| Full production `src` | `33510` | `27268` | `-6242` | `< 28000` |
+| Strict core pipeline | `11337` | `11041` | `-296` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4024` | `-659` | `3000-4000` |
-| Broad core pipeline | `16020` | `15086` | `-934` | `11000-13000` |
+| Broad core pipeline | `16020` | `15065` | `-955` | `11000-13000` |
 
 Strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
 | `pivot/runtime/*` | `3571` |
-| `pivot/expansion/*` | `2260` |
+| `pivot/expansion/*` | `2239` |
 | `pivot/query/*` | `1395` |
 | `pivot/layout/*` | `739` |
 | `pivot/core/*` | `159` |
@@ -142,6 +142,8 @@ Completed structural cuts:
 - Expansion query specs now derive filter dimensions and anchor depth from the
   coverage target instead of passing a separate query-context callback through
   the planner.
+- Expansion fetch execution now uses the request lifecycle scope as the request
+  group identity instead of serializing target payloads into scheduler state.
 - Collapsed dimension state no longer suppresses visible metric-tier expansion
   keys, so metric rows can reopen under a collapsed parent without expanding the
   dimension children.
