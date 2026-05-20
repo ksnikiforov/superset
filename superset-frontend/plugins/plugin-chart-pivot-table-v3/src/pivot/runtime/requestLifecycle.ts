@@ -17,22 +17,15 @@
  * under the License.
  */
 
-export type LatestRequestToken = {
-  id: number;
-  requestGroupId: string;
-  isCurrent: () => boolean;
-};
-
 export type LatestRequestScope = {
   id: number;
-  beginRequest: (requestGroupId: string) => LatestRequestToken;
-  finish: (token: LatestRequestToken) => void;
+  beginRequest: (requestGroupId: string) => void;
+  finish: (requestGroupId: string) => void;
   isCurrent: () => boolean;
 };
 
 export type LatestRequestLifecycle = {
   beginScope: () => LatestRequestScope;
-  finish: (token: LatestRequestToken) => void;
   invalidate: () => number;
 };
 
@@ -59,39 +52,22 @@ export const createLatestRequestLifecycle = ({
   cancel,
 }: LatestRequestLifecycleOptions = {}): LatestRequestLifecycle => {
   let currentRequestId = 0;
-  const activeRequestGroupIds = new Map<string, Set<number>>();
+  const activeRequestGroupIds = new Map<string, number>();
 
   const cancelRequestGroup = (requestGroupId: string) => {
     cancel?.(requestGroupId);
   };
 
   const cancelActiveRequestGroups = () => {
-    activeRequestGroupIds.forEach((_ids, requestGroupId) => {
+    activeRequestGroupIds.forEach((_requestId, requestGroupId) => {
       cancelRequestGroup(requestGroupId);
     });
     activeRequestGroupIds.clear();
   };
 
-  const activateRequestGroup = ({
-    requestGroupId,
-    requestId,
-  }: {
-    requestGroupId: string;
-    requestId: number;
-  }) => {
-    const ids = activeRequestGroupIds.get(requestGroupId) ?? new Set<number>();
-    ids.add(requestId);
-    activeRequestGroupIds.set(requestGroupId, ids);
-  };
-
-  const finishToken = (token: LatestRequestToken) => {
-    const activeIds = activeRequestGroupIds.get(token.requestGroupId);
-    if (!activeIds) {
-      return;
-    }
-    activeIds.delete(token.id);
-    if (activeIds.size === 0) {
-      activeRequestGroupIds.delete(token.requestGroupId);
+  const finishRequestGroup = (requestId: number, requestGroupId: string) => {
+    if (activeRequestGroupIds.get(requestGroupId) === requestId) {
+      activeRequestGroupIds.delete(requestGroupId);
     }
   };
 
@@ -100,16 +76,12 @@ export const createLatestRequestLifecycle = ({
     beginRequest(requestGroupId: string) {
       if (activeRequestGroupIds.has(requestGroupId)) {
         cancelRequestGroup(requestGroupId);
-        activeRequestGroupIds.delete(requestGroupId);
       }
-      activateRequestGroup({ requestGroupId, requestId });
-      return {
-        id: requestId,
-        requestGroupId,
-        isCurrent: () => requestId === currentRequestId,
-      };
+      activeRequestGroupIds.set(requestGroupId, requestId);
     },
-    finish: finishToken,
+    finish(requestGroupId: string) {
+      finishRequestGroup(requestId, requestGroupId);
+    },
     isCurrent: () => requestId === currentRequestId,
   });
 
@@ -121,7 +93,6 @@ export const createLatestRequestLifecycle = ({
 
   return {
     beginScope,
-    finish: finishToken,
     invalidate() {
       currentRequestId += 1;
       cancelActiveRequestGroups();

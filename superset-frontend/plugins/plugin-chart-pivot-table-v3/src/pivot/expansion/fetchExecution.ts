@@ -37,7 +37,7 @@ export type ExpansionFetchRuntime = {
   fetchFormData: PivotTableQueryFormData;
   layout: LayoutContext;
   factStore: PivotFactStore;
-  materializeLoadedTree: () => PivotTreeData;
+  materializeLoadedTree: () => Promise<PivotTreeData>;
   addWarnings: (nextWarnings?: ChartDataWarning[]) => void;
   setLoadingKeys: (keys: Set<string>) => void;
 };
@@ -62,7 +62,7 @@ const executeExpansionQueryTask = async ({
 }): Promise<boolean> => {
   const { requestScope, addWarnings } = runtime;
   const requestGroupId = `${runtime.instanceId}:${requestScope.id}`;
-  const token = requestScope.beginRequest(requestGroupId);
+  requestScope.beginRequest(requestGroupId);
   try {
     const result = await fetchPivotExpansion({
       targets,
@@ -78,7 +78,7 @@ const executeExpansionQueryTask = async ({
     }
     return Boolean(result.didFetch);
   } finally {
-    requestScope.finish(token);
+    requestScope.finish(requestGroupId);
   }
 };
 
@@ -154,7 +154,10 @@ export const runHydrationExpansionFetchLoop = async ({
       targets: hydrationPlan.targets,
       runtime: fetchRuntime,
     });
-    currentTree = didFetch ? fetchRuntime.materializeLoadedTree() : currentTree;
+    if (didFetch) {
+      // eslint-disable-next-line no-await-in-loop
+      currentTree = await fetchRuntime.materializeLoadedTree();
+    }
     if (!fetchRuntime.requestScope.isCurrent()) {
       return { status: 'stale' as const };
     }

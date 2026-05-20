@@ -95,17 +95,17 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `27166` | `-6344` | `< 28000` |
-| Strict core pipeline | `11337` | `10945` | `-392` | `8000` |
+| Full production `src` | `33510` | `27143` | `-6367` | `< 28000` |
+| Strict core pipeline | `11337` | `10922` | `-415` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4018` | `-665` | `3000-4000` |
-| Broad core pipeline | `16020` | `14963` | `-1057` | `11000-13000` |
+| Broad core pipeline | `16020` | `14940` | `-1080` | `11000-13000` |
 
 Strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `3493` |
-| `pivot/expansion/*` | `2221` |
+| `pivot/runtime/*` | `3464` |
+| `pivot/expansion/*` | `2227` |
 | `pivot/query/*` | `1395` |
 | `pivot/layout/*` | `739` |
 | `pivot/core/*` | `159` |
@@ -151,6 +151,10 @@ Completed structural cuts:
 - Seamless runtime updates now use one latest-request scope across fetch and
   materialization; the duplicate materialization lifecycle and generic request
   wrapper were removed.
+- The latest-request lifecycle no longer exposes token objects or a top-level
+  finish API; request-group liveness is scope-owned.
+- Expansion hydration now rematerializes through the async materializer after
+  fetches, so large expansion result commits can yield like seamless updates.
 - Collapsed dimension state no longer suppresses visible metric-tier expansion
   keys, so metric rows can reopen under a collapsed parent without expanding the
   dimension children.

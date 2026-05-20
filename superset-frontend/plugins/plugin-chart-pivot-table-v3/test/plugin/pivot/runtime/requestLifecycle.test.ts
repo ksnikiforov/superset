@@ -26,8 +26,10 @@ describe('requestLifecycle', () => {
     const cancel = jest.fn();
     const lifecycle = createLatestRequestLifecycle({ cancel });
 
-    const first = lifecycle.beginScope().beginRequest('pivot-v3-seamless');
-    const second = lifecycle.beginScope().beginRequest('pivot-v3-seamless');
+    const first = lifecycle.beginScope();
+    first.beginRequest('pivot-v3-seamless');
+    const second = lifecycle.beginScope();
+    second.beginRequest('pivot-v3-seamless');
 
     expect(first.id).toBe(1);
     expect(second.id).toBe(2);
@@ -42,18 +44,15 @@ describe('requestLifecycle', () => {
     const lifecycle = createLatestRequestLifecycle({ cancel });
     const scope = lifecycle.beginScope();
 
-    const first = scope.beginRequest('branch:a');
-    const second = scope.beginRequest('batch:b');
+    scope.beginRequest('branch:a');
+    scope.beginRequest('batch:b');
 
-    expect(first.id).toBe(1);
-    expect(second.id).toBe(1);
-    expect(first.isCurrent()).toBe(true);
-    expect(second.isCurrent()).toBe(true);
+    expect(scope.id).toBe(1);
+    expect(scope.isCurrent()).toBe(true);
 
     lifecycle.invalidate();
 
-    expect(first.isCurrent()).toBe(false);
-    expect(second.isCurrent()).toBe(false);
+    expect(scope.isCurrent()).toBe(false);
     expect(cancel).toHaveBeenCalledTimes(2);
     expect(cancel).toHaveBeenCalledWith('branch:a');
     expect(cancel).toHaveBeenCalledWith('batch:b');
@@ -63,9 +62,9 @@ describe('requestLifecycle', () => {
     const cancel = jest.fn();
     const lifecycle = createLatestRequestLifecycle({ cancel });
     const scope = lifecycle.beginScope();
-    const token = scope.beginRequest('branch:a');
+    scope.beginRequest('branch:a');
 
-    scope.finish(token);
+    scope.finish('branch:a');
     scope.beginRequest('branch:a');
 
     expect(cancel).not.toHaveBeenCalled();
@@ -75,13 +74,11 @@ describe('requestLifecycle', () => {
     const lifecycle = createLatestRequestLifecycle();
 
     const firstScope = lifecycle.beginScope();
-    const first = firstScope.beginRequest('pivot-v3-seamless');
+    firstScope.beginRequest('pivot-v3-seamless');
     const secondScope = lifecycle.beginScope();
-    const second = secondScope.beginRequest('pivot-v3-seamless');
+    secondScope.beginRequest('pivot-v3-seamless');
 
-    expect(first.isCurrent()).toBe(false);
     expect(firstScope.isCurrent()).toBe(false);
-    expect(second.isCurrent()).toBe(true);
     expect(secondScope.isCurrent()).toBe(true);
   });
 
@@ -89,11 +86,11 @@ describe('requestLifecycle', () => {
     const cancel = jest.fn();
     const lifecycle = createLatestRequestLifecycle({ cancel });
     const firstScope = lifecycle.beginScope();
-    const first = firstScope.beginRequest('pivot-v3-seamless');
+    firstScope.beginRequest('pivot-v3-seamless');
     const secondScope = lifecycle.beginScope();
     secondScope.beginRequest('pivot-v3-seamless');
 
-    firstScope.finish(first);
+    firstScope.finish('pivot-v3-seamless');
     lifecycle.invalidate();
 
     expect(cancel).toHaveBeenCalledTimes(2);

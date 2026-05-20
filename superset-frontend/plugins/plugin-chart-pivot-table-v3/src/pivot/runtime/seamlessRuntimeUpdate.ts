@@ -381,7 +381,7 @@ export const fetchAndMaterializeSeamlessRuntimeUpdate = async ({
   });
   const factStore = createPivotFactStore();
   const requestScope = requestLifecycle.beginScope();
-  const token = requestScope.beginRequest(SEAMLESS_REQUEST_GROUP);
+  requestScope.beginRequest(SEAMLESS_REQUEST_GROUP);
 
   try {
     const { results } = await fetchPlannedQuerySpecs({
@@ -392,7 +392,7 @@ export const fetchAndMaterializeSeamlessRuntimeUpdate = async ({
       shouldContinue: requestScope.isCurrent,
       yieldToMain: yieldToMainThread,
     });
-    requestScope.finish(token);
+    requestScope.finish(SEAMLESS_REQUEST_GROUP);
     if (!requestScope.isCurrent()) {
       return { status: 'stale' as const };
     }
@@ -427,6 +427,6 @@ export const fetchAndMaterializeSeamlessRuntimeUpdate = async ({
       ? { status: 'aborted' as const, error }
       : { status: 'error' as const, error };
   } finally {
-    requestScope.finish(token);
+    requestScope.finish(SEAMLESS_REQUEST_GROUP);
   }
 };

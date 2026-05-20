@@ -64,8 +64,9 @@ import {
 import {
   createLatestRequestLifecycle,
   type LatestRequestScope,
+  yieldToMainThread,
 } from '../runtime/requestLifecycle';
-import { materializeLoadedPivotTreeFromFactStore } from '../runtime/materializePivotTree';
+import { materializeLoadedPivotTreeFromFactStoreAsync } from '../runtime/materializePivotTree';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import { getStableColumnKey } from '../../utils';
 
@@ -378,10 +379,12 @@ export const useExpansionEngine = ({
         layout: fetchLayout,
         factStore,
         materializeLoadedTree: () =>
-          materializeLoadedPivotTreeFromFactStore({
+          materializeLoadedPivotTreeFromFactStoreAsync({
             store: factStore,
             layout: fetchLayout,
             formData: fetchFormData,
+            shouldContinue: requestScope.isCurrent,
+            yieldToMain: yieldToMainThread,
           }),
         addWarnings,
         setLoadingKeys,
