@@ -160,53 +160,11 @@ type ResolveLayoutTransitionInput = {
   previousLayout: PivotLayoutKeyState;
   currentLayout: PivotLayoutKeyState;
   hasNewData: boolean;
-  program: PivotProgram;
 };
 
 export const isPrefix = (prefix: string[], target: string[]) =>
   prefix.length <= target.length &&
   prefix.every((value, idx) => value === target[idx]);
-
-function pruneTreeToStableLayout({
-  tree,
-  rowsChanged,
-  colsChanged,
-  rowStablePrefix,
-  colStablePrefix,
-  program,
-}: {
-  tree: PivotTreeData;
-  rowsChanged: boolean;
-  colsChanged: boolean;
-  rowStablePrefix: number;
-  colStablePrefix: number;
-  program: PivotProgram;
-}) {
-  const { countDimDepth } = createExpansionMetricPolicy(program);
-  const pruneNodes = (
-    nodes: Record<string, PivotTreeNode>,
-    stablePrefix: number,
-  ) =>
-    Object.fromEntries(
-      Object.entries(nodes).filter(
-        ([key, node]) =>
-          key === rootKey || countDimDepth(node.path) <= stablePrefix,
-      ),
-    );
-  const rows = rowsChanged ? pruneNodes(tree.rows, rowStablePrefix) : tree.rows;
-  const cols = colsChanged ? pruneNodes(tree.cols, colStablePrefix) : tree.cols;
-  const cells = Object.fromEntries(
-    Object.entries(tree.cells).filter(
-      ([, cell]) => rows[cell.rowKey] && cols[cell.colKey],
-    ),
-  );
-  return {
-    ...tree,
-    rows,
-    cols,
-    cells,
-  };
-}
 
 export const resolveLayoutTransition = ({
   data,
@@ -214,7 +172,6 @@ export const resolveLayoutTransition = ({
   previousLayout,
   currentLayout,
   hasNewData,
-  program,
 }: ResolveLayoutTransitionInput) => {
   const rowsChanged = !isSameLayout(previousLayout.rows, currentLayout.rows);
   const colsChanged = !isSameLayout(previousLayout.cols, currentLayout.cols);
@@ -232,17 +189,7 @@ export const resolveLayoutTransition = ({
     previousLayout.cols,
     currentLayout.cols,
   );
-  const sourceTree =
-    hasNewData || (!rowsChanged && !colsChanged)
-      ? data
-      : pruneTreeToStableLayout({
-          tree: currentTree,
-          rowsChanged,
-          colsChanged,
-          rowStablePrefix,
-          colStablePrefix,
-          program,
-        });
+  const sourceTree = hasNewData ? data : currentTree;
   return {
     rowsChanged,
     colsChanged,

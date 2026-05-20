@@ -501,7 +501,6 @@ export const useExpansionEngine = ({
       previousLayout,
       currentLayout,
       hasNewData,
-      program: pivotProgram,
     });
     const isInitialMount = previousSemanticSignature === null;
     const semanticSignatureChanged =

@@ -95,17 +95,17 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `27266` | `-6244` | `< 28000` |
-| Strict core pipeline | `11337` | `11031` | `-306` | `8000` |
+| Full production `src` | `33510` | `27212` | `-6298` | `< 28000` |
+| Strict core pipeline | `11337` | `10977` | `-360` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4026` | `-657` | `3000-4000` |
-| Broad core pipeline | `16020` | `15057` | `-963` | `11000-13000` |
+| Broad core pipeline | `16020` | `15003` | `-1017` | `11000-13000` |
 
 Strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
 | `pivot/runtime/*` | `3535` |
-| `pivot/expansion/*` | `2201` |
+| `pivot/expansion/*` | `2147` |
 | `pivot/query/*` | `1378` |
 | `pivot/layout/*` | `739` |
 | `pivot/core/*` | `252` |
@@ -126,6 +126,8 @@ Completed structural cuts:
 - Initial query planning fetches visible root coverage only.
 - Same-axis expansion, persisted expansion, and hydration share the same
   manifest executor.
+- Expansion layout transitions no longer locally prune/project tree shape; the
+  loaded tree stays intact and expansion state controls visibility.
 - Materialization is fact-store backed for initial and incremental paths.
 - Chart-owned metadata recovery and several render-policy adapters were
   removed.
