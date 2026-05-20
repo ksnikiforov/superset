@@ -39,10 +39,7 @@ import {
   type PivotFactStoreBatch,
   type PivotFactStore,
 } from './factStore';
-import {
-  materializeLoadedPivotTreeFromFactStore,
-  materializeLoadedPivotTreeFromFactStoreAsync,
-} from './materializePivotTree';
+import { materializeLoadedPivotTreeFromFactStore } from './materializePivotTree';
 import {
   assertChunkedWorkCurrent,
   type ChunkedWorkOptions,
@@ -289,17 +286,55 @@ const upsertIngestedFactsIntoStore = ({
   );
 };
 
+export const upsertQueryResultsIntoFactStoreAsync = async <
+  T extends QueryResultWithData,
+>({
+  store,
+  specs,
+  results,
+  chunkSize,
+  shouldContinue,
+  yieldToMain,
+}: {
+  store: PivotFactStore;
+  specs: PlannedQuerySpec[];
+  results: T[];
+} & ChunkedWorkOptions): Promise<PivotFactStoreBatch[]> => {
+  const ingested = await ingestQueryResultsAsync({
+    specs,
+    results,
+    chunkSize,
+    shouldContinue,
+    yieldToMain,
+  });
+  const factBatches = ingested.map(factStoreBatchFromIngested);
+  for (let idx = 0; idx < factBatches.length; idx += 1) {
+    // eslint-disable-next-line no-await-in-loop
+    await upsertFactBatchIntoStoreAsync({
+      store,
+      batch: factBatches[idx],
+      chunkSize,
+      shouldContinue,
+      yieldToMain,
+    });
+  }
+  return factBatches;
+};
+
 export const fetchPlannedQuerySpecs = async ({
   formData,
   specs,
   requestGroupId,
   factStore,
+  chunkSize,
+  shouldContinue,
+  yieldToMain,
 }: {
   formData: PivotTableQueryFormData;
   specs: PlannedQuerySpec[];
   requestGroupId?: string;
   factStore?: PivotFactStore;
-}): Promise<{ results: ChartDataQueryResult[] }> => {
+} & ChunkedWorkOptions): Promise<{ results: ChartDataQueryResult[] }> => {
   const factSelectors = factStore?.getCoverageSelectors() ?? [];
   const missingSpecs = specs.filter(
     spec =>
@@ -324,13 +359,24 @@ export const fetchPlannedQuerySpecs = async ({
     requestGroupId,
   });
   if (factStore) {
-    upsertIngestedFactsIntoStore({
-      store: factStore,
-      ingested: ingestQueryResults({
+    if (chunkSize !== undefined || shouldContinue || yieldToMain) {
+      await upsertQueryResultsIntoFactStoreAsync({
+        store: factStore,
         specs: missingSpecs,
         results,
-      }),
-    });
+        chunkSize,
+        shouldContinue,
+        yieldToMain,
+      });
+    } else {
+      upsertIngestedFactsIntoStore({
+        store: factStore,
+        ingested: ingestQueryResults({
+          specs: missingSpecs,
+          results,
+        }),
+      });
+    }
   }
   return { results };
 };
@@ -362,28 +408,6 @@ const upsertFactBatchIntoStoreAsync = async ({
   }
 };
 
-const buildFactStoreAsync = async ({
-  factBatches,
-  chunkSize,
-  shouldContinue,
-  yieldToMain,
-}: {
-  factBatches: PivotFactStoreBatch[];
-} & ChunkedWorkOptions) => {
-  const store = createPivotFactStore();
-  for (let idx = 0; idx < factBatches.length; idx += 1) {
-    // eslint-disable-next-line no-await-in-loop
-    await upsertFactBatchIntoStoreAsync({
-      store,
-      batch: factBatches[idx],
-      chunkSize,
-      shouldContinue,
-      yieldToMain,
-    });
-  }
-  return store;
-};
-
 export const buildInitialRuntimeFromSpecResults = ({
   specs,
   results,
@@ -404,51 +428,6 @@ export const buildInitialRuntimeFromSpecResults = ({
       store,
       layout,
       formData,
-    }),
-    factBatches,
-  };
-};
-
-export const buildInitialRuntimeFromSpecResultsAsync = async ({
-  specs,
-  results,
-  layout,
-  formData,
-  chunkSize,
-  shouldContinue,
-  yieldToMain,
-}: {
-  specs: PlannedQuerySpec[];
-  results: QueryResultWithData[];
-  layout: LayoutContext;
-  formData: PivotTableQueryFormData;
-} & ChunkedWorkOptions): Promise<{
-  tree: PivotTreeData;
-  factBatches: PivotFactStoreBatch[];
-}> => {
-  const ingested = await ingestQueryResultsAsync({
-    specs,
-    results,
-    chunkSize,
-    shouldContinue,
-    yieldToMain,
-  });
-  const factBatches = ingested.map(factStoreBatchFromIngested);
-  const store = await buildFactStoreAsync({
-    factBatches,
-    chunkSize,
-    shouldContinue,
-    yieldToMain,
-  });
-  await yieldChunkedWork({ shouldContinue, yieldToMain });
-  return {
-    tree: await materializeLoadedPivotTreeFromFactStoreAsync({
-      store,
-      layout,
-      formData,
-      chunkSize,
-      shouldContinue,
-      yieldToMain,
     }),
     factBatches,
   };

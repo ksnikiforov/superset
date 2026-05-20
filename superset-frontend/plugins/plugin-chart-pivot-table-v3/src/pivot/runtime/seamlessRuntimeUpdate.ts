@@ -31,10 +31,11 @@ import {
 } from '../query/specs';
 import { normalizeRuntimeLayout } from '../layout/resolveInteractionLayout';
 import {
-  buildInitialRuntimeFromSpecResultsAsync,
   collectPlannedQueryWarnings,
+  createPivotFactStore,
   fetchPlannedQuerySpecs,
 } from './ingestQueryResults';
+import { materializeLoadedPivotTreeFromFactStoreAsync } from './materializePivotTree';
 import {
   executeLatestRequest,
   executeScheduledLatestRequest,
@@ -382,17 +383,21 @@ export const fetchAndMaterializeSeamlessRuntimeUpdate = async ({
     metricsOverride: sourceMetrics,
     measureLeavesByMetricOverride: sourceMeasureLeavesByMetric,
   });
+  const factStore = createPivotFactStore();
   const fetchResult = await executeLatestRequest({
     lifecycle: requestLifecycle,
     requestGroupId: SEAMLESS_REQUEST_GROUP,
     onStart: () => {
       materializationLifecycle.invalidate();
     },
-    run: () =>
+    run: token =>
       fetchPlannedQuerySpecs({
         formData,
         specs,
         requestGroupId: SEAMLESS_REQUEST_GROUP,
+        factStore,
+        shouldContinue: token.isCurrent,
+        yieldToMain: yieldToMainThread,
       }),
   });
   if (fetchResult.status === 'stale') {
@@ -407,9 +412,8 @@ export const fetchAndMaterializeSeamlessRuntimeUpdate = async ({
     lifecycle: materializationLifecycle,
     requestGroupId: SEAMLESS_MATERIALIZATION_GROUP,
     run: token =>
-      buildInitialRuntimeFromSpecResultsAsync({
-        results,
-        specs,
+      materializeLoadedPivotTreeFromFactStoreAsync({
+        store: factStore,
         layout,
         formData,
         shouldContinue: token.isCurrent,
@@ -428,8 +432,8 @@ export const fetchAndMaterializeSeamlessRuntimeUpdate = async ({
 
   return {
     status: 'success',
-    tree: materializationResult.value.tree,
-    factBatches: materializationResult.value.factBatches,
+    tree: materializationResult.value,
+    factBatches: factStore.getFactBatches(),
     warnings: collectPlannedQueryWarnings(results),
   };
 };

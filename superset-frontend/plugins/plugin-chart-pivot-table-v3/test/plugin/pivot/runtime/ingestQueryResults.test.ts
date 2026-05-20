@@ -18,11 +18,14 @@
  */
 import { type PlannedQuerySpec } from '../../../../src/pivot/query/specs';
 import {
-  buildInitialRuntimeFromSpecResultsAsync,
   createPivotFactStore,
   ingestQueryResults,
+  upsertQueryResultsIntoFactStoreAsync,
 } from '../../../../src/pivot/runtime/ingestQueryResults';
-import { materializeLoadedPivotTreeFromFactStore } from '../../fixtures/metricAxis';
+import {
+  materializeLoadedPivotTreeFromFactStore,
+  materializeLoadedPivotTreeFromFactStoreAsync,
+} from '../../fixtures/metricAxis';
 import { buildLayoutContext } from '../../../../src/pivot/layout/LayoutContext';
 import { MetricsLayoutEnum } from '../../../../src/types';
 import {
@@ -331,7 +334,9 @@ test('chunked initial runtime materialization yields while preserving facts and 
   });
   const yieldToMain = jest.fn(async () => undefined);
 
-  const runtime = await buildInitialRuntimeFromSpecResultsAsync({
+  const store = createPivotFactStore();
+  const factBatches = await upsertQueryResultsIntoFactStoreAsync({
+    store,
     specs: [spec],
     results: [
       {
@@ -342,6 +347,11 @@ test('chunked initial runtime materialization yields while preserving facts and 
         ],
       },
     ],
+    chunkSize: 1,
+    yieldToMain,
+  });
+  const tree = await materializeLoadedPivotTreeFromFactStoreAsync({
+    store,
     layout: buildLayoutContext(formData),
     formData,
     chunkSize: 1,
@@ -350,15 +360,15 @@ test('chunked initial runtime materialization yields while preserving facts and 
 
   const rowKey = serializePath(['France', encodeMetricKey('sales')]);
   const colKey = serializePath(['2026-01']);
-  expect(runtime.factBatches).toHaveLength(1);
-  expect(runtime.factBatches[0].facts).toHaveLength(2);
-  expect(runtime.tree.cells[serializeCellKey(rowKey, colKey)]?.values).toEqual(
+  expect(factBatches).toHaveLength(1);
+  expect(factBatches[0].facts).toHaveLength(2);
+  expect(tree.cells[serializeCellKey(rowKey, colKey)]?.values).toEqual(
     expect.objectContaining({ sales: 12 }),
   );
   expect(yieldToMain.mock.calls.length).toBeGreaterThan(3);
 });
 
-test('chunked initial runtime materialization aborts stale work before commit', async () => {
+test('chunked fact-store ingestion aborts stale work before commit', async () => {
   const spec = buildSpec({
     queryName: 'pivot_v3|1|1',
     rowDepth: 1,
@@ -366,19 +376,15 @@ test('chunked initial runtime materialization aborts stale work before commit', 
     rowGroupby: ['country'],
     colGroupby: ['month'],
   });
-  const formData = buildFormData({
-    groupbyRows: ['country', METRICS_PLACEHOLDER],
-    groupbyColumns: ['month'],
-    metrics: ['sales'],
-    metricsLayout: MetricsLayoutEnum.ROWS,
-  });
   let current = true;
   const yieldToMain = jest.fn(async () => {
     current = false;
   });
+  const store = createPivotFactStore();
 
   await expect(
-    buildInitialRuntimeFromSpecResultsAsync({
+    upsertQueryResultsIntoFactStoreAsync({
+      store,
       specs: [spec],
       results: [
         {
@@ -386,8 +392,6 @@ test('chunked initial runtime materialization aborts stale work before commit', 
           data: [{ country: 'France', month: '2026-01', sales: 12 }],
         },
       ],
-      layout: buildLayoutContext(formData),
-      formData,
       chunkSize: 1,
       shouldContinue: () => current,
       yieldToMain,
