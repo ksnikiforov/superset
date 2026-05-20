@@ -117,10 +117,6 @@ export const compilePivotProgram = ({
   const metrics = toMetricRefs(toMetrics(rawMetrics));
   const preferredAxis: PivotAxis =
     metricsLayout === MetricsLayoutEnum.ROWS ? 'row' : 'col';
-  const metricsLayoutResolvedWhenEmpty =
-    preferredAxis === 'row'
-      ? MetricsLayoutEnum.ROWS
-      : MetricsLayoutEnum.COLUMNS;
 
   if (metrics.length === 0) {
     return {
@@ -130,8 +126,7 @@ export const compilePivotProgram = ({
       columnDimensions,
       metrics,
       metricKeys: [],
-      metricsLayoutResolved: metricsLayoutResolvedWhenEmpty,
-      valueAxis: undefined,
+      valueAxis: preferredAxis,
       metricInsertIndex: -1,
     };
   }
@@ -172,8 +167,6 @@ export const compilePivotProgram = ({
     columnDimensions,
     metrics,
     metricKeys: metrics.map(metric => metric.key),
-    metricsLayoutResolved:
-      valueAxis === 'row' ? MetricsLayoutEnum.ROWS : MetricsLayoutEnum.COLUMNS,
     valueAxis,
     metricInsertIndex,
   };
@@ -182,25 +175,27 @@ export const compilePivotProgram = ({
 const pivotProgramToPlacement = (
   program: PivotProgram,
 ): PivotProgramPlacement => {
-  const fallbackAxis =
-    program.metricsLayoutResolved === MetricsLayoutEnum.ROWS ? 'row' : 'col';
-  const { rows, cols } = program.valueAxis
-    ? insertValuesPlaceholder(
-        program.rowDimensions,
-        program.columnDimensions,
-        { axis: program.valueAxis, index: program.metricInsertIndex },
-        METRICS_PLACEHOLDER,
-      )
-    : {
-        rows: program.rowDimensions,
-        cols: program.columnDimensions,
-      };
+  const { rows, cols } =
+    program.metricKeys.length > 0
+      ? insertValuesPlaceholder(
+          program.rowDimensions,
+          program.columnDimensions,
+          { axis: program.valueAxis, index: program.metricInsertIndex },
+          METRICS_PLACEHOLDER,
+        )
+      : {
+          rows: program.rowDimensions,
+          cols: program.columnDimensions,
+        };
 
   return {
     rows,
     cols,
-    axis: program.valueAxis ?? fallbackAxis,
-    layout: program.metricsLayoutResolved,
+    axis: program.valueAxis,
+    layout:
+      program.valueAxis === 'row'
+        ? MetricsLayoutEnum.ROWS
+        : MetricsLayoutEnum.COLUMNS,
     metricPosition: program.metricInsertIndex,
   };
 };

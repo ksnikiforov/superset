@@ -40,7 +40,7 @@ describe('compilePivotProgram', () => {
 
     expect(describeAxis(program.rows)).toEqual(['values', 'dimension:r1']);
     expect(describeAxis(program.columns)).toEqual(['dimension:c1']);
-    expect(program.metricsLayoutResolved).toBe(MetricsLayoutEnum.ROWS);
+    expect(program.valueAxis).toBe('row');
     expect(program.metricInsertIndex).toBe(0);
   });
 
@@ -85,7 +85,7 @@ describe('compilePivotProgram', () => {
 
     expect(describeAxis(program.rows)).toEqual(['dimension:r1']);
     expect(describeAxis(program.columns)).toEqual(['values', 'dimension:c1']);
-    expect(program.metricsLayoutResolved).toBe(MetricsLayoutEnum.COLUMNS);
+    expect(program.valueAxis).toBe('col');
     expect(program.metricInsertIndex).toBe(0);
   });
 

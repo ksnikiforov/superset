@@ -27,7 +27,11 @@ import {
   SMART_DATE_ID,
   TimeFormats,
 } from '@superset-ui/core';
-import { PivotTableProps, PivotTableQueryFormData } from './types';
+import {
+  MetricsLayoutEnum,
+  PivotTableProps,
+  PivotTableQueryFormData,
+} from './types';
 import {
   buildResolvedMetricLabelMap,
   getStableColumnKey,
@@ -160,12 +164,10 @@ export default function transformProps(
     rowSubtotalLevels,
     colSubtotalLevelsForQuery: colSubtotalLevels,
   } = layout;
-  const {
-    rowDimensions,
-    columnDimensions,
-    metricsLayoutResolved: metricsLayout,
-    metricInsertIndex,
-  } = layout.pivotProgram;
+  const { rowDimensions, columnDimensions, valueAxis, metricInsertIndex } =
+    layout.pivotProgram;
+  const metricsLayout =
+    valueAxis === 'row' ? MetricsLayoutEnum.ROWS : MetricsLayoutEnum.COLUMNS;
   const planMetrics = initialSpecs.reduce(
     (acc, spec) => mergeMetrics(acc, spec.metrics),
     metrics,

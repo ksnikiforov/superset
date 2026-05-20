@@ -25,7 +25,6 @@ import {
 import {
   type MeasureHierarchy,
   type MeasureLeafSpec,
-  MetricsLayoutEnum,
   type PivotPath,
   type PivotTableQueryFormData,
   type PivotTreeData,
@@ -662,27 +661,8 @@ type ApplyMeasureAxisInput = {
   promoteExistingNodes: boolean;
 };
 
-const getValueAxis = (program: PivotProgram): 'row' | 'col' =>
-  program.valueAxis ??
-  (program.metricsLayoutResolved === MetricsLayoutEnum.ROWS ? 'row' : 'col');
-
 const getAxisDimensions = (program: PivotProgram, axis: 'row' | 'col') =>
   axis === 'row' ? program.rowDimensions : program.columnDimensions;
-
-const getAxisProgram = (program: PivotProgram, axis: 'row' | 'col') =>
-  axis === 'row' ? program.rows : program.columns;
-
-const getValuesInsertIndex = (program: PivotProgram) => {
-  const valueAxis = getValueAxis(program);
-  const axisProgram = getAxisProgram(program, valueAxis);
-  const valuesIndex = axisProgram.findIndex(level => level.kind === 'values');
-  if (valuesIndex < 0) {
-    return getAxisDimensions(program, valueAxis).length;
-  }
-  return axisProgram
-    .slice(0, valuesIndex)
-    .filter(level => level.kind === 'dimension').length;
-};
 
 const applyMeasureAxis = ({
   tree,
@@ -696,10 +676,12 @@ const applyMeasureAxis = ({
   if (groups.length === 0) {
     return tree;
   }
-  const valueAxis = getValueAxis(program);
-  const rowGroupby = program.rowDimensions;
-  const colGroupby = program.columnDimensions;
-  const insertIndex = getValuesInsertIndex(program);
+  const {
+    valueAxis,
+    rowDimensions: rowGroupby,
+    columnDimensions: colGroupby,
+    metricInsertIndex: insertIndex,
+  } = program;
   const valueAxisDepth =
     valueAxis === 'row' ? rowGroupby.length : colGroupby.length;
   const valuesAtEnd = insertIndex >= valueAxisDepth;
@@ -1027,8 +1009,7 @@ export const applyMeasureHierarchyAxis = (
   metricLabelMap?: Record<string, string>,
 ): PivotTreeData => {
   const leafTierVisible = measureHierarchy.leafTierVisibility === 'visible';
-  const insertIndex = getValuesInsertIndex(program);
-  const valueAxis = getValueAxis(program);
+  const { valueAxis, metricInsertIndex: insertIndex } = program;
   const axisDepth = getAxisDimensions(program, valueAxis).length;
   const hasSingleMetric = measureHierarchy.groups.length === 1;
   return applyMeasureAxis({

@@ -137,7 +137,7 @@ export const usePivotLayout = ({
     [formData, pivotProgram],
   );
   const { metricLabelMap, metrics } = layout;
-  const { metricsLayoutResolved: resolvedMetricsLayout, metricInsertIndex } =
+  const { valueAxis: resolvedValueAxis, metricInsertIndex } =
     layout.pivotProgram;
   const { metricKeys: metricLabels } = layout.pivotProgram;
 
@@ -153,7 +153,7 @@ export const usePivotLayout = ({
     () =>
       JSON.stringify({
         metrics: metricLabels,
-        metricsLayout: resolvedMetricsLayout,
+        valueAxis: resolvedValueAxis,
         metricPosition: metricLabels.length > 0 ? metricInsertIndex : -1,
         rowSubtotalLevels: normalizedRowSubtotalLevels,
         colSubtotalLevels: normalizedColSubtotalLevels,
@@ -173,7 +173,7 @@ export const usePivotLayout = ({
       metricLabels,
       normalizedColSubtotalLevels,
       normalizedRowSubtotalLevels,
-      resolvedMetricsLayout,
+      resolvedValueAxis,
     ],
   );
 

@@ -17,7 +17,7 @@
  * under the License.
  */
 import type { QueryFormColumn, QueryFormMetric } from '@superset-ui/core';
-import type { MetricsLayoutEnum, PivotAxis } from '../../types';
+import type { PivotAxis } from '../../types';
 
 export type PivotColumnRef = QueryFormColumn;
 
@@ -46,8 +46,7 @@ export type PivotProgram = {
   columnDimensions: PivotColumnRef[];
   metrics: PivotMetricRef[];
   metricKeys: string[];
-  metricsLayoutResolved: MetricsLayoutEnum;
-  valueAxis?: PivotAxis;
+  valueAxis: PivotAxis;
   metricInsertIndex: number;
 };
 

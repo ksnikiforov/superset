@@ -17,7 +17,6 @@
  * under the License.
  */
 import {
-  MetricsLayoutEnum,
   type MeasureHierarchy,
   type PivotTreeNode,
 } from '../../../../src/types';
@@ -80,7 +79,6 @@ const pivotProgram: PivotProgram = {
   columnDimensions: ['year'],
   metrics: [{ key: 'sales', metric: 'sales', index: 0 }],
   metricKeys: ['sales'],
-  metricsLayoutResolved: MetricsLayoutEnum.COLUMNS,
   valueAxis: 'col',
   metricInsertIndex: 1,
 };
@@ -198,11 +196,29 @@ describe('column sort helpers', () => {
   });
 
   it('ignores clicks on non-metric column headers', () => {
+    const rowValueAxisLayout: PivotColumnSortLayout = {
+      ...layout,
+      layout: {
+        pivotProgram: {
+          ...pivotProgram,
+          rows: [
+            {
+              kind: 'values',
+              metrics: [{ key: 'sales', metric: 'sales', index: 0 }],
+            },
+          ],
+          columns: [{ kind: 'dimension', column: 'year' }],
+          valueAxis: 'row',
+          metricInsertIndex: 0,
+        },
+      },
+    };
+
     expect(
       buildPivotColumnSortStateForClick({
         current: null,
         node: node('year', ['2025']),
-        layout,
+        layout: rowValueAxisLayout,
         columnNodes: {},
       }),
     ).toBeUndefined();

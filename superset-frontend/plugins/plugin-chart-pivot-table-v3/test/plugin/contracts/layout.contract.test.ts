@@ -66,6 +66,9 @@ describe('layout resolution (contracts)', () => {
     const result = transformProps(
       chartProps as ChartProps<PivotTableQueryFormData>,
     );
+    const resultLayout = buildLayoutContext(
+      result.formData as PivotTableQueryFormData,
+    );
     const signature = JSON.parse(result.treeDataSignature ?? '{}') as {
       rows: string[];
       cols: string[];
@@ -75,21 +78,19 @@ describe('layout resolution (contracts)', () => {
       colSubtotalLevels: number[];
     };
 
-    expect(signature.rows).toEqual(layout.pivotProgram.rowDimensions);
-    expect(signature.cols).toEqual(layout.pivotProgram.columnDimensions);
+    expect(signature.rows).toEqual(resultLayout.pivotProgram.rowDimensions);
+    expect(signature.cols).toEqual(resultLayout.pivotProgram.columnDimensions);
 
     expect(
       specs.some(spec => spec.meta.factSelector.scope.kind === 'root'),
     ).toBe(true);
-    expect(signature.metricsLayout).toBe(
-      layout.pivotProgram.metricsLayoutResolved,
-    );
+    expect(signature.metricsLayout).toBe(result.formData.metricsLayout);
     expect(signature.metricInsertIndex).toBe(
-      layout.pivotProgram.metricInsertIndex,
+      resultLayout.pivotProgram.metricInsertIndex,
     );
-    expect(signature.rowSubtotalLevels).toEqual(layout.rowSubtotalLevels);
+    expect(signature.rowSubtotalLevels).toEqual(resultLayout.rowSubtotalLevels);
     expect(signature.colSubtotalLevels).toEqual(
-      layout.colSubtotalLevelsForQuery,
+      resultLayout.colSubtotalLevelsForQuery,
     );
   });
 

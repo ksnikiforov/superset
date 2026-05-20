@@ -17,7 +17,6 @@
  * under the License.
  */
 import {
-  MetricsLayoutEnum,
   type MeasureHierarchy,
   type PivotTreeData,
   type PivotTreeNode,
@@ -95,7 +94,6 @@ const pivotProgram: PivotProgram = {
   columnDimensions: ['month'],
   metrics: [{ key: 'sales', metric: 'sales', index: 0 }],
   metricKeys: ['sales'],
-  metricsLayoutResolved: MetricsLayoutEnum.COLUMNS,
   valueAxis: 'col',
   metricInsertIndex: 1,
 };
@@ -108,7 +106,7 @@ const dateProgram: PivotProgram = {
   columnDimensions: ['order_date'],
   metrics: [],
   metricKeys: [],
-  valueAxis: undefined,
+  valueAxis: 'col',
   metricInsertIndex: -1,
 };
 
@@ -122,7 +120,6 @@ const columnMetricFirstProgram: PivotProgram = {
     { kind: 'dimension', column: 'month' },
   ],
   valueAxis: 'col',
-  metricsLayoutResolved: MetricsLayoutEnum.COLUMNS,
   metricInsertIndex: 0,
 };
 
@@ -137,7 +134,6 @@ const rowMetricFirstProgram: PivotProgram = {
   ],
   columns: [{ kind: 'dimension', column: 'month' }],
   valueAxis: 'row',
-  metricsLayoutResolved: MetricsLayoutEnum.ROWS,
   metricInsertIndex: 0,
 };
 
