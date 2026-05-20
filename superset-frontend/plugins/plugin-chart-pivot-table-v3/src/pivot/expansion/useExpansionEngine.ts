@@ -87,25 +87,6 @@ const createEmptyExpansionState = (): PivotExpansionStateKeys => ({
   collapsedCols: [],
 });
 
-const updateLoadingCounts = ({
-  loadingCounts,
-  key,
-  delta,
-}: {
-  loadingCounts: Map<string, number>;
-  key: string;
-  delta: number;
-}) => {
-  const counts = new Map(loadingCounts);
-  const nextCount = (counts.get(key) ?? 0) + delta;
-  if (nextCount <= 0) {
-    counts.delete(key);
-  } else {
-    counts.set(key, nextCount);
-  }
-  return counts;
-};
-
 type ExpansionPersistenceDeps = {
   shouldPersist: boolean;
   setControlValue?: HandlerFunction;
@@ -196,14 +177,8 @@ export const useExpansionEngine = ({
   }));
   const { row: expandedRows, col: expandedCols } = expandedByAxis;
   const expandedRef = useRef(expandedByAxis);
-  const [loadingCounts, setLoadingCounts] = useState<Map<string, number>>(
-    () => new Map(),
-  );
+  const [loadingKeys, setLoadingKeys] = useState<Set<string>>(() => new Set());
   const [isHydrating, setIsHydrating] = useState(false);
-  const loadingKeys = useMemo(
-    () => new Set(loadingCounts.keys()),
-    [loadingCounts],
-  );
   const fetchFormDataRef = useRef(fetchFormData);
   const initialExpansionState =
     coerceExpansionState(persistedExpansionState) ??
@@ -267,16 +242,8 @@ export const useExpansionEngine = ({
   useSyncRef(expandedRef, expandedByAxis);
   useSyncRef(fetchFormDataRef, fetchFormData);
 
-  const updateLoadingKey = useCallback(
-    (key: string, delta: number) =>
-      setLoadingCounts(current =>
-        updateLoadingCounts({ loadingCounts: current, key, delta }),
-      ),
-    [],
-  );
-
   const clearLoadingState = useCallback(() => {
-    setLoadingCounts(new Map());
+    setLoadingKeys(new Set());
   }, []);
 
   const commitExpansionState = useCallback(
@@ -400,10 +367,10 @@ export const useExpansionEngine = ({
             formData: fetchFormDataRef.current,
           }),
         addWarnings,
-        updateLoadingKey,
+        setLoadingKeys,
       };
     },
-    [addWarnings, fetchLayout, updateLoadingKey],
+    [addWarnings, fetchLayout],
   );
 
   const collapseNode = useCallback(

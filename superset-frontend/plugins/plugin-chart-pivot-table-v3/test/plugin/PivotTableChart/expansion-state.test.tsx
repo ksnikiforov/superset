@@ -1876,10 +1876,18 @@ describe('PivotTableChart expansion state persistence', () => {
         [],
       );
     };
-    const shallowTree = buildTreeWithDepth(1);
-    const deepestTree = buildTreeWithDepth(4);
-    branchExpansionMock.mockImplementation(
-      resolveMockBranchFetchResult({ data: deepestTree }),
+    const treesByDepth = new Map(
+      [1, 2, 3, 4].map(depth => [depth, buildTreeWithDepth(depth)]),
+    );
+    const shallowTree = treesByDepth.get(1) as PivotTreeData;
+    branchExpansionMock.mockImplementation((params: FetchPivotBranchParams) =>
+      Promise.resolve(
+        buildMockBranchFetchResult(params, {
+          data:
+            treesByDepth.get(params.target.coverageTarget.need.rowDepth) ??
+            shallowTree,
+        }),
+      ),
     );
 
     render(

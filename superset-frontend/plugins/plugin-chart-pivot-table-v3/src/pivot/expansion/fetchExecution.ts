@@ -50,7 +50,7 @@ export type ExpansionFetchRuntime = {
   factStore: PivotFactStore;
   materializeLoadedTree: () => PivotTreeData;
   addWarnings: (nextWarnings?: ChartDataWarning[]) => void;
-  updateLoadingKey: (key: string, delta: number) => void;
+  setLoadingKeys: (keys: Set<string>) => void;
 };
 
 type HydrationFetchLoopParams = {
@@ -230,16 +230,11 @@ const resolveExpansionFetchPlan = (
 const executeExpansionQueryTask = async ({
   request,
   runtime,
-  loadingKeys,
 }: {
   request: ExpansionQueryRequest;
   runtime: ExpansionFetchRuntime;
-  loadingKeys: string[];
 }): Promise<void> => {
-  const { requestScope, updateLoadingKey, addWarnings } = runtime;
-  if (requestScope.isCurrent()) {
-    loadingKeys.forEach(key => updateLoadingKey(key, 1));
-  }
+  const { requestScope, addWarnings } = runtime;
   const requestGroupId = buildExpansionRequestGroupId({ runtime, request });
   const token = requestScope.beginRequest(requestGroupId);
   try {
@@ -257,9 +252,6 @@ const executeExpansionQueryTask = async ({
     }
   } finally {
     requestScope.finish(token);
-    if (requestScope.isCurrent()) {
-      loadingKeys.forEach(key => updateLoadingKey(key, -1));
-    }
   }
 };
 
@@ -281,6 +273,15 @@ const filterMissingIntersectionTargets = ({
   );
 };
 
+const setPhaseLoadingKeys = (
+  runtime: ExpansionFetchRuntime,
+  loadingKeys: string[],
+) => {
+  if (runtime.requestScope.isCurrent()) {
+    runtime.setLoadingKeys(new Set(loadingKeys));
+  }
+};
+
 export const fetchExpansionTargetDeltas = async ({
   targets,
   runtime,
@@ -290,6 +291,10 @@ export const fetchExpansionTargetDeltas = async ({
 }): Promise<boolean> => {
   const { batches, singles, intersections } =
     resolveExpansionFetchPlan(targets);
+  setPhaseLoadingKeys(runtime, [
+    ...singles.map(target => target.pathKey),
+    ...batches.flatMap(batch => batch.targets.map(target => target.pathKey)),
+  ]);
   const branchFetchPromises: Array<Promise<void>> = [
     ...singles.map(target =>
       executeExpansionQueryTask({
@@ -298,7 +303,6 @@ export const fetchExpansionTargetDeltas = async ({
           kind: 'branch',
           target,
         },
-        loadingKeys: [target.pathKey],
       }),
     ),
     ...batches.map(batch =>
@@ -308,7 +312,6 @@ export const fetchExpansionTargetDeltas = async ({
           kind: 'batch',
           batch,
         },
-        loadingKeys: batch.targets.map(target => target.pathKey),
       }),
     ),
   ];
@@ -320,6 +323,13 @@ export const fetchExpansionTargetDeltas = async ({
     intersections,
     runtime,
   });
+  setPhaseLoadingKeys(
+    runtime,
+    missingIntersections.flatMap(target => [
+      ...target.rowPathKeys,
+      ...target.columnPathKeys,
+    ]),
+  );
   await Promise.all(
     missingIntersections.map(target =>
       executeExpansionQueryTask({
@@ -328,13 +338,13 @@ export const fetchExpansionTargetDeltas = async ({
           kind: 'intersection',
           target,
         },
-        loadingKeys: [...target.rowPathKeys, ...target.columnPathKeys],
       }),
     ),
   );
   if (!runtime.requestScope.isCurrent()) {
     return false;
   }
+  setPhaseLoadingKeys(runtime, []);
   return branchFetchPromises.length + missingIntersections.length > 0;
 };
 

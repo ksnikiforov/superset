@@ -290,8 +290,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13331` insertions, `18177` deletions, net `-4846`.
-- Current production TypeScript/TSX total: about `28664` lines.
+- Production `src`: `13313` insertions, `18182` deletions, net `-4869`.
+- Current production TypeScript/TSX total: about `28641` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -303,17 +303,17 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `28664` | `-4846` | `< 28000` |
-| Strict core pipeline | `11337` | `11497` | `+160` | `8000` |
+| Full production `src` | `33510` | `28641` | `-4869` | `< 28000` |
+| Strict core pipeline | `11337` | `11476` | `+139` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4893` | `+210` | `3000-4000` |
-| Broad core pipeline | `16020` | `16390` | `+370` | `11000-13000` |
+| Broad core pipeline | `16020` | `16369` | `+349` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
 | `pivot/runtime/*` | `3769` |
-| `pivot/expansion/*` | `2576` |
+| `pivot/expansion/*` | `2555` |
 | `pivot/query/*` | `1521` |
 | `pivot/layout/*` | `770` |
 | `pivot/core/*` | `252` |
@@ -342,6 +342,11 @@ Latest expansion-ingestion cleanup: expansion fetch now passes request
 lifecycle cancellation and main-thread yielding into planned-spec fact-store
 ingestion. Large branch, batch, or intersection responses can yield during fact
 conversion/upsert instead of doing a synchronous ingest before materialization.
+
+Latest expansion-loading cleanup: expansion loading state is now phase-level
+set state owned by the hydration executor. The old per-request loading reference
+count map and request-local increment/decrement callbacks are gone; branch,
+batch, and intersection phases publish their active visible keys directly.
 
 Latest core cleanup: row display intent now uses the same
 `axisCoverageNeeds` manifest as expansion/loading. The old numeric
