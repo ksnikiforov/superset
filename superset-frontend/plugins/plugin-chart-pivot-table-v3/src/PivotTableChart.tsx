@@ -452,7 +452,7 @@ function PivotTableChart(props: PivotTableProps) {
     headerOffset,
     headerRowOffsets,
     headerRef,
-    colTotalPosition: layoutResult.resolvedColTotalPosition,
+    colTotalPosition: layoutResult.layout.colTotalPosition,
     formatting,
     onToggleNode: handleToggle,
     onSortColumn: renderModelResult.handleColumnSort,

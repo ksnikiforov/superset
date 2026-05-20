@@ -824,7 +824,7 @@ export const usePivotFormatting = ({
   }, [metricDatabars]);
 
   const isRowTotalAtStart =
-    layout.resolvedColTotalPosition === 'start' && renderModel.showRowRoot;
+    layout.layout.colTotalPosition === 'start' && renderModel.showRowRoot;
   const visibleCells = renderModel.visibleCellEntries;
   const { visibleRows, visibleCols } = renderModel;
 
@@ -837,7 +837,7 @@ export const usePivotFormatting = ({
         metricLabelSet: metricNodePolicy.metricLabelSet,
         expandedRows,
         countDimDepth: metricNodePolicy.countDimDepth,
-        rowSubtotalLevels: layout.normalizedRowSubtotalLevels,
+        rowSubtotalLevels: layout.layout.rowSubtotalLevels,
       }),
     [expandedRows, layout, metricNodePolicy, rowSubTotals],
   );

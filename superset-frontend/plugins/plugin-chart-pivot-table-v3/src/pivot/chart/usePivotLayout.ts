@@ -42,9 +42,7 @@ const defaultPivotNodeSorter = () => 0;
 export type PivotLayoutResult = {
   layout: ReturnType<typeof buildLayoutContext>;
   expansionSemanticSignature: string;
-  normalizedRowSubtotalLevels: number[];
   normalizedColSubtotalLevels: number[];
-  resolvedColTotalPosition: TotalPosition;
   effectiveRowSubtotalPosition: TotalPosition;
   hideMetricHeaderOnRows: boolean;
   compareMetricOrder: (a: PivotTreeNode, b: PivotTreeNode) => number;
@@ -310,9 +308,7 @@ export const usePivotLayout = ({
   return {
     layout,
     expansionSemanticSignature,
-    normalizedRowSubtotalLevels,
     normalizedColSubtotalLevels,
-    resolvedColTotalPosition,
     effectiveRowSubtotalPosition,
     hideMetricHeaderOnRows,
     compareMetricOrder,

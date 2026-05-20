@@ -269,10 +269,10 @@ export const usePivotRenderModel = ({
       resolvedGroupbyRows.map(getColumnLabel),
     );
     const pushMetricTotalsToEnd =
-      (colTotals && layout.resolvedColTotalPosition === 'end') ||
+      (colTotals && layout.layout.colTotalPosition === 'end') ||
       (rowSubTotals && layout.effectiveRowSubtotalPosition === 'end');
     const pullMetricTotalsToStart =
-      colTotals && layout.resolvedColTotalPosition === 'start';
+      colTotals && layout.layout.colTotalPosition === 'start';
     if (
       !rowSubTotals &&
       !pushMetricTotalsToEnd &&
