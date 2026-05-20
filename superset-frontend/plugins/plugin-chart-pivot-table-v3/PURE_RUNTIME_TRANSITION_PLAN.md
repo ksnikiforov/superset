@@ -345,8 +345,8 @@ Implementation rules for accelerated chunks:
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13053` insertions, `18271` deletions, net `-5218`.
-- Current production TypeScript/TSX total: about `28292` lines.
+- Production `src`: `12987` insertions, `18279` deletions, net `-5292`.
+- Current production TypeScript/TSX total: about `28218` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -358,35 +358,35 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `28292` | `-5218` | `< 28000` |
-| Strict core pipeline | `11337` | `11198` | `-139` | `8000` |
-| Non-visual chart runtime hooks | `4683` | `4883` | `+200` | `3000-4000` |
-| Broad core pipeline | `16020` | `16081` | `+61` | `11000-13000` |
+| Full production `src` | `33510` | `28218` | `-5292` | `< 28000` |
+| Strict core pipeline | `11337` | `11555` | `+218` | `8000` |
+| Non-visual chart runtime hooks | `4683` | `4452` | `-231` | `3000-4000` |
+| Broad core pipeline | `16020` | `16007` | `-13` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `3769` |
-| `pivot/expansion/*` | `2465` |
-| `pivot/query/*` | `1495` |
+| `pivot/runtime/*` | `3758` |
+| `pivot/expansion/*` | `2427` |
+| `pivot/query/*` | `1387` |
 | `pivot/layout/*` | `770` |
 | `pivot/core/*` | `252` |
 | core domain helpers | `1572` |
-| formatting/data/render-model support | `1032` |
+| formatting/data/render-model support | `1389` |
 
 Interpretation: plugin-wide source has shrunk, but core pipeline source has
 grown because runtime authority moved out of chart/control code before the old
 planner and render-repair surfaces were fully deleted. The next large cuts must
 reduce strict core, not only move lines into it.
 
-Latest acceleration cleanup: expansion axis fetches now pass
-`ExpansionCoverageTarget` directly instead of wrapping the same axis/path/need
-inside a second `FetchTarget` object. Batch candidates extend the coverage
-target only with transport grouping metadata. The bounded row x column
-intersection path is preserved through an explicit `requiresPathDiscovery`
-planner flag, so already-visible row/column paths still choose a narrower
-intersection request instead of broader same-axis branch batches.
+Latest render-policy ownership cleanup: `pivot/chart/layoutRuntime.ts` was
+deleted. Layout-only metric/subtotal policy now lives with `usePivotLayout`,
+while visible-child, collapsed-values, and row-subtotal render policy live
+inside `render/renderModel.ts`. This removes the chart-level render-policy
+adapter and makes the broad core deletion-negative for the first time, but it
+also exposes that strict core still needs real deletions rather than more policy
+migration.
 
 Latest transport cleanup: emitted `BatchGroup` requests no longer carry a
 separate `signature` field. Candidate signatures are used only while grouping

@@ -57,11 +57,6 @@ import {
   formatRenderTreeDateLabels,
   resolveColumnHeaderLabel,
 } from './renderDisplay';
-import {
-  resolveAxisChildrenBeforeSubtotalPolicy,
-  resolveCollapsedValuesNodesForAxis,
-  resolveRowSubtotalChildrenPolicy,
-} from './layoutRuntime';
 
 type DimensionSortingKeys = {
   metricKey?: string;
@@ -392,57 +387,6 @@ export const usePivotRenderModel = ({
       }),
     [layout],
   );
-  const getCollapsedChildrenForAxis = useCallback(
-    (
-      axis: 'row' | 'col',
-      parent: PivotTreeNode,
-      expandedSet: Set<string>,
-      nodes: Record<string, PivotTreeNode>,
-    ) =>
-      resolveCollapsedValuesNodesForAxis({
-        program: layout.layout.pivotProgram,
-        axis,
-        parent,
-        expandedSet,
-        nodes,
-        isLeafTierVisible,
-      }),
-    [isLeafTierVisible, layout.layout.pivotProgram],
-  );
-  const getAxisChildrenForNodes = useCallback(
-    (
-      axis: 'row' | 'col',
-      parent: PivotTreeNode,
-      nodes: Record<string, PivotTreeNode>,
-    ) => {
-      const filtered = resolveAxisChildrenBeforeSubtotalPolicy({
-        program: layout.layout.pivotProgram,
-        axis,
-        parent,
-        nodes,
-        isLeafTierVisible,
-        colTotals: axis === 'row' ? layout.layout.colTotals : undefined,
-        normalizedColSubtotalLevelCount:
-          axis === 'col'
-            ? layout.normalizedColSubtotalLevels.length
-            : undefined,
-      });
-      if (axis === 'col') {
-        return filtered;
-      }
-      return resolveRowSubtotalChildrenPolicy({
-        program: layout.layout.pivotProgram,
-        children: filtered,
-        parent,
-        nodes,
-        rowSubTotals: layout.layout.rowSubTotals,
-        rowSubtotalPositionForParent: layout.getRowSubtotalPosition(parent),
-        isLeafTierVisible,
-      });
-    },
-    [isLeafTierVisible, layout],
-  );
-
   const renderModel = useMemo(
     () =>
       buildRenderModel({
@@ -459,26 +403,11 @@ export const usePivotRenderModel = ({
           resolvedColSubtotalPosition: layout.effectiveColSubtotalPosition,
           pivotProgram: layout.layout.pivotProgram,
           hasMultipleMeasures,
+          isLeafTierVisible,
+          rowSubTotals: layout.layout.rowSubTotals,
+          getRowSubtotalPosition: layout.getRowSubtotalPosition,
           rowSorter,
           colSorter,
-          getRowChildren: parent =>
-            getAxisChildrenForNodes('row', parent, renderTree.rows),
-          getCollapsedRowChildren: parent =>
-            getCollapsedChildrenForAxis(
-              'row',
-              parent,
-              expandedRows,
-              renderTree.rows,
-            ),
-          getColChildren: parent =>
-            getAxisChildrenForNodes('col', parent, renderTree.cols),
-          getCollapsedColLeaves: parent =>
-            getCollapsedChildrenForAxis(
-              'col',
-              parent,
-              expandedCols,
-              renderTree.cols,
-            ),
           getColumnDisplayPath,
           getColumnHeaderLabel,
         },
@@ -487,11 +416,10 @@ export const usePivotRenderModel = ({
       colSorter,
       expandedCols,
       expandedRows,
-      getAxisChildrenForNodes,
-      getCollapsedChildrenForAxis,
       getColumnDisplayPath,
       getColumnHeaderLabel,
       hasMultipleMeasures,
+      isLeafTierVisible,
       layout,
       renderTree,
       rowSorter,
