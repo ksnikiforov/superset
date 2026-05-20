@@ -354,7 +354,7 @@ export type PivotFormattingResult = {
   renderCellContent: (
     rowNode: PivotTreeNode,
     colNode: PivotTreeNode,
-    metricKeyOverride?: string,
+    metricKey: string,
     d3FormatOverride?: string,
   ) => ReactNode;
   renderDatabarContent: (
@@ -894,7 +894,7 @@ export const usePivotFormatting = ({
     (
       rowNode: PivotTreeNode,
       colNode: PivotTreeNode,
-      metricKeyOverride?: string,
+      metricKey: string,
       d3FormatOverride?: string,
     ) => {
       if (shouldHideRowValues(rowNode)) {
@@ -904,7 +904,6 @@ export const usePivotFormatting = ({
       if (!cell) {
         return '';
       }
-      const metricKey = metricKeyOverride || deriveMetricKey(rowNode, colNode);
       const value = renderValue(
         metricKey,
         cell.values[metricKey],
@@ -915,13 +914,7 @@ export const usePivotFormatting = ({
       }
       return value;
     },
-    [
-      allowRenderHtml,
-      deriveMetricKey,
-      renderValue,
-      shouldHideRowValues,
-      tree.cells,
-    ],
+    [allowRenderHtml, renderValue, shouldHideRowValues, tree.cells],
   );
 
   const renderDatabarContent = useCallback(

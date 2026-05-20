@@ -345,8 +345,8 @@ Implementation rules for accelerated chunks:
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13196` insertions, `18250` deletions, net `-5054`.
-- Current production TypeScript/TSX total: about `28456` lines.
+- Production `src`: `13199` insertions, `18260` deletions, net `-5061`.
+- Current production TypeScript/TSX total: about `28449` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -358,10 +358,10 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `28456` | `-5054` | `< 28000` |
+| Full production `src` | `33510` | `28449` | `-5061` | `< 28000` |
 | Strict core pipeline | `11337` | `11355` | `+18` | `8000` |
-| Non-visual chart runtime hooks | `4683` | `4890` | `+207` | `3000-4000` |
-| Broad core pipeline | `16020` | `16245` | `+225` | `11000-13000` |
+| Non-visual chart runtime hooks | `4683` | `4883` | `+200` | `3000-4000` |
+| Broad core pipeline | `16020` | `16238` | `+218` | `11000-13000` |
 
 Current strict core breakdown:
 
@@ -444,6 +444,11 @@ into `deriveMetricKey` as a fallback source. Metric identity is resolved from
 the compiled program, metric/leaf tokens, and measure hierarchy only; ambiguous
 cells fall back to the first compiled metric instead of the first arbitrary cell
 value key.
+
+Latest render formatting cleanup: cell rendering now requires the already
+resolved metric key from the render boundary. `renderCellContent` no longer
+derives or guesses metric identity, so visible cell rendering consumes the
+metric selected by the render model instead of owning another fallback path.
 
 Latest fact-boundary cleanup: `PivotFactStore` now rejects facts whose row or
 column path depth does not match the declared batch coverage. Test expansion
