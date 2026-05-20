@@ -305,7 +305,6 @@ export const fetchPlannedQuerySpecs = async ({
   if (missingSpecs.length === 0) {
     return { results: [] };
   }
-  const metricsForQuery = missingSpecs[0]?.metrics;
   const timeOffsets = Array.from(
     new Set([
       ...(formData.time_offsets ?? []),
@@ -315,9 +314,6 @@ export const fetchPlannedQuerySpecs = async ({
   const results = await supersetChartDataClient.fetch({
     formData: {
       ...formData,
-      ...(metricsForQuery && metricsForQuery.length > 0
-        ? { metrics: metricsForQuery }
-        : {}),
       ...(timeOffsets.length > 0 ? { time_offsets: timeOffsets } : {}),
     },
     specs: missingSpecs,

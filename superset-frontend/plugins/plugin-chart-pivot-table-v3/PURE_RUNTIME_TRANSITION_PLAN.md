@@ -303,16 +303,16 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `28764` | `-4746` | `< 28000` |
-| Strict core pipeline | `11337` | `11568` | `+231` | `8000` |
+| Full production `src` | `33510` | `28760` | `-4750` | `< 28000` |
+| Strict core pipeline | `11337` | `11564` | `+227` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4924` | `+241` | `3000-4000` |
-| Broad core pipeline | `16020` | `16492` | `+472` | `11000-13000` |
+| Broad core pipeline | `16020` | `16488` | `+468` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `3818` |
+| `pivot/runtime/*` | `3814` |
 | `pivot/expansion/*` | `2567` |
 | `pivot/query/*` | `1409` |
 | `pivot/layout/*` | `770` |
@@ -547,6 +547,11 @@ session expansion-state memory layer. Explicit expanded/collapsed refs are the
 session state, and persistence writes directly from the visible manifest state.
 This removes another adapter between user expansion intent and manifest-driven
 hydration.
+
+Latest planned-fetch cleanup: planned query execution no longer rewrites
+request form data to the first missing spec's metrics. Each planned spec is the
+metric authority for its own query object, which keeps split metric/measure
+loads from inheriting unrelated support metrics at the bundle boundary.
 
 Checkpoint: deleting `PivotExpansionPlan.hasMissingNodes` is not currently a
 safe simplification. A trial cut changed persisted row x column restore by
