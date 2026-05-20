@@ -96,25 +96,25 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `26457` | `-7053` | `< 20000` |
-| Strict core pipeline | `12907` | `10668` | `-2239` | `< 8000` |
+| Full production `src` | `33510` | `26321` | `-7189` | `< 20000` |
+| Strict core pipeline | `12907` | `10490` | `-2417` | `< 8000` |
 
 Diagnostic scope only:
 
 | Scope | Baseline lines | Current lines | Delta |
 | --- | ---: | ---: | ---: |
-| Core pipeline dirs (`runtime/expansion/query/layout/core`) | `8698` | `7766` | `-932` |
+| Core pipeline dirs (`runtime/expansion/query/layout/core`) | `8698` | `7630` | `-1068` |
 
 Core pipeline breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `3394` |
-| `pivot/expansion/*` | `2156` |
-| `pivot/query/*` | `1360` |
+| `pivot/runtime/*` | `3422` |
+| `pivot/expansion/*` | `1973` |
+| `pivot/query/*` | `1357` |
 | `pivot/layout/*` + `pivot/core/*` | `878` |
-| core domain helpers | `1513` |
-| formatting/data/render-model support | `1389` |
+| core domain helpers | `1549` |
+| formatting/data/render-model support | `1311` |
 
 Completed structural cuts:
 
@@ -229,6 +229,10 @@ Completed structural cuts:
   view rendering.
 - Expansion reinitialization and hydration planning now use axis-keyed
   transition state instead of parallel row/column transition fields.
+- Expansion persistence now stores explicit user intent directly instead of
+  deriving a "visible persisted state" from the materialized tree. This removes
+  tree-visibility scanning from `stateTransitions.ts`; coverage planning still
+  decides which persisted/explicit paths are fetchable.
 
 Remaining duplicate authority:
 

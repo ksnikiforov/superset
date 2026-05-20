@@ -46,9 +46,11 @@ import {
   type PivotFactStore,
   type PivotFactStoreBatch,
 } from '../runtime/factStore';
-import { type PivotAxisCoverageNeed } from '../runtime/coverage';
 import {
-  buildVisiblePersistedExpansionState,
+  pathsFromAxisScope,
+  type PivotAxisCoverageNeed,
+} from '../runtime/coverage';
+import {
   PIVOT_AXES,
   planHydrationIteration,
   resolveCollapsedExpansionState,
@@ -66,8 +68,8 @@ import { StaleChunkedWorkError } from '../runtime/chunkedWork';
 import { materializeLoadedPivotTreeFromFactStoreAsync } from '../runtime/materializePivotTree';
 import { supersetChartDataClient } from '../data/SupersetChartDataClient';
 import { getStableColumnKey } from '../../utils';
-import { pathsFromAxisScope } from '../runtime/coverage';
 import { fetchPivotExpansion } from './fetchPivotExpansion';
+import { rootKey } from '../viewModel';
 
 type AxisSetMap = Record<PivotAxis, Set<string>>;
 type ExpansionIntentSets = {
@@ -102,10 +104,14 @@ const expansionStateKeysToIntent = (
 const expansionIntentToStateKeys = (
   intent: ExpansionIntentSets,
 ): PivotExpansionStateKeys => ({
-  rows: Array.from(intent.expanded.row),
-  cols: Array.from(intent.expanded.col),
-  collapsedRows: Array.from(intent.collapsed.row),
-  collapsedCols: Array.from(intent.collapsed.col),
+  rows: Array.from(intent.expanded.row).filter(key => key !== rootKey),
+  cols: Array.from(intent.expanded.col).filter(key => key !== rootKey),
+  collapsedRows: Array.from(intent.collapsed.row).filter(
+    key => key !== rootKey,
+  ),
+  collapsedCols: Array.from(intent.collapsed.col).filter(
+    key => key !== rootKey,
+  ),
 });
 
 type ExpansionPersistenceDeps = {
@@ -311,26 +317,12 @@ export const useExpansionEngine = ({
     });
   }, []);
 
-  const persistExpansionState = useCallback(
-    (nextExpanded: AxisSetMap) => {
-      const visible = buildVisiblePersistedExpansionState({
-        tree: treeRef.current,
-        expanded: nextExpanded,
-        explicitExpanded: expansionIntentRef.current.expanded,
-        explicitCollapsed: expansionIntentRef.current.collapsed,
-        program: pivotProgram,
-      });
-      expansionIntentRef.current = {
-        expanded: visible.visibleExpanded,
-        collapsed: visible.visibleCollapsed,
-      };
-      persistExpansionStateKeys(
-        visible.persistedState,
-        expansionPersistenceDepsRef.current,
-      );
-    },
-    [pivotProgram],
-  );
+  const persistExpansionState = useCallback(() => {
+    persistExpansionStateKeys(
+      expansionIntentToStateKeys(expansionIntentRef.current),
+      expansionPersistenceDepsRef.current,
+    );
+  }, []);
 
   const resolveExpandedForMetrics = useCallback(
     (axis: PivotAxis, nextExpanded: Set<string>, nextTree: PivotTreeData) =>
@@ -395,10 +387,7 @@ export const useExpansionEngine = ({
       commitExpansionState({
         expanded: { [axis]: resolvedExpanded },
       });
-      persistExpansionState({
-        ...expandedRef.current,
-        [axis]: resolvedExpanded,
-      });
+      persistExpansionState();
     },
     [commitExpansionState, persistExpansionState, resolveExpandedForMetrics],
   );
@@ -477,7 +466,7 @@ export const useExpansionEngine = ({
             expanded: resolvedExpanded,
           });
           if (persistOnComplete) {
-            persistExpansionState(resolvedExpanded);
+            persistExpansionState();
           }
         }
       } finally {
