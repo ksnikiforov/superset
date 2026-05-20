@@ -42,6 +42,7 @@ import {
   SUBTOTAL_TOKEN,
 } from '../core/tokens';
 import { getMetricKey, getMetricKeys } from '../metrics';
+import { createMetricNodePolicy } from '../metricsTotals';
 import {
   buildOffsetMetricKey,
   buildMeasureLeafOutputKey,
@@ -612,6 +613,7 @@ type ApplyMeasureAxisInput = {
   leafTierVisible: boolean;
   program: PivotProgram;
   metricLabelMap?: Record<string, string>;
+  dateFormatters?: PivotTableQueryFormData['dateFormatters'];
   preserveValueAxisSourceNodes: boolean;
   promoteExistingNodes: boolean;
 };
@@ -625,6 +627,7 @@ const applyMeasureAxis = ({
   leafTierVisible,
   program,
   metricLabelMap,
+  dateFormatters,
   preserveValueAxisSourceNodes,
   promoteExistingNodes,
 }: ApplyMeasureAxisInput): PivotTreeData => {
@@ -641,6 +644,7 @@ const applyMeasureAxis = ({
     valueAxis === 'row' ? rowGroupby.length : colGroupby.length;
   const valuesAtEnd = insertIndex >= valueAxisDepth;
   const metricKeys = groups.map(group => group.metricKey);
+  const metricNodePolicy = createMetricNodePolicy(program);
   const metricTokenSet = new Set(metricKeys.map(encodeMetricKey));
   const leafLabelMap = new Map<string, string>();
   const singleLeafByMetric = new Map<
@@ -714,6 +718,33 @@ const applyMeasureAxis = ({
       const leaf = singleLeafByMetric.get(metricKey);
       if (leaf && !leaf.isValue) {
         label = `${metricDisplayLabel ?? metricKey} ${leaf.label}`;
+      }
+    }
+    if (
+      !metricKey &&
+      !leafId &&
+      !isSubtotalToken(rawValue) &&
+      rawValue !== null &&
+      rawValue !== undefined
+    ) {
+      const dimensionKey = metricNodePolicy.getDimensionKeyForNode(
+        {
+          axis,
+          key,
+          path,
+          label,
+          formattedLabel: label,
+          level: path.length,
+          hasChildren: false,
+          isSubtotal: false,
+        },
+        axis,
+      );
+      const formatter = dimensionKey
+        ? dateFormatters?.[dimensionKey]
+        : undefined;
+      if (formatter) {
+        label = formatter(rawValue);
       }
     }
     const isMetricNode = metricTokenSet.has(
@@ -962,6 +993,7 @@ export const applyMeasureHierarchyAxis = (
   measureHierarchy: MeasureHierarchy,
   program: PivotProgram,
   metricLabelMap?: Record<string, string>,
+  dateFormatters?: PivotTableQueryFormData['dateFormatters'],
 ): PivotTreeData => {
   const leafTierVisible = measureHierarchy.leafTierVisibility === 'visible';
   const { valueAxis, metricInsertIndex: insertIndex } = program;
@@ -973,6 +1005,7 @@ export const applyMeasureHierarchyAxis = (
     leafTierVisible,
     program,
     metricLabelMap,
+    dateFormatters,
     preserveValueAxisSourceNodes:
       leafTierVisible ||
       (hasSingleMetric && (insertIndex === 0 || insertIndex >= axisDepth)),
@@ -1084,6 +1117,7 @@ const finalizeMaterializedTree = (
       measureHierarchy,
       pivotProgram,
       formData.metricLabelMap as Record<string, string> | undefined,
+      formData.dateFormatters,
     ),
     metrics,
     formData.metricLabelMap as Record<string, string> | undefined,

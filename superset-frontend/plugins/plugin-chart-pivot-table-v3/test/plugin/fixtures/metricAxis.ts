@@ -18,6 +18,7 @@
  */
 import { type QueryFormColumn, type QueryFormMetric } from '@superset-ui/core';
 import {
+  type DateFormatter,
   type MeasureHierarchy,
   MetricsLayoutEnum,
   type PivotTreeData,
@@ -85,6 +86,7 @@ export const applyMetricAxis = (
   colGroupby: QueryFormColumn[],
   metricPosition?: number,
   metricLabelMap?: Record<string, string>,
+  dateFormatters?: Record<string, DateFormatter | undefined>,
 ): PivotTreeData => {
   const program = compileMetricAxisProgram({
     metrics,
@@ -98,6 +100,7 @@ export const applyMetricAxis = (
     buildValueMeasureHierarchy(program.metricKeys),
     program,
     metricLabelMap,
+    dateFormatters,
   );
 };
 
@@ -106,6 +109,7 @@ export function applyMeasureHierarchyAxis(
   measureHierarchy: MeasureHierarchy,
   program: PivotProgram,
   metricLabelMap?: Record<string, string>,
+  dateFormatters?: Record<string, DateFormatter | undefined>,
 ): PivotTreeData;
 export function applyMeasureHierarchyAxis(
   tree: PivotTreeData,
@@ -115,6 +119,7 @@ export function applyMeasureHierarchyAxis(
   colGroupby: QueryFormColumn[],
   metricPosition?: number,
   metricLabelMap?: Record<string, string>,
+  dateFormatters?: Record<string, DateFormatter | undefined>,
 ): PivotTreeData;
 export function applyMeasureHierarchyAxis(
   tree: PivotTreeData,
@@ -124,6 +129,7 @@ export function applyMeasureHierarchyAxis(
   colGroupby?: QueryFormColumn[],
   metricPosition?: number,
   legacyMetricLabelMap?: Record<string, string>,
+  dateFormatters?: Record<string, DateFormatter | undefined>,
 ): PivotTreeData {
   if (typeof programOrMetricsLayout === 'object') {
     return applyMeasureHierarchyAxisRuntime(
@@ -131,6 +137,7 @@ export function applyMeasureHierarchyAxis(
       measureHierarchy,
       programOrMetricsLayout,
       metricLabelMapOrRowGroupby as Record<string, string> | undefined,
+      colGroupby as Record<string, DateFormatter | undefined> | undefined,
     );
   }
   const metrics = measureHierarchy.groups.map(group => group.metricKey);
@@ -147,5 +154,6 @@ export function applyMeasureHierarchyAxis(
       metricPosition,
     }),
     legacyMetricLabelMap,
+    dateFormatters,
   );
 }

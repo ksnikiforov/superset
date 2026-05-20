@@ -54,7 +54,6 @@ import {
 import {
   buildColumnDisplayPath,
   buildRenderNodeDisplayState,
-  formatRenderTreeDateLabels,
   resolveColumnHeaderLabel,
 } from './renderDisplay';
 
@@ -188,16 +187,7 @@ export const usePivotRenderModel = ({
   const isLeafTierVisible =
     layout.layout.measureHierarchy.leafTierVisibility === 'visible';
 
-  const { dateFormatters } = formData;
-  const renderTree = useMemo(
-    () =>
-      formatRenderTreeDateLabels({
-        tree,
-        dateFormatters,
-        program: layout.layout.pivotProgram,
-      }),
-    [dateFormatters, layout.layout.pivotProgram, tree],
-  );
+  const renderTree = tree;
 
   const getProjectedPathParts = useCallback(
     (axis: 'row' | 'col', path: PivotTreeNode['path']) =>

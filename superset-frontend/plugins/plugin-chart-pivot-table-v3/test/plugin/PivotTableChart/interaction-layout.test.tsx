@@ -690,6 +690,8 @@ describe('PivotTableChart interaction layout', () => {
     const metrics = ['m1', 'm2'];
     const rowGroupby = ['row2'];
     const colGroupby = ['orderDate'];
+    const orderDateFormatter = (value: number | Date) =>
+      `Year ${new Date(value).getUTCFullYear()}`;
     const tree = applyMetricAxis(
       buildTreeFromRecords(
         [
@@ -717,6 +719,8 @@ describe('PivotTableChart interaction layout', () => {
       rowGroupby,
       colGroupby,
       1,
+      undefined,
+      { orderDate: orderDateFormatter },
     );
     const runtimeLayout: PivotRuntimeLayout = {
       version: 1,
@@ -726,8 +730,6 @@ describe('PivotTableChart interaction layout', () => {
       leafSelection: {},
       valuePlacement: { axis: 'col', index: 1 },
     };
-    const orderDateFormatter = (value: number | Date) =>
-      `Year ${new Date(value).getUTCFullYear()}`;
     const formData = buildFormData({
       interactionMode: 'user_controlled',
       dimensions: [...rowGroupby, ...colGroupby],

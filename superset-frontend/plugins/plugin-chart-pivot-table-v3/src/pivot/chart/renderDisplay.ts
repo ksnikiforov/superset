@@ -18,13 +18,10 @@
  */
 import { type DataRecordValue } from '@superset-ui/core';
 import {
-  type DateFormatter,
   type MeasureHierarchy,
   type PivotAxis,
-  type PivotTreeData,
   type PivotTreeNode,
 } from '../../types';
-import { coerceEpochMsStringToNumber } from '../../utils';
 import {
   decodeMeasureLeafId,
   decodeMetricKey,
@@ -168,102 +165,6 @@ export const resolveColumnHeaderLabel = ({
     );
   }
   return formatPivotLabelValue(rawValue, '');
-};
-
-const normalizeDateFormatterInput = (value: DataRecordValue) => {
-  const normalizedValue = coerceEpochMsStringToNumber(value);
-  if (typeof normalizedValue === 'number') {
-    return normalizedValue;
-  }
-  if (normalizedValue instanceof Date) {
-    return normalizedValue.getTime();
-  }
-  if (typeof normalizedValue === 'string') {
-    const parsed = Date.parse(normalizedValue);
-    return Number.isFinite(parsed) ? parsed : undefined;
-  }
-  return undefined;
-};
-
-const formatAxisDateLabels = ({
-  axis,
-  nodes,
-  dateFormatters,
-  program,
-}: {
-  axis: PivotAxis;
-  nodes: Record<string, PivotTreeNode>;
-  dateFormatters: Record<string, DateFormatter | undefined>;
-  program: PivotLayoutResult['layout']['pivotProgram'];
-}) => {
-  if (Object.keys(dateFormatters).length === 0) {
-    return nodes;
-  }
-  const metricNodePolicy = createMetricNodePolicy(program);
-  let hasChanges = false;
-  const nextNodes: Record<string, PivotTreeNode> = { ...nodes };
-  Object.values(nodes).forEach(node => {
-    if (node.path.length === 0 || node.path.some(isSubtotalToken)) {
-      return;
-    }
-    const tail = node.path[node.path.length - 1];
-    if (decodeMetricKey(tail) || decodeMeasureLeafId(tail)) {
-      return;
-    }
-    const dimensionKey = metricNodePolicy.getDimensionKeyForNode(node, axis);
-    if (!dimensionKey) {
-      return;
-    }
-    const formatter = dateFormatters[dimensionKey];
-    if (!formatter) {
-      return;
-    }
-    const nonSubtotalParts = metricNodePolicy.getNonMetricPathParts(node.path);
-    const rawValue = nonSubtotalParts[nonSubtotalParts.length - 1];
-    if (rawValue === null || rawValue === undefined) {
-      return;
-    }
-    const formatterInput = normalizeDateFormatterInput(rawValue);
-    if (formatterInput === undefined) {
-      return;
-    }
-    const formatted = formatter(formatterInput);
-    if (formatted !== node.formattedLabel) {
-      nextNodes[node.key] = { ...node, formattedLabel: formatted };
-      hasChanges = true;
-    }
-  });
-  return hasChanges ? nextNodes : nodes;
-};
-
-export const formatRenderTreeDateLabels = ({
-  tree,
-  dateFormatters,
-  program,
-}: {
-  tree: PivotTreeData;
-  dateFormatters?: Record<string, DateFormatter | undefined>;
-  program: PivotLayoutResult['layout']['pivotProgram'];
-}) => {
-  if (!dateFormatters || Object.keys(dateFormatters).length === 0) {
-    return tree;
-  }
-  const nextRows = formatAxisDateLabels({
-    axis: 'row',
-    nodes: tree.rows,
-    dateFormatters,
-    program,
-  });
-  const nextCols = formatAxisDateLabels({
-    axis: 'col',
-    nodes: tree.cols,
-    dateFormatters,
-    program,
-  });
-  if (nextRows === tree.rows && nextCols === tree.cols) {
-    return tree;
-  }
-  return { ...tree, rows: nextRows, cols: nextCols };
 };
 
 export type RenderNodeDisplayState = {

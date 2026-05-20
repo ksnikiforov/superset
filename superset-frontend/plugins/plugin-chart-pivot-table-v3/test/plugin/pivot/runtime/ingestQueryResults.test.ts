@@ -266,6 +266,50 @@ test('keeps support and offset facts without materializing support metric branch
   });
 });
 
+test('materializes projected date labels when values are before dimensions', () => {
+  const spec = buildSpec({
+    queryName: 'pivot_v3|1|0',
+    rowDepth: 1,
+    colDepth: 0,
+    rowGroupby: ['order_date'],
+  });
+  const store = createPivotFactStore();
+  ingestQueryResults({
+    specs: [spec],
+    results: [
+      {
+        query_name: spec.queryName,
+        data: [{ order_date: '1704067200000', sales: 10 }],
+      },
+    ],
+  }).forEach(ingested =>
+    store.upsertBatch({
+      ...ingested.spec.meta.factSelector,
+      facts: ingested.facts,
+    }),
+  );
+  const formData = buildFormData({
+    groupbyRows: [METRICS_PLACEHOLDER, 'order_date'],
+    groupbyColumns: [],
+    metrics: ['sales'],
+    metricsLayout: MetricsLayoutEnum.ROWS,
+    dateFormatters: {
+      order_date: value => `date:${new Date(Number(value)).getUTCMonth() + 1}`,
+    },
+  });
+  const tree = materializeLoadedPivotTreeFromFactStore({
+    store,
+    layout: buildLayoutContext(formData),
+    formData,
+  });
+  const projectedDateKey = serializePath([
+    encodeMetricKey('sales'),
+    '1704067200000',
+  ]);
+
+  expect(tree.rows[projectedDateKey]?.formattedLabel).toBe('date:1');
+});
+
 test('materializes column subtotal leaves from planned coverage specs', () => {
   const spec = buildSpec({
     queryName: 'pivot_v3|1|1|branch:row:France',

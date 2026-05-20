@@ -345,8 +345,8 @@ Implementation rules for accelerated chunks:
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `12812` insertions, `18279` deletions, net `-5467`.
-- Current production TypeScript/TSX total: about `28043` lines.
+- Production `src`: `12738` insertions, `18280` deletions, net `-5542`.
+- Current production TypeScript/TSX total: about `27968` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -358,10 +358,10 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `28043` | `-5467` | `< 28000` |
-| Strict core pipeline | `11337` | `11380` | `+43` | `8000` |
-| Non-visual chart runtime hooks | `4683` | `4452` | `-231` | `3000-4000` |
-| Broad core pipeline | `16020` | `15832` | `-188` | `11000-13000` |
+| Full production `src` | `33510` | `27968` | `-5542` | `< 28000` |
+| Strict core pipeline | `11337` | `11414` | `+77` | `8000` |
+| Non-visual chart runtime hooks | `4683` | `4343` | `-340` | `3000-4000` |
+| Broad core pipeline | `16020` | `15757` | `-263` | `11000-13000` |
 
 Current strict core breakdown:
 
@@ -518,6 +518,12 @@ Latest expansion-loading cleanup: expansion loading state is now phase-level
 set state owned by the hydration executor. The old per-request loading reference
 count map and request-local increment/decrement callbacks are gone; branch,
 batch, and intersection phases publish their active visible keys directly.
+
+Latest render-label ownership cleanup: date label projection for metric-axis
+layouts moved from `chart/renderDisplay.ts` into `runtime/materializePivotTree`.
+The renderer no longer scans tree nodes to repair date labels after
+materialization; projected date nodes are labeled when measure/metric axis nodes
+are constructed.
 
 Latest core cleanup: row display intent now uses the same
 `axisCoverageNeeds` manifest as expansion/loading. The old numeric
