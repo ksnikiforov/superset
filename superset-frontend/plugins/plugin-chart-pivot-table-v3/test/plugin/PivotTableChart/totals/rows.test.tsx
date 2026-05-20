@@ -2737,7 +2737,17 @@ describe('PivotTableChart totals & subtotals - rows', () => {
       1,
     );
     const labeledTree = labelRowSubtotalLeaves(withMetrics, metrics);
-    return { labeledTree, metrics, rowGroupby };
+    return {
+      labeledTree,
+      metrics,
+      rowGroupby,
+      layoutRows: [
+        'quantityBand',
+        METRICS_PLACEHOLDER,
+        'returnFlag',
+        'revenueBand',
+      ],
+    };
   };
 
   const buildDeepMetricSubtotalTree = (subtotalLevels: number[]) => {
@@ -2937,14 +2947,15 @@ describe('PivotTableChart totals & subtotals - rows', () => {
   };
 
   it('renders top-level metric subtotals and suppresses returnFlag totals when top position is selected with multiple metrics', () => {
-    const { labeledTree, metrics, rowGroupby } = buildMetricSubtotalTree();
+    const { labeledTree, metrics, rowGroupby, layoutRows } =
+      buildMetricSubtotalTree();
 
     const { container } = render(
       <PivotTableChart
         data={labeledTree}
         formData={buildFormData({
           ...(baseProps as Partial<PivotTableQueryFormData>),
-          groupbyRows: rowGroupby,
+          groupbyRows: layoutRows,
           groupbyColumns: [],
           metricsLayout: MetricsLayoutEnum.ROWS,
           metrics,
@@ -3030,14 +3041,15 @@ describe('PivotTableChart totals & subtotals - rows', () => {
   });
 
   it('renders top-level metric subtotals and returnFlag totals when bottom position is selected with multiple metrics', () => {
-    const { labeledTree, metrics, rowGroupby } = buildMetricSubtotalTree();
+    const { labeledTree, metrics, rowGroupby, layoutRows } =
+      buildMetricSubtotalTree();
 
     const { container } = render(
       <PivotTableChart
         data={labeledTree}
         formData={buildFormData({
           ...(baseProps as Partial<PivotTableQueryFormData>),
-          groupbyRows: rowGroupby,
+          groupbyRows: layoutRows,
           groupbyColumns: [],
           metricsLayout: MetricsLayoutEnum.ROWS,
           metrics,

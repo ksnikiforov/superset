@@ -410,4 +410,32 @@ describe('pivot/chart/layoutRuntime', () => {
       }),
     ).toEqual([dimensionChild, subtotalDescendant]);
   });
+
+  it('keeps explicit single-metric row subtotal descendants when the metric header is hidden', () => {
+    const parent = node('row', ['West']);
+    const subtotalDescendant = {
+      ...node('row', ['West', SUBTOTAL_TOKEN, encodeMetricKey('sales')]),
+      isSubtotal: true,
+    };
+    const nodes = {
+      [parent.key]: parent,
+      [subtotalDescendant.key]: subtotalDescendant,
+    };
+
+    expect(
+      resolveRowSubtotalChildrenPolicy({
+        program: policyProgram({
+          rowDimensions: ['r1'],
+          metricKeys: ['sales'],
+          metricInsertIndex: 1,
+        }),
+        children: [],
+        parent,
+        nodes,
+        rowSubTotals: true,
+        rowSubtotalPositionForParent: 'end',
+        hideMetricHeaderOnRows: true,
+      }),
+    ).toEqual([subtotalDescendant]);
+  });
 });

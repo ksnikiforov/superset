@@ -414,7 +414,7 @@ export const resolveRowSubtotalChildrenPolicy = ({
         isMetricTokenForKeys(val, metricLabelSet),
       );
       return hideMetricHeaderOnRows
-        ? !hasMetricToken
+        ? true
         : !requireMetricLabel || hasMetricToken;
     });
     const seen = new Set(filtered.map(child => child.key));

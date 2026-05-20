@@ -70,6 +70,7 @@ type LegacyTestPivotProps = {
   valueFormat?: PivotTableQueryFormData['valueFormat'];
   columnFormats?: PivotTableQueryFormData['columnFormats'];
   currencyFormats?: PivotTableQueryFormData['currencyFormats'];
+  verboseMap?: PivotTableQueryFormData['verboseMap'];
   allowRenderHtml?: PivotTableQueryFormData['allowRenderHtml'];
   metricColorFormatters?: unknown[];
   rawFormData?: PivotTableQueryFormData;
@@ -407,6 +408,36 @@ const baseProps: PivotTableProps & LegacyTestPivotProps = {
 
 type TestPivotTableChartProps = Partial<PivotTableProps & LegacyTestPivotProps>;
 
+const LEGACY_FORM_DATA_KEYS = [
+  'startCollapsed',
+  'initialDepth',
+  'rowTotals',
+  'colTotals',
+  'rowSubTotals',
+  'rowSubtotalLevels',
+  'colSubtotalLevels',
+  'rowTotalPosition',
+  'rowSubtotalPosition',
+  'colTotalPosition',
+  'colSubtotalPosition',
+  'aggregateFunction',
+  'valueFormat',
+  'columnFormats',
+  'currencyFormats',
+  'allowRenderHtml',
+  'verboseMap',
+] as const satisfies readonly (keyof PivotTableQueryFormData &
+  keyof LegacyTestPivotProps)[];
+
+const buildLegacyFormDataOverrides = (
+  props: TestPivotTableChartProps,
+): Partial<PivotTableQueryFormData> =>
+  Object.fromEntries(
+    LEGACY_FORM_DATA_KEYS.filter(key =>
+      Object.prototype.hasOwnProperty.call(props, key),
+    ).map(key => [key, props[key]]),
+  ) as Partial<PivotTableQueryFormData>;
+
 export default function TestPivotTableChart(props: TestPivotTableChartProps) {
   const mergedProps: PivotTableProps & LegacyTestPivotProps = {
     ...baseProps,
@@ -422,6 +453,10 @@ export default function TestPivotTableChart(props: TestPivotTableChartProps) {
       props.sourceMeasureLeavesByMetric ??
       props.formData?.measureLeavesByMetric ??
       baseProps.sourceMeasureLeavesByMetric,
+  };
+  mergedProps.formData = {
+    ...mergedProps.formData,
+    ...buildLegacyFormDataOverrides(props),
   };
   const runtimeLayout = mergedProps.formData.pivotRuntimeLayout;
   const chartProps = { ...mergedProps };

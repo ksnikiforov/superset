@@ -165,9 +165,14 @@ export const resolveMetricDisplayLabel = (
   }
 
   const { metricLabelMap, verboseMap, metrics = [] } = options ?? {};
-  const mappedLabel =
-    getMetricLookupLabel(metricLabelMap, normalizedKey) ??
-    normalizeMetricLabelToken(verboseMap?.[normalizedKey]);
+  const mappedLabel = getMetricLookupLabel(metricLabelMap, normalizedKey);
+  const verboseLabel = normalizeMetricLabelToken(verboseMap?.[normalizedKey]);
+  if (mappedLabel && mappedLabel !== normalizedKey) {
+    return mappedLabel;
+  }
+  if (verboseLabel) {
+    return verboseLabel;
+  }
   if (mappedLabel) {
     return mappedLabel;
   }
@@ -209,11 +214,15 @@ export const buildResolvedMetricLabelMap = ({
     if (!metricKey) {
       return;
     }
+    const mappedLabel = getMetricLookupLabel(resolved, metricKey);
+    const verboseLabel = normalizeMetricLabelToken(verboseMap?.[metricKey]);
     const label =
-      getMetricLookupLabel(resolved, metricKey) ??
-      normalizeMetricLabelToken(verboseMap?.[metricKey]) ??
-      getMetricIntrinsicLabel(metric) ??
-      metricKey;
+      mappedLabel && mappedLabel !== metricKey
+        ? mappedLabel
+        : (verboseLabel ??
+          mappedLabel ??
+          getMetricIntrinsicLabel(metric) ??
+          metricKey);
     resolved.set(metricKey, label);
   });
 
