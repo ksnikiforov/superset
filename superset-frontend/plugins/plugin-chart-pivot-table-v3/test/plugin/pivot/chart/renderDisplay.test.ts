@@ -79,17 +79,6 @@ const baseDisplayConfig = {
 };
 
 const pivotProgram: PivotProgram = {
-  rows: [
-    { kind: 'dimension', column: 'country' },
-    { kind: 'dimension', column: 'state' },
-  ],
-  columns: [
-    { kind: 'dimension', column: 'month' },
-    {
-      kind: 'values',
-      metrics: [{ key: 'sales', metric: 'sales', index: 0 }],
-    },
-  ],
   rowDimensions: ['country', 'state'],
   columnDimensions: ['month'],
   metrics: [{ key: 'sales', metric: 'sales', index: 0 }],
@@ -100,8 +89,6 @@ const pivotProgram: PivotProgram = {
 
 const dateProgram: PivotProgram = {
   ...pivotProgram,
-  rows: [{ kind: 'dimension', column: 'order_date' }],
-  columns: [{ kind: 'dimension', column: 'order_date' }],
   rowDimensions: ['order_date'],
   columnDimensions: ['order_date'],
   metrics: [],
@@ -112,27 +99,12 @@ const dateProgram: PivotProgram = {
 
 const columnMetricFirstProgram: PivotProgram = {
   ...pivotProgram,
-  columns: [
-    {
-      kind: 'values',
-      metrics: [{ key: 'sales', metric: 'sales', index: 0 }],
-    },
-    { kind: 'dimension', column: 'month' },
-  ],
   valueAxis: 'col',
   metricInsertIndex: 0,
 };
 
 const rowMetricFirstProgram: PivotProgram = {
   ...pivotProgram,
-  rows: [
-    {
-      kind: 'values',
-      metrics: [{ key: 'sales', metric: 'sales', index: 0 }],
-    },
-    { kind: 'dimension', column: 'country' },
-  ],
-  columns: [{ kind: 'dimension', column: 'month' }],
   valueAxis: 'row',
   metricInsertIndex: 0,
 };

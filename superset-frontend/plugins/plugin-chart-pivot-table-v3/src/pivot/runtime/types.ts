@@ -40,8 +40,6 @@ export type PivotAxisLevel =
 export type PivotAxisProgram = PivotAxisLevel[];
 
 export type PivotProgram = {
-  rows: PivotAxisProgram;
-  columns: PivotAxisProgram;
   rowDimensions: PivotColumnRef[];
   columnDimensions: PivotColumnRef[];
   metrics: PivotMetricRef[];

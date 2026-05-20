@@ -91,23 +91,41 @@ export type ResolveAxisChildProjectionInput = {
   childPath: PivotPath;
 };
 
-const axisProgramFor = (program: PivotProgram, axis: PivotAxis) =>
-  axis === 'row' ? program.rows : program.columns;
+const axisDimensionsFor = (program: PivotProgram, axis: PivotAxis) =>
+  axis === 'row' ? program.rowDimensions : program.columnDimensions;
+
+export const buildPivotAxisProgram = (
+  program: PivotProgram,
+  axis: PivotAxis,
+): PivotAxisProgram => {
+  const dimensions = axisDimensionsFor(program, axis);
+  const dimensionLevels = dimensions.map(column => ({
+    kind: 'dimension' as const,
+    column,
+  }));
+  if (axis !== program.valueAxis || program.metricKeys.length === 0) {
+    return dimensionLevels;
+  }
+  const insertIndex = Math.max(
+    0,
+    Math.min(program.metricInsertIndex, dimensions.length),
+  );
+  return [
+    ...dimensionLevels.slice(0, insertIndex),
+    { kind: 'values' as const, metrics: program.metrics },
+    ...dimensionLevels.slice(insertIndex),
+  ];
+};
 
 export const getValuesLevelIndex = (program: PivotProgram, axis: PivotAxis) => {
-  const index = axisProgramFor(program, axis).findIndex(
+  const index = buildPivotAxisProgram(program, axis).findIndex(
     level => level.kind === 'values',
   );
   return index >= 0 ? index : undefined;
 };
 
-export const getAxisDimensionCount = (
-  program: PivotProgram,
-  axis: PivotAxis,
-) =>
-  axis === 'row'
-    ? program.rowDimensions.length
-    : program.columnDimensions.length;
+export const getAxisDimensionCount = (program: PivotProgram, axis: PivotAxis) =>
+  axisDimensionsFor(program, axis).length;
 
 export const isValuesFirstOnAxis = (program: PivotProgram, axis: PivotAxis) =>
   getValuesLevelIndex(program, axis) === 0;
@@ -246,7 +264,7 @@ export const resolveAxisProjection = ({
   axis,
   path,
 }: ResolveAxisProjectionInput): PivotAxisProjection => {
-  const sourceLevels = axisProgramFor(program, axis);
+  const sourceLevels = buildPivotAxisProgram(program, axis);
   const valuesLevelIndex = findValuesLevelIndex(sourceLevels);
   const metricKeys = collectPathMetricKeys(path, new Set(program.metricKeys));
   const measureLeafIds = collectPathMeasureLeafIds(path);

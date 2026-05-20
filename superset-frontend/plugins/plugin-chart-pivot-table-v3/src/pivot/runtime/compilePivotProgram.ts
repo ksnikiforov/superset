@@ -28,12 +28,7 @@ import {
   normalizePlaceholder,
 } from '../core/tokens';
 import { getMetricKey } from '../metrics';
-import type {
-  PivotAxisProgram,
-  PivotColumnRef,
-  PivotMetricRef,
-  PivotProgram,
-} from './types';
+import type { PivotColumnRef, PivotMetricRef, PivotProgram } from './types';
 
 export type CompilePivotProgramInput = {
   groupbyRows?: QueryFormColumn[] | QueryFormColumn;
@@ -71,22 +66,6 @@ const toMetricRefs = (metrics: QueryFormMetric[]): PivotMetricRef[] => {
   return refs;
 };
 
-const toDimensionLevels = (columns: PivotColumnRef[]): PivotAxisProgram =>
-  columns.map(column => ({
-    kind: 'dimension',
-    column,
-  }));
-
-const withValuesLevel = (
-  columns: PivotColumnRef[],
-  metrics: PivotMetricRef[],
-  insertIndex: number,
-): PivotAxisProgram => [
-  ...toDimensionLevels(columns.slice(0, insertIndex)),
-  { kind: 'values' as const, metrics },
-  ...toDimensionLevels(columns.slice(insertIndex)),
-];
-
 export const insertValuesPlaceholder = <T>(
   rows: T[],
   cols: T[],
@@ -120,8 +99,6 @@ export const compilePivotProgram = ({
 
   if (metrics.length === 0) {
     return {
-      rows: toDimensionLevels(rowDimensions),
-      columns: toDimensionLevels(columnDimensions),
       rowDimensions,
       columnDimensions,
       metrics,
@@ -155,14 +132,6 @@ export const compilePivotProgram = ({
   );
 
   return {
-    rows:
-      valueAxis === 'row'
-        ? withValuesLevel(rowDimensions, metrics, metricInsertIndex)
-        : toDimensionLevels(rowDimensions),
-    columns:
-      valueAxis === 'col'
-        ? withValuesLevel(columnDimensions, metrics, metricInsertIndex)
-        : toDimensionLevels(columnDimensions),
     rowDimensions,
     columnDimensions,
     metrics,

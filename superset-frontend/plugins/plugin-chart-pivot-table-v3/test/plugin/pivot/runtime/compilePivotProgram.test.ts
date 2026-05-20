@@ -21,6 +21,7 @@ import {
   compilePivotProgram,
   resolvePivotProgramPlacement,
 } from '../../../../src/pivot/runtime/compilePivotProgram';
+import { buildPivotAxisProgram } from '../../../../src/pivot/runtime/projection';
 import type { PivotAxisProgram } from '../../../../src/pivot/runtime/types';
 import { MetricsLayoutEnum } from '../../../../src/types';
 
@@ -38,8 +39,13 @@ describe('compilePivotProgram', () => {
       metricsLayout: MetricsLayoutEnum.ROWS,
     });
 
-    expect(describeAxis(program.rows)).toEqual(['values', 'dimension:r1']);
-    expect(describeAxis(program.columns)).toEqual(['dimension:c1']);
+    expect(describeAxis(buildPivotAxisProgram(program, 'row'))).toEqual([
+      'values',
+      'dimension:r1',
+    ]);
+    expect(describeAxis(buildPivotAxisProgram(program, 'col'))).toEqual([
+      'dimension:c1',
+    ]);
     expect(program.valueAxis).toBe('row');
     expect(program.metricInsertIndex).toBe(0);
   });
@@ -51,7 +57,7 @@ describe('compilePivotProgram', () => {
       metricsLayout: MetricsLayoutEnum.ROWS,
     });
 
-    expect(describeAxis(program.rows)).toEqual([
+    expect(describeAxis(buildPivotAxisProgram(program, 'row'))).toEqual([
       'dimension:r1',
       'values',
       'dimension:r2',
@@ -67,7 +73,7 @@ describe('compilePivotProgram', () => {
       metricsLayout: MetricsLayoutEnum.ROWS,
     });
 
-    expect(describeAxis(program.rows)).toEqual([
+    expect(describeAxis(buildPivotAxisProgram(program, 'row'))).toEqual([
       'dimension:r1',
       'dimension:r2',
       'values',
@@ -83,8 +89,13 @@ describe('compilePivotProgram', () => {
       metricsLayout: MetricsLayoutEnum.COLUMNS,
     });
 
-    expect(describeAxis(program.rows)).toEqual(['dimension:r1']);
-    expect(describeAxis(program.columns)).toEqual(['values', 'dimension:c1']);
+    expect(describeAxis(buildPivotAxisProgram(program, 'row'))).toEqual([
+      'dimension:r1',
+    ]);
+    expect(describeAxis(buildPivotAxisProgram(program, 'col'))).toEqual([
+      'values',
+      'dimension:c1',
+    ]);
     expect(program.valueAxis).toBe('col');
     expect(program.metricInsertIndex).toBe(0);
   });
@@ -96,7 +107,7 @@ describe('compilePivotProgram', () => {
       metricsLayout: MetricsLayoutEnum.COLUMNS,
     });
 
-    expect(describeAxis(program.columns)).toEqual([
+    expect(describeAxis(buildPivotAxisProgram(program, 'col'))).toEqual([
       'dimension:c1',
       'values',
       'dimension:c2',
@@ -112,7 +123,7 @@ describe('compilePivotProgram', () => {
       metricsLayout: MetricsLayoutEnum.COLUMNS,
     });
 
-    expect(describeAxis(program.columns)).toEqual([
+    expect(describeAxis(buildPivotAxisProgram(program, 'col'))).toEqual([
       'dimension:c1',
       'dimension:c2',
       'values',

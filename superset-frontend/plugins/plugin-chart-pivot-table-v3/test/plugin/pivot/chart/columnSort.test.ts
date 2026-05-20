@@ -67,14 +67,6 @@ const measureHierarchy: MeasureHierarchy = {
 };
 
 const pivotProgram: PivotProgram = {
-  rows: [],
-  columns: [
-    { kind: 'dimension', column: 'year' },
-    {
-      kind: 'values',
-      metrics: [{ key: 'sales', metric: 'sales', index: 0 }],
-    },
-  ],
   rowDimensions: [],
   columnDimensions: ['year'],
   metrics: [{ key: 'sales', metric: 'sales', index: 0 }],
@@ -201,13 +193,6 @@ describe('column sort helpers', () => {
       layout: {
         pivotProgram: {
           ...pivotProgram,
-          rows: [
-            {
-              kind: 'values',
-              metrics: [{ key: 'sales', metric: 'sales', index: 0 }],
-            },
-          ],
-          columns: [{ kind: 'dimension', column: 'year' }],
           valueAxis: 'row',
           metricInsertIndex: 0,
         },

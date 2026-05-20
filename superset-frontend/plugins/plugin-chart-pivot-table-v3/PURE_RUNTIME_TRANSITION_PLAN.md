@@ -345,8 +345,8 @@ Implementation rules for accelerated chunks:
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `12963` insertions, `18278` deletions, net `-5315`.
-- Current production TypeScript/TSX total: about `28195` lines.
+- Production `src`: `12903` insertions, `18278` deletions, net `-5375`.
+- Current production TypeScript/TSX total: about `28135` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -358,16 +358,16 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `28195` | `-5315` | `< 28000` |
-| Strict core pipeline | `11337` | `11530` | `+193` | `8000` |
+| Full production `src` | `33510` | `28135` | `-5375` | `< 28000` |
+| Strict core pipeline | `11337` | `11470` | `+133` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4452` | `-231` | `3000-4000` |
-| Broad core pipeline | `16020` | `15982` | `-38` | `11000-13000` |
+| Broad core pipeline | `16020` | `15922` | `-98` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `3733` |
+| `pivot/runtime/*` | `3673` |
 | `pivot/expansion/*` | `2427` |
 | `pivot/query/*` | `1387` |
 | `pivot/layout/*` | `770` |
@@ -393,6 +393,12 @@ deleted. `PivotProgram.valueAxis` is now the single Values-axis authority, and
 UI-facing `MetricsLayoutEnum` is derived only at the transform/control boundary.
 The materializer also stopped scanning axis levels to rediscover Values
 placement and uses `program.metricInsertIndex` directly.
+
+Latest program-shape cleanup: `PivotProgram.rows` and `PivotProgram.columns`
+were deleted. Axis programs are now derived from dimensions, metrics,
+`valueAxis`, and `metricInsertIndex` at the projection boundary. This removes
+duplicated compiled state and deletes the materializer branch that rebuilt
+axis-level arrays for partial batch materialization.
 
 Latest transport cleanup: emitted `BatchGroup` requests no longer carry a
 separate `signature` field. Candidate signatures are used only while grouping
