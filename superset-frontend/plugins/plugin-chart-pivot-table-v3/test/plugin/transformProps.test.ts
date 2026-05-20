@@ -238,8 +238,8 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
     const specs = buildInitialQuerySpecs(formData);
     const queryResults = specs.map(spec => {
       if (
-        spec.meta.coverage.rowDepth === 0 &&
-        spec.meta.coverage.columnDepth === 0
+        spec.meta.factSelector.coverage.rowDepth === 0 &&
+        spec.meta.factSelector.coverage.columnDepth === 0
       ) {
         return {
           query: { query_name: spec.queryName },
@@ -249,8 +249,8 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
         };
       }
       if (
-        spec.meta.coverage.rowDepth === 1 &&
-        spec.meta.coverage.columnDepth === 1
+        spec.meta.factSelector.coverage.rowDepth === 1 &&
+        spec.meta.factSelector.coverage.columnDepth === 1
       ) {
         return {
           query: { query_name: spec.queryName },
@@ -260,8 +260,8 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
         };
       }
       if (
-        spec.meta.coverage.rowDepth === 1 &&
-        spec.meta.coverage.columnDepth === 0
+        spec.meta.factSelector.coverage.rowDepth === 1 &&
+        spec.meta.factSelector.coverage.columnDepth === 0
       ) {
         return {
           query: { query_name: spec.queryName },
@@ -271,8 +271,8 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
         };
       }
       if (
-        spec.meta.coverage.rowDepth === 0 &&
-        spec.meta.coverage.columnDepth === 1
+        spec.meta.factSelector.coverage.rowDepth === 0 &&
+        spec.meta.factSelector.coverage.columnDepth === 1
       ) {
         return {
           query: { query_name: spec.queryName },
@@ -574,8 +574,8 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
       const scopeKind = spec.meta.factSelector.scope.kind;
       if (scopeKind === 'root') {
         if (
-          spec.meta.coverage.rowDepth === 0 &&
-          spec.meta.coverage.columnDepth === 0
+          spec.meta.factSelector.coverage.rowDepth === 0 &&
+          spec.meta.factSelector.coverage.columnDepth === 0
         ) {
           return {
             query: { query_name: spec.queryName },
@@ -585,8 +585,8 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
           };
         }
         if (
-          spec.meta.coverage.rowDepth === 1 &&
-          spec.meta.coverage.columnDepth === 1
+          spec.meta.factSelector.coverage.rowDepth === 1 &&
+          spec.meta.factSelector.coverage.columnDepth === 1
         ) {
           return {
             query: { query_name: spec.queryName },
@@ -596,8 +596,8 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
           };
         }
         if (
-          spec.meta.coverage.rowDepth === 1 &&
-          spec.meta.coverage.columnDepth === 0
+          spec.meta.factSelector.coverage.rowDepth === 1 &&
+          spec.meta.factSelector.coverage.columnDepth === 0
         ) {
           return {
             query: { query_name: spec.queryName },
@@ -607,8 +607,8 @@ describe('Pivot Table v3 transformProps (bootstrap)', () => {
           };
         }
         if (
-          spec.meta.coverage.rowDepth === 0 &&
-          spec.meta.coverage.columnDepth === 1
+          spec.meta.factSelector.coverage.rowDepth === 0 &&
+          spec.meta.factSelector.coverage.columnDepth === 1
         ) {
           return {
             query: { query_name: spec.queryName },

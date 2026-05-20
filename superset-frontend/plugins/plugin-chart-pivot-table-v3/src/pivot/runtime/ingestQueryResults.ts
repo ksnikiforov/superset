@@ -222,7 +222,7 @@ export const ingestQueryResults = <T extends QueryResultWithData>({
       facts: factsFromRecords({
         result,
         metrics: spec.metrics,
-        coverage: spec.meta.coverage,
+        coverage: spec.meta.factSelector.coverage,
       }),
     };
   });
@@ -252,7 +252,7 @@ const ingestQueryResultsAsync = async <T extends QueryResultWithData>({
       facts: await factsFromRecordsAsync({
         result,
         metrics: spec.metrics,
-        coverage: spec.meta.coverage,
+        coverage: spec.meta.factSelector.coverage,
         chunkSize,
         shouldContinue,
         yieldToMain,

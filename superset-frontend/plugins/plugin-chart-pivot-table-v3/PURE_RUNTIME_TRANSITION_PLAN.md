@@ -290,8 +290,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13336` insertions, `18177` deletions, net `-4841`.
-- Current production TypeScript/TSX total: about `28669` lines.
+- Production `src`: `13334` insertions, `18177` deletions, net `-4843`.
+- Current production TypeScript/TSX total: about `28667` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -303,10 +303,10 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `28669` | `-4841` | `< 28000` |
-| Strict core pipeline | `11337` | `11502` | `+165` | `8000` |
+| Full production `src` | `33510` | `28667` | `-4843` | `< 28000` |
+| Strict core pipeline | `11337` | `11500` | `+163` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4893` | `+210` | `3000-4000` |
-| Broad core pipeline | `16020` | `16395` | `+375` | `11000-13000` |
+| Broad core pipeline | `16020` | `16393` | `+373` | `11000-13000` |
 
 Current strict core breakdown:
 
@@ -314,7 +314,7 @@ Current strict core breakdown:
 | --- | ---: |
 | `pivot/runtime/*` | `3781` |
 | `pivot/expansion/*` | `2567` |
-| `pivot/query/*` | `1523` |
+| `pivot/query/*` | `1521` |
 | `pivot/layout/*` | `770` |
 | `pivot/core/*` | `252` |
 | core domain helpers | `1580` |
@@ -594,6 +594,11 @@ gone. Query execution now asks the coverage manifest directly whether planned
 fact selectors are already loaded via `factSelectorsCoverSelector`, keeping
 coverage authority in `runtime/coverage.ts` instead of duplicating it as a fact
 store method.
+
+Latest query-meta cleanup: planned query metadata no longer duplicates
+coverage beside the fact selector. Consumers read
+`spec.meta.factSelector.coverage`, keeping the planned selector as the single
+query-to-fact-store contract.
 
 Checkpoint: deleting `PivotExpansionPlan.hasMissingNodes` is not currently a
 safe simplification. A trial cut changed persisted row x column restore by

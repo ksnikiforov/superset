@@ -119,8 +119,8 @@ describe('temporal branch query specs contract', () => {
       expect(temporalFilter?.val).toBe(1483228800000);
       expect(spec.queryName).toBe(
         `${formatQueryName(
-          spec.meta.coverage.rowDepth,
-          spec.meta.coverage.columnDepth,
+          spec.meta.factSelector.coverage.rowDepth,
+          spec.meta.factSelector.coverage.columnDepth,
         )}|branch:row:${serializePath(path)}`,
       );
     });
@@ -197,8 +197,8 @@ describe('temporal branch query specs contract', () => {
       expect(inFilter?.val).toEqual([1483228800000, 1514764800000]);
       expect(spec.queryName).toBe(
         `${formatQueryName(
-          spec.meta.coverage.rowDepth,
-          spec.meta.coverage.columnDepth,
+          spec.meta.factSelector.coverage.rowDepth,
+          spec.meta.factSelector.coverage.columnDepth,
         )}|batch:row:|chunk:0`,
       );
     });

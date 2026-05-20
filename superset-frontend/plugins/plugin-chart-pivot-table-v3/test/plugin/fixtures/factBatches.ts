@@ -156,7 +156,7 @@ const buildFactsForSpec = (
   spec: PlannedQuerySpec,
   data?: PivotTreeData,
 ): PivotFact[] => {
-  const facts = buildFactsForCoverage(data, spec.meta.coverage);
+  const facts = buildFactsForCoverage(data, spec.meta.factSelector.coverage);
   return buildFactsForScope(facts, spec.meta.factSelector.scope);
 };
 

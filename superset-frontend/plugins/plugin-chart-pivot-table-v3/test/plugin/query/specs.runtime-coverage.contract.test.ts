@@ -85,13 +85,13 @@ describe('runtime coverage query specs contract', () => {
 
     expect(specs.length).toBeGreaterThan(0);
     specs.forEach(spec => {
-      expect(spec.meta.coverage).toMatchObject({
-        rowDepth: spec.meta.coverage.rowDepth,
-        columnDepth: spec.meta.coverage.columnDepth,
+      expect(spec.meta.factSelector.coverage).toMatchObject({
+        rowDepth: spec.meta.factSelector.coverage.rowDepth,
+        columnDepth: spec.meta.factSelector.coverage.columnDepth,
       });
       expect(spec.columns).toEqual([
-        ...(spec.meta.coverage?.rowDimensions ?? []),
-        ...(spec.meta.coverage?.columnDimensions ?? []),
+        ...(spec.meta.factSelector.coverage?.rowDimensions ?? []),
+        ...(spec.meta.factSelector.coverage?.columnDimensions ?? []),
       ]);
     });
   });
@@ -151,7 +151,9 @@ describe('runtime coverage query specs contract', () => {
     expect(specs.length).toBeGreaterThan(0);
     expect(
       specs.some(spec =>
-        spec.meta.coverage?.columnDimensions.includes('subcategory'),
+        spec.meta.factSelector.coverage?.columnDimensions.includes(
+          'subcategory',
+        ),
       ),
     ).toBe(true);
     expect(specs[0].meta.factSelector.scope).toMatchObject({

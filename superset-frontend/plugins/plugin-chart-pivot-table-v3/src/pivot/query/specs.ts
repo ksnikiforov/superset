@@ -101,7 +101,6 @@ export type QuerySpec = {
 
 export type QuerySpecMeta = {
   requiredTimeOffsets: string[];
-  coverage: PivotFactCoverage;
   factSelector: PivotFactSelector;
 };
 
@@ -680,7 +679,6 @@ const buildSpecsForCoverages = ({
     filters,
     meta: {
       requiredTimeOffsets: ctx.requiredTimeOffsets,
-      coverage,
       factSelector: buildSpecFactSelector({
         coverage,
         materialization: ctx.materialization,

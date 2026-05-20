@@ -1595,7 +1595,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
       new Set(
         (fetchCall?.specs as PlannedQuerySpec[]).map(
           spec =>
-            `${spec.meta.coverage.rowDepth}|${spec.meta.coverage.columnDepth}`,
+            `${spec.meta.factSelector.coverage.rowDepth}|${spec.meta.factSelector.coverage.columnDepth}`,
         ),
       ),
     ).toEqual(new Set(['1|1', '1|0', '0|1']));
@@ -3355,8 +3355,8 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
         const path = scope?.kind === 'axisPaths' ? (scope.paths[0] ?? []) : [];
         return `${scope?.kind ?? 'unknown'}:${scope?.axis ?? 'none'}:${serializePath(
           path ?? [],
-        )}:${spec.meta?.coverage?.rowDepth ?? 0}:${
-          spec.meta?.coverage?.columnDepth ?? 0
+        )}:${spec.meta?.factSelector?.coverage?.rowDepth ?? 0}:${
+          spec.meta?.factSelector?.coverage?.columnDepth ?? 0
         }`;
       },
     );
@@ -3603,14 +3603,21 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     expect(plannedSpecs.length).toBeGreaterThan(0);
     expect(
       plannedSpecs.some(
-        (spec: { meta?: { coverage?: { columnDepth?: number } } }) =>
-          (spec.meta?.coverage?.columnDepth ?? 0) >= 1,
+        (spec: {
+          meta?: { factSelector?: { coverage?: { columnDepth?: number } } };
+        }) => (spec.meta?.factSelector?.coverage?.columnDepth ?? 0) >= 1,
       ),
     ).toBe(true);
     expect(
       plannedSpecs.some(
-        (spec: { meta?: { coverage?: { columnDimensions?: string[] } } }) =>
-          (spec.meta?.coverage?.columnDimensions ?? []).includes('c1'),
+        (spec: {
+          meta?: {
+            factSelector?: { coverage?: { columnDimensions?: string[] } };
+          };
+        }) =>
+          (spec.meta?.factSelector?.coverage?.columnDimensions ?? []).includes(
+            'c1',
+          ),
       ),
     ).toBe(true);
     expect(

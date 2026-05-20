@@ -207,8 +207,8 @@ describe('buildExpansionQuerySpecs', () => {
       path: ['A'],
     });
 
-    expect(specs[0].meta.coverage.rowDepth).toBe(2);
-    expect(specs[0].meta.coverage.columnDepth).toBe(0);
+    expect(specs[0].meta.factSelector.coverage.rowDepth).toBe(2);
+    expect(specs[0].meta.factSelector.coverage.columnDepth).toBe(0);
   });
 
   it('uses the visible column depth for row fetches', () => {
@@ -226,7 +226,7 @@ describe('buildExpansionQuerySpecs', () => {
       visibleColDepth: 0,
     });
 
-    expect(specs[0].meta.coverage.columnDepth).toBe(0);
+    expect(specs[0].meta.factSelector.coverage.columnDepth).toBe(0);
   });
 
   it('limits column fetch row depth to what is visible', () => {
@@ -244,7 +244,7 @@ describe('buildExpansionQuerySpecs', () => {
       visibleRowDepth: 1,
     });
 
-    expect(specs[0].meta.coverage.rowDepth).toBe(1);
+    expect(specs[0].meta.factSelector.coverage.rowDepth).toBe(1);
   });
 
   it('does not infer branch query depth from rendered tree shape', () => {
@@ -260,8 +260,8 @@ describe('buildExpansionQuerySpecs', () => {
       path: ['C'],
     });
 
-    expect(specs[0].meta.coverage.rowDepth).toBe(0);
-    expect(specs[0].meta.coverage.columnDepth).toBe(2);
+    expect(specs[0].meta.factSelector.coverage.rowDepth).toBe(0);
+    expect(specs[0].meta.factSelector.coverage.columnDepth).toBe(2);
   });
 
   it('fetches metric-front column expansion with root metrics populated', async () => {

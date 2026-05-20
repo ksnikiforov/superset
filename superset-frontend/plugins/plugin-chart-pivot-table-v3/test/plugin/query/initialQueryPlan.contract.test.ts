@@ -85,11 +85,13 @@ describe('buildInitialQuerySpecs (contracts)', () => {
       specs
         .filter(spec => specScopeKind(spec) === 'root')
         .map(spec => [
-          spec.meta.coverage.rowDepth,
-          spec.meta.coverage.columnDepth,
+          spec.meta.factSelector.coverage.rowDepth,
+          spec.meta.factSelector.coverage.columnDepth,
         ]),
     ).not.toContainEqual([2, 1]);
-    expect(specs.every(spec => spec.meta.coverage.rowDepth <= 1)).toBe(true);
+    expect(
+      specs.every(spec => spec.meta.factSelector.coverage.rowDepth <= 1),
+    ).toBe(true);
     expect(layout.axisCoverageNeeds).toContainEqual({
       axis: 'row',
       depth: 2,
@@ -128,8 +130,8 @@ describe('buildInitialQuerySpecs (contracts)', () => {
     expect(
       specs.every(
         spec =>
-          spec.meta.coverage.rowDepth <= 1 &&
-          spec.meta.coverage.columnDepth <= 1,
+          spec.meta.factSelector.coverage.rowDepth <= 1 &&
+          spec.meta.factSelector.coverage.columnDepth <= 1,
       ),
     ).toBe(true);
   });
@@ -147,12 +149,12 @@ describe('buildInitialQuerySpecs (contracts)', () => {
     const gridSpec = specs.find(
       spec =>
         specScopeKind(spec) === 'root' &&
-        spec.meta.coverage.rowDepth === 1 &&
-        spec.meta.coverage.columnDepth === 1,
+        spec.meta.factSelector.coverage.rowDepth === 1 &&
+        spec.meta.factSelector.coverage.columnDepth === 1,
     );
 
     expect(gridSpec?.columns).toEqual(['country', 'category']);
-    expect(gridSpec?.meta.coverage).toMatchObject({
+    expect(gridSpec?.meta.factSelector.coverage).toMatchObject({
       rowDepth: 1,
       columnDepth: 1,
       rowDimensions: ['country'],
@@ -178,8 +180,8 @@ describe('buildInitialQuerySpecs (contracts)', () => {
 
     expect(
       specs.map(spec => [
-        spec.meta.coverage.rowDepth,
-        spec.meta.coverage.columnDepth,
+        spec.meta.factSelector.coverage.rowDepth,
+        spec.meta.factSelector.coverage.columnDepth,
       ]),
     ).toEqual(
       expect.arrayContaining([
@@ -191,8 +193,8 @@ describe('buildInitialQuerySpecs (contracts)', () => {
     expect(
       specs.some(
         spec =>
-          spec.meta.coverage.rowDepth === 0 &&
-          spec.meta.coverage.columnDepth === 0,
+          spec.meta.factSelector.coverage.rowDepth === 0 &&
+          spec.meta.factSelector.coverage.columnDepth === 0,
       ),
     ).toBe(false);
   });

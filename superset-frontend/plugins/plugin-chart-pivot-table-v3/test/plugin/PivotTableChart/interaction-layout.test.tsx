@@ -64,7 +64,7 @@ const buildInitialBootstrapRuntime = ({
       query_name: spec.queryName,
       data:
         resultsByDepth[
-          `${spec.meta.coverage.rowDepth}|${spec.meta.coverage.columnDepth}`
+          `${spec.meta.factSelector.coverage.rowDepth}|${spec.meta.factSelector.coverage.columnDepth}`
         ] ?? [],
     })),
     layout,
@@ -1927,9 +1927,11 @@ describe('PivotTableChart interaction layout', () => {
           spec =>
             (
               spec as {
-                meta?: { coverage?: { columnDepth?: number } };
+                meta?: {
+                  factSelector?: { coverage?: { columnDepth?: number } };
+                };
               }
-            ).meta?.coverage?.columnDepth === 1,
+            ).meta?.factSelector?.coverage?.columnDepth === 1,
         );
         const resultsByDepth: Record<string, DataRecord[]> = includesColumnDepth
           ? {
@@ -1957,7 +1959,7 @@ describe('PivotTableChart interaction layout', () => {
         return specs.map(spec => {
           const { rowDepth, columnDepth } = (
             spec as unknown as PlannedQuerySpec
-          ).meta.coverage;
+          ).meta.factSelector.coverage;
           return {
             data: resultsByDepth[`${rowDepth}|${columnDepth}`] ?? [],
           };
@@ -1997,7 +1999,7 @@ describe('PivotTableChart interaction layout', () => {
       new Set(
         (fetchSpy.mock.calls[0][0].specs as PlannedQuerySpec[]).map(
           spec =>
-            `${spec.meta.coverage.rowDepth}|${spec.meta.coverage.columnDepth}`,
+            `${spec.meta.factSelector.coverage.rowDepth}|${spec.meta.factSelector.coverage.columnDepth}`,
         ),
       ),
     ).toEqual(new Set(['1|1', '1|0', '0|1']));
@@ -2010,7 +2012,7 @@ describe('PivotTableChart interaction layout', () => {
       new Set(
         (fetchSpy.mock.calls[1][0].specs as PlannedQuerySpec[]).map(
           spec =>
-            `${spec.meta.coverage.rowDepth}|${spec.meta.coverage.columnDepth}`,
+            `${spec.meta.factSelector.coverage.rowDepth}|${spec.meta.factSelector.coverage.columnDepth}`,
         ),
       ),
     ).toEqual(new Set(['1|0']));

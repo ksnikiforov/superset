@@ -546,7 +546,7 @@ describe('branch fact coverage', () => {
             columnDepth: axis === 'col' ? 2 : 0,
           }),
         },
-      }).map(spec => spec.meta.coverage);
+      }).map(spec => spec.meta.factSelector.coverage);
 
       expect(projection.filterDimensionPath).toEqual(['US']);
       expect(projection.projectedDimensionPath).toEqual(['US', 'Boston']);

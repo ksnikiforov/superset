@@ -153,7 +153,9 @@ describe('PivotTableChart basic regression smoke guardrails', () => {
       [],
     );
     fetchPivotBranchMock.mockImplementation(params =>
-      Promise.resolve(buildMockExpansionFetchResult(params, { data: expandedTree })),
+      Promise.resolve(
+        buildMockExpansionFetchResult(params, { data: expandedTree }),
+      ),
     );
 
     const formData = buildFormData({
@@ -285,8 +287,9 @@ describe('PivotTableChart basic regression smoke guardrails', () => {
     ).toEqual(['c1', METRICS_PLACEHOLDER]);
     expect(
       (fetchCall?.specs ?? []).some(
-        (spec: { meta?: { coverage?: { columnDepth?: number } } }) =>
-          (spec.meta?.coverage?.columnDepth ?? 0) >= 1,
+        (spec: {
+          meta?: { factSelector?: { coverage?: { columnDepth?: number } } };
+        }) => (spec.meta?.factSelector?.coverage?.columnDepth ?? 0) >= 1,
       ),
     ).toBe(true);
 

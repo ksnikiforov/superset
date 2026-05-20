@@ -422,7 +422,7 @@ describe('fetchBatch', () => {
     const store = createPivotFactStore();
     const preloadedSpec = specs[specs.length - 1];
     store.upsertBatch({
-      coverage: preloadedSpec.meta.coverage,
+      coverage: preloadedSpec.meta.factSelector.coverage,
       scope: {
         kind: 'axisPaths',
         axis: 'row',

@@ -66,9 +66,7 @@ const buildSpec = ({
     metrics,
     filters: [],
     meta: {
-      kind: 'root',
       requiredTimeOffsets: [],
-      coverage,
       factSelector: {
         coverage,
         scope: { kind: 'root' },
@@ -151,9 +149,6 @@ test('records exact branch scope on fact-store batches', () => {
     ...spec,
     meta: {
       ...spec.meta,
-      kind: 'branch',
-      axis: 'row',
-      path: ['France'],
       factSelector: {
         ...spec.meta.factSelector,
         scope: {
