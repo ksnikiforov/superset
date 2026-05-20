@@ -95,10 +95,10 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `27380` | `-6130` | `< 28000` |
-| Strict core pipeline | `11337` | `11145` | `-192` | `8000` |
+| Full production `src` | `33510` | `27358` | `-6152` | `< 28000` |
+| Strict core pipeline | `11337` | `11123` | `-214` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4026` | `-657` | `3000-4000` |
-| Broad core pipeline | `16020` | `15171` | `-849` | `11000-13000` |
+| Broad core pipeline | `16020` | `15149` | `-871` | `11000-13000` |
 
 Strict core breakdown:
 
@@ -106,7 +106,7 @@ Strict core breakdown:
 | --- | ---: |
 | `pivot/runtime/*` | `3535` |
 | `pivot/expansion/*` | `2201` |
-| `pivot/query/*` | `1492` |
+| `pivot/query/*` | `1470` |
 | `pivot/layout/*` | `739` |
 | `pivot/core/*` | `252` |
 | core domain helpers | `1537` |
@@ -116,6 +116,8 @@ Completed structural cuts:
 
 - Branch/batch/intersection fetch APIs were removed from production callers.
 - Expansion fetch now receives coverage targets, not request kinds.
+- Production query planning exposes phased expansion specs only; flattened query
+  spec helpers are test-fixture utilities.
 - Query specs carry exact fact-store selectors.
 - Expansion coverage planning no longer depends on the render model.
 - Configured pre-expansion now compiles into manifest-shaped coverage.

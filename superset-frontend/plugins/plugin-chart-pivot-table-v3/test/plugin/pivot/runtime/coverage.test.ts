@@ -36,12 +36,12 @@ import {
 import { type PivotFactSelector } from '../../../../src/pivot/runtime/factStore';
 import { resolveAxisProjection } from '../../../../src/pivot/runtime/projection';
 import { buildLayoutContext } from '../../../../src/pivot/layout/LayoutContext';
-import { buildExpansionQuerySpecs } from '../../../../src/pivot/query/specs';
 import {
   MetricsLayoutEnum,
   type PivotPath,
   type PivotTableQueryFormData,
 } from '../../../../src/types';
+import { buildExpansionQuerySpecs } from '../../fixtures/querySpecs';
 
 const axisScope = (
   axis: 'row' | 'col',

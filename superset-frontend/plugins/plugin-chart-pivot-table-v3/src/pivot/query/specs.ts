@@ -60,7 +60,10 @@ import {
 import { resolveInteractionFormData } from '../layout/resolveInteractionLayout';
 import { getMetricKey } from '../metrics';
 import { collectRequiredTimeOffsets } from '../measureLeaves';
-import { type ExpansionCoverageTarget } from '../expansion/planner';
+import {
+  isIntersectionCoverageTarget,
+  type ExpansionCoverageTarget,
+} from '../expansion/planner';
 import {
   buildPathFilters,
   coerceValueForColumn,
@@ -292,13 +295,13 @@ const buildBranchFactCoverages = ({
   includeColumnTotalForRowFormatting?: boolean;
 }): PivotFactCoverage[] => {
   const depthPairs: DepthPair[] = [];
+  const depthPairKeys = new Set<string>();
   const addDepthPair = (rowDepthVal: number, columnDepthVal: number) => {
     const key = `${rowDepthVal}|${columnDepthVal}`;
-    if (
-      depthPairs.find(pair => `${pair.rowDepth}|${pair.columnDepth}` === key)
-    ) {
+    if (depthPairKeys.has(key)) {
       return;
     }
+    depthPairKeys.add(key);
     depthPairs.push({
       rowDepth: rowDepthVal,
       columnDepth: columnDepthVal,
@@ -768,12 +771,9 @@ const resolveIntersectionExpansionAnchor = ({
   return { axis: 'row', path: rowPath ?? [] };
 };
 
-const targetScopePaths = (
-  target: ExpansionCoverageTarget,
-  axis: PivotAxis,
-): PivotPath[] =>
+const targetScopePaths = (target: ExpansionCoverageTarget): PivotPath[] =>
   pathsFromAxisScope(
-    axis === 'row' ? target.need.rowScope : target.need.columnScope,
+    target.axis === 'row' ? target.need.rowScope : target.need.columnScope,
   );
 
 const chunkTargets = (
@@ -781,8 +781,8 @@ const chunkTargets = (
   chunkSize: number,
 ): ExpansionCoverageTarget[][] => {
   const sorted = [...targets].sort((a, b) =>
-    serializePath(targetScopePaths(a, a.axis)[0] ?? []).localeCompare(
-      serializePath(targetScopePaths(b, b.axis)[0] ?? []),
+    serializePath(targetScopePaths(a)[0] ?? []).localeCompare(
+      serializePath(targetScopePaths(b)[0] ?? []),
     ),
   );
   const chunks: ExpansionCoverageTarget[][] = [];
@@ -806,7 +806,7 @@ export const optimizeExpansionFetchPlan = ({
   const groups = new Map<string, ExpansionCoverageTarget[]>();
 
   targets.forEach(target => {
-    const path = targetScopePaths(target, target.axis)[0] ?? [];
+    const path = targetScopePaths(target)[0] ?? [];
     if (path.length === 0) {
       singles.push(target);
       return;
@@ -841,10 +841,6 @@ export const optimizeExpansionFetchPlan = ({
   return { batches, singles };
 };
 
-const isIntersectionTarget = (target: ExpansionCoverageTarget) =>
-  target.need.rowScope.kind !== 'root' &&
-  target.need.columnScope.kind !== 'root';
-
 type ExpansionSpecContext = {
   formData: PivotTableQueryFormData;
   layout: LayoutContext;
@@ -859,7 +855,7 @@ const buildSingleTargetExpansionSpecs = ({
 }): PlannedQuerySpec[] => {
   const { axis } = target;
   const path = parsePath(target.pathKey);
-  const scopedPath = targetScopePaths(target, axis)[0] ?? [];
+  const scopedPath = targetScopePaths(target)[0] ?? [];
   return buildAxisExpansionSpecs({
     formData,
     layout,
@@ -896,9 +892,7 @@ const buildBatchTargetExpansionSpecs = ({
   const batchAxis = coverageTarget.axis;
   const representative = parsePath(coverageTarget.pathKey);
   const parentPathKey = serializePath(representative.slice(0, -1));
-  const scopedPaths = targets.flatMap(target =>
-    targetScopePaths(target, batchAxis),
-  );
+  const scopedPaths = targets.flatMap(targetScopePaths);
   const parentDimensionPath = scopedPaths[0]?.slice(0, -1) ?? [];
   const siblingValues = scopedPaths.map(path => path[path.length - 1]);
   return buildAxisExpansionSpecs({
@@ -974,9 +968,9 @@ export const buildExpansionQuerySpecPhases = ({
 }: ExpansionSpecContext & {
   targets: ExpansionCoverageTarget[];
 }) => {
-  const intersections = targets.filter(isIntersectionTarget);
+  const intersections = targets.filter(isIntersectionCoverageTarget);
   const { batches, singles } = optimizeExpansionFetchPlan({
-    targets: targets.filter(target => !isIntersectionTarget(target)),
+    targets: targets.filter(target => !isIntersectionCoverageTarget(target)),
   });
   return {
     nonIntersectionSpecs: [
@@ -1003,22 +997,6 @@ export const buildExpansionQuerySpecPhases = ({
       }),
     ),
   };
-};
-
-export const buildExpansionQuerySpecs = ({
-  formData,
-  layout,
-  targets,
-}: ExpansionSpecContext & {
-  targets: ExpansionCoverageTarget[];
-}): PlannedQuerySpec[] => {
-  const { nonIntersectionSpecs, intersectionSpecs } =
-    buildExpansionQuerySpecPhases({
-      formData,
-      layout,
-      targets,
-    });
-  return [...nonIntersectionSpecs, ...intersectionSpecs];
 };
 
 export const buildInitialQuerySpecs = (

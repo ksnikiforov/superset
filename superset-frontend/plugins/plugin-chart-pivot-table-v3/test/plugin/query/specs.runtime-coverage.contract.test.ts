@@ -17,7 +17,7 @@
  * under the License.
  */
 import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
-import { buildExpansionQuerySpecs } from '../../../src/pivot/query/specs';
+import { buildExpansionQuerySpecs } from '../fixtures/querySpecs';
 import {
   encodeMetricKey,
   METRICS_PLACEHOLDER,

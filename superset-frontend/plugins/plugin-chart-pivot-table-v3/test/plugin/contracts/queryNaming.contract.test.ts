@@ -18,9 +18,9 @@
  */
 import { PATH_DIVIDER, serializePath } from '../../../src/pivot/core/path';
 import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
-import { buildExpansionQuerySpecs } from '../../../src/pivot/query/specs';
 import { buildAxisExpansionCoverageTarget } from '../../../src/pivot/expansion/planner';
 import { buildFormData } from '../fixtures/pivotFormData';
+import { buildExpansionQuerySpecs } from '../fixtures/querySpecs';
 
 const branchQueryNames = ({
   formData,

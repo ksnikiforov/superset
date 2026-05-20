@@ -35,12 +35,10 @@ import {
   isMetricToken,
   isSubtotalToken,
 } from '../../../src/pivot/core/tokens';
-import {
-  buildExpansionQuerySpecs,
-  type PlannedQuerySpec,
-} from '../../../src/pivot/query/specs';
+import { type PlannedQuerySpec } from '../../../src/pivot/query/specs';
 import { type PivotFactCoverage } from '../../../src/pivot/runtime/types';
 import { type PivotPath, type PivotTreeData } from '../../../src/types';
+import { buildExpansionQuerySpecs } from './querySpecs';
 
 type MockFetchResult<T> = Partial<T> & {
   data?: PivotTreeData;

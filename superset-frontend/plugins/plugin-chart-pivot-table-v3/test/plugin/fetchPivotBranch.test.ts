@@ -43,15 +43,13 @@ import {
 import { serializeCellKey, serializePath } from '../../src/pivot/core/path';
 import { buildTreeFromRecords } from './fixtures/buildTreeFromRecords';
 import { buildLayoutContext } from '../../src/pivot/layout/LayoutContext';
-import {
-  buildExpansionQuerySpecs,
-  formatQueryName,
-} from '../../src/pivot/query/specs';
+import { formatQueryName } from '../../src/pivot/query/specs';
 import { buildAxisExpansionCoverageTarget } from '../../src/pivot/expansion/planner';
 import { createPivotFactStore } from '../../src/pivot/runtime/factStore';
 import { materializeLoadedPivotTreeFromFactStore } from '../../src/pivot/runtime/materializePivotTree';
 import { buildFormData } from './fixtures/pivotFormData';
 import { applyMetricAxis } from './fixtures/metricAxis';
+import { buildExpansionQuerySpecs } from './fixtures/querySpecs';
 
 jest.mock('@superset-ui/core', () => {
   const actual = jest.requireActual('@superset-ui/core');

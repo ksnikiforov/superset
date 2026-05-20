@@ -19,13 +19,11 @@
 import { GenericDataType } from '@superset-ui/core';
 import { MetricsLayoutEnum } from '../../../src/types';
 import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
-import {
-  buildExpansionQuerySpecs,
-  formatQueryName,
-} from '../../../src/pivot/query/specs';
+import { formatQueryName } from '../../../src/pivot/query/specs';
 import { serializePath } from '../../../src/pivot/core/path';
 import { buildAxisExpansionCoverageTarget } from '../../../src/pivot/expansion/planner';
 import { buildFormData } from '../fixtures/pivotFormData';
+import { buildExpansionQuerySpecs } from '../fixtures/querySpecs';
 
 type FilterClause = {
   col?: string;
