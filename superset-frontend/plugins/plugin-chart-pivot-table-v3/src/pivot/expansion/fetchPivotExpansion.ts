@@ -23,6 +23,7 @@ import {
   type ExpansionQuerySpecRequest,
 } from '../query/specs';
 import { type PivotFactStore } from '../runtime/factStore';
+import { type ChunkedWorkOptions } from '../runtime/chunkedWork';
 import {
   collectPlannedQueryWarnings,
   fetchPlannedQuerySpecs,
@@ -36,7 +37,7 @@ export type FetchPivotExpansionRequest = ExpansionRequestWithoutLayout & {
   layout: LayoutContext;
   requestGroupId?: string;
   factStore?: PivotFactStore;
-};
+} & ChunkedWorkOptions;
 
 export type FetchPivotExpansionResult = { warnings?: ChartDataWarning[] };
 
@@ -51,6 +52,9 @@ export const fetchPivotExpansion = async (
       specs,
       requestGroupId: request.requestGroupId,
       factStore: request.factStore,
+      chunkSize: request.chunkSize,
+      shouldContinue: request.shouldContinue,
+      yieldToMain: request.yieldToMain,
     });
     const warnings = collectPlannedQueryWarnings(results);
     return {

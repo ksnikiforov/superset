@@ -21,7 +21,10 @@ import { parsePath, serializePath } from '../core/path';
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import { type LayoutContext } from '../layout/LayoutContext';
 import { type PivotFactStore } from '../runtime/factStore';
-import { type LatestRequestScope } from '../runtime/requestLifecycle';
+import {
+  type LatestRequestScope,
+  yieldToMainThread,
+} from '../runtime/requestLifecycle';
 import { stableStringify } from '../shared/stableStringify';
 import { planHydrationIteration } from './stateTransitions';
 import type { PivotProgram } from '../runtime/types';
@@ -246,6 +249,8 @@ const executeExpansionQueryTask = async ({
       requestGroupId,
       formData: runtime.fetchFormData,
       factStore: runtime.factStore,
+      shouldContinue: requestScope.isCurrent,
+      yieldToMain: yieldToMainThread,
     });
     if (requestScope.isCurrent()) {
       addWarnings(result.warnings);
