@@ -31,7 +31,7 @@ import {
 } from '../../../../src/pivot/runtime/coverage';
 import {
   buildAxisExpansionCoverageTarget,
-  filterMissingExpansionCoverageTargets,
+  type ExpansionCoverageTarget,
 } from '../../../../src/pivot/expansion/planner';
 import { type PivotFactSelector } from '../../../../src/pivot/runtime/factStore';
 import { resolveAxisProjection } from '../../../../src/pivot/runtime/projection';
@@ -60,6 +60,22 @@ const scopedFullScope = (
   axis,
   ancestorPaths: [path],
 });
+
+const filterMissingTargets = ({
+  targets,
+  factSelectors,
+}: {
+  targets: ExpansionCoverageTarget[];
+  factSelectors: PivotFactSelector[];
+}) => {
+  const missingNeeds = new Set(
+    diffCoverageManifest({
+      required: targets.map(target => target.need),
+      factSelectors,
+    }),
+  );
+  return targets.filter(target => missingNeeds.has(target.need));
+};
 
 describe('expansion fact coverage', () => {
   it('derives loaded expansion coverage from typed fact selectors', () => {
@@ -110,7 +126,7 @@ describe('expansion fact coverage', () => {
       });
 
     expect(
-      filterMissingExpansionCoverageTargets({
+      filterMissingTargets({
         targets: [
           target({
             axis: 'row',
@@ -122,7 +138,7 @@ describe('expansion fact coverage', () => {
         factSelectors,
       }),
     ).toEqual([]);
-    const missingDeepColumn = filterMissingExpansionCoverageTargets({
+    const missingDeepColumn = filterMissingTargets({
       targets: [
         target({
           axis: 'row',
@@ -148,7 +164,7 @@ describe('expansion fact coverage', () => {
         columnDepth: 4,
       },
     ]);
-    const missingColumnBranch = filterMissingExpansionCoverageTargets({
+    const missingColumnBranch = filterMissingTargets({
       targets: [
         target({
           axis: 'col',
@@ -505,7 +521,7 @@ describe('branch fact coverage', () => {
     ];
 
     expect(
-      filterMissingExpansionCoverageTargets({
+      filterMissingTargets({
         targets: [
           buildAxisExpansionCoverageTarget({
             program,

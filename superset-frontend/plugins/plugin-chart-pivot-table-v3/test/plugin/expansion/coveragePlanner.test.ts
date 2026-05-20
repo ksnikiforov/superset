@@ -75,7 +75,7 @@ const factSelectorsFromFetchedColumnDepths = (
   );
 
 describe('expansionPlanner', () => {
-  it('treats nodes as satisfied when fetched depth meets the requirement', () => {
+  it('builds axis targets even when loaded coverage may satisfy them', () => {
     const keyA = serializePath(['A']);
     const nodes: Record<string, PivotTreeNode> = {
       [rootKey]: makeNode({ axis: 'row', path: [], hasChildren: true }),
@@ -91,10 +91,10 @@ describe('expansionPlanner', () => {
       program: testProgram,
     });
 
-    expect(sortFetchPathKeys(plan)).toEqual([]);
+    expect(sortFetchPathKeys(plan)).toEqual([keyA]);
   });
 
-  it('trusts fetched coverage for semantically expandable nodes', () => {
+  it('leaves semantic coverage satisfaction to the manifest diff', () => {
     const keyA = serializePath(['A']);
     const nodes: Record<string, PivotTreeNode> = {
       [rootKey]: makeNode({ axis: 'row', path: [], hasChildren: true }),
@@ -110,7 +110,7 @@ describe('expansionPlanner', () => {
       program: testProgram,
     });
 
-    expect(sortFetchPathKeys(plan)).toEqual([]);
+    expect(sortFetchPathKeys(plan)).toEqual([keyA]);
   });
 
   it('requires a fetch when the required depth increases', () => {
@@ -168,7 +168,7 @@ describe('expansionPlanner', () => {
       program: testProgram,
     });
 
-    expect(sortFetchPathKeys(plan)).toEqual([keyAB]);
+    expect(sortFetchPathKeys(plan)).toEqual([keyA, keyAB]);
   });
 
   it('fetches the ancestor when a missing key needs deeper data', () => {
@@ -188,7 +188,7 @@ describe('expansionPlanner', () => {
       program: testProgram,
     });
 
-    expect(sortFetchPathKeys(plan)).toEqual([keyA]);
+    expect(sortFetchPathKeys(plan)).toEqual([keyA, keyAB]);
   });
 
   it('updates planned fetches as expansion and depth evolve', () => {
@@ -217,7 +217,7 @@ describe('expansionPlanner', () => {
       factSelectors: factSelectorsFromFetchedColumnDepths(fetchedDepth),
       program: testProgram,
     });
-    expect(sortFetchPathKeys(plan2)).toEqual([]);
+    expect(sortFetchPathKeys(plan2)).toEqual([keyA]);
 
     const plan3 = planExpansionForAxis({
       axis: 'row',
@@ -227,7 +227,7 @@ describe('expansionPlanner', () => {
       factSelectors: factSelectorsFromFetchedColumnDepths(fetchedDepth),
       program: testProgram,
     });
-    expect(sortFetchPathKeys(plan3)).toEqual([keyAB]);
+    expect(sortFetchPathKeys(plan3)).toEqual([keyA, keyAB]);
 
     const plan4 = planExpansionForAxis({
       axis: 'row',
@@ -237,7 +237,7 @@ describe('expansionPlanner', () => {
       factSelectors: factSelectorsFromFetchedColumnDepths(fetchedDepth),
       program: testProgram,
     });
-    expect(sortFetchPathKeys(plan4)).toEqual([keyA]);
+    expect(sortFetchPathKeys(plan4)).toEqual([keyA, keyAB]);
 
     const nodesWithChild: Record<string, PivotTreeNode> = {
       ...baseNodes,
@@ -251,6 +251,6 @@ describe('expansionPlanner', () => {
       factSelectors: factSelectorsFromFetchedColumnDepths(new Map([[keyA, 2]])),
       program: testProgram,
     });
-    expect(sortFetchPathKeys(plan5)).toEqual([keyAB]);
+    expect(sortFetchPathKeys(plan5)).toEqual([keyA, keyAB]);
   });
 });

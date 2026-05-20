@@ -96,22 +96,22 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `26321` | `-7189` | `< 20000` |
-| Strict core pipeline | `12907` | `10490` | `-2417` | `< 8000` |
+| Full production `src` | `33510` | `26390` | `-7120` | `< 20000` |
+| Strict core pipeline | `12907` | `10488` | `-2419` | `< 8000` |
 
 Diagnostic scope only:
 
 | Scope | Baseline lines | Current lines | Delta |
 | --- | ---: | ---: | ---: |
-| Core pipeline dirs (`runtime/expansion/query/layout/core`) | `8698` | `7630` | `-1068` |
+| Core pipeline dirs (`runtime/expansion/query/layout/core`) | `8698` | `7688` | `-1010` |
 
 Core pipeline breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `3422` |
-| `pivot/expansion/*` | `1973` |
-| `pivot/query/*` | `1357` |
+| `pivot/runtime/*` | `3466` |
+| `pivot/expansion/*` | `1972` |
+| `pivot/query/*` | `1372` |
 | `pivot/layout/*` + `pivot/core/*` | `878` |
 | core domain helpers | `1549` |
 | formatting/data/render-model support | `1311` |
@@ -233,6 +233,9 @@ Completed structural cuts:
   deriving a "visible persisted state" from the materialized tree. This removes
   tree-visibility scanning from `stateTransitions.ts`; coverage planning still
   decides which persisted/explicit paths are fetchable.
+- Expansion hydration now builds direct, axis, and intersection coverage
+  candidates first, then uses `diffCoverageManifest` as the loading authority;
+  the old exported target-level coverage filter was removed.
 
 Remaining duplicate authority:
 

@@ -21,7 +21,6 @@ import { type PivotAxis, type PivotPath } from '../../types';
 import { parsePath, serializePath } from '../core/path';
 import { decodeMetricKey } from '../core/tokens';
 import {
-  diffCoverageManifest,
   normalizeFactValueKeys,
   pathsFromAxisScope,
   type PivotAxisCoverageNeed,
@@ -294,40 +293,16 @@ export const buildIntersectionCoverageTarget = ({
   },
 });
 
-export const filterMissingExpansionCoverageTargets = ({
-  targets,
-  factSelectors,
-}: {
-  targets: ExpansionCoverageTarget[];
-  factSelectors: PivotFactSelector[];
-}) => {
-  const missingNeedKeys = new Set(
-    diffCoverageManifest({
-      required: targets.map(target => target.need),
-      factSelectors,
-    }).map(stableStringify),
-  );
-  return targets.filter(target =>
-    missingNeedKeys.has(stableStringify(target.need)),
-  );
-};
-
-const pathStartsWith = (path: PivotPath, prefix: PivotPath) =>
-  prefix.length <= path.length &&
-  prefix.every((value, index) => path[index] === value);
-
 export const planExpansionForAxis = ({
   axis,
   program,
   expandedKeys,
   coverage,
-  factSelectors,
 }: {
   axis: PivotAxis;
   program: PivotProgram;
   expandedKeys: Set<string>;
   coverage: PivotExpansionCoverageDepths;
-  factSelectors: PivotFactSelector[];
 }): ExpansionCoverageTarget[] => {
   const fetchTargets = new Map<string, ExpansionCoverageTarget>();
   const hasNonRootExpanded =
@@ -359,19 +334,9 @@ export const planExpansionForAxis = ({
       return expandedKeys.has(ancestorKey);
     })
     .map(candidate => ({ ...candidate, target: buildTarget(candidate.key) }));
-  const missingTargetKeys = new Set(
-    filterMissingExpansionCoverageTargets({
-      targets: candidates.map(({ target }) => target),
-      factSelectors,
-    }).map(needKey),
-  );
 
   candidates.forEach(({ target }) => {
-    const keyForTarget = needKey(target);
-    if (!missingTargetKeys.has(keyForTarget)) {
-      return;
-    }
-    fetchTargets.set(keyForTarget, target);
+    fetchTargets.set(needKey(target), target);
   });
 
   const rootTarget = buildTarget(rootKey);
@@ -379,24 +344,6 @@ export const planExpansionForAxis = ({
   if (fetchTargets.size > 1 && fetchTargets.has(rootNeedKey)) {
     fetchTargets.delete(rootNeedKey);
   }
-  const pendingTargets = Array.from(fetchTargets.values()).map(target => ({
-    target,
-    path: parsePath(target.pathKey),
-  }));
-  pendingTargets.forEach(({ target, path }) => {
-    const axisDepth =
-      target.axis === 'row' ? coverage.rowDepth : coverage.columnDepth;
-    const hasAncestorRequest = pendingTargets.some(
-      ({ target: ancestorTarget, path: ancestorPath }) =>
-        ancestorTarget.pathKey !== target.pathKey &&
-        ancestorPath.length > 0 &&
-        ancestorPath.length < path.length &&
-        pathStartsWith(path, ancestorPath),
-    );
-    if (hasAncestorRequest && path.length > axisDepth) {
-      fetchTargets.delete(needKey(target));
-    }
-  });
 
   return Array.from(fetchTargets.values());
 };

@@ -124,7 +124,7 @@ describe('pivot/expansion/planner', () => {
     });
   });
 
-  it('uses typed branch coverage to skip only the covered expanded path', () => {
+  it('builds branch coverage targets before manifest diffing', () => {
     const aKey = serializePath(['A']);
     const bKey = serializePath(['B']);
     const factSelectors: PivotFactSelector[] = [
@@ -157,11 +157,11 @@ describe('pivot/expansion/planner', () => {
       program: testProgram,
     });
 
-    expect(fetchPathKeys(plan)).toEqual([bKey]);
-    expect(plan.map(target => target.pathKey)).toEqual([bKey]);
+    expect(fetchPathKeys(plan)).toEqual([aKey, bKey]);
+    expect(plan.map(target => target.pathKey)).toEqual([aKey, bKey]);
   });
 
-  it('diffs expansion coverage requests through the manifest', () => {
+  it('keeps coverage satisfaction outside axis target construction', () => {
     const aKey = serializePath(['A']);
     const bKey = serializePath(['B']);
     const plan = planExpansionForAxis({
@@ -192,7 +192,7 @@ describe('pivot/expansion/planner', () => {
       program: testProgram,
     });
 
-    expect(fetchPathKeys(plan)).toEqual([bKey]);
+    expect(fetchPathKeys(plan)).toEqual([aKey, bKey]);
   });
 
   it('does not turn subtotal display paths into fetch coverage requests', () => {
@@ -261,8 +261,12 @@ describe('pivot/expansion/planner', () => {
       program: testProgram,
     });
 
-    expect(fetchPathKeys(plan)).toEqual([txKey]);
-    expect(plan.map(target => target.pathKey)).toEqual([txKey]);
+    expect(fetchPathKeys(plan)).toEqual([caKey, nyKey, txKey]);
+    expect(plan.map(target => target.pathKey)).toEqual([
+      caKey,
+      nyKey,
+      txKey,
+    ]);
   });
 
   it('does not let typed metric branch coverage satisfy sibling metrics', () => {
@@ -303,8 +307,8 @@ describe('pivot/expansion/planner', () => {
       program: testProgram,
     });
 
-    expect(fetchPathKeys(plan)).toEqual([profitKey]);
-    expect(plan.map(target => target.pathKey)).toEqual([profitKey]);
+    expect(fetchPathKeys(plan)).toEqual([salesKey, profitKey]);
+    expect(plan.map(target => target.pathKey)).toEqual([salesKey, profitKey]);
   });
 
   it('keeps rendered metric siblings as separate fetch targets when coverage keys differ', () => {
