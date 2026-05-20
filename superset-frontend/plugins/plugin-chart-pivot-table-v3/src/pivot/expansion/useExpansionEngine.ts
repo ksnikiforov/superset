@@ -367,12 +367,13 @@ export const useExpansionEngine = ({
         expanded: { row: nextRows, col: nextCols },
         explicitExpanded: explicitExpandedRef.current,
         explicitCollapsed: explicitCollapsedRef.current,
+        program: pivotProgram,
       });
       explicitExpandedRef.current = visible.visibleExpanded;
       explicitCollapsedRef.current = visible.visibleCollapsed;
       writeSessionExpansionState(visible.persistedState);
     },
-    [writeSessionExpansionState],
+    [pivotProgram, writeSessionExpansionState],
   );
 
   const resolveExpandedForMetrics = useCallback(

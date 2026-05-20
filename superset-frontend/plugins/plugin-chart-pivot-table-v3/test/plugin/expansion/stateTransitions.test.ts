@@ -267,6 +267,7 @@ describe('pivot/expansion/stateTransitions', () => {
         row: new Set([bKey, hiddenRowKey]),
         col: new Set([yKey, hiddenColKey]),
       },
+      program: testProgram,
     });
 
     expect(result.persistedState).toEqual({

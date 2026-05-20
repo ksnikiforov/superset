@@ -355,74 +355,46 @@ const buildChildrenByParent = (nodes: Record<string, PivotTreeNode>) => {
   return childrenByParent;
 };
 
-const collectVisibleAxisKeys = (
-  nodes: Record<string, PivotTreeNode>,
-  expanded: Set<string>,
-) => {
-  const visible = new Set<string>([rootKey]);
+const collectAxisVisibility = ({
+  axis,
+  nodes,
+  expanded,
+  program,
+}: {
+  axis: PivotAxis;
+  nodes: Record<string, PivotTreeNode>;
+  expanded: Set<string>;
+  program: PivotProgram;
+}) => {
+  const { countDimDepth } = createExpansionMetricPolicy(program);
+  const axisDimensionCount =
+    axis === 'row'
+      ? program.rowDimensions.length
+      : program.columnDimensions.length;
+  const visibleKeys = new Set<string>([rootKey]);
+  let visibleDepth = 0;
+  const root = nodes[rootKey];
+  if (!root) {
+    return { visibleKeys, visibleDepth };
+  }
   const childrenByParent = buildChildrenByParent(nodes);
   const visit = (node: PivotTreeNode) => {
-    visible.add(node.key);
+    visibleKeys.add(node.key);
+    visibleDepth = Math.max(visibleDepth, countDimDepth(node.path));
     if (node.key !== rootKey && !expanded.has(node.key)) {
       return;
     }
     (childrenByParent.get(node.key) ?? []).forEach(visit);
   };
-  const root = nodes[rootKey];
-  if (root) {
-    visit(root);
-  }
-  return visible;
-};
-
-export const computeVisibleDepths = ({
-  tree,
-  expandedRows,
-  expandedCols,
-  program,
-}: {
-  tree: PivotTreeData;
-  expandedRows: Set<string>;
-  expandedCols: Set<string>;
-  program: PivotProgram;
-}): { visibleRowDepth: number; visibleColDepth: number } => {
-  const { countDimDepth } = createExpansionMetricPolicy(program);
-  const maxVisibleDepth = (
-    axis: PivotAxis,
-    nodes: Record<string, PivotTreeNode>,
-    expanded: Set<string>,
-  ) => {
-    const root = nodes[rootKey];
-    const axisDimensionCount =
-      axis === 'row'
-        ? program.rowDimensions.length
-        : program.columnDimensions.length;
-    if (!root) {
-      return 0;
-    }
-    const childrenByParent = buildChildrenByParent(nodes);
-    let maxDepth = 0;
-    const visit = (node: PivotTreeNode) => {
-      maxDepth = Math.max(maxDepth, countDimDepth(node.path));
-      if (node.key !== rootKey && !expanded.has(node.key)) {
-        return;
-      }
-      (childrenByParent.get(node.key) ?? []).forEach(visit);
-    };
-    visit(root);
-    expanded.forEach(key => {
-      const path = nodes[key]?.path ?? parsePath(key);
-      maxDepth = Math.max(
-        maxDepth,
-        Math.min(axisDimensionCount, countDimDepth(path) + 1),
-      );
-    });
-    return maxDepth;
-  };
-  return {
-    visibleRowDepth: maxVisibleDepth('row', tree.rows, expandedRows),
-    visibleColDepth: maxVisibleDepth('col', tree.cols, expandedCols),
-  };
+  visit(root);
+  expanded.forEach(key => {
+    const path = nodes[key]?.path ?? parsePath(key);
+    visibleDepth = Math.max(
+      visibleDepth,
+      Math.min(axisDimensionCount, countDimDepth(path) + 1),
+    );
+  });
+  return { visibleKeys, visibleDepth };
 };
 
 export const resolveExpandedForMetrics = ({
@@ -649,12 +621,20 @@ export const planHydrationIteration = ({
   getMissingExpansionCoverage: PivotExpansionCoverageDiff;
   program: PivotProgram;
 }) => {
-  const { visibleRowDepth, visibleColDepth } = computeVisibleDepths({
-    tree,
-    expandedRows: desiredRows,
-    expandedCols: desiredCols,
+  const rowVisibility = collectAxisVisibility({
+    axis: 'row',
+    nodes: tree.rows,
+    expanded: desiredRows,
     program,
   });
+  const colVisibility = collectAxisVisibility({
+    axis: 'col',
+    nodes: tree.cols,
+    expanded: desiredCols,
+    program,
+  });
+  const visibleRowDepth = rowVisibility.visibleDepth;
+  const visibleColDepth = colVisibility.visibleDepth;
   const rowPlan = planExpansionForAxis({
     axis: 'row',
     program,
@@ -755,19 +735,31 @@ export const buildVisiblePersistedExpansionState = ({
   expanded,
   explicitExpanded,
   explicitCollapsed,
+  program,
 }: {
   tree: PivotTreeData;
   expanded: Record<PivotAxis, Set<string>>;
   explicitExpanded: Record<PivotAxis, Set<string>>;
   explicitCollapsed: Record<PivotAxis, Set<string>>;
+  program: PivotProgram;
 }): {
   persistedState: PivotExpansionStateKeys;
   visibleExpanded: Record<PivotAxis, Set<string>>;
   visibleCollapsed: Record<PivotAxis, Set<string>>;
 } => {
-  const visibleKeys: Record<PivotAxis, Set<string>> = {
-    row: collectVisibleAxisKeys(tree.rows, expanded.row),
-    col: collectVisibleAxisKeys(tree.cols, expanded.col),
+  const visibleKeys = {
+    row: collectAxisVisibility({
+      axis: 'row',
+      nodes: tree.rows,
+      expanded: expanded.row,
+      program,
+    }).visibleKeys,
+    col: collectAxisVisibility({
+      axis: 'col',
+      nodes: tree.cols,
+      expanded: expanded.col,
+      program,
+    }).visibleKeys,
   };
   const visibleExpandedKeys = {
     row: filterVisibleExpansionKeys(explicitExpanded.row, visibleKeys.row),

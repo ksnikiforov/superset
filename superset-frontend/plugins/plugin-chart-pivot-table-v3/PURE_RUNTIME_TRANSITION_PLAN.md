@@ -290,8 +290,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13151` insertions, `17879` deletions, net `-4728`.
-- Current production TypeScript/TSX total: about `28782` lines.
+- Production `src`: `13144` insertions, `17879` deletions, net `-4735`.
+- Current production TypeScript/TSX total: about `28775` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -303,17 +303,17 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `28782` | `-4728` | `< 28000` |
-| Strict core pipeline | `11337` | `11586` | `+249` | `8000` |
+| Full production `src` | `33510` | `28775` | `-4735` | `< 28000` |
+| Strict core pipeline | `11337` | `11579` | `+242` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4924` | `+241` | `3000-4000` |
-| Broad core pipeline | `16020` | `16510` | `+490` | `11000-13000` |
+| Broad core pipeline | `16020` | `16503` | `+483` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
 | `pivot/runtime/*` | `3818` |
-| `pivot/expansion/*` | `2585` |
+| `pivot/expansion/*` | `2578` |
 | `pivot/query/*` | `1409` |
 | `pivot/layout/*` | `770` |
 | core/shared/domain helpers | `1800` |
@@ -634,6 +634,12 @@ coverage directly, while loaded expanded state still drives committed render
 state. This removes the duplicate "pending means desired expansion" path from
 `useExpansionEngine`, `stateTransitions`, `stateModel`, and render-display
 intent construction without changing the fetch/loading contract.
+
+Latest expansion visibility cleanup: visible-depth planning and persisted
+expansion pruning now share one axis visibility traversal. The exported
+`computeVisibleDepths` wrapper is gone; hydration planning reads visibility
+directly from the shared traversal, keeping expansion visibility policy in one
+place.
 
 Latest persistence pruning cleanup: `buildVisiblePersistedExpansionState` now
 accepts and returns axis-shaped expansion sets instead of row/column-specific
