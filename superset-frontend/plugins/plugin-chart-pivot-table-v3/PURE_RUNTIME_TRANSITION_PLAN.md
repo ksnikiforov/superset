@@ -345,8 +345,8 @@ Implementation rules for accelerated chunks:
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13194` insertions, `18239` deletions, net `-5045`.
-- Current production TypeScript/TSX total: about `28465` lines.
+- Production `src`: `13196` insertions, `18250` deletions, net `-5054`.
+- Current production TypeScript/TSX total: about `28456` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -358,10 +358,10 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `28465` | `-5045` | `< 28000` |
-| Strict core pipeline | `11337` | `11363` | `+26` | `8000` |
-| Non-visual chart runtime hooks | `4683` | `4891` | `+208` | `3000-4000` |
-| Broad core pipeline | `16020` | `16254` | `+234` | `11000-13000` |
+| Full production `src` | `33510` | `28456` | `-5054` | `< 28000` |
+| Strict core pipeline | `11337` | `11355` | `+18` | `8000` |
+| Non-visual chart runtime hooks | `4683` | `4890` | `+207` | `3000-4000` |
+| Broad core pipeline | `16020` | `16245` | `+225` | `11000-13000` |
 
 Current strict core breakdown:
 
@@ -372,7 +372,7 @@ Current strict core breakdown:
 | `pivot/query/*` | `1495` |
 | `pivot/layout/*` | `770` |
 | `pivot/core/*` | `252` |
-| core domain helpers | `1580` |
+| core domain helpers | `1572` |
 | formatting/data/render-model support | `1032` |
 
 Interpretation: plugin-wide source has shrunk, but core pipeline source has
@@ -438,6 +438,12 @@ Latest render-repair cleanup: measure-leaf metric expansion moved out of
 the expansion sets it receives instead of adding metric nodes locally, and
 leaf-tier visibility no longer makes expansion depth masquerade as subtotal
 styling.
+
+Latest metric-identity cleanup: render formatting no longer passes cell values
+into `deriveMetricKey` as a fallback source. Metric identity is resolved from
+the compiled program, metric/leaf tokens, and measure hierarchy only; ambiguous
+cells fall back to the first compiled metric instead of the first arbitrary cell
+value key.
 
 Latest fact-boundary cleanup: `PivotFactStore` now rejects facts whose row or
 column path depth does not match the declared batch coverage. Test expansion

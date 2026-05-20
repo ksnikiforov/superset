@@ -163,17 +163,6 @@ describe('cellUtils helpers', () => {
       encodeMeasureLeafKey(ixLeaf.id),
     ]);
     const colNode = buildNode('col', [encodeMetricKey(metricKey)]);
-    const cells = {
-      [serializeCellKey(rowNode.key, colNode.key)]: {
-        rowKey: rowNode.key,
-        colKey: colNode.key,
-        values: {
-          [metricKey]: 10,
-          [buildMeasureLeafOutputKey(metricKey, ixLeaf)]: 25,
-        },
-      },
-    };
-
     const result = deriveMetricKey({
       rowNode,
       colNode,
@@ -182,7 +171,6 @@ describe('cellUtils helpers', () => {
         metrics: [metricKey],
         metricsLayout: MetricsLayoutEnum.COLUMNS,
       }),
-      cells,
       measureHierarchy: {
         kind: 'measureStackV1',
         groups: [{ metricKey, leaves: [buildValueLeaf(), ixLeaf] }],
@@ -203,16 +191,6 @@ describe('cellUtils helpers', () => {
     const rowNode = buildNode('row', ['A']);
     const colNode = buildNode('col', ['2024']);
     const outputKey = buildMeasureLeafOutputKey(metricKey, ixLeaf);
-    const cells = {
-      [serializeCellKey(rowNode.key, colNode.key)]: {
-        rowKey: rowNode.key,
-        colKey: colNode.key,
-        values: {
-          [metricKey]: 10,
-          [outputKey]: 2,
-        },
-      },
-    };
 
     const result = deriveMetricKey({
       rowNode,
@@ -222,7 +200,6 @@ describe('cellUtils helpers', () => {
         metrics: [metricKey],
         metricsLayout: MetricsLayoutEnum.COLUMNS,
       }),
-      cells,
       measureHierarchy: {
         kind: 'measureStackV1',
         groups: [{ metricKey, leaves: [ixLeaf] }],

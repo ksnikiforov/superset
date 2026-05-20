@@ -38,7 +38,6 @@ type DeriveMetricKeyParams = {
   rowNode: PivotTreeNode;
   colNode: PivotTreeNode;
   program: PivotProgram;
-  cells: Record<string, PivotResultCell>;
   measureHierarchy?: MeasureHierarchy;
 };
 
@@ -46,11 +45,8 @@ export const deriveMetricKey = ({
   rowNode,
   colNode,
   program,
-  cells,
   measureHierarchy,
 }: DeriveMetricKeyParams) => {
-  const cellValues =
-    cells[serializeCellKey(rowNode.key, colNode.key)]?.values || {};
   const metricLabels = program.metricKeys;
   const primaryPath = program.valueAxis === 'row' ? rowNode.path : colNode.path;
   const secondaryPath =
@@ -87,14 +83,10 @@ export const deriveMetricKey = ({
     );
     const leaf = group?.leaves[0];
     if (leaf) {
-      const outputKey = buildMeasureLeafOutputKey(metricKey, leaf);
-      if (outputKey in cellValues) {
-        return outputKey;
-      }
+      return buildMeasureLeafOutputKey(metricKey, leaf);
     }
   }
-  // Fallback: first available metric in the cell values.
-  return Object.keys(cellValues)[0];
+  return metricLabels[0] ?? '';
 };
 
 type ShouldHideRowValuesParams = {

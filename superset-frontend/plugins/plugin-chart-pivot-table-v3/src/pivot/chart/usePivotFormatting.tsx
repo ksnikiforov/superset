@@ -784,10 +784,9 @@ export const usePivotFormatting = ({
         rowNode,
         colNode,
         program: layout.layout.pivotProgram,
-        cells: tree.cells,
         measureHierarchy: layout.layout.measureHierarchy,
       }),
-    [layout.layout.measureHierarchy, layout.layout.pivotProgram, tree.cells],
+    [layout.layout.measureHierarchy, layout.layout.pivotProgram],
   );
 
   const themeColor = useMemo(() => {
