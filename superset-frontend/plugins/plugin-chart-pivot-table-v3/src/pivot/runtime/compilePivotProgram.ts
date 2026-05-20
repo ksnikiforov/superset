@@ -28,7 +28,7 @@ import {
   normalizePlaceholder,
 } from '../core/tokens';
 import { getMetricKey } from '../metrics';
-import type { PivotColumnRef, PivotMetricRef, PivotProgram } from './types';
+import type { PivotMetricRef, PivotProgram } from './types';
 
 export type CompilePivotProgramInput = {
   groupbyRows?: QueryFormColumn[] | QueryFormColumn;
@@ -110,17 +110,12 @@ export const compilePivotProgram = ({
 
   const rowsHasValues = rowsNormalized.some(isMetricsPlaceholder);
   const columnsHasValues = columnsNormalized.some(isMetricsPlaceholder);
-  let valueAxis = preferredAxis;
-
-  if (rowsHasValues && !columnsHasValues) {
-    valueAxis = 'row';
-  } else if (columnsHasValues && !rowsHasValues) {
-    valueAxis = 'col';
-  } else if (rowsHasValues && columnsHasValues) {
-    valueAxis = lastMoved || preferredAxis;
-  } else if (!rowsHasValues && !columnsHasValues) {
-    valueAxis = lastMoved || preferredAxis;
-  }
+  const valueAxis =
+    rowsHasValues === columnsHasValues
+      ? lastMoved || preferredAxis
+      : rowsHasValues
+        ? 'row'
+        : 'col';
 
   const normalizedAxis =
     valueAxis === 'row' ? rowsNormalized : columnsNormalized;

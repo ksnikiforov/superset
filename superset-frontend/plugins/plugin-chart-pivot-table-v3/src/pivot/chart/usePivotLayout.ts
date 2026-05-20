@@ -19,7 +19,6 @@
 import { useCallback, useMemo } from 'react';
 import {
   type MeasureHierarchy,
-  MetricsLayoutEnum,
   type PivotTableProps,
   type PivotTreeNode,
   type TotalPosition,
@@ -127,9 +126,6 @@ export const usePivotLayout = ({
     () =>
       buildLayoutContext({
         ...formData,
-        metricsLayout:
-          (formData.metricsLayout as MetricsLayoutEnum) ||
-          MetricsLayoutEnum.COLUMNS,
         colTotals: formData.colTotals ?? true,
         rowSubTotals: formData.rowSubTotals ?? false,
         pivotProgram,

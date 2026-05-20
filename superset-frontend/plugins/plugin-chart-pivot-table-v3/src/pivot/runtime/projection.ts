@@ -24,11 +24,7 @@ import {
   isMeasureLeafToken,
   isSubtotalToken,
 } from '../core/tokens';
-import {
-  type PivotAxisProgram,
-  type PivotProgram,
-  type PivotColumnRef,
-} from './types';
+import { type PivotProgram, type PivotColumnRef } from './types';
 
 export type PivotAxisProjection = {
   axis: PivotAxis;
@@ -83,44 +79,29 @@ export type ResolveAxisChildProjectionInput = {
 const axisDimensionsFor = (program: PivotProgram, axis: PivotAxis) =>
   axis === 'row' ? program.rowDimensions : program.columnDimensions;
 
-export const buildPivotAxisProgram = (
-  program: PivotProgram,
-  axis: PivotAxis,
-): PivotAxisProgram => {
-  const dimensions = axisDimensionsFor(program, axis);
-  const dimensionLevels = dimensions.map(column => ({
-    kind: 'dimension' as const,
-    column,
-  }));
-  if (axis !== program.valueAxis || program.metricKeys.length === 0) {
-    return dimensionLevels;
-  }
-  const insertIndex = Math.max(
-    0,
-    Math.min(program.metricInsertIndex, dimensions.length),
-  );
-  return [
-    ...dimensionLevels.slice(0, insertIndex),
-    { kind: 'values' as const, metrics: program.metrics },
-    ...dimensionLevels.slice(insertIndex),
-  ];
-};
-
-export const getValuesLevelIndex = (program: PivotProgram, axis: PivotAxis) => {
-  const index = buildPivotAxisProgram(program, axis).findIndex(
-    level => level.kind === 'values',
-  );
-  return index >= 0 ? index : undefined;
-};
-
 export const getAxisDimensionCount = (program: PivotProgram, axis: PivotAxis) =>
   axisDimensionsFor(program, axis).length;
+
+export const getValuesLevelIndex = (program: PivotProgram, axis: PivotAxis) => {
+  if (axis !== program.valueAxis || program.metricKeys.length === 0) {
+    return undefined;
+  }
+  return Math.max(
+    0,
+    Math.min(program.metricInsertIndex, getAxisDimensionCount(program, axis)),
+  );
+};
 
 export const isValuesFirstOnAxis = (program: PivotProgram, axis: PivotAxis) =>
   getValuesLevelIndex(program, axis) === 0;
 
-export const isValuesAtAxisEnd = (program: PivotProgram, axis: PivotAxis) =>
-  getValuesLevelIndex(program, axis) === getAxisDimensionCount(program, axis);
+export const isValuesAtAxisEnd = (program: PivotProgram, axis: PivotAxis) => {
+  const valuesIndex = getValuesLevelIndex(program, axis);
+  return (
+    valuesIndex !== undefined &&
+    valuesIndex === getAxisDimensionCount(program, axis)
+  );
+};
 
 export const isCanonicalValuesPathToken = (
   value: unknown,
@@ -163,9 +144,6 @@ const collectPathMeasureLeafIds = (path: PivotPath): string[] => {
   });
   return result;
 };
-
-const findValuesLevelIndex = (levels: PivotAxisProgram) =>
-  levels.findIndex(level => level.kind === 'values');
 
 const collectSkippedPreValuesDimensions = (
   dimensions: PivotColumnRef[],
@@ -225,8 +203,10 @@ export const resolveAxisProjection = ({
   axis,
   path,
 }: ResolveAxisProjectionInput): PivotAxisProjection => {
-  const sourceLevels = buildPivotAxisProgram(program, axis);
-  const valuesLevelIndex = findValuesLevelIndex(sourceLevels);
+  const axisDimensions = axisDimensionsFor(program, axis);
+  const valuesLevelIndex = getValuesLevelIndex(program, axis);
+  const sourceLevelCount =
+    axisDimensions.length + (valuesLevelIndex === undefined ? 0 : 1);
   const metricKeys = collectPathMetricKeys(path, new Set(program.metricKeys));
   const measureLeafIds = collectPathMeasureLeafIds(path);
   const filterDimensionPath: PivotPath = [];
@@ -259,19 +239,19 @@ export const resolveAxisProjection = ({
     valuesLevelSeen,
   });
 
-  while (sourceIndex < sourceLevels.length) {
-    const level = sourceLevels[sourceIndex];
+  while (sourceIndex < sourceLevelCount) {
+    const levelKind = sourceIndex === valuesLevelIndex ? 'values' : 'dimension';
     if (pathIndex >= path.length) {
-      return buildProjection(level.kind);
+      return buildProjection(levelKind);
     }
 
     const value = path[pathIndex];
-    if (level.kind === 'dimension') {
+    if (levelKind === 'dimension') {
       if (isCanonicalValuesPathToken(value, program)) {
-        if (valuesLevelIndex > sourceIndex) {
+        if (valuesLevelIndex !== undefined && valuesLevelIndex > sourceIndex) {
           skippedPreValuesDimensions.push(
             ...collectSkippedPreValuesDimensions(
-              axisDimensionsFor(program, axis),
+              axisDimensions,
               sourceIndex,
               valuesLevelIndex,
             ),

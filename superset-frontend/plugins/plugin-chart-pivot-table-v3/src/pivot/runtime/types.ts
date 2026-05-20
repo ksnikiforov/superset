@@ -27,18 +27,6 @@ export type PivotMetricRef = {
   index: number;
 };
 
-export type PivotAxisLevel =
-  | {
-      kind: 'dimension';
-      column: PivotColumnRef;
-    }
-  | {
-      kind: 'values';
-      metrics: PivotMetricRef[];
-    };
-
-export type PivotAxisProgram = PivotAxisLevel[];
-
 export type PivotProgram = {
   rowDimensions: PivotColumnRef[];
   columnDimensions: PivotColumnRef[];

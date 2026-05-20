@@ -99,9 +99,6 @@ const valueKeysForExpansionPath = (
     : fallbackValueKeys;
 };
 
-const pathContainsMetricToken = (path: PivotPath) =>
-  path.some(value => decodeMetricKey(value) !== undefined);
-
 export const buildAxisExpansionCoverageTarget = ({
   axis,
   pathKey,
@@ -123,10 +120,7 @@ export const buildAxisExpansionCoverageTarget = ({
   });
   const branchDimensions = projectionQueryDimensions(branchProjection);
   const branchDimensionDepth = branchDimensions.length;
-  const branchPath =
-    branchProjection.valuesLevelSeen || !pathContainsMetricToken(path)
-      ? projectionQueryFilterPath(branchProjection)
-      : path;
+  const branchPath = projectionQueryFilterPath(branchProjection);
   const rowDepth = axis === 'row' ? branchDimensionDepth : visibleRowDepth;
   const columnDepth = axis === 'col' ? branchDimensionDepth : visibleColDepth;
   const valueKeys = buildFactValueKeys({
@@ -209,22 +203,15 @@ export const filterMissingExpansionCoverageTargets = ({
   targets: ExpansionCoverageTarget[];
   factSelectors: PivotFactSelector[];
 }) => {
-  const cache = new Map<string, boolean>();
-  const isLoaded = (target: ExpansionCoverageTarget) => {
-    const key = stableStringify(target.need);
-    const cached = cache.get(key);
-    if (cached !== undefined) {
-      return cached;
-    }
-    const loaded =
-      diffCoverageManifest({
-        required: [target.need],
-        factSelectors,
-      }).length === 0;
-    cache.set(key, loaded);
-    return loaded;
-  };
-  return targets.filter(target => !isLoaded(target));
+  const missingNeedKeys = new Set(
+    diffCoverageManifest({
+      required: targets.map(target => target.need),
+      factSelectors,
+    }).map(stableStringify),
+  );
+  return targets.filter(target =>
+    missingNeedKeys.has(stableStringify(target.need)),
+  );
 };
 
 const pathStartsWith = (

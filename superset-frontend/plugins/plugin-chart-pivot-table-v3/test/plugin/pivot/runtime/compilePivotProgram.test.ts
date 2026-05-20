@@ -21,17 +21,10 @@ import {
   compilePivotProgram,
   resolvePivotProgramPlacement,
 } from '../../../../src/pivot/runtime/compilePivotProgram';
-import { buildPivotAxisProgram } from '../../../../src/pivot/runtime/projection';
-import type { PivotAxisProgram } from '../../../../src/pivot/runtime/types';
 import { MetricsLayoutEnum } from '../../../../src/types';
 
-const describeAxis = (axis: PivotAxisProgram) =>
-  axis.map(level =>
-    level.kind === 'values' ? 'values' : `dimension:${level.column}`,
-  );
-
 describe('compilePivotProgram', () => {
-  it('represents Values first on rows as an axis level', () => {
+  it('represents Values first on rows in the compiled program', () => {
     const program = compilePivotProgram({
       groupbyRows: [METRICS_PLACEHOLDER, 'r1'],
       groupbyColumns: ['c1'],
@@ -39,49 +32,37 @@ describe('compilePivotProgram', () => {
       metricsLayout: MetricsLayoutEnum.ROWS,
     });
 
-    expect(describeAxis(buildPivotAxisProgram(program, 'row'))).toEqual([
-      'values',
-      'dimension:r1',
-    ]);
-    expect(describeAxis(buildPivotAxisProgram(program, 'col'))).toEqual([
-      'dimension:c1',
-    ]);
+    expect(program.rowDimensions).toEqual(['r1']);
+    expect(program.columnDimensions).toEqual(['c1']);
     expect(program.valueAxis).toBe('row');
     expect(program.metricInsertIndex).toBe(0);
   });
 
-  it('represents Values in the middle on rows as an axis level', () => {
+  it('represents Values in the middle on rows in the compiled program', () => {
     const program = compilePivotProgram({
       groupbyRows: ['r1', METRICS_PLACEHOLDER, 'r2'],
       metrics: ['m1'],
       metricsLayout: MetricsLayoutEnum.ROWS,
     });
 
-    expect(describeAxis(buildPivotAxisProgram(program, 'row'))).toEqual([
-      'dimension:r1',
-      'values',
-      'dimension:r2',
-    ]);
     expect(program.rowDimensions).toEqual(['r1', 'r2']);
+    expect(program.valueAxis).toBe('row');
     expect(program.metricInsertIndex).toBe(1);
   });
 
-  it('represents Values last on rows as an axis level', () => {
+  it('represents Values last on rows in the compiled program', () => {
     const program = compilePivotProgram({
       groupbyRows: ['r1', 'r2', METRICS_PLACEHOLDER],
       metrics: ['m1'],
       metricsLayout: MetricsLayoutEnum.ROWS,
     });
 
-    expect(describeAxis(buildPivotAxisProgram(program, 'row'))).toEqual([
-      'dimension:r1',
-      'dimension:r2',
-      'values',
-    ]);
+    expect(program.rowDimensions).toEqual(['r1', 'r2']);
+    expect(program.valueAxis).toBe('row');
     expect(program.metricInsertIndex).toBe(2);
   });
 
-  it('represents Values first on columns as an axis level', () => {
+  it('represents Values first on columns in the compiled program', () => {
     const program = compilePivotProgram({
       groupbyRows: ['r1'],
       groupbyColumns: [METRICS_PLACEHOLDER, 'c1'],
@@ -89,45 +70,33 @@ describe('compilePivotProgram', () => {
       metricsLayout: MetricsLayoutEnum.COLUMNS,
     });
 
-    expect(describeAxis(buildPivotAxisProgram(program, 'row'))).toEqual([
-      'dimension:r1',
-    ]);
-    expect(describeAxis(buildPivotAxisProgram(program, 'col'))).toEqual([
-      'values',
-      'dimension:c1',
-    ]);
+    expect(program.rowDimensions).toEqual(['r1']);
+    expect(program.columnDimensions).toEqual(['c1']);
     expect(program.valueAxis).toBe('col');
     expect(program.metricInsertIndex).toBe(0);
   });
 
-  it('represents Values in the middle on columns as an axis level', () => {
+  it('represents Values in the middle on columns in the compiled program', () => {
     const program = compilePivotProgram({
       groupbyColumns: ['c1', METRICS_PLACEHOLDER, 'c2'],
       metrics: ['m1'],
       metricsLayout: MetricsLayoutEnum.COLUMNS,
     });
 
-    expect(describeAxis(buildPivotAxisProgram(program, 'col'))).toEqual([
-      'dimension:c1',
-      'values',
-      'dimension:c2',
-    ]);
     expect(program.columnDimensions).toEqual(['c1', 'c2']);
+    expect(program.valueAxis).toBe('col');
     expect(program.metricInsertIndex).toBe(1);
   });
 
-  it('represents Values last on columns as an axis level', () => {
+  it('represents Values last on columns in the compiled program', () => {
     const program = compilePivotProgram({
       groupbyColumns: ['c1', 'c2', METRICS_PLACEHOLDER],
       metrics: ['m1'],
       metricsLayout: MetricsLayoutEnum.COLUMNS,
     });
 
-    expect(describeAxis(buildPivotAxisProgram(program, 'col'))).toEqual([
-      'dimension:c1',
-      'dimension:c2',
-      'values',
-    ]);
+    expect(program.columnDimensions).toEqual(['c1', 'c2']);
+    expect(program.valueAxis).toBe('col');
     expect(program.metricInsertIndex).toBe(2);
   });
 

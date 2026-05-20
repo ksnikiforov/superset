@@ -345,8 +345,8 @@ Implementation rules for accelerated chunks:
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `12303` insertions, `18294` deletions, net `-5991`.
-- Current production TypeScript/TSX total: about `27519` lines.
+- Production `src`: `12203` insertions, `18279` deletions, net `-6076`.
+- Current production TypeScript/TSX total: about `27434` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -358,19 +358,19 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `27519` | `-5991` | `< 28000` |
-| Strict core pipeline | `11337` | `11280` | `-57` | `8000` |
-| Non-visual chart runtime hooks | `4683` | `4030` | `-653` | `3000-4000` |
-| Broad core pipeline | `16020` | `15310` | `-710` | `11000-13000` |
+| Full production `src` | `33510` | `27434` | `-6076` | `< 28000` |
+| Strict core pipeline | `11337` | `11199` | `-138` | `8000` |
+| Non-visual chart runtime hooks | `4683` | `4026` | `-657` | `3000-4000` |
+| Broad core pipeline | `16020` | `15225` | `-795` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `3596` |
-| `pivot/expansion/*` | `2363` |
+| `pivot/runtime/*` | `3559` |
+| `pivot/expansion/*` | `2350` |
 | `pivot/query/*` | `1373` |
-| `pivot/layout/*` | `770` |
+| `pivot/layout/*` | `739` |
 | `pivot/core/*` | `252` |
 | core domain helpers | `1537` |
 | formatting/data/render-model support | `1389` |
@@ -1035,6 +1035,16 @@ deleted; the expansion hook now owns that simple local condition directly.
 The follow-up removed the simple `normalizedRowSubtotalLevels` and
 `resolvedColTotalPosition` result aliases as well; consumers now read those
 directly from the compiled layout.
+
+Latest program/manifest authority cleanup: runtime layout reconstruction now
+uses `compilePivotProgram` for rows, columns, Values axis, and Values index
+instead of re-parsing `METRICS_PLACEHOLDER` locally. The synthetic
+`PivotAxisProgram` layer is gone; projection answers Values-level position
+directly from the compiled program. Expansion missing-target filtering now
+performs one manifest diff instead of rechecking each target through a cached
+per-target loop. Metric-token expansion paths are treated as canonical encoded
+paths and are projected through the same query filter path rule as every other
+expansion path.
 
 The refactor has substantially reduced the original chart and expansion
 hotspots, and plugin-wide source is now slightly below the starting point.

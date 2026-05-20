@@ -114,37 +114,22 @@ export const buildRuntimeLayoutFromFormData = (
 ): PivotRuntimeLayout => {
   const rowGroupby = ensureIsArray<QueryFormColumn>(formData.groupbyRows);
   const colGroupby = ensureIsArray<QueryFormColumn>(formData.groupbyColumns);
-  const rowValueIndex = rowGroupby.indexOf(METRICS_PLACEHOLDER);
-  const colValueIndex = colGroupby.indexOf(METRICS_PLACEHOLDER);
-  const metrics = getMetricKeys(ensureIsArray(formData.metrics));
-  const axis =
-    rowValueIndex >= 0 ||
-    (colValueIndex < 0 && formData.metricsLayout === MetricsLayoutEnum.ROWS)
-      ? 'row'
-      : 'col';
-  const rows = rowGroupby
-    .filter(column => column !== METRICS_PLACEHOLDER)
-    .map(column => getStableColumnKey(column));
-  const cols = colGroupby
-    .filter(column => column !== METRICS_PLACEHOLDER)
-    .map(column => getStableColumnKey(column));
+  const program = compilePivotProgram({
+    groupbyRows: rowGroupby,
+    groupbyColumns: colGroupby,
+    metrics: formData.metrics,
+    metricsLayout: formData.metricsLayout as MetricsLayoutEnum,
+  });
 
   return {
     version: 1,
-    rows,
-    cols,
-    metrics,
+    rows: program.rowDimensions.map(column => getStableColumnKey(column)),
+    cols: program.columnDimensions.map(column => getStableColumnKey(column)),
+    metrics: program.metricKeys,
     leafSelection: {},
     valuePlacement: {
-      axis,
-      index:
-        axis === 'row'
-          ? rowValueIndex >= 0
-            ? rowValueIndex
-            : rows.length
-          : colValueIndex >= 0
-            ? colValueIndex
-            : cols.length,
+      axis: program.valueAxis,
+      index: Math.max(program.metricInsertIndex, 0),
     },
   };
 };
@@ -179,10 +164,7 @@ export const resolveInteractionFormData = ({
   const resolvedMetricKeys =
     runtimeMetricKeys.length > 0 ? runtimeMetricKeys : availableMetricKeys;
 
-  const placement = resolvedLayout.valuePlacement ?? {
-    axis: 'col',
-    index: cols.length,
-  };
+  const { valuePlacement: placement } = resolvedLayout;
   const { axis } = placement;
 
   const rowGroupby = rows.map(key => dimensionMap.get(key));
@@ -278,29 +260,16 @@ export const resolveAppliedInteractionLayout = ({
   committedRuntimeLayout,
   appliedDimensionKeys,
 }: AppliedInteractionLayoutParams): AppliedInteractionLayout => {
-  const appliedMetricKeysBase = getMetricKeys(ensureIsArray(sourceMetrics));
-  const committedMetrics = committedRuntimeLayout.metrics ?? [];
-  const appliedMetricKeys =
-    committedMetrics.length === 0
-      ? appliedMetricKeysBase
-      : [
-          ...appliedMetricKeysBase,
-          ...committedMetrics.filter(
-            metricKey => !appliedMetricKeysBase.includes(metricKey),
-          ),
-        ];
   const appliedRuntimeLayout = normalizeRuntimeLayout(
     committedRuntimeLayout,
     appliedDimensionKeys,
-    appliedMetricKeys,
+    getMetricKeys(ensureIsArray(sourceMetrics)),
   );
-  const metricsForLayout = sourceMetrics;
-  const leavesForLayout = sourceMeasureLeavesByMetric;
   const appliedLayoutFormData = resolveInteractionFormData({
     formData: {
       ...appliedFormData,
-      metrics: metricsForLayout,
-      measureLeavesByMetric: leavesForLayout,
+      metrics: sourceMetrics,
+      measureLeavesByMetric: sourceMeasureLeavesByMetric,
     },
     runtimeLayout: appliedRuntimeLayout,
   });
