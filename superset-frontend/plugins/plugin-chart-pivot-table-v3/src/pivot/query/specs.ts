@@ -66,7 +66,11 @@ import {
   type ExpansionCoverageTarget,
 } from '../expansion/planner';
 import { coerceValueForColumn, normalizeTemporalValue } from './pathFilters';
-import { buildFactCoverage, pathsFromAxisScope } from '../runtime/coverage';
+import {
+  buildFactCoverage,
+  pathsFromAxisScope,
+  type PivotCoverageNeed,
+} from '../runtime/coverage';
 import {
   buildFactValueKeys,
   type PivotFactSelector,
@@ -946,82 +950,75 @@ export const buildInitialQuerySpecs = (
     colGroupby.length > 0
       ? Math.max(rootVisibleDepth('col', colGroupby.length), 1)
       : 0;
-  type RootSpec = {
-    rowDepth: number;
-    columnDepth: number;
-    hasValueCells: boolean;
-    includeTotals: boolean;
-  };
+  const buildRootNeed = (
+    rowDepth: number,
+    columnDepth: number,
+  ): PivotCoverageNeed => ({
+    rowDepth,
+    columnDepth,
+    rowDimensions: layout.pivotProgram.rowDimensions.slice(0, rowDepth),
+    columnDimensions: layout.pivotProgram.columnDimensions.slice(
+      0,
+      columnDepth,
+    ),
+    valueKeys: buildFactValueKeys({
+      metricKeys: layout.pivotProgram.metricKeys,
+      requiredTimeOffsets: layout.requiredTimeOffsets,
+    }),
+    rowScope: { kind: 'root' },
+    columnScope: { kind: 'root' },
+  });
   const hasMetrics = layout.pivotProgram.metricKeys.length > 0;
-  const rootSpecs = [
+  const rootNeeds = [
     needsTotals || !hasMetrics || (firstRowDepth === 0 && firstColDepth === 0)
-      ? {
-          rowDepth: 0,
-          columnDepth: 0,
-          hasValueCells: false,
-          includeTotals: needsTotals,
-        }
+      ? buildRootNeed(0, 0)
       : undefined,
     hasMetrics && firstRowDepth > 0 && firstColDepth > 0
-      ? {
-          rowDepth: firstRowDepth,
-          columnDepth: firstColDepth,
-          hasValueCells: true,
-          includeTotals: false,
-        }
+      ? buildRootNeed(firstRowDepth, firstColDepth)
       : undefined,
     hasMetrics && rowGroupby.length > 0
-      ? {
-          rowDepth: firstRowDepth,
-          columnDepth: 0,
-          hasValueCells: true,
-          includeTotals: needsTotals,
-        }
+      ? buildRootNeed(firstRowDepth, 0)
       : undefined,
     hasMetrics && colGroupby.length > 0
-      ? {
-          rowDepth: 0,
-          columnDepth: firstColDepth,
-          hasValueCells: true,
-          includeTotals: needsTotals,
-        }
+      ? buildRootNeed(0, firstColDepth)
       : undefined,
-  ].filter((spec): spec is RootSpec => spec !== undefined);
+  ].filter((need): need is PivotCoverageNeed => need !== undefined);
 
-  return rootSpecs.map(
-    ({ rowDepth, columnDepth, hasValueCells, includeTotals }) => {
-      const coverage = buildFactCoverage({
-        rowDimensions: layout.pivotProgram.rowDimensions,
-        columnDimensions: layout.pivotProgram.columnDimensions,
-        rowDepth,
-        columnDepth,
-      });
-      const queryShape = buildQueryShape({
-        rowDepth,
-        columnDepth,
-        hasValueCells,
-        needsTotals: includeTotals,
-        rowGroupby,
-        colGroupby,
-        metrics,
-        metricFormattingScope: formData.metricFormattingScope,
-        metricFormatting: formData.metricFormatting,
-        metricDatabars: formData.metricDatabars,
-        rowFormatting: formData.rowFormatting,
-        colFormatting: formData.colFormatting,
-        rowSorting: formData.rowSorting,
-        colSorting: formData.colSorting,
-        measureHierarchy: layout.measureHierarchy,
-      });
-      return buildPlannedQuerySpec({
-        coverage,
-        metrics: queryShape.metrics,
-        requiredTimeOffsets: layout.requiredTimeOffsets,
-        scope: { kind: 'root' },
-        filters: [],
-      });
-    },
-  );
+  return rootNeeds.map(need => {
+    const { rowDepth, columnDepth } = need;
+    const hasValueCells = hasMetrics && (rowDepth > 0 || columnDepth > 0);
+    const includeTotals = needsTotals && (rowDepth === 0 || columnDepth === 0);
+    const coverage = buildFactCoverage({
+      rowDimensions: layout.pivotProgram.rowDimensions,
+      columnDimensions: layout.pivotProgram.columnDimensions,
+      rowDepth,
+      columnDepth,
+    });
+    const queryShape = buildQueryShape({
+      rowDepth,
+      columnDepth,
+      hasValueCells,
+      needsTotals: includeTotals,
+      rowGroupby,
+      colGroupby,
+      metrics,
+      metricFormattingScope: formData.metricFormattingScope,
+      metricFormatting: formData.metricFormatting,
+      metricDatabars: formData.metricDatabars,
+      rowFormatting: formData.rowFormatting,
+      colFormatting: formData.colFormatting,
+      rowSorting: formData.rowSorting,
+      colSorting: formData.colSorting,
+      measureHierarchy: layout.measureHierarchy,
+    });
+    return buildPlannedQuerySpec({
+      coverage,
+      metrics: queryShape.metrics,
+      requiredTimeOffsets: layout.requiredTimeOffsets,
+      scope: { kind: 'root' },
+      filters: [],
+    });
+  });
 };
 
 export type SelectionFilterMap = Record<string, DataRecordValue[]>;
