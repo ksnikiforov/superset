@@ -17,8 +17,10 @@
  * under the License.
  */
 import {
+  type BinaryQueryObjectFilterClause,
   type DataRecordValue,
-  type GenericDataType,
+  type ExtraFormData,
+  GenericDataType,
   getColumnLabel,
   type QueryFormColumn,
   type QueryFormMetric,
@@ -64,7 +66,11 @@ import {
   type FetchTarget,
   type IntersectionFetchTarget,
 } from '../expansion/planner';
-import { buildPathFilters, coerceValueForColumn } from './pathFilters';
+import {
+  buildPathFilters,
+  coerceValueForColumn,
+  normalizeTemporalValue,
+} from './pathFilters';
 import { buildFactCoverage } from '../runtime/coverage';
 import {
   buildFactValueKeys,
@@ -81,7 +87,6 @@ import {
 } from '../runtime/projection';
 import { type PivotFactCoverage } from '../runtime/types';
 import { stableStringify } from '../shared/stableStringify';
-import { normalizeFormDataExtraFilters } from './normalizeExtraFormData';
 
 export const QUERY_NAME_PREFIX = 'pivot_v3';
 export const formatQueryName = (rowDepth: number, colDepth: number) =>
@@ -1178,6 +1183,124 @@ export const buildSelectionFilterClauses = ({
       },
     ];
   });
+};
+
+const shouldCoerceTemporalValue = ({
+  column,
+  colTypeMap,
+  temporalLookup,
+}: {
+  column?: QueryFormColumn;
+  colTypeMap?: Record<string, GenericDataType>;
+  temporalLookup?: Record<string, boolean>;
+}): boolean => {
+  const columnLabel = column ? getColumnLabel(column) : undefined;
+  if (!columnLabel) {
+    return false;
+  }
+  return (
+    colTypeMap?.[columnLabel] === GenericDataType.Temporal ||
+    temporalLookup?.[columnLabel] === true
+  );
+};
+
+const coerceTemporalValue = (value: DataRecordValue): DataRecordValue =>
+  typeof value === 'string' || typeof value === 'number'
+    ? normalizeTemporalValue(value)
+    : value;
+
+const normalizeFilterValue = ({
+  value,
+  column,
+  colTypeMap,
+  temporalLookup,
+}: {
+  value: DataRecordValue;
+  column?: QueryFormColumn;
+  colTypeMap?: Record<string, GenericDataType>;
+  temporalLookup?: Record<string, boolean>;
+}): DataRecordValue =>
+  shouldCoerceTemporalValue({ column, colTypeMap, temporalLookup })
+    ? coerceTemporalValue(value)
+    : value;
+
+const normalizeExtraFormDataFilters = (
+  extraFormData: ExtraFormData,
+  colTypeMap?: Record<string, GenericDataType>,
+  temporalLookup?: Record<string, boolean>,
+): ExtraFormData => {
+  if (
+    !Array.isArray(extraFormData.filters) ||
+    extraFormData.filters.length === 0
+  ) {
+    return extraFormData;
+  }
+  let hasChanges = false;
+  const nextFilters = extraFormData.filters.map(filter => {
+    if (!('val' in filter)) {
+      return filter;
+    }
+    const { col, val } = filter;
+    if (Array.isArray(val)) {
+      const filterWithArray = filter as SetQueryObjectFilterClause;
+      let arrayChanged = false;
+      const nextValues = val.map(item => {
+        const normalized = normalizeFilterValue({
+          value: item,
+          column: col,
+          colTypeMap,
+          temporalLookup,
+        });
+        if (normalized !== item) {
+          arrayChanged = true;
+        }
+        return normalized;
+      });
+      if (!arrayChanged) {
+        return filter;
+      }
+      hasChanges = true;
+      return { ...filterWithArray, val: nextValues };
+    }
+    const filterWithValue = filter as BinaryQueryObjectFilterClause;
+    const nextValue = normalizeFilterValue({
+      value: val,
+      column: col,
+      colTypeMap,
+      temporalLookup,
+    });
+    if (nextValue === val) {
+      return filter;
+    }
+    hasChanges = true;
+    return { ...filterWithValue, val: nextValue };
+  });
+  return hasChanges
+    ? {
+        ...extraFormData,
+        filters: nextFilters,
+      }
+    : extraFormData;
+};
+
+export const normalizeFormDataExtraFilters = (
+  formData: PivotTableQueryFormData,
+): PivotTableQueryFormData => {
+  const extraFormData = formData.extra_form_data;
+  if (!extraFormData) {
+    return formData;
+  }
+  const normalizedExtra = normalizeExtraFormDataFilters(
+    extraFormData,
+    formData.colTypeMap,
+    formData.temporal_columns_lookup,
+  );
+  return normalizedExtra === extraFormData
+    ? formData
+    : {
+        ...formData,
+        extra_form_data: normalizedExtra,
+      };
 };
 
 export const buildSelectionFilteredFormData = ({

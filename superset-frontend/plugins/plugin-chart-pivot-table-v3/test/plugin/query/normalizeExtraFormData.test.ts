@@ -17,7 +17,7 @@
  * under the License.
  */
 import { GenericDataType } from '@superset-ui/core';
-import { normalizeFormDataExtraFilters } from '../../../src/pivot/query/normalizeExtraFormData';
+import { normalizeFormDataExtraFilters } from '../../../src/pivot/query/specs';
 import { buildFormData } from '../fixtures/pivotFormData';
 
 describe('normalizeFormDataExtraFilters', () => {

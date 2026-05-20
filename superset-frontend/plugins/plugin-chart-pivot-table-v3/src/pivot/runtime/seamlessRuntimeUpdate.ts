@@ -25,8 +25,10 @@ import {
 } from '../../types';
 import { hasSelectedFilters } from '../filters';
 import { stableStringify } from '../shared/stableStringify';
-import { normalizeFormDataExtraFilters } from '../query/normalizeExtraFormData';
-import { buildInitialPivotUpdatePlan } from '../query/specs';
+import {
+  buildInitialPivotUpdatePlan,
+  normalizeFormDataExtraFilters,
+} from '../query/specs';
 import { normalizeRuntimeLayout } from '../layout/resolveInteractionLayout';
 import {
   buildInitialRuntimeFromSpecResultsAsync,

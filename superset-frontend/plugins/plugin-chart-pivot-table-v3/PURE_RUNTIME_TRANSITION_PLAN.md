@@ -290,8 +290,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13144` insertions, `17879` deletions, net `-4735`.
-- Current production TypeScript/TSX total: about `28775` lines.
+- Production `src`: `13362` insertions, `18171` deletions, net `-4809`.
+- Current production TypeScript/TSX total: about `28701` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -303,10 +303,10 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `28730` | `-4780` | `< 28000` |
-| Strict core pipeline | `11337` | `11533` | `+196` | `8000` |
+| Full production `src` | `33510` | `28701` | `-4809` | `< 28000` |
+| Strict core pipeline | `11337` | `11504` | `+167` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4923` | `+240` | `3000-4000` |
-| Broad core pipeline | `16020` | `16456` | `+436` | `11000-13000` |
+| Broad core pipeline | `16020` | `16427` | `+407` | `11000-13000` |
 
 Current strict core breakdown:
 
@@ -314,7 +314,7 @@ Current strict core breakdown:
 | --- | ---: |
 | `pivot/runtime/*` | `3814` |
 | `pivot/expansion/*` | `2567` |
-| `pivot/query/*` | `1550` |
+| `pivot/query/*` | `1519` |
 | `pivot/layout/*` | `770` |
 | `pivot/core/*` | `252` |
 | core domain helpers | `1548` |
@@ -559,6 +559,11 @@ Selection-filter normalization, interaction layout resolution, time-offset
 merging, and bootstrap spec creation now live at the planned query boundary in
 `query/specs.ts`. This removes a wrapper module and makes transform, buildQuery,
 and seamless updates enter the same query-planning surface.
+
+Latest query-boundary cleanup: `query/normalizeExtraFormData.ts` is gone.
+Temporal extra-filter normalization now lives with selection-filter
+normalization and bootstrap spec creation in `query/specs.ts`, so the query
+boundary owns form-data normalization without another adapter module.
 
 Checkpoint: deleting `PivotExpansionPlan.hasMissingNodes` is not currently a
 safe simplification. A trial cut changed persisted row x column restore by
