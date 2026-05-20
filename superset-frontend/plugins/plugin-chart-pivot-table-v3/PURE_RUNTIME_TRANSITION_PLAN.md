@@ -39,7 +39,8 @@ Concrete success criteria:
 - Chart code wires runtime pieces but does not second-guess loaded state.
 - Interactions remain live while requests/materialization are in progress.
 - Hidden or not-expanded layers do not trigger query loads.
-- Core source size keeps moving toward the `8000` line strict-core target.
+- Strict core pipeline source keeps moving toward the `8000` line target.
+- Full production `src` keeps moving toward the `<20000` line target.
 
 ## Target Pipeline
 
@@ -95,9 +96,14 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `27112` | `-6398` | `< 28000` |
-| Core pipeline dirs (`runtime/expansion/query/layout/core`) | `8698` | `7952` | `-746` | `8000` |
-| Engine logic set | `12907` | `10929` | `-1978` | `< 11000` |
+| Full production `src` | `33510` | `27067` | `-6443` | `< 20000` |
+| Strict core pipeline | `12907` | `10908` | `-1999` | `< 8000` |
+
+Diagnostic scope only:
+
+| Scope | Baseline lines | Current lines | Delta |
+| --- | ---: | ---: | ---: |
+| Core pipeline dirs (`runtime/expansion/query/layout/core`) | `8698` | `7952` | `-746` |
 
 Core pipeline breakdown:
 
@@ -163,6 +169,9 @@ Completed structural cuts:
 - Fact store batch filtering now only carries the intersection scope matcher it
   actually enforces; root and axis-path batches stay batch-level coverage
   records.
+- Column subtotal rendering now expects explicit materialized subtotal leaves;
+  tests no longer preserve parent-node subtotal fixture shapes that production
+  render would need to repair.
 - Collapsed dimension state no longer suppresses visible metric-tier expansion
   keys, so metric rows can reopen under a collapsed parent without expanding the
   dimension children.

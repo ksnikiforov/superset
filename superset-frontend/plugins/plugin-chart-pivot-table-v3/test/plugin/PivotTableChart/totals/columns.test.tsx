@@ -2118,7 +2118,7 @@ describe('PivotTableChart totals & subtotals - columns', () => {
     expect(labels).not.toContain('N');
   });
 
-  it('currently renders both parent total and subtotal leaves when column subtotals are enabled (duplication)', async () => {
+  it('renders explicit subtotal leaves without parent-total duplication', async () => {
     const rootKey = serializePath([]);
     const rowKey = serializePath(['US']);
     const makeColNode = (
@@ -2140,15 +2140,13 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       };
     };
 
-    // Build a tree where the parent column node is marked as a subtotal and
-    // also has a child subtotal leaf, matching the UI duplication scenario.
+    // Build the canonical subtotal shape: parent column nodes are structural,
+    // subtotal values live under explicit subtotal leaves.
     const cols: Record<string, PivotTreeNode> = {
       [rootKey]: makeColNode([], true, true),
-      [serializePath(['A'])]: makeColNode(['A'], true, true),
+      [serializePath(['A'])]: makeColNode(['A'], false, true),
       [serializePath(['A', '1-URGENT'])]: makeColNode(['A', '1-URGENT']),
       [serializePath(['A', '2-HIGH'])]: makeColNode(['A', '2-HIGH']),
-      // Parent total encoded as a leaf at the same depth as children.
-      [serializePath(['A', 'A'])]: makeColNode(['A', 'A'], true),
       [serializePath(['A', SUBTOTAL_TOKEN])]: makeColNode(
         ['A', SUBTOTAL_TOKEN],
         true,
@@ -2177,12 +2175,6 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       },
     };
     const cells: Record<string, PivotResultCell> = {
-      [serializeCellKey(rowKey, serializePath(['A']))]: {
-        rowKey,
-        colKey: serializePath(['A']),
-        values: { metric1: 100 },
-        isSubtotal: true,
-      },
       [serializeCellKey(rowKey, serializePath(['A', '1-URGENT']))]: {
         rowKey,
         colKey: serializePath(['A', '1-URGENT']),
@@ -2192,12 +2184,6 @@ describe('PivotTableChart totals & subtotals - columns', () => {
         rowKey,
         colKey: serializePath(['A', '2-HIGH']),
         values: { metric1: 20 },
-      },
-      [serializeCellKey(rowKey, serializePath(['A', 'A']))]: {
-        rowKey,
-        colKey: serializePath(['A', 'A']),
-        values: { metric1: 25 },
-        isSubtotal: true,
       },
       [serializeCellKey(rowKey, serializePath(['A', SUBTOTAL_TOKEN]))]: {
         rowKey,
@@ -2259,7 +2245,6 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       .getAllByRole('columnheader')
       .map(cell => cell.textContent?.trim())
       .filter(label => label && label !== 'Rows');
-    // Desired behavior: parent total leaf should not render alongside branch subtotal leaves.
     expect(labels).not.toContain('A');
     expect(labels).toEqual(
       expect.arrayContaining(['1-URGENT', '2-HIGH', 'Subtotal']),
@@ -2288,13 +2273,13 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       };
     };
 
-    // Shape: flag -> priority -> bucket, with a redundant ancestor total leaf at depth 3.
+    // Shape: flag -> priority -> bucket, with subtotal values under explicit leaves.
     const cols: Record<string, PivotTreeNode> = {
       [rootKey]: makeColNode([], true, true),
-      [serializePath(['A'])]: makeColNode(['A'], true, true),
+      [serializePath(['A'])]: makeColNode(['A'], false, true),
       [serializePath(['A', '1-URGENT'])]: makeColNode(
         ['A', '1-URGENT'],
-        true,
+        false,
         true,
       ),
       [serializePath(['A', '1-URGENT', '10k-50k'])]: makeColNode([
@@ -2309,11 +2294,6 @@ describe('PivotTableChart totals & subtotals - columns', () => {
       ]),
       [serializePath(['A', '1-URGENT', SUBTOTAL_TOKEN])]: makeColNode(
         ['A', '1-URGENT', SUBTOTAL_TOKEN],
-        true,
-      ),
-      // Redundant ancestor total leaf that should be suppressed.
-      [serializePath(['A', '1-URGENT', 'A'])]: makeColNode(
-        ['A', '1-URGENT', 'A'],
         true,
       ),
     };
@@ -2349,12 +2329,6 @@ describe('PivotTableChart totals & subtotals - columns', () => {
         rowKey,
         colKey: serializePath(['A', '1-URGENT', '1k-5k']),
         values: { metric1: 20 },
-      },
-      [serializeCellKey(rowKey, serializePath(['A', '1-URGENT', 'A']))]: {
-        rowKey,
-        colKey: serializePath(['A', '1-URGENT', 'A']),
-        values: { metric1: 30 },
-        isSubtotal: true,
       },
       [serializeCellKey(
         rowKey,

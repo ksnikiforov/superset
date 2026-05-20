@@ -140,24 +140,18 @@ const createColLeavesBuilder = ({
     const isMetricSubtotalAtDepth = (leaf: PivotTreeNode) =>
       (isMetricGrandTotalNode(leaf) || isMetricSubtotalNode(leaf)) &&
       countDimDepth(leaf.path) === dimDepth;
-    const filterHiddenSubtotals = (leaves: PivotTreeNode[]) => {
-      const hasDeeperLeaves = leaves.some(
-        leaf => countDimDepth(leaf.path) > dimDepth,
-      );
-      if (!hasDeeperLeaves) {
-        return leaves;
-      }
-      return leaves.filter(leaf => {
-        if (leaf.path.some(val => decodeMeasureLeafId(val))) {
-          return true;
-        }
-        return !(
-          isNodeDescendant(leaf) &&
-          (isSubtotalToken(leaf.path[node.path.length]) ||
-            isMetricSubtotalAtDepth(leaf))
-        );
-      });
-    };
+    const isSubtotalLeaf = (leaf: PivotTreeNode) =>
+      isNodeDescendant(leaf) &&
+      (isSubtotalToken(leaf.path[node.path.length]) ||
+        isMetricGrandTotalNode(leaf) ||
+        (isBranchLeaf(leaf) && isMetricSubtotalAtDepth(leaf)));
+    const hasDeeperLeaves = (leaves: PivotTreeNode[]) =>
+      leaves.some(leaf => countDimDepth(leaf.path) > dimDepth);
+    const shouldHideSubtotalLeaf = (leaf: PivotTreeNode) =>
+      isNodeDescendant(leaf) &&
+      !leaf.path.some(val => decodeMeasureLeafId(val)) &&
+      (isSubtotalToken(leaf.path[node.path.length]) ||
+        isMetricSubtotalAtDepth(leaf));
     if (!expandedCols.has(node.key) || children.length === 0) {
       const collapsedMetricLeaves = getCollapsedColLeaves(node);
       if (collapsedMetricLeaves.length === 0) {
@@ -177,64 +171,25 @@ const createColLeavesBuilder = ({
     );
     const suppressMetricGroupLeaf = isMetricGroup && hasMeasureLeafDescendants;
     if (!includeSubtotal) {
-      return filterHiddenSubtotals(childLeaves);
+      return hasDeeperLeaves(childLeaves)
+        ? childLeaves.filter(leaf => !shouldHideSubtotalLeaf(leaf))
+        : childLeaves;
     }
-    const isSubtotalTokenLeaf = (leaf: PivotTreeNode) =>
-      isBranchLeaf(leaf) && isSubtotalToken(leaf.path[node.path.length]);
-    const isMetricSubtotalLeaf = (leaf: PivotTreeNode) =>
-      isBranchLeaf(leaf) && isMetricSubtotalAtDepth(leaf);
-    const baseDimDepth = countDimDepth(
-      node.path.filter(val => !isSubtotalToken(val)),
-    );
-    const subtotalTokenDescendants = childLeaves.filter(leaf => {
-      if (!leaf.path.slice(node.path.length).some(isSubtotalToken)) {
-        return false;
-      }
-      const leafBaseDepth = countDimDepth(
-        leaf.path.filter(val => !isSubtotalToken(val)),
-      );
-      return leafBaseDepth === baseDimDepth;
-    });
-    const hasSubtotalTokenDescendants = subtotalTokenDescendants.length > 0;
     const explicitSubtotalKeys = new Set<string>();
-    const resolvedSubtotalLeaves = [
-      ...childLeaves.filter(
-        leaf =>
-          isSubtotalTokenLeaf(leaf) ||
-          isMetricGrandTotalNode(leaf) ||
-          (!hasSubtotalTokenDescendants && isMetricSubtotalLeaf(leaf)),
-      ),
-      ...(hasSubtotalTokenDescendants ? subtotalTokenDescendants : []),
-    ].filter(leaf => {
-      if (explicitSubtotalKeys.has(leaf.key)) {
+    const resolvedSubtotalLeaves = childLeaves.filter(leaf => {
+      if (!isSubtotalLeaf(leaf) || explicitSubtotalKeys.has(leaf.key)) {
         return false;
       }
       explicitSubtotalKeys.add(leaf.key);
       return true;
     });
-    const isDuplicateSubtotalLeaf = (leaf: PivotTreeNode) =>
-      isBranchLeaf(leaf) &&
-      !explicitSubtotalKeys.has(leaf.key) &&
-      ((hasSubtotalTokenDescendants && isMetricSubtotalLeaf(leaf)) ||
-        leaf.label === node.label ||
-        node.path.includes(leaf.path[node.path.length]));
     if (resolvedSubtotalLeaves.length > 0) {
       const remainingLeaves = childLeaves.filter(
-        leaf =>
-          !explicitSubtotalKeys.has(leaf.key) && !isDuplicateSubtotalLeaf(leaf),
+        leaf => !explicitSubtotalKeys.has(leaf.key),
       );
       return placeAtFront
         ? [...resolvedSubtotalLeaves, ...remainingLeaves]
         : [...remainingLeaves, ...resolvedSubtotalLeaves];
-    }
-    const subtotalLeaf = childLeaves.find(isDuplicateSubtotalLeaf);
-    if (subtotalLeaf) {
-      const remainingLeaves = childLeaves.filter(
-        leaf => leaf.key !== subtotalLeaf.key && !isDuplicateSubtotalLeaf(leaf),
-      );
-      return placeAtFront
-        ? [subtotalLeaf, ...remainingLeaves]
-        : [...remainingLeaves, subtotalLeaf];
     }
     if (suppressMetricGroupLeaf) {
       return childLeaves;

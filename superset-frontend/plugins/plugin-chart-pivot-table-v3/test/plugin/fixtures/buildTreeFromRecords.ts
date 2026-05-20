@@ -25,6 +25,7 @@ import {
 } from '@superset-ui/core';
 import { type DateFormatter, PivotTreeData } from '../../../src/types';
 import { serializeCellKey, serializePath } from '../../../src/pivot/core/path';
+import { SUBTOTAL_TOKEN } from '../../../src/pivot/core/tokens';
 import { formatPivotLabelValue } from '../../../src/pivot/viewModel';
 import { getMetricKeys } from '../../../src/pivot/metrics';
 
@@ -65,20 +66,30 @@ export const buildTreeFromRecords = (
     const key = serializePath(path);
     if (nodes[key]) return;
     const rawValue = path[path.length - 1];
+    const isSubtotalPath = path.includes(SUBTOTAL_TOKEN);
     const label =
       path.length === 0
         ? 'Grand total'
-        : formatPivotLabelValue(rawValue, totalLabel);
+        : rawValue === SUBTOTAL_TOKEN
+          ? 'Subtotal'
+          : formatPivotLabelValue(rawValue, totalLabel);
     const groupby = axis === 'row' ? rowGroupby : colGroupby;
-    const column = groupby[path.length - 1];
+    const dimensionDepth = path.filter(
+      value => value !== SUBTOTAL_TOKEN,
+    ).length;
+    const column = groupby[dimensionDepth - 1];
     const columnLabel = column ? getColumnLabel(column) : undefined;
     const formatter = columnLabel ? dateFormatters?.[columnLabel] : undefined;
     const formattedLabel =
-      path.length === 0 || rawValue === null || rawValue === undefined
+      path.length === 0 ||
+      isSubtotalPath ||
+      rawValue === null ||
+      rawValue === undefined
         ? label
         : formatter
           ? (formatter as (value: DataRecordValue) => string)(rawValue)
           : label;
+    const fullDepth = axis === 'row' ? rowGroupby.length : colGroupby.length;
     nodes[key] = {
       axis,
       key,
@@ -86,10 +97,8 @@ export const buildTreeFromRecords = (
       label,
       formattedLabel,
       level: path.length,
-      hasChildren:
-        path.length < (axis === 'row' ? rowGroupby.length : colGroupby.length),
-      isSubtotal:
-        path.length < (axis === 'row' ? rowGroupby.length : colGroupby.length),
+      hasChildren: !isSubtotalPath && path.length < fullDepth,
+      isSubtotal: path.length === 0 || isSubtotalPath,
     };
   };
 
@@ -108,8 +117,23 @@ export const buildTreeFromRecords = (
       ensureNode('col', colPath.slice(0, i), 'Total');
     }
 
-    const rowKey = serializePath(rowPath);
-    const colKey = serializePath(colPath);
+    const cellRowPath =
+      rowPath.length > 0 && rowPath.length < rowGroupby.length
+        ? [...rowPath, SUBTOTAL_TOKEN]
+        : rowPath;
+    const cellColPath =
+      colPath.length > 0 && colPath.length < colGroupby.length
+        ? [...colPath, SUBTOTAL_TOKEN]
+        : colPath;
+    if (cellRowPath !== rowPath) {
+      ensureNode('row', cellRowPath, 'Total');
+    }
+    if (cellColPath !== colPath) {
+      ensureNode('col', cellColPath, 'Total');
+    }
+
+    const rowKey = serializePath(cellRowPath);
+    const colKey = serializePath(cellColPath);
 
     const values = metricValueKeys.reduce(
       (acc, key) => ({
