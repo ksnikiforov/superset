@@ -61,12 +61,8 @@ export type ResolveCollapsedValuesProjectionInput = {
 };
 
 export type AxisChildProjection = {
-  parentProjection: PivotAxisProjection;
-  childProjection: PivotAxisProjection;
-  valuesTokenIndex?: number;
   rawValuesTokenIndex?: number;
   introducesValues: boolean;
-  addsProjectedDimension: boolean;
 };
 
 export type ResolveAxisChildProjectionInput = {
@@ -154,10 +150,6 @@ const collectSkippedPreValuesDimensions = (
 const withoutSubtotalTokens = (path: PivotPath) =>
   path.filter(value => !isSubtotalToken(value));
 
-export const projectionQueryDimensions = (
-  projection: PivotAxisProjection,
-): PivotProgram['rowDimensions'] => projection.queryDimensions;
-
 const resolveProjectionQueryDimensions = ({
   program,
   axis,
@@ -190,13 +182,6 @@ const resolveProjectionQueryDimensions = ({
       .slice(0, postValuesDimensionPath.length + 1),
   ];
 };
-
-export const projectionQueryFilterPath = (
-  projection: PivotAxisProjection,
-): PivotPath =>
-  projection.valuesLevelSeen
-    ? [...projection.filterDimensionPath, ...projection.postValuesDimensionPath]
-    : projection.filterDimensionPath;
 
 export const resolveAxisProjection = ({
   program,
@@ -259,7 +244,7 @@ export const resolveAxisProjection = ({
           sourceIndex = valuesLevelIndex;
           continue;
         }
-        return buildProjection(level.kind);
+        return buildProjection(levelKind);
       }
       projectedDimensionPath.push(value);
       if (valuesLevelSeen) {
@@ -282,7 +267,7 @@ export const resolveAxisProjection = ({
       pathIndex += 1;
     }
     if (!consumedValuesToken) {
-      return buildProjection(level.kind);
+      return buildProjection(levelKind);
     }
     sourceIndex += 1;
   }
@@ -323,26 +308,17 @@ export const resolveAxisChildProjection = ({
     axis,
     path: projectableChildPath,
   });
-  const valuesTokenIndex = projectableChildPath.findIndex(value =>
-    isCanonicalValuesPathToken(value, program),
-  );
   const rawValuesTokenIndex = childPath.findIndex(value =>
     isCanonicalValuesPathToken(value, program),
   );
   const firstChildValue = projectableChildPath[projectableParentPath.length];
   return {
-    parentProjection,
-    childProjection,
-    valuesTokenIndex: valuesTokenIndex >= 0 ? valuesTokenIndex : undefined,
     rawValuesTokenIndex:
       rawValuesTokenIndex >= 0 ? rawValuesTokenIndex : undefined,
     introducesValues:
       !parentProjection.valuesLevelSeen &&
       childProjection.valuesLevelSeen &&
       isCanonicalValuesPathToken(firstChildValue, program),
-    addsProjectedDimension:
-      childProjection.projectedDimensionPath.length >
-      parentProjection.projectedDimensionPath.length,
   };
 };
 

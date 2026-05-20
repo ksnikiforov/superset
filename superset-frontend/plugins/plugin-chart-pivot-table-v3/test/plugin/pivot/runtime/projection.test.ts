@@ -236,7 +236,6 @@ describe('resolveAxisProjection', () => {
         }),
       ).toMatchObject({
         introducesValues: false,
-        addsProjectedDimension: true,
       });
 
       expect(
@@ -247,10 +246,8 @@ describe('resolveAxisProjection', () => {
           childPath: ['1-URGENT', encodeMetricKey('revenue')],
         }),
       ).toMatchObject({
-        valuesTokenIndex: 1,
         rawValuesTokenIndex: 1,
         introducesValues: true,
-        addsProjectedDimension: false,
       });
 
       expect(
@@ -261,10 +258,8 @@ describe('resolveAxisProjection', () => {
           childPath: ['1-URGENT', encodeMetricKey('revenue'), 'Returned'],
         }),
       ).toMatchObject({
-        valuesTokenIndex: 1,
         rawValuesTokenIndex: 1,
         introducesValues: false,
-        addsProjectedDimension: true,
       });
     },
   );
@@ -284,10 +279,8 @@ describe('resolveAxisProjection', () => {
         childPath: [encodeMetricKey('revenue'), 'Consumer'],
       }),
     ).toMatchObject({
-      valuesTokenIndex: 0,
       rawValuesTokenIndex: 0,
       introducesValues: true,
-      addsProjectedDimension: true,
     });
   });
 
@@ -306,7 +299,6 @@ describe('resolveAxisProjection', () => {
         childPath: ['1992', SUBTOTAL_TOKEN, encodeMetricKey('revenue')],
       }),
     ).toMatchObject({
-      valuesTokenIndex: 1,
       rawValuesTokenIndex: 2,
       introducesValues: true,
     });

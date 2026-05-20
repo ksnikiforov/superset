@@ -345,8 +345,8 @@ Implementation rules for accelerated chunks:
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `12203` insertions, `18279` deletions, net `-6076`.
-- Current production TypeScript/TSX total: about `27434` lines.
+- Production `src`: `12205` insertions, `18301` deletions, net `-6096`.
+- Current production TypeScript/TSX total: about `27414` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -358,16 +358,16 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `27434` | `-6076` | `< 28000` |
-| Strict core pipeline | `11337` | `11199` | `-138` | `8000` |
+| Full production `src` | `33510` | `27414` | `-6096` | `< 28000` |
+| Strict core pipeline | `11337` | `11179` | `-158` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4026` | `-657` | `3000-4000` |
-| Broad core pipeline | `16020` | `15225` | `-795` | `11000-13000` |
+| Broad core pipeline | `16020` | `15205` | `-815` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `3559` |
+| `pivot/runtime/*` | `3539` |
 | `pivot/expansion/*` | `2350` |
 | `pivot/query/*` | `1373` |
 | `pivot/layout/*` | `739` |
@@ -378,6 +378,12 @@ Current strict core breakdown:
 Interpretation: plugin-wide source has shrunk, and strict core is now slightly
 below the starting point. The next large cuts must keep reducing strict core
 directly instead of only moving chart/control code into runtime modules.
+
+Latest projection-boundary cleanup: `resolveAxisChildProjection` now exposes
+only the fields production render policy consumes, and expansion planning reads
+query dimensions directly from the axis projection. This trims test-only
+projection surface and keeps Values requestability under the runtime projection
+policy.
 
 Latest expansion-planner cleanup: same-axis expansion planning no longer builds
 a second projected coverage-key grouping layer. The planner now dedupes exact

@@ -35,8 +35,7 @@ import {
 } from '../runtime/factStore';
 import {
   canRequestAxisExpansion,
-  projectionQueryDimensions,
-  projectionQueryFilterPath,
+  type PivotAxisProjection,
   resolveAxisProjection,
 } from '../runtime/projection';
 import type { PivotProgram } from '../runtime/types';
@@ -70,6 +69,11 @@ const axisPathScopeFromPath = (path: PivotPath) => ({
   paths: [path],
 });
 
+const projectionFilterPath = (projection: PivotAxisProjection) =>
+  projection.valuesLevelSeen
+    ? [...projection.filterDimensionPath, ...projection.postValuesDimensionPath]
+    : projection.filterDimensionPath;
+
 const expansionFilterPath = ({
   program,
   axis,
@@ -78,14 +82,14 @@ const expansionFilterPath = ({
   program: PivotProgram;
   axis: PivotAxis;
   path: PivotPath;
-}) =>
-  projectionQueryFilterPath(
-    resolveAxisProjection({
-      program,
-      axis,
-      path,
-    }),
-  );
+}) => {
+  const projection = resolveAxisProjection({
+    program,
+    axis,
+    path,
+  });
+  return projectionFilterPath(projection);
+};
 
 const valueKeysForExpansionPath = (
   path: PivotPath,
@@ -118,9 +122,9 @@ export const buildAxisExpansionCoverageTarget = ({
     axis,
     path,
   });
-  const branchDimensions = projectionQueryDimensions(branchProjection);
+  const branchDimensions = branchProjection.queryDimensions;
   const branchDimensionDepth = branchDimensions.length;
-  const branchPath = projectionQueryFilterPath(branchProjection);
+  const branchPath = projectionFilterPath(branchProjection);
   const rowDepth = axis === 'row' ? branchDimensionDepth : visibleRowDepth;
   const columnDepth = axis === 'col' ? branchDimensionDepth : visibleColDepth;
   const valueKeys = buildFactValueKeys({
