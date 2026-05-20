@@ -518,39 +518,56 @@ const uniqueExpansionTargets = (targets: ExpansionCoverageTarget[]) => {
   return Array.from(map.values());
 };
 
+const depthForExpansionKeys = ({
+  axis,
+  axisCoverageNeeds,
+  expanded,
+  program,
+}: {
+  axis: PivotAxis;
+  axisCoverageNeeds: PivotAxisCoverageNeed[];
+  expanded: Set<string>;
+  program: PivotProgram;
+}) => {
+  const { countDimDepth } = createExpansionMetricPolicy(program);
+  const dimensionCount = getAxisDimensionCount(program, axis);
+  const configuredDepth = axisCoverageNeeds
+    .filter(need => need.axis === axis)
+    .reduce((max, need) => Math.max(max, need.depth), 0);
+  const expansionDepth = Array.from(expanded).reduce((max, key) => {
+    if (key === rootKey) {
+      return Math.max(max, dimensionCount > 0 ? 1 : 0);
+    }
+    return Math.max(max, countDimDepth(parsePath(key)) + 1);
+  }, 0);
+  return Math.min(dimensionCount, Math.max(configuredDepth, expansionDepth));
+};
+
 export const planHydrationIteration = ({
-  tree,
   desired,
   axisCoverageNeeds = [],
   factSelectors,
   program,
 }: {
-  tree: PivotTreeData;
   desired: Record<PivotAxis, Set<string>>;
   axisCoverageNeeds?: PivotAxisCoverageNeed[];
   factSelectors: PivotFactSelector[];
   program: PivotProgram;
 }) => {
-  const rowVisibility = collectAxisVisibility({
+  const visibleRowDepth = depthForExpansionKeys({
     axis: 'row',
-    nodes: tree.rows,
     expanded: desired.row,
+    axisCoverageNeeds,
     program,
   });
-  const colVisibility = collectAxisVisibility({
+  const visibleColDepth = depthForExpansionKeys({
     axis: 'col',
-    nodes: tree.cols,
     expanded: desired.col,
+    axisCoverageNeeds,
     program,
   });
-  const visibleRowDepth = rowVisibility.visibleDepth;
-  const visibleColDepth = colVisibility.visibleDepth;
-  const rowPathKeys = Array.from(desired.row).filter(
-    key => key !== rootKey && tree.rows[key],
-  );
-  const columnPathKeys = Array.from(desired.col).filter(
-    key => key !== rootKey && tree.cols[key],
-  );
+  const rowPathKeys = Array.from(desired.row).filter(key => key !== rootKey);
+  const columnPathKeys = Array.from(desired.col).filter(key => key !== rootKey);
   const hasNonRootRows = Array.from(desired.row).some(key => key !== rootKey);
   const hasNonRootCols = Array.from(desired.col).some(key => key !== rootKey);
   const rowExpansionKeys =
@@ -579,7 +596,6 @@ export const planHydrationIteration = ({
     axis: 'row',
     program,
     expandedKeys: rowExpansionKeys,
-    nodes: tree.rows,
     coverage: { rowDepth: visibleRowDepth, columnDepth: visibleColDepth },
     factSelectors: factSelectorsWithPlannedCoverage,
   });
@@ -587,7 +603,6 @@ export const planHydrationIteration = ({
     axis: 'col',
     program,
     expandedKeys: colExpansionKeys,
-    nodes: tree.cols,
     coverage: { rowDepth: visibleRowDepth, columnDepth: visibleColDepth },
     factSelectors: factSelectorsWithPlannedCoverage,
   });
@@ -615,22 +630,10 @@ export const planHydrationIteration = ({
     }).length > 0
       ? [intersectionCoverageTarget]
       : [];
-  const hasUnknownRowExpansion = Array.from(rowExpansionKeys).some(
-    key => key !== rootKey && !tree.rows[key],
-  );
-  const hasUnknownColumnExpansion = Array.from(colExpansionKeys).some(
-    key => key !== rootKey && !tree.cols[key],
-  );
-  const shouldFetchIntersectionOnly =
-    intersectionTargets.length > 0 &&
-    !hasUnknownRowExpansion &&
-    !hasUnknownColumnExpansion;
-  const rowTargetsForTransport = shouldFetchIntersectionOnly ? [] : rowTargets;
-  const colTargetsForTransport = shouldFetchIntersectionOnly ? [] : colTargets;
   const targets = uniqueExpansionTargets([
     ...directCoverageTargets,
-    ...rowTargetsForTransport,
-    ...colTargetsForTransport,
+    ...rowTargets,
+    ...colTargets,
     ...intersectionTargets,
   ]);
 

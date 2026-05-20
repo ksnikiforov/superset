@@ -20,6 +20,7 @@
 import { PivotAxis, PivotTreeNode } from '../../../src/types';
 import {
   buildAxisExpansionCoverageTarget,
+  factSelectorFromTarget,
   planExpansionForAxis,
 } from '../../../src/pivot/expansion/planner';
 import { serializePath } from '../../../src/pivot/core/path';
@@ -69,23 +70,7 @@ const factSelectorsFromFetchedColumnDepths = (
         rowDepth: 1,
         columnDepth: depth,
       });
-      return {
-        coverage: {
-          rowDepth: target.need.rowDepth,
-          columnDepth: target.need.columnDepth,
-          rowDimensions: target.need.rowDimensions,
-          columnDimensions: target.need.columnDimensions,
-        },
-        scope: {
-          kind: 'axisPaths',
-          axis: 'row',
-          paths:
-            target.need.rowScope.kind === 'paths'
-              ? target.need.rowScope.paths
-              : [],
-        },
-        valueKeys: target.need.valueKeys,
-      };
+      return factSelectorFromTarget(target);
     }),
   );
 

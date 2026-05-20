@@ -96,14 +96,14 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `26467` | `-7043` | `< 20000` |
-| Strict core pipeline | `12907` | `10678` | `-2229` | `< 8000` |
+| Full production `src` | `33510` | `26457` | `-7053` | `< 20000` |
+| Strict core pipeline | `12907` | `10668` | `-2239` | `< 8000` |
 
 Diagnostic scope only:
 
 | Scope | Baseline lines | Current lines | Delta |
 | --- | ---: | ---: | ---: |
-| Core pipeline dirs (`runtime/expansion/query/layout/core`) | `8698` | `7776` | `-922` |
+| Core pipeline dirs (`runtime/expansion/query/layout/core`) | `8698` | `7766` | `-932` |
 
 Core pipeline breakdown:
 
@@ -182,6 +182,9 @@ Completed structural cuts:
   states were removed.
 - Expansion branch coverage is now first-class `scopedFull` fact coverage
   instead of overloading `axisPaths` to mean subtree loading.
+- Hydration manifest planning no longer reads materialized tree visibility or
+  loaded node maps; it derives requested depths and branch targets from explicit
+  expansion keys plus configured coverage needs.
 - Fact store batch filtering now only carries the intersection scope matcher it
   actually enforces; root and axis-path batches stay batch-level coverage
   records.

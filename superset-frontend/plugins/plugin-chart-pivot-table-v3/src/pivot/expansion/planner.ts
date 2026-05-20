@@ -17,11 +17,7 @@
  * under the License.
  */
 
-import {
-  type PivotAxis,
-  type PivotPath,
-  type PivotTreeNode,
-} from '../../types';
+import { type PivotAxis, type PivotPath } from '../../types';
 import { parsePath, serializePath } from '../core/path';
 import { decodeMetricKey } from '../core/tokens';
 import {
@@ -316,10 +312,7 @@ export const filterMissingExpansionCoverageTargets = ({
   );
 };
 
-const pathStartsWith = (
-  path: PivotTreeNode['path'],
-  prefix: PivotTreeNode['path'],
-) =>
+const pathStartsWith = (path: PivotPath, prefix: PivotPath) =>
   prefix.length <= path.length &&
   prefix.every((value, index) => path[index] === value);
 
@@ -327,14 +320,12 @@ export const planExpansionForAxis = ({
   axis,
   program,
   expandedKeys,
-  nodes,
   coverage,
   factSelectors,
 }: {
   axis: PivotAxis;
   program: PivotProgram;
   expandedKeys: Set<string>;
-  nodes: Record<string, PivotTreeNode>;
   coverage: PivotExpansionCoverageDepths;
   factSelectors: PivotFactSelector[];
 }): ExpansionCoverageTarget[] => {
@@ -352,10 +343,7 @@ export const planExpansionForAxis = ({
     });
   const candidates = Array.from(expandedKeys)
     .filter(key => key !== rootKey || !hasNonRootExpanded)
-    .map(key => {
-      const path = nodes[key]?.path ?? parsePath(key);
-      return { key, path };
-    })
+    .map(key => ({ key, path: parsePath(key) }))
     .filter(({ path }) => {
       if (!canRequestAxisExpansion({ program, axis, path })) {
         return false;

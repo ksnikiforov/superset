@@ -418,7 +418,6 @@ export const useExpansionEngine = ({
         };
         const factStore = factStoreRef.current as PivotFactStore;
         const plan = planHydrationIteration({
-          tree: treeRef.current,
           desired,
           axisCoverageNeeds,
           factSelectors: factStore.getCoverageSelectors(),
