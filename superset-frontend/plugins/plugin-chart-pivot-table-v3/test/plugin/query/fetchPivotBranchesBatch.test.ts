@@ -38,8 +38,13 @@ import {
 } from '../../../src/types';
 import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
 import { buildExpansionQuerySpecs } from '../../../src/pivot/query/specs';
-import { createPivotFactStore } from '../../../src/pivot/runtime/factStore';
+import {
+  createPivotFactStore,
+  type PivotFactSelector,
+  type PivotFactStore,
+} from '../../../src/pivot/runtime/factStore';
 import { materializeLoadedPivotTreeFromFactStore } from '../../../src/pivot/runtime/materializePivotTree';
+import { factSelectorsCoverSelector } from '../../../src/pivot/runtime/coverage';
 
 jest.mock('@superset-ui/core', () => {
   const actual = jest.requireActual('@superset-ui/core');
@@ -79,6 +84,11 @@ const makeTree = (): PivotTreeData => ({
   },
   cells: {},
 });
+
+const hasCompatibleCoverage = (
+  store: Pick<PivotFactStore, 'getCoverageSelectors'>,
+  selector: PivotFactSelector,
+) => factSelectorsCoverSelector(store.getCoverageSelectors(), selector);
 
 const mockPost = SupersetClient.post as jest.Mock;
 
@@ -355,7 +365,7 @@ describe('fetchBatch', () => {
     const rowKey = serializePath(['US', 'CA', 'SF']);
     const metricColKey = serializePath([encodeMetricKey('m1')]);
 
-    expect(store.hasCompatibleCoverage(spec.meta.factSelector)).toBe(true);
+    expect(hasCompatibleCoverage(store, spec.meta.factSelector)).toBe(true);
     expect(mockPost).not.toHaveBeenCalled();
     expect(tree.rows[rowKey]).toBeDefined();
     expect(tree.cells[serializeCellKey(rowKey, metricColKey)]?.values.m1).toBe(
@@ -422,7 +432,7 @@ describe('fetchBatch', () => {
       facts: [],
     });
     const expectedMissingSpecs = specs.filter(
-      spec => !store.hasCompatibleCoverage(spec.meta.factSelector),
+      spec => !hasCompatibleCoverage(store, spec.meta.factSelector),
     );
 
     await fetchBatch({

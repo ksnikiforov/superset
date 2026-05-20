@@ -20,11 +20,7 @@ import { type DataRecordValue } from '@superset-ui/core';
 import { type PivotAxis, type PivotPath } from '../../types';
 import { serializePath } from '../core/path';
 import { stableStringify } from '../shared/stableStringify';
-import {
-  buildCoverageNeedFromFactSelector,
-  diffCoverageManifest,
-  normalizeFactValueKeys,
-} from './coverage';
+import { normalizeFactValueKeys } from './coverage';
 import { type PivotFactCoverage } from './types';
 
 export type PivotFact = {
@@ -69,7 +65,6 @@ export type PivotFactStore = {
   upsertBatch: (batch: PivotFactStoreBatch) => void;
   getCoverageSelectors: () => PivotFactSelector[];
   getFactBatches: () => PivotFactStoreBatch[];
-  hasCompatibleCoverage: (selector: PivotFactSelector) => boolean;
 };
 
 const buildPivotFactRequestKey = ({
@@ -171,19 +166,6 @@ export const createPivotFactStore = (): PivotFactStore => {
     factsByRequest.set(key, Array.from(factsByFactKey.values()));
   };
 
-  const hasCompatibleCoverage = (selector: PivotFactSelector) => {
-    const candidateSelectors = Array.from(selectorByRequest.values()).filter(
-      candidate =>
-        selector.scope.kind !== 'root' ? true : candidate.scope.kind === 'root',
-    );
-    return (
-      diffCoverageManifest({
-        required: [buildCoverageNeedFromFactSelector(selector)],
-        factSelectors: candidateSelectors,
-      }).length === 0
-    );
-  };
-
   return {
     upsertBatch,
     getCoverageSelectors: () => Array.from(selectorByRequest.values()),
@@ -192,7 +174,6 @@ export const createPivotFactStore = (): PivotFactStore => {
         ...selector,
         facts: factsByRequest.get(key) ?? [],
       })),
-    hasCompatibleCoverage,
   };
 };
 

@@ -318,3 +318,15 @@ export const buildCoverageNeedFromFactSelector = ({
     columnScope: scopedAxis === 'col' ? axisScope : { kind: 'root' },
   };
 };
+
+export const factSelectorsCoverSelector = (
+  factSelectors: PivotFactSelector[],
+  selector: PivotFactSelector,
+) =>
+  diffCoverageManifest({
+    required: [buildCoverageNeedFromFactSelector(selector)],
+    factSelectors:
+      selector.scope.kind === 'root'
+        ? factSelectors.filter(candidate => candidate.scope.kind === 'root')
+        : factSelectors,
+  }).length === 0;

@@ -49,6 +49,7 @@ import {
   maybeYieldChunkedWork,
   yieldChunkedWork,
 } from './chunkedWork';
+import { factSelectorsCoverSelector } from './coverage';
 
 export { createPivotFactStore } from './factStore';
 export type {
@@ -299,8 +300,11 @@ export const fetchPlannedQuerySpecs = async ({
   requestGroupId?: string;
   factStore?: PivotFactStore;
 }): Promise<{ results: ChartDataQueryResult[] }> => {
+  const factSelectors = factStore?.getCoverageSelectors() ?? [];
   const missingSpecs = specs.filter(
-    spec => !factStore?.hasCompatibleCoverage(spec.meta.factSelector),
+    spec =>
+      !factStore ||
+      !factSelectorsCoverSelector(factSelectors, spec.meta.factSelector),
   );
   if (missingSpecs.length === 0) {
     return { results: [] };

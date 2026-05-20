@@ -290,8 +290,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13339` insertions, `18177` deletions, net `-4838`.
-- Current production TypeScript/TSX total: about `28672` lines.
+- Production `src`: `13336` insertions, `18177` deletions, net `-4841`.
+- Current production TypeScript/TSX total: about `28669` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -303,16 +303,16 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `28672` | `-4838` | `< 28000` |
-| Strict core pipeline | `11337` | `11505` | `+168` | `8000` |
+| Full production `src` | `33510` | `28669` | `-4841` | `< 28000` |
+| Strict core pipeline | `11337` | `11502` | `+165` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4893` | `+210` | `3000-4000` |
-| Broad core pipeline | `16020` | `16398` | `+378` | `11000-13000` |
+| Broad core pipeline | `16020` | `16395` | `+375` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `3784` |
+| `pivot/runtime/*` | `3781` |
 | `pivot/expansion/*` | `2567` |
 | `pivot/query/*` | `1523` |
 | `pivot/layout/*` | `770` |
@@ -588,6 +588,12 @@ query transport optimization, but the fact store and coverage manifest no
 longer carry separate branch-vs-batch semantics. This removes duplicated scope
 matching from `runtime/coverage.ts` and `runtime/factStore.ts` while preserving
 split/batched expansion fetch behavior.
+
+Latest coverage-boundary cleanup: `PivotFactStore.hasCompatibleCoverage` is
+gone. Query execution now asks the coverage manifest directly whether planned
+fact selectors are already loaded via `factSelectorsCoverSelector`, keeping
+coverage authority in `runtime/coverage.ts` instead of duplicating it as a fact
+store method.
 
 Checkpoint: deleting `PivotExpansionPlan.hasMissingNodes` is not currently a
 safe simplification. A trial cut changed persisted row x column restore by
