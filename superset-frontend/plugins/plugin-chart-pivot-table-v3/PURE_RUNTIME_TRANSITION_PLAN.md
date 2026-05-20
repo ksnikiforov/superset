@@ -95,16 +95,16 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `27201` | `-6309` | `< 28000` |
-| Strict core pipeline | `11337` | `10966` | `-371` | `8000` |
+| Full production `src` | `33510` | `27181` | `-6329` | `< 28000` |
+| Strict core pipeline | `11337` | `10946` | `-391` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4026` | `-657` | `3000-4000` |
-| Broad core pipeline | `16020` | `14992` | `-1028` | `11000-13000` |
+| Broad core pipeline | `16020` | `14972` | `-1048` | `11000-13000` |
 
 Strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `3535` |
+| `pivot/runtime/*` | `3515` |
 | `pivot/expansion/*` | `2136` |
 | `pivot/query/*` | `1378` |
 | `pivot/layout/*` | `739` |
@@ -131,6 +131,8 @@ Completed structural cuts:
 - Expansion layout transition planning now reports layout metadata only; loaded
   tree selection stays in the expansion engine.
 - Materialization is fact-store backed for initial and incremental paths.
+- Materialization no longer has a final root relabel wrapper; root labels are
+  produced by tree construction/projection.
 - Chart-owned metadata recovery and several render-policy adapters were
   removed.
 
@@ -143,6 +145,13 @@ Remaining duplicate authority:
 - Render/layout code still contains policy that should become pure projection
   over the materialized tree.
 - `PivotTableChart.tsx` still coordinates too many runtime state machines.
+
+Open behavior checkpoints:
+
+- Removing single-metric base-cell propagation from measure-axis projection
+  breaks visible single-metric cells, column subtotal values, databar/sorting
+  offsets, and expansion subtotal cells. This branch is not a safe deletion
+  target without an explicit UX redesign for single-metric layouts.
 
 ## Execution Order
 

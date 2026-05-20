@@ -226,22 +226,6 @@ const applyMeasureLeafValues = (
   return next;
 };
 
-const finalizeInitialPivotTree = ({ tree }: { tree: PivotTreeData }) => {
-  const rootKey = serializePath([]);
-  const finalizedTree = tree;
-  (['rows', 'cols'] as const).forEach(axis => {
-    const root = finalizedTree[axis][rootKey];
-    if (root) {
-      finalizedTree[axis][rootKey] = {
-        ...root,
-        label: 'Grand total',
-        formattedLabel: 'Grand total',
-      };
-    }
-  });
-  return finalizedTree;
-};
-
 type FactTreeBuilderInput = {
   rowColumns: QueryFormColumn[];
   columnColumns: QueryFormColumn[];
@@ -1230,12 +1214,10 @@ export const materializeLoadedPivotTreeFromFactStore = ({
   layout: LayoutContext;
   formData: PivotTableQueryFormData;
 }): PivotTreeData =>
-  finalizeInitialPivotTree({
-    tree: materializeFactStoreBatches({
-      batches: store.getFactBatches(),
-      layout,
-      formData,
-    }),
+  materializeFactStoreBatches({
+    batches: store.getFactBatches(),
+    layout,
+    formData,
   });
 
 export const materializeLoadedPivotTreeFromFactStoreAsync = async ({
@@ -1272,7 +1254,5 @@ export const materializeLoadedPivotTreeFromFactStoreAsync = async ({
     });
     mergedTree = mergeTrees(mergedTree, nextTree);
   }
-  return finalizeInitialPivotTree({
-    tree: mergedTree,
-  });
+  return mergedTree;
 };
