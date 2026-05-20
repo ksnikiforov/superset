@@ -20,7 +20,6 @@ import { useCallback, useMemo } from 'react';
 import {
   MetricsLayoutEnum,
   type PivotTableProps,
-  type PivotTreeData,
   type PivotTreeNode,
   type TotalPosition,
 } from '../../types';
@@ -28,40 +27,22 @@ import { resolveMetricDisplayLabel } from '../../utils';
 import { decodeMetricKey } from '../core/tokens';
 import { buildLayoutContext } from '../layout/LayoutContext';
 import type { PivotProgram } from '../runtime/types';
-import type { RenderModelConfig } from '../render/renderModel';
 import {
   buildMetricOrderComparator,
-  resolveAxisChildrenBeforeSubtotalPolicy,
-  resolveCollapsedValuesNodesForAxis,
   resolveMetricAxisLayoutPolicy,
-  resolveRowSubtotalChildrenPolicy,
 } from './layoutRuntime';
-
-const defaultPivotNodeSorter = () => 0;
 
 export type PivotLayoutResult = {
   layout: ReturnType<typeof buildLayoutContext>;
   expansionSemanticSignature: string;
   normalizedColSubtotalLevels: number[];
   effectiveRowSubtotalPosition: TotalPosition;
+  effectiveColSubtotalPosition: TotalPosition;
   hideMetricHeaderOnRows: boolean;
+  hideMetricHeaderOnCols: boolean;
   compareMetricOrder: (a: PivotTreeNode, b: PivotTreeNode) => number;
   getMetricDisplayLabelForKey: (metricKey: string) => string;
   getRowSubtotalPosition: (node: PivotTreeNode) => TotalPosition;
-  buildRenderModelConfig: (params: {
-    tree: PivotTreeData;
-    expandedRows: Set<string>;
-    expandedCols: Set<string>;
-    rowTotals?: boolean;
-    colTotals?: boolean;
-    rowSorter?: (a: PivotTreeNode, b: PivotTreeNode) => number;
-    colSorter?: (a: PivotTreeNode, b: PivotTreeNode) => number;
-    getColumnDisplayPath?: (
-      col: PivotTreeNode,
-      maxDepth: number,
-    ) => PivotTreeNode['path'];
-    getColumnHeaderLabel?: (value: unknown) => string;
-  }) => RenderModelConfig;
 };
 
 export const usePivotLayout = ({
@@ -91,10 +72,6 @@ export const usePivotLayout = ({
   const { metricsLayoutResolved: resolvedMetricsLayout, metricInsertIndex } =
     layout.pivotProgram;
   const { metricKeys: metricLabels } = layout.pivotProgram;
-  const isMultiMetric = metricLabels.length > 1;
-  const hasMultipleMeasures =
-    isMultiMetric ||
-    layout.measureHierarchy.groups.some(group => group.leaves.length > 1);
 
   const normalizedRowSubtotalLevels = layout.rowSubtotalLevels;
   const normalizedColSubtotalLevels = useMemo(() => {
@@ -132,9 +109,7 @@ export const usePivotLayout = ({
     ],
   );
 
-  const resolvedRowTotalPosition = layout.rowTotalPosition;
   const resolvedRowSubtotalPosition = layout.rowSubtotalPosition;
-  const resolvedColTotalPosition = layout.colTotalPosition;
   const resolvedColSubtotalPosition = layout.colSubtotalPosition;
 
   const {
@@ -197,123 +172,16 @@ export const usePivotLayout = ({
     [forceRowSubtotalEnd, layout.pivotProgram, resolvedRowSubtotalPosition],
   );
 
-  const getCollapsedChildrenForAxis = useCallback(
-    (
-      axis: 'row' | 'col',
-      parent: PivotTreeNode,
-      expandedSet: Set<string>,
-      nodes: Record<string, PivotTreeNode>,
-    ) =>
-      resolveCollapsedValuesNodesForAxis({
-        program: layout.pivotProgram,
-        axis,
-        parent,
-        expandedSet,
-        nodes,
-        isLeafTierVisible,
-      }),
-    [isLeafTierVisible, layout.pivotProgram],
-  );
-
-  const getAxisChildrenForNodes = useCallback(
-    (
-      axis: 'row' | 'col',
-      parent: PivotTreeNode,
-      nodes: Record<string, PivotTreeNode>,
-    ) => {
-      const filtered = resolveAxisChildrenBeforeSubtotalPolicy({
-        program: layout.pivotProgram,
-        axis,
-        parent,
-        nodes,
-        hideMetricHeader:
-          axis === 'row' ? hideMetricHeaderOnRows : hideMetricHeaderOnCols,
-        colTotals: axis === 'row' ? layout.colTotals : undefined,
-        normalizedColSubtotalLevelCount:
-          axis === 'col' ? normalizedColSubtotalLevels.length : undefined,
-      });
-      if (axis === 'col') {
-        return filtered;
-      }
-      return resolveRowSubtotalChildrenPolicy({
-        program: layout.pivotProgram,
-        children: filtered,
-        parent,
-        nodes,
-        rowSubTotals: layout.rowSubTotals,
-        rowSubtotalPositionForParent: getRowSubtotalPosition(parent),
-        hideMetricHeaderOnRows,
-      });
-    },
-    [
-      getRowSubtotalPosition,
-      hideMetricHeaderOnCols,
-      hideMetricHeaderOnRows,
-      layout.colTotals,
-      layout.pivotProgram,
-      layout.rowSubTotals,
-      normalizedColSubtotalLevels.length,
-    ],
-  );
-
-  const buildRenderModelConfig = useCallback(
-    ({
-      tree,
-      expandedRows,
-      expandedCols,
-      rowTotals: rowTotalsForModel = layout.rowTotals,
-      colTotals: colTotalsForModel = layout.colTotals,
-      rowSorter = defaultPivotNodeSorter,
-      colSorter = defaultPivotNodeSorter,
-      getColumnDisplayPath,
-      getColumnHeaderLabel,
-    }: Parameters<PivotLayoutResult['buildRenderModelConfig']>[0]) => ({
-      normalizedRowSubtotalLevels,
-      normalizedColSubtotalLevels,
-      rowTotals: rowTotalsForModel,
-      colTotals: colTotalsForModel,
-      rowTotalPosition: resolvedRowTotalPosition,
-      colTotalPosition: resolvedColTotalPosition,
-      resolvedColSubtotalPosition: effectiveColSubtotalPosition,
-      pivotProgram: layout.pivotProgram,
-      hasMultipleMeasures,
-      rowSorter,
-      colSorter,
-      getRowChildren: parent =>
-        getAxisChildrenForNodes('row', parent, tree.rows),
-      getCollapsedRowChildren: parent =>
-        getCollapsedChildrenForAxis('row', parent, expandedRows, tree.rows),
-      getColChildren: parent =>
-        getAxisChildrenForNodes('col', parent, tree.cols),
-      getCollapsedColLeaves: parent =>
-        getCollapsedChildrenForAxis('col', parent, expandedCols, tree.cols),
-      getColumnDisplayPath,
-      getColumnHeaderLabel,
-    }),
-    [
-      effectiveColSubtotalPosition,
-      getAxisChildrenForNodes,
-      getCollapsedChildrenForAxis,
-      hasMultipleMeasures,
-      layout.colTotals,
-      layout.pivotProgram,
-      layout.rowTotals,
-      normalizedColSubtotalLevels,
-      normalizedRowSubtotalLevels,
-      resolvedColTotalPosition,
-      resolvedRowTotalPosition,
-    ],
-  );
-
   return {
     layout,
     expansionSemanticSignature,
     normalizedColSubtotalLevels,
     effectiveRowSubtotalPosition,
+    effectiveColSubtotalPosition,
     hideMetricHeaderOnRows,
+    hideMetricHeaderOnCols,
     compareMetricOrder,
     getMetricDisplayLabelForKey,
     getRowSubtotalPosition,
-    buildRenderModelConfig,
   };
 };

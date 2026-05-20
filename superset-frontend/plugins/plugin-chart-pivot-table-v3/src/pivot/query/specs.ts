@@ -308,7 +308,6 @@ type ResolvedFetchContext = {
   metricsForQuery: QueryFormMetric[];
   requiredTimeOffsets: string[];
   sanitizedPath: PivotPath;
-  coverageTarget: ExpansionCoverageTarget;
   materialization?: PivotFactMaterialization;
   coverages: PivotFactCoverage[];
 };
@@ -643,7 +642,6 @@ const resolveFetchContext = ({
     metricsForQuery: queryShape.metrics,
     requiredTimeOffsets,
     sanitizedPath,
-    coverageTarget,
     materialization: resolveFactMaterialization({
       layout,
       axis,

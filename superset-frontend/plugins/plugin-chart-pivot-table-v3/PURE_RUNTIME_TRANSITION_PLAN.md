@@ -290,8 +290,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13211` insertions, `17851` deletions, net `-4640`.
-- Current production TypeScript/TSX total: about `28870` lines.
+- Production `src`: `13194` insertions, `17878` deletions, net `-4684`.
+- Current production TypeScript/TSX total: about `28826` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -303,10 +303,10 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `28870` | `-4640` | `< 28000` |
-| Strict core pipeline | `11337` | `11631` | `+294` | `8000` |
-| Non-visual chart runtime hooks | `4683` | `4967` | `+284` | `3000-4000` |
-| Broad core pipeline | `16020` | `16598` | `+578` | `11000-13000` |
+| Full production `src` | `33510` | `28826` | `-4684` | `< 28000` |
+| Strict core pipeline | `11337` | `11629` | `+292` | `8000` |
+| Non-visual chart runtime hooks | `4683` | `4925` | `+242` | `3000-4000` |
+| Broad core pipeline | `16020` | `16554` | `+534` | `11000-13000` |
 
 Current strict core breakdown:
 
@@ -314,7 +314,7 @@ Current strict core breakdown:
 | --- | ---: |
 | `pivot/runtime/*` | `3818` |
 | `pivot/expansion/*` | `2628` |
-| `pivot/query/*` | `1412` |
+| `pivot/query/*` | `1409` |
 | `pivot/layout/*` | `770` |
 | core/shared/domain helpers | `1800` |
 | formatting/data/render-model/update support | `1204` |
@@ -618,6 +618,15 @@ pending, explicit-expanded, and explicit-collapsed intent in axis-shaped refs
 instead of separate row/column ref objects. This removes duplicated hook
 dependency plumbing and keeps the expansion runtime state boundary aligned with
 the axis-neutral transition model.
+
+Latest render-boundary cleanup: `usePivotLayout` no longer exports a
+`buildRenderModelConfig` adapter or owns render child callbacks. Layout now
+returns compiled layout plus the small metric/subtotal policy needed by
+formatting/rendering, while `usePivotRenderModel` builds the render model
+configuration at the render boundary. Query-spec fetch context also stopped
+returning the unused compiled coverage target after consuming it. This is a
+modest deletion slice, but it removes another chart-layout wrapper surface and
+keeps render policy from living in the layout hook.
 
 Latest persistence pruning cleanup: `buildVisiblePersistedExpansionState` now
 accepts and returns axis-shaped expansion sets instead of row/column-specific

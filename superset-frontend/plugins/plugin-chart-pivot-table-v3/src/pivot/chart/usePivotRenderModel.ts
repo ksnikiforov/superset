@@ -58,6 +58,11 @@ import {
   formatRenderTreeDateLabels,
   resolveColumnHeaderLabel,
 } from './renderDisplay';
+import {
+  resolveAxisChildrenBeforeSubtotalPolicy,
+  resolveCollapsedValuesNodesForAxis,
+  resolveRowSubtotalChildrenPolicy,
+} from './layoutRuntime';
 
 type DimensionSortingKeys = {
   metricKey?: string;
@@ -183,6 +188,13 @@ export const usePivotRenderModel = ({
     [layout.layout.measureHierarchy, layout.layout.pivotProgram],
   );
   const hasRowSorting = Object.keys(rowSortingKeyMap).length > 0;
+  const hasMultipleMeasures =
+    layout.layout.pivotProgram.metricKeys.length > 1 ||
+    layout.layout.measureHierarchy.groups.some(
+      group => group.leaves.length > 1,
+    );
+  const isLeafTierVisible =
+    layout.layout.measureHierarchy.leafTierVisibility === 'visible';
 
   const { dateFormatters } = formData;
   const renderTree = useMemo(
@@ -383,9 +395,60 @@ export const usePivotRenderModel = ({
       }),
     [layout],
   );
+  const getCollapsedChildrenForAxis = useCallback(
+    (
+      axis: 'row' | 'col',
+      parent: PivotTreeNode,
+      expandedSet: Set<string>,
+      nodes: Record<string, PivotTreeNode>,
+    ) =>
+      resolveCollapsedValuesNodesForAxis({
+        program: layout.layout.pivotProgram,
+        axis,
+        parent,
+        expandedSet,
+        nodes,
+        isLeafTierVisible,
+      }),
+    [isLeafTierVisible, layout.layout.pivotProgram],
+  );
+  const getAxisChildrenForNodes = useCallback(
+    (
+      axis: 'row' | 'col',
+      parent: PivotTreeNode,
+      nodes: Record<string, PivotTreeNode>,
+    ) => {
+      const filtered = resolveAxisChildrenBeforeSubtotalPolicy({
+        program: layout.layout.pivotProgram,
+        axis,
+        parent,
+        nodes,
+        hideMetricHeader:
+          axis === 'row'
+            ? layout.hideMetricHeaderOnRows
+            : layout.hideMetricHeaderOnCols,
+        colTotals: axis === 'row' ? layout.layout.colTotals : undefined,
+        normalizedColSubtotalLevelCount:
+          axis === 'col'
+            ? layout.normalizedColSubtotalLevels.length
+            : undefined,
+      });
+      if (axis === 'col') {
+        return filtered;
+      }
+      return resolveRowSubtotalChildrenPolicy({
+        program: layout.layout.pivotProgram,
+        children: filtered,
+        parent,
+        nodes,
+        rowSubTotals: layout.layout.rowSubTotals,
+        rowSubtotalPositionForParent: layout.getRowSubtotalPosition(parent),
+        hideMetricHeaderOnRows: layout.hideMetricHeaderOnRows,
+      });
+    },
+    [layout],
+  );
 
-  const isLeafTierVisible =
-    layout.layout.measureHierarchy.leafTierVisibility === 'visible';
   const expandedRowsForRender = useMemo(
     () =>
       expandMetricNodesForRender({
@@ -423,22 +486,49 @@ export const usePivotRenderModel = ({
         tree: renderTree,
         expandedRows: expandedRowsForRender,
         expandedCols: expandedColsForRender,
-        config: layout.buildRenderModelConfig({
-          tree: renderTree,
-          expandedRows: expandedRowsForRender,
-          expandedCols: expandedColsForRender,
+        config: {
+          normalizedRowSubtotalLevels: layout.layout.rowSubtotalLevels,
+          normalizedColSubtotalLevels: layout.normalizedColSubtotalLevels,
+          rowTotals: layout.layout.rowTotals,
+          colTotals: layout.layout.colTotals,
+          rowTotalPosition: layout.layout.rowTotalPosition,
+          colTotalPosition: layout.layout.colTotalPosition,
+          resolvedColSubtotalPosition: layout.effectiveColSubtotalPosition,
+          pivotProgram: layout.layout.pivotProgram,
+          hasMultipleMeasures,
           rowSorter,
           colSorter,
+          getRowChildren: parent =>
+            getAxisChildrenForNodes('row', parent, renderTree.rows),
+          getCollapsedRowChildren: parent =>
+            getCollapsedChildrenForAxis(
+              'row',
+              parent,
+              expandedRowsForRender,
+              renderTree.rows,
+            ),
+          getColChildren: parent =>
+            getAxisChildrenForNodes('col', parent, renderTree.cols),
+          getCollapsedColLeaves: parent =>
+            getCollapsedChildrenForAxis(
+              'col',
+              parent,
+              expandedColsForRender,
+              renderTree.cols,
+            ),
           getColumnDisplayPath,
           getColumnHeaderLabel,
-        }),
+        },
       }),
     [
       colSorter,
       expandedColsForRender,
       expandedRowsForRender,
+      getAxisChildrenForNodes,
+      getCollapsedChildrenForAxis,
       getColumnDisplayPath,
       getColumnHeaderLabel,
+      hasMultipleMeasures,
       layout,
       renderTree,
       rowSorter,
