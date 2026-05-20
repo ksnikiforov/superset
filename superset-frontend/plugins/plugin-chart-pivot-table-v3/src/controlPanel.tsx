@@ -141,6 +141,55 @@ const isUserControlledMode = ({
 }: Pick<ControlPanelState, 'controls' | 'form_data'>) =>
   getInteractionMode(controls, formData) === INTERACTION_MODE_USER;
 
+const mapGroupbyControlStateToProps = (
+  state: ControlPanelState,
+  controlState: ControlState,
+  chartState?: Record<string, unknown>,
+) => {
+  const base =
+    typeof sharedControls.groupby.mapStateToProps === 'function'
+      ? sharedControls.groupby.mapStateToProps(state, controlState, chartState)
+      : {};
+  return {
+    ...base,
+    formData: state.form_data,
+    datasource: state.datasource,
+  };
+};
+
+const getQueryFormColumns = (value: unknown): QueryFormColumn[] =>
+  ensureIsArray<QueryFormColumn>(value).filter(isQueryFormColumn);
+
+const buildDimensionMap = (columns: QueryFormColumn[]) =>
+  new Map(columns.map(column => [getStableColumnKey(column), column] as const));
+
+const resolveRuntimeColumnDimensions = (
+  state: ControlPanelState,
+): QueryFormColumn[] => {
+  const runtimeLayout =
+    state?.form_data?.pivotRuntimeLayout ??
+    buildRuntimeLayoutFromFormData(
+      (state?.form_data ?? {}) as PivotTableQueryFormData,
+    );
+  const dimensionMap = buildDimensionMap([
+    ...getQueryFormColumns(state?.controls?.dimensions?.value),
+    ...getQueryFormColumns(state?.form_data?.dimensions),
+    ...getQueryFormColumns(state?.form_data?.groupbyColumns),
+  ]);
+  return runtimeLayout.cols
+    .map(key => dimensionMap.get(key) ?? key)
+    .filter(isQueryFormColumn);
+};
+
+const resolveColumnSubtotalGroupby = (
+  state: ControlPanelState,
+): QueryFormColumn[] =>
+  stripMetricsPlaceholder(
+    isUserControlledMode(state)
+      ? resolveRuntimeColumnDimensions(state)
+      : getQueryFormColumns(state?.controls?.groupbyColumns?.value),
+  );
+
 const getOptionKey = (opt: unknown) => {
   if (typeof opt !== 'object' || opt === null) {
     return undefined;
@@ -188,24 +237,12 @@ const withMetricsPlaceholder =
         : options.filter(opt => getOptionKey(opt) !== METRICS_PLACEHOLDER);
       const rowsRaw =
         axis === 'row'
-          ? ensureIsArray<QueryFormColumn>(
-              controlState?.value as QueryFormColumn | QueryFormColumn[],
-            )
-          : ensureIsArray<QueryFormColumn>(
-              state?.controls?.groupbyRows?.value as
-                | QueryFormColumn
-                | QueryFormColumn[],
-            );
+          ? getQueryFormColumns(controlState?.value)
+          : getQueryFormColumns(state?.controls?.groupbyRows?.value);
       const colsRaw =
         axis === 'col'
-          ? ensureIsArray<QueryFormColumn>(
-              controlState?.value as QueryFormColumn | QueryFormColumn[],
-            )
-          : ensureIsArray<QueryFormColumn>(
-              state?.controls?.groupbyColumns?.value as
-                | QueryFormColumn
-                | QueryFormColumn[],
-            );
+          ? getQueryFormColumns(controlState?.value)
+          : getQueryFormColumns(state?.controls?.groupbyColumns?.value);
       const preferredLayout =
         (state?.controls?.metricsLayout?.value as MetricsLayoutEnum) ||
         (state?.form_data?.metricsLayout as MetricsLayoutEnum) ||
@@ -229,11 +266,17 @@ const withMetricsPlaceholder =
           preferredAxis: resolved.layout,
           metrics: metricsValue,
           controlNames: { rows: 'groupbyRows', cols: 'groupbyColumns' },
-          resolve: resolvePivotProgramPlacement,
         },
       };
     },
   });
+
+const pivotDimensionControlBase = {
+  ...sharedControls.groupby,
+  type: PivotDndColumnSelect,
+  dragTypeOverride: 'pivot_v3_dnd',
+  mapStateToProps: mapGroupbyControlStateToProps,
+};
 
 type ColumnSubtotalOption = {
   value: number;
@@ -356,30 +399,9 @@ const config: ControlPanelConfig = {
           {
             name: 'dimensions',
             config: {
-              ...sharedControls.groupby,
-              type: PivotDndColumnSelect,
-              dragTypeOverride: 'pivot_v3_dnd',
+              ...pivotDimensionControlBase,
               label: t('Dimensions'),
               description: t('Dimensions available for interactive layout'),
-              mapStateToProps: (
-                state: ControlPanelState,
-                controlState: ControlState,
-                chartState?: Record<string, unknown>,
-              ) => {
-                const base =
-                  typeof sharedControls.groupby.mapStateToProps === 'function'
-                    ? sharedControls.groupby.mapStateToProps(
-                        state,
-                        controlState,
-                        chartState,
-                      )
-                    : {};
-                return {
-                  ...base,
-                  formData: state.form_data,
-                  datasource: state.datasource,
-                };
-              },
               visibility: isUserControlledMode,
               resetOnHide: false,
             },
@@ -389,30 +411,9 @@ const config: ControlPanelConfig = {
           {
             name: 'groupbyRows',
             config: withMetricsPlaceholder('row')({
-              ...sharedControls.groupby,
-              type: PivotDndColumnSelect,
-              dragTypeOverride: 'pivot_v3_dnd',
+              ...pivotDimensionControlBase,
               label: t('Rows'),
               description: t('Columns to group by on the rows'),
-              mapStateToProps: (
-                state: ControlPanelState,
-                controlState: ControlState,
-                chartState?: Record<string, unknown>,
-              ) => {
-                const base =
-                  typeof sharedControls.groupby.mapStateToProps === 'function'
-                    ? sharedControls.groupby.mapStateToProps(
-                        state,
-                        controlState,
-                        chartState,
-                      )
-                    : {};
-                return {
-                  ...base,
-                  formData: state.form_data,
-                  datasource: state.datasource,
-                };
-              },
               visibility: ({ controls, form_data }) =>
                 !isUserControlledMode({ controls, form_data }),
               resetOnHide: false,
@@ -423,30 +424,9 @@ const config: ControlPanelConfig = {
           {
             name: 'groupbyColumns',
             config: withMetricsPlaceholder('col')({
-              ...sharedControls.groupby,
-              type: PivotDndColumnSelect,
-              dragTypeOverride: 'pivot_v3_dnd',
+              ...pivotDimensionControlBase,
               label: t('Columns'),
               description: t('Columns to group by on the columns'),
-              mapStateToProps: (
-                state: ControlPanelState,
-                controlState: ControlState,
-                chartState?: Record<string, unknown>,
-              ) => {
-                const base =
-                  typeof sharedControls.groupby.mapStateToProps === 'function'
-                    ? sharedControls.groupby.mapStateToProps(
-                        state,
-                        controlState,
-                        chartState,
-                      )
-                    : {};
-                return {
-                  ...base,
-                  formData: state.form_data,
-                  datasource: state.datasource,
-                };
-              },
               visibility: ({ controls, form_data }) =>
                 !isUserControlledMode({ controls, form_data }),
               resetOnHide: false,
@@ -819,37 +799,7 @@ const config: ControlPanelConfig = {
               renderTrigger: true,
               shouldMapStateToProps: () => true,
               mapStateToProps: (state: ControlPanelState) => {
-                const fixedColsRaw = ensureIsArray(
-                  state?.controls?.groupbyColumns?.value,
-                ).filter(isQueryFormColumn);
-                const runtimeLayout =
-                  state?.form_data?.pivotRuntimeLayout ??
-                  buildRuntimeLayoutFromFormData(
-                    (state?.form_data ?? {}) as PivotTableQueryFormData,
-                  );
-                const dimensionMap = new Map(
-                  [
-                    ...ensureIsArray<QueryFormColumn>(
-                      state?.controls?.dimensions?.value,
-                    ),
-                    ...ensureIsArray<QueryFormColumn>(
-                      state?.form_data?.dimensions,
-                    ),
-                    ...ensureIsArray<QueryFormColumn>(
-                      state?.form_data?.groupbyColumns,
-                    ),
-                  ]
-                    .filter(isQueryFormColumn)
-                    .map(
-                      column => [getStableColumnKey(column), column] as const,
-                    ),
-                );
-                const colsRaw = runtimeLayout.cols
-                  .map(key => dimensionMap.get(key) ?? key)
-                  .filter(isQueryFormColumn);
-                const colGroupby = stripMetricsPlaceholder(
-                  isUserControlledMode(state) ? colsRaw : fixedColsRaw,
-                );
+                const colGroupby = resolveColumnSubtotalGroupby(state);
                 const colDepth = colGroupby.length;
                 const maxSubtotalDepth = Math.max(colDepth - 1, 0);
                 const options =

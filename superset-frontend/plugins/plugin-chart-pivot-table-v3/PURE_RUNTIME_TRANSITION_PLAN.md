@@ -96,7 +96,7 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `26652` | `-6858` | `< 20000` |
+| Full production `src` | `33510` | `26603` | `-6907` | `< 20000` |
 | Strict core pipeline | `12907` | `10834` | `-2073` | `< 8000` |
 
 Diagnostic scope only:
@@ -185,6 +185,10 @@ Completed structural cuts:
 - Test fact-tree fixtures no longer rewrite every partially loaded aggregate
   path into a subtotal leaf; subtotal leaves are explicit fixtures or injected
   by the materializer path.
+- Fixed and user-controlled control-panel layouts now share the same dimension
+  state mapping helpers, and fixed row/column controls call the canonical pivot
+  placement compiler directly instead of accepting an injected placement
+  resolver.
 - Collapsed dimension state no longer suppresses visible metric-tier expansion
   keys, so metric rows can reopen under a collapsed parent without expanding the
   dimension children.

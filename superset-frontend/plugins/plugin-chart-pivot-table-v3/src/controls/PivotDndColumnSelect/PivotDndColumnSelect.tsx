@@ -65,6 +65,7 @@ import {
   transferDimensionSettingsAcrossAxes,
 } from '../../utils';
 import { METRICS_PLACEHOLDER } from '../../pivot/core/tokens';
+import { resolvePivotProgramPlacement } from '../../pivot/runtime/compilePivotProgram';
 import {
   DimensionFormattingField,
   DimensionFormattingScope,
@@ -172,18 +173,7 @@ export type PivotPlacement = {
   cols: QueryFormColumn[];
   metrics: QueryFormMetric[];
   preferredAxis?: MetricsLayoutEnum;
-  controlNames?: { rows: string; cols: string };
-  resolve?: (options: {
-    groupbyRows: QueryFormColumn[];
-    groupbyColumns: QueryFormColumn[];
-    metrics: QueryFormMetric[];
-    metricsLayout?: MetricsLayoutEnum;
-    lastMoved?: 'row' | 'col';
-  }) => {
-    rows: QueryFormColumn[];
-    cols: QueryFormColumn[];
-    layout?: MetricsLayoutEnum;
-  };
+  controlNames: { rows: string; cols: string };
   setControlValue?: (
     name: string,
     value: QueryFormColumn[] | QueryFormColumn | null | undefined,
@@ -340,11 +330,7 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
 
   const applyChange = useCallback(
     (nextValue: QueryFormColumn[] | QueryFormColumn | null | undefined) => {
-      if (
-        pivotPlacement?.resolve &&
-        pivotPlacement.controlNames?.rows &&
-        pivotPlacement.controlNames?.cols
-      ) {
+      if (pivotPlacement) {
         const prevRows = toArray(pivotPlacement.rows);
         const prevCols = toArray(pivotPlacement.cols);
         let rowsNext =
@@ -360,7 +346,7 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
             val => val === METRICS_PLACEHOLDER || !colsNext.includes(val),
           );
         }
-        const resolved = pivotPlacement.resolve({
+        const resolved = resolvePivotProgramPlacement({
           groupbyRows: rowsNext,
           groupbyColumns: colsNext,
           metrics: pivotPlacement.metrics,
@@ -391,9 +377,6 @@ function PivotDndColumnSelect(props: PivotDndColumnSelectProps) {
           },
         );
         const { controlNames } = pivotPlacement;
-        if (!controlNames) {
-          return;
-        }
         // Defer control updates to avoid unmounting drop targets mid-drag,
         // which can trigger react-dnd's "Expected to find a valid target".
         requestAnimationFrame(() => {

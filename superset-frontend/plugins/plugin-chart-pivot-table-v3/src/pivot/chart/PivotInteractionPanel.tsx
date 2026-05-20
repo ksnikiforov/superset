@@ -90,6 +90,30 @@ const SectionTitle = styled(Typography.Text)`
   color: ${({ theme }) => theme.colorTextSecondary};
 `;
 
+const ToggleIcon = styled.svg`
+  display: block;
+  width: 12px;
+  height: 12px;
+`;
+
+const RowLinesIcon = () => (
+  <ToggleIcon viewBox="0 0 12 12" fill="none" aria-hidden="true">
+    <line x1="1" y1="2" x2="11" y2="2" stroke="currentColor" />
+    <line x1="1" y1="4.5" x2="11" y2="4.5" stroke="currentColor" />
+    <line x1="1" y1="7" x2="11" y2="7" stroke="currentColor" />
+    <line x1="1" y1="9.5" x2="11" y2="9.5" stroke="currentColor" />
+  </ToggleIcon>
+);
+
+const ColLinesIcon = () => (
+  <ToggleIcon viewBox="0 0 12 12" fill="none" aria-hidden="true">
+    <line x1="2" y1="1" x2="2" y2="11" stroke="currentColor" />
+    <line x1="4.5" y1="1" x2="4.5" y2="11" stroke="currentColor" />
+    <line x1="7" y1="1" x2="7" y2="11" stroke="currentColor" />
+    <line x1="9.5" y1="1" x2="9.5" y2="11" stroke="currentColor" />
+  </ToggleIcon>
+);
+
 const SectionHeader = styled.div`
   display: flex;
   align-items: center;
@@ -955,16 +979,10 @@ export const PivotInteractionPanel = ({
           <DimensionsHeaderLeft>
             <Space size={4}>
               <Tooltip title={t('Select row placement')}>
-                <Icons.InsertRowAboveOutlined
-                  iconSize="s"
-                  iconColor="currentColor"
-                />
+                <RowLinesIcon />
               </Tooltip>
               <Tooltip title={t('Select column placement')}>
-                <Icons.ColumnWidthOutlined
-                  iconSize="s"
-                  iconColor="currentColor"
-                />
+                <ColLinesIcon />
               </Tooltip>
             </Space>
             <SectionTitle>{t('Dimensions')}</SectionTitle>
