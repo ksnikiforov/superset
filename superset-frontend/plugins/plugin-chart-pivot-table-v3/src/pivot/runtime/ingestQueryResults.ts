@@ -133,6 +133,22 @@ const getMetricValueKeysFromRecord = (
 const pathFromRecord = (record: DataRecord, columns: QueryFormColumn[]) =>
   columns.map(column => record[getColumnLabel(column)]);
 
+const factsFromRecord = (
+  record: DataRecord,
+  valueKeys: string[],
+  rowColumns: QueryFormColumn[],
+  columnColumns: QueryFormColumn[],
+): PivotFact[] => {
+  const rowPath = pathFromRecord(record, rowColumns);
+  const columnPath = pathFromRecord(record, columnColumns);
+  return valueKeys.map(valueKey => ({
+    rowPath,
+    columnPath,
+    valueKey,
+    value: record[valueKey],
+  }));
+};
+
 const factsFromRecords = ({
   result,
   metrics,
@@ -147,16 +163,9 @@ const factsFromRecords = ({
   const rowColumns = coverage.rowDimensions;
   const columnColumns = coverage.columnDimensions;
 
-  return records.flatMap(record => {
-    const rowPath = pathFromRecord(record, rowColumns);
-    const columnPath = pathFromRecord(record, columnColumns);
-    return valueKeys.map(valueKey => ({
-      rowPath,
-      columnPath,
-      valueKey,
-      value: record[valueKey],
-    }));
-  });
+  return records.flatMap(record =>
+    factsFromRecord(record, valueKeys, rowColumns, columnColumns),
+  );
 };
 
 const factsFromRecordsAsync = async ({
@@ -178,17 +187,9 @@ const factsFromRecordsAsync = async ({
   const facts: PivotFact[] = [];
 
   for (let idx = 0; idx < records.length; idx += 1) {
-    const record = records[idx];
-    const rowPath = pathFromRecord(record, rowColumns);
-    const columnPath = pathFromRecord(record, columnColumns);
-    valueKeys.forEach(valueKey => {
-      facts.push({
-        rowPath,
-        columnPath,
-        valueKey,
-        value: record[valueKey],
-      });
-    });
+    facts.push(
+      ...factsFromRecord(records[idx], valueKeys, rowColumns, columnColumns),
+    );
     // eslint-disable-next-line no-await-in-loop
     await maybeYieldChunkedWork({
       processed: idx + 1,
@@ -274,18 +275,6 @@ const factStoreBatchFromIngested = ({
   facts,
 });
 
-const upsertIngestedFactsIntoStore = ({
-  store,
-  ingested,
-}: {
-  store: PivotFactStore;
-  ingested: IngestedQueryResult[];
-}) => {
-  ingested.forEach(batch =>
-    store.upsertBatch(factStoreBatchFromIngested(batch)),
-  );
-};
-
 export const upsertQueryResultsIntoFactStoreAsync = async <
   T extends QueryResultWithData,
 >({
@@ -359,24 +348,14 @@ export const fetchPlannedQuerySpecs = async ({
     requestGroupId,
   });
   if (factStore) {
-    if (chunkSize !== undefined || shouldContinue || yieldToMain) {
-      await upsertQueryResultsIntoFactStoreAsync({
-        store: factStore,
-        specs: missingSpecs,
-        results,
-        chunkSize,
-        shouldContinue,
-        yieldToMain,
-      });
-    } else {
-      upsertIngestedFactsIntoStore({
-        store: factStore,
-        ingested: ingestQueryResults({
-          specs: missingSpecs,
-          results,
-        }),
-      });
-    }
+    await upsertQueryResultsIntoFactStoreAsync({
+      store: factStore,
+      specs: missingSpecs,
+      results,
+      chunkSize,
+      shouldContinue,
+      yieldToMain,
+    });
   }
   return { results };
 };

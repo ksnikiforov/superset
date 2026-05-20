@@ -1204,6 +1204,22 @@ const groupFactStoreBatchesByMaterializationPlan = ({
   return Array.from(batchesByPlan.values());
 };
 
+const materializeInputFromPlanGroup = (
+  formData: PivotTableQueryFormData,
+  {
+    plan,
+    batches,
+  }: ReturnType<typeof groupFactStoreBatchesByMaterializationPlan>[number],
+): MaterializePivotTreeInput => ({
+  batches,
+  metrics: plan.metrics,
+  formData,
+  measureHierarchy: plan.measureHierarchy,
+  rowSubtotalLevels: plan.rowSubtotalLevels,
+  colSubtotalLevels: plan.colSubtotalLevels,
+  pivotProgram: plan.pivotProgram,
+});
+
 const materializeFactStoreBatches = ({
   batches,
   layout,
@@ -1217,18 +1233,10 @@ const materializeFactStoreBatches = ({
     batches,
     layout,
   }).reduce<PivotTreeData>(
-    (tree, { plan, batches: planBatches }) =>
+    (tree, group) =>
       mergeTrees(
         tree,
-        materializePivotTree({
-          batches: planBatches,
-          metrics: plan.metrics,
-          formData,
-          measureHierarchy: plan.measureHierarchy,
-          rowSubtotalLevels: plan.rowSubtotalLevels,
-          colSubtotalLevels: plan.colSubtotalLevels,
-          pivotProgram: plan.pivotProgram,
-        }),
+        materializePivotTree(materializeInputFromPlanGroup(formData, group)),
       ),
     emptyPivotTree(),
   );
@@ -1266,16 +1274,9 @@ export const materializeLoadedPivotTreeFromFactStoreAsync = async ({
     layout,
   });
   for (let idx = 0; idx < groups.length; idx += 1) {
-    const { plan, batches } = groups[idx];
     // eslint-disable-next-line no-await-in-loop
     const nextTree = await materializePivotTreeAsync({
-      batches,
-      metrics: plan.metrics,
-      formData,
-      measureHierarchy: plan.measureHierarchy,
-      rowSubtotalLevels: plan.rowSubtotalLevels,
-      colSubtotalLevels: plan.colSubtotalLevels,
-      pivotProgram: plan.pivotProgram,
+      ...materializeInputFromPlanGroup(formData, groups[idx]),
       chunkSize,
       shouldContinue,
       yieldToMain,

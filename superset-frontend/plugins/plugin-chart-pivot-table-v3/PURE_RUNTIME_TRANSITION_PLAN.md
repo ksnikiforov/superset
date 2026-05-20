@@ -96,20 +96,20 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `26603` | `-6907` | `< 20000` |
-| Strict core pipeline | `12907` | `10834` | `-2073` | `< 8000` |
+| Full production `src` | `33510` | `26583` | `-6927` | `< 20000` |
+| Strict core pipeline | `12907` | `10814` | `-2093` | `< 8000` |
 
 Diagnostic scope only:
 
 | Scope | Baseline lines | Current lines | Delta |
 | --- | ---: | ---: | ---: |
-| Core pipeline dirs (`runtime/expansion/query/layout/core`) | `8698` | `7932` | `-766` |
+| Core pipeline dirs (`runtime/expansion/query/layout/core`) | `8698` | `7912` | `-786` |
 
 Core pipeline breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `3414` |
+| `pivot/runtime/*` | `3394` |
 | `pivot/expansion/*` | `2245` |
 | `pivot/query/*` | `1395` |
 | `pivot/layout/*` + `pivot/core/*` | `878` |
@@ -165,6 +165,10 @@ Completed structural cuts:
   synchronous commit path, while large result sets use the async materializer.
 - Fact-batch materialization now owns fact-tree construction directly; the
   separate sync/async fact-tree wrapper functions were removed.
+- Planned query fetch ingestion now uses one fact-store upsert path; the
+  hook-local sync ingestion branch was deleted.
+- Sync and async fact-store materialization now share the same plan-group to
+  materializer input mapping.
 - Fact store batch filtering now only carries the intersection scope matcher it
   actually enforces; root and axis-path batches stay batch-level coverage
   records.
