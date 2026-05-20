@@ -117,26 +117,12 @@ const normalizeSelector = ({
 const startsWithPath = (path: PivotPath, prefix: PivotPath) =>
   prefix.every((value, index) => path[index] === value);
 
-const factMatchesScope = (fact: PivotFact, scope: PivotFactStoreBatchScope) => {
-  switch (scope.kind) {
-    case 'root':
-      return true;
-    case 'axisPaths':
-      return scope.paths.some(path =>
-        startsWithPath(
-          scope.axis === 'row' ? fact.rowPath : fact.columnPath,
-          path,
-        ),
-      );
-    case 'intersection':
-      return (
-        scope.rowPaths.some(path => startsWithPath(fact.rowPath, path)) &&
-        scope.columnPaths.some(path => startsWithPath(fact.columnPath, path))
-      );
-    default:
-      return false;
-  }
-};
+const factMatchesIntersectionScope = (
+  fact: PivotFact,
+  scope: Extract<PivotFactStoreBatchScope, { kind: 'intersection' }>,
+) =>
+  scope.rowPaths.some(path => startsWithPath(fact.rowPath, path)) &&
+  scope.columnPaths.some(path => startsWithPath(fact.columnPath, path));
 
 const factMatchesCoverage = (fact: PivotFact, coverage: PivotFactCoverage) =>
   fact.rowPath.length === coverage.rowDepth &&
@@ -162,7 +148,7 @@ export const createPivotFactStore = (): PivotFactStore => {
         fact =>
           factMatchesCoverage(fact, selector.coverage) &&
           (selector.scope.kind !== 'intersection' ||
-            factMatchesScope(fact, selector.scope)),
+            factMatchesIntersectionScope(fact, selector.scope)),
       )
       .forEach(fact => {
         const factKey = buildPivotFactKey(selector, fact);

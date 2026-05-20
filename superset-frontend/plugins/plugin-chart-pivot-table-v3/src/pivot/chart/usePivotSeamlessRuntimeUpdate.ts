@@ -386,9 +386,10 @@ export const usePivotSeamlessRuntimeUpdate = (
       upstreamSeamlessSignature: upstreamSignature,
     });
     lastUpstreamQueryContextRef.current = updatePlan.nextUpstreamState;
-    updatePlan.updates.forEach(({ runtimeLayout: nextLayout, selection }) => {
+    if (updatePlan.update) {
+      const { runtimeLayout: nextLayout, selection } = updatePlan.update;
       applySeamlessUpdate(nextLayout, selection);
-    });
+    }
   }, [
     applySeamlessUpdate,
     committedFilters,

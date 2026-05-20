@@ -95,16 +95,15 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `27133` | `-6377` | `< 28000` |
-| Strict core pipeline | `11337` | `10912` | `-425` | `8000` |
-| Non-visual chart runtime hooks | `4683` | `4018` | `-665` | `3000-4000` |
-| Broad core pipeline | `16020` | `14930` | `-1090` | `11000-13000` |
+| Full production `src` | `33510` | `27112` | `-6398` | `< 28000` |
+| Core pipeline dirs (`runtime/expansion/query/layout/core`) | `8698` | `7952` | `-746` | `8000` |
+| Engine logic set | `12907` | `10929` | `-1978` | `< 11000` |
 
-Strict core breakdown:
+Core pipeline breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `3436` |
+| `pivot/runtime/*` | `3414` |
 | `pivot/expansion/*` | `2245` |
 | `pivot/query/*` | `1395` |
 | `pivot/layout/*` | `739` |
@@ -151,6 +150,8 @@ Completed structural cuts:
 - Seamless runtime updates now use one latest-request scope across fetch and
   materialization; the duplicate materialization lifecycle and generic request
   wrapper were removed.
+- Seamless runtime sync now produces a single optional follow-up update instead
+  of an array of duplicate chart-side updates.
 - The latest-request lifecycle no longer exposes token objects or a top-level
   finish API; request-group liveness is scope-owned.
 - Expansion hydration now rematerializes through the async materializer after
@@ -159,6 +160,9 @@ Completed structural cuts:
   synchronous commit path, while large result sets use the async materializer.
 - Fact-batch materialization now owns fact-tree construction directly; the
   separate sync/async fact-tree wrapper functions were removed.
+- Fact store batch filtering now only carries the intersection scope matcher it
+  actually enforces; root and axis-path batches stay batch-level coverage
+  records.
 - Collapsed dimension state no longer suppresses visible metric-tier expansion
   keys, so metric rows can reopen under a collapsed parent without expanding the
   dimension children.

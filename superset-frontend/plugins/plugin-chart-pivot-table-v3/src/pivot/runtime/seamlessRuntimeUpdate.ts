@@ -191,25 +191,17 @@ export const prepareSeamlessRuntimeUpdateEffect = ({
     isEqual(committedFilters, persistedInteractionFilters) &&
     isEqual(uiSelectedFilters, persistedInteractionFilters) &&
     !hasMatchingPersistedFilterSync;
-  const updates: Array<{
-    runtimeLayout: PivotRuntimeLayout;
-    selection: RuntimeSelection;
-  }> = [];
-  if (shouldApplyStaleUpdate) {
-    updates.push({
-      runtimeLayout: uiRuntimeLayout,
-      selection: uiSelectedFilters,
-    });
-  }
-  if (shouldApplyPersistedFilterUpdate) {
-    updates.push({
-      runtimeLayout: uiRuntimeLayout,
-      selection: persistedInteractionFilters,
-    });
-  }
   return {
     nextUpstreamState,
-    updates,
+    update:
+      shouldApplyStaleUpdate || shouldApplyPersistedFilterUpdate
+        ? {
+            runtimeLayout: uiRuntimeLayout,
+            selection: shouldApplyPersistedFilterUpdate
+              ? persistedInteractionFilters
+              : uiSelectedFilters,
+          }
+        : undefined,
   };
 };
 

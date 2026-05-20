@@ -105,16 +105,10 @@ test('prepares seamless runtime effect updates in chart application order', () =
       data: currentData,
       signature: 'query-b',
     },
-    updates: [
-      {
-        runtimeLayout,
-        selection: persistedFilters,
-      },
-      {
-        runtimeLayout,
-        selection: persistedFilters,
-      },
-    ],
+    update: {
+      runtimeLayout,
+      selection: persistedFilters,
+    },
   });
 });
 
@@ -141,7 +135,7 @@ test('skips seamless runtime effect updates for unrelated upstream state', () =>
       data: currentData,
       signature: 'query-b',
     },
-    updates: [],
+    update: undefined,
   });
 
   expect(
@@ -161,7 +155,7 @@ test('skips seamless runtime effect updates for unrelated upstream state', () =>
     }),
   ).toEqual({
     nextUpstreamState: null,
-    updates: [],
+    update: undefined,
   });
 });
 
