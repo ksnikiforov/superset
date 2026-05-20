@@ -326,7 +326,6 @@ function PivotTableChart(props: PivotTableProps) {
     loadingKeys,
     errorMessage,
     warnings,
-    isHydrating,
     handleToggle,
     handleRetry,
   } = useExpansionEngine({
@@ -428,7 +427,6 @@ function PivotTableChart(props: PivotTableProps) {
     [seamlessWarnings, warnings],
   );
   const activeErrorMessage = seamlessError ?? errorMessage;
-  const cornerLoaderVisible = seamlessLoading || isHydrating;
   const tableHeight = Math.max(
     0,
     isUserControlledMode ? height - INTERACTION_TOP_CHIPS_HEIGHT : height,
@@ -447,7 +445,7 @@ function PivotTableChart(props: PivotTableProps) {
     onRetry: handleRetry,
     warnings: combinedWarnings,
     showGlobalLoader: false,
-    showCornerLoader: cornerLoaderVisible,
+    showCornerLoader: seamlessLoading,
     stickyHeaders: resolvedStickyHeaders,
     headerOffset,
     headerRowOffsets,

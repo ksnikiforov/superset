@@ -76,7 +76,6 @@ type ExpansionStateCommit = {
 };
 
 type HydrateExpansionOptions = {
-  showLoader?: boolean;
   persistOnComplete?: boolean;
 };
 
@@ -129,7 +128,6 @@ export type ExpansionEngineResult = {
   expandedRows: Set<string>;
   expandedCols: Set<string>;
   loadingKeys: Set<string>;
-  isHydrating: boolean;
   errorMessage?: string;
   warnings: ChartDataWarning[];
   handleToggle: (axis: PivotAxis, node: PivotTreeNode) => void;
@@ -178,7 +176,6 @@ export const useExpansionEngine = ({
   const { row: expandedRows, col: expandedCols } = expandedByAxis;
   const expandedRef = useRef(expandedByAxis);
   const [loadingKeys, setLoadingKeys] = useState<Set<string>>(() => new Set());
-  const [isHydrating, setIsHydrating] = useState(false);
   const fetchFormDataRef = useRef(fetchFormData);
   const initialExpansionState =
     coerceExpansionState(persistedExpansionState) ??
@@ -277,7 +274,6 @@ export const useExpansionEngine = ({
       const message = error instanceof Error ? error.message : String(error);
       expansionRequestLifecycle.invalidate();
       clearLoadingState();
-      setIsHydrating(false);
       setErrorMessage(message);
     },
     [clearLoadingState, expansionRequestLifecycle],
@@ -406,13 +402,9 @@ export const useExpansionEngine = ({
 
   const hydrateAtomic = useCallback(
     async (options?: HydrateExpansionOptions) => {
-      const shouldShowLoader = options?.showLoader ?? false;
       const shouldPersist = options?.persistOnComplete ?? false;
       const requestScope = expansionRequestLifecycle.beginScope();
       clearLoadingState();
-      if (shouldShowLoader) {
-        setIsHydrating(true);
-      }
 
       try {
         const result = await runHydrationExpansionFetchLoop({
@@ -443,9 +435,7 @@ export const useExpansionEngine = ({
           }
         }
       } finally {
-        if (shouldShowLoader) {
-          setIsHydrating(false);
-        }
+        clearLoadingState();
       }
     },
     [
@@ -472,7 +462,6 @@ export const useExpansionEngine = ({
       if (toggleDecision.kind === 'collapse') {
         expansionRequestLifecycle.invalidate();
         clearLoadingState();
-        setIsHydrating(false);
         collapseNode(axis, node);
         return;
       }
@@ -481,7 +470,6 @@ export const useExpansionEngine = ({
         explicitExpandedRef.current[axis] = toggleDecision.nextManualExpanded;
         explicitCollapsedRef.current[axis] = toggleDecision.nextManualCollapsed;
         hydrateAtomic({
-          showLoader: false,
           persistOnComplete: true,
         }).catch(reportAsyncError);
       }
@@ -549,7 +537,6 @@ export const useExpansionEngine = ({
 
     expansionRequestLifecycle.invalidate();
     factStoreRef.current = createPivotFactStoreFromBatches(factBatches);
-    setIsHydrating(false);
     warningsRef.current = new Map();
     setWarnings([]);
     setErrorMessage(undefined);
@@ -612,9 +599,7 @@ export const useExpansionEngine = ({
         persistedState.collapsedRows.length > 0 ||
         persistedState.collapsedCols.length > 0);
     if (shouldHydrateExpansionIntent) {
-      hydrateAtomic({
-        showLoader: false,
-      }).catch(reportAsyncError);
+      hydrateAtomic().catch(reportAsyncError);
     }
   }, [
     clearLoadingState,
@@ -638,7 +623,7 @@ export const useExpansionEngine = ({
     warningsRef.current = new Map();
     setWarnings([]);
 
-    hydrateAtomic({ showLoader: true }).catch(reportAsyncError);
+    hydrateAtomic().catch(reportAsyncError);
   }, [hydrateAtomic, reportAsyncError]);
 
   return {
@@ -646,7 +631,6 @@ export const useExpansionEngine = ({
     expandedRows,
     expandedCols,
     loadingKeys,
-    isHydrating,
     errorMessage,
     warnings,
     handleToggle,
