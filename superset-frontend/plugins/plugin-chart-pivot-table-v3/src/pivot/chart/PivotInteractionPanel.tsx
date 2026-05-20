@@ -155,6 +155,22 @@ const DimensionsHeaderLeft = styled.div`
   min-width: 0;
 `;
 
+const DimensionsHeaderControls = styled.div`
+  display: flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.sizeXXS}px;
+  flex: 0 0 auto;
+`;
+
+const DimensionsHeaderIcon = styled.span`
+  width: 16px;
+  height: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: ${({ theme }) => theme.colorTextSecondary};
+`;
+
 const DimensionRow = styled.div`
   display: flex;
   align-items: center;
@@ -977,14 +993,18 @@ export const PivotInteractionPanel = ({
       <DimensionsSection>
         <SectionHeader>
           <DimensionsHeaderLeft>
-            <Space size={4}>
+            <DimensionsHeaderControls>
               <Tooltip title={t('Select row placement')}>
-                <RowLinesIcon />
+                <DimensionsHeaderIcon>
+                  <RowLinesIcon />
+                </DimensionsHeaderIcon>
               </Tooltip>
               <Tooltip title={t('Select column placement')}>
-                <ColLinesIcon />
+                <DimensionsHeaderIcon>
+                  <ColLinesIcon />
+                </DimensionsHeaderIcon>
               </Tooltip>
-            </Space>
+            </DimensionsHeaderControls>
             <SectionTitle>{t('Dimensions')}</SectionTitle>
           </DimensionsHeaderLeft>
           {onClearFilters ? (
