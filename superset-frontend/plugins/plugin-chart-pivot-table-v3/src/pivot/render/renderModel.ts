@@ -219,7 +219,6 @@ const resolveAxisChildrenBeforeSubtotalPolicy = ({
   nodes,
   isLeafTierVisible,
   colTotals = false,
-  normalizedColSubtotalLevels = [],
 }: {
   program: PivotProgram;
   axis: PivotAxis;
@@ -227,18 +226,13 @@ const resolveAxisChildrenBeforeSubtotalPolicy = ({
   nodes: Record<string, PivotTreeNode>;
   isLeafTierVisible: boolean;
   colTotals?: boolean;
-  normalizedColSubtotalLevels?: number[];
 }): PivotTreeNode[] => {
   const children = findChildren(nodes, parent);
   if (axis === 'col' && isExplicitSubtotalNode(parent)) {
     return children;
   }
-  const {
-    metricLabelSet,
-    countDimDepth,
-    isMetricGrandTotalNode,
-    isMetricSubtotalNode,
-  } = createMetricNodePolicy(program);
+  const { metricLabelSet, isMetricGrandTotalNode, isMetricSubtotalNode } =
+    createMetricNodePolicy(program);
   const metricIndex = getValuesLevelIndex(program, axis);
   const hideMetricHeader = shouldHideMetricHeaderOnAxis({
     program,
@@ -284,14 +278,7 @@ const resolveAxisChildrenBeforeSubtotalPolicy = ({
       hasNonMetricChildren: boolean,
     ) => {
       if (axis === 'col') {
-        const childIsConfiguredMetricSubtotal =
-          decodeMetricKey(child.path[child.path.length - 1]) !== undefined &&
-          normalizedColSubtotalLevels.includes(countDimDepth(child.path));
-        return (
-          isMetricGrandTotalNode(child) ||
-          isMetricSubtotalNode(child) ||
-          childIsConfiguredMetricSubtotal
-        );
+        return isMetricGrandTotalNode(child) || isMetricSubtotalNode(child);
       }
       if (!hasNonMetricChildren) {
         return isMetricGrandTotalNode(child) || isMetricSubtotalNode(child);
@@ -572,8 +559,6 @@ export const buildRenderModelAxes = ({
       nodes,
       isLeafTierVisible: config.isLeafTierVisible,
       colTotals: axis === 'row' ? config.colTotals : undefined,
-      normalizedColSubtotalLevels:
-        axis === 'col' ? config.normalizedColSubtotalLevels : undefined,
     });
     if (axis === 'col') {
       return filtered;

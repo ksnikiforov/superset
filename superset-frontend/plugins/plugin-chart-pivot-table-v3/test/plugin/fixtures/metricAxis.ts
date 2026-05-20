@@ -87,6 +87,7 @@ export const applyMetricAxis = (
   metricPosition?: number,
   metricLabelMap?: Record<string, string>,
   dateFormatters?: Record<string, DateFormatter | undefined>,
+  colSubtotalLevels: number[] = [],
 ): PivotTreeData => {
   const program = compileMetricAxisProgram({
     metrics,
@@ -101,6 +102,7 @@ export const applyMetricAxis = (
     program,
     metricLabelMap,
     dateFormatters,
+    colSubtotalLevels,
   );
 };
 

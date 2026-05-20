@@ -626,6 +626,7 @@ type ApplyMeasureAxisInput = {
   groups: MeasureAxisGroup[];
   leafTierVisible: boolean;
   program: PivotProgram;
+  colSubtotalLevels: number[];
   metricLabelMap?: Record<string, string>;
   dateFormatters?: PivotTableQueryFormData['dateFormatters'];
   preserveValueAxisSourceNodes: boolean;
@@ -640,6 +641,7 @@ const applyMeasureAxis = ({
   groups,
   leafTierVisible,
   program,
+  colSubtotalLevels,
   metricLabelMap,
   dateFormatters,
   preserveValueAxisSourceNodes,
@@ -765,6 +767,13 @@ const applyMeasureAxis = ({
       String(path[path.length - 1] ?? ''),
     );
     const isLeafNode = leafId !== undefined;
+    const isConfiguredColumnMetricSubtotal =
+      axis === 'col' &&
+      valueAxis === 'col' &&
+      valuesAtEnd &&
+      isMetricNode &&
+      !leafTierVisible &&
+      colSubtotalLevels.includes(metricNodePolicy.countDimDepth(path));
     let hasChildren = path.length < fullDepth;
     if (isMetricNode && !leafTierVisible) {
       if (
@@ -787,9 +796,10 @@ const applyMeasureAxis = ({
     }
     const isSubtotalValue =
       isSubtotal ??
-      (path.length < fullDepth &&
-        !(isMetricNode && hasChildren === false) &&
-        !(isLeafNode && hasChildren === false));
+      (isConfiguredColumnMetricSubtotal ||
+        (path.length < fullDepth &&
+          !(isMetricNode && hasChildren === false) &&
+          !(isLeafNode && hasChildren === false)));
     const node = {
       axis,
       key,
@@ -1014,6 +1024,7 @@ export const applyMeasureHierarchyAxis = (
   program: PivotProgram,
   metricLabelMap?: Record<string, string>,
   dateFormatters?: PivotTableQueryFormData['dateFormatters'],
+  colSubtotalLevels: number[] = [],
 ): PivotTreeData => {
   const leafTierVisible = measureHierarchy.leafTierVisibility === 'visible';
   const { valueAxis, metricInsertIndex: insertIndex } = program;
@@ -1024,6 +1035,7 @@ export const applyMeasureHierarchyAxis = (
     groups: measureHierarchy.groups,
     leafTierVisible,
     program,
+    colSubtotalLevels,
     metricLabelMap,
     dateFormatters,
     preserveValueAxisSourceNodes:
@@ -1132,6 +1144,7 @@ const finalizeMaterializedTree = (
     formData,
     measureHierarchy,
     pivotProgram,
+    colSubtotalLevels,
   }: MaterializePivotTreeInput,
 ) =>
   labelRowSubtotalLeaves(
@@ -1141,6 +1154,7 @@ const finalizeMaterializedTree = (
       pivotProgram,
       formData.metricLabelMap as Record<string, string> | undefined,
       formData.dateFormatters,
+      colSubtotalLevels,
     ),
     metrics,
     formData.metricLabelMap as Record<string, string> | undefined,
