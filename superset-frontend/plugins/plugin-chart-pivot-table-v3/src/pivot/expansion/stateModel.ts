@@ -23,7 +23,11 @@ import {
   type PivotTreeData,
   PivotTreeNode,
 } from '../../types';
-import { decodeMetricKey, isSubtotalToken } from '../core/tokens';
+import {
+  decodeMetricKey,
+  isMetricTokenForKeys,
+  isSubtotalToken,
+} from '../core/tokens';
 import { parsePath, serializePath } from '../core/path';
 import { countDimDepth } from '../metricsTotals';
 import { rootKey } from '../viewModel';
@@ -80,6 +84,18 @@ export const coerceExpansionState = (
 
 const pathStartsWith = (path: PivotPath, prefix: PivotPath) =>
   prefix.every((value, index) => path[index] === value);
+
+const isCollapsedMetricTierDescendant = ({
+  candidatePath,
+  collapsedPath,
+  metricLabelSet,
+}: {
+  candidatePath: PivotPath;
+  collapsedPath: PivotPath;
+  metricLabelSet: ReadonlySet<string>;
+}) =>
+  candidatePath.length > collapsedPath.length &&
+  isMetricTokenForKeys(candidatePath[collapsedPath.length], metricLabelSet);
 
 const resolveNodePath = (
   key: string,
@@ -196,11 +212,19 @@ export const buildDesiredExpandedKeys = ({
   });
   const next = new Set<string>([...needExpanded, ...manualExpanded]);
   const nodes = axis === 'row' ? tree.rows : tree.cols;
+  const metricLabelSet = new Set(program.metricKeys);
   manualCollapsed.forEach(key => {
     const collapsedPath = resolveNodePath(key, nodes);
     Array.from(next).forEach(candidate => {
       const candidatePath = resolveNodePath(candidate, nodes);
-      if (pathStartsWith(candidatePath, collapsedPath)) {
+      if (
+        pathStartsWith(candidatePath, collapsedPath) &&
+        !isCollapsedMetricTierDescendant({
+          candidatePath,
+          collapsedPath,
+          metricLabelSet,
+        })
+      ) {
         next.delete(candidate);
       }
     });

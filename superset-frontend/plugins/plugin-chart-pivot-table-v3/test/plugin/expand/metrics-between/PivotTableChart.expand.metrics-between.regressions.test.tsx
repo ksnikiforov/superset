@@ -31,6 +31,7 @@ import {
 import { buildFormData } from '../../fixtures/pivotFormData';
 import {
   buildMockBranchFetchResult,
+  getMockExpansionRequestPath,
   resolveMockBranchFetchResult,
 } from '../../fixtures/factBatches';
 import { buildTreeFromRecords } from '../../fixtures/buildTreeFromRecords';
@@ -136,22 +137,37 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     const shipModeReturnFlagBranch = buildTreeAtDepth(records, 3);
     const shipInstructionBranch = buildTreeAtDepth(records, 4);
 
-    fetchPivotBranchMock
-      .mockImplementationOnce(
-        resolveMockBranchFetchResult({ data: metricBranch }),
-      )
-      .mockImplementationOnce(
-        resolveMockBranchFetchResult({ data: returnFlagBranch }),
-      )
-      .mockImplementationOnce(
-        resolveMockBranchFetchResult({ data: shipModeBranch }),
-      )
-      .mockImplementationOnce(
-        resolveMockBranchFetchResult({ data: shipModeReturnFlagBranch }),
-      )
-      .mockImplementationOnce(
-        resolveMockBranchFetchResult({ data: shipInstructionBranch }),
-      );
+    fetchPivotBranchMock.mockImplementation(
+      (params: FetchPivotBranchParams) => {
+        const path = getMockExpansionRequestPath(params);
+        const metricIndex = path.findIndex(val =>
+          metrics.includes(getMetricKey(val)),
+        );
+        if (metricIndex >= 0) {
+          const maxRowDepth = Math.max(
+            ...params.targets.map(target => target.need.rowDepth),
+          );
+          return Promise.resolve(
+            buildMockBranchFetchResult(params, {
+              data: maxRowDepth >= 3 ? returnFlagBranch : metricBranch,
+            }),
+          );
+        }
+        const maxRowDepth = Math.max(
+          ...params.targets.map(target => target.need.rowDepth),
+        );
+        return Promise.resolve(
+          buildMockBranchFetchResult(params, {
+            data:
+              maxRowDepth >= 4
+                ? shipInstructionBranch
+                : maxRowDepth >= 3
+                  ? shipModeReturnFlagBranch
+                  : shipModeBranch,
+          }),
+        );
+      },
+    );
 
     const { container, getByText } = render(
       <PivotTableChart
@@ -239,7 +255,7 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     fireEvent.click(within(orderPriorityRow).getByLabelText('plus-square'));
 
     await waitFor(() => {
-      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(5);
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(3);
     });
 
     fireEvent.click(within(orderPriorityRow).getByLabelText('minus-square'));
@@ -489,7 +505,7 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
     fireEvent.click(within(orderPriorityRow).getByLabelText('plus-square'));
 
     await waitFor(() => {
-      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(5);
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(3);
     });
 
     fireEvent.click(within(orderPriorityRow).getByLabelText('minus-square'));
@@ -787,7 +803,7 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
 
     fetchPivotBranchMock.mockImplementation(
       (params: FetchPivotBranchParams) => {
-        const { path } = params;
+        const path = getMockExpansionRequestPath(params);
         const metricIndex = path.findIndex(val =>
           metrics.includes(getMetricKey(val)),
         );
@@ -962,7 +978,7 @@ describe('PivotTableChart expansion with metrics between dimensions (regressions
 
     fetchPivotBranchMock.mockImplementation(
       (params: FetchPivotBranchParams) => {
-        const { path } = params;
+        const path = getMockExpansionRequestPath(params);
         if (path.length === 2) {
           return Promise.resolve(
             buildMockBranchFetchResult(params, { data: orderStatusBranch }),

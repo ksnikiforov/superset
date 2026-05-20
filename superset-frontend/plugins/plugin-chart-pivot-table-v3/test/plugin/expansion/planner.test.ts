@@ -21,6 +21,7 @@ import { planExpansionForAxis } from '../../../src/pivot/expansion/planner';
 import { rootKey } from '../../../src/pivot/viewModel';
 import {
   encodeMetricKey,
+  METRICS_PLACEHOLDER,
   SUBTOTAL_TOKEN,
 } from '../../../src/pivot/core/tokens';
 import { serializePath } from '../../../src/pivot/core/path';
@@ -278,7 +279,7 @@ describe('pivot/expansion/planner', () => {
         scope: {
           kind: 'axisPaths',
           axis: 'row',
-          paths: [['A', encodeMetricKey('sales')]],
+          paths: [['A']],
         },
         valueKeys: ['sales'],
       },
@@ -351,6 +352,81 @@ describe('pivot/expansion/planner', () => {
     expect(plan.targets).toHaveLength(2);
     expect(new Set(plan.targets.map(target => target.pathKey))).toEqual(
       new Set([metricAKey, metricBKey]),
+    );
+  });
+
+  it('plans canonical coverage when expanding a skipped pre-Values ancestor with an open metric', () => {
+    const program = compilePivotProgram({
+      groupbyRows: [
+        'orderPriority',
+        'shipMode',
+        METRICS_PLACEHOLDER,
+        'orderStatus',
+      ],
+      metrics: ['averageOrderValue', 'weightedDiscount'],
+    });
+    const orderPriorityKey = serializePath(['1-URGENT']);
+    const metricKey = serializePath([
+      '1-URGENT',
+      encodeMetricKey('averageOrderValue'),
+    ]);
+    const plan = planExpansionForAxis({
+      axis: 'row',
+      expandedKeys: new Set([rootKey, orderPriorityKey, metricKey]),
+      nodes: {
+        [rootKey]: makeNode({ axis: 'row', path: [] }),
+        [orderPriorityKey]: makeNode({
+          axis: 'row',
+          path: ['1-URGENT'],
+        }),
+        [metricKey]: makeNode({
+          axis: 'row',
+          path: ['1-URGENT', encodeMetricKey('averageOrderValue')],
+        }),
+      },
+      coverage: { rowDepth: 2, columnDepth: 0 },
+      factSelectors: [
+        {
+          coverage: {
+            rowDepth: 2,
+            columnDepth: 0,
+            rowDimensions: ['orderPriority', 'orderStatus'],
+            columnDimensions: [],
+          },
+          materialization: {
+            valueAxis: 'row',
+            valueInsertIndex: 1,
+          },
+          scope: {
+            kind: 'axisPaths',
+            axis: 'row',
+            paths: [['1-URGENT']],
+          },
+          valueKeys: ['averageOrderValue'],
+        },
+      ],
+      program,
+    });
+
+    expect(plan.targets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          pathKey: orderPriorityKey,
+          need: expect.objectContaining({
+            rowDepth: 2,
+            rowDimensions: ['orderPriority', 'shipMode'],
+            valueKeys: ['averageOrderValue', 'weightedDiscount'],
+          }),
+        }),
+        expect.objectContaining({
+          pathKey: metricKey,
+          need: expect.objectContaining({
+            rowDepth: 3,
+            rowDimensions: ['orderPriority', 'shipMode', 'orderStatus'],
+            valueKeys: ['averageOrderValue'],
+          }),
+        }),
+      ]),
     );
   });
 });

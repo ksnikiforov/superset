@@ -46,6 +46,8 @@ const buildSpec = ({
   metrics = ['sales'],
   rowGroupby = ['country'],
   colGroupby = ['month'],
+  materialization,
+  scope = { kind: 'root' } as PlannedQuerySpec['meta']['factSelector']['scope'],
 }: {
   queryName: string;
   rowDepth: number;
@@ -53,6 +55,8 @@ const buildSpec = ({
   metrics?: string[];
   rowGroupby?: string[];
   colGroupby?: string[];
+  materialization?: PlannedQuerySpec['meta']['factSelector']['materialization'];
+  scope?: PlannedQuerySpec['meta']['factSelector']['scope'];
 }): PlannedQuerySpec => {
   const coverage = {
     rowDepth,
@@ -72,8 +76,9 @@ const buildSpec = ({
       requiredTimeOffsets: [],
       factSelector: {
         coverage,
-        scope: { kind: 'root' },
+        scope,
         valueKeys: metrics,
+        materialization,
       },
     },
   };
@@ -360,6 +365,105 @@ test('materializes column subtotal leaves from planned coverage specs', () => {
     values: expect.objectContaining({ sales: 12 }),
     isSubtotal: true,
   });
+});
+
+test('materializes full branches after skipped pre-Values metric branches', () => {
+  const store = createPivotFactStore();
+  const skippedSpec = buildSpec({
+    queryName: 'pivot_v3|2|0|scope:urgent-status',
+    rowDepth: 2,
+    colDepth: 0,
+    metrics: ['averageOrderValue', 'weightedDiscount'],
+    rowGroupby: ['orderPriority', 'orderStatus'],
+    colGroupby: [],
+    materialization: {
+      valueAxis: 'row',
+      valueInsertIndex: 1,
+    },
+    scope: {
+      kind: 'axisPaths',
+      axis: 'row',
+      paths: [['1-URGENT']],
+    },
+  });
+  const fullSpec = buildSpec({
+    queryName: 'pivot_v3|3|0|scope:urgent-full',
+    rowDepth: 3,
+    colDepth: 0,
+    metrics: ['averageOrderValue', 'weightedDiscount'],
+    rowGroupby: ['orderPriority', 'shipMode', 'orderStatus'],
+    colGroupby: [],
+    scope: {
+      kind: 'axisPaths',
+      axis: 'row',
+      paths: [['1-URGENT']],
+    },
+  });
+
+  ingestQueryResults({
+    specs: [skippedSpec, fullSpec],
+    results: [
+      {
+        query_name: skippedSpec.queryName,
+        data: [
+          {
+            orderPriority: '1-URGENT',
+            orderStatus: 'F',
+            averageOrderValue: 100,
+            weightedDiscount: 0.05,
+          },
+        ],
+      },
+      {
+        query_name: fullSpec.queryName,
+        data: [
+          {
+            orderPriority: '1-URGENT',
+            shipMode: 'AIR',
+            orderStatus: 'F',
+            averageOrderValue: 100,
+            weightedDiscount: 0.05,
+          },
+        ],
+      },
+    ],
+  }).forEach(ingested =>
+    store.upsertBatch({
+      ...ingested.spec.meta.factSelector,
+      facts: ingested.facts,
+    }),
+  );
+
+  const formData = buildFormData({
+    groupbyRows: [
+      'orderPriority',
+      'shipMode',
+      METRICS_PLACEHOLDER,
+      'orderStatus',
+    ],
+    groupbyColumns: [],
+    metrics: ['averageOrderValue', 'weightedDiscount'],
+    metricsLayout: MetricsLayoutEnum.ROWS,
+  });
+  const tree = materializeLoadedPivotTreeFromFactStore({
+    store,
+    layout: buildLayoutContext(formData),
+    formData,
+  });
+  const skippedMetricStatusKey = serializePath([
+    '1-URGENT',
+    encodeMetricKey('averageOrderValue'),
+    'F',
+  ]);
+  const fullMetricStatusKey = serializePath([
+    '1-URGENT',
+    'AIR',
+    encodeMetricKey('averageOrderValue'),
+    'F',
+  ]);
+
+  expect(tree.rows[skippedMetricStatusKey]).toBeDefined();
+  expect(tree.rows[fullMetricStatusKey]).toBeDefined();
 });
 
 test('chunked initial runtime materialization yields while preserving facts and tree output', async () => {

@@ -294,7 +294,8 @@ const collectAxisVisibility = ({
   expanded: Set<string>;
   program: PivotProgram;
 }) => {
-  const { countDimDepth } = createExpansionMetricPolicy(program);
+  const { countDimDepth, metricLabelSet } =
+    createExpansionMetricPolicy(program);
   const axisDimensionCount = getAxisDimensionCount(program, axis);
   const visibleKeys = new Set<string>([rootKey]);
   let visibleDepth = 0;
@@ -312,6 +313,16 @@ const collectAxisVisibility = ({
     (childrenByParent.get(node.key) ?? []).forEach(visit);
   };
   visit(root);
+  Object.values(nodes).forEach(node => {
+    const metricIndex = findMetricIndex(node.path, metricLabelSet);
+    if (metricIndex < 0) {
+      return;
+    }
+    const parentKey = serializePath(node.path.slice(0, metricIndex));
+    if (visibleKeys.has(parentKey)) {
+      visibleKeys.add(node.key);
+    }
+  });
   expanded.forEach(key => {
     const path = nodes[key]?.path ?? parsePath(key);
     visibleDepth = Math.max(

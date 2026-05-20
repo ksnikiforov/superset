@@ -927,6 +927,12 @@ const applyMeasureAxis = ({
       node.isSubtotal || undefined,
     ),
   );
+  ensureNode(
+    valueAxis,
+    [],
+    valueAxisDepth,
+    sourceNodesForAxis(valueAxis)[serializePath([])]?.isSubtotal || undefined,
+  );
 
   Object.values(tree.cells).forEach(cell => {
     const baseRow = tree.rows[cell.rowKey];

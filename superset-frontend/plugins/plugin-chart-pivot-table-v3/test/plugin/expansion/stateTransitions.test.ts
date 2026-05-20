@@ -237,6 +237,40 @@ describe('pivot/expansion/stateTransitions', () => {
     expect(result).toEqual(new Set([rootKey, aKey]));
   });
 
+  it('duplicates skipped-dimension metric expansion under newly loaded prefixes', () => {
+    const metricToken = encodeMetricKey('m1');
+    const parentKey = serializePath(['A']);
+    const collapsedMetricKey = serializePath(['A', metricToken]);
+    const loadedMetricKey = serializePath(['A', 'B', metricToken]);
+    const tree: PivotTreeData = {
+      rows: {
+        [rootKey]: makeNode('row', [], true),
+        [parentKey]: makeNode('row', ['A'], true),
+        [collapsedMetricKey]: makeNode('row', ['A', metricToken], true),
+        [serializePath(['A', 'B'])]: makeNode('row', ['A', 'B'], true),
+        [loadedMetricKey]: makeNode('row', ['A', 'B', metricToken], true),
+      },
+      cols: {},
+      cells: {},
+    };
+
+    const result = resolveExpandedForMetrics({
+      axis: 'row',
+      expanded: new Set([rootKey, parentKey, collapsedMetricKey]),
+      tree,
+      collapsed: new Set(),
+      program: compilePivotProgram({
+        groupbyRows: ['r0', 'r1', METRICS_PLACEHOLDER, 'r2'],
+        metrics: ['m1'],
+        metricsLayout: MetricsLayoutEnum.ROWS,
+      }),
+    });
+
+    expect(result).toEqual(
+      new Set([rootKey, parentKey, collapsedMetricKey, loadedMetricKey]),
+    );
+  });
+
   it('resolves visible measure-leaf metric nodes before render', () => {
     const metricToken = encodeMetricKey('m1');
     const aKey = serializePath(['A']);
@@ -307,6 +341,49 @@ describe('pivot/expansion/stateTransitions', () => {
       row: new Set([bKey]),
       col: new Set([yKey]),
     });
+  });
+
+  it('keeps visible collapsed metric-tier expansion state', () => {
+    const metricToken = encodeMetricKey('m1');
+    const parentKey = serializePath(['A']);
+    const metricKey = serializePath(['A', metricToken]);
+    const hiddenMetricKey = serializePath(['hidden', metricToken]);
+    const tree: PivotTreeData = {
+      rows: {
+        [rootKey]: makeNode('row', [], true),
+        [parentKey]: makeNode('row', ['A'], true),
+        [metricKey]: makeNode('row', ['A', metricToken], true),
+        [hiddenMetricKey]: makeNode('row', ['hidden', metricToken], true),
+      },
+      cols: {
+        [rootKey]: makeNode('col', [], false),
+      },
+      cells: {},
+    };
+
+    const result = buildVisiblePersistedExpansionState({
+      tree,
+      expanded: {
+        row: new Set([rootKey, metricKey]),
+        col: new Set([rootKey]),
+      },
+      explicitExpanded: {
+        row: new Set([metricKey, hiddenMetricKey]),
+        col: new Set(),
+      },
+      explicitCollapsed: {
+        row: new Set(),
+        col: new Set(),
+      },
+      program: compilePivotProgram({
+        groupbyRows: ['r0', 'r1', METRICS_PLACEHOLDER, 'r2'],
+        metrics: ['m1'],
+        metricsLayout: MetricsLayoutEnum.ROWS,
+      }),
+    });
+
+    expect(result.persistedState.rows).toEqual([metricKey]);
+    expect(result.visibleExpanded.row).toEqual(new Set([metricKey]));
   });
 
   it('plans fetch targets for expanded nodes', () => {

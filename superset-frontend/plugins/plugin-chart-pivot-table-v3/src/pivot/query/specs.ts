@@ -437,19 +437,58 @@ const filterMeasureHierarchyByScope = ({
   };
 };
 
+const resolveMaterializedValueInsertIndex = ({
+  layout,
+  axis,
+  coverageTarget,
+}: {
+  layout: LayoutContext;
+  axis: PivotAxis;
+  coverageTarget: ExpansionCoverageTarget;
+}) => {
+  const axisDimensions =
+    axis === 'row'
+      ? layout.pivotProgram.rowDimensions
+      : layout.pivotProgram.columnDimensions;
+  const needDimensions =
+    axis === 'row'
+      ? coverageTarget.need.rowDimensions
+      : coverageTarget.need.columnDimensions;
+  const valuesIndex = Math.max(
+    0,
+    Math.min(layout.pivotProgram.metricInsertIndex, axisDimensions.length),
+  );
+  let insertIndex = 0;
+  while (
+    insertIndex < valuesIndex &&
+    insertIndex < needDimensions.length &&
+    getStableColumnKey(axisDimensions[insertIndex]) ===
+      getStableColumnKey(needDimensions[insertIndex])
+  ) {
+    insertIndex += 1;
+  }
+  return insertIndex;
+};
+
 const resolveFactMaterialization = ({
   layout,
   axis,
   projection,
+  coverageTarget,
 }: {
   layout: LayoutContext;
   axis: PivotAxis;
   projection: PivotAxisProjection;
+  coverageTarget: ExpansionCoverageTarget;
 }): PivotFactMaterialization | undefined =>
   axis === layout.pivotProgram.valueAxis && projection.valuesLevelSeen
     ? {
         valueAxis: axis,
-        valueInsertIndex: projection.filterDimensionPath.length,
+        valueInsertIndex: resolveMaterializedValueInsertIndex({
+          layout,
+          axis,
+          coverageTarget,
+        }),
       }
     : undefined;
 
@@ -559,6 +598,7 @@ const resolveFetchContext = ({
       layout,
       axis,
       projection,
+      coverageTarget,
     }),
     coverages,
   };

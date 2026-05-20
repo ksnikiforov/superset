@@ -31,6 +31,7 @@ import {
 import { buildFormData } from '../../fixtures/pivotFormData';
 import {
   buildMockBranchFetchResult,
+  getMockExpansionRequestPath,
   resolveMockBranchFetchResult,
 } from '../../fixtures/factBatches';
 import { buildTreeFromRecords } from '../../fixtures/buildTreeFromRecords';
@@ -346,7 +347,6 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
     await waitFor(() => {
       expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
     });
-
     const rows = Array.from(tbody.querySelectorAll<HTMLElement>('tr'));
     const shipModeRow = getByText('AIR').closest('tr') as HTMLTableRowElement;
     const shipModeIndex = rows.indexOf(shipModeRow);
@@ -443,7 +443,7 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
 
     fetchPivotBranchMock.mockImplementation(
       (params: FetchPivotBranchParams) => {
-        const { path } = params;
+        const path = getMockExpansionRequestPath(params);
         const metricIndex = path.findIndex(val =>
           metrics.includes(getMetricKey(val)),
         );
@@ -478,6 +478,23 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
           }
         }
         if (path.length === 1) {
+          const maxRowDepth = Math.max(
+            ...params.targets.map(target => target.need.rowDepth),
+          );
+          if (maxRowDepth >= 4) {
+            return Promise.resolve(
+              buildMockBranchFetchResult(params, {
+                data: orderStatusInstructionBranch,
+              }),
+            );
+          }
+          if (maxRowDepth >= 3) {
+            return Promise.resolve(
+              buildMockBranchFetchResult(params, {
+                data: orderStatusMetricBranch,
+              }),
+            );
+          }
           return Promise.resolve(
             buildMockBranchFetchResult(params, { data: shipModeBranch }),
           );
@@ -553,6 +570,9 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
     fireEvent.click(
       within(metricRow as HTMLElement).getByLabelText('plus-square'),
     );
+    await waitFor(() => {
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
+    });
 
     const initialInstructionRow = (await waitFor(() =>
       within(tbody).getByText('COLLECT COD').closest('tr'),
@@ -843,7 +863,7 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
 
     fetchPivotBranchMock.mockImplementation(
       (params: FetchPivotBranchParams) => {
-        const { path } = params;
+        const path = getMockExpansionRequestPath(params);
         const metricIndex = path.findIndex(val =>
           metrics.includes(getMetricKey(val)),
         );
@@ -860,6 +880,16 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
           );
         }
         if (path.length === 1) {
+          const maxRowDepth = Math.max(
+            ...params.targets.map(target => target.need.rowDepth),
+          );
+          if (maxRowDepth >= 3) {
+            return Promise.resolve(
+              buildMockBranchFetchResult(params, {
+                data: orderStatusMetricBranch,
+              }),
+            );
+          }
           return Promise.resolve(
             buildMockBranchFetchResult(params, { data: shipModeBranch }),
           );
@@ -1483,8 +1513,6 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
     const baseTree = buildTreeAtDepth(records, 1);
     const metricBranch = buildCollapsedBranch(records, 2);
     const returnFlagBranch = buildCollapsedBranch(records, 3);
-    const shipModeBranch = buildTreeAtDepth(records, 2);
-    const shipModeReturnFlagBranch = buildTreeAtDepth(records, 3);
     const shipInstructionBranch = buildTreeAtDepth(records, 4);
 
     fetchPivotBranchMock
@@ -1493,12 +1521,6 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
       )
       .mockImplementationOnce(
         resolveMockBranchFetchResult({ data: returnFlagBranch }),
-      )
-      .mockImplementationOnce(
-        resolveMockBranchFetchResult({ data: shipModeBranch }),
-      )
-      .mockImplementationOnce(
-        resolveMockBranchFetchResult({ data: shipModeReturnFlagBranch }),
       )
       .mockImplementationOnce(
         resolveMockBranchFetchResult({ data: shipInstructionBranch }),
@@ -1591,7 +1613,7 @@ describe('PivotTableChart expansion with metrics between dimensions (expansion)'
     fireEvent.click(within(orderPriorityRow).getByLabelText('plus-square'));
 
     await waitFor(() => {
-      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(5);
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(3);
     });
 
     const shipModeRow = (await waitFor(() =>

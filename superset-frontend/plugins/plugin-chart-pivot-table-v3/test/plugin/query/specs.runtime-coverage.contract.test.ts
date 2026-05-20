@@ -159,6 +159,56 @@ describe('runtime coverage query specs contract', () => {
     });
   });
 
+  it('materializes canonical skipped pre-Values coverage at the visible prefix', () => {
+    const formData = buildFormData({
+      groupbyRows: [
+        'orderPriority',
+        'shipMode',
+        METRICS_PLACEHOLDER,
+        'orderStatus',
+      ],
+      groupbyColumns: [],
+      metrics: ['averageOrderValue', 'weightedDiscount'],
+      metricsLayout: MetricsLayoutEnum.ROWS,
+      rowTotals: false,
+      colTotals: false,
+    });
+    const layout = buildLayoutContext(formData);
+    const metricTarget = fetchTarget({
+      layout,
+      axis: 'row',
+      path: ['1-URGENT', encodeMetricKey('averageOrderValue')],
+      visibleRowDepth: 2,
+      visibleColDepth: 0,
+    });
+    const specs = buildExpansionQuerySpecs({
+      formData,
+      layout,
+      targets: [
+        {
+          ...metricTarget,
+          need: {
+            ...metricTarget.need,
+            rowDepth: 3,
+            rowDimensions: ['orderPriority', 'shipMode', 'orderStatus'],
+          },
+        },
+      ],
+    });
+
+    expect(specs).toHaveLength(1);
+    expect(specs[0].columns).toEqual([
+      'orderPriority',
+      'shipMode',
+      'orderStatus',
+    ]);
+    expect(specs[0].metrics).toEqual(['averageOrderValue']);
+    expect(specs[0].meta.factSelector.materialization).toEqual({
+      valueAxis: 'row',
+      valueInsertIndex: 2,
+    });
+  });
+
   it('does not build branch specs for synthetic subtotal display paths', () => {
     const formData = buildFormData({
       groupbyRows: ['country', 'state', 'city'],

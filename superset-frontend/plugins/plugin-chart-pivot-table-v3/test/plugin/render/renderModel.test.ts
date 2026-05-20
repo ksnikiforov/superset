@@ -25,6 +25,10 @@ import {
   type PivotTreeNode,
 } from '../../../src/types';
 import { serializePath } from '../../../src/pivot/core/path';
+import {
+  encodeMetricKey,
+  METRICS_PLACEHOLDER,
+} from '../../../src/pivot/core/tokens';
 import { compilePivotProgram } from '../../../src/pivot/runtime/compilePivotProgram';
 
 const makeNode = ({
@@ -151,12 +155,11 @@ describe('buildRenderModel', () => {
           groupbyColumns: ['col'],
         }),
         hasMultipleMeasures: false,
+        isLeafTierVisible: false,
+        rowSubTotals: false,
+        getRowSubtotalPosition: () => 'start',
         rowSorter: (a, b) => a.label.localeCompare(b.label),
         colSorter: (a, b) => a.label.localeCompare(b.label),
-        getRowChildren: parent => findChildren(tree.rows, parent),
-        getCollapsedRowChildren: () => [],
-        getColChildren: parent => findChildren(tree.cols, parent),
-        getCollapsedColLeaves: () => [],
       },
     });
 
@@ -219,15 +222,117 @@ describe('buildRenderModel', () => {
           metricsLayout: MetricsLayoutEnum.COLUMNS,
         }),
         hasMultipleMeasures: true,
+        isLeafTierVisible: false,
+        rowSubTotals: false,
+        getRowSubtotalPosition: () => 'start',
         rowSorter: (a, b) => a.label.localeCompare(b.label),
         colSorter: (a, b) => a.label.localeCompare(b.label),
-        getRowChildren: parent => findChildren(tree.rows, parent),
-        getCollapsedRowChildren: () => [],
-        getColChildren: parent => findChildren(tree.cols, parent),
-        getCollapsedColLeaves: () => [],
       },
     });
 
     expect(renderModel.visibleRows.map(node => node.key)).toEqual([rootKey]);
+  });
+
+  it('renders post-Values dimension children under expanded collapsed metric rows', () => {
+    const urgentKey = serializePath(['1-URGENT']);
+    const shipModeKey = serializePath(['1-URGENT', 'AIR']);
+    const metricKey = serializePath([
+      '1-URGENT',
+      'AIR',
+      encodeMetricKey('averageOrderValue'),
+    ]);
+    const statusKey = serializePath([
+      '1-URGENT',
+      'AIR',
+      encodeMetricKey('averageOrderValue'),
+      'F',
+    ]);
+    const tree: PivotTreeData = {
+      rows: {
+        [rootKey]: makeNode({
+          axis: 'row',
+          key: rootKey,
+          path: [],
+          label: 'Grand total',
+          hasChildren: true,
+        }),
+        [urgentKey]: makeNode({
+          axis: 'row',
+          key: urgentKey,
+          path: ['1-URGENT'],
+          label: '1-URGENT',
+          hasChildren: true,
+        }),
+        [shipModeKey]: makeNode({
+          axis: 'row',
+          key: shipModeKey,
+          path: ['1-URGENT', 'AIR'],
+          label: 'AIR',
+          hasChildren: true,
+        }),
+        [metricKey]: makeNode({
+          axis: 'row',
+          key: metricKey,
+          path: ['1-URGENT', 'AIR', encodeMetricKey('averageOrderValue')],
+          label: 'averageOrderValue',
+          hasChildren: true,
+        }),
+        [statusKey]: makeNode({
+          axis: 'row',
+          key: statusKey,
+          path: ['1-URGENT', 'AIR', encodeMetricKey('averageOrderValue'), 'F'],
+          label: 'F',
+          hasChildren: false,
+        }),
+      },
+      cols: {
+        [rootKey]: makeNode({
+          axis: 'col',
+          key: rootKey,
+          path: [],
+          label: 'Grand total',
+          hasChildren: false,
+        }),
+      },
+      cells: {},
+    };
+
+    const renderModel = buildRenderModel({
+      tree,
+      expandedRows: new Set([rootKey, urgentKey, metricKey]),
+      expandedCols: new Set([rootKey]),
+      config: {
+        normalizedRowSubtotalLevels: [],
+        normalizedColSubtotalLevels: [],
+        rowTotals: false,
+        colTotals: false,
+        rowTotalPosition: 'start',
+        colTotalPosition: 'start',
+        resolvedColSubtotalPosition: 'start',
+        pivotProgram: compilePivotProgram({
+          groupbyRows: [
+            'orderPriority',
+            'shipMode',
+            METRICS_PLACEHOLDER,
+            'orderStatus',
+          ],
+          metrics: ['averageOrderValue', 'weightedDiscount'],
+          metricsLayout: MetricsLayoutEnum.ROWS,
+        }),
+        hasMultipleMeasures: false,
+        isLeafTierVisible: false,
+        rowSubTotals: false,
+        getRowSubtotalPosition: () => 'start',
+        rowSorter: (a, b) => a.label.localeCompare(b.label),
+        colSorter: (a, b) => a.label.localeCompare(b.label),
+      },
+    });
+
+    expect(renderModel.visibleRows.map(node => node.key)).toEqual([
+      urgentKey,
+      shipModeKey,
+      metricKey,
+      statusKey,
+    ]);
   });
 });

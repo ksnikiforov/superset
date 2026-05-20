@@ -95,18 +95,18 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `27116` | `-6394` | `< 28000` |
-| Strict core pipeline | `11337` | `10887` | `-450` | `8000` |
+| Full production `src` | `33510` | `27318` | `-6192` | `< 28000` |
+| Strict core pipeline | `11337` | `11091` | `-246` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4024` | `-659` | `3000-4000` |
-| Broad core pipeline | `16020` | `14913` | `-1107` | `11000-13000` |
+| Broad core pipeline | `16020` | `15115` | `-905` | `11000-13000` |
 
 Strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `3565` |
-| `pivot/expansion/*` | `2121` |
-| `pivot/query/*` | `1367` |
+| `pivot/runtime/*` | `3571` |
+| `pivot/expansion/*` | `2277` |
+| `pivot/query/*` | `1407` |
 | `pivot/layout/*` | `739` |
 | `pivot/core/*` | `159` |
 | core domain helpers | `1549` |
@@ -133,6 +133,14 @@ Completed structural cuts:
   loaded tree stays intact and expansion state controls visibility.
 - Expansion layout transition planning now reports layout metadata only; loaded
   tree selection stays in the expansion engine.
+- Skipped pre-Values metric expansion now requests canonical visible coverage
+  when an ancestor expansion makes the skipped dimension visible; it does not
+  request still-hidden skipped layers.
+- Collapsed dimension state no longer suppresses visible metric-tier expansion
+  keys, so metric rows can reopen under a collapsed parent without expanding the
+  dimension children.
+- Values-at-end materialization now preserves the hidden value-axis root anchor
+  needed by render traversal.
 - Materialization is fact-store backed for initial and incremental paths.
 - Materialization batch projection now shares the subtotal injection plan between
   sync and async paths instead of carrying separate coverage/subtotal branches.
@@ -184,13 +192,16 @@ deletion-conscious.
 
 ## Next Commits
 
-1. Continue Priority 2 only where it deletes code: reduce the remaining
+1. Replace the additive skipped-Values planner branches with a general
+   manifest-path normalizer so `planner.ts` and `query/specs.ts` shrink instead
+   of accumulating edge cases.
+2. Continue Priority 2 only where it deletes code: reduce the remaining
    expansion hook scheduler state or fold it into manifest execution.
-2. Attack Priority 3 only with tests first: isolate subtotal and measure-axis
+3. Attack Priority 3 only with tests first: isolate subtotal and measure-axis
    materialization behavior, then delete post-processing wrappers.
-3. Resume Priority 4 after materializer behavior is stable: render should stop
+4. Resume Priority 4 after materializer behavior is stable: render should stop
    inferring metric/subtotal structure from tree shape.
-4. Shrink `PivotTableChart.tsx` only where code is deleted, not merely moved.
+5. Shrink `PivotTableChart.tsx` only where code is deleted, not merely moved.
 
 ## Verification Standard
 
