@@ -96,14 +96,14 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `26857` | `-6653` | `< 20000` |
-| Strict core pipeline | `12907` | `10908` | `-1999` | `< 8000` |
+| Full production `src` | `33510` | `26688` | `-6822` | `< 20000` |
+| Strict core pipeline | `12907` | `10870` | `-2037` | `< 8000` |
 
 Diagnostic scope only:
 
 | Scope | Baseline lines | Current lines | Delta |
 | --- | ---: | ---: | ---: |
-| Core pipeline dirs (`runtime/expansion/query/layout/core`) | `8698` | `7952` | `-746` |
+| Core pipeline dirs (`runtime/expansion/query/layout/core`) | `8698` | `7932` | `-766` |
 
 Core pipeline breakdown:
 
@@ -112,8 +112,7 @@ Core pipeline breakdown:
 | `pivot/runtime/*` | `3414` |
 | `pivot/expansion/*` | `2245` |
 | `pivot/query/*` | `1395` |
-| `pivot/layout/*` | `739` |
-| `pivot/core/*` | `159` |
+| `pivot/layout/*` + `pivot/core/*` | `878` |
 | core domain helpers | `1549` |
 | formatting/data/render-model support | `1389` |
 
@@ -175,6 +174,11 @@ Completed structural cuts:
 - Metric rows and measure-leaf rows now share one conditional-formatting/databar
   control implementation; measure-leaf controls no longer duplicate formatter,
   color, and scale-like UI logic.
+- The in-chart interaction panel now uses the shared interaction drag placement
+  helper for checkbox row/column moves; panel-local value-index surgery was
+  removed.
+- Interaction chip strips now own their drop behavior directly; duplicate
+  filler drop-zone components were removed.
 - Collapsed dimension state no longer suppresses visible metric-tier expansion
   keys, so metric rows can reopen under a collapsed parent without expanding the
   dimension children.

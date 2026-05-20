@@ -58,7 +58,11 @@ import {
 import { getStableColumnKey, resolveMetricDisplayLabel } from '../../utils';
 import { getMetricKey } from '../metrics';
 import { isValueLeaf } from '../measureLeaves';
-import { INTERACTION_DIMENSION_DND_TYPE } from '../layout/interactionDrag';
+import {
+  applyDimensionDrag,
+  INTERACTION_DIMENSION_DND_TYPE,
+  removeDimensionFromLayout,
+} from '../layout/interactionDrag';
 import { normalizeRuntimeLayout } from '../layout/resolveInteractionLayout';
 
 const PanelSection = styled.div`
@@ -86,25 +90,12 @@ const SectionTitle = styled(Typography.Text)`
   color: ${({ theme }) => theme.colorTextSecondary};
 `;
 
-const Row = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: ${({ theme }) => theme.sizeXS}px;
-`;
-
 const SectionHeader = styled.div`
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: ${({ theme }) => theme.sizeXS}px;
   width: 100%;
-`;
-
-const OptionRow = styled.div`
-  display: flex;
-  align-items: center;
-  gap: ${({ theme }) => theme.sizeXS}px;
 `;
 
 const OrderedToggle = styled.button<{ $checked: boolean }>`
@@ -128,16 +119,6 @@ const OrderedToggle = styled.button<{ $checked: boolean }>`
   cursor: pointer;
 `;
 
-const ToggleLabel = styled(Typography.Text)`
-  font-size: 12px;
-`;
-
-const ToggleIcon = styled.svg`
-  display: block;
-  width: 12px;
-  height: 12px;
-`;
-
 const ActionButton = styled(Button)`
   width: 100%;
 `;
@@ -148,22 +129,6 @@ const DimensionsHeaderLeft = styled.div`
   gap: ${({ theme }) => theme.sizeXS}px;
   flex: 1 1 auto;
   min-width: 0;
-`;
-
-const DimensionsHeaderControls = styled.div`
-  display: flex;
-  align-items: center;
-  gap: ${({ theme }) => theme.sizeXXS}px;
-  flex: 0 0 auto;
-`;
-
-const DimensionsHeaderIcon = styled.span`
-  width: 16px;
-  height: 16px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  color: ${({ theme }) => theme.colorTextSecondary};
 `;
 
 const DimensionRow = styled.div`
@@ -663,24 +628,6 @@ const DimensionFilterPopover = memo(
     areDataRecordValueArraysEqual(previous.pendingValues, next.pendingValues),
 );
 
-const RowLinesIcon = () => (
-  <ToggleIcon viewBox="0 0 12 12" fill="none" aria-hidden="true">
-    <line x1="1" y1="2" x2="11" y2="2" stroke="currentColor" />
-    <line x1="1" y1="4.5" x2="11" y2="4.5" stroke="currentColor" />
-    <line x1="1" y1="7" x2="11" y2="7" stroke="currentColor" />
-    <line x1="1" y1="9.5" x2="11" y2="9.5" stroke="currentColor" />
-  </ToggleIcon>
-);
-
-const ColLinesIcon = () => (
-  <ToggleIcon viewBox="0 0 12 12" fill="none" aria-hidden="true">
-    <line x1="2" y1="1" x2="2" y2="11" stroke="currentColor" />
-    <line x1="4.5" y1="1" x2="4.5" y2="11" stroke="currentColor" />
-    <line x1="7" y1="1" x2="7" y2="11" stroke="currentColor" />
-    <line x1="9.5" y1="1" x2="9.5" y2="11" stroke="currentColor" />
-  </ToggleIcon>
-);
-
 export const PivotInteractionPanel = ({
   dimensions,
   metrics,
@@ -925,50 +872,17 @@ export const PivotInteractionPanel = ({
 
   const moveDimension = useCallback(
     (dimensionKey: string, targetAxis?: 'row' | 'col') => {
-      const rowIndex = resolvedLayout.rows.indexOf(dimensionKey);
-      const colIndex = resolvedLayout.cols.indexOf(dimensionKey);
-      const nextRows = resolvedLayout.rows.filter(key => key !== dimensionKey);
-      const nextCols = resolvedLayout.cols.filter(key => key !== dimensionKey);
-      const nextValuePlacement = { ...resolvedLayout.valuePlacement };
-      if (rowIndex >= 0 && nextValuePlacement.axis === 'row') {
-        if (rowIndex < nextValuePlacement.index) {
-          nextValuePlacement.index = Math.max(0, nextValuePlacement.index - 1);
-        }
-      }
-      if (colIndex >= 0 && nextValuePlacement.axis === 'col') {
-        if (colIndex < nextValuePlacement.index) {
-          nextValuePlacement.index = Math.max(0, nextValuePlacement.index - 1);
-        }
-      }
-      if (targetAxis === 'row') {
-        const rowLength = nextRows.length;
-        const valueOnRows = nextValuePlacement.axis === 'row';
-        const valueAtEnd = nextValuePlacement.index === rowLength;
-        if (valueOnRows && valueAtEnd) {
-          nextRows.splice(nextValuePlacement.index, 0, dimensionKey);
-          nextValuePlacement.index += 1;
-        } else {
-          nextRows.push(dimensionKey);
-        }
-      } else if (targetAxis === 'col') {
-        const colLength = nextCols.length;
-        const valueOnCols = nextValuePlacement.axis === 'col';
-        const valueAtEnd = nextValuePlacement.index === colLength;
-        if (valueOnCols && valueAtEnd) {
-          nextCols.splice(nextValuePlacement.index, 0, dimensionKey);
-          nextValuePlacement.index += 1;
-        } else {
-          nextCols.push(dimensionKey);
-        }
-      }
-      onChange({
-        ...resolvedLayout,
-        rows: nextRows,
-        cols: nextCols,
-        valuePlacement: nextValuePlacement,
-      });
+      onChange(
+        targetAxis
+          ? applyDimensionDrag(resolvedLayout, {
+              dimensionKey,
+              targetAxis,
+              metricsAvailable: metricKeys.length > 0,
+            })
+          : removeDimensionFromLayout(resolvedLayout, dimensionKey),
+      );
     },
-    [onChange, resolvedLayout],
+    [metricKeys.length, onChange, resolvedLayout],
   );
 
   const measuresContent = (
@@ -978,20 +892,18 @@ export const PivotInteractionPanel = ({
           const orderIndex = pendingMetrics.indexOf(option.key);
           const selected = orderIndex >= 0;
           return (
-            <Row key={option.key}>
-              <OptionRow>
-                <OrderedToggle
-                  type="button"
-                  $checked={selected}
-                  onClick={() => toggleMetric(option.key)}
-                  aria-pressed={selected}
-                  aria-label={`Toggle measure ${option.label}`}
-                >
-                  {selected ? orderIndex + 1 : ''}
-                </OrderedToggle>
-                <ToggleLabel>{option.label}</ToggleLabel>
-              </OptionRow>
-            </Row>
+            <Space key={option.key} size={8}>
+              <OrderedToggle
+                type="button"
+                $checked={selected}
+                onClick={() => toggleMetric(option.key)}
+                aria-pressed={selected}
+                aria-label={`Toggle measure ${option.label}`}
+              >
+                {selected ? orderIndex + 1 : ''}
+              </OrderedToggle>
+              <Typography.Text>{option.label}</Typography.Text>
+            </Space>
           );
         })}
       </MeasuresList>
@@ -1041,18 +953,20 @@ export const PivotInteractionPanel = ({
       <DimensionsSection>
         <SectionHeader>
           <DimensionsHeaderLeft>
-            <DimensionsHeaderControls>
+            <Space size={4}>
               <Tooltip title={t('Select row placement')}>
-                <DimensionsHeaderIcon>
-                  <RowLinesIcon />
-                </DimensionsHeaderIcon>
+                <Icons.InsertRowAboveOutlined
+                  iconSize="s"
+                  iconColor="currentColor"
+                />
               </Tooltip>
               <Tooltip title={t('Select column placement')}>
-                <DimensionsHeaderIcon>
-                  <ColLinesIcon />
-                </DimensionsHeaderIcon>
+                <Icons.ColumnWidthOutlined
+                  iconSize="s"
+                  iconColor="currentColor"
+                />
               </Tooltip>
-            </DimensionsHeaderControls>
+            </Space>
             <SectionTitle>{t('Dimensions')}</SectionTitle>
           </DimensionsHeaderLeft>
           {onClearFilters ? (

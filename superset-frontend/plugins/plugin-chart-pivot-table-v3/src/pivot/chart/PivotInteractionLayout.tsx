@@ -73,12 +73,6 @@ const ChipRow = styled.div`
   overflow: hidden;
 `;
 
-const ChipRowDropZone = styled.div`
-  flex: 1 1 auto;
-  min-width: ${({ theme }) => theme.sizeSM}px;
-  height: 100%;
-`;
-
 const ChipColumn = styled.div`
   display: flex;
   flex-direction: column;
@@ -88,13 +82,6 @@ const ChipColumn = styled.div`
   border-right: 1px solid ${({ theme }) => theme.colorBorderSecondary};
   overflow: hidden;
   align-items: center;
-`;
-
-const ChipColumnDropZone = styled.div`
-  flex: 1 1 auto;
-  min-height: ${({ theme }) => theme.sizeSM}px;
-  width: 100%;
-  align-self: stretch;
 `;
 
 const Chip = styled.div`
@@ -369,44 +356,6 @@ const InteractionChip = ({
   );
 };
 
-type StripDropZoneProps = {
-  axis: PivotAxis;
-  chipCount: number;
-  onDropDimension: InteractionDropDimension;
-  onDropValue: InteractionDropValue;
-};
-
-const StripDropZone = ({
-  axis,
-  chipCount,
-  onDropDimension,
-  onDropValue,
-}: StripDropZoneProps) => {
-  const [, drop] = useDrop<DragItem, void, unknown>({
-    accept: [dimensionDndType, valueDndType],
-    drop: item => {
-      if (item.kind === 'dimension') {
-        onDropDimension(
-          item.dimensionKey,
-          axis,
-          chipCount,
-          false,
-          item.sourceAxis,
-          item.sourceChipIndex,
-        );
-      } else {
-        onDropValue(axis, chipCount, item.sourceAxis, item.sourceChipIndex);
-      }
-    },
-  });
-
-  return axis === 'row' ? (
-    <ChipColumnDropZone ref={drop} />
-  ) : (
-    <ChipRowDropZone ref={drop} />
-  );
-};
-
 const PivotDragLayer = memo(() => {
   const dragLayer = useDragLayer(monitor => ({
     item: monitor.getItem() as DragItem | null,
@@ -575,12 +524,6 @@ export const PivotInteractionLayout = ({
               onRemove={onRemoveDimension}
             />
           ))}
-          <StripDropZone
-            axis="col"
-            chipCount={colChips.length}
-            onDropDimension={onDropDimension}
-            onDropValue={onDropValue}
-          />
         </ChipRow>
         <TableRow>
           <ChipColumn ref={dropOnRowStrip} data-test="pivot-v3-row-chip-strip">
@@ -599,12 +542,6 @@ export const PivotInteractionLayout = ({
                 onRemove={onRemoveDimension}
               />
             ))}
-            <StripDropZone
-              axis="row"
-              chipCount={rowChips.length}
-              onDropDimension={onDropDimension}
-              onDropValue={onDropValue}
-            />
           </ChipColumn>
           <TableArea $height={tableHeight} $width={tableWidth}>
             {children}

@@ -116,24 +116,6 @@ const chipIndexToDimensionIndex = (chipIndex: number, valueIndex?: number) => {
   return chipIndex > valueIndex ? chipIndex - 1 : chipIndex;
 };
 
-const defaultInsertIndex = (
-  layout: PivotRuntimeLayout,
-  axis: PivotAxis,
-  metricsAvailable: boolean,
-) => {
-  const list = layout[getAxisKey(axis)];
-  const valueIndex = resolveValueIndex(
-    layout,
-    axis,
-    list.length,
-    metricsAvailable,
-  );
-  if (valueIndex !== undefined && valueIndex < list.length) {
-    return valueIndex;
-  }
-  return list.length;
-};
-
 export type DimensionDragOptions = {
   dimensionKey: string;
   targetAxis: PivotAxis;
@@ -163,14 +145,6 @@ export const applyDimensionDrag = (
   const list = [...cleaned[axisKey]];
   const dimCount = list.length;
 
-  let insertIndex = targetChipIndex;
-  if (insertIndex === undefined) {
-    insertIndex = defaultInsertIndex(cleaned, targetAxis, metricsAvailable);
-  } else if (sourceAxis === targetAxis && typeof sourceChipIndex === 'number') {
-    if (sourceChipIndex < insertIndex) {
-      insertIndex -= 1;
-    }
-  }
   const valueIndex = resolveValueIndex(
     cleaned,
     targetAxis,
@@ -178,6 +152,12 @@ export const applyDimensionDrag = (
     metricsAvailable,
   );
   const chipCount = dimCount + (valueIndex !== undefined ? 1 : 0);
+  let insertIndex = targetChipIndex ?? chipCount;
+  if (sourceAxis === targetAxis && typeof sourceChipIndex === 'number') {
+    if (sourceChipIndex < insertIndex) {
+      insertIndex -= 1;
+    }
+  }
   insertIndex = clampIndex(insertIndex, 0, chipCount);
   const dimInsertIndex = chipIndexToDimensionIndex(insertIndex, valueIndex);
   let shouldInsertBeforeValue = insertBeforeValue;
