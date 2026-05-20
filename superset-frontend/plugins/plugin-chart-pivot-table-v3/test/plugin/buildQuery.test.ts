@@ -20,7 +20,6 @@
 import buildQuery from '../../src/buildQuery';
 import { formatQueryName } from '../../src/pivot/query/specs';
 import { buildFormData } from './fixtures/pivotFormData';
-import { serializePath } from '../../src/pivot/core/path';
 
 const baseFormData = buildFormData({
   groupbyRows: ['row1', 'row2'],
@@ -115,9 +114,7 @@ describe('buildQuery (bootstrap)', () => {
     const names = queryContext.queries.map(query =>
       typeof query.query_name === 'string' ? query.query_name : '',
     );
-    expect(names.some(name => name.includes('|branch:row:A'))).toBe(false);
-    expect(names.some(name => name.includes('|branch:col:B'))).toBe(false);
-    expect(names.some(name => name.includes('|batch:'))).toBe(false);
+    expect(names.some(name => name.includes('|scope:'))).toBe(false);
   });
 
   test('does not use persisted column expansions to increase initial query depth', () => {
@@ -137,7 +134,7 @@ describe('buildQuery (bootstrap)', () => {
     const rowBranchQueries = queryContext.queries.filter(
       query =>
         typeof query.query_name === 'string' &&
-        query.query_name.includes('|branch:row:A'),
+        query.query_name.includes('|scope:'),
     );
     expect(
       queryContext.queries.every(
@@ -189,7 +186,7 @@ describe('buildQuery (bootstrap)', () => {
       typeof query.query_name === 'string' ? query.query_name : '',
     );
     expect(names.some(name => name.includes('|root'))).toBe(false);
-    expect(names.some(name => name.includes('|branch:row:A'))).toBe(false);
+    expect(names.some(name => name.includes('|scope:'))).toBe(false);
   });
 
   test('does not batch sibling persisted expansions during initial query planning', () => {
@@ -218,18 +215,6 @@ describe('buildQuery (bootstrap)', () => {
     const names = queryContext.queries.map(query =>
       typeof query.query_name === 'string' ? query.query_name : '',
     );
-    expect(
-      names.some(name => name.includes(`|batch:row:${serializePath(['US'])}`)),
-    ).toBe(false);
-    expect(
-      names.some(name =>
-        name.includes(`|branch:row:${serializePath(['US', 'CA'])}`),
-      ),
-    ).toBe(false);
-    expect(
-      names.some(name =>
-        name.includes(`|branch:row:${serializePath(['US', 'NY'])}`),
-      ),
-    ).toBe(false);
+    expect(names.some(name => name.includes('|scope:'))).toBe(false);
   });
 });

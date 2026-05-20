@@ -81,6 +81,13 @@ type QueryPayload = {
   filters?: Array<{ col?: string; op?: string; val?: string }>;
 };
 
+const queryDepthNames = (queries: QueryPayload[]) =>
+  queries.map(query =>
+    typeof query.query_name === 'string'
+      ? query.query_name.split('|scope:')[0]
+      : '',
+  );
+
 const buildFetchTarget = ({
   layout,
   axis,
@@ -1040,13 +1047,13 @@ describe('buildExpansionQuerySpecs', () => {
     const queries =
       (postMock.mock.calls[0][0] as any).jsonPayload?.queries || [];
     expect(queries.length).toBe(4);
-    const queryNames = queries.map((q: any) => q.query_name);
+    const queryNames = queryDepthNames(queries);
     expect(queryNames).toEqual(
       expect.arrayContaining([
-        `${formatQueryName(2, 2)}|branch:row:${serializePath(['USA'])}`,
-        `${formatQueryName(2, 1)}|branch:row:${serializePath(['USA'])}`,
-        `${formatQueryName(1, 2)}|branch:row:${serializePath(['USA'])}`,
-        `${formatQueryName(1, 1)}|branch:row:${serializePath(['USA'])}`,
+        formatQueryName(2, 2),
+        formatQueryName(2, 1),
+        formatQueryName(1, 2),
+        formatQueryName(1, 1),
       ]),
     );
   });
@@ -1121,12 +1128,8 @@ describe('buildExpansionQuerySpecs', () => {
     expect(postMock).toHaveBeenCalledTimes(1);
     const queries =
       (postMock.mock.calls[0][0] as any).jsonPayload?.queries || [];
-    const queryNames = queries.map((q: any) => q.query_name);
-    expect(queryNames).toEqual(
-      expect.arrayContaining([
-        `${formatQueryName(2, 1)}|branch:row:${serializePath(['A'])}`,
-      ]),
-    );
+    const queryNames = queryDepthNames(queries);
+    expect(queryNames).toEqual(expect.arrayContaining([formatQueryName(2, 1)]));
     const subtotalKey = serializePath(['X', SUBTOTAL_TOKEN]);
     const rowKey = serializePath(['A', 'B']);
     expect(tree.cols[subtotalKey]).toBeDefined();
@@ -1197,13 +1200,13 @@ describe('buildExpansionQuerySpecs', () => {
     const queries =
       (postMock.mock.calls[0][0] as any).jsonPayload?.queries || [];
     expect(queries.length).toBe(4);
-    const queryNames = queries.map((q: any) => q.query_name);
+    const queryNames = queryDepthNames(queries);
     expect(queryNames).toEqual(
       expect.arrayContaining([
-        `${formatQueryName(2, 2)}|branch:col:${serializePath(['Consumer'])}`,
-        `${formatQueryName(1, 2)}|branch:col:${serializePath(['Consumer'])}`,
-        `${formatQueryName(2, 1)}|branch:col:${serializePath(['Consumer'])}`,
-        `${formatQueryName(1, 1)}|branch:col:${serializePath(['Consumer'])}`,
+        formatQueryName(2, 2),
+        formatQueryName(1, 2),
+        formatQueryName(2, 1),
+        formatQueryName(1, 1),
       ]),
     );
   });
@@ -1278,15 +1281,15 @@ describe('buildExpansionQuerySpecs', () => {
     const queries =
       (postMock.mock.calls[0][0] as any).jsonPayload?.queries || [];
     expect(queries.length).toBe(6);
-    const queryNames = queries.map((q: any) => q.query_name);
+    const queryNames = queryDepthNames(queries);
     expect(queryNames).toEqual(
       expect.arrayContaining([
-        `${formatQueryName(3, 2)}|branch:col:${serializePath(['Consumer'])}`,
-        `${formatQueryName(2, 2)}|branch:col:${serializePath(['Consumer'])}`,
-        `${formatQueryName(1, 2)}|branch:col:${serializePath(['Consumer'])}`,
-        `${formatQueryName(3, 1)}|branch:col:${serializePath(['Consumer'])}`,
-        `${formatQueryName(2, 1)}|branch:col:${serializePath(['Consumer'])}`,
-        `${formatQueryName(1, 1)}|branch:col:${serializePath(['Consumer'])}`,
+        formatQueryName(3, 2),
+        formatQueryName(2, 2),
+        formatQueryName(1, 2),
+        formatQueryName(3, 1),
+        formatQueryName(2, 1),
+        formatQueryName(1, 1),
       ]),
     );
   });
@@ -1365,15 +1368,15 @@ describe('buildExpansionQuerySpecs', () => {
     expect(postMock).toHaveBeenCalledTimes(1);
     const queries =
       (postMock.mock.calls[0][0] as any).jsonPayload?.queries || [];
-    const queryNames = queries.map((q: any) => q.query_name);
+    const queryNames = queryDepthNames(queries);
     expect(queryNames).toEqual(
       expect.arrayContaining([
-        `${formatQueryName(2, 3)}|branch:row:${serializePath(['USA'])}`,
-        `${formatQueryName(2, 2)}|branch:row:${serializePath(['USA'])}`,
-        `${formatQueryName(2, 1)}|branch:row:${serializePath(['USA'])}`,
-        `${formatQueryName(1, 3)}|branch:row:${serializePath(['USA'])}`,
-        `${formatQueryName(1, 2)}|branch:row:${serializePath(['USA'])}`,
-        `${formatQueryName(1, 1)}|branch:row:${serializePath(['USA'])}`,
+        formatQueryName(2, 3),
+        formatQueryName(2, 2),
+        formatQueryName(2, 1),
+        formatQueryName(1, 3),
+        formatQueryName(1, 2),
+        formatQueryName(1, 1),
       ]),
     );
   });
@@ -1422,12 +1425,8 @@ describe('buildExpansionQuerySpecs', () => {
 
     const queries =
       (postMock.mock.calls[0][0] as any).jsonPayload?.queries || [];
-    const queryNames = queries.map((q: any) => q.query_name);
-    expect(queryNames).toEqual(
-      expect.arrayContaining([
-        `${formatQueryName(1, 0)}|branch:row:${serializePath(['A'])}`,
-      ]),
-    );
+    const queryNames = queryDepthNames(queries);
+    expect(queryNames).toEqual(expect.arrayContaining([formatQueryName(1, 0)]));
   });
 
   it('propagates extra_form_data filters into branch queries', async () => {

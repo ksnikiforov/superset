@@ -22,6 +22,7 @@ import { buildLayoutContext } from '../../../src/pivot/layout/LayoutContext';
 import { formatQueryName } from '../../../src/pivot/query/specs';
 import { serializePath } from '../../../src/pivot/core/path';
 import { buildAxisExpansionCoverageTarget } from '../../../src/pivot/expansion/planner';
+import { stableStringify } from '../../../src/pivot/shared/stableStringify';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { buildExpansionQuerySpecs } from '../fixtures/querySpecs';
 
@@ -113,7 +114,11 @@ describe('temporal branch query specs contract', () => {
         `${formatQueryName(
           spec.meta.factSelector.coverage.rowDepth,
           spec.meta.factSelector.coverage.columnDepth,
-        )}|branch:row:${serializePath(path)}`,
+        )}|scope:${stableStringify({
+          axis: 'row',
+          kind: 'axisPaths',
+          paths: [path],
+        })}`,
       );
     });
   });
@@ -178,7 +183,11 @@ describe('temporal branch query specs contract', () => {
         `${formatQueryName(
           spec.meta.factSelector.coverage.rowDepth,
           spec.meta.factSelector.coverage.columnDepth,
-        )}|batch:row:`,
+        )}|scope:${stableStringify({
+          axis: 'row',
+          kind: 'axisPaths',
+          paths: [['1483228800000'], ['1514764800000']],
+        })}`,
       );
     });
   });

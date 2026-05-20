@@ -64,11 +64,7 @@ import {
   isIntersectionCoverageTarget,
   type ExpansionCoverageTarget,
 } from '../expansion/planner';
-import {
-  buildPathFilters,
-  coerceValueForColumn,
-  normalizeTemporalValue,
-} from './pathFilters';
+import { coerceValueForColumn, normalizeTemporalValue } from './pathFilters';
 import { buildFactCoverage, pathsFromAxisScope } from '../runtime/coverage';
 import {
   buildFactValueKeys,
@@ -257,7 +253,6 @@ type PlannedQuerySpecParams = {
   materialization?: PivotFactMaterialization;
   scope: PivotFactStoreBatchScope;
   filters: QueryObjectFilterClause[];
-  suffix: string;
 };
 
 type DepthPair = { rowDepth: number; columnDepth: number };
@@ -576,9 +571,10 @@ const buildPlannedQuerySpec = ({
   materialization,
   scope,
   filters,
-  suffix,
 }: PlannedQuerySpecParams): PlannedQuerySpec => ({
-  queryName: `${formatQueryName(coverage.rowDepth, coverage.columnDepth)}${suffix}`,
+  queryName: `${formatQueryName(coverage.rowDepth, coverage.columnDepth)}${
+    scope.kind === 'root' ? '' : `|scope:${stableStringify(scope)}`
+  }`,
   columns: [...coverage.rowDimensions, ...coverage.columnDimensions],
   metrics,
   filters,
@@ -604,7 +600,6 @@ const buildAxisExpansionSpecs = ({
   queryAnchorPath,
   coverageTarget,
   filters,
-  suffix,
   scope,
 }: {
   formData: PivotTableQueryFormData;
@@ -614,7 +609,6 @@ const buildAxisExpansionSpecs = ({
   queryAnchorPath: PivotPath;
   coverageTarget: ExpansionCoverageTarget;
   filters: (ctx: ResolvedFetchContext) => QueryObjectFilterClause[];
-  suffix: string;
   scope: PivotFactStoreBatchScope;
 }): PlannedQuerySpec[] => {
   if (!canRequestAxisExpansion({ program: layout.pivotProgram, axis, path })) {
@@ -639,53 +633,12 @@ const buildAxisExpansionSpecs = ({
       materialization: ctx.materialization,
       scope,
       filters: resolvedFilters,
-      suffix,
     }),
   );
 };
 
 const isNullish = (value: PivotPathValue | unknown) =>
   value === null || value === undefined;
-
-const buildBatchFilterClauses = ({
-  axisGroupby,
-  parentPath,
-  siblingValues,
-  colTypeMap,
-}: {
-  axisGroupby: QueryFormColumn[];
-  parentPath: PivotPath;
-  siblingValues: PivotPathValue[];
-  colTypeMap?: Record<string, GenericDataType>;
-}): QueryObjectFilterClause[] => {
-  const prefixFilters = buildPathFilters(axisGroupby, parentPath, colTypeMap);
-  if (siblingValues.length === 0) {
-    return prefixFilters;
-  }
-  const siblingIndex = parentPath.length;
-  const siblingColumn = axisGroupby[siblingIndex];
-  if (!siblingColumn) {
-    return prefixFilters;
-  }
-  if (siblingValues.some(isNullish)) {
-    return [
-      ...prefixFilters,
-      {
-        col: getColumnLabel(siblingColumn),
-        op: 'IS NULL',
-      } as UnaryQueryObjectFilterClause,
-    ];
-  }
-  const resolvedSiblingValues = siblingValues.map(value =>
-    coerceValueForColumn(value, siblingColumn, colTypeMap),
-  ) as DataRecordValue[];
-  const siblingClause: SetQueryObjectFilterClause = {
-    col: getColumnLabel(siblingColumn),
-    op: 'IN',
-    val: resolvedSiblingValues,
-  };
-  return [...prefixFilters, siblingClause];
-};
 
 const buildPathSetFilterClauses = ({
   axisGroupby,
@@ -846,39 +799,7 @@ type ExpansionSpecContext = {
   layout: LayoutContext;
 };
 
-const buildSingleTargetExpansionSpecs = ({
-  formData,
-  layout,
-  target,
-}: ExpansionSpecContext & {
-  target: ExpansionCoverageTarget;
-}): PlannedQuerySpec[] => {
-  const { axis } = target;
-  const path = parsePath(target.pathKey);
-  const scopedPath = targetScopePaths(target)[0] ?? [];
-  return buildAxisExpansionSpecs({
-    formData,
-    layout,
-    axis,
-    path,
-    queryAnchorPath: scopedPath,
-    coverageTarget: target,
-    filters: ctx =>
-      buildPathFilters(
-        axis === 'row' ? ctx.rowGroupbyForQuery : ctx.colGroupbyForQuery,
-        scopedPath,
-        formData.colTypeMap,
-      ),
-    suffix: `|branch:${axis}:${target.pathKey}`,
-    scope: {
-      kind: 'axisPaths',
-      axis,
-      paths: [scopedPath],
-    },
-  });
-};
-
-const buildBatchTargetExpansionSpecs = ({
+const buildAxisPathExpansionSpecs = ({
   formData,
   layout,
   targets,
@@ -889,31 +810,26 @@ const buildBatchTargetExpansionSpecs = ({
   if (!coverageTarget) {
     return [];
   }
-  const batchAxis = coverageTarget.axis;
-  const representative = parsePath(coverageTarget.pathKey);
-  const parentPathKey = serializePath(representative.slice(0, -1));
+  const { axis } = coverageTarget;
+  const path = parsePath(coverageTarget.pathKey);
   const scopedPaths = targets.flatMap(targetScopePaths);
-  const parentDimensionPath = scopedPaths[0]?.slice(0, -1) ?? [];
-  const siblingValues = scopedPaths.map(path => path[path.length - 1]);
   return buildAxisExpansionSpecs({
     formData,
     layout,
-    axis: batchAxis,
-    path: representative,
+    axis,
+    path,
     queryAnchorPath: scopedPaths[0] ?? [],
     coverageTarget,
     filters: ctx =>
-      buildBatchFilterClauses({
+      buildPathSetFilterClauses({
         axisGroupby:
-          batchAxis === 'row' ? ctx.rowGroupbyForQuery : ctx.colGroupbyForQuery,
-        parentPath: parentDimensionPath,
-        siblingValues,
+          axis === 'row' ? ctx.rowGroupbyForQuery : ctx.colGroupbyForQuery,
+        paths: scopedPaths,
         colTypeMap: formData.colTypeMap,
       }),
-    suffix: `|batch:${batchAxis}:${parentPathKey}`,
     scope: {
       kind: 'axisPaths',
-      axis: batchAxis,
+      axis,
       paths: scopedPaths,
     },
   });
@@ -952,7 +868,6 @@ const buildIntersectionTargetExpansionSpecs = ({
         colTypeMap: formData.colTypeMap,
       }),
     ],
-    suffix: `|intersection:${stableStringify([rowPaths, columnPaths])}`,
     scope: {
       kind: 'intersection',
       rowPaths,
@@ -974,21 +889,15 @@ export const buildExpansionQuerySpecPhases = ({
   });
   return {
     nonIntersectionSpecs: [
-      ...singles.flatMap(target =>
-        buildSingleTargetExpansionSpecs({
-          formData,
-          layout,
-          target,
-        }),
-      ),
-      ...batches.flatMap(batch =>
-        buildBatchTargetExpansionSpecs({
-          formData,
-          layout,
-          targets: batch,
-        }),
-      ),
-    ],
+      ...singles.map(target => [target]),
+      ...batches,
+    ].flatMap(targetGroup =>
+      buildAxisPathExpansionSpecs({
+        formData,
+        layout,
+        targets: targetGroup,
+      }),
+    ),
     intersectionSpecs: intersections.flatMap(target =>
       buildIntersectionTargetExpansionSpecs({
         formData,
@@ -1092,7 +1001,6 @@ export const buildInitialQuerySpecs = (
         requiredTimeOffsets: layout.requiredTimeOffsets,
         scope: { kind: 'root' },
         filters: [],
-        suffix: '',
       });
     },
   );

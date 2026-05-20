@@ -22,7 +22,7 @@ import { buildAxisExpansionCoverageTarget } from '../../../src/pivot/expansion/p
 import { buildFormData } from '../fixtures/pivotFormData';
 import { buildExpansionQuerySpecs } from '../fixtures/querySpecs';
 
-const branchQueryNames = ({
+const branchQuerySpecs = ({
   formData,
   path,
 }: {
@@ -43,50 +43,60 @@ const branchQueryNames = ({
         columnDepth: 0,
       }),
     ],
-  }).map(spec => spec.queryName);
+  });
 };
 
 describe('query naming (contracts)', () => {
-  it('uses serializePath() for branch suffixes, including divider values', () => {
+  it('derives expansion query identity from fact scope with divider values', () => {
     const dividerValue = `A${PATH_DIVIDER}B`;
     const formData = buildFormData({
       groupbyRows: ['r1', 'r2'],
       groupbyColumns: [],
       metrics: ['m1'],
     });
-    const names = branchQueryNames({ formData, path: [dividerValue] });
+    const specs = branchQuerySpecs({ formData, path: [dividerValue] });
 
+    expect(specs.some(spec => spec.queryName.includes('|scope:'))).toBe(true);
     expect(
-      names.some(name =>
-        name.includes(`|branch:row:${serializePath([dividerValue])}`),
+      specs.every(
+        spec =>
+          spec.meta.factSelector.scope.kind === 'axisPaths' &&
+          spec.meta.factSelector.scope.axis === 'row' &&
+          spec.meta.factSelector.scope.paths[0]?.[0] === dividerValue,
       ),
     ).toBe(true);
   });
 
-  it('uses serializePath() for branch suffixes, including null values', () => {
+  it('derives expansion query identity from fact scope with null values', () => {
     const formData = buildFormData({
       groupbyRows: ['r1', 'r2'],
       groupbyColumns: [],
       metrics: ['m1'],
     });
-    const names = branchQueryNames({ formData, path: [null] });
+    const specs = branchQuerySpecs({ formData, path: [null] });
 
     expect(
-      names.some(name => name.includes(`|branch:row:${serializePath([null])}`)),
+      specs.every(
+        spec =>
+          spec.meta.factSelector.scope.kind === 'axisPaths' &&
+          spec.meta.factSelector.scope.paths[0]?.[0] === null,
+      ),
     ).toBe(true);
   });
 
-  it('uses serializePath() for branch suffixes, including undefined values', () => {
+  it('derives expansion query identity from fact scope with undefined values', () => {
     const formData = buildFormData({
       groupbyRows: ['r1', 'r2'],
       groupbyColumns: [],
       metrics: ['m1'],
     });
-    const names = branchQueryNames({ formData, path: [undefined] });
+    const specs = branchQuerySpecs({ formData, path: [undefined] });
 
     expect(
-      names.some(name =>
-        name.includes(`|branch:row:${serializePath([undefined])}`),
+      specs.every(
+        spec =>
+          spec.meta.factSelector.scope.kind === 'axisPaths' &&
+          spec.meta.factSelector.scope.paths[0]?.[0] === undefined,
       ),
     ).toBe(true);
   });

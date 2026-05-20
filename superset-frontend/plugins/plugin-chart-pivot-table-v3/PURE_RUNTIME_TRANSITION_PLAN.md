@@ -95,10 +95,10 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `27358` | `-6152` | `< 28000` |
-| Strict core pipeline | `11337` | `11123` | `-214` | `8000` |
+| Full production `src` | `33510` | `27266` | `-6244` | `< 28000` |
+| Strict core pipeline | `11337` | `11031` | `-306` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4026` | `-657` | `3000-4000` |
-| Broad core pipeline | `16020` | `15149` | `-871` | `11000-13000` |
+| Broad core pipeline | `16020` | `15057` | `-963` | `11000-13000` |
 
 Strict core breakdown:
 
@@ -106,7 +106,7 @@ Strict core breakdown:
 | --- | ---: |
 | `pivot/runtime/*` | `3535` |
 | `pivot/expansion/*` | `2201` |
-| `pivot/query/*` | `1470` |
+| `pivot/query/*` | `1378` |
 | `pivot/layout/*` | `739` |
 | `pivot/core/*` | `252` |
 | core domain helpers | `1537` |
@@ -118,6 +118,8 @@ Completed structural cuts:
 - Expansion fetch now receives coverage targets, not request kinds.
 - Production query planning exposes phased expansion specs only; flattened query
   spec helpers are test-fixture utilities.
+- Axis expansion and sibling batching now share one axis-path scope query
+  builder; batching is no longer represented in query names.
 - Query specs carry exact fact-store selectors.
 - Expansion coverage planning no longer depends on the render model.
 - Configured pre-expansion now compiles into manifest-shaped coverage.
@@ -130,8 +132,6 @@ Completed structural cuts:
 
 Remaining duplicate authority:
 
-- `query/specs.ts` still has private single/batch/intersection transport helper
-  branches.
 - `stateTransitions.ts` and `useExpansionEngine.ts` still own too much
   scheduler state and row/column orchestration.
 - `materializePivotTree.ts` still mixes tree construction, subtotal injection,
@@ -156,15 +156,13 @@ deletion-conscious.
 
 ## Next Commits
 
-1. Finish Priority 1 by shrinking `query/specs.ts` transport helpers. Keep
-   batching internal and remove request-kind naming where it is only historical.
-2. Move Priority 2 in one larger pass: convert expansion loading/pending/manual
+1. Move Priority 2 in one larger pass: convert expansion loading/pending/manual
    state to an axis-neutral transition shape and delete hook-local duplication.
-3. Attack Priority 3 only with tests first: isolate subtotal and measure-axis
+2. Attack Priority 3 only with tests first: isolate subtotal and measure-axis
    materialization behavior, then delete post-processing wrappers.
-4. Resume Priority 4 after materializer behavior is stable: render should stop
+3. Resume Priority 4 after materializer behavior is stable: render should stop
    inferring metric/subtotal structure from tree shape.
-5. Shrink `PivotTableChart.tsx` only where code is deleted, not merely moved.
+4. Shrink `PivotTableChart.tsx` only where code is deleted, not merely moved.
 
 ## Verification Standard
 

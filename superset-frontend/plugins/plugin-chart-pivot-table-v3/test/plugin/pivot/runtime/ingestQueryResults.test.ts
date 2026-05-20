@@ -143,7 +143,7 @@ test('does not positionally match partially named branch results', () => {
 test('records exact branch scope on fact-store batches', () => {
   const store = createPivotFactStore();
   const spec = buildSpec({
-    queryName: 'pivot_v3|2|1|branch:row:France',
+    queryName: 'pivot_v3|2|1|scope:France',
     rowDepth: 2,
     colDepth: 1,
     rowGroupby: ['country', 'city'],
@@ -198,7 +198,7 @@ test('records exact branch scope on fact-store batches', () => {
 
 test('keeps support and offset facts without materializing support metric branches', () => {
   const spec = buildSpec({
-    queryName: 'pivot_v3|1|0|branch:row:France',
+    queryName: 'pivot_v3|1|0|scope:France',
     rowDepth: 1,
     colDepth: 0,
     metrics: ['sales', 'sortMetric'],
@@ -312,7 +312,7 @@ test('materializes projected date labels when values are before dimensions', () 
 
 test('materializes column subtotal leaves from planned coverage specs', () => {
   const spec = buildSpec({
-    queryName: 'pivot_v3|1|1|branch:row:France',
+    queryName: 'pivot_v3|1|1|scope:France',
     rowDepth: 1,
     colDepth: 1,
     rowGroupby: ['country'],
