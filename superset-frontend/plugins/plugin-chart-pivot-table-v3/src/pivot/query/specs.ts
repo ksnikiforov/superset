@@ -52,7 +52,7 @@ import {
   mergeMetrics,
   getStableColumnKey,
 } from '../../utils';
-import { parsePath } from '../core/path';
+import { parsePath, serializePath } from '../core/path';
 import {
   buildLayoutContext,
   type LayoutContext,
@@ -319,11 +319,8 @@ const uniqueDepths = (depths: number[]) => Array.from(new Set(depths));
 const buildBranchFactCoverages = ({
   program,
   axis,
+  coverageTarget,
   branchAnchorDepth,
-  rowDepth,
-  columnDepth,
-  rowDimensions = program.rowDimensions,
-  columnDimensions = program.columnDimensions,
   rowSubtotalLevels,
   columnSubtotalLevels,
   rowTotals = false,
@@ -333,11 +330,8 @@ const buildBranchFactCoverages = ({
 }: {
   program: LayoutContext['pivotProgram'];
   axis: PivotAxis;
+  coverageTarget: ExpansionCoverageTarget;
   branchAnchorDepth: number;
-  rowDepth: number;
-  columnDepth: number;
-  rowDimensions?: LayoutContext['pivotProgram']['rowDimensions'];
-  columnDimensions?: LayoutContext['pivotProgram']['columnDimensions'];
   rowSubtotalLevels: number[];
   columnSubtotalLevels: number[];
   rowTotals?: boolean;
@@ -365,6 +359,8 @@ const buildBranchFactCoverages = ({
       );
     });
   };
+  const { rowDepth, columnDepth, rowDimensions, columnDimensions } =
+    coverageTarget.need;
   addDepthPair(rowDepth, columnDepth);
 
   const valuesAtRowFront = isValuesFirstOnAxis(program, 'row');
@@ -616,11 +612,8 @@ const resolveFetchContext = ({
   const coverages = buildBranchFactCoverages({
     program: layout.pivotProgram,
     axis,
+    coverageTarget,
     branchAnchorDepth: sanitizedPath.length,
-    rowDepth,
-    columnDepth: colDepth,
-    rowDimensions: queryShape.rowGroupby,
-    columnDimensions: queryShape.colGroupby,
     rowSubtotalLevels,
     columnSubtotalLevels: colSubtotalLevels,
     rowTotals: layout.rowTotals,
@@ -905,6 +898,7 @@ export const buildExpansionQuerySpecs = (
     }
     const batchAxis = coverageTarget.axis;
     const representative = parsePath(coverageTarget.pathKey);
+    const parentPathKey = serializePath(representative.slice(0, -1));
     const scopedPaths = batch.targets.map(target =>
       projectQueryFilterPath({
         layout,
@@ -930,7 +924,7 @@ export const buildExpansionQuerySpecs = (
           siblingValues,
           colTypeMap: formData.colTypeMap,
         }),
-      suffix: `|batch:${batchAxis}:${stableStringify(scopedPaths)}`,
+      suffix: `|batch:${batchAxis}:${parentPathKey}`,
       scope: {
         kind: 'axisPaths',
         axis: batchAxis,

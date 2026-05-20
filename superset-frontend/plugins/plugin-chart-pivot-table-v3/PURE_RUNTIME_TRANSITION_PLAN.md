@@ -345,8 +345,8 @@ Implementation rules for accelerated chunks:
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13178` insertions, `18260` deletions, net `-5082`.
-- Current production TypeScript/TSX total: about `28428` lines.
+- Production `src`: `13172` insertions, `18260` deletions, net `-5088`.
+- Current production TypeScript/TSX total: about `28422` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -358,10 +358,10 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `28428` | `-5082` | `< 28000` |
-| Strict core pipeline | `11337` | `11334` | `-3` | `8000` |
+| Full production `src` | `33510` | `28422` | `-5088` | `< 28000` |
+| Strict core pipeline | `11337` | `11328` | `-9` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4883` | `+200` | `3000-4000` |
-| Broad core pipeline | `16020` | `16217` | `+197` | `11000-13000` |
+| Broad core pipeline | `16020` | `16211` | `+191` | `11000-13000` |
 
 Current strict core breakdown:
 
@@ -916,6 +916,11 @@ coverage targets. Batch axis, parent scope, sibling filter values, and loaded
 fact-store paths are derived from those targets at the query boundary instead
 of being stored as parallel transport metadata. This keeps batching as a
 transport optimization over manifest targets, not a second request authority.
+
+Latest branch-coverage cleanup: expansion support coverage now consumes the
+compiled coverage target directly. Branch fact coverage no longer receives
+duplicated row/column depths or dimension arrays beside the manifest target it
+is already planning from.
 
 Latest expansion signature cleanup: expansion reinitialization now consumes one
 semantic signature plus the row/column layout transition already owned by
