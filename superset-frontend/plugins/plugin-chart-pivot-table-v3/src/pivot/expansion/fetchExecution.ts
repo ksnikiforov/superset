@@ -76,26 +76,20 @@ type BatchPlan = {
   singles: ExpansionCoverageTarget[];
 };
 
-type CandidateWithPath = ExpansionCoverageTarget & {
-  siblingValue: BatchGroup['siblingValues'][number];
-};
-
 type BatchSeed = {
-  axis: BatchGroup['axis'];
-  parentPathKey: string;
-  targets: CandidateWithPath[];
+  targets: ExpansionCoverageTarget[];
 };
 
 const isNullish = (value: unknown) => value === null || value === undefined;
 
 const chunkTargets = (
-  targets: CandidateWithPath[],
+  targets: ExpansionCoverageTarget[],
   chunkSize: number,
-): CandidateWithPath[][] => {
+): ExpansionCoverageTarget[][] => {
   const sorted = [...targets].sort((a, b) =>
     a.pathKey.localeCompare(b.pathKey),
   );
-  const chunks: CandidateWithPath[][] = [];
+  const chunks: ExpansionCoverageTarget[][] = [];
   for (let idx = 0; idx < sorted.length; idx += chunkSize) {
     chunks.push(sorted.slice(idx, idx + chunkSize));
   }
@@ -131,27 +125,15 @@ export const optimizeExpansionFetchPlan = ({
       target.need.valueKeys,
       target.axis === 'row' ? target.need.columnScope : target.need.rowScope,
     ]);
-    const seed = groups.get(groupKey) ?? {
-      axis: target.axis,
-      parentPathKey,
-      targets: [],
-    };
-    seed.targets.push({
-      ...target,
-      siblingValue,
-    });
+    const seed = groups.get(groupKey) ?? { targets: [] };
+    seed.targets.push(target);
     groups.set(groupKey, seed);
   });
 
   const batches: BatchGroup[] = [];
   groups.forEach(seed => {
     chunkTargets(seed.targets, maxBatchSize).forEach(chunk => {
-      const group = {
-        axis: seed.axis,
-        parentPathKey: seed.parentPathKey,
-        siblingValues: chunk.map(target => target.siblingValue),
-        targets: chunk,
-      };
+      const group = { targets: chunk };
       if (group.targets.length <= 1) {
         singles.push(...group.targets);
         return;

@@ -61,9 +61,6 @@ export type PivotExpansionCoverageDiff = (
 ) => ExpansionCoverageTarget[];
 
 export type BatchGroup = {
-  axis: PivotAxis;
-  parentPathKey: string;
-  siblingValues: PivotPathValue[];
   targets: ExpansionCoverageTarget[];
 };
 

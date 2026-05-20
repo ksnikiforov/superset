@@ -900,41 +900,41 @@ export const buildExpansionQuerySpecs = (
   if (request.kind === 'batch') {
     const { formData, layout, batch } = request;
     const coverageTarget = batch.targets[0];
-    const representativeKey = batch.targets[0]?.pathKey;
-    if (!representativeKey || !coverageTarget) {
+    if (!coverageTarget) {
       return [];
     }
-    const representative = parsePath(representativeKey);
-    const parentPath = parsePath(batch.parentPathKey);
-    const parentDimensionPath = projectQueryFilterPath({
-      layout,
-      axis: batch.axis,
-      path: parentPath,
-    });
+    const batchAxis = coverageTarget.axis;
+    const representative = parsePath(coverageTarget.pathKey);
+    const scopedPaths = batch.targets.map(target =>
+      projectQueryFilterPath({
+        layout,
+        axis: batchAxis,
+        path: parsePath(target.pathKey),
+      }),
+    );
+    const parentDimensionPath = scopedPaths[0]?.slice(0, -1) ?? [];
+    const siblingValues = scopedPaths.map(path => path[path.length - 1]);
     return buildAxisExpansionSpecs({
       formData,
       layout,
-      axis: batch.axis,
+      axis: batchAxis,
       path: representative,
       coverageTarget,
       filters: ctx =>
         buildBatchFilterClauses({
           axisGroupby:
-            batch.axis === 'row'
+            batchAxis === 'row'
               ? ctx.rowGroupbyForQuery
               : ctx.colGroupbyForQuery,
           parentPath: parentDimensionPath,
-          siblingValues: batch.siblingValues,
+          siblingValues,
           colTypeMap: formData.colTypeMap,
         }),
-      suffix: `|batch:${batch.axis}:${batch.parentPathKey}`,
+      suffix: `|batch:${batchAxis}:${stableStringify(scopedPaths)}`,
       scope: {
         kind: 'axisPaths',
-        axis: batch.axis,
-        paths: batch.siblingValues.map(value => [
-          ...parentDimensionPath,
-          value,
-        ]),
+        axis: batchAxis,
+        paths: scopedPaths,
       },
     });
   }

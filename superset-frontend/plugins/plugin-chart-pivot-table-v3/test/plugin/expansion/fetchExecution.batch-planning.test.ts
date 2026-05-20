@@ -38,6 +38,10 @@ const makeTarget = (path: PivotPathValue[]): ExpansionCoverageTarget => ({
   },
 });
 
+const batchSiblingValues = (
+  batch: ReturnType<typeof optimizeExpansionFetchPlan>['batches'][number],
+) => batch.targets.map(target => parsePath(target.pathKey).slice(-1)[0]);
+
 describe('fetchPlanOptimizer', () => {
   it('groups compatible sibling targets into a batch', () => {
     const targets = [makeTarget(['US', 'CA']), makeTarget(['US', 'NY'])];
@@ -45,7 +49,7 @@ describe('fetchPlanOptimizer', () => {
 
     expect(plan.batches).toHaveLength(1);
     expect(plan.singles).toHaveLength(0);
-    expect(plan.batches[0].siblingValues).toEqual(['CA', 'NY']);
+    expect(batchSiblingValues(plan.batches[0])).toEqual(['CA', 'NY']);
   });
 
   it('does not mix null and non-null siblings', () => {
@@ -56,7 +60,7 @@ describe('fetchPlanOptimizer', () => {
     ];
     const plan = optimizeExpansionFetchPlan({ targets });
 
-    const siblings = plan.batches.flatMap(batch => batch.siblingValues);
+    const siblings = plan.batches.flatMap(batchSiblingValues);
     expect(siblings).toContain('CA');
     expect(siblings).toContain('NY');
     expect(siblings).not.toContain(null);
