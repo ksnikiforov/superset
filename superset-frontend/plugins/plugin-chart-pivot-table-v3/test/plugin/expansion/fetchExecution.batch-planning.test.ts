@@ -40,17 +40,24 @@ const makeTarget = (path: PivotPathValue[]): ExpansionCoverageTarget => ({
 });
 
 const batchSiblingValues = (
-  batch: ReturnType<typeof optimizeExpansionFetchPlan>['batches'][number],
+  batch: ReturnType<typeof optimizeExpansionFetchPlan>[number],
 ) => batch.map(target => parsePath(target.pathKey).slice(-1)[0]);
+
+const multiTargetGroups = (
+  groups: ReturnType<typeof optimizeExpansionFetchPlan>,
+) => groups.filter(group => group.length > 1);
+
+const singleTargetGroups = (
+  groups: ReturnType<typeof optimizeExpansionFetchPlan>,
+) => groups.filter(group => group.length === 1);
 
 describe('fetchPlanOptimizer', () => {
   it('groups compatible sibling targets into a batch', () => {
     const targets = [makeTarget(['US', 'CA']), makeTarget(['US', 'NY'])];
     const plan = optimizeExpansionFetchPlan({ targets });
 
-    expect(plan.batches).toHaveLength(1);
-    expect(plan.singles).toHaveLength(0);
-    expect(batchSiblingValues(plan.batches[0])).toEqual(['CA', 'NY']);
+    expect(plan).toHaveLength(1);
+    expect(batchSiblingValues(plan[0])).toEqual(['CA', 'NY']);
   });
 
   it('does not mix null and non-null siblings', () => {
@@ -61,12 +68,12 @@ describe('fetchPlanOptimizer', () => {
     ];
     const plan = optimizeExpansionFetchPlan({ targets });
 
-    const siblings = plan.batches.flatMap(batchSiblingValues);
+    const siblings = multiTargetGroups(plan).flatMap(batchSiblingValues);
     expect(siblings).toContain('CA');
     expect(siblings).toContain('NY');
     expect(siblings).not.toContain(null);
-    const nullSingles = plan.singles.filter(
-      target => parsePath(target.pathKey).slice(-1)[0] === null,
+    const nullSingles = singleTargetGroups(plan).filter(
+      ([target]) => parsePath(target.pathKey).slice(-1)[0] === null,
     );
     expect(nullSingles).toHaveLength(1);
   });
@@ -87,8 +94,8 @@ describe('fetchPlanOptimizer', () => {
       ],
     });
 
-    expect(plan.batches).toHaveLength(1);
-    expect(batchSiblingValues(plan.batches[0])).toEqual(['CA', 'NY']);
+    expect(plan).toHaveLength(1);
+    expect(batchSiblingValues(plan[0])).toEqual(['CA', 'NY']);
   });
 
   it('enforces max batch size', () => {
@@ -98,12 +105,12 @@ describe('fetchPlanOptimizer', () => {
     );
     const plan = optimizeExpansionFetchPlan({ targets });
 
-    const batchSizes = plan.batches.map(batch => batch.length);
+    const batchSizes = plan.map(batch => batch.length);
     const hasMaxBatch = batchSizes.includes(MAX_EXPANSION_BATCH_SIBLINGS);
     expect(hasMaxBatch).toBe(true);
-    expect(
-      batchSizes.reduce((sum, size) => sum + size, 0) + plan.singles.length,
-    ).toBe(MAX_EXPANSION_BATCH_SIBLINGS + 1);
+    expect(batchSizes.reduce((sum, size) => sum + size, 0)).toBe(
+      MAX_EXPANSION_BATCH_SIBLINGS + 1,
+    );
   });
 
   it('separates incompatible coverage depths', () => {
@@ -120,8 +127,8 @@ describe('fetchPlanOptimizer', () => {
     ];
     const plan = optimizeExpansionFetchPlan({ targets });
 
-    expect(plan.batches).toHaveLength(0);
-    expect(plan.singles).toHaveLength(2);
+    expect(multiTargetGroups(plan)).toHaveLength(0);
+    expect(singleTargetGroups(plan)).toHaveLength(2);
   });
 
   it('separates sibling targets with different value keys', () => {
@@ -146,7 +153,7 @@ describe('fetchPlanOptimizer', () => {
       ],
     });
 
-    expect(plan.batches).toHaveLength(0);
-    expect(plan.singles).toHaveLength(2);
+    expect(multiTargetGroups(plan)).toHaveLength(0);
+    expect(singleTargetGroups(plan)).toHaveLength(2);
   });
 });

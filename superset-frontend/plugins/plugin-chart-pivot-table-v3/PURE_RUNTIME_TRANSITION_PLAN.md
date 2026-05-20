@@ -95,18 +95,18 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `27155` | `-6355` | `< 28000` |
-| Strict core pipeline | `11337` | `10920` | `-417` | `8000` |
+| Full production `src` | `33510` | `27143` | `-6367` | `< 28000` |
+| Strict core pipeline | `11337` | `10908` | `-429` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4026` | `-657` | `3000-4000` |
-| Broad core pipeline | `16020` | `14946` | `-1074` | `11000-13000` |
+| Broad core pipeline | `16020` | `14934` | `-1086` | `11000-13000` |
 
 Strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
 | `pivot/runtime/*` | `3570` |
-| `pivot/expansion/*` | `2136` |
-| `pivot/query/*` | `1378` |
+| `pivot/expansion/*` | `2135` |
+| `pivot/query/*` | `1367` |
 | `pivot/layout/*` | `739` |
 | `pivot/core/*` | `159` |
 | core domain helpers | `1549` |
@@ -121,6 +121,9 @@ Completed structural cuts:
 - Axis expansion and sibling batching now share one axis-path scope query
   builder; batching is no longer represented in query names.
 - Query specs carry exact fact-store selectors.
+- Expansion query planning now emits ordered target groups instead of separate
+  batch/single transport branches; intersection specs remain a later phase so
+  branch fetches can satisfy them before they load.
 - Expansion coverage planning no longer depends on the render model.
 - Configured pre-expansion now compiles into manifest-shaped coverage.
 - Initial query planning fetches visible root coverage only.

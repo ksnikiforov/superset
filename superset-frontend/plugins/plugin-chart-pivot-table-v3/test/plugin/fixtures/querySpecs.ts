@@ -20,8 +20,4 @@ import { buildExpansionQuerySpecPhases } from '../../../src/pivot/query/specs';
 
 export const buildExpansionQuerySpecs = (
   ...args: Parameters<typeof buildExpansionQuerySpecPhases>
-) => {
-  const { nonIntersectionSpecs, intersectionSpecs } =
-    buildExpansionQuerySpecPhases(...args);
-  return [...nonIntersectionSpecs, ...intersectionSpecs];
-};
+) => buildExpansionQuerySpecPhases(...args).flat();

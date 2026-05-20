@@ -46,14 +46,17 @@ export const fetchPivotExpansion = async (
   request: FetchPivotExpansionRequest,
 ): Promise<FetchPivotExpansionResult> => {
   try {
-    const { nonIntersectionSpecs, intersectionSpecs } =
-      buildExpansionQuerySpecPhases({
-        formData: request.formData,
-        layout: request.layout,
-        targets: request.targets,
-      });
-    const fetchSpecs = (specs: typeof nonIntersectionSpecs) =>
-      fetchPlannedQuerySpecs({
+    const specPhases = buildExpansionQuerySpecPhases({
+      formData: request.formData,
+      layout: request.layout,
+      targets: request.targets,
+    });
+    const results: Awaited<
+      ReturnType<typeof fetchPlannedQuerySpecs>
+    >['results'] = [];
+    for (const specs of specPhases) {
+      // eslint-disable-next-line no-await-in-loop
+      const result = await fetchPlannedQuerySpecs({
         formData: request.formData,
         specs,
         requestGroupId: request.requestGroupId,
@@ -62,12 +65,8 @@ export const fetchPivotExpansion = async (
         shouldContinue: request.shouldContinue,
         yieldToMain: request.yieldToMain,
       });
-    const nonIntersectionResult = await fetchSpecs(nonIntersectionSpecs);
-    const intersectionResult = await fetchSpecs(intersectionSpecs);
-    const results = [
-      ...nonIntersectionResult.results,
-      ...intersectionResult.results,
-    ];
+      results.push(...result.results);
+    }
     const warnings = collectPlannedQueryWarnings(results);
     return {
       ...(results.length > 0 ? { didFetch: true as const } : {}),

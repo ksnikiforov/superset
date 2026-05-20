@@ -751,17 +751,14 @@ export const optimizeExpansionFetchPlan = ({
 }: {
   targets: ExpansionCoverageTarget[];
   maxBatchSize?: number;
-}): {
-  batches: ExpansionCoverageTarget[][];
-  singles: ExpansionCoverageTarget[];
-} => {
-  const singles: ExpansionCoverageTarget[] = [];
+}): ExpansionCoverageTarget[][] => {
+  const targetGroups: ExpansionCoverageTarget[][] = [];
   const groups = new Map<string, ExpansionCoverageTarget[]>();
 
   targets.forEach(target => {
     const path = targetScopePaths(target)[0] ?? [];
     if (path.length === 0) {
-      singles.push(target);
+      targetGroups.push([target]);
       return;
     }
     const parentPathKey = serializePath(path.slice(0, -1));
@@ -780,18 +777,13 @@ export const optimizeExpansionFetchPlan = ({
     groups.set(groupKey, [...(groups.get(groupKey) ?? []), target]);
   });
 
-  const batches: ExpansionCoverageTarget[][] = [];
   groups.forEach(group => {
     chunkTargets(group, maxBatchSize).forEach(chunk => {
-      if (chunk.length <= 1) {
-        singles.push(...chunk);
-        return;
-      }
-      batches.push(chunk);
+      targetGroups.push(chunk);
     });
   });
 
-  return { batches, singles };
+  return targetGroups;
 };
 
 type ExpansionSpecContext = {
@@ -882,30 +874,27 @@ export const buildExpansionQuerySpecPhases = ({
   targets,
 }: ExpansionSpecContext & {
   targets: ExpansionCoverageTarget[];
-}) => {
+}): PlannedQuerySpec[][] => {
   const intersections = targets.filter(isIntersectionCoverageTarget);
-  const { batches, singles } = optimizeExpansionFetchPlan({
+  const targetGroups = optimizeExpansionFetchPlan({
     targets: targets.filter(target => !isIntersectionCoverageTarget(target)),
   });
-  return {
-    nonIntersectionSpecs: [
-      ...singles.map(target => [target]),
-      ...batches,
-    ].flatMap(targetGroup =>
+  return [
+    targetGroups.flatMap(targetGroup =>
       buildAxisPathExpansionSpecs({
         formData,
         layout,
         targets: targetGroup,
       }),
     ),
-    intersectionSpecs: intersections.flatMap(target =>
+    intersections.flatMap(target =>
       buildIntersectionTargetExpansionSpecs({
         formData,
         layout,
         target,
       }),
     ),
-  };
+  ].filter(phase => phase.length > 0);
 };
 
 export const buildInitialQuerySpecs = (
