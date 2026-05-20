@@ -96,7 +96,7 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `27067` | `-6443` | `< 20000` |
+| Full production `src` | `33510` | `26857` | `-6653` | `< 20000` |
 | Strict core pipeline | `12907` | `10908` | `-1999` | `< 8000` |
 
 Diagnostic scope only:
@@ -172,6 +172,9 @@ Completed structural cuts:
 - Column subtotal rendering now expects explicit materialized subtotal leaves;
   tests no longer preserve parent-node subtotal fixture shapes that production
   render would need to repair.
+- Metric rows and measure-leaf rows now share one conditional-formatting/databar
+  control implementation; measure-leaf controls no longer duplicate formatter,
+  color, and scale-like UI logic.
 - Collapsed dimension state no longer suppresses visible metric-tier expansion
   keys, so metric rows can reopen under a collapsed parent without expanding the
   dimension children.

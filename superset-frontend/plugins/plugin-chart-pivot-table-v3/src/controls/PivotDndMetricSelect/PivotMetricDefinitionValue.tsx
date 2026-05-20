@@ -1044,97 +1044,73 @@ export const MetricFormatSelector = (props: MetricFormatSelectorProps) => {
   );
 };
 
-export default function PivotMetricDefinitionValue(
-  props: PivotMetricDefinitionValueProps,
-) {
+type MetricFormattingControlProps = {
+  metricKey: string;
+  metricLabel: string;
+  ariaLabel: string;
+  excelOnly?: boolean;
+  formatting: PivotMetricFormatting;
+  databar: PivotMetricDatabar;
+  metricDatabars: PivotMetricDatabarMap;
+  availableMetrics: MetricOptionValue[];
+  selectedMetrics: MetricOptionValue[];
+  metricLabelMap?: Record<string, string>;
+  columns: ColumnMeta[];
+  savedMetrics: Metric[];
+  datasource?: AdhocMetricPopoverDatasource;
+  onFormattingChange: (
+    field: keyof PivotMetricFormatting,
+    metric?: PivotMetricFormattingValue,
+  ) => void;
+  onDatabarChange: (
+    field: keyof PivotMetricDatabar,
+    value?: PivotMetricDatabar[keyof PivotMetricDatabar],
+  ) => void;
+};
+
+export const MetricFormattingControl = ({
+  metricKey,
+  metricLabel,
+  ariaLabel,
+  excelOnly = false,
+  formatting,
+  databar,
+  metricDatabars,
+  availableMetrics,
+  selectedMetrics,
+  metricLabelMap,
+  columns,
+  savedMetrics,
+  datasource,
+  onFormattingChange,
+  onDatabarChange,
+}: MetricFormattingControlProps) => {
   const theme = useTheme();
-  const {
-    metricDatabars,
-    metricFormatting,
-    metricLabelMap,
-    onMetricDatabarChange,
-    onMetricFormattingChange,
-    option,
-    savedMetrics,
-  } = props;
   const defaultPositiveColor =
     theme.colorSuccess || DEFAULT_DATABAR_POSITIVE_COLOR;
   const defaultNegativeColor =
     theme.colorError || DEFAULT_DATABAR_NEGATIVE_COLOR;
-  const mergedMetricLabelMap = useMemo(
-    () => buildMetricLabelMap(savedMetrics, metricLabelMap),
-    [metricLabelMap, savedMetrics],
-  );
-  const metricLabel = useMemo(
-    () => resolveMetricLabel(option, mergedMetricLabelMap),
-    [mergedMetricLabelMap, option],
-  );
-  const metricKey = useMemo(() => {
-    const key = resolveMetricKey(option);
-    if (key) {
-      return key;
-    }
-    return metricLabel !== t('Metric') ? metricLabel : '';
-  }, [metricLabel, option]);
-  const isIxMetric = useMemo(
-    () => isIxMetricIdentifier(metricLabel) || isIxMetricIdentifier(metricKey),
-    [metricKey, metricLabel],
-  );
-  const handleAddMeasureLeaf = useCallback(() => {
-    if (!metricKey || metricLabel === t('Metric')) {
-      return;
-    }
-    props.onAddMeasureLeaf?.(metricKey, metricLabel);
-  }, [metricKey, metricLabel, props]);
   const presetColors = useMemo(() => {
     const categoricalScheme = getCategoricalSchemeRegistry().get();
     return categoricalScheme?.colors.slice(0, 9) || [];
   }, []);
-  const formattingKey = metricKey;
-  const databarKey = metricKey;
-  const formatting = (formattingKey && metricFormatting[formattingKey]) || {};
-  const databar = (databarKey && metricDatabars[databarKey]) || {};
   const hasFormatting = Boolean(
     formatting.backgroundColor ||
       formatting.textColor ||
       formatting.d3Format ||
       databar.type,
   );
-  const handleFormattingChange = useCallback(
-    (
-      field: keyof PivotMetricFormatting,
-      metric?: PivotMetricFormattingValue,
-    ) => {
-      if (!formattingKey) {
-        return;
-      }
-      onMetricFormattingChange(formattingKey, field, metric);
-    },
-    [formattingKey, onMetricFormattingChange],
-  );
-  const handleDatabarChange = useCallback(
-    (
-      field: keyof PivotMetricDatabar,
-      value?: PivotMetricDatabar[keyof PivotMetricDatabar],
-    ) => {
-      if (!databarKey) {
-        return;
-      }
-      onMetricDatabarChange(databarKey, field, value);
-    },
-    [databarKey, onMetricDatabarChange],
-  );
   const handleDatabarTypeChange = useCallback(
     (value: string) => {
       const nextType =
         value === 'none' ? undefined : (value as PivotDatabarType);
-      handleDatabarChange('type', nextType);
+      onDatabarChange('type', nextType);
       if (nextType) {
         if (!databar.positiveColor) {
-          handleDatabarChange('positiveColor', defaultPositiveColor);
+          onDatabarChange('positiveColor', defaultPositiveColor);
         }
         if (!databar.negativeColor) {
-          handleDatabarChange('negativeColor', defaultNegativeColor);
+          onDatabarChange('negativeColor', defaultNegativeColor);
         }
       }
     },
@@ -1143,7 +1119,7 @@ export default function PivotMetricDefinitionValue(
       databar.positiveColor,
       defaultNegativeColor,
       defaultPositiveColor,
-      handleDatabarChange,
+      onDatabarChange,
     ],
   );
   const databarTypeValue = databar.type ?? 'none';
@@ -1163,28 +1139,22 @@ export default function PivotMetricDefinitionValue(
     });
     return { scaleLikeSources: sources, scaleLikeTargets: targets };
   }, [metricDatabars]);
-  const scaleLikeMetricKey = databarKey || metricKey;
   const scaleLikeDisabled = Boolean(
-    scaleLikeMetricKey && scaleLikeTargets.has(scaleLikeMetricKey),
+    metricKey && scaleLikeTargets.has(metricKey),
   );
   const scaleLikeMetrics = useMemo(() => {
-    if (!scaleLikeMetricKey) {
-      return props.selectedMetrics;
+    if (!metricKey) {
+      return selectedMetrics;
     }
-    return props.selectedMetrics.filter(metric => {
+    return selectedMetrics.filter(metric => {
       const candidateKey = getMetricKey(metric as QueryFormMetric | Metric);
-      if (!candidateKey) {
-        return false;
-      }
-      if (candidateKey === scaleLikeMetricKey) {
-        return false;
-      }
-      if (scaleLikeSources.has(candidateKey)) {
-        return false;
-      }
-      return true;
+      return (
+        !!candidateKey &&
+        candidateKey !== metricKey &&
+        !scaleLikeSources.has(candidateKey)
+      );
     });
-  }, [props.selectedMetrics, scaleLikeMetricKey, scaleLikeSources]);
+  }, [metricKey, scaleLikeSources, selectedMetrics]);
 
   const formattingPopoverContent = (
     <div data-ignore-control-popover>
@@ -1197,16 +1167,16 @@ export default function PivotMetricDefinitionValue(
           <MetricFormatSelector
             key={selector.field}
             enableExcel
-            excelOnly={isIxMetric}
+            excelOnly={excelOnly}
             label={selector.label}
             tooltip={selector.tooltip}
             value={formatting[selector.field]}
-            metrics={props.availableMetrics}
-            metricLabelMap={mergedMetricLabelMap}
-            onChange={metric => handleFormattingChange(selector.field, metric)}
-            columns={props.columns}
-            savedMetrics={props.savedMetrics}
-            datasource={props.datasource}
+            metrics={availableMetrics}
+            metricLabelMap={metricLabelMap}
+            onChange={metric => onFormattingChange(selector.field, metric)}
+            columns={columns}
+            savedMetrics={savedMetrics}
+            datasource={datasource}
           />
         ))}
         <Divider style={{ margin: 0 }} />
@@ -1232,23 +1202,23 @@ export default function PivotMetricDefinitionValue(
                 tooltip={t('Scale this databar to the selected metric.')}
                 value={databar.scaleLike}
                 metrics={scaleLikeMetrics}
-                metricLabelMap={mergedMetricLabelMap}
-                onChange={metric => handleDatabarChange('scaleLike', metric)}
+                metricLabelMap={metricLabelMap}
+                onChange={metric => onDatabarChange('scaleLike', metric)}
                 disabled={scaleLikeDisabled}
-                columns={props.columns}
-                savedMetrics={props.savedMetrics}
-                datasource={props.datasource}
+                columns={columns}
+                savedMetrics={savedMetrics}
+                datasource={datasource}
               />
               <MetricFormatSelector
                 label={t('Color by metric')}
                 tooltip={t('Metric that returns a color for the databar.')}
                 value={databar.colorMetric}
-                metrics={props.availableMetrics}
-                metricLabelMap={mergedMetricLabelMap}
-                onChange={metric => handleDatabarChange('colorMetric', metric)}
-                columns={props.columns}
-                savedMetrics={props.savedMetrics}
-                datasource={props.datasource}
+                metrics={availableMetrics}
+                metricLabelMap={metricLabelMap}
+                onChange={metric => onDatabarChange('colorMetric', metric)}
+                columns={columns}
+                savedMetrics={savedMetrics}
+                datasource={datasource}
               />
               <Space direction="vertical" size={4}>
                 <Typography.Text>{t('Positive color')}</Typography.Text>
@@ -1257,7 +1227,7 @@ export default function PivotMetricDefinitionValue(
                   value={databar.positiveColor ?? defaultPositiveColor}
                   disabled={colorMode === 'byMetric'}
                   onChangeComplete={color =>
-                    handleDatabarChange('positiveColor', rgbToHex(color))
+                    onDatabarChange('positiveColor', rgbToHex(color))
                   }
                   showText
                 />
@@ -1269,7 +1239,7 @@ export default function PivotMetricDefinitionValue(
                   value={databar.negativeColor ?? defaultNegativeColor}
                   disabled={colorMode === 'byMetric'}
                   onChangeComplete={color =>
-                    handleDatabarChange('negativeColor', rgbToHex(color))
+                    onDatabarChange('negativeColor', rgbToHex(color))
                   }
                   showText
                 />
@@ -1281,6 +1251,94 @@ export default function PivotMetricDefinitionValue(
     </div>
   );
 
+  return (
+    <Popover
+      content={formattingPopoverContent}
+      overlayStyle={{ width: 'fit-content' }}
+      trigger="click"
+      placement="right"
+      getPopupContainer={() => document.body}
+    >
+      <Tooltip title={t('Add conditional formatting')}>
+        <MetricFormattingButtonWrap data-ignore-control-popover>
+          <MetricFormattingButton
+            aria-label={ariaLabel}
+            data-test="pivot-metric-formatting-button"
+            icon={<Icons.FormatPainterOutlined iconSize="s" />}
+            size="small"
+            buttonStyle={hasFormatting ? 'primary' : 'tertiary'}
+          />
+        </MetricFormattingButtonWrap>
+      </Tooltip>
+    </Popover>
+  );
+};
+
+export default function PivotMetricDefinitionValue(
+  props: PivotMetricDefinitionValueProps,
+) {
+  const {
+    metricDatabars,
+    metricFormatting,
+    metricLabelMap,
+    onMetricDatabarChange,
+    onMetricFormattingChange,
+    option,
+    savedMetrics,
+  } = props;
+  const mergedMetricLabelMap = useMemo(
+    () => buildMetricLabelMap(savedMetrics, metricLabelMap),
+    [metricLabelMap, savedMetrics],
+  );
+  const metricLabel = useMemo(
+    () => resolveMetricLabel(option, mergedMetricLabelMap),
+    [mergedMetricLabelMap, option],
+  );
+  const metricKey = useMemo(() => {
+    const key = resolveMetricKey(option);
+    if (key) {
+      return key;
+    }
+    return metricLabel !== t('Metric') ? metricLabel : '';
+  }, [metricLabel, option]);
+  const isIxMetric = useMemo(
+    () => isIxMetricIdentifier(metricLabel) || isIxMetricIdentifier(metricKey),
+    [metricKey, metricLabel],
+  );
+  const handleAddMeasureLeaf = useCallback(() => {
+    if (!metricKey || metricLabel === t('Metric')) {
+      return;
+    }
+    props.onAddMeasureLeaf?.(metricKey, metricLabel);
+  }, [metricKey, metricLabel, props]);
+  const formattingKey = metricKey;
+  const databarKey = metricKey;
+  const formatting = (formattingKey && metricFormatting[formattingKey]) || {};
+  const databar = (databarKey && metricDatabars[databarKey]) || {};
+  const handleFormattingChange = useCallback(
+    (
+      field: keyof PivotMetricFormatting,
+      metric?: PivotMetricFormattingValue,
+    ) => {
+      if (!formattingKey) {
+        return;
+      }
+      onMetricFormattingChange(formattingKey, field, metric);
+    },
+    [formattingKey, onMetricFormattingChange],
+  );
+  const handleDatabarChange = useCallback(
+    (
+      field: keyof PivotMetricDatabar,
+      value?: PivotMetricDatabar[keyof PivotMetricDatabar],
+    ) => {
+      if (!databarKey) {
+        return;
+      }
+      onMetricDatabarChange(databarKey, field, value);
+    },
+    [databarKey, onMetricDatabarChange],
+  );
   const formattingControl = (
     <Space size={4}>
       {props.onAddMeasureLeaf && (
@@ -1295,25 +1353,23 @@ export default function PivotMetricDefinitionValue(
           </MeasureLeafButton>
         </Tooltip>
       )}
-      <Popover
-        content={formattingPopoverContent}
-        overlayStyle={{ width: 'fit-content' }}
-        trigger="click"
-        placement="right"
-        getPopupContainer={() => document.body}
-      >
-        <Tooltip title={t('Add conditional formatting')}>
-          <MetricFormattingButtonWrap data-ignore-control-popover>
-            <MetricFormattingButton
-              aria-label={t('Add conditional formatting for %s', metricLabel)}
-              data-test="pivot-metric-formatting-button"
-              icon={<Icons.FormatPainterOutlined iconSize="s" />}
-              size="small"
-              buttonStyle={hasFormatting ? 'primary' : 'tertiary'}
-            />
-          </MetricFormattingButtonWrap>
-        </Tooltip>
-      </Popover>
+      <MetricFormattingControl
+        metricKey={metricKey}
+        metricLabel={metricLabel}
+        ariaLabel={t('Add conditional formatting for %s', metricLabel)}
+        excelOnly={isIxMetric}
+        formatting={formatting}
+        databar={databar}
+        metricDatabars={metricDatabars}
+        availableMetrics={props.availableMetrics}
+        selectedMetrics={props.selectedMetrics}
+        metricLabelMap={mergedMetricLabelMap}
+        columns={props.columns}
+        savedMetrics={props.savedMetrics}
+        datasource={props.datasource}
+        onFormattingChange={handleFormattingChange}
+        onDatabarChange={handleDatabarChange}
+      />
     </Space>
   );
 

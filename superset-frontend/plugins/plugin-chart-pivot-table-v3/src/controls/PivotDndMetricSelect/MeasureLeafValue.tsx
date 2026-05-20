@@ -17,36 +17,10 @@
  * under the License.
  */
 import { useCallback, useMemo } from 'react';
-import {
-  getCategoricalSchemeRegistry,
-  Metric,
-  QueryFormMetric,
-  styled,
-  t,
-  useTheme,
-} from '@superset-ui/core';
-import {
-  Button,
-  ColorPicker,
-  type ColorValue,
-  Divider,
-  Popover,
-  Select,
-  Space,
-  Tooltip,
-  Typography,
-} from '@superset-ui/core/components';
-import { Icons } from '@superset-ui/core/components/Icons';
+import { Metric, useTheme } from '@superset-ui/core';
 import { ColumnMeta } from '@superset-ui/chart-controls';
 import {
-  DEFAULT_DATABAR_NEGATIVE_COLOR,
-  DEFAULT_DATABAR_POSITIVE_COLOR,
-} from '../../utils';
-import { getMetricKey } from '../../pivot/metrics';
-import {
   MeasureLeafSpec,
-  MetricFormattingField,
-  PivotDatabarType,
   PivotMetricDatabar,
   PivotMetricDatabarMap,
   PivotMetricFormatting,
@@ -59,48 +33,9 @@ import {
 } from '../../pivot/measureLeaves';
 import OptionControlLabel from './OptionControlLabel';
 import {
-  MetricFormatSelector,
+  MetricFormattingControl,
   type MetricOptionValue,
 } from './PivotMetricDefinitionValue';
-
-const MetricFormattingButton = styled(Button)`
-  height: ${({ theme }) => theme.sizeUnit * 5}px;
-  min-height: ${({ theme }) => theme.sizeUnit * 5}px;
-  min-width: ${({ theme }) => theme.sizeUnit * 5}px;
-  width: ${({ theme }) => theme.sizeUnit * 5}px;
-  padding: 0;
-`;
-
-const MetricFormattingButtonWrap = styled.div`
-  display: flex;
-  align-items: center;
-  padding-right: ${({ theme }) => theme.sizeUnit}px;
-`;
-
-const rgbToHex = (color: ColorValue): string => {
-  const { r, g, b, a = 1 } = color.toRgb();
-  const toHex = (value: number) => {
-    const hex = Math.round(value).toString(16);
-    return hex.length === 1 ? `0${hex}` : hex;
-  };
-  const base = `#${toHex(r)}${toHex(g)}${toHex(b)}`;
-  if (a !== 1) {
-    return `${base}${toHex(Math.round(a * 255))}`;
-  }
-  return base;
-};
-
-const DATABAR_TYPE_OPTIONS: Array<{
-  label: string;
-  value: PivotDatabarType | 'none';
-}> = [
-  { label: t('None'), value: 'none' },
-  { label: t('Filled bar'), value: 'bar' },
-  { label: t('Lollipop bar'), value: 'lollipop' },
-  { label: t('Waterfall'), value: 'waterfall' },
-];
-
-const METRIC_SELECT_WIDTH = 220;
 
 export type MeasureLeafValueProps = {
   metricLabel: string;
@@ -135,34 +70,6 @@ export type MeasureLeafValueProps = {
   isGroupDragging?: boolean;
 };
 
-const FORMAT_SELECTOR_CONFIG: Array<{
-  field: MetricFormattingField;
-  label: string;
-  tooltip: React.ReactNode;
-}> = [
-  {
-    field: 'backgroundColor',
-    label: t('Background color metric'),
-    tooltip: t(
-      "Metric that returns a color for the cell background (HEX, RGB, or RGBA). Example: '#111111'.",
-    ),
-  },
-  {
-    field: 'textColor',
-    label: t('Text color metric'),
-    tooltip: t(
-      "Metric that returns a color for the cell text (HEX, RGB, or RGBA). Example: '#ffffff'.",
-    ),
-  },
-  {
-    field: 'd3Format',
-    label: t('D3 format string metric'),
-    tooltip: t(
-      "Metric that returns a d3-format string used to render values. Example: '.2f'.",
-    ),
-  },
-];
-
 export default function MeasureLeafValue({
   metricLabel,
   metricKey,
@@ -186,10 +93,6 @@ export default function MeasureLeafValue({
   isGroupDragging = false,
 }: MeasureLeafValueProps) {
   const theme = useTheme();
-  const defaultPositiveColor =
-    theme.colorSuccess || DEFAULT_DATABAR_POSITIVE_COLOR;
-  const defaultNegativeColor =
-    theme.colorError || DEFAULT_DATABAR_NEGATIVE_COLOR;
   const outputKey = useMemo(
     () => buildMeasureLeafOutputKey(metricKey, leaf),
     [leaf, metricKey],
@@ -197,12 +100,6 @@ export default function MeasureLeafValue({
   const formatting = metricFormatting[outputKey] || {};
   const databar = metricDatabars[outputKey] || {};
   const isIxLeaf = leaf.kind === 'builtIn' && leaf.operator === 'ix';
-  const hasFormatting = Boolean(
-    formatting.backgroundColor ||
-      formatting.textColor ||
-      formatting.d3Format ||
-      databar.type,
-  );
   const handleFormattingChange = useCallback(
     (
       field: keyof PivotMetricFormatting,
@@ -221,187 +118,24 @@ export default function MeasureLeafValue({
     },
     [onMetricDatabarChange, outputKey],
   );
-  const handleDatabarTypeChange = useCallback(
-    (value: string) => {
-      const nextType =
-        value === 'none' ? undefined : (value as PivotDatabarType);
-      handleDatabarChange('type', nextType);
-      if (nextType) {
-        if (!databar.positiveColor) {
-          handleDatabarChange('positiveColor', defaultPositiveColor);
-        }
-        if (!databar.negativeColor) {
-          handleDatabarChange('negativeColor', defaultNegativeColor);
-        }
-      }
-    },
-    [
-      databar.negativeColor,
-      databar.positiveColor,
-      defaultNegativeColor,
-      defaultPositiveColor,
-      handleDatabarChange,
-    ],
-  );
-  const databarTypeValue = databar.type ?? 'none';
-  const colorMode = databar.colorMode === 'byMetric' ? 'byMetric' : 'static';
-  const showDatabarControls = databarTypeValue !== 'none';
-  const { scaleLikeSources, scaleLikeTargets } = useMemo(() => {
-    const sources = new Set<string>();
-    const targets = new Set<string>();
-    Object.entries(metricDatabars).forEach(([key, config]) => {
-      const targetKey = config.scaleLike
-        ? getMetricKey(config.scaleLike as QueryFormMetric | Metric)
-        : undefined;
-      if (targetKey) {
-        sources.add(key);
-        targets.add(targetKey);
-      }
-    });
-    return { scaleLikeSources: sources, scaleLikeTargets: targets };
-  }, [metricDatabars]);
-  const scaleLikeMetricKey = outputKey;
-  const scaleLikeDisabled = Boolean(
-    scaleLikeMetricKey && scaleLikeTargets.has(scaleLikeMetricKey),
-  );
-  const scaleLikeMetrics = useMemo(() => {
-    if (!scaleLikeMetricKey) {
-      return selectedMetrics;
-    }
-    return selectedMetrics.filter(metric => {
-      const candidateKey = getMetricKey(metric as QueryFormMetric | Metric);
-      if (!candidateKey) {
-        return false;
-      }
-      if (candidateKey === scaleLikeMetricKey) {
-        return false;
-      }
-      if (scaleLikeSources.has(candidateKey)) {
-        return false;
-      }
-      return true;
-    });
-  }, [scaleLikeMetricKey, scaleLikeSources, selectedMetrics]);
-  const presetColors = useMemo(() => {
-    const categoricalScheme = getCategoricalSchemeRegistry().get();
-    return categoricalScheme?.colors.slice(0, 9) || [];
-  }, []);
-
-  const formattingPopoverContent = (
-    <div data-ignore-control-popover>
-      <Space direction="vertical" size={8}>
-        <Typography.Text strong>{t('Conditional formatting')}</Typography.Text>
-        <Typography.Text type="secondary">
-          {t('Metric: %s', `${metricLabel} ${leaf.label}`.trim())}
-        </Typography.Text>
-        {FORMAT_SELECTOR_CONFIG.map(selector => (
-          <MetricFormatSelector
-            key={selector.field}
-            enableExcel
-            excelOnly={isIxLeaf}
-            label={selector.label}
-            tooltip={selector.tooltip}
-            value={formatting[selector.field]}
-            metrics={availableMetrics}
-            metricLabelMap={metricLabelMap}
-            onChange={metric => handleFormattingChange(selector.field, metric)}
-            columns={columns}
-            savedMetrics={savedMetrics}
-            datasource={datasource}
-          />
-        ))}
-        <Divider style={{ margin: 0 }} />
-        <Typography.Text strong>{t('Databars')}</Typography.Text>
-        <Typography.Text type="secondary">
-          {t('Metric: %s', `${metricLabel} ${leaf.label}`.trim())}
-        </Typography.Text>
-        <Space direction="vertical" size={8}>
-          <div>
-            <Typography.Text>{t('Databar type')}</Typography.Text>
-            <Select
-              ariaLabel={t('Databar type')}
-              options={DATABAR_TYPE_OPTIONS}
-              value={databarTypeValue}
-              css={{ width: METRIC_SELECT_WIDTH }}
-              onChange={handleDatabarTypeChange}
-            />
-          </div>
-          {showDatabarControls && (
-            <>
-              <MetricFormatSelector
-                label={t('Scale like')}
-                tooltip={t('Scale this databar to the selected metric.')}
-                value={databar.scaleLike}
-                metrics={scaleLikeMetrics}
-                metricLabelMap={metricLabelMap}
-                onChange={metric => handleDatabarChange('scaleLike', metric)}
-                disabled={scaleLikeDisabled}
-                columns={columns}
-                savedMetrics={savedMetrics}
-                datasource={datasource}
-              />
-              <MetricFormatSelector
-                label={t('Color by metric')}
-                tooltip={t('Metric that returns a color for the databar.')}
-                value={databar.colorMetric}
-                metrics={availableMetrics}
-                metricLabelMap={metricLabelMap}
-                onChange={metric => handleDatabarChange('colorMetric', metric)}
-                columns={columns}
-                savedMetrics={savedMetrics}
-                datasource={datasource}
-              />
-              <Space direction="vertical" size={4}>
-                <Typography.Text>{t('Positive color')}</Typography.Text>
-                <ColorPicker
-                  presets={[{ label: t('Theme colors'), colors: presetColors }]}
-                  value={databar.positiveColor ?? defaultPositiveColor}
-                  disabled={colorMode === 'byMetric'}
-                  onChangeComplete={color =>
-                    handleDatabarChange('positiveColor', rgbToHex(color))
-                  }
-                  showText
-                />
-              </Space>
-              <Space direction="vertical" size={4}>
-                <Typography.Text>{t('Negative color')}</Typography.Text>
-                <ColorPicker
-                  presets={[{ label: t('Theme colors'), colors: presetColors }]}
-                  value={databar.negativeColor ?? defaultNegativeColor}
-                  disabled={colorMode === 'byMetric'}
-                  onChangeComplete={color =>
-                    handleDatabarChange('negativeColor', rgbToHex(color))
-                  }
-                  showText
-                />
-              </Space>
-            </>
-          )}
-        </Space>
-      </Space>
-    </div>
-  );
-
   const formattingControl = (
-    <Popover
-      content={formattingPopoverContent}
-      overlayStyle={{ width: 'fit-content' }}
-      trigger="click"
-      placement="right"
-      getPopupContainer={() => document.body}
-    >
-      <Tooltip title={t('Add conditional formatting')}>
-        <MetricFormattingButtonWrap data-ignore-control-popover>
-          <MetricFormattingButton
-            aria-label={t('Add conditional formatting for %s', leaf.label)}
-            data-test="pivot-metric-formatting-button"
-            icon={<Icons.FormatPainterOutlined iconSize="s" />}
-            size="small"
-            buttonStyle={hasFormatting ? 'primary' : 'tertiary'}
-          />
-        </MetricFormattingButtonWrap>
-      </Tooltip>
-    </Popover>
+    <MetricFormattingControl
+      metricKey={outputKey}
+      metricLabel={`${metricLabel} ${leaf.label}`.trim()}
+      ariaLabel={`Add conditional formatting for ${leaf.label}`}
+      excelOnly={isIxLeaf}
+      formatting={formatting}
+      databar={databar}
+      metricDatabars={metricDatabars}
+      availableMetrics={availableMetrics}
+      selectedMetrics={selectedMetrics}
+      metricLabelMap={metricLabelMap}
+      columns={columns}
+      savedMetrics={savedMetrics}
+      datasource={datasource}
+      onFormattingChange={handleFormattingChange}
+      onDatabarChange={handleDatabarChange}
+    />
   );
 
   const handleRemove = useCallback(
