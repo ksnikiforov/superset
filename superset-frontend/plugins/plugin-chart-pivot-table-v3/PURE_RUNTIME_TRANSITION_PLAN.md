@@ -345,8 +345,8 @@ Implementation rules for accelerated chunks:
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `12347` insertions, `18294` deletions, net `-5947`.
-- Current production TypeScript/TSX total: about `27563` lines.
+- Production `src`: `12303` insertions, `18294` deletions, net `-5991`.
+- Current production TypeScript/TSX total: about `27519` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -358,17 +358,17 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `27563` | `-5947` | `< 28000` |
-| Strict core pipeline | `11337` | `11324` | `-13` | `8000` |
+| Full production `src` | `33510` | `27519` | `-5991` | `< 28000` |
+| Strict core pipeline | `11337` | `11280` | `-57` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4030` | `-653` | `3000-4000` |
-| Broad core pipeline | `16020` | `15354` | `-666` | `11000-13000` |
+| Broad core pipeline | `16020` | `15310` | `-710` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `3647` |
-| `pivot/expansion/*` | `2356` |
+| `pivot/runtime/*` | `3596` |
+| `pivot/expansion/*` | `2363` |
 | `pivot/query/*` | `1373` |
 | `pivot/layout/*` | `770` |
 | `pivot/core/*` | `252` |
@@ -384,6 +384,13 @@ a second projected coverage-key grouping layer. The planner now dedupes exact
 coverage needs and preserves the ancestor-discovery rule; transport batching
 remains owned by the expansion executor. The obsolete projection coverage-key
 API was deleted with that grouping layer.
+
+Latest expansion-execution cleanup: sibling batching now groups by the
+query-scope path carried by the coverage need, not by the rendered display path
+key. Display path keys remain only for spinner identity. The standalone
+scheduled-request lifecycle wrapper was also removed; seamless materialization
+uses the same latest-request primitive as fetches and performs its explicit
+main-thread yields locally.
 
 Latest chart-owned fallback cleanup: `PivotTableChart` no longer fetches
 dataset metadata from `/api/v1/dataset/:id` after render to recover missing

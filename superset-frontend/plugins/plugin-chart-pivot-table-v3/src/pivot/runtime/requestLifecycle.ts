@@ -31,10 +31,7 @@ export type LatestRequestScope = {
 };
 
 export type LatestRequestLifecycle = {
-  begin: (requestGroupId: string) => LatestRequestToken;
   beginScope: () => LatestRequestScope;
-  currentId: () => number;
-  currentScope: () => LatestRequestScope;
   finish: (token: LatestRequestToken) => void;
   invalidate: () => number;
 };
@@ -123,16 +120,7 @@ export const createLatestRequestLifecycle = ({
   };
 
   return {
-    begin(requestGroupId: string) {
-      return beginScope().beginRequest(requestGroupId);
-    },
     beginScope,
-    currentId() {
-      return currentRequestId;
-    },
-    currentScope() {
-      return createScope(currentRequestId);
-    },
     finish: finishToken,
     invalidate() {
       currentRequestId += 1;
@@ -175,19 +163,6 @@ export const yieldToMainThread = (): Promise<void> =>
     setTimeout(resolve, 0);
   });
 
-class StaleLatestRequestError extends Error {
-  constructor() {
-    super('Latest request is stale');
-    this.name = 'StaleLatestRequestError';
-  }
-}
-
-const assertLatestRequest = (token: LatestRequestToken) => {
-  if (!token.isCurrent()) {
-    throw new StaleLatestRequestError();
-  }
-};
-
 export const executeLatestRequest = async <T>({
   lifecycle,
   requestGroupId,
@@ -197,7 +172,7 @@ export const executeLatestRequest = async <T>({
   onError,
   onSettled,
 }: ExecuteLatestRequestParams<T>): Promise<ExecuteLatestRequestResult<T>> => {
-  const token = lifecycle.begin(requestGroupId);
+  const token = lifecycle.beginScope().beginRequest(requestGroupId);
   onStart?.(token);
 
   try {
@@ -223,38 +198,3 @@ export const executeLatestRequest = async <T>({
     }
   }
 };
-
-export type ExecuteScheduledLatestRequestParams<T> = Omit<
-  ExecuteLatestRequestParams<T>,
-  'run'
-> & {
-  run: (token: LatestRequestToken) => T | Promise<T>;
-  yieldBeforeRun?: boolean;
-  yieldBeforeSuccess?: boolean;
-  yieldToMain?: MainThreadYield;
-};
-
-export const executeScheduledLatestRequest = async <T>({
-  run,
-  yieldBeforeRun = true,
-  yieldBeforeSuccess = true,
-  yieldToMain = yieldToMainThread,
-  ...params
-}: ExecuteScheduledLatestRequestParams<T>): Promise<
-  ExecuteLatestRequestResult<T>
-> =>
-  executeLatestRequest({
-    ...params,
-    run: async token => {
-      if (yieldBeforeRun) {
-        await yieldToMain();
-        assertLatestRequest(token);
-      }
-      const value = await run(token);
-      if (yieldBeforeSuccess) {
-        await yieldToMain();
-        assertLatestRequest(token);
-      }
-      return value;
-    },
-  });

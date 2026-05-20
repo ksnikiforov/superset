@@ -17,7 +17,7 @@
  * under the License.
  */
 import { type PivotTableQueryFormData, type PivotTreeData } from '../../types';
-import { parsePath, serializePath } from '../core/path';
+import { serializePath } from '../core/path';
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import { type LayoutContext } from '../layout/LayoutContext';
 import { pathsFromAxisScope } from '../runtime/coverage';
@@ -80,12 +80,19 @@ type BatchSeed = {
 
 const isNullish = (value: unknown) => value === null || value === undefined;
 
+const targetScopePaths = (target: ExpansionCoverageTarget) =>
+  pathsFromAxisScope(
+    target.axis === 'row' ? target.need.rowScope : target.need.columnScope,
+  );
+
 const chunkTargets = (
   targets: ExpansionCoverageTarget[],
   chunkSize: number,
 ): ExpansionCoverageTarget[][] => {
   const sorted = [...targets].sort((a, b) =>
-    a.pathKey.localeCompare(b.pathKey),
+    serializePath(targetScopePaths(a)[0] ?? []).localeCompare(
+      serializePath(targetScopePaths(b)[0] ?? []),
+    ),
   );
   const chunks: ExpansionCoverageTarget[][] = [];
   for (let idx = 0; idx < sorted.length; idx += chunkSize) {
@@ -105,7 +112,7 @@ export const optimizeExpansionFetchPlan = ({
   const groups = new Map<string, BatchSeed>();
 
   targets.forEach(target => {
-    const path = parsePath(target.pathKey);
+    const path = targetScopePaths(target)[0] ?? [];
     if (path.length === 0) {
       singles.push(target);
       return;

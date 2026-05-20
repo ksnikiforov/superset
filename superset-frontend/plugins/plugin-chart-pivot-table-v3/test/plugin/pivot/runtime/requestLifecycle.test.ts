@@ -19,7 +19,6 @@
 import {
   createLatestRequestLifecycle,
   executeLatestRequest,
-  executeScheduledLatestRequest,
   isAbortError,
 } from '../../../../src/pivot/runtime/requestLifecycle';
 
@@ -28,8 +27,8 @@ describe('requestLifecycle', () => {
     const cancel = jest.fn();
     const lifecycle = createLatestRequestLifecycle({ cancel });
 
-    const first = lifecycle.begin('pivot-v3-seamless');
-    const second = lifecycle.begin('pivot-v3-seamless');
+    const first = lifecycle.beginScope().beginRequest('pivot-v3-seamless');
+    const second = lifecycle.beginScope().beginRequest('pivot-v3-seamless');
 
     expect(first.id).toBe(1);
     expect(second.id).toBe(2);
@@ -161,99 +160,5 @@ describe('requestLifecycle', () => {
     expect(isAbortError(abortError)).toBe(true);
     expect(onError).not.toHaveBeenCalled();
     expect(onSettled).toHaveBeenCalledTimes(1);
-  });
-
-  it('defers scheduled work until the scheduler yields', async () => {
-    const lifecycle = createLatestRequestLifecycle();
-    const run = jest.fn(() => 'done');
-    const onSuccess = jest.fn();
-    let releaseYield: (() => void) | undefined;
-    const yieldToMain = jest.fn(
-      () =>
-        new Promise<void>(resolve => {
-          releaseYield = resolve;
-        }),
-    );
-
-    const request = executeScheduledLatestRequest({
-      lifecycle,
-      requestGroupId: 'pivot-v3-materialize',
-      run,
-      onSuccess,
-      yieldBeforeSuccess: false,
-      yieldToMain,
-    });
-
-    expect(yieldToMain).toHaveBeenCalledTimes(1);
-    expect(run).not.toHaveBeenCalled();
-
-    releaseYield?.();
-    await expect(request).resolves.toMatchObject({ status: 'success' });
-
-    expect(run).toHaveBeenCalledTimes(1);
-    expect(onSuccess).toHaveBeenCalledWith(
-      'done',
-      expect.objectContaining({ id: 1 }),
-    );
-  });
-
-  it('skips scheduled work when the token becomes stale before execution', async () => {
-    const lifecycle = createLatestRequestLifecycle();
-    const run = jest.fn(() => 'stale-result');
-    let releaseYield: (() => void) | undefined;
-    const yieldToMain = jest.fn(
-      () =>
-        new Promise<void>(resolve => {
-          releaseYield = resolve;
-        }),
-    );
-
-    const request = executeScheduledLatestRequest({
-      lifecycle,
-      requestGroupId: 'pivot-v3-materialize',
-      run,
-      yieldBeforeSuccess: false,
-      yieldToMain,
-    });
-
-    lifecycle.invalidate();
-    releaseYield?.();
-
-    await expect(request).resolves.toMatchObject({ status: 'stale' });
-    expect(run).not.toHaveBeenCalled();
-  });
-
-  it('drops scheduled results when the token becomes stale before success', async () => {
-    const lifecycle = createLatestRequestLifecycle();
-    const run = jest.fn(() => 'late-result');
-    const onSuccess = jest.fn();
-    const releaseYields: Array<() => void> = [];
-    const yieldToMain = jest.fn(
-      () =>
-        new Promise<void>(resolve => {
-          releaseYields.push(resolve);
-        }),
-    );
-
-    const request = executeScheduledLatestRequest({
-      lifecycle,
-      requestGroupId: 'pivot-v3-materialize',
-      run,
-      onSuccess,
-      yieldToMain,
-    });
-
-    releaseYields[0]?.();
-    await Promise.resolve();
-    await Promise.resolve();
-
-    expect(run).toHaveBeenCalledTimes(1);
-    expect(yieldToMain).toHaveBeenCalledTimes(2);
-
-    lifecycle.invalidate();
-    releaseYields[1]?.();
-
-    await expect(request).resolves.toMatchObject({ status: 'stale' });
-    expect(onSuccess).not.toHaveBeenCalled();
   });
 });

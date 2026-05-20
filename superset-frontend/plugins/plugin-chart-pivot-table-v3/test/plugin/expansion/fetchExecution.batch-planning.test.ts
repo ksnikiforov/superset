@@ -22,6 +22,7 @@ import {
 } from '../../../src/pivot/expansion/fetchExecution';
 import { type ExpansionCoverageTarget } from '../../../src/pivot/expansion/planner';
 import { parsePath, serializePath } from '../../../src/pivot/core/path';
+import { encodeMetricKey } from '../../../src/pivot/core/tokens';
 import { type PivotPathValue } from '../../../src/types';
 
 const makeTarget = (path: PivotPathValue[]): ExpansionCoverageTarget => ({
@@ -68,6 +69,26 @@ describe('fetchPlanOptimizer', () => {
       target => parsePath(target.pathKey).slice(-1)[0] === null,
     );
     expect(nullSingles).toHaveLength(1);
+  });
+
+  it('groups by query scope path rather than rendered metric path', () => {
+    const caTarget = makeTarget(['US', 'CA']);
+    const nyTarget = makeTarget(['US', 'NY']);
+    const plan = optimizeExpansionFetchPlan({
+      targets: [
+        {
+          ...caTarget,
+          pathKey: serializePath([encodeMetricKey('sales'), 'US', 'CA']),
+        },
+        {
+          ...nyTarget,
+          pathKey: serializePath([encodeMetricKey('sales'), 'US', 'NY']),
+        },
+      ],
+    });
+
+    expect(plan.batches).toHaveLength(1);
+    expect(batchSiblingValues(plan.batches[0])).toEqual(['CA', 'NY']);
   });
 
   it('enforces max batch size', () => {

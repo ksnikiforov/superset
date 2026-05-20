@@ -38,7 +38,6 @@ import {
 import { materializeLoadedPivotTreeFromFactStoreAsync } from './materializePivotTree';
 import {
   executeLatestRequest,
-  executeScheduledLatestRequest,
   type LatestRequestLifecycle,
   yieldToMainThread,
 } from './requestLifecycle';
@@ -408,17 +407,27 @@ export const fetchAndMaterializeSeamlessRuntimeUpdate = async ({
   }
 
   const { results } = fetchResult.value;
-  const materializationResult = await executeScheduledLatestRequest({
+  const materializationResult = await executeLatestRequest({
     lifecycle: materializationLifecycle,
     requestGroupId: SEAMLESS_MATERIALIZATION_GROUP,
-    run: token =>
-      materializeLoadedPivotTreeFromFactStoreAsync({
+    run: async token => {
+      await yieldToMainThread();
+      if (!token.isCurrent()) {
+        throw new Error('Latest materialization request is stale');
+      }
+      const tree = await materializeLoadedPivotTreeFromFactStoreAsync({
         store: factStore,
         layout,
         formData,
         shouldContinue: token.isCurrent,
         yieldToMain: yieldToMainThread,
-      }),
+      });
+      await yieldToMainThread();
+      if (!token.isCurrent()) {
+        throw new Error('Latest materialization request is stale');
+      }
+      return tree;
+    },
   });
   if (materializationResult.status === 'stale') {
     return { status: 'stale' };
