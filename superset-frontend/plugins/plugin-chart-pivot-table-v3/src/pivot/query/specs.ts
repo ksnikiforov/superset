@@ -246,16 +246,12 @@ type PlannedQuerySpecParams = {
   filters: QueryObjectFilterClause[];
 };
 
-type DepthPair = { rowDepth: number; columnDepth: number };
-
 export const MAX_EXPANSION_BATCH_SIBLINGS = 50;
 
 const parentDepth = (depth: number) => Math.max(depth - 1, 0);
 
-const rangeFromOne = (depth: number): number[] =>
+const depthsFromOne = (depth: number): number[] =>
   Array.from({ length: depth }, (_, idx) => idx + 1);
-
-const uniqueDepths = (depths: number[]) => Array.from(new Set(depths));
 
 const buildBranchFactCoverages = ({
   program,
@@ -280,26 +276,15 @@ const buildBranchFactCoverages = ({
   includeRowTotalForColumnFormatting?: boolean;
   includeColumnTotalForRowFormatting?: boolean;
 }): PivotFactCoverage[] => {
-  const depthPairs: DepthPair[] = [];
-  const depthPairKeys = new Set<string>();
-  const addDepthPair = (rowDepthVal: number, columnDepthVal: number) => {
-    const key = `${rowDepthVal}|${columnDepthVal}`;
-    if (depthPairKeys.has(key)) {
-      return;
-    }
-    depthPairKeys.add(key);
-    depthPairs.push({
-      rowDepth: rowDepthVal,
-      columnDepth: columnDepthVal,
-    });
-  };
-  const addDepthGrid = (rowDepths: number[], columnDepths: number[]) => {
-    uniqueDepths(rowDepths).forEach(rowDepthVal => {
-      uniqueDepths(columnDepths).forEach(columnDepthVal =>
+  const depthPairs = new Set<string>();
+  const addDepthPair = (rowDepthVal: number, columnDepthVal: number) =>
+    depthPairs.add(`${rowDepthVal}|${columnDepthVal}`);
+  const addDepthGrid = (rowDepths: number[], columnDepths: number[]) =>
+    [...new Set(rowDepths)].forEach(rowDepthVal =>
+      [...new Set(columnDepths)].forEach(columnDepthVal =>
         addDepthPair(rowDepthVal, columnDepthVal),
-      );
-    });
-  };
+      ),
+    );
   const { rowDepth, columnDepth, rowDimensions, columnDimensions } =
     coverageTarget.need;
   addDepthPair(rowDepth, columnDepth);
@@ -314,7 +299,7 @@ const buildBranchFactCoverages = ({
       addDepthPair(0, columnDepth);
     }
     if (rowDepth > 0) {
-      addDepthGrid(rowDepth === 1 ? [0, 1] : rangeFromOne(rowDepth), [
+      addDepthGrid(rowDepth === 1 ? [0, 1] : depthsFromOne(rowDepth), [
         columnDepth,
         columnParentDepth,
       ]);
@@ -329,7 +314,7 @@ const buildBranchFactCoverages = ({
     }
     addDepthGrid(
       rowDepth > 0 ? [rowDepth, rowParentDepth] : [rowDepth],
-      rangeFromOne(columnDepth),
+      depthsFromOne(columnDepth),
     );
   }
 
@@ -362,12 +347,15 @@ const buildBranchFactCoverages = ({
 
   const queryPairs =
     branchAnchorDepth === 0
-      ? depthPairs
-      : depthPairs.filter(pair =>
-          axis === 'row'
-            ? pair.rowDepth >= branchAnchorDepth
-            : pair.columnDepth >= branchAnchorDepth,
-        );
+      ? [...depthPairs]
+      : [...depthPairs].filter(pairKey => {
+          const [pairRowDepth, pairColumnDepth] = pairKey
+            .split('|')
+            .map(Number);
+          return axis === 'row'
+            ? pairRowDepth >= branchAnchorDepth
+            : pairColumnDepth >= branchAnchorDepth;
+        });
   const hasTotalRow = columnTotals || rowSubtotalLevels.includes(0);
   const hasTotalColumn = rowTotals || columnSubtotalLevels.includes(0);
   const shouldIncludeGrandTotalPair =
@@ -375,14 +363,16 @@ const buildBranchFactCoverages = ({
     (hasTotalRow && hasTotalColumn) ||
     (valuesAtRowFront && hasTotalColumn) ||
     (valuesAtColumnFront && hasTotalRow);
-
-  return (
+  const coveragePairs = (
     shouldIncludeGrandTotalPair
       ? queryPairs
-      : queryPairs.filter(
-          pair => !(pair.rowDepth === 0 && pair.columnDepth === 0),
-        )
-  ).map(pair =>
+      : queryPairs.filter(pairKey => pairKey !== '0|0')
+  ).map(pairKey => {
+    const [rowDepthVal, columnDepthVal] = pairKey.split('|').map(Number);
+    return { rowDepth: rowDepthVal, columnDepth: columnDepthVal };
+  });
+
+  return coveragePairs.map(pair =>
     buildFactCoverage({
       rowDimensions,
       columnDimensions,
