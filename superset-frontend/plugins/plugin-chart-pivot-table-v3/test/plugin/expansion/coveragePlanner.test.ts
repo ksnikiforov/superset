@@ -19,12 +19,13 @@
 
 import { PivotAxis, PivotTreeNode } from '../../../src/types';
 import {
+  buildAxisExpansionCoverageTarget,
   planExpansionForAxis,
-  type PivotExpansionCoverageDiff,
 } from '../../../src/pivot/expansion/planner';
 import { serializePath } from '../../../src/pivot/core/path';
 import { rootKey } from '../../../src/pivot/viewModel';
 import { compilePivotProgram } from '../../../src/pivot/runtime/compilePivotProgram';
+import { type PivotFactSelector } from '../../../src/pivot/runtime/factStore';
 
 const testProgram = compilePivotProgram({
   groupbyRows: ['country', 'state', 'city'],
@@ -56,14 +57,37 @@ const makeNode = ({
 const sortFetchPathKeys = (plan: ReturnType<typeof planExpansionForAxis>) =>
   plan.targets.map(target => target.pathKey).sort();
 
-const getMissingCoverageFromDepths =
-  (depthByPathKey: Map<string, number>): PivotExpansionCoverageDiff =>
-  targets =>
-    targets.filter(({ axis, pathKey, need }) => {
-      const fetchedDepth = depthByPathKey.get(pathKey);
-      const requiredDepth = axis === 'row' ? need.columnDepth : need.rowDepth;
-      return !(fetchedDepth !== undefined && fetchedDepth >= requiredDepth);
-    });
+const factSelectorsFromFetchedColumnDepths = (
+  depthByPathKey: Map<string, number>,
+): PivotFactSelector[] =>
+  Array.from(depthByPathKey.entries()).flatMap(([pathKey, columnDepth]) =>
+    Array.from({ length: columnDepth }, (_, index) => index + 1).map(depth => {
+      const target = buildAxisExpansionCoverageTarget({
+        axis: 'row',
+        pathKey,
+        program: testProgram,
+        rowDepth: 1,
+        columnDepth: depth,
+      });
+      return {
+        coverage: {
+          rowDepth: target.need.rowDepth,
+          columnDepth: target.need.columnDepth,
+          rowDimensions: target.need.rowDimensions,
+          columnDimensions: target.need.columnDimensions,
+        },
+        scope: {
+          kind: 'axisPaths',
+          axis: 'row',
+          paths:
+            target.need.rowScope.kind === 'paths'
+              ? target.need.rowScope.paths
+              : [],
+        },
+        valueKeys: target.need.valueKeys,
+      };
+    }),
+  );
 
 describe('expansionPlanner', () => {
   it('treats nodes as satisfied when fetched depth meets the requirement', () => {
@@ -78,9 +102,7 @@ describe('expansionPlanner', () => {
       expandedKeys: new Set([rootKey, keyA]),
       nodes,
       coverage: { rowDepth: 1, columnDepth: 1 },
-      getMissingExpansionCoverage: getMissingCoverageFromDepths(
-        new Map([[keyA, 1]]),
-      ),
+      factSelectors: factSelectorsFromFetchedColumnDepths(new Map([[keyA, 1]])),
       program: testProgram,
     });
 
@@ -100,9 +122,7 @@ describe('expansionPlanner', () => {
       expandedKeys: new Set([rootKey, keyA]),
       nodes,
       coverage: { rowDepth: 1, columnDepth: 1 },
-      getMissingExpansionCoverage: getMissingCoverageFromDepths(
-        new Map([[keyA, 2]]),
-      ),
+      factSelectors: factSelectorsFromFetchedColumnDepths(new Map([[keyA, 2]])),
       program: testProgram,
     });
 
@@ -121,9 +141,7 @@ describe('expansionPlanner', () => {
       expandedKeys: new Set([rootKey, keyA]),
       nodes,
       coverage: { rowDepth: 1, columnDepth: 2 },
-      getMissingExpansionCoverage: getMissingCoverageFromDepths(
-        new Map([[keyA, 1]]),
-      ),
+      factSelectors: factSelectorsFromFetchedColumnDepths(new Map([[keyA, 1]])),
       program: testProgram,
     });
 
@@ -142,7 +160,7 @@ describe('expansionPlanner', () => {
       expandedKeys: new Set([rootKey, keyA]),
       nodes,
       coverage: { rowDepth: 1, columnDepth: 0 },
-      getMissingExpansionCoverage: getMissingCoverageFromDepths(new Map()),
+      factSelectors: factSelectorsFromFetchedColumnDepths(new Map()),
       program: testProgram,
     });
 
@@ -162,9 +180,7 @@ describe('expansionPlanner', () => {
       expandedKeys: new Set([rootKey, keyA, keyAB]),
       nodes,
       coverage: { rowDepth: 1, columnDepth: 1 },
-      getMissingExpansionCoverage: getMissingCoverageFromDepths(
-        new Map([[keyA, 1]]),
-      ),
+      factSelectors: factSelectorsFromFetchedColumnDepths(new Map([[keyA, 1]])),
       program: testProgram,
     });
 
@@ -185,9 +201,7 @@ describe('expansionPlanner', () => {
       expandedKeys: new Set([rootKey, keyA, keyAB]),
       nodes,
       coverage: { rowDepth: 1, columnDepth: 2 },
-      getMissingExpansionCoverage: getMissingCoverageFromDepths(
-        new Map([[keyA, 1]]),
-      ),
+      factSelectors: factSelectorsFromFetchedColumnDepths(new Map([[keyA, 1]])),
       program: testProgram,
     });
 
@@ -207,7 +221,7 @@ describe('expansionPlanner', () => {
       expandedKeys: new Set([rootKey, keyA]),
       nodes: baseNodes,
       coverage: { rowDepth: 1, columnDepth: 1 },
-      getMissingExpansionCoverage: getMissingCoverageFromDepths(new Map()),
+      factSelectors: factSelectorsFromFetchedColumnDepths(new Map()),
       program: testProgram,
     });
     expect(sortFetchPathKeys(plan1)).toEqual([keyA]);
@@ -218,7 +232,7 @@ describe('expansionPlanner', () => {
       expandedKeys: new Set([rootKey, keyA]),
       nodes: baseNodes,
       coverage: { rowDepth: 1, columnDepth: 1 },
-      getMissingExpansionCoverage: getMissingCoverageFromDepths(fetchedDepth),
+      factSelectors: factSelectorsFromFetchedColumnDepths(fetchedDepth),
       program: testProgram,
     });
     expect(sortFetchPathKeys(plan2)).toEqual([]);
@@ -228,7 +242,7 @@ describe('expansionPlanner', () => {
       expandedKeys: new Set([rootKey, keyA, keyAB]),
       nodes: baseNodes,
       coverage: { rowDepth: 1, columnDepth: 1 },
-      getMissingExpansionCoverage: getMissingCoverageFromDepths(fetchedDepth),
+      factSelectors: factSelectorsFromFetchedColumnDepths(fetchedDepth),
       program: testProgram,
     });
     expect(sortFetchPathKeys(plan3)).toEqual([keyAB]);
@@ -238,7 +252,7 @@ describe('expansionPlanner', () => {
       expandedKeys: new Set([rootKey, keyA, keyAB]),
       nodes: baseNodes,
       coverage: { rowDepth: 1, columnDepth: 2 },
-      getMissingExpansionCoverage: getMissingCoverageFromDepths(fetchedDepth),
+      factSelectors: factSelectorsFromFetchedColumnDepths(fetchedDepth),
       program: testProgram,
     });
     expect(sortFetchPathKeys(plan4)).toEqual([keyA]);
@@ -252,9 +266,7 @@ describe('expansionPlanner', () => {
       expandedKeys: new Set([rootKey, keyA, keyAB]),
       nodes: nodesWithChild,
       coverage: { rowDepth: 1, columnDepth: 2 },
-      getMissingExpansionCoverage: getMissingCoverageFromDepths(
-        new Map([[keyA, 2]]),
-      ),
+      factSelectors: factSelectorsFromFetchedColumnDepths(new Map([[keyA, 2]])),
       program: testProgram,
     });
     expect(sortFetchPathKeys(plan5)).toEqual([keyAB]);

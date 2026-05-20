@@ -24,7 +24,6 @@ import {
   resolveExpandedForMetrics,
   resolveExpansionToggleDecision,
 } from '../../../src/pivot/expansion/stateTransitions';
-import { createExpansionCoverageDiff } from '../../../src/pivot/expansion/planner';
 import { rootKey } from '../../../src/pivot/viewModel';
 import {
   encodeMetricKey,
@@ -50,12 +49,6 @@ describe('pivot/expansion/stateTransitions', () => {
     groupbyColumns: ['month', 'day'],
     metrics: ['sales'],
   });
-  const expansionCoverageLoadedFromSelectors = (
-    factSelectors: PivotFactSelector[] = [],
-  ) =>
-    createExpansionCoverageDiff({
-      factSelectors,
-    });
   const fetchPathKeys = (targets: Array<{ pathKey: string }>) =>
     targets.map(target => target.pathKey);
   const makeNode = (
@@ -336,9 +329,7 @@ describe('pivot/expansion/stateTransitions', () => {
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
-      getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors([
-        loadedRootCoverage,
-      ]),
+      factSelectors: [loadedRootCoverage],
       program: testProgram,
     });
 
@@ -369,7 +360,7 @@ describe('pivot/expansion/stateTransitions', () => {
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
-      getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors([
+      factSelectors: [
         {
           coverage: {
             rowDepth: 2,
@@ -384,7 +375,7 @@ describe('pivot/expansion/stateTransitions', () => {
           },
           valueKeys: ['sales'],
         },
-      ]),
+      ],
       program: testProgram,
     });
 
@@ -416,7 +407,7 @@ describe('pivot/expansion/stateTransitions', () => {
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
-      getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors(),
+      factSelectors: [],
       program: testProgram,
     });
 
@@ -447,9 +438,7 @@ describe('pivot/expansion/stateTransitions', () => {
       tree,
       desiredRows: new Set([rootKey]),
       desiredCols: new Set([rootKey, xKey]),
-      getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors([
-        loadedBootstrapCoverage,
-      ]),
+      factSelectors: [loadedBootstrapCoverage],
       program: testProgram,
     });
 
@@ -500,10 +489,7 @@ describe('pivot/expansion/stateTransitions', () => {
       tree,
       desiredRows: new Set([rootKey]),
       desiredCols: new Set([rootKey, xKey]),
-      getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors([
-        loadedBootstrapCoverage,
-        loadedColumnBranch,
-      ]),
+      factSelectors: [loadedBootstrapCoverage, loadedColumnBranch],
       program: testProgram,
     });
 
@@ -518,7 +504,7 @@ describe('pivot/expansion/stateTransitions', () => {
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
-      getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors(),
+      factSelectors: [],
       program: testProgram,
     });
 
@@ -568,7 +554,7 @@ describe('pivot/expansion/stateTransitions', () => {
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
-      getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors(),
+      factSelectors: [],
       program: metricProgram,
     });
 
@@ -616,7 +602,7 @@ describe('pivot/expansion/stateTransitions', () => {
       tree,
       desiredRows: new Set([rootKey, aKey]),
       desiredCols: new Set([rootKey, xKey]),
-      getMissingExpansionCoverage: expansionCoverageLoadedFromSelectors(),
+      factSelectors: [],
       program: metricProgram,
     });
 

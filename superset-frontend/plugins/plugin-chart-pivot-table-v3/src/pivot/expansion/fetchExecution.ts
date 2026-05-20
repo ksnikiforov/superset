@@ -31,9 +31,8 @@ import { planHydrationIteration } from './stateTransitions';
 import type { PivotProgram } from '../runtime/types';
 import {
   type BatchGroup,
-  createExpansionCoverageDiff,
   type ExpansionCoverageTarget,
-  type ExpansionFetchTarget,
+  filterMissingExpansionCoverageTargets,
   isIntersectionCoverageTarget,
 } from './planner';
 import {
@@ -158,17 +157,8 @@ const buildExpansionRequestGroupId = ({
     request,
   });
 
-const createRuntimeExpansionCoverageDiff = ({
-  runtime,
-}: {
-  runtime: ExpansionFetchRuntime;
-}) =>
-  createExpansionCoverageDiff({
-    factSelectors: runtime.factStore.getCoverageSelectors(),
-  });
-
 const resolveExpansionFetchPlan = (
-  targets: ExpansionFetchTarget[],
+  targets: ExpansionCoverageTarget[],
 ): {
   singles: ExpansionCoverageTarget[];
   batches: BatchGroup[];
@@ -219,9 +209,10 @@ const filterMissingIntersectionTargets = ({
   intersections: ExpansionCoverageTarget[];
   runtime: ExpansionFetchRuntime;
 }) => {
-  const missingRequests = createRuntimeExpansionCoverageDiff({
-    runtime,
-  })(intersections);
+  const missingRequests = filterMissingExpansionCoverageTargets({
+    targets: intersections,
+    factSelectors: runtime.factStore.getCoverageSelectors(),
+  });
   const missingKeys = new Set(
     missingRequests.map(request => stableStringify(request.need)),
   );
@@ -248,7 +239,7 @@ export const fetchExpansionTargetDeltas = async ({
   targets,
   runtime,
 }: {
-  targets: ExpansionFetchTarget[];
+  targets: ExpansionCoverageTarget[];
   runtime: ExpansionFetchRuntime;
 }): Promise<boolean> => {
   const { batches, singles, intersections } =
@@ -326,9 +317,7 @@ export const runHydrationExpansionFetchLoop = async ({
       tree: currentTree,
       desiredRows,
       desiredCols,
-      getMissingExpansionCoverage: createRuntimeExpansionCoverageDiff({
-        runtime: fetchRuntime,
-      }),
+      factSelectors: fetchRuntime.factStore.getCoverageSelectors(),
       program,
     });
     if (hydrationPlan.kind === 'complete') {

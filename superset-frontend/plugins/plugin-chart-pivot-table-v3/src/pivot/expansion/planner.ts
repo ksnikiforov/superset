@@ -56,15 +56,9 @@ export type ExpansionCoverageTarget = {
   need: PivotCoverageNeed;
 };
 
-export type PivotExpansionCoverageDiff = (
-  targets: ExpansionCoverageTarget[],
-) => ExpansionCoverageTarget[];
-
 export type BatchGroup = {
   targets: ExpansionCoverageTarget[];
 };
-
-export type ExpansionFetchTarget = ExpansionCoverageTarget;
 
 export const isIntersectionCoverageTarget = (target: ExpansionCoverageTarget) =>
   target.need.rowScope.kind !== 'root' &&
@@ -215,11 +209,13 @@ export const buildIntersectionCoverageTarget = ({
   },
 });
 
-export const createExpansionCoverageDiff = ({
+export const filterMissingExpansionCoverageTargets = ({
+  targets,
   factSelectors,
 }: {
+  targets: ExpansionCoverageTarget[];
   factSelectors: PivotFactSelector[];
-}): PivotExpansionCoverageDiff => {
+}) => {
   const cache = new Map<string, boolean>();
   const isLoaded = (target: ExpansionCoverageTarget) => {
     const key = stableStringify(target.need);
@@ -235,7 +231,7 @@ export const createExpansionCoverageDiff = ({
     cache.set(key, loaded);
     return loaded;
   };
-  return targets => targets.filter(target => !isLoaded(target));
+  return targets.filter(target => !isLoaded(target));
 };
 
 const coverageKeyForPathKey = (
@@ -298,14 +294,14 @@ export const planExpansionForAxis = ({
   expandedKeys,
   nodes,
   coverage,
-  getMissingExpansionCoverage,
+  factSelectors,
 }: {
   axis: PivotAxis;
   program: PivotProgram;
   expandedKeys: Set<string>;
   nodes: Record<string, PivotTreeNode>;
   coverage: PivotExpansionCoverageDepths;
-  getMissingExpansionCoverage: PivotExpansionCoverageDiff;
+  factSelectors: PivotFactSelector[];
 }): PivotExpansionPlan => {
   const fetchTargets = new Map<string, ExpansionCoverageTarget>();
   let requiresPathDiscovery = false;
@@ -330,9 +326,10 @@ export const planExpansionForAxis = ({
     .filter(({ path }) => canRequestAxisExpansion({ program, axis, path }))
     .map(candidate => ({ ...candidate, target: buildTarget(candidate.key) }));
   const missingTargetKeys = new Set(
-    getMissingExpansionCoverage(candidates.map(({ target }) => target)).map(
-      targetKey,
-    ),
+    filterMissingExpansionCoverageTargets({
+      targets: candidates.map(({ target }) => target),
+      factSelectors,
+    }).map(targetKey),
   );
 
   candidates.forEach(({ target }) => {

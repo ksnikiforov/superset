@@ -25,10 +25,9 @@ import {
 import { parsePath, serializePath } from '../core/path';
 import {
   buildIntersectionCoverageTarget,
-  type ExpansionFetchTarget,
+  filterMissingExpansionCoverageTargets,
   planExpansionForAxis,
   type PivotExpansionPlan,
-  type PivotExpansionCoverageDiff,
 } from './planner';
 import {
   buildDesiredExpandedKeys,
@@ -37,6 +36,7 @@ import {
 } from './stateModel';
 import { rootKey } from '../viewModel';
 import { type PivotAxisCoverageNeed } from '../runtime/coverage';
+import { type PivotFactSelector } from '../runtime/factStore';
 import { getValuesLevelIndex } from '../runtime/projection';
 import type { PivotProgram } from '../runtime/types';
 import { isMetricTokenForKeys, isSubtotalToken } from '../core/tokens';
@@ -587,13 +587,13 @@ export const planHydrationIteration = ({
   tree,
   desiredRows,
   desiredCols,
-  getMissingExpansionCoverage,
+  factSelectors,
   program,
 }: {
   tree: PivotTreeData;
   desiredRows: Set<string>;
   desiredCols: Set<string>;
-  getMissingExpansionCoverage: PivotExpansionCoverageDiff;
+  factSelectors: PivotFactSelector[];
   program: PivotProgram;
 }) => {
   const rowVisibility = collectAxisVisibility({
@@ -628,7 +628,7 @@ export const planHydrationIteration = ({
     expandedKeys: rowExpansionKeys,
     nodes: tree.rows,
     coverage: { rowDepth: visibleRowDepth, columnDepth: visibleColDepth },
-    getMissingExpansionCoverage,
+    factSelectors,
   });
   const colPlan = planExpansionForAxis({
     axis: 'col',
@@ -636,7 +636,7 @@ export const planHydrationIteration = ({
     expandedKeys: colExpansionKeys,
     nodes: tree.cols,
     coverage: { rowDepth: visibleRowDepth, columnDepth: visibleColDepth },
-    getMissingExpansionCoverage,
+    factSelectors,
   });
 
   const shouldCheckIntersection =
@@ -654,9 +654,12 @@ export const planHydrationIteration = ({
         columnPathKeys,
       })
     : undefined;
-  const intersectionTargets: ExpansionFetchTarget[] =
+  const intersectionTargets =
     intersectionCoverageTarget &&
-    getMissingExpansionCoverage([intersectionCoverageTarget]).length > 0
+    filterMissingExpansionCoverageTargets({
+      targets: [intersectionCoverageTarget],
+      factSelectors,
+    }).length > 0
       ? [intersectionCoverageTarget]
       : [];
   const shouldFetchIntersectionOnly =

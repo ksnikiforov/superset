@@ -17,11 +17,7 @@
  * under the License.
  */
 
-import {
-  createExpansionCoverageDiff,
-  planExpansionForAxis,
-  type PivotExpansionCoverageDiff,
-} from '../../../src/pivot/expansion/planner';
+import { planExpansionForAxis } from '../../../src/pivot/expansion/planner';
 import { rootKey } from '../../../src/pivot/viewModel';
 import {
   encodeMetricKey,
@@ -59,13 +55,6 @@ const makeNode = ({
   };
 };
 
-const getMissingCoverageFromSelectors = (
-  factSelectors: PivotFactSelector[] = [],
-): PivotExpansionCoverageDiff =>
-  createExpansionCoverageDiff({
-    factSelectors,
-  });
-
 const fetchPathKeys = (plan: ReturnType<typeof planExpansionForAxis>) =>
   plan.targets.map(target => target.pathKey);
 
@@ -98,7 +87,7 @@ describe('pivot/expansion/planner', () => {
       expandedKeys: new Set([rootKey, aKey]),
       nodes,
       coverage: { rowDepth: 1, columnDepth: 1 },
-      getMissingExpansionCoverage: getMissingCoverageFromSelectors(),
+      factSelectors: [],
       program: testProgram,
     });
 
@@ -123,7 +112,7 @@ describe('pivot/expansion/planner', () => {
         }),
       },
       coverage: { rowDepth: 1, columnDepth: 0 },
-      getMissingExpansionCoverage: getMissingCoverageFromSelectors(),
+      factSelectors: [],
       program: testProgram,
     });
 
@@ -137,7 +126,7 @@ describe('pivot/expansion/planner', () => {
   it('uses typed branch coverage to skip only the covered expanded path', () => {
     const aKey = serializePath(['A']);
     const bKey = serializePath(['B']);
-    const getMissingExpansionCoverage = getMissingCoverageFromSelectors([
+    const factSelectors: PivotFactSelector[] = [
       {
         coverage: {
           rowDepth: 2,
@@ -152,7 +141,7 @@ describe('pivot/expansion/planner', () => {
         },
         valueKeys: ['sales', 'profit'],
       },
-    ]);
+    ];
 
     const plan = planExpansionForAxis({
       axis: 'row',
@@ -163,7 +152,7 @@ describe('pivot/expansion/planner', () => {
         [bKey]: makeNode({ axis: 'row', path: ['B'] }),
       },
       coverage: { rowDepth: 1, columnDepth: 1 },
-      getMissingExpansionCoverage,
+      factSelectors,
       program: testProgram,
     });
 
@@ -171,14 +160,10 @@ describe('pivot/expansion/planner', () => {
     expect(plan.targets.map(target => target.pathKey)).toEqual([bKey]);
   });
 
-  it('diffs expansion coverage requests as one set', () => {
+  it('diffs expansion coverage requests through the manifest', () => {
     const aKey = serializePath(['A']);
     const bKey = serializePath(['B']);
-    const getMissingExpansionCoverage = jest.fn(
-      (requests: Parameters<PivotExpansionCoverageDiff>[0]) => requests,
-    );
-
-    planExpansionForAxis({
+    const plan = planExpansionForAxis({
       axis: 'row',
       expandedKeys: new Set([rootKey, aKey, bKey]),
       nodes: {
@@ -187,16 +172,26 @@ describe('pivot/expansion/planner', () => {
         [bKey]: makeNode({ axis: 'row', path: ['B'] }),
       },
       coverage: { rowDepth: 1, columnDepth: 1 },
-      getMissingExpansionCoverage,
+      factSelectors: [
+        {
+          coverage: {
+            rowDepth: 2,
+            columnDepth: 1,
+            rowDimensions: ['category', 'subcategory'],
+            columnDimensions: ['month'],
+          },
+          scope: {
+            kind: 'axisPaths',
+            axis: 'row',
+            paths: [['A']],
+          },
+          valueKeys: ['sales', 'profit'],
+        },
+      ],
       program: testProgram,
     });
 
-    expect(getMissingExpansionCoverage).toHaveBeenCalledTimes(1);
-    expect(
-      getMissingExpansionCoverage.mock.calls[0][0].map(
-        request => request.pathKey,
-      ),
-    ).toEqual([aKey, bKey]);
+    expect(fetchPathKeys(plan)).toEqual([bKey]);
   });
 
   it('does not turn subtotal display paths into fetch coverage requests', () => {
@@ -206,10 +201,6 @@ describe('pivot/expansion/planner', () => {
       SUBTOTAL_TOKEN,
       encodeMetricKey('sales'),
     ]);
-    const getMissingExpansionCoverage = jest.fn(
-      (requests: Parameters<PivotExpansionCoverageDiff>[0]) => requests,
-    );
-
     const plan = planExpansionForAxis({
       axis: 'row',
       expandedKeys: new Set([metricKey, subtotalMetricKey]),
@@ -224,15 +215,10 @@ describe('pivot/expansion/planner', () => {
         }),
       },
       coverage: { rowDepth: 1, columnDepth: 1 },
-      getMissingExpansionCoverage,
+      factSelectors: [],
       program: testProgram,
     });
 
-    expect(
-      getMissingExpansionCoverage.mock.calls[0][0].map(
-        request => request.pathKey,
-      ),
-    ).toEqual([metricKey]);
     expect(fetchPathKeys(plan)).toEqual([metricKey]);
     expect(plan.targets.map(target => target.pathKey)).toEqual([metricKey]);
   });
@@ -241,7 +227,7 @@ describe('pivot/expansion/planner', () => {
     const caKey = serializePath(['US', 'CA']);
     const nyKey = serializePath(['US', 'NY']);
     const txKey = serializePath(['US', 'TX']);
-    const getMissingExpansionCoverage = getMissingCoverageFromSelectors([
+    const factSelectors: PivotFactSelector[] = [
       {
         coverage: {
           rowDepth: 3,
@@ -259,7 +245,7 @@ describe('pivot/expansion/planner', () => {
         },
         valueKeys: ['sales', 'profit'],
       },
-    ]);
+    ];
 
     const plan = planExpansionForAxis({
       axis: 'row',
@@ -270,7 +256,7 @@ describe('pivot/expansion/planner', () => {
         [txKey]: makeNode({ axis: 'row', path: ['US', 'TX'] }),
       },
       coverage: { rowDepth: 1, columnDepth: 0 },
-      getMissingExpansionCoverage,
+      factSelectors,
       program: testProgram,
     });
 
@@ -281,7 +267,7 @@ describe('pivot/expansion/planner', () => {
   it('does not let typed metric branch coverage satisfy sibling metrics', () => {
     const salesKey = serializePath(['A', encodeMetricKey('sales')]);
     const profitKey = serializePath(['A', encodeMetricKey('profit')]);
-    const getMissingExpansionCoverage = getMissingCoverageFromSelectors([
+    const factSelectors: PivotFactSelector[] = [
       {
         coverage: {
           rowDepth: 2,
@@ -296,7 +282,7 @@ describe('pivot/expansion/planner', () => {
         },
         valueKeys: ['sales'],
       },
-    ]);
+    ];
 
     const plan = planExpansionForAxis({
       axis: 'row',
@@ -312,7 +298,7 @@ describe('pivot/expansion/planner', () => {
         }),
       },
       coverage: { rowDepth: 1, columnDepth: 1 },
-      getMissingExpansionCoverage,
+      factSelectors,
       program: testProgram,
     });
 
@@ -358,7 +344,7 @@ describe('pivot/expansion/planner', () => {
       expandedKeys: new Set([metricAKey, metricBKey]),
       nodes,
       coverage: { rowDepth: 1, columnDepth: 1 },
-      getMissingExpansionCoverage: getMissingCoverageFromSelectors(),
+      factSelectors: [],
       program: testProgram,
     });
 
