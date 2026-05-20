@@ -84,7 +84,6 @@ const compareSortValues = (
 };
 
 export type PivotRenderModelResult = {
-  renderTree: PivotTreeData;
   renderModel: RenderModel;
   shouldShowToggle: (axis: 'row' | 'col', node?: PivotTreeNode) => boolean;
   isRowAggregateBold: (node?: PivotTreeNode) => boolean;
@@ -187,8 +186,6 @@ export const usePivotRenderModel = ({
   const isLeafTierVisible =
     layout.layout.measureHierarchy.leafTierVisibility === 'visible';
 
-  const renderTree = tree;
-
   const getProjectedPathParts = useCallback(
     (axis: 'row' | 'col', path: PivotTreeNode['path']) =>
       resolveAxisProjection({
@@ -202,14 +199,14 @@ export const usePivotRenderModel = ({
   const { rowValuesMap, colValuesMap } = useMemo(
     () =>
       buildFormattingValueMaps({
-        cells: renderTree.cells,
-        rows: renderTree.rows,
-        cols: renderTree.cols,
+        cells: tree.cells,
+        rows: tree.rows,
+        cols: tree.cols,
         getRowNonMetricPathParts: path => getProjectedPathParts('row', path),
         getColNonMetricPathParts: path => getProjectedPathParts('col', path),
         rootKey,
       }),
-    [getProjectedPathParts, renderTree],
+    [getProjectedPathParts, tree],
   );
 
   const compareMetricSort = useCallback(
@@ -302,11 +299,13 @@ export const usePivotRenderModel = ({
       }
       if (activeColumnSort) {
         const aValue =
-          renderTree.cells[serializeCellKey(a.key, activeColumnSort.colKey)]
-            ?.values[activeColumnSort.metricKey];
+          tree.cells[serializeCellKey(a.key, activeColumnSort.colKey)]?.values[
+            activeColumnSort.metricKey
+          ];
         const bValue =
-          renderTree.cells[serializeCellKey(b.key, activeColumnSort.colKey)]
-            ?.values[activeColumnSort.metricKey];
+          tree.cells[serializeCellKey(b.key, activeColumnSort.colKey)]?.values[
+            activeColumnSort.metricKey
+          ];
         const uiColumnSortCmp = compareSortValues(
           aValue,
           bValue,
@@ -329,7 +328,7 @@ export const usePivotRenderModel = ({
     resolvedGroupbyRows,
     hasRowSorting,
     layout,
-    renderTree.cells,
+    tree.cells,
     rowOrder,
     rowSubTotals,
     activeColumnSort,
@@ -380,7 +379,7 @@ export const usePivotRenderModel = ({
   const renderModel = useMemo(
     () =>
       buildRenderModel({
-        tree: renderTree,
+        tree,
         expandedRows,
         expandedCols,
         config: {
@@ -411,7 +410,7 @@ export const usePivotRenderModel = ({
       hasMultipleMeasures,
       isLeafTierVisible,
       layout,
-      renderTree,
+      tree,
       rowSorter,
     ],
   );
@@ -419,12 +418,12 @@ export const usePivotRenderModel = ({
   const renderNodeDisplayState = useMemo(
     () =>
       buildRenderNodeDisplayState({
-        rowNodes: renderTree.rows,
+        rowNodes: tree.rows,
         expandedRows,
         layout,
         isLeafTierVisible,
       }),
-    [expandedRows, isLeafTierVisible, layout, renderTree.rows],
+    [expandedRows, isLeafTierVisible, layout, tree.rows],
   );
 
   const isColumnSortable = useCallback(
@@ -446,12 +445,12 @@ export const usePivotRenderModel = ({
           current,
           node,
           layout: columnSortLayout,
-          columnNodes: renderTree.cols,
+          columnNodes: tree.cols,
         });
         return next === undefined ? current : next;
       });
     },
-    [columnSortLayout, renderTree.cols],
+    [columnSortLayout, tree.cols],
   );
 
   useEffect(() => {
@@ -459,14 +458,13 @@ export const usePivotRenderModel = ({
       const next = reconcilePivotColumnSortState({
         current,
         layout: columnSortLayout,
-        columnNodes: renderTree.cols,
+        columnNodes: tree.cols,
       });
       return next === current ? current : next;
     });
-  }, [columnSortLayout, renderTree.cols]);
+  }, [columnSortLayout, tree.cols]);
 
   return {
-    renderTree,
     renderModel,
     shouldShowToggle: renderNodeDisplayState.shouldShowToggle,
     isRowAggregateBold: renderNodeDisplayState.isRowAggregateBold,

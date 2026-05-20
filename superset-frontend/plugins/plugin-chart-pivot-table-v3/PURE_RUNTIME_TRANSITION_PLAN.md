@@ -95,10 +95,10 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `27138` | `-6372` | `< 28000` |
-| Strict core pipeline | `11337` | `10903` | `-434` | `8000` |
-| Non-visual chart runtime hooks | `4683` | `4026` | `-657` | `3000-4000` |
-| Broad core pipeline | `16020` | `14929` | `-1091` | `11000-13000` |
+| Full production `src` | `33510` | `27130` | `-6380` | `< 28000` |
+| Strict core pipeline | `11337` | `10901` | `-436` | `8000` |
+| Non-visual chart runtime hooks | `4683` | `4024` | `-659` | `3000-4000` |
+| Broad core pipeline | `16020` | `14927` | `-1093` | `11000-13000` |
 
 Strict core breakdown:
 
@@ -143,6 +143,9 @@ Completed structural cuts:
   materializer plumbing.
 - Chart-owned metadata recovery and several render-policy adapters were
   removed.
+- The render model hook no longer exposes a second `renderTree`; chart code now
+  passes the materialized expansion tree directly into formatting, filters, and
+  view rendering.
 
 Remaining duplicate authority:
 

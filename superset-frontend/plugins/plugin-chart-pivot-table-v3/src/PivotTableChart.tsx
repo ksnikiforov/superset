@@ -350,22 +350,16 @@ function PivotTableChart(props: PivotTableProps) {
     formData: appliedLayoutFormData,
     layout: layoutResult,
   });
-  const { renderTree } = renderModelResult;
 
   const treeDimensionFilterValues = useMemo(
     () =>
       buildTreeDimensionFilterValues({
         dimensions: dimensionList,
-        rows: renderTree.rows,
-        cols: renderTree.cols,
+        rows: tree.rows,
+        cols: tree.cols,
         program: layoutResult.layout.pivotProgram,
       }),
-    [
-      dimensionList,
-      layoutResult.layout.pivotProgram,
-      renderTree.cols,
-      renderTree.rows,
-    ],
+    [dimensionList, layoutResult.layout.pivotProgram, tree.cols, tree.rows],
   );
   const {
     values: dimensionFilterValues,
@@ -393,7 +387,7 @@ function PivotTableChart(props: PivotTableProps) {
   });
 
   const formatting = usePivotFormatting({
-    tree: renderTree,
+    tree,
     renderModel: renderModelResult.renderModel,
     expandedRows,
     formData: appliedLayoutFormData,
@@ -434,7 +428,7 @@ function PivotTableChart(props: PivotTableProps) {
       : undefined;
   const sharedPivotViewProps = {
     renderModel: renderModelResult.renderModel,
-    tree: renderTree,
+    tree,
     expandedRows,
     expandedCols,
     errorMessage: activeErrorMessage,
