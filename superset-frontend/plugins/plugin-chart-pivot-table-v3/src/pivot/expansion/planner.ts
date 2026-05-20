@@ -60,15 +60,11 @@ export type PivotExpansionCoverageDiff = (
   targets: ExpansionCoverageTarget[],
 ) => ExpansionCoverageTarget[];
 
-export type BatchCandidate = ExpansionCoverageTarget & {
-  batchSignature: string;
-};
-
 export type BatchGroup = {
   axis: PivotAxis;
   parentPathKey: string;
   siblingValues: PivotPathValue[];
-  targets: BatchCandidate[];
+  targets: ExpansionCoverageTarget[];
 };
 
 export type IntersectionFetchTarget = {

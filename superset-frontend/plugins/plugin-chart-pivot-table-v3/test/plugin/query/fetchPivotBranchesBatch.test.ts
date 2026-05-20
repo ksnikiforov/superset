@@ -92,10 +92,7 @@ const hasCompatibleCoverage = (
 
 const mockPost = SupersetClient.post as jest.Mock;
 
-type TestBatchTarget = Pick<
-  BatchGroup['targets'][number],
-  'axis' | 'pathKey' | 'batchSignature'
->;
+type TestBatchTarget = Pick<BatchGroup['targets'][number], 'axis' | 'pathKey'>;
 type TestBatchGroup = Omit<BatchGroup, 'targets'> & {
   targets: TestBatchTarget[];
 };
@@ -120,7 +117,6 @@ const withBatchCoverageTargets = ({
       rowDepth: visibleRowDepth,
       columnDepth: visibleColDepth,
     }),
-    batchSignature: target.batchSignature,
   })),
 });
 
@@ -183,12 +179,10 @@ describe('fetchBatch', () => {
         {
           axis: 'row',
           pathKey: serializePath(['US', 'CA']),
-          batchSignature: 'sig',
         },
         {
           axis: 'row',
           pathKey: serializePath(['US', 'NY']),
-          batchSignature: 'sig',
         },
       ],
     };
@@ -237,7 +231,6 @@ describe('fetchBatch', () => {
         {
           axis: 'row',
           pathKey: serializePath(['US', null]),
-          batchSignature: 'sig',
         },
       ],
     };
@@ -283,7 +276,6 @@ describe('fetchBatch', () => {
         {
           axis: 'row',
           pathKey: serializePath(['US']),
-          batchSignature: 'sig',
         },
       ],
     };
@@ -315,12 +307,10 @@ describe('fetchBatch', () => {
         {
           axis: 'row',
           pathKey: serializePath(['US', 'CA']),
-          batchSignature: 'sig',
         },
         {
           axis: 'row',
           pathKey: serializePath(['US', 'NY']),
-          batchSignature: 'sig',
         },
       ],
     };
@@ -403,7 +393,6 @@ describe('fetchBatch', () => {
         {
           axis: 'row',
           pathKey: serializePath(['US', 'CA']),
-          batchSignature: 'sig',
         },
       ],
     };
@@ -468,12 +457,10 @@ describe('fetchBatch', () => {
         {
           axis: 'row',
           pathKey: serializePath(['US']),
-          batchSignature: 'values-only',
         },
         {
           axis: 'row',
           pathKey: serializePath(['CA']),
-          batchSignature: 'values-only',
         },
       ],
     };

@@ -209,7 +209,6 @@ describe('runtime coverage query specs contract', () => {
             visibleRowDepth: 1,
             visibleColDepth: 0,
           }),
-          batchSignature: 'values-only',
         },
         {
           ...fetchTarget({
@@ -219,7 +218,6 @@ describe('runtime coverage query specs contract', () => {
             visibleRowDepth: 1,
             visibleColDepth: 0,
           }),
-          batchSignature: 'values-only',
         },
       ],
     };
@@ -257,7 +255,6 @@ describe('runtime coverage query specs contract', () => {
             visibleRowDepth: 2,
             visibleColDepth: 0,
           }),
-          batchSignature: 'subtotal-display',
         },
       ],
     };

@@ -55,10 +55,7 @@ const waitForAsyncDataMock = waitForAsyncData as jest.MockedFunction<
   typeof waitForAsyncData
 >;
 
-type TestBatchTarget = Pick<
-  BatchGroup['targets'][number],
-  'axis' | 'pathKey' | 'batchSignature'
->;
+type TestBatchTarget = Pick<BatchGroup['targets'][number], 'axis' | 'pathKey'>;
 type TestBatchGroup = Omit<BatchGroup, 'targets'> & {
   targets: TestBatchTarget[];
 };
@@ -132,7 +129,6 @@ const fetchBatch = (
           rowDepth: visibleRowDepth,
           columnDepth: visibleColDepth,
         }),
-        batchSignature: target.batchSignature,
       })),
     },
   });
@@ -216,12 +212,10 @@ describe('Global Async Queries (HTTP 202) support', () => {
         {
           axis: 'row',
           pathKey: serializePath(['US', 'CA']),
-          batchSignature: 'sig',
         },
         {
           axis: 'row',
           pathKey: serializePath(['US', 'NY']),
-          batchSignature: 'sig',
         },
       ],
     };

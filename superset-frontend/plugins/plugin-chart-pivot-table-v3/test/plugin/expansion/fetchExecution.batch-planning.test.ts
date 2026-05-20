@@ -20,17 +20,13 @@ import {
   optimizeExpansionFetchPlan,
   MAX_BATCH_SIBLINGS,
 } from '../../../src/pivot/expansion/fetchExecution';
-import { type BatchCandidate } from '../../../src/pivot/expansion/planner';
+import { type ExpansionCoverageTarget } from '../../../src/pivot/expansion/planner';
 import { parsePath, serializePath } from '../../../src/pivot/core/path';
 import { type PivotPathValue } from '../../../src/types';
 
-const makeTarget = (
-  path: PivotPathValue[],
-  signature = 'sig',
-): BatchCandidate => ({
+const makeTarget = (path: PivotPathValue[]): ExpansionCoverageTarget => ({
   axis: 'row',
   pathKey: serializePath(path),
-  batchSignature: signature,
   need: {
     rowDepth: path.length,
     columnDepth: 0,
@@ -84,10 +80,17 @@ describe('fetchPlanOptimizer', () => {
     ).toBe(MAX_BATCH_SIBLINGS + 1);
   });
 
-  it('separates incompatible signatures', () => {
+  it('separates incompatible coverage depths', () => {
+    const nyTarget = makeTarget(['US', 'NY']);
     const targets = [
-      makeTarget(['US', 'CA'], 'sig-1'),
-      makeTarget(['US', 'NY'], 'sig-2'),
+      makeTarget(['US', 'CA']),
+      {
+        ...nyTarget,
+        need: {
+          ...nyTarget.need,
+          columnDepth: 1,
+        },
+      },
     ];
     const plan = optimizeExpansionFetchPlan({ targets });
 

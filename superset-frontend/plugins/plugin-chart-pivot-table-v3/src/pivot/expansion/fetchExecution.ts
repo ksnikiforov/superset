@@ -29,7 +29,6 @@ import { stableStringify } from '../shared/stableStringify';
 import { planHydrationIteration } from './stateTransitions';
 import type { PivotProgram } from '../runtime/types';
 import {
-  type BatchCandidate,
   type BatchGroup,
   createExpansionCoverageDiff,
   type ExpansionCoverageTarget,
@@ -74,10 +73,10 @@ export const MAX_BATCH_SIBLINGS = 50;
 
 type BatchPlan = {
   batches: BatchGroup[];
-  singles: BatchCandidate[];
+  singles: ExpansionCoverageTarget[];
 };
 
-type CandidateWithPath = BatchCandidate & {
+type CandidateWithPath = ExpansionCoverageTarget & {
   parentPathKey: string;
   siblingValue: BatchGroup['siblingValues'][number];
 };
@@ -121,10 +120,10 @@ export const optimizeExpansionFetchPlan = ({
   targets,
   maxBatchSize = MAX_BATCH_SIBLINGS,
 }: {
-  targets: BatchCandidate[];
+  targets: ExpansionCoverageTarget[];
   maxBatchSize?: number;
 }): BatchPlan => {
-  const singles: BatchCandidate[] = [];
+  const singles: ExpansionCoverageTarget[] = [];
   const groups = new Map<string, BatchGroupSeed>();
 
   targets.forEach(target => {
@@ -135,9 +134,11 @@ export const optimizeExpansionFetchPlan = ({
     }
     const parentPathKey = serializePath(path.slice(0, -1));
     const siblingValue = path[path.length - 1];
+    const { rowDepth, columnDepth } = target.need;
     const groupKey = JSON.stringify([
       target.axis,
-      target.batchSignature,
+      rowDepth,
+      columnDepth,
       parentPathKey,
     ]);
     const seed = groups.get(groupKey) ?? {
@@ -205,17 +206,11 @@ const resolveExpansionFetchPlan = (
   batches: BatchGroup[];
   intersections: IntersectionFetchTarget[];
 } => {
-  const batchCandidates: BatchCandidate[] = [];
-  for (const target of targets) {
-    if (isIntersectionFetchTarget(target)) {
-      continue;
-    }
-    const { rowDepth, columnDepth } = target.need;
-    const batchSignature = `${target.axis}|${rowDepth}|${columnDepth}`;
-    batchCandidates.push({ ...target, batchSignature });
-  }
   const { batches, singles } = optimizeExpansionFetchPlan({
-    targets: batchCandidates,
+    targets: targets.filter(
+      (target): target is ExpansionCoverageTarget =>
+        !isIntersectionFetchTarget(target),
+    ),
   });
   return {
     singles,

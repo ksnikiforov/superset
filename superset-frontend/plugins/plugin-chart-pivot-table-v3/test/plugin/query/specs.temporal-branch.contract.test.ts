@@ -156,7 +156,6 @@ describe('temporal branch query specs contract', () => {
             visibleRowDepth: 0,
             visibleColDepth: 0,
           }),
-          batchSignature: 'temporal-batch',
         },
         {
           ...fetchTarget({
@@ -166,7 +165,6 @@ describe('temporal branch query specs contract', () => {
             visibleRowDepth: 0,
             visibleColDepth: 0,
           }),
-          batchSignature: 'temporal-batch',
         },
       ],
     };
