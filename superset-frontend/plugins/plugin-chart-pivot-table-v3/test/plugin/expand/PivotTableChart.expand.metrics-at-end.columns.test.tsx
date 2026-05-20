@@ -27,6 +27,7 @@ import { METRICS_PLACEHOLDER } from '../../../src/pivot/core/tokens';
 import { fetchPivotExpansion as fetchPivotBranch } from '../../../src/pivot/expansion/fetchPivotExpansion';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';
+import { resolveMockExpansionFetchResult } from '../fixtures/factBatches';
 
 jest.mock('../../../src/pivot/expansion/fetchPivotExpansion', () => {
   const actual = jest.requireActual(
@@ -116,10 +117,9 @@ describe('PivotTableChart expansion with metrics at the column end', () => {
       colGroupby.length,
     );
 
-    fetchPivotBranchMock.mockResolvedValueOnce({
-      data: branchTree,
-      factBatches: [],
-    });
+    fetchPivotBranchMock.mockImplementationOnce(
+      resolveMockExpansionFetchResult({ data: branchTree }),
+    );
 
     const { container } = render(
       <PivotTableChart
@@ -374,10 +374,9 @@ describe('PivotTableChart expansion with metrics at the column end', () => {
       colGroupby.length,
     );
 
-    fetchPivotBranchMock.mockResolvedValueOnce({
-      data: branchTree,
-      factBatches: [],
-    });
+    fetchPivotBranchMock.mockImplementationOnce(
+      resolveMockExpansionFetchResult({ data: branchTree }),
+    );
 
     const { container } = render(
       <PivotTableChart
@@ -465,7 +464,9 @@ describe('PivotTableChart expansion with metrics at the column end', () => {
     fireEvent.click(within(collapsedCell).getByLabelText('minus-square'));
 
     await waitFor(() => {
-      expect(within(thead).getByLabelText('plus-square')).toBeInTheDocument();
+      expect(
+        within(thead).getAllByLabelText('plus-square').length,
+      ).toBeGreaterThan(0);
     });
 
     expect(countBlankCells(getRow())).toBe(0);

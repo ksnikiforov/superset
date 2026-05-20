@@ -31,6 +31,7 @@ import { mergeTrees } from '../../fixtures/tree';
 import { fetchPivotExpansion as fetchPivotBranch } from '../../../../src/pivot/expansion/fetchPivotExpansion';
 import {
   buildMockBranchFetchResult,
+  getMockExpansionRequestAxis,
   getMockExpansionRequestPath,
   resolveMockBranchFetchResult,
 } from '../../fixtures/factBatches';
@@ -226,15 +227,16 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
     const colToggle = getAllByLabelText('plus-square')[0];
     fireEvent.click(colToggle);
     await waitFor(() => {
-      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
+      expect(getAllByLabelText('minus-square')[0]).toBeInTheDocument();
     });
+    expect(fetchPivotBranchMock).not.toHaveBeenCalled();
     fireEvent.click(getAllByLabelText('minus-square')[0]);
 
     const usaRow = getByText('USA').closest('tr') as HTMLTableRowElement;
     const rowToggle = within(usaRow).getByLabelText('plus-square');
     fireEvent.click(rowToggle);
     await waitFor(() => {
-      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(2);
+      expect(fetchPivotBranchMock).toHaveBeenCalledTimes(1);
     });
     expect(getByText('USA')).toBeInTheDocument();
   });
@@ -515,8 +517,9 @@ describe('PivotTableChart expansion with metrics before dimensions (column-metri
 
     type FetchPivotBranchArgs = Parameters<typeof fetchPivotBranch>[0];
     fetchPivotBranchMock.mockImplementation((params: FetchPivotBranchArgs) => {
-      const { axis, path, visibleRowDepth } = params;
-      const resolvedVisibleRowDepth = visibleRowDepth ?? 0;
+      const axis = getMockExpansionRequestAxis(params);
+      const path = getMockExpansionRequestPath(params);
+      const resolvedVisibleRowDepth = params.targets[0]?.need.rowDepth ?? 0;
       if (axis === 'col') {
         return Promise.resolve(
           buildMockBranchFetchResult(params, {

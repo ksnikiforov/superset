@@ -146,6 +146,58 @@ const buildFactsForCoverage = (
     }));
   });
 
+const buildExactFactsForCoverage = (
+  tree: PivotTreeData,
+  coverage: PivotFactStoreBatch['coverage'],
+): PivotFact[] =>
+  Object.values(tree.cells).flatMap(cell => {
+    const row = tree.rows[cell.rowKey];
+    const col = tree.cols[cell.colKey];
+    if (!row || !col) {
+      return [];
+    }
+    const rowPath = toDimensionalPath(row.path);
+    const columnPath = toDimensionalPath(col.path);
+    if (
+      rowPath.length !== coverage.rowDepth ||
+      columnPath.length !== coverage.columnDepth
+    ) {
+      return [];
+    }
+    return Object.entries(cell.values).map(([valueKey, value]) => ({
+      rowPath,
+      columnPath,
+      valueKey,
+      value,
+    }));
+  });
+
+const collectExactCoverageDepths = (
+  tree: PivotTreeData,
+  bootstrapDepth: { rowDepth: number; columnDepth: number },
+) => {
+  const depthMap = new Map<string, { rowDepth: number; columnDepth: number }>();
+  const addDepth = (rowDepth: number, columnDepth: number) => {
+    depthMap.set(`${rowDepth}|${columnDepth}`, { rowDepth, columnDepth });
+  };
+  addDepth(bootstrapDepth.rowDepth, bootstrapDepth.columnDepth);
+  Object.values(tree.cells).forEach(cell => {
+    const row = tree.rows[cell.rowKey];
+    const col = tree.cols[cell.colKey];
+    if (!row || !col) {
+      return;
+    }
+    addDepth(
+      countDimensionalPathDepth(row.path),
+      countDimensionalPathDepth(col.path),
+    );
+  });
+  return Array.from(depthMap.values()).sort(
+    (left, right) =>
+      left.rowDepth - right.rowDepth || left.columnDepth - right.columnDepth,
+  );
+};
+
 const collectLoadedBranchPaths = ({
   axis,
   tree,
@@ -221,22 +273,25 @@ export const buildPreloadedBootstrapFactBatches = (
   const bootstrapColDepth =
     groupby.groupbyColumns.length > 0 && colDepth > 0 ? 1 : 0;
   const valueKeys = collectTreeValueKeys(tree);
-  const coverage = {
+  return collectExactCoverageDepths(tree, {
     rowDepth: bootstrapRowDepth,
     columnDepth: bootstrapColDepth,
-    rowDimensions: groupby.groupbyRows.slice(0, bootstrapRowDepth),
-    columnDimensions: groupby.groupbyColumns.slice(0, bootstrapColDepth),
-  };
-  return [
-    {
+  }).map(({ rowDepth: depthRow, columnDepth: depthCol }) => {
+    const coverage = {
+      rowDepth: depthRow,
+      columnDepth: depthCol,
+      rowDimensions: groupby.groupbyRows.slice(0, depthRow),
+      columnDimensions: groupby.groupbyColumns.slice(0, depthCol),
+    };
+    return {
       coverage,
-      facts: buildFactsForCoverage(tree, coverage),
+      facts: buildExactFactsForCoverage(tree, coverage),
       valueKeys,
       scope: {
         kind: 'root',
       },
-    },
-  ];
+    };
+  });
 };
 
 export const buildPreloadedBranchFactBatches = (

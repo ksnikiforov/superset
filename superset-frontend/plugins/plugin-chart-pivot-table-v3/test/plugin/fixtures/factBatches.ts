@@ -107,14 +107,14 @@ const buildFactsForCoverage = (
     const rowPath = toFactPath(row.path);
     const columnPath = toFactPath(col.path);
     if (
-      rowPath.length !== coverage.rowDepth ||
-      columnPath.length !== coverage.columnDepth
+      rowPath.length < coverage.rowDepth ||
+      columnPath.length < coverage.columnDepth
     ) {
       return [];
     }
     return Object.entries(cell.values).map(([valueKey, value]) => ({
-      rowPath,
-      columnPath,
+      rowPath: rowPath.slice(0, coverage.rowDepth),
+      columnPath: columnPath.slice(0, coverage.columnDepth),
       valueKey,
       value,
     }));
