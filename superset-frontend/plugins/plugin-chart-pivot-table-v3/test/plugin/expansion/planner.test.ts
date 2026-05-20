@@ -57,7 +57,7 @@ const makeNode = ({
 };
 
 const fetchPathKeys = (plan: ReturnType<typeof planExpansionForAxis>) =>
-  plan.targets.map(target => target.pathKey);
+  plan.map(target => target.pathKey);
 
 describe('pivot/expansion/planner', () => {
   it('plans grouped fetch targets for an expanded node', () => {
@@ -93,7 +93,7 @@ describe('pivot/expansion/planner', () => {
     });
 
     expect(fetchPathKeys(plan)).toEqual([aKey]);
-    expect(plan.targets[0]).toMatchObject({
+    expect(plan[0]).toMatchObject({
       axis: 'row',
       pathKey: aKey,
     });
@@ -118,7 +118,7 @@ describe('pivot/expansion/planner', () => {
     });
 
     expect(fetchPathKeys(plan)).toEqual([aKey]);
-    expect(plan.targets[0]).toMatchObject({
+    expect(plan[0]).toMatchObject({
       axis: 'row',
       pathKey: aKey,
     });
@@ -158,7 +158,7 @@ describe('pivot/expansion/planner', () => {
     });
 
     expect(fetchPathKeys(plan)).toEqual([bKey]);
-    expect(plan.targets.map(target => target.pathKey)).toEqual([bKey]);
+    expect(plan.map(target => target.pathKey)).toEqual([bKey]);
   });
 
   it('diffs expansion coverage requests through the manifest', () => {
@@ -221,7 +221,7 @@ describe('pivot/expansion/planner', () => {
     });
 
     expect(fetchPathKeys(plan)).toEqual([metricKey]);
-    expect(plan.targets.map(target => target.pathKey)).toEqual([metricKey]);
+    expect(plan.map(target => target.pathKey)).toEqual([metricKey]);
   });
 
   it('uses typed batch coverage to skip only covered sibling paths', () => {
@@ -262,7 +262,7 @@ describe('pivot/expansion/planner', () => {
     });
 
     expect(fetchPathKeys(plan)).toEqual([txKey]);
-    expect(plan.targets.map(target => target.pathKey)).toEqual([txKey]);
+    expect(plan.map(target => target.pathKey)).toEqual([txKey]);
   });
 
   it('does not let typed metric branch coverage satisfy sibling metrics', () => {
@@ -304,7 +304,7 @@ describe('pivot/expansion/planner', () => {
     });
 
     expect(fetchPathKeys(plan)).toEqual([profitKey]);
-    expect(plan.targets.map(target => target.pathKey)).toEqual([profitKey]);
+    expect(plan.map(target => target.pathKey)).toEqual([profitKey]);
   });
 
   it('keeps rendered metric siblings as separate fetch targets when coverage keys differ', () => {
@@ -349,8 +349,8 @@ describe('pivot/expansion/planner', () => {
       program: testProgram,
     });
 
-    expect(plan.targets).toHaveLength(2);
-    expect(new Set(plan.targets.map(target => target.pathKey))).toEqual(
+    expect(plan).toHaveLength(2);
+    expect(new Set(plan.map(target => target.pathKey))).toEqual(
       new Set([metricAKey, metricBKey]),
     );
   });
@@ -408,7 +408,7 @@ describe('pivot/expansion/planner', () => {
       program,
     });
 
-    expect(plan.targets).toEqual(
+    expect(plan).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           pathKey: orderPriorityKey,

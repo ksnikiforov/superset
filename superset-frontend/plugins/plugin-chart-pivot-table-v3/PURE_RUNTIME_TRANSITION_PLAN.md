@@ -95,17 +95,17 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `27318` | `-6192` | `< 28000` |
-| Strict core pipeline | `11337` | `11091` | `-246` | `8000` |
+| Full production `src` | `33510` | `27301` | `-6209` | `< 28000` |
+| Strict core pipeline | `11337` | `11074` | `-263` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4024` | `-659` | `3000-4000` |
-| Broad core pipeline | `16020` | `15115` | `-905` | `11000-13000` |
+| Broad core pipeline | `16020` | `15098` | `-922` | `11000-13000` |
 
 Strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
 | `pivot/runtime/*` | `3571` |
-| `pivot/expansion/*` | `2277` |
+| `pivot/expansion/*` | `2260` |
 | `pivot/query/*` | `1407` |
 | `pivot/layout/*` | `739` |
 | `pivot/core/*` | `159` |
@@ -136,6 +136,9 @@ Completed structural cuts:
 - Skipped pre-Values metric expansion now requests canonical visible coverage
   when an ancestor expansion makes the skipped dimension visible; it does not
   request still-hidden skipped layers.
+- Expansion planning now returns coverage targets directly; path-discovery is
+  no longer a parallel planner result and intersection gating derives from the
+  requested expansion keys against the current tree.
 - Collapsed dimension state no longer suppresses visible metric-tier expansion
   keys, so metric rows can reopen under a collapsed parent without expanding the
   dimension children.

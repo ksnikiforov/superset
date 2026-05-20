@@ -57,11 +57,6 @@ export const isIntersectionCoverageTarget = (target: ExpansionCoverageTarget) =>
   target.need.rowScope.kind !== 'root' &&
   target.need.columnScope.kind !== 'root';
 
-export type PivotExpansionPlan = {
-  targets: ExpansionCoverageTarget[];
-  requiresPathDiscovery: boolean;
-};
-
 const needKey = ({ need }: ExpansionCoverageTarget) => stableStringify(need);
 
 const axisPathScopeFromPath = (path: PivotPath) => ({
@@ -335,9 +330,8 @@ export const planExpansionForAxis = ({
   nodes: Record<string, PivotTreeNode>;
   coverage: PivotExpansionCoverageDepths;
   factSelectors: PivotFactSelector[];
-}): PivotExpansionPlan => {
+}): ExpansionCoverageTarget[] => {
   const fetchTargets = new Map<string, ExpansionCoverageTarget>();
-  let requiresPathDiscovery = false;
   const hasNonRootExpanded =
     expandedKeys.size > 1 ||
     (expandedKeys.size === 1 && !expandedKeys.has(rootKey));
@@ -359,9 +353,8 @@ export const planExpansionForAxis = ({
   const candidates = Array.from(expandedKeys)
     .filter(key => key !== rootKey || !hasNonRootExpanded)
     .map(key => {
-      const node = nodes[key];
-      const path = node?.path ?? parsePath(key);
-      return { key, node, path };
+      const path = nodes[key]?.path ?? parsePath(key);
+      return { key, path };
     })
     .filter(({ path }) => canRequestAxisExpansion({ program, axis, path }))
     .map(candidate => ({ ...candidate, target: buildTarget(candidate.key) }));
@@ -395,8 +388,6 @@ export const planExpansionForAxis = ({
     if (!missingTargetKeys.has(keyForTarget)) {
       return;
     }
-    const node = nodes[target.pathKey];
-    requiresPathDiscovery ||= !node;
     fetchTargets.set(keyForTarget, target);
   });
 
@@ -424,8 +415,5 @@ export const planExpansionForAxis = ({
     }
   });
 
-  return {
-    targets: Array.from(fetchTargets.values()),
-    requiresPathDiscovery,
-  };
+  return Array.from(fetchTargets.values());
 };

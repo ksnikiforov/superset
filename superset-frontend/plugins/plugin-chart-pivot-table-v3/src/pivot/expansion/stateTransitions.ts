@@ -27,7 +27,6 @@ import {
   buildIntersectionCoverageTarget,
   filterMissingExpansionCoverageTargets,
   planExpansionForAxis,
-  type PivotExpansionPlan,
 } from './planner';
 import {
   buildDesiredExpandedKeys,
@@ -46,11 +45,6 @@ export const PIVOT_AXES: PivotAxis[] = ['row', 'col'];
 
 const getAxisDimensionCount = (program: PivotProgram, axis: PivotAxis) =>
   (axis === 'row' ? program.rowDimensions : program.columnDimensions).length;
-
-const emptyExpansionPlan: PivotExpansionPlan = {
-  targets: [],
-  requiresPathDiscovery: false,
-};
 
 const createExpansionMetricPolicy = (program: PivotProgram) => {
   const metricNodePolicy = createMetricNodePolicy(program);
@@ -549,7 +543,7 @@ export const planHydrationIteration = ({
     hasNonRootCols && !hasNonRootRows ? new Set<string>() : desired.row;
   const colExpansionKeys =
     hasNonRootRows && !hasNonRootCols ? new Set<string>() : desired.col;
-  const rowPlan = planExpansionForAxis({
+  const rowTargets = planExpansionForAxis({
     axis: 'row',
     program,
     expandedKeys: rowExpansionKeys,
@@ -557,7 +551,7 @@ export const planHydrationIteration = ({
     coverage: { rowDepth: visibleRowDepth, columnDepth: visibleColDepth },
     factSelectors,
   });
-  const colPlan = planExpansionForAxis({
+  const colTargets = planExpansionForAxis({
     axis: 'col',
     program,
     expandedKeys: colExpansionKeys,
@@ -589,21 +583,22 @@ export const planHydrationIteration = ({
     }).length > 0
       ? [intersectionCoverageTarget]
       : [];
+  const hasUnknownRowExpansion = Array.from(rowExpansionKeys).some(
+    key => key !== rootKey && !tree.rows[key],
+  );
+  const hasUnknownColumnExpansion = Array.from(colExpansionKeys).some(
+    key => key !== rootKey && !tree.cols[key],
+  );
   const shouldFetchIntersectionOnly =
     intersectionTargets.length > 0 &&
-    !rowPlan.requiresPathDiscovery &&
-    !colPlan.requiresPathDiscovery;
-  const { rowPlan: rowPlanForTransport, colPlan: colPlanForTransport } =
-    shouldFetchIntersectionOnly
-      ? {
-          rowPlan: emptyExpansionPlan,
-          colPlan: emptyExpansionPlan,
-        }
-      : { rowPlan, colPlan };
+    !hasUnknownRowExpansion &&
+    !hasUnknownColumnExpansion;
+  const rowTargetsForTransport = shouldFetchIntersectionOnly ? [] : rowTargets;
+  const colTargetsForTransport = shouldFetchIntersectionOnly ? [] : colTargets;
 
   if (
-    rowPlanForTransport.targets.length === 0 &&
-    colPlanForTransport.targets.length === 0 &&
+    rowTargetsForTransport.length === 0 &&
+    colTargetsForTransport.length === 0 &&
     intersectionTargets.length === 0
   ) {
     return {
@@ -616,8 +611,8 @@ export const planHydrationIteration = ({
     kind: 'fetch',
     desired,
     targets: [
-      ...rowPlanForTransport.targets,
-      ...colPlanForTransport.targets,
+      ...rowTargetsForTransport,
+      ...colTargetsForTransport,
       ...intersectionTargets,
     ],
   };

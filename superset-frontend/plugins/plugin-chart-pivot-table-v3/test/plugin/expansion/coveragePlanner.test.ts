@@ -55,7 +55,7 @@ const makeNode = ({
 });
 
 const sortFetchPathKeys = (plan: ReturnType<typeof planExpansionForAxis>) =>
-  plan.targets.map(target => target.pathKey).sort();
+  plan.map(target => target.pathKey).sort();
 
 const factSelectorsFromFetchedColumnDepths = (
   depthByPathKey: Map<string, number>,
@@ -107,7 +107,6 @@ describe('expansionPlanner', () => {
     });
 
     expect(sortFetchPathKeys(plan)).toEqual([]);
-    expect(plan.requiresPathDiscovery).toBe(false);
   });
 
   it('trusts fetched coverage for semantically expandable nodes', () => {
@@ -185,7 +184,6 @@ describe('expansionPlanner', () => {
     });
 
     expect(sortFetchPathKeys(plan)).toEqual([keyAB]);
-    expect(plan.requiresPathDiscovery).toBe(true);
   });
 
   it('fetches the ancestor when a missing key needs deeper data', () => {
@@ -206,7 +204,6 @@ describe('expansionPlanner', () => {
     });
 
     expect(sortFetchPathKeys(plan)).toEqual([keyA]);
-    expect(plan.requiresPathDiscovery).toBe(true);
   });
 
   it('updates planned fetches as expansion and depth evolve', () => {
