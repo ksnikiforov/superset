@@ -49,6 +49,13 @@ export type PivotCoverageNeed = {
   columnScope: AxisPathScope;
 };
 
+export const pathsFromAxisScope = (scope: AxisPathScope): PivotPath[] => {
+  if (scope.kind === 'root') {
+    return [];
+  }
+  return scope.kind === 'paths' ? scope.paths : scope.ancestorPaths;
+};
+
 const clampDepth = (depth: number, maxDepth: number) => {
   if (!Number.isFinite(depth)) {
     return 0;
@@ -176,9 +183,9 @@ const scopeCoversAxisPaths = (
     if (axisScopeContainsValuesToken(needScope)) {
       return false;
     }
-    const paths =
-      needScope.kind === 'paths' ? needScope.paths : needScope.ancestorPaths;
-    return paths.every(path => path.length <= loadedDepth);
+    return pathsFromAxisScope(needScope).every(
+      path => path.length <= loadedDepth,
+    );
   }
   if (scope.kind === 'axisPaths' && scope.axis !== axis) {
     return true;

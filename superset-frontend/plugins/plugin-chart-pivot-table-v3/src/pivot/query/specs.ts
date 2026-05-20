@@ -70,7 +70,7 @@ import {
   coerceValueForColumn,
   normalizeTemporalValue,
 } from './pathFilters';
-import { buildFactCoverage } from '../runtime/coverage';
+import { buildFactCoverage, pathsFromAxisScope } from '../runtime/coverage';
 import {
   buildFactValueKeys,
   type PivotFactSelector,
@@ -934,28 +934,14 @@ export const buildExpansionQuerySpecs = (
   }
 
   const { formData, layout, target } = request;
-  const { rowPathKeys, columnPathKeys, coverageTarget } = target;
-  const rowPaths = rowPathKeys.map(parsePath);
-  const columnPaths = columnPathKeys.map(parsePath);
+  const { coverageTarget } = target;
+  const rowPaths = pathsFromAxisScope(coverageTarget.need.rowScope);
+  const columnPaths = pathsFromAxisScope(coverageTarget.need.columnScope);
   const anchor = resolveIntersectionExpansionAnchor({
     layout,
     rowPaths,
     columnPaths,
   });
-  const scopedRowPaths = rowPaths.map(path =>
-    projectQueryFilterPath({
-      layout,
-      axis: 'row',
-      path,
-    }),
-  );
-  const scopedColumnPaths = columnPaths.map(path =>
-    projectQueryFilterPath({
-      layout,
-      axis: 'col',
-      path,
-    }),
-  );
   return buildAxisExpansionSpecs({
     formData,
     layout,
@@ -965,20 +951,20 @@ export const buildExpansionQuerySpecs = (
     filters: ctx => [
       ...buildPathSetFilterClauses({
         axisGroupby: ctx.rowGroupbyForQuery,
-        paths: scopedRowPaths,
+        paths: rowPaths,
         colTypeMap: formData.colTypeMap,
       }),
       ...buildPathSetFilterClauses({
         axisGroupby: ctx.colGroupbyForQuery,
-        paths: scopedColumnPaths,
+        paths: columnPaths,
         colTypeMap: formData.colTypeMap,
       }),
     ],
-    suffix: `|intersection:${stableStringify([rowPathKeys, columnPathKeys])}`,
+    suffix: `|intersection:${stableStringify([rowPaths, columnPaths])}`,
     scope: {
       kind: 'intersection',
-      rowPaths: scopedRowPaths,
-      columnPaths: scopedColumnPaths,
+      rowPaths,
+      columnPaths,
     },
   });
 };

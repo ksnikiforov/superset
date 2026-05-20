@@ -20,7 +20,10 @@ import {
   type FetchPivotExpansionRequest,
   type FetchPivotExpansionResult,
 } from '../../../src/pivot/expansion/fetchPivotExpansion';
-import { buildFactCoverage } from '../../../src/pivot/runtime/coverage';
+import {
+  buildFactCoverage,
+  pathsFromAxisScope,
+} from '../../../src/pivot/runtime/coverage';
 import {
   type PivotFact,
   type PivotFactStoreBatchScope,
@@ -66,7 +69,9 @@ export const getMockExpansionRequestAxis = (
   if (params.kind === 'intersection') {
     return 'row';
   }
-  return params.kind === 'batch' ? params.batch.axis : params.target.axis;
+  return params.kind === 'batch'
+    ? (params.batch.targets[0]?.axis ?? 'row')
+    : params.target.axis;
 };
 
 export const getMockExpansionRequestPath = (
@@ -247,7 +252,7 @@ export const buildMockIntersectionFactBatches = ({
 }: Pick<FetchPivotIntersectionParams, 'formData' | 'layout' | 'target'> & {
   data?: PivotTreeData;
 }): PivotFactStoreBatch[] => {
-  const { rowPathKeys, columnPathKeys, coverageTarget } = target;
+  const { coverageTarget } = target;
   const specs = buildExpansionQuerySpecs({
     kind: 'intersection',
     formData,
@@ -268,8 +273,8 @@ export const buildMockIntersectionFactBatches = ({
           valueKeys: [],
           scope: {
             kind: 'intersection',
-            rowPaths: rowPathKeys.map(parsePath),
-            columnPaths: columnPathKeys.map(parsePath),
+            rowPaths: pathsFromAxisScope(coverageTarget.need.rowScope),
+            columnPaths: pathsFromAxisScope(coverageTarget.need.columnScope),
           },
         },
       ];

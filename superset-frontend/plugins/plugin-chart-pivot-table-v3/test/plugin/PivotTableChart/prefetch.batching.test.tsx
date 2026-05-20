@@ -25,7 +25,6 @@ import {
 } from '../../../src/types';
 
 import { fetchPivotExpansion } from '../../../src/pivot/expansion/fetchPivotExpansion';
-import { serializePath } from '../../../src/pivot/core/path';
 import type {
   FetchPivotBranchesBatchParams,
   FetchPivotBranchesBatchResult,
@@ -267,7 +266,7 @@ describe('PivotTableChart batching on persisted restore', () => {
       if (params.kind === 'branch') {
         return Promise.resolve(buildMockBranchFetchResult(params));
       }
-      if (params.batch.axis === 'row') {
+      if (params.batch.targets[0]?.axis === 'row') {
         return deferredRow.implementation(params);
       }
       return deferredCol.implementation(params);
@@ -322,12 +321,12 @@ describe('PivotTableChart batching on persisted restore', () => {
     expect(expansionCalls('intersection')[0][0]).toEqual(
       expect.objectContaining({
         target: expect.objectContaining({
-          rowPathKeys: [serializePath(['A']), serializePath(['B'])],
-          columnPathKeys: [serializePath(['CA']), serializePath(['NY'])],
           coverageTarget: expect.objectContaining({
             need: expect.objectContaining({
               rowDepth: 2,
               columnDepth: 2,
+              rowScope: { kind: 'paths', paths: [['A'], ['B']] },
+              columnScope: { kind: 'paths', paths: [['CA'], ['NY']] },
             }),
           }),
         }),

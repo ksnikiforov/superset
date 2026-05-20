@@ -66,8 +66,6 @@ export type BatchGroup = {
 
 export type IntersectionFetchTarget = {
   kind: 'intersection';
-  rowPathKeys: string[];
-  columnPathKeys: string[];
   coverageTarget: ExpansionCoverageTarget;
 };
 

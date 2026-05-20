@@ -660,8 +660,6 @@ export const planHydrationIteration = ({
       ? [
           {
             kind: 'intersection',
-            rowPathKeys,
-            columnPathKeys,
             coverageTarget: intersectionCoverageTarget,
           },
         ]

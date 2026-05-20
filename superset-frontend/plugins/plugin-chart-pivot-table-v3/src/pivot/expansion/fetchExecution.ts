@@ -20,6 +20,7 @@ import { type PivotTableQueryFormData, type PivotTreeData } from '../../types';
 import { parsePath, serializePath } from '../core/path';
 import { type ChartDataWarning } from '../data/ChartDataClient';
 import { type LayoutContext } from '../layout/LayoutContext';
+import { pathsFromAxisScope } from '../runtime/coverage';
 import { type PivotFactStore } from '../runtime/factStore';
 import {
   type LatestRequestScope,
@@ -242,6 +243,13 @@ const setPhaseLoadingKeys = (
   }
 };
 
+const loadingKeysForIntersection = ({
+  coverageTarget,
+}: IntersectionFetchTarget) => [
+  ...pathsFromAxisScope(coverageTarget.need.rowScope).map(serializePath),
+  ...pathsFromAxisScope(coverageTarget.need.columnScope).map(serializePath),
+];
+
 export const fetchExpansionTargetDeltas = async ({
   targets,
   runtime,
@@ -285,10 +293,7 @@ export const fetchExpansionTargetDeltas = async ({
   });
   setPhaseLoadingKeys(
     runtime,
-    missingIntersections.flatMap(target => [
-      ...target.rowPathKeys,
-      ...target.columnPathKeys,
-    ]),
+    missingIntersections.flatMap(loadingKeysForIntersection),
   );
   await Promise.all(
     missingIntersections.map(target =>

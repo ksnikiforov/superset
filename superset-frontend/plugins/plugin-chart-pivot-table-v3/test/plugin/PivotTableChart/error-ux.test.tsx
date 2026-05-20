@@ -91,7 +91,7 @@ describe('PivotTableChart error UX (Phase 4.5)', () => {
         const path = parsePath(target.pathKey);
         return fetchPivotBranchMock({
           formData,
-          axis: batch.axis,
+          axis: target.axis,
           path,
           visibleRowDepth,
           visibleColDepth,

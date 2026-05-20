@@ -112,7 +112,7 @@ describe('PivotTableChart persisted prefetch ignores stale results', () => {
         return Promise.resolve(
           fetchPivotBranchMock({
             formData,
-            axis: batch.axis,
+            axis: target.axis,
             path,
             visibleRowDepth,
             visibleColDepth,
