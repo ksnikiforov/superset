@@ -198,7 +198,6 @@ describe('runtime coverage query specs contract', () => {
     const layout = buildLayoutContext(formData);
     const batch: BatchGroup = {
       axis: 'row',
-      signature: 'values-only',
       parentPathKey: '',
       siblingValues: ['US', 'CA'],
       targets: [
@@ -247,7 +246,6 @@ describe('runtime coverage query specs contract', () => {
     const layout = buildLayoutContext(formData);
     const batch: BatchGroup = {
       axis: 'row',
-      signature: 'subtotal-display',
       parentPathKey: serializePath(['US']),
       siblingValues: [SUBTOTAL_TOKEN],
       targets: [

@@ -345,8 +345,8 @@ Implementation rules for accelerated chunks:
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13308` insertions, `18186` deletions, net `-4878`.
-- Current production TypeScript/TSX total: about `28632` lines.
+- Production `src`: `13304` insertions, `18186` deletions, net `-4882`.
+- Current production TypeScript/TSX total: about `28628` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -358,17 +358,17 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `28632` | `-4878` | `< 28000` |
-| Strict core pipeline | `11337` | `11468` | `+131` | `8000` |
+| Full production `src` | `33510` | `28628` | `-4882` | `< 28000` |
+| Strict core pipeline | `11337` | `11464` | `+127` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4951` | `+268` | `3000-4000` |
-| Broad core pipeline | `16020` | `16419` | `+399` | `11000-13000` |
+| Broad core pipeline | `16020` | `16415` | `+395` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
 | `pivot/runtime/*` | `3769` |
-| `pivot/expansion/*` | `2545` |
+| `pivot/expansion/*` | `2541` |
 | `pivot/query/*` | `1520` |
 | `pivot/layout/*` | `770` |
 | `pivot/core/*` | `252` |
@@ -387,6 +387,11 @@ target only with transport grouping metadata. The bounded row x column
 intersection path is preserved through an explicit `requiresPathDiscovery`
 planner flag, so already-visible row/column paths still choose a narrower
 intersection request instead of broader same-axis branch batches.
+
+Latest transport cleanup: emitted `BatchGroup` requests no longer carry a
+separate `signature` field. Candidate signatures are used only while grouping
+sibling expansion targets; once the batch is built, the request shape contains
+only axis, parent path, sibling values, and target coverage.
 
 Latest fact-boundary cleanup: `PivotFactStore` now rejects facts whose row or
 column path depth does not match the declared batch coverage. Test expansion

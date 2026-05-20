@@ -66,7 +66,6 @@ export type BatchCandidate = ExpansionCoverageTarget & {
 
 export type BatchGroup = {
   axis: PivotAxis;
-  signature: string;
   parentPathKey: string;
   siblingValues: PivotPathValue[];
   targets: BatchCandidate[];

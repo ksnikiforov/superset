@@ -177,7 +177,6 @@ describe('fetchBatch', () => {
     });
     const batch: TestBatchGroup = {
       axis: 'row',
-      signature: 'sig',
       parentPathKey: serializePath(['US']),
       siblingValues: ['CA', 'NY'],
       targets: [
@@ -232,7 +231,6 @@ describe('fetchBatch', () => {
     });
     const batch: TestBatchGroup = {
       axis: 'row',
-      signature: 'sig',
       parentPathKey: serializePath(['US']),
       siblingValues: [null],
       targets: [
@@ -279,7 +277,6 @@ describe('fetchBatch', () => {
     });
     const batch: TestBatchGroup = {
       axis: 'row',
-      signature: 'sig',
       parentPathKey: serializePath([]),
       siblingValues: ['US'],
       targets: [
@@ -312,7 +309,6 @@ describe('fetchBatch', () => {
     });
     const batch: TestBatchGroup = {
       axis: 'row',
-      signature: 'sig',
       parentPathKey: serializePath(['US']),
       siblingValues: ['CA', 'NY'],
       targets: [
@@ -401,7 +397,6 @@ describe('fetchBatch', () => {
     });
     const batch: TestBatchGroup = {
       axis: 'row',
-      signature: 'sig',
       parentPathKey: serializePath(['US']),
       siblingValues: ['CA'],
       targets: [
@@ -467,7 +462,6 @@ describe('fetchBatch', () => {
     });
     const batch: TestBatchGroup = {
       axis: 'row',
-      signature: 'values-only',
       parentPathKey: '',
       siblingValues: ['US', 'CA'],
       targets: [

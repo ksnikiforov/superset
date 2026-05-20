@@ -84,7 +84,6 @@ type CandidateWithPath = BatchCandidate & {
 
 type BatchGroupSeed = {
   axis: BatchGroup['axis'];
-  signature: string;
   parentPathKey: string;
   nonNullTargets: CandidateWithPath[];
   nullTargets: CandidateWithPath[];
@@ -113,7 +112,6 @@ const buildBatchGroups = (
 ): BatchGroup[] =>
   chunkTargets(targets, maxBatchSize).map(chunk => ({
     axis: seed.axis,
-    signature: seed.signature,
     parentPathKey: seed.parentPathKey,
     siblingValues: chunk.map(target => target.siblingValue),
     targets: chunk,
@@ -144,7 +142,6 @@ export const optimizeExpansionFetchPlan = ({
     ]);
     const seed = groups.get(groupKey) ?? {
       axis: target.axis,
-      signature: target.batchSignature,
       parentPathKey,
       nonNullTargets: [],
       nullTargets: [],

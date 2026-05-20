@@ -210,7 +210,6 @@ describe('Global Async Queries (HTTP 202) support', () => {
 
     const batch: TestBatchGroup = {
       axis: 'row',
-      signature: 'sig',
       parentPathKey: serializePath(['US']),
       siblingValues: ['CA', 'NY'],
       targets: [

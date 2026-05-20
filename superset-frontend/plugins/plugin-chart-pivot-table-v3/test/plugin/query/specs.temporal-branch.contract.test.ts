@@ -145,7 +145,6 @@ describe('temporal branch query specs contract', () => {
     const layout = buildLayoutContext(formData);
     const batch: BatchGroup = {
       axis: 'row',
-      signature: 'temporal-batch',
       parentPathKey: '',
       siblingValues: ['1483228800000', '1514764800000'],
       targets: [
