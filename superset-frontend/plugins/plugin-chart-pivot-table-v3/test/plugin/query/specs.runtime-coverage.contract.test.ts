@@ -64,16 +64,17 @@ describe('runtime coverage query specs contract', () => {
     const layout = buildLayoutContext(formData);
 
     const specs = buildExpansionQuerySpecs({
-      kind: 'branch',
       formData,
       layout,
-      target: fetchTarget({
-        layout,
-        axis: 'row',
-        path: ['US'],
-        visibleRowDepth: 1,
-        visibleColDepth: 1,
-      }),
+      targets: [
+        fetchTarget({
+          layout,
+          axis: 'row',
+          path: ['US'],
+          visibleRowDepth: 1,
+          visibleColDepth: 1,
+        }),
+      ],
     });
 
     expect(specs.length).toBeGreaterThan(0);
@@ -101,16 +102,17 @@ describe('runtime coverage query specs contract', () => {
     const layout = buildLayoutContext(formData);
 
     const specs = buildExpansionQuerySpecs({
-      kind: 'branch',
       formData,
       layout,
-      target: fetchTarget({
-        layout,
-        axis: 'col',
-        path: ['Furniture'],
-        visibleRowDepth: 0,
-        visibleColDepth: 1,
-      }),
+      targets: [
+        fetchTarget({
+          layout,
+          axis: 'col',
+          path: ['Furniture'],
+          visibleRowDepth: 0,
+          visibleColDepth: 1,
+        }),
+      ],
     });
 
     expect(specs).toEqual([]);
@@ -129,16 +131,17 @@ describe('runtime coverage query specs contract', () => {
 
     const path = ['Furniture', encodeMetricKey('sales')];
     const specs = buildExpansionQuerySpecs({
-      kind: 'branch',
       formData,
       layout,
-      target: fetchTarget({
-        layout,
-        axis: 'col',
-        path,
-        visibleRowDepth: 0,
-        visibleColDepth: 1,
-      }),
+      targets: [
+        fetchTarget({
+          layout,
+          axis: 'col',
+          path,
+          visibleRowDepth: 0,
+          visibleColDepth: 1,
+        }),
+      ],
     });
 
     expect(specs.length).toBeGreaterThan(0);
@@ -168,16 +171,17 @@ describe('runtime coverage query specs contract', () => {
     const layout = buildLayoutContext(formData);
 
     const specs = buildExpansionQuerySpecs({
-      kind: 'branch',
       formData,
       layout,
-      target: fetchTarget({
-        layout,
-        axis: 'row',
-        path: ['US', SUBTOTAL_TOKEN],
-        visibleRowDepth: 2,
-        visibleColDepth: 0,
-      }),
+      targets: [
+        fetchTarget({
+          layout,
+          axis: 'row',
+          path: ['US', SUBTOTAL_TOKEN],
+          visibleRowDepth: 2,
+          visibleColDepth: 0,
+        }),
+      ],
     });
 
     expect(specs).toEqual([]);
@@ -215,10 +219,9 @@ describe('runtime coverage query specs contract', () => {
     ];
 
     const specs = buildExpansionQuerySpecs({
-      kind: 'batch',
       formData,
       layout,
-      batch,
+      targets: batch,
     });
 
     expect(specs).toEqual([]);
@@ -247,10 +250,9 @@ describe('runtime coverage query specs contract', () => {
     ];
 
     const specs = buildExpansionQuerySpecs({
-      kind: 'batch',
       formData,
       layout,
-      batch,
+      targets: batch,
     });
 
     expect(specs).toEqual([]);

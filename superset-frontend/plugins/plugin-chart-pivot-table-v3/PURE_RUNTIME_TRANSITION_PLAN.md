@@ -174,20 +174,21 @@ Current semantic-layout contract:
   axis-expansion spec boundary instead of a separate local planning path.
 - Branch, batch, and intersection fetch no longer expose separate production
   query APIs. Expansion query execution now enters through
-  `fetchPivotExpansion({ kind })`, and the legacy `fetchPivotBranch`,
+  `fetchPivotExpansion({ targets })`, and the legacy `fetchPivotBranch`,
   `fetchPivotBranchesBatch`, and `fetchPivotIntersection` wrapper exports have
   been removed.
+- Expansion fetch request typing is coverage-target based. The caller no
+  longer submits branch/batch/intersection request kinds; query/spec planning
+  privately chooses branch, batch, or intersection transport from the same
+  target set.
 - Branch, batch, and intersection query-spec construction now also enters
-  through one request-shaped API, `buildExpansionQuerySpecs({ kind })`. The
-  separate production `buildBranchQuerySpecs`, `buildBatchQuerySpecs`, and
-  `buildIntersectionQuerySpecs` exports have been removed.
-- Expansion fetch request typing now derives from the same
-  `ExpansionQuerySpecRequest` union used by query-spec construction. The fetch
-  layer no longer maintains a duplicate branch/batch/intersection request
-  union.
+  through one coverage-target API, `buildExpansionQuerySpecs({ targets })`.
+  The separate production `buildBranchQuerySpecs`,
+  `buildBatchQuerySpecs`, and `buildIntersectionQuerySpecs` exports have been
+  removed.
 - Expansion fetch execution no longer carries separate same-axis/hydration
-  request-kind overrides. Branch, batch, and intersection identity now comes
-  from the typed expansion request itself.
+  request-kind overrides. Expansion submits target coverage only; transport
+  grouping and intersection ordering belong to the query/fetch boundary.
 - Seamless runtime fetch execution no longer accepts hook-injected fetch,
   fetch-start, or error callbacks. It calls the chart-data client directly
   through its runtime boundary, leaving the chart hook responsible only for UI
@@ -311,8 +312,10 @@ Execution order is now most-impactful first:
 | 4 | Render-policy deletion | Renderer consumes a final materialized tree | Delete remaining metric/header/subtotal inference in `layoutRuntime.ts`, `renderDisplay.ts`, and `usePivotRenderModel.ts` | Medium-large deletion; removes render-time semantic repair |
 | 5 | Chart runtime shrink | Chart shell wires hooks only | Move remaining query/runtime/filter orchestration out only when it deletes chart-owned decisions; avoid extraction-only controllers | Medium deletion; lower architectural risk |
 
-The next concrete implementation target is Priority 1: a manifest query executor.
-The intended shape:
+Priority 1 has now removed caller-visible branch/batch/intersection expansion
+requests. The remaining Priority 1 work is to collapse the private
+branch/batch/intersection query-spec union into first-class coverage needs
+without losing transport batching. The intended shape remains:
 
 ```text
 visible/runtime intent
@@ -345,8 +348,8 @@ Implementation rules for accelerated chunks:
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `12205` insertions, `18301` deletions, net `-6096`.
-- Current production TypeScript/TSX total: about `27414` lines.
+- Production `src`: `12150` insertions, `18273` deletions, net `-6123`.
+- Current production TypeScript/TSX total: about `27387` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -358,18 +361,18 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `27414` | `-6096` | `< 28000` |
-| Strict core pipeline | `11337` | `11179` | `-158` | `8000` |
+| Full production `src` | `33510` | `27387` | `-6123` | `< 28000` |
+| Strict core pipeline | `11337` | `11152` | `-185` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4026` | `-657` | `3000-4000` |
-| Broad core pipeline | `16020` | `15205` | `-815` | `11000-13000` |
+| Broad core pipeline | `16020` | `15178` | `-842` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `3539` |
-| `pivot/expansion/*` | `2350` |
-| `pivot/query/*` | `1373` |
+| `pivot/runtime/*` | `3535` |
+| `pivot/expansion/*` | `2215` |
+| `pivot/query/*` | `1485` |
 | `pivot/layout/*` | `739` |
 | `pivot/core/*` | `252` |
 | core domain helpers | `1537` |
@@ -390,6 +393,13 @@ a second projected coverage-key grouping layer. The planner now dedupes exact
 coverage needs and preserves the ancestor-discovery rule; transport batching
 remains owned by the expansion executor. The obsolete projection coverage-key
 API was deleted with that grouping layer.
+
+Latest expansion coverage execution cleanup: expansion execution no longer
+builds caller-visible branch, batch, or intersection request objects. The
+hydration loop submits one set of `ExpansionCoverageTarget`s, and
+`query/specs.ts` privately chooses singleton branch specs, batched sibling
+specs, and delayed intersection specs. Batching remains, but only as transport
+planning below the coverage boundary.
 
 Latest expansion-execution cleanup: sibling batching now groups by the
 query-scope path carried by the coverage need, not by the rendered display path

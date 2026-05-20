@@ -68,18 +68,9 @@ jest.mock('../../../src/pivot/expansion/fetchPivotExpansion', () => {
   };
 });
 
-type FetchPivotBranchParams = Extract<
-  FetchPivotExpansionRequest,
-  { kind: 'branch' }
->;
-type FetchPivotBranchesBatchParams = Extract<
-  FetchPivotExpansionRequest,
-  { kind: 'batch' }
->;
-type FetchPivotIntersectionParams = Extract<
-  FetchPivotExpansionRequest,
-  { kind: 'intersection' }
->;
+type FetchPivotBranchParams = FetchPivotExpansionRequest;
+type FetchPivotBranchesBatchParams = FetchPivotExpansionRequest;
+type FetchPivotIntersectionParams = FetchPivotExpansionRequest;
 type FetchPivotBranchResult = FetchPivotExpansionResult;
 type FetchPivotBranchesBatchResult = FetchPivotExpansionResult;
 
@@ -92,18 +83,17 @@ describe('PivotTableChart expansion state persistence', () => {
   const intersectionExpansionMock = jest.fn();
 
   const resolveBatchWithSingles = async ({
-    batch,
+    targets,
     formData,
     factStore,
     layout,
   }: FetchPivotBranchesBatchParams): Promise<FetchPivotBranchesBatchResult> => {
     const results = await Promise.all(
-      batch.map(target =>
+      targets.map(target =>
         Promise.resolve(
           branchExpansionMock({
-            kind: 'branch',
             formData,
-            target,
+            targets: [target],
             factStore,
             layout,
           }),
@@ -114,7 +104,7 @@ describe('PivotTableChart expansion state persistence', () => {
       (acc, result) => mergeTrees(acc, result.data),
       undefined,
     );
-    return { data: merged };
+    return { data: merged, didFetch: true };
   };
 
   const createDeferredBranchFetch = () => {
@@ -310,16 +300,19 @@ describe('PivotTableChart expansion state persistence', () => {
     });
     fetchPivotExpansionMock.mockReset();
     fetchPivotExpansionMock.mockImplementation(params => {
-      switch (params.kind) {
-        case 'branch':
-          return branchExpansionMock(params);
-        case 'batch':
-          return batchExpansionMock(params);
-        case 'intersection':
-          return intersectionExpansionMock(params);
-        default:
-          return Promise.resolve({});
+      if (
+        params.targets.every(
+          target =>
+            target.need.rowScope.kind !== 'root' &&
+            target.need.columnScope.kind !== 'root',
+        )
+      ) {
+        return intersectionExpansionMock(params);
       }
+      if (params.targets.length > 1) {
+        return batchExpansionMock(params);
+      }
+      return branchExpansionMock(params);
     });
   });
 
@@ -1883,7 +1876,9 @@ describe('PivotTableChart expansion state persistence', () => {
     branchExpansionMock.mockImplementation((params: FetchPivotBranchParams) =>
       Promise.resolve(
         buildMockBranchFetchResult(params, {
-          data: treesByDepth.get(params.target.need.rowDepth) ?? shallowTree,
+          data:
+            treesByDepth.get(params.targets[0]?.need.rowDepth ?? 0) ??
+            shallowTree,
         }),
       ),
     );
@@ -1974,7 +1969,7 @@ describe('PivotTableChart expansion state persistence', () => {
     };
     const shallowTree = buildTreeWithDepth(2);
     const deepTree = buildTreeWithDepth(3);
-    branchExpansionMock.mockImplementationOnce(
+    branchExpansionMock.mockImplementation(
       resolveMockBranchFetchResult({ data: deepTree }),
     );
 

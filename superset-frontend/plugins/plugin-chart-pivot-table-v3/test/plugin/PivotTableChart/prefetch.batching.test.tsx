@@ -24,17 +24,13 @@ import {
   PivotTreeData,
 } from '../../../src/types';
 
-import { fetchPivotExpansion } from '../../../src/pivot/expansion/fetchPivotExpansion';
-import type {
-  FetchPivotBranchesBatchParams,
-  FetchPivotBranchesBatchResult,
+import {
+  fetchPivotExpansion,
+  type FetchPivotExpansionRequest,
+  type FetchPivotExpansionResult,
 } from '../../../src/pivot/expansion/fetchPivotExpansion';
 import { buildFormData } from '../fixtures/pivotFormData';
-import {
-  buildMockBatchFetchResult,
-  buildMockBranchFetchResult,
-  buildMockIntersectionFetchResult,
-} from '../fixtures/factBatches';
+import { buildMockExpansionFetchResult } from '../fixtures/factBatches';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';
 
@@ -48,32 +44,31 @@ jest.mock('../../../src/pivot/expansion/fetchPivotExpansion', () => {
   };
 });
 
-const createDeferredBatchFetch = () => {
-  const resolvers: Array<
-    (result: Partial<FetchPivotBranchesBatchResult>) => void
-  > = [];
-  const promises: Array<Promise<FetchPivotBranchesBatchResult>> = [];
-  let resolvedResult: Partial<FetchPivotBranchesBatchResult> | undefined;
+const createDeferredExpansionFetch = () => {
+  const resolvers: Array<(result: Partial<FetchPivotExpansionResult>) => void> =
+    [];
+  const promises: Array<Promise<FetchPivotExpansionResult>> = [];
+  let resolvedResult: Partial<FetchPivotExpansionResult> | undefined;
 
   return {
-    implementation: (params: FetchPivotBranchesBatchParams) => {
+    implementation: (params: FetchPivotExpansionRequest) => {
       if (resolvedResult) {
         const promise = Promise.resolve(
-          buildMockBatchFetchResult(params, resolvedResult),
+          buildMockExpansionFetchResult(params, resolvedResult),
         );
         promises.push(promise);
         return promise;
       }
-      const promise = new Promise<FetchPivotBranchesBatchResult>(resolve => {
+      const promise = new Promise<FetchPivotExpansionResult>(resolve => {
         resolvers.push(result =>
-          resolve(buildMockBatchFetchResult(params, result)),
+          resolve(buildMockExpansionFetchResult(params, result)),
         );
       });
       promises.push(promise);
       return promise;
     },
     promises,
-    resolveAll: (result: Partial<FetchPivotBranchesBatchResult>) => {
+    resolveAll: (result: Partial<FetchPivotExpansionResult>) => {
       resolvedResult = result;
       resolvers.splice(0).forEach(resolve => resolve(result));
     },
@@ -113,22 +108,17 @@ const buildTree = ({
   );
 };
 
-describe('PivotTableChart batching on persisted restore', () => {
+describe('PivotTableChart coverage prefetch on persisted restore', () => {
   const fetchPivotExpansionMock = fetchPivotExpansion as jest.MockedFunction<
     typeof fetchPivotExpansion
   >;
-  const expansionCalls = (
-    kind: Parameters<typeof fetchPivotExpansion>[0]['kind'],
-  ) =>
-    fetchPivotExpansionMock.mock.calls.filter(
-      ([params]) => params.kind === kind,
-    );
+  const coverageCalls = () => fetchPivotExpansionMock.mock.calls;
 
   beforeEach(() => {
     fetchPivotExpansionMock.mockReset();
   });
 
-  it('batches sibling expansions into one request', async () => {
+  it('submits sibling expansions as one coverage request', async () => {
     const records = [
       { r1: 'A', r2: 'X', m1: 10 },
       { r1: 'A', r2: 'Y', m1: 12 },
@@ -137,15 +127,6 @@ describe('PivotTableChart batching on persisted restore', () => {
     const rowGroupby = ['r1', 'r2'];
     const colGroupby: string[] = [];
     const metrics = ['m1'];
-
-    const baseTree = buildTree({
-      records,
-      rowGroupby,
-      colGroupby,
-      metrics,
-      rowDepth: 1,
-      colDepth: 0,
-    });
     const branchTree = buildTree({
       records,
       rowGroupby,
@@ -155,21 +136,11 @@ describe('PivotTableChart batching on persisted restore', () => {
       colDepth: 0,
     });
 
-    fetchPivotExpansionMock.mockImplementation(params => {
-      if (params.kind === 'batch') {
-        return Promise.resolve(
-          buildMockBatchFetchResult(params, { data: branchTree }),
-        );
-      }
-      if (params.kind === 'intersection') {
-        return Promise.resolve(
-          buildMockIntersectionFetchResult(params, { data: branchTree }),
-        );
-      }
-      return Promise.resolve(
-        buildMockBranchFetchResult(params, { data: branchTree }),
-      );
-    });
+    fetchPivotExpansionMock.mockImplementation(params =>
+      Promise.resolve(
+        buildMockExpansionFetchResult(params, { data: branchTree }),
+      ),
+    );
 
     const pivotExpansionState: PivotExpansionState = {
       rowKeys: rowGroupby,
@@ -180,7 +151,14 @@ describe('PivotTableChart batching on persisted restore', () => {
 
     render(
       <PivotTableChart
-        data={baseTree}
+        data={buildTree({
+          records,
+          rowGroupby,
+          colGroupby,
+          metrics,
+          rowDepth: 1,
+          colDepth: 0,
+        })}
         formData={buildFormData({
           groupbyRows: rowGroupby,
           groupbyColumns: colGroupby,
@@ -204,11 +182,13 @@ describe('PivotTableChart batching on persisted restore', () => {
       />,
     );
 
-    await waitFor(() => expect(expansionCalls('batch')).toHaveLength(1));
-    expect(expansionCalls('branch')).toHaveLength(0);
+    await waitFor(() => expect(coverageCalls()).toHaveLength(1));
+    expect(coverageCalls()[0][0].targets.map(target => target.pathKey)).toEqual(
+      expect.arrayContaining(['A', 'B']),
+    );
   });
 
-  it('applies out-of-order batch results correctly', async () => {
+  it('hydrates row and column persisted targets from one coverage request', async () => {
     const records = [
       { r1: 'A', r2: 'X', c1: 'CA', c2: 'P', m1: 10 },
       { r1: 'A', r2: 'Y', c1: 'CA', c2: 'Q', m1: 12 },
@@ -218,59 +198,11 @@ describe('PivotTableChart batching on persisted restore', () => {
     const rowGroupby = ['r1', 'r2'];
     const colGroupby = ['c1', 'c2'];
     const metrics = ['m1'];
+    const deferredFetch = createDeferredExpansionFetch();
 
-    const baseTree = buildTree({
-      records,
-      rowGroupby,
-      colGroupby,
-      metrics,
-      rowDepth: 1,
-      colDepth: 1,
-    });
-    const rowBranch = buildTree({
-      records,
-      rowGroupby,
-      colGroupby,
-      metrics,
-      rowDepth: 2,
-      colDepth: 1,
-    });
-    const colBranch = buildTree({
-      records,
-      rowGroupby,
-      colGroupby,
-      metrics,
-      rowDepth: 1,
-      colDepth: 2,
-    });
-    const intersectionBranch = buildTree({
-      records,
-      rowGroupby,
-      colGroupby,
-      metrics,
-      rowDepth: 2,
-      colDepth: 2,
-    });
-
-    const deferredRow = createDeferredBatchFetch();
-    const deferredCol = createDeferredBatchFetch();
-
-    fetchPivotExpansionMock.mockImplementation(params => {
-      if (params.kind === 'intersection') {
-        return Promise.resolve(
-          buildMockIntersectionFetchResult(params, {
-            data: intersectionBranch,
-          }),
-        );
-      }
-      if (params.kind === 'branch') {
-        return Promise.resolve(buildMockBranchFetchResult(params));
-      }
-      if (params.batch[0]?.axis === 'row') {
-        return deferredRow.implementation(params);
-      }
-      return deferredCol.implementation(params);
-    });
+    fetchPivotExpansionMock.mockImplementation(params =>
+      deferredFetch.implementation(params),
+    );
 
     const pivotExpansionState: PivotExpansionState = {
       rowKeys: rowGroupby,
@@ -281,7 +213,14 @@ describe('PivotTableChart batching on persisted restore', () => {
 
     render(
       <PivotTableChart
-        data={baseTree}
+        data={buildTree({
+          records,
+          rowGroupby,
+          colGroupby,
+          metrics,
+          rowDepth: 1,
+          colDepth: 1,
+        })}
         formData={buildFormData({
           groupbyRows: rowGroupby,
           groupbyColumns: colGroupby,
@@ -305,22 +244,27 @@ describe('PivotTableChart batching on persisted restore', () => {
       />,
     );
 
-    await waitFor(() => expect(expansionCalls('batch')).toHaveLength(2));
-
-    expect(deferredCol.promises).toHaveLength(1);
-    expect(deferredRow.promises).toHaveLength(1);
-    deferredCol.resolveAll({ data: colBranch });
-    deferredRow.resolveAll({ data: rowBranch });
+    await waitFor(() => expect(coverageCalls()).toHaveLength(1));
+    expect(deferredFetch.promises).toHaveLength(1);
+    deferredFetch.resolveAll({
+      data: buildTree({
+        records,
+        rowGroupby,
+        colGroupby,
+        metrics,
+        rowDepth: 2,
+        colDepth: 2,
+      }),
+    });
 
     await waitFor(() => {
       expect(screen.getByText('X')).toBeInTheDocument();
       expect(screen.getByText('P')).toBeInTheDocument();
     });
-    expect(expansionCalls('branch')).toHaveLength(0);
-    expect(expansionCalls('intersection')).toHaveLength(1);
-    expect(expansionCalls('intersection')[0][0]).toEqual(
-      expect.objectContaining({
-        target: expect.objectContaining({
+    expect(coverageCalls()[0][0].targets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          pathKey: '',
           need: expect.objectContaining({
             rowDepth: 2,
             columnDepth: 2,
@@ -328,7 +272,7 @@ describe('PivotTableChart batching on persisted restore', () => {
             columnScope: { kind: 'paths', paths: [['CA'], ['NY']] },
           }),
         }),
-      }),
+      ]),
     );
   });
 });

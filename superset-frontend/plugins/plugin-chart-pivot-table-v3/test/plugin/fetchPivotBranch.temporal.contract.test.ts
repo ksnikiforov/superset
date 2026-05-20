@@ -57,7 +57,7 @@ type QueryPayload = {
 };
 
 const fetchBranch = (
-  params: Omit<FetchPivotExpansionRequest, 'kind' | 'layout' | 'target'> & {
+  params: Omit<FetchPivotExpansionRequest, 'layout' | 'targets'> & {
     axis: PivotAxis;
     path: PivotPath;
     visibleRowDepth?: number;
@@ -77,18 +77,19 @@ const fetchBranch = (
   } = params;
   const pathKey = serializePath(path);
   return fetchPivotExpansion({
-    kind: 'branch',
     formData,
     factStore,
     requestGroupId,
     layout,
-    target: buildAxisExpansionCoverageTarget({
-      program: layout.pivotProgram,
-      axis,
-      pathKey,
-      rowDepth: visibleRowDepth,
-      columnDepth: visibleColDepth,
-    }),
+    targets: [
+      buildAxisExpansionCoverageTarget({
+        program: layout.pivotProgram,
+        axis,
+        pathKey,
+        rowDepth: visibleRowDepth,
+        columnDepth: visibleColDepth,
+      }),
+    ],
   });
 };
 

@@ -259,6 +259,8 @@ type PlannedQuerySpecParams = {
 
 type DepthPair = { rowDepth: number; columnDepth: number };
 
+export const MAX_EXPANSION_BATCH_SIBLINGS = 50;
+
 const parentDepth = (depth: number) => Math.max(depth - 1, 0);
 
 const rangeFromOne = (depth: number): number[] =>
@@ -486,10 +488,6 @@ const resolveFetchContext = ({
     axis,
     path,
   });
-  const rowGroupbyForBranch =
-    axis === 'row' ? coverageTarget.need.rowDimensions : rowGroupby;
-  const colGroupbyForBranch =
-    axis === 'col' ? coverageTarget.need.columnDimensions : colGroupby;
   const { rowDepth, columnDepth: colDepth } = coverageTarget.need;
 
   const hasRowFormatting =
@@ -526,8 +524,8 @@ const resolveFetchContext = ({
     columnDepth: colDepth,
     hasValueCells: true,
     needsTotals,
-    rowGroupby: rowGroupbyForBranch,
-    colGroupby: colGroupbyForBranch,
+    rowGroupby: coverageTarget.need.rowDimensions,
+    colGroupby: coverageTarget.need.columnDimensions,
     metrics: materializedMetrics,
     availableMetrics: metrics,
     metricFormattingScope: formData.metricFormattingScope,
@@ -643,7 +641,7 @@ const buildAxisExpansionSpecs = ({
   );
 };
 
-const isNullish = (value: PivotPathValue) =>
+const isNullish = (value: PivotPathValue | unknown) =>
   value === null || value === undefined;
 
 const buildBatchFilterClauses = ({
@@ -778,7 +776,76 @@ const targetScopePaths = (
     axis === 'row' ? target.need.rowScope : target.need.columnScope,
   );
 
-export type ExpansionQuerySpecRequest =
+const chunkTargets = (
+  targets: ExpansionCoverageTarget[],
+  chunkSize: number,
+): ExpansionCoverageTarget[][] => {
+  const sorted = [...targets].sort((a, b) =>
+    serializePath(targetScopePaths(a, a.axis)[0] ?? []).localeCompare(
+      serializePath(targetScopePaths(b, b.axis)[0] ?? []),
+    ),
+  );
+  const chunks: ExpansionCoverageTarget[][] = [];
+  for (let idx = 0; idx < sorted.length; idx += chunkSize) {
+    chunks.push(sorted.slice(idx, idx + chunkSize));
+  }
+  return chunks;
+};
+
+export const optimizeExpansionFetchPlan = ({
+  targets,
+  maxBatchSize = MAX_EXPANSION_BATCH_SIBLINGS,
+}: {
+  targets: ExpansionCoverageTarget[];
+  maxBatchSize?: number;
+}): {
+  batches: ExpansionCoverageTarget[][];
+  singles: ExpansionCoverageTarget[];
+} => {
+  const singles: ExpansionCoverageTarget[] = [];
+  const groups = new Map<string, ExpansionCoverageTarget[]>();
+
+  targets.forEach(target => {
+    const path = targetScopePaths(target, target.axis)[0] ?? [];
+    if (path.length === 0) {
+      singles.push(target);
+      return;
+    }
+    const parentPathKey = serializePath(path.slice(0, -1));
+    const siblingValue = path[path.length - 1];
+    const groupKey = stableStringify([
+      target.axis,
+      parentPathKey,
+      isNullish(siblingValue) ? 'null' : 'value',
+      target.need.rowDepth,
+      target.need.columnDepth,
+      target.need.rowDimensions,
+      target.need.columnDimensions,
+      target.need.valueKeys,
+      target.axis === 'row' ? target.need.columnScope : target.need.rowScope,
+    ]);
+    groups.set(groupKey, [...(groups.get(groupKey) ?? []), target]);
+  });
+
+  const batches: ExpansionCoverageTarget[][] = [];
+  groups.forEach(group => {
+    chunkTargets(group, maxBatchSize).forEach(chunk => {
+      if (chunk.length <= 1) {
+        singles.push(...chunk);
+        return;
+      }
+      batches.push(chunk);
+    });
+  });
+
+  return { batches, singles };
+};
+
+const isIntersectionTarget = (target: ExpansionCoverageTarget) =>
+  target.need.rowScope.kind !== 'root' &&
+  target.need.columnScope.kind !== 'root';
+
+type ExpansionQuerySpecRequest =
   | {
       kind: 'branch';
       formData: PivotTableQueryFormData;
@@ -798,7 +865,7 @@ export type ExpansionQuerySpecRequest =
       target: ExpansionCoverageTarget;
     };
 
-export const buildExpansionQuerySpecs = (
+const buildExpansionQuerySpecsForRequest = (
   request: ExpansionQuerySpecRequest,
 ): PlannedQuerySpec[] => {
   if (request.kind === 'branch') {
@@ -900,6 +967,51 @@ export const buildExpansionQuerySpecs = (
       columnPaths,
     },
   });
+};
+
+export const buildExpansionQuerySpecs = ({
+  formData,
+  layout,
+  targets,
+  includeIntersections = true,
+}: {
+  formData: PivotTableQueryFormData;
+  layout: LayoutContext;
+  targets: ExpansionCoverageTarget[];
+  includeIntersections?: boolean;
+}): PlannedQuerySpec[] => {
+  const intersections = targets.filter(isIntersectionTarget);
+  const { batches, singles } = optimizeExpansionFetchPlan({
+    targets: targets.filter(target => !isIntersectionTarget(target)),
+  });
+  return [
+    ...singles.flatMap(target =>
+      buildExpansionQuerySpecsForRequest({
+        kind: 'branch',
+        formData,
+        layout,
+        target,
+      }),
+    ),
+    ...batches.flatMap(batch =>
+      buildExpansionQuerySpecsForRequest({
+        kind: 'batch',
+        formData,
+        layout,
+        batch,
+      }),
+    ),
+    ...(includeIntersections
+      ? intersections.flatMap(target =>
+          buildExpansionQuerySpecsForRequest({
+            kind: 'intersection',
+            formData,
+            layout,
+            target,
+          }),
+        )
+      : []),
+  ];
 };
 
 export const buildInitialQuerySpecs = (

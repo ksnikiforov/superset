@@ -29,15 +29,8 @@ import {
 import { stableStringify } from '../shared/stableStringify';
 import { planHydrationIteration } from './stateTransitions';
 import type { PivotProgram } from '../runtime/types';
-import {
-  type ExpansionCoverageTarget,
-  filterMissingExpansionCoverageTargets,
-  isIntersectionCoverageTarget,
-} from './planner';
-import {
-  fetchPivotExpansion,
-  type FetchPivotExpansionRequest,
-} from './fetchPivotExpansion';
+import { type ExpansionCoverageTarget } from './planner';
+import { fetchPivotExpansion } from './fetchPivotExpansion';
 
 export type ExpansionFetchRuntime = {
   requestScope: LatestRequestScope;
@@ -62,136 +55,32 @@ type HydrationFetchLoopParams = {
   fetchRuntime: ExpansionFetchRuntime;
 };
 
-type ExpansionQueryRequest = Omit<
-  FetchPivotExpansionRequest,
-  'formData' | 'requestGroupId' | 'factStore'
->;
-
-export const MAX_BATCH_SIBLINGS = 50;
-
-type BatchPlan = {
-  batches: ExpansionCoverageTarget[][];
-  singles: ExpansionCoverageTarget[];
-};
-
-type BatchSeed = {
-  targets: ExpansionCoverageTarget[];
-};
-
-const isNullish = (value: unknown) => value === null || value === undefined;
-
-const targetScopePaths = (target: ExpansionCoverageTarget) =>
-  pathsFromAxisScope(
-    target.axis === 'row' ? target.need.rowScope : target.need.columnScope,
-  );
-
-const chunkTargets = (
-  targets: ExpansionCoverageTarget[],
-  chunkSize: number,
-): ExpansionCoverageTarget[][] => {
-  const sorted = [...targets].sort((a, b) =>
-    serializePath(targetScopePaths(a)[0] ?? []).localeCompare(
-      serializePath(targetScopePaths(b)[0] ?? []),
-    ),
-  );
-  const chunks: ExpansionCoverageTarget[][] = [];
-  for (let idx = 0; idx < sorted.length; idx += chunkSize) {
-    chunks.push(sorted.slice(idx, idx + chunkSize));
-  }
-  return chunks;
-};
-
-export const optimizeExpansionFetchPlan = ({
-  targets,
-  maxBatchSize = MAX_BATCH_SIBLINGS,
-}: {
-  targets: ExpansionCoverageTarget[];
-  maxBatchSize?: number;
-}): BatchPlan => {
-  const singles: ExpansionCoverageTarget[] = [];
-  const groups = new Map<string, BatchSeed>();
-
-  targets.forEach(target => {
-    const path = targetScopePaths(target)[0] ?? [];
-    if (path.length === 0) {
-      singles.push(target);
-      return;
-    }
-    const parentPathKey = serializePath(path.slice(0, -1));
-    const siblingValue = path[path.length - 1];
-    const groupKey = stableStringify([
-      target.axis,
-      parentPathKey,
-      isNullish(siblingValue) ? 'null' : 'value',
-      target.need.rowDepth,
-      target.need.columnDepth,
-      target.need.rowDimensions,
-      target.need.columnDimensions,
-      target.need.valueKeys,
-      target.axis === 'row' ? target.need.columnScope : target.need.rowScope,
-    ]);
-    const seed = groups.get(groupKey) ?? { targets: [] };
-    seed.targets.push(target);
-    groups.set(groupKey, seed);
-  });
-
-  const batches: ExpansionCoverageTarget[][] = [];
-  groups.forEach(seed => {
-    chunkTargets(seed.targets, maxBatchSize).forEach(chunk => {
-      if (chunk.length <= 1) {
-        singles.push(...chunk);
-        return;
-      }
-      batches.push(chunk);
-    });
-  });
-
-  return { batches, singles };
-};
-
 const buildExpansionRequestGroupId = ({
   runtime,
-  request,
+  targets,
 }: {
   runtime: ExpansionFetchRuntime;
-  request: ExpansionQueryRequest;
+  targets: ExpansionCoverageTarget[];
 }) =>
   stableStringify({
     instanceId: runtime.instanceId,
     transactionId: runtime.requestScope.id,
-    request,
+    targets,
   });
-
-const resolveExpansionFetchPlan = (
-  targets: ExpansionCoverageTarget[],
-): {
-  singles: ExpansionCoverageTarget[];
-  batches: ExpansionCoverageTarget[][];
-  intersections: ExpansionCoverageTarget[];
-} => {
-  const { batches, singles } = optimizeExpansionFetchPlan({
-    targets: targets.filter(target => !isIntersectionCoverageTarget(target)),
-  });
-  return {
-    singles,
-    batches,
-    intersections: targets.filter(isIntersectionCoverageTarget),
-  };
-};
 
 const executeExpansionQueryTask = async ({
-  request,
+  targets,
   runtime,
 }: {
-  request: ExpansionQueryRequest;
+  targets: ExpansionCoverageTarget[];
   runtime: ExpansionFetchRuntime;
-}): Promise<void> => {
+}): Promise<boolean> => {
   const { requestScope, addWarnings } = runtime;
-  const requestGroupId = buildExpansionRequestGroupId({ runtime, request });
+  const requestGroupId = buildExpansionRequestGroupId({ runtime, targets });
   const token = requestScope.beginRequest(requestGroupId);
   try {
     const result = await fetchPivotExpansion({
-      ...request,
+      targets,
       layout: runtime.layout,
       requestGroupId,
       formData: runtime.fetchFormData,
@@ -202,28 +91,10 @@ const executeExpansionQueryTask = async ({
     if (requestScope.isCurrent()) {
       addWarnings(result.warnings);
     }
+    return Boolean(result.didFetch);
   } finally {
     requestScope.finish(token);
   }
-};
-
-const filterMissingIntersectionTargets = ({
-  intersections,
-  runtime,
-}: {
-  intersections: ExpansionCoverageTarget[];
-  runtime: ExpansionFetchRuntime;
-}) => {
-  const missingRequests = filterMissingExpansionCoverageTargets({
-    targets: intersections,
-    factSelectors: runtime.factStore.getCoverageSelectors(),
-  });
-  const missingKeys = new Set(
-    missingRequests.map(request => stableStringify(request.need)),
-  );
-  return intersections.filter(target =>
-    missingKeys.has(stableStringify(target.need)),
-  );
 };
 
 const setPhaseLoadingKeys = (
@@ -240,6 +111,16 @@ const loadingKeysForIntersection = (target: ExpansionCoverageTarget) => [
   ...pathsFromAxisScope(target.need.columnScope).map(serializePath),
 ];
 
+const loadingKeysForTarget = (target: ExpansionCoverageTarget) => {
+  if (
+    target.need.rowScope.kind !== 'root' &&
+    target.need.columnScope.kind !== 'root'
+  ) {
+    return loadingKeysForIntersection(target);
+  }
+  return [target.pathKey];
+};
+
 export const fetchExpansionTargetDeltas = async ({
   targets,
   runtime,
@@ -247,60 +128,16 @@ export const fetchExpansionTargetDeltas = async ({
   targets: ExpansionCoverageTarget[];
   runtime: ExpansionFetchRuntime;
 }): Promise<boolean> => {
-  const { batches, singles, intersections } =
-    resolveExpansionFetchPlan(targets);
-  setPhaseLoadingKeys(runtime, [
-    ...singles.map(target => target.pathKey),
-    ...batches.flatMap(batch => batch.map(target => target.pathKey)),
-  ]);
-  const branchFetchPromises: Array<Promise<void>> = [
-    ...singles.map(target =>
-      executeExpansionQueryTask({
-        runtime,
-        request: {
-          kind: 'branch',
-          target,
-        },
-      }),
-    ),
-    ...batches.map(batch =>
-      executeExpansionQueryTask({
-        runtime,
-        request: {
-          kind: 'batch',
-          batch,
-        },
-      }),
-    ),
-  ];
-  await Promise.all(branchFetchPromises);
-  if (!runtime.requestScope.isCurrent()) {
-    return false;
-  }
-  const missingIntersections = filterMissingIntersectionTargets({
-    intersections,
+  setPhaseLoadingKeys(runtime, targets.flatMap(loadingKeysForTarget));
+  const didFetch = await executeExpansionQueryTask({
+    targets,
     runtime,
   });
-  setPhaseLoadingKeys(
-    runtime,
-    missingIntersections.flatMap(loadingKeysForIntersection),
-  );
-  await Promise.all(
-    missingIntersections.map(target =>
-      executeExpansionQueryTask({
-        runtime,
-        request: {
-          kind: 'intersection',
-          target,
-        },
-      }),
-    ),
-  );
   if (!runtime.requestScope.isCurrent()) {
     return false;
   }
   setPhaseLoadingKeys(runtime, []);
-  return branchFetchPromises.length + missingIntersections.length > 0;
+  return didFetch;
 };
 
 export const runHydrationExpansionFetchLoop = async ({

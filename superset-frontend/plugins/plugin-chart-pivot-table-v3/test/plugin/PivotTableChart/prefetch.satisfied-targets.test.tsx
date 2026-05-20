@@ -20,21 +20,14 @@
 import { render, screen, waitFor } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
-import { mergeTrees } from '../../../src/pivot/core/tree';
-import { parsePath } from '../../../src/pivot/core/path';
 import {
-  fetchPivotExpansion as fetchPivotBranch,
-  fetchPivotExpansion as fetchPivotBranchesBatch,
-} from '../../../src/pivot/expansion/fetchPivotExpansion';
-import type {
-  FetchPivotBranchResult,
-  FetchPivotBranchesBatchParams,
-  FetchPivotBranchesBatchResult,
+  fetchPivotExpansion,
+  type FetchPivotExpansionResult,
 } from '../../../src/pivot/expansion/fetchPivotExpansion';
 import { buildFormData } from '../fixtures/pivotFormData';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../fixtures/metricAxis';
-import { buildMockBranchFetchResult } from '../fixtures/factBatches';
+import { buildMockExpansionFetchResult } from '../fixtures/factBatches';
 
 jest.mock('../../../src/pivot/expansion/fetchPivotExpansion', () => {
   const actual = jest.requireActual(
@@ -43,7 +36,6 @@ jest.mock('../../../src/pivot/expansion/fetchPivotExpansion', () => {
   return {
     ...actual,
     fetchPivotExpansion: jest.fn(),
-    fetchPivotBranchesBatch: jest.fn(),
   };
 });
 
@@ -59,9 +51,6 @@ const createDeferred = <T,>(): Deferred<T> => {
   });
   return { promise, resolve };
 };
-
-const getRequestPath = (params: Parameters<typeof fetchPivotBranch>[0]) =>
-  params.kind === 'branch' ? parsePath(params.target.pathKey) : [];
 
 const rowGroupby = ['r1', 'r2', 'r3'];
 const colGroupby: string[] = [];
@@ -90,47 +79,15 @@ const buildTree = (
 };
 
 describe('PivotTableChart persisted prefetch hydrates until targets satisfied', () => {
-  const fetchPivotBranchMock = fetchPivotBranch as jest.MockedFunction<
-    typeof fetchPivotBranch
+  const fetchPivotExpansionMock = fetchPivotExpansion as jest.MockedFunction<
+    typeof fetchPivotExpansion
   >;
-  const fetchPivotBranchesBatchMock =
-    fetchPivotBranchesBatch as jest.MockedFunction<
-      typeof fetchPivotBranchesBatch
-    >;
-
-  const resolveBatchWithSingles = async ({
-    batch,
-    formData,
-    factStore,
-    layout,
-  }: FetchPivotBranchesBatchParams): Promise<FetchPivotBranchesBatchResult> => {
-    const results = await Promise.all(
-      batch.map(target =>
-        Promise.resolve(
-          fetchPivotBranchMock({
-            kind: 'branch',
-            formData,
-            layout,
-            target,
-            factStore,
-          }),
-        ),
-      ),
-    );
-    const merged = results.reduce<PivotTreeData | undefined>(
-      (acc, result) => mergeTrees(acc, result.data),
-      undefined,
-    );
-    return { data: merged };
-  };
 
   beforeEach(() => {
-    fetchPivotBranchMock.mockReset();
-    fetchPivotBranchesBatchMock.mockReset();
-    fetchPivotBranchesBatchMock.mockImplementation(resolveBatchWithSingles);
+    fetchPivotExpansionMock.mockReset();
   });
 
-  it('keeps the table interactive while parent+child expansions are hydrated', async () => {
+  it('keeps the table interactive while persisted nested coverage is hydrated', async () => {
     const records = [
       { r1: 'A', r2: 'X', r3: 'P', m1: 10 },
       { r1: 'A', r2: 'X', r3: 'Q', m1: 11 },
@@ -139,28 +96,13 @@ describe('PivotTableChart persisted prefetch hydrates until targets satisfied', 
     ];
 
     const baseTree = buildTree(records, 1);
-    const branchA = buildTree(
-      records.filter(row => row.r1 === 'A'),
-      2,
+    const deepTree = buildTree(records, 3);
+    const deferredFetch = createDeferred<FetchPivotExpansionResult>();
+    fetchPivotExpansionMock.mockImplementation(params =>
+      deferredFetch.promise.then(result =>
+        buildMockExpansionFetchResult(params, result),
+      ),
     );
-    const branchAX = buildTree(
-      records.filter(row => row.r1 === 'A' && row.r2 === 'X'),
-      3,
-    );
-
-    const deferredA = createDeferred<FetchPivotBranchResult>();
-    const deferredAX = createDeferred<FetchPivotBranchResult>();
-    fetchPivotBranchMock.mockImplementation(params => {
-      if (JSON.stringify(getRequestPath(params)) === JSON.stringify(['A'])) {
-        return deferredA.promise;
-      }
-      if (
-        JSON.stringify(getRequestPath(params)) === JSON.stringify(['A', 'X'])
-      ) {
-        return deferredAX.promise;
-      }
-      return Promise.resolve(buildMockBranchFetchResult(params));
-    });
 
     const { container } = render(
       <PivotTableChart
@@ -210,51 +152,27 @@ describe('PivotTableChart persisted prefetch hydrates until targets satisfied', 
       />,
     );
 
-    await waitFor(() => expect(fetchPivotBranchMock).toHaveBeenCalled());
+    await waitFor(() => expect(fetchPivotExpansionMock).toHaveBeenCalled());
     expect(container.querySelector('table')).not.toBeNull();
     expect(screen.getByText('A')).toBeInTheDocument();
     expect(screen.getByLabelText('loading')).toBeInTheDocument();
+    expect(fetchPivotExpansionMock.mock.calls[0][0].targets).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          need: expect.objectContaining({
+            rowScope: { kind: 'paths', paths: [['A']] },
+          }),
+        }),
+        expect.objectContaining({
+          need: expect.objectContaining({
+            rowScope: { kind: 'paths', paths: [['A', 'X']] },
+          }),
+        }),
+      ]),
+    );
 
-    await waitFor(() =>
-      expect(
-        fetchPivotBranchMock.mock.calls.some(
-          ([params]) =>
-            JSON.stringify(getRequestPath(params)) === JSON.stringify(['A']),
-        ),
-      ).toBe(true),
-    );
-    const branchAParams = fetchPivotBranchMock.mock.calls.find(
-      ([params]) =>
-        JSON.stringify(getRequestPath(params)) === JSON.stringify(['A']),
-    )?.[0];
-    expect(branchAParams).toBeDefined();
-    deferredA.resolve(
-      buildMockBranchFetchResult(branchAParams!, {
-        data: branchA,
-      }),
-    );
-    await deferredA.promise;
-
-    await waitFor(() =>
-      expect(
-        fetchPivotBranchMock.mock.calls.some(
-          ([params]) =>
-            JSON.stringify(getRequestPath(params)) ===
-            JSON.stringify(['A', 'X']),
-        ),
-      ).toBe(true),
-    );
-    const branchAXParams = fetchPivotBranchMock.mock.calls.find(
-      ([params]) =>
-        JSON.stringify(getRequestPath(params)) === JSON.stringify(['A', 'X']),
-    )?.[0];
-    expect(branchAXParams).toBeDefined();
-    deferredAX.resolve(
-      buildMockBranchFetchResult(branchAXParams!, {
-        data: branchAX,
-      }),
-    );
-    await deferredAX.promise;
+    deferredFetch.resolve({ data: deepTree, didFetch: true });
+    await deferredFetch.promise;
     await waitFor(() => {
       expect(container.querySelector('table')).not.toBeNull();
       expect(screen.getByText('P')).toBeInTheDocument();

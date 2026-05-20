@@ -41,9 +41,7 @@ import {
 } from '../../../src/pivot/expansion/fetchPivotExpansion';
 import { type PivotFactStoreBatch } from '../../../src/pivot/runtime/factStore';
 import {
-  buildMockBatchFetchResult,
-  buildMockBranchFetchResult,
-  buildMockIntersectionFetchResult,
+  buildMockExpansionFetchResult as buildMockCoverageFetchResult,
   getMockExpansionRequestAxis,
 } from '../fixtures/factBatches';
 import { applyMetricAxis } from '../fixtures/metricAxis';
@@ -79,15 +77,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
   const buildMockExpansionFetchResult = (
     params: FetchPivotExpansionRequest,
     data?: PivotTreeData,
-  ) => {
-    if (params.kind === 'branch') {
-      return buildMockBranchFetchResult(params, { data });
-    }
-    if (params.kind === 'batch') {
-      return buildMockBatchFetchResult(params, { data });
-    }
-    return buildMockIntersectionFetchResult(params, { data });
-  };
+  ) => buildMockCoverageFetchResult(params, { data });
   const resolveExpansionData =
     (data?: PivotTreeData) => (params: FetchPivotExpansionRequest) =>
       Promise.resolve(buildMockExpansionFetchResult(params, data));
@@ -3091,7 +3081,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
     fetchPivotBranchMock.mockImplementation(
       async (params: FetchPivotExpansionRequest) => {
         if (
-          params.kind === 'branch' &&
+          params.targets.some(target => target.axis === 'row') &&
           getMockExpansionRequestAxis(params) === 'row'
         ) {
           await branchPromise;

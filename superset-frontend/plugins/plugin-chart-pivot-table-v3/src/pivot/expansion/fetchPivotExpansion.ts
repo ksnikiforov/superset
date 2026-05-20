@@ -17,11 +17,10 @@
  * under the License.
  */
 import { type ChartDataWarning } from '../data/ChartDataClient';
+import { type PivotTableQueryFormData } from '../../types';
+import { type ExpansionCoverageTarget } from './planner';
 import { type LayoutContext } from '../layout/LayoutContext';
-import {
-  buildExpansionQuerySpecs,
-  type ExpansionQuerySpecRequest,
-} from '../query/specs';
+import { buildExpansionQuerySpecs } from '../query/specs';
 import { type PivotFactStore } from '../runtime/factStore';
 import { type ChunkedWorkOptions } from '../runtime/chunkedWork';
 import {
@@ -30,34 +29,59 @@ import {
 } from '../runtime/ingestQueryResults';
 import { isAbortError } from '../runtime/requestLifecycle';
 
-type ExpansionRequestWithoutLayout<Request = ExpansionQuerySpecRequest> =
-  Request extends unknown ? Omit<Request, 'layout'> : never;
-
-export type FetchPivotExpansionRequest = ExpansionRequestWithoutLayout & {
+export type FetchPivotExpansionRequest = {
+  formData: PivotTableQueryFormData;
   layout: LayoutContext;
+  targets: ExpansionCoverageTarget[];
   requestGroupId?: string;
   factStore?: PivotFactStore;
 } & ChunkedWorkOptions;
 
-export type FetchPivotExpansionResult = { warnings?: ChartDataWarning[] };
+export type FetchPivotExpansionResult = {
+  didFetch?: true;
+  warnings?: ChartDataWarning[];
+};
 
 export const fetchPivotExpansion = async (
   request: FetchPivotExpansionRequest,
 ): Promise<FetchPivotExpansionResult> => {
-  const specs = buildExpansionQuerySpecs(request);
-
   try {
-    const { results } = await fetchPlannedQuerySpecs({
+    const nonIntersectionSpecs = buildExpansionQuerySpecs({
       formData: request.formData,
-      specs,
+      layout: request.layout,
+      targets: request.targets,
+      includeIntersections: false,
+    });
+    const nonIntersectionResult = await fetchPlannedQuerySpecs({
+      formData: request.formData,
+      specs: nonIntersectionSpecs,
       requestGroupId: request.requestGroupId,
       factStore: request.factStore,
       chunkSize: request.chunkSize,
       shouldContinue: request.shouldContinue,
       yieldToMain: request.yieldToMain,
     });
+    const intersectionSpecs = buildExpansionQuerySpecs({
+      formData: request.formData,
+      layout: request.layout,
+      targets: request.targets,
+    }).filter(spec => spec.meta.factSelector.scope.kind === 'intersection');
+    const intersectionResult = await fetchPlannedQuerySpecs({
+      formData: request.formData,
+      specs: intersectionSpecs,
+      requestGroupId: request.requestGroupId,
+      factStore: request.factStore,
+      chunkSize: request.chunkSize,
+      shouldContinue: request.shouldContinue,
+      yieldToMain: request.yieldToMain,
+    });
+    const results = [
+      ...nonIntersectionResult.results,
+      ...intersectionResult.results,
+    ];
     const warnings = collectPlannedQueryWarnings(results);
     return {
+      ...(results.length > 0 ? { didFetch: true as const } : {}),
       ...(warnings.length > 0 ? { warnings } : {}),
     };
   } catch (error) {

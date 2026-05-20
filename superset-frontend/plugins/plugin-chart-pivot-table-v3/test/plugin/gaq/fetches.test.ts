@@ -61,7 +61,7 @@ type TestBatchGroup = {
 };
 
 const fetchBranch = (
-  params: Omit<FetchPivotExpansionRequest, 'kind' | 'layout' | 'target'> & {
+  params: Omit<FetchPivotExpansionRequest, 'layout' | 'targets'> & {
     axis: PivotAxis;
     path: PivotPath;
     visibleRowDepth?: number;
@@ -81,23 +81,24 @@ const fetchBranch = (
   } = params;
   const pathKey = serializePath(path);
   return fetchPivotExpansion({
-    kind: 'branch',
     formData,
     factStore,
     requestGroupId,
     layout,
-    target: buildAxisExpansionCoverageTarget({
-      program: layout.pivotProgram,
-      axis,
-      pathKey,
-      rowDepth: visibleRowDepth,
-      columnDepth: visibleColDepth,
-    }),
+    targets: [
+      buildAxisExpansionCoverageTarget({
+        program: layout.pivotProgram,
+        axis,
+        pathKey,
+        rowDepth: visibleRowDepth,
+        columnDepth: visibleColDepth,
+      }),
+    ],
   });
 };
 
 const fetchBatch = (
-  params: Omit<FetchPivotExpansionRequest, 'kind' | 'layout' | 'batch'> & {
+  params: Omit<FetchPivotExpansionRequest, 'layout' | 'targets'> & {
     batch: TestBatchGroup;
     visibleRowDepth: number;
     visibleColDepth: number;
@@ -114,20 +115,19 @@ const fetchBatch = (
     requestGroupId,
   } = params;
   return fetchPivotExpansion({
-    kind: 'batch',
     formData,
     factStore,
     requestGroupId,
     layout,
-    batch: batch.targets.map(target => ({
-      ...buildAxisExpansionCoverageTarget({
+    targets: batch.targets.map(target =>
+      buildAxisExpansionCoverageTarget({
         program: layout.pivotProgram,
         axis: target.axis,
         pathKey: target.pathKey,
         rowDepth: visibleRowDepth,
         columnDepth: visibleColDepth,
       }),
-    })),
+    ),
   });
 };
 
@@ -191,7 +191,7 @@ describe('Global Async Queries (HTTP 202) support', () => {
     });
 
     expect(waitForAsyncDataMock).toHaveBeenCalledTimes(1);
-    expect(result).toEqual({});
+    expect(result).toEqual({ didFetch: true });
   });
 
   it('waits for async chart data in fetchBatch()', async () => {
@@ -230,6 +230,6 @@ describe('Global Async Queries (HTTP 202) support', () => {
     });
 
     expect(waitForAsyncDataMock).toHaveBeenCalledTimes(1);
-    expect(result).toEqual({});
+    expect(result).toEqual({ didFetch: true });
   });
 });

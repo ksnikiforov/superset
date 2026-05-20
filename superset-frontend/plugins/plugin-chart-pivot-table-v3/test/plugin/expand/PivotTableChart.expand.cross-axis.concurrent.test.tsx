@@ -23,8 +23,8 @@ import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
 
 import { fetchPivotExpansion as fetchPivotBranch } from '../../../src/pivot/expansion/fetchPivotExpansion';
 import type {
-  FetchPivotBranchParams,
-  FetchPivotBranchResult,
+  FetchPivotExpansionRequest as FetchPivotBranchParams,
+  FetchPivotExpansionResult as FetchPivotBranchResult,
 } from '../../../src/pivot/expansion/fetchPivotExpansion';
 import { buildFormData } from '../fixtures/pivotFormData';
 import {

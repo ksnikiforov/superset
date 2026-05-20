@@ -18,8 +18,8 @@
  */
 import {
   optimizeExpansionFetchPlan,
-  MAX_BATCH_SIBLINGS,
-} from '../../../src/pivot/expansion/fetchExecution';
+  MAX_EXPANSION_BATCH_SIBLINGS,
+} from '../../../src/pivot/query/specs';
 import { type ExpansionCoverageTarget } from '../../../src/pivot/expansion/planner';
 import { parsePath, serializePath } from '../../../src/pivot/core/path';
 import { encodeMetricKey } from '../../../src/pivot/core/tokens';
@@ -92,17 +92,18 @@ describe('fetchPlanOptimizer', () => {
   });
 
   it('enforces max batch size', () => {
-    const targets = Array.from({ length: MAX_BATCH_SIBLINGS + 1 }, (_, idx) =>
-      makeTarget(['US', `S${idx}`]),
+    const targets = Array.from(
+      { length: MAX_EXPANSION_BATCH_SIBLINGS + 1 },
+      (_, idx) => makeTarget(['US', `S${idx}`]),
     );
     const plan = optimizeExpansionFetchPlan({ targets });
 
     const batchSizes = plan.batches.map(batch => batch.length);
-    const hasMaxBatch = batchSizes.includes(MAX_BATCH_SIBLINGS);
+    const hasMaxBatch = batchSizes.includes(MAX_EXPANSION_BATCH_SIBLINGS);
     expect(hasMaxBatch).toBe(true);
     expect(
       batchSizes.reduce((sum, size) => sum + size, 0) + plan.singles.length,
-    ).toBe(MAX_BATCH_SIBLINGS + 1);
+    ).toBe(MAX_EXPANSION_BATCH_SIBLINGS + 1);
   });
 
   it('separates incompatible coverage depths', () => {

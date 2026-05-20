@@ -126,18 +126,19 @@ const fetchBranch = (
     requestGroupId,
   } = params;
   return fetchPivotExpansion({
-    kind: 'branch',
     formData,
     factStore,
     requestGroupId,
     layout,
-    target: buildFetchTarget({
-      layout,
-      axis,
-      path,
-      visibleRowDepth,
-      visibleColDepth,
-    }),
+    targets: [
+      buildFetchTarget({
+        layout,
+        axis,
+        path,
+        visibleRowDepth,
+        visibleColDepth,
+      }),
+    ],
   });
 };
 
@@ -156,16 +157,17 @@ const buildBranchSpecs = ({
 }) => {
   const layout = buildLayoutContext(formData);
   return buildExpansionQuerySpecs({
-    kind: 'branch',
     formData,
     layout,
-    target: buildFetchTarget({
-      layout,
-      axis,
-      path,
-      visibleRowDepth,
-      visibleColDepth,
-    }),
+    targets: [
+      buildFetchTarget({
+        layout,
+        axis,
+        path,
+        visibleRowDepth,
+        visibleColDepth,
+      }),
+    ],
   });
 };
 

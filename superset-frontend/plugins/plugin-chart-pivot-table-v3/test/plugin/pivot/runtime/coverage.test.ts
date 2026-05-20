@@ -540,16 +540,17 @@ describe('branch fact coverage', () => {
       });
 
       const coverage = buildExpansionQuerySpecs({
-        kind: 'branch',
         formData,
         layout,
-        target: buildAxisExpansionCoverageTarget({
-          program,
-          axis,
-          pathKey: serializePath(['US', encodeMetricKey('sales'), 'Boston']),
-          rowDepth: axis === 'row' ? 2 : 0,
-          columnDepth: axis === 'col' ? 2 : 0,
-        }),
+        targets: [
+          buildAxisExpansionCoverageTarget({
+            program,
+            axis,
+            pathKey: serializePath(['US', encodeMetricKey('sales'), 'Boston']),
+            rowDepth: axis === 'row' ? 2 : 0,
+            columnDepth: axis === 'col' ? 2 : 0,
+          }),
+        ],
       }).map(spec => spec.meta.factSelector.coverage);
 
       expect(projection.filterDimensionPath).toEqual(['US']);

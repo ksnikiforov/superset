@@ -119,7 +119,7 @@ const withBatchCoverageTargets = ({
   }));
 
 const fetchBatch = (
-  params: Omit<FetchPivotExpansionRequest, 'kind' | 'layout' | 'batch'> & {
+  params: Omit<FetchPivotExpansionRequest, 'layout' | 'targets'> & {
     batch: TestBatchGroup;
     visibleRowDepth: number;
     visibleColDepth: number;
@@ -136,12 +136,11 @@ const fetchBatch = (
     requestGroupId,
   } = params;
   return fetchPivotExpansion({
-    kind: 'batch',
     formData,
     factStore,
     requestGroupId,
     layout,
-    batch: withBatchCoverageTargets({
+    targets: withBatchCoverageTargets({
       layout,
       batch,
       visibleRowDepth,
@@ -320,10 +319,9 @@ describe('fetchBatch', () => {
       visibleColDepth: 0,
     });
     const specs = buildExpansionQuerySpecs({
-      kind: 'batch',
       formData,
       layout,
-      batch: batchWithCoverage,
+      targets: batchWithCoverage,
     });
     expect(specs).toHaveLength(1);
 
@@ -402,10 +400,9 @@ describe('fetchBatch', () => {
       visibleColDepth: 1,
     });
     const specs = buildExpansionQuerySpecs({
-      kind: 'batch',
       formData,
       layout,
-      batch: batchWithCoverage,
+      targets: batchWithCoverage,
     });
     expect(specs.length).toBeGreaterThan(1);
 

@@ -89,16 +89,17 @@ describe('temporal branch query specs contract', () => {
     const layout = buildLayoutContext(formData);
     const path = ['1483228800000'];
     const specs = buildExpansionQuerySpecs({
-      kind: 'branch',
       formData,
       layout,
-      target: fetchTarget({
-        layout,
-        axis: 'row',
-        path,
-        visibleRowDepth: 1,
-        visibleColDepth: 0,
-      }),
+      targets: [
+        fetchTarget({
+          layout,
+          axis: 'row',
+          path,
+          visibleRowDepth: 1,
+          visibleColDepth: 0,
+        }),
+      ],
     });
 
     expect(specs.length).toBeGreaterThan(0);
@@ -162,10 +163,9 @@ describe('temporal branch query specs contract', () => {
     ];
 
     const specs = buildExpansionQuerySpecs({
-      kind: 'batch',
       formData,
       layout,
-      batch,
+      targets: batch,
     });
 
     expect(specs.length).toBeGreaterThan(0);

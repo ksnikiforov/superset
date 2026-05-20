@@ -47,44 +47,28 @@ type MockFetchResult<T> = Partial<T> & {
   factBatches?: PivotFactStoreBatch[];
 };
 
-type FetchPivotBranchParams = Extract<
-  FetchPivotExpansionRequest,
-  { kind: 'branch' }
->;
-type FetchPivotBranchesBatchParams = Extract<
-  FetchPivotExpansionRequest,
-  { kind: 'batch' }
->;
-type FetchPivotIntersectionParams = Extract<
-  FetchPivotExpansionRequest,
-  { kind: 'intersection' }
->;
+type FetchPivotBranchParams = FetchPivotExpansionRequest;
+type FetchPivotBranchesBatchParams = FetchPivotExpansionRequest;
+type FetchPivotIntersectionParams = FetchPivotExpansionRequest;
 type FetchPivotBranchResult = FetchPivotExpansionResult;
 type FetchPivotBranchesBatchResult = FetchPivotExpansionResult;
 type FetchPivotIntersectionResult = FetchPivotExpansionResult;
 
 export const getMockExpansionRequestAxis = (
   params: FetchPivotExpansionRequest,
-) => {
-  if (params.kind === 'intersection') {
-    return 'row';
-  }
-  return params.kind === 'batch'
-    ? (params.batch[0]?.axis ?? 'row')
-    : params.target.axis;
-};
+) => params.targets[0]?.axis ?? 'row';
 
 export const getMockExpansionRequestPath = (
   params: FetchPivotExpansionRequest,
 ): PivotPath => {
-  if (params.kind === 'intersection') {
+  const target = params.targets[0];
+  if (
+    target?.need.rowScope.kind !== 'root' &&
+    target?.need.columnScope.kind !== 'root'
+  ) {
     return [];
   }
-  return parsePath(
-    params.kind === 'batch'
-      ? (params.batch[0]?.pathKey ?? '')
-      : params.target.pathKey,
-  );
+  return parsePath(target?.pathKey ?? '');
 };
 
 const stripMockFactBatches = <T>(result: MockFetchResult<T>): Partial<T> => {
@@ -92,6 +76,14 @@ const stripMockFactBatches = <T>(result: MockFetchResult<T>): Partial<T> => {
   delete fetchResult.factBatches;
   return fetchResult;
 };
+
+const stripMockFactBatchesWithFetch = <T extends FetchPivotExpansionResult>(
+  result: MockFetchResult<T>,
+  factBatches: PivotFactStoreBatch[],
+): T => ({
+  ...stripMockFactBatches(result),
+  ...(factBatches.length > 0 ? { didFetch: true as const } : {}),
+});
 
 const toFactPath = (path: PivotPath): PivotPath =>
   path.filter(
@@ -178,22 +170,23 @@ const buildMockFactBatchesFromSpecs = (
     facts: buildFactsForSpec(spec, data),
   }));
 
-export const buildMockBranchFactBatches = ({
+export const buildMockExpansionFactBatches = ({
   formData,
   layout,
-  target,
+  targets,
   data,
-}: Pick<FetchPivotBranchParams, 'formData' | 'layout' | 'target'> & {
+}: Pick<FetchPivotExpansionRequest, 'formData' | 'layout' | 'targets'> & {
   data?: PivotTreeData;
 }): PivotFactStoreBatch[] => {
   const specs = buildExpansionQuerySpecs({
-    kind: 'branch',
     formData,
     layout,
-    target,
+    targets,
   });
   return buildMockFactBatchesFromSpecs(specs, data);
 };
+
+export const buildMockBranchFactBatches = buildMockExpansionFactBatches;
 
 export const buildMockBranchFetchResult = (
   params: FetchPivotBranchParams,
@@ -201,9 +194,9 @@ export const buildMockBranchFetchResult = (
 ): FetchPivotBranchResult => {
   const factBatches =
     result.factBatches ??
-    buildMockBranchFactBatches({ ...params, data: result.data });
+    buildMockExpansionFactBatches({ ...params, data: result.data });
   factBatches.forEach(batch => params.factStore?.upsertBatch(batch));
-  return stripMockFactBatches(result);
+  return stripMockFactBatchesWithFetch(result, factBatches);
 };
 
 export const resolveMockBranchFetchResult =
@@ -214,16 +207,15 @@ export const resolveMockBranchFetchResult =
 export const buildMockBatchFactBatches = ({
   formData,
   layout,
-  batch,
+  targets,
   data,
-}: Pick<FetchPivotBranchesBatchParams, 'batch' | 'formData' | 'layout'> & {
+}: Pick<FetchPivotBranchesBatchParams, 'targets' | 'formData' | 'layout'> & {
   data?: PivotTreeData;
 }): PivotFactStoreBatch[] => {
   const specs = buildExpansionQuerySpecs({
-    kind: 'batch',
     formData,
     layout,
-    batch,
+    targets,
   });
   return buildMockFactBatchesFromSpecs(specs, data);
 };
@@ -236,7 +228,7 @@ export const buildMockBatchFetchResult = (
     result.factBatches ??
     buildMockBatchFactBatches({ ...params, data: result.data });
   factBatches.forEach(batch => params.factStore?.upsertBatch(batch));
-  return stripMockFactBatches(result);
+  return stripMockFactBatchesWithFetch(result, factBatches);
 };
 
 export const resolveMockBatchFetchResult =
@@ -247,17 +239,20 @@ export const resolveMockBatchFetchResult =
 export const buildMockIntersectionFactBatches = ({
   formData,
   layout,
-  target,
+  targets,
   data,
-}: Pick<FetchPivotIntersectionParams, 'formData' | 'layout' | 'target'> & {
+}: Pick<FetchPivotIntersectionParams, 'formData' | 'layout' | 'targets'> & {
   data?: PivotTreeData;
 }): PivotFactStoreBatch[] => {
   const specs = buildExpansionQuerySpecs({
-    kind: 'intersection',
     formData,
     layout,
-    target,
+    targets,
   });
+  const target = targets[0];
+  if (!target) {
+    return [];
+  }
   return specs.length > 0
     ? buildMockFactBatchesFromSpecs(specs, data)
     : [
@@ -287,23 +282,18 @@ export const buildMockIntersectionFetchResult = (
     result.factBatches ??
     buildMockIntersectionFactBatches({ ...params, data: result.data });
   factBatches.forEach(batch => params.factStore?.upsertBatch(batch));
-  return stripMockFactBatches(result);
+  return stripMockFactBatchesWithFetch(result, factBatches);
 };
 
 export const buildMockExpansionFetchResult = (
   params: FetchPivotExpansionRequest,
   result: MockFetchResult<FetchPivotExpansionResult> = {},
 ): FetchPivotExpansionResult => {
-  switch (params.kind) {
-    case 'branch':
-      return buildMockBranchFetchResult(params, result);
-    case 'batch':
-      return buildMockBatchFetchResult(params, result);
-    case 'intersection':
-      return buildMockIntersectionFetchResult(params, result);
-    default:
-      return stripMockFactBatches(result);
-  }
+  const factBatches =
+    result.factBatches ??
+    buildMockExpansionFactBatches({ ...params, data: result.data });
+  factBatches.forEach(batch => params.factStore?.upsertBatch(batch));
+  return stripMockFactBatchesWithFetch(result, factBatches);
 };
 
 export const resolveMockExpansionFetchResult =
