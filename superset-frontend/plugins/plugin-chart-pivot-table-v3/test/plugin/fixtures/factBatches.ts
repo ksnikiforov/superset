@@ -252,7 +252,6 @@ export const buildMockIntersectionFactBatches = ({
 }: Pick<FetchPivotIntersectionParams, 'formData' | 'layout' | 'target'> & {
   data?: PivotTreeData;
 }): PivotFactStoreBatch[] => {
-  const { coverageTarget } = target;
   const specs = buildExpansionQuerySpecs({
     kind: 'intersection',
     formData,
@@ -266,15 +265,15 @@ export const buildMockIntersectionFactBatches = ({
           coverage: buildFactCoverage({
             rowDimensions: layout.pivotProgram.rowDimensions,
             columnDimensions: layout.pivotProgram.columnDimensions,
-            rowDepth: coverageTarget.need.rowDepth,
-            columnDepth: coverageTarget.need.columnDepth,
+            rowDepth: target.need.rowDepth,
+            columnDepth: target.need.columnDepth,
           }),
           facts: [],
           valueKeys: [],
           scope: {
             kind: 'intersection',
-            rowPaths: pathsFromAxisScope(coverageTarget.need.rowScope),
-            columnPaths: pathsFromAxisScope(coverageTarget.need.columnScope),
+            rowPaths: pathsFromAxisScope(target.need.rowScope),
+            columnPaths: pathsFromAxisScope(target.need.columnScope),
           },
         },
       ];

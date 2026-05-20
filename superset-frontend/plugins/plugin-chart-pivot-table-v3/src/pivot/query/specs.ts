@@ -63,7 +63,6 @@ import { collectRequiredTimeOffsets } from '../measureLeaves';
 import {
   type BatchGroup,
   type ExpansionCoverageTarget,
-  type IntersectionFetchTarget,
 } from '../expansion/planner';
 import {
   buildPathFilters,
@@ -855,7 +854,7 @@ export type ExpansionQuerySpecRequest =
       kind: 'intersection';
       formData: PivotTableQueryFormData;
       layout: LayoutContext;
-      target: IntersectionFetchTarget;
+      target: ExpansionCoverageTarget;
     };
 
 export const buildExpansionQuerySpecs = (
@@ -934,9 +933,8 @@ export const buildExpansionQuerySpecs = (
   }
 
   const { formData, layout, target } = request;
-  const { coverageTarget } = target;
-  const rowPaths = pathsFromAxisScope(coverageTarget.need.rowScope);
-  const columnPaths = pathsFromAxisScope(coverageTarget.need.columnScope);
+  const rowPaths = pathsFromAxisScope(target.need.rowScope);
+  const columnPaths = pathsFromAxisScope(target.need.columnScope);
   const anchor = resolveIntersectionExpansionAnchor({
     layout,
     rowPaths,
@@ -947,7 +945,7 @@ export const buildExpansionQuerySpecs = (
     layout,
     axis: anchor.axis,
     path: anchor.path,
-    coverageTarget,
+    coverageTarget: target,
     filters: ctx => [
       ...buildPathSetFilterClauses({
         axisGroupby: ctx.rowGroupbyForQuery,

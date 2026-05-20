@@ -657,12 +657,7 @@ export const planHydrationIteration = ({
   const intersectionTargets: ExpansionFetchTarget[] =
     intersectionCoverageTarget &&
     getMissingExpansionCoverage([intersectionCoverageTarget]).length > 0
-      ? [
-          {
-            kind: 'intersection',
-            coverageTarget: intersectionCoverageTarget,
-          },
-        ]
+      ? [intersectionCoverageTarget]
       : [];
   const shouldFetchIntersectionOnly =
     intersectionTargets.length > 0 &&

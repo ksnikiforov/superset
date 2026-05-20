@@ -34,8 +34,7 @@ import {
   createExpansionCoverageDiff,
   type ExpansionCoverageTarget,
   type ExpansionFetchTarget,
-  type IntersectionFetchTarget,
-  isIntersectionFetchTarget,
+  isIntersectionCoverageTarget,
 } from './planner';
 import {
   fetchPivotExpansion,
@@ -173,18 +172,15 @@ const resolveExpansionFetchPlan = (
 ): {
   singles: ExpansionCoverageTarget[];
   batches: BatchGroup[];
-  intersections: IntersectionFetchTarget[];
+  intersections: ExpansionCoverageTarget[];
 } => {
   const { batches, singles } = optimizeExpansionFetchPlan({
-    targets: targets.filter(
-      (target): target is ExpansionCoverageTarget =>
-        !isIntersectionFetchTarget(target),
-    ),
+    targets: targets.filter(target => !isIntersectionCoverageTarget(target)),
   });
   return {
     singles,
     batches,
-    intersections: targets.filter(isIntersectionFetchTarget),
+    intersections: targets.filter(isIntersectionCoverageTarget),
   };
 };
 
@@ -220,17 +216,17 @@ const filterMissingIntersectionTargets = ({
   intersections,
   runtime,
 }: {
-  intersections: IntersectionFetchTarget[];
+  intersections: ExpansionCoverageTarget[];
   runtime: ExpansionFetchRuntime;
 }) => {
   const missingRequests = createRuntimeExpansionCoverageDiff({
     runtime,
-  })(intersections.map(target => target.coverageTarget));
+  })(intersections);
   const missingKeys = new Set(
     missingRequests.map(request => stableStringify(request.need)),
   );
   return intersections.filter(target =>
-    missingKeys.has(stableStringify(target.coverageTarget.need)),
+    missingKeys.has(stableStringify(target.need)),
   );
 };
 
@@ -243,11 +239,9 @@ const setPhaseLoadingKeys = (
   }
 };
 
-const loadingKeysForIntersection = ({
-  coverageTarget,
-}: IntersectionFetchTarget) => [
-  ...pathsFromAxisScope(coverageTarget.need.rowScope).map(serializePath),
-  ...pathsFromAxisScope(coverageTarget.need.columnScope).map(serializePath),
+const loadingKeysForIntersection = (target: ExpansionCoverageTarget) => [
+  ...pathsFromAxisScope(target.need.rowScope).map(serializePath),
+  ...pathsFromAxisScope(target.need.columnScope).map(serializePath),
 ];
 
 export const fetchExpansionTargetDeltas = async ({

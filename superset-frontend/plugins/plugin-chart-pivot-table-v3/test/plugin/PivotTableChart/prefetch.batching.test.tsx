@@ -321,13 +321,11 @@ describe('PivotTableChart batching on persisted restore', () => {
     expect(expansionCalls('intersection')[0][0]).toEqual(
       expect.objectContaining({
         target: expect.objectContaining({
-          coverageTarget: expect.objectContaining({
-            need: expect.objectContaining({
-              rowDepth: 2,
-              columnDepth: 2,
-              rowScope: { kind: 'paths', paths: [['A'], ['B']] },
-              columnScope: { kind: 'paths', paths: [['CA'], ['NY']] },
-            }),
+          need: expect.objectContaining({
+            rowDepth: 2,
+            columnDepth: 2,
+            rowScope: { kind: 'paths', paths: [['A'], ['B']] },
+            columnScope: { kind: 'paths', paths: [['CA'], ['NY']] },
           }),
         }),
       }),

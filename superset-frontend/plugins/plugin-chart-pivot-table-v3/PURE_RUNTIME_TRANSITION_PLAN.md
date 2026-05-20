@@ -345,8 +345,8 @@ Implementation rules for accelerated chunks:
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13148` insertions, `18260` deletions, net `-5112`.
-- Current production TypeScript/TSX total: about `28398` lines.
+- Production `src`: `13128` insertions, `18260` deletions, net `-5132`.
+- Current production TypeScript/TSX total: about `28378` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -358,10 +358,10 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `28398` | `-5112` | `< 28000` |
-| Strict core pipeline | `11337` | `11304` | `-33` | `8000` |
+| Full production `src` | `33510` | `28378` | `-5132` | `< 28000` |
+| Strict core pipeline | `11337` | `11284` | `-53` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4883` | `+200` | `3000-4000` |
-| Broad core pipeline | `16020` | `16187` | `+167` | `11000-13000` |
+| Broad core pipeline | `16020` | `16167` | `+147` | `11000-13000` |
 
 Current strict core breakdown:
 
@@ -932,6 +932,12 @@ parallel row/column path-key arrays. Query filters, fact-store scope, and
 loading keys derive their path sets from the compiled coverage target's
 manifest scopes, leaving the intersection target as a thin executable wrapper
 around manifest coverage.
+
+Latest intersection-wrapper cleanup: the executable intersection wrapper is
+gone. Hydration now submits the compiled intersection coverage target directly,
+and fetch execution classifies intersection work from the manifest scope shape.
+Branch, batch, and intersection transport still differ at execution time, but
+loaded coverage identity is now the same coverage target object throughout.
 
 Latest expansion signature cleanup: expansion reinitialization now consumes one
 semantic signature plus the row/column layout transition already owned by

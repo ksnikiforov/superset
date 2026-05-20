@@ -64,18 +64,11 @@ export type BatchGroup = {
   targets: ExpansionCoverageTarget[];
 };
 
-export type IntersectionFetchTarget = {
-  kind: 'intersection';
-  coverageTarget: ExpansionCoverageTarget;
-};
+export type ExpansionFetchTarget = ExpansionCoverageTarget;
 
-export type ExpansionFetchTarget =
-  | ExpansionCoverageTarget
-  | IntersectionFetchTarget;
-
-export const isIntersectionFetchTarget = (
-  target: ExpansionFetchTarget,
-): target is IntersectionFetchTarget => 'kind' in target;
+export const isIntersectionCoverageTarget = (target: ExpansionCoverageTarget) =>
+  target.need.rowScope.kind !== 'root' &&
+  target.need.columnScope.kind !== 'root';
 
 export type PivotExpansionPlan = {
   targets: ExpansionCoverageTarget[];
