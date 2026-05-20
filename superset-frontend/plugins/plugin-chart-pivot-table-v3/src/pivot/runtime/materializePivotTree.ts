@@ -30,7 +30,6 @@ import {
   type PivotTreeData,
   type PivotTreeNode,
 } from '../../types';
-import { formatPivotLabelValue, mergeTrees } from '../core/tree';
 import { serializeCellKey, serializePath } from '../core/path';
 import {
   decodeMeasureLeafId,
@@ -63,6 +62,7 @@ import {
   maybeYieldChunkedWork,
   yieldChunkedWork,
 } from './chunkedWork';
+import { formatPivotLabelValue } from '../viewModel';
 
 type MaterializationFactBatch = {
   facts: PivotFact[];
@@ -80,6 +80,61 @@ type MaterializePivotTreeInput = {
 };
 
 const emptyPivotTree = (): PivotTreeData => ({ rows: {}, cols: {}, cells: {} });
+
+const mergeTreeValueMaps = <T extends { values?: Record<string, unknown> }>(
+  left?: Record<string, T>,
+  right?: Record<string, T>,
+) => {
+  const result: Record<string, T> = { ...(left || {}) };
+  Object.entries(right || {}).forEach(([key, item]) => {
+    const existing = result[key];
+    if (!existing) {
+      result[key] = item;
+      return;
+    }
+    const values =
+      item.values && Object.keys(item.values).length > 0
+        ? { ...(existing.values || {}), ...item.values }
+        : existing.values;
+    result[key] = {
+      ...existing,
+      ...item,
+      ...(values ? { values } : {}),
+    };
+  });
+  return result;
+};
+
+const mergeTreeCells = (
+  left?: PivotTreeData['cells'],
+  right?: PivotTreeData['cells'],
+) => {
+  const result: PivotTreeData['cells'] = { ...(left ?? {}) };
+  Object.entries(right || {}).forEach(([key, cell]) => {
+    const existing = result[key];
+    if (!existing) {
+      result[key] = cell;
+      return;
+    }
+    const values =
+      cell.values && Object.keys(cell.values).length > 0
+        ? { ...(existing.values || {}), ...cell.values }
+        : existing.values;
+    result[key] = {
+      ...existing,
+      ...cell,
+      ...(values ? { values } : {}),
+      isSubtotal: cell.isSubtotal ?? existing.isSubtotal,
+    };
+  });
+  return result;
+};
+
+const mergeTrees = (left?: PivotTreeData, right?: PivotTreeData) => ({
+  rows: mergeTreeValueMaps<PivotTreeNode>(left?.rows, right?.rows),
+  cols: mergeTreeValueMaps<PivotTreeNode>(left?.cols, right?.cols),
+  cells: mergeTreeCells(left?.cells, right?.cells),
+});
 
 const buildBatchMaterializationProgram = ({
   program,

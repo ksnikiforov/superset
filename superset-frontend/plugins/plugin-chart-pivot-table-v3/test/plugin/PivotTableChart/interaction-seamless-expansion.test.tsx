@@ -32,7 +32,7 @@ import {
 import { getStableColumnKey } from '../../../src/utils';
 import { METRICS_PLACEHOLDER } from '../../../src/pivot/core/tokens';
 import { serializePath } from '../../../src/pivot/core/path';
-import { mergeTrees } from '../../../src/pivot/core/tree';
+import { mergeTrees } from '../fixtures/tree';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';
 import { supersetChartDataClient } from '../../../src/pivot/data/SupersetChartDataClient';
 import {

@@ -26,9 +26,21 @@ import {
 import { PivotTreeNode } from '../types';
 import { decodeMetricKey, isSubtotalToken } from './core/tokens';
 import { serializePath } from './core/path';
-import { formatPivotLabelValue } from './core/tree';
 
 export const rootKey = serializePath([]);
+
+export const formatPivotLabelValue = (
+  value: DataRecordValue,
+  fallback = '',
+) => {
+  if (value === null) {
+    return '(NULL)';
+  }
+  if (value === undefined) {
+    return fallback;
+  }
+  return String(value);
+};
 
 const childLookupCache = new WeakMap<
   Record<string, PivotTreeNode>,

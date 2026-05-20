@@ -34,7 +34,7 @@ import {
   SUBTOTAL_TOKEN,
 } from '../../../src/pivot/core/tokens';
 import { serializeCellKey, serializePath } from '../../../src/pivot/core/path';
-import { mergeTrees } from '../../../src/pivot/core/tree';
+import { mergeTrees } from '../fixtures/tree';
 import {
   buildBuiltInLeaf,
   buildCustomLeaf,

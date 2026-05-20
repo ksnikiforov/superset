@@ -95,21 +95,21 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `27181` | `-6329` | `< 28000` |
-| Strict core pipeline | `11337` | `10946` | `-391` | `8000` |
+| Full production `src` | `33510` | `27155` | `-6355` | `< 28000` |
+| Strict core pipeline | `11337` | `10920` | `-417` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4026` | `-657` | `3000-4000` |
-| Broad core pipeline | `16020` | `14972` | `-1048` | `11000-13000` |
+| Broad core pipeline | `16020` | `14946` | `-1074` | `11000-13000` |
 
 Strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `3515` |
+| `pivot/runtime/*` | `3570` |
 | `pivot/expansion/*` | `2136` |
 | `pivot/query/*` | `1378` |
 | `pivot/layout/*` | `739` |
-| `pivot/core/*` | `252` |
-| core domain helpers | `1537` |
+| `pivot/core/*` | `159` |
+| core domain helpers | `1549` |
 | formatting/data/render-model support | `1389` |
 
 Completed structural cuts:
@@ -133,6 +133,9 @@ Completed structural cuts:
 - Materialization is fact-store backed for initial and incremental paths.
 - Materialization no longer has a final root relabel wrapper; root labels are
   produced by tree construction/projection.
+- The legacy production `pivot/core/tree.ts` wrapper was removed; label
+  formatting now lives with the view model, and tree merging is local
+  materializer plumbing.
 - Chart-owned metadata recovery and several render-policy adapters were
   removed.
 
@@ -151,7 +154,9 @@ Open behavior checkpoints:
 - Removing single-metric base-cell propagation from measure-axis projection
   breaks visible single-metric cells, column subtotal values, databar/sorting
   offsets, and expansion subtotal cells. This branch is not a safe deletion
-  target without an explicit UX redesign for single-metric layouts.
+  target without an explicit UX redesign for single-metric layouts. The visible
+  redesign where single-metric pivots always show the metric tier is rejected,
+  so current single-metric base-cell behavior must remain.
 
 ## Execution Order
 

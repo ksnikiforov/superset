@@ -20,7 +20,7 @@
 import { fireEvent, render, screen, waitFor } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
-import { mergeTrees } from '../../../src/pivot/core/tree';
+import { mergeTrees } from '../fixtures/tree';
 import { parsePath } from '../../../src/pivot/core/path';
 import { fetchPivotExpansion as fetchPivotBranch } from '../../../src/pivot/expansion/fetchPivotExpansion';
 import {

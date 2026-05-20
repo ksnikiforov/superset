@@ -27,7 +27,7 @@ import {
   type PlannedQuerySpec,
 } from '../../../src/pivot/query/specs';
 import { buildInitialRuntimeFromSpecResults } from '../../../src/pivot/runtime/ingestQueryResults';
-import { mergeTrees } from '../../../src/pivot/core/tree';
+import { mergeTrees } from '../fixtures/tree';
 import { MetricsLayoutEnum, PivotRuntimeLayout } from '../../../src/types';
 import {
   buildBuiltInLeaf,

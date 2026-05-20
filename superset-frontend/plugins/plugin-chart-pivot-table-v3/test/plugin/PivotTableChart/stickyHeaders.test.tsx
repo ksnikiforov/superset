@@ -20,7 +20,7 @@
 import { render, waitFor, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { buildFormData } from '../fixtures/pivotFormData';
-import { mergeTrees } from '../../../src/pivot/core/tree';
+import { mergeTrees } from '../fixtures/tree';
 import { METRICS_PLACEHOLDER } from '../../../src/pivot/core/tokens';
 import { MetricsLayoutEnum } from '../../../src/types';
 import { buildTreeFromRecords } from '../fixtures/buildTreeFromRecords';

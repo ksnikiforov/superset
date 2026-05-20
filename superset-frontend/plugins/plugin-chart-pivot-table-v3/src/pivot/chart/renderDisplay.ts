@@ -29,7 +29,6 @@ import {
   isSubtotalToken,
   SUBTOTAL_TOKEN,
 } from '../core/tokens';
-import { formatPivotLabelValue } from '../core/tree';
 import {
   createMetricNodePolicy,
   getMetricLabelFromPath,
@@ -43,6 +42,7 @@ import {
   resolveAxisProjection,
 } from '../runtime/projection';
 import type { PivotProgram } from '../runtime/types';
+import { formatPivotLabelValue } from '../viewModel';
 import { type PivotLayoutResult } from './usePivotLayout';
 
 export type ColumnDisplayConfig = {

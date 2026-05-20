@@ -31,7 +31,7 @@ import {
   serializeCellKey,
   serializePath,
 } from '../../../../src/pivot/core/path';
-import { mergeTrees } from '../../../../src/pivot/core/tree';
+import { mergeTrees } from '../../fixtures/tree';
 import {
   fetchPivotExpansion as fetchPivotBranch,
   type FetchPivotExpansionRequest,

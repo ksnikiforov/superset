@@ -16,21 +16,11 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-import { DataRecordValue } from '@superset-ui/core';
-import { PivotResultCell, PivotTreeData, PivotTreeNode } from '../../types';
-
-export const formatPivotLabelValue = (
-  value: DataRecordValue,
-  fallback = '',
-) => {
-  if (value === null) {
-    return '(NULL)';
-  }
-  if (value === undefined) {
-    return fallback;
-  }
-  return String(value);
-};
+import {
+  type PivotResultCell,
+  type PivotTreeData,
+  type PivotTreeNode,
+} from '../../../src/types';
 
 export const mergeTrees = (
   left?: PivotTreeData,

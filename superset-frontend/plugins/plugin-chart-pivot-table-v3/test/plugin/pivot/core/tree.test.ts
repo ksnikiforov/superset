@@ -25,7 +25,7 @@ import {
   encodeMeasureLeafKey,
   encodeMetricKey,
 } from '../../../../src/pivot/core/tokens';
-import { mergeTrees } from '../../../../src/pivot/core/tree';
+import { mergeTrees } from '../../fixtures/tree';
 import { buildTreeFromRecords } from '../../fixtures/buildTreeFromRecords';
 import {
   buildBuiltInLeaf,

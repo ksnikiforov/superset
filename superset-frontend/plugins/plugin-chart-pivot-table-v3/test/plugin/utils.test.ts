@@ -37,9 +37,10 @@ import {
   SUBTOTAL_TOKEN,
 } from '../../src/pivot/core/tokens';
 import { serializeCellKey, serializePath } from '../../src/pivot/core/path';
-import { mergeTrees, formatPivotLabelValue } from '../../src/pivot/core/tree';
+import { formatPivotLabelValue } from '../../src/pivot/viewModel';
 import { buildTreeFromRecords } from './fixtures/buildTreeFromRecords';
 import { labelRowSubtotalLeaves, applyMetricAxis } from './fixtures/metricAxis';
+import { mergeTrees } from './fixtures/tree';
 
 const rootKey = serializePath([]);
 

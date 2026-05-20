@@ -30,7 +30,7 @@ import {
   PivotTableQueryFormData,
   PivotTreeData,
 } from '../../../src/types';
-import { mergeTrees } from '../../../src/pivot/core/tree';
+import { mergeTrees } from '../fixtures/tree';
 import { PATH_DIVIDER } from '../../../src/pivot/core/path';
 import {
   METRIC_TOKEN_PREFIX,

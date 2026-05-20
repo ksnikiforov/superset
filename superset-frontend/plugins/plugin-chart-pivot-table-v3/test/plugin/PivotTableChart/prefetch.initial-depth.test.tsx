@@ -20,7 +20,7 @@
 import { render, waitFor, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
-import { mergeTrees } from '../../../src/pivot/core/tree';
+import { mergeTrees } from '../fixtures/tree';
 import {
   fetchPivotExpansion as fetchPivotBranch,
   fetchPivotExpansion as fetchPivotIntersection,

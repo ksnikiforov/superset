@@ -39,7 +39,7 @@ import {
   serializeCellKey,
   serializePath,
 } from '../../../../src/pivot/core/path';
-import { mergeTrees } from '../../../../src/pivot/core/tree';
+import { mergeTrees } from '../../fixtures/tree';
 import { buildTreeFromRecords } from '../../fixtures/buildTreeFromRecords';
 import { applyMetricAxis } from '../../fixtures/metricAxis';
 

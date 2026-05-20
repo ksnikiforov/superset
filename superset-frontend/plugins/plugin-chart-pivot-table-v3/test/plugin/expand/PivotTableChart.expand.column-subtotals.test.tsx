@@ -21,7 +21,7 @@ import { fireEvent, render, waitFor, within } from '../../testUtils';
 import PivotTableChart from '../fixtures/TestPivotTableChart';
 import { MetricsLayoutEnum, PivotTreeData } from '../../../src/types';
 import { baseFormData, buildFormData } from '../fixtures/pivotFormData';
-import { mergeTrees } from '../../../src/pivot/core/tree';
+import { mergeTrees } from '../fixtures/tree';
 import { serializeCellKey, serializePath } from '../../../src/pivot/core/path';
 import {
   METRICS_PLACEHOLDER,

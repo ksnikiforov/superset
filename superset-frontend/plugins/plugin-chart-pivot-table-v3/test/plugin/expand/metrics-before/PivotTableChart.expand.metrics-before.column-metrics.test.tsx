@@ -27,7 +27,7 @@ import {
   decodeMetricKey,
   METRICS_PLACEHOLDER,
 } from '../../../../src/pivot/core/tokens';
-import { mergeTrees } from '../../../../src/pivot/core/tree';
+import { mergeTrees } from '../../fixtures/tree';
 import { fetchPivotExpansion as fetchPivotBranch } from '../../../../src/pivot/expansion/fetchPivotExpansion';
 import {
   buildMockBranchFetchResult,

@@ -25,7 +25,7 @@ import {
 } from '@superset-ui/core';
 import { type DateFormatter, PivotTreeData } from '../../../src/types';
 import { serializeCellKey, serializePath } from '../../../src/pivot/core/path';
-import { formatPivotLabelValue } from '../../../src/pivot/core/tree';
+import { formatPivotLabelValue } from '../../../src/pivot/viewModel';
 import { getMetricKeys } from '../../../src/pivot/metrics';
 
 export const buildTreeFromRecords = (
