@@ -190,7 +190,6 @@ export const useExpansionEngine = ({
   });
   const [errorMessage, setErrorMessage] = useState<string>();
   const [warnings, setWarnings] = useState<ChartDataWarning[]>([]);
-  const warningsRef = useRef<Map<string, ChartDataWarning>>(new Map());
   const expansionSemanticSignatureRef = useRef<string | null>(null);
   const requestGroupPrefixRef = useRef(nanoid());
   const expansionRequestLifecycle = useMemo(
@@ -279,29 +278,24 @@ export const useExpansionEngine = ({
     [clearLoadingState, expansionRequestLifecycle],
   );
 
-  const addWarnings = useCallback(
-    (nextWarnings?: ChartDataWarning[]) => {
-      if (!nextWarnings || nextWarnings.length === 0) {
-        return;
-      }
-      const map = new Map(warningsRef.current);
-      let didChange = false;
+  const addWarnings = useCallback((nextWarnings?: ChartDataWarning[]) => {
+    if (!nextWarnings || nextWarnings.length === 0) {
+      return;
+    }
+    setWarnings(current => {
+      const map = new Map(
+        current.map(warning => [stableStringify(warning), warning]),
+      );
       nextWarnings.forEach(warning => {
-        const key = stableStringify(warning);
-        if (map.has(key)) {
-          return;
-        }
-        map.set(key, warning);
-        didChange = true;
+        map.set(stableStringify(warning), warning);
       });
-      if (!didChange) {
-        return;
+      const next = Array.from(map.values());
+      if (next.length === current.length) {
+        return current;
       }
-      warningsRef.current = map;
-      setWarnings(Array.from(map.values()));
-    },
-    [setWarnings],
-  );
+      return next;
+    });
+  }, []);
 
   const persistExpansionState = useCallback(
     (nextRows: Set<string>, nextCols: Set<string>) => {
@@ -537,7 +531,6 @@ export const useExpansionEngine = ({
 
     expansionRequestLifecycle.invalidate();
     factStoreRef.current = createPivotFactStoreFromBatches(factBatches);
-    warningsRef.current = new Map();
     setWarnings([]);
     setErrorMessage(undefined);
     clearLoadingState();
@@ -620,7 +613,6 @@ export const useExpansionEngine = ({
 
   const handleRetry = useCallback(() => {
     setErrorMessage(undefined);
-    warningsRef.current = new Map();
     setWarnings([]);
 
     hydrateAtomic().catch(reportAsyncError);
