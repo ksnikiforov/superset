@@ -22,10 +22,8 @@ import {
   decodeMetricKey,
   encodeMetricKey,
   isMeasureLeafToken,
-  METRICS_PLACEHOLDER,
   isSubtotalToken,
 } from '../core/tokens';
-import { parsePath, serializePath } from '../core/path';
 import {
   type PivotAxisProgram,
   type PivotProgram,
@@ -49,10 +47,6 @@ export type ResolveAxisProjectionInput = {
   program: PivotProgram;
   axis: PivotAxis;
   path: PivotPath;
-};
-
-export type AxisPathKeyInput = Omit<ResolveAxisProjectionInput, 'path'> & {
-  key: string;
 };
 
 export type CollapsedValuesMetricProjection = {
@@ -225,36 +219,6 @@ export const projectionQueryFilterPath = (
   projection.valuesLevelSeen
     ? [...projection.filterDimensionPath, ...projection.postValuesDimensionPath]
     : projection.filterDimensionPath;
-
-const projectAxisPathToCoverageDimensions = ({
-  program,
-  path,
-}: ResolveAxisProjectionInput): PivotPath => {
-  const coveragePath: PivotPath = [];
-  let consumedValuesTier = false;
-  path.forEach(value => {
-    if (isCanonicalValuesPathToken(value, program)) {
-      if (!consumedValuesTier) {
-        coveragePath.push(METRICS_PLACEHOLDER);
-        consumedValuesTier = true;
-      }
-      coveragePath.push(value);
-      return;
-    }
-    coveragePath.push(value);
-  });
-  return coveragePath;
-};
-
-export const buildAxisCoverageKey = (
-  input: ResolveAxisProjectionInput,
-): string => serializePath(projectAxisPathToCoverageDimensions(input));
-
-export const buildAxisCoverageKeyFromPathKey = ({
-  key,
-  ...input
-}: AxisPathKeyInput): string =>
-  buildAxisCoverageKey({ ...input, path: parsePath(key) });
 
 export const resolveAxisProjection = ({
   program,

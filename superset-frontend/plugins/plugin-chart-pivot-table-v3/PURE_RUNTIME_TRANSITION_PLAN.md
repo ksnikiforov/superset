@@ -345,8 +345,8 @@ Implementation rules for accelerated chunks:
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `12425` insertions, `18282` deletions, net `-5857`.
-- Current production TypeScript/TSX total: about `27653` lines.
+- Production `src`: `12347` insertions, `18294` deletions, net `-5947`.
+- Current production TypeScript/TSX total: about `27563` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -358,27 +358,32 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `27653` | `-5857` | `< 28000` |
-| Strict core pipeline | `11337` | `11414` | `+77` | `8000` |
+| Full production `src` | `33510` | `27563` | `-5947` | `< 28000` |
+| Strict core pipeline | `11337` | `11324` | `-13` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4030` | `-653` | `3000-4000` |
-| Broad core pipeline | `16020` | `15444` | `-576` | `11000-13000` |
+| Broad core pipeline | `16020` | `15354` | `-666` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `3649` |
-| `pivot/expansion/*` | `2410` |
+| `pivot/runtime/*` | `3647` |
+| `pivot/expansion/*` | `2356` |
 | `pivot/query/*` | `1373` |
 | `pivot/layout/*` | `770` |
 | `pivot/core/*` | `252` |
 | core domain helpers | `1537` |
 | formatting/data/render-model support | `1389` |
 
-Interpretation: plugin-wide source has shrunk, but core pipeline source has
-grown because runtime authority moved out of chart/control code before the old
-planner and render-repair surfaces were fully deleted. The next large cuts must
-reduce strict core, not only move lines into it.
+Interpretation: plugin-wide source has shrunk, and strict core is now slightly
+below the starting point. The next large cuts must keep reducing strict core
+directly instead of only moving chart/control code into runtime modules.
+
+Latest expansion-planner cleanup: same-axis expansion planning no longer builds
+a second projected coverage-key grouping layer. The planner now dedupes exact
+coverage needs and preserves the ancestor-discovery rule; transport batching
+remains owned by the expansion executor. The obsolete projection coverage-key
+API was deleted with that grouping layer.
 
 Latest chart-owned fallback cleanup: `PivotTableChart` no longer fetches
 dataset metadata from `/api/v1/dataset/:id` after render to recover missing
