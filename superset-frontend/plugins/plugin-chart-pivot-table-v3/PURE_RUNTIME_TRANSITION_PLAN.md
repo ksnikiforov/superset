@@ -286,6 +286,61 @@ Compatibility with previous behavior is not a requirement by itself. If a
 simpler runtime model changes visible UX, document the case and get approval
 before cutting.
 
+## Acceleration Plan
+
+The refactor needs to move in larger authority-deleting chunks. A slice is not
+strategically successful just because code moved into a cleaner module; it must
+delete one of the remaining duplicate runtime decision surfaces.
+
+Current diagnosis:
+
+- plugin-wide production source is deletion-positive;
+- strict core is still slightly above baseline because new runtime authority was
+  added before old chart/query/expansion/materialization branches were fully
+  removed;
+- recent fixes improved correctness, but too many slices were boundary-hardening
+  rather than strict-core deletion.
+
+Execution order is now most-impactful first:
+
+| Priority | Chunk | Authority To Centralize | Deletion Target | Expected Impact |
+| --- | --- | --- | --- | --- |
+| 1 | Manifest query executor | Coverage manifest decides all missing fetches | Collapse branch/batch/intersection/root query target shapes into coverage-needs plus transport batching | High core simplification; removes expansion/query planner duplication |
+| 2 | Expansion scheduler reduction | Desired visible coverage plus fact diff decides hydration | Delete mode-specific hydration suppression, opposite-root special cases, and tree-missing fetch checks where coverage already answers them | High correctness and UX impact; fewer accidental hidden-layer queries |
+| 3 | Materializer one-pass model | Materializer constructs final semantic tree directly | Replace base-tree + merge + measure-axis post-processing where possible; eliminate single-metric propagation branches if visible behavior is approved | Largest potential core-line reduction; highest regression risk |
+| 4 | Render-policy deletion | Renderer consumes a final materialized tree | Delete remaining metric/header/subtotal inference in `layoutRuntime.ts`, `renderDisplay.ts`, and `usePivotRenderModel.ts` | Medium-large deletion; removes render-time semantic repair |
+| 5 | Chart runtime shrink | Chart shell wires hooks only | Move remaining query/runtime/filter orchestration out only when it deletes chart-owned decisions; avoid extraction-only controllers | Medium deletion; lower architectural risk |
+
+The next concrete implementation target is Priority 1: a manifest query executor.
+The intended shape:
+
+```text
+visible/runtime intent
+  -> CoverageNeed[]
+  -> diffCoverageManifest(...)
+  -> transport grouping
+  -> PlannedQuerySpec[]
+  -> fetch/ingest fact store
+```
+
+This should remove the remaining branch-era split where expansion builds
+`ExpansionCoverageTarget`, query specs rebuild branch fact coverages, and fetch
+execution separately groups branch/batch/intersection requests. Batch remains a
+transport optimization only; it must not be represented as different loaded
+coverage.
+
+Implementation rules for accelerated chunks:
+
+- No new compatibility adapters unless they immediately delete a larger old
+  surface in the same patch.
+- Prefer changing tests to the new architecture when the old assertion is
+  defending an implementation artifact, but stop for approval when visible UX
+  changes.
+- A patch can be line-positive only if it unlocks a named later deletion in the
+  same priority chunk; otherwise it is the wrong patch.
+- Every source-changing patch must update the metrics table and report strict
+  core movement.
+
 ## Current Metrics
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
