@@ -399,7 +399,7 @@ function PivotTableChart(props: PivotTableProps) {
   const formatting = usePivotFormatting({
     tree: renderTree,
     renderModel: renderModelResult.renderModel,
-    expandedRows: renderModelResult.expandedRowsForRender,
+    expandedRows,
     formData: appliedLayoutFormData,
     layout: layoutResult,
     rowValuesMap: renderModelResult.rowValuesMap,
@@ -439,8 +439,8 @@ function PivotTableChart(props: PivotTableProps) {
   const sharedPivotViewProps = {
     renderModel: renderModelResult.renderModel,
     tree: renderTree,
-    expandedRows: renderModelResult.expandedRowsForRender,
-    expandedCols: renderModelResult.expandedColsForRender,
+    expandedRows,
+    expandedCols,
     errorMessage: activeErrorMessage,
     onRetry: handleRetry,
     warnings: combinedWarnings,

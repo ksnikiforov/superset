@@ -320,8 +320,10 @@ export const useExpansionEngine = ({
         tree: nextTree,
         collapsed: explicitCollapsedRef.current[axis],
         program: pivotProgram,
+        isLeafTierVisible:
+          fetchLayout.measureHierarchy.leafTierVisibility === 'visible',
       }),
-    [pivotProgram],
+    [fetchLayout.measureHierarchy.leafTierVisibility, pivotProgram],
   );
 
   const buildDesiredExpanded = useCallback(

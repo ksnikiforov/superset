@@ -25,7 +25,6 @@ import {
 import {
   buildColumnDisplayPath,
   buildRenderNodeDisplayState,
-  expandMetricNodesForRender,
   formatRenderTreeDateLabels,
   resolveColumnHeaderLabel,
 } from '../../../../src/pivot/chart/renderDisplay';
@@ -196,29 +195,6 @@ test('resolves metric and measure-leaf column header labels', () => {
       getMetricDisplayLabelForKey: () => 'Sales',
     }),
   ).toBe('Value');
-});
-
-test('adds metric nodes to expanded render state only when the leaf tier is visible', () => {
-  const metricNode = node(['West', encodeMetricKey('sales')]);
-  const expanded = new Set<string>();
-  const nodes = { [metricNode.key]: metricNode };
-
-  expect(
-    expandMetricNodesForRender({
-      expanded,
-      nodes,
-      isLeafTierVisible: false,
-      program: pivotProgram,
-    }),
-  ).toBe(expanded);
-  expect(
-    expandMetricNodesForRender({
-      expanded,
-      nodes,
-      isLeafTierVisible: true,
-      program: pivotProgram,
-    }).has(metricNode.key),
-  ).toBe(true);
 });
 
 test('formats render tree date labels for row and column dimensions', () => {

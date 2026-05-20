@@ -170,31 +170,6 @@ export const resolveColumnHeaderLabel = ({
   return formatPivotLabelValue(rawValue, '');
 };
 
-export const expandMetricNodesForRender = ({
-  expanded,
-  nodes,
-  isLeafTierVisible,
-  program,
-}: {
-  expanded: Set<string>;
-  nodes: Record<string, PivotTreeNode>;
-  isLeafTierVisible: boolean;
-  program: PivotProgram;
-}) => {
-  if (!isLeafTierVisible) {
-    return expanded;
-  }
-  const metricKeySet = new Set(program.metricKeys);
-  const next = new Set(expanded);
-  Object.values(nodes).forEach(node => {
-    const decoded = decodeMetricKey(node.path[node.path.length - 1]);
-    if (decoded !== undefined && metricKeySet.has(decoded)) {
-      next.add(node.key);
-    }
-  });
-  return next;
-};
-
 const normalizeDateFormatterInput = (value: DataRecordValue) => {
   const normalizedValue = coerceEpochMsStringToNumber(value);
   if (typeof normalizedValue === 'number') {
@@ -325,13 +300,14 @@ export const buildRenderNodeDisplayState = ({
   const isMetricTokenValue = (value: unknown) =>
     isMetricTokenForKeys(value, metricLabelSet);
   const manualExpandedRowDepths = new Set<number>();
-  expandedRows.forEach(key => {
-    const node = rowNodes[key];
-    if (!node?.hasChildren) {
-      return;
-    }
-    manualExpandedRowDepths.add(countDimDepth(node.path));
-  });
+  if (!isLeafTierVisible) {
+    expandedRows.forEach(key => {
+      const node = rowNodes[key];
+      if (node?.hasChildren) {
+        manualExpandedRowDepths.add(countDimDepth(node.path));
+      }
+    });
+  }
 
   const isExplicitTotalNode = (node: PivotTreeNode) =>
     isExplicitTotalNodeBase(node, {

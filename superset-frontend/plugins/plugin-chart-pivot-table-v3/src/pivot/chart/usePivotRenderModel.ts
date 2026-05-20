@@ -54,7 +54,6 @@ import {
 import {
   buildColumnDisplayPath,
   buildRenderNodeDisplayState,
-  expandMetricNodesForRender,
   formatRenderTreeDateLabels,
   resolveColumnHeaderLabel,
 } from './renderDisplay';
@@ -99,8 +98,6 @@ export type PivotRenderModelResult = {
   getNodeDimDepth: (node: PivotTreeNode) => number;
   rowValuesMap: Map<string, Record<string, DataRecordValue>>;
   colValuesMap: Map<string, Record<string, DataRecordValue>>;
-  expandedRowsForRender: Set<string>;
-  expandedColsForRender: Set<string>;
   handleColumnSort: (node: PivotTreeNode) => void;
   isColumnSortable: (node: PivotTreeNode) => boolean;
   getColumnSortOrder: (node: PivotTreeNode) => PivotSortOrder | undefined;
@@ -446,43 +443,12 @@ export const usePivotRenderModel = ({
     [isLeafTierVisible, layout],
   );
 
-  const expandedRowsForRender = useMemo(
-    () =>
-      expandMetricNodesForRender({
-        expanded: expandedRows,
-        nodes: renderTree.rows,
-        isLeafTierVisible,
-        program: layout.layout.pivotProgram,
-      }),
-    [
-      expandedRows,
-      isLeafTierVisible,
-      layout.layout.pivotProgram,
-      renderTree.rows,
-    ],
-  );
-  const expandedColsForRender = useMemo(
-    () =>
-      expandMetricNodesForRender({
-        expanded: expandedCols,
-        nodes: renderTree.cols,
-        isLeafTierVisible,
-        program: layout.layout.pivotProgram,
-      }),
-    [
-      expandedCols,
-      isLeafTierVisible,
-      layout.layout.pivotProgram,
-      renderTree.cols,
-    ],
-  );
-
   const renderModel = useMemo(
     () =>
       buildRenderModel({
         tree: renderTree,
-        expandedRows: expandedRowsForRender,
-        expandedCols: expandedColsForRender,
+        expandedRows,
+        expandedCols,
         config: {
           normalizedRowSubtotalLevels: layout.layout.rowSubtotalLevels,
           normalizedColSubtotalLevels: layout.normalizedColSubtotalLevels,
@@ -501,7 +467,7 @@ export const usePivotRenderModel = ({
             getCollapsedChildrenForAxis(
               'row',
               parent,
-              expandedRowsForRender,
+              expandedRows,
               renderTree.rows,
             ),
           getColChildren: parent =>
@@ -510,7 +476,7 @@ export const usePivotRenderModel = ({
             getCollapsedChildrenForAxis(
               'col',
               parent,
-              expandedColsForRender,
+              expandedCols,
               renderTree.cols,
             ),
           getColumnDisplayPath,
@@ -519,8 +485,8 @@ export const usePivotRenderModel = ({
       }),
     [
       colSorter,
-      expandedColsForRender,
-      expandedRowsForRender,
+      expandedCols,
+      expandedRows,
       getAxisChildrenForNodes,
       getCollapsedChildrenForAxis,
       getColumnDisplayPath,
@@ -584,8 +550,6 @@ export const usePivotRenderModel = ({
   return {
     renderTree,
     renderModel,
-    expandedRowsForRender,
-    expandedColsForRender,
     shouldShowToggle: renderNodeDisplayState.shouldShowToggle,
     isRowAggregateBold: renderNodeDisplayState.isRowAggregateBold,
     isColAggregateBold: renderNodeDisplayState.isColAggregateBold,

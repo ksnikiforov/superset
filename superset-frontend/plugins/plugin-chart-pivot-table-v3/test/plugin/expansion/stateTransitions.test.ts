@@ -244,6 +244,36 @@ describe('pivot/expansion/stateTransitions', () => {
     expect(result).toEqual(new Set([rootKey, aKey]));
   });
 
+  it('resolves visible measure-leaf metric nodes before render', () => {
+    const metricToken = encodeMetricKey('m1');
+    const aKey = serializePath(['A']);
+    const aMetricKey = serializePath(['A', metricToken]);
+    const tree: PivotTreeData = {
+      rows: {
+        [rootKey]: makeNode('row', [], true),
+        [aKey]: makeNode('row', ['A'], true),
+        [aMetricKey]: makeNode('row', ['A', metricToken], true),
+      },
+      cols: {},
+      cells: {},
+    };
+
+    const result = resolveExpandedForMetrics({
+      axis: 'row',
+      expanded: new Set([rootKey, aKey]),
+      tree,
+      collapsed: new Set(),
+      program: compilePivotProgram({
+        groupbyRows: ['r0', METRICS_PLACEHOLDER],
+        metrics: ['m1'],
+        metricsLayout: MetricsLayoutEnum.ROWS,
+      }),
+      isLeafTierVisible: true,
+    });
+
+    expect(result).toEqual(new Set([rootKey, aKey, aMetricKey]));
+  });
+
   it('persists only visible explicit expansion state', () => {
     const { tree, aKey, xKey } = buildTree({ includeIntersectionCell: true });
     const hiddenRowKey = serializePath(['hidden']);

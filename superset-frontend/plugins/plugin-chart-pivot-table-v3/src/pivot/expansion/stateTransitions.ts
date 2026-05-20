@@ -403,12 +403,14 @@ export const resolveExpandedForMetrics = ({
   tree,
   collapsed,
   program,
+  isLeafTierVisible = false,
 }: {
   axis: PivotAxis;
   expanded: Set<string>;
   tree: PivotTreeData;
   collapsed: Set<string>;
   program: PivotProgram;
+  isLeafTierVisible?: boolean;
 }) => {
   const nodes = axis === 'row' ? tree.rows : tree.cols;
   const metricIndex = getValuesLevelIndex(program, axis);
@@ -421,6 +423,14 @@ export const resolveExpandedForMetrics = ({
   });
   const next = new Set(resolved);
   collapsed.forEach(key => next.delete(key));
+  if (isLeafTierVisible) {
+    Object.values(nodes).forEach(node => {
+      const metricValue = node.path[node.path.length - 1];
+      if (isMetricTokenForKeys(metricValue, metricLabelSet)) {
+        next.add(node.key);
+      }
+    });
+  }
   if (metricIndex === undefined) {
     return next;
   }
