@@ -44,10 +44,13 @@ import { createMetricNodePolicy } from '../metricsTotals';
 
 const PIVOT_AXES: PivotAxis[] = ['row', 'col'];
 
-const createEmptyExpansionPlan = (): PivotExpansionPlan => ({
+const getAxisDimensionCount = (program: PivotProgram, axis: PivotAxis) =>
+  (axis === 'row' ? program.rowDimensions : program.columnDimensions).length;
+
+const emptyExpansionPlan: PivotExpansionPlan = {
   targets: [],
   requiresPathDiscovery: false,
-});
+};
 
 const createExpansionMetricPolicy = (program: PivotProgram) => {
   const metricNodePolicy = createMetricNodePolicy(program);
@@ -367,10 +370,7 @@ const collectAxisVisibility = ({
   program: PivotProgram;
 }) => {
   const { countDimDepth } = createExpansionMetricPolicy(program);
-  const axisDimensionCount =
-    axis === 'row'
-      ? program.rowDimensions.length
-      : program.columnDimensions.length;
+  const axisDimensionCount = getAxisDimensionCount(program, axis);
   const visibleKeys = new Set<string>([rootKey]);
   let visibleDepth = 0;
   const root = nodes[rootKey];
@@ -531,40 +531,37 @@ export const resolveReinitializedExpansionState = (params: {
   const { tree, sessionState } = params;
   const includeMetricDepth = (axis: PivotAxis) => {
     const metricIndex = getValuesLevelIndex(params.program, axis);
-    const dimensionCount =
-      axis === 'row'
-        ? params.program.rowDimensions.length
-        : params.program.columnDimensions.length;
+    const dimensionCount = getAxisDimensionCount(params.program, axis);
     return metricIndex !== undefined && metricIndex < dimensionCount;
   };
-  const common = {
-    tree,
-    program: params.program,
-    hasNewData: params.hasNewData,
+  const axisInputs = {
+    row: {
+      keys: sessionState.rows ?? [],
+      collapsed: sessionState.collapsedRows ?? [],
+      nodes: tree.rows,
+      stablePrefix: params.rowStablePrefix,
+      reset: params.shouldResetExpandedRows,
+      changed: params.rowsChanged,
+    },
+    col: {
+      keys: sessionState.cols ?? [],
+      collapsed: sessionState.collapsedCols ?? [],
+      nodes: tree.cols,
+      stablePrefix: params.colStablePrefix,
+      reset: params.shouldResetExpandedCols,
+      changed: params.colsChanged,
+    },
   };
   const axisState = Object.fromEntries(
     PIVOT_AXES.map(axis => [
       axis,
       resolveExpansionCacheAxis({
-        ...common,
+        ...axisInputs[axis],
         axis,
         axisCoverageNeeds: params.axisCoverageNeeds,
-        keys:
-          axis === 'row'
-            ? (sessionState.rows ?? [])
-            : (sessionState.cols ?? []),
-        collapsed:
-          axis === 'row'
-            ? (sessionState.collapsedRows ?? [])
-            : (sessionState.collapsedCols ?? []),
-        nodes: axis === 'row' ? tree.rows : tree.cols,
-        stablePrefix:
-          axis === 'row' ? params.rowStablePrefix : params.colStablePrefix,
-        reset:
-          axis === 'row'
-            ? params.shouldResetExpandedRows
-            : params.shouldResetExpandedCols,
-        changed: axis === 'row' ? params.rowsChanged : params.colsChanged,
+        tree,
+        program: params.program,
+        hasNewData: params.hasNewData,
         includeMetricDepth: includeMetricDepth(axis),
       }),
     ]),
@@ -669,8 +666,8 @@ export const planHydrationIteration = ({
   const { rowPlan: rowPlanForTransport, colPlan: colPlanForTransport } =
     shouldFetchIntersectionOnly
       ? {
-          rowPlan: createEmptyExpansionPlan(),
-          colPlan: createEmptyExpansionPlan(),
+          rowPlan: emptyExpansionPlan,
+          colPlan: emptyExpansionPlan,
         }
       : { rowPlan, colPlan };
 
