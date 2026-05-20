@@ -1025,7 +1025,10 @@ export const buildSelectionFilterClauses = ({
     if (!Array.isArray(values) || values.length === 0) {
       return [];
     }
-    const col = dimensionMap.get(key) ?? (key as unknown as QueryFormColumn);
+    const col = dimensionMap.get(key);
+    if (!col) {
+      return [];
+    }
     return [
       {
         col,

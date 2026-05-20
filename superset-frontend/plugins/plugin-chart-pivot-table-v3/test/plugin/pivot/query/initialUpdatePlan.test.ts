@@ -49,6 +49,24 @@ describe('buildInitialPivotUpdatePlan', () => {
     ]);
   });
 
+  it('ignores selection filters outside canonical dimension keys', () => {
+    const formData = buildFormData({
+      interactionMode: 'user_controlled',
+      dimensions: ['country'],
+    });
+
+    const filters = buildSelectionFilterClauses({
+      formData,
+      selection: {
+        Country: ['US'],
+        country: ['CA'],
+        unknown: ['ignored'],
+      },
+    });
+
+    expect(filters).toEqual([{ col: 'country', op: 'IN', val: ['CA'] }]);
+  });
+
   it('builds normalized form data with selection filters', () => {
     const formData = buildFormData({
       interactionMode: 'user_controlled',

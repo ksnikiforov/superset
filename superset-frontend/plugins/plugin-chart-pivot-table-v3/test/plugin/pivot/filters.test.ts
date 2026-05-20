@@ -143,7 +143,7 @@ describe('selected filter state helpers', () => {
     expect(firstSelectedFilters({}, {})).toEqual({});
   });
 
-  it('normalizes persisted filters to stable dimension keys', () => {
+  it('normalizes persisted filters to canonical dimension keys', () => {
     expect(
       normalizePivotSelectedFilters({
         filters: {
@@ -196,7 +196,7 @@ describe('selected filter state helpers', () => {
     });
   });
 
-  it('collects tree filter values by stable and verbose dimension aliases', () => {
+  it('collects tree filter values by canonical dimension keys', () => {
     const rows = {
       countryFrance: {
         key: 'countryFrance',
@@ -220,10 +220,6 @@ describe('selected filter state helpers', () => {
         dimensions: ['country', { label: 'Region', sqlExpression: 'region' }],
         rows,
         cols,
-        verboseMap: {
-          country: 'Country',
-          region: 'Region',
-        },
         program: testProgram({
           groupbyRows: ['country'],
           groupbyColumns: ['region'],
@@ -233,9 +229,7 @@ describe('selected filter state helpers', () => {
       }),
     ).toEqual({
       country: ['France'],
-      Country: ['France'],
       region: ['EU'],
-      Region: ['EU'],
     });
   });
 

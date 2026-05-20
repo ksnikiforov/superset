@@ -52,21 +52,10 @@ export const normalizePivotSelectedFilters = ({
   const dimensionKeys = new Set(
     dimensions.map(dimension => getStableColumnKey(dimension)),
   );
-  const dimensionLabels = new Map(
-    dimensions.map(dimension => [
-      getColumnLabel(dimension),
-      getStableColumnKey(dimension),
-    ]),
-  );
   const normalized: PivotSelectedFilters = {};
   Object.entries(filters).forEach(([key, values]) => {
     if (dimensionKeys.has(key)) {
       normalized[key] = values;
-      return;
-    }
-    const stableKey = dimensionLabels.get(key);
-    if (stableKey) {
-      normalized[stableKey] = values;
     }
   });
   return normalized;
@@ -118,44 +107,22 @@ export const buildTreeDimensionFilterValues = ({
   rows,
   cols,
   program,
-  verboseMap = {},
 }: {
   dimensions: QueryFormColumn[];
   rows: Record<string, PivotTreeNode>;
   cols: Record<string, PivotTreeNode>;
   program: PivotProgram;
-  verboseMap?: Record<string, string | undefined>;
 }): PivotSelectedFilters => {
   const metricNodePolicy = createMetricNodePolicy(program);
   const valuesMap = new Map<string, Set<DataRecordValue>>();
-  const aliasMap = new Map<string, Set<string>>();
-  const addAlias = (from?: string, to?: string) => {
-    if (!from || !to) {
-      return;
-    }
-    const set = aliasMap.get(from) ?? new Set<string>();
-    set.add(to);
-    aliasMap.set(from, set);
-  };
-  dimensions.forEach(dimension => {
-    const stableKey = getStableColumnKey(dimension);
-    const labelKey = getColumnLabel(dimension);
-    addAlias(stableKey, stableKey);
-    addAlias(labelKey, stableKey);
-  });
-  Object.entries(verboseMap).forEach(([key, verbose]) => {
-    if (typeof verbose !== 'string' || verbose.length === 0) {
-      return;
-    }
-    addAlias(key, verbose);
-    addAlias(verbose, verbose);
-  });
+  const dimensionKeys = new Set(
+    dimensions.map(dimension => getStableColumnKey(dimension)),
+  );
   const addValue = (key: string, value: DataRecordValue) => {
     const set = valuesMap.get(key) ?? new Set<DataRecordValue>();
     set.add(value);
     valuesMap.set(key, set);
   };
-  const resolveAliases = (key: string) => aliasMap.get(key) ?? new Set([key]);
   const collectValues = (
     nodes: Record<string, PivotTreeNode>,
     axis: 'row' | 'col',
@@ -165,7 +132,7 @@ export const buildTreeDimensionFilterValues = ({
         return;
       }
       const dimensionKey = metricNodePolicy.getDimensionKeyForNode(node, axis);
-      if (!dimensionKey) {
+      if (!dimensionKey || !dimensionKeys.has(dimensionKey)) {
         return;
       }
       const parts = metricNodePolicy.getNonMetricPathParts(node.path);
@@ -173,9 +140,7 @@ export const buildTreeDimensionFilterValues = ({
         return;
       }
       const normalized = (parts[parts.length - 1] ?? null) as DataRecordValue;
-      resolveAliases(dimensionKey).forEach(key => {
-        addValue(key, normalized);
-      });
+      addValue(dimensionKey, normalized);
     });
   };
   collectValues(rows, 'row');

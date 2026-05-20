@@ -361,14 +361,12 @@ function PivotTableChart(props: PivotTableProps) {
         rows: renderTree.rows,
         cols: renderTree.cols,
         program: layoutResult.layout.pivotProgram,
-        verboseMap: resolvedVerboseMap,
       }),
     [
       dimensionList,
       layoutResult.layout.pivotProgram,
       renderTree.cols,
       renderTree.rows,
-      resolvedVerboseMap,
     ],
   );
   const {

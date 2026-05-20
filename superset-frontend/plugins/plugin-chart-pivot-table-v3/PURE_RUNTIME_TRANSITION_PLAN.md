@@ -345,8 +345,8 @@ Implementation rules for accelerated chunks:
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `12846` insertions, `18279` deletions, net `-5433`.
-- Current production TypeScript/TSX total: about `28077` lines.
+- Production `src`: `12812` insertions, `18279` deletions, net `-5467`.
+- Current production TypeScript/TSX total: about `28043` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -358,10 +358,10 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `28077` | `-5433` | `< 28000` |
-| Strict core pipeline | `11337` | `11412` | `+75` | `8000` |
+| Full production `src` | `33510` | `28043` | `-5467` | `< 28000` |
+| Strict core pipeline | `11337` | `11380` | `+43` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4452` | `-231` | `3000-4000` |
-| Broad core pipeline | `16020` | `15864` | `-156` | `11000-13000` |
+| Broad core pipeline | `16020` | `15832` | `-188` | `11000-13000` |
 
 Current strict core breakdown:
 
@@ -369,16 +369,24 @@ Current strict core breakdown:
 | --- | ---: |
 | `pivot/runtime/*` | `3649` |
 | `pivot/expansion/*` | `2410` |
-| `pivot/query/*` | `1370` |
+| `pivot/query/*` | `1373` |
 | `pivot/layout/*` | `770` |
 | `pivot/core/*` | `252` |
-| core domain helpers | `1572` |
+| core domain helpers | `1537` |
 | formatting/data/render-model support | `1389` |
 
 Interpretation: plugin-wide source has shrunk, but core pipeline source has
 grown because runtime authority moved out of chart/control code before the old
 planner and render-repair surfaces were fully deleted. The next large cuts must
 reduce strict core, not only move lines into it.
+
+Latest selection-filter cleanup: selected dimension filters are now
+canonical-key only. The runtime no longer builds tree filter values under
+verbose/label aliases, persisted filter normalization no longer maps labels
+back to stable keys, and query planning ignores unknown selected-filter keys
+instead of treating them as ad hoc query columns. This spends the canonical
+dimension-identity policy in the filter/query path and removes another
+compatibility alias surface.
 
 Latest render-policy ownership cleanup: `pivot/chart/layoutRuntime.ts` was
 deleted. Layout-only metric/subtotal policy now lives with `usePivotLayout`,
