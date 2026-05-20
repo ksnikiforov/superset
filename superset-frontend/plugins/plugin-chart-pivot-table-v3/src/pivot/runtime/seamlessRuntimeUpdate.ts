@@ -362,10 +362,8 @@ export const fetchAndMaterializeSeamlessRuntimeUpdate = async ({
   runtimeLayout,
   selection,
 }: SeamlessRuntimeUpdateConfig) => {
-  const queryFormData = { ...baseFormData };
-  delete queryFormData.pivotExpansionState;
   const { formData, layout, specs } = buildInitialPivotUpdatePlan({
-    formData: queryFormData,
+    formData: baseFormData,
     runtimeLayout,
     selection,
     metricsOverride: sourceMetrics,

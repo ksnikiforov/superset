@@ -503,8 +503,8 @@ export const planHydrationIteration = ({
   });
   const rowPathKeys = Array.from(desired.row).filter(key => key !== rootKey);
   const columnPathKeys = Array.from(desired.col).filter(key => key !== rootKey);
-  const hasNonRootRows = Array.from(desired.row).some(key => key !== rootKey);
-  const hasNonRootCols = Array.from(desired.col).some(key => key !== rootKey);
+  const hasNonRootRows = rowPathKeys.length > 0;
+  const hasNonRootCols = columnPathKeys.length > 0;
   const rowExpansionKeys =
     hasNonRootCols && !hasNonRootRows ? new Set<string>() : desired.row;
   const colExpansionKeys =
@@ -575,13 +575,11 @@ export const planHydrationIteration = ({
   if (targets.length === 0) {
     return {
       kind: 'complete',
-      desired,
     };
   }
 
   return {
     kind: 'fetch',
-    desired,
     targets,
   };
 };

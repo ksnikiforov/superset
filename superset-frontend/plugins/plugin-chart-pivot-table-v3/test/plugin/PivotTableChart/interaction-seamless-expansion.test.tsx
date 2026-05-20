@@ -3951,7 +3951,7 @@ describe('PivotTableChart seamless expansion uses committed layout', () => {
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     const lastFetch = fetchMock.mock.calls.at(-1)?.[0];
-    expect(lastFetch?.formData?.pivotExpansionState).toBeUndefined();
+    expect(lastFetch?.formData?.pivotExpansionState).toBeDefined();
     await waitFor(() =>
       expect(screen.getAllByText('m2').length).toBeGreaterThan(0),
     );
