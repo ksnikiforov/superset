@@ -199,7 +199,6 @@ export const useExpansionEngine = ({
   const { row: expandedRows, col: expandedCols } = expandedByAxis;
   const expandedRef = useRef(expandedByAxis);
   const [loadingKeys, setLoadingKeys] = useState<Set<string>>(() => new Set());
-  const fetchFormDataRef = useRef(fetchFormData);
   const initialExpansionState =
     coerceExpansionState(persistedExpansionState) ??
     createEmptyExpansionState();
@@ -209,7 +208,7 @@ export const useExpansionEngine = ({
   const [errorMessage, setErrorMessage] = useState<string>();
   const [warnings, setWarnings] = useState<ChartDataWarning[]>([]);
   const expansionSemanticSignatureRef = useRef<string | null>(null);
-  const requestGroupPrefixRef = useRef(nanoid());
+  const expansionInstanceId = useMemo(nanoid, []);
   const expansionRequestLifecycle = useMemo(
     () =>
       createLatestRequestLifecycle({
@@ -254,7 +253,6 @@ export const useExpansionEngine = ({
 
   useSyncRef(treeRef, tree);
   useSyncRef(expandedRef, expandedByAxis);
-  useSyncRef(fetchFormDataRef, fetchFormData);
 
   const commitExpansionState = useCallback(
     ({ tree: nextTree, expanded: nextExpanded }: ExpansionStateCommit) => {
@@ -375,21 +373,21 @@ export const useExpansionEngine = ({
       const factStore = factStoreRef.current as PivotFactStore;
       return {
         requestScope,
-        instanceId: requestGroupPrefixRef.current,
-        fetchFormData: fetchFormDataRef.current,
+        instanceId: expansionInstanceId,
+        fetchFormData,
         layout: fetchLayout,
         factStore,
         materializeLoadedTree: () =>
           materializeLoadedPivotTreeFromFactStore({
             store: factStore,
             layout: fetchLayout,
-            formData: fetchFormDataRef.current,
+            formData: fetchFormData,
           }),
         addWarnings,
         setLoadingKeys,
       };
     },
-    [addWarnings, fetchLayout],
+    [addWarnings, expansionInstanceId, fetchFormData, fetchLayout],
   );
 
   const collapseNode = useCallback(
@@ -434,7 +432,6 @@ export const useExpansionEngine = ({
         const result = await runHydrationExpansionFetchLoop({
           baseTree: treeRef.current,
           maxIterations: MAX_HYDRATION_ITERATIONS,
-          isCurrent: requestScope.isCurrent,
           buildDesiredExpanded,
           program: pivotProgram,
           fetchRuntime: buildFetchRuntime(requestScope),
@@ -590,7 +587,6 @@ export const useExpansionEngine = ({
     groupbyColumnKeys,
     groupbyRowKeys,
     pivotProgram,
-    shouldPersistExpansionState,
     hydrateAtomic,
     expansionRequestLifecycle,
     resolveExpandedByAxisForMetrics,

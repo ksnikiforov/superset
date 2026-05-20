@@ -45,7 +45,6 @@ export type ExpansionFetchRuntime = {
 type HydrationFetchLoopParams = {
   baseTree: PivotTreeData;
   maxIterations: number;
-  isCurrent: () => boolean;
   buildDesiredExpanded: (
     axis: 'row' | 'col',
     tree: PivotTreeData,
@@ -122,14 +121,13 @@ export const fetchExpansionTargetDeltas = async ({
 export const runHydrationExpansionFetchLoop = async ({
   baseTree,
   maxIterations,
-  isCurrent,
   buildDesiredExpanded,
   program,
   fetchRuntime,
 }: HydrationFetchLoopParams) => {
   let currentTree = baseTree;
   for (let iteration = 0; iteration < maxIterations; iteration += 1) {
-    if (!isCurrent()) {
+    if (!fetchRuntime.requestScope.isCurrent()) {
       return { status: 'stale' as const };
     }
     const treeForIteration = currentTree;
@@ -157,7 +155,7 @@ export const runHydrationExpansionFetchLoop = async ({
       runtime: fetchRuntime,
     });
     currentTree = didFetch ? fetchRuntime.materializeLoadedTree() : currentTree;
-    if (!isCurrent()) {
+    if (!fetchRuntime.requestScope.isCurrent()) {
       return { status: 'stale' as const };
     }
   }
