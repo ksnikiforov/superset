@@ -345,8 +345,8 @@ Implementation rules for accelerated chunks:
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13046` insertions, `18257` deletions, net `-5211`.
-- Current production TypeScript/TSX total: about `28299` lines.
+- Production `src`: `13053` insertions, `18271` deletions, net `-5218`.
+- Current production TypeScript/TSX total: about `28292` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -358,10 +358,10 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `28299` | `-5211` | `< 28000` |
-| Strict core pipeline | `11337` | `11205` | `-132` | `8000` |
+| Full production `src` | `33510` | `28292` | `-5218` | `< 28000` |
+| Strict core pipeline | `11337` | `11198` | `-139` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4883` | `+200` | `3000-4000` |
-| Broad core pipeline | `16020` | `16088` | `+68` | `11000-13000` |
+| Broad core pipeline | `16020` | `16081` | `+61` | `11000-13000` |
 
 Current strict core breakdown:
 
@@ -944,6 +944,11 @@ Latest query-support cleanup: support metric inclusion is now owned by
 parallel "needs formatting/databars/sort support" flags before entering query
 shape construction. Query depth, visible value cells, totals, and the support
 maps themselves determine the extra metrics in one place.
+
+Latest initial-query cleanup: bootstrap root query planning now builds an
+explicit root coverage request list and maps it through the shared query-shape
+builder. The old local `addRootSpec` mutation helper is gone, keeping initial
+query planning closer to the manifest/list-of-needs model used elsewhere.
 
 Latest expansion signature cleanup: expansion reinitialization now consumes one
 semantic signature plus the row/column layout transition already owned by

@@ -935,94 +935,87 @@ export const buildInitialQuerySpecs = (
     colSubtotalLevels.length > 0;
   const firstRowDepth = rowGroupby.length > 0 ? 1 : 0;
   const firstColDepth = colGroupby.length > 0 ? 1 : 0;
-  const specs: PlannedQuerySpec[] = [];
-
-  const addRootSpec = ({
-    rowDepth,
-    columnDepth,
-    hasValueCells,
-    includeTotals,
-  }: {
+  const rootSpecs: Array<{
     rowDepth: number;
     columnDepth: number;
     hasValueCells: boolean;
     includeTotals: boolean;
-  }) => {
-    const coverage = buildFactCoverage({
-      rowDimensions: layout.pivotProgram.rowDimensions,
-      columnDimensions: layout.pivotProgram.columnDimensions,
-      rowDepth,
-      columnDepth,
-    });
-    const queryShape = buildQueryShape({
-      rowDepth,
-      columnDepth,
-      hasValueCells,
-      needsTotals: includeTotals,
-      rowGroupby,
-      colGroupby,
-      metrics,
-      metricFormattingScope: formData.metricFormattingScope,
-      metricFormatting: formData.metricFormatting,
-      metricDatabars: formData.metricDatabars,
-      rowFormatting: formData.rowFormatting,
-      colFormatting: formData.colFormatting,
-      rowSorting: formData.rowSorting,
-      colSorting: formData.colSorting,
-      measureHierarchy: layout.measureHierarchy,
-    });
-    specs.push(
-      buildPlannedQuerySpec({
-        coverage,
-        metrics: queryShape.metrics,
-        requiredTimeOffsets: layout.requiredTimeOffsets,
-        scope: { kind: 'root' },
-        filters: [],
-        suffix: '',
-      }),
-    );
-  };
+  }> = [];
 
   if (
     needsTotals ||
     layout.pivotProgram.metricKeys.length === 0 ||
     (firstRowDepth === 0 && firstColDepth === 0)
   ) {
-    addRootSpec({
+    rootSpecs.push({
       rowDepth: 0,
       columnDepth: 0,
       hasValueCells: false,
       includeTotals: needsTotals,
     });
   }
-  if (layout.pivotProgram.metricKeys.length === 0) {
-    return specs;
+  if (layout.pivotProgram.metricKeys.length > 0) {
+    if (firstRowDepth > 0 && firstColDepth > 0) {
+      rootSpecs.push({
+        rowDepth: firstRowDepth,
+        columnDepth: firstColDepth,
+        hasValueCells: true,
+        includeTotals: false,
+      });
+    }
+    if (rowGroupby.length > 0) {
+      rootSpecs.push({
+        rowDepth: firstRowDepth,
+        columnDepth: 0,
+        hasValueCells: true,
+        includeTotals: needsTotals,
+      });
+    }
+    if (colGroupby.length > 0) {
+      rootSpecs.push({
+        rowDepth: 0,
+        columnDepth: firstColDepth,
+        hasValueCells: true,
+        includeTotals: needsTotals,
+      });
+    }
   }
-  if (firstRowDepth > 0 && firstColDepth > 0) {
-    addRootSpec({
-      rowDepth: firstRowDepth,
-      columnDepth: firstColDepth,
-      hasValueCells: true,
-      includeTotals: false,
-    });
-  }
-  if (rowGroupby.length > 0) {
-    addRootSpec({
-      rowDepth: firstRowDepth,
-      columnDepth: 0,
-      hasValueCells: true,
-      includeTotals: needsTotals,
-    });
-  }
-  if (colGroupby.length > 0) {
-    addRootSpec({
-      rowDepth: 0,
-      columnDepth: firstColDepth,
-      hasValueCells: true,
-      includeTotals: needsTotals,
-    });
-  }
-  return specs;
+
+  return rootSpecs.map(
+    ({ rowDepth, columnDepth, hasValueCells, includeTotals }) => {
+      const coverage = buildFactCoverage({
+        rowDimensions: layout.pivotProgram.rowDimensions,
+        columnDimensions: layout.pivotProgram.columnDimensions,
+        rowDepth,
+        columnDepth,
+      });
+      const queryShape = buildQueryShape({
+        rowDepth,
+        columnDepth,
+        hasValueCells,
+        needsTotals: includeTotals,
+        rowGroupby,
+        colGroupby,
+        metrics,
+        metricFormattingScope: formData.metricFormattingScope,
+        metricFormatting: formData.metricFormatting,
+        metricDatabars: formData.metricDatabars,
+        rowFormatting: formData.rowFormatting,
+        colFormatting: formData.colFormatting,
+        rowSorting: formData.rowSorting,
+        colSorting: formData.colSorting,
+        measureHierarchy: layout.measureHierarchy,
+      });
+      return buildPlannedQuerySpec({
+        coverage,
+        metrics: queryShape.metrics,
+        requiredTimeOffsets: layout.requiredTimeOffsets,
+        scope: { kind: 'root' },
+        filters: [],
+        suffix: '',
+      });
+    },
+  );
 };
 
 export type SelectionFilterMap = Record<string, DataRecordValue[]>;
