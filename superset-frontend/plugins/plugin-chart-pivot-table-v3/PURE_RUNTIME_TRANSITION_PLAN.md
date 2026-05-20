@@ -290,8 +290,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13194` insertions, `17878` deletions, net `-4684`.
-- Current production TypeScript/TSX total: about `28826` lines.
+- Production `src`: `13151` insertions, `17879` deletions, net `-4728`.
+- Current production TypeScript/TSX total: about `28782` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -303,17 +303,17 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `28826` | `-4684` | `< 28000` |
-| Strict core pipeline | `11337` | `11629` | `+292` | `8000` |
-| Non-visual chart runtime hooks | `4683` | `4925` | `+242` | `3000-4000` |
-| Broad core pipeline | `16020` | `16554` | `+534` | `11000-13000` |
+| Full production `src` | `33510` | `28782` | `-4728` | `< 28000` |
+| Strict core pipeline | `11337` | `11586` | `+249` | `8000` |
+| Non-visual chart runtime hooks | `4683` | `4924` | `+241` | `3000-4000` |
+| Broad core pipeline | `16020` | `16510` | `+490` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
 | `pivot/runtime/*` | `3818` |
-| `pivot/expansion/*` | `2628` |
+| `pivot/expansion/*` | `2585` |
 | `pivot/query/*` | `1409` |
 | `pivot/layout/*` | `770` |
 | core/shared/domain helpers | `1800` |
@@ -627,6 +627,13 @@ configuration at the render boundary. Query-spec fetch context also stopped
 returning the unused compiled coverage target after consuming it. This is a
 modest deletion slice, but it removes another chart-layout wrapper surface and
 keeps render policy from living in the layout hook.
+
+Latest expansion scheduler cleanup: the separate pending expansion map is gone.
+Manual expansion intent is updated immediately and now drives hydration
+coverage directly, while loaded expanded state still drives committed render
+state. This removes the duplicate "pending means desired expansion" path from
+`useExpansionEngine`, `stateTransitions`, `stateModel`, and render-display
+intent construction without changing the fetch/loading contract.
 
 Latest persistence pruning cleanup: `buildVisiblePersistedExpansionState` now
 accepts and returns axis-shaped expansion sets instead of row/column-specific

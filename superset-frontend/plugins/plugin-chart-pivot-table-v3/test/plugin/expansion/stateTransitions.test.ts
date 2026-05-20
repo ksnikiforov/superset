@@ -110,7 +110,6 @@ describe('pivot/expansion/stateTransitions', () => {
     const decision = resolveExpansionToggleDecision({
       node,
       expanded: new Set([node.key]),
-      pending: new Set(),
       manualExpanded: new Set(),
       manualCollapsed: new Set(),
     });
@@ -123,29 +122,25 @@ describe('pivot/expansion/stateTransitions', () => {
     const decision = resolveExpansionToggleDecision({
       node,
       expanded: new Set(),
-      pending: new Set(),
       manualExpanded: new Set(),
       manualCollapsed: new Set([node.key]),
     });
 
     expect(decision).toEqual({
       kind: 'expand',
-      nextPending: new Set([node.key]),
       nextManualExpanded: new Set([node.key]),
       nextManualCollapsed: new Set(),
     });
   });
 
-  it('resolves expansion toggles with pending ancestors and manual state', () => {
+  it('resolves expansion toggles with ancestor and manual state', () => {
     const parentKey = serializePath(['A']);
     const node = makeNode('row', ['A', 'B'], true);
-    const pending = new Set<string>();
     const manualExpanded = new Set(['manual']);
     const manualCollapsed = new Set([node.key, 'other']);
     const decision = resolveExpansionToggleDecision({
       node,
       expanded: new Set([parentKey]),
-      pending,
       manualExpanded,
       manualCollapsed,
     });
@@ -154,14 +149,10 @@ describe('pivot/expansion/stateTransitions', () => {
     if (decision.kind !== 'expand') {
       return;
     }
-    expect([...decision.nextPending].sort()).toEqual(
-      [parentKey, node.key].sort(),
-    );
     expect([...decision.nextManualExpanded].sort()).toEqual(
       ['manual', parentKey, node.key].sort(),
     );
     expect([...decision.nextManualCollapsed]).toEqual(['other']);
-    expect([...pending]).toEqual([]);
     expect([...manualExpanded]).toEqual(['manual']);
     expect([...manualCollapsed].sort()).toEqual([node.key, 'other'].sort());
   });
@@ -174,7 +165,6 @@ describe('pivot/expansion/stateTransitions', () => {
     const result = resolveCollapsedExpansionState({
       node: child,
       expanded: new Set([parent.key, child.key, grandchild.key, sibling.key]),
-      pending: new Set([child.key, grandchild.key, sibling.key]),
       manualExpanded: new Set([child.key, grandchild.key, sibling.key]),
       manualCollapsed: new Set([grandchild.key, sibling.key]),
       nodes: {
@@ -188,7 +178,6 @@ describe('pivot/expansion/stateTransitions', () => {
     expect([...result.nextExpanded].sort()).toEqual(
       [parent.key, sibling.key].sort(),
     );
-    expect([...result.nextPending]).toEqual([sibling.key]);
     expect([...result.nextManualExpanded]).toEqual([sibling.key]);
     expect([...result.nextManualCollapsed].sort()).toEqual(
       [child.key, sibling.key].sort(),

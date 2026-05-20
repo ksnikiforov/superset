@@ -122,7 +122,6 @@ describe('expansionStateModel', () => {
       program,
       manualExpanded: new Set(),
       manualCollapsed: new Set(),
-      pendingKeys: new Set(),
     });
     expect(expanded.has(rootKey)).toBe(true);
     expect(expanded.has(serializePath(['A']))).toBe(true);
@@ -188,7 +187,6 @@ describe('expansionStateModel', () => {
       }),
       manualExpanded: new Set([serializePath(['A'])]),
       manualCollapsed: new Set([serializePath(['B'])]),
-      pendingKeys: new Set(),
     });
 
     expect(expanded).toEqual(

@@ -73,7 +73,6 @@ type AxisSetMap = Record<PivotAxis, Set<string>>;
 type ExpansionStateCommit = {
   tree?: PivotTreeData;
   expanded?: Partial<AxisSetMap>;
-  pending?: Partial<AxisSetMap>;
 };
 
 type HydrateExpansionOptions = {
@@ -205,10 +204,6 @@ export const useExpansionEngine = ({
     () => new Set(loadingCounts.keys()),
     [loadingCounts],
   );
-  const pendingRef = useRef<AxisSetMap>({
-    row: new Set(),
-    col: new Set(),
-  });
   const fetchFormDataRef = useRef(fetchFormData);
   const explicitExpandedRef = useRef<AxisSetMap>({
     row: new Set(),
@@ -305,22 +300,14 @@ export const useExpansionEngine = ({
   );
 
   const commitExpansionState = useCallback(
-    ({
-      tree: nextTree,
-      expanded: nextExpanded,
-      pending: nextPending,
-    }: ExpansionStateCommit) => {
+    ({ tree: nextTree, expanded: nextExpanded }: ExpansionStateCommit) => {
       if (nextTree) {
         treeRef.current = nextTree;
       }
       (['row', 'col'] as const).forEach(axis => {
         const expanded = nextExpanded?.[axis];
-        const pending = nextPending?.[axis];
         if (expanded) {
           expandedRef.current[axis] = expanded;
-        }
-        if (pending) {
-          pendingRef.current[axis] = pending;
         }
       });
       unstable_batchedUpdates(() => {
@@ -409,7 +396,6 @@ export const useExpansionEngine = ({
         program: pivotProgram,
         manualExpanded: explicitExpandedRef.current[axis],
         manualCollapsed: explicitCollapsedRef.current[axis],
-        pendingKeys: pendingRef.current[axis],
       }),
     [axisCoverageNeeds, pivotProgram],
   );
@@ -439,13 +425,11 @@ export const useExpansionEngine = ({
   const collapseNode = useCallback(
     (axis: PivotAxis, node: PivotTreeNode) => {
       const expanded = expandedRef.current[axis];
-      const pending = pendingRef.current[axis];
       const nodes =
         axis === 'row' ? treeRef.current.rows : treeRef.current.cols;
       const collapsedState = resolveCollapsedExpansionState({
         node,
         expanded,
-        pending,
         manualExpanded: explicitExpandedRef.current[axis],
         manualCollapsed: explicitCollapsedRef.current[axis],
         nodes,
@@ -460,7 +444,6 @@ export const useExpansionEngine = ({
       );
       commitExpansionState({
         expanded: { [axis]: resolvedExpanded },
-        pending: { [axis]: collapsedState.nextPending },
       });
       persistExpansionState(
         axis === 'row' ? resolvedExpanded : expandedRef.current.row,
@@ -503,7 +486,6 @@ export const useExpansionEngine = ({
           commitExpansionState({
             tree: result.tree,
             expanded: { row: resolvedRows, col: resolvedCols },
-            pending: { row: new Set(), col: new Set() },
           });
           if (shouldPersist) {
             persistExpansionState(resolvedRows, resolvedCols);
@@ -530,11 +512,9 @@ export const useExpansionEngine = ({
   const handleToggle = useCallback(
     (axis: PivotAxis, node: PivotTreeNode) => {
       const expanded = expandedRef.current[axis];
-      const pending = pendingRef.current[axis];
       const toggleDecision = resolveExpansionToggleDecision({
         node,
         expanded,
-        pending,
         manualExpanded: explicitExpandedRef.current[axis],
         manualCollapsed: explicitCollapsedRef.current[axis],
       });
@@ -547,9 +527,6 @@ export const useExpansionEngine = ({
       }
 
       if (toggleDecision.kind === 'expand') {
-        commitExpansionState({
-          pending: { [axis]: toggleDecision.nextPending },
-        });
         explicitExpandedRef.current[axis] = toggleDecision.nextManualExpanded;
         explicitCollapsedRef.current[axis] = toggleDecision.nextManualCollapsed;
         hydrateAtomic({
@@ -560,7 +537,6 @@ export const useExpansionEngine = ({
     },
     [
       collapseNode,
-      commitExpansionState,
       expansionRequestLifecycle,
       hydrateAtomic,
       reportAsyncError,
@@ -662,7 +638,6 @@ export const useExpansionEngine = ({
     commitExpansionState({
       tree: normalizedTree,
       expanded: { row: resolvedRows, col: resolvedCols },
-      pending: { row: new Set(), col: new Set() },
     });
 
     const layoutChangedOnlyByHiddenAppend =

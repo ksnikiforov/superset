@@ -338,7 +338,6 @@ export const buildRenderNodeDisplayState = ({
     program: layout.layout.pivotProgram,
     manualExpanded: new Set(),
     manualCollapsed: new Set(),
-    pendingKeys: new Set(),
   });
   const manualExpandedRowDepths = new Set<number>();
   expandedRows.forEach(key => {

@@ -180,7 +180,6 @@ export const buildDesiredExpandedKeys = ({
   program,
   manualExpanded,
   manualCollapsed,
-  pendingKeys,
 }: {
   axis: PivotAxis;
   tree: PivotTreeData;
@@ -188,7 +187,6 @@ export const buildDesiredExpandedKeys = ({
   program: PivotProgram;
   manualExpanded: Set<string>;
   manualCollapsed: Set<string>;
-  pendingKeys: Set<string>;
 }) => {
   const needExpanded = expandAxisCoverageNeedKeys({
     axis,
@@ -196,11 +194,7 @@ export const buildDesiredExpandedKeys = ({
     axisCoverageNeeds,
     program,
   });
-  const next = new Set<string>([
-    ...needExpanded,
-    ...manualExpanded,
-    ...pendingKeys,
-  ]);
+  const next = new Set<string>([...needExpanded, ...manualExpanded]);
   const nodes = axis === 'row' ? tree.rows : tree.cols;
   manualCollapsed.forEach(key => {
     const collapsedPath = resolveNodePath(key, nodes);

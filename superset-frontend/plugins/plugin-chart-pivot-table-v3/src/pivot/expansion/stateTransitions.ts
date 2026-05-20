@@ -285,30 +285,25 @@ export const dropDescendants = (
 export const resolveExpansionToggleDecision = ({
   node,
   expanded,
-  pending,
   manualExpanded,
   manualCollapsed,
 }: {
   node: PivotTreeNode;
   expanded: Set<string>;
-  pending: Set<string>;
   manualExpanded: Set<string>;
   manualCollapsed: Set<string>;
 }) => {
-  const isOpen = expanded.has(node.key) || pending.has(node.key);
+  const isOpen = expanded.has(node.key) || manualExpanded.has(node.key);
   if (isOpen) {
     return { kind: 'collapse' };
   }
 
-  const nextPending = new Set(pending);
-  addAncestors(node.path, nextPending, expanded);
   const nextManualExpanded = new Set(manualExpanded);
   addAncestors(node.path, nextManualExpanded, expanded);
   const nextManualCollapsed = new Set(manualCollapsed);
   nextManualCollapsed.delete(node.key);
   return {
     kind: 'expand',
-    nextPending,
     nextManualExpanded,
     nextManualCollapsed,
   };
@@ -317,14 +312,12 @@ export const resolveExpansionToggleDecision = ({
 export const resolveCollapsedExpansionState = ({
   node,
   expanded,
-  pending,
   manualExpanded,
   manualCollapsed,
   nodes,
 }: {
   node: PivotTreeNode;
   expanded: Set<string>;
-  pending: Set<string>;
   manualExpanded: Set<string>;
   manualCollapsed: Set<string>;
   nodes: Record<string, PivotTreeNode>;
@@ -340,12 +333,8 @@ export const resolveCollapsedExpansionState = ({
   const nextExpanded = dropDescendants(node.path, expanded, nodes);
   nextExpanded.delete(node.key);
 
-  const nextPending = dropDescendants(node.path, pending, nodes);
-  nextPending.delete(node.key);
-
   return {
     nextExpanded,
-    nextPending,
     nextManualExpanded,
     nextManualCollapsed,
   };
@@ -532,7 +521,6 @@ const resolveExpansionCacheAxis = (config: ExpansionReinitAxis) => {
     program: config.program,
     manualExpanded: new Set(prunedManualKeys),
     manualCollapsed: new Set(prunedCollapsedKeys),
-    pendingKeys: new Set(),
   });
   const expandedKeys =
     config.reset || (config.changed && !config.hasNewData)
