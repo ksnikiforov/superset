@@ -96,21 +96,21 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `26583` | `-6927` | `< 20000` |
-| Strict core pipeline | `12907` | `10814` | `-2093` | `< 8000` |
+| Full production `src` | `33510` | `26586` | `-6924` | `< 20000` |
+| Strict core pipeline | `12907` | `10797` | `-2110` | `< 8000` |
 
 Diagnostic scope only:
 
 | Scope | Baseline lines | Current lines | Delta |
 | --- | ---: | ---: | ---: |
-| Core pipeline dirs (`runtime/expansion/query/layout/core`) | `8698` | `7912` | `-786` |
+| Core pipeline dirs (`runtime/expansion/query/layout/core`) | `8698` | `7895` | `-803` |
 
 Core pipeline breakdown:
 
 | Area | Lines |
 | --- | ---: |
 | `pivot/runtime/*` | `3394` |
-| `pivot/expansion/*` | `2245` |
+| `pivot/expansion/*` | `2228` |
 | `pivot/query/*` | `1395` |
 | `pivot/layout/*` + `pivot/core/*` | `878` |
 | core domain helpers | `1513` |
@@ -169,6 +169,8 @@ Completed structural cuts:
   hook-local sync ingestion branch was deleted.
 - Sync and async fact-store materialization now share the same plan-group to
   materializer input mapping.
+- Expansion fetch commits now always use the async materializer boundary; the
+  expansion hook no longer owns a fact-count-based sync/async branch.
 - Fact store batch filtering now only carries the intersection scope matcher it
   actually enforces; root and axis-path batches stay batch-level coverage
   records.
