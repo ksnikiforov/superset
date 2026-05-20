@@ -573,41 +573,6 @@ export const resolveReinitializedExpansionState = (params: {
   };
 };
 
-const suppressOppositeRootFetches = ({
-  rowPlan,
-  colPlan,
-  desiredRows,
-  desiredCols,
-}: {
-  rowPlan: PivotExpansionPlan;
-  colPlan: PivotExpansionPlan;
-  desiredRows: Set<string>;
-  desiredCols: Set<string>;
-}) => {
-  const hasNonRootRows = Array.from(desiredRows).some(key => key !== rootKey);
-  const hasNonRootCols = Array.from(desiredCols).some(key => key !== rootKey);
-  return {
-    rowPlan:
-      hasNonRootCols && !hasNonRootRows
-        ? {
-            ...rowPlan,
-            targets: rowPlan.targets.filter(
-              target => target.pathKey !== rootKey,
-            ),
-          }
-        : rowPlan,
-    colPlan:
-      hasNonRootRows && !hasNonRootCols
-        ? {
-            ...colPlan,
-            targets: colPlan.targets.filter(
-              target => target.pathKey !== rootKey,
-            ),
-          }
-        : colPlan,
-  };
-};
-
 export const planHydrationIteration = ({
   tree,
   desiredRows,
@@ -635,10 +600,22 @@ export const planHydrationIteration = ({
   });
   const visibleRowDepth = rowVisibility.visibleDepth;
   const visibleColDepth = colVisibility.visibleDepth;
+  const rowPathKeys = Array.from(desiredRows).filter(
+    key => key !== rootKey && tree.rows[key],
+  );
+  const columnPathKeys = Array.from(desiredCols).filter(
+    key => key !== rootKey && tree.cols[key],
+  );
+  const hasNonRootRows = Array.from(desiredRows).some(key => key !== rootKey);
+  const hasNonRootCols = Array.from(desiredCols).some(key => key !== rootKey);
+  const rowExpansionKeys =
+    hasNonRootCols && !hasNonRootRows ? new Set<string>() : desiredRows;
+  const colExpansionKeys =
+    hasNonRootRows && !hasNonRootCols ? new Set<string>() : desiredCols;
   const rowPlan = planExpansionForAxis({
     axis: 'row',
     program,
-    expandedKeys: desiredRows,
+    expandedKeys: rowExpansionKeys,
     nodes: tree.rows,
     coverage: { rowDepth: visibleRowDepth, columnDepth: visibleColDepth },
     getMissingExpansionCoverage,
@@ -646,18 +623,12 @@ export const planHydrationIteration = ({
   const colPlan = planExpansionForAxis({
     axis: 'col',
     program,
-    expandedKeys: desiredCols,
+    expandedKeys: colExpansionKeys,
     nodes: tree.cols,
     coverage: { rowDepth: visibleRowDepth, columnDepth: visibleColDepth },
     getMissingExpansionCoverage,
   });
 
-  const rowPathKeys = Array.from(desiredRows).filter(
-    key => key !== rootKey && tree.rows[key],
-  );
-  const columnPathKeys = Array.from(desiredCols).filter(
-    key => key !== rootKey && tree.cols[key],
-  );
   const shouldCheckIntersection =
     visibleRowDepth > 0 &&
     visibleColDepth > 0 &&
@@ -695,12 +666,7 @@ export const planHydrationIteration = ({
           rowPlan: createEmptyExpansionPlan(),
           colPlan: createEmptyExpansionPlan(),
         }
-      : suppressOppositeRootFetches({
-          rowPlan,
-          colPlan,
-          desiredRows,
-          desiredCols,
-        });
+      : { rowPlan, colPlan };
 
   if (
     rowPlanForTransport.targets.length === 0 &&
