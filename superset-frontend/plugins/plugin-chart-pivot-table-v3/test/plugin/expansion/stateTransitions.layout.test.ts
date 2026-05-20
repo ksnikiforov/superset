@@ -17,180 +17,66 @@
  * under the License.
  */
 
-import {
-  type PivotAxis,
-  type PivotTreeData,
-  type PivotTreeNode,
-} from '../../../src/types';
 import { resolveLayoutTransition } from '../../../src/pivot/expansion/stateTransitions';
-import { rootKey } from '../../../src/pivot/viewModel';
-import { serializeCellKey, serializePath } from '../../../src/pivot/core/path';
-
-const makeNode = ({
-  axis,
-  path,
-  hasChildren = false,
-}: {
-  axis: PivotAxis;
-  path: PivotTreeNode['path'];
-  hasChildren?: boolean;
-}): PivotTreeNode => ({
-  axis,
-  key: path.length === 0 ? rootKey : serializePath(path),
-  path,
-  label: path.length === 0 ? 'Total' : String(path[path.length - 1]),
-  formattedLabel: path.length === 0 ? 'Total' : String(path[path.length - 1]),
-  level: path.length,
-  hasChildren,
-});
-
-const makeTree = ({
-  rows,
-  cols = [makeNode({ axis: 'col', path: [] })],
-  cells = {},
-}: {
-  rows: PivotTreeNode[];
-  cols?: PivotTreeNode[];
-  cells?: PivotTreeData['cells'];
-}): PivotTreeData => ({
-  rows: Object.fromEntries(rows.map(node => [node.key, node])),
-  cols: Object.fromEntries(cols.map(node => [node.key, node])),
-  cells,
-});
 
 const baseTransitionConfig = {
   currentLayout: { rows: ['country'], cols: [] },
   previousLayout: { rows: ['country'], cols: [] },
-  hasNewData: false,
 };
 
 describe('pivot/expansion/stateTransitions layout changes', () => {
-  it('keeps the loaded tree for layout changes without fresh data', () => {
-    const usKey = serializePath(['US']);
-    const usCaKey = serializePath(['US', 'CA']);
-    const data = makeTree({
-      rows: [
-        makeNode({ axis: 'row', path: [] }),
-        makeNode({ axis: 'row', path: ['US'] }),
-      ],
+  it('reports unchanged row and column layouts', () => {
+    expect(resolveLayoutTransition(baseTransitionConfig)).toMatchObject({
+      rowsChanged: false,
+      colsChanged: false,
+      shouldExpandRows: false,
+      shouldExpandCols: false,
+      rowStablePrefix: 1,
+      colStablePrefix: 0,
     });
-    const currentTree = makeTree({
-      rows: [
-        makeNode({ axis: 'row', path: [] }),
-        makeNode({ axis: 'row', path: ['US'], hasChildren: true }),
-        makeNode({ axis: 'row', path: ['US', 'CA'] }),
-      ],
-    });
-
-    const transition = resolveLayoutTransition({
-      ...baseTransitionConfig,
-      data,
-      currentTree,
-      currentLayout: { rows: ['country', 'state'], cols: [] },
-    });
-
-    expect(transition.normalizedTree.rows[usKey]).toBeDefined();
-    expect(transition.normalizedTree.rows[usCaKey]).toBeDefined();
-    expect(transition.normalizedTree.cells).toEqual({});
   });
 
-  it('leaves loaded child cells intact while reporting the stable prefix', () => {
-    const usKey = serializePath(['US']);
-    const usCaKey = serializePath(['US', 'CA']);
-    const data = makeTree({
-      rows: [makeNode({ axis: 'row', path: [] })],
-    });
-    const currentTree = makeTree({
-      rows: [
-        makeNode({ axis: 'row', path: [] }),
-        makeNode({ axis: 'row', path: ['US'], hasChildren: true }),
-        makeNode({ axis: 'row', path: ['US', 'CA'] }),
-      ],
-      cells: {
-        [serializeCellKey(usKey, rootKey)]: {
-          rowKey: usKey,
-          colKey: rootKey,
-          values: { sales: 100 },
-        },
-        [serializeCellKey(usCaKey, rootKey)]: {
-          rowKey: usCaKey,
-          colKey: rootKey,
-          values: { sales: 7 },
-        },
-      },
-    });
-
-    const transition = resolveLayoutTransition({
-      ...baseTransitionConfig,
-      data,
-      currentTree,
-      previousLayout: { rows: ['country', 'state'], cols: [] },
-      currentLayout: { rows: ['country'], cols: [] },
-    });
-
-    expect(transition.rowStablePrefix).toBe(1);
+  it('reports trailing row appends as expansion-compatible changes', () => {
     expect(
-      transition.normalizedTree.cells[serializeCellKey(usKey, rootKey)],
+      resolveLayoutTransition({
+        ...baseTransitionConfig,
+        previousLayout: { rows: ['country'], cols: [] },
+        currentLayout: { rows: ['country', 'state'], cols: [] },
+      }),
     ).toMatchObject({
-      rowKey: usKey,
-      colKey: rootKey,
-      values: { sales: 100 },
+      rowsChanged: true,
+      colsChanged: false,
+      shouldExpandRows: true,
+      shouldExpandCols: false,
+      rowStablePrefix: 1,
     });
+  });
+
+  it('reports trailing row trims without treating them as expansion appends', () => {
     expect(
-      transition.normalizedTree.cells[serializeCellKey(usCaKey, rootKey)],
+      resolveLayoutTransition({
+        ...baseTransitionConfig,
+        previousLayout: { rows: ['country', 'state', 'city'], cols: [] },
+        currentLayout: { rows: ['country', 'state'], cols: [] },
+      }),
     ).toMatchObject({
-      rowKey: usCaKey,
-      colKey: rootKey,
-      values: { sales: 7 },
+      rowsChanged: true,
+      shouldExpandRows: false,
+      rowStablePrefix: 2,
     });
   });
 
-  it('limits desired auto-expansion without promoting added layers locally', () => {
-    const usKey = serializePath(['US']);
-    const data = makeTree({
-      rows: [makeNode({ axis: 'row', path: [] })],
+  it('uses the same stable-prefix policy for columns', () => {
+    expect(
+      resolveLayoutTransition({
+        previousLayout: { rows: [], cols: ['year', 'quarter'] },
+        currentLayout: { rows: [], cols: ['year', 'month'] },
+      }),
+    ).toMatchObject({
+      rowsChanged: false,
+      colsChanged: true,
+      shouldExpandCols: false,
+      colStablePrefix: 1,
     });
-    const currentTree = makeTree({
-      rows: [
-        makeNode({ axis: 'row', path: [] }),
-        makeNode({ axis: 'row', path: ['US'] }),
-      ],
-    });
-
-    const transition = resolveLayoutTransition({
-      ...baseTransitionConfig,
-      data,
-      currentTree,
-      previousLayout: { rows: ['country'], cols: [] },
-      currentLayout: { rows: ['country', 'state'], cols: [] },
-    });
-
-    expect(transition.rowStablePrefix).toBe(1);
-    expect(transition.normalizedTree.rows[usKey]).toMatchObject({
-      hasChildren: false,
-    });
-  });
-
-  it('reports the stable prefix on trailing trims', () => {
-    const data = makeTree({
-      rows: [makeNode({ axis: 'row', path: [] })],
-    });
-    const currentTree = makeTree({
-      rows: [
-        makeNode({ axis: 'row', path: [] }),
-        makeNode({ axis: 'row', path: ['US'], hasChildren: true }),
-        makeNode({ axis: 'row', path: ['US', 'CA'], hasChildren: true }),
-      ],
-    });
-
-    const transition = resolveLayoutTransition({
-      ...baseTransitionConfig,
-      data,
-      currentTree,
-      previousLayout: { rows: ['country', 'state', 'city'], cols: [] },
-      currentLayout: { rows: ['country', 'state'], cols: [] },
-    });
-
-    expect(transition.rowStablePrefix).toBe(2);
   });
 });

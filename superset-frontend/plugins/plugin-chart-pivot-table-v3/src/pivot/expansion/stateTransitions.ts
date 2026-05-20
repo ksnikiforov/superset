@@ -155,11 +155,8 @@ export type PivotLayoutKeyState = {
 };
 
 type ResolveLayoutTransitionInput = {
-  data: PivotTreeData;
-  currentTree: PivotTreeData;
   previousLayout: PivotLayoutKeyState;
   currentLayout: PivotLayoutKeyState;
-  hasNewData: boolean;
 };
 
 export const isPrefix = (prefix: string[], target: string[]) =>
@@ -167,11 +164,8 @@ export const isPrefix = (prefix: string[], target: string[]) =>
   prefix.every((value, idx) => value === target[idx]);
 
 export const resolveLayoutTransition = ({
-  data,
-  currentTree,
   previousLayout,
   currentLayout,
-  hasNewData,
 }: ResolveLayoutTransitionInput) => {
   const rowsChanged = !isSameLayout(previousLayout.rows, currentLayout.rows);
   const colsChanged = !isSameLayout(previousLayout.cols, currentLayout.cols);
@@ -189,13 +183,11 @@ export const resolveLayoutTransition = ({
     previousLayout.cols,
     currentLayout.cols,
   );
-  const sourceTree = hasNewData ? data : currentTree;
   return {
     rowsChanged,
     colsChanged,
     shouldExpandRows,
     shouldExpandCols,
-    normalizedTree: sourceTree,
     rowStablePrefix,
     colStablePrefix,
   };

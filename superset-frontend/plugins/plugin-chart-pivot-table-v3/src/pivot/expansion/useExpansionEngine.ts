@@ -487,20 +487,17 @@ export const useExpansionEngine = ({
       cols: groupbyColumnKeys,
     };
     const previousLayout = previousLayoutRef.current;
+    const normalizedTree = hasNewData ? data : treeRef.current;
     const {
       rowsChanged,
       colsChanged,
       shouldExpandRows,
       shouldExpandCols,
-      normalizedTree,
       rowStablePrefix,
       colStablePrefix,
     } = resolveLayoutTransition({
-      data,
-      currentTree: treeRef.current,
       previousLayout,
       currentLayout,
-      hasNewData,
     });
     const isInitialMount = previousSemanticSignature === null;
     const semanticSignatureChanged =
