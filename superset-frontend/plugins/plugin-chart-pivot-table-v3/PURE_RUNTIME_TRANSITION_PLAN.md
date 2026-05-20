@@ -345,8 +345,8 @@ Implementation rules for accelerated chunks:
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `12903` insertions, `18278` deletions, net `-5375`.
-- Current production TypeScript/TSX total: about `28135` lines.
+- Production `src`: `12879` insertions, `18278` deletions, net `-5399`.
+- Current production TypeScript/TSX total: about `28111` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -358,16 +358,16 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `28135` | `-5375` | `< 28000` |
-| Strict core pipeline | `11337` | `11470` | `+133` | `8000` |
+| Full production `src` | `33510` | `28111` | `-5399` | `< 28000` |
+| Strict core pipeline | `11337` | `11446` | `+109` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4452` | `-231` | `3000-4000` |
-| Broad core pipeline | `16020` | `15922` | `-98` | `11000-13000` |
+| Broad core pipeline | `16020` | `15904` | `-116` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `3673` |
+| `pivot/runtime/*` | `3649` |
 | `pivot/expansion/*` | `2427` |
 | `pivot/query/*` | `1387` |
 | `pivot/layout/*` | `770` |
@@ -399,6 +399,13 @@ were deleted. Axis programs are now derived from dimensions, metrics,
 `valueAxis`, and `metricInsertIndex` at the projection boundary. This removes
 duplicated compiled state and deletes the materializer branch that rebuilt
 axis-level arrays for partial batch materialization.
+
+Latest axis-projection cleanup: `PivotAxisProjection` no longer exposes the
+derived source axis program, skipped source levels, or next source level object.
+It now exposes only query dimensions, skipped pre-Values dimensions, and the
+next semantic level kind needed by coverage and render display. This keeps
+axis-level reconstruction private to the projection boundary and removes
+another partial compiled-layout shape from downstream runtime code.
 
 Latest transport cleanup: emitted `BatchGroup` requests no longer carry a
 separate `signature` field. Candidate signatures are used only while grouping

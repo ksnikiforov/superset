@@ -335,8 +335,8 @@ export const buildRenderNodeDisplayState = ({
       path: node.path.filter(value => !isSubtotalToken(value)),
     });
     if (
-      !projection.nextLevel ||
-      (projection.nextLevel.kind === 'values' && !projection.valuesLevelSeen)
+      !projection.nextLevelKind ||
+      (projection.nextLevelKind === 'values' && !projection.valuesLevelSeen)
     ) {
       return false;
     }

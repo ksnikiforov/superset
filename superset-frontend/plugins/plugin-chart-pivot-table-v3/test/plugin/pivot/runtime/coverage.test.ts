@@ -546,9 +546,7 @@ describe('branch fact coverage', () => {
 
       expect(projection.filterDimensionPath).toEqual(['US']);
       expect(projection.projectedDimensionPath).toEqual(['US', 'Boston']);
-      expect(
-        projection.skippedPreValuesLevels.map(level => level.column),
-      ).toEqual(['state']);
+      expect(projection.skippedPreValuesDimensions).toEqual(['state']);
       expect(
         coverage.every(item =>
           axis === 'row' ? item.rowDepth >= 1 : item.columnDepth >= 1,

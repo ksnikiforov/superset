@@ -27,26 +27,21 @@ import {
 } from '../core/tokens';
 import { parsePath, serializePath } from '../core/path';
 import {
-  type PivotAxisLevel,
   type PivotAxisProgram,
   type PivotProgram,
+  type PivotColumnRef,
 } from './types';
-
-export type PivotDimensionAxisLevel = Extract<
-  PivotAxisLevel,
-  { kind: 'dimension' }
->;
 
 export type PivotAxisProjection = {
   axis: PivotAxis;
-  sourceLevels: PivotAxisProgram;
+  queryDimensions: PivotColumnRef[];
   filterDimensionPath: PivotPath;
   projectedDimensionPath: PivotPath;
   postValuesDimensionPath: PivotPath;
-  skippedPreValuesLevels: PivotDimensionAxisLevel[];
+  skippedPreValuesDimensions: PivotColumnRef[];
   metricKeys: string[];
   measureLeafIds: string[];
-  nextLevel?: PivotAxisLevel;
+  nextLevelKind?: 'dimension' | 'values';
   valuesLevelSeen: boolean;
 };
 
@@ -178,48 +173,50 @@ const collectPathMeasureLeafIds = (path: PivotPath): string[] => {
 const findValuesLevelIndex = (levels: PivotAxisProgram) =>
   levels.findIndex(level => level.kind === 'values');
 
-const collectSkippedPreValuesLevels = (
-  levels: PivotAxisProgram,
+const collectSkippedPreValuesDimensions = (
+  dimensions: PivotColumnRef[],
   startIndex: number,
   valuesLevelIndex: number,
-): PivotDimensionAxisLevel[] =>
-  levels
-    .slice(startIndex, valuesLevelIndex)
-    .filter(
-      (level): level is PivotDimensionAxisLevel => level.kind === 'dimension',
-    );
+): PivotColumnRef[] => dimensions.slice(startIndex, valuesLevelIndex);
 
 const withoutSubtotalTokens = (path: PivotPath) =>
   path.filter(value => !isSubtotalToken(value));
 
-const dimensionLevels = (levels: PivotAxisProgram): PivotDimensionAxisLevel[] =>
-  levels.filter(
-    (level): level is PivotDimensionAxisLevel => level.kind === 'dimension',
-  );
-
 export const projectionQueryDimensions = (
   projection: PivotAxisProjection,
-): PivotProgram['rowDimensions'] => {
-  if (!projection.valuesLevelSeen) {
-    return dimensionLevels(projection.sourceLevels)
-      .slice(0, projection.filterDimensionPath.length + 1)
-      .map(level => level.column);
+): PivotProgram['rowDimensions'] => projection.queryDimensions;
+
+const resolveProjectionQueryDimensions = ({
+  program,
+  axis,
+  filterDimensionPath,
+  projectedDimensionPath,
+  postValuesDimensionPath,
+  valuesLevelSeen,
+}: {
+  program: PivotProgram;
+  axis: PivotAxis;
+  filterDimensionPath: PivotPath;
+  projectedDimensionPath: PivotPath;
+  postValuesDimensionPath: PivotPath;
+  valuesLevelSeen: boolean;
+}): PivotColumnRef[] => {
+  const dimensions = axisDimensionsFor(program, axis);
+  if (!valuesLevelSeen) {
+    return dimensions.slice(0, filterDimensionPath.length + 1);
   }
-  const valuesLevelIndex = findValuesLevelIndex(projection.sourceLevels);
-  if (valuesLevelIndex < 0) {
-    return dimensionLevels(projection.sourceLevels)
-      .slice(0, projection.projectedDimensionPath.length + 1)
-      .map(level => level.column);
+  const valuesLevelIndex = getValuesLevelIndex(program, axis);
+  if (valuesLevelIndex === undefined) {
+    return dimensions.slice(0, projectedDimensionPath.length + 1);
   }
-  const preValuesDimensions = dimensionLevels(
-    projection.sourceLevels.slice(0, valuesLevelIndex),
-  ).slice(0, projection.filterDimensionPath.length);
-  const postValuesDimensions = dimensionLevels(
-    projection.sourceLevels.slice(valuesLevelIndex + 1),
-  ).slice(0, projection.postValuesDimensionPath.length + 1);
-  return [...preValuesDimensions, ...postValuesDimensions].map(
-    level => level.column,
-  );
+  return [
+    ...dimensions
+      .slice(0, valuesLevelIndex)
+      .slice(0, filterDimensionPath.length),
+    ...dimensions
+      .slice(valuesLevelIndex)
+      .slice(0, postValuesDimensionPath.length + 1),
+  ];
 };
 
 export const projectionQueryFilterPath = (
@@ -271,35 +268,46 @@ export const resolveAxisProjection = ({
   const filterDimensionPath: PivotPath = [];
   const projectedDimensionPath: PivotPath = [];
   const postValuesDimensionPath: PivotPath = [];
-  const skippedPreValuesLevels: PivotDimensionAxisLevel[] = [];
+  const skippedPreValuesDimensions: PivotColumnRef[] = [];
   let valuesLevelSeen = false;
   let sourceIndex = 0;
   let pathIndex = 0;
 
+  const buildProjection = (
+    nextLevelKind?: PivotAxisProjection['nextLevelKind'],
+  ): PivotAxisProjection => ({
+    axis,
+    queryDimensions: resolveProjectionQueryDimensions({
+      program,
+      axis,
+      filterDimensionPath,
+      projectedDimensionPath,
+      postValuesDimensionPath,
+      valuesLevelSeen,
+    }),
+    filterDimensionPath,
+    projectedDimensionPath,
+    postValuesDimensionPath,
+    skippedPreValuesDimensions,
+    metricKeys,
+    measureLeafIds,
+    nextLevelKind,
+    valuesLevelSeen,
+  });
+
   while (sourceIndex < sourceLevels.length) {
     const level = sourceLevels[sourceIndex];
     if (pathIndex >= path.length) {
-      return {
-        axis,
-        sourceLevels,
-        filterDimensionPath,
-        projectedDimensionPath,
-        postValuesDimensionPath,
-        skippedPreValuesLevels,
-        metricKeys,
-        measureLeafIds,
-        nextLevel: level,
-        valuesLevelSeen,
-      };
+      return buildProjection(level.kind);
     }
 
     const value = path[pathIndex];
     if (level.kind === 'dimension') {
       if (isCanonicalValuesPathToken(value, program)) {
         if (valuesLevelIndex > sourceIndex) {
-          skippedPreValuesLevels.push(
-            ...collectSkippedPreValuesLevels(
-              sourceLevels,
+          skippedPreValuesDimensions.push(
+            ...collectSkippedPreValuesDimensions(
+              axisDimensionsFor(program, axis),
               sourceIndex,
               valuesLevelIndex,
             ),
@@ -307,18 +315,7 @@ export const resolveAxisProjection = ({
           sourceIndex = valuesLevelIndex;
           continue;
         }
-        return {
-          axis,
-          sourceLevels,
-          filterDimensionPath,
-          projectedDimensionPath,
-          postValuesDimensionPath,
-          skippedPreValuesLevels,
-          metricKeys,
-          measureLeafIds,
-          nextLevel: level,
-          valuesLevelSeen,
-        };
+        return buildProjection(level.kind);
       }
       projectedDimensionPath.push(value);
       if (valuesLevelSeen) {
@@ -341,33 +338,12 @@ export const resolveAxisProjection = ({
       pathIndex += 1;
     }
     if (!consumedValuesToken) {
-      return {
-        axis,
-        sourceLevels,
-        filterDimensionPath,
-        projectedDimensionPath,
-        postValuesDimensionPath,
-        skippedPreValuesLevels,
-        metricKeys,
-        measureLeafIds,
-        nextLevel: level,
-        valuesLevelSeen,
-      };
+      return buildProjection(level.kind);
     }
     sourceIndex += 1;
   }
 
-  return {
-    axis,
-    sourceLevels,
-    filterDimensionPath,
-    projectedDimensionPath,
-    postValuesDimensionPath,
-    skippedPreValuesLevels,
-    metricKeys,
-    measureLeafIds,
-    valuesLevelSeen,
-  };
+  return buildProjection();
 };
 
 export const canRequestAxisExpansion = ({
@@ -380,8 +356,8 @@ export const canRequestAxisExpansion = ({
   }
   const projection = resolveAxisProjection({ program, axis, path });
   return (
-    projection.nextLevel?.kind === 'dimension' ||
-    projection.skippedPreValuesLevels.length > 0
+    projection.nextLevelKind === 'dimension' ||
+    projection.skippedPreValuesDimensions.length > 0
   );
 };
 
@@ -465,7 +441,7 @@ export const resolveCollapsedValuesProjection = ({
       metricToken,
       metricPath,
       sourceMetricPath,
-      hasProjectedChildren: metricProjection.nextLevel?.kind === 'dimension',
+      hasProjectedChildren: metricProjection.nextLevelKind === 'dimension',
     });
   });
   return collapsedMetrics;

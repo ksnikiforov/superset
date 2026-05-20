@@ -32,7 +32,7 @@ import {
 import { MetricsLayoutEnum } from '../../../../src/types';
 
 const skippedColumns = (projection: ReturnType<typeof resolveAxisProjection>) =>
-  projection.skippedPreValuesLevels.map(level => level.column);
+  projection.skippedPreValuesDimensions;
 
 describe('resolveAxisProjection', () => {
   it.each([
