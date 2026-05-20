@@ -941,51 +941,47 @@ export const buildInitialQuerySpecs = (
     colSubtotalLevels.length > 0;
   const firstRowDepth = rowGroupby.length > 0 ? 1 : 0;
   const firstColDepth = colGroupby.length > 0 ? 1 : 0;
-  const rootSpecs: Array<{
+  type RootSpec = {
     rowDepth: number;
     columnDepth: number;
     hasValueCells: boolean;
     includeTotals: boolean;
-  }> = [];
-
-  if (
-    needsTotals ||
-    layout.pivotProgram.metricKeys.length === 0 ||
-    (firstRowDepth === 0 && firstColDepth === 0)
-  ) {
-    rootSpecs.push({
-      rowDepth: 0,
-      columnDepth: 0,
-      hasValueCells: false,
-      includeTotals: needsTotals,
-    });
-  }
-  if (layout.pivotProgram.metricKeys.length > 0) {
-    if (firstRowDepth > 0 && firstColDepth > 0) {
-      rootSpecs.push({
-        rowDepth: firstRowDepth,
-        columnDepth: firstColDepth,
-        hasValueCells: true,
-        includeTotals: false,
-      });
-    }
-    if (rowGroupby.length > 0) {
-      rootSpecs.push({
-        rowDepth: firstRowDepth,
-        columnDepth: 0,
-        hasValueCells: true,
-        includeTotals: needsTotals,
-      });
-    }
-    if (colGroupby.length > 0) {
-      rootSpecs.push({
-        rowDepth: 0,
-        columnDepth: firstColDepth,
-        hasValueCells: true,
-        includeTotals: needsTotals,
-      });
-    }
-  }
+  };
+  const hasMetrics = layout.pivotProgram.metricKeys.length > 0;
+  const rootSpecs = [
+    needsTotals || !hasMetrics || (firstRowDepth === 0 && firstColDepth === 0)
+      ? {
+          rowDepth: 0,
+          columnDepth: 0,
+          hasValueCells: false,
+          includeTotals: needsTotals,
+        }
+      : undefined,
+    hasMetrics && firstRowDepth > 0 && firstColDepth > 0
+      ? {
+          rowDepth: firstRowDepth,
+          columnDepth: firstColDepth,
+          hasValueCells: true,
+          includeTotals: false,
+        }
+      : undefined,
+    hasMetrics && rowGroupby.length > 0
+      ? {
+          rowDepth: firstRowDepth,
+          columnDepth: 0,
+          hasValueCells: true,
+          includeTotals: needsTotals,
+        }
+      : undefined,
+    hasMetrics && colGroupby.length > 0
+      ? {
+          rowDepth: 0,
+          columnDepth: firstColDepth,
+          hasValueCells: true,
+          includeTotals: needsTotals,
+        }
+      : undefined,
+  ].filter((spec): spec is RootSpec => spec !== undefined);
 
   return rootSpecs.map(
     ({ rowDepth, columnDepth, hasValueCells, includeTotals }) => {
@@ -1080,11 +1076,6 @@ const shouldCoerceTemporalValue = ({
   );
 };
 
-const coerceTemporalValue = (value: DataRecordValue): DataRecordValue =>
-  typeof value === 'string' || typeof value === 'number'
-    ? normalizeTemporalValue(value)
-    : value;
-
 const normalizeFilterValue = ({
   value,
   column,
@@ -1096,8 +1087,9 @@ const normalizeFilterValue = ({
   colTypeMap?: Record<string, GenericDataType>;
   temporalLookup?: Record<string, boolean>;
 }): DataRecordValue =>
-  shouldCoerceTemporalValue({ column, colTypeMap, temporalLookup })
-    ? coerceTemporalValue(value)
+  shouldCoerceTemporalValue({ column, colTypeMap, temporalLookup }) &&
+  (typeof value === 'string' || typeof value === 'number')
+    ? normalizeTemporalValue(value)
     : value;
 
 const normalizeExtraFormDataFilters = (
@@ -1203,30 +1195,6 @@ export const buildSelectionFilteredFormData = ({
   );
 };
 
-const withMetricOverrides = ({
-  formData,
-  metricsOverride,
-  measureLeavesByMetricOverride,
-}: {
-  formData: PivotTableQueryFormData;
-  metricsOverride?: PivotTableQueryFormData['metrics'];
-  measureLeavesByMetricOverride?: PivotTableQueryFormData['measureLeavesByMetric'];
-}) => {
-  if (
-    metricsOverride === undefined &&
-    measureLeavesByMetricOverride === undefined
-  ) {
-    return formData;
-  }
-  return {
-    ...formData,
-    ...(metricsOverride !== undefined ? { metrics: metricsOverride } : {}),
-    ...(measureLeavesByMetricOverride !== undefined
-      ? { measureLeavesByMetric: measureLeavesByMetricOverride }
-      : {}),
-  };
-};
-
 export type BuildInitialPivotUpdatePlanParams = {
   formData: PivotTableQueryFormData;
   runtimeLayout?: PivotRuntimeLayout;
@@ -1254,11 +1222,18 @@ export const buildInitialPivotUpdatePlan = ({
     formData,
     selection: resolvedSelection,
   });
-  const formDataWithOverrides = withMetricOverrides({
-    formData: normalizedFormData,
-    metricsOverride,
-    measureLeavesByMetricOverride,
-  });
+  const formDataWithOverrides =
+    metricsOverride === undefined && measureLeavesByMetricOverride === undefined
+      ? normalizedFormData
+      : {
+          ...normalizedFormData,
+          ...(metricsOverride !== undefined
+            ? { metrics: metricsOverride }
+            : {}),
+          ...(measureLeavesByMetricOverride !== undefined
+            ? { measureLeavesByMetric: measureLeavesByMetricOverride }
+            : {}),
+        };
   const resolvedFormData = resolveInteractionFormData({
     formData: formDataWithOverrides,
     runtimeLayout: runtimeLayout ?? normalizedFormData.pivotRuntimeLayout,

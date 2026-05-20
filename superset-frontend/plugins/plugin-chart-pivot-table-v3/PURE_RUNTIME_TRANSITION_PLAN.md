@@ -96,14 +96,14 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `26514` | `-6996` | `< 20000` |
-| Strict core pipeline | `12907` | `10725` | `-2182` | `< 8000` |
+| Full production `src` | `33510` | `26489` | `-7021` | `< 20000` |
+| Strict core pipeline | `12907` | `10700` | `-2207` | `< 8000` |
 
 Diagnostic scope only:
 
 | Scope | Baseline lines | Current lines | Delta |
 | --- | ---: | ---: | ---: |
-| Core pipeline dirs (`runtime/expansion/query/layout/core`) | `8698` | `7823` | `-875` |
+| Core pipeline dirs (`runtime/expansion/query/layout/core`) | `8698` | `7798` | `-900` |
 
 Core pipeline breakdown:
 
@@ -111,7 +111,7 @@ Core pipeline breakdown:
 | --- | ---: |
 | `pivot/runtime/*` | `3394` |
 | `pivot/expansion/*` | `2156` |
-| `pivot/query/*` | `1395` |
+| `pivot/query/*` | `1370` |
 | `pivot/layout/*` + `pivot/core/*` | `878` |
 | core domain helpers | `1513` |
 | formatting/data/render-model support | `1389` |
@@ -172,6 +172,9 @@ Completed structural cuts:
 - Skipped pre-Values metric expansion now canonicalizes inside the normal
   coverage target builder; the parallel skipped-target planner branch was
   removed, and skipped requests require the visible ancestor to be expanded.
+- Initial query planning now builds its root coverage specs as one declarative
+  list, and the single-use metric override helper was inlined into the initial
+  update plan.
 - Fact store batch filtering now only carries the intersection scope matcher it
   actually enforces; root and axis-path batches stay batch-level coverage
   records.
