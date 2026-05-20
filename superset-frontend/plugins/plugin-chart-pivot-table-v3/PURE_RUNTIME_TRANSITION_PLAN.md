@@ -345,8 +345,8 @@ Implementation rules for accelerated chunks:
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13238` insertions, `18218` deletions, net `-4980`.
-- Current production TypeScript/TSX total: about `28530` lines.
+- Production `src`: `13224` insertions, `18221` deletions, net `-4997`.
+- Current production TypeScript/TSX total: about `28513` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -358,10 +358,10 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `28530` | `-4980` | `< 28000` |
-| Strict core pipeline | `11337` | `11368` | `+31` | `8000` |
+| Full production `src` | `33510` | `28513` | `-4997` | `< 28000` |
+| Strict core pipeline | `11337` | `11351` | `+14` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4951` | `+268` | `3000-4000` |
-| Broad core pipeline | `16020` | `16319` | `+299` | `11000-13000` |
+| Broad core pipeline | `16020` | `16302` | `+282` | `11000-13000` |
 
 Current strict core breakdown:
 
@@ -369,7 +369,7 @@ Current strict core breakdown:
 | --- | ---: |
 | `pivot/runtime/*` | `3769` |
 | `pivot/expansion/*` | `2453` |
-| `pivot/query/*` | `1512` |
+| `pivot/query/*` | `1495` |
 | `pivot/layout/*` | `770` |
 | `pivot/core/*` | `252` |
 | core domain helpers | `1580` |
@@ -427,6 +427,11 @@ from the manifest need shape, including dimensions, depths, value keys, and the
 opposite-axis scope. Transport batching can still combine truly equivalent
 siblings, but it no longer batches split metric/measure loads through one
 representative target.
+
+Latest query-spec cleanup: root/bootstrap specs no longer construct a fake
+expansion fetch context to reuse the expansion builder. Planned specs now build
+their fact selector directly from coverage, metrics, scope, and filters, and
+the one-use coverage wrapper was removed.
 
 Latest fact-boundary cleanup: `PivotFactStore` now rejects facts whose row or
 column path depth does not match the declared batch coverage. Test expansion

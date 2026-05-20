@@ -287,28 +287,6 @@ const projectQueryFilterPath = ({
     }),
   );
 
-const buildSpecFactSelector = ({
-  coverage,
-  materialization,
-  scope,
-  metrics,
-  requiredTimeOffsets,
-}: {
-  coverage: PivotFactCoverage;
-  materialization?: PivotFactMaterialization;
-  scope: PivotFactStoreBatchScope;
-  metrics: QueryFormMetric[];
-  requiredTimeOffsets: string[];
-}): PivotFactSelector => ({
-  coverage,
-  materialization,
-  scope,
-  valueKeys: buildFactValueKeys({
-    metricKeys: metrics.map(getMetricKey).filter(Boolean) as string[],
-    requiredTimeOffsets,
-  }),
-});
-
 type ResolvedFetchContext = {
   rowGroupbyForQuery: QueryFormColumn[];
   colGroupbyForQuery: QueryFormColumn[];
@@ -317,6 +295,16 @@ type ResolvedFetchContext = {
   sanitizedPath: PivotPath;
   materialization?: PivotFactMaterialization;
   coverages: PivotFactCoverage[];
+};
+
+type PlannedQuerySpecParams = {
+  coverage: PivotFactCoverage;
+  metrics: QueryFormMetric[];
+  requiredTimeOffsets: string[];
+  materialization?: PivotFactMaterialization;
+  scope: PivotFactStoreBatchScope;
+  filters: QueryObjectFilterClause[];
+  suffix: string;
 };
 
 type DepthPair = { rowDepth: number; columnDepth: number };
@@ -658,35 +646,32 @@ const resolveFetchContext = ({
   };
 };
 
-const buildSpecsForCoverages = ({
-  coverages,
-  ctx,
+const buildPlannedQuerySpec = ({
+  coverage,
+  metrics,
+  requiredTimeOffsets,
+  materialization,
+  scope,
   filters,
   suffix,
-  scope,
-}: {
-  coverages: PivotFactCoverage[];
-  ctx: ResolvedFetchContext;
-  filters: QueryObjectFilterClause[];
-  suffix: string;
-  scope: PivotFactStoreBatchScope;
-}): PlannedQuerySpec[] =>
-  coverages.map(coverage => ({
-    queryName: `${formatQueryName(coverage.rowDepth, coverage.columnDepth)}${suffix}`,
-    columns: [...coverage.rowDimensions, ...coverage.columnDimensions],
-    metrics: ctx.metricsForQuery,
-    filters,
-    meta: {
-      requiredTimeOffsets: ctx.requiredTimeOffsets,
-      factSelector: buildSpecFactSelector({
-        coverage,
-        materialization: ctx.materialization,
-        scope,
-        metrics: ctx.metricsForQuery,
-        requiredTimeOffsets: ctx.requiredTimeOffsets,
+}: PlannedQuerySpecParams): PlannedQuerySpec => ({
+  queryName: `${formatQueryName(coverage.rowDepth, coverage.columnDepth)}${suffix}`,
+  columns: [...coverage.rowDimensions, ...coverage.columnDimensions],
+  metrics,
+  filters,
+  meta: {
+    requiredTimeOffsets,
+    factSelector: {
+      coverage,
+      materialization,
+      scope,
+      valueKeys: buildFactValueKeys({
+        metricKeys: metrics.map(getMetricKey).filter(Boolean) as string[],
+        requiredTimeOffsets,
       }),
     },
-  }));
+  },
+});
 
 const buildAxisExpansionSpecs = ({
   formData,
@@ -719,13 +704,18 @@ const buildAxisExpansionSpecs = ({
     coverageTarget,
   });
 
-  return buildSpecsForCoverages({
-    coverages: ctx.coverages,
-    ctx,
-    filters: filters(ctx),
-    suffix,
-    scope,
-  });
+  const resolvedFilters = filters(ctx);
+  return ctx.coverages.map(coverage =>
+    buildPlannedQuerySpec({
+      coverage,
+      metrics: ctx.metricsForQuery,
+      requiredTimeOffsets: ctx.requiredTimeOffsets,
+      materialization: ctx.materialization,
+      scope,
+      filters: resolvedFilters,
+      suffix,
+    }),
+  );
 };
 
 const isNullish = (value: PivotPathValue) =>
@@ -1075,20 +1065,13 @@ export const buildInitialQuerySpecs = (
       measureHierarchy: layout.measureHierarchy,
     });
     specs.push(
-      ...buildSpecsForCoverages({
-        coverages: [coverage],
-        ctx: {
-          rowGroupbyForQuery: queryShape.rowGroupby,
-          colGroupbyForQuery: queryShape.colGroupby,
-          metricsForQuery: queryShape.metrics,
-          requiredTimeOffsets: layout.requiredTimeOffsets,
-          sanitizedPath: [],
-          materialization: undefined,
-          coverages: [coverage],
-        },
+      buildPlannedQuerySpec({
+        coverage,
+        metrics: queryShape.metrics,
+        requiredTimeOffsets: layout.requiredTimeOffsets,
+        scope: { kind: 'root' },
         filters: [],
         suffix: '',
-        scope: { kind: 'root' },
       }),
     );
   };
