@@ -40,7 +40,7 @@ const makeTarget = (path: PivotPathValue[]): ExpansionCoverageTarget => ({
 
 const batchSiblingValues = (
   batch: ReturnType<typeof optimizeExpansionFetchPlan>['batches'][number],
-) => batch.targets.map(target => parsePath(target.pathKey).slice(-1)[0]);
+) => batch.map(target => parsePath(target.pathKey).slice(-1)[0]);
 
 describe('fetchPlanOptimizer', () => {
   it('groups compatible sibling targets into a batch', () => {
@@ -76,7 +76,7 @@ describe('fetchPlanOptimizer', () => {
     );
     const plan = optimizeExpansionFetchPlan({ targets });
 
-    const batchSizes = plan.batches.map(batch => batch.targets.length);
+    const batchSizes = plan.batches.map(batch => batch.length);
     const hasMaxBatch = batchSizes.includes(MAX_BATCH_SIBLINGS);
     expect(hasMaxBatch).toBe(true);
     expect(

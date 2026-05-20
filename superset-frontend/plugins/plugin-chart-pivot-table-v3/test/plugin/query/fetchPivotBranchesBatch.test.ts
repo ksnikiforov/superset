@@ -23,7 +23,7 @@ import {
 } from '../../../src/pivot/expansion/fetchPivotExpansion';
 import {
   buildAxisExpansionCoverageTarget,
-  type BatchGroup,
+  type ExpansionCoverageTarget,
 } from '../../../src/pivot/expansion/planner';
 import { buildFormData } from '../fixtures/pivotFormData';
 import {
@@ -92,8 +92,8 @@ const hasCompatibleCoverage = (
 
 const mockPost = SupersetClient.post as jest.Mock;
 
-type TestBatchTarget = Pick<BatchGroup['targets'][number], 'axis' | 'pathKey'>;
-type TestBatchGroup = Omit<BatchGroup, 'targets'> & {
+type TestBatchTarget = Pick<ExpansionCoverageTarget, 'axis' | 'pathKey'>;
+type TestBatchGroup = {
   targets: TestBatchTarget[];
 };
 
@@ -107,9 +107,8 @@ const withBatchCoverageTargets = ({
   batch: TestBatchGroup;
   visibleRowDepth: number;
   visibleColDepth: number;
-}): BatchGroup => ({
-  ...batch,
-  targets: batch.targets.map(target => ({
+}): ExpansionCoverageTarget[] =>
+  batch.targets.map(target => ({
     ...buildAxisExpansionCoverageTarget({
       program: layout.pivotProgram,
       axis: target.axis,
@@ -117,8 +116,7 @@ const withBatchCoverageTargets = ({
       rowDepth: visibleRowDepth,
       columnDepth: visibleColDepth,
     }),
-  })),
-});
+  }));
 
 const fetchBatch = (
   params: Omit<FetchPivotExpansionRequest, 'kind' | 'layout' | 'batch'> & {

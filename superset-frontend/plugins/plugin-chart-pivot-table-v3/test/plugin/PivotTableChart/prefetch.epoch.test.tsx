@@ -107,7 +107,7 @@ describe('PivotTableChart persisted prefetch ignores stale results', () => {
     visibleColDepth,
   }: FetchPivotBranchesBatchParams): Promise<FetchPivotBranchesBatchResult> => {
     const results = await Promise.all(
-      batch.targets.map(target => {
+      batch.map(target => {
         const path = parsePath(target.pathKey);
         return Promise.resolve(
           fetchPivotBranchMock({

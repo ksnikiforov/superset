@@ -25,10 +25,7 @@ import {
 } from '../../../src/pivot/core/tokens';
 import { MetricsLayoutEnum } from '../../../src/types';
 import { serializePath } from '../../../src/pivot/core/path';
-import {
-  buildAxisExpansionCoverageTarget,
-  type BatchGroup,
-} from '../../../src/pivot/expansion/planner';
+import { buildAxisExpansionCoverageTarget } from '../../../src/pivot/expansion/planner';
 import { buildFormData } from '../fixtures/pivotFormData';
 
 const fetchTarget = ({
@@ -196,31 +193,26 @@ describe('runtime coverage query specs contract', () => {
       colTotals: false,
     });
     const layout = buildLayoutContext(formData);
-    const batch: BatchGroup = {
-      axis: 'row',
-      parentPathKey: '',
-      siblingValues: ['US', 'CA'],
-      targets: [
-        {
-          ...fetchTarget({
-            layout,
-            axis: 'row',
-            path: ['US'],
-            visibleRowDepth: 1,
-            visibleColDepth: 0,
-          }),
-        },
-        {
-          ...fetchTarget({
-            layout,
-            axis: 'row',
-            path: ['CA'],
-            visibleRowDepth: 1,
-            visibleColDepth: 0,
-          }),
-        },
-      ],
-    };
+    const batch = [
+      {
+        ...fetchTarget({
+          layout,
+          axis: 'row',
+          path: ['US'],
+          visibleRowDepth: 1,
+          visibleColDepth: 0,
+        }),
+      },
+      {
+        ...fetchTarget({
+          layout,
+          axis: 'row',
+          path: ['CA'],
+          visibleRowDepth: 1,
+          visibleColDepth: 0,
+        }),
+      },
+    ];
 
     const specs = buildExpansionQuerySpecs({
       kind: 'batch',
@@ -242,22 +234,17 @@ describe('runtime coverage query specs contract', () => {
       colTotals: false,
     });
     const layout = buildLayoutContext(formData);
-    const batch: BatchGroup = {
-      axis: 'row',
-      parentPathKey: serializePath(['US']),
-      siblingValues: [SUBTOTAL_TOKEN],
-      targets: [
-        {
-          ...fetchTarget({
-            layout,
-            axis: 'row',
-            path: ['US', SUBTOTAL_TOKEN],
-            visibleRowDepth: 2,
-            visibleColDepth: 0,
-          }),
-        },
-      ],
-    };
+    const batch = [
+      {
+        ...fetchTarget({
+          layout,
+          axis: 'row',
+          path: ['US', SUBTOTAL_TOKEN],
+          visibleRowDepth: 2,
+          visibleColDepth: 0,
+        }),
+      },
+    ];
 
     const specs = buildExpansionQuerySpecs({
       kind: 'batch',

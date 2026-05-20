@@ -56,10 +56,6 @@ export type ExpansionCoverageTarget = {
   need: PivotCoverageNeed;
 };
 
-export type BatchGroup = {
-  targets: ExpansionCoverageTarget[];
-};
-
 export const isIntersectionCoverageTarget = (target: ExpansionCoverageTarget) =>
   target.need.rowScope.kind !== 'root' &&
   target.need.columnScope.kind !== 'root';

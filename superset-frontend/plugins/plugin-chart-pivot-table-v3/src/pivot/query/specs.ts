@@ -60,10 +60,7 @@ import {
 import { resolveInteractionFormData } from '../layout/resolveInteractionLayout';
 import { getMetricKey } from '../metrics';
 import { collectRequiredTimeOffsets } from '../measureLeaves';
-import {
-  type BatchGroup,
-  type ExpansionCoverageTarget,
-} from '../expansion/planner';
+import { type ExpansionCoverageTarget } from '../expansion/planner';
 import {
   buildPathFilters,
   coerceValueForColumn,
@@ -800,7 +797,7 @@ export type ExpansionQuerySpecRequest =
       kind: 'batch';
       formData: PivotTableQueryFormData;
       layout: LayoutContext;
-      batch: BatchGroup;
+      batch: ExpansionCoverageTarget[];
     }
   | {
       kind: 'intersection';
@@ -843,14 +840,14 @@ export const buildExpansionQuerySpecs = (
   }
   if (request.kind === 'batch') {
     const { formData, layout, batch } = request;
-    const coverageTarget = batch.targets[0];
+    const coverageTarget = batch[0];
     if (!coverageTarget) {
       return [];
     }
     const batchAxis = coverageTarget.axis;
     const representative = parsePath(coverageTarget.pathKey);
     const parentPathKey = serializePath(representative.slice(0, -1));
-    const scopedPaths = batch.targets.map(target =>
+    const scopedPaths = batch.map(target =>
       projectQueryFilterPath({
         layout,
         axis: batchAxis,

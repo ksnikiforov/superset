@@ -98,7 +98,7 @@ describe('PivotTableChart expansion state persistence', () => {
     layout,
   }: FetchPivotBranchesBatchParams): Promise<FetchPivotBranchesBatchResult> => {
     const results = await Promise.all(
-      batch.targets.map(target =>
+      batch.map(target =>
         Promise.resolve(
           branchExpansionMock({
             kind: 'branch',

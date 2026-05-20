@@ -70,7 +70,7 @@ export const getMockExpansionRequestAxis = (
     return 'row';
   }
   return params.kind === 'batch'
-    ? (params.batch.targets[0]?.axis ?? 'row')
+    ? (params.batch[0]?.axis ?? 'row')
     : params.target.axis;
 };
 
@@ -82,7 +82,7 @@ export const getMockExpansionRequestPath = (
   }
   return parsePath(
     params.kind === 'batch'
-      ? (params.batch.targets[0]?.pathKey ?? '')
+      ? (params.batch[0]?.pathKey ?? '')
       : params.target.pathKey,
   );
 };

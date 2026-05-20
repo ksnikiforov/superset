@@ -24,10 +24,7 @@ import {
   formatQueryName,
 } from '../../../src/pivot/query/specs';
 import { serializePath } from '../../../src/pivot/core/path';
-import {
-  buildAxisExpansionCoverageTarget,
-  type BatchGroup,
-} from '../../../src/pivot/expansion/planner';
+import { buildAxisExpansionCoverageTarget } from '../../../src/pivot/expansion/planner';
 import { buildFormData } from '../fixtures/pivotFormData';
 
 type FilterClause = {
@@ -143,31 +140,26 @@ describe('temporal branch query specs contract', () => {
       },
     });
     const layout = buildLayoutContext(formData);
-    const batch: BatchGroup = {
-      axis: 'row',
-      parentPathKey: '',
-      siblingValues: ['1483228800000', '1514764800000'],
-      targets: [
-        {
-          ...fetchTarget({
-            layout,
-            axis: 'row',
-            path: ['1483228800000'],
-            visibleRowDepth: 0,
-            visibleColDepth: 0,
-          }),
-        },
-        {
-          ...fetchTarget({
-            layout,
-            axis: 'row',
-            path: ['1514764800000'],
-            visibleRowDepth: 0,
-            visibleColDepth: 0,
-          }),
-        },
-      ],
-    };
+    const batch = [
+      {
+        ...fetchTarget({
+          layout,
+          axis: 'row',
+          path: ['1483228800000'],
+          visibleRowDepth: 0,
+          visibleColDepth: 0,
+        }),
+      },
+      {
+        ...fetchTarget({
+          layout,
+          axis: 'row',
+          path: ['1514764800000'],
+          visibleRowDepth: 0,
+          visibleColDepth: 0,
+        }),
+      },
+    ];
 
     const specs = buildExpansionQuerySpecs({
       kind: 'batch',

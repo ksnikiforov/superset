@@ -345,8 +345,8 @@ Implementation rules for accelerated chunks:
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `12868` insertions, `18278` deletions, net `-5410`.
-- Current production TypeScript/TSX total: about `28100` lines.
+- Production `src`: `12860` insertions, `18279` deletions, net `-5419`.
+- Current production TypeScript/TSX total: about `28091` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -358,18 +358,18 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `28100` | `-5410` | `< 28000` |
-| Strict core pipeline | `11337` | `11435` | `+98` | `8000` |
+| Full production `src` | `33510` | `28091` | `-5419` | `< 28000` |
+| Strict core pipeline | `11337` | `11426` | `+89` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4452` | `-231` | `3000-4000` |
-| Broad core pipeline | `16020` | `15887` | `-133` | `11000-13000` |
+| Broad core pipeline | `16020` | `15878` | `-142` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
 | `pivot/runtime/*` | `3649` |
-| `pivot/expansion/*` | `2416` |
-| `pivot/query/*` | `1387` |
+| `pivot/expansion/*` | `2410` |
+| `pivot/query/*` | `1384` |
 | `pivot/layout/*` | `770` |
 | `pivot/core/*` | `252` |
 | core domain helpers | `1572` |
@@ -413,6 +413,12 @@ now consume loaded fact selectors directly and call the manifest diff
 internally. This removes a policy injection point from expansion planning and
 forces tests to model concrete fact-store coverage rather than fake depth
 callbacks.
+
+Latest batch-transport cleanup: expansion batch transport no longer carries a
+one-field `BatchGroup` wrapper. A batch is now directly an
+`ExpansionCoverageTarget[]`, so fetch execution and query-spec construction
+consume the same compiled manifest targets without a parallel transport object
+whose only field was `targets`.
 
 Latest transport cleanup: emitted `BatchGroup` requests no longer carry a
 separate `signature` field. Candidate signatures are used only while grouping

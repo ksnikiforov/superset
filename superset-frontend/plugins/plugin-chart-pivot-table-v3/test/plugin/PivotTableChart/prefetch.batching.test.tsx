@@ -266,7 +266,7 @@ describe('PivotTableChart batching on persisted restore', () => {
       if (params.kind === 'branch') {
         return Promise.resolve(buildMockBranchFetchResult(params));
       }
-      if (params.batch.targets[0]?.axis === 'row') {
+      if (params.batch[0]?.axis === 'row') {
         return deferredRow.implementation(params);
       }
       return deferredCol.implementation(params);

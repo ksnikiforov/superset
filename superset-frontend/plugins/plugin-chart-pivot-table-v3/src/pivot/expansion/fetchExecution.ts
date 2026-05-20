@@ -30,7 +30,6 @@ import { stableStringify } from '../shared/stableStringify';
 import { planHydrationIteration } from './stateTransitions';
 import type { PivotProgram } from '../runtime/types';
 import {
-  type BatchGroup,
   type ExpansionCoverageTarget,
   filterMissingExpansionCoverageTargets,
   isIntersectionCoverageTarget,
@@ -71,7 +70,7 @@ type ExpansionQueryRequest = Omit<
 export const MAX_BATCH_SIBLINGS = 50;
 
 type BatchPlan = {
-  batches: BatchGroup[];
+  batches: ExpansionCoverageTarget[][];
   singles: ExpansionCoverageTarget[];
 };
 
@@ -129,15 +128,14 @@ export const optimizeExpansionFetchPlan = ({
     groups.set(groupKey, seed);
   });
 
-  const batches: BatchGroup[] = [];
+  const batches: ExpansionCoverageTarget[][] = [];
   groups.forEach(seed => {
     chunkTargets(seed.targets, maxBatchSize).forEach(chunk => {
-      const group = { targets: chunk };
-      if (group.targets.length <= 1) {
-        singles.push(...group.targets);
+      if (chunk.length <= 1) {
+        singles.push(...chunk);
         return;
       }
-      batches.push(group);
+      batches.push(chunk);
     });
   });
 
@@ -161,7 +159,7 @@ const resolveExpansionFetchPlan = (
   targets: ExpansionCoverageTarget[],
 ): {
   singles: ExpansionCoverageTarget[];
-  batches: BatchGroup[];
+  batches: ExpansionCoverageTarget[][];
   intersections: ExpansionCoverageTarget[];
 } => {
   const { batches, singles } = optimizeExpansionFetchPlan({
@@ -246,7 +244,7 @@ export const fetchExpansionTargetDeltas = async ({
     resolveExpansionFetchPlan(targets);
   setPhaseLoadingKeys(runtime, [
     ...singles.map(target => target.pathKey),
-    ...batches.flatMap(batch => batch.targets.map(target => target.pathKey)),
+    ...batches.flatMap(batch => batch.map(target => target.pathKey)),
   ]);
   const branchFetchPromises: Array<Promise<void>> = [
     ...singles.map(target =>

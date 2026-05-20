@@ -34,7 +34,7 @@ import {
 import { buildFormData } from '../fixtures/pivotFormData';
 import {
   buildAxisExpansionCoverageTarget,
-  type BatchGroup,
+  type ExpansionCoverageTarget,
 } from '../../../src/pivot/expansion/planner';
 
 jest.mock('src/middleware/asyncEvent', () => ({
@@ -55,8 +55,8 @@ const waitForAsyncDataMock = waitForAsyncData as jest.MockedFunction<
   typeof waitForAsyncData
 >;
 
-type TestBatchTarget = Pick<BatchGroup['targets'][number], 'axis' | 'pathKey'>;
-type TestBatchGroup = Omit<BatchGroup, 'targets'> & {
+type TestBatchTarget = Pick<ExpansionCoverageTarget, 'axis' | 'pathKey'>;
+type TestBatchGroup = {
   targets: TestBatchTarget[];
 };
 
@@ -119,18 +119,15 @@ const fetchBatch = (
     factStore,
     requestGroupId,
     layout,
-    batch: {
-      ...batch,
-      targets: batch.targets.map(target => ({
-        ...buildAxisExpansionCoverageTarget({
-          program: layout.pivotProgram,
-          axis: target.axis,
-          pathKey: target.pathKey,
-          rowDepth: visibleRowDepth,
-          columnDepth: visibleColDepth,
-        }),
-      })),
-    },
+    batch: batch.targets.map(target => ({
+      ...buildAxisExpansionCoverageTarget({
+        program: layout.pivotProgram,
+        axis: target.axis,
+        pathKey: target.pathKey,
+        rowDepth: visibleRowDepth,
+        columnDepth: visibleColDepth,
+      }),
+    })),
   });
 };
 
