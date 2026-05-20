@@ -345,8 +345,8 @@ Implementation rules for accelerated chunks:
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `12860` insertions, `18279` deletions, net `-5419`.
-- Current production TypeScript/TSX total: about `28091` lines.
+- Production `src`: `12846` insertions, `18279` deletions, net `-5433`.
+- Current production TypeScript/TSX total: about `28077` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -358,10 +358,10 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `28091` | `-5419` | `< 28000` |
-| Strict core pipeline | `11337` | `11426` | `+89` | `8000` |
+| Full production `src` | `33510` | `28077` | `-5433` | `< 28000` |
+| Strict core pipeline | `11337` | `11412` | `+75` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4452` | `-231` | `3000-4000` |
-| Broad core pipeline | `16020` | `15878` | `-142` | `11000-13000` |
+| Broad core pipeline | `16020` | `15864` | `-156` | `11000-13000` |
 
 Current strict core breakdown:
 
@@ -369,7 +369,7 @@ Current strict core breakdown:
 | --- | ---: |
 | `pivot/runtime/*` | `3649` |
 | `pivot/expansion/*` | `2410` |
-| `pivot/query/*` | `1384` |
+| `pivot/query/*` | `1370` |
 | `pivot/layout/*` | `770` |
 | `pivot/core/*` | `252` |
 | core domain helpers | `1572` |
@@ -419,6 +419,12 @@ one-field `BatchGroup` wrapper. A batch is now directly an
 `ExpansionCoverageTarget[]`, so fetch execution and query-spec construction
 consume the same compiled manifest targets without a parallel transport object
 whose only field was `targets`.
+
+Latest query-scope cleanup: expansion query specs no longer re-project rendered
+paths to build query filters and fact-store scopes. Branch, batch, and
+intersection specs now consume the semantic row/column scopes already carried
+by the compiled `ExpansionCoverageTarget`, deleting the query-side
+`projectQueryFilterPath` reconstruction path.
 
 Latest transport cleanup: emitted `BatchGroup` requests no longer carry a
 separate `signature` field. Candidate signatures are used only while grouping

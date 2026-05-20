@@ -31,7 +31,7 @@ import {
 } from '../../../../src/pivot/runtime/coverage';
 import {
   buildAxisExpansionCoverageTarget,
-  createExpansionCoverageDiff,
+  filterMissingExpansionCoverageTargets,
 } from '../../../../src/pivot/expansion/planner';
 import { type PivotFactSelector } from '../../../../src/pivot/runtime/factStore';
 import { resolveAxisProjection } from '../../../../src/pivot/runtime/projection';
@@ -59,30 +59,28 @@ describe('expansion fact coverage', () => {
       groupbyColumns: ['year', 'quarter', 'month', 'day'],
       metrics: ['sales'],
     });
-    const getMissingExpansionCoverage = createExpansionCoverageDiff({
-      factSelectors: [
-        {
-          coverage: {
-            rowDepth: 2,
-            columnDepth: 1,
-            rowDimensions: ['country', 'city'],
-            columnDimensions: ['year'],
-          },
-          scope: axisScope('row', ['France']),
-          valueKeys: ['sales'],
+    const factSelectors: PivotFactSelector[] = [
+      {
+        coverage: {
+          rowDepth: 2,
+          columnDepth: 1,
+          rowDimensions: ['country', 'city'],
+          columnDimensions: ['year'],
         },
-        {
-          coverage: {
-            rowDepth: 2,
-            columnDepth: 3,
-            rowDimensions: ['country', 'city'],
-            columnDimensions: ['year', 'quarter', 'month'],
-          },
-          scope: axisScope('row', ['France']),
-          valueKeys: ['sales'],
+        scope: axisScope('row', ['France']),
+        valueKeys: ['sales'],
+      },
+      {
+        coverage: {
+          rowDepth: 2,
+          columnDepth: 3,
+          rowDimensions: ['country', 'city'],
+          columnDimensions: ['year', 'quarter', 'month'],
         },
-      ],
-    });
+        scope: axisScope('row', ['France']),
+        valueKeys: ['sales'],
+      },
+    ];
     const target = ({
       axis,
       path,
@@ -103,23 +101,29 @@ describe('expansion fact coverage', () => {
       });
 
     expect(
-      getMissingExpansionCoverage([
+      filterMissingExpansionCoverageTargets({
+        targets: [
+          target({
+            axis: 'row',
+            path: ['France'],
+            rowDepth: 2,
+            columnDepth: 1,
+          }),
+        ],
+        factSelectors,
+      }),
+    ).toEqual([]);
+    const missingDeepColumn = filterMissingExpansionCoverageTargets({
+      targets: [
         target({
           axis: 'row',
           path: ['France'],
           rowDepth: 2,
-          columnDepth: 1,
+          columnDepth: 4,
         }),
-      ]),
-    ).toEqual([]);
-    const missingDeepColumn = getMissingExpansionCoverage([
-      target({
-        axis: 'row',
-        path: ['France'],
-        rowDepth: 2,
-        columnDepth: 4,
-      }),
-    ]);
+      ],
+      factSelectors,
+    });
     expect(
       missingDeepColumn.map(({ axis, pathKey, need }) => ({
         axis,
@@ -135,14 +139,17 @@ describe('expansion fact coverage', () => {
         columnDepth: 4,
       },
     ]);
-    const missingColumnBranch = getMissingExpansionCoverage([
-      target({
-        axis: 'col',
-        path: ['France'],
-        rowDepth: 1,
-        columnDepth: 1,
-      }),
-    ]);
+    const missingColumnBranch = filterMissingExpansionCoverageTargets({
+      targets: [
+        target({
+          axis: 'col',
+          path: ['France'],
+          rowDepth: 1,
+          columnDepth: 1,
+        }),
+      ],
+      factSelectors,
+    });
     expect(
       missingColumnBranch.map(({ axis, pathKey, need }) => ({
         axis,
@@ -475,35 +482,36 @@ describe('branch fact coverage', () => {
       metrics: ['averageOrderValue', 'weightedDiscount'],
       metricsLayout: MetricsLayoutEnum.ROWS,
     });
-    const getMissingExpansionCoverage = createExpansionCoverageDiff({
-      factSelectors: [
-        {
-          coverage: {
-            rowDepth: 2,
-            columnDepth: 1,
-            rowDimensions: ['returnFlag', 'orderPriority'],
-            columnDimensions: ['shipMode'],
-          },
-          scope: {
-            kind: 'axisPaths',
-            axis: 'row',
-            paths: [['A']],
-          },
-          valueKeys: ['averageOrderValue'],
-        },
-      ],
-    });
-
-    expect(
-      getMissingExpansionCoverage([
-        buildAxisExpansionCoverageTarget({
-          program,
-          axis: 'row',
-          pathKey: serializePath([encodeMetricKey('averageOrderValue'), 'A']),
+    const factSelectors: PivotFactSelector[] = [
+      {
+        coverage: {
           rowDepth: 2,
           columnDepth: 1,
-        }),
-      ]),
+          rowDimensions: ['returnFlag', 'orderPriority'],
+          columnDimensions: ['shipMode'],
+        },
+        scope: {
+          kind: 'axisPaths',
+          axis: 'row',
+          paths: [['A']],
+        },
+        valueKeys: ['averageOrderValue'],
+      },
+    ];
+
+    expect(
+      filterMissingExpansionCoverageTargets({
+        targets: [
+          buildAxisExpansionCoverageTarget({
+            program,
+            axis: 'row',
+            pathKey: serializePath([encodeMetricKey('averageOrderValue'), 'A']),
+            rowDepth: 2,
+            columnDepth: 1,
+          }),
+        ],
+        factSelectors,
+      }),
     ).toEqual([]);
   });
 
