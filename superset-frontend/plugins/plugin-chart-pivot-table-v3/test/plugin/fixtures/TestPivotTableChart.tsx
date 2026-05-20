@@ -81,8 +81,11 @@ const isDimensionalChildValue = (value: PivotPath[number]) =>
   !isMeasureLeafToken(value) &&
   !isSubtotalToken(value);
 
+const toDimensionalPath = (path: PivotPath) =>
+  path.filter(isDimensionalChildValue);
+
 const countDimensionalPathDepth = (path: PivotPath) =>
-  path.filter(isDimensionalChildValue).length;
+  toDimensionalPath(path).length;
 
 const maxPathDepth = (nodes: PivotTreeData['rows']) =>
   Object.values(nodes).reduce(
@@ -130,8 +133,11 @@ const buildFactsForCoverage = (
     if (!row || !col) {
       return [];
     }
-    const rowPath = row.path.slice(0, coverage.rowDepth);
-    const columnPath = col.path.slice(0, coverage.columnDepth);
+    const rowPath = toDimensionalPath(row.path).slice(0, coverage.rowDepth);
+    const columnPath = toDimensionalPath(col.path).slice(
+      0,
+      coverage.columnDepth,
+    );
     return Object.entries(cell.values).map(([valueKey, value]) => ({
       rowPath,
       columnPath,
@@ -286,7 +292,7 @@ export const buildPreloadedBranchFactBatches = (
             scope: {
               kind: 'axisPaths',
               axis,
-              paths: [path],
+              paths: [toDimensionalPath(path)],
             },
           });
         });
@@ -348,7 +354,7 @@ export const buildPreloadedRenderedBranchFactBatches = (
             scope: {
               kind: 'axisPaths',
               axis,
-              paths: [node.path],
+              paths: [toDimensionalPath(node.path)],
             },
           });
         });

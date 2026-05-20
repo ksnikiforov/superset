@@ -90,15 +90,13 @@ const stripMockFactBatches = <T>(result: MockFetchResult<T>): Partial<T> => {
   return fetchResult;
 };
 
-const toFactPath = (path: PivotPath, depth: number): PivotPath =>
-  path
-    .filter(
-      value =>
-        !isMetricToken(value) &&
-        !isMeasureLeafToken(value) &&
-        !isSubtotalToken(value),
-    )
-    .slice(0, depth);
+const toFactPath = (path: PivotPath): PivotPath =>
+  path.filter(
+    value =>
+      !isMetricToken(value) &&
+      !isMeasureLeafToken(value) &&
+      !isSubtotalToken(value),
+  );
 
 const buildFactsForCoverage = (
   tree: PivotTreeData | undefined,
@@ -113,9 +111,17 @@ const buildFactsForCoverage = (
     if (!row || !col) {
       return [];
     }
+    const rowPath = toFactPath(row.path);
+    const columnPath = toFactPath(col.path);
+    if (
+      rowPath.length !== coverage.rowDepth ||
+      columnPath.length !== coverage.columnDepth
+    ) {
+      return [];
+    }
     return Object.entries(cell.values).map(([valueKey, value]) => ({
-      rowPath: toFactPath(row.path, coverage.rowDepth),
-      columnPath: toFactPath(col.path, coverage.columnDepth),
+      rowPath,
+      columnPath,
       valueKey,
       value,
     }));

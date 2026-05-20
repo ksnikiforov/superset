@@ -290,8 +290,8 @@ before cutting.
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13334` insertions, `18177` deletions, net `-4843`.
-- Current production TypeScript/TSX total: about `28667` lines.
+- Production `src`: `13339` insertions, `18177` deletions, net `-4838`.
+- Current production TypeScript/TSX total: about `28672` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -303,16 +303,16 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `28667` | `-4843` | `< 28000` |
-| Strict core pipeline | `11337` | `11500` | `+163` | `8000` |
+| Full production `src` | `33510` | `28672` | `-4838` | `< 28000` |
+| Strict core pipeline | `11337` | `11505` | `+168` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4893` | `+210` | `3000-4000` |
-| Broad core pipeline | `16020` | `16393` | `+373` | `11000-13000` |
+| Broad core pipeline | `16020` | `16398` | `+378` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
-| `pivot/runtime/*` | `3781` |
+| `pivot/runtime/*` | `3786` |
 | `pivot/expansion/*` | `2567` |
 | `pivot/query/*` | `1521` |
 | `pivot/layout/*` | `770` |
@@ -324,6 +324,13 @@ Interpretation: plugin-wide source has shrunk, but core pipeline source has
 grown because runtime authority moved out of chart/control code before the old
 planner and render-repair surfaces were fully deleted. The next large cuts must
 reduce strict core, not only move lines into it.
+
+Latest fact-boundary cleanup: `PivotFactStore` now rejects facts whose row or
+column path depth does not match the declared batch coverage. Test expansion
+fixtures now convert rendered metric/subtotal paths back to the same dimensional
+query scopes used by the runtime, so ancestor/subtotal regressions are caught at
+fact ingestion and materialization boundaries instead of patched by render-time
+fallbacks.
 
 Latest core cleanup: row display intent now uses the same
 `axisCoverageNeeds` manifest as expansion/loading. The old numeric

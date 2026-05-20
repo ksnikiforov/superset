@@ -186,6 +186,33 @@ test('uses exact-depth root coverage for narrower branch coverage', () => {
   expect(hasCompatibleCoverage(store, franceBranchSelector)).toBe(true);
 });
 
+test('rejects facts whose paths do not match batch coverage depth', () => {
+  const store = createPivotFactStore();
+
+  store.upsertBatch({
+    ...selector,
+    facts: [
+      buildFact({ value: 1 }),
+      buildFact({ rowPath: ['France', 'Paris'], value: 2 }),
+      buildFact({ columnPath: [], value: 3 }),
+    ],
+  });
+
+  expect(store.getFactBatches()[0].facts).toEqual([buildFact({ value: 1 })]);
+});
+
+test('keeps coverage selector for empty exact-depth batch', () => {
+  const store = createPivotFactStore();
+
+  store.upsertBatch({
+    ...selector,
+    facts: [buildFact({ rowPath: ['France', 'Paris'] })],
+  });
+
+  expect(store.getFactBatches()[0].facts).toEqual([]);
+  expect(hasCompatibleCoverage(store, selector)).toBe(true);
+});
+
 test('uses intersection scope for bounded cross-axis coverage', () => {
   const store = createPivotFactStore();
   const intersectionCoverage: PivotFactCoverage = {

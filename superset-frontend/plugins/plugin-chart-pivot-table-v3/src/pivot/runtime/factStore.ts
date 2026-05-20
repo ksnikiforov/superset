@@ -138,6 +138,10 @@ const factMatchesScope = (fact: PivotFact, scope: PivotFactStoreBatchScope) => {
   }
 };
 
+const factMatchesCoverage = (fact: PivotFact, coverage: PivotFactCoverage) =>
+  fact.rowPath.length === coverage.rowDepth &&
+  fact.columnPath.length === coverage.columnDepth;
+
 export const createPivotFactStore = (): PivotFactStore => {
   const factsByRequest = new Map<string, PivotFact[]>();
   const selectorByRequest = new Map<string, PivotFactSelector>();
@@ -156,8 +160,9 @@ export const createPivotFactStore = (): PivotFactStore => {
     facts
       .filter(
         fact =>
-          selector.scope.kind !== 'intersection' ||
-          factMatchesScope(fact, selector.scope),
+          factMatchesCoverage(fact, selector.coverage) &&
+          (selector.scope.kind !== 'intersection' ||
+            factMatchesScope(fact, selector.scope)),
       )
       .forEach(fact => {
         const factKey = buildPivotFactKey(selector, fact);
