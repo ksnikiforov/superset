@@ -345,8 +345,8 @@ Implementation rules for accelerated chunks:
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `12738` insertions, `18280` deletions, net `-5542`.
-- Current production TypeScript/TSX total: about `27968` lines.
+- Production `src`: `12425` insertions, `18282` deletions, net `-5857`.
+- Current production TypeScript/TSX total: about `27653` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -358,10 +358,10 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `27968` | `-5542` | `< 28000` |
+| Full production `src` | `33510` | `27653` | `-5857` | `< 28000` |
 | Strict core pipeline | `11337` | `11414` | `+77` | `8000` |
-| Non-visual chart runtime hooks | `4683` | `4343` | `-340` | `3000-4000` |
-| Broad core pipeline | `16020` | `15757` | `-263` | `11000-13000` |
+| Non-visual chart runtime hooks | `4683` | `4030` | `-653` | `3000-4000` |
+| Broad core pipeline | `16020` | `15444` | `-576` | `11000-13000` |
 
 Current strict core breakdown:
 
@@ -379,6 +379,13 @@ Interpretation: plugin-wide source has shrunk, but core pipeline source has
 grown because runtime authority moved out of chart/control code before the old
 planner and render-repair surfaces were fully deleted. The next large cuts must
 reduce strict core, not only move lines into it.
+
+Latest chart-owned fallback cleanup: `PivotTableChart` no longer fetches
+dataset metadata from `/api/v1/dataset/:id` after render to recover missing
+verbose labels or python date formats. Dataset labels and temporal formatters
+now come from the transform/query-backed chart props snapshot. This removes an
+async chart-owned metadata state machine and keeps the chart runtime from
+second-guessing prepared form data.
 
 Latest selection-filter cleanup: selected dimension filters are now
 canonical-key only. The runtime no longer builds tree filter values under
@@ -1266,7 +1273,6 @@ Primary files:
 - `src/pivot/chart/usePivotSeamlessRuntimeUpdate.ts`
 - `src/pivot/expansion/useExpansionEngine.ts`
 - `src/pivot/chart/useDimensionFilterValues.ts`
-- `src/pivot/chart/usePivotDatasetMeta.ts`
 
 Success criteria:
 

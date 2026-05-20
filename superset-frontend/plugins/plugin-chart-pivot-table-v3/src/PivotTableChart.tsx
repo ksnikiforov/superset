@@ -33,7 +33,6 @@ import { usePivotRenderModel } from './pivot/chart/usePivotRenderModel';
 import { useStickyHeaders } from './pivot/chart/useStickyHeaders';
 import { usePivotFormatting } from './pivot/chart/usePivotFormatting';
 import { usePivotInteractions } from './pivot/chart/usePivotInteractions';
-import { usePivotDatasetMeta } from './pivot/chart/usePivotDatasetMeta';
 import { usePivotRuntimeLayoutState } from './pivot/chart/usePivotRuntimeLayoutState';
 import {
   INTERACTION_PANEL_WIDTH,
@@ -99,20 +98,19 @@ function PivotTableChart(props: PivotTableProps) {
     () => dimensionList.map(dimension => getStableColumnKey(dimension)),
     [dimensionList],
   );
-  const datasourceId = useMemo(() => {
-    const datasource = formData.datasource || '';
-    const [idPart] = datasource.split('__');
-    const id = Number(idPart);
-    return Number.isFinite(id) ? id : null;
-  }, [formData.datasource]);
-  const { resolvedVerboseMap, resolvedDateFormatters } = usePivotDatasetMeta({
-    datasourceId,
-    dimensions: dimensionList,
-    formData,
-    fetchFormDataBase,
-    verboseMap: formData.verboseMap,
-    dateFormatters: formData.dateFormatters ?? {},
-  });
+  const resolvedVerboseMap = useMemo<Record<string, string>>(
+    () =>
+      Object.fromEntries(
+        Object.entries(formData.verboseMap ?? {}).filter(
+          (entry): entry is [string, string] => typeof entry[1] === 'string',
+        ),
+      ),
+    [formData.verboseMap],
+  );
+  const resolvedDateFormatters = useMemo(
+    () => formData.dateFormatters ?? {},
+    [formData.dateFormatters],
+  );
   const fetchFormDataBaseWithFormatters = useMemo(
     () => ({
       ...fetchFormDataBase,
