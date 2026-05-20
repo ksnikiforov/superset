@@ -423,10 +423,7 @@ export const usePivotRenderModel = ({
         axis,
         parent,
         nodes,
-        hideMetricHeader:
-          axis === 'row'
-            ? layout.hideMetricHeaderOnRows
-            : layout.hideMetricHeaderOnCols,
+        isLeafTierVisible,
         colTotals: axis === 'row' ? layout.layout.colTotals : undefined,
         normalizedColSubtotalLevelCount:
           axis === 'col'
@@ -443,10 +440,10 @@ export const usePivotRenderModel = ({
         nodes,
         rowSubTotals: layout.layout.rowSubTotals,
         rowSubtotalPositionForParent: layout.getRowSubtotalPosition(parent),
-        hideMetricHeaderOnRows: layout.hideMetricHeaderOnRows,
+        isLeafTierVisible,
       });
     },
-    [layout],
+    [isLeafTierVisible, layout],
   );
 
   const expandedRowsForRender = useMemo(

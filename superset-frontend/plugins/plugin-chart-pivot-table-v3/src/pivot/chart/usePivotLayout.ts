@@ -38,8 +38,6 @@ export type PivotLayoutResult = {
   normalizedColSubtotalLevels: number[];
   effectiveRowSubtotalPosition: TotalPosition;
   effectiveColSubtotalPosition: TotalPosition;
-  hideMetricHeaderOnRows: boolean;
-  hideMetricHeaderOnCols: boolean;
   compareMetricOrder: (a: PivotTreeNode, b: PivotTreeNode) => number;
   getMetricDisplayLabelForKey: (metricKey: string) => string;
   getRowSubtotalPosition: (node: PivotTreeNode) => TotalPosition;
@@ -65,9 +63,6 @@ export const usePivotLayout = ({
       }),
     [formData, pivotProgram],
   );
-  const isLeafTierVisible =
-    layout.measureHierarchy.leafTierVisibility === 'visible';
-
   const { metricLabelMap, metrics } = layout;
   const { metricsLayoutResolved: resolvedMetricsLayout, metricInsertIndex } =
     layout.pivotProgram;
@@ -116,19 +111,15 @@ export const usePivotLayout = ({
     forceRowSubtotalEnd,
     effectiveRowSubtotalPosition,
     effectiveColSubtotalPosition,
-    hideMetricHeaderOnRows,
-    hideMetricHeaderOnCols,
   } = useMemo(
     () =>
       resolveMetricAxisLayoutPolicy({
         program: layout.pivotProgram,
-        isLeafTierVisible,
         rowSubTotals: layout.rowSubTotals,
         resolvedRowSubtotalPosition,
         resolvedColSubtotalPosition,
       }),
     [
-      isLeafTierVisible,
       layout.pivotProgram,
       layout.rowSubTotals,
       resolvedColSubtotalPosition,
@@ -178,8 +169,6 @@ export const usePivotLayout = ({
     normalizedColSubtotalLevels,
     effectiveRowSubtotalPosition,
     effectiveColSubtotalPosition,
-    hideMetricHeaderOnRows,
-    hideMetricHeaderOnCols,
     compareMetricOrder,
     getMetricDisplayLabelForKey,
     getRowSubtotalPosition,

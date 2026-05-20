@@ -23,7 +23,11 @@ import {
   decodeMeasureLeafId,
   isSubtotalToken,
 } from './core/tokens';
-import { getValuesLevelIndex, isValuesFirstOnAxis } from './runtime/projection';
+import {
+  getAxisDimensionCount,
+  getValuesLevelIndex,
+  isValuesFirstOnAxis,
+} from './runtime/projection';
 import type { PivotProgram } from './runtime/types';
 
 type MetricTotalsConfig = {
@@ -34,7 +38,7 @@ type MetricTotalsConfig = {
 type NodeDepthConfig = {
   metricLabelSet: Set<string>;
   program: PivotProgram;
-  hideMetricHeaderOnRows: boolean;
+  isLeafTierVisible: boolean;
 };
 
 export const getMetricLabelFromPath = (
@@ -236,9 +240,29 @@ export const isExplicitTotalNode = (
   return isMetricGrandTotalNode(node, config);
 };
 
+export const shouldHideMetricHeaderOnAxis = ({
+  program,
+  axis,
+  isLeafTierVisible,
+}: {
+  program: PivotProgram;
+  axis: 'row' | 'col';
+  isLeafTierVisible: boolean;
+}) => {
+  const metricIndex = getValuesLevelIndex(program, axis);
+  const dimensionCount = getAxisDimensionCount(program, axis);
+  return (
+    program.valueAxis === axis &&
+    !isLeafTierVisible &&
+    program.metricKeys.length === 1 &&
+    metricIndex === dimensionCount &&
+    dimensionCount > 0
+  );
+};
+
 export const getNodeDimDepth = (
   node: PivotTreeNode,
-  { metricLabelSet, program, hideMetricHeaderOnRows }: NodeDepthConfig,
+  { metricLabelSet, program, isLeafTierVisible }: NodeDepthConfig,
 ) => {
   const rowMetricIndex = getValuesLevelIndex(program, 'row');
   const dimDepth = countDimDepth(node.path, metricLabelSet);
@@ -263,7 +287,15 @@ export const getNodeDimDepth = (
     return decoded !== undefined && metricLabelSet.has(decoded);
   });
   const metricDepth =
-    program.valueAxis === 'row' && !hideMetricHeaderOnRows && hasMetric ? 1 : 0;
+    program.valueAxis === 'row' &&
+    !shouldHideMetricHeaderOnAxis({
+      program,
+      axis: 'row',
+      isLeafTierVisible,
+    }) &&
+    hasMetric
+      ? 1
+      : 0;
   const leafDepth =
     program.valueAxis === 'row' &&
     node.path.some(val => decodeMeasureLeafId(val))

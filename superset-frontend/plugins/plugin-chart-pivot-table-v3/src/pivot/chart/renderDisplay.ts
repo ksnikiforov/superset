@@ -298,10 +298,7 @@ export type RenderNodeDisplayState = {
   getNodeDimDepth: (node: PivotTreeNode) => number;
 };
 
-type RenderNodeDisplayLayout = Pick<
-  PivotLayoutResult,
-  'hideMetricHeaderOnRows'
-> & {
+type RenderNodeDisplayLayout = {
   layout: Pick<PivotLayoutResult['layout'], 'pivotProgram'>;
 };
 
@@ -346,7 +343,7 @@ export const buildRenderNodeDisplayState = ({
     getNodeDimDepthBase(node, {
       metricLabelSet,
       program: layout.layout.pivotProgram,
-      hideMetricHeaderOnRows: layout.hideMetricHeaderOnRows,
+      isLeafTierVisible,
     });
 
   const shouldShowToggle = (axis: PivotAxis, node?: PivotTreeNode) => {

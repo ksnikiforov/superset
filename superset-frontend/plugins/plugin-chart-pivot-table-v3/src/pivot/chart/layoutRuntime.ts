@@ -34,6 +34,7 @@ import {
   getMetricLabelFromPath,
   getMetricTierNodes,
   isExplicitSubtotalNode,
+  shouldHideMetricHeaderOnAxis,
 } from '../metricsTotals';
 import {
   getAxisDimensionCount,
@@ -49,7 +50,6 @@ import { findChildren } from '../viewModel';
 
 type ResolveMetricAxisLayoutParams = {
   program: PivotProgram;
-  isLeafTierVisible: boolean;
   rowSubTotals: boolean;
   resolvedRowSubtotalPosition: TotalPosition;
   resolvedColSubtotalPosition: TotalPosition;
@@ -59,8 +59,6 @@ export type MetricAxisLayoutPolicy = {
   forceRowSubtotalEnd: boolean;
   effectiveRowSubtotalPosition: TotalPosition;
   effectiveColSubtotalPosition: TotalPosition;
-  hideMetricHeaderOnRows: boolean;
-  hideMetricHeaderOnCols: boolean;
 };
 
 export const buildMetricOrderComparator = ({
@@ -108,19 +106,13 @@ export const buildMetricOrderComparator = ({
 
 export const resolveMetricAxisLayoutPolicy = ({
   program,
-  isLeafTierVisible,
   rowSubTotals,
   resolvedRowSubtotalPosition,
   resolvedColSubtotalPosition,
 }: ResolveMetricAxisLayoutParams): MetricAxisLayoutPolicy => {
-  const { rowDimensions, columnDimensions, metricKeys } = program;
+  const { metricKeys } = program;
   const metricLabelCount = metricKeys.length;
-  const rowDimCount = rowDimensions.length;
-  const colDimCount = columnDimensions.length;
-  const isSingleMetric = metricLabelCount === 1;
   const isMultiMetric = metricLabelCount > 1;
-  const metricIndexOnRows = getValuesLevelIndex(program, 'row');
-  const metricIndexOnCols = getValuesLevelIndex(program, 'col');
   const metricsFirstOnRows = isValuesFirstOnAxis(program, 'row');
 
   const forceRowSubtotalEnd =
@@ -136,25 +128,10 @@ export const resolveMetricAxisLayoutPolicy = ({
       ? 'end'
       : resolvedColSubtotalPosition;
 
-  const hideMetricHeaderOnRows =
-    program.valueAxis === 'row' &&
-    !isLeafTierVisible &&
-    isSingleMetric &&
-    metricIndexOnRows === rowDimCount &&
-    rowDimCount > 0;
-  const hideMetricHeaderOnCols =
-    program.valueAxis === 'col' &&
-    !isLeafTierVisible &&
-    isSingleMetric &&
-    metricIndexOnCols === colDimCount &&
-    colDimCount > 0;
-
   return {
     forceRowSubtotalEnd,
     effectiveRowSubtotalPosition,
     effectiveColSubtotalPosition,
-    hideMetricHeaderOnRows,
-    hideMetricHeaderOnCols,
   };
 };
 
@@ -163,7 +140,7 @@ type ResolveAxisChildrenBeforeSubtotalPolicyParams = {
   axis: PivotAxis;
   parent: PivotTreeNode;
   nodes: Record<string, PivotTreeNode>;
-  hideMetricHeader: boolean;
+  isLeafTierVisible: boolean;
   colTotals?: boolean;
   normalizedColSubtotalLevelCount?: number;
 };
@@ -173,7 +150,7 @@ export const resolveAxisChildrenBeforeSubtotalPolicy = ({
   axis,
   parent,
   nodes,
-  hideMetricHeader,
+  isLeafTierVisible,
   colTotals = false,
   normalizedColSubtotalLevelCount = 0,
 }: ResolveAxisChildrenBeforeSubtotalPolicyParams): PivotTreeNode[] => {
@@ -181,6 +158,11 @@ export const resolveAxisChildrenBeforeSubtotalPolicy = ({
   const { metricLabelSet, isMetricGrandTotalNode, isMetricSubtotalNode } =
     createMetricNodePolicy(program);
   const metricIndex = getValuesLevelIndex(program, axis);
+  const hideMetricHeader = shouldHideMetricHeaderOnAxis({
+    program,
+    axis,
+    isLeafTierVisible,
+  });
   const groupbyLength = getAxisDimensionCount(program, axis);
   const getChildProjection = (child: PivotTreeNode) =>
     resolveAxisChildProjection({
@@ -362,7 +344,7 @@ type ResolveRowSubtotalChildrenPolicyParams = {
   nodes: Record<string, PivotTreeNode>;
   rowSubTotals: boolean;
   rowSubtotalPositionForParent: TotalPosition;
-  hideMetricHeaderOnRows: boolean;
+  isLeafTierVisible: boolean;
 };
 
 export const resolveRowSubtotalChildrenPolicy = ({
@@ -372,13 +354,18 @@ export const resolveRowSubtotalChildrenPolicy = ({
   nodes,
   rowSubTotals,
   rowSubtotalPositionForParent,
-  hideMetricHeaderOnRows,
+  isLeafTierVisible,
 }: ResolveRowSubtotalChildrenPolicyParams): PivotTreeNode[] => {
   const isMultiMetric = program.metricKeys.length > 1;
   const { metricLabelSet, countDimDepth, isMetricGrandTotalNode } =
     createMetricNodePolicy(program);
   const metricIndexOnRows = getValuesLevelIndex(program, 'row');
   const isRowMetricAxis = program.valueAxis === 'row';
+  const hideMetricHeaderOnRows = shouldHideMetricHeaderOnAxis({
+    program,
+    axis: 'row',
+    isLeafTierVisible,
+  });
   let filtered = children;
   if (isRowMetricAxis && !isMultiMetric) {
     filtered = filtered.filter(child => !isMetricGrandTotalNode(child));

@@ -36,6 +36,7 @@ import {
   SUBTOTAL_TOKEN,
 } from '../../../../src/pivot/core/tokens';
 import { serializePath } from '../../../../src/pivot/core/path';
+import { shouldHideMetricHeaderOnAxis } from '../../../../src/pivot/metricsTotals';
 
 const node = (axis: 'row' | 'col', path: PivotTreeNode['path']) => ({
   axis,
@@ -215,18 +216,19 @@ describe('pivot/chart/layoutRuntime', () => {
       rowDimensions: ['r1'],
       metricInsertIndex: 1,
     });
-    const withoutLeafTier = resolveMetricAxisLayoutPolicy({
-      ...baseParams,
+    const withoutLeafTier = shouldHideMetricHeaderOnAxis({
       program,
+      axis: 'row',
+      isLeafTierVisible: false,
     });
-    const withLeafTier = resolveMetricAxisLayoutPolicy({
-      ...baseParams,
+    const withLeafTier = shouldHideMetricHeaderOnAxis({
       program,
+      axis: 'row',
       isLeafTierVisible: true,
     });
 
-    expect(withoutLeafTier.hideMetricHeaderOnRows).toBe(true);
-    expect(withLeafTier.hideMetricHeaderOnRows).toBe(false);
+    expect(withoutLeafTier).toBe(true);
+    expect(withLeafTier).toBe(false);
   });
 
   it('filters hidden metric-header children before subtotal placement', () => {
@@ -246,7 +248,7 @@ describe('pivot/chart/layoutRuntime', () => {
         axis: 'row',
         parent,
         nodes,
-        hideMetricHeader: true,
+        isLeafTierVisible: false,
       }),
     ).toEqual([]);
   });
@@ -273,7 +275,7 @@ describe('pivot/chart/layoutRuntime', () => {
         axis: 'row',
         parent,
         nodes,
-        hideMetricHeader: false,
+        isLeafTierVisible: false,
       }),
     ).toEqual([dimensionChild]);
   });
@@ -371,7 +373,7 @@ describe('pivot/chart/layoutRuntime', () => {
         nodes: {},
         rowSubTotals: true,
         rowSubtotalPositionForParent: 'start',
-        hideMetricHeaderOnRows: false,
+        isLeafTierVisible: false,
       }),
     ).toEqual([dimensionChild, grandTotalChild]);
   });
@@ -406,7 +408,7 @@ describe('pivot/chart/layoutRuntime', () => {
         nodes,
         rowSubTotals: true,
         rowSubtotalPositionForParent: 'end',
-        hideMetricHeaderOnRows: false,
+        isLeafTierVisible: false,
       }),
     ).toEqual([dimensionChild, subtotalDescendant]);
   });
@@ -434,7 +436,7 @@ describe('pivot/chart/layoutRuntime', () => {
         nodes,
         rowSubTotals: true,
         rowSubtotalPositionForParent: 'end',
-        hideMetricHeaderOnRows: true,
+        isLeafTierVisible: false,
       }),
     ).toEqual([subtotalDescendant]);
   });
