@@ -96,21 +96,21 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `26586` | `-6924` | `< 20000` |
-| Strict core pipeline | `12907` | `10797` | `-2110` | `< 8000` |
+| Full production `src` | `33510` | `26514` | `-6996` | `< 20000` |
+| Strict core pipeline | `12907` | `10725` | `-2182` | `< 8000` |
 
 Diagnostic scope only:
 
 | Scope | Baseline lines | Current lines | Delta |
 | --- | ---: | ---: | ---: |
-| Core pipeline dirs (`runtime/expansion/query/layout/core`) | `8698` | `7895` | `-803` |
+| Core pipeline dirs (`runtime/expansion/query/layout/core`) | `8698` | `7823` | `-875` |
 
 Core pipeline breakdown:
 
 | Area | Lines |
 | --- | ---: |
 | `pivot/runtime/*` | `3394` |
-| `pivot/expansion/*` | `2228` |
+| `pivot/expansion/*` | `2156` |
 | `pivot/query/*` | `1395` |
 | `pivot/layout/*` + `pivot/core/*` | `878` |
 | core domain helpers | `1513` |
@@ -161,8 +161,6 @@ Completed structural cuts:
   finish API; request-group liveness is scope-owned.
 - Expansion hydration now rematerializes through the async materializer after
   fetches, so large expansion result commits can yield like seamless updates.
-- Expansion materialization is now size-aware: small result sets keep the
-  synchronous commit path, while large result sets use the async materializer.
 - Fact-batch materialization now owns fact-tree construction directly; the
   separate sync/async fact-tree wrapper functions were removed.
 - Planned query fetch ingestion now uses one fact-store upsert path; the
@@ -171,6 +169,9 @@ Completed structural cuts:
   materializer input mapping.
 - Expansion fetch commits now always use the async materializer boundary; the
   expansion hook no longer owns a fact-count-based sync/async branch.
+- Skipped pre-Values metric expansion now canonicalizes inside the normal
+  coverage target builder; the parallel skipped-target planner branch was
+  removed, and skipped requests require the visible ancestor to be expanded.
 - Fact store batch filtering now only carries the intersection scope matcher it
   actually enforces; root and axis-path batches stay batch-level coverage
   records.
@@ -251,16 +252,13 @@ deletion-conscious.
 
 ## Next Commits
 
-1. Replace the additive skipped-Values planner branches with a general
-   manifest-path normalizer so `planner.ts` and `query/specs.ts` shrink instead
-   of accumulating edge cases.
-2. Continue Priority 2 only where it deletes code: reduce the remaining
+1. Continue Priority 2 only where it deletes code: reduce the remaining
    expansion hook scheduler state or fold it into manifest execution.
-3. Attack Priority 3 only with tests first: isolate subtotal and measure-axis
+2. Attack Priority 3 only with tests first: isolate subtotal and measure-axis
    materialization behavior, then delete post-processing wrappers.
-4. Resume Priority 4 after materializer behavior is stable: render should stop
+3. Resume Priority 4 after materializer behavior is stable: render should stop
    inferring metric/subtotal structure from tree shape.
-5. Shrink `PivotTableChart.tsx` only where code is deleted, not merely moved.
+4. Shrink `PivotTableChart.tsx` only where code is deleted, not merely moved.
 
 ## Verification Standard
 

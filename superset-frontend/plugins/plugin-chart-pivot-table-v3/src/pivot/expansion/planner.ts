@@ -98,9 +98,6 @@ const valueKeysForExpansionPath = (
     : fallbackValueKeys;
 };
 
-const axisDimensionsFor = (program: PivotProgram, axis: PivotAxis) =>
-  axis === 'row' ? program.rowDimensions : program.columnDimensions;
-
 export const buildAxisExpansionCoverageTarget = ({
   axis,
   pathKey,
@@ -121,8 +118,44 @@ export const buildAxisExpansionCoverageTarget = ({
     path,
   });
   const branchDimensions = branchProjection.queryDimensions;
-  const branchDimensionDepth = branchDimensions.length;
+  let coverageDimensions = branchDimensions;
   const branchPath = projectionFilterPath(branchProjection);
+  if (
+    branchProjection.valuesLevelSeen &&
+    branchProjection.skippedPreValuesDimensions.length > 0 &&
+    branchProjection.postValuesDimensionPath.length === 0
+  ) {
+    const axisDimensions =
+      axis === 'row' ? program.rowDimensions : program.columnDimensions;
+    const visibleAxisDepth = axis === 'row' ? visibleRowDepth : visibleColDepth;
+    const valuesIndex =
+      program.valueAxis === axis
+        ? Math.max(
+            0,
+            Math.min(program.metricInsertIndex, axisDimensions.length),
+          )
+        : axisDimensions.length;
+    const visiblePreValuesDepth = Math.min(
+      visibleAxisDepth,
+      valuesIndex,
+      branchProjection.filterDimensionPath.length + 1,
+    );
+    if (visiblePreValuesDepth > branchProjection.filterDimensionPath.length) {
+      const canonicalDimensions = [
+        ...axisDimensions.slice(0, visiblePreValuesDepth),
+        ...axisDimensions
+          .slice(valuesIndex)
+          .slice(0, branchProjection.postValuesDimensionPath.length + 1),
+      ];
+      if (
+        canonicalDimensions.length > visibleAxisDepth &&
+        canonicalDimensions.length > branchDimensions.length
+      ) {
+        coverageDimensions = canonicalDimensions;
+      }
+    }
+  }
+  const branchDimensionDepth = coverageDimensions.length;
   const rowDepth = axis === 'row' ? branchDimensionDepth : visibleRowDepth;
   const columnDepth = axis === 'col' ? branchDimensionDepth : visibleColDepth;
   const valueKeys = buildFactValueKeys({
@@ -137,110 +170,17 @@ export const buildAxisExpansionCoverageTarget = ({
       columnDepth,
       rowDimensions:
         axis === 'row'
-          ? branchDimensions
+          ? coverageDimensions
           : program.rowDimensions.slice(0, rowDepth),
       columnDimensions:
         axis === 'col'
-          ? branchDimensions
+          ? coverageDimensions
           : program.columnDimensions.slice(0, columnDepth),
       valueKeys: valueKeysForExpansionPath(path, valueKeys),
       rowScope:
         axis === 'row' ? axisPathScopeFromPath(branchPath) : { kind: 'root' },
       columnScope:
         axis === 'col' ? axisPathScopeFromPath(branchPath) : { kind: 'root' },
-    },
-  };
-};
-
-const buildCanonicalSkippedValuesCoverageTarget = ({
-  axis,
-  pathKey,
-  program,
-  rowDepth: visibleRowDepth,
-  columnDepth: visibleColDepth,
-}: {
-  axis: PivotAxis;
-  pathKey: string;
-  program: PivotProgram;
-  rowDepth: number;
-  columnDepth: number;
-}): ExpansionCoverageTarget | undefined => {
-  const path = parsePath(pathKey);
-  const projection = resolveAxisProjection({
-    program,
-    axis,
-    path,
-  });
-  if (
-    !projection.valuesLevelSeen ||
-    projection.skippedPreValuesDimensions.length === 0
-  ) {
-    return undefined;
-  }
-  const dimensions = axisDimensionsFor(program, axis);
-  const visibleAxisDepth = axis === 'row' ? visibleRowDepth : visibleColDepth;
-  const valuesIndex =
-    program.valueAxis === axis
-      ? Math.max(0, Math.min(program.metricInsertIndex, dimensions.length))
-      : dimensions.length;
-  const visiblePreValuesDepth = Math.min(
-    visibleAxisDepth,
-    valuesIndex,
-    projection.filterDimensionPath.length + 1,
-  );
-  if (visiblePreValuesDepth <= projection.filterDimensionPath.length) {
-    return undefined;
-  }
-  const postValuesDimensions = dimensions
-    .slice(valuesIndex)
-    .slice(0, projection.postValuesDimensionPath.length + 1);
-  const branchDimensions = [
-    ...dimensions.slice(0, visiblePreValuesDepth),
-    ...postValuesDimensions,
-  ];
-  const canonicalDepth = branchDimensions.length;
-  const skippedDepth = axis === 'row' ? visibleRowDepth : visibleColDepth;
-  const baseTarget = buildAxisExpansionCoverageTarget({
-    axis,
-    pathKey,
-    program,
-    rowDepth: visibleRowDepth,
-    columnDepth: visibleColDepth,
-  });
-  const baseDepth =
-    axis === 'row' ? baseTarget.need.rowDepth : baseTarget.need.columnDepth;
-  if (canonicalDepth <= skippedDepth || canonicalDepth <= baseDepth) {
-    return undefined;
-  }
-  const rowDepth = axis === 'row' ? canonicalDepth : visibleRowDepth;
-  const columnDepth = axis === 'col' ? canonicalDepth : visibleColDepth;
-  const valueKeys = buildFactValueKeys({
-    metricKeys: program.metricKeys,
-  });
-
-  return {
-    axis,
-    pathKey,
-    need: {
-      rowDepth,
-      columnDepth,
-      rowDimensions:
-        axis === 'row'
-          ? branchDimensions
-          : program.rowDimensions.slice(0, rowDepth),
-      columnDimensions:
-        axis === 'col'
-          ? branchDimensions
-          : program.columnDimensions.slice(0, columnDepth),
-      valueKeys: valueKeysForExpansionPath(path, valueKeys),
-      rowScope:
-        axis === 'row'
-          ? axisPathScopeFromPath(projection.filterDimensionPath)
-          : { kind: 'root' },
-      columnScope:
-        axis === 'col'
-          ? axisPathScopeFromPath(projection.filterDimensionPath)
-          : { kind: 'root' },
     },
   };
 };
@@ -343,47 +283,35 @@ export const planExpansionForAxis = ({
       program,
       ...coverage,
     });
-  const buildCanonicalSkippedTarget = (key: string) =>
-    buildCanonicalSkippedValuesCoverageTarget({
-      axis,
-      pathKey: key,
-      program,
-      ...coverage,
-    });
   const candidates = Array.from(expandedKeys)
     .filter(key => key !== rootKey || !hasNonRootExpanded)
     .map(key => {
       const path = nodes[key]?.path ?? parsePath(key);
       return { key, path };
     })
-    .filter(({ path }) => canRequestAxisExpansion({ program, axis, path }))
+    .filter(({ path }) => {
+      if (!canRequestAxisExpansion({ program, axis, path })) {
+        return false;
+      }
+      const projection = resolveAxisProjection({ program, axis, path });
+      if (projection.skippedPreValuesDimensions.length === 0) {
+        return true;
+      }
+      const ancestorKey =
+        projection.filterDimensionPath.length === 0
+          ? rootKey
+          : serializePath(projection.filterDimensionPath);
+      return expandedKeys.has(ancestorKey);
+    })
     .map(candidate => ({ ...candidate, target: buildTarget(candidate.key) }));
-  const candidateKeys = new Set(candidates.map(candidate => candidate.key));
-  const canonicalSkippedCandidates = candidates.flatMap(candidate => {
-    const projection = resolveAxisProjection({
-      program,
-      axis,
-      path: candidate.path,
-    });
-    const ancestorKey =
-      projection.filterDimensionPath.length === 0
-        ? rootKey
-        : serializePath(projection.filterDimensionPath);
-    if (!candidateKeys.has(ancestorKey)) {
-      return [];
-    }
-    const target = buildCanonicalSkippedTarget(candidate.key);
-    return target ? [{ ...candidate, target }] : [];
-  });
-  const allCandidates = [...candidates, ...canonicalSkippedCandidates];
   const missingTargetKeys = new Set(
     filterMissingExpansionCoverageTargets({
-      targets: allCandidates.map(({ target }) => target),
+      targets: candidates.map(({ target }) => target),
       factSelectors,
     }).map(needKey),
   );
 
-  allCandidates.forEach(({ target }) => {
+  candidates.forEach(({ target }) => {
     const keyForTarget = needKey(target);
     if (!missingTargetKeys.has(keyForTarget)) {
       return;
