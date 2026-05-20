@@ -345,8 +345,8 @@ Implementation rules for accelerated chunks:
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13257` insertions, `18216` deletions, net `-4959`.
-- Current production TypeScript/TSX total: about `28551` lines.
+- Production `src`: `13252` insertions, `18218` deletions, net `-4966`.
+- Current production TypeScript/TSX total: about `28544` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -358,17 +358,17 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `28551` | `-4959` | `< 28000` |
-| Strict core pipeline | `11337` | `11389` | `+52` | `8000` |
+| Full production `src` | `33510` | `28544` | `-4966` | `< 28000` |
+| Strict core pipeline | `11337` | `11382` | `+45` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4951` | `+268` | `3000-4000` |
-| Broad core pipeline | `16020` | `16340` | `+320` | `11000-13000` |
+| Broad core pipeline | `16020` | `16333` | `+313` | `11000-13000` |
 
 Current strict core breakdown:
 
 | Area | Lines |
 | --- | ---: |
 | `pivot/runtime/*` | `3769` |
-| `pivot/expansion/*` | `2474` |
+| `pivot/expansion/*` | `2467` |
 | `pivot/query/*` | `1512` |
 | `pivot/layout/*` | `770` |
 | `pivot/core/*` | `252` |
@@ -417,6 +417,10 @@ loader is now reserved for semantic layout fetches.
 Latest expansion warning cleanup: expansion warnings no longer maintain a
 parallel ref-backed warning map. The hook deduplicates warnings through the
 React state updater, leaving one warning state source.
+
+Latest expansion hydration cleanup: `hydrateAtomic` now takes the one remaining
+persist-on-complete flag directly. The old options object was deleted after the
+global loader flag was removed.
 
 Latest fact-boundary cleanup: `PivotFactStore` now rejects facts whose row or
 column path depth does not match the declared batch coverage. Test expansion

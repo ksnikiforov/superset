@@ -75,10 +75,6 @@ type ExpansionStateCommit = {
   expanded?: Partial<AxisSetMap>;
 };
 
-type HydrateExpansionOptions = {
-  persistOnComplete?: boolean;
-};
-
 const createEmptyExpansionState = (): PivotExpansionStateKeys => ({
   rows: [],
   cols: [],
@@ -395,8 +391,7 @@ export const useExpansionEngine = ({
   );
 
   const hydrateAtomic = useCallback(
-    async (options?: HydrateExpansionOptions) => {
-      const shouldPersist = options?.persistOnComplete ?? false;
+    async (persistOnComplete = false) => {
       const requestScope = expansionRequestLifecycle.beginScope();
       clearLoadingState();
 
@@ -424,7 +419,7 @@ export const useExpansionEngine = ({
             tree: result.tree,
             expanded: { row: resolvedRows, col: resolvedCols },
           });
-          if (shouldPersist) {
+          if (persistOnComplete) {
             persistExpansionState(resolvedRows, resolvedCols);
           }
         }
@@ -463,9 +458,7 @@ export const useExpansionEngine = ({
       if (toggleDecision.kind === 'expand') {
         explicitExpandedRef.current[axis] = toggleDecision.nextManualExpanded;
         explicitCollapsedRef.current[axis] = toggleDecision.nextManualCollapsed;
-        hydrateAtomic({
-          persistOnComplete: true,
-        }).catch(reportAsyncError);
+        hydrateAtomic(true).catch(reportAsyncError);
       }
     },
     [
