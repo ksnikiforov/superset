@@ -96,21 +96,21 @@ Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `26390` | `-7120` | `< 20000` |
-| Strict core pipeline | `12907` | `10488` | `-2419` | `< 8000` |
+| Full production `src` | `33510` | `26389` | `-7121` | `< 20000` |
+| Strict core pipeline | `12907` | `10487` | `-2420` | `< 8000` |
 
 Diagnostic scope only:
 
 | Scope | Baseline lines | Current lines | Delta |
 | --- | ---: | ---: | ---: |
-| Core pipeline dirs (`runtime/expansion/query/layout/core`) | `8698` | `7688` | `-1010` |
+| Core pipeline dirs (`runtime/expansion/query/layout/core`) | `8698` | `7687` | `-1011` |
 
 Core pipeline breakdown:
 
 | Area | Lines |
 | --- | ---: |
 | `pivot/runtime/*` | `3466` |
-| `pivot/expansion/*` | `1972` |
+| `pivot/expansion/*` | `1971` |
 | `pivot/query/*` | `1372` |
 | `pivot/layout/*` + `pivot/core/*` | `878` |
 | core domain helpers | `1549` |
@@ -236,6 +236,9 @@ Completed structural cuts:
 - Expansion hydration now builds direct, axis, and intersection coverage
   candidates first, then uses `diffCoverageManifest` as the loading authority;
   the old exported target-level coverage filter was removed.
+- Expansion hydration fetch planning now uses explicit expansion intent plus
+  configured coverage needs; materialized tree-derived expansion is only used
+  after materialization to commit visible UI state.
 
 Remaining duplicate authority:
 

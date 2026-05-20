@@ -404,13 +404,12 @@ export const useExpansionEngine = ({
         if (!requestScope.isCurrent()) {
           return;
         }
-        const desired = {
-          row: buildDesiredExpanded('row', treeRef.current),
-          col: buildDesiredExpanded('col', treeRef.current),
-        };
         const factStore = factStoreRef.current as PivotFactStore;
         const plan = planHydrationIteration({
-          desired,
+          desired: {
+            row: new Set([rootKey, ...expansionIntentRef.current.expanded.row]),
+            col: new Set([rootKey, ...expansionIntentRef.current.expanded.col]),
+          },
           axisCoverageNeeds,
           factSelectors: factStore.getCoverageSelectors(),
           program: pivotProgram,
