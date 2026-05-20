@@ -77,15 +77,13 @@ type BatchPlan = {
 };
 
 type CandidateWithPath = ExpansionCoverageTarget & {
-  parentPathKey: string;
   siblingValue: BatchGroup['siblingValues'][number];
 };
 
-type BatchGroupSeed = {
+type BatchSeed = {
   axis: BatchGroup['axis'];
   parentPathKey: string;
-  nonNullTargets: CandidateWithPath[];
-  nullTargets: CandidateWithPath[];
+  targets: CandidateWithPath[];
 };
 
 const isNullish = (value: unknown) => value === null || value === undefined;
@@ -104,18 +102,6 @@ const chunkTargets = (
   return chunks;
 };
 
-const buildBatchGroups = (
-  seed: BatchGroupSeed,
-  targets: CandidateWithPath[],
-  maxBatchSize: number,
-): BatchGroup[] =>
-  chunkTargets(targets, maxBatchSize).map(chunk => ({
-    axis: seed.axis,
-    parentPathKey: seed.parentPathKey,
-    siblingValues: chunk.map(target => target.siblingValue),
-    targets: chunk,
-  }));
-
 export const optimizeExpansionFetchPlan = ({
   targets,
   maxBatchSize = MAX_BATCH_SIBLINGS,
@@ -124,7 +110,7 @@ export const optimizeExpansionFetchPlan = ({
   maxBatchSize?: number;
 }): BatchPlan => {
   const singles: ExpansionCoverageTarget[] = [];
-  const groups = new Map<string, BatchGroupSeed>();
+  const groups = new Map<string, BatchSeed>();
 
   targets.forEach(target => {
     const path = parsePath(target.pathKey);
@@ -134,38 +120,38 @@ export const optimizeExpansionFetchPlan = ({
     }
     const parentPathKey = serializePath(path.slice(0, -1));
     const siblingValue = path[path.length - 1];
-    const { rowDepth, columnDepth } = target.need;
-    const groupKey = JSON.stringify([
+    const groupKey = stableStringify([
       target.axis,
-      rowDepth,
-      columnDepth,
       parentPathKey,
+      isNullish(siblingValue) ? 'null' : 'value',
+      target.need.rowDepth,
+      target.need.columnDepth,
+      target.need.rowDimensions,
+      target.need.columnDimensions,
+      target.need.valueKeys,
+      target.axis === 'row' ? target.need.columnScope : target.need.rowScope,
     ]);
     const seed = groups.get(groupKey) ?? {
       axis: target.axis,
       parentPathKey,
-      nonNullTargets: [],
-      nullTargets: [],
+      targets: [],
     };
-    const candidate = {
+    seed.targets.push({
       ...target,
-      parentPathKey,
       siblingValue,
-    };
-    if (isNullish(siblingValue)) {
-      seed.nullTargets.push(candidate);
-    } else {
-      seed.nonNullTargets.push(candidate);
-    }
+    });
     groups.set(groupKey, seed);
   });
 
   const batches: BatchGroup[] = [];
   groups.forEach(seed => {
-    [
-      ...buildBatchGroups(seed, seed.nonNullTargets, maxBatchSize),
-      ...buildBatchGroups(seed, seed.nullTargets, maxBatchSize),
-    ].forEach(group => {
+    chunkTargets(seed.targets, maxBatchSize).forEach(chunk => {
+      const group = {
+        axis: seed.axis,
+        parentPathKey: seed.parentPathKey,
+        siblingValues: chunk.map(target => target.siblingValue),
+        targets: chunk,
+      };
       if (group.targets.length <= 1) {
         singles.push(...group.targets);
         return;

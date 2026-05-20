@@ -97,4 +97,30 @@ describe('fetchPlanOptimizer', () => {
     expect(plan.batches).toHaveLength(0);
     expect(plan.singles).toHaveLength(2);
   });
+
+  it('separates sibling targets with different value keys', () => {
+    const caTarget = makeTarget(['US', 'CA']);
+    const nyTarget = makeTarget(['US', 'NY']);
+    const plan = optimizeExpansionFetchPlan({
+      targets: [
+        {
+          ...caTarget,
+          need: {
+            ...caTarget.need,
+            valueKeys: ['sales'],
+          },
+        },
+        {
+          ...nyTarget,
+          need: {
+            ...nyTarget.need,
+            valueKeys: ['profit'],
+          },
+        },
+      ],
+    });
+
+    expect(plan.batches).toHaveLength(0);
+    expect(plan.singles).toHaveLength(2);
+  });
 });
