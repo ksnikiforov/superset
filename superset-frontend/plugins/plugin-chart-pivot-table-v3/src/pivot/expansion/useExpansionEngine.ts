@@ -256,10 +256,6 @@ export const useExpansionEngine = ({
   useSyncRef(expandedRef, expandedByAxis);
   useSyncRef(fetchFormDataRef, fetchFormData);
 
-  const clearLoadingState = useCallback(() => {
-    setLoadingKeys(new Set());
-  }, []);
-
   const commitExpansionState = useCallback(
     ({ tree: nextTree, expanded: nextExpanded }: ExpansionStateCommit) => {
       if (nextTree) {
@@ -290,10 +286,10 @@ export const useExpansionEngine = ({
     (error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);
       expansionRequestLifecycle.invalidate();
-      clearLoadingState();
+      setLoadingKeys(new Set());
       setErrorMessage(message);
     },
-    [clearLoadingState, expansionRequestLifecycle],
+    [expansionRequestLifecycle],
   );
 
   const addWarnings = useCallback((nextWarnings?: ChartDataWarning[]) => {
@@ -432,7 +428,7 @@ export const useExpansionEngine = ({
   const hydrateAtomic = useCallback(
     async (persistOnComplete = false) => {
       const requestScope = expansionRequestLifecycle.beginScope();
-      clearLoadingState();
+      setLoadingKeys(new Set());
 
       try {
         const result = await runHydrationExpansionFetchLoop({
@@ -457,13 +453,12 @@ export const useExpansionEngine = ({
           }
         }
       } finally {
-        clearLoadingState();
+        setLoadingKeys(new Set());
       }
     },
     [
       buildDesiredExpanded,
       buildFetchRuntime,
-      clearLoadingState,
       commitExpansionState,
       expansionRequestLifecycle,
       persistExpansionState,
@@ -483,7 +478,7 @@ export const useExpansionEngine = ({
       });
       if (toggleDecision.kind === 'collapse') {
         expansionRequestLifecycle.invalidate();
-        clearLoadingState();
+        setLoadingKeys(new Set());
         collapseNode(axis, node);
         return;
       }
@@ -496,13 +491,7 @@ export const useExpansionEngine = ({
         hydrateAtomic(true).catch(reportAsyncError);
       }
     },
-    [
-      collapseNode,
-      expansionRequestLifecycle,
-      hydrateAtomic,
-      reportAsyncError,
-      clearLoadingState,
-    ],
+    [collapseNode, expansionRequestLifecycle, hydrateAtomic, reportAsyncError],
   );
 
   useEffect(() => {
@@ -548,7 +537,7 @@ export const useExpansionEngine = ({
     factStoreRef.current = createPivotFactStoreFromBatches(factBatches);
     setWarnings([]);
     setErrorMessage(undefined);
-    clearLoadingState();
+    setLoadingKeys(new Set());
     const reinitializedExpansion = resolveReinitializedExpansionState({
       tree: normalizedTree,
       sessionState: sessionExpansionState,
@@ -593,7 +582,6 @@ export const useExpansionEngine = ({
       hydrateAtomic().catch(reportAsyncError);
     }
   }, [
-    clearLoadingState,
     commitExpansionState,
     data,
     expansionSemanticSignature,
