@@ -345,8 +345,8 @@ Implementation rules for accelerated chunks:
 
 Baseline: `7088db374448845ef6e71cf74817aa53efbc5fc1`.
 
-- Production `src`: `13128` insertions, `18260` deletions, net `-5132`.
-- Current production TypeScript/TSX total: about `28378` lines.
+- Production `src`: `13046` insertions, `18257` deletions, net `-5211`.
+- Current production TypeScript/TSX total: about `28299` lines.
 - Implied baseline production TypeScript/TSX total: about `33510` lines.
 
 Engine-size accounting must be updated with every plan update that changes
@@ -358,10 +358,10 @@ formatting, databars, and interaction logic.
 
 | Scope | Baseline lines | Current lines | Delta | Target |
 | --- | ---: | ---: | ---: | ---: |
-| Full production `src` | `33510` | `28378` | `-5132` | `< 28000` |
-| Strict core pipeline | `11337` | `11284` | `-53` | `8000` |
+| Full production `src` | `33510` | `28299` | `-5211` | `< 28000` |
+| Strict core pipeline | `11337` | `11205` | `-132` | `8000` |
 | Non-visual chart runtime hooks | `4683` | `4883` | `+200` | `3000-4000` |
-| Broad core pipeline | `16020` | `16167` | `+147` | `11000-13000` |
+| Broad core pipeline | `16020` | `16088` | `+68` | `11000-13000` |
 
 Current strict core breakdown:
 
@@ -938,6 +938,12 @@ gone. Hydration now submits the compiled intersection coverage target directly,
 and fetch execution classifies intersection work from the manifest scope shape.
 Branch, batch, and intersection transport still differ at execution time, but
 loaded coverage identity is now the same coverage target object throughout.
+
+Latest query-support cleanup: support metric inclusion is now owned by
+`buildQueryShape`. Initial and expansion query planners no longer precompute
+parallel "needs formatting/databars/sort support" flags before entering query
+shape construction. Query depth, visible value cells, totals, and the support
+maps themselves determine the extra metrics in one place.
 
 Latest expansion signature cleanup: expansion reinitialization now consumes one
 semantic signature plus the row/column layout transition already owned by

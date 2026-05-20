@@ -138,12 +138,6 @@ const buildQueryShape = ({
   columnDepth,
   hasValueCells,
   needsTotals,
-  needsMetricFormatting,
-  needsDatabars,
-  needsRowOrdering,
-  needsColOrdering,
-  needsRowDimensionFormatting,
-  needsColDimensionFormatting,
   rowGroupby,
   colGroupby,
   metrics,
@@ -161,12 +155,6 @@ const buildQueryShape = ({
   columnDepth: number;
   hasValueCells: boolean;
   needsTotals: boolean;
-  needsMetricFormatting: boolean;
-  needsDatabars: boolean;
-  needsRowOrdering: boolean;
-  needsColOrdering: boolean;
-  needsRowDimensionFormatting: boolean;
-  needsColDimensionFormatting: boolean;
   rowGroupby: QueryFormColumn[];
   colGroupby: QueryFormColumn[];
   metrics: QueryFormMetric[];
@@ -198,10 +186,9 @@ const buildQueryShape = ({
 
   const extraMetrics: QueryFormMetric[] = [];
   if (
-    needsMetricFormatting &&
-    (metricFormattingScope === 'values'
+    metricFormattingScope === 'values'
       ? hasValueCells
-      : hasValueCells || needsTotals)
+      : hasValueCells || needsTotals
   ) {
     extraMetrics.push(
       ...collectMetricFormattingMetricsForQuery(
@@ -210,7 +197,7 @@ const buildQueryShape = ({
       ),
     );
   }
-  if (needsDatabars && hasValueCells) {
+  if (hasValueCells) {
     extraMetrics.push(
       ...collectMetricDatabarMetricsForQuery(
         filterMetricKeyedMap(metricDatabars),
@@ -218,42 +205,28 @@ const buildQueryShape = ({
       ),
     );
   }
-  if (needsRowDimensionFormatting) {
-    extraMetrics.push(
-      ...collectDimensionFormattingMetricsForQuery(
-        rowFormatting,
-        rowGroupbyForQuery,
-        availableMetrics,
-      ),
-    );
-  }
-  if (needsColDimensionFormatting) {
-    extraMetrics.push(
-      ...collectDimensionFormattingMetricsForQuery(
-        colFormatting,
-        colGroupbyForQuery,
-        availableMetrics,
-      ),
-    );
-  }
-  if (needsRowOrdering) {
-    extraMetrics.push(
-      ...collectDimensionSortingMetricsForQuery(
-        rowSorting,
-        rowGroupbyForQuery,
-        availableMetrics,
-      ),
-    );
-  }
-  if (needsColOrdering) {
-    extraMetrics.push(
-      ...collectDimensionSortingMetricsForQuery(
-        colSorting,
-        colGroupbyForQuery,
-        availableMetrics,
-      ),
-    );
-  }
+  extraMetrics.push(
+    ...collectDimensionFormattingMetricsForQuery(
+      rowFormatting,
+      rowGroupbyForQuery,
+      availableMetrics,
+    ),
+    ...collectDimensionFormattingMetricsForQuery(
+      colFormatting,
+      colGroupbyForQuery,
+      availableMetrics,
+    ),
+    ...collectDimensionSortingMetricsForQuery(
+      rowSorting,
+      rowGroupbyForQuery,
+      availableMetrics,
+    ),
+    ...collectDimensionSortingMetricsForQuery(
+      colSorting,
+      colGroupbyForQuery,
+      availableMetrics,
+    ),
+  );
   extraMetrics.push(
     ...collectMeasureLeafMetricsForQuery(
       measureHierarchy,
@@ -540,9 +513,6 @@ const resolveFetchContext = ({
     axis === 'col' ? coverageTarget.need.columnDimensions : colGroupby;
   const { rowDepth, columnDepth: colDepth } = coverageTarget.need;
 
-  const needsMetricFormatting =
-    Object.keys(formData.metricFormatting || {}).length > 0;
-  const needsDatabars = Object.keys(formData.metricDatabars || {}).length > 0;
   const hasRowFormatting =
     collectDimensionFormattingMetricsForQuery(
       formData.rowFormatting,
@@ -552,18 +522,6 @@ const resolveFetchContext = ({
   const hasColFormatting =
     collectDimensionFormattingMetricsForQuery(
       formData.colFormatting,
-      colGroupby,
-      metrics,
-    ).length > 0;
-  const needsRowOrdering =
-    collectDimensionSortingMetricsForQuery(
-      formData.rowSorting,
-      rowGroupby,
-      metrics,
-    ).length > 0;
-  const needsColOrdering =
-    collectDimensionSortingMetricsForQuery(
-      formData.colSorting,
       colGroupby,
       metrics,
     ).length > 0;
@@ -589,12 +547,6 @@ const resolveFetchContext = ({
     columnDepth: colDepth,
     hasValueCells: true,
     needsTotals,
-    needsMetricFormatting,
-    needsDatabars,
-    needsRowOrdering,
-    needsColOrdering,
-    needsRowDimensionFormatting: hasRowFormatting,
-    needsColDimensionFormatting: hasColFormatting,
     rowGroupby: rowGroupbyForBranch,
     colGroupby: colGroupbyForBranch,
     metrics: materializedMetrics,
@@ -981,15 +933,6 @@ export const buildInitialQuerySpecs = (
     layout.colTotals ||
     rowSubtotalLevels.length > 0 ||
     colSubtotalLevels.length > 0;
-  const needsMetricFormatting =
-    Object.keys(formData.metricFormatting || {}).length > 0;
-  const needsDatabars = Object.keys(formData.metricDatabars || {}).length > 0;
-  const needsRowOrdering = Object.keys(formData.rowSorting || {}).length > 0;
-  const needsColOrdering = Object.keys(formData.colSorting || {}).length > 0;
-  const needsRowDimensionFormatting =
-    Object.keys(formData.rowFormatting || {}).length > 0;
-  const needsColDimensionFormatting =
-    Object.keys(formData.colFormatting || {}).length > 0;
   const firstRowDepth = rowGroupby.length > 0 ? 1 : 0;
   const firstColDepth = colGroupby.length > 0 ? 1 : 0;
   const specs: PlannedQuerySpec[] = [];
@@ -999,19 +942,11 @@ export const buildInitialQuerySpecs = (
     columnDepth,
     hasValueCells,
     includeTotals,
-    includeRowOrdering = false,
-    includeColOrdering = false,
-    includeRowFormatting = false,
-    includeColFormatting = false,
   }: {
     rowDepth: number;
     columnDepth: number;
     hasValueCells: boolean;
     includeTotals: boolean;
-    includeRowOrdering?: boolean;
-    includeColOrdering?: boolean;
-    includeRowFormatting?: boolean;
-    includeColFormatting?: boolean;
   }) => {
     const coverage = buildFactCoverage({
       rowDimensions: layout.pivotProgram.rowDimensions,
@@ -1024,12 +959,6 @@ export const buildInitialQuerySpecs = (
       columnDepth,
       hasValueCells,
       needsTotals: includeTotals,
-      needsMetricFormatting,
-      needsDatabars,
-      needsRowOrdering: includeRowOrdering,
-      needsColOrdering: includeColOrdering,
-      needsRowDimensionFormatting: includeRowFormatting,
-      needsColDimensionFormatting: includeColFormatting,
       rowGroupby,
       colGroupby,
       metrics,
@@ -1075,10 +1004,6 @@ export const buildInitialQuerySpecs = (
       columnDepth: firstColDepth,
       hasValueCells: true,
       includeTotals: false,
-      includeRowOrdering: needsRowOrdering,
-      includeColOrdering: needsColOrdering,
-      includeRowFormatting: needsRowDimensionFormatting,
-      includeColFormatting: needsColDimensionFormatting,
     });
   }
   if (rowGroupby.length > 0) {
@@ -1087,8 +1012,6 @@ export const buildInitialQuerySpecs = (
       columnDepth: 0,
       hasValueCells: true,
       includeTotals: needsTotals,
-      includeRowOrdering: needsRowOrdering,
-      includeRowFormatting: needsRowDimensionFormatting,
     });
   }
   if (colGroupby.length > 0) {
@@ -1097,8 +1020,6 @@ export const buildInitialQuerySpecs = (
       columnDepth: firstColDepth,
       hasValueCells: true,
       includeTotals: needsTotals,
-      includeColOrdering: needsColOrdering,
-      includeColFormatting: needsColDimensionFormatting,
     });
   }
   return specs;
